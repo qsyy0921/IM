@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/qsyy0921/IM/services/action-executor/internal/types"
 )
@@ -18,11 +19,35 @@ func NewRepository(pool *pgxpool.Pool) Repository {
 	return Repository{pool: pool}
 }
 
-func (repository Repository) InsertExecutionAudit(ctx context.Context, audit types.ExecutionAudit) error {
+func (repository Repository) RecordExecution(
+	ctx context.Context,
+	audit types.ExecutionAudit,
+	projection types.ToolResultProjection,
+) error {
 	if repository.pool == nil {
 		return errors.Join(types.ErrExecutionAuditFailed, errors.New("nil pg pool"))
 	}
-	_, err := repository.pool.Exec(ctx, `
+	tx, err := repository.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("%w: %v", types.ErrExecutionAuditFailed, err)
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+	if err := insertExecutionAudit(ctx, tx, audit); err != nil {
+		return err
+	}
+	if err := insertToolResultProjection(ctx, tx, projection); err != nil {
+		return err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("%w: %v", types.ErrExecutionAuditFailed, err)
+	}
+	return nil
+}
+
+func insertExecutionAudit(ctx context.Context, tx pgx.Tx, audit types.ExecutionAudit) error {
+	_, err := tx.Exec(ctx, `
 INSERT INTO action_executor_execution_audits (
     tenant_id,
     execution_id,
@@ -86,6 +111,50 @@ INSERT INTO action_executor_execution_audits (
 		audit.Status,
 		audit.Executed,
 		audit.OutputSHA256,
+	)
+	if err != nil {
+		return fmt.Errorf("%w: %v", types.ErrExecutionAuditFailed, err)
+	}
+	return nil
+}
+
+func insertToolResultProjection(ctx context.Context, tx pgx.Tx, projection types.ToolResultProjection) error {
+	_, err := tx.Exec(ctx, `
+INSERT INTO action_executor_tool_results (
+    tenant_id,
+    result_id,
+    execution_id,
+    proposal_id,
+    approval_id,
+    prepared_audit_id,
+    user_id,
+    skill_id,
+    tool_name,
+    resource_type,
+    resource_id,
+    status,
+    executed,
+    result_ref,
+    output_sha256
+) VALUES (
+    $1, $2, $3, $4, $5, $6, $7,
+    $8, $9, $10, $11, $12, $13, $14, $15
+)`,
+		string(projection.TenantID),
+		projection.ResultID,
+		projection.ExecutionID,
+		projection.ProposalID,
+		projection.ApprovalID,
+		projection.PreparedAuditID,
+		string(projection.UserID),
+		projection.SkillID,
+		projection.ToolName,
+		projection.ResourceType,
+		projection.ResourceID,
+		projection.Status,
+		projection.Executed,
+		projection.ResultRef,
+		projection.OutputSHA256,
 	)
 	if err != nil {
 		return fmt.Errorf("%w: %v", types.ErrExecutionAuditFailed, err)

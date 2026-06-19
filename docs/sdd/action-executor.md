@@ -4,7 +4,7 @@
 
 `action-executor` 是 NexusIM AI 应用底座中的受控动作执行边界。它承接 Agent proposal、approval 和 `mcp-gateway` prepare 之后的动作执行请求，把真实写动作纳入 policy precheck、审批关联和低敏 audit。
 
-第一版只记录 approved execution boundary，不连接外部 MCP server，不执行真实业务写动作。
+当前第一阶段记录 approved execution boundary，并在同一事务内写低敏 tool result projection。不连接外部 MCP server，不执行真实业务写动作。
 
 ## 职责
 
@@ -28,6 +28,13 @@
   - policy decision metadata
   - `input_sha256`
   - 不保存完整 `input_json`
+- 写入低敏 tool result projection：
+  - `result_id`
+  - `execution_id`
+  - `proposal_id` / `approval_id` / `prepared_audit_id`
+  - `status`
+  - `result_ref`
+  - `output_sha256`，当前未执行外部工具时为空
 
 ## 非职责
 
@@ -70,6 +77,7 @@ agent-service proposal
 - 第一版只返回 `RECORDED` / `BLOCKED`，且 `executed=false`。
 - `input_json` 只校验 JSON 和大小，audit 只保存 hash。
 - policy deny 必须 fail closed 并落低敏 audit。
+- tool result projection 不是 provider 输出存储；当前只记录 `NOT_EXECUTED` / `BLOCKED` 等低敏状态引用。
 - 后续接入真实 executor adapter 前，不能宣称外部工具执行链路完成。
 
 ## Migration
@@ -83,10 +91,17 @@ agent-service proposal
   - `tenant_id + approval_id + created_at`
 - 状态：`RECORDED` / `BLOCKED` / `FAILED`
 
+`migrations/postgres/action-executor/000002_action_executor_tool_results.sql` 新增 `action_executor_tool_results`：
+
+- 主键：`tenant_id + result_id`
+- 唯一索引：`tenant_id + execution_id`
+- 外键：`tenant_id + execution_id -> action_executor_execution_audits`
+- 状态：`NOT_EXECUTED` / `BLOCKED` / `SUCCEEDED` / `FAILED`
+- 当前 first path 只生成 `NOT_EXECUTED` 或 `BLOCKED` 低敏投影，不保存 raw output
+
 ## 后续
 
 - 接入真实 MCP adapter / tool provider。
-- 低风险动作 result projection。
 - per tenant / per tool rate limit。
 - provider failure fallback / retry / DLQ。
 - 外部 audit sink。

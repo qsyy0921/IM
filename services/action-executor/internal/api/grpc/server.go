@@ -109,6 +109,9 @@ func resultToProto(result types.ExecuteApprovedActionResult) *actionexecutorv1.E
 		DecisionSource:    result.DecisionSource,
 		Executed:          result.Executed,
 		OutputJson:        result.OutputJSON,
+		ResultId:          result.ResultID,
+		ResultStatus:      result.ResultStatus,
+		ResultRef:         result.ResultRef,
 	}
 }
 

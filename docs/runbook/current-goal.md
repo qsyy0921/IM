@@ -17,7 +17,7 @@
 2. 读取 prompt.md 和 agent.md。
 3. 读取 docs/runbook/current-goal.md 的当前 active slice；再按需读取 current-brief、remaining-goals、相关 service brief 或 SDD；不要全文扫长历史文档。
 
-当前 active slice：skill-registry first catalog path、mcp-gateway first prepare path、action-executor first execution audit path 和新的 `retrieval-gateway -> agent-service -> mcp-gateway` adapter smoke 已落；agent-service proposal 前已改为调用 `mcp-gateway.PrepareToolCall`，返回 `skill_id` / `prepared_audit_id`，并已落第一版 proposal store / approval workflow / `VerifyApprovedAgentProposal`；action-executor 已通过 Agent 公开 RPC 校验 approved proposal / approval / prepare audit / skill / tool / resource，仍只记录 execution boundary，`executed=false`，不连接外部 MCP/tool provider；Agent execution eval adapter 已覆盖 proposal -> approve -> action-executor execution audit 的低敏断言。下一步默认推进 real tool adapter、tool result projection、approval operator / audit outbox；如果该串接已完成，则按本页优先级继续下一项 AI 主线。
+当前 active slice：skill-registry first catalog path、mcp-gateway first prepare path、action-executor first execution audit path 和新的 `retrieval-gateway -> agent-service -> mcp-gateway` adapter smoke 已落；agent-service proposal 前已改为调用 `mcp-gateway.PrepareToolCall`，返回 `skill_id` / `prepared_audit_id`，并已落第一版 proposal store / approval workflow / `VerifyApprovedAgentProposal`；action-executor 已通过 Agent 公开 RPC 校验 approved proposal / approval / prepare audit / skill / tool / resource，仍只记录 execution boundary，`executed=false`，不连接外部 MCP/tool provider；Agent execution eval adapter 已覆盖 proposal -> approve -> action-executor execution audit / result projection 的低敏断言；low-sensitive tool result projection 已与 execution audit 同事务落库。下一步默认推进 real tool adapter、approval operator / audit outbox、真实 tool output safety cases；如果该串接已完成，则按本页优先级继续下一项 AI 主线。
 
 硬边界：RAG / summary / Agent 只能消费 EvidencePack，不直接读 message / conversation / private tables；真实写动作必须继续走 policy、proposal / approval / executor / audit。
 
@@ -53,7 +53,8 @@ search-service v0.1（第一步，已完成第一轮 smoke）
 -> agent-service -> mcp-gateway prepare adapter smoke（已通过）
 -> proposal store / approval / action-executor handoff（已落 first path）
 -> Agent execution eval adapter（已落 first path）
--> real tool adapter / tool result projection / approval operator follow-up
+-> low-sensitive tool result projection（已落 first path）
+-> real tool adapter / approval operator / true tool output safety follow-up
 -> 不做孤立 LLM demo
 ```
 
@@ -72,9 +73,9 @@ search-service v0.1（第一步，已完成第一轮 smoke）
 3. `memory-service`：SDD / proto / migration、六层 skeleton、repository first pass、projection usecase、runtime wiring、PG integration、timeline worker 单测和 clean projection smoke 已落。group memory / StructuredMemoryEvent / Memory Graph / profile aggregate 必须带 source refs、speaker / audience scope、valid_from / valid_to、supersedes、confidence 和 review state，不能把群聊事实直接升级成个人长期偏好。
 4. `retrieval-gateway`：第一版真实 smoke 已通过，统一 EvidencePack、权限过滤、引用来源和 temporal version；第一版只通过 search / memory 公开 gRPC 契约聚合，不直接读业务库；policy-service retrieval precheck 已有 first-stage 可选接入；EvidencePack 字段 hardening first pass 已补 source coverage、rerank score、dedupe reason。
 5. `rag-service`：first-stage 只读 answer path、`loadtest/rag`、RAG eval execution adapter、真实 RAG adapter smoke、provider boundary 和 citation verifier first pass 已落；只消费 EvidencePack，返回 citations 和 `generated_by_llm=false`，无 evidence 必须拒答。
-6. AI eval harness：first-stage 低敏 case schema / validator 已落；RAG adapter 已落；Agent execution adapter 已落 first path，覆盖 approved proposal / execution audit / no external execution 边界；后续补真实 tool result 和更多 Agent safety case。
+6. AI eval harness：first-stage 低敏 case schema / validator 已落；RAG adapter 已落；Agent execution adapter 已落 first path，覆盖 approved proposal / execution audit / result projection / no external execution 边界；后续补真实 tool output 和更多 Agent safety case。
 7. `summary-service`：first-stage 只读 summary path 和真实 adapter smoke 已落；只消费受控 EvidencePack，返回 citations 和 `generated_by_llm=false`，无 evidence 必须拒绝摘要。
-8. Agent / `skill-registry` / `mcp-gateway` / `action-executor`：只消费受控 EvidencePack 和 tool policy，不直接读业务库；`agent-service` first proposal-only path、旧真实 adapter smoke、新的 Agent -> mcp-gateway adapter smoke、proposal store、approval workflow 和 `VerifyApprovedAgentProposal` first path 已落；`skill-registry` first catalog path 已落；`mcp-gateway` first prepare path 已落；`action-executor` first execution audit path 已落，并已通过 Agent 公开 RPC 校验 approved proposal / approval / prepare audit / skill / tool / resource；Agent execution eval adapter 已落 first path；后续推进 real tool adapter、tool result projection 和 approval operator / audit outbox。
+8. Agent / `skill-registry` / `mcp-gateway` / `action-executor`：只消费受控 EvidencePack 和 tool policy，不直接读业务库；`agent-service` first proposal-only path、旧真实 adapter smoke、新的 Agent -> mcp-gateway adapter smoke、proposal store、approval workflow 和 `VerifyApprovedAgentProposal` first path 已落；`skill-registry` first catalog path 已落；`mcp-gateway` first prepare path 已落；`action-executor` first execution audit path 已落，并已通过 Agent 公开 RPC 校验 approved proposal / approval / prepare audit / skill / tool / resource；Agent execution eval adapter 和 low-sensitive tool result projection 已落 first path；后续推进 real tool adapter、approval operator / audit outbox 和真实 tool output safety cases。
 9. 生产级观测、HA、长压和 sizing：继续作为 hardening backlog 推进，但不阻塞当前 AI 底座路线启动。
 
 新发现的待完成工作必须写入 `docs/runbook/remaining-goals.md`；已完成的工作从该文档移除，并同步到对应 service brief / progress 文档。

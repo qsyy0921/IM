@@ -30,12 +30,22 @@ func TestExecuteApprovedActionRecordsAllowedExecutionWithoutRunningExternalTool(
 	if result.Status != types.ExecutionStatusRecorded || !result.Allowed || result.Executed {
 		t.Fatalf("unexpected result: %+v", result)
 	}
+	if result.ResultID == "" || result.ResultStatus != types.ResultStatusNotExecuted || result.ResultRef == "" {
+		t.Fatalf("expected not-executed result projection fields, got %+v", result)
+	}
 	if len(audit.rows) != 1 {
 		t.Fatalf("expected one audit row, got %d", len(audit.rows))
+	}
+	if len(audit.results) != 1 {
+		t.Fatalf("expected one result projection, got %d", len(audit.results))
 	}
 	row := audit.rows[0]
 	if row.InputSHA256 == "" || row.Executed || row.Status != types.ExecutionStatusRecorded {
 		t.Fatalf("unexpected audit row: %+v", row)
+	}
+	projection := audit.results[0]
+	if projection.ExecutionID != result.ExecutionID || projection.ResultID != result.ResultID || projection.Status != types.ResultStatusNotExecuted {
+		t.Fatalf("unexpected result projection: %+v", projection)
 	}
 }
 
@@ -74,8 +84,14 @@ func TestExecuteApprovedActionRecordsPolicyDeny(t *testing.T) {
 	if result.Status != types.ExecutionStatusBlocked || result.Allowed {
 		t.Fatalf("unexpected result: %+v", result)
 	}
+	if result.ResultStatus != types.ResultStatusBlocked {
+		t.Fatalf("expected blocked result projection status, got %+v", result)
+	}
 	if len(audit.rows) != 1 || audit.rows[0].Status != types.ExecutionStatusBlocked {
 		t.Fatalf("expected blocked audit row, got %+v", audit.rows)
+	}
+	if len(audit.results) != 1 || audit.results[0].Status != types.ResultStatusBlocked {
+		t.Fatalf("expected blocked result projection, got %+v", audit.results)
 	}
 }
 
@@ -186,14 +202,20 @@ func (approval fakeApproval) VerifyApprovedProposal(
 }
 
 type fakeAuditRepository struct {
-	rows []types.ExecutionAudit
-	err  error
+	rows    []types.ExecutionAudit
+	results []types.ToolResultProjection
+	err     error
 }
 
-func (repository *fakeAuditRepository) InsertExecutionAudit(_ context.Context, audit types.ExecutionAudit) error {
+func (repository *fakeAuditRepository) RecordExecution(
+	_ context.Context,
+	audit types.ExecutionAudit,
+	projection types.ToolResultProjection,
+) error {
 	if repository.err != nil {
 		return repository.err
 	}
 	repository.rows = append(repository.rows, audit)
+	repository.results = append(repository.results, projection)
 	return nil
 }

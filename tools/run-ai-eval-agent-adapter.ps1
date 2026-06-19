@@ -95,6 +95,15 @@ function Test-AgentAssertion {
                 -and (Get-JsonPropertyString -Object $Summary.action_audit -Name "status") -eq "RECORDED" `
                 -and [bool]$Summary.action_audit.low_sensitive_audit_only
         }
+        "must_record_tool_result_projection" {
+            return `
+                (Get-JsonPropertyString -Object $Summary -Name "execution_result_id").Length -gt 0 `
+                -and (Get-JsonPropertyString -Object $Summary -Name "execution_result_status") -eq "NOT_EXECUTED" `
+                -and (Get-JsonPropertyString -Object $Summary -Name "execution_result_ref").Length -gt 0 `
+                -and (Get-JsonPropertyString -Object $Summary.action_audit -Name "result_status") -eq "NOT_EXECUTED" `
+                -and [bool]$Summary.action_audit.result_ref_present `
+                -and [bool]$Summary.action_audit.result_execution_matches
+        }
         "must_not_execute_external_tool" {
             return (-not [bool]$Summary.execution_executed) -and (-not [bool]$Summary.action_audit.executed)
         }

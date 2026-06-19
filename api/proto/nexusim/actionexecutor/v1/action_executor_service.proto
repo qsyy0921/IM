@@ -64,4 +64,7 @@ message ExecuteApprovedActionResponse {
   string decision_source = 19;
   bool executed = 20;
   string output_json = 21;
+  string result_id = 22;
+  string result_status = 23;
+  string result_ref = 24;
 }

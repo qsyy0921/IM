@@ -68,6 +68,6 @@ This adapter runs `loadtest/agent`, which seeds low-sensitive search / memory /
 skill / policy rows, calls real `agent-service CreateAgentProposal` and
 `ApproveAgentProposal`, calls real `action-executor ExecuteApprovedAction`, and
 validates active Agent / action-executor cases against the returned proposal,
-approval, execution response and low-sensitive audit rows. It proves the
-proposal / approval / executor / audit boundary only; it still does not execute
-external MCP tools.
+approval, execution response, low-sensitive audit rows and low-sensitive tool
+result projection. It proves the proposal / approval / executor / audit /
+result-projection boundary only; it still does not execute external MCP tools.

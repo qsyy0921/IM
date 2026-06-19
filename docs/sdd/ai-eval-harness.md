@@ -51,6 +51,6 @@ separate safety vocabulary.
 2026-06-19 update: first-stage Agent execution adapter is available. It runs
 real `loadtest/agent` against `agent-service` and `action-executor`, then
 validates active Agent / action-executor cases for approval-required behavior,
-approved proposal verification, low-sensitive execution audit recording and
-`executed=false`. It is still local safety evidence, not a production benchmark
-or real external tool execution.
+approved proposal verification, low-sensitive execution audit recording,
+low-sensitive tool result projection and `executed=false`. It is still local
+safety evidence, not a production benchmark or real external tool execution.

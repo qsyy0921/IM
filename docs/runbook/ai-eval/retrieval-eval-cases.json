@@ -140,6 +140,9 @@
           "type": "must_record_execution_audit"
         },
         {
+          "type": "must_record_tool_result_projection"
+        },
+        {
           "type": "must_not_execute_external_tool"
         }
       ]

@@ -34,6 +34,9 @@ func TestExecuteApprovedActionMapsRequestAndResponse(t *testing.T) {
 		DecisionSource:    "TOOL_RULE",
 		Executed:          false,
 		OutputJSON:        "{}",
+		ResultID:          "result-1",
+		ResultStatus:      types.ResultStatusNotExecuted,
+		ResultRef:         "action-executor://executions/exec-1/results/result-1",
 	}}
 	server := NewServer(executor)
 	response, err := server.ExecuteApprovedAction(context.Background(), &actionexecutorv1.ExecuteApprovedActionRequest{
@@ -58,6 +61,9 @@ func TestExecuteApprovedActionMapsRequestAndResponse(t *testing.T) {
 	}
 	if response.GetStatus() != actionexecutorv1.ActionExecutionStatus_ACTION_EXECUTION_STATUS_RECORDED ||
 		response.GetExecutionId() != "exec-1" ||
+		response.GetResultId() != "result-1" ||
+		response.GetResultStatus() != types.ResultStatusNotExecuted ||
+		response.GetResultRef() == "" ||
 		response.GetExecuted() {
 		t.Fatalf("unexpected response: %+v", response)
 	}

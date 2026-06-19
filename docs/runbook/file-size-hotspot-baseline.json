@@ -1,5 +1,5 @@
 ﻿{
-    "created_at":  "2026-06-19T05:46:57.6211986Z",
+    "created_at":  "2026-06-19T06:08:45.8132159Z",
     "scope":  "handwritten Go/Markdown/PowerShell/Bash file-size budget snapshot; not a code-quality score",
     "file_count":  1452,
     "thresholds":  {
@@ -92,6 +92,15 @@
                           "MaxRatio":  0.424
                       },
                       {
+                          "Path":  "loadtest\\agent\\main.go",
+                          "Lines":  1253,
+                          "Kind":  "test/runner",
+                          "Warn":  2500,
+                          "Max":  3000,
+                          "WarnRatio":  0.5012,
+                          "MaxRatio":  0.4177
+                      },
+                      {
                           "Path":  "loadtest\\contacts\\main.go",
                           "Lines":  1246,
                           "Kind":  "test/runner",
@@ -99,15 +108,6 @@
                           "Max":  3000,
                           "WarnRatio":  0.4984,
                           "MaxRatio":  0.4153
-                      },
-                      {
-                          "Path":  "docs\\runbook\\loadtest\\message-service\\loadtest-report-20260609.md",
-                          "Lines":  622,
-                          "Kind":  "docs",
-                          "Warn":  1200,
-                          "Max":  1500,
-                          "WarnRatio":  0.5183,
-                          "MaxRatio":  0.4147
                       }
                   ],
     "hotspots":  [

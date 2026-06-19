@@ -321,6 +321,9 @@ type ExecuteApprovedActionResponse struct {
 	DecisionSource    string                 `protobuf:"bytes,19,opt,name=decision_source,json=decisionSource,proto3" json:"decision_source,omitempty"`
 	Executed          bool                   `protobuf:"varint,20,opt,name=executed,proto3" json:"executed,omitempty"`
 	OutputJson        string                 `protobuf:"bytes,21,opt,name=output_json,json=outputJson,proto3" json:"output_json,omitempty"`
+	ResultId          string                 `protobuf:"bytes,22,opt,name=result_id,json=resultId,proto3" json:"result_id,omitempty"`
+	ResultStatus      string                 `protobuf:"bytes,23,opt,name=result_status,json=resultStatus,proto3" json:"result_status,omitempty"`
+	ResultRef         string                 `protobuf:"bytes,24,opt,name=result_ref,json=resultRef,proto3" json:"result_ref,omitempty"`
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
@@ -502,6 +505,27 @@ func (x *ExecuteApprovedActionResponse) GetOutputJson() string {
 	return ""
 }
 
+func (x *ExecuteApprovedActionResponse) GetResultId() string {
+	if x != nil {
+		return x.ResultId
+	}
+	return ""
+}
+
+func (x *ExecuteApprovedActionResponse) GetResultStatus() string {
+	if x != nil {
+		return x.ResultStatus
+	}
+	return ""
+}
+
+func (x *ExecuteApprovedActionResponse) GetResultRef() string {
+	if x != nil {
+		return x.ResultRef
+	}
+	return ""
+}
+
 var File_nexusim_actionexecutor_v1_action_executor_service_proto protoreflect.FileDescriptor
 
 const file_nexusim_actionexecutor_v1_action_executor_service_proto_rawDesc = "" +
@@ -535,7 +559,7 @@ const file_nexusim_actionexecutor_v1_action_executor_service_proto_rawDesc = "" 
 	"\x06intent\x18\v \x01(\tR\x06intent\x12\x1d\n" +
 	"\n" +
 	"input_json\x18\f \x01(\tR\tinputJson\x12'\n" +
-	"\x0fidempotency_key\x18\r \x01(\tR\x0eidempotencyKey\"\xa0\x06\n" +
+	"\x0fidempotency_key\x18\r \x01(\tR\x0eidempotencyKey\"\x81\a\n" +
 	"\x1dExecuteApprovedActionResponse\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x12!\n" +
@@ -563,7 +587,11 @@ const file_nexusim_actionexecutor_v1_action_executor_service_proto_rawDesc = "" 
 	"\x0fdecision_source\x18\x13 \x01(\tR\x0edecisionSource\x12\x1a\n" +
 	"\bexecuted\x18\x14 \x01(\bR\bexecuted\x12\x1f\n" +
 	"\voutput_json\x18\x15 \x01(\tR\n" +
-	"outputJson*\xaf\x01\n" +
+	"outputJson\x12\x1b\n" +
+	"\tresult_id\x18\x16 \x01(\tR\bresultId\x12#\n" +
+	"\rresult_status\x18\x17 \x01(\tR\fresultStatus\x12\x1d\n" +
+	"\n" +
+	"result_ref\x18\x18 \x01(\tR\tresultRef*\xaf\x01\n" +
 	"\x15ActionExecutionStatus\x12'\n" +
 	"#ACTION_EXECUTION_STATUS_UNSPECIFIED\x10\x00\x12$\n" +
 	" ACTION_EXECUTION_STATUS_RECORDED\x10\x01\x12#\n" +

@@ -21,6 +21,11 @@ const (
 	ExecutionStatusBlocked  = "BLOCKED"
 	ExecutionStatusFailed   = "FAILED"
 
+	ResultStatusNotExecuted = "NOT_EXECUTED"
+	ResultStatusBlocked     = "BLOCKED"
+	ResultStatusSucceeded   = "SUCCEEDED"
+	ResultStatusFailed      = "FAILED"
+
 	maxInputJSONBytes = 64 * 1024
 )
 
@@ -191,6 +196,25 @@ type ExecutionAudit struct {
 	CreatedAt         time.Time
 }
 
+type ToolResultProjection struct {
+	TenantID        TenantID
+	ResultID        string
+	ExecutionID     string
+	ProposalID      string
+	ApprovalID      string
+	PreparedAuditID string
+	UserID          UserID
+	SkillID         string
+	ToolName        string
+	ResourceType    string
+	ResourceID      string
+	Status          string
+	Executed        bool
+	ResultRef       string
+	OutputSHA256    string
+	CreatedAt       time.Time
+}
+
 type ExecuteApprovedActionResult struct {
 	TenantID          TenantID
 	UserID            UserID
@@ -213,6 +237,9 @@ type ExecuteApprovedActionResult struct {
 	DecisionSource    string
 	Executed          bool
 	OutputJSON        string
+	ResultID          string
+	ResultStatus      string
+	ResultRef         string
 }
 
 func normalizeToolAction(action string) string {

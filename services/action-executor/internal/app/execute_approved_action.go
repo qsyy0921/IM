@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"strings"
@@ -105,6 +106,9 @@ func (usecase ExecuteApprovedActionUseCase) insertAudit(
 ) (types.ExecuteApprovedActionResult, error) {
 	result.Status = status
 	result.ExecutionID = newExecutionID()
+	result.ResultID = newResultID()
+	result.ResultStatus = resultStatusForExecution(status, result.Executed)
+	result.ResultRef = resultRef(result.ExecutionID, result.ResultID)
 	audit := types.ExecutionAudit{
 		TenantID:          command.AuthContext.TenantID,
 		ExecutionID:       result.ExecutionID,
@@ -133,8 +137,26 @@ func (usecase ExecuteApprovedActionUseCase) insertAudit(
 		DecisionSource:    result.DecisionSource,
 		Status:            status,
 		Executed:          result.Executed,
+		OutputSHA256:      outputSHA256(result.OutputJSON, result.Executed),
 	}
-	if err := usecase.audit.InsertExecutionAudit(ctx, audit); err != nil {
+	projection := types.ToolResultProjection{
+		TenantID:        command.AuthContext.TenantID,
+		ResultID:        result.ResultID,
+		ExecutionID:     result.ExecutionID,
+		ProposalID:      command.ProposalID,
+		ApprovalID:      command.ApprovalID,
+		PreparedAuditID: command.PreparedAuditID,
+		UserID:          command.AuthContext.UserID,
+		SkillID:         command.SkillID,
+		ToolName:        command.ToolName,
+		ResourceType:    command.ResourceType,
+		ResourceID:      command.ResourceID,
+		Status:          result.ResultStatus,
+		Executed:        result.Executed,
+		ResultRef:       result.ResultRef,
+		OutputSHA256:    audit.OutputSHA256,
+	}
+	if err := usecase.audit.RecordExecution(ctx, audit, projection); err != nil {
 		return types.ExecuteApprovedActionResult{}, err
 	}
 	return result, nil
@@ -210,6 +232,39 @@ func newExecutionID() string {
 		return "act_exec_fallback"
 	}
 	return "act_exec_" + hex.EncodeToString(buf[:])
+}
+
+func newResultID() string {
+	var buf [16]byte
+	if _, err := rand.Read(buf[:]); err != nil {
+		return "act_result_fallback"
+	}
+	return "act_result_" + hex.EncodeToString(buf[:])
+}
+
+func resultStatusForExecution(status string, executed bool) string {
+	if status == types.ExecutionStatusBlocked {
+		return types.ResultStatusBlocked
+	}
+	if status == types.ExecutionStatusFailed {
+		return types.ResultStatusFailed
+	}
+	if executed {
+		return types.ResultStatusSucceeded
+	}
+	return types.ResultStatusNotExecuted
+}
+
+func resultRef(executionID string, resultID string) string {
+	return "action-executor://executions/" + executionID + "/results/" + resultID
+}
+
+func outputSHA256(outputJSON string, executed bool) string {
+	if !executed || strings.TrimSpace(outputJSON) == "" || strings.TrimSpace(outputJSON) == "{}" {
+		return ""
+	}
+	sum := sha256.Sum256([]byte(outputJSON))
+	return hex.EncodeToString(sum[:])
 }
 
 func PublicBlockedError(result types.ExecuteApprovedActionResult) error {

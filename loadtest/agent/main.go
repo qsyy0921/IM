@@ -97,6 +97,9 @@ type agentSmokeSummary struct {
 	ExecutionDecisionSource   string       `json:"execution_decision_source"`
 	ExecutionClassification   string       `json:"execution_classification"`
 	ExecutionExecuted         bool         `json:"execution_executed"`
+	ExecutionResultID         string       `json:"execution_result_id"`
+	ExecutionResultStatus     string       `json:"execution_result_status"`
+	ExecutionResultRef        string       `json:"execution_result_ref"`
 	ProposalText              string       `json:"proposal_text"`
 	RequiresApproval          bool         `json:"requires_approval"`
 	GeneratedByLLM            bool         `json:"generated_by_llm"`
@@ -148,6 +151,10 @@ type actionAudit struct {
 	Executed               bool   `json:"executed"`
 	InputSHA256Present     bool   `json:"input_sha256_present"`
 	OutputSHA256Present    bool   `json:"output_sha256_present"`
+	ResultID               string `json:"result_id"`
+	ResultStatus           string `json:"result_status"`
+	ResultRefPresent       bool   `json:"result_ref_present"`
+	ResultExecutionMatches bool   `json:"result_execution_matches"`
 	ProposalIDMatches      bool   `json:"proposal_id_matches"`
 	ApprovalIDMatches      bool   `json:"approval_id_matches"`
 	PreparedAuditIDMatches bool   `json:"prepared_audit_id_matches"`
@@ -318,6 +325,7 @@ func applyProjectionMigrations(ctx context.Context, pool *pgxpool.Pool) error {
 		filepath.Join("migrations", "postgres", "mcp-gateway", "000001_mcp_gateway_core.sql"),
 		filepath.Join("migrations", "postgres", "agent-service", "000001_agent_proposals.sql"),
 		filepath.Join("migrations", "postgres", "action-executor", "000001_action_executor_core.sql"),
+		filepath.Join("migrations", "postgres", "action-executor", "000002_action_executor_tool_results.sql"),
 	} {
 		data, err := os.ReadFile(path)
 		if err != nil {
@@ -332,6 +340,7 @@ func applyProjectionMigrations(ctx context.Context, pool *pgxpool.Pool) error {
 
 func cleanupTenant(ctx context.Context, pool *pgxpool.Pool, tenantID string) error {
 	for _, statement := range []string{
+		`DELETE FROM action_executor_tool_results WHERE tenant_id = $1`,
 		`DELETE FROM action_executor_execution_audits WHERE tenant_id = $1`,
 		`DELETE FROM agent_proposals WHERE tenant_id = $1`,
 		`DELETE FROM mcp_gateway_tool_call_audits WHERE tenant_id = $1`,
@@ -714,6 +723,9 @@ func verifyWorkflow(
 	if strings.TrimSpace(execution.GetExecutionId()) == "" {
 		return agentSmokeSummary{}, errors.New("missing execution_id")
 	}
+	if strings.TrimSpace(execution.GetResultId()) == "" || execution.GetResultStatus() != "NOT_EXECUTED" || strings.TrimSpace(execution.GetResultRef()) == "" {
+		return agentSmokeSummary{}, fmt.Errorf("unexpected execution result projection fields: result_id=%q status=%q ref=%q", execution.GetResultId(), execution.GetResultStatus(), execution.GetResultRef())
+	}
 
 	decision := response.GetToolPolicyDecision()
 	if decision == nil || !decision.GetAllowed() {
@@ -784,6 +796,7 @@ func verifyWorkflow(
 	}
 	verified = append(verified, "agent proposal approval recorded and verified by action-executor")
 	verified = append(verified, "action-executor recorded approved execution audit with executed=false")
+	verified = append(verified, "action-executor recorded low-sensitive tool result projection")
 	verified = append(verified, "first-stage response is proposal-only and generated_by_llm=false")
 
 	return agentSmokeSummary{
@@ -810,6 +823,9 @@ func verifyWorkflow(
 		ExecutionDecisionSource:   execution.GetDecisionSource(),
 		ExecutionClassification:   execution.GetClassification(),
 		ExecutionExecuted:         execution.GetExecuted(),
+		ExecutionResultID:         execution.GetResultId(),
+		ExecutionResultStatus:     execution.GetResultStatus(),
+		ExecutionResultRef:        execution.GetResultRef(),
 		ProposalText:              response.GetProposalText(),
 		RequiresApproval:          response.GetRequiresApproval(),
 		GeneratedByLLM:            response.GetGeneratedByLlm(),
@@ -969,6 +985,27 @@ WHERE tenant_id = $1
 	audit.ApprovalIDMatches = approvalID == approval.GetApprovalId()
 	audit.PreparedAuditIDMatches = preparedAuditID == proposal.GetPreparedAuditId()
 	audit.LowSensitiveAuditOnly = audit.InputSHA256Present && !audit.OutputSHA256Present
+	var resultExecutionID string
+	var resultRef string
+	err = pool.QueryRow(ctx, `
+SELECT result_id, execution_id, status, result_ref
+FROM action_executor_tool_results
+WHERE tenant_id = $1
+  AND execution_id = $2
+  AND proposal_id = $3
+  AND approval_id = $4
+  AND prepared_audit_id = $5
+`, cfg.tenantID, execution.GetExecutionId(), proposal.GetProposalId(), approval.GetApprovalId(), proposal.GetPreparedAuditId()).Scan(
+		&audit.ResultID,
+		&resultExecutionID,
+		&audit.ResultStatus,
+		&resultRef,
+	)
+	if err != nil {
+		return actionAudit{}, fmt.Errorf("query action-executor tool result projection: %w", err)
+	}
+	audit.ResultRefPresent = strings.TrimSpace(resultRef) != ""
+	audit.ResultExecutionMatches = resultExecutionID == execution.GetExecutionId()
 	if audit.Status != "RECORDED" || !audit.Allowed || !audit.RequiresApproval {
 		return actionAudit{}, fmt.Errorf("unexpected action audit decision: %+v", audit)
 	}
@@ -983,6 +1020,9 @@ WHERE tenant_id = $1
 	}
 	if !audit.InputSHA256Present {
 		return actionAudit{}, errors.New("action audit must store low-sensitive input_sha256")
+	}
+	if audit.ResultID != execution.GetResultId() || audit.ResultStatus != "NOT_EXECUTED" || !audit.ResultRefPresent || !audit.ResultExecutionMatches {
+		return actionAudit{}, fmt.Errorf("unexpected action result projection: %+v", audit)
 	}
 	if !audit.ProposalIDMatches || !audit.ApprovalIDMatches || !audit.PreparedAuditIDMatches {
 		return actionAudit{}, fmt.Errorf("action audit linkage mismatch: %+v", audit)

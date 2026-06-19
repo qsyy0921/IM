@@ -19,5 +19,5 @@ type ProposalApprovalPort interface {
 }
 
 type ExecutionAuditRepository interface {
-	InsertExecutionAudit(context.Context, types.ExecutionAudit) error
+	RecordExecution(context.Context, types.ExecutionAudit, types.ToolResultProjection) error
 }

@@ -1,6 +1,6 @@
 ﻿# File Size Budget Hotspots
 
-- Created at: 2026-06-19T05:46:57.6211986Z
+- Created at: 2026-06-19T06:08:45.8132159Z
 - Scope: handwritten Go/Markdown/PowerShell/Bash file-size budget snapshot; not a code-quality score
 - Files checked: 1452
 - Warnings: 0
@@ -17,7 +17,7 @@
 | docs\architecture\target-architecture-ai.md | docs | 692 | 1200 | 1500 | 57.7 | 46.1 |
 | tools\run-loadtest-capacity-baseline-suite.ps1 | script/runner | 669 | 1000 | 1500 | 66.9 | 44.6 |
 | services\identity-service\cmd\identity-service\main_test.go | test/runner | 1272 | 2500 | 3000 | 50.9 | 42.4 |
+| loadtest\agent\main.go | test/runner | 1253 | 2500 | 3000 | 50.1 | 41.8 |
 | loadtest\contacts\main.go | test/runner | 1246 | 2500 | 3000 | 49.8 | 41.5 |
-| docs\runbook\loadtest\message-service\loadtest-report-20260609.md | docs | 622 | 1200 | 1500 | 51.8 | 41.5 |
 
 This is a complexity governance snapshot only. Large files are review priorities, not automatic design failures.

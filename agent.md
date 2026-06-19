@@ -53,11 +53,12 @@ Existing real services: `api-gateway`, `identity-service`, `message-service`,
 `conversation-service`, `delivery-service`, `push-gateway`, `receipt-service`,
 `contacts-service`, and `policy-service`.
 
-Current active slice: `skill-registry` first catalog path is landed after the
-real local `retrieval-gateway -> policy-service -> agent-service` adapter
-smoke. Next move is `mcp-gateway`, then `action-executor`. Search, memory,
-retrieval, real RAG / summary / Agent adapter smokes, and the skill catalog
-foundation are passed.
+Current active slice: `skill-registry` first catalog path and `mcp-gateway`
+first prepare path are landed after the real local
+`retrieval-gateway -> policy-service -> agent-service` adapter smoke. Next move
+is `action-executor`. Search, memory, retrieval, real RAG / summary / Agent
+adapter smokes, the skill catalog foundation, and the MCP prepare boundary are
+passed.
 
 AI invariants: keep facts, projections, retrieval and controlled execution
 separate. Memory requires source refs, scope, validity, supersession,

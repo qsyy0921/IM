@@ -135,6 +135,14 @@
       "grafana_dashboard": "skill-registry-observability.json"
     },
     {
+      "name": "mcp-gateway",
+      "stage": "foundation-active",
+      "local_process": "mcp-gateway-grpc",
+      "debug_port": 11924,
+      "prometheus_rule_file": "prometheus-mcp-gateway-alerts.yml",
+      "grafana_dashboard": "mcp-gateway-observability.json"
+    },
+    {
       "name": "media-service",
       "stage": "future"
     },
@@ -148,10 +156,6 @@
     },
     {
       "name": "admin-service",
-      "stage": "future"
-    },
-    {
-      "name": "mcp-gateway",
       "stage": "future"
     },
     {

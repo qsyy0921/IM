@@ -1,0 +1,51 @@
+syntax = "proto3";
+
+package nexusim.mcpgateway.v1;
+
+import "nexusim/policy/v1/policy_service.proto";
+
+option go_package = "github.com/qsyy0921/IM/api/proto/nexusim/mcpgateway/v1;mcpgatewayv1";
+
+service MCPGatewayService {
+  rpc PrepareToolCall(PrepareToolCallRequest) returns (PrepareToolCallResponse);
+}
+
+message AuthContext {
+  string tenant_id = 1;
+  string user_id = 2;
+  string device_id = 3;
+  string session_id = 4;
+  string trace_id = 5;
+  string request_id = 6;
+}
+
+message PrepareToolCallRequest {
+  AuthContext auth_context = 1;
+  string skill_id = 2;
+  string tool_name = 3;
+  nexusim.policy.v1.ToolAction action = 4;
+  string resource_type = 5;
+  string resource_id = 6;
+  string risk_level = 7;
+  string intent = 8;
+  string input_json = 9;
+  string idempotency_key = 10;
+}
+
+message PrepareToolCallResponse {
+  string tenant_id = 1;
+  string user_id = 2;
+  string skill_id = 3;
+  string tool_name = 4;
+  nexusim.policy.v1.ToolAction action = 5;
+  string resource_type = 6;
+  string resource_id = 7;
+  string risk_level = 8;
+  bool allowed = 9;
+  bool requires_approval = 10;
+  int64 permission_version = 11;
+  string classification = 12;
+  string reason = 13;
+  string decision_source = 14;
+  string audit_id = 15;
+}

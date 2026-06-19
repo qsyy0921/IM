@@ -1,0 +1,20 @@
+groups:
+  - name: nexusim-mcp-gateway
+    rules:
+      - alert: NexusIMMCPGatewayDown
+        expr: up{service="mcp-gateway"} == 0
+        for: 2m
+        labels:
+          severity: warning
+          service: mcp-gateway
+        annotations:
+          summary: "mcp-gateway metrics endpoint is down"
+
+      - alert: NexusIMMCPGatewayInfoMissing
+        expr: absent(nexusim_mcp_gateway_service_info)
+        for: 2m
+        labels:
+          severity: warning
+          service: mcp-gateway
+        annotations:
+          summary: "mcp-gateway info metric is missing"

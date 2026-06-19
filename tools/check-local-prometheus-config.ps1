@@ -310,4 +310,15 @@ foreach ($alert in $requiredSkillRegistryAlerts) {
     }
 }
 
+$requiredMCPGatewayAlerts = @(
+    "NexusIMMCPGatewayDown",
+    "NexusIMMCPGatewayInfoMissing"
+)
+
+foreach ($alert in $requiredMCPGatewayAlerts) {
+    if ($rulesByService["mcp-gateway"] -notmatch [regex]::Escape($alert)) {
+        throw "Prometheus mcp-gateway rules missing alert: $alert"
+    }
+}
+
 Write-Host "OK   local Prometheus config"

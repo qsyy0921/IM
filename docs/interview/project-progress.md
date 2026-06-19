@@ -197,7 +197,7 @@ AI 能力先按依赖逐步进入。`search-service` / group memory / retrieval 
 | `summary-service` | 第一版只读 EvidencePack 会话摘要路径和真实 adapter smoke 已落；后续补未读摘要和日报 |
 | `agent-service` | 第一版 proposal-only path 和真实本地 adapter smoke 已落；先过 policy-service `CheckToolAction`，再消费 EvidencePack 生成可引用 proposal，不执行真实动作 |
 | `skill-registry` | 第一版技能合约目录已落；把可复用的 IM / knowledge 工作流沉淀为可版本化、可审计的 Skill metadata，但不执行工具 |
-| `mcp-gateway/tool-gateway` | 把检索、摘要、proposal-only Agent 动作封装成受权限和审计约束的工具入口 |
+| `mcp-gateway/tool-gateway` | 第一版 prepare 边界已落；把 skill-registry 技能合约、policy-service `CheckToolAction` 和低敏 audit 串起来，但不执行外部 MCP tool |
 | evidence pack | AI 输出必须携带 source message id、conversation seq、conversation id |
 | Agent 写动作链路 | Proposal -> Approval -> Executor -> Audit，避免 Agent 直接改业务事实 |
 
@@ -253,10 +253,10 @@ search / RAG / Agent 后端能力。
 
 1. 补齐 message / conversation / receipt / contacts / policy 中搜索和记忆依赖的事件语义；
 2. 保持安全启动门禁、trusted metadata、TLS / mTLS 边界；
-3. 基于已通过的 `search-service` v0.1 projection smoke、`memory-service` source-backed projection smoke、`retrieval-gateway` EvidencePack smoke、retrieval policy precheck、EvidencePack 字段 first pass、AI eval case schema、rag-service first read-only answer path、真实 RAG adapter smoke、citation verifier、summary-service first read-only path 和真实 summary adapter smoke、agent-service first proposal-only path 和真实 adapter smoke，以及已落地的 skill-registry first catalog path，继续推进 MCP / executor；
+3. 基于已通过的 `search-service` v0.1 projection smoke、`memory-service` source-backed projection smoke、`retrieval-gateway` EvidencePack smoke、retrieval policy precheck、EvidencePack 字段 first pass、AI eval case schema、rag-service first read-only answer path、真实 RAG adapter smoke、citation verifier、summary-service first read-only path 和真实 summary adapter smoke、agent-service first proposal-only path 和真实 adapter smoke、skill-registry first catalog path 和 mcp-gateway first prepare path，继续推进 action-executor；
 4. 保持 search visibility / tombstone 语义后续不被 RAG / Agent 绕过；
 5. 收敛必要的观测、repair、audit、DLQ 和容量证据，不把生产级完整系统测试作为短期阻塞；
-6. 再进入 MCP gateway / action-executor 的后端能力；
+6. 再进入 action-executor 的后端能力；
 7. 控制代码复杂度，避免核心文件继续变大。
 
 ## 面试讲述线
@@ -268,7 +268,7 @@ search / RAG / Agent 后端能力。
 
 在身份侧，我实现了登录、Refresh Token、MFA、recovery code、JWKS、challenge delivery outbox、SMTP / webhook challenge sender 和启动安全门禁。系统也补了 health、ready、debug metrics、repair、audit、cleanup、worker retry 和多种本地故障 smoke。
 
-后续我会先把 9 个核心服务做必要收口，补齐消息变更、成员窗口、群管理、回执、联系人和策略这些 AI 会依赖的 IM 语义；短期不把生产级完整系统测试作为转进阻塞，而是用切片级本地检查和最小 smoke 守住事实、权限和证据边界。当前 search-service v0.1 已跑通 projection smoke；memory-service 已跑通 source-backed group memory projection smoke；retrieval-gateway 已跑通 search + memory -> EvidencePack smoke，并已接入 first-stage 可选 policy-service retrieval precheck、EvidencePack field hardening first pass 和 AI eval harness first pass；rag-service 已落第一版只读 answer path、RAG smoke runner、eval adapter、真实本地 adapter smoke、provider boundary 和 citation verifier；summary-service 已落第一版只读 EvidencePack summary path 和真实本地 adapter smoke；agent-service 已落第一版 proposal-only path 和真实本地 adapter smoke；skill-registry 已落第一版技能合约目录。后续做 MCP gateway 和 action-executor。大模型只能通过权限过滤后的 EvidencePack 访问聊天记录，Agent 写动作必须走 proposal、approval、executor 和 audit。
+后续我会先把 9 个核心服务做必要收口，补齐消息变更、成员窗口、群管理、回执、联系人和策略这些 AI 会依赖的 IM 语义；短期不把生产级完整系统测试作为转进阻塞，而是用切片级本地检查和最小 smoke 守住事实、权限和证据边界。当前 search-service v0.1 已跑通 projection smoke；memory-service 已跑通 source-backed group memory projection smoke；retrieval-gateway 已跑通 search + memory -> EvidencePack smoke，并已接入 first-stage 可选 policy-service retrieval precheck、EvidencePack field hardening first pass 和 AI eval harness first pass；rag-service 已落第一版只读 answer path、RAG smoke runner、eval adapter、真实本地 adapter smoke、provider boundary 和 citation verifier；summary-service 已落第一版只读 EvidencePack summary path 和真实本地 adapter smoke；agent-service 已落第一版 proposal-only path 和真实本地 adapter smoke；skill-registry 已落第一版技能合约目录；mcp-gateway 已落第一版 tool prepare 边界，把 skill catalog、policy precheck 和低敏审计串起来但不执行外部工具。后续做 action-executor。大模型只能通过权限过滤后的 EvidencePack 访问聊天记录，Agent 写动作必须走 proposal、approval、executor 和 audit。
 ```
 
 ## 维护规则

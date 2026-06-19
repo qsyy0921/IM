@@ -29,3 +29,4 @@ services:
       - ./prometheus-summary-service-alerts.yml:/etc/prometheus/rules/summary-service.yml:ro
       - ./prometheus-agent-service-alerts.yml:/etc/prometheus/rules/agent-service.yml:ro
       - ./prometheus-skill-registry-alerts.yml:/etc/prometheus/rules/skill-registry.yml:ro
+      - ./prometheus-mcp-gateway-alerts.yml:/etc/prometheus/rules/mcp-gateway.yml:ro

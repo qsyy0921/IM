@@ -10,7 +10,7 @@
 | `target-architecture-foundation.md` | 架构定位、技术栈口径、总体拓扑、服务边界、Control Plane。 |
 | `target-architecture-timeline.md` | 消息写入、成员边界、Fanout、数据模型、Kafka、Redis 与长连接。 |
 | `target-architecture-platform.md` | 权限、搜索、RAG、Agent、多 Region、审计、观测、ADR、演进结论。 |
-| `target-architecture-ai.md` | AI / memory / RAG / Agent 的后续目标架构、数据模型、检索流程和评测门禁。 |
+| `target-architecture-ai.md` | AI / memory / RAG / Agent 的后续目标架构、Python AI Worker 边界、数据模型、检索流程和评测门禁。 |
 | `adr/` | 已接受的关键架构决策记录。 |
 | `add.md` | Legacy 业务架构草案。保留早期系统范围、服务边界和阶段路线，用于历史对照；当前路线以 target 系列和 runbook 为准。 |
 | `tadd.md` | Legacy 技术架构草案。保留早期技术栈和工程约束讨论；当前中间件、门禁和服务状态以 target 系列、ADR、SDD 和 runbook 为准。 |
@@ -21,7 +21,7 @@
 2. 需要目标态边界、拓扑和技术栈时，读 `target-architecture-foundation.md`。
 3. 需要消息主链路、Kafka、Redis route、push resume 时，读 `target-architecture-timeline.md`。
 4. 需要搜索、RAG、Agent、观测、ADR 和演进路线时，读 `target-architecture-platform.md`。
-5. 需要 AI / memory / Agent 的详细目标架构时，读 `target-architecture-ai.md`。
+5. 需要 AI / memory / Agent / Python AI Worker 的详细目标架构时，读 `target-architecture-ai.md`。
 6. 需要早期设计对照或演进背景时，再查 `add.md` / `tadd.md`；不要从这两份文档推导当前开发目标。
 
 ## 变更规则

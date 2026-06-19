@@ -42,6 +42,7 @@ approval operator
 
 硬边界：RAG / summary / Agent 只能消费 EvidencePack；真实写动作必须走
 policy、proposal / approval、executor 和 audit；不能直接读业务私表。
+Python AI Worker 只能做模型 / 算法 / eval 候选层，Go 仍负责控制面和事实边界。
 
 ## 执行规则
 

@@ -20,7 +20,7 @@
 
 当前 active slice：skill-registry catalog、mcp-gateway prepare、action-executor audit、Agent adapter smoke、proposal store、approval workflow、approval outbox relay、approved proposal handoff、execution eval、low-sensitive result projection、本地安全 tool adapter 已落。下一步默认推进 approval operator、外部 MCP adapter failure fallback、真实 tool output safety cases；完成后按 current-goal.md 选择下一项 AI 主线任务。
 
-硬边界：RAG / summary / Agent 只能消费 EvidencePack，不直接读 message / conversation / private tables；真实写动作必须继续走 policy、proposal / approval / executor / audit。
+硬边界：RAG / summary / Agent 只能消费 EvidencePack，不直接读 message / conversation / private tables；真实写动作必须继续走 policy、proposal / approval / executor / audit；Python AI Worker 只做模型 / 算法 / eval 候选层，Go 仍负责控制面和事实边界。
 
 可用多个 sub-agent 做互不重叠任务；主 agent 负责集成、检查和文档同步。不回滚用户已有修改。新发现的待办写入 docs/runbook/remaining-goals.md。
 ```

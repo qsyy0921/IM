@@ -14,7 +14,7 @@
 1. 先读 [foundation](./target-architecture-foundation.md)：架构定位、技术栈口径、总体拓扑、服务边界、控制面。
 2. 再读 [timeline](./target-architecture-timeline.md)：消息写入、成员边界、Fanout、数据模型、Kafka、Redis 与长连接。
 3. 需要平台和长期演进时读 [platform](./target-architecture-platform.md)：权限、搜索、RAG、Agent、多 Region、审计、观测、ADR、阶段结论。
-4. 需要 AI / memory / Agent 的后续目标架构时读 [AI](./target-architecture-ai.md)：结构化记忆、画像、EvidencePack、检索流程和 AI eval。
+4. 需要 AI / memory / Agent / Python AI Worker 的后续目标架构时读 [AI](./target-architecture-ai.md)：结构化记忆、画像、EvidencePack、检索流程、Python worker 边界和 AI eval。
 
 ## 文档范围
 
@@ -24,7 +24,7 @@
 | `target-architecture-foundation.md` | 第 1-4 章和 `Control Plane` |
 | `target-architecture-timeline.md` | 第 5-9 章 |
 | `target-architecture-platform.md` | 第 10-16 章 |
-| `target-architecture-ai.md` | AI / memory / RAG / Agent 后续目标架构 |
+| `target-architecture-ai.md` | AI / memory / RAG / Agent / Python worker 后续目标架构 |
 
 ## 当前硬边界
 

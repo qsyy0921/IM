@@ -74,10 +74,10 @@ next AI mainline task from `current-goal.md`.
 Search, memory, retrieval, real RAG / summary / Agent adapter smokes, the skill
 catalog foundation, the MCP prepare boundary, and approved proposal preflight
 are passed.
-AI invariants: keep facts, projections, retrieval and controlled execution
-separate. Memory requires source refs, scope, validity, supersession,
-confidence and review state. RAG / summary / Agent consume EvidencePack only;
-actions go through policy, proposal / approval, executor and audit.
+AI invariants: separate facts, projections, retrieval and controlled execution.
+Memory requires source refs, scope, validity, supersession, confidence and review state. RAG / summary / Agent consume EvidencePack only;
+actions go through policy, proposal / approval, executor and audit; Python AI
+workers only return candidates, while Go owns control, state and audit.
 
 ## Progress Documents
 

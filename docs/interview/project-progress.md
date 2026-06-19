@@ -25,6 +25,10 @@ NexusIM 是一个以 Go 微服务为主的分布式 IM 后端项目。当前目�
 -> memory / retrieval / RAG / summary / Agent / skill-registry / MCP gateway / action-executor
 ```
 
+语言和运行时边界：生产后端控制面继续以 Go 为主；Python 后续只作为 AI Worker
+层，用于 LLM、embedding、rerank、memory extraction、planner prototype 和 eval
+candidate，不直接写 IM 业务库，不绕过 policy / approval / audit。
+
 当前可以准确表述为：
 
 ```text
@@ -123,7 +127,7 @@ search-service v0.1 / group memory / retrieval / RAG / summary / Agent 是下一
 - PostgreSQL `repmgr + pgpool` local failover smoke；
 - Kafka KRaft 3 broker local leader failover / controller-switch / ISR observation smoke；
 - Kafka KRaft repeated ISR flapping smoke：2 轮 broker stop/start 均观察到 ISR 收缩 / 恢复和 `acks=all` probe 写入成功；
-- Kafka producer hardening evaluation：6 个 producer package 固定 `acks=all`、禁自动建 topic、bounded retry/backoff，并明确当前 `kafka-go` 不声明 idempotent / transactional producer 语义，业务可靠性边界仍是 outbox / event_id 幂等。
+- Kafka producer hardening evaluation：7 个 producer package 固定 `acks=all`、禁自动建 topic、bounded retry/backoff，并明确当前 `kafka-go` 不声明 idempotent / transactional producer 语义，业务可靠性边界仍是 outbox / event_id 幂等。
 - Kafka producer fault observation：本地 `kafka-go` producer 在 broker stop/restore 窗口内写入 120 条 records，消费侧观察到 unique 120、missing ack 0、duplicate 0；这只是本地观察，不是 exactly-once 证明。
 - Kafka consumer group rebalance smoke：两个 push-gateway delivery-consumer 进入同一 group，停止一个后，`im.delivery.events` 的 3 个 partition 被重新分配给剩余 consumer。
 - Kafka consumer churn smoke：2 个 push-gateway delivery-consumer 在同一 group 中反复 leave / rejoin，2 轮 8 个 transition 均回到 Stable，且 3 个 partition 都已分配。
@@ -199,6 +203,7 @@ AI 能力先按依赖逐步进入。`search-service` / group memory / retrieval 
 | `skill-registry` | 第一版技能合约目录已落；把可复用的 IM / knowledge 工作流沉淀为可版本化、可审计的 Skill metadata，但不执行工具 |
 | `mcp-gateway/tool-gateway` | 第一版 prepare 边界已落；把 skill-registry 技能合约、policy-service `CheckToolAction` 和低敏 audit 串起来，但不执行外部 MCP tool |
 | `action-executor` | 第一版 approved execution audit、low-sensitive tool result projection 和本地安全 `nexusim.local.echo` adapter 已落；强制 proposal / approval / prepare audit 关联，重新做 skill execute contract check 和 policy execute precheck；业务 tool 仍只记录低敏审计和结果引用，`executed=false`，本地安全 echo tool 可 `SUCCEEDED` 并只记录 output hash |
+| Python AI Worker | ADR-036 已固定边界；后续只作为 LLM / embedding / rerank / memory extraction / planner / eval 候选层接入，最终校验、权限、审批、审计和持久化仍由 Go 服务完成 |
 | evidence pack | AI 输出必须携带 source message id、conversation seq、conversation id |
 | Agent 写动作链路 | Proposal -> Approval -> Executor -> Audit，避免 Agent 直接改业务事实 |
 

@@ -133,6 +133,83 @@ flowchart LR
 | `action-executor` | action attempts、idempotency ledger、execution result refs | low-risk allowlist action or approved proposal | execution status、business request id、audit refs | 不接收未授权高风险动作，不绕过公开业务 API |
 | `ai-eval-service` | eval dataset/run/result | dataset、model/prompt/retrieval/tool versions | pass/fail、failure class | 不参与线上热路径 |
 
+### 3.4 Python AI Worker Layer
+
+Go 仍是 NexusIM AI 应用的控制面和事实边界；Python 只作为 AI Worker 层，
+负责模型生态更强、迭代更快的候选生成和离线评测。Python worker 不是第二套
+业务后端，不能直接写 IM 主库，不能绕过 policy / approval / audit。
+
+默认调用形态：
+
+```text
+Go service
+-> gRPC / HTTP / Kafka contract
+-> Python AI worker
+-> candidate result / model result / eval result
+-> Go service validates, authorizes, audits, persists or rejects
+```
+
+Go 负责：
+
+- 权限、租户隔离、用户 / device / agent identity；
+- PostgreSQL 事务、outbox、Kafka 发布、DLQ / repair；
+- EvidencePack 校验、citation verifier、tool policy、approval、audit；
+- 公开 API、稳定错误码、metrics / tracing / operator。
+
+Python worker 可以负责：
+
+- LLM provider adapter、prompt 实验和 token budget 探索；
+- embedding、rerank、cross-encoder、local model runtime；
+- memory extraction candidate、profile aggregation candidate；
+- planner / critic / verifier 原型；
+- offline eval、benchmark、数据集处理和报告生成。
+
+Python worker 禁止：
+
+- 直接读写 message / conversation / delivery / identity / contacts / policy 私表；
+- 直接持久化最终 memory、summary、answer、proposal、approval 或 execution state；
+- 执行高风险业务动作或绕过 action-executor；
+- 保存 raw prompt、raw provider body、secret、token 或完整敏感 payload；
+- 将群聊单条内容直接升级为个人画像或 ACTIVE memory。
+
+通信方式按场景选择：
+
+| 方式 | 适用场景 | 必要边界 |
+| --- | --- | --- |
+| gRPC | 长期运行、低延迟 worker | protobuf contract、deadline、trace、稳定错误 |
+| HTTP | 简单 provider adapter / 本地原型 | JSON schema、timeout、retry budget |
+| Kafka | 异步 / 批处理 / 长任务 | task_id / result_id 幂等、DLQ、replay |
+| CLI subprocess | 本地实验 / 一次性评测 | 不进入线上热路径 |
+
+后续引入 Python 代码时推荐目录：
+
+```text
+ai/python/
+  pyproject.toml
+  README.md
+  nexusim_ai_common/
+    config.py
+    logging.py
+    tracing.py
+    kafka.py
+    grpc_client.py
+    safety.py
+  workers/
+    llm_worker/
+    embedding_worker/
+    rerank_worker/
+    memory_worker/
+    planner_worker/
+    eval_worker/
+  contracts/
+  scripts/
+```
+
+建议工具链：Python 3.12、`uv`、`pydantic`、`grpcio` 或 FastAPI、`pytest`、
+`ruff`、`mypy`、OpenTelemetry；Kafka worker 可用 `aiokafka` 或
+`confluent-kafka`。正式接入前必须有 ADR / SDD 指明调用方、契约、超时、
+输出过滤、失败回退和 Go 侧拒绝 malformed / unsafe output 的测试。
+
 ## 4. 数据模型方向
 
 ### 4.1 RawEvent

@@ -36,10 +36,12 @@
 - `action-executor` first execution audit path + proposal / approval / prepare audit linkage
 - AI eval harness first-stage case schema / validator + RAG execution adapter
 - Agent execution eval adapter + low-sensitive tool result projection + local safe tool adapter first path
+- Python AI Worker 边界已由 ADR-036 固定：Python 只做模型 / 算法 / eval 候选层，Go 继续拥有控制面、状态、审计和持久化
 
 当前尚未真实实现的后续 AI / Agent 能力：
 
 - `ai-eval-service`
+- Python worker foundation 目录、toolchain、contract guard 和第一条 worker smoke
 - 后续产品化 / 平台服务：`media-service`、`notification-service`、`audit-service`、`admin-service`
 
 当前可以采用 multi sub-agent 方式加快后续 AI 底座开发，但只允许拆分互不重叠的服务、文档或验证范围；主 agent 保持最终方案、集成和检查责任。
@@ -116,7 +118,7 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 - 安全启动门禁 catalog：集中索引 DDD / cross-service table / future service boundary / debug listener / public listener auth / TLS / gateway / api-gateway legacy / quota 子门禁 / api-gateway legacy evidence / repair operator safety gates，并校验已接入 `check-local` 或由父 check 覆盖
 - Kafka KRaft 3 broker local failover / controller-switch / ISR observation smoke，且 ISR observation raw summary 已有可复用 JSON / Markdown summary validator
 - Kafka KRaft repeated ISR flapping smoke：本地 2 轮 broker stop/start 均验证 ISR 从 3 收缩到 2、恢复到 3，且 `acks=all` probe 在降级和恢复阶段均可写入；这是本地 flapping 观察，不是生产 Kafka HA 或 rebalance storm 证明
-- outbox Kafka producer first-stage `acks=all` / bounded retry-backoff 配置、本地门禁、6 个 producer package 配置单测、producer config summary 和 Kafka producer hardening evaluation；当前 `kafka-go` writer 明确不声明 idempotent / transactional producer 语义，可靠业务边界仍是 outbox / event_id 幂等
+- outbox Kafka producer first-stage `acks=all` / bounded retry-backoff 配置、本地门禁、7 个 producer package 配置单测、producer config summary 和 Kafka producer hardening evaluation；当前 `kafka-go` writer 明确不声明 idempotent / transactional producer 语义，可靠业务边界仍是 outbox / event_id 幂等
 - 本地 `kafka-go` producer in-flight broker-fault observation：120 条 records 在 broker stop/restore 窗口内全部 ack，消费侧 unique 120、missing acknowledged 0、observed duplicate 0；这是一次本地观察，不证明 exactly-once producer 语义
 - push-gateway delivery-consumer 本地 Kafka consumer group rebalance smoke：2 个 consumer 进入同一 group 后停止 1 个，Kafka 将 `im.delivery.events` 3 个 partition 重新分配到剩余 consumer
 - push-gateway delivery-consumer 本地 Kafka consumer churn smoke：2 轮 leave / rejoin、8 个 transition 均回到 Stable，且 `im.delivery.events` 3 个 partition 每次都已分配；这是本地 churn 观察，不是生产 rebalance storm SLO

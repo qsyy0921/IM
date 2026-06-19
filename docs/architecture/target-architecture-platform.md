@@ -62,7 +62,7 @@ freeze affected policy scope
 
 ### 10.2 Search/RAG
 
-详细 AI / memory / Agent 后续目标架构见 `target-architecture-ai.md`。本节只保留跨服务硬边界。AI 底座主线为 `search-service -> memory-service -> retrieval-gateway -> rag-service / summary-service -> agent-service -> skill-registry / mcp-gateway -> action-executor`；`ai-eval-service` 可先以 harness / gate 落地。服务和中间件不是写死终局，新增或替换必须符合独立数据模型、独立伸缩、独立故障、独立安全边界之一，或显著降低复杂度，并通过 ADR。
+详细 AI / memory / Agent 后续目标架构见 `target-architecture-ai.md`。本节只保留跨服务硬边界。AI 底座主线为 `search-service -> memory-service -> retrieval-gateway -> rag-service / summary-service -> agent-service -> skill-registry / mcp-gateway -> action-executor`；`ai-eval-service` 可先以 harness / gate 落地。服务和中间件不是写死终局，新增或替换必须符合独立数据模型、独立伸缩、独立故障、独立安全边界之一，或显著降低复杂度，并通过 ADR。Python AI Worker 边界以 ADR-036 为准：Python 只做模型 / 算法 / eval 候选层，Go 继续负责控制面、权限、审计和持久化。
 
 OpenSearch 文档必须包含：
 
@@ -404,6 +404,7 @@ RAG/summary/Agent 进入生产发布前必须跑安全评测。短期建设 AI �
 | ADR-033 | api-gateway tenant quota source 由控制面 / 配置源版本化发布 | 避免 user-facing gateway 直连业务内部表，DB-backed quota 需通过服务拥有的配置契约 |
 | ADR-034 | PostgreSQL production quorum boundary | 本地 `repmgr + pgpool` 只作为 smoke 拓扑；生产 HA 必须另有 quorum / fencing 证据 |
 | ADR-035 | AI 底座按 search、memory、retrieval、RAG、summary、Agent、skill、tool、executor 和 eval gate 分阶段演进 | 先形成可复用大模型应用底座；eval 可先是 harness，后续新增、合并或替换必须满足独立数据模型/伸缩/故障/安全边界或降低复杂度 |
+| ADR-036 | Python AI Worker 只做模型 / 算法 / eval 候选层，Go 继续拥有控制面和事实边界 | 允许 Python 快速迭代 LLM、embedding、rerank、memory extraction 和 planner 原型，同时防止形成第二套绕过 policy / approval / audit 的业务后端 |
 
 ## 16. 演进结论与下一阶段
 
@@ -421,6 +422,7 @@ RAG/summary/Agent 进入生产发布前必须跑安全评测。短期建设 AI �
 | P1 | `rag-service` + `summary-service` | 只消费 EvidencePack 的只读问答和摘要，不直接检索、不写事实源 |
 | P1 | AI eval harness / `ai-eval-service` | 伴随 search / retrieval / RAG / Agent 演进，覆盖权限/删除/时间版本/evidence/tool policy 门禁 |
 | P2 | `agent-service` + `skill-registry` + `mcp-gateway/tool-gateway` + `action-executor` | read-only/proposal-only Agent、skill schema、tool policy、低风险 allowlist、proposal、idempotency 和 audit |
+| P2 | Python AI Worker foundation | 只承接 LLM / embedding / rerank / memory extraction / planner / eval 候选任务；Go 继续负责控制面、权限、审计和持久化 |
 | P2 | 生产级验证和容量基线 | HA、全量压测、混沌、跨 Region、K8s rollout、容量模型和故障演练，作为上线加固而非当前阶段阻塞 |
 
 这些交付物可以用 multi sub-agent 并行推进，但只能按互不重叠的服务、文档或验证面拆分；主 agent 必须统一合并、做最终检查并关闭不再需要的 sub-agent。

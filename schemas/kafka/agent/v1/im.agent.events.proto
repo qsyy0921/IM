@@ -1,0 +1,47 @@
+syntax = "proto3";
+
+package nexusim.agent.events.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/qsyy0921/IM/schemas/kafka/agent/v1;agenteventsv1";
+
+// Topic: im.agent.events
+// Partition key: proposal_id.
+// Producer: agent-service approval outbox relay.
+message AgentEvent {
+  string event_id = 1;
+  string event_type = 2;
+  string event_version = 3;
+
+  string tenant_id = 4;
+  string aggregate_type = 5; // "agent_proposal"
+  string aggregate_id = 6;   // proposal_id
+  int64 aggregate_version = 7;
+
+  string partition_key = 8;
+  int64 mapping_version = 9;
+  string trace_id = 10;
+  string correlation_id = 11;
+  string causation_id = 12;
+  string producer = 13;
+  google.protobuf.Timestamp occurred_at = 14;
+
+  oneof payload {
+    AgentProposalApprovedV1 proposal_approved = 20;
+  }
+}
+
+message AgentProposalApprovedV1 {
+  string tenant_id = 1;
+  string proposal_id = 2;
+  string approval_id = 3;
+  string prepared_audit_id = 4;
+  string skill_id = 5;
+  string tool_name = 6;
+  string resource_type = 7;
+  string resource_id = 8;
+  string risk_level = 9;
+  string approved_by_user_id = 10;
+  google.protobuf.Timestamp approved_at = 11;
+}

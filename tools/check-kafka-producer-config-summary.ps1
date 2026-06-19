@@ -20,8 +20,8 @@ try {
     }
 
     $summary = Get-Content -LiteralPath $summaryPath -Raw | ConvertFrom-Json
-    if ($summary.producer_count -ne 6) {
-        throw "Kafka producer summary must include 6 producer files."
+    if ($summary.producer_count -ne 7) {
+        throw "Kafka producer summary must include 7 producer files."
     }
     if ($summary.required_acks -ne "RequireAll" -or $summary.allow_auto_topic_creation -ne $false) {
         throw "Kafka producer summary has incorrect acks or auto-topic settings."
@@ -35,6 +35,7 @@ try {
 
     $services = @($summary.producers | ForEach-Object { [string]$_.service } | Sort-Object)
     $expectedServices = @(
+        "agent-service",
         "contacts-service",
         "delivery-service",
         "identity-service",

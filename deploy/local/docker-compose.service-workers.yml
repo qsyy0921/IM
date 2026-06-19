@@ -153,6 +153,18 @@ services:
       - nexusim-services
       - nexusim-local
 
+  agent-service-approval-outbox-relay:
+    image: nexusim/agent-service:local
+    container_name: nexusim-agent-service-approval-outbox-relay
+    environment:
+      NEXUSIM_AGENT_SERVICE_MODE: approval-outbox-relay
+      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@host.docker.internal:5432/nexusim?sslmode=disable
+      NEXUSIM_KAFKA_BROKERS: kafka:29092
+    restart: unless-stopped
+    networks:
+      - nexusim-services
+      - nexusim-local
+
 networks:
   nexusim-services:
     name: nexusim-services

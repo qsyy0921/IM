@@ -17,8 +17,10 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	agentgrpc "github.com/qsyy0921/IM/services/agent-service/internal/api/grpc"
 	"github.com/qsyy0921/IM/services/agent-service/internal/app"
+	kafkainfra "github.com/qsyy0921/IM/services/agent-service/internal/infrastructure/kafka"
 	postgresinfra "github.com/qsyy0921/IM/services/agent-service/internal/infrastructure/postgres"
 	rpcinfra "github.com/qsyy0921/IM/services/agent-service/internal/infrastructure/rpc"
+	"github.com/qsyy0921/IM/services/agent-service/internal/trigger/outbox"
 	"google.golang.org/grpc"
 )
 
@@ -41,6 +43,8 @@ func run(ctx context.Context) error {
 		return runNoop(ctx)
 	case "grpc":
 		return runGRPC(ctx)
+	case "approval-outbox-relay":
+		return runApprovalOutboxRelay(ctx)
 	default:
 		return fmt.Errorf("unsupported NEXUSIM_AGENT_SERVICE_MODE %q", mode)
 	}
@@ -134,6 +138,47 @@ func runGRPC(ctx context.Context) error {
 	}
 }
 
+func runApprovalOutboxRelay(ctx context.Context) error {
+	debugAddr, err := agentDebugAddrFromEnv()
+	if err != nil {
+		return err
+	}
+	stopDebug, err := startDebugServer(ctx, debugAddr)
+	if err != nil {
+		return err
+	}
+	defer stopDebug()
+
+	pool, err := openPGPool(ctx)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	producer, err := kafkainfra.NewWriterProducer(splitCSV(os.Getenv("NEXUSIM_KAFKA_BROKERS")))
+	if err != nil {
+		return err
+	}
+	defer producer.Close()
+
+	topic := envString("NEXUSIM_AGENT_EVENTS_TOPIC", outbox.TopicAgentEvents)
+	relay := outbox.NewRelay(
+		postgresinfra.NewOutboxStore(pool),
+		producer,
+		outbox.Config{
+			Topic:          topic,
+			BatchSize:      envInt("NEXUSIM_AGENT_APPROVAL_OUTBOX_BATCH_SIZE", 500),
+			PollInterval:   envDuration("NEXUSIM_AGENT_APPROVAL_OUTBOX_POLL_INTERVAL", time.Second),
+			MaxAttempts:    envInt("NEXUSIM_AGENT_APPROVAL_OUTBOX_MAX_ATTEMPTS", 5),
+			RetryBaseDelay: envDuration("NEXUSIM_AGENT_APPROVAL_OUTBOX_RETRY_BASE_DELAY", time.Second),
+			ErrorBackoff:   envDuration("NEXUSIM_AGENT_APPROVAL_OUTBOX_RELAY_ERROR_BACKOFF", time.Second),
+			Logf:           log.Printf,
+		},
+	)
+	log.Printf("agent-service approval outbox relay started topic=%s", topic)
+	return relay.Run(ctx)
+}
+
 func agentServiceModeFromEnv() string {
 	mode := strings.TrimSpace(os.Getenv("NEXUSIM_AGENT_SERVICE_MODE"))
 	if mode == "" {
@@ -144,7 +189,7 @@ func agentServiceModeFromEnv() string {
 
 func validateAgentServiceMode(mode string) error {
 	switch mode {
-	case "noop", "grpc":
+	case "noop", "grpc", "approval-outbox-relay":
 		return nil
 	default:
 		return fmt.Errorf("unsupported NEXUSIM_AGENT_SERVICE_MODE %q", mode)
@@ -218,6 +263,30 @@ func envDuration(name string, fallback time.Duration) time.Duration {
 		return fallback
 	}
 	return parsed
+}
+
+func envInt(name string, fallback int) int {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		return fallback
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil {
+		return fallback
+	}
+	return parsed
+}
+
+func splitCSV(value string) []string {
+	parts := strings.Split(value, ",")
+	result := make([]string, 0, len(parts))
+	for _, part := range parts {
+		trimmed := strings.TrimSpace(part)
+		if trimmed != "" {
+			result = append(result, trimmed)
+		}
+	}
+	return result
 }
 
 func openPGPool(ctx context.Context) (*pgxpool.Pool, error) {

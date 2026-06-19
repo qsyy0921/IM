@@ -24,7 +24,7 @@ group memory -> EvidencePack -> RAG -> summary -> multi-agent
 - `search-service`、`memory-service`、`retrieval-gateway` first paths。
 - `rag-service`、`summary-service` read-only EvidencePack paths。
 - `agent-service` proposal-only path、mcp-gateway prepare、proposal store、
-  approval workflow、approval audit outbox、`VerifyApprovedAgentProposal`。
+  approval workflow、approval outbox relay、`VerifyApprovedAgentProposal`。
 - `skill-registry` first catalog path。
 - `mcp-gateway` first prepare path。
 - `action-executor` first execution audit、approved proposal preflight、
@@ -36,7 +36,6 @@ group memory -> EvidencePack -> RAG -> summary -> multi-agent
 
 ```text
 approval operator
--> approval outbox relay
 -> external MCP adapter failure fallback
 -> true tool output safety cases
 ```

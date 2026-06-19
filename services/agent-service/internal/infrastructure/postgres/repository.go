@@ -17,7 +17,7 @@ type Repository struct {
 }
 
 const (
-	agentApprovalOutboxEventType      = "agent.proposal.approved.v1"
+	agentApprovalOutboxEventType      = types.AgentEventProposalApproved
 	agentApprovalOutboxEventVersion   = "v1"
 	agentApprovalOutboxMappingVersion = 1
 	agentApprovalOutboxProducer       = "agent-service"

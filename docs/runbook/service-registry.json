@@ -237,6 +237,12 @@
       "service": "memory-service",
       "env": "NEXUSIM_MEMORY_SERVICE_MODE",
       "value": "timeline-consumer"
+    },
+    {
+      "name": "agent-service-approval-outbox-relay",
+      "service": "agent-service",
+      "env": "NEXUSIM_AGENT_SERVICE_MODE",
+      "value": "approval-outbox-relay"
     }
   ]
 }

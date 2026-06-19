@@ -122,7 +122,7 @@ try {
     }
 
     $summary = Get-Content -LiteralPath $jsonPath -Raw | ConvertFrom-Json
-    if (-not $summary.passed -or $summary.producer_config.producer_count -ne 6) {
+    if (-not $summary.passed -or $summary.producer_config.producer_count -ne 7) {
         Write-Host "FAIL Kafka producer hardening summary has wrong pass/config fields." -ForegroundColor Red
         exit 1
     }

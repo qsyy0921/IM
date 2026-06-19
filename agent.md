@@ -60,17 +60,17 @@ Existing real services: `api-gateway`, `identity-service`, `message-service`,
 Current active slice: `skill-registry` first catalog path, `mcp-gateway`
 first prepare path, `action-executor` first execution audit path, Agent ->
 mcp-gateway adapter smoke, proposal store, approval workflow,
-approval audit outbox, action-executor approved proposal handoff, Agent
+approval outbox relay, action-executor approved proposal handoff, Agent
 execution eval adapter, low-sensitive tool result projection, and local safe
 tool adapter first path are landed. `agent-service` now calls
 `mcp-gateway.PrepareToolCall`, persists low-sensitive proposal / approval
-metadata, emits a low-sensitive approval outbox event, and exposes
-`VerifyApprovedAgentProposal` for `action-executor`.
+metadata, exposes `VerifyApprovedAgentProposal`, and publishes low-sensitive
+`im.agent.events` approval events through the approval outbox relay.
 `action-executor` can execute only the deterministic low-sensitive
 `nexusim.local.echo` local adapter and records output hash only; it still does
-not connect external MCP/provider tools. Next move is approval operator /
-approval outbox relay, external MCP adapter failure fallback, true tool output
-safety cases, or the next AI mainline task from `current-goal.md`.
+not connect external MCP/provider tools. Next move is approval operator,
+external MCP adapter failure fallback, true tool output safety cases, or the
+next AI mainline task from `current-goal.md`.
 Search, memory, retrieval, real RAG / summary / Agent adapter smokes, the skill
 catalog foundation, the MCP prepare boundary, and approved proposal preflight
 are passed.

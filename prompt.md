@@ -18,7 +18,7 @@
 2. 读取 prompt.md 和 agent.md，确认当前主线仍是 AI 应用底座。
 3. 读取 docs/runbook/current-goal.md 的当前 active slice；再按需读取 current-brief、remaining-goals、相关 service brief 或 SDD；不要全文扫长历史文档。
 
-当前 active slice：skill-registry catalog、mcp-gateway prepare、action-executor audit、Agent adapter smoke、proposal store、approval workflow、approval audit outbox、approved proposal handoff、execution eval、low-sensitive result projection、本地安全 tool adapter 已落。下一步默认推进 approval operator / approval outbox relay、外部 MCP adapter failure fallback、真实 tool output safety cases；完成后按 current-goal.md 选择下一项 AI 主线任务。
+当前 active slice：skill-registry catalog、mcp-gateway prepare、action-executor audit、Agent adapter smoke、proposal store、approval workflow、approval outbox relay、approved proposal handoff、execution eval、low-sensitive result projection、本地安全 tool adapter 已落。下一步默认推进 approval operator、外部 MCP adapter failure fallback、真实 tool output safety cases；完成后按 current-goal.md 选择下一项 AI 主线任务。
 
 硬边界：RAG / summary / Agent 只能消费 EvidencePack，不直接读 message / conversation / private tables；真实写动作必须继续走 policy、proposal / approval / executor / audit。
 

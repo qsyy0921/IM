@@ -32,4 +32,3 @@
 - 接真实 MCP / tool adapter。
 - 增加 rate limit、failure fallback、result projection 和 DLQ / repair。
 - 接 AI eval 的 Agent action safety adapter。
-

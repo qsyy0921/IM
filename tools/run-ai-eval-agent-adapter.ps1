@@ -100,6 +100,18 @@ function Test-AgentAssertion {
                 -and [int64]$Summary.search_projection_version -eq [int64]$Summary.seed.visibility_version `
                 -and [int64]$Summary.memory_projection_version -eq [int64]$Summary.seed.memory_projection_version
         }
+        "must_preserve_agent_retrieval_versions" {
+            return `
+                (Get-JsonPropertyString -Object $Summary -Name "agent_version").Length -gt 0 `
+                -and (Get-JsonPropertyString -Object $Summary -Name "retrieval_version").Length -gt 0
+        }
+        "must_keep_proposal_only_before_execution" {
+            return `
+                (Get-JsonPropertyString -Object $Summary -Name "proposal_status") -eq "PROPOSED" `
+                -and [bool]$Summary.requires_approval `
+                -and (-not [bool]$Summary.generated_by_llm) `
+                -and (-not [bool]$Summary.execution_executed)
+        }
         "must_record_prepare_audit" {
             return `
                 (Get-JsonPropertyString -Object $Summary -Name "prepared_audit_id").Length -gt 0 `
@@ -123,6 +135,17 @@ function Test-AgentAssertion {
                 -and [int64]$Summary.mcp_audit.permission_version -eq [int64]$Summary.policy_permission_version `
                 -and (Get-JsonPropertyString -Object $Summary.action_audit -Name "decision_source") -eq (Get-JsonPropertyString -Object $Summary -Name "execution_decision_source") `
                 -and (Get-JsonPropertyString -Object $Summary.action_audit -Name "classification") -eq (Get-JsonPropertyString -Object $Summary -Name "execution_classification")
+        }
+        "must_record_tool_payload_hash_only" {
+            return `
+                [bool]$Summary.mcp_audit.input_sha256_present `
+                -and [bool]$Summary.mcp_audit.raw_input_column_absent `
+                -and [bool]$Summary.action_audit.input_sha256_present `
+                -and [bool]$Summary.action_audit.raw_input_column_absent `
+                -and [bool]$Summary.action_audit.raw_output_column_absent `
+                -and [bool]$Summary.action_audit.result_raw_output_column_absent `
+                -and [bool]$Summary.action_audit.output_sha256_present `
+                -and [bool]$Summary.action_audit.low_sensitive_audit_only
         }
         "must_verify_approved_proposal" {
             return `

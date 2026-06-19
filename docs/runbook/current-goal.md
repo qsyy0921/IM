@@ -32,13 +32,14 @@ group memory -> EvidencePack -> RAG -> summary -> multi-agent
   multi-adapter regression gate smoke、gate policy manifest、Python optional
   adapter path、service-stack preflight wrapper、RAG / Agent optional
   service-stack live gate smoke、CI-safe gate skeleton、RAG / Agent regression
-  case expansion first pass、profile / Agent output safety expansion 和报告：
+  case expansion first pass、profile / Agent output safety expansion、
+  service-stack version / hash-only expansion 和报告：
   `docs/runbook/loadtest/ai-eval-service/`。
 
 下一步默认推进：
 
 ```text
-继续扩 service-stack RAG-Agent regression cases
+继续扩 service-stack negative RAG-Agent regression cases
 ```
 
 硬边界：RAG / summary / Agent 只能消费 EvidencePack；真实写动作必须走

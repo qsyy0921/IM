@@ -96,6 +96,11 @@ function Test-RAGAssertion {
                 -and [int64]$Summary.search_projection_version -eq [int64]$Summary.seed.visibility_version `
                 -and [int64]$Summary.memory_projection_version -eq [int64]$Summary.seed.memory_projection_version
         }
+        "must_preserve_rag_retrieval_versions" {
+            return `
+                (Get-JsonPropertyString -Object $Summary -Name "rag_version").Length -gt 0 `
+                -and (Get-JsonPropertyString -Object $Summary -Name "retrieval_version").Length -gt 0
+        }
         "must_abstain" {
             return $Summary.answer_status -eq "INSUFFICIENT_EVIDENCE"
         }

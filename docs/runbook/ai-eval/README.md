@@ -214,6 +214,9 @@ The 2026-06-20 profile / Agent output safety expansion run increased the
 CI-safe fixture adapter to 6 cases for cross-group profile isolation,
 superseded-memory exclusion, citation-only redaction and unapproved-action
 payload refusal.
+The 2026-06-20 service-stack version / hash-only expansion run increased the
+live suite to 17 cases and added RAG / Agent version preservation plus
+action-executor hash-only audit checks.
 
 First-stage Go-side Python worker adapter smoke:
 

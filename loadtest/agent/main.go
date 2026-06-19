@@ -138,6 +138,7 @@ type mcpAudit struct {
 	InputSHA256Present    bool   `json:"input_sha256_present"`
 	IdempotencyKeyMatches bool   `json:"idempotency_key_matches"`
 	LowSensitiveAuditOnly bool   `json:"low_sensitive_audit_only"`
+	RawInputColumnAbsent  bool   `json:"raw_input_column_absent"`
 }
 
 type actionAudit struct {
@@ -152,6 +153,9 @@ type actionAudit struct {
 	Executed               bool   `json:"executed"`
 	InputSHA256Present     bool   `json:"input_sha256_present"`
 	OutputSHA256Present    bool   `json:"output_sha256_present"`
+	RawInputColumnAbsent   bool   `json:"raw_input_column_absent"`
+	RawOutputColumnAbsent  bool   `json:"raw_output_column_absent"`
+	ResultRawOutputAbsent  bool   `json:"result_raw_output_column_absent"`
 	ResultID               string `json:"result_id"`
 	ResultStatus           string `json:"result_status"`
 	ResultRefPresent       bool   `json:"result_ref_present"`
@@ -915,9 +919,14 @@ WHERE tenant_id = $1
 	if err != nil {
 		return mcpAudit{}, fmt.Errorf("query mcp-gateway prepare audit: %w", err)
 	}
+	rawInputColumnAbsent, err := columnAbsent(ctx, pool, "mcp_gateway_tool_call_audits", "input_json")
+	if err != nil {
+		return mcpAudit{}, err
+	}
 	audit.InputSHA256Present = strings.TrimSpace(inputSHA256) != ""
 	audit.IdempotencyKeyMatches = idempotencyKey == response.GetProposalId()
-	audit.LowSensitiveAuditOnly = audit.InputSHA256Present
+	audit.RawInputColumnAbsent = rawInputColumnAbsent
+	audit.LowSensitiveAuditOnly = audit.InputSHA256Present && audit.RawInputColumnAbsent
 	if audit.Status != "ALLOWED" || !audit.Allowed || !audit.RequiresApproval {
 		return mcpAudit{}, fmt.Errorf("unexpected mcp audit decision: %+v", audit)
 	}
@@ -927,8 +936,8 @@ WHERE tenant_id = $1
 	if audit.PermissionVersion != 42 || audit.Classification != "TOOL_APPROVAL_REQUIRED" || audit.DecisionSource != "TOOL_RULE" {
 		return mcpAudit{}, fmt.Errorf("unexpected mcp audit policy metadata: %+v", audit)
 	}
-	if !audit.InputSHA256Present {
-		return mcpAudit{}, errors.New("mcp audit must store low-sensitive input_sha256")
+	if !audit.InputSHA256Present || !audit.RawInputColumnAbsent {
+		return mcpAudit{}, errors.New("mcp audit must store low-sensitive input_sha256 and no raw input column")
 	}
 	if !audit.IdempotencyKeyMatches {
 		return mcpAudit{}, fmt.Errorf("mcp audit idempotency key mismatch: %q != %q", idempotencyKey, response.GetProposalId())
@@ -996,12 +1005,31 @@ WHERE tenant_id = $1
 	if err != nil {
 		return actionAudit{}, fmt.Errorf("query action-executor execution audit: %w", err)
 	}
+	rawInputColumnAbsent, err := columnAbsent(ctx, pool, "action_executor_execution_audits", "input_json")
+	if err != nil {
+		return actionAudit{}, err
+	}
+	rawOutputColumnAbsent, err := columnAbsent(ctx, pool, "action_executor_execution_audits", "output_json")
+	if err != nil {
+		return actionAudit{}, err
+	}
+	resultRawOutputAbsent, err := columnAbsent(ctx, pool, "action_executor_tool_results", "output_json")
+	if err != nil {
+		return actionAudit{}, err
+	}
 	audit.InputSHA256Present = strings.TrimSpace(inputSHA256) != ""
 	audit.OutputSHA256Present = strings.TrimSpace(outputSHA256) != ""
+	audit.RawInputColumnAbsent = rawInputColumnAbsent
+	audit.RawOutputColumnAbsent = rawOutputColumnAbsent
+	audit.ResultRawOutputAbsent = resultRawOutputAbsent
 	audit.ProposalIDMatches = proposalID == proposal.GetProposalId()
 	audit.ApprovalIDMatches = approvalID == approval.GetApprovalId()
 	audit.PreparedAuditIDMatches = preparedAuditID == proposal.GetPreparedAuditId()
-	audit.LowSensitiveAuditOnly = audit.InputSHA256Present && (!audit.Executed || audit.OutputSHA256Present)
+	audit.LowSensitiveAuditOnly = audit.InputSHA256Present &&
+		audit.RawInputColumnAbsent &&
+		audit.RawOutputColumnAbsent &&
+		audit.ResultRawOutputAbsent &&
+		(!audit.Executed || audit.OutputSHA256Present)
 	var resultExecutionID string
 	var resultRef string
 	err = pool.QueryRow(ctx, `
@@ -1054,6 +1082,20 @@ WHERE tenant_id = $1
 		return actionAudit{}, fmt.Errorf("action audit linkage mismatch: %+v", audit)
 	}
 	return audit, nil
+}
+
+func columnAbsent(ctx context.Context, pool *pgxpool.Pool, tableName string, columnName string) (bool, error) {
+	var count int
+	if err := pool.QueryRow(ctx, `
+SELECT COUNT(*)
+FROM information_schema.columns
+WHERE table_schema = 'public'
+  AND table_name = $1
+  AND column_name = $2
+`, tableName, columnName).Scan(&count); err != nil {
+		return false, fmt.Errorf("query column presence %s.%s: %w", tableName, columnName, err)
+	}
+	return count == 0, nil
 }
 
 func verifyCitation(citation *agentv1.AgentCitation, seed seededData) error {

@@ -29,8 +29,8 @@ provider-grade 运维和完整系统测试暂不作为当前转进阻塞。
    action-executor external adapter 和 Python worker 的 policy-driven
    multi-adapter gate smoke，也已跑通 RAG / Agent service-stack live gate 和
    CI-safe gate skeleton。RAG coverage / Agent prepare-audit 第一批扩展和
-   profile / Agent output safety expansion 已落；下一步继续补更深的
-   service-stack RAG / Agent regression cases；仍不得保存 raw prompt、
+   profile / Agent output safety expansion 和 service-stack version / hash-only
+   expansion 已落；下一步补 service-stack negative RAG / Agent cases；仍不得保存 raw prompt、
    EvidencePack、model output、用户正文、secret 或 tool input。
    继续补真实 Agent 输出回归、外部 MCP failure fallback、tool/action safety
    cases 和 RAG / summary citation regression。所有

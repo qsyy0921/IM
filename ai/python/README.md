@@ -69,12 +69,14 @@ Run this repo-level guard when changing Python worker foundations:
 .\tools\check-python-ai-worker-boundary.ps1
 .\tools\run-python-ai-worker-smoke.ps1 -Python C:\Users\10495\anaconda3\envs\IM\python.exe
 .\tools\run-ai-eval-python-worker-adapter.ps1 -Python C:\Users\10495\anaconda3\envs\IM\python.exe
+go run ./tools/python-worker-go-adapter-smoke -python C:\Users\10495\anaconda3\envs\IM\python.exe
 ```
 
 The guard is intentionally small. It protects the first-stage boundary:
 candidate-only Python, Go-owned control plane, no direct IM PostgreSQL table
 access from Python workers, and a reproducible `IM` conda environment.
 
-The first worker smoke and eval adapter prove only local candidate contract
-safety: malformed / unsafe inputs fail closed, and successful candidates return
-hashes and source refs rather than raw output text.
+The worker smoke, eval adapter and Go-side adapter smoke prove only local
+candidate contract safety: malformed / unsafe inputs fail closed, successful
+candidates return hashes and source refs rather than raw output text, and Go
+consumes candidate metadata rather than delegating control to Python.

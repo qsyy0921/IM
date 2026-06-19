@@ -10,6 +10,7 @@ summary, Agent and tool/action boundaries.
 - RAG execution adapter: `tools/run-ai-eval-rag-adapter.ps1`
 - Agent execution adapter: `tools/run-ai-eval-agent-adapter.ps1`
 - Python worker output-safety adapter: `tools/run-ai-eval-python-worker-adapter.ps1`
+- Go-side Python worker adapter smoke: `tools/python-worker-go-adapter-smoke`
 - Scope: first-stage schema + local execution coverage only; not a production
   benchmark, not a model-quality claim, and not a long-running eval platform.
 
@@ -89,3 +90,14 @@ First-stage Python worker output-safety adapter:
 This adapter calls the local candidate-only Python worker CLI and verifies that
 malformed and unsafe inputs return low-sensitive `FAILED` candidates. It does
 not call external providers, databases or Go services.
+
+First-stage Go-side Python worker adapter smoke:
+
+```powershell
+go run ./tools/python-worker-go-adapter-smoke `
+  -python C:\Users\10495\anaconda3\envs\IM\python.exe
+```
+
+This adapter proves Go can invoke the Python candidate CLI and consume only the
+validated candidate metadata / output hash. It still does not call external
+providers, databases or business services.

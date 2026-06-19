@@ -39,11 +39,13 @@ group memory -> EvidencePack -> RAG -> summary -> multi-agent
   provider failure 回退 extractive，unsafe / malformed output fail closed。
 - Python worker malformed / unsafe output eval coverage 和第一条 candidate-only
   worker smoke。
+- Go-side Python candidate adapter smoke：Go 控制面调用 Python worker CLI，
+  验证只消费低敏 candidate metadata / output hash。
 
 下一步默认推进：
 
 ```text
-Go-side Python candidate adapter / first integration
+Service-level Python candidate integration
 ```
 
 硬边界：RAG / summary / Agent 只能消费 EvidencePack；真实写动作必须走

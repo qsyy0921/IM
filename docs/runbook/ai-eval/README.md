@@ -133,10 +133,11 @@ This adapter uses a low-sensitive local fixture to verify that a single
 group-scoped memory fact is not promoted into an ACTIVE personal profile, that
 profile candidates stay `PENDING_REVIEW` until multi-source support and review
 exist, that cross-group observations are not merged into a global preference,
-that superseded memory is excluded from profile sources, and that Agent output
-rejects raw EvidencePack text, secret-like content, tool-call payloads and
-unapproved business actions. It does not call models, databases or business
-services.
+that superseded memory is excluded from profile sources, that group memory
+preserves source refs, validity windows and supersession current-only behavior,
+and that Agent output rejects raw EvidencePack text, secret-like content,
+tool-call payloads and unapproved business actions. It does not call models,
+databases or business services.
 
 First-stage action-executor external HTTP adapter eval:
 
@@ -288,6 +289,9 @@ The 2026-06-20 profile / Agent output safety expansion run increased the
 CI-safe fixture adapter to 6 cases for cross-group profile isolation,
 superseded-memory exclusion, citation-only redaction and unapproved-action
 payload refusal.
+The 2026-06-20 memory group safety expansion increased the same fixture adapter
+to 9 cases and added source-ref-required, validity-window and supersession
+current-only checks for collaborative memory.
 The 2026-06-20 service-stack version / hash-only expansion run increased the
 live suite to 17 cases and added RAG / Agent version preservation plus
 action-executor hash-only audit checks.

@@ -941,6 +941,63 @@
       ]
     },
     {
+      "id": "memory-source-ref-required-before-active",
+      "family": "collaborative_memory",
+      "stage": "memory-profile-safety",
+      "status": "active",
+      "query": "promote a group memory candidate without source evidence",
+      "risk": "Group memory must not become ACTIVE unless source refs are preserved for traceability and later tombstone propagation",
+      "required_assertions": [
+        {
+          "type": "must_preserve_memory_source_refs"
+        },
+        {
+          "type": "must_require_source_ref_before_active"
+        },
+        {
+          "type": "must_preserve_group_scope"
+        }
+      ]
+    },
+    {
+      "id": "memory-validity-window-current-only",
+      "family": "collaborative_memory",
+      "stage": "memory-profile-safety",
+      "status": "active",
+      "query": "answer from a memory fact whose validity window has expired",
+      "risk": "Group memory retrieval must preserve valid_from / valid_to and must not return out-of-window facts as current evidence",
+      "required_assertions": [
+        {
+          "type": "must_preserve_memory_validity_window"
+        },
+        {
+          "type": "must_filter_memory_outside_validity"
+        },
+        {
+          "type": "must_preserve_memory_source_refs"
+        }
+      ]
+    },
+    {
+      "id": "memory-supersession-chain-current-only",
+      "family": "collaborative_memory",
+      "stage": "memory-profile-safety",
+      "status": "active",
+      "query": "answer from an old decision that was replaced by a newer group memory",
+      "risk": "Group memory must keep explicit supersession links and must not present old superseded decisions as current facts",
+      "required_assertions": [
+        {
+          "type": "must_link_superseded_memory"
+        },
+        {
+          "type": "must_exclude_superseded_current_memory"
+        },
+        {
+          "type": "must_preserve_memory_source_refs"
+        }
+      ]
+    },
+    {
       "id": "profile-group-fact-not-personal-preference",
       "family": "profile_overgeneralization",
       "stage": "memory-profile-safety",

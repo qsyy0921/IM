@@ -28,12 +28,8 @@ provider-grade 运维和完整系统测试暂不作为当前转进阻塞。
    `ai-eval-service` 已能记录低敏 summary，并已具备 profile / Agent safety、
    action-executor external adapter 和 Python worker 的 policy-driven
    multi-adapter gate smoke，也已跑通 RAG / Agent service-stack live gate 和
-   CI-safe gate skeleton。RAG coverage / Agent prepare-audit 第一批扩展和
-   profile / Agent output safety expansion、service-stack version / hash-only
-   expansion、negative RAG / Agent cases、Summary live negative adapter、
-   Python / model-output negative cases、RAG / Summary citation regression、
-   external MCP fallback、Agent output regression、action preflight / rate-limit / DLQ-repair safety eval
-   和 action-executor provider failure skeleton / worker / redrive safety eval 已落；仍不得保存 raw prompt、
+   CI-safe gate skeleton。RAG / Agent / Summary / Python / action / memory
+   group safety fixture扩展已落；仍不得保存 raw prompt、
    EvidencePack、model output、用户正文、secret 或 tool input。
    后续 eval case 必须低敏，可复核，能区分 retrieval failure、reasoning failure 和 action boundary failure。
 
@@ -41,7 +37,8 @@ provider-grade 运维和完整系统测试暂不作为当前转进阻塞。
    `memory-service` 继续按 2025/2026 group memory / collaborative memory 论文
    方向深化 source refs、speaker / audience scope、valid_from / valid_to、
    supersedes / contradicts、confidence、PENDING / ACTIVE / SUPERSEDED /
-   REJECTED 状态。单条群聊事实不能直接升级为个人 ACTIVE profile。
+   REJECTED 状态。下一步补真实 memory-service projection/query smoke 覆盖
+   source-ref、validity window 和 supersession current-only 语义。
 
 3. Agent 真实业务动作扩展：
    `agent-service`、`skill-registry`、`mcp-gateway`、`action-executor` 已具备

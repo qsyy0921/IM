@@ -84,6 +84,40 @@ function Test-ProfileAgentAssertion {
                 [bool]$Fixture.profile.review_required `
                 -and (Get-JsonPropertyString -Object $Fixture.profile -Name "profile_status") -eq "PENDING_REVIEW"
         }
+        "must_preserve_memory_source_refs" {
+            return `
+                [bool]$Fixture.memory.source_refs_preserved `
+                -and ([int]$Fixture.memory.source_ref_count -ge [int]$Fixture.memory.min_source_refs) `
+                -and (Get-JsonPropertyString -Object $Fixture.memory -Name "primary_source_type") -eq "MESSAGE"
+        }
+        "must_require_source_ref_before_active" {
+            return `
+                [bool]$Fixture.memory.active_requires_source_ref `
+                -and [bool]$Fixture.memory.no_source_ref_active_blocked `
+                -and (Get-JsonPropertyString -Object $Fixture.memory -Name "no_source_ref_candidate_status") -ne "ACTIVE"
+        }
+        "must_preserve_memory_validity_window" {
+            return `
+                [bool]$Fixture.memory.validity_window_preserved `
+                -and ([int64]$Fixture.memory.valid_from_seq -le [int64]$Fixture.memory.query_seq) `
+                -and ([int64]$Fixture.memory.query_seq -le [int64]$Fixture.memory.valid_to_seq)
+        }
+        "must_filter_memory_outside_validity" {
+            return `
+                [bool]$Fixture.memory.outside_validity_filtered `
+                -and ([int64]$Fixture.memory.outside_query_seq -gt [int64]$Fixture.memory.valid_to_seq)
+        }
+        "must_link_superseded_memory" {
+            return `
+                [bool]$Fixture.memory.supersession_link_preserved `
+                -and (Get-JsonPropertyString -Object $Fixture.memory -Name "old_memory_status") -eq "SUPERSEDED" `
+                -and (Get-JsonPropertyString -Object $Fixture.memory -Name "new_memory_status") -eq "ACTIVE"
+        }
+        "must_exclude_superseded_current_memory" {
+            return `
+                [bool]$Fixture.memory.superseded_current_excluded `
+                -and (-not [bool]$Fixture.memory.old_memory_returned_as_current)
+        }
         "must_reject_sensitive_agent_output" {
             return `
                 [bool]$Fixture.agent.unsafe_output_rejected `
@@ -179,6 +213,26 @@ $fixture = [pscustomobject]@{
         superseded_source_temporal_status = "SUPERSEDED"
         active_profile_source_temporal_status = "ACTIVE"
         superseded_source_excluded = $true
+    }
+    memory = [pscustomobject]@{
+        source_refs_preserved = $true
+        source_ref_count = 2
+        min_source_refs = 1
+        primary_source_type = "MESSAGE"
+        active_requires_source_ref = $true
+        no_source_ref_active_blocked = $true
+        no_source_ref_candidate_status = "PENDING_REVIEW"
+        validity_window_preserved = $true
+        valid_from_seq = 12
+        valid_to_seq = 24
+        query_seq = 18
+        outside_query_seq = 31
+        outside_validity_filtered = $true
+        supersession_link_preserved = $true
+        old_memory_status = "SUPERSEDED"
+        new_memory_status = "ACTIVE"
+        superseded_current_excluded = $true
+        old_memory_returned_as_current = $false
     }
     agent = [pscustomobject]@{
         evidencepack_required = $true

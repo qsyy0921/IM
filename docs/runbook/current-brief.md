@@ -33,13 +33,14 @@ agent、skill-registry、mcp-gateway、action-executor、ai-eval。
 adapter path、RAG / Agent live gate、CI-safe gate skeleton、RAG-Agent expansion、
 profile / Agent safety、negative cases、Python/model-output、RAG/Summary citation、
 external MCP fallback、Agent output regression、action preflight / rate-limit / DLQ-repair safety eval
-和 action-executor provider failure skeleton / worker / redrive safety eval 已落；
+和 action-executor provider failure skeleton / worker / redrive safety eval、memory
+group source-ref / validity / supersession fixture eval 已落；
 只保存低敏 run refs / counters / metadata。
 
 当前下一步：
 
 ```text
-继续扩 memory-service group memory source-ref / validity / supersession eval
+继续推进 memory-service runtime source-ref / validity / supersession projection/query smoke
 ```
 
 完整系统测试、生产级 HA、长压和 sizing 继续后置为 hardening backlog。

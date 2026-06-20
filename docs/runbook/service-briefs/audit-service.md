@@ -1,7 +1,7 @@
 # audit-service
 
-状态：future / SDD v0.1 draft pending。当前不得创建 `services/audit-service`
-目录，直到完成 ADR 或 stage switch。
+状态：future / SDD v0.1 draft 已存在。当前不得创建 `services/audit-service`
+目录，直到完成 stage switch。
 
 定位：统一审计平台，聚合登录审计、安全审计、管理操作审计、策略决策归档、
 Agent 动作审计、审计导出和 hash-chain proof。
@@ -15,6 +15,7 @@ Agent 动作审计、审计导出和 hash-chain proof。
 
 第一切片建议：
 
-- 消费 identity / policy / agent / action audit events。
+- 具体边界见 `docs/sdd/audit-service.md`。
+- 消费 identity / policy / agent / action / notification 低敏 audit events。
 - 提供 `AppendAuditRecord` / `QueryAuditRecords` 内部 API。
-- 增加 hash-chain segment 和 export manifest。
+- 增加 hash-chain segment、redacted export manifest 和 proof verify。

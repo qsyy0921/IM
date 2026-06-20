@@ -40,7 +40,7 @@ Go 侧服务底座、EvidencePack、proposal / approval / audit 和 eval 持久�
 当前下一步：
 
 ```text
-media / notification SDD draft 已存在；下一步按 service brief 推进 audit-service SDD
+media / notification / audit SDD draft 已存在；下一步推进 control-plane-service SDD
 ```
 
 完整系统测试、生产级 HA、长压和 sizing 继续后置为 hardening backlog。

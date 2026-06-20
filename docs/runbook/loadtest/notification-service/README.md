@@ -31,9 +31,32 @@
 
 - `docs/runbook/loadtest/notification-service/loadtest-report-20260620-notification-outbox-relay-smoke.md`
 
+## Delivery worker / noop provider smoke
+
+脚本：
+
+```powershell
+.\loadtest\notification\run-local-smoke.ps1 -WithDeliveryWorker
+```
+
+新增行为：
+
+1. 在 outbox relay smoke 基础上额外启动
+   `NEXUSIM_NOTIFICATION_SERVICE_MODE=delivery-worker`。
+2. delivery worker 使用 `NEXUSIM_NOTIFICATION_PROVIDER_MODE=noop`。
+3. runner 等待 request 进入 `DELIVERED`，并确认：
+   - delivery attempt 写入一次；
+   - `notification.delivery.succeeded.v1` outbox 写入；
+   - `notification_outbox PENDING=0 / PUBLISHED=2 / DLQ=0`；
+   - Kafka readback 包含 `request_accepted` 和 `delivery_succeeded` 两种 payload。
+
+报告：
+
+- `docs/runbook/loadtest/notification-service/loadtest-report-20260620-notification-delivery-worker-smoke.md`
+
 边界：
 
 - 这是单节点本地 Kafka smoke，不证明 Kafka HA / ISR / 网络分区语义。
-- 当前只验证 request accepted event publish，不验证 provider worker、真实 email /
-  SMS / APNs / FCM、bounce 或 suppression。
+- 当前只验证 noop provider worker，不验证真实 email / SMS / APNs / FCM、bounce
+  或 suppression。
 - raw summary / logs 写入 `H:\NexusIM\loadtest-results`。

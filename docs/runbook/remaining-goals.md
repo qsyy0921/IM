@@ -77,9 +77,10 @@ eval 已能支撑算法切片；生产级 HA、长压、sizing 和完整系统�
   focused checks / 完整 `check-local`。当前只覆盖 `CreateNotificationRequest` /
   `GetNotificationStatus` / `CancelNotificationRequest`、request 事实源和
   `notification.request.accepted.v1` outbox；`notification_outbox -> im.notification.events`
-  最小 relay、Kafka schema、runtime mode、真实 PG relay 测试和真实 Kafka smoke 已补。
-  后续仍需 delivery worker、provider adapter、bounce / suppression worker、
-  provider-grade email / SMS / APNs / FCM。
+  最小 relay、Kafka schema、runtime mode、真实 PG relay 测试和真实 Kafka smoke 已补；
+  delivery worker、noop provider adapter 和 delivery succeeded smoke 已补。
+  后续仍需 provider-grade webhook / SMTP / SMS / APNs / FCM adapter、
+  bounce / suppression worker、provider redrive / audit 产品化。
 
 ## 后置平台 / 产品化服务
 

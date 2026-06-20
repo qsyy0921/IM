@@ -48,6 +48,46 @@ func TestBuildNotificationEventRejectsSensitivePayloadFields(t *testing.T) {
 	}
 }
 
+func TestBuildNotificationEventDeliverySucceeded(t *testing.T) {
+	payload := map[string]any{
+		"tenant_id":                "tenant-notification",
+		"request_id":               "notif-1",
+		"channel":                  "EMAIL",
+		"provider_id":              "local-noop",
+		"provider_message_id_hash": "hash-1",
+	}
+	event, err := BuildNotificationEvent(notificationOutboxMessage(types.NotificationEventDeliverySucceeded, payload))
+	if err != nil {
+		t.Fatalf("build notification event: %v", err)
+	}
+	succeeded := event.GetDeliverySucceeded()
+	if succeeded == nil ||
+		succeeded.ProviderId != "local-noop" ||
+		succeeded.ProviderMessageIdHash != "hash-1" {
+		t.Fatalf("unexpected delivery succeeded event: %+v", event)
+	}
+}
+
+func TestBuildNotificationEventDeliveryDeadLettered(t *testing.T) {
+	payload := map[string]any{
+		"tenant_id":     "tenant-notification",
+		"request_id":    "notif-1",
+		"channel":       "EMAIL",
+		"failure_class": types.FailureClassProviderUnavailable,
+		"public_error":  types.PublicErrorProviderUnavailable,
+	}
+	event, err := BuildNotificationEvent(notificationOutboxMessage(types.NotificationEventDeliveryDeadLettered, payload))
+	if err != nil {
+		t.Fatalf("build notification event: %v", err)
+	}
+	deadLettered := event.GetDeliveryDeadLettered()
+	if deadLettered == nil ||
+		deadLettered.FailureClass != types.FailureClassProviderUnavailable ||
+		deadLettered.PublicError != types.PublicErrorProviderUnavailable {
+		t.Fatalf("unexpected delivery dead-lettered event: %+v", event)
+	}
+}
+
 func TestBuildNotificationEventRejectsUnsupportedAndMalformed(t *testing.T) {
 	if _, err := BuildNotificationEvent(notificationOutboxMessage("notification.future.v9", acceptedPayload())); err == nil {
 		t.Fatalf("expected unsupported event type to fail")

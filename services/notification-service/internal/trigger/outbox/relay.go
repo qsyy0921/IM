@@ -181,6 +181,9 @@ func BuildNotificationEvent(message types.OutboxMessage) (*notificationeventsv1.
 	if err != nil {
 		return nil, err
 	}
+	if err := validateNotificationPayloadForEvent(message.EventType, payload); err != nil {
+		return nil, err
+	}
 	traceID := firstNonEmpty(message.TraceID, payload.TraceID)
 	correlationID := firstNonEmpty(message.CorrelationID, payload.CorrelationID, message.EventID)
 	causationID := firstNonEmpty(message.CausationID, payload.CausationID, message.EventID)
@@ -204,6 +207,18 @@ func BuildNotificationEvent(message types.OutboxMessage) (*notificationeventsv1.
 		event.Payload = &notificationeventsv1.NotificationEvent_RequestAccepted{
 			RequestAccepted: notificationRequestAccepted(payload),
 		}
+	case types.NotificationEventDeliverySucceeded:
+		event.Payload = &notificationeventsv1.NotificationEvent_DeliverySucceeded{
+			DeliverySucceeded: notificationDeliverySucceeded(payload),
+		}
+	case types.NotificationEventDeliveryFailed:
+		event.Payload = &notificationeventsv1.NotificationEvent_DeliveryFailed{
+			DeliveryFailed: notificationDeliveryFailed(payload),
+		}
+	case types.NotificationEventDeliveryDeadLettered:
+		event.Payload = &notificationeventsv1.NotificationEvent_DeliveryDeadLettered{
+			DeliveryDeadLettered: notificationDeliveryDeadLettered(payload),
+		}
 	default:
 		return nil, errors.New("unsupported notification outbox event type")
 	}
@@ -211,20 +226,24 @@ func BuildNotificationEvent(message types.OutboxMessage) (*notificationeventsv1.
 }
 
 type notificationPayload struct {
-	TenantID          string `json:"tenant_id"`
-	RequestID         string `json:"request_id"`
-	RequesterService  string `json:"requester_service"`
-	Channel           string `json:"channel"`
-	RecipientRef      string `json:"recipient_ref"`
-	DestinationMasked string `json:"destination_masked"`
-	TemplateKey       string `json:"template_key"`
-	TemplateVersion   string `json:"template_version"`
-	Locale            string `json:"locale"`
-	Priority          string `json:"priority"`
-	Status            string `json:"status"`
-	CorrelationID     string `json:"correlation_id"`
-	CausationID       string `json:"causation_id"`
-	TraceID           string `json:"trace_id"`
+	TenantID              string `json:"tenant_id"`
+	RequestID             string `json:"request_id"`
+	RequesterService      string `json:"requester_service"`
+	Channel               string `json:"channel"`
+	RecipientRef          string `json:"recipient_ref"`
+	DestinationMasked     string `json:"destination_masked"`
+	TemplateKey           string `json:"template_key"`
+	TemplateVersion       string `json:"template_version"`
+	Locale                string `json:"locale"`
+	Priority              string `json:"priority"`
+	Status                string `json:"status"`
+	ProviderID            string `json:"provider_id"`
+	ProviderMessageIDHash string `json:"provider_message_id_hash"`
+	FailureClass          string `json:"failure_class"`
+	PublicError           string `json:"public_error"`
+	CorrelationID         string `json:"correlation_id"`
+	CausationID           string `json:"causation_id"`
+	TraceID               string `json:"trace_id"`
 }
 
 func decodeNotificationPayload(payloadJSON []byte) (notificationPayload, error) {
@@ -235,18 +254,33 @@ func decodeNotificationPayload(payloadJSON []byte) (notificationPayload, error) 
 	if err := json.Unmarshal(payloadJSON, &payload); err != nil {
 		return notificationPayload{}, err
 	}
-	if payload.TenantID == "" ||
-		payload.RequestID == "" ||
-		payload.RequesterService == "" ||
-		payload.Channel == "" ||
-		payload.RecipientRef == "" ||
-		payload.TemplateKey == "" ||
-		payload.TemplateVersion == "" ||
-		payload.Priority == "" ||
-		payload.Status == "" {
-		return notificationPayload{}, errors.New("notification request payload is incomplete")
-	}
 	return payload, nil
+}
+
+func validateNotificationPayloadForEvent(eventType string, payload notificationPayload) error {
+	if payload.TenantID == "" || payload.RequestID == "" || payload.Channel == "" {
+		return errors.New("notification payload is incomplete")
+	}
+	switch eventType {
+	case types.NotificationEventRequestAccepted:
+		if payload.RequesterService == "" ||
+			payload.RecipientRef == "" ||
+			payload.TemplateKey == "" ||
+			payload.TemplateVersion == "" ||
+			payload.Priority == "" ||
+			payload.Status == "" {
+			return errors.New("notification request accepted payload is incomplete")
+		}
+	case types.NotificationEventDeliverySucceeded:
+		if payload.ProviderID == "" || payload.ProviderMessageIDHash == "" {
+			return errors.New("notification delivery succeeded payload is incomplete")
+		}
+	case types.NotificationEventDeliveryFailed, types.NotificationEventDeliveryDeadLettered:
+		if payload.FailureClass == "" || payload.PublicError == "" {
+			return errors.New("notification delivery failure payload is incomplete")
+		}
+	}
+	return nil
 }
 
 func containsForbiddenPayloadField(payloadJSON []byte) bool {
@@ -284,6 +318,36 @@ func notificationRequestAccepted(payload notificationPayload) *notificationevent
 		Locale:            payload.Locale,
 		Priority:          payload.Priority,
 		Status:            payload.Status,
+	}
+}
+
+func notificationDeliverySucceeded(payload notificationPayload) *notificationeventsv1.NotificationDeliverySucceededV1 {
+	return &notificationeventsv1.NotificationDeliverySucceededV1{
+		TenantId:              payload.TenantID,
+		RequestId:             payload.RequestID,
+		Channel:               payload.Channel,
+		ProviderId:            payload.ProviderID,
+		ProviderMessageIdHash: payload.ProviderMessageIDHash,
+	}
+}
+
+func notificationDeliveryFailed(payload notificationPayload) *notificationeventsv1.NotificationDeliveryFailedV1 {
+	return &notificationeventsv1.NotificationDeliveryFailedV1{
+		TenantId:     payload.TenantID,
+		RequestId:    payload.RequestID,
+		Channel:      payload.Channel,
+		FailureClass: payload.FailureClass,
+		PublicError:  payload.PublicError,
+	}
+}
+
+func notificationDeliveryDeadLettered(payload notificationPayload) *notificationeventsv1.NotificationDeliveryDeadLetteredV1 {
+	return &notificationeventsv1.NotificationDeliveryDeadLetteredV1{
+		TenantId:     payload.TenantID,
+		RequestId:    payload.RequestID,
+		Channel:      payload.Channel,
+		FailureClass: payload.FailureClass,
+		PublicError:  payload.PublicError,
 	}
 }
 

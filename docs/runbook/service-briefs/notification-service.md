@@ -9,6 +9,9 @@ builder 单测和真实 PostgreSQL relay 集成测试已补。当前不宣称 pr
 email / SMS / APNs / FCM。
 `notification_outbox -> im.notification.events` 真实 Kafka smoke 已通过，报告见
 `docs/runbook/loadtest/notification-service/loadtest-report-20260620-notification-outbox-relay-smoke.md`。
+第一版 `delivery-worker` 和 noop provider adapter 已落地，真实本地 delivery smoke
+已通过，报告见
+`docs/runbook/loadtest/notification-service/loadtest-report-20260620-notification-delivery-worker-smoke.md`。
 
 Stage-switch 记录：`docs/runbook/stage-switch/notification-service.md`。
 
@@ -31,6 +34,6 @@ bounce handling、provider retry 和通知审计。
 
 下一步：
 
-- 继续做 provider worker / provider adapter 边界。
-- 后续再做 delivery worker、bounce / suppression worker 和 provider-grade email /
-  SMS / APNs / FCM。
+- 继续做 provider-grade webhook / SMTP / SMS / APNs / FCM adapter 边界，或先按
+  promotion plan 转入 `audit-service`。
+- 后续再做 bounce / suppression worker、provider redrive / audit 产品化。

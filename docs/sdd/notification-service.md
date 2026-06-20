@@ -311,10 +311,13 @@ NEXUSIM_NOTIFICATION_SERVICE_MODE=cleanup
 provider 配置第一版：
 
 ```text
-NEXUSIM_NOTIFICATION_PROVIDER_MODE=webhook|smtp|noop
+NEXUSIM_NOTIFICATION_PROVIDER_MODE=noop|fake
 NEXUSIM_NOTIFICATION_SECRET_PAYLOAD_KEY=...
 NEXUSIM_NOTIFICATION_SECRET_PAYLOAD_KEYRING_JSON=...
 ```
+
+`noop` / `fake` 只用于本地 smoke 和 provider boundary 验证；真实
+webhook / SMTP / SMS / APNs / FCM adapter 需要单独切片接入。
 
 operator：
 

@@ -20,6 +20,8 @@ import (
 	"github.com/qsyy0921/IM/services/notification-service/internal/infrastructure/destinationhash"
 	kafkainfra "github.com/qsyy0921/IM/services/notification-service/internal/infrastructure/kafka"
 	postgresinfra "github.com/qsyy0921/IM/services/notification-service/internal/infrastructure/postgres"
+	providerinfra "github.com/qsyy0921/IM/services/notification-service/internal/infrastructure/provider"
+	"github.com/qsyy0921/IM/services/notification-service/internal/trigger/delivery"
 	"github.com/qsyy0921/IM/services/notification-service/internal/trigger/outbox"
 	"google.golang.org/grpc"
 )
@@ -43,6 +45,8 @@ func run(ctx context.Context) error {
 		return runNoop(ctx)
 	case "grpc":
 		return runGRPC(ctx)
+	case "delivery-worker":
+		return runDeliveryWorker(ctx)
 	case "outbox-relay":
 		return runOutboxRelay(ctx)
 	default:
@@ -122,6 +126,45 @@ func runGRPC(ctx context.Context) error {
 	}
 }
 
+func runDeliveryWorker(ctx context.Context) error {
+	debugAddr, err := notificationDebugAddrFromEnv()
+	if err != nil {
+		return err
+	}
+	stopDebug, err := startDebugServer(ctx, debugAddr)
+	if err != nil {
+		return err
+	}
+	defer stopDebug()
+
+	pool, err := openPGPool(ctx)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	provider, providerID, err := notificationProviderFromEnv()
+	if err != nil {
+		return err
+	}
+	worker := delivery.NewWorker(
+		postgresinfra.NewDeliveryStore(pool),
+		provider,
+		nil,
+		delivery.Config{
+			ProviderID:     providerID,
+			BatchSize:      envInt("NEXUSIM_NOTIFICATION_DELIVERY_BATCH_SIZE", 50),
+			PollInterval:   envDuration("NEXUSIM_NOTIFICATION_DELIVERY_POLL_INTERVAL", time.Second),
+			MaxAttempts:    envInt("NEXUSIM_NOTIFICATION_DELIVERY_MAX_ATTEMPTS", 3),
+			RetryBaseDelay: envDuration("NEXUSIM_NOTIFICATION_DELIVERY_RETRY_BASE_DELAY", time.Second),
+			ErrorBackoff:   envDuration("NEXUSIM_NOTIFICATION_DELIVERY_ERROR_BACKOFF", time.Second),
+			Logf:           log.Printf,
+		},
+	)
+	log.Printf("notification-service delivery worker using provider %s", providerID)
+	return worker.Run(ctx)
+}
+
 func runOutboxRelay(ctx context.Context) error {
 	debugAddr, err := notificationDebugAddrFromEnv()
 	if err != nil {
@@ -180,10 +223,24 @@ func notificationServiceModeFromEnv() string {
 
 func validateNotificationServiceMode(mode string) error {
 	switch mode {
-	case "noop", "grpc", "outbox-relay":
+	case "noop", "grpc", "delivery-worker", "outbox-relay":
 		return nil
 	default:
 		return fmt.Errorf("unsupported NEXUSIM_NOTIFICATION_SERVICE_MODE %q", mode)
+	}
+}
+
+func notificationProviderFromEnv() (delivery.Provider, string, error) {
+	mode := strings.TrimSpace(os.Getenv("NEXUSIM_NOTIFICATION_PROVIDER_MODE"))
+	if mode == "" {
+		mode = "noop"
+	}
+	providerID := envString("NEXUSIM_NOTIFICATION_PROVIDER_ID", "local-"+mode)
+	switch mode {
+	case "noop", "fake":
+		return providerinfra.NewNoopProvider(providerID), providerID, nil
+	default:
+		return nil, "", fmt.Errorf("unsupported NEXUSIM_NOTIFICATION_PROVIDER_MODE %q", mode)
 	}
 }
 

@@ -5,6 +5,7 @@ param(
     [string]$NotificationGrpcAddr = "",
     [string]$KafkaBrokers = "localhost:9092",
     [string]$NotificationEventsTopic = "",
+    [switch]$WithDeliveryWorker,
     [switch]$SkipBuild
 )
 
@@ -15,7 +16,11 @@ $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\.."))
 Assert-ExternalOutputRoot -Value $ResultRoot -RepositoryRoot $repoRoot -Name "ResultRoot"
 
 if (-not $RunName) {
-    $RunName = "notification-service-outbox-relay-smoke-" + (Get-Date -Format "yyyyMMdd-HHmmss")
+    if ($WithDeliveryWorker) {
+        $RunName = "notification-service-delivery-worker-smoke-" + (Get-Date -Format "yyyyMMdd-HHmmss")
+    } else {
+        $RunName = "notification-service-outbox-relay-smoke-" + (Get-Date -Format "yyyyMMdd-HHmmss")
+    }
 }
 if (-not $NotificationEventsTopic) {
     $NotificationEventsTopic = "im.notification.events.$RunName"
@@ -172,6 +177,18 @@ try {
         NEXUSIM_NOTIFICATION_DESTINATION_HASH_KEY = "local-notification-destination-hash-key"
     }
 
+    if ($WithDeliveryWorker) {
+        $processes += Start-NexusProcess -Name "notification-delivery-worker" -FilePath (Join-Path $repoRoot "bin\notification-service.exe") -Env @{
+            NEXUSIM_NOTIFICATION_SERVICE_MODE = "delivery-worker"
+            NEXUSIM_PG_DSN = $PgDsn
+            NEXUSIM_NOTIFICATION_PROVIDER_MODE = "noop"
+            NEXUSIM_NOTIFICATION_PROVIDER_ID = "local-noop"
+            NEXUSIM_NOTIFICATION_DELIVERY_BATCH_SIZE = "100"
+            NEXUSIM_NOTIFICATION_DELIVERY_POLL_INTERVAL = "200ms"
+            NEXUSIM_NOTIFICATION_DEBUG_ADDR = ""
+        }
+    }
+
     $processes += Start-NexusProcess -Name "notification-outbox-relay" -FilePath (Join-Path $repoRoot "bin\notification-service.exe") -Env @{
         NEXUSIM_NOTIFICATION_SERVICE_MODE = "outbox-relay"
         NEXUSIM_PG_DSN = $PgDsn
@@ -183,14 +200,19 @@ try {
     }
 
     $runner = Join-Path $repoRoot "bin\notification-smoke.exe"
-    & $runner `
-        "--pg-dsn" $PgDsn `
-        "--notification-target" $NotificationGrpcAddr `
-        "--result-root" $ResultRoot `
-        "--run-name" $RunName `
-        "--kafka-brokers" $KafkaBrokers `
-        "--notification-events-topic" $NotificationEventsTopic `
-        "--wait-timeout" "20s"
+    $runnerArgs = @(
+        "--pg-dsn", $PgDsn,
+        "--notification-target", $NotificationGrpcAddr,
+        "--result-root", $ResultRoot,
+        "--run-name", $RunName,
+        "--kafka-brokers", $KafkaBrokers,
+        "--notification-events-topic", $NotificationEventsTopic,
+        "--wait-timeout", "20s"
+    )
+    if ($WithDeliveryWorker) {
+        $runnerArgs += "--expect-delivered"
+    }
+    & $runner @runnerArgs
     if ($LASTEXITCODE -ne 0) {
         throw "notification smoke failed with exit code $LASTEXITCODE"
     }

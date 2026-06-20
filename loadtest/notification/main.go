@@ -40,6 +40,7 @@ type config struct {
 	deviceID           string
 	requesterService   string
 	idempotencyKey     string
+	expectDelivered    bool
 	cleanup            bool
 	applyMigration     bool
 }
@@ -62,6 +63,8 @@ type summary struct {
 	Error                  string                   `json:"error,omitempty"`
 	RequestID              string                   `json:"request_id"`
 	RequestStatus          string                   `json:"request_status"`
+	ExpectedDelivered      bool                     `json:"expected_delivered"`
+	DeliveryAttemptCount   int64                    `json:"delivery_attempt_count,omitempty"`
 	Outbox                 outboxSummary            `json:"outbox"`
 	NotificationEventCount int64                    `json:"notification_event_count,omitempty"`
 	NotificationEvents     []notificationKafkaEvent `json:"notification_events,omitempty"`
@@ -70,6 +73,9 @@ type summary struct {
 type outboxSummary struct {
 	Total     int64 `json:"total"`
 	Accepted  int64 `json:"accepted"`
+	Succeeded int64 `json:"succeeded"`
+	Failed    int64 `json:"failed"`
+	Dead      int64 `json:"dead_lettered"`
 	Pending   int64 `json:"pending"`
 	Published int64 `json:"published"`
 	DLQ       int64 `json:"dlq"`
@@ -113,6 +119,7 @@ func parseConfig() config {
 	flag.StringVar(&cfg.deviceID, "device-id", "notification-device-1", "requesting device id")
 	flag.StringVar(&cfg.requesterService, "requester-service", "identity-service", "requester service")
 	flag.StringVar(&cfg.idempotencyKey, "idempotency-key", "", "idempotency key; defaults to key derived from run name")
+	flag.BoolVar(&cfg.expectDelivered, "expect-delivered", false, "wait for delivery worker to mark the request delivered")
 	flag.BoolVar(&cfg.cleanup, "cleanup", true, "delete notification rows for the smoke tenant before running")
 	flag.BoolVar(&cfg.applyMigration, "apply-migration", true, "apply notification migrations before running")
 	flag.Parse()
@@ -164,6 +171,7 @@ func run(cfg config) error {
 		UserID:             cfg.userID,
 		RequesterService:   cfg.requesterService,
 		StartedAt:          time.Now().UTC(),
+		ExpectedDelivered:  cfg.expectDelivered,
 	}
 	result.GitDirty = strings.TrimSpace(result.GitStatusShort) != ""
 	defer func() {
@@ -238,9 +246,23 @@ func run(cfg config) error {
 		return errors.New(result.Error)
 	}
 
+	wantPublished := int64(1)
+	wantEvents := 1
+	if cfg.expectDelivered {
+		wantPublished = 2
+		wantEvents = 2
+		status, attemptCount, err := waitNotificationDelivered(ctx, pool, cfg, result.RequestID)
+		if err != nil {
+			result.Error = err.Error()
+			return err
+		}
+		result.RequestStatus = status
+		result.DeliveryAttemptCount = attemptCount
+	}
+
 	var outbox outboxSummary
 	if cfg.kafkaEnabled() {
-		outbox, err = waitOutboxPublished(ctx, pool, cfg, result.RequestID, 1)
+		outbox, err = waitOutboxPublished(ctx, pool, cfg, result.RequestID, wantPublished)
 	} else {
 		outbox, err = readOutboxSummary(ctx, pool, cfg.tenantID, result.RequestID)
 	}
@@ -253,8 +275,12 @@ func run(cfg config) error {
 		result.Error = fmt.Sprintf("unexpected outbox summary: %+v", outbox)
 		return errors.New(result.Error)
 	}
+	if cfg.expectDelivered && outbox.Succeeded != 1 {
+		result.Error = fmt.Sprintf("expected one delivery succeeded event, got outbox summary: %+v", outbox)
+		return errors.New(result.Error)
+	}
 	if cfg.kafkaEnabled() {
-		events, err := readNotificationEvents(ctx, cfg, result.RequestID, 1)
+		events, err := readNotificationEvents(ctx, cfg, result.RequestID, wantEvents)
 		if err != nil {
 			result.Error = err.Error()
 			return err
@@ -289,8 +315,15 @@ WHERE tenant_id = $1
 		if !payloadSafe(payload) {
 			return outboxSummary{}, fmt.Errorf("notification outbox leaked internal field: %s", payload)
 		}
-		if eventType == "notification.request.accepted.v1" {
+		switch eventType {
+		case "notification.request.accepted.v1":
 			summary.Accepted++
+		case "notification.delivery.succeeded.v1":
+			summary.Succeeded++
+		case "notification.delivery.failed.v1":
+			summary.Failed++
+		case "notification.delivery.dead_lettered.v1":
+			summary.Dead++
 		}
 		switch status {
 		case "PENDING":
@@ -305,6 +338,41 @@ WHERE tenant_id = $1
 		return outboxSummary{}, fmt.Errorf("iterate notification outbox: %w", err)
 	}
 	return summary, nil
+}
+
+func waitNotificationDelivered(ctx context.Context, pool *pgxpool.Pool, cfg config, requestID string) (string, int64, error) {
+	deadline := time.Now().Add(cfg.waitTimeout)
+	for {
+		status, attemptCount, err := readNotificationRequestState(ctx, pool, cfg.tenantID, requestID)
+		if err != nil {
+			return "", 0, err
+		}
+		if status == "DELIVERED" {
+			return status, attemptCount, nil
+		}
+		if status == "DLQ" || status == "CANCELED" {
+			return status, attemptCount, fmt.Errorf("notification request reached terminal non-delivered status %s", status)
+		}
+		if time.Now().After(deadline) {
+			return status, attemptCount, fmt.Errorf("notification request was not delivered before timeout: status=%s attempts=%d", status, attemptCount)
+		}
+		time.Sleep(cfg.pollInterval)
+	}
+}
+
+func readNotificationRequestState(ctx context.Context, pool *pgxpool.Pool, tenantID string, requestID string) (string, int64, error) {
+	var status string
+	var attemptCount int64
+	err := pool.QueryRow(ctx, `
+SELECT status, attempt_count
+FROM notification_requests
+WHERE tenant_id = $1
+  AND request_id = $2
+`, tenantID, requestID).Scan(&status, &attemptCount)
+	if err != nil {
+		return "", 0, fmt.Errorf("read notification request state: %w", err)
+	}
+	return status, attemptCount, nil
 }
 
 func waitOutboxPublished(ctx context.Context, pool *pgxpool.Pool, cfg config, requestID string, wantPublished int64) (outboxSummary, error) {
@@ -381,6 +449,18 @@ func summarizeNotificationEvent(event *notificationeventsv1.NotificationEvent) n
 		result.PayloadKind = "request_accepted"
 		result.Channel = payload.RequestAccepted.GetChannel()
 		result.Status = payload.RequestAccepted.GetStatus()
+	case *notificationeventsv1.NotificationEvent_DeliverySucceeded:
+		result.PayloadKind = "delivery_succeeded"
+		result.Channel = payload.DeliverySucceeded.GetChannel()
+		result.Status = "DELIVERED"
+	case *notificationeventsv1.NotificationEvent_DeliveryFailed:
+		result.PayloadKind = "delivery_failed"
+		result.Channel = payload.DeliveryFailed.GetChannel()
+		result.Status = "RETRY_WAIT"
+	case *notificationeventsv1.NotificationEvent_DeliveryDeadLettered:
+		result.PayloadKind = "delivery_dead_lettered"
+		result.Channel = payload.DeliveryDeadLettered.GetChannel()
+		result.Status = "DLQ"
 	}
 	return result
 }

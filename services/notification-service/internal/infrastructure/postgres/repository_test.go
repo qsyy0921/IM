@@ -75,18 +75,18 @@ func TestRepositoryCreateNotificationRequestWithoutSecretPayloadIntegration(t *t
 	repository := NewRepository(pool)
 
 	command := createNotificationCommand()
-	command.IdempotencyKey = "idem-without-secret"
+	command.IdempotencyKey = "idem-no-sensitive-payload"
 	command.SecretPayloadCiphertext = nil
 	command.SecretPayloadKeyVersion = ""
 	command.SecretPayloadExpiresAt = time.Time{}
-	result, err := repository.CreateNotificationRequest(ctx, command, "notif-without-secret", "hash-user-example", command.CommandHash("hash-user-example"))
+	result, err := repository.CreateNotificationRequest(ctx, command, "notif-no-sensitive-payload", "hash-user-example", command.CommandHash("hash-user-example"))
 	if err != nil {
 		t.Fatalf("create notification request without secret payload: %v", err)
 	}
-	if result.RequestID != "notif-without-secret" || len(result.SecretPayloadCiphertext) != 0 {
+	if result.RequestID != "notif-no-sensitive-payload" || len(result.SecretPayloadCiphertext) != 0 {
 		t.Fatalf("unexpected request without secret payload: %+v", result)
 	}
-	assertNotificationOutboxDoesNotLeak(t, ctx, pool, "notif-without-secret", command.DestinationRef, "secret")
+	assertNotificationOutboxDoesNotLeak(t, ctx, pool, "notif-no-sensitive-payload", command.DestinationRef, "raw-token-value")
 }
 
 func createNotificationCommand() types.CreateNotificationRequestCommand {

@@ -40,7 +40,7 @@ Go 侧服务底座、EvidencePack、proposal / approval / audit 和 eval 持久�
 当前下一步：
 
 ```text
-future platform / product services 的 10 个 SDD draft 已存在；media-service 已进入 product-active，第一版 proto / migration / 六层 skeleton / cmd runtime / Docker / observability 覆盖已落；PG 集成测试、object-key 泄露回归门禁、最小 gRPC smoke、media outbox relay 代码切片、真实 Kafka smoke 和本地 mock processing worker 已补；notification-service 已通过 stage-switch 并进入 product-active，第一版 proto / migration / 六层 skeleton / grpc runtime / Docker / observability、notification outbox relay、Kafka schema、runtime mode、真实 PG relay 集成测试和真实 Kafka smoke 已落；下一步做 notification provider worker / provider adapter 边界
+future platform / product services 的 10 个 SDD draft 已存在；media-service 已进入 product-active，第一版 proto / migration / 六层 skeleton / cmd runtime / Docker / observability 覆盖已落；PG 集成测试、object-key 泄露回归门禁、最小 gRPC smoke、media outbox relay 代码切片、真实 Kafka smoke 和本地 mock processing worker 已补；notification-service 已通过 stage-switch 并进入 product-active，第一版 proto / migration / 六层 skeleton / grpc runtime / Docker / observability、notification outbox relay、Kafka schema、runtime mode、真实 PG relay 集成测试、真实 Kafka smoke、delivery worker 和 noop provider delivery smoke 已落；下一步做 notification provider-grade adapter / bounce-suppression，或按 promotion plan 转入 audit-service stage-switch
 ```
 
 完整系统测试、生产级 HA、长压和 sizing 继续后置为 hardening backlog。

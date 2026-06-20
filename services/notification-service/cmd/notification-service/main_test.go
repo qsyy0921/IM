@@ -3,7 +3,7 @@ package main
 import "testing"
 
 func TestValidateNotificationServiceMode(t *testing.T) {
-	for _, mode := range []string{"noop", "grpc", "outbox-relay"} {
+	for _, mode := range []string{"noop", "grpc", "delivery-worker", "outbox-relay"} {
 		if err := validateNotificationServiceMode(mode); err != nil {
 			t.Fatalf("mode %s should be valid: %v", mode, err)
 		}

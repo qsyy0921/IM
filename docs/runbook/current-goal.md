@@ -77,7 +77,12 @@ vector-index-service
   trigger builder 单测和真实 PostgreSQL relay 集成测试。
 - `notification_outbox -> im.notification.events` 真实 Kafka smoke 已通过，报告见
   `docs/runbook/loadtest/notification-service/loadtest-report-20260620-notification-outbox-relay-smoke.md`。
-- 下一步默认进入 notification provider worker / provider adapter 边界。
+- `notification-service` 第一版 delivery worker 和 noop provider adapter 已落地，
+  `CreateNotificationRequest -> delivery-worker -> noop provider -> notification_outbox
+  -> im.notification.events` 真实本地 smoke 已通过，报告见
+  `docs/runbook/loadtest/notification-service/loadtest-report-20260620-notification-delivery-worker-smoke.md`。
+- 下一步默认继续 notification provider-grade adapter / bounce-suppression 边界，
+  或按 promotion plan 转入 `audit-service` stage-switch。
 
 ## 硬边界
 

@@ -49,7 +49,11 @@ model-gateway / workflow / knowledge-ingestion / vector-index
 
 ## 下一步
 
-- 默认继续 `admin-service` stage-switch 或 `vector-index-service` stage-switch。
+- `admin-service` 和 `vector-index-service` 已完成 stage-switch review；下一步可进入
+  对应第一版 implementation slice。
+- 默认继续 `vector-index-service` 第一版 implementation slice，用于闭合
+  model-gateway / knowledge-ingestion / retrieval 的向量索引边界。
+- 也可以改做 `admin-service` 第一版 implementation slice。
 - 也可以继续 notification SMTP / SMS / APNs / FCM adapter 或 bounce-suppression。
 
 ## 硬边界

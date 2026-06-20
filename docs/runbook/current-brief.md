@@ -35,7 +35,9 @@ future platform / product services 的 10 个 SDD draft 已存在；`media-servi
 `knowledge-ingestion-service` 已完成第一版 metadata + chunk manifest path；
 `workflow-service` 已完成 `CreateWorkflow`、`RecordWorkflowDecision`、`GetWorkflow`
 最小审批等待路径，并通过 focused checks / 完整 `check-local`。
-下一步默认做 `admin-service` 或 `vector-index-service` stage-switch。
+`admin-service` 和 `vector-index-service` 已完成 stage-switch review。下一步默认进入
+`vector-index-service` 第一版 implementation slice，也可以改做 `admin-service`
+第一版 implementation slice。
 ```
 
 系统测试 / HA / 长压 / sizing 后置；总览、待办、单服务状态分别看

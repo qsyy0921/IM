@@ -189,6 +189,50 @@ type RebuildWorkerStats struct {
 	Completed int
 }
 
+type VectorEmbeddingTask struct {
+	AuthContext        AuthContext
+	SourceService      string
+	CollectionType     string
+	SourceRefHash      string
+	SourceID           string
+	SourceVersion      int64
+	SourceHash         string
+	ChunkHash          string
+	InputText          string
+	InputHash          string
+	InputSchemaVersion int
+	EmbeddingModelRef  string
+	Dimension          int
+	VisibilityScope    string
+	VisibilityVersion  int64
+	PolicyVersion      string
+	DataClass          string
+	DeleteProofID      string
+	RetentionPolicyRef string
+	IdempotencyKey     string
+	CorrelationID      string
+	CausationID        string
+	TraceID            string
+	Timeout            time.Duration
+}
+
+type VectorEmbeddingResult struct {
+	InvocationID        string
+	ProviderID          string
+	ModelID             string
+	EmbeddingVectorHash string
+	Dimension           int
+	Replayed            bool
+	EmbeddingReturned   bool
+}
+
+type EmbeddingWorkerStats struct {
+	Claimed   int
+	Embedded  int
+	Upserted  int
+	Completed int
+}
+
 type VectorTombstone struct {
 	TenantID            TenantID
 	TombstoneID         string
@@ -428,6 +472,67 @@ func (command GetVectorIndexJobCommand) Validate() error {
 	}
 	if command.JobID == "" {
 		return NewInvalidArgument("job_id is required")
+	}
+	return nil
+}
+
+func (task VectorEmbeddingTask) Normalized() VectorEmbeddingTask {
+	task.AuthContext = task.AuthContext.Normalized()
+	task.SourceService = strings.TrimSpace(task.SourceService)
+	task.CollectionType = strings.ToUpper(strings.TrimSpace(task.CollectionType))
+	task.SourceRefHash = strings.TrimSpace(task.SourceRefHash)
+	task.SourceID = strings.TrimSpace(task.SourceID)
+	task.SourceHash = strings.TrimSpace(task.SourceHash)
+	task.ChunkHash = strings.TrimSpace(task.ChunkHash)
+	task.InputText = strings.TrimSpace(task.InputText)
+	task.InputHash = strings.TrimSpace(task.InputHash)
+	task.EmbeddingModelRef = strings.TrimSpace(task.EmbeddingModelRef)
+	task.VisibilityScope = strings.TrimSpace(task.VisibilityScope)
+	task.PolicyVersion = strings.TrimSpace(task.PolicyVersion)
+	task.DataClass = strings.ToUpper(strings.TrimSpace(task.DataClass))
+	task.DeleteProofID = strings.TrimSpace(task.DeleteProofID)
+	task.RetentionPolicyRef = strings.TrimSpace(task.RetentionPolicyRef)
+	task.IdempotencyKey = strings.TrimSpace(task.IdempotencyKey)
+	task.CorrelationID = strings.TrimSpace(task.CorrelationID)
+	task.CausationID = strings.TrimSpace(task.CausationID)
+	task.TraceID = strings.TrimSpace(task.TraceID)
+	return task
+}
+
+func (task VectorEmbeddingTask) Validate() error {
+	task = task.Normalized()
+	if err := task.AuthContext.Validate(); err != nil {
+		return err
+	}
+	if task.AuthContext.ServiceName != AllowedCallerVectorIndex {
+		return NewPermissionDenied("embedding worker must use vector-index-service auth")
+	}
+	if !isAllowedSourceService(task.SourceService) {
+		return NewInvalidArgument("source_service is unsupported")
+	}
+	if !isAllowedCollectionType(task.CollectionType) {
+		return NewInvalidArgument("collection_type is unsupported")
+	}
+	if task.SourceRefHash == "" || task.SourceID == "" || task.SourceVersion <= 0 {
+		return NewInvalidArgument("source refs are required")
+	}
+	if !looksHash(task.SourceRefHash) || !looksHash(task.SourceHash) || !looksHash(task.ChunkHash) || !looksHash(task.InputHash) {
+		return NewInvalidArgument("source and input refs must be hashes")
+	}
+	if task.InputText == "" || task.InputSchemaVersion <= 0 {
+		return NewInvalidArgument("embedding input text and schema version are required")
+	}
+	if task.EmbeddingModelRef == "" || task.Dimension <= 0 {
+		return NewInvalidArgument("embedding model and dimension are required")
+	}
+	if task.VisibilityScope == "" || task.VisibilityVersion <= 0 || task.PolicyVersion == "" || task.DataClass == "" {
+		return NewInvalidArgument("visibility, policy and data class metadata are required")
+	}
+	if task.IdempotencyKey == "" {
+		return NewInvalidArgument("idempotency_key is required")
+	}
+	if containsSensitiveValue(task.SourceService, task.SourceID, task.EmbeddingModelRef, task.VisibilityScope, task.PolicyVersion, task.DataClass, task.DeleteProofID, task.RetentionPolicyRef) {
+		return NewInvalidArgument("embedding task metadata must use low-sensitive refs")
 	}
 	return nil
 }

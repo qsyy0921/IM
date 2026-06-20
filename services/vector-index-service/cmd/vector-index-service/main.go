@@ -17,10 +17,14 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	vectorgrpc "github.com/qsyy0921/IM/services/vector-index-service/internal/api/grpc"
 	"github.com/qsyy0921/IM/services/vector-index-service/internal/app"
+	embeddinginfra "github.com/qsyy0921/IM/services/vector-index-service/internal/infrastructure/embedding"
 	kafkainfra "github.com/qsyy0921/IM/services/vector-index-service/internal/infrastructure/kafka"
 	postgresinfra "github.com/qsyy0921/IM/services/vector-index-service/internal/infrastructure/postgres"
+	rpcinfra "github.com/qsyy0921/IM/services/vector-index-service/internal/infrastructure/rpc"
+	"github.com/qsyy0921/IM/services/vector-index-service/internal/trigger/embedding"
 	"github.com/qsyy0921/IM/services/vector-index-service/internal/trigger/outbox"
 	"github.com/qsyy0921/IM/services/vector-index-service/internal/trigger/rebuild"
+	"github.com/qsyy0921/IM/services/vector-index-service/internal/types"
 	"google.golang.org/grpc"
 )
 
@@ -47,6 +51,8 @@ func run(ctx context.Context) error {
 		return runOutboxRelay(ctx)
 	case "rebuild-worker":
 		return runRebuildWorker(ctx)
+	case "embedding-worker":
+		return runEmbeddingWorker(ctx)
 	default:
 		return fmt.Errorf("unsupported NEXUSIM_VECTOR_INDEX_SERVICE_MODE %q", mode)
 	}
@@ -200,6 +206,59 @@ func runRebuildWorker(ctx context.Context) error {
 	return worker.Run(ctx)
 }
 
+func runEmbeddingWorker(ctx context.Context) error {
+	debugAddr, err := vectorIndexDebugAddrFromEnv()
+	if err != nil {
+		return err
+	}
+	stopDebug, err := startDebugServer(ctx, debugAddr)
+	if err != nil {
+		return err
+	}
+	defer stopDebug()
+
+	pool, err := openPGPool(ctx)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	taskFile := strings.TrimSpace(os.Getenv("NEXUSIM_VECTOR_EMBEDDING_TASKS_FILE"))
+	source, err := embeddinginfra.NewFileTaskSource(taskFile)
+	if err != nil {
+		return err
+	}
+	modelAddr := strings.TrimSpace(os.Getenv("NEXUSIM_MODEL_GATEWAY_GRPC_ADDR"))
+	modelClient, closeModel, err := rpcinfra.DialModelGatewayClient(
+		ctx,
+		modelAddr,
+		envDuration("NEXUSIM_VECTOR_EMBEDDING_MODEL_TIMEOUT", 5*time.Second),
+	)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if closeErr := closeModel(); closeErr != nil {
+			log.Printf("vector-index-service model-gateway client close failed: %v", closeErr)
+		}
+	}()
+
+	repository := postgresinfra.NewRepository(pool)
+	worker := embedding.NewWorker(
+		source,
+		modelClient,
+		vectorUpsertAdapter{useCase: app.NewUpsertVectorItemUseCase(repository, app.NewRandomIDGenerator())},
+		embedding.Config{
+			BatchSize:    envInt("NEXUSIM_VECTOR_EMBEDDING_BATCH_SIZE", 50),
+			PollInterval: envDuration("NEXUSIM_VECTOR_EMBEDDING_POLL_INTERVAL", time.Second),
+			ErrorBackoff: envDuration("NEXUSIM_VECTOR_EMBEDDING_ERROR_BACKOFF", time.Second),
+			Logf:         log.Printf,
+		},
+	)
+	log.Printf("vector-index-service embedding worker started with file task source %s", taskFile)
+	return worker.Run(ctx)
+}
+
 func vectorIndexModeFromEnv() string {
 	mode := strings.TrimSpace(os.Getenv("NEXUSIM_VECTOR_INDEX_SERVICE_MODE"))
 	if mode == "" {
@@ -210,7 +269,7 @@ func vectorIndexModeFromEnv() string {
 
 func validateVectorIndexMode(mode string) error {
 	switch mode {
-	case "noop", "grpc", "outbox-relay", "rebuild-worker":
+	case "noop", "grpc", "outbox-relay", "rebuild-worker", "embedding-worker":
 		return nil
 	default:
 		return fmt.Errorf("unsupported NEXUSIM_VECTOR_INDEX_SERVICE_MODE %q", mode)
@@ -371,4 +430,13 @@ func newDebugHandler() http.Handler {
 	mux.HandleFunc("/metrics", metricsHandler)
 	mux.HandleFunc("/debug/metrics", metricsHandler)
 	return mux
+}
+
+type vectorUpsertAdapter struct {
+	useCase app.UpsertVectorItemUseCase
+}
+
+func (adapter vectorUpsertAdapter) UpsertVectorItem(ctx context.Context, command types.UpsertVectorItemCommand) error {
+	_, err := adapter.useCase.Execute(ctx, command)
+	return err
 }

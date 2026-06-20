@@ -63,6 +63,11 @@ model-gateway / workflow / knowledge-ingestion / vector-index
   embedding hash、维度、token / cost / latency 等低敏 metadata，不保存 raw input 或
   embedding vector array。这解除后续 `vector-index-service` embedding worker 不能绕过
   model-gateway 的边界问题。
+- `vector-index-service` 已补 first-stage `embedding-worker`：从本地 JSONL 任务源读取
+  受控输入文本，调用 `model-gateway.InvokeEmbedding`，再经现有 app usecase 写
+  vector item metadata。该切片用于验证 worker / model-gateway / vector upsert 边界，
+  不新增 raw text 公共 API，也不把 raw text 或 embedding vector array 落入
+  PostgreSQL / outbox / metrics。
 - `admin-service` 已从 stage-switch 进入 product-active 第一版 implementation
   slice，覆盖 `CreateAdminOperation`、`ApproveAdminOperation`、
   `GetAdminOperation`、`ListAdminOperations`、PostgreSQL operation / approval
@@ -94,9 +99,9 @@ model-gateway / workflow / knowledge-ingestion / vector-index
 
 - 默认继续补更多下游公开 admin API adapter，或为 admin config / quota 增加
   compensation operator。
-- 默认下一步可继续 `vector-index-service` embedding worker，通过 `model-gateway.InvokeEmbedding`
-  生成向量后再写 vector-index；或继续 Milvus / pgvector backend / provider backend
-  rebuild。
+- 默认下一步可继续 `vector-index-service` 真实 chunk consumer / embedding task
+  持久队列、Milvus / pgvector backend / provider backend rebuild；也可以继续更多下游
+  admin API adapter。
 - 也可以继续 notification SMTP / SMS / APNs / FCM adapter 或 bounce-suppression。
 
 ## 硬边界

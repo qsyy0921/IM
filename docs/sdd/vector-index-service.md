@@ -254,6 +254,21 @@ knowledge.chunk.ready.v1
 -> mark INDEXED + write vector.item.indexed.v1 outbox
 ```
 
+First-stage embedding worker：
+
+```text
+NEXUSIM_VECTOR_INDEX_SERVICE_MODE=embedding-worker
+-> read controlled JSONL embedding tasks from NEXUSIM_VECTOR_EMBEDDING_TASKS_FILE
+-> verify input_hash matches in-memory input_text before model call
+-> call model-gateway InvokeEmbedding
+-> write vector_items / vector_index_jobs / vector_outbox through existing UpsertVectorItem
+-> only persist source refs, input hash, embedding hash, dimension, model ref and visibility metadata
+```
+
+该 worker 是本地 smoke / worker 边界验证入口，不是生产 chunk consumer。它不得新增
+raw text 公共 API，也不得把 `input_text` 或 embedding vector array 写入 PostgreSQL、
+outbox、metrics、logs 或 Kafka payload。
+
 Tombstone：
 
 ```text
@@ -380,13 +395,27 @@ source_ref_hash、chunk_hash、backend_vector_id、trace_id 或 request_id。
 
 ```text
 NEXUSIM_VECTOR_INDEX_SERVICE_MODE=grpc
-NEXUSIM_VECTOR_INDEX_SERVICE_MODE=chunk-consumer
-NEXUSIM_VECTOR_INDEX_SERVICE_MODE=embedding-worker
-NEXUSIM_VECTOR_INDEX_SERVICE_MODE=backend-worker
 NEXUSIM_VECTOR_INDEX_SERVICE_MODE=rebuild-worker
 NEXUSIM_VECTOR_INDEX_SERVICE_MODE=outbox-relay
-NEXUSIM_VECTOR_INDEX_SERVICE_MODE=cleanup
+NEXUSIM_VECTOR_INDEX_SERVICE_MODE=embedding-worker
 ```
+
+当前已实现 runtime mode：`noop`、`grpc`、`rebuild-worker`、`outbox-relay`、
+`embedding-worker`。`chunk-consumer`、`backend-worker`、`cleanup` 仍是目标态规划，
+不应写入当前本地 smoke 命令。
+
+`embedding-worker` 第一版必需配置：
+
+```text
+NEXUSIM_PG_DSN=...
+NEXUSIM_MODEL_GATEWAY_GRPC_ADDR=127.0.0.1:10770
+NEXUSIM_VECTOR_EMBEDDING_TASKS_FILE=H:\NexusIM\loadtest-results\vector-embedding-tasks.jsonl
+NEXUSIM_VECTOR_EMBEDDING_BATCH_SIZE=50
+NEXUSIM_VECTOR_EMBEDDING_MODEL_TIMEOUT=5s
+```
+
+任务文件只用于本地 worker 验证；生产级 embedding task 需要由
+knowledge / memory / search 的受控 producer 或持久 task queue 提供。
 
 operator：
 

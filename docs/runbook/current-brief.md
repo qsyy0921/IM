@@ -39,7 +39,9 @@ future platform / product services 的 10 个 SDD draft 已存在；`media-servi
 已完成第一版 `UpsertVectorItem` / `TombstoneVectorItem` /
 `SearchVectors` / `GetVectorIndexJob` / `RequestVectorRebuild` path、
 first-stage rebuild checkpoint worker、`vector_outbox -> im.vector.events` 第一版 relay、
-真实 Kafka relay smoke，以及 knowledge chunk -> vector upsert 公开 API handoff smoke。`admin-service` 已完成第一版
+真实 Kafka relay smoke、knowledge chunk -> vector upsert 公开 API handoff smoke，以及
+first-stage `embedding-worker`：本地 JSONL 任务源 -> `model-gateway.InvokeEmbedding` ->
+vector upsert hash / metadata。`admin-service` 已完成第一版
 `CreateAdminOperation` / `ApproveAdminOperation` / `GetAdminOperation` /
 `ListAdminOperations` path、`admin_outbox -> im.admin.events` outbox relay 和
 `operation-worker` risk routing 执行闭环；`REPAIR_REQUEST` 已接入
@@ -54,7 +56,8 @@ control-plane-service.RollbackConfigVersion`；第三条 control-plane adapter �
 control-plane-service.PublishConfigVersion(API_GATEWAY_TENANT_QUOTA)`。
 admin `Create -> operator approve -> operation-worker -> control-plane` 本地多进程
 publish / rollback / tenant quota smoke 已通过。下一步默认继续更多下游公开 admin API adapter、
-admin compensation operator，或继续 vector embedding / provider backend worker。
+admin compensation operator，或继续 vector 真实 chunk consumer / embedding task 持久队列 /
+provider backend worker。
 ```
 
 系统测试 / HA / 长压 / sizing 后置；总览、待办、单服务状态分别看

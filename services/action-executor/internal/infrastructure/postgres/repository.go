@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -23,6 +24,7 @@ func (repository Repository) RecordExecution(
 	ctx context.Context,
 	audit types.ExecutionAudit,
 	projection types.ToolResultProjection,
+	providerFailure *types.ProviderFailureProjection,
 ) error {
 	if repository.pool == nil {
 		return errors.Join(types.ErrExecutionAuditFailed, errors.New("nil pg pool"))
@@ -39,6 +41,11 @@ func (repository Repository) RecordExecution(
 	}
 	if err := insertToolResultProjection(ctx, tx, projection); err != nil {
 		return err
+	}
+	if providerFailure != nil {
+		if err := insertProviderFailureProjection(ctx, tx, *providerFailure); err != nil {
+			return err
+		}
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("%w: %v", types.ErrExecutionAuditFailed, err)
@@ -162,6 +169,65 @@ INSERT INTO action_executor_tool_results (
 	return nil
 }
 
+func insertProviderFailureProjection(
+	ctx context.Context,
+	tx pgx.Tx,
+	projection types.ProviderFailureProjection,
+) error {
+	_, err := tx.Exec(ctx, `
+INSERT INTO action_executor_provider_failures (
+    tenant_id,
+    provider_failure_id,
+    execution_id,
+    result_id,
+    proposal_id,
+    approval_id,
+    prepared_audit_id,
+    user_id,
+    skill_id,
+    tool_name,
+    resource_type,
+    resource_id,
+    classification,
+    status,
+    retryable,
+    retry_count,
+    next_retry_at,
+    dead_lettered_at,
+    failure_ref,
+    created_at
+) VALUES (
+    $1, $2, $3, $4, $5, $6, $7,
+    $8, $9, $10, $11, $12, $13, $14,
+    $15, $16, $17, $18, $19, COALESCE($20, now())
+)`,
+		string(projection.TenantID),
+		projection.ProviderFailureID,
+		projection.ExecutionID,
+		projection.ResultID,
+		projection.ProposalID,
+		projection.ApprovalID,
+		projection.PreparedAuditID,
+		string(projection.UserID),
+		projection.SkillID,
+		projection.ToolName,
+		projection.ResourceType,
+		projection.ResourceID,
+		truncateLowSensitive(projection.Classification, 128),
+		projection.Status,
+		projection.Retryable,
+		projection.RetryCount,
+		nullableTime(projection.NextRetryAt),
+		nullableTime(projection.DeadLetteredAt),
+		truncateLowSensitive(projection.FailureRef, 512),
+		nullableTime(projection.CreatedAt),
+	)
+	if err != nil {
+		return fmt.Errorf("%w: %v", types.ErrExecutionAuditFailed, err)
+	}
+	return nil
+}
+
 func truncateLowSensitive(value string, max int) string {
 	value = strings.TrimSpace(value)
 	if max <= 0 {
@@ -172,4 +238,11 @@ func truncateLowSensitive(value string, max int) string {
 		return value
 	}
 	return string(runes[:max])
+}
+
+func nullableTime(value time.Time) any {
+	if value.IsZero() {
+		return nil
+	}
+	return value
 }

@@ -32,13 +32,14 @@ agent、skill-registry、mcp-gateway、action-executor、ai-eval。
 `ai-eval-service` catalog、RecordEvalRun recorder、multi-adapter gate、Python optional
 adapter path、RAG / Agent live gate、CI-safe gate skeleton、RAG-Agent expansion、
 profile / Agent safety、negative cases、Python/model-output、RAG/Summary citation、
-external MCP fallback、Agent output regression 和 action preflight / rate-limit / DLQ-repair safety eval 已落；
+external MCP fallback、Agent output regression、action preflight / rate-limit / DLQ-repair safety eval
+和 action-executor provider failure retry/DLQ skeleton 已落；
 只保存低敏 run refs / counters / metadata。
 
 当前下一步：
 
 ```text
-继续扩 action-executor provider retry / DLQ first-stage design skeleton
+继续扩 action-executor provider retry worker / operator redrive safety eval
 ```
 
 完整系统测试、生产级 HA、长压和 sizing 继续后置为 hardening backlog。
@@ -55,6 +56,4 @@ external MCP fallback、Agent output regression 和 action preflight / rate-limi
 - 不回滚用户已有修改。
 - 不为了“了解项目”全文读取长历史文档。
 - 新发现的待完成工作写入 `docs/runbook/remaining-goals.md`。
-- 门禁按风险分层：小改跑相关测试 / 文档脚本；跨服务、生成代码、
-  migration、registry、Docker/compose、安全边界或提交推送前才跑完整
-  `.\tools\check-local.ps1`。
+- 门禁按风险分层：小改跑相关测试 / 文档脚本；跨服务、生成代码、migration、registry、Docker/compose、安全边界或提交推送前才跑完整 `.\tools\check-local.ps1`。

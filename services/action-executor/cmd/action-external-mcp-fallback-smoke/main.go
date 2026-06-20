@@ -280,6 +280,7 @@ func (repository *recordingAuditRepository) RecordExecution(
 	_ context.Context,
 	audit types.ExecutionAudit,
 	projection types.ToolResultProjection,
+	_ *types.ProviderFailureProjection,
 ) error {
 	repository.rows = append(repository.rows, audit)
 	repository.projections = append(repository.projections, projection)

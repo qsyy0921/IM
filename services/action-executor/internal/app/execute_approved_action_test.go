@@ -183,6 +183,23 @@ func TestExecuteApprovedActionClassifiesExternalToolExecutionFailures(t *testing
 			if len(audit.results) != 1 || audit.results[0].Status != types.ResultStatusFailed || audit.results[0].OutputSHA256 != "" {
 				t.Fatalf("expected failed result projection without output hash, got %+v", audit.results)
 			}
+			if len(audit.providerFailures) != 1 {
+				t.Fatalf("expected provider failure projection, got %+v", audit.providerFailures)
+			}
+			failure := audit.providerFailures[0]
+			if failure.Classification != testCase.classification || failure.FailureRef == "" {
+				t.Fatalf("unexpected provider failure projection: %+v", failure)
+			}
+			switch testCase.classification {
+			case "TOOL_EXECUTION_TIMEOUT", "TOOL_PROVIDER_UNAVAILABLE", "TOOL_PROVIDER_RATE_LIMITED":
+				if failure.Status != types.ProviderFailureStatusRetryPending || !failure.Retryable || failure.NextRetryAt.IsZero() || !failure.DeadLetteredAt.IsZero() {
+					t.Fatalf("expected retry-pending provider failure, got %+v", failure)
+				}
+			default:
+				if failure.Status != types.ProviderFailureStatusDLQ || failure.Retryable || failure.DeadLetteredAt.IsZero() || !failure.NextRetryAt.IsZero() {
+					t.Fatalf("expected DLQ provider failure, got %+v", failure)
+				}
+			}
 		})
 	}
 }
@@ -231,6 +248,17 @@ func TestExecuteApprovedActionRejectsUnsafeToolOutputs(t *testing.T) {
 			}
 			if len(audit.results) != 1 || audit.results[0].OutputSHA256 != "" || audit.results[0].Executed {
 				t.Fatalf("unsafe result projection should not store output hash: %+v", audit.results)
+			}
+			if len(audit.providerFailures) != 1 {
+				t.Fatalf("expected unsafe output provider failure projection, got %+v", audit.providerFailures)
+			}
+			failure := audit.providerFailures[0]
+			if failure.Classification != "TOOL_OUTPUT_UNSAFE" ||
+				failure.Status != types.ProviderFailureStatusDLQ ||
+				failure.Retryable ||
+				failure.DeadLetteredAt.IsZero() ||
+				failure.FailureRef == "" {
+				t.Fatalf("unexpected unsafe output provider failure projection: %+v", failure)
 			}
 		})
 	}
@@ -542,21 +570,26 @@ func (approval fakeApproval) VerifyApprovedProposal(
 }
 
 type fakeAuditRepository struct {
-	rows    []types.ExecutionAudit
-	results []types.ToolResultProjection
-	err     error
+	rows             []types.ExecutionAudit
+	results          []types.ToolResultProjection
+	providerFailures []types.ProviderFailureProjection
+	err              error
 }
 
 func (repository *fakeAuditRepository) RecordExecution(
 	_ context.Context,
 	audit types.ExecutionAudit,
 	projection types.ToolResultProjection,
+	providerFailure *types.ProviderFailureProjection,
 ) error {
 	if repository.err != nil {
 		return repository.err
 	}
 	repository.rows = append(repository.rows, audit)
 	repository.results = append(repository.results, projection)
+	if providerFailure != nil {
+		repository.providerFailures = append(repository.providerFailures, *providerFailure)
+	}
 	return nil
 }
 

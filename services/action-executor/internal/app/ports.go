@@ -27,5 +27,10 @@ type ActionRateLimiterPort interface {
 }
 
 type ExecutionAuditRepository interface {
-	RecordExecution(context.Context, types.ExecutionAudit, types.ToolResultProjection) error
+	RecordExecution(
+		context.Context,
+		types.ExecutionAudit,
+		types.ToolResultProjection,
+		*types.ProviderFailureProjection,
+	) error
 }

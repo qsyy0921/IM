@@ -24,7 +24,7 @@ func TestRepositoryInsertExecutionAuditIntegration(t *testing.T) {
 	}
 	defer pool.Close()
 	applyMigration(t, ctx, pool)
-	if _, err := pool.Exec(ctx, `TRUNCATE action_executor_tool_results, action_executor_execution_audits`); err != nil {
+	if _, err := pool.Exec(ctx, `TRUNCATE action_executor_provider_failures, action_executor_tool_results, action_executor_execution_audits`); err != nil {
 		t.Fatalf("reset action executor tables: %v", err)
 	}
 
@@ -71,7 +71,7 @@ func TestRepositoryInsertExecutionAuditIntegration(t *testing.T) {
 		Executed:        false,
 		ResultRef:       "action-executor://executions/exec-1/results/result-1",
 	}
-	if err := repository.RecordExecution(ctx, audit, projection); err != nil {
+	if err := repository.RecordExecution(ctx, audit, projection, nil); err != nil {
 		t.Fatalf("record execution: %v", err)
 	}
 
@@ -102,11 +102,138 @@ WHERE tenant_id = $1 AND execution_id = $2`, "tenant-1", "exec-1").Scan(&resultS
 	}
 }
 
+func TestRepositoryInsertProviderFailureProjectionIntegration(t *testing.T) {
+	dsn := os.Getenv("NEXUSIM_PG_DSN")
+	if dsn == "" {
+		t.Skip("NEXUSIM_PG_DSN is not set")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	pool, err := pgxpool.New(ctx, dsn)
+	if err != nil {
+		t.Fatalf("connect pg: %v", err)
+	}
+	defer pool.Close()
+	applyMigration(t, ctx, pool)
+	if _, err := pool.Exec(ctx, `TRUNCATE action_executor_provider_failures, action_executor_tool_results, action_executor_execution_audits`); err != nil {
+		t.Fatalf("reset action executor tables: %v", err)
+	}
+
+	repository := NewRepository(pool)
+	audit := types.ExecutionAudit{
+		TenantID:          "tenant-1",
+		ExecutionID:       "exec-provider-failure-1",
+		ProposalID:        "proposal-provider-failure-1",
+		ApprovalID:        "approval-provider-failure-1",
+		PreparedAuditID:   "mcp-audit-provider-failure-1",
+		UserID:            "user-1",
+		DeviceID:          "device-1",
+		SkillID:           "skill-1",
+		ToolName:          "conversation.reply.send",
+		Action:            types.ToolActionExecute,
+		ResourceType:      "conversation",
+		ResourceID:        "conv-1",
+		RiskLevel:         "LOW",
+		Intent:            "send approved reply",
+		IdempotencyKey:    "idem-provider-failure-1",
+		InputSHA256:       "abc",
+		Allowed:           true,
+		RequiresApproval:  true,
+		PermissionVersion: 7,
+		Classification:    "TOOL_PROVIDER_UNAVAILABLE",
+		Reason:            "tool provider unavailable",
+		DecisionSource:    "action-executor",
+		Status:            types.ExecutionStatusFailed,
+		Executed:          false,
+	}
+	projection := types.ToolResultProjection{
+		TenantID:        "tenant-1",
+		ResultID:        "result-provider-failure-1",
+		ExecutionID:     "exec-provider-failure-1",
+		ProposalID:      "proposal-provider-failure-1",
+		ApprovalID:      "approval-provider-failure-1",
+		PreparedAuditID: "mcp-audit-provider-failure-1",
+		UserID:          "user-1",
+		SkillID:         "skill-1",
+		ToolName:        "conversation.reply.send",
+		ResourceType:    "conversation",
+		ResourceID:      "conv-1",
+		Status:          types.ResultStatusFailed,
+		Executed:        false,
+		ResultRef:       "action-executor://executions/exec-provider-failure-1/results/result-provider-failure-1",
+	}
+	failure := types.ProviderFailureProjection{
+		TenantID:          "tenant-1",
+		ProviderFailureID: "provider-failure-1",
+		ExecutionID:       "exec-provider-failure-1",
+		ResultID:          "result-provider-failure-1",
+		ProposalID:        "proposal-provider-failure-1",
+		ApprovalID:        "approval-provider-failure-1",
+		PreparedAuditID:   "mcp-audit-provider-failure-1",
+		UserID:            "user-1",
+		SkillID:           "skill-1",
+		ToolName:          "conversation.reply.send",
+		ResourceType:      "conversation",
+		ResourceID:        "conv-1",
+		Classification:    "TOOL_PROVIDER_UNAVAILABLE",
+		Status:            types.ProviderFailureStatusRetryPending,
+		Retryable:         true,
+		RetryCount:        0,
+		NextRetryAt:       time.Now().UTC().Add(time.Minute),
+		FailureRef:        "action-executor://executions/exec-provider-failure-1/provider-failures/provider-failure-1",
+		CreatedAt:         time.Now().UTC(),
+	}
+	if err := repository.RecordExecution(ctx, audit, projection, &failure); err != nil {
+		t.Fatalf("record execution provider failure: %v", err)
+	}
+
+	var storedStatus string
+	var storedClassification string
+	var storedRetryable bool
+	var storedRetryCount int
+	var storedFailureRef string
+	var nextRetryAt time.Time
+	var deadLetteredAtIsNull bool
+	err = pool.QueryRow(ctx, `
+SELECT status, classification, retryable, retry_count, failure_ref, next_retry_at, dead_lettered_at IS NULL
+FROM action_executor_provider_failures
+WHERE tenant_id = $1 AND provider_failure_id = $2`, "tenant-1", "provider-failure-1").Scan(
+		&storedStatus,
+		&storedClassification,
+		&storedRetryable,
+		&storedRetryCount,
+		&storedFailureRef,
+		&nextRetryAt,
+		&deadLetteredAtIsNull,
+	)
+	if err != nil {
+		t.Fatalf("query provider failure: %v", err)
+	}
+	if storedStatus != types.ProviderFailureStatusRetryPending ||
+		storedClassification != "TOOL_PROVIDER_UNAVAILABLE" ||
+		!storedRetryable ||
+		storedRetryCount != 0 ||
+		storedFailureRef == "" ||
+		nextRetryAt.IsZero() ||
+		!deadLetteredAtIsNull {
+		t.Fatalf("unexpected provider failure row: status=%s class=%s retryable=%v count=%d ref=%s next=%v dlq=%v",
+			storedStatus,
+			storedClassification,
+			storedRetryable,
+			storedRetryCount,
+			storedFailureRef,
+			nextRetryAt,
+			deadLetteredAtIsNull,
+		)
+	}
+}
+
 func applyMigration(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
 	t.Helper()
 	for _, name := range []string{
 		"000001_action_executor_core.sql",
 		"000002_action_executor_tool_results.sql",
+		"000003_action_executor_provider_failures.sql",
 	} {
 		path := filepath.Join("..", "..", "..", "..", "..", "migrations", "postgres", "action-executor", name)
 		sqlBytes, err := os.ReadFile(path)

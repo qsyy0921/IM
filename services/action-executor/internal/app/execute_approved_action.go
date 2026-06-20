@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/qsyy0921/IM/services/action-executor/internal/types"
 )
@@ -105,15 +106,15 @@ func (usecase ExecuteApprovedActionUseCase) Execute(
 	}
 	if strings.TrimSpace(skill.Status) != types.SkillStatusActive {
 		result := blockedResult(command, skill, "SKILL_DISABLED", "skill disabled")
-		return usecase.insertAudit(ctx, command, result, types.ExecutionStatusBlocked)
+		return usecase.insertAudit(ctx, command, result, types.ExecutionStatusBlocked, nil)
 	}
 	if strings.TrimSpace(skill.ToolName) != command.ToolName {
 		result := blockedResult(command, skill, "TOOL_MISMATCH", "tool does not match skill")
-		return usecase.insertAudit(ctx, command, result, types.ExecutionStatusBlocked)
+		return usecase.insertAudit(ctx, command, result, types.ExecutionStatusBlocked, nil)
 	}
 	if !types.ToolActionAllowed(skill.AllowedActions, types.ToolActionExecute) {
 		result := blockedResult(command, skill, "ACTION_NOT_ALLOWED", "tool execute action not allowed")
-		return usecase.insertAudit(ctx, command, result, types.ExecutionStatusBlocked)
+		return usecase.insertAudit(ctx, command, result, types.ExecutionStatusBlocked, nil)
 	}
 
 	decision, err := usecase.policy.CheckToolAction(ctx, types.CheckToolActionCommand{
@@ -173,7 +174,7 @@ func (usecase ExecuteApprovedActionUseCase) Execute(
 	} else if usecase.executor != nil {
 		return usecase.executeToolAndInsertAudit(ctx, command, skill, result, status)
 	}
-	return usecase.insertAudit(ctx, command, result, status)
+	return usecase.insertAudit(ctx, command, result, status, nil)
 }
 
 func (usecase ExecuteApprovedActionUseCase) executeToolAndInsertAudit(
@@ -183,6 +184,7 @@ func (usecase ExecuteApprovedActionUseCase) executeToolAndInsertAudit(
 	result types.ExecuteApprovedActionResult,
 	status string,
 ) (types.ExecuteApprovedActionResult, error) {
+	var providerFailure *types.ProviderFailureProjection
 	if usecase.executor != nil {
 		execution, err := usecase.executor.ExecuteTool(ctx, types.ToolExecutionCommand{
 			AuthContext:  command.AuthContext,
@@ -206,6 +208,7 @@ func (usecase ExecuteApprovedActionUseCase) executeToolAndInsertAudit(
 					result.DecisionSource = "action-executor"
 					result.Executed = false
 					result.OutputJSON = "{}"
+					providerFailure = &types.ProviderFailureProjection{}
 					break
 				}
 				result.Executed = true
@@ -219,9 +222,10 @@ func (usecase ExecuteApprovedActionUseCase) executeToolAndInsertAudit(
 			result.DecisionSource = "action-executor"
 			result.Executed = false
 			result.OutputJSON = "{}"
+			providerFailure = &types.ProviderFailureProjection{}
 		}
 	}
-	return usecase.insertAudit(ctx, command, result, status)
+	return usecase.insertAudit(ctx, command, result, status, providerFailure)
 }
 
 func (usecase ExecuteApprovedActionUseCase) insertAudit(
@@ -229,6 +233,7 @@ func (usecase ExecuteApprovedActionUseCase) insertAudit(
 	command types.ExecuteApprovedActionCommand,
 	result types.ExecuteApprovedActionResult,
 	status string,
+	providerFailure *types.ProviderFailureProjection,
 ) (types.ExecuteApprovedActionResult, error) {
 	result.Status = status
 	result.ExecutionID = newExecutionID()
@@ -282,7 +287,10 @@ func (usecase ExecuteApprovedActionUseCase) insertAudit(
 		ResultRef:       result.ResultRef,
 		OutputSHA256:    audit.OutputSHA256,
 	}
-	if err := usecase.audit.RecordExecution(ctx, audit, projection); err != nil {
+	if providerFailure != nil {
+		providerFailure = providerFailureProjection(command, result)
+	}
+	if err := usecase.audit.RecordExecution(ctx, audit, projection, providerFailure); err != nil {
 		return types.ExecuteApprovedActionResult{}, err
 	}
 	return result, nil
@@ -412,6 +420,66 @@ func resultStatusForExecution(status string, executed bool) string {
 
 func resultRef(executionID string, resultID string) string {
 	return "action-executor://executions/" + executionID + "/results/" + resultID
+}
+
+func providerFailureProjection(
+	command types.ExecuteApprovedActionCommand,
+	result types.ExecuteApprovedActionResult,
+) *types.ProviderFailureProjection {
+	status, retryable := providerFailureStatus(result.Classification)
+	if status == "" {
+		return nil
+	}
+	now := time.Now().UTC()
+	projection := types.ProviderFailureProjection{
+		TenantID:          command.AuthContext.TenantID,
+		ProviderFailureID: newProviderFailureID(),
+		ExecutionID:       result.ExecutionID,
+		ResultID:          result.ResultID,
+		ProposalID:        command.ProposalID,
+		ApprovalID:        command.ApprovalID,
+		PreparedAuditID:   command.PreparedAuditID,
+		UserID:            command.AuthContext.UserID,
+		SkillID:           command.SkillID,
+		ToolName:          command.ToolName,
+		ResourceType:      command.ResourceType,
+		ResourceID:        command.ResourceID,
+		Classification:    result.Classification,
+		Status:            status,
+		Retryable:         retryable,
+		RetryCount:        0,
+		CreatedAt:         now,
+	}
+	if retryable {
+		projection.NextRetryAt = now.Add(30 * time.Second)
+	} else {
+		projection.DeadLetteredAt = now
+	}
+	projection.FailureRef = providerFailureRef(result.ExecutionID, projection.ProviderFailureID)
+	return &projection
+}
+
+func providerFailureStatus(classification string) (string, bool) {
+	switch strings.TrimSpace(classification) {
+	case "TOOL_EXECUTION_TIMEOUT", "TOOL_PROVIDER_UNAVAILABLE", "TOOL_PROVIDER_RATE_LIMITED":
+		return types.ProviderFailureStatusRetryPending, true
+	case "TOOL_PROVIDER_PERMISSION_DENIED", "TOOL_OUTPUT_UNSAFE", "TOOL_EXECUTION_FAILED":
+		return types.ProviderFailureStatusDLQ, false
+	default:
+		return "", false
+	}
+}
+
+func newProviderFailureID() string {
+	var buf [16]byte
+	if _, err := rand.Read(buf[:]); err != nil {
+		return "act_provider_failure_fallback"
+	}
+	return "act_provider_failure_" + hex.EncodeToString(buf[:])
+}
+
+func providerFailureRef(executionID string, providerFailureID string) string {
+	return "action-executor://executions/" + executionID + "/provider-failures/" + providerFailureID
 }
 
 func outputSHA256(outputJSON string, executed bool) string {

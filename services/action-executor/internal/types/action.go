@@ -28,6 +28,9 @@ const (
 	ResultStatusSucceeded   = "SUCCEEDED"
 	ResultStatusFailed      = "FAILED"
 
+	ProviderFailureStatusRetryPending = "RETRY_PENDING"
+	ProviderFailureStatusDLQ          = "DLQ"
+
 	maxInputJSONBytes = 64 * 1024
 )
 
@@ -234,6 +237,29 @@ type ToolResultProjection struct {
 	ResultRef       string
 	OutputSHA256    string
 	CreatedAt       time.Time
+}
+
+type ProviderFailureProjection struct {
+	TenantID          TenantID
+	ProviderFailureID string
+	ExecutionID       string
+	ResultID          string
+	ProposalID        string
+	ApprovalID        string
+	PreparedAuditID   string
+	UserID            UserID
+	SkillID           string
+	ToolName          string
+	ResourceType      string
+	ResourceID        string
+	Classification    string
+	Status            string
+	Retryable         bool
+	RetryCount        int
+	NextRetryAt       time.Time
+	DeadLetteredAt    time.Time
+	FailureRef        string
+	CreatedAt         time.Time
 }
 
 type ExecuteApprovedActionResult struct {

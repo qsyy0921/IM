@@ -49,11 +49,13 @@ model-gateway / workflow / knowledge-ingestion / vector-index
 - `control-plane-service` 已切到 product-active，第一实现切片已落
   `PublishConfigVersion` / `GetConfigSnapshot` / `AckAppliedConfigVersion`、
   proto / migration / runtime / observability，并已通过最小 gRPC smoke。
+- `presence-service` SDD v0.1 stage-switch review 已通过；下一实现切片才能
+  同步切换 registry、proto、migration、runtime、Docker / observability。
 
 ## 下一步
 
-- 默认进入 `presence-service` stage-switch，或继续 control-plane outbox relay /
-  drift monitor。
+- 默认进入 `presence-service` 第一实现切片；也可以继续 control-plane outbox
+  relay / drift monitor。
 - 也可以继续 notification SMTP / SMS / APNs / FCM adapter 或 bounce-suppression。
 
 ## 硬边界

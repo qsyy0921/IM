@@ -65,6 +65,9 @@
   Prometheus / Grafana 覆盖已落；当前覆盖 `PublishConfigVersion`、
   `GetConfigSnapshot`、`AckAppliedConfigVersion`、DB-backed quota / feature
   snapshot 和低敏 control outbox；最小 gRPC smoke 已通过并归档。
+- `presence-service` stage-switch approved：SDD v0.1 已复核，边界冻结为在线状态、
+  输入中、设备在线、最后在线和 visibility 过滤；下一实现切片再同步切 registry、
+  proto、migration、runtime、Docker / observability。
 
 当前 Go 侧服务底座、控制面、EvidencePack、proposal / approval / audit、
 Python Worker 候选接入边界和低敏 eval 持久化已经足够支撑算法切片；
@@ -74,7 +77,7 @@ Python Worker 候选接入边界和低敏 eval 持久化已经足够支撑算法
 当前尚未真实实现的后续产品化 / 平台服务：
 
 - `admin-service`（SDD v0.1 draft 已存在）
-- `presence-service`（SDD v0.1 draft 已存在）
+- `presence-service`（stage-switch 已通过，等待第一实现切片）
 - `model-gateway`（SDD v0.1 draft 已存在）
 - `knowledge-ingestion-service`（SDD v0.1 draft 已存在）
 - `workflow-service`（SDD v0.1 draft 已存在）

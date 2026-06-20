@@ -74,7 +74,9 @@ Foundation backlog 锚点：`search-service`、`memory-service`、`retrieval-gat
 registry / proto / migration 同步切换外，不得提前创建 `services/<name>` 目录：
 
 - `admin-service`：租户、封禁、配置、repair 审批、运维操作。
-- `presence-service`：在线状态、输入中、最后在线、设备在线。
+- `presence-service`：stage-switch 已通过；下一实现切片同步 registry、proto、
+  migration、runtime、Docker / observability，并先落 `UpdatePresence` /
+  `GetPresence` / `UpdateTyping` 最小 gRPC 路径。
 - `model-gateway`：模型 provider、embedding、rerank、成本、fallback、审计。
 - `workflow-service`：审批等待、长事务、补偿、retention、operator workflow。
 - `knowledge-ingestion-service`：文件 / 网页导入、chunking、embedding pipeline。

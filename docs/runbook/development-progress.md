@@ -86,9 +86,10 @@
   第一版 proto / migration / 六层 skeleton / `grpc` runtime / Docker /
   Prometheus / Grafana 覆盖已落；当前覆盖 `CreateWorkflow`、
   `RecordWorkflowDecision`、`GetWorkflow`、action / repair approval 最小状态机和
-  低敏 `workflow_outbox`；focused checks、真实 PostgreSQL integration 和完整
-  `check-local` 已通过，不宣称 timer / compensation worker、external callback wait
-  或 outbox relay。
+  低敏 `workflow_outbox`；已作为 admin-service `REPAIR_REQUEST -> REPAIR_APPROVAL`
+  的长审批入口；focused checks、真实 PostgreSQL integration 和完整 `check-local`
+  已通过，不宣称 timer / compensation worker、external callback wait、通用
+  `ADMIN_OPERATION` workflow 类型或 outbox relay。
 - `vector-index-service` product-active：SDD v0.1 和 stage-switch review 已通过，
   第一版 proto / migration / 六层 skeleton / `grpc` runtime / Docker /
   Prometheus / Grafana 覆盖已落；当前覆盖 `UpsertVectorItem`、
@@ -101,7 +102,9 @@
   `ApproveAdminOperation`、`GetAdminOperation`、`ListAdminOperations`、
   PostgreSQL operation / approval 状态、低敏 `admin_outbox`、
   `admin_outbox -> im.admin.events` outbox relay 和 `operation-worker`
-  本地 no-op executor 执行闭环；不宣称真实下游 mutation、workflow 长审批、
+  risk routing 执行闭环；`REPAIR_REQUEST` 已路由到 workflow-service
+  `REPAIR_APPROVAL`，其它 `CRITICAL` operation 在通用 workflow 类型或专用
+  adapter 前 fail-closed；不宣称真实下游 mutation、通用 admin workflow、
   admin UI 或 provider-grade 运维。
 
 当前 Go 侧服务底座、控制面、EvidencePack、proposal / approval / audit、
@@ -277,7 +280,7 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 | `media-service` | product-active，第一版 skeleton + PG hardening + gRPC smoke + outbox relay + processing worker 已落 | `media_service.proto`、PostgreSQL core migration、六层 skeleton、`CreateUploadSession` / `CompleteUpload` / `GetMediaAsset` / `GetMediaDownloadURL` / `DeleteMediaAsset` app + gRPC adapter、fake object-store port、PostgreSQL repository first pass、真实 PG upload / complete / delete / outbox / processing 集成测试、object_key 不出 public response / fake presign URL / outbox payload 的回归门禁、`grpc` / `processing-worker` runtime mode、Docker / Prometheus / Grafana wiring、`loadtest/media` 和 2026-06-20 最小 gRPC smoke 已落；`media_outbox -> im.media.events` Kafka schema、outbox store、Kafka producer、trigger relay、`outbox-relay` runtime mode、真实 PG relay 顺序 / retry / DLQ 测试、真实 Kafka readback smoke 和 mock scanner / thumbnail / transcode worker smoke 已落；第一版仍不做真实 S3、真实 scanner、真实 thumbnail/transcode provider 或 provider-grade download policy | `service-briefs/media-service.md` |
 | `notification-service` | product-active，第一版 skeleton + accepted outbox + outbox relay + delivery worker 已落 | `notification_service.proto`、PostgreSQL core migration、六层 skeleton、`CreateNotificationRequest` / `GetNotificationStatus` / `CancelNotificationRequest` app + gRPC adapter、destination hash port、PostgreSQL repository first pass、accepted outbox 敏感字段不泄露回归测试、无 secret payload 普通请求写库回归测试、`grpc` / `delivery-worker` / `outbox-relay` runtime mode、Docker / Prometheus / Grafana wiring、`im.notification.events` Kafka schema、outbox store、Kafka producer、trigger relay、真实 PG relay publish / retry / DLQ / request-order blocker 测试、delivery store success / DLQ 测试、noop provider adapter、webhook provider adapter 和 2026-06-20 真实 Kafka / delivery smoke 已落；第一版仍不做 provider-grade email / SMS / APNs / FCM、bounce / suppression worker | `service-briefs/notification-service.md` |
 | `audit-service` | product-active，第一版 append / query / proof 和最小 gRPC smoke 已落 | `audit_service.proto`、PostgreSQL core migration、六层 skeleton、`AppendAuditRecord` / `QueryAuditRecords` / `VerifyAuditProof` app + gRPC adapter、PostgreSQL repository、hash-chain proof、低敏 `audit.record.appended.v1` outbox、`grpc` runtime mode、Docker / Prometheus / Grafana wiring、最小 gRPC smoke 报告已落；第一版仍不做 Kafka ingestion、export worker、SIEM forwarding、segment sealing 或 retention cleanup | `service-briefs/audit-service.md` |
-| `admin-service` | product-active，第一版 operation / approval 管理入口 + outbox relay + operation worker 已落 | `admin_service.proto`、PostgreSQL core migration、六层 skeleton、`CreateAdminOperation` / `ApproveAdminOperation` / `GetAdminOperation` / `ListAdminOperations` app + gRPC adapter、PostgreSQL repository、high-risk separation-of-duty、低敏 `admin_outbox`、`grpc` / `operation-worker` / `outbox-relay` runtime mode、`im.admin.events` Kafka schema、outbox store、Kafka producer、trigger relay、本地 no-op executor、`admin_operation_results` result 投影、Docker / Prometheus / Grafana / worker compose wiring 已落；第一版仍不做真实下游 mutation、workflow-service 长审批、admin UI 或 provider-grade 运维 | `service-briefs/admin-service.md` |
+| `admin-service` | product-active，第一版 operation / approval 管理入口 + outbox relay + operation worker 已落 | `admin_service.proto`、PostgreSQL core migration、六层 skeleton、`CreateAdminOperation` / `ApproveAdminOperation` / `GetAdminOperation` / `ListAdminOperations` app + gRPC adapter、PostgreSQL repository、high-risk separation-of-duty、低敏 `admin_outbox`、`grpc` / `operation-worker` / `outbox-relay` runtime mode、`im.admin.events` Kafka schema、outbox store、Kafka producer、trigger relay、本地 no-op executor、risk routing、`REPAIR_REQUEST -> workflow-service REPAIR_APPROVAL`、`admin_operation_results` result 投影、Docker / Prometheus / Grafana / worker compose wiring 已落；第一版仍不做真实下游 mutation、通用 `ADMIN_OPERATION` workflow、admin UI 或 provider-grade 运维 | `service-briefs/admin-service.md` |
 | `control-plane-service` | product-active，第一版 config publish / snapshot / ACK 和最小 gRPC smoke 已落 | `control_plane_service.proto`、PostgreSQL core migration、六层 skeleton、`PublishConfigVersion` / `GetConfigSnapshot` / `AckAppliedConfigVersion` app + gRPC adapter、PostgreSQL repository、DB-backed quota / feature snapshot、低敏 `control_outbox`、`grpc` runtime mode、Docker / Prometheus / Grafana wiring、最小 gRPC smoke 报告已落；第一版仍不做 rollback、Kafka relay、drift monitor、expiry / cleanup worker 或 api-gateway consumer | `service-briefs/control-plane-service.md` |
 
 ## 剩余目标入口

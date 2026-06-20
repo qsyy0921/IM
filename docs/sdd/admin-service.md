@@ -160,6 +160,17 @@ operator reason raw text
 | `AUDIT_EXPORT_REQUEST` | 调 audit-service export API |
 | `NOTIFICATION_SUPPRESSION_CHANGE` | 调 notification-service suppression API |
 
+第一版 operation-worker 已支持最小 workflow 路由：
+
+```text
+REPAIR_REQUEST -> workflow-service CreateWorkflow(REPAIR_APPROVAL)
+```
+
+该路径只传 `target_ref_hash`、`payload_hash`、`reason_ref` 和 `evidence_refs` 等低敏
+ref/hash；admin-service result 只记录 `workflow:<workflow_id>`。其它 `CRITICAL`
+operation 在通用 `ADMIN_OPERATION` workflow 类型或专用下游 adapter 落地前不得走
+本地 no-op executor，必须 fail-closed。
+
 高风险 operation 默认走：
 
 ```text
@@ -343,6 +354,16 @@ NEXUSIM_ADMIN_SERVICE_MODE=operation-worker
 NEXUSIM_ADMIN_SERVICE_MODE=outbox-relay
 NEXUSIM_ADMIN_SERVICE_MODE=cleanup
 ```
+
+`operation-worker` 第一版配置：
+
+```text
+NEXUSIM_WORKFLOW_GRPC_ADDR=127.0.0.1:10820
+NEXUSIM_ADMIN_WORKFLOW_RPC_TIMEOUT=1s
+```
+
+未设置 `NEXUSIM_WORKFLOW_GRPC_ADDR` 时，`REPAIR_REQUEST` / `CRITICAL` operation 会
+fail-closed 并记录失败结果，不会被本地 no-op executor 标记为成功。
 
 operator：
 

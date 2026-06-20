@@ -20,6 +20,7 @@ import (
 	executorinfra "github.com/qsyy0921/IM/services/admin-service/internal/infrastructure/executor"
 	kafkainfra "github.com/qsyy0921/IM/services/admin-service/internal/infrastructure/kafka"
 	postgresinfra "github.com/qsyy0921/IM/services/admin-service/internal/infrastructure/postgres"
+	rpcinfra "github.com/qsyy0921/IM/services/admin-service/internal/infrastructure/rpc"
 	"github.com/qsyy0921/IM/services/admin-service/internal/trigger/operation"
 	"github.com/qsyy0921/IM/services/admin-service/internal/trigger/outbox"
 	"google.golang.org/grpc"
@@ -139,9 +140,32 @@ func runOperationWorker(ctx context.Context) error {
 	}
 	defer pool.Close()
 
+	localExecutor := executorinfra.NewNoopExecutor(envString("NEXUSIM_ADMIN_OPERATION_EXECUTOR_ID", "local-noop"))
+	var workflowExecutor executorinfra.OperationExecutor
+	workflowAddr := strings.TrimSpace(os.Getenv("NEXUSIM_WORKFLOW_GRPC_ADDR"))
+	if workflowAddr != "" {
+		executor, closeWorkflow, err := rpcinfra.DialWorkflowExecutor(
+			ctx,
+			workflowAddr,
+			envDuration("NEXUSIM_ADMIN_WORKFLOW_RPC_TIMEOUT", time.Second),
+		)
+		if err != nil {
+			return err
+		}
+		defer func() {
+			if closeErr := closeWorkflow(); closeErr != nil {
+				log.Printf("admin-service workflow client close failed: %v", closeErr)
+			}
+		}()
+		workflowExecutor = executor
+		log.Printf("admin-service operation worker routing workflow-required operations to %s", workflowAddr)
+	} else {
+		log.Println("admin-service operation worker has no workflow-service address; workflow-required operations fail closed")
+	}
+
 	worker := operation.NewWorker(
 		postgresinfra.NewRepository(pool),
-		executorinfra.NewNoopExecutor(envString("NEXUSIM_ADMIN_OPERATION_EXECUTOR_ID", "local-noop")),
+		executorinfra.NewRiskRoutingExecutor(localExecutor, workflowExecutor),
 		operation.Config{
 			BatchSize:      envInt("NEXUSIM_ADMIN_OPERATION_BATCH_SIZE", 50),
 			PollInterval:   envDuration("NEXUSIM_ADMIN_OPERATION_POLL_INTERVAL", time.Second),

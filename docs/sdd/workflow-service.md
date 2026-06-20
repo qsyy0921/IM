@@ -168,6 +168,11 @@ workflow_id, workflow_status, next_step_id, decision_id, outbox_event_id
 | `ACTION_APPROVAL` | agent-service / action-executor | 高风险 tool action 审批等待 |
 | `REPAIR_APPROVAL` | admin-service / operator | DLQ、repair、redrive、cleanup 审批 |
 
+当前 admin-service 已接入第一版 `REPAIR_REQUEST -> REPAIR_APPROVAL`：admin operation
+worker 只向 workflow-service 传 low-sensitive ref/hash，并把 workflow id 作为
+admin result 的 downstream ref。通用 `ADMIN_OPERATION` workflow 类型仍是后续扩展，
+不能把其它 CRITICAL admin operation 伪装成 repair approval。
+
 后续扩展：
 
 | 类型 | 入口 | 目标 |

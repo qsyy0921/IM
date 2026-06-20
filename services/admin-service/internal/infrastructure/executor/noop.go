@@ -18,6 +18,9 @@ func NewNoopExecutor(downstreamService string) NoopExecutor {
 }
 
 func (executor NoopExecutor) Execute(_ context.Context, operation types.AdminOperation) (types.OperationExecutionResult, error) {
+	if requiresWorkflow(operation) {
+		return types.OperationExecutionResult{}, types.NewFailedPrecondition("admin operation requires workflow execution")
+	}
 	return types.OperationExecutionResult{
 		DownstreamService:    executor.DownstreamService,
 		DownstreamRequestRef: "operation:" + operation.OperationID,

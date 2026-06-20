@@ -39,8 +39,9 @@ future platform / product services 的 10 个 SDD draft 已存在；`media-servi
 `SearchVectors` / `GetVectorIndexJob` path。`admin-service` 已完成第一版
 `CreateAdminOperation` / `ApproveAdminOperation` / `GetAdminOperation` /
 `ListAdminOperations` path、`admin_outbox -> im.admin.events` outbox relay 和
-`operation-worker` 本地 no-op executor 执行闭环。
-下一步默认继续 admin workflow 长审批接入 / 真实下游公开 admin API adapter，或继续 vector
+`operation-worker` risk routing 执行闭环；`REPAIR_REQUEST` 已接入
+workflow-service `REPAIR_APPROVAL`，其它通用 `ADMIN_OPERATION` workflow 类型后置。
+下一步默认继续 admin 通用 workflow 类型 / 真实下游公开 admin API adapter，或继续 vector
 embedding / rebuild / outbox 后续 worker。
 ```
 

@@ -1,0 +1,20 @@
+groups:
+  - name: nexusim-media-service
+    rules:
+      - alert: NexusIMMediaServiceDown
+        expr: up{service="media-service"} == 0
+        for: 2m
+        labels:
+          severity: warning
+          service: media-service
+        annotations:
+          summary: "media-service metrics endpoint is down"
+
+      - alert: NexusIMMediaServiceInfoMissing
+        expr: absent(nexusim_media_service_info)
+        for: 2m
+        labels:
+          severity: warning
+          service: media-service
+        annotations:
+          summary: "media-service info metric is missing"

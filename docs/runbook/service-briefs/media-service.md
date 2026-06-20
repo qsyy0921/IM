@@ -1,7 +1,8 @@
 # media-service
 
-状态：future / SDD v0.1 draft 已存在 / stage-switch review passed。当前不得创建
-`services/media-service` 目录，直到 implementation slice 同步更新 registry / gate。
+状态：product-active / SDD v0.1 draft 已存在 / stage-switch review passed /
+implementation slice in progress。当前允许创建 `services/media-service` 目录，但只限
+第一切片的 proto、migration、六层 skeleton、Docker 和观测覆盖。
 
 Stage-switch 记录：`docs/runbook/stage-switch/media-service.md`。
 

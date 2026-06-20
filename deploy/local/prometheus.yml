@@ -163,3 +163,11 @@ scrape_configs:
           - host.docker.internal:11926
         labels:
           service: ai-eval-service
+
+  - job_name: nexusim-media-service
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - host.docker.internal:11927
+        labels:
+          service: media-service

@@ -334,6 +334,23 @@ services:
       nexusim-services:
         ipv4_address: 172.30.80.29
 
+  media-service-grpc:
+    image: nexusim/media-service:local
+    container_name: nexusim-media-service-grpc
+    environment:
+      NEXUSIM_MEDIA_SERVICE_MODE: grpc
+      NEXUSIM_MEDIA_GRPC_ADDR: 172.30.80.30:10680
+      NEXUSIM_MEDIA_DEBUG_ADDR: 172.30.80.30:11927
+      NEXUSIM_MEDIA_FAKE_OBJECT_BASE_URL: http://127.0.0.1:19080/media
+      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@host.docker.internal:5432/nexusim?sslmode=disable
+    ports:
+      - "10680:10680"
+      - "11927:11927"
+    restart: unless-stopped
+    networks:
+      nexusim-services:
+        ipv4_address: 172.30.80.30
+
   push-gateway-ws:
     image: nexusim/push-gateway:local
     container_name: nexusim-push-gateway-ws

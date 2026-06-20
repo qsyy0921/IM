@@ -264,6 +264,10 @@ $aiEvalServiceRequiredMetrics = @(
     "nexusim_ai_eval_service_info"
 )
 
+$mediaServiceRequiredMetrics = @(
+    "nexusim_media_service_info"
+)
+
 Test-Dashboard -Path $dashboardPathsByService["api-gateway"] -Name "api-gateway" -ExpectedUid "nexusim-api-gateway" -MinimumPanels 5 -RequiredMetrics $apiGatewayRequiredMetrics
 Test-Dashboard -Path $dashboardPathsByService["identity-service"] -Name "identity-service" -ExpectedUid "nexusim-identity-service" -MinimumPanels 8 -RequiredMetrics $identityRequiredMetrics
 Test-Dashboard -Path $dashboardPathsByService["message-service"] -Name "message-service" -ExpectedUid "nexusim-message-service" -MinimumPanels 8 -RequiredMetrics $messageRequiredMetrics
@@ -282,5 +286,6 @@ Test-Dashboard -Path $dashboardPathsByService["skill-registry"] -Name "skill-reg
 Test-Dashboard -Path $dashboardPathsByService["mcp-gateway"] -Name "mcp-gateway" -ExpectedUid "nexusim-mcp-gateway" -MinimumPanels 1 -RequiredMetrics $mcpGatewayRequiredMetrics
 Test-Dashboard -Path $dashboardPathsByService["action-executor"] -Name "action-executor" -ExpectedUid "nexusim-action-executor" -MinimumPanels 1 -RequiredMetrics $actionExecutorRequiredMetrics
 Test-Dashboard -Path $dashboardPathsByService["ai-eval-service"] -Name "ai-eval-service" -ExpectedUid "nexusim-ai-eval-service" -MinimumPanels 1 -RequiredMetrics $aiEvalServiceRequiredMetrics
+Test-Dashboard -Path $dashboardPathsByService["media-service"] -Name "media-service" -ExpectedUid "nexusim-media-service" -MinimumPanels 1 -RequiredMetrics $mediaServiceRequiredMetrics
 
 Write-Host "OK   local Grafana config"

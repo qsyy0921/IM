@@ -343,4 +343,15 @@ foreach ($alert in $requiredAIEvalServiceAlerts) {
     }
 }
 
+$requiredMediaServiceAlerts = @(
+    "NexusIMMediaServiceDown",
+    "NexusIMMediaServiceInfoMissing"
+)
+
+foreach ($alert in $requiredMediaServiceAlerts) {
+    if ($rulesByService["media-service"] -notmatch [regex]::Escape($alert)) {
+        throw "Prometheus media-service rules missing alert: $alert"
+    }
+}
+
 Write-Host "OK   local Prometheus config"

@@ -18,9 +18,13 @@
 [skill-registry](skill-registry.md) / [mcp](mcp-gateway.md) /
 [action-executor](action-executor.md) / [ai-eval](ai-eval-service.md)
 
+## Product-active platform / product services
+
+[media](media-service.md)
+
 ## Future platform / product services
 
-[media](media-service.md) / [notification](notification-service.md) / [audit](audit-service.md) /
+[notification](notification-service.md) / [audit](audit-service.md) /
 [admin](admin-service.md) / [control-plane](control-plane-service.md) / [presence](presence-service.md) /
 [model-gateway](model-gateway.md) / [workflow](workflow-service.md) / [knowledge-ingestion](knowledge-ingestion-service.md) / [vector-index](vector-index-service.md)
 

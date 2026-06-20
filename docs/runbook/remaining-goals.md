@@ -62,11 +62,17 @@ eval 已能支撑算法切片；生产级 HA、长压、sizing 和完整系统�
 | `contacts-service` | 组织级策略、租户默认值、来源策略、隐私例外接入 admin/config service。 |
 | `policy-service` | provider-grade ReBAC graph / DSL、moderation / risk scoring、tenant DSL / quota、外部 audit pipeline。 |
 
+## Product-active 平台 / 产品化服务
+
+- `media-service`：第一版 proto / migration / 六层 skeleton / cmd runtime /
+  Docker / Prometheus / Grafana 覆盖已落；下一步补真实 PostgreSQL repository
+  集成测试、最小 gRPC smoke、object_key 不出 public response / outbox payload
+  的回归门禁，然后再进入 media outbox relay / processing worker。
+
 ## 后置平台 / 产品化服务
 
-这些服务已登记为 `future`，stage switch 前不得创建 `services/<name>` 目录：
+这些服务仍登记为 `future`，stage switch 前不得创建 `services/<name>` 目录：
 
-- `media-service`：媒体上传、对象存储、缩略图、病毒扫描、语音转码。
 - `notification-service`：email、SMS、APNs / FCM、模板、bounce handling。
 - `audit-service`：统一审计、导出、hash-chain、Agent 动作审计。
 - `admin-service`：租户、封禁、配置、repair 审批、运维操作。

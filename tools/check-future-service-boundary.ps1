@@ -22,6 +22,7 @@ function Read-UTF8Text {
 
 $currentImplementedServices = Get-NexusIMRegistryServiceNames -RepoRoot $repoRoot -Stages @("core")
 $currentFoundationServices = Get-NexusIMRegistryServiceNames -RepoRoot $repoRoot -Stages @("foundation-active")
+$currentProductServices = Get-NexusIMRegistryServiceNames -RepoRoot $repoRoot -Stages @("product-active")
 $futureServices = Get-NexusIMRegistryServiceNames -RepoRoot $repoRoot -Stages @("future")
 
 $currentBrief = Read-UTF8Text -Path $currentBriefPath
@@ -36,7 +37,7 @@ foreach ($service in $currentImplementedServices) {
     }
 }
 
-$allowedServiceDirs = @($currentImplementedServices + $currentFoundationServices)
+$allowedServiceDirs = @(Get-NexusIMRegistryServiceNames -RepoRoot $repoRoot -Active)
 $actualServiceDirs = @(Get-ChildItem -LiteralPath $servicesRoot -Directory | ForEach-Object { $_.Name })
 $unexpectedServices = @($actualServiceDirs | Where-Object { $_ -notin $allowedServiceDirs } | Sort-Object)
 if ($unexpectedServices.Count -gt 0) {
@@ -74,6 +75,26 @@ foreach ($service in $currentFoundationServices) {
                 throw "Active foundation service brief must state foundation-active status: docs\runbook\service-briefs\$service.md"
             }
         }
+    }
+}
+
+foreach ($service in $currentProductServices) {
+    if (-not $currentBrief.Contains($service)) {
+        throw "current-brief.md must list active product service: $service"
+    }
+    if (-not $remainingGoals.Contains($service)) {
+        throw "remaining-goals.md must keep active product service backlog: $service"
+    }
+    if (-not (Test-Path -LiteralPath (Join-Path $servicesRoot $service) -PathType Container)) {
+        throw "Missing active product service directory: services\$service"
+    }
+    $briefPath = Join-Path $serviceBriefRoot "$service.md"
+    if (-not (Test-Path -LiteralPath $briefPath -PathType Leaf)) {
+        throw "Missing active product service brief: docs\runbook\service-briefs\$service.md"
+    }
+    $brief = Read-UTF8Text -Path $briefPath
+    if (-not ($brief.Contains("product-active") -or $brief.Contains("stage-switch review passed"))) {
+        throw "Active product service brief must state product-active or stage-switch review status: docs\runbook\service-briefs\$service.md"
     }
 }
 

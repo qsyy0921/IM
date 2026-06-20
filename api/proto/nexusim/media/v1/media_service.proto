@@ -1,0 +1,156 @@
+syntax = "proto3";
+
+package nexusim.media.v1;
+
+option go_package = "github.com/qsyy0921/IM/api/proto/nexusim/media/v1;mediav1";
+
+service MediaService {
+  rpc CreateUploadSession(CreateUploadSessionRequest) returns (CreateUploadSessionResponse);
+  rpc CompleteUpload(CompleteUploadRequest) returns (CompleteUploadResponse);
+  rpc GetMediaAsset(GetMediaAssetRequest) returns (GetMediaAssetResponse);
+  rpc GetMediaDownloadURL(GetMediaDownloadURLRequest) returns (GetMediaDownloadURLResponse);
+  rpc DeleteMediaAsset(DeleteMediaAssetRequest) returns (DeleteMediaAssetResponse);
+}
+
+enum MediaKind {
+  MEDIA_KIND_UNSPECIFIED = 0;
+  MEDIA_KIND_IMAGE = 1;
+  MEDIA_KIND_FILE = 2;
+  MEDIA_KIND_VOICE = 3;
+  MEDIA_KIND_VIDEO = 4;
+}
+
+enum MediaAssetStatus {
+  MEDIA_ASSET_STATUS_UNSPECIFIED = 0;
+  MEDIA_ASSET_STATUS_UPLOAD_PENDING = 1;
+  MEDIA_ASSET_STATUS_UPLOADED = 2;
+  MEDIA_ASSET_STATUS_PROCESSING = 3;
+  MEDIA_ASSET_STATUS_READY = 4;
+  MEDIA_ASSET_STATUS_QUARANTINED = 5;
+  MEDIA_ASSET_STATUS_FAILED = 6;
+  MEDIA_ASSET_STATUS_DELETED = 7;
+  MEDIA_ASSET_STATUS_EXPIRED = 8;
+}
+
+enum MediaProcessingStatus {
+  MEDIA_PROCESSING_STATUS_UNSPECIFIED = 0;
+  MEDIA_PROCESSING_STATUS_PENDING = 1;
+  MEDIA_PROCESSING_STATUS_PASSED = 2;
+  MEDIA_PROCESSING_STATUS_SKIPPED = 3;
+  MEDIA_PROCESSING_STATUS_FAILED = 4;
+}
+
+enum MediaVariant {
+  MEDIA_VARIANT_UNSPECIFIED = 0;
+  MEDIA_VARIANT_ORIGINAL = 1;
+  MEDIA_VARIANT_THUMBNAIL = 2;
+  MEDIA_VARIANT_TRANSCODED = 3;
+}
+
+message AuthContext {
+  string tenant_id = 1;
+  string user_id = 2;
+  string device_id = 3;
+  string session_id = 4;
+  string trace_id = 5;
+  string request_id = 6;
+}
+
+message MediaAsset {
+  string tenant_id = 1;
+  string asset_id = 2;
+  string owner_user_id = 3;
+  string conversation_id = 4;
+  MediaKind media_kind = 5;
+  string content_type = 6;
+  string file_name = 7;
+  int64 size_bytes = 8;
+  string sha256 = 9;
+  MediaAssetStatus status = 10;
+  MediaProcessingStatus scan_status = 11;
+  MediaProcessingStatus thumbnail_status = 12;
+  MediaProcessingStatus transcode_status = 13;
+  int64 created_at_unix_ms = 14;
+  int64 uploaded_at_unix_ms = 15;
+  int64 ready_at_unix_ms = 16;
+  int64 deleted_at_unix_ms = 17;
+}
+
+message MessageAttachmentRef {
+  string asset_id = 1;
+  MediaKind media_kind = 2;
+  string content_type = 3;
+  string file_name = 4;
+  int64 size_bytes = 5;
+  string sha256 = 6;
+}
+
+message CreateUploadSessionRequest {
+  AuthContext auth_context = 1;
+  string conversation_id = 2;
+  MediaKind media_kind = 3;
+  string file_name = 4;
+  string content_type = 5;
+  int64 size_bytes = 6;
+  string sha256 = 7;
+  string idempotency_key = 8;
+}
+
+message CreateUploadSessionResponse {
+  string asset_id = 1;
+  string upload_session_id = 2;
+  string upload_url = 3;
+  map<string, string> required_headers = 4;
+  int64 expires_at_unix_ms = 5;
+  int64 max_size_bytes = 6;
+  repeated string accepted_content_types = 7;
+}
+
+message CompleteUploadRequest {
+  AuthContext auth_context = 1;
+  string asset_id = 2;
+  string upload_session_id = 3;
+  string sha256 = 4;
+  int64 size_bytes = 5;
+}
+
+message CompleteUploadResponse {
+  MediaAsset asset = 1;
+  MessageAttachmentRef message_attachment_ref = 2;
+}
+
+message GetMediaAssetRequest {
+  AuthContext auth_context = 1;
+  string asset_id = 2;
+}
+
+message GetMediaAssetResponse {
+  MediaAsset asset = 1;
+}
+
+message GetMediaDownloadURLRequest {
+  AuthContext auth_context = 1;
+  string asset_id = 2;
+  string conversation_id = 3;
+  string message_id = 4;
+  MediaVariant requested_variant = 5;
+}
+
+message GetMediaDownloadURLResponse {
+  string asset_id = 1;
+  MediaVariant variant = 2;
+  string download_url = 3;
+  int64 expires_at_unix_ms = 4;
+  map<string, string> required_headers = 5;
+}
+
+message DeleteMediaAssetRequest {
+  AuthContext auth_context = 1;
+  string asset_id = 2;
+  string delete_request_id = 3;
+  string reason = 4;
+}
+
+message DeleteMediaAssetResponse {
+  MediaAsset asset = 1;
+}

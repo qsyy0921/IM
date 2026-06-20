@@ -52,9 +52,11 @@ vector-index-service
   SDD v0.1 draft 已存在。
 - `media-service` stage-switch review 已通过，记录见
   `docs/runbook/stage-switch/media-service.md`。
-- 下一步默认进入 `media-service` implementation slice：同步 registry / gate 后，
-  再落 proto / migration / 六层 skeleton。该切片涉及 service-registry、proto、
-  migration 和 Docker/observability，需要扩大门禁。
+- `media-service` 已进入 `product-active`，第一版 proto / migration / 六层
+  skeleton / cmd runtime / Docker / Prometheus / Grafana 覆盖已落。
+- 下一步默认继续 `media-service` focused hardening：真实 PostgreSQL repository
+  集成测试、最小 gRPC smoke、object_key 不出 public response / outbox payload
+  的回归门禁；完成后再推进 `notification-service` stage switch / implementation。
 
 ## 硬边界
 

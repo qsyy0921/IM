@@ -39,13 +39,19 @@
 - Agent execution eval adapter + low-sensitive tool result projection + local safe tool adapter first path
 - Python AI Worker 边界已由 ADR-036 固定，且 foundation first path 已落：`ai/python` 目录、`IM` conda toolchain、candidate contract helpers、低敏 safety guard、contract validator、candidate-only worker CLI、malformed / unsafe output eval adapter、bad model-output rejection adapter、第一条 worker smoke、Go-side Python candidate adapter smoke，以及 `rag-service` / `summary-service` / `agent-service` 服务级 Python worker candidate guard；Python 只做模型 / 算法 / eval 候选层，Go 继续拥有控制面、状态、审计和持久化
 
+当前已开始的后续产品化 / 平台服务：
+
+- `media-service` product-active：SDD v0.1 和 stage-switch review 已通过，第一版
+  proto / migration / 六层 skeleton / `grpc` runtime / fake object-store port /
+  Docker / Prometheus / Grafana 覆盖已落；下一步补真实 PG 集成测试、最小
+  gRPC smoke 和 object_key 泄露回归门禁。
+
 当前 Go 侧服务底座、控制面、EvidencePack、proposal / approval / audit、
 Python Worker 候选接入边界和低敏 eval 持久化已经足够支撑算法切片；
 下一步默认进入低敏 collaborative-memory 算法/eval，而不是继续泛化清九服务 P2。
 
 当前尚未真实实现的后续产品化 / 平台服务：
 
-- `media-service`（SDD v0.1 draft 已存在，stage-switch review passed）
 - `notification-service`（SDD v0.1 draft 已存在）
 - `audit-service`（SDD v0.1 draft 已存在）
 - `admin-service`（SDD v0.1 draft 已存在）
@@ -218,6 +224,7 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 | `mcp-gateway` | 已落第一版工具调用 prepare 边界 | `mcp_gateway_service.proto`、SDD、migration、六层 skeleton、`PrepareToolCall` app / gRPC adapter、skill-registry RPC client、policy-service RPC client、PostgreSQL 低敏 audit repository、`grpc` runtime mode、本地 Docker / compose / Prometheus / Grafana wiring 已落地；第一版只做 skill contract 校验、policy precheck 和 audit，不执行外部 MCP tool | `service-briefs/mcp-gateway.md` |
 | `action-executor` | 已落第一版 approved execution audit + Agent approval preflight + result projection + local safe tool adapter + guarded external HTTP adapter + external adapter eval + preflight / rate-limit / DLQ-repair safety eval + provider failure worker | `action_executor_service.proto`、SDD、migration、六层 skeleton、`ExecuteApprovedAction` app / gRPC adapter、agent-service proposal verification RPC client、skill-registry RPC client、policy-service RPC client、PostgreSQL 低敏 execution audit repository、低敏 `action_executor_tool_results` projection、低敏 `action_executor_provider_failures` projection、bounded retry bookkeeping worker、`nexusim.local.echo` 本地安全 adapter、显式 allowlist + `LOW` risk 外部 HTTP provider adapter、外部 adapter eval / failure smoke、preflight safety smoke、rate-limited action blocked、rate-limiter unavailable fail-closed、repair/DLQ/redrive operator guard smoke、`grpc` runtime mode、本地 Docker / compose / Prometheus / Grafana wiring 已落地；第一版强制 proposal / approval / prepare audit 关联，并通过 `agent-service.VerifyApprovedAgentProposal` 校验 proposal 已批准且字段匹配；未配置 adapter 的业务 tool 仍 `executed=false`，repair/DLQ/redrive 类动作必须走 operator workflow，echo 和 allowlisted HTTP provider tool 可 `SUCCEEDED` 并只记录 output hash，provider failure 只记录 retry/DLQ 状态，不保存 raw input / provider output / provider 原始错误 | `service-briefs/action-executor.md` |
 | `ai-eval-service` | 已落第一版持久化 eval run catalog、RecordEvalRun recorder、policy-driven multi-adapter gate smoke、Python optional adapter path、RAG / Agent service-stack live gate、Summary live negative adapter、CI-safe gate skeleton、第一批 RAG-Agent regression expansion、profile / Agent output safety expansion、service-stack version / hash-only expansion、negative RAG / Agent cases、Python/model-output negative cases、RAG/Summary citation source-ref regression、external MCP fallback eval cases、Agent output regression、action preflight / rate-limit / DLQ-repair safety eval、action provider failure worker / redrive safety eval、memory group source-ref / validity / supersession / cross-group / temporal eval、RAG / Summary / Agent current-memory consumption regression、memory extraction confidence / review eval、current-memory service-stack live smoke、cross-group / temporal retrieval smoke、RAG / Summary / Agent stack consumption smoke 和 40/40 optional stack gate | `ai_eval_service.proto`、SDD、migration、六层 skeleton、`RecordEvalRun` / `GetEvalRun` / `ListEvalRuns` app / gRPC adapter、PostgreSQL repository、`grpc` runtime mode、本地 Docker / compose / Prometheus / Grafana wiring、`ai-eval-record-smoke`、`run-ai-eval-record-run-smoke.ps1`、`gate-policy.local.json`、`validate-ai-eval-gate-policy.ps1`、`run-ai-eval-regression-gate-smoke.ps1`、`run-ai-eval-service-stack-gate-smoke.ps1` 和 `check-ai-eval-regression-gate.ps1` 已落地；case catalog 66 个 case，CI-safe fixture adapter 16 cases，optional stack gate 6 adapters / 40 cases passed；retrieval 和 RAG / Summary / Agent stack smokes 已验证跨群 source refs / speaker attribution 和 stale / future memory exclusion；CI-safe gate 只跑不依赖服务栈的 required adapters；第一版不保存 raw prompt / EvidencePack / model output | `service-briefs/ai-eval-service.md` |
+| `media-service` | product-active，第一版 skeleton 已落 | `media_service.proto`、PostgreSQL core migration、六层 skeleton、`CreateUploadSession` / `CompleteUpload` / `GetMediaAsset` / `GetMediaDownloadURL` / `DeleteMediaAsset` app + gRPC adapter、fake object-store port、PostgreSQL repository first pass、`grpc` runtime mode、Docker / Prometheus / Grafana wiring 已落；第一版只做媒体 metadata / upload session / fake presign / outbox row，不做真实 S3、scanner、thumbnail/transcode worker 或 provider-grade download policy | `service-briefs/media-service.md` |
 
 ## 剩余目标入口
 

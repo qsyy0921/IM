@@ -3,7 +3,8 @@
   "description": "Single source of truth for NexusIM service lifecycle and local guard coverage. Gate scripts should read this file instead of hard-coding service lists.",
   "active_stages": [
     "core",
-    "foundation-active"
+    "foundation-active",
+    "product-active"
   ],
   "services": [
     {
@@ -160,7 +161,11 @@
     },
     {
       "name": "media-service",
-      "stage": "future"
+      "stage": "product-active",
+      "local_process": "media-service-grpc",
+      "debug_port": 11927,
+      "prometheus_rule_file": "prometheus-media-service-alerts.yml",
+      "grafana_dashboard": "media-service-observability.json"
     },
     {
       "name": "notification-service",

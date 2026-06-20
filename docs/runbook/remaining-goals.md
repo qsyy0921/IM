@@ -67,16 +67,16 @@ Foundation backlog 锚点：`search-service`、`memory-service`、`retrieval-gat
   retention cleanup、segment sealing 和 provider-grade audit export。
 - `control-plane-service`：后续仍需 outbox relay、rollback、drift monitor、
   expiry / cleanup worker、api-gateway quota consumer 和 provider-grade rollout。
+- `presence-service`：后续仍需 push-gateway session event consumer、
+  `SubscribePresence`、stale scanner、presence outbox relay、Redis hot-state
+  integration 和 provider-grade privacy / contacts policy integration。
 
 ## 后置平台 / 产品化服务
 
-这些服务仍登记为 `future`。除已完成 stage-switch 的服务在下一实现切片中与
-registry / proto / migration 同步切换外，不得提前创建 `services/<name>` 目录：
+这些服务仍登记为 `future`。完成对应 stage-switch 和门禁影响确认前，不得提前
+创建 `services/<name>` 目录：
 
 - `admin-service`：租户、封禁、配置、repair 审批、运维操作。
-- `presence-service`：stage-switch 已通过；下一实现切片同步 registry、proto、
-  migration、runtime、Docker / observability，并先落 `UpdatePresence` /
-  `GetPresence` / `UpdateTyping` 最小 gRPC 路径。
 - `model-gateway`：模型 provider、embedding、rerank、成本、fallback、审计。
 - `workflow-service`：审批等待、长事务、补偿、retention、operator workflow。
 - `knowledge-ingestion-service`：文件 / 网页导入、chunking、embedding pipeline。

@@ -49,13 +49,15 @@ model-gateway / workflow / knowledge-ingestion / vector-index
 - `control-plane-service` 已切到 product-active，第一实现切片已落
   `PublishConfigVersion` / `GetConfigSnapshot` / `AckAppliedConfigVersion`、
   proto / migration / runtime / observability，并已通过最小 gRPC smoke。
-- `presence-service` SDD v0.1 stage-switch review 已通过；下一实现切片才能
-  同步切换 registry、proto、migration、runtime、Docker / observability。
+- `presence-service` 已切到 product-active，第一实现切片已落
+  `UpdatePresence` / `GetPresence` / `UpdateTyping`、proto / migration /
+  runtime / observability，并已通过最小 gRPC smoke。
 
 ## 下一步
 
-- 默认进入 `presence-service` 第一实现切片；也可以继续 control-plane outbox
-  relay / drift monitor。
+- 默认进入下一个 future service stage-switch：`model-gateway`、`workflow-service`
+  或 `knowledge-ingestion-service`；也可以继续 presence outbox relay /
+  stale scanner / push-gateway session event consumer。
 - 也可以继续 notification SMTP / SMS / APNs / FCM adapter 或 bounce-suppression。
 
 ## 硬边界
@@ -75,5 +77,4 @@ model-gateway / workflow / knowledge-ingestion / vector-index
 - 当前阶段背景：`docs/runbook/current-brief.md`
 - 剩余待办：`docs/runbook/remaining-goals.md`
 - 服务入口：`docs/runbook/service-briefs/<service>.md`
-- 未来服务总表：`docs/runbook/service-registry.json`
 - 新发现待办写入 `docs/runbook/remaining-goals.md`

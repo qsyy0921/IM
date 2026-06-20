@@ -197,7 +197,11 @@
     },
     {
       "name": "presence-service",
-      "stage": "future"
+      "stage": "product-active",
+      "local_process": "presence-service-grpc",
+      "debug_port": 11931,
+      "prometheus_rule_file": "prometheus-presence-service-alerts.yml",
+      "grafana_dashboard": "presence-service-observability.json"
     },
     {
       "name": "vector-index-service",

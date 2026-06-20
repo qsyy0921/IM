@@ -1,0 +1,97 @@
+syntax = "proto3";
+
+package nexusim.presence.v1;
+
+option go_package = "github.com/qsyy0921/IM/api/proto/nexusim/presence/v1;presencev1";
+
+service PresenceService {
+  rpc UpdatePresence(UpdatePresenceRequest) returns (UpdatePresenceResponse);
+  rpc GetPresence(GetPresenceRequest) returns (GetPresenceResponse);
+  rpc UpdateTyping(UpdateTypingRequest) returns (UpdateTypingResponse);
+}
+
+message AuthContext {
+  string tenant_id = 1;
+  string user_id = 2;
+  string service_name = 3;
+  string instance_ref = 4;
+  string trace_id = 5;
+  string request_id = 6;
+}
+
+message PresenceState {
+  string tenant_id = 1;
+  string user_id = 2;
+  string visible_state = 3;
+  string actual_state = 4;
+  string manual_status = 5;
+  int64 last_seen_at_unix_ms = 6;
+  int32 device_count = 7;
+  repeated DevicePresence device_states = 8;
+  string visibility_decision = 9;
+}
+
+message DevicePresence {
+  string device_id = 1;
+  string session_id = 2;
+  string state = 3;
+  string device_state = 4;
+  int64 last_seen_at_unix_ms = 5;
+  int64 expires_at_unix_ms = 6;
+}
+
+message TypingIndicator {
+  string tenant_id = 1;
+  string conversation_id = 2;
+  string user_id = 3;
+  string device_id = 4;
+  string typing_state = 5;
+  int64 expires_at_unix_ms = 6;
+}
+
+message UpdatePresenceRequest {
+  AuthContext auth_context = 1;
+  string user_id = 2;
+  string device_id = 3;
+  string session_id = 4;
+  string presence_state = 5;
+  string manual_status = 6;
+  int64 ttl_ms = 7;
+  string source = 8;
+  string idempotency_key = 9;
+  string correlation_id = 10;
+  string causation_id = 11;
+  string trace_id = 12;
+}
+
+message UpdatePresenceResponse {
+  PresenceState state = 1;
+}
+
+message GetPresenceRequest {
+  AuthContext auth_context = 1;
+  string requester_user_id = 2;
+  repeated string target_user_ids = 3;
+  string conversation_id = 4;
+  bool include_devices = 5;
+}
+
+message GetPresenceResponse {
+  repeated PresenceState states = 1;
+}
+
+message UpdateTypingRequest {
+  AuthContext auth_context = 1;
+  string conversation_id = 2;
+  string user_id = 3;
+  string device_id = 4;
+  string typing_state = 5;
+  int64 ttl_ms = 6;
+  string correlation_id = 7;
+  string causation_id = 8;
+  string trace_id = 9;
+}
+
+message UpdateTypingResponse {
+  TypingIndicator typing = 1;
+}

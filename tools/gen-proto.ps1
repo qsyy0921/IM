@@ -24,6 +24,7 @@ protoc `
     "$ApiProtoDir/nexusim/memory/v1/memory_service.proto" `
     "$ApiProtoDir/nexusim/mcpgateway/v1/mcp_gateway_service.proto" `
     "$ApiProtoDir/nexusim/notification/v1/notification_service.proto" `
+    "$ApiProtoDir/nexusim/presence/v1/presence_service.proto" `
     "$ApiProtoDir/nexusim/policy/v1/policy_service.proto" `
     "$ApiProtoDir/nexusim/rag/v1/rag_service.proto" `
     "$ApiProtoDir/nexusim/receipt/v1/receipt_service.proto" `

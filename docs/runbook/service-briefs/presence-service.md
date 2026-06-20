@@ -1,8 +1,8 @@
 # presence-service
 
-状态：future / SDD v0.1 draft 已存在；stage-switch approved。当前不得单独
-创建 `services/presence-service` 目录；下一实现切片必须同步切换
-`service-registry.json`、proto、migration、runtime、Docker / observability。
+状态：product-active。SDD v0.1 和 stage-switch review 已通过，第一实现切片
+已同步 service-registry、proto、migration、六层 skeleton、`grpc` runtime、
+Docker / Prometheus / Grafana，并通过最小 gRPC smoke。
 
 定位：在线状态服务，负责用户在线、设备在线、输入中、最后在线时间和 presence
 订阅 / 广播。
@@ -16,7 +16,7 @@
 
 Stage-switch 记录：`docs/runbook/stage-switch/presence-service.md`。
 
-第一实现切片建议：
+第一实现切片已落：
 
 - 具体边界见 `docs/sdd/presence-service.md`。
 - `UpdatePresence` / `GetPresence` / `UpdateTyping`。
@@ -24,3 +24,5 @@ Stage-switch 记录：`docs/runbook/stage-switch/presence-service.md`。
   push-gateway session event consumer、SubscribePresence、stale scanner 和 outbox relay
   后续再补。
 - 支持 privacy / contacts policy 过滤。
+- smoke 证据：
+  `docs/runbook/loadtest/presence-service/loadtest-report-20260620-presence-grpc-smoke.md`。

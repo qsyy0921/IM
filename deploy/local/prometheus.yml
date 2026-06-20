@@ -195,3 +195,11 @@ scrape_configs:
           - host.docker.internal:11930
         labels:
           service: control-plane-service
+
+  - job_name: nexusim-presence-service
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - host.docker.internal:11931
+        labels:
+          service: presence-service

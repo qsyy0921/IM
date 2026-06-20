@@ -1,0 +1,20 @@
+groups:
+  - name: nexusim-presence-service
+    rules:
+      - alert: NexusIMPresenceServiceDown
+        expr: up{service="presence-service"} == 0
+        for: 2m
+        labels:
+          severity: warning
+          service: presence-service
+        annotations:
+          summary: "presence-service metrics endpoint is down"
+
+      - alert: NexusIMPresenceServiceInfoMissing
+        expr: absent(nexusim_presence_service_info)
+        for: 2m
+        labels:
+          severity: warning
+          service: presence-service
+        annotations:
+          summary: "presence-service info metric is missing"

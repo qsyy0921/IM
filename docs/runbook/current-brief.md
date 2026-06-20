@@ -42,8 +42,9 @@ Go 侧服务底座、EvidencePack、proposal / approval / audit 和 eval 持久�
 ```text
 future platform / product services 的 10 个 SDD draft 已存在；media-service、
 `media-service`、`notification-service`、`audit-service`、`control-plane-service`
-已进入 product-active 并通过各自第一版 smoke。`presence-service`
-stage-switch review 已通过；下一步做 presence 第一实现切片。
+和 `presence-service` 已进入 product-active 并通过各自第一版 smoke。
+下一步按需切换 `model-gateway`、`workflow-service` 或
+`knowledge-ingestion-service`，或继续 presence outbox / session-event 后续切片。
 ```
 
 系统测试 / HA / 长压 / sizing 后置；总览、待办、单服务状态分别看

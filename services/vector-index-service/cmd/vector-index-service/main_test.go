@@ -13,6 +13,22 @@ func TestValidateVectorIndexMode(t *testing.T) {
 	}
 }
 
+func TestEmbeddingTaskSourceModeFromEnv(t *testing.T) {
+	t.Setenv("NEXUSIM_VECTOR_EMBEDDING_SOURCE", "")
+	t.Setenv("NEXUSIM_KNOWLEDGE_INGESTION_GRPC_ADDR", "")
+	if got := embeddingTaskSourceModeFromEnv(); got != "file" {
+		t.Fatalf("expected file fallback, got %s", got)
+	}
+	t.Setenv("NEXUSIM_KNOWLEDGE_INGESTION_GRPC_ADDR", "127.0.0.1:10740")
+	if got := embeddingTaskSourceModeFromEnv(); got != "knowledge" {
+		t.Fatalf("expected knowledge auto source, got %s", got)
+	}
+	t.Setenv("NEXUSIM_VECTOR_EMBEDDING_SOURCE", "file")
+	if got := embeddingTaskSourceModeFromEnv(); got != "file" {
+		t.Fatalf("explicit source should win, got %s", got)
+	}
+}
+
 func TestValidateVectorIndexDebugListenerConfigAllowsEmptyOrPrivateAddress(t *testing.T) {
 	if err := validateVectorIndexDebugListenerConfig("", false); err != nil {
 		t.Fatalf("empty debug listener should be allowed: %v", err)

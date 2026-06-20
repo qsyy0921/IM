@@ -223,11 +223,17 @@ func runEmbeddingWorker(ctx context.Context) error {
 	}
 	defer pool.Close()
 
-	taskFile := strings.TrimSpace(os.Getenv("NEXUSIM_VECTOR_EMBEDDING_TASKS_FILE"))
-	source, err := embeddinginfra.NewFileTaskSource(taskFile)
+	source, closeSource, err := newEmbeddingTaskSource(ctx)
 	if err != nil {
 		return err
 	}
+	defer func() {
+		if closeSource != nil {
+			if closeErr := closeSource(); closeErr != nil {
+				log.Printf("vector-index-service embedding task source close failed: %v", closeErr)
+			}
+		}
+	}()
 	modelAddr := strings.TrimSpace(os.Getenv("NEXUSIM_MODEL_GATEWAY_GRPC_ADDR"))
 	modelClient, closeModel, err := rpcinfra.DialModelGatewayClient(
 		ctx,
@@ -255,8 +261,48 @@ func runEmbeddingWorker(ctx context.Context) error {
 			Logf:         log.Printf,
 		},
 	)
-	log.Printf("vector-index-service embedding worker started with file task source %s", taskFile)
+	log.Printf("vector-index-service embedding worker started with %s task source", embeddingTaskSourceModeFromEnv())
 	return worker.Run(ctx)
+}
+
+func newEmbeddingTaskSource(ctx context.Context) (embedding.TaskSource, func() error, error) {
+	sourceMode := embeddingTaskSourceModeFromEnv()
+	switch sourceMode {
+	case "file":
+		taskFile := strings.TrimSpace(os.Getenv("NEXUSIM_VECTOR_EMBEDDING_TASKS_FILE"))
+		source, err := embeddinginfra.NewFileTaskSource(taskFile)
+		return source, nil, err
+	case "knowledge":
+		source, closeSource, err := rpcinfra.DialKnowledgeChunkTaskSource(
+			ctx,
+			strings.TrimSpace(os.Getenv("NEXUSIM_KNOWLEDGE_INGESTION_GRPC_ADDR")),
+			rpcinfra.KnowledgeChunkSourceConfig{
+				TenantID:          envString("NEXUSIM_VECTOR_EMBEDDING_TENANT_ID", ""),
+				SourceID:          envString("NEXUSIM_VECTOR_EMBEDDING_SOURCE_ID", ""),
+				DocumentID:        envString("NEXUSIM_VECTOR_EMBEDDING_DOCUMENT_ID", ""),
+				PageSize:          envInt("NEXUSIM_VECTOR_EMBEDDING_KNOWLEDGE_PAGE_SIZE", 50),
+				EmbeddingModelRef: envString("NEXUSIM_VECTOR_EMBEDDING_MODEL_REF", "deterministic-embedding-v1"),
+				Dimension:         envInt("NEXUSIM_VECTOR_EMBEDDING_DIMENSION", 8),
+				VisibilityVersion: int64(envInt("NEXUSIM_VECTOR_EMBEDDING_VISIBILITY_VERSION", 1)),
+				TraceID:           envString("NEXUSIM_VECTOR_EMBEDDING_TRACE_ID", ""),
+			},
+			envDuration("NEXUSIM_VECTOR_EMBEDDING_KNOWLEDGE_TIMEOUT", 5*time.Second),
+		)
+		return source, closeSource, err
+	default:
+		return nil, nil, fmt.Errorf("unsupported NEXUSIM_VECTOR_EMBEDDING_SOURCE %q", sourceMode)
+	}
+}
+
+func embeddingTaskSourceModeFromEnv() string {
+	mode := strings.ToLower(strings.TrimSpace(os.Getenv("NEXUSIM_VECTOR_EMBEDDING_SOURCE")))
+	if mode != "" {
+		return mode
+	}
+	if strings.TrimSpace(os.Getenv("NEXUSIM_KNOWLEDGE_INGESTION_GRPC_ADDR")) != "" {
+		return "knowledge"
+	}
+	return "file"
 }
 
 func vectorIndexModeFromEnv() string {

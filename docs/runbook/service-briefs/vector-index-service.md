@@ -35,11 +35,13 @@ vector 写入、rebuild 和 backfill 逻辑复杂到影响 retrieval / memory �
 - `loadtest/knowledgevector` 已覆盖 `knowledge-ingestion-service` chunk manifest
   经公开 gRPC handoff 到 vector upsert，再由 vector search 读回。
 - 确认 raw text、embedding vector array、source URI、object key 不进入事件 / metrics / relay payload。
-- first-stage `embedding-worker` 已落地：从本地 JSONL 任务源读取受控输入文本，
-  调 `model-gateway.InvokeEmbedding`，再调用现有 vector upsert 写入 hash / refs /
-  visibility metadata；PostgreSQL、outbox、metrics 和 relay payload 仍不保存 raw text
-  或 embedding vector array。该模式用于本地 smoke / worker 边界验证，不是生产
-  parser / chunk consumer。
+- first-stage `embedding-worker` 已落地：支持本地 JSONL 任务源，以及通过
+  `knowledge-ingestion-service.ListKnowledgeChunks` 公开 API 拉取 redacted preview 的
+  knowledge 任务源；随后调 `model-gateway.InvokeEmbedding`，再调用现有 vector upsert
+  写入 hash / refs / visibility metadata。PostgreSQL、outbox、metrics 和 relay payload
+  仍不保存 raw text 或 embedding vector array。该模式用于本地 smoke / worker 边界验证，
+  不是生产 parser / chunk consumer。
 
-后续待办：真实 knowledge / memory / search chunk consumer、真实 Milvus / pgvector /
-OpenSearch backend、provider backend rebuild / backfill worker、embedding task 持久队列。
+后续待办：Kafka / outbox 驱动的真实 knowledge / memory / search chunk consumer、真实
+Milvus / pgvector / OpenSearch backend、provider backend rebuild / backfill worker、
+embedding task 持久队列。

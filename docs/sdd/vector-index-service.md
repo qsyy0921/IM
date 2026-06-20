@@ -258,16 +258,18 @@ First-stage embedding worker：
 
 ```text
 NEXUSIM_VECTOR_INDEX_SERVICE_MODE=embedding-worker
--> read controlled JSONL embedding tasks from NEXUSIM_VECTOR_EMBEDDING_TASKS_FILE
+-> choose NEXUSIM_VECTOR_EMBEDDING_SOURCE=file|knowledge
+-> file source reads controlled JSONL embedding tasks from NEXUSIM_VECTOR_EMBEDDING_TASKS_FILE
+-> knowledge source calls knowledge-ingestion-service.ListKnowledgeChunks and uses redacted preview
 -> verify input_hash matches in-memory input_text before model call
 -> call model-gateway InvokeEmbedding
 -> write vector_items / vector_index_jobs / vector_outbox through existing UpsertVectorItem
 -> only persist source refs, input hash, embedding hash, dimension, model ref and visibility metadata
 ```
 
-该 worker 是本地 smoke / worker 边界验证入口，不是生产 chunk consumer。它不得新增
-raw text 公共 API，也不得把 `input_text` 或 embedding vector array 写入 PostgreSQL、
-outbox、metrics、logs 或 Kafka payload。
+该 worker 是 first-stage worker 边界验证入口，不是 Kafka / outbox 驱动的生产 chunk
+consumer。它不得新增 raw text 公共 API，也不得把 `input_text` 或 embedding vector array
+写入 PostgreSQL、outbox、metrics、logs 或 Kafka payload。
 
 Tombstone：
 
@@ -409,13 +411,27 @@ NEXUSIM_VECTOR_INDEX_SERVICE_MODE=embedding-worker
 ```text
 NEXUSIM_PG_DSN=...
 NEXUSIM_MODEL_GATEWAY_GRPC_ADDR=127.0.0.1:10770
+NEXUSIM_VECTOR_EMBEDDING_SOURCE=file
 NEXUSIM_VECTOR_EMBEDDING_TASKS_FILE=H:\NexusIM\loadtest-results\vector-embedding-tasks.jsonl
 NEXUSIM_VECTOR_EMBEDDING_BATCH_SIZE=50
 NEXUSIM_VECTOR_EMBEDDING_MODEL_TIMEOUT=5s
 ```
 
-任务文件只用于本地 worker 验证；生产级 embedding task 需要由
-knowledge / memory / search 的受控 producer 或持久 task queue 提供。
+Knowledge source 配置：
+
+```text
+NEXUSIM_VECTOR_EMBEDDING_SOURCE=knowledge
+NEXUSIM_KNOWLEDGE_INGESTION_GRPC_ADDR=127.0.0.1:10740
+NEXUSIM_VECTOR_EMBEDDING_TENANT_ID=tenant_1
+NEXUSIM_VECTOR_EMBEDDING_SOURCE_ID=ksrc_1
+NEXUSIM_VECTOR_EMBEDDING_DOCUMENT_ID=kdoc_1
+NEXUSIM_VECTOR_EMBEDDING_MODEL_REF=deterministic-embedding-v1
+NEXUSIM_VECTOR_EMBEDDING_DIMENSION=8
+```
+
+JSONL 任务文件和 knowledge redacted-preview source 只用于 first-stage worker 验证；
+生产级 embedding task 需要由 knowledge / memory / search 的受控 producer 或持久 task
+queue 提供。
 
 operator：
 

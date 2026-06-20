@@ -16,6 +16,7 @@
 - `media-service.md`
 - `notification-service.md`
 - `audit-service.md`
+- `admin-service.md`
 - `control-plane-service.md`
 - `conversation-service.md`
 - `conversation-service-member-change-saga.md`

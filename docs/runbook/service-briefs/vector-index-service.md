@@ -28,7 +28,9 @@ vector 写入、rebuild 和 backfill 逻辑复杂到影响 retrieval / memory �
 - `loadtest/vectorindex` 已覆盖公开 gRPC upsert / tombstone / search、真实 outbox
   relay 和 Kafka `im.vector.events` readback；runbook 见
   `docs/runbook/loadtest/vector-index-service/README.md`。
+- `loadtest/knowledgevector` 已覆盖 `knowledge-ingestion-service` chunk manifest
+  经公开 gRPC handoff 到 vector upsert，再由 vector search 读回。
 - 确认 raw text、embedding vector array、source URI、object key 不进入事件 / metrics / relay payload。
 
 后续待办：embedding worker、rebuild worker、Milvus / pgvector / OpenSearch
-backend、vector-index handoff smoke。
+backend。

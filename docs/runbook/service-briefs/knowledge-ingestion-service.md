@@ -26,5 +26,8 @@ pipeline、权限 metadata、增量重建和导入审计。
   embedding / crawler / vector provider。
 - 真实 PG 集成测试覆盖 source + job + chunks + low-sensitive outbox transaction。
 - outbox payload 不包含 source URI、object key、chunk text、parser raw error。
+- `loadtest/knowledgevector` 已通过公开 gRPC 证明 knowledge source / chunk
+  manifest 可 handoff 到 `vector-index-service.UpsertVectorItem`，并由
+  `SearchVectors` 搜到。
 - 后续补 parser worker、embedding handoff、tombstone/delete proof、outbox relay
-  和 vector-index handoff。
+  和真实 connector。

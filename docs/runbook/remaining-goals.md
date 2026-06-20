@@ -74,9 +74,10 @@ Foundation backlog 锚点：`search-service`、`memory-service`、`retrieval-gat
   embedding、rerank、outbox relay、route-refresh worker、budget-reset worker 和
   cleanup worker。
 - `knowledge-ingestion-service`：后续仍需 parser worker、embedding handoff、
-  tombstone / delete proof、outbox relay、vector-index handoff 和真实 connector。
+  tombstone / delete proof、outbox relay 和真实 connector；公开 API 级
+  vector-index handoff smoke 已通过，真正异步 handoff worker 仍可后置。
 - `vector-index-service`：后续仍需 embedding worker、rebuild worker、
-  Milvus / pgvector / OpenSearch backend 和 vector-index handoff smoke。
+  Milvus / pgvector / OpenSearch backend。
 - `admin-service`：`REPAIR_REQUEST -> workflow-service REPAIR_APPROVAL`、
   `CRITICAL -> workflow-service ADMIN_OPERATION` 和第一版 operation-specific
   approval policy / target-service routing 已接；`CONFIG_PUBLISH` /

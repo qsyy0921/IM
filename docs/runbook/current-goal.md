@@ -68,8 +68,12 @@ vector-index-service
   `docs/runbook/loadtest/media-service/loadtest-report-20260620-media-processing-worker-smoke.md`。
 - `notification-service` stage-switch review 已通过，记录见
   `docs/runbook/stage-switch/notification-service.md`。
-- 下一步默认创建 `notification-service` 第一版 proto / migration / 六层 skeleton /
-  cmd runtime / Docker / observability，并同步 `service-registry.json`。
+- `notification-service` 已进入 `product-active` implementation slice，第一版
+  proto / migration / 六层 skeleton / `grpc` runtime / Docker / observability 覆盖已落，
+  并已通过 focused checks / 完整 `check-local`；当前能力只覆盖 request 事实源、
+  status 查询、cancel 和 accepted outbox。
+- 下一步默认进入 `notification_outbox -> im.notification.events` relay 或 provider
+  worker 的下一个切片。
 
 ## 硬边界
 

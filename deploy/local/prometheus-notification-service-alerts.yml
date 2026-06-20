@@ -1,0 +1,20 @@
+groups:
+  - name: nexusim-notification-service
+    rules:
+      - alert: NexusIMNotificationServiceDown
+        expr: up{service="notification-service"} == 0
+        for: 2m
+        labels:
+          severity: warning
+          service: notification-service
+        annotations:
+          summary: "notification-service metrics endpoint is down"
+
+      - alert: NexusIMNotificationServiceInfoMissing
+        expr: absent(nexusim_notification_service_info)
+        for: 2m
+        labels:
+          severity: warning
+          service: notification-service
+        annotations:
+          summary: "notification-service info metric is missing"

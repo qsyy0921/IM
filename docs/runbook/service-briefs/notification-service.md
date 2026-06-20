@@ -1,8 +1,10 @@
 # notification-service
 
-状态：future / SDD v0.1 draft 已存在 / stage-switch review passed。当前仍不得
-创建 `services/notification-service` 目录，直到 implementation slice 同步更新
-`service-registry.json`。
+状态：product-active / SDD v0.1 draft 已存在 / stage-switch review passed /
+first implementation slice completed。第一版 proto、migration、六层 skeleton、
+`grpc` runtime、Docker、Prometheus 和 Grafana 覆盖已落，并已通过 focused checks /
+完整 `check-local`。当前只实现 request 事实源、status 查询、cancel 和 accepted
+outbox，不宣称 provider-grade email / SMS / APNs / FCM。
 
 Stage-switch 记录：`docs/runbook/stage-switch/notification-service.md`。
 
@@ -22,3 +24,7 @@ bounce handling、provider retry 和通知审计。
 - `CreateNotificationRequest` / `GetNotificationStatus` / `CancelNotificationRequest`。
 - PostgreSQL request + delivery attempt + outbox + suppression state。
 - provider adapter 先做 webhook / SMTP fake/real boundary，后续再接 SMS / APNs / FCM。
+
+下一步：
+
+- 后续再做 `notification_outbox -> im.notification.events` relay 和 provider worker。

@@ -171,3 +171,11 @@ scrape_configs:
           - host.docker.internal:11927
         labels:
           service: media-service
+
+  - job_name: nexusim-notification-service
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - host.docker.internal:11928
+        labels:
+          service: notification-service

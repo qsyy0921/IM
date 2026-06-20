@@ -1,0 +1,126 @@
+syntax = "proto3";
+
+package nexusim.notification.v1;
+
+option go_package = "github.com/qsyy0921/IM/api/proto/nexusim/notification/v1;notificationv1";
+
+service NotificationService {
+  rpc CreateNotificationRequest(CreateNotificationRequestRequest) returns (CreateNotificationRequestResponse);
+  rpc GetNotificationStatus(GetNotificationStatusRequest) returns (GetNotificationStatusResponse);
+  rpc CancelNotificationRequest(CancelNotificationRequestRequest) returns (CancelNotificationRequestResponse);
+}
+
+enum NotificationChannel {
+  NOTIFICATION_CHANNEL_UNSPECIFIED = 0;
+  NOTIFICATION_CHANNEL_EMAIL = 1;
+  NOTIFICATION_CHANNEL_SMS = 2;
+  NOTIFICATION_CHANNEL_APNS = 3;
+  NOTIFICATION_CHANNEL_FCM = 4;
+  NOTIFICATION_CHANNEL_SYSTEM = 5;
+}
+
+enum NotificationRequestStatus {
+  NOTIFICATION_REQUEST_STATUS_UNSPECIFIED = 0;
+  NOTIFICATION_REQUEST_STATUS_ACCEPTED = 1;
+  NOTIFICATION_REQUEST_STATUS_SCHEDULED = 2;
+  NOTIFICATION_REQUEST_STATUS_SENDING = 3;
+  NOTIFICATION_REQUEST_STATUS_RETRY_WAIT = 4;
+  NOTIFICATION_REQUEST_STATUS_DELIVERED = 5;
+  NOTIFICATION_REQUEST_STATUS_DLQ = 6;
+  NOTIFICATION_REQUEST_STATUS_CANCELED = 7;
+}
+
+enum NotificationPriority {
+  NOTIFICATION_PRIORITY_UNSPECIFIED = 0;
+  NOTIFICATION_PRIORITY_LOW = 1;
+  NOTIFICATION_PRIORITY_NORMAL = 2;
+  NOTIFICATION_PRIORITY_HIGH = 3;
+}
+
+message AuthContext {
+  string tenant_id = 1;
+  string user_id = 2;
+  string device_id = 3;
+  string session_id = 4;
+  string trace_id = 5;
+  string request_id = 6;
+}
+
+message NotificationRequestRecord {
+  string tenant_id = 1;
+  string request_id = 2;
+  string requester_service = 3;
+  string requester_user_id = 4;
+  NotificationChannel channel = 5;
+  string recipient_ref = 6;
+  string destination_masked = 7;
+  string template_key = 8;
+  string template_version = 9;
+  string locale = 10;
+  NotificationPriority priority = 11;
+  NotificationRequestStatus status = 12;
+  int32 attempt_count = 13;
+  int64 next_attempt_at_unix_ms = 14;
+  int64 expires_at_unix_ms = 15;
+  string last_failure_class = 16;
+  string last_public_error = 17;
+  int64 created_at_unix_ms = 18;
+  int64 delivered_at_unix_ms = 19;
+  int64 dead_lettered_at_unix_ms = 20;
+  int64 canceled_at_unix_ms = 21;
+  string correlation_id = 22;
+  string causation_id = 23;
+  string trace_id = 24;
+}
+
+message CreateNotificationRequestRequest {
+  AuthContext auth_context = 1;
+  string requester_service = 2;
+  string requester_user_id = 3;
+  NotificationChannel channel = 4;
+  string recipient_ref = 5;
+  string destination_ref = 6;
+  string destination_masked = 7;
+  string template_key = 8;
+  string template_version = 9;
+  string locale = 10;
+  NotificationPriority priority = 11;
+  int64 scheduled_at_unix_ms = 12;
+  int64 expires_at_unix_ms = 13;
+  string idempotency_key = 14;
+  string template_variables_json = 15;
+  bytes secret_payload_ciphertext = 16;
+  string secret_payload_key_version = 17;
+  int64 secret_payload_expires_at_unix_ms = 18;
+  string correlation_id = 19;
+  string causation_id = 20;
+  string trace_id = 21;
+}
+
+message CreateNotificationRequestResponse {
+  string request_id = 1;
+  NotificationRequestStatus status = 2;
+  int64 next_attempt_at_unix_ms = 3;
+  int64 accepted_at_unix_ms = 4;
+  NotificationRequestRecord record = 5;
+}
+
+message GetNotificationStatusRequest {
+  AuthContext auth_context = 1;
+  string request_id = 2;
+}
+
+message GetNotificationStatusResponse {
+  NotificationRequestRecord record = 1;
+}
+
+message CancelNotificationRequestRequest {
+  AuthContext auth_context = 1;
+  string request_id = 2;
+  string cancel_request_id = 3;
+  string reason = 4;
+}
+
+message CancelNotificationRequestResponse {
+  NotificationRequestRecord record = 1;
+}

@@ -45,8 +45,13 @@
   proto / migration / 六层 skeleton / `grpc` runtime / fake object-store port /
   Docker / Prometheus / Grafana 覆盖已落；真实 PG 集成测试和 object_key 不出
   public response / fake presign URL / outbox payload 的回归门禁已补；最小
-  gRPC smoke 已通过；`media_outbox -> im.media.events` 最小 relay 代码切片已落，
-  下一步跑真实 Kafka smoke，再补 processing worker。
+  gRPC smoke、`media_outbox -> im.media.events` 真实 Kafka smoke 和本地 mock
+  processing worker smoke 已通过。
+- `notification-service` product-active：SDD v0.1 和 stage-switch review 已通过，
+  第一版 proto / migration / 六层 skeleton / `grpc` runtime / Docker / Prometheus /
+  Grafana 覆盖已落，并已通过 focused checks / 完整 `check-local`；当前只覆盖
+  request 事实源、status 查询、cancel 和 accepted outbox，不宣称 provider-grade
+  email / SMS / APNs / FCM。
 
 当前 Go 侧服务底座、控制面、EvidencePack、proposal / approval / audit、
 Python Worker 候选接入边界和低敏 eval 持久化已经足够支撑算法切片；
@@ -54,7 +59,6 @@ Python Worker 候选接入边界和低敏 eval 持久化已经足够支撑算法
 
 当前尚未真实实现的后续产品化 / 平台服务：
 
-- `notification-service`（SDD v0.1 draft 已存在）
 - `audit-service`（SDD v0.1 draft 已存在）
 - `admin-service`（SDD v0.1 draft 已存在）
 - `control-plane-service`（SDD v0.1 draft 已存在）

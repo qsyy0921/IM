@@ -169,7 +169,11 @@
     },
     {
       "name": "notification-service",
-      "stage": "future"
+      "stage": "product-active",
+      "local_process": "notification-service-grpc",
+      "debug_port": 11928,
+      "prometheus_rule_file": "prometheus-notification-service-alerts.yml",
+      "grafana_dashboard": "notification-service-observability.json"
     },
     {
       "name": "audit-service",

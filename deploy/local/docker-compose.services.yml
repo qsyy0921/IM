@@ -351,6 +351,23 @@ services:
       nexusim-services:
         ipv4_address: 172.30.80.30
 
+  notification-service-grpc:
+    image: nexusim/notification-service:local
+    container_name: nexusim-notification-service-grpc
+    environment:
+      NEXUSIM_NOTIFICATION_SERVICE_MODE: grpc
+      NEXUSIM_NOTIFICATION_GRPC_ADDR: 172.30.80.31:10690
+      NEXUSIM_NOTIFICATION_DEBUG_ADDR: 172.30.80.31:11928
+      NEXUSIM_NOTIFICATION_DESTINATION_HASH_KEY: local-notification-destination-hash-key
+      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@host.docker.internal:5432/nexusim?sslmode=disable
+    ports:
+      - "10690:10690"
+      - "11928:11928"
+    restart: unless-stopped
+    networks:
+      nexusim-services:
+        ipv4_address: 172.30.80.31
+
   push-gateway-ws:
     image: nexusim/push-gateway:local
     container_name: nexusim-push-gateway-ws

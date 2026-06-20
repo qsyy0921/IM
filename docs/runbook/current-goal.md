@@ -43,13 +43,13 @@ model-gateway / workflow / knowledge-ingestion / vector-index
   `control-plane-service`、`presence-service`、`model-gateway`、
   `knowledge-ingestion-service` 已 product-active 并通过各自第一版 focused
   checks / smoke。
-- `workflow-service` 已完成 stage-switch review，下一步可以进入第一版
-  implementation slice；当前尚未创建 `services/workflow-service` 目录。
+- `workflow-service` 已从 stage-switch 进入 product-active 第一版 implementation
+  slice，当前实现 `CreateWorkflow`、`RecordWorkflowDecision`、`GetWorkflow` 最小路径。
 
 ## 下一步
 
-- 默认继续 `workflow-service` 第一版 implementation slice；也可以先做
-  `admin-service` stage-switch 或 `vector-index-service` stage-switch。
+- 默认收口 `workflow-service` 第一版 implementation slice；通过 focused checks
+  后再做 `admin-service` stage-switch 或 `vector-index-service` stage-switch。
 - 也可以继续 notification SMTP / SMS / APNs / FCM adapter 或 bounce-suppression。
 
 ## 硬边界

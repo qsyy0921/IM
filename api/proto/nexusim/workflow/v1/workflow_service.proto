@@ -1,0 +1,118 @@
+syntax = "proto3";
+
+package nexusim.workflow.v1;
+
+option go_package = "github.com/qsyy0921/IM/api/proto/nexusim/workflow/v1;workflowv1";
+
+service WorkflowService {
+  rpc CreateWorkflow(CreateWorkflowRequest) returns (CreateWorkflowResponse);
+  rpc RecordWorkflowDecision(RecordWorkflowDecisionRequest) returns (RecordWorkflowDecisionResponse);
+  rpc GetWorkflow(GetWorkflowRequest) returns (GetWorkflowResponse);
+}
+
+message AuthContext {
+  string tenant_id = 1;
+  string user_id = 2;
+  string service_name = 3;
+  string instance_ref = 4;
+  string trace_id = 5;
+  string request_id = 6;
+}
+
+message Workflow {
+  string tenant_id = 1;
+  string workflow_id = 2;
+  string workflow_type = 3;
+  string risk_level = 4;
+  string requester_ref = 5;
+  string requester_service = 6;
+  string target_service = 7;
+  string target_operation = 8;
+  string target_ref_hash = 9;
+  string payload_schema_version = 10;
+  string payload_ref_hash = 11;
+  string approval_policy_ref = 12;
+  string timeout_policy_ref = 13;
+  string compensation_policy_ref = 14;
+  string reason_ref = 15;
+  repeated string evidence_refs = 16;
+  string status = 17;
+  string current_step_id = 18;
+  string correlation_id = 19;
+  string causation_id = 20;
+  string trace_id = 21;
+  int64 created_at_unix_ms = 22;
+  int64 updated_at_unix_ms = 23;
+  int64 completed_at_unix_ms = 24;
+}
+
+message WorkflowDecision {
+  string tenant_id = 1;
+  string workflow_id = 2;
+  string decision_id = 3;
+  string step_id = 4;
+  string decider_ref = 5;
+  string decision_type = 6;
+  string decision_policy_ref = 7;
+  string reason_ref = 8;
+  repeated string evidence_refs = 9;
+  int64 created_at_unix_ms = 10;
+}
+
+message CreateWorkflowRequest {
+  AuthContext auth_context = 1;
+  string requester_ref = 2;
+  string requester_service = 3;
+  string workflow_type = 4;
+  string risk_level = 5;
+  string target_ref_hash = 6;
+  string target_service = 7;
+  string target_operation = 8;
+  string approval_policy_ref = 9;
+  string timeout_policy_ref = 10;
+  string compensation_policy_ref = 11;
+  string payload_schema_version = 12;
+  string payload_ref_hash = 13;
+  string reason_ref = 14;
+  repeated string evidence_refs = 15;
+  string idempotency_key = 16;
+  string correlation_id = 17;
+  string causation_id = 18;
+  string trace_id = 19;
+}
+
+message CreateWorkflowResponse {
+  Workflow workflow = 1;
+  bool replayed = 2;
+}
+
+message RecordWorkflowDecisionRequest {
+  AuthContext auth_context = 1;
+  string workflow_id = 2;
+  string step_id = 3;
+  string decision_type = 4;
+  string decider_ref = 5;
+  string decision_policy_ref = 6;
+  string reason_ref = 7;
+  repeated string evidence_refs = 8;
+  string idempotency_key = 9;
+  string correlation_id = 10;
+  string causation_id = 11;
+  string trace_id = 12;
+}
+
+message RecordWorkflowDecisionResponse {
+  Workflow workflow = 1;
+  WorkflowDecision decision = 2;
+  bool replayed = 3;
+}
+
+message GetWorkflowRequest {
+  AuthContext auth_context = 1;
+  string workflow_id = 2;
+}
+
+message GetWorkflowResponse {
+  Workflow workflow = 1;
+  repeated WorkflowDecision decisions = 2;
+}

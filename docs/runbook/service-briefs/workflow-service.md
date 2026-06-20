@@ -1,8 +1,8 @@
 # workflow-service
 
-状态：future / SDD v0.1 draft / stage-switch approved / implementation pending。
-当前不得创建 `services/workflow-service` 目录，直到实现切片同步切换 service
-registry、proto、migration、runtime、Docker 和 observability。
+状态：product-active / first path implementation in progress。
+`services/workflow-service` 已进入第一版实现切片，同步覆盖 service registry、proto、
+migration、runtime、Docker 和 observability。
 
 设计入口：`docs/sdd/workflow-service.md`。
 
@@ -18,12 +18,11 @@ retention、外部系统调用补偿和人工审批状态。
 - 高风险动作必须保留 proposal / approval / executor / audit 链。
 - Temporal 等工作流引擎只是候选，中间件不写死。
 
-第一切片建议：
+第一切片范围：
 
-- 先按 SDD 落 proto / migration / 六层 skeleton，并同步
+- 已按 SDD 落 proto / migration / 六层 skeleton，并同步
   `docs/runbook/service-registry.json`。
-- 把现有 operator approval manifest 抽成 workflow request / decision model。
-- 先支持 action approval 和 repair approval 两类低敏 workflow。
+- 第一版支持 action approval 和 repair approval 两类低敏 workflow。
 - 确认 reason / payload / EvidencePack / proposal 正文不进入事件或 metrics。
 - 第一版只做 `CreateWorkflow`、`RecordWorkflowDecision`、`GetWorkflow`；
   timer / compensation worker、external callback wait 和 outbox relay 后置。

@@ -33,8 +33,9 @@ future platform / product services 的 10 个 SDD draft 已存在；`media-servi
 `notification-service`、`audit-service`、`control-plane-service`、`presence-service`
 和 `model-gateway` 已进入 product-active 并通过各自第一版 smoke。
 `knowledge-ingestion-service` 已完成第一版 metadata + chunk manifest path；
-`workflow-service` 已通过 stage-switch review。下一步默认进入
-`workflow-service` 第一版 implementation slice，也可以先做 `admin-service` /
+`workflow-service` 已进入第一版 implementation slice，目标是
+`CreateWorkflow`、`RecordWorkflowDecision`、`GetWorkflow` 最小审批等待路径。
+下一步默认收口 workflow focused checks，也可以随后做 `admin-service` /
 `vector-index-service` stage-switch。
 ```
 

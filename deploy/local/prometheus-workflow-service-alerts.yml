@@ -1,0 +1,20 @@
+groups:
+  - name: nexusim-workflow-service
+    rules:
+      - alert: NexusIMWorkflowServiceDown
+        expr: up{service="workflow-service"} == 0
+        for: 2m
+        labels:
+          severity: warning
+          service: workflow-service
+        annotations:
+          summary: "workflow-service metrics endpoint is down"
+
+      - alert: NexusIMWorkflowServiceInfoMissing
+        expr: absent(nexusim_workflow_service_info)
+        for: 2m
+        labels:
+          severity: warning
+          service: workflow-service
+        annotations:
+          summary: "workflow-service info metric is missing"

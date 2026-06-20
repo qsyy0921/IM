@@ -19,11 +19,12 @@
 [media](media-service.md) / [notification](notification-service.md) /
 [audit](audit-service.md) / [control-plane](control-plane-service.md) /
 [presence](presence-service.md) / [model-gateway](model-gateway.md) /
-[knowledge-ingestion](knowledge-ingestion-service.md)
+[knowledge-ingestion](knowledge-ingestion-service.md) /
+[workflow](workflow-service.md)
 
 ## Future platform / product services
 
-[admin](admin-service.md) / [workflow](workflow-service.md) / [vector-index](vector-index-service.md)
+[admin](admin-service.md) / [vector-index](vector-index-service.md)
 
 ## 当前推进规则
 

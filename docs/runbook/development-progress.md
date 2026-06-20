@@ -82,6 +82,12 @@
   chunk manifest、低敏 `knowledge_outbox`；真实 PG 集成测试已验证 source + job +
   chunks + outbox 同事务，且 outbox 不含 source URI、object key、chunk text 或
   parser raw error。
+- `workflow-service` product-active：SDD v0.1 和 stage-switch review 已通过，
+  第一版 proto / migration / 六层 skeleton / `grpc` runtime / Docker /
+  Prometheus / Grafana 覆盖已落；当前覆盖 `CreateWorkflow`、
+  `RecordWorkflowDecision`、`GetWorkflow`、action / repair approval 最小状态机和
+  低敏 `workflow_outbox`，不宣称 timer / compensation worker、external callback
+  wait 或 outbox relay。
 
 当前 Go 侧服务底座、控制面、EvidencePack、proposal / approval / audit、
 Python Worker 候选接入边界和低敏 eval 持久化已经足够支撑算法切片；
@@ -91,7 +97,6 @@ Python Worker 候选接入边界和低敏 eval 持久化已经足够支撑算法
 当前尚未真实实现的后续产品化 / 平台服务：
 
 - `admin-service`（SDD v0.1 draft 已存在）
-- `workflow-service`（SDD v0.1 draft 和 stage-switch review 已完成，尚未创建服务目录）
 - `vector-index-service`（SDD v0.1 draft 已存在）
 
 当前可以采用 multi sub-agent 方式加快后续 AI 底座开发，但只允许拆分互不重叠的服务、文档或验证范围；主 agent 保持最终方案、集成和检查责任。

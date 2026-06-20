@@ -217,7 +217,11 @@
     },
     {
       "name": "workflow-service",
-      "stage": "future"
+      "stage": "product-active",
+      "local_process": "workflow-service-grpc",
+      "debug_port": 11934,
+      "prometheus_rule_file": "prometheus-workflow-service-alerts.yml",
+      "grafana_dashboard": "workflow-service-observability.json"
     },
     {
       "name": "knowledge-ingestion-service",

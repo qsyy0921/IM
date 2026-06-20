@@ -81,9 +81,9 @@ Foundation backlog 锚点：`search-service`、`memory-service`、`retrieval-gat
 这些服务仍未完成第一版实现；implementation 切片前不得提前创建 `services/<name>`：
 
 - `admin-service`：租户、封禁、配置、repair 审批、运维操作。
-- `workflow-service`：stage-switch approved；下一步做 `CreateWorkflow` /
-  `RecordWorkflowDecision` / `GetWorkflow` 第一版实现，先支持 action approval 和
-  repair approval。
+- `workflow-service`：第一版 `CreateWorkflow` / `RecordWorkflowDecision` /
+  `GetWorkflow` 后，继续补 timer worker、compensation worker、external callback
+  wait、outbox relay、workflow repair operators 和完整 action / repair smoke。
 - `vector-index-service`：向量索引写入、重建、backfill；满足拆分条件后再独立。
 
 新增服务必须满足独立模型 / 伸缩 / 故障 / 安全边界或明显降复杂度，并通过 ADR / SDD v0.1。

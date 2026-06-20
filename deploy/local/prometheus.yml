@@ -219,3 +219,11 @@ scrape_configs:
           - host.docker.internal:11933
         labels:
           service: knowledge-ingestion-service
+
+  - job_name: nexusim-workflow-service
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - host.docker.internal:11934
+        labels:
+          service: workflow-service

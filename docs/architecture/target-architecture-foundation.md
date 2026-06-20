@@ -204,13 +204,13 @@ flowchart TB
 | --- | --- |
 | 已实现后端主链路 | `api-gateway`、`identity-service`、`message-service`、`conversation-service`、`delivery-service`、`push-gateway`、`receipt-service`、`contacts-service`、`policy-service` |
 | 下一阶段 AI 底座主线 | `search-service v0.1`、`memory-service`、`retrieval-gateway`、`rag-service`、`summary-service`、`agent-service`、`skill-registry`、`mcp-gateway/tool-gateway`、`action-executor` |
-| 目标态候选 / 后置平台能力 | `route-service`、`control-plane-service`、`timeline-service`、`media-service`、`audit-service`、`notification-service`、`admin-service`、`ai-eval-service` 等按 ADR 渐进拆分 |
+| 目标态候选 / 后置平台能力 | `route-service`、`control-plane-service`、`timeline-service`、`media-service`、`notification-service`、`audit-service`、`admin-service`、`presence-service`、`model-gateway`、`workflow-service`、`knowledge-ingestion-service`、`vector-index-service` 等按 ADR 渐进拆分 |
 
 | 层级 | 组件 |
 | --- | --- |
 | 接入层 | `api-gateway`、`route-service`、`push-gateway` |
-| IM 核心 | `identity-service`、`policy-service`、`control-plane-service`、`conversation-service`、`contacts-service`、`message-service`、`timeline-service`、`delivery-service`、`receipt-service`、`media-service`、`audit-service` |
-| 检索与 Agent 智能层 | `search-service`、`memory-service`、`retrieval-gateway`、`rag-service`、`summary-service`、`agent-service`、`skill-registry`、`mcp-gateway/tool-gateway`、`action-executor`、`ai-eval-service` |
+| IM 核心 | `identity-service`、`policy-service`、`control-plane-service`、`conversation-service`、`contacts-service`、`message-service`、`timeline-service`、`delivery-service`、`receipt-service`、`push-gateway`、`presence-service`、`media-service`、`notification-service`、`audit-service`、`admin-service` |
+| 检索与 Agent 智能层 | `search-service`、`memory-service`、`retrieval-gateway`、`rag-service`、`summary-service`、`agent-service`、`skill-registry`、`mcp-gateway/tool-gateway`、`action-executor`、`ai-eval-service`、`model-gateway`、`workflow-service`、`knowledge-ingestion-service`、`vector-index-service` |
 
 | 服务 | 数据归属 | 核心职责 | 禁止事项 |
 | --- | --- | --- | --- |
@@ -226,7 +226,9 @@ flowchart TB
 | timeline-service | sequencer state、seq block、gap marker | 热点会话 seq block、leader fencing、gap marker | 普通会话不拆散 message 本地事务 |
 | delivery-service | user_inbox、delivery task | fanout、离线补拉、在线推送触发 | 不推进 read cursor |
 | receipt-service | delivery ACK、read cursor、unread projection | ACK、已读、未读聚合 | 不改消息事实 |
+| presence-service | presence_sessions、typing state | 在线状态、输入中、最后在线和设备在线投影 | 不作为消息投递或权限事实源 |
 | media-service | media_objects、scan_jobs | 上传、扫描、短期 URL | 不绕过权限下载 |
+| notification-service | notification_requests、delivery attempts | email、SMS、APNs/FCM、模板、bounce handling | 不保存验证码或 provider body 明文 |
 | search-service | search index | 产品搜索索引唯一写入口 | 其他服务不直写搜索后端 |
 | memory-service | structured memory、profile aggregate、memory graph | 结构化记忆、版本语义、画像聚合和跨群归因 | 不作为消息事实源、不替代 policy-service |
 | retrieval-gateway | evidence_pack、retrieval audit | 权限过滤、混合检索、rerank、EvidencePack | Agent/前端不直连索引 |
@@ -237,6 +239,10 @@ flowchart TB
 | mcp-gateway/tool-gateway | tool_call_log、tool route config | MCP/内部工具调用入口、schema 校验、tool policy、调用路由 | 不绕过 policy/approval 执行高风险动作 |
 | action-executor | action_execution_attempts、Temporal workflow state | 执行低风险 allowlist 或已审批动作、调用公开业务 API、写执行结果 | 不接收未授权高风险动作、不绕过业务 API |
 | ai-eval-service | eval datasets、eval runs、failure records | 权限、证据、时间版本、tool policy 和模型/prompt/retrieval 变更门禁 | 不参与线上热路径 |
+| model-gateway | provider config、cost audit | 模型 provider、embedding、rerank、fallback、成本和低敏审计 | 不拥有 IM 事实或 Agent approval |
+| workflow-service | workflow state、approval wait、compensation state | 长事务、审批等待、retention、repair 和外部补偿 | 不进入 IM 热路径 |
+| knowledge-ingestion-service | ingestion jobs、chunk manifests | 文件 / 网页 / 知识库导入、chunking、embedding pipeline | 不绕过 media / policy / retrieval 边界 |
+| vector-index-service | vector refs、index rebuild jobs | 向量写入、重建、backfill 和 delete proof | 不作为 retrieval 入口 |
 | audit-service | audit_logs、audit_manifest | 不可变审计、导出、修复留痕 | 不作为业务状态源 |
 
 当前态 vs 目标态：

@@ -272,8 +272,12 @@ NexusIM 的开发顺序不是“先把所有功能铺开”，而是：
 - `notification-service`
 - `audit-service`
 - `admin-service`
-- `tenant/config-service`
+- `control-plane-service`
 - `presence-service`
+- `model-gateway`
+- `workflow-service`
+- `knowledge-ingestion-service`
+- `vector-index-service`
 
 ## 8. 暂不纳入当前面试主线：客户端
 

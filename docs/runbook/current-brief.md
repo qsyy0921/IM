@@ -14,8 +14,7 @@
 ## 当前阶段
 
 NexusIM 已有本地 / 双机可运行的最小分布式 IM 后端。
-9 个后端服务已进入真实链路：api-gateway、identity、message、
-conversation、delivery、push、receipt、contacts、policy。
+9 个后端服务已进入真实链路：`api-gateway`、`identity-service`、`message-service`、`conversation-service`、`delivery-service`、`push-gateway`、`receipt-service`、`contacts-service`、`policy-service`。
 
 当前唯一默认主线是 AI 大模型应用底座：
 
@@ -25,8 +24,7 @@ group memory -> EvidencePack -> RAG -> summary -> multi-agent
 -> proposal / approval / audit -> ai-eval
 ```
 
-AI foundation-active 服务：search、memory、retrieval、rag、summary、
-agent、skill-registry、mcp-gateway、action-executor、ai-eval。
+AI foundation-active 服务：`search-service`、`memory-service`、`retrieval-gateway`、`rag-service`、`summary-service`、`agent-service`、`skill-registry`、`mcp-gateway`、`action-executor`、`ai-eval-service`。
 
 `ai-eval-service` catalog、gate、negative / action / memory evals、
 action-executor provider failure worker / redrive safety eval、memory-service

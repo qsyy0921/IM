@@ -74,7 +74,19 @@ EverMemBench 只是设计输入之一。它强调多人、多群、多时间版�
 - 不为了接一个模型 provider 提前固定全部模型、中间件或云厂商。
 - 不把 AI 结果当业务事实源；AI 输出只能是建议、摘要、证据包或待审批动作。
 
-### 3.2 目标依赖图
+### 3.2 Future AI-adjacent services
+
+这些服务已经进入 future registry，但不在当前算法/eval 切片里直接落目录。
+只有当现有服务内的 port / adapter 明显变复杂，或出现独立伸缩、故障、安全边界时才 promotion。
+
+| 服务 | 触发拆分条件 |
+| --- | --- |
+| `model-gateway` | 多模型 provider、embedding / rerank、成本、fallback、prompt policy 和低敏审计需要统一治理 |
+| `workflow-service` | Agent approval、repair、retention、外部补偿等长事务需要独立状态机 |
+| `knowledge-ingestion-service` | 文件 / 网页 / 企业知识库导入、chunking、embedding pipeline 和导入审计独立成面 |
+| `vector-index-service` | Milvus / pgvector / OpenSearch vector 写入、重建、backfill 和 delete proof 需要独立扩缩容 |
+
+### 3.3 目标依赖图
 
 ```mermaid
 flowchart LR

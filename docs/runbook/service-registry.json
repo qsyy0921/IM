@@ -173,6 +173,30 @@
     {
       "name": "admin-service",
       "stage": "future"
+    },
+    {
+      "name": "control-plane-service",
+      "stage": "future"
+    },
+    {
+      "name": "presence-service",
+      "stage": "future"
+    },
+    {
+      "name": "vector-index-service",
+      "stage": "future"
+    },
+    {
+      "name": "model-gateway",
+      "stage": "future"
+    },
+    {
+      "name": "workflow-service",
+      "stage": "future"
+    },
+    {
+      "name": "knowledge-ingestion-service",
+      "stage": "future"
     }
   ],
   "worker_roles": [

@@ -6,7 +6,7 @@
 维护规则：
 
 - 新发现的待完成工作追加到本文件。
-- 已完成工作从本文件移除，并同步到对应 service brief / progress / smoke report。
+- 已完成工作从本文件移除，并同步到 service brief / progress / smoke report。
 - 不记录已完成证据，不写长历史，不替代 SDD / ADR。
 
 ## 当前默认主线
@@ -19,79 +19,70 @@ search-service -> memory-service -> retrieval-gateway
 -> skill-registry -> mcp-gateway -> action-executor -> ai-eval-service
 ```
 
-9 个既有 IM 服务只做阻塞 AI 主线的必要收口；Go 侧服务底座、EvidencePack、
-proposal / approval / audit 和低敏 eval 已能支撑算法切片。生产级 HA、长压、
-sizing、provider-grade 运维和完整系统测试暂不作为当前阻塞。
+9 个既有 IM 服务只做阻塞 AI 主线的必要收口。Go 侧服务底座、
+EvidencePack、proposal / approval / audit、Python Worker 候选接入和低敏
+eval 已能支撑算法切片；生产级 HA、长压、sizing 和完整系统测试暂不作为当前阻塞。
 
 ## 当前未完成重点
 
 1. AI eval 回归扩展：
-   `ai-eval-service` 已能记录低敏 summary，并已具备 profile / Agent safety、
-   action-executor external adapter 和 Python worker 的 policy-driven
-   multi-adapter gate smoke，也已跑通 RAG / Agent service-stack live gate 和
-   CI-safe gate skeleton。RAG / Agent / Summary / Python / action / memory
-   group safety fixture扩展已落；仍不得保存 raw prompt、
+   继续扩展低敏 case，区分 retrieval failure、reasoning failure、action
+   boundary failure 和 memory lifecycle failure。不得保存 raw prompt、
    EvidencePack、model output、用户正文、secret 或 tool input。
-   后续 eval case 必须低敏，可复核，能区分 retrieval failure、reasoning failure 和 action boundary failure。
 
 2. Memory / retrieval 深化：
-   `memory-service` 继续按 2025/2026 group memory / collaborative memory 论文
-   方向深化 source refs、speaker / audience scope、valid_from / valid_to、
+   `memory-service` 继续按 group / collaborative memory 论文方向深化
+   source refs、speaker / audience scope、valid_from / valid_to、
    supersedes / contradicts、confidence、PENDING / ACTIVE / SUPERSEDED /
-   REJECTED 状态。`QueryMemoryEvents.at_conversation_seq`、runtime checks 和
-   retrieval-gateway EvidencePack current-only memory query，以及 RAG /
-   Summary / Agent API 显式透传 `at_conversation_seq`，以及 RAG / Summary /
-   Agent current-memory consumption CI-safe regression、memory extraction
-   confidence / review eval、current-memory service-stack live smoke、cross-group /
-   temporal CI-safe fixture eval、retrieval smoke、RAG / Summary / Agent stack smoke
-   和 optional stack gate 已落；当前进入低敏 collaborative-memory 算法/eval，
-   优先 multi-hop / temporal update / profile aggregation，保留 source-ref / visibility / review 边界。
+   REJECTED 状态。优先 multi-hop、temporal update、profile aggregation，
+   保留 visibility、review state 和 source-ref 边界。
 
 3. Agent 真实业务动作扩展：
-   `agent-service`、`skill-registry`、`mcp-gateway`、`action-executor` 已具备
-   first path。后续接真实 MCP / provider tool 或业务写动作时，仍必须走：
+   `agent-service`、`skill-registry`、`mcp-gateway`、`action-executor`
+   后续接真实 MCP / provider tool 或业务写动作时，仍必须走：
    policy precheck -> skill contract -> prepare audit -> proposal -> approval
-   -> executor -> low-sensitive result projection -> audit。高风险动作第一阶段
-   禁止自动执行。
+   -> executor -> low-sensitive result projection -> audit。
 
 4. Python AI Worker 扩展：
-   `rag-service`、`summary-service`、`agent-service` 已接 candidate guard。
-   后续可扩 embedding / rerank / memory extraction / planner / eval 候选，但
+   可扩 embedding / rerank / memory extraction / planner / eval 候选，但
    Python 只返回候选和 hash / citation metadata；Go 继续拥有权限、审计、
    状态和持久化。
 
 ## 9 个现有服务必要收口
 
-这些不是默认下一步，只有阻塞 AI 主线或用户点名时才进入当前切片：
-
 | 服务 | 未完成工作 |
 | --- | --- |
-| `api-gateway` | legacy observation window 目标环境证据、provider-grade 配置中心 quota 控制面、灰度治理、生产观测。 |
+| `api-gateway` | 目标环境 legacy observation evidence、provider-grade 配置中心 quota 控制面、灰度治理、生产观测。 |
 | `identity-service` | WebAuthn/passkeys、OIDC federation、多 issuer、KMS/HSM、完整风控、生产级 email/SMS provider。 |
-| `message-service` | 会话级删除策略深化、provider-grade 外部 proof 工作流、发送链路生产观测；媒体二进制后续由 media 能力承担。 |
+| `message-service` | 删除 / 撤回 / 编辑语义深化、外部 proof workflow、发送链路生产观测；媒体二进制交给 future media 能力。 |
 | `conversation-service` | 更完整群管理、owner transfer 策略深化、完整历史窗口 / targeted replay repair。 |
 | `delivery-service` | 更多 delivery event 消费方、projection repair 深化、容量曲线。 |
-| `push-gateway` | 生产级 Redis HA 设计、跨实例 resume 深化、长时间在线容量曲线。 |
+| `push-gateway` | 生产级 Redis HA、跨实例 resume 深化、长时间在线容量曲线。 |
 | `receipt-service` | 会话列表更多产品能力、更多摘要策略和容量曲线。 |
 | `contacts-service` | 组织级策略、租户默认值、来源策略、隐私例外接入 admin/config service。 |
 | `policy-service` | provider-grade ReBAC graph / DSL、moderation / risk scoring、tenant DSL / quota、外部 audit pipeline。 |
 
 ## 后置平台 / 产品化服务
 
-这些服务可以后续新增，不是当前阻塞项：
+这些服务已登记为 `future`，stage switch 前不得创建 `services/<name>` 目录：
 
-- `media-service`
-- `notification-service`
-- `audit-service`
-- `admin-service`
-- Web / App / 桌面端展示层
+- `media-service`：媒体上传、对象存储、缩略图、病毒扫描、语音转码。
+- `notification-service`：email、SMS、APNs / FCM、模板、bounce handling。
+- `audit-service`：统一审计、导出、hash-chain、Agent 动作审计。
+- `admin-service`：租户、封禁、配置、repair 审批、运维操作。
+- `control-plane-service`：配置中心、功能开关、灰度、quota、applied ACK。
+- `presence-service`：在线状态、输入中、最后在线、设备在线。
+- `model-gateway`：模型 provider、embedding、rerank、成本、fallback、审计。
+- `workflow-service`：审批等待、长事务、补偿、retention、operator workflow。
+- `knowledge-ingestion-service`：文件 / 网页导入、chunking、embedding pipeline。
+- `vector-index-service`：向量索引写入、重建、backfill；满足拆分条件后再独立。
 
 新增服务必须满足独立数据模型、独立伸缩需求、独立故障边界、独立安全边界，
-或能显著降低现有服务复杂度，并通过 ADR。
+或能显著降低现有服务复杂度，并通过 ADR / SDD v0.1。
 
 ## 后置 Hardening
 
-- 生产级统一观测：collector、Alertmanager 路由、日志汇聚、SLO、retention。
+- 生产级统一观测：collector、Alertmanager、日志汇聚、SLO、retention。
 - 分布式 HA / 故障演练：Redis / Kafka / PostgreSQL 更长时长和多故障组合。
 - Repair / DLQ / audit 产品化：审批系统、运维 UI、批量 repair、外部审计。
 - 容量和复杂度治理：9 服务长压 campaign、资源曲线、生产 sizing、文件拆分。

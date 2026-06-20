@@ -27,15 +27,32 @@ services/<service-name>/
 | `types` | 命令、DTO、枚举、错误码、跨层轻量类型 |
 | `trigger` | Outbox Relay、Kafka consumer、定时任务、补偿任务 |
 
-## 当前服务
+## 当前 active 服务
 
-| 服务 | 状态 | 说明 |
-| --- | --- | --- |
-| `message-service` | 第一阶段主链路已落地 | 普通会话 `SendMessage -> PostgreSQL transaction -> outbox -> Kafka` 已实现；热点 sequencer、RAG、Agent 暂不实现。 |
-| `conversation-service` | 最小 read/write path 已落地 | 提供 `GetSendContext`，并已实现成员变更 `CreateMemberChange / GetMemberChange`、成员边界事件和 saga progress worker。 |
-| `delivery-service` | 最小投递链路已落地 | 消费 conversation timeline，维护 `user_inbox`、`AckDelivery` cursor、`delivery_outbox` 和 `im.delivery.events`；gRPC server 和 push-gateway delivery RPC client 已支持第一阶段可选 TLS / mTLS，默认 plaintext。 |
-| `push-gateway` | 最小在线通知 / 分布式 route 已落地 | 消费 `im.delivery.events`，通过 WebSocket 发送轻量 notify，并通过 Redis route / resume 支持跨实例在线唤醒。 |
-| `receipt-service` | 最小回执链路已落地 | 已跑通 `im.delivery.events -> receipt projection -> MarkRead -> GetReceiptState -> receipt_outbox -> im.receipt.events` 真实进程 smoke；已新增会话列表 / 未读数 SDD，作为 receipt-service 扩展 projection，不新增独立服务；gRPC server 和 receipt/demo smoke runner 已支持第一阶段可选 TLS / mTLS，默认 plaintext。 |
+active 服务清单以 `docs/runbook/service-registry.json` 为准，不能手写漂移。
+
+当前包含：
+
+```text
+api-gateway, identity-service, message-service, conversation-service,
+delivery-service, push-gateway, receipt-service, contacts-service,
+policy-service, search-service, memory-service, retrieval-gateway,
+rag-service, summary-service, agent-service, skill-registry,
+mcp-gateway, action-executor, ai-eval-service
+```
+
+每个服务的当前状态看 `docs/runbook/service-briefs/<service>.md`。
+
+## Future 服务
+
+future 服务已经进入 registry 和 brief，但 stage switch 前不得创建
+`services/<service>` 目录。当前包括：
+
+```text
+media-service, notification-service, audit-service, admin-service,
+control-plane-service, presence-service, model-gateway,
+workflow-service, knowledge-ingestion-service, vector-index-service
+```
 
 ## 约束
 

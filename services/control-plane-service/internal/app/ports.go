@@ -9,6 +9,7 @@ import (
 
 type Repository interface {
 	PublishConfigVersion(ctx context.Context, prepared domain.PreparedConfigVersion, eventID string) (types.ConfigVersion, error)
+	RollbackConfigVersion(ctx context.Context, prepared domain.PreparedConfigRollback, eventID string) (types.ConfigVersion, bool, error)
 	GetConfigSnapshot(ctx context.Context, command types.GetConfigSnapshotCommand) (types.ConfigSnapshot, error)
 	AckAppliedConfigVersion(ctx context.Context, command types.AckAppliedConfigVersionCommand, eventID string) (types.AppliedConfigVersion, error)
 }

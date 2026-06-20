@@ -16,6 +16,11 @@ type PreparedConfigVersion struct {
 	CommandHash     string
 }
 
+type PreparedConfigRollback struct {
+	Command     types.RollbackConfigVersionCommand
+	CommandHash string
+}
+
 func PrepareConfigVersion(command types.PublishConfigVersionCommand) (PreparedConfigVersion, error) {
 	if err := command.Validate(); err != nil {
 		return PreparedConfigVersion{}, err
@@ -36,6 +41,21 @@ func PrepareConfigVersion(command types.PublishConfigVersionCommand) (PreparedCo
 		PayloadJSON:     canonicalPayload,
 		PayloadChecksum: checksum,
 		CommandHash:     commandHash,
+	}, nil
+}
+
+func PrepareConfigRollback(command types.RollbackConfigVersionCommand) (PreparedConfigRollback, error) {
+	if err := command.Validate(); err != nil {
+		return PreparedConfigRollback{}, err
+	}
+	normalized := command.Normalized()
+	commandHash, err := CanonicalRollbackCommandHash(normalized)
+	if err != nil {
+		return PreparedConfigRollback{}, err
+	}
+	return PreparedConfigRollback{
+		Command:     normalized,
+		CommandHash: commandHash,
 	}, nil
 }
 
@@ -70,6 +90,25 @@ func CanonicalCommandHash(command types.PublishConfigVersionCommand) (string, er
 	encoded, err := json.Marshal(payload)
 	if err != nil {
 		return "", types.NewInvalidArgument("command hash payload invalid")
+	}
+	return SHA256String(string(encoded)), nil
+}
+
+func CanonicalRollbackCommandHash(command types.RollbackConfigVersionCommand) (string, error) {
+	payload := map[string]any{
+		"tenant_id":       string(command.AuthContext.TenantID),
+		"environment":     command.Environment,
+		"config_kind":     command.ConfigKind,
+		"bundle_key":      command.BundleKey,
+		"target_version":  command.TargetVersion,
+		"approval_ref":    command.ApprovalRef,
+		"operator_ref":    command.OperatorRef,
+		"reason_ref":      command.ReasonRef,
+		"idempotency_key": command.IdempotencyKey,
+	}
+	encoded, err := json.Marshal(payload)
+	if err != nil {
+		return "", types.NewInvalidArgument("rollback command hash payload invalid")
 	}
 	return SHA256String(string(encoded)), nil
 }

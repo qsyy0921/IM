@@ -4,6 +4,7 @@ param(
     [string]$RunName = "",
     [string]$AdminGrpcAddr = "",
     [string]$ControlPlaneGrpcAddr = "",
+    [string]$SmokeMode = "config-publish-smoke",
     [switch]$SkipBuild
 )
 
@@ -14,7 +15,7 @@ $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\.."))
 Assert-ExternalOutputRoot -Value $ResultRoot -RepositoryRoot $repoRoot -Name "ResultRoot"
 
 if (-not $RunName) {
-    $RunName = "admin-config-publish-smoke-" + (Get-Date -Format "yyyyMMdd-HHmmss")
+    $RunName = "admin-$SmokeMode-" + (Get-Date -Format "yyyyMMdd-HHmmss")
 }
 
 $resultDir = Join-Path $ResultRoot $RunName
@@ -126,7 +127,7 @@ try {
     }
 
     & (Join-Path $repoRoot "bin\admin-smoke.exe") `
-        --mode config-publish-smoke `
+        --mode $SmokeMode `
         --pg-dsn $PgDsn `
         --target $AdminGrpcAddr `
         --control-plane-target $ControlPlaneGrpcAddr `

@@ -65,7 +65,7 @@ Foundation backlog 锚点：`search-service`、`memory-service`、`retrieval-gat
   suppression worker、provider redrive / audit 产品化。
 - `audit-service`：后续仍需 Kafka ingestion、export worker、SIEM forwarding、
   retention cleanup、segment sealing 和 provider-grade audit export。
-- `control-plane-service`：后续仍需 outbox relay、rollback、drift monitor、
+- `control-plane-service`：后续仍需 outbox relay、drift monitor、
   expiry / cleanup worker、api-gateway quota consumer 和 provider-grade rollout。
 - `presence-service`：后续仍需 push-gateway session event consumer、
   `SubscribePresence`、stale scanner、presence outbox relay、Redis hot-state
@@ -79,9 +79,10 @@ Foundation backlog 锚点：`search-service`、`memory-service`、`retrieval-gat
   Milvus / pgvector / OpenSearch backend 和 vector-index handoff smoke。
 - `admin-service`：`REPAIR_REQUEST -> workflow-service REPAIR_APPROVAL`、
   `CRITICAL -> workflow-service ADMIN_OPERATION` 和第一版 operation-specific
-  approval policy / target-service routing 已接；后续仍需 audit ingestion /
-  export、admin UI、更多下游公开 admin API adapter、rollback / compensation
-  operator 和 provider-grade 运维。
+  approval policy / target-service routing 已接；`CONFIG_PUBLISH` /
+  `CONFIG_ROLLBACK` 已接 control-plane 公开 API；后续仍需 audit ingestion /
+  export、admin UI、更多下游公开 admin API adapter、compensation operator 和
+  provider-grade 运维。
 
 ## 后置平台 / 产品化服务
 

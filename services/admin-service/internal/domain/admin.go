@@ -41,6 +41,7 @@ var allowedPayloadKeys = map[string]bool{
 	"config_kind":              true,
 	"bundle_key":               true,
 	"version":                  true,
+	"target_version":           true,
 	"schema_version":           true,
 	"payload_json":             true,
 	"effective_at_unix_ms":     true,

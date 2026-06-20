@@ -15,8 +15,10 @@ const (
 	ConfigKindModelProviderPolicy       = "MODEL_PROVIDER_POLICY"
 	ConfigKindMediaPolicy               = "MEDIA_POLICY"
 
-	StatusActive    = "ACTIVE"
-	StatusPublished = "PUBLISHED"
+	StatusActive     = "ACTIVE"
+	StatusPublished  = "PUBLISHED"
+	StatusRolledBack = "ROLLED_BACK"
+	StatusExpired    = "EXPIRED"
 
 	AppliedStatusInSync          = "IN_SYNC"
 	AppliedStatusStaleVersion    = "STALE_VERSION"
@@ -119,6 +121,21 @@ type PublishConfigVersionCommand struct {
 	TraceID        string
 }
 
+type RollbackConfigVersionCommand struct {
+	AuthContext    AuthContext
+	Environment    string
+	ConfigKind     string
+	BundleKey      string
+	TargetVersion  string
+	ApprovalRef    string
+	OperatorRef    string
+	ReasonRef      string
+	IdempotencyKey string
+	CorrelationID  string
+	CausationID    string
+	TraceID        string
+}
+
 func (command PublishConfigVersionCommand) Validate() error {
 	if err := command.AuthContext.Validate(); err != nil {
 		return err
@@ -159,6 +176,46 @@ func (command PublishConfigVersionCommand) Normalized() PublishConfigVersionComm
 	command.PayloadJSON = strings.TrimSpace(command.PayloadJSON)
 	command.EffectiveAt = command.EffectiveAt.UTC()
 	command.ExpiresAt = command.ExpiresAt.UTC()
+	command.ApprovalRef = strings.TrimSpace(command.ApprovalRef)
+	command.OperatorRef = strings.TrimSpace(command.OperatorRef)
+	command.ReasonRef = strings.TrimSpace(command.ReasonRef)
+	command.IdempotencyKey = strings.TrimSpace(command.IdempotencyKey)
+	command.CorrelationID = strings.TrimSpace(command.CorrelationID)
+	command.CausationID = strings.TrimSpace(command.CausationID)
+	command.TraceID = strings.TrimSpace(command.TraceID)
+	if command.TraceID == "" {
+		command.TraceID = strings.TrimSpace(command.AuthContext.TraceID)
+	}
+	return command
+}
+
+func (command RollbackConfigVersionCommand) Validate() error {
+	if err := command.AuthContext.Validate(); err != nil {
+		return err
+	}
+	if strings.TrimSpace(command.Environment) == "" {
+		return NewInvalidArgument("environment is required")
+	}
+	if !IsValidConfigKind(command.ConfigKind) {
+		return NewInvalidArgument("config_kind is invalid")
+	}
+	if strings.TrimSpace(command.BundleKey) == "" {
+		return NewInvalidArgument("bundle_key is required")
+	}
+	if strings.TrimSpace(command.TargetVersion) == "" {
+		return NewInvalidArgument("target_version is required")
+	}
+	if strings.TrimSpace(command.IdempotencyKey) == "" {
+		return NewInvalidArgument("idempotency_key is required")
+	}
+	return nil
+}
+
+func (command RollbackConfigVersionCommand) Normalized() RollbackConfigVersionCommand {
+	command.Environment = strings.TrimSpace(command.Environment)
+	command.ConfigKind = strings.TrimSpace(command.ConfigKind)
+	command.BundleKey = strings.TrimSpace(command.BundleKey)
+	command.TargetVersion = strings.TrimSpace(command.TargetVersion)
 	command.ApprovalRef = strings.TrimSpace(command.ApprovalRef)
 	command.OperatorRef = strings.TrimSpace(command.OperatorRef)
 	command.ReasonRef = strings.TrimSpace(command.ReasonRef)

@@ -106,6 +106,23 @@ func TestParseFlagsBuildsConfigPublishSmokeDefaults(t *testing.T) {
 	}
 }
 
+func TestParseFlagsBuildsConfigRollbackSmokeDefaults(t *testing.T) {
+	cfg := parseFlags([]string{
+		"-mode", "config-rollback-smoke",
+		"-tenant-id", "tenant-admin-smoke",
+		"-run-name", "admin rollback smoke",
+	})
+	if cfg.mode != "config-rollback-smoke" {
+		t.Fatalf("mode = %q", cfg.mode)
+	}
+	if cfg.runName != "admin rollback smoke" {
+		t.Fatalf("run name = %q", cfg.runName)
+	}
+	if err := cfg.validate(); err != nil {
+		t.Fatalf("validate: %v", err)
+	}
+}
+
 func TestConfigPublishOperationPayloadDoesNotExposeSecretFields(t *testing.T) {
 	payload := configPublishOperationPayload("quota-v1")
 	var decoded map[string]any
@@ -125,6 +142,20 @@ func TestConfigPublishOperationPayloadDoesNotExposeSecretFields(t *testing.T) {
 	}
 	if _, ok := decoded["payload_json"].(string); !ok {
 		t.Fatalf("payload_json is not a string: %#v", decoded["payload_json"])
+	}
+}
+
+func TestConfigRollbackOperationPayloadUsesLowSensitiveTargetVersion(t *testing.T) {
+	payload := configRollbackOperationPayload("quota-v1")
+	var decoded map[string]any
+	if err := json.Unmarshal([]byte(payload), &decoded); err != nil {
+		t.Fatalf("payload json: %v", err)
+	}
+	if decoded["target_version"] != "quota-v1" {
+		t.Fatalf("target_version = %v", decoded["target_version"])
+	}
+	if _, ok := decoded["payload_json"]; ok {
+		t.Fatal("rollback payload should not include payload_json")
 	}
 }
 

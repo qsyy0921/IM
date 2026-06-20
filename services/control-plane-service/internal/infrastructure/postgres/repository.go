@@ -66,6 +66,65 @@ func (repository *Repository) PublishConfigVersion(
 	return version, nil
 }
 
+func (repository *Repository) RollbackConfigVersion(
+	ctx context.Context,
+	prepared domain.PreparedConfigRollback,
+	eventID string,
+) (types.ConfigVersion, bool, error) {
+	if repository.pool == nil {
+		return types.ConfigVersion{}, false, types.NewDBWriteFailed("control-plane repository is not configured")
+	}
+	tx, err := repository.pool.Begin(ctx)
+	if err != nil {
+		return types.ConfigVersion{}, false, types.NewDBWriteFailed(err.Error())
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	command := prepared.Command
+	existing, found, err := findExistingRollback(ctx, tx, command)
+	if err != nil {
+		return types.ConfigVersion{}, false, types.NewDBReadFailed(err.Error())
+	}
+	if found {
+		if existing.CommandHash != prepared.CommandHash {
+			return types.ConfigVersion{}, false, types.NewAlreadyExists("config rollback idempotency conflict")
+		}
+		target, err := lockConfigVersion(ctx, tx, command, existing.TargetVersion)
+		if err != nil {
+			return types.ConfigVersion{}, false, err
+		}
+		if err := tx.Commit(ctx); err != nil {
+			return types.ConfigVersion{}, false, types.NewDBReadFailed(err.Error())
+		}
+		return target, true, nil
+	}
+
+	target, err := lockConfigVersion(ctx, tx, command, command.TargetVersion)
+	if err != nil {
+		return types.ConfigVersion{}, false, err
+	}
+	if target.Status == types.StatusExpired {
+		return types.ConfigVersion{}, false, types.NewFailedPrecondition("rollback target is expired")
+	}
+	if err := insertRollbackRequest(ctx, tx, prepared); err != nil {
+		return types.ConfigVersion{}, false, types.NewDBWriteFailed(err.Error())
+	}
+	if err := markNewerVersionsRolledBack(ctx, tx, command, target); err != nil {
+		return types.ConfigVersion{}, false, types.NewDBWriteFailed(err.Error())
+	}
+	rolledBack, err := activateRollbackTarget(ctx, tx, command)
+	if err != nil {
+		return types.ConfigVersion{}, false, types.NewDBWriteFailed(err.Error())
+	}
+	if err := insertRollbackOutbox(ctx, tx, eventID, rolledBack, command); err != nil {
+		return types.ConfigVersion{}, false, types.NewDBWriteFailed(err.Error())
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return types.ConfigVersion{}, false, types.NewDBWriteFailed(err.Error())
+	}
+	return rolledBack, false, nil
+}
+
 func (repository *Repository) GetConfigSnapshot(
 	ctx context.Context,
 	command types.GetConfigSnapshotCommand,
@@ -192,6 +251,127 @@ LIMIT 1
 	return version, true, nil
 }
 
+type rollbackRequestRow struct {
+	TargetVersion string
+	CommandHash   string
+}
+
+func findExistingRollback(
+	ctx context.Context,
+	tx pgx.Tx,
+	command types.RollbackConfigVersionCommand,
+) (rollbackRequestRow, bool, error) {
+	row := tx.QueryRow(ctx, `
+SELECT target_version, command_hash
+FROM control_config_rollbacks
+WHERE tenant_id = $1
+  AND environment = $2
+  AND config_kind = $3
+  AND bundle_key = $4
+  AND idempotency_key = $5
+LIMIT 1
+`, string(command.AuthContext.TenantID), command.Environment, command.ConfigKind, command.BundleKey, command.IdempotencyKey)
+	var existing rollbackRequestRow
+	if err := row.Scan(&existing.TargetVersion, &existing.CommandHash); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return rollbackRequestRow{}, false, nil
+		}
+		return rollbackRequestRow{}, false, err
+	}
+	return existing, true, nil
+}
+
+func lockConfigVersion(
+	ctx context.Context,
+	tx pgx.Tx,
+	command types.RollbackConfigVersionCommand,
+	version string,
+) (types.ConfigVersion, error) {
+	row := tx.QueryRow(ctx, `
+SELECT tenant_id, environment, config_kind, bundle_key, version, schema_version,
+       payload_json::text, payload_checksum, command_hash, status,
+       effective_at, COALESCE(expires_at, 'epoch'::timestamptz), published_at,
+       approval_ref, operator_ref, reason_ref, idempotency_key, correlation_id, causation_id, trace_id
+FROM control_config_versions
+WHERE tenant_id = $1
+  AND environment = $2
+  AND config_kind = $3
+  AND bundle_key = $4
+  AND version = $5
+FOR UPDATE
+`, string(command.AuthContext.TenantID), command.Environment, command.ConfigKind, command.BundleKey, version)
+	target, err := scanConfigVersion(row)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return types.ConfigVersion{}, types.NewNotFound("rollback target not found")
+		}
+		return types.ConfigVersion{}, types.NewDBReadFailed(err.Error())
+	}
+	return target, nil
+}
+
+func insertRollbackRequest(ctx context.Context, tx pgx.Tx, prepared domain.PreparedConfigRollback) error {
+	command := prepared.Command
+	_, err := tx.Exec(ctx, `
+INSERT INTO control_config_rollbacks (
+    tenant_id, environment, config_kind, bundle_key, idempotency_key,
+    target_version, command_hash, approval_ref, operator_ref, reason_ref,
+    correlation_id, causation_id, trace_id, created_at
+) VALUES (
+    $1, $2, $3, $4, $5,
+    $6, $7, $8, $9, $10,
+    $11, $12, $13, now()
+)
+`, string(command.AuthContext.TenantID), command.Environment, command.ConfigKind, command.BundleKey,
+		command.IdempotencyKey, command.TargetVersion, prepared.CommandHash, command.ApprovalRef, command.OperatorRef,
+		command.ReasonRef, command.CorrelationID, command.CausationID, command.TraceID)
+	return err
+}
+
+func markNewerVersionsRolledBack(
+	ctx context.Context,
+	tx pgx.Tx,
+	command types.RollbackConfigVersionCommand,
+	target types.ConfigVersion,
+) error {
+	_, err := tx.Exec(ctx, `
+UPDATE control_config_versions
+SET status = 'ROLLED_BACK',
+    rolled_back_at = now()
+WHERE tenant_id = $1
+  AND environment = $2
+  AND config_kind = $3
+  AND bundle_key = $4
+  AND version <> $5
+  AND status IN ('ACTIVE', 'PUBLISHED')
+  AND (effective_at >= $6 OR published_at >= $7)
+`, string(command.AuthContext.TenantID), command.Environment, command.ConfigKind, command.BundleKey,
+		command.TargetVersion, target.EffectiveAt, target.PublishedAt)
+	return err
+}
+
+func activateRollbackTarget(
+	ctx context.Context,
+	tx pgx.Tx,
+	command types.RollbackConfigVersionCommand,
+) (types.ConfigVersion, error) {
+	row := tx.QueryRow(ctx, `
+UPDATE control_config_versions
+SET status = 'ACTIVE',
+    rolled_back_at = NULL
+WHERE tenant_id = $1
+  AND environment = $2
+  AND config_kind = $3
+  AND bundle_key = $4
+  AND version = $5
+RETURNING tenant_id, environment, config_kind, bundle_key, version, schema_version,
+       payload_json::text, payload_checksum, command_hash, status,
+       effective_at, COALESCE(expires_at, 'epoch'::timestamptz), published_at,
+       approval_ref, operator_ref, reason_ref, idempotency_key, correlation_id, causation_id, trace_id
+`, string(command.AuthContext.TenantID), command.Environment, command.ConfigKind, command.BundleKey, command.TargetVersion)
+	return scanConfigVersion(row)
+}
+
 func insertConfigVersion(ctx context.Context, tx pgx.Tx, prepared domain.PreparedConfigVersion) (types.ConfigVersion, error) {
 	command := prepared.Command
 	var expiresAt any
@@ -308,6 +488,29 @@ func insertAppliedOutbox(ctx context.Context, tx pgx.Tx, eventID string, applied
 	return insertOutbox(ctx, tx, eventID, applied.TenantID, "applied_ack",
 		fmt.Sprintf("%s:%s:%s:%s", applied.Environment, applied.ServiceName, applied.ConfigKind, applied.BundleKey),
 		"control.config.applied.v1", string(applied.TenantID)+":"+applied.ServiceName, payload)
+}
+
+func insertRollbackOutbox(
+	ctx context.Context,
+	tx pgx.Tx,
+	eventID string,
+	version types.ConfigVersion,
+	command types.RollbackConfigVersionCommand,
+) error {
+	payload := map[string]any{
+		"tenant_id":        string(version.TenantID),
+		"environment":      version.Environment,
+		"config_kind":      version.ConfigKind,
+		"bundle_key":       version.BundleKey,
+		"target_version":   version.Version,
+		"checksum_present": version.PayloadChecksum != "",
+		"operator_ref":     command.OperatorRef,
+		"approval_ref":     command.ApprovalRef,
+		"trace_id":         command.TraceID,
+	}
+	return insertOutbox(ctx, tx, eventID, version.TenantID, "config_version",
+		fmt.Sprintf("%s:%s:%s:%s", version.Environment, version.ConfigKind, version.BundleKey, version.Version),
+		"control.config.rolled_back.v1", string(version.TenantID)+":"+version.BundleKey, payload)
 }
 
 func insertOutbox(

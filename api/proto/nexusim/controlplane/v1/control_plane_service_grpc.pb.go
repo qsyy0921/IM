@@ -22,6 +22,7 @@ const (
 	ControlPlaneService_PublishConfigVersion_FullMethodName    = "/nexusim.controlplane.v1.ControlPlaneService/PublishConfigVersion"
 	ControlPlaneService_GetConfigSnapshot_FullMethodName       = "/nexusim.controlplane.v1.ControlPlaneService/GetConfigSnapshot"
 	ControlPlaneService_AckAppliedConfigVersion_FullMethodName = "/nexusim.controlplane.v1.ControlPlaneService/AckAppliedConfigVersion"
+	ControlPlaneService_RollbackConfigVersion_FullMethodName   = "/nexusim.controlplane.v1.ControlPlaneService/RollbackConfigVersion"
 )
 
 // ControlPlaneServiceClient is the client API for ControlPlaneService service.
@@ -31,6 +32,7 @@ type ControlPlaneServiceClient interface {
 	PublishConfigVersion(ctx context.Context, in *PublishConfigVersionRequest, opts ...grpc.CallOption) (*PublishConfigVersionResponse, error)
 	GetConfigSnapshot(ctx context.Context, in *GetConfigSnapshotRequest, opts ...grpc.CallOption) (*GetConfigSnapshotResponse, error)
 	AckAppliedConfigVersion(ctx context.Context, in *AckAppliedConfigVersionRequest, opts ...grpc.CallOption) (*AckAppliedConfigVersionResponse, error)
+	RollbackConfigVersion(ctx context.Context, in *RollbackConfigVersionRequest, opts ...grpc.CallOption) (*RollbackConfigVersionResponse, error)
 }
 
 type controlPlaneServiceClient struct {
@@ -71,6 +73,16 @@ func (c *controlPlaneServiceClient) AckAppliedConfigVersion(ctx context.Context,
 	return out, nil
 }
 
+func (c *controlPlaneServiceClient) RollbackConfigVersion(ctx context.Context, in *RollbackConfigVersionRequest, opts ...grpc.CallOption) (*RollbackConfigVersionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RollbackConfigVersionResponse)
+	err := c.cc.Invoke(ctx, ControlPlaneService_RollbackConfigVersion_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ControlPlaneServiceServer is the server API for ControlPlaneService service.
 // All implementations must embed UnimplementedControlPlaneServiceServer
 // for forward compatibility.
@@ -78,6 +90,7 @@ type ControlPlaneServiceServer interface {
 	PublishConfigVersion(context.Context, *PublishConfigVersionRequest) (*PublishConfigVersionResponse, error)
 	GetConfigSnapshot(context.Context, *GetConfigSnapshotRequest) (*GetConfigSnapshotResponse, error)
 	AckAppliedConfigVersion(context.Context, *AckAppliedConfigVersionRequest) (*AckAppliedConfigVersionResponse, error)
+	RollbackConfigVersion(context.Context, *RollbackConfigVersionRequest) (*RollbackConfigVersionResponse, error)
 	mustEmbedUnimplementedControlPlaneServiceServer()
 }
 
@@ -96,6 +109,9 @@ func (UnimplementedControlPlaneServiceServer) GetConfigSnapshot(context.Context,
 }
 func (UnimplementedControlPlaneServiceServer) AckAppliedConfigVersion(context.Context, *AckAppliedConfigVersionRequest) (*AckAppliedConfigVersionResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method AckAppliedConfigVersion not implemented")
+}
+func (UnimplementedControlPlaneServiceServer) RollbackConfigVersion(context.Context, *RollbackConfigVersionRequest) (*RollbackConfigVersionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RollbackConfigVersion not implemented")
 }
 func (UnimplementedControlPlaneServiceServer) mustEmbedUnimplementedControlPlaneServiceServer() {}
 func (UnimplementedControlPlaneServiceServer) testEmbeddedByValue()                             {}
@@ -172,6 +188,24 @@ func _ControlPlaneService_AckAppliedConfigVersion_Handler(srv interface{}, ctx c
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ControlPlaneService_RollbackConfigVersion_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RollbackConfigVersionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ControlPlaneServiceServer).RollbackConfigVersion(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ControlPlaneService_RollbackConfigVersion_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ControlPlaneServiceServer).RollbackConfigVersion(ctx, req.(*RollbackConfigVersionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ControlPlaneService_ServiceDesc is the grpc.ServiceDesc for ControlPlaneService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -190,6 +224,10 @@ var ControlPlaneService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "AckAppliedConfigVersion",
 			Handler:    _ControlPlaneService_AckAppliedConfigVersion_Handler,
+		},
+		{
+			MethodName: "RollbackConfigVersion",
+			Handler:    _ControlPlaneService_RollbackConfigVersion_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

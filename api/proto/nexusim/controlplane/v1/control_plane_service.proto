@@ -8,6 +8,7 @@ service ControlPlaneService {
   rpc PublishConfigVersion(PublishConfigVersionRequest) returns (PublishConfigVersionResponse);
   rpc GetConfigSnapshot(GetConfigSnapshotRequest) returns (GetConfigSnapshotResponse);
   rpc AckAppliedConfigVersion(AckAppliedConfigVersionRequest) returns (AckAppliedConfigVersionResponse);
+  rpc RollbackConfigVersion(RollbackConfigVersionRequest) returns (RollbackConfigVersionResponse);
 }
 
 message AuthContext {
@@ -123,4 +124,25 @@ message AckAppliedConfigVersionRequest {
 
 message AckAppliedConfigVersionResponse {
   AppliedConfigVersion applied = 1;
+}
+
+message RollbackConfigVersionRequest {
+  AuthContext auth_context = 1;
+  string environment = 2;
+  string config_kind = 3;
+  string bundle_key = 4;
+  string target_version = 5;
+  string approval_ref = 6;
+  string operator_ref = 7;
+  string reason_ref = 8;
+  string idempotency_key = 9;
+  string correlation_id = 10;
+  string causation_id = 11;
+  string trace_id = 12;
+}
+
+message RollbackConfigVersionResponse {
+  ConfigVersion version = 1;
+  ConfigSnapshot snapshot = 2;
+  bool replayed = 3;
 }

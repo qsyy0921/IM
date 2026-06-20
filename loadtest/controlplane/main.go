@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -231,12 +232,19 @@ func runSmoke(ctx context.Context, cfg config, pool *pgxpool.Pool, client contro
 }
 
 func applyMigration(ctx context.Context, pool *pgxpool.Pool) error {
-	sqlBytes, err := os.ReadFile(filepath.Join("migrations", "postgres", "control-plane", "000001_control_plane_core.sql"))
+	files, err := filepath.Glob(filepath.Join("migrations", "postgres", "control-plane", "*.sql"))
 	if err != nil {
-		return fmt.Errorf("read control-plane migration: %w", err)
+		return fmt.Errorf("list control-plane migrations: %w", err)
 	}
-	if _, err := pool.Exec(ctx, string(sqlBytes)); err != nil {
-		return fmt.Errorf("apply control-plane migration: %w", err)
+	sort.Strings(files)
+	for _, file := range files {
+		sqlBytes, err := os.ReadFile(file)
+		if err != nil {
+			return fmt.Errorf("read control-plane migration %s: %w", file, err)
+		}
+		if _, err := pool.Exec(ctx, string(sqlBytes)); err != nil {
+			return fmt.Errorf("apply control-plane migration %s: %w", file, err)
+		}
 	}
 	return nil
 }
@@ -245,6 +253,7 @@ func cleanupTenant(ctx context.Context, pool *pgxpool.Pool, tenantID string) err
 	for _, query := range []string{
 		`DELETE FROM control_outbox WHERE tenant_id = $1`,
 		`DELETE FROM control_applied_acks WHERE tenant_id = $1`,
+		`DELETE FROM control_config_rollbacks WHERE tenant_id = $1`,
 		`DELETE FROM control_rollout_rules WHERE tenant_id = $1`,
 		`DELETE FROM control_config_versions WHERE tenant_id = $1`,
 		`DELETE FROM control_config_bundles WHERE tenant_id = $1`,

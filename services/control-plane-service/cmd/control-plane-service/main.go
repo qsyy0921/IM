@@ -87,6 +87,7 @@ func runGRPC(ctx context.Context) error {
 	server := grpc.NewServer()
 	controlgrpc.Register(server, controlgrpc.NewServer(
 		app.NewPublishConfigVersionUseCase(repository, eventIDs),
+		app.NewRollbackConfigVersionUseCase(repository, eventIDs),
 		app.NewGetConfigSnapshotUseCase(repository),
 		app.NewAckAppliedConfigVersionUseCase(repository, eventIDs),
 	))

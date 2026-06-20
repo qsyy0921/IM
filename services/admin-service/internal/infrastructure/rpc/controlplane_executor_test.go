@@ -90,6 +90,67 @@ func TestControlPlaneConfigPublishExecutorRejectsMalformedPayload(t *testing.T) 
 	}
 }
 
+func TestControlPlaneConfigPublishExecutorRollsBackConfigVersion(t *testing.T) {
+	client := &fakeControlPlaneClient{
+		rollbackResponse: &controlplanev1.RollbackConfigVersionResponse{
+			Version: &controlplanev1.ConfigVersion{Version: "v20260620"},
+		},
+	}
+	executor := NewControlPlaneConfigPublishExecutor(client, time.Second)
+
+	result, err := executor.Execute(context.Background(), types.AdminOperation{
+		TenantID:      "tenant-admin",
+		OperationID:   "admop_config_rollback",
+		OperationType: "CONFIG_ROLLBACK",
+		PayloadJSON: `{
+			"environment":"local",
+			"config_kind":"quota",
+			"bundle_key":"api-gateway.default",
+			"target_version":"v20260620"
+		}`,
+		ReasonRef:     "reason:rollback-ticket-1",
+		RequestedBy:   "admin:operator-1",
+		CorrelationID: "corr-rollback",
+		CausationID:   "cause-rollback",
+		TraceID:       "trace-rollback",
+	})
+	if err != nil {
+		t.Fatalf("execute rollback: %v", err)
+	}
+	if result.DownstreamService != "control-plane-service" ||
+		result.DownstreamRequestRef != "config-rollback:local:quota:api-gateway.default:v20260620" ||
+		result.Status != types.OperationStatusSucceeded {
+		t.Fatalf("unexpected result: %+v", result)
+	}
+	request := client.rollbackRequest
+	if request.GetTargetVersion() != "v20260620" ||
+		request.GetIdempotencyKey() != "admin-control-plane-rollback:admop_config_rollback" ||
+		request.GetApprovalRef() != "admin-operation:admop_config_rollback" ||
+		request.GetReasonRef() != "reason:rollback-ticket-1" {
+		t.Fatalf("unexpected rollback request: %+v", request)
+	}
+	if client.request != nil {
+		t.Fatal("rollback operation should not call PublishConfigVersion")
+	}
+}
+
+func TestControlPlaneConfigPublishExecutorRejectsMalformedRollbackPayload(t *testing.T) {
+	client := &fakeControlPlaneClient{}
+	executor := NewControlPlaneConfigPublishExecutor(client, time.Second)
+
+	_, err := executor.Execute(context.Background(), types.AdminOperation{
+		OperationID:   "admop_config_rollback_bad",
+		OperationType: "CONFIG_ROLLBACK",
+		PayloadJSON:   `{"environment":"local"}`,
+	})
+	if !errors.Is(err, types.ErrInvalidArgument) {
+		t.Fatalf("expected invalid argument, got %v", err)
+	}
+	if client.rollbackRequest != nil {
+		t.Fatalf("malformed payload should not call control-plane")
+	}
+}
+
 func TestControlPlaneConfigPublishExecutorMapsPublicErrors(t *testing.T) {
 	executor := NewControlPlaneConfigPublishExecutor(&fakeControlPlaneClient{
 		err: status.Error(codes.PermissionDenied, "raw policy body"),
@@ -112,9 +173,11 @@ func TestControlPlaneConfigPublishExecutorMapsPublicErrors(t *testing.T) {
 }
 
 type fakeControlPlaneClient struct {
-	request  *controlplanev1.PublishConfigVersionRequest
-	response *controlplanev1.PublishConfigVersionResponse
-	err      error
+	request          *controlplanev1.PublishConfigVersionRequest
+	response         *controlplanev1.PublishConfigVersionResponse
+	rollbackRequest  *controlplanev1.RollbackConfigVersionRequest
+	rollbackResponse *controlplanev1.RollbackConfigVersionResponse
+	err              error
 }
 
 func (client *fakeControlPlaneClient) PublishConfigVersion(
@@ -127,6 +190,18 @@ func (client *fakeControlPlaneClient) PublishConfigVersion(
 		return nil, client.err
 	}
 	return client.response, nil
+}
+
+func (client *fakeControlPlaneClient) RollbackConfigVersion(
+	_ context.Context,
+	request *controlplanev1.RollbackConfigVersionRequest,
+	_ ...grpc.CallOption,
+) (*controlplanev1.RollbackConfigVersionResponse, error) {
+	client.rollbackRequest = request
+	if client.err != nil {
+		return nil, client.err
+	}
+	return client.rollbackResponse, nil
 }
 
 func (client *fakeControlPlaneClient) GetConfigSnapshot(

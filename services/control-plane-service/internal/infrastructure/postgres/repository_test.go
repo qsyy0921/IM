@@ -81,7 +81,115 @@ func TestRepositoryPublishSnapshotAckIntegration(t *testing.T) {
 	if applied.Status != types.AppliedStatusInSync {
 		t.Fatalf("unexpected applied ack: %+v", applied)
 	}
-	assertOutboxSafe(t, ctx, pool, string(command.AuthContext.TenantID))
+	assertOutboxSafe(t, ctx, pool, string(command.AuthContext.TenantID), 2)
+}
+
+func TestRepositoryRollbackConfigVersionIntegration(t *testing.T) {
+	ctx := context.Background()
+	pool := openControlTestPool(t)
+	resetControlTables(t, ctx, pool)
+	repository := NewRepository(pool)
+
+	first := validPublishCommand()
+	first.Version = "quota-v1"
+	first.IdempotencyKey = "idem-v1"
+	second := validPublishCommand()
+	second.Version = "quota-v2"
+	second.IdempotencyKey = "idem-v2"
+	second.PayloadJSON = `{"plans":{"tenant-free":{"requests_per_second":30,"burst":60}}}`
+	second.EffectiveAt = first.EffectiveAt.Add(time.Second)
+	firstPrepared, err := domain.PrepareConfigVersion(first)
+	if err != nil {
+		t.Fatalf("prepare first: %v", err)
+	}
+	secondPrepared, err := domain.PrepareConfigVersion(second)
+	if err != nil {
+		t.Fatalf("prepare second: %v", err)
+	}
+	if _, err := repository.PublishConfigVersion(ctx, firstPrepared, "evt_publish_1"); err != nil {
+		t.Fatalf("publish first: %v", err)
+	}
+	if _, err := repository.PublishConfigVersion(ctx, secondPrepared, "evt_publish_2"); err != nil {
+		t.Fatalf("publish second: %v", err)
+	}
+	snapshot, err := repository.GetConfigSnapshot(ctx, types.GetConfigSnapshotCommand{
+		AuthContext: types.AuthContext{TenantID: first.AuthContext.TenantID},
+		Environment: first.Environment,
+		ServiceName: "api-gateway",
+		ConfigKind:  first.ConfigKind,
+		BundleKey:   first.BundleKey,
+	})
+	if err != nil {
+		t.Fatalf("get latest snapshot: %v", err)
+	}
+	if snapshot.Version != "quota-v2" {
+		t.Fatalf("snapshot before rollback = %+v", snapshot)
+	}
+
+	rollback := types.RollbackConfigVersionCommand{
+		AuthContext:    first.AuthContext,
+		Environment:    first.Environment,
+		ConfigKind:     first.ConfigKind,
+		BundleKey:      first.BundleKey,
+		TargetVersion:  first.Version,
+		IdempotencyKey: "rollback-idem-1",
+		OperatorRef:    "operator:test",
+		ApprovalRef:    "approval:test",
+		ReasonRef:      "reason:test",
+	}
+	preparedRollback, err := domain.PrepareConfigRollback(rollback)
+	if err != nil {
+		t.Fatalf("prepare rollback: %v", err)
+	}
+	rolledBack, replayed, err := repository.RollbackConfigVersion(ctx, preparedRollback, "evt_rollback_1")
+	if err != nil {
+		t.Fatalf("rollback config version: %v", err)
+	}
+	if replayed || rolledBack.Version != first.Version || rolledBack.Status != types.StatusActive {
+		t.Fatalf("unexpected rollback result replayed=%v version=%+v", replayed, rolledBack)
+	}
+	replay, replayed, err := repository.RollbackConfigVersion(ctx, preparedRollback, "evt_rollback_replay")
+	if err != nil {
+		t.Fatalf("rollback replay: %v", err)
+	}
+	if !replayed || replay.Version != first.Version {
+		t.Fatalf("unexpected rollback replay replayed=%v version=%+v", replayed, replay)
+	}
+	conflict := rollback
+	conflict.TargetVersion = second.Version
+	conflictPrepared, err := domain.PrepareConfigRollback(conflict)
+	if err != nil {
+		t.Fatalf("prepare conflict rollback: %v", err)
+	}
+	if _, _, err := repository.RollbackConfigVersion(ctx, conflictPrepared, "evt_rollback_conflict"); !errors.Is(err, types.ErrAlreadyExists) {
+		t.Fatalf("expected rollback idempotency conflict, got %v", err)
+	}
+
+	snapshot, err = repository.GetConfigSnapshot(ctx, types.GetConfigSnapshotCommand{
+		AuthContext: types.AuthContext{TenantID: first.AuthContext.TenantID},
+		Environment: first.Environment,
+		ServiceName: "api-gateway",
+		ConfigKind:  first.ConfigKind,
+		BundleKey:   first.BundleKey,
+	})
+	if err != nil {
+		t.Fatalf("get snapshot after rollback: %v", err)
+	}
+	if snapshot.Version != first.Version || snapshot.PayloadChecksum != rolledBack.PayloadChecksum {
+		t.Fatalf("unexpected snapshot after rollback: %+v", snapshot)
+	}
+	var secondStatus string
+	if err := pool.QueryRow(ctx, `
+SELECT status
+FROM control_config_versions
+WHERE tenant_id = $1 AND environment = $2 AND config_kind = $3 AND bundle_key = $4 AND version = $5
+`, string(first.AuthContext.TenantID), first.Environment, first.ConfigKind, first.BundleKey, second.Version).Scan(&secondStatus); err != nil {
+		t.Fatalf("read second status: %v", err)
+	}
+	if secondStatus != types.StatusRolledBack {
+		t.Fatalf("second status = %s", secondStatus)
+	}
+	assertOutboxSafe(t, ctx, pool, string(first.AuthContext.TenantID), 3)
 }
 
 func validPublishCommand() types.PublishConfigVersionCommand {
@@ -122,13 +230,19 @@ func openControlTestPool(t *testing.T) *pgxpool.Pool {
 
 func applyControlMigration(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
 	t.Helper()
-	path := filepath.Join("..", "..", "..", "..", "..", "migrations", "postgres", "control-plane", "000001_control_plane_core.sql")
-	sqlBytes, err := os.ReadFile(path)
+	dir := filepath.Join("..", "..", "..", "..", "..", "migrations", "postgres", "control-plane")
+	files, err := filepath.Glob(filepath.Join(dir, "*.sql"))
 	if err != nil {
-		t.Fatalf("read migration: %v", err)
+		t.Fatalf("list migrations: %v", err)
 	}
-	if _, err := pool.Exec(ctx, string(sqlBytes)); err != nil {
-		t.Fatalf("apply migration: %v", err)
+	for _, path := range files {
+		sqlBytes, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("read migration %s: %v", path, err)
+		}
+		if _, err := pool.Exec(ctx, string(sqlBytes)); err != nil {
+			t.Fatalf("apply migration %s: %v", path, err)
+		}
 	}
 }
 
@@ -138,6 +252,7 @@ func resetControlTables(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
 TRUNCATE
     control_outbox,
     control_applied_acks,
+    control_config_rollbacks,
     control_rollout_rules,
     control_config_versions,
     control_config_bundles
@@ -148,7 +263,7 @@ CASCADE
 	}
 }
 
-func assertOutboxSafe(t *testing.T, ctx context.Context, pool *pgxpool.Pool, tenantID string) {
+func assertOutboxSafe(t *testing.T, ctx context.Context, pool *pgxpool.Pool, tenantID string, expected int) {
 	t.Helper()
 	rows, err := pool.Query(ctx, `SELECT payload_json::text FROM control_outbox WHERE tenant_id = $1`, tenantID)
 	if err != nil {
@@ -168,7 +283,7 @@ func assertOutboxSafe(t *testing.T, ctx context.Context, pool *pgxpool.Pool, ten
 			}
 		}
 	}
-	if count != 2 {
-		t.Fatalf("expected two outbox rows, got %d", count)
+	if count != expected {
+		t.Fatalf("expected %d outbox rows, got %d", expected, count)
 	}
 }

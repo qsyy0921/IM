@@ -16,6 +16,10 @@ type PublishConfigVersionExecutor interface {
 	Execute(context.Context, types.PublishConfigVersionCommand) (types.ConfigVersion, error)
 }
 
+type RollbackConfigVersionExecutor interface {
+	Execute(context.Context, types.RollbackConfigVersionCommand) (types.ConfigVersion, bool, error)
+}
+
 type GetConfigSnapshotExecutor interface {
 	Execute(context.Context, types.GetConfigSnapshotCommand) (types.ConfigSnapshot, error)
 }
@@ -27,17 +31,20 @@ type AckAppliedConfigVersionExecutor interface {
 type Server struct {
 	controlv1.UnimplementedControlPlaneServiceServer
 	publishConfigVersion    PublishConfigVersionExecutor
+	rollbackConfigVersion   RollbackConfigVersionExecutor
 	getConfigSnapshot       GetConfigSnapshotExecutor
 	ackAppliedConfigVersion AckAppliedConfigVersionExecutor
 }
 
 func NewServer(
 	publishConfigVersion PublishConfigVersionExecutor,
+	rollbackConfigVersion RollbackConfigVersionExecutor,
 	getConfigSnapshot GetConfigSnapshotExecutor,
 	ackAppliedConfigVersion AckAppliedConfigVersionExecutor,
 ) *Server {
 	return &Server{
 		publishConfigVersion:    publishConfigVersion,
+		rollbackConfigVersion:   rollbackConfigVersion,
 		getConfigSnapshot:       getConfigSnapshot,
 		ackAppliedConfigVersion: ackAppliedConfigVersion,
 	}
@@ -95,6 +102,54 @@ func (server *Server) PublishConfigVersion(
 			ExpiresAt:       version.ExpiresAt,
 			RolloutDecision: "MATCH",
 		}),
+	}, nil
+}
+
+func (server *Server) RollbackConfigVersion(
+	ctx context.Context,
+	request *controlv1.RollbackConfigVersionRequest,
+) (*controlv1.RollbackConfigVersionResponse, error) {
+	if request == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+	auth, ok := authFromProto(ctx, request.GetAuthContext())
+	if !ok {
+		return nil, status.Error(codes.InvalidArgument, "auth_context is required")
+	}
+	version, replayed, err := server.rollbackConfigVersion.Execute(ctx, types.RollbackConfigVersionCommand{
+		AuthContext:    auth,
+		Environment:    request.GetEnvironment(),
+		ConfigKind:     request.GetConfigKind(),
+		BundleKey:      request.GetBundleKey(),
+		TargetVersion:  request.GetTargetVersion(),
+		ApprovalRef:    request.GetApprovalRef(),
+		OperatorRef:    request.GetOperatorRef(),
+		ReasonRef:      request.GetReasonRef(),
+		IdempotencyKey: request.GetIdempotencyKey(),
+		CorrelationID:  request.GetCorrelationId(),
+		CausationID:    request.GetCausationId(),
+		TraceID:        request.GetTraceId(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	return &controlv1.RollbackConfigVersionResponse{
+		Version: versionToProto(version),
+		Snapshot: snapshotToProto(types.ConfigSnapshot{
+			TenantID:        version.TenantID,
+			Environment:     version.Environment,
+			ConfigKind:      version.ConfigKind,
+			BundleKey:       version.BundleKey,
+			Version:         version.Version,
+			SchemaVersion:   version.SchemaVersion,
+			PayloadJSON:     version.PayloadJSON,
+			PayloadChecksum: version.PayloadChecksum,
+			GeneratedAt:     time.Now().UTC(),
+			EffectiveAt:     version.EffectiveAt,
+			ExpiresAt:       version.ExpiresAt,
+			RolloutDecision: "MATCH",
+		}),
+		Replayed: replayed,
 	}, nil
 }
 

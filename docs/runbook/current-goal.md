@@ -68,10 +68,14 @@ model-gateway / workflow / knowledge-ingestion / vector-index
 - `admin-service` 已跑通第一条真实下游 adapter 的本地多进程 smoke：公开 gRPC
   `CreateAdminOperation -> operator approve -> operation-worker ->
   control-plane PublishConfigVersion -> GetConfigSnapshot`。
+- `admin-service` / `control-plane-service` 已新增 config rollback path：非
+  `CRITICAL` 的 `CONFIG_ROLLBACK` 通过 operation-worker 调
+  `control-plane-service.RollbackConfigVersion`，并已跑通本地多进程
+  `publish v1 -> publish v2 -> rollback to v1 -> GetConfigSnapshot` smoke。
 
 ## 下一步
 
-- 默认继续补更多下游公开 admin API adapter，或为 admin config publish 增加 rollback /
+- 默认继续补更多下游公开 admin API adapter，或为 admin config publish 增加
   compensation operator。
 - 也可以继续 `vector-index-service` embedding worker / rebuild worker / outbox relay。
 - 也可以继续 notification SMTP / SMS / APNs / FCM adapter 或 bounce-suppression。

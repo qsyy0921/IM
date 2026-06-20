@@ -20,9 +20,15 @@ Stage-switch 记录：`docs/runbook/stage-switch/control-plane-service.md`。
 - 具体边界见 `docs/sdd/control-plane-service.md`。
 - Tenant quota / feature flag snapshot 的 DB-backed source 已落。
 - `PublishConfigVersion` / `GetConfigSnapshot` / `AckAppliedConfigVersion` 已落。
+- `RollbackConfigVersion` 已落，使用 idempotency key 记录 rollback 请求，
+  replay 不重复推进，目标版本重新置为 `ACTIVE`，同 bundle 的更新版本标记为
+  `ROLLED_BACK`，并写低敏 `control.config.rolled_back.v1` outbox。
 - 最小 gRPC smoke 已通过并归档：
   `docs/runbook/loadtest/control-plane-service/loadtest-report-20260620-control-plane-grpc-smoke.md`。
 - 已被 admin-service 真实下游 adapter smoke 验证为可通过
   `CreateAdminOperation -> ApproveAdminOperation -> operation-worker` 间接发布配置：
   `docs/runbook/loadtest/admin-service/loadtest-report-20260621-admin-config-publish-smoke.md`。
+- 已被 admin-service rollback smoke 验证为可通过
+  `CreateAdminOperation -> ApproveAdminOperation -> operation-worker` 间接回滚配置：
+  `docs/runbook/loadtest/admin-service/loadtest-report-20260621-admin-config-rollback-smoke.md`。
 - 与 api-gateway quota snapshot gate 对齐。

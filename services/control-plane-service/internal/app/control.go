@@ -14,8 +14,17 @@ type PublishConfigVersionUseCase struct {
 	eventIDs   EventIDGenerator
 }
 
+type RollbackConfigVersionUseCase struct {
+	repository Repository
+	eventIDs   EventIDGenerator
+}
+
 func NewPublishConfigVersionUseCase(repository Repository, eventIDs EventIDGenerator) *PublishConfigVersionUseCase {
 	return &PublishConfigVersionUseCase{repository: repository, eventIDs: eventIDs}
+}
+
+func NewRollbackConfigVersionUseCase(repository Repository, eventIDs EventIDGenerator) *RollbackConfigVersionUseCase {
+	return &RollbackConfigVersionUseCase{repository: repository, eventIDs: eventIDs}
 }
 
 func (useCase *PublishConfigVersionUseCase) Execute(
@@ -27,6 +36,17 @@ func (useCase *PublishConfigVersionUseCase) Execute(
 		return types.ConfigVersion{}, err
 	}
 	return useCase.repository.PublishConfigVersion(ctx, prepared, useCase.eventIDs.NewEventID())
+}
+
+func (useCase *RollbackConfigVersionUseCase) Execute(
+	ctx context.Context,
+	command types.RollbackConfigVersionCommand,
+) (types.ConfigVersion, bool, error) {
+	prepared, err := domain.PrepareConfigRollback(command)
+	if err != nil {
+		return types.ConfigVersion{}, false, err
+	}
+	return useCase.repository.RollbackConfigVersion(ctx, prepared, useCase.eventIDs.NewEventID())
 }
 
 type GetConfigSnapshotUseCase struct {

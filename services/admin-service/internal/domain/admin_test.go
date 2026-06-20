@@ -84,6 +84,25 @@ func TestPrepareCreateRejectsSensitiveConfigPublishPayload(t *testing.T) {
 	}
 }
 
+func TestPrepareCreateAcceptsConfigRollbackPayload(t *testing.T) {
+	command := validCreateCommand(`{
+		"environment":"local",
+		"config_kind":"API_GATEWAY_TENANT_QUOTA",
+		"bundle_key":"api-gateway/default",
+		"target_version":"quota-v1"
+	}`)
+	command.OperationType = "CONFIG_ROLLBACK"
+	command.PayloadSchemaVersion = "admin.config_rollback.v1"
+
+	prepared, err := PrepareCreate(command, "op_config_rollback", time.Now())
+	if err != nil {
+		t.Fatalf("prepare create: %v", err)
+	}
+	if !strings.Contains(prepared.PayloadJSON, "target_version") {
+		t.Fatalf("unexpected payload: %s", prepared.PayloadJSON)
+	}
+}
+
 func validCreateCommand(payload string) types.CreateAdminOperationCommand {
 	return types.CreateAdminOperationCommand{
 		AuthContext:          types.AuthContext{TenantID: "tenant-admin-test", ServiceName: "admin-ui"},

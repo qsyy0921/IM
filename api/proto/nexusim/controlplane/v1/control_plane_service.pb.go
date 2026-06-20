@@ -1061,6 +1061,198 @@ func (x *AckAppliedConfigVersionResponse) GetApplied() *AppliedConfigVersion {
 	return nil
 }
 
+type RollbackConfigVersionRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	AuthContext    *AuthContext           `protobuf:"bytes,1,opt,name=auth_context,json=authContext,proto3" json:"auth_context,omitempty"`
+	Environment    string                 `protobuf:"bytes,2,opt,name=environment,proto3" json:"environment,omitempty"`
+	ConfigKind     string                 `protobuf:"bytes,3,opt,name=config_kind,json=configKind,proto3" json:"config_kind,omitempty"`
+	BundleKey      string                 `protobuf:"bytes,4,opt,name=bundle_key,json=bundleKey,proto3" json:"bundle_key,omitempty"`
+	TargetVersion  string                 `protobuf:"bytes,5,opt,name=target_version,json=targetVersion,proto3" json:"target_version,omitempty"`
+	ApprovalRef    string                 `protobuf:"bytes,6,opt,name=approval_ref,json=approvalRef,proto3" json:"approval_ref,omitempty"`
+	OperatorRef    string                 `protobuf:"bytes,7,opt,name=operator_ref,json=operatorRef,proto3" json:"operator_ref,omitempty"`
+	ReasonRef      string                 `protobuf:"bytes,8,opt,name=reason_ref,json=reasonRef,proto3" json:"reason_ref,omitempty"`
+	IdempotencyKey string                 `protobuf:"bytes,9,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
+	CorrelationId  string                 `protobuf:"bytes,10,opt,name=correlation_id,json=correlationId,proto3" json:"correlation_id,omitempty"`
+	CausationId    string                 `protobuf:"bytes,11,opt,name=causation_id,json=causationId,proto3" json:"causation_id,omitempty"`
+	TraceId        string                 `protobuf:"bytes,12,opt,name=trace_id,json=traceId,proto3" json:"trace_id,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *RollbackConfigVersionRequest) Reset() {
+	*x = RollbackConfigVersionRequest{}
+	mi := &file_nexusim_controlplane_v1_control_plane_service_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RollbackConfigVersionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RollbackConfigVersionRequest) ProtoMessage() {}
+
+func (x *RollbackConfigVersionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_nexusim_controlplane_v1_control_plane_service_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RollbackConfigVersionRequest.ProtoReflect.Descriptor instead.
+func (*RollbackConfigVersionRequest) Descriptor() ([]byte, []int) {
+	return file_nexusim_controlplane_v1_control_plane_service_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *RollbackConfigVersionRequest) GetAuthContext() *AuthContext {
+	if x != nil {
+		return x.AuthContext
+	}
+	return nil
+}
+
+func (x *RollbackConfigVersionRequest) GetEnvironment() string {
+	if x != nil {
+		return x.Environment
+	}
+	return ""
+}
+
+func (x *RollbackConfigVersionRequest) GetConfigKind() string {
+	if x != nil {
+		return x.ConfigKind
+	}
+	return ""
+}
+
+func (x *RollbackConfigVersionRequest) GetBundleKey() string {
+	if x != nil {
+		return x.BundleKey
+	}
+	return ""
+}
+
+func (x *RollbackConfigVersionRequest) GetTargetVersion() string {
+	if x != nil {
+		return x.TargetVersion
+	}
+	return ""
+}
+
+func (x *RollbackConfigVersionRequest) GetApprovalRef() string {
+	if x != nil {
+		return x.ApprovalRef
+	}
+	return ""
+}
+
+func (x *RollbackConfigVersionRequest) GetOperatorRef() string {
+	if x != nil {
+		return x.OperatorRef
+	}
+	return ""
+}
+
+func (x *RollbackConfigVersionRequest) GetReasonRef() string {
+	if x != nil {
+		return x.ReasonRef
+	}
+	return ""
+}
+
+func (x *RollbackConfigVersionRequest) GetIdempotencyKey() string {
+	if x != nil {
+		return x.IdempotencyKey
+	}
+	return ""
+}
+
+func (x *RollbackConfigVersionRequest) GetCorrelationId() string {
+	if x != nil {
+		return x.CorrelationId
+	}
+	return ""
+}
+
+func (x *RollbackConfigVersionRequest) GetCausationId() string {
+	if x != nil {
+		return x.CausationId
+	}
+	return ""
+}
+
+func (x *RollbackConfigVersionRequest) GetTraceId() string {
+	if x != nil {
+		return x.TraceId
+	}
+	return ""
+}
+
+type RollbackConfigVersionResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Version       *ConfigVersion         `protobuf:"bytes,1,opt,name=version,proto3" json:"version,omitempty"`
+	Snapshot      *ConfigSnapshot        `protobuf:"bytes,2,opt,name=snapshot,proto3" json:"snapshot,omitempty"`
+	Replayed      bool                   `protobuf:"varint,3,opt,name=replayed,proto3" json:"replayed,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RollbackConfigVersionResponse) Reset() {
+	*x = RollbackConfigVersionResponse{}
+	mi := &file_nexusim_controlplane_v1_control_plane_service_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RollbackConfigVersionResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RollbackConfigVersionResponse) ProtoMessage() {}
+
+func (x *RollbackConfigVersionResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_nexusim_controlplane_v1_control_plane_service_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RollbackConfigVersionResponse.ProtoReflect.Descriptor instead.
+func (*RollbackConfigVersionResponse) Descriptor() ([]byte, []int) {
+	return file_nexusim_controlplane_v1_control_plane_service_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *RollbackConfigVersionResponse) GetVersion() *ConfigVersion {
+	if x != nil {
+		return x.Version
+	}
+	return nil
+}
+
+func (x *RollbackConfigVersionResponse) GetSnapshot() *ConfigSnapshot {
+	if x != nil {
+		return x.Snapshot
+	}
+	return nil
+}
+
+func (x *RollbackConfigVersionResponse) GetReplayed() bool {
+	if x != nil {
+		return x.Replayed
+	}
+	return false
+}
+
 var File_nexusim_controlplane_v1_control_plane_service_proto protoreflect.FileDescriptor
 
 const file_nexusim_controlplane_v1_control_plane_service_proto_rawDesc = "" +
@@ -1179,11 +1371,33 @@ const file_nexusim_controlplane_v1_control_plane_service_proto_rawDesc = "" +
 	"\fcausation_id\x18\f \x01(\tR\vcausationId\x12\x19\n" +
 	"\btrace_id\x18\r \x01(\tR\atraceId\"j\n" +
 	"\x1fAckAppliedConfigVersionResponse\x12G\n" +
-	"\aapplied\x18\x01 \x01(\v2-.nexusim.controlplane.v1.AppliedConfigVersionR\aapplied2\xa6\x03\n" +
+	"\aapplied\x18\x01 \x01(\v2-.nexusim.controlplane.v1.AppliedConfigVersionR\aapplied\"\xe3\x03\n" +
+	"\x1cRollbackConfigVersionRequest\x12G\n" +
+	"\fauth_context\x18\x01 \x01(\v2$.nexusim.controlplane.v1.AuthContextR\vauthContext\x12 \n" +
+	"\venvironment\x18\x02 \x01(\tR\venvironment\x12\x1f\n" +
+	"\vconfig_kind\x18\x03 \x01(\tR\n" +
+	"configKind\x12\x1d\n" +
+	"\n" +
+	"bundle_key\x18\x04 \x01(\tR\tbundleKey\x12%\n" +
+	"\x0etarget_version\x18\x05 \x01(\tR\rtargetVersion\x12!\n" +
+	"\fapproval_ref\x18\x06 \x01(\tR\vapprovalRef\x12!\n" +
+	"\foperator_ref\x18\a \x01(\tR\voperatorRef\x12\x1d\n" +
+	"\n" +
+	"reason_ref\x18\b \x01(\tR\treasonRef\x12'\n" +
+	"\x0fidempotency_key\x18\t \x01(\tR\x0eidempotencyKey\x12%\n" +
+	"\x0ecorrelation_id\x18\n" +
+	" \x01(\tR\rcorrelationId\x12!\n" +
+	"\fcausation_id\x18\v \x01(\tR\vcausationId\x12\x19\n" +
+	"\btrace_id\x18\f \x01(\tR\atraceId\"\xc2\x01\n" +
+	"\x1dRollbackConfigVersionResponse\x12@\n" +
+	"\aversion\x18\x01 \x01(\v2&.nexusim.controlplane.v1.ConfigVersionR\aversion\x12C\n" +
+	"\bsnapshot\x18\x02 \x01(\v2'.nexusim.controlplane.v1.ConfigSnapshotR\bsnapshot\x12\x1a\n" +
+	"\breplayed\x18\x03 \x01(\bR\breplayed2\xaf\x04\n" +
 	"\x13ControlPlaneService\x12\x83\x01\n" +
 	"\x14PublishConfigVersion\x124.nexusim.controlplane.v1.PublishConfigVersionRequest\x1a5.nexusim.controlplane.v1.PublishConfigVersionResponse\x12z\n" +
 	"\x11GetConfigSnapshot\x121.nexusim.controlplane.v1.GetConfigSnapshotRequest\x1a2.nexusim.controlplane.v1.GetConfigSnapshotResponse\x12\x8c\x01\n" +
-	"\x17AckAppliedConfigVersion\x127.nexusim.controlplane.v1.AckAppliedConfigVersionRequest\x1a8.nexusim.controlplane.v1.AckAppliedConfigVersionResponseBIZGgithub.com/qsyy0921/IM/api/proto/nexusim/controlplane/v1;controlplanev1b\x06proto3"
+	"\x17AckAppliedConfigVersion\x127.nexusim.controlplane.v1.AckAppliedConfigVersionRequest\x1a8.nexusim.controlplane.v1.AckAppliedConfigVersionResponse\x12\x86\x01\n" +
+	"\x15RollbackConfigVersion\x125.nexusim.controlplane.v1.RollbackConfigVersionRequest\x1a6.nexusim.controlplane.v1.RollbackConfigVersionResponseBIZGgithub.com/qsyy0921/IM/api/proto/nexusim/controlplane/v1;controlplanev1b\x06proto3"
 
 var (
 	file_nexusim_controlplane_v1_control_plane_service_proto_rawDescOnce sync.Once
@@ -1197,7 +1411,7 @@ func file_nexusim_controlplane_v1_control_plane_service_proto_rawDescGZIP() []by
 	return file_nexusim_controlplane_v1_control_plane_service_proto_rawDescData
 }
 
-var file_nexusim_controlplane_v1_control_plane_service_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
+var file_nexusim_controlplane_v1_control_plane_service_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
 var file_nexusim_controlplane_v1_control_plane_service_proto_goTypes = []any{
 	(*AuthContext)(nil),                     // 0: nexusim.controlplane.v1.AuthContext
 	(*ConfigVersion)(nil),                   // 1: nexusim.controlplane.v1.ConfigVersion
@@ -1209,6 +1423,8 @@ var file_nexusim_controlplane_v1_control_plane_service_proto_goTypes = []any{
 	(*GetConfigSnapshotResponse)(nil),       // 7: nexusim.controlplane.v1.GetConfigSnapshotResponse
 	(*AckAppliedConfigVersionRequest)(nil),  // 8: nexusim.controlplane.v1.AckAppliedConfigVersionRequest
 	(*AckAppliedConfigVersionResponse)(nil), // 9: nexusim.controlplane.v1.AckAppliedConfigVersionResponse
+	(*RollbackConfigVersionRequest)(nil),    // 10: nexusim.controlplane.v1.RollbackConfigVersionRequest
+	(*RollbackConfigVersionResponse)(nil),   // 11: nexusim.controlplane.v1.RollbackConfigVersionResponse
 }
 var file_nexusim_controlplane_v1_control_plane_service_proto_depIdxs = []int32{
 	0,  // 0: nexusim.controlplane.v1.PublishConfigVersionRequest.auth_context:type_name -> nexusim.controlplane.v1.AuthContext
@@ -1218,17 +1434,22 @@ var file_nexusim_controlplane_v1_control_plane_service_proto_depIdxs = []int32{
 	2,  // 4: nexusim.controlplane.v1.GetConfigSnapshotResponse.snapshot:type_name -> nexusim.controlplane.v1.ConfigSnapshot
 	0,  // 5: nexusim.controlplane.v1.AckAppliedConfigVersionRequest.auth_context:type_name -> nexusim.controlplane.v1.AuthContext
 	3,  // 6: nexusim.controlplane.v1.AckAppliedConfigVersionResponse.applied:type_name -> nexusim.controlplane.v1.AppliedConfigVersion
-	4,  // 7: nexusim.controlplane.v1.ControlPlaneService.PublishConfigVersion:input_type -> nexusim.controlplane.v1.PublishConfigVersionRequest
-	6,  // 8: nexusim.controlplane.v1.ControlPlaneService.GetConfigSnapshot:input_type -> nexusim.controlplane.v1.GetConfigSnapshotRequest
-	8,  // 9: nexusim.controlplane.v1.ControlPlaneService.AckAppliedConfigVersion:input_type -> nexusim.controlplane.v1.AckAppliedConfigVersionRequest
-	5,  // 10: nexusim.controlplane.v1.ControlPlaneService.PublishConfigVersion:output_type -> nexusim.controlplane.v1.PublishConfigVersionResponse
-	7,  // 11: nexusim.controlplane.v1.ControlPlaneService.GetConfigSnapshot:output_type -> nexusim.controlplane.v1.GetConfigSnapshotResponse
-	9,  // 12: nexusim.controlplane.v1.ControlPlaneService.AckAppliedConfigVersion:output_type -> nexusim.controlplane.v1.AckAppliedConfigVersionResponse
-	10, // [10:13] is the sub-list for method output_type
-	7,  // [7:10] is the sub-list for method input_type
-	7,  // [7:7] is the sub-list for extension type_name
-	7,  // [7:7] is the sub-list for extension extendee
-	0,  // [0:7] is the sub-list for field type_name
+	0,  // 7: nexusim.controlplane.v1.RollbackConfigVersionRequest.auth_context:type_name -> nexusim.controlplane.v1.AuthContext
+	1,  // 8: nexusim.controlplane.v1.RollbackConfigVersionResponse.version:type_name -> nexusim.controlplane.v1.ConfigVersion
+	2,  // 9: nexusim.controlplane.v1.RollbackConfigVersionResponse.snapshot:type_name -> nexusim.controlplane.v1.ConfigSnapshot
+	4,  // 10: nexusim.controlplane.v1.ControlPlaneService.PublishConfigVersion:input_type -> nexusim.controlplane.v1.PublishConfigVersionRequest
+	6,  // 11: nexusim.controlplane.v1.ControlPlaneService.GetConfigSnapshot:input_type -> nexusim.controlplane.v1.GetConfigSnapshotRequest
+	8,  // 12: nexusim.controlplane.v1.ControlPlaneService.AckAppliedConfigVersion:input_type -> nexusim.controlplane.v1.AckAppliedConfigVersionRequest
+	10, // 13: nexusim.controlplane.v1.ControlPlaneService.RollbackConfigVersion:input_type -> nexusim.controlplane.v1.RollbackConfigVersionRequest
+	5,  // 14: nexusim.controlplane.v1.ControlPlaneService.PublishConfigVersion:output_type -> nexusim.controlplane.v1.PublishConfigVersionResponse
+	7,  // 15: nexusim.controlplane.v1.ControlPlaneService.GetConfigSnapshot:output_type -> nexusim.controlplane.v1.GetConfigSnapshotResponse
+	9,  // 16: nexusim.controlplane.v1.ControlPlaneService.AckAppliedConfigVersion:output_type -> nexusim.controlplane.v1.AckAppliedConfigVersionResponse
+	11, // 17: nexusim.controlplane.v1.ControlPlaneService.RollbackConfigVersion:output_type -> nexusim.controlplane.v1.RollbackConfigVersionResponse
+	14, // [14:18] is the sub-list for method output_type
+	10, // [10:14] is the sub-list for method input_type
+	10, // [10:10] is the sub-list for extension type_name
+	10, // [10:10] is the sub-list for extension extendee
+	0,  // [0:10] is the sub-list for field type_name
 }
 
 func init() { file_nexusim_controlplane_v1_control_plane_service_proto_init() }
@@ -1242,7 +1463,7 @@ func file_nexusim_controlplane_v1_control_plane_service_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_nexusim_controlplane_v1_control_plane_service_proto_rawDesc), len(file_nexusim_controlplane_v1_control_plane_service_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   10,
+			NumMessages:   12,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

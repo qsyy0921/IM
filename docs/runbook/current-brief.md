@@ -44,10 +44,12 @@ workflow-service `REPAIR_APPROVAL`，其它 `CRITICAL` operation 已接入
 workflow-service `ADMIN_OPERATION`，并已写入第一版 operation-specific approval
 policy / target service；`loadtest/admin` operator CLI 已支持公开 gRPC create /
 approve / reject / get / list；第一条真实下游 adapter 已支持非 `CRITICAL`
-`CONFIG_PUBLISH -> control-plane-service.PublishConfigVersion`。
+`CONFIG_PUBLISH -> control-plane-service.PublishConfigVersion`；第二条 control-plane
+adapter 已支持非 `CRITICAL` `CONFIG_ROLLBACK ->
+control-plane-service.RollbackConfigVersion`。
 admin `Create -> operator approve -> operation-worker -> control-plane` 本地多进程
-smoke 已通过。下一步默认继续更多下游公开 admin API adapter、admin rollback /
-compensation operator，或继续 vector embedding / rebuild / outbox 后续 worker。
+publish / rollback smoke 已通过。下一步默认继续更多下游公开 admin API adapter、
+admin compensation operator，或继续 vector embedding / rebuild / outbox 后续 worker。
 ```
 
 系统测试 / HA / 长压 / sizing 后置；总览、待办、单服务状态分别看

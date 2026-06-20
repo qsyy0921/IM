@@ -32,6 +32,13 @@ type configPublishPayload struct {
 	ExpiresAtUnixMS   int64  `json:"expires_at_unix_ms"`
 }
 
+type configRollbackPayload struct {
+	Environment   string `json:"environment"`
+	ConfigKind    string `json:"config_kind"`
+	BundleKey     string `json:"bundle_key"`
+	TargetVersion string `json:"target_version"`
+}
+
 func NewControlPlaneConfigPublishExecutor(
 	client controlplanev1.ControlPlaneServiceClient,
 	timeout time.Duration,
@@ -67,6 +74,9 @@ func (executor ControlPlaneConfigPublishExecutor) Execute(
 ) (types.OperationExecutionResult, error) {
 	if executor.client == nil {
 		return types.OperationExecutionResult{}, types.NewUnavailable("control-plane executor is not configured")
+	}
+	if operation.OperationType == "CONFIG_ROLLBACK" {
+		return executor.executeRollback(ctx, operation)
 	}
 	payload, err := parseConfigPublishPayload(operation.PayloadJSON)
 	if err != nil {
@@ -119,6 +129,57 @@ func (executor ControlPlaneConfigPublishExecutor) Execute(
 	}, nil
 }
 
+func (executor ControlPlaneConfigPublishExecutor) executeRollback(
+	ctx context.Context,
+	operation types.AdminOperation,
+) (types.OperationExecutionResult, error) {
+	payload, err := parseConfigRollbackPayload(operation.PayloadJSON)
+	if err != nil {
+		return types.OperationExecutionResult{}, err
+	}
+	callCtx, cancel := context.WithTimeout(ctx, executor.timeout)
+	defer cancel()
+	response, err := executor.client.RollbackConfigVersion(callCtx, &controlplanev1.RollbackConfigVersionRequest{
+		AuthContext: &controlplanev1.AuthContext{
+			TenantId:    string(operation.TenantID),
+			UserId:      operation.RequestedBy,
+			ServiceName: "admin-service",
+			InstanceRef: "operation-worker",
+			TraceId:     operation.TraceID,
+			RequestId:   operation.OperationID,
+		},
+		Environment:    payload.Environment,
+		ConfigKind:     payload.ConfigKind,
+		BundleKey:      payload.BundleKey,
+		TargetVersion:  payload.TargetVersion,
+		ApprovalRef:    "admin-operation:" + operation.OperationID,
+		OperatorRef:    operation.RequestedBy,
+		ReasonRef:      operation.ReasonRef,
+		IdempotencyKey: "admin-control-plane-rollback:" + operation.OperationID,
+		CorrelationId:  operation.CorrelationID,
+		CausationId:    firstNonEmpty(operation.CausationID, operation.OperationID),
+		TraceId:        operation.TraceID,
+	})
+	if err != nil {
+		return types.OperationExecutionResult{}, mapControlPlaneError(err)
+	}
+	version := response.GetVersion()
+	if version == nil || strings.TrimSpace(version.GetVersion()) == "" {
+		return types.OperationExecutionResult{}, types.NewUnavailable("control-plane response is incomplete")
+	}
+	return types.OperationExecutionResult{
+		DownstreamService: "control-plane-service",
+		DownstreamRequestRef: fmt.Sprintf(
+			"config-rollback:%s:%s:%s:%s",
+			payload.Environment,
+			payload.ConfigKind,
+			payload.BundleKey,
+			payload.TargetVersion,
+		),
+		Status: types.OperationStatusSucceeded,
+	}, nil
+}
+
 func parseConfigPublishPayload(raw string) (configPublishPayload, error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
@@ -144,6 +205,28 @@ func parseConfigPublishPayload(raw string) (configPublishPayload, error) {
 	}
 	if !json.Valid([]byte(payload.PayloadJSON)) {
 		return configPublishPayload{}, types.NewInvalidArgument("config publish payload_json is malformed")
+	}
+	return payload, nil
+}
+
+func parseConfigRollbackPayload(raw string) (configRollbackPayload, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return configRollbackPayload{}, types.NewInvalidArgument("config rollback payload is required")
+	}
+	var payload configRollbackPayload
+	if err := json.Unmarshal([]byte(raw), &payload); err != nil {
+		return configRollbackPayload{}, types.NewInvalidArgument("config rollback payload is malformed")
+	}
+	payload.Environment = strings.TrimSpace(payload.Environment)
+	payload.ConfigKind = strings.TrimSpace(payload.ConfigKind)
+	payload.BundleKey = strings.TrimSpace(payload.BundleKey)
+	payload.TargetVersion = strings.TrimSpace(payload.TargetVersion)
+	if payload.Environment == "" ||
+		payload.ConfigKind == "" ||
+		payload.BundleKey == "" ||
+		payload.TargetVersion == "" {
+		return configRollbackPayload{}, types.NewInvalidArgument("config rollback payload is incomplete")
 	}
 	return payload, nil
 }

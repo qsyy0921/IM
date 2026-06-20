@@ -45,6 +45,7 @@ reject
 get
 list
 config-publish-smoke
+config-rollback-smoke
 ```
 
 边界：
@@ -74,4 +75,13 @@ config-publish-smoke
   `NEXUSIM_CONTROL_PLANE_GRPC_ADDR` 后会调用
   `control-plane-service.PublishConfigVersion`；该 smoke 仍应通过公开 gRPC 创建和审批
   operation，不直接写数据库。
+- rollback smoke 可运行：
+
+```powershell
+.\loadtest\admin\run-local-smoke.ps1 -SmokeMode config-rollback-smoke
+```
+
+- rollback smoke 会连续发布 v1 / v2，再通过 `CONFIG_ROLLBACK` operation 调
+  `control-plane-service.RollbackConfigVersion` 回到 v1，并用
+  `GetConfigSnapshot` 验证当前 snapshot。
 - 仍不替代 admin UI、审批系统或 provider-grade 运维平台。

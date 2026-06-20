@@ -23,26 +23,34 @@ import (
 const defaultResultRoot = `H:\NexusIM\loadtest-results`
 
 type configPublishSmokeSummary struct {
-	Commit             string    `json:"commit"`
-	CommitFull         string    `json:"commit_full"`
-	GitDirty           bool      `json:"git_dirty"`
-	ResultDir          string    `json:"result_dir"`
-	RunName            string    `json:"run_name"`
-	AdminTarget        string    `json:"admin_target"`
-	ControlPlaneTarget string    `json:"control_plane_target"`
-	TenantID           string    `json:"tenant_id"`
-	StartedAt          time.Time `json:"started_at"`
-	FinishedAt         time.Time `json:"finished_at"`
-	Success            bool      `json:"success"`
-	Error              string    `json:"error,omitempty"`
-	OperationID        string    `json:"operation_id,omitempty"`
-	CreatedStatus      string    `json:"created_status,omitempty"`
-	ApprovedStatus     string    `json:"approved_status,omitempty"`
-	FinalStatus        string    `json:"final_status,omitempty"`
-	SnapshotVersion    string    `json:"snapshot_version,omitempty"`
-	SnapshotChecksum   string    `json:"snapshot_checksum,omitempty"`
-	ReplayedCreate     bool      `json:"replayed_create,omitempty"`
-	ReplayedApproval   bool      `json:"replayed_approval,omitempty"`
+	Commit              string    `json:"commit"`
+	CommitFull          string    `json:"commit_full"`
+	GitDirty            bool      `json:"git_dirty"`
+	ResultDir           string    `json:"result_dir"`
+	RunName             string    `json:"run_name"`
+	Mode                string    `json:"mode"`
+	AdminTarget         string    `json:"admin_target"`
+	ControlPlaneTarget  string    `json:"control_plane_target"`
+	TenantID            string    `json:"tenant_id"`
+	StartedAt           time.Time `json:"started_at"`
+	FinishedAt          time.Time `json:"finished_at"`
+	Success             bool      `json:"success"`
+	Error               string    `json:"error,omitempty"`
+	OperationID         string    `json:"operation_id,omitempty"`
+	CreatedStatus       string    `json:"created_status,omitempty"`
+	ApprovedStatus      string    `json:"approved_status,omitempty"`
+	FinalStatus         string    `json:"final_status,omitempty"`
+	SecondOperationID   string    `json:"second_operation_id,omitempty"`
+	SecondFinalStatus   string    `json:"second_final_status,omitempty"`
+	RollbackOperationID string    `json:"rollback_operation_id,omitempty"`
+	RollbackFinalStatus string    `json:"rollback_final_status,omitempty"`
+	PublishedVersion    string    `json:"published_version,omitempty"`
+	CandidateVersion    string    `json:"candidate_version,omitempty"`
+	RollbackTarget      string    `json:"rollback_target,omitempty"`
+	SnapshotVersion     string    `json:"snapshot_version,omitempty"`
+	SnapshotChecksum    string    `json:"snapshot_checksum,omitempty"`
+	ReplayedCreate      bool      `json:"replayed_create,omitempty"`
+	ReplayedApproval    bool      `json:"replayed_approval,omitempty"`
 }
 
 func runConfigPublishSmoke(ctx context.Context, cfg config, out *os.File) error {
@@ -51,6 +59,7 @@ func runConfigPublishSmoke(ctx context.Context, cfg config, out *os.File) error 
 		CommitFull:         strings.TrimSpace(gitOutput("rev-parse", "HEAD")),
 		GitDirty:           strings.TrimSpace(gitOutput("status", "--short", "--untracked-files=all")) != "",
 		RunName:            cfg.runName,
+		Mode:               cfg.mode,
 		AdminTarget:        cfg.target,
 		ControlPlaneTarget: cfg.controlPlaneTarget,
 		TenantID:           cfg.tenantID,
@@ -130,78 +139,173 @@ func runConfigPublishWorkflow(
 	summary *configPublishSmokeSummary,
 ) error {
 	version := "quota-" + sanitizeRunName(cfg.runName)
-	payload := configPublishOperationPayload(version)
+	if cfg.mode == "config-rollback-smoke" {
+		version += "-v1"
+	}
+	publish, err := submitAdminOperation(
+		ctx,
+		cfg,
+		adminClient,
+		"CONFIG_PUBLISH",
+		"admin.config_publish.v1",
+		configPublishOperationPayload(version),
+		"publish:"+version,
+	)
+	if err != nil {
+		return err
+	}
+	summary.OperationID = publish.OperationID
+	summary.CreatedStatus = publish.CreatedStatus
+	summary.ApprovedStatus = publish.ApprovedStatus
+	summary.FinalStatus = publish.FinalStatus
+	summary.ReplayedCreate = publish.ReplayedCreate
+	summary.ReplayedApproval = publish.ReplayedApproval
+	summary.PublishedVersion = version
+	if err := assertConfigSnapshot(ctx, cfg, controlClient, version, summary); err != nil {
+		return err
+	}
+	if cfg.mode != "config-rollback-smoke" {
+		return nil
+	}
+
+	candidateVersion := strings.TrimSuffix(version, "-v1") + "-v2"
+	candidate, err := submitAdminOperation(
+		ctx,
+		cfg,
+		adminClient,
+		"CONFIG_PUBLISH",
+		"admin.config_publish.v1",
+		configPublishOperationPayload(candidateVersion),
+		"publish:"+candidateVersion,
+	)
+	if err != nil {
+		return err
+	}
+	summary.SecondOperationID = candidate.OperationID
+	summary.SecondFinalStatus = candidate.FinalStatus
+	summary.CandidateVersion = candidateVersion
+	if err := assertConfigSnapshot(ctx, cfg, controlClient, candidateVersion, summary); err != nil {
+		return err
+	}
+
+	rollback, err := submitAdminOperation(
+		ctx,
+		cfg,
+		adminClient,
+		"CONFIG_ROLLBACK",
+		"admin.config_rollback.v1",
+		configRollbackOperationPayload(version),
+		"rollback:"+version,
+	)
+	if err != nil {
+		return err
+	}
+	summary.RollbackOperationID = rollback.OperationID
+	summary.RollbackFinalStatus = rollback.FinalStatus
+	summary.RollbackTarget = version
+	return assertConfigSnapshot(ctx, cfg, controlClient, version, summary)
+}
+
+type submittedOperation struct {
+	OperationID      string
+	CreatedStatus    string
+	ApprovedStatus   string
+	FinalStatus      string
+	ReplayedCreate   bool
+	ReplayedApproval bool
+}
+
+func submitAdminOperation(
+	ctx context.Context,
+	cfg config,
+	adminClient adminv1.AdminServiceClient,
+	operationType string,
+	payloadSchema string,
+	payload string,
+	idempotencySuffix string,
+) (submittedOperation, error) {
 	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
 	create, err := adminClient.CreateAdminOperation(requestCtx, &adminv1.CreateAdminOperationRequest{
 		AuthContext:          smokeAdminAuth(cfg, "create"),
 		OperatorRef:          "operator:admin-smoke",
 		OperatorRole:         "ADMIN",
-		OperationType:        "CONFIG_PUBLISH",
-		TargetRefHash:        "sha256:admin-config-publish-smoke-target",
+		OperationType:        operationType,
+		TargetRefHash:        "sha256:admin-config-smoke-target",
 		RiskLevel:            "MEDIUM",
-		PayloadSchemaVersion: "admin.config_publish.v1",
+		PayloadSchemaVersion: payloadSchema,
 		OperationPayloadJson: payload,
-		ReasonRef:            "reason:admin-config-publish-smoke",
-		EvidenceRefs:         []string{"evidence:admin-config-publish-smoke"},
-		IdempotencyKey:       "admin-config-publish-smoke:create:" + version,
-		CorrelationId:        "corr-admin-config-publish-smoke",
-		CausationId:          "admin-config-publish-smoke",
-		TraceId:              "trace-admin-config-publish-smoke",
+		ReasonRef:            "reason:admin-config-smoke",
+		EvidenceRefs:         []string{"evidence:admin-config-smoke"},
+		IdempotencyKey:       "admin-config-smoke:create:" + idempotencySuffix,
+		CorrelationId:        "corr-admin-config-smoke",
+		CausationId:          "admin-config-smoke",
+		TraceId:              "trace-admin-config-smoke",
 	})
 	cancel()
 	if err != nil {
-		return fmt.Errorf("create admin config publish operation: %w", err)
+		return submittedOperation{}, fmt.Errorf("create admin %s operation: %w", operationType, err)
 	}
 	operation := create.GetOperation()
 	if operation == nil {
-		return errors.New("create admin operation returned empty operation")
+		return submittedOperation{}, errors.New("create admin operation returned empty operation")
 	}
-	summary.OperationID = operation.GetOperationId()
-	summary.CreatedStatus = operation.GetStatus()
-	summary.ReplayedCreate = create.GetReplayed()
+	result := submittedOperation{
+		OperationID:    operation.GetOperationId(),
+		CreatedStatus:  operation.GetStatus(),
+		ReplayedCreate: create.GetReplayed(),
+	}
 
 	requestCtx, cancel = context.WithTimeout(ctx, cfg.requestTimeout)
 	approve, err := adminClient.ApproveAdminOperation(requestCtx, &adminv1.ApproveAdminOperationRequest{
 		AuthContext:       smokeAdminAuth(cfg, "approve"),
-		OperationId:       summary.OperationID,
+		OperationId:       result.OperationID,
 		ApproverRef:       "operator:approver-smoke",
 		ApproverRole:      "ADMIN",
 		Decision:          "APPROVE",
-		ApprovalPolicyRef: "admin.config_publish.smoke.v1",
-		ReasonRef:         "reason:admin-config-publish-smoke-approval",
-		EvidenceRefs:      []string{"evidence:admin-config-publish-smoke-approval"},
-		IdempotencyKey:    "admin-config-publish-smoke:approve:" + summary.OperationID,
-		CorrelationId:     "corr-admin-config-publish-smoke",
-		CausationId:       summary.OperationID,
-		TraceId:           "trace-admin-config-publish-smoke",
+		ApprovalPolicyRef: "admin.config.smoke.v1",
+		ReasonRef:         "reason:admin-config-smoke-approval",
+		EvidenceRefs:      []string{"evidence:admin-config-smoke-approval"},
+		IdempotencyKey:    "admin-config-smoke:approve:" + result.OperationID,
+		CorrelationId:     "corr-admin-config-smoke",
+		CausationId:       result.OperationID,
+		TraceId:           "trace-admin-config-smoke",
 	})
 	cancel()
 	if err != nil {
-		return fmt.Errorf("approve admin config publish operation: %w", err)
+		return submittedOperation{}, fmt.Errorf("approve admin %s operation: %w", operationType, err)
 	}
 	approved := approve.GetOperation()
 	if approved == nil {
-		return errors.New("approve admin operation returned empty operation")
+		return submittedOperation{}, errors.New("approve admin operation returned empty operation")
 	}
-	summary.ApprovedStatus = approved.GetStatus()
-	summary.ReplayedApproval = approve.GetReplayed()
-
-	final, err := waitForAdminOperationStatus(ctx, cfg, adminClient, summary.OperationID)
+	result.ApprovedStatus = approved.GetStatus()
+	result.ReplayedApproval = approve.GetReplayed()
+	final, err := waitForAdminOperationStatus(ctx, cfg, adminClient, result.OperationID)
 	if err != nil {
-		return err
+		return submittedOperation{}, err
 	}
-	summary.FinalStatus = final.GetStatus()
-	if summary.FinalStatus != "SUCCEEDED" {
-		return fmt.Errorf("admin operation final status = %s", summary.FinalStatus)
+	result.FinalStatus = final.GetStatus()
+	if result.FinalStatus != "SUCCEEDED" {
+		return result, fmt.Errorf("admin %s operation final status = %s", operationType, result.FinalStatus)
 	}
-	requestCtx, cancel = context.WithTimeout(ctx, cfg.requestTimeout)
+	return result, nil
+}
+
+func assertConfigSnapshot(
+	ctx context.Context,
+	cfg config,
+	controlClient controlv1.ControlPlaneServiceClient,
+	wantVersion string,
+	summary *configPublishSmokeSummary,
+) error {
+	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
 	snapshot, err := controlClient.GetConfigSnapshot(requestCtx, &controlv1.GetConfigSnapshotRequest{
 		AuthContext: &controlv1.AuthContext{
 			TenantId:    cfg.tenantID,
 			ServiceName: "api-gateway",
 			InstanceRef: "api-gateway-admin-smoke",
-			TraceId:     "trace-admin-config-publish-smoke",
-			RequestId:   "request-admin-config-publish-smoke-snapshot",
+			TraceId:     "trace-admin-config-smoke",
+			RequestId:   "request-admin-config-smoke-snapshot",
 		},
 		Environment:    "local",
 		ServiceName:    "api-gateway",
@@ -212,7 +316,7 @@ func runConfigPublishWorkflow(
 	})
 	cancel()
 	if err != nil {
-		return fmt.Errorf("get config snapshot after admin publish: %w", err)
+		return fmt.Errorf("get config snapshot after admin operation: %w", err)
 	}
 	got := snapshot.GetSnapshot()
 	if got == nil {
@@ -220,8 +324,8 @@ func runConfigPublishWorkflow(
 	}
 	summary.SnapshotVersion = got.GetVersion()
 	summary.SnapshotChecksum = got.GetPayloadChecksum()
-	if summary.SnapshotVersion != version {
-		return fmt.Errorf("config snapshot version = %s, want %s", summary.SnapshotVersion, version)
+	if summary.SnapshotVersion != wantVersion {
+		return fmt.Errorf("config snapshot version = %s, want %s", summary.SnapshotVersion, wantVersion)
 	}
 	if strings.TrimSpace(summary.SnapshotChecksum) == "" {
 		return errors.New("config snapshot checksum is empty")
@@ -282,6 +386,17 @@ func configPublishOperationPayload(version string) string {
 	return string(encoded)
 }
 
+func configRollbackOperationPayload(targetVersion string) string {
+	payload := map[string]any{
+		"environment":    "local",
+		"config_kind":    "API_GATEWAY_TENANT_QUOTA",
+		"bundle_key":     "api-gateway/default",
+		"target_version": targetVersion,
+	}
+	encoded, _ := json.Marshal(payload)
+	return string(encoded)
+}
+
 func smokeAdminAuth(cfg config, request string) *adminv1.AuthContext {
 	return &adminv1.AuthContext{
 		TenantId:    cfg.tenantID,
@@ -319,6 +434,7 @@ func cleanupConfigPublishSmokeTenant(ctx context.Context, pool *pgxpool.Pool, te
 		`DELETE FROM admin_operations WHERE tenant_id = $1`,
 		`DELETE FROM control_outbox WHERE tenant_id = $1`,
 		`DELETE FROM control_applied_acks WHERE tenant_id = $1`,
+		`DELETE FROM control_config_rollbacks WHERE tenant_id = $1`,
 		`DELETE FROM control_rollout_rules WHERE tenant_id = $1`,
 		`DELETE FROM control_config_versions WHERE tenant_id = $1`,
 		`DELETE FROM control_config_bundles WHERE tenant_id = $1`,
@@ -340,7 +456,7 @@ func writeConfigPublishSmokeSummary(cfg config, summary *configPublishSmokeSumma
 	if err != nil {
 		return err
 	}
-	path := filepath.Join(resultDir, "admin-config-publish-smoke-summary.json")
+	path := filepath.Join(resultDir, "admin-"+sanitizeRunName(cfg.mode)+"-summary.json")
 	if err := os.WriteFile(path, encoded, 0o644); err != nil {
 		return err
 	}

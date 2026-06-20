@@ -49,7 +49,7 @@ Python Worker 候选接入边界和低敏 eval 持久化已经足够支撑算法
 - `notification-service`（SDD v0.1 draft 已存在）
 - `audit-service`（SDD v0.1 draft 已存在）
 - `admin-service`
-- `control-plane-service`
+- `control-plane-service`（SDD v0.1 draft 已存在）
 - `presence-service`
 - `model-gateway`
 - `workflow-service`

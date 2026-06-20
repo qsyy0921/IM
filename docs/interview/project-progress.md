@@ -215,7 +215,7 @@ AI 能力先按依赖逐步进入。`search-service` / group memory / retrieval 
 | `media-service` | 图片、语音、视频、文件上传下载、对象存储、缩略图、病毒扫描、语音转码 / 时长探测 |
 | `notification-service` | 邮件、短信、APNs / FCM、系统通知、模板、bounce handling |
 | `audit-service` | 登录审计、安全审计、管理操作审计、策略决策归档 |
-| `admin-service` | 租户管理、封禁、配置、运维操作、repair 工作台；第一版已把 repair 和 CRITICAL 管理操作接入 workflow 长审批 |
+| `admin-service` | 租户管理、封禁、配置、运维操作、repair 工作台；第一版已把 repair 和 CRITICAL 管理操作接入 workflow 长审批，并为 config / policy / audit / notification 类操作写入专用审批策略和目标服务 |
 | `control-plane-service` | 多租户配置、功能开关、限流策略、灰度、配额、动态策略发布和 applied-version ACK |
 | `presence-service` | 在线状态、输入中、最后在线时间；当前 push-gateway session registry 还不是完整 presence 服务 |
 | `model-gateway` | 统一模型 provider、embedding、rerank、成本、fallback、prompt policy 和低敏审计 |

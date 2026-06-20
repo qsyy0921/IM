@@ -25,8 +25,10 @@
   `admin.operation.executed/failed.v1` outbox。
 - 已接入第一版 workflow 路由：`REPAIR_REQUEST` 创建
   `workflow-service` 的 `REPAIR_APPROVAL`，其它 `CRITICAL` operation 创建
-  `ADMIN_OPERATION`，result 记录 `workflow:<workflow_id>`；未配置 workflow 地址时，
-  `REPAIR_REQUEST` / `CRITICAL` 操作 fail-closed，不会被本地 no-op executor 标记成功。
+  `ADMIN_OPERATION`；config / quota / policy / audit / notification 类 operation
+  会写入专用 approval policy 和 target service，result 记录 `workflow:<workflow_id>`；
+  未配置 workflow 地址时，`REPAIR_REQUEST` / `CRITICAL` 操作 fail-closed，
+  不会被本地 no-op executor 标记成功。
 - 覆盖 proto、core migration、六层 skeleton、`grpc` runtime、Docker / Prometheus / Grafana。
 - PostgreSQL first path 覆盖 create conflict / replay、approval replay、separation-of-duty、get/list 和低敏 outbox。
 - Outbox relay 覆盖 typed protobuf schema、Kafka writer producer、builder fail-closed、
@@ -37,5 +39,5 @@
 
 后续：
 
-- 更多 operation 专用 workflow adapter、audit-service ingestion / export、admin UI、
-  operator approval CLI、下游公开 admin API adapter。
+- audit-service ingestion / export、admin UI、operator approval CLI、下游公开
+  admin API adapter。

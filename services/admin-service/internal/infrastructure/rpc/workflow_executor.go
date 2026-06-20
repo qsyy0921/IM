@@ -24,6 +24,26 @@ const (
 	defaultWorkflowTimeoutPolicy  = "admin.workflow.timeout.default.v1"
 )
 
+var adminWorkflowPolicies = map[string]string{
+	executor.OperationTypeConfigPublish:                 "admin.workflow.config_publish.v1",
+	executor.OperationTypeConfigRollback:                "admin.workflow.config_rollback.v1",
+	executor.OperationTypeTenantQuotaChange:             "admin.workflow.tenant_quota_change.v1",
+	executor.OperationTypePolicyRuleChange:              "admin.workflow.policy_rule_change.v1",
+	executor.OperationTypeRebacRelationChange:           "admin.workflow.rebac_relation_change.v1",
+	executor.OperationTypeAuditExportRequest:            "admin.workflow.audit_export_request.v1",
+	executor.OperationTypeNotificationSuppressionChange: "admin.workflow.notification_suppression_change.v1",
+}
+
+var adminWorkflowTargetServices = map[string]string{
+	executor.OperationTypeConfigPublish:                 "control-plane-service",
+	executor.OperationTypeConfigRollback:                "control-plane-service",
+	executor.OperationTypeTenantQuotaChange:             "control-plane-service",
+	executor.OperationTypePolicyRuleChange:              "policy-service",
+	executor.OperationTypeRebacRelationChange:           "policy-service",
+	executor.OperationTypeAuditExportRequest:            "audit-service",
+	executor.OperationTypeNotificationSuppressionChange: "notification-service",
+}
+
 type WorkflowExecutor struct {
 	client  workflowv1.WorkflowServiceClient
 	timeout time.Duration
@@ -74,7 +94,7 @@ func (executor WorkflowExecutor) Execute(ctx context.Context, operation types.Ad
 		WorkflowType:         workflowType,
 		RiskLevel:            operation.RiskLevel,
 		TargetRefHash:        operation.TargetRefHash,
-		TargetService:        "admin-service",
+		TargetService:        workflowTargetService(operation),
 		TargetOperation:      operation.OperationType,
 		ApprovalPolicyRef:    workflowApprovalPolicy(operation, workflowType),
 		TimeoutPolicyRef:     defaultWorkflowTimeoutPolicy,
@@ -115,10 +135,20 @@ func workflowApprovalPolicy(operation types.AdminOperation, workflowType string)
 	if workflowType == workflowTypeRepairApproval {
 		return defaultWorkflowApprovalPolicy
 	}
+	if policy, ok := adminWorkflowPolicies[operation.OperationType]; ok {
+		return policy
+	}
 	if operation.RiskLevel == types.RiskLevelCritical {
 		return defaultAdminWorkflowPolicy
 	}
 	return defaultWorkflowApprovalPolicy
+}
+
+func workflowTargetService(operation types.AdminOperation) string {
+	if targetService, ok := adminWorkflowTargetServices[operation.OperationType]; ok {
+		return targetService
+	}
+	return "admin-service"
 }
 
 func firstNonEmpty(values ...string) string {

@@ -88,8 +88,9 @@
   `RecordWorkflowDecision`、`GetWorkflow`、action / repair / admin operation
   approval 最小状态机和低敏 `workflow_outbox`；已作为 admin-service
   `REPAIR_REQUEST -> REPAIR_APPROVAL` 和 `CRITICAL -> ADMIN_OPERATION` 的长审批
-  入口；focused checks、真实 PostgreSQL integration 和完整 `check-local` 已通过，
-  不宣称 timer / compensation worker、external callback wait 或 outbox relay。
+  入口，并支撑 admin operation-specific approval policy / target-service routing；
+  focused checks、真实 PostgreSQL integration 和完整 `check-local` 已通过，不宣称
+  timer / compensation worker、external callback wait 或 outbox relay。
 - `vector-index-service` product-active：SDD v0.1 和 stage-switch review 已通过，
   第一版 proto / migration / 六层 skeleton / `grpc` runtime / Docker /
   Prometheus / Grafana 覆盖已落；当前覆盖 `UpsertVectorItem`、

@@ -74,7 +74,7 @@ func TestWorkflowExecutorCreatesAdminOperationWorkflowForCriticalOperation(t *te
 	result, err := workflowExecutor.Execute(context.Background(), types.AdminOperation{
 		TenantID:             "tenant-admin-rpc-test",
 		OperationID:          "admop_config_1",
-		OperationType:        "CONFIG_PUBLISH",
+		OperationType:        executor.OperationTypeConfigPublish,
 		TargetRefHash:        "sha256:target",
 		RiskLevel:            types.RiskLevelCritical,
 		PayloadSchemaVersion: "admin.config_publish.v1",
@@ -89,8 +89,39 @@ func TestWorkflowExecutorCreatesAdminOperationWorkflowForCriticalOperation(t *te
 		t.Fatalf("unexpected result: %+v", result)
 	}
 	if client.request.GetWorkflowType() != "ADMIN_OPERATION" ||
+		client.request.GetApprovalPolicyRef() != "admin.workflow.config_publish.v1" ||
+		client.request.GetTargetService() != "control-plane-service" ||
+		client.request.GetTargetOperation() != executor.OperationTypeConfigPublish {
+		t.Fatalf("unexpected workflow request: %+v", client.request)
+	}
+}
+
+func TestWorkflowExecutorUsesDefaultAdminPolicyForUnmappedCriticalOperation(t *testing.T) {
+	client := &fakeWorkflowClient{
+		response: &workflowv1.CreateWorkflowResponse{
+			Workflow: &workflowv1.Workflow{WorkflowId: "wf_admin_operation_default_1"},
+		},
+	}
+	workflowExecutor := NewWorkflowExecutor(client, time.Second)
+
+	_, err := workflowExecutor.Execute(context.Background(), types.AdminOperation{
+		TenantID:             "tenant-admin-rpc-test",
+		OperationID:          "admop_tenant_disable_1",
+		OperationType:        "TENANT_DISABLE",
+		TargetRefHash:        "sha256:target",
+		RiskLevel:            types.RiskLevelCritical,
+		PayloadSchemaVersion: "admin.tenant_disable.v1",
+		PayloadHash:          "sha256:payload",
+		ReasonRef:            "reason:tenant",
+		RequestedBy:          "operator:alice",
+	})
+	if err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if client.request.GetWorkflowType() != "ADMIN_OPERATION" ||
 		client.request.GetApprovalPolicyRef() != defaultAdminWorkflowPolicy ||
-		client.request.GetTargetOperation() != "CONFIG_PUBLISH" {
+		client.request.GetTargetService() != "admin-service" ||
+		client.request.GetTargetOperation() != "TENANT_DISABLE" {
 		t.Fatalf("unexpected workflow request: %+v", client.request)
 	}
 }

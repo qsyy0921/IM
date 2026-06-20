@@ -172,6 +172,13 @@ ref/hash；admin-service result 只记录 `workflow:<workflow_id>`。未配置
 `NEXUSIM_WORKFLOW_GRPC_ADDR` 时，`REPAIR_REQUEST` / `CRITICAL` operation 不得走
 本地 no-op executor，必须 fail-closed。
 
+第一版 workflow request 会按 operation 类型写入专用 approval policy 和 target
+service：`CONFIG_PUBLISH` / `CONFIG_ROLLBACK` / `TENANT_QUOTA_CHANGE` 指向
+`control-plane-service`，policy / ReBAC 操作指向 `policy-service`，
+`AUDIT_EXPORT_REQUEST` 指向 `audit-service`，`NOTIFICATION_SUPPRESSION_CHANGE`
+指向 `notification-service`。未映射的 `CRITICAL` operation 仍使用
+`admin.workflow.operation.v1` 和 `admin-service` target，等待后续专用 adapter。
+
 高风险 operation 默认走：
 
 ```text

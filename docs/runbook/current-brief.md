@@ -41,8 +41,9 @@ future platform / product services 的 10 个 SDD draft 已存在；`media-servi
 `ListAdminOperations` path、`admin_outbox -> im.admin.events` outbox relay 和
 `operation-worker` risk routing 执行闭环；`REPAIR_REQUEST` 已接入
 workflow-service `REPAIR_APPROVAL`，其它 `CRITICAL` operation 已接入
-workflow-service `ADMIN_OPERATION`。
-下一步默认继续 admin operation 专用 workflow adapter / 真实下游公开 admin API adapter，或继续 vector
+workflow-service `ADMIN_OPERATION`，并已写入第一版 operation-specific approval
+policy / target service。
+下一步默认继续 admin 真实下游公开 admin API adapter / operator approval CLI，或继续 vector
 embedding / rebuild / outbox 后续 worker。
 ```
 

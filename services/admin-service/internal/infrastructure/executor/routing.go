@@ -6,7 +6,16 @@ import (
 	"github.com/qsyy0921/IM/services/admin-service/internal/types"
 )
 
-const OperationTypeRepairRequest = "REPAIR_REQUEST"
+const (
+	OperationTypeRepairRequest                 = "REPAIR_REQUEST"
+	OperationTypeConfigPublish                 = "CONFIG_PUBLISH"
+	OperationTypeConfigRollback                = "CONFIG_ROLLBACK"
+	OperationTypeTenantQuotaChange             = "TENANT_QUOTA_CHANGE"
+	OperationTypePolicyRuleChange              = "POLICY_RULE_CHANGE"
+	OperationTypeRebacRelationChange           = "REBAC_RELATION_CHANGE"
+	OperationTypeAuditExportRequest            = "AUDIT_EXPORT_REQUEST"
+	OperationTypeNotificationSuppressionChange = "NOTIFICATION_SUPPRESSION_CHANGE"
+)
 
 type OperationExecutor interface {
 	Execute(context.Context, types.AdminOperation) (types.OperationExecutionResult, error)

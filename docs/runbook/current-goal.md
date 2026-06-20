@@ -56,13 +56,13 @@ model-gateway / workflow / knowledge-ingestion / vector-index
   状态、低敏 admin outbox、`admin_outbox -> im.admin.events` outbox relay 和
   `operation-worker` risk routing 第一版执行闭环。`REPAIR_REQUEST` 已接入
   `workflow-service` 创建 `REPAIR_APPROVAL`，其它 `CRITICAL` operation 已接入
-  `ADMIN_OPERATION`，未配置 workflow 时 `REPAIR_REQUEST` / `CRITICAL` 操作
-  fail-closed，不再被本地 no-op executor 标记成功。
+  `ADMIN_OPERATION`，并为 config / quota / policy / audit / notification 类操作写入
+  第一版专用 approval policy 和 target service；未配置 workflow 时
+  `REPAIR_REQUEST` / `CRITICAL` 操作 fail-closed，不再被本地 no-op executor 标记成功。
 
 ## 下一步
 
-- 默认继续 `admin-service` 更多 operation 专用 workflow adapter 或真实下游公开
-  admin API adapter。
+- 默认继续 `admin-service` 真实下游公开 admin API adapter 或 operator approval CLI。
 - 也可以继续 `vector-index-service` embedding worker / rebuild worker / outbox relay。
 - 也可以继续 notification SMTP / SMS / APNs / FCM adapter 或 bounce-suppression。
 

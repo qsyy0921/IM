@@ -45,12 +45,12 @@ model-gateway / workflow / knowledge-ingestion / vector-index
   delivery worker、noop provider、webhook provider 和相关 smoke。
 - `audit-service` 已切到 product-active，第一实现切片已落
   `AppendAuditRecord` / `QueryAuditRecords` / `VerifyAuditProof`、
-  proto / migration / runtime / observability。
+  proto / migration / runtime / observability，并已通过最小 gRPC smoke。
 
 ## 下一步
 
-- 默认完成 `audit-service` focused gates 和最小 smoke 归档；通过后进入
-  `admin-service` 或 `control-plane-service` stage-switch。
+- 默认进入 `admin-service` 或 `control-plane-service` stage-switch，先读对应
+  service brief 和 SDD draft，再冻结 v0.1 边界与门禁影响。
 - 也可以继续 notification SMTP / SMS / APNs / FCM adapter 或 bounce-suppression。
 
 ## 硬边界

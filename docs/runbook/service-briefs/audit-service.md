@@ -19,11 +19,12 @@ Agent 动作审计、审计导出和 hash-chain proof。
 - `QueryAuditRecords`：redacted audit record query。
 - `VerifyAuditProof`：hash-chain proof verification。
 - `audit_outbox` 第一版低敏 `audit.record.appended.v1` 事件落库。
+- 最小 gRPC smoke 已通过并归档：
+  `docs/runbook/loadtest/audit-service/loadtest-report-20260620-audit-grpc-smoke.md`。
 
 下一切片建议：
 
 - 具体边界见 `docs/sdd/audit-service.md`。
 - stage-switch 记录见 `docs/runbook/stage-switch/audit-service.md`。
-- 补最小 gRPC smoke / report。
 - Kafka ingestion、export worker、SIEM forwarding、segment sealing 和
   retention cleanup 后置。

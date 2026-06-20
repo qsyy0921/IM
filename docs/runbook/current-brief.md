@@ -42,13 +42,13 @@ Go 侧服务底座、EvidencePack、proposal / approval / audit 和 eval 持久�
 ```text
 future platform / product services 的 10 个 SDD draft 已存在；media-service、
 notification-service 和 audit-service 已进入 product-active。audit-service 第一版
-proto / migration / grpc runtime / Docker / observability 已落，先覆盖
-Append / Query / Verify proof。下一步做 audit smoke 或 admin / control-plane stage-switch。
+proto / migration / grpc runtime / Docker / observability 已落，已覆盖
+Append / Query / Verify proof，并已通过最小 gRPC smoke。下一步进入
+admin / control-plane stage-switch。
 ```
 
-完整系统测试、生产级 HA、长压和 sizing 继续后置为 hardening backlog。
-文档职责：进度总览见 `development-progress.md`，未完成工作见
-`remaining-goals.md`，单服务状态见 `service-briefs/<service>.md`。
+系统测试 / HA / 长压 / sizing 后置；总览、待办、单服务状态分别看
+`development-progress.md`、`remaining-goals.md`、`service-briefs/<service>.md`。
 
 - RAG / summary / Agent 只能消费权限过滤后的 EvidencePack。
 - 真实写动作必须走 policy、proposal / approval、executor 和 audit。

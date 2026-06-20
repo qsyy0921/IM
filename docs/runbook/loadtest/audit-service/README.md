@@ -31,3 +31,7 @@
   SIEM forwarding、segment sealing 或 retention cleanup。
 - hash-chain proof 只证明 audit-service 已接收记录后的篡改检测，不证明上游业务事实完整或真实。
 - raw summary / logs 写入 `H:\NexusIM\loadtest-results`。
+
+## 已归档报告
+
+- `loadtest-report-20260620-audit-grpc-smoke.md`

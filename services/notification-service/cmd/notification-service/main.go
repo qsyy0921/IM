@@ -143,14 +143,14 @@ func runDeliveryWorker(ctx context.Context) error {
 	}
 	defer pool.Close()
 
-	provider, providerID, err := notificationProviderFromEnv()
+	provider, classifier, providerID, err := notificationProviderFromEnv()
 	if err != nil {
 		return err
 	}
 	worker := delivery.NewWorker(
 		postgresinfra.NewDeliveryStore(pool),
 		provider,
-		nil,
+		classifier,
 		delivery.Config{
 			ProviderID:     providerID,
 			BatchSize:      envInt("NEXUSIM_NOTIFICATION_DELIVERY_BATCH_SIZE", 50),
@@ -230,17 +230,28 @@ func validateNotificationServiceMode(mode string) error {
 	}
 }
 
-func notificationProviderFromEnv() (delivery.Provider, string, error) {
-	mode := strings.TrimSpace(os.Getenv("NEXUSIM_NOTIFICATION_PROVIDER_MODE"))
+func notificationProviderFromEnv() (delivery.Provider, delivery.FailureClassifier, string, error) {
+	mode := strings.ToLower(strings.TrimSpace(os.Getenv("NEXUSIM_NOTIFICATION_PROVIDER_MODE")))
 	if mode == "" {
 		mode = "noop"
 	}
 	providerID := envString("NEXUSIM_NOTIFICATION_PROVIDER_ID", "local-"+mode)
 	switch mode {
 	case "noop", "fake":
-		return providerinfra.NewNoopProvider(providerID), providerID, nil
+		return providerinfra.NewNoopProvider(providerID), nil, providerID, nil
+	case "webhook":
+		provider, err := providerinfra.NewWebhookProvider(providerinfra.WebhookConfig{
+			URL:         envString("NEXUSIM_NOTIFICATION_WEBHOOK_URL", ""),
+			BearerToken: envString("NEXUSIM_NOTIFICATION_WEBHOOK_BEARER_TOKEN", ""),
+			ProviderID:  providerID,
+			Timeout:     envDuration("NEXUSIM_NOTIFICATION_WEBHOOK_TIMEOUT", 5*time.Second),
+		})
+		if err != nil {
+			return nil, nil, "", err
+		}
+		return provider, providerinfra.NewWebhookFailureClassifier(), providerID, nil
 	default:
-		return nil, "", fmt.Errorf("unsupported NEXUSIM_NOTIFICATION_PROVIDER_MODE %q", mode)
+		return nil, nil, "", fmt.Errorf("unsupported NEXUSIM_NOTIFICATION_PROVIDER_MODE %q", mode)
 	}
 }
 

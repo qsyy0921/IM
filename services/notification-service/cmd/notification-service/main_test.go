@@ -36,3 +36,23 @@ func TestValidateNotificationDebugListenerConfigAllowsExplicitPublicOptIn(t *tes
 		t.Fatalf("public debug listener should pass with allow flag: %v", err)
 	}
 }
+
+func TestNotificationProviderFromEnvSupportsWebhook(t *testing.T) {
+	t.Setenv("NEXUSIM_NOTIFICATION_PROVIDER_MODE", "WEBHOOK")
+	t.Setenv("NEXUSIM_NOTIFICATION_PROVIDER_ID", "provider-webhook-1")
+	t.Setenv("NEXUSIM_NOTIFICATION_WEBHOOK_URL", "http://127.0.0.1/provider")
+	provider, classifier, providerID, err := notificationProviderFromEnv()
+	if err != nil {
+		t.Fatalf("webhook provider should be valid: %v", err)
+	}
+	if provider == nil || classifier == nil || providerID != "provider-webhook-1" {
+		t.Fatalf("unexpected webhook provider wiring provider=%T classifier=%T id=%q", provider, classifier, providerID)
+	}
+}
+
+func TestNotificationProviderFromEnvRejectsUnsupportedProvider(t *testing.T) {
+	t.Setenv("NEXUSIM_NOTIFICATION_PROVIDER_MODE", "smtp")
+	if _, _, _, err := notificationProviderFromEnv(); err == nil {
+		t.Fatal("unsupported notification provider should fail")
+	}
+}

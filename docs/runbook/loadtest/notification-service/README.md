@@ -54,9 +54,22 @@
 
 - `docs/runbook/loadtest/notification-service/loadtest-report-20260620-notification-delivery-worker-smoke.md`
 
+可选 provider 参数：
+
+```powershell
+.\loadtest\notification\run-local-smoke.ps1 -WithDeliveryWorker `
+  -ProviderMode webhook `
+  -WebhookUrl http://127.0.0.1:18080/notification `
+  -WebhookBearerToken local-token
+```
+
+`webhook` provider 只发送低敏 envelope / template variables，并使用 provider
+idempotency header；provider response body 会被丢弃，`provider_message_id` 只以 hash
+形式进入 delivery result。
+
 边界：
 
 - 这是单节点本地 Kafka smoke，不证明 Kafka HA / ISR / 网络分区语义。
-- 当前只验证 noop provider worker，不验证真实 email / SMS / APNs / FCM、bounce
-  或 suppression。
+- 当前只验证 noop provider smoke 和 webhook HTTP adapter 边界，不验证真实 email /
+  SMS / APNs / FCM、bounce 或 suppression。
 - raw summary / logs 写入 `H:\NexusIM\loadtest-results`。

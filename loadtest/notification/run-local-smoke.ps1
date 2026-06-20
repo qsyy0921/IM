@@ -5,6 +5,10 @@ param(
     [string]$NotificationGrpcAddr = "",
     [string]$KafkaBrokers = "localhost:9092",
     [string]$NotificationEventsTopic = "",
+    [string]$ProviderMode = "noop",
+    [string]$ProviderID = "",
+    [string]$WebhookUrl = "",
+    [string]$WebhookBearerToken = "",
     [switch]$WithDeliveryWorker,
     [switch]$SkipBuild
 )
@@ -24,6 +28,12 @@ if (-not $RunName) {
 }
 if (-not $NotificationEventsTopic) {
     $NotificationEventsTopic = "im.notification.events.$RunName"
+}
+if (-not $ProviderID) {
+    $ProviderID = "local-$ProviderMode"
+}
+if ($WithDeliveryWorker -and $ProviderMode -eq "webhook" -and -not $WebhookUrl) {
+    throw "WebhookUrl is required when ProviderMode=webhook"
 }
 
 $resultDir = Join-Path $ResultRoot $RunName
@@ -178,15 +188,20 @@ try {
     }
 
     if ($WithDeliveryWorker) {
-        $processes += Start-NexusProcess -Name "notification-delivery-worker" -FilePath (Join-Path $repoRoot "bin\notification-service.exe") -Env @{
+        $deliveryEnv = @{
             NEXUSIM_NOTIFICATION_SERVICE_MODE = "delivery-worker"
             NEXUSIM_PG_DSN = $PgDsn
-            NEXUSIM_NOTIFICATION_PROVIDER_MODE = "noop"
-            NEXUSIM_NOTIFICATION_PROVIDER_ID = "local-noop"
+            NEXUSIM_NOTIFICATION_PROVIDER_MODE = $ProviderMode
+            NEXUSIM_NOTIFICATION_PROVIDER_ID = $ProviderID
             NEXUSIM_NOTIFICATION_DELIVERY_BATCH_SIZE = "100"
             NEXUSIM_NOTIFICATION_DELIVERY_POLL_INTERVAL = "200ms"
             NEXUSIM_NOTIFICATION_DEBUG_ADDR = ""
         }
+        if ($ProviderMode -eq "webhook") {
+            $deliveryEnv["NEXUSIM_NOTIFICATION_WEBHOOK_URL"] = $WebhookUrl
+            $deliveryEnv["NEXUSIM_NOTIFICATION_WEBHOOK_BEARER_TOKEN"] = $WebhookBearerToken
+        }
+        $processes += Start-NexusProcess -Name "notification-delivery-worker" -FilePath (Join-Path $repoRoot "bin\notification-service.exe") -Env $deliveryEnv
     }
 
     $processes += Start-NexusProcess -Name "notification-outbox-relay" -FilePath (Join-Path $repoRoot "bin\notification-service.exe") -Env @{

@@ -81,8 +81,10 @@ vector-index-service
   `CreateNotificationRequest -> delivery-worker -> noop provider -> notification_outbox
   -> im.notification.events` 真实本地 smoke 已通过，报告见
   `docs/runbook/loadtest/notification-service/loadtest-report-20260620-notification-delivery-worker-smoke.md`。
-- 下一步默认继续 notification provider-grade adapter / bounce-suppression 边界，
-  或按 promotion plan 转入 `audit-service` stage-switch。
+- `notification-service` 第一版 webhook provider adapter 已落地，支持低敏 HTTP
+  provider envelope、provider idempotency header、provider message id hash 和稳定失败分类。
+- 下一步默认继续 notification SMTP / SMS / APNs / FCM adapter 或
+  bounce-suppression 边界，或按 promotion plan 转入 `audit-service` stage-switch。
 
 ## 硬边界
 

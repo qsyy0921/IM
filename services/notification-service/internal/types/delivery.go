@@ -8,9 +8,11 @@ const (
 	AttemptStatusFailed    = "FAILED"
 
 	FailureClassProviderUnavailable = "PROVIDER_UNAVAILABLE"
+	FailureClassProviderRejected    = "PROVIDER_REJECTED"
 	FailureClassExpired             = "EXPIRED"
 
 	PublicErrorProviderUnavailable = "notification provider unavailable"
+	PublicErrorProviderRejected    = "notification provider rejected request"
 	PublicErrorExpired             = "notification request expired"
 )
 

@@ -12,6 +12,9 @@ email / SMS / APNs / FCM。
 第一版 `delivery-worker` 和 noop provider adapter 已落地，真实本地 delivery smoke
 已通过，报告见
 `docs/runbook/loadtest/notification-service/loadtest-report-20260620-notification-delivery-worker-smoke.md`。
+第一版 webhook provider adapter 已落地，支持低敏 HTTP provider envelope、
+provider idempotency header、provider message id hash 和稳定失败分类；不发送
+destination hash、secret payload 或 provider response body。
 
 Stage-switch 记录：`docs/runbook/stage-switch/notification-service.md`。
 
@@ -34,6 +37,6 @@ bounce handling、provider retry 和通知审计。
 
 下一步：
 
-- 继续做 provider-grade webhook / SMTP / SMS / APNs / FCM adapter 边界，或先按
-  promotion plan 转入 `audit-service`。
+- 继续做 SMTP / SMS / APNs / FCM provider adapter 边界，或先按 promotion plan
+  转入 `audit-service`。
 - 后续再做 bounce / suppression worker、provider redrive / audit 产品化。

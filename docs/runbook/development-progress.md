@@ -86,8 +86,9 @@
   第一版 proto / migration / 六层 skeleton / `grpc` runtime / Docker /
   Prometheus / Grafana 覆盖已落；当前覆盖 `CreateWorkflow`、
   `RecordWorkflowDecision`、`GetWorkflow`、action / repair approval 最小状态机和
-  低敏 `workflow_outbox`，不宣称 timer / compensation worker、external callback
-  wait 或 outbox relay。
+  低敏 `workflow_outbox`；focused checks、真实 PostgreSQL integration 和完整
+  `check-local` 已通过，不宣称 timer / compensation worker、external callback wait
+  或 outbox relay。
 
 当前 Go 侧服务底座、控制面、EvidencePack、proposal / approval / audit、
 Python Worker 候选接入边界和低敏 eval 持久化已经足够支撑算法切片；

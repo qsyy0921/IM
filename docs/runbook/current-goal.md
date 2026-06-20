@@ -44,12 +44,12 @@ model-gateway / workflow / knowledge-ingestion / vector-index
   `knowledge-ingestion-service` 已 product-active 并通过各自第一版 focused
   checks / smoke。
 - `workflow-service` 已从 stage-switch 进入 product-active 第一版 implementation
-  slice，当前实现 `CreateWorkflow`、`RecordWorkflowDecision`、`GetWorkflow` 最小路径。
+  slice，`CreateWorkflow`、`RecordWorkflowDecision`、`GetWorkflow` 最小路径已落地并
+  通过 focused checks / 完整 `check-local`。
 
 ## 下一步
 
-- 默认收口 `workflow-service` 第一版 implementation slice；通过 focused checks
-  后再做 `admin-service` stage-switch 或 `vector-index-service` stage-switch。
+- 默认继续 `admin-service` stage-switch 或 `vector-index-service` stage-switch。
 - 也可以继续 notification SMTP / SMS / APNs / FCM adapter 或 bounce-suppression。
 
 ## 硬边界

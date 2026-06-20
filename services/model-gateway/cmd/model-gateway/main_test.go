@@ -13,14 +13,26 @@ func TestValidateModelGatewayMode(t *testing.T) {
 	}
 }
 
-func TestValidateModelGatewayDebugListenerConfig(t *testing.T) {
+func TestValidateModelGatewayDebugListenerConfigAllowsEmptyOrPrivateAddress(t *testing.T) {
+	if err := validateModelGatewayDebugListenerConfig("", false); err != nil {
+		t.Fatalf("empty debug listener should be allowed: %v", err)
+	}
 	if err := validateModelGatewayDebugListenerConfig("127.0.0.1:11932", false); err != nil {
 		t.Fatalf("loopback debug listener should be allowed: %v", err)
 	}
 	if err := validateModelGatewayDebugListenerConfig("172.30.80.35:11932", false); err != nil {
 		t.Fatalf("private debug listener should be allowed: %v", err)
 	}
+}
+
+func TestValidateModelGatewayDebugListenerConfigRejectsPublicAddressByDefault(t *testing.T) {
 	if err := validateModelGatewayDebugListenerConfig("0.0.0.0:11932", false); err == nil {
 		t.Fatal("public debug listener should require explicit override")
+	}
+}
+
+func TestValidateModelGatewayDebugListenerConfigAllowsExplicitPublicOptIn(t *testing.T) {
+	if err := validateModelGatewayDebugListenerConfig("0.0.0.0:11932", true); err != nil {
+		t.Fatalf("explicit public debug listener opt-in should be allowed: %v", err)
 	}
 }

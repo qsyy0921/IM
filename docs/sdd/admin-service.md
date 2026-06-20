@@ -376,12 +376,15 @@ fail-closed 并记录失败结果，不会被本地 no-op executor 标记为成�
 operator：
 
 ```text
-admin-operation-audit
-admin-operation-approve
-admin-operation-execute
-admin-operation-cancel
+loadtest/admin -mode approve
+loadtest/admin -mode reject
+loadtest/admin -mode get
+loadtest/admin -mode list
 admin-outbox-repair
 ```
+
+`loadtest/admin` 只调用公开 admin gRPC，不读私表，不输出 payload 原文、reason
+原文、EvidencePack 正文或 downstream response body。
 
 ## 17. 验收标准
 

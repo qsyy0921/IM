@@ -42,8 +42,10 @@ future platform / product services 的 10 个 SDD draft 已存在；`media-servi
 `operation-worker` risk routing 执行闭环；`REPAIR_REQUEST` 已接入
 workflow-service `REPAIR_APPROVAL`，其它 `CRITICAL` operation 已接入
 workflow-service `ADMIN_OPERATION`，并已写入第一版 operation-specific approval
-policy / target service。
-下一步默认继续 admin 真实下游公开 admin API adapter / operator approval CLI，或继续 vector
+policy / target service；`loadtest/admin` operator CLI 已支持公开 gRPC approve /
+reject / get / list。
+下一步默认继续 admin 真实下游公开 admin API adapter / admin operation 真实进程
+smoke，或继续 vector
 embedding / rebuild / outbox 后续 worker。
 ```
 

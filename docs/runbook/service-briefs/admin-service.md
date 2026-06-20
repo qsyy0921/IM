@@ -36,8 +36,10 @@
 - Operation worker 覆盖 worker unit、executor risk routing、workflow RPC executor
   unit、真实 PostgreSQL result / outbox integration、`operation-worker` cmd mode、
   worker registry 和本地 compose wiring。
+- 已新增 `loadtest/admin` operator CLI，支持通过公开 gRPC 执行 approve / reject /
+  get / list，本地输出低敏 JSON，不读数据库私表。
 
 后续：
 
-- audit-service ingestion / export、admin UI、operator approval CLI、下游公开
-  admin API adapter。
+- audit-service ingestion / export、admin UI、下游公开 admin API adapter，以及
+  `Create -> operator approve -> operation-worker` 真实进程 smoke。

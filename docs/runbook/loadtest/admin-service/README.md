@@ -1,0 +1,43 @@
+# admin-service operator tools
+
+本目录记录 `admin-service` 本地 operator 工具和后续 smoke。原始 summary / log
+如后续生成，应写入 `H:\NexusIM\loadtest-results`；仓库只放说明和报告。
+
+## Operator approval CLI
+
+工具：
+
+```powershell
+go run ./loadtest/admin -mode approve `
+  -target 127.0.0.1:10770 `
+  -tenant-id tenant-admin `
+  -operation-id admop_123 `
+  -approver-ref operator:bob `
+  -approver-role ADMIN `
+  -reason-ref reason:ticket-123 `
+  -evidence-refs evidence:ticket-123
+```
+
+支持模式：
+
+```text
+approve
+reject
+get
+list
+```
+
+边界：
+
+- 只调用 `admin-service` 公开 gRPC API。
+- 不读取 PostgreSQL 私表，也不直接执行业务 mutation。
+- 输出低敏 JSON：operation / approval id、状态、hash/ref、时间戳；不输出
+  `operation_payload_json`、reason 原文、EvidencePack 正文或下游 response body。
+- 支持 `-admin-tls-*` 参数连接 TLS / mTLS gRPC 端点；不配置时用于本地 insecure
+  smoke / operator 演示。
+
+后续：
+
+- 可在真实 smoke 中组合 `CreateAdminOperation -> operator approve ->
+  operation-worker -> workflow/downstream adapter -> GetAdminOperation`。
+- 仍不替代 admin UI、审批系统或 provider-grade 运维平台。

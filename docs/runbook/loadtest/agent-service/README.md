@@ -10,6 +10,10 @@
 - `loadtest-report-20260619-agent-adapter-smoke.md`：真实本地
   `retrieval-gateway -> policy-service -> agent-service` adapter smoke。
   这是历史报告。
+- `loadtest-report-20260620-agent-cross-temporal-stack-smoke.md`：真实本地
+  Agent proposal service-stack smoke，验证跨群 source refs / speaker
+  attribution、expired / superseded / future memory exclusion 和 proposal-only
+  边界。
 
 ## 运行入口
 

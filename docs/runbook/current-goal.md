@@ -20,7 +20,6 @@ group memory -> EvidencePack -> RAG -> summary -> multi-agent
 ## 当前 Active Slice
 
 已落：
-
 - search / memory / retrieval / RAG / summary / Agent first paths。
 - skill-registry、mcp-gateway、action-executor first paths。
 - proposal / approval / audit / approval outbox relay / approved execution。
@@ -60,16 +59,17 @@ group memory -> EvidencePack -> RAG -> summary -> multi-agent
 - cross-group / temporal retrieval smoke：低敏 CI-safe cases 和真实
   `loadtest/retrieval` 已覆盖跨群 source refs / speaker attribution，并按
   query seq 排除 expired / superseded / future memory。
+- cross-group / temporal RAG / Summary / Agent service-stack consumption：三条真实
+  adapter smoke 已验证跨群 source refs / speaker attribution，并排除 stale / future memory。
 
 下一步默认推进：
-
 ```text
-将 cross-group / temporal cases 扩到 RAG / Summary / Agent service-stack consumption
+把 cross-group / temporal stack 断言沉淀进统一 ai-eval gate，并继续扩展低敏 collaborative-memory cases
 ```
 
 硬边界：RAG / summary / Agent 只能消费 EvidencePack；真实写动作必须走
-policy、proposal / approval、executor 和 audit；不能直接读业务私表。
-Python AI Worker 只能做模型 / 算法 / eval 候选层，Go 仍负责控制面和事实边界。
+policy、proposal / approval、executor 和 audit；Python AI Worker 只做候选层，
+Go 负责控制面、事实边界和审计。
 
 ## 执行规则
 

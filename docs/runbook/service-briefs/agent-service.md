@@ -1,6 +1,6 @@
 # agent-service
 
-状态：foundation-active / proposal + approval + current-memory live smoke passed.
+状态：foundation-active / proposal + approval + cross-group temporal stack smoke passed.
 
 定位：受控 Agent proposal 边界。只消费 retrieval-gateway `EvidencePack`，
 proposal 前调用 `mcp-gateway.PrepareToolCall` 做 skill / policy / prepare audit。
@@ -17,13 +17,13 @@ proposal 前调用 `mcp-gateway.PrepareToolCall` 做 skill / policy / prepare au
 - 可选 `python-worker` proposal provider mode：Go 先生成 grounded proposal，Python worker 只返回 proposal hash / citation metadata；hash / citation mismatch 与 worker failure 已有 Agent output regression。
 - Agent adapter smoke、Agent -> mcp-gateway smoke、Agent execution eval adapter first path 和 Agent output safety fixture eval 已落。
 - `at_conversation_seq` 已透传到 EvidencePack；CI-safe regression 和 2026-06-20 live smoke 均验证 proposal 不引用 stale memory。
+- 2026-06-20 cross-group / temporal stack smoke 已验证 proposal path 保留跨群 source refs / speaker attribution，并排除 stale / future memory。
 
 ## 边界
 
-- 不执行真实工具或业务 mutation。
-- 不直接读 message / conversation / search / memory / policy 私表。
+- 不执行真实工具或业务 mutation；不直接读 message / conversation / search / memory / policy 私表。
 - 外部 LLM / Python worker / MCP provider 后续必须走 port、verifier、proposal / approval / executor / audit。
 
 ## 下一步
 
-- 配合下一轮 cross-group / temporal collaborative memory eval 扩展更多 Agent 场景；仍只提交 proposal。
+- 将这些跨群 / 时间窗口断言沉淀进更统一的 ai-eval gate，并继续扩展更多 Agent 场景；仍只提交 proposal。

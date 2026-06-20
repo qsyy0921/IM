@@ -63,78 +63,87 @@ type config struct {
 }
 
 type seededData struct {
-	TenantID                string `json:"tenant_id"`
-	ConversationID          string `json:"conversation_id"`
-	ViewerUserID            string `json:"viewer_user_id"`
-	SenderUserID            string `json:"sender_user_id"`
-	MessageID               string `json:"message_id"`
-	SourceEventID           string `json:"source_event_id"`
-	MemoryEventID           string `json:"memory_event_id"`
-	MemorySourceRefID       string `json:"memory_source_ref_id"`
-	ExpiredMemoryEventID    string `json:"expired_memory_event_id,omitempty"`
-	SupersededMemoryEventID string `json:"superseded_memory_event_id,omitempty"`
-	ConversationSeq         int64  `json:"conversation_seq"`
-	VisibilityVersion       int64  `json:"visibility_version"`
-	MemoryValidFromSeq      int64  `json:"memory_valid_from_seq"`
-	MemoryValidToSeq        int64  `json:"memory_valid_to_seq"`
-	MemoryProjectionVer     int64  `json:"memory_projection_version"`
-	CurrentMemoryAtSeq      int64  `json:"current_memory_at_seq"`
+	TenantID                 string `json:"tenant_id"`
+	ConversationID           string `json:"conversation_id"`
+	CrossGroupConversationID string `json:"cross_group_conversation_id,omitempty"`
+	ViewerUserID             string `json:"viewer_user_id"`
+	SenderUserID             string `json:"sender_user_id"`
+	CrossGroupActorUserID    string `json:"cross_group_actor_user_id,omitempty"`
+	MessageID                string `json:"message_id"`
+	CrossGroupMessageID      string `json:"cross_group_message_id,omitempty"`
+	SourceEventID            string `json:"source_event_id"`
+	CrossGroupSourceEventID  string `json:"cross_group_source_event_id,omitempty"`
+	MemoryEventID            string `json:"memory_event_id"`
+	MemorySourceRefID        string `json:"memory_source_ref_id"`
+	CrossGroupSourceRefID    string `json:"cross_group_source_ref_id,omitempty"`
+	ExpiredMemoryEventID     string `json:"expired_memory_event_id,omitempty"`
+	SupersededMemoryEventID  string `json:"superseded_memory_event_id,omitempty"`
+	FutureMemoryEventID      string `json:"future_memory_event_id,omitempty"`
+	ConversationSeq          int64  `json:"conversation_seq"`
+	VisibilityVersion        int64  `json:"visibility_version"`
+	MemoryValidFromSeq       int64  `json:"memory_valid_from_seq"`
+	MemoryValidToSeq         int64  `json:"memory_valid_to_seq"`
+	MemoryProjectionVer      int64  `json:"memory_projection_version"`
+	CurrentMemoryAtSeq       int64  `json:"current_memory_at_seq"`
 }
 
 type agentSmokeSummary struct {
-	RunName                   string       `json:"run_name"`
-	ResultDir                 string       `json:"result_dir"`
-	AgentTarget               string       `json:"agent_target"`
-	ActionExecutorTarget      string       `json:"action_executor_target"`
-	Objective                 string       `json:"objective"`
-	Scenario                  string       `json:"scenario"`
-	ToolName                  string       `json:"tool_name"`
-	SkillID                   string       `json:"skill_id"`
-	ResourceType              string       `json:"resource_type"`
-	RiskLevel                 string       `json:"risk_level"`
-	Seed                      seededData   `json:"seed"`
-	ProposalID                string       `json:"proposal_id"`
-	PreparedAuditID           string       `json:"prepared_audit_id"`
-	ProposalStatus            string       `json:"proposal_status"`
-	ApprovalID                string       `json:"approval_id"`
-	ApprovedByUserID          string       `json:"approved_by_user_id"`
-	ApprovedAtUnixMs          int64        `json:"approved_at_unix_ms"`
-	ExecutionID               string       `json:"execution_id"`
-	ExecutionStatus           string       `json:"execution_status"`
-	ExecutionAllowed          bool         `json:"execution_allowed"`
-	ExecutionRequiresApproval bool         `json:"execution_requires_approval"`
-	ExecutionDecisionSource   string       `json:"execution_decision_source"`
-	ExecutionClassification   string       `json:"execution_classification"`
-	ExecutionExecuted         bool         `json:"execution_executed"`
-	ExecutionResultID         string       `json:"execution_result_id"`
-	ExecutionResultStatus     string       `json:"execution_result_status"`
-	ExecutionResultRef        string       `json:"execution_result_ref"`
-	ProposalText              string       `json:"proposal_text"`
-	RequiresApproval          bool         `json:"requires_approval"`
-	GeneratedByLLM            bool         `json:"generated_by_llm"`
-	CitationCount             int          `json:"citation_count"`
-	PolicyAllowed             bool         `json:"policy_allowed"`
-	PolicyRequiresApproval    bool         `json:"policy_requires_approval"`
-	PolicyDecisionSource      string       `json:"policy_decision_source"`
-	PolicyClassification      string       `json:"policy_classification"`
-	PolicyPermissionVersion   int64        `json:"policy_permission_version"`
-	MCPAudit                  mcpAudit     `json:"mcp_audit"`
-	ActionAudit               actionAudit  `json:"action_audit"`
-	PackID                    string       `json:"pack_id"`
-	EvidenceItemCount         int          `json:"evidence_item_count"`
-	SearchItemCount           int          `json:"search_item_count"`
-	MemoryItemCount           int          `json:"memory_item_count"`
-	CurrentMemoryAtSeq        int64        `json:"current_memory_at_seq"`
-	ExpiredMemoryExcluded     bool         `json:"expired_memory_excluded"`
-	SupersededMemoryExcluded  bool         `json:"superseded_memory_excluded"`
-	SourceCounts              sourceCounts `json:"source_counts"`
-	SearchProjectionVersion   int64        `json:"search_projection_version"`
-	MemoryProjectionVersion   int64        `json:"memory_projection_version"`
-	AgentVersion              string       `json:"agent_version"`
-	RetrievalVersion          string       `json:"retrieval_version"`
-	Verified                  []string     `json:"verified"`
-	StartedAt                 time.Time    `json:"started_at"`
-	FinishedAt                time.Time    `json:"finished_at"`
+	RunName                               string       `json:"run_name"`
+	ResultDir                             string       `json:"result_dir"`
+	AgentTarget                           string       `json:"agent_target"`
+	ActionExecutorTarget                  string       `json:"action_executor_target"`
+	Objective                             string       `json:"objective"`
+	Scenario                              string       `json:"scenario"`
+	ToolName                              string       `json:"tool_name"`
+	SkillID                               string       `json:"skill_id"`
+	ResourceType                          string       `json:"resource_type"`
+	RiskLevel                             string       `json:"risk_level"`
+	Seed                                  seededData   `json:"seed"`
+	ProposalID                            string       `json:"proposal_id"`
+	PreparedAuditID                       string       `json:"prepared_audit_id"`
+	ProposalStatus                        string       `json:"proposal_status"`
+	ApprovalID                            string       `json:"approval_id"`
+	ApprovedByUserID                      string       `json:"approved_by_user_id"`
+	ApprovedAtUnixMs                      int64        `json:"approved_at_unix_ms"`
+	ExecutionID                           string       `json:"execution_id"`
+	ExecutionStatus                       string       `json:"execution_status"`
+	ExecutionAllowed                      bool         `json:"execution_allowed"`
+	ExecutionRequiresApproval             bool         `json:"execution_requires_approval"`
+	ExecutionDecisionSource               string       `json:"execution_decision_source"`
+	ExecutionClassification               string       `json:"execution_classification"`
+	ExecutionExecuted                     bool         `json:"execution_executed"`
+	ExecutionResultID                     string       `json:"execution_result_id"`
+	ExecutionResultStatus                 string       `json:"execution_result_status"`
+	ExecutionResultRef                    string       `json:"execution_result_ref"`
+	ProposalText                          string       `json:"proposal_text"`
+	RequiresApproval                      bool         `json:"requires_approval"`
+	GeneratedByLLM                        bool         `json:"generated_by_llm"`
+	CitationCount                         int          `json:"citation_count"`
+	PolicyAllowed                         bool         `json:"policy_allowed"`
+	PolicyRequiresApproval                bool         `json:"policy_requires_approval"`
+	PolicyDecisionSource                  string       `json:"policy_decision_source"`
+	PolicyClassification                  string       `json:"policy_classification"`
+	PolicyPermissionVersion               int64        `json:"policy_permission_version"`
+	MCPAudit                              mcpAudit     `json:"mcp_audit"`
+	ActionAudit                           actionAudit  `json:"action_audit"`
+	PackID                                string       `json:"pack_id"`
+	EvidenceItemCount                     int          `json:"evidence_item_count"`
+	SearchItemCount                       int          `json:"search_item_count"`
+	MemoryItemCount                       int          `json:"memory_item_count"`
+	CurrentMemoryAtSeq                    int64        `json:"current_memory_at_seq"`
+	ExpiredMemoryExcluded                 bool         `json:"expired_memory_excluded"`
+	SupersededMemoryExcluded              bool         `json:"superseded_memory_excluded"`
+	FutureMemoryExcluded                  bool         `json:"future_memory_excluded"`
+	CrossGroupSourceRefsPreserved         bool         `json:"cross_group_source_refs_preserved"`
+	CrossGroupSpeakerAttributionPreserved bool         `json:"cross_group_speaker_attribution_preserved"`
+	SourceCounts                          sourceCounts `json:"source_counts"`
+	SearchProjectionVersion               int64        `json:"search_projection_version"`
+	MemoryProjectionVersion               int64        `json:"memory_projection_version"`
+	AgentVersion                          string       `json:"agent_version"`
+	RetrievalVersion                      string       `json:"retrieval_version"`
+	Verified                              []string     `json:"verified"`
+	StartedAt                             time.Time    `json:"started_at"`
+	FinishedAt                            time.Time    `json:"finished_at"`
 }
 
 type mcpAudit struct {
@@ -484,20 +493,30 @@ ON CONFLICT (tenant_id, tool_name, action, resource_type, risk_level) DO UPDATE 
 
 func seedProjectionRows(ctx context.Context, pool *pgxpool.Pool, cfg config) (seededData, error) {
 	now := time.Now().UTC().Truncate(time.Millisecond)
+	crossGroupConversationID := cfg.conversationID + "-strategy"
+	crossGroupActorUserID := cfg.senderUserID + "-strategy"
 	messageID := "msg-agent-" + randomSuffix()
+	crossGroupMessageID := "msg-agent-cross-" + randomSuffix()
 	sourceEventID := "evt-agent-" + randomSuffix()
+	crossGroupSourceEventID := "evt-agent-cross-" + randomSuffix()
 	memoryEventID := "mem-agent-" + randomSuffix()
 	sourceRefID := "ref-agent-" + randomSuffix()
+	crossGroupSourceRefID := "ref-agent-cross-" + randomSuffix()
 	expiredMemoryEventID := "mem-agent-expired-" + randomSuffix()
 	expiredSourceRefID := "ref-agent-expired-" + randomSuffix()
 	supersededMemoryEventID := "mem-agent-superseded-" + randomSuffix()
 	supersededSourceRefID := "ref-agent-superseded-" + randomSuffix()
+	futureMemoryEventID := "mem-agent-future-" + randomSuffix()
+	futureSourceRefID := "ref-agent-future-" + randomSuffix()
 	seq := int64(2)
 	currentMemoryAtSeq := seq + 5
 	visibilityVersion := int64(41)
 	memoryProjectionVersion := int64(43)
 	searchText := "The phoenix launch decision is approved with a follow-up note for rollout owners."
-	factText := "Phoenix launch decision follow-up should preserve EvidencePack source references before any action execution."
+	crossGroupText := "The strategy group confirmed the phoenix launch decision before any agent proposal."
+	factText := "Phoenix launch decision follow-up should preserve EvidencePack source references and cross group attribution before any action execution."
+	actorJSON := jsonStringArray(cfg.senderUserID, crossGroupActorUserID)
+	audienceJSON := jsonStringArray(cfg.viewerUserID)
 
 	tx, err := pool.Begin(ctx)
 	if err != nil {
@@ -506,13 +525,15 @@ func seedProjectionRows(ctx context.Context, pool *pgxpool.Pool, cfg config) (se
 	defer func() { _ = tx.Rollback(ctx) }()
 
 	for _, table := range []string{"search_membership_projection", "memory_membership_projection"} {
-		if _, err := tx.Exec(ctx, fmt.Sprintf(`
+		for _, conversationID := range []string{cfg.conversationID, crossGroupConversationID} {
+			if _, err := tx.Exec(ctx, fmt.Sprintf(`
 INSERT INTO %s (
 	tenant_id, conversation_id, user_id, role, status, join_seq, leave_seq,
 	member_version, permission_version, updated_by_event_id, updated_at
 ) VALUES ($1, $2, $3, 'MEMBER', 'ACTIVE', 1, NULL, 1, $4, $5, $6)
-`, table), cfg.tenantID, cfg.conversationID, cfg.viewerUserID, visibilityVersion, "member-seed-"+sourceEventID, now); err != nil {
-			return seededData{}, err
+`, table), cfg.tenantID, conversationID, cfg.viewerUserID, visibilityVersion, "member-seed-"+sourceEventID, now); err != nil {
+				return seededData{}, err
+			}
 		}
 	}
 
@@ -523,6 +544,15 @@ INSERT INTO search_message_documents (
 	visibility_version, occurred_at, updated_at
 ) VALUES ($1, $2, $3, $4, $5, $6, 'TEXT', $7, 'NONE', 1, $8, $9, $9)
 `, cfg.tenantID, cfg.conversationID, messageID, seq, sourceEventID, searchText, cfg.senderUserID, visibilityVersion, now); err != nil {
+		return seededData{}, err
+	}
+	if _, err := tx.Exec(ctx, `
+INSERT INTO search_message_documents (
+	tenant_id, conversation_id, message_id, conversation_seq, source_event_id,
+	searchable_text, message_type, sender_id, tombstone_status, change_version,
+	visibility_version, occurred_at, updated_at
+) VALUES ($1, $2, $3, $4, $5, $6, 'TEXT', $7, 'NONE', 1, $8, $9, $9)
+`, cfg.tenantID, crossGroupConversationID, crossGroupMessageID, seq+1, crossGroupSourceEventID, crossGroupText, crossGroupActorUserID, visibilityVersion, now); err != nil {
 		return seededData{}, err
 	}
 
@@ -540,7 +570,7 @@ INSERT INTO memory_structured_events (
 	'[]'::jsonb, 0.9300, $10, 'agent-smoke-v1',
 	$11, $9, $9
 )
-`, cfg.tenantID, memoryEventID, cfg.conversationID, factText, jsonArray(cfg.senderUserID), jsonArray(cfg.viewerUserID), seq, seq+10, now, visibilityVersion, memoryProjectionVersion); err != nil {
+`, cfg.tenantID, memoryEventID, cfg.conversationID, factText, actorJSON, audienceJSON, seq, seq+10, now, visibilityVersion, memoryProjectionVersion); err != nil {
 		return seededData{}, err
 	}
 
@@ -548,8 +578,10 @@ INSERT INTO memory_structured_events (
 INSERT INTO memory_event_source_refs (
 	tenant_id, memory_event_id, source_ref_id, source_type, source_id,
 	source_event_id, conversation_id, conversation_seq, occurred_at, created_at
-) VALUES ($1, $2, $3, 'MESSAGE', $4, $5, $6, $7, $8, $8)
-`, cfg.tenantID, memoryEventID, sourceRefID, messageID, sourceEventID, cfg.conversationID, seq, now); err != nil {
+) VALUES
+	($1, $2, $3, 'MESSAGE', $4, $5, $6, $7, $10, $10),
+	($1, $2, $8, 'MESSAGE', $11, $12, $9, $13, $10, $10)
+`, cfg.tenantID, memoryEventID, sourceRefID, messageID, sourceEventID, cfg.conversationID, seq, crossGroupSourceRefID, crossGroupConversationID, now, crossGroupMessageID, crossGroupSourceEventID, seq+1); err != nil {
 		return seededData{}, err
 	}
 
@@ -580,6 +612,15 @@ INSERT INTO memory_event_source_refs (
 			validTo:    seq + 10,
 			confidence: 0.8700,
 		},
+		{
+			eventID:    futureMemoryEventID,
+			sourceRef:  futureSourceRefID,
+			status:     "ACTIVE",
+			factText:   "Future phoenix launch action reminder should not appear before its valid sequence.",
+			validFrom:  seq + 20,
+			validTo:    seq + 30,
+			confidence: 0.8600,
+		},
 	}
 	for _, stale := range staleMemories {
 		if _, err := tx.Exec(ctx, `
@@ -596,7 +637,7 @@ INSERT INTO memory_structured_events (
 	'[]'::jsonb, $11, $12, 'agent-smoke-v1',
 	$13, $10, $10
 )
-`, cfg.tenantID, stale.eventID, cfg.conversationID, stale.status, stale.factText, jsonArray(cfg.senderUserID), jsonArray(cfg.viewerUserID), stale.validFrom, stale.validTo, now, stale.confidence, visibilityVersion, memoryProjectionVersion); err != nil {
+`, cfg.tenantID, stale.eventID, cfg.conversationID, stale.status, stale.factText, actorJSON, audienceJSON, stale.validFrom, stale.validTo, now, stale.confidence, visibilityVersion, memoryProjectionVersion); err != nil {
 			return seededData{}, err
 		}
 		if _, err := tx.Exec(ctx, `
@@ -613,22 +654,28 @@ INSERT INTO memory_event_source_refs (
 		return seededData{}, err
 	}
 	return seededData{
-		TenantID:                cfg.tenantID,
-		ConversationID:          cfg.conversationID,
-		ViewerUserID:            cfg.viewerUserID,
-		SenderUserID:            cfg.senderUserID,
-		MessageID:               messageID,
-		SourceEventID:           sourceEventID,
-		MemoryEventID:           memoryEventID,
-		MemorySourceRefID:       sourceRefID,
-		ExpiredMemoryEventID:    expiredMemoryEventID,
-		SupersededMemoryEventID: supersededMemoryEventID,
-		ConversationSeq:         seq,
-		VisibilityVersion:       visibilityVersion,
-		MemoryValidFromSeq:      seq,
-		MemoryValidToSeq:        seq + 10,
-		MemoryProjectionVer:     memoryProjectionVersion,
-		CurrentMemoryAtSeq:      currentMemoryAtSeq,
+		TenantID:                 cfg.tenantID,
+		ConversationID:           cfg.conversationID,
+		CrossGroupConversationID: crossGroupConversationID,
+		ViewerUserID:             cfg.viewerUserID,
+		SenderUserID:             cfg.senderUserID,
+		CrossGroupActorUserID:    crossGroupActorUserID,
+		MessageID:                messageID,
+		CrossGroupMessageID:      crossGroupMessageID,
+		SourceEventID:            sourceEventID,
+		CrossGroupSourceEventID:  crossGroupSourceEventID,
+		MemoryEventID:            memoryEventID,
+		MemorySourceRefID:        sourceRefID,
+		CrossGroupSourceRefID:    crossGroupSourceRefID,
+		ExpiredMemoryEventID:     expiredMemoryEventID,
+		SupersededMemoryEventID:  supersededMemoryEventID,
+		FutureMemoryEventID:      futureMemoryEventID,
+		ConversationSeq:          seq,
+		VisibilityVersion:        visibilityVersion,
+		MemoryValidFromSeq:       seq,
+		MemoryValidToSeq:         seq + 10,
+		MemoryProjectionVer:      memoryProjectionVersion,
+		CurrentMemoryAtSeq:       currentMemoryAtSeq,
 	}, nil
 }
 
@@ -903,11 +950,12 @@ func verifyWorkflow(
 		return agentSmokeSummary{}, err
 	}
 	verified = append(verified, "memory evidence preserved with active temporal status and source ref")
+	verified = append(verified, "cross-group memory source refs and speaker attribution preserved in EvidencePack")
 	currentCheck, err := verifyCurrentMemoryOnly(pack, seed)
 	if err != nil {
 		return agentSmokeSummary{}, err
 	}
-	verified = append(verified, "expired and superseded memory decoys excluded from current EvidencePack")
+	verified = append(verified, "expired, superseded and future memory decoys excluded from current EvidencePack")
 	counts, err := verifySourceCoverage(pack, seed)
 	if err != nil {
 		return agentSmokeSummary{}, err
@@ -933,59 +981,62 @@ func verifyWorkflow(
 	verified = append(verified, "first-stage response is proposal-only and generated_by_llm=false")
 
 	return agentSmokeSummary{
-		RunName:                   cfg.runName,
-		ResultDir:                 resultDir,
-		AgentTarget:               cfg.agentTarget,
-		ActionExecutorTarget:      cfg.actionTarget,
-		Objective:                 cfg.objective,
-		Scenario:                  cfg.scenario,
-		ToolName:                  cfg.toolName,
-		SkillID:                   cfg.skillID,
-		ResourceType:              cfg.resourceType,
-		RiskLevel:                 cfg.riskLevel,
-		Seed:                      seed,
-		ProposalID:                response.GetProposalId(),
-		PreparedAuditID:           response.GetPreparedAuditId(),
-		ProposalStatus:            proposalStatusName(response.GetStatus()),
-		ApprovalID:                approval.GetApprovalId(),
-		ApprovedByUserID:          approval.GetApprovedByUserId(),
-		ApprovedAtUnixMs:          approval.GetApprovedAtUnixMs(),
-		ExecutionID:               execution.GetExecutionId(),
-		ExecutionStatus:           executionStatusName(execution.GetStatus()),
-		ExecutionAllowed:          execution.GetAllowed(),
-		ExecutionRequiresApproval: execution.GetRequiresApproval(),
-		ExecutionDecisionSource:   execution.GetDecisionSource(),
-		ExecutionClassification:   execution.GetClassification(),
-		ExecutionExecuted:         execution.GetExecuted(),
-		ExecutionResultID:         execution.GetResultId(),
-		ExecutionResultStatus:     execution.GetResultStatus(),
-		ExecutionResultRef:        execution.GetResultRef(),
-		ProposalText:              response.GetProposalText(),
-		RequiresApproval:          response.GetRequiresApproval(),
-		GeneratedByLLM:            response.GetGeneratedByLlm(),
-		CitationCount:             len(response.GetCitations()),
-		PolicyAllowed:             decision.GetAllowed(),
-		PolicyRequiresApproval:    decision.GetRequiresApproval(),
-		PolicyDecisionSource:      decision.GetDecisionSource(),
-		PolicyClassification:      decision.GetClassification(),
-		PolicyPermissionVersion:   decision.GetPermissionVersion(),
-		MCPAudit:                  audit,
-		ActionAudit:               actionAudit,
-		PackID:                    pack.GetPackId(),
-		EvidenceItemCount:         len(pack.GetItems()),
-		SearchItemCount:           int(counts.SearchMessage),
-		MemoryItemCount:           int(counts.MemoryEvent),
-		CurrentMemoryAtSeq:        currentCheck.AtConversationSeq,
-		ExpiredMemoryExcluded:     currentCheck.ExpiredMemoryExcluded,
-		SupersededMemoryExcluded:  currentCheck.SupersededMemoryExcluded,
-		SourceCounts:              counts,
-		SearchProjectionVersion:   pack.GetSearchProjectionVersion(),
-		MemoryProjectionVersion:   pack.GetMemoryProjectionVersion(),
-		AgentVersion:              response.GetAgentVersion(),
-		RetrievalVersion:          pack.GetRetrievalVersion(),
-		Verified:                  verified,
-		StartedAt:                 startedAt,
-		FinishedAt:                time.Now().UTC(),
+		RunName:                               cfg.runName,
+		ResultDir:                             resultDir,
+		AgentTarget:                           cfg.agentTarget,
+		ActionExecutorTarget:                  cfg.actionTarget,
+		Objective:                             cfg.objective,
+		Scenario:                              cfg.scenario,
+		ToolName:                              cfg.toolName,
+		SkillID:                               cfg.skillID,
+		ResourceType:                          cfg.resourceType,
+		RiskLevel:                             cfg.riskLevel,
+		Seed:                                  seed,
+		ProposalID:                            response.GetProposalId(),
+		PreparedAuditID:                       response.GetPreparedAuditId(),
+		ProposalStatus:                        proposalStatusName(response.GetStatus()),
+		ApprovalID:                            approval.GetApprovalId(),
+		ApprovedByUserID:                      approval.GetApprovedByUserId(),
+		ApprovedAtUnixMs:                      approval.GetApprovedAtUnixMs(),
+		ExecutionID:                           execution.GetExecutionId(),
+		ExecutionStatus:                       executionStatusName(execution.GetStatus()),
+		ExecutionAllowed:                      execution.GetAllowed(),
+		ExecutionRequiresApproval:             execution.GetRequiresApproval(),
+		ExecutionDecisionSource:               execution.GetDecisionSource(),
+		ExecutionClassification:               execution.GetClassification(),
+		ExecutionExecuted:                     execution.GetExecuted(),
+		ExecutionResultID:                     execution.GetResultId(),
+		ExecutionResultStatus:                 execution.GetResultStatus(),
+		ExecutionResultRef:                    execution.GetResultRef(),
+		ProposalText:                          response.GetProposalText(),
+		RequiresApproval:                      response.GetRequiresApproval(),
+		GeneratedByLLM:                        response.GetGeneratedByLlm(),
+		CitationCount:                         len(response.GetCitations()),
+		PolicyAllowed:                         decision.GetAllowed(),
+		PolicyRequiresApproval:                decision.GetRequiresApproval(),
+		PolicyDecisionSource:                  decision.GetDecisionSource(),
+		PolicyClassification:                  decision.GetClassification(),
+		PolicyPermissionVersion:               decision.GetPermissionVersion(),
+		MCPAudit:                              audit,
+		ActionAudit:                           actionAudit,
+		PackID:                                pack.GetPackId(),
+		EvidenceItemCount:                     len(pack.GetItems()),
+		SearchItemCount:                       int(counts.SearchMessage),
+		MemoryItemCount:                       int(counts.MemoryEvent),
+		CurrentMemoryAtSeq:                    currentCheck.AtConversationSeq,
+		ExpiredMemoryExcluded:                 currentCheck.ExpiredMemoryExcluded,
+		SupersededMemoryExcluded:              currentCheck.SupersededMemoryExcluded,
+		FutureMemoryExcluded:                  currentCheck.FutureMemoryExcluded,
+		CrossGroupSourceRefsPreserved:         true,
+		CrossGroupSpeakerAttributionPreserved: true,
+		SourceCounts:                          counts,
+		SearchProjectionVersion:               pack.GetSearchProjectionVersion(),
+		MemoryProjectionVersion:               pack.GetMemoryProjectionVersion(),
+		AgentVersion:                          response.GetAgentVersion(),
+		RetrievalVersion:                      pack.GetRetrievalVersion(),
+		Verified:                              verified,
+		StartedAt:                             startedAt,
+		FinishedAt:                            time.Now().UTC(),
 	}, nil
 }
 
@@ -1435,9 +1486,26 @@ func verifyMemoryItem(item *retrievalv1.EvidenceItem, seed seededData) error {
 	if len(item.GetSourceRefs()) == 0 {
 		return errors.New("memory item missing source refs")
 	}
-	ref := item.GetSourceRefs()[0]
-	if ref.GetSourceEventId() != seed.SourceEventID || ref.GetSourceId() != seed.MessageID {
-		return fmt.Errorf("unexpected memory source ref: %+v", ref)
+	primaryRef, ok := findSourceRef(item.GetSourceRefs(), seed.MessageID, seed.SourceEventID, seed.ConversationID)
+	if !ok {
+		return fmt.Errorf("memory item missing primary source ref for message %q", seed.MessageID)
+	}
+	if primaryRef.GetConversationSeq() != seed.ConversationSeq {
+		return fmt.Errorf("unexpected primary source ref seq: %+v", primaryRef)
+	}
+	crossRef, ok := findSourceRef(item.GetSourceRefs(), seed.CrossGroupMessageID, seed.CrossGroupSourceEventID, seed.CrossGroupConversationID)
+	if !ok {
+		return fmt.Errorf("memory item missing cross-group source ref for message %q", seed.CrossGroupMessageID)
+	}
+	if crossRef.GetConversationSeq() != seed.ConversationSeq+1 {
+		return fmt.Errorf("unexpected cross-group source ref seq: %+v", crossRef)
+	}
+	if !stringSliceContains(item.GetActorUserIds(), seed.SenderUserID) ||
+		!stringSliceContains(item.GetActorUserIds(), seed.CrossGroupActorUserID) {
+		return fmt.Errorf("unexpected actor user ids: %v", item.GetActorUserIds())
+	}
+	if !stringSliceContains(item.GetAudienceUserIds(), seed.ViewerUserID) {
+		return fmt.Errorf("unexpected audience user ids: %v", item.GetAudienceUserIds())
 	}
 	return nil
 }
@@ -1446,6 +1514,7 @@ type currentMemoryCheck struct {
 	AtConversationSeq        int64
 	ExpiredMemoryExcluded    bool
 	SupersededMemoryExcluded bool
+	FutureMemoryExcluded     bool
 }
 
 func verifyCurrentMemoryOnly(pack *retrievalv1.EvidencePack, seed seededData) (currentMemoryCheck, error) {
@@ -1453,6 +1522,7 @@ func verifyCurrentMemoryOnly(pack *retrievalv1.EvidencePack, seed seededData) (c
 		AtConversationSeq:        seed.CurrentMemoryAtSeq,
 		ExpiredMemoryExcluded:    true,
 		SupersededMemoryExcluded: true,
+		FutureMemoryExcluded:     true,
 	}
 	currentFound := false
 	for _, item := range pack.GetItems() {
@@ -1466,6 +1536,8 @@ func verifyCurrentMemoryOnly(pack *retrievalv1.EvidencePack, seed seededData) (c
 			check.ExpiredMemoryExcluded = false
 		case seed.SupersededMemoryEventID:
 			check.SupersededMemoryExcluded = false
+		case seed.FutureMemoryEventID:
+			check.FutureMemoryExcluded = false
 		}
 	}
 	if !currentFound {
@@ -1477,7 +1549,35 @@ func verifyCurrentMemoryOnly(pack *retrievalv1.EvidencePack, seed seededData) (c
 	if !check.SupersededMemoryExcluded {
 		return check, fmt.Errorf("superseded memory event %q returned as current evidence", seed.SupersededMemoryEventID)
 	}
+	if !check.FutureMemoryExcluded {
+		return check, fmt.Errorf("future memory event %q returned as current evidence", seed.FutureMemoryEventID)
+	}
 	return check, nil
+}
+
+func findSourceRef(
+	refs []*retrievalv1.EvidenceSourceRef,
+	sourceID string,
+	sourceEventID string,
+	conversationID string,
+) (*retrievalv1.EvidenceSourceRef, bool) {
+	for _, ref := range refs {
+		if ref.GetSourceId() == sourceID &&
+			ref.GetSourceEventId() == sourceEventID &&
+			ref.GetConversationId() == conversationID {
+			return ref, true
+		}
+	}
+	return nil, false
+}
+
+func stringSliceContains(values []string, target string) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
 }
 
 func verifySourceCoverage(pack *retrievalv1.EvidencePack, seed seededData) (sourceCounts, error) {
@@ -1567,7 +1667,11 @@ func writeSummary(resultDir string, result agentSmokeSummary) error {
 }
 
 func jsonArray(value string) string {
-	encoded, _ := json.Marshal([]string{value})
+	return jsonStringArray(value)
+}
+
+func jsonStringArray(values ...string) string {
+	encoded, _ := json.Marshal(values)
 	return string(encoded)
 }
 

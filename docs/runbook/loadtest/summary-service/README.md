@@ -7,6 +7,9 @@
 
 - `loadtest-report-20260619-summary-adapter-smoke.md`：真实本地
   `retrieval-gateway -> summary-service` adapter smoke。
+- `loadtest-report-20260620-summary-cross-temporal-stack-smoke.md`：真实本地
+  Summary service-stack smoke，验证跨群 source refs / speaker attribution 和
+  expired / superseded / future memory exclusion。
 
 ## 运行入口
 

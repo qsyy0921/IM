@@ -1,6 +1,6 @@
 # rag-service
 
-状态：foundation-active / provider boundary + current-memory live smoke passed.
+状态：foundation-active / provider boundary + cross-group temporal stack smoke passed.
 
 定位：RAG 问答边界服务。它只消费 retrieval-gateway 返回的
 `EvidencePack`，不直接读 message / conversation / search / memory 私有表，
@@ -20,7 +20,10 @@
 - `loadtest/rag`、`tools/run-ai-eval-rag-adapter.ps1` 和真实本地
   `retrieval-gateway -> rag-service` adapter smoke 已通过
 - `at_conversation_seq` 已透传到 EvidencePack current-memory query；CI-safe regression 和 2026-06-20 live smoke 均验证 stale memory 不作为 current citation。
+- 2026-06-20 cross-group / temporal stack smoke 已验证跨群 source refs /
+  speaker attribution 被保留，expired / superseded / future memory 不进入
+  current EvidencePack。
 
 下一步：
 
-- 配合下一轮 cross-group / temporal collaborative memory eval 扩展更多检索场景；provider 仍走 port、guard 和 citation verifier。
+- 将这些跨群 / 时间窗口断言沉淀进更统一的 ai-eval gate，并继续扩展更多检索场景；provider 仍走 port、guard 和 citation verifier。

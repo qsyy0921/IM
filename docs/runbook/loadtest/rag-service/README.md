@@ -7,6 +7,9 @@
 
 - `loadtest-report-20260619-rag-adapter-smoke.md`：真实本地
   `retrieval-gateway -> rag-service` RAG adapter smoke。
+- `loadtest-report-20260620-rag-cross-temporal-stack-smoke.md`：真实本地
+  RAG service-stack smoke，验证跨群 source refs / speaker attribution 和
+  expired / superseded / future memory exclusion。
 
 ## 运行入口
 

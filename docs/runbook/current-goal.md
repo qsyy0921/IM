@@ -63,8 +63,10 @@ vector-index-service
   `NEXUSIM_MEDIA_SERVICE_MODE=outbox-relay` runtime mode。
 - `media-service` outbox relay 真实 Kafka smoke 已通过，报告见
   `docs/runbook/loadtest/media-service/loadtest-report-20260620-media-outbox-relay-smoke.md`。
-- 下一步默认补 media processing worker；也可以推进 `notification-service`
-  stage switch / implementation。
+- `media-service` 第一版 processing worker 已落地，使用本地 mock scanner /
+  thumbnail / transcode adapter；真实进程 smoke 已通过，报告见
+  `docs/runbook/loadtest/media-service/loadtest-report-20260620-media-processing-worker-smoke.md`。
+- 下一步默认推进 `notification-service` stage switch / implementation。
 
 ## 硬边界
 

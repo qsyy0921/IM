@@ -68,8 +68,10 @@ eval 已能支撑算法切片；生产级 HA、长压、sizing 和完整系统�
   Docker / Prometheus / Grafana 覆盖已落；真实 PostgreSQL repository 集成测试和
   object_key 不出 public response / fake presign URL / outbox payload 的回归门禁
   已补；最小 gRPC smoke 已通过；`media_outbox -> im.media.events` 最小 relay
-  代码切片、Kafka schema、runtime mode、真实 PG relay 测试和真实 Kafka smoke 已补。
-  下一步进入 processing worker。
+  代码切片、Kafka schema、runtime mode、真实 PG relay 测试和真实 Kafka smoke 已补；
+  第一版 processing worker 和 mock scanner / thumbnail / transcode adapter 已补。
+  后续仍需真实 S3-compatible adapter、scanner、thumbnail / transcode provider 和更完整
+  download policy。
 
 ## 后置平台 / 产品化服务
 

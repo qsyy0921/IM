@@ -14,23 +14,26 @@
 默认行为：
 
 1. 构建 `services/media-service/cmd/media-service` 和 `loadtest/media`。
-2. 启动 `NEXUSIM_MEDIA_SERVICE_MODE=grpc`，使用 fake object store。
+2. 启动 `NEXUSIM_MEDIA_SERVICE_MODE=grpc` 和
+   `NEXUSIM_MEDIA_SERVICE_MODE=processing-worker`，使用 fake object store 和本地
+   mock scanner / thumbnail / transcode adapter。
 3. runner 通过真实 gRPC 调用：
    `CreateUploadSession -> CompleteUpload -> GetMediaAsset -> GetMediaDownloadURL`。
 4. runner 查询 PostgreSQL，确认：
    - asset 进入 `READY`；
    - scan 状态为 `PASSED`；
+   - image thumbnail 状态为 `PASSED`；
    - `media.asset.uploaded.v1` 和 `media.asset.ready.v1` outbox 已落库；
    - `media_access_audit` 写入一次允许访问；
    - public response、fake presigned URL 和 outbox payload 不暴露 `object_key`。
 
 边界：
 
-- 这是 fake object store 下的最小 gRPC smoke，不证明真实 S3 / scanner /
+- 这是 fake object store 和 mock processing adapter 下的最小 gRPC smoke，不证明真实 S3 / scanner /
   thumbnail / transcode provider 可用。
 - 当前只验证 media 本服务的 upload / complete / download 授权本地链路，不发布
   `im.media.events`。
-- processing worker 需要单独 smoke。
+- processing worker 真实进程会参与本地 smoke。
 
 ## Outbox relay / Kafka smoke
 
@@ -56,6 +59,7 @@
 报告：
 
 - `docs/runbook/loadtest/media-service/loadtest-report-20260620-media-outbox-relay-smoke.md`
+- `docs/runbook/loadtest/media-service/loadtest-report-20260620-media-processing-worker-smoke.md`
 
 边界：
 

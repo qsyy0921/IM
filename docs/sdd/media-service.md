@@ -336,5 +336,7 @@ media-orphan-cleanup
   阻塞后续事件、retry 写稳定低敏 `last_error`。
 - 真实 Kafka outbox relay smoke 已通过，验证 `media_outbox PUBLISHED=2`、
   `PENDING=0`、`DLQ=0`，并从 Kafka 读回两个 typed `MediaEvent`。
-- 下一步仍需 processing worker；真实 S3、scanner、thumbnail/transcode provider
-  继续后置。
+- 第一版 processing worker 已落地：`CompleteUpload` 进入 `PROCESSING` 并写
+  `SCAN` / `THUMBNAIL` / `TRANSCODE` jobs；worker 使用本地 mock adapter 完成
+  jobs 后推进 asset `READY`，再写 `media.asset.ready.v1`。
+- 真实 S3、scanner、thumbnail/transcode provider 继续后置。

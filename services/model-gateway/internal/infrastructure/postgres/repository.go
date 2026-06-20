@@ -24,6 +24,32 @@ func (repository *Repository) StartTextInvocation(
 	ctx context.Context,
 	prepared domain.PreparedTextGeneration,
 ) (types.ModelInvocation, bool, error) {
+	return repository.startInvocation(ctx, prepared.Command.AuthContext.TenantID, prepared.Command.CallerService, prepared.Command.IdempotencyKey, prepared.CommandHash, domain.InvocationFromStart(prepared))
+}
+
+func (repository *Repository) CompleteTextInvocation(ctx context.Context, invocation types.ModelInvocation) error {
+	return repository.completeInvocation(ctx, invocation)
+}
+
+func (repository *Repository) StartEmbeddingInvocation(
+	ctx context.Context,
+	prepared domain.PreparedEmbedding,
+) (types.ModelInvocation, bool, error) {
+	return repository.startInvocation(ctx, prepared.Command.AuthContext.TenantID, prepared.Command.CallerService, prepared.Command.IdempotencyKey, prepared.CommandHash, domain.InvocationFromEmbeddingStart(prepared))
+}
+
+func (repository *Repository) CompleteEmbeddingInvocation(ctx context.Context, invocation types.ModelInvocation) error {
+	return repository.completeInvocation(ctx, invocation)
+}
+
+func (repository *Repository) startInvocation(
+	ctx context.Context,
+	tenantID types.TenantID,
+	callerService string,
+	idempotencyKey string,
+	commandHash string,
+	invocation types.ModelInvocation,
+) (types.ModelInvocation, bool, error) {
 	if repository.pool == nil {
 		return types.ModelInvocation{}, false, types.NewDBWriteFailed("model repository is not configured")
 	}
@@ -33,12 +59,12 @@ func (repository *Repository) StartTextInvocation(
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
-	existing, found, err := findInvocationByIdempotency(ctx, tx, prepared.Command.AuthContext.TenantID, prepared.Command.CallerService, prepared.Command.IdempotencyKey)
+	existing, found, err := findInvocationByIdempotency(ctx, tx, tenantID, callerService, idempotencyKey)
 	if err != nil {
 		return types.ModelInvocation{}, false, err
 	}
 	if found {
-		if existing.CommandHash != prepared.CommandHash {
+		if existing.CommandHash != commandHash {
 			return types.ModelInvocation{}, false, types.NewFailedPrecondition("idempotency command conflict")
 		}
 		if err := tx.Commit(ctx); err != nil {
@@ -47,7 +73,6 @@ func (repository *Repository) StartTextInvocation(
 		return existing, true, nil
 	}
 
-	invocation := domain.InvocationFromStart(prepared)
 	if err := insertInvocation(ctx, tx, invocation); err != nil {
 		return types.ModelInvocation{}, false, types.NewDBWriteFailed(err.Error())
 	}
@@ -57,7 +82,7 @@ func (repository *Repository) StartTextInvocation(
 	return invocation, false, nil
 }
 
-func (repository *Repository) CompleteTextInvocation(ctx context.Context, invocation types.ModelInvocation) error {
+func (repository *Repository) completeInvocation(ctx context.Context, invocation types.ModelInvocation) error {
 	if repository.pool == nil {
 		return types.NewDBWriteFailed("model repository is not configured")
 	}

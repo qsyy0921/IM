@@ -70,9 +70,9 @@ Foundation backlog 锚点：`search-service`、`memory-service`、`retrieval-gat
 - `presence-service`：后续仍需 push-gateway session event consumer、
   `SubscribePresence`、stale scanner、presence outbox relay、Redis hot-state
   integration 和 provider-grade privacy / contacts policy integration。
-- `model-gateway`：后续仍需真实 OpenAI / Claude / local-model HTTP provider、
-  embedding、rerank、outbox relay、route-refresh worker、budget-reset worker 和
-  cleanup worker。
+- `model-gateway`：`InvokeEmbedding` 第一版 mock provider path 已落；后续仍需真实
+  OpenAI / Claude / local-model HTTP provider、真实 embedding provider、rerank、outbox relay、
+  route-refresh worker、budget-reset worker 和 cleanup worker。
 - `knowledge-ingestion-service`：后续仍需 parser worker、embedding handoff、
   tombstone / delete proof、outbox relay 和真实 connector；公开 API 级
   vector-index handoff smoke 已通过，真正异步 handoff worker 仍可后置。

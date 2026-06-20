@@ -20,6 +20,7 @@ const _ = grpc.SupportPackageIsVersion9
 
 const (
 	ModelGatewayService_InvokeTextGeneration_FullMethodName = "/nexusim.model.v1.ModelGatewayService/InvokeTextGeneration"
+	ModelGatewayService_InvokeEmbedding_FullMethodName      = "/nexusim.model.v1.ModelGatewayService/InvokeEmbedding"
 	ModelGatewayService_GetModelInvocation_FullMethodName   = "/nexusim.model.v1.ModelGatewayService/GetModelInvocation"
 )
 
@@ -28,6 +29,7 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type ModelGatewayServiceClient interface {
 	InvokeTextGeneration(ctx context.Context, in *InvokeTextGenerationRequest, opts ...grpc.CallOption) (*InvokeTextGenerationResponse, error)
+	InvokeEmbedding(ctx context.Context, in *InvokeEmbeddingRequest, opts ...grpc.CallOption) (*InvokeEmbeddingResponse, error)
 	GetModelInvocation(ctx context.Context, in *GetModelInvocationRequest, opts ...grpc.CallOption) (*GetModelInvocationResponse, error)
 }
 
@@ -49,6 +51,16 @@ func (c *modelGatewayServiceClient) InvokeTextGeneration(ctx context.Context, in
 	return out, nil
 }
 
+func (c *modelGatewayServiceClient) InvokeEmbedding(ctx context.Context, in *InvokeEmbeddingRequest, opts ...grpc.CallOption) (*InvokeEmbeddingResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(InvokeEmbeddingResponse)
+	err := c.cc.Invoke(ctx, ModelGatewayService_InvokeEmbedding_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *modelGatewayServiceClient) GetModelInvocation(ctx context.Context, in *GetModelInvocationRequest, opts ...grpc.CallOption) (*GetModelInvocationResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetModelInvocationResponse)
@@ -64,6 +76,7 @@ func (c *modelGatewayServiceClient) GetModelInvocation(ctx context.Context, in *
 // for forward compatibility.
 type ModelGatewayServiceServer interface {
 	InvokeTextGeneration(context.Context, *InvokeTextGenerationRequest) (*InvokeTextGenerationResponse, error)
+	InvokeEmbedding(context.Context, *InvokeEmbeddingRequest) (*InvokeEmbeddingResponse, error)
 	GetModelInvocation(context.Context, *GetModelInvocationRequest) (*GetModelInvocationResponse, error)
 	mustEmbedUnimplementedModelGatewayServiceServer()
 }
@@ -77,6 +90,9 @@ type UnimplementedModelGatewayServiceServer struct{}
 
 func (UnimplementedModelGatewayServiceServer) InvokeTextGeneration(context.Context, *InvokeTextGenerationRequest) (*InvokeTextGenerationResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method InvokeTextGeneration not implemented")
+}
+func (UnimplementedModelGatewayServiceServer) InvokeEmbedding(context.Context, *InvokeEmbeddingRequest) (*InvokeEmbeddingResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method InvokeEmbedding not implemented")
 }
 func (UnimplementedModelGatewayServiceServer) GetModelInvocation(context.Context, *GetModelInvocationRequest) (*GetModelInvocationResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetModelInvocation not implemented")
@@ -120,6 +136,24 @@ func _ModelGatewayService_InvokeTextGeneration_Handler(srv interface{}, ctx cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ModelGatewayService_InvokeEmbedding_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(InvokeEmbeddingRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ModelGatewayServiceServer).InvokeEmbedding(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ModelGatewayService_InvokeEmbedding_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ModelGatewayServiceServer).InvokeEmbedding(ctx, req.(*InvokeEmbeddingRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _ModelGatewayService_GetModelInvocation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetModelInvocationRequest)
 	if err := dec(in); err != nil {
@@ -148,6 +182,10 @@ var ModelGatewayService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "InvokeTextGeneration",
 			Handler:    _ModelGatewayService_InvokeTextGeneration_Handler,
+		},
+		{
+			MethodName: "InvokeEmbedding",
+			Handler:    _ModelGatewayService_InvokeEmbedding_Handler,
 		},
 		{
 			MethodName: "GetModelInvocation",

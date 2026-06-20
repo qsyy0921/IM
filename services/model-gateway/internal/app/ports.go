@@ -10,11 +10,17 @@ import (
 type Repository interface {
 	StartTextInvocation(ctx context.Context, prepared domain.PreparedTextGeneration) (types.ModelInvocation, bool, error)
 	CompleteTextInvocation(ctx context.Context, invocation types.ModelInvocation) error
+	StartEmbeddingInvocation(ctx context.Context, prepared domain.PreparedEmbedding) (types.ModelInvocation, bool, error)
+	CompleteEmbeddingInvocation(ctx context.Context, invocation types.ModelInvocation) error
 	GetModelInvocation(ctx context.Context, tenantID types.TenantID, invocationID string) (types.ModelInvocation, error)
 }
 
 type TextProvider interface {
 	GenerateText(ctx context.Context, request domain.ProviderTextRequest) (domain.ProviderTextResult, error)
+}
+
+type EmbeddingProvider interface {
+	Embed(ctx context.Context, request domain.ProviderEmbeddingRequest) (domain.ProviderEmbeddingResult, error)
 }
 
 type InvocationIDGenerator interface {

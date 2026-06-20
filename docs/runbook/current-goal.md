@@ -58,6 +58,11 @@ model-gateway / workflow / knowledge-ingestion / vector-index
   DLQ 状态推进、focused tests 和 `loadtest/vectorindex` 真实 Kafka relay smoke；
   `loadtest/knowledgevector` 已跑通 knowledge chunk manifest -> vector upsert ->
   vector search 的公开 API handoff。
+- `model-gateway` 已补 `InvokeEmbedding` 第一版公开 gRPC 路径：deterministic mock
+  embedding provider 会把向量返回给调用方，但 PostgreSQL / outbox 只保存 input hash、
+  embedding hash、维度、token / cost / latency 等低敏 metadata，不保存 raw input 或
+  embedding vector array。这解除后续 `vector-index-service` embedding worker 不能绕过
+  model-gateway 的边界问题。
 - `admin-service` 已从 stage-switch 进入 product-active 第一版 implementation
   slice，覆盖 `CreateAdminOperation`、`ApproveAdminOperation`、
   `GetAdminOperation`、`ListAdminOperations`、PostgreSQL operation / approval
@@ -89,8 +94,9 @@ model-gateway / workflow / knowledge-ingestion / vector-index
 
 - 默认继续补更多下游公开 admin API adapter，或为 admin config / quota 增加
   compensation operator。
-- 也可以继续 `vector-index-service` embedding worker / Milvus 或 pgvector backend /
-  provider backend rebuild。
+- 默认下一步可继续 `vector-index-service` embedding worker，通过 `model-gateway.InvokeEmbedding`
+  生成向量后再写 vector-index；或继续 Milvus / pgvector backend / provider backend
+  rebuild。
 - 也可以继续 notification SMTP / SMS / APNs / FCM adapter 或 bounce-suppression。
 
 ## 硬边界

@@ -74,8 +74,11 @@
 - `model-gateway` product-active：SDD v0.1 和 stage-switch review 已通过，
   第一版 proto / migration / 六层 skeleton / `grpc` runtime / Docker /
   Prometheus / Grafana 覆盖已落；当前覆盖 `InvokeTextGeneration`、
-  `GetModelInvocation`、allowlisted deterministic mock provider、低敏
-  invocation metadata 和 `model_outbox`；最小 gRPC smoke 已通过并归档。
+  `InvokeEmbedding`、`GetModelInvocation`、allowlisted deterministic mock text /
+  embedding provider、低敏 invocation metadata 和 `model_outbox`；`InvokeEmbedding`
+  返回向量给调用方，但 PostgreSQL / outbox 只保存 input hash、embedding hash、维度、
+  token / cost / latency 等 metadata，不保存 raw input 或 embedding vector array；
+  最小 gRPC smoke 已通过并归档。
 - `knowledge-ingestion-service` product-active：SDD v0.1 和 stage-switch review
   已通过，第一版 proto / migration / 六层 skeleton / `grpc` runtime / Docker /
   Prometheus / Grafana 覆盖已落；当前覆盖 `CreateKnowledgeSource`、

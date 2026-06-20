@@ -7,6 +7,7 @@ import (
 
 const (
 	RequestTypeTextGeneration = "TEXT_GENERATION"
+	RequestTypeEmbedding      = "EMBEDDING"
 
 	DataClassLowSensitive      = "LOW_SENSITIVE"
 	DataClassBusinessInternal  = "BUSINESS_INTERNAL"
@@ -24,14 +25,19 @@ const (
 	FailureClassRouteUnavailable = "ROUTE_UNAVAILABLE"
 
 	DefaultModelClass       = "TEXT_GENERATION"
+	DefaultEmbeddingClass   = "EMBEDDING"
 	DefaultRoutePolicy      = "LOCAL_MOCK"
 	DefaultSafetyPolicy     = "DEFAULT"
 	DefaultRouteVersion     = "local-v1"
 	DefaultProviderID       = "local-mock"
 	DefaultModelID          = "deterministic-text-v1"
+	DefaultEmbeddingModelID = "deterministic-embedding-v1"
 	DefaultTimeout          = 5 * time.Second
 	MaxTimeout              = 30 * time.Second
 	MaxTextGenerationTokens = 4096
+	DefaultEmbeddingDims    = 8
+	MaxEmbeddingDims        = 1536
+	MaxEmbeddingInputChars  = 32768
 )
 
 type PromptPart struct {
@@ -68,6 +74,26 @@ type TextGenerationCommand struct {
 	CorrelationID       string
 	CausationID         string
 	TraceID             string
+}
+
+type EmbeddingCommand struct {
+	AuthContext        AuthContext
+	CallerService      string
+	CallerUseCase      string
+	RequestID          string
+	IdempotencyKey     string
+	ModelClass         string
+	PreferredModel     string
+	RoutePolicy        string
+	DataClass          string
+	InputText          string
+	InputHash          string
+	InputSchemaVersion int
+	Dimensions         int
+	Timeout            time.Duration
+	CorrelationID      string
+	CausationID        string
+	TraceID            string
 }
 
 func (command TextGenerationCommand) Validate() error {
@@ -115,6 +141,43 @@ func (command TextGenerationCommand) Validate() error {
 	return nil
 }
 
+func (command EmbeddingCommand) Validate() error {
+	if err := command.AuthContext.ValidateService(); err != nil {
+		return err
+	}
+	if strings.TrimSpace(command.CallerService) == "" {
+		return NewInvalidArgument("caller_service is required")
+	}
+	if strings.TrimSpace(command.CallerUseCase) == "" {
+		return NewInvalidArgument("caller_use_case is required")
+	}
+	if strings.TrimSpace(command.IdempotencyKey) == "" {
+		return NewInvalidArgument("idempotency_key is required")
+	}
+	if !IsValidDataClass(command.DataClass) {
+		return NewInvalidArgument("data_class is invalid")
+	}
+	if strings.TrimSpace(command.InputText) == "" {
+		return NewInvalidArgument("input_text is required")
+	}
+	if len(command.InputText) > MaxEmbeddingInputChars {
+		return NewInvalidArgument("input_text is too large")
+	}
+	if strings.TrimSpace(command.InputHash) == "" {
+		return NewInvalidArgument("input_hash is required")
+	}
+	if command.InputSchemaVersion <= 0 {
+		return NewInvalidArgument("input_schema_version is required")
+	}
+	if command.Dimensions <= 0 || command.Dimensions > MaxEmbeddingDims {
+		return NewInvalidArgument("dimensions is invalid")
+	}
+	if command.Timeout <= 0 || command.Timeout > MaxTimeout {
+		return NewInvalidArgument("timeout_ms is invalid")
+	}
+	return nil
+}
+
 func (command TextGenerationCommand) Normalized() TextGenerationCommand {
 	command.CallerService = strings.TrimSpace(command.CallerService)
 	command.CallerUseCase = strings.TrimSpace(command.CallerUseCase)
@@ -148,6 +211,35 @@ func (command TextGenerationCommand) Normalized() TextGenerationCommand {
 	for index := range command.PromptParts {
 		command.PromptParts[index].Role = strings.ToUpper(strings.TrimSpace(command.PromptParts[index].Role))
 		command.PromptParts[index].ContentHash = strings.TrimSpace(command.PromptParts[index].ContentHash)
+	}
+	return command
+}
+
+func (command EmbeddingCommand) Normalized() EmbeddingCommand {
+	command.CallerService = strings.TrimSpace(command.CallerService)
+	command.CallerUseCase = strings.TrimSpace(command.CallerUseCase)
+	command.RequestID = strings.TrimSpace(command.RequestID)
+	command.IdempotencyKey = strings.TrimSpace(command.IdempotencyKey)
+	command.ModelClass = strings.ToUpper(strings.TrimSpace(command.ModelClass))
+	if command.ModelClass == "" {
+		command.ModelClass = DefaultEmbeddingClass
+	}
+	command.PreferredModel = strings.TrimSpace(command.PreferredModel)
+	if command.PreferredModel == "" {
+		command.PreferredModel = DefaultEmbeddingModelID
+	}
+	command.RoutePolicy = strings.ToUpper(strings.TrimSpace(command.RoutePolicy))
+	if command.RoutePolicy == "" {
+		command.RoutePolicy = DefaultRoutePolicy
+	}
+	command.DataClass = strings.ToUpper(strings.TrimSpace(command.DataClass))
+	command.InputText = strings.TrimSpace(command.InputText)
+	command.InputHash = strings.TrimSpace(command.InputHash)
+	command.CorrelationID = strings.TrimSpace(command.CorrelationID)
+	command.CausationID = strings.TrimSpace(command.CausationID)
+	command.TraceID = strings.TrimSpace(command.TraceID)
+	if command.TraceID == "" {
+		command.TraceID = strings.TrimSpace(command.AuthContext.TraceID)
 	}
 	return command
 }
@@ -208,6 +300,13 @@ type TextGenerationResult struct {
 	OutputText     string
 	OutputReturned bool
 	Replayed       bool
+}
+
+type EmbeddingResult struct {
+	Invocation        ModelInvocation
+	EmbeddingValues   []float32
+	EmbeddingReturned bool
+	Replayed          bool
 }
 
 func IsValidDataClass(value string) bool {

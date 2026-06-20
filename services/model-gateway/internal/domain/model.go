@@ -20,6 +20,16 @@ type PreparedTextGeneration struct {
 	StartedAt    time.Time
 }
 
+type PreparedEmbedding struct {
+	Command      types.EmbeddingCommand
+	CommandHash  string
+	InvocationID string
+	ProviderID   string
+	ModelID      string
+	RouteVersion string
+	StartedAt    time.Time
+}
+
 type ProviderTextRequest struct {
 	ProviderID      string
 	ModelID         string
@@ -30,9 +40,28 @@ type ProviderTextRequest struct {
 	Timeout         time.Duration
 }
 
+type ProviderEmbeddingRequest struct {
+	ProviderID string
+	ModelID    string
+	InputText  string
+	InputHash  string
+	Dimensions int
+	Timeout    time.Duration
+}
+
 type ProviderTextResult struct {
 	OutputText              string
 	OutputHash              string
+	OutputSchemaVersion     int
+	TokenUsage              types.TokenUsage
+	EstimatedCostMicrounits int64
+	Latency                 time.Duration
+	FallbackUsed            bool
+}
+
+type ProviderEmbeddingResult struct {
+	EmbeddingValues         []float32
+	EmbeddingHash           string
 	OutputSchemaVersion     int
 	TokenUsage              types.TokenUsage
 	EstimatedCostMicrounits int64
@@ -79,6 +108,45 @@ func PrepareTextGeneration(
 	}, nil
 }
 
+func PrepareEmbedding(
+	command types.EmbeddingCommand,
+	invocationID string,
+	now time.Time,
+) (PreparedEmbedding, error) {
+	if command.Timeout == 0 {
+		command.Timeout = types.DefaultTimeout
+	}
+	if command.Dimensions == 0 {
+		command.Dimensions = types.DefaultEmbeddingDims
+	}
+	normalized := command.Normalized()
+	if err := normalized.Validate(); err != nil {
+		return PreparedEmbedding{}, err
+	}
+	if normalized.ModelClass != types.DefaultEmbeddingClass {
+		return PreparedEmbedding{}, types.NewFailedPrecondition("model_class is not allowlisted")
+	}
+	if normalized.RoutePolicy != types.DefaultRoutePolicy {
+		return PreparedEmbedding{}, types.NewFailedPrecondition("route_policy is not allowlisted")
+	}
+	if normalized.PreferredModel != types.DefaultEmbeddingModelID {
+		return PreparedEmbedding{}, types.NewFailedPrecondition("preferred_model is not allowlisted")
+	}
+	hash, err := embeddingCommandHash(normalized)
+	if err != nil {
+		return PreparedEmbedding{}, err
+	}
+	return PreparedEmbedding{
+		Command:      normalized,
+		CommandHash:  hash,
+		InvocationID: strings.TrimSpace(invocationID),
+		ProviderID:   types.DefaultProviderID,
+		ModelID:      types.DefaultEmbeddingModelID,
+		RouteVersion: types.DefaultRouteVersion,
+		StartedAt:    now.UTC(),
+	}, nil
+}
+
 func ProviderRequest(prepared PreparedTextGeneration) ProviderTextRequest {
 	command := prepared.Command
 	return ProviderTextRequest{
@@ -89,6 +157,18 @@ func ProviderRequest(prepared PreparedTextGeneration) ProviderTextRequest {
 		MaxOutputTokens: command.MaxOutputTokens,
 		Temperature:     command.Temperature,
 		Timeout:         command.Timeout,
+	}
+}
+
+func EmbeddingProviderRequest(prepared PreparedEmbedding) ProviderEmbeddingRequest {
+	command := prepared.Command
+	return ProviderEmbeddingRequest{
+		ProviderID: prepared.ProviderID,
+		ModelID:    prepared.ModelID,
+		InputText:  command.InputText,
+		InputHash:  command.InputHash,
+		Dimensions: command.Dimensions,
+		Timeout:    command.Timeout,
 	}
 }
 
@@ -118,12 +198,54 @@ func InvocationFromStart(prepared PreparedTextGeneration) types.ModelInvocation 
 	}
 }
 
+func InvocationFromEmbeddingStart(prepared PreparedEmbedding) types.ModelInvocation {
+	command := prepared.Command
+	return types.ModelInvocation{
+		TenantID:            command.AuthContext.TenantID,
+		InvocationID:        prepared.InvocationID,
+		IdempotencyKey:      command.IdempotencyKey,
+		CommandHash:         prepared.CommandHash,
+		CallerService:       command.CallerService,
+		CallerUseCase:       command.CallerUseCase,
+		RequestType:         types.RequestTypeEmbedding,
+		DataClass:           command.DataClass,
+		ProviderID:          prepared.ProviderID,
+		ModelID:             prepared.ModelID,
+		RouteVersion:        prepared.RouteVersion,
+		PromptHash:          command.InputHash,
+		Status:              types.InvocationStatusPending,
+		Timeout:             command.Timeout,
+		PromptSchemaVersion: command.InputSchemaVersion,
+		CorrelationID:       command.CorrelationID,
+		CausationID:         command.CausationID,
+		TraceID:             command.TraceID,
+		CreatedAt:           prepared.StartedAt,
+	}
+}
+
 func InvocationFromSuccess(
 	started types.ModelInvocation,
 	result ProviderTextResult,
 	completedAt time.Time,
 ) types.ModelInvocation {
 	started.OutputHash = result.OutputHash
+	started.OutputSchemaVersion = result.OutputSchemaVersion
+	started.TokenUsage = result.TokenUsage
+	started.EstimatedCostMicrounits = result.EstimatedCostMicrounits
+	started.Status = types.InvocationStatusSucceeded
+	started.FailureClass = types.FailureClassNone
+	started.FallbackUsed = result.FallbackUsed
+	started.ProviderLatency = result.Latency
+	started.CompletedAt = completedAt.UTC()
+	return started
+}
+
+func InvocationFromEmbeddingSuccess(
+	started types.ModelInvocation,
+	result ProviderEmbeddingResult,
+	completedAt time.Time,
+) types.ModelInvocation {
+	started.OutputHash = result.EmbeddingHash
 	started.OutputSchemaVersion = result.OutputSchemaVersion
 	started.TokenUsage = result.TokenUsage
 	started.EstimatedCostMicrounits = result.EstimatedCostMicrounits
@@ -149,6 +271,11 @@ func InvocationFromFailure(
 	started.ProviderLatency = latency
 	started.CompletedAt = completedAt.UTC()
 	return started
+}
+
+func EmbeddingHash(values []float32) string {
+	encoded, _ := json.Marshal(values)
+	return HashRef(string(encoded))
 }
 
 func OutputHash(output string) string {
@@ -182,6 +309,28 @@ func commandHash(command types.TextGenerationCommand) (string, error) {
 	encoded, err := json.Marshal(payload)
 	if err != nil {
 		return "", types.NewInvalidArgument("model command hash payload invalid")
+	}
+	return HashRef(string(encoded)), nil
+}
+
+func embeddingCommandHash(command types.EmbeddingCommand) (string, error) {
+	payload := map[string]any{
+		"tenant_id":            string(command.AuthContext.TenantID),
+		"caller_service":       command.CallerService,
+		"caller_use_case":      command.CallerUseCase,
+		"idempotency_key":      command.IdempotencyKey,
+		"model_class":          command.ModelClass,
+		"preferred_model":      command.PreferredModel,
+		"route_policy":         command.RoutePolicy,
+		"data_class":           command.DataClass,
+		"input_hash":           command.InputHash,
+		"input_schema_version": command.InputSchemaVersion,
+		"dimensions":           command.Dimensions,
+		"timeout_ms":           command.Timeout.Milliseconds(),
+	}
+	encoded, err := json.Marshal(payload)
+	if err != nil {
+		return "", types.NewInvalidArgument("model embedding command hash payload invalid")
 	}
 	return HashRef(string(encoded)), nil
 }

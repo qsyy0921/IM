@@ -35,3 +35,33 @@ func TestPrepareTextGenerationNormalizesAndRejectsExternalRoute(t *testing.T) {
 		t.Fatal("expected non-allowlisted route policy to fail")
 	}
 }
+
+func TestPrepareEmbeddingUsesInputHashAndRejectsTextModel(t *testing.T) {
+	command := types.EmbeddingCommand{
+		AuthContext:        types.AuthContext{TenantID: "tenant-1", ServiceName: "vector-index-service"},
+		CallerService:      "vector-index-service",
+		CallerUseCase:      "embed-vector-item",
+		IdempotencyKey:     "idem-embed-1",
+		ModelClass:         "embedding",
+		PreferredModel:     types.DefaultEmbeddingModelID,
+		RoutePolicy:        types.DefaultRoutePolicy,
+		DataClass:          "business_internal",
+		InputText:          "source chunk text",
+		InputHash:          "sha256:input",
+		InputSchemaVersion: 1,
+		Dimensions:         8,
+		Timeout:            time.Second,
+	}
+	prepared, err := PrepareEmbedding(command, "minv_embed", time.Unix(1, 0))
+	if err != nil {
+		t.Fatalf("prepare embedding: %v", err)
+	}
+	invocation := InvocationFromEmbeddingStart(prepared)
+	if invocation.RequestType != types.RequestTypeEmbedding || invocation.PromptHash != "sha256:input" {
+		t.Fatalf("unexpected embedding invocation: %+v", invocation)
+	}
+	command.PreferredModel = types.DefaultModelID
+	if _, err := PrepareEmbedding(command, "minv_embed_2", time.Unix(1, 0)); err == nil {
+		t.Fatal("expected text model to be rejected for embedding")
+	}
+}

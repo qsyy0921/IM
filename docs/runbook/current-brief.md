@@ -35,7 +35,8 @@ future platform / product services 的 10 个 SDD draft 已存在；`media-servi
 `knowledge-ingestion-service` 已完成第一版 metadata + chunk manifest path；
 `workflow-service` 已完成 `CreateWorkflow`、`RecordWorkflowDecision`、`GetWorkflow`
 最小审批等待路径，并通过 focused checks / 完整 `check-local`。
-`vector-index-service` 已完成第一版 `UpsertVectorItem` / `TombstoneVectorItem` /
+`model-gateway` 已补第一版 `InvokeEmbedding` mock provider 路径；`vector-index-service`
+已完成第一版 `UpsertVectorItem` / `TombstoneVectorItem` /
 `SearchVectors` / `GetVectorIndexJob` / `RequestVectorRebuild` path、
 first-stage rebuild checkpoint worker、`vector_outbox -> im.vector.events` 第一版 relay、
 真实 Kafka relay smoke，以及 knowledge chunk -> vector upsert 公开 API handoff smoke。`admin-service` 已完成第一版

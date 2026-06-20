@@ -62,6 +62,49 @@ func TestRepositoryTextInvocationIntegration(t *testing.T) {
 	assertModelOutboxLowSensitive(t, ctx, pool)
 }
 
+func TestRepositoryEmbeddingInvocationIntegration(t *testing.T) {
+	ctx := context.Background()
+	pool := openModelTestPool(t)
+	resetModelTables(t, ctx, pool)
+	repository := NewRepository(pool)
+	prepared := prepareEmbeddingInvocation(t, "embed-idem-1", "sha256:embedding-input", "minv_embedding_1")
+
+	started, replayed, err := repository.StartEmbeddingInvocation(ctx, prepared)
+	if err != nil {
+		t.Fatalf("start embedding invocation: %v", err)
+	}
+	if replayed || started.Status != types.InvocationStatusPending || started.RequestType != types.RequestTypeEmbedding {
+		t.Fatalf("unexpected started embedding invocation: replayed=%v %+v", replayed, started)
+	}
+	completed := domain.InvocationFromEmbeddingSuccess(started, domain.ProviderEmbeddingResult{
+		EmbeddingValues:         []float32{0.11, 0.22, 0.33, 0.44},
+		EmbeddingHash:           "sha256:embedding-output",
+		OutputSchemaVersion:     1,
+		TokenUsage:              types.TokenUsage{InputTokens: 4, OutputTokens: 0, TotalTokens: 4},
+		EstimatedCostMicrounits: 20,
+		Latency:                 7 * time.Millisecond,
+	}, time.Now().UTC())
+	if err := repository.CompleteEmbeddingInvocation(ctx, completed); err != nil {
+		t.Fatalf("complete embedding invocation: %v", err)
+	}
+
+	replay, replayed, err := repository.StartEmbeddingInvocation(ctx, prepared)
+	if err != nil {
+		t.Fatalf("replay start embedding invocation: %v", err)
+	}
+	if !replayed || replay.InvocationID != started.InvocationID || replay.OutputHash != "sha256:embedding-output" {
+		t.Fatalf("unexpected embedding replay: replayed=%v %+v", replayed, replay)
+	}
+	loaded, err := repository.GetModelInvocation(ctx, "tenant-model-test", started.InvocationID)
+	if err != nil {
+		t.Fatalf("get embedding invocation: %v", err)
+	}
+	if loaded.PromptHash != "sha256:embedding-input" || loaded.RequestType != types.RequestTypeEmbedding {
+		t.Fatalf("unexpected loaded embedding invocation: %+v", loaded)
+	}
+	assertModelOutboxLowSensitive(t, ctx, pool)
+}
+
 func prepareTextInvocation(
 	t *testing.T,
 	idempotencyKey string,
@@ -93,6 +136,39 @@ func prepareTextInvocation(
 	}, invocationID, time.Now().UTC())
 	if err != nil {
 		t.Fatalf("prepare text invocation: %v", err)
+	}
+	return prepared
+}
+
+func prepareEmbeddingInvocation(
+	t *testing.T,
+	idempotencyKey string,
+	inputHash string,
+	invocationID string,
+) domain.PreparedEmbedding {
+	t.Helper()
+	prepared, err := domain.PrepareEmbedding(types.EmbeddingCommand{
+		AuthContext: types.AuthContext{
+			TenantID:    "tenant-model-test",
+			ServiceName: "vector-index-service",
+		},
+		CallerService:      "vector-index-service",
+		CallerUseCase:      "embed-vector-item",
+		IdempotencyKey:     idempotencyKey,
+		ModelClass:         types.DefaultEmbeddingClass,
+		PreferredModel:     types.DefaultEmbeddingModelID,
+		RoutePolicy:        types.DefaultRoutePolicy,
+		DataClass:          types.DataClassBusinessInternal,
+		InputText:          "do not persist this raw embedding input",
+		InputHash:          inputHash,
+		InputSchemaVersion: 1,
+		Dimensions:         4,
+		Timeout:            time.Second,
+		CorrelationID:      "corr-model-test",
+		TraceID:            "trace-model-test",
+	}, invocationID, time.Now().UTC())
+	if err != nil {
+		t.Fatalf("prepare embedding invocation: %v", err)
 	}
 	return prepared
 }
@@ -156,7 +232,7 @@ func assertModelOutboxLowSensitive(t *testing.T, ctx context.Context, pool *pgxp
 		if err := rows.Scan(&aggregateID, &partitionKey, &payload); err != nil {
 			t.Fatalf("scan model outbox: %v", err)
 		}
-		for _, forbidden := range []string{"source backed answer only", "do not persist this raw output", "api_key", "private_key", "provider_body", "password"} {
+		for _, forbidden := range []string{"source backed answer only", "do not persist this raw output", "do not persist this raw embedding input", "0.11", "0.22", "0.33", "0.44", "api_key", "private_key", "provider_body", "password"} {
 			if strings.Contains(payload, forbidden) || strings.Contains(aggregateID, forbidden) || strings.Contains(partitionKey, forbidden) {
 				t.Fatalf("model outbox leaked forbidden value %q: aggregate=%s partition=%s payload=%s", forbidden, aggregateID, partitionKey, payload)
 			}

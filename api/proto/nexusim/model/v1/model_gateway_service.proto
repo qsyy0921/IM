@@ -6,6 +6,7 @@ option go_package = "github.com/qsyy0921/IM/api/proto/nexusim/model/v1;modelv1";
 
 service ModelGatewayService {
   rpc InvokeTextGeneration(InvokeTextGenerationRequest) returns (InvokeTextGenerationResponse);
+  rpc InvokeEmbedding(InvokeEmbeddingRequest) returns (InvokeEmbeddingResponse);
   rpc GetModelInvocation(GetModelInvocationRequest) returns (GetModelInvocationResponse);
 }
 
@@ -94,6 +95,42 @@ message InvokeTextGenerationResponse {
   int64 provider_latency_ms = 11;
   bool replayed = 12;
   bool output_returned = 13;
+}
+
+message InvokeEmbeddingRequest {
+  AuthContext auth_context = 1;
+  string caller_service = 2;
+  string caller_use_case = 3;
+  string request_id = 4;
+  string idempotency_key = 5;
+  string model_class = 6;
+  string preferred_model = 7;
+  string route_policy = 8;
+  string data_class = 9;
+  string input_text = 10;
+  string input_hash = 11;
+  int32 input_schema_version = 12;
+  int32 dimensions = 13;
+  int64 timeout_ms = 14;
+  string correlation_id = 15;
+  string causation_id = 16;
+  string trace_id = 17;
+}
+
+message InvokeEmbeddingResponse {
+  string invocation_id = 1;
+  string provider_id = 2;
+  string model_id = 3;
+  repeated float embedding_values = 4;
+  string embedding_hash = 5;
+  int32 dimensions = 6;
+  TokenUsage token_usage = 7;
+  int64 estimated_cost_microunits = 8;
+  string failure_class = 9;
+  bool fallback_used = 10;
+  int64 provider_latency_ms = 11;
+  bool replayed = 12;
+  bool embedding_returned = 13;
 }
 
 message GetModelInvocationRequest {

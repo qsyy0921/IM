@@ -8,7 +8,7 @@ embedding、rerank、provider route、超时、重试、fallback、成本预算�
 
 职责：
 
-- 提供统一的 `InvokeTextGeneration`、`CreateEmbedding`、`RerankEvidence` 调用面。
+- 提供统一的 `InvokeTextGeneration`、`InvokeEmbedding`、`RerankEvidence` 调用面。
 - 适配 OpenAI-compatible、Claude-compatible、本地模型 HTTP、embedding 和 rerank provider。
 - 执行 provider allowlist、模型 allowlist、tenant budget、timeout、retry、circuit breaker。
 - 记录低敏 invocation metadata、token / cost 估算、latency、failure class 和 trace refs。
@@ -51,7 +51,7 @@ services/model-gateway/
 | 层 | 本服务内容 |
 | --- | --- |
 | `api` | gRPC / HTTP adapter，verified service metadata，稳定错误映射 |
-| `app` | InvokeTextGeneration、CreateEmbedding、RerankEvidence、GetModelInvocation |
+| `app` | InvokeTextGeneration、InvokeEmbedding、RerankEvidence、GetModelInvocation |
 | `domain` | provider route、budget、request class、safety envelope、failure class |
 | `infrastructure` | PostgreSQL repository、provider HTTP clients、control-plane / policy clients |
 | `types` | command、DTO、错误码、枚举、低敏 metadata |
@@ -93,7 +93,7 @@ SECURITY_SENSITIVE
 
 ```text
 rpc InvokeTextGeneration(InvokeTextGenerationRequest) returns (InvokeTextGenerationResponse)
-rpc CreateEmbedding(CreateEmbeddingRequest) returns (CreateEmbeddingResponse)
+rpc InvokeEmbedding(InvokeEmbeddingRequest) returns (InvokeEmbeddingResponse)
 rpc RerankEvidence(RerankEvidenceRequest) returns (RerankEvidenceResponse)
 rpc GetModelInvocation(GetModelInvocationRequest) returns (GetModelInvocationResponse)
 ```
@@ -127,7 +127,7 @@ provider_latency_ms
 
 响应中的 `output_text` 只返回给同步调用方，不进入 `model_invocations` 或 Kafka 事件。
 
-`CreateEmbedding` 请求字段：
+`InvokeEmbedding` 请求字段：
 
 ```text
 tenant_id, caller_service, caller_use_case
@@ -139,8 +139,11 @@ data_class, timeout_ms
 响应字段：
 
 ```text
-invocation_id, embedding_vectors[], model_id, token_usage, cost_estimate
+invocation_id, embedding_values[], embedding_hash, dimensions, model_id, token_usage, cost_estimate
 ```
+
+`embedding_values[]` 只返回给同步调用方，不进入 `model_invocations` 或 Kafka 事件；持久化层只保存
+`input_hash`、`embedding_hash`、维度、token / cost / latency 等低敏 metadata。
 
 `RerankEvidence` 请求字段：
 
@@ -286,7 +289,7 @@ InvokeTextGeneration
 Embedding：
 
 ```text
-CreateEmbedding
+InvokeEmbedding
 -> validate chunk count / dimension / data class
 -> policy + budget check
 -> call embedding provider

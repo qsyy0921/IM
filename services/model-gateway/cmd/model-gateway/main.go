@@ -87,6 +87,7 @@ func runGRPC(ctx context.Context) error {
 	server := grpc.NewServer()
 	modelgrpc.Register(server, modelgrpc.NewServer(
 		app.NewInvokeTextGenerationUseCase(repository, provider.NewMockTextProvider(), app.NewRandomInvocationIDGenerator()),
+		app.NewInvokeEmbeddingUseCase(repository, provider.NewMockEmbeddingProvider(), app.NewRandomInvocationIDGenerator()),
 		app.NewGetModelInvocationUseCase(repository),
 	))
 

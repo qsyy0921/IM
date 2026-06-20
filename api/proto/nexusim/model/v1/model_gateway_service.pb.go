@@ -789,6 +789,318 @@ func (x *InvokeTextGenerationResponse) GetOutputReturned() bool {
 	return false
 }
 
+type InvokeEmbeddingRequest struct {
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	AuthContext        *AuthContext           `protobuf:"bytes,1,opt,name=auth_context,json=authContext,proto3" json:"auth_context,omitempty"`
+	CallerService      string                 `protobuf:"bytes,2,opt,name=caller_service,json=callerService,proto3" json:"caller_service,omitempty"`
+	CallerUseCase      string                 `protobuf:"bytes,3,opt,name=caller_use_case,json=callerUseCase,proto3" json:"caller_use_case,omitempty"`
+	RequestId          string                 `protobuf:"bytes,4,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	IdempotencyKey     string                 `protobuf:"bytes,5,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
+	ModelClass         string                 `protobuf:"bytes,6,opt,name=model_class,json=modelClass,proto3" json:"model_class,omitempty"`
+	PreferredModel     string                 `protobuf:"bytes,7,opt,name=preferred_model,json=preferredModel,proto3" json:"preferred_model,omitempty"`
+	RoutePolicy        string                 `protobuf:"bytes,8,opt,name=route_policy,json=routePolicy,proto3" json:"route_policy,omitempty"`
+	DataClass          string                 `protobuf:"bytes,9,opt,name=data_class,json=dataClass,proto3" json:"data_class,omitempty"`
+	InputText          string                 `protobuf:"bytes,10,opt,name=input_text,json=inputText,proto3" json:"input_text,omitempty"`
+	InputHash          string                 `protobuf:"bytes,11,opt,name=input_hash,json=inputHash,proto3" json:"input_hash,omitempty"`
+	InputSchemaVersion int32                  `protobuf:"varint,12,opt,name=input_schema_version,json=inputSchemaVersion,proto3" json:"input_schema_version,omitempty"`
+	Dimensions         int32                  `protobuf:"varint,13,opt,name=dimensions,proto3" json:"dimensions,omitempty"`
+	TimeoutMs          int64                  `protobuf:"varint,14,opt,name=timeout_ms,json=timeoutMs,proto3" json:"timeout_ms,omitempty"`
+	CorrelationId      string                 `protobuf:"bytes,15,opt,name=correlation_id,json=correlationId,proto3" json:"correlation_id,omitempty"`
+	CausationId        string                 `protobuf:"bytes,16,opt,name=causation_id,json=causationId,proto3" json:"causation_id,omitempty"`
+	TraceId            string                 `protobuf:"bytes,17,opt,name=trace_id,json=traceId,proto3" json:"trace_id,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
+func (x *InvokeEmbeddingRequest) Reset() {
+	*x = InvokeEmbeddingRequest{}
+	mi := &file_nexusim_model_v1_model_gateway_service_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *InvokeEmbeddingRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*InvokeEmbeddingRequest) ProtoMessage() {}
+
+func (x *InvokeEmbeddingRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_nexusim_model_v1_model_gateway_service_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use InvokeEmbeddingRequest.ProtoReflect.Descriptor instead.
+func (*InvokeEmbeddingRequest) Descriptor() ([]byte, []int) {
+	return file_nexusim_model_v1_model_gateway_service_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *InvokeEmbeddingRequest) GetAuthContext() *AuthContext {
+	if x != nil {
+		return x.AuthContext
+	}
+	return nil
+}
+
+func (x *InvokeEmbeddingRequest) GetCallerService() string {
+	if x != nil {
+		return x.CallerService
+	}
+	return ""
+}
+
+func (x *InvokeEmbeddingRequest) GetCallerUseCase() string {
+	if x != nil {
+		return x.CallerUseCase
+	}
+	return ""
+}
+
+func (x *InvokeEmbeddingRequest) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+func (x *InvokeEmbeddingRequest) GetIdempotencyKey() string {
+	if x != nil {
+		return x.IdempotencyKey
+	}
+	return ""
+}
+
+func (x *InvokeEmbeddingRequest) GetModelClass() string {
+	if x != nil {
+		return x.ModelClass
+	}
+	return ""
+}
+
+func (x *InvokeEmbeddingRequest) GetPreferredModel() string {
+	if x != nil {
+		return x.PreferredModel
+	}
+	return ""
+}
+
+func (x *InvokeEmbeddingRequest) GetRoutePolicy() string {
+	if x != nil {
+		return x.RoutePolicy
+	}
+	return ""
+}
+
+func (x *InvokeEmbeddingRequest) GetDataClass() string {
+	if x != nil {
+		return x.DataClass
+	}
+	return ""
+}
+
+func (x *InvokeEmbeddingRequest) GetInputText() string {
+	if x != nil {
+		return x.InputText
+	}
+	return ""
+}
+
+func (x *InvokeEmbeddingRequest) GetInputHash() string {
+	if x != nil {
+		return x.InputHash
+	}
+	return ""
+}
+
+func (x *InvokeEmbeddingRequest) GetInputSchemaVersion() int32 {
+	if x != nil {
+		return x.InputSchemaVersion
+	}
+	return 0
+}
+
+func (x *InvokeEmbeddingRequest) GetDimensions() int32 {
+	if x != nil {
+		return x.Dimensions
+	}
+	return 0
+}
+
+func (x *InvokeEmbeddingRequest) GetTimeoutMs() int64 {
+	if x != nil {
+		return x.TimeoutMs
+	}
+	return 0
+}
+
+func (x *InvokeEmbeddingRequest) GetCorrelationId() string {
+	if x != nil {
+		return x.CorrelationId
+	}
+	return ""
+}
+
+func (x *InvokeEmbeddingRequest) GetCausationId() string {
+	if x != nil {
+		return x.CausationId
+	}
+	return ""
+}
+
+func (x *InvokeEmbeddingRequest) GetTraceId() string {
+	if x != nil {
+		return x.TraceId
+	}
+	return ""
+}
+
+type InvokeEmbeddingResponse struct {
+	state                   protoimpl.MessageState `protogen:"open.v1"`
+	InvocationId            string                 `protobuf:"bytes,1,opt,name=invocation_id,json=invocationId,proto3" json:"invocation_id,omitempty"`
+	ProviderId              string                 `protobuf:"bytes,2,opt,name=provider_id,json=providerId,proto3" json:"provider_id,omitempty"`
+	ModelId                 string                 `protobuf:"bytes,3,opt,name=model_id,json=modelId,proto3" json:"model_id,omitempty"`
+	EmbeddingValues         []float32              `protobuf:"fixed32,4,rep,packed,name=embedding_values,json=embeddingValues,proto3" json:"embedding_values,omitempty"`
+	EmbeddingHash           string                 `protobuf:"bytes,5,opt,name=embedding_hash,json=embeddingHash,proto3" json:"embedding_hash,omitempty"`
+	Dimensions              int32                  `protobuf:"varint,6,opt,name=dimensions,proto3" json:"dimensions,omitempty"`
+	TokenUsage              *TokenUsage            `protobuf:"bytes,7,opt,name=token_usage,json=tokenUsage,proto3" json:"token_usage,omitempty"`
+	EstimatedCostMicrounits int64                  `protobuf:"varint,8,opt,name=estimated_cost_microunits,json=estimatedCostMicrounits,proto3" json:"estimated_cost_microunits,omitempty"`
+	FailureClass            string                 `protobuf:"bytes,9,opt,name=failure_class,json=failureClass,proto3" json:"failure_class,omitempty"`
+	FallbackUsed            bool                   `protobuf:"varint,10,opt,name=fallback_used,json=fallbackUsed,proto3" json:"fallback_used,omitempty"`
+	ProviderLatencyMs       int64                  `protobuf:"varint,11,opt,name=provider_latency_ms,json=providerLatencyMs,proto3" json:"provider_latency_ms,omitempty"`
+	Replayed                bool                   `protobuf:"varint,12,opt,name=replayed,proto3" json:"replayed,omitempty"`
+	EmbeddingReturned       bool                   `protobuf:"varint,13,opt,name=embedding_returned,json=embeddingReturned,proto3" json:"embedding_returned,omitempty"`
+	unknownFields           protoimpl.UnknownFields
+	sizeCache               protoimpl.SizeCache
+}
+
+func (x *InvokeEmbeddingResponse) Reset() {
+	*x = InvokeEmbeddingResponse{}
+	mi := &file_nexusim_model_v1_model_gateway_service_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *InvokeEmbeddingResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*InvokeEmbeddingResponse) ProtoMessage() {}
+
+func (x *InvokeEmbeddingResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_nexusim_model_v1_model_gateway_service_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use InvokeEmbeddingResponse.ProtoReflect.Descriptor instead.
+func (*InvokeEmbeddingResponse) Descriptor() ([]byte, []int) {
+	return file_nexusim_model_v1_model_gateway_service_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *InvokeEmbeddingResponse) GetInvocationId() string {
+	if x != nil {
+		return x.InvocationId
+	}
+	return ""
+}
+
+func (x *InvokeEmbeddingResponse) GetProviderId() string {
+	if x != nil {
+		return x.ProviderId
+	}
+	return ""
+}
+
+func (x *InvokeEmbeddingResponse) GetModelId() string {
+	if x != nil {
+		return x.ModelId
+	}
+	return ""
+}
+
+func (x *InvokeEmbeddingResponse) GetEmbeddingValues() []float32 {
+	if x != nil {
+		return x.EmbeddingValues
+	}
+	return nil
+}
+
+func (x *InvokeEmbeddingResponse) GetEmbeddingHash() string {
+	if x != nil {
+		return x.EmbeddingHash
+	}
+	return ""
+}
+
+func (x *InvokeEmbeddingResponse) GetDimensions() int32 {
+	if x != nil {
+		return x.Dimensions
+	}
+	return 0
+}
+
+func (x *InvokeEmbeddingResponse) GetTokenUsage() *TokenUsage {
+	if x != nil {
+		return x.TokenUsage
+	}
+	return nil
+}
+
+func (x *InvokeEmbeddingResponse) GetEstimatedCostMicrounits() int64 {
+	if x != nil {
+		return x.EstimatedCostMicrounits
+	}
+	return 0
+}
+
+func (x *InvokeEmbeddingResponse) GetFailureClass() string {
+	if x != nil {
+		return x.FailureClass
+	}
+	return ""
+}
+
+func (x *InvokeEmbeddingResponse) GetFallbackUsed() bool {
+	if x != nil {
+		return x.FallbackUsed
+	}
+	return false
+}
+
+func (x *InvokeEmbeddingResponse) GetProviderLatencyMs() int64 {
+	if x != nil {
+		return x.ProviderLatencyMs
+	}
+	return 0
+}
+
+func (x *InvokeEmbeddingResponse) GetReplayed() bool {
+	if x != nil {
+		return x.Replayed
+	}
+	return false
+}
+
+func (x *InvokeEmbeddingResponse) GetEmbeddingReturned() bool {
+	if x != nil {
+		return x.EmbeddingReturned
+	}
+	return false
+}
+
 type GetModelInvocationRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	AuthContext   *AuthContext           `protobuf:"bytes,1,opt,name=auth_context,json=authContext,proto3" json:"auth_context,omitempty"`
@@ -799,7 +1111,7 @@ type GetModelInvocationRequest struct {
 
 func (x *GetModelInvocationRequest) Reset() {
 	*x = GetModelInvocationRequest{}
-	mi := &file_nexusim_model_v1_model_gateway_service_proto_msgTypes[6]
+	mi := &file_nexusim_model_v1_model_gateway_service_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -811,7 +1123,7 @@ func (x *GetModelInvocationRequest) String() string {
 func (*GetModelInvocationRequest) ProtoMessage() {}
 
 func (x *GetModelInvocationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nexusim_model_v1_model_gateway_service_proto_msgTypes[6]
+	mi := &file_nexusim_model_v1_model_gateway_service_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -824,7 +1136,7 @@ func (x *GetModelInvocationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetModelInvocationRequest.ProtoReflect.Descriptor instead.
 func (*GetModelInvocationRequest) Descriptor() ([]byte, []int) {
-	return file_nexusim_model_v1_model_gateway_service_proto_rawDescGZIP(), []int{6}
+	return file_nexusim_model_v1_model_gateway_service_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *GetModelInvocationRequest) GetAuthContext() *AuthContext {
@@ -850,7 +1162,7 @@ type GetModelInvocationResponse struct {
 
 func (x *GetModelInvocationResponse) Reset() {
 	*x = GetModelInvocationResponse{}
-	mi := &file_nexusim_model_v1_model_gateway_service_proto_msgTypes[7]
+	mi := &file_nexusim_model_v1_model_gateway_service_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -862,7 +1174,7 @@ func (x *GetModelInvocationResponse) String() string {
 func (*GetModelInvocationResponse) ProtoMessage() {}
 
 func (x *GetModelInvocationResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nexusim_model_v1_model_gateway_service_proto_msgTypes[7]
+	mi := &file_nexusim_model_v1_model_gateway_service_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -875,7 +1187,7 @@ func (x *GetModelInvocationResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetModelInvocationResponse.ProtoReflect.Descriptor instead.
 func (*GetModelInvocationResponse) Descriptor() ([]byte, []int) {
-	return file_nexusim_model_v1_model_gateway_service_proto_rawDescGZIP(), []int{7}
+	return file_nexusim_model_v1_model_gateway_service_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *GetModelInvocationResponse) GetInvocation() *ModelInvocation {
@@ -984,16 +1296,63 @@ const file_nexusim_model_v1_model_gateway_service_proto_rawDesc = "" +
 	" \x01(\bR\ffallbackUsed\x12.\n" +
 	"\x13provider_latency_ms\x18\v \x01(\x03R\x11providerLatencyMs\x12\x1a\n" +
 	"\breplayed\x18\f \x01(\bR\breplayed\x12'\n" +
-	"\x0foutput_returned\x18\r \x01(\bR\x0eoutputReturned\"\x82\x01\n" +
+	"\x0foutput_returned\x18\r \x01(\bR\x0eoutputReturned\"\x91\x05\n" +
+	"\x16InvokeEmbeddingRequest\x12@\n" +
+	"\fauth_context\x18\x01 \x01(\v2\x1d.nexusim.model.v1.AuthContextR\vauthContext\x12%\n" +
+	"\x0ecaller_service\x18\x02 \x01(\tR\rcallerService\x12&\n" +
+	"\x0fcaller_use_case\x18\x03 \x01(\tR\rcallerUseCase\x12\x1d\n" +
+	"\n" +
+	"request_id\x18\x04 \x01(\tR\trequestId\x12'\n" +
+	"\x0fidempotency_key\x18\x05 \x01(\tR\x0eidempotencyKey\x12\x1f\n" +
+	"\vmodel_class\x18\x06 \x01(\tR\n" +
+	"modelClass\x12'\n" +
+	"\x0fpreferred_model\x18\a \x01(\tR\x0epreferredModel\x12!\n" +
+	"\froute_policy\x18\b \x01(\tR\vroutePolicy\x12\x1d\n" +
+	"\n" +
+	"data_class\x18\t \x01(\tR\tdataClass\x12\x1d\n" +
+	"\n" +
+	"input_text\x18\n" +
+	" \x01(\tR\tinputText\x12\x1d\n" +
+	"\n" +
+	"input_hash\x18\v \x01(\tR\tinputHash\x120\n" +
+	"\x14input_schema_version\x18\f \x01(\x05R\x12inputSchemaVersion\x12\x1e\n" +
+	"\n" +
+	"dimensions\x18\r \x01(\x05R\n" +
+	"dimensions\x12\x1d\n" +
+	"\n" +
+	"timeout_ms\x18\x0e \x01(\x03R\ttimeoutMs\x12%\n" +
+	"\x0ecorrelation_id\x18\x0f \x01(\tR\rcorrelationId\x12!\n" +
+	"\fcausation_id\x18\x10 \x01(\tR\vcausationId\x12\x19\n" +
+	"\btrace_id\x18\x11 \x01(\tR\atraceId\"\xac\x04\n" +
+	"\x17InvokeEmbeddingResponse\x12#\n" +
+	"\rinvocation_id\x18\x01 \x01(\tR\finvocationId\x12\x1f\n" +
+	"\vprovider_id\x18\x02 \x01(\tR\n" +
+	"providerId\x12\x19\n" +
+	"\bmodel_id\x18\x03 \x01(\tR\amodelId\x12)\n" +
+	"\x10embedding_values\x18\x04 \x03(\x02R\x0fembeddingValues\x12%\n" +
+	"\x0eembedding_hash\x18\x05 \x01(\tR\rembeddingHash\x12\x1e\n" +
+	"\n" +
+	"dimensions\x18\x06 \x01(\x05R\n" +
+	"dimensions\x12=\n" +
+	"\vtoken_usage\x18\a \x01(\v2\x1c.nexusim.model.v1.TokenUsageR\n" +
+	"tokenUsage\x12:\n" +
+	"\x19estimated_cost_microunits\x18\b \x01(\x03R\x17estimatedCostMicrounits\x12#\n" +
+	"\rfailure_class\x18\t \x01(\tR\ffailureClass\x12#\n" +
+	"\rfallback_used\x18\n" +
+	" \x01(\bR\ffallbackUsed\x12.\n" +
+	"\x13provider_latency_ms\x18\v \x01(\x03R\x11providerLatencyMs\x12\x1a\n" +
+	"\breplayed\x18\f \x01(\bR\breplayed\x12-\n" +
+	"\x12embedding_returned\x18\r \x01(\bR\x11embeddingReturned\"\x82\x01\n" +
 	"\x19GetModelInvocationRequest\x12@\n" +
 	"\fauth_context\x18\x01 \x01(\v2\x1d.nexusim.model.v1.AuthContextR\vauthContext\x12#\n" +
 	"\rinvocation_id\x18\x02 \x01(\tR\finvocationId\"_\n" +
 	"\x1aGetModelInvocationResponse\x12A\n" +
 	"\n" +
 	"invocation\x18\x01 \x01(\v2!.nexusim.model.v1.ModelInvocationR\n" +
-	"invocation2\xfd\x01\n" +
+	"invocation2\xe5\x02\n" +
 	"\x13ModelGatewayService\x12u\n" +
-	"\x14InvokeTextGeneration\x12-.nexusim.model.v1.InvokeTextGenerationRequest\x1a..nexusim.model.v1.InvokeTextGenerationResponse\x12o\n" +
+	"\x14InvokeTextGeneration\x12-.nexusim.model.v1.InvokeTextGenerationRequest\x1a..nexusim.model.v1.InvokeTextGenerationResponse\x12f\n" +
+	"\x0fInvokeEmbedding\x12(.nexusim.model.v1.InvokeEmbeddingRequest\x1a).nexusim.model.v1.InvokeEmbeddingResponse\x12o\n" +
 	"\x12GetModelInvocation\x12+.nexusim.model.v1.GetModelInvocationRequest\x1a,.nexusim.model.v1.GetModelInvocationResponseB;Z9github.com/qsyy0921/IM/api/proto/nexusim/model/v1;modelv1b\x06proto3"
 
 var (
@@ -1008,7 +1367,7 @@ func file_nexusim_model_v1_model_gateway_service_proto_rawDescGZIP() []byte {
 	return file_nexusim_model_v1_model_gateway_service_proto_rawDescData
 }
 
-var file_nexusim_model_v1_model_gateway_service_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_nexusim_model_v1_model_gateway_service_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_nexusim_model_v1_model_gateway_service_proto_goTypes = []any{
 	(*AuthContext)(nil),                  // 0: nexusim.model.v1.AuthContext
 	(*PromptPart)(nil),                   // 1: nexusim.model.v1.PromptPart
@@ -1016,25 +1375,31 @@ var file_nexusim_model_v1_model_gateway_service_proto_goTypes = []any{
 	(*ModelInvocation)(nil),              // 3: nexusim.model.v1.ModelInvocation
 	(*InvokeTextGenerationRequest)(nil),  // 4: nexusim.model.v1.InvokeTextGenerationRequest
 	(*InvokeTextGenerationResponse)(nil), // 5: nexusim.model.v1.InvokeTextGenerationResponse
-	(*GetModelInvocationRequest)(nil),    // 6: nexusim.model.v1.GetModelInvocationRequest
-	(*GetModelInvocationResponse)(nil),   // 7: nexusim.model.v1.GetModelInvocationResponse
+	(*InvokeEmbeddingRequest)(nil),       // 6: nexusim.model.v1.InvokeEmbeddingRequest
+	(*InvokeEmbeddingResponse)(nil),      // 7: nexusim.model.v1.InvokeEmbeddingResponse
+	(*GetModelInvocationRequest)(nil),    // 8: nexusim.model.v1.GetModelInvocationRequest
+	(*GetModelInvocationResponse)(nil),   // 9: nexusim.model.v1.GetModelInvocationResponse
 }
 var file_nexusim_model_v1_model_gateway_service_proto_depIdxs = []int32{
-	2, // 0: nexusim.model.v1.ModelInvocation.token_usage:type_name -> nexusim.model.v1.TokenUsage
-	0, // 1: nexusim.model.v1.InvokeTextGenerationRequest.auth_context:type_name -> nexusim.model.v1.AuthContext
-	1, // 2: nexusim.model.v1.InvokeTextGenerationRequest.prompt_parts:type_name -> nexusim.model.v1.PromptPart
-	2, // 3: nexusim.model.v1.InvokeTextGenerationResponse.token_usage:type_name -> nexusim.model.v1.TokenUsage
-	0, // 4: nexusim.model.v1.GetModelInvocationRequest.auth_context:type_name -> nexusim.model.v1.AuthContext
-	3, // 5: nexusim.model.v1.GetModelInvocationResponse.invocation:type_name -> nexusim.model.v1.ModelInvocation
-	4, // 6: nexusim.model.v1.ModelGatewayService.InvokeTextGeneration:input_type -> nexusim.model.v1.InvokeTextGenerationRequest
-	6, // 7: nexusim.model.v1.ModelGatewayService.GetModelInvocation:input_type -> nexusim.model.v1.GetModelInvocationRequest
-	5, // 8: nexusim.model.v1.ModelGatewayService.InvokeTextGeneration:output_type -> nexusim.model.v1.InvokeTextGenerationResponse
-	7, // 9: nexusim.model.v1.ModelGatewayService.GetModelInvocation:output_type -> nexusim.model.v1.GetModelInvocationResponse
-	8, // [8:10] is the sub-list for method output_type
-	6, // [6:8] is the sub-list for method input_type
-	6, // [6:6] is the sub-list for extension type_name
-	6, // [6:6] is the sub-list for extension extendee
-	0, // [0:6] is the sub-list for field type_name
+	2,  // 0: nexusim.model.v1.ModelInvocation.token_usage:type_name -> nexusim.model.v1.TokenUsage
+	0,  // 1: nexusim.model.v1.InvokeTextGenerationRequest.auth_context:type_name -> nexusim.model.v1.AuthContext
+	1,  // 2: nexusim.model.v1.InvokeTextGenerationRequest.prompt_parts:type_name -> nexusim.model.v1.PromptPart
+	2,  // 3: nexusim.model.v1.InvokeTextGenerationResponse.token_usage:type_name -> nexusim.model.v1.TokenUsage
+	0,  // 4: nexusim.model.v1.InvokeEmbeddingRequest.auth_context:type_name -> nexusim.model.v1.AuthContext
+	2,  // 5: nexusim.model.v1.InvokeEmbeddingResponse.token_usage:type_name -> nexusim.model.v1.TokenUsage
+	0,  // 6: nexusim.model.v1.GetModelInvocationRequest.auth_context:type_name -> nexusim.model.v1.AuthContext
+	3,  // 7: nexusim.model.v1.GetModelInvocationResponse.invocation:type_name -> nexusim.model.v1.ModelInvocation
+	4,  // 8: nexusim.model.v1.ModelGatewayService.InvokeTextGeneration:input_type -> nexusim.model.v1.InvokeTextGenerationRequest
+	6,  // 9: nexusim.model.v1.ModelGatewayService.InvokeEmbedding:input_type -> nexusim.model.v1.InvokeEmbeddingRequest
+	8,  // 10: nexusim.model.v1.ModelGatewayService.GetModelInvocation:input_type -> nexusim.model.v1.GetModelInvocationRequest
+	5,  // 11: nexusim.model.v1.ModelGatewayService.InvokeTextGeneration:output_type -> nexusim.model.v1.InvokeTextGenerationResponse
+	7,  // 12: nexusim.model.v1.ModelGatewayService.InvokeEmbedding:output_type -> nexusim.model.v1.InvokeEmbeddingResponse
+	9,  // 13: nexusim.model.v1.ModelGatewayService.GetModelInvocation:output_type -> nexusim.model.v1.GetModelInvocationResponse
+	11, // [11:14] is the sub-list for method output_type
+	8,  // [8:11] is the sub-list for method input_type
+	8,  // [8:8] is the sub-list for extension type_name
+	8,  // [8:8] is the sub-list for extension extendee
+	0,  // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_nexusim_model_v1_model_gateway_service_proto_init() }
@@ -1048,7 +1413,7 @@ func file_nexusim_model_v1_model_gateway_service_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_nexusim_model_v1_model_gateway_service_proto_rawDesc), len(file_nexusim_model_v1_model_gateway_service_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   8,
+			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -16,6 +16,10 @@ type InvokeTextGenerationExecutor interface {
 	Execute(context.Context, types.TextGenerationCommand) (types.TextGenerationResult, error)
 }
 
+type InvokeEmbeddingExecutor interface {
+	Execute(context.Context, types.EmbeddingCommand) (types.EmbeddingResult, error)
+}
+
 type GetModelInvocationExecutor interface {
 	Execute(context.Context, types.GetModelInvocationCommand) (types.ModelInvocation, error)
 }
@@ -23,15 +27,18 @@ type GetModelInvocationExecutor interface {
 type Server struct {
 	modelv1.UnimplementedModelGatewayServiceServer
 	invokeTextGeneration InvokeTextGenerationExecutor
+	invokeEmbedding      InvokeEmbeddingExecutor
 	getModelInvocation   GetModelInvocationExecutor
 }
 
 func NewServer(
 	invokeTextGeneration InvokeTextGenerationExecutor,
+	invokeEmbedding InvokeEmbeddingExecutor,
 	getModelInvocation GetModelInvocationExecutor,
 ) *Server {
 	return &Server{
 		invokeTextGeneration: invokeTextGeneration,
+		invokeEmbedding:      invokeEmbedding,
 		getModelInvocation:   getModelInvocation,
 	}
 }
@@ -100,6 +107,57 @@ func (server *Server) InvokeTextGeneration(
 		ProviderLatencyMs:       invocation.ProviderLatency.Milliseconds(),
 		Replayed:                result.Replayed,
 		OutputReturned:          result.OutputReturned,
+	}, nil
+}
+
+func (server *Server) InvokeEmbedding(
+	ctx context.Context,
+	request *modelv1.InvokeEmbeddingRequest,
+) (*modelv1.InvokeEmbeddingResponse, error) {
+	if request == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+	auth, ok := authFromProto(ctx, request.GetAuthContext())
+	if !ok {
+		return nil, status.Error(codes.InvalidArgument, "auth_context is required")
+	}
+	result, err := server.invokeEmbedding.Execute(ctx, types.EmbeddingCommand{
+		AuthContext:        auth,
+		CallerService:      request.GetCallerService(),
+		CallerUseCase:      request.GetCallerUseCase(),
+		RequestID:          request.GetRequestId(),
+		IdempotencyKey:     request.GetIdempotencyKey(),
+		ModelClass:         request.GetModelClass(),
+		PreferredModel:     request.GetPreferredModel(),
+		RoutePolicy:        request.GetRoutePolicy(),
+		DataClass:          request.GetDataClass(),
+		InputText:          request.GetInputText(),
+		InputHash:          request.GetInputHash(),
+		InputSchemaVersion: int(request.GetInputSchemaVersion()),
+		Dimensions:         int(request.GetDimensions()),
+		Timeout:            durationFromMillis(request.GetTimeoutMs()),
+		CorrelationID:      request.GetCorrelationId(),
+		CausationID:        request.GetCausationId(),
+		TraceID:            request.GetTraceId(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	invocation := result.Invocation
+	return &modelv1.InvokeEmbeddingResponse{
+		InvocationId:            invocation.InvocationID,
+		ProviderId:              invocation.ProviderID,
+		ModelId:                 invocation.ModelID,
+		EmbeddingValues:         result.EmbeddingValues,
+		EmbeddingHash:           invocation.OutputHash,
+		Dimensions:              int32(len(result.EmbeddingValues)),
+		TokenUsage:              tokenUsageToProto(invocation.TokenUsage),
+		EstimatedCostMicrounits: invocation.EstimatedCostMicrounits,
+		FailureClass:            invocation.FailureClass,
+		FallbackUsed:            invocation.FallbackUsed,
+		ProviderLatencyMs:       invocation.ProviderLatency.Milliseconds(),
+		Replayed:                result.Replayed,
+		EmbeddingReturned:       result.EmbeddingReturned,
 	}, nil
 }
 

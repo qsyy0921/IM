@@ -56,8 +56,10 @@ vector-index-service
   skeleton / cmd runtime / Docker / Prometheus / Grafana 覆盖已落。
 - `media-service` focused hardening 已补真实 PostgreSQL repository 集成测试和
   object_key 不出 public response / fake presign URL / outbox payload 的回归门禁。
-- 下一步默认继续 `media-service` 最小 gRPC smoke；完成后再进入 media outbox
-  relay / processing worker，或推进 `notification-service` stage switch / implementation。
+- `media-service` 最小 gRPC smoke 已通过，报告见
+  `docs/runbook/loadtest/media-service/loadtest-report-20260620-media-grpc-smoke.md`。
+- 下一步默认继续 media outbox relay / processing worker；也可以推进
+  `notification-service` stage switch / implementation。
 
 ## 硬边界
 

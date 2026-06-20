@@ -14,6 +14,7 @@
 
 - `message-service.md`
 - `media-service.md`
+- `notification-service.md`
 - `conversation-service.md`
 - `conversation-service-member-change-saga.md`
 - `delivery-service.md`

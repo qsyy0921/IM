@@ -40,7 +40,7 @@ Go 侧服务底座、EvidencePack、proposal / approval / audit 和 eval 持久�
 当前下一步：
 
 ```text
-按 service brief 顺序冻结 future 服务 SDD / stage-switch 计划，先不一次性落全部目录
+media / notification SDD draft 已存在；下一步按 service brief 推进 audit-service SDD
 ```
 
 完整系统测试、生产级 HA、长压和 sizing 继续后置为 hardening backlog。

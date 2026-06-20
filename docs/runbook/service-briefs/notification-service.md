@@ -1,7 +1,7 @@
 # notification-service
 
-状态：future / SDD v0.1 draft pending。当前不得创建
-`services/notification-service` 目录，直到完成 ADR 或 stage switch。
+状态：future / SDD v0.1 draft 已存在。当前不得创建
+`services/notification-service` 目录，直到完成 stage switch。
 
 定位：统一通知服务，负责 email、SMS、APNs / FCM、系统通知、模板、
 bounce handling、provider retry 和通知审计。
@@ -15,6 +15,7 @@ bounce handling、provider retry 和通知审计。
 
 第一切片建议：
 
-- 先接 identity challenge delivery request，保留现有稳定 public error。
-- PostgreSQL delivery audit + retry / DLQ skeleton。
-- provider adapter 先做 webhook / SMTP，后续再接 SMS / APNs / FCM。
+- 具体边界见 `docs/sdd/notification-service.md`。
+- `CreateNotificationRequest` / `GetNotificationStatus` / `CancelNotificationRequest`。
+- PostgreSQL request + delivery attempt + outbox + suppression state。
+- provider adapter 先做 webhook / SMTP fake/real boundary，后续再接 SMS / APNs / FCM。

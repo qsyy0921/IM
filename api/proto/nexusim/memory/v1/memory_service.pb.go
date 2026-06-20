@@ -922,6 +922,7 @@ type QueryMemoryEventsRequest struct {
 	Statuses          []MemoryEventStatus    `protobuf:"varint,8,rep,packed,name=statuses,proto3,enum=nexusim.memory.v1.MemoryEventStatus" json:"statuses,omitempty"`
 	AfterValidFromSeq int64                  `protobuf:"varint,9,opt,name=after_valid_from_seq,json=afterValidFromSeq,proto3" json:"after_valid_from_seq,omitempty"`
 	Limit             int32                  `protobuf:"varint,10,opt,name=limit,proto3" json:"limit,omitempty"`
+	AtConversationSeq int64                  `protobuf:"varint,11,opt,name=at_conversation_seq,json=atConversationSeq,proto3" json:"at_conversation_seq,omitempty"`
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
@@ -1022,6 +1023,13 @@ func (x *QueryMemoryEventsRequest) GetAfterValidFromSeq() int64 {
 func (x *QueryMemoryEventsRequest) GetLimit() int32 {
 	if x != nil {
 		return x.Limit
+	}
+	return 0
+}
+
+func (x *QueryMemoryEventsRequest) GetAtConversationSeq() int64 {
+	if x != nil {
+		return x.AtConversationSeq
 	}
 	return 0
 }
@@ -1395,7 +1403,7 @@ const file_nexusim_memory_v1_memory_service_proto_rawDesc = "" +
 	"\x12valid_from_unix_ms\x18\n" +
 	" \x01(\x03R\x0fvalidFromUnixMs\x12'\n" +
 	"\x10valid_to_unix_ms\x18\v \x01(\x03R\rvalidToUnixMs\x12+\n" +
-	"\x12updated_at_unix_ms\x18\f \x01(\x03R\x0fupdatedAtUnixMs\"\xb0\x03\n" +
+	"\x12updated_at_unix_ms\x18\f \x01(\x03R\x0fupdatedAtUnixMs\"\xe0\x03\n" +
 	"\x18QueryMemoryEventsRequest\x12A\n" +
 	"\fauth_context\x18\x01 \x01(\v2\x1e.nexusim.memory.v1.AuthContextR\vauthContext\x124\n" +
 	"\x05scope\x18\x02 \x01(\x0e2\x1e.nexusim.memory.v1.MemoryScopeR\x05scope\x12\x19\n" +
@@ -1407,7 +1415,8 @@ const file_nexusim_memory_v1_memory_service_proto_rawDesc = "" +
 	"\bstatuses\x18\b \x03(\x0e2$.nexusim.memory.v1.MemoryEventStatusR\bstatuses\x12/\n" +
 	"\x14after_valid_from_seq\x18\t \x01(\x03R\x11afterValidFromSeq\x12\x14\n" +
 	"\x05limit\x18\n" +
-	" \x01(\x05R\x05limit\"\xab\x01\n" +
+	" \x01(\x05R\x05limit\x12.\n" +
+	"\x13at_conversation_seq\x18\v \x01(\x03R\x11atConversationSeq\"\xab\x01\n" +
 	"\x19QueryMemoryEventsResponse\x12>\n" +
 	"\x05items\x18\x01 \x03(\v2(.nexusim.memory.v1.StructuredMemoryEventR\x05items\x12\x1f\n" +
 	"\vnext_cursor\x18\x02 \x01(\tR\n" +

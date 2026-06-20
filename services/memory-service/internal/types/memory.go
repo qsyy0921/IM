@@ -106,6 +106,7 @@ type QueryMemoryEventsCommand struct {
 	Query             string
 	Statuses          []string
 	AfterValidFromSeq int64
+	AtConversationSeq int64
 	Limit             int
 }
 
@@ -121,6 +122,9 @@ func (command QueryMemoryEventsCommand) Validate() error {
 	}
 	if command.AfterValidFromSeq < 0 {
 		return NewInvalidArgument("after_valid_from_seq must be non-negative")
+	}
+	if command.AtConversationSeq < 0 {
+		return NewInvalidArgument("at_conversation_seq must be non-negative")
 	}
 	if len(strings.TrimSpace(command.Query)) > 512 {
 		return NewInvalidArgument("query is too long")

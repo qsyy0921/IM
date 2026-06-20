@@ -134,6 +134,7 @@ message QueryMemoryEventsRequest {
   repeated MemoryEventStatus statuses = 8;
   int64 after_valid_from_seq = 9;
   int32 limit = 10;
+  int64 at_conversation_seq = 11;
 }
 
 message QueryMemoryEventsResponse {

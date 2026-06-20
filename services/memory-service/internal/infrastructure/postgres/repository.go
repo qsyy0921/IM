@@ -62,6 +62,13 @@ func (repository *Repository) QueryMemoryEvents(
 		args = append(args, string(command.ActorUserID))
 		filters = append(filters, fmt.Sprintf("e.actor_user_ids ? $%d", len(args)))
 	}
+	if command.AtConversationSeq > 0 {
+		args = append(args, command.AtConversationSeq)
+		filters = append(filters,
+			fmt.Sprintf("COALESCE(e.valid_from_seq, 0) <= $%d", len(args)),
+			fmt.Sprintf("(e.valid_to_seq IS NULL OR e.valid_to_seq = 0 OR e.valid_to_seq >= $%d)", len(args)),
+		)
+	}
 	if command.Topic != "" {
 		args = append(args, command.Topic)
 		filters = append(filters, fmt.Sprintf("e.topic = $%d", len(args)))

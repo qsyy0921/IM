@@ -56,6 +56,7 @@ func (server *Server) QueryMemoryEvents(ctx context.Context, request *memoryv1.Q
 		Query:             request.GetQuery(),
 		Statuses:          statusesFromProto(request.GetStatuses()),
 		AfterValidFromSeq: request.GetAfterValidFromSeq(),
+		AtConversationSeq: request.GetAtConversationSeq(),
 		Limit:             int(request.GetLimit()),
 	}
 	result, err := server.queryMemoryEvents.Execute(ctx, command)

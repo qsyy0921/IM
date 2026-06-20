@@ -38,13 +38,15 @@ group memory -> EvidencePack -> RAG -> summary -> multi-agent
   RAG / Summary citation source-ref regression、external MCP fallback eval cases、
   Agent output regression、action preflight / rate-limit / DLQ-repair safety eval、
   action-executor provider failure retry/DLQ skeleton、worker 和 redrive safety eval、
-  memory-service group memory source-ref / validity / supersession fixture eval。既有 eval 报告见
+  memory-service group memory source-ref / validity / supersession fixture eval，
+  memory-service runtime `at_conversation_seq` query semantics、source-ref /
+  validity / supersession PostgreSQL coverage 和 `loadtest/memory` smoke checks。既有 eval 报告见
   `docs/runbook/loadtest/ai-eval-service/`。
 
 下一步默认推进：
 
 ```text
-继续推进 memory-service runtime source-ref / validity / supersession projection/query smoke
+继续推进 retrieval-gateway EvidencePack 接入 memory-service current-only memory query
 ```
 
 硬边界：RAG / summary / Agent 只能消费 EvidencePack；真实写动作必须走

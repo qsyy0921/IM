@@ -70,10 +70,10 @@ guard. RAG/Summary guarded external HTTP boundary, Python worker safety eval,
 Go-side smoke, RAG/Summary/Agent candidate guards, and action-executor guarded
 external HTTP adapter + eval first paths are landed. Profile / Agent output
 safety expanded eval cases plus the local fixture adapter are landed.
-`ai-eval-service` catalog, gate policy, CI-safe / optional adapters, negative
-cases, action safety evals, provider-failure eval and memory group fixture eval
-are landed.
-Next: memory-service runtime source-ref / validity / supersession projection/query smoke.
+`ai-eval-service` catalog, gate policy, negative/action/memory evals, and
+memory-service runtime `at_conversation_seq` source-ref / validity /
+supersession query checks are landed. Next: retrieval-gateway EvidencePack
+should call memory-service current-only memory query while preserving boundaries.
 Search, memory, retrieval, real RAG / summary / Agent adapter smokes, the skill
 catalog foundation, the MCP prepare boundary, and approved proposal preflight
 are passed.

@@ -102,6 +102,10 @@ type checkRecord struct {
 	StrangerHidden        bool `json:"stranger_hidden"`
 	RevokedMemoryHidden   bool `json:"revoked_memory_hidden"`
 	ProfileAggregatesNone bool `json:"profile_aggregates_none"`
+	RuntimeSourceRef      bool `json:"runtime_source_ref"`
+	ValidityWindowCurrent bool `json:"validity_window_current"`
+	SupersededHidden      bool `json:"superseded_hidden"`
+	SupersessionLink      bool `json:"supersession_link"`
 }
 
 type membershipRecord struct {
@@ -368,7 +372,140 @@ func publishAndVerify(
 		return err
 	}
 	result.Checks.RevokedMemoryHidden = true
+	if err := seedRuntimeMemoryWindow(ctx, pool, cfg, runID); err != nil {
+		return err
+	}
+	if err := verifyRuntimeMemoryWindow(ctx, cfg, client, runID, result); err != nil {
+		return err
+	}
 	return nil
+}
+
+func seedRuntimeMemoryWindow(ctx context.Context, pool *pgxpool.Pool, cfg config, runID string) error {
+	eventPrefix := "runtime-memory-" + runID
+	if _, err := pool.Exec(ctx, `
+INSERT INTO memory_structured_events (
+	tenant_id,
+	memory_event_id,
+	scope_type,
+	scope_id,
+	conversation_id,
+	topic,
+	event_type,
+	status,
+	review_state,
+	fact_text,
+	actor_user_ids,
+	audience_user_ids,
+	valid_from_seq,
+	valid_to_seq,
+	supersedes_event_ids,
+	contradicts_event_ids,
+	confidence,
+	visibility_version,
+	extraction_version,
+	source_projection_version
+) VALUES
+($1, $3 || '-expired', 'CONVERSATION', $2, $2, 'runtime-memory', 'DECISION', 'ACTIVE', 'APPROVED', 'expired runtime memory decision', '["memory-sender-1"]'::jsonb, '[]'::jsonb, 2, 5, '[]'::jsonb, '[]'::jsonb, 0.9000, 1, 'smoke-v1', 5),
+($1, $3 || '-current', 'CONVERSATION', $2, $2, 'runtime-memory', 'DECISION', 'ACTIVE', 'APPROVED', 'current runtime memory decision', '["memory-sender-1"]'::jsonb, '[]'::jsonb, 10, 20, '[]'::jsonb, '[]'::jsonb, 0.9100, 1, 'smoke-v1', 20),
+($1, $3 || '-superseded', 'CONVERSATION', $2, $2, 'runtime-memory', 'DECISION', 'SUPERSEDED', 'APPROVED', 'old runtime memory decision', '["memory-sender-1"]'::jsonb, '[]'::jsonb, 6, 12, '[]'::jsonb, '[]'::jsonb, 0.8000, 1, 'smoke-v1', 12),
+($1, $3 || '-replacement', 'CONVERSATION', $2, $2, 'runtime-memory', 'DECISION', 'ACTIVE', 'APPROVED', 'replacement runtime memory decision', '["memory-sender-1"]'::jsonb, '[]'::jsonb, 13, NULL, jsonb_build_array($3 || '-superseded'), '[]'::jsonb, 0.9500, 1, 'smoke-v1', 30)
+`, cfg.tenantID, cfg.conversationID, eventPrefix); err != nil {
+		return fmt.Errorf("seed runtime memory events: %w", err)
+	}
+	if _, err := pool.Exec(ctx, `
+INSERT INTO memory_event_source_refs (
+	tenant_id,
+	memory_event_id,
+	source_ref_id,
+	source_type,
+	source_id,
+	source_event_id,
+	conversation_id,
+	conversation_seq,
+	occurred_at
+) VALUES
+($1, $3 || '-expired', 'source-expired', 'MESSAGE', 'msg-expired', 'event-expired', $2, 2, now()),
+($1, $3 || '-current', 'source-current', 'MESSAGE', 'msg-current', 'event-current', $2, 10, now()),
+($1, $3 || '-superseded', 'source-superseded', 'MESSAGE', 'msg-superseded', 'event-superseded', $2, 6, now()),
+($1, $3 || '-replacement', 'source-replacement', 'MESSAGE', 'msg-replacement', 'event-replacement', $2, 13, now())
+`, cfg.tenantID, cfg.conversationID, eventPrefix); err != nil {
+		return fmt.Errorf("seed runtime memory source refs: %w", err)
+	}
+	return nil
+}
+
+func verifyRuntimeMemoryWindow(ctx context.Context, cfg config, client memoryv1.MemoryServiceClient, runID string, result *summary) error {
+	eventPrefix := "runtime-memory-" + runID
+	currentID := eventPrefix + "-current"
+	expiredID := eventPrefix + "-expired"
+	supersededID := eventPrefix + "-superseded"
+	replacementID := eventPrefix + "-replacement"
+
+	response, err := queryMemoryWithOptions(ctx, cfg, client, cfg.viewerUserID, queryMemoryOptions{
+		query:             "runtime memory",
+		statuses:          []memoryv1.MemoryEventStatus{memoryv1.MemoryEventStatus_MEMORY_EVENT_STATUS_ACTIVE},
+		atConversationSeq: 15,
+	})
+	if err != nil {
+		return err
+	}
+	items := memoryItemsByID(response.GetItems())
+	if len(items) != 2 {
+		return fmt.Errorf("expected active runtime current and replacement events at seq 15, got %d: %+v", len(items), response.GetItems())
+	}
+	current, ok := items[currentID]
+	if !ok {
+		return fmt.Errorf("current runtime memory should be visible at seq 15: %+v", response.GetItems())
+	}
+	replacement, ok := items[replacementID]
+	if !ok {
+		return fmt.Errorf("replacement runtime memory should be visible at seq 15: %+v", response.GetItems())
+	}
+	if _, ok := items[expiredID]; ok {
+		return fmt.Errorf("expired runtime memory should be hidden at seq 15: %+v", response.GetItems())
+	}
+	if _, ok := items[supersededID]; ok {
+		return fmt.Errorf("superseded runtime memory should be hidden from active query: %+v", response.GetItems())
+	}
+	if len(current.GetSourceRefs()) != 1 || len(replacement.GetSourceRefs()) != 1 {
+		return fmt.Errorf("runtime memory items should keep source refs: %+v", response.GetItems())
+	}
+	if len(replacement.GetSupersedesEventIds()) != 1 || replacement.GetSupersedesEventIds()[0] != supersededID {
+		return fmt.Errorf("replacement should preserve supersession link: %+v", replacement.GetSupersedesEventIds())
+	}
+	result.Checks.RuntimeSourceRef = true
+	result.Checks.SupersededHidden = true
+	result.Checks.SupersessionLink = true
+
+	response, err = queryMemoryWithOptions(ctx, cfg, client, cfg.viewerUserID, queryMemoryOptions{
+		query:             "runtime memory",
+		statuses:          []memoryv1.MemoryEventStatus{memoryv1.MemoryEventStatus_MEMORY_EVENT_STATUS_ACTIVE},
+		atConversationSeq: 25,
+	})
+	if err != nil {
+		return err
+	}
+	items = memoryItemsByID(response.GetItems())
+	if len(items) != 1 {
+		return fmt.Errorf("expected only replacement runtime memory at seq 25, got %d: %+v", len(items), response.GetItems())
+	}
+	if _, ok := items[replacementID]; !ok {
+		return fmt.Errorf("replacement runtime memory should stay visible at seq 25: %+v", response.GetItems())
+	}
+	if _, ok := items[currentID]; ok {
+		return fmt.Errorf("current runtime memory should expire after valid_to_seq: %+v", response.GetItems())
+	}
+	result.Checks.ValidityWindowCurrent = true
+	return nil
+}
+
+func memoryItemsByID(items []*memoryv1.StructuredMemoryEvent) map[string]*memoryv1.StructuredMemoryEvent {
+	byID := make(map[string]*memoryv1.StructuredMemoryEvent, len(items))
+	for _, item := range items {
+		byID[item.GetMemoryEventId()] = item
+	}
+	return byID
 }
 
 func publishEvent(ctx context.Context, cfg config, writer *kafkago.Writer, event *conversationtimelinev1.ConversationTimelineEvent) error {
@@ -509,15 +646,33 @@ func waitMemoryQueryCount(ctx context.Context, cfg config, client memoryv1.Memor
 	return err
 }
 
+type queryMemoryOptions struct {
+	query             string
+	statuses          []memoryv1.MemoryEventStatus
+	atConversationSeq int64
+}
+
 func queryMemory(ctx context.Context, cfg config, client memoryv1.MemoryServiceClient, userID string, query string) (*memoryv1.QueryMemoryEventsResponse, error) {
+	return queryMemoryWithOptions(ctx, cfg, client, userID, queryMemoryOptions{
+		query:    query,
+		statuses: []memoryv1.MemoryEventStatus{memoryv1.MemoryEventStatus_MEMORY_EVENT_STATUS_PENDING},
+	})
+}
+
+func queryMemoryWithOptions(ctx context.Context, cfg config, client memoryv1.MemoryServiceClient, userID string, options queryMemoryOptions) (*memoryv1.QueryMemoryEventsResponse, error) {
 	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
 	defer cancel()
+	statuses := options.statuses
+	if len(statuses) == 0 {
+		statuses = []memoryv1.MemoryEventStatus{memoryv1.MemoryEventStatus_MEMORY_EVENT_STATUS_ACTIVE}
+	}
 	return client.QueryMemoryEvents(requestCtx, &memoryv1.QueryMemoryEventsRequest{
-		AuthContext:    auth(cfg, userID),
-		ConversationId: cfg.conversationID,
-		Query:          query,
-		Statuses:       []memoryv1.MemoryEventStatus{memoryv1.MemoryEventStatus_MEMORY_EVENT_STATUS_PENDING},
-		Limit:          20,
+		AuthContext:       auth(cfg, userID),
+		ConversationId:    cfg.conversationID,
+		Query:             options.query,
+		Statuses:          statuses,
+		AtConversationSeq: options.atConversationSeq,
+		Limit:             20,
 	})
 }
 

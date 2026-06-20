@@ -15,5 +15,10 @@
 - `loadtest/memory` 和 clean projection smoke：member join -> message persisted -> PENDING StructuredMemoryEvent + source ref -> Query/Get -> revoke hidden
 - profile overgeneralization eval case + local fixture adapter：单条群聊事实不能升级为 ACTIVE profile，profile candidate 必须保留 GROUP scope 且 PENDING_REVIEW
 - group memory fixture eval：ACTIVE 需要 source refs，validity window 必须保留，superseded memory 不能作为 current fact
+- runtime current-only query semantics：`QueryMemoryEvents.at_conversation_seq` 会过滤
+  `valid_from_seq / valid_to_seq`，默认 ACTIVE query 不返回 `SUPERSEDED`
+  memory，且返回项保留 source refs 和 `supersedes_event_ids`
+- `loadtest/memory` 已增加 source-ref、validity window、supersession 的 runtime
+  smoke checks；真实进程 smoke 仍按需要手动运行
 
-下一步：补 runtime projection/query smoke 覆盖 source-ref、validity window 和 supersession。第一版仍不做 LLM extraction，不把单条群消息直接升级为 ACTIVE profile fact。
+下一步：把 retrieval-gateway EvidencePack 接入 memory-service current-only memory query。第一版仍不做 LLM extraction，不把单条群消息直接升级为 ACTIVE profile fact。

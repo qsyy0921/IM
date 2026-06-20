@@ -93,6 +93,96 @@ func TestRepositoryProjectAndQueryMemoryEventsIntegration(t *testing.T) {
 	}
 }
 
+func TestRepositoryQueryMemoryEventsAtConversationSeqIntegration(t *testing.T) {
+	ctx := context.Background()
+	pool := openMemoryTestPool(t)
+	resetMemoryTables(t, ctx, pool)
+	repository := NewRepository(pool)
+
+	projectMemory(t, ctx, repository, types.ProjectTimelineEventCommand{
+		TenantID:          "tenant-1",
+		EventID:           "event-member-join",
+		EventType:         types.TimelineEventConversationMemberJoined,
+		ConversationID:    "conv-1",
+		ConversationSeq:   1,
+		ConsumerGroup:     "memory-test",
+		Topic:             "conversation.timeline.events",
+		PartitionID:       0,
+		OffsetValue:       2,
+		TargetUserID:      "user-1",
+		MemberRole:        types.MemoryMemberRoleMember,
+		MemberStatus:      types.MemoryMemberStatusActive,
+		MemberVersion:     1,
+		PermissionVersion: 1,
+	})
+	seedRuntimeMemoryWindow(t, ctx, pool, "tenant-1", "conv-1")
+
+	items, _, err := repository.QueryMemoryEvents(ctx, types.QueryMemoryEventsCommand{
+		AuthContext: types.AuthContext{
+			TenantID: "tenant-1",
+			UserID:   "user-1",
+			DeviceID: "device-1",
+		},
+		ConversationID:    "conv-1",
+		Query:             "runtime memory",
+		Statuses:          []string{types.MemoryStatusActive},
+		AtConversationSeq: 15,
+		Limit:             10,
+	}, 10)
+	if err != nil {
+		t.Fatalf("query memory events at seq 15: %v", err)
+	}
+	byID := memoryEventsByID(items)
+	if len(items) != 2 {
+		t.Fatalf("expected current and replacement active events, got %d: %+v", len(items), items)
+	}
+	if _, ok := byID["mem-current"]; !ok {
+		t.Fatalf("current memory should be visible at seq 15: %+v", items)
+	}
+	replacement, ok := byID["mem-replacement"]
+	if !ok {
+		t.Fatalf("replacement memory should be visible at seq 15: %+v", items)
+	}
+	if len(replacement.SourceRefs) != 1 || replacement.SourceRefs[0].ConversationSeq != 13 {
+		t.Fatalf("replacement should keep source ref: %+v", replacement.SourceRefs)
+	}
+	if len(replacement.SupersedesEventIDs) != 1 || replacement.SupersedesEventIDs[0] != "mem-superseded" {
+		t.Fatalf("replacement should preserve supersession link: %+v", replacement.SupersedesEventIDs)
+	}
+	if _, ok := byID["mem-expired"]; ok {
+		t.Fatalf("expired memory should be hidden at seq 15: %+v", items)
+	}
+	if _, ok := byID["mem-superseded"]; ok {
+		t.Fatalf("superseded memory should be hidden from active query: %+v", items)
+	}
+
+	items, _, err = repository.QueryMemoryEvents(ctx, types.QueryMemoryEventsCommand{
+		AuthContext: types.AuthContext{
+			TenantID: "tenant-1",
+			UserID:   "user-1",
+			DeviceID: "device-1",
+		},
+		ConversationID:    "conv-1",
+		Query:             "runtime memory",
+		Statuses:          []string{types.MemoryStatusActive},
+		AtConversationSeq: 25,
+		Limit:             10,
+	}, 10)
+	if err != nil {
+		t.Fatalf("query memory events at seq 25: %v", err)
+	}
+	byID = memoryEventsByID(items)
+	if len(items) != 1 {
+		t.Fatalf("expected only replacement active event at seq 25, got %d: %+v", len(items), items)
+	}
+	if _, ok := byID["mem-replacement"]; !ok {
+		t.Fatalf("replacement memory should remain visible at seq 25: %+v", items)
+	}
+	if _, ok := byID["mem-current"]; ok {
+		t.Fatalf("current memory should expire after valid_to_seq: %+v", items)
+	}
+}
+
 func TestRepositoryTombstonesMemoryByMessageIntegration(t *testing.T) {
 	ctx := context.Background()
 	pool := openMemoryTestPool(t)
@@ -155,6 +245,67 @@ func TestRepositoryTombstonesMemoryByMessageIntegration(t *testing.T) {
 	if len(items) != 0 {
 		t.Fatalf("revoked memory should be hidden: %+v", items)
 	}
+}
+
+func seedRuntimeMemoryWindow(t *testing.T, ctx context.Context, pool *pgxpool.Pool, tenantID string, conversationID string) {
+	t.Helper()
+	if _, err := pool.Exec(ctx, `
+INSERT INTO memory_structured_events (
+	tenant_id,
+	memory_event_id,
+	scope_type,
+	scope_id,
+	conversation_id,
+	topic,
+	event_type,
+	status,
+	review_state,
+	fact_text,
+	actor_user_ids,
+	audience_user_ids,
+	valid_from_seq,
+	valid_to_seq,
+	supersedes_event_ids,
+	contradicts_event_ids,
+	confidence,
+	visibility_version,
+	extraction_version,
+	source_projection_version
+) VALUES
+($1, 'mem-expired', 'CONVERSATION', $2, $2, 'runtime-memory', 'DECISION', 'ACTIVE', 'APPROVED', 'expired runtime memory decision', '["user-2"]'::jsonb, '[]'::jsonb, 2, 5, '[]'::jsonb, '[]'::jsonb, 0.9000, 1, 'test-v1', 5),
+($1, 'mem-current', 'CONVERSATION', $2, $2, 'runtime-memory', 'DECISION', 'ACTIVE', 'APPROVED', 'current runtime memory decision', '["user-2"]'::jsonb, '[]'::jsonb, 10, 20, '[]'::jsonb, '[]'::jsonb, 0.9100, 1, 'test-v1', 20),
+($1, 'mem-superseded', 'CONVERSATION', $2, $2, 'runtime-memory', 'DECISION', 'SUPERSEDED', 'APPROVED', 'old runtime memory decision', '["user-2"]'::jsonb, '[]'::jsonb, 6, 12, '[]'::jsonb, '[]'::jsonb, 0.8000, 1, 'test-v1', 12),
+($1, 'mem-replacement', 'CONVERSATION', $2, $2, 'runtime-memory', 'DECISION', 'ACTIVE', 'APPROVED', 'replacement runtime memory decision', '["user-3"]'::jsonb, '[]'::jsonb, 13, NULL, '["mem-superseded"]'::jsonb, '[]'::jsonb, 0.9500, 1, 'test-v1', 30)
+`, tenantID, conversationID); err != nil {
+		t.Fatalf("seed runtime memory events: %v", err)
+	}
+	if _, err := pool.Exec(ctx, `
+INSERT INTO memory_event_source_refs (
+	tenant_id,
+	memory_event_id,
+	source_ref_id,
+	source_type,
+	source_id,
+	source_event_id,
+	conversation_id,
+	conversation_seq,
+	occurred_at
+) VALUES
+($1, 'mem-expired', 'source-expired', 'MESSAGE', 'msg-expired', 'event-expired', $2, 2, now()),
+($1, 'mem-current', 'source-current', 'MESSAGE', 'msg-current', 'event-current', $2, 10, now()),
+($1, 'mem-superseded', 'source-superseded', 'MESSAGE', 'msg-superseded', 'event-superseded', $2, 6, now()),
+($1, 'mem-replacement', 'source-replacement', 'MESSAGE', 'msg-replacement', 'event-replacement', $2, 13, now())
+`, tenantID, conversationID); err != nil {
+		t.Fatalf("seed runtime memory source refs: %v", err)
+	}
+}
+
+func memoryEventsByID(items []types.StructuredMemoryEvent) map[string]types.StructuredMemoryEvent {
+	byID := make(map[string]types.StructuredMemoryEvent, len(items))
+	for _, item := range items {
+		byID[item.MemoryEventID] = item
+	}
+	return byID
 }
 
 func projectMemory(t *testing.T, ctx context.Context, repository *Repository, command types.ProjectTimelineEventCommand) {

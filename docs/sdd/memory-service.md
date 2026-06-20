@@ -64,6 +64,12 @@ RPCs:
 These APIs return only structured, source-backed memory records. They do not
 return model answers.
 
+`QueryMemoryEvents.at_conversation_seq` is the runtime "current fact" selector
+for conversation-scoped retrieval. When set, the service returns only memory
+whose `valid_from_seq` is not after that seq and whose `valid_to_seq` is unset
+or still covers that seq. The default status set remains `ACTIVE`; callers may
+explicitly request `PENDING` for review/smoke flows.
+
 ## 3. Core Model
 
 `StructuredMemoryEvent` is not the raw message. It is a source-backed memory
@@ -113,6 +119,8 @@ membership semantics as search:
 ```text
 source_ref.conversation_seq >= membership.join_seq
 AND (membership.leave_seq IS NULL OR source_ref.conversation_seq <= membership.leave_seq)
+AND (query.at_conversation_seq is unset OR memory.valid_from_seq <= query.at_conversation_seq)
+AND (query.at_conversation_seq is unset OR memory.valid_to_seq is null OR memory.valid_to_seq >= query.at_conversation_seq)
 AND memory_event.status = ACTIVE
 AND review_state != REJECTED
 ```

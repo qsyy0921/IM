@@ -78,7 +78,8 @@ Foundation backlog 锚点：`search-service`、`memory-service`、`retrieval-gat
   vector-index handoff smoke 已通过，真正异步 handoff worker 仍可后置。
 - `vector-index-service`：first-stage rebuild checkpoint worker、JSONL task source 和
   `knowledge-ingestion-service.ListKnowledgeChunks` 公开 API source 的
-  `embedding-worker -> model-gateway.InvokeEmbedding -> vector upsert` 已落；后续仍需
+  `embedding-worker -> model-gateway.InvokeEmbedding -> vector upsert` 已落，并已补
+  `loadtest/vectorembedding` 真实进程 smoke；后续仍需
   Kafka / outbox 驱动的真实 knowledge / memory / search chunk consumer、embedding task
   持久队列、真实 Milvus / pgvector / OpenSearch backend，以及 provider backend rebuild /
   backfill worker。

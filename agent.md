@@ -52,10 +52,8 @@ base: search, memory, retrieval, RAG, summary, agent, skill-registry,
 mcp-gateway, action-executor and ai-eval. Details live in service briefs and
 progress docs.
 
-Current future-service promotion target lives in `current-goal.md`. It currently
-covers media, notification, audit, admin, control-plane, presence, model-gateway,
-workflow, knowledge-ingestion and vector-index. Promote them service-by-service;
-do not create every future service directory in one change.
+Current active targets live in `current-goal.md`. Promote future services
+service-by-service; do not create every planned service directory in one change.
 
 AI invariants: separate facts, projections, retrieval and controlled execution.
 Memory requires source refs, scope, validity, supersession, confidence and review state. RAG / summary / Agent consume EvidencePack only;

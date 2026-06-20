@@ -69,6 +69,11 @@ model-gateway / workflow / knowledge-ingestion / vector-index
   usecase 写 vector item metadata。该切片用于验证 worker / model-gateway /
   knowledge public API / vector upsert 边界，不新增 raw text 公共 API，也不把 raw text
   或 embedding vector array 落入 PostgreSQL / outbox / metrics。
+- `vector-index-service` 已跑通 `loadtest/vectorembedding` embedding worker 真实进程
+  smoke：公开 gRPC 准备 knowledge source / job / chunk manifest，启动
+  `embedding-worker` 通过 `ListKnowledgeChunks` 拉 redacted preview，经
+  `model-gateway.InvokeEmbedding` 写 vector metadata，并用 `SearchVectors` 验证。该 runner
+  不手工 upsert、不读私表，原始 summary 写入 `H:\NexusIM\loadtest-results`。
 - `admin-service` 已从 stage-switch 进入 product-active 第一版 implementation
   slice，覆盖 `CreateAdminOperation`、`ApproveAdminOperation`、
   `GetAdminOperation`、`ListAdminOperations`、PostgreSQL operation / approval

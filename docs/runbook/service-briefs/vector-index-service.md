@@ -41,6 +41,9 @@ vector 写入、rebuild 和 backfill 逻辑复杂到影响 retrieval / memory �
   写入 hash / refs / visibility metadata。PostgreSQL、outbox、metrics 和 relay payload
   仍不保存 raw text 或 embedding vector array。该模式用于本地 smoke / worker 边界验证，
   不是生产 parser / chunk consumer。
+- `loadtest/vectorembedding` 已跑通 embedding worker 真实进程 smoke：公开 gRPC
+  准备 knowledge chunk manifest，启动 embedding worker，经 `model-gateway.InvokeEmbedding`
+  写入 vector metadata，再通过 `SearchVectors` 验证结果；runner 不手工 upsert，也不读私表。
 
 后续待办：Kafka / outbox 驱动的真实 knowledge / memory / search chunk consumer、真实
 Milvus / pgvector / OpenSearch backend、provider backend rebuild / backfill worker、

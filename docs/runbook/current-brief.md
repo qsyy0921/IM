@@ -42,7 +42,10 @@ first-stage rebuild checkpoint worker、`vector_outbox -> im.vector.events` 第�
 真实 Kafka relay smoke、knowledge chunk -> vector upsert 公开 API handoff smoke，以及
 first-stage `embedding-worker`：本地 JSONL 任务源或
 `knowledge-ingestion-service.ListKnowledgeChunks` redacted preview 公开 API 任务源 ->
-`model-gateway.InvokeEmbedding` -> vector upsert hash / metadata。`admin-service` 已完成第一版
+`model-gateway.InvokeEmbedding` -> vector upsert hash / metadata。`loadtest/vectorembedding`
+真实进程 smoke 已跑通，用公开 gRPC 准备 knowledge chunk manifest，
+再启动 embedding worker 经 `model-gateway.InvokeEmbedding` 写 vector metadata，并通过
+`SearchVectors` 验证；该 smoke 入口不手工 upsert、不读私表。`admin-service` 已完成第一版
 `CreateAdminOperation` / `ApproveAdminOperation` / `GetAdminOperation` /
 `ListAdminOperations` path、`admin_outbox -> im.admin.events` outbox relay 和
 `operation-worker` risk routing 执行闭环；`REPAIR_REQUEST` 已接入

@@ -107,8 +107,12 @@
   真实 rebuild-worker + outbox relay + Kafka `im.vector.events` readback，并覆盖
   rebuild request job / checkpoint started / completed；
   `loadtest/knowledgevector` 已跑通 knowledge
-  chunk -> vector upsert -> vector search handoff；不宣称 Milvus / pgvector /
-  OpenSearch、embedding worker 或 provider backend rebuild。
+  chunk -> vector upsert -> vector search handoff；first-stage `embedding-worker` 已支持
+  JSONL task source 和 `knowledge-ingestion-service.ListKnowledgeChunks` 公开 API source，
+  并已跑通 `loadtest/vectorembedding` 真实进程 smoke，验证
+  `knowledge-ingestion -> model-gateway.InvokeEmbedding -> vector-index SearchVectors`
+  边界；不宣称 Kafka / outbox chunk consumer、Milvus / pgvector / OpenSearch、
+  embedding task 持久队列或 provider backend rebuild。
 - `admin-service` product-active：SDD v0.1 和 stage-switch review 已通过，
   第一版 proto / migration / 六层 skeleton / `grpc` runtime / Docker /
   Prometheus / Grafana 覆盖已落；当前覆盖 `CreateAdminOperation`、

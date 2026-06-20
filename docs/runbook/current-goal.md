@@ -16,16 +16,8 @@ future platform / product services promotion
 ## 当前目标服务
 
 ```text
-media-service
-notification-service
-audit-service
-admin-service
-control-plane-service
-presence-service
-model-gateway
-workflow-service
-knowledge-ingestion-service
-vector-index-service
+media / notification / audit / admin / control-plane / presence
+model-gateway / workflow / knowledge-ingestion / vector-index
 ```
 
 ## 默认推进方式
@@ -45,46 +37,21 @@ vector-index-service
 
 ## 当前进展
 
-- `docs/sdd/future-platform-services.md` 已冻结组合 promotion 边界。
-- `media-service`、`notification-service`、`audit-service`、`control-plane-service`、
-  `admin-service`、`presence-service`、`model-gateway`、
-  `knowledge-ingestion-service`、`workflow-service` 和 `vector-index-service`
-  SDD v0.1 draft 已存在。
-- `media-service` stage-switch review 已通过，记录见
-  `docs/runbook/stage-switch/media-service.md`。
-- `media-service` 已进入 `product-active`，第一版 proto / migration / 六层
-  skeleton / cmd runtime / Docker / Prometheus / Grafana 覆盖已落。
-- `media-service` focused hardening 已补真实 PostgreSQL repository 集成测试和
-  object_key 不出 public response / fake presign URL / outbox payload 的回归门禁。
-- `media-service` 最小 gRPC smoke 已通过，报告见
-  `docs/runbook/loadtest/media-service/loadtest-report-20260620-media-grpc-smoke.md`。
-- `media-service` 已补 `media_outbox -> im.media.events` 最小 outbox relay、
-  Kafka protobuf schema、真实 PostgreSQL outbox relay 集成测试和
-  `NEXUSIM_MEDIA_SERVICE_MODE=outbox-relay` runtime mode。
-- `media-service` outbox relay 真实 Kafka smoke 已通过，报告见
-  `docs/runbook/loadtest/media-service/loadtest-report-20260620-media-outbox-relay-smoke.md`。
-- `media-service` 第一版 processing worker 已落地，使用本地 mock scanner /
-  thumbnail / transcode adapter；真实进程 smoke 已通过，报告见
-  `docs/runbook/loadtest/media-service/loadtest-report-20260620-media-processing-worker-smoke.md`。
-- `notification-service` stage-switch review 已通过，记录见
-  `docs/runbook/stage-switch/notification-service.md`。
-- `notification-service` 已进入 `product-active` implementation slice，第一版
-  proto / migration / 六层 skeleton / `grpc` runtime / Docker / observability 覆盖已落，
-  并已通过 focused checks / 完整 `check-local`；当前能力只覆盖 request 事实源、
-  status 查询、cancel 和 accepted outbox。
-- `notification-service` 已补 `notification_outbox -> im.notification.events` 最小
-  outbox relay、Kafka protobuf schema、runtime mode、service-registry / compose wiring、
-  trigger builder 单测和真实 PostgreSQL relay 集成测试。
-- `notification_outbox -> im.notification.events` 真实 Kafka smoke 已通过，报告见
-  `docs/runbook/loadtest/notification-service/loadtest-report-20260620-notification-outbox-relay-smoke.md`。
-- `notification-service` 第一版 delivery worker 和 noop provider adapter 已落地，
-  `CreateNotificationRequest -> delivery-worker -> noop provider -> notification_outbox
-  -> im.notification.events` 真实本地 smoke 已通过，报告见
-  `docs/runbook/loadtest/notification-service/loadtest-report-20260620-notification-delivery-worker-smoke.md`。
-- `notification-service` 第一版 webhook provider adapter 已落地，支持低敏 HTTP
-  provider envelope、provider idempotency header、provider message id hash 和稳定失败分类。
-- 下一步默认继续 notification SMTP / SMS / APNs / FCM adapter 或
-  bounce-suppression 边界，或按 promotion plan 转入 `audit-service` stage-switch。
+- 组合 promotion 边界见 `docs/sdd/future-platform-services.md`。
+- 10 个目标服务的 SDD v0.1 draft 已存在，单服务状态见 service brief。
+- `media-service` 已 product-active，完成 skeleton、gRPC smoke、outbox relay smoke
+  和 mock processing worker smoke。
+- `notification-service` 已 product-active，完成 skeleton、outbox relay、
+  delivery worker、noop provider、webhook provider 和相关 smoke。
+- `audit-service` SDD v0.1 stage-switch 已通过，记录见
+  `docs/runbook/stage-switch/audit-service.md`。
+
+## 下一步
+
+- 默认进入 `audit-service` 第一实现切片：registry / proto / migration /
+  runtime / observability 同步切换，先落 `AppendAuditRecord` /
+  `QueryAuditRecords` / `VerifyAuditProof`。
+- 也可以继续 notification SMTP / SMS / APNs / FCM adapter 或 bounce-suppression。
 
 ## 硬边界
 

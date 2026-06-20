@@ -12,11 +12,7 @@
 
 ## Foundation-active AI 服务
 
-[search](search-service.md) / [memory](memory-service.md) /
-[retrieval](retrieval-gateway.md) / [rag](rag-service.md) /
-[summary](summary-service.md) / [agent](agent-service.md) /
-[skill-registry](skill-registry.md) / [mcp](mcp-gateway.md) /
-[action-executor](action-executor.md) / [ai-eval](ai-eval-service.md)
+[search](search-service.md) / [memory](memory-service.md) / [retrieval](retrieval-gateway.md) / [rag](rag-service.md) / [summary](summary-service.md) / [agent](agent-service.md) / [skill-registry](skill-registry.md) / [mcp](mcp-gateway.md) / [action-executor](action-executor.md) / [ai-eval](ai-eval-service.md)
 
 ## Product-active platform / product services
 
@@ -24,8 +20,7 @@
 
 ## Future platform / product services
 
-[audit](audit-service.md) / [admin](admin-service.md) /
-[control-plane](control-plane-service.md) / [presence](presence-service.md) /
+[audit](audit-service.md) / [admin](admin-service.md) / [control-plane](control-plane-service.md) / [presence](presence-service.md) /
 [model-gateway](model-gateway.md) / [workflow](workflow-service.md) / [knowledge-ingestion](knowledge-ingestion-service.md) / [vector-index](vector-index-service.md)
 
 ## 当前推进规则

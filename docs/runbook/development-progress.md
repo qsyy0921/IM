@@ -57,11 +57,12 @@
 
 当前 Go 侧服务底座、控制面、EvidencePack、proposal / approval / audit、
 Python Worker 候选接入边界和低敏 eval 持久化已经足够支撑算法切片；
-下一步默认进入低敏 collaborative-memory 算法/eval，而不是继续泛化清九服务 P2。
+当前 active slice 已转为 future platform / product services promotion，继续按服务
+推进媒体、通知、审计、控制面等产品化 / 平台服务，不再泛化清九服务 P2。
 
 当前尚未真实实现的后续产品化 / 平台服务：
 
-- `audit-service`（SDD v0.1 draft 已存在）
+- `audit-service`（SDD v0.1 stage-switch 已通过；服务目录尚未创建）
 - `admin-service`（SDD v0.1 draft 已存在）
 - `control-plane-service`（SDD v0.1 draft 已存在）
 - `presence-service`（SDD v0.1 draft 已存在）

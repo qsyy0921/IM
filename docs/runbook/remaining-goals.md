@@ -11,17 +11,12 @@
 
 ## 当前默认主线
 
-AI 大模型应用底座仍是默认开发主线：
-
-```text
-search-service -> memory-service -> retrieval-gateway
--> rag-service / summary-service -> agent-service
--> skill-registry -> mcp-gateway -> action-executor -> ai-eval-service
-```
-
-9 个既有 IM 服务只做阻塞 AI 主线的必要收口。Go 侧服务底座、
-EvidencePack、proposal / approval / audit、Python Worker 候选接入和低敏
-eval 已能支撑算法切片；生产级 HA、长压、sizing 和完整系统测试暂不作为当前阻塞。
+当前 active slice 是 future platform / product services promotion。AI 底座和
+9 个既有 IM 服务只做阻塞该主线的必要收口；生产级 HA、长压、sizing 和完整系统测试
+暂不作为当前阻塞。
+Foundation backlog 锚点：`search-service`、`memory-service`、`retrieval-gateway`、
+`rag-service`、`summary-service`、`agent-service`、`skill-registry`、`mcp-gateway`、
+`action-executor`、`ai-eval-service`。
 
 ## 当前未完成重点
 
@@ -64,30 +59,19 @@ eval 已能支撑算法切片；生产级 HA、长压、sizing 和完整系统�
 
 ## Product-active 平台 / 产品化服务
 
-- `media-service`：第一版 proto / migration / 六层 skeleton / cmd runtime /
-  Docker / Prometheus / Grafana 覆盖已落；真实 PostgreSQL repository 集成测试和
-  object_key 不出 public response / fake presign URL / outbox payload 的回归门禁
-  已补；最小 gRPC smoke 已通过；`media_outbox -> im.media.events` 最小 relay
-  代码切片、Kafka schema、runtime mode、真实 PG relay 测试和真实 Kafka smoke 已补；
-  第一版 processing worker 和 mock scanner / thumbnail / transcode adapter 已补。
-  后续仍需真实 S3-compatible adapter、scanner、thumbnail / transcode provider 和更完整
-  download policy。
-- `notification-service`：stage-switch review 已通过，第一版 proto / migration /
-  六层 skeleton / `grpc` runtime / Docker / Prometheus / Grafana 覆盖已落，并已通过
-  focused checks / 完整 `check-local`。当前只覆盖 `CreateNotificationRequest` /
-  `GetNotificationStatus` / `CancelNotificationRequest`、request 事实源和
-  `notification.request.accepted.v1` outbox；`notification_outbox -> im.notification.events`
-  最小 relay、Kafka schema、runtime mode、真实 PG relay 测试和真实 Kafka smoke 已补；
-  delivery worker、noop provider adapter、webhook provider adapter 和 delivery
-  succeeded smoke 已补。
-  后续仍需 SMTP / SMS / APNs / FCM adapter、
-  bounce / suppression worker、provider redrive / audit 产品化。
+- `media-service`：后续仍需真实 S3-compatible adapter、scanner、thumbnail /
+  transcode provider 和更完整 download policy。
+- `notification-service`：后续仍需 SMTP / SMS / APNs / FCM adapter、bounce /
+  suppression worker、provider redrive / audit 产品化。
 
 ## 后置平台 / 产品化服务
 
-这些服务仍登记为 `future`，stage switch 前不得创建 `services/<name>` 目录：
+这些服务仍登记为 `future`。除已完成 stage-switch 的服务在下一实现切片中与
+registry / proto / migration 同步切换外，不得提前创建 `services/<name>` 目录：
 
-- `audit-service`：统一审计、导出、hash-chain、Agent 动作审计。
+- `audit-service`：SDD v0.1 stage-switch 已通过，下一实现切片需同步切换
+  service-registry / proto / migration / runtime / observability，并先落
+  `AppendAuditRecord` / `QueryAuditRecords` / `VerifyAuditProof`。
 - `admin-service`：租户、封禁、配置、repair 审批、运维操作。
 - `control-plane-service`：配置中心、功能开关、灰度、quota、applied ACK。
 - `presence-service`：在线状态、输入中、最后在线、设备在线。

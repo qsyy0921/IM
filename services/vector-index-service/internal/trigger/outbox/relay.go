@@ -189,7 +189,7 @@ func BuildVectorEvent(message types.OutboxMessage) (*vectoreventsv1.VectorEvent,
 		EventType:        message.EventType,
 		EventVersion:     int32(message.EventVersion),
 		TenantId:         string(message.TenantID),
-		AggregateType:    "vector_item",
+		AggregateType:    aggregateTypeForEvent(message.EventType),
 		AggregateId:      message.AggregateID,
 		AggregateVersion: message.AggregateVersion,
 		PartitionKey:     message.PartitionKey,
@@ -208,6 +208,14 @@ func BuildVectorEvent(message types.OutboxMessage) (*vectoreventsv1.VectorEvent,
 		event.Payload = &vectoreventsv1.VectorEvent_ItemTombstoned{
 			ItemTombstoned: vectorItemTombstoned(payload, string(message.TenantID)),
 		}
+	case "vector.rebuild.started.v1":
+		event.Payload = &vectoreventsv1.VectorEvent_RebuildStarted{
+			RebuildStarted: vectorRebuildStarted(payload, string(message.TenantID)),
+		}
+	case "vector.rebuild.completed.v1":
+		event.Payload = &vectoreventsv1.VectorEvent_RebuildCompleted{
+			RebuildCompleted: vectorRebuildCompleted(payload, string(message.TenantID)),
+		}
 	default:
 		return nil, errors.New("unsupported vector outbox event type")
 	}
@@ -225,6 +233,10 @@ type vectorPayload struct {
 	TombstoneStatus   string `json:"tombstone_status"`
 	DeleteProofID     string `json:"delete_proof_id"`
 	ReasonClass       string `json:"reason_class"`
+	RebuildJobRefHash string `json:"rebuild_job_ref_hash"`
+	CollectionIDHash  string `json:"collection_id_hash"`
+	PartitionKeyHash  string `json:"partition_key_hash"`
+	CursorHash        string `json:"cursor_hash"`
 }
 
 func decodeVectorPayload(payloadJSON []byte) (vectorPayload, error) {
@@ -239,6 +251,32 @@ func decodeVectorPayload(payloadJSON []byte) (vectorPayload, error) {
 }
 
 func validateVectorPayloadForEvent(eventType string, payload vectorPayload) error {
+	switch eventType {
+	case "vector.item.indexed.v1":
+		if err := validateVectorItemPayload(payload); err != nil {
+			return err
+		}
+		return nil
+	case "vector.item.tombstoned.v1":
+		if err := validateVectorItemPayload(payload); err != nil {
+			return err
+		}
+		if payload.DeleteProofID == "" || payload.ReasonClass == "" {
+			return errors.New("vector tombstoned payload is incomplete")
+		}
+		return nil
+	case "vector.rebuild.started.v1", "vector.rebuild.completed.v1":
+		if payload.RebuildJobRefHash == "" || payload.CollectionIDHash == "" ||
+			payload.PartitionKeyHash == "" || payload.CursorHash == "" {
+			return errors.New("vector rebuild payload is incomplete")
+		}
+		return nil
+	default:
+		return errors.New("unsupported vector outbox event type")
+	}
+}
+
+func validateVectorItemPayload(payload vectorPayload) error {
 	if payload.VectorItemRefHash == "" ||
 		payload.CollectionType == "" ||
 		payload.SourceService == "" ||
@@ -247,19 +285,9 @@ func validateVectorPayloadForEvent(eventType string, payload vectorPayload) erro
 		payload.Dimension <= 0 ||
 		payload.VisibilityVersion <= 0 ||
 		payload.TombstoneStatus == "" {
-		return errors.New("vector payload is incomplete")
+		return errors.New("vector item payload is incomplete")
 	}
-	switch eventType {
-	case "vector.item.indexed.v1":
-		return nil
-	case "vector.item.tombstoned.v1":
-		if payload.DeleteProofID == "" || payload.ReasonClass == "" {
-			return errors.New("vector tombstoned payload is incomplete")
-		}
-		return nil
-	default:
-		return errors.New("unsupported vector outbox event type")
-	}
+	return nil
 }
 
 func containsForbiddenPayloadField(payloadJSON []byte) bool {
@@ -313,6 +341,39 @@ func vectorItemTombstoned(payload vectorPayload, tenantID string) *vectoreventsv
 		TombstoneStatus:   payload.TombstoneStatus,
 		DeleteProofId:     payload.DeleteProofID,
 		ReasonClass:       payload.ReasonClass,
+	}
+}
+
+func vectorRebuildStarted(payload vectorPayload, tenantID string) *vectoreventsv1.VectorRebuildStartedV1 {
+	return &vectoreventsv1.VectorRebuildStartedV1{
+		TenantId:          tenantID,
+		RebuildJobRefHash: payload.RebuildJobRefHash,
+		CollectionIdHash:  payload.CollectionIDHash,
+		CollectionType:    payload.CollectionType,
+		SourceService:     payload.SourceService,
+		PartitionKeyHash:  payload.PartitionKeyHash,
+		CursorHash:        payload.CursorHash,
+	}
+}
+
+func vectorRebuildCompleted(payload vectorPayload, tenantID string) *vectoreventsv1.VectorRebuildCompletedV1 {
+	return &vectoreventsv1.VectorRebuildCompletedV1{
+		TenantId:          tenantID,
+		RebuildJobRefHash: payload.RebuildJobRefHash,
+		CollectionIdHash:  payload.CollectionIDHash,
+		CollectionType:    payload.CollectionType,
+		SourceService:     payload.SourceService,
+		PartitionKeyHash:  payload.PartitionKeyHash,
+		CursorHash:        payload.CursorHash,
+	}
+}
+
+func aggregateTypeForEvent(eventType string) string {
+	switch eventType {
+	case "vector.rebuild.started.v1", "vector.rebuild.completed.v1":
+		return "vector_rebuild"
+	default:
+		return "vector_item"
 	}
 }
 

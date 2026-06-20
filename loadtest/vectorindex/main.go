@@ -40,6 +40,7 @@ type config struct {
 	idempotencyKey     string
 	cleanup            bool
 	applyMigration     bool
+	expectRebuildDone  bool
 	sourceService      string
 	collectionType     string
 	embeddingModelRef  string
@@ -56,41 +57,47 @@ type config struct {
 }
 
 type summary struct {
-	Commit                string             `json:"commit"`
-	CommitFull            string             `json:"commit_full"`
-	GitDirty              bool               `json:"git_dirty"`
-	GitStatusShort        string             `json:"git_status_short,omitempty"`
-	ResultDir             string             `json:"result_dir"`
-	VectorTarget          string             `json:"vector_target"`
-	KafkaBrokers          []string           `json:"kafka_brokers,omitempty"`
-	VectorEventsTopic     string             `json:"vector_events_topic,omitempty"`
-	TenantID              string             `json:"tenant_id"`
-	UserID                string             `json:"user_id"`
-	StartedAt             time.Time          `json:"started_at"`
-	FinishedAt            time.Time          `json:"finished_at"`
-	Success               bool               `json:"success"`
-	Error                 string             `json:"error,omitempty"`
-	VectorItemID          string             `json:"vector_item_id"`
-	VectorItemRefHash     string             `json:"vector_item_ref_hash"`
-	UpsertJobID           string             `json:"upsert_job_id"`
-	RebuildJobID          string             `json:"rebuild_job_id"`
-	RebuildCheckpoint     string             `json:"rebuild_checkpoint_status"`
-	TombstoneJobID        string             `json:"tombstone_job_id"`
-	TombstoneID           string             `json:"tombstone_id"`
-	SearchBeforeCount     int                `json:"search_before_count"`
-	SearchAfterCount      int                `json:"search_after_count"`
-	Outbox                outboxSummary      `json:"outbox"`
-	VectorKafkaEventCount int                `json:"vector_kafka_event_count,omitempty"`
-	VectorKafkaEvents     []vectorKafkaEvent `json:"vector_kafka_events,omitempty"`
+	Commit                 string             `json:"commit"`
+	CommitFull             string             `json:"commit_full"`
+	GitDirty               bool               `json:"git_dirty"`
+	GitStatusShort         string             `json:"git_status_short,omitempty"`
+	ResultDir              string             `json:"result_dir"`
+	VectorTarget           string             `json:"vector_target"`
+	KafkaBrokers           []string           `json:"kafka_brokers,omitempty"`
+	VectorEventsTopic      string             `json:"vector_events_topic,omitempty"`
+	TenantID               string             `json:"tenant_id"`
+	UserID                 string             `json:"user_id"`
+	StartedAt              time.Time          `json:"started_at"`
+	FinishedAt             time.Time          `json:"finished_at"`
+	Success                bool               `json:"success"`
+	Error                  string             `json:"error,omitempty"`
+	VectorItemID           string             `json:"vector_item_id"`
+	VectorItemRefHash      string             `json:"vector_item_ref_hash"`
+	UpsertJobID            string             `json:"upsert_job_id"`
+	RebuildJobID           string             `json:"rebuild_job_id"`
+	RebuildJobRefHash      string             `json:"rebuild_job_ref_hash"`
+	RebuildCheckpoint      string             `json:"rebuild_checkpoint_status"`
+	TombstoneJobID         string             `json:"tombstone_job_id"`
+	TombstoneID            string             `json:"tombstone_id"`
+	SearchBeforeCount      int                `json:"search_before_count"`
+	SearchAfterCount       int                `json:"search_after_count"`
+	Outbox                 outboxSummary      `json:"outbox"`
+	RebuildOutbox          *outboxSummary     `json:"rebuild_outbox,omitempty"`
+	VectorKafkaEventCount  int                `json:"vector_kafka_event_count,omitempty"`
+	VectorKafkaEvents      []vectorKafkaEvent `json:"vector_kafka_events,omitempty"`
+	RebuildKafkaEventCount int                `json:"rebuild_kafka_event_count,omitempty"`
+	RebuildKafkaEvents     []vectorKafkaEvent `json:"rebuild_kafka_events,omitempty"`
 }
 
 type outboxSummary struct {
-	Total      int64 `json:"total"`
-	Indexed    int64 `json:"indexed"`
-	Tombstoned int64 `json:"tombstoned"`
-	Pending    int64 `json:"pending"`
-	Published  int64 `json:"published"`
-	DLQ        int64 `json:"dlq"`
+	Total            int64 `json:"total"`
+	Indexed          int64 `json:"indexed"`
+	Tombstoned       int64 `json:"tombstoned"`
+	RebuildStarted   int64 `json:"rebuild_started"`
+	RebuildCompleted int64 `json:"rebuild_completed"`
+	Pending          int64 `json:"pending"`
+	Published        int64 `json:"published"`
+	DLQ              int64 `json:"dlq"`
 }
 
 type vectorKafkaEvent struct {
@@ -137,6 +144,7 @@ func parseConfig() config {
 	flag.StringVar(&cfg.idempotencyKey, "idempotency-key", "", "idempotency key; defaults to key derived from run name")
 	flag.BoolVar(&cfg.cleanup, "cleanup", true, "delete vector rows for the smoke tenant before running")
 	flag.BoolVar(&cfg.applyMigration, "apply-migration", true, "apply vector-index migrations before running")
+	flag.BoolVar(&cfg.expectRebuildDone, "expect-rebuild-completed", envBool("NEXUSIM_VECTOR_EXPECT_REBUILD_COMPLETED", false), "wait for rebuild-worker to complete the rebuild checkpoint")
 	flag.Parse()
 
 	if runName == "" {
@@ -259,6 +267,7 @@ func run(cfg config) error {
 		return err
 	}
 	result.RebuildJobID = rebuild.GetJob().GetJobId()
+	result.RebuildJobRefHash = hashRef(result.RebuildJobID)
 	result.RebuildCheckpoint = rebuild.GetCheckpoint().GetStatus()
 	if result.RebuildJobID == "" || rebuild.GetJob().GetStatus() != "PENDING" || result.RebuildCheckpoint != "PENDING" {
 		result.Error = fmt.Sprintf("unexpected rebuild response: job=%+v checkpoint=%+v", rebuild.GetJob(), rebuild.GetCheckpoint())
@@ -269,7 +278,50 @@ func run(cfg config) error {
 		result.Error = "get rebuild job: " + err.Error()
 		return err
 	}
-	if loadedRebuild.GetJob().GetJobType() != "REBUILD" || loadedRebuild.GetJob().GetStatus() != "PENDING" {
+	if loadedRebuild.GetJob().GetJobType() != "REBUILD" {
+		result.Error = fmt.Sprintf("unexpected loaded rebuild job: %+v", loadedRebuild.GetJob())
+		return errors.New(result.Error)
+	}
+	if cfg.expectRebuildDone {
+		completedRebuild, err := waitVectorJobStatus(ctx, client, cfg, result.RebuildJobID, "INDEXED")
+		if err != nil {
+			result.Error = err.Error()
+			return err
+		}
+		result.RebuildCheckpoint, err = readRebuildCheckpointStatus(ctx, pool, cfg, result.RebuildJobID)
+		if err != nil {
+			result.Error = err.Error()
+			return err
+		}
+		if completedRebuild.GetJob().GetStatus() != "INDEXED" || result.RebuildCheckpoint != "COMPLETED" {
+			result.Error = fmt.Sprintf("unexpected completed rebuild: job=%+v checkpoint=%s", completedRebuild.GetJob(), result.RebuildCheckpoint)
+			return errors.New(result.Error)
+		}
+		var rebuildOutbox outboxSummary
+		if cfg.kafkaEnabled() {
+			rebuildOutbox, err = waitOutboxPublished(ctx, pool, cfg, result.RebuildJobRefHash, 2)
+		} else {
+			rebuildOutbox, err = readOutboxSummary(ctx, pool, cfg.tenantID, result.RebuildJobRefHash)
+		}
+		if err != nil {
+			result.Error = err.Error()
+			return err
+		}
+		result.RebuildOutbox = &rebuildOutbox
+		if rebuildOutbox.RebuildStarted != 1 || rebuildOutbox.RebuildCompleted != 1 || rebuildOutbox.DLQ != 0 {
+			result.Error = fmt.Sprintf("unexpected rebuild outbox summary: %+v", rebuildOutbox)
+			return errors.New(result.Error)
+		}
+		if cfg.kafkaEnabled() {
+			events, err := readVectorEvents(ctx, cfg, result.RebuildJobRefHash, 2)
+			if err != nil {
+				result.Error = err.Error()
+				return err
+			}
+			result.RebuildKafkaEvents = events
+			result.RebuildKafkaEventCount = len(events)
+		}
+	} else if loadedRebuild.GetJob().GetStatus() != "PENDING" {
 		result.Error = fmt.Sprintf("unexpected loaded rebuild job: %+v", loadedRebuild.GetJob())
 		return errors.New(result.Error)
 	}
@@ -362,13 +414,17 @@ func requestVectorRebuild(ctx context.Context, client vectorv1.VectorIndexServic
 		EmbeddingModelRef: cfg.embeddingModelRef,
 		Dimension:         3,
 		SourceService:     cfg.sourceService,
-		PartitionKey:      cfg.sourceService + ":" + cfg.tenantID,
+		PartitionKey:      rebuildPartitionKey(cfg),
 		CursorValue:       "cursor:start",
 		IdempotencyKey:    cfg.idempotencyKey + "-rebuild",
 		CorrelationId:     cfg.idempotencyKey,
 		CausationId:       cfg.idempotencyKey,
 		TraceId:           cfg.traceID,
 	})
+}
+
+func rebuildPartitionKey(cfg config) string {
+	return cfg.sourceService + ":" + cfg.tenantID
 }
 
 func getVectorJob(ctx context.Context, client vectorv1.VectorIndexServiceClient, cfg config, jobID string) (*vectorv1.GetVectorIndexJobResponse, error) {
@@ -378,6 +434,25 @@ func getVectorJob(ctx context.Context, client vectorv1.VectorIndexServiceClient,
 		AuthContext: authContext(cfg, "vector-index-service", "vector-smoke-get-job"),
 		JobId:       jobID,
 	})
+}
+
+func waitVectorJobStatus(ctx context.Context, client vectorv1.VectorIndexServiceClient, cfg config, jobID string, wantStatus string) (*vectorv1.GetVectorIndexJobResponse, error) {
+	deadline := time.Now().Add(cfg.waitTimeout)
+	var last *vectorv1.GetVectorIndexJobResponse
+	for {
+		response, err := getVectorJob(ctx, client, cfg, jobID)
+		if err != nil {
+			return nil, fmt.Errorf("get vector job %s: %w", jobID, err)
+		}
+		last = response
+		if response.GetJob().GetStatus() == wantStatus {
+			return response, nil
+		}
+		if time.Now().After(deadline) {
+			return last, fmt.Errorf("vector job %s did not reach %s; last=%+v", jobID, wantStatus, last.GetJob())
+		}
+		time.Sleep(cfg.pollInterval)
+	}
 }
 
 func tombstoneVectorItem(ctx context.Context, client vectorv1.VectorIndexServiceClient, cfg config, vectorItemID string) (*vectorv1.TombstoneVectorItemResponse, error) {
@@ -451,6 +526,10 @@ WHERE tenant_id = $1
 			summary.Indexed++
 		case "vector.item.tombstoned.v1":
 			summary.Tombstoned++
+		case "vector.rebuild.started.v1":
+			summary.RebuildStarted++
+		case "vector.rebuild.completed.v1":
+			summary.RebuildCompleted++
 		}
 		switch status {
 		case "PENDING":
@@ -465,6 +544,21 @@ WHERE tenant_id = $1
 		return outboxSummary{}, fmt.Errorf("iterate vector outbox: %w", err)
 	}
 	return summary, nil
+}
+
+func readRebuildCheckpointStatus(ctx context.Context, pool *pgxpool.Pool, cfg config, rebuildJobID string) (string, error) {
+	var status string
+	err := pool.QueryRow(ctx, `
+SELECT status
+FROM vector_rebuild_checkpoints
+WHERE tenant_id = $1
+  AND rebuild_job_id = $2
+  AND partition_key = $3
+`, cfg.tenantID, rebuildJobID, rebuildPartitionKey(cfg)).Scan(&status)
+	if err != nil {
+		return "", fmt.Errorf("read rebuild checkpoint status: %w", err)
+	}
+	return status, nil
 }
 
 func waitOutboxPublished(ctx context.Context, pool *pgxpool.Pool, cfg config, vectorItemRefHash string, wantPublished int64) (outboxSummary, error) {
@@ -545,6 +639,12 @@ func summarizeVectorEvent(event *vectoreventsv1.VectorEvent) vectorKafkaEvent {
 		result.PayloadKind = "item_tombstoned"
 		result.CollectionType = payload.ItemTombstoned.GetCollectionType()
 		result.TombstoneStatus = payload.ItemTombstoned.GetTombstoneStatus()
+	case *vectoreventsv1.VectorEvent_RebuildStarted:
+		result.PayloadKind = "rebuild_started"
+		result.CollectionType = payload.RebuildStarted.GetCollectionType()
+	case *vectoreventsv1.VectorEvent_RebuildCompleted:
+		result.PayloadKind = "rebuild_completed"
+		result.CollectionType = payload.RebuildCompleted.GetCollectionType()
 	}
 	return result
 }
@@ -721,6 +821,20 @@ func envOr(name string, fallback string) string {
 		return fallback
 	}
 	return value
+}
+
+func envBool(name string, fallback bool) bool {
+	value := strings.ToLower(strings.TrimSpace(os.Getenv(name)))
+	switch value {
+	case "":
+		return fallback
+	case "1", "true", "yes", "y", "on":
+		return true
+	case "0", "false", "no", "n", "off":
+		return false
+	default:
+		return fallback
+	}
 }
 
 func splitCSV(value string) []string {

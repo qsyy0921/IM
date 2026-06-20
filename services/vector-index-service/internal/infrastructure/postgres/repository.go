@@ -251,6 +251,67 @@ WHERE tenant_id = $1 AND job_id = $2
 	return job, nil
 }
 
+func (repository *Repository) ClaimRebuildTasks(ctx context.Context, limit int) ([]types.VectorRebuildTask, error) {
+	if repository.pool == nil {
+		return nil, types.NewDBWriteFailed("vector repository is not configured")
+	}
+	if limit <= 0 {
+		limit = 50
+	}
+	tx, err := repository.pool.Begin(ctx)
+	if err != nil {
+		return nil, types.NewDBWriteFailed(err.Error())
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	tasks, err := selectPendingRebuildTasks(ctx, tx, limit)
+	if err != nil {
+		return nil, err
+	}
+	for index := range tasks {
+		tasks[index].Job.Status = types.JobStatusVectorUpserting
+		tasks[index].Checkpoint.Status = types.RebuildCheckpointStatusRunning
+		tasks[index].Checkpoint.UpdatedAt = time.Now().UTC()
+		if err := markRebuildTaskRunning(ctx, tx, tasks[index]); err != nil {
+			return nil, err
+		}
+		if err := insertRebuildOutbox(ctx, tx, tasks[index], "vector.rebuild.started.v1", 1); err != nil {
+			return nil, err
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, types.NewDBWriteFailed(err.Error())
+	}
+	return tasks, nil
+}
+
+func (repository *Repository) CompleteRebuildTask(ctx context.Context, task types.VectorRebuildTask) error {
+	if repository.pool == nil {
+		return types.NewDBWriteFailed("vector repository is not configured")
+	}
+	tx, err := repository.pool.Begin(ctx)
+	if err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	now := time.Now().UTC()
+	task.Job.Status = types.JobStatusIndexed
+	task.Job.CompletedAt = now
+	task.Checkpoint.Status = types.RebuildCheckpointStatusComplete
+	task.Checkpoint.UpdatedAt = now
+	if err := markRebuildTaskCompleted(ctx, tx, task); err != nil {
+		return err
+	}
+	if err := insertRebuildOutbox(ctx, tx, task, "vector.rebuild.completed.v1", 2); err != nil {
+		return err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	return nil
+}
+
 func getCollectionForUpdate(ctx context.Context, tx pgx.Tx, tenantID types.TenantID, collectionID string) (types.VectorCollection, error) {
 	row := tx.QueryRow(ctx, `
 SELECT tenant_id, collection_id, collection_type, backend_type, dimension,
@@ -277,6 +338,133 @@ FOR UPDATE
 		return types.VectorCollection{}, types.NewFailedPrecondition("vector collection is not active")
 	}
 	return collection, nil
+}
+
+func selectPendingRebuildTasks(ctx context.Context, tx pgx.Tx, limit int) ([]types.VectorRebuildTask, error) {
+	rows, err := tx.Query(ctx, `
+SELECT
+    vj.tenant_id, vj.job_id, vj.collection_id, vj.vector_item_id, vj.job_type,
+    vj.status, vj.retry_count, vj.failure_class, vj.public_error,
+    vj.idempotency_key, vj.command_hash, vj.correlation_id, vj.causation_id,
+    vj.trace_id, vj.created_at, vj.completed_at,
+    vrc.tenant_id, vrc.rebuild_job_id, vrc.collection_id, vrc.source_service,
+    vrc.partition_key, vrc.cursor_value, vrc.status, vrc.updated_at,
+    vc.collection_type
+FROM vector_index_jobs vj
+JOIN vector_rebuild_checkpoints vrc
+  ON vrc.tenant_id = vj.tenant_id
+ AND vrc.rebuild_job_id = vj.job_id
+JOIN vector_collections vc
+  ON vc.tenant_id = vj.tenant_id
+ AND vc.collection_id = vj.collection_id
+WHERE vj.job_type = 'REBUILD'
+  AND vj.status = 'PENDING'
+  AND vrc.status = 'PENDING'
+  AND vc.status = 'ACTIVE'
+ORDER BY vj.created_at, vj.job_id
+LIMIT $1
+FOR UPDATE OF vj, vrc SKIP LOCKED
+`, limit)
+	if err != nil {
+		return nil, types.NewDBWriteFailed(err.Error())
+	}
+	defer rows.Close()
+
+	tasks := []types.VectorRebuildTask{}
+	for rows.Next() {
+		var task types.VectorRebuildTask
+		var completedAt *time.Time
+		err := rows.Scan(
+			&task.Job.TenantID, &task.Job.JobID, &task.Job.CollectionID, &task.Job.VectorItemID,
+			&task.Job.JobType, &task.Job.Status, &task.Job.RetryCount, &task.Job.FailureClass,
+			&task.Job.PublicError, &task.Job.IdempotencyKey, &task.Job.CommandHash,
+			&task.Job.CorrelationID, &task.Job.CausationID, &task.Job.TraceID,
+			&task.Job.CreatedAt, &completedAt,
+			&task.Checkpoint.TenantID, &task.Checkpoint.RebuildJobID,
+			&task.Checkpoint.CollectionID, &task.Checkpoint.SourceService,
+			&task.Checkpoint.PartitionKey, &task.Checkpoint.CursorValue,
+			&task.Checkpoint.Status, &task.Checkpoint.UpdatedAt,
+			&task.CollectionType,
+		)
+		if err != nil {
+			return nil, types.NewDBReadFailed(err.Error())
+		}
+		if completedAt != nil {
+			task.Job.CompletedAt = *completedAt
+		}
+		tasks = append(tasks, task)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, types.NewDBReadFailed(err.Error())
+	}
+	return tasks, nil
+}
+
+func markRebuildTaskRunning(ctx context.Context, tx pgx.Tx, task types.VectorRebuildTask) error {
+	tag, err := tx.Exec(ctx, `
+UPDATE vector_index_jobs
+SET status = 'VECTOR_UPSERTING'
+WHERE tenant_id = $1
+  AND job_id = $2
+  AND job_type = 'REBUILD'
+  AND status = 'PENDING'
+`, string(task.Job.TenantID), task.Job.JobID)
+	if err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	if tag.RowsAffected() != 1 {
+		return types.NewFailedPrecondition("vector rebuild job is not claimable")
+	}
+	tag, err = tx.Exec(ctx, `
+UPDATE vector_rebuild_checkpoints
+SET status = 'RUNNING',
+    updated_at = $4
+WHERE tenant_id = $1
+  AND rebuild_job_id = $2
+  AND partition_key = $3
+  AND status = 'PENDING'
+`, string(task.Checkpoint.TenantID), task.Checkpoint.RebuildJobID, task.Checkpoint.PartitionKey, task.Checkpoint.UpdatedAt)
+	if err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	if tag.RowsAffected() != 1 {
+		return types.NewFailedPrecondition("vector rebuild checkpoint is not claimable")
+	}
+	return nil
+}
+
+func markRebuildTaskCompleted(ctx context.Context, tx pgx.Tx, task types.VectorRebuildTask) error {
+	tag, err := tx.Exec(ctx, `
+UPDATE vector_index_jobs
+SET status = 'INDEXED',
+    completed_at = $3
+WHERE tenant_id = $1
+  AND job_id = $2
+  AND job_type = 'REBUILD'
+  AND status = 'VECTOR_UPSERTING'
+`, string(task.Job.TenantID), task.Job.JobID, task.Job.CompletedAt)
+	if err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	if tag.RowsAffected() != 1 {
+		return types.NewFailedPrecondition("vector rebuild job is not running")
+	}
+	tag, err = tx.Exec(ctx, `
+UPDATE vector_rebuild_checkpoints
+SET status = 'COMPLETED',
+    updated_at = $4
+WHERE tenant_id = $1
+  AND rebuild_job_id = $2
+  AND partition_key = $3
+  AND status = 'RUNNING'
+`, string(task.Checkpoint.TenantID), task.Checkpoint.RebuildJobID, task.Checkpoint.PartitionKey, task.Checkpoint.UpdatedAt)
+	if err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	if tag.RowsAffected() != 1 {
+		return types.NewFailedPrecondition("vector rebuild checkpoint is not running")
+	}
+	return nil
 }
 
 func upsertCollection(ctx context.Context, tx pgx.Tx, collection types.VectorCollection) error {
@@ -420,6 +608,37 @@ func insertTombstonedOutbox(ctx context.Context, tx pgx.Tx, item types.VectorIte
 	payload["delete_proof_id"] = tombstone.DeleteProofID
 	payload["reason_class"] = tombstone.ReasonClass
 	return insertOutbox(ctx, tx, "evt_"+tombstone.TombstoneID, item, "vector.item.tombstoned.v1", payload)
+}
+
+func insertRebuildOutbox(ctx context.Context, tx pgx.Tx, task types.VectorRebuildTask, eventType string, eventVersion int) error {
+	payload := map[string]any{
+		"rebuild_job_ref_hash": domain.HashRef(task.Job.JobID),
+		"collection_id_hash":   domain.HashRef(task.Job.CollectionID),
+		"collection_type":      task.CollectionType,
+		"source_service":       task.Checkpoint.SourceService,
+		"partition_key_hash":   domain.HashRef(task.Checkpoint.PartitionKey),
+		"cursor_hash":          domain.HashRef(task.Checkpoint.CursorValue),
+	}
+	encoded, err := json.Marshal(payload)
+	if err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	aggregateID := domain.HashRef(task.Job.JobID)
+	_, err = tx.Exec(ctx, `
+INSERT INTO vector_outbox (
+    event_id, tenant_id, aggregate_type, aggregate_id, event_type,
+    event_version, partition_key, payload_json, status, available_at, created_at, updated_at
+) VALUES (
+    $1, $2, 'vector_rebuild', $3, $4,
+    $5, $6, $7::jsonb, 'PENDING', now(), now(), now()
+)
+ON CONFLICT (event_id) DO NOTHING
+`, "evt_"+task.Job.JobID+"_"+eventType, string(task.Job.TenantID), aggregateID, eventType,
+		eventVersion, string(task.Job.TenantID)+":"+aggregateID, string(encoded))
+	if err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	return nil
 }
 
 func insertOutbox(ctx context.Context, tx pgx.Tx, eventID string, item types.VectorItem, eventType string, payload map[string]any) error {

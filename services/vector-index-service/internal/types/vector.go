@@ -23,7 +23,10 @@ const (
 	JobStatusIndexed                = "INDEXED"
 	JobStatusTombstoned             = "TOMBSTONED"
 	JobStatusPending                = "PENDING"
+	JobStatusVectorUpserting        = "VECTOR_UPSERTING"
 	RebuildCheckpointStatusPending  = "PENDING"
+	RebuildCheckpointStatusRunning  = "RUNNING"
+	RebuildCheckpointStatusComplete = "COMPLETED"
 	OutboxStatusPublished           = "PUBLISHED"
 	OutboxStatusDLQ                 = "DLQ"
 	AllowedCallerKnowledgeIngestion = "knowledge-ingestion-service"
@@ -173,6 +176,17 @@ type VectorRebuildCheckpoint struct {
 	CursorValue   string
 	Status        string
 	UpdatedAt     time.Time
+}
+
+type VectorRebuildTask struct {
+	Job            VectorIndexJob
+	Checkpoint     VectorRebuildCheckpoint
+	CollectionType string
+}
+
+type RebuildWorkerStats struct {
+	Claimed   int
+	Completed int
 }
 
 type VectorTombstone struct {

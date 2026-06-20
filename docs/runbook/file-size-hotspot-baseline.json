@@ -1,7 +1,7 @@
 ﻿{
-    "created_at":  "2026-06-20T22:35:01.8867579Z",
+    "created_at":  "2026-06-20T22:57:00.9414409Z",
     "scope":  "handwritten Go/Markdown/PowerShell/Bash file-size budget snapshot; not a code-quality score",
-    "file_count":  1882,
+    "file_count":  1884,
     "thresholds":  {
                        "production_warn_lines":  2500,
                        "production_max_lines":  3500,

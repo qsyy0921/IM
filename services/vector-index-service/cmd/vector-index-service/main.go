@@ -20,6 +20,7 @@ import (
 	kafkainfra "github.com/qsyy0921/IM/services/vector-index-service/internal/infrastructure/kafka"
 	postgresinfra "github.com/qsyy0921/IM/services/vector-index-service/internal/infrastructure/postgres"
 	"github.com/qsyy0921/IM/services/vector-index-service/internal/trigger/outbox"
+	"github.com/qsyy0921/IM/services/vector-index-service/internal/trigger/rebuild"
 	"google.golang.org/grpc"
 )
 
@@ -44,6 +45,8 @@ func run(ctx context.Context) error {
 		return runGRPC(ctx)
 	case "outbox-relay":
 		return runOutboxRelay(ctx)
+	case "rebuild-worker":
+		return runRebuildWorker(ctx)
 	default:
 		return fmt.Errorf("unsupported NEXUSIM_VECTOR_INDEX_SERVICE_MODE %q", mode)
 	}
@@ -167,6 +170,36 @@ func runOutboxRelay(ctx context.Context) error {
 	return relay.Run(ctx)
 }
 
+func runRebuildWorker(ctx context.Context) error {
+	debugAddr, err := vectorIndexDebugAddrFromEnv()
+	if err != nil {
+		return err
+	}
+	stopDebug, err := startDebugServer(ctx, debugAddr)
+	if err != nil {
+		return err
+	}
+	defer stopDebug()
+
+	pool, err := openPGPool(ctx)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	worker := rebuild.NewWorker(
+		postgresinfra.NewRepository(pool),
+		rebuild.Config{
+			BatchSize:    envInt("NEXUSIM_VECTOR_REBUILD_BATCH_SIZE", 50),
+			PollInterval: envDuration("NEXUSIM_VECTOR_REBUILD_POLL_INTERVAL", time.Second),
+			ErrorBackoff: envDuration("NEXUSIM_VECTOR_REBUILD_ERROR_BACKOFF", time.Second),
+			Logf:         log.Printf,
+		},
+	)
+	log.Printf("vector-index-service rebuild worker started")
+	return worker.Run(ctx)
+}
+
 func vectorIndexModeFromEnv() string {
 	mode := strings.TrimSpace(os.Getenv("NEXUSIM_VECTOR_INDEX_SERVICE_MODE"))
 	if mode == "" {
@@ -177,7 +210,7 @@ func vectorIndexModeFromEnv() string {
 
 func validateVectorIndexMode(mode string) error {
 	switch mode {
-	case "noop", "grpc", "outbox-relay":
+	case "noop", "grpc", "outbox-relay", "rebuild-worker":
 		return nil
 	default:
 		return fmt.Errorf("unsupported NEXUSIM_VECTOR_INDEX_SERVICE_MODE %q", mode)

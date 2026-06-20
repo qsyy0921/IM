@@ -20,19 +20,21 @@ vector 写入、rebuild 和 backfill 逻辑复杂到影响 retrieval / memory �
 当前已覆盖：
 
 - `UpsertVectorItem`、`TombstoneVectorItem`、`SearchVectors`、`GetVectorIndexJob`。
-- `RequestVectorRebuild` 第一版 rebuild job / checkpoint request path；真正
-  rebuild worker 后置。
+- `RequestVectorRebuild` 第一版 rebuild job / checkpoint request path；first-stage
+  `rebuild-worker` 已能 claim PENDING rebuild、推进 checkpoint 并写
+  `vector.rebuild.started.v1` / `vector.rebuild.completed.v1` 低敏 outbox event。
 - local / PostgreSQL-backed test vector adapter；Milvus / pgvector / OpenSearch
   vector 后置。
 - `vector_outbox -> im.vector.events` 第一版 outbox relay、低敏 Kafka schema、
   PENDING / PUBLISHED / retry / DLQ 状态推进、同 aggregate 顺序阻塞和 focused
   builder / PostgreSQL store 测试。
-- `loadtest/vectorindex` 已覆盖公开 gRPC upsert / tombstone / search、真实 outbox
-  relay 和 Kafka `im.vector.events` readback；runbook 见
+- `loadtest/vectorindex` 已覆盖公开 gRPC upsert / tombstone / search、
+  `RequestVectorRebuild -> rebuild-worker -> rebuild started/completed outbox`、
+  真实 outbox relay 和 Kafka `im.vector.events` readback；runbook 见
   `docs/runbook/loadtest/vector-index-service/README.md`。
 - `loadtest/knowledgevector` 已覆盖 `knowledge-ingestion-service` chunk manifest
   经公开 gRPC handoff 到 vector upsert，再由 vector search 读回。
 - 确认 raw text、embedding vector array、source URI、object key 不进入事件 / metrics / relay payload。
 
-后续待办：embedding worker、rebuild worker、Milvus / pgvector / OpenSearch
-backend。
+后续待办：embedding worker、真实 Milvus / pgvector / OpenSearch backend、provider
+backend rebuild / backfill worker。

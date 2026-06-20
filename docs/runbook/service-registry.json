@@ -342,6 +342,18 @@
       "service": "admin-service",
       "env": "NEXUSIM_ADMIN_SERVICE_MODE",
       "value": "operation-worker"
+    },
+    {
+      "name": "vector-index-service-outbox-relay",
+      "service": "vector-index-service",
+      "env": "NEXUSIM_VECTOR_INDEX_SERVICE_MODE",
+      "value": "outbox-relay"
+    },
+    {
+      "name": "vector-index-service-rebuild-worker",
+      "service": "vector-index-service",
+      "env": "NEXUSIM_VECTOR_INDEX_SERVICE_MODE",
+      "value": "rebuild-worker"
     }
   ]
 }

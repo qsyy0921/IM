@@ -155,6 +155,72 @@ func TestRepositoryRequestVectorRebuildIntegration(t *testing.T) {
 	}
 }
 
+func TestRepositoryClaimAndCompleteRebuildTaskIntegration(t *testing.T) {
+	ctx := context.Background()
+	pool := openVectorTestPool(t)
+	resetVectorTables(t, ctx, pool)
+	repository := NewRepository(pool)
+
+	upsert := prepareUpsert(t, "vector-rebuild-worker-item", "vitem_rebuild_worker_source", "vjob_rebuild_worker_source")
+	if _, _, _, err := repository.UpsertVectorItem(ctx, upsert); err != nil {
+		t.Fatalf("seed vector collection: %v", err)
+	}
+	rebuild := prepareRebuild(t, "vector-rebuild-worker-idem", "vjob_rebuild_worker_1")
+	job, checkpoint, replayed, err := repository.RequestVectorRebuild(ctx, rebuild)
+	if err != nil {
+		t.Fatalf("request vector rebuild: %v", err)
+	}
+	if replayed || job.Status != types.JobStatusPending || checkpoint.Status != types.RebuildCheckpointStatusPending {
+		t.Fatalf("unexpected pending rebuild: replayed=%v job=%+v checkpoint=%+v", replayed, job, checkpoint)
+	}
+
+	tasks, err := repository.ClaimRebuildTasks(ctx, 10)
+	if err != nil {
+		t.Fatalf("claim rebuild tasks: %v", err)
+	}
+	if len(tasks) != 1 {
+		t.Fatalf("expected one rebuild task, got %d", len(tasks))
+	}
+	task := tasks[0]
+	if task.Job.JobID != job.JobID ||
+		task.Job.Status != types.JobStatusVectorUpserting ||
+		task.Checkpoint.Status != types.RebuildCheckpointStatusRunning ||
+		task.CollectionType != types.CollectionTypeKnowledgeChunk {
+		t.Fatalf("unexpected claimed task: %+v", task)
+	}
+	claimedJob, err := repository.GetVectorIndexJob(ctx, types.GetVectorIndexJobCommand{
+		AuthContext: types.AuthContext{TenantID: "tenant-vector-test", ServiceName: types.AllowedCallerVectorIndex},
+		JobID:       job.JobID,
+	})
+	if err != nil {
+		t.Fatalf("get claimed rebuild job: %v", err)
+	}
+	if claimedJob.Status != types.JobStatusVectorUpserting {
+		t.Fatalf("unexpected claimed job status: %+v", claimedJob)
+	}
+	if got := rebuildCheckpointStatus(t, ctx, pool, job.JobID, rebuild.Command.PartitionKey); got != types.RebuildCheckpointStatusRunning {
+		t.Fatalf("unexpected running checkpoint status: %s", got)
+	}
+
+	if err := repository.CompleteRebuildTask(ctx, task); err != nil {
+		t.Fatalf("complete rebuild task: %v", err)
+	}
+	completedJob, err := repository.GetVectorIndexJob(ctx, types.GetVectorIndexJobCommand{
+		AuthContext: types.AuthContext{TenantID: "tenant-vector-test", ServiceName: types.AllowedCallerVectorIndex},
+		JobID:       job.JobID,
+	})
+	if err != nil {
+		t.Fatalf("get completed rebuild job: %v", err)
+	}
+	if completedJob.Status != types.JobStatusIndexed || completedJob.CompletedAt.IsZero() {
+		t.Fatalf("unexpected completed job: %+v", completedJob)
+	}
+	if got := rebuildCheckpointStatus(t, ctx, pool, job.JobID, rebuild.Command.PartitionKey); got != types.RebuildCheckpointStatusComplete {
+		t.Fatalf("unexpected completed checkpoint status: %s", got)
+	}
+	assertRebuildOutboxLowSensitive(t, ctx, pool, job.JobID)
+}
+
 func prepareUpsert(t *testing.T, idempotencyKey string, vectorItemID string, jobID string) domain.PreparedUpsert {
 	t.Helper()
 	prepared, err := domain.PrepareUpsert(types.UpsertVectorItemCommand{
@@ -319,5 +385,80 @@ func assertVectorOutboxLowSensitive(t *testing.T, ctx context.Context, pool *pgx
 	}
 	if count != 2 {
 		t.Fatalf("expected two vector outbox rows, got %d", count)
+	}
+}
+
+func rebuildCheckpointStatus(t *testing.T, ctx context.Context, pool *pgxpool.Pool, jobID string, partitionKey string) string {
+	t.Helper()
+	var status string
+	if err := pool.QueryRow(ctx, `
+SELECT status
+FROM vector_rebuild_checkpoints
+WHERE tenant_id = 'tenant-vector-test'
+  AND rebuild_job_id = $1
+  AND partition_key = $2
+`, jobID, partitionKey).Scan(&status); err != nil {
+		t.Fatalf("query rebuild checkpoint status: %v", err)
+	}
+	return status
+}
+
+func assertRebuildOutboxLowSensitive(t *testing.T, ctx context.Context, pool *pgxpool.Pool, jobID string) {
+	t.Helper()
+	aggregateID := domain.HashRef(jobID)
+	rows, err := pool.Query(ctx, `
+SELECT event_type, aggregate_type, aggregate_id, partition_key, payload_json::text
+FROM vector_outbox
+WHERE tenant_id = 'tenant-vector-test'
+  AND aggregate_id = $1
+ORDER BY event_version, event_type
+`, aggregateID)
+	if err != nil {
+		t.Fatalf("query rebuild outbox: %v", err)
+	}
+	defer rows.Close()
+	seen := map[string]bool{}
+	for rows.Next() {
+		var eventType string
+		var aggregateType string
+		var aggregateIDValue string
+		var partitionKey string
+		var payload string
+		if err := rows.Scan(&eventType, &aggregateType, &aggregateIDValue, &partitionKey, &payload); err != nil {
+			t.Fatalf("scan rebuild outbox: %v", err)
+		}
+		if aggregateType != "vector_rebuild" || aggregateIDValue != aggregateID {
+			t.Fatalf("unexpected rebuild outbox aggregate: type=%s id=%s", aggregateType, aggregateIDValue)
+		}
+		for _, forbidden := range []string{
+			jobID,
+			"vjob_rebuild_worker_1",
+			"knowledge-ingestion-service:tenant-vector-test",
+			"cursor:start",
+			"raw:",
+			"http://",
+			"https://",
+			"s3://",
+			"embedding_vector",
+			"secret",
+			"token",
+		} {
+			if strings.Contains(payload, forbidden) || strings.Contains(aggregateIDValue, forbidden) || strings.Contains(partitionKey, forbidden) {
+				t.Fatalf("rebuild outbox leaked forbidden value %q: aggregate=%s partition=%s payload=%s", forbidden, aggregateIDValue, partitionKey, payload)
+			}
+		}
+		if !strings.Contains(payload, `"rebuild_job_ref_hash"`) ||
+			!strings.Contains(payload, `"collection_id_hash"`) ||
+			!strings.Contains(payload, `"partition_key_hash"`) ||
+			!strings.Contains(payload, `"cursor_hash"`) {
+			t.Fatalf("rebuild outbox missing hashed fields: %s", payload)
+		}
+		seen[eventType] = true
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatalf("rebuild outbox rows: %v", err)
+	}
+	if !seen["vector.rebuild.started.v1"] || !seen["vector.rebuild.completed.v1"] || len(seen) != 2 {
+		t.Fatalf("unexpected rebuild outbox event types: %+v", seen)
 	}
 }

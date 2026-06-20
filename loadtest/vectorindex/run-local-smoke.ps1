@@ -181,6 +181,15 @@ try {
         NEXUSIM_VECTOR_INDEX_DEBUG_ADDR = ""
     }
 
+    $processes += Start-NexusProcess -Name "vector-index-rebuild-worker" -FilePath (Join-Path $repoRoot "bin\vector-index-service.exe") -Env @{
+        NEXUSIM_VECTOR_INDEX_SERVICE_MODE = "rebuild-worker"
+        NEXUSIM_PG_DSN = $PgDsn
+        NEXUSIM_VECTOR_REBUILD_BATCH_SIZE = "10"
+        NEXUSIM_VECTOR_REBUILD_POLL_INTERVAL = "200ms"
+        NEXUSIM_VECTOR_REBUILD_ERROR_BACKOFF = "200ms"
+        NEXUSIM_VECTOR_INDEX_DEBUG_ADDR = ""
+    }
+
     $runner = Join-Path $repoRoot "bin\vector-index-smoke.exe"
     $runnerArgs = @(
         "--pg-dsn", $PgDsn,
@@ -189,6 +198,7 @@ try {
         "--run-name", $RunName,
         "--kafka-brokers", $KafkaBrokers,
         "--vector-events-topic", $VectorEventsTopic,
+        "--expect-rebuild-completed",
         "--wait-timeout", "20s"
     )
     & $runner @runnerArgs

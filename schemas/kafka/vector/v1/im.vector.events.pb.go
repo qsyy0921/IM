@@ -44,6 +44,8 @@ type VectorEvent struct {
 	//
 	//	*VectorEvent_ItemIndexed
 	//	*VectorEvent_ItemTombstoned
+	//	*VectorEvent_RebuildStarted
+	//	*VectorEvent_RebuildCompleted
 	Payload       isVectorEvent_Payload `protobuf_oneof:"payload"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -195,6 +197,24 @@ func (x *VectorEvent) GetItemTombstoned() *VectorItemTombstonedV1 {
 	return nil
 }
 
+func (x *VectorEvent) GetRebuildStarted() *VectorRebuildStartedV1 {
+	if x != nil {
+		if x, ok := x.Payload.(*VectorEvent_RebuildStarted); ok {
+			return x.RebuildStarted
+		}
+	}
+	return nil
+}
+
+func (x *VectorEvent) GetRebuildCompleted() *VectorRebuildCompletedV1 {
+	if x != nil {
+		if x, ok := x.Payload.(*VectorEvent_RebuildCompleted); ok {
+			return x.RebuildCompleted
+		}
+	}
+	return nil
+}
+
 type isVectorEvent_Payload interface {
 	isVectorEvent_Payload()
 }
@@ -207,9 +227,21 @@ type VectorEvent_ItemTombstoned struct {
 	ItemTombstoned *VectorItemTombstonedV1 `protobuf:"bytes,21,opt,name=item_tombstoned,json=itemTombstoned,proto3,oneof"`
 }
 
+type VectorEvent_RebuildStarted struct {
+	RebuildStarted *VectorRebuildStartedV1 `protobuf:"bytes,22,opt,name=rebuild_started,json=rebuildStarted,proto3,oneof"`
+}
+
+type VectorEvent_RebuildCompleted struct {
+	RebuildCompleted *VectorRebuildCompletedV1 `protobuf:"bytes,23,opt,name=rebuild_completed,json=rebuildCompleted,proto3,oneof"`
+}
+
 func (*VectorEvent_ItemIndexed) isVectorEvent_Payload() {}
 
 func (*VectorEvent_ItemTombstoned) isVectorEvent_Payload() {}
+
+func (*VectorEvent_RebuildStarted) isVectorEvent_Payload() {}
+
+func (*VectorEvent_RebuildCompleted) isVectorEvent_Payload() {}
 
 type VectorItemIndexedV1 struct {
 	state             protoimpl.MessageState `protogen:"open.v1"`
@@ -443,11 +475,195 @@ func (x *VectorItemTombstonedV1) GetReasonClass() string {
 	return ""
 }
 
+type VectorRebuildStartedV1 struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	TenantId          string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	RebuildJobRefHash string                 `protobuf:"bytes,2,opt,name=rebuild_job_ref_hash,json=rebuildJobRefHash,proto3" json:"rebuild_job_ref_hash,omitempty"`
+	CollectionIdHash  string                 `protobuf:"bytes,3,opt,name=collection_id_hash,json=collectionIdHash,proto3" json:"collection_id_hash,omitempty"`
+	CollectionType    string                 `protobuf:"bytes,4,opt,name=collection_type,json=collectionType,proto3" json:"collection_type,omitempty"`
+	SourceService     string                 `protobuf:"bytes,5,opt,name=source_service,json=sourceService,proto3" json:"source_service,omitempty"`
+	PartitionKeyHash  string                 `protobuf:"bytes,6,opt,name=partition_key_hash,json=partitionKeyHash,proto3" json:"partition_key_hash,omitempty"`
+	CursorHash        string                 `protobuf:"bytes,7,opt,name=cursor_hash,json=cursorHash,proto3" json:"cursor_hash,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *VectorRebuildStartedV1) Reset() {
+	*x = VectorRebuildStartedV1{}
+	mi := &file_vector_v1_im_vector_events_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *VectorRebuildStartedV1) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*VectorRebuildStartedV1) ProtoMessage() {}
+
+func (x *VectorRebuildStartedV1) ProtoReflect() protoreflect.Message {
+	mi := &file_vector_v1_im_vector_events_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use VectorRebuildStartedV1.ProtoReflect.Descriptor instead.
+func (*VectorRebuildStartedV1) Descriptor() ([]byte, []int) {
+	return file_vector_v1_im_vector_events_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *VectorRebuildStartedV1) GetTenantId() string {
+	if x != nil {
+		return x.TenantId
+	}
+	return ""
+}
+
+func (x *VectorRebuildStartedV1) GetRebuildJobRefHash() string {
+	if x != nil {
+		return x.RebuildJobRefHash
+	}
+	return ""
+}
+
+func (x *VectorRebuildStartedV1) GetCollectionIdHash() string {
+	if x != nil {
+		return x.CollectionIdHash
+	}
+	return ""
+}
+
+func (x *VectorRebuildStartedV1) GetCollectionType() string {
+	if x != nil {
+		return x.CollectionType
+	}
+	return ""
+}
+
+func (x *VectorRebuildStartedV1) GetSourceService() string {
+	if x != nil {
+		return x.SourceService
+	}
+	return ""
+}
+
+func (x *VectorRebuildStartedV1) GetPartitionKeyHash() string {
+	if x != nil {
+		return x.PartitionKeyHash
+	}
+	return ""
+}
+
+func (x *VectorRebuildStartedV1) GetCursorHash() string {
+	if x != nil {
+		return x.CursorHash
+	}
+	return ""
+}
+
+type VectorRebuildCompletedV1 struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	TenantId          string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	RebuildJobRefHash string                 `protobuf:"bytes,2,opt,name=rebuild_job_ref_hash,json=rebuildJobRefHash,proto3" json:"rebuild_job_ref_hash,omitempty"`
+	CollectionIdHash  string                 `protobuf:"bytes,3,opt,name=collection_id_hash,json=collectionIdHash,proto3" json:"collection_id_hash,omitempty"`
+	CollectionType    string                 `protobuf:"bytes,4,opt,name=collection_type,json=collectionType,proto3" json:"collection_type,omitempty"`
+	SourceService     string                 `protobuf:"bytes,5,opt,name=source_service,json=sourceService,proto3" json:"source_service,omitempty"`
+	PartitionKeyHash  string                 `protobuf:"bytes,6,opt,name=partition_key_hash,json=partitionKeyHash,proto3" json:"partition_key_hash,omitempty"`
+	CursorHash        string                 `protobuf:"bytes,7,opt,name=cursor_hash,json=cursorHash,proto3" json:"cursor_hash,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *VectorRebuildCompletedV1) Reset() {
+	*x = VectorRebuildCompletedV1{}
+	mi := &file_vector_v1_im_vector_events_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *VectorRebuildCompletedV1) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*VectorRebuildCompletedV1) ProtoMessage() {}
+
+func (x *VectorRebuildCompletedV1) ProtoReflect() protoreflect.Message {
+	mi := &file_vector_v1_im_vector_events_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use VectorRebuildCompletedV1.ProtoReflect.Descriptor instead.
+func (*VectorRebuildCompletedV1) Descriptor() ([]byte, []int) {
+	return file_vector_v1_im_vector_events_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *VectorRebuildCompletedV1) GetTenantId() string {
+	if x != nil {
+		return x.TenantId
+	}
+	return ""
+}
+
+func (x *VectorRebuildCompletedV1) GetRebuildJobRefHash() string {
+	if x != nil {
+		return x.RebuildJobRefHash
+	}
+	return ""
+}
+
+func (x *VectorRebuildCompletedV1) GetCollectionIdHash() string {
+	if x != nil {
+		return x.CollectionIdHash
+	}
+	return ""
+}
+
+func (x *VectorRebuildCompletedV1) GetCollectionType() string {
+	if x != nil {
+		return x.CollectionType
+	}
+	return ""
+}
+
+func (x *VectorRebuildCompletedV1) GetSourceService() string {
+	if x != nil {
+		return x.SourceService
+	}
+	return ""
+}
+
+func (x *VectorRebuildCompletedV1) GetPartitionKeyHash() string {
+	if x != nil {
+		return x.PartitionKeyHash
+	}
+	return ""
+}
+
+func (x *VectorRebuildCompletedV1) GetCursorHash() string {
+	if x != nil {
+		return x.CursorHash
+	}
+	return ""
+}
+
 var File_vector_v1_im_vector_events_proto protoreflect.FileDescriptor
 
 const file_vector_v1_im_vector_events_proto_rawDesc = "" +
 	"\n" +
-	" vector/v1/im.vector.events.proto\x12\x18nexusim.vector.events.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\x9f\x05\n" +
+	" vector/v1/im.vector.events.proto\x12\x18nexusim.vector.events.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xdf\x06\n" +
 	"\vVectorEvent\x12\x19\n" +
 	"\bevent_id\x18\x01 \x01(\tR\aeventId\x12\x1d\n" +
 	"\n" +
@@ -466,7 +682,9 @@ const file_vector_v1_im_vector_events_proto_rawDesc = "" +
 	"\voccurred_at\x18\r \x01(\v2\x1a.google.protobuf.TimestampR\n" +
 	"occurredAt\x12R\n" +
 	"\fitem_indexed\x18\x14 \x01(\v2-.nexusim.vector.events.v1.VectorItemIndexedV1H\x00R\vitemIndexed\x12[\n" +
-	"\x0fitem_tombstoned\x18\x15 \x01(\v20.nexusim.vector.events.v1.VectorItemTombstonedV1H\x00R\x0eitemTombstonedB\t\n" +
+	"\x0fitem_tombstoned\x18\x15 \x01(\v20.nexusim.vector.events.v1.VectorItemTombstonedV1H\x00R\x0eitemTombstoned\x12[\n" +
+	"\x0frebuild_started\x18\x16 \x01(\v20.nexusim.vector.events.v1.VectorRebuildStartedV1H\x00R\x0erebuildStarted\x12a\n" +
+	"\x11rebuild_completed\x18\x17 \x01(\v22.nexusim.vector.events.v1.VectorRebuildCompletedV1H\x00R\x10rebuildCompletedB\t\n" +
 	"\apayload\"\x83\x03\n" +
 	"\x13VectorItemIndexedV1\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12/\n" +
@@ -490,7 +708,25 @@ const file_vector_v1_im_vector_events_proto_rawDesc = "" +
 	"\x10tombstone_status\x18\t \x01(\tR\x0ftombstoneStatus\x12&\n" +
 	"\x0fdelete_proof_id\x18\n" +
 	" \x01(\tR\rdeleteProofId\x12!\n" +
-	"\freason_class\x18\v \x01(\tR\vreasonClassB?Z=github.com/qsyy0921/IM/schemas/kafka/vector/v1;vectoreventsv1b\x06proto3"
+	"\freason_class\x18\v \x01(\tR\vreasonClass\"\xb3\x02\n" +
+	"\x16VectorRebuildStartedV1\x12\x1b\n" +
+	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12/\n" +
+	"\x14rebuild_job_ref_hash\x18\x02 \x01(\tR\x11rebuildJobRefHash\x12,\n" +
+	"\x12collection_id_hash\x18\x03 \x01(\tR\x10collectionIdHash\x12'\n" +
+	"\x0fcollection_type\x18\x04 \x01(\tR\x0ecollectionType\x12%\n" +
+	"\x0esource_service\x18\x05 \x01(\tR\rsourceService\x12,\n" +
+	"\x12partition_key_hash\x18\x06 \x01(\tR\x10partitionKeyHash\x12\x1f\n" +
+	"\vcursor_hash\x18\a \x01(\tR\n" +
+	"cursorHash\"\xb5\x02\n" +
+	"\x18VectorRebuildCompletedV1\x12\x1b\n" +
+	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12/\n" +
+	"\x14rebuild_job_ref_hash\x18\x02 \x01(\tR\x11rebuildJobRefHash\x12,\n" +
+	"\x12collection_id_hash\x18\x03 \x01(\tR\x10collectionIdHash\x12'\n" +
+	"\x0fcollection_type\x18\x04 \x01(\tR\x0ecollectionType\x12%\n" +
+	"\x0esource_service\x18\x05 \x01(\tR\rsourceService\x12,\n" +
+	"\x12partition_key_hash\x18\x06 \x01(\tR\x10partitionKeyHash\x12\x1f\n" +
+	"\vcursor_hash\x18\a \x01(\tR\n" +
+	"cursorHashB?Z=github.com/qsyy0921/IM/schemas/kafka/vector/v1;vectoreventsv1b\x06proto3"
 
 var (
 	file_vector_v1_im_vector_events_proto_rawDescOnce sync.Once
@@ -504,22 +740,26 @@ func file_vector_v1_im_vector_events_proto_rawDescGZIP() []byte {
 	return file_vector_v1_im_vector_events_proto_rawDescData
 }
 
-var file_vector_v1_im_vector_events_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
+var file_vector_v1_im_vector_events_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
 var file_vector_v1_im_vector_events_proto_goTypes = []any{
-	(*VectorEvent)(nil),            // 0: nexusim.vector.events.v1.VectorEvent
-	(*VectorItemIndexedV1)(nil),    // 1: nexusim.vector.events.v1.VectorItemIndexedV1
-	(*VectorItemTombstonedV1)(nil), // 2: nexusim.vector.events.v1.VectorItemTombstonedV1
-	(*timestamppb.Timestamp)(nil),  // 3: google.protobuf.Timestamp
+	(*VectorEvent)(nil),              // 0: nexusim.vector.events.v1.VectorEvent
+	(*VectorItemIndexedV1)(nil),      // 1: nexusim.vector.events.v1.VectorItemIndexedV1
+	(*VectorItemTombstonedV1)(nil),   // 2: nexusim.vector.events.v1.VectorItemTombstonedV1
+	(*VectorRebuildStartedV1)(nil),   // 3: nexusim.vector.events.v1.VectorRebuildStartedV1
+	(*VectorRebuildCompletedV1)(nil), // 4: nexusim.vector.events.v1.VectorRebuildCompletedV1
+	(*timestamppb.Timestamp)(nil),    // 5: google.protobuf.Timestamp
 }
 var file_vector_v1_im_vector_events_proto_depIdxs = []int32{
-	3, // 0: nexusim.vector.events.v1.VectorEvent.occurred_at:type_name -> google.protobuf.Timestamp
+	5, // 0: nexusim.vector.events.v1.VectorEvent.occurred_at:type_name -> google.protobuf.Timestamp
 	1, // 1: nexusim.vector.events.v1.VectorEvent.item_indexed:type_name -> nexusim.vector.events.v1.VectorItemIndexedV1
 	2, // 2: nexusim.vector.events.v1.VectorEvent.item_tombstoned:type_name -> nexusim.vector.events.v1.VectorItemTombstonedV1
-	3, // [3:3] is the sub-list for method output_type
-	3, // [3:3] is the sub-list for method input_type
-	3, // [3:3] is the sub-list for extension type_name
-	3, // [3:3] is the sub-list for extension extendee
-	0, // [0:3] is the sub-list for field type_name
+	3, // 3: nexusim.vector.events.v1.VectorEvent.rebuild_started:type_name -> nexusim.vector.events.v1.VectorRebuildStartedV1
+	4, // 4: nexusim.vector.events.v1.VectorEvent.rebuild_completed:type_name -> nexusim.vector.events.v1.VectorRebuildCompletedV1
+	5, // [5:5] is the sub-list for method output_type
+	5, // [5:5] is the sub-list for method input_type
+	5, // [5:5] is the sub-list for extension type_name
+	5, // [5:5] is the sub-list for extension extendee
+	0, // [0:5] is the sub-list for field type_name
 }
 
 func init() { file_vector_v1_im_vector_events_proto_init() }
@@ -530,6 +770,8 @@ func file_vector_v1_im_vector_events_proto_init() {
 	file_vector_v1_im_vector_events_proto_msgTypes[0].OneofWrappers = []any{
 		(*VectorEvent_ItemIndexed)(nil),
 		(*VectorEvent_ItemTombstoned)(nil),
+		(*VectorEvent_RebuildStarted)(nil),
+		(*VectorEvent_RebuildCompleted)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -537,7 +779,7 @@ func file_vector_v1_im_vector_events_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_vector_v1_im_vector_events_proto_rawDesc), len(file_vector_v1_im_vector_events_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   3,
+			NumMessages:   5,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

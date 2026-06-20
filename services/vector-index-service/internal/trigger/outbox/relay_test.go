@@ -61,6 +61,40 @@ func TestBuildVectorEventTombstoned(t *testing.T) {
 	}
 }
 
+func TestBuildVectorEventRebuildStarted(t *testing.T) {
+	event, err := BuildVectorEvent(validRebuildOutboxMessage("vector.rebuild.started.v1"))
+	if err != nil {
+		t.Fatalf("build vector rebuild event: %v", err)
+	}
+	if event.GetAggregateType() != "vector_rebuild" {
+		t.Fatalf("unexpected aggregate type: %+v", event)
+	}
+	payload := event.GetRebuildStarted()
+	if payload == nil {
+		t.Fatalf("expected rebuild started payload: %+v", event)
+	}
+	if payload.GetRebuildJobRefHash() != "sha256:vjob" ||
+		payload.GetCollectionIdHash() != "sha256:collection" ||
+		payload.GetPartitionKeyHash() != "sha256:partition" ||
+		payload.GetCursorHash() != "sha256:cursor" {
+		t.Fatalf("unexpected rebuild started payload: %+v", payload)
+	}
+}
+
+func TestBuildVectorEventRebuildCompleted(t *testing.T) {
+	event, err := BuildVectorEvent(validRebuildOutboxMessage("vector.rebuild.completed.v1"))
+	if err != nil {
+		t.Fatalf("build vector rebuild event: %v", err)
+	}
+	payload := event.GetRebuildCompleted()
+	if payload == nil {
+		t.Fatalf("expected rebuild completed payload: %+v", event)
+	}
+	if payload.GetCollectionType() != "KNOWLEDGE_CHUNK" || payload.GetSourceService() != "knowledge-ingestion-service" {
+		t.Fatalf("unexpected rebuild completed payload: %+v", payload)
+	}
+}
+
 func TestBuildVectorEventRejectsUnsafePayload(t *testing.T) {
 	message := validOutboxMessage("vector.item.indexed.v1")
 	message.PayloadJSON = []byte(`{"vector_item_ref_hash":"sha256:vitem","embedding_vector":[0.1]}`)
@@ -70,7 +104,7 @@ func TestBuildVectorEventRejectsUnsafePayload(t *testing.T) {
 }
 
 func TestBuildVectorEventRejectsUnsupportedType(t *testing.T) {
-	message := validOutboxMessage("vector.rebuild.started.v1")
+	message := validOutboxMessage("vector.unknown.v1")
 	if _, err := BuildVectorEvent(message); err == nil {
 		t.Fatal("expected unsupported event to fail")
 	}
@@ -125,6 +159,32 @@ func validOutboxMessage(eventType string) types.OutboxMessage {
 			"dimension":1536,
 			"visibility_version":7,
 			"tombstone_status":"NONE"
+		}`),
+	}
+}
+
+func validRebuildOutboxMessage(eventType string) types.OutboxMessage {
+	return types.OutboxMessage{
+		EventID:          "evt_rebuild_1",
+		TenantID:         "tenant-vector",
+		AggregateID:      "sha256:vjob",
+		EventType:        eventType,
+		EventVersion:     1,
+		PartitionKey:     "tenant-vector:sha256:vjob",
+		Producer:         "vector-index-service",
+		RetryCount:       0,
+		OccurredAt:       time.Unix(1700000000, 0).UTC(),
+		AggregateVersion: 1,
+		CorrelationID:    "corr-vector",
+		CausationID:      "cause-vector",
+		TraceID:          "trace-vector",
+		PayloadJSON: []byte(`{
+			"rebuild_job_ref_hash":"sha256:vjob",
+			"collection_id_hash":"sha256:collection",
+			"collection_type":"KNOWLEDGE_CHUNK",
+			"source_service":"knowledge-ingestion-service",
+			"partition_key_hash":"sha256:partition",
+			"cursor_hash":"sha256:cursor"
 		}`),
 	}
 }

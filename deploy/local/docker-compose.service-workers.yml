@@ -226,6 +226,19 @@ services:
       - nexusim-services
       - nexusim-local
 
+  vector-index-service-rebuild-worker:
+    image: nexusim/vector-index-service:local
+    container_name: nexusim-vector-index-service-rebuild-worker
+    environment:
+      NEXUSIM_VECTOR_INDEX_SERVICE_MODE: rebuild-worker
+      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@host.docker.internal:5432/nexusim?sslmode=disable
+      NEXUSIM_VECTOR_REBUILD_BATCH_SIZE: 50
+      NEXUSIM_VECTOR_REBUILD_POLL_INTERVAL: 1s
+    restart: unless-stopped
+    networks:
+      - nexusim-services
+      - nexusim-local
+
   agent-service-approval-outbox-relay:
     image: nexusim/agent-service:local
     container_name: nexusim-agent-service-approval-outbox-relay

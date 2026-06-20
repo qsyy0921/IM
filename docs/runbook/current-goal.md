@@ -50,7 +50,9 @@ model-gateway / workflow / knowledge-ingestion / vector-index
 - `vector-index-service` 已从 stage-switch 进入 product-active 第一版 implementation
   slice，覆盖 `UpsertVectorItem`、`TombstoneVectorItem`、`SearchVectors`、
   `GetVectorIndexJob`、PostgreSQL metadata、local / PostgreSQL-backed test vector adapter
-  和 `RequestVectorRebuild` rebuild job / checkpoint API，并已接
+  和 `RequestVectorRebuild` rebuild job / checkpoint API；first-stage
+  `rebuild-worker` 已能 claim / complete rebuild checkpoint，并写
+  `vector.rebuild.started.v1` / `vector.rebuild.completed.v1` 低敏 outbox event。并已接
   `vector_outbox -> im.vector.events` 第一版 outbox relay。当前 relay 已覆盖低敏
   Kafka schema、event builder、PostgreSQL outbox store、PENDING / PUBLISHED / retry /
   DLQ 状态推进、focused tests 和 `loadtest/vectorindex` 真实 Kafka relay smoke；
@@ -87,8 +89,8 @@ model-gateway / workflow / knowledge-ingestion / vector-index
 
 - 默认继续补更多下游公开 admin API adapter，或为 admin config / quota 增加
   compensation operator。
-- 也可以继续 `vector-index-service` embedding worker / rebuild worker / Milvus 或
-  pgvector backend。
+- 也可以继续 `vector-index-service` embedding worker / Milvus 或 pgvector backend /
+  provider backend rebuild。
 - 也可以继续 notification SMTP / SMS / APNs / FCM adapter 或 bounce-suppression。
 
 ## 硬边界

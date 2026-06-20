@@ -163,6 +163,49 @@ function Test-ProfileAgentAssertion {
                 (-not [bool]$Fixture.memory.unreviewed_contradiction_returned_as_current) `
                 -and (Get-JsonPropertyString -Object $Fixture.memory -Name "contradictory_candidate_status") -ne "ACTIVE"
         }
+        "must_preserve_cross_group_source_refs" {
+            return `
+                [bool]$Fixture.memory.cross_group_source_refs_preserved `
+                -and ([int]$Fixture.memory.cross_group_count -ge 2) `
+                -and ([int]$Fixture.memory.cross_group_source_ref_count -ge [int]$Fixture.memory.cross_group_count)
+        }
+        "must_link_cross_group_related_events" {
+            return `
+                [bool]$Fixture.memory.related_event_chain_preserved `
+                -and ([int]$Fixture.memory.related_event_count -ge 3) `
+                -and [bool]$Fixture.memory.cross_group_dependency_preserved
+        }
+        "must_not_flatten_cross_group_scope" {
+            return `
+                (-not [bool]$Fixture.memory.cross_group_scope_flattened) `
+                -and [bool]$Fixture.memory.group_scope_preserved `
+                -and (Get-JsonPropertyString -Object $Fixture.memory -Name "scope_resolution") -eq "GROUP_SCOPED"
+        }
+        "must_preserve_speaker_attribution" {
+            return `
+                [bool]$Fixture.memory.speaker_attribution_preserved `
+                -and ([int]$Fixture.memory.actor_count -ge 2) `
+                -and ([int]$Fixture.memory.speaker_source_ref_count -ge [int]$Fixture.memory.actor_count)
+        }
+        "must_preserve_temporal_update_order" {
+            return `
+                [bool]$Fixture.memory.temporal_update_order_preserved `
+                -and ([int64]$Fixture.memory.old_valid_from_seq -lt [int64]$Fixture.memory.new_valid_from_seq) `
+                -and ([int64]$Fixture.memory.old_valid_to_seq -lt [int64]$Fixture.memory.new_valid_from_seq)
+        }
+        "must_select_memory_version_by_query_seq" {
+            return `
+                [bool]$Fixture.memory.version_selected_by_query_seq `
+                -and ([int64]$Fixture.memory.version_query_seq -ge [int64]$Fixture.memory.new_valid_from_seq) `
+                -and (Get-JsonPropertyString -Object $Fixture.memory -Name "selected_memory_event_id") -eq (Get-JsonPropertyString -Object $Fixture.memory -Name "new_memory_event_id") `
+                -and (Get-JsonPropertyString -Object $Fixture.memory -Name "selected_memory_status") -eq "ACTIVE"
+        }
+        "must_not_return_future_memory_as_current" {
+            return `
+                (-not [bool]$Fixture.memory.future_memory_returned_before_valid_from) `
+                -and ([int64]$Fixture.memory.before_update_query_seq -lt [int64]$Fixture.memory.new_valid_from_seq) `
+                -and (Get-JsonPropertyString -Object $Fixture.memory -Name "before_update_selected_event_id") -ne (Get-JsonPropertyString -Object $Fixture.memory -Name "new_memory_event_id")
+        }
         "must_propagate_current_memory_query_seq" {
             $consumer = Get-CurrentMemoryConsumerFixture -Fixture $Fixture -Consumer (Get-JsonPropertyString -Object $Assertion -Name "consumer")
             return `
@@ -318,6 +361,31 @@ $fixture = [pscustomobject]@{
         contradictory_review_state = "NEEDS_REVIEW"
         contradictory_active_blocked = $true
         unreviewed_contradiction_returned_as_current = $false
+        cross_group_source_refs_preserved = $true
+        cross_group_count = 2
+        cross_group_source_ref_count = 3
+        related_event_chain_preserved = $true
+        related_event_count = 3
+        cross_group_dependency_preserved = $true
+        cross_group_scope_flattened = $false
+        group_scope_preserved = $true
+        scope_resolution = "GROUP_SCOPED"
+        speaker_attribution_preserved = $true
+        actor_count = 3
+        speaker_source_ref_count = 3
+        temporal_update_order_preserved = $true
+        old_valid_from_seq = 10
+        old_valid_to_seq = 20
+        new_valid_from_seq = 21
+        version_query_seq = 24
+        version_selected_by_query_seq = $true
+        old_memory_event_id = "mem-rollout-window-v1"
+        new_memory_event_id = "mem-rollout-window-v2"
+        selected_memory_event_id = "mem-rollout-window-v2"
+        selected_memory_status = "ACTIVE"
+        before_update_query_seq = 18
+        before_update_selected_event_id = "mem-rollout-window-v1"
+        future_memory_returned_before_valid_from = $false
     }
     current_memory_consumers = [pscustomobject]@{
         rag = [pscustomobject]@{

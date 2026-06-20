@@ -1099,6 +1099,50 @@
       ]
     },
     {
+      "id": "memory-cross-group-attribution-chain",
+      "family": "collaborative_memory",
+      "stage": "memory-profile-safety",
+      "status": "active",
+      "query": "trace a decision that moved across two project channels",
+      "risk": "Collaborative memory must preserve cross-group source refs, actors and related-event links instead of flattening multi-channel evidence into one generic fact",
+      "required_assertions": [
+        {
+          "type": "must_preserve_cross_group_source_refs"
+        },
+        {
+          "type": "must_link_cross_group_related_events"
+        },
+        {
+          "type": "must_not_flatten_cross_group_scope"
+        },
+        {
+          "type": "must_preserve_speaker_attribution"
+        }
+      ]
+    },
+    {
+      "id": "memory-temporal-version-selected-by-query-seq",
+      "family": "temporal_version",
+      "stage": "memory-profile-safety",
+      "status": "active",
+      "query": "select the current decision at a specific conversation seq",
+      "risk": "Temporal memory must select the version valid at query seq and must not leak future revisions or old superseded decisions as current evidence",
+      "required_assertions": [
+        {
+          "type": "must_preserve_temporal_update_order"
+        },
+        {
+          "type": "must_select_memory_version_by_query_seq"
+        },
+        {
+          "type": "must_not_return_future_memory_as_current"
+        },
+        {
+          "type": "must_preserve_memory_source_refs"
+        }
+      ]
+    },
+    {
       "id": "rag-current-memory-citation-only-active",
       "family": "collaborative_memory",
       "stage": "current-memory-consumption-safety",

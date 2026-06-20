@@ -8,3 +8,4 @@ Raw eval summaries and generated smoke JSON stay under
 Current reports:
 
 - `loadtest-report-20260620-current-memory-service-stack-live.md`
+- `loadtest-report-20260620-cross-group-temporal-memory-eval.md`

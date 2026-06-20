@@ -16,8 +16,8 @@ adapter、状态、计数、summary/report 引用和低敏 metadata。
 - gate runner 支持 optional adapters；Python path 和 RAG / Agent service-stack live gate 已登记到 catalog。
 - `check-ai-eval-regression-gate.ps1` 已接入 `check-local`，只跑 CI-safe
   required adapters，不启动 Docker / PostgreSQL / live RAG-Agent stack。
-- Case catalog 64；current-memory service-stack live gate 38/38 passed；fixture / Python / RAG / Summary / Agent / action safety adapters 已落。
+- Case catalog 66；current-memory service-stack live gate 38/38 passed；cross-group / temporal memory fixture eval 和其它安全 adapters 已落。
 
 边界：不保存 raw EvidencePack、prompt、model output、用户正文、secret 或 tool input；不授权业务动作。
 
-下一步：推进 cross-group / temporal collaborative memory eval first pass。
+下一步：将 cross-group / temporal memory eval 扩到 retrieval 或 service-stack smoke。

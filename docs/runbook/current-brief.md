@@ -35,14 +35,14 @@ runtime `at_conversation_seq` query semantics 和 source-ref / validity /
 supersession PG coverage / smoke checks、retrieval-gateway EvidencePack
 current-only memory query、RAG / Summary / Agent API 显式 at seq 透传、
 RAG / Summary / Agent current-memory consumption CI-safe regression、memory
-extraction confidence / review eval，以及 current-memory service-stack live
-smoke / adapter assertions 已落并归档；
+extraction confidence / review eval、current-memory service-stack live smoke
+和 cross-group / temporal memory fixture eval 已落；
 只保存低敏 run refs / counters / metadata。
 
 当前下一步：
 
 ```text
-推进 cross-group / temporal collaborative memory eval first pass
+将 cross-group / temporal memory eval 扩到 retrieval 或 service-stack smoke
 ```
 
 完整系统测试、生产级 HA、长压和 sizing 继续后置为 hardening backlog。

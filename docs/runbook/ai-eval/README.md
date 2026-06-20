@@ -303,6 +303,9 @@ exclusion. The memory extraction confidence / review expansion increased it to
 The 2026-06-20 service-stack version / hash-only expansion run increased the
 live suite to 17 cases and added RAG / Agent version preservation plus
 action-executor hash-only audit checks.
+The 2026-06-20 cross-group / temporal memory eval run increased the CI-safe
+fixture adapter to 16 cases and added cross-group attribution-chain plus
+query-seq temporal-version selection checks.
 The 2026-06-20 negative RAG / Agent service-stack run increased the live suite
 to 19 cases and added RAG no-evidence abstain plus Agent policy-denied blocked
 proposal checks.

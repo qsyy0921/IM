@@ -73,10 +73,10 @@ safety expanded eval cases plus the local fixture adapter are landed.
 memory-service runtime `at_conversation_seq` source-ref / validity /
 supersession query checks, retrieval current-only memory query, RAG /
 Summary / Agent explicit `at_conversation_seq` requests, RAG / Summary / Agent
-current-memory consumption and memory extraction confidence / review CI-safe
-regressions, and current-memory service-stack live smoke are landed and archived.
-Next: implement the first cross-group / temporal collaborative memory eval slice
-without widening into broad hardening.
+current-memory consumption, memory extraction confidence / review, current-memory
+service-stack live smoke, and cross-group / temporal memory fixture eval are
+landed. Next: expand selected cross-group / temporal memory cases into retrieval
+or service-stack smoke without widening into broad hardening.
 Search, memory, retrieval, real RAG / summary / Agent adapter smokes, the skill
 catalog foundation, the MCP prepare boundary, and approved proposal preflight
 are passed.

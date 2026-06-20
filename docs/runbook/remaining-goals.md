@@ -41,10 +41,9 @@ provider-grade 运维和完整系统测试暂不作为当前转进阻塞。
    retrieval-gateway EvidencePack current-only memory query，以及 RAG /
    Summary / Agent API 显式透传 `at_conversation_seq`，以及 RAG / Summary /
    Agent current-memory consumption CI-safe regression、memory extraction
-   confidence / review eval，以及 current-memory service-stack live smoke
-   harness / adapter assertion 已落并归档；后续优先补 cross-group / temporal
-   collaborative memory eval first pass，继续保留 source-ref / visibility /
-   review 边界。
+   confidence / review eval、current-memory service-stack live smoke，以及
+   cross-group / temporal CI-safe fixture eval 已落；后续把 selected cases 扩到
+   retrieval 或 service-stack smoke，继续保留 source-ref / visibility / review 边界。
 
 3. Agent 真实业务动作扩展：
    `agent-service`、`skill-registry`、`mcp-gateway`、`action-executor` 已具备

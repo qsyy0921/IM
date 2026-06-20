@@ -77,7 +77,9 @@ Foundation backlog 锚点：`search-service`、`memory-service`、`retrieval-gat
 创建 `services/<name>` 目录：
 
 - `admin-service`：租户、封禁、配置、repair 审批、运维操作。
-- `model-gateway`：模型 provider、embedding、rerank、成本、fallback、审计。
+- `model-gateway`：stage-switch 已通过；下一实现切片同步 registry、proto、
+  migration、runtime、Docker / observability，并先落
+  `InvokeTextGeneration` / `GetModelInvocation` 最小 gRPC 路径。
 - `workflow-service`：审批等待、长事务、补偿、retention、operator workflow。
 - `knowledge-ingestion-service`：文件 / 网页导入、chunking、embedding pipeline。
 - `vector-index-service`：向量索引写入、重建、backfill；满足拆分条件后再独立。

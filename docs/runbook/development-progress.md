@@ -79,7 +79,7 @@ Python Worker 候选接入边界和低敏 eval 持久化已经足够支撑算法
 当前尚未真实实现的后续产品化 / 平台服务：
 
 - `admin-service`（SDD v0.1 draft 已存在）
-- `model-gateway`（SDD v0.1 draft 已存在）
+- `model-gateway`（SDD v0.1 draft 已存在，stage-switch 已通过，等待第一实现切片）
 - `knowledge-ingestion-service`（SDD v0.1 draft 已存在）
 - `workflow-service`（SDD v0.1 draft 已存在）
 - `vector-index-service`（SDD v0.1 draft 已存在）

@@ -40,11 +40,12 @@ Go 侧服务底座、EvidencePack、proposal / approval / audit 和 eval 持久�
 当前下一步：
 
 ```text
-future platform / product services 的 10 个 SDD draft 已存在；media-service、
-`media-service`、`notification-service`、`audit-service`、`control-plane-service`
-和 `presence-service` 已进入 product-active 并通过各自第一版 smoke。
-下一步按需切换 `model-gateway`、`workflow-service` 或
-`knowledge-ingestion-service`，或继续 presence outbox / session-event 后续切片。
+future platform / product services 的 10 个 SDD draft 已存在；`media-service`、
+`notification-service`、`audit-service`、`control-plane-service` 和 `presence-service`
+已进入 product-active 并通过各自第一版 smoke。
+`model-gateway` stage-switch review 已通过；下一步默认进入
+model-gateway 第一实现切片，或继续 `workflow-service` /
+`knowledge-ingestion-service` stage-switch。
 ```
 
 系统测试 / HA / 长压 / sizing 后置；总览、待办、单服务状态分别看
@@ -56,5 +57,4 @@ future platform / product services 的 10 个 SDD draft 已存在；media-servic
 - future 服务 promotion 期间不得一次性创建全部服务目录。
 - 媒体、通知、审计、控制面、presence、model、workflow、ingestion、vector 等边界必须继续通过公开 API、事件或明确 port 串联。
 - 不回滚用户已有修改。
-- 不为了“了解项目”全文读取长历史文档。
 - 新发现的待完成工作写入 `docs/runbook/remaining-goals.md`。

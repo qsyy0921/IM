@@ -1,8 +1,7 @@
 # vector-index-service
 
-状态：future / SDD v0.1 draft / stage-switch approved。当前不得创建
-`services/vector-index-service` 目录，直到实现切片同步切换 service registry、proto、
-migration、runtime、Docker 和 observability。
+状态：product-active / 第一版 implementation slice 已落地。已同步 service registry、
+proto、migration、六层 runtime、Docker、Prometheus 和 Grafana。
 
 设计入口：`docs/sdd/vector-index-service.md`。
 
@@ -18,11 +17,12 @@ vector 写入、rebuild 和 backfill 逻辑复杂到影响 retrieval / memory �
 - 删除 / 撤回 / retention 必须传播 tombstone 并可验证。
 - model provider 和 embedding 成本治理可经 model-gateway / control-plane 接入。
 
-第一切片建议：
+当前已覆盖：
 
-- 先按 SDD 落 proto / migration / 六层 skeleton。
-- 第一版只做 `UpsertVectorItem`、`TombstoneVectorItem`、`SearchVectors`、
-  `GetVectorIndexJob`。
-- 先使用 local / PostgreSQL-backed test vector adapter；Milvus / pgvector /
-  OpenSearch vector 后置。
+- `UpsertVectorItem`、`TombstoneVectorItem`、`SearchVectors`、`GetVectorIndexJob`。
+- local / PostgreSQL-backed test vector adapter；Milvus / pgvector / OpenSearch
+  vector 后置。
 - 确认 raw text、embedding vector array、source URI、object key 不进入事件 / metrics。
+
+后续待办：embedding worker、rebuild worker、outbox relay、Milvus / pgvector /
+OpenSearch backend、vector-index handoff smoke。

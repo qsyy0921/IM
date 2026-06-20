@@ -46,14 +46,14 @@ model-gateway / workflow / knowledge-ingestion / vector-index
 - `workflow-service` 已从 stage-switch 进入 product-active 第一版 implementation
   slice，`CreateWorkflow`、`RecordWorkflowDecision`、`GetWorkflow` 最小路径已落地并
   通过 focused checks / 完整 `check-local`。
+- `vector-index-service` 已从 stage-switch 进入 product-active 第一版 implementation
+  slice，覆盖 `UpsertVectorItem`、`TombstoneVectorItem`、`SearchVectors`、
+  `GetVectorIndexJob`、PostgreSQL metadata 和 local / PostgreSQL-backed test vector adapter。
 
 ## 下一步
 
-- `admin-service` 和 `vector-index-service` 已完成 stage-switch review；下一步可进入
-  对应第一版 implementation slice。
-- 默认继续 `vector-index-service` 第一版 implementation slice，用于闭合
-  model-gateway / knowledge-ingestion / retrieval 的向量索引边界。
-- 也可以改做 `admin-service` 第一版 implementation slice。
+- 默认继续 `admin-service` 第一版 implementation slice。
+- 也可以继续 `vector-index-service` embedding worker / rebuild worker / outbox relay。
 - 也可以继续 notification SMTP / SMS / APNs / FCM adapter 或 bounce-suppression。
 
 ## 硬边界

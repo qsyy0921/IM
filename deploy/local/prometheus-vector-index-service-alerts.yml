@@ -1,0 +1,20 @@
+groups:
+  - name: nexusim-vector-index-service
+    rules:
+      - alert: NexusIMVectorIndexServiceDown
+        expr: up{service="vector-index-service"} == 0
+        for: 2m
+        labels:
+          severity: warning
+          service: vector-index-service
+        annotations:
+          summary: "vector-index-service metrics endpoint is down"
+
+      - alert: NexusIMVectorIndexServiceInfoMissing
+        expr: absent(nexusim_vector_index_service_info)
+        for: 2m
+        labels:
+          severity: warning
+          service: vector-index-service
+        annotations:
+          summary: "vector-index-service info metric is missing"

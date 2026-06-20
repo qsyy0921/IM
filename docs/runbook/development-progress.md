@@ -89,6 +89,12 @@
   低敏 `workflow_outbox`；focused checks、真实 PostgreSQL integration 和完整
   `check-local` 已通过，不宣称 timer / compensation worker、external callback wait
   或 outbox relay。
+- `vector-index-service` product-active：SDD v0.1 和 stage-switch review 已通过，
+  第一版 proto / migration / 六层 skeleton / `grpc` runtime / Docker /
+  Prometheus / Grafana 覆盖已落；当前覆盖 `UpsertVectorItem`、
+  `TombstoneVectorItem`、`SearchVectors`、`GetVectorIndexJob`、PostgreSQL metadata
+  和 local / PostgreSQL-backed test vector adapter；不宣称 Milvus / pgvector /
+  OpenSearch、embedding worker、rebuild worker 或 outbox relay。
 
 当前 Go 侧服务底座、控制面、EvidencePack、proposal / approval / audit、
 Python Worker 候选接入边界和低敏 eval 持久化已经足够支撑算法切片；
@@ -98,7 +104,6 @@ Python Worker 候选接入边界和低敏 eval 持久化已经足够支撑算法
 当前尚未真实实现的后续产品化 / 平台服务：
 
 - `admin-service`（SDD v0.1 draft 和 stage-switch review 已完成）
-- `vector-index-service`（SDD v0.1 draft 和 stage-switch review 已完成）
 
 当前可以采用 multi sub-agent 方式加快后续 AI 底座开发，但只允许拆分互不重叠的服务、文档或验证范围；主 agent 保持最终方案、集成和检查责任。
 

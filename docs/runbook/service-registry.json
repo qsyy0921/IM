@@ -205,7 +205,11 @@
     },
     {
       "name": "vector-index-service",
-      "stage": "future"
+      "stage": "product-active",
+      "local_process": "vector-index-service-grpc",
+      "debug_port": 11935,
+      "prometheus_rule_file": "prometheus-vector-index-service-alerts.yml",
+      "grafana_dashboard": "vector-index-service-observability.json"
     },
     {
       "name": "model-gateway",

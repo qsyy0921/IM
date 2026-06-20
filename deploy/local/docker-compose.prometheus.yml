@@ -40,3 +40,4 @@ services:
       - ./prometheus-model-gateway-alerts.yml:/etc/prometheus/rules/model-gateway.yml:ro
       - ./prometheus-knowledge-ingestion-service-alerts.yml:/etc/prometheus/rules/knowledge-ingestion-service.yml:ro
       - ./prometheus-workflow-service-alerts.yml:/etc/prometheus/rules/workflow-service.yml:ro
+      - ./prometheus-vector-index-service-alerts.yml:/etc/prometheus/rules/vector-index-service.yml:ro

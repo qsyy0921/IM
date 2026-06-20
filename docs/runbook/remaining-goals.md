@@ -75,6 +75,8 @@ Foundation backlog 锚点：`search-service`、`memory-service`、`retrieval-gat
   cleanup worker。
 - `knowledge-ingestion-service`：后续仍需 parser worker、embedding handoff、
   tombstone / delete proof、outbox relay、vector-index handoff 和真实 connector。
+- `vector-index-service`：后续仍需 embedding worker、rebuild worker、outbox relay、
+  Milvus / pgvector / OpenSearch backend 和 vector-index handoff smoke。
 
 ## 后置平台 / 产品化服务
 
@@ -84,7 +86,6 @@ Foundation backlog 锚点：`search-service`、`memory-service`、`retrieval-gat
 - `workflow-service`：第一版 `CreateWorkflow` / `RecordWorkflowDecision` /
   `GetWorkflow` 后，继续补 timer worker、compensation worker、external callback
   wait、outbox relay、workflow repair operators 和完整 action / repair smoke。
-- `vector-index-service`：stage-switch approved；第一版实现见 service brief。
 
 新增服务必须满足独立模型 / 伸缩 / 故障 / 安全边界或明显降复杂度，并通过 ADR / SDD v0.1。
 

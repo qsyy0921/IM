@@ -36,13 +36,13 @@ supersession PG coverage / smoke checks、retrieval-gateway EvidencePack
 current-only memory query、RAG / Summary / Agent API 显式 at seq 透传、
 RAG / Summary / Agent current-memory consumption CI-safe regression、memory
 extraction confidence / review eval、current-memory service-stack live smoke
-和 cross-group / temporal memory fixture eval 已落；
+和 cross-group / temporal retrieval smoke 已落；
 只保存低敏 run refs / counters / metadata。
 
 当前下一步：
 
 ```text
-将 cross-group / temporal memory eval 扩到 retrieval 或 service-stack smoke
+将 cross-group / temporal cases 扩到 RAG / Summary / Agent service-stack consumption
 ```
 
 完整系统测试、生产级 HA、长压和 sizing 继续后置为 hardening backlog。

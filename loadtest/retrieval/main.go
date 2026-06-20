@@ -43,40 +43,53 @@ type config struct {
 }
 
 type seededData struct {
-	TenantID                string `json:"tenant_id"`
-	ConversationID          string `json:"conversation_id"`
-	ViewerUserID            string `json:"viewer_user_id"`
-	SenderUserID            string `json:"sender_user_id"`
-	MessageID               string `json:"message_id"`
-	SourceEventID           string `json:"source_event_id"`
-	MemoryEventID           string `json:"memory_event_id"`
-	ExpiredMemoryEventID    string `json:"expired_memory_event_id"`
-	SupersededMemoryEventID string `json:"superseded_memory_event_id"`
-	MemorySourceRefID       string `json:"memory_source_ref_id"`
-	ConversationSeq         int64  `json:"conversation_seq"`
-	VisibilityVersion       int64  `json:"visibility_version"`
-	MemoryValidFromSeq      int64  `json:"memory_valid_from_seq"`
-	MemoryValidToSeq        int64  `json:"memory_valid_to_seq"`
-	MemoryProjectionVer     int64  `json:"memory_projection_version"`
+	TenantID                 string `json:"tenant_id"`
+	ConversationID           string `json:"conversation_id"`
+	CrossGroupConversationID string `json:"cross_group_conversation_id"`
+	ViewerUserID             string `json:"viewer_user_id"`
+	SenderUserID             string `json:"sender_user_id"`
+	CrossGroupActorUserID    string `json:"cross_group_actor_user_id"`
+	MessageID                string `json:"message_id"`
+	CrossGroupMessageID      string `json:"cross_group_message_id"`
+	SourceEventID            string `json:"source_event_id"`
+	CrossGroupSourceEventID  string `json:"cross_group_source_event_id"`
+	MemoryEventID            string `json:"memory_event_id"`
+	ExpiredMemoryEventID     string `json:"expired_memory_event_id"`
+	SupersededMemoryEventID  string `json:"superseded_memory_event_id"`
+	FutureMemoryEventID      string `json:"future_memory_event_id"`
+	MemorySourceRefID        string `json:"memory_source_ref_id"`
+	CrossGroupSourceRefID    string `json:"cross_group_source_ref_id"`
+	ConversationSeq          int64  `json:"conversation_seq"`
+	VisibilityVersion        int64  `json:"visibility_version"`
+	MemoryValidFromSeq       int64  `json:"memory_valid_from_seq"`
+	MemoryValidToSeq         int64  `json:"memory_valid_to_seq"`
+	MemoryProjectionVer      int64  `json:"memory_projection_version"`
 }
 
 type evidenceSummary struct {
-	RunName                 string       `json:"run_name"`
-	ResultDir               string       `json:"result_dir"`
-	RetrievalTarget         string       `json:"retrieval_target"`
-	Query                   string       `json:"query"`
-	Seed                    seededData   `json:"seed"`
-	PackID                  string       `json:"pack_id"`
-	ItemCount               int          `json:"item_count"`
-	SearchItemCount         int          `json:"search_item_count"`
-	MemoryItemCount         int          `json:"memory_item_count"`
-	SourceCounts            sourceCounts `json:"source_counts"`
-	SearchProjectionVersion int64        `json:"search_projection_version"`
-	MemoryProjectionVersion int64        `json:"memory_projection_version"`
-	RetrievalVersion        string       `json:"retrieval_version"`
-	Verified                []string     `json:"verified"`
-	StartedAt               time.Time    `json:"started_at"`
-	FinishedAt              time.Time    `json:"finished_at"`
+	RunName                               string       `json:"run_name"`
+	ResultDir                             string       `json:"result_dir"`
+	RetrievalTarget                       string       `json:"retrieval_target"`
+	Query                                 string       `json:"query"`
+	Seed                                  seededData   `json:"seed"`
+	PackID                                string       `json:"pack_id"`
+	ItemCount                             int          `json:"item_count"`
+	SearchItemCount                       int          `json:"search_item_count"`
+	MemoryItemCount                       int          `json:"memory_item_count"`
+	SourceCounts                          sourceCounts `json:"source_counts"`
+	SearchProjectionVersion               int64        `json:"search_projection_version"`
+	MemoryProjectionVersion               int64        `json:"memory_projection_version"`
+	RetrievalVersion                      string       `json:"retrieval_version"`
+	CurrentMemoryAtSeq                    int64        `json:"current_memory_at_seq"`
+	CrossGroupSourceRefsPreserved         bool         `json:"cross_group_source_refs_preserved"`
+	CrossGroupSpeakerAttributionPreserved bool         `json:"cross_group_speaker_attribution_preserved"`
+	TemporalVersionSelectedByQuerySeq     bool         `json:"temporal_version_selected_by_query_seq"`
+	ExpiredMemoryExcluded                 bool         `json:"expired_memory_excluded"`
+	SupersededMemoryExcluded              bool         `json:"superseded_memory_excluded"`
+	FutureMemoryExcluded                  bool         `json:"future_memory_excluded"`
+	Verified                              []string     `json:"verified"`
+	StartedAt                             time.Time    `json:"started_at"`
+	FinishedAt                            time.Time    `json:"finished_at"`
 }
 
 type sourceCounts struct {
@@ -224,17 +237,26 @@ func cleanupTenant(ctx context.Context, pool *pgxpool.Pool, tenantID string) err
 
 func seedProjectionRows(ctx context.Context, pool *pgxpool.Pool, cfg config) (seededData, error) {
 	now := time.Now().UTC().Truncate(time.Millisecond)
+	crossGroupConversationID := cfg.conversationID + "-strategy"
+	crossGroupActorUserID := cfg.senderUserID + "-strategy"
 	messageID := "msg-retrieval-" + randomSuffix()
+	crossGroupMessageID := "msg-retrieval-cross-" + randomSuffix()
 	sourceEventID := "evt-retrieval-" + randomSuffix()
+	crossGroupSourceEventID := "evt-retrieval-cross-" + randomSuffix()
 	memoryEventID := "mem-retrieval-" + randomSuffix()
 	expiredMemoryEventID := "mem-retrieval-expired-" + randomSuffix()
 	supersededMemoryEventID := "mem-retrieval-superseded-" + randomSuffix()
+	futureMemoryEventID := "mem-retrieval-future-" + randomSuffix()
 	sourceRefID := "ref-retrieval-" + randomSuffix()
+	crossGroupSourceRefID := "ref-retrieval-cross-" + randomSuffix()
 	seq := int64(2)
 	visibilityVersion := int64(17)
 	memoryProjectionVersion := int64(23)
 	searchText := "The phoenix launch decision requires the retrieval gateway evidence pack smoke to preserve citations."
-	factText := "Phoenix launch decision requires EvidencePack source refs and temporal version preservation."
+	crossGroupText := "The phoenix launch decision was confirmed by the strategy group and must keep cross group attribution."
+	factText := "Phoenix launch decision requires EvidencePack source refs, cross group attribution, and temporal version preservation."
+	actorJSON := jsonStringArray(cfg.senderUserID, crossGroupActorUserID)
+	audienceJSON := jsonStringArray(cfg.viewerUserID)
 
 	tx, err := pool.Begin(ctx)
 	if err != nil {
@@ -245,15 +267,17 @@ func seedProjectionRows(ctx context.Context, pool *pgxpool.Pool, cfg config) (se
 	}()
 
 	for _, table := range []string{"search_membership_projection", "memory_membership_projection"} {
-		if _, err := tx.Exec(ctx, fmt.Sprintf(`
+		for _, conversationID := range []string{cfg.conversationID, crossGroupConversationID} {
+			if _, err := tx.Exec(ctx, fmt.Sprintf(`
 INSERT INTO %s (
 	tenant_id, conversation_id, user_id, role, status, join_seq, leave_seq,
 	member_version, permission_version, updated_by_event_id, updated_at
 ) VALUES ($1, $2, $3, 'MEMBER', 'ACTIVE', 1, NULL, 1, $4, $5, $6)
 `, table),
-			cfg.tenantID, cfg.conversationID, cfg.viewerUserID, visibilityVersion, "member-seed-"+sourceEventID, now,
-		); err != nil {
-			return seededData{}, err
+				cfg.tenantID, conversationID, cfg.viewerUserID, visibilityVersion, "member-seed-"+sourceEventID, now,
+			); err != nil {
+				return seededData{}, err
+			}
 		}
 	}
 
@@ -264,6 +288,15 @@ INSERT INTO search_message_documents (
 	visibility_version, occurred_at, updated_at
 ) VALUES ($1, $2, $3, $4, $5, $6, 'TEXT', $7, 'NONE', 1, $8, $9, $9)
 `, cfg.tenantID, cfg.conversationID, messageID, seq, sourceEventID, searchText, cfg.senderUserID, visibilityVersion, now); err != nil {
+		return seededData{}, err
+	}
+	if _, err := tx.Exec(ctx, `
+INSERT INTO search_message_documents (
+	tenant_id, conversation_id, message_id, conversation_seq, source_event_id,
+	searchable_text, message_type, sender_id, tombstone_status, change_version,
+	visibility_version, occurred_at, updated_at
+) VALUES ($1, $2, $3, $4, $5, $6, 'TEXT', $7, 'NONE', 1, $8, $9, $9)
+`, cfg.tenantID, crossGroupConversationID, crossGroupMessageID, seq+1, crossGroupSourceEventID, crossGroupText, crossGroupActorUserID, visibilityVersion, now); err != nil {
 		return seededData{}, err
 	}
 
@@ -281,7 +314,7 @@ INSERT INTO memory_structured_events (
 	'[]'::jsonb, 0.8700, $10, 'retrieval-smoke-v1',
 	$11, $9, $9
 )
-`, cfg.tenantID, memoryEventID, cfg.conversationID, factText, jsonArray(cfg.senderUserID), jsonArray(cfg.viewerUserID), seq, seq+10, now, visibilityVersion, memoryProjectionVersion); err != nil {
+`, cfg.tenantID, memoryEventID, cfg.conversationID, factText, actorJSON, audienceJSON, seq, seq+10, now, visibilityVersion, memoryProjectionVersion); err != nil {
 		return seededData{}, err
 	}
 
@@ -302,8 +335,13 @@ INSERT INTO memory_structured_events (
 	 'DECISION', 'SUPERSEDED', 'APPROVED', $5, $6::jsonb, $7::jsonb,
 	 $8, $12, $9, NULL, '[]'::jsonb,
 	 '[]'::jsonb, 0.9800, $10, 'retrieval-smoke-v1',
+	 $11, $9, $9),
+	($1, $13, 'CONVERSATION', $4, $4, 'phoenix-launch',
+	 'DECISION', 'ACTIVE', 'APPROVED', $5, $6::jsonb, $7::jsonb,
+	 $14, NULL, $9, NULL, '[]'::jsonb,
+	 '[]'::jsonb, 0.9700, $10, 'retrieval-smoke-v1',
 	 $11, $9, $9)
-`, cfg.tenantID, expiredMemoryEventID, supersededMemoryEventID, cfg.conversationID, factText, jsonArray(cfg.senderUserID), jsonArray(cfg.viewerUserID), seq-1, now, visibilityVersion, memoryProjectionVersion, seq+10); err != nil {
+`, cfg.tenantID, expiredMemoryEventID, supersededMemoryEventID, cfg.conversationID, factText, actorJSON, audienceJSON, seq-1, now, visibilityVersion, memoryProjectionVersion, seq+10, futureMemoryEventID, seq+20); err != nil {
 		return seededData{}, err
 	}
 
@@ -311,8 +349,10 @@ INSERT INTO memory_structured_events (
 INSERT INTO memory_event_source_refs (
 	tenant_id, memory_event_id, source_ref_id, source_type, source_id,
 	source_event_id, conversation_id, conversation_seq, occurred_at, created_at
-) VALUES ($1, $2, $3, 'MESSAGE', $4, $5, $6, $7, $8, $8)
-`, cfg.tenantID, memoryEventID, sourceRefID, messageID, sourceEventID, cfg.conversationID, seq, now); err != nil {
+) VALUES
+	($1, $2, $3, 'MESSAGE', $4, $5, $6, $7, $10, $10),
+	($1, $2, $8, 'MESSAGE', $11, $12, $9, $13, $10, $10)
+`, cfg.tenantID, memoryEventID, sourceRefID, messageID, sourceEventID, cfg.conversationID, seq, crossGroupSourceRefID, crossGroupConversationID, now, crossGroupMessageID, crossGroupSourceEventID, seq+1); err != nil {
 		return seededData{}, err
 	}
 
@@ -322,8 +362,9 @@ INSERT INTO memory_event_source_refs (
 	source_event_id, conversation_id, conversation_seq, occurred_at, created_at
 ) VALUES
 	($1, $2, 'ref-expired', 'MESSAGE', $4, $5, $6, 1, $7, $7),
-	($1, $3, 'ref-superseded', 'MESSAGE', $4, $5, $6, $8, $7, $7)
-`, cfg.tenantID, expiredMemoryEventID, supersededMemoryEventID, messageID, sourceEventID, cfg.conversationID, now, seq); err != nil {
+	($1, $3, 'ref-superseded', 'MESSAGE', $4, $5, $6, $8, $7, $7),
+	($1, $9, 'ref-future', 'MESSAGE', $4, $5, $6, $10, $7, $7)
+`, cfg.tenantID, expiredMemoryEventID, supersededMemoryEventID, messageID, sourceEventID, cfg.conversationID, now, seq, futureMemoryEventID, seq+20); err != nil {
 		return seededData{}, err
 	}
 
@@ -331,21 +372,27 @@ INSERT INTO memory_event_source_refs (
 		return seededData{}, err
 	}
 	return seededData{
-		TenantID:                cfg.tenantID,
-		ConversationID:          cfg.conversationID,
-		ViewerUserID:            cfg.viewerUserID,
-		SenderUserID:            cfg.senderUserID,
-		MessageID:               messageID,
-		SourceEventID:           sourceEventID,
-		MemoryEventID:           memoryEventID,
-		ExpiredMemoryEventID:    expiredMemoryEventID,
-		SupersededMemoryEventID: supersededMemoryEventID,
-		MemorySourceRefID:       sourceRefID,
-		ConversationSeq:         seq,
-		VisibilityVersion:       visibilityVersion,
-		MemoryValidFromSeq:      seq,
-		MemoryValidToSeq:        seq + 10,
-		MemoryProjectionVer:     memoryProjectionVersion,
+		TenantID:                 cfg.tenantID,
+		ConversationID:           cfg.conversationID,
+		CrossGroupConversationID: crossGroupConversationID,
+		ViewerUserID:             cfg.viewerUserID,
+		SenderUserID:             cfg.senderUserID,
+		CrossGroupActorUserID:    crossGroupActorUserID,
+		MessageID:                messageID,
+		CrossGroupMessageID:      crossGroupMessageID,
+		SourceEventID:            sourceEventID,
+		CrossGroupSourceEventID:  crossGroupSourceEventID,
+		MemoryEventID:            memoryEventID,
+		ExpiredMemoryEventID:     expiredMemoryEventID,
+		SupersededMemoryEventID:  supersededMemoryEventID,
+		FutureMemoryEventID:      futureMemoryEventID,
+		MemorySourceRefID:        sourceRefID,
+		CrossGroupSourceRefID:    crossGroupSourceRefID,
+		ConversationSeq:          seq,
+		VisibilityVersion:        visibilityVersion,
+		MemoryValidFromSeq:       seq,
+		MemoryValidToSeq:         seq + 10,
+		MemoryProjectionVer:      memoryProjectionVersion,
 	}, nil
 }
 
@@ -401,13 +448,18 @@ func verifyEvidence(
 
 	var searchItem *retrievalv1.EvidenceItem
 	var memoryItem *retrievalv1.EvidenceItem
+	staleMemoryExcluded := map[string]bool{
+		seed.ExpiredMemoryEventID:    true,
+		seed.SupersededMemoryEventID: true,
+		seed.FutureMemoryEventID:     true,
+	}
 	for _, item := range pack.GetItems() {
 		switch item.GetSourceType() {
 		case retrievalv1.EvidenceSourceType_EVIDENCE_SOURCE_TYPE_SEARCH_MESSAGE:
 			candidate := item
 			searchItem = candidate
 		case retrievalv1.EvidenceSourceType_EVIDENCE_SOURCE_TYPE_MEMORY_EVENT:
-			if item.GetMemoryEventId() == seed.ExpiredMemoryEventID || item.GetMemoryEventId() == seed.SupersededMemoryEventID {
+			if staleMemoryExcluded[item.GetMemoryEventId()] {
 				return evidenceSummary{}, fmt.Errorf("stale memory evidence leaked into EvidencePack: %+v", item)
 			}
 			candidate := item
@@ -430,6 +482,8 @@ func verifyEvidence(
 		return evidenceSummary{}, err
 	}
 	verified = append(verified, "memory item is active current-only evidence with source refs, review state and extraction version")
+	verified = append(verified, "cross-group memory source refs and speaker attribution are preserved")
+	verified = append(verified, "expired, superseded and future memory decoys are excluded by query seq")
 
 	counts := sourceCounts{}
 	for _, count := range pack.GetSourceCounts() {
@@ -455,22 +509,29 @@ func verifyEvidence(
 	verified = append(verified, "source counts, projection versions and stale-memory filtering preserved")
 
 	return evidenceSummary{
-		RunName:                 cfg.runName,
-		ResultDir:               resultDir,
-		RetrievalTarget:         cfg.retrievalTarget,
-		Query:                   cfg.query,
-		Seed:                    seed,
-		PackID:                  pack.GetPackId(),
-		ItemCount:               len(pack.GetItems()),
-		SearchItemCount:         int(counts.SearchMessage),
-		MemoryItemCount:         int(counts.MemoryEvent),
-		SourceCounts:            counts,
-		SearchProjectionVersion: pack.GetSearchProjectionVersion(),
-		MemoryProjectionVersion: pack.GetMemoryProjectionVersion(),
-		RetrievalVersion:        pack.GetRetrievalVersion(),
-		Verified:                verified,
-		StartedAt:               startedAt,
-		FinishedAt:              time.Now().UTC(),
+		RunName:                               cfg.runName,
+		ResultDir:                             resultDir,
+		RetrievalTarget:                       cfg.retrievalTarget,
+		Query:                                 cfg.query,
+		Seed:                                  seed,
+		PackID:                                pack.GetPackId(),
+		ItemCount:                             len(pack.GetItems()),
+		SearchItemCount:                       int(counts.SearchMessage),
+		MemoryItemCount:                       int(counts.MemoryEvent),
+		SourceCounts:                          counts,
+		SearchProjectionVersion:               pack.GetSearchProjectionVersion(),
+		MemoryProjectionVersion:               pack.GetMemoryProjectionVersion(),
+		RetrievalVersion:                      pack.GetRetrievalVersion(),
+		CurrentMemoryAtSeq:                    seed.ConversationSeq + 5,
+		CrossGroupSourceRefsPreserved:         true,
+		CrossGroupSpeakerAttributionPreserved: true,
+		TemporalVersionSelectedByQuerySeq:     true,
+		ExpiredMemoryExcluded:                 true,
+		SupersededMemoryExcluded:              true,
+		FutureMemoryExcluded:                  true,
+		Verified:                              verified,
+		StartedAt:                             startedAt,
+		FinishedAt:                            time.Now().UTC(),
 	}, nil
 }
 
@@ -519,17 +580,59 @@ func verifyMemoryItem(item *retrievalv1.EvidenceItem, seed seededData) error {
 	if len(item.GetSourceRefs()) == 0 {
 		return errors.New("memory item missing source refs")
 	}
-	ref := item.GetSourceRefs()[0]
-	if ref.GetSourceEventId() != seed.SourceEventID || ref.GetSourceId() != seed.MessageID {
-		return fmt.Errorf("unexpected memory source ref: %+v", ref)
+	primaryRef, ok := findSourceRef(item.GetSourceRefs(), seed.MessageID, seed.SourceEventID, seed.ConversationID)
+	if !ok {
+		return fmt.Errorf("memory item missing primary source ref for message %q", seed.MessageID)
 	}
-	if len(item.GetActorUserIds()) == 0 || item.GetActorUserIds()[0] != seed.SenderUserID {
+	if primaryRef.GetSourceEventId() != seed.SourceEventID ||
+		primaryRef.GetSourceId() != seed.MessageID ||
+		primaryRef.GetConversationId() != seed.ConversationID ||
+		primaryRef.GetConversationSeq() != seed.ConversationSeq {
+		return fmt.Errorf("unexpected primary memory source ref: %+v", primaryRef)
+	}
+	crossRef, ok := findSourceRef(item.GetSourceRefs(), seed.CrossGroupMessageID, seed.CrossGroupSourceEventID, seed.CrossGroupConversationID)
+	if !ok {
+		return fmt.Errorf("memory item missing cross-group source ref for message %q", seed.CrossGroupMessageID)
+	}
+	if crossRef.GetSourceEventId() != seed.CrossGroupSourceEventID ||
+		crossRef.GetSourceId() != seed.CrossGroupMessageID ||
+		crossRef.GetConversationId() != seed.CrossGroupConversationID ||
+		crossRef.GetConversationSeq() != seed.ConversationSeq+1 {
+		return fmt.Errorf("unexpected cross-group memory source ref: %+v", crossRef)
+	}
+	if !stringSliceContains(item.GetActorUserIds(), seed.SenderUserID) ||
+		!stringSliceContains(item.GetActorUserIds(), seed.CrossGroupActorUserID) {
 		return fmt.Errorf("unexpected actor user ids: %v", item.GetActorUserIds())
 	}
-	if len(item.GetAudienceUserIds()) == 0 || item.GetAudienceUserIds()[0] != seed.ViewerUserID {
+	if !stringSliceContains(item.GetAudienceUserIds(), seed.ViewerUserID) {
 		return fmt.Errorf("unexpected audience user ids: %v", item.GetAudienceUserIds())
 	}
 	return nil
+}
+
+func findSourceRef(
+	refs []*retrievalv1.EvidenceSourceRef,
+	sourceID string,
+	sourceEventID string,
+	conversationID string,
+) (*retrievalv1.EvidenceSourceRef, bool) {
+	for _, ref := range refs {
+		if ref.GetSourceId() == sourceID &&
+			ref.GetSourceEventId() == sourceEventID &&
+			ref.GetConversationId() == conversationID {
+			return ref, true
+		}
+	}
+	return nil, false
+}
+
+func stringSliceContains(values []string, target string) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
 }
 
 func writeSummary(resultDir string, result evidenceSummary) error {
@@ -547,7 +650,11 @@ func writeSummary(resultDir string, result evidenceSummary) error {
 }
 
 func jsonArray(value string) string {
-	encoded, _ := json.Marshal([]string{value})
+	return jsonStringArray(value)
+}
+
+func jsonStringArray(values ...string) string {
+	encoded, _ := json.Marshal(values)
 	return string(encoded)
 }
 

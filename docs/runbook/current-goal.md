@@ -57,14 +57,14 @@ group memory -> EvidencePack -> RAG -> summary -> multi-agent
   64 cases，service-stack adapter 已断言真实服务栈排除 stale memory。2026-06-20
   真实本地 live gate 38/38 通过，报告见
   `docs/runbook/loadtest/ai-eval-service/loadtest-report-20260620-current-memory-service-stack-live.md`。
-- cross-group / temporal memory eval first pass：新增 2 个低敏 CI-safe cases，
-  验证跨群 source refs / speaker attribution / related-event chain 不被压扁，
-  以及按 query seq 选择有效版本、不返回未来 memory。
+- cross-group / temporal retrieval smoke：低敏 CI-safe cases 和真实
+  `loadtest/retrieval` 已覆盖跨群 source refs / speaker attribution，并按
+  query seq 排除 expired / superseded / future memory。
 
 下一步默认推进：
 
 ```text
-将 cross-group / temporal memory eval 扩到 retrieval 或 service-stack smoke
+将 cross-group / temporal cases 扩到 RAG / Summary / Agent service-stack consumption
 ```
 
 硬边界：RAG / summary / Agent 只能消费 EvidencePack；真实写动作必须走

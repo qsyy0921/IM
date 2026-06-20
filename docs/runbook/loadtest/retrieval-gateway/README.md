@@ -9,6 +9,7 @@ search-service grpc + memory-service grpc
 -> retrieval-gateway grpc
 -> RetrieveEvidence
 -> EvidencePack contains SEARCH_MESSAGE + MEMORY_EVENT
+-> cross-group source refs preserved, stale / future memory excluded by query seq
 ```
 
 第一版 smoke 不重复验证 Kafka timeline projection。`loadtest/retrieval` 会直接在
@@ -27,3 +28,4 @@ PostgreSQL 中 seed search / memory projection rows，然后通过三个真实 g
 报告：
 
 - [2026-06-19 retrieval EvidencePack smoke](loadtest-report-20260619-retrieval-evidence-smoke.md)
+- [2026-06-20 cross-group / temporal retrieval smoke](loadtest-report-20260620-cross-group-temporal-retrieval-smoke.md)

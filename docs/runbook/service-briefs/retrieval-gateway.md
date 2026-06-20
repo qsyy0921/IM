@@ -16,15 +16,14 @@
   app 层在 search / memory 前通过 `CheckToolAction` fail-closed 检查
 - registry / Docker runtime / local compose / Prometheus / Grafana foundation-active wiring
 - `loadtest/retrieval` 和真实本地 smoke：search + memory projection
-  -> retrieval-gateway `RetrieveEvidence` -> `SEARCH_MESSAGE` + `MEMORY_EVENT`
+  -> retrieval-gateway `RetrieveEvidence` -> `SEARCH_MESSAGE` + `MEMORY_EVENT`；
+  2026-06-20 扩展到 cross-group source refs / speaker attribution 和
+  expired / superseded / future memory query-seq exclusion。
 - EvidencePack 字段 hardening first pass：`rerank_score`、`dedupe_reason`、
   `source_coverage` 已落地，app / gRPC tests 覆盖排序、去重和覆盖统计。
 - EvidencePack -> memory-service current-only query 已落：默认 memory status 收敛为
   ACTIVE，显式 `at_conversation_seq` 透传给 memory-service；未传时使用 search hit
   最大 conversation seq 作为 first-stage fallback。
 
-下一步：
-
-- RAG / summary / Agent API 显式透传 `at_conversation_seq`，减少对 search fallback
-  的依赖。
-- 后续由 `rag-service` / `summary-service` / `agent-service` 消费 EvidencePack，不绕过 retrieval-gateway。
+下一步：把 selected cross-group / temporal cases 扩到 RAG / summary / Agent
+service-stack consumption；后续不绕过 retrieval-gateway。

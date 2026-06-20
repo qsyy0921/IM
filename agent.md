@@ -75,8 +75,9 @@ supersession query checks, retrieval current-only memory query, RAG /
 Summary / Agent explicit `at_conversation_seq` requests, RAG / Summary / Agent
 current-memory consumption, memory extraction confidence / review, current-memory
 service-stack live smoke, and cross-group / temporal memory fixture eval are
-landed. Next: expand selected cross-group / temporal memory cases into retrieval
-or service-stack smoke without widening into broad hardening.
+landed. Cross-group / temporal retrieval smoke is landed. Next: expand selected
+cross-group / temporal cases into RAG / Summary / Agent service-stack consumption
+without widening into broad hardening.
 Search, memory, retrieval, real RAG / summary / Agent adapter smokes, the skill
 catalog foundation, the MCP prepare boundary, and approved proposal preflight
 are passed.

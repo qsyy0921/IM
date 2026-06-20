@@ -54,9 +54,10 @@ vector-index-service
   `docs/runbook/stage-switch/media-service.md`。
 - `media-service` 已进入 `product-active`，第一版 proto / migration / 六层
   skeleton / cmd runtime / Docker / Prometheus / Grafana 覆盖已落。
-- 下一步默认继续 `media-service` focused hardening：真实 PostgreSQL repository
-  集成测试、最小 gRPC smoke、object_key 不出 public response / outbox payload
-  的回归门禁；完成后再推进 `notification-service` stage switch / implementation。
+- `media-service` focused hardening 已补真实 PostgreSQL repository 集成测试和
+  object_key 不出 public response / fake presign URL / outbox payload 的回归门禁。
+- 下一步默认继续 `media-service` 最小 gRPC smoke；完成后再进入 media outbox
+  relay / processing worker，或推进 `notification-service` stage switch / implementation。
 
 ## 硬边界
 

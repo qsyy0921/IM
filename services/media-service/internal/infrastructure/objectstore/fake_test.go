@@ -1,0 +1,36 @@
+package objectstore
+
+import (
+	"context"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/qsyy0921/IM/services/media-service/internal/types"
+)
+
+func TestFakeStoreDoesNotExposeObjectKey(t *testing.T) {
+	store := NewFakeStore("http://media.local")
+	objectKey := "tenant-1/conv-1/object-secret-key"
+
+	putURL, err := store.PresignPut(context.Background(), objectKey, types.ObjectMetadata{
+		SizeBytes: 12,
+		SHA256:    strings.Repeat("a", 64),
+	}, time.Now().Add(time.Minute))
+	if err != nil {
+		t.Fatalf("presign put: %v", err)
+	}
+	getURL, err := store.PresignGet(context.Background(), objectKey, types.VariantOriginal, time.Now().Add(time.Minute))
+	if err != nil {
+		t.Fatalf("presign get: %v", err)
+	}
+
+	for _, rawURL := range []string{putURL.URL, getURL.URL} {
+		if strings.Contains(rawURL, objectKey) || strings.Contains(rawURL, "object-secret-key") || strings.Contains(rawURL, "key=") {
+			t.Fatalf("presigned URL leaked object key: %s", rawURL)
+		}
+		if !strings.Contains(rawURL, "token=") {
+			t.Fatalf("presigned URL should carry opaque token: %s", rawURL)
+		}
+	}
+}

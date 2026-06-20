@@ -1,8 +1,8 @@
 # media-service
 
 状态：product-active / SDD v0.1 draft 已存在 / stage-switch review passed /
-implementation slice in progress。当前允许创建 `services/media-service` 目录，但只限
-第一切片的 proto、migration、六层 skeleton、Docker 和观测覆盖。
+implementation slice in progress。第一版 proto、migration、六层 skeleton、Docker 和
+观测覆盖已落；真实 PG repository 集成测试和 object_key 泄露回归门禁已补。
 
 Stage-switch 记录：`docs/runbook/stage-switch/media-service.md`。
 
@@ -21,3 +21,9 @@ Stage-switch 记录：`docs/runbook/stage-switch/media-service.md`。
 - `CreateUploadSession` / `CompleteUpload` / `GetMediaDownloadURL`。
 - PostgreSQL asset metadata + S3-compatible object storage port。
 - 图片 thumbnail 和 virus-scan 状态先做 mock adapter + audit。
+
+下一步：
+
+- 最小 gRPC smoke。
+- media outbox relay / processing worker。
+- 真实 S3-compatible adapter、scanner、thumbnail / transcode provider 后置。

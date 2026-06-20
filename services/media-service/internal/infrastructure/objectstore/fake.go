@@ -2,6 +2,8 @@ package objectstore
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"net/url"
 	"strings"
 	"time"
@@ -47,6 +49,11 @@ func (store FakeStore) PresignGet(_ context.Context, objectKey string, variant s
 func (store FakeStore) objectURL(objectKey string, operation string) string {
 	values := url.Values{}
 	values.Set("op", operation)
-	values.Set("key", objectKey)
+	values.Set("token", opaqueObjectToken(objectKey))
 	return store.BaseURL + "?" + values.Encode()
+}
+
+func opaqueObjectToken(objectKey string) string {
+	sum := sha256.Sum256([]byte(objectKey))
+	return hex.EncodeToString(sum[:])
 }

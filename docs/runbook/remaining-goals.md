@@ -65,9 +65,9 @@ eval 已能支撑算法切片；生产级 HA、长压、sizing 和完整系统�
 ## Product-active 平台 / 产品化服务
 
 - `media-service`：第一版 proto / migration / 六层 skeleton / cmd runtime /
-  Docker / Prometheus / Grafana 覆盖已落；下一步补真实 PostgreSQL repository
-  集成测试、最小 gRPC smoke、object_key 不出 public response / outbox payload
-  的回归门禁，然后再进入 media outbox relay / processing worker。
+  Docker / Prometheus / Grafana 覆盖已落；真实 PostgreSQL repository 集成测试和
+  object_key 不出 public response / fake presign URL / outbox payload 的回归门禁
+  已补；下一步补最小 gRPC smoke，然后再进入 media outbox relay / processing worker。
 
 ## 后置平台 / 产品化服务
 

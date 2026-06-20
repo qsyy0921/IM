@@ -66,6 +66,12 @@ protoc `
     -I $KafkaSchemaDir `
     --go_out=$KafkaSchemaDir `
     --go_opt=paths=source_relative `
+    "$KafkaSchemaDir/media/v1/im.media.events.proto"
+
+protoc `
+    -I $KafkaSchemaDir `
+    --go_out=$KafkaSchemaDir `
+    --go_opt=paths=source_relative `
     "$KafkaSchemaDir/agent/v1/im.agent.events.proto"
 
 protoc `

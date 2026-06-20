@@ -234,19 +234,29 @@ func openMediaTestPool(t *testing.T) *pgxpool.Pool {
 		t.Fatalf("open pg pool: %v", err)
 	}
 	t.Cleanup(pool.Close)
-	applyMediaMigration(t, context.Background(), pool)
+	applyMediaMigrations(t, context.Background(), pool)
 	return pool
 }
 
-func applyMediaMigration(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
+func applyMediaMigrations(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
 	t.Helper()
-	path := filepath.Join("..", "..", "..", "..", "..", "migrations", "postgres", "media", "000001_media_core.sql")
-	content, err := os.ReadFile(path)
+	dir := filepath.Join("..", "..", "..", "..", "..", "migrations", "postgres", "media")
+	entries, err := os.ReadDir(dir)
 	if err != nil {
-		t.Fatalf("read migration: %v", err)
+		t.Fatalf("read migration dir: %v", err)
 	}
-	if _, err := pool.Exec(ctx, string(content)); err != nil {
-		t.Fatalf("apply migration: %v", err)
+	for _, entry := range entries {
+		if entry.IsDir() || filepath.Ext(entry.Name()) != ".sql" {
+			continue
+		}
+		path := filepath.Join(dir, entry.Name())
+		content, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("read migration %s: %v", entry.Name(), err)
+		}
+		if _, err := pool.Exec(ctx, string(content)); err != nil {
+			t.Fatalf("apply migration %s: %v", entry.Name(), err)
+		}
 	}
 }
 

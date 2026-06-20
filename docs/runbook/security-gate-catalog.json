@@ -25,6 +25,13 @@
       "note": "Only foundation-active services in service-registry.json may appear during the current AI foundation phase; later retrieval, RAG, agent, media, notification, audit, admin, and client-facing service directories must not appear before ADR/stage switch."
     },
     {
+      "name": "Python AI worker boundary",
+      "category": "architecture-boundary",
+      "script": "tools/check-python-ai-worker-boundary.ps1",
+      "check_local_label": "python ai worker boundary",
+      "note": "Python AI worker code must stay in the model / algorithm / eval candidate layer while Go owns control, state, persistence and audit."
+    },
+    {
       "name": "debug listener exposure",
       "category": "listener-boundary",
       "script": "tools/check-debug-listener-exposure.ps1",

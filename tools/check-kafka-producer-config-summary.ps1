@@ -20,8 +20,18 @@ try {
     }
 
     $summary = Get-Content -LiteralPath $summaryPath -Raw | ConvertFrom-Json
-    if ($summary.producer_count -ne 7) {
-        throw "Kafka producer summary must include 7 producer files."
+    $expectedServices = @(
+        "agent-service",
+        "contacts-service",
+        "delivery-service",
+        "identity-service",
+        "media-service",
+        "message-service",
+        "policy-service",
+        "receipt-service"
+    )
+    if ($summary.producer_count -ne $expectedServices.Count) {
+        throw "Kafka producer summary must include $($expectedServices.Count) producer files."
     }
     if ($summary.required_acks -ne "RequireAll" -or $summary.allow_auto_topic_creation -ne $false) {
         throw "Kafka producer summary has incorrect acks or auto-topic settings."
@@ -34,15 +44,6 @@ try {
     }
 
     $services = @($summary.producers | ForEach-Object { [string]$_.service } | Sort-Object)
-    $expectedServices = @(
-        "agent-service",
-        "contacts-service",
-        "delivery-service",
-        "identity-service",
-        "message-service",
-        "policy-service",
-        "receipt-service"
-    )
     $diff = Compare-Object -ReferenceObject $expectedServices -DifferenceObject $services
     if ($diff) {
         $diffText = ($diff | ForEach-Object { "$($_.SideIndicator) $($_.InputObject)" }) -join ", "

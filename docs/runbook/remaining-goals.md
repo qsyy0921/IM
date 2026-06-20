@@ -67,7 +67,9 @@ eval 已能支撑算法切片；生产级 HA、长压、sizing 和完整系统�
 - `media-service`：第一版 proto / migration / 六层 skeleton / cmd runtime /
   Docker / Prometheus / Grafana 覆盖已落；真实 PostgreSQL repository 集成测试和
   object_key 不出 public response / fake presign URL / outbox payload 的回归门禁
-  已补；最小 gRPC smoke 已通过；下一步进入 media outbox relay / processing worker。
+  已补；最小 gRPC smoke 已通过；`media_outbox -> im.media.events` 最小 relay
+  代码切片、Kafka schema、runtime mode 和真实 PG relay 测试已补。下一步跑
+  media outbox relay 真实 Kafka smoke，再进入 processing worker。
 
 ## 后置平台 / 产品化服务
 
@@ -91,6 +93,7 @@ eval 已能支撑算法切片；生产级 HA、长压、sizing 和完整系统�
 - 生产级统一观测：collector、Alertmanager、日志汇聚、SLO、retention。
 - 分布式 HA / 故障演练：Redis / Kafka / PostgreSQL 更长时长和多故障组合。
 - Repair / DLQ / audit 产品化：审批系统、运维 UI、批量 repair、外部审计。
-- 容量和复杂度治理：9 服务长压 campaign、资源曲线、生产 sizing、文件拆分。
+- 容量和复杂度治理：保留 9 服务 `capacity_summary` 统一口径；后续再做
+  9 服务长压 campaign、资源曲线、生产 sizing、文件拆分。
 
 可使用多个 sub-agent 并行推进，但必须按服务、文档集、测试面或只读审查问题拆分互不重叠职责；禁止同时改同一 proto、migration、service brief 或架构章节。

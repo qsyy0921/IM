@@ -1,0 +1,80 @@
+syntax = "proto3";
+
+package nexusim.media.events.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/qsyy0921/IM/schemas/kafka/media/v1;mediaeventsv1";
+
+// Topic: im.media.events
+// Partition key: tenant_id + ":" + asset_id
+// Producer: media-service outbox relay
+message MediaEvent {
+  string event_id = 1;
+  string event_type = 2;
+  int32 event_version = 3;
+
+  string tenant_id = 4;
+  string aggregate_type = 5; // "media_asset"
+  string aggregate_id = 6;   // asset_id
+  int64 aggregate_version = 7;
+
+  string partition_key = 8;
+  string trace_id = 9;
+  string correlation_id = 10;
+  string causation_id = 11;
+  string producer = 12;
+  google.protobuf.Timestamp occurred_at = 13;
+
+  oneof payload {
+    MediaAssetUploadedV1 asset_uploaded = 20;
+    MediaAssetReadyV1 asset_ready = 21;
+    MediaAssetDeletedV1 asset_deleted = 22;
+    MediaAssetQuarantinedV1 asset_quarantined = 23;
+  }
+}
+
+message MediaAssetUploadedV1 {
+  string tenant_id = 1;
+  string asset_id = 2;
+  string conversation_id = 3;
+  string media_kind = 4;
+  string content_type = 5;
+  int64 size_bytes = 6;
+  string sha256 = 7;
+  string status = 8;
+}
+
+message MediaAssetReadyV1 {
+  string tenant_id = 1;
+  string asset_id = 2;
+  string conversation_id = 3;
+  string media_kind = 4;
+  string content_type = 5;
+  int64 size_bytes = 6;
+  string sha256 = 7;
+  string status = 8;
+}
+
+message MediaAssetDeletedV1 {
+  string tenant_id = 1;
+  string asset_id = 2;
+  string conversation_id = 3;
+  string media_kind = 4;
+  string content_type = 5;
+  int64 size_bytes = 6;
+  string sha256 = 7;
+  string status = 8;
+}
+
+message MediaAssetQuarantinedV1 {
+  string tenant_id = 1;
+  string asset_id = 2;
+  string conversation_id = 3;
+  string media_kind = 4;
+  string content_type = 5;
+  int64 size_bytes = 6;
+  string sha256 = 7;
+  string status = 8;
+  string reason = 9;
+}

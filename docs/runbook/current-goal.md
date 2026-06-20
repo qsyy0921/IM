@@ -58,8 +58,11 @@ vector-index-service
   object_key 不出 public response / fake presign URL / outbox payload 的回归门禁。
 - `media-service` 最小 gRPC smoke 已通过，报告见
   `docs/runbook/loadtest/media-service/loadtest-report-20260620-media-grpc-smoke.md`。
-- 下一步默认继续 media outbox relay / processing worker；也可以推进
-  `notification-service` stage switch / implementation。
+- `media-service` 已补 `media_outbox -> im.media.events` 最小 outbox relay、
+  Kafka protobuf schema、真实 PostgreSQL outbox relay 集成测试和
+  `NEXUSIM_MEDIA_SERVICE_MODE=outbox-relay` runtime mode。
+- 下一步默认跑 media outbox relay 真实 Kafka smoke，随后补 processing worker；
+  也可以推进 `notification-service` stage switch / implementation。
 
 ## 硬边界
 

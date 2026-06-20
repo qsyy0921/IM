@@ -173,7 +173,8 @@ attempt_count, next_retry_at, last_error, dead_lettered_at
 
 media_outbox:
 event_id, tenant_id, asset_id, event_type, event_version,
-partition_key, payload_json, status, retry_count, next_retry_at, published_at
+partition_key, payload_json, status, retry_count, next_retry_at, published_at,
+last_error
 ```
 
 `object_key` 是服务内部字段，禁止在 public API response、Kafka payload、debug metrics 或 audit export 中直接输出。
@@ -325,3 +326,13 @@ media-orphan-cleanup
 - PostgreSQL repository 和 fake object storage integration 测试通过。
 - `CreateUploadSession -> CompleteUpload -> GetMediaDownloadURL` 本地 smoke 通过。
 - malformed outbox / processing payload fail closed，不发布错误事件。
+
+当前实现进展：
+
+- `CreateUploadSession -> CompleteUpload -> GetMediaDownloadURL` 最小 gRPC smoke 已通过。
+- `media_outbox -> im.media.events` 最小 relay 代码切片已落，包含 Kafka schema、
+  outbox store、Kafka producer、trigger relay 和 `outbox-relay` runtime mode。
+- 真实 PostgreSQL 测试已覆盖同一 asset 事件按递增 `id` 顺序发布、低版本 DLQ
+  阻塞后续事件、retry 写稳定低敏 `last_error`。
+- 下一步仍需真实 Kafka outbox relay smoke 和 processing worker；真实 S3、
+  scanner、thumbnail/transcode provider 继续后置。

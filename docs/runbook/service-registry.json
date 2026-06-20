@@ -276,6 +276,12 @@
       "service": "agent-service",
       "env": "NEXUSIM_AGENT_SERVICE_MODE",
       "value": "approval-outbox-relay"
+    },
+    {
+      "name": "media-service-outbox-relay",
+      "service": "media-service",
+      "env": "NEXUSIM_MEDIA_SERVICE_MODE",
+      "value": "outbox-relay"
     }
   ]
 }

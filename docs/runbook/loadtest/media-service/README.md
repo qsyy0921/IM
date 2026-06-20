@@ -30,4 +30,6 @@
   thumbnail / transcode provider 可用。
 - 当前只验证 media 本服务的 upload / complete / download 授权本地链路，不发布
   `im.media.events`。
-- 后续 media outbox relay / processing worker 需要单独 smoke。
+- `media_outbox -> im.media.events` relay 代码切片已落，但还需要单独真实 Kafka
+  smoke 验证 `PENDING -> PUBLISHED` 和 protobuf oneof payload。
+- processing worker 需要单独 smoke。

@@ -181,8 +181,8 @@ func run(cfg config) error {
 	}
 	defer pool.Close()
 	if cfg.applyMigration {
-		if err := applyMediaMigration(ctx, pool); err != nil {
-			result.Error = "apply media migration: " + err.Error()
+		if err := applyMediaMigrations(ctx, pool); err != nil {
+			result.Error = "apply media migrations: " + err.Error()
 			return err
 		}
 	}
@@ -417,14 +417,24 @@ WHERE tenant_id = $1
 	return count, nil
 }
 
-func applyMediaMigration(ctx context.Context, pool *pgxpool.Pool) error {
-	path := filepath.Join("migrations", "postgres", "media", "000001_media_core.sql")
-	content, err := os.ReadFile(path)
+func applyMediaMigrations(ctx context.Context, pool *pgxpool.Pool) error {
+	dir := filepath.Join("migrations", "postgres", "media")
+	entries, err := os.ReadDir(dir)
 	if err != nil {
-		return fmt.Errorf("read media migration: %w", err)
+		return fmt.Errorf("read media migration dir: %w", err)
 	}
-	if _, err := pool.Exec(ctx, string(content)); err != nil {
-		return fmt.Errorf("apply media migration: %w", err)
+	for _, entry := range entries {
+		if entry.IsDir() || filepath.Ext(entry.Name()) != ".sql" {
+			continue
+		}
+		path := filepath.Join(dir, entry.Name())
+		content, err := os.ReadFile(path)
+		if err != nil {
+			return fmt.Errorf("read media migration %s: %w", entry.Name(), err)
+		}
+		if _, err := pool.Exec(ctx, string(content)); err != nil {
+			return fmt.Errorf("apply media migration %s: %w", entry.Name(), err)
+		}
 	}
 	return nil
 }

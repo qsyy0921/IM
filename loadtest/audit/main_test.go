@@ -1,6 +1,9 @@
 package main
 
-import "testing"
+import (
+	"path/filepath"
+	"testing"
+)
 
 func TestSanitizeRunName(t *testing.T) {
 	if got := sanitizeRunName(" audit smoke/one "); got != "audit-smoke-one" {
@@ -18,10 +21,12 @@ func TestPayloadLeaksSensitiveValue(t *testing.T) {
 }
 
 func TestPathInside(t *testing.T) {
-	if !pathInside(`E:\development\IM\loadtest\results`, `E:\development\IM`) {
+	repoRoot := `E:\development\IM`
+	repoLocalResultPath := filepath.Join(repoRoot, "loadtest", "results")
+	if !pathInside(repoLocalResultPath, repoRoot) {
 		t.Fatal("repo-local result path should be detected")
 	}
-	if pathInside(`H:\NexusIM\loadtest-results\audit`, `E:\development\IM`) {
+	if pathInside(`H:\NexusIM\loadtest-results\audit`, repoRoot) {
 		t.Fatal("external H drive result path should be allowed")
 	}
 }

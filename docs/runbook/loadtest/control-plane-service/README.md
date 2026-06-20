@@ -29,3 +29,7 @@
 - 这是 PostgreSQL + gRPC 的最小本地 smoke，不验证 rollback、Kafka relay、
   drift monitor、expiry / cleanup worker 或 api-gateway consumer。
 - control-plane 不进入请求热路径；api-gateway 仍负责 quota 执行和本地 snapshot 校验。
+
+## 已归档报告
+
+- `loadtest-report-20260620-control-plane-grpc-smoke.md`

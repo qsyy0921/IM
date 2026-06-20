@@ -44,7 +44,7 @@ future platform / product services 的 10 个 SDD draft 已存在；media-servic
 notification-service 和 audit-service 已进入 product-active。audit-service 第一版
 proto / migration / grpc runtime / Docker / observability 已落，已覆盖
 Append / Query / Verify proof，并已通过最小 gRPC smoke。control-plane-service
-第一版 Publish / Snapshot / ACK 已落；下一步做 focused gates / smoke。
+第一版 Publish / Snapshot / ACK 和最小 gRPC smoke 已落；下一步做 presence stage-switch。
 ```
 
 系统测试 / HA / 长压 / sizing 后置；总览、待办、单服务状态分别看

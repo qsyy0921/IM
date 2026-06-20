@@ -48,12 +48,12 @@ model-gateway / workflow / knowledge-ingestion / vector-index
   proto / migration / runtime / observability，并已通过最小 gRPC smoke。
 - `control-plane-service` 已切到 product-active，第一实现切片已落
   `PublishConfigVersion` / `GetConfigSnapshot` / `AckAppliedConfigVersion`、
-  proto / migration / runtime / observability。
+  proto / migration / runtime / observability，并已通过最小 gRPC smoke。
 
 ## 下一步
 
-- 默认完成 `control-plane-service` focused gates 和最小 smoke 归档；通过后进入
-  `presence-service` stage-switch 或继续 control-plane outbox relay / drift monitor。
+- 默认进入 `presence-service` stage-switch，或继续 control-plane outbox relay /
+  drift monitor。
 - 也可以继续 notification SMTP / SMS / APNs / FCM adapter 或 bounce-suppression。
 
 ## 硬边界

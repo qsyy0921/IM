@@ -20,4 +20,6 @@ Stage-switch 记录：`docs/runbook/stage-switch/control-plane-service.md`。
 - 具体边界见 `docs/sdd/control-plane-service.md`。
 - Tenant quota / feature flag snapshot 的 DB-backed source 已落。
 - `PublishConfigVersion` / `GetConfigSnapshot` / `AckAppliedConfigVersion` 已落。
+- 最小 gRPC smoke 已通过并归档：
+  `docs/runbook/loadtest/control-plane-service/loadtest-report-20260620-control-plane-grpc-smoke.md`。
 - 与 api-gateway quota snapshot gate 对齐。

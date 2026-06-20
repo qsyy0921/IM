@@ -52,7 +52,7 @@ model-gateway / workflow / knowledge-ingestion / vector-index
   `GetVectorIndexJob`、PostgreSQL metadata、local / PostgreSQL-backed test vector adapter
   和 `vector_outbox -> im.vector.events` 第一版 outbox relay。当前 relay 已覆盖低敏
   Kafka schema、event builder、PostgreSQL outbox store、PENDING / PUBLISHED / retry /
-  DLQ 状态推进和 focused tests；真实 Kafka relay smoke 仍待跑。
+  DLQ 状态推进、focused tests 和 `loadtest/vectorindex` 真实 Kafka relay smoke。
 - `admin-service` 已从 stage-switch 进入 product-active 第一版 implementation
   slice，覆盖 `CreateAdminOperation`、`ApproveAdminOperation`、
   `GetAdminOperation`、`ListAdminOperations`、PostgreSQL operation / approval
@@ -84,8 +84,8 @@ model-gateway / workflow / knowledge-ingestion / vector-index
 
 - 默认继续补更多下游公开 admin API adapter，或为 admin config / quota 增加
   compensation operator。
-- 也可以继续 `vector-index-service` embedding worker / rebuild worker / 真实 Kafka
-  relay smoke / Milvus 或 pgvector backend。
+- 也可以继续 `vector-index-service` embedding worker / rebuild worker / Milvus 或
+  pgvector backend / handoff smoke。
 - 也可以继续 notification SMTP / SMS / APNs / FCM adapter 或 bounce-suppression。
 
 ## 硬边界

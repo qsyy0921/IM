@@ -25,7 +25,10 @@ vector 写入、rebuild 和 backfill 逻辑复杂到影响 retrieval / memory �
 - `vector_outbox -> im.vector.events` 第一版 outbox relay、低敏 Kafka schema、
   PENDING / PUBLISHED / retry / DLQ 状态推进、同 aggregate 顺序阻塞和 focused
   builder / PostgreSQL store 测试。
+- `loadtest/vectorindex` 已覆盖公开 gRPC upsert / tombstone / search、真实 outbox
+  relay 和 Kafka `im.vector.events` readback；runbook 见
+  `docs/runbook/loadtest/vector-index-service/README.md`。
 - 确认 raw text、embedding vector array、source URI、object key 不进入事件 / metrics / relay payload。
 
-后续待办：embedding worker、rebuild worker、真实 Kafka relay smoke、Milvus /
-pgvector / OpenSearch backend、vector-index handoff smoke。
+后续待办：embedding worker、rebuild worker、Milvus / pgvector / OpenSearch
+backend、vector-index handoff smoke。

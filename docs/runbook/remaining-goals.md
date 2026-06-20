@@ -75,8 +75,8 @@ Foundation backlog 锚点：`search-service`、`memory-service`、`retrieval-gat
   cleanup worker。
 - `knowledge-ingestion-service`：后续仍需 parser worker、embedding handoff、
   tombstone / delete proof、outbox relay、vector-index handoff 和真实 connector。
-- `vector-index-service`：后续仍需 embedding worker、rebuild worker、真实 Kafka
-  relay smoke、Milvus / pgvector / OpenSearch backend 和 vector-index handoff smoke。
+- `vector-index-service`：后续仍需 embedding worker、rebuild worker、
+  Milvus / pgvector / OpenSearch backend 和 vector-index handoff smoke。
 - `admin-service`：`REPAIR_REQUEST -> workflow-service REPAIR_APPROVAL`、
   `CRITICAL -> workflow-service ADMIN_OPERATION` 和第一版 operation-specific
   approval policy / target-service routing 已接；`CONFIG_PUBLISH` /

@@ -58,6 +58,10 @@ func (repository *Repository) CreateNotificationRequest(
 		status = types.StatusScheduled
 		nextAttemptAt = command.ScheduledAt.UTC()
 	}
+	secretPayloadCiphertext := command.SecretPayloadCiphertext
+	if secretPayloadCiphertext == nil {
+		secretPayloadCiphertext = []byte{}
+	}
 	row := tx.QueryRow(ctx, `
 INSERT INTO notification_requests (
 	tenant_id,
@@ -138,7 +142,7 @@ RETURNING
 		command.Locale,
 		command.Priority,
 		command.TemplateVariablesJSON,
-		command.SecretPayloadCiphertext,
+		secretPayloadCiphertext,
 		command.SecretPayloadKeyVersion,
 		nullableTime(command.SecretPayloadExpiresAt),
 		status,

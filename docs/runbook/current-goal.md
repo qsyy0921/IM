@@ -43,6 +43,12 @@ vector-index-service
 5. 只有完成对应服务 SDD v0.1 和门禁影响确认后，才把该服务从 `future`
    stage switch 到 active，并创建 `services/<service>`。
 
+## 当前进展
+
+- `docs/sdd/future-platform-services.md` 已冻结组合 promotion 边界。
+- `docs/sdd/media-service.md` 已起草 v0.1 draft；下一步默认推进
+  `notification-service` SDD v0.1。
+
 ## 硬边界
 
 - 不一次性 promotion 全部 future 服务。

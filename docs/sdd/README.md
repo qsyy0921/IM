@@ -13,6 +13,7 @@
 ## 服务 SDD
 
 - `message-service.md`
+- `media-service.md`
 - `conversation-service.md`
 - `conversation-service-member-change-saga.md`
 - `delivery-service.md`

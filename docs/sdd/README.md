@@ -34,6 +34,7 @@
 - `action-executor.md`
 - `ai-eval-service.md`
 - `ai-eval-harness.md`
+- `future-platform-services.md`
 
 ## 通用约束
 

@@ -29,58 +29,34 @@ Keep entrance docs short. Do not copy the same status into every file.
 ## Current Direction
 
 This section is the routing guard. If a future prompt or short Codex goal is
-ambiguous, this wins unless the user gives a more specific request.
+ambiguous, the active slice comes from `docs/runbook/current-goal.md`. Do not
+hard-code the active slice in this file.
 
 ```text
-AI application foundation is the default main line; broad 9-service P2 backlog
-cleanup is not the default development entry:
-group memory -> cross-group/time EvidencePack -> RAG -> summary -> multi-agent
--> skill registry -> MCP/tool gateway -> action executor -> approval/audit
--> AI evaluation.
+Read current-goal.md first, then read only the service brief / SDD needed by
+that active slice.
 ```
 
-The AI/RAG/Agent line is the main product direction; when the user says "continue development", move this chain forward by default.
-Production HA drills, long load tests, sizing, and provider-grade operations are
-hardening backlog unless explicitly named or they expose a P0/P1 blocker.
-The existing IM backend and distributed base are treated as a usable foundation;
-do not choose broad 9-service P2 hardening as the next task unless it blocks the
-AI line or the user explicitly asks for it.
-If the visible Codex goal prompt does not make this main line obvious, update
-`prompt.md`; its first line must name AI application foundation as default.
+The stable Codex goal prompt intentionally does not name the active service or
+priority. Keep concrete scope in `current-goal.md`, not in the goal box.
+Production HA drills, long load tests, sizing, provider-grade operations and
+broad backlog cleanup remain hardening backlog unless explicitly named or they
+block the active slice.
 
 Existing real services: `api-gateway`, `identity-service`, `message-service`,
 `conversation-service`, `delivery-service`, `push-gateway`, `receipt-service`,
 `contacts-service`, and `policy-service`.
 
-Current active slice: `skill-registry` first catalog path, `mcp-gateway`
-first prepare path, `action-executor` first execution audit path, Agent ->
-mcp-gateway adapter smoke, proposal store, approval workflow,
-approval outbox relay, action-executor approved proposal handoff, Agent
-execution eval adapter, low-sensitive tool result projection, local safe tool
-adapter, and proposal approval operator first paths are landed. `agent-service` now calls
-`mcp-gateway.PrepareToolCall`, persists low-sensitive proposal / approval
-metadata, exposes `VerifyApprovedAgentProposal`, and publishes low-sensitive
-`im.agent.events` approval events through the approval outbox relay.
-`action-executor` can execute deterministic low-sensitive `nexusim.local.echo`
-and an explicitly configured LOW-risk external HTTP provider adapter; both record output hash only.
-External MCP/provider fallback is classified as stable low-sensitive failure and unsafe tool output is suppressed. Python AI Worker foundation is landed with the
-`ai/python` directory, reproducible `IM` conda toolchain and candidate contract
-guard. RAG/Summary guarded external HTTP boundary, Python worker safety eval,
-Go-side smoke, RAG/Summary/Agent candidate guards, and action-executor guarded
-external HTTP adapter + eval first paths are landed. Profile / Agent output
-safety expanded eval cases plus the local fixture adapter are landed.
-`ai-eval-service` catalog, gate policy, negative/action/memory evals, and
-memory-service runtime `at_conversation_seq` source-ref / validity /
-supersession query checks, retrieval current-only memory query, RAG /
-Summary / Agent explicit `at_conversation_seq` requests, RAG / Summary / Agent
-current-memory consumption, memory extraction confidence / review, current-memory
-service-stack live smoke, and cross-group / temporal memory fixture eval are
-landed. Cross-group / temporal retrieval, RAG / Summary / Agent stack smokes,
-and optional stack gate are landed. Next: expand low-sensitive collaborative-memory
-cases without widening into broad hardening.
-Search, memory, retrieval, real RAG / summary / Agent adapter smokes, the skill
-catalog foundation, the MCP prepare boundary, and approved proposal preflight
-are passed.
+AI foundation services already landed enough first paths to act as a usable
+base: search, memory, retrieval, RAG, summary, agent, skill-registry,
+mcp-gateway, action-executor and ai-eval. Details live in service briefs and
+progress docs.
+
+Current future-service promotion target lives in `current-goal.md`. It currently
+covers media, notification, audit, admin, control-plane, presence, model-gateway,
+workflow, knowledge-ingestion and vector-index. Promote them service-by-service;
+do not create every future service directory in one change.
+
 AI invariants: separate facts, projections, retrieval and controlled execution.
 Memory requires source refs, scope, validity, supersession, confidence and review state. RAG / summary / Agent consume EvidencePack only;
 actions go through policy, proposal / approval, executor and audit; Python AI
@@ -96,17 +72,16 @@ only the owning document. New work goes into `remaining-goals.md`; promote it to
 
 Prefer:
 
-1. IM semantics required by search / memory / retrieval / Agent.
+1. The active slice in `current-goal.md`.
 2. Security boundaries: public listener guards, mock auth, trusted metadata,
    TLS / mTLS, sensitive data hygiene.
-3. Service hardening from `remaining-goals.md` only when it blocks the current
-   foundation work.
+3. Service hardening from `remaining-goals.md` only when it blocks active work.
 4. Repair / DLQ / audit and operator safety.
-5. Search / group memory / retrieval before RAG or Agent.
+5. Search / memory / retrieval / EvidencePack boundaries before RAG or Agent changes.
 6. Observability, fault smoke, capacity, and complexity governance as
    non-blocking hardening unless requested.
 
-If a candidate task does not move the current main line, treat it as backlog
+If a candidate task does not move the current active slice, treat it as backlog
 unless it is a P0/P1 fix, a user-explicit request, or a small cleanup needed to
 unblock the active slice.
 

@@ -32,6 +32,7 @@ vector-index-service
 
 1. 每轮先读 `prompt.md`、`agent.md`、本文件和相关 service brief。
 2. 先冻结组合边界：哪些服务先做、哪些只保留 port / adapter、哪些需要 ADR。
+   组合边界文档见 `docs/sdd/future-platform-services.md`。
 3. 对每个服务按顺序推进：SDD v0.1 -> proto / migration -> 六层 skeleton
    -> cmd runtime -> Docker / Prometheus / Grafana -> focused smoke。
 4. 第一组优先级建议：

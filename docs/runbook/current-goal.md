@@ -75,8 +75,9 @@ vector-index-service
 - `notification-service` 已补 `notification_outbox -> im.notification.events` 最小
   outbox relay、Kafka protobuf schema、runtime mode、service-registry / compose wiring、
   trigger builder 单测和真实 PostgreSQL relay 集成测试。
-- 下一步默认进入 notification provider worker，或先跑
-  `notification_outbox -> im.notification.events` 真实 Kafka smoke 并归档报告。
+- `notification_outbox -> im.notification.events` 真实 Kafka smoke 已通过，报告见
+  `docs/runbook/loadtest/notification-service/loadtest-report-20260620-notification-outbox-relay-smoke.md`。
+- 下一步默认进入 notification provider worker / provider adapter 边界。
 
 ## 硬边界
 

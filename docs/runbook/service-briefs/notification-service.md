@@ -7,6 +7,8 @@ first implementation slice completed。第一版 proto、migration、六层 skel
 Kafka protobuf schema、runtime mode、service-registry / compose wiring、trigger
 builder 单测和真实 PostgreSQL relay 集成测试已补。当前不宣称 provider-grade
 email / SMS / APNs / FCM。
+`notification_outbox -> im.notification.events` 真实 Kafka smoke 已通过，报告见
+`docs/runbook/loadtest/notification-service/loadtest-report-20260620-notification-outbox-relay-smoke.md`。
 
 Stage-switch 记录：`docs/runbook/stage-switch/notification-service.md`。
 
@@ -29,7 +31,6 @@ bounce handling、provider retry 和通知审计。
 
 下一步：
 
-- 先跑 `notification_outbox -> im.notification.events` 真实 Kafka smoke 并归档报告，
-  或继续做 provider worker。
-- 后续再做 delivery worker、provider adapter、bounce / suppression worker 和
-  provider-grade email / SMS / APNs / FCM。
+- 继续做 provider worker / provider adapter 边界。
+- 后续再做 delivery worker、bounce / suppression worker 和 provider-grade email /
+  SMS / APNs / FCM。

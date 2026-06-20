@@ -19,6 +19,7 @@
 - `admin-service.md`
 - `control-plane-service.md`
 - `presence-service.md`
+- `model-gateway.md`
 - `conversation-service.md`
 - `conversation-service-member-change-saga.md`
 - `delivery-service.md`

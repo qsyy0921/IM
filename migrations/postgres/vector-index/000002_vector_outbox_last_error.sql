@@ -1,0 +1,2 @@
+ALTER TABLE vector_outbox
+    ADD COLUMN IF NOT EXISTS last_error TEXT NOT NULL DEFAULT '';

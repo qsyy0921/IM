@@ -370,7 +370,7 @@ source_ref_hash、chunk_hash、backend_vector_id、trace_id 或 request_id。
 | app unit | caller allowlist、policy deny、embedding failure、idempotency |
 | backend adapter | local vector adapter upsert/search/delete、malformed metadata fail closed |
 | PostgreSQL integration | item + job + tombstone + outbox transaction |
-| event builder | 不输出 raw text、vector array、source URI、hash |
+| event builder / outbox relay | 不输出 raw text、vector array、source URI、object key、secret；只发布低敏 ref / hash metadata |
 | query test | retrieval caller only，post-filter tombstone / visibility |
 | smoke | chunk.ready -> vector indexed -> SearchVectors refs -> tombstone -> no result |
 

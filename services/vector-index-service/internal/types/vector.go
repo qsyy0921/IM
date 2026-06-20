@@ -22,6 +22,8 @@ const (
 	JobTypeRebuild                  = "REBUILD"
 	JobStatusIndexed                = "INDEXED"
 	JobStatusTombstoned             = "TOMBSTONED"
+	OutboxStatusPublished           = "PUBLISHED"
+	OutboxStatusDLQ                 = "DLQ"
 	AllowedCallerKnowledgeIngestion = "knowledge-ingestion-service"
 	AllowedCallerMemory             = "memory-service"
 	AllowedCallerSearch             = "search-service"
@@ -167,6 +169,35 @@ type VectorSearchResult struct {
 	Score             float64
 	VisibilityVersion int64
 	TombstoneStatus   string
+}
+
+type OutboxMessage struct {
+	EventID          string
+	TenantID         TenantID
+	AggregateID      string
+	EventType        string
+	EventVersion     int
+	PartitionKey     string
+	Producer         string
+	PayloadJSON      []byte
+	RetryCount       int
+	OccurredAt       time.Time
+	AggregateVersion int64
+	CorrelationID    string
+	CausationID      string
+	TraceID          string
+}
+
+type OutboxRelayStats struct {
+	Fetched      int
+	Published    int
+	Retried      int
+	DeadLettered int
+}
+
+type KafkaPublishRecord struct {
+	Key   []byte
+	Value []byte
 }
 
 func (command UpsertVectorItemCommand) Normalized() UpsertVectorItemCommand {

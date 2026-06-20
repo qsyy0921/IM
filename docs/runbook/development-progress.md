@@ -96,8 +96,10 @@
   第一版 proto / migration / 六层 skeleton / `grpc` runtime / Docker /
   Prometheus / Grafana 覆盖已落；当前覆盖 `UpsertVectorItem`、
   `TombstoneVectorItem`、`SearchVectors`、`GetVectorIndexJob`、PostgreSQL metadata
-  和 local / PostgreSQL-backed test vector adapter；不宣称 Milvus / pgvector /
-  OpenSearch、embedding worker、rebuild worker 或 outbox relay。
+  和 local / PostgreSQL-backed test vector adapter；`vector_outbox -> im.vector.events`
+  第一版 outbox relay、低敏 Kafka schema、PENDING / PUBLISHED / retry / DLQ 状态推进和
+  focused relay / store tests 已落；不宣称 Milvus / pgvector / OpenSearch、
+  embedding worker、rebuild worker 或真实 Kafka relay smoke。
 - `admin-service` product-active：SDD v0.1 和 stage-switch review 已通过，
   第一版 proto / migration / 六层 skeleton / `grpc` runtime / Docker /
   Prometheus / Grafana 覆盖已落；当前覆盖 `CreateAdminOperation`、

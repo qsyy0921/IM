@@ -18,7 +18,8 @@ $expectedProducerFiles = @(
     "services\message-service\internal\infrastructure\kafka\producer.go",
     "services\notification-service\internal\infrastructure\kafka\producer.go",
     "services\policy-service\internal\infrastructure\kafka\producer.go",
-    "services\receipt-service\internal\infrastructure\kafka\producer.go"
+    "services\receipt-service\internal\infrastructure\kafka\producer.go",
+    "services\vector-index-service\internal\infrastructure\kafka\producer.go"
 )
 
 $requiredSnippets = @(

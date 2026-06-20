@@ -3,7 +3,7 @@ package main
 import "testing"
 
 func TestValidateVectorIndexMode(t *testing.T) {
-	for _, mode := range []string{"noop", "grpc"} {
+	for _, mode := range []string{"noop", "grpc", "outbox-relay"} {
 		if err := validateVectorIndexMode(mode); err != nil {
 			t.Fatalf("mode %s: %v", mode, err)
 		}

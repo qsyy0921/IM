@@ -1,0 +1,59 @@
+syntax = "proto3";
+
+package nexusim.vector.events.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/qsyy0921/IM/schemas/kafka/vector/v1;vectoreventsv1";
+
+// Topic: im.vector.events
+// Partition key: tenant_id + ":" + vector_item_ref_hash
+// Producer: vector-index-service outbox relay
+message VectorEvent {
+  string event_id = 1;
+  string event_type = 2;
+  int32 event_version = 3;
+
+  string tenant_id = 4;
+  string aggregate_type = 5; // "vector_item"
+  string aggregate_id = 6;   // vector_item_ref_hash
+  int64 aggregate_version = 7;
+
+  string partition_key = 8;
+  string trace_id = 9;
+  string correlation_id = 10;
+  string causation_id = 11;
+  string producer = 12;
+  google.protobuf.Timestamp occurred_at = 13;
+
+  oneof payload {
+    VectorItemIndexedV1 item_indexed = 20;
+    VectorItemTombstonedV1 item_tombstoned = 21;
+  }
+}
+
+message VectorItemIndexedV1 {
+  string tenant_id = 1;
+  string vector_item_ref_hash = 2;
+  string collection_type = 3;
+  string source_service = 4;
+  string source_ref_hash = 5;
+  string embedding_model_ref = 6;
+  int32 dimension = 7;
+  int64 visibility_version = 8;
+  string tombstone_status = 9;
+}
+
+message VectorItemTombstonedV1 {
+  string tenant_id = 1;
+  string vector_item_ref_hash = 2;
+  string collection_type = 3;
+  string source_service = 4;
+  string source_ref_hash = 5;
+  string embedding_model_ref = 6;
+  int32 dimension = 7;
+  int64 visibility_version = 8;
+  string tombstone_status = 9;
+  string delete_proof_id = 10;
+  string reason_class = 11;
+}

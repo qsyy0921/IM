@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -169,13 +170,20 @@ func openVectorTestPool(t *testing.T) *pgxpool.Pool {
 
 func applyVectorMigration(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
 	t.Helper()
-	path := filepath.Join("..", "..", "..", "..", "..", "migrations", "postgres", "vector-index", "000001_vector_index_core.sql")
-	content, err := os.ReadFile(path)
+	dir := filepath.Join("..", "..", "..", "..", "..", "migrations", "postgres", "vector-index")
+	files, err := filepath.Glob(filepath.Join(dir, "*.sql"))
 	if err != nil {
-		t.Fatalf("read vector migration: %v", err)
+		t.Fatalf("list vector migrations: %v", err)
 	}
-	if _, err := pool.Exec(ctx, string(content)); err != nil {
-		t.Fatalf("apply vector migration: %v", err)
+	sort.Strings(files)
+	for _, path := range files {
+		content, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("read vector migration %s: %v", path, err)
+		}
+		if _, err := pool.Exec(ctx, string(content)); err != nil {
+			t.Fatalf("apply vector migration %s: %v", path, err)
+		}
 	}
 }
 

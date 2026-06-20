@@ -30,7 +30,8 @@ try {
         "message-service",
         "notification-service",
         "policy-service",
-        "receipt-service"
+        "receipt-service",
+        "vector-index-service"
     )
     if ($summary.producer_count -ne $expectedServices.Count) {
         throw "Kafka producer summary must include $($expectedServices.Count) producer files."

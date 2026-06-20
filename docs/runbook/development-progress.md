@@ -53,7 +53,7 @@ Python Worker 候选接入边界和低敏 eval 持久化已经足够支撑算法
 - `presence-service`（SDD v0.1 draft 已存在）
 - `model-gateway`（SDD v0.1 draft 已存在）
 - `knowledge-ingestion-service`（SDD v0.1 draft 已存在）
-- `workflow-service`
+- `workflow-service`（SDD v0.1 draft 已存在）
 - `vector-index-service`
 
 当前可以采用 multi sub-agent 方式加快后续 AI 底座开发，但只允许拆分互不重叠的服务、文档或验证范围；主 agent 保持最终方案、集成和检查责任。

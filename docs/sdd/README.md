@@ -21,6 +21,7 @@
 - `presence-service.md`
 - `model-gateway.md`
 - `knowledge-ingestion-service.md`
+- `workflow-service.md`
 - `conversation-service.md`
 - `conversation-service-member-change-saga.md`
 - `delivery-service.md`

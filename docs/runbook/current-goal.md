@@ -48,8 +48,10 @@ vector-index-service
 - `docs/sdd/future-platform-services.md` 已冻结组合 promotion 边界。
 - `media-service`、`notification-service`、`audit-service`、`control-plane-service`、
   `admin-service`、`presence-service`、`model-gateway`、
-  `knowledge-ingestion-service` 和 `workflow-service` SDD v0.1 draft 已存在；
-  下一步默认推进 `vector-index-service` SDD v0.1。
+  `knowledge-ingestion-service`、`workflow-service` 和 `vector-index-service`
+  SDD v0.1 draft 已存在。
+- 下一步默认从 `media-service` 开始做 stage-switch 条件复核；确认 SDD 无 P0/P1、
+  边界和门禁影响清楚后，再进入 proto / migration / 六层 skeleton。
 
 ## 硬边界
 

@@ -40,7 +40,7 @@ Go 侧服务底座、EvidencePack、proposal / approval / audit 和 eval 持久�
 当前下一步：
 
 ```text
-media / notification / audit / control-plane / admin / presence / model-gateway / knowledge-ingestion / workflow SDD draft 已存在；下一步推进 vector-index-service SDD
+future platform / product services 的 10 个 SDD draft 已存在；下一步从 media-service 做 stage-switch 复核
 ```
 
 完整系统测试、生产级 HA、长压和 sizing 继续后置为 hardening backlog。

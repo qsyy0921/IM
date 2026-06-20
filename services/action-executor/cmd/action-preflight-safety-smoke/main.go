@@ -201,6 +201,63 @@ func runSmoke(ctx context.Context) (smokeSummary, error) {
 	}
 	cases = append(cases, unapproved)
 
+	rateLimited, err := runCase(ctx, caseConfig{
+		id:       "action-preflight-rate-limited-blocked",
+		skill:    activeSkill(types.LocalSafeEchoToolName, "LOW"),
+		policy:   allowingPolicy(),
+		approval: approvedProposal{},
+		executor: &recordingToolExecutor{
+			result: types.ToolExecutionResult{
+				Executed:   true,
+				OutputJSON: `{"status":"should-not-run"}`,
+			},
+		},
+		limiter: fakeRateLimiter{decision: types.ActionRateLimitDecision{
+			Allowed:        false,
+			Classification: "ACTION_RATE_LIMITED",
+			Reason:         "action rate limited",
+			DecisionSource: "action-executor-rate-limit",
+		}},
+		command: localEchoCommand("LOW"),
+	})
+	if err != nil {
+		return smokeSummary{}, err
+	}
+	if !isBlocked(rateLimited, "ACTION_RATE_LIMITED") || rateLimited.ExecutorCalled {
+		return smokeSummary{}, fmt.Errorf("unexpected rate limited case: %+v", rateLimited)
+	}
+	cases = append(cases, rateLimited)
+
+	limiterUnavailable, err := runCase(ctx, caseConfig{
+		id:       "action-preflight-rate-limit-unavailable-fails-closed",
+		skill:    activeSkill(types.LocalSafeEchoToolName, "LOW"),
+		policy:   allowingPolicy(),
+		approval: approvedProposal{},
+		executor: &recordingToolExecutor{
+			result: types.ToolExecutionResult{
+				Executed:   true,
+				OutputJSON: `{"status":"should-not-run"}`,
+			},
+		},
+		limiter: fakeRateLimiter{err: errors.New("limiter private details must not leak")},
+		command: localEchoCommand("LOW"),
+	})
+	if err != nil {
+		return smokeSummary{}, err
+	}
+	if limiterUnavailable.ExecutionStatus != types.ExecutionStatusFailed ||
+		limiterUnavailable.ResultStatus != types.ResultStatusFailed ||
+		limiterUnavailable.Classification != "ACTION_RATE_LIMIT_UNAVAILABLE" ||
+		limiterUnavailable.Allowed ||
+		limiterUnavailable.Executed ||
+		!limiterUnavailable.AuditRecorded ||
+		!limiterUnavailable.ProjectionRecorded ||
+		limiterUnavailable.OutputSHA256Present ||
+		limiterUnavailable.ExecutorCalled {
+		return smokeSummary{}, fmt.Errorf("unexpected limiter unavailable case: %+v", limiterUnavailable)
+	}
+	cases = append(cases, limiterUnavailable)
+
 	return smokeSummary{
 		SchemaVersion: 1,
 		Adapter:       "action-preflight-safety",
@@ -213,6 +270,7 @@ func runSmoke(ctx context.Context) (smokeSummary, error) {
 			"disabled skills and tool mismatches are blocked before policy/provider execution",
 			"elevated risk local-safe tools remain not executed and hashless",
 			"unapproved proposals fail before audit/result rows are recorded",
+			"rate-limited actions are blocked or fail closed before tool execution",
 		},
 	}, nil
 }
@@ -223,17 +281,19 @@ type caseConfig struct {
 	policy   fakeToolPolicy
 	approval proposalPort
 	executor app.ToolExecutorPort
+	limiter  app.ActionRateLimiterPort
 	command  types.ExecuteApprovedActionCommand
 }
 
 func runCase(ctx context.Context, cfg caseConfig) (smokeCase, error) {
 	audit := &recordingAuditRepository{}
-	usecase := app.NewExecuteApprovedActionUseCaseWithToolExecutor(
+	usecase := app.NewExecuteApprovedActionUseCaseWithToolExecutorAndRateLimiter(
 		fakeSkillCatalog{skill: cfg.skill},
 		cfg.policy,
 		cfg.approval,
 		audit,
 		cfg.executor,
+		cfg.limiter,
 	)
 	result, err := usecase.Execute(ctx, cfg.command)
 	if err != nil {
@@ -450,6 +510,21 @@ func executorCalled(executor app.ToolExecutorPort) bool {
 type recordingDelegatingToolExecutor struct {
 	called   bool
 	delegate app.ToolExecutorPort
+}
+
+type fakeRateLimiter struct {
+	decision types.ActionRateLimitDecision
+	err      error
+}
+
+func (limiter fakeRateLimiter) CheckActionRateLimit(
+	context.Context,
+	types.ActionRateLimitCommand,
+) (types.ActionRateLimitDecision, error) {
+	if limiter.err != nil {
+		return types.ActionRateLimitDecision{}, limiter.err
+	}
+	return limiter.decision, nil
 }
 
 func (executor *recordingDelegatingToolExecutor) ExecuteTool(

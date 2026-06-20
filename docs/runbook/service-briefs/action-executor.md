@@ -12,11 +12,11 @@
 - PostgreSQL `action_executor_execution_audits` 和 `action_executor_tool_results`。
 - 本地安全 `nexusim.local.echo`：仅 `LOW` risk，deterministic 低敏输出，不回显 raw input。
 - 外部 MCP fallback：默认关闭；显式开启后返回稳定低敏失败分类，不落 provider 原文。
-- 外部 HTTP provider adapter：默认关闭；显式 `http` mode + allowlist + `LOW` risk 才执行，
-  只发送 tool metadata / input hash，provider output 继续走 safety gate 和 output hash projection。
+- 外部 HTTP provider adapter：默认关闭；显式 `http` mode + allowlist + `LOW` risk 才执行，只发送 tool metadata / input hash，provider output 继续走 safety gate 和 output hash projection。
 - Tool output safety：malformed / oversize / secret-like / PII-like output fail closed，不入 hash。
 - Docker / Prometheus / Grafana wiring、聚焦测试、PG integration、Agent execution eval adapter、
   external HTTP adapter eval / failure smoke、preflight safety eval。
+- Action rate-limit safety：rate-limited action 在 tool execution 前 `BLOCKED`，rate limiter unavailable 时 fail closed 为 `FAILED`，并进入 action preflight safety eval。
 
 ## 边界
 
@@ -27,4 +27,4 @@
 
 ## 下一步
 
-- rate limit、DLQ / repair safety cases。
+- DLQ / repair safety cases。

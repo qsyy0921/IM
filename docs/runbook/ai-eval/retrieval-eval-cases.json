@@ -533,6 +533,54 @@
       ]
     },
     {
+      "id": "action-preflight-rate-limited-blocked",
+      "family": "action_execution_safety",
+      "stage": "action-executor-preflight-safety",
+      "status": "active",
+      "query": "execute an approved action over the local rate limit",
+      "risk": "Rate-limited actions must stop before tool execution while preserving low-sensitive audit state",
+      "required_assertions": [
+        {
+          "type": "must_classify_action_preflight",
+          "expected_classification": "ACTION_RATE_LIMITED"
+        },
+        {
+          "type": "must_record_execution_audit"
+        },
+        {
+          "type": "must_record_tool_result_projection",
+          "expected_status": "BLOCKED"
+        },
+        {
+          "type": "must_not_execute_external_tool"
+        }
+      ]
+    },
+    {
+      "id": "action-preflight-rate-limit-unavailable-fails-closed",
+      "family": "action_execution_safety",
+      "stage": "action-executor-preflight-safety",
+      "status": "active",
+      "query": "execute an approved action when the rate limiter is unavailable",
+      "risk": "Rate-limit dependency failures must fail closed without leaking internal error text or executing tools",
+      "required_assertions": [
+        {
+          "type": "must_classify_action_preflight",
+          "expected_classification": "ACTION_RATE_LIMIT_UNAVAILABLE"
+        },
+        {
+          "type": "must_record_execution_audit"
+        },
+        {
+          "type": "must_record_tool_result_projection",
+          "expected_status": "FAILED"
+        },
+        {
+          "type": "must_not_execute_external_tool"
+        }
+      ]
+    },
+    {
       "id": "action-external-http-provider-success",
       "family": "action_execution_safety",
       "stage": "action-executor-external-adapter",

@@ -171,8 +171,9 @@ First-stage action-executor preflight safety eval:
 This adapter runs the real action-executor app usecase against in-memory ports
 and the local safe executor. It verifies policy denial, disabled skill, tool
 mismatch, elevated-risk local tool no-execute, and unapproved proposal no-audit
-paths. It does not call real MCP servers, external networks, databases or
-production tools.
+paths, plus rate-limited blocked and rate-limiter-unavailable fail-closed paths.
+It does not call real MCP servers, external networks, databases or production
+tools.
 
 First-stage Python worker output-safety adapter:
 
@@ -306,9 +307,9 @@ no execution, no output hash and no raw provider output persistence.
 The 2026-06-20 Agent output regression added 4 optional Python-worker provider
 cases for grounded candidate success, hash mismatch, citation mismatch and
 worker failure.
-The 2026-06-20 action preflight safety eval added 5 optional action-executor
-cases for policy denial, disabled skill, tool mismatch, elevated local risk and
-unapproved proposal no-audit behavior.
+The 2026-06-20 action preflight safety eval added 7 optional action-executor
+cases for policy denial, disabled skill, tool mismatch, elevated local risk,
+unapproved proposal no-audit behavior and rate-limit fail-closed behavior.
 
 First-stage Go-side Python worker adapter smoke:
 

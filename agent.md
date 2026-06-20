@@ -73,8 +73,8 @@ safety expanded eval cases plus the local fixture adapter are landed.
 `ai-eval-service` catalog, RecordEvalRun recorder, gate policy, Python optional adapter,
 RAG / Agent live gate, CI-safe gate skeleton, negative cases, Summary live negative adapter,
 Python model-output, RAG/Summary citation regressions, external MCP fallback eval,
-Agent output regression and action preflight safety eval are landed. Next:
-action-executor rate limit / DLQ / repair safety cases.
+Agent output regression and action preflight / rate-limit safety eval are landed.
+Next: action-executor DLQ / repair safety cases.
 Search, memory, retrieval, real RAG / summary / Agent adapter smokes, the skill
 catalog foundation, the MCP prepare boundary, and approved proposal preflight
 are passed.

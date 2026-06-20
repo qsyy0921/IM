@@ -19,6 +19,7 @@ type ExecuteApprovedActionUseCase struct {
 	approval ProposalApprovalPort
 	audit    ExecutionAuditRepository
 	executor ToolExecutorPort
+	limiter  ActionRateLimiterPort
 }
 
 func NewExecuteApprovedActionUseCase(
@@ -43,6 +44,24 @@ func NewExecuteApprovedActionUseCaseWithToolExecutor(
 		approval: approval,
 		audit:    audit,
 		executor: executor,
+	}
+}
+
+func NewExecuteApprovedActionUseCaseWithToolExecutorAndRateLimiter(
+	catalog SkillCatalogPort,
+	policy ToolPolicyPort,
+	approval ProposalApprovalPort,
+	audit ExecutionAuditRepository,
+	executor ToolExecutorPort,
+	limiter ActionRateLimiterPort,
+) ExecuteApprovedActionUseCase {
+	return ExecuteApprovedActionUseCase{
+		catalog:  catalog,
+		policy:   policy,
+		approval: approval,
+		audit:    audit,
+		executor: executor,
+		limiter:  limiter,
 	}
 }
 
@@ -113,7 +132,50 @@ func (usecase ExecuteApprovedActionUseCase) Execute(
 	status := types.ExecutionStatusRecorded
 	if !result.Allowed {
 		status = types.ExecutionStatusBlocked
+	} else if usecase.limiter != nil {
+		limitDecision, err := usecase.limiter.CheckActionRateLimit(ctx, types.ActionRateLimitCommand{
+			AuthContext:    command.AuthContext,
+			ToolName:       command.ToolName,
+			Action:         types.ToolActionExecute,
+			ResourceType:   command.ResourceType,
+			ResourceID:     command.ResourceID,
+			RiskLevel:      result.RiskLevel,
+			Intent:         command.Intent,
+			IdempotencyKey: command.IdempotencyKey,
+		})
+		if err != nil {
+			status = types.ExecutionStatusFailed
+			result.Allowed = false
+			result.Classification = "ACTION_RATE_LIMIT_UNAVAILABLE"
+			result.Reason = "action rate limit unavailable"
+			result.DecisionSource = "action-executor-rate-limit"
+			result.Executed = false
+			result.OutputJSON = "{}"
+		} else if !limitDecision.Allowed {
+			status = types.ExecutionStatusBlocked
+			result.Allowed = false
+			result.Classification = nonEmpty(limitDecision.Classification, "ACTION_RATE_LIMITED")
+			result.Reason = nonEmpty(limitDecision.Reason, "action rate limited")
+			result.DecisionSource = nonEmpty(limitDecision.DecisionSource, "action-executor-rate-limit")
+			result.Executed = false
+			result.OutputJSON = "{}"
+		} else if usecase.executor != nil {
+			return usecase.executeToolAndInsertAudit(ctx, command, skill, result, status)
+		}
 	} else if usecase.executor != nil {
+		return usecase.executeToolAndInsertAudit(ctx, command, skill, result, status)
+	}
+	return usecase.insertAudit(ctx, command, result, status)
+}
+
+func (usecase ExecuteApprovedActionUseCase) executeToolAndInsertAudit(
+	ctx context.Context,
+	command types.ExecuteApprovedActionCommand,
+	skill types.SkillDefinition,
+	result types.ExecuteApprovedActionResult,
+	status string,
+) (types.ExecuteApprovedActionResult, error) {
+	if usecase.executor != nil {
 		execution, err := usecase.executor.ExecuteTool(ctx, types.ToolExecutionCommand{
 			AuthContext:  command.AuthContext,
 			Skill:        skill,
@@ -280,6 +342,14 @@ func effectiveRiskLevel(requested string, skillRisk string) string {
 		return requested
 	}
 	return strings.ToUpper(strings.TrimSpace(skillRisk))
+}
+
+func nonEmpty(value string, fallback string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return fallback
+	}
+	return value
 }
 
 func newExecutionID() string {

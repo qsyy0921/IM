@@ -22,6 +22,10 @@ type ToolExecutorPort interface {
 	ExecuteTool(context.Context, types.ToolExecutionCommand) (types.ToolExecutionResult, error)
 }
 
+type ActionRateLimiterPort interface {
+	CheckActionRateLimit(context.Context, types.ActionRateLimitCommand) (types.ActionRateLimitDecision, error)
+}
+
 type ExecutionAuditRepository interface {
 	RecordExecution(context.Context, types.ExecutionAudit, types.ToolResultProjection) error
 }

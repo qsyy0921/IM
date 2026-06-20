@@ -236,6 +236,87 @@ func TestExecuteApprovedActionRejectsUnsafeToolOutputs(t *testing.T) {
 	}
 }
 
+func TestExecuteApprovedActionBlocksRateLimitedActionBeforeToolExecution(t *testing.T) {
+	audit := &fakeAuditRepository{}
+	executor := &fakeToolExecutor{result: types.ToolExecutionResult{
+		Executed:   true,
+		OutputJSON: `{"status":"should-not-run"}`,
+	}}
+	usecase := NewExecuteApprovedActionUseCaseWithToolExecutorAndRateLimiter(
+		fakeSkillCatalog{skill: activeSkill()},
+		allowingPolicy(),
+		fakeApproval{},
+		audit,
+		executor,
+		fakeRateLimiter{decision: types.ActionRateLimitDecision{
+			Allowed:        false,
+			Classification: "ACTION_RATE_LIMITED",
+			Reason:         "action rate limited",
+			DecisionSource: "action-executor-rate-limit",
+		}},
+	)
+	result, err := usecase.Execute(context.Background(), validCommand())
+	if err != nil {
+		t.Fatalf("execute action: %v", err)
+	}
+	if result.Status != types.ExecutionStatusBlocked ||
+		result.ResultStatus != types.ResultStatusBlocked ||
+		result.Allowed ||
+		result.Executed ||
+		result.Classification != "ACTION_RATE_LIMITED" {
+		t.Fatalf("expected rate-limited blocked result, got %+v", result)
+	}
+	if executor.called {
+		t.Fatalf("tool executor should not be called when rate-limited")
+	}
+	if len(audit.rows) != 1 || audit.rows[0].Executed || audit.rows[0].OutputSHA256 != "" {
+		t.Fatalf("expected blocked audit without output hash, got %+v", audit.rows)
+	}
+	if len(audit.results) != 1 || audit.results[0].Status != types.ResultStatusBlocked || audit.results[0].OutputSHA256 != "" {
+		t.Fatalf("expected blocked projection without output hash, got %+v", audit.results)
+	}
+}
+
+func TestExecuteApprovedActionFailsClosedWhenRateLimiterUnavailable(t *testing.T) {
+	audit := &fakeAuditRepository{}
+	executor := &fakeToolExecutor{result: types.ToolExecutionResult{
+		Executed:   true,
+		OutputJSON: `{"status":"should-not-run"}`,
+	}}
+	usecase := NewExecuteApprovedActionUseCaseWithToolExecutorAndRateLimiter(
+		fakeSkillCatalog{skill: activeSkill()},
+		allowingPolicy(),
+		fakeApproval{},
+		audit,
+		executor,
+		fakeRateLimiter{err: errors.New("limiter store unavailable: private details")},
+	)
+	result, err := usecase.Execute(context.Background(), validCommand())
+	if err != nil {
+		t.Fatalf("execute action: %v", err)
+	}
+	if result.Status != types.ExecutionStatusFailed ||
+		result.ResultStatus != types.ResultStatusFailed ||
+		result.Allowed ||
+		result.Executed ||
+		result.Classification != "ACTION_RATE_LIMIT_UNAVAILABLE" ||
+		result.Reason != "action rate limit unavailable" {
+		t.Fatalf("expected fail-closed limiter result, got %+v", result)
+	}
+	if executor.called {
+		t.Fatalf("tool executor should not be called when limiter fails")
+	}
+	if strings.Contains(result.Reason, "private details") || strings.Contains(result.Classification, "private details") {
+		t.Fatalf("limiter internal error leaked into public fields: %+v", result)
+	}
+	if len(audit.rows) != 1 || audit.rows[0].Status != types.ExecutionStatusFailed || audit.rows[0].OutputSHA256 != "" {
+		t.Fatalf("expected failed audit without output hash, got %+v", audit.rows)
+	}
+	if len(audit.results) != 1 || audit.results[0].Status != types.ResultStatusFailed || audit.results[0].OutputSHA256 != "" {
+		t.Fatalf("expected failed projection without output hash, got %+v", audit.results)
+	}
+}
+
 func TestExecuteApprovedActionRequiresApprovalAndPreparedAudit(t *testing.T) {
 	command := validCommand()
 	command.ApprovalID = ""
@@ -422,15 +503,32 @@ type fakeToolExecutor struct {
 	command types.ToolExecutionCommand
 	result  types.ToolExecutionResult
 	err     error
+	called  bool
 }
 
 func (executor *fakeToolExecutor) ExecuteTool(
 	_ context.Context,
 	command types.ToolExecutionCommand,
 ) (types.ToolExecutionResult, error) {
+	executor.called = true
 	executor.command = command
 	if executor.err != nil {
 		return types.ToolExecutionResult{}, executor.err
 	}
 	return executor.result, nil
+}
+
+type fakeRateLimiter struct {
+	decision types.ActionRateLimitDecision
+	err      error
+}
+
+func (limiter fakeRateLimiter) CheckActionRateLimit(
+	context.Context,
+	types.ActionRateLimitCommand,
+) (types.ActionRateLimitDecision, error) {
+	if limiter.err != nil {
+		return types.ActionRateLimitDecision{}, limiter.err
+	}
+	return limiter.decision, nil
 }

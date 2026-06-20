@@ -140,6 +140,25 @@ type ToolPolicyDecision struct {
 	DecisionSource    string
 }
 
+type ActionRateLimitCommand struct {
+	AuthContext    AuthContext
+	ToolName       string
+	Action         string
+	ResourceType   string
+	ResourceID     string
+	RiskLevel      string
+	Intent         string
+	IdempotencyKey string
+}
+
+type ActionRateLimitDecision struct {
+	Allowed        bool
+	LimitKey       string
+	Classification string
+	Reason         string
+	DecisionSource string
+}
+
 type VerifyApprovedProposalCommand struct {
 	AuthContext     AuthContext
 	ProposalID      string

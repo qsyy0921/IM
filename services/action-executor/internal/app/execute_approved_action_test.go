@@ -317,6 +317,43 @@ func TestExecuteApprovedActionFailsClosedWhenRateLimiterUnavailable(t *testing.T
 	}
 }
 
+func TestExecuteApprovedActionBlocksRepairOrDLQActionBeforeToolExecution(t *testing.T) {
+	audit := &fakeAuditRepository{}
+	executor := &fakeToolExecutor{result: types.ToolExecutionResult{
+		Executed:   true,
+		OutputJSON: `{"status":"should-not-run"}`,
+	}}
+	usecase := NewExecuteApprovedActionUseCaseWithToolExecutorAndRateLimiter(
+		fakeSkillCatalog{skill: activeRepairSkill()},
+		allowingPolicy(),
+		fakeApproval{},
+		audit,
+		executor,
+		fakeRateLimiter{decision: types.ActionRateLimitDecision{Allowed: true}},
+	)
+	result, err := usecase.Execute(context.Background(), repairCommand())
+	if err != nil {
+		t.Fatalf("execute action: %v", err)
+	}
+	if result.Status != types.ExecutionStatusBlocked ||
+		result.ResultStatus != types.ResultStatusBlocked ||
+		result.Allowed ||
+		result.Executed ||
+		result.Classification != "ACTION_REPAIR_REQUIRES_OPERATOR" ||
+		result.Reason != "repair action requires operator workflow" {
+		t.Fatalf("expected repair guard blocked result, got %+v", result)
+	}
+	if executor.called {
+		t.Fatalf("tool executor should not be called for repair/DLQ actions")
+	}
+	if len(audit.rows) != 1 || audit.rows[0].Executed || audit.rows[0].OutputSHA256 != "" {
+		t.Fatalf("expected repair guard audit without output hash, got %+v", audit.rows)
+	}
+	if len(audit.results) != 1 || audit.results[0].Status != types.ResultStatusBlocked || audit.results[0].OutputSHA256 != "" {
+		t.Fatalf("expected blocked projection without output hash, got %+v", audit.results)
+	}
+}
+
 func TestExecuteApprovedActionRequiresApprovalAndPreparedAudit(t *testing.T) {
 	command := validCommand()
 	command.ApprovalID = ""
@@ -410,6 +447,22 @@ func validCommand() types.ExecuteApprovedActionCommand {
 	}
 }
 
+func repairCommand() types.ExecuteApprovedActionCommand {
+	command := validCommand()
+	command.ProposalID = "proposal-repair-1"
+	command.ApprovalID = "approval-repair-1"
+	command.PreparedAuditID = "mcp-audit-repair-1"
+	command.SkillID = "skill-repair-1"
+	command.ToolName = "delivery.outbox.repair"
+	command.ResourceType = "delivery_outbox_dlq"
+	command.ResourceID = "repair-target-present"
+	command.RiskLevel = "HIGH"
+	command.Intent = "operator-approved repair"
+	command.InputJSON = `{"repair_id":"fixture"}`
+	command.IdempotencyKey = "idem-repair-1"
+	return command
+}
+
 func activeSkill() types.SkillDefinition {
 	return types.SkillDefinition{
 		TenantID:         "tenant-1",
@@ -420,6 +473,14 @@ func activeSkill() types.SkillDefinition {
 		RiskLevel:        "LOW",
 		RequiresApproval: true,
 	}
+}
+
+func activeRepairSkill() types.SkillDefinition {
+	skill := activeSkill()
+	skill.SkillID = "skill-repair-1"
+	skill.ToolName = "delivery.outbox.repair"
+	skill.RiskLevel = "HIGH"
+	return skill
 }
 
 func allowingPolicy() fakeToolPolicy {

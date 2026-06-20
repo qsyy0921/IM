@@ -581,6 +581,74 @@
       ]
     },
     {
+      "id": "action-preflight-dlq-repair-operator-required",
+      "family": "action_execution_safety",
+      "stage": "action-executor-preflight-safety",
+      "status": "active",
+      "query": "execute an approved DLQ repair action through a generic tool adapter",
+      "risk": "DLQ and repair actions must not run through generic action adapters without an operator workflow",
+      "required_assertions": [
+        {
+          "type": "must_classify_action_preflight",
+          "expected_classification": "ACTION_REPAIR_REQUIRES_OPERATOR"
+        },
+        {
+          "type": "must_record_execution_audit"
+        },
+        {
+          "type": "must_record_tool_result_projection",
+          "expected_status": "BLOCKED"
+        },
+        {
+          "type": "must_not_execute_external_tool"
+        }
+      ]
+    },
+    {
+      "id": "action-preflight-dlq-repair-policy-denied",
+      "family": "action_execution_safety",
+      "stage": "action-executor-preflight-safety",
+      "status": "active",
+      "query": "execute a DLQ repair action denied by tool policy",
+      "risk": "DLQ and repair actions must remain blocked by policy before any tool execution",
+      "required_assertions": [
+        {
+          "type": "must_classify_action_preflight",
+          "expected_classification": "TOOL_DENIED"
+        },
+        {
+          "type": "must_record_execution_audit"
+        },
+        {
+          "type": "must_record_tool_result_projection",
+          "expected_status": "BLOCKED"
+        },
+        {
+          "type": "must_not_execute_external_tool"
+        }
+      ]
+    },
+    {
+      "id": "action-preflight-dlq-repair-unapproved-no-audit",
+      "family": "action_execution_safety",
+      "stage": "action-executor-preflight-safety",
+      "status": "active",
+      "query": "execute a DLQ repair action without approved proposal state",
+      "risk": "Unapproved DLQ and repair actions must stop before execution audit/result state is created",
+      "required_assertions": [
+        {
+          "type": "must_classify_action_preflight",
+          "expected_error_class": "PROPOSAL_NOT_APPROVED"
+        },
+        {
+          "type": "must_not_create_approval_or_execution"
+        },
+        {
+          "type": "must_not_execute_external_tool"
+        }
+      ]
+    },
+    {
       "id": "action-external-http-provider-success",
       "family": "action_execution_safety",
       "stage": "action-executor-external-adapter",

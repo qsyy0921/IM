@@ -132,6 +132,14 @@ func (usecase ExecuteApprovedActionUseCase) Execute(
 	status := types.ExecutionStatusRecorded
 	if !result.Allowed {
 		status = types.ExecutionStatusBlocked
+	} else if isRepairOrDLQAction(command) {
+		status = types.ExecutionStatusBlocked
+		result.Allowed = false
+		result.Classification = "ACTION_REPAIR_REQUIRES_OPERATOR"
+		result.Reason = "repair action requires operator workflow"
+		result.DecisionSource = "action-executor-repair-guard"
+		result.Executed = false
+		result.OutputJSON = "{}"
 	} else if usecase.limiter != nil {
 		limitDecision, err := usecase.limiter.CheckActionRateLimit(ctx, types.ActionRateLimitCommand{
 			AuthContext:    command.AuthContext,
@@ -342,6 +350,27 @@ func effectiveRiskLevel(requested string, skillRisk string) string {
 		return requested
 	}
 	return strings.ToUpper(strings.TrimSpace(skillRisk))
+}
+
+func isRepairOrDLQAction(command types.ExecuteApprovedActionCommand) bool {
+	return containsRepairOrDLQToken(command.ToolName) ||
+		containsRepairOrDLQToken(command.ResourceType)
+}
+
+func containsRepairOrDLQToken(value string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(value))
+	normalized = strings.ReplaceAll(normalized, "-", "_")
+	normalized = strings.ReplaceAll(normalized, ".", "_")
+	normalized = strings.ReplaceAll(normalized, "/", "_")
+	for _, token := range strings.FieldsFunc(normalized, func(r rune) bool {
+		return r == '_' || r == ':' || r == ' '
+	}) {
+		switch token {
+		case "repair", "redrive", "dlq":
+			return true
+		}
+	}
+	return strings.Contains(normalized, "dead_letter") || strings.Contains(normalized, "deadletter")
 }
 
 func nonEmpty(value string, fallback string) string {

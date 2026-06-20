@@ -36,13 +36,13 @@ group memory -> EvidencePack -> RAG -> summary -> multi-agent
   service-stack version / hash-only expansion、negative RAG / Agent cases、
   Summary live negative adapter、Python / model-output negative regression cases、
   RAG / Summary citation source-ref regression、external MCP fallback eval cases、
-  Agent output regression、action preflight / rate-limit safety eval 和报告：
+  Agent output regression、action preflight / rate-limit / DLQ-repair safety eval 和报告：
   `docs/runbook/loadtest/ai-eval-service/`。
 
 下一步默认推进：
 
 ```text
-继续扩 action-executor DLQ / repair safety cases
+继续扩 action-executor provider retry / DLQ first-stage design skeleton
 ```
 
 硬边界：RAG / summary / Agent 只能消费 EvidencePack；真实写动作必须走

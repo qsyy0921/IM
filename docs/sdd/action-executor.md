@@ -48,6 +48,10 @@
   permission-denied / failed 等稳定分类，不保存 provider 原始错误。
 - 所有 adapter output 进入响应 / hash 前必须经过安全门禁：
   valid JSON object、大小限制、无 secret-like / PII-like key 或 value。
+- 明显的 repair / redrive / DLQ / dead-letter 类 tool / resource 元数据会被
+  first-stage repair guard 拦截为 `ACTION_REPAIR_REQUIRES_OPERATOR`，不能通过
+  通用 action adapter 执行；后续真实 repair 仍走专门 operator / approval
+  workflow。
 
 ## 非职责
 
@@ -130,6 +134,9 @@ agent-service proposal
   `output_sha256`，响应只返回 `{}`。
 - `input_json` 只校验 JSON 和大小，audit 只保存 hash。
 - policy deny 必须 fail closed 并落低敏 audit。
+- repair / redrive / DLQ / dead-letter 类动作即使 proposal 和 policy 允许，
+  第一阶段也必须停在 `ACTION_REPAIR_REQUIRES_OPERATOR`，不调用通用 tool
+  adapter、不写 output hash。
 - tool result projection 不是 provider 输出存储；当前只记录
   `NOT_EXECUTED` / `BLOCKED` / `SUCCEEDED` 等低敏状态引用和 output hash。
 - 当前外部 HTTP adapter 只证明 guarded first path，不代表任意 MCP server、
@@ -160,5 +167,5 @@ agent-service proposal
 
 - 接入更完整的真实外部 MCP adapter / tool provider。
 - per tenant / per tool rate limit。
-- provider retry / DLQ。
+- provider retry / DLQ 和正式 repair operator handoff。
 - 外部 audit sink。

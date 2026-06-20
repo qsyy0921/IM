@@ -89,7 +89,7 @@ func parseConfig(args []string) (smokeConfig, error) {
 }
 
 func runSmoke(ctx context.Context) (smokeSummary, error) {
-	cases := make([]smokeCase, 0, 5)
+	cases := make([]smokeCase, 0, 10)
 
 	policyDenied, err := runCase(ctx, caseConfig{
 		id:       "action-preflight-policy-denied",
@@ -258,6 +258,74 @@ func runSmoke(ctx context.Context) (smokeSummary, error) {
 	}
 	cases = append(cases, limiterUnavailable)
 
+	repairGuard, err := runCase(ctx, caseConfig{
+		id:       "action-preflight-dlq-repair-operator-required",
+		skill:    activeRepairSkill(),
+		policy:   allowingPolicy(),
+		approval: approvedProposal{},
+		executor: &recordingToolExecutor{
+			result: types.ToolExecutionResult{
+				Executed:   true,
+				OutputJSON: `{"status":"should-not-run"}`,
+			},
+		},
+		limiter: fakeRateLimiter{decision: types.ActionRateLimitDecision{Allowed: true}},
+		command: repairCommand(),
+	})
+	if err != nil {
+		return smokeSummary{}, err
+	}
+	if !isBlocked(repairGuard, "ACTION_REPAIR_REQUIRES_OPERATOR") || repairGuard.ExecutorCalled {
+		return smokeSummary{}, fmt.Errorf("unexpected repair guard case: %+v", repairGuard)
+	}
+	cases = append(cases, repairGuard)
+
+	repairPolicyDenied, err := runCase(ctx, caseConfig{
+		id:       "action-preflight-dlq-repair-policy-denied",
+		skill:    activeRepairSkill(),
+		policy:   deniedPolicy(),
+		approval: approvedProposal{},
+		executor: &recordingToolExecutor{
+			result: types.ToolExecutionResult{
+				Executed:   true,
+				OutputJSON: `{"status":"should-not-run"}`,
+			},
+		},
+		command: repairCommand(),
+	})
+	if err != nil {
+		return smokeSummary{}, err
+	}
+	if !isBlocked(repairPolicyDenied, "TOOL_DENIED") || repairPolicyDenied.ExecutorCalled {
+		return smokeSummary{}, fmt.Errorf("unexpected repair policy denied case: %+v", repairPolicyDenied)
+	}
+	cases = append(cases, repairPolicyDenied)
+
+	repairUnapproved, err := runCase(ctx, caseConfig{
+		id:       "action-preflight-dlq-repair-unapproved-no-audit",
+		skill:    activeRepairSkill(),
+		policy:   allowingPolicy(),
+		approval: rejectedProposal{err: types.ErrProposalNotApproved},
+		executor: &recordingToolExecutor{
+			result: types.ToolExecutionResult{
+				Executed:   true,
+				OutputJSON: `{"status":"should-not-run"}`,
+			},
+		},
+		command: repairCommand(),
+	})
+	if err != nil {
+		return smokeSummary{}, err
+	}
+	if repairUnapproved.ErrorClass != "PROPOSAL_NOT_APPROVED" ||
+		repairUnapproved.AuditRecorded ||
+		repairUnapproved.ProjectionRecorded ||
+		repairUnapproved.ExecutorCalled ||
+		repairUnapproved.Executed {
+		return smokeSummary{}, fmt.Errorf("unexpected repair unapproved case: %+v", repairUnapproved)
+	}
+	cases = append(cases, repairUnapproved)
+
 	return smokeSummary{
 		SchemaVersion: 1,
 		Adapter:       "action-preflight-safety",
@@ -271,6 +339,7 @@ func runSmoke(ctx context.Context) (smokeSummary, error) {
 			"elevated risk local-safe tools remain not executed and hashless",
 			"unapproved proposals fail before audit/result rows are recorded",
 			"rate-limited actions are blocked or fail closed before tool execution",
+			"DLQ/repair actions require operator workflow and cannot bypass policy or approval",
 		},
 	}, nil
 }
@@ -361,6 +430,21 @@ func localEchoCommand(riskLevel string) types.ExecuteApprovedActionCommand {
 	}
 }
 
+func repairCommand() types.ExecuteApprovedActionCommand {
+	command := localEchoCommand("HIGH")
+	command.ProposalID = "proposal-action-preflight-repair"
+	command.ApprovalID = "approval-action-preflight-repair"
+	command.PreparedAuditID = "mcp-audit-action-preflight-repair"
+	command.SkillID = "delivery.outbox.repair"
+	command.ToolName = "delivery.outbox.repair"
+	command.ResourceType = "delivery_outbox_dlq"
+	command.ResourceID = "repair-target-present"
+	command.Intent = "operator approved repair smoke"
+	command.InputJSON = `{"repair_id":"fixture"}`
+	command.IdempotencyKey = "action-preflight-repair-safety"
+	return command
+}
+
 func activeSkill(toolName string, riskLevel string) types.SkillDefinition {
 	return types.SkillDefinition{
 		TenantID:         "tenant-action-preflight",
@@ -371,6 +455,12 @@ func activeSkill(toolName string, riskLevel string) types.SkillDefinition {
 		RiskLevel:        riskLevel,
 		RequiresApproval: true,
 	}
+}
+
+func activeRepairSkill() types.SkillDefinition {
+	skill := activeSkill("delivery.outbox.repair", "HIGH")
+	skill.SkillID = "delivery.outbox.repair"
+	return skill
 }
 
 func disabledSkill(toolName string, riskLevel string) types.SkillDefinition {

@@ -26,6 +26,14 @@ type config struct {
 	traceID           string
 	requestID         string
 	operationID       string
+	operatorRef       string
+	operatorRole      string
+	targetRefHash     string
+	riskLevel         string
+	payloadSchema     string
+	operationPayload  string
+	payloadFile       string
+	payloadLoadError  error
 	approverRef       string
 	approverRole      string
 	decision          string
@@ -91,7 +99,7 @@ func main() {
 func parseFlags(args []string) config {
 	cfg := config{}
 	flags := flag.NewFlagSet("admin-operator", flag.ExitOnError)
-	flags.StringVar(&cfg.mode, "mode", "approve", "mode: approve, reject, get, or list")
+	flags.StringVar(&cfg.mode, "mode", "approve", "mode: create, approve, reject, get, or list")
 	flags.StringVar(&cfg.target, "target", envOr("NEXUSIM_ADMIN_GRPC_ADDR", "127.0.0.1:10770"), "admin-service gRPC target")
 	flags.DurationVar(&cfg.requestTimeout, "request-timeout", 5*time.Second, "request timeout")
 	flags.StringVar(&cfg.tls.CAFile, "admin-tls-ca-file", os.Getenv("NEXUSIM_ADMIN_TLS_CA_FILE"), "CA PEM for admin-service gRPC TLS")
@@ -104,6 +112,13 @@ func parseFlags(args []string) config {
 	flags.StringVar(&cfg.traceID, "trace-id", "", "trace id")
 	flags.StringVar(&cfg.requestID, "request-id", "", "request id")
 	flags.StringVar(&cfg.operationID, "operation-id", "", "admin operation id")
+	flags.StringVar(&cfg.operatorRef, "operator-ref", "operator:cli", "operator ref for create")
+	flags.StringVar(&cfg.operatorRole, "operator-role", "ADMIN", "operator role for create")
+	flags.StringVar(&cfg.targetRefHash, "target-ref-hash", "sha256:operator-cli-target", "low-sensitive target ref hash")
+	flags.StringVar(&cfg.riskLevel, "risk-level", "MEDIUM", "operation risk level")
+	flags.StringVar(&cfg.payloadSchema, "payload-schema-version", "", "operation payload schema version")
+	flags.StringVar(&cfg.operationPayload, "operation-payload-json", "", "operation payload JSON; not printed in output")
+	flags.StringVar(&cfg.payloadFile, "operation-payload-file", "", "path to operation payload JSON file; not printed in output")
 	flags.StringVar(&cfg.approverRef, "approver-ref", "operator:cli", "approver ref")
 	flags.StringVar(&cfg.approverRole, "approver-role", "ADMIN", "approver role")
 	flags.StringVar(&cfg.decision, "decision", "APPROVE", "approval decision")
@@ -120,12 +135,24 @@ func parseFlags(args []string) config {
 	cfg.pageSize = int32(pageSize)
 	cfg.mode = strings.ToLower(strings.TrimSpace(cfg.mode))
 	cfg.decision = strings.ToUpper(strings.TrimSpace(cfg.decision))
+	cfg.riskLevel = strings.ToUpper(strings.TrimSpace(cfg.riskLevel))
 	cfg.evidenceRefs = splitCSV(evidenceRefs)
+	cfg.operationPayload = strings.TrimSpace(cfg.operationPayload)
+	if cfg.operationPayload == "" && strings.TrimSpace(cfg.payloadFile) != "" {
+		if content, err := os.ReadFile(strings.TrimSpace(cfg.payloadFile)); err == nil {
+			cfg.operationPayload = strings.TrimSpace(string(content))
+		} else {
+			cfg.payloadLoadError = err
+		}
+	}
 	if cfg.requestID == "" {
 		cfg.requestID = "admin-operator-" + cfg.mode
 	}
 	if cfg.traceID == "" {
 		cfg.traceID = cfg.requestID
+	}
+	if cfg.idempotencyKey == "" && cfg.mode == "create" {
+		cfg.idempotencyKey = "create:" + cfg.operationType + ":" + cfg.targetRefHash + ":" + cfg.operatorRef
 	}
 	if cfg.idempotencyKey == "" && (cfg.mode == "approve" || cfg.mode == "reject") {
 		cfg.idempotencyKey = cfg.mode + ":" + cfg.operationID + ":" + cfg.approverRef
@@ -166,6 +193,28 @@ func execute(ctx context.Context, cfg config, client adminv1.AdminServiceClient)
 		CheckedAt: time.Now().UTC(),
 	}
 	switch cfg.mode {
+	case "create":
+		response, err := client.CreateAdminOperation(ctx, &adminv1.CreateAdminOperationRequest{
+			AuthContext:          authContext(cfg),
+			OperatorRef:          cfg.operatorRef,
+			OperatorRole:         cfg.operatorRole,
+			OperationType:        cfg.operationType,
+			TargetRefHash:        cfg.targetRefHash,
+			RiskLevel:            cfg.riskLevel,
+			PayloadSchemaVersion: cfg.payloadSchema,
+			OperationPayloadJson: cfg.operationPayload,
+			ReasonRef:            cfg.reasonRef,
+			EvidenceRefs:         append([]string(nil), cfg.evidenceRefs...),
+			IdempotencyKey:       cfg.idempotencyKey,
+			CorrelationId:        cfg.requestID,
+			CausationId:          cfg.operationType,
+			TraceId:              cfg.traceID,
+		})
+		if err != nil {
+			return commandResult{}, fmt.Errorf("create admin operation: %w", err)
+		}
+		result.Operation = summarizeOperation(response.GetOperation())
+		result.Replayed = response.GetReplayed()
 	case "approve", "reject":
 		decision := cfg.decision
 		if cfg.mode == "reject" {
@@ -235,6 +284,37 @@ func (cfg config) validate() error {
 		return errors.New("--request-timeout must be positive")
 	}
 	switch cfg.mode {
+	case "create":
+		if cfg.payloadLoadError != nil {
+			return fmt.Errorf("read --operation-payload-file: %w", cfg.payloadLoadError)
+		}
+		if strings.TrimSpace(cfg.operatorRef) == "" {
+			return errors.New("--operator-ref is required")
+		}
+		if strings.TrimSpace(cfg.operatorRole) == "" {
+			return errors.New("--operator-role is required")
+		}
+		if strings.TrimSpace(cfg.operationType) == "" {
+			return errors.New("--operation-type is required")
+		}
+		if strings.TrimSpace(cfg.targetRefHash) == "" {
+			return errors.New("--target-ref-hash is required")
+		}
+		if strings.TrimSpace(cfg.riskLevel) == "" {
+			return errors.New("--risk-level is required")
+		}
+		if strings.TrimSpace(cfg.payloadSchema) == "" {
+			return errors.New("--payload-schema-version is required")
+		}
+		if strings.TrimSpace(cfg.operationPayload) == "" {
+			return errors.New("--operation-payload-json or --operation-payload-file is required")
+		}
+		if !json.Valid([]byte(cfg.operationPayload)) {
+			return errors.New("--operation-payload-json must be valid JSON")
+		}
+		if strings.TrimSpace(cfg.idempotencyKey) == "" {
+			return errors.New("--idempotency-key is required")
+		}
 	case "approve", "reject":
 		if strings.TrimSpace(cfg.operationID) == "" {
 			return errors.New("--operation-id is required")
@@ -254,7 +334,7 @@ func (cfg config) validate() error {
 			return errors.New("--page-size must be positive")
 		}
 	default:
-		return fmt.Errorf("--mode must be approve, reject, get, or list")
+		return fmt.Errorf("--mode must be create, approve, reject, get, or list")
 	}
 	return nil
 }

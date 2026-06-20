@@ -7,6 +7,24 @@
 
 工具：
 
+创建 operation：
+
+```powershell
+go run ./loadtest/admin -mode create `
+  -target 127.0.0.1:10770 `
+  -tenant-id tenant-admin `
+  -operation-type CONFIG_PUBLISH `
+  -target-ref-hash sha256:quota-target `
+  -risk-level MEDIUM `
+  -payload-schema-version admin.config_publish.v1 `
+  -operation-payload-file H:\NexusIM\loadtest-results\admin\config-publish-payload.json `
+  -operator-ref operator:alice `
+  -reason-ref reason:ticket-123 `
+  -evidence-refs evidence:ticket-123
+```
+
+审批 operation：
+
 ```powershell
 go run ./loadtest/admin -mode approve `
   -target 127.0.0.1:10770 `
@@ -21,6 +39,7 @@ go run ./loadtest/admin -mode approve `
 支持模式：
 
 ```text
+create
 approve
 reject
 get
@@ -33,6 +52,8 @@ list
 - 不读取 PostgreSQL 私表，也不直接执行业务 mutation。
 - 输出低敏 JSON：operation / approval id、状态、hash/ref、时间戳；不输出
   `operation_payload_json`、reason 原文、EvidencePack 正文或下游 response body。
+- `create` 可通过 `-operation-payload-file` 读取 payload；原始 payload 文件应放在
+  `H:\NexusIM\loadtest-results`，不要放进仓库。
 - 支持 `-admin-tls-*` 参数连接 TLS / mTLS gRPC 端点；不配置时用于本地 insecure
   smoke / operator 演示。
 

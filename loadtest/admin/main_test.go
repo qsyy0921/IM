@@ -42,6 +42,49 @@ func TestParseFlagsBuildsApprovalDefaults(t *testing.T) {
 	}
 }
 
+func TestParseFlagsBuildsCreateDefaults(t *testing.T) {
+	cfg := parseFlags([]string{
+		"-mode", "create",
+		"-operation-type", "CONFIG_PUBLISH",
+		"-target-ref-hash", "sha256:quota-target",
+		"-payload-schema-version", "admin.config_publish.v1",
+		"-operation-payload-json", `{"environment":"local","config_kind":"quota","bundle_key":"api-gateway.default","version":"v1","schema_version":"control-plane.quota.v1","payload_json":"{}"}`,
+		"-operator-ref", "operator:alice",
+	})
+	if cfg.mode != "create" {
+		t.Fatalf("mode = %q", cfg.mode)
+	}
+	if cfg.riskLevel != "MEDIUM" {
+		t.Fatalf("risk = %q", cfg.riskLevel)
+	}
+	if cfg.idempotencyKey != "create:CONFIG_PUBLISH:sha256:quota-target:operator:alice" {
+		t.Fatalf("idempotency key = %q", cfg.idempotencyKey)
+	}
+	if err := cfg.validate(); err != nil {
+		t.Fatalf("validate: %v", err)
+	}
+}
+
+func TestValidateRejectsInvalidCreatePayloadJSON(t *testing.T) {
+	cfg := config{
+		mode:             "create",
+		target:           "127.0.0.1:10770",
+		tenantID:         "tenant",
+		operatorRef:      "operator:alice",
+		operatorRole:     "ADMIN",
+		operationType:    "CONFIG_PUBLISH",
+		targetRefHash:    "sha256:quota-target",
+		riskLevel:        "MEDIUM",
+		payloadSchema:    "admin.config_publish.v1",
+		operationPayload: "{not-json",
+		idempotencyKey:   "idem",
+		requestTimeout:   1,
+	}
+	if err := cfg.validate(); err == nil {
+		t.Fatal("expected validation error")
+	}
+}
+
 func TestValidateRejectsMissingOperationForApproval(t *testing.T) {
 	cfg := config{
 		mode:           "approve",

@@ -36,8 +36,8 @@
 - Operation worker 覆盖 worker unit、executor risk routing、workflow RPC executor
   unit、真实 PostgreSQL result / outbox integration、`operation-worker` cmd mode、
   worker registry 和本地 compose wiring。
-- 已新增 `loadtest/admin` operator CLI，支持通过公开 gRPC 执行 approve / reject /
-  get / list，本地输出低敏 JSON，不读数据库私表。
+- 已新增 `loadtest/admin` operator CLI，支持通过公开 gRPC 执行 create / approve /
+  reject / get / list，本地输出低敏 JSON，不读数据库私表。
 - 已新增第一条真实下游公开 API adapter：非 `CRITICAL` 的 `CONFIG_PUBLISH`
   在配置 `NEXUSIM_CONTROL_PLANE_GRPC_ADDR` 后由 operation-worker 调
   `control-plane-service.PublishConfigVersion`；未配置时保留本地 first-stage

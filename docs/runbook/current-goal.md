@@ -59,8 +59,8 @@ model-gateway / workflow / knowledge-ingestion / vector-index
   `ADMIN_OPERATION`，并为 config / quota / policy / audit / notification 类操作写入
   第一版专用 approval policy 和 target service；未配置 workflow 时
   `REPAIR_REQUEST` / `CRITICAL` 操作 fail-closed，不再被本地 no-op executor 标记成功。
-- `admin-service` 已新增 `loadtest/admin` operator CLI，用公开 gRPC 完成 approve /
-  reject / get / list，输出低敏 JSON，不读取私表。
+- `admin-service` 已新增 `loadtest/admin` operator CLI，用公开 gRPC 完成 create /
+  approve / reject / get / list，输出低敏 JSON，不读取私表。
 - `admin-service` 已新增第一条真实下游公开 API adapter：非 `CRITICAL` 的
   `CONFIG_PUBLISH` 可在配置 `NEXUSIM_CONTROL_PLANE_GRPC_ADDR` 后由
   operation-worker 调 `control-plane-service.PublishConfigVersion`；critical 操作

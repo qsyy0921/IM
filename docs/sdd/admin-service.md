@@ -393,6 +393,7 @@ fail-closed 并记录失败结果，不会被本地 no-op executor 标记为成�
 operator：
 
 ```text
+loadtest/admin -mode create
 loadtest/admin -mode approve
 loadtest/admin -mode reject
 loadtest/admin -mode get

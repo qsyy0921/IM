@@ -13,15 +13,15 @@ UpdatePresence -> idempotent replay -> GetPresence visibility filtering
 Raw summary and logs are stored outside the repository:
 
 ```text
-H:\NexusIM\loadtest-results\presence-grpc-smoke-20260620
+H:\NexusIM\loadtest-results\presence-grpc-smoke-20260620-clean
 ```
 
 ## Environment
 
-- commit at run: `ab14866146d1722511bb2a28bcf034ff5e2bb312`
-- git_dirty: `true` because this implementation slice was still uncommitted
-- target: `127.0.0.1:50276`
-- tenant: `tenant-presence-grpc-smoke-20260620`
+- commit at run: `3cac0968dd77caa62084d6e2d0ad57688e50c10c`
+- git_dirty: `false`
+- target: `127.0.0.1:58215`
+- tenant: `tenant-presence-grpc-smoke-20260620-clean`
 
 ## Result
 

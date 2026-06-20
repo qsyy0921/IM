@@ -43,14 +43,15 @@ func (server *Server) RetrieveEvidence(
 		return nil, status.Error(codes.InvalidArgument, "auth_context is required")
 	}
 	result, err := server.retrieveEvidence.Execute(ctx, types.RetrieveEvidenceCommand{
-		AuthContext:    auth,
-		Query:          request.GetQuery(),
-		ConversationID: types.ConversationID(request.GetConversationId()),
-		AfterSeq:       request.GetAfterSeq(),
-		Limit:          int(request.GetLimit()),
-		IncludeSearch:  request.GetIncludeSearch(),
-		IncludeMemory:  request.GetIncludeMemory(),
-		MemoryStatuses: memoryStatusesFromProto(request.GetMemoryStatuses()),
+		AuthContext:       auth,
+		Query:             request.GetQuery(),
+		ConversationID:    types.ConversationID(request.GetConversationId()),
+		AfterSeq:          request.GetAfterSeq(),
+		Limit:             int(request.GetLimit()),
+		IncludeSearch:     request.GetIncludeSearch(),
+		IncludeMemory:     request.GetIncludeMemory(),
+		MemoryStatuses:    memoryStatusesFromProto(request.GetMemoryStatuses()),
+		AtConversationSeq: request.GetAtConversationSeq(),
 	})
 	if err != nil {
 		return nil, publicError(err)

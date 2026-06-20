@@ -58,6 +58,7 @@ func (client MemoryClient) QueryMemoryEvents(ctx context.Context, query types.Me
 		Query:             query.Query,
 		Statuses:          memoryStatusesToProto(query.Statuses),
 		AfterValidFromSeq: query.AfterValidFromSeq,
+		AtConversationSeq: query.AtConversationSeq,
 		Limit:             int32(query.Limit),
 	})
 	if err != nil {

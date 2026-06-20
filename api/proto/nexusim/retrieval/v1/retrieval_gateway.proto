@@ -48,6 +48,7 @@ message RetrieveEvidenceRequest {
   bool include_search = 6;
   bool include_memory = 7;
   repeated EvidenceMemoryStatus memory_statuses = 8;
+  int64 at_conversation_seq = 9;
 }
 
 message EvidenceSourceRef {

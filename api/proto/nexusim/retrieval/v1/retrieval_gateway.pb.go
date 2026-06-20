@@ -265,17 +265,18 @@ func (x *AuthContext) GetRequestId() string {
 }
 
 type RetrieveEvidenceRequest struct {
-	state          protoimpl.MessageState `protogen:"open.v1"`
-	AuthContext    *AuthContext           `protobuf:"bytes,1,opt,name=auth_context,json=authContext,proto3" json:"auth_context,omitempty"`
-	Query          string                 `protobuf:"bytes,2,opt,name=query,proto3" json:"query,omitempty"`
-	ConversationId string                 `protobuf:"bytes,3,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
-	AfterSeq       int64                  `protobuf:"varint,4,opt,name=after_seq,json=afterSeq,proto3" json:"after_seq,omitempty"`
-	Limit          int32                  `protobuf:"varint,5,opt,name=limit,proto3" json:"limit,omitempty"`
-	IncludeSearch  bool                   `protobuf:"varint,6,opt,name=include_search,json=includeSearch,proto3" json:"include_search,omitempty"`
-	IncludeMemory  bool                   `protobuf:"varint,7,opt,name=include_memory,json=includeMemory,proto3" json:"include_memory,omitempty"`
-	MemoryStatuses []EvidenceMemoryStatus `protobuf:"varint,8,rep,packed,name=memory_statuses,json=memoryStatuses,proto3,enum=nexusim.retrieval.v1.EvidenceMemoryStatus" json:"memory_statuses,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	AuthContext       *AuthContext           `protobuf:"bytes,1,opt,name=auth_context,json=authContext,proto3" json:"auth_context,omitempty"`
+	Query             string                 `protobuf:"bytes,2,opt,name=query,proto3" json:"query,omitempty"`
+	ConversationId    string                 `protobuf:"bytes,3,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
+	AfterSeq          int64                  `protobuf:"varint,4,opt,name=after_seq,json=afterSeq,proto3" json:"after_seq,omitempty"`
+	Limit             int32                  `protobuf:"varint,5,opt,name=limit,proto3" json:"limit,omitempty"`
+	IncludeSearch     bool                   `protobuf:"varint,6,opt,name=include_search,json=includeSearch,proto3" json:"include_search,omitempty"`
+	IncludeMemory     bool                   `protobuf:"varint,7,opt,name=include_memory,json=includeMemory,proto3" json:"include_memory,omitempty"`
+	MemoryStatuses    []EvidenceMemoryStatus `protobuf:"varint,8,rep,packed,name=memory_statuses,json=memoryStatuses,proto3,enum=nexusim.retrieval.v1.EvidenceMemoryStatus" json:"memory_statuses,omitempty"`
+	AtConversationSeq int64                  `protobuf:"varint,9,opt,name=at_conversation_seq,json=atConversationSeq,proto3" json:"at_conversation_seq,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *RetrieveEvidenceRequest) Reset() {
@@ -362,6 +363,13 @@ func (x *RetrieveEvidenceRequest) GetMemoryStatuses() []EvidenceMemoryStatus {
 		return x.MemoryStatuses
 	}
 	return nil
+}
+
+func (x *RetrieveEvidenceRequest) GetAtConversationSeq() int64 {
+	if x != nil {
+		return x.AtConversationSeq
+	}
+	return 0
 }
 
 type EvidenceSourceRef struct {
@@ -969,7 +977,7 @@ const file_nexusim_retrieval_v1_retrieval_gateway_proto_rawDesc = "" +
 	"session_id\x18\x04 \x01(\tR\tsessionId\x12\x19\n" +
 	"\btrace_id\x18\x05 \x01(\tR\atraceId\x12\x1d\n" +
 	"\n" +
-	"request_id\x18\x06 \x01(\tR\trequestId\"\xf4\x02\n" +
+	"request_id\x18\x06 \x01(\tR\trequestId\"\xa4\x03\n" +
 	"\x17RetrieveEvidenceRequest\x12D\n" +
 	"\fauth_context\x18\x01 \x01(\v2!.nexusim.retrieval.v1.AuthContextR\vauthContext\x12\x14\n" +
 	"\x05query\x18\x02 \x01(\tR\x05query\x12'\n" +
@@ -978,7 +986,8 @@ const file_nexusim_retrieval_v1_retrieval_gateway_proto_rawDesc = "" +
 	"\x05limit\x18\x05 \x01(\x05R\x05limit\x12%\n" +
 	"\x0einclude_search\x18\x06 \x01(\bR\rincludeSearch\x12%\n" +
 	"\x0einclude_memory\x18\a \x01(\bR\rincludeMemory\x12S\n" +
-	"\x0fmemory_statuses\x18\b \x03(\x0e2*.nexusim.retrieval.v1.EvidenceMemoryStatusR\x0ememoryStatuses\"\xfc\x01\n" +
+	"\x0fmemory_statuses\x18\b \x03(\x0e2*.nexusim.retrieval.v1.EvidenceMemoryStatusR\x0ememoryStatuses\x12.\n" +
+	"\x13at_conversation_seq\x18\t \x01(\x03R\x11atConversationSeq\"\xfc\x01\n" +
 	"\x11EvidenceSourceRef\x12\x1f\n" +
 	"\vsource_type\x18\x01 \x01(\tR\n" +
 	"sourceType\x12\x1b\n" +

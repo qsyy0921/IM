@@ -43,19 +43,21 @@ type config struct {
 }
 
 type seededData struct {
-	TenantID            string `json:"tenant_id"`
-	ConversationID      string `json:"conversation_id"`
-	ViewerUserID        string `json:"viewer_user_id"`
-	SenderUserID        string `json:"sender_user_id"`
-	MessageID           string `json:"message_id"`
-	SourceEventID       string `json:"source_event_id"`
-	MemoryEventID       string `json:"memory_event_id"`
-	MemorySourceRefID   string `json:"memory_source_ref_id"`
-	ConversationSeq     int64  `json:"conversation_seq"`
-	VisibilityVersion   int64  `json:"visibility_version"`
-	MemoryValidFromSeq  int64  `json:"memory_valid_from_seq"`
-	MemoryValidToSeq    int64  `json:"memory_valid_to_seq"`
-	MemoryProjectionVer int64  `json:"memory_projection_version"`
+	TenantID                string `json:"tenant_id"`
+	ConversationID          string `json:"conversation_id"`
+	ViewerUserID            string `json:"viewer_user_id"`
+	SenderUserID            string `json:"sender_user_id"`
+	MessageID               string `json:"message_id"`
+	SourceEventID           string `json:"source_event_id"`
+	MemoryEventID           string `json:"memory_event_id"`
+	ExpiredMemoryEventID    string `json:"expired_memory_event_id"`
+	SupersededMemoryEventID string `json:"superseded_memory_event_id"`
+	MemorySourceRefID       string `json:"memory_source_ref_id"`
+	ConversationSeq         int64  `json:"conversation_seq"`
+	VisibilityVersion       int64  `json:"visibility_version"`
+	MemoryValidFromSeq      int64  `json:"memory_valid_from_seq"`
+	MemoryValidToSeq        int64  `json:"memory_valid_to_seq"`
+	MemoryProjectionVer     int64  `json:"memory_projection_version"`
 }
 
 type evidenceSummary struct {
@@ -120,7 +122,7 @@ func run(ctx context.Context, args []string) error {
 		return err
 	}
 
-	response, err := retrieveEvidence(ctx, cfg)
+	response, err := retrieveEvidence(ctx, cfg, seed)
 	if err != nil {
 		return err
 	}
@@ -225,6 +227,8 @@ func seedProjectionRows(ctx context.Context, pool *pgxpool.Pool, cfg config) (se
 	messageID := "msg-retrieval-" + randomSuffix()
 	sourceEventID := "evt-retrieval-" + randomSuffix()
 	memoryEventID := "mem-retrieval-" + randomSuffix()
+	expiredMemoryEventID := "mem-retrieval-expired-" + randomSuffix()
+	supersededMemoryEventID := "mem-retrieval-superseded-" + randomSuffix()
 	sourceRefID := "ref-retrieval-" + randomSuffix()
 	seq := int64(2)
 	visibilityVersion := int64(17)
@@ -272,12 +276,34 @@ INSERT INTO memory_structured_events (
 	source_projection_version, created_at, updated_at
 ) VALUES (
 	$1, $2, 'CONVERSATION', $3, $3, 'phoenix-launch',
-	'DECISION', 'PENDING', 'UNREVIEWED', $4, $5::jsonb, $6::jsonb,
+	'DECISION', 'ACTIVE', 'APPROVED', $4, $5::jsonb, $6::jsonb,
 	$7, $8, $9, NULL, '[]'::jsonb,
 	'[]'::jsonb, 0.8700, $10, 'retrieval-smoke-v1',
 	$11, $9, $9
 )
 `, cfg.tenantID, memoryEventID, cfg.conversationID, factText, jsonArray(cfg.senderUserID), jsonArray(cfg.viewerUserID), seq, seq+10, now, visibilityVersion, memoryProjectionVersion); err != nil {
+		return seededData{}, err
+	}
+
+	if _, err := tx.Exec(ctx, `
+INSERT INTO memory_structured_events (
+	tenant_id, memory_event_id, scope_type, scope_id, conversation_id, topic,
+	event_type, status, review_state, fact_text, actor_user_ids, audience_user_ids,
+	valid_from_seq, valid_to_seq, valid_from_at, valid_to_at, supersedes_event_ids,
+	contradicts_event_ids, confidence, visibility_version, extraction_version,
+	source_projection_version, created_at, updated_at
+) VALUES
+	($1, $2, 'CONVERSATION', $4, $4, 'phoenix-launch',
+	 'DECISION', 'ACTIVE', 'APPROVED', $5, $6::jsonb, $7::jsonb,
+	 1, $8, $9, NULL, '[]'::jsonb,
+	 '[]'::jsonb, 0.9900, $10, 'retrieval-smoke-v1',
+	 $11, $9, $9),
+	($1, $3, 'CONVERSATION', $4, $4, 'phoenix-launch',
+	 'DECISION', 'SUPERSEDED', 'APPROVED', $5, $6::jsonb, $7::jsonb,
+	 $8, $12, $9, NULL, '[]'::jsonb,
+	 '[]'::jsonb, 0.9800, $10, 'retrieval-smoke-v1',
+	 $11, $9, $9)
+`, cfg.tenantID, expiredMemoryEventID, supersededMemoryEventID, cfg.conversationID, factText, jsonArray(cfg.senderUserID), jsonArray(cfg.viewerUserID), seq-1, now, visibilityVersion, memoryProjectionVersion, seq+10); err != nil {
 		return seededData{}, err
 	}
 
@@ -290,27 +316,40 @@ INSERT INTO memory_event_source_refs (
 		return seededData{}, err
 	}
 
+	if _, err := tx.Exec(ctx, `
+INSERT INTO memory_event_source_refs (
+	tenant_id, memory_event_id, source_ref_id, source_type, source_id,
+	source_event_id, conversation_id, conversation_seq, occurred_at, created_at
+) VALUES
+	($1, $2, 'ref-expired', 'MESSAGE', $4, $5, $6, 1, $7, $7),
+	($1, $3, 'ref-superseded', 'MESSAGE', $4, $5, $6, $8, $7, $7)
+`, cfg.tenantID, expiredMemoryEventID, supersededMemoryEventID, messageID, sourceEventID, cfg.conversationID, now, seq); err != nil {
+		return seededData{}, err
+	}
+
 	if err := tx.Commit(ctx); err != nil {
 		return seededData{}, err
 	}
 	return seededData{
-		TenantID:            cfg.tenantID,
-		ConversationID:      cfg.conversationID,
-		ViewerUserID:        cfg.viewerUserID,
-		SenderUserID:        cfg.senderUserID,
-		MessageID:           messageID,
-		SourceEventID:       sourceEventID,
-		MemoryEventID:       memoryEventID,
-		MemorySourceRefID:   sourceRefID,
-		ConversationSeq:     seq,
-		VisibilityVersion:   visibilityVersion,
-		MemoryValidFromSeq:  seq,
-		MemoryValidToSeq:    seq + 10,
-		MemoryProjectionVer: memoryProjectionVersion,
+		TenantID:                cfg.tenantID,
+		ConversationID:          cfg.conversationID,
+		ViewerUserID:            cfg.viewerUserID,
+		SenderUserID:            cfg.senderUserID,
+		MessageID:               messageID,
+		SourceEventID:           sourceEventID,
+		MemoryEventID:           memoryEventID,
+		ExpiredMemoryEventID:    expiredMemoryEventID,
+		SupersededMemoryEventID: supersededMemoryEventID,
+		MemorySourceRefID:       sourceRefID,
+		ConversationSeq:         seq,
+		VisibilityVersion:       visibilityVersion,
+		MemoryValidFromSeq:      seq,
+		MemoryValidToSeq:        seq + 10,
+		MemoryProjectionVer:     memoryProjectionVersion,
 	}, nil
 }
 
-func retrieveEvidence(ctx context.Context, cfg config) (*retrievalv1.RetrieveEvidenceResponse, error) {
+func retrieveEvidence(ctx context.Context, cfg config, seed seededData) (*retrievalv1.RetrieveEvidenceResponse, error) {
 	dialOption, err := grpctls.DialOption(cfg.tls, "retrieval-tls")
 	if err != nil {
 		return nil, err
@@ -332,9 +371,10 @@ func retrieveEvidence(ctx context.Context, cfg config) (*retrievalv1.RetrieveEvi
 			TraceId:   "retrieval-smoke-trace",
 			RequestId: "retrieval-smoke-request",
 		},
-		Query:          cfg.query,
-		ConversationId: cfg.conversationID,
-		Limit:          10,
+		Query:             cfg.query,
+		ConversationId:    cfg.conversationID,
+		AtConversationSeq: seed.ConversationSeq + 5,
+		Limit:             10,
 	})
 }
 
@@ -367,6 +407,9 @@ func verifyEvidence(
 			candidate := item
 			searchItem = candidate
 		case retrievalv1.EvidenceSourceType_EVIDENCE_SOURCE_TYPE_MEMORY_EVENT:
+			if item.GetMemoryEventId() == seed.ExpiredMemoryEventID || item.GetMemoryEventId() == seed.SupersededMemoryEventID {
+				return evidenceSummary{}, fmt.Errorf("stale memory evidence leaked into EvidencePack: %+v", item)
+			}
 			candidate := item
 			memoryItem = candidate
 		}
@@ -386,7 +429,7 @@ func verifyEvidence(
 	if err := verifyMemoryItem(memoryItem, seed); err != nil {
 		return evidenceSummary{}, err
 	}
-	verified = append(verified, "memory item carries source refs, temporal status, review state and extraction version")
+	verified = append(verified, "memory item is active current-only evidence with source refs, review state and extraction version")
 
 	counts := sourceCounts{}
 	for _, count := range pack.GetSourceCounts() {
@@ -397,7 +440,7 @@ func verifyEvidence(
 			counts.MemoryEvent = count.GetCount()
 		}
 	}
-	if counts.SearchMessage < 1 || counts.MemoryEvent < 1 {
+	if counts.SearchMessage != 1 || counts.MemoryEvent != 1 {
 		return evidenceSummary{}, fmt.Errorf("unexpected source counts: %+v", counts)
 	}
 	if pack.GetSearchProjectionVersion() != seed.VisibilityVersion {
@@ -409,7 +452,7 @@ func verifyEvidence(
 	if strings.TrimSpace(pack.GetRetrievalVersion()) == "" {
 		return evidenceSummary{}, errors.New("missing retrieval version")
 	}
-	verified = append(verified, "source counts and projection versions preserved")
+	verified = append(verified, "source counts, projection versions and stale-memory filtering preserved")
 
 	return evidenceSummary{
 		RunName:                 cfg.runName,
@@ -464,10 +507,10 @@ func verifyMemoryItem(item *retrievalv1.EvidenceItem, seed seededData) error {
 	if item.GetVisibilityVersion() != seed.VisibilityVersion {
 		return fmt.Errorf("unexpected memory visibility_version %d", item.GetVisibilityVersion())
 	}
-	if item.GetTemporalStatus() != "PENDING" {
+	if item.GetTemporalStatus() != "ACTIVE" {
 		return fmt.Errorf("unexpected temporal status %q", item.GetTemporalStatus())
 	}
-	if item.GetReviewState() != "UNREVIEWED" {
+	if item.GetReviewState() != "APPROVED" {
 		return fmt.Errorf("unexpected review state %q", item.GetReviewState())
 	}
 	if item.GetExtractionVersion() != "retrieval-smoke-v1" {

@@ -32,13 +32,14 @@ agent、skill-registry、mcp-gateway、action-executor、ai-eval。
 `ai-eval-service` catalog、gate、negative / action / memory evals、
 action-executor provider failure worker / redrive safety eval、memory-service
 runtime `at_conversation_seq` query semantics 和 source-ref / validity /
-supersession PG coverage / smoke checks 已落；
+supersession PG coverage / smoke checks、retrieval-gateway EvidencePack
+current-only memory query 已落；
 只保存低敏 run refs / counters / metadata。
 
 当前下一步：
 
 ```text
-继续推进 retrieval-gateway EvidencePack 接入 memory-service current-only memory query
+继续推进 RAG / Summary / Agent API 显式透传 at_conversation_seq 到 EvidencePack
 ```
 
 完整系统测试、生产级 HA、长压和 sizing 继续后置为 hardening backlog。

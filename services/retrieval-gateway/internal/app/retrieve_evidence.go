@@ -49,6 +49,7 @@ func (usecase RetrieveEvidenceUseCase) Execute(
 	seen := map[string]int{}
 	var searchProjectionVersion int64
 	var memoryProjectionVersion int64
+	var searchMaxConversationSeq int64
 
 	if command.ShouldIncludeSearch() {
 		if usecase.search == nil {
@@ -67,6 +68,9 @@ func (usecase RetrieveEvidenceUseCase) Execute(
 		searchProjectionVersion = result.ProjectionVersion
 		coverage[types.EvidenceSourceSearchMessage].CandidateCount = len(result.Items)
 		for _, hit := range result.Items {
+			if hit.ConversationSeq > searchMaxConversationSeq {
+				searchMaxConversationSeq = hit.ConversationSeq
+			}
 			item := searchHitToEvidence(hit)
 			appendEvidenceCandidate(&candidates, seen, coverage, item)
 		}
@@ -81,6 +85,7 @@ func (usecase RetrieveEvidenceUseCase) Execute(
 			Query:             command.NormalizedQuery(),
 			ConversationID:    command.ConversationID,
 			AfterValidFromSeq: command.AfterSeq,
+			AtConversationSeq: effectiveMemoryAtConversationSeq(command, searchMaxConversationSeq),
 			Statuses:          command.EffectiveMemoryStatuses(),
 			Limit:             limit,
 		})
@@ -142,6 +147,13 @@ func newSourceCoverage(command types.RetrieveEvidenceCommand) map[string]*source
 		types.EvidenceSourceSearchMessage: &sourceCoverageState{Requested: command.ShouldIncludeSearch()},
 		types.EvidenceSourceMemoryEvent:   &sourceCoverageState{Requested: command.ShouldIncludeMemory()},
 	}
+}
+
+func effectiveMemoryAtConversationSeq(command types.RetrieveEvidenceCommand, searchMaxConversationSeq int64) int64 {
+	if command.AtConversationSeq > 0 {
+		return command.AtConversationSeq
+	}
+	return searchMaxConversationSeq
 }
 
 func appendEvidenceCandidate(

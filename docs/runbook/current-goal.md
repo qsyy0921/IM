@@ -40,13 +40,14 @@ group memory -> EvidencePack -> RAG -> summary -> multi-agent
   action-executor provider failure retry/DLQ skeleton、worker 和 redrive safety eval、
   memory-service group memory source-ref / validity / supersession fixture eval，
   memory-service runtime `at_conversation_seq` query semantics、source-ref /
-  validity / supersession PostgreSQL coverage 和 `loadtest/memory` smoke checks。既有 eval 报告见
+  validity / supersession PostgreSQL coverage 和 `loadtest/memory` smoke checks，
+  retrieval-gateway EvidencePack -> memory-service current-only query。既有 eval 报告见
   `docs/runbook/loadtest/ai-eval-service/`。
 
 下一步默认推进：
 
 ```text
-继续推进 retrieval-gateway EvidencePack 接入 memory-service current-only memory query
+继续推进 RAG / Summary / Agent API 显式透传 at_conversation_seq 到 EvidencePack
 ```
 
 硬边界：RAG / summary / Agent 只能消费 EvidencePack；真实写动作必须走

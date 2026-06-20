@@ -29,8 +29,8 @@ func TestRetrieveEvidenceMergesSearchAndMemory(t *testing.T) {
 		Items: []types.MemoryEventEvidence{{
 			MemoryEventID:     "mem-1",
 			ConversationID:    "conv-1",
-			Status:            types.MemoryStatusPending,
-			ReviewState:       "UNREVIEWED",
+			Status:            types.MemoryStatusActive,
+			ReviewState:       "APPROVED",
 			FactText:          "memory fact",
 			ActorUserIDs:      []string{"user-a"},
 			SourceRefs:        []types.EvidenceSourceRef{{SourceType: "MESSAGE", SourceID: "msg-1", ConversationSeq: 10}},
@@ -66,6 +66,12 @@ func TestRetrieveEvidenceMergesSearchAndMemory(t *testing.T) {
 	if result.Pack.Items[1].RerankScore != 0.8 || result.Pack.Items[1].DedupeReason != types.EvidenceDedupeUniqueSource {
 		t.Fatalf("unexpected memory item rank metadata: %+v", result.Pack.Items[1])
 	}
+	if got := memory.query.AtConversationSeq; got != 10 {
+		t.Fatalf("expected memory current query at search seq 10, got %d", got)
+	}
+	if got := memory.query.Statuses; len(got) != 1 || got[0] != types.MemoryStatusActive {
+		t.Fatalf("expected active memory status by default, got %+v", got)
+	}
 	if got := result.Pack.SourceCoverage; len(got) != 2 ||
 		got[0].SourceType != types.EvidenceSourceSearchMessage ||
 		got[0].CandidateCount != 1 ||
@@ -76,6 +82,21 @@ func TestRetrieveEvidenceMergesSearchAndMemory(t *testing.T) {
 		got[1].ReturnedCount != 1 ||
 		got[1].Status != types.EvidenceCoverageReturned {
 		t.Fatalf("unexpected source coverage: %+v", got)
+	}
+}
+
+func TestRetrieveEvidenceUsesExplicitMemoryAtConversationSeq(t *testing.T) {
+	command := validCommand()
+	command.IncludeSearch = false
+	command.IncludeMemory = true
+	command.AtConversationSeq = 42
+	memory := fakeMemoryPort{}
+	_, err := NewRetrieveEvidenceUseCase(&fakeSearchPort{}, &memory).Execute(context.Background(), command)
+	if err != nil {
+		t.Fatalf("Execute returned error: %v", err)
+	}
+	if got := memory.query.AtConversationSeq; got != 42 {
+		t.Fatalf("expected explicit memory current seq 42, got %d", got)
 	}
 }
 
@@ -269,10 +290,12 @@ type fakeMemoryPort struct {
 	result types.MemoryResult
 	err    error
 	called bool
+	query  types.MemoryQuery
 }
 
-func (port *fakeMemoryPort) QueryMemoryEvents(context.Context, types.MemoryQuery) (types.MemoryResult, error) {
+func (port *fakeMemoryPort) QueryMemoryEvents(_ context.Context, query types.MemoryQuery) (types.MemoryResult, error) {
 	port.called = true
+	port.query = query
 	return port.result, port.err
 }
 

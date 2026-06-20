@@ -39,14 +39,15 @@ const (
 )
 
 type RetrieveEvidenceCommand struct {
-	AuthContext    AuthContext
-	Query          string
-	ConversationID ConversationID
-	AfterSeq       int64
-	Limit          int
-	IncludeSearch  bool
-	IncludeMemory  bool
-	MemoryStatuses []string
+	AuthContext       AuthContext
+	Query             string
+	ConversationID    ConversationID
+	AfterSeq          int64
+	Limit             int
+	IncludeSearch     bool
+	IncludeMemory     bool
+	MemoryStatuses    []string
+	AtConversationSeq int64
 }
 
 func (command RetrieveEvidenceCommand) Validate() error {
@@ -61,6 +62,9 @@ func (command RetrieveEvidenceCommand) Validate() error {
 	}
 	if command.AfterSeq < 0 {
 		return NewInvalidArgument("after_seq must be non-negative")
+	}
+	if command.AtConversationSeq < 0 {
+		return NewInvalidArgument("at_conversation_seq must be non-negative")
 	}
 	if command.Limit < 0 || command.Limit > MaxEvidenceLimit {
 		return NewInvalidArgument("limit must be between 0 and 50")
@@ -96,15 +100,16 @@ func (command RetrieveEvidenceCommand) EffectiveMemoryStatuses() []string {
 	if len(command.MemoryStatuses) > 0 {
 		return command.MemoryStatuses
 	}
-	return []string{MemoryStatusPending, MemoryStatusActive}
+	return []string{MemoryStatusActive}
 }
 
 func (command RetrieveEvidenceCommand) PackID() string {
-	sum := sha256.Sum256([]byte(fmt.Sprintf("%s|%s|%s|%d|%d|%t|%t",
+	sum := sha256.Sum256([]byte(fmt.Sprintf("%s|%s|%s|%d|%d|%d|%t|%t",
 		command.AuthContext.TenantID,
 		command.AuthContext.UserID,
 		command.NormalizedQuery(),
 		command.AfterSeq,
+		command.AtConversationSeq,
 		command.EffectiveLimit(),
 		command.ShouldIncludeSearch(),
 		command.ShouldIncludeMemory(),
@@ -142,6 +147,7 @@ type MemoryQuery struct {
 	Query             string
 	ConversationID    ConversationID
 	AfterValidFromSeq int64
+	AtConversationSeq int64
 	Statuses          []string
 	Limit             int
 }

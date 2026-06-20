@@ -36,6 +36,9 @@ RAG / summary / Agent 必须消费 `EvidencePack`，不能绕过 retrieval-gatew
 
 - `pack_id`：由 tenant / user / query / limit / source flags 派生的稳定请求标识。
 - `query`、`conversation_id`。
+- `at_conversation_seq`：可选当前会话时点，用于调用 memory-service 的
+  `QueryMemoryEvents.at_conversation_seq`；未传时第一版使用返回 search hit 的
+  最大 `conversation_seq` 作为 fallback。
 - `items`：
   - `SEARCH_MESSAGE`：来自 search-service 的 message hit。
   - `MEMORY_EVENT`：来自 memory-service 的 StructuredMemoryEvent。
@@ -58,6 +61,10 @@ RAG / summary / Agent 必须消费 `EvidencePack`，不能绕过 retrieval-gatew
 
 - search-service 负责消息可见性和 tombstone 过滤。
 - memory-service 负责 memory event 可见性和 revoked / deleted 隐藏。
+- retrieval-gateway 默认只请求 ACTIVE memory；PENDING / SUPERSEDED 只能由
+  调试、review 或指定调用方显式请求。
+- retrieval-gateway 调 memory-service 时传递 `at_conversation_seq`，确保
+  `valid_from_seq / valid_to_seq` current-only 过滤生效。
 - retrieval-gateway 透传 verified auth metadata 和 request body auth context。
 - 如果配置 `NEXUSIM_POLICY_GRPC_ADDR`，retrieval-gateway 会在调用 search / memory
   前通过 policy-service `CheckToolAction` 执行显式 retrieval precheck：

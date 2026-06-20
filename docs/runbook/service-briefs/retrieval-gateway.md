@@ -19,9 +19,12 @@
   -> retrieval-gateway `RetrieveEvidence` -> `SEARCH_MESSAGE` + `MEMORY_EVENT`
 - EvidencePack 字段 hardening first pass：`rerank_score`、`dedupe_reason`、
   `source_coverage` 已落地，app / gRPC tests 覆盖排序、去重和覆盖统计。
+- EvidencePack -> memory-service current-only query 已落：默认 memory status 收敛为
+  ACTIVE，显式 `at_conversation_seq` 透传给 memory-service；未传时使用 search hit
+  最大 conversation seq 作为 first-stage fallback。
 
 下一步：
 
-- focused tests 和 `check-local` 收口。
+- RAG / summary / Agent API 显式透传 `at_conversation_seq`，减少对 search fallback
+  的依赖。
 - 后续由 `rag-service` / `summary-service` / `agent-service` 消费 EvidencePack，不绕过 retrieval-gateway。
-- RAG / summary / Agent 接入前继续补 AI eval execution adapters。

@@ -37,10 +37,10 @@ provider-grade 运维和完整系统测试暂不作为当前转进阻塞。
    `memory-service` 继续按 2025/2026 group memory / collaborative memory 论文
    方向深化 source refs、speaker / audience scope、valid_from / valid_to、
    supersedes / contradicts、confidence、PENDING / ACTIVE / SUPERSEDED /
-   REJECTED 状态。`QueryMemoryEvents.at_conversation_seq` 和 runtime
-   source-ref / validity / supersession checks 已落；下一步把
-   `retrieval-gateway` EvidencePack 接入 memory-service current-only memory
-   query，并继续保留 source-ref / visibility / review 边界。
+   REJECTED 状态。`QueryMemoryEvents.at_conversation_seq`、runtime checks 和
+   retrieval-gateway EvidencePack current-only memory query 已落；下一步让
+   RAG / Summary / Agent API 显式透传 `at_conversation_seq`，继续保留
+   source-ref / visibility / review 边界。
 
 3. Agent 真实业务动作扩展：
    `agent-service`、`skill-registry`、`mcp-gateway`、`action-executor` 已具备

@@ -80,6 +80,21 @@ func TestRetrieveEvidenceMapsUnavailable(t *testing.T) {
 	}
 }
 
+func TestRetrieveEvidenceMapsAtConversationSeq(t *testing.T) {
+	executor := &recordingRetrieveExecutor{result: types.RetrieveEvidenceResult{
+		Pack: types.EvidencePack{PackID: "ep_1", RetrievalVersion: types.RetrievalVersion},
+	}}
+	request := validRequest()
+	request.AtConversationSeq = 42
+	_, err := NewServer(executor).RetrieveEvidence(context.Background(), request)
+	if err != nil {
+		t.Fatalf("RetrieveEvidence returned error: %v", err)
+	}
+	if got := executor.command.AtConversationSeq; got != 42 {
+		t.Fatalf("expected at_conversation_seq 42, got %d", got)
+	}
+}
+
 func validRequest() *retrievalv1.RetrieveEvidenceRequest {
 	return &retrievalv1.RetrieveEvidenceRequest{
 		AuthContext: &retrievalv1.AuthContext{
@@ -104,5 +119,15 @@ func (executor fakeRetrieveExecutor) Execute(context.Context, types.RetrieveEvid
 	if executor.result.Pack.PackID == "" {
 		return types.RetrieveEvidenceResult{}, errors.New("missing fake result")
 	}
+	return executor.result, nil
+}
+
+type recordingRetrieveExecutor struct {
+	result  types.RetrieveEvidenceResult
+	command types.RetrieveEvidenceCommand
+}
+
+func (executor *recordingRetrieveExecutor) Execute(_ context.Context, command types.RetrieveEvidenceCommand) (types.RetrieveEvidenceResult, error) {
+	executor.command = command
 	return executor.result, nil
 }

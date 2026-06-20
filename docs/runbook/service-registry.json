@@ -330,6 +330,12 @@
       "service": "notification-service",
       "env": "NEXUSIM_NOTIFICATION_SERVICE_MODE",
       "value": "delivery-worker"
+    },
+    {
+      "name": "admin-service-outbox-relay",
+      "service": "admin-service",
+      "env": "NEXUSIM_ADMIN_SERVICE_MODE",
+      "value": "outbox-relay"
     }
   ]
 }

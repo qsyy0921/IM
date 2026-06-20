@@ -21,6 +21,7 @@ try {
 
     $summary = Get-Content -LiteralPath $summaryPath -Raw | ConvertFrom-Json
     $expectedServices = @(
+        "admin-service",
         "agent-service",
         "contacts-service",
         "delivery-service",

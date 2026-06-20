@@ -93,4 +93,10 @@ protoc `
     -I $KafkaSchemaDir `
     --go_out=$KafkaSchemaDir `
     --go_opt=paths=source_relative `
+    "$KafkaSchemaDir/admin/v1/im.admin.events.proto"
+
+protoc `
+    -I $KafkaSchemaDir `
+    --go_out=$KafkaSchemaDir `
+    --go_opt=paths=source_relative `
     "$KafkaSchemaDir/policy/v1/im.policy.events.proto"

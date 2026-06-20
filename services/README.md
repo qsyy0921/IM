@@ -27,32 +27,14 @@ services/<service-name>/
 | `types` | 命令、DTO、枚举、错误码、跨层轻量类型 |
 | `trigger` | Outbox Relay、Kafka consumer、定时任务、补偿任务 |
 
-## 当前 active 服务
+## 当前服务清单
 
 active 服务清单以 `docs/runbook/service-registry.json` 为准，不能手写漂移。
 
-当前包含：
-
-```text
-api-gateway, identity-service, message-service, conversation-service,
-delivery-service, push-gateway, receipt-service, contacts-service,
-policy-service, search-service, memory-service, retrieval-gateway,
-rag-service, summary-service, agent-service, skill-registry,
-mcp-gateway, action-executor, ai-eval-service
-```
-
 每个服务的当前状态看 `docs/runbook/service-briefs/<service>.md`。
 
-## Future 服务
-
-future 服务已经进入 registry 和 brief，但 stage switch 前不得创建
-`services/<service>` 目录。当前包括：
-
-```text
-media-service, notification-service, audit-service, admin-service,
-control-plane-service, presence-service, model-gateway,
-workflow-service, knowledge-ingestion-service, vector-index-service
-```
+`future` / `product-active` / `foundation-active` 等 stage 也以 registry 和 service
+brief 为准；不要在本文件复制服务名列表。
 
 ## 约束
 

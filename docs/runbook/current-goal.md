@@ -52,11 +52,11 @@ model-gateway / workflow / knowledge-ingestion / vector-index
 - `admin-service` 已从 stage-switch 进入 product-active 第一版 implementation
   slice，覆盖 `CreateAdminOperation`、`ApproveAdminOperation`、
   `GetAdminOperation`、`ListAdminOperations`、PostgreSQL operation / approval
-  状态和低敏 admin outbox。
+  状态、低敏 admin outbox 和 `admin_outbox -> im.admin.events` outbox relay。
 
 ## 下一步
 
-- 默认继续 `admin-service` operation worker / outbox relay / workflow-service 长审批接入。
+- 默认继续 `admin-service` operation worker / workflow-service 长审批接入。
 - 也可以继续 `vector-index-service` embedding worker / rebuild worker / outbox relay。
 - 也可以继续 notification SMTP / SMS / APNs / FCM adapter 或 bounce-suppression。
 

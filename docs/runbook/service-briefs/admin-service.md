@@ -1,7 +1,7 @@
 # admin-service
 
-状态：product-active / 第一版 implementation landed。已同步 service registry、
-proto、migration、runtime、Docker 和 observability。
+状态：product-active / 第一版 implementation + outbox relay landed。已同步 registry、
+proto、migration、runtime、Docker、worker compose 和 observability。
 
 定位：管理后台 API，负责租户管理、封禁、配置操作、repair 审批和 operator workflow 入口。
 
@@ -13,17 +13,18 @@ proto、migration、runtime、Docker 和 observability。
 - 管理操作默认最小权限、可追溯、可撤销或可补偿。
 
 第一切片：
-- 具体边界见 `docs/sdd/admin-service.md`。
-- Stage-switch 记录见 `docs/runbook/stage-switch/admin-service.md`。
+- 边界见 `docs/sdd/admin-service.md`；stage-switch 见
+  `docs/runbook/stage-switch/admin-service.md`。
 - 已落 `CreateAdminOperation`、`ApproveAdminOperation`、`GetAdminOperation`、
   `ListAdminOperations`，不直接执行真实下游 mutation。
-- 已输出低敏 admin outbox event，后续归档到 audit-service。
-- 覆盖 proto、core migration、六层 skeleton、`grpc` runtime、Docker / Prometheus /
-  Grafana wiring。
-- PostgreSQL repository first path 覆盖 create replay / conflict、approval replay /
-  separation-of-duty、get/list 和低敏 admin outbox。
+- 已输出低敏 admin outbox event，并提供 `outbox-relay` runtime 发布
+  `admin_outbox -> im.admin.events`，后续可由 audit-service 归档。
+- 覆盖 proto、core migration、六层 skeleton、`grpc` runtime、Docker / Prometheus / Grafana。
+- PostgreSQL first path 覆盖 create conflict / replay、approval replay、separation-of-duty、get/list 和低敏 outbox。
+- Outbox relay 覆盖 typed protobuf schema、Kafka writer producer、builder fail-closed、
+  PostgreSQL retry / DLQ / same-operation order blocker 和 worker compose。
 
 后续：
 
-- operation worker、outbox relay、workflow-service 长审批、audit-service ingestion /
-  export、admin UI、operator approval CLI、下游公开 admin API adapter。
+- operation worker、workflow-service 长审批、audit-service ingestion / export、
+  admin UI、operator approval CLI、下游公开 admin API adapter。

@@ -51,7 +51,7 @@ func (repository *Repository) CreateAdminOperation(
 	if err := insertOperation(ctx, tx, operation); err != nil {
 		return types.AdminOperation{}, false, err
 	}
-	if err := insertOperationOutbox(ctx, tx, "evt_"+operation.OperationID+"_submitted", operation, "admin.operation.submitted.v1", adminOperationPayload(operation)); err != nil {
+	if err := insertOperationOutbox(ctx, tx, "evt_"+operation.OperationID+"_submitted", operation, types.AdminEventOperationSubmitted, adminOperationPayload(operation)); err != nil {
 		return types.AdminOperation{}, false, err
 	}
 	if err := tx.Commit(ctx); err != nil {
@@ -113,14 +113,14 @@ func (repository *Repository) ApproveAdminOperation(
 	if err != nil {
 		return types.AdminOperation{}, types.AdminApproval{}, false, err
 	}
-	eventType := "admin.operation.approved.v1"
+	eventType := types.AdminEventOperationApproved
 	if approval.Decision == types.DecisionReject {
-		eventType = "admin.operation.rejected.v1"
+		eventType = types.AdminEventOperationRejected
 	}
 	payload := adminOperationPayload(updated)
 	payload["approval_id"] = approval.ApprovalID
 	payload["decision"] = approval.Decision
-	payload["approver_ref_hash"] = domain.HashText(approval.ApproverRef)
+	payload["approved_by_hash"] = domain.HashText(approval.ApproverRef)
 	if err := insertOperationOutbox(ctx, tx, "evt_"+approval.ApprovalID, updated, eventType, payload); err != nil {
 		return types.AdminOperation{}, types.AdminApproval{}, false, err
 	}
@@ -334,7 +334,7 @@ ON CONFLICT (event_id) DO NOTHING
 }
 
 func adminOperationPayload(operation types.AdminOperation) map[string]any {
-	return map[string]any{
+	payload := map[string]any{
 		"tenant_id":              string(operation.TenantID),
 		"operation_id":           operation.OperationID,
 		"operation_type":         operation.OperationType,
@@ -342,7 +342,6 @@ func adminOperationPayload(operation types.AdminOperation) map[string]any {
 		"risk_level":             operation.RiskLevel,
 		"status":                 operation.Status,
 		"requested_by_hash":      domain.HashText(operation.RequestedBy),
-		"approved_by_hash":       domain.HashText(operation.ApprovedBy),
 		"payload_schema_version": operation.PayloadSchemaVersion,
 		"payload_hash":           operation.PayloadHash,
 		"reason_ref":             operation.ReasonRef,
@@ -350,6 +349,10 @@ func adminOperationPayload(operation types.AdminOperation) map[string]any {
 		"causation_id":           operation.CausationID,
 		"trace_id":               operation.TraceID,
 	}
+	if operation.ApprovedBy != "" {
+		payload["approved_by_hash"] = domain.HashText(operation.ApprovedBy)
+	}
+	return payload
 }
 
 func listApprovals(ctx context.Context, querier interface {

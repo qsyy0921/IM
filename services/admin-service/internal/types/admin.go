@@ -19,6 +19,14 @@ const (
 	RiskLevelMedium   = "MEDIUM"
 	RiskLevelHigh     = "HIGH"
 	RiskLevelCritical = "CRITICAL"
+
+	AdminEventOperationSubmitted = "admin.operation.submitted.v1"
+	AdminEventOperationApproved  = "admin.operation.approved.v1"
+	AdminEventOperationRejected  = "admin.operation.rejected.v1"
+
+	OutboxStatusPending   = "PENDING"
+	OutboxStatusPublished = "PUBLISHED"
+	OutboxStatusDLQ       = "DLQ"
 )
 
 type CreateAdminOperationCommand struct {
@@ -101,4 +109,33 @@ type AdminApproval struct {
 	ReasonRef         string
 	EvidenceRefs      []string
 	CreatedAt         time.Time
+}
+
+type OutboxMessage struct {
+	EventID          string
+	TenantID         TenantID
+	OperationID      string
+	EventType        string
+	EventVersion     int
+	PartitionKey     string
+	Producer         string
+	PayloadJSON      []byte
+	RetryCount       int
+	OccurredAt       time.Time
+	AggregateVersion int64
+	CorrelationID    string
+	CausationID      string
+	TraceID          string
+}
+
+type OutboxRelayStats struct {
+	Fetched      int
+	Published    int
+	Retried      int
+	DeadLettered int
+}
+
+type KafkaPublishRecord struct {
+	Key   []byte
+	Value []byte
 }

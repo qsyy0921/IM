@@ -1,0 +1,75 @@
+syntax = "proto3";
+
+package nexusim.admin.events.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/qsyy0921/IM/schemas/kafka/admin/v1;admineventsv1";
+
+// Topic: im.admin.events
+// Partition key: tenant_id + ":" + operation_id
+// Producer: admin-service outbox relay
+message AdminEvent {
+  string event_id = 1;
+  string event_type = 2;
+  int32 event_version = 3;
+
+  string tenant_id = 4;
+  string aggregate_type = 5; // "admin_operation"
+  string aggregate_id = 6;   // operation_id
+  int64 aggregate_version = 7;
+
+  string partition_key = 8;
+  string trace_id = 9;
+  string correlation_id = 10;
+  string causation_id = 11;
+  string producer = 12;
+  google.protobuf.Timestamp occurred_at = 13;
+
+  oneof payload {
+    AdminOperationSubmittedV1 operation_submitted = 20;
+    AdminOperationApprovedV1 operation_approved = 21;
+    AdminOperationRejectedV1 operation_rejected = 22;
+  }
+}
+
+message AdminOperationSubmittedV1 {
+  string tenant_id = 1;
+  string operation_id = 2;
+  string operation_type = 3;
+  string target_ref_hash = 4;
+  string risk_level = 5;
+  string status = 6;
+  string requested_by_hash = 7;
+  string payload_schema_version = 8;
+  string payload_hash = 9;
+  string reason_ref = 10;
+}
+
+message AdminOperationApprovedV1 {
+  string tenant_id = 1;
+  string operation_id = 2;
+  string operation_type = 3;
+  string target_ref_hash = 4;
+  string risk_level = 5;
+  string status = 6;
+  string requested_by_hash = 7;
+  string approved_by_hash = 8;
+  string approval_id = 9;
+  string decision = 10;
+  string payload_hash = 11;
+}
+
+message AdminOperationRejectedV1 {
+  string tenant_id = 1;
+  string operation_id = 2;
+  string operation_type = 3;
+  string target_ref_hash = 4;
+  string risk_level = 5;
+  string status = 6;
+  string requested_by_hash = 7;
+  string approved_by_hash = 8;
+  string approval_id = 9;
+  string decision = 10;
+  string payload_hash = 11;
+}

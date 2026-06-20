@@ -3,7 +3,7 @@ package main
 import "testing"
 
 func TestValidateAdminMode(t *testing.T) {
-	for _, mode := range []string{"noop", "grpc"} {
+	for _, mode := range []string{"noop", "grpc", "outbox-relay"} {
 		if err := validateAdminMode(mode); err != nil {
 			t.Fatalf("mode %s: %v", mode, err)
 		}

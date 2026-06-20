@@ -146,13 +146,18 @@ func openAdminTestPool(t *testing.T) *pgxpool.Pool {
 
 func applyAdminMigration(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
 	t.Helper()
-	path := filepath.Join("..", "..", "..", "..", "..", "migrations", "postgres", "admin", "000001_admin_core.sql")
-	content, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("read admin migration: %v", err)
-	}
-	if _, err := pool.Exec(ctx, string(content)); err != nil {
-		t.Fatalf("apply admin migration: %v", err)
+	for _, name := range []string{
+		"000001_admin_core.sql",
+		"000002_admin_outbox_last_error.sql",
+	} {
+		path := filepath.Join("..", "..", "..", "..", "..", "migrations", "postgres", "admin", name)
+		content, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("read admin migration %s: %v", name, err)
+		}
+		if _, err := pool.Exec(ctx, string(content)); err != nil {
+			t.Fatalf("apply admin migration %s: %v", name, err)
+		}
 	}
 }
 

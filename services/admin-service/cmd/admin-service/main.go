@@ -17,7 +17,9 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	admingrpc "github.com/qsyy0921/IM/services/admin-service/internal/api/grpc"
 	"github.com/qsyy0921/IM/services/admin-service/internal/app"
+	kafkainfra "github.com/qsyy0921/IM/services/admin-service/internal/infrastructure/kafka"
 	postgresinfra "github.com/qsyy0921/IM/services/admin-service/internal/infrastructure/postgres"
+	"github.com/qsyy0921/IM/services/admin-service/internal/trigger/outbox"
 	"google.golang.org/grpc"
 )
 
@@ -40,6 +42,8 @@ func run(ctx context.Context) error {
 		return runNoop(ctx)
 	case "grpc":
 		return runGRPC(ctx)
+	case "outbox-relay":
+		return runOutboxRelay(ctx)
 	default:
 		return fmt.Errorf("unsupported NEXUSIM_ADMIN_SERVICE_MODE %q", mode)
 	}
@@ -114,6 +118,54 @@ func runGRPC(ctx context.Context) error {
 	}
 }
 
+func runOutboxRelay(ctx context.Context) error {
+	debugAddr, err := adminDebugAddrFromEnv()
+	if err != nil {
+		return err
+	}
+	stopDebug, err := startDebugServer(ctx, debugAddr)
+	if err != nil {
+		return err
+	}
+	defer stopDebug()
+
+	pool, err := openPGPool(ctx)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	brokers := splitCSV(os.Getenv("NEXUSIM_KAFKA_BROKERS"))
+	if len(brokers) == 0 {
+		return errors.New("NEXUSIM_KAFKA_BROKERS is required")
+	}
+	producer, err := kafkainfra.NewWriterProducer(brokers)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if closeErr := producer.Close(); closeErr != nil {
+			log.Printf("admin-service outbox relay producer close failed: %v", closeErr)
+		}
+	}()
+
+	relay := outbox.NewRelay(
+		postgresinfra.NewOutboxStore(pool),
+		producer,
+		outbox.Config{
+			Topic:          envString("NEXUSIM_ADMIN_EVENTS_TOPIC", outbox.TopicAdminEvents),
+			BatchSize:      envInt("NEXUSIM_ADMIN_OUTBOX_BATCH_SIZE", 500),
+			PollInterval:   envDuration("NEXUSIM_ADMIN_OUTBOX_POLL_INTERVAL", time.Second),
+			MaxAttempts:    envInt("NEXUSIM_ADMIN_OUTBOX_MAX_ATTEMPTS", 5),
+			RetryBaseDelay: envDuration("NEXUSIM_ADMIN_OUTBOX_RETRY_BASE_DELAY", time.Second),
+			ErrorBackoff:   envDuration("NEXUSIM_ADMIN_OUTBOX_ERROR_BACKOFF", time.Second),
+			Logf:           log.Printf,
+		},
+	)
+	log.Printf("admin-service outbox relay publishing to %s via brokers %s", envString("NEXUSIM_ADMIN_EVENTS_TOPIC", outbox.TopicAdminEvents), strings.Join(brokers, ","))
+	return relay.Run(ctx)
+}
+
 func adminModeFromEnv() string {
 	mode := strings.TrimSpace(os.Getenv("NEXUSIM_ADMIN_SERVICE_MODE"))
 	if mode == "" {
@@ -124,7 +176,7 @@ func adminModeFromEnv() string {
 
 func validateAdminMode(mode string) error {
 	switch mode {
-	case "noop", "grpc":
+	case "noop", "grpc", "outbox-relay":
 		return nil
 	default:
 		return fmt.Errorf("unsupported NEXUSIM_ADMIN_SERVICE_MODE %q", mode)
@@ -186,6 +238,42 @@ func envString(name string, fallback string) string {
 		return fallback
 	}
 	return value
+}
+
+func envInt(name string, fallback int) int {
+	raw := strings.TrimSpace(os.Getenv(name))
+	if raw == "" {
+		return fallback
+	}
+	value, err := strconv.Atoi(raw)
+	if err != nil || value <= 0 {
+		return fallback
+	}
+	return value
+}
+
+func envDuration(name string, fallback time.Duration) time.Duration {
+	raw := strings.TrimSpace(os.Getenv(name))
+	if raw == "" {
+		return fallback
+	}
+	value, err := time.ParseDuration(raw)
+	if err != nil || value <= 0 {
+		return fallback
+	}
+	return value
+}
+
+func splitCSV(value string) []string {
+	parts := strings.Split(value, ",")
+	items := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			items = append(items, part)
+		}
+	}
+	return items
 }
 
 func openPGPool(ctx context.Context) (*pgxpool.Pool, error) {

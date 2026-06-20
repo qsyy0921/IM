@@ -9,6 +9,7 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 $servicesRoot = Join-Path $repoRoot "services"
 
 $expectedProducerFiles = @(
+    "services\admin-service\internal\infrastructure\kafka\producer.go",
     "services\agent-service\internal\infrastructure\kafka\producer.go",
     "services\contacts-service\internal\infrastructure\kafka\producer.go",
     "services\delivery-service\internal\infrastructure\kafka\producer.go",

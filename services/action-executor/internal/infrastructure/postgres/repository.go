@@ -16,6 +16,12 @@ type Repository struct {
 	pool *pgxpool.Pool
 }
 
+type providerFailureRetryRow struct {
+	TenantID          string
+	ProviderFailureID string
+	RetryCount        int
+}
+
 func NewRepository(pool *pgxpool.Pool) Repository {
 	return Repository{pool: pool}
 }
@@ -228,6 +234,92 @@ INSERT INTO action_executor_provider_failures (
 	return nil
 }
 
+func (repository Repository) ProcessDueProviderFailures(
+	ctx context.Context,
+	limit int,
+	maxAttempts int,
+	retryBaseDelay time.Duration,
+	now time.Time,
+) (types.ProviderFailureRetryStats, error) {
+	if repository.pool == nil {
+		return types.ProviderFailureRetryStats{}, errors.Join(types.ErrExecutionAuditFailed, errors.New("nil pg pool"))
+	}
+	limit, maxAttempts, retryBaseDelay, now = normalizeProviderFailureRetryConfig(limit, maxAttempts, retryBaseDelay, now)
+	tx, err := repository.pool.Begin(ctx)
+	if err != nil {
+		return types.ProviderFailureRetryStats{}, fmt.Errorf("%w: %v", types.ErrExecutionAuditFailed, err)
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+	rows, err := tx.Query(ctx, `
+SELECT tenant_id, provider_failure_id, retry_count
+FROM action_executor_provider_failures
+WHERE status = 'RETRY_PENDING'
+  AND retryable = TRUE
+  AND next_retry_at IS NOT NULL
+  AND next_retry_at <= $1
+ORDER BY next_retry_at, created_at, provider_failure_id
+LIMIT $2
+FOR UPDATE SKIP LOCKED`, now, limit)
+	if err != nil {
+		return types.ProviderFailureRetryStats{}, fmt.Errorf("%w: %v", types.ErrExecutionAuditFailed, err)
+	}
+	ready := make([]providerFailureRetryRow, 0, limit)
+	for rows.Next() {
+		var row providerFailureRetryRow
+		if err := rows.Scan(&row.TenantID, &row.ProviderFailureID, &row.RetryCount); err != nil {
+			return types.ProviderFailureRetryStats{}, fmt.Errorf("%w: %v", types.ErrExecutionAuditFailed, err)
+		}
+		ready = append(ready, row)
+	}
+	if err := rows.Err(); err != nil {
+		return types.ProviderFailureRetryStats{}, fmt.Errorf("%w: %v", types.ErrExecutionAuditFailed, err)
+	}
+	rows.Close()
+
+	stats := types.ProviderFailureRetryStats{Fetched: len(ready)}
+	for _, row := range ready {
+		nextRetryCount := row.RetryCount + 1
+		if nextRetryCount >= maxAttempts {
+			if _, err := tx.Exec(ctx, `
+UPDATE action_executor_provider_failures
+SET retry_count = $3,
+    status = 'DLQ',
+    retryable = FALSE,
+    next_retry_at = NULL,
+    dead_lettered_at = $4
+WHERE tenant_id = $1 AND provider_failure_id = $2`,
+				row.TenantID,
+				row.ProviderFailureID,
+				nextRetryCount,
+				now,
+			); err != nil {
+				return types.ProviderFailureRetryStats{}, fmt.Errorf("%w: %v", types.ErrExecutionAuditFailed, err)
+			}
+			stats.DeadLettered++
+			continue
+		}
+		if _, err := tx.Exec(ctx, `
+UPDATE action_executor_provider_failures
+SET retry_count = $3,
+    next_retry_at = $4
+WHERE tenant_id = $1 AND provider_failure_id = $2`,
+			row.TenantID,
+			row.ProviderFailureID,
+			nextRetryCount,
+			now.Add(providerFailureRetryDelay(retryBaseDelay, nextRetryCount)),
+		); err != nil {
+			return types.ProviderFailureRetryStats{}, fmt.Errorf("%w: %v", types.ErrExecutionAuditFailed, err)
+		}
+		stats.Rescheduled++
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return types.ProviderFailureRetryStats{}, fmt.Errorf("%w: %v", types.ErrExecutionAuditFailed, err)
+	}
+	return stats, nil
+}
+
 func truncateLowSensitive(value string, max int) string {
 	value = strings.TrimSpace(value)
 	if max <= 0 {
@@ -245,4 +337,36 @@ func nullableTime(value time.Time) any {
 		return nil
 	}
 	return value
+}
+
+func normalizeProviderFailureRetryConfig(
+	limit int,
+	maxAttempts int,
+	retryBaseDelay time.Duration,
+	now time.Time,
+) (int, int, time.Duration, time.Time) {
+	if limit <= 0 {
+		limit = 100
+	}
+	if maxAttempts <= 0 {
+		maxAttempts = 3
+	}
+	if retryBaseDelay <= 0 {
+		retryBaseDelay = 30 * time.Second
+	}
+	if now.IsZero() {
+		now = time.Now().UTC()
+	}
+	return limit, maxAttempts, retryBaseDelay, now.UTC()
+}
+
+func providerFailureRetryDelay(base time.Duration, nextRetryCount int) time.Duration {
+	if nextRetryCount <= 1 {
+		return base
+	}
+	shift := nextRetryCount - 1
+	if shift > 6 {
+		shift = 6
+	}
+	return base * time.Duration(1<<shift)
 }

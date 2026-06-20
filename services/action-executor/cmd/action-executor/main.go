@@ -20,6 +20,7 @@ import (
 	postgresinfra "github.com/qsyy0921/IM/services/action-executor/internal/infrastructure/postgres"
 	rpcinfra "github.com/qsyy0921/IM/services/action-executor/internal/infrastructure/rpc"
 	toolinfra "github.com/qsyy0921/IM/services/action-executor/internal/infrastructure/tool"
+	"github.com/qsyy0921/IM/services/action-executor/internal/trigger/providerfailure"
 	"google.golang.org/grpc"
 )
 
@@ -42,9 +43,48 @@ func run(ctx context.Context) error {
 		return runNoop(ctx)
 	case "grpc":
 		return runGRPC(ctx)
+	case "provider-failure-worker":
+		return runProviderFailureWorker(ctx)
 	default:
 		return fmt.Errorf("unsupported NEXUSIM_ACTION_EXECUTOR_MODE %q", mode)
 	}
+}
+
+func runProviderFailureWorker(ctx context.Context) error {
+	debugAddr, err := actionExecutorDebugAddrFromEnv()
+	if err != nil {
+		return err
+	}
+	stopDebug, err := startDebugServer(ctx, debugAddr)
+	if err != nil {
+		return err
+	}
+	defer stopDebug()
+
+	pool, err := openPGPool(ctx)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	worker := providerfailure.NewWorker(postgresinfra.NewRepository(pool), providerfailure.Config{
+		BatchSize:      envInt("NEXUSIM_ACTION_EXECUTOR_PROVIDER_FAILURE_BATCH_SIZE", 100),
+		MaxAttempts:    envInt("NEXUSIM_ACTION_EXECUTOR_PROVIDER_FAILURE_MAX_ATTEMPTS", 3),
+		RetryBaseDelay: envDuration("NEXUSIM_ACTION_EXECUTOR_PROVIDER_FAILURE_RETRY_BASE_DELAY", 30*time.Second),
+		PollInterval:   envDuration("NEXUSIM_ACTION_EXECUTOR_PROVIDER_FAILURE_POLL_INTERVAL", time.Second),
+		ErrorBackoff:   envDuration("NEXUSIM_ACTION_EXECUTOR_PROVIDER_FAILURE_ERROR_BACKOFF", time.Second),
+		Logf:           log.Printf,
+	})
+	if envBool("NEXUSIM_ACTION_EXECUTOR_PROVIDER_FAILURE_RUN_ONCE", false) {
+		stats, err := worker.RunOnce(ctx)
+		if err != nil {
+			return err
+		}
+		log.Printf("action-executor provider failure worker run-once: fetched=%d rescheduled=%d dead_lettered=%d", stats.Fetched, stats.Rescheduled, stats.DeadLettered)
+		return nil
+	}
+	log.Println("action-executor provider failure worker started")
+	return worker.Run(ctx)
 }
 
 func runNoop(ctx context.Context) error {
@@ -199,7 +239,7 @@ func actionExecutorModeFromEnv() string {
 
 func validateActionExecutorMode(mode string) error {
 	switch mode {
-	case "noop", "grpc":
+	case "noop", "grpc", "provider-failure-worker":
 		return nil
 	default:
 		return fmt.Errorf("unsupported NEXUSIM_ACTION_EXECUTOR_MODE %q", mode)
@@ -281,6 +321,18 @@ func envInt(name string, fallback int) int {
 		return fallback
 	}
 	parsed, err := strconv.Atoi(value)
+	if err != nil {
+		return fallback
+	}
+	return parsed
+}
+
+func envBool(name string, fallback bool) bool {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		return fallback
+	}
+	parsed, err := strconv.ParseBool(value)
 	if err != nil {
 		return fallback
 	}

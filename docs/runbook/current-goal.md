@@ -37,13 +37,13 @@ group memory -> EvidencePack -> RAG -> summary -> multi-agent
   Summary live negative adapter、Python / model-output negative regression cases、
   RAG / Summary citation source-ref regression、external MCP fallback eval cases、
   Agent output regression、action preflight / rate-limit / DLQ-repair safety eval、
-  action-executor provider failure retry/DLQ skeleton。既有 eval 报告见
+  action-executor provider failure retry/DLQ skeleton、worker 和 redrive safety eval。既有 eval 报告见
   `docs/runbook/loadtest/ai-eval-service/`。
 
 下一步默认推进：
 
 ```text
-继续扩 action-executor provider retry worker / operator redrive safety eval
+继续扩 memory-service group memory source-ref / validity / supersession eval
 ```
 
 硬边界：RAG / summary / Agent 只能消费 EvidencePack；真实写动作必须走

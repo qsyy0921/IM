@@ -262,6 +262,12 @@ type ProviderFailureProjection struct {
 	CreatedAt         time.Time
 }
 
+type ProviderFailureRetryStats struct {
+	Fetched      int
+	Rescheduled  int
+	DeadLettered int
+}
+
 type ExecuteApprovedActionResult struct {
 	TenantID          TenantID
 	UserID            UserID

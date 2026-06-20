@@ -355,6 +355,7 @@ func applyProjectionMigrations(ctx context.Context, pool *pgxpool.Pool) error {
 		filepath.Join("migrations", "postgres", "agent-service", "000001_agent_proposals.sql"),
 		filepath.Join("migrations", "postgres", "action-executor", "000001_action_executor_core.sql"),
 		filepath.Join("migrations", "postgres", "action-executor", "000002_action_executor_tool_results.sql"),
+		filepath.Join("migrations", "postgres", "action-executor", "000003_action_executor_provider_failures.sql"),
 	} {
 		data, err := os.ReadFile(path)
 		if err != nil {
@@ -369,6 +370,7 @@ func applyProjectionMigrations(ctx context.Context, pool *pgxpool.Pool) error {
 
 func cleanupTenant(ctx context.Context, pool *pgxpool.Pool, tenantID string) error {
 	for _, statement := range []string{
+		`DELETE FROM action_executor_provider_failures WHERE tenant_id = $1`,
 		`DELETE FROM action_executor_tool_results WHERE tenant_id = $1`,
 		`DELETE FROM action_executor_execution_audits WHERE tenant_id = $1`,
 		`DELETE FROM agent_proposals WHERE tenant_id = $1`,

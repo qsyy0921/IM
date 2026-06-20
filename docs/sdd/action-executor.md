@@ -4,7 +4,7 @@
 
 `action-executor` 是 NexusIM AI 应用底座中的受控动作执行边界。它承接 Agent proposal、approval 和 `mcp-gateway` prepare 之后的动作执行请求，把真实写动作纳入 policy precheck、审批关联和低敏 audit。
 
-当前第一阶段记录 approved execution boundary，并在同一事务内写低敏 tool result projection。已支持本地安全 `nexusim.local.echo` adapter first path，用于验证真实低敏 output hash / result projection；已支持外部 MCP fallback 稳定失败分类、tool output safety first path，以及显式开启的外部 HTTP provider adapter guarded first path。默认不连接外部 MCP / provider；外部 HTTP adapter 只允许 allowlist 内的 `LOW` risk tool，只发送 tool metadata / `input_sha256`，不发送 raw `input_json`，provider output 仍必须经过安全门禁后才写 hash / projection。工具 provider 失败和 unsafe output 已有 first-stage `provider_failures` 状态投影，可区分 `RETRY_PENDING` 与 `DLQ`，但尚未实现 retry worker、redrive API 或 operator UI。
+当前第一阶段记录 approved execution boundary，并在同一事务内写低敏 tool result projection。已支持本地安全 `nexusim.local.echo` adapter first path，用于验证真实低敏 output hash / result projection；已支持外部 MCP fallback 稳定失败分类、tool output safety first path，以及显式开启的外部 HTTP provider adapter guarded first path。默认不连接外部 MCP / provider；外部 HTTP adapter 只允许 allowlist 内的 `LOW` risk tool，只发送 tool metadata / `input_sha256`，不发送 raw `input_json`，provider output 仍必须经过安全门禁后才写 hash / projection。工具 provider 失败和 unsafe output 已有 first-stage `provider_failures` 状态投影和 bounded retry bookkeeping worker，可区分 `RETRY_PENDING` 与 `DLQ`，但尚未实现 redrive API、operator UI 或真实 provider replay。
 
 ## 职责
 
@@ -54,6 +54,10 @@
     `DLQ`
   - 只保存 classification、状态、retry metadata 和 `failure_ref`，不保存
     provider raw error、tool output 或 raw input。
+- `provider-failure-worker` 只处理到期 `RETRY_PENDING` 行：
+  - 未超过 max attempts 时增加 `retry_count` 并推进 `next_retry_at`
+  - 达到 max attempts 时转 `DLQ`
+  - 不调用 tool executor，不重放 provider，不需要 raw input
 - 所有 adapter output 进入响应 / hash 前必须经过安全门禁：
   valid JSON object、大小限制、无 secret-like / PII-like key 或 value。
 - 明显的 repair / redrive / DLQ / dead-letter 类 tool / resource 元数据会被
@@ -148,9 +152,9 @@ agent-service proposal
   adapter、不写 output hash。
 - tool result projection 不是 provider 输出存储；当前只记录
   `NOT_EXECUTED` / `BLOCKED` / `SUCCEEDED` 等低敏状态引用和 output hash。
-- 当前外部 HTTP adapter 只证明 guarded first path；provider failure 表只证明
-  first-stage retry / DLQ 状态投影，不代表任意 MCP server、高风险业务写动作、
-  retry worker、redrive API 或生产级 tool gateway 完成。
+- 当前外部 HTTP adapter 只证明 guarded first path；provider failure worker 只证明
+  bounded retry bookkeeping，不代表任意 MCP server、高风险业务写动作、
+  provider replay、redrive API 或生产级 tool gateway 完成。
 
 ## Migration
 
@@ -184,11 +188,11 @@ agent-service proposal
 - retry state check：
   - `RETRY_PENDING` 必须 `retryable=true` 且有 `next_retry_at`
   - `DLQ` 必须 `retryable=false` 且有 `dead_lettered_at`
-- 当前只做低敏状态投影和后续 worker / operator workflow 的输入面。
+- 当前只做低敏状态投影、bounded retry bookkeeping 和后续 operator workflow 的输入面。
 
 ## 后续
 
 - 接入更完整的真实外部 MCP adapter / tool provider。
-- provider retry worker / bounded backoff / redrive API。
-- 正式 repair operator handoff。
+- redrive API / 正式 repair operator handoff。
+- provider failure metrics / operator UI。
 - 外部 audit sink。

@@ -33,10 +33,9 @@ provider-grade 运维和完整系统测试暂不作为当前转进阻塞。
    expansion、negative RAG / Agent cases、Summary live negative adapter、
    Python / model-output negative cases、RAG / Summary citation regression、
    external MCP fallback、Agent output regression、action preflight / rate-limit / DLQ-repair safety eval
-   和 action-executor provider failure retry/DLQ skeleton 已落；仍不得保存 raw prompt、
+   和 action-executor provider failure skeleton / worker / redrive safety eval 已落；仍不得保存 raw prompt、
    EvidencePack、model output、用户正文、secret 或 tool input。
-   继续补 action-executor provider retry worker / operator redrive safety eval。所有 eval case 必须低敏，可复核，能区分 retrieval failure、reasoning failure 和
-   action boundary failure。
+   后续 eval case 必须低敏，可复核，能区分 retrieval failure、reasoning failure 和 action boundary failure。
 
 2. Memory / retrieval 深化：
    `memory-service` 继续按 2025/2026 group memory / collaborative memory 论文

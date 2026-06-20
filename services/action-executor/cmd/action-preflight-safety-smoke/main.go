@@ -89,7 +89,7 @@ func parseConfig(args []string) (smokeConfig, error) {
 }
 
 func runSmoke(ctx context.Context) (smokeSummary, error) {
-	cases := make([]smokeCase, 0, 10)
+	cases := make([]smokeCase, 0, 11)
 
 	policyDenied, err := runCase(ctx, caseConfig{
 		id:       "action-preflight-policy-denied",
@@ -280,6 +280,28 @@ func runSmoke(ctx context.Context) (smokeSummary, error) {
 	}
 	cases = append(cases, repairGuard)
 
+	providerFailureRedrive, err := runCase(ctx, caseConfig{
+		id:       "action-preflight-provider-failure-redrive-operator-required",
+		skill:    activeProviderFailureRedriveSkill(),
+		policy:   allowingPolicy(),
+		approval: approvedProposal{},
+		executor: &recordingToolExecutor{
+			result: types.ToolExecutionResult{
+				Executed:   true,
+				OutputJSON: `{"status":"should-not-run"}`,
+			},
+		},
+		limiter: fakeRateLimiter{decision: types.ActionRateLimitDecision{Allowed: true}},
+		command: providerFailureRedriveCommand(),
+	})
+	if err != nil {
+		return smokeSummary{}, err
+	}
+	if !isBlocked(providerFailureRedrive, "ACTION_REPAIR_REQUIRES_OPERATOR") || providerFailureRedrive.ExecutorCalled {
+		return smokeSummary{}, fmt.Errorf("unexpected provider failure redrive guard case: %+v", providerFailureRedrive)
+	}
+	cases = append(cases, providerFailureRedrive)
+
 	repairPolicyDenied, err := runCase(ctx, caseConfig{
 		id:       "action-preflight-dlq-repair-policy-denied",
 		skill:    activeRepairSkill(),
@@ -445,6 +467,21 @@ func repairCommand() types.ExecuteApprovedActionCommand {
 	return command
 }
 
+func providerFailureRedriveCommand() types.ExecuteApprovedActionCommand {
+	command := localEchoCommand("HIGH")
+	command.ProposalID = "proposal-action-provider-failure-redrive"
+	command.ApprovalID = "approval-action-provider-failure-redrive"
+	command.PreparedAuditID = "mcp-audit-action-provider-failure-redrive"
+	command.SkillID = "action.provider_failure.redrive"
+	command.ToolName = "action.provider_failure.redrive"
+	command.ResourceType = "action_executor_provider_failures_dlq"
+	command.ResourceID = "provider-failure-fixture"
+	command.Intent = "operator approved provider failure redrive smoke"
+	command.InputJSON = `{"provider_failure_id":"provider-failure-fixture"}`
+	command.IdempotencyKey = "action-provider-failure-redrive-safety"
+	return command
+}
+
 func activeSkill(toolName string, riskLevel string) types.SkillDefinition {
 	return types.SkillDefinition{
 		TenantID:         "tenant-action-preflight",
@@ -460,6 +497,12 @@ func activeSkill(toolName string, riskLevel string) types.SkillDefinition {
 func activeRepairSkill() types.SkillDefinition {
 	skill := activeSkill("delivery.outbox.repair", "HIGH")
 	skill.SkillID = "delivery.outbox.repair"
+	return skill
+}
+
+func activeProviderFailureRedriveSkill() types.SkillDefinition {
+	skill := activeSkill("action.provider_failure.redrive", "HIGH")
+	skill.SkillID = "action.provider_failure.redrive"
 	return skill
 }
 

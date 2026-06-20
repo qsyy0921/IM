@@ -1,6 +1,6 @@
 # action-executor Brief
 
-状态：foundation-active / approved execution audit + guarded adapters + provider failure projection.
+状态：foundation-active / approved execution audit + guarded adapters + provider failure worker.
 
 ## 已落
 
@@ -16,7 +16,7 @@
 - Tool output safety：malformed / oversize / secret-like / PII-like output fail closed，不入 hash。
 - Docker / Prometheus / Grafana wiring、聚焦测试、PG integration、Agent execution eval adapter、external HTTP adapter eval / failure smoke、preflight safety eval。
 - Action rate-limit / repair-DLQ safety：rate-limited action 在 tool execution 前 `BLOCKED`；limiter unavailable fail closed 为 `FAILED`；repair / DLQ action 需 operator workflow，不进通用 adapter。
-- Provider failure skeleton：timeout / unavailable / rate-limit -> `RETRY_PENDING`；permission denied / unsafe / generic failure -> `DLQ`；只保存低敏分类、状态和 ref。
+- Provider failure lifecycle：timeout / unavailable / rate-limit -> `RETRY_PENDING`；permission denied / unsafe / generic failure -> `DLQ`；worker 只做 bounded retry bookkeeping / DLQ，不重放 tool。
 
 ## 边界
 
@@ -27,4 +27,4 @@
 
 ## 下一步
 
-- provider retry worker / operator redrive safety eval。
+- 后续 redrive API / metrics / operator UI；默认主线转回 memory / retrieval 深化。

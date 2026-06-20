@@ -432,6 +432,22 @@ services:
       nexusim-services:
         ipv4_address: 172.30.80.35
 
+  knowledge-ingestion-service-grpc:
+    image: nexusim/knowledge-ingestion-service:local
+    container_name: nexusim-knowledge-ingestion-service-grpc
+    environment:
+      NEXUSIM_KNOWLEDGE_INGESTION_SERVICE_MODE: grpc
+      NEXUSIM_KNOWLEDGE_INGESTION_GRPC_ADDR: 172.30.80.36:10740
+      NEXUSIM_KNOWLEDGE_INGESTION_DEBUG_ADDR: 172.30.80.36:11933
+      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@host.docker.internal:5432/nexusim?sslmode=disable
+    ports:
+      - "10740:10740"
+      - "11933:11933"
+    restart: unless-stopped
+    networks:
+      nexusim-services:
+        ipv4_address: 172.30.80.36
+
   push-gateway-ws:
     image: nexusim/push-gateway:local
     container_name: nexusim-push-gateway-ws

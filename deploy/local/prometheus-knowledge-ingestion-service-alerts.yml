@@ -1,0 +1,20 @@
+groups:
+  - name: nexusim-knowledge-ingestion-service
+    rules:
+      - alert: NexusIMKnowledgeIngestionServiceDown
+        expr: up{service="knowledge-ingestion-service"} == 0
+        for: 2m
+        labels:
+          severity: warning
+          service: knowledge-ingestion-service
+        annotations:
+          summary: "knowledge-ingestion-service metrics endpoint is down"
+
+      - alert: NexusIMKnowledgeIngestionServiceInfoMissing
+        expr: absent(nexusim_knowledge_ingestion_service_info)
+        for: 2m
+        labels:
+          severity: warning
+          service: knowledge-ingestion-service
+        annotations:
+          summary: "knowledge-ingestion-service info metric is missing"

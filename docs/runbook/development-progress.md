@@ -75,6 +75,13 @@
   Prometheus / Grafana 覆盖已落；当前覆盖 `InvokeTextGeneration`、
   `GetModelInvocation`、allowlisted deterministic mock provider、低敏
   invocation metadata 和 `model_outbox`；最小 gRPC smoke 已通过并归档。
+- `knowledge-ingestion-service` product-active：SDD v0.1 和 stage-switch review
+  已通过，第一版 proto / migration / 六层 skeleton / `grpc` runtime / Docker /
+  Prometheus / Grafana 覆盖已落；当前覆盖 `CreateKnowledgeSource`、
+  `SubmitIngestionJob`、`GetIngestionJob`、`ListKnowledgeChunks`、本地 metadata +
+  chunk manifest、低敏 `knowledge_outbox`；真实 PG 集成测试已验证 source + job +
+  chunks + outbox 同事务，且 outbox 不含 source URI、object key、chunk text 或
+  parser raw error。
 
 当前 Go 侧服务底座、控制面、EvidencePack、proposal / approval / audit、
 Python Worker 候选接入边界和低敏 eval 持久化已经足够支撑算法切片；
@@ -84,8 +91,6 @@ Python Worker 候选接入边界和低敏 eval 持久化已经足够支撑算法
 当前尚未真实实现的后续产品化 / 平台服务：
 
 - `admin-service`（SDD v0.1 draft 已存在）
-- `knowledge-ingestion-service`（SDD v0.1 draft 和 stage-switch review 已完成，
-  尚未创建服务目录）
 - `workflow-service`（SDD v0.1 draft 和 stage-switch review 已完成，尚未创建服务目录）
 - `vector-index-service`（SDD v0.1 draft 已存在）
 

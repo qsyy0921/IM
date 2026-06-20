@@ -73,6 +73,8 @@ Foundation backlog 锚点：`search-service`、`memory-service`、`retrieval-gat
 - `model-gateway`：后续仍需真实 OpenAI / Claude / local-model HTTP provider、
   embedding、rerank、outbox relay、route-refresh worker、budget-reset worker 和
   cleanup worker。
+- `knowledge-ingestion-service`：后续仍需 parser worker、embedding handoff、
+  tombstone / delete proof、outbox relay、vector-index handoff 和真实 connector。
 
 ## 后置平台 / 产品化服务
 
@@ -82,9 +84,6 @@ Foundation backlog 锚点：`search-service`、`memory-service`、`retrieval-gat
 - `workflow-service`：stage-switch approved；下一步做 `CreateWorkflow` /
   `RecordWorkflowDecision` / `GetWorkflow` 第一版实现，先支持 action approval 和
   repair approval。
-- `knowledge-ingestion-service`：stage-switch approved；下一步做
-  `CreateKnowledgeSource` / `SubmitIngestionJob` / `GetIngestionJob` /
-  `ListKnowledgeChunks` 第一版实现，先支持本地 metadata + chunk manifest。
 - `vector-index-service`：向量索引写入、重建、backfill；满足拆分条件后再独立。
 
 新增服务必须满足独立模型 / 伸缩 / 故障 / 安全边界或明显降复杂度，并通过 ADR / SDD v0.1。

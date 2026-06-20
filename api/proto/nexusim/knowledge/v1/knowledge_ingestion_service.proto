@@ -1,0 +1,163 @@
+syntax = "proto3";
+
+package nexusim.knowledge.v1;
+
+option go_package = "github.com/qsyy0921/IM/api/proto/nexusim/knowledge/v1;knowledgev1";
+
+service KnowledgeIngestionService {
+  rpc CreateKnowledgeSource(CreateKnowledgeSourceRequest) returns (CreateKnowledgeSourceResponse);
+  rpc SubmitIngestionJob(SubmitIngestionJobRequest) returns (SubmitIngestionJobResponse);
+  rpc GetIngestionJob(GetIngestionJobRequest) returns (GetIngestionJobResponse);
+  rpc ListKnowledgeChunks(ListKnowledgeChunksRequest) returns (ListKnowledgeChunksResponse);
+}
+
+message AuthContext {
+  string tenant_id = 1;
+  string user_id = 2;
+  string service_name = 3;
+  string instance_ref = 4;
+  string trace_id = 5;
+  string request_id = 6;
+}
+
+message KnowledgeSource {
+  string tenant_id = 1;
+  string source_id = 2;
+  string source_type = 3;
+  string source_ref_hash = 4;
+  string media_object_ref = 5;
+  string owner_ref = 6;
+  string visibility_scope = 7;
+  string data_class = 8;
+  string content_hash = 9;
+  string mime_type = 10;
+  int64 size_bytes = 11;
+  string source_version = 12;
+  string retention_policy_ref = 13;
+  string status = 14;
+  int64 created_at_unix_ms = 15;
+  int64 updated_at_unix_ms = 16;
+}
+
+message KnowledgeIngestionJob {
+  string tenant_id = 1;
+  string job_id = 2;
+  string source_id = 3;
+  string source_version = 4;
+  string job_type = 5;
+  string parser_profile = 6;
+  string chunk_profile = 7;
+  string embedding_policy_ref = 8;
+  string vector_policy_ref = 9;
+  string requested_by = 10;
+  string status = 11;
+  string failure_class = 12;
+  string public_error = 13;
+  int64 created_at_unix_ms = 14;
+  int64 completed_at_unix_ms = 15;
+}
+
+message KnowledgeChunk {
+  string tenant_id = 1;
+  string chunk_id = 2;
+  string source_id = 3;
+  string document_id = 4;
+  int32 chunk_index = 5;
+  string chunk_hash = 6;
+  string chunk_preview_redacted = 7;
+  string source_version = 8;
+  string visibility_scope = 9;
+  string data_class = 10;
+  string chunk_version = 11;
+  string status = 12;
+  string tombstone_status = 13;
+  string policy_version = 14;
+  string delete_proof_id = 15;
+  int64 created_at_unix_ms = 16;
+  int64 updated_at_unix_ms = 17;
+}
+
+message ChunkManifestItem {
+  string chunk_hash = 1;
+  string chunk_preview_redacted = 2;
+  string visibility_scope = 3;
+  string data_class = 4;
+  string policy_version = 5;
+  string chunk_version = 6;
+}
+
+message CreateKnowledgeSourceRequest {
+  AuthContext auth_context = 1;
+  string source_type = 2;
+  string source_ref = 3;
+  string source_uri_hash = 4;
+  string media_object_ref = 5;
+  string owner_ref = 6;
+  string visibility_scope = 7;
+  string data_class = 8;
+  string content_hash = 9;
+  string mime_type = 10;
+  int64 size_bytes = 11;
+  string source_version = 12;
+  string retention_policy_ref = 13;
+  string idempotency_key = 14;
+  string correlation_id = 15;
+  string causation_id = 16;
+  string trace_id = 17;
+}
+
+message CreateKnowledgeSourceResponse {
+  KnowledgeSource source = 1;
+  bool replayed = 2;
+}
+
+message SubmitIngestionJobRequest {
+  AuthContext auth_context = 1;
+  string source_id = 2;
+  string source_version = 3;
+  string job_type = 4;
+  string parser_profile = 5;
+  string chunk_profile = 6;
+  string embedding_policy_ref = 7;
+  string vector_policy_ref = 8;
+  string requested_by = 9;
+  string idempotency_key = 10;
+  string document_hash = 11;
+  string mime_type = 12;
+  int64 size_bytes = 13;
+  int32 page_count = 14;
+  string language = 15;
+  repeated ChunkManifestItem chunks = 16;
+  string correlation_id = 17;
+  string causation_id = 18;
+  string trace_id = 19;
+}
+
+message SubmitIngestionJobResponse {
+  KnowledgeIngestionJob job = 1;
+  string document_id = 2;
+  int32 chunk_count = 3;
+  bool replayed = 4;
+}
+
+message GetIngestionJobRequest {
+  AuthContext auth_context = 1;
+  string job_id = 2;
+}
+
+message GetIngestionJobResponse {
+  KnowledgeIngestionJob job = 1;
+}
+
+message ListKnowledgeChunksRequest {
+  AuthContext auth_context = 1;
+  string source_id = 2;
+  string document_id = 3;
+  int32 page_size = 4;
+  string page_token = 5;
+}
+
+message ListKnowledgeChunksResponse {
+  repeated KnowledgeChunk chunks = 1;
+  string next_page_token = 2;
+}

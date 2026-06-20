@@ -20,6 +20,7 @@ protoc `
     "$ApiProtoDir/nexusim/delivery/v1/delivery_service.proto" `
     "$ApiProtoDir/nexusim/gateway/v1/gateway_service.proto" `
     "$ApiProtoDir/nexusim/identity/v1/identity_service.proto" `
+    "$ApiProtoDir/nexusim/knowledge/v1/knowledge_ingestion_service.proto" `
     "$ApiProtoDir/nexusim/media/v1/media_service.proto" `
     "$ApiProtoDir/nexusim/memory/v1/memory_service.proto" `
     "$ApiProtoDir/nexusim/mcpgateway/v1/mcp_gateway_service.proto" `

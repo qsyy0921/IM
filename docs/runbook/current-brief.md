@@ -32,9 +32,10 @@ Go 侧服务底座、EvidencePack、proposal / approval / audit、Python Worker 
 future platform / product services 的 10 个 SDD draft 已存在；`media-service`、
 `notification-service`、`audit-service`、`control-plane-service`、`presence-service`
 和 `model-gateway` 已进入 product-active 并通过各自第一版 smoke。
-`workflow-service` 和 `knowledge-ingestion-service` 已通过 stage-switch review，
-下一步默认进入 `knowledge-ingestion-service` 或 `workflow-service` 第一版
-implementation slice；也可以先做 `admin-service` stage-switch。
+`knowledge-ingestion-service` 已完成第一版 metadata + chunk manifest path；
+`workflow-service` 已通过 stage-switch review。下一步默认进入
+`workflow-service` 第一版 implementation slice，也可以先做 `admin-service` /
+`vector-index-service` stage-switch。
 ```
 
 系统测试 / HA / 长压 / sizing 后置；总览、待办、单服务状态分别看

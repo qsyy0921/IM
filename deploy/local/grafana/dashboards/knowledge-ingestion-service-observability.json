@@ -1,0 +1,62 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "targets": [
+        {
+          "expr": "nexusim_knowledge_ingestion_service_info",
+          "legendFormat": "knowledge-ingestion-service"
+        },
+        {
+          "expr": "up{service=\"knowledge-ingestion-service\"}",
+          "legendFormat": "metrics up"
+        }
+      ],
+      "title": "Knowledge ingestion runtime",
+      "type": "stat"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "style": "dark",
+  "tags": [
+    "nexusim",
+    "knowledge-ingestion-service"
+  ],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timezone": "browser",
+  "title": "NexusIM knowledge-ingestion-service observability",
+  "uid": "nexusim-knowledge-ingestion-service",
+  "version": 1,
+  "weekStart": ""
+}

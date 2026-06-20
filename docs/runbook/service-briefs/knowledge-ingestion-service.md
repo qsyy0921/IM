@@ -1,8 +1,6 @@
 # knowledge-ingestion-service
 
-状态：future / SDD v0.1 draft / stage-switch approved / implementation pending。
-当前不得创建 `services/knowledge-ingestion-service` 目录，直到实现切片同步切换
-service registry、proto、migration、runtime、Docker 和 observability。
+状态：product-active，第一版 metadata + chunk manifest path 已落。
 
 设计入口：`docs/sdd/knowledge-ingestion-service.md`。
 
@@ -18,13 +16,15 @@ pipeline、权限 metadata、增量重建和导入审计。
 - chunk / embedding 必须带 source ref、版本、visibility 和 delete proof。
 - Python parser / embedding worker 只能返回候选，Go 服务拥有状态和审计。
 
-第一切片建议：
+已落第一切片：
 
-- 先按 SDD 落 proto / migration / 六层 skeleton，并同步
-  `docs/runbook/service-registry.json`。
-- 先支持本地文档 metadata + chunk manifest，不接真实 provider。
-- 输出低敏 ingestion event，后续交给 vector-index / retrieval。
-- 确认 source URI、object key、chunk text、parser raw error 不进入事件 / metrics。
-- 第一版只做 `CreateKnowledgeSource`、`SubmitIngestionJob`、`GetIngestionJob`
-  和 `ListKnowledgeChunks`；真实 provider parsing、embedding、crawler 和
-  vector-store write 后置。
+- `knowledge_ingestion_service.proto`、PostgreSQL core migration、六层 skeleton、
+  `grpc` runtime、Docker / Prometheus / Grafana wiring 已落。
+- 当前覆盖 `CreateKnowledgeSource`、`SubmitIngestionJob`、`GetIngestionJob`、
+  `ListKnowledgeChunks`。
+- 第一版只支持本地 document metadata + chunk manifest，不接真实 parser /
+  embedding / crawler / vector provider。
+- 真实 PG 集成测试覆盖 source + job + chunks + low-sensitive outbox transaction。
+- outbox payload 不包含 source URI、object key、chunk text、parser raw error。
+- 后续补 parser worker、embedding handoff、tombstone/delete proof、outbox relay
+  和 vector-index handoff。

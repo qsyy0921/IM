@@ -221,7 +221,11 @@
     },
     {
       "name": "knowledge-ingestion-service",
-      "stage": "future"
+      "stage": "product-active",
+      "local_process": "knowledge-ingestion-service-grpc",
+      "debug_port": 11933,
+      "prometheus_rule_file": "prometheus-knowledge-ingestion-service-alerts.yml",
+      "grafana_dashboard": "knowledge-ingestion-service-observability.json"
     }
   ],
   "worker_roles": [

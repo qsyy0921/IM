@@ -334,5 +334,7 @@ media-orphan-cleanup
   outbox store、Kafka producer、trigger relay 和 `outbox-relay` runtime mode。
 - 真实 PostgreSQL 测试已覆盖同一 asset 事件按递增 `id` 顺序发布、低版本 DLQ
   阻塞后续事件、retry 写稳定低敏 `last_error`。
-- 下一步仍需真实 Kafka outbox relay smoke 和 processing worker；真实 S3、
-  scanner、thumbnail/transcode provider 继续后置。
+- 真实 Kafka outbox relay smoke 已通过，验证 `media_outbox PUBLISHED=2`、
+  `PENDING=0`、`DLQ=0`，并从 Kafka 读回两个 typed `MediaEvent`。
+- 下一步仍需 processing worker；真实 S3、scanner、thumbnail/transcode provider
+  继续后置。

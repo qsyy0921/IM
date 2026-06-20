@@ -3,7 +3,8 @@
 状态：product-active / SDD v0.1 draft 已存在 / stage-switch review passed /
 implementation slice in progress。第一版 proto、migration、六层 skeleton、Docker 和
 观测覆盖已落；真实 PG repository 集成测试、object_key 泄露回归门禁和最小 gRPC
-smoke 已补；`media_outbox -> im.media.events` 最小 relay 代码切片已落。
+smoke 已补；`media_outbox -> im.media.events` 最小 relay 代码切片和真实 Kafka
+smoke 已落。
 
 Stage-switch 记录：`docs/runbook/stage-switch/media-service.md`。
 
@@ -25,10 +26,10 @@ Stage-switch 记录：`docs/runbook/stage-switch/media-service.md`。
 
 下一步：
 
-- media outbox relay 真实 Kafka smoke。
 - processing worker。
 - 真实 S3-compatible adapter、scanner、thumbnail / transcode provider 后置。
 
 最近 smoke：
 
 - `docs/runbook/loadtest/media-service/loadtest-report-20260620-media-grpc-smoke.md`
+- `docs/runbook/loadtest/media-service/loadtest-report-20260620-media-outbox-relay-smoke.md`

@@ -53,6 +53,10 @@
    - Kafka event 不暴露 `object_key` 或 `download_url`；
    - `media_outbox PENDING=0 / PUBLISHED=2 / DLQ=0`。
 
+报告：
+
+- `docs/runbook/loadtest/media-service/loadtest-report-20260620-media-outbox-relay-smoke.md`
+
 边界：
 
 - 这是单节点本地 Kafka smoke，不证明 Kafka HA / ISR / 网络分区语义。

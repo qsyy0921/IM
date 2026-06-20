@@ -5,7 +5,7 @@
 - 已经开发了哪些后端能力；
 - 当前系统能证明什么；
 - 还差哪些生产化和产品化能力；
-- 后续如何在 9 个核心服务必要收口后，转进搜索、记忆、检索和大模型应用后端。
+- 当前如何从 Go 微服务底座进入搜索、记忆、检索和大模型算法/eval。
 
 它不是每轮 Codex 工作入口，也不是工程待办来源；每轮工作仍先看 `docs/runbook/current-brief.md`，当前未完成工作以 `docs/runbook/remaining-goals.md` 为准。
 
@@ -51,24 +51,23 @@ candidate，不直接写 IM 业务库，不绕过 policy / approval / audit。
 第三阶段：补 delivery-service 和 push-gateway，把 durable inbox、PullInbox、AckDelivery、在线通知和跨实例 route 串起来。
 第四阶段：补 receipt-service、contacts-service、policy-service 和 api-gateway，把已读/未读、联系人、权限决策和统一入口补齐。
 第五阶段：集中治理分布式可靠性、安全启动门禁、trusted metadata / TLS 边界、repair / audit / cleanup、debug metrics 和代码复杂度。
-第六阶段：9 个核心服务做必要收口后，以 search-service v0.1 作为向 AI 大模型应用后端转进的第一步；当前 search-service 第一实现切片已跑通 projection smoke；memory-service 已跑通 source-backed projection smoke；retrieval-gateway / EvidencePack 第一轮真实 smoke 已通过，且已补 policy-service retrieval precheck 和 EvidencePack field hardening first pass；AI eval harness first pass 已有低敏 case schema / validator；rag-service 已落第一版只读问答路径、`loadtest/rag`、RAG eval execution adapter、真实本地 adapter smoke、provider boundary、citation verifier first pass、guarded external HTTP LLM boundary 和服务级 Python worker candidate guard；summary-service 已落第一版只读 EvidencePack 摘要路径、真实本地 adapter smoke、guarded external HTTP LLM boundary 和服务级 Python worker candidate guard；agent-service 已落第一版 proposal-only path、真实本地 adapter smoke、MCP gateway prepare、proposal store、approval preflight、approval outbox relay 和 approval operator；skill-registry 已落第一版技能合约目录；MCP gateway 已落第一版 prepare 边界；action-executor 已落第一版 approved execution audit 边界，并会通过 agent-service 公开 RPC 校验 approved proposal / approval / prepare audit；Agent execution eval adapter 已覆盖 proposal -> approve -> execution audit / result projection 的 first path；本地安全 `nexusim.local.echo` adapter 已可真实执行并只记录 output hash；Python AI Worker foundation 已落 `ai/python` 目录、`IM` conda toolchain、candidate contract guard、output-safety eval、第一条 worker smoke、Go-side adapter smoke 和 RAG / Summary 服务级 candidate guard；外部 MCP/provider tool 仍未接。
+第六阶段：search / memory / retrieval / RAG / summary / Agent / skill-registry / MCP gateway / action-executor / ai-eval first paths 已落，EvidencePack、proposal / approval / audit、Python AI Worker 候选边界和 40/40 optional stack gate 已验证；当前正式进入 collaborative-memory 算法/eval，优先 multi-hop、temporal update 和 profile aggregation。
 ```
 
-当前项目处在第五阶段到第六阶段之间：
+当前项目已经进入第六阶段的算法/eval 切片：
 
 ```text
-9 个后端服务已经能跑通主链路；
-短期目标是对 9 个服务做必要收口，然后向 AI 大模型应用后端转进；
-短期不以生产级完整系统测试或生产级 HA 作为进入 search-service v0.1 的前置阻塞，验证重点放在当前切片的本地检查、最小 smoke、权限过滤和 EvidencePack 证据边界；
-search-service v0.1 第一实现切片已推进到 PG repository、真实 SearchMessages 查询、grpc runtime 和 timeline consumer，并已跑通 projection smoke；memory-service 已跑通 source-backed projection smoke；retrieval-gateway / EvidencePack 第一轮真实 smoke 已通过，且已补 retrieval policy precheck、EvidencePack field hardening first pass 和 AI eval harness first pass；rag-service 已落第一版只读问答路径、真实本地 adapter smoke、provider boundary、citation verifier first pass 和 guarded external HTTP LLM boundary；summary-service 已落第一版只读 EvidencePack 摘要路径、真实本地 adapter smoke 和 guarded external HTTP LLM boundary；agent-service 已落第一版 proposal-only path、真实本地 adapter smoke、mcp-gateway prepare、proposal store、approval preflight、approval outbox relay 和 approval operator；skill-registry 已落第一版技能合约目录；
-后续按 agent-service planner Python candidate integration 继续推进；
+9 个后端服务已经能跑通主链路，并作为 AI 主线的 Go 底座；
+短期不以生产级完整系统测试或生产级 HA 作为算法/eval 前置阻塞，验证重点放在低敏 cases、EvidencePack、权限过滤、source refs、时间版本和审计边界；
+search / memory / retrieval / RAG / summary / Agent / skill / MCP / executor / ai-eval first paths 已落，RAG / Summary / Agent stack 已通过 cross-group / temporal optional gate；
+后续按 low-sensitive collaborative-memory 算法/eval 推进，优先 multi-hop / temporal update / profile aggregation；
 api-gateway 已补 first-stage tenant-scoped rate limit、静态 tenant plan override、tenant plan 文件热更新、版本化 quota URL source、DB-backed tenant plan snapshot source、本地 tenant quota audit / set operator、tenant quota approval manifest 强制校验、URL bearer token / HTTPS guard、URL source CA / client cert TLS 边界、可选 checksum-required gate、applied quota snapshot stale 观测和 quota snapshot gate；
 api-gateway 已补 legacy/facade traffic metrics，以及 legacy observation-window / removal-plan 低敏 evidence manifest，用于旧 descriptor 迁移观察和归档；
 legacy descriptor 已收敛为显式 opt-in 默认；
 当前 9 个服务已补 first-stage Prometheus text /metrics、本地 Prometheus alert rules 和本地 Grafana dashboard 原型；
 api-gateway 已补 first-stage OpenTelemetry 入口 server span 和下游 gRPC client span；当前 9 个服务均已纳入 first-stage trace runtime wiring，其中 8 个后端 gRPC 服务使用 server span，push-gateway 使用 WebSocket connection span，并由采样策略和本地 check-local 门禁约束；
 本地 OTel collector debug 入口和 policy OTLP smoke 脚本已补，可用于面试演示 OTLP trace 链路，但还不是生产告警平台；
-search-service v0.1 / group memory / retrieval / RAG / summary / Agent 是下一阶段基础能力，其中 search-service 第一实现切片、memory-service source-backed projection smoke、retrieval-gateway EvidencePack smoke、retrieval policy precheck、EvidencePack field hardening first pass、AI eval harness first pass、rag-service first read-only answer path、`loadtest/rag`、RAG eval adapter、真实本地 adapter smoke、provider boundary、citation verifier first pass、guarded external HTTP LLM boundary、RAG / Summary 服务级 Python worker candidate guard、summary-service first read-only summary path、真实 adapter smoke 和 guarded external HTTP LLM boundary、agent-service first proposal-only path 和真实 adapter smoke、agent-service -> mcp-gateway prepare 接入、proposal store / approval preflight / approval outbox relay / approval operator、skill-registry first catalog path、mcp-gateway first prepare path、action-executor first execution audit / approved proposal handoff、Agent execution eval adapter first path、low-sensitive tool result projection、本地安全 tool adapter、外部 MCP fallback 稳定失败分类、tool output safety first path、Python AI Worker foundation、output-safety eval、第一条 worker smoke 和 Go-side adapter smoke 已分别完成 smoke 或实现；下一步进入 agent-service planner Python candidate integration；
+search-service v0.1 / group memory / retrieval / RAG / summary / Agent / skill / MCP / action-executor / ai-eval 已分别完成 first path、smoke 或 eval gate；当前 Go 底座已足够支撑算法切片，下一步进入 low-sensitive collaborative-memory 算法/eval；
 后续开发可以使用 multi sub-agent 并行推进，但以服务 / 文档 / 测试面拆分，最终由主 agent 统一集成和验证；
 客户端暂不纳入当前面试主线。
 ```
@@ -164,17 +163,17 @@ search-service v0.1 / group memory / retrieval / RAG / summary / Agent 是下一
 
 这里按面试表达分层。当前没有已知 P0 / P1 阻塞；下面主要是还没完成的产品能力、生产化能力和大模型应用能力。
 
-### 短期：9 个服务必要收口后转进 search-service v0.1
+### 当前：AI 大模型应用底座算法/eval
 
-短期先把已有 9 个服务做必要收口，达到 search / memory / Agent 可以依赖的事实、权限和事件边界；不以生产级完整系统测试或生产级 HA 作为转进阻塞：
+当前 9 个服务作为 Go 底座，默认只回补阻塞 AI 主线的 P0/P1；不以生产级完整系统测试或生产级 HA 作为算法/eval 阻塞：
 
 统一推进顺序：
 
-1. 补齐消息编辑 / 撤回 / 删除、群管理、成员可见窗口、回执、联系人、策略决策等 AI 依赖语义。
-2. 保持安全启动门禁、trusted metadata / TLS 边界和 policy / audit 不回退。
-3. 继续 `search-service` v0.1，先完成 projection / visibility / tombstone / `SearchMessages`。
-4. 再建设 memory / group memory、retrieval-gateway 和 EvidencePack。
-5. 之后进入 RAG / summary / Agent / skill-registry / MCP gateway / action-executor；生产级完整系统测试和生产级 HA 深水区继续后置。
+1. 扩展 low-sensitive collaborative-memory eval cases。
+2. 优先 multi-hop / temporal update / profile aggregation。
+3. 让 Python AI Worker 输出算法候选，Go 继续做权限、状态、审批、审计和 eval。
+4. 保持 EvidencePack、source refs、visibility、review state 和 proposal / approval / audit 不回退。
+5. 生产级完整系统测试和生产级 HA 深水区继续后置。
 
 | 服务 | 待开发 / 待完善功能 |
 | --- | --- |
@@ -252,18 +251,16 @@ search / RAG / Agent 后端能力。
 当前阶段是：
 
 ```text
-把已有 9 个核心服务补成 AI-ready IM 后端底座。
+Go 微服务底座已支撑 AI 算法/eval，当前推进 collaborative-memory。
 ```
 
 短期优先级：
 
-1. 补齐 message / conversation / receipt / contacts / policy 中搜索和记忆依赖的事件语义；
-2. 保持安全启动门禁、trusted metadata、TLS / mTLS 边界；
-3. 基于已通过的 `search-service` v0.1 projection smoke、`memory-service` source-backed projection smoke、`retrieval-gateway` EvidencePack smoke、retrieval policy precheck、EvidencePack 字段 first pass、AI eval case schema、rag-service first read-only answer path、真实 RAG adapter smoke、citation verifier、RAG guarded external HTTP LLM boundary、RAG / Summary 服务级 Python worker candidate guard、summary-service first read-only path、真实 summary adapter smoke、summary guarded external HTTP LLM boundary、agent-service first proposal-only path、agent-service -> mcp-gateway prepare 接入、proposal store / approval preflight / approval outbox relay / approval operator、skill-registry first catalog path、mcp-gateway first prepare path、action-executor first execution audit / approved proposal handoff、Agent execution eval adapter first path、low-sensitive tool result projection、本地安全 tool adapter、外部 MCP fallback 稳定失败分类、tool output safety first path、Python AI Worker foundation、output-safety eval、第一条 worker smoke 和 Go-side adapter smoke，继续推进 agent-service planner Python candidate integration；
-4. 保持 search visibility / tombstone 语义后续不被 RAG / Agent 绕过；
-5. 收敛必要的观测、repair、audit、DLQ 和容量证据，不把生产级完整系统测试作为短期阻塞；
-6. 再进入真实 tool adapter / approval store 的后端能力；
-7. 控制代码复杂度，避免核心文件继续变大。
+1. 扩展 multi-hop / temporal update / profile aggregation 低敏 cases；
+2. 做 memory extraction / rerank / planner / eval 候选算法；
+3. 保持 RAG / Summary / Agent 只消费 EvidencePack；
+4. 保持真实写动作必须走 policy、proposal / approval、executor 和 audit；
+5. 控制代码复杂度，避免核心文件继续变大。
 
 ## 面试讲述线
 
@@ -274,7 +271,7 @@ search / RAG / Agent 后端能力。
 
 在身份侧，我实现了登录、Refresh Token、MFA、recovery code、JWKS、challenge delivery outbox、SMTP / webhook challenge sender 和启动安全门禁。系统也补了 health、ready、debug metrics、repair、audit、cleanup、worker retry 和多种本地故障 smoke。
 
-后续我会先把 9 个核心服务做必要收口，补齐消息变更、成员窗口、群管理、回执、联系人和策略这些 AI 会依赖的 IM 语义；短期不把生产级完整系统测试作为转进阻塞，而是用切片级本地检查和最小 smoke 守住事实、权限和证据边界。当前 search-service v0.1 已跑通 projection smoke；memory-service 已跑通 source-backed group memory projection smoke；retrieval-gateway 已跑通 search + memory -> EvidencePack smoke，并已接入 first-stage 可选 policy-service retrieval precheck、EvidencePack field hardening first pass 和 AI eval harness first pass；rag-service 已落第一版只读 answer path、RAG smoke runner、eval adapter、真实本地 adapter smoke、provider boundary、citation verifier、guarded external HTTP LLM boundary 和服务级 Python worker candidate guard；summary-service 已落第一版只读 EvidencePack summary path、真实本地 adapter smoke、guarded external HTTP LLM boundary 和服务级 Python worker candidate guard；agent-service 已落第一版 proposal-only path、真实本地 adapter smoke、mcp-gateway prepare、proposal store、approval preflight、approval outbox relay 和 approval operator；skill-registry 已落第一版技能合约目录；mcp-gateway 已落第一版 tool prepare 边界，把 skill catalog、policy precheck 和低敏审计串起来但不执行外部工具；action-executor 已落第一版 approved execution audit 边界，会通过 agent-service 公开 RPC 校验 proposal / approval / prepare audit 关联，并同事务写入低敏 tool result projection；本地安全 `nexusim.local.echo` 可真实执行并只记录 output hash，外部 MCP fallback 稳定失败分类、tool output safety first path、Python AI Worker foundation、output-safety eval、第一条 worker smoke、Go-side adapter smoke 和 RAG / Summary 服务级 candidate guard 已落，真实外部 MCP/provider tool 和业务写动作仍未接。Agent execution eval adapter 已覆盖 proposal、approval、execution audit、result projection 和 safe local tool output 的低敏断言。后续做 agent-service planner Python candidate integration。大模型只能通过权限过滤后的 EvidencePack 访问聊天记录，Agent 写动作必须走 proposal、approval、executor 和 audit。
+现在 Go 微服务底座已经支撑 AI 应用链路：search、memory、retrieval、RAG、summary、Agent、skill-registry、mcp-gateway、action-executor 和 ai-eval 都有 first path 或 smoke，RAG / Summary / Agent 已通过 cross-group / temporal optional stack gate。下一步不是继续泛化清九服务 P2，而是做 collaborative-memory 算法/eval：multi-hop、temporal update、profile aggregation。大模型只能通过权限过滤后的 EvidencePack 访问聊天记录，Agent 写动作必须走 proposal、approval、executor 和 audit，Python AI Worker 只返回候选，Go 继续拥有权限、状态、审计和持久化。
 ```
 
 ## 维护规则

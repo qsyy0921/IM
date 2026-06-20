@@ -20,4 +20,4 @@ adapter、状态、计数、summary/report 引用和低敏 metadata。
 
 边界：不保存 raw EvidencePack、prompt、model output、用户正文、secret 或 tool input；不授权业务动作。
 
-下一步：继续扩展低敏 collaborative-memory cases，优先 multi-hop / temporal update / profile aggregation 边界。
+下一步：进入低敏 collaborative-memory 算法/eval，优先 multi-hop / temporal update / profile aggregation 边界。

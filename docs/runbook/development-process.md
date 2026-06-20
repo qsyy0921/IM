@@ -20,10 +20,10 @@ NexusIM 的开发顺序不是“先把所有功能铺开”，而是：
 
 ```text
 先把主链路做对
--> 把 9 个核心服务做必要收口
--> 以 search-service v0.1 建搜索、可见性和 tombstone 底座
--> 再建设 memory / retrieval / EvidencePack
--> 再扩 RAG / summary / Agent / skill-registry / mcp-gateway / action-executor / Python AI Worker 后端
+-> 把 9 个核心服务做成 AI-ready 底座
+-> 建 search / memory / retrieval / EvidencePack
+-> 建 RAG / summary / Agent / skill-registry / mcp-gateway / action-executor / Python AI Worker
+-> 进入 collaborative-memory 算法/eval
 -> 分布式可靠性和生产级完整测试按风险持续补强
 -> 最后按需要做客户端和产品化展示
 ```
@@ -107,7 +107,7 @@ NexusIM 的开发顺序不是“先把所有功能铺开”，而是：
 - 关键文档、service brief、runbook 已经稳定
 - 不要求生产级完整系统测试或生产级 HA 全部完成后才启动 `search-service` v0.1
 
-当前项目就在这个阶段。
+当前阶段已经完成到可支撑 AI 算法切片；后续只在阻塞 AI 主线时回补九服务收口。
 
 当前执行规则：
 
@@ -309,14 +309,12 @@ Web / App / 桌面端是后续产品化展示层，
 
 ## 10. 当前实际顺序
 
-按目前项目状态，最合理的顺序仍然是：
+按目前项目状态，最合理的顺序已经调整为：
 
 ```text
-补完整当前 9 个核心服务的 IM 语义和 AI 所需事件边界
--> 启动 search-service v0.1，先做 projection / visibility / tombstone / SearchMessages
--> 启动 memory / group memory / retrieval-gateway / EvidencePack
--> 再进入 rag-service / summary-service / agent-service
--> 再封装 skill-registry / mcp-gateway / action-executor / Python AI Worker foundation
+保留 9 个 IM 服务作为可运行底座
+-> 在已落 search / memory / retrieval / RAG / summary / Agent / tool / eval 链路上
+   扩展 collaborative-memory 算法/eval
 -> 生产级 HA、生产级完整系统测试和客户端产品化继续后置
 -> 后续再按需要补 media / notification / audit / admin / 客户端
 ```
@@ -324,5 +322,5 @@ Web / App / 桌面端是后续产品化展示层，
 这条顺序的关键点只有一个：
 
 ```text
-先把 AI 会依赖的数据、权限、证据和审计底座做扎实，再继续长能力；短期不等待生产级完整系统测试全部完成。
+先用低敏 eval 把 AI 会依赖的数据、权限、证据和审计边界证明清楚，再迭代算法；短期不等待生产级完整系统测试全部完成。
 ```

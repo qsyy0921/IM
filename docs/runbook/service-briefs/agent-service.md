@@ -26,4 +26,4 @@ proposal 前调用 `mcp-gateway.PrepareToolCall` 做 skill / policy / prepare au
 
 ## 下一步
 
-- 将这些跨群 / 时间窗口断言沉淀进更统一的 ai-eval gate，并继续扩展更多 Agent 场景；仍只提交 proposal。
+- 40/40 optional stack gate 已覆盖跨群 / 时间窗口断言；下一步扩展 multi-hop / temporal update / profile aggregation Agent 场景；仍只提交 proposal。

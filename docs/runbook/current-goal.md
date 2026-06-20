@@ -62,16 +62,16 @@ group memory -> EvidencePack -> RAG -> summary -> multi-agent
 - cross-group / temporal RAG / Summary / Agent service-stack consumption 和 optional
   stack gate：真实 adapter smoke 与 40/40 gate 已验证跨群 source refs / speaker
   attribution，并排除 stale / future memory。
-
+- Go 侧服务底座、EvidencePack、proposal / approval / audit、Python Worker
+  候选边界和低敏 eval 已足够支撑算法切片；后续 Go 工作只围绕候选接入、
+  边界校验、状态流转和 eval 继续补。
 下一步默认推进：
 ```text
-继续扩展低敏 collaborative-memory cases，优先 multi-hop / temporal update / profile aggregation 边界
+进入低敏 collaborative-memory 算法/eval，优先 multi-hop / temporal update / profile aggregation 边界
 ```
 
 硬边界：RAG / summary / Agent 只能消费 EvidencePack；真实写动作必须走
 policy、proposal / approval、executor 和 audit；Python 只做候选层，Go 负责控制面、事实边界和审计。
-
-## 执行规则
 
 1. 每轮先读 `prompt.md`、`agent.md` 和本文件。
 2. 需要阶段背景时读 `current-brief.md`；需要选择未完成任务时读 `remaining-goals.md`。

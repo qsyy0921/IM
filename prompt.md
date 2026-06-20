@@ -18,7 +18,7 @@
 2. 读取 prompt.md 和 agent.md，确认当前主线仍是 AI 应用底座。
 3. 读取 docs/runbook/current-goal.md 的当前 active slice；再按需读取 current-brief、remaining-goals、相关 service brief 或 SDD；不要全文扫长历史文档。
 
-当前 active slice：skill-registry、mcp-gateway、action-executor、Agent proposal / approval / audit、Python AI Worker、RAG / Summary / Agent candidate guard、ai-eval catalog / gate、negative / action / memory evals、memory-service runtime source-ref / validity / supersession query checks、retrieval-gateway EvidencePack current-only memory query、RAG / Summary / Agent API 显式 at_conversation_seq 透传、RAG / Summary / Agent current-memory consumption CI-safe regression、memory extraction confidence / review eval、current-memory service-stack live smoke、cross-group / temporal memory fixture eval、retrieval smoke、RAG / Summary / Agent service-stack consumption 和 cross-group / temporal optional stack gate 已落。下一步默认继续扩展低敏 collaborative-memory cases，优先 multi-hop / temporal update / profile aggregation 边界。
+当前 active slice：Go 侧服务底座、控制面、EvidencePack、proposal / approval / audit、Python AI Worker 候选边界、RAG / Summary / Agent candidate guard、ai-eval catalog / gate、memory-service runtime source-ref / validity / supersession query checks、retrieval-gateway current-only memory query、RAG / Summary / Agent 显式 at_conversation_seq、current-memory regression、confidence / review eval、service-stack live smoke、cross-group / temporal retrieval + RAG / Summary / Agent stack smoke 和 40/40 optional stack gate 已落。下一步默认进入低敏 collaborative-memory 算法/eval 切片，优先 multi-hop / temporal update / profile aggregation。
 
 硬边界：RAG / summary / Agent 只能消费 EvidencePack，不直接读 message / conversation / private tables；真实写动作必须继续走 policy、proposal / approval / executor / audit；Python AI Worker 只做模型 / 算法 / eval 候选层，Go 仍负责控制面和事实边界。
 

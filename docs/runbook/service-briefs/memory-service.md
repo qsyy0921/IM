@@ -25,4 +25,4 @@
 - memory extraction confidence / review eval、cross-group attribution-chain 和
   temporal query-seq version selection eval 已接入 ai-eval gate。
 
-下一步：把 cross-group / temporal eval 扩到 retrieval 或 service-stack smoke。第一版仍不做 LLM extraction，不把单条群消息直接升级为 ACTIVE profile fact。
+下一步：进入低敏 collaborative-memory 算法/eval，优先 multi-hop、temporal update 和 profile aggregation；第一版仍不把单条群消息直接升级为 ACTIVE profile fact。

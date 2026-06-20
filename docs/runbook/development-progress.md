@@ -39,6 +39,10 @@
 - Agent execution eval adapter + low-sensitive tool result projection + local safe tool adapter first path
 - Python AI Worker 边界已由 ADR-036 固定，且 foundation first path 已落：`ai/python` 目录、`IM` conda toolchain、candidate contract helpers、低敏 safety guard、contract validator、candidate-only worker CLI、malformed / unsafe output eval adapter、bad model-output rejection adapter、第一条 worker smoke、Go-side Python candidate adapter smoke，以及 `rag-service` / `summary-service` / `agent-service` 服务级 Python worker candidate guard；Python 只做模型 / 算法 / eval 候选层，Go 继续拥有控制面、状态、审计和持久化
 
+当前 Go 侧服务底座、控制面、EvidencePack、proposal / approval / audit、
+Python Worker 候选接入边界和低敏 eval 持久化已经足够支撑算法切片；
+下一步默认进入低敏 collaborative-memory 算法/eval，而不是继续泛化清九服务 P2。
+
 当前尚未真实实现的后续产品化 / 平台服务：
 
 - `media-service`
@@ -221,14 +225,14 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 
 ```text
 前 9 个微服务已经能跑通 IM 主链路，
-现在处于“9 个现有服务做必要收口，并向 AI 大模型应用底座转进”，
+现在处于“Go 底座已支撑 AI 算法/eval，正式推进 collaborative-memory 算法切片”，
 search-service v0.1 第一实现切片已继续推进到 PG repository / SearchMessages / grpc runtime / timeline consumer，并已跑通 clean projection smoke；
 memory-service 已从 contract 切到 foundation-active implementation 并跑通 clean projection smoke；
 retrieval-gateway / EvidencePack 第一轮真实 smoke、policy precheck、EvidencePack 字段 hardening 和 cross-group / temporal retrieval smoke 已落；
 rag-service / summary-service / agent-service 已落 first path、真实 adapter smoke 和 Python worker candidate guard；
 skill-registry、mcp-gateway、action-executor 和 ai-eval-service 已形成 Agent controlled execution / eval first-stage 闭环；
 external MCP fallback、guarded external HTTP provider、tool output safety、profile / Agent output safety、RAG / Summary citation regression、Agent output regression、action preflight / rate-limit / DLQ-repair safety eval、action provider failure worker / redrive safety eval、memory group fixture eval、current-memory service-stack live gate、cross-group / temporal memory fixture eval、retrieval smoke、RAG / Summary / Agent stack consumption smoke 和 optional stack gate 已落；
-后续继续扩展低敏 collaborative-memory cases，优先 multi-hop / temporal update / profile aggregation 边界。
+后续继续扩展低敏 collaborative-memory 算法/eval，优先 multi-hop / temporal update / profile aggregation 边界。
 短期生产级测试、完整 HA、长压和 sizing 不再作为当前转进阻塞，但仍留在 hardening backlog。
 ```
 

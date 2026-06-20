@@ -408,21 +408,18 @@ RAG/summary/Agent 进入生产发布前必须跑安全评测。短期建设 AI �
 
 ## 16. 演进结论与下一阶段
 
-本文是目标态架构基线，不是终局服务数量或中间件清单。短期路径调整为：先完成当前 9 个 IM 后端服务的必要语义、安全边界、事件契约和本地可验证闭环，再转向 AI 大模型应用底座。生产级 HA、全量压测、混沌和跨 Region 验证作为后续加固项，不作为当前转向 AI 底座的阻塞。新增总架构点必须通过 ADR，并说明为什么不能在现有服务或中间件边界内解决。
+本文是目标态架构基线，不是终局服务数量或中间件清单。当前 9 个 IM 后端服务已作为可运行基础，AI 大模型应用底座已推进到 EvidencePack、RAG / summary / Agent、受控工具执行和 ai-eval gate；生产级 HA、全量压测、混沌和跨 Region 验证作为后续加固项，不阻塞 collaborative-memory 算法/eval。新增总架构点必须通过 ADR，并说明为什么不能在现有服务或中间件边界内解决。
 
 优先交付：
 
 | 优先级 | 交付物 | 范围 |
 | --- | --- | --- |
-| P0 | 9 服务必要收口 | 编辑、撤回、删除、群管理、成员窗口、回执、联系人、policy decision audit、事件契约和本地集成验证 |
-| P0 | 契约和 migration 补齐 | 当前 9 服务需要的 Proto / OpenAPI / AsyncAPI、PostgreSQL migration、Kafka schema，保证 search / memory 可消费 |
-| P1 | `search-service` | 可重建搜索 projection、tombstone、成员可见窗口和 `SearchMessages` |
-| P1 | `memory-service` | StructuredMemoryEvent、版本语义、跨群归因、memory graph 和画像聚合 |
-| P1 | `retrieval-gateway` | strict ACL、EvidencePack、索引版本、引用来源和 temporal version |
-| P1 | `rag-service` + `summary-service` | 只消费 EvidencePack 的只读问答和摘要，不直接检索、不写事实源 |
-| P1 | AI eval harness / `ai-eval-service` | 伴随 search / retrieval / RAG / Agent 演进，覆盖权限/删除/时间版本/evidence/tool policy 门禁 |
-| P2 | `agent-service` + `skill-registry` + `mcp-gateway/tool-gateway` + `action-executor` | read-only/proposal-only Agent、skill schema、tool policy、低风险 allowlist、proposal、idempotency 和 audit |
-| P2 | Python AI Worker foundation | 只承接 LLM / embedding / rerank / memory extraction / planner / eval 候选任务；Go 继续负责控制面、权限、审计和持久化 |
+| P0 | collaborative-memory 算法/eval | multi-hop、temporal update、profile aggregation 低敏 cases 和候选算法边界 |
+| P0 | `memory-service` / `retrieval-gateway` 深化 | StructuredMemoryEvent、版本语义、跨群归因、EvidencePack current-only query 和 source attribution |
+| P1 | `rag-service` + `summary-service` 算法接入 | 只消费 EvidencePack 的候选生成、rerank / answer / summary 策略和 citation verifier |
+| P1 | `agent-service` controlled planning | proposal-only / approved execution 链路上的 planner candidate、tool policy 和 audit |
+| P1 | AI eval harness / `ai-eval-service` | 伴随 memory / retrieval / RAG / Agent 演进，覆盖权限/删除/时间版本/evidence/tool policy 门禁 |
+| P2 | Python AI Worker 算法扩展 | 只承接 LLM / embedding / rerank / memory extraction / planner / eval 候选任务；Go 继续负责控制面、权限、审计和持久化 |
 | P2 | 生产级验证和容量基线 | HA、全量压测、混沌、跨 Region、K8s rollout、容量模型和故障演练，作为上线加固而非当前阶段阻塞 |
 
 这些交付物可以用 multi sub-agent 并行推进，但只能按互不重叠的服务、文档或验证面拆分；主 agent 必须统一合并、做最终检查并关闭不再需要的 sub-agent。

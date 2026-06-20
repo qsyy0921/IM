@@ -1,6 +1,6 @@
 # NexusIM AI / Memory / Agent Target Architecture
 
-本文规划 NexusIM 后续 AI 相关后端能力。它不是一次性全开工清单；短期不以生产级 HA、全量压测、混沌和跨 Region 验证作为继续推进的阻塞，先完成当前 9 个 IM 后端服务的必要语义、安全和契约收口，然后转向 AI 大模型应用底座。本文用于保证后续 search、memory、retrieval、RAG、summary、Agent、tool 和 eval 能力不会各自长成孤岛。
+本文规划 NexusIM 后续 AI 相关后端能力。它不是一次性全开工清单；短期不以生产级 HA、全量压测、混沌和跨 Region 验证作为继续推进的阻塞。当前 9 个 IM 后端服务已作为可运行基础，AI 大模型应用底座已进入 collaborative-memory 算法/eval 切片。本文用于保证后续 search、memory、retrieval、RAG、summary、Agent、tool 和 eval 能力不会各自长成孤岛。
 
 ## 1. 设计输入
 
@@ -667,14 +667,11 @@ model
 
 ## 9. 推荐演进顺序
 
-1. 补齐已有 9 个后端服务中 AI 依赖的必要 IM 语义：编辑、撤回、删除、群管理、成员窗口、回执、联系人和 policy decision audit；生产级 HA、全量压测、混沌和跨 Region 验证不作为转入 AI 底座的短期阻塞。
-2. 实现 `search-service`：先做消息搜索 projection、成员可见窗口、撤回/删除 tombstone。
-3. 实现 `memory-service`：抽取结构化事件、版本语义、跨群归因、memory graph 和画像聚合。
-4. 实现 `retrieval-gateway` 第一版：基于 search / memory 输出 EvidencePack，不急着做生成。
-5. 实现 `rag-service` 和 `summary-service`：必须经过 retrieval-gateway 和 EvidencePack。
-6. `agent-service` first proposal-only path 已落；下一步补真实 adapter smoke，再逐步接 proposal store / approval / executor。
-7. 深化 `skill-registry`、`mcp-gateway/tool-gateway`、`action-executor`：最小 catalog / prepare / proposal / approval audit outbox / execution audit / 本地安全 allowlist 已落，后续补 approval operator、approval outbox relay、外部 MCP adapter failure fallback、业务 action idempotency / audit。
-8. 建立 AI eval harness / `ai-eval-service` 最小门禁：伴随 search、retrieval、RAG、summary、Agent 和 tool policy 演进，覆盖权限、删除后不可见、时间版本、oracle evidence、attribution 和 tool policy。
+1. 保留 9 个 IM 服务作为可运行底座，只回补阻塞 AI 主线的 P0/P1。
+2. 在已落 search / memory / retrieval / RAG / summary / Agent / skill / tool / executor / eval 链路上扩展 collaborative-memory 算法/eval。
+3. 优先补 multi-hop、temporal update、profile aggregation 的低敏 cases，区分 retrieval failure、reasoning failure、action boundary failure。
+4. 让 Python AI Worker 只产出 memory extraction / rerank / planner / eval 候选；Go 继续负责权限、状态、审批、审计和持久化。
+5. 后续再深化真实 MCP/provider tool、业务写动作、生产级 HA、容量和客户端展示。
 
 ## 10. 与现有 9 服务的关系
 
@@ -688,17 +685,15 @@ model
 
 ## 11. 第一版可落地切片
 
-为了避免一次性铺太大，第一轮只建议做：
+第一轮 foundation 已基本落地；接下来建议做：
 
-1. `search-service` 最小 projection：message persisted / edited / revoked / deleted + member visibility。
-2. `SearchMessages` API：只返回可见消息，不做生成。
-3. `memory-service` / group memory 最小 projection：StructuredMemoryEvent + supersedes + source refs。
-4. `retrieval-gateway` thin facade：调用 search-service / memory-service，生成 EvidencePack。
-5. `rag-service` read-only 问答：只接受 EvidencePack，不直接检索。
-6. `summary-service` 最小摘要任务：只基于 EvidencePack 生成，可按删除和 tombstone 重算。
-7. AI eval harness：覆盖权限泄漏、删除后不可见、oracle evidence、跨群归因、无证据拒答和 tool policy；需要独立运行/存储后再升级为 `ai-eval-service`。
+1. multi-hop collaborative-memory cases：跨人、跨群、跨事件链路追踪。
+2. temporal update cases：旧事实被新事实覆盖、过期、撤回或归档后不可误用。
+3. profile aggregation cases：长期画像聚合，同时防止群聊事实误升为个人偏好。
+4. memory extraction candidate：source refs、speaker / audience、validity、supersedes、confidence、review reason。
+5. retrieval / rerank candidate：EvidencePack 内的结构过滤、BM25 / vector / graph expansion 和 current-only filtering。
 
-Agent 第一版必须等 retrieval-gateway 和最小 eval gate 稳定后再做；`skill-registry`、`mcp-gateway/tool-gateway`、`action-executor` 先只开放极小 allowlist 和 proposal 链路。
+RAG、summary、Agent 继续只消费 EvidencePack；真实写动作继续走 proposal / approval / executor / audit。
 
 ## 12. AI 能力复用矩阵
 

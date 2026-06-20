@@ -27,7 +27,7 @@ Search/RAG/Agent 是异步投影和智能协作层。
 
 ## 2. 架构范围
 
-以下“当前阶段”是早期历史切片，不代表 2026-06-18 的当前路线。当前路线是 9 个已实现后端服务必要收口后进入 `search-service v0.1 -> memory-service -> retrieval-gateway -> RAG / summary / Agent`。
+以下“当前阶段”是早期历史切片，不代表当前路线。当前路线是 9 个已实现后端服务作为 Go 底座，AI 大模型应用底座已进入 collaborative-memory 算法/eval。
 
 早期阶段只交付：
 

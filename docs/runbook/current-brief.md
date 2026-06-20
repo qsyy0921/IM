@@ -14,7 +14,6 @@
 ## 当前阶段
 
 NexusIM 已有本地 / 双机可运行的最小分布式 IM 后端。
-
 9 个后端服务已进入真实链路：api-gateway、identity、message、
 conversation、delivery、push、receipt、contacts、policy。
 
@@ -39,18 +38,18 @@ extraction confidence / review eval、current-memory service-stack live smoke、
 cross-group / temporal retrieval smoke、RAG / Summary / Agent stack consumption smoke 和 optional stack gate 已落；
 只保存低敏 run refs / counters / metadata。
 
+Go 侧服务底座、EvidencePack、proposal / approval / audit 和 eval 持久化
+已足够支撑算法切片；后续 Go 工作围绕候选接入、边界校验和状态流转。
+
 当前下一步：
 
 ```text
-继续扩展低敏 collaborative-memory cases，优先 multi-hop / temporal update / profile aggregation 边界
+进入低敏 collaborative-memory 算法/eval，优先 multi-hop / temporal update / profile aggregation 边界
 ```
 
 完整系统测试、生产级 HA、长压和 sizing 继续后置为 hardening backlog。
-
 文档职责：进度总览见 `development-progress.md`，未完成工作见
 `remaining-goals.md`，单服务状态见 `service-briefs/<service>.md`。
-
-## 硬约束
 
 - RAG / summary / Agent 只能消费权限过滤后的 EvidencePack。
 - 真实写动作必须走 policy、proposal / approval、executor 和 audit。

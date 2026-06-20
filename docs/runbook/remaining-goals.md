@@ -19,8 +19,9 @@ search-service -> memory-service -> retrieval-gateway
 -> skill-registry -> mcp-gateway -> action-executor -> ai-eval-service
 ```
 
-9 个既有 IM 服务只做阻塞 AI 主线的必要收口；生产级 HA、长压、sizing、
-provider-grade 运维和完整系统测试暂不作为当前转进阻塞。
+9 个既有 IM 服务只做阻塞 AI 主线的必要收口；Go 侧服务底座、EvidencePack、
+proposal / approval / audit 和低敏 eval 已能支撑算法切片。生产级 HA、长压、
+sizing、provider-grade 运维和完整系统测试暂不作为当前阻塞。
 
 ## 当前未完成重点
 
@@ -43,7 +44,7 @@ provider-grade 运维和完整系统测试暂不作为当前转进阻塞。
    Agent current-memory consumption CI-safe regression、memory extraction
    confidence / review eval、current-memory service-stack live smoke、cross-group /
    temporal CI-safe fixture eval、retrieval smoke、RAG / Summary / Agent stack smoke
-   和 optional stack gate 已落；后续继续扩展低敏 collaborative-memory cases，
+   和 optional stack gate 已落；当前进入低敏 collaborative-memory 算法/eval，
    优先 multi-hop / temporal update / profile aggregation，保留 source-ref / visibility / review 边界。
 
 3. Agent 真实业务动作扩展：
@@ -94,7 +95,5 @@ provider-grade 运维和完整系统测试暂不作为当前转进阻塞。
 - 分布式 HA / 故障演练：Redis / Kafka / PostgreSQL 更长时长和多故障组合。
 - Repair / DLQ / audit 产品化：审批系统、运维 UI、批量 repair、外部审计。
 - 容量和复杂度治理：9 服务长压 campaign、资源曲线、生产 sizing、文件拆分。
-
-## Sub-Agent 规则
 
 可使用多个 sub-agent 并行推进，但必须按服务、文档集、测试面或只读审查问题拆分互不重叠职责；禁止同时改同一 proto、migration、service brief 或架构章节。

@@ -26,4 +26,4 @@
 
 下一步：
 
-- 将这些跨群 / 时间窗口断言沉淀进更统一的 ai-eval gate，并继续扩展更多摘要场景；provider 仍走 port、guard、hash / citation 校验和 verifier。
+- 40/40 optional stack gate 已覆盖跨群 / 时间窗口断言；下一步扩展 multi-hop / temporal update / profile aggregation 摘要场景，provider 仍走 port、guard、hash / citation 校验和 verifier。

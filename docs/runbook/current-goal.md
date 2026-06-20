@@ -49,10 +49,14 @@ model-gateway / workflow / knowledge-ingestion / vector-index
 - `vector-index-service` 已从 stage-switch 进入 product-active 第一版 implementation
   slice，覆盖 `UpsertVectorItem`、`TombstoneVectorItem`、`SearchVectors`、
   `GetVectorIndexJob`、PostgreSQL metadata 和 local / PostgreSQL-backed test vector adapter。
+- `admin-service` 已从 stage-switch 进入 product-active 第一版 implementation
+  slice，覆盖 `CreateAdminOperation`、`ApproveAdminOperation`、
+  `GetAdminOperation`、`ListAdminOperations`、PostgreSQL operation / approval
+  状态和低敏 admin outbox。
 
 ## 下一步
 
-- 默认继续 `admin-service` 第一版 implementation slice。
+- 默认继续 `admin-service` operation worker / outbox relay / workflow-service 长审批接入。
 - 也可以继续 `vector-index-service` embedding worker / rebuild worker / outbox relay。
 - 也可以继续 notification SMTP / SMS / APNs / FCM adapter 或 bounce-suppression。
 

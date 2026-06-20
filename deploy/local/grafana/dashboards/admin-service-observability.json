@@ -1,0 +1,38 @@
+{
+  "title": "NexusIM admin-service",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "panels": [
+    {
+      "type": "stat",
+      "title": "admin-service up",
+      "targets": [
+        {
+          "expr": "up{service=\"admin-service\"}"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "type": "stat",
+      "title": "admin-service info",
+      "targets": [
+        {
+          "expr": "nexusim_admin_service_info"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 0
+      }
+    }
+  ]
+}

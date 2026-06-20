@@ -188,6 +188,14 @@ scrape_configs:
         labels:
           service: audit-service
 
+  - job_name: nexusim-admin-service
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - host.docker.internal:11936
+        labels:
+          service: admin-service
+
   - job_name: nexusim-control-plane-service
     metrics_path: /metrics
     static_configs:

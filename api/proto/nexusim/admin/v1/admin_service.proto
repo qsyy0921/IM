@@ -1,0 +1,118 @@
+syntax = "proto3";
+
+package nexusim.admin.v1;
+
+option go_package = "github.com/qsyy0921/IM/api/proto/nexusim/admin/v1;adminv1";
+
+service AdminService {
+  rpc CreateAdminOperation(CreateAdminOperationRequest) returns (CreateAdminOperationResponse);
+  rpc ApproveAdminOperation(ApproveAdminOperationRequest) returns (ApproveAdminOperationResponse);
+  rpc GetAdminOperation(GetAdminOperationRequest) returns (GetAdminOperationResponse);
+  rpc ListAdminOperations(ListAdminOperationsRequest) returns (ListAdminOperationsResponse);
+}
+
+message AuthContext {
+  string tenant_id = 1;
+  string user_id = 2;
+  string service_name = 3;
+  string instance_ref = 4;
+  string trace_id = 5;
+  string request_id = 6;
+}
+
+message AdminOperation {
+  string tenant_id = 1;
+  string operation_id = 2;
+  string operation_type = 3;
+  string target_ref_hash = 4;
+  string risk_level = 5;
+  string payload_schema_version = 6;
+  string payload_hash = 7;
+  string reason_ref = 8;
+  repeated string evidence_refs = 9;
+  string status = 10;
+  string requested_by = 11;
+  string approved_by = 12;
+  string correlation_id = 13;
+  string causation_id = 14;
+  string trace_id = 15;
+  int64 requested_at_unix_ms = 16;
+  int64 approved_at_unix_ms = 17;
+  int64 updated_at_unix_ms = 18;
+}
+
+message AdminApproval {
+  string tenant_id = 1;
+  string approval_id = 2;
+  string operation_id = 3;
+  string approver_ref = 4;
+  string decision = 5;
+  string approval_policy_ref = 6;
+  string reason_ref = 7;
+  repeated string evidence_refs = 8;
+  int64 created_at_unix_ms = 9;
+}
+
+message CreateAdminOperationRequest {
+  AuthContext auth_context = 1;
+  string operator_ref = 2;
+  string operator_role = 3;
+  string operation_type = 4;
+  string target_ref_hash = 5;
+  string risk_level = 6;
+  string payload_schema_version = 7;
+  string operation_payload_json = 8;
+  string reason_ref = 9;
+  repeated string evidence_refs = 10;
+  string idempotency_key = 11;
+  string correlation_id = 12;
+  string causation_id = 13;
+  string trace_id = 14;
+}
+
+message CreateAdminOperationResponse {
+  AdminOperation operation = 1;
+  bool replayed = 2;
+}
+
+message ApproveAdminOperationRequest {
+  AuthContext auth_context = 1;
+  string operation_id = 2;
+  string approver_ref = 3;
+  string approver_role = 4;
+  string decision = 5;
+  string approval_policy_ref = 6;
+  string reason_ref = 7;
+  repeated string evidence_refs = 8;
+  string idempotency_key = 9;
+  string correlation_id = 10;
+  string causation_id = 11;
+  string trace_id = 12;
+}
+
+message ApproveAdminOperationResponse {
+  AdminOperation operation = 1;
+  AdminApproval approval = 2;
+  bool replayed = 3;
+}
+
+message GetAdminOperationRequest {
+  AuthContext auth_context = 1;
+  string operation_id = 2;
+}
+
+message GetAdminOperationResponse {
+  AdminOperation operation = 1;
+  repeated AdminApproval approvals = 2;
+}
+
+message ListAdminOperationsRequest {
+  AuthContext auth_context = 1;
+  string status = 2;
+  string operation_type = 3;
+  int32 page_size = 4;
+}
+
+message ListAdminOperationsResponse {
+  repeated AdminOperation operations = 1;
+}

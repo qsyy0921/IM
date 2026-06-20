@@ -1,11 +1,9 @@
 # admin-service
 
-状态：future / SDD v0.1 draft / stage-switch approved。
-当前不得创建 `services/admin-service` 目录，直到实现切片同步切换 service
-registry、proto、migration、runtime、Docker 和 observability。
+状态：product-active / 第一版 implementation landed。已同步 service registry、
+proto、migration、runtime、Docker 和 observability。
 
-定位：管理后台 API，负责租户管理、封禁、配置操作、repair 审批、运维操作和
-operator workflow 入口。
+定位：管理后台 API，负责租户管理、封禁、配置操作、repair 审批和 operator workflow 入口。
 
 边界：
 
@@ -14,10 +12,18 @@ operator workflow 入口。
 - 不承载普通用户 IM 流量，不替代 api-gateway 的客户端入口。
 - 管理操作默认最小权限、可追溯、可撤销或可补偿。
 
-第一切片建议：
-
+第一切片：
 - 具体边界见 `docs/sdd/admin-service.md`。
 - Stage-switch 记录见 `docs/runbook/stage-switch/admin-service.md`。
-- 先做 `CreateAdminOperation`、`ApproveAdminOperation`、`GetAdminOperation`、
+- 已落 `CreateAdminOperation`、`ApproveAdminOperation`、`GetAdminOperation`、
   `ListAdminOperations`，不直接执行真实下游 mutation。
-- 输出低敏 admin outbox event，后续归档到 audit-service。
+- 已输出低敏 admin outbox event，后续归档到 audit-service。
+- 覆盖 proto、core migration、六层 skeleton、`grpc` runtime、Docker / Prometheus /
+  Grafana wiring。
+- PostgreSQL repository first path 覆盖 create replay / conflict、approval replay /
+  separation-of-duty、get/list 和低敏 admin outbox。
+
+后续：
+
+- operation worker、outbox relay、workflow-service 长审批、audit-service ingestion /
+  export、admin UI、operator approval CLI、下游公开 admin API adapter。

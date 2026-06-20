@@ -36,8 +36,10 @@ future platform / product services 的 10 个 SDD draft 已存在；`media-servi
 `workflow-service` 已完成 `CreateWorkflow`、`RecordWorkflowDecision`、`GetWorkflow`
 最小审批等待路径，并通过 focused checks / 完整 `check-local`。
 `vector-index-service` 已完成第一版 `UpsertVectorItem` / `TombstoneVectorItem` /
-`SearchVectors` / `GetVectorIndexJob` path。下一步默认进入 `admin-service`
-第一版 implementation slice，或继续 vector embedding / rebuild / outbox 后续 worker。
+`SearchVectors` / `GetVectorIndexJob` path。`admin-service` 已完成第一版
+`CreateAdminOperation` / `ApproveAdminOperation` / `GetAdminOperation` /
+`ListAdminOperations` path。下一步默认继续 admin operation worker / outbox relay /
+workflow 长审批接入，或继续 vector embedding / rebuild / outbox 后续 worker。
 ```
 
 系统测试 / HA / 长压 / sizing 后置；总览、待办、单服务状态分别看

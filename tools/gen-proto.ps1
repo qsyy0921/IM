@@ -14,6 +14,7 @@ protoc `
     "$ApiProtoDir/nexusim/actionexecutor/v1/action_executor_service.proto" `
     "$ApiProtoDir/nexusim/aieval/v1/ai_eval_service.proto" `
     "$ApiProtoDir/nexusim/agent/v1/agent_service.proto" `
+    "$ApiProtoDir/nexusim/admin/v1/admin_service.proto" `
     "$ApiProtoDir/nexusim/audit/v1/audit_service.proto" `
     "$ApiProtoDir/nexusim/controlplane/v1/control_plane_service.proto" `
     "$ApiProtoDir/nexusim/contacts/v1/contacts_service.proto" `

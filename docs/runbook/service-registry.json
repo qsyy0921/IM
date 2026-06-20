@@ -185,7 +185,11 @@
     },
     {
       "name": "admin-service",
-      "stage": "future"
+      "stage": "product-active",
+      "local_process": "admin-service-grpc",
+      "debug_port": 11936,
+      "prometheus_rule_file": "prometheus-admin-service-alerts.yml",
+      "grafana_dashboard": "admin-service-observability.json"
     },
     {
       "name": "control-plane-service",

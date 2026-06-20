@@ -77,17 +77,17 @@ Foundation backlog 锚点：`search-service`、`memory-service`、`retrieval-gat
   tombstone / delete proof、outbox relay、vector-index handoff 和真实 connector。
 - `vector-index-service`：后续仍需 embedding worker、rebuild worker、outbox relay、
   Milvus / pgvector / OpenSearch backend 和 vector-index handoff smoke。
+- `admin-service`：后续仍需 operation worker、outbox relay、workflow-service 长审批、
+  audit ingestion / export、operator approval CLI、admin UI 和下游公开 admin API adapter。
 
 ## 后置平台 / 产品化服务
 
-这些服务仍未完成第一版实现；implementation 切片前不得提前创建 `services/<name>`：
+后置服务暂无新条目。新增服务必须满足独立模型 / 伸缩 / 故障 / 安全边界或明显降复杂度，
+并通过 ADR / SDD v0.1。
 
-- `admin-service`：stage-switch approved；第一版实现见 service brief。
-- `workflow-service`：第一版 `CreateWorkflow` / `RecordWorkflowDecision` /
-  `GetWorkflow` 后，继续补 timer worker、compensation worker、external callback
-  wait、outbox relay、workflow repair operators 和完整 action / repair smoke。
-
-新增服务必须满足独立模型 / 伸缩 / 故障 / 安全边界或明显降复杂度，并通过 ADR / SDD v0.1。
+`workflow-service`：第一版 `CreateWorkflow` / `RecordWorkflowDecision` /
+`GetWorkflow` 后，继续补 timer worker、compensation worker、external callback
+wait、outbox relay、workflow repair operators 和完整 action / repair smoke。
 
 ## 后置 Hardening
 

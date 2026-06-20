@@ -1,0 +1,11 @@
+groups:
+  - name: nexusim-admin-service
+    rules:
+      - alert: NexusIMAdminServiceDown
+        expr: up{service="admin-service"} == 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "admin-service debug endpoint is down"
+          description: "The local admin-service debug endpoint has not been scrapeable for 2 minutes."

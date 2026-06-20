@@ -17,14 +17,11 @@
 ## Product-active platform / product services
 
 [media](media-service.md) / [notification](notification-service.md) /
-[audit](audit-service.md) / [control-plane](control-plane-service.md) /
+[audit](audit-service.md) / [admin](admin-service.md) /
+[control-plane](control-plane-service.md) /
 [presence](presence-service.md) / [model-gateway](model-gateway.md) /
 [knowledge-ingestion](knowledge-ingestion-service.md) /
 [workflow](workflow-service.md) / [vector-index](vector-index-service.md)
-
-## Future platform / product services
-
-[admin](admin-service.md)
 
 ## 当前推进规则
 

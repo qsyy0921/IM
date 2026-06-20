@@ -1,7 +1,9 @@
 # knowledge-ingestion-service
 
-状态：future / SDD v0.1 draft pending。当前不得创建
-`services/knowledge-ingestion-service` 目录，直到完成 ADR 或 stage switch。
+状态：future / SDD v0.1 draft exists。当前不得创建
+`services/knowledge-ingestion-service` 目录，直到完成 stage switch。
+
+设计入口：`docs/sdd/knowledge-ingestion-service.md`。
 
 定位：企业知识库导入服务，负责文件解析、网页导入、chunking、embedding
 pipeline、权限 metadata、增量重建和导入审计。
@@ -15,5 +17,7 @@ pipeline、权限 metadata、增量重建和导入审计。
 
 第一切片建议：
 
+- 先按 SDD 落 proto / migration / 六层 skeleton。
 - 先支持本地文档 metadata + chunk manifest，不接真实 provider。
 - 输出低敏 ingestion event，后续交给 vector-index / retrieval。
+- 确认 source URI、object key、chunk text、parser raw error 不进入事件 / metrics。

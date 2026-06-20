@@ -6,37 +6,50 @@
 ## 当前 Active Slice
 
 ```text
-media-service v0.1 promotion
+future platform / product services promotion
 ```
 
-用户已点名把下一步目标指向 `media-service`。当前任务不是一次性开发全部 future
-服务，而是把 `media-service` 从 future 规划推进到可实现的第一切片。
+用户已点名把 goal 指向全部待开发 future 微服务。当前目标不是只做
+`media-service`，也不是一次性把全部服务目录铺开，而是把这批服务按统一边界推进到
+可逐个实现的 promotion plan。
 
-## 为什么先做 media-service
+## 当前目标服务
 
-- IM 产品完整化迟早需要图片、语音、视频、文件和对象存储。
-- message-service 目前只应保存媒体引用和低敏 metadata，不应承担二进制上传、
-  缩略图、病毒扫描、语音转码或下载授权。
-- media 边界清晰，适合作为 future 服务 promotion 的第一个样板。
+```text
+media-service
+notification-service
+audit-service
+admin-service
+control-plane-service
+presence-service
+model-gateway
+workflow-service
+knowledge-ingestion-service
+vector-index-service
+```
 
-## 下一步默认动作
+## 默认推进方式
 
-1. 读取 `prompt.md`、`agent.md`、本文件和
-   `docs/runbook/service-briefs/media-service.md`。
-2. 起草 / 更新 `docs/sdd/media-service.md`，冻结 v0.1 边界：
-   upload session、asset metadata、object storage port、download URL、
-   scan / thumbnail / transcode 状态、policy / visibility 校验。
-3. 明确非目标：不保存 message 正文，不替代 message-service，不绕过
-   identity / policy / conversation visibility，不直接暴露 object key。
-4. 准备 stage switch 方案：service-registry、proto、migration、六层 skeleton、
-   cmd runtime、Docker、Prometheus、Grafana、service brief 和 focused tests。
-5. 只有完成 SDD v0.1 和门禁影响确认后，才创建 `services/media-service`。
+1. 每轮先读 `prompt.md`、`agent.md`、本文件和相关 service brief。
+2. 先冻结组合边界：哪些服务先做、哪些只保留 port / adapter、哪些需要 ADR。
+3. 对每个服务按顺序推进：SDD v0.1 -> proto / migration -> 六层 skeleton
+   -> cmd runtime -> Docker / Prometheus / Grafana -> focused smoke。
+4. 第一组优先级建议：
+   `media-service` -> `notification-service` -> `audit-service`
+   -> `control-plane-service` -> `presence-service`
+   -> `model-gateway` / `knowledge-ingestion-service` / `workflow-service`
+   -> `vector-index-service`。
+5. 只有完成对应服务 SDD v0.1 和门禁影响确认后，才把该服务从 `future`
+   stage switch 到 active，并创建 `services/<service>`。
 
 ## 硬边界
 
-- 不一次性 promotion 其它 future 服务。
+- 不一次性 promotion 全部 future 服务。
 - 不把媒体二进制塞回 message-service。
-- 不直接读其它服务私有表；跨服务只走公开 API、事件或明确 port。
+- 不把 identity 局部 webhook / SMTP 扩成完整 notification-service 前的生产承诺。
+- 不让 admin / control-plane / workflow 直接改其它服务私有表。
+- 不让 model-gateway / vector-index / knowledge-ingestion 绕过 retrieval /
+  policy / EvidencePack 边界。
 - 不回滚用户已有修改。
 - 小改跑 focused checks；涉及 service-registry / Docker / compose / proto /
   migration / 安全边界时再扩大门禁。
@@ -45,6 +58,6 @@ media-service v0.1 promotion
 
 - 当前阶段背景：`docs/runbook/current-brief.md`
 - 剩余待办：`docs/runbook/remaining-goals.md`
-- media 入口：`docs/runbook/service-briefs/media-service.md`
+- 服务入口：`docs/runbook/service-briefs/<service>.md`
 - 未来服务总表：`docs/runbook/service-registry.json`
 - 新发现待办写入 `docs/runbook/remaining-goals.md`

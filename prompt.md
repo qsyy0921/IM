@@ -7,19 +7,19 @@
 ```text
 持续推进 E:\development\IM 的 NexusIM。
 
-【当前 active slice】media-service v0.1 promotion。先把 media-service 从 future 规划推进到 SDD / 契约 / stage-switch 方案，再落第一实现切片。
+【当前 active slice】future platform / product services promotion。目标覆盖 media-service、notification-service、audit-service、admin-service、control-plane-service、presence-service、model-gateway、workflow-service、knowledge-ingestion-service、vector-index-service。
 
 【不要默认做】生产级 HA、长压、sizing、provider-grade 运维、九服务长期 P2 hardening、Docker/双机基础设施整理，或泛泛“把九服务继续做干净”。
-九个既有 IM 服务和 AI foundation 服务都作为可运行底座；只处理阻塞 media-service promotion 的 P0/P1、用户明确点名任务、或本轮切片必须补的边界。
+九个既有 IM 服务和 AI foundation 服务都作为可运行底座；只处理阻塞这批 future 服务 promotion 的 P0/P1、用户明确点名任务、或本轮切片必须补的边界。
 
 每轮开始：
 1. 执行 git status --short --branch --untracked-files=all。
-2. 读取 prompt.md 和 agent.md，确认当前 active slice 仍是 media-service。
+2. 读取 prompt.md 和 agent.md，确认当前 active slice 仍是 future services promotion。
 3. 读取 docs/runbook/current-goal.md 的当前 active slice；再按需读取 current-brief、remaining-goals、相关 service brief 或 SDD；不要全文扫长历史文档。
 
-当前 active slice：media-service v0.1 promotion。先读 `docs/runbook/service-briefs/media-service.md`，起草 / 更新 `docs/sdd/media-service.md`，冻结 upload session、asset metadata、object storage port、download URL、scan / thumbnail / transcode 状态和 policy / visibility 校验。确认 service-registry、proto、migration、六层 skeleton、Docker、Prometheus、Grafana 和 focused tests 的门禁影响后，再创建 `services/media-service`。
+当前 active slice：future platform / product services promotion。先读相关 `docs/runbook/service-briefs/<service>.md`，为每个服务按顺序冻结 SDD v0.1、stage-switch 条件和 focused checks；完成某个服务的 SDD / 门禁影响确认后，再创建对应 `services/<service>`。
 
-硬边界：不一次性 promotion 其它 future 服务；不把媒体二进制塞回 message-service；不直接读其它服务私有表；跨服务只走公开 API、事件或明确 port。
+硬边界：不一次性创建全部 future 服务目录；不直接读其它服务私有表；跨服务只走公开 API、事件或明确 port；model / vector / ingestion / workflow 不得绕过 retrieval、policy、EvidencePack、approval 和 audit。
 
 可用多个 sub-agent 做互不重叠任务；主 agent 负责集成、检查和文档同步。不回滚用户已有修改。新发现的待办写入 docs/runbook/remaining-goals.md。
 

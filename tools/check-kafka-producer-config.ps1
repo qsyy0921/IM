@@ -15,6 +15,7 @@ $expectedProducerFiles = @(
     "services\identity-service\internal\infrastructure\kafka\producer.go",
     "services\media-service\internal\infrastructure\kafka\producer.go",
     "services\message-service\internal\infrastructure\kafka\producer.go",
+    "services\notification-service\internal\infrastructure\kafka\producer.go",
     "services\policy-service\internal\infrastructure\kafka\producer.go",
     "services\receipt-service\internal\infrastructure\kafka\producer.go"
 )

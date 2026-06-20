@@ -1,0 +1,83 @@
+syntax = "proto3";
+
+package nexusim.notification.events.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/qsyy0921/IM/schemas/kafka/notification/v1;notificationeventsv1";
+
+// Topic: im.notification.events
+// Partition key: tenant_id + ":" + request_id
+// Producer: notification-service outbox relay
+message NotificationEvent {
+  string event_id = 1;
+  string event_type = 2;
+  int32 event_version = 3;
+
+  string tenant_id = 4;
+  string aggregate_type = 5; // "notification_request"
+  string aggregate_id = 6;   // request_id
+  int64 aggregate_version = 7;
+
+  string partition_key = 8;
+  string trace_id = 9;
+  string correlation_id = 10;
+  string causation_id = 11;
+  string producer = 12;
+  google.protobuf.Timestamp occurred_at = 13;
+
+  oneof payload {
+    NotificationRequestAcceptedV1 request_accepted = 20;
+    NotificationDeliverySucceededV1 delivery_succeeded = 21;
+    NotificationDeliveryFailedV1 delivery_failed = 22;
+    NotificationDeliveryDeadLetteredV1 delivery_dead_lettered = 23;
+    NotificationRecipientSuppressedV1 recipient_suppressed = 24;
+  }
+}
+
+message NotificationRequestAcceptedV1 {
+  string tenant_id = 1;
+  string request_id = 2;
+  string requester_service = 3;
+  string channel = 4;
+  string recipient_ref = 5;
+  string destination_masked = 6;
+  string template_key = 7;
+  string template_version = 8;
+  string locale = 9;
+  string priority = 10;
+  string status = 11;
+}
+
+message NotificationDeliverySucceededV1 {
+  string tenant_id = 1;
+  string request_id = 2;
+  string channel = 3;
+  string provider_id = 4;
+  string provider_message_id_hash = 5;
+}
+
+message NotificationDeliveryFailedV1 {
+  string tenant_id = 1;
+  string request_id = 2;
+  string channel = 3;
+  string failure_class = 4;
+  string public_error = 5;
+}
+
+message NotificationDeliveryDeadLetteredV1 {
+  string tenant_id = 1;
+  string request_id = 2;
+  string channel = 3;
+  string failure_class = 4;
+  string public_error = 5;
+}
+
+message NotificationRecipientSuppressedV1 {
+  string tenant_id = 1;
+  string suppression_id = 2;
+  string channel = 3;
+  string recipient_ref = 4;
+  string reason = 5;
+  string source = 6;
+}

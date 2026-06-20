@@ -76,9 +76,10 @@ eval 已能支撑算法切片；生产级 HA、长压、sizing 和完整系统�
   六层 skeleton / `grpc` runtime / Docker / Prometheus / Grafana 覆盖已落，并已通过
   focused checks / 完整 `check-local`。当前只覆盖 `CreateNotificationRequest` /
   `GetNotificationStatus` / `CancelNotificationRequest`、request 事实源和
-  `notification.request.accepted.v1` outbox。后续仍需
-  `notification_outbox -> im.notification.events` relay、delivery worker、provider
-  adapter、bounce / suppression worker、provider-grade email / SMS / APNs / FCM。
+  `notification.request.accepted.v1` outbox；`notification_outbox -> im.notification.events`
+  最小 relay、Kafka schema、runtime mode 和真实 PG relay 测试已补。后续仍需真实
+  Kafka smoke、delivery worker、provider adapter、bounce / suppression worker、
+  provider-grade email / SMS / APNs / FCM。
 
 ## 后置平台 / 产品化服务
 

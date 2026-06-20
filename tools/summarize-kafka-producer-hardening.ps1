@@ -60,7 +60,7 @@ try {
     $producer = Read-JsonFile -Path $producerSummaryPath
     $isr = Read-JsonFile -Path $isrSummaryPath
 
-    Assert-Condition -Condition ($producer.producer_count -eq 8) -Message "Kafka producer config must cover 8 producer packages."
+    Assert-Condition -Condition ($producer.producer_count -eq 9) -Message "Kafka producer config must cover 9 producer packages."
     Assert-Condition -Condition ($producer.required_acks -eq "RequireAll") -Message "Kafka producer config must require acks=all."
     Assert-Condition -Condition ($producer.allow_auto_topic_creation -eq $false) -Message "Kafka producer config must disable auto topic creation."
     Assert-Condition -Condition ($producer.max_attempts -eq 5) -Message "Kafka producer config must keep bounded MaxAttempts=5."

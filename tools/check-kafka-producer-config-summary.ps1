@@ -27,6 +27,7 @@ try {
         "identity-service",
         "media-service",
         "message-service",
+        "notification-service",
         "policy-service",
         "receipt-service"
     )

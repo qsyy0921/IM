@@ -3,8 +3,10 @@
 状态：product-active / SDD v0.1 draft 已存在 / stage-switch review passed /
 first implementation slice completed。第一版 proto、migration、六层 skeleton、
 `grpc` runtime、Docker、Prometheus 和 Grafana 覆盖已落，并已通过 focused checks /
-完整 `check-local`。当前只实现 request 事实源、status 查询、cancel 和 accepted
-outbox，不宣称 provider-grade email / SMS / APNs / FCM。
+完整 `check-local`。`notification_outbox -> im.notification.events` 最小 relay、
+Kafka protobuf schema、runtime mode、service-registry / compose wiring、trigger
+builder 单测和真实 PostgreSQL relay 集成测试已补。当前不宣称 provider-grade
+email / SMS / APNs / FCM。
 
 Stage-switch 记录：`docs/runbook/stage-switch/notification-service.md`。
 
@@ -27,4 +29,7 @@ bounce handling、provider retry 和通知审计。
 
 下一步：
 
-- 后续再做 `notification_outbox -> im.notification.events` relay 和 provider worker。
+- 先跑 `notification_outbox -> im.notification.events` 真实 Kafka smoke 并归档报告，
+  或继续做 provider worker。
+- 后续再做 delivery worker、provider adapter、bounce / suppression worker 和
+  provider-grade email / SMS / APNs / FCM。

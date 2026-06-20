@@ -3,12 +3,12 @@ package main
 import "testing"
 
 func TestValidateNotificationServiceMode(t *testing.T) {
-	for _, mode := range []string{"noop", "grpc"} {
+	for _, mode := range []string{"noop", "grpc", "outbox-relay"} {
 		if err := validateNotificationServiceMode(mode); err != nil {
 			t.Fatalf("mode %s should be valid: %v", mode, err)
 		}
 	}
-	if err := validateNotificationServiceMode("outbox-relay"); err == nil {
+	if err := validateNotificationServiceMode("provider-worker"); err == nil {
 		t.Fatal("unsupported mode should fail")
 	}
 }

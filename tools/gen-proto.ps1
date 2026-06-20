@@ -73,6 +73,12 @@ protoc `
     -I $KafkaSchemaDir `
     --go_out=$KafkaSchemaDir `
     --go_opt=paths=source_relative `
+    "$KafkaSchemaDir/notification/v1/im.notification.events.proto"
+
+protoc `
+    -I $KafkaSchemaDir `
+    --go_out=$KafkaSchemaDir `
+    --go_opt=paths=source_relative `
     "$KafkaSchemaDir/agent/v1/im.agent.events.proto"
 
 protoc `

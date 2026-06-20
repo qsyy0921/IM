@@ -72,8 +72,11 @@ vector-index-service
   proto / migration / 六层 skeleton / `grpc` runtime / Docker / observability 覆盖已落，
   并已通过 focused checks / 完整 `check-local`；当前能力只覆盖 request 事实源、
   status 查询、cancel 和 accepted outbox。
-- 下一步默认进入 `notification_outbox -> im.notification.events` relay 或 provider
-  worker 的下一个切片。
+- `notification-service` 已补 `notification_outbox -> im.notification.events` 最小
+  outbox relay、Kafka protobuf schema、runtime mode、service-registry / compose wiring、
+  trigger builder 单测和真实 PostgreSQL relay 集成测试。
+- 下一步默认进入 notification provider worker，或先跑
+  `notification_outbox -> im.notification.events` 真实 Kafka smoke 并归档报告。
 
 ## 硬边界
 

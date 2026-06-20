@@ -286,6 +286,12 @@
       "service": "media-service",
       "env": "NEXUSIM_MEDIA_SERVICE_MODE",
       "value": "outbox-relay"
+    },
+    {
+      "name": "notification-service-outbox-relay",
+      "service": "notification-service",
+      "env": "NEXUSIM_NOTIFICATION_SERVICE_MODE",
+      "value": "outbox-relay"
     }
   ]
 }

@@ -130,13 +130,22 @@
       "stage": "rag-service",
       "status": "active",
       "query": "phoenix launch decision current memory",
-      "risk": "RAG service-stack smoke must prove expired and superseded group memory rows are excluded from current EvidencePack results",
+      "risk": "RAG service-stack smoke must prove cross-group attribution is preserved and stale or future group memory rows are excluded from current EvidencePack results",
       "required_assertions": [
         {
           "type": "must_preserve_evidencepack_source_coverage"
         },
         {
           "type": "must_exclude_expired_superseded_memory_items"
+        },
+        {
+          "type": "must_not_return_future_memory_as_current"
+        },
+        {
+          "type": "must_preserve_cross_group_source_refs"
+        },
+        {
+          "type": "must_preserve_speaker_attribution"
         },
         {
           "type": "must_preserve_projection_versions"
@@ -270,13 +279,22 @@
       "stage": "summary-service",
       "status": "active",
       "query": "phoenix launch decision current memory summary",
-      "risk": "Summary service-stack smoke must prove expired and superseded group memory rows are excluded from current EvidencePack results",
+      "risk": "Summary service-stack smoke must prove cross-group attribution is preserved and stale or future group memory rows are excluded from current EvidencePack results",
       "required_assertions": [
         {
           "type": "must_preserve_evidencepack_source_coverage"
         },
         {
           "type": "must_exclude_expired_superseded_memory_items"
+        },
+        {
+          "type": "must_not_return_future_memory_as_current"
+        },
+        {
+          "type": "must_preserve_cross_group_source_refs"
+        },
+        {
+          "type": "must_preserve_speaker_attribution"
         },
         {
           "type": "must_preserve_projection_versions"
@@ -355,7 +373,7 @@
       "stage": "agent-service",
       "status": "active",
       "query": "prepare proposal with current group memory only",
-      "risk": "Agent proposal service-stack smoke must prove expired and superseded group memory rows are excluded from current EvidencePack results before proposal text is produced",
+      "risk": "Agent proposal service-stack smoke must prove cross-group attribution is preserved and stale or future group memory rows are excluded from current EvidencePack results before proposal text is produced",
       "required_assertions": [
         {
           "type": "must_keep_proposal_only_before_execution"
@@ -365,6 +383,15 @@
         },
         {
           "type": "must_exclude_expired_superseded_memory_items"
+        },
+        {
+          "type": "must_not_return_future_memory_as_current"
+        },
+        {
+          "type": "must_preserve_cross_group_source_refs"
+        },
+        {
+          "type": "must_preserve_speaker_attribution"
         },
         {
           "type": "must_preserve_projection_versions"

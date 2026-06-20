@@ -9,3 +9,4 @@ Current reports:
 
 - `loadtest-report-20260620-current-memory-service-stack-live.md`
 - `loadtest-report-20260620-cross-group-temporal-memory-eval.md`
+- `loadtest-report-20260620-cross-temporal-stack-gate.md`

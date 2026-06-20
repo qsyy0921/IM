@@ -124,6 +124,26 @@ function Test-SummaryAssertion {
                 -and (Get-JsonPropertyString -Object $Summary.seed -Name "expired_memory_event_id").Length -gt 0 `
                 -and (Get-JsonPropertyString -Object $Summary.seed -Name "superseded_memory_event_id").Length -gt 0
         }
+        "must_not_return_future_memory_as_current" {
+            return `
+                [int64]$Summary.current_memory_at_seq -gt 0 `
+                -and [bool]$Summary.future_memory_excluded `
+                -and (Get-JsonPropertyString -Object $Summary.seed -Name "future_memory_event_id").Length -gt 0
+        }
+        "must_preserve_cross_group_source_refs" {
+            return `
+                [bool]$Summary.cross_group_source_refs_preserved `
+                -and (Get-JsonPropertyString -Object $Summary.seed -Name "cross_group_conversation_id").Length -gt 0 `
+                -and (Get-JsonPropertyString -Object $Summary.seed -Name "cross_group_message_id").Length -gt 0 `
+                -and (Get-JsonPropertyString -Object $Summary.seed -Name "cross_group_source_event_id").Length -gt 0 `
+                -and (Get-JsonPropertyString -Object $Summary.seed -Name "cross_group_source_ref_id").Length -gt 0
+        }
+        "must_preserve_speaker_attribution" {
+            return `
+                [bool]$Summary.cross_group_speaker_attribution_preserved `
+                -and (Get-JsonPropertyString -Object $Summary.seed -Name "sender_user_id").Length -gt 0 `
+                -and (Get-JsonPropertyString -Object $Summary.seed -Name "cross_group_actor_user_id").Length -gt 0
+        }
         "must_preserve_projection_versions" {
             return `
                 [int64]$Summary.search_projection_version -gt 0 `

@@ -312,6 +312,9 @@ proposal checks.
 The 2026-06-20 Summary negative adapter run added `summary-service` live
 grounded-citation and no-evidence abstain coverage; see
 `docs/runbook/loadtest/ai-eval-service/`.
+The 2026-06-20 cross-group / temporal optional stack gate ran 6 adapters / 40
+cases and made RAG / Summary / Agent service-stack cases assert future-memory
+exclusion, cross-group source refs and speaker attribution.
 The 2026-06-20 Python model-output negative run expanded `python-ai-worker` to
 5 cases covering bad inputs plus Go-side bad candidate output rejection.
 The 2026-06-20 RAG / Summary citation regression added source-ref integrity

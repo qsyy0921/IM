@@ -42,9 +42,9 @@ provider-grade 运维和完整系统测试暂不作为当前转进阻塞。
    Summary / Agent API 显式透传 `at_conversation_seq`，以及 RAG / Summary /
    Agent current-memory consumption CI-safe regression、memory extraction
    confidence / review eval、current-memory service-stack live smoke、cross-group /
-   temporal CI-safe fixture eval、retrieval smoke 和 RAG / Summary / Agent stack smoke 已落；
-   后续把这些断言沉淀进统一 ai-eval gate，并继续扩展低敏 collaborative-memory cases，
-   保留 source-ref / visibility / review 边界。
+   temporal CI-safe fixture eval、retrieval smoke、RAG / Summary / Agent stack smoke
+   和 optional stack gate 已落；后续继续扩展低敏 collaborative-memory cases，
+   优先 multi-hop / temporal update / profile aggregation，保留 source-ref / visibility / review 边界。
 
 3. Agent 真实业务动作扩展：
    `agent-service`、`skill-registry`、`mcp-gateway`、`action-executor` 已具备

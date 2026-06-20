@@ -59,17 +59,17 @@ group memory -> EvidencePack -> RAG -> summary -> multi-agent
 - cross-group / temporal retrieval smoke：低敏 CI-safe cases 和真实
   `loadtest/retrieval` 已覆盖跨群 source refs / speaker attribution，并按
   query seq 排除 expired / superseded / future memory。
-- cross-group / temporal RAG / Summary / Agent service-stack consumption：三条真实
-  adapter smoke 已验证跨群 source refs / speaker attribution，并排除 stale / future memory。
+- cross-group / temporal RAG / Summary / Agent service-stack consumption 和 optional
+  stack gate：真实 adapter smoke 与 40/40 gate 已验证跨群 source refs / speaker
+  attribution，并排除 stale / future memory。
 
 下一步默认推进：
 ```text
-把 cross-group / temporal stack 断言沉淀进统一 ai-eval gate，并继续扩展低敏 collaborative-memory cases
+继续扩展低敏 collaborative-memory cases，优先 multi-hop / temporal update / profile aggregation 边界
 ```
 
 硬边界：RAG / summary / Agent 只能消费 EvidencePack；真实写动作必须走
-policy、proposal / approval、executor 和 audit；Python AI Worker 只做候选层，
-Go 负责控制面、事实边界和审计。
+policy、proposal / approval、executor 和 audit；Python 只做候选层，Go 负责控制面、事实边界和审计。
 
 ## 执行规则
 

@@ -30,3 +30,7 @@
   HTTP provider、embedding、rerank、outbox relay、route-refresh worker 或预算重置 worker。
 - RAG / summary / Agent 仍负责 prompt builder、EvidencePack、citation verifier 和
   action approval；`model-gateway` 只提供受控模型调用通道。
+
+## 已归档报告
+
+- `loadtest-report-20260620-model-gateway-grpc-smoke.md`

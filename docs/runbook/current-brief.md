@@ -24,28 +24,16 @@ future services -> SDD v0.1 -> stage-switch plan -> service-by-service skeleton
 
 AI foundation-active 服务：`search-service`、`memory-service`、`retrieval-gateway`、`rag-service`、`summary-service`、`agent-service`、`skill-registry`、`mcp-gateway`、`action-executor`、`ai-eval-service`。
 
-`ai-eval-service` catalog、gate、negative / action / memory evals、
-action-executor provider failure worker / redrive safety eval、memory-service
-runtime `at_conversation_seq` query semantics 和 source-ref / validity /
-supersession PG coverage / smoke checks、retrieval-gateway EvidencePack
-current-only memory query、RAG / Summary / Agent API 显式 at seq 透传、
-RAG / Summary / Agent current-memory consumption CI-safe regression、memory
-extraction confidence / review eval、current-memory service-stack live smoke、
-cross-group / temporal retrieval smoke、RAG / Summary / Agent stack consumption smoke 和 optional stack gate 已落；
-只保存低敏 run refs / counters / metadata。
-
-Go 侧服务底座、EvidencePack、proposal / approval / audit 和 eval 持久化
-已足够支撑算法切片；后续 Go 工作围绕候选接入、边界校验和状态流转。
+Go 侧服务底座、EvidencePack、proposal / approval / audit、Python Worker 候选接入边界和低敏 eval 持久化已经足够支撑算法切片；后续 Go 工作围绕候选接入、边界校验和状态流转。
 
 当前下一步：
 
 ```text
 future platform / product services 的 10 个 SDD draft 已存在；`media-service`、
-`notification-service`、`audit-service`、`control-plane-service` 和 `presence-service`
-已进入 product-active 并通过各自第一版 smoke。
-`model-gateway` stage-switch review 已通过；下一步默认进入
-model-gateway 第一实现切片，或继续 `workflow-service` /
-`knowledge-ingestion-service` stage-switch。
+`notification-service`、`audit-service`、`control-plane-service`、`presence-service`
+和 `model-gateway` 已进入 product-active 并通过各自第一版 smoke。
+下一步默认继续 `workflow-service` / `knowledge-ingestion-service` stage-switch，
+也可以先做 `admin-service` stage-switch。
 ```
 
 系统测试 / HA / 长压 / sizing 后置；总览、待办、单服务状态分别看

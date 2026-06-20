@@ -40,15 +40,13 @@ model-gateway / workflow / knowledge-ingestion / vector-index
 - 组合 promotion 边界见 `docs/sdd/future-platform-services.md`。
 - 10 个目标服务的 SDD v0.1 draft 已存在，单服务状态见 service brief。
 - `media-service`、`notification-service`、`audit-service`、
-  `control-plane-service`、`presence-service` 已 product-active 并通过各自
-  第一版 smoke。
-- `model-gateway` SDD v0.1 stage-switch review 已通过；下一实现切片才能
-  同步切换 registry、proto、migration、runtime、Docker / observability。
+  `control-plane-service`、`presence-service`、`model-gateway` 已 product-active
+  并通过各自第一版 smoke。
 
 ## 下一步
 
-- 默认进入 `model-gateway` 第一实现切片；也可以继续 `workflow-service` 或
-  `knowledge-ingestion-service` stage-switch。
+- 默认继续 `workflow-service` 或 `knowledge-ingestion-service` stage-switch；
+  也可以先做 `admin-service` stage-switch。
 - 也可以继续 notification SMTP / SMS / APNs / FCM adapter 或 bounce-suppression。
 
 ## 硬边界

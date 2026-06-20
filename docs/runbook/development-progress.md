@@ -70,16 +70,20 @@
   Prometheus / Grafana 覆盖已落；当前覆盖 `UpdatePresence`、`GetPresence`、
   `UpdateTyping`、PostgreSQL user / session / typing projection 和低敏
   presence outbox；最小 gRPC smoke 已通过并归档。
+- `model-gateway` product-active：SDD v0.1 和 stage-switch review 已通过，
+  第一版 proto / migration / 六层 skeleton / `grpc` runtime / Docker /
+  Prometheus / Grafana 覆盖已落；当前覆盖 `InvokeTextGeneration`、
+  `GetModelInvocation`、allowlisted deterministic mock provider、低敏
+  invocation metadata 和 `model_outbox`；最小 gRPC smoke 已通过并归档。
 
 当前 Go 侧服务底座、控制面、EvidencePack、proposal / approval / audit、
 Python Worker 候选接入边界和低敏 eval 持久化已经足够支撑算法切片；
 当前 active slice 已转为 future platform / product services promotion，继续按服务
-推进媒体、通知、审计、控制面等产品化 / 平台服务，不再泛化清九服务 P2。
+推进媒体、通知、审计、控制面、presence、model 等产品化 / 平台服务，不再泛化清九服务 P2。
 
 当前尚未真实实现的后续产品化 / 平台服务：
 
 - `admin-service`（SDD v0.1 draft 已存在）
-- `model-gateway`（SDD v0.1 draft 已存在，stage-switch 已通过，等待第一实现切片）
 - `knowledge-ingestion-service`（SDD v0.1 draft 已存在）
 - `workflow-service`（SDD v0.1 draft 已存在）
 - `vector-index-service`（SDD v0.1 draft 已存在）

@@ -70,6 +70,9 @@ Foundation backlog 锚点：`search-service`、`memory-service`、`retrieval-gat
 - `presence-service`：后续仍需 push-gateway session event consumer、
   `SubscribePresence`、stale scanner、presence outbox relay、Redis hot-state
   integration 和 provider-grade privacy / contacts policy integration。
+- `model-gateway`：后续仍需真实 OpenAI / Claude / local-model HTTP provider、
+  embedding、rerank、outbox relay、route-refresh worker、budget-reset worker 和
+  cleanup worker。
 
 ## 后置平台 / 产品化服务
 
@@ -77,9 +80,6 @@ Foundation backlog 锚点：`search-service`、`memory-service`、`retrieval-gat
 创建 `services/<name>` 目录：
 
 - `admin-service`：租户、封禁、配置、repair 审批、运维操作。
-- `model-gateway`：stage-switch 已通过；下一实现切片同步 registry、proto、
-  migration、runtime、Docker / observability，并先落
-  `InvokeTextGeneration` / `GetModelInvocation` 最小 gRPC 路径。
 - `workflow-service`：审批等待、长事务、补偿、retention、operator workflow。
 - `knowledge-ingestion-service`：文件 / 网页导入、chunking、embedding pipeline。
 - `vector-index-service`：向量索引写入、重建、backfill；满足拆分条件后再独立。

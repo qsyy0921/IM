@@ -7,21 +7,17 @@
 ```text
 持续推进 E:\development\IM 的 NexusIM。
 
-【当前 active slice】future platform / product services promotion。目标覆盖 media-service、notification-service、audit-service、admin-service、control-plane-service、presence-service、model-gateway、workflow-service、knowledge-ingestion-service、vector-index-service。
-
-【不要默认做】生产级 HA、长压、sizing、provider-grade 运维、九服务长期 P2 hardening、Docker/双机基础设施整理，或泛泛“把九服务继续做干净”。
-九个既有 IM 服务和 AI foundation 服务都作为可运行底座；只处理阻塞这批 future 服务 promotion 的 P0/P1、用户明确点名任务、或本轮切片必须补的边界。
+目标框只保留稳定启动规则；不要从目标框判断当前具体任务、服务清单或优先级。
+当前 active slice、边界和下一步必须读取仓库文档，尤其是 docs/runbook/current-goal.md。
 
 每轮开始：
 1. 执行 git status --short --branch --untracked-files=all。
-2. 读取 prompt.md 和 agent.md，确认当前 active slice 仍是 future services promotion。
-3. 读取 docs/runbook/current-goal.md 的当前 active slice；再按需读取 current-brief、remaining-goals、相关 service brief 或 SDD；不要全文扫长历史文档。
+2. 读取 prompt.md 和 agent.md，确认文档路由和工作规则。
+3. 读取 docs/runbook/current-goal.md 获取当前 active slice。
+4. 需要阶段背景时读 docs/runbook/current-brief.md；需要选择待办时读 docs/runbook/remaining-goals.md。
+5. 当前任务涉及哪个服务，再读 docs/runbook/service-briefs/README.md、对应 service brief 和必要 SDD 章节；不要全文扫长历史文档。
 
-当前 active slice：future platform / product services promotion。先读相关 `docs/runbook/service-briefs/<service>.md`，为每个服务按顺序冻结 SDD v0.1、stage-switch 条件和 focused checks；完成某个服务的 SDD / 门禁影响确认后，再创建对应 `services/<service>`。
-
-硬边界：不一次性创建全部 future 服务目录；不直接读其它服务私有表；跨服务只走公开 API、事件或明确 port；model / vector / ingestion / workflow 不得绕过 retrieval、policy、EvidencePack、approval 和 audit。
-
-可用多个 sub-agent 做互不重叠任务；主 agent 负责集成、检查和文档同步。不回滚用户已有修改。新发现的待办写入 docs/runbook/remaining-goals.md。
+工作方式：按 current-goal 小切片闭环；可用多个 sub-agent 做互不重叠任务；主 agent 负责集成、检查和文档同步。不回滚用户已有修改。新发现的待办写入 docs/runbook/remaining-goals.md。
 
 门禁按风险分层：小改只跑相关测试 / 文档脚本；跨服务、生成代码、migration、service-registry、Docker/compose、安全边界或提交推送前才跑完整 check-local。
 ```
@@ -34,7 +30,7 @@
 
 ## 工作原则
 
-1. 主线阶段以 `current-goal.md` 和 `current-brief.md` 为准；不要在本文件重复维护长状态。
+1. 主线阶段以 `current-goal.md` 和 `current-brief.md` 为准；不要在本文件维护当前 active slice 细节。
 2. 小切片闭环：设计、代码、必要测试、文档一起收；默认跑相关局部门禁，不频繁跑完整 `check-local`。
 3. 降低耦合并控制复杂度：不跨服务读内部表，不引入网状同步 RPC，接近行数阈值就拆同 package 文件。
 4. 新服务和中间件不写死；满足独立模型 / 伸缩 / 故障 / 安全边界或明显降复杂度时通过 ADR 新增。

@@ -1,7 +1,9 @@
 # media-service
 
-状态：future / SDD v0.1 draft 已存在。当前不得创建 `services/media-service`
-目录，直到完成 stage switch。
+状态：future / SDD v0.1 draft 已存在 / stage-switch review passed。当前不得创建
+`services/media-service` 目录，直到 implementation slice 同步更新 registry / gate。
+
+Stage-switch 记录：`docs/runbook/stage-switch/media-service.md`。
 
 定位：IM 媒体资产服务，负责图片、语音、视频、文件上传下载、对象存储元数据、
 缩略图、病毒扫描、语音转码和时长 / hash 探测。

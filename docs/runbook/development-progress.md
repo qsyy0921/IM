@@ -45,7 +45,7 @@ Python Worker 候选接入边界和低敏 eval 持久化已经足够支撑算法
 
 当前尚未真实实现的后续产品化 / 平台服务：
 
-- `media-service`（SDD v0.1 draft 已存在）
+- `media-service`（SDD v0.1 draft 已存在，stage-switch review passed）
 - `notification-service`（SDD v0.1 draft 已存在）
 - `audit-service`（SDD v0.1 draft 已存在）
 - `admin-service`（SDD v0.1 draft 已存在）

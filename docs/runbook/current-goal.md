@@ -50,8 +50,11 @@ vector-index-service
   `admin-service`、`presence-service`、`model-gateway`、
   `knowledge-ingestion-service`、`workflow-service` 和 `vector-index-service`
   SDD v0.1 draft 已存在。
-- 下一步默认从 `media-service` 开始做 stage-switch 条件复核；确认 SDD 无 P0/P1、
-  边界和门禁影响清楚后，再进入 proto / migration / 六层 skeleton。
+- `media-service` stage-switch review 已通过，记录见
+  `docs/runbook/stage-switch/media-service.md`。
+- 下一步默认进入 `media-service` implementation slice：同步 registry / gate 后，
+  再落 proto / migration / 六层 skeleton。该切片涉及 service-registry、proto、
+  migration 和 Docker/observability，需要扩大门禁。
 
 ## 硬边界
 

@@ -1,7 +1,9 @@
 # control-plane-service
 
-状态：future / SDD v0.1 draft 已存在。当前不得创建
-`services/control-plane-service` 目录，直到完成 stage switch。
+状态：future / SDD v0.1 draft 已存在 / stage-switch 已通过。下一实现切片
+必须同步切换 service-registry，并创建 `services/control-plane-service` 目录。
+
+Stage-switch 记录：`docs/runbook/stage-switch/control-plane-service.md`。
 
 定位：多租户运行控制面，负责功能开关、灰度、限流策略、配额、动态策略发布、
 配置版本和 applied-version ACK。

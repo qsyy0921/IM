@@ -46,11 +46,13 @@ model-gateway / workflow / knowledge-ingestion / vector-index
 - `audit-service` 已切到 product-active，第一实现切片已落
   `AppendAuditRecord` / `QueryAuditRecords` / `VerifyAuditProof`、
   proto / migration / runtime / observability，并已通过最小 gRPC smoke。
+- `control-plane-service` stage-switch 已通过，下一实现切片可开始
+  proto / migration / 六层 skeleton。
 
 ## 下一步
 
-- 默认进入 `admin-service` 或 `control-plane-service` stage-switch，先读对应
-  service brief 和 SDD draft，再冻结 v0.1 边界与门禁影响。
+- 默认进入 `control-plane-service` 第一实现切片：
+  `PublishConfigVersion` / `GetConfigSnapshot` / `AckAppliedConfigVersion`。
 - 也可以继续 notification SMTP / SMS / APNs / FCM adapter 或 bounce-suppression。
 
 ## 硬边界

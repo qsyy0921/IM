@@ -7,20 +7,19 @@
 ```text
 持续推进 E:\development\IM 的 NexusIM。
 
-【当前唯一默认主线】AI 大模型应用底座，不是泛化清理九个 IM 服务 P2 backlog。
-默认链路：group memory -> EvidencePack -> RAG -> summary -> multi-agent -> skill-registry -> MCP/tool gateway -> action-executor -> proposal / approval / audit -> ai-eval。
+【当前 active slice】media-service v0.1 promotion。先把 media-service 从 future 规划推进到 SDD / 契约 / stage-switch 方案，再落第一实现切片。
 
 【不要默认做】生产级 HA、长压、sizing、provider-grade 运维、九服务长期 P2 hardening、Docker/双机基础设施整理，或泛泛“把九服务继续做干净”。
-九个既有 IM 服务是 AI 主线的可运行底座；只处理阻塞 AI 主线的 P0/P1、用户明确点名任务、或本轮切片必须补的边界。
+九个既有 IM 服务和 AI foundation 服务都作为可运行底座；只处理阻塞 media-service promotion 的 P0/P1、用户明确点名任务、或本轮切片必须补的边界。
 
 每轮开始：
 1. 执行 git status --short --branch --untracked-files=all。
-2. 读取 prompt.md 和 agent.md，确认当前主线仍是 AI 应用底座。
+2. 读取 prompt.md 和 agent.md，确认当前 active slice 仍是 media-service。
 3. 读取 docs/runbook/current-goal.md 的当前 active slice；再按需读取 current-brief、remaining-goals、相关 service brief 或 SDD；不要全文扫长历史文档。
 
-当前 active slice：Go 侧服务底座、控制面、EvidencePack、proposal / approval / audit、Python AI Worker 候选边界、RAG / Summary / Agent candidate guard、ai-eval catalog / gate、memory-service runtime source-ref / validity / supersession query checks、retrieval-gateway current-only memory query、RAG / Summary / Agent 显式 at_conversation_seq、current-memory regression、confidence / review eval、service-stack live smoke、cross-group / temporal retrieval + RAG / Summary / Agent stack smoke 和 40/40 optional stack gate 已落。下一步默认进入低敏 collaborative-memory 算法/eval 切片，优先 multi-hop / temporal update / profile aggregation。
+当前 active slice：media-service v0.1 promotion。先读 `docs/runbook/service-briefs/media-service.md`，起草 / 更新 `docs/sdd/media-service.md`，冻结 upload session、asset metadata、object storage port、download URL、scan / thumbnail / transcode 状态和 policy / visibility 校验。确认 service-registry、proto、migration、六层 skeleton、Docker、Prometheus、Grafana 和 focused tests 的门禁影响后，再创建 `services/media-service`。
 
-硬边界：RAG / summary / Agent 只能消费 EvidencePack，不直接读 message / conversation / private tables；真实写动作必须继续走 policy、proposal / approval / executor / audit；Python AI Worker 只做模型 / 算法 / eval 候选层，Go 仍负责控制面和事实边界。
+硬边界：不一次性 promotion 其它 future 服务；不把媒体二进制塞回 message-service；不直接读其它服务私有表；跨服务只走公开 API、事件或明确 port。
 
 可用多个 sub-agent 做互不重叠任务；主 agent 负责集成、检查和文档同步。不回滚用户已有修改。新发现的待办写入 docs/runbook/remaining-goals.md。
 

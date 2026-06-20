@@ -3,78 +3,48 @@
 本文件只维护当前可执行目标。Codex 目标框短 prompt 见根目录 `prompt.md`，
 不要把长 prompt 复制到这里。
 
-## 当前默认主线
-
-```text
-当前唯一默认主线：AI 大模型应用底座。
-group memory -> EvidencePack -> RAG -> summary -> multi-agent
--> skill-registry -> MCP/tool gateway -> action-executor
--> proposal / approval / audit -> ai-eval
-```
-
-如果用户只说“继续 / 接下来做什么 / 动手去做”，默认推进这条 AI 主线。
-9 个既有 IM 服务是可运行基础；默认只处理阻塞 AI 主线的 P0/P1、用户点名任务，
-或本轮切片必须补的边界。不要把任务自动切回九服务长期 P2 hardening、
-生产级 HA、长压、sizing、provider-grade 运维或 Docker/双机基础设施整理。
-
 ## 当前 Active Slice
 
-已落：
-- search / memory / retrieval / RAG / summary / Agent first paths。
-- skill-registry、mcp-gateway、action-executor first paths。
-- proposal / approval / audit / approval outbox relay / approved execution。
-- local safe tool adapter、guarded external HTTP adapter、tool output safety。
-- Python AI Worker foundation、Go-side candidate adapter smoke、RAG / Summary /
-  Agent 服务级 Python candidate guard。
-- profile overgeneralization / Agent output safety eval cases 和扩展回归。
-- `ai-eval-service` persistent eval run catalog、RecordEvalRun recorder smoke、
-  multi-adapter regression gate smoke、gate policy manifest、Python optional
-  adapter path、service-stack preflight wrapper、RAG / Agent optional
-  service-stack live gate smoke、CI-safe gate skeleton、RAG / Agent regression
-  case expansion first pass、profile / Agent output safety expansion、
-  service-stack version / hash-only expansion、negative RAG / Agent cases、
-  Summary live negative adapter、Python / model-output negative regression cases、
-  RAG / Summary citation source-ref regression、external MCP fallback eval cases、
-  Agent output regression、action preflight / rate-limit / DLQ-repair safety eval、
-  action-executor provider failure retry/DLQ skeleton、worker 和 redrive safety eval、
-  memory-service group memory source-ref / validity / supersession fixture eval，
-  memory-service runtime `at_conversation_seq` query semantics、source-ref /
-  validity / supersession PostgreSQL coverage 和 `loadtest/memory` smoke checks，
-  retrieval-gateway EvidencePack -> memory-service current-only query，RAG /
-  Summary / Agent API 显式透传 `at_conversation_seq` 到 EvidencePack。既有 eval 报告见
-  `docs/runbook/loadtest/ai-eval-service/`。
-- current-memory consumption regression / eval：新增 RAG、Summary、Agent
-  三个低敏 fixture case，验证 `at_conversation_seq` 传播、过期 memory 和
-  superseded memory 不会作为 current citation，被纳入 CI-safe AI eval gate。
-- memory extraction confidence / review eval：新增低置信候选和 contradiction
-  候选低敏 fixture case，验证弱信号 / 冲突记忆必须保留 source refs、停在
-  PENDING / NEEDS_REVIEW，不能直接成为 current ACTIVE evidence。
-- current-memory service-stack live smoke：`loadtest/rag`、`loadtest/summary`
-  和 `loadtest/agent` 已在真实服务栈 seed 中加入 expired / superseded 低敏
-  decoy memory，并在 summary JSON 中记录 `current_memory_at_seq`、
-  `expired_memory_excluded`、`superseded_memory_excluded`；ai-eval catalog 增至
-  64 cases，service-stack adapter 已断言真实服务栈排除 stale memory。2026-06-20
-  真实本地 live gate 38/38 通过，报告见
-  `docs/runbook/loadtest/ai-eval-service/loadtest-report-20260620-current-memory-service-stack-live.md`。
-- cross-group / temporal retrieval smoke：低敏 CI-safe cases 和真实
-  `loadtest/retrieval` 已覆盖跨群 source refs / speaker attribution，并按
-  query seq 排除 expired / superseded / future memory。
-- cross-group / temporal RAG / Summary / Agent service-stack consumption 和 optional
-  stack gate：真实 adapter smoke 与 40/40 gate 已验证跨群 source refs / speaker
-  attribution，并排除 stale / future memory。
-- Go 侧服务底座、EvidencePack、proposal / approval / audit、Python Worker
-  候选边界和低敏 eval 已足够支撑算法切片；后续 Go 工作只围绕候选接入、
-  边界校验、状态流转和 eval 继续补。
-下一步默认推进：
 ```text
-进入低敏 collaborative-memory 算法/eval，优先 multi-hop / temporal update / profile aggregation 边界
+media-service v0.1 promotion
 ```
 
-硬边界：RAG / summary / Agent 只能消费 EvidencePack；真实写动作必须走
-policy、proposal / approval、executor 和 audit；Python 只做候选层，Go 负责控制面、事实边界和审计。
+用户已点名把下一步目标指向 `media-service`。当前任务不是一次性开发全部 future
+服务，而是把 `media-service` 从 future 规划推进到可实现的第一切片。
 
-1. 每轮先读 `prompt.md`、`agent.md` 和本文件。
-2. 需要阶段背景时读 `current-brief.md`；需要选择未完成任务时读 `remaining-goals.md`。
-3. 当前任务涉及哪个服务，再读对应 `service-briefs/<service>.md` 和必要 SDD 章节。
-4. 新发现待办写入 `remaining-goals.md`。
-5. 有意义切片要闭环：代码、测试、文档、focused commit。
+## 为什么先做 media-service
+
+- IM 产品完整化迟早需要图片、语音、视频、文件和对象存储。
+- message-service 目前只应保存媒体引用和低敏 metadata，不应承担二进制上传、
+  缩略图、病毒扫描、语音转码或下载授权。
+- media 边界清晰，适合作为 future 服务 promotion 的第一个样板。
+
+## 下一步默认动作
+
+1. 读取 `prompt.md`、`agent.md`、本文件和
+   `docs/runbook/service-briefs/media-service.md`。
+2. 起草 / 更新 `docs/sdd/media-service.md`，冻结 v0.1 边界：
+   upload session、asset metadata、object storage port、download URL、
+   scan / thumbnail / transcode 状态、policy / visibility 校验。
+3. 明确非目标：不保存 message 正文，不替代 message-service，不绕过
+   identity / policy / conversation visibility，不直接暴露 object key。
+4. 准备 stage switch 方案：service-registry、proto、migration、六层 skeleton、
+   cmd runtime、Docker、Prometheus、Grafana、service brief 和 focused tests。
+5. 只有完成 SDD v0.1 和门禁影响确认后，才创建 `services/media-service`。
+
+## 硬边界
+
+- 不一次性 promotion 其它 future 服务。
+- 不把媒体二进制塞回 message-service。
+- 不直接读其它服务私有表；跨服务只走公开 API、事件或明确 port。
+- 不回滚用户已有修改。
+- 小改跑 focused checks；涉及 service-registry / Docker / compose / proto /
+  migration / 安全边界时再扩大门禁。
+
+## 文档路由
+
+- 当前阶段背景：`docs/runbook/current-brief.md`
+- 剩余待办：`docs/runbook/remaining-goals.md`
+- media 入口：`docs/runbook/service-briefs/media-service.md`
+- 未来服务总表：`docs/runbook/service-registry.json`
+- 新发现待办写入 `docs/runbook/remaining-goals.md`

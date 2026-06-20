@@ -16,12 +16,10 @@
 NexusIM 已有本地 / 双机可运行的最小分布式 IM 后端。
 9 个后端服务已进入真实链路：`api-gateway`、`identity-service`、`message-service`、`conversation-service`、`delivery-service`、`push-gateway`、`receipt-service`、`contacts-service`、`policy-service`。
 
-当前唯一默认主线是 AI 大模型应用底座：
+当前 active slice 已临时切到 `media-service v0.1 promotion`：
 
 ```text
-group memory -> EvidencePack -> RAG -> summary -> multi-agent
--> skill-registry -> mcp-gateway/tool-gateway -> action-executor
--> proposal / approval / audit -> ai-eval
+future media-service -> SDD v0.1 -> stage-switch plan -> first skeleton
 ```
 
 AI foundation-active 服务：`search-service`、`memory-service`、`retrieval-gateway`、`rag-service`、`summary-service`、`agent-service`、`skill-registry`、`mcp-gateway`、`action-executor`、`ai-eval-service`。
@@ -42,7 +40,7 @@ Go 侧服务底座、EvidencePack、proposal / approval / audit 和 eval 持久�
 当前下一步：
 
 ```text
-进入低敏 collaborative-memory 算法/eval，优先 multi-hop / temporal update / profile aggregation 边界
+起草 / 更新 docs/sdd/media-service.md，并冻结 media-service v0.1 边界
 ```
 
 完整系统测试、生产级 HA、长压和 sizing 继续后置为 hardening backlog。
@@ -52,6 +50,8 @@ Go 侧服务底座、EvidencePack、proposal / approval / audit 和 eval 持久�
 - RAG / summary / Agent 只能消费权限过滤后的 EvidencePack。
 - 真实写动作必须走 policy、proposal / approval、executor 和 audit。
 - Python AI Worker 只做模型 / 算法 / eval 候选层，Go 负责控制面、状态和审计。
+- media-service promotion 期间不得一次性 promotion 其它 future 服务。
+- 媒体二进制不得塞回 message-service；下载授权不得绕过 policy / visibility。
 - 不回滚用户已有修改。
 - 不为了“了解项目”全文读取长历史文档。
 - 新发现的待完成工作写入 `docs/runbook/remaining-goals.md`。

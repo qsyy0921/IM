@@ -20,6 +20,8 @@ vector 写入、rebuild 和 backfill 逻辑复杂到影响 retrieval / memory �
 当前已覆盖：
 
 - `UpsertVectorItem`、`TombstoneVectorItem`、`SearchVectors`、`GetVectorIndexJob`。
+- `RequestVectorRebuild` 第一版 rebuild job / checkpoint request path；真正
+  rebuild worker 后置。
 - local / PostgreSQL-backed test vector adapter；Milvus / pgvector / OpenSearch
   vector 后置。
 - `vector_outbox -> im.vector.events` 第一版 outbox relay、低敏 Kafka schema、

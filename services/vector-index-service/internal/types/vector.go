@@ -22,6 +22,8 @@ const (
 	JobTypeRebuild                  = "REBUILD"
 	JobStatusIndexed                = "INDEXED"
 	JobStatusTombstoned             = "TOMBSTONED"
+	JobStatusPending                = "PENDING"
+	RebuildCheckpointStatusPending  = "PENDING"
 	OutboxStatusPublished           = "PUBLISHED"
 	OutboxStatusDLQ                 = "DLQ"
 	AllowedCallerKnowledgeIngestion = "knowledge-ingestion-service"
@@ -77,6 +79,20 @@ type SearchVectorsCommand struct {
 	VisibilityScope    string
 	PolicyVersion      string
 	At                 time.Time
+}
+
+type RequestVectorRebuildCommand struct {
+	AuthContext       AuthContext
+	CollectionType    string
+	EmbeddingModelRef string
+	Dimension         int
+	SourceService     string
+	PartitionKey      string
+	CursorValue       string
+	IdempotencyKey    string
+	CorrelationID     string
+	CausationID       string
+	TraceID           string
 }
 
 type GetVectorIndexJobCommand struct {
@@ -146,6 +162,17 @@ type VectorIndexJob struct {
 	TraceID        string
 	CreatedAt      time.Time
 	CompletedAt    time.Time
+}
+
+type VectorRebuildCheckpoint struct {
+	TenantID      TenantID
+	RebuildJobID  string
+	CollectionID  string
+	SourceService string
+	PartitionKey  string
+	CursorValue   string
+	Status        string
+	UpdatedAt     time.Time
 }
 
 type VectorTombstone struct {
@@ -331,6 +358,49 @@ func (command SearchVectorsCommand) Validate() error {
 	return nil
 }
 
+func (command RequestVectorRebuildCommand) Normalized() RequestVectorRebuildCommand {
+	command.AuthContext = command.AuthContext.Normalized()
+	command.CollectionType = strings.ToUpper(strings.TrimSpace(command.CollectionType))
+	command.EmbeddingModelRef = strings.TrimSpace(command.EmbeddingModelRef)
+	command.SourceService = strings.TrimSpace(command.SourceService)
+	command.PartitionKey = strings.TrimSpace(command.PartitionKey)
+	command.CursorValue = strings.TrimSpace(command.CursorValue)
+	command.IdempotencyKey = strings.TrimSpace(command.IdempotencyKey)
+	command.CorrelationID = strings.TrimSpace(command.CorrelationID)
+	command.CausationID = strings.TrimSpace(command.CausationID)
+	command.TraceID = strings.TrimSpace(command.TraceID)
+	return command
+}
+
+func (command RequestVectorRebuildCommand) Validate() error {
+	command = command.Normalized()
+	if err := command.AuthContext.Validate(); err != nil {
+		return err
+	}
+	if command.AuthContext.ServiceName != AllowedCallerVectorIndex {
+		return NewPermissionDenied("caller is not allowed to request vector rebuild")
+	}
+	if !isAllowedCollectionType(command.CollectionType) {
+		return NewInvalidArgument("collection_type is unsupported")
+	}
+	if command.EmbeddingModelRef == "" || command.Dimension <= 0 {
+		return NewInvalidArgument("embedding model and dimension are required")
+	}
+	if !isAllowedSourceService(command.SourceService) {
+		return NewInvalidArgument("source_service is unsupported")
+	}
+	if command.PartitionKey == "" || command.CursorValue == "" {
+		return NewInvalidArgument("partition_key and cursor_value are required")
+	}
+	if command.IdempotencyKey == "" {
+		return NewInvalidArgument("idempotency_key is required")
+	}
+	if containsSensitiveValue(command.EmbeddingModelRef, command.SourceService, command.PartitionKey, command.CursorValue, command.IdempotencyKey) {
+		return NewInvalidArgument("rebuild refs must be low-sensitive")
+	}
+	return nil
+}
+
 func (command GetVectorIndexJobCommand) Normalized() GetVectorIndexJobCommand {
 	command.AuthContext = command.AuthContext.Normalized()
 	command.JobID = strings.TrimSpace(command.JobID)
@@ -360,6 +430,15 @@ func isAllowedIndexingCaller(service string) bool {
 func isAllowedCollectionType(value string) bool {
 	switch value {
 	case CollectionTypeKnowledgeChunk, CollectionTypeMemoryEvent, CollectionTypeSearchDocument, CollectionTypeProfileAggregate, CollectionTypeEvalFixture:
+		return true
+	default:
+		return false
+	}
+}
+
+func isAllowedSourceService(value string) bool {
+	switch strings.TrimSpace(value) {
+	case AllowedCallerKnowledgeIngestion, AllowedCallerMemory, AllowedCallerSearch:
 		return true
 	default:
 		return false

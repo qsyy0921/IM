@@ -73,6 +73,8 @@ type summary struct {
 	VectorItemID          string             `json:"vector_item_id"`
 	VectorItemRefHash     string             `json:"vector_item_ref_hash"`
 	UpsertJobID           string             `json:"upsert_job_id"`
+	RebuildJobID          string             `json:"rebuild_job_id"`
+	RebuildCheckpoint     string             `json:"rebuild_checkpoint_status"`
 	TombstoneJobID        string             `json:"tombstone_job_id"`
 	TombstoneID           string             `json:"tombstone_id"`
 	SearchBeforeCount     int                `json:"search_before_count"`
@@ -251,6 +253,27 @@ func run(cfg config) error {
 		return errors.New(result.Error)
 	}
 
+	rebuild, err := requestVectorRebuild(ctx, client, cfg)
+	if err != nil {
+		result.Error = "request vector rebuild: " + err.Error()
+		return err
+	}
+	result.RebuildJobID = rebuild.GetJob().GetJobId()
+	result.RebuildCheckpoint = rebuild.GetCheckpoint().GetStatus()
+	if result.RebuildJobID == "" || rebuild.GetJob().GetStatus() != "PENDING" || result.RebuildCheckpoint != "PENDING" {
+		result.Error = fmt.Sprintf("unexpected rebuild response: job=%+v checkpoint=%+v", rebuild.GetJob(), rebuild.GetCheckpoint())
+		return errors.New(result.Error)
+	}
+	loadedRebuild, err := getVectorJob(ctx, client, cfg, result.RebuildJobID)
+	if err != nil {
+		result.Error = "get rebuild job: " + err.Error()
+		return err
+	}
+	if loadedRebuild.GetJob().GetJobType() != "REBUILD" || loadedRebuild.GetJob().GetStatus() != "PENDING" {
+		result.Error = fmt.Sprintf("unexpected loaded rebuild job: %+v", loadedRebuild.GetJob())
+		return errors.New(result.Error)
+	}
+
 	tombstone, err := tombstoneVectorItem(ctx, client, cfg, result.VectorItemID)
 	if err != nil {
 		result.Error = "tombstone vector item: " + err.Error()
@@ -327,6 +350,33 @@ func upsertVectorItem(ctx context.Context, client vectorv1.VectorIndexServiceCli
 		CorrelationId:       cfg.idempotencyKey,
 		CausationId:         cfg.idempotencyKey,
 		TraceId:             cfg.traceID,
+	})
+}
+
+func requestVectorRebuild(ctx context.Context, client vectorv1.VectorIndexServiceClient, cfg config) (*vectorv1.RequestVectorRebuildResponse, error) {
+	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
+	defer cancel()
+	return client.RequestVectorRebuild(requestCtx, &vectorv1.RequestVectorRebuildRequest{
+		AuthContext:       authContext(cfg, "vector-index-service", "vector-smoke-rebuild"),
+		CollectionType:    cfg.collectionType,
+		EmbeddingModelRef: cfg.embeddingModelRef,
+		Dimension:         3,
+		SourceService:     cfg.sourceService,
+		PartitionKey:      cfg.sourceService + ":" + cfg.tenantID,
+		CursorValue:       "cursor:start",
+		IdempotencyKey:    cfg.idempotencyKey + "-rebuild",
+		CorrelationId:     cfg.idempotencyKey,
+		CausationId:       cfg.idempotencyKey,
+		TraceId:           cfg.traceID,
+	})
+}
+
+func getVectorJob(ctx context.Context, client vectorv1.VectorIndexServiceClient, cfg config, jobID string) (*vectorv1.GetVectorIndexJobResponse, error) {
+	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
+	defer cancel()
+	return client.GetVectorIndexJob(requestCtx, &vectorv1.GetVectorIndexJobRequest{
+		AuthContext: authContext(cfg, "vector-index-service", "vector-smoke-get-job"),
+		JobId:       jobID,
 	})
 }
 

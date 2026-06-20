@@ -54,6 +54,22 @@ func TestSearchVectorsRequiresRetrievalCaller(t *testing.T) {
 	}
 }
 
+func TestPrepareRebuildRequiresVectorIndexCaller(t *testing.T) {
+	command := validRebuildCommand()
+	command.AuthContext.ServiceName = types.AllowedCallerKnowledgeIngestion
+	if _, err := PrepareRebuild(command, "vjob_rebuild_test", time.Now()); !errors.Is(err, types.ErrPermissionDenied) {
+		t.Fatalf("expected permission denied for non vector-index caller, got %v", err)
+	}
+	command = validRebuildCommand()
+	prepared, err := PrepareRebuild(command, "vjob_rebuild_test", time.Now())
+	if err != nil {
+		t.Fatalf("prepare valid rebuild: %v", err)
+	}
+	if prepared.CollectionID == "" || prepared.CommandHash == "" || prepared.JobID != "vjob_rebuild_test" {
+		t.Fatalf("unexpected prepared rebuild: %+v", prepared)
+	}
+}
+
 func validUpsertCommand() types.UpsertVectorItemCommand {
 	return types.UpsertVectorItemCommand{
 		AuthContext: types.AuthContext{
@@ -75,5 +91,21 @@ func validUpsertCommand() types.UpsertVectorItemCommand {
 		PolicyVersion:       "policy:v1",
 		DataClass:           "LOW",
 		IdempotencyKey:      "idem-1",
+	}
+}
+
+func validRebuildCommand() types.RequestVectorRebuildCommand {
+	return types.RequestVectorRebuildCommand{
+		AuthContext: types.AuthContext{
+			TenantID:    "tenant-vector-domain",
+			ServiceName: types.AllowedCallerVectorIndex,
+		},
+		CollectionType:    types.CollectionTypeKnowledgeChunk,
+		EmbeddingModelRef: "model:text-embedding-local",
+		Dimension:         3,
+		SourceService:     types.AllowedCallerKnowledgeIngestion,
+		PartitionKey:      "knowledge-ingestion-service:tenant-vector-domain",
+		CursorValue:       "cursor:start",
+		IdempotencyKey:    "rebuild-idem-1",
 	}
 }

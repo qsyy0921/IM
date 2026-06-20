@@ -449,6 +449,106 @@ func (x *VectorIndexJob) GetCompletedAtUnixMs() int64 {
 	return 0
 }
 
+type VectorRebuildCheckpoint struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	TenantId        string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	RebuildJobId    string                 `protobuf:"bytes,2,opt,name=rebuild_job_id,json=rebuildJobId,proto3" json:"rebuild_job_id,omitempty"`
+	CollectionId    string                 `protobuf:"bytes,3,opt,name=collection_id,json=collectionId,proto3" json:"collection_id,omitempty"`
+	SourceService   string                 `protobuf:"bytes,4,opt,name=source_service,json=sourceService,proto3" json:"source_service,omitempty"`
+	PartitionKey    string                 `protobuf:"bytes,5,opt,name=partition_key,json=partitionKey,proto3" json:"partition_key,omitempty"`
+	CursorValue     string                 `protobuf:"bytes,6,opt,name=cursor_value,json=cursorValue,proto3" json:"cursor_value,omitempty"`
+	Status          string                 `protobuf:"bytes,7,opt,name=status,proto3" json:"status,omitempty"`
+	UpdatedAtUnixMs int64                  `protobuf:"varint,8,opt,name=updated_at_unix_ms,json=updatedAtUnixMs,proto3" json:"updated_at_unix_ms,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *VectorRebuildCheckpoint) Reset() {
+	*x = VectorRebuildCheckpoint{}
+	mi := &file_nexusim_vector_v1_vector_index_service_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *VectorRebuildCheckpoint) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*VectorRebuildCheckpoint) ProtoMessage() {}
+
+func (x *VectorRebuildCheckpoint) ProtoReflect() protoreflect.Message {
+	mi := &file_nexusim_vector_v1_vector_index_service_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use VectorRebuildCheckpoint.ProtoReflect.Descriptor instead.
+func (*VectorRebuildCheckpoint) Descriptor() ([]byte, []int) {
+	return file_nexusim_vector_v1_vector_index_service_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *VectorRebuildCheckpoint) GetTenantId() string {
+	if x != nil {
+		return x.TenantId
+	}
+	return ""
+}
+
+func (x *VectorRebuildCheckpoint) GetRebuildJobId() string {
+	if x != nil {
+		return x.RebuildJobId
+	}
+	return ""
+}
+
+func (x *VectorRebuildCheckpoint) GetCollectionId() string {
+	if x != nil {
+		return x.CollectionId
+	}
+	return ""
+}
+
+func (x *VectorRebuildCheckpoint) GetSourceService() string {
+	if x != nil {
+		return x.SourceService
+	}
+	return ""
+}
+
+func (x *VectorRebuildCheckpoint) GetPartitionKey() string {
+	if x != nil {
+		return x.PartitionKey
+	}
+	return ""
+}
+
+func (x *VectorRebuildCheckpoint) GetCursorValue() string {
+	if x != nil {
+		return x.CursorValue
+	}
+	return ""
+}
+
+func (x *VectorRebuildCheckpoint) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *VectorRebuildCheckpoint) GetUpdatedAtUnixMs() int64 {
+	if x != nil {
+		return x.UpdatedAtUnixMs
+	}
+	return 0
+}
+
 type VectorSearchResult struct {
 	state             protoimpl.MessageState `protogen:"open.v1"`
 	VectorItemRef     string                 `protobuf:"bytes,1,opt,name=vector_item_ref,json=vectorItemRef,proto3" json:"vector_item_ref,omitempty"`
@@ -464,7 +564,7 @@ type VectorSearchResult struct {
 
 func (x *VectorSearchResult) Reset() {
 	*x = VectorSearchResult{}
-	mi := &file_nexusim_vector_v1_vector_index_service_proto_msgTypes[3]
+	mi := &file_nexusim_vector_v1_vector_index_service_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -476,7 +576,7 @@ func (x *VectorSearchResult) String() string {
 func (*VectorSearchResult) ProtoMessage() {}
 
 func (x *VectorSearchResult) ProtoReflect() protoreflect.Message {
-	mi := &file_nexusim_vector_v1_vector_index_service_proto_msgTypes[3]
+	mi := &file_nexusim_vector_v1_vector_index_service_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -489,7 +589,7 @@ func (x *VectorSearchResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VectorSearchResult.ProtoReflect.Descriptor instead.
 func (*VectorSearchResult) Descriptor() ([]byte, []int) {
-	return file_nexusim_vector_v1_vector_index_service_proto_rawDescGZIP(), []int{3}
+	return file_nexusim_vector_v1_vector_index_service_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *VectorSearchResult) GetVectorItemRef() string {
@@ -570,7 +670,7 @@ type UpsertVectorItemRequest struct {
 
 func (x *UpsertVectorItemRequest) Reset() {
 	*x = UpsertVectorItemRequest{}
-	mi := &file_nexusim_vector_v1_vector_index_service_proto_msgTypes[4]
+	mi := &file_nexusim_vector_v1_vector_index_service_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -582,7 +682,7 @@ func (x *UpsertVectorItemRequest) String() string {
 func (*UpsertVectorItemRequest) ProtoMessage() {}
 
 func (x *UpsertVectorItemRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nexusim_vector_v1_vector_index_service_proto_msgTypes[4]
+	mi := &file_nexusim_vector_v1_vector_index_service_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -595,7 +695,7 @@ func (x *UpsertVectorItemRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpsertVectorItemRequest.ProtoReflect.Descriptor instead.
 func (*UpsertVectorItemRequest) Descriptor() ([]byte, []int) {
-	return file_nexusim_vector_v1_vector_index_service_proto_rawDescGZIP(), []int{4}
+	return file_nexusim_vector_v1_vector_index_service_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *UpsertVectorItemRequest) GetAuthContext() *AuthContext {
@@ -756,7 +856,7 @@ type UpsertVectorItemResponse struct {
 
 func (x *UpsertVectorItemResponse) Reset() {
 	*x = UpsertVectorItemResponse{}
-	mi := &file_nexusim_vector_v1_vector_index_service_proto_msgTypes[5]
+	mi := &file_nexusim_vector_v1_vector_index_service_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -768,7 +868,7 @@ func (x *UpsertVectorItemResponse) String() string {
 func (*UpsertVectorItemResponse) ProtoMessage() {}
 
 func (x *UpsertVectorItemResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nexusim_vector_v1_vector_index_service_proto_msgTypes[5]
+	mi := &file_nexusim_vector_v1_vector_index_service_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -781,7 +881,7 @@ func (x *UpsertVectorItemResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpsertVectorItemResponse.ProtoReflect.Descriptor instead.
 func (*UpsertVectorItemResponse) Descriptor() ([]byte, []int) {
-	return file_nexusim_vector_v1_vector_index_service_proto_rawDescGZIP(), []int{5}
+	return file_nexusim_vector_v1_vector_index_service_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *UpsertVectorItemResponse) GetItem() *VectorItem {
@@ -821,7 +921,7 @@ type TombstoneVectorItemRequest struct {
 
 func (x *TombstoneVectorItemRequest) Reset() {
 	*x = TombstoneVectorItemRequest{}
-	mi := &file_nexusim_vector_v1_vector_index_service_proto_msgTypes[6]
+	mi := &file_nexusim_vector_v1_vector_index_service_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -833,7 +933,7 @@ func (x *TombstoneVectorItemRequest) String() string {
 func (*TombstoneVectorItemRequest) ProtoMessage() {}
 
 func (x *TombstoneVectorItemRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nexusim_vector_v1_vector_index_service_proto_msgTypes[6]
+	mi := &file_nexusim_vector_v1_vector_index_service_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -846,7 +946,7 @@ func (x *TombstoneVectorItemRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TombstoneVectorItemRequest.ProtoReflect.Descriptor instead.
 func (*TombstoneVectorItemRequest) Descriptor() ([]byte, []int) {
-	return file_nexusim_vector_v1_vector_index_service_proto_rawDescGZIP(), []int{6}
+	return file_nexusim_vector_v1_vector_index_service_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *TombstoneVectorItemRequest) GetAuthContext() *AuthContext {
@@ -917,7 +1017,7 @@ type TombstoneVectorItemResponse struct {
 
 func (x *TombstoneVectorItemResponse) Reset() {
 	*x = TombstoneVectorItemResponse{}
-	mi := &file_nexusim_vector_v1_vector_index_service_proto_msgTypes[7]
+	mi := &file_nexusim_vector_v1_vector_index_service_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -929,7 +1029,7 @@ func (x *TombstoneVectorItemResponse) String() string {
 func (*TombstoneVectorItemResponse) ProtoMessage() {}
 
 func (x *TombstoneVectorItemResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nexusim_vector_v1_vector_index_service_proto_msgTypes[7]
+	mi := &file_nexusim_vector_v1_vector_index_service_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -942,7 +1042,7 @@ func (x *TombstoneVectorItemResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TombstoneVectorItemResponse.ProtoReflect.Descriptor instead.
 func (*TombstoneVectorItemResponse) Descriptor() ([]byte, []int) {
-	return file_nexusim_vector_v1_vector_index_service_proto_rawDescGZIP(), []int{7}
+	return file_nexusim_vector_v1_vector_index_service_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *TombstoneVectorItemResponse) GetItem() *VectorItem {
@@ -991,7 +1091,7 @@ type SearchVectorsRequest struct {
 
 func (x *SearchVectorsRequest) Reset() {
 	*x = SearchVectorsRequest{}
-	mi := &file_nexusim_vector_v1_vector_index_service_proto_msgTypes[8]
+	mi := &file_nexusim_vector_v1_vector_index_service_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1003,7 +1103,7 @@ func (x *SearchVectorsRequest) String() string {
 func (*SearchVectorsRequest) ProtoMessage() {}
 
 func (x *SearchVectorsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nexusim_vector_v1_vector_index_service_proto_msgTypes[8]
+	mi := &file_nexusim_vector_v1_vector_index_service_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1016,7 +1116,7 @@ func (x *SearchVectorsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SearchVectorsRequest.ProtoReflect.Descriptor instead.
 func (*SearchVectorsRequest) Descriptor() ([]byte, []int) {
-	return file_nexusim_vector_v1_vector_index_service_proto_rawDescGZIP(), []int{8}
+	return file_nexusim_vector_v1_vector_index_service_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *SearchVectorsRequest) GetAuthContext() *AuthContext {
@@ -1098,7 +1198,7 @@ type SearchVectorsResponse struct {
 
 func (x *SearchVectorsResponse) Reset() {
 	*x = SearchVectorsResponse{}
-	mi := &file_nexusim_vector_v1_vector_index_service_proto_msgTypes[9]
+	mi := &file_nexusim_vector_v1_vector_index_service_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1110,7 +1210,7 @@ func (x *SearchVectorsResponse) String() string {
 func (*SearchVectorsResponse) ProtoMessage() {}
 
 func (x *SearchVectorsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nexusim_vector_v1_vector_index_service_proto_msgTypes[9]
+	mi := &file_nexusim_vector_v1_vector_index_service_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1123,7 +1223,7 @@ func (x *SearchVectorsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SearchVectorsResponse.ProtoReflect.Descriptor instead.
 func (*SearchVectorsResponse) Descriptor() ([]byte, []int) {
-	return file_nexusim_vector_v1_vector_index_service_proto_rawDescGZIP(), []int{9}
+	return file_nexusim_vector_v1_vector_index_service_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *SearchVectorsResponse) GetResults() []*VectorSearchResult {
@@ -1131,6 +1231,190 @@ func (x *SearchVectorsResponse) GetResults() []*VectorSearchResult {
 		return x.Results
 	}
 	return nil
+}
+
+type RequestVectorRebuildRequest struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	AuthContext       *AuthContext           `protobuf:"bytes,1,opt,name=auth_context,json=authContext,proto3" json:"auth_context,omitempty"`
+	CollectionType    string                 `protobuf:"bytes,2,opt,name=collection_type,json=collectionType,proto3" json:"collection_type,omitempty"`
+	EmbeddingModelRef string                 `protobuf:"bytes,3,opt,name=embedding_model_ref,json=embeddingModelRef,proto3" json:"embedding_model_ref,omitempty"`
+	Dimension         int32                  `protobuf:"varint,4,opt,name=dimension,proto3" json:"dimension,omitempty"`
+	SourceService     string                 `protobuf:"bytes,5,opt,name=source_service,json=sourceService,proto3" json:"source_service,omitempty"`
+	PartitionKey      string                 `protobuf:"bytes,6,opt,name=partition_key,json=partitionKey,proto3" json:"partition_key,omitempty"`
+	CursorValue       string                 `protobuf:"bytes,7,opt,name=cursor_value,json=cursorValue,proto3" json:"cursor_value,omitempty"`
+	IdempotencyKey    string                 `protobuf:"bytes,8,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
+	CorrelationId     string                 `protobuf:"bytes,9,opt,name=correlation_id,json=correlationId,proto3" json:"correlation_id,omitempty"`
+	CausationId       string                 `protobuf:"bytes,10,opt,name=causation_id,json=causationId,proto3" json:"causation_id,omitempty"`
+	TraceId           string                 `protobuf:"bytes,11,opt,name=trace_id,json=traceId,proto3" json:"trace_id,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *RequestVectorRebuildRequest) Reset() {
+	*x = RequestVectorRebuildRequest{}
+	mi := &file_nexusim_vector_v1_vector_index_service_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RequestVectorRebuildRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RequestVectorRebuildRequest) ProtoMessage() {}
+
+func (x *RequestVectorRebuildRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_nexusim_vector_v1_vector_index_service_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RequestVectorRebuildRequest.ProtoReflect.Descriptor instead.
+func (*RequestVectorRebuildRequest) Descriptor() ([]byte, []int) {
+	return file_nexusim_vector_v1_vector_index_service_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *RequestVectorRebuildRequest) GetAuthContext() *AuthContext {
+	if x != nil {
+		return x.AuthContext
+	}
+	return nil
+}
+
+func (x *RequestVectorRebuildRequest) GetCollectionType() string {
+	if x != nil {
+		return x.CollectionType
+	}
+	return ""
+}
+
+func (x *RequestVectorRebuildRequest) GetEmbeddingModelRef() string {
+	if x != nil {
+		return x.EmbeddingModelRef
+	}
+	return ""
+}
+
+func (x *RequestVectorRebuildRequest) GetDimension() int32 {
+	if x != nil {
+		return x.Dimension
+	}
+	return 0
+}
+
+func (x *RequestVectorRebuildRequest) GetSourceService() string {
+	if x != nil {
+		return x.SourceService
+	}
+	return ""
+}
+
+func (x *RequestVectorRebuildRequest) GetPartitionKey() string {
+	if x != nil {
+		return x.PartitionKey
+	}
+	return ""
+}
+
+func (x *RequestVectorRebuildRequest) GetCursorValue() string {
+	if x != nil {
+		return x.CursorValue
+	}
+	return ""
+}
+
+func (x *RequestVectorRebuildRequest) GetIdempotencyKey() string {
+	if x != nil {
+		return x.IdempotencyKey
+	}
+	return ""
+}
+
+func (x *RequestVectorRebuildRequest) GetCorrelationId() string {
+	if x != nil {
+		return x.CorrelationId
+	}
+	return ""
+}
+
+func (x *RequestVectorRebuildRequest) GetCausationId() string {
+	if x != nil {
+		return x.CausationId
+	}
+	return ""
+}
+
+func (x *RequestVectorRebuildRequest) GetTraceId() string {
+	if x != nil {
+		return x.TraceId
+	}
+	return ""
+}
+
+type RequestVectorRebuildResponse struct {
+	state         protoimpl.MessageState   `protogen:"open.v1"`
+	Job           *VectorIndexJob          `protobuf:"bytes,1,opt,name=job,proto3" json:"job,omitempty"`
+	Checkpoint    *VectorRebuildCheckpoint `protobuf:"bytes,2,opt,name=checkpoint,proto3" json:"checkpoint,omitempty"`
+	Replayed      bool                     `protobuf:"varint,3,opt,name=replayed,proto3" json:"replayed,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RequestVectorRebuildResponse) Reset() {
+	*x = RequestVectorRebuildResponse{}
+	mi := &file_nexusim_vector_v1_vector_index_service_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RequestVectorRebuildResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RequestVectorRebuildResponse) ProtoMessage() {}
+
+func (x *RequestVectorRebuildResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_nexusim_vector_v1_vector_index_service_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RequestVectorRebuildResponse.ProtoReflect.Descriptor instead.
+func (*RequestVectorRebuildResponse) Descriptor() ([]byte, []int) {
+	return file_nexusim_vector_v1_vector_index_service_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *RequestVectorRebuildResponse) GetJob() *VectorIndexJob {
+	if x != nil {
+		return x.Job
+	}
+	return nil
+}
+
+func (x *RequestVectorRebuildResponse) GetCheckpoint() *VectorRebuildCheckpoint {
+	if x != nil {
+		return x.Checkpoint
+	}
+	return nil
+}
+
+func (x *RequestVectorRebuildResponse) GetReplayed() bool {
+	if x != nil {
+		return x.Replayed
+	}
+	return false
 }
 
 type GetVectorIndexJobRequest struct {
@@ -1143,7 +1427,7 @@ type GetVectorIndexJobRequest struct {
 
 func (x *GetVectorIndexJobRequest) Reset() {
 	*x = GetVectorIndexJobRequest{}
-	mi := &file_nexusim_vector_v1_vector_index_service_proto_msgTypes[10]
+	mi := &file_nexusim_vector_v1_vector_index_service_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1155,7 +1439,7 @@ func (x *GetVectorIndexJobRequest) String() string {
 func (*GetVectorIndexJobRequest) ProtoMessage() {}
 
 func (x *GetVectorIndexJobRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nexusim_vector_v1_vector_index_service_proto_msgTypes[10]
+	mi := &file_nexusim_vector_v1_vector_index_service_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1168,7 +1452,7 @@ func (x *GetVectorIndexJobRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetVectorIndexJobRequest.ProtoReflect.Descriptor instead.
 func (*GetVectorIndexJobRequest) Descriptor() ([]byte, []int) {
-	return file_nexusim_vector_v1_vector_index_service_proto_rawDescGZIP(), []int{10}
+	return file_nexusim_vector_v1_vector_index_service_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *GetVectorIndexJobRequest) GetAuthContext() *AuthContext {
@@ -1194,7 +1478,7 @@ type GetVectorIndexJobResponse struct {
 
 func (x *GetVectorIndexJobResponse) Reset() {
 	*x = GetVectorIndexJobResponse{}
-	mi := &file_nexusim_vector_v1_vector_index_service_proto_msgTypes[11]
+	mi := &file_nexusim_vector_v1_vector_index_service_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1206,7 +1490,7 @@ func (x *GetVectorIndexJobResponse) String() string {
 func (*GetVectorIndexJobResponse) ProtoMessage() {}
 
 func (x *GetVectorIndexJobResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nexusim_vector_v1_vector_index_service_proto_msgTypes[11]
+	mi := &file_nexusim_vector_v1_vector_index_service_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1219,7 +1503,7 @@ func (x *GetVectorIndexJobResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetVectorIndexJobResponse.ProtoReflect.Descriptor instead.
 func (*GetVectorIndexJobResponse) Descriptor() ([]byte, []int) {
-	return file_nexusim_vector_v1_vector_index_service_proto_rawDescGZIP(), []int{11}
+	return file_nexusim_vector_v1_vector_index_service_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *GetVectorIndexJobResponse) GetJob() *VectorIndexJob {
@@ -1284,7 +1568,16 @@ const file_nexusim_vector_v1_vector_index_service_proto_rawDesc = "" +
 	"\fpublic_error\x18\t \x01(\tR\vpublicError\x12+\n" +
 	"\x12created_at_unix_ms\x18\n" +
 	" \x01(\x03R\x0fcreatedAtUnixMs\x12/\n" +
-	"\x14completed_at_unix_ms\x18\v \x01(\x03R\x11completedAtUnixMs\"\xa4\x02\n" +
+	"\x14completed_at_unix_ms\x18\v \x01(\x03R\x11completedAtUnixMs\"\xb5\x02\n" +
+	"\x17VectorRebuildCheckpoint\x12\x1b\n" +
+	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12$\n" +
+	"\x0erebuild_job_id\x18\x02 \x01(\tR\frebuildJobId\x12#\n" +
+	"\rcollection_id\x18\x03 \x01(\tR\fcollectionId\x12%\n" +
+	"\x0esource_service\x18\x04 \x01(\tR\rsourceService\x12#\n" +
+	"\rpartition_key\x18\x05 \x01(\tR\fpartitionKey\x12!\n" +
+	"\fcursor_value\x18\x06 \x01(\tR\vcursorValue\x12\x16\n" +
+	"\x06status\x18\a \x01(\tR\x06status\x12+\n" +
+	"\x12updated_at_unix_ms\x18\b \x01(\x03R\x0fupdatedAtUnixMs\"\xa4\x02\n" +
 	"\x12VectorSearchResult\x12&\n" +
 	"\x0fvector_item_ref\x18\x01 \x01(\tR\rvectorItemRef\x12&\n" +
 	"\x0fsource_ref_hash\x18\x02 \x01(\tR\rsourceRefHash\x12%\n" +
@@ -1351,16 +1644,36 @@ const file_nexusim_vector_v1_vector_index_service_proto_rawDesc = "" +
 	"at_unix_ms\x18\n" +
 	" \x01(\x03R\batUnixMs\"X\n" +
 	"\x15SearchVectorsResponse\x12?\n" +
-	"\aresults\x18\x01 \x03(\v2%.nexusim.vector.v1.VectorSearchResultR\aresults\"t\n" +
+	"\aresults\x18\x01 \x03(\v2%.nexusim.vector.v1.VectorSearchResultR\aresults\"\xd4\x03\n" +
+	"\x1bRequestVectorRebuildRequest\x12A\n" +
+	"\fauth_context\x18\x01 \x01(\v2\x1e.nexusim.vector.v1.AuthContextR\vauthContext\x12'\n" +
+	"\x0fcollection_type\x18\x02 \x01(\tR\x0ecollectionType\x12.\n" +
+	"\x13embedding_model_ref\x18\x03 \x01(\tR\x11embeddingModelRef\x12\x1c\n" +
+	"\tdimension\x18\x04 \x01(\x05R\tdimension\x12%\n" +
+	"\x0esource_service\x18\x05 \x01(\tR\rsourceService\x12#\n" +
+	"\rpartition_key\x18\x06 \x01(\tR\fpartitionKey\x12!\n" +
+	"\fcursor_value\x18\a \x01(\tR\vcursorValue\x12'\n" +
+	"\x0fidempotency_key\x18\b \x01(\tR\x0eidempotencyKey\x12%\n" +
+	"\x0ecorrelation_id\x18\t \x01(\tR\rcorrelationId\x12!\n" +
+	"\fcausation_id\x18\n" +
+	" \x01(\tR\vcausationId\x12\x19\n" +
+	"\btrace_id\x18\v \x01(\tR\atraceId\"\xbb\x01\n" +
+	"\x1cRequestVectorRebuildResponse\x123\n" +
+	"\x03job\x18\x01 \x01(\v2!.nexusim.vector.v1.VectorIndexJobR\x03job\x12J\n" +
+	"\n" +
+	"checkpoint\x18\x02 \x01(\v2*.nexusim.vector.v1.VectorRebuildCheckpointR\n" +
+	"checkpoint\x12\x1a\n" +
+	"\breplayed\x18\x03 \x01(\bR\breplayed\"t\n" +
 	"\x18GetVectorIndexJobRequest\x12A\n" +
 	"\fauth_context\x18\x01 \x01(\v2\x1e.nexusim.vector.v1.AuthContextR\vauthContext\x12\x15\n" +
 	"\x06job_id\x18\x02 \x01(\tR\x05jobId\"P\n" +
 	"\x19GetVectorIndexJobResponse\x123\n" +
-	"\x03job\x18\x01 \x01(\v2!.nexusim.vector.v1.VectorIndexJobR\x03job2\xcb\x03\n" +
+	"\x03job\x18\x01 \x01(\v2!.nexusim.vector.v1.VectorIndexJobR\x03job2\xc4\x04\n" +
 	"\x12VectorIndexService\x12k\n" +
 	"\x10UpsertVectorItem\x12*.nexusim.vector.v1.UpsertVectorItemRequest\x1a+.nexusim.vector.v1.UpsertVectorItemResponse\x12t\n" +
 	"\x13TombstoneVectorItem\x12-.nexusim.vector.v1.TombstoneVectorItemRequest\x1a..nexusim.vector.v1.TombstoneVectorItemResponse\x12b\n" +
-	"\rSearchVectors\x12'.nexusim.vector.v1.SearchVectorsRequest\x1a(.nexusim.vector.v1.SearchVectorsResponse\x12n\n" +
+	"\rSearchVectors\x12'.nexusim.vector.v1.SearchVectorsRequest\x1a(.nexusim.vector.v1.SearchVectorsResponse\x12w\n" +
+	"\x14RequestVectorRebuild\x12..nexusim.vector.v1.RequestVectorRebuildRequest\x1a/.nexusim.vector.v1.RequestVectorRebuildResponse\x12n\n" +
 	"\x11GetVectorIndexJob\x12+.nexusim.vector.v1.GetVectorIndexJobRequest\x1a,.nexusim.vector.v1.GetVectorIndexJobResponseB=Z;github.com/qsyy0921/IM/api/proto/nexusim/vector/v1;vectorv1b\x06proto3"
 
 var (
@@ -1375,20 +1688,23 @@ func file_nexusim_vector_v1_vector_index_service_proto_rawDescGZIP() []byte {
 	return file_nexusim_vector_v1_vector_index_service_proto_rawDescData
 }
 
-var file_nexusim_vector_v1_vector_index_service_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
+var file_nexusim_vector_v1_vector_index_service_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
 var file_nexusim_vector_v1_vector_index_service_proto_goTypes = []any{
-	(*AuthContext)(nil),                 // 0: nexusim.vector.v1.AuthContext
-	(*VectorItem)(nil),                  // 1: nexusim.vector.v1.VectorItem
-	(*VectorIndexJob)(nil),              // 2: nexusim.vector.v1.VectorIndexJob
-	(*VectorSearchResult)(nil),          // 3: nexusim.vector.v1.VectorSearchResult
-	(*UpsertVectorItemRequest)(nil),     // 4: nexusim.vector.v1.UpsertVectorItemRequest
-	(*UpsertVectorItemResponse)(nil),    // 5: nexusim.vector.v1.UpsertVectorItemResponse
-	(*TombstoneVectorItemRequest)(nil),  // 6: nexusim.vector.v1.TombstoneVectorItemRequest
-	(*TombstoneVectorItemResponse)(nil), // 7: nexusim.vector.v1.TombstoneVectorItemResponse
-	(*SearchVectorsRequest)(nil),        // 8: nexusim.vector.v1.SearchVectorsRequest
-	(*SearchVectorsResponse)(nil),       // 9: nexusim.vector.v1.SearchVectorsResponse
-	(*GetVectorIndexJobRequest)(nil),    // 10: nexusim.vector.v1.GetVectorIndexJobRequest
-	(*GetVectorIndexJobResponse)(nil),   // 11: nexusim.vector.v1.GetVectorIndexJobResponse
+	(*AuthContext)(nil),                  // 0: nexusim.vector.v1.AuthContext
+	(*VectorItem)(nil),                   // 1: nexusim.vector.v1.VectorItem
+	(*VectorIndexJob)(nil),               // 2: nexusim.vector.v1.VectorIndexJob
+	(*VectorRebuildCheckpoint)(nil),      // 3: nexusim.vector.v1.VectorRebuildCheckpoint
+	(*VectorSearchResult)(nil),           // 4: nexusim.vector.v1.VectorSearchResult
+	(*UpsertVectorItemRequest)(nil),      // 5: nexusim.vector.v1.UpsertVectorItemRequest
+	(*UpsertVectorItemResponse)(nil),     // 6: nexusim.vector.v1.UpsertVectorItemResponse
+	(*TombstoneVectorItemRequest)(nil),   // 7: nexusim.vector.v1.TombstoneVectorItemRequest
+	(*TombstoneVectorItemResponse)(nil),  // 8: nexusim.vector.v1.TombstoneVectorItemResponse
+	(*SearchVectorsRequest)(nil),         // 9: nexusim.vector.v1.SearchVectorsRequest
+	(*SearchVectorsResponse)(nil),        // 10: nexusim.vector.v1.SearchVectorsResponse
+	(*RequestVectorRebuildRequest)(nil),  // 11: nexusim.vector.v1.RequestVectorRebuildRequest
+	(*RequestVectorRebuildResponse)(nil), // 12: nexusim.vector.v1.RequestVectorRebuildResponse
+	(*GetVectorIndexJobRequest)(nil),     // 13: nexusim.vector.v1.GetVectorIndexJobRequest
+	(*GetVectorIndexJobResponse)(nil),    // 14: nexusim.vector.v1.GetVectorIndexJobResponse
 }
 var file_nexusim_vector_v1_vector_index_service_proto_depIdxs = []int32{
 	0,  // 0: nexusim.vector.v1.UpsertVectorItemRequest.auth_context:type_name -> nexusim.vector.v1.AuthContext
@@ -1398,22 +1714,27 @@ var file_nexusim_vector_v1_vector_index_service_proto_depIdxs = []int32{
 	1,  // 4: nexusim.vector.v1.TombstoneVectorItemResponse.item:type_name -> nexusim.vector.v1.VectorItem
 	2,  // 5: nexusim.vector.v1.TombstoneVectorItemResponse.job:type_name -> nexusim.vector.v1.VectorIndexJob
 	0,  // 6: nexusim.vector.v1.SearchVectorsRequest.auth_context:type_name -> nexusim.vector.v1.AuthContext
-	3,  // 7: nexusim.vector.v1.SearchVectorsResponse.results:type_name -> nexusim.vector.v1.VectorSearchResult
-	0,  // 8: nexusim.vector.v1.GetVectorIndexJobRequest.auth_context:type_name -> nexusim.vector.v1.AuthContext
-	2,  // 9: nexusim.vector.v1.GetVectorIndexJobResponse.job:type_name -> nexusim.vector.v1.VectorIndexJob
-	4,  // 10: nexusim.vector.v1.VectorIndexService.UpsertVectorItem:input_type -> nexusim.vector.v1.UpsertVectorItemRequest
-	6,  // 11: nexusim.vector.v1.VectorIndexService.TombstoneVectorItem:input_type -> nexusim.vector.v1.TombstoneVectorItemRequest
-	8,  // 12: nexusim.vector.v1.VectorIndexService.SearchVectors:input_type -> nexusim.vector.v1.SearchVectorsRequest
-	10, // 13: nexusim.vector.v1.VectorIndexService.GetVectorIndexJob:input_type -> nexusim.vector.v1.GetVectorIndexJobRequest
-	5,  // 14: nexusim.vector.v1.VectorIndexService.UpsertVectorItem:output_type -> nexusim.vector.v1.UpsertVectorItemResponse
-	7,  // 15: nexusim.vector.v1.VectorIndexService.TombstoneVectorItem:output_type -> nexusim.vector.v1.TombstoneVectorItemResponse
-	9,  // 16: nexusim.vector.v1.VectorIndexService.SearchVectors:output_type -> nexusim.vector.v1.SearchVectorsResponse
-	11, // 17: nexusim.vector.v1.VectorIndexService.GetVectorIndexJob:output_type -> nexusim.vector.v1.GetVectorIndexJobResponse
-	14, // [14:18] is the sub-list for method output_type
-	10, // [10:14] is the sub-list for method input_type
-	10, // [10:10] is the sub-list for extension type_name
-	10, // [10:10] is the sub-list for extension extendee
-	0,  // [0:10] is the sub-list for field type_name
+	4,  // 7: nexusim.vector.v1.SearchVectorsResponse.results:type_name -> nexusim.vector.v1.VectorSearchResult
+	0,  // 8: nexusim.vector.v1.RequestVectorRebuildRequest.auth_context:type_name -> nexusim.vector.v1.AuthContext
+	2,  // 9: nexusim.vector.v1.RequestVectorRebuildResponse.job:type_name -> nexusim.vector.v1.VectorIndexJob
+	3,  // 10: nexusim.vector.v1.RequestVectorRebuildResponse.checkpoint:type_name -> nexusim.vector.v1.VectorRebuildCheckpoint
+	0,  // 11: nexusim.vector.v1.GetVectorIndexJobRequest.auth_context:type_name -> nexusim.vector.v1.AuthContext
+	2,  // 12: nexusim.vector.v1.GetVectorIndexJobResponse.job:type_name -> nexusim.vector.v1.VectorIndexJob
+	5,  // 13: nexusim.vector.v1.VectorIndexService.UpsertVectorItem:input_type -> nexusim.vector.v1.UpsertVectorItemRequest
+	7,  // 14: nexusim.vector.v1.VectorIndexService.TombstoneVectorItem:input_type -> nexusim.vector.v1.TombstoneVectorItemRequest
+	9,  // 15: nexusim.vector.v1.VectorIndexService.SearchVectors:input_type -> nexusim.vector.v1.SearchVectorsRequest
+	11, // 16: nexusim.vector.v1.VectorIndexService.RequestVectorRebuild:input_type -> nexusim.vector.v1.RequestVectorRebuildRequest
+	13, // 17: nexusim.vector.v1.VectorIndexService.GetVectorIndexJob:input_type -> nexusim.vector.v1.GetVectorIndexJobRequest
+	6,  // 18: nexusim.vector.v1.VectorIndexService.UpsertVectorItem:output_type -> nexusim.vector.v1.UpsertVectorItemResponse
+	8,  // 19: nexusim.vector.v1.VectorIndexService.TombstoneVectorItem:output_type -> nexusim.vector.v1.TombstoneVectorItemResponse
+	10, // 20: nexusim.vector.v1.VectorIndexService.SearchVectors:output_type -> nexusim.vector.v1.SearchVectorsResponse
+	12, // 21: nexusim.vector.v1.VectorIndexService.RequestVectorRebuild:output_type -> nexusim.vector.v1.RequestVectorRebuildResponse
+	14, // 22: nexusim.vector.v1.VectorIndexService.GetVectorIndexJob:output_type -> nexusim.vector.v1.GetVectorIndexJobResponse
+	18, // [18:23] is the sub-list for method output_type
+	13, // [13:18] is the sub-list for method input_type
+	13, // [13:13] is the sub-list for extension type_name
+	13, // [13:13] is the sub-list for extension extendee
+	0,  // [0:13] is the sub-list for field type_name
 }
 
 func init() { file_nexusim_vector_v1_vector_index_service_proto_init() }
@@ -1427,7 +1748,7 @@ func file_nexusim_vector_v1_vector_index_service_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_nexusim_vector_v1_vector_index_service_proto_rawDesc), len(file_nexusim_vector_v1_vector_index_service_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   12,
+			NumMessages:   15,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

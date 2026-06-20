@@ -183,6 +183,54 @@ LIMIT $5
 	return results, nil
 }
 
+func (repository *Repository) RequestVectorRebuild(
+	ctx context.Context,
+	prepared domain.PreparedRebuild,
+) (types.VectorIndexJob, types.VectorRebuildCheckpoint, bool, error) {
+	if repository.pool == nil {
+		return types.VectorIndexJob{}, types.VectorRebuildCheckpoint{}, false, types.NewDBWriteFailed("vector repository is not configured")
+	}
+	tx, err := repository.pool.Begin(ctx)
+	if err != nil {
+		return types.VectorIndexJob{}, types.VectorRebuildCheckpoint{}, false, types.NewDBWriteFailed(err.Error())
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	if _, err := getCollectionForUpdate(ctx, tx, prepared.Command.AuthContext.TenantID, prepared.CollectionID); err != nil {
+		return types.VectorIndexJob{}, types.VectorRebuildCheckpoint{}, false, err
+	}
+	existingJob, found, err := findRebuildJobByIdempotency(ctx, tx, prepared)
+	if err != nil {
+		return types.VectorIndexJob{}, types.VectorRebuildCheckpoint{}, false, err
+	}
+	if found {
+		if existingJob.CommandHash != prepared.CommandHash {
+			return types.VectorIndexJob{}, types.VectorRebuildCheckpoint{}, false, types.NewAlreadyExists("vector rebuild idempotency conflict")
+		}
+		checkpoint, err := getRebuildCheckpoint(ctx, tx, existingJob.TenantID, existingJob.JobID, prepared.Command.PartitionKey)
+		if err != nil {
+			return types.VectorIndexJob{}, types.VectorRebuildCheckpoint{}, false, err
+		}
+		if err := tx.Commit(ctx); err != nil {
+			return types.VectorIndexJob{}, types.VectorRebuildCheckpoint{}, false, types.NewDBWriteFailed(err.Error())
+		}
+		return existingJob, checkpoint, true, nil
+	}
+
+	job := domain.RebuildJobFromPrepared(prepared)
+	checkpoint := domain.RebuildCheckpointFromPrepared(prepared)
+	if err := insertJob(ctx, tx, job); err != nil {
+		return types.VectorIndexJob{}, types.VectorRebuildCheckpoint{}, false, err
+	}
+	if err := insertRebuildCheckpoint(ctx, tx, checkpoint); err != nil {
+		return types.VectorIndexJob{}, types.VectorRebuildCheckpoint{}, false, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return types.VectorIndexJob{}, types.VectorRebuildCheckpoint{}, false, types.NewDBWriteFailed(err.Error())
+	}
+	return job, checkpoint, false, nil
+}
+
 func (repository *Repository) GetVectorIndexJob(
 	ctx context.Context,
 	command types.GetVectorIndexJobCommand,
@@ -201,6 +249,34 @@ WHERE tenant_id = $1 AND job_id = $2
 		return types.VectorIndexJob{}, types.NewDBReadFailed(err.Error())
 	}
 	return job, nil
+}
+
+func getCollectionForUpdate(ctx context.Context, tx pgx.Tx, tenantID types.TenantID, collectionID string) (types.VectorCollection, error) {
+	row := tx.QueryRow(ctx, `
+SELECT tenant_id, collection_id, collection_type, backend_type, dimension,
+       embedding_model_ref, route_policy_ref, status, metadata_schema_version,
+       created_at, updated_at
+FROM vector_collections
+WHERE tenant_id = $1 AND collection_id = $2
+FOR UPDATE
+`, string(tenantID), collectionID)
+	var collection types.VectorCollection
+	err := row.Scan(
+		&collection.TenantID, &collection.CollectionID, &collection.CollectionType,
+		&collection.BackendType, &collection.Dimension, &collection.EmbeddingModelRef,
+		&collection.RoutePolicyRef, &collection.Status, &collection.MetadataSchemaVersion,
+		&collection.CreatedAt, &collection.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return types.VectorCollection{}, types.NewNotFound("vector collection not found")
+		}
+		return types.VectorCollection{}, types.NewDBReadFailed(err.Error())
+	}
+	if collection.Status != types.CollectionStatusActive {
+		return types.VectorCollection{}, types.NewFailedPrecondition("vector collection is not active")
+	}
+	return collection, nil
 }
 
 func upsertCollection(ctx context.Context, tx pgx.Tx, collection types.VectorCollection) error {
@@ -291,6 +367,24 @@ INSERT INTO vector_tombstones (
 `, string(tombstone.TenantID), tombstone.TombstoneID, tombstone.VectorItemID, tombstone.SourceRefHash,
 		tombstone.DeleteProofID, tombstone.ReasonClass, tombstone.BackendDeleteStatus,
 		tombstone.IdempotencyKey, tombstone.CommandHash, tombstone.CreatedAt)
+	if err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	return nil
+}
+
+func insertRebuildCheckpoint(ctx context.Context, tx pgx.Tx, checkpoint types.VectorRebuildCheckpoint) error {
+	_, err := tx.Exec(ctx, `
+INSERT INTO vector_rebuild_checkpoints (
+    tenant_id, rebuild_job_id, collection_id, source_service, partition_key,
+    cursor_value, status, updated_at
+) VALUES (
+    $1, $2, $3, $4, $5,
+    $6, $7, $8
+)
+`, string(checkpoint.TenantID), checkpoint.RebuildJobID, checkpoint.CollectionID,
+		checkpoint.SourceService, checkpoint.PartitionKey, checkpoint.CursorValue,
+		checkpoint.Status, checkpoint.UpdatedAt)
 	if err != nil {
 		return types.NewDBWriteFailed(err.Error())
 	}
@@ -414,6 +508,38 @@ LIMIT 1
 	return job, nil
 }
 
+func findRebuildJobByIdempotency(ctx context.Context, tx pgx.Tx, prepared domain.PreparedRebuild) (types.VectorIndexJob, bool, error) {
+	row := tx.QueryRow(ctx, selectJobSQL()+`
+WHERE tenant_id = $1 AND vector_item_id = $2 AND job_type = 'REBUILD' AND idempotency_key = $3
+LIMIT 1
+`, string(prepared.Command.AuthContext.TenantID), prepared.CollectionID, prepared.Command.IdempotencyKey)
+	job, err := scanJob(row)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return types.VectorIndexJob{}, false, nil
+		}
+		return types.VectorIndexJob{}, false, types.NewDBReadFailed(err.Error())
+	}
+	return job, true, nil
+}
+
+func getRebuildCheckpoint(ctx context.Context, tx pgx.Tx, tenantID types.TenantID, jobID string, partitionKey string) (types.VectorRebuildCheckpoint, error) {
+	row := tx.QueryRow(ctx, `
+SELECT tenant_id, rebuild_job_id, collection_id, source_service, partition_key,
+       cursor_value, status, updated_at
+FROM vector_rebuild_checkpoints
+WHERE tenant_id = $1 AND rebuild_job_id = $2 AND partition_key = $3
+`, string(tenantID), jobID, partitionKey)
+	checkpoint, err := scanRebuildCheckpoint(row)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return types.VectorRebuildCheckpoint{}, types.NewNotFound("vector rebuild checkpoint not found")
+		}
+		return types.VectorRebuildCheckpoint{}, types.NewDBReadFailed(err.Error())
+	}
+	return checkpoint, nil
+}
+
 func findTombstoneByIdempotency(ctx context.Context, tx pgx.Tx, command types.TombstoneVectorItemCommand) (types.VectorTombstone, bool, error) {
 	row := tx.QueryRow(ctx, `
 SELECT tenant_id, tombstone_id, vector_item_id, source_ref_hash, delete_proof_id,
@@ -498,4 +624,14 @@ func scanTombstone(row scanner) (types.VectorTombstone, error) {
 		&tombstone.CreatedAt,
 	)
 	return tombstone, err
+}
+
+func scanRebuildCheckpoint(row scanner) (types.VectorRebuildCheckpoint, error) {
+	var checkpoint types.VectorRebuildCheckpoint
+	err := row.Scan(
+		&checkpoint.TenantID, &checkpoint.RebuildJobID, &checkpoint.CollectionID,
+		&checkpoint.SourceService, &checkpoint.PartitionKey, &checkpoint.CursorValue,
+		&checkpoint.Status, &checkpoint.UpdatedAt,
+	)
+	return checkpoint, err
 }

@@ -104,6 +104,57 @@ func TestRepositoryVectorFirstPathIntegration(t *testing.T) {
 	assertVectorOutboxLowSensitive(t, ctx, pool)
 }
 
+func TestRepositoryRequestVectorRebuildIntegration(t *testing.T) {
+	ctx := context.Background()
+	pool := openVectorTestPool(t)
+	resetVectorTables(t, ctx, pool)
+	repository := NewRepository(pool)
+
+	upsert := prepareUpsert(t, "vector-rebuild-item", "vitem_rebuild_source", "vjob_rebuild_source")
+	if _, _, _, err := repository.UpsertVectorItem(ctx, upsert); err != nil {
+		t.Fatalf("seed vector collection: %v", err)
+	}
+
+	rebuild := prepareRebuild(t, "vector-rebuild-idem", "vjob_rebuild_1")
+	job, checkpoint, replayed, err := repository.RequestVectorRebuild(ctx, rebuild)
+	if err != nil {
+		t.Fatalf("request vector rebuild: %v", err)
+	}
+	if replayed || job.JobType != types.JobTypeRebuild || job.Status != types.JobStatusPending {
+		t.Fatalf("unexpected rebuild job: replayed=%v job=%+v", replayed, job)
+	}
+	if checkpoint.RebuildJobID != job.JobID || checkpoint.Status != types.RebuildCheckpointStatusPending || checkpoint.PartitionKey != rebuild.Command.PartitionKey {
+		t.Fatalf("unexpected rebuild checkpoint: %+v", checkpoint)
+	}
+
+	replayedJob, replayedCheckpoint, replayed, err := repository.RequestVectorRebuild(ctx, rebuild)
+	if err != nil {
+		t.Fatalf("replay vector rebuild: %v", err)
+	}
+	if !replayed || replayedJob.JobID != job.JobID || replayedCheckpoint.RebuildJobID != checkpoint.RebuildJobID {
+		t.Fatalf("unexpected rebuild replay: replayed=%v job=%+v checkpoint=%+v", replayed, replayedJob, replayedCheckpoint)
+	}
+
+	conflict := prepareRebuild(t, "vector-rebuild-idem", "vjob_rebuild_conflict")
+	conflict.Command.CursorValue = "cursor-conflict"
+	conflict.CommandHash = "sha256:rebuild-conflict"
+	if _, _, _, err := repository.RequestVectorRebuild(ctx, conflict); !errors.Is(err, types.ErrAlreadyExists) {
+		t.Fatalf("expected rebuild idempotency conflict, got %v", err)
+	}
+
+	missingCollection := prepareRebuild(t, "vector-rebuild-missing", "vjob_rebuild_missing")
+	missingCollection.Command.EmbeddingModelRef = "model:text-embedding-missing"
+	missingCollection.CollectionID = domain.CollectionID(
+		missingCollection.Command.AuthContext.TenantID,
+		missingCollection.Command.CollectionType,
+		missingCollection.Command.EmbeddingModelRef,
+		missingCollection.Command.Dimension,
+	)
+	if _, _, _, err := repository.RequestVectorRebuild(ctx, missingCollection); !errors.Is(err, types.ErrNotFound) {
+		t.Fatalf("expected missing collection not found, got %v", err)
+	}
+}
+
 func prepareUpsert(t *testing.T, idempotencyKey string, vectorItemID string, jobID string) domain.PreparedUpsert {
 	t.Helper()
 	prepared, err := domain.PrepareUpsert(types.UpsertVectorItemCommand{
@@ -130,6 +181,28 @@ func prepareUpsert(t *testing.T, idempotencyKey string, vectorItemID string, job
 	}, vectorItemID, jobID, time.Now().UTC())
 	if err != nil {
 		t.Fatalf("prepare upsert: %v", err)
+	}
+	return prepared
+}
+
+func prepareRebuild(t *testing.T, idempotencyKey string, jobID string) domain.PreparedRebuild {
+	t.Helper()
+	prepared, err := domain.PrepareRebuild(types.RequestVectorRebuildCommand{
+		AuthContext: types.AuthContext{
+			TenantID:    "tenant-vector-test",
+			ServiceName: types.AllowedCallerVectorIndex,
+		},
+		CollectionType:    types.CollectionTypeKnowledgeChunk,
+		EmbeddingModelRef: "model:text-embedding-local",
+		Dimension:         3,
+		SourceService:     types.AllowedCallerKnowledgeIngestion,
+		PartitionKey:      "knowledge-ingestion-service:tenant-vector-test",
+		CursorValue:       "cursor:start",
+		IdempotencyKey:    idempotencyKey,
+		CorrelationID:     "corr-vector-rebuild-test",
+	}, jobID, time.Now().UTC())
+	if err != nil {
+		t.Fatalf("prepare rebuild: %v", err)
 	}
 	return prepared
 }

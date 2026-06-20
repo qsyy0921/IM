@@ -50,7 +50,8 @@ model-gateway / workflow / knowledge-ingestion / vector-index
 - `vector-index-service` 已从 stage-switch 进入 product-active 第一版 implementation
   slice，覆盖 `UpsertVectorItem`、`TombstoneVectorItem`、`SearchVectors`、
   `GetVectorIndexJob`、PostgreSQL metadata、local / PostgreSQL-backed test vector adapter
-  和 `vector_outbox -> im.vector.events` 第一版 outbox relay。当前 relay 已覆盖低敏
+  和 `RequestVectorRebuild` rebuild job / checkpoint API，并已接
+  `vector_outbox -> im.vector.events` 第一版 outbox relay。当前 relay 已覆盖低敏
   Kafka schema、event builder、PostgreSQL outbox store、PENDING / PUBLISHED / retry /
   DLQ 状态推进、focused tests 和 `loadtest/vectorindex` 真实 Kafka relay smoke；
   `loadtest/knowledgevector` 已跑通 knowledge chunk manifest -> vector upsert ->

@@ -36,9 +36,9 @@ future platform / product services 的 10 个 SDD draft 已存在；`media-servi
 `workflow-service` 已完成 `CreateWorkflow`、`RecordWorkflowDecision`、`GetWorkflow`
 最小审批等待路径，并通过 focused checks / 完整 `check-local`。
 `vector-index-service` 已完成第一版 `UpsertVectorItem` / `TombstoneVectorItem` /
-`SearchVectors` / `GetVectorIndexJob` path、`vector_outbox -> im.vector.events`
-第一版 relay、真实 Kafka relay smoke，以及 knowledge chunk -> vector upsert
-公开 API handoff smoke。`admin-service` 已完成第一版
+`SearchVectors` / `GetVectorIndexJob` / `RequestVectorRebuild` path、
+`vector_outbox -> im.vector.events` 第一版 relay、真实 Kafka relay smoke，以及
+knowledge chunk -> vector upsert 公开 API handoff smoke。`admin-service` 已完成第一版
 `CreateAdminOperation` / `ApproveAdminOperation` / `GetAdminOperation` /
 `ListAdminOperations` path、`admin_outbox -> im.admin.events` outbox relay 和
 `operation-worker` risk routing 执行闭环；`REPAIR_REQUEST` 已接入

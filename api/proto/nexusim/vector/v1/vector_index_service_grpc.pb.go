@@ -19,10 +19,11 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	VectorIndexService_UpsertVectorItem_FullMethodName    = "/nexusim.vector.v1.VectorIndexService/UpsertVectorItem"
-	VectorIndexService_TombstoneVectorItem_FullMethodName = "/nexusim.vector.v1.VectorIndexService/TombstoneVectorItem"
-	VectorIndexService_SearchVectors_FullMethodName       = "/nexusim.vector.v1.VectorIndexService/SearchVectors"
-	VectorIndexService_GetVectorIndexJob_FullMethodName   = "/nexusim.vector.v1.VectorIndexService/GetVectorIndexJob"
+	VectorIndexService_UpsertVectorItem_FullMethodName     = "/nexusim.vector.v1.VectorIndexService/UpsertVectorItem"
+	VectorIndexService_TombstoneVectorItem_FullMethodName  = "/nexusim.vector.v1.VectorIndexService/TombstoneVectorItem"
+	VectorIndexService_SearchVectors_FullMethodName        = "/nexusim.vector.v1.VectorIndexService/SearchVectors"
+	VectorIndexService_RequestVectorRebuild_FullMethodName = "/nexusim.vector.v1.VectorIndexService/RequestVectorRebuild"
+	VectorIndexService_GetVectorIndexJob_FullMethodName    = "/nexusim.vector.v1.VectorIndexService/GetVectorIndexJob"
 )
 
 // VectorIndexServiceClient is the client API for VectorIndexService service.
@@ -32,6 +33,7 @@ type VectorIndexServiceClient interface {
 	UpsertVectorItem(ctx context.Context, in *UpsertVectorItemRequest, opts ...grpc.CallOption) (*UpsertVectorItemResponse, error)
 	TombstoneVectorItem(ctx context.Context, in *TombstoneVectorItemRequest, opts ...grpc.CallOption) (*TombstoneVectorItemResponse, error)
 	SearchVectors(ctx context.Context, in *SearchVectorsRequest, opts ...grpc.CallOption) (*SearchVectorsResponse, error)
+	RequestVectorRebuild(ctx context.Context, in *RequestVectorRebuildRequest, opts ...grpc.CallOption) (*RequestVectorRebuildResponse, error)
 	GetVectorIndexJob(ctx context.Context, in *GetVectorIndexJobRequest, opts ...grpc.CallOption) (*GetVectorIndexJobResponse, error)
 }
 
@@ -73,6 +75,16 @@ func (c *vectorIndexServiceClient) SearchVectors(ctx context.Context, in *Search
 	return out, nil
 }
 
+func (c *vectorIndexServiceClient) RequestVectorRebuild(ctx context.Context, in *RequestVectorRebuildRequest, opts ...grpc.CallOption) (*RequestVectorRebuildResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RequestVectorRebuildResponse)
+	err := c.cc.Invoke(ctx, VectorIndexService_RequestVectorRebuild_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *vectorIndexServiceClient) GetVectorIndexJob(ctx context.Context, in *GetVectorIndexJobRequest, opts ...grpc.CallOption) (*GetVectorIndexJobResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetVectorIndexJobResponse)
@@ -90,6 +102,7 @@ type VectorIndexServiceServer interface {
 	UpsertVectorItem(context.Context, *UpsertVectorItemRequest) (*UpsertVectorItemResponse, error)
 	TombstoneVectorItem(context.Context, *TombstoneVectorItemRequest) (*TombstoneVectorItemResponse, error)
 	SearchVectors(context.Context, *SearchVectorsRequest) (*SearchVectorsResponse, error)
+	RequestVectorRebuild(context.Context, *RequestVectorRebuildRequest) (*RequestVectorRebuildResponse, error)
 	GetVectorIndexJob(context.Context, *GetVectorIndexJobRequest) (*GetVectorIndexJobResponse, error)
 	mustEmbedUnimplementedVectorIndexServiceServer()
 }
@@ -109,6 +122,9 @@ func (UnimplementedVectorIndexServiceServer) TombstoneVectorItem(context.Context
 }
 func (UnimplementedVectorIndexServiceServer) SearchVectors(context.Context, *SearchVectorsRequest) (*SearchVectorsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method SearchVectors not implemented")
+}
+func (UnimplementedVectorIndexServiceServer) RequestVectorRebuild(context.Context, *RequestVectorRebuildRequest) (*RequestVectorRebuildResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RequestVectorRebuild not implemented")
 }
 func (UnimplementedVectorIndexServiceServer) GetVectorIndexJob(context.Context, *GetVectorIndexJobRequest) (*GetVectorIndexJobResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetVectorIndexJob not implemented")
@@ -188,6 +204,24 @@ func _VectorIndexService_SearchVectors_Handler(srv interface{}, ctx context.Cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _VectorIndexService_RequestVectorRebuild_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RequestVectorRebuildRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(VectorIndexServiceServer).RequestVectorRebuild(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: VectorIndexService_RequestVectorRebuild_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(VectorIndexServiceServer).RequestVectorRebuild(ctx, req.(*RequestVectorRebuildRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _VectorIndexService_GetVectorIndexJob_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetVectorIndexJobRequest)
 	if err := dec(in); err != nil {
@@ -224,6 +258,10 @@ var VectorIndexService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SearchVectors",
 			Handler:    _VectorIndexService_SearchVectors_Handler,
+		},
+		{
+			MethodName: "RequestVectorRebuild",
+			Handler:    _VectorIndexService_RequestVectorRebuild_Handler,
 		},
 		{
 			MethodName: "GetVectorIndexJob",

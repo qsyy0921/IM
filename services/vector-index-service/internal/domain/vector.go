@@ -28,6 +28,14 @@ type PreparedTombstone struct {
 	CreatedAt   time.Time
 }
 
+type PreparedRebuild struct {
+	Command      types.RequestVectorRebuildCommand
+	CommandHash  string
+	CollectionID string
+	JobID        string
+	CreatedAt    time.Time
+}
+
 func PrepareUpsert(
 	command types.UpsertVectorItemCommand,
 	vectorItemID string,
@@ -72,6 +80,28 @@ func PrepareTombstone(
 		TombstoneID: strings.TrimSpace(tombstoneID),
 		JobID:       strings.TrimSpace(jobID),
 		CreatedAt:   now.UTC(),
+	}, nil
+}
+
+func PrepareRebuild(
+	command types.RequestVectorRebuildCommand,
+	jobID string,
+	now time.Time,
+) (PreparedRebuild, error) {
+	normalized := command.Normalized()
+	if err := normalized.Validate(); err != nil {
+		return PreparedRebuild{}, err
+	}
+	hash, err := rebuildCommandHash(normalized)
+	if err != nil {
+		return PreparedRebuild{}, err
+	}
+	return PreparedRebuild{
+		Command:      normalized,
+		CommandHash:  hash,
+		CollectionID: CollectionID(normalized.AuthContext.TenantID, normalized.CollectionType, normalized.EmbeddingModelRef, normalized.Dimension),
+		JobID:        strings.TrimSpace(jobID),
+		CreatedAt:    now.UTC(),
 	}, nil
 }
 
@@ -176,13 +206,47 @@ func TombstoneJobFromPrepared(prepared PreparedTombstone, item types.VectorItem)
 	}
 }
 
+func RebuildJobFromPrepared(prepared PreparedRebuild) types.VectorIndexJob {
+	return types.VectorIndexJob{
+		TenantID:       prepared.Command.AuthContext.TenantID,
+		JobID:          prepared.JobID,
+		CollectionID:   prepared.CollectionID,
+		VectorItemID:   prepared.CollectionID,
+		JobType:        types.JobTypeRebuild,
+		Status:         types.JobStatusPending,
+		IdempotencyKey: prepared.Command.IdempotencyKey,
+		CommandHash:    prepared.CommandHash,
+		CorrelationID:  prepared.Command.CorrelationID,
+		CausationID:    prepared.Command.CausationID,
+		TraceID:        prepared.Command.TraceID,
+		CreatedAt:      prepared.CreatedAt,
+	}
+}
+
+func RebuildCheckpointFromPrepared(prepared PreparedRebuild) types.VectorRebuildCheckpoint {
+	return types.VectorRebuildCheckpoint{
+		TenantID:      prepared.Command.AuthContext.TenantID,
+		RebuildJobID:  prepared.JobID,
+		CollectionID:  prepared.CollectionID,
+		SourceService: prepared.Command.SourceService,
+		PartitionKey:  prepared.Command.PartitionKey,
+		CursorValue:   prepared.Command.CursorValue,
+		Status:        types.RebuildCheckpointStatusPending,
+		UpdatedAt:     prepared.CreatedAt,
+	}
+}
+
 func HashRef(value string) string {
 	sum := sha256.Sum256([]byte(strings.TrimSpace(value)))
 	return "sha256:" + hex.EncodeToString(sum[:])
 }
 
 func collectionID(command types.UpsertVectorItemCommand) string {
-	return "vc_" + strings.TrimPrefix(HashRef(string(command.AuthContext.TenantID)+"|"+command.CollectionType+"|"+command.EmbeddingModelRef+"|"+strconv.Itoa(command.Dimension)), "sha256:")[:24]
+	return CollectionID(command.AuthContext.TenantID, command.CollectionType, command.EmbeddingModelRef, command.Dimension)
+}
+
+func CollectionID(tenantID types.TenantID, collectionType string, embeddingModelRef string, dimension int) string {
+	return "vc_" + strings.TrimPrefix(HashRef(string(tenantID)+"|"+collectionType+"|"+embeddingModelRef+"|"+strconv.Itoa(dimension)), "sha256:")[:24]
 }
 
 func upsertCommandHash(command types.UpsertVectorItemCommand) (string, error) {
@@ -230,6 +294,27 @@ func tombstoneCommandHash(command types.TombstoneVectorItemCommand) (string, err
 	encoded, err := json.Marshal(payload)
 	if err != nil {
 		return "", types.NewInvalidArgument("vector tombstone command hash payload invalid")
+	}
+	return HashRef(string(encoded)), nil
+}
+
+func rebuildCommandHash(command types.RequestVectorRebuildCommand) (string, error) {
+	payload := map[string]any{
+		"tenant_id":           string(command.AuthContext.TenantID),
+		"collection_type":     command.CollectionType,
+		"embedding_model_ref": command.EmbeddingModelRef,
+		"dimension":           command.Dimension,
+		"source_service":      command.SourceService,
+		"partition_key":       command.PartitionKey,
+		"cursor_value":        command.CursorValue,
+		"idempotency_key":     command.IdempotencyKey,
+		"correlation_id":      command.CorrelationID,
+		"causation_id":        command.CausationID,
+		"trace_id":            command.TraceID,
+	}
+	encoded, err := json.Marshal(payload)
+	if err != nil {
+		return "", types.NewInvalidArgument("vector rebuild command hash payload invalid")
 	}
 	return HashRef(string(encoded)), nil
 }

@@ -25,6 +25,10 @@ type SearchVectorsExecutor interface {
 	Execute(context.Context, types.SearchVectorsCommand) ([]types.VectorSearchResult, error)
 }
 
+type RequestVectorRebuildExecutor interface {
+	Execute(context.Context, types.RequestVectorRebuildCommand) (app.RequestVectorRebuildResult, error)
+}
+
 type GetVectorIndexJobExecutor interface {
 	Execute(context.Context, types.GetVectorIndexJobCommand) (types.VectorIndexJob, error)
 }
@@ -34,6 +38,7 @@ type Server struct {
 	upsert    UpsertVectorItemExecutor
 	tombstone TombstoneVectorItemExecutor
 	search    SearchVectorsExecutor
+	rebuild   RequestVectorRebuildExecutor
 	getJob    GetVectorIndexJobExecutor
 }
 
@@ -41,12 +46,14 @@ func NewServer(
 	upsert UpsertVectorItemExecutor,
 	tombstone TombstoneVectorItemExecutor,
 	search SearchVectorsExecutor,
+	rebuild RequestVectorRebuildExecutor,
 	getJob GetVectorIndexJobExecutor,
 ) *Server {
 	return &Server{
 		upsert:    upsert,
 		tombstone: tombstone,
 		search:    search,
+		rebuild:   rebuild,
 		getJob:    getJob,
 	}
 }
@@ -168,6 +175,40 @@ func (server *Server) SearchVectors(
 	return response, nil
 }
 
+func (server *Server) RequestVectorRebuild(
+	ctx context.Context,
+	request *vectorv1.RequestVectorRebuildRequest,
+) (*vectorv1.RequestVectorRebuildResponse, error) {
+	if request == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+	auth, ok := authFromProto(ctx, request.GetAuthContext())
+	if !ok {
+		return nil, status.Error(codes.InvalidArgument, "auth_context is required")
+	}
+	result, err := server.rebuild.Execute(ctx, types.RequestVectorRebuildCommand{
+		AuthContext:       auth,
+		CollectionType:    request.GetCollectionType(),
+		EmbeddingModelRef: request.GetEmbeddingModelRef(),
+		Dimension:         int(request.GetDimension()),
+		SourceService:     request.GetSourceService(),
+		PartitionKey:      request.GetPartitionKey(),
+		CursorValue:       request.GetCursorValue(),
+		IdempotencyKey:    request.GetIdempotencyKey(),
+		CorrelationID:     request.GetCorrelationId(),
+		CausationID:       request.GetCausationId(),
+		TraceID:           request.GetTraceId(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	return &vectorv1.RequestVectorRebuildResponse{
+		Job:        jobToProto(result.Job),
+		Checkpoint: checkpointToProto(result.Checkpoint),
+		Replayed:   result.Replayed,
+	}, nil
+}
+
 func (server *Server) GetVectorIndexJob(
 	ctx context.Context,
 	request *vectorv1.GetVectorIndexJobRequest,
@@ -247,6 +288,19 @@ func jobToProto(job types.VectorIndexJob) *vectorv1.VectorIndexJob {
 		PublicError:       job.PublicError,
 		CreatedAtUnixMs:   timeToUnixMillis(job.CreatedAt),
 		CompletedAtUnixMs: timeToUnixMillis(job.CompletedAt),
+	}
+}
+
+func checkpointToProto(checkpoint types.VectorRebuildCheckpoint) *vectorv1.VectorRebuildCheckpoint {
+	return &vectorv1.VectorRebuildCheckpoint{
+		TenantId:        string(checkpoint.TenantID),
+		RebuildJobId:    checkpoint.RebuildJobID,
+		CollectionId:    checkpoint.CollectionID,
+		SourceService:   checkpoint.SourceService,
+		PartitionKey:    checkpoint.PartitionKey,
+		CursorValue:     checkpoint.CursorValue,
+		Status:          checkpoint.Status,
+		UpdatedAtUnixMs: timeToUnixMillis(checkpoint.UpdatedAt),
 	}
 }
 

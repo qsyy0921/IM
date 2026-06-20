@@ -108,6 +108,36 @@ func (useCase SearchVectorsUseCase) Execute(ctx context.Context, command types.S
 	return useCase.repository.SearchVectors(ctx, normalized)
 }
 
+type RequestVectorRebuildUseCase struct {
+	repository VectorRepository
+	ids        IDGenerator
+}
+
+type RequestVectorRebuildResult struct {
+	Job        types.VectorIndexJob
+	Checkpoint types.VectorRebuildCheckpoint
+	Replayed   bool
+}
+
+func NewRequestVectorRebuildUseCase(repository VectorRepository, ids IDGenerator) RequestVectorRebuildUseCase {
+	return RequestVectorRebuildUseCase{repository: repository, ids: ids}
+}
+
+func (useCase RequestVectorRebuildUseCase) Execute(ctx context.Context, command types.RequestVectorRebuildCommand) (RequestVectorRebuildResult, error) {
+	if useCase.repository == nil || useCase.ids == nil {
+		return RequestVectorRebuildResult{}, types.NewUnavailable("vector rebuild dependencies are not configured")
+	}
+	prepared, err := domain.PrepareRebuild(command, useCase.ids.NewJobID(), time.Now().UTC())
+	if err != nil {
+		return RequestVectorRebuildResult{}, err
+	}
+	job, checkpoint, replayed, err := useCase.repository.RequestVectorRebuild(ctx, prepared)
+	if err != nil {
+		return RequestVectorRebuildResult{}, err
+	}
+	return RequestVectorRebuildResult{Job: job, Checkpoint: checkpoint, Replayed: replayed}, nil
+}
+
 type GetVectorIndexJobUseCase struct {
 	repository VectorRepository
 }

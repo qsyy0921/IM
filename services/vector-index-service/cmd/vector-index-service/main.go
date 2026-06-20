@@ -93,6 +93,7 @@ func runGRPC(ctx context.Context) error {
 		app.NewUpsertVectorItemUseCase(repository, ids),
 		app.NewTombstoneVectorItemUseCase(repository, ids),
 		app.NewSearchVectorsUseCase(repository),
+		app.NewRequestVectorRebuildUseCase(repository, ids),
 		app.NewGetVectorIndexJobUseCase(repository),
 	))
 

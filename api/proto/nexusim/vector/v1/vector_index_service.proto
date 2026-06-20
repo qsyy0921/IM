@@ -8,6 +8,7 @@ service VectorIndexService {
   rpc UpsertVectorItem(UpsertVectorItemRequest) returns (UpsertVectorItemResponse);
   rpc TombstoneVectorItem(TombstoneVectorItemRequest) returns (TombstoneVectorItemResponse);
   rpc SearchVectors(SearchVectorsRequest) returns (SearchVectorsResponse);
+  rpc RequestVectorRebuild(RequestVectorRebuildRequest) returns (RequestVectorRebuildResponse);
   rpc GetVectorIndexJob(GetVectorIndexJobRequest) returns (GetVectorIndexJobResponse);
 }
 
@@ -58,6 +59,17 @@ message VectorIndexJob {
   string public_error = 9;
   int64 created_at_unix_ms = 10;
   int64 completed_at_unix_ms = 11;
+}
+
+message VectorRebuildCheckpoint {
+  string tenant_id = 1;
+  string rebuild_job_id = 2;
+  string collection_id = 3;
+  string source_service = 4;
+  string partition_key = 5;
+  string cursor_value = 6;
+  string status = 7;
+  int64 updated_at_unix_ms = 8;
 }
 
 message VectorSearchResult {
@@ -133,6 +145,26 @@ message SearchVectorsRequest {
 
 message SearchVectorsResponse {
   repeated VectorSearchResult results = 1;
+}
+
+message RequestVectorRebuildRequest {
+  AuthContext auth_context = 1;
+  string collection_type = 2;
+  string embedding_model_ref = 3;
+  int32 dimension = 4;
+  string source_service = 5;
+  string partition_key = 6;
+  string cursor_value = 7;
+  string idempotency_key = 8;
+  string correlation_id = 9;
+  string causation_id = 10;
+  string trace_id = 11;
+}
+
+message RequestVectorRebuildResponse {
+  VectorIndexJob job = 1;
+  VectorRebuildCheckpoint checkpoint = 2;
+  bool replayed = 3;
 }
 
 message GetVectorIndexJobRequest {

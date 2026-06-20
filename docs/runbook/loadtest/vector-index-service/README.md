@@ -9,8 +9,10 @@
 
 - 启动 `vector-index-service` gRPC 进程。
 - 启动 `vector-index-service` outbox relay 进程。
-- 通过公开 gRPC 执行 `UpsertVectorItem -> SearchVectors -> TombstoneVectorItem -> SearchVectors`。
+- 通过公开 gRPC 执行 `UpsertVectorItem -> SearchVectors -> RequestVectorRebuild
+  -> GetVectorIndexJob -> TombstoneVectorItem -> SearchVectors`。
 - 验证 `vector_outbox` 生成 `vector.item.indexed.v1` 和 `vector.item.tombstoned.v1`。
+- 验证 rebuild request 生成 `PENDING` rebuild job 和 `PENDING` checkpoint。
 - 从 Kafka `im.vector.events.<run>` 读取 `VectorEvent`，确认 relay 发布成功。
 - 检查 outbox / Kafka payload 不包含 raw text、source URI、object key、向量数组或 secret 类字段。
 
@@ -38,6 +40,6 @@
 当前边界：
 
 - 这是 relay / metadata smoke，不是 embedding worker、Milvus / pgvector /
-  OpenSearch backend smoke。
+  OpenSearch backend 或真正 rebuild worker smoke。
 - runner 只写低敏 hash / ref，不写 raw document、message body、source URI、
   object key 或 embedding vector array。

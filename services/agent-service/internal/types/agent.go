@@ -41,21 +41,22 @@ const (
 )
 
 type CreateAgentProposalCommand struct {
-	AuthContext    AuthContext
-	ConversationID ConversationID
-	Objective      string
-	SkillID        string
-	ToolName       string
-	ToolAction     string
-	ResourceType   string
-	ResourceID     string
-	RiskLevel      string
-	Intent         string
-	AfterSeq       int64
-	Limit          int
-	IncludeSearch  bool
-	IncludeMemory  bool
-	MemoryStatuses []string
+	AuthContext       AuthContext
+	ConversationID    ConversationID
+	Objective         string
+	SkillID           string
+	ToolName          string
+	ToolAction        string
+	ResourceType      string
+	ResourceID        string
+	RiskLevel         string
+	Intent            string
+	AfterSeq          int64
+	AtConversationSeq int64
+	Limit             int
+	IncludeSearch     bool
+	IncludeMemory     bool
+	MemoryStatuses    []string
 }
 
 func (command CreateAgentProposalCommand) Validate() error {
@@ -100,6 +101,9 @@ func (command CreateAgentProposalCommand) Validate() error {
 	}
 	if command.AfterSeq < 0 {
 		return NewInvalidArgument("after_seq must be non-negative")
+	}
+	if command.AtConversationSeq < 0 {
+		return NewInvalidArgument("at_conversation_seq must be non-negative")
 	}
 	if command.Limit < 0 || command.Limit > MaxAgentEvidenceLimit {
 		return NewInvalidArgument("limit must be between 0 and 30")
@@ -175,7 +179,7 @@ func (command CreateAgentProposalCommand) EffectiveMemoryStatuses() []string {
 }
 
 func (command CreateAgentProposalCommand) ProposalID() string {
-	sum := sha256.Sum256([]byte(fmt.Sprintf("%s|%s|%s|%s|%s|%s|%s|%s|%d|%d",
+	sum := sha256.Sum256([]byte(fmt.Sprintf("%s|%s|%s|%s|%s|%s|%s|%s|%d|%d|%d",
 		command.AuthContext.TenantID,
 		command.AuthContext.UserID,
 		command.ConversationID,
@@ -185,20 +189,22 @@ func (command CreateAgentProposalCommand) ProposalID() string {
 		command.ToolAction,
 		command.NormalizedResourceType(),
 		command.AfterSeq,
+		command.AtConversationSeq,
 		command.EffectiveLimit(),
 	)))
 	return "ap_" + hex.EncodeToString(sum[:8])
 }
 
 type RetrieveEvidenceQuery struct {
-	AuthContext    AuthContext
-	Query          string
-	ConversationID ConversationID
-	AfterSeq       int64
-	Limit          int
-	IncludeSearch  bool
-	IncludeMemory  bool
-	MemoryStatuses []string
+	AuthContext       AuthContext
+	Query             string
+	ConversationID    ConversationID
+	AfterSeq          int64
+	AtConversationSeq int64
+	Limit             int
+	IncludeSearch     bool
+	IncludeMemory     bool
+	MemoryStatuses    []string
 }
 
 type EvidenceSourceRef struct {

@@ -53,16 +53,17 @@ func TestServerCreateAgentProposal(t *testing.T) {
 			UserId:   "user-1",
 			DeviceId: "device-1",
 		},
-		ConversationId: "conv-1",
-		Objective:      "draft action plan",
-		SkillId:        "conversation.note.create",
-		ToolName:       "conversation.note.create",
-		ToolAction:     policyv1.ToolAction_TOOL_ACTION_CALL,
-		ResourceType:   "conversation",
-		ResourceId:     "conv-1",
-		RiskLevel:      "LOW",
-		IncludeSearch:  true,
-		IncludeMemory:  true,
+		ConversationId:    "conv-1",
+		Objective:         "draft action plan",
+		SkillId:           "conversation.note.create",
+		ToolName:          "conversation.note.create",
+		ToolAction:        policyv1.ToolAction_TOOL_ACTION_CALL,
+		ResourceType:      "conversation",
+		ResourceId:        "conv-1",
+		RiskLevel:         "LOW",
+		AtConversationSeq: 17,
+		IncludeSearch:     true,
+		IncludeMemory:     true,
 		MemoryStatuses: []retrievalv1.EvidenceMemoryStatus{
 			retrievalv1.EvidenceMemoryStatus_EVIDENCE_MEMORY_STATUS_ACTIVE,
 		},
@@ -81,6 +82,7 @@ func TestServerCreateAgentProposal(t *testing.T) {
 	if executor.command.ToolAction != types.ToolActionCall ||
 		executor.command.SkillID != "conversation.note.create" ||
 		executor.command.AuthContext.TenantID != "tenant-1" ||
+		executor.command.AtConversationSeq != 17 ||
 		len(executor.command.MemoryStatuses) != 1 {
 		t.Fatalf("unexpected command: %+v", executor.command)
 	}

@@ -8,6 +8,8 @@ version 过滤的 `EvidencePack`，并向客户端返回带引用的回答。
 
 - 对外提供 `AnswerQuestion`。
 - 调用 `retrieval-gateway.RetrieveEvidence` 获取 EvidencePack。
+- 可选 `at_conversation_seq` 显式传给 retrieval-gateway，用于固定 memory
+  current-only 查询时点；未传时允许 retrieval-gateway 使用 search hit fallback。
 - 第一版通过 `AnswerProvider` port 生成 deterministic extractive answer；
   默认实现不调用外部 LLM provider。
 - 可选 `external-http` provider mode 只作为第一阶段外部 LLM boundary：它仍走
@@ -50,6 +52,8 @@ RAG / summary / Agent 后续能力只能沿用该 evidence boundary。任何新�
 - `AuthContext` 优先使用 verified metadata，本地开发可用 request body。
 - `retrieval-gateway` 失败时 fail closed，返回稳定 public error。
 - `AnswerQuestion` 不返回没有 EvidencePack 支撑的事实。
+- 显式 `at_conversation_seq` 不能为负；传入后必须贯穿到 retrieval-gateway，
+  防止 RAG 读取过期或 superseded memory。
 - citations 必须可追踪到 evidence item 或 source ref；provider 输出后统一
   由 citation verifier 检查。
 - 高风险写动作属于后续 Agent / action-executor，不属于本服务。

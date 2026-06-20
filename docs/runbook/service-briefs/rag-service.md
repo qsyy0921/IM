@@ -22,9 +22,9 @@
 - retrieval-gateway 公开 proto RPC client、app / gRPC / cmd focused tests
 - `loadtest/rag`、`tools/run-ai-eval-rag-adapter.ps1` 和真实本地
   `retrieval-gateway -> rag-service` adapter smoke 已通过
+- `AnswerQuestionRequest.at_conversation_seq` 已透传到 EvidencePack current-memory query。
 
 下一步：
 
-- provider-specific LLM / Python worker 后续仍必须走 AnswerProvider port、prompt
-  guard 和 citation verifier。
-- `summary-service`、`agent-service`、action-executor guarded external HTTP adapter eval、profile / Agent output safety eval、ai-eval-service catalog 和 RecordEvalRun recorder smoke 已落；下一步默认推进 AI eval multi-adapter aggregation / regression gate first path。summary / Agent 仍只能消费 EvidencePack。
+- 后续 provider 仍走 AnswerProvider port、prompt guard 和 citation verifier。
+- 补 current-memory regression / eval，验证 RAG 不引用 stale memory。

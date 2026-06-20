@@ -44,6 +44,9 @@ func TestGenerateConversationSummaryBuildsGroundedExtractiveSummary(t *testing.T
 	if retrieval.query.Query != "release recap" {
 		t.Fatalf("unexpected retrieval query: %q", retrieval.query.Query)
 	}
+	if retrieval.query.AtConversationSeq != 13 {
+		t.Fatalf("expected at_conversation_seq to be forwarded, got %d", retrieval.query.AtConversationSeq)
+	}
 }
 
 func TestGenerateConversationSummaryAbstainsWithoutEvidence(t *testing.T) {
@@ -147,9 +150,10 @@ func validCommand() types.GenerateConversationSummaryCommand {
 			UserID:   "user-1",
 			DeviceID: "device-1",
 		},
-		ConversationID: "conv-1",
-		Focus:          "release recap",
-		Limit:          3,
+		ConversationID:    "conv-1",
+		Focus:             "release recap",
+		AtConversationSeq: 13,
+		Limit:             3,
 	}
 }
 

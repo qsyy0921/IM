@@ -143,7 +143,7 @@ func run(ctx context.Context, args []string) error {
 		return err
 	}
 
-	response, err := generateConversationSummary(ctx, cfg)
+	response, err := generateConversationSummary(ctx, cfg, seed)
 	if err != nil {
 		return err
 	}
@@ -361,6 +361,7 @@ INSERT INTO memory_event_source_refs (
 func generateConversationSummary(
 	ctx context.Context,
 	cfg config,
+	seed seededData,
 ) (*summaryv1.GenerateConversationSummaryResponse, error) {
 	dialOption, err := grpctls.DialOption(cfg.tls, "summary-tls")
 	if err != nil {
@@ -385,11 +386,12 @@ func generateConversationSummary(
 				TraceId:   "summary-smoke-trace",
 				RequestId: "summary-smoke-request",
 			},
-			Focus:          cfg.focus,
-			ConversationId: cfg.conversationID,
-			Limit:          10,
-			IncludeSearch:  true,
-			IncludeMemory:  true,
+			Focus:             cfg.focus,
+			ConversationId:    cfg.conversationID,
+			AtConversationSeq: seed.ConversationSeq + 5,
+			Limit:             10,
+			IncludeSearch:     true,
+			IncludeMemory:     true,
 			MemoryStatuses: []retrievalv1.EvidenceMemoryStatus{
 				retrievalv1.EvidenceMemoryStatus_EVIDENCE_MEMORY_STATUS_ACTIVE,
 			},

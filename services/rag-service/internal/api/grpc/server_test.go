@@ -15,7 +15,7 @@ import (
 
 func TestAnswerQuestionMapsResult(t *testing.T) {
 	now := time.UnixMilli(1710000000000)
-	server := NewServer(fakeAnswerExecutor{result: types.AnswerQuestionResult{
+	executor := &fakeAnswerExecutor{result: types.AnswerQuestionResult{
 		AnswerID:   "ans-1",
 		Status:     types.AnswerStatusGrounded,
 		AnswerText: "Grounded extractive answer: [1] answer",
@@ -45,7 +45,8 @@ func TestAnswerQuestionMapsResult(t *testing.T) {
 		},
 		RAGVersion:     types.RAGVersion,
 		GeneratedByLLM: false,
-	}})
+	}}
+	server := NewServer(executor)
 	response, err := server.AnswerQuestion(context.Background(), validRequest())
 	if err != nil {
 		t.Fatalf("AnswerQuestion returned error: %v", err)
@@ -62,10 +63,13 @@ func TestAnswerQuestionMapsResult(t *testing.T) {
 	if response.GetCitations()[0].GetSourceEventId() != "evt-1" {
 		t.Fatalf("citation not mapped: %+v", response.GetCitations()[0])
 	}
+	if executor.command.AtConversationSeq != 11 {
+		t.Fatalf("expected at_conversation_seq to be mapped, got %+v", executor.command)
+	}
 }
 
 func TestAnswerQuestionRequiresAuthContext(t *testing.T) {
-	_, err := NewServer(fakeAnswerExecutor{}).AnswerQuestion(context.Background(), &ragv1.AnswerQuestionRequest{
+	_, err := NewServer(&fakeAnswerExecutor{}).AnswerQuestion(context.Background(), &ragv1.AnswerQuestionRequest{
 		Question: "question?",
 	})
 	if status.Code(err) != codes.InvalidArgument {
@@ -74,14 +78,14 @@ func TestAnswerQuestionRequiresAuthContext(t *testing.T) {
 }
 
 func TestAnswerQuestionMapsRetrievalUnavailable(t *testing.T) {
-	_, err := NewServer(fakeAnswerExecutor{err: types.ErrRetrievalUnavailable}).AnswerQuestion(context.Background(), validRequest())
+	_, err := NewServer(&fakeAnswerExecutor{err: types.ErrRetrievalUnavailable}).AnswerQuestion(context.Background(), validRequest())
 	if status.Code(err) != codes.Unavailable {
 		t.Fatalf("expected unavailable, got %v", err)
 	}
 }
 
 func TestAnswerQuestionMapsCitationVerificationFailure(t *testing.T) {
-	_, err := NewServer(fakeAnswerExecutor{err: types.ErrCitationVerification}).AnswerQuestion(context.Background(), validRequest())
+	_, err := NewServer(&fakeAnswerExecutor{err: types.ErrCitationVerification}).AnswerQuestion(context.Background(), validRequest())
 	if status.Code(err) != codes.Internal {
 		t.Fatalf("expected internal, got %v", err)
 	}
@@ -97,21 +101,24 @@ func validRequest() *ragv1.AnswerQuestionRequest {
 			UserId:   "user-1",
 			DeviceId: "device-1",
 		},
-		Question:       "question?",
-		ConversationId: "conv-1",
-		Limit:          3,
+		Question:          "question?",
+		ConversationId:    "conv-1",
+		AtConversationSeq: 11,
+		Limit:             3,
 	}
 }
 
 type fakeAnswerExecutor struct {
-	result types.AnswerQuestionResult
-	err    error
+	command types.AnswerQuestionCommand
+	result  types.AnswerQuestionResult
+	err     error
 }
 
-func (executor fakeAnswerExecutor) Execute(
-	context.Context,
-	types.AnswerQuestionCommand,
+func (executor *fakeAnswerExecutor) Execute(
+	_ context.Context,
+	command types.AnswerQuestionCommand,
 ) (types.AnswerQuestionResult, error) {
+	executor.command = command
 	if executor.err != nil {
 		return types.AnswerQuestionResult{}, executor.err
 	}

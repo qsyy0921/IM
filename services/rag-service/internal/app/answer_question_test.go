@@ -63,6 +63,9 @@ func TestAnswerQuestionBuildsGroundedExtractiveAnswer(t *testing.T) {
 	if len(retrieval.query.MemoryStatuses) != 1 || retrieval.query.MemoryStatuses[0] != types.MemoryStatusActive {
 		t.Fatalf("expected active memory by default, got %+v", retrieval.query.MemoryStatuses)
 	}
+	if retrieval.query.AtConversationSeq != 11 {
+		t.Fatalf("expected at_conversation_seq to be forwarded, got %d", retrieval.query.AtConversationSeq)
+	}
 }
 
 func TestAnswerQuestionUsesProviderBoundary(t *testing.T) {
@@ -186,9 +189,10 @@ func validCommand() types.AnswerQuestionCommand {
 			UserID:   "user-1",
 			DeviceID: "device-1",
 		},
-		Question:       " what changed? ",
-		ConversationID: "conv-1",
-		Limit:          5,
+		Question:          " what changed? ",
+		ConversationID:    "conv-1",
+		AtConversationSeq: 11,
+		Limit:             5,
 	}
 }
 

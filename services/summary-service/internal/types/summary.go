@@ -29,14 +29,15 @@ const (
 )
 
 type GenerateConversationSummaryCommand struct {
-	AuthContext    AuthContext
-	ConversationID ConversationID
-	Focus          string
-	AfterSeq       int64
-	Limit          int
-	IncludeSearch  bool
-	IncludeMemory  bool
-	MemoryStatuses []string
+	AuthContext       AuthContext
+	ConversationID    ConversationID
+	Focus             string
+	AfterSeq          int64
+	AtConversationSeq int64
+	Limit             int
+	IncludeSearch     bool
+	IncludeMemory     bool
+	MemoryStatuses    []string
 }
 
 func (command GenerateConversationSummaryCommand) Validate() error {
@@ -51,6 +52,9 @@ func (command GenerateConversationSummaryCommand) Validate() error {
 	}
 	if command.AfterSeq < 0 {
 		return NewInvalidArgument("after_seq must be non-negative")
+	}
+	if command.AtConversationSeq < 0 {
+		return NewInvalidArgument("at_conversation_seq must be non-negative")
 	}
 	if command.Limit < 0 || command.Limit > MaxSummaryEvidenceLimit {
 		return NewInvalidArgument("limit must be between 0 and 30")
@@ -97,26 +101,28 @@ func (command GenerateConversationSummaryCommand) EffectiveMemoryStatuses() []st
 }
 
 func (command GenerateConversationSummaryCommand) SummaryID() string {
-	sum := sha256.Sum256([]byte(fmt.Sprintf("%s|%s|%s|%s|%d|%d",
+	sum := sha256.Sum256([]byte(fmt.Sprintf("%s|%s|%s|%s|%d|%d|%d",
 		command.AuthContext.TenantID,
 		command.AuthContext.UserID,
 		command.ConversationID,
 		command.RetrievalQuery(),
 		command.AfterSeq,
+		command.AtConversationSeq,
 		command.EffectiveLimit(),
 	)))
 	return "sum_" + hex.EncodeToString(sum[:8])
 }
 
 type RetrieveEvidenceQuery struct {
-	AuthContext    AuthContext
-	Query          string
-	ConversationID ConversationID
-	AfterSeq       int64
-	Limit          int
-	IncludeSearch  bool
-	IncludeMemory  bool
-	MemoryStatuses []string
+	AuthContext       AuthContext
+	Query             string
+	ConversationID    ConversationID
+	AfterSeq          int64
+	AtConversationSeq int64
+	Limit             int
+	IncludeSearch     bool
+	IncludeMemory     bool
+	MemoryStatuses    []string
 }
 
 type EvidenceSourceRef struct {

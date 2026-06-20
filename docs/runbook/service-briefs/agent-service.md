@@ -16,6 +16,8 @@ proposal 前调用 `mcp-gateway.PrepareToolCall` 做 skill / policy / prepare au
 - `proposal-approval-audit` / `proposal-approval-approve`：默认 dry-run，reason 走文件，输出不含正文 / EvidencePack。
 - 可选 `python-worker` proposal provider mode：Go 先生成 grounded proposal，Python worker 只返回 proposal hash / citation metadata；hash / citation mismatch 与 worker failure 已有 Agent output regression。
 - Agent adapter smoke、Agent -> mcp-gateway smoke、Agent execution eval adapter first path 和 Agent output safety fixture eval 已落。
+- `CreateAgentProposalRequest.at_conversation_seq` 已显式透传到 retrieval-gateway
+  EvidencePack；prepare deny 仍不检索 EvidencePack。
 
 ## 边界
 
@@ -25,4 +27,4 @@ proposal 前调用 `mcp-gateway.PrepareToolCall` 做 skill / policy / prepare au
 
 ## 下一步
 
-- 继续补 tool/action safety cases；Agent 仍只提交 proposal，不直接执行工具。
+- 补 current-memory regression / eval，验证 Agent proposal 不引用 stale memory；仍只提交 proposal。

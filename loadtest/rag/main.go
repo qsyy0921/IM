@@ -143,7 +143,7 @@ func run(ctx context.Context, args []string) error {
 		return err
 	}
 
-	response, err := answerQuestion(ctx, cfg)
+	response, err := answerQuestion(ctx, cfg, seed)
 	if err != nil {
 		return err
 	}
@@ -358,7 +358,7 @@ INSERT INTO memory_event_source_refs (
 	}, nil
 }
 
-func answerQuestion(ctx context.Context, cfg config) (*ragv1.AnswerQuestionResponse, error) {
+func answerQuestion(ctx context.Context, cfg config, seed seededData) (*ragv1.AnswerQuestionResponse, error) {
 	dialOption, err := grpctls.DialOption(cfg.tls, "rag-tls")
 	if err != nil {
 		return nil, err
@@ -380,11 +380,12 @@ func answerQuestion(ctx context.Context, cfg config) (*ragv1.AnswerQuestionRespo
 			TraceId:   "rag-smoke-trace",
 			RequestId: "rag-smoke-request",
 		},
-		Question:       cfg.question,
-		ConversationId: cfg.conversationID,
-		Limit:          10,
-		IncludeSearch:  true,
-		IncludeMemory:  true,
+		Question:          cfg.question,
+		ConversationId:    cfg.conversationID,
+		AtConversationSeq: seed.ConversationSeq + 5,
+		Limit:             10,
+		IncludeSearch:     true,
+		IncludeMemory:     true,
 		MemoryStatuses: []retrievalv1.EvidenceMemoryStatus{
 			retrievalv1.EvidenceMemoryStatus_EVIDENCE_MEMORY_STATUS_ACTIVE,
 		},

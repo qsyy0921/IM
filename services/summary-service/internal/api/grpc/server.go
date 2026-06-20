@@ -44,14 +44,15 @@ func (server *Server) GenerateConversationSummary(
 		return nil, status.Error(codes.InvalidArgument, "auth_context is required")
 	}
 	result, err := server.generateSummary.Execute(ctx, types.GenerateConversationSummaryCommand{
-		AuthContext:    auth,
-		ConversationID: types.ConversationID(request.GetConversationId()),
-		Focus:          request.GetFocus(),
-		AfterSeq:       request.GetAfterSeq(),
-		Limit:          int(request.GetLimit()),
-		IncludeSearch:  request.GetIncludeSearch(),
-		IncludeMemory:  request.GetIncludeMemory(),
-		MemoryStatuses: memoryStatusesFromProto(request.GetMemoryStatuses()),
+		AuthContext:       auth,
+		ConversationID:    types.ConversationID(request.GetConversationId()),
+		Focus:             request.GetFocus(),
+		AfterSeq:          request.GetAfterSeq(),
+		AtConversationSeq: request.GetAtConversationSeq(),
+		Limit:             int(request.GetLimit()),
+		IncludeSearch:     request.GetIncludeSearch(),
+		IncludeMemory:     request.GetIncludeMemory(),
+		MemoryStatuses:    memoryStatusesFromProto(request.GetMemoryStatuses()),
 	})
 	if err != nil {
 		return nil, publicError(err)

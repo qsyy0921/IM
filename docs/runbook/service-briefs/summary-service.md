@@ -22,9 +22,9 @@
 - retrieval-gateway 公开 proto RPC client、app / gRPC / cmd focused tests
 - `loadtest/summary`、`tools/run-summary-adapter-smoke.ps1` 和真实本地
   `retrieval-gateway -> summary-service` adapter smoke 已通过
+- `GenerateConversationSummaryRequest.at_conversation_seq` 已透传到 EvidencePack current-memory query。
 
 下一步：
 
-- provider-specific LLM / Python worker 后续仍必须走 SummaryProvider port、
-  prompt guard、hash / citation metadata 校验和 citation verifier。
-- `agent-service` 服务级 planner Python candidate guard、action-executor guarded external HTTP adapter eval、profile / Agent output safety eval、ai-eval-service catalog 和 RecordEvalRun recorder smoke 已落；下一步默认推进 AI eval multi-adapter aggregation / regression gate first path。summary / Agent 仍只能消费 EvidencePack。
+- 后续 provider 仍走 SummaryProvider port、prompt guard、hash / citation 校验和 verifier。
+- 补 current-memory regression / eval，验证 Summary 不引用 stale memory。

@@ -44,14 +44,15 @@ func (server *Server) AnswerQuestion(
 		return nil, status.Error(codes.InvalidArgument, "auth_context is required")
 	}
 	result, err := server.answerQuestion.Execute(ctx, types.AnswerQuestionCommand{
-		AuthContext:    auth,
-		Question:       request.GetQuestion(),
-		ConversationID: types.ConversationID(request.GetConversationId()),
-		AfterSeq:       request.GetAfterSeq(),
-		Limit:          int(request.GetLimit()),
-		IncludeSearch:  request.GetIncludeSearch(),
-		IncludeMemory:  request.GetIncludeMemory(),
-		MemoryStatuses: memoryStatusesFromProto(request.GetMemoryStatuses()),
+		AuthContext:       auth,
+		Question:          request.GetQuestion(),
+		ConversationID:    types.ConversationID(request.GetConversationId()),
+		AfterSeq:          request.GetAfterSeq(),
+		AtConversationSeq: request.GetAtConversationSeq(),
+		Limit:             int(request.GetLimit()),
+		IncludeSearch:     request.GetIncludeSearch(),
+		IncludeMemory:     request.GetIncludeMemory(),
+		MemoryStatuses:    memoryStatusesFromProto(request.GetMemoryStatuses()),
 	})
 	if err != nil {
 		return nil, publicError(err)

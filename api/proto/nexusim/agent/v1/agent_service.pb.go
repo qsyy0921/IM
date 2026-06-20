@@ -79,24 +79,25 @@ func (AgentProposalStatus) EnumDescriptor() ([]byte, []int) {
 }
 
 type CreateAgentProposalRequest struct {
-	state          protoimpl.MessageState    `protogen:"open.v1"`
-	AuthContext    *v1.AuthContext           `protobuf:"bytes,1,opt,name=auth_context,json=authContext,proto3" json:"auth_context,omitempty"`
-	ConversationId string                    `protobuf:"bytes,2,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
-	Objective      string                    `protobuf:"bytes,3,opt,name=objective,proto3" json:"objective,omitempty"`
-	ToolName       string                    `protobuf:"bytes,4,opt,name=tool_name,json=toolName,proto3" json:"tool_name,omitempty"`
-	ToolAction     v11.ToolAction            `protobuf:"varint,5,opt,name=tool_action,json=toolAction,proto3,enum=nexusim.policy.v1.ToolAction" json:"tool_action,omitempty"`
-	ResourceType   string                    `protobuf:"bytes,6,opt,name=resource_type,json=resourceType,proto3" json:"resource_type,omitempty"`
-	ResourceId     string                    `protobuf:"bytes,7,opt,name=resource_id,json=resourceId,proto3" json:"resource_id,omitempty"`
-	RiskLevel      string                    `protobuf:"bytes,8,opt,name=risk_level,json=riskLevel,proto3" json:"risk_level,omitempty"`
-	Intent         string                    `protobuf:"bytes,9,opt,name=intent,proto3" json:"intent,omitempty"`
-	AfterSeq       int64                     `protobuf:"varint,10,opt,name=after_seq,json=afterSeq,proto3" json:"after_seq,omitempty"`
-	Limit          int32                     `protobuf:"varint,11,opt,name=limit,proto3" json:"limit,omitempty"`
-	IncludeSearch  bool                      `protobuf:"varint,12,opt,name=include_search,json=includeSearch,proto3" json:"include_search,omitempty"`
-	IncludeMemory  bool                      `protobuf:"varint,13,opt,name=include_memory,json=includeMemory,proto3" json:"include_memory,omitempty"`
-	MemoryStatuses []v1.EvidenceMemoryStatus `protobuf:"varint,14,rep,packed,name=memory_statuses,json=memoryStatuses,proto3,enum=nexusim.retrieval.v1.EvidenceMemoryStatus" json:"memory_statuses,omitempty"`
-	SkillId        string                    `protobuf:"bytes,15,opt,name=skill_id,json=skillId,proto3" json:"skill_id,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	state             protoimpl.MessageState    `protogen:"open.v1"`
+	AuthContext       *v1.AuthContext           `protobuf:"bytes,1,opt,name=auth_context,json=authContext,proto3" json:"auth_context,omitempty"`
+	ConversationId    string                    `protobuf:"bytes,2,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
+	Objective         string                    `protobuf:"bytes,3,opt,name=objective,proto3" json:"objective,omitempty"`
+	ToolName          string                    `protobuf:"bytes,4,opt,name=tool_name,json=toolName,proto3" json:"tool_name,omitempty"`
+	ToolAction        v11.ToolAction            `protobuf:"varint,5,opt,name=tool_action,json=toolAction,proto3,enum=nexusim.policy.v1.ToolAction" json:"tool_action,omitempty"`
+	ResourceType      string                    `protobuf:"bytes,6,opt,name=resource_type,json=resourceType,proto3" json:"resource_type,omitempty"`
+	ResourceId        string                    `protobuf:"bytes,7,opt,name=resource_id,json=resourceId,proto3" json:"resource_id,omitempty"`
+	RiskLevel         string                    `protobuf:"bytes,8,opt,name=risk_level,json=riskLevel,proto3" json:"risk_level,omitempty"`
+	Intent            string                    `protobuf:"bytes,9,opt,name=intent,proto3" json:"intent,omitempty"`
+	AfterSeq          int64                     `protobuf:"varint,10,opt,name=after_seq,json=afterSeq,proto3" json:"after_seq,omitempty"`
+	Limit             int32                     `protobuf:"varint,11,opt,name=limit,proto3" json:"limit,omitempty"`
+	IncludeSearch     bool                      `protobuf:"varint,12,opt,name=include_search,json=includeSearch,proto3" json:"include_search,omitempty"`
+	IncludeMemory     bool                      `protobuf:"varint,13,opt,name=include_memory,json=includeMemory,proto3" json:"include_memory,omitempty"`
+	MemoryStatuses    []v1.EvidenceMemoryStatus `protobuf:"varint,14,rep,packed,name=memory_statuses,json=memoryStatuses,proto3,enum=nexusim.retrieval.v1.EvidenceMemoryStatus" json:"memory_statuses,omitempty"`
+	SkillId           string                    `protobuf:"bytes,15,opt,name=skill_id,json=skillId,proto3" json:"skill_id,omitempty"`
+	AtConversationSeq int64                     `protobuf:"varint,16,opt,name=at_conversation_seq,json=atConversationSeq,proto3" json:"at_conversation_seq,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *CreateAgentProposalRequest) Reset() {
@@ -232,6 +233,13 @@ func (x *CreateAgentProposalRequest) GetSkillId() string {
 		return x.SkillId
 	}
 	return ""
+}
+
+func (x *CreateAgentProposalRequest) GetAtConversationSeq() int64 {
+	if x != nil {
+		return x.AtConversationSeq
+	}
+	return 0
 }
 
 type AgentCitation struct {
@@ -962,7 +970,7 @@ var File_nexusim_agent_v1_agent_service_proto protoreflect.FileDescriptor
 
 const file_nexusim_agent_v1_agent_service_proto_rawDesc = "" +
 	"\n" +
-	"$nexusim/agent/v1/agent_service.proto\x12\x10nexusim.agent.v1\x1a&nexusim/policy/v1/policy_service.proto\x1a,nexusim/retrieval/v1/retrieval_gateway.proto\"\xf4\x04\n" +
+	"$nexusim/agent/v1/agent_service.proto\x12\x10nexusim.agent.v1\x1a&nexusim/policy/v1/policy_service.proto\x1a,nexusim/retrieval/v1/retrieval_gateway.proto\"\xa4\x05\n" +
 	"\x1aCreateAgentProposalRequest\x12D\n" +
 	"\fauth_context\x18\x01 \x01(\v2!.nexusim.retrieval.v1.AuthContextR\vauthContext\x12'\n" +
 	"\x0fconversation_id\x18\x02 \x01(\tR\x0econversationId\x12\x1c\n" +
@@ -982,7 +990,8 @@ const file_nexusim_agent_v1_agent_service_proto_rawDesc = "" +
 	"\x0einclude_search\x18\f \x01(\bR\rincludeSearch\x12%\n" +
 	"\x0einclude_memory\x18\r \x01(\bR\rincludeMemory\x12S\n" +
 	"\x0fmemory_statuses\x18\x0e \x03(\x0e2*.nexusim.retrieval.v1.EvidenceMemoryStatusR\x0ememoryStatuses\x12\x19\n" +
-	"\bskill_id\x18\x0f \x01(\tR\askillId\"\xc3\x02\n" +
+	"\bskill_id\x18\x0f \x01(\tR\askillId\x12.\n" +
+	"\x13at_conversation_seq\x18\x10 \x01(\x03R\x11atConversationSeq\"\xc3\x02\n" +
 	"\rAgentCitation\x12\x1f\n" +
 	"\vevidence_id\x18\x01 \x01(\tR\n" +
 	"evidenceId\x12I\n" +

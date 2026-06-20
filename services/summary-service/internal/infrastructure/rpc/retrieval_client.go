@@ -55,13 +55,14 @@ func (client RetrievalClient) RetrieveEvidence(
 			TraceId:   query.AuthContext.TraceID,
 			RequestId: query.AuthContext.RequestID,
 		},
-		Query:          query.Query,
-		ConversationId: string(query.ConversationID),
-		AfterSeq:       query.AfterSeq,
-		Limit:          int32(query.Limit),
-		IncludeSearch:  query.IncludeSearch,
-		IncludeMemory:  query.IncludeMemory,
-		MemoryStatuses: memoryStatusesToProto(query.MemoryStatuses),
+		Query:             query.Query,
+		ConversationId:    string(query.ConversationID),
+		AfterSeq:          query.AfterSeq,
+		AtConversationSeq: query.AtConversationSeq,
+		Limit:             int32(query.Limit),
+		IncludeSearch:     query.IncludeSearch,
+		IncludeMemory:     query.IncludeMemory,
+		MemoryStatuses:    memoryStatusesToProto(query.MemoryStatuses),
 	})
 	if err != nil {
 		return types.RetrieveEvidenceResult{}, mapRetrievalError(err)

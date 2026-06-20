@@ -18,6 +18,8 @@ proposal 元数据，并提供 approval / execution preflight 校验；它仍不
   `VerifyApprovedAgentProposal`。
 - 调用 `mcp-gateway.PrepareToolCall` 做 tool action prepare / precheck。
 - 调用 `retrieval-gateway.RetrieveEvidence` 获取 EvidencePack。
+- 可选 `at_conversation_seq` 显式传给 retrieval-gateway，用于固定 memory
+  current-only 查询时点；未传时允许 retrieval-gateway 使用 search hit fallback。
 - 第一版通过 `ProposalProvider` port 生成 deterministic extractive proposal；
   默认实现不调用外部 LLM provider。
 - 可选 `python-worker` provider mode 只作为第一阶段 planner candidate
@@ -88,6 +90,8 @@ Agent 不允许绕过 mcp-gateway / policy，也不允许直接执行 mutation�
 - Agent 传给 mcp-gateway 的 `input_json` 只包含低敏 metadata，不包含 prompt /
   evidence 原文或业务 payload；mcp-gateway 只保存 input hash。
 - `CreateAgentProposal` 不返回没有 EvidencePack 支撑的事实。
+- 显式 `at_conversation_seq` 不能为负；传入后必须贯穿到 retrieval-gateway，
+  防止 Agent proposal 引用过期或 superseded memory。
 - citations 必须可追踪到 evidence item 或 source ref。
 - Python worker 不能决定 proposal status、approval、execution 或 audit；
   worker 输出仅用于候选完整性校验，不能成为业务事实源。

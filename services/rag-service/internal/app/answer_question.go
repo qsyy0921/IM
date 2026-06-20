@@ -35,14 +35,15 @@ func (usecase AnswerQuestionUseCase) Execute(
 		return types.AnswerQuestionResult{}, types.ErrRAGUnavailable
 	}
 	evidence, err := usecase.retrieval.RetrieveEvidence(ctx, types.RetrieveEvidenceQuery{
-		AuthContext:    command.AuthContext,
-		Query:          command.NormalizedQuestion(),
-		ConversationID: command.ConversationID,
-		AfterSeq:       command.AfterSeq,
-		Limit:          command.EffectiveLimit(),
-		IncludeSearch:  command.ShouldIncludeSearch(),
-		IncludeMemory:  command.ShouldIncludeMemory(),
-		MemoryStatuses: command.EffectiveMemoryStatuses(),
+		AuthContext:       command.AuthContext,
+		Query:             command.NormalizedQuestion(),
+		ConversationID:    command.ConversationID,
+		AfterSeq:          command.AfterSeq,
+		AtConversationSeq: command.AtConversationSeq,
+		Limit:             command.EffectiveLimit(),
+		IncludeSearch:     command.ShouldIncludeSearch(),
+		IncludeMemory:     command.ShouldIncludeMemory(),
+		MemoryStatuses:    command.EffectiveMemoryStatuses(),
 	})
 	if err != nil {
 		return types.AnswerQuestionResult{}, err

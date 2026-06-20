@@ -12,7 +12,7 @@ import (
 )
 
 func TestGenerateConversationSummaryMapsResult(t *testing.T) {
-	server := NewServer(fakeGenerateExecutor{result: types.GenerateConversationSummaryResult{
+	executor := &fakeGenerateExecutor{result: types.GenerateConversationSummaryResult{
 		SummaryID:      "sum-1",
 		Status:         types.SummaryStatusGrounded,
 		SummaryText:    "summary",
@@ -25,7 +25,8 @@ func TestGenerateConversationSummaryMapsResult(t *testing.T) {
 			ConversationID:  "conv-1",
 			ConversationSeq: 2,
 		}},
-	}})
+	}}
+	server := NewServer(executor)
 	response, err := server.GenerateConversationSummary(context.Background(), validRequest())
 	if err != nil {
 		t.Fatalf("GenerateConversationSummary returned error: %v", err)
@@ -39,17 +40,20 @@ func TestGenerateConversationSummaryMapsResult(t *testing.T) {
 	if len(response.GetCitations()) != 1 {
 		t.Fatalf("expected citation, got %#v", response.GetCitations())
 	}
+	if executor.command.AtConversationSeq != 13 {
+		t.Fatalf("expected at_conversation_seq to be mapped, got %+v", executor.command)
+	}
 }
 
 func TestGenerateConversationSummaryRequiresAuthContext(t *testing.T) {
-	_, err := NewServer(fakeGenerateExecutor{}).GenerateConversationSummary(context.Background(), &summaryv1.GenerateConversationSummaryRequest{})
+	_, err := NewServer(&fakeGenerateExecutor{}).GenerateConversationSummary(context.Background(), &summaryv1.GenerateConversationSummaryRequest{})
 	if status.Code(err) != codes.InvalidArgument {
 		t.Fatalf("expected invalid argument, got %v", err)
 	}
 }
 
 func TestGenerateConversationSummaryMapsCitationVerificationFailure(t *testing.T) {
-	_, err := NewServer(fakeGenerateExecutor{err: types.ErrCitationVerification}).GenerateConversationSummary(context.Background(), validRequest())
+	_, err := NewServer(&fakeGenerateExecutor{err: types.ErrCitationVerification}).GenerateConversationSummary(context.Background(), validRequest())
 	if status.Code(err) != codes.Internal {
 		t.Fatalf("expected internal, got %v", err)
 	}
@@ -65,21 +69,24 @@ func validRequest() *summaryv1.GenerateConversationSummaryRequest {
 			UserId:   "user-1",
 			DeviceId: "device-1",
 		},
-		ConversationId: "conv-1",
-		Focus:          "release recap",
-		Limit:          3,
+		ConversationId:    "conv-1",
+		Focus:             "release recap",
+		AtConversationSeq: 13,
+		Limit:             3,
 	}
 }
 
 type fakeGenerateExecutor struct {
-	result types.GenerateConversationSummaryResult
-	err    error
+	command types.GenerateConversationSummaryCommand
+	result  types.GenerateConversationSummaryResult
+	err     error
 }
 
-func (executor fakeGenerateExecutor) Execute(
+func (executor *fakeGenerateExecutor) Execute(
 	_ context.Context,
-	_ types.GenerateConversationSummaryCommand,
+	command types.GenerateConversationSummaryCommand,
 ) (types.GenerateConversationSummaryResult, error) {
+	executor.command = command
 	if executor.err != nil {
 		return types.GenerateConversationSummaryResult{}, executor.err
 	}

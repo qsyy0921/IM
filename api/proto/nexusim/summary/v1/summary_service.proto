@@ -25,6 +25,7 @@ message GenerateConversationSummaryRequest {
   bool include_search = 6;
   bool include_memory = 7;
   repeated nexusim.retrieval.v1.EvidenceMemoryStatus memory_statuses = 8;
+  int64 at_conversation_seq = 9;
 }
 
 message Citation {

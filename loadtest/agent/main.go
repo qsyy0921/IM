@@ -217,7 +217,7 @@ func run(ctx context.Context, args []string) error {
 		return err
 	}
 
-	response, err := createProposal(ctx, cfg)
+	response, err := createProposal(ctx, cfg, seed)
 	if err != nil {
 		return err
 	}
@@ -562,7 +562,7 @@ INSERT INTO memory_event_source_refs (
 	}, nil
 }
 
-func createProposal(ctx context.Context, cfg config) (*agentv1.CreateAgentProposalResponse, error) {
+func createProposal(ctx context.Context, cfg config, seed seededData) (*agentv1.CreateAgentProposalResponse, error) {
 	dialOption, err := grpctls.DialOption(cfg.tls, "agent-tls")
 	if err != nil {
 		return nil, err
@@ -584,18 +584,19 @@ func createProposal(ctx context.Context, cfg config) (*agentv1.CreateAgentPropos
 			TraceId:   "agent-smoke-trace",
 			RequestId: "agent-smoke-request",
 		},
-		ConversationId: cfg.conversationID,
-		Objective:      cfg.objective,
-		SkillId:        cfg.skillID,
-		ToolName:       cfg.toolName,
-		ToolAction:     policyv1.ToolAction_TOOL_ACTION_CALL,
-		ResourceType:   cfg.resourceType,
-		ResourceId:     cfg.resourceID,
-		RiskLevel:      cfg.riskLevel,
-		Intent:         cfg.intent,
-		Limit:          10,
-		IncludeSearch:  true,
-		IncludeMemory:  true,
+		ConversationId:    cfg.conversationID,
+		Objective:         cfg.objective,
+		SkillId:           cfg.skillID,
+		ToolName:          cfg.toolName,
+		ToolAction:        policyv1.ToolAction_TOOL_ACTION_CALL,
+		ResourceType:      cfg.resourceType,
+		ResourceId:        cfg.resourceID,
+		RiskLevel:         cfg.riskLevel,
+		Intent:            cfg.intent,
+		AtConversationSeq: seed.ConversationSeq + 5,
+		Limit:             10,
+		IncludeSearch:     true,
+		IncludeMemory:     true,
 		MemoryStatuses: []retrievalv1.EvidenceMemoryStatus{
 			retrievalv1.EvidenceMemoryStatus_EVIDENCE_MEMORY_STATUS_ACTIVE,
 		},

@@ -141,21 +141,22 @@ func (server *Server) CreateAgentProposal(
 		return nil, status.Error(codes.InvalidArgument, "auth_context is required")
 	}
 	result, err := server.createProposal.Execute(ctx, types.CreateAgentProposalCommand{
-		AuthContext:    auth,
-		ConversationID: types.ConversationID(request.GetConversationId()),
-		Objective:      request.GetObjective(),
-		SkillID:        request.GetSkillId(),
-		ToolName:       request.GetToolName(),
-		ToolAction:     toolActionFromProto(request.GetToolAction()),
-		ResourceType:   request.GetResourceType(),
-		ResourceID:     request.GetResourceId(),
-		RiskLevel:      request.GetRiskLevel(),
-		Intent:         request.GetIntent(),
-		AfterSeq:       request.GetAfterSeq(),
-		Limit:          int(request.GetLimit()),
-		IncludeSearch:  request.GetIncludeSearch(),
-		IncludeMemory:  request.GetIncludeMemory(),
-		MemoryStatuses: memoryStatusesFromProto(request.GetMemoryStatuses()),
+		AuthContext:       auth,
+		ConversationID:    types.ConversationID(request.GetConversationId()),
+		Objective:         request.GetObjective(),
+		SkillID:           request.GetSkillId(),
+		ToolName:          request.GetToolName(),
+		ToolAction:        toolActionFromProto(request.GetToolAction()),
+		ResourceType:      request.GetResourceType(),
+		ResourceID:        request.GetResourceId(),
+		RiskLevel:         request.GetRiskLevel(),
+		Intent:            request.GetIntent(),
+		AfterSeq:          request.GetAfterSeq(),
+		AtConversationSeq: request.GetAtConversationSeq(),
+		Limit:             int(request.GetLimit()),
+		IncludeSearch:     request.GetIncludeSearch(),
+		IncludeMemory:     request.GetIncludeMemory(),
+		MemoryStatuses:    memoryStatusesFromProto(request.GetMemoryStatuses()),
 	})
 	if err != nil {
 		return nil, publicError(err)

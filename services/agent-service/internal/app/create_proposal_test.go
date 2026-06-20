@@ -42,6 +42,9 @@ func TestCreateAgentProposalUseCaseReturnsProposal(t *testing.T) {
 	if retrieval.query.Query != "draft action plan" || retrieval.query.ConversationID != "conv-1" {
 		t.Fatalf("unexpected retrieval query: %+v", retrieval.query)
 	}
+	if retrieval.query.AtConversationSeq != 17 {
+		t.Fatalf("expected at_conversation_seq to be forwarded, got %d", retrieval.query.AtConversationSeq)
+	}
 	if prepare.command.SkillID != "conversation.note.create" ||
 		prepare.command.ToolName != "conversation.note.create" ||
 		prepare.command.Action != types.ToolActionCall ||
@@ -146,16 +149,17 @@ func testCommand() types.CreateAgentProposalCommand {
 			UserID:   "user-1",
 			DeviceID: "device-1",
 		},
-		ConversationID: "conv-1",
-		Objective:      "draft action plan",
-		ToolName:       "conversation.note.create",
-		ToolAction:     types.ToolActionCall,
-		ResourceType:   "conversation",
-		ResourceID:     "conv-1",
-		RiskLevel:      "LOW",
-		Intent:         "draft action plan",
-		IncludeSearch:  true,
-		IncludeMemory:  true,
+		ConversationID:    "conv-1",
+		Objective:         "draft action plan",
+		ToolName:          "conversation.note.create",
+		ToolAction:        types.ToolActionCall,
+		ResourceType:      "conversation",
+		ResourceID:        "conv-1",
+		RiskLevel:         "LOW",
+		Intent:            "draft action plan",
+		AtConversationSeq: 17,
+		IncludeSearch:     true,
+		IncludeMemory:     true,
 	}
 }
 

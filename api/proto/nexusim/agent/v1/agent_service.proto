@@ -37,6 +37,7 @@ message CreateAgentProposalRequest {
   bool include_memory = 13;
   repeated nexusim.retrieval.v1.EvidenceMemoryStatus memory_statuses = 14;
   string skill_id = 15;
+  int64 at_conversation_seq = 16;
 }
 
 message AgentCitation {

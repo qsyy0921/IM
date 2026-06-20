@@ -29,14 +29,15 @@ const (
 )
 
 type AnswerQuestionCommand struct {
-	AuthContext    AuthContext
-	Question       string
-	ConversationID ConversationID
-	AfterSeq       int64
-	Limit          int
-	IncludeSearch  bool
-	IncludeMemory  bool
-	MemoryStatuses []string
+	AuthContext       AuthContext
+	Question          string
+	ConversationID    ConversationID
+	AfterSeq          int64
+	AtConversationSeq int64
+	Limit             int
+	IncludeSearch     bool
+	IncludeMemory     bool
+	MemoryStatuses    []string
 }
 
 func (command AnswerQuestionCommand) Validate() error {
@@ -51,6 +52,9 @@ func (command AnswerQuestionCommand) Validate() error {
 	}
 	if command.AfterSeq < 0 {
 		return NewInvalidArgument("after_seq must be non-negative")
+	}
+	if command.AtConversationSeq < 0 {
+		return NewInvalidArgument("at_conversation_seq must be non-negative")
 	}
 	if command.Limit < 0 || command.Limit > MaxAnswerEvidenceLimit {
 		return NewInvalidArgument("limit must be between 0 and 20")
@@ -90,26 +94,28 @@ func (command AnswerQuestionCommand) EffectiveMemoryStatuses() []string {
 }
 
 func (command AnswerQuestionCommand) AnswerID() string {
-	sum := sha256.Sum256([]byte(fmt.Sprintf("%s|%s|%s|%s|%d|%d",
+	sum := sha256.Sum256([]byte(fmt.Sprintf("%s|%s|%s|%s|%d|%d|%d",
 		command.AuthContext.TenantID,
 		command.AuthContext.UserID,
 		command.ConversationID,
 		command.NormalizedQuestion(),
 		command.AfterSeq,
+		command.AtConversationSeq,
 		command.EffectiveLimit(),
 	)))
 	return "ans_" + hex.EncodeToString(sum[:8])
 }
 
 type RetrieveEvidenceQuery struct {
-	AuthContext    AuthContext
-	Query          string
-	ConversationID ConversationID
-	AfterSeq       int64
-	Limit          int
-	IncludeSearch  bool
-	IncludeMemory  bool
-	MemoryStatuses []string
+	AuthContext       AuthContext
+	Query             string
+	ConversationID    ConversationID
+	AfterSeq          int64
+	AtConversationSeq int64
+	Limit             int
+	IncludeSearch     bool
+	IncludeMemory     bool
+	MemoryStatuses    []string
 }
 
 type EvidenceSourceRef struct {

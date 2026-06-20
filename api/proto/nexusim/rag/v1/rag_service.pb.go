@@ -72,17 +72,18 @@ func (AnswerStatus) EnumDescriptor() ([]byte, []int) {
 }
 
 type AnswerQuestionRequest struct {
-	state          protoimpl.MessageState    `protogen:"open.v1"`
-	AuthContext    *v1.AuthContext           `protobuf:"bytes,1,opt,name=auth_context,json=authContext,proto3" json:"auth_context,omitempty"`
-	Question       string                    `protobuf:"bytes,2,opt,name=question,proto3" json:"question,omitempty"`
-	ConversationId string                    `protobuf:"bytes,3,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
-	AfterSeq       int64                     `protobuf:"varint,4,opt,name=after_seq,json=afterSeq,proto3" json:"after_seq,omitempty"`
-	Limit          int32                     `protobuf:"varint,5,opt,name=limit,proto3" json:"limit,omitempty"`
-	IncludeSearch  bool                      `protobuf:"varint,6,opt,name=include_search,json=includeSearch,proto3" json:"include_search,omitempty"`
-	IncludeMemory  bool                      `protobuf:"varint,7,opt,name=include_memory,json=includeMemory,proto3" json:"include_memory,omitempty"`
-	MemoryStatuses []v1.EvidenceMemoryStatus `protobuf:"varint,8,rep,packed,name=memory_statuses,json=memoryStatuses,proto3,enum=nexusim.retrieval.v1.EvidenceMemoryStatus" json:"memory_statuses,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	state             protoimpl.MessageState    `protogen:"open.v1"`
+	AuthContext       *v1.AuthContext           `protobuf:"bytes,1,opt,name=auth_context,json=authContext,proto3" json:"auth_context,omitempty"`
+	Question          string                    `protobuf:"bytes,2,opt,name=question,proto3" json:"question,omitempty"`
+	ConversationId    string                    `protobuf:"bytes,3,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
+	AfterSeq          int64                     `protobuf:"varint,4,opt,name=after_seq,json=afterSeq,proto3" json:"after_seq,omitempty"`
+	Limit             int32                     `protobuf:"varint,5,opt,name=limit,proto3" json:"limit,omitempty"`
+	IncludeSearch     bool                      `protobuf:"varint,6,opt,name=include_search,json=includeSearch,proto3" json:"include_search,omitempty"`
+	IncludeMemory     bool                      `protobuf:"varint,7,opt,name=include_memory,json=includeMemory,proto3" json:"include_memory,omitempty"`
+	MemoryStatuses    []v1.EvidenceMemoryStatus `protobuf:"varint,8,rep,packed,name=memory_statuses,json=memoryStatuses,proto3,enum=nexusim.retrieval.v1.EvidenceMemoryStatus" json:"memory_statuses,omitempty"`
+	AtConversationSeq int64                     `protobuf:"varint,9,opt,name=at_conversation_seq,json=atConversationSeq,proto3" json:"at_conversation_seq,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *AnswerQuestionRequest) Reset() {
@@ -169,6 +170,13 @@ func (x *AnswerQuestionRequest) GetMemoryStatuses() []v1.EvidenceMemoryStatus {
 		return x.MemoryStatuses
 	}
 	return nil
+}
+
+func (x *AnswerQuestionRequest) GetAtConversationSeq() int64 {
+	if x != nil {
+		return x.AtConversationSeq
+	}
+	return 0
 }
 
 type Citation struct {
@@ -367,7 +375,7 @@ var File_nexusim_rag_v1_rag_service_proto protoreflect.FileDescriptor
 
 const file_nexusim_rag_v1_rag_service_proto_rawDesc = "" +
 	"\n" +
-	" nexusim/rag/v1/rag_service.proto\x12\x0enexusim.rag.v1\x1a,nexusim/retrieval/v1/retrieval_gateway.proto\"\xf8\x02\n" +
+	" nexusim/rag/v1/rag_service.proto\x12\x0enexusim.rag.v1\x1a,nexusim/retrieval/v1/retrieval_gateway.proto\"\xa8\x03\n" +
 	"\x15AnswerQuestionRequest\x12D\n" +
 	"\fauth_context\x18\x01 \x01(\v2!.nexusim.retrieval.v1.AuthContextR\vauthContext\x12\x1a\n" +
 	"\bquestion\x18\x02 \x01(\tR\bquestion\x12'\n" +
@@ -376,7 +384,8 @@ const file_nexusim_rag_v1_rag_service_proto_rawDesc = "" +
 	"\x05limit\x18\x05 \x01(\x05R\x05limit\x12%\n" +
 	"\x0einclude_search\x18\x06 \x01(\bR\rincludeSearch\x12%\n" +
 	"\x0einclude_memory\x18\a \x01(\bR\rincludeMemory\x12S\n" +
-	"\x0fmemory_statuses\x18\b \x03(\x0e2*.nexusim.retrieval.v1.EvidenceMemoryStatusR\x0ememoryStatuses\"\xbe\x02\n" +
+	"\x0fmemory_statuses\x18\b \x03(\x0e2*.nexusim.retrieval.v1.EvidenceMemoryStatusR\x0ememoryStatuses\x12.\n" +
+	"\x13at_conversation_seq\x18\t \x01(\x03R\x11atConversationSeq\"\xbe\x02\n" +
 	"\bCitation\x12\x1f\n" +
 	"\vevidence_id\x18\x01 \x01(\tR\n" +
 	"evidenceId\x12I\n" +

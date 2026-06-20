@@ -34,3 +34,4 @@ services:
       - ./prometheus-ai-eval-service-alerts.yml:/etc/prometheus/rules/ai-eval-service.yml:ro
       - ./prometheus-media-service-alerts.yml:/etc/prometheus/rules/media-service.yml:ro
       - ./prometheus-notification-service-alerts.yml:/etc/prometheus/rules/notification-service.yml:ro
+      - ./prometheus-audit-service-alerts.yml:/etc/prometheus/rules/audit-service.yml:ro

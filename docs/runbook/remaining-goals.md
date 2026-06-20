@@ -63,15 +63,14 @@ Foundation backlog 锚点：`search-service`、`memory-service`、`retrieval-gat
   transcode provider 和更完整 download policy。
 - `notification-service`：后续仍需 SMTP / SMS / APNs / FCM adapter、bounce /
   suppression worker、provider redrive / audit 产品化。
+- `audit-service`：后续仍需 Kafka ingestion、export worker、SIEM forwarding、
+  retention cleanup、segment sealing 和 provider-grade audit export。
 
 ## 后置平台 / 产品化服务
 
 这些服务仍登记为 `future`。除已完成 stage-switch 的服务在下一实现切片中与
 registry / proto / migration 同步切换外，不得提前创建 `services/<name>` 目录：
 
-- `audit-service`：SDD v0.1 stage-switch 已通过，下一实现切片需同步切换
-  service-registry / proto / migration / runtime / observability，并先落
-  `AppendAuditRecord` / `QueryAuditRecords` / `VerifyAuditProof`。
 - `admin-service`：租户、封禁、配置、repair 审批、运维操作。
 - `control-plane-service`：配置中心、功能开关、灰度、quota、applied ACK。
 - `presence-service`：在线状态、输入中、最后在线、设备在线。

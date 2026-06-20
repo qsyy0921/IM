@@ -368,6 +368,22 @@ services:
       nexusim-services:
         ipv4_address: 172.30.80.31
 
+  audit-service-grpc:
+    image: nexusim/audit-service:local
+    container_name: nexusim-audit-service-grpc
+    environment:
+      NEXUSIM_AUDIT_SERVICE_MODE: grpc
+      NEXUSIM_AUDIT_GRPC_ADDR: 172.30.80.32:10700
+      NEXUSIM_AUDIT_DEBUG_ADDR: 172.30.80.32:11929
+      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@host.docker.internal:5432/nexusim?sslmode=disable
+    ports:
+      - "10700:10700"
+      - "11929:11929"
+    restart: unless-stopped
+    networks:
+      nexusim-services:
+        ipv4_address: 172.30.80.32
+
   push-gateway-ws:
     image: nexusim/push-gateway:local
     container_name: nexusim-push-gateway-ws

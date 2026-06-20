@@ -43,14 +43,14 @@ model-gateway / workflow / knowledge-ingestion / vector-index
   和 mock processing worker smoke。
 - `notification-service` 已 product-active，完成 skeleton、outbox relay、
   delivery worker、noop provider、webhook provider 和相关 smoke。
-- `audit-service` SDD v0.1 stage-switch 已通过，记录见
-  `docs/runbook/stage-switch/audit-service.md`。
+- `audit-service` 已切到 product-active，第一实现切片已落
+  `AppendAuditRecord` / `QueryAuditRecords` / `VerifyAuditProof`、
+  proto / migration / runtime / observability。
 
 ## 下一步
 
-- 默认进入 `audit-service` 第一实现切片：registry / proto / migration /
-  runtime / observability 同步切换，先落 `AppendAuditRecord` /
-  `QueryAuditRecords` / `VerifyAuditProof`。
+- 默认完成 `audit-service` focused gates 和最小 smoke 归档；通过后进入
+  `admin-service` 或 `control-plane-service` stage-switch。
 - 也可以继续 notification SMTP / SMS / APNs / FCM adapter 或 bounce-suppression。
 
 ## 硬边界

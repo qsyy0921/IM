@@ -177,7 +177,11 @@
     },
     {
       "name": "audit-service",
-      "stage": "future"
+      "stage": "product-active",
+      "local_process": "audit-service-grpc",
+      "debug_port": 11929,
+      "prometheus_rule_file": "prometheus-audit-service-alerts.yml",
+      "grafana_dashboard": "audit-service-observability.json"
     },
     {
       "name": "admin-service",

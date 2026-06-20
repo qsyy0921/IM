@@ -1,0 +1,20 @@
+groups:
+  - name: nexusim-audit-service
+    rules:
+      - alert: NexusIMAuditServiceDown
+        expr: up{service="audit-service"} == 0
+        for: 2m
+        labels:
+          severity: warning
+          service: audit-service
+        annotations:
+          summary: "audit-service metrics endpoint is down"
+
+      - alert: NexusIMAuditServiceInfoMissing
+        expr: absent(nexusim_audit_service_info)
+        for: 2m
+        labels:
+          severity: warning
+          service: audit-service
+        annotations:
+          summary: "audit-service info metric is missing"

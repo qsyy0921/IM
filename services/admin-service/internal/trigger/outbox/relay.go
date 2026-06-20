@@ -215,6 +215,14 @@ func BuildAdminEvent(message types.OutboxMessage) (*admineventsv1.AdminEvent, er
 		event.Payload = &admineventsv1.AdminEvent_OperationRejected{
 			OperationRejected: adminOperationRejected(payload),
 		}
+	case types.AdminEventOperationExecuted:
+		event.Payload = &admineventsv1.AdminEvent_OperationExecuted{
+			OperationExecuted: adminOperationExecuted(payload),
+		}
+	case types.AdminEventOperationFailed:
+		event.Payload = &admineventsv1.AdminEvent_OperationFailed{
+			OperationFailed: adminOperationFailed(payload),
+		}
 	default:
 		return nil, errors.New("unsupported admin outbox event type")
 	}
@@ -232,6 +240,11 @@ type adminPayload struct {
 	ApprovedByHash       string `json:"approved_by_hash"`
 	ApprovalID           string `json:"approval_id"`
 	Decision             string `json:"decision"`
+	ResultID             string `json:"result_id"`
+	DownstreamService    string `json:"downstream_service"`
+	DownstreamRequestRef string `json:"downstream_request_ref"`
+	FailureClass         string `json:"failure_class"`
+	PublicError          string `json:"public_error"`
 	PayloadSchemaVersion string `json:"payload_schema_version"`
 	PayloadHash          string `json:"payload_hash"`
 	ReasonRef            string `json:"reason_ref"`
@@ -270,6 +283,18 @@ func validateAdminPayloadForEvent(eventType string, payload adminPayload) error 
 	case types.AdminEventOperationApproved, types.AdminEventOperationRejected:
 		if payload.ApprovedByHash == "" || payload.ApprovalID == "" || payload.Decision == "" {
 			return errors.New("admin operation approval payload is incomplete")
+		}
+	case types.AdminEventOperationExecuted:
+		if payload.ApprovedByHash == "" || payload.ResultID == "" || payload.DownstreamService == "" {
+			return errors.New("admin operation executed payload is incomplete")
+		}
+	case types.AdminEventOperationFailed:
+		if payload.ApprovedByHash == "" ||
+			payload.ResultID == "" ||
+			payload.DownstreamService == "" ||
+			payload.FailureClass == "" ||
+			payload.PublicError == "" {
+			return errors.New("admin operation failed payload is incomplete")
 		}
 	}
 	return nil
@@ -347,6 +372,42 @@ func adminOperationRejected(payload adminPayload) *admineventsv1.AdminOperationR
 		ApprovalId:      payload.ApprovalID,
 		Decision:        payload.Decision,
 		PayloadHash:     payload.PayloadHash,
+	}
+}
+
+func adminOperationExecuted(payload adminPayload) *admineventsv1.AdminOperationExecutedV1 {
+	return &admineventsv1.AdminOperationExecutedV1{
+		TenantId:             payload.TenantID,
+		OperationId:          payload.OperationID,
+		OperationType:        payload.OperationType,
+		TargetRefHash:        payload.TargetRefHash,
+		RiskLevel:            payload.RiskLevel,
+		Status:               payload.Status,
+		RequestedByHash:      payload.RequestedByHash,
+		ApprovedByHash:       payload.ApprovedByHash,
+		ResultId:             payload.ResultID,
+		DownstreamService:    payload.DownstreamService,
+		DownstreamRequestRef: payload.DownstreamRequestRef,
+		PayloadHash:          payload.PayloadHash,
+	}
+}
+
+func adminOperationFailed(payload adminPayload) *admineventsv1.AdminOperationFailedV1 {
+	return &admineventsv1.AdminOperationFailedV1{
+		TenantId:             payload.TenantID,
+		OperationId:          payload.OperationID,
+		OperationType:        payload.OperationType,
+		TargetRefHash:        payload.TargetRefHash,
+		RiskLevel:            payload.RiskLevel,
+		Status:               payload.Status,
+		RequestedByHash:      payload.RequestedByHash,
+		ApprovedByHash:       payload.ApprovedByHash,
+		ResultId:             payload.ResultID,
+		DownstreamService:    payload.DownstreamService,
+		DownstreamRequestRef: payload.DownstreamRequestRef,
+		FailureClass:         payload.FailureClass,
+		PublicError:          payload.PublicError,
+		PayloadHash:          payload.PayloadHash,
 	}
 }
 

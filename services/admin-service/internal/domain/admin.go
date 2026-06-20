@@ -82,6 +82,57 @@ type PreparedApproval struct {
 	CreatedAt   time.Time
 }
 
+func PrepareOperationResult(
+	operation types.AdminOperation,
+	result types.OperationExecutionResult,
+	resultID string,
+	now time.Time,
+) (types.AdminOperationResult, error) {
+	if operation.TenantID == "" || strings.TrimSpace(operation.OperationID) == "" {
+		return types.AdminOperationResult{}, types.NewInvalidArgument("operation is required")
+	}
+	if operation.Status != types.OperationStatusExecuting {
+		return types.AdminOperationResult{}, types.NewFailedPrecondition("operation is not executing")
+	}
+	if strings.TrimSpace(resultID) == "" {
+		return types.AdminOperationResult{}, types.NewInvalidArgument("result id is required")
+	}
+	result.Status = normalizeUpper(result.Status)
+	result.DownstreamService = strings.TrimSpace(result.DownstreamService)
+	result.DownstreamRequestRef = strings.TrimSpace(result.DownstreamRequestRef)
+	result.FailureClass = normalizeUpper(result.FailureClass)
+	result.PublicError = strings.TrimSpace(result.PublicError)
+	if result.DownstreamService == "" {
+		return types.AdminOperationResult{}, types.NewInvalidArgument("downstream service is required")
+	}
+	if !lowSensitiveText(result.DownstreamService) || !lowSensitiveText(result.DownstreamRequestRef) ||
+		!lowSensitiveText(result.FailureClass) || !lowSensitiveText(result.PublicError) {
+		return types.AdminOperationResult{}, types.NewInvalidArgument("operation result contains sensitive field")
+	}
+	if result.Status != types.OperationStatusSucceeded && result.Status != types.OperationStatusFailed {
+		return types.AdminOperationResult{}, types.NewInvalidArgument("operation result status is unsupported")
+	}
+	if result.Status == types.OperationStatusFailed && (result.FailureClass == "" || result.PublicError == "") {
+		return types.AdminOperationResult{}, types.NewInvalidArgument("failed operation result requires public failure")
+	}
+	if result.Status == types.OperationStatusSucceeded && (result.FailureClass != "" || result.PublicError != "") {
+		return types.AdminOperationResult{}, types.NewInvalidArgument("succeeded operation result cannot include failure fields")
+	}
+	completedAt := now.UTC()
+	return types.AdminOperationResult{
+		TenantID:             operation.TenantID,
+		ResultID:             strings.TrimSpace(resultID),
+		OperationID:          operation.OperationID,
+		DownstreamService:    result.DownstreamService,
+		DownstreamRequestRef: result.DownstreamRequestRef,
+		Status:               result.Status,
+		FailureClass:         result.FailureClass,
+		PublicError:          result.PublicError,
+		CreatedAt:            completedAt,
+		CompletedAt:          completedAt,
+	}, nil
+}
+
 func PrepareCreate(command types.CreateAdminOperationCommand, operationID string, now time.Time) (PreparedOperation, error) {
 	command.OperatorRole = normalizeUpper(command.OperatorRole)
 	command.OperationType = normalizeUpper(command.OperationType)
@@ -342,6 +393,13 @@ func lowSensitiveValue(value any) bool {
 	default:
 		return false
 	}
+}
+
+func lowSensitiveText(value string) bool {
+	if strings.TrimSpace(value) == "" {
+		return true
+	}
+	return lowSensitiveValue(value)
 }
 
 func firstNonEmpty(values ...string) string {

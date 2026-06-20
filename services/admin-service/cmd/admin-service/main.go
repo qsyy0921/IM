@@ -17,8 +17,10 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	admingrpc "github.com/qsyy0921/IM/services/admin-service/internal/api/grpc"
 	"github.com/qsyy0921/IM/services/admin-service/internal/app"
+	executorinfra "github.com/qsyy0921/IM/services/admin-service/internal/infrastructure/executor"
 	kafkainfra "github.com/qsyy0921/IM/services/admin-service/internal/infrastructure/kafka"
 	postgresinfra "github.com/qsyy0921/IM/services/admin-service/internal/infrastructure/postgres"
+	"github.com/qsyy0921/IM/services/admin-service/internal/trigger/operation"
 	"github.com/qsyy0921/IM/services/admin-service/internal/trigger/outbox"
 	"google.golang.org/grpc"
 )
@@ -42,6 +44,8 @@ func run(ctx context.Context) error {
 		return runNoop(ctx)
 	case "grpc":
 		return runGRPC(ctx)
+	case "operation-worker":
+		return runOperationWorker(ctx)
 	case "outbox-relay":
 		return runOutboxRelay(ctx)
 	default:
@@ -118,6 +122,39 @@ func runGRPC(ctx context.Context) error {
 	}
 }
 
+func runOperationWorker(ctx context.Context) error {
+	debugAddr, err := adminDebugAddrFromEnv()
+	if err != nil {
+		return err
+	}
+	stopDebug, err := startDebugServer(ctx, debugAddr)
+	if err != nil {
+		return err
+	}
+	defer stopDebug()
+
+	pool, err := openPGPool(ctx)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	worker := operation.NewWorker(
+		postgresinfra.NewRepository(pool),
+		executorinfra.NewNoopExecutor(envString("NEXUSIM_ADMIN_OPERATION_EXECUTOR_ID", "local-noop")),
+		operation.Config{
+			BatchSize:      envInt("NEXUSIM_ADMIN_OPERATION_BATCH_SIZE", 50),
+			PollInterval:   envDuration("NEXUSIM_ADMIN_OPERATION_POLL_INTERVAL", time.Second),
+			StaleAfter:     envDuration("NEXUSIM_ADMIN_OPERATION_STALE_AFTER", 5*time.Minute),
+			ErrorBackoff:   envDuration("NEXUSIM_ADMIN_OPERATION_ERROR_BACKOFF", time.Second),
+			ResultIDPrefix: envString("NEXUSIM_ADMIN_OPERATION_RESULT_ID_PREFIX", "admres_"),
+			Logf:           log.Printf,
+		},
+	)
+	log.Println("admin-service operation worker started with local executor")
+	return worker.Run(ctx)
+}
+
 func runOutboxRelay(ctx context.Context) error {
 	debugAddr, err := adminDebugAddrFromEnv()
 	if err != nil {
@@ -176,7 +213,7 @@ func adminModeFromEnv() string {
 
 func validateAdminMode(mode string) error {
 	switch mode {
-	case "noop", "grpc", "outbox-relay":
+	case "noop", "grpc", "operation-worker", "outbox-relay":
 		return nil
 	default:
 		return fmt.Errorf("unsupported NEXUSIM_ADMIN_SERVICE_MODE %q", mode)

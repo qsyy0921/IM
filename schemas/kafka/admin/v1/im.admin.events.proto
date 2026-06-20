@@ -30,6 +30,8 @@ message AdminEvent {
     AdminOperationSubmittedV1 operation_submitted = 20;
     AdminOperationApprovedV1 operation_approved = 21;
     AdminOperationRejectedV1 operation_rejected = 22;
+    AdminOperationExecutedV1 operation_executed = 23;
+    AdminOperationFailedV1 operation_failed = 24;
   }
 }
 
@@ -72,4 +74,36 @@ message AdminOperationRejectedV1 {
   string approval_id = 9;
   string decision = 10;
   string payload_hash = 11;
+}
+
+message AdminOperationExecutedV1 {
+  string tenant_id = 1;
+  string operation_id = 2;
+  string operation_type = 3;
+  string target_ref_hash = 4;
+  string risk_level = 5;
+  string status = 6;
+  string requested_by_hash = 7;
+  string approved_by_hash = 8;
+  string result_id = 9;
+  string downstream_service = 10;
+  string downstream_request_ref = 11;
+  string payload_hash = 12;
+}
+
+message AdminOperationFailedV1 {
+  string tenant_id = 1;
+  string operation_id = 2;
+  string operation_type = 3;
+  string target_ref_hash = 4;
+  string risk_level = 5;
+  string status = 6;
+  string requested_by_hash = 7;
+  string approved_by_hash = 8;
+  string result_id = 9;
+  string downstream_service = 10;
+  string downstream_request_ref = 11;
+  string failure_class = 12;
+  string public_error = 13;
+  string payload_hash = 14;
 }

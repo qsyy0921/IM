@@ -176,6 +176,18 @@ services:
       - nexusim-services
       - nexusim-local
 
+  admin-service-operation-worker:
+    image: nexusim/admin-service:local
+    container_name: nexusim-admin-service-operation-worker
+    environment:
+      NEXUSIM_ADMIN_SERVICE_MODE: operation-worker
+      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@host.docker.internal:5432/nexusim?sslmode=disable
+      NEXUSIM_ADMIN_OPERATION_EXECUTOR_ID: local-noop
+    restart: unless-stopped
+    networks:
+      - nexusim-services
+      - nexusim-local
+
   search-service-timeline-consumer:
     image: nexusim/search-service:local
     container_name: nexusim-search-service-timeline-consumer

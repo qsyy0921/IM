@@ -46,6 +46,36 @@ func TestBuildAdminEventApproved(t *testing.T) {
 	}
 }
 
+func TestBuildAdminEventExecutedAndFailed(t *testing.T) {
+	executedEvent, err := BuildAdminEvent(adminOutboxMessage(types.AdminEventOperationExecuted, executedPayload()))
+	if err != nil {
+		t.Fatalf("build executed event: %v", err)
+	}
+	executed := executedEvent.GetOperationExecuted()
+	if executed == nil ||
+		executed.ResultId != "admres-1" ||
+		executed.DownstreamService != "local-noop" ||
+		executed.DownstreamRequestRef != "operation:admop-1" {
+		t.Fatalf("unexpected executed event: %+v", executedEvent)
+	}
+
+	failedPayload := executedPayload()
+	failedPayload["status"] = types.OperationStatusFailed
+	failedPayload["failure_class"] = "EXECUTOR_UNAVAILABLE"
+	failedPayload["public_error"] = "admin operation execution failed"
+	failedEvent, err := BuildAdminEvent(adminOutboxMessage(types.AdminEventOperationFailed, failedPayload))
+	if err != nil {
+		t.Fatalf("build failed event: %v", err)
+	}
+	failed := failedEvent.GetOperationFailed()
+	if failed == nil ||
+		failed.ResultId != "admres-1" ||
+		failed.FailureClass != "EXECUTOR_UNAVAILABLE" ||
+		failed.PublicError != "admin operation execution failed" {
+		t.Fatalf("unexpected failed event: %+v", failedEvent)
+	}
+}
+
 func TestBuildAdminEventRejectsSensitivePayloadFields(t *testing.T) {
 	for _, field := range []string{"payload_json", "operation_payload_json", "operator_ref", "token", "secret", "provider_body"} {
 		payload := submittedPayload()
@@ -163,5 +193,14 @@ func approvedPayload(decision string) map[string]any {
 	payload["approved_by_hash"] = "sha256:approver"
 	payload["approval_id"] = "admappr-1"
 	payload["decision"] = decision
+	return payload
+}
+
+func executedPayload() map[string]any {
+	payload := approvedPayload(types.DecisionApprove)
+	payload["status"] = types.OperationStatusSucceeded
+	payload["result_id"] = "admres-1"
+	payload["downstream_service"] = "local-noop"
+	payload["downstream_request_ref"] = "operation:admop-1"
 	return payload
 }

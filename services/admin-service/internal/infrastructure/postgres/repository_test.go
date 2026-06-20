@@ -87,6 +87,60 @@ func TestRepositoryAdminFirstPathIntegration(t *testing.T) {
 	assertAdminOutboxLowSensitive(t, ctx, pool)
 }
 
+func TestRepositoryAdminOperationExecutionIntegration(t *testing.T) {
+	ctx := context.Background()
+	pool := openAdminTestPool(t)
+	resetAdminTables(t, ctx, pool)
+	repository := NewRepository(pool)
+
+	prepared := prepareAdminOperation(t, "admin-exec-create-idem-1", "admop_exec_test_1", types.RiskLevelMedium)
+	operation, _, err := repository.CreateAdminOperation(ctx, prepared)
+	if err != nil {
+		t.Fatalf("create admin operation: %v", err)
+	}
+	approval := prepareApproval(t, operation.OperationID, "admin-exec-approve-idem-1", "admappr_exec_test_1", "admin:executor-approver", types.DecisionApprove)
+	if _, _, _, err := repository.ApproveAdminOperation(ctx, approval); err != nil {
+		t.Fatalf("approve admin operation: %v", err)
+	}
+
+	claimed, err := repository.ClaimApprovedOperations(ctx, 10, time.Minute)
+	if err != nil {
+		t.Fatalf("claim approved operations: %v", err)
+	}
+	if len(claimed) != 1 || claimed[0].Status != types.OperationStatusExecuting {
+		t.Fatalf("unexpected claimed operations: %+v", claimed)
+	}
+	completed, err := repository.CompleteAdminOperation(ctx, claimed[0], types.OperationExecutionResult{
+		DownstreamService:    "local-noop",
+		DownstreamRequestRef: "operation:" + claimed[0].OperationID,
+		Status:               types.OperationStatusSucceeded,
+	}, "admres_exec_test_1")
+	if err != nil {
+		t.Fatalf("complete admin operation: %v", err)
+	}
+	if completed.Status != types.OperationStatusSucceeded {
+		t.Fatalf("unexpected completed operation: %+v", completed)
+	}
+
+	var resultStatus string
+	var downstreamService string
+	if err := pool.QueryRow(ctx, `
+SELECT status, downstream_service
+FROM admin_operation_results
+WHERE tenant_id = $1 AND result_id = $2
+`, string(completed.TenantID), "admres_exec_test_1").Scan(&resultStatus, &downstreamService); err != nil {
+		t.Fatalf("query admin result: %v", err)
+	}
+	if resultStatus != types.OperationStatusSucceeded || downstreamService != "local-noop" {
+		t.Fatalf("unexpected result status=%s downstream=%s", resultStatus, downstreamService)
+	}
+	assertAdminOutboxEventLowSensitive(t, ctx, pool, types.AdminEventOperationExecuted, []string{
+		`"result_id"`,
+		`"downstream_service"`,
+		`"downstream_request_ref"`,
+	})
+}
+
 func prepareAdminOperation(t *testing.T, idempotencyKey string, operationID string, risk string) domain.PreparedOperation {
 	t.Helper()
 	prepared, err := domain.PrepareCreate(types.CreateAdminOperationCommand{
@@ -217,5 +271,38 @@ func assertAdminOutboxLowSensitive(t *testing.T, ctx context.Context, pool *pgxp
 	}
 	if count != 2 {
 		t.Fatalf("expected two admin outbox rows, got %d", count)
+	}
+}
+
+func assertAdminOutboxEventLowSensitive(t *testing.T, ctx context.Context, pool *pgxpool.Pool, eventType string, requiredFields []string) {
+	t.Helper()
+	var payload string
+	if err := pool.QueryRow(ctx, `
+SELECT payload_json::text
+FROM admin_outbox
+WHERE tenant_id = 'tenant-admin-test' AND event_type = $1
+`, eventType).Scan(&payload); err != nil {
+		t.Fatalf("query admin outbox event %s: %v", eventType, err)
+	}
+	for _, field := range requiredFields {
+		if !strings.Contains(payload, field) {
+			t.Fatalf("admin outbox event %s missing %s: %s", eventType, field, payload)
+		}
+	}
+	for _, forbidden := range []string{
+		`"target_user_ref"`,
+		`"operation_payload_json"`,
+		"password",
+		"token",
+		"secret",
+		"provider body",
+		"raw prompt",
+		"message body",
+		"admin:requester",
+		"admin:executor-approver",
+	} {
+		if strings.Contains(payload, forbidden) {
+			t.Fatalf("admin outbox event %s leaked forbidden value %q: %s", eventType, forbidden, payload)
+		}
 	}
 }

@@ -3,13 +3,13 @@ package main
 import "testing"
 
 func TestValidateAdminMode(t *testing.T) {
-	for _, mode := range []string{"noop", "grpc", "outbox-relay"} {
+	for _, mode := range []string{"noop", "grpc", "operation-worker", "outbox-relay"} {
 		if err := validateAdminMode(mode); err != nil {
 			t.Fatalf("mode %s: %v", mode, err)
 		}
 	}
-	if err := validateAdminMode("operation-worker"); err == nil {
-		t.Fatal("expected unsupported mode to fail until worker slice is implemented")
+	if err := validateAdminMode("future-worker"); err == nil {
+		t.Fatal("expected unsupported mode to fail")
 	}
 }
 

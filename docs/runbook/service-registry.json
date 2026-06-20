@@ -336,6 +336,12 @@
       "service": "admin-service",
       "env": "NEXUSIM_ADMIN_SERVICE_MODE",
       "value": "outbox-relay"
+    },
+    {
+      "name": "admin-service-operation-worker",
+      "service": "admin-service",
+      "env": "NEXUSIM_ADMIN_SERVICE_MODE",
+      "value": "operation-worker"
     }
   ]
 }

@@ -182,7 +182,8 @@ policy precheck
 | `admin.operation.canceled.v1` | `im.admin.events` | `tenant_id:operation_id` | 已取消 |
 
 事件 payload 只包含 operation id、operation type、target ref hash、risk level、
-status、operator ref、approval ref、failure_class、correlation/causation refs。禁止输出
+status、operator hash、approval hash / approval id、result id、downstream service、
+downstream request ref、failure_class、public_error、correlation/causation refs。禁止输出
 payload_json 原文、reason 原文、下游 response body 或 secret。
 
 ## 8. 数据库设计

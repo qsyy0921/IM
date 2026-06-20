@@ -77,8 +77,8 @@ Foundation backlog 锚点：`search-service`、`memory-service`、`retrieval-gat
   tombstone / delete proof、outbox relay、vector-index handoff 和真实 connector。
 - `vector-index-service`：后续仍需 embedding worker、rebuild worker、outbox relay、
   Milvus / pgvector / OpenSearch backend 和 vector-index handoff smoke。
-- `admin-service`：后续仍需 operation worker、outbox relay、workflow-service 长审批、
-  audit ingestion / export、operator approval CLI、admin UI 和下游公开 admin API adapter。
+- `admin-service`：后续仍需 workflow-service 长审批、audit ingestion / export、
+  operator approval CLI、admin UI 和下游公开 admin API adapter。
 
 ## 后置平台 / 产品化服务
 

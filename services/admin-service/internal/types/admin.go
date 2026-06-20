@@ -23,6 +23,8 @@ const (
 	AdminEventOperationSubmitted = "admin.operation.submitted.v1"
 	AdminEventOperationApproved  = "admin.operation.approved.v1"
 	AdminEventOperationRejected  = "admin.operation.rejected.v1"
+	AdminEventOperationExecuted  = "admin.operation.executed.v1"
+	AdminEventOperationFailed    = "admin.operation.failed.v1"
 
 	OutboxStatusPending   = "PENDING"
 	OutboxStatusPublished = "PUBLISHED"
@@ -109,6 +111,33 @@ type AdminApproval struct {
 	ReasonRef         string
 	EvidenceRefs      []string
 	CreatedAt         time.Time
+}
+
+type AdminOperationResult struct {
+	TenantID             TenantID
+	ResultID             string
+	OperationID          string
+	DownstreamService    string
+	DownstreamRequestRef string
+	Status               string
+	FailureClass         string
+	PublicError          string
+	CreatedAt            time.Time
+	CompletedAt          time.Time
+}
+
+type OperationExecutionResult struct {
+	DownstreamService    string
+	DownstreamRequestRef string
+	Status               string
+	FailureClass         string
+	PublicError          string
+}
+
+type OperationWorkerStats struct {
+	Claimed   int
+	Succeeded int
+	Failed    int
 }
 
 type OutboxMessage struct {

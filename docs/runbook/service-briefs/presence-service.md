@@ -1,7 +1,7 @@
 # presence-service
 
-状态：future / SDD v0.1 draft pending。当前不得创建 `services/presence-service`
-目录，直到完成 ADR 或 stage switch。
+状态：future / SDD v0.1 draft 已存在。当前不得创建 `services/presence-service`
+目录，直到完成 stage switch。
 
 定位：在线状态服务，负责用户在线、设备在线、输入中、最后在线时间和 presence
 订阅 / 广播。
@@ -15,6 +15,7 @@
 
 第一切片建议：
 
+- 具体边界见 `docs/sdd/presence-service.md`。
 - `UpdatePresence` / `SubscribePresence` / `GetPresence`。
 - 先消费 push-gateway session events 或显式 heartbeat。
 - 支持 privacy / contacts policy 过滤。

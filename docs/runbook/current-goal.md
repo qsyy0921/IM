@@ -46,8 +46,9 @@ vector-index-service
 ## 当前进展
 
 - `docs/sdd/future-platform-services.md` 已冻结组合 promotion 边界。
-- `media-service`、`notification-service`、`audit-service`、`control-plane-service`
-  和 `admin-service` SDD v0.1 draft 已存在；下一步默认推进 `presence-service` SDD v0.1。
+- `media-service`、`notification-service`、`audit-service`、`control-plane-service`、
+  `admin-service` 和 `presence-service` SDD v0.1 draft 已存在；下一步默认推进
+  `model-gateway` SDD v0.1。
 
 ## 硬边界
 

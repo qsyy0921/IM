@@ -23,8 +23,10 @@
 - `loadtest/rag`、`tools/run-ai-eval-rag-adapter.ps1` 和真实本地
   `retrieval-gateway -> rag-service` adapter smoke 已通过
 - `AnswerQuestionRequest.at_conversation_seq` 已透传到 EvidencePack current-memory query。
+- ai-eval 已补 RAG current-memory consumption CI-safe regression：`at_conversation_seq`
+  必须传播，过期和 superseded memory 不得作为 current citation。
 
 下一步：
 
 - 后续 provider 仍走 AnswerProvider port、prompt guard 和 citation verifier。
-- 补 current-memory regression / eval，验证 RAG 不引用 stale memory。
+- 补 current-memory service-stack live smoke，验证真实服务栈不引用 stale memory。

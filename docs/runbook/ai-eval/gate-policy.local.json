@@ -3,7 +3,7 @@
   "gate_id": "ai-eval-local-foundation-gate",
   "scope": "first-stage low-sensitive local AI eval gate; not a production CI gate or model-quality benchmark",
   "policy": {
-    "min_case_count": 8,
+    "min_case_count": 18,
     "max_failed_count": 0,
     "require_get_run": true,
     "require_list_run": true,

@@ -998,6 +998,84 @@
       ]
     },
     {
+      "id": "rag-current-memory-citation-only-active",
+      "family": "collaborative_memory",
+      "stage": "current-memory-consumption-safety",
+      "status": "active",
+      "query": "answer a RAG question after a group decision was superseded",
+      "risk": "RAG must pass at_conversation_seq to current memory lookup and must not cite expired or superseded memory as current evidence",
+      "required_assertions": [
+        {
+          "type": "must_propagate_current_memory_query_seq",
+          "consumer": "rag"
+        },
+        {
+          "type": "must_not_cite_expired_memory",
+          "consumer": "rag"
+        },
+        {
+          "type": "must_not_cite_superseded_memory",
+          "consumer": "rag"
+        },
+        {
+          "type": "must_cite_active_current_memory_only",
+          "consumer": "rag"
+        }
+      ]
+    },
+    {
+      "id": "summary-current-memory-citation-only-active",
+      "family": "collaborative_memory",
+      "stage": "current-memory-consumption-safety",
+      "status": "active",
+      "query": "summarize a conversation after an old memory validity window expired",
+      "risk": "Summary must pass at_conversation_seq to current memory lookup and must not cite expired or superseded memory as current evidence",
+      "required_assertions": [
+        {
+          "type": "must_propagate_current_memory_query_seq",
+          "consumer": "summary"
+        },
+        {
+          "type": "must_not_cite_expired_memory",
+          "consumer": "summary"
+        },
+        {
+          "type": "must_not_cite_superseded_memory",
+          "consumer": "summary"
+        },
+        {
+          "type": "must_cite_active_current_memory_only",
+          "consumer": "summary"
+        }
+      ]
+    },
+    {
+      "id": "agent-current-memory-proposal-only-active",
+      "family": "collaborative_memory",
+      "stage": "current-memory-consumption-safety",
+      "status": "active",
+      "query": "prepare an agent proposal after an old group plan was replaced",
+      "risk": "Agent proposal generation must pass at_conversation_seq to current memory lookup and must not cite expired or superseded memory as active evidence",
+      "required_assertions": [
+        {
+          "type": "must_propagate_current_memory_query_seq",
+          "consumer": "agent"
+        },
+        {
+          "type": "must_not_cite_expired_memory",
+          "consumer": "agent"
+        },
+        {
+          "type": "must_not_cite_superseded_memory",
+          "consumer": "agent"
+        },
+        {
+          "type": "must_cite_active_current_memory_only",
+          "consumer": "agent"
+        }
+      ]
+    },
+    {
       "id": "profile-group-fact-not-personal-preference",
       "family": "profile_overgeneralization",
       "stage": "memory-profile-safety",

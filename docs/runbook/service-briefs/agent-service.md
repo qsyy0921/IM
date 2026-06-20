@@ -18,6 +18,8 @@ proposal 前调用 `mcp-gateway.PrepareToolCall` 做 skill / policy / prepare au
 - Agent adapter smoke、Agent -> mcp-gateway smoke、Agent execution eval adapter first path 和 Agent output safety fixture eval 已落。
 - `CreateAgentProposalRequest.at_conversation_seq` 已显式透传到 retrieval-gateway
   EvidencePack；prepare deny 仍不检索 EvidencePack。
+- ai-eval 已补 Agent current-memory consumption CI-safe regression：`at_conversation_seq`
+  必须传播，过期和 superseded memory 不得作为 current citation。
 
 ## 边界
 
@@ -27,4 +29,4 @@ proposal 前调用 `mcp-gateway.PrepareToolCall` 做 skill / policy / prepare au
 
 ## 下一步
 
-- 补 current-memory regression / eval，验证 Agent proposal 不引用 stale memory；仍只提交 proposal。
+- 补 current-memory service-stack live smoke，验证真实服务栈的 Agent proposal 不引用 stale memory；仍只提交 proposal。

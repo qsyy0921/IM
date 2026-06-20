@@ -39,9 +39,10 @@ provider-grade 运维和完整系统测试暂不作为当前转进阻塞。
    supersedes / contradicts、confidence、PENDING / ACTIVE / SUPERSEDED /
    REJECTED 状态。`QueryMemoryEvents.at_conversation_seq`、runtime checks 和
    retrieval-gateway EvidencePack current-only memory query，以及 RAG /
-   Summary / Agent API 显式透传 `at_conversation_seq` 已落；下一步补
-   current-memory regression / eval，验证 RAG、Summary、Agent 不引用过期或
-   superseded memory，继续保留 source-ref / visibility / review 边界。
+   Summary / Agent API 显式透传 `at_conversation_seq`，以及 RAG / Summary /
+   Agent current-memory consumption CI-safe regression 已落；后续补
+   current-memory service-stack live smoke，并继续深化 memory extraction
+   confidence / review，保留 source-ref / visibility / review 边界。
 
 3. Agent 真实业务动作扩展：
    `agent-service`、`skill-registry`、`mcp-gateway`、`action-executor` 已具备

@@ -39,8 +39,7 @@ group memory -> cross-group/time EvidencePack -> RAG -> summary -> multi-agent
 -> AI evaluation.
 ```
 
-The AI/RAG/Agent line is the main product direction, not future side work; when
-the user says "continue development", move this chain forward by default.
+The AI/RAG/Agent line is the main product direction; when the user says "continue development", move this chain forward by default.
 Production HA drills, long load tests, sizing, and provider-grade operations are
 hardening backlog unless explicitly named or they expose a P0/P1 blocker.
 The existing IM backend and distributed base are treated as a usable foundation;
@@ -73,8 +72,9 @@ safety expanded eval cases plus the local fixture adapter are landed.
 `ai-eval-service` catalog, gate policy, negative/action/memory evals, and
 memory-service runtime `at_conversation_seq` source-ref / validity /
 supersession query checks, retrieval current-only memory query, and RAG /
-Summary / Agent explicit `at_conversation_seq` requests are landed. Next:
-current-memory regression / eval should reject expired or superseded memory.
+Summary / Agent explicit `at_conversation_seq` requests are landed. RAG /
+Summary / Agent current-memory consumption CI-safe regression is also landed.
+Next: current-memory service-stack live smoke, or memory extraction confidence / review eval.
 Search, memory, retrieval, real RAG / summary / Agent adapter smokes, the skill
 catalog foundation, the MCP prepare boundary, and approved proposal preflight
 are passed.

@@ -44,11 +44,14 @@ group memory -> EvidencePack -> RAG -> summary -> multi-agent
   retrieval-gateway EvidencePack -> memory-service current-only query，RAG /
   Summary / Agent API 显式透传 `at_conversation_seq` 到 EvidencePack。既有 eval 报告见
   `docs/runbook/loadtest/ai-eval-service/`。
+- current-memory consumption regression / eval：新增 RAG、Summary、Agent
+  三个低敏 fixture case，验证 `at_conversation_seq` 传播、过期 memory 和
+  superseded memory 不会作为 current citation，被纳入 CI-safe AI eval gate。
 
 下一步默认推进：
 
 ```text
-继续推进 current-memory regression / eval，验证 RAG、Summary、Agent 不引用过期或 superseded memory
+推进 current-memory service-stack live smoke；若本轮不启动服务栈，则继续 memory extraction confidence / review eval
 ```
 
 硬边界：RAG / summary / Agent 只能消费 EvidencePack；真实写动作必须走

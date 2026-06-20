@@ -20,5 +20,8 @@
   memory，且返回项保留 source refs 和 `supersedes_event_ids`
 - `loadtest/memory` 已增加 source-ref、validity window、supersession 的 runtime
   smoke checks；真实进程 smoke 仍按需要手动运行
+- RAG / Summary / Agent current-memory consumption CI-safe regression 已接入
+  ai-eval gate，验证过期和 superseded memory 不应作为 current citation。
 
-下一步：把 retrieval-gateway EvidencePack 接入 memory-service current-only memory query。第一版仍不做 LLM extraction，不把单条群消息直接升级为 ACTIVE profile fact。
+下一步：补 current-memory service-stack live smoke；继续做 memory extraction
+confidence / review eval。第一版仍不做 LLM extraction，不把单条群消息直接升级为 ACTIVE profile fact。

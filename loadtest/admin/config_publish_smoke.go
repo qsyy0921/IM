@@ -139,6 +139,28 @@ func runConfigPublishWorkflow(
 	summary *configPublishSmokeSummary,
 ) error {
 	version := "quota-" + sanitizeRunName(cfg.runName)
+	if cfg.mode == "tenant-quota-smoke" {
+		quota, err := submitAdminOperation(
+			ctx,
+			cfg,
+			adminClient,
+			"TENANT_QUOTA_CHANGE",
+			"admin.tenant_quota_change.v1",
+			tenantQuotaOperationPayload(version),
+			"tenant-quota:"+version,
+		)
+		if err != nil {
+			return err
+		}
+		summary.OperationID = quota.OperationID
+		summary.CreatedStatus = quota.CreatedStatus
+		summary.ApprovedStatus = quota.ApprovedStatus
+		summary.FinalStatus = quota.FinalStatus
+		summary.ReplayedCreate = quota.ReplayedCreate
+		summary.ReplayedApproval = quota.ReplayedApproval
+		summary.PublishedVersion = version
+		return assertConfigSnapshot(ctx, cfg, controlClient, version, summary)
+	}
 	if cfg.mode == "config-rollback-smoke" {
 		version += "-v1"
 	}
@@ -392,6 +414,20 @@ func configRollbackOperationPayload(targetVersion string) string {
 		"config_kind":    "API_GATEWAY_TENANT_QUOTA",
 		"bundle_key":     "api-gateway/default",
 		"target_version": targetVersion,
+	}
+	encoded, _ := json.Marshal(payload)
+	return string(encoded)
+}
+
+func tenantQuotaOperationPayload(version string) string {
+	payload := map[string]any{
+		"environment":          "local",
+		"bundle_key":           "api-gateway/default",
+		"config_version":       version,
+		"tenant_ref":           "tenant-free",
+		"quota_rps":            20,
+		"quota_burst":          40,
+		"effective_at_unix_ms": time.Now().Add(-time.Minute).UTC().UnixMilli(),
 	}
 	encoded, _ := json.Marshal(payload)
 	return string(encoded)

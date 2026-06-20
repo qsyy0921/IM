@@ -72,10 +72,14 @@ model-gateway / workflow / knowledge-ingestion / vector-index
   `CRITICAL` 的 `CONFIG_ROLLBACK` 通过 operation-worker 调
   `control-plane-service.RollbackConfigVersion`，并已跑通本地多进程
   `publish v1 -> publish v2 -> rollback to v1 -> GetConfigSnapshot` smoke。
+- `admin-service` / `control-plane-service` 已新增 tenant quota path：非
+  `CRITICAL` 的 `TENANT_QUOTA_CHANGE` 通过 operation-worker 调
+  `control-plane-service.PublishConfigVersion(API_GATEWAY_TENANT_QUOTA)`，并已跑通
+  本地多进程 `Create -> approve -> tenant quota publish -> GetConfigSnapshot` smoke。
 
 ## 下一步
 
-- 默认继续补更多下游公开 admin API adapter，或为 admin config publish 增加
+- 默认继续补更多下游公开 admin API adapter，或为 admin config / quota 增加
   compensation operator。
 - 也可以继续 `vector-index-service` embedding worker / rebuild worker / outbox relay。
 - 也可以继续 notification SMTP / SMS / APNs / FCM adapter 或 bounce-suppression。

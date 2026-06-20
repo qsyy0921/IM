@@ -134,6 +134,91 @@ func TestControlPlaneConfigPublishExecutorRollsBackConfigVersion(t *testing.T) {
 	}
 }
 
+func TestControlPlaneConfigPublishExecutorChangesTenantQuota(t *testing.T) {
+	client := &fakeControlPlaneClient{
+		response: &controlplanev1.PublishConfigVersionResponse{
+			Version: &controlplanev1.ConfigVersion{Version: "quota-v1.tenant-a"},
+		},
+	}
+	executor := NewControlPlaneConfigPublishExecutor(client, time.Second)
+
+	result, err := executor.Execute(context.Background(), types.AdminOperation{
+		TenantID:      "tenant-admin",
+		OperationID:   "admop_tenant_quota",
+		OperationType: "TENANT_QUOTA_CHANGE",
+		PayloadJSON: `{
+			"environment":"local",
+			"bundle_key":"api-gateway/default",
+			"config_version":"quota-v1.tenant-a",
+			"tenant_ref":"tenant-a",
+			"quota_rps":42,
+			"quota_burst":84,
+			"effective_at_unix_ms":1000
+		}`,
+		ReasonRef:     "reason:quota-ticket-1",
+		RequestedBy:   "admin:operator-1",
+		CorrelationID: "corr-quota",
+		CausationID:   "cause-quota",
+		TraceID:       "trace-quota",
+	})
+	if err != nil {
+		t.Fatalf("execute tenant quota: %v", err)
+	}
+	if result.DownstreamService != "control-plane-service" ||
+		result.DownstreamRequestRef != "tenant-quota:local:api-gateway/default:tenant-a:quota-v1.tenant-a" ||
+		result.Status != types.OperationStatusSucceeded {
+		t.Fatalf("unexpected result: %+v", result)
+	}
+	request := client.request
+	if request.GetConfigKind() != "API_GATEWAY_TENANT_QUOTA" ||
+		request.GetBundleKey() != "api-gateway/default" ||
+		request.GetVersion() != "quota-v1.tenant-a" ||
+		request.GetSchemaVersion() != "quota-v1" ||
+		request.GetPayloadJson() != `{"plans":{"tenant-a":{"burst":84,"requests_per_second":42}}}` ||
+		request.GetEffectiveAtUnixMs() != 1000 ||
+		request.GetIdempotencyKey() != "admin-control-plane-tenant-quota:admop_tenant_quota" ||
+		request.GetApprovalRef() != "admin-operation:admop_tenant_quota" {
+		t.Fatalf("unexpected tenant quota publish request: %+v", request)
+	}
+	if client.rollbackRequest != nil {
+		t.Fatal("tenant quota operation should not call RollbackConfigVersion")
+	}
+}
+
+func TestControlPlaneConfigPublishExecutorRejectsMalformedTenantQuotaPayload(t *testing.T) {
+	client := &fakeControlPlaneClient{}
+	executor := NewControlPlaneConfigPublishExecutor(client, time.Second)
+
+	_, err := executor.Execute(context.Background(), types.AdminOperation{
+		OperationID:   "admop_tenant_quota_bad",
+		OperationType: "TENANT_QUOTA_CHANGE",
+		PayloadJSON:   `{"environment":"local","bundle_key":"api-gateway/default","tenant_ref":"tenant-a","quota_rps":0,"quota_burst":84,"config_version":"quota-v1"}`,
+	})
+	if !errors.Is(err, types.ErrInvalidArgument) {
+		t.Fatalf("expected invalid argument, got %v", err)
+	}
+	if client.request != nil {
+		t.Fatalf("malformed tenant quota payload should not call control-plane")
+	}
+}
+
+func TestControlPlaneConfigPublishExecutorRejectsTenantQuotaWithoutEffectiveAt(t *testing.T) {
+	client := &fakeControlPlaneClient{}
+	executor := NewControlPlaneConfigPublishExecutor(client, time.Second)
+
+	_, err := executor.Execute(context.Background(), types.AdminOperation{
+		OperationID:   "admop_tenant_quota_missing_effective_at",
+		OperationType: "TENANT_QUOTA_CHANGE",
+		PayloadJSON:   `{"environment":"local","bundle_key":"api-gateway/default","tenant_ref":"tenant-a","quota_rps":42,"quota_burst":84,"config_version":"quota-v1"}`,
+	})
+	if !errors.Is(err, types.ErrInvalidArgument) {
+		t.Fatalf("expected invalid argument, got %v", err)
+	}
+	if client.request != nil {
+		t.Fatalf("tenant quota payload without effective_at should not call control-plane")
+	}
+}
+
 func TestControlPlaneConfigPublishExecutorRejectsMalformedRollbackPayload(t *testing.T) {
 	client := &fakeControlPlaneClient{}
 	executor := NewControlPlaneConfigPublishExecutor(client, time.Second)

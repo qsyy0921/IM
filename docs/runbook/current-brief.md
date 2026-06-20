@@ -46,9 +46,11 @@ policy / target service；`loadtest/admin` operator CLI 已支持公开 gRPC cre
 approve / reject / get / list；第一条真实下游 adapter 已支持非 `CRITICAL`
 `CONFIG_PUBLISH -> control-plane-service.PublishConfigVersion`；第二条 control-plane
 adapter 已支持非 `CRITICAL` `CONFIG_ROLLBACK ->
-control-plane-service.RollbackConfigVersion`。
+control-plane-service.RollbackConfigVersion`；第三条 control-plane adapter 已支持非
+`CRITICAL` `TENANT_QUOTA_CHANGE ->
+control-plane-service.PublishConfigVersion(API_GATEWAY_TENANT_QUOTA)`。
 admin `Create -> operator approve -> operation-worker -> control-plane` 本地多进程
-publish / rollback smoke 已通过。下一步默认继续更多下游公开 admin API adapter、
+publish / rollback / tenant quota smoke 已通过。下一步默认继续更多下游公开 admin API adapter、
 admin compensation operator，或继续 vector embedding / rebuild / outbox 后续 worker。
 ```
 

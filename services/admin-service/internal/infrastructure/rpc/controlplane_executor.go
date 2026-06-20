@@ -39,6 +39,18 @@ type configRollbackPayload struct {
 	TargetVersion string `json:"target_version"`
 }
 
+type tenantQuotaChangePayload struct {
+	Environment       string  `json:"environment"`
+	BundleKey         string  `json:"bundle_key"`
+	Version           string  `json:"version"`
+	ConfigVersion     string  `json:"config_version"`
+	TenantRef         string  `json:"tenant_ref"`
+	QuotaRPS          float64 `json:"quota_rps"`
+	QuotaBurst        int64   `json:"quota_burst"`
+	EffectiveAtUnixMS int64   `json:"effective_at_unix_ms"`
+	ExpiresAtUnixMS   int64   `json:"expires_at_unix_ms"`
+}
+
 func NewControlPlaneConfigPublishExecutor(
 	client controlplanev1.ControlPlaneServiceClient,
 	timeout time.Duration,
@@ -75,8 +87,11 @@ func (executor ControlPlaneConfigPublishExecutor) Execute(
 	if executor.client == nil {
 		return types.OperationExecutionResult{}, types.NewUnavailable("control-plane executor is not configured")
 	}
-	if operation.OperationType == "CONFIG_ROLLBACK" {
+	switch operation.OperationType {
+	case "CONFIG_ROLLBACK":
 		return executor.executeRollback(ctx, operation)
+	case "TENANT_QUOTA_CHANGE":
+		return executor.executeTenantQuotaChange(ctx, operation)
 	}
 	payload, err := parseConfigPublishPayload(operation.PayloadJSON)
 	if err != nil {
@@ -124,6 +139,66 @@ func (executor ControlPlaneConfigPublishExecutor) Execute(
 			payload.ConfigKind,
 			payload.BundleKey,
 			payload.Version,
+		),
+		Status: types.OperationStatusSucceeded,
+	}, nil
+}
+
+func (executor ControlPlaneConfigPublishExecutor) executeTenantQuotaChange(
+	ctx context.Context,
+	operation types.AdminOperation,
+) (types.OperationExecutionResult, error) {
+	payload, err := parseTenantQuotaChangePayload(operation.PayloadJSON)
+	if err != nil {
+		return types.OperationExecutionResult{}, err
+	}
+	payloadJSON, err := tenantQuotaPayloadJSON(payload)
+	if err != nil {
+		return types.OperationExecutionResult{}, err
+	}
+	version := firstNonEmpty(payload.Version, payload.ConfigVersion)
+	callCtx, cancel := context.WithTimeout(ctx, executor.timeout)
+	defer cancel()
+	response, err := executor.client.PublishConfigVersion(callCtx, &controlplanev1.PublishConfigVersionRequest{
+		AuthContext: &controlplanev1.AuthContext{
+			TenantId:    string(operation.TenantID),
+			UserId:      operation.RequestedBy,
+			ServiceName: "admin-service",
+			InstanceRef: "operation-worker",
+			TraceId:     operation.TraceID,
+			RequestId:   operation.OperationID,
+		},
+		Environment:       payload.Environment,
+		ConfigKind:        "API_GATEWAY_TENANT_QUOTA",
+		BundleKey:         payload.BundleKey,
+		Version:           version,
+		SchemaVersion:     "quota-v1",
+		PayloadJson:       payloadJSON,
+		EffectiveAtUnixMs: payload.EffectiveAtUnixMS,
+		ExpiresAtUnixMs:   payload.ExpiresAtUnixMS,
+		ApprovalRef:       "admin-operation:" + operation.OperationID,
+		OperatorRef:       operation.RequestedBy,
+		ReasonRef:         operation.ReasonRef,
+		IdempotencyKey:    "admin-control-plane-tenant-quota:" + operation.OperationID,
+		CorrelationId:     operation.CorrelationID,
+		CausationId:       firstNonEmpty(operation.CausationID, operation.OperationID),
+		TraceId:           operation.TraceID,
+	})
+	if err != nil {
+		return types.OperationExecutionResult{}, mapControlPlaneError(err)
+	}
+	published := response.GetVersion()
+	if published == nil || strings.TrimSpace(published.GetVersion()) == "" {
+		return types.OperationExecutionResult{}, types.NewUnavailable("control-plane response is incomplete")
+	}
+	return types.OperationExecutionResult{
+		DownstreamService: "control-plane-service",
+		DownstreamRequestRef: fmt.Sprintf(
+			"tenant-quota:%s:%s:%s:%s",
+			payload.Environment,
+			payload.BundleKey,
+			payload.TenantRef,
+			version,
 		),
 		Status: types.OperationStatusSucceeded,
 	}, nil
@@ -207,6 +282,54 @@ func parseConfigPublishPayload(raw string) (configPublishPayload, error) {
 		return configPublishPayload{}, types.NewInvalidArgument("config publish payload_json is malformed")
 	}
 	return payload, nil
+}
+
+func parseTenantQuotaChangePayload(raw string) (tenantQuotaChangePayload, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return tenantQuotaChangePayload{}, types.NewInvalidArgument("tenant quota payload is required")
+	}
+	var payload tenantQuotaChangePayload
+	if err := json.Unmarshal([]byte(raw), &payload); err != nil {
+		return tenantQuotaChangePayload{}, types.NewInvalidArgument("tenant quota payload is malformed")
+	}
+	payload.Environment = strings.TrimSpace(payload.Environment)
+	payload.BundleKey = strings.TrimSpace(payload.BundleKey)
+	payload.Version = strings.TrimSpace(payload.Version)
+	payload.ConfigVersion = strings.TrimSpace(payload.ConfigVersion)
+	payload.TenantRef = strings.TrimSpace(payload.TenantRef)
+	version := firstNonEmpty(payload.Version, payload.ConfigVersion)
+	if payload.Environment == "" ||
+		payload.BundleKey == "" ||
+		version == "" ||
+		payload.TenantRef == "" {
+		return tenantQuotaChangePayload{}, types.NewInvalidArgument("tenant quota payload is incomplete")
+	}
+	if payload.QuotaRPS <= 0 || payload.QuotaBurst <= 0 {
+		return tenantQuotaChangePayload{}, types.NewInvalidArgument("tenant quota values must be positive")
+	}
+	if payload.EffectiveAtUnixMS <= 0 {
+		return tenantQuotaChangePayload{}, types.NewInvalidArgument("tenant quota effective_at is required")
+	}
+	if payload.ExpiresAtUnixMS > 0 && payload.ExpiresAtUnixMS <= payload.EffectiveAtUnixMS {
+		return tenantQuotaChangePayload{}, types.NewInvalidArgument("tenant quota expires_at must be after effective_at")
+	}
+	return payload, nil
+}
+
+func tenantQuotaPayloadJSON(payload tenantQuotaChangePayload) (string, error) {
+	encoded, err := json.Marshal(map[string]any{
+		"plans": map[string]any{
+			payload.TenantRef: map[string]any{
+				"requests_per_second": payload.QuotaRPS,
+				"burst":               payload.QuotaBurst,
+			},
+		},
+	})
+	if err != nil {
+		return "", types.NewInvalidArgument("tenant quota payload is invalid")
+	}
+	return string(encoded), nil
 }
 
 func parseConfigRollbackPayload(raw string) (configRollbackPayload, error) {

@@ -46,6 +46,7 @@ get
 list
 config-publish-smoke
 config-rollback-smoke
+tenant-quota-smoke
 ```
 
 边界：
@@ -84,4 +85,13 @@ config-rollback-smoke
 - rollback smoke 会连续发布 v1 / v2，再通过 `CONFIG_ROLLBACK` operation 调
   `control-plane-service.RollbackConfigVersion` 回到 v1，并用
   `GetConfigSnapshot` 验证当前 snapshot。
+- tenant quota smoke 可运行：
+
+```powershell
+.\loadtest\admin\run-local-smoke.ps1 -SmokeMode tenant-quota-smoke
+```
+
+- tenant quota smoke 会创建并审批 `TENANT_QUOTA_CHANGE` operation，由
+  operation-worker 调 `control-plane-service.PublishConfigVersion` 发布
+  `API_GATEWAY_TENANT_QUOTA` 配置，并用 `GetConfigSnapshot` 验证当前 snapshot。
 - 仍不替代 admin UI、审批系统或 provider-grade 运维平台。

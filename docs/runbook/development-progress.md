@@ -110,7 +110,9 @@
   approve / reject / get / list；非 `CRITICAL` 的 `CONFIG_PUBLISH` 已可通过
   `NEXUSIM_CONTROL_PLANE_GRPC_ADDR` 调用 control-plane public gRPC；非
   `CRITICAL` 的 `CONFIG_ROLLBACK` 已可通过同一公开 gRPC adapter 回滚
-  control-plane 配置；本地多进程 config publish / rollback smoke 已通过；
+  control-plane 配置；非 `CRITICAL` 的 `TENANT_QUOTA_CHANGE` 已可通过同一公开
+  gRPC adapter 发布 `API_GATEWAY_TENANT_QUOTA` 配置；本地多进程 config publish /
+  rollback / tenant quota smoke 已通过；
   不宣称其它真实下游 mutation、admin UI 或 provider-grade 运维。
 
 当前 Go 侧服务底座、控制面、EvidencePack、proposal / approval / audit、

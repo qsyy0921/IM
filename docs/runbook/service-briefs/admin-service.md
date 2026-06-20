@@ -45,6 +45,10 @@
 - 已新增第二条 control-plane 下游公开 API adapter：非 `CRITICAL` 的
   `CONFIG_ROLLBACK` 在配置 `NEXUSIM_CONTROL_PLANE_GRPC_ADDR` 后由
   operation-worker 调 `control-plane-service.RollbackConfigVersion`。
+- 已新增第三条 control-plane 下游公开 API adapter：非 `CRITICAL` 的
+  `TENANT_QUOTA_CHANGE` 在配置 `NEXUSIM_CONTROL_PLANE_GRPC_ADDR` 后由
+  operation-worker 调 `control-plane-service.PublishConfigVersion` 发布
+  `API_GATEWAY_TENANT_QUOTA` 配置。
 - 已新增并跑通本地多进程 config publish smoke：通过公开 gRPC 执行
   `CreateAdminOperation -> operator approve -> operation-worker ->
   control-plane PublishConfigVersion -> GetConfigSnapshot`，报告见
@@ -52,6 +56,10 @@
 - 已新增并跑通本地多进程 config rollback smoke：通过公开 gRPC 连续发布 v1 / v2，
   再执行 `CONFIG_ROLLBACK -> control-plane RollbackConfigVersion` 回到 v1，报告见
   `docs/runbook/loadtest/admin-service/loadtest-report-20260621-admin-config-rollback-smoke.md`。
+- 已新增并跑通本地多进程 tenant quota smoke：通过公开 gRPC 执行
+  `TENANT_QUOTA_CHANGE -> control-plane PublishConfigVersion(API_GATEWAY_TENANT_QUOTA)`
+  并用 `GetConfigSnapshot` 验证生效版本，报告见
+  `docs/runbook/loadtest/admin-service/loadtest-report-20260621-admin-tenant-quota-smoke.md`。
 
 后续：
 

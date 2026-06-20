@@ -107,7 +107,7 @@ func main() {
 func parseFlags(args []string) config {
 	cfg := config{}
 	flags := flag.NewFlagSet("admin-operator", flag.ExitOnError)
-	flags.StringVar(&cfg.mode, "mode", "approve", "mode: create, approve, reject, get, list, config-publish-smoke, or config-rollback-smoke")
+	flags.StringVar(&cfg.mode, "mode", "approve", "mode: create, approve, reject, get, list, config-publish-smoke, config-rollback-smoke, or tenant-quota-smoke")
 	flags.StringVar(&cfg.target, "target", envOr("NEXUSIM_ADMIN_GRPC_ADDR", "127.0.0.1:10770"), "admin-service gRPC target")
 	flags.DurationVar(&cfg.requestTimeout, "request-timeout", 5*time.Second, "request timeout")
 	flags.StringVar(&cfg.tls.CAFile, "admin-tls-ca-file", os.Getenv("NEXUSIM_ADMIN_TLS_CA_FILE"), "CA PEM for admin-service gRPC TLS")
@@ -139,14 +139,14 @@ func parseFlags(args []string) config {
 	flags.StringVar(&cfg.operationType, "operation-type", "", "list filter operation type")
 	var pageSize int
 	flags.IntVar(&pageSize, "page-size", 20, "list page size")
-	flags.StringVar(&cfg.controlPlaneTarget, "control-plane-target", envOr("NEXUSIM_CONTROL_PLANE_GRPC_ADDR", "127.0.0.1:10710"), "control-plane-service gRPC target for config-publish-smoke")
-	flags.StringVar(&cfg.pgDSN, "pg-dsn", envOr("NEXUSIM_PG_DSN", "postgres://nexusim:nexusim@localhost:5432/nexusim?sslmode=disable"), "PostgreSQL DSN for config-publish-smoke")
-	flags.StringVar(&cfg.resultRoot, "result-root", defaultResultRoot, "external result root for config-publish-smoke")
-	flags.StringVar(&cfg.runName, "run-name", "", "run name for config-publish-smoke")
-	flags.BoolVar(&cfg.applyMigration, "apply-migration", true, "apply admin/control-plane migrations before config-publish-smoke")
-	flags.BoolVar(&cfg.cleanup, "cleanup", true, "cleanup smoke tenant before config-publish-smoke")
-	flags.DurationVar(&cfg.pollTimeout, "poll-timeout", 15*time.Second, "operation polling timeout for config-publish-smoke")
-	flags.DurationVar(&cfg.pollInterval, "poll-interval", 300*time.Millisecond, "operation polling interval for config-publish-smoke")
+	flags.StringVar(&cfg.controlPlaneTarget, "control-plane-target", envOr("NEXUSIM_CONTROL_PLANE_GRPC_ADDR", "127.0.0.1:10710"), "control-plane-service gRPC target for control-plane admin smoke")
+	flags.StringVar(&cfg.pgDSN, "pg-dsn", envOr("NEXUSIM_PG_DSN", "postgres://nexusim:nexusim@localhost:5432/nexusim?sslmode=disable"), "PostgreSQL DSN for control-plane admin smoke")
+	flags.StringVar(&cfg.resultRoot, "result-root", defaultResultRoot, "external result root for control-plane admin smoke")
+	flags.StringVar(&cfg.runName, "run-name", "", "run name for control-plane admin smoke")
+	flags.BoolVar(&cfg.applyMigration, "apply-migration", true, "apply admin/control-plane migrations before control-plane admin smoke")
+	flags.BoolVar(&cfg.cleanup, "cleanup", true, "cleanup smoke tenant before control-plane admin smoke")
+	flags.DurationVar(&cfg.pollTimeout, "poll-timeout", 15*time.Second, "operation polling timeout for control-plane admin smoke")
+	flags.DurationVar(&cfg.pollInterval, "poll-interval", 300*time.Millisecond, "operation polling interval for control-plane admin smoke")
 	_ = flags.Parse(args)
 	cfg.pageSize = int32(pageSize)
 	cfg.mode = strings.ToLower(strings.TrimSpace(cfg.mode))
@@ -173,7 +173,7 @@ func parseFlags(args []string) config {
 	if cfg.idempotencyKey == "" && (cfg.mode == "approve" || cfg.mode == "reject") {
 		cfg.idempotencyKey = cfg.mode + ":" + cfg.operationID + ":" + cfg.approverRef
 	}
-	if cfg.runName == "" && (cfg.mode == "config-publish-smoke" || cfg.mode == "config-rollback-smoke") {
+	if cfg.runName == "" && isControlPlaneAdminSmokeMode(cfg.mode) {
 		cfg.runName = "admin-" + cfg.mode + "-" + time.Now().UTC().Format("20060102-150405")
 	}
 	return cfg
@@ -183,7 +183,7 @@ func run(ctx context.Context, cfg config, out *os.File) error {
 	if err := cfg.validate(); err != nil {
 		return err
 	}
-	if cfg.mode == "config-publish-smoke" || cfg.mode == "config-rollback-smoke" {
+	if isControlPlaneAdminSmokeMode(cfg.mode) {
 		return runConfigPublishSmoke(ctx, cfg, out)
 	}
 	dialOption, err := grpctls.DialOption(cfg.tls, "admin-tls")
@@ -355,7 +355,7 @@ func (cfg config) validate() error {
 		if cfg.pageSize <= 0 {
 			return errors.New("--page-size must be positive")
 		}
-	case "config-publish-smoke", "config-rollback-smoke":
+	case "config-publish-smoke", "config-rollback-smoke", "tenant-quota-smoke":
 		if strings.TrimSpace(cfg.controlPlaneTarget) == "" {
 			return errors.New("--control-plane-target is required")
 		}
@@ -375,9 +375,15 @@ func (cfg config) validate() error {
 			return errors.New("--poll-interval must be positive")
 		}
 	default:
-		return fmt.Errorf("--mode must be create, approve, reject, get, list, config-publish-smoke, or config-rollback-smoke")
+		return fmt.Errorf("--mode must be create, approve, reject, get, list, config-publish-smoke, config-rollback-smoke, or tenant-quota-smoke")
 	}
 	return nil
+}
+
+func isControlPlaneAdminSmokeMode(mode string) bool {
+	return mode == "config-publish-smoke" ||
+		mode == "config-rollback-smoke" ||
+		mode == "tenant-quota-smoke"
 }
 
 func authContext(cfg config) *adminv1.AuthContext {

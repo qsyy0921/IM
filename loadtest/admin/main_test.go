@@ -123,6 +123,23 @@ func TestParseFlagsBuildsConfigRollbackSmokeDefaults(t *testing.T) {
 	}
 }
 
+func TestParseFlagsBuildsTenantQuotaSmokeDefaults(t *testing.T) {
+	cfg := parseFlags([]string{
+		"-mode", "tenant-quota-smoke",
+		"-tenant-id", "tenant-admin-smoke",
+		"-run-name", "admin tenant quota smoke",
+	})
+	if cfg.mode != "tenant-quota-smoke" {
+		t.Fatalf("mode = %q", cfg.mode)
+	}
+	if cfg.runName != "admin tenant quota smoke" {
+		t.Fatalf("run name = %q", cfg.runName)
+	}
+	if err := cfg.validate(); err != nil {
+		t.Fatalf("validate: %v", err)
+	}
+}
+
 func TestConfigPublishOperationPayloadDoesNotExposeSecretFields(t *testing.T) {
 	payload := configPublishOperationPayload("quota-v1")
 	var decoded map[string]any
@@ -156,6 +173,26 @@ func TestConfigRollbackOperationPayloadUsesLowSensitiveTargetVersion(t *testing.
 	}
 	if _, ok := decoded["payload_json"]; ok {
 		t.Fatal("rollback payload should not include payload_json")
+	}
+}
+
+func TestTenantQuotaOperationPayloadUsesLowSensitiveFields(t *testing.T) {
+	payload := tenantQuotaOperationPayload("quota-v1")
+	var decoded map[string]any
+	if err := json.Unmarshal([]byte(payload), &decoded); err != nil {
+		t.Fatalf("payload json: %v", err)
+	}
+	if decoded["config_version"] != "quota-v1" ||
+		decoded["tenant_ref"] != "tenant-free" ||
+		decoded["quota_rps"].(float64) != 20 ||
+		decoded["quota_burst"].(float64) != 40 ||
+		decoded["effective_at_unix_ms"].(float64) <= 0 {
+		t.Fatalf("unexpected payload: %+v", decoded)
+	}
+	for _, forbidden := range []string{"payload_json", "secret", "token", "password"} {
+		if _, ok := decoded[forbidden]; ok {
+			t.Fatalf("tenant quota payload leaked %q", forbidden)
+		}
 	}
 }
 

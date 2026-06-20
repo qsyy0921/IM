@@ -103,6 +103,29 @@ func TestPrepareCreateAcceptsConfigRollbackPayload(t *testing.T) {
 	}
 }
 
+func TestPrepareCreateAcceptsTenantQuotaPayload(t *testing.T) {
+	command := validCreateCommand(`{
+		"environment":"local",
+		"bundle_key":"api-gateway/default",
+		"config_version":"quota-v1",
+		"tenant_ref":"tenant-free",
+		"quota_rps":20,
+		"quota_burst":40,
+		"effective_at_unix_ms":1000
+	}`)
+	command.OperationType = "TENANT_QUOTA_CHANGE"
+	command.PayloadSchemaVersion = "admin.tenant_quota_change.v1"
+
+	prepared, err := PrepareCreate(command, "op_tenant_quota", time.Now())
+	if err != nil {
+		t.Fatalf("prepare create: %v", err)
+	}
+	if !strings.Contains(prepared.PayloadJSON, "quota_rps") ||
+		!strings.Contains(prepared.PayloadJSON, "tenant-free") {
+		t.Fatalf("unexpected payload: %s", prepared.PayloadJSON)
+	}
+}
+
 func validCreateCommand(payload string) types.CreateAdminOperationCommand {
 	return types.CreateAdminOperationCommand{
 		AuthContext:          types.AuthContext{TenantID: "tenant-admin-test", ServiceName: "admin-ui"},

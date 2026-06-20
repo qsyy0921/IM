@@ -134,6 +134,35 @@ function Test-ProfileAgentAssertion {
                 [bool]$Fixture.memory.superseded_current_excluded `
                 -and (-not [bool]$Fixture.memory.old_memory_returned_as_current)
         }
+        "must_keep_low_confidence_memory_pending_review" {
+            return `
+                [double]$Fixture.memory.low_confidence_candidate_confidence -lt [double]$Fixture.memory.min_active_confidence `
+                -and (Get-JsonPropertyString -Object $Fixture.memory -Name "low_confidence_candidate_status") -eq "PENDING" `
+                -and (Get-JsonPropertyString -Object $Fixture.memory -Name "low_confidence_review_state") -eq "NEEDS_REVIEW"
+        }
+        "must_require_review_before_active_memory" {
+            return `
+                [bool]$Fixture.memory.review_required_before_active `
+                -and [bool]$Fixture.memory.low_confidence_active_blocked `
+                -and (Get-JsonPropertyString -Object $Fixture.memory -Name "low_confidence_candidate_status") -ne "ACTIVE"
+        }
+        "must_link_contradictory_memory" {
+            return `
+                [bool]$Fixture.memory.contradiction_link_preserved `
+                -and [int]$Fixture.memory.contradicts_event_count -gt 0 `
+                -and (Get-JsonPropertyString -Object $Fixture.memory -Name "contradicted_memory_status") -eq "ACTIVE"
+        }
+        "must_keep_contradictory_memory_pending_review" {
+            return `
+                [bool]$Fixture.memory.contradictory_active_blocked `
+                -and (Get-JsonPropertyString -Object $Fixture.memory -Name "contradictory_candidate_status") -eq "PENDING" `
+                -and (Get-JsonPropertyString -Object $Fixture.memory -Name "contradictory_review_state") -eq "NEEDS_REVIEW"
+        }
+        "must_not_return_unreviewed_contradiction_as_current" {
+            return `
+                (-not [bool]$Fixture.memory.unreviewed_contradiction_returned_as_current) `
+                -and (Get-JsonPropertyString -Object $Fixture.memory -Name "contradictory_candidate_status") -ne "ACTIVE"
+        }
         "must_propagate_current_memory_query_seq" {
             $consumer = Get-CurrentMemoryConsumerFixture -Fixture $Fixture -Consumer (Get-JsonPropertyString -Object $Assertion -Name "consumer")
             return `
@@ -276,6 +305,19 @@ $fixture = [pscustomobject]@{
         new_memory_status = "ACTIVE"
         superseded_current_excluded = $true
         old_memory_returned_as_current = $false
+        low_confidence_candidate_confidence = 0.52
+        min_active_confidence = 0.80
+        low_confidence_candidate_status = "PENDING"
+        low_confidence_review_state = "NEEDS_REVIEW"
+        review_required_before_active = $true
+        low_confidence_active_blocked = $true
+        contradiction_link_preserved = $true
+        contradicts_event_count = 1
+        contradicted_memory_status = "ACTIVE"
+        contradictory_candidate_status = "PENDING"
+        contradictory_review_state = "NEEDS_REVIEW"
+        contradictory_active_blocked = $true
+        unreviewed_contradiction_returned_as_current = $false
     }
     current_memory_consumers = [pscustomobject]@{
         rag = [pscustomobject]@{

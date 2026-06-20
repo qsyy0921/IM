@@ -22,6 +22,7 @@
   smoke checks；真实进程 smoke 仍按需要手动运行
 - RAG / Summary / Agent current-memory consumption CI-safe regression 已接入
   ai-eval gate，验证过期和 superseded memory 不应作为 current citation。
+- memory extraction confidence / review eval 已接入 ai-eval gate，验证弱信号
+  和 contradiction 候选必须停在 PENDING / NEEDS_REVIEW。
 
-下一步：补 current-memory service-stack live smoke；继续做 memory extraction
-confidence / review eval。第一版仍不做 LLM extraction，不把单条群消息直接升级为 ACTIVE profile fact。
+下一步：补 current-memory service-stack live smoke。第一版仍不做 LLM extraction，不把单条群消息直接升级为 ACTIVE profile fact。

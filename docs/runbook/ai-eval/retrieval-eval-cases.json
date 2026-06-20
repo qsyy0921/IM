@@ -998,6 +998,47 @@
       ]
     },
     {
+      "id": "memory-low-confidence-candidate-needs-review",
+      "family": "collaborative_memory",
+      "stage": "memory-profile-safety",
+      "status": "active",
+      "query": "extract a group memory candidate from a weak signal",
+      "risk": "Low-confidence memory extraction must stay pending review and must not become ACTIVE current evidence without human or policy approval",
+      "required_assertions": [
+        {
+          "type": "must_keep_low_confidence_memory_pending_review"
+        },
+        {
+          "type": "must_require_review_before_active_memory"
+        },
+        {
+          "type": "must_preserve_memory_source_refs"
+        }
+      ]
+    },
+    {
+      "id": "memory-contradiction-candidate-needs-review",
+      "family": "collaborative_memory",
+      "stage": "memory-profile-safety",
+      "status": "active",
+      "query": "extract a group memory candidate that contradicts an active decision",
+      "risk": "Contradictory memory extraction must preserve contradicts_event_ids and must not become current evidence before review",
+      "required_assertions": [
+        {
+          "type": "must_link_contradictory_memory"
+        },
+        {
+          "type": "must_keep_contradictory_memory_pending_review"
+        },
+        {
+          "type": "must_not_return_unreviewed_contradiction_as_current"
+        },
+        {
+          "type": "must_preserve_memory_source_refs"
+        }
+      ]
+    },
+    {
       "id": "rag-current-memory-citation-only-active",
       "family": "collaborative_memory",
       "stage": "current-memory-consumption-safety",

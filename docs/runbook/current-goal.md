@@ -47,11 +47,14 @@ group memory -> EvidencePack -> RAG -> summary -> multi-agent
 - current-memory consumption regression / eval：新增 RAG、Summary、Agent
   三个低敏 fixture case，验证 `at_conversation_seq` 传播、过期 memory 和
   superseded memory 不会作为 current citation，被纳入 CI-safe AI eval gate。
+- memory extraction confidence / review eval：新增低置信候选和 contradiction
+  候选低敏 fixture case，验证弱信号 / 冲突记忆必须保留 source refs、停在
+  PENDING / NEEDS_REVIEW，不能直接成为 current ACTIVE evidence。
 
 下一步默认推进：
 
 ```text
-推进 current-memory service-stack live smoke；若本轮不启动服务栈，则继续 memory extraction confidence / review eval
+推进 current-memory service-stack live smoke
 ```
 
 硬边界：RAG / summary / Agent 只能消费 EvidencePack；真实写动作必须走

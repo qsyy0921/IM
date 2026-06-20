@@ -137,6 +137,8 @@ that superseded memory is excluded from profile sources, that group memory
 preserves source refs, validity windows and supersession current-only behavior,
 that RAG / Summary / Agent current-memory consumers propagate
 `at_conversation_seq` and avoid expired or superseded memory citations, and
+that weak-signal / contradictory memory extraction candidates remain pending
+review instead of becoming ACTIVE evidence, and
 that Agent output rejects raw EvidencePack text, secret-like content, tool-call
 payloads and unapproved business actions. It does not call models, databases or
 business services.
@@ -296,7 +298,8 @@ to 9 cases and added source-ref-required, validity-window and supersession
 current-only checks for collaborative memory. The current-memory consumption
 expansion increased it to 11 cases and added RAG / Summary / Agent checks for
 `at_conversation_seq` propagation plus expired / superseded memory citation
-exclusion.
+exclusion. The memory extraction confidence / review expansion increased it to
+13 cases and added low-confidence plus contradiction candidate review gates.
 The 2026-06-20 service-stack version / hash-only expansion run increased the
 live suite to 17 cases and added RAG / Agent version preservation plus
 action-executor hash-only audit checks.

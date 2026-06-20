@@ -42,8 +42,9 @@ provider-grade 运维和完整系统测试暂不作为当前转进阻塞。
    Summary / Agent API 显式透传 `at_conversation_seq`，以及 RAG / Summary /
    Agent current-memory consumption CI-safe regression、memory extraction
    confidence / review eval，以及 current-memory service-stack live smoke
-   harness / adapter assertion 已落；后续运行真实服务栈 smoke 并归档报告，
-   继续保留 source-ref / visibility / review 边界。
+   harness / adapter assertion 已落并归档；后续优先补 cross-group / temporal
+   collaborative memory eval first pass，继续保留 source-ref / visibility /
+   review 边界。
 
 3. Agent 真实业务动作扩展：
    `agent-service`、`skill-registry`、`mcp-gateway`、`action-executor` 已具备
@@ -96,6 +97,4 @@ provider-grade 运维和完整系统测试暂不作为当前转进阻塞。
 
 ## Sub-Agent 规则
 
-可使用多个 sub-agent 并行推进，但必须按服务、文档集、测试面或只读审查问题
-拆分互不重叠职责。禁止多个 sub-agent 同时修改同一 proto、migration、service
-brief 或架构章节。主 agent 负责集成、检查和关闭 stale sub-agent。
+可使用多个 sub-agent 并行推进，但必须按服务、文档集、测试面或只读审查问题拆分互不重叠职责；禁止同时改同一 proto、migration、service brief 或架构章节。

@@ -36,13 +36,13 @@ supersession PG coverage / smoke checks、retrieval-gateway EvidencePack
 current-only memory query、RAG / Summary / Agent API 显式 at seq 透传、
 RAG / Summary / Agent current-memory consumption CI-safe regression、memory
 extraction confidence / review eval，以及 current-memory service-stack live
-smoke harness / adapter assertions 已落；
+smoke / adapter assertions 已落并归档；
 只保存低敏 run refs / counters / metadata。
 
 当前下一步：
 
 ```text
-运行 current-memory service-stack live smoke 并归档报告
+推进 cross-group / temporal collaborative memory eval first pass
 ```
 
 完整系统测试、生产级 HA、长压和 sizing 继续后置为 hardening backlog。
@@ -54,9 +54,7 @@ smoke harness / adapter assertions 已落；
 
 - RAG / summary / Agent 只能消费权限过滤后的 EvidencePack。
 - 真实写动作必须走 policy、proposal / approval、executor 和 audit。
-- Python AI Worker 只做模型 / 算法 / eval 候选层，Go 负责控制面、状态、
-  审计和持久化。
+- Python AI Worker 只做模型 / 算法 / eval 候选层，Go 负责控制面、状态和审计。
 - 不回滚用户已有修改。
 - 不为了“了解项目”全文读取长历史文档。
 - 新发现的待完成工作写入 `docs/runbook/remaining-goals.md`。
-- 门禁按风险分层：小改跑相关测试 / 文档脚本；跨服务、生成代码、migration、registry、Docker/compose、安全边界或提交推送前才跑完整 `.\tools\check-local.ps1`。

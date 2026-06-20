@@ -50,16 +50,18 @@ group memory -> EvidencePack -> RAG -> summary -> multi-agent
 - memory extraction confidence / review eval：新增低置信候选和 contradiction
   候选低敏 fixture case，验证弱信号 / 冲突记忆必须保留 source refs、停在
   PENDING / NEEDS_REVIEW，不能直接成为 current ACTIVE evidence。
-- current-memory service-stack live smoke harness：`loadtest/rag`、`loadtest/summary`
+- current-memory service-stack live smoke：`loadtest/rag`、`loadtest/summary`
   和 `loadtest/agent` 已在真实服务栈 seed 中加入 expired / superseded 低敏
   decoy memory，并在 summary JSON 中记录 `current_memory_at_seq`、
   `expired_memory_excluded`、`superseded_memory_excluded`；ai-eval catalog 增至
-  64 cases，service-stack adapter 已能断言真实服务栈排除 stale memory。
+  64 cases，service-stack adapter 已断言真实服务栈排除 stale memory。2026-06-20
+  真实本地 live gate 38/38 通过，报告见
+  `docs/runbook/loadtest/ai-eval-service/loadtest-report-20260620-current-memory-service-stack-live.md`。
 
 下一步默认推进：
 
 ```text
-运行 current-memory service-stack live smoke 并归档报告
+推进 cross-group / temporal collaborative memory eval first pass
 ```
 
 硬边界：RAG / summary / Agent 只能消费 EvidencePack；真实写动作必须走
@@ -73,12 +75,3 @@ Python AI Worker 只能做模型 / 算法 / eval 候选层，Go 仍负责控制�
 3. 当前任务涉及哪个服务，再读对应 `service-briefs/<service>.md` 和必要 SDD 章节。
 4. 新发现待办写入 `remaining-goals.md`。
 5. 有意义切片要闭环：代码、测试、文档、focused commit。
-
-## 分层路线
-
-| 层级 | 内容 | 当前状态 |
-| --- | --- | --- |
-| 第一层 | 发消息、会话、投递、在线通知、ACK | 最小闭环已完成 |
-| 第二层 | outbox、Kafka、durable inbox、Redis route、多实例 smoke | 本地 / 双机可运行 |
-| 第三层 | 回执、删除/撤回/编辑、联系人、群管理、鉴权 | 必要收口 |
-| 第四层 | search、memory、retrieval、RAG、summary、Agent、tool/action | 当前主线 |

@@ -74,7 +74,9 @@ memory-service runtime `at_conversation_seq` source-ref / validity /
 supersession query checks, retrieval current-only memory query, RAG /
 Summary / Agent explicit `at_conversation_seq` requests, RAG / Summary / Agent
 current-memory consumption and memory extraction confidence / review CI-safe
-regressions, and current-memory service-stack live smoke harness are landed. Next: run current-memory service-stack live smoke and archive the report.
+regressions, and current-memory service-stack live smoke are landed and archived.
+Next: implement the first cross-group / temporal collaborative memory eval slice
+without widening into broad hardening.
 Search, memory, retrieval, real RAG / summary / Agent adapter smokes, the skill
 catalog foundation, the MCP prepare boundary, and approved proposal preflight
 are passed.
@@ -115,8 +117,7 @@ practical.
 - Do not revert user changes.
 - Do not read another service's private tables from production code.
 - Do not introduce mesh-like synchronous RPC dependencies.
-- Do not create shared packages until at least two real callers need a stable
-  contract.
+- Do not create shared packages until at least two real callers need a stable contract.
 - Keep abstractions local until the second real use case appears.
 - Split production files near 2500 lines; split tests or runners near 3000 lines.
 - Refresh legitimate file-size baseline drift with `tools/update-file-size-hotspot-baseline.ps1`.
@@ -134,7 +135,5 @@ Use tiered gates to avoid wasting time:
 
 1. Small docs or one-package code: run focused tests/scripts only.
 2. One-service changes: run that service tests, build, and relevant smoke.
-3. Cross-service, generated code, migration, registry, Docker/compose, security
-   boundary, or pre-push changes: run `.\tools\check-local.ps1`.
-4. Always end with `git status --short --branch --untracked-files=all`.
-Full gates, long load tests, fault drills and production-readiness checks run only when risk, scope, or the user asks.
+3. Cross-service, generated code, migration, registry, Docker/compose, security boundary, or pre-push changes: run `.\tools\check-local.ps1`.
+4. End with `git status --short --branch --untracked-files=all`; full gates run only when risk, scope, or the user asks.

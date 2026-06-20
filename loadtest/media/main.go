@@ -18,6 +18,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	mediav1 "github.com/qsyy0921/IM/api/proto/nexusim/media/v1"
 	"github.com/qsyy0921/IM/loadtest/internal/grpctls"
+	mediaeventsv1 "github.com/qsyy0921/IM/schemas/kafka/media/v1"
+	kafkago "github.com/segmentio/kafka-go"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
@@ -34,6 +36,10 @@ type config struct {
 	pgDSN          string
 	resultDir      string
 	requestTimeout time.Duration
+	waitTimeout    time.Duration
+	pollInterval   time.Duration
+	kafkaBrokers   []string
+	mediaTopic     string
 	tenantID       string
 	userID         string
 	deviceID       string
@@ -44,39 +50,55 @@ type config struct {
 }
 
 type summary struct {
-	Commit             string        `json:"commit"`
-	CommitFull         string        `json:"commit_full"`
-	GitDirty           bool          `json:"git_dirty"`
-	GitStatusShort     string        `json:"git_status_short,omitempty"`
-	ResultDir          string        `json:"result_dir"`
-	MediaTarget        string        `json:"media_target"`
-	MediaTLSEnabled    bool          `json:"media_tls_enabled"`
-	TenantID           string        `json:"tenant_id"`
-	UserID             string        `json:"user_id"`
-	ConversationID     string        `json:"conversation_id"`
-	MessageID          string        `json:"message_id"`
-	StartedAt          time.Time     `json:"started_at"`
-	FinishedAt         time.Time     `json:"finished_at"`
-	Success            bool          `json:"success"`
-	Error              string        `json:"error,omitempty"`
-	AssetID            string        `json:"asset_id"`
-	UploadSessionID    string        `json:"upload_session_id"`
-	AssetStatus        string        `json:"asset_status"`
-	ScanStatus         string        `json:"scan_status"`
-	ThumbnailStatus    string        `json:"thumbnail_status"`
-	TranscodeStatus    string        `json:"transcode_status"`
-	UploadURLSafe      bool          `json:"upload_url_safe"`
-	DownloadURLSafe    bool          `json:"download_url_safe"`
-	PublicAssetSafe    bool          `json:"public_asset_safe"`
-	Outbox             outboxSummary `json:"outbox"`
-	AccessAuditAllowed int64         `json:"access_audit_allowed"`
+	Commit               string            `json:"commit"`
+	CommitFull           string            `json:"commit_full"`
+	GitDirty             bool              `json:"git_dirty"`
+	GitStatusShort       string            `json:"git_status_short,omitempty"`
+	ResultDir            string            `json:"result_dir"`
+	MediaTarget          string            `json:"media_target"`
+	MediaTLSEnabled      bool              `json:"media_tls_enabled"`
+	KafkaBrokers         []string          `json:"kafka_brokers,omitempty"`
+	MediaTopic           string            `json:"media_topic,omitempty"`
+	TenantID             string            `json:"tenant_id"`
+	UserID               string            `json:"user_id"`
+	ConversationID       string            `json:"conversation_id"`
+	MessageID            string            `json:"message_id"`
+	StartedAt            time.Time         `json:"started_at"`
+	FinishedAt           time.Time         `json:"finished_at"`
+	Success              bool              `json:"success"`
+	Error                string            `json:"error,omitempty"`
+	AssetID              string            `json:"asset_id"`
+	UploadSessionID      string            `json:"upload_session_id"`
+	AssetStatus          string            `json:"asset_status"`
+	ScanStatus           string            `json:"scan_status"`
+	ThumbnailStatus      string            `json:"thumbnail_status"`
+	TranscodeStatus      string            `json:"transcode_status"`
+	UploadURLSafe        bool              `json:"upload_url_safe"`
+	DownloadURLSafe      bool              `json:"download_url_safe"`
+	PublicAssetSafe      bool              `json:"public_asset_safe"`
+	Outbox               outboxSummary     `json:"outbox"`
+	MediaKafkaEventCount int64             `json:"media_kafka_event_count,omitempty"`
+	MediaKafkaEvents     []mediaKafkaEvent `json:"media_kafka_events,omitempty"`
+	AccessAuditAllowed   int64             `json:"access_audit_allowed"`
 }
 
 type outboxSummary struct {
-	Uploaded int64 `json:"uploaded"`
-	Ready    int64 `json:"ready"`
-	Pending  int64 `json:"pending"`
-	DLQ      int64 `json:"dlq"`
+	Total     int64 `json:"total"`
+	Uploaded  int64 `json:"uploaded"`
+	Ready     int64 `json:"ready"`
+	Pending   int64 `json:"pending"`
+	Published int64 `json:"published"`
+	DLQ       int64 `json:"dlq"`
+}
+
+type mediaKafkaEvent struct {
+	EventID          string `json:"event_id"`
+	EventType        string `json:"event_type"`
+	AggregateID      string `json:"aggregate_id"`
+	AggregateVersion int64  `json:"aggregate_version"`
+	PartitionKey     string `json:"partition_key"`
+	PayloadKind      string `json:"payload_kind"`
+	Status           string `json:"status"`
 }
 
 type assetSnapshot struct {
@@ -99,12 +121,17 @@ func parseConfig() config {
 	var cfg config
 	var resultRoot string
 	var runName string
+	var kafkaBrokers string
 	flag.StringVar(&cfg.mediaTarget, "media-target", envOr("NEXUSIM_MEDIA_GRPC_ADDR", "127.0.0.1:10680"), "media-service gRPC target")
 	registerTLSFlags("media-tls", "NEXUSIM_MEDIA_TLS", "media-service", &cfg.mediaTLS)
 	flag.StringVar(&cfg.pgDSN, "pg-dsn", envOr("NEXUSIM_PG_DSN", "postgres://nexusim:nexusim@localhost:5432/nexusim?sslmode=disable"), "PostgreSQL DSN")
 	flag.StringVar(&resultRoot, "result-root", defaultResultRoot, "external result root for raw smoke output")
 	flag.StringVar(&runName, "run-name", "", "run name under result-root")
 	flag.DurationVar(&cfg.requestTimeout, "request-timeout", 3*time.Second, "per request timeout")
+	flag.DurationVar(&cfg.waitTimeout, "wait-timeout", 15*time.Second, "wait timeout for outbox relay and Kafka readback")
+	flag.DurationVar(&cfg.pollInterval, "poll-interval", 200*time.Millisecond, "poll interval for outbox relay and Kafka readback")
+	flag.StringVar(&kafkaBrokers, "kafka-brokers", os.Getenv("NEXUSIM_KAFKA_BROKERS"), "Kafka brokers for optional media event readback")
+	flag.StringVar(&cfg.mediaTopic, "media-events-topic", os.Getenv("NEXUSIM_MEDIA_EVENTS_TOPIC"), "Kafka topic for optional media event readback")
 	flag.StringVar(&cfg.tenantID, "tenant-id", "", "tenant id; defaults to tenant derived from run name")
 	flag.StringVar(&cfg.userID, "user-id", "media-user-1", "requesting user id")
 	flag.StringVar(&cfg.deviceID, "device-id", "media-device-1", "requesting device id")
@@ -130,6 +157,13 @@ func parseConfig() config {
 	if cfg.requestTimeout <= 0 {
 		cfg.requestTimeout = 3 * time.Second
 	}
+	if cfg.waitTimeout <= 0 {
+		cfg.waitTimeout = 15 * time.Second
+	}
+	if cfg.pollInterval <= 0 {
+		cfg.pollInterval = 200 * time.Millisecond
+	}
+	cfg.kafkaBrokers = splitCSV(kafkaBrokers)
 	cfg.resultDir = filepath.Join(resultRoot, runName)
 	return cfg
 }
@@ -159,6 +193,8 @@ func run(cfg config) error {
 		ResultDir:       cfg.resultDir,
 		MediaTarget:     cfg.mediaTarget,
 		MediaTLSEnabled: cfg.mediaTLS.Enabled(),
+		KafkaBrokers:    cfg.kafkaBrokers,
+		MediaTopic:      cfg.mediaTopic,
 		TenantID:        cfg.tenantID,
 		UserID:          cfg.userID,
 		ConversationID:  cfg.conversationID,
@@ -312,13 +348,26 @@ func runSmoke(ctx context.Context, cfg config, pool *pgxpool.Pool, client mediav
 	if snapshot.Status != "READY" || snapshot.ScanStatus != "PASSED" {
 		return fmt.Errorf("unexpected asset state: %+v", snapshot)
 	}
-	outbox, err := readOutboxSummary(ctx, pool, cfg.tenantID, createResponse.GetAssetId(), snapshot.ObjectKey)
+	var outbox outboxSummary
+	if cfg.kafkaEnabled() {
+		outbox, err = waitOutboxPublished(ctx, pool, cfg, createResponse.GetAssetId(), snapshot.ObjectKey, 2)
+	} else {
+		outbox, err = readOutboxSummary(ctx, pool, cfg.tenantID, createResponse.GetAssetId(), snapshot.ObjectKey)
+	}
 	if err != nil {
 		return err
 	}
 	result.Outbox = outbox
 	if outbox.Uploaded != 1 || outbox.Ready != 1 || outbox.DLQ != 0 {
 		return fmt.Errorf("unexpected outbox summary: %+v", outbox)
+	}
+	if cfg.kafkaEnabled() {
+		events, err := readMediaEvents(ctx, cfg, createResponse.GetAssetId(), 2)
+		if err != nil {
+			return err
+		}
+		result.MediaKafkaEvents = events
+		result.MediaKafkaEventCount = int64(len(events))
 	}
 	auditAllowed, err := countAccessAudit(ctx, pool, cfg.tenantID, createResponse.GetAssetId())
 	if err != nil {
@@ -378,6 +427,7 @@ WHERE tenant_id = $1
 		if err := rows.Scan(&eventType, &status, &payload); err != nil {
 			return outboxSummary{}, fmt.Errorf("scan media outbox: %w", err)
 		}
+		summary.Total++
 		if strings.Contains(payload, objectKey) ||
 			strings.Contains(payload, "object_key") ||
 			strings.Contains(payload, "download_url") {
@@ -392,6 +442,8 @@ WHERE tenant_id = $1
 		switch status {
 		case "PENDING":
 			summary.Pending++
+		case "PUBLISHED":
+			summary.Published++
 		case "DLQ":
 			summary.DLQ++
 		}
@@ -400,6 +452,92 @@ WHERE tenant_id = $1
 		return outboxSummary{}, fmt.Errorf("iterate media outbox: %w", err)
 	}
 	return summary, nil
+}
+
+func waitOutboxPublished(ctx context.Context, pool *pgxpool.Pool, cfg config, assetID string, objectKey string, wantPublished int64) (outboxSummary, error) {
+	deadline := time.Now().Add(cfg.waitTimeout)
+	for {
+		summary, err := readOutboxSummary(ctx, pool, cfg.tenantID, assetID, objectKey)
+		if err != nil {
+			return outboxSummary{}, err
+		}
+		if summary.Published >= wantPublished && summary.Pending == 0 && summary.DLQ == 0 {
+			return summary, nil
+		}
+		if time.Now().After(deadline) {
+			return summary, fmt.Errorf("media outbox did not drain: %+v", summary)
+		}
+		time.Sleep(cfg.pollInterval)
+	}
+}
+
+func readMediaEvents(ctx context.Context, cfg config, assetID string, want int) ([]mediaKafkaEvent, error) {
+	if !cfg.kafkaEnabled() {
+		return nil, nil
+	}
+	reader := kafkago.NewReader(kafkago.ReaderConfig{
+		Brokers:   cfg.kafkaBrokers,
+		Topic:     cfg.mediaTopic,
+		Partition: 0,
+		MinBytes:  1,
+		MaxBytes:  10e6,
+	})
+	defer reader.Close()
+	if err := reader.SetOffset(kafkago.FirstOffset); err != nil {
+		return nil, err
+	}
+	deadline := time.Now().Add(cfg.waitTimeout)
+	events := make([]mediaKafkaEvent, 0, want)
+	seen := map[string]bool{}
+	for len(events) < want && time.Now().Before(deadline) {
+		readCtx, cancel := context.WithTimeout(ctx, cfg.pollInterval)
+		message, err := reader.ReadMessage(readCtx)
+		cancel()
+		if err != nil {
+			continue
+		}
+		var event mediaeventsv1.MediaEvent
+		if err := proto.Unmarshal(message.Value, &event); err != nil {
+			continue
+		}
+		if event.GetTenantId() != cfg.tenantID || event.GetAggregateId() != assetID || seen[event.GetEventId()] {
+			continue
+		}
+		if !protoMessageSafe(&event) {
+			return events, fmt.Errorf("media Kafka event leaked internal object key fields: %s", event.GetEventId())
+		}
+		seen[event.GetEventId()] = true
+		events = append(events, summarizeMediaEvent(&event))
+	}
+	if len(events) < want {
+		return events, fmt.Errorf("expected %d media Kafka events, got %d", want, len(events))
+	}
+	return events, nil
+}
+
+func summarizeMediaEvent(event *mediaeventsv1.MediaEvent) mediaKafkaEvent {
+	result := mediaKafkaEvent{
+		EventID:          event.GetEventId(),
+		EventType:        event.GetEventType(),
+		AggregateID:      event.GetAggregateId(),
+		AggregateVersion: event.GetAggregateVersion(),
+		PartitionKey:     event.GetPartitionKey(),
+	}
+	switch payload := event.GetPayload().(type) {
+	case *mediaeventsv1.MediaEvent_AssetUploaded:
+		result.PayloadKind = "asset_uploaded"
+		result.Status = payload.AssetUploaded.GetStatus()
+	case *mediaeventsv1.MediaEvent_AssetReady:
+		result.PayloadKind = "asset_ready"
+		result.Status = payload.AssetReady.GetStatus()
+	case *mediaeventsv1.MediaEvent_AssetDeleted:
+		result.PayloadKind = "asset_deleted"
+		result.Status = payload.AssetDeleted.GetStatus()
+	case *mediaeventsv1.MediaEvent_AssetQuarantined:
+		result.PayloadKind = "asset_quarantined"
+		result.Status = payload.AssetQuarantined.GetStatus()
+	}
+	return result
 }
 
 func countAccessAudit(ctx context.Context, pool *pgxpool.Pool, tenantID string, assetID string) (int64, error) {
@@ -465,7 +603,14 @@ func validateConfig(cfg config) error {
 	if strings.TrimSpace(cfg.tenantID) == "" || strings.TrimSpace(cfg.userID) == "" || strings.TrimSpace(cfg.conversationID) == "" {
 		return errors.New("tenant-id, user-id and conversation-id are required")
 	}
+	if (len(cfg.kafkaBrokers) == 0) != (strings.TrimSpace(cfg.mediaTopic) == "") {
+		return errors.New("kafka-brokers and media-events-topic must be provided together")
+	}
 	return nil
+}
+
+func (cfg config) kafkaEnabled() bool {
+	return len(cfg.kafkaBrokers) > 0 && strings.TrimSpace(cfg.mediaTopic) != ""
 }
 
 func writeSummary(resultDir string, result summary) error {
@@ -561,6 +706,18 @@ func envOr(name string, fallback string) string {
 		return fallback
 	}
 	return value
+}
+
+func splitCSV(value string) []string {
+	parts := strings.Split(value, ",")
+	items := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			items = append(items, part)
+		}
+	}
+	return items
 }
 
 func gitOutput(args ...string) string {

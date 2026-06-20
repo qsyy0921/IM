@@ -3,7 +3,10 @@ param(
     [string]$ResultRoot = "H:\NexusIM\loadtest-results",
     [string]$RunName = "",
     [string]$MediaGrpcAddr = "",
+    [string]$KafkaBrokers = "localhost:9092",
+    [string]$MediaEventsTopic = "",
     [string]$FakeObjectBaseURL = "http://media.local/fake",
+    [switch]$WithOutboxRelay,
     [switch]$SkipBuild
 )
 
@@ -14,7 +17,11 @@ $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\.."))
 Assert-ExternalOutputRoot -Value $ResultRoot -RepositoryRoot $repoRoot -Name "ResultRoot"
 
 if (-not $RunName) {
-    $RunName = "media-service-grpc-smoke-" + (Get-Date -Format "yyyyMMdd-HHmmss")
+    $prefix = if ($WithOutboxRelay) { "media-service-outbox-relay-smoke-" } else { "media-service-grpc-smoke-" }
+    $RunName = $prefix + (Get-Date -Format "yyyyMMdd-HHmmss")
+}
+if ($WithOutboxRelay -and -not $MediaEventsTopic) {
+    $MediaEventsTopic = "im.media.events.$RunName"
 }
 
 $resultDir = Join-Path $ResultRoot $RunName
@@ -36,6 +43,40 @@ function Get-FreeTcpPort {
     } finally {
         $listener.Stop()
     }
+}
+
+function Apply-PostgresMigration {
+    param(
+        [string]$Path,
+        [string]$Name
+    )
+    $resolved = Resolve-Path $Path
+    $containerPath = "/tmp/$Name"
+    docker cp $resolved "nexusim-postgres:$containerPath" | Out-Null
+    docker exec nexusim-postgres psql `
+        -U nexusim `
+        -d nexusim `
+        -v ON_ERROR_STOP=1 `
+        -f $containerPath | Out-Null
+}
+
+function Apply-MediaMigrations {
+    Get-ChildItem -Path (Join-Path $repoRoot "migrations\postgres\media") -Filter "*.sql" |
+        Sort-Object Name |
+        ForEach-Object {
+            Apply-PostgresMigration -Path $_.FullName -Name $_.Name
+        }
+}
+
+function Ensure-KafkaTopic {
+    param([string]$Topic)
+    docker exec nexusim-kafka kafka-topics `
+        --bootstrap-server localhost:9092 `
+        --create `
+        --if-not-exists `
+        --topic $Topic `
+        --partitions 1 `
+        --replication-factor 1 | Out-Null
 }
 
 function Wait-Tcp {
@@ -106,7 +147,11 @@ function Start-NexusProcess {
     $process.BeginOutputReadLine()
     $process.BeginErrorReadLine()
 
-    Wait-Tcp -HostName "127.0.0.1" -Port $Port
+    if ($Port -gt 0) {
+        Wait-Tcp -HostName "127.0.0.1" -Port $Port
+    } else {
+        Start-Sleep -Milliseconds 800
+    }
     return $process
 }
 
@@ -119,6 +164,11 @@ if (-not $MediaGrpcAddr) {
 
 $processes = @()
 try {
+    if ($WithOutboxRelay) {
+        Apply-MediaMigrations
+        Ensure-KafkaTopic -Topic $MediaEventsTopic
+    }
+
     $processes += Start-NexusProcess -Name "media-grpc" -FilePath (Join-Path $repoRoot "bin\media-service.exe") -Port $mediaGrpcPort -Env @{
         NEXUSIM_MEDIA_SERVICE_MODE = "grpc"
         NEXUSIM_MEDIA_GRPC_ADDR = $MediaGrpcAddr
@@ -127,18 +177,43 @@ try {
         NEXUSIM_MEDIA_FAKE_OBJECT_BASE_URL = $FakeObjectBaseURL
     }
 
+    if ($WithOutboxRelay) {
+        $processes += Start-NexusProcess -Name "media-outbox-relay" -FilePath (Join-Path $repoRoot "bin\media-service.exe") -Env @{
+            NEXUSIM_MEDIA_SERVICE_MODE = "outbox-relay"
+            NEXUSIM_PG_DSN = $PgDsn
+            NEXUSIM_KAFKA_BROKERS = $KafkaBrokers
+            NEXUSIM_MEDIA_EVENTS_TOPIC = $MediaEventsTopic
+            NEXUSIM_MEDIA_OUTBOX_BATCH_SIZE = "100"
+            NEXUSIM_MEDIA_OUTBOX_POLL_INTERVAL = "200ms"
+            NEXUSIM_MEDIA_DEBUG_ADDR = ""
+        }
+    }
+
     $runner = Join-Path $repoRoot "bin\media-smoke.exe"
-    & $runner `
-        --pg-dsn $PgDsn `
-        --media-target $MediaGrpcAddr `
-        --result-root $ResultRoot `
-        --run-name $RunName
+    $runnerArgs = @(
+        "--pg-dsn", $PgDsn,
+        "--media-target", $MediaGrpcAddr,
+        "--result-root", $ResultRoot,
+        "--run-name", $RunName
+    )
+    if ($WithOutboxRelay) {
+        $runnerArgs += @(
+            "--kafka-brokers", $KafkaBrokers,
+            "--media-events-topic", $MediaEventsTopic,
+            "--wait-timeout", "20s"
+        )
+    }
+    & $runner @runnerArgs
     if ($LASTEXITCODE -ne 0) {
         throw "media smoke failed with exit code $LASTEXITCODE"
     }
 
     Write-Host "run_name=$RunName"
     Write-Host "media_grpc_addr=$MediaGrpcAddr"
+    if ($WithOutboxRelay) {
+        Write-Host "media_events_topic=$MediaEventsTopic"
+        Write-Host "kafka_brokers=$KafkaBrokers"
+    }
     Write-Host "result_dir=$resultDir"
 } finally {
     foreach ($process in $processes) {

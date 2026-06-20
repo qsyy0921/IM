@@ -1,7 +1,10 @@
 # notification-service
 
-状态：future / SDD v0.1 draft 已存在。当前不得创建
-`services/notification-service` 目录，直到完成 stage switch。
+状态：future / SDD v0.1 draft 已存在 / stage-switch review passed。当前仍不得
+创建 `services/notification-service` 目录，直到 implementation slice 同步更新
+`service-registry.json`。
+
+Stage-switch 记录：`docs/runbook/stage-switch/notification-service.md`。
 
 定位：统一通知服务，负责 email、SMS、APNs / FCM、系统通知、模板、
 bounce handling、provider retry 和通知审计。

@@ -77,7 +77,9 @@ eval 已能支撑算法切片；生产级 HA、长压、sizing 和完整系统�
 
 这些服务仍登记为 `future`，stage switch 前不得创建 `services/<name>` 目录：
 
-- `notification-service`：email、SMS、APNs / FCM、模板、bounce handling。
+- `notification-service`：stage-switch review 已通过；下一步创建第一版 proto /
+  migration / 六层 skeleton / cmd runtime / Docker / observability。email、SMS、
+  APNs / FCM、模板、bounce handling 的 provider-grade 能力后置。
 - `audit-service`：统一审计、导出、hash-chain、Agent 动作审计。
 - `admin-service`：租户、封禁、配置、repair 审批、运维操作。
 - `control-plane-service`：配置中心、功能开关、灰度、quota、applied ACK。

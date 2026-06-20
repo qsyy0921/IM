@@ -66,7 +66,10 @@ vector-index-service
 - `media-service` 第一版 processing worker 已落地，使用本地 mock scanner /
   thumbnail / transcode adapter；真实进程 smoke 已通过，报告见
   `docs/runbook/loadtest/media-service/loadtest-report-20260620-media-processing-worker-smoke.md`。
-- 下一步默认推进 `notification-service` stage switch / implementation。
+- `notification-service` stage-switch review 已通过，记录见
+  `docs/runbook/stage-switch/notification-service.md`。
+- 下一步默认创建 `notification-service` 第一版 proto / migration / 六层 skeleton /
+  cmd runtime / Docker / observability，并同步 `service-registry.json`。
 
 ## 硬边界
 

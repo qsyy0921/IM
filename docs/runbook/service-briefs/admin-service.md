@@ -38,8 +38,12 @@
   worker registry 和本地 compose wiring。
 - 已新增 `loadtest/admin` operator CLI，支持通过公开 gRPC 执行 approve / reject /
   get / list，本地输出低敏 JSON，不读数据库私表。
+- 已新增第一条真实下游公开 API adapter：非 `CRITICAL` 的 `CONFIG_PUBLISH`
+  在配置 `NEXUSIM_CONTROL_PLANE_GRPC_ADDR` 后由 operation-worker 调
+  `control-plane-service.PublishConfigVersion`；未配置时保留本地 first-stage
+  no-op fallback，`CRITICAL` 操作仍走 workflow。
 
 后续：
 
-- audit-service ingestion / export、admin UI、下游公开 admin API adapter，以及
-  `Create -> operator approve -> operation-worker` 真实进程 smoke。
+- audit-service ingestion / export、admin UI、更多下游公开 admin API adapter，以及
+  `Create -> operator approve -> operation-worker -> control-plane` 真实进程 smoke。

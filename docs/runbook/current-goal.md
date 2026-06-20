@@ -61,11 +61,15 @@ model-gateway / workflow / knowledge-ingestion / vector-index
   `REPAIR_REQUEST` / `CRITICAL` 操作 fail-closed，不再被本地 no-op executor 标记成功。
 - `admin-service` 已新增 `loadtest/admin` operator CLI，用公开 gRPC 完成 approve /
   reject / get / list，输出低敏 JSON，不读取私表。
+- `admin-service` 已新增第一条真实下游公开 API adapter：非 `CRITICAL` 的
+  `CONFIG_PUBLISH` 可在配置 `NEXUSIM_CONTROL_PLANE_GRPC_ADDR` 后由
+  operation-worker 调 `control-plane-service.PublishConfigVersion`；critical 操作
+  仍走 workflow。
 
 ## 下一步
 
-- 默认继续 `admin-service` 真实下游公开 admin API adapter，或补
-  `Create -> operator approve -> operation-worker` 真实进程 smoke。
+- 默认继续 `admin-service` 的 `Create -> operator approve -> operation-worker ->
+  control-plane` 真实进程 smoke，或继续补更多下游公开 admin API adapter。
 - 也可以继续 `vector-index-service` embedding worker / rebuild worker / outbox relay。
 - 也可以继续 notification SMTP / SMS / APNs / FCM adapter 或 bounce-suppression。
 

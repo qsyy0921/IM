@@ -74,6 +74,58 @@ func TestRiskRoutingExecutorRejectsCriticalWhenWorkflowMissing(t *testing.T) {
 	}
 }
 
+func TestOperationTypeRoutingExecutorDelegatesMappedOperation(t *testing.T) {
+	fallback := &fakeExecutor{}
+	configPublisher := &fakeExecutor{
+		result: types.OperationExecutionResult{
+			DownstreamService:    "control-plane-service",
+			DownstreamRequestRef: "config:local:quota:api-gateway:v1",
+			Status:               types.OperationStatusSucceeded,
+		},
+	}
+	router := NewOperationTypeRoutingExecutor(fallback, map[string]OperationExecutor{
+		OperationTypeConfigPublish: configPublisher,
+	})
+
+	result, err := router.Execute(context.Background(), types.AdminOperation{
+		OperationID:   "admop_config_publish",
+		OperationType: OperationTypeConfigPublish,
+		RiskLevel:     types.RiskLevelMedium,
+	})
+	if err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if result.DownstreamService != "control-plane-service" {
+		t.Fatalf("unexpected result: %+v", result)
+	}
+	if configPublisher.calls != 1 || fallback.calls != 0 {
+		t.Fatalf("unexpected calls config=%d fallback=%d", configPublisher.calls, fallback.calls)
+	}
+}
+
+func TestOperationTypeRoutingExecutorFallsBackForUnmappedOperation(t *testing.T) {
+	fallback := &fakeExecutor{
+		result: types.OperationExecutionResult{
+			DownstreamService:    "local",
+			DownstreamRequestRef: "operation:admop_user_ban",
+			Status:               types.OperationStatusSucceeded,
+		},
+	}
+	router := NewOperationTypeRoutingExecutor(fallback, nil)
+
+	result, err := router.Execute(context.Background(), types.AdminOperation{
+		OperationID:   "admop_user_ban",
+		OperationType: "USER_BAN",
+		RiskLevel:     types.RiskLevelMedium,
+	})
+	if err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if result.DownstreamService != "local" || fallback.calls != 1 {
+		t.Fatalf("unexpected fallback result=%+v calls=%d", result, fallback.calls)
+	}
+}
+
 func TestNoopExecutorRejectsWorkflowRequiredOperations(t *testing.T) {
 	noop := NewNoopExecutor("local")
 	for _, operation := range []types.AdminOperation{

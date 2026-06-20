@@ -179,6 +179,19 @@ service：`CONFIG_PUBLISH` / `CONFIG_ROLLBACK` / `TENANT_QUOTA_CHANGE` 指向
 指向 `notification-service`。未映射的 `CRITICAL` operation 仍使用
 `admin.workflow.operation.v1` 和 `admin-service` target，等待后续专用 adapter。
 
+第一版真实下游 adapter 先覆盖非 `CRITICAL` 的 `CONFIG_PUBLISH`：
+
+```text
+operation-worker
+-> parse operation_payload_json as admin.config_publish.v1
+-> control-plane-service.PublishConfigVersion
+-> admin result downstream_service=control-plane-service
+```
+
+该 adapter 只在配置 `NEXUSIM_CONTROL_PLANE_GRPC_ADDR` 时启用；未配置时保留
+first-stage local no-op fallback。`CRITICAL` risk 的 `CONFIG_PUBLISH` 仍按上面的
+workflow 路由处理，不在 admin-service 内联执行。
+
 高风险 operation 默认走：
 
 ```text
@@ -368,10 +381,14 @@ NEXUSIM_ADMIN_SERVICE_MODE=cleanup
 ```text
 NEXUSIM_WORKFLOW_GRPC_ADDR=127.0.0.1:10820
 NEXUSIM_ADMIN_WORKFLOW_RPC_TIMEOUT=1s
+NEXUSIM_CONTROL_PLANE_GRPC_ADDR=127.0.0.1:10760
+NEXUSIM_ADMIN_CONTROL_PLANE_RPC_TIMEOUT=1s
 ```
 
 未设置 `NEXUSIM_WORKFLOW_GRPC_ADDR` 时，`REPAIR_REQUEST` / `CRITICAL` operation 会
 fail-closed 并记录失败结果，不会被本地 no-op executor 标记为成功。
+未设置 `NEXUSIM_CONTROL_PLANE_GRPC_ADDR` 时，非 critical `CONFIG_PUBLISH` 仍保持
+第一阶段 local executor fallback；设置后才调用 control-plane public gRPC。
 
 operator：
 

@@ -40,4 +40,8 @@ list
 
 - 可在真实 smoke 中组合 `CreateAdminOperation -> operator approve ->
   operation-worker -> workflow/downstream adapter -> GetAdminOperation`。
+- 第一条真实下游 adapter 是非 critical `CONFIG_PUBLISH`，operation-worker 设置
+  `NEXUSIM_CONTROL_PLANE_GRPC_ADDR` 后会调用
+  `control-plane-service.PublishConfigVersion`；该 smoke 仍应通过公开 gRPC 创建和审批
+  operation，不直接写数据库。
 - 仍不替代 admin UI、审批系统或 provider-grade 运维平台。

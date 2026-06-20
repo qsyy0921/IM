@@ -26,8 +26,23 @@ type RiskRoutingExecutor struct {
 	workflow OperationExecutor
 }
 
+type OperationTypeRoutingExecutor struct {
+	fallback OperationExecutor
+	routes   map[string]OperationExecutor
+}
+
 func NewRiskRoutingExecutor(local OperationExecutor, workflow OperationExecutor) RiskRoutingExecutor {
 	return RiskRoutingExecutor{local: local, workflow: workflow}
+}
+
+func NewOperationTypeRoutingExecutor(fallback OperationExecutor, routes map[string]OperationExecutor) OperationTypeRoutingExecutor {
+	copied := make(map[string]OperationExecutor, len(routes))
+	for operationType, route := range routes {
+		if operationType != "" && route != nil {
+			copied[operationType] = route
+		}
+	}
+	return OperationTypeRoutingExecutor{fallback: fallback, routes: copied}
 }
 
 func (executor RiskRoutingExecutor) Execute(ctx context.Context, operation types.AdminOperation) (types.OperationExecutionResult, error) {
@@ -41,6 +56,16 @@ func (executor RiskRoutingExecutor) Execute(ctx context.Context, operation types
 		return types.OperationExecutionResult{}, types.NewUnavailable("admin local executor is not configured")
 	}
 	return executor.local.Execute(ctx, operation)
+}
+
+func (executor OperationTypeRoutingExecutor) Execute(ctx context.Context, operation types.AdminOperation) (types.OperationExecutionResult, error) {
+	if route := executor.routes[operation.OperationType]; route != nil {
+		return route.Execute(ctx, operation)
+	}
+	if executor.fallback == nil {
+		return types.OperationExecutionResult{}, types.NewUnavailable("admin local executor is not configured")
+	}
+	return executor.fallback.Execute(ctx, operation)
 }
 
 func requiresWorkflow(operation types.AdminOperation) bool {

@@ -140,7 +140,29 @@ func runOperationWorker(ctx context.Context) error {
 	}
 	defer pool.Close()
 
-	localExecutor := executorinfra.NewNoopExecutor(envString("NEXUSIM_ADMIN_OPERATION_EXECUTOR_ID", "local-noop"))
+	localExecutor := executorinfra.OperationExecutor(
+		executorinfra.NewNoopExecutor(envString("NEXUSIM_ADMIN_OPERATION_EXECUTOR_ID", "local-noop")),
+	)
+	controlPlaneAddr := strings.TrimSpace(os.Getenv("NEXUSIM_CONTROL_PLANE_GRPC_ADDR"))
+	if controlPlaneAddr != "" {
+		executor, closeControlPlane, err := rpcinfra.DialControlPlaneConfigPublishExecutor(
+			ctx,
+			controlPlaneAddr,
+			envDuration("NEXUSIM_ADMIN_CONTROL_PLANE_RPC_TIMEOUT", time.Second),
+		)
+		if err != nil {
+			return err
+		}
+		defer func() {
+			if closeErr := closeControlPlane(); closeErr != nil {
+				log.Printf("admin-service control-plane client close failed: %v", closeErr)
+			}
+		}()
+		localExecutor = executorinfra.NewOperationTypeRoutingExecutor(localExecutor, map[string]executorinfra.OperationExecutor{
+			executorinfra.OperationTypeConfigPublish: executor,
+		})
+		log.Printf("admin-service operation worker routing CONFIG_PUBLISH to control-plane-service at %s", controlPlaneAddr)
+	}
 	var workflowExecutor executorinfra.OperationExecutor
 	workflowAddr := strings.TrimSpace(os.Getenv("NEXUSIM_WORKFLOW_GRPC_ADDR"))
 	if workflowAddr != "" {

@@ -22,8 +22,7 @@
 
 ## Future platform / product services
 
-[admin](admin-service.md) / [workflow](workflow-service.md) / [knowledge-ingestion](knowledge-ingestion-service.md) /
-[vector-index](vector-index-service.md)
+[admin](admin-service.md) / [workflow](workflow-service.md) / [knowledge-ingestion](knowledge-ingestion-service.md) / [vector-index](vector-index-service.md)
 
 ## 当前推进规则
 
@@ -35,5 +34,5 @@
 ## 查询规则
 
 - 当前任务入口：`docs/runbook/current-brief.md`；剩余目标：`docs/runbook/remaining-goals.md`。
-- 服务状态读本目录相关 brief；服务设计读对应 `docs/sdd/<service>.md` 相关章节。
+- 服务状态读本目录相关 brief；服务设计读对应 SDD 相关章节。
 - smoke / 压测证据按关键词查 `docs/runbook/loadtest/<service>/`；历史长文档查 archive，不要全文读。

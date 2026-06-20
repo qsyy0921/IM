@@ -42,11 +42,15 @@ model-gateway / workflow / knowledge-ingestion / vector-index
 - `media-service`、`notification-service`、`audit-service`、
   `control-plane-service`、`presence-service`、`model-gateway` 已 product-active
   并通过各自第一版 smoke。
+- `workflow-service` 和 `knowledge-ingestion-service` 已完成 stage-switch
+  review，下一步可以进入对应第一版 implementation slice；当前尚未创建
+  `services/<service>` 目录。
 
 ## 下一步
 
-- 默认继续 `workflow-service` 或 `knowledge-ingestion-service` stage-switch；
-  也可以先做 `admin-service` stage-switch。
+- 默认继续 `knowledge-ingestion-service` 第一版 implementation slice；也可以先做
+  `workflow-service` 第一版 implementation slice，或先做 `admin-service`
+  stage-switch。
 - 也可以继续 notification SMTP / SMS / APNs / FCM adapter 或 bounce-suppression。
 
 ## 硬边界

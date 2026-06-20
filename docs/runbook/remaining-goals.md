@@ -76,16 +76,18 @@ Foundation backlog 锚点：`search-service`、`memory-service`、`retrieval-gat
 
 ## 后置平台 / 产品化服务
 
-这些服务仍登记为 `future`。完成对应 stage-switch 和门禁影响确认前，不得提前
-创建 `services/<name>` 目录：
+这些服务仍未完成第一版实现；implementation 切片前不得提前创建 `services/<name>`：
 
 - `admin-service`：租户、封禁、配置、repair 审批、运维操作。
-- `workflow-service`：审批等待、长事务、补偿、retention、operator workflow。
-- `knowledge-ingestion-service`：文件 / 网页导入、chunking、embedding pipeline。
+- `workflow-service`：stage-switch approved；下一步做 `CreateWorkflow` /
+  `RecordWorkflowDecision` / `GetWorkflow` 第一版实现，先支持 action approval 和
+  repair approval。
+- `knowledge-ingestion-service`：stage-switch approved；下一步做
+  `CreateKnowledgeSource` / `SubmitIngestionJob` / `GetIngestionJob` /
+  `ListKnowledgeChunks` 第一版实现，先支持本地 metadata + chunk manifest。
 - `vector-index-service`：向量索引写入、重建、backfill；满足拆分条件后再独立。
 
-新增服务必须满足独立数据模型、独立伸缩需求、独立故障边界、独立安全边界，
-或能显著降低现有服务复杂度，并通过 ADR / SDD v0.1。
+新增服务必须满足独立模型 / 伸缩 / 故障 / 安全边界或明显降复杂度，并通过 ADR / SDD v0.1。
 
 ## 后置 Hardening
 

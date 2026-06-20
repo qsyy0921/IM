@@ -1,0 +1,106 @@
+syntax = "proto3";
+
+package nexusim.model.v1;
+
+option go_package = "github.com/qsyy0921/IM/api/proto/nexusim/model/v1;modelv1";
+
+service ModelGatewayService {
+  rpc InvokeTextGeneration(InvokeTextGenerationRequest) returns (InvokeTextGenerationResponse);
+  rpc GetModelInvocation(GetModelInvocationRequest) returns (GetModelInvocationResponse);
+}
+
+message AuthContext {
+  string tenant_id = 1;
+  string user_id = 2;
+  string service_name = 3;
+  string instance_ref = 4;
+  string trace_id = 5;
+  string request_id = 6;
+}
+
+message PromptPart {
+  string role = 1;
+  string content = 2;
+  string content_hash = 3;
+}
+
+message TokenUsage {
+  int32 input_tokens = 1;
+  int32 output_tokens = 2;
+  int32 total_tokens = 3;
+}
+
+message ModelInvocation {
+  string tenant_id = 1;
+  string invocation_id = 2;
+  string idempotency_key = 3;
+  string caller_service = 4;
+  string caller_use_case = 5;
+  string request_type = 6;
+  string data_class = 7;
+  string provider_id = 8;
+  string model_id = 9;
+  string route_version = 10;
+  string prompt_hash = 11;
+  string output_hash = 12;
+  TokenUsage token_usage = 13;
+  int64 estimated_cost_microunits = 14;
+  string status = 15;
+  string failure_class = 16;
+  bool fallback_used = 17;
+  int64 provider_latency_ms = 18;
+  string correlation_id = 19;
+  string causation_id = 20;
+  string trace_id = 21;
+  int64 created_at_unix_ms = 22;
+  int64 completed_at_unix_ms = 23;
+}
+
+message InvokeTextGenerationRequest {
+  AuthContext auth_context = 1;
+  string caller_service = 2;
+  string caller_use_case = 3;
+  string request_id = 4;
+  string idempotency_key = 5;
+  string model_class = 6;
+  string preferred_model = 7;
+  string route_policy = 8;
+  string data_class = 9;
+  string safety_policy = 10;
+  repeated PromptPart prompt_parts = 11;
+  string prompt_hash = 12;
+  int32 prompt_schema_version = 13;
+  string evidence_pack_ref = 14;
+  bool citation_required = 15;
+  int32 max_output_tokens = 16;
+  double temperature = 17;
+  int64 timeout_ms = 18;
+  string correlation_id = 19;
+  string causation_id = 20;
+  string trace_id = 21;
+}
+
+message InvokeTextGenerationResponse {
+  string invocation_id = 1;
+  string provider_id = 2;
+  string model_id = 3;
+  string output_text = 4;
+  string output_hash = 5;
+  int32 output_schema_version = 6;
+  TokenUsage token_usage = 7;
+  int64 estimated_cost_microunits = 8;
+  string failure_class = 9;
+  bool fallback_used = 10;
+  int64 provider_latency_ms = 11;
+  bool replayed = 12;
+  bool output_returned = 13;
+}
+
+message GetModelInvocationRequest {
+  AuthContext auth_context = 1;
+  string invocation_id = 2;
+}
+
+message GetModelInvocationResponse {
+  ModelInvocation invocation = 1;
+}

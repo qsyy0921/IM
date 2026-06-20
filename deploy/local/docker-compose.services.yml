@@ -416,6 +416,22 @@ services:
       nexusim-services:
         ipv4_address: 172.30.80.34
 
+  model-gateway-grpc:
+    image: nexusim/model-gateway:local
+    container_name: nexusim-model-gateway-grpc
+    environment:
+      NEXUSIM_MODEL_GATEWAY_MODE: grpc
+      NEXUSIM_MODEL_GATEWAY_GRPC_ADDR: 172.30.80.35:10730
+      NEXUSIM_MODEL_GATEWAY_DEBUG_ADDR: 172.30.80.35:11932
+      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@host.docker.internal:5432/nexusim?sslmode=disable
+    ports:
+      - "10730:10730"
+      - "11932:11932"
+    restart: unless-stopped
+    networks:
+      nexusim-services:
+        ipv4_address: 172.30.80.35
+
   push-gateway-ws:
     image: nexusim/push-gateway:local
     container_name: nexusim-push-gateway-ws

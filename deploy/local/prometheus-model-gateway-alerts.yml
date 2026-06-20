@@ -1,0 +1,20 @@
+groups:
+  - name: nexusim-model-gateway
+    rules:
+      - alert: NexusIMModelGatewayDown
+        expr: up{service="model-gateway"} == 0
+        for: 2m
+        labels:
+          severity: warning
+          service: model-gateway
+        annotations:
+          summary: "model-gateway metrics endpoint is down"
+
+      - alert: NexusIMModelGatewayInfoMissing
+        expr: absent(nexusim_model_gateway_service_info)
+        for: 2m
+        labels:
+          severity: warning
+          service: model-gateway
+        annotations:
+          summary: "model-gateway info metric is missing"

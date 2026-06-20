@@ -209,7 +209,11 @@
     },
     {
       "name": "model-gateway",
-      "stage": "future"
+      "stage": "product-active",
+      "local_process": "model-gateway-grpc",
+      "debug_port": 11932,
+      "prometheus_rule_file": "prometheus-model-gateway-alerts.yml",
+      "grafana_dashboard": "model-gateway-observability.json"
     },
     {
       "name": "workflow-service",

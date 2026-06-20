@@ -1,0 +1,20 @@
+groups:
+  - name: nexusim-control-plane-service
+    rules:
+      - alert: NexusIMControlPlaneServiceDown
+        expr: up{service="control-plane-service"} == 0
+        for: 2m
+        labels:
+          severity: warning
+          service: control-plane-service
+        annotations:
+          summary: "control-plane-service metrics endpoint is down"
+
+      - alert: NexusIMControlPlaneServiceInfoMissing
+        expr: absent(nexusim_control_plane_service_info)
+        for: 2m
+        labels:
+          severity: warning
+          service: control-plane-service
+        annotations:
+          summary: "control-plane-service info metric is missing"

@@ -189,7 +189,11 @@
     },
     {
       "name": "control-plane-service",
-      "stage": "future"
+      "stage": "product-active",
+      "local_process": "control-plane-service-grpc",
+      "debug_port": 11930,
+      "prometheus_rule_file": "prometheus-control-plane-service-alerts.yml",
+      "grafana_dashboard": "control-plane-service-observability.json"
     },
     {
       "name": "presence-service",

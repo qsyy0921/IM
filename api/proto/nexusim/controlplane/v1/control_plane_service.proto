@@ -1,0 +1,126 @@
+syntax = "proto3";
+
+package nexusim.controlplane.v1;
+
+option go_package = "github.com/qsyy0921/IM/api/proto/nexusim/controlplane/v1;controlplanev1";
+
+service ControlPlaneService {
+  rpc PublishConfigVersion(PublishConfigVersionRequest) returns (PublishConfigVersionResponse);
+  rpc GetConfigSnapshot(GetConfigSnapshotRequest) returns (GetConfigSnapshotResponse);
+  rpc AckAppliedConfigVersion(AckAppliedConfigVersionRequest) returns (AckAppliedConfigVersionResponse);
+}
+
+message AuthContext {
+  string tenant_id = 1;
+  string user_id = 2;
+  string service_name = 3;
+  string instance_ref = 4;
+  string trace_id = 5;
+  string request_id = 6;
+}
+
+message ConfigVersion {
+  string tenant_id = 1;
+  string environment = 2;
+  string config_kind = 3;
+  string bundle_key = 4;
+  string version = 5;
+  string schema_version = 6;
+  string payload_checksum = 7;
+  string status = 8;
+  int64 effective_at_unix_ms = 9;
+  int64 expires_at_unix_ms = 10;
+  int64 published_at_unix_ms = 11;
+}
+
+message ConfigSnapshot {
+  string tenant_id = 1;
+  string environment = 2;
+  string service_name = 3;
+  string config_kind = 4;
+  string bundle_key = 5;
+  string version = 6;
+  string schema_version = 7;
+  string payload_json = 8;
+  string payload_checksum = 9;
+  int64 generated_at_unix_ms = 10;
+  int64 effective_at_unix_ms = 11;
+  int64 expires_at_unix_ms = 12;
+  string rollout_decision = 13;
+  string previous_version = 14;
+}
+
+message AppliedConfigVersion {
+  string tenant_id = 1;
+  string environment = 2;
+  string service_name = 3;
+  string instance_ref = 4;
+  string config_kind = 5;
+  string bundle_key = 6;
+  string version = 7;
+  string service_version = 8;
+  string status = 9;
+  string last_error_class = 10;
+  int64 applied_at_unix_ms = 11;
+}
+
+message PublishConfigVersionRequest {
+  AuthContext auth_context = 1;
+  string environment = 2;
+  string config_kind = 3;
+  string bundle_key = 4;
+  string version = 5;
+  string schema_version = 6;
+  string payload_json = 7;
+  int64 effective_at_unix_ms = 8;
+  int64 expires_at_unix_ms = 9;
+  string approval_ref = 10;
+  string operator_ref = 11;
+  string reason_ref = 12;
+  string idempotency_key = 13;
+  string correlation_id = 14;
+  string causation_id = 15;
+  string trace_id = 16;
+}
+
+message PublishConfigVersionResponse {
+  ConfigVersion version = 1;
+  ConfigSnapshot snapshot = 2;
+}
+
+message GetConfigSnapshotRequest {
+  AuthContext auth_context = 1;
+  string environment = 2;
+  string service_name = 3;
+  string config_kind = 4;
+  string bundle_key = 5;
+  string current_version = 6;
+  string instance_ref = 7;
+  string ring = 8;
+  string service_version = 9;
+}
+
+message GetConfigSnapshotResponse {
+  ConfigSnapshot snapshot = 1;
+  bool not_modified = 2;
+}
+
+message AckAppliedConfigVersionRequest {
+  AuthContext auth_context = 1;
+  string environment = 2;
+  string service_name = 3;
+  string instance_ref = 4;
+  string config_kind = 5;
+  string bundle_key = 6;
+  string version = 7;
+  string service_version = 8;
+  string status = 9;
+  string last_error_class = 10;
+  string correlation_id = 11;
+  string causation_id = 12;
+  string trace_id = 13;
+}
+
+message AckAppliedConfigVersionResponse {
+  AppliedConfigVersion applied = 1;
+}

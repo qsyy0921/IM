@@ -65,6 +65,8 @@ Foundation backlog 锚点：`search-service`、`memory-service`、`retrieval-gat
   suppression worker、provider redrive / audit 产品化。
 - `audit-service`：后续仍需 Kafka ingestion、export worker、SIEM forwarding、
   retention cleanup、segment sealing 和 provider-grade audit export。
+- `control-plane-service`：后续仍需 outbox relay、rollback、drift monitor、
+  expiry / cleanup worker、api-gateway quota consumer 和 provider-grade rollout。
 
 ## 后置平台 / 产品化服务
 
@@ -72,7 +74,6 @@ Foundation backlog 锚点：`search-service`、`memory-service`、`retrieval-gat
 registry / proto / migration 同步切换外，不得提前创建 `services/<name>` 目录：
 
 - `admin-service`：租户、封禁、配置、repair 审批、运维操作。
-- `control-plane-service`：配置中心、功能开关、灰度、quota、applied ACK。
 - `presence-service`：在线状态、输入中、最后在线、设备在线。
 - `model-gateway`：模型 provider、embedding、rerank、成本、fallback、审计。
 - `workflow-service`：审批等待、长事务、补偿、retention、operator workflow。

@@ -35,3 +35,4 @@ services:
       - ./prometheus-media-service-alerts.yml:/etc/prometheus/rules/media-service.yml:ro
       - ./prometheus-notification-service-alerts.yml:/etc/prometheus/rules/notification-service.yml:ro
       - ./prometheus-audit-service-alerts.yml:/etc/prometheus/rules/audit-service.yml:ro
+      - ./prometheus-control-plane-service-alerts.yml:/etc/prometheus/rules/control-plane-service.yml:ro

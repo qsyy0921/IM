@@ -177,6 +177,15 @@ try {
         NEXUSIM_MEDIA_FAKE_OBJECT_BASE_URL = $FakeObjectBaseURL
     }
 
+    $processes += Start-NexusProcess -Name "media-processing-worker" -FilePath (Join-Path $repoRoot "bin\media-service.exe") -Env @{
+        NEXUSIM_MEDIA_SERVICE_MODE = "processing-worker"
+        NEXUSIM_PG_DSN = $PgDsn
+        NEXUSIM_MEDIA_PROCESSING_BATCH_SIZE = "50"
+        NEXUSIM_MEDIA_PROCESSING_POLL_INTERVAL = "100ms"
+        NEXUSIM_MEDIA_PROCESSING_RETRY_BASE_DELAY = "200ms"
+        NEXUSIM_MEDIA_DEBUG_ADDR = ""
+    }
+
     if ($WithOutboxRelay) {
         $processes += Start-NexusProcess -Name "media-outbox-relay" -FilePath (Join-Path $repoRoot "bin\media-service.exe") -Env @{
             NEXUSIM_MEDIA_SERVICE_MODE = "outbox-relay"

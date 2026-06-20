@@ -20,7 +20,9 @@ import (
 	kafkainfra "github.com/qsyy0921/IM/services/media-service/internal/infrastructure/kafka"
 	"github.com/qsyy0921/IM/services/media-service/internal/infrastructure/objectstore"
 	postgresinfra "github.com/qsyy0921/IM/services/media-service/internal/infrastructure/postgres"
+	processinginfra "github.com/qsyy0921/IM/services/media-service/internal/infrastructure/processing"
 	"github.com/qsyy0921/IM/services/media-service/internal/trigger/outbox"
+	"github.com/qsyy0921/IM/services/media-service/internal/trigger/processing"
 	"google.golang.org/grpc"
 )
 
@@ -43,11 +45,48 @@ func run(ctx context.Context) error {
 		return runNoop(ctx)
 	case "grpc":
 		return runGRPC(ctx)
+	case "processing-worker":
+		return runProcessingWorker(ctx)
 	case "outbox-relay":
 		return runOutboxRelay(ctx)
 	default:
 		return fmt.Errorf("unsupported NEXUSIM_MEDIA_SERVICE_MODE %q", mode)
 	}
+}
+
+func runProcessingWorker(ctx context.Context) error {
+	debugAddr, err := mediaDebugAddrFromEnv()
+	if err != nil {
+		return err
+	}
+	stopDebug, err := startDebugServer(ctx, debugAddr)
+	if err != nil {
+		return err
+	}
+	defer stopDebug()
+
+	pool, err := openPGPool(ctx)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	worker := processing.NewWorker(
+		postgresinfra.NewRepository(pool),
+		processinginfra.NewMockScanner(),
+		processinginfra.NewMockThumbnailer(),
+		processinginfra.NewMockTranscoder(),
+		processing.Config{
+			BatchSize:      envInt("NEXUSIM_MEDIA_PROCESSING_BATCH_SIZE", 50),
+			PollInterval:   envDuration("NEXUSIM_MEDIA_PROCESSING_POLL_INTERVAL", time.Second),
+			MaxAttempts:    envInt("NEXUSIM_MEDIA_PROCESSING_MAX_ATTEMPTS", 3),
+			RetryBaseDelay: envDuration("NEXUSIM_MEDIA_PROCESSING_RETRY_BASE_DELAY", time.Second),
+			ErrorBackoff:   envDuration("NEXUSIM_MEDIA_PROCESSING_ERROR_BACKOFF", time.Second),
+			Logf:           log.Printf,
+		},
+	)
+	log.Println("media-service processing worker started with local mock processors")
+	return worker.Run(ctx)
 }
 
 func runNoop(ctx context.Context) error {
@@ -180,7 +219,7 @@ func mediaServiceModeFromEnv() string {
 
 func validateMediaServiceMode(mode string) error {
 	switch mode {
-	case "noop", "grpc", "outbox-relay":
+	case "noop", "grpc", "processing-worker", "outbox-relay":
 		return nil
 	default:
 		return fmt.Errorf("unsupported NEXUSIM_MEDIA_SERVICE_MODE %q", mode)

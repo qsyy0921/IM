@@ -119,7 +119,7 @@ func (repository *Repository) CompleteUpload(
 	if asset.OwnerUserID != command.AuthContext.UserID {
 		return types.MediaAsset{}, types.NewPermissionDenied("asset owner mismatch")
 	}
-	if session.Status == "COMPLETED" && asset.Status == types.AssetStatusReady {
+	if session.Status == "COMPLETED" {
 		if err := tx.Commit(ctx); err != nil {
 			return types.MediaAsset{}, types.NewDBWriteFailed(err.Error())
 		}
@@ -158,14 +158,14 @@ WHERE tenant_id = $1
 		return types.MediaAsset{}, types.NewDBWriteFailed(err.Error())
 	}
 
+	scanStatus, thumbnailStatus, transcodeStatus := initialProcessingStatuses(asset.MediaKind)
 	row := tx.QueryRow(ctx, `
 UPDATE media_assets
-SET status = 'READY',
-    scan_status = 'PASSED',
-    thumbnail_status = 'SKIPPED',
-    transcode_status = 'SKIPPED',
-    uploaded_at = COALESCE(uploaded_at, now()),
-    ready_at = COALESCE(ready_at, now())
+SET status = 'PROCESSING',
+    scan_status = $3,
+    thumbnail_status = $4,
+    transcode_status = $5,
+    uploaded_at = COALESCE(uploaded_at, now())
 WHERE tenant_id = $1
   AND asset_id = $2
 RETURNING
@@ -187,15 +187,15 @@ RETURNING
 	uploaded_at,
 	ready_at,
 	deleted_at
-`, command.AuthContext.TenantID, command.AssetID)
+`, command.AuthContext.TenantID, command.AssetID, scanStatus, thumbnailStatus, transcodeStatus)
 	updatedAsset, err := scanAsset(row)
 	if err != nil {
 		return types.MediaAsset{}, types.NewDBWriteFailed(err.Error())
 	}
-	if err := insertMediaEvent(ctx, tx, updatedAsset, "media.asset.uploaded.v1", updatedAsset.AssetID+"-uploaded-v1", "UPLOADED"); err != nil {
+	if err := insertProcessingJobs(ctx, tx, updatedAsset); err != nil {
 		return types.MediaAsset{}, types.NewDBWriteFailed(err.Error())
 	}
-	if err := insertMediaEvent(ctx, tx, updatedAsset, "media.asset.ready.v1", updatedAsset.AssetID+"-ready-v1", "READY"); err != nil {
+	if err := insertMediaEvent(ctx, tx, updatedAsset, "media.asset.uploaded.v1", updatedAsset.AssetID+"-uploaded-v1", "UPLOADED"); err != nil {
 		return types.MediaAsset{}, types.NewDBWriteFailed(err.Error())
 	}
 	if err := tx.Commit(ctx); err != nil {
@@ -307,6 +307,232 @@ RETURNING
 		return types.MediaAsset{}, types.NewDBWriteFailed(err.Error())
 	}
 	return asset, nil
+}
+
+func (repository *Repository) ClaimProcessingJobs(ctx context.Context, limit int) ([]types.ProcessingJob, error) {
+	if repository.pool == nil {
+		return nil, types.NewDBReadFailed("media repository is not configured")
+	}
+	if limit <= 0 {
+		limit = 50
+	}
+	tx, err := repository.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return nil, types.NewDBWriteFailed(err.Error())
+	}
+	defer rollback(ctx, tx)
+
+	rows, err := tx.Query(ctx, `
+WITH ready AS (
+	SELECT j.tenant_id, j.job_id
+	FROM media_processing_jobs j
+	JOIN media_assets a
+	  ON a.tenant_id = j.tenant_id
+	 AND a.asset_id = j.asset_id
+	WHERE j.status IN ('PENDING', 'FAILED')
+	  AND (j.next_retry_at IS NULL OR j.next_retry_at <= now())
+	  AND j.dead_lettered_at IS NULL
+	  AND a.status = 'PROCESSING'
+	ORDER BY j.created_at, j.job_id
+	LIMIT $1
+	FOR UPDATE OF j SKIP LOCKED
+),
+claimed AS (
+	UPDATE media_processing_jobs j
+	SET status = 'RUNNING',
+	    attempt_count = j.attempt_count + 1,
+	    next_retry_at = NULL,
+	    updated_at = now()
+	FROM ready
+	WHERE j.tenant_id = ready.tenant_id
+	  AND j.job_id = ready.job_id
+	RETURNING
+		j.tenant_id,
+		j.job_id,
+		j.asset_id,
+		j.job_type,
+		j.status,
+		j.attempt_count,
+		j.next_retry_at,
+		j.last_error,
+		j.dead_lettered_at,
+		j.created_at,
+		j.updated_at
+)
+SELECT
+	c.tenant_id,
+	c.job_id,
+	c.asset_id,
+	c.job_type,
+	c.status,
+	c.attempt_count,
+	c.next_retry_at,
+	c.last_error,
+	c.dead_lettered_at,
+	c.created_at,
+	c.updated_at,
+	a.tenant_id,
+	a.asset_id,
+	a.owner_user_id,
+	a.conversation_id,
+	a.media_kind,
+	a.content_type,
+	a.file_name,
+	a.size_bytes,
+	a.sha256,
+	a.object_key,
+	a.status,
+	a.scan_status,
+	a.thumbnail_status,
+	a.transcode_status,
+	a.created_at,
+	a.uploaded_at,
+	a.ready_at,
+	a.deleted_at
+FROM claimed c
+JOIN media_assets a
+  ON a.tenant_id = c.tenant_id
+ AND a.asset_id = c.asset_id
+ORDER BY c.created_at, c.job_id
+`, limit)
+	if err != nil {
+		return nil, types.NewDBReadFailed(err.Error())
+	}
+	defer rows.Close()
+
+	jobs := make([]types.ProcessingJob, 0)
+	for rows.Next() {
+		job, err := scanProcessingJob(rows)
+		if err != nil {
+			return nil, types.NewDBReadFailed(err.Error())
+		}
+		jobs = append(jobs, job)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, types.NewDBReadFailed(err.Error())
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, types.NewDBWriteFailed(err.Error())
+	}
+	return jobs, nil
+}
+
+func (repository *Repository) MarkProcessingJobSucceeded(ctx context.Context, job types.ProcessingJob) (types.MediaAsset, error) {
+	if repository.pool == nil {
+		return types.MediaAsset{}, types.NewDBWriteFailed("media repository is not configured")
+	}
+	tx, err := repository.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return types.MediaAsset{}, types.NewDBWriteFailed(err.Error())
+	}
+	defer rollback(ctx, tx)
+
+	locked, err := lockProcessingJob(ctx, tx, job.TenantID, job.JobID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return types.MediaAsset{}, types.NewFailedPrecondition("processing job not found")
+		}
+		return types.MediaAsset{}, types.NewDBReadFailed(err.Error())
+	}
+	if locked.Status == types.ProcessingJobStatusSucceeded {
+		asset, err := selectAssetForUpdate(ctx, tx, locked.TenantID, locked.AssetID)
+		if err != nil {
+			return types.MediaAsset{}, types.NewDBReadFailed(err.Error())
+		}
+		if err := tx.Commit(ctx); err != nil {
+			return types.MediaAsset{}, types.NewDBWriteFailed(err.Error())
+		}
+		return asset, nil
+	}
+	if locked.Status != types.ProcessingJobStatusRunning {
+		return types.MediaAsset{}, types.NewFailedPrecondition("processing job is not running")
+	}
+	if _, err := tx.Exec(ctx, `
+UPDATE media_processing_jobs
+SET status = 'SUCCEEDED',
+    last_error = '',
+    updated_at = now()
+WHERE tenant_id = $1
+  AND job_id = $2
+`, locked.TenantID, locked.JobID); err != nil {
+		return types.MediaAsset{}, types.NewDBWriteFailed(err.Error())
+	}
+	asset, err := updateAssetProcessingStatus(ctx, tx, locked, types.ProcessingStatusPassed)
+	if err != nil {
+		return types.MediaAsset{}, types.NewDBWriteFailed(err.Error())
+	}
+	asset, err = maybeMarkAssetReady(ctx, tx, asset)
+	if err != nil {
+		return types.MediaAsset{}, types.NewDBWriteFailed(err.Error())
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return types.MediaAsset{}, types.NewDBWriteFailed(err.Error())
+	}
+	return asset, nil
+}
+
+func (repository *Repository) MarkProcessingJobFailed(
+	ctx context.Context,
+	job types.ProcessingJob,
+	cause error,
+	maxAttempts int,
+	retryDelay time.Duration,
+) (bool, error) {
+	if repository.pool == nil {
+		return false, types.NewDBWriteFailed("media repository is not configured")
+	}
+	if maxAttempts <= 0 {
+		maxAttempts = 3
+	}
+	if retryDelay <= 0 {
+		retryDelay = time.Second
+	}
+	tx, err := repository.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return false, types.NewDBWriteFailed(err.Error())
+	}
+	defer rollback(ctx, tx)
+
+	locked, err := lockProcessingJob(ctx, tx, job.TenantID, job.JobID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return false, types.NewFailedPrecondition("processing job not found")
+		}
+		return false, types.NewDBReadFailed(err.Error())
+	}
+	if locked.Status != types.ProcessingJobStatusRunning {
+		return false, types.NewFailedPrecondition("processing job is not running")
+	}
+	publicError := sanitizeProcessingError(cause)
+	deadLettered := locked.AttemptCount >= maxAttempts
+	if deadLettered {
+		_, err = tx.Exec(ctx, `
+UPDATE media_processing_jobs
+SET status = 'DLQ',
+    last_error = $3,
+    dead_lettered_at = now(),
+    updated_at = now()
+WHERE tenant_id = $1
+  AND job_id = $2
+`, locked.TenantID, locked.JobID, publicError)
+	} else {
+		_, err = tx.Exec(ctx, `
+UPDATE media_processing_jobs
+SET status = 'FAILED',
+    next_retry_at = $3,
+    last_error = $4,
+    updated_at = now()
+WHERE tenant_id = $1
+  AND job_id = $2
+`, locked.TenantID, locked.JobID, time.Now().Add(retryDelay), publicError)
+	}
+	if err != nil {
+		return false, types.NewDBWriteFailed(err.Error())
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return false, types.NewDBWriteFailed(err.Error())
+	}
+	return deadLettered, nil
 }
 
 func selectUploadSessionByIdempotency(
@@ -476,6 +702,180 @@ ON CONFLICT (tenant_id, event_id) DO NOTHING
 	return err
 }
 
+func initialProcessingStatuses(mediaKind string) (scanStatus string, thumbnailStatus string, transcodeStatus string) {
+	scanStatus = types.ProcessingStatusPending
+	thumbnailStatus = types.ProcessingStatusSkipped
+	transcodeStatus = types.ProcessingStatusSkipped
+	switch mediaKind {
+	case types.MediaKindImage:
+		thumbnailStatus = types.ProcessingStatusPending
+	case types.MediaKindVideo:
+		thumbnailStatus = types.ProcessingStatusPending
+		transcodeStatus = types.ProcessingStatusPending
+	case types.MediaKindVoice:
+		transcodeStatus = types.ProcessingStatusPending
+	}
+	return scanStatus, thumbnailStatus, transcodeStatus
+}
+
+func insertProcessingJobs(ctx context.Context, tx pgx.Tx, asset types.MediaAsset) error {
+	jobTypes := []string{types.ProcessingJobTypeScan}
+	if asset.ThumbnailStatus == types.ProcessingStatusPending {
+		jobTypes = append(jobTypes, types.ProcessingJobTypeThumbnail)
+	}
+	if asset.TranscodeStatus == types.ProcessingStatusPending {
+		jobTypes = append(jobTypes, types.ProcessingJobTypeTranscode)
+	}
+	for _, jobType := range jobTypes {
+		jobID := fmt.Sprintf("%s-%s-v1", asset.AssetID, strings.ToLower(jobType))
+		if _, err := tx.Exec(ctx, `
+INSERT INTO media_processing_jobs (
+	tenant_id,
+	job_id,
+	asset_id,
+	job_type,
+	status,
+	created_at,
+	updated_at
+) VALUES ($1, $2, $3, $4, 'PENDING', now(), now())
+ON CONFLICT (tenant_id, job_id) DO NOTHING
+`, asset.TenantID, jobID, asset.AssetID, jobType); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func lockProcessingJob(ctx context.Context, tx pgx.Tx, tenantID types.TenantID, jobID string) (types.ProcessingJob, error) {
+	row := tx.QueryRow(ctx, `
+SELECT
+	tenant_id,
+	job_id,
+	asset_id,
+	job_type,
+	status,
+	attempt_count,
+	next_retry_at,
+	last_error,
+	dead_lettered_at,
+	created_at,
+	updated_at
+FROM media_processing_jobs
+WHERE tenant_id = $1
+  AND job_id = $2
+FOR UPDATE
+`, tenantID, strings.TrimSpace(jobID))
+	return scanProcessingJobOnly(row)
+}
+
+func selectAssetForUpdate(ctx context.Context, tx pgx.Tx, tenantID types.TenantID, assetID string) (types.MediaAsset, error) {
+	row := tx.QueryRow(ctx, selectAssetSQL()+`
+WHERE tenant_id = $1
+  AND asset_id = $2
+FOR UPDATE
+`, tenantID, strings.TrimSpace(assetID))
+	return scanAsset(row)
+}
+
+func updateAssetProcessingStatus(
+	ctx context.Context,
+	tx pgx.Tx,
+	job types.ProcessingJob,
+	status string,
+) (types.MediaAsset, error) {
+	var setClause string
+	switch job.JobType {
+	case types.ProcessingJobTypeScan:
+		setClause = "scan_status = $3"
+	case types.ProcessingJobTypeThumbnail:
+		setClause = "thumbnail_status = $3"
+	case types.ProcessingJobTypeTranscode:
+		setClause = "transcode_status = $3"
+	default:
+		return types.MediaAsset{}, fmt.Errorf("unsupported processing job type %q", job.JobType)
+	}
+	row := tx.QueryRow(ctx, `
+UPDATE media_assets
+SET `+setClause+`
+WHERE tenant_id = $1
+  AND asset_id = $2
+RETURNING
+	tenant_id,
+	asset_id,
+	owner_user_id,
+	conversation_id,
+	media_kind,
+	content_type,
+	file_name,
+	size_bytes,
+	sha256,
+	object_key,
+	status,
+	scan_status,
+	thumbnail_status,
+	transcode_status,
+	created_at,
+	uploaded_at,
+	ready_at,
+	deleted_at
+`, job.TenantID, job.AssetID, status)
+	return scanAsset(row)
+}
+
+func maybeMarkAssetReady(ctx context.Context, tx pgx.Tx, asset types.MediaAsset) (types.MediaAsset, error) {
+	if asset.Status != types.AssetStatusProcessing ||
+		!isProcessingTerminal(asset.ScanStatus) ||
+		!isProcessingTerminal(asset.ThumbnailStatus) ||
+		!isProcessingTerminal(asset.TranscodeStatus) {
+		return asset, nil
+	}
+	row := tx.QueryRow(ctx, `
+UPDATE media_assets
+SET status = 'READY',
+    ready_at = COALESCE(ready_at, now())
+WHERE tenant_id = $1
+  AND asset_id = $2
+RETURNING
+	tenant_id,
+	asset_id,
+	owner_user_id,
+	conversation_id,
+	media_kind,
+	content_type,
+	file_name,
+	size_bytes,
+	sha256,
+	object_key,
+	status,
+	scan_status,
+	thumbnail_status,
+	transcode_status,
+	created_at,
+	uploaded_at,
+	ready_at,
+	deleted_at
+`, asset.TenantID, asset.AssetID)
+	updated, err := scanAsset(row)
+	if err != nil {
+		return types.MediaAsset{}, err
+	}
+	if err := insertMediaEvent(ctx, tx, updated, "media.asset.ready.v1", updated.AssetID+"-ready-v1", "READY"); err != nil {
+		return types.MediaAsset{}, err
+	}
+	return updated, nil
+}
+
+func isProcessingTerminal(status string) bool {
+	return status == types.ProcessingStatusPassed || status == types.ProcessingStatusSkipped
+}
+
+func sanitizeProcessingError(err error) string {
+	if err == nil {
+		return "media processing failed"
+	}
+	return "media processing failed"
+}
+
 func selectAssetSQL() string {
 	return `
 SELECT
@@ -620,6 +1020,80 @@ func scanAsset(row scanner) (types.MediaAsset, error) {
 	asset.ReadyAt = nullTime(readyAt)
 	asset.DeletedAt = nullTime(deletedAt)
 	return asset, nil
+}
+
+func scanProcessingJob(row scanner) (types.ProcessingJob, error) {
+	var job types.ProcessingJob
+	var asset types.MediaAsset
+	var nextRetryAt sql.NullTime
+	var deadLetteredAt sql.NullTime
+	var uploadedAt sql.NullTime
+	var readyAt sql.NullTime
+	var deletedAt sql.NullTime
+	if err := row.Scan(
+		&job.TenantID,
+		&job.JobID,
+		&job.AssetID,
+		&job.JobType,
+		&job.Status,
+		&job.AttemptCount,
+		&nextRetryAt,
+		&job.LastError,
+		&deadLetteredAt,
+		&job.CreatedAt,
+		&job.UpdatedAt,
+		&asset.TenantID,
+		&asset.AssetID,
+		&asset.OwnerUserID,
+		&asset.ConversationID,
+		&asset.MediaKind,
+		&asset.ContentType,
+		&asset.FileName,
+		&asset.SizeBytes,
+		&asset.SHA256,
+		&asset.ObjectKey,
+		&asset.Status,
+		&asset.ScanStatus,
+		&asset.ThumbnailStatus,
+		&asset.TranscodeStatus,
+		&asset.CreatedAt,
+		&uploadedAt,
+		&readyAt,
+		&deletedAt,
+	); err != nil {
+		return types.ProcessingJob{}, err
+	}
+	job.NextRetryAt = nullTime(nextRetryAt)
+	job.DeadLetteredAt = nullTime(deadLetteredAt)
+	asset.UploadedAt = nullTime(uploadedAt)
+	asset.ReadyAt = nullTime(readyAt)
+	asset.DeletedAt = nullTime(deletedAt)
+	job.Asset = asset
+	return job, nil
+}
+
+func scanProcessingJobOnly(row scanner) (types.ProcessingJob, error) {
+	var job types.ProcessingJob
+	var nextRetryAt sql.NullTime
+	var deadLetteredAt sql.NullTime
+	if err := row.Scan(
+		&job.TenantID,
+		&job.JobID,
+		&job.AssetID,
+		&job.JobType,
+		&job.Status,
+		&job.AttemptCount,
+		&nextRetryAt,
+		&job.LastError,
+		&deadLetteredAt,
+		&job.CreatedAt,
+		&job.UpdatedAt,
+	); err != nil {
+		return types.ProcessingJob{}, err
+	}
+	job.NextRetryAt = nullTime(nextRetryAt)
+	job.DeadLetteredAt = nullTime(deadLetteredAt)
+	return job, nil
 }
 
 func scanSession(row scanner) (types.UploadSession, error) {

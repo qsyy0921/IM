@@ -29,6 +29,16 @@ const (
 	ProcessingStatusSkipped = "SKIPPED"
 	ProcessingStatusFailed  = "FAILED"
 
+	ProcessingJobTypeScan      = "SCAN"
+	ProcessingJobTypeThumbnail = "THUMBNAIL"
+	ProcessingJobTypeTranscode = "TRANSCODE"
+
+	ProcessingJobStatusPending   = "PENDING"
+	ProcessingJobStatusRunning   = "RUNNING"
+	ProcessingJobStatusSucceeded = "SUCCEEDED"
+	ProcessingJobStatusFailed    = "FAILED"
+	ProcessingJobStatusDLQ       = "DLQ"
+
 	VariantOriginal   = "ORIGINAL"
 	VariantThumbnail  = "THUMBNAIL"
 	VariantTranscoded = "TRANSCODED"
@@ -72,6 +82,28 @@ type UploadSession struct {
 	ExpiresAt       time.Time
 	CompletedAt     time.Time
 	CreatedAt       time.Time
+}
+
+type ProcessingJob struct {
+	TenantID       TenantID
+	JobID          string
+	AssetID        string
+	JobType        string
+	Status         string
+	AttemptCount   int
+	NextRetryAt    time.Time
+	LastError      string
+	DeadLetteredAt time.Time
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+	Asset          MediaAsset
+}
+
+type ProcessingWorkerStats struct {
+	Claimed      int
+	Succeeded    int
+	Retried      int
+	DeadLettered int
 }
 
 type CreateUploadSessionResult struct {

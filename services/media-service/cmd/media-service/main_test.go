@@ -6,13 +6,13 @@ import (
 )
 
 func TestValidateMediaServiceModeAllowsRuntimeModes(t *testing.T) {
-	for _, mode := range []string{"noop", "grpc", "outbox-relay"} {
+	for _, mode := range []string{"noop", "grpc", "processing-worker", "outbox-relay"} {
 		if err := validateMediaServiceMode(mode); err != nil {
 			t.Fatalf("expected media service mode %q to be allowed: %v", mode, err)
 		}
 	}
-	if err := validateMediaServiceMode("processing-worker"); err == nil {
-		t.Fatalf("expected unimplemented media service mode to fail")
+	if err := validateMediaServiceMode("unknown"); err == nil {
+		t.Fatalf("expected unsupported media service mode to fail")
 	}
 }
 

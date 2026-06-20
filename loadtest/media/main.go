@@ -207,7 +207,7 @@ func run(cfg config) error {
 		_ = writeSummary(cfg.resultDir, result)
 	}()
 
-	ctx, cancel := context.WithTimeout(context.Background(), cfg.requestTimeout+10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), cfg.requestTimeout+cfg.waitTimeout+10*time.Second)
 	defer cancel()
 
 	pool, err := pgxpool.New(ctx, cfg.pgDSN)
@@ -295,13 +295,23 @@ func runSmoke(ctx context.Context, cfg config, pool *pgxpool.Pool, client mediav
 	if err != nil {
 		return fmt.Errorf("complete upload: %w", err)
 	}
-	if completeResponse.GetAsset().GetStatus() != mediav1.MediaAssetStatus_MEDIA_ASSET_STATUS_READY {
-		return fmt.Errorf("asset did not become ready: %s", completeResponse.GetAsset().GetStatus())
+	if completeResponse.GetAsset().GetStatus() != mediav1.MediaAssetStatus_MEDIA_ASSET_STATUS_PROCESSING &&
+		completeResponse.GetAsset().GetStatus() != mediav1.MediaAssetStatus_MEDIA_ASSET_STATUS_READY {
+		return fmt.Errorf("asset did not enter processing or ready state: %s", completeResponse.GetAsset().GetStatus())
 	}
 	result.PublicAssetSafe = protoMessageSafe(completeResponse.GetAsset())
 	if !result.PublicAssetSafe {
 		return fmt.Errorf("complete response leaked object key")
 	}
+
+	snapshot, err := waitAssetReady(ctx, pool, cfg, createResponse.GetAssetId())
+	if err != nil {
+		return err
+	}
+	result.AssetStatus = snapshot.Status
+	result.ScanStatus = snapshot.ScanStatus
+	result.ThumbnailStatus = snapshot.ThumbnailStatus
+	result.TranscodeStatus = snapshot.TranscodeStatus
 
 	assetAuth := protoCloneAuth(auth)
 	assetAuth.RequestId = "request-media-get-asset"
@@ -337,14 +347,6 @@ func runSmoke(ctx context.Context, cfg config, pool *pgxpool.Pool, client mediav
 		return fmt.Errorf("download URL leaked internal object key fields: %s", downloadResponse.GetDownloadUrl())
 	}
 
-	snapshot, err := readAssetSnapshot(ctx, pool, cfg.tenantID, createResponse.GetAssetId())
-	if err != nil {
-		return err
-	}
-	result.AssetStatus = snapshot.Status
-	result.ScanStatus = snapshot.ScanStatus
-	result.ThumbnailStatus = snapshot.ThumbnailStatus
-	result.TranscodeStatus = snapshot.TranscodeStatus
 	if snapshot.Status != "READY" || snapshot.ScanStatus != "PASSED" {
 		return fmt.Errorf("unexpected asset state: %+v", snapshot)
 	}
@@ -378,6 +380,27 @@ func runSmoke(ctx context.Context, cfg config, pool *pgxpool.Pool, client mediav
 		return fmt.Errorf("expected one allowed access audit row, got %d", auditAllowed)
 	}
 	return nil
+}
+
+func waitAssetReady(ctx context.Context, pool *pgxpool.Pool, cfg config, assetID string) (assetSnapshot, error) {
+	deadline := time.Now().Add(cfg.waitTimeout)
+	for {
+		snapshot, err := readAssetSnapshot(ctx, pool, cfg.tenantID, assetID)
+		if err != nil {
+			return assetSnapshot{}, err
+		}
+		if snapshot.Status == "READY" {
+			return snapshot, nil
+		}
+		if time.Now().After(deadline) {
+			return assetSnapshot{}, fmt.Errorf("asset did not become ready before timeout: %+v", snapshot)
+		}
+		select {
+		case <-ctx.Done():
+			return assetSnapshot{}, ctx.Err()
+		case <-time.After(cfg.pollInterval):
+		}
+	}
 }
 
 func protoCloneAuth(auth *mediav1.AuthContext) *mediav1.AuthContext {

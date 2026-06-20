@@ -44,6 +44,7 @@ approve
 reject
 get
 list
+config-publish-smoke
 ```
 
 边界：
@@ -59,8 +60,16 @@ list
 
 后续：
 
-- 可在真实 smoke 中组合 `CreateAdminOperation -> operator approve ->
-  operation-worker -> workflow/downstream adapter -> GetAdminOperation`。
+- 本地进程 smoke 可直接运行：
+
+```powershell
+.\loadtest\admin\run-local-smoke.ps1
+```
+
+- 该 smoke 会启动 `control-plane-service grpc`、`admin-service grpc` 和
+  `admin-service operation-worker`，再通过公开 gRPC 执行
+  `CreateAdminOperation -> operator approve -> operation-worker ->
+  control-plane PublishConfigVersion -> GetConfigSnapshot`。
 - 第一条真实下游 adapter 是非 critical `CONFIG_PUBLISH`，operation-worker 设置
   `NEXUSIM_CONTROL_PLANE_GRPC_ADDR` 后会调用
   `control-plane-service.PublishConfigVersion`；该 smoke 仍应通过公开 gRPC 创建和审批

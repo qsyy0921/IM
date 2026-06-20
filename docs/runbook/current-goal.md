@@ -65,11 +65,14 @@ model-gateway / workflow / knowledge-ingestion / vector-index
   `CONFIG_PUBLISH` 可在配置 `NEXUSIM_CONTROL_PLANE_GRPC_ADDR` 后由
   operation-worker 调 `control-plane-service.PublishConfigVersion`；critical 操作
   仍走 workflow。
+- `admin-service` 已跑通第一条真实下游 adapter 的本地多进程 smoke：公开 gRPC
+  `CreateAdminOperation -> operator approve -> operation-worker ->
+  control-plane PublishConfigVersion -> GetConfigSnapshot`。
 
 ## 下一步
 
-- 默认继续 `admin-service` 的 `Create -> operator approve -> operation-worker ->
-  control-plane` 真实进程 smoke，或继续补更多下游公开 admin API adapter。
+- 默认继续补更多下游公开 admin API adapter，或为 admin config publish 增加 rollback /
+  compensation operator。
 - 也可以继续 `vector-index-service` embedding worker / rebuild worker / outbox relay。
 - 也可以继续 notification SMTP / SMS / APNs / FCM adapter 或 bounce-suppression。
 

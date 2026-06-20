@@ -80,8 +80,8 @@ Foundation backlog 锚点：`search-service`、`memory-service`、`retrieval-gat
 - `admin-service`：`REPAIR_REQUEST -> workflow-service REPAIR_APPROVAL`、
   `CRITICAL -> workflow-service ADMIN_OPERATION` 和第一版 operation-specific
   approval policy / target-service routing 已接；后续仍需 audit ingestion /
-  export、admin UI、更多下游公开 admin API adapter，以及
-  `Create -> operator approve -> operation-worker -> control-plane` 真实进程 smoke。
+  export、admin UI、更多下游公开 admin API adapter、rollback / compensation
+  operator 和 provider-grade 运维。
 
 ## 后置平台 / 产品化服务
 

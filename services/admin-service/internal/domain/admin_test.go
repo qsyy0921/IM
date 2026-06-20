@@ -44,6 +44,46 @@ func TestNormalizePayloadCanonicalizesJSON(t *testing.T) {
 	}
 }
 
+func TestPrepareCreateAcceptsConfigPublishPayload(t *testing.T) {
+	command := validCreateCommand(`{
+		"environment":"local",
+		"config_kind":"API_GATEWAY_TENANT_QUOTA",
+		"bundle_key":"api-gateway/default",
+		"version":"quota-v1",
+		"schema_version":"quota-v1",
+		"effective_at_unix_ms":1000,
+		"payload_json":"{\"plans\":{\"tenant-free\":{\"requests_per_second\":20,\"burst\":40}}}"
+	}`)
+	command.OperationType = "CONFIG_PUBLISH"
+	command.PayloadSchemaVersion = "admin.config_publish.v1"
+
+	prepared, err := PrepareCreate(command, "op_config_publish", time.Now())
+	if err != nil {
+		t.Fatalf("prepare create: %v", err)
+	}
+	if !strings.Contains(prepared.PayloadJSON, "payload_json") ||
+		!strings.Contains(prepared.PayloadJSON, "API_GATEWAY_TENANT_QUOTA") {
+		t.Fatalf("unexpected payload: %s", prepared.PayloadJSON)
+	}
+}
+
+func TestPrepareCreateRejectsSensitiveConfigPublishPayload(t *testing.T) {
+	command := validCreateCommand(`{
+		"environment":"local",
+		"config_kind":"API_GATEWAY_TENANT_QUOTA",
+		"bundle_key":"api-gateway/default",
+		"version":"quota-v1",
+		"schema_version":"quota-v1",
+		"payload_json":"{\"secret\":\"do-not-store\"}"
+	}`)
+	command.OperationType = "CONFIG_PUBLISH"
+	command.PayloadSchemaVersion = "admin.config_publish.v1"
+
+	if _, err := PrepareCreate(command, "op_config_publish", time.Now()); !errors.Is(err, types.ErrInvalidArgument) {
+		t.Fatalf("expected invalid argument, got %v", err)
+	}
+}
+
 func validCreateCommand(payload string) types.CreateAdminOperationCommand {
 	return types.CreateAdminOperationCommand{
 		AuthContext:          types.AuthContext{TenantID: "tenant-admin-test", ServiceName: "admin-ui"},

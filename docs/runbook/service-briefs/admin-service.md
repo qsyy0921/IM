@@ -42,8 +42,12 @@
   在配置 `NEXUSIM_CONTROL_PLANE_GRPC_ADDR` 后由 operation-worker 调
   `control-plane-service.PublishConfigVersion`；未配置时保留本地 first-stage
   no-op fallback，`CRITICAL` 操作仍走 workflow。
+- 已新增并跑通本地多进程 config publish smoke：通过公开 gRPC 执行
+  `CreateAdminOperation -> operator approve -> operation-worker ->
+  control-plane PublishConfigVersion -> GetConfigSnapshot`，报告见
+  `docs/runbook/loadtest/admin-service/loadtest-report-20260621-admin-config-publish-smoke.md`。
 
 后续：
 
-- audit-service ingestion / export、admin UI、更多下游公开 admin API adapter，以及
-  `Create -> operator approve -> operation-worker -> control-plane` 真实进程 smoke。
+- audit-service ingestion / export、admin UI、更多下游公开 admin API adapter、
+  rollback / compensation operator 和 provider-grade 运维。

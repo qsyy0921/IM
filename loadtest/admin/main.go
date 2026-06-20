@@ -16,34 +16,42 @@ import (
 )
 
 type config struct {
-	mode              string
-	target            string
-	requestTimeout    time.Duration
-	tls               grpctls.Config
-	tenantID          string
-	userID            string
-	instanceRef       string
-	traceID           string
-	requestID         string
-	operationID       string
-	operatorRef       string
-	operatorRole      string
-	targetRefHash     string
-	riskLevel         string
-	payloadSchema     string
-	operationPayload  string
-	payloadFile       string
-	payloadLoadError  error
-	approverRef       string
-	approverRole      string
-	decision          string
-	approvalPolicyRef string
-	reasonRef         string
-	evidenceRefs      []string
-	idempotencyKey    string
-	status            string
-	operationType     string
-	pageSize          int32
+	mode               string
+	target             string
+	requestTimeout     time.Duration
+	tls                grpctls.Config
+	tenantID           string
+	userID             string
+	instanceRef        string
+	traceID            string
+	requestID          string
+	operationID        string
+	operatorRef        string
+	operatorRole       string
+	targetRefHash      string
+	riskLevel          string
+	payloadSchema      string
+	operationPayload   string
+	payloadFile        string
+	payloadLoadError   error
+	approverRef        string
+	approverRole       string
+	decision           string
+	approvalPolicyRef  string
+	reasonRef          string
+	evidenceRefs       []string
+	idempotencyKey     string
+	status             string
+	operationType      string
+	pageSize           int32
+	controlPlaneTarget string
+	pgDSN              string
+	resultRoot         string
+	runName            string
+	applyMigration     bool
+	cleanup            bool
+	pollTimeout        time.Duration
+	pollInterval       time.Duration
 }
 
 type commandResult struct {
@@ -99,7 +107,7 @@ func main() {
 func parseFlags(args []string) config {
 	cfg := config{}
 	flags := flag.NewFlagSet("admin-operator", flag.ExitOnError)
-	flags.StringVar(&cfg.mode, "mode", "approve", "mode: create, approve, reject, get, or list")
+	flags.StringVar(&cfg.mode, "mode", "approve", "mode: create, approve, reject, get, list, or config-publish-smoke")
 	flags.StringVar(&cfg.target, "target", envOr("NEXUSIM_ADMIN_GRPC_ADDR", "127.0.0.1:10770"), "admin-service gRPC target")
 	flags.DurationVar(&cfg.requestTimeout, "request-timeout", 5*time.Second, "request timeout")
 	flags.StringVar(&cfg.tls.CAFile, "admin-tls-ca-file", os.Getenv("NEXUSIM_ADMIN_TLS_CA_FILE"), "CA PEM for admin-service gRPC TLS")
@@ -131,6 +139,14 @@ func parseFlags(args []string) config {
 	flags.StringVar(&cfg.operationType, "operation-type", "", "list filter operation type")
 	var pageSize int
 	flags.IntVar(&pageSize, "page-size", 20, "list page size")
+	flags.StringVar(&cfg.controlPlaneTarget, "control-plane-target", envOr("NEXUSIM_CONTROL_PLANE_GRPC_ADDR", "127.0.0.1:10710"), "control-plane-service gRPC target for config-publish-smoke")
+	flags.StringVar(&cfg.pgDSN, "pg-dsn", envOr("NEXUSIM_PG_DSN", "postgres://nexusim:nexusim@localhost:5432/nexusim?sslmode=disable"), "PostgreSQL DSN for config-publish-smoke")
+	flags.StringVar(&cfg.resultRoot, "result-root", defaultResultRoot, "external result root for config-publish-smoke")
+	flags.StringVar(&cfg.runName, "run-name", "", "run name for config-publish-smoke")
+	flags.BoolVar(&cfg.applyMigration, "apply-migration", true, "apply admin/control-plane migrations before config-publish-smoke")
+	flags.BoolVar(&cfg.cleanup, "cleanup", true, "cleanup smoke tenant before config-publish-smoke")
+	flags.DurationVar(&cfg.pollTimeout, "poll-timeout", 15*time.Second, "operation polling timeout for config-publish-smoke")
+	flags.DurationVar(&cfg.pollInterval, "poll-interval", 300*time.Millisecond, "operation polling interval for config-publish-smoke")
 	_ = flags.Parse(args)
 	cfg.pageSize = int32(pageSize)
 	cfg.mode = strings.ToLower(strings.TrimSpace(cfg.mode))
@@ -157,12 +173,18 @@ func parseFlags(args []string) config {
 	if cfg.idempotencyKey == "" && (cfg.mode == "approve" || cfg.mode == "reject") {
 		cfg.idempotencyKey = cfg.mode + ":" + cfg.operationID + ":" + cfg.approverRef
 	}
+	if cfg.runName == "" && cfg.mode == "config-publish-smoke" {
+		cfg.runName = "admin-config-publish-smoke-" + time.Now().UTC().Format("20060102-150405")
+	}
 	return cfg
 }
 
 func run(ctx context.Context, cfg config, out *os.File) error {
 	if err := cfg.validate(); err != nil {
 		return err
+	}
+	if cfg.mode == "config-publish-smoke" {
+		return runConfigPublishSmoke(ctx, cfg, out)
 	}
 	dialOption, err := grpctls.DialOption(cfg.tls, "admin-tls")
 	if err != nil {
@@ -333,8 +355,27 @@ func (cfg config) validate() error {
 		if cfg.pageSize <= 0 {
 			return errors.New("--page-size must be positive")
 		}
+	case "config-publish-smoke":
+		if strings.TrimSpace(cfg.controlPlaneTarget) == "" {
+			return errors.New("--control-plane-target is required")
+		}
+		if strings.TrimSpace(cfg.pgDSN) == "" {
+			return errors.New("--pg-dsn is required")
+		}
+		if strings.TrimSpace(cfg.resultRoot) == "" {
+			return errors.New("--result-root is required")
+		}
+		if strings.TrimSpace(cfg.runName) == "" {
+			return errors.New("--run-name is required")
+		}
+		if cfg.pollTimeout <= 0 {
+			return errors.New("--poll-timeout must be positive")
+		}
+		if cfg.pollInterval <= 0 {
+			return errors.New("--poll-interval must be positive")
+		}
 	default:
-		return fmt.Errorf("--mode must be create, approve, reject, get, or list")
+		return fmt.Errorf("--mode must be create, approve, reject, get, list, or config-publish-smoke")
 	}
 	return nil
 }

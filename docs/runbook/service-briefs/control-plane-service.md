@@ -22,4 +22,7 @@ Stage-switch 记录：`docs/runbook/stage-switch/control-plane-service.md`。
 - `PublishConfigVersion` / `GetConfigSnapshot` / `AckAppliedConfigVersion` 已落。
 - 最小 gRPC smoke 已通过并归档：
   `docs/runbook/loadtest/control-plane-service/loadtest-report-20260620-control-plane-grpc-smoke.md`。
+- 已被 admin-service 真实下游 adapter smoke 验证为可通过
+  `CreateAdminOperation -> ApproveAdminOperation -> operation-worker` 间接发布配置：
+  `docs/runbook/loadtest/admin-service/loadtest-report-20260621-admin-config-publish-smoke.md`。
 - 与 api-gateway quota snapshot gate 对齐。

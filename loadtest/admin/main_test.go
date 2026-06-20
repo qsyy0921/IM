@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"testing"
 
 	adminv1 "github.com/qsyy0921/IM/api/proto/nexusim/admin/v1"
@@ -82,6 +83,48 @@ func TestValidateRejectsInvalidCreatePayloadJSON(t *testing.T) {
 	}
 	if err := cfg.validate(); err == nil {
 		t.Fatal("expected validation error")
+	}
+}
+
+func TestParseFlagsBuildsConfigPublishSmokeDefaults(t *testing.T) {
+	cfg := parseFlags([]string{
+		"-mode", "config-publish-smoke",
+		"-tenant-id", "tenant-admin-smoke",
+		"-run-name", "admin smoke:one",
+	})
+	if cfg.mode != "config-publish-smoke" {
+		t.Fatalf("mode = %q", cfg.mode)
+	}
+	if cfg.controlPlaneTarget == "" || cfg.pgDSN == "" || cfg.resultRoot == "" {
+		t.Fatalf("missing smoke defaults: %+v", cfg)
+	}
+	if cfg.runName != "admin smoke:one" {
+		t.Fatalf("run name = %q", cfg.runName)
+	}
+	if err := cfg.validate(); err != nil {
+		t.Fatalf("validate: %v", err)
+	}
+}
+
+func TestConfigPublishOperationPayloadDoesNotExposeSecretFields(t *testing.T) {
+	payload := configPublishOperationPayload("quota-v1")
+	var decoded map[string]any
+	if err := json.Unmarshal([]byte(payload), &decoded); err != nil {
+		t.Fatalf("payload json: %v", err)
+	}
+	forbidden := []string{"secret", "token", "password", "private_key", "dsn"}
+	for key := range decoded {
+		for _, marker := range forbidden {
+			if key == marker {
+				t.Fatalf("unexpected sensitive key %q", key)
+			}
+		}
+	}
+	if decoded["version"] != "quota-v1" {
+		t.Fatalf("version = %v", decoded["version"])
+	}
+	if _, ok := decoded["payload_json"].(string); !ok {
+		t.Fatalf("payload_json is not a string: %#v", decoded["payload_json"])
 	}
 }
 

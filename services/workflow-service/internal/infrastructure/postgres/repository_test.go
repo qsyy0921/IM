@@ -71,6 +71,32 @@ func TestRepositoryWorkflowFirstPathIntegration(t *testing.T) {
 	assertWorkflowOutboxLowSensitive(t, ctx, pool)
 }
 
+func TestRepositoryCreateAdminOperationWorkflowIntegration(t *testing.T) {
+	ctx := context.Background()
+	pool := openWorkflowTestPool(t)
+	resetWorkflowTables(t, ctx, pool)
+	repository := NewRepository(pool)
+
+	prepared := prepareWorkflow(t, "wf-admin-operation-idem-1", "wf_admin_operation_1", "wfs_admin_operation_1")
+	prepared.Command.WorkflowType = types.WorkflowTypeAdminOperation
+	prepared.Command.RiskLevel = types.RiskLevelCritical
+	prepared.Command.RequesterService = "admin-service"
+	prepared.Command.TargetService = "admin-service"
+	prepared.Command.TargetOperation = "CONFIG_PUBLISH"
+	prepared.Command.PayloadSchemaVersion = "admin.config_publish.v1"
+	prepared.CommandHash = domain.HashRef("admin-operation-workflow")
+
+	workflow, replayed, err := repository.CreateWorkflow(ctx, prepared)
+	if err != nil {
+		t.Fatalf("create admin operation workflow: %v", err)
+	}
+	if replayed || workflow.WorkflowType != types.WorkflowTypeAdminOperation ||
+		workflow.RiskLevel != types.RiskLevelCritical ||
+		workflow.TargetOperation != "CONFIG_PUBLISH" {
+		t.Fatalf("unexpected admin operation workflow: replayed=%v %+v", replayed, workflow)
+	}
+}
+
 func prepareWorkflow(t *testing.T, idempotencyKey string, workflowID string, stepID string) domain.PreparedWorkflow {
 	t.Helper()
 	prepared, err := domain.PrepareWorkflow(types.CreateWorkflowCommand{
@@ -140,13 +166,22 @@ func openWorkflowTestPool(t *testing.T) *pgxpool.Pool {
 
 func applyWorkflowMigration(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
 	t.Helper()
-	path := filepath.Join("..", "..", "..", "..", "..", "migrations", "postgres", "workflow", "000001_workflow_core.sql")
-	content, err := os.ReadFile(path)
+	pattern := filepath.Join("..", "..", "..", "..", "..", "migrations", "postgres", "workflow", "*.sql")
+	paths, err := filepath.Glob(pattern)
 	if err != nil {
-		t.Fatalf("read workflow migration: %v", err)
+		t.Fatalf("find workflow migrations: %v", err)
 	}
-	if _, err := pool.Exec(ctx, string(content)); err != nil {
-		t.Fatalf("apply workflow migration: %v", err)
+	if len(paths) == 0 {
+		t.Fatalf("no workflow migrations matched %s", pattern)
+	}
+	for _, path := range paths {
+		content, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("read workflow migration %s: %v", path, err)
+		}
+		if _, err := pool.Exec(ctx, string(content)); err != nil {
+			t.Fatalf("apply workflow migration %s: %v", path, err)
+		}
 	}
 }
 

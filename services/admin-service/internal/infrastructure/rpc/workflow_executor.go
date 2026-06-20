@@ -17,8 +17,10 @@ import (
 
 const (
 	workflowTypeRepairApproval = "REPAIR_APPROVAL"
+	workflowTypeAdminOperation = "ADMIN_OPERATION"
 
 	defaultWorkflowApprovalPolicy = "admin.workflow.repair.v1"
+	defaultAdminWorkflowPolicy    = "admin.workflow.operation.v1"
 	defaultWorkflowTimeoutPolicy  = "admin.workflow.timeout.default.v1"
 )
 
@@ -74,7 +76,7 @@ func (executor WorkflowExecutor) Execute(ctx context.Context, operation types.Ad
 		TargetRefHash:        operation.TargetRefHash,
 		TargetService:        "admin-service",
 		TargetOperation:      operation.OperationType,
-		ApprovalPolicyRef:    defaultWorkflowApprovalPolicy,
+		ApprovalPolicyRef:    workflowApprovalPolicy(operation, workflowType),
 		TimeoutPolicyRef:     defaultWorkflowTimeoutPolicy,
 		PayloadSchemaVersion: operation.PayloadSchemaVersion,
 		PayloadRefHash:       operation.PayloadHash,
@@ -103,7 +105,20 @@ func workflowTypeForAdminOperation(operation types.AdminOperation) (string, erro
 	if operation.OperationType == executor.OperationTypeRepairRequest {
 		return workflowTypeRepairApproval, nil
 	}
+	if operation.RiskLevel == types.RiskLevelCritical {
+		return workflowTypeAdminOperation, nil
+	}
 	return "", types.NewFailedPrecondition("admin operation workflow type is unsupported")
+}
+
+func workflowApprovalPolicy(operation types.AdminOperation, workflowType string) string {
+	if workflowType == workflowTypeRepairApproval {
+		return defaultWorkflowApprovalPolicy
+	}
+	if operation.RiskLevel == types.RiskLevelCritical {
+		return defaultAdminWorkflowPolicy
+	}
+	return defaultWorkflowApprovalPolicy
 }
 
 func firstNonEmpty(values ...string) string {

@@ -63,13 +63,45 @@ func TestWorkflowExecutorCreatesRepairApprovalWorkflow(t *testing.T) {
 	}
 }
 
-func TestWorkflowExecutorRejectsUnsupportedOperationType(t *testing.T) {
+func TestWorkflowExecutorCreatesAdminOperationWorkflowForCriticalOperation(t *testing.T) {
+	client := &fakeWorkflowClient{
+		response: &workflowv1.CreateWorkflowResponse{
+			Workflow: &workflowv1.Workflow{WorkflowId: "wf_admin_operation_1"},
+		},
+	}
+	workflowExecutor := NewWorkflowExecutor(client, time.Second)
+
+	result, err := workflowExecutor.Execute(context.Background(), types.AdminOperation{
+		TenantID:             "tenant-admin-rpc-test",
+		OperationID:          "admop_config_1",
+		OperationType:        "CONFIG_PUBLISH",
+		TargetRefHash:        "sha256:target",
+		RiskLevel:            types.RiskLevelCritical,
+		PayloadSchemaVersion: "admin.config_publish.v1",
+		PayloadHash:          "sha256:payload",
+		ReasonRef:            "reason:config",
+		RequestedBy:          "operator:alice",
+	})
+	if err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if result.DownstreamRequestRef != "workflow:wf_admin_operation_1" {
+		t.Fatalf("unexpected result: %+v", result)
+	}
+	if client.request.GetWorkflowType() != "ADMIN_OPERATION" ||
+		client.request.GetApprovalPolicyRef() != defaultAdminWorkflowPolicy ||
+		client.request.GetTargetOperation() != "CONFIG_PUBLISH" {
+		t.Fatalf("unexpected workflow request: %+v", client.request)
+	}
+}
+
+func TestWorkflowExecutorRejectsUnsupportedNonCriticalOperationType(t *testing.T) {
 	workflowExecutor := NewWorkflowExecutor(&fakeWorkflowClient{}, time.Second)
 
 	_, err := workflowExecutor.Execute(context.Background(), types.AdminOperation{
 		OperationID:   "admop_config",
 		OperationType: "CONFIG_PUBLISH",
-		RiskLevel:     types.RiskLevelCritical,
+		RiskLevel:     types.RiskLevelHigh,
 	})
 	if !errors.Is(err, types.ErrFailedPrecondition) {
 		t.Fatalf("expected failed precondition, got %v", err)

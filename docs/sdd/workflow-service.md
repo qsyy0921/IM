@@ -161,17 +161,18 @@ workflow_id, workflow_status, next_step_id, decision_id, outbox_event_id
 
 ## 6. 工作流类别
 
-第一版支持两类最小 workflow：
+第一版支持三类最小 workflow：
 
 | 类型 | 入口 | 目标 |
 | --- | --- | --- |
 | `ACTION_APPROVAL` | agent-service / action-executor | 高风险 tool action 审批等待 |
 | `REPAIR_APPROVAL` | admin-service / operator | DLQ、repair、redrive、cleanup 审批 |
+| `ADMIN_OPERATION` | admin-service | 非 repair 的 CRITICAL 管理操作审批等待 |
 
 当前 admin-service 已接入第一版 `REPAIR_REQUEST -> REPAIR_APPROVAL`：admin operation
 worker 只向 workflow-service 传 low-sensitive ref/hash，并把 workflow id 作为
-admin result 的 downstream ref。通用 `ADMIN_OPERATION` workflow 类型仍是后续扩展，
-不能把其它 CRITICAL admin operation 伪装成 repair approval。
+admin result 的 downstream ref。非 repair 的 `CRITICAL` admin operation 使用
+`ADMIN_OPERATION`，不能伪装成 repair approval。
 
 后续扩展：
 
@@ -406,7 +407,7 @@ workflow-outbox-repair
 进入 first smoke 前：
 
 - proto / migration / 六层 skeleton / cmd runtime 已落。
-- `ACTION_APPROVAL` 和 `REPAIR_APPROVAL` 最小 workflow tests 通过。
+- `ACTION_APPROVAL`、`REPAIR_APPROVAL` 和 `ADMIN_OPERATION` 最小 workflow tests 通过。
 - 高风险 workflow 无审批时 fail closed。
 - event、metrics、audit summary 不包含 reason 原文、payload 原文、EvidencePack、
   proposal 正文或 downstream response。

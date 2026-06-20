@@ -45,7 +45,8 @@ model-gateway / workflow / knowledge-ingestion / vector-index
   checks / smoke。
 - `workflow-service` 已从 stage-switch 进入 product-active 第一版 implementation
   slice，`CreateWorkflow`、`RecordWorkflowDecision`、`GetWorkflow` 最小路径已落地并
-  通过 focused checks / 完整 `check-local`。
+  支持 `ACTION_APPROVAL`、`REPAIR_APPROVAL` 和 `ADMIN_OPERATION`，通过 focused
+  checks / 完整 `check-local`。
 - `vector-index-service` 已从 stage-switch 进入 product-active 第一版 implementation
   slice，覆盖 `UpsertVectorItem`、`TombstoneVectorItem`、`SearchVectors`、
   `GetVectorIndexJob`、PostgreSQL metadata 和 local / PostgreSQL-backed test vector adapter。
@@ -54,14 +55,14 @@ model-gateway / workflow / knowledge-ingestion / vector-index
   `GetAdminOperation`、`ListAdminOperations`、PostgreSQL operation / approval
   状态、低敏 admin outbox、`admin_outbox -> im.admin.events` outbox relay 和
   `operation-worker` risk routing 第一版执行闭环。`REPAIR_REQUEST` 已接入
-  `workflow-service` 创建 `REPAIR_APPROVAL`，未配置 workflow 时
-  `REPAIR_REQUEST` / `CRITICAL` 操作 fail-closed，不再被本地 no-op executor
-  标记成功。
+  `workflow-service` 创建 `REPAIR_APPROVAL`，其它 `CRITICAL` operation 已接入
+  `ADMIN_OPERATION`，未配置 workflow 时 `REPAIR_REQUEST` / `CRITICAL` 操作
+  fail-closed，不再被本地 no-op executor 标记成功。
 
 ## 下一步
 
-- 默认继续 `admin-service` 通用 `ADMIN_OPERATION` workflow 类型、更多 operation
-  专用 workflow adapter 或真实下游公开 admin API adapter。
+- 默认继续 `admin-service` 更多 operation 专用 workflow adapter 或真实下游公开
+  admin API adapter。
 - 也可以继续 `vector-index-service` embedding worker / rebuild worker / outbox relay。
 - 也可以继续 notification SMTP / SMS / APNs / FCM adapter 或 bounce-suppression。
 

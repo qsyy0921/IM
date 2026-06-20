@@ -164,11 +164,12 @@ operator reason raw text
 
 ```text
 REPAIR_REQUEST -> workflow-service CreateWorkflow(REPAIR_APPROVAL)
+CRITICAL non-repair operation -> workflow-service CreateWorkflow(ADMIN_OPERATION)
 ```
 
 该路径只传 `target_ref_hash`、`payload_hash`、`reason_ref` 和 `evidence_refs` 等低敏
-ref/hash；admin-service result 只记录 `workflow:<workflow_id>`。其它 `CRITICAL`
-operation 在通用 `ADMIN_OPERATION` workflow 类型或专用下游 adapter 落地前不得走
+ref/hash；admin-service result 只记录 `workflow:<workflow_id>`。未配置
+`NEXUSIM_WORKFLOW_GRPC_ADDR` 时，`REPAIR_REQUEST` / `CRITICAL` operation 不得走
 本地 no-op executor，必须 fail-closed。
 
 高风险 operation 默认走：

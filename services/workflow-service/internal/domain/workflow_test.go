@@ -31,6 +31,26 @@ func TestPrepareWorkflowNormalizesAndBuildsWaitingDecision(t *testing.T) {
 	}
 }
 
+func TestPrepareWorkflowAllowsAdminOperationType(t *testing.T) {
+	prepared, err := PrepareWorkflow(validCreateCommand(func(command *types.CreateWorkflowCommand) {
+		command.RequesterService = "admin-service"
+		command.WorkflowType = types.WorkflowTypeAdminOperation
+		command.RiskLevel = types.RiskLevelCritical
+		command.TargetService = "admin-service"
+		command.TargetOperation = "CONFIG_PUBLISH"
+		command.PayloadSchemaVersion = "admin.config_publish.v1"
+	}), "wf_admin_1", "wfs_admin_1", time.Now())
+	if err != nil {
+		t.Fatalf("prepare admin operation workflow: %v", err)
+	}
+	workflow := WorkflowFromPrepared(prepared)
+	if workflow.WorkflowType != types.WorkflowTypeAdminOperation ||
+		workflow.RiskLevel != types.RiskLevelCritical ||
+		workflow.TargetOperation != "CONFIG_PUBLISH" {
+		t.Fatalf("unexpected admin workflow: %+v", workflow)
+	}
+}
+
 func TestStatusAfterDecision(t *testing.T) {
 	status, terminal := StatusAfterDecision(types.DecisionTypeApprove)
 	if status != types.WorkflowStatusApproved || !terminal {

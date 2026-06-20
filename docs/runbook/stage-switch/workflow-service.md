@@ -69,10 +69,11 @@ RecordWorkflowDecision
 GetWorkflow
 ```
 
-Support only `ACTION_APPROVAL` and `REPAIR_APPROVAL` first. `AdvanceWorkflow`,
-timer workers, compensation workers, external callback waits and outbox relay
-can follow after the first gRPC smoke unless they are needed to prove the first
-path.
+Support `ACTION_APPROVAL` and `REPAIR_APPROVAL` in the initial slice, then add
+`ADMIN_OPERATION` when admin-service needs a generic CRITICAL operation approval
+path. `AdvanceWorkflow`, timer workers, compensation workers, external callback
+waits and outbox relay can follow after the first gRPC smoke unless they are
+needed to prove the first path.
 
 ## Focused Acceptance For First Smoke
 

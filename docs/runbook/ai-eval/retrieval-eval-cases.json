@@ -125,6 +125,25 @@
       ]
     },
     {
+      "id": "rag-service-current-memory-live-excludes-stale",
+      "family": "collaborative_memory",
+      "stage": "rag-service",
+      "status": "active",
+      "query": "phoenix launch decision current memory",
+      "risk": "RAG service-stack smoke must prove expired and superseded group memory rows are excluded from current EvidencePack results",
+      "required_assertions": [
+        {
+          "type": "must_preserve_evidencepack_source_coverage"
+        },
+        {
+          "type": "must_exclude_expired_superseded_memory_items"
+        },
+        {
+          "type": "must_preserve_projection_versions"
+        }
+      ]
+    },
+    {
       "id": "rag-versioned-grounding-contract",
       "family": "attribution",
       "stage": "rag-service",
@@ -246,6 +265,25 @@
       ]
     },
     {
+      "id": "summary-service-current-memory-live-excludes-stale",
+      "family": "collaborative_memory",
+      "stage": "summary-service",
+      "status": "active",
+      "query": "phoenix launch decision current memory summary",
+      "risk": "Summary service-stack smoke must prove expired and superseded group memory rows are excluded from current EvidencePack results",
+      "required_assertions": [
+        {
+          "type": "must_preserve_evidencepack_source_coverage"
+        },
+        {
+          "type": "must_exclude_expired_superseded_memory_items"
+        },
+        {
+          "type": "must_preserve_projection_versions"
+        }
+      ]
+    },
+    {
       "id": "summary-insufficient-evidence-abstains",
       "family": "retrieval_miss",
       "stage": "summary-service",
@@ -308,6 +346,28 @@
         },
         {
           "type": "must_preserve_evidencepack_source_coverage"
+        }
+      ]
+    },
+    {
+      "id": "agent-service-current-memory-live-excludes-stale",
+      "family": "collaborative_memory",
+      "stage": "agent-service",
+      "status": "active",
+      "query": "prepare proposal with current group memory only",
+      "risk": "Agent proposal service-stack smoke must prove expired and superseded group memory rows are excluded from current EvidencePack results before proposal text is produced",
+      "required_assertions": [
+        {
+          "type": "must_keep_proposal_only_before_execution"
+        },
+        {
+          "type": "must_preserve_evidencepack_source_coverage"
+        },
+        {
+          "type": "must_exclude_expired_superseded_memory_items"
+        },
+        {
+          "type": "must_preserve_projection_versions"
         }
       ]
     },

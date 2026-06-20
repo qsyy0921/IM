@@ -50,11 +50,16 @@ group memory -> EvidencePack -> RAG -> summary -> multi-agent
 - memory extraction confidence / review eval：新增低置信候选和 contradiction
   候选低敏 fixture case，验证弱信号 / 冲突记忆必须保留 source refs、停在
   PENDING / NEEDS_REVIEW，不能直接成为 current ACTIVE evidence。
+- current-memory service-stack live smoke harness：`loadtest/rag`、`loadtest/summary`
+  和 `loadtest/agent` 已在真实服务栈 seed 中加入 expired / superseded 低敏
+  decoy memory，并在 summary JSON 中记录 `current_memory_at_seq`、
+  `expired_memory_excluded`、`superseded_memory_excluded`；ai-eval catalog 增至
+  64 cases，service-stack adapter 已能断言真实服务栈排除 stale memory。
 
 下一步默认推进：
 
 ```text
-推进 current-memory service-stack live smoke
+运行 current-memory service-stack live smoke 并归档报告
 ```
 
 硬边界：RAG / summary / Agent 只能消费 EvidencePack；真实写动作必须走

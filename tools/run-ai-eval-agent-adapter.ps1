@@ -93,6 +93,14 @@ function Test-AgentAssertion {
                 -and $searchCount -gt 0 `
                 -and $memoryCount -gt 0
         }
+        "must_exclude_expired_superseded_memory_items" {
+            return `
+                [int64]$Summary.current_memory_at_seq -gt 0 `
+                -and [bool]$Summary.expired_memory_excluded `
+                -and [bool]$Summary.superseded_memory_excluded `
+                -and (Get-JsonPropertyString -Object $Summary.seed -Name "expired_memory_event_id").Length -gt 0 `
+                -and (Get-JsonPropertyString -Object $Summary.seed -Name "superseded_memory_event_id").Length -gt 0
+        }
         "must_preserve_projection_versions" {
             return `
                 [int64]$Summary.search_projection_version -gt 0 `

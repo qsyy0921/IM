@@ -71,9 +71,10 @@ external HTTP adapter + eval first paths are landed. Profile / Agent output
 safety expanded eval cases plus the local fixture adapter are landed.
 `ai-eval-service` catalog, gate policy, negative/action/memory evals, and
 memory-service runtime `at_conversation_seq` source-ref / validity /
-supersession query checks, retrieval current-only memory query, and RAG /
-Summary / Agent explicit `at_conversation_seq` requests are landed. RAG /
-Summary / Agent current-memory consumption and memory extraction confidence / review CI-safe regressions are landed. Next: current-memory service-stack live smoke.
+supersession query checks, retrieval current-only memory query, RAG /
+Summary / Agent explicit `at_conversation_seq` requests, RAG / Summary / Agent
+current-memory consumption and memory extraction confidence / review CI-safe
+regressions, and current-memory service-stack live smoke harness are landed. Next: run current-memory service-stack live smoke and archive the report.
 Search, memory, retrieval, real RAG / summary / Agent adapter smokes, the skill
 catalog foundation, the MCP prepare boundary, and approved proposal preflight
 are passed.

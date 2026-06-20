@@ -116,6 +116,7 @@ $knownAssertionTypes = @(
     "must_record_tool_result_projection",
     "must_execute_safe_local_tool",
     "must_preserve_evidencepack_source_coverage",
+    "must_exclude_expired_superseded_memory_items",
     "must_return_empty_evidencepack",
     "must_preserve_projection_versions",
     "must_preserve_rag_retrieval_versions",

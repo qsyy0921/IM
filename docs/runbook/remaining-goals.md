@@ -40,9 +40,10 @@ provider-grade 运维和完整系统测试暂不作为当前转进阻塞。
    REJECTED 状态。`QueryMemoryEvents.at_conversation_seq`、runtime checks 和
    retrieval-gateway EvidencePack current-only memory query，以及 RAG /
    Summary / Agent API 显式透传 `at_conversation_seq`，以及 RAG / Summary /
-   Agent current-memory consumption CI-safe regression 和 memory extraction
-   confidence / review eval 已落；后续补 current-memory service-stack live
-   smoke，并继续保留 source-ref / visibility / review 边界。
+   Agent current-memory consumption CI-safe regression、memory extraction
+   confidence / review eval，以及 current-memory service-stack live smoke
+   harness / adapter assertion 已落；后续运行真实服务栈 smoke 并归档报告，
+   继续保留 source-ref / visibility / review 边界。
 
 3. Agent 真实业务动作扩展：
    `agent-service`、`skill-registry`、`mcp-gateway`、`action-executor` 已具备

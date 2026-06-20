@@ -20,6 +20,8 @@ proposal 前调用 `mcp-gateway.PrepareToolCall` 做 skill / policy / prepare au
   EvidencePack；prepare deny 仍不检索 EvidencePack。
 - ai-eval 已补 Agent current-memory consumption CI-safe regression：`at_conversation_seq`
   必须传播，过期和 superseded memory 不得作为 current citation。
+- `loadtest/agent` 已加入 expired / superseded 低敏 decoy memory seed，并在
+  summary JSON 输出 stale memory 排除结果，供 service-stack live adapter 断言。
 
 ## 边界
 
@@ -29,4 +31,4 @@ proposal 前调用 `mcp-gateway.PrepareToolCall` 做 skill / policy / prepare au
 
 ## 下一步
 
-- 补 current-memory service-stack live smoke，验证真实服务栈的 Agent proposal 不引用 stale memory；仍只提交 proposal。
+- 运行 current-memory service-stack live smoke，验证真实服务栈的 Agent proposal 不引用 stale memory；仍只提交 proposal。

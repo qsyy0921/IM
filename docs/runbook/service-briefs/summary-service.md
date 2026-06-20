@@ -25,8 +25,10 @@
 - `GenerateConversationSummaryRequest.at_conversation_seq` 已透传到 EvidencePack current-memory query。
 - ai-eval 已补 Summary current-memory consumption CI-safe regression：`at_conversation_seq`
   必须传播，过期和 superseded memory 不得作为 current citation。
+- `loadtest/summary` 已加入 expired / superseded 低敏 decoy memory seed，并在
+  summary JSON 输出 stale memory 排除结果，供 service-stack live adapter 断言。
 
 下一步：
 
 - 后续 provider 仍走 SummaryProvider port、prompt guard、hash / citation 校验和 verifier。
-- 补 current-memory service-stack live smoke，验证真实服务栈不引用 stale memory。
+- 运行 current-memory service-stack live smoke，验证真实服务栈不引用 stale memory。

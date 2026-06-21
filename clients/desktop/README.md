@@ -13,8 +13,8 @@ the native bridge can stay narrow and auditable.
 - The shell includes development-only session storage, an in-memory message
   cache, static lifecycle/network ports, and unsupported local wakeup
   notifications.
-- First Tauri v2 Rust runner skeleton exists under `src-tauri`; it exposes no
-  IPC commands yet.
+- First Tauri v2 Rust runner skeleton exists under `src-tauri`; it exposes only
+  the read-only `runtime_metadata` command.
 - `shell-config.example.json` records the low-permission WebView config bridge
   for local LAN endpoints and desktop runtime identity. It can be rendered to
   `web/public/nexusim-shell-config.js` before a shell build.
@@ -28,6 +28,9 @@ the native bridge can stay narrow and auditable.
 ## Security Rules
 
 - Desktop IPC must expose only explicit commands.
+- Current IPC is metadata-only. It must not expose tokens, storage, file-system
+  access or message APIs until a separate native capability ADR defines the
+  audit and permission boundary.
 - Shell config is endpoint and identity metadata only. It must not contain
   gateway tokens, refresh tokens, passwords, private keys, or arbitrary native
   capability flags.

@@ -103,8 +103,8 @@ First slice:
   network/lifecycle ports and unsupported local wakeup notifications. This
   moves desktop beyond a pure contract, but it is not an installer yet.
 - `clients/desktop/src-tauri` now has a first-stage Tauri v2 Rust runner
-  skeleton with no IPC commands. `bundle.active` remains `false`, so this is not
-  a local Windows artifact yet.
+  skeleton with only a read-only `runtime_metadata` IPC command. `bundle.active`
+  remains `false`, so this is not a local Windows artifact yet.
 - `clients/android` now has a first-stage TypeScript runtime adapter:
   `loadAndroidRuntimeConfig`, `createAndroidPlatformAdapter`, development-only
   session storage, localStorage-backed persistent message cache, static
@@ -209,10 +209,11 @@ First slice:
   It does not replace existing secure mTLS gateway / push smoke coverage.
 - PC desktop and Android now both have first-stage TypeScript runtime adapters.
   PC desktop also has a Tauri runner skeleton, and Android has a Kotlin native
-  WebView asset shell skeleton. Both targets reserve native SQLite store config
-  and fail closed until native bridges exist. Neither target produces `.msi`,
-  `.exe`, `.apk`, or `.aab` artifacts yet; the repository now has dry-run-tested
-  build wrappers for those future artifacts.
+  WebView asset shell skeleton. PC exposes only read-only runtime metadata IPC;
+  Android exposes only read-only metadata JavaScript bridge. Both targets reserve
+  native SQLite store config and fail closed until native bridges exist. Neither
+  target produces `.msi`, `.exe`, `.apk`, or `.aab` artifacts yet; the repository
+  now has dry-run-tested build wrappers for those future artifacts.
 - `/api/auth/logout` performs first-stage server-side logout for the current
   authenticated session only. Broader device/session management remains an
   identity/admin capability, not a client BFF target selector.

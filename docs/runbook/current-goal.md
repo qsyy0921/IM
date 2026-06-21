@@ -26,8 +26,8 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   `client-core`、`web`、`desktop`、`android` 均有明确 package / runtime contract；
   Web 端已有 Vite shell；PC desktop 和 Android 均已有 first-stage TypeScript
   runtime adapter（development session store、localStorage-backed persistent
-  message store、static lifecycle/network ports）；PC desktop 已有 Tauri v2 runner skeleton（无 IPC
-  command、bundle inactive）；Android 已有 Kotlin WebView asset shell / metadata
+  message store、static lifecycle/network ports）；PC desktop 已有 Tauri v2 runner skeleton（仅只读
+  `runtime_metadata` command、bundle inactive）；Android 已有 Kotlin WebView asset shell / metadata
   bridge skeleton（不拥有 token 或消息事实），但仍不产出安装包 / APK。
 - `api-gateway` 已新增 first-stage client BFF HTTP/JSON surface：`/api/auth/login`、
   `/api/auth/refresh`、`/api/me`、`/api/conversations`、

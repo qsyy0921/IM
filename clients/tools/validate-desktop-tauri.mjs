@@ -42,7 +42,12 @@ assert(build.includes("tauri_build::build()"), "Tauri build hook missing");
 
 const main = read("desktop/src-tauri/src/main.rs");
 assert(main.includes("tauri::Builder::default()"), "Tauri Builder entrypoint missing");
-assert(!main.includes("invoke_handler"), "desktop shell must not expose IPC commands yet");
+assert(main.includes("#[tauri::command]"), "desktop shell must expose only audited Tauri commands");
+assert(main.includes("fn runtime_metadata() -> String"), "desktop runtime metadata command missing");
+assert(main.includes("tauri::generate_handler![runtime_metadata]"), "desktop invoke handler must only register runtime_metadata");
+assert(main.includes('RUNTIME_TARGET: &str = "windows-desktop"'), "desktop runtime target marker missing");
+assert(main.includes('NATIVE_BRIDGE_VERSION: &str = "0.1.0"'), "desktop native bridge version marker missing");
+assert(!main.match(/std::fs|File::|Command::|process::|token|secret|password|credential|message_id/i), "desktop metadata bridge must not expose sensitive or broad native capability");
 
 const config = readJSON("desktop/src-tauri/tauri.conf.json");
 assert(config.productName === "NexusIM", "desktop product name mismatch");

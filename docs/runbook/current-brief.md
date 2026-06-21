@@ -64,6 +64,8 @@ adoption rules，不把服务数量、中间件或部署形态写死。
   IndexedDB adapter first path 已落，`loadtest/clientweb` 本地 smoke 已通过并归档；
   loopback clean baseline 和 Windows wired `172.31.50.1` clean baseline 已通过，
   BFF HTTP route metrics / rate-limit adapter 已落；PC desktop / Android 已有
+  shared `LocalMessageStore.listMessages` 读缓存 port 和一致的 pending -> accepted
+  send 迁移语义；
   target shell Web assets prep，PC 已有只读 `runtime_metadata` IPC，且
   `frontendDist` 指向 shared prepared Web dist；Android 已用
   WebViewAssetLoader 加载本地 assets，并已注册只读单方法 `NexusIMNative`

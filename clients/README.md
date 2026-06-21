@@ -40,6 +40,9 @@ The three targets share:
 - `@nexusim/protocol`: public API and WebSocket frame types.
 - `@nexusim/client-core`: auth session, push connection, PullInbox sync,
   send queue, ACK queue and platform adapter ports.
+- `LocalMessageStore`: shared cache/read model port for cursor, pending send,
+  accepted-send migration and `listMessages`; Web uses IndexedDB while PC /
+  Android first-stage shells use a key-value-backed implementation.
 
 Platform-specific code implements:
 

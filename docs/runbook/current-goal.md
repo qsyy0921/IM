@@ -78,6 +78,9 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   send、accepted send 稳定 key 迁移、防 replay duplicate、failed-send 状态和
   conversations-needing-sync 列表。desktop / Android 均已预留 `sqlite` store
   config，且在 native bridge 未实现前 fail-fast；后续生产化再接 native SQLite bridge。
+- `LocalMessageStore.listMessages` 已提升为 shared client-core port；
+  `MemoryMessageStore`、`KeyValueMessageStore` 和 Web `IndexedDBMessageStore`
+  现在都有同一读缓存语义，并补了 pending -> accepted-send 迁移去重测试。
 - `clients` workspace 已新增 focused runtime lifecycle smoke：
   `npm --prefix clients run test:runtime-lifecycle` 会编译并实例化 desktop /
   Android runtime，验证 login 持久化 session、restoreSession hydrate auth manager、

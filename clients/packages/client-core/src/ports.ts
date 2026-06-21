@@ -35,6 +35,7 @@ export interface LocalMessageStore {
   markPending(message: MessageItem): Promise<void>;
   markSendAccepted(localID: string, response: SendMessageResponse): Promise<void>;
   markSendFailed(localID: string, reason: string): Promise<void>;
+  listMessages(conversationID: ConversationID): Promise<MessageItem[]>;
   listConversationsNeedingSync(): Promise<ConversationID[]>;
   clear(): Promise<void>;
 }

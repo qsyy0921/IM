@@ -61,6 +61,7 @@ export class MemoryMessageStore implements LocalMessageStore {
       status: "SENT"
     };
     this.#pendingByLocalID.delete(localID);
+    this.#delete(pending);
     this.#upsert(accepted);
     this.#recordReceivedSeq(accepted);
   }
@@ -81,6 +82,16 @@ export class MemoryMessageStore implements LocalMessageStore {
     return Array.from(this.#messagesByConversation.keys()).sort();
   }
 
+  async listMessages(conversationID: ConversationID): Promise<MessageItem[]> {
+    const messages = this.#messagesByConversation.get(conversationID);
+    if (!messages) {
+      return [];
+    }
+    return Array.from(messages.values())
+      .sort(compareMessages)
+      .map(message => ({ ...message }));
+  }
+
   async clear(): Promise<void> {
     this.#messagesByConversation.clear();
     this.#pendingByLocalID.clear();
@@ -94,6 +105,10 @@ export class MemoryMessageStore implements LocalMessageStore {
       this.#messagesByConversation.set(message.conversationID, messages);
     }
     messages.set(messageKey(message), { ...message });
+  }
+
+  #delete(message: MessageItem): void {
+    this.#messagesByConversation.get(message.conversationID)?.delete(messageKey(message));
   }
 
   #recordReceivedSeq(message: MessageItem): void {
@@ -116,4 +131,11 @@ function messageKey(message: MessageItem): string {
 
 function localMessageID(message: MessageItem): string {
   return message.clientMessageID ?? message.messageID;
+}
+
+function compareMessages(left: MessageItem, right: MessageItem): number {
+  if (left.conversationSeq !== right.conversationSeq) {
+    return left.conversationSeq - right.conversationSeq;
+  }
+  return (left.createdAtMs ?? 0) - (right.createdAtMs ?? 0);
 }

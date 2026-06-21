@@ -47,7 +47,9 @@
   renderer 和 target shell Web assets prep；Web 已接
   first-stage BFF fetch / push WebSocket / IndexedDB local
   store adapters，并把 Web shell 接到 login / PullInbox / SendMessage /
-  AckDelivery flow；`IndexedDBMessageStore` 已新增无外部依赖 first-stage
+  AckDelivery flow；`LocalMessageStore.listMessages` 已成为 shared client-core
+  读缓存 port，Web / PC / Android 后续 UI 可复用同一 local read-model 边界；
+  `IndexedDBMessageStore` 已新增无外部依赖 first-stage
   persistence test harness，覆盖 cursor、ordering、pending/accepted key
   migration、replay de-duplication 和 failed-send 状态；`loadtest/clientweb`
   已新增脚本化 BFF + push client-path

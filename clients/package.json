@@ -27,6 +27,7 @@
     "test:shell-smoke-plan": "node ./tools/test-client-shell-smoke-plan.mjs",
     "validate:builder-profile": "node ./tools/validate-client-builder-profile.mjs",
     "test:key-value-store": "node ./tools/test-key-value-message-store.mjs",
+    "test:local-message-store": "node ./tools/test-local-message-store-contract.mjs",
     "test:runtime-lifecycle": "node ./tools/test-client-runtime-lifecycle.mjs",
     "build:shell-assets:desktop": "node ./tools/prepare-shell-web-assets.mjs --target windows-desktop",
     "build:shell-assets:android": "node ./tools/prepare-shell-web-assets.mjs --target android",

@@ -290,8 +290,9 @@ ClientShellActions
 
 Browser, PC, and Android implement those ports differently, but the core
 algorithms stay shared.
-`LocalMessageStore` includes a `clear` operation so logout can remove cached
-messages, local cursors and pending-send records without making any local store
+`LocalMessageStore` includes `listMessages` and `clear` operations so all shells
+can read the same local cache boundary and logout can remove cached messages,
+local cursors and pending-send records without making any local store
 authoritative. Shared runtime logout must also disconnect push and clear the
 platform secure session store.
 `ClientShellActions` is the shared UI lifecycle contract for restore and logout;
@@ -409,7 +410,8 @@ PC desktop and Android now use shared `KeyValueMessageStore` with WebView
 replace only the storage port with SQLite/native adapters while keeping
 `client-core` sync, send queue and ACK semantics shared. PC desktop and Android
 `sqlite` configuration is reserved and must fail fast until a real native bridge
-exists.
+exists. `MemoryMessageStore`, `KeyValueMessageStore` and `IndexedDBMessageStore`
+share the same pending-send readback and accepted-send de-duplication contract.
 
 Minimum local entities:
 

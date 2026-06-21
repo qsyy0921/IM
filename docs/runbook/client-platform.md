@@ -145,6 +145,11 @@ First slice:
   `LocalMessageStore.clear`
   is now part of the shared port so logout can remove cached messages, cursors
   and pending sends consistently across targets.
+- `LocalMessageStore.listMessages` is now part of the shared port. Web,
+  desktop and Android shell UI can read cached messages through the same local
+  read-model boundary; `MemoryMessageStore`, `KeyValueMessageStore` and
+  `IndexedDBMessageStore` now share the same pending / accepted-send migration
+  expectations.
 - `npm --prefix clients run test:runtime-lifecycle` is the first focused
   desktop / Android runtime lifecycle smoke. It compiles the TypeScript runtime
   packages locally, instantiates both platform runtime factories, and verifies

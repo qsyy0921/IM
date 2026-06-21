@@ -48,6 +48,43 @@ func TestControlPlaneCompensationExecutorRollsBackConfig(t *testing.T) {
 	}
 }
 
+func TestControlPlaneCompensationExecutorUsesResolver(t *testing.T) {
+	client := &fakeControlPlaneClient{
+		rollbackResponse: &controlplanev1.RollbackConfigVersionResponse{
+			Version: &controlplanev1.ConfigVersion{Version: "v3"},
+		},
+	}
+	executor := NewControlPlaneCompensationExecutorWithResolver(client, time.Second, fakeInstructionResolver{
+		instruction: types.WorkflowCompensationInstruction{
+			PayloadRefHash:  "sha256:payload",
+			TargetService:   "control-plane-service",
+			TargetOperation: "CONFIG_ROLLBACK",
+			InstructionType: types.WorkflowCompensationInstructionTypeControlPlaneRollback,
+			Environment:     "prod",
+			ConfigKind:      "POLICY_RULESET_REF",
+			BundleKey:       "tenant-a",
+			TargetVersion:   "v3",
+			OperatorRef:     "operator:store",
+			ReasonRef:       "reason-sha256:store",
+			Status:          types.WorkflowCompensationInstructionStatusActive,
+		},
+		ok: true,
+	})
+
+	result, err := executor.ExecuteCompensation(context.Background(), compensationForControlPlane())
+	if err != nil {
+		t.Fatalf("execute compensation: %v", err)
+	}
+	if result.Status != types.WorkflowCompensationStatusSucceeded ||
+		result.DownstreamRequestRef != "config-rollback:prod:POLICY_RULESET_REF:tenant-a:v3" {
+		t.Fatalf("unexpected result: %+v", result)
+	}
+	if client.rollbackRequest.GetReasonRef() != "reason-sha256:store" ||
+		client.rollbackRequest.GetOperatorRef() != "operator:store" {
+		t.Fatalf("unexpected resolver-backed rollback request: %+v", client.rollbackRequest)
+	}
+}
+
 func TestControlPlaneCompensationExecutorFailsClosedWithoutInstruction(t *testing.T) {
 	executor := NewControlPlaneCompensationExecutor(&fakeControlPlaneClient{}, time.Second, nil)
 
@@ -112,6 +149,19 @@ type fakeControlPlaneClient struct {
 	rollbackRequest  *controlplanev1.RollbackConfigVersionRequest
 	rollbackResponse *controlplanev1.RollbackConfigVersionResponse
 	err              error
+}
+
+type fakeInstructionResolver struct {
+	instruction types.WorkflowCompensationInstruction
+	ok          bool
+	err         error
+}
+
+func (resolver fakeInstructionResolver) ResolveControlPlaneRollbackInstruction(
+	context.Context,
+	types.WorkflowCompensation,
+) (types.WorkflowCompensationInstruction, bool, error) {
+	return resolver.instruction, resolver.ok, resolver.err
 }
 
 func (client *fakeControlPlaneClient) PublishConfigVersion(context.Context, *controlplanev1.PublishConfigVersionRequest, ...grpc.CallOption) (*controlplanev1.PublishConfigVersionResponse, error) {

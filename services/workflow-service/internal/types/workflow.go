@@ -31,6 +31,10 @@ const (
 	WorkflowCompensationStatusSucceeded = "SUCCEEDED"
 	WorkflowCompensationStatusFailed    = "FAILED"
 
+	WorkflowCompensationInstructionTypeControlPlaneRollback = "CONTROL_PLANE_ROLLBACK"
+	WorkflowCompensationInstructionStatusActive             = "ACTIVE"
+	WorkflowCompensationInstructionStatusDisabled           = "DISABLED"
+
 	WorkflowEventCompensationRequested = "workflow.compensation.requested.v1"
 	WorkflowEventCompensationSucceeded = "workflow.compensation.succeeded.v1"
 	WorkflowEventCompensationFailed    = "workflow.compensation.failed.v1"
@@ -170,6 +174,25 @@ type WorkflowCompensationExecutionResult struct {
 	PublicError          string
 }
 
+type WorkflowCompensationInstruction struct {
+	TenantID        TenantID
+	InstructionID   string
+	WorkflowID      string
+	PayloadRefHash  string
+	TargetService   string
+	TargetOperation string
+	InstructionType string
+	Environment     string
+	ConfigKind      string
+	BundleKey       string
+	TargetVersion   string
+	OperatorRef     string
+	ReasonRef       string
+	Status          string
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+}
+
 func (command CreateWorkflowCommand) Normalized() CreateWorkflowCommand {
 	command.AuthContext = command.AuthContext.Normalized()
 	command.RequesterRef = strings.TrimSpace(command.RequesterRef)
@@ -284,6 +307,61 @@ func (command GetWorkflowCommand) Validate() error {
 	}
 	if command.WorkflowID == "" {
 		return NewInvalidArgument("workflow_id is required")
+	}
+	return nil
+}
+
+func (instruction WorkflowCompensationInstruction) Normalized() WorkflowCompensationInstruction {
+	instruction.TenantID = TenantID(strings.TrimSpace(string(instruction.TenantID)))
+	instruction.InstructionID = strings.TrimSpace(instruction.InstructionID)
+	instruction.WorkflowID = strings.TrimSpace(instruction.WorkflowID)
+	instruction.PayloadRefHash = strings.TrimSpace(instruction.PayloadRefHash)
+	instruction.TargetService = strings.TrimSpace(instruction.TargetService)
+	instruction.TargetOperation = strings.TrimSpace(instruction.TargetOperation)
+	instruction.InstructionType = strings.ToUpper(strings.TrimSpace(instruction.InstructionType))
+	instruction.Environment = strings.TrimSpace(instruction.Environment)
+	instruction.ConfigKind = strings.TrimSpace(instruction.ConfigKind)
+	instruction.BundleKey = strings.TrimSpace(instruction.BundleKey)
+	instruction.TargetVersion = strings.TrimSpace(instruction.TargetVersion)
+	instruction.OperatorRef = strings.TrimSpace(instruction.OperatorRef)
+	instruction.ReasonRef = strings.TrimSpace(instruction.ReasonRef)
+	instruction.Status = strings.ToUpper(strings.TrimSpace(instruction.Status))
+	if instruction.Status == "" {
+		instruction.Status = WorkflowCompensationInstructionStatusActive
+	}
+	return instruction
+}
+
+func (instruction WorkflowCompensationInstruction) Validate() error {
+	instruction = instruction.Normalized()
+	if instruction.TenantID == "" ||
+		instruction.InstructionID == "" ||
+		instruction.PayloadRefHash == "" ||
+		instruction.TargetService == "" ||
+		instruction.TargetOperation == "" ||
+		instruction.InstructionType == "" ||
+		instruction.OperatorRef == "" ||
+		instruction.ReasonRef == "" {
+		return NewInvalidArgument("workflow compensation instruction is incomplete")
+	}
+	if instruction.InstructionType != WorkflowCompensationInstructionTypeControlPlaneRollback {
+		return NewInvalidArgument("workflow compensation instruction type is unsupported")
+	}
+	if instruction.Status != WorkflowCompensationInstructionStatusActive &&
+		instruction.Status != WorkflowCompensationInstructionStatusDisabled {
+		return NewInvalidArgument("workflow compensation instruction status is unsupported")
+	}
+	if instruction.TargetService != "control-plane-service" || instruction.TargetOperation != "CONFIG_ROLLBACK" {
+		return NewInvalidArgument("workflow compensation instruction target is unsupported")
+	}
+	if instruction.Environment == "" || instruction.ConfigKind == "" ||
+		instruction.BundleKey == "" || instruction.TargetVersion == "" {
+		return NewInvalidArgument("control-plane compensation instruction is incomplete")
+	}
+	if looksSensitive(instruction.PayloadRefHash) ||
+		looksSensitive(instruction.OperatorRef) ||
+		looksSensitive(instruction.ReasonRef) {
+		return NewInvalidArgument("workflow compensation instruction refs must be low-sensitive")
 	}
 	return nil
 }

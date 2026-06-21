@@ -20,6 +20,7 @@ import (
 	postgresinfra "github.com/qsyy0921/IM/services/workflow-service/internal/infrastructure/postgres"
 	rpcinfra "github.com/qsyy0921/IM/services/workflow-service/internal/infrastructure/rpc"
 	"github.com/qsyy0921/IM/services/workflow-service/internal/trigger/compensation"
+	"github.com/qsyy0921/IM/services/workflow-service/internal/types"
 	"google.golang.org/grpc"
 )
 
@@ -46,6 +47,8 @@ func run(ctx context.Context) error {
 		return runCompensationWorker(ctx)
 	case "compensation-executor":
 		return runCompensationExecutor(ctx)
+	case "compensation-instruction-import":
+		return runCompensationInstructionImport(ctx)
 	default:
 		return fmt.Errorf("unsupported NEXUSIM_WORKFLOW_SERVICE_MODE %q", mode)
 	}
@@ -166,14 +169,15 @@ func runCompensationExecutor(ctx context.Context) error {
 	}
 	defer pool.Close()
 
-	executor, cleanup, err := workflowCompensationExecutorFromEnv(ctx)
+	repository := postgresinfra.NewRepository(pool)
+	executor, cleanup, err := workflowCompensationExecutorFromEnv(ctx, repository)
 	if err != nil {
 		return err
 	}
 	if cleanup != nil {
 		defer func() { _ = cleanup() }()
 	}
-	worker := compensation.NewExecutionWorker(postgresinfra.NewRepository(pool), executor, compensation.Config{
+	worker := compensation.NewExecutionWorker(repository, executor, compensation.Config{
 		BatchSize:    envInt("NEXUSIM_WORKFLOW_COMPENSATION_EXECUTION_BATCH_SIZE", 50),
 		PollInterval: envDuration("NEXUSIM_WORKFLOW_COMPENSATION_EXECUTION_POLL_INTERVAL", time.Second),
 		ErrorBackoff: envDuration("NEXUSIM_WORKFLOW_COMPENSATION_EXECUTION_ERROR_BACKOFF", time.Second),
@@ -186,7 +190,37 @@ func runCompensationExecutor(ctx context.Context) error {
 	return nil
 }
 
-func workflowCompensationExecutorFromEnv(ctx context.Context) (compensation.Executor, func() error, error) {
+func runCompensationInstructionImport(ctx context.Context) error {
+	pool, err := openPGPool(ctx)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	tenantID := strings.TrimSpace(os.Getenv("NEXUSIM_WORKFLOW_COMPENSATION_INSTRUCTION_TENANT_ID"))
+	if tenantID == "" {
+		return errors.New("NEXUSIM_WORKFLOW_COMPENSATION_INSTRUCTION_TENANT_ID is required")
+	}
+	instructions, err := rpcinfra.LoadControlPlaneRollbackInstructions(os.Getenv("NEXUSIM_WORKFLOW_COMPENSATION_INSTRUCTION_FILE"))
+	if err != nil {
+		return err
+	}
+	workflowInstructions, err := rpcinfra.ControlPlaneRollbackInstructionsForTenant(types.TenantID(tenantID), instructions)
+	if err != nil {
+		return err
+	}
+	count, err := postgresinfra.NewRepository(pool).UpsertWorkflowCompensationInstructions(ctx, workflowInstructions)
+	if err != nil {
+		return err
+	}
+	log.Printf("workflow-service imported %d compensation instructions", count)
+	return nil
+}
+
+func workflowCompensationExecutorFromEnv(
+	ctx context.Context,
+	instructionResolver rpcinfra.ControlPlaneRollbackInstructionResolver,
+) (compensation.Executor, func() error, error) {
 	mode := envString("NEXUSIM_WORKFLOW_COMPENSATION_EXECUTOR_MODE", "")
 	switch mode {
 	case "control-plane-rollback-file":
@@ -199,6 +233,16 @@ func workflowCompensationExecutorFromEnv(ctx context.Context) (compensation.Exec
 			os.Getenv("NEXUSIM_CONTROL_PLANE_GRPC_ADDR"),
 			envDuration("NEXUSIM_WORKFLOW_COMPENSATION_RPC_TIMEOUT", time.Second),
 			instructions,
+		)
+	case "control-plane-rollback-store":
+		if instructionResolver == nil {
+			return nil, nil, errors.New("workflow compensation instruction resolver is required")
+		}
+		return rpcinfra.DialControlPlaneCompensationExecutorWithResolver(
+			ctx,
+			os.Getenv("NEXUSIM_CONTROL_PLANE_GRPC_ADDR"),
+			envDuration("NEXUSIM_WORKFLOW_COMPENSATION_RPC_TIMEOUT", time.Second),
+			instructionResolver,
 		)
 	case "":
 		return nil, nil, errors.New("NEXUSIM_WORKFLOW_COMPENSATION_EXECUTOR_MODE is required")
@@ -217,7 +261,7 @@ func workflowModeFromEnv() string {
 
 func validateWorkflowMode(mode string) error {
 	switch mode {
-	case "noop", "grpc", "compensation-worker", "compensation-executor":
+	case "noop", "grpc", "compensation-worker", "compensation-executor", "compensation-instruction-import":
 		return nil
 	default:
 		return fmt.Errorf("unsupported NEXUSIM_WORKFLOW_SERVICE_MODE %q", mode)

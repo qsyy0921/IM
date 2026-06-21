@@ -174,10 +174,17 @@ model-gateway / workflow / knowledge-ingestion / vector-index
   control-plane-service 公开 `RollbackConfigVersion`；缺失 instruction 或 unsupported
   target 会 fail closed，不读取 admin-service 私有表，也不把 raw payload 写入
   workflow DB / outbox。
+- `workflow-service` 已新增 first-stage compensation instruction registry：
+  `compensation-instruction-import` 可把显式 JSON instruction file 导入 /
+  replay 到 workflow-service 自有 `workflow_compensation_instructions` 表；
+  `compensation-executor` 支持 `control-plane-rollback-store` 从 DB registry resolve
+  instruction。registry 只存 environment / config kind / bundle / target version /
+  operator ref / reason ref 等低敏字段，不保存 admin payload 原文。
 
 ## 下一步
 
-- 默认继续更多明确下游补偿 adapter / compensation instruction 管理，或补其它明确下游公开 admin API adapter。
+- 默认继续更多明确下游补偿 adapter、compensation instruction approval binding，
+  或补其它明确下游公开 admin API adapter。
 - 默认下一步可继续 vector-index provider backend：在镜像可用后跑 focused pgvector smoke、
   真实 Milvus / OpenSearch backend、provider backend repair / 真 provider backfill smoke，
   或继续 active future service 的 focused checks。

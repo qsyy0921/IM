@@ -1,0 +1,136 @@
+package postgres
+
+import (
+	"context"
+	"errors"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/qsyy0921/IM/services/workflow-service/internal/types"
+)
+
+func (repository *Repository) UpsertWorkflowCompensationInstructions(
+	ctx context.Context,
+	instructions []types.WorkflowCompensationInstruction,
+) (int, error) {
+	if repository.pool == nil {
+		return 0, types.NewDBWriteFailed("workflow repository is not configured")
+	}
+	tx, err := repository.pool.Begin(ctx)
+	if err != nil {
+		return 0, types.NewDBWriteFailed(err.Error())
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	upserted := 0
+	for _, instruction := range instructions {
+		normalized := instruction.Normalized()
+		if err := normalized.Validate(); err != nil {
+			return 0, err
+		}
+		if err := upsertWorkflowCompensationInstruction(ctx, tx, normalized); err != nil {
+			return 0, err
+		}
+		upserted++
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return 0, types.NewDBWriteFailed(err.Error())
+	}
+	return upserted, nil
+}
+
+func (repository *Repository) ResolveControlPlaneRollbackInstruction(
+	ctx context.Context,
+	compensation types.WorkflowCompensation,
+) (types.WorkflowCompensationInstruction, bool, error) {
+	if repository.pool == nil {
+		return types.WorkflowCompensationInstruction{}, false, types.NewDBReadFailed("workflow repository is not configured")
+	}
+	row := repository.pool.QueryRow(ctx, `
+SELECT tenant_id, instruction_id, workflow_id, payload_ref_hash, target_service, target_operation,
+       instruction_type, environment, config_kind, bundle_key, target_version, operator_ref,
+       reason_ref, status, created_at, updated_at
+FROM workflow_compensation_instructions
+WHERE tenant_id = $1
+  AND payload_ref_hash = $2
+  AND target_service = $3
+  AND target_operation = $4
+  AND status = $5
+ORDER BY created_at DESC, instruction_id DESC
+LIMIT 1
+`, string(compensation.TenantID), compensation.PayloadRefHash, compensation.TargetService,
+		compensation.TargetOperation, types.WorkflowCompensationInstructionStatusActive)
+	instruction, err := scanWorkflowCompensationInstruction(row)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return types.WorkflowCompensationInstruction{}, false, nil
+	}
+	if err != nil {
+		return types.WorkflowCompensationInstruction{}, false, types.NewDBReadFailed(err.Error())
+	}
+	return instruction, true, nil
+}
+
+func upsertWorkflowCompensationInstruction(
+	ctx context.Context,
+	tx pgx.Tx,
+	instruction types.WorkflowCompensationInstruction,
+) error {
+	_, err := tx.Exec(ctx, `
+INSERT INTO workflow_compensation_instructions (
+    tenant_id, instruction_id, workflow_id, payload_ref_hash, target_service, target_operation,
+    instruction_type, environment, config_kind, bundle_key, target_version,
+    operator_ref, reason_ref, status, created_at, updated_at
+) VALUES (
+    $1, $2, $3, $4, $5, $6,
+    $7, $8, $9, $10, $11,
+    $12, $13, $14, now(), now()
+)
+ON CONFLICT (tenant_id, instruction_id) DO UPDATE SET
+    workflow_id = EXCLUDED.workflow_id,
+    payload_ref_hash = EXCLUDED.payload_ref_hash,
+    target_service = EXCLUDED.target_service,
+    target_operation = EXCLUDED.target_operation,
+    instruction_type = EXCLUDED.instruction_type,
+    environment = EXCLUDED.environment,
+    config_kind = EXCLUDED.config_kind,
+    bundle_key = EXCLUDED.bundle_key,
+    target_version = EXCLUDED.target_version,
+    operator_ref = EXCLUDED.operator_ref,
+    reason_ref = EXCLUDED.reason_ref,
+    status = EXCLUDED.status,
+    updated_at = now()
+`, string(instruction.TenantID), instruction.InstructionID, instruction.WorkflowID,
+		instruction.PayloadRefHash, instruction.TargetService, instruction.TargetOperation,
+		instruction.InstructionType, instruction.Environment, instruction.ConfigKind,
+		instruction.BundleKey, instruction.TargetVersion, instruction.OperatorRef,
+		instruction.ReasonRef, instruction.Status)
+	if err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	return nil
+}
+
+func scanWorkflowCompensationInstruction(row scanner) (types.WorkflowCompensationInstruction, error) {
+	var instruction types.WorkflowCompensationInstruction
+	err := row.Scan(
+		&instruction.TenantID,
+		&instruction.InstructionID,
+		&instruction.WorkflowID,
+		&instruction.PayloadRefHash,
+		&instruction.TargetService,
+		&instruction.TargetOperation,
+		&instruction.InstructionType,
+		&instruction.Environment,
+		&instruction.ConfigKind,
+		&instruction.BundleKey,
+		&instruction.TargetVersion,
+		&instruction.OperatorRef,
+		&instruction.ReasonRef,
+		&instruction.Status,
+		&instruction.CreatedAt,
+		&instruction.UpdatedAt,
+	)
+	if err != nil {
+		return types.WorkflowCompensationInstruction{}, err
+	}
+	return instruction, nil
+}

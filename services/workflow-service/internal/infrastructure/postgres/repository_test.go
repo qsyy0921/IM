@@ -248,6 +248,63 @@ func TestRepositoryExecuteWorkflowCompensationIntegration(t *testing.T) {
 	assertWorkflowCompensationResultOutbox(t, ctx, pool, workflow.WorkflowID, completed.CompensationID, types.WorkflowEventCompensationSucceeded)
 }
 
+func TestRepositoryWorkflowCompensationInstructionRegistryIntegration(t *testing.T) {
+	ctx := context.Background()
+	pool := openWorkflowTestPool(t)
+	resetWorkflowTables(t, ctx, pool)
+	repository := NewRepository(pool)
+
+	instructions := []types.WorkflowCompensationInstruction{{
+		TenantID:        "tenant-workflow-test",
+		InstructionID:   "wfci_test_1",
+		WorkflowID:      "wf_compensation_execution_1",
+		PayloadRefHash:  "sha256:rollback-payload",
+		TargetService:   "control-plane-service",
+		TargetOperation: "CONFIG_ROLLBACK",
+		InstructionType: types.WorkflowCompensationInstructionTypeControlPlaneRollback,
+		Environment:     "local",
+		ConfigKind:      "API_GATEWAY_TENANT_QUOTA",
+		BundleKey:       "tenant-a",
+		TargetVersion:   "v1",
+		OperatorRef:     "operator:rollback",
+		ReasonRef:       "reason-sha256:rollback",
+		Status:          types.WorkflowCompensationInstructionStatusActive,
+	}}
+	if count, err := repository.UpsertWorkflowCompensationInstructions(ctx, instructions); err != nil || count != 1 {
+		t.Fatalf("upsert compensation instruction: count=%d err=%v", count, err)
+	}
+	instructions[0].TargetVersion = "v2"
+	if count, err := repository.UpsertWorkflowCompensationInstructions(ctx, instructions); err != nil || count != 1 {
+		t.Fatalf("replay compensation instruction: count=%d err=%v", count, err)
+	}
+
+	resolved, ok, err := repository.ResolveControlPlaneRollbackInstruction(ctx, types.WorkflowCompensation{
+		TenantID:        "tenant-workflow-test",
+		PayloadRefHash:  "sha256:rollback-payload",
+		TargetService:   "control-plane-service",
+		TargetOperation: "CONFIG_ROLLBACK",
+	})
+	if err != nil {
+		t.Fatalf("resolve compensation instruction: %v", err)
+	}
+	if !ok || resolved.TargetVersion != "v2" || resolved.OperatorRef != "operator:rollback" {
+		t.Fatalf("unexpected resolved instruction ok=%v %+v", ok, resolved)
+	}
+
+	instructions[0].Status = types.WorkflowCompensationInstructionStatusDisabled
+	if _, err := repository.UpsertWorkflowCompensationInstructions(ctx, instructions); err != nil {
+		t.Fatalf("disable compensation instruction: %v", err)
+	}
+	if _, ok, err := repository.ResolveControlPlaneRollbackInstruction(ctx, types.WorkflowCompensation{
+		TenantID:        "tenant-workflow-test",
+		PayloadRefHash:  "sha256:rollback-payload",
+		TargetService:   "control-plane-service",
+		TargetOperation: "CONFIG_ROLLBACK",
+	}); err != nil || ok {
+		t.Fatalf("disabled instruction should not resolve ok=%v err=%v", ok, err)
+	}
+}
+
 func prepareWorkflow(t *testing.T, idempotencyKey string, workflowID string, stepID string) domain.PreparedWorkflow {
 	t.Helper()
 	prepared, err := domain.PrepareWorkflow(types.CreateWorkflowCommand{
@@ -369,8 +426,9 @@ func applyWorkflowMigration(t *testing.T, ctx context.Context, pool *pgxpool.Poo
 
 func clearWorkflowTablesIfPresent(ctx context.Context, pool *pgxpool.Pool) {
 	_, _ = pool.Exec(ctx, `
-TRUNCATE
+DROP TABLE IF EXISTS
     workflow_outbox,
+    workflow_compensation_instructions,
     workflow_compensations,
     workflow_timers,
     workflow_decisions,
@@ -385,6 +443,7 @@ func resetWorkflowTables(t *testing.T, ctx context.Context, pool *pgxpool.Pool) 
 	_, err := pool.Exec(ctx, `
 TRUNCATE
     workflow_outbox,
+    workflow_compensation_instructions,
     workflow_compensations,
     workflow_timers,
     workflow_decisions,

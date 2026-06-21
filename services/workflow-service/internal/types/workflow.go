@@ -336,6 +336,7 @@ func (instruction WorkflowCompensationInstruction) Validate() error {
 	instruction = instruction.Normalized()
 	if instruction.TenantID == "" ||
 		instruction.InstructionID == "" ||
+		instruction.WorkflowID == "" ||
 		instruction.PayloadRefHash == "" ||
 		instruction.TargetService == "" ||
 		instruction.TargetOperation == "" ||

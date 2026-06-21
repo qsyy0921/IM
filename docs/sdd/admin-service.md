@@ -435,7 +435,8 @@ workflow-service `COMPENSATION_REQUEST`，用于后续人工审批和 workflow-s
 `compensation-worker` 物化补偿请求；admin-service 不在该 mode 内联执行真实补偿
 mutation。workflow-service 第一版 `compensation-executor` 可通过显式 instruction file
 或 workflow-service 自有 instruction registry 执行 control-plane rollback
-compensation；admin-service 仍只提供 operation 入口和低敏 refs。
+compensation；DB registry instruction 必须绑定具体 compensation workflow 并校验低敏
+refs。admin-service 仍只提供 operation 入口和低敏 refs。
 
 ## 17. 验收标准
 

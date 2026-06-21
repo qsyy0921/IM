@@ -38,6 +38,8 @@ retention、外部系统调用补偿和人工审批状态。
   不支持 target fail closed，不读取 admin-service 私有表。
 - 已新增 first-stage `compensation-instruction-import` operator mode：从显式 JSON
   instruction file 导入 / replay control-plane rollback instruction 到 workflow DB；
+  DB instruction 必须绑定具体 `COMPENSATION_REQUEST` workflow，导入时校验 workflow
+  已批准或待补偿、target / payload refs 一致；resolve 时只匹配同一 workflow。registry
   只保存 environment / config kind / bundle / target version / operator ref /
   reason ref 等低敏字段，不保存 admin payload 原文。
 - 已被 admin-service operation worker 用于第一版 `REPAIR_REQUEST ->

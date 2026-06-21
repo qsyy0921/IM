@@ -183,8 +183,10 @@ reason refs，并使用稳定 idempotency key；workflow-service 当前会在审
 workflow-service 自有 `workflow_compensation_instructions` registry 解析 instruction：
 operator 先导入低敏 instruction，再用 `payload_ref_hash` 匹配 workflow compensation，
 调用 control-plane-service 公开 `RollbackConfigVersion`；缺 instruction 或 unsupported
-target fail closed。更多下游 adapter、instruction approval binding 和 provider-grade
-运维后置。
+target fail closed。DB registry instruction 必须绑定具体 `COMPENSATION_REQUEST`
+workflow，导入时校验 workflow 已批准或待补偿、target / payload refs 一致；resolve
+时只匹配同一 workflow。更多下游 adapter、provider-grade instruction UI / external
+approval binding 和运维后置。
 
 后续扩展：
 
@@ -357,7 +359,8 @@ Compensation 不能自动执行高风险业务 mutation；它只能创建 `COMPE
 明确 allowlisted 的低风险 public API。
 第一阶段 `compensation-executor` 只允许 `CONFIG_ROLLBACK -> control-plane-service`
 公开 API，且必须由 file 或 DB registry 提供显式 instruction；registry 只保存低敏
-refs / version 字段，不保存 admin payload 原文。
+refs / version 字段，不保存 admin payload 原文。DB registry mode 还必须绑定具体
+workflow id，避免同一 payload hash 的 instruction 被复用到其它补偿。
 
 ## 14. 安全边界
 

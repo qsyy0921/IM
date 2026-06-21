@@ -253,11 +253,15 @@ func TestRepositoryWorkflowCompensationInstructionRegistryIntegration(t *testing
 	pool := openWorkflowTestPool(t)
 	resetWorkflowTables(t, ctx, pool)
 	repository := NewRepository(pool)
+	workflow := createApprovedCompensationWorkflow(t, ctx, repository)
+	if _, err := repository.RequestApprovedCompensations(ctx, 10); err != nil {
+		t.Fatalf("request approved compensation: %v", err)
+	}
 
 	instructions := []types.WorkflowCompensationInstruction{{
 		TenantID:        "tenant-workflow-test",
 		InstructionID:   "wfci_test_1",
-		WorkflowID:      "wf_compensation_execution_1",
+		WorkflowID:      workflow.WorkflowID,
 		PayloadRefHash:  "sha256:rollback-payload",
 		TargetService:   "control-plane-service",
 		TargetOperation: "CONFIG_ROLLBACK",
@@ -280,6 +284,7 @@ func TestRepositoryWorkflowCompensationInstructionRegistryIntegration(t *testing
 
 	resolved, ok, err := repository.ResolveControlPlaneRollbackInstruction(ctx, types.WorkflowCompensation{
 		TenantID:        "tenant-workflow-test",
+		WorkflowID:      workflow.WorkflowID,
 		PayloadRefHash:  "sha256:rollback-payload",
 		TargetService:   "control-plane-service",
 		TargetOperation: "CONFIG_ROLLBACK",
@@ -290,6 +295,15 @@ func TestRepositoryWorkflowCompensationInstructionRegistryIntegration(t *testing
 	if !ok || resolved.TargetVersion != "v2" || resolved.OperatorRef != "operator:rollback" {
 		t.Fatalf("unexpected resolved instruction ok=%v %+v", ok, resolved)
 	}
+	if _, ok, err := repository.ResolveControlPlaneRollbackInstruction(ctx, types.WorkflowCompensation{
+		TenantID:        "tenant-workflow-test",
+		WorkflowID:      "wf_other",
+		PayloadRefHash:  "sha256:rollback-payload",
+		TargetService:   "control-plane-service",
+		TargetOperation: "CONFIG_ROLLBACK",
+	}); err != nil || ok {
+		t.Fatalf("wrong workflow should not resolve ok=%v err=%v", ok, err)
+	}
 
 	instructions[0].Status = types.WorkflowCompensationInstructionStatusDisabled
 	if _, err := repository.UpsertWorkflowCompensationInstructions(ctx, instructions); err != nil {
@@ -297,11 +311,17 @@ func TestRepositoryWorkflowCompensationInstructionRegistryIntegration(t *testing
 	}
 	if _, ok, err := repository.ResolveControlPlaneRollbackInstruction(ctx, types.WorkflowCompensation{
 		TenantID:        "tenant-workflow-test",
+		WorkflowID:      workflow.WorkflowID,
 		PayloadRefHash:  "sha256:rollback-payload",
 		TargetService:   "control-plane-service",
 		TargetOperation: "CONFIG_ROLLBACK",
 	}); err != nil || ok {
 		t.Fatalf("disabled instruction should not resolve ok=%v err=%v", ok, err)
+	}
+	instructions[0].Status = types.WorkflowCompensationInstructionStatusActive
+	instructions[0].PayloadRefHash = "sha256:different"
+	if _, err := repository.UpsertWorkflowCompensationInstructions(ctx, instructions); !errors.Is(err, types.ErrInvalidArgument) {
+		t.Fatalf("expected mismatched refs to fail, got %v", err)
 	}
 }
 

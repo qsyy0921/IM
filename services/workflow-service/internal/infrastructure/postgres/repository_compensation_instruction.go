@@ -27,6 +27,9 @@ func (repository *Repository) UpsertWorkflowCompensationInstructions(
 		if err := normalized.Validate(); err != nil {
 			return 0, err
 		}
+		if err := validateWorkflowCompensationInstructionBinding(ctx, tx, normalized); err != nil {
+			return 0, err
+		}
 		if err := upsertWorkflowCompensationInstruction(ctx, tx, normalized); err != nil {
 			return 0, err
 		}
@@ -54,11 +57,12 @@ WHERE tenant_id = $1
   AND payload_ref_hash = $2
   AND target_service = $3
   AND target_operation = $4
-  AND status = $5
+  AND workflow_id = $5
+  AND status = $6
 ORDER BY created_at DESC, instruction_id DESC
 LIMIT 1
 `, string(compensation.TenantID), compensation.PayloadRefHash, compensation.TargetService,
-		compensation.TargetOperation, types.WorkflowCompensationInstructionStatusActive)
+		compensation.TargetOperation, compensation.WorkflowID, types.WorkflowCompensationInstructionStatusActive)
 	instruction, err := scanWorkflowCompensationInstruction(row)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return types.WorkflowCompensationInstruction{}, false, nil
@@ -67,6 +71,30 @@ LIMIT 1
 		return types.WorkflowCompensationInstruction{}, false, types.NewDBReadFailed(err.Error())
 	}
 	return instruction, true, nil
+}
+
+func validateWorkflowCompensationInstructionBinding(
+	ctx context.Context,
+	tx pgx.Tx,
+	instruction types.WorkflowCompensationInstruction,
+) error {
+	workflow, err := getWorkflowForUpdate(ctx, tx, instruction.TenantID, instruction.WorkflowID)
+	if err != nil {
+		return err
+	}
+	if workflow.WorkflowType != types.WorkflowTypeCompensationRequest {
+		return types.NewInvalidArgument("workflow compensation instruction must bind a compensation workflow")
+	}
+	if workflow.Status != types.WorkflowStatusApproved &&
+		workflow.Status != types.WorkflowStatusCompensationPending {
+		return types.NewFailedPrecondition("workflow compensation instruction requires approved workflow")
+	}
+	if workflow.TargetService != instruction.TargetService ||
+		workflow.TargetOperation != instruction.TargetOperation ||
+		workflow.PayloadRefHash != instruction.PayloadRefHash {
+		return types.NewInvalidArgument("workflow compensation instruction does not match workflow refs")
+	}
+	return nil
 }
 
 func upsertWorkflowCompensationInstruction(

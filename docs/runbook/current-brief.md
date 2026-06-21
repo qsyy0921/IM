@@ -96,8 +96,9 @@ publish / rollback / tenant quota / policy ruleset smoke 已通过。`admin-serv
 已支持显式 instruction file 驱动的 control-plane rollback adapter，缺失 instruction /
 unsupported target fail closed；并已补 workflow-service 自有
 `workflow_compensation_instructions` 低敏 registry、`compensation-instruction-import`
-operator mode 和 `control-plane-rollback-store` resolver。下一步默认继续更多明确下游补偿 adapter /
-compensation instruction approval binding、其它明确下游公开 admin API adapter，或在镜像可用后继续 focused pgvector smoke、Milvus /
+operator mode 和 `control-plane-rollback-store` resolver；store instruction 已强制绑定
+具体 `COMPENSATION_REQUEST` workflow 并校验 refs。下一步默认继续更多明确下游补偿 adapter /
+provider-grade compensation instruction 审批 / UI 管理、其它明确下游公开 admin API adapter，或在镜像可用后继续 focused pgvector smoke、Milvus /
 OpenSearch backend / provider repair / 真 provider backfill smoke。
 ```
 

@@ -146,6 +146,11 @@ async function main() {
   assertEqual(nativeMetadata?.capabilities?.localStore?.ready, false, "android local store readiness");
   assertEqual(nativeMetadata?.capabilities?.localStore?.reason, "sqlite-native-bridge-unavailable", "android local store reason");
   assertEqual(nativeMetadata?.capabilities?.localStore?.bridge, "android-sqlite", "android local store bridge");
+  assertEqual(
+    nativeMetadata?.capabilities?.localStore?.nextAction,
+    "android-sqlite is required before android can use sqlite local store",
+    "android not-ready local store next action"
+  );
   assertEqual(readAndroidNativeStorageBridge(nativeMetadata), undefined, "android native storage bridge rejects not-ready metadata");
 
   const androidNativeItems = new Map();
@@ -178,6 +183,11 @@ async function main() {
   };
   const readyAndroidMetadata = readAndroidNativeBridgeMetadata();
   assertEqual(readyAndroidMetadata?.capabilities?.localStore?.ready, true, "android ready native store metadata");
+  assertEqual(
+    readyAndroidMetadata?.capabilities?.localStore?.nextAction,
+    "",
+    "android ready native store has no next action"
+  );
   const androidNativeStorage = readAndroidNativeStorageBridge(readyAndroidMetadata);
   assertEqual(typeof androidNativeStorage?.setItem, "function", "android ready native storage bridge");
   androidNativeStorage?.setItem("android-key", "android-value");
@@ -283,6 +293,11 @@ async function main() {
   assertEqual(desktopMetadata?.capabilities?.localStore?.ready, false, "desktop local store readiness");
   assertEqual(desktopMetadata?.capabilities?.localStore?.reason, "sqlite-native-bridge-unavailable", "desktop local store reason");
   assertEqual(desktopMetadata?.capabilities?.localStore?.bridge, "tauri-sqlite", "desktop local store bridge");
+  assertEqual(
+    desktopMetadata?.capabilities?.localStore?.nextAction,
+    "tauri-sqlite is required before windows-desktop can use sqlite local store",
+    "desktop not-ready local store next action"
+  );
   assertEqual(readDesktopNativeStorageBridge(desktopMetadata), undefined, "desktop native storage bridge rejects not-ready metadata");
 
   const desktopNativeItems = new Map();
@@ -324,6 +339,11 @@ async function main() {
   };
   const readyDesktopMetadata = await readDesktopNativeBridgeMetadata();
   assertEqual(readyDesktopMetadata?.capabilities?.localStore?.ready, true, "desktop ready native store metadata");
+  assertEqual(
+    readyDesktopMetadata?.capabilities?.localStore?.nextAction,
+    "",
+    "desktop ready native store has no next action"
+  );
   const desktopNativeStorage = readDesktopNativeStorageBridge(readyDesktopMetadata);
   assertEqual(typeof desktopNativeStorage?.setItem, "function", "desktop ready native storage bridge");
   await desktopNativeStorage?.setItem("desktop-key", "desktop-value");

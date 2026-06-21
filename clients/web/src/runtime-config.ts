@@ -239,7 +239,7 @@ function nativeLocalStoreReadiness(
     ready,
     reason: ready ? "" : "sqlite-native-bridge-unavailable",
     bridge,
-    nextAction: `${bridge} is required before ${target} can use sqlite local store`
+    nextAction: ready ? "" : `${bridge} is required before ${target} can use sqlite local store`
   };
 }
 

@@ -136,6 +136,7 @@ func ItemFromPrepared(prepared PreparedUpsert) types.VectorItem {
 		ChunkHash:           command.ChunkHash,
 		EmbeddingModelRef:   command.EmbeddingModelRef,
 		EmbeddingVectorHash: command.EmbeddingVectorHash,
+		BackendVectorID:     prepared.VectorItemID,
 		Dimension:           command.Dimension,
 		VisibilityScope:     command.VisibilityScope,
 		VisibilityVersion:   command.VisibilityVersion,

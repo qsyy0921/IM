@@ -29,6 +29,7 @@ func TestRepositoryVectorFirstPathIntegration(t *testing.T) {
 	if replayed || item.Status != types.VectorItemStatusIndexed || job.Status != types.JobStatusIndexed {
 		t.Fatalf("unexpected upsert: replayed=%v item=%+v job=%+v", replayed, item, job)
 	}
+	assertBackendItemState(t, ctx, pool, item.VectorItemID, types.BackendItemStatusActive, types.TombstoneStatusNone)
 	replayedItem, _, replayed, err := repository.UpsertVectorItem(ctx, prepared)
 	if err != nil {
 		t.Fatalf("replay upsert: %v", err)
@@ -71,6 +72,7 @@ func TestRepositoryVectorFirstPathIntegration(t *testing.T) {
 	if replayed || tombstoneID == "" || tombstoned.Status != types.VectorItemStatusTombstoned || tombstoneJob.Status != types.JobStatusTombstoned {
 		t.Fatalf("unexpected tombstone: replayed=%v tombstone=%s item=%+v job=%+v", replayed, tombstoneID, tombstoned, tombstoneJob)
 	}
+	assertBackendItemState(t, ctx, pool, item.VectorItemID, types.BackendItemStatusDeleted, types.TombstoneStatusTombstoned)
 	results, err = repository.SearchVectors(ctx, types.SearchVectorsCommand{
 		AuthContext: types.AuthContext{
 			TenantID:    "tenant-vector-test",
@@ -152,6 +154,49 @@ func TestRepositoryRequestVectorRebuildIntegration(t *testing.T) {
 	)
 	if _, _, _, err := repository.RequestVectorRebuild(ctx, missingCollection); !errors.Is(err, types.ErrNotFound) {
 		t.Fatalf("expected missing collection not found, got %v", err)
+	}
+}
+
+func TestRepositorySearchRequiresActiveBackendItemIntegration(t *testing.T) {
+	ctx := context.Background()
+	pool := openVectorTestPool(t)
+	resetVectorTables(t, ctx, pool)
+	repository := NewRepository(pool)
+
+	prepared := prepareUpsert(t, "vector-backend-search", "vitem_backend_search", "vjob_backend_search")
+	if _, _, _, err := repository.UpsertVectorItem(ctx, prepared); err != nil {
+		t.Fatalf("seed vector item: %v", err)
+	}
+	if _, err := pool.Exec(ctx, `
+UPDATE vector_backend_items
+SET status = 'DELETED',
+    tombstone_status = 'TOMBSTONED',
+    deleted_at = now(),
+    updated_at = now()
+WHERE tenant_id = 'tenant-vector-test'
+  AND vector_item_id = 'vitem_backend_search'
+`); err != nil {
+		t.Fatalf("mark backend item deleted: %v", err)
+	}
+
+	results, err := repository.SearchVectors(ctx, types.SearchVectorsCommand{
+		AuthContext: types.AuthContext{
+			TenantID:    "tenant-vector-test",
+			ServiceName: types.AllowedCallerRetrieval,
+		},
+		RequesterRef:       "retrieval:requester",
+		RetrievalRequestID: "retrieval-request-backend-state",
+		CollectionTypes:    []string{types.CollectionTypeKnowledgeChunk},
+		QueryEmbeddingRef:  "embedding-ref:query-1",
+		TopK:               10,
+		VisibilityScope:    prepared.Command.VisibilityScope,
+		PolicyVersion:      prepared.Command.PolicyVersion,
+	})
+	if err != nil {
+		t.Fatalf("search vectors: %v", err)
+	}
+	if len(results) != 0 {
+		t.Fatalf("deleted backend item should not be returned: %+v", results)
 	}
 }
 
@@ -446,12 +491,34 @@ TRUNCATE
     vector_rebuild_checkpoints,
     vector_tombstones,
     vector_index_jobs,
+    vector_backend_items,
     vector_items,
     vector_collections
 CASCADE
 `)
 	if err != nil {
 		t.Fatalf("reset vector tables: %v", err)
+	}
+}
+
+func assertBackendItemState(t *testing.T, ctx context.Context, pool *pgxpool.Pool, vectorItemID string, expectedStatus string, expectedTombstone string) {
+	t.Helper()
+	var backendType string
+	var backendVectorID string
+	var status string
+	var tombstoneStatus string
+	if err := pool.QueryRow(ctx, `
+SELECT backend_type, backend_vector_id, status, tombstone_status
+FROM vector_backend_items
+WHERE tenant_id = 'tenant-vector-test'
+  AND vector_item_id = $1
+`, vectorItemID).Scan(&backendType, &backendVectorID, &status, &tombstoneStatus); err != nil {
+		t.Fatalf("query vector backend item: %v", err)
+	}
+	if backendType != types.BackendTypePostgresTest || backendVectorID == "" ||
+		status != expectedStatus || tombstoneStatus != expectedTombstone {
+		t.Fatalf("unexpected backend item state: backend_type=%s backend_vector_id=%s status=%s tombstone=%s",
+			backendType, backendVectorID, status, tombstoneStatus)
 	}
 }
 

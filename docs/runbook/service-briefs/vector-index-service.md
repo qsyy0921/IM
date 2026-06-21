@@ -23,8 +23,9 @@ vector 写入、rebuild 和 backfill 逻辑复杂到影响 retrieval / memory �
 - `RequestVectorRebuild` 第一版 rebuild job / checkpoint request path；first-stage
   `rebuild-worker` 已能 claim PENDING rebuild、推进 checkpoint 并写
   `vector.rebuild.started.v1` / `vector.rebuild.completed.v1` 低敏 outbox event。
-- local / PostgreSQL-backed test vector adapter；Milvus / pgvector / OpenSearch
-  vector 后置。
+- local / PostgreSQL-backed test vector adapter；PostgreSQL backend state adapter
+  已显式记录 backend item ACTIVE / DELETED 状态，`SearchVectors` 必须 join ACTIVE
+  backend state 才返回 refs；Milvus / pgvector / OpenSearch vector 后置。
 - `vector_outbox -> im.vector.events` 第一版 outbox relay、低敏 Kafka schema、
   PENDING / PUBLISHED / retry / DLQ 状态推进、同 aggregate 顺序阻塞和 focused
   builder / PostgreSQL store 测试。

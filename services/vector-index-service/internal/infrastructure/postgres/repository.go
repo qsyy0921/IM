@@ -60,6 +60,9 @@ func (repository *Repository) UpsertVectorItem(
 	if err := insertItem(ctx, tx, item); err != nil {
 		return types.VectorItem{}, types.VectorIndexJob{}, false, err
 	}
+	if err := upsertBackendItem(ctx, tx, collection, item); err != nil {
+		return types.VectorItem{}, types.VectorIndexJob{}, false, err
+	}
 	if err := insertJob(ctx, tx, job); err != nil {
 		return types.VectorItem{}, types.VectorIndexJob{}, false, err
 	}
@@ -111,6 +114,10 @@ func (repository *Repository) TombstoneVectorItem(
 	if err != nil {
 		return types.VectorItem{}, types.VectorIndexJob{}, "", false, err
 	}
+	collection, err := getCollectionForUpdate(ctx, tx, item.TenantID, item.CollectionID)
+	if err != nil {
+		return types.VectorItem{}, types.VectorIndexJob{}, "", false, err
+	}
 	if item.TombstoneStatus == types.TombstoneStatusTombstoned || item.Status == types.VectorItemStatusTombstoned {
 		return types.VectorItem{}, types.VectorIndexJob{}, "", false, types.NewFailedPrecondition("vector item is already tombstoned")
 	}
@@ -118,6 +125,9 @@ func (repository *Repository) TombstoneVectorItem(
 	job := domain.TombstoneJobFromPrepared(prepared, item)
 	updated, err := markItemTombstoned(ctx, tx, item, prepared.Command.DeleteProofID, prepared.CreatedAt)
 	if err != nil {
+		return types.VectorItem{}, types.VectorIndexJob{}, "", false, err
+	}
+	if err := markBackendItemDeleted(ctx, tx, collection, updated, prepared.CreatedAt); err != nil {
 		return types.VectorItem{}, types.VectorIndexJob{}, "", false, err
 	}
 	if err := insertTombstone(ctx, tx, tombstone); err != nil {
@@ -151,10 +161,17 @@ SELECT vi.vector_item_id, vi.source_ref_hash, vi.source_service, vc.collection_t
 FROM vector_items vi
 JOIN vector_collections vc
   ON vc.tenant_id = vi.tenant_id AND vc.collection_id = vi.collection_id
+JOIN vector_backend_items vbi
+  ON vbi.tenant_id = vi.tenant_id
+ AND vbi.backend_type = vc.backend_type
+ AND vbi.vector_item_id = vi.vector_item_id
 WHERE vi.tenant_id = $1
   AND vi.status = 'INDEXED'
   AND vi.tombstone_status = 'NONE'
   AND vi.delete_proof_id = ''
+  AND vi.backend_vector_id <> ''
+  AND vbi.status = 'ACTIVE'
+  AND vbi.tombstone_status = 'NONE'
   AND vi.visibility_scope = $2
   AND vi.policy_version = $3
   AND (cardinality($4::text[]) = 0 OR vc.collection_type = ANY($4::text[]))
@@ -495,24 +512,56 @@ func insertItem(ctx context.Context, tx pgx.Tx, item types.VectorItem) error {
 INSERT INTO vector_items (
     tenant_id, vector_item_id, collection_id, source_service, source_ref_hash,
     source_id, source_version, source_hash, chunk_hash, embedding_model_ref,
-    embedding_vector_hash, dimension, visibility_scope, visibility_version,
+    embedding_vector_hash, backend_vector_id, dimension, visibility_scope, visibility_version,
     policy_version, data_class, tombstone_status, delete_proof_id,
     retention_policy_ref, status, idempotency_key, command_hash,
     correlation_id, causation_id, trace_id, created_at, updated_at
 ) VALUES (
     $1, $2, $3, $4, $5,
     $6, $7, $8, $9, $10,
-    $11, $12, $13, $14,
-    $15, $16, $17, $18,
-    $19, $20, $21, $22,
-    $23, $24, $25, $26, $27
+    $11, $12, $13, $14, $15,
+    $16, $17, $18, $19,
+    $20, $21, $22, $23,
+    $24, $25, $26, $27, $28
 )
 `, string(item.TenantID), item.VectorItemID, item.CollectionID, item.SourceService, item.SourceRefHash,
 		item.SourceID, item.SourceVersion, item.SourceHash, item.ChunkHash, item.EmbeddingModelRef,
-		item.EmbeddingVectorHash, item.Dimension, item.VisibilityScope, item.VisibilityVersion,
+		item.EmbeddingVectorHash, item.BackendVectorID, item.Dimension, item.VisibilityScope, item.VisibilityVersion,
 		item.PolicyVersion, item.DataClass, item.TombstoneStatus, item.DeleteProofID,
 		item.RetentionPolicyRef, item.Status, item.IdempotencyKey, item.CommandHash,
 		item.CorrelationID, item.CausationID, item.TraceID, item.CreatedAt, item.UpdatedAt)
+	if err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	return nil
+}
+
+func upsertBackendItem(ctx context.Context, tx pgx.Tx, collection types.VectorCollection, item types.VectorItem) error {
+	if item.BackendVectorID == "" {
+		return types.NewDBWriteFailed("backend_vector_id is required")
+	}
+	_, err := tx.Exec(ctx, `
+INSERT INTO vector_backend_items (
+    tenant_id, backend_type, backend_vector_id, vector_item_id, collection_id,
+    source_ref_hash, embedding_vector_hash, dimension, status, tombstone_status,
+    indexed_at, updated_at
+) VALUES (
+    $1, $2, $3, $4, $5,
+    $6, $7, $8, 'ACTIVE', 'NONE',
+    $9, $9
+)
+ON CONFLICT (tenant_id, backend_type, backend_vector_id) DO UPDATE
+SET vector_item_id = EXCLUDED.vector_item_id,
+    collection_id = EXCLUDED.collection_id,
+    source_ref_hash = EXCLUDED.source_ref_hash,
+    embedding_vector_hash = EXCLUDED.embedding_vector_hash,
+    dimension = EXCLUDED.dimension,
+    status = 'ACTIVE',
+    tombstone_status = 'NONE',
+    deleted_at = NULL,
+    updated_at = EXCLUDED.updated_at
+`, string(item.TenantID), collection.BackendType, item.BackendVectorID, item.VectorItemID, item.CollectionID,
+		item.SourceRefHash, item.EmbeddingVectorHash, item.Dimension, item.UpdatedAt)
 	if err != nil {
 		return types.NewDBWriteFailed(err.Error())
 	}
@@ -557,6 +606,27 @@ INSERT INTO vector_tombstones (
 		tombstone.IdempotencyKey, tombstone.CommandHash, tombstone.CreatedAt)
 	if err != nil {
 		return types.NewDBWriteFailed(err.Error())
+	}
+	return nil
+}
+
+func markBackendItemDeleted(ctx context.Context, tx pgx.Tx, collection types.VectorCollection, item types.VectorItem, deletedAt time.Time) error {
+	tag, err := tx.Exec(ctx, `
+UPDATE vector_backend_items
+SET status = 'DELETED',
+    tombstone_status = 'TOMBSTONED',
+    deleted_at = $5,
+    updated_at = $5
+WHERE tenant_id = $1
+  AND backend_type = $2
+  AND backend_vector_id = $3
+  AND vector_item_id = $4
+`, string(item.TenantID), collection.BackendType, item.BackendVectorID, item.VectorItemID, deletedAt)
+	if err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	if tag.RowsAffected() != 1 {
+		return types.NewFailedPrecondition("vector backend item is not indexed")
 	}
 	return nil
 }
@@ -782,7 +852,7 @@ func selectItemSQL() string {
 SELECT vi.tenant_id, vi.vector_item_id, vi.collection_id, vc.collection_type,
        vi.source_service, vi.source_ref_hash, vi.source_id, vi.source_version,
        vi.source_hash, vi.chunk_hash, vi.embedding_model_ref, vi.embedding_vector_hash,
-       vi.dimension, vi.visibility_scope, vi.visibility_version, vi.policy_version,
+       vi.backend_vector_id, vi.dimension, vi.visibility_scope, vi.visibility_version, vi.policy_version,
        vi.data_class, vi.tombstone_status, vi.delete_proof_id, vi.retention_policy_ref,
        vi.status, vi.idempotency_key, vi.command_hash, vi.correlation_id,
        vi.causation_id, vi.trace_id, vi.created_at, vi.updated_at
@@ -811,7 +881,7 @@ func scanItem(row scanner) (types.VectorItem, error) {
 		&item.TenantID, &item.VectorItemID, &item.CollectionID, &item.CollectionType,
 		&item.SourceService, &item.SourceRefHash, &item.SourceID, &item.SourceVersion,
 		&item.SourceHash, &item.ChunkHash, &item.EmbeddingModelRef, &item.EmbeddingVectorHash,
-		&item.Dimension, &item.VisibilityScope, &item.VisibilityVersion, &item.PolicyVersion,
+		&item.BackendVectorID, &item.Dimension, &item.VisibilityScope, &item.VisibilityVersion, &item.PolicyVersion,
 		&item.DataClass, &item.TombstoneStatus, &item.DeleteProofID, &item.RetentionPolicyRef,
 		&item.Status, &item.IdempotencyKey, &item.CommandHash, &item.CorrelationID,
 		&item.CausationID, &item.TraceID, &item.CreatedAt, &item.UpdatedAt,

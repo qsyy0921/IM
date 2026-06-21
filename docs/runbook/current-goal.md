@@ -50,7 +50,9 @@ model-gateway / workflow / knowledge-ingestion / vector-index
 - `vector-index-service` 已从 stage-switch 进入 product-active 第一版 implementation
   slice，覆盖 `UpsertVectorItem`、`TombstoneVectorItem`、`SearchVectors`、
   `GetVectorIndexJob`、PostgreSQL metadata、local / PostgreSQL-backed test vector adapter
-  和 `RequestVectorRebuild` rebuild job / checkpoint API；first-stage
+  和 `RequestVectorRebuild` rebuild job / checkpoint API；PostgreSQL backend state
+  adapter 已显式记录 backend item ACTIVE / DELETED 状态，Search 必须 join ACTIVE
+  backend state 才返回 refs；first-stage
   `rebuild-worker` 已能 claim / complete rebuild checkpoint，并写
   `vector.rebuild.started.v1` / `vector.rebuild.completed.v1` 低敏 outbox event。并已接
   `vector_outbox -> im.vector.events` 第一版 outbox relay。当前 relay 已覆盖低敏
@@ -127,8 +129,9 @@ model-gateway / workflow / knowledge-ingestion / vector-index
 
 - 默认继续补更多下游公开 admin API adapter，或为 admin config / quota 增加
   compensation operator。
-- 默认下一步可继续 vector-index provider backend：Milvus / pgvector backend /
-  provider backend rebuild / backfill worker，或继续更多下游 admin API adapter。
+- 默认下一步可继续 vector-index provider backend：真实 Milvus / pgvector /
+  OpenSearch backend、provider backend rebuild / backfill worker，或继续更多下游
+  admin API adapter。
 - 也可以继续 notification SMTP / SMS / APNs / FCM adapter 或 bounce-suppression。
 
 ## 硬边界

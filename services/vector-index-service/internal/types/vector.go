@@ -13,6 +13,11 @@ const (
 	CollectionTypeEvalFixture       = "EVAL_FIXTURE"
 	CollectionStatusActive          = "ACTIVE"
 	BackendTypePostgresTest         = "POSTGRES_TEST"
+	BackendTypePGVector             = "PGVECTOR"
+	BackendTypeMilvus               = "MILVUS"
+	BackendTypeOpenSearchVector     = "OPENSEARCH_VECTOR"
+	BackendItemStatusActive         = "ACTIVE"
+	BackendItemStatusDeleted        = "DELETED"
 	VectorItemStatusIndexed         = "INDEXED"
 	VectorItemStatusTombstoned      = "TOMBSTONED"
 	TombstoneStatusNone             = "NONE"
@@ -133,6 +138,7 @@ type VectorItem struct {
 	ChunkHash           string
 	EmbeddingModelRef   string
 	EmbeddingVectorHash string
+	BackendVectorID     string
 	Dimension           int
 	VisibilityScope     string
 	VisibilityVersion   int64

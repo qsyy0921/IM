@@ -241,6 +241,20 @@ partition_key, cursor_value, status, updated_at
 PostgreSQL 不保存 raw vector array；vector backend 保存实际向量和低敏 metadata。若本地测试 adapter
 必须保存 vector array，也必须限制为 test profile，并禁止进入 events / metrics。
 
+First-stage PostgreSQL backend state adapter:
+
+```text
+vector_backend_items:
+tenant_id, backend_type, backend_vector_id, vector_item_id, collection_id,
+source_ref_hash, embedding_vector_hash, dimension,
+status, tombstone_status, indexed_at, deleted_at, updated_at
+```
+
+该表不保存 raw text 或 embedding vector array，只记录低敏 backend state。`SearchVectors`
+必须同时满足 PostgreSQL metadata 和 backend state 为 ACTIVE；如果 backend state 缺失或
+已删除，必须 fail closed / 不返回该 ref。真实 pgvector / Milvus / OpenSearch adapter
+后续仍需要接入实际向量存储和 rebuild / repair。
+
 ## 9. 核心流程
 
 Chunk ready indexing：

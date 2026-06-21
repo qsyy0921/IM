@@ -19,6 +19,7 @@ export interface ClientRuntime {
   pushConnection: PushConnectionManager;
   sendQueue: MessageSendQueue;
   ackQueue: AckQueue;
+  logout(): Promise<void>;
 }
 
 export interface CreateClientRuntimeOptions {
@@ -35,10 +36,16 @@ export function createClientRuntime(options: CreateClientRuntimeOptions): Client
   const pushTransport = new WebSocketPushTransport();
   const idFactory = options.idFactory ?? defaultIDFactory;
   const nowMs = options.nowMs ?? Date.now;
+  const auth = new AuthSessionManager(bff);
   const inboxSync = new InboxSyncEngine({
     deliveryAPI: bff,
     store: options.platform.messageStore,
     pageSize: options.inboxPageSize ?? 64
+  });
+  const pushConnection = new PushConnectionManager({
+    url: config.pushWebSocketURL,
+    transport: pushTransport,
+    scheduler: inboxSync
   });
 
   return {
@@ -46,13 +53,9 @@ export function createClientRuntime(options: CreateClientRuntimeOptions): Client
     platform: options.platform,
     bff,
     pushTransport,
-    auth: new AuthSessionManager(bff),
+    auth,
     inboxSync,
-    pushConnection: new PushConnectionManager({
-      url: config.pushWebSocketURL,
-      transport: pushTransport,
-      scheduler: inboxSync
-    }),
+    pushConnection,
     sendQueue: new MessageSendQueue({
       messagingAPI: bff,
       store: options.platform.messageStore,
@@ -63,7 +66,16 @@ export function createClientRuntime(options: CreateClientRuntimeOptions): Client
     ackQueue: new AckQueue({
       deliveryAPI: bff,
       requestIDFactory: idFactory
-    })
+    }),
+    async logout(): Promise<void> {
+      try {
+        await auth.logout();
+      } finally {
+        pushConnection.disconnect();
+        await options.platform.secureSessionStore.clearSession();
+        await options.platform.messageStore.clear();
+      }
+    }
   };
 }
 

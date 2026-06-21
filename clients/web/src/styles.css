@@ -137,6 +137,12 @@ button {
   font-weight: 700;
 }
 
+.panel button.secondary-button {
+  border: 1px solid #cbd5d9;
+  background: #ffffff;
+  color: #304048;
+}
+
 .conversation-list {
   display: grid;
   gap: 8px;
@@ -286,7 +292,8 @@ button {
 }
 
 .composer button:disabled,
-.composer input:disabled {
+.composer input:disabled,
+.panel button:disabled {
   cursor: not-allowed;
   opacity: 0.6;
 }

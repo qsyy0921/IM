@@ -95,6 +95,11 @@ assertEqual(
   "failed send keeps local record with FAILED status"
 );
 
+await store.clear();
+assertEqual(await store.getLastReceivedSeq("conv-1"), 0, "clear removes cursor");
+assertDeepEqual(await store.listMessages("conv-1"), [], "clear removes cached messages");
+assertDeepEqual(await store.listConversationsNeedingSync(), [], "clear removes sync cursors");
+
 console.log("indexeddb message store persistence ok");
 }
 
@@ -233,6 +238,11 @@ class FakeObjectStore {
 
   delete(key) {
     this.store.records.delete(key);
+    this.transaction?.queueComplete();
+  }
+
+  clear() {
+    this.store.records.clear();
     this.transaction?.queueComplete();
   }
 

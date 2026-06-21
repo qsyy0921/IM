@@ -43,7 +43,9 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   `api-gateway` HTTP/JSON BFF，`BrowserPushTransport` 使用 `push-gateway`
   WebSocket，`IndexedDBMessageStore` 作为 local cache / cursor store；Web shell
   已能走 login -> push connect -> conversation / manual open -> PullInbox -> send
-  -> AckDelivery 的真实 adapter flow。
+  -> AckDelivery 的真实 adapter flow；Web shell 已接 first-stage logout UI，
+  logout 会调用 BFF 当前 session revoke、断开 WebSocket、清空 IndexedDB local
+  cache 和 UI session state。
 - `BFFClient` 已下沉到 `@nexusim/client-core`，Web 原路径仅 re-export；
   PC desktop / Android 后续复用同一 HTTP/JSON BFF adapter，不复制 Web 私有代码。
 - `WebSocketPushTransport` 已下沉到 `@nexusim/client-core`，Web 原
@@ -52,7 +54,8 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
 - `@nexusim/client-core` 已新增 `createClientRuntime`，统一组装 BFF API、push
   transport、auth session、inbox sync、send queue 和 ack queue；`clients/desktop`
   / `clients/android` 已分别新增 `createDesktopClientRuntime` /
-  `createAndroidClientRuntime`。
+  `createAndroidClientRuntime`；shared runtime 已提供 first-stage logout 编排，
+  会调用 BFF logout、断开 push、清理 secure session store 和 local message store。
 - `clients` workspace 已新增本地构建前置检查
   `npm --prefix clients run check:build-prereqs`；该检查只读取本机 Rust /
   Tauri / JDK / Gradle / Android SDK 状态，不安装依赖、不拉包、不使用 `npx`

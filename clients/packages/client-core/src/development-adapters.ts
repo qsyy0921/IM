@@ -81,6 +81,12 @@ export class MemoryMessageStore implements LocalMessageStore {
     return Array.from(this.#messagesByConversation.keys()).sort();
   }
 
+  async clear(): Promise<void> {
+    this.#messagesByConversation.clear();
+    this.#pendingByLocalID.clear();
+    this.#lastReceivedSeq.clear();
+  }
+
   #upsert(message: MessageItem): void {
     let messages = this.#messagesByConversation.get(message.conversationID);
     if (!messages) {

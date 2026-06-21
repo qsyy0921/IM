@@ -73,7 +73,9 @@ First slice:
   accepted send stable-key migration, replay de-duplication and failed-send
   state.
 - The Web shell is wired to login, connect push, list / manually open
-  conversations, PullInbox, send text and AckDelivery through those adapters.
+  conversations, PullInbox, send text, AckDelivery and logout through those
+  adapters. Logout calls BFF current-session revoke, disconnects WebSocket,
+  clears IndexedDB local cache and resets UI session state.
 - `clients/desktop` now has a first-stage TypeScript runtime adapter:
   `loadDesktopRuntimeConfig`, `createDesktopPlatformAdapter`, development-only
   session storage, localStorage-backed persistent message cache, static
@@ -97,12 +99,16 @@ First slice:
 - `@nexusim/client-core` now exposes `createClientRuntime`, wiring BFF API,
   push transport, auth session manager, inbox sync, send queue and ack queue.
   Desktop and Android expose `createDesktopClientRuntime` /
-  `createAndroidClientRuntime` over their platform adapters.
+  `createAndroidClientRuntime` over their platform adapters. The shared runtime
+  also exposes first-stage logout orchestration: call BFF logout, disconnect
+  push, clear secure session storage and clear local message cache.
 - `@nexusim/client-core` now exposes `KeyValueMessageStore`, a reusable
   string-KV persistent store for non-browser targets. Desktop and Android use
   first-stage WebView `localStorage` wrappers by default; future native SQLite
   adapters can replace only the storage/platform port. Android `sqlite` config
-  is reserved and fails fast until that bridge exists.
+  is reserved and fails fast until that bridge exists. `LocalMessageStore.clear`
+  is now part of the shared port so logout can remove cached messages, cursors
+  and pending sends consistently across targets.
 - `loadtest/clientweb` provides the first scriptable client-path smoke. Setup
   uses public gRPC APIs to register users, seed the conversation owner and create
   the receiver JOIN; the verified client path then uses only HTTP BFF and

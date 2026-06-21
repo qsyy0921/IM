@@ -114,6 +114,14 @@ export class IndexedDBMessageStore implements LocalMessageStore {
     return cursors.map(cursor => cursor.conversationID);
   }
 
+  async clear(): Promise<void> {
+    const db = await this.#db();
+    await txDone(db, [MESSAGE_STORE, CURSOR_STORE], "readwrite", transaction => {
+      transaction.objectStore(MESSAGE_STORE).clear();
+      transaction.objectStore(CURSOR_STORE).clear();
+    });
+  }
+
   async listMessages(conversationID: ConversationID): Promise<MessageItem[]> {
     const db = await this.#db();
     const messages = await idbGetAll<StoredMessage>(db, MESSAGE_STORE);

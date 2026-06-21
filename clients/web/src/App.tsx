@@ -58,6 +58,29 @@ export function App() {
     });
   }
 
+  async function logout(): Promise<void> {
+    await run("logout", async () => {
+      const currentSession = sessionRef.current;
+      try {
+        if (currentSession) {
+          await api.logout(currentSession);
+        }
+      } finally {
+        pushConnectionRef.current?.close();
+        pushConnectionRef.current = null;
+        sessionRef.current = null;
+        activeConversationRef.current = "";
+        setSession(null);
+        setConversations([]);
+        setActiveConversationID("");
+        setMessages([]);
+        setComposerText("");
+        setPushStatus("disconnected");
+        await store.clear();
+      }
+    });
+  }
+
   async function loadConversations(currentSession = sessionRef.current): Promise<void> {
     if (!currentSession) {
       throw new Error("login first");
@@ -249,6 +272,9 @@ export function App() {
           </label>
           <button type="button" onClick={() => void login()}>
             登录并连接
+          </button>
+          <button className="secondary-button" type="button" onClick={() => void logout()} disabled={!session}>
+            退出登录
           </button>
         </section>
 

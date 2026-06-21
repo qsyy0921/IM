@@ -98,6 +98,12 @@ async function main() {
     "persistent cursor store lists conversations needing sync"
   );
 
+  await afterFailureRestart.clear();
+  const afterClearRestart = new KeyValueMessageStore(storage, { namespace: "desktop-replay-test" });
+  assertEqual(await afterClearRestart.getLastReceivedSeq("conv-1"), 0, "clear removes persisted cursor");
+  assertDeepEqual(await afterClearRestart.listMessages("conv-1"), [], "clear removes cached messages");
+  assertDeepEqual(await afterClearRestart.listConversationsNeedingSync(), [], "clear removes sync cursors");
+
   console.log("key-value message store persistence ok");
 }
 

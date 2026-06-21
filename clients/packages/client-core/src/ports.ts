@@ -36,6 +36,7 @@ export interface LocalMessageStore {
   markSendAccepted(localID: string, response: SendMessageResponse): Promise<void>;
   markSendFailed(localID: string, reason: string): Promise<void>;
   listConversationsNeedingSync(): Promise<ConversationID[]>;
+  clear(): Promise<void>;
 }
 
 export interface PushTransport {

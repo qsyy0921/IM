@@ -226,6 +226,10 @@ RuntimeDeviceIdentity
 
 Browser, PC, and Android implement those ports differently, but the core
 algorithms stay shared.
+`LocalMessageStore` includes a `clear` operation so logout can remove cached
+messages, local cursors and pending-send records without making any local store
+authoritative. Shared runtime logout must also disconnect push and clear the
+platform secure session store.
 
 ```text
 browser  -> IndexedDB + fetch + WebSocket + browser lifecycle

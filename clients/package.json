@@ -18,6 +18,7 @@
     "test:shell-config": "node ./tools/test-shell-config-contract.mjs",
     "test:shell-web-assets": "node ./tools/test-shell-web-assets.mjs",
     "test:artifact-builders": "node ./tools/test-client-artifact-builders.mjs",
+    "validate:builder-profile": "node ./tools/validate-client-builder-profile.mjs",
     "test:key-value-store": "node ./tools/test-key-value-message-store.mjs",
     "test:runtime-lifecycle": "node ./tools/test-client-runtime-lifecycle.mjs",
     "build:shell-assets:desktop": "node ./tools/prepare-shell-web-assets.mjs --target windows-desktop",

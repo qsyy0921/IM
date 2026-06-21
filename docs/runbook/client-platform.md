@@ -155,6 +155,11 @@ First slice:
   commands are present as `build:desktop-artifact` and `build:android-apk`, but
   they fail fast with missing-toolchain JSON until the local Tauri / Android
   toolchains are installed.
+- `npm --prefix clients run validate:builder-profile` validates the Android
+  Docker builder profile without building or pulling images. The profile lives
+  in `deploy/local/docker-compose.client-builders.yml` and uses
+  `deploy/docker/client-android-builder.Dockerfile`; it is opt-in because the
+  first image build downloads Node and Android SDK components.
 - `@nexusim/client-core` now exposes `ClientShellActions`; desktop and Android
   export thin `createDesktopShellActions` / `createAndroidShellActions` wrappers.
   These wrappers do not own business logic; they only bind shell UI actions to
@@ -217,6 +222,8 @@ rejected. For local LAN client smoke, prefer the wired `172.x.x.x` address.
 - Android APK build needs JDK 17+ plus Gradle / Android SDK. If those are not
   installed locally, use a Docker / CI builder profile instead of claiming an
   APK baseline.
+- The repository now includes an Android Docker builder profile, but it has not
+  been run in this slice and therefore does not prove an APK baseline yet.
 
 Focused local check:
 
@@ -225,6 +232,7 @@ npm --prefix clients run check:build-prereqs
 npm --prefix clients run test:shell-config
 npm --prefix clients run test:shell-web-assets
 npm --prefix clients run test:artifact-builders
+npm --prefix clients run validate:builder-profile
 ```
 
 This command reports readiness as JSON and exits non-zero when artifact / APK
@@ -238,4 +246,5 @@ node clients/tools/build-desktop-artifact.mjs --dry-run
 node clients/tools/build-android-apk.mjs --dry-run
 npm --prefix clients run build:desktop-artifact
 npm --prefix clients run build:android-apk
+docker compose -f deploy/local/docker-compose.client-builders.yml --profile client-builders run --rm client-android-apk-builder
 ```

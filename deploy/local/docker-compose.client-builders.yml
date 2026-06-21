@@ -1,0 +1,24 @@
+name: nexusim-client-builders
+
+services:
+  client-android-apk-builder:
+    profiles:
+      - client-builders
+    build:
+      context: ../..
+      dockerfile: deploy/docker/client-android-builder.Dockerfile
+    image: nexusim/client-android-builder:local
+    working_dir: /workspace
+    environment:
+      NEXUSIM_CLIENT_ARTIFACT_DIR: /artifacts/android
+    volumes:
+      - ../..:/workspace
+      - ${NEXUSIM_CLIENT_ARTIFACTS_DIR:-../../clients/artifacts}:/artifacts
+    command:
+      - bash
+      - -lc
+      - >
+        npm --prefix clients ci &&
+        npm --prefix clients run build:android-apk &&
+        mkdir -p "$${NEXUSIM_CLIENT_ARTIFACT_DIR}" &&
+        cp clients/android/native/app/build/outputs/apk/debug/app-debug.apk "$${NEXUSIM_CLIENT_ARTIFACT_DIR}/nexusim-debug.apk"

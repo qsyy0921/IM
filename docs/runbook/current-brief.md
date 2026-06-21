@@ -43,8 +43,9 @@ presence-service、vector-index-service、workflow-service。
 Windows wired `172.31.50.1` clean baseline 已通过并归档；BFF HTTP route metrics /
 rate-limit adapter 已落。PC / Android runtime shell 已进入 assets prep / native
 shell 骨架阶段；artifact / APK build wrapper 已有 dry-run-tested command plan，
-但本机仍缺 Tauri CLI 与 Android JDK 17+ / Gradle / SDK。下一步是补本地工具链或
-builder profile，产出本地 Windows artifact、Android unsigned APK 和真实壳层 smoke。
+Android Docker builder profile 已落但尚未运行。本机仍缺 Tauri CLI 与 Android
+JDK 17+ / Gradle / SDK。下一步是补本地工具链或显式运行 builder profile，产出本地
+Windows artifact、Android unsigned APK 和真实壳层 smoke。
 
 真实业务语言边界已经固定为：Go 负责后端微服务、client BFF、控制面、事实源和
 审计；TypeScript 负责 Web / PC / Android 的共享客户端协议、同步核心和 UI；
@@ -63,8 +64,8 @@ adoption rules，不把服务数量、中间件或部署形态写死。
   loopback clean baseline 和 Windows wired `172.31.50.1` clean baseline 已通过，
   BFF HTTP route metrics / rate-limit adapter 已落；PC desktop / Android 已有
   target shell Web assets prep，Android 已用 WebViewAssetLoader 加载本地 assets，
-  artifact / APK wrapper 已能 dry-run 输出命令和缺失工具链，下一步做本地 artifact /
-  APK 和真实平台 shell smoke。
+  artifact / APK wrapper 已能 dry-run 输出命令和缺失工具链，Android builder profile
+  已能静态校验，下一步做本地 artifact / APK 和真实平台 shell smoke。
 - admin / audit / workflow：客户端切片完成后继续公开 API handoff、operator
   workflow、低敏审批 review artifact 和补偿边界。
 - vector-index：继续 provider backend、pgvector / Milvus / OpenSearch 相关

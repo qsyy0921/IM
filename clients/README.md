@@ -98,11 +98,23 @@ npm --prefix clients run build:desktop-artifact
 npm --prefix clients run build:android-apk
 ```
 
+Android can also be built through the local Docker builder profile when the image
+is intentionally built:
+
+```powershell
+npm --prefix clients run validate:builder-profile
+docker compose -f deploy/local/docker-compose.client-builders.yml --profile client-builders run --rm client-android-apk-builder
+```
+
+The Docker profile is not run by default and may download the Android / Node
+toolchain the first time it is built.
+
 Current packaging status:
 
 - Browser: Vite dev/build shell exists.
 - PC desktop: Tauri shell skeleton can prepare target-specific Web assets and
   has a build wrapper; no installer yet because this machine lacks Tauri CLI.
 - Android: native WebView shell can prepare target-specific Web assets and has
-  an APK build wrapper; no APK/AAB yet because this machine lacks JDK 17+,
-  Gradle and Android SDK.
+  an APK build wrapper plus a Docker builder profile; no APK/AAB has been
+  produced yet because the local native toolchain is missing and the Docker
+  builder image has not been built in this slice.

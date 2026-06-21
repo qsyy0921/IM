@@ -48,7 +48,8 @@
   指向 JDK 8；需要 JDK 17+ 和 Android build toolchain，或通过
   Docker / CI builder 产物链路；可用 `npm --prefix clients run check:build-prereqs`
   检查当前机器状态。`build:android-apk` wrapper 已落，会在工具链 ready 时准备
-  shell assets 并执行 Gradle `:app:assembleDebug`；当前仍未产出 APK。
+  shell assets 并执行 Gradle `:app:assembleDebug`；Android Docker builder profile
+  已落但尚未运行，当前仍未产出 APK。
 - 三端 smoke：Web / PC / Android 都只能连 `api-gateway` 和 `push-gateway`；
   PullInbox 是事实源，WebSocket 只做在线唤醒。
 - Local store：`IndexedDBMessageStore` 已有 first-stage persistence test；

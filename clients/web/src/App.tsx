@@ -1,28 +1,24 @@
 import { useMemo, useRef, useState } from "react";
-import { MessageSendQueue, validateRuntimeConfig } from "@nexusim/client-core";
+import { createClientRuntime, validateRuntimeConfig } from "@nexusim/client-core";
 import type { AuthSession, ConversationSummary, DeliveryNotifyFrame, MessageItem, ServerFrame } from "@nexusim/protocol";
-import { BFFClient } from "./adapters/bff-client";
-import { BrowserPushTransport } from "./adapters/browser-push-transport";
-import { IndexedDBMessageStore } from "./adapters/indexeddb-message-store";
+import { createBrowserPlatformAdapter } from "./platform-adapter";
 import { loadRuntimeConfig } from "./runtime-config";
 
 const runtimeConfig = validateRuntimeConfig(loadRuntimeConfig());
 
 export function App() {
-  const api = useMemo(() => new BFFClient(runtimeConfig.apiBaseURL), []);
-  const store = useMemo(() => new IndexedDBMessageStore(), []);
-  const pushTransport = useMemo(() => new BrowserPushTransport(), []);
-  const sendQueue = useMemo(
+  const platform = useMemo(() => createBrowserPlatformAdapter({ config: runtimeConfig }), []);
+  const runtime = useMemo(
     () =>
-      new MessageSendQueue({
-        messagingAPI: api,
-        store,
-        idempotencyKeyFactory: newID,
-        clientMessageIDFactory: newID,
+      createClientRuntime({
+        config: runtimeConfig,
+        platform,
+        idFactory: newID,
         nowMs: () => Date.now()
       }),
-    [api, store]
+    [platform]
   );
+  const store = platform.messageStore;
 
   const [tenantID, setTenantID] = useState("tenant-local");
   const [userID, setUserID] = useState("user-a");
@@ -44,13 +40,12 @@ export function App() {
   async function login(): Promise<void> {
     await run("login", async () => {
       pushConnectionRef.current?.close();
-      const response = await api.login({
+      const nextSession = await runtime.login({
         tenantID,
         userID,
         password,
         deviceID: runtimeConfig.deviceID
       });
-      const nextSession = response.session;
       sessionRef.current = nextSession;
       setSession(nextSession);
       await connectPush(nextSession);
@@ -60,11 +55,8 @@ export function App() {
 
   async function logout(): Promise<void> {
     await run("logout", async () => {
-      const currentSession = sessionRef.current;
       try {
-        if (currentSession) {
-          await api.logout(currentSession);
-        }
+        await runtime.logout();
       } finally {
         pushConnectionRef.current?.close();
         pushConnectionRef.current = null;
@@ -85,7 +77,7 @@ export function App() {
     if (!currentSession) {
       throw new Error("login first");
     }
-    const items = await api.listConversations(currentSession, { limit: 50 });
+    const items = await runtime.bff.listConversations(currentSession, { limit: 50 });
     setConversations(items);
     if (items.length > 0) {
       const firstConversationID = items[0]!.conversationID;
@@ -124,14 +116,14 @@ export function App() {
         return;
       }
       setComposerText("");
-      await sendQueue.sendText({ session: currentSession, conversationID, text });
+      await runtime.sendQueue.sendText({ session: currentSession, conversationID, text });
       await syncConversation(conversationID, currentSession);
     });
   }
 
   async function connectPush(currentSession: AuthSession): Promise<void> {
     setPushStatus("connecting");
-    const connection = await pushTransport.connect({
+    const connection = await runtime.pushTransport.connect({
       url: runtimeConfig.pushWebSocketURL,
       session: currentSession,
       onFrame: frame => void handlePushFrame(frame),
@@ -173,7 +165,7 @@ export function App() {
       return;
     }
     const afterSeq = await store.getLastReceivedSeq(conversationID);
-    const response = await api.pullInbox(
+    const response = await runtime.bff.pullInbox(
       {
         tenantID: currentSession.tenantID,
         userID: currentSession.userID,
@@ -191,17 +183,8 @@ export function App() {
     }
     const maxSeq = nextMessages.reduce((max, message) => Math.max(max, message.conversationSeq), afterSeq);
     if (maxSeq > afterSeq) {
-      await api.ackDelivery(
-        {
-          tenantID: currentSession.tenantID,
-          userID: currentSession.userID,
-          deviceID: currentSession.deviceID,
-          conversationID,
-          lastReceivedSeq: maxSeq,
-          requestID: newID()
-        },
-        currentSession
-      );
+      runtime.ackQueue.recordReceived(conversationID, maxSeq);
+      await runtime.ackQueue.flush(currentSession);
     }
   }
 

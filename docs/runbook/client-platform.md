@@ -68,6 +68,11 @@ First slice:
     compatibility re-export.
   - `IndexedDBMessageStore` implements the local cache / cursor store behind
     the `LocalMessageStore` port.
+- `clients/web` now also has `createBrowserPlatformAdapter`, which binds the
+  browser shell to the shared `createClientRuntime` auth / send / ack / logout
+  lifecycle. The browser session store is first-stage tab-scoped
+  `sessionStorage`; production Web auth still needs an httpOnly-cookie or
+  equivalent hardened session strategy.
 - `IndexedDBMessageStore` now has a dependency-free first-stage persistence
   test harness covering cursor persistence, message ordering, pending send,
   accepted send stable-key migration, replay de-duplication and failed-send
@@ -119,6 +124,9 @@ First slice:
   cleanup without requiring Tauri CLI, Android SDK or network access. It also
   exercises the desktop / Android thin shell actions that a real PC or Android
   UI can call for restore/logout.
+- `npm --prefix clients run test:web-platform` covers browser session storage,
+  browser runtime identity, network/lifecycle ports and unsupported wakeup
+  boundaries without requiring a live browser or backend.
 - `@nexusim/client-core` now exposes `ClientShellActions`; desktop and Android
   export thin `createDesktopShellActions` / `createAndroidShellActions` wrappers.
   These wrappers do not own business logic; they only bind shell UI actions to

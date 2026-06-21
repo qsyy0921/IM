@@ -45,7 +45,9 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   已能走 login -> push connect -> conversation / manual open -> PullInbox -> send
   -> AckDelivery 的真实 adapter flow；Web shell 已接 first-stage logout UI，
   logout 会调用 BFF 当前 session revoke、断开 WebSocket、清空 IndexedDB local
-  cache 和 UI session state。
+  cache 和 UI session state；Web shell 现在也通过 browser platform adapter 复用
+  `createClientRuntime` 的 auth / send / ack / logout 编排，不再手动复制 BFF /
+  send queue 组装。
 - `BFFClient` 已下沉到 `@nexusim/client-core`，Web 原路径仅 re-export；
   PC desktop / Android 后续复用同一 HTTP/JSON BFF adapter，不复制 Web 私有代码。
 - `WebSocketPushTransport` 已下沉到 `@nexusim/client-core`，Web 原
@@ -80,6 +82,11 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   message cache。该测试现在也通过 desktop / Android thin shell actions 调用
   shared restore / logout 编排，证明真实壳层可以接入统一 action contract。该测试不依赖
   Tauri CLI / Android SDK，不替代真实安装包或 APK。
+- `clients` workspace 已新增 focused browser platform adapter test：
+  `npm --prefix clients run test:web-platform` 覆盖 browser session store、
+  browser platform identity、network / lifecycle ports 和 unsupported wakeup
+  boundary；Web session store 仅作为 first-stage tab-scoped sessionStorage
+  adapter，后续生产 Web 鉴权仍需 httpOnly cookie / provider-grade session 策略。
 - `loadtest/clientweb` 已新增 first-stage scriptable client smoke runner：
   准备阶段用 identity / api-gateway gRPC 注册用户、seed 会话并创建 JOIN；真实客户端
   验证段只走 `api-gateway` HTTP BFF 和 `push-gateway` WebSocket，覆盖 BFF login、

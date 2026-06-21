@@ -14,6 +14,7 @@
     "dev:web": "npm --workspace @nexusim/web run dev",
     "build:web": "npm --workspace @nexusim/web run build",
     "test:indexeddb-store": "npm --workspace @nexusim/web run test:indexeddb-store",
+    "test:web-platform": "node ./tools/test-web-platform-adapter.mjs",
     "test:key-value-store": "node ./tools/test-key-value-message-store.mjs",
     "test:runtime-lifecycle": "node ./tools/test-client-runtime-lifecycle.mjs",
     "typecheck:desktop": "npm --workspace @nexusim/desktop run typecheck",

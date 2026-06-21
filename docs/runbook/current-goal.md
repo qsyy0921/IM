@@ -218,7 +218,9 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
 - `clients/tools/report-client-artifact-readiness.mjs` 已提供低敏 readiness
   report；`test:artifact-readiness` 覆盖 schema、无敏感字段和无本机绝对路径。
   报告已区分 Android Docker builder image build command 与实际 builder run command，
-  会显示 prepared shell asset manifest verification 状态，并输出低敏
+  会显示 prepared shell asset manifest verification 状态、desktop / Android local store
+  readiness（当前默认 `local-storage`，目标 `sqlite`，native bridge 未实现时输出
+  `sqlite-native-bridge-unavailable`），并输出低敏
   `nextActions`，不会自动下载或构建。当前报告显示 Windows desktop ready
  （通过 repo-local `local:tauri`），Docker / Compose 可用、Android builder profile
   可解析，但 `nexusim/client-android-builder:local` image 尚未构建；Android 本地路径

@@ -234,7 +234,10 @@ First slice:
   readiness matrix for local desktop, local Android and Android Docker builder
   paths. It reports missing capabilities and the exact next build command
   without printing local absolute paths. It also includes per-target prepared
-  shell asset verification status. It separates the Android Docker builder image
+  shell asset verification status and per-target local store readiness. The
+  local store section records the current first-stage `local-storage` cache,
+  target `sqlite` production store and missing native bridge reason without
+  treating that as a blocker for current shell smoke. It separates the Android Docker builder image
   build command from the actual builder run command and emits low-sensitive
   `nextActions`; it never starts a download or build by itself. When the image
   is missing, the next action points at `build:android-apk:docker:bootstrap`,

@@ -76,6 +76,7 @@ function nativeTarget(target, readinessTarget, artifactPlan, installPlan) {
     shellAssets: readinessTarget.shellAssets,
     nativeToolchainReady: readinessTarget.ready,
     missingToolchain: readinessTarget.missing,
+    localStore: readinessTarget.localStore,
     artifact: artifactStatus,
     install: installStatus,
     commands: nativeCommands(target, readinessTarget),
@@ -308,6 +309,9 @@ function nativeNotes(target, readinessTarget, artifactStatus, installStatus) {
   }
   if (target === "android" && readinessTarget.dockerBuilder && !readinessTarget.ready) {
     notes.push("Android can use the opt-in Docker builder path; the first image build may download toolchains.");
+  }
+  if (readinessTarget.localStore?.nativeStoreReadiness?.ready === false) {
+    notes.push("Native SQLite local store is not ready; current platform smoke continues to use the first-stage localStorage cache.");
   }
   return notes;
 }

@@ -20,6 +20,10 @@ const serialized = JSON.stringify(report);
 assert(report.schemaVersion === "nexusim.client-artifact-readiness.v1", "schema version mismatch");
 assert(report.targets["windows-desktop"].buildCommand.includes("build:desktop-artifact:collect"), "desktop collect command missing");
 assert(typeof report.targets["windows-desktop"].shellAssets?.verified === "boolean", "desktop shell asset status missing");
+assert(report.targets["windows-desktop"].localStore?.currentDefault === "local-storage", "desktop local store default missing");
+assert(report.targets["windows-desktop"].localStore?.productionTarget === "sqlite", "desktop local store production target missing");
+assert(report.targets["windows-desktop"].localStore?.nativeStoreReadiness?.reason === "sqlite-native-bridge-unavailable", "desktop native store readiness reason mismatch");
+assert(report.targets["windows-desktop"].localStore?.nativeStoreReadiness?.bridge === "tauri-sqlite", "desktop native store bridge mismatch");
 if (report.targets["windows-desktop"].ready) {
   assert(
     !report.targets["windows-desktop"].missing.some(item => item.name === "cargo tauri" || item.name === "local:tauri"),
@@ -28,6 +32,10 @@ if (report.targets["windows-desktop"].ready) {
 }
 assert(report.targets.android.buildCommand.includes("build:android-apk:collect"), "android collect command missing");
 assert(typeof report.targets.android.shellAssets?.verified === "boolean", "android shell asset status missing");
+assert(report.targets.android.localStore?.currentDefault === "local-storage", "android local store default missing");
+assert(report.targets.android.localStore?.productionTarget === "sqlite", "android local store production target missing");
+assert(report.targets.android.localStore?.nativeStoreReadiness?.reason === "sqlite-native-bridge-unavailable", "android native store readiness reason mismatch");
+assert(report.targets.android.localStore?.nativeStoreReadiness?.bridge === "android-sqlite", "android native store bridge mismatch");
 assert(report.targets.android.dockerBuilder.profile === "client-builders", "android builder profile mismatch");
 assert(report.targets.android.dockerBuilder.outputHint.endsWith("manifest.json"), "android builder manifest hint missing");
 assert(

@@ -28,6 +28,8 @@ assert(plan.targets["windows-desktop"].commands.prepareAssets.includes("build:sh
 assert(plan.targets["windows-desktop"].commands.verifyAssets.includes("windows-desktop"), "desktop verify command missing");
 assert(plan.targets["windows-desktop"].commands.installPlan.includes("plan:artifact-install"), "desktop install plan command missing");
 assert(plan.targets["windows-desktop"].install, "desktop install status missing");
+assert(plan.targets["windows-desktop"].localStore?.nativeStoreReadiness?.bridge === "tauri-sqlite", "desktop local store readiness missing");
+assert(plan.targets["windows-desktop"].notes.some(note => note.includes("Native SQLite local store is not ready")), "desktop native sqlite note missing");
 assert(typeof plan.targets["windows-desktop"].install.readyForInstall === "boolean", "desktop install readiness missing");
 assert(Array.isArray(plan.targets["windows-desktop"].install.missing), "desktop install missing list missing");
 assert(Array.isArray(plan.targets["windows-desktop"].checklist), "desktop checklist missing");
@@ -73,6 +75,8 @@ assert(plan.targets.android.commands.deviceReadiness.includes("report:android-de
 assert(plan.targets.android.commands.webviewDevtoolsReadiness.includes("report:android-webview-devtools-readiness"), "android WebView devtools readiness command missing");
 assert(plan.targets.android.commands.webviewMetadataSmoke.includes("smoke:android-webview-metadata"), "android WebView metadata smoke command missing");
 assert(plan.targets.android.install, "android install status missing");
+assert(plan.targets.android.localStore?.nativeStoreReadiness?.bridge === "android-sqlite", "android local store readiness missing");
+assert(plan.targets.android.notes.some(note => note.includes("Native SQLite local store is not ready")), "android native sqlite note missing");
 assert(typeof plan.targets.android.install.readyForInstall === "boolean", "android install readiness missing");
 assert(typeof plan.targets.android.install.installPrereqs.adbAvailable === "boolean", "android adb prereq status missing");
 assert(Array.isArray(plan.targets.android.install.missing), "android install missing list missing");
@@ -99,7 +103,20 @@ const readyReadiness = {
       },
       missing: [],
       buildCommand: "npm --prefix clients run build:desktop-artifact:collect",
-      dryRunCommand: "node clients/tools/build-desktop-artifact.mjs --dry-run --collect"
+      dryRunCommand: "node clients/tools/build-desktop-artifact.mjs --dry-run --collect",
+      localStore: {
+        currentDefault: "local-storage",
+        productionTarget: "sqlite",
+        nativeStoreReadiness: {
+          target: "windows-desktop",
+          requestedStore: "sqlite",
+          ready: false,
+          reason: "sqlite-native-bridge-unavailable",
+          bridge: "tauri-sqlite",
+          nextAction: "tauri-sqlite is required before windows-desktop can use sqlite local store"
+        },
+        currentSmokeStore: "local-storage"
+      }
     },
     android: {
       ready: true,
@@ -109,7 +126,20 @@ const readyReadiness = {
       },
       missing: [],
       buildCommand: "npm --prefix clients run build:android-apk:collect",
-      dryRunCommand: "node clients/tools/build-android-apk.mjs --dry-run --collect"
+      dryRunCommand: "node clients/tools/build-android-apk.mjs --dry-run --collect",
+      localStore: {
+        currentDefault: "local-storage",
+        productionTarget: "sqlite",
+        nativeStoreReadiness: {
+          target: "android",
+          requestedStore: "sqlite",
+          ready: false,
+          reason: "sqlite-native-bridge-unavailable",
+          bridge: "android-sqlite",
+          nextAction: "android-sqlite is required before android can use sqlite local store"
+        },
+        currentSmokeStore: "local-storage"
+      }
     }
   }
 };

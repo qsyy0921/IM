@@ -31,6 +31,7 @@ export function buildReadinessReport() {
         ready: prereqs.desktopArtifactReady,
         missing: missingChecks(prereqs.checks, "desktop"),
         shellAssets: shellAssetStatus("windows-desktop"),
+        localStore: localStoreReadiness("windows-desktop"),
         buildCommand: "npm --prefix clients run build:desktop-artifact:collect",
         dryRunCommand: "node clients/tools/build-desktop-artifact.mjs --dry-run --collect"
       },
@@ -38,6 +39,7 @@ export function buildReadinessReport() {
         ready: prereqs.androidApkReady,
         missing: missingChecks(prereqs.checks, "android"),
         shellAssets: shellAssetStatus("android"),
+        localStore: localStoreReadiness("android"),
         buildCommand: "npm --prefix clients run build:android-apk:collect",
         dryRunCommand: "node clients/tools/build-android-apk.mjs --dry-run --collect",
         dockerBuilder: {
@@ -185,6 +187,23 @@ function shellAssetFailureReason(error) {
     return "sensitive-manifest";
   }
   return "invalid-manifest";
+}
+
+function localStoreReadiness(target) {
+  const bridge = target === "windows-desktop" ? "tauri-sqlite" : "android-sqlite";
+  return {
+    currentDefault: "local-storage",
+    productionTarget: "sqlite",
+    nativeStoreReadiness: {
+      target,
+      requestedStore: "sqlite",
+      ready: false,
+      reason: "sqlite-native-bridge-unavailable",
+      bridge,
+      nextAction: `${bridge} is required before ${target} can use sqlite local store`
+    },
+    currentSmokeStore: "local-storage"
+  };
 }
 
 function dockerStatus() {

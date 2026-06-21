@@ -26,6 +26,8 @@ assert(result.schemaVersion === "nexusim.android-webview-metadata-smoke.v1", "sc
 assert(result.dryRun === true, "dry-run flag missing");
 assert(result.runID === "android-webview-metadata-test", "run id mismatch");
 assert(result.build.shellConfig === "temporary-loopback-metadata", "temporary shell config marker missing");
+assert(result.build.freshBuildRequired === true, "Android metadata smoke must require a fresh callback-config build");
+assert(result.build.freshBuildReason.includes("callback URL"), "fresh-build reason should mention callback URL injection");
 assert(result.adb.packageName === "com.nexusim.android", "Android package marker missing");
 assert(result.adb.mainActivity === "com.nexusim.android/.MainActivity", "Android activity marker missing");
 assert(result.adb.reverseLoopback === true, "adb reverse loopback marker missing");

@@ -168,7 +168,9 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   低敏 plan，真实运行会构建注入临时 metadata callback 的 APK、通过 `adb reverse`
   暴露 loopback callback、安装并启动 `com.nexusim.android/.MainActivity`，等待
   `NexusIMNative.runtimeMetadata()` 回调。该 Android runner 仍受 APK toolchain
-  阻塞，尚未形成真实设备 baseline。
+  阻塞，尚未形成真实设备 baseline。由于 callback URL 在打包前注入 shell assets，
+  该 metadata smoke 必须 fresh-build 当前 run 的 APK；普通旧 APK 不能作为
+  callback path 证据。
 - PC Web shell 已新增登录级自动化前置：Web UI 暴露稳定 `data-testid`
   automation contract 和 `ack-status` 诊断，`npm --prefix clients run
   smoke:desktop-webview-login` 可通过 WebView2/CDP 外部驱动 Tauri WebView 登录、

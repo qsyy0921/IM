@@ -256,7 +256,10 @@ Responsibilities:
   the device, install the collected APK, launch
   `com.nexusim.android/.MainActivity`, and wait for
   `NexusIMNative.runtimeMetadata()` evidence. This is still a metadata-only
-  WebView smoke, not a login-level client smoke.
+  WebView smoke, not a login-level client smoke. Because the callback URL is
+  rendered into shell assets before packaging, this smoke requires a fresh APK
+  build for that callback; a previously collected normal APK is not valid
+  evidence for the callback path.
 - Android asset preparation must clean the WebView asset output directory before
   copying a new build, so APKs do not carry stale Web bundles.
 - Android asset preparation uses the same low-sensitive shell asset manifest as

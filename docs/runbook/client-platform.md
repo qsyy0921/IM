@@ -243,6 +243,9 @@ First slice:
   `com.nexusim.android/.MainActivity`, and waits for the WebView to POST the
   `NexusIMNative.runtimeMetadata()` report through `adb reverse`. It proves only
   appassets + metadata bridge wiring, not login, PullInbox, WebSocket, or ACK.
+  This smoke intentionally requires a fresh APK build because the callback URL
+  is injected into shell assets before packaging; a previously collected normal
+  APK cannot prove the callback path unless it was built for the same callback.
 - `npm --prefix clients run validate:builder-profile` validates the Android
   Docker builder profile without building or pulling images. The profile lives
   in `deploy/local/docker-compose.client-builders.yml` and uses

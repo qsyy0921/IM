@@ -27,6 +27,8 @@ async function main(argv) {
     build: {
       command: "npm --prefix clients run smoke:android-webview-metadata",
       shellConfig: "temporary-loopback-metadata",
+      freshBuildRequired: true,
+      freshBuildReason: "metadata callback URL is injected into shell assets before APK packaging",
       artifactHint: "clients/artifacts/<run-id>/nexusim-android-debug.apk"
     },
     adb: {

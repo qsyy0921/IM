@@ -20,17 +20,27 @@ const serialized = JSON.stringify(report);
 assert(report.schemaVersion === "nexusim.client-artifact-readiness.v1", "schema version mismatch");
 assert(report.targets["windows-desktop"].buildCommand.includes("build:desktop-artifact:collect"), "desktop collect command missing");
 assert(typeof report.targets["windows-desktop"].shellAssets?.verified === "boolean", "desktop shell asset status missing");
+if (report.targets["windows-desktop"].ready) {
+  assert(
+    !report.targets["windows-desktop"].missing.some(item => item.name === "cargo tauri" || item.name === "local:tauri"),
+    "desktop missing list should not include a satisfied alternative Tauri CLI"
+  );
+}
 assert(report.targets.android.buildCommand.includes("build:android-apk:collect"), "android collect command missing");
 assert(typeof report.targets.android.shellAssets?.verified === "boolean", "android shell asset status missing");
 assert(report.targets.android.dockerBuilder.profile === "client-builders", "android builder profile mismatch");
 assert(report.targets.android.dockerBuilder.outputHint.endsWith("manifest.json"), "android builder manifest hint missing");
 assert(
-  report.targets.android.dockerBuilder.imageBuildCommand.includes("build client-android-apk-builder"),
+  report.targets.android.dockerBuilder.imageBuildCommand.includes("build:android-apk:docker:bootstrap"),
   "android builder image build command missing"
 );
 assert(
-  report.targets.android.dockerBuilder.buildCommand.includes("run --rm client-android-apk-builder"),
+  report.targets.android.dockerBuilder.buildCommand.includes("build:android-apk:docker"),
   "android builder run command missing"
+);
+assert(
+  report.targets.android.dockerBuilder.safeDryRunCommand.includes("run-android-docker-builder.mjs --dry-run"),
+  "android builder safe dry-run command missing"
 );
 assert(Array.isArray(report.checks), "checks must be an array");
 assert(Array.isArray(report.nextActions), "nextActions must be an array");

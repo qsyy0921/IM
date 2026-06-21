@@ -175,9 +175,11 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
 - Android 已新增 opt-in Docker builder profile：
   `deploy/docker/client-android-builder.Dockerfile` 和
   `deploy/local/docker-compose.client-builders.yml`。`validate:builder-profile`
-  只做静态校验，不拉镜像；该 profile 已接 `build:android-apk:collect`，成功构建后会把
-  APK 和低敏 manifest 写入 `clients/artifacts/android/docker-android-debug/`；首次真正运行该 profile 会下载 Node / Android SDK
-  toolchain。本轮未构建镜像，也未声称 APK baseline。
+  只做静态校验，不拉镜像；`build:android-apk:docker` 现在是受控 wrapper，默认要求
+  `nexusim/client-android-builder:local` 已存在，不会隐式下载 toolchain；
+  `build:android-apk:docker:bootstrap` 是显式 bootstrap 入口，会在缺镜像时下载 /
+  构建 Node 与 Android SDK toolchain。该 profile 已接 `build:android-apk:collect`，成功构建后会把
+  APK 和低敏 manifest 写入 `clients/artifacts/android/docker-android-debug/`。当前仍未构建镜像，也未声称 APK baseline。
 - `clients/tools/report-client-artifact-readiness.mjs` 已提供低敏 readiness
   report；`test:artifact-readiness` 覆盖 schema、无敏感字段和无本机绝对路径。
   报告已区分 Android Docker builder image build command 与实际 builder run command，
@@ -185,7 +187,8 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   `nextActions`，不会自动下载或构建。当前报告显示 Windows desktop ready
  （通过 repo-local `local:tauri`），Docker / Compose 可用、Android builder profile
   可解析，但 `nexusim/client-android-builder:local` image 尚未构建；Android 本地路径
-  仍缺 JDK 17+ / Gradle / Android SDK。
+  仍缺 JDK 17+ / Gradle / Android SDK。readiness 下一步现在指向受控
+  `npm --prefix clients run build:android-apk:docker:bootstrap`，并显式标记会下载 toolchain。
 - `clients/tools/plan-client-shell-smoke.mjs` 已提供低敏 browser / desktop /
   Android shell smoke plan；它汇总 toolchain readiness、prepared asset
   verification、artifact presence、collected-artifact install readiness、安全构建命令、
@@ -267,8 +270,9 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
 
 ## 下一步优先级
 
-1. 补 Android JDK 17+ / Gradle / Android SDK，或显式运行 Android Docker builder
-   profile，然后运行 `build:android-apk:collect` 产出首个 APK + manifest。
+1. 补 Android JDK 17+ / Gradle / Android SDK，或显式运行
+   `npm --prefix clients run build:android-apk:docker:bootstrap` 构建 Android Docker builder
+   image；镜像存在后运行 `npm --prefix clients run build:android-apk:docker` 产出首个 APK + manifest。
 2. 在真实 Android shell UI 中接入现有 shell action，并在工具链 ready 后跑平台 shell smoke。
 3. 后续把 desktop / Android first-stage localStorage store 替换为 native
    SQLite bridge，并补真实平台 runtime smoke。

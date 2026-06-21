@@ -12,9 +12,9 @@ const androidBuilderImage = "nexusim/client-android-builder:local";
 const androidBuilderCompose = "deploy/local/docker-compose.client-builders.yml";
 const androidBuilderDockerfile = "deploy/docker/client-android-builder.Dockerfile";
 const androidBuilderImageBuildCommand =
-  "docker compose -f deploy/local/docker-compose.client-builders.yml --profile client-builders build client-android-apk-builder";
+  "npm --prefix clients run build:android-apk:docker:bootstrap";
 const androidBuilderRunCommand =
-  "docker compose -f deploy/local/docker-compose.client-builders.yml --profile client-builders run --rm client-android-apk-builder";
+  "npm --prefix clients run build:android-apk:docker";
 
 function main() {
   console.log(JSON.stringify(buildReadinessReport(), null, 2));
@@ -52,7 +52,9 @@ export function buildReadinessReport() {
           imagePresent: docker.imagePresent,
           outputHint: "clients/artifacts/android/docker-android-debug/manifest.json",
           imageBuildCommand: androidBuilderImageBuildCommand,
-          buildCommand: androidBuilderRunCommand
+          buildCommand: androidBuilderRunCommand,
+          safeDryRunCommand: "node clients/tools/run-android-docker-builder.mjs --dry-run",
+          buildImageOnlyCommand: "npm --prefix clients run build:android-apk:docker:image"
         }
       }
     },
@@ -108,11 +110,31 @@ function nextActions(prereqs, docker) {
 
 function missingChecks(checks, target) {
   return checks
-    .filter(check => check.target === target && !check.ok)
+    .filter(check => check.target === target && !check.ok && !isSatisfiedByAlternative(checks, check))
     .map(check => ({
       name: check.name,
       label: check.label
     }));
+}
+
+function isSatisfiedByAlternative(checks, check) {
+  if (check.name === "cargo tauri" && checkOK(checks, "local:tauri")) {
+    return true;
+  }
+  if (check.name === "local:tauri" && checkOK(checks, "cargo tauri")) {
+    return true;
+  }
+  if (check.name === "ANDROID_HOME" && checkOK(checks, "ANDROID_SDK_ROOT")) {
+    return true;
+  }
+  if (check.name === "ANDROID_SDK_ROOT" && checkOK(checks, "ANDROID_HOME")) {
+    return true;
+  }
+  return false;
+}
+
+function checkOK(checks, name) {
+  return checks.some(check => check.name === name && check.ok);
 }
 
 function sanitizedChecks(checks) {

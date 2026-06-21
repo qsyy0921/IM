@@ -189,6 +189,11 @@ First slice:
   `npm --prefix clients install`; Android still fails fast with
   missing-toolchain JSON until the local Android toolchain or Docker builder
   image exists.
+- `npm --prefix clients run test:android-docker-builder` validates the safe
+  Android Docker builder wrapper. `build:android-apk:docker` runs only when
+  the local builder image already exists; `build:android-apk:docker:bootstrap`
+  is the explicit opt-in command that may download Node / Android SDK toolchains
+  to build the image.
 - `npm --prefix clients run test:artifact-collector` validates the first-stage
   artifact collector. Once a real desktop artifact or Android APK exists,
   `npm --prefix clients run collect:client-artifacts` copies it into ignored
@@ -210,7 +215,9 @@ First slice:
   without printing local absolute paths. It also includes per-target prepared
   shell asset verification status. It separates the Android Docker builder image
   build command from the actual builder run command and emits low-sensitive
-  `nextActions`; it never starts a download or build by itself.
+  `nextActions`; it never starts a download or build by itself. When the image
+  is missing, the next action points at `build:android-apk:docker:bootstrap`,
+  making the toolchain download explicit instead of accidental.
 - `npm --prefix clients run plan:shell-smoke` prints a low-sensitive browser /
   desktop / Android shell smoke plan. It combines toolchain readiness, prepared
   asset verification, artifact presence, collected-artifact install readiness,
@@ -277,9 +284,10 @@ First slice:
   smoke:desktop-webview-metadata` now proves the Tauri WebView can load the
   prepared shell, read the PC `runtime_metadata` IPC and POST a low-sensitive
   loopback report from inside the rendered shell. The fuller login-level
-  desktop UI smoke remains pending. Android still does not produce `.apk` or
-  `.aab` artifacts because the local toolchain / Docker builder image has not
-  been completed.
+  desktop UI smoke has also passed on clean commit `c72ea512`, covering WebView
+  login, externally triggered `delivery.notify`, PullInbox, message observe and
+  AckDelivery. Android still does not produce `.apk` or `.aab` artifacts because
+  the local toolchain / Docker builder image has not been completed.
 - `/api/auth/logout` performs first-stage server-side logout for the current
   authenticated session only. Broader device/session management remains an
   identity/admin capability, not a client BFF target selector.
@@ -300,14 +308,12 @@ rejected. For local LAN client smoke, prefer the wired `172.x.x.x` address.
 
 ## Next Work
 
-1. Run login-level real PC shell smoke against the collected standalone Windows
-   artifact; launch sanity smoke, composed evidence and Tauri WebView metadata
-   callback smoke already pass. The next PC step should verify login,
-   PullInbox, delivery notify and AckDelivery inside the rendered Tauri shell.
-2. Add first unsigned local APK from the Android native bridge or Docker builder.
-3. Wire lifecycle UI controls into the real Android shell, and run platform-shell
+1. Add first unsigned local APK from the Android native bridge or Docker builder.
+   Use the safe Docker wrapper dry-run first, then explicitly bootstrap the
+   builder image only when toolchain download is acceptable.
+2. Wire lifecycle UI controls into the real Android shell, and run platform-shell
    smoke once packaging/runtime tooling is ready.
-4. Replace first-stage desktop / Android localStorage stores with native SQLite
+3. Replace first-stage desktop / Android localStorage stores with native SQLite
    bridge adapters when packaging/runtime tooling is ready.
 
 ## Local Build Prerequisites
@@ -334,6 +340,7 @@ npm --prefix clients run test:artifact-builders
 npm --prefix clients run test:artifact-collector
 npm --prefix clients run test:artifact-install-plan
 npm --prefix clients run test:artifact-readiness
+npm --prefix clients run test:android-docker-builder
 npm --prefix clients run test:desktop-artifact-launch-smoke
 npm --prefix clients run test:shell-smoke-plan
 npm --prefix clients run report:artifact-readiness
@@ -358,9 +365,9 @@ npm --prefix clients run smoke:desktop-webview-metadata
 ```
 
 The report includes `nextActions`. When the Android Docker builder image is
-missing, the first Android next action is the explicit image build command. After
-the image exists, the next action becomes the builder run command that writes the
-APK and manifest.
+missing, the first Android next action is the explicit bootstrap command. After
+the image exists, the next action becomes the safe builder run command that
+writes the APK and manifest.
 
 Artifact wrappers:
 
@@ -372,9 +379,10 @@ npm --prefix clients run build:desktop-artifact
 npm --prefix clients run build:android-apk
 npm --prefix clients run build:desktop-artifact:collect
 npm --prefix clients run build:android-apk:collect
+npm --prefix clients run build:android-apk:docker
+npm --prefix clients run build:android-apk:docker:bootstrap
+npm --prefix clients run build:android-apk:docker:image
 npm --prefix clients run collect:client-artifacts
-docker compose -f deploy/local/docker-compose.client-builders.yml --profile client-builders build client-android-apk-builder
-docker compose -f deploy/local/docker-compose.client-builders.yml --profile client-builders run --rm client-android-apk-builder
 ```
 
 After preparing both shell targets, `node clients/tools/verify-shell-assets.mjs --target all`

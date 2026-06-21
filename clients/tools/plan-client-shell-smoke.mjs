@@ -147,7 +147,8 @@ function nativeCommands(target, readinessTarget) {
     installPlan: "npm --prefix clients run plan:artifact-install",
     dockerBuilder: readinessTarget.dockerBuilder?.imagePresent
       ? readinessTarget.dockerBuilder.buildCommand
-      : readinessTarget.dockerBuilder?.imageBuildCommand
+      : readinessTarget.dockerBuilder?.imageBuildCommand,
+    dockerBuilderDryRun: readinessTarget.dockerBuilder?.safeDryRunCommand
   };
 }
 

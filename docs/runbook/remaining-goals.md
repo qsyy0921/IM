@@ -35,7 +35,8 @@
 - Windows packaging：产出本地可安装或可运行的 Windows artifact；不要求生产签名。
   当前本机尚缺 Tauri CLI / `cargo-tauri`，需要先补本地构建前置或通过
   Docker / CI builder 产物链路；可用 `npm --prefix clients run check:build-prereqs`
-  检查当前机器状态。
+  检查当前机器状态。`build:desktop-artifact` wrapper 已落，会在工具链 ready 时
+  准备 shell assets 并执行 Tauri build；当前仍未产出 installer。
 - `clients/android`：first-stage TypeScript runtime adapter 和 Kotlin WebView
   asset shell skeleton 已落；`createAndroidClientRuntime` 已能组装 shared
   `BFFClient` / `WebSocketPushTransport` / auth / inbox / send / ack queue；
@@ -46,7 +47,8 @@
   `push-gateway` 地址配置。当前本机尚缺 Gradle / Android SDK，且 `java`
   指向 JDK 8；需要 JDK 17+ 和 Android build toolchain，或通过
   Docker / CI builder 产物链路；可用 `npm --prefix clients run check:build-prereqs`
-  检查当前机器状态。
+  检查当前机器状态。`build:android-apk` wrapper 已落，会在工具链 ready 时准备
+  shell assets 并执行 Gradle `:app:assembleDebug`；当前仍未产出 APK。
 - 三端 smoke：Web / PC / Android 都只能连 `api-gateway` 和 `push-gateway`；
   PullInbox 是事实源，WebSocket 只做在线唤醒。
 - Local store：`IndexedDBMessageStore` 已有 first-stage persistence test；

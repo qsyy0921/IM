@@ -59,7 +59,9 @@
   store 和 static lifecycle/network runtime adapter；PC desktop 已有 Tauri v2
   runner skeleton（无 IPC command、bundle inactive）；Android 已有 Kotlin
   WebView asset shell skeleton（通过 WebViewAssetLoader 加载本地 Web assets）；
-  下一步复用同一 core 接
+  desktop / Android artifact build wrapper 已有 dry-run-tested command plan，
+  但本机仍缺 Tauri CLI / Android JDK 17+ / Gradle / SDK；下一步补工具链或 builder
+  profile 后复用同一 core 接
   local Windows artifact 和 Android APK。
 
 当前已开始的 AI 大模型应用底座能力：
@@ -435,7 +437,7 @@ baseline 已通过，PC desktop / Android first-stage runtime adapter 已落，P
   且 thin shell actions 已接入 shared restore / logout contract；下一步接 local
   Windows artifact、Android APK 和真实壳层 UI / WebView bridge smoke；Web
   IndexedDB local store、browser platform adapter、shell config contract 和
-  target shell Web assets prep 已补 first-stage focused tests。
+  target shell Web assets prep / artifact builder dry-run 已补 first-stage focused tests。
 长期后续按完整目标架构推进业务平台、数据平台、AI / Agent 平台、客户端平台和中间件平台；
 后续 AI 继续扩展低敏 collaborative-memory 算法/eval，优先 multi-hop / temporal update / profile aggregation 边界。
 短期生产级测试、完整 HA、长压和 sizing 不再作为当前转进阻塞，但仍留在 hardening backlog。

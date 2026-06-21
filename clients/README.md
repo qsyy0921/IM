@@ -82,8 +82,27 @@ npm --prefix clients run build:shell-assets:desktop
 npm --prefix clients run build:shell-assets:android
 ```
 
+Check artifact build commands without requiring the heavy native toolchains:
+
+```powershell
+npm --prefix clients run test:artifact-builders
+node clients/tools/build-desktop-artifact.mjs --dry-run
+node clients/tools/build-android-apk.mjs --dry-run
+```
+
+Real artifact commands are present, but they fail fast until the local toolchain
+is ready:
+
+```powershell
+npm --prefix clients run build:desktop-artifact
+npm --prefix clients run build:android-apk
+```
+
 Current packaging status:
 
 - Browser: Vite dev/build shell exists.
-- PC desktop: Tauri shell skeleton can prepare target-specific Web assets, no installer yet.
-- Android: native WebView shell can prepare target-specific Web assets, no APK/AAB yet.
+- PC desktop: Tauri shell skeleton can prepare target-specific Web assets and
+  has a build wrapper; no installer yet because this machine lacks Tauri CLI.
+- Android: native WebView shell can prepare target-specific Web assets and has
+  an APK build wrapper; no APK/AAB yet because this machine lacks JDK 17+,
+  Gradle and Android SDK.

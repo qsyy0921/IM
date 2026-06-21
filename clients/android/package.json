@@ -6,7 +6,8 @@
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "validate:native": "node ../tools/validate-android-native.mjs",
-    "prepare:web-assets": "npm --prefix .. run build:shell-assets:android"
+    "prepare:web-assets": "npm --prefix .. run build:shell-assets:android",
+    "build:apk": "npm --prefix .. run build:android-apk"
   },
   "dependencies": {
     "@nexusim/client-core": "0.1.0",

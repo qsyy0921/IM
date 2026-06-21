@@ -104,6 +104,12 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   skeleton 已改成 `WebViewAssetLoader` 加载本地 app assets，禁用 file / content
   access；Gradle `preBuild` 会调用同一资产准备脚本。该流程已通过 focused
   `test:shell-web-assets`、desktop / Android validators 和实际 shell asset build。
+- `clients/tools/build-desktop-artifact.mjs` 与
+  `clients/tools/build-android-apk.mjs` 已提供 first-stage artifact / APK build
+  wrapper；`test:artifact-builders` 覆盖 dry-run 命令计划和低敏输出。当前机器
+  `check:build-prereqs` 仍显示 desktop 缺 Tauri CLI / `cargo-tauri`，Android 缺
+  JDK 17+ / Gradle / Android SDK，所以 wrapper 会 fail fast，尚未产出 installer
+  或 APK。
 - `loadtest/clientweb` 已新增 first-stage scriptable client smoke runner：
   准备阶段用 identity / api-gateway gRPC 注册用户、seed 会话并创建 JOIN；真实客户端
   验证段只走 `api-gateway` HTTP BFF 和 `push-gateway` WebSocket，覆盖 BFF login、
@@ -177,7 +183,8 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
 
 ## 下一步优先级
 
-1. 后续按同一 core 接 PC desktop local Windows artifact 和 Android unsigned APK。
+1. 补本地 Tauri CLI / Android JDK 17+ / Gradle / Android SDK 或 builder profile，
+   然后运行 `build:desktop-artifact` 和 `build:android-apk` 产出首个本地 artifact。
 2. 在真实 PC / Android shell UI 中接入现有 shell logout action，并在工具链 ready 后跑平台 shell smoke。
 3. 后续把 desktop / Android first-stage localStorage store 替换为 native
    SQLite bridge，并补真实平台 runtime smoke。

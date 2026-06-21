@@ -8,6 +8,7 @@
     "validate:tauri": "node ../tools/validate-desktop-tauri.mjs",
     "prepare:web-assets": "npm --prefix .. run build:shell-assets:desktop",
     "build:shell-assets:desktop": "npm --prefix .. run build:shell-assets:desktop",
+    "build:artifact": "npm --prefix .. run build:desktop-artifact",
     "tauri:dev": "tauri dev",
     "tauri:build": "npm run prepare:web-assets && tauri build"
   },

@@ -150,6 +150,11 @@ First slice:
   sensitive fields such as token, secret and password.
 - `npm --prefix clients run test:shell-web-assets` validates the target asset
   prep wrapper without requiring Tauri CLI, Android SDK or a live backend.
+- `npm --prefix clients run test:artifact-builders` validates the first-stage
+  desktop artifact / Android APK build wrappers in dry-run mode. Real build
+  commands are present as `build:desktop-artifact` and `build:android-apk`, but
+  they fail fast with missing-toolchain JSON until the local Tauri / Android
+  toolchains are installed.
 - `@nexusim/client-core` now exposes `ClientShellActions`; desktop and Android
   export thin `createDesktopShellActions` / `createAndroidShellActions` wrappers.
   These wrappers do not own business logic; they only bind shell UI actions to
@@ -176,7 +181,8 @@ First slice:
 - PC desktop and Android now both have first-stage TypeScript runtime adapters.
   PC desktop also has a Tauri runner skeleton, and Android has a Kotlin native
   WebView asset shell skeleton. Neither target produces `.msi`, `.exe`, `.apk`,
-  or `.aab` artifacts yet.
+  or `.aab` artifacts yet; the repository now has dry-run-tested build wrappers
+  for those future artifacts.
 - `/api/auth/logout` performs first-stage server-side logout for the current
   authenticated session only. Broader device/session management remains an
   identity/admin capability, not a client BFF target selector.
@@ -218,8 +224,18 @@ Focused local check:
 npm --prefix clients run check:build-prereqs
 npm --prefix clients run test:shell-config
 npm --prefix clients run test:shell-web-assets
+npm --prefix clients run test:artifact-builders
 ```
 
 This command reports readiness as JSON and exits non-zero when artifact / APK
 toolchains are missing. It is local-only: it does not install dependencies, pull
 packages, or use `npx` to resolve remote CLIs.
+
+Artifact wrappers:
+
+```powershell
+node clients/tools/build-desktop-artifact.mjs --dry-run
+node clients/tools/build-android-apk.mjs --dry-run
+npm --prefix clients run build:desktop-artifact
+npm --prefix clients run build:android-apk
+```

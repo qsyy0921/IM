@@ -19,6 +19,11 @@ Flutter or native Kotlin for a concrete reason.
 - `shell-config.example.json` records the low-permission WebView config bridge
   for local LAN endpoints and Android runtime identity. It can be rendered to
   `web/public/nexusim-shell-config.js` before a shell build.
+- `npm --prefix clients run build:android-apk` is the first-stage APK wrapper.
+  It prepares Web assets and then runs Gradle `:app:assembleDebug` when JDK 17+
+  and Android SDK are available. Use
+  `node clients/tools/build-android-apk.mjs --dry-run` to inspect the command
+  and missing toolchain without building.
 - No APK or AAB is produced yet.
 - `app.config.json` records the intended first Android package metadata.
 
@@ -40,5 +45,7 @@ Flutter or native Kotlin for a concrete reason.
 npm --prefix clients run typecheck:android
 npm --prefix clients run validate:android-native
 npm --prefix clients run test:shell-config
+npm --prefix clients run test:artifact-builders
 node clients/tools/render-shell-config.mjs --input clients/android/shell-config.example.json
+node clients/tools/build-android-apk.mjs --dry-run
 ```

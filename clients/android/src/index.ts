@@ -5,3 +5,4 @@ export * from "./memory-message-store";
 export * from "./persistent-message-store";
 export * from "./platform-adapter";
 export * from "./runtime";
+export * from "./shell-actions";

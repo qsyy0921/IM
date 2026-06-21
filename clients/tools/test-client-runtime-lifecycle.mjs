@@ -14,7 +14,9 @@ async function main() {
     entryPath,
     `
       export { createDesktopClientRuntime } from "../desktop/src/runtime";
+      export { createDesktopShellActions } from "../desktop/src/shell-actions";
       export { createAndroidClientRuntime } from "../android/src/runtime";
+      export { createAndroidShellActions } from "../android/src/shell-actions";
     `,
     "utf8"
   );
@@ -28,9 +30,12 @@ async function main() {
     logLevel: "silent"
   });
 
-  const { createDesktopClientRuntime, createAndroidClientRuntime } = await import(
-    pathToFileURL(bundlePath).href
-  );
+  const {
+    createDesktopClientRuntime,
+    createDesktopShellActions,
+    createAndroidClientRuntime,
+    createAndroidShellActions
+  } = await import(pathToFileURL(bundlePath).href);
 
   await exerciseRuntime("desktop", createDesktopClientRuntime, {
     apiBaseURL: "http://bff.local",
@@ -40,7 +45,7 @@ async function main() {
     secureStorage: "development",
     localStore: "memory",
     shell: "tauri"
-  });
+  }, createDesktopShellActions);
 
   await exerciseRuntime("android", createAndroidClientRuntime, {
     apiBaseURL: "http://bff.local",
@@ -50,12 +55,12 @@ async function main() {
     secureStorage: "development",
     localStore: "memory",
     notificationProvider: "none"
-  });
+  }, createAndroidShellActions);
 
   console.log("client runtime lifecycle ok");
 }
 
-async function exerciseRuntime(label, createRuntime, config) {
+async function exerciseRuntime(label, createRuntime, config, createShellActions) {
   const calls = installFetchStub(label);
   const runtime = createRuntime({ config });
   const session = await runtime.login({
@@ -86,12 +91,10 @@ async function exerciseRuntime(label, createRuntime, config) {
   ]);
 
   const restoredRuntime = createRuntime({ config, platform: runtime.platform });
-  const restoredSession = await restoredRuntime.restoreSession();
-  assertEqual(
-    restoredSession?.accessToken,
-    `${label}-gateway-token-1`,
-    `${label} restore loads persisted session`
-  );
+  const shellActions = createShellActions(restoredRuntime);
+  const restoredState = await shellActions.restoreSession();
+  assertEqual(restoredState.authenticated, true, `${label} shell restore reports authenticated`);
+  assertEqual(restoredState.sessionID, `${label}-session-1`, `${label} shell restore returns session id`);
   assertEqual(
     restoredRuntime.auth.current()?.accessToken,
     `${label}-gateway-token-1`,
@@ -106,7 +109,8 @@ async function exerciseRuntime(label, createRuntime, config) {
     `${label} refresh persists new refresh token`
   );
 
-  await restoredRuntime.logout();
+  const loggedOutState = await shellActions.logout();
+  assertEqual(loggedOutState.authenticated, false, `${label} shell logout reports unauthenticated`);
   assertEqual(restoredRuntime.auth.current(), null, `${label} logout clears auth manager`);
   assertEqual(await runtime.platform.secureSessionStore.loadSession(), null, `${label} logout clears session store`);
   assertEqual(

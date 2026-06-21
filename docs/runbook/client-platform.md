@@ -116,7 +116,13 @@ First slice:
   desktop / Android runtime lifecycle smoke. It compiles the TypeScript runtime
   packages locally, instantiates both platform runtime factories, and verifies
   login persistence, session restore, refresh-token persistence and logout cache
-  cleanup without requiring Tauri CLI, Android SDK or network access.
+  cleanup without requiring Tauri CLI, Android SDK or network access. It also
+  exercises the desktop / Android thin shell actions that a real PC or Android
+  UI can call for restore/logout.
+- `@nexusim/client-core` now exposes `ClientShellActions`; desktop and Android
+  export thin `createDesktopShellActions` / `createAndroidShellActions` wrappers.
+  These wrappers do not own business logic; they only bind shell UI actions to
+  the shared runtime lifecycle.
 - `loadtest/clientweb` provides the first scriptable client-path smoke. Setup
   uses public gRPC APIs to register users, seed the conversation owner and create
   the receiver JOIN; the verified client path then uses only HTTP BFF and
@@ -162,7 +168,7 @@ rejected. For local LAN client smoke, prefer the wired `172.x.x.x` address.
 
 1. Add first local Windows artifact from the PC desktop Tauri runner.
 2. Add first unsigned local APK from the Android native bridge.
-3. Wire logout UI / action into the real desktop and Android shells and run a
+3. Wire logout UI controls into the real desktop and Android shells and run a
    platform-shell smoke once packaging/runtime tooling is ready.
 4. Replace first-stage desktop / Android localStorage stores with native SQLite
    bridge adapters when packaging/runtime tooling is ready.

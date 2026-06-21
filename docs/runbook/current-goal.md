@@ -77,7 +77,9 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   `npm --prefix clients run test:runtime-lifecycle` 会编译并实例化 desktop /
   Android runtime，验证 login 持久化 session、restoreSession hydrate auth manager、
   refresh 更新持久 refresh token，以及 logout 清理 secure session store 和 local
-  message cache。该测试不依赖 Tauri CLI / Android SDK，不替代真实安装包或 APK。
+  message cache。该测试现在也通过 desktop / Android thin shell actions 调用
+  shared restore / logout 编排，证明真实壳层可以接入统一 action contract。该测试不依赖
+  Tauri CLI / Android SDK，不替代真实安装包或 APK。
 - `loadtest/clientweb` 已新增 first-stage scriptable client smoke runner：
   准备阶段用 identity / api-gateway gRPC 注册用户、seed 会话并创建 JOIN；真实客户端
   验证段只走 `api-gateway` HTTP BFF 和 `push-gateway` WebSocket，覆盖 BFF login、
@@ -152,7 +154,7 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
 ## 下一步优先级
 
 1. 后续按同一 core 接 PC desktop local Windows artifact 和 Android unsigned APK。
-2. 在真实 PC / Android shell 中接入 logout UI / action，并跑平台 shell smoke。
+2. 在真实 PC / Android shell UI 中接入现有 shell logout action，并跑平台 shell smoke。
 3. 后续把 desktop / Android first-stage localStorage store 替换为 native
    SQLite bridge，并补真实平台 runtime smoke。
 4. 再回到 workflow compensation adapter / instruction approval UI / ops 管理；

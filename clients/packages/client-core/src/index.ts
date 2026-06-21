@@ -11,3 +11,4 @@ export * from "./key-value-message-store";
 export * from "./http-bff-client";
 export * from "./websocket-push-transport";
 export * from "./runtime";
+export * from "./shell-actions";

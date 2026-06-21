@@ -15,7 +15,8 @@
 ## 当前优先顺序
 
 1. 完成 client platform MVP foundation：PC desktop / Android 安装包或可运行
-   artifact、真实壳层 logout 入口、真实平台 shell smoke 和后续 native SQLite bridge。
+   artifact、真实壳层 UI 接入现有 shell logout action、真实平台 shell smoke 和后续
+   native SQLite bridge。
 2. 回到 AI / Agent 主线：group memory eval、EvidencePack、Agent 真实业务动作、
    Python AI Worker 候选算法。
 3. 继续 product-active 服务：workflow / audit / admin / notification / media /
@@ -28,8 +29,9 @@
 - `clients/desktop`：first-stage TypeScript runtime adapter 和 Tauri runner
   skeleton 已落；`createDesktopClientRuntime` 已能组装 shared `BFFClient` /
   `WebSocketPushTransport` / auth / inbox / send / ack queue；shared runtime
-  lifecycle smoke 已覆盖 login / restore / refresh / logout 本地状态；继续接真实
-  desktop shell UI / artifact。
+  lifecycle smoke 已覆盖 login / restore / refresh / logout 本地状态；thin
+  `createDesktopShellActions` 已接 shared restore / logout 编排；继续接真实 desktop
+  shell UI / artifact。
 - Windows packaging：产出本地可安装或可运行的 Windows artifact；不要求生产签名。
   当前本机尚缺 Tauri CLI / `cargo-tauri`，需要先补本地构建前置或通过
   Docker / CI builder 产物链路；可用 `npm --prefix clients run check:build-prereqs`
@@ -38,7 +40,8 @@
   bridge skeleton 已落；`createAndroidClientRuntime` 已能组装 shared
   `BFFClient` / `WebSocketPushTransport` / auth / inbox / send / ack queue；
   shared runtime lifecycle smoke 已覆盖 login / restore / refresh / logout 本地状态；
-  继续产出 unsigned APK，Kotlin 只做薄 bridge，业务协议和 sync core 复用 TypeScript。
+  thin `createAndroidShellActions` 已接 shared restore / logout 编排；继续产出 unsigned
+  APK，Kotlin 只做薄 bridge，业务协议和 sync core 复用 TypeScript。
 - Android packaging：产出本地 unsigned APK，并支持局域网 `api-gateway` /
   `push-gateway` 地址配置。当前本机尚缺 Gradle / Android SDK，且 `java`
   指向 JDK 8；需要 JDK 17+ 和 Android build toolchain，或通过
@@ -51,8 +54,9 @@
   `localStorage` first-stage durable adapter，并有 cursor replay test；后续在
   native packaging/runtime ready 后替换为 SQLite bridge。
 - Auth lifecycle：BFF `/api/auth/logout`、shared runtime login / refresh /
-  restore / logout 编排和 Web logout local cleanup 已落；后续在 PC / Android
-  真实 runtime shell 中接入 logout 入口并跑平台 shell smoke。
+  restore / logout 编排、desktop / Android shell action wrapper 和 Web logout local
+  cleanup 已落；后续在 PC / Android 真实 shell UI 中接入 logout 控件并跑平台
+  shell smoke。
 
 ## AI / Agent Platform 未完成
 

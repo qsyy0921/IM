@@ -42,6 +42,10 @@ admin operation approval、补偿请求和人工审批状态。
 - approved repair invocation 在执行 import 前会校验 instruction manifest，并且
   invocation summary 只记录 manifest hash / instruction count，不输出 manifest 路径、
   payload ref 文件正文或 operator reason 原文。
+- `write-repair-approval-review-page.ps1` 可把 workflow import 的 plan / request /
+  decision / invocation / audit bundle 渲染为低敏静态 HTML review page；页面只展示
+  hash、path hash、env key、preflight 和 audit 摘要，不复制 payload / reason /
+  evidence 原文或本机路径。
 - 已被 admin-service 用于 repair / critical / compensation handoff。
 
 后续：timer worker、更多 compensation adapter、instruction approval UI /

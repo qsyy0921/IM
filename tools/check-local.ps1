@@ -68,6 +68,9 @@ try {
     Write-Host "== repair approval chain =="
     Invoke-LocalCheck "check-repair-approval-chain.ps1"
 
+    Write-Host "== repair approval review page =="
+    Invoke-LocalCheck "check-repair-approval-review-page.ps1"
+
     Write-Host "== approved repair invocation =="
     Invoke-LocalCheck "check-approved-repair-invocation.ps1"
 

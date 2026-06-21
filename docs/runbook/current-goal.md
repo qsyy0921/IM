@@ -49,13 +49,17 @@ model-gateway / workflow / knowledge-ingestion / vector-index
 - approved repair invocation 会在 `workflow-service compensation-instruction-import`
   执行前校验 instruction manifest，只在 summary 中记录 manifest hash / count，
   不输出 manifest 路径、payload ref 文件正文或 operator reason 原文。
+- 已新增本地静态 repair approval review page writer，用于把 plan / request /
+  decision / invocation / audit bundle 渲染为低敏 HTML 审批页；页面只展示 hash、
+  path hash、env key 和 preflight 摘要，不复制 reason、payload、manifest path
+  或 evidence 原文。
 
 ## 下一步优先级
 
 1. 继续 workflow compensation adapter / instruction approval UI / ops 管理；
    当前已有本地 workflow get / decision / decision manifest / instruction list CLI，
    低敏 compensation instruction manifest 生成 / 校验，以及 catalog-backed import
-   approval 链路和 invocation preflight；后续可接审批 UI。
+   approval 链路、invocation preflight 和静态 review page；后续可接正式审批 UI。
 2. 继续明确其它下游公开 admin API adapter。
 3. 在镜像可用后补 vector-index focused pgvector smoke；后续再接 Milvus /
    OpenSearch backend、provider repair 和真 provider backfill smoke。

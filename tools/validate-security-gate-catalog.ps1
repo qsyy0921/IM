@@ -118,6 +118,7 @@ $requiredCatalogScripts = @(
     "tools/check-repair-approval-request.ps1",
     "tools/check-repair-approval-decision.ps1",
     "tools/check-repair-approval-chain.ps1",
+    "tools/check-repair-approval-review-page.ps1",
     "tools/check-approved-repair-invocation.ps1",
     "tools/check-repair-batch-manifest.ps1",
     "tools/check-repair-audit-bundle.ps1",

@@ -35,7 +35,8 @@ presence-service、vector-index-service、workflow-service。
 
 当前短线重点：
 
-- admin / audit / workflow：继续补公开 API handoff、operator workflow 和补偿边界。
+- admin / audit / workflow：继续补公开 API handoff、operator workflow、低敏审批
+  review artifact 和补偿边界。
 - vector-index：继续 provider backend、pgvector / Milvus / OpenSearch 相关 focused smoke。
 - notification：可继续 provider adapter、bounce / suppression。
 

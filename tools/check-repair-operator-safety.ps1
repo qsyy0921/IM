@@ -110,6 +110,7 @@ $writerScripts = @(
     "write-repair-operator-plan.ps1",
     "write-repair-approval-request.ps1",
     "write-repair-approval-decision.ps1",
+    "write-repair-approval-review-page.ps1",
     "write-repair-batch-manifest.ps1",
     "write-repair-audit-bundle.ps1",
     "validate-repair-approval-chain.ps1",

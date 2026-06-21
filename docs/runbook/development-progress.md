@@ -110,6 +110,9 @@
   `ListWorkflowCompensationInstructions` 已提供按 workflow 的低敏 instruction refs /
   version / status 查询 API，`loadtest/workflow` 已提供 first-stage 本地 get /
   record-decision / instruction-list operator CLI，给 operator UI / ops 管理后续接入；
+  本地 repair approval review page writer 已能把 plan / request / decision /
+  invocation / audit bundle 渲染成只含 hash / path hash / env key / preflight 摘要的
+  低敏 HTML 审批页，不复制 reason、payload、manifest path 或 evidence 原文；
   workflow 第一路径已通过完整 `check-local`，本 worker / executor / registry 切片按
   风险分层用 focused checks 收口；不宣称 timer worker、多 adapter compensation
   platform、provider-grade instruction UI / external approval binding、external

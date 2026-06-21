@@ -50,6 +50,14 @@
 
 校验器确认 plan / request / decision 的 hash、`approval_id`、service / mode / command 和 `APPROVED` 状态一致，并回查 `repair-operators.catalog.json`，确保 service / mode / mode env / command 仍属于当前机器可读 catalog。它不执行 operator，也不会复制环境变量值、审批 reason 或业务数据。
 
+本地静态审批 review page 生成入口：
+
+```powershell
+.\tools\write-repair-approval-review-page.ps1 -PlanPath H:\NexusIM\operator-plans\plan.json -RequestPath H:\NexusIM\operator-plans\approval.json -DecisionPath H:\NexusIM\operator-plans\decision.json -InvocationSummaryPath H:\NexusIM\operator-plans\invoke-summary.json -AuditBundlePath H:\NexusIM\operator-plans\audit-bundle.json -GeneratedBy operator-a -OutputPath H:\NexusIM\operator-plans\approval-review.html
+```
+
+该页面是 first-stage 本地 operator UI artifact。它会先复用 approval-chain validator，再渲染 service / mode / approval id / decision id、artifact hash、path hash、环境变量名、reason hash、preflight hash 和 audit bundle 摘要；不会复制环境变量值、operator reason 原文、manifest 路径、payload ref 文件正文、业务数据或 evidence 原文。它不执行 operator，也不是正式运维 UI / 外部审批系统。
+
 本地审批后执行预检入口：
 
 ```powershell

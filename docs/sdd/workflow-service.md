@@ -467,6 +467,12 @@ control-plane rollback mutation。
 approved repair invocation 会在执行 import 前重新调用 instruction manifest validator；
 summary 只保存 manifest hash、path hash 和 instruction count，不输出 manifest 路径、
 payload ref 文件正文或 operator reason 原文。
+`write-repair-approval-review-page.ps1` 提供第一版本地静态 operator review page：
+它复用 approval-chain validator，并从 plan / request / decision / invocation /
+audit bundle 渲染低敏 HTML，只展示 service / mode / approval refs、artifact hash、
+path hash、env key、preflight hash 和 audit 摘要；不复制环境变量值、operator
+reason 原文、manifest 路径、payload ref 文件正文、业务数据或 evidence 原文，也不执行
+operator。该页面是 first-stage operator UI artifact，不是正式审批系统。
 
 ## 18. 验收标准
 

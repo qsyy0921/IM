@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-06-18",
+  "updated_at": "2026-06-21",
   "scope": "Local startup/security boundary gate catalog for NexusIM. These gates protect local development and CI-style checks; they are not a substitute for production identity, network policy, mTLS rollout, or external audit controls.",
   "entries": [
     {
@@ -161,6 +161,13 @@
       "script": "tools/check-repair-approval-chain.ps1",
       "check_local_label": "repair approval chain",
       "note": "Approved repair execution must require a valid request/decision chain."
+    },
+    {
+      "name": "repair approval review page",
+      "category": "operator-safety",
+      "script": "tools/check-repair-approval-review-page.ps1",
+      "check_local_label": "repair approval review page",
+      "note": "Static operator review pages must render only hashes and low-sensitive metadata, never raw env values, reasons, paths, payloads, or evidence bodies."
     },
     {
       "name": "approved repair invocation",

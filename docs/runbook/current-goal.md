@@ -35,7 +35,8 @@ model-gateway / workflow / knowledge-ingestion / vector-index
   compensation instruction refs / version / status；不读 admin-service 私表。
 - `loadtest/workflow` 已新增 first-stage workflow operator CLI，通过 workflow-service
   公开 gRPC get workflow、record decision、查询 compensation instruction metadata；
-  它只输出低敏 refs / version / status，不输出 payload / reason 原文。
+  它只输出低敏 refs / version / status，不输出 payload / reason 原文，并在
+  `record-decision` 本地拒绝明显敏感的 decider / policy / reason / evidence ref。
 
 ## 下一步优先级
 

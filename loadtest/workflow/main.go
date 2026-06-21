@@ -278,6 +278,18 @@ func (cfg config) validate() error {
 		if strings.TrimSpace(cfg.deciderRef) == "" {
 			return errors.New("decider-ref is required for record-decision")
 		}
+		if err := validateLowSensitiveRef("decider-ref", cfg.deciderRef); err != nil {
+			return err
+		}
+		if err := validateLowSensitiveRef("decision-policy-ref", cfg.decisionPolicy); err != nil {
+			return err
+		}
+		if err := validateLowSensitiveRef("reason-ref", cfg.reasonRef); err != nil {
+			return err
+		}
+		if err := validateLowSensitiveRefs("evidence-refs", cfg.evidenceRefs); err != nil {
+			return err
+		}
 		if !isAllowedDecision(cfg.decision) {
 			return errors.New("decision must be APPROVE, REJECT, REQUEST_CHANGES, or CANCEL")
 		}
@@ -289,6 +301,35 @@ func (cfg config) validate() error {
 		return errors.New("page-size must be greater than zero")
 	}
 	return nil
+}
+
+func validateLowSensitiveRefs(field string, values []string) error {
+	for _, value := range values {
+		if err := validateLowSensitiveRef(field, value); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateLowSensitiveRef(field string, value string) error {
+	if looksSensitiveRef(value) {
+		return fmt.Errorf("%s must be a low-sensitive ref or hash", field)
+	}
+	return nil
+}
+
+func looksSensitiveRef(value string) bool {
+	value = strings.ToLower(strings.TrimSpace(value))
+	if value == "" {
+		return false
+	}
+	for _, marker := range []string{"secret", "token", "api_key", "apikey", "password", "private://", "raw:", "dsn=", "postgres://"} {
+		if strings.Contains(value, marker) {
+			return true
+		}
+	}
+	return false
 }
 
 func authContext(cfg config) *workflowv1.AuthContext {

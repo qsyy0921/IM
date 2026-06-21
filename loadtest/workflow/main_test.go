@@ -84,6 +84,41 @@ func TestValidateRejectsInvalidDecision(t *testing.T) {
 	}
 }
 
+func TestValidateRejectsSensitiveDecisionRefs(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+	}{
+		{
+			name: "decider",
+			args: []string{"-decider-ref", "bearer-token:operator"},
+		},
+		{
+			name: "reason",
+			args: []string{"-reason-ref", "raw:operator approved because secret"},
+		},
+		{
+			name: "evidence",
+			args: []string{"-evidence-refs", "evidence:ok,postgres://db-host"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			args := []string{
+				"-mode", "record-decision",
+				"-workflow-id", "wf_1",
+				"-step-id", "wfs_1",
+				"-decision", "APPROVE",
+			}
+			args = append(args, tt.args...)
+			cfg := parseFlags(args)
+			if err := cfg.validate(); err == nil {
+				t.Fatal("expected validation error")
+			}
+		})
+	}
+}
+
 func TestExecuteGetWorkflow(t *testing.T) {
 	cfg := parseFlags([]string{
 		"-mode", "get",

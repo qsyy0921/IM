@@ -437,7 +437,10 @@ go run ./loadtest/workflow -mode list-compensation-instructions -workflow-id wf_
 
 该 CLI 只通过 workflow-service 公开 gRPC get workflow、record decision 和查询
 低敏 instruction refs / version / status，不读 PostgreSQL 私表，不输出 workflow
-payload、instruction payload、reason 原文或 downstream response body。
+payload、instruction payload、reason 原文或 downstream response body。`record-decision`
+模式会在本机拒绝看起来像 secret / token / password / raw body / DSN 的
+`decider-ref`、`decision-policy-ref`、`reason-ref` 或 `evidence-refs`，避免
+operator 把敏感原文送入 gRPC 请求。
 
 ## 18. 验收标准
 

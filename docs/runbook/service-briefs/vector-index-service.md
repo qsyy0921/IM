@@ -82,6 +82,12 @@ vector 写入、rebuild 和 backfill 逻辑复杂到影响 retrieval / memory �
   provider backend；未配置 provider backend 会 fail-fast，默认不启用。该模式已支持
   checkpoint cursor 分页续跑，每批推进 `vector_rebuild_checkpoints.cursor_value`，后续继续
   claim RUNNING rebuild，直到没有下一页才标记 completed。
+- `loadtest/vectorembedding` 已新增 `-IncludeRebuildBackfill` focused smoke，当前已跑通
+  `postgres-test` provider backfill：producer / queue / embedding-worker 先写 completed
+  task，再由 rebuild-worker 按当前 run tenant claim rebuild job、分页 backfill 并完成
+  checkpoint。`vector_embedding_tasks` 新入队使用 PostgreSQL `now()` 写
+  `available_at / created_at / updated_at`，避免本地 / 双机进程时间与数据库时间漂移导致
+  刚入队任务不可 claim。
 
 后续待办：memory / search chunk consumer、镜像可用后的 focused pgvector smoke、真实
-Milvus / OpenSearch backend、provider backend repair、真实 provider backfill smoke。
+Milvus / OpenSearch backend、provider backend repair、真 provider backfill smoke。

@@ -80,6 +80,10 @@ type summary struct {
 	EmbeddingTaskPending   int       `json:"embedding_task_pending"`
 	EmbeddingTaskRunning   int       `json:"embedding_task_running"`
 	EmbeddingTaskCompleted int       `json:"embedding_task_completed"`
+	RebuildJobID           string    `json:"rebuild_job_id,omitempty"`
+	RebuildJobStatus       string    `json:"rebuild_job_status,omitempty"`
+	RebuildCheckpoint      string    `json:"rebuild_checkpoint_status,omitempty"`
+	RebuildCursorValue     string    `json:"rebuild_cursor_value,omitempty"`
 	VisibilityScope        string    `json:"visibility_scope,omitempty"`
 	PolicyVersion          string    `json:"policy_version,omitempty"`
 	EmbeddingModelRef      string    `json:"embedding_model_ref"`
@@ -201,6 +205,11 @@ func run(cfg config) error {
 		}
 	case "verify-queue":
 		if err := verifyQueue(ctx, cfg, &result); err != nil {
+			result.Error = err.Error()
+			return err
+		}
+	case "request-rebuild":
+		if err := requestRebuild(ctx, cfg, &result); err != nil {
 			result.Error = err.Error()
 			return err
 		}
@@ -416,6 +425,70 @@ func verify(ctx context.Context, cfg config, result *summary) error {
 	}
 }
 
+func requestRebuild(ctx context.Context, cfg config, result *summary) error {
+	conn, err := grpc.DialContext(ctx, cfg.vectorTarget, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock())
+	if err != nil {
+		return fmt.Errorf("dial vector-index-service: %w", err)
+	}
+	defer conn.Close()
+	client := vectorv1.NewVectorIndexServiceClient(conn)
+
+	response, err := requestVectorRebuild(ctx, client, cfg)
+	if err != nil {
+		return fmt.Errorf("request vector rebuild: %w", err)
+	}
+	jobID := response.GetJob().GetJobId()
+	if jobID == "" {
+		return errors.New("vector rebuild response missing job id")
+	}
+	result.RebuildJobID = jobID
+	result.RebuildCheckpoint = response.GetCheckpoint().GetStatus()
+	result.RebuildCursorValue = response.GetCheckpoint().GetCursorValue()
+	result.KnowledgeSourceID = cfg.sourceID
+	result.DocumentID = cfg.documentID
+	result.ChunkCount = cfg.expectedCount
+	result.ExpectedCount = cfg.expectedCount
+	result.VisibilityScope = cfg.visibilityScope
+	result.PolicyVersion = cfg.policyVersion
+
+	completed, err := waitVectorJobStatus(ctx, client, cfg, jobID, "INDEXED")
+	if err != nil {
+		return err
+	}
+	result.RebuildJobStatus = completed.GetJob().GetStatus()
+
+	checkpoint, err := readRebuildCheckpoint(ctx, cfg, jobID, rebuildPartitionKey(cfg))
+	if err != nil {
+		return err
+	}
+	result.RebuildCheckpoint = checkpoint.status
+	result.RebuildCursorValue = checkpoint.cursorValue
+	if checkpoint.status != "COMPLETED" {
+		return fmt.Errorf("expected rebuild checkpoint COMPLETED, got %s", checkpoint.status)
+	}
+	if cfg.expectedCount > 1 && !strings.HasPrefix(checkpoint.cursorValue, "embedding-task:") {
+		return fmt.Errorf("expected paginated rebuild cursor to start with embedding-task:, got %q", checkpoint.cursorValue)
+	}
+
+	pool, err := pgxpool.New(ctx, cfg.pgDSN)
+	if err != nil {
+		return fmt.Errorf("open postgres: %w", err)
+	}
+	defer pool.Close()
+	counts, err := readEmbeddingTaskCounts(ctx, pool, cfg)
+	if err != nil {
+		return err
+	}
+	result.EmbeddingTaskCount = counts.total
+	result.EmbeddingTaskPending = counts.pending
+	result.EmbeddingTaskRunning = counts.running
+	result.EmbeddingTaskCompleted = counts.completed
+	if counts.completed < cfg.expectedCount {
+		return fmt.Errorf("expected at least %d completed embedding tasks before rebuild backfill, got %d", cfg.expectedCount, counts.completed)
+	}
+	return nil
+}
+
 type pgVectorCounts struct {
 	total        int
 	active       int
@@ -446,6 +519,87 @@ WHERE tenant_id = $1
 		return pgVectorCounts{}, fmt.Errorf("read pgvector backend rows: %w", err)
 	}
 	return counts, nil
+}
+
+type rebuildCheckpointSummary struct {
+	status      string
+	cursorValue string
+}
+
+func readRebuildCheckpoint(ctx context.Context, cfg config, jobID string, partitionKey string) (rebuildCheckpointSummary, error) {
+	pool, err := pgxpool.New(ctx, cfg.pgDSN)
+	if err != nil {
+		return rebuildCheckpointSummary{}, fmt.Errorf("open postgres: %w", err)
+	}
+	defer pool.Close()
+	var checkpoint rebuildCheckpointSummary
+	err = pool.QueryRow(ctx, `
+SELECT status, cursor_value
+FROM vector_rebuild_checkpoints
+WHERE tenant_id = $1
+  AND rebuild_job_id = $2
+  AND partition_key = $3
+`, cfg.tenantID, jobID, partitionKey).Scan(&checkpoint.status, &checkpoint.cursorValue)
+	if err != nil {
+		return rebuildCheckpointSummary{}, fmt.Errorf("read vector rebuild checkpoint: %w", err)
+	}
+	return checkpoint, nil
+}
+
+func requestVectorRebuild(ctx context.Context, client vectorv1.VectorIndexServiceClient, cfg config) (*vectorv1.RequestVectorRebuildResponse, error) {
+	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
+	defer cancel()
+	return client.RequestVectorRebuild(requestCtx, &vectorv1.RequestVectorRebuildRequest{
+		AuthContext:       vectorAuth(cfg, "vector-index-service", "vector-embedding-rebuild"),
+		CollectionType:    "KNOWLEDGE_CHUNK",
+		EmbeddingModelRef: cfg.embeddingModel,
+		Dimension:         int32(cfg.embeddingDim),
+		SourceService:     "knowledge-ingestion-service",
+		PartitionKey:      rebuildPartitionKey(cfg),
+		CursorValue:       "cursor:start",
+		IdempotencyKey:    cfg.idempotencyKey + "-rebuild-backfill",
+		CorrelationId:     cfg.idempotencyKey,
+		CausationId:       cfg.idempotencyKey,
+		TraceId:           cfg.traceID,
+	})
+}
+
+func waitVectorJobStatus(ctx context.Context, client vectorv1.VectorIndexServiceClient, cfg config, jobID string, wantStatus string) (*vectorv1.GetVectorIndexJobResponse, error) {
+	deadline := time.Now().Add(cfg.waitTimeout)
+	var last *vectorv1.GetVectorIndexJobResponse
+	for {
+		response, err := getVectorJob(ctx, client, cfg, jobID)
+		if err != nil {
+			return nil, fmt.Errorf("get vector job %s: %w", jobID, err)
+		}
+		last = response
+		if response.GetJob().GetStatus() == wantStatus {
+			return response, nil
+		}
+		if time.Now().After(deadline) {
+			return last, fmt.Errorf("vector job %s did not reach %s; last=%+v", jobID, wantStatus, last.GetJob())
+		}
+		timer := time.NewTimer(cfg.pollInterval)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return nil, ctx.Err()
+		case <-timer.C:
+		}
+	}
+}
+
+func getVectorJob(ctx context.Context, client vectorv1.VectorIndexServiceClient, cfg config, jobID string) (*vectorv1.GetVectorIndexJobResponse, error) {
+	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
+	defer cancel()
+	return client.GetVectorIndexJob(requestCtx, &vectorv1.GetVectorIndexJobRequest{
+		AuthContext: vectorAuth(cfg, "vector-index-service", "vector-embedding-get-rebuild"),
+		JobId:       jobID,
+	})
+}
+
+func rebuildPartitionKey(cfg config) string {
+	return "knowledge-ingestion-service:" + cfg.tenantID + ":" + cfg.sourceID + ":" + cfg.documentID
 }
 
 func createKnowledgeSource(ctx context.Context, client knowledgev1.KnowledgeIngestionServiceClient, cfg config) (*knowledgev1.CreateKnowledgeSourceResponse, error) {
@@ -648,6 +802,19 @@ func validateConfig(cfg config) error {
 	case "verify-queue":
 		if strings.TrimSpace(cfg.pgDSN) == "" {
 			return errors.New("pg-dsn is required")
+		}
+		if cfg.expectedCount <= 0 {
+			return errors.New("expected-count must be positive")
+		}
+	case "request-rebuild":
+		if strings.TrimSpace(cfg.vectorTarget) == "" {
+			return errors.New("vector-target is required")
+		}
+		if strings.TrimSpace(cfg.pgDSN) == "" {
+			return errors.New("pg-dsn is required")
+		}
+		if strings.TrimSpace(cfg.sourceID) == "" || strings.TrimSpace(cfg.documentID) == "" {
+			return errors.New("source-id and document-id are required for request-rebuild")
 		}
 		if cfg.expectedCount <= 0 {
 			return errors.New("expected-count must be positive")

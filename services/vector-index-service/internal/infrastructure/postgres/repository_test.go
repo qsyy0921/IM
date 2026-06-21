@@ -324,6 +324,46 @@ func TestRepositoryClaimAndCompleteRebuildTaskIntegration(t *testing.T) {
 	assertRebuildOutboxLowSensitive(t, ctx, pool, job.JobID)
 }
 
+func TestRepositoryClaimRebuildTasksForTenantIntegration(t *testing.T) {
+	ctx := context.Background()
+	pool := openVectorTestPool(t)
+	resetVectorTables(t, ctx, pool)
+	repository := NewRepository(pool)
+
+	targetUpsert := prepareUpsertForTenant(t, "tenant-vector-test", "vector-rebuild-filter-item", "vitem_rebuild_filter_target", "vjob_rebuild_filter_target_source")
+	if _, _, _, err := repository.UpsertVectorItem(ctx, targetUpsert); err != nil {
+		t.Fatalf("seed target vector collection: %v", err)
+	}
+	targetRebuild := prepareRebuildForTenant(t, "tenant-vector-test", "vector-rebuild-filter-idem", "vjob_rebuild_filter_target")
+	if _, _, _, err := repository.RequestVectorRebuild(ctx, targetRebuild); err != nil {
+		t.Fatalf("request target rebuild: %v", err)
+	}
+
+	otherUpsert := prepareUpsertForTenant(t, "tenant-vector-other", "vector-rebuild-filter-other-item", "vitem_rebuild_filter_other", "vjob_rebuild_filter_other_source")
+	if _, _, _, err := repository.UpsertVectorItem(ctx, otherUpsert); err != nil {
+		t.Fatalf("seed other vector collection: %v", err)
+	}
+	otherRebuild := prepareRebuildForTenant(t, "tenant-vector-other", "vector-rebuild-filter-other-idem", "vjob_rebuild_filter_other")
+	if _, _, _, err := repository.RequestVectorRebuild(ctx, otherRebuild); err != nil {
+		t.Fatalf("request other rebuild: %v", err)
+	}
+
+	tasks, err := repository.ClaimRebuildTasksForTenant(ctx, "tenant-vector-test", 10)
+	if err != nil {
+		t.Fatalf("claim target rebuild tasks: %v", err)
+	}
+	if len(tasks) != 1 || tasks[0].Job.TenantID != "tenant-vector-test" || tasks[0].Job.JobID != targetRebuild.JobID {
+		t.Fatalf("tenant filter claimed wrong rebuild tasks: %+v", tasks)
+	}
+	otherTasks, err := repository.ClaimRebuildTasksForTenant(ctx, "tenant-vector-other", 10)
+	if err != nil {
+		t.Fatalf("claim other rebuild tasks: %v", err)
+	}
+	if len(otherTasks) != 1 || otherTasks[0].Job.TenantID != "tenant-vector-other" || otherTasks[0].Job.JobID != otherRebuild.JobID {
+		t.Fatalf("other tenant filter claimed wrong rebuild tasks: %+v", otherTasks)
+	}
+}
+
 func TestEmbeddingTaskSourceClaimCompleteIntegration(t *testing.T) {
 	ctx := context.Background()
 	pool := openVectorTestPool(t)
@@ -489,9 +529,14 @@ func TestEmbeddingTaskSourceListCompletedTasksForRebuildIntegration(t *testing.T
 
 func prepareUpsert(t *testing.T, idempotencyKey string, vectorItemID string, jobID string) domain.PreparedUpsert {
 	t.Helper()
+	return prepareUpsertForTenant(t, "tenant-vector-test", idempotencyKey, vectorItemID, jobID)
+}
+
+func prepareUpsertForTenant(t *testing.T, tenantID string, idempotencyKey string, vectorItemID string, jobID string) domain.PreparedUpsert {
+	t.Helper()
 	prepared, err := domain.PrepareUpsert(types.UpsertVectorItemCommand{
 		AuthContext: types.AuthContext{
-			TenantID:    "tenant-vector-test",
+			TenantID:    types.TenantID(tenantID),
 			ServiceName: types.AllowedCallerKnowledgeIngestion,
 		},
 		SourceService:       types.AllowedCallerKnowledgeIngestion,
@@ -519,16 +564,21 @@ func prepareUpsert(t *testing.T, idempotencyKey string, vectorItemID string, job
 
 func prepareRebuild(t *testing.T, idempotencyKey string, jobID string) domain.PreparedRebuild {
 	t.Helper()
+	return prepareRebuildForTenant(t, "tenant-vector-test", idempotencyKey, jobID)
+}
+
+func prepareRebuildForTenant(t *testing.T, tenantID string, idempotencyKey string, jobID string) domain.PreparedRebuild {
+	t.Helper()
 	prepared, err := domain.PrepareRebuild(types.RequestVectorRebuildCommand{
 		AuthContext: types.AuthContext{
-			TenantID:    "tenant-vector-test",
+			TenantID:    types.TenantID(tenantID),
 			ServiceName: types.AllowedCallerVectorIndex,
 		},
 		CollectionType:    types.CollectionTypeKnowledgeChunk,
 		EmbeddingModelRef: "model:text-embedding-local",
 		Dimension:         3,
 		SourceService:     types.AllowedCallerKnowledgeIngestion,
-		PartitionKey:      "knowledge-ingestion-service:tenant-vector-test",
+		PartitionKey:      "knowledge-ingestion-service:" + tenantID,
 		CursorValue:       "cursor:start",
 		IdempotencyKey:    idempotencyKey,
 		CorrelationID:     "corr-vector-rebuild-test",

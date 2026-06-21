@@ -83,7 +83,10 @@ func (backfiller EmbeddingTaskBackfiller) BackfillRebuildTask(
 		if expected := sha256Ref(normalized.InputText); expected != normalized.InputHash {
 			return stats, types.NewInvalidArgument("embedding input hash mismatch")
 		}
-		result, err := backfiller.embedder.Embed(ctx, normalized)
+		modelTask := normalized
+		modelTask.IdempotencyKey = "rebuild-backfill:" + normalized.IdempotencyKey
+		modelTask.AuthContext.RequestID = firstNonEmpty(normalized.AuthContext.RequestID, normalized.IdempotencyKey) + ":rebuild-backfill"
+		result, err := backfiller.embedder.Embed(ctx, modelTask)
 		if err != nil {
 			return stats, err
 		}

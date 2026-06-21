@@ -210,8 +210,13 @@ func runRebuildWorker(ctx context.Context) error {
 			}
 		}
 	}()
+	repository := postgresinfra.NewRepository(pool)
+	var rebuildStore rebuild.Store = repository
+	if tenantID := envString("NEXUSIM_VECTOR_REBUILD_TENANT_ID", ""); tenantID != "" {
+		rebuildStore = postgresinfra.NewTenantRebuildStore(repository, tenantID)
+	}
 	worker := rebuild.NewWorker(
-		postgresinfra.NewRepository(pool),
+		rebuildStore,
 		rebuild.Config{
 			BatchSize:    envInt("NEXUSIM_VECTOR_REBUILD_BATCH_SIZE", 50),
 			PollInterval: envDuration("NEXUSIM_VECTOR_REBUILD_POLL_INTERVAL", time.Second),

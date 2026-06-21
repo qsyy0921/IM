@@ -66,7 +66,10 @@ array；同时新增 optional pgvector adapter 包；`embedding-worker` 可通�
 本机未发现 `pgvector/pgvector:pg16` 镜像，所以真实 pgvector smoke 尚未执行。
 `rebuild-worker` 已新增显式 `embedding-tasks` provider backfill：只读取本服务 completed
 queue 中 redacted preview，重新 embedding 后写 provider backend；未配置 backend fail-fast，
-并已支持 checkpoint cursor 分页续跑。公开 API / PostgreSQL metadata / outbox / metrics 仍不暴露 raw vector array。
+并已支持 checkpoint cursor 分页续跑。`postgres-test` provider backfill focused smoke 已通过：
+`loadtest/vectorembedding/run-local-smoke.ps1 -IncludeRebuildBackfill` 覆盖 producer / queue /
+worker / rebuild-worker，本地通过 `NEXUSIM_VECTOR_REBUILD_TENANT_ID` 限定 run tenant，避免历史
+rebuild job 干扰。公开 API / PostgreSQL metadata / outbox / metrics 仍不暴露 raw vector array。
 `admin-service` 已完成第一版
 `CreateAdminOperation` / `ApproveAdminOperation` / `GetAdminOperation` /
 `ListAdminOperations` path、`admin_outbox -> im.admin.events` outbox relay 和
@@ -83,7 +86,7 @@ control-plane-service.PublishConfigVersion(API_GATEWAY_TENANT_QUOTA)`。
 admin `Create -> operator approve -> operation-worker -> control-plane` 本地多进程
 publish / rollback / tenant quota smoke 已通过。下一步默认继续更多下游公开 admin API adapter、
 admin compensation operator，或在镜像可用后继续 focused pgvector smoke、Milvus /
-OpenSearch backend / provider repair / 真实 provider backfill smoke。
+OpenSearch backend / provider repair / 真 provider backfill smoke。
 ```
 
 系统测试 / HA / 长压 / sizing 后置；总览、待办、单服务状态分别看

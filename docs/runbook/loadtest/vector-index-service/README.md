@@ -195,6 +195,25 @@ $env:NEXUSIM_MODEL_GATEWAY_GRPC_ADDR = "127.0.0.1:10770"
 $env:NEXUSIM_VECTOR_PROVIDER_BACKEND = "postgres-test" # local metadata-backed verification
 ```
 
+本地 focused smoke 可直接使用：
+
+```powershell
+.\loadtest\vectorembedding\run-local-smoke.ps1 `
+  -IncludeRebuildBackfill `
+  -PgDsn "postgres://nexusim:nexusim@localhost:5432/nexusim?sslmode=disable" `
+  -ResultRoot "H:\NexusIM\loadtest-results"
+```
+
+该入口会：
+
+- 先跑 `knowledge-ingestion-service -> embedding-producer -> vector_embedding_tasks
+  -> embedding-worker -> model-gateway -> vector metadata`。
+- 再启动 `rebuild-worker`，设置 `NEXUSIM_VECTOR_REBUILD_TENANT_ID` 限定当前 run tenant，
+  避免本地历史 RUNNING/PENDING rebuild job 干扰 focused smoke。
+- 使用 `postgres-test` provider backend 做本地 metadata-backed sink 验证，不保存 raw
+  vector array。
+- 设置 `NEXUSIM_VECTOR_REBUILD_BACKFILL_BATCH_SIZE=1`，验证 checkpoint cursor 分页续跑。
+
 真实 pgvector backend smoke 时改用：
 
 ```powershell
@@ -213,3 +232,6 @@ $env:NEXUSIM_VECTOR_PGVECTOR_DSN = "postgres://nexusim:nexusim@localhost:15432/n
 - 每批最多处理 `NEXUSIM_VECTOR_REBUILD_BACKFILL_BATCH_SIZE` 条 matching completed task；
   如果还有下一页，会推进 `vector_rebuild_checkpoints.cursor_value` 并等待下一轮继续 claim
   RUNNING rebuild；只有没有下一页时才标记 rebuild complete。
+- embedding task queue 新写入使用 PostgreSQL `now()` 作为 `available_at / created_at /
+  updated_at`，避免本地 / 双机开发时应用进程时间和数据库时间轻微漂移导致刚入队任务
+  暂时不可 claim。

@@ -47,7 +47,6 @@ func (source *EmbeddingTaskSource) EnqueueEmbeddingTask(ctx context.Context, tas
 	if expected := sha256Ref(task.InputText); expected != task.InputHash {
 		return false, types.NewInvalidArgument("embedding input hash mismatch")
 	}
-	now := time.Now().UTC()
 	taskID := embeddingTaskID(task)
 	tag, err := source.pool.Exec(ctx, `
 INSERT INTO vector_embedding_tasks (
@@ -63,7 +62,7 @@ INSERT INTO vector_embedding_tasks (
     $11, $12, $13, $14,
     $15, $16, $17, $18, $19,
     $20, $21, $22, $23, $24,
-    'PENDING', $25, $25, $25
+    'PENDING', now(), now(), now()
 )
 ON CONFLICT (tenant_id, source_service, source_id, source_version, embedding_model_ref, idempotency_key)
 DO NOTHING
@@ -72,7 +71,7 @@ DO NOTHING
 		task.InputHash, task.InputSchemaVersion, task.EmbeddingModelRef, task.Dimension,
 		task.VisibilityScope, task.VisibilityVersion, task.PolicyVersion, task.DataClass, task.DeleteProofID,
 		task.RetentionPolicyRef, task.IdempotencyKey, task.CorrelationID, task.CausationID, task.TraceID,
-		now)
+	)
 	if err != nil {
 		return false, types.NewDBWriteFailed(err.Error())
 	}

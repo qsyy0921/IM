@@ -358,6 +358,11 @@ RequestVectorRebuild
 RUNNING rebuild；只有没有下一页时才把 rebuild job 标记完成。生产级 rebuild / backfill 仍
 需要 provider repair、更多 upstream replay 和真实 provider smoke。
 
+定向 repair / 本地 smoke 可设置 `NEXUSIM_VECTOR_REBUILD_TENANT_ID`，让 rebuild worker
+只 claim 指定 tenant 的 rebuild job；默认不设置时仍按全局 worker 语义 claim。PostgreSQL
+embedding task 新入队使用数据库 `now()` 写 `available_at / created_at / updated_at`，避免
+双机 / 多进程环境中应用时钟和数据库时钟轻微漂移导致刚入队任务短暂不可 claim。
+
 ## 10. 与 retrieval-gateway 的边界
 
 `retrieval-gateway` 是唯一面向 RAG / summary / Agent 的检索入口。
@@ -527,6 +532,7 @@ Optional rebuild provider backfill 配置：
 NEXUSIM_VECTOR_INDEX_SERVICE_MODE=rebuild-worker
 NEXUSIM_VECTOR_REBUILD_BACKFILL_SOURCE=embedding-tasks
 NEXUSIM_VECTOR_REBUILD_BACKFILL_BATCH_SIZE=100
+NEXUSIM_VECTOR_REBUILD_TENANT_ID=tenant_1 # optional scoped claim for focused smoke / repair
 NEXUSIM_MODEL_GATEWAY_GRPC_ADDR=127.0.0.1:10770
 NEXUSIM_VECTOR_PROVIDER_BACKEND=postgres-test
 
@@ -538,7 +544,9 @@ NEXUSIM_VECTOR_PGVECTOR_DSN=postgres://...
 该模式只读取本服务 PostgreSQL queue 中 `COMPLETED` 的 `vector_embedding_tasks`，并重新
 embedding redacted preview 后写 provider backend。未配置 provider backend 时 fail-fast；
 `postgres-test` 只确认 metadata backend state，不保存 raw vector array；默认
-`rebuild-worker` 不启用该 backfill。
+`rebuild-worker` 不启用该 backfill。`loadtest/vectorembedding/run-local-smoke.ps1
+-IncludeRebuildBackfill` 已覆盖本地 `postgres-test` provider backfill；真 pgvector /
+Milvus / OpenSearch provider backfill smoke 后置。
 
 Knowledge source 配置：
 

@@ -8,6 +8,7 @@ param(
     [string]$VectorProviderBackend = "",
     [string]$PgVectorDsn = "",
     [string]$PgVectorTable = "vector_embedding_items",
+    [switch]$IncludeRebuildBackfill,
     [switch]$SkipBuild
 )
 
@@ -124,6 +125,9 @@ if (-not $VectorGrpcAddr) {
 if ($PgVectorDsn -and -not $VectorProviderBackend) {
     $VectorProviderBackend = "pgvector"
 }
+if ($IncludeRebuildBackfill -and -not $VectorProviderBackend) {
+    $VectorProviderBackend = "postgres-test"
+}
 $knowledgeGrpcPort = [int]($KnowledgeGrpcAddr.Split(":")[-1])
 $modelGatewayGrpcPort = [int]($ModelGatewayGrpcAddr.Split(":")[-1])
 $vectorGrpcPort = [int]($VectorGrpcAddr.Split(":")[-1])
@@ -224,6 +228,43 @@ try {
     & $runner @verifyArgs
     if ($LASTEXITCODE -ne 0) {
         throw "vector embedding smoke verify failed with exit code $LASTEXITCODE"
+    }
+
+    if ($IncludeRebuildBackfill) {
+        $processes += Start-NexusProcess -Name "vector-index-rebuild-worker" -FilePath (Join-Path $repoRoot "bin\vector-index-service.exe") -Env @{
+            NEXUSIM_VECTOR_INDEX_SERVICE_MODE = "rebuild-worker"
+            NEXUSIM_PG_DSN = $PgDsn
+            NEXUSIM_VECTOR_INDEX_DEBUG_ADDR = ""
+            NEXUSIM_VECTOR_REBUILD_BACKFILL_SOURCE = "embedding-tasks"
+            NEXUSIM_VECTOR_REBUILD_BACKFILL_BATCH_SIZE = "1"
+            NEXUSIM_VECTOR_REBUILD_BATCH_SIZE = "10"
+            NEXUSIM_VECTOR_REBUILD_POLL_INTERVAL = "200ms"
+            NEXUSIM_VECTOR_REBUILD_ERROR_BACKOFF = "200ms"
+            NEXUSIM_VECTOR_REBUILD_TENANT_ID = $prepareSummary.tenant_id
+            NEXUSIM_MODEL_GATEWAY_GRPC_ADDR = $ModelGatewayGrpcAddr
+            NEXUSIM_VECTOR_PROVIDER_BACKEND = $VectorProviderBackend
+            NEXUSIM_VECTOR_PGVECTOR_DSN = $PgVectorDsn
+            NEXUSIM_VECTOR_PGVECTOR_TABLE = $PgVectorTable
+            NEXUSIM_VECTOR_PGVECTOR_DIMENSION = [string]$prepareSummary.embedding_dimension
+            NEXUSIM_VECTOR_PGVECTOR_ENSURE_SCHEMA = "true"
+        }
+
+        & $runner `
+            --phase request-rebuild `
+            --pg-dsn $PgDsn `
+            --vector-target $VectorGrpcAddr `
+            --result-root $ResultRoot `
+            --run-name $RunName `
+            --tenant-id $prepareSummary.tenant_id `
+            --source-id $prepareSummary.knowledge_source_id `
+            --document-id $prepareSummary.document_id `
+            --visibility-scope $prepareSummary.visibility_scope `
+            --policy-version $prepareSummary.policy_version `
+            --expected-count $prepareSummary.chunk_count `
+            --wait-timeout "20s"
+        if ($LASTEXITCODE -ne 0) {
+            throw "vector rebuild backfill smoke failed with exit code $LASTEXITCODE"
+        }
     }
 
     Write-Host "run_name=$RunName"

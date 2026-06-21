@@ -142,8 +142,14 @@ func TestEmbeddingTaskBackfillerUpsertsProviderBackend(t *testing.T) {
 	if len(embedder.tasks) != 1 || embedder.tasks[0].InputText != task.InputText {
 		t.Fatalf("unexpected embedder tasks: %+v", embedder.tasks)
 	}
+	if embedder.tasks[0].IdempotencyKey != "rebuild-backfill:"+task.IdempotencyKey {
+		t.Fatalf("model embedding call should use rebuild-specific idempotency key: %+v", embedder.tasks[0])
+	}
 	if len(upserter.commands) != 1 || upserter.commands[0].EmbeddingVectorHash != "sha256:embeddinghash" {
 		t.Fatalf("unexpected upsert commands: %+v", upserter.commands)
+	}
+	if upserter.commands[0].IdempotencyKey != task.IdempotencyKey {
+		t.Fatalf("vector upsert should keep original item idempotency key: %+v", upserter.commands[0])
 	}
 	if len(backend.calls) != 1 || backend.calls[0].item.VectorItemID != "vitem_rebuild_backfill" {
 		t.Fatalf("unexpected backend calls: %+v", backend.calls)

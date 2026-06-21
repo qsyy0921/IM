@@ -269,6 +269,14 @@ WHERE tenant_id = $1 AND job_id = $2
 }
 
 func (repository *Repository) ClaimRebuildTasks(ctx context.Context, limit int) ([]types.VectorRebuildTask, error) {
+	return repository.claimRebuildTasks(ctx, limit, "")
+}
+
+func (repository *Repository) ClaimRebuildTasksForTenant(ctx context.Context, tenantID types.TenantID, limit int) ([]types.VectorRebuildTask, error) {
+	return repository.claimRebuildTasks(ctx, limit, tenantID)
+}
+
+func (repository *Repository) claimRebuildTasks(ctx context.Context, limit int, tenantID types.TenantID) ([]types.VectorRebuildTask, error) {
 	if repository.pool == nil {
 		return nil, types.NewDBWriteFailed("vector repository is not configured")
 	}
@@ -281,7 +289,7 @@ func (repository *Repository) ClaimRebuildTasks(ctx context.Context, limit int) 
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
-	tasks, err := selectPendingRebuildTasks(ctx, tx, limit)
+	tasks, err := selectPendingRebuildTasks(ctx, tx, tenantID, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -381,7 +389,7 @@ FOR UPDATE
 	return collection, nil
 }
 
-func selectPendingRebuildTasks(ctx context.Context, tx pgx.Tx, limit int) ([]types.VectorRebuildTask, error) {
+func selectPendingRebuildTasks(ctx context.Context, tx pgx.Tx, tenantID types.TenantID, limit int) ([]types.VectorRebuildTask, error) {
 	rows, err := tx.Query(ctx, `
 SELECT
     vj.tenant_id, vj.job_id, vj.collection_id, vj.vector_item_id, vj.job_type,
@@ -404,10 +412,11 @@ WHERE vj.job_type = 'REBUILD'
     (vj.status = 'VECTOR_UPSERTING' AND vrc.status = 'RUNNING')
   )
   AND vc.status = 'ACTIVE'
+  AND ($1 = '' OR vj.tenant_id = $1)
 ORDER BY vj.created_at, vj.job_id
-LIMIT $1
+LIMIT $2
 FOR UPDATE OF vj, vrc SKIP LOCKED
-`, limit)
+`, string(tenantID), limit)
 	if err != nil {
 		return nil, types.NewDBWriteFailed(err.Error())
 	}

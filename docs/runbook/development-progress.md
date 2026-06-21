@@ -130,7 +130,11 @@
   时脚本默认不拉镜像，本机未发现 `pgvector/pgvector:pg16`，因此不宣称 focused pgvector smoke、Milvus /
   OpenSearch 或 provider backend repair；`rebuild-worker` 已支持显式 `embedding-tasks`
   provider backfill，读取本服务 completed queue 的 redacted preview 重新 embedding 后写
-  provider backend，并通过 checkpoint cursor 分页续跑。
+  provider backend，并通过 checkpoint cursor 分页续跑；`loadtest/vectorembedding
+  -IncludeRebuildBackfill` 已跑通 `postgres-test` 本地 provider backfill focused smoke，
+  覆盖 producer / queue / embedding-worker / rebuild-worker，并通过 tenant-scoped rebuild
+  claim 隔离本地历史 rebuild job；真 pgvector / Milvus / OpenSearch provider backfill smoke
+  仍后置。
 - `admin-service` product-active：SDD v0.1 和 stage-switch review 已通过，
   第一版 proto / migration / 六层 skeleton / `grpc` runtime / Docker /
   Prometheus / Grafana 覆盖已落；当前覆盖 `CreateAdminOperation`、

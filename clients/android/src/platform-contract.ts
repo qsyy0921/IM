@@ -3,7 +3,7 @@ import type { ClientPlatformAdapter, ClientRuntimeConfig } from "@nexusim/client
 export interface AndroidRuntimeConfig extends ClientRuntimeConfig {
   platform: "android";
   secureStorage: "android-keystore" | "development";
-  localStore: "sqlite" | "memory";
+  localStore: "sqlite" | "local-storage" | "memory";
   notificationProvider: "none" | "fcm";
 }
 

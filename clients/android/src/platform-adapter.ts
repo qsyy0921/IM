@@ -1,12 +1,14 @@
 import type {
   AppLifecyclePort,
   ConnectivityState,
+  LocalMessageStore,
   NetworkStatePort,
   WakeupNotificationPort
 } from "@nexusim/client-core";
 import type { AndroidPlatformAdapter, AndroidRuntimeConfig } from "./platform-contract";
 import { AndroidDevelopmentSessionStore } from "./development-session-store";
 import { AndroidMemoryMessageStore } from "./memory-message-store";
+import { AndroidPersistentMessageStore } from "./persistent-message-store";
 import { loadAndroidRuntimeConfig } from "./runtime-config";
 
 export interface AndroidPlatformAdapterOptions {
@@ -14,6 +16,7 @@ export interface AndroidPlatformAdapterOptions {
   appVersion?: string;
   installationID?: string;
   initialNetworkState?: ConnectivityState;
+  messageStore?: LocalMessageStore;
 }
 
 export function createAndroidPlatformAdapter(
@@ -28,11 +31,23 @@ export function createAndroidPlatformAdapter(
       appVersion: options.appVersion ?? "0.1.0"
     },
     secureSessionStore: new AndroidDevelopmentSessionStore(),
-    messageStore: new AndroidMemoryMessageStore(),
+    messageStore: options.messageStore ?? androidMessageStore(config),
     networkState: staticNetworkState(options.initialNetworkState ?? "UNKNOWN"),
     lifecycle: staticLifecycle(),
     wakeupNotifications: androidWakeupNotifications(config.notificationProvider)
   };
+}
+
+function androidMessageStore(config: AndroidRuntimeConfig): LocalMessageStore {
+  if (config.localStore === "memory") {
+    return new AndroidMemoryMessageStore();
+  }
+  if (config.localStore === "sqlite") {
+    throw new Error("Android SQLite message store bridge is not available yet");
+  }
+  return new AndroidPersistentMessageStore({
+    namespace: `${config.platform}:${config.deviceID}`
+  });
 }
 
 function staticNetworkState(initial: ConnectivityState): NetworkStatePort {

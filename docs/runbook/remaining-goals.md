@@ -44,9 +44,10 @@
   检查当前机器状态。
 - 三端 smoke：Web / PC / Android 都只能连 `api-gateway` 和 `push-gateway`；
   PullInbox 是事实源，WebSocket 只做在线唤醒。
-- Local store：`IndexedDBMessageStore` 已有 first-stage persistence test；继续补
-  desktop durable store / Android durable store 的 persistence 和 cursor replay
-  tests；当前 desktop / Android store 仍是 development in-memory adapter。
+- Local store：`IndexedDBMessageStore` 已有 first-stage persistence test；
+  desktop / Android 已默认接 shared `KeyValueMessageStore` + WebView
+  `localStorage` first-stage durable adapter，并有 cursor replay test；后续在
+  native packaging/runtime ready 后替换为 SQLite bridge。
 - Auth lifecycle：`/api/auth/logout` 仍等待 identity user self-session revoke 契约；
   完成后补 BFF logout 和客户端状态清理。
 

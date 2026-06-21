@@ -1,12 +1,14 @@
 import type {
   AppLifecyclePort,
   ConnectivityState,
+  LocalMessageStore,
   NetworkStatePort,
   WakeupNotificationPort
 } from "@nexusim/client-core";
 import type { DesktopPlatformAdapter, DesktopRuntimeConfig } from "./platform-contract";
 import { DesktopDevelopmentSessionStore } from "./development-session-store";
 import { DesktopMemoryMessageStore } from "./memory-message-store";
+import { DesktopPersistentMessageStore } from "./persistent-message-store";
 import { loadDesktopRuntimeConfig } from "./runtime-config";
 
 export interface DesktopPlatformAdapterOptions {
@@ -14,6 +16,7 @@ export interface DesktopPlatformAdapterOptions {
   appVersion?: string;
   installationID?: string;
   initialNetworkState?: ConnectivityState;
+  messageStore?: LocalMessageStore;
 }
 
 export function createDesktopPlatformAdapter(
@@ -29,11 +32,20 @@ export function createDesktopPlatformAdapter(
       appVersion: options.appVersion ?? "0.1.0"
     },
     secureSessionStore: new DesktopDevelopmentSessionStore(),
-    messageStore: new DesktopMemoryMessageStore(),
+    messageStore: options.messageStore ?? desktopMessageStore(config),
     networkState: staticNetworkState(options.initialNetworkState ?? "UNKNOWN"),
     lifecycle: staticLifecycle(),
     wakeupNotifications: unsupportedWakeupNotifications()
   };
+}
+
+function desktopMessageStore(config: DesktopRuntimeConfig): LocalMessageStore {
+  if (config.localStore === "memory") {
+    return new DesktopMemoryMessageStore();
+  }
+  return new DesktopPersistentMessageStore({
+    namespace: `${config.os}:${config.deviceID}`
+  });
 }
 
 function staticNetworkState(initial: ConnectivityState): NetworkStatePort {

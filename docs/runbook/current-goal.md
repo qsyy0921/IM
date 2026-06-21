@@ -25,8 +25,8 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
 - `clients/` workspace skeleton 已创建并通过 focused validation：`protocol`、
   `client-core`、`web`、`desktop`、`android` 均有明确 package / runtime contract；
   Web 端已有 Vite shell；PC desktop 和 Android 均已有 first-stage TypeScript
-  runtime adapter（development session store、in-memory message store、static
-  lifecycle/network ports）；PC desktop 已有 Tauri v2 runner skeleton（无 IPC
+  runtime adapter（development session store、localStorage-backed persistent
+  message store、static lifecycle/network ports）；PC desktop 已有 Tauri v2 runner skeleton（无 IPC
   command、bundle inactive）；Android 已有 Kotlin native bridge skeleton（只做
   launch shell / metadata，不拥有 token 或消息事实），但仍不产出安装包 / APK。
 - `api-gateway` 已新增 first-stage client BFF HTTP/JSON surface：`/api/auth/login`、
@@ -61,6 +61,11 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
 - `IndexedDBMessageStore` 已有 first-stage persistence test harness，覆盖
   cursor persistence、message seq ordering、pending send、send accepted 后稳定
   seq key 迁移、防 replay duplicate，以及 send failed 本地状态。
+- `@nexusim/client-core` 已新增 shared `KeyValueMessageStore`，desktop /
+  Android 默认通过 WebView `localStorage` wrapper 获得 first-stage persistent
+  local cache；focused test 覆盖 store 实例重开后的 cursor persistence、pending
+  send、accepted send 稳定 key 迁移、防 replay duplicate、failed-send 状态和
+  conversations-needing-sync 列表。后续生产化再接 native SQLite bridge。
 - `loadtest/clientweb` 已新增 first-stage scriptable client smoke runner：
   准备阶段用 identity / api-gateway gRPC 注册用户、seed 会话并创建 JOIN；真实客户端
   验证段只走 `api-gateway` HTTP BFF 和 `push-gateway` WebSocket，覆盖 BFF login、
@@ -135,8 +140,8 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
 ## 下一步优先级
 
 1. 后续按同一 core 接 PC desktop local Windows artifact 和 Android unsigned APK。
-2. 后续把 desktop / Android memory store 换成持久 store，并补对应 cursor
-   replay tests。
+2. 后续把 desktop / Android first-stage localStorage store 替换为 native
+   SQLite bridge，并补真实平台 runtime smoke。
 3. 再回到 workflow compensation adapter / instruction approval UI / ops 管理；
    当前已有本地 workflow get / decision / decision manifest / instruction list CLI，
    低敏 compensation instruction manifest 生成 / 校验，以及 catalog-backed import

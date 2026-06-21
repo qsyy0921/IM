@@ -29,7 +29,7 @@ export function loadAndroidRuntimeConfig(
       "android-local-device",
     platform: "android",
     secureStorage: overrides.secureStorage ?? "development",
-    localStore: overrides.localStore ?? "memory",
+    localStore: overrides.localStore ?? "local-storage",
     notificationProvider: overrides.notificationProvider ?? "none"
   };
 

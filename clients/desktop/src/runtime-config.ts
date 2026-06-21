@@ -30,6 +30,7 @@ export function loadDesktopRuntimeConfig(
       "desktop-local-device",
     os: overrides.os ?? detectDesktopOS(),
     secureStorage: overrides.secureStorage ?? "development",
+    localStore: overrides.localStore ?? "local-storage",
     shell: "tauri"
   };
 

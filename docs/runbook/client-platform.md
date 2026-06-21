@@ -72,17 +72,17 @@ First slice:
   conversations, PullInbox, send text and AckDelivery through those adapters.
 - `clients/desktop` now has a first-stage TypeScript runtime adapter:
   `loadDesktopRuntimeConfig`, `createDesktopPlatformAdapter`, development-only
-  session storage, in-memory message cache, static network/lifecycle ports and
-  unsupported local wakeup notifications. This moves desktop beyond a pure
-  contract, but it is not a Tauri runner or installer yet.
+  session storage, localStorage-backed persistent message cache, static
+  network/lifecycle ports and unsupported local wakeup notifications. This
+  moves desktop beyond a pure contract, but it is not an installer yet.
 - `clients/desktop/src-tauri` now has a first-stage Tauri v2 Rust runner
   skeleton with no IPC commands. `bundle.active` remains `false`, so this is not
   a local Windows artifact yet.
 - `clients/android` now has a first-stage TypeScript runtime adapter:
   `loadAndroidRuntimeConfig`, `createAndroidPlatformAdapter`, development-only
-  session storage, in-memory message cache, static network/lifecycle ports and
-  unsupported push/local wakeup notifications. This moves Android beyond a pure
-  contract, but it is not a native bridge or APK yet.
+  session storage, localStorage-backed persistent message cache, static
+  network/lifecycle ports and unsupported push/local wakeup notifications. This
+  moves Android beyond a pure contract, but it is not an APK yet.
 - `clients/android/native` now has a first-stage Kotlin native bridge skeleton.
   It owns only launch shell / metadata and does not own token storage, local
   message facts, BFF calls, or push delivery semantics.
@@ -94,6 +94,11 @@ First slice:
   push transport, auth session manager, inbox sync, send queue and ack queue.
   Desktop and Android expose `createDesktopClientRuntime` /
   `createAndroidClientRuntime` over their platform adapters.
+- `@nexusim/client-core` now exposes `KeyValueMessageStore`, a reusable
+  string-KV persistent store for non-browser targets. Desktop and Android use
+  first-stage WebView `localStorage` wrappers by default; future native SQLite
+  adapters can replace only the storage/platform port. Android `sqlite` config
+  is reserved and fails fast until that bridge exists.
 - `loadtest/clientweb` provides the first scriptable client-path smoke. Setup
   uses public gRPC APIs to register users, seed the conversation owner and create
   the receiver JOIN; the verified client path then uses only HTTP BFF and
@@ -139,8 +144,8 @@ rejected. For local LAN client smoke, prefer the wired `172.x.x.x` address.
 
 1. Add first local Windows artifact from the PC desktop Tauri runner.
 2. Add first unsigned local APK from the Android native bridge.
-3. Move desktop / Android from in-memory development stores to durable platform
-   stores and add cursor replay tests for those stores.
+3. Replace first-stage desktop / Android localStorage stores with native SQLite
+   bridge adapters when packaging/runtime tooling is ready.
 
 ## Local Build Prerequisites
 

@@ -177,7 +177,9 @@ Responsibilities:
 
 - Reuse Web UI and `client-core`.
 - Store tokens through Windows Credential Manager before production release.
-- Use SQLite behind `LocalMessageStore`.
+- First-stage runtime may use a WebView `localStorage` backed
+  `KeyValueMessageStore` for cursor / cache persistence. Target production
+  runtime should replace that storage port with SQLite behind `LocalMessageStore`.
 - Keep native IPC as explicit commands only.
 - Produce local `.msi` / `.exe` installer after the Web MVP is connected.
 
@@ -195,7 +197,9 @@ Responsibilities:
 
 - Reuse `protocol` and `client-core`.
 - Use Android Keystore / encrypted storage for auth material before production.
-- Use SQLite behind `LocalMessageStore`.
+- First-stage runtime may use a WebView `localStorage` backed
+  `KeyValueMessageStore` for cursor / cache persistence. Target production
+  runtime should replace that storage port with SQLite behind `LocalMessageStore`.
 - Integrate FCM later as wakeup only.
 - Produce a local unsigned `.apk` before signed distribution.
 
@@ -225,8 +229,8 @@ algorithms stay shared.
 
 ```text
 browser  -> IndexedDB + fetch + WebSocket + browser lifecycle
-PC       -> SQLite + Tauri HTTP/WebSocket + OS credential store + native lifecycle
-Android  -> SQLite + platform HTTP/WebSocket + Android Keystore + app lifecycle
+PC       -> localStorage first-stage, then SQLite + Tauri HTTP/WebSocket + OS credential store + native lifecycle
+Android  -> localStorage first-stage, then SQLite + platform HTTP/WebSocket + Android Keystore + app lifecycle
 ```
 
 ## First Client API Contract
@@ -326,7 +330,11 @@ server-accepted view.
 ## Local Storage
 
 First Web implementation uses IndexedDB through a `LocalMessageStore` port.
-PC desktop and Android may use SQLite behind the same port.
+PC desktop and Android now use shared `KeyValueMessageStore` with WebView
+`localStorage` as the first-stage durable cache. Production packaging should
+replace only the storage port with SQLite/native adapters while keeping
+`client-core` sync, send queue and ACK semantics shared. Android `sqlite`
+configuration is reserved and must fail fast until a real native bridge exists.
 
 Minimum local entities:
 
@@ -377,7 +385,7 @@ PC desktop, and Android clients.
 
 - LAN smoke for the Web MVP path against `api-gateway` BFF and `push-gateway`.
 - PC desktop shell with Tauri and Windows `.msi` / `.exe` packaging.
-- IndexedDB persistence tests beyond the first browser adapter.
+- Native SQLite store bridge and platform replay smoke for PC / Android.
 - Android runtime implementation and unsigned local `.apk` packaging.
 - Full group creation / group profile / invite / member-management UI.
 - Media upload and preview after `media-service` provider path is ready.

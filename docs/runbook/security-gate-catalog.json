@@ -212,6 +212,13 @@
       "note": "Message compliance proof manifests must contain only external proof references and hashes, not raw proof bodies."
     },
     {
+      "name": "workflow compensation instruction manifest",
+      "category": "operator-safety",
+      "script": "tools/check-workflow-compensation-instruction-manifest.ps1",
+      "check_local_label": "workflow compensation instruction manifest",
+      "note": "Workflow compensation rollback instruction manifests must stay low-sensitive, external to the repository, and free of raw payload or operator reason text."
+    },
+    {
       "name": "capacity baseline evidence manifest",
       "category": "evidence-safety",
       "script": "tools/check-capacity-baseline-evidence.ps1",

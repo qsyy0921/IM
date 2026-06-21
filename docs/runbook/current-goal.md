@@ -39,12 +39,16 @@ model-gateway / workflow / knowledge-ingestion / vector-index
   `record-decision` 本地拒绝明显敏感的 decider / policy / reason / evidence ref；
   `-decision-manifest` 可作为 first-stage external approval binding；本地 writer /
   validator 可生成和校验仓库外低敏 decision manifest。
+- 已新增本地 workflow compensation instruction manifest writer / validator /
+  self-test，用于生成和校验仓库外低敏 control-plane rollback instruction JSON；
+  manifest 只保存 workflow / payload hash / config target / operator / reason ref，
+  不保存 rollback payload、operator reason 原文或本机文件路径。
 
 ## 下一步优先级
 
 1. 继续 workflow compensation adapter / instruction approval UI / ops 管理；
    当前已有本地 workflow get / decision / decision manifest / instruction list CLI，
-   后续可接审批 UI。
+   以及低敏 compensation instruction manifest 生成 / 校验；后续可接审批 UI。
 2. 继续明确其它下游公开 admin API adapter。
 3. 在镜像可用后补 vector-index focused pgvector smoke；后续再接 Milvus /
    OpenSearch backend、provider repair 和真 provider backfill smoke。

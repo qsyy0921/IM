@@ -31,6 +31,11 @@ admin operation approval、补偿请求和人工审批状态。
 - `write-workflow-decision-manifest.ps1` / `validate-workflow-decision-manifest.ps1`：
   生成和校验仓库外低敏 decision manifest，不保存审批 comment、EvidencePack 或
   payload 原文。
+- `write-workflow-compensation-instruction-manifest.ps1` /
+  `validate-workflow-compensation-instruction-manifest.ps1`：生成和校验仓库外
+  低敏 control-plane rollback instruction JSON，只保存 workflow id、payload hash、
+  config target、operator ref 和 reason hash，不保存 rollback payload、operator
+  reason 原文或本机文件路径。
 - 已被 admin-service 用于 repair / critical / compensation handoff。
 
 后续：timer worker、更多 compensation adapter、instruction approval UI /

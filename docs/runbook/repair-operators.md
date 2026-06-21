@@ -228,6 +228,8 @@ workflow-service PostgreSQL 私表：
 ```powershell
 .\tools\write-workflow-decision-manifest.ps1 -OutputPath H:\NexusIM\operator-plans\workflow-decision.json -WorkflowID wf_123 -StepID wfs_1 -Decision APPROVE -DeciderRef operator-a -ReasonFile H:\NexusIM\operator-plans\workflow-decision-reason.txt -EvidenceRef evidence:ticket-123
 .\tools\validate-workflow-decision-manifest.ps1 -ManifestPath H:\NexusIM\operator-plans\workflow-decision.json -ExpectedWorkflowID wf_123 -ExpectedStepID wfs_1 -ExpectedDecision APPROVE
+.\tools\write-workflow-compensation-instruction-manifest.ps1 -OutputPath H:\NexusIM\operator-plans\workflow-compensation-instruction.json -WorkflowID wf_123 -PayloadRefFile H:\NexusIM\operator-plans\rollback-payload-ref.txt -Environment local -ConfigKind API_GATEWAY_TENANT_QUOTA -BundleKey tenant-a -TargetVersion quota-v1 -OperatorRef operator:rollback -ReasonFile H:\NexusIM\operator-plans\rollback-reason.txt
+.\tools\validate-workflow-compensation-instruction-manifest.ps1 -ManifestPath H:\NexusIM\operator-plans\workflow-compensation-instruction.json -ExpectedWorkflowID wf_123 -ExpectedTargetVersion quota-v1
 go run ./loadtest/workflow -mode get -workflow-id wf_123
 go run ./loadtest/workflow -mode record-decision -workflow-id wf_123 -step-id wfs_1 -decision APPROVE -decider-ref operator:a
 go run ./loadtest/workflow -mode record-decision -decision-manifest H:\NexusIM\operator-plans\workflow-decision.json
@@ -249,6 +251,13 @@ correlation refs，不保存审批 comment、EvidencePack、payload 或 provider
 `write-workflow-decision-manifest.ps1` 可从 reason 文件生成 `reason-sha256:<hash>`，
 `validate-workflow-decision-manifest.ps1` 只做 schema / 低敏字段校验，不调用
 workflow-service，也不读取数据库。
+`write-workflow-compensation-instruction-manifest.ps1` /
+`validate-workflow-compensation-instruction-manifest.ps1` 可生成和校验 workflow
+compensation executor 使用的 control-plane rollback instruction JSON。该 manifest
+只包含 workflow id、payload hash、config target、operator ref 和 reason ref；payload
+/ reason 文件只用于计算 hash，不会被复制进 manifest，也不会保存本机路径。它是
+first-stage operator handoff，不是正式 instruction approval UI，也不调用
+workflow-service、control-plane-service 或数据库。
 
 `agent-service` 提供 `proposal-approval-audit` / `proposal-approval-approve`，用于审计和审批 Agent proposal。环境变量为 `NEXUSIM_AGENT_SERVICE_MODE`；`proposal-approval-audit` 默认只列 `PROPOSED` proposal，可按 tenant / proposal / user / status / tool / resource_type 过滤，可选 `NEXUSIM_AGENT_PROPOSAL_APPROVAL_AUDIT_OUTPUT` 写低敏 JSON；`proposal-approval-approve` 需要 `NEXUSIM_AGENT_PROPOSAL_APPROVAL_TENANT_ID`、`NEXUSIM_AGENT_PROPOSAL_APPROVAL_PROPOSAL_ID`、`NEXUSIM_AGENT_PROPOSAL_APPROVAL_APPROVED_BY_USER_ID`，默认 `NEXUSIM_AGENT_PROPOSAL_APPROVAL_DRY_RUN=true`，只有显式设为 false 才会调用服务内 approval workflow 并同事务写 approval outbox。审批 reason 应通过 `NEXUSIM_AGENT_PROPOSAL_APPROVAL_REASON_FILE` 读取；输出可选 `NEXUSIM_AGENT_PROPOSAL_APPROVAL_OUTPUT`，只包含 proposal / approval / skill / tool / resource / status 元数据和 `reason_present`，不输出 objective、proposal_text、citations、EvidencePack 或 reason 原文。
 

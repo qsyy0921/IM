@@ -432,6 +432,8 @@ workflow-outbox-repair
 ```powershell
 .\tools\write-workflow-decision-manifest.ps1 -OutputPath H:\NexusIM\operator-plans\workflow-decision.json -WorkflowID wf_123 -StepID wfs_1 -Decision APPROVE -DeciderRef operator-a -ReasonFile H:\NexusIM\operator-plans\workflow-decision-reason.txt -EvidenceRef evidence:ticket-123
 .\tools\validate-workflow-decision-manifest.ps1 -ManifestPath H:\NexusIM\operator-plans\workflow-decision.json -ExpectedWorkflowID wf_123 -ExpectedStepID wfs_1 -ExpectedDecision APPROVE
+.\tools\write-workflow-compensation-instruction-manifest.ps1 -OutputPath H:\NexusIM\operator-plans\workflow-compensation-instruction.json -WorkflowID wf_123 -PayloadRefFile H:\NexusIM\operator-plans\rollback-payload-ref.txt -Environment local -ConfigKind API_GATEWAY_TENANT_QUOTA -BundleKey tenant-a -TargetVersion quota-v1 -OperatorRef operator:rollback -ReasonFile H:\NexusIM\operator-plans\rollback-reason.txt
+.\tools\validate-workflow-compensation-instruction-manifest.ps1 -ManifestPath H:\NexusIM\operator-plans\workflow-compensation-instruction.json -ExpectedWorkflowID wf_123 -ExpectedTargetVersion quota-v1
 go run ./loadtest/workflow -mode get -workflow-id wf_123
 go run ./loadtest/workflow -mode record-decision -workflow-id wf_123 -step-id wfs_1 -decision APPROVE -decider-ref operator:a
 go run ./loadtest/workflow -mode record-decision -decision-manifest H:\NexusIM\operator-plans\workflow-decision.json
@@ -448,6 +450,15 @@ approval binding：manifest 只允许 `nexusim.workflow.decision_manifest.v1` �
 workflow id、step id、decision、低敏 reason/evidence refs、idempotency key 和
 correlation refs，不保存审批 comment 或 payload 原文。writer / validator 只处理
 仓库外低敏 JSON artifact，不调用服务、不读取数据库。
+
+`write-workflow-compensation-instruction-manifest.ps1` /
+`validate-workflow-compensation-instruction-manifest.ps1` 是第一版 compensation
+instruction handoff：它复用 runtime 的 `instructions` JSON 形状，生成 / 校验
+control-plane rollback instruction 所需的 workflow id、payload ref hash、
+environment、config kind、bundle key、target version、operator ref 和 reason ref。
+payload / reason 可从仓库外文件计算 hash，但 manifest 不复制 payload、reason 原文
+或本机路径。validator 只做 schema / 低敏字段校验，不调用 workflow-service、
+control-plane-service 或数据库。
 
 ## 18. 验收标准
 

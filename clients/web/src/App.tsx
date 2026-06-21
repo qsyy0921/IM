@@ -1,9 +1,15 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createClientRuntime, validateRuntimeConfig } from "@nexusim/client-core";
 import type { AuthSession, ConversationSummary, DeliveryNotifyFrame, MessageItem, ServerFrame } from "@nexusim/protocol";
 import { createBrowserPlatformAdapter } from "./platform-adapter";
 import type { BrowserPlatformAdapterOptions } from "./platform-adapter";
-import { loadRuntimeConfig, readAndroidNativeBridgeMetadata, readClientShellConfig } from "./runtime-config";
+import {
+  loadRuntimeConfig,
+  readAndroidNativeBridgeMetadata,
+  readClientShellConfig,
+  readDesktopNativeBridgeMetadata
+} from "./runtime-config";
+import type { NativeBridgeMetadata } from "./runtime-config";
 
 const runtimeConfig = validateRuntimeConfig(loadRuntimeConfig());
 const shellConfig = readClientShellConfig();
@@ -38,10 +44,23 @@ export function App() {
   const [status, setStatus] = useState("ready");
   const [pushStatus, setPushStatus] = useState("disconnected");
   const [error, setError] = useState("");
+  const [desktopNativeMetadata, setDesktopNativeMetadata] = useState<NativeBridgeMetadata | undefined>();
 
   const sessionRef = useRef<AuthSession | null>(null);
   const activeConversationRef = useRef("");
   const pushConnectionRef = useRef<{ close(): void } | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    void readDesktopNativeBridgeMetadata().then(metadata => {
+      if (active) {
+        setDesktopNativeMetadata(metadata);
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   async function login(): Promise<void> {
     await run("login", async () => {
@@ -215,6 +234,7 @@ export function App() {
   }
 
   const activeConversation = conversations.find(item => item.conversationID === activeConversationID);
+  const nativeMetadata = desktopNativeMetadata ?? androidNativeMetadata;
 
   return (
     <main className="shell">
@@ -246,10 +266,10 @@ export function App() {
               <dt>Target</dt>
               <dd>{shellConfig.target ?? "browser"}</dd>
             </div>
-            {androidNativeMetadata ? (
+            {nativeMetadata ? (
               <div>
                 <dt>Native</dt>
-                <dd>{`${androidNativeMetadata.runtimeLabel} ${androidNativeMetadata.nativeBridgeVersion}`}</dd>
+                <dd>{`${nativeMetadata.runtimeLabel} ${nativeMetadata.nativeBridgeVersion}`}</dd>
               </div>
             ) : null}
           </dl>

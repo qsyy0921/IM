@@ -104,7 +104,8 @@ First slice:
   moves desktop beyond a pure contract, but it is not an installer yet.
 - `clients/desktop/src-tauri` now has a first-stage Tauri v2 Rust runner
   skeleton with only a read-only `runtime_metadata` IPC command. `bundle.active`
-  remains `false`, so this is not a local Windows artifact yet.
+  remains `false`, so this is not a local Windows artifact yet. The Web shell
+  can invoke this command for diagnostics and fails closed on malformed metadata.
 - `clients/android` now has a first-stage TypeScript runtime adapter:
   `loadAndroidRuntimeConfig`, `createAndroidPlatformAdapter`, development-only
   session storage, localStorage-backed persistent message cache, static
@@ -118,9 +119,9 @@ First slice:
   The Web runtime can parse `runtimeMetadata()` for diagnostics, and invalid
   bridge payloads fail closed. The bridge exposes no token, storage,
   file-system or message APIs.
-- The Web shell runtime panel now displays shell target and Android native
-  bridge metadata when present. This is diagnostics only; it does not grant Web
-  code native capabilities.
+- The Web shell runtime panel now displays shell target plus PC Tauri or Android
+  native bridge metadata when present. This is diagnostics only; it does not
+  grant Web code native capabilities.
 - PC desktop and Android can reuse the same `@nexusim/client-core` BFF adapter
   instead of copying Web-private HTTP mapping code.
 - PC desktop and Android can also reuse the same `@nexusim/client-core`
@@ -209,11 +210,12 @@ First slice:
   It does not replace existing secure mTLS gateway / push smoke coverage.
 - PC desktop and Android now both have first-stage TypeScript runtime adapters.
   PC desktop also has a Tauri runner skeleton, and Android has a Kotlin native
-  WebView asset shell skeleton. PC exposes only read-only runtime metadata IPC;
-  Android exposes only read-only metadata JavaScript bridge. Both targets reserve
-  native SQLite store config and fail closed until native bridges exist. Neither
-  target produces `.msi`, `.exe`, `.apk`, or `.aab` artifacts yet; the repository
-  now has dry-run-tested build wrappers for those future artifacts.
+  WebView asset shell skeleton. PC exposes only read-only runtime metadata IPC
+  and Web can read it for diagnostics; Android exposes only read-only metadata
+  JavaScript bridge. Both targets reserve native SQLite store config and fail
+  closed until native bridges exist. Neither target produces `.msi`, `.exe`,
+  `.apk`, or `.aab` artifacts yet; the repository now has dry-run-tested build
+  wrappers for those future artifacts.
 - `/api/auth/logout` performs first-stage server-side logout for the current
   authenticated session only. Broader device/session management remains an
   identity/admin capability, not a client BFF target selector.

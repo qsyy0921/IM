@@ -197,6 +197,9 @@ PC constraints:
 - No broad native bridge. First-stage Tauri IPC may expose only read-only
   runtime metadata until a separate native capability ADR defines commands,
   audit and permission checks.
+- Web shell may call only the fixed `runtime_metadata` command for diagnostics.
+  It must not construct arbitrary native command names or pass business payloads
+  into the native bridge.
 - No arbitrary file-system access from Web code.
 - No auto-update before signing and update-channel governance are defined.
 
@@ -391,6 +394,8 @@ need hardened token storage per platform.
   a broad native bridge.
 - PC desktop Tauri command surface must stay metadata-only until a dedicated
   native capability contract exists.
+- PC Web code may display Tauri metadata for local diagnostics, but the metadata
+  bridge must not become a storage, token, filesystem or message API.
 - Android must use encrypted platform storage before production and must treat
   FCM/APNs-style push as wakeup only, never as delivered message truth.
 - Android native WebView bridge must remain read-only metadata-only until a

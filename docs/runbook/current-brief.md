@@ -66,7 +66,7 @@ adoption rules，不把服务数量、中间件或部署形态写死。
   BFF HTTP route metrics / rate-limit adapter 已落；PC desktop / Android 已有
   target shell Web assets prep，PC 已有只读 `runtime_metadata` IPC，Android 已用
   WebViewAssetLoader 加载本地 assets，并已注册只读 `NexusIMNative` metadata
-  bridge，Web shell 已能展示该 metadata 作为诊断信息；artifact / APK wrapper 已能
+  bridge，Web shell 已能展示 PC / Android native metadata 作为诊断信息；artifact / APK wrapper 已能
   dry-run 输出命令和缺失工具链，Android builder profile
   已能静态校验，下一步做本地 artifact / APK 和真实平台 shell smoke。
 - admin / audit / workflow：客户端切片完成后继续公开 API handoff、operator

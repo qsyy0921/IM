@@ -57,9 +57,9 @@
   route metrics / rate-limit adapter 已接入 api-gateway 低敏观测和限流管线。
   PC desktop 和 Android 已新增 development session store、in-memory message
   store 和 static lifecycle/network runtime adapter；PC desktop 已有 Tauri v2
-  runner skeleton（仅只读 `runtime_metadata` command、bundle inactive）；Android 已有 Kotlin
-  WebView asset shell skeleton（通过 WebViewAssetLoader 加载本地 Web assets，并注册只读
-  `NexusIMNative` runtime metadata bridge）；
+  runner skeleton（仅只读 `runtime_metadata` command、bundle inactive，Web shell 可读
+  该 metadata 作为诊断）；Android 已有 Kotlin WebView asset shell skeleton（通过
+  WebViewAssetLoader 加载本地 Web assets，并注册只读 `NexusIMNative` runtime metadata bridge）；
   desktop / Android artifact build wrapper 已有 dry-run-tested command plan，
   artifact collector 已能归档产物并生成低敏 SHA-256 manifest，build wrapper 已支持
   成功构建后自动归档，Android Docker builder
@@ -236,8 +236,9 @@ Python Worker 候选接入边界和低敏 eval 持久化已经足够支撑算法
 HTTP/JSON surface 已建立；Web fetch / WebSocket / local store first path 已接，
 第一轮本地 Web MVP smoke、loopback clean baseline 和 Windows wired `172.31.50.1`
 clean baseline 已通过，BFF HTTP route metrics / rate-limit adapter 已落，PC
-Tauri read-only metadata runner skeleton 和 Android read-only native metadata bridge skeleton 已有，下一步是
-local Windows artifact / Android APK；Web IndexedDB local store 已补
+Tauri read-only metadata runner skeleton、Web 端 Tauri metadata 诊断读取和
+Android read-only native metadata bridge skeleton 已有，下一步是 local Windows
+artifact / Android APK；Web IndexedDB local store 已补
 first-stage persistence test。
 
 future platform / product services 已作为长期产品化主线保留：继续按服务推进

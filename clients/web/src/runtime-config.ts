@@ -26,6 +26,14 @@ export interface AndroidNativeBridgeMetadata {
   readonly runtimeLabel: string;
 }
 
+export interface DesktopNativeBridgeMetadata {
+  readonly target: "windows-desktop";
+  readonly nativeBridgeVersion: string;
+  readonly runtimeLabel: string;
+}
+
+export type NativeBridgeMetadata = AndroidNativeBridgeMetadata | DesktopNativeBridgeMetadata;
+
 export function loadRuntimeConfig(): ClientRuntimeConfig {
   const env = (import.meta as unknown as ViteImportMeta).env ?? {};
   const shell = readClientShellConfig();
@@ -34,6 +42,42 @@ export function loadRuntimeConfig(): ClientRuntimeConfig {
     pushWebSocketURL: shell.pushWebSocketURL ?? env.VITE_NEXUSIM_WS_URL ?? "ws://127.0.0.1:8088/ws",
     deviceID: shell.deviceID ?? env.VITE_NEXUSIM_DEVICE_ID ?? "web-local-device"
   };
+}
+
+export async function readDesktopNativeBridgeMetadata(): Promise<DesktopNativeBridgeMetadata | undefined> {
+  const tauri = (globalThis as {
+    __TAURI__?: {
+      core?: {
+        invoke?: (command: string) => Promise<unknown>;
+      };
+    };
+  }).__TAURI__;
+  if (!tauri?.core || typeof tauri.core.invoke !== "function") {
+    return undefined;
+  }
+  try {
+    const response = await tauri.core.invoke("runtime_metadata");
+    if (typeof response !== "string") {
+      return undefined;
+    }
+    const raw = JSON.parse(response) as Record<string, unknown>;
+    if (
+      raw.target !== "windows-desktop" ||
+      typeof raw.nativeBridgeVersion !== "string" ||
+      raw.nativeBridgeVersion.trim() === "" ||
+      typeof raw.runtimeLabel !== "string" ||
+      raw.runtimeLabel.trim() === ""
+    ) {
+      return undefined;
+    }
+    return {
+      target: "windows-desktop",
+      nativeBridgeVersion: raw.nativeBridgeVersion,
+      runtimeLabel: raw.runtimeLabel
+    };
+  } catch {
+    return undefined;
+  }
 }
 
 export function readAndroidNativeBridgeMetadata(): AndroidNativeBridgeMetadata | undefined {

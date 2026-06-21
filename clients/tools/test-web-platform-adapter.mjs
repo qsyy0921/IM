@@ -15,7 +15,7 @@ async function main() {
     entryPath,
     `
       export { BrowserSessionStore, createBrowserPlatformAdapter } from "../web/src/platform-adapter";
-      export { loadRuntimeConfig, readAndroidNativeBridgeMetadata, readClientShellConfig } from "../web/src/runtime-config";
+      export { loadRuntimeConfig, readAndroidNativeBridgeMetadata, readClientShellConfig, readDesktopNativeBridgeMetadata } from "../web/src/runtime-config";
     `,
     "utf8"
   );
@@ -34,7 +34,8 @@ async function main() {
     createBrowserPlatformAdapter,
     loadRuntimeConfig,
     readAndroidNativeBridgeMetadata,
-    readClientShellConfig
+    readClientShellConfig,
+    readDesktopNativeBridgeMetadata
   } = await import(
     pathToFileURL(bundlePath).href
   );
@@ -132,6 +133,50 @@ async function main() {
     }
   };
   assertEqual(readAndroidNativeBridgeMetadata(), undefined, "android native bridge rejects malformed json");
+
+  globalThis.__TAURI__ = {
+    core: {
+      async invoke(command) {
+        assertEqual(command, "runtime_metadata", "desktop native bridge command");
+        return JSON.stringify({
+          target: "windows-desktop",
+          nativeBridgeVersion: "0.1.0",
+          runtimeLabel: "NexusIM desktop shell"
+        });
+      }
+    }
+  };
+  const desktopMetadata = await readDesktopNativeBridgeMetadata();
+  assertEqual(desktopMetadata?.target, "windows-desktop", "desktop native bridge metadata target");
+  assertEqual(desktopMetadata?.nativeBridgeVersion, "0.1.0", "desktop native bridge metadata version");
+  assertEqual(desktopMetadata?.runtimeLabel, "NexusIM desktop shell", "desktop native bridge metadata label");
+
+  globalThis.__TAURI__ = {
+    core: {
+      async invoke() {
+        return JSON.stringify({ target: "android" });
+      }
+    }
+  };
+  assertEqual(await readDesktopNativeBridgeMetadata(), undefined, "desktop native bridge rejects non-desktop target");
+
+  globalThis.__TAURI__ = {
+    core: {
+      async invoke() {
+        return "not-json";
+      }
+    }
+  };
+  assertEqual(await readDesktopNativeBridgeMetadata(), undefined, "desktop native bridge rejects malformed json");
+
+  globalThis.__TAURI__ = {
+    core: {
+      async invoke() {
+        return { target: "windows-desktop" };
+      }
+    }
+  };
+  assertEqual(await readDesktopNativeBridgeMetadata(), undefined, "desktop native bridge rejects non-string response");
 
   console.log("web platform adapter ok");
 }

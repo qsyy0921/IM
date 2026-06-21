@@ -21,6 +21,8 @@ const _ = grpc.SupportPackageIsVersion9
 const (
 	AuditService_AppendAuditRecord_FullMethodName = "/nexusim.audit.v1.AuditService/AppendAuditRecord"
 	AuditService_QueryAuditRecords_FullMethodName = "/nexusim.audit.v1.AuditService/QueryAuditRecords"
+	AuditService_CreateAuditExport_FullMethodName = "/nexusim.audit.v1.AuditService/CreateAuditExport"
+	AuditService_GetAuditExport_FullMethodName    = "/nexusim.audit.v1.AuditService/GetAuditExport"
 	AuditService_VerifyAuditProof_FullMethodName  = "/nexusim.audit.v1.AuditService/VerifyAuditProof"
 )
 
@@ -30,6 +32,8 @@ const (
 type AuditServiceClient interface {
 	AppendAuditRecord(ctx context.Context, in *AppendAuditRecordRequest, opts ...grpc.CallOption) (*AppendAuditRecordResponse, error)
 	QueryAuditRecords(ctx context.Context, in *QueryAuditRecordsRequest, opts ...grpc.CallOption) (*QueryAuditRecordsResponse, error)
+	CreateAuditExport(ctx context.Context, in *CreateAuditExportRequest, opts ...grpc.CallOption) (*CreateAuditExportResponse, error)
+	GetAuditExport(ctx context.Context, in *GetAuditExportRequest, opts ...grpc.CallOption) (*GetAuditExportResponse, error)
 	VerifyAuditProof(ctx context.Context, in *VerifyAuditProofRequest, opts ...grpc.CallOption) (*VerifyAuditProofResponse, error)
 }
 
@@ -61,6 +65,26 @@ func (c *auditServiceClient) QueryAuditRecords(ctx context.Context, in *QueryAud
 	return out, nil
 }
 
+func (c *auditServiceClient) CreateAuditExport(ctx context.Context, in *CreateAuditExportRequest, opts ...grpc.CallOption) (*CreateAuditExportResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateAuditExportResponse)
+	err := c.cc.Invoke(ctx, AuditService_CreateAuditExport_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *auditServiceClient) GetAuditExport(ctx context.Context, in *GetAuditExportRequest, opts ...grpc.CallOption) (*GetAuditExportResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetAuditExportResponse)
+	err := c.cc.Invoke(ctx, AuditService_GetAuditExport_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *auditServiceClient) VerifyAuditProof(ctx context.Context, in *VerifyAuditProofRequest, opts ...grpc.CallOption) (*VerifyAuditProofResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(VerifyAuditProofResponse)
@@ -77,6 +101,8 @@ func (c *auditServiceClient) VerifyAuditProof(ctx context.Context, in *VerifyAud
 type AuditServiceServer interface {
 	AppendAuditRecord(context.Context, *AppendAuditRecordRequest) (*AppendAuditRecordResponse, error)
 	QueryAuditRecords(context.Context, *QueryAuditRecordsRequest) (*QueryAuditRecordsResponse, error)
+	CreateAuditExport(context.Context, *CreateAuditExportRequest) (*CreateAuditExportResponse, error)
+	GetAuditExport(context.Context, *GetAuditExportRequest) (*GetAuditExportResponse, error)
 	VerifyAuditProof(context.Context, *VerifyAuditProofRequest) (*VerifyAuditProofResponse, error)
 	mustEmbedUnimplementedAuditServiceServer()
 }
@@ -93,6 +119,12 @@ func (UnimplementedAuditServiceServer) AppendAuditRecord(context.Context, *Appen
 }
 func (UnimplementedAuditServiceServer) QueryAuditRecords(context.Context, *QueryAuditRecordsRequest) (*QueryAuditRecordsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method QueryAuditRecords not implemented")
+}
+func (UnimplementedAuditServiceServer) CreateAuditExport(context.Context, *CreateAuditExportRequest) (*CreateAuditExportResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateAuditExport not implemented")
+}
+func (UnimplementedAuditServiceServer) GetAuditExport(context.Context, *GetAuditExportRequest) (*GetAuditExportResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetAuditExport not implemented")
 }
 func (UnimplementedAuditServiceServer) VerifyAuditProof(context.Context, *VerifyAuditProofRequest) (*VerifyAuditProofResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method VerifyAuditProof not implemented")
@@ -154,6 +186,42 @@ func _AuditService_QueryAuditRecords_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AuditService_CreateAuditExport_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateAuditExportRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuditServiceServer).CreateAuditExport(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuditService_CreateAuditExport_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuditServiceServer).CreateAuditExport(ctx, req.(*CreateAuditExportRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AuditService_GetAuditExport_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetAuditExportRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuditServiceServer).GetAuditExport(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuditService_GetAuditExport_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuditServiceServer).GetAuditExport(ctx, req.(*GetAuditExportRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _AuditService_VerifyAuditProof_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(VerifyAuditProofRequest)
 	if err := dec(in); err != nil {
@@ -186,6 +254,14 @@ var AuditService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "QueryAuditRecords",
 			Handler:    _AuditService_QueryAuditRecords_Handler,
+		},
+		{
+			MethodName: "CreateAuditExport",
+			Handler:    _AuditService_CreateAuditExport_Handler,
+		},
+		{
+			MethodName: "GetAuditExport",
+			Handler:    _AuditService_GetAuditExport_Handler,
 		},
 		{
 			MethodName: "VerifyAuditProof",

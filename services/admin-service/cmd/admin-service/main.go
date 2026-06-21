@@ -168,6 +168,26 @@ func runOperationWorker(ctx context.Context) error {
 		})
 		log.Printf("admin-service operation worker routing CONFIG_PUBLISH/CONFIG_ROLLBACK/TENANT_QUOTA_CHANGE/POLICY_RULE_CHANGE to control-plane-service at %s", controlPlaneAddr)
 	}
+	auditAddr := strings.TrimSpace(os.Getenv("NEXUSIM_AUDIT_GRPC_ADDR"))
+	if auditAddr != "" {
+		executor, closeAudit, err := rpcinfra.DialAuditExportExecutor(
+			ctx,
+			auditAddr,
+			envDuration("NEXUSIM_ADMIN_AUDIT_RPC_TIMEOUT", time.Second),
+		)
+		if err != nil {
+			return err
+		}
+		defer func() {
+			if closeErr := closeAudit(); closeErr != nil {
+				log.Printf("admin-service audit client close failed: %v", closeErr)
+			}
+		}()
+		localExecutor = executorinfra.NewOperationTypeRoutingExecutor(localExecutor, map[string]executorinfra.OperationExecutor{
+			executorinfra.OperationTypeAuditExportRequest: executor,
+		})
+		log.Printf("admin-service operation worker routing AUDIT_EXPORT_REQUEST to audit-service at %s", auditAddr)
+	}
 	var workflowExecutor executorinfra.OperationExecutor
 	workflowAddr := strings.TrimSpace(os.Getenv("NEXUSIM_WORKFLOW_GRPC_ADDR"))
 	if workflowAddr != "" {

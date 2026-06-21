@@ -20,6 +20,14 @@ type QueryAuditRecordsExecutor interface {
 	Execute(context.Context, types.QueryAuditRecordsCommand) (types.QueryAuditRecordsResult, error)
 }
 
+type CreateAuditExportExecutor interface {
+	Execute(context.Context, types.CreateAuditExportCommand) (types.AuditExportJob, error)
+}
+
+type GetAuditExportExecutor interface {
+	Execute(context.Context, types.GetAuditExportCommand) (types.AuditExportJob, error)
+}
+
 type VerifyAuditProofExecutor interface {
 	Execute(context.Context, types.VerifyAuditProofCommand) (types.AuditProofVerification, error)
 }
@@ -28,17 +36,23 @@ type Server struct {
 	auditv1.UnimplementedAuditServiceServer
 	appendAuditRecord AppendAuditRecordExecutor
 	queryAuditRecords QueryAuditRecordsExecutor
+	createAuditExport CreateAuditExportExecutor
+	getAuditExport    GetAuditExportExecutor
 	verifyAuditProof  VerifyAuditProofExecutor
 }
 
 func NewServer(
 	appendAuditRecord AppendAuditRecordExecutor,
 	queryAuditRecords QueryAuditRecordsExecutor,
+	createAuditExport CreateAuditExportExecutor,
+	getAuditExport GetAuditExportExecutor,
 	verifyAuditProof VerifyAuditProofExecutor,
 ) *Server {
 	return &Server{
 		appendAuditRecord: appendAuditRecord,
 		queryAuditRecords: queryAuditRecords,
+		createAuditExport: createAuditExport,
+		getAuditExport:    getAuditExport,
 		verifyAuditProof:  verifyAuditProof,
 	}
 }
@@ -114,6 +128,57 @@ func (server *Server) QueryAuditRecords(
 		Records:    records,
 		NextCursor: result.NextCursor,
 	}, nil
+}
+
+func (server *Server) CreateAuditExport(
+	ctx context.Context,
+	request *auditv1.CreateAuditExportRequest,
+) (*auditv1.CreateAuditExportResponse, error) {
+	if request == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+	auth, ok := authFromProto(ctx, request.GetAuthContext())
+	if !ok {
+		return nil, status.Error(codes.InvalidArgument, "auth_context is required")
+	}
+	job, err := server.createAuditExport.Execute(ctx, types.CreateAuditExportCommand{
+		AuthContext:      auth,
+		AuditStream:      request.GetAuditStream(),
+		RecordType:       request.GetRecordType(),
+		SourceService:    request.GetSourceService(),
+		FilterHash:       request.GetFilterHash(),
+		RedactionProfile: request.GetRedactionProfile(),
+		RequestedByRef:   request.GetRequestedByRef(),
+		IdempotencyKey:   request.GetIdempotencyKey(),
+		CorrelationID:    request.GetCorrelationId(),
+		CausationID:      request.GetCausationId(),
+		TraceID:          request.GetTraceId(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	return &auditv1.CreateAuditExportResponse{ExportJob: exportJobToProto(job)}, nil
+}
+
+func (server *Server) GetAuditExport(
+	ctx context.Context,
+	request *auditv1.GetAuditExportRequest,
+) (*auditv1.GetAuditExportResponse, error) {
+	if request == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+	auth, ok := authFromProto(ctx, request.GetAuthContext())
+	if !ok {
+		return nil, status.Error(codes.InvalidArgument, "auth_context is required")
+	}
+	job, err := server.getAuditExport.Execute(ctx, types.GetAuditExportCommand{
+		AuthContext: auth,
+		ExportID:    request.GetExportId(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	return &auditv1.GetAuditExportResponse{ExportJob: exportJobToProto(job)}, nil
 }
 
 func (server *Server) VerifyAuditProof(
@@ -193,6 +258,27 @@ func recordToProto(record types.AuditRecord) *auditv1.AuditRecord {
 	}
 }
 
+func exportJobToProto(job types.AuditExportJob) *auditv1.AuditExportJob {
+	return &auditv1.AuditExportJob{
+		TenantId:          string(job.TenantID),
+		ExportId:          job.ExportID,
+		Status:            job.Status,
+		AuditStream:       job.AuditStream,
+		RecordType:        job.RecordType,
+		SourceService:     job.SourceService,
+		FilterHash:        job.FilterHash,
+		RedactionProfile:  job.RedactionProfile,
+		RequestedByRef:    job.RequestedByRef,
+		RequestedAtUnixMs: timeToUnixMillis(job.RequestedAt),
+		ManifestRef:       job.ManifestRef,
+		RecordCount:       job.RecordCount,
+		CompletedAtUnixMs: timeToUnixMillis(job.CompletedAt),
+		FailedAtUnixMs:    timeToUnixMillis(job.FailedAt),
+		PublicError:       job.PublicError,
+		IdempotencyKey:    job.IdempotencyKey,
+	}
+}
+
 func unixMillisToTime(value int64) time.Time {
 	if value <= 0 {
 		return time.Time{}
@@ -214,9 +300,9 @@ func grpcError(err error) error {
 	case errors.Is(err, types.ErrPermissionDenied):
 		return status.Error(codes.PermissionDenied, "permission denied")
 	case errors.Is(err, types.ErrAlreadyExists):
-		return status.Error(codes.AlreadyExists, "audit record already exists")
+		return status.Error(codes.AlreadyExists, "audit target already exists")
 	case errors.Is(err, types.ErrNotFound):
-		return status.Error(codes.NotFound, "audit record not found")
+		return status.Error(codes.NotFound, "audit target not found")
 	case errors.Is(err, types.ErrFailedPrecondition):
 		return status.Error(codes.FailedPrecondition, "audit precondition failed")
 	case errors.Is(err, types.ErrDBReadFailed):

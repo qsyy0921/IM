@@ -26,6 +26,7 @@ try {
         "contacts-service",
         "delivery-service",
         "identity-service",
+        "knowledge-ingestion-service",
         "media-service",
         "message-service",
         "notification-service",

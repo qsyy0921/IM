@@ -130,6 +130,67 @@ WHERE tenant_id = 'tenant-audit-test'
 	}
 }
 
+func TestRepositoryCreateAuditExportIntegration(t *testing.T) {
+	ctx := context.Background()
+	pool := openAuditTestPool(t)
+	resetAuditTables(t, ctx, pool)
+	repository := NewRepository(pool)
+
+	prepared := prepareAuditExport(t, "filter-hash-1", "idem-export-1")
+	job, err := repository.CreateAuditExport(ctx, prepared, "audexp_1")
+	if err != nil {
+		t.Fatalf("create audit export: %v", err)
+	}
+	if job.ExportID != "audexp_1" ||
+		job.Status != types.AuditExportStatusPending ||
+		job.AuditStream != "security" ||
+		job.FilterHash != "filter-hash-1" ||
+		job.RedactionProfile != "ops-redacted" ||
+		job.CommandHash != prepared.CommandHash {
+		t.Fatalf("unexpected export job: %+v prepared=%+v", job, prepared)
+	}
+
+	replay, err := repository.CreateAuditExport(ctx, prepared, "audexp_should_not_win")
+	if err != nil {
+		t.Fatalf("replay audit export: %v", err)
+	}
+	if replay.ExportID != job.ExportID {
+		t.Fatalf("replay returned different export: %+v", replay)
+	}
+
+	conflict := prepareAuditExport(t, "different-filter", "idem-export-1")
+	if _, err := repository.CreateAuditExport(ctx, conflict, "audexp_conflict"); !errors.Is(err, types.ErrAlreadyExists) {
+		t.Fatalf("expected export idempotency conflict, got %v", err)
+	}
+
+	got, err := repository.GetAuditExport(ctx, "tenant-audit-test", "audexp_1")
+	if err != nil {
+		t.Fatalf("get audit export: %v", err)
+	}
+	if got.ExportID != job.ExportID || got.IdempotencyKey != "idem-export-1" {
+		t.Fatalf("unexpected get export result: %+v", got)
+	}
+}
+
+func prepareAuditExport(t *testing.T, filterHash string, idempotencyKey string) domain.PreparedExport {
+	t.Helper()
+	prepared, err := domain.PrepareExport(types.CreateAuditExportCommand{
+		AuthContext:      validAuth(),
+		AuditStream:      "security",
+		RecordType:       "IDENTITY_AUTH",
+		SourceService:    "identity-service",
+		FilterHash:       filterHash,
+		RedactionProfile: "ops-redacted",
+		RequestedByRef:   "admin:operator-1",
+		IdempotencyKey:   idempotencyKey,
+		CorrelationID:    "corr-export",
+	})
+	if err != nil {
+		t.Fatalf("prepare audit export: %v", err)
+	}
+	return prepared
+}
+
 func prepareAuditRecord(t *testing.T, sourceService, sourceEventID, idempotencyKey, attributes string) domain.PreparedRecord {
 	t.Helper()
 	prepared, err := domain.PrepareRecord(types.AppendAuditRecordCommand{
@@ -227,6 +288,7 @@ func resetAuditTables(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
 	if _, err := pool.Exec(ctx, `
 TRUNCATE
 	audit_outbox,
+	audit_export_jobs,
 	audit_hash_segments,
 	audit_records
 `); err != nil {

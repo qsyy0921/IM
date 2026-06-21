@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -56,6 +57,30 @@ func TestQueryAuditRecordsReturnsCursor(t *testing.T) {
 	}
 }
 
+func TestCreateAuditExportPreparesJob(t *testing.T) {
+	repository := &fakeRepository{}
+	job, err := NewCreateAuditExportUseCase(repository, fixedAuditIDGenerator("aud_1")).Execute(
+		context.Background(),
+		types.CreateAuditExportCommand{
+			AuthContext:      validAuth(),
+			FilterHash:       "filter-hash-1",
+			RedactionProfile: "ops-redacted",
+			RequestedByRef:   "admin:operator-1",
+			IdempotencyKey:   "idem-export-1",
+			TraceID:          "trace-export",
+		},
+	)
+	if err != nil {
+		t.Fatalf("create audit export: %v", err)
+	}
+	if job.ExportID != "audexp_1" ||
+		job.Status != types.AuditExportStatusPending ||
+		repository.preparedExport.Command.AuditStream != types.DefaultAuditStream ||
+		repository.preparedExport.CommandHash == "" {
+		t.Fatalf("export job was not prepared: job=%+v prepared=%+v", job, repository.preparedExport)
+	}
+}
+
 func validAppendCommand(attributes string) types.AppendAuditRecordCommand {
 	return types.AppendAuditRecordCommand{
 		AuthContext:    validAuth(),
@@ -84,10 +109,15 @@ func (generator fixedAuditIDGenerator) NewAuditID() (string, error) {
 	return string(generator), nil
 }
 
+func (generator fixedAuditIDGenerator) NewAuditExportID() (string, error) {
+	return "audexp" + strings.TrimPrefix(string(generator), "aud"), nil
+}
+
 type fakeRepository struct {
-	prepared     domain.PreparedRecord
-	queryRecords []types.AuditRecord
-	fetchLimit   int
+	prepared       domain.PreparedRecord
+	preparedExport domain.PreparedExport
+	queryRecords   []types.AuditRecord
+	fetchLimit     int
 }
 
 func (repository *fakeRepository) AppendAuditRecord(
@@ -116,6 +146,33 @@ func (repository *fakeRepository) QueryAuditRecords(
 ) ([]types.AuditRecord, error) {
 	repository.fetchLimit = fetchLimit
 	return repository.queryRecords, nil
+}
+
+func (repository *fakeRepository) CreateAuditExport(
+	_ context.Context,
+	prepared domain.PreparedExport,
+	exportID string,
+) (types.AuditExportJob, error) {
+	repository.preparedExport = prepared
+	return types.AuditExportJob{
+		TenantID:         prepared.Command.AuthContext.TenantID,
+		ExportID:         exportID,
+		Status:           types.AuditExportStatusPending,
+		AuditStream:      prepared.Command.AuditStream,
+		FilterHash:       prepared.Command.FilterHash,
+		RedactionProfile: prepared.Command.RedactionProfile,
+		RequestedByRef:   prepared.Command.RequestedByRef,
+		IdempotencyKey:   prepared.Command.IdempotencyKey,
+		CommandHash:      prepared.CommandHash,
+	}, nil
+}
+
+func (repository *fakeRepository) GetAuditExport(
+	_ context.Context,
+	_ types.TenantID,
+	exportID string,
+) (types.AuditExportJob, error) {
+	return types.AuditExportJob{ExportID: exportID, Status: types.AuditExportStatusPending}, nil
 }
 
 func (repository *fakeRepository) VerifyAuditProof(

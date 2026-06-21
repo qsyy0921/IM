@@ -91,6 +91,57 @@ func (useCase *VerifyAuditProofUseCase) Execute(
 	return useCase.repository.VerifyAuditProof(ctx, command.AuthContext.TenantID, command.AuditID)
 }
 
+type CreateAuditExportUseCase struct {
+	repository Repository
+	auditIDs   AuditIDGenerator
+}
+
+func NewCreateAuditExportUseCase(repository Repository, auditIDs AuditIDGenerator) *CreateAuditExportUseCase {
+	return &CreateAuditExportUseCase{repository: repository, auditIDs: auditIDs}
+}
+
+func (useCase *CreateAuditExportUseCase) Execute(
+	ctx context.Context,
+	command types.CreateAuditExportCommand,
+) (types.AuditExportJob, error) {
+	if useCase.repository == nil {
+		return types.AuditExportJob{}, types.NewDBWriteFailed("audit repository is not configured")
+	}
+	if useCase.auditIDs == nil {
+		return types.AuditExportJob{}, types.NewDBWriteFailed("audit id generator is not configured")
+	}
+	prepared, err := domain.PrepareExport(command)
+	if err != nil {
+		return types.AuditExportJob{}, err
+	}
+	exportID, err := useCase.auditIDs.NewAuditExportID()
+	if err != nil {
+		return types.AuditExportJob{}, err
+	}
+	return useCase.repository.CreateAuditExport(ctx, prepared, exportID)
+}
+
+type GetAuditExportUseCase struct {
+	repository Repository
+}
+
+func NewGetAuditExportUseCase(repository Repository) *GetAuditExportUseCase {
+	return &GetAuditExportUseCase{repository: repository}
+}
+
+func (useCase *GetAuditExportUseCase) Execute(
+	ctx context.Context,
+	command types.GetAuditExportCommand,
+) (types.AuditExportJob, error) {
+	if err := command.Validate(); err != nil {
+		return types.AuditExportJob{}, err
+	}
+	if useCase.repository == nil {
+		return types.AuditExportJob{}, types.NewDBReadFailed("audit repository is not configured")
+	}
+	return useCase.repository.GetAuditExport(ctx, command.AuthContext.TenantID, command.ExportID)
+}
+
 type RandomAuditIDGenerator struct{}
 
 func NewRandomAuditIDGenerator() RandomAuditIDGenerator {
@@ -103,4 +154,12 @@ func (RandomAuditIDGenerator) NewAuditID() (string, error) {
 		return "", types.NewDBWriteFailed("audit id generation failed")
 	}
 	return "aud_" + hex.EncodeToString(raw[:]), nil
+}
+
+func (RandomAuditIDGenerator) NewAuditExportID() (string, error) {
+	var raw [16]byte
+	if _, err := rand.Read(raw[:]); err != nil {
+		return "", types.NewDBWriteFailed("audit export id generation failed")
+	}
+	return "audexp_" + hex.EncodeToString(raw[:]), nil
 }

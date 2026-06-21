@@ -1,42 +1,23 @@
 # control-plane-service
 
-状态：product-active。第一版 proto、migration、六层 skeleton、`grpc` runtime、
-Docker、Prometheus / Grafana 和 DB-backed config snapshot 已落。
+状态：product-active / first-stage config version、snapshot、rollback 和 ACK 已落。
 
-Stage-switch 记录：`docs/runbook/stage-switch/control-plane-service.md`。
-
-定位：多租户运行控制面，负责功能开关、灰度、限流策略、配额、动态策略发布、
-配置版本和 applied-version ACK。
+定位：多租户运行控制面，负责功能开关、灰度、限流策略、配额、配置版本和
+applied-version ACK。
 
 边界：
-
-- 不替代 policy-service 的授权决策，也不替代 api-gateway 的请求限流执行。
+- 不替代 policy-service 授权决策，也不替代 api-gateway 的请求限流执行。
 - 配置发布必须版本化、可回滚、可审计，并能证明实例已应用。
-- 动态配置不能绕过启动安全门禁和 mTLS / trusted metadata 边界。
-- tenant/config-service 需求统一收敛到该服务，除非后续 ADR 另拆。
+- 动态配置不能绕过启动安全门禁、mTLS 或 trusted metadata 边界。
 
-第一切片建议：
-
-- 具体边界见 `docs/sdd/control-plane-service.md`。
-- Tenant quota / feature flag snapshot 的 DB-backed source 已落。
-- `PublishConfigVersion` / `GetConfigSnapshot` / `AckAppliedConfigVersion` 已落。
-- `RollbackConfigVersion` 已落，使用 idempotency key 记录 rollback 请求，
-  replay 不重复推进，目标版本重新置为 `ACTIVE`，同 bundle 的更新版本标记为
-  `ROLLED_BACK`，并写低敏 `control.config.rolled_back.v1` outbox。
-- 最小 gRPC smoke 已通过并归档：
-  `docs/runbook/loadtest/control-plane-service/loadtest-report-20260620-control-plane-grpc-smoke.md`。
-- 已被 admin-service 真实下游 adapter smoke 验证为可通过
-  `CreateAdminOperation -> ApproveAdminOperation -> operation-worker` 间接发布配置：
-  `docs/runbook/loadtest/admin-service/loadtest-report-20260621-admin-config-publish-smoke.md`。
-- 已被 admin-service rollback smoke 验证为可通过
-  `CreateAdminOperation -> ApproveAdminOperation -> operation-worker` 间接回滚配置：
-  `docs/runbook/loadtest/admin-service/loadtest-report-20260621-admin-config-rollback-smoke.md`。
-- 已被 admin-service tenant quota smoke 验证为可通过
-  `CreateAdminOperation -> ApproveAdminOperation -> operation-worker` 间接发布
-  `API_GATEWAY_TENANT_QUOTA` 配置：
-  `docs/runbook/loadtest/admin-service/loadtest-report-20260621-admin-tenant-quota-smoke.md`。
-- 已被 admin-service policy ruleset smoke 验证为可通过
-  `CreateAdminOperation -> ApproveAdminOperation -> operation-worker` 间接发布低敏
-  `POLICY_RULESET_REF` 配置引用：
-  `docs/runbook/loadtest/admin-service/loadtest-report-20260621-admin-policy-ruleset-smoke.md`。
+已覆盖：
+- `PublishConfigVersion` / `RollbackConfigVersion` / `GetConfigSnapshot` /
+  `AckAppliedConfigVersion`。
+- Tenant quota / feature flag snapshot 的 DB-backed source。
+- 回滚使用 idempotency key，replay 不重复推进，并写低敏 rollback outbox。
+- 最小 gRPC smoke 和 admin-driven config publish / rollback / tenant quota /
+  policy ruleset smoke 已归档在 `docs/runbook/loadtest/`。
 - 与 api-gateway quota snapshot gate 对齐。
+
+后续：outbox relay、drift monitor、expiry / cleanup worker、api-gateway quota
+consumer、provider-grade rollout。

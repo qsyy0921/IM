@@ -17,6 +17,11 @@ type PreparedRecord struct {
 	CommandHash       string
 }
 
+type PreparedExport struct {
+	Command     types.CreateAuditExportCommand
+	CommandHash string
+}
+
 func PrepareRecord(command types.AppendAuditRecordCommand) (PreparedRecord, error) {
 	command = command.Normalized()
 	if err := command.Validate(); err != nil {
@@ -53,6 +58,27 @@ func PrepareRecord(command types.AppendAuditRecordCommand) (PreparedRecord, erro
 		CanonicalJSONHash: canonicalHash,
 		CommandHash:       commandHash,
 	}, nil
+}
+
+func PrepareExport(command types.CreateAuditExportCommand) (PreparedExport, error) {
+	command = command.Normalized()
+	if err := command.Validate(); err != nil {
+		return PreparedExport{}, err
+	}
+	commandHash := SHA256Hex(strings.Join([]string{
+		string(command.AuthContext.TenantID),
+		command.AuditStream,
+		command.RecordType,
+		command.SourceService,
+		command.FilterHash,
+		command.RedactionProfile,
+		command.RequestedByRef,
+		command.IdempotencyKey,
+		command.CorrelationID,
+		command.CausationID,
+		command.TraceID,
+	}, "\x00"))
+	return PreparedExport{Command: command, CommandHash: commandHash}, nil
 }
 
 func CanonicalJSON(command types.AppendAuditRecordCommand) (string, error) {

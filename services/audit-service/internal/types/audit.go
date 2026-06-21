@@ -11,6 +11,12 @@ const (
 	DefaultLimit       = 50
 	MaxLimit           = 200
 	MaxAttributesBytes = 16 * 1024
+
+	AuditExportStatusPending   = "PENDING"
+	AuditExportStatusRunning   = "RUNNING"
+	AuditExportStatusCompleted = "COMPLETED"
+	AuditExportStatusFailed    = "FAILED"
+	AuditExportStatusCanceled  = "CANCELED"
 )
 
 var allowedAttributeKeys = map[string]struct{}{
@@ -183,6 +189,97 @@ func (command QueryAuditRecordsCommand) EffectiveLimit() int {
 type QueryAuditRecordsResult struct {
 	Records    []AuditRecord
 	NextCursor string
+}
+
+type AuditExportJob struct {
+	TenantID         TenantID
+	ExportID         string
+	Status           string
+	AuditStream      string
+	RecordType       string
+	SourceService    string
+	FilterHash       string
+	RedactionProfile string
+	RequestedByRef   string
+	RequestedAt      time.Time
+	ManifestRef      string
+	RecordCount      int64
+	CompletedAt      time.Time
+	FailedAt         time.Time
+	PublicError      string
+	IdempotencyKey   string
+	CommandHash      string
+	CorrelationID    string
+	CausationID      string
+	TraceID          string
+}
+
+type CreateAuditExportCommand struct {
+	AuthContext      AuthContext
+	AuditStream      string
+	RecordType       string
+	SourceService    string
+	FilterHash       string
+	RedactionProfile string
+	RequestedByRef   string
+	IdempotencyKey   string
+	CorrelationID    string
+	CausationID      string
+	TraceID          string
+}
+
+func (command CreateAuditExportCommand) Validate() error {
+	if err := command.AuthContext.Validate(); err != nil {
+		return err
+	}
+	if strings.TrimSpace(command.FilterHash) == "" {
+		return NewInvalidArgument("filter_hash is required")
+	}
+	if strings.TrimSpace(command.RedactionProfile) == "" {
+		return NewInvalidArgument("redaction_profile is required")
+	}
+	if strings.TrimSpace(command.RequestedByRef) == "" {
+		return NewInvalidArgument("requested_by_ref is required")
+	}
+	if strings.TrimSpace(command.IdempotencyKey) == "" {
+		return NewInvalidArgument("idempotency_key is required")
+	}
+	return nil
+}
+
+func (command CreateAuditExportCommand) Normalized() CreateAuditExportCommand {
+	command.AuditStream = strings.TrimSpace(command.AuditStream)
+	if command.AuditStream == "" {
+		command.AuditStream = DefaultAuditStream
+	}
+	command.RecordType = strings.TrimSpace(command.RecordType)
+	command.SourceService = strings.TrimSpace(command.SourceService)
+	command.FilterHash = strings.TrimSpace(command.FilterHash)
+	command.RedactionProfile = strings.TrimSpace(command.RedactionProfile)
+	command.RequestedByRef = strings.TrimSpace(command.RequestedByRef)
+	command.IdempotencyKey = strings.TrimSpace(command.IdempotencyKey)
+	command.CorrelationID = strings.TrimSpace(command.CorrelationID)
+	command.CausationID = strings.TrimSpace(command.CausationID)
+	command.TraceID = strings.TrimSpace(command.TraceID)
+	if command.TraceID == "" {
+		command.TraceID = strings.TrimSpace(command.AuthContext.TraceID)
+	}
+	return command
+}
+
+type GetAuditExportCommand struct {
+	AuthContext AuthContext
+	ExportID    string
+}
+
+func (command GetAuditExportCommand) Validate() error {
+	if err := command.AuthContext.Validate(); err != nil {
+		return err
+	}
+	if strings.TrimSpace(command.ExportID) == "" {
+		return NewInvalidArgument("export_id is required")
+	}
+	return nil
 }
 
 type VerifyAuditProofCommand struct {

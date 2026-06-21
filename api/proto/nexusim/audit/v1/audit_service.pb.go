@@ -661,6 +661,434 @@ func (x *QueryAuditRecordsResponse) GetNextCursor() string {
 	return ""
 }
 
+type AuditExportJob struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	TenantId          string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	ExportId          string                 `protobuf:"bytes,2,opt,name=export_id,json=exportId,proto3" json:"export_id,omitempty"`
+	Status            string                 `protobuf:"bytes,3,opt,name=status,proto3" json:"status,omitempty"`
+	AuditStream       string                 `protobuf:"bytes,4,opt,name=audit_stream,json=auditStream,proto3" json:"audit_stream,omitempty"`
+	RecordType        string                 `protobuf:"bytes,5,opt,name=record_type,json=recordType,proto3" json:"record_type,omitempty"`
+	SourceService     string                 `protobuf:"bytes,6,opt,name=source_service,json=sourceService,proto3" json:"source_service,omitempty"`
+	FilterHash        string                 `protobuf:"bytes,7,opt,name=filter_hash,json=filterHash,proto3" json:"filter_hash,omitempty"`
+	RedactionProfile  string                 `protobuf:"bytes,8,opt,name=redaction_profile,json=redactionProfile,proto3" json:"redaction_profile,omitempty"`
+	RequestedByRef    string                 `protobuf:"bytes,9,opt,name=requested_by_ref,json=requestedByRef,proto3" json:"requested_by_ref,omitempty"`
+	RequestedAtUnixMs int64                  `protobuf:"varint,10,opt,name=requested_at_unix_ms,json=requestedAtUnixMs,proto3" json:"requested_at_unix_ms,omitempty"`
+	ManifestRef       string                 `protobuf:"bytes,11,opt,name=manifest_ref,json=manifestRef,proto3" json:"manifest_ref,omitempty"`
+	RecordCount       int64                  `protobuf:"varint,12,opt,name=record_count,json=recordCount,proto3" json:"record_count,omitempty"`
+	CompletedAtUnixMs int64                  `protobuf:"varint,13,opt,name=completed_at_unix_ms,json=completedAtUnixMs,proto3" json:"completed_at_unix_ms,omitempty"`
+	FailedAtUnixMs    int64                  `protobuf:"varint,14,opt,name=failed_at_unix_ms,json=failedAtUnixMs,proto3" json:"failed_at_unix_ms,omitempty"`
+	PublicError       string                 `protobuf:"bytes,15,opt,name=public_error,json=publicError,proto3" json:"public_error,omitempty"`
+	IdempotencyKey    string                 `protobuf:"bytes,16,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *AuditExportJob) Reset() {
+	*x = AuditExportJob{}
+	mi := &file_nexusim_audit_v1_audit_service_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AuditExportJob) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AuditExportJob) ProtoMessage() {}
+
+func (x *AuditExportJob) ProtoReflect() protoreflect.Message {
+	mi := &file_nexusim_audit_v1_audit_service_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AuditExportJob.ProtoReflect.Descriptor instead.
+func (*AuditExportJob) Descriptor() ([]byte, []int) {
+	return file_nexusim_audit_v1_audit_service_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *AuditExportJob) GetTenantId() string {
+	if x != nil {
+		return x.TenantId
+	}
+	return ""
+}
+
+func (x *AuditExportJob) GetExportId() string {
+	if x != nil {
+		return x.ExportId
+	}
+	return ""
+}
+
+func (x *AuditExportJob) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *AuditExportJob) GetAuditStream() string {
+	if x != nil {
+		return x.AuditStream
+	}
+	return ""
+}
+
+func (x *AuditExportJob) GetRecordType() string {
+	if x != nil {
+		return x.RecordType
+	}
+	return ""
+}
+
+func (x *AuditExportJob) GetSourceService() string {
+	if x != nil {
+		return x.SourceService
+	}
+	return ""
+}
+
+func (x *AuditExportJob) GetFilterHash() string {
+	if x != nil {
+		return x.FilterHash
+	}
+	return ""
+}
+
+func (x *AuditExportJob) GetRedactionProfile() string {
+	if x != nil {
+		return x.RedactionProfile
+	}
+	return ""
+}
+
+func (x *AuditExportJob) GetRequestedByRef() string {
+	if x != nil {
+		return x.RequestedByRef
+	}
+	return ""
+}
+
+func (x *AuditExportJob) GetRequestedAtUnixMs() int64 {
+	if x != nil {
+		return x.RequestedAtUnixMs
+	}
+	return 0
+}
+
+func (x *AuditExportJob) GetManifestRef() string {
+	if x != nil {
+		return x.ManifestRef
+	}
+	return ""
+}
+
+func (x *AuditExportJob) GetRecordCount() int64 {
+	if x != nil {
+		return x.RecordCount
+	}
+	return 0
+}
+
+func (x *AuditExportJob) GetCompletedAtUnixMs() int64 {
+	if x != nil {
+		return x.CompletedAtUnixMs
+	}
+	return 0
+}
+
+func (x *AuditExportJob) GetFailedAtUnixMs() int64 {
+	if x != nil {
+		return x.FailedAtUnixMs
+	}
+	return 0
+}
+
+func (x *AuditExportJob) GetPublicError() string {
+	if x != nil {
+		return x.PublicError
+	}
+	return ""
+}
+
+func (x *AuditExportJob) GetIdempotencyKey() string {
+	if x != nil {
+		return x.IdempotencyKey
+	}
+	return ""
+}
+
+type CreateAuditExportRequest struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	AuthContext      *AuthContext           `protobuf:"bytes,1,opt,name=auth_context,json=authContext,proto3" json:"auth_context,omitempty"`
+	AuditStream      string                 `protobuf:"bytes,2,opt,name=audit_stream,json=auditStream,proto3" json:"audit_stream,omitempty"`
+	RecordType       string                 `protobuf:"bytes,3,opt,name=record_type,json=recordType,proto3" json:"record_type,omitempty"`
+	SourceService    string                 `protobuf:"bytes,4,opt,name=source_service,json=sourceService,proto3" json:"source_service,omitempty"`
+	FilterHash       string                 `protobuf:"bytes,5,opt,name=filter_hash,json=filterHash,proto3" json:"filter_hash,omitempty"`
+	RedactionProfile string                 `protobuf:"bytes,6,opt,name=redaction_profile,json=redactionProfile,proto3" json:"redaction_profile,omitempty"`
+	RequestedByRef   string                 `protobuf:"bytes,7,opt,name=requested_by_ref,json=requestedByRef,proto3" json:"requested_by_ref,omitempty"`
+	IdempotencyKey   string                 `protobuf:"bytes,8,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
+	CorrelationId    string                 `protobuf:"bytes,9,opt,name=correlation_id,json=correlationId,proto3" json:"correlation_id,omitempty"`
+	CausationId      string                 `protobuf:"bytes,10,opt,name=causation_id,json=causationId,proto3" json:"causation_id,omitempty"`
+	TraceId          string                 `protobuf:"bytes,11,opt,name=trace_id,json=traceId,proto3" json:"trace_id,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *CreateAuditExportRequest) Reset() {
+	*x = CreateAuditExportRequest{}
+	mi := &file_nexusim_audit_v1_audit_service_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateAuditExportRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateAuditExportRequest) ProtoMessage() {}
+
+func (x *CreateAuditExportRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_nexusim_audit_v1_audit_service_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateAuditExportRequest.ProtoReflect.Descriptor instead.
+func (*CreateAuditExportRequest) Descriptor() ([]byte, []int) {
+	return file_nexusim_audit_v1_audit_service_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *CreateAuditExportRequest) GetAuthContext() *AuthContext {
+	if x != nil {
+		return x.AuthContext
+	}
+	return nil
+}
+
+func (x *CreateAuditExportRequest) GetAuditStream() string {
+	if x != nil {
+		return x.AuditStream
+	}
+	return ""
+}
+
+func (x *CreateAuditExportRequest) GetRecordType() string {
+	if x != nil {
+		return x.RecordType
+	}
+	return ""
+}
+
+func (x *CreateAuditExportRequest) GetSourceService() string {
+	if x != nil {
+		return x.SourceService
+	}
+	return ""
+}
+
+func (x *CreateAuditExportRequest) GetFilterHash() string {
+	if x != nil {
+		return x.FilterHash
+	}
+	return ""
+}
+
+func (x *CreateAuditExportRequest) GetRedactionProfile() string {
+	if x != nil {
+		return x.RedactionProfile
+	}
+	return ""
+}
+
+func (x *CreateAuditExportRequest) GetRequestedByRef() string {
+	if x != nil {
+		return x.RequestedByRef
+	}
+	return ""
+}
+
+func (x *CreateAuditExportRequest) GetIdempotencyKey() string {
+	if x != nil {
+		return x.IdempotencyKey
+	}
+	return ""
+}
+
+func (x *CreateAuditExportRequest) GetCorrelationId() string {
+	if x != nil {
+		return x.CorrelationId
+	}
+	return ""
+}
+
+func (x *CreateAuditExportRequest) GetCausationId() string {
+	if x != nil {
+		return x.CausationId
+	}
+	return ""
+}
+
+func (x *CreateAuditExportRequest) GetTraceId() string {
+	if x != nil {
+		return x.TraceId
+	}
+	return ""
+}
+
+type CreateAuditExportResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ExportJob     *AuditExportJob        `protobuf:"bytes,1,opt,name=export_job,json=exportJob,proto3" json:"export_job,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateAuditExportResponse) Reset() {
+	*x = CreateAuditExportResponse{}
+	mi := &file_nexusim_audit_v1_audit_service_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateAuditExportResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateAuditExportResponse) ProtoMessage() {}
+
+func (x *CreateAuditExportResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_nexusim_audit_v1_audit_service_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateAuditExportResponse.ProtoReflect.Descriptor instead.
+func (*CreateAuditExportResponse) Descriptor() ([]byte, []int) {
+	return file_nexusim_audit_v1_audit_service_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *CreateAuditExportResponse) GetExportJob() *AuditExportJob {
+	if x != nil {
+		return x.ExportJob
+	}
+	return nil
+}
+
+type GetAuditExportRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AuthContext   *AuthContext           `protobuf:"bytes,1,opt,name=auth_context,json=authContext,proto3" json:"auth_context,omitempty"`
+	ExportId      string                 `protobuf:"bytes,2,opt,name=export_id,json=exportId,proto3" json:"export_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetAuditExportRequest) Reset() {
+	*x = GetAuditExportRequest{}
+	mi := &file_nexusim_audit_v1_audit_service_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetAuditExportRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetAuditExportRequest) ProtoMessage() {}
+
+func (x *GetAuditExportRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_nexusim_audit_v1_audit_service_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetAuditExportRequest.ProtoReflect.Descriptor instead.
+func (*GetAuditExportRequest) Descriptor() ([]byte, []int) {
+	return file_nexusim_audit_v1_audit_service_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *GetAuditExportRequest) GetAuthContext() *AuthContext {
+	if x != nil {
+		return x.AuthContext
+	}
+	return nil
+}
+
+func (x *GetAuditExportRequest) GetExportId() string {
+	if x != nil {
+		return x.ExportId
+	}
+	return ""
+}
+
+type GetAuditExportResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ExportJob     *AuditExportJob        `protobuf:"bytes,1,opt,name=export_job,json=exportJob,proto3" json:"export_job,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetAuditExportResponse) Reset() {
+	*x = GetAuditExportResponse{}
+	mi := &file_nexusim_audit_v1_audit_service_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetAuditExportResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetAuditExportResponse) ProtoMessage() {}
+
+func (x *GetAuditExportResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_nexusim_audit_v1_audit_service_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetAuditExportResponse.ProtoReflect.Descriptor instead.
+func (*GetAuditExportResponse) Descriptor() ([]byte, []int) {
+	return file_nexusim_audit_v1_audit_service_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *GetAuditExportResponse) GetExportJob() *AuditExportJob {
+	if x != nil {
+		return x.ExportJob
+	}
+	return nil
+}
+
 type VerifyAuditProofRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	AuthContext   *AuthContext           `protobuf:"bytes,1,opt,name=auth_context,json=authContext,proto3" json:"auth_context,omitempty"`
@@ -671,7 +1099,7 @@ type VerifyAuditProofRequest struct {
 
 func (x *VerifyAuditProofRequest) Reset() {
 	*x = VerifyAuditProofRequest{}
-	mi := &file_nexusim_audit_v1_audit_service_proto_msgTypes[6]
+	mi := &file_nexusim_audit_v1_audit_service_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -683,7 +1111,7 @@ func (x *VerifyAuditProofRequest) String() string {
 func (*VerifyAuditProofRequest) ProtoMessage() {}
 
 func (x *VerifyAuditProofRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nexusim_audit_v1_audit_service_proto_msgTypes[6]
+	mi := &file_nexusim_audit_v1_audit_service_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -696,7 +1124,7 @@ func (x *VerifyAuditProofRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VerifyAuditProofRequest.ProtoReflect.Descriptor instead.
 func (*VerifyAuditProofRequest) Descriptor() ([]byte, []int) {
-	return file_nexusim_audit_v1_audit_service_proto_rawDescGZIP(), []int{6}
+	return file_nexusim_audit_v1_audit_service_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *VerifyAuditProofRequest) GetAuthContext() *AuthContext {
@@ -726,7 +1154,7 @@ type VerifyAuditProofResponse struct {
 
 func (x *VerifyAuditProofResponse) Reset() {
 	*x = VerifyAuditProofResponse{}
-	mi := &file_nexusim_audit_v1_audit_service_proto_msgTypes[7]
+	mi := &file_nexusim_audit_v1_audit_service_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -738,7 +1166,7 @@ func (x *VerifyAuditProofResponse) String() string {
 func (*VerifyAuditProofResponse) ProtoMessage() {}
 
 func (x *VerifyAuditProofResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nexusim_audit_v1_audit_service_proto_msgTypes[7]
+	mi := &file_nexusim_audit_v1_audit_service_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -751,7 +1179,7 @@ func (x *VerifyAuditProofResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VerifyAuditProofResponse.ProtoReflect.Descriptor instead.
 func (*VerifyAuditProofResponse) Descriptor() ([]byte, []int) {
-	return file_nexusim_audit_v1_audit_service_proto_rawDescGZIP(), []int{7}
+	return file_nexusim_audit_v1_audit_service_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *VerifyAuditProofResponse) GetAuditId() string {
@@ -867,7 +1295,51 @@ const file_nexusim_audit_v1_audit_service_proto_rawDesc = "" +
 	"\x19QueryAuditRecordsResponse\x127\n" +
 	"\arecords\x18\x01 \x03(\v2\x1d.nexusim.audit.v1.AuditRecordR\arecords\x12\x1f\n" +
 	"\vnext_cursor\x18\x02 \x01(\tR\n" +
-	"nextCursor\"v\n" +
+	"nextCursor\"\xe4\x04\n" +
+	"\x0eAuditExportJob\x12\x1b\n" +
+	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x1b\n" +
+	"\texport_id\x18\x02 \x01(\tR\bexportId\x12\x16\n" +
+	"\x06status\x18\x03 \x01(\tR\x06status\x12!\n" +
+	"\faudit_stream\x18\x04 \x01(\tR\vauditStream\x12\x1f\n" +
+	"\vrecord_type\x18\x05 \x01(\tR\n" +
+	"recordType\x12%\n" +
+	"\x0esource_service\x18\x06 \x01(\tR\rsourceService\x12\x1f\n" +
+	"\vfilter_hash\x18\a \x01(\tR\n" +
+	"filterHash\x12+\n" +
+	"\x11redaction_profile\x18\b \x01(\tR\x10redactionProfile\x12(\n" +
+	"\x10requested_by_ref\x18\t \x01(\tR\x0erequestedByRef\x12/\n" +
+	"\x14requested_at_unix_ms\x18\n" +
+	" \x01(\x03R\x11requestedAtUnixMs\x12!\n" +
+	"\fmanifest_ref\x18\v \x01(\tR\vmanifestRef\x12!\n" +
+	"\frecord_count\x18\f \x01(\x03R\vrecordCount\x12/\n" +
+	"\x14completed_at_unix_ms\x18\r \x01(\x03R\x11completedAtUnixMs\x12)\n" +
+	"\x11failed_at_unix_ms\x18\x0e \x01(\x03R\x0efailedAtUnixMs\x12!\n" +
+	"\fpublic_error\x18\x0f \x01(\tR\vpublicError\x12'\n" +
+	"\x0fidempotency_key\x18\x10 \x01(\tR\x0eidempotencyKey\"\xcd\x03\n" +
+	"\x18CreateAuditExportRequest\x12@\n" +
+	"\fauth_context\x18\x01 \x01(\v2\x1d.nexusim.audit.v1.AuthContextR\vauthContext\x12!\n" +
+	"\faudit_stream\x18\x02 \x01(\tR\vauditStream\x12\x1f\n" +
+	"\vrecord_type\x18\x03 \x01(\tR\n" +
+	"recordType\x12%\n" +
+	"\x0esource_service\x18\x04 \x01(\tR\rsourceService\x12\x1f\n" +
+	"\vfilter_hash\x18\x05 \x01(\tR\n" +
+	"filterHash\x12+\n" +
+	"\x11redaction_profile\x18\x06 \x01(\tR\x10redactionProfile\x12(\n" +
+	"\x10requested_by_ref\x18\a \x01(\tR\x0erequestedByRef\x12'\n" +
+	"\x0fidempotency_key\x18\b \x01(\tR\x0eidempotencyKey\x12%\n" +
+	"\x0ecorrelation_id\x18\t \x01(\tR\rcorrelationId\x12!\n" +
+	"\fcausation_id\x18\n" +
+	" \x01(\tR\vcausationId\x12\x19\n" +
+	"\btrace_id\x18\v \x01(\tR\atraceId\"\\\n" +
+	"\x19CreateAuditExportResponse\x12?\n" +
+	"\n" +
+	"export_job\x18\x01 \x01(\v2 .nexusim.audit.v1.AuditExportJobR\texportJob\"v\n" +
+	"\x15GetAuditExportRequest\x12@\n" +
+	"\fauth_context\x18\x01 \x01(\v2\x1d.nexusim.audit.v1.AuthContextR\vauthContext\x12\x1b\n" +
+	"\texport_id\x18\x02 \x01(\tR\bexportId\"Y\n" +
+	"\x16GetAuditExportResponse\x12?\n" +
+	"\n" +
+	"export_job\x18\x01 \x01(\v2 .nexusim.audit.v1.AuditExportJobR\texportJob\"v\n" +
 	"\x17VerifyAuditProofRequest\x12@\n" +
 	"\fauth_context\x18\x01 \x01(\v2\x1d.nexusim.audit.v1.AuthContextR\vauthContext\x12\x19\n" +
 	"\baudit_id\x18\x02 \x01(\tR\aauditId\"\xc5\x01\n" +
@@ -877,10 +1349,12 @@ const file_nexusim_audit_v1_audit_service_proto_rawDesc = "" +
 	"\x0efailure_reason\x18\x03 \x01(\tR\rfailureReason\x12\x1f\n" +
 	"\vrecord_hash\x18\x04 \x01(\tR\n" +
 	"recordHash\x120\n" +
-	"\x14previous_record_hash\x18\x05 \x01(\tR\x12previousRecordHash2\xd5\x02\n" +
+	"\x14previous_record_hash\x18\x05 \x01(\tR\x12previousRecordHash2\xa8\x04\n" +
 	"\fAuditService\x12l\n" +
 	"\x11AppendAuditRecord\x12*.nexusim.audit.v1.AppendAuditRecordRequest\x1a+.nexusim.audit.v1.AppendAuditRecordResponse\x12l\n" +
-	"\x11QueryAuditRecords\x12*.nexusim.audit.v1.QueryAuditRecordsRequest\x1a+.nexusim.audit.v1.QueryAuditRecordsResponse\x12i\n" +
+	"\x11QueryAuditRecords\x12*.nexusim.audit.v1.QueryAuditRecordsRequest\x1a+.nexusim.audit.v1.QueryAuditRecordsResponse\x12l\n" +
+	"\x11CreateAuditExport\x12*.nexusim.audit.v1.CreateAuditExportRequest\x1a+.nexusim.audit.v1.CreateAuditExportResponse\x12c\n" +
+	"\x0eGetAuditExport\x12'.nexusim.audit.v1.GetAuditExportRequest\x1a(.nexusim.audit.v1.GetAuditExportResponse\x12i\n" +
 	"\x10VerifyAuditProof\x12).nexusim.audit.v1.VerifyAuditProofRequest\x1a*.nexusim.audit.v1.VerifyAuditProofResponseB;Z9github.com/qsyy0921/IM/api/proto/nexusim/audit/v1;auditv1b\x06proto3"
 
 var (
@@ -895,7 +1369,7 @@ func file_nexusim_audit_v1_audit_service_proto_rawDescGZIP() []byte {
 	return file_nexusim_audit_v1_audit_service_proto_rawDescData
 }
 
-var file_nexusim_audit_v1_audit_service_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_nexusim_audit_v1_audit_service_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
 var file_nexusim_audit_v1_audit_service_proto_goTypes = []any{
 	(*AuthContext)(nil),               // 0: nexusim.audit.v1.AuthContext
 	(*AuditRecord)(nil),               // 1: nexusim.audit.v1.AuditRecord
@@ -903,26 +1377,39 @@ var file_nexusim_audit_v1_audit_service_proto_goTypes = []any{
 	(*AppendAuditRecordResponse)(nil), // 3: nexusim.audit.v1.AppendAuditRecordResponse
 	(*QueryAuditRecordsRequest)(nil),  // 4: nexusim.audit.v1.QueryAuditRecordsRequest
 	(*QueryAuditRecordsResponse)(nil), // 5: nexusim.audit.v1.QueryAuditRecordsResponse
-	(*VerifyAuditProofRequest)(nil),   // 6: nexusim.audit.v1.VerifyAuditProofRequest
-	(*VerifyAuditProofResponse)(nil),  // 7: nexusim.audit.v1.VerifyAuditProofResponse
+	(*AuditExportJob)(nil),            // 6: nexusim.audit.v1.AuditExportJob
+	(*CreateAuditExportRequest)(nil),  // 7: nexusim.audit.v1.CreateAuditExportRequest
+	(*CreateAuditExportResponse)(nil), // 8: nexusim.audit.v1.CreateAuditExportResponse
+	(*GetAuditExportRequest)(nil),     // 9: nexusim.audit.v1.GetAuditExportRequest
+	(*GetAuditExportResponse)(nil),    // 10: nexusim.audit.v1.GetAuditExportResponse
+	(*VerifyAuditProofRequest)(nil),   // 11: nexusim.audit.v1.VerifyAuditProofRequest
+	(*VerifyAuditProofResponse)(nil),  // 12: nexusim.audit.v1.VerifyAuditProofResponse
 }
 var file_nexusim_audit_v1_audit_service_proto_depIdxs = []int32{
-	0, // 0: nexusim.audit.v1.AppendAuditRecordRequest.auth_context:type_name -> nexusim.audit.v1.AuthContext
-	1, // 1: nexusim.audit.v1.AppendAuditRecordResponse.record:type_name -> nexusim.audit.v1.AuditRecord
-	0, // 2: nexusim.audit.v1.QueryAuditRecordsRequest.auth_context:type_name -> nexusim.audit.v1.AuthContext
-	1, // 3: nexusim.audit.v1.QueryAuditRecordsResponse.records:type_name -> nexusim.audit.v1.AuditRecord
-	0, // 4: nexusim.audit.v1.VerifyAuditProofRequest.auth_context:type_name -> nexusim.audit.v1.AuthContext
-	2, // 5: nexusim.audit.v1.AuditService.AppendAuditRecord:input_type -> nexusim.audit.v1.AppendAuditRecordRequest
-	4, // 6: nexusim.audit.v1.AuditService.QueryAuditRecords:input_type -> nexusim.audit.v1.QueryAuditRecordsRequest
-	6, // 7: nexusim.audit.v1.AuditService.VerifyAuditProof:input_type -> nexusim.audit.v1.VerifyAuditProofRequest
-	3, // 8: nexusim.audit.v1.AuditService.AppendAuditRecord:output_type -> nexusim.audit.v1.AppendAuditRecordResponse
-	5, // 9: nexusim.audit.v1.AuditService.QueryAuditRecords:output_type -> nexusim.audit.v1.QueryAuditRecordsResponse
-	7, // 10: nexusim.audit.v1.AuditService.VerifyAuditProof:output_type -> nexusim.audit.v1.VerifyAuditProofResponse
-	8, // [8:11] is the sub-list for method output_type
-	5, // [5:8] is the sub-list for method input_type
-	5, // [5:5] is the sub-list for extension type_name
-	5, // [5:5] is the sub-list for extension extendee
-	0, // [0:5] is the sub-list for field type_name
+	0,  // 0: nexusim.audit.v1.AppendAuditRecordRequest.auth_context:type_name -> nexusim.audit.v1.AuthContext
+	1,  // 1: nexusim.audit.v1.AppendAuditRecordResponse.record:type_name -> nexusim.audit.v1.AuditRecord
+	0,  // 2: nexusim.audit.v1.QueryAuditRecordsRequest.auth_context:type_name -> nexusim.audit.v1.AuthContext
+	1,  // 3: nexusim.audit.v1.QueryAuditRecordsResponse.records:type_name -> nexusim.audit.v1.AuditRecord
+	0,  // 4: nexusim.audit.v1.CreateAuditExportRequest.auth_context:type_name -> nexusim.audit.v1.AuthContext
+	6,  // 5: nexusim.audit.v1.CreateAuditExportResponse.export_job:type_name -> nexusim.audit.v1.AuditExportJob
+	0,  // 6: nexusim.audit.v1.GetAuditExportRequest.auth_context:type_name -> nexusim.audit.v1.AuthContext
+	6,  // 7: nexusim.audit.v1.GetAuditExportResponse.export_job:type_name -> nexusim.audit.v1.AuditExportJob
+	0,  // 8: nexusim.audit.v1.VerifyAuditProofRequest.auth_context:type_name -> nexusim.audit.v1.AuthContext
+	2,  // 9: nexusim.audit.v1.AuditService.AppendAuditRecord:input_type -> nexusim.audit.v1.AppendAuditRecordRequest
+	4,  // 10: nexusim.audit.v1.AuditService.QueryAuditRecords:input_type -> nexusim.audit.v1.QueryAuditRecordsRequest
+	7,  // 11: nexusim.audit.v1.AuditService.CreateAuditExport:input_type -> nexusim.audit.v1.CreateAuditExportRequest
+	9,  // 12: nexusim.audit.v1.AuditService.GetAuditExport:input_type -> nexusim.audit.v1.GetAuditExportRequest
+	11, // 13: nexusim.audit.v1.AuditService.VerifyAuditProof:input_type -> nexusim.audit.v1.VerifyAuditProofRequest
+	3,  // 14: nexusim.audit.v1.AuditService.AppendAuditRecord:output_type -> nexusim.audit.v1.AppendAuditRecordResponse
+	5,  // 15: nexusim.audit.v1.AuditService.QueryAuditRecords:output_type -> nexusim.audit.v1.QueryAuditRecordsResponse
+	8,  // 16: nexusim.audit.v1.AuditService.CreateAuditExport:output_type -> nexusim.audit.v1.CreateAuditExportResponse
+	10, // 17: nexusim.audit.v1.AuditService.GetAuditExport:output_type -> nexusim.audit.v1.GetAuditExportResponse
+	12, // 18: nexusim.audit.v1.AuditService.VerifyAuditProof:output_type -> nexusim.audit.v1.VerifyAuditProofResponse
+	14, // [14:19] is the sub-list for method output_type
+	9,  // [9:14] is the sub-list for method input_type
+	9,  // [9:9] is the sub-list for extension type_name
+	9,  // [9:9] is the sub-list for extension extendee
+	0,  // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_nexusim_audit_v1_audit_service_proto_init() }
@@ -936,7 +1423,7 @@ func file_nexusim_audit_v1_audit_service_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_nexusim_audit_v1_audit_service_proto_rawDesc), len(file_nexusim_audit_v1_audit_service_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   8,
+			NumMessages:   13,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -7,6 +7,8 @@ option go_package = "github.com/qsyy0921/IM/api/proto/nexusim/audit/v1;auditv1";
 service AuditService {
   rpc AppendAuditRecord(AppendAuditRecordRequest) returns (AppendAuditRecordResponse);
   rpc QueryAuditRecords(QueryAuditRecordsRequest) returns (QueryAuditRecordsResponse);
+  rpc CreateAuditExport(CreateAuditExportRequest) returns (CreateAuditExportResponse);
+  rpc GetAuditExport(GetAuditExportRequest) returns (GetAuditExportResponse);
   rpc VerifyAuditProof(VerifyAuditProofRequest) returns (VerifyAuditProofResponse);
 }
 
@@ -79,6 +81,52 @@ message QueryAuditRecordsRequest {
 message QueryAuditRecordsResponse {
   repeated AuditRecord records = 1;
   string next_cursor = 2;
+}
+
+message AuditExportJob {
+  string tenant_id = 1;
+  string export_id = 2;
+  string status = 3;
+  string audit_stream = 4;
+  string record_type = 5;
+  string source_service = 6;
+  string filter_hash = 7;
+  string redaction_profile = 8;
+  string requested_by_ref = 9;
+  int64 requested_at_unix_ms = 10;
+  string manifest_ref = 11;
+  int64 record_count = 12;
+  int64 completed_at_unix_ms = 13;
+  int64 failed_at_unix_ms = 14;
+  string public_error = 15;
+  string idempotency_key = 16;
+}
+
+message CreateAuditExportRequest {
+  AuthContext auth_context = 1;
+  string audit_stream = 2;
+  string record_type = 3;
+  string source_service = 4;
+  string filter_hash = 5;
+  string redaction_profile = 6;
+  string requested_by_ref = 7;
+  string idempotency_key = 8;
+  string correlation_id = 9;
+  string causation_id = 10;
+  string trace_id = 11;
+}
+
+message CreateAuditExportResponse {
+  AuditExportJob export_job = 1;
+}
+
+message GetAuditExportRequest {
+  AuthContext auth_context = 1;
+  string export_id = 2;
+}
+
+message GetAuditExportResponse {
+  AuditExportJob export_job = 1;
 }
 
 message VerifyAuditProofRequest {

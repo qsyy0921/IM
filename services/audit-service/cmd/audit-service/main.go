@@ -88,6 +88,8 @@ func runGRPC(ctx context.Context) error {
 	auditgrpc.Register(server, auditgrpc.NewServer(
 		app.NewAppendAuditRecordUseCase(repository, app.NewRandomAuditIDGenerator()),
 		app.NewQueryAuditRecordsUseCase(repository),
+		app.NewCreateAuditExportUseCase(repository, app.NewRandomAuditIDGenerator()),
+		app.NewGetAuditExportUseCase(repository),
 		app.NewVerifyAuditProofUseCase(repository),
 	))
 

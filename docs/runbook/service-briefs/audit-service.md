@@ -1,30 +1,23 @@
 # audit-service
 
-状态：product-active / 第一实现切片已落。已同步 service-registry、proto、
-migration、`grpc` runtime、Docker、Prometheus、Grafana 和六层目录。
+状态：product-active / first-stage append、query、export job metadata 和 proof 已落。
 
-定位：统一审计平台，聚合登录审计、安全审计、管理操作审计、策略决策归档、
-Agent 动作审计、审计导出和 hash-chain proof。
+定位：统一审计归档和证明服务，聚合登录、安全、管理操作、策略决策和 Agent
+动作审计；对外导出必须低敏脱敏。
 
 边界：
+- 各服务本地 audit / outbox 仍是事实产生点；audit-service 负责归档、查询和导出视图。
+- 不替代业务服务事务内 audit，不直接修业务事实。
+- hash-chain 只证明篡改检测，不保存 secret。
 
-- 各服务本地 audit / outbox 仍是事实产生点；audit-service 负责归档、查询和导出。
-- 不替代业务服务的事务内 audit，也不直接修业务事实。
-- Agent 写动作必须能关联 proposal、approval、executor result 和 policy decision。
-- 对外导出必须低敏脱敏，hash-chain 只证明篡改检测，不保存 secret。
-
-已落地：
-
+已覆盖：
 - `AppendAuditRecord`：PostgreSQL append，按 source event / idempotency 幂等。
 - `QueryAuditRecords`：redacted audit record query。
+- `CreateAuditExport` / `GetAuditExport`：只创建 / 查询 PENDING job 和低敏
+  filter hash / redaction profile / requester refs；不生成 manifest。
 - `VerifyAuditProof`：hash-chain proof verification。
-- `audit_outbox` 第一版低敏 `audit.record.appended.v1` 事件落库。
-- 最小 gRPC smoke 已通过并归档：
-  `docs/runbook/loadtest/audit-service/loadtest-report-20260620-audit-grpc-smoke.md`。
+- 低敏 `audit.record.appended.v1` outbox。
+- 最小 gRPC smoke：`docs/runbook/loadtest/audit-service/`。
 
-下一切片建议：
-
-- 具体边界见 `docs/sdd/audit-service.md`。
-- stage-switch 记录见 `docs/runbook/stage-switch/audit-service.md`。
-- Kafka ingestion、export worker、SIEM forwarding、segment sealing 和
-  retention cleanup 后置。
+后续：Kafka ingestion、export worker / manifest、SIEM forwarding、segment sealing、
+retention cleanup、provider-grade audit export。

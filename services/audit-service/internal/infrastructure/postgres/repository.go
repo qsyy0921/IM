@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"strings"
@@ -238,6 +239,143 @@ LIMIT $2
 	return records, nil
 }
 
+func (repository *Repository) CreateAuditExport(
+	ctx context.Context,
+	prepared domain.PreparedExport,
+	exportID string,
+) (types.AuditExportJob, error) {
+	if repository.pool == nil {
+		return types.AuditExportJob{}, types.NewDBWriteFailed("audit repository is not configured")
+	}
+	tx, err := repository.pool.Begin(ctx)
+	if err != nil {
+		return types.AuditExportJob{}, types.NewDBWriteFailed(err.Error())
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	existing, found, err := findExistingExport(ctx, tx, prepared.Command.AuthContext.TenantID, prepared.Command.IdempotencyKey)
+	if err != nil {
+		return types.AuditExportJob{}, types.NewDBReadFailed(err.Error())
+	}
+	if found {
+		if existing.CommandHash != prepared.CommandHash {
+			return types.AuditExportJob{}, types.NewAlreadyExists("audit export idempotency conflict")
+		}
+		if err := tx.Commit(ctx); err != nil {
+			return types.AuditExportJob{}, types.NewDBReadFailed(err.Error())
+		}
+		return existing, nil
+	}
+
+	row := tx.QueryRow(ctx, `
+INSERT INTO audit_export_jobs (
+	tenant_id,
+	export_id,
+	status,
+	audit_stream,
+	record_type,
+	source_service,
+	filter_hash,
+	redaction_profile,
+	requested_by_ref,
+	idempotency_key,
+	command_hash,
+	correlation_id,
+	causation_id,
+	trace_id
+) VALUES (
+	$1, $2, 'PENDING', $3, $4, $5, $6, $7, $8,
+	$9, $10, $11, $12, $13
+)
+RETURNING
+	tenant_id,
+	export_id,
+	status,
+	audit_stream,
+	record_type,
+	source_service,
+	filter_hash,
+	redaction_profile,
+	requested_by_ref,
+	requested_at,
+	manifest_ref,
+	record_count,
+	completed_at,
+	failed_at,
+	public_error,
+	idempotency_key,
+	command_hash,
+	correlation_id,
+	causation_id,
+	trace_id
+`, prepared.Command.AuthContext.TenantID,
+		exportID,
+		prepared.Command.AuditStream,
+		prepared.Command.RecordType,
+		prepared.Command.SourceService,
+		prepared.Command.FilterHash,
+		prepared.Command.RedactionProfile,
+		prepared.Command.RequestedByRef,
+		prepared.Command.IdempotencyKey,
+		prepared.CommandHash,
+		prepared.Command.CorrelationID,
+		prepared.Command.CausationID,
+		prepared.Command.TraceID,
+	)
+	job, err := scanExportJob(row)
+	if err != nil {
+		return types.AuditExportJob{}, types.NewDBWriteFailed(err.Error())
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return types.AuditExportJob{}, types.NewDBWriteFailed(err.Error())
+	}
+	return job, nil
+}
+
+func (repository *Repository) GetAuditExport(
+	ctx context.Context,
+	tenantID types.TenantID,
+	exportID string,
+) (types.AuditExportJob, error) {
+	if repository.pool == nil {
+		return types.AuditExportJob{}, types.NewDBReadFailed("audit repository is not configured")
+	}
+	row := repository.pool.QueryRow(ctx, `
+SELECT
+	tenant_id,
+	export_id,
+	status,
+	audit_stream,
+	record_type,
+	source_service,
+	filter_hash,
+	redaction_profile,
+	requested_by_ref,
+	requested_at,
+	manifest_ref,
+	record_count,
+	completed_at,
+	failed_at,
+	public_error,
+	idempotency_key,
+	command_hash,
+	correlation_id,
+	causation_id,
+	trace_id
+FROM audit_export_jobs
+WHERE tenant_id = $1
+  AND export_id = $2
+`, tenantID, strings.TrimSpace(exportID))
+	job, err := scanExportJob(row)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return types.AuditExportJob{}, types.NewNotFound("audit export not found")
+	}
+	if err != nil {
+		return types.AuditExportJob{}, types.NewDBReadFailed(err.Error())
+	}
+	return job, nil
+}
+
 func (repository *Repository) VerifyAuditProof(
 	ctx context.Context,
 	tenantID types.TenantID,
@@ -278,6 +416,50 @@ func (repository *Repository) VerifyAuditProof(
 	}
 	result.Valid = true
 	return result, nil
+}
+
+func findExistingExport(
+	ctx context.Context,
+	tx pgx.Tx,
+	tenantID types.TenantID,
+	idempotencyKey string,
+) (types.AuditExportJob, bool, error) {
+	row := tx.QueryRow(ctx, `
+SELECT
+	tenant_id,
+	export_id,
+	status,
+	audit_stream,
+	record_type,
+	source_service,
+	filter_hash,
+	redaction_profile,
+	requested_by_ref,
+	requested_at,
+	manifest_ref,
+	record_count,
+	completed_at,
+	failed_at,
+	public_error,
+	idempotency_key,
+	command_hash,
+	correlation_id,
+	causation_id,
+	trace_id
+FROM audit_export_jobs
+WHERE tenant_id = $1
+  AND idempotency_key = $2
+LIMIT 1
+FOR UPDATE
+`, tenantID, idempotencyKey)
+	job, err := scanExportJob(row)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return types.AuditExportJob{}, false, nil
+	}
+	if err != nil {
+		return types.AuditExportJob{}, false, err
+	}
+	return job, true, nil
 }
 
 func findExistingRecord(
@@ -492,6 +674,43 @@ func scanRecord(scanner recordScanner) (types.AuditRecord, error) {
 	}
 	record.AttributesJSON = string(attributesRaw)
 	return record, nil
+}
+
+func scanExportJob(scanner recordScanner) (types.AuditExportJob, error) {
+	var job types.AuditExportJob
+	var completedAt sql.NullTime
+	var failedAt sql.NullTime
+	if err := scanner.Scan(
+		&job.TenantID,
+		&job.ExportID,
+		&job.Status,
+		&job.AuditStream,
+		&job.RecordType,
+		&job.SourceService,
+		&job.FilterHash,
+		&job.RedactionProfile,
+		&job.RequestedByRef,
+		&job.RequestedAt,
+		&job.ManifestRef,
+		&job.RecordCount,
+		&completedAt,
+		&failedAt,
+		&job.PublicError,
+		&job.IdempotencyKey,
+		&job.CommandHash,
+		&job.CorrelationID,
+		&job.CausationID,
+		&job.TraceID,
+	); err != nil {
+		return types.AuditExportJob{}, err
+	}
+	if completedAt.Valid {
+		job.CompletedAt = completedAt.Time
+	}
+	if failedAt.Valid {
+		job.FailedAt = failedAt.Time
+	}
+	return job, nil
 }
 
 func itoa(value int) string {

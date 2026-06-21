@@ -482,8 +482,9 @@ need hardened token storage per platform.
   a broad native bridge.
 - PC desktop Tauri command surface must stay single-command metadata-only until
   a dedicated native capability contract exists.
-- PC Web code may display Tauri metadata for local diagnostics, but the metadata
-  bridge must not become a storage, token, filesystem or message API.
+- PC Web code may display Tauri metadata and low-sensitive capability readiness
+  for local diagnostics, but the metadata bridge must not become a storage,
+  token, filesystem or message API.
 - PC / Android WebView UI should use shared `ClientShellActions` for login,
   refresh, restore and logout so native shells do not grow separate auth
   lifecycle behavior.

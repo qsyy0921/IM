@@ -350,6 +350,14 @@ export function App() {
                 <dd>{`${nativeMetadata.runtimeLabel} ${nativeMetadata.nativeBridgeVersion}`}</dd>
               </div>
             ) : null}
+            {nativeMetadata?.capabilities?.localStore ? (
+              <div>
+                <dt>Local store</dt>
+                <dd data-testid="native-store-readiness">
+                  {nativeLocalStoreStatus(nativeMetadata.capabilities.localStore)}
+                </dd>
+              </div>
+            ) : null}
           </dl>
         </section>
 
@@ -521,6 +529,14 @@ function newID(): string {
     return globalThis.crypto.randomUUID();
   }
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function nativeLocalStoreStatus(localStore: NonNullable<NativeBridgeMetadata["capabilities"]>["localStore"]): string {
+  if (!localStore) {
+    return "local-storage";
+  }
+  const readiness = localStore.ready ? "ready" : localStore.reason;
+  return `local-storage -> ${localStore.requestedStore}; ${readiness}; ${localStore.bridge}`;
 }
 
 function errorMessage(error: unknown): string {

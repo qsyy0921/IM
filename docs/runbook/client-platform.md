@@ -144,7 +144,9 @@ First slice:
   flag. This keeps dev / smoke automation possible while avoiding an
   unconditional release debugging path.
 - The Web shell runtime panel now displays shell target plus PC Tauri or Android
-  native bridge metadata when present. This is diagnostics only; it does not
+  native bridge metadata when present. When metadata includes local-store
+  capability readiness, the panel shows the low-sensitive current store, target
+  store, bridge and unavailable reason. This is diagnostics only; it does not
   grant Web code native capabilities.
 - PC desktop and Android can reuse the same `@nexusim/client-core` BFF adapter
   instead of copying Web-private HTTP mapping code.

@@ -118,8 +118,9 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   placeholder 控制：debug APK 保留局域网 HTTP / WebSocket smoke 能力，release
   默认禁用明文流量。
 - Web shell 的运行入口面板已展示 shell target、PC Tauri `runtime_metadata`
-  和 Android native bridge metadata；metadata smoke report 也会携带低敏 local-store
-  readiness。该展示只用于本地诊断，不改变客户端权限边界。
+  和 Android native bridge metadata；当 native metadata 携带 local-store capability
+  时，面板也会展示低敏 readiness（当前 localStorage、目标 sqlite、bridge reason）。
+  metadata smoke report 同样携带该 readiness。该展示只用于本地诊断，不改变客户端权限边界。
 - Web app 会在主 bundle 前加载 `nexusim-shell-config.js`；`clients/desktop` 和
   `clients/android` 已各自提供低敏 `shell-config.example.json`，并由
   `clients/tools/render-shell-config.mjs` 渲染成注入脚本。`test:shell-config` 和

@@ -20,6 +20,7 @@ const requiredTestIDs = [
   "runtime-status",
   "push-status",
   "ack-status",
+  "native-store-readiness",
   "error-banner",
   "message-list",
   "message-item",
@@ -33,6 +34,8 @@ for (const testID of requiredTestIDs) {
 
 assertIncludes(appSource, "setLastAck({ conversationID, seq: maxSeq })", "web shell must expose AckDelivery progress after sync");
 assertIncludes(appSource, "runtime.ackQueue.flush(currentSession)", "web shell must keep AckDelivery inside shared runtime path");
+assertIncludes(appSource, "nativeMetadata?.capabilities?.localStore", "web shell must display native local-store readiness when available");
+assertIncludes(appSource, "nativeLocalStoreStatus", "web shell must keep local-store readiness formatting explicit");
 
 console.log("web shell automation contract ok");
 

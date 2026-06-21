@@ -43,6 +43,7 @@
     "test:android-docker-builder": "node ./tools/test-android-docker-builder.mjs",
     "test:key-value-store": "node ./tools/test-key-value-message-store.mjs",
     "test:local-message-store": "node ./tools/test-local-message-store-contract.mjs",
+    "test:native-store-readiness": "node ./tools/test-native-store-readiness.mjs",
     "test:runtime-lifecycle": "node ./tools/test-client-runtime-lifecycle.mjs",
     "build:shell-assets:desktop": "node ./tools/prepare-shell-web-assets.mjs --target windows-desktop",
     "build:shell-assets:android": "node ./tools/prepare-shell-web-assets.mjs --target android",

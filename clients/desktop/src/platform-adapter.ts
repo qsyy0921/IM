@@ -5,6 +5,7 @@ import type {
   NetworkStatePort,
   WakeupNotificationPort
 } from "@nexusim/client-core";
+import { assertNativeStoreReady } from "@nexusim/client-core";
 import type { DesktopPlatformAdapter, DesktopRuntimeConfig } from "./platform-contract";
 import { DesktopDevelopmentSessionStore } from "./development-session-store";
 import { DesktopMemoryMessageStore } from "./memory-message-store";
@@ -44,7 +45,10 @@ function desktopMessageStore(config: DesktopRuntimeConfig): LocalMessageStore {
     return new DesktopMemoryMessageStore();
   }
   if (config.localStore === "sqlite") {
-    throw new Error("Desktop SQLite message store bridge is not available yet");
+    assertNativeStoreReady({
+      target: "windows-desktop",
+      requestedStore: "sqlite"
+    });
   }
   return new DesktopPersistentMessageStore({
     namespace: `${config.os}:${config.deviceID}`

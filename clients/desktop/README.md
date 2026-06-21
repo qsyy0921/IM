@@ -19,6 +19,10 @@ the native bridge can stay narrow and auditable.
 - `shell-config.example.json` records the low-permission WebView config bridge
   for local LAN endpoints and desktop runtime identity. It can be rendered to
   `web/public/nexusim-shell-config.js` before a shell build.
+- The reserved `sqlite` local store config fails closed through shared
+  `NativeStoreReadiness` with reason `sqlite-native-bridge-unavailable` and
+  expected bridge `tauri-sqlite`. The current shell still uses localStorage
+  persistence until the Tauri SQLite bridge is implemented.
 - `npm --prefix clients run build:desktop-artifact` is the first-stage artifact
   wrapper. It prepares and verifies Web assets, then runs the available Tauri
   CLI with `NEXUSIM_SKIP_SHELL_ASSET_PREP=true` so Tauri does not run the same

@@ -446,8 +446,11 @@ PC desktop and Android now use shared `KeyValueMessageStore` with WebView
 `localStorage` as the first-stage durable cache. Production packaging should
 replace only the storage port with SQLite/native adapters while keeping
 `client-core` sync, send queue and ACK semantics shared. PC desktop and Android
-`sqlite` configuration is reserved and must fail fast until a real native bridge
-exists. `MemoryMessageStore`, `KeyValueMessageStore` and `IndexedDBMessageStore`
+`sqlite` configuration is reserved and must fail fast through
+`NativeStoreReadiness` until a real native bridge exists. That shared contract
+keeps the failure low-sensitive and stable: `reason`, expected bridge and next
+action are explicit, while platform adapters do not expose native paths or
+tokens. `MemoryMessageStore`, `KeyValueMessageStore` and `IndexedDBMessageStore`
 share the same pending-send readback and accepted-send de-duplication contract.
 
 Minimum local entities:

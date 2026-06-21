@@ -160,7 +160,10 @@ First slice:
   string-KV persistent store for non-browser targets. Desktop and Android use
   first-stage WebView `localStorage` wrappers by default; future native SQLite
   adapters can replace only the storage/platform port. Desktop and Android
-  `sqlite` config is reserved and fails fast until that bridge exists.
+  `sqlite` config is reserved and fails fast through shared
+  `NativeStoreReadiness` until that bridge exists. The readiness contract emits
+  stable low-sensitive `reason`, expected bridge and next action fields, so
+  tools and runtime adapters do not need target-specific error strings.
   `LocalMessageStore.clear`
   is now part of the shared port so logout can remove cached messages, cursors
   and pending sends consistently across targets.
@@ -303,7 +306,7 @@ First slice:
   WebView asset shell skeleton. PC exposes only read-only runtime metadata IPC
   and Web can read it for diagnostics; Android exposes only a single-method
   read-only metadata JavaScript bridge. Both targets reserve native SQLite store
-  config and fail closed until native bridges exist. Windows desktop now
+  config and fail closed via shared readiness until native bridges exist. Windows desktop now
   produces a first-stage standalone `.exe` artifact and low-sensitive collected
   manifest; `smoke:desktop-artifact-launch` has verified the exe starts, stays
   alive during the smoke hold window and terminates cleanly.
@@ -344,7 +347,9 @@ rejected. For local LAN client smoke, prefer the wired `172.x.x.x` address.
 2. Wire lifecycle UI controls into the real Android shell, and run platform-shell
    smoke once packaging/runtime tooling is ready.
 3. Replace first-stage desktop / Android localStorage stores with native SQLite
-   bridge adapters when packaging/runtime tooling is ready.
+   bridge adapters when packaging/runtime tooling is ready. The shared
+   `NativeStoreReadiness` contract is already in place; the remaining work is
+   implementing the actual Tauri / Android SQLite bridge and platform smoke.
 
 ## Local Build Prerequisites
 
@@ -373,6 +378,7 @@ npm --prefix clients run test:artifact-collector
 npm --prefix clients run test:artifact-install-plan
 npm --prefix clients run test:artifact-readiness
 npm --prefix clients run test:android-docker-builder
+npm --prefix clients run test:native-store-readiness
 npm --prefix clients run test:android-webview-metadata-smoke
 npm --prefix clients run test:android-device-readiness
 npm --prefix clients run test:desktop-artifact-launch-smoke

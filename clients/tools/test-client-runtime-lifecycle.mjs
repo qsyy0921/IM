@@ -73,7 +73,7 @@ async function main() {
         shell: "tauri"
       }
     }),
-    "Desktop SQLite message store bridge is not available yet",
+    "reason=sqlite-native-bridge-unavailable; bridge=tauri-sqlite",
     "desktop sqlite store must fail closed until native bridge exists"
   );
 
@@ -89,7 +89,7 @@ async function main() {
         notificationProvider: "none"
       }
     }),
-    "Android SQLite message store bridge is not available yet",
+    "reason=sqlite-native-bridge-unavailable; bridge=android-sqlite",
     "android sqlite store must fail closed until native bridge exists"
   );
 
@@ -242,7 +242,7 @@ function assertThrows(task, expectedMessage, message) {
   try {
     task();
   } catch (error) {
-    if (error instanceof Error && error.message === expectedMessage) {
+    if (error instanceof Error && error.message.includes(expectedMessage)) {
       return;
     }
     const actual = error instanceof Error ? error.message : String(error);

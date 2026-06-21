@@ -23,6 +23,10 @@ Flutter or native Kotlin for a concrete reason.
 - The WebView uses `WebViewAssetLoader`, loads `appassets.androidplatform.net`,
   enables DOM storage for the shared TypeScript runtime, and keeps raw file /
   content access disabled.
+- The reserved `sqlite` local store config fails closed through shared
+  `NativeStoreReadiness` with reason `sqlite-native-bridge-unavailable` and
+  expected bridge `android-sqlite`. The current shell still uses localStorage
+  persistence until the Android SQLite bridge is implemented.
 - `shell-config.example.json` records the low-permission WebView config bridge
   for local LAN endpoints and Android runtime identity. It can be rendered to
   `web/public/nexusim-shell-config.js` before a shell build.

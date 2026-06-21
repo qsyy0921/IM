@@ -5,6 +5,7 @@ import type {
   NetworkStatePort,
   WakeupNotificationPort
 } from "@nexusim/client-core";
+import { assertNativeStoreReady } from "@nexusim/client-core";
 import type { AndroidPlatformAdapter, AndroidRuntimeConfig } from "./platform-contract";
 import { AndroidDevelopmentSessionStore } from "./development-session-store";
 import { AndroidMemoryMessageStore } from "./memory-message-store";
@@ -43,7 +44,10 @@ function androidMessageStore(config: AndroidRuntimeConfig): LocalMessageStore {
     return new AndroidMemoryMessageStore();
   }
   if (config.localStore === "sqlite") {
-    throw new Error("Android SQLite message store bridge is not available yet");
+    assertNativeStoreReady({
+      target: "android",
+      requestedStore: "sqlite"
+    });
   }
   return new AndroidPersistentMessageStore({
     namespace: `${config.platform}:${config.deviceID}`

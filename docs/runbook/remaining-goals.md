@@ -15,7 +15,7 @@
 ## 当前优先顺序
 
 1. 完成 client platform MVP foundation：PC desktop / Android 安装包或可运行
-   artifact、真实壳层 UI 接入现有 shell logout action、真实平台 shell smoke 和后续
+   artifact、真实壳层 UI 接入现有 shell lifecycle actions、真实平台 shell smoke 和后续
    native SQLite bridge。
 2. 回到 AI / Agent 主线：group memory eval、EvidencePack、Agent 真实业务动作、
    Python AI Worker 候选算法。
@@ -30,7 +30,7 @@
   skeleton 已落；`createDesktopClientRuntime` 已能组装 shared `BFFClient` /
   `WebSocketPushTransport` / auth / inbox / send / ack queue；shared runtime
   lifecycle smoke 已覆盖 login / restore / refresh / logout 本地状态；thin
-  `createDesktopShellActions` 已接 shared restore / logout 编排；继续接真实 desktop
+  `createDesktopShellActions` 已接 shared login / refresh / restore / logout 编排；继续接真实 desktop
   shell UI / artifact。
 - Windows packaging：产出本地可安装或可运行的 Windows artifact；不要求生产签名。
   当前本机尚缺 Tauri CLI / `cargo-tauri`，需要先补本地构建前置或通过
@@ -42,7 +42,7 @@
   asset shell skeleton 已落；`createAndroidClientRuntime` 已能组装 shared
   `BFFClient` / `WebSocketPushTransport` / auth / inbox / send / ack queue；
   shared runtime lifecycle smoke 已覆盖 login / restore / refresh / logout 本地状态；
-  thin `createAndroidShellActions` 已接 shared restore / logout 编排；继续产出 unsigned
+  thin `createAndroidShellActions` 已接 shared login / refresh / restore / logout 编排；继续产出 unsigned
   APK，Kotlin 只做薄 bridge，业务协议和 sync core 复用 TypeScript。
 - Android packaging：产出本地 unsigned APK，并支持局域网 `api-gateway` /
   `push-gateway` 地址配置。当前本机尚缺 Gradle / Android SDK，且 `java`
@@ -61,15 +61,14 @@
   native packaging/runtime ready 后替换为 SQLite bridge。
 - Auth lifecycle：BFF `/api/auth/logout`、shared runtime login / refresh /
   restore / logout 编排、desktop / Android shell action wrapper 和 Web logout local
-  cleanup 已落；后续在 PC / Android 真实 shell UI 中接入 logout 控件并跑平台
-  shell smoke。
+  cleanup 已落；Web shell 已通过 shared action 执行 login / restore / logout；后续在 PC / Android 真实 shell UI 中接入 lifecycle controls 并跑平台 shell smoke。
 - Web hardening：browser platform adapter 当前使用 first-stage tab-scoped
   `sessionStorage` session store；生产 Web 鉴权后续需要 httpOnly cookie /
   provider-grade session 策略，避免把 token 长期放在 Web storage。
 - WebView bridge：`globalThis.__NEXUSIM_CLIENT_SHELL__` 已能选择
   `windows-desktop` / `android` target 和 LAN endpoint；desktop / Android
   `shell-config.example.json`、renderer 与 target shell Web assets prep 已落；
-  后续需要真实 Tauri / Android shell UI 接入现有 shell action，并用真实壳层 smoke
+  后续需要真实 Tauri / Android shell UI 接入现有 shell lifecycle actions，并用真实壳层 smoke
   验证。
 
 ## AI / Agent Platform 未完成

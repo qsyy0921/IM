@@ -39,7 +39,8 @@
   inbox sync / push / send / ack queue；shared runtime 已新增 login / refresh /
   restoreSession / logout lifecycle，focused runtime smoke 已覆盖 desktop /
   Android session persistence、restore、refresh persistence 和 logout local cleanup；
-  desktop / Android thin shell actions 已接 shared restore / logout 编排；
+  desktop / Android thin shell actions 已接 shared login / refresh / restore /
+  logout 编排；
   `clients/web` 已通过 browser platform adapter 复用同一 shared runtime 的 auth /
   send / ack / logout 编排，并支持 first-stage WebView bridge config 选择
   `windows-desktop` / `android` target 和 LAN endpoint；Web 会在主 bundle 前加载
@@ -64,7 +65,8 @@
   Android 已有 Kotlin WebView asset shell skeleton（通过
   WebViewAssetLoader 加载本地 Web assets，并注册只读单方法 `NexusIMNative`
   runtime metadata bridge）；
-  Web shell 登录面板已通过 shared `ClientShellActions` 接入 restore / logout，
+  Web shell 登录面板已通过 shared `ClientShellActions` 接入 login / restore / logout，
+  desktop / Android thin shell actions 已覆盖 login / refresh / restore / logout，
   供 PC / Android WebView 复用同一 UI action contract；
   shell asset prep 已先清理目标目录再复制，并写低敏 relative-path / SHA-256
   manifest，artifact wrapper 会在 native build 前验证 manifest，避免旧 Web bundle
@@ -455,7 +457,7 @@ future platform / product services 已进入 product-active first-stage implemen
 baseline 已通过，PC desktop / Android first-stage runtime adapter 已落，PC
   Tauri runner skeleton 和 Android WebView asset shell skeleton 已有，shared runtime
   lifecycle smoke 已覆盖 desktop / Android 登录持久化、恢复、刷新和登出清理，
-  且 thin shell actions 已接入 shared restore / logout contract；下一步接 local
+  且 thin shell actions 已接入 shared login / refresh / restore / logout contract；下一步接 local
   Windows artifact、Android APK 和真实壳层 UI / WebView bridge smoke；Web
   IndexedDB local store、browser platform adapter、shell config contract 和
   target shell Web assets prep / artifact builder dry-run / Android builder profile

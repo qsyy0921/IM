@@ -1,4 +1,4 @@
-import type { AuthSession } from "@nexusim/protocol";
+import type { AuthSession, LoginRequest } from "@nexusim/protocol";
 import type { ClientRuntime } from "./runtime";
 
 export interface ClientShellSessionState {
@@ -11,16 +11,24 @@ export interface ClientShellSessionState {
 
 export interface ClientShellActions {
   currentSession(): ClientShellSessionState;
+  login(request: LoginRequest): Promise<ClientShellSessionState>;
+  refresh(): Promise<ClientShellSessionState>;
   restoreSession(): Promise<ClientShellSessionState>;
   logout(): Promise<ClientShellSessionState>;
 }
 
 export function createClientShellActions(
-  runtime: Pick<ClientRuntime, "auth" | "restoreSession" | "logout">
+  runtime: Pick<ClientRuntime, "auth" | "login" | "refresh" | "restoreSession" | "logout">
 ): ClientShellActions {
   return {
     currentSession(): ClientShellSessionState {
       return sessionState(runtime.auth.current());
+    },
+    async login(request: LoginRequest): Promise<ClientShellSessionState> {
+      return sessionState(await runtime.login(request));
+    },
+    async refresh(): Promise<ClientShellSessionState> {
+      return sessionState(await runtime.refresh());
     },
     async restoreSession(): Promise<ClientShellSessionState> {
       return sessionState(await runtime.restoreSession());

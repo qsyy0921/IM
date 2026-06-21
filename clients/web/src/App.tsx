@@ -66,12 +66,16 @@ export function App() {
   async function login(): Promise<void> {
     await run("login", async () => {
       pushConnectionRef.current?.close();
-      const nextSession = await runtime.login({
+      const loginState = await shellActions.login({
         tenantID,
         userID,
         password,
         deviceID: runtimeConfig.deviceID
       });
+      const nextSession = runtime.auth.current();
+      if (!loginState.authenticated || !nextSession) {
+        throw new Error("login did not create session");
+      }
       sessionRef.current = nextSession;
       setSession(nextSession);
       await connectPush(nextSession);

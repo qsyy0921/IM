@@ -99,13 +99,16 @@ async function main() {
 async function exerciseRuntime(label, createRuntime, config, createShellActions) {
   const calls = installFetchStub(label);
   const runtime = createRuntime({ config });
-  const session = await runtime.login({
+  const shellActions = createShellActions(runtime);
+  const loginState = await shellActions.login({
     tenantID: "tenant-1",
     userID: "user-1",
     password: "password",
     deviceID: config.deviceID
   });
-  assertEqual(session.accessToken, `${label}-gateway-token-1`, `${label} login returns gateway token`);
+  assertEqual(loginState.authenticated, true, `${label} shell login reports authenticated`);
+  assertEqual(loginState.sessionID, `${label}-session-1`, `${label} shell login returns session id`);
+  assertEqual(runtime.auth.current()?.accessToken, `${label}-gateway-token-1`, `${label} login hydrates auth manager`);
   assertEqual(
     (await runtime.platform.secureSessionStore.loadSession())?.accessToken,
     `${label}-gateway-token-1`,
@@ -127,8 +130,8 @@ async function exerciseRuntime(label, createRuntime, config, createShellActions)
   ]);
 
   const restoredRuntime = createRuntime({ config, platform: runtime.platform });
-  const shellActions = createShellActions(restoredRuntime);
-  const restoredState = await shellActions.restoreSession();
+  const restoredShellActions = createShellActions(restoredRuntime);
+  const restoredState = await restoredShellActions.restoreSession();
   assertEqual(restoredState.authenticated, true, `${label} shell restore reports authenticated`);
   assertEqual(restoredState.sessionID, `${label}-session-1`, `${label} shell restore returns session id`);
   assertEqual(
@@ -137,15 +140,16 @@ async function exerciseRuntime(label, createRuntime, config, createShellActions)
     `${label} restore hydrates auth manager`
   );
 
-  const refreshed = await restoredRuntime.refresh();
-  assertEqual(refreshed.accessToken, `${label}-gateway-token-2`, `${label} refresh returns new token`);
+  const refreshedState = await restoredShellActions.refresh();
+  assertEqual(refreshedState.authenticated, true, `${label} shell refresh reports authenticated`);
+  assertEqual(restoredRuntime.auth.current()?.accessToken, `${label}-gateway-token-2`, `${label} refresh returns new token`);
   assertEqual(
     (await runtime.platform.secureSessionStore.loadSession())?.refreshToken,
     `${label}-refresh-token-2`,
     `${label} refresh persists new refresh token`
   );
 
-  const loggedOutState = await shellActions.logout();
+  const loggedOutState = await restoredShellActions.logout();
   assertEqual(loggedOutState.authenticated, false, `${label} shell logout reports unauthenticated`);
   assertEqual(restoredRuntime.auth.current(), null, `${label} logout clears auth manager`);
   assertEqual(await runtime.platform.secureSessionStore.loadSession(), null, `${label} logout clears session store`);

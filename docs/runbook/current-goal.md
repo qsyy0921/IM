@@ -61,8 +61,9 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   会调用 BFF logout、断开 push、清理 secure session store 和 local message store；
   shared runtime 现在也提供 `login` / `refresh` / `restoreSession`，登录和刷新会写入
   平台 secure session store，重启式 runtime 重新创建后可从平台 store hydrate
-  auth manager；Web shell 登录面板已通过 `ClientShellActions` 接入 restore /
-  logout action，PC / Android WebView 后续复用同一 UI action contract。
+  auth manager；`ClientShellActions` 现在覆盖 login / refresh / restore /
+  logout，Web shell 登录面板已通过该 contract 执行登录、恢复和登出，
+  PC / Android WebView 后续复用同一 UI action contract。
 - `clients` workspace 已新增本地构建前置检查
   `npm --prefix clients run check:build-prereqs`；该检查只读取本机 Rust /
   Tauri / JDK / Gradle / Android SDK 状态，不安装依赖、不拉包、不使用 `npx`
@@ -86,7 +87,7 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   Android runtime，验证 login 持久化 session、restoreSession hydrate auth manager、
   refresh 更新持久 refresh token，以及 logout 清理 secure session store 和 local
   message cache。该测试现在也通过 desktop / Android thin shell actions 调用
-  shared restore / logout 编排，证明真实壳层可以接入统一 action contract。该测试不依赖
+  shared login / refresh / restore / logout 编排，证明真实壳层可以接入统一 action contract。该测试不依赖
   Tauri CLI / Android SDK，不替代真实安装包或 APK。
 - `clients` workspace 已新增 focused browser platform adapter test：
   `npm --prefix clients run test:web-platform` 覆盖 browser session store、

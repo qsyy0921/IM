@@ -295,9 +295,10 @@ can read the same local cache boundary and logout can remove cached messages,
 local cursors and pending-send records without making any local store
 authoritative. Shared runtime logout must also disconnect push and clear the
 platform secure session store.
-`ClientShellActions` is the shared UI lifecycle contract for restore and logout;
-browser, PC WebView and Android WebView shells should bind UI buttons to this
-contract instead of duplicating platform-specific auth lifecycle code.
+`ClientShellActions` is the shared UI lifecycle contract for login, refresh,
+restore and logout; browser, PC WebView and Android WebView shells should bind
+UI buttons to this contract instead of duplicating platform-specific auth
+lifecycle code.
 
 ```text
 browser  -> IndexedDB + fetch + WebSocket + browser lifecycle
@@ -442,8 +443,9 @@ need hardened token storage per platform.
   a dedicated native capability contract exists.
 - PC Web code may display Tauri metadata for local diagnostics, but the metadata
   bridge must not become a storage, token, filesystem or message API.
-- PC / Android WebView UI should use shared `ClientShellActions` for restore and
-  logout so native shells do not grow separate auth lifecycle behavior.
+- PC / Android WebView UI should use shared `ClientShellActions` for login,
+  refresh, restore and logout so native shells do not grow separate auth
+  lifecycle behavior.
 - Android must use encrypted platform storage before production and must treat
   FCM/APNs-style push as wakeup only, never as delivered message truth.
 - Android native WebView bridge must remain single-method read-only

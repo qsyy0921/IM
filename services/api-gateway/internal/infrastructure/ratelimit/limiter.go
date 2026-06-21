@@ -272,6 +272,20 @@ func (limiter *Limiter) UnaryServerInterceptor() grpcgo.UnaryServerInterceptor {
 	}
 }
 
+func (limiter *Limiter) Check(ctx context.Context, method string) error {
+	if limiter == nil || !limiter.enabled {
+		return nil
+	}
+	allowed, retryDelay, err := limiter.allow(ctx, method)
+	if err != nil && !limiter.failOpen {
+		return status.Error(codes.Unavailable, "rate limiter unavailable")
+	}
+	if !allowed {
+		return rateLimitExceededError(retryDelay)
+	}
+	return nil
+}
+
 func (limiter *Limiter) Snapshot() Snapshot {
 	if limiter == nil {
 		return Snapshot{}

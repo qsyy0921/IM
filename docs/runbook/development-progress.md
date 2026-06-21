@@ -37,8 +37,9 @@
   AckDelivery flow；`loadtest/clientweb` 已新增脚本化 BFF + push client-path
   smoke runner 和本地私有启动脚本。2026-06-21 第一轮本地 Web MVP smoke 已通过并
   归档到 `docs/runbook/loadtest/client-platform/`；同日提交后 loopback clean
-  baseline 和 Windows wired `172.31.50.1` clean baseline 均已通过。下一步补
-  BFF HTTP 层治理，然后复用同一 core 接 PC installer 和 Android APK。
+  baseline 和 Windows wired `172.31.50.1` clean baseline 均已通过；BFF HTTP
+  route metrics / rate-limit adapter 已接入 api-gateway 低敏观测和限流管线。
+  下一步复用同一 core 接 PC installer 和 Android APK。
 
 当前已开始的 AI 大模型应用底座能力：
 
@@ -202,7 +203,8 @@ Python Worker 候选接入边界和低敏 eval 持久化已经足够支撑算法
 `protocol` / `client-core` skeleton 和 `api-gateway` client BFF first-stage
 HTTP/JSON surface 已建立；Web fetch / WebSocket / local store first path 已接，
 第一轮本地 Web MVP smoke、loopback clean baseline 和 Windows wired `172.31.50.1`
-clean baseline 已通过，下一步是 BFF HTTP 层治理。
+clean baseline 已通过，BFF HTTP route metrics / rate-limit adapter 已落，下一步是
+PC / Android runtime。
 
 future platform / product services promotion 已作为后续主线保留：继续按服务推进
 媒体、通知、审计、控制面、presence、model 等产品化 / 平台服务，但不抢占当前
@@ -354,7 +356,7 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 
 | 服务 | 当前状态 | 最近进展 / 证据 | 详情入口 |
 | --- | --- | --- | --- |
-| `api-gateway` | 已落地、已接主链路 | quota source guard、file / URL / DB tenant plan snapshot source、first-stage tenant quota audit / set operator、tenant quota approval manifest 强制校验、versioned-required / checksum-required snapshot policy、future snapshot timestamp fail-closed、legacy quiet-window gate / observation window gate、legacy observation/removal-plan 低敏 evidence manifest、OTel / Prometheus 本地观测、cmd rate-limit 配置测试拆分、secure stack 短基线、`loadtest/demo --gateway-facade` `capacity_summary` 和 `--duration` / `--vus` facade 容量循环入口 | `service-briefs/api-gateway.md` |
+| `api-gateway` | 已落地、已接主链路 | quota source guard、file / URL / DB tenant plan snapshot source、first-stage tenant quota audit / set operator、tenant quota approval manifest 强制校验、versioned-required / checksum-required snapshot policy、future snapshot timestamp fail-closed、legacy quiet-window gate / observation window gate、legacy observation/removal-plan 低敏 evidence manifest、OTel / Prometheus 本地观测、client BFF HTTP route metrics / rate-limit adapter、cmd rate-limit 配置测试拆分、secure stack 短基线、`loadtest/demo --gateway-facade` `capacity_summary` 和 `--duration` / `--vus` facade 容量循环入口 | `service-briefs/api-gateway.md` |
 | `identity-service` | 已落地、已接登录主链路 | login / refresh / MFA / recovery code / JWKS / opt-in OIDC discovery / production-like key guard / challenge delivery、SMTP template、session MFA proof audit / challenge delivery repair audit / cleanup / gateway keyring rotate JSON 留存、repository / cmd helper 和 app 测试拆分、loadtest `capacity_summary` 口径和本地 Login/Refresh 30m 长跑切片 | `service-briefs/identity-service.md` |
 | `message-service` | 已落地、已接主链路 | `SendMessage` / 编辑 / 撤回 / 删除、delete scope fail-closed 错误语义、合规删除 external proof manifest verifier、`TEXT` + `IMAGE` / `FILE` / `VOICE` 附件引用消息、`LOCATION` / `CARD` 结构化 payload 消息、outbox / Kafka timeline、outbox audit / repair / repair audit / cleanup JSON 留存、first-stage `/metrics` 和 OTel server span、mutation repository 测试拆分、loadtest `capacity_summary` 口径和本地 seeded 30m 长跑切片 | `service-briefs/message-service.md` |
 | `conversation-service` | 已落地、已接主链路 | `GetSendContext` / member change / owner transfer / owner transfer 负向 PG 回归 / ACTIVE roster 分页与单 role / 多 role 过滤、user / role-first 排序、`user_id_prefix` 轻量前缀过滤 / saga / member-change audit JSON 留存、member-window audit（含 ACTIVE 会话 owner 数量异常）/ repair / repair audit（含 ACTIVE 缺 `join_seq` 当前窗口修复、inactive `LEAVE_BEFORE_JOIN`、conversation version floor、非 ACTIVE 会话内 ACTIVE 成员转 LEFT 的保守修复）、first-stage `/metrics` 和 OTel server span、loadtest `capacity_summary` 口径和本地 seeded 30m 长跑切片 | `service-briefs/conversation-service.md` |

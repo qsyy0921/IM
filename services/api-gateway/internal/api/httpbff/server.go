@@ -120,6 +120,8 @@ type Config struct {
 	Gateway        Gateway
 	Authenticator  Authenticator
 	PushTokens     PushTokenIssuer
+	Metrics        MetricsRecorder
+	RateLimiter    RateLimiter
 	AllowedOrigins []string
 }
 
@@ -127,6 +129,8 @@ type Server struct {
 	gateway        Gateway
 	authenticator  Authenticator
 	pushTokens     PushTokenIssuer
+	metrics        MetricsRecorder
+	rateLimiter    RateLimiter
 	allowedOrigins map[string]struct{}
 	allowAnyOrigin bool
 	marshal        protojson.MarshalOptions
@@ -147,6 +151,8 @@ func NewServer(config Config) *Server {
 		gateway:       config.Gateway,
 		authenticator: config.Authenticator,
 		pushTokens:    config.PushTokens,
+		metrics:       config.Metrics,
+		rateLimiter:   config.RateLimiter,
 		marshal: protojson.MarshalOptions{
 			UseProtoNames:   true,
 			EmitUnpopulated: false,
@@ -171,7 +177,18 @@ func NewServer(config Config) *Server {
 }
 
 func (server *Server) ServeHTTP(response http.ResponseWriter, request *http.Request) {
+	started := time.Now()
+	route := RouteName(request)
+	recorder := newStatusRecorder(response)
+	server.serveHTTP(recorder, request, route)
+	server.recordMetrics(route, request.Method, recorder.statusCode(), time.Since(started))
+}
+
+func (server *Server) serveHTTP(response http.ResponseWriter, request *http.Request, route string) {
 	if server.handleCORS(response, request) {
+		return
+	}
+	if !server.checkRateLimit(response, request, route) {
 		return
 	}
 	path := strings.TrimRight(request.URL.Path, "/")

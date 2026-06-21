@@ -76,6 +76,7 @@ func runGRPC() error {
 	}
 	defer authenticator.Close()
 	grpcMetrics := monitoringinfra.NewGRPCMetrics()
+	httpBFFMetrics := monitoringinfra.NewHTTPBFFMetrics()
 	traceConfig, err := apiGatewayTraceConfigFromEnv()
 	if err != nil {
 		return err
@@ -109,6 +110,7 @@ func runGRPC() error {
 		return err
 	}
 	stopDebug, err := startDebugServer(ctx, debugAddr, monitoringinfra.NewHandler(grpcMetrics).
+		WithHTTPBFFStats(httpBFFMetrics.Snapshot).
 		WithAuthJWKStats(authenticator.JWKStats).
 		WithRateLimitStats(rateLimiter.Snapshot).
 		WithRuntimeStats(func() monitoringinfra.RuntimeSnapshot {
@@ -231,6 +233,8 @@ func runGRPC() error {
 		Gateway:        gateway,
 		Authenticator:  authenticator,
 		PushTokens:     newBFFPushTokenIssuerFromEnv(),
+		Metrics:        httpBFFMetrics,
+		RateLimiter:    rateLimiter,
 		AllowedOrigins: splitCSV(os.Getenv("NEXUSIM_API_GATEWAY_BFF_ALLOWED_ORIGINS")),
 	}))
 	if err != nil {

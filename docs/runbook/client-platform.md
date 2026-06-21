@@ -52,7 +52,9 @@ First slice:
   refresh, `me`, conversation list, PullInbox-backed conversation messages,
   send, ACK, contacts and receipt lookup. The BFF reuses the existing gateway
   facade and injects trusted downstream metadata; it does not read internal
-  service tables.
+  service tables. The BFF now also has first-stage HTTP route metrics and
+  rate-limit adapter wiring, reusing api-gateway's existing rate limiter and
+  low-cardinality `/debug/metrics` / `/metrics` pipeline.
 - `clients/web` now has the first real browser adapters:
   - `BFFClient` maps HTTP/JSON BFF payloads into shared protocol types.
   - `BrowserPushTransport` connects to `push-gateway` WebSocket and handles
@@ -103,7 +105,6 @@ rejected. For local LAN client smoke, prefer the wired `172.x.x.x` address.
 
 ## Next Work
 
-1. Add HTTP-layer BFF metrics / rate-limit adapter; current BFF calls the
-   gateway facade directly and does not pass through gRPC interceptors.
-2. Add PC desktop Tauri runner and first local Windows installer.
-3. Add Android runtime shell and first unsigned local APK.
+1. Add PC desktop Tauri runner and first local Windows installer.
+2. Add Android runtime shell and first unsigned local APK.
+3. Add IndexedDB persistence tests beyond the first browser adapter.

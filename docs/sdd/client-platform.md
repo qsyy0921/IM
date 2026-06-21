@@ -256,8 +256,10 @@ First-stage implementation note:
   `delivery-service.PullInbox`, not by a direct message table read.
 - `/api/auth/logout` is reserved and currently fail-closed as `UNIMPLEMENTED`
   until identity-service has a user self-session revoke contract.
-- HTTP-layer BFF metrics / rate-limit middleware remains a follow-up; the first
-  slice keeps the service boundary correct and reuses gateway authentication.
+- HTTP-layer BFF metrics / rate-limit adapter is first-stage implemented. It
+  reuses the api-gateway rate limiter and records fixed-route HTTP metrics into
+  `/debug/metrics` and `/metrics`; labels do not include raw URL,
+  conversation_id, tenant, user, token, request id or trace id.
 
 `push-gateway` remains WebSocket-based:
 
@@ -374,9 +376,8 @@ PC desktop, and Android clients.
 ## Later Slices
 
 - LAN smoke for the Web MVP path against `api-gateway` BFF and `push-gateway`.
-- HTTP-layer client BFF metrics / rate-limit middleware.
-- IndexedDB persistence tests beyond the first browser adapter.
 - PC desktop shell with Tauri and Windows `.msi` / `.exe` packaging.
+- IndexedDB persistence tests beyond the first browser adapter.
 - Android runtime implementation and unsigned local `.apk` packaging.
 - Full group creation / group profile / invite / member-management UI.
 - Media upload and preview after `media-service` provider path is ready.

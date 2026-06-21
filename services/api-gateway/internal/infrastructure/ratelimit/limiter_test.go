@@ -410,6 +410,30 @@ func TestLimiterRejectsUnsupportedScope(t *testing.T) {
 	}
 }
 
+func TestLimiterCheckUsesSharedAccounting(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	limiter, err := New(Config{
+		Enabled:           true,
+		RequestsPerSecond: 1,
+		Burst:             1,
+		Now:               func() time.Time { return now },
+	})
+	if err != nil {
+		t.Fatalf("new limiter: %v", err)
+	}
+	ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs("authorization", "Bearer token-1"))
+	if err := limiter.Check(ctx, "/nexusim.api_gateway.bff.HTTPBFF/messages.send"); err != nil {
+		t.Fatalf("first check should pass: %v", err)
+	}
+	if err := limiter.Check(ctx, "/nexusim.api_gateway.bff.HTTPBFF/messages.send"); status.Code(err) != codes.ResourceExhausted {
+		t.Fatalf("second check should be rate limited, got %v", err)
+	}
+	snapshot := limiter.Snapshot()
+	if snapshot.TotalAccepted != 1 || snapshot.TotalLimited != 1 || snapshot.TrackedKeys != 1 {
+		t.Fatalf("unexpected check snapshot: %+v", snapshot)
+	}
+}
+
 func TestLimiterRejectsInvalidTenantPlans(t *testing.T) {
 	if _, err := New(Config{
 		Enabled:           true,

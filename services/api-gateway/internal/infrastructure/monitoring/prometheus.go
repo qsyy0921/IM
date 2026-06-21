@@ -21,6 +21,9 @@ func renderPrometheus(snapshot Snapshot) string {
 	if snapshot.GRPC != nil {
 		writeGRPCPrometheus(&builder, *snapshot.GRPC)
 	}
+	if snapshot.HTTPBFF != nil {
+		writeHTTPBFFPrometheus(&builder, *snapshot.HTTPBFF)
+	}
 	if snapshot.AuthJWKs != nil {
 		writeAuthJWKPrometheus(&builder, *snapshot.AuthJWKs)
 	}
@@ -73,6 +76,46 @@ func writeGRPCPrometheus(builder *strings.Builder, snapshot GRPCSnapshot) {
 		writePrometheusSample(builder, "nexusim_api_gateway_grpc_latency_max_milliseconds", map[string]string{
 			"method": method.Method,
 		}, strconv.FormatInt(method.LatencyMaxMS, 10))
+	}
+}
+
+func writeHTTPBFFPrometheus(builder *strings.Builder, snapshot HTTPBFFSnapshot) {
+	writePrometheusHeader(builder, "nexusim_api_gateway_bff_http_requests_total", "Counter", "Total api-gateway client BFF HTTP requests by route, method and status code.")
+	writePrometheusHeader(builder, "nexusim_api_gateway_bff_http_errors_total", "Counter", "Total api-gateway client BFF HTTP error responses by route and method.")
+	writePrometheusHeader(builder, "nexusim_api_gateway_bff_http_latency_avg_milliseconds", "Gauge", "Average api-gateway client BFF HTTP request latency by route and method.")
+	writePrometheusHeader(builder, "nexusim_api_gateway_bff_http_latency_max_milliseconds", "Gauge", "Maximum api-gateway client BFF HTTP request latency by route and method.")
+	routes := append([]HTTPBFFRouteSnapshot(nil), snapshot.Routes...)
+	sort.Slice(routes, func(i, j int) bool {
+		if routes[i].Route == routes[j].Route {
+			return routes[i].Method < routes[j].Method
+		}
+		return routes[i].Route < routes[j].Route
+	})
+	for _, route := range routes {
+		codeNames := make([]string, 0, len(route.StatusCodes))
+		for code := range route.StatusCodes {
+			codeNames = append(codeNames, code)
+		}
+		sort.Strings(codeNames)
+		for _, code := range codeNames {
+			writePrometheusSample(builder, "nexusim_api_gateway_bff_http_requests_total", map[string]string{
+				"route":       route.Route,
+				"method":      route.Method,
+				"status_code": code,
+			}, strconv.FormatInt(route.StatusCodes[code], 10))
+		}
+		writePrometheusSample(builder, "nexusim_api_gateway_bff_http_errors_total", map[string]string{
+			"route":  route.Route,
+			"method": route.Method,
+		}, strconv.FormatInt(route.ErrorCount, 10))
+		writePrometheusSample(builder, "nexusim_api_gateway_bff_http_latency_avg_milliseconds", map[string]string{
+			"route":  route.Route,
+			"method": route.Method,
+		}, strconv.FormatInt(route.LatencyAvgMS, 10))
+		writePrometheusSample(builder, "nexusim_api_gateway_bff_http_latency_max_milliseconds", map[string]string{
+			"route":  route.Route,
+			"method": route.Method,
+		}, strconv.FormatInt(route.LatencyMaxMS, 10))
 	}
 }
 

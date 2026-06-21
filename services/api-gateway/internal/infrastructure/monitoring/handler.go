@@ -13,6 +13,7 @@ const serviceName = "api-gateway"
 
 type Handler struct {
 	grpcMetrics        *GRPCMetrics
+	httpBFFStatsFunc   func() HTTPBFFSnapshot
 	jwkStatsFunc       func() gatewayauth.JWKStats
 	rateLimitStatsFunc func() ratelimit.Snapshot
 	runtimeStatsFunc   func() RuntimeSnapshot
@@ -21,6 +22,11 @@ type Handler struct {
 
 func NewHandler(grpcMetrics *GRPCMetrics) *Handler {
 	return &Handler{grpcMetrics: grpcMetrics}
+}
+
+func (h *Handler) WithHTTPBFFStats(statsFunc func() HTTPBFFSnapshot) *Handler {
+	h.httpBFFStatsFunc = statsFunc
+	return h
 }
 
 func (h *Handler) WithAuthJWKStats(statsFunc func() gatewayauth.JWKStats) *Handler {
@@ -77,6 +83,10 @@ func (h *Handler) snapshot() Snapshot {
 		grpcSnapshot := h.grpcMetrics.Snapshot()
 		snapshot.GRPC = &grpcSnapshot
 	}
+	if h.httpBFFStatsFunc != nil {
+		stats := h.httpBFFStatsFunc()
+		snapshot.HTTPBFF = &stats
+	}
 	if h.jwkStatsFunc != nil {
 		stats := h.jwkStatsFunc()
 		snapshot.AuthJWKs = &stats
@@ -105,6 +115,7 @@ type Snapshot struct {
 	Service       string                `json:"service"`
 	GeneratedAtMS int64                 `json:"generated_at_ms"`
 	GRPC          *GRPCSnapshot         `json:"grpc,omitempty"`
+	HTTPBFF       *HTTPBFFSnapshot      `json:"http_bff,omitempty"`
 	AuthJWKs      *gatewayauth.JWKStats `json:"auth_jwks,omitempty"`
 	RateLimit     *ratelimit.Snapshot   `json:"rate_limit,omitempty"`
 	Runtime       *RuntimeSnapshot      `json:"runtime,omitempty"`

@@ -16,6 +16,16 @@ func TestHandlerHealthReadyAndMetrics(t *testing.T) {
 	metrics.record("/nexusim.api/Test", "OK", 7)
 	handler := NewHandler(metrics).WithAuthJWKStats(func() gatewayauth.JWKStats {
 		return gatewayauth.JWKStats{RemoteURLConfigured: true, CachedKeyCount: 2, RefreshFailures: 1}
+	}).WithHTTPBFFStats(func() HTTPBFFSnapshot {
+		return HTTPBFFSnapshot{TotalRequests: 2, TotalErrors: 1, Routes: []HTTPBFFRouteSnapshot{{
+			Route:        "messages.send",
+			Method:       "POST",
+			Count:        2,
+			ErrorCount:   1,
+			LatencyAvgMS: 5,
+			LatencyMaxMS: 8,
+			StatusCodes:  map[string]int64{"200": 1, "429": 1},
+		}}}
 	}).WithRateLimitStats(func() ratelimit.Snapshot {
 		return ratelimit.Snapshot{Enabled: true, Backend: "redis", RedisMode: "single", RatePerSecond: 10, Burst: 20, TenantPlanSource: "none", TotalLimited: 3}
 	}).WithRuntimeStats(func() RuntimeSnapshot {
@@ -50,6 +60,9 @@ func TestHandlerHealthReadyAndMetrics(t *testing.T) {
 	if snapshot.AuthJWKs == nil || !snapshot.AuthJWKs.RemoteURLConfigured || snapshot.AuthJWKs.CachedKeyCount != 2 {
 		t.Fatalf("unexpected jwk stats: %+v", snapshot.AuthJWKs)
 	}
+	if snapshot.HTTPBFF == nil || snapshot.HTTPBFF.TotalRequests != 2 || snapshot.HTTPBFF.TotalErrors != 1 {
+		t.Fatalf("unexpected http bff stats: %+v", snapshot.HTTPBFF)
+	}
 	if snapshot.RateLimit == nil || !snapshot.RateLimit.Enabled || snapshot.RateLimit.TotalLimited != 3 {
 		t.Fatalf("unexpected rate limit stats: %+v", snapshot.RateLimit)
 	}
@@ -72,6 +85,16 @@ func TestHandlerPrometheusMetrics(t *testing.T) {
 	metrics.record("/nexusim.api/Test\"Method\nLine", "OK", 3)
 	handler := NewHandler(metrics).WithAuthJWKStats(func() gatewayauth.JWKStats {
 		return gatewayauth.JWKStats{RemoteURLConfigured: true, CachedKeyCount: 2, RefreshFailures: 1}
+	}).WithHTTPBFFStats(func() HTTPBFFSnapshot {
+		return HTTPBFFSnapshot{Routes: []HTTPBFFRouteSnapshot{{
+			Route:        "conversation.messages",
+			Method:       "GET",
+			Count:        3,
+			ErrorCount:   1,
+			LatencyAvgMS: 4,
+			LatencyMaxMS: 10,
+			StatusCodes:  map[string]int64{"200": 2, "404": 1},
+		}}}
 	}).WithRateLimitStats(func() ratelimit.Snapshot {
 		return ratelimit.Snapshot{
 			Enabled:                    true,
@@ -121,6 +144,10 @@ func TestHandlerPrometheusMetrics(t *testing.T) {
 	assertContains(t, body, `nexusim_api_gateway_grpc_exposure_requests_total{exposure="facade"} 2`)
 	assertContains(t, body, `nexusim_api_gateway_grpc_exposure_requests_total{exposure="legacy_descriptor"} 1`)
 	assertContains(t, body, `nexusim_api_gateway_grpc_legacy_descriptor_last_seen_unix_milliseconds`)
+	assertContains(t, body, `nexusim_api_gateway_bff_http_requests_total{method="GET",route="conversation.messages",status_code="200"} 2`)
+	assertContains(t, body, `nexusim_api_gateway_bff_http_requests_total{method="GET",route="conversation.messages",status_code="404"} 1`)
+	assertContains(t, body, `nexusim_api_gateway_bff_http_errors_total{method="GET",route="conversation.messages"} 1`)
+	assertContains(t, body, `nexusim_api_gateway_bff_http_latency_avg_milliseconds{method="GET",route="conversation.messages"} 4`)
 	assertContains(t, body, `nexusim_api_gateway_rate_limit_enabled{`+rateLabels+`} 1`)
 	assertContains(t, body, `nexusim_api_gateway_rate_limit_tenant_plan_require_checksum{`+rateLabels+`} 1`)
 	assertContains(t, body, `nexusim_api_gateway_rate_limit_tenant_plan_require_versioned{`+rateLabels+`} 1`)

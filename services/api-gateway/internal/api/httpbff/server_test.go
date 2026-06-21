@@ -209,6 +209,68 @@ func TestGatewayErrorMapsToHTTPStatus(t *testing.T) {
 	}
 }
 
+func TestHTTPBFFMetricsRecordsLowCardinalityRoute(t *testing.T) {
+	metrics := &fakeMetricsRecorder{}
+	handler := NewServer(Config{Metrics: metrics})
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/api/health", nil)
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+	if len(metrics.records) != 1 {
+		t.Fatalf("expected one metrics record, got %+v", metrics.records)
+	}
+	record := metrics.records[0]
+	if record.route != "health" || record.method != http.MethodGet || record.statusCode != http.StatusOK {
+		t.Fatalf("unexpected metrics record: %+v", record)
+	}
+}
+
+func TestRateLimiterRejectsBFFRequestBeforeGatewayCall(t *testing.T) {
+	gatewayCalled := false
+	limiter := &fakeRateLimiter{err: status.Error(codes.ResourceExhausted, "rate limit exceeded")}
+	metrics := &fakeMetricsRecorder{}
+	handler := NewServer(Config{
+		RateLimiter: limiter,
+		Metrics:     metrics,
+		Gateway: &fakeGateway{
+			sendMessage: func(context.Context, *messagev1.SendMessageRequest) (*messagev1.SendMessageResponse, error) {
+				gatewayCalled = true
+				return &messagev1.SendMessageResponse{}, nil
+			},
+		},
+	})
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/messages/send", strings.NewReader(`{
+		"conversation_id":"conv-1",
+		"client_msg_id":"client-1",
+		"message_type":"TEXT",
+		"payload":{"text":"hello"}
+	}`))
+	request.Header.Set("Authorization", "Bearer token-1")
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected rate limit status, got %d body=%s", response.Code, response.Body.String())
+	}
+	if gatewayCalled {
+		t.Fatalf("gateway should not be called after BFF rate-limit rejection")
+	}
+	if len(limiter.methods) != 1 || limiter.methods[0] != "/nexusim.api_gateway.bff.HTTPBFF/messages.send" {
+		t.Fatalf("unexpected rate-limit methods: %+v", limiter.methods)
+	}
+	if len(metrics.records) != 1 || metrics.records[0].route != "messages.send" || metrics.records[0].statusCode != http.StatusTooManyRequests {
+		t.Fatalf("unexpected metrics records: %+v", metrics.records)
+	}
+	if !strings.Contains(response.Body.String(), `"code":"ResourceExhausted"`) {
+		t.Fatalf("expected public rate-limit error body, got %s", response.Body.String())
+	}
+}
+
 type fakeGateway struct {
 	login             func(context.Context, *identityv1.LoginRequest) (*identityv1.LoginResponse, error)
 	refresh           func(context.Context, *identityv1.RefreshGatewayTokenRequest) (*identityv1.RefreshGatewayTokenResponse, error)
@@ -311,4 +373,28 @@ func firstMetadata(md metadata.MD, key string) string {
 		return ""
 	}
 	return values[0]
+}
+
+type fakeMetricsRecorder struct {
+	records []fakeMetricsRecord
+}
+
+type fakeMetricsRecord struct {
+	route      string
+	method     string
+	statusCode int
+}
+
+func (recorder *fakeMetricsRecorder) RecordHTTPBFF(route string, method string, statusCode int, _ time.Duration) {
+	recorder.records = append(recorder.records, fakeMetricsRecord{route: route, method: method, statusCode: statusCode})
+}
+
+type fakeRateLimiter struct {
+	err     error
+	methods []string
+}
+
+func (limiter *fakeRateLimiter) Check(_ context.Context, method string) error {
+	limiter.methods = append(limiter.methods, method)
+	return limiter.err
 }

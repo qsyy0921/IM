@@ -29,8 +29,11 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   `/api/auth/refresh`、`/api/me`、`/api/conversations`、
   `/api/conversations/{conversation_id}/messages`、`/api/messages/send`、
   `/api/delivery/ack`、`/api/contacts`、`/api/receipts`。BFF 复用既有
-  gateway facade 和鉴权 / trusted metadata 注入，不读内部服务私表；`/api/auth/logout`
-  先保留为显式 `UNIMPLEMENTED`，等待 identity self-session revoke 契约。
+  gateway facade 和鉴权 / trusted metadata 注入，不读内部服务私表；BFF HTTP 层已接
+  first-stage route metrics / rate-limit adapter，复用 api-gateway 既有限流器和
+  `/debug/metrics` / `/metrics` 低敏观测管线，指标 label 只含固定 route / method /
+  status_code；`/api/auth/logout` 先保留为显式 `UNIMPLEMENTED`，等待 identity
+  self-session revoke 契约。
 - `clients/web` 已新增 first-stage browser adapters：`BFFClient` 使用
   `api-gateway` HTTP/JSON BFF，`BrowserPushTransport` 使用 `push-gateway`
   WebSocket，`IndexedDBMessageStore` 作为 local cache / cursor store；Web shell
@@ -107,9 +110,8 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
 
 ## 下一步优先级
 
-1. 给 client BFF 补 HTTP 层 metrics / rate-limit adapter；当前 BFF 已复用
-   gateway facade 鉴权，但 HTTP 请求没有进入 gRPC interceptor。
-2. 后续按同一 core 接 PC desktop Tauri runner 和 Android runtime shell。
+1. 后续按同一 core 接 PC desktop Tauri runner 和 Android runtime shell。
+2. 补 IndexedDB persistence tests beyond first browser adapter。
 3. 再回到 workflow compensation adapter / instruction approval UI / ops 管理；
    当前已有本地 workflow get / decision / decision manifest / instruction list CLI，
    低敏 compensation instruction manifest 生成 / 校验，以及 catalog-backed import

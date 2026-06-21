@@ -15,12 +15,18 @@ the native bridge can stay narrow and auditable.
   notifications.
 - First Tauri v2 Rust runner skeleton exists under `src-tauri`; it exposes no
   IPC commands yet.
+- `shell-config.example.json` records the low-permission WebView config bridge
+  for local LAN endpoints and desktop runtime identity. It can be rendered to
+  `web/public/nexusim-shell-config.js` before a shell build.
 - No Windows installer is produced yet.
 - `src-tauri/tauri.conf.json` records the intended shell boundary.
 
 ## Security Rules
 
 - Desktop IPC must expose only explicit commands.
+- Shell config is endpoint and identity metadata only. It must not contain
+  gateway tokens, refresh tokens, passwords, private keys, or arbitrary native
+  capability flags.
 - No broad file-system bridge.
 - `DesktopDevelopmentSessionStore` is local-development only; token storage must
   use OS secure storage before production release.
@@ -31,4 +37,6 @@ the native bridge can stay narrow and auditable.
 ```powershell
 npm --prefix clients run typecheck:desktop
 npm --prefix clients run validate:desktop-tauri
+npm --prefix clients run test:shell-config
+node clients/tools/render-shell-config.mjs --input clients/desktop/shell-config.example.json
 ```

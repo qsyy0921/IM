@@ -92,6 +92,11 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   API / WebSocket 地址、device / installation / app version 和 session key；当前
   focused test 覆盖 `windows-desktop` 与 `android` target selection。该 bridge 只
   做 runtime identity / config 选择，不授予文件系统或 native token 权限。
+- Web app 会在主 bundle 前加载 `nexusim-shell-config.js`；`clients/desktop` 和
+  `clients/android` 已各自提供低敏 `shell-config.example.json`，并由
+  `clients/tools/render-shell-config.mjs` 渲染成注入脚本。`test:shell-config` 和
+  desktop / Android skeleton validator 会拒绝 unsupported target 与 token /
+  secret / password 等敏感字段。
 - `loadtest/clientweb` 已新增 first-stage scriptable client smoke runner：
   准备阶段用 identity / api-gateway gRPC 注册用户、seed 会话并创建 JOIN；真实客户端
   验证段只走 `api-gateway` HTTP BFF 和 `push-gateway` WebSocket，覆盖 BFF login、
@@ -166,7 +171,8 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
 ## 下一步优先级
 
 1. 后续按同一 core 接 PC desktop local Windows artifact 和 Android unsigned APK。
-2. 在真实 PC / Android shell UI 中接入现有 shell logout action，并跑平台 shell smoke。
+2. 在真实 PC / Android shell build 中使用 shell config renderer 注入
+   `nexusim-shell-config.js`，接入现有 shell logout action，并跑平台 shell smoke。
 3. 后续把 desktop / Android first-stage localStorage store 替换为 native
    SQLite bridge，并补真实平台 runtime smoke。
 4. 再回到 workflow compensation adapter / instruction approval UI / ops 管理；

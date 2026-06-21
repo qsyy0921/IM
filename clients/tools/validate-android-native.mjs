@@ -20,7 +20,9 @@ const requiredPaths = [
   "android/native/app/build.gradle.kts",
   "android/native/app/src/main/AndroidManifest.xml",
   "android/native/app/src/main/java/com/nexusim/android/MainActivity.kt",
-  "android/native/app/src/main/java/com/nexusim/android/NexusIMBridge.kt"
+  "android/native/app/src/main/java/com/nexusim/android/NexusIMBridge.kt",
+  "android/shell-config.example.json",
+  "web/public/nexusim-shell-config.js"
 ];
 
 for (const relativePath of requiredPaths) {
@@ -50,5 +52,14 @@ const bridge = read("android/native/app/src/main/java/com/nexusim/android/NexusI
 assert(bridge.includes('runtimeTarget: String = "android"'), "Android runtime target marker missing");
 assert(!bridge.includes("SharedPreferences"), "native bridge must not own session storage yet");
 assert(!bridge.includes("SQLite"), "native bridge must not own message store yet");
+
+const shellConfig = JSON.parse(read("android/shell-config.example.json"));
+assert(shellConfig.target === "android", "Android shell config target mismatch");
+assert(typeof shellConfig.apiBaseURL === "string", "Android shell config apiBaseURL missing");
+assert(typeof shellConfig.pushWebSocketURL === "string", "Android shell config pushWebSocketURL missing");
+assert(!JSON.stringify(shellConfig).match(/token|secret|password|credential|private/i), "Android shell config must not contain secrets");
+
+const shellConfigPlaceholder = read("web/public/nexusim-shell-config.js");
+assert(shellConfigPlaceholder.includes("__NEXUSIM_CLIENT_SHELL__"), "web shell config placeholder missing");
 
 console.log("android native bridge skeleton ok");

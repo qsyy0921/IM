@@ -1,0 +1,9 @@
+{
+  "target": "android",
+  "apiBaseURL": "http://172.31.50.1:8080",
+  "pushWebSocketURL": "ws://172.31.50.1:8088/ws",
+  "deviceID": "android-local-device",
+  "installationID": "android:android-local-device",
+  "appVersion": "0.1.0",
+  "sessionKey": "nexusim:android:session"
+}

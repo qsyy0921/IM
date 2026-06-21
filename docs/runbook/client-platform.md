@@ -79,6 +79,11 @@ First slice:
   key so the same Web UI can identify itself as `windows-desktop` or `android`.
   This bridge is configuration-only: it does not expose file system access,
   broad native IPC or native token authority.
+- `web/index.html` loads `nexusim-shell-config.js` before the app bundle.
+  Browser mode uses the checked-in empty placeholder; desktop / Android shell
+  builds can render their low-sensitive `shell-config.example.json` through
+  `clients/tools/render-shell-config.mjs` and replace that placeholder for a
+  local shell build.
 - `IndexedDBMessageStore` now has a dependency-free first-stage persistence
   test harness covering cursor persistence, message ordering, pending send,
   accepted send stable-key migration, replay de-duplication and failed-send
@@ -134,6 +139,9 @@ First slice:
   browser runtime identity, network/lifecycle ports and unsupported wakeup
   boundaries, plus WebView bridge target selection for desktop and Android,
   without requiring a live browser or backend.
+- `npm --prefix clients run test:shell-config` validates the desktop / Android
+  shell config templates and renderer, and rejects unsupported targets or
+  sensitive fields such as token, secret and password.
 - `@nexusim/client-core` now exposes `ClientShellActions`; desktop and Android
   export thin `createDesktopShellActions` / `createAndroidShellActions` wrappers.
   These wrappers do not own business logic; they only bind shell UI actions to
@@ -183,8 +191,9 @@ rejected. For local LAN client smoke, prefer the wired `172.x.x.x` address.
 
 1. Add first local Windows artifact from the PC desktop Tauri runner.
 2. Add first unsigned local APK from the Android native bridge.
-3. Wire logout UI controls into the real desktop and Android shells and run a
-   platform-shell smoke once packaging/runtime tooling is ready.
+3. Render target-specific `nexusim-shell-config.js`, wire logout UI controls
+   into the real desktop and Android shells, and run a platform-shell smoke once
+   packaging/runtime tooling is ready.
 4. Replace first-stage desktop / Android localStorage stores with native SQLite
    bridge adapters when packaging/runtime tooling is ready.
 
@@ -200,6 +209,7 @@ Focused local check:
 
 ```powershell
 npm --prefix clients run check:build-prereqs
+npm --prefix clients run test:shell-config
 ```
 
 This command reports readiness as JSON and exits non-zero when artifact / APK

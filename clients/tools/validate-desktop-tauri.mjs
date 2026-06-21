@@ -22,7 +22,9 @@ const requiredPaths = [
   "desktop/src-tauri/Cargo.toml",
   "desktop/src-tauri/build.rs",
   "desktop/src-tauri/src/main.rs",
-  "desktop/src-tauri/tauri.conf.json"
+  "desktop/src-tauri/tauri.conf.json",
+  "desktop/shell-config.example.json",
+  "web/public/nexusim-shell-config.js"
 ];
 
 for (const relativePath of requiredPaths) {
@@ -46,5 +48,14 @@ assert(config.productName === "NexusIM", "desktop product name mismatch");
 assert(config.identifier === "com.nexusim.desktop", "desktop identifier mismatch");
 assert(config.build?.frontendDist === "../web/dist", "desktop frontendDist mismatch");
 assert(config.bundle?.active === false, "desktop bundle must stay inactive until artifact build slice");
+
+const shellConfig = readJSON("desktop/shell-config.example.json");
+assert(shellConfig.target === "windows-desktop", "desktop shell config target mismatch");
+assert(typeof shellConfig.apiBaseURL === "string", "desktop shell config apiBaseURL missing");
+assert(typeof shellConfig.pushWebSocketURL === "string", "desktop shell config pushWebSocketURL missing");
+assert(!JSON.stringify(shellConfig).match(/token|secret|password|credential|private/i), "desktop shell config must not contain secrets");
+
+const shellConfigPlaceholder = read("web/public/nexusim-shell-config.js");
+assert(shellConfigPlaceholder.includes("__NEXUSIM_CLIENT_SHELL__"), "web shell config placeholder missing");
 
 console.log("desktop tauri runner skeleton ok");

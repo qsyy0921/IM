@@ -16,6 +16,9 @@ Flutter or native Kotlin for a concrete reason.
 - First Kotlin native bridge skeleton exists under `native/`; it owns only the
   launch shell and bridge metadata, not session storage, local message facts or
   BFF calls.
+- `shell-config.example.json` records the low-permission WebView config bridge
+  for local LAN endpoints and Android runtime identity. It can be rendered to
+  `web/public/nexusim-shell-config.js` before a shell build.
 - No APK or AAB is produced yet.
 - `app.config.json` records the intended first Android package metadata.
 
@@ -23,6 +26,9 @@ Flutter or native Kotlin for a concrete reason.
 
 - `AndroidDevelopmentSessionStore` is local-development only; access tokens must
   move to Android Keystore / encrypted storage before a production release.
+- Shell config is endpoint and identity metadata only. It must not contain
+  gateway tokens, refresh tokens, passwords, private keys, or arbitrary native
+  capability flags.
 - Current local message cache is in-memory only; production cache should use
   SQLite behind `LocalMessageStore`.
 - Push notification integration must not bypass PullInbox reconciliation.
@@ -33,4 +39,6 @@ Flutter or native Kotlin for a concrete reason.
 ```powershell
 npm --prefix clients run typecheck:android
 npm --prefix clients run validate:android-native
+npm --prefix clients run test:shell-config
+node clients/tools/render-shell-config.mjs --input clients/android/shell-config.example.json
 ```

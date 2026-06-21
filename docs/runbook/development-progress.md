@@ -42,7 +42,9 @@
   desktop / Android thin shell actions 已接 shared restore / logout 编排；
   `clients/web` 已通过 browser platform adapter 复用同一 shared runtime 的 auth /
   send / ack / logout 编排，并支持 first-stage WebView bridge config 选择
-  `windows-desktop` / `android` target 和 LAN endpoint；Web 已接
+  `windows-desktop` / `android` target 和 LAN endpoint；Web 会在主 bundle 前加载
+  `nexusim-shell-config.js`，desktop / Android 已提供低敏 shell config 模板与
+  renderer；Web 已接
   first-stage BFF fetch / push WebSocket / IndexedDB local
   store adapters，并把 Web shell 接到 login / PullInbox / SendMessage /
   AckDelivery flow；`IndexedDBMessageStore` 已新增无外部依赖 first-stage
@@ -431,7 +433,8 @@ baseline 已通过，PC desktop / Android first-stage runtime adapter 已落，P
   lifecycle smoke 已覆盖 desktop / Android 登录持久化、恢复、刷新和登出清理，
   且 thin shell actions 已接入 shared restore / logout contract；下一步接 local
   Windows artifact、Android APK 和真实壳层 UI / WebView bridge smoke；Web
-  IndexedDB local store 和 browser platform adapter 已补 first-stage focused tests。
+  IndexedDB local store、browser platform adapter 和 shell config contract 已补
+  first-stage focused tests。
 长期后续按完整目标架构推进业务平台、数据平台、AI / Agent 平台、客户端平台和中间件平台；
 后续 AI 继续扩展低敏 collaborative-memory 算法/eval，优先 multi-hop / temporal update / profile aggregation 边界。
 短期生产级测试、完整 HA、长压和 sizing 不再作为当前转进阻塞，但仍留在 hardening backlog。

@@ -33,6 +33,7 @@ const requiredPaths = [
   "web/src/adapters/browser-push-transport.ts",
   "tools/test-indexeddb-message-store.mjs",
   "tools/test-key-value-message-store.mjs",
+  "tools/test-web-shell-lifecycle-contract.mjs",
   "tools/check-client-build-prereqs.mjs",
   "tools/client-build-env.mjs",
   "tools/build-desktop-artifact.mjs",

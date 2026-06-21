@@ -15,6 +15,7 @@
     "build:web": "npm --workspace @nexusim/web run build",
     "test:indexeddb-store": "npm --workspace @nexusim/web run test:indexeddb-store",
     "test:web-platform": "node ./tools/test-web-platform-adapter.mjs",
+    "test:web-shell-actions": "node ./tools/test-web-shell-lifecycle-contract.mjs",
     "test:shell-config": "node ./tools/test-shell-config-contract.mjs",
     "test:shell-web-assets": "node ./tools/test-shell-web-assets.mjs",
     "test:shell-asset-prep-wrapper": "node ./tools/test-shell-asset-prep-wrapper.mjs",

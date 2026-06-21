@@ -94,6 +94,10 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   browser platform identity、network / lifecycle ports 和 unsupported wakeup
   boundary；Web session store 仅作为 first-stage tab-scoped sessionStorage
   adapter，后续生产 Web 鉴权仍需 httpOnly cookie / provider-grade session 策略。
+- `clients` workspace 已新增 focused Web shell lifecycle contract test：
+  `npm --prefix clients run test:web-shell-actions` 会确认 Web shell 通过 shared
+  `ClientShellActions` 调用 login / refresh / restore / logout，且不直接调用
+  runtime auth lifecycle 方法，避免 PC / Android WebView 后续出现另一套 UI action path。
 - Web shell 支持 first-stage WebView bridge config：
   `globalThis.__NEXUSIM_CLIENT_SHELL__` 可由 PC / Android 壳层注入 target、
   API / WebSocket 地址、device / installation / app version 和 session key；当前

@@ -161,6 +161,11 @@ First slice:
   browser runtime identity, network/lifecycle ports and unsupported wakeup
   boundaries, plus WebView bridge target selection for desktop and Android,
   without requiring a live browser or backend.
+- `npm --prefix clients run test:web-shell-actions` guards the Web shell
+  lifecycle contract. It verifies the Web shell binds login, refresh, restore
+  and logout through shared `ClientShellActions` and does not call runtime auth
+  lifecycle methods directly, so PC / Android WebView shells can keep the same
+  UI action path.
 - `npm --prefix clients run test:shell-config` validates the desktop / Android
   shell config templates and renderer, and rejects unsupported targets or
   sensitive fields such as token, secret and password.

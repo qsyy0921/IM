@@ -67,6 +67,7 @@
   runtime metadata bridge）；
   Web shell 登录面板已通过 shared `ClientShellActions` 接入 login / refresh / restore / logout，
   desktop / Android thin shell actions 已覆盖 login / refresh / restore / logout，
+  `test:web-shell-actions` 已防止 Web shell 绕过 shared lifecycle contract，
   供 PC / Android WebView 复用同一 UI action contract；
   shell asset prep 已先清理目标目录再复制，并写低敏 relative-path / SHA-256
   manifest，artifact wrapper 会在 native build 前验证 manifest，避免旧 Web bundle

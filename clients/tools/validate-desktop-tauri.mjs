@@ -1,0 +1,50 @@
+import { existsSync, readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { join } from "node:path";
+
+const root = fileURLToPath(new URL("..", import.meta.url));
+
+function read(path) {
+  return readFileSync(join(root, path), "utf8");
+}
+
+function readJSON(path) {
+  return JSON.parse(read(path));
+}
+
+function assert(condition, message) {
+  if (!condition) {
+    throw new Error(message);
+  }
+}
+
+const requiredPaths = [
+  "desktop/src-tauri/Cargo.toml",
+  "desktop/src-tauri/build.rs",
+  "desktop/src-tauri/src/main.rs",
+  "desktop/src-tauri/tauri.conf.json"
+];
+
+for (const relativePath of requiredPaths) {
+  assert(existsSync(join(root, relativePath)), `missing ${relativePath}`);
+}
+
+const cargo = read("desktop/src-tauri/Cargo.toml");
+assert(cargo.includes('name = "nexusim-desktop"'), "Cargo package name mismatch");
+assert(cargo.includes('tauri = { version = "2"'), "Tauri v2 dependency missing");
+assert(cargo.includes('tauri-build = { version = "2"'), "Tauri v2 build dependency missing");
+
+const build = read("desktop/src-tauri/build.rs");
+assert(build.includes("tauri_build::build()"), "Tauri build hook missing");
+
+const main = read("desktop/src-tauri/src/main.rs");
+assert(main.includes("tauri::Builder::default()"), "Tauri Builder entrypoint missing");
+assert(!main.includes("invoke_handler"), "desktop shell must not expose IPC commands yet");
+
+const config = readJSON("desktop/src-tauri/tauri.conf.json");
+assert(config.productName === "NexusIM", "desktop product name mismatch");
+assert(config.identifier === "com.nexusim.desktop", "desktop identifier mismatch");
+assert(config.build?.frontendDist === "../web/dist", "desktop frontendDist mismatch");
+assert(config.bundle?.active === false, "desktop bundle must stay inactive until artifact build slice");
+
+console.log("desktop tauri runner skeleton ok");

@@ -14,6 +14,7 @@
     "dev:web": "npm --workspace @nexusim/web run dev",
     "build:web": "npm --workspace @nexusim/web run build",
     "typecheck:desktop": "npm --workspace @nexusim/desktop run typecheck",
+    "validate:desktop-tauri": "npm --workspace @nexusim/desktop run validate:tauri",
     "typecheck:android": "npm --workspace @nexusim/android run typecheck",
     "typecheck": "npm --workspaces --if-present run typecheck"
   },

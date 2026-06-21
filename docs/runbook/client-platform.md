@@ -68,6 +68,9 @@ First slice:
   session storage, in-memory message cache, static network/lifecycle ports and
   unsupported local wakeup notifications. This moves desktop beyond a pure
   contract, but it is not a Tauri runner or installer yet.
+- `clients/desktop/src-tauri` now has a first-stage Tauri v2 Rust runner
+  skeleton with no IPC commands. `bundle.active` remains `false`, so this is not
+  a local Windows artifact yet.
 - `clients/android` now has a first-stage TypeScript runtime adapter:
   `loadAndroidRuntimeConfig`, `createAndroidPlatformAdapter`, development-only
   session storage, in-memory message cache, static network/lifecycle ports and
@@ -93,7 +96,8 @@ First slice:
   `docs/runbook/loadtest/client-platform/loadtest-report-20260621-client-web-bff-push-wired-172-clean-baseline.md`.
   It does not replace existing secure mTLS gateway / push smoke coverage.
 - PC desktop and Android now both have first-stage TypeScript runtime adapters.
-  Neither target produces `.msi`, `.exe`, `.apk`, or `.aab` artifacts yet.
+  PC desktop also has a Tauri runner skeleton. Neither target produces `.msi`,
+  `.exe`, `.apk`, or `.aab` artifacts yet.
 - `/api/auth/logout` is reserved and currently returns `UNIMPLEMENTED`; identity
   still needs a user self-session revoke contract before server-side logout is
   real.
@@ -114,7 +118,7 @@ rejected. For local LAN client smoke, prefer the wired `172.x.x.x` address.
 
 ## Next Work
 
-1. Add PC desktop Tauri runner and first local Windows artifact.
+1. Add first local Windows artifact from the PC desktop Tauri runner.
 2. Add Android native bridge and first unsigned local APK.
 3. Add IndexedDB persistence tests beyond the first browser adapter, then move
    desktop / Android from in-memory development stores to durable platform stores.

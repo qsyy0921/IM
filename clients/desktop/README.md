@@ -13,6 +13,8 @@ the native bridge can stay narrow and auditable.
 - The shell includes development-only session storage, an in-memory message
   cache, static lifecycle/network ports, and unsupported local wakeup
   notifications.
+- First Tauri v2 Rust runner skeleton exists under `src-tauri`; it exposes no
+  IPC commands yet.
 - No Windows installer is produced yet.
 - `src-tauri/tauri.conf.json` records the intended shell boundary.
 
@@ -23,3 +25,10 @@ the native bridge can stay narrow and auditable.
 - `DesktopDevelopmentSessionStore` is local-development only; token storage must
   use OS secure storage before production release.
 - Auto-update and code signing are required before public distribution.
+
+## Focused Checks
+
+```powershell
+npm --prefix clients run typecheck:desktop
+npm --prefix clients run validate:desktop-tauri
+```

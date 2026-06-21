@@ -25,8 +25,8 @@
 
 ## Client Platform MVP 未完成
 
-- `clients/desktop`：first-stage TypeScript runtime adapter 已落；继续接 PC
-  desktop Tauri runner / BFF client，复用 `protocol` / `client-core`，跑通
+- `clients/desktop`：first-stage TypeScript runtime adapter 和 Tauri runner
+  skeleton 已落；继续接 BFF client，复用 `protocol` / `client-core`，跑通
   login、conversation list、PullInbox、send、ACK、push notify。
 - Windows packaging：产出本地可安装或可运行的 Windows artifact；不要求生产签名。
 - `clients/android`：first-stage TypeScript runtime adapter 已落；继续接

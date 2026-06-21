@@ -176,7 +176,9 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   `npm --prefix clients run smoke:android-webview-login -- --fixture <clientweb-fixture.json>`；
   dry-run 覆盖 debuggable APK、ADB、WebView devtools、clientweb fixture 和公共 UI
   selector 契约，不构建 APK、不连接设备，也不声称 login / PullInbox / AckDelivery
-  已在 Android WebView 内通过。`loadtest/clientweb/run-local-smoke.ps1` 也已新增显式
+  已在 Android WebView 内通过。WebView devtools socket parser 已新增 focused
+  fixture test，后续真机 runner 发现 socket 失败时可先用同一解析规则排查，而不需要
+  启动完整 APK smoke。`loadtest/clientweb/run-local-smoke.ps1` 也已新增显式
   `-RunAndroidWebViewLoginSmoke` 入口，可在本地 BFF / push 栈存活期间生成临时 fixture
   并调用 Android runner；默认不执行该路径。真实执行仍等待 collected debuggable APK
   和工具链 ready。

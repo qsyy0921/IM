@@ -289,7 +289,7 @@ async function waitForWebViewDevtoolsSocket(timeoutMs) {
   throw new Error(`timed out waiting for Android WebView devtools socket${lastOutput ? ": no webview_devtools_remote entry" : ""}`);
 }
 
-function parseWebViewDevtoolsSocket(output) {
+export function parseWebViewDevtoolsSocket(output) {
   const sockets = output
     .split(/\r?\n/)
     .map(line => {

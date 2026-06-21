@@ -47,7 +47,9 @@ first-stage `embedding-worker`：本地 JSONL 任务源或
 再启动 embedding worker 经 `model-gateway.InvokeEmbedding` 写 vector metadata，并通过
 `SearchVectors` 验证；该 smoke 入口不手工 upsert、不读私表。PostgreSQL embedding
 task queue 已新增，`embedding-worker` 可用 `NEXUSIM_VECTOR_EMBEDDING_SOURCE=postgres`
-claim redacted-preview task 并 complete。`admin-service` 已完成第一版
+claim redacted-preview task 并 complete；`embedding-producer` 可从 file / knowledge
+source 读取 redacted-preview task 写入该 queue，`loadtest/vectorembedding` 已跑通
+producer -> queue -> worker 链路。`admin-service` 已完成第一版
 `CreateAdminOperation` / `ApproveAdminOperation` / `GetAdminOperation` /
 `ListAdminOperations` path、`admin_outbox -> im.admin.events` outbox relay 和
 `operation-worker` risk routing 执行闭环；`REPAIR_REQUEST` 已接入
@@ -62,8 +64,7 @@ control-plane-service.RollbackConfigVersion`；第三条 control-plane adapter �
 control-plane-service.PublishConfigVersion(API_GATEWAY_TENANT_QUOTA)`。
 admin `Create -> operator approve -> operation-worker -> control-plane` 本地多进程
 publish / rollback / tenant quota smoke 已通过。下一步默认继续更多下游公开 admin API adapter、
-admin compensation operator，或继续 vector Kafka / outbox chunk consumer / embedding task
-持久队列 / provider backend worker。
+admin compensation operator，或继续 vector Kafka / outbox chunk consumer / provider backend worker。
 ```
 
 系统测试 / HA / 长压 / sizing 后置；总览、待办、单服务状态分别看

@@ -78,6 +78,11 @@ model-gateway / workflow / knowledge-ingestion / vector-index
   `vector_embedding_tasks` 只持久化 redacted preview、input hash 和低敏 refs / visibility
   metadata；`embedding-worker` 支持 `NEXUSIM_VECTOR_EMBEDDING_SOURCE=postgres`，用
   `FOR UPDATE SKIP LOCKED` claim、claim-timeout retry 和 complete 标记。
+- `vector-index-service` 已新增 first-stage `embedding-producer`：
+  `NEXUSIM_VECTOR_INDEX_SERVICE_MODE=embedding-producer` 从 file / knowledge source 读取
+  redacted-preview task 并写入 PostgreSQL queue；producer 不允许使用 postgres source。
+  `loadtest/vectorembedding` 已跑通 producer -> queue -> embedding-worker 链路，
+  最近结果：`H:\NexusIM\loadtest-results\vector-embedding-producer-smoke-20260621-081520`。
 - `admin-service` 已从 stage-switch 进入 product-active 第一版 implementation
   slice，覆盖 `CreateAdminOperation`、`ApproveAdminOperation`、
   `GetAdminOperation`、`ListAdminOperations`、PostgreSQL operation / approval
@@ -110,8 +115,7 @@ model-gateway / workflow / knowledge-ingestion / vector-index
 - 默认继续补更多下游公开 admin API adapter，或为 admin config / quota 增加
   compensation operator。
 - 默认下一步可继续 `vector-index-service` Kafka / outbox 驱动的真实 chunk consumer、
-  embedding task producer、Milvus / pgvector backend / provider backend rebuild；也可以
-  继续更多下游 admin API adapter。
+  Milvus / pgvector backend / provider backend rebuild；也可以继续更多下游 admin API adapter。
 - 也可以继续 notification SMTP / SMS / APNs / FCM adapter 或 bounce-suppression。
 
 ## 硬边界

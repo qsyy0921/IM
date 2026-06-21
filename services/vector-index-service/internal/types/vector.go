@@ -236,6 +236,13 @@ type EmbeddingWorkerStats struct {
 	Completed int
 }
 
+type EmbeddingProducerStats struct {
+	Claimed   int
+	Enqueued  int
+	Replayed  int
+	Completed int
+}
+
 type VectorTombstone struct {
 	TenantID            TenantID
 	TombstoneID         string

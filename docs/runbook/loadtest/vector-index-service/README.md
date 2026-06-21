@@ -58,8 +58,11 @@
 - 准备一个 knowledge source / ingestion job / chunk manifest。
 - 启动 `vector-index-service` embedding worker，使用
   `knowledge-ingestion-service.ListKnowledgeChunks` 公开 API 拉取 redacted preview。
-- 验证 worker 调用 `model-gateway.InvokeEmbedding` 后，通过 `vector-index-service`
-  公开 `SearchVectors` 能检索到 knowledge chunk vector metadata。
+- 验证 `embedding-producer` 通过 knowledge public API 拉取 redacted preview 并写入
+  PostgreSQL `vector_embedding_tasks` queue。
+- 验证 `embedding-worker` 从 PostgreSQL queue claim task，调用
+  `model-gateway.InvokeEmbedding` 后，通过 `vector-index-service` 公开
+  `SearchVectors` 能检索到 knowledge chunk vector metadata。
 
 运行：
 
@@ -77,9 +80,9 @@
 
 当前边界：
 
-- 这是 first-stage worker / public API / model-gateway handoff smoke，不是
-  Kafka / outbox chunk consumer、embedding task producer、provider backend
-  rebuild 或 Milvus / pgvector / OpenSearch backend smoke。
+- 这是 first-stage producer / PostgreSQL queue / worker / public API /
+  model-gateway handoff smoke，不是 Kafka / outbox chunk consumer、provider
+  backend rebuild 或 Milvus / pgvector / OpenSearch backend smoke。
 - runner 不手工调用 `UpsertVectorItem`，也不读其它服务私有表；验证只走
   `SearchVectors`。
 - PostgreSQL / outbox / metrics / summary 不保存 raw document、source URI、object key

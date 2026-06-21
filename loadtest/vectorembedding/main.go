@@ -111,7 +111,7 @@ func parseConfig() config {
 
 	cfg.phase = strings.ToLower(strings.TrimSpace(cfg.phase))
 	if runName == "" {
-		runName = "vector-embedding-worker-smoke-" + time.Now().Format("20060102-150405")
+		runName = "vector-embedding-producer-smoke-" + time.Now().Format("20060102-150405")
 	}
 	safeRunName := sanitizeRunName(runName)
 	if cfg.tenantID == "" {
@@ -297,11 +297,11 @@ func createKnowledgeSource(ctx context.Context, client knowledgev1.KnowledgeInge
 	return client.CreateKnowledgeSource(requestCtx, &knowledgev1.CreateKnowledgeSourceRequest{
 		AuthContext:        knowledgeAuth(cfg, "knowledge-ingestion-service", "vector-embedding-source"),
 		SourceType:         "MANUAL_MARKDOWN",
-		SourceRef:          "vector-embedding-worker-smoke-source",
+		SourceRef:          "vector-embedding-producer-smoke-source",
 		SourceUriHash:      hashRef(cfg.tenantID + "|source-uri"),
 		MediaObjectRef:     "media-object-ref-vector-embedding-smoke",
 		OwnerRef:           "owner-ref-vector-embedding-smoke",
-		VisibilityScope:    "conversation:vector-embedding-worker-smoke",
+		VisibilityScope:    "conversation:vector-embedding-producer-smoke",
 		DataClass:          "BUSINESS_INTERNAL",
 		ContentHash:        hashRef(cfg.tenantID + "|content"),
 		MimeType:           "text/markdown",
@@ -321,7 +321,7 @@ func submitKnowledgeJob(ctx context.Context, client knowledgev1.KnowledgeIngesti
 	chunks := []*knowledgev1.ChunkManifestItem{
 		{
 			ChunkHash:            hashRef(cfg.tenantID + "|chunk|0"),
-			ChunkPreviewRedacted: "redacted vector embedding worker chunk 0",
+			ChunkPreviewRedacted: "redacted vector embedding producer chunk 0",
 			VisibilityScope:      source.GetVisibilityScope(),
 			DataClass:            source.GetDataClass(),
 			PolicyVersion:        "policy-vector-embedding-smoke",
@@ -329,7 +329,7 @@ func submitKnowledgeJob(ctx context.Context, client knowledgev1.KnowledgeIngesti
 		},
 		{
 			ChunkHash:            hashRef(cfg.tenantID + "|chunk|1"),
-			ChunkPreviewRedacted: "redacted vector embedding worker chunk 1",
+			ChunkPreviewRedacted: "redacted vector embedding producer chunk 1",
 			VisibilityScope:      source.GetVisibilityScope(),
 			DataClass:            source.GetDataClass(),
 			PolicyVersion:        "policy-vector-embedding-smoke",
@@ -343,8 +343,8 @@ func submitKnowledgeJob(ctx context.Context, client knowledgev1.KnowledgeIngesti
 		JobType:            "INGEST",
 		ParserProfile:      "local-manifest-v1",
 		ChunkProfile:       "fixed-manifest-v1",
-		EmbeddingPolicyRef: "embedding-policy-vector-worker-smoke",
-		VectorPolicyRef:    "vector-policy-vector-worker-smoke",
+		EmbeddingPolicyRef: "embedding-policy-vector-producer-smoke",
+		VectorPolicyRef:    "vector-policy-vector-producer-smoke",
 		RequestedBy:        cfg.userID,
 		IdempotencyKey:     cfg.idempotencyKey + "-job",
 		DocumentHash:       hashRef(cfg.tenantID + "|document"),
@@ -501,7 +501,7 @@ func writeSummary(resultDir string, result summary) error {
 	if err != nil {
 		return err
 	}
-	path := filepath.Join(resultDir, "vector-embedding-worker-summary.json")
+	path := filepath.Join(resultDir, "vector-embedding-producer-summary.json")
 	if err := os.WriteFile(path, append(encoded, '\n'), 0o644); err != nil {
 		return err
 	}
@@ -546,7 +546,7 @@ func pathInside(path string, root string) bool {
 func sanitizeRunName(value string) string {
 	value = strings.TrimSpace(value)
 	if value == "" {
-		return "vector-embedding-worker-smoke"
+		return "vector-embedding-producer-smoke"
 	}
 	var builder strings.Builder
 	for _, r := range value {

@@ -15,7 +15,7 @@ $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\.."))
 Assert-ExternalOutputRoot -Value $ResultRoot -RepositoryRoot $repoRoot -Name "ResultRoot"
 
 if (-not $RunName) {
-    $RunName = "vector-embedding-worker-smoke-" + (Get-Date -Format "yyyyMMdd-HHmmss")
+    $RunName = "vector-embedding-producer-smoke-" + (Get-Date -Format "yyyyMMdd-HHmmss")
 }
 
 $resultDir = Join-Path $ResultRoot $RunName
@@ -157,22 +157,35 @@ try {
         throw "vector embedding smoke prepare failed with exit code $LASTEXITCODE"
     }
 
-    $summaryPath = Join-Path $resultDir "vector-embedding-worker-summary.json"
+    $summaryPath = Join-Path $resultDir "vector-embedding-producer-summary.json"
     $prepareSummary = Get-Content -Path $summaryPath -Raw | ConvertFrom-Json
 
-    $processes += Start-NexusProcess -Name "vector-index-embedding-worker" -FilePath (Join-Path $repoRoot "bin\vector-index-service.exe") -Env @{
-        NEXUSIM_VECTOR_INDEX_SERVICE_MODE = "embedding-worker"
+    $processes += Start-NexusProcess -Name "vector-index-embedding-producer" -FilePath (Join-Path $repoRoot "bin\vector-index-service.exe") -Env @{
+        NEXUSIM_VECTOR_INDEX_SERVICE_MODE = "embedding-producer"
         NEXUSIM_PG_DSN = $PgDsn
         NEXUSIM_VECTOR_INDEX_DEBUG_ADDR = ""
-        NEXUSIM_VECTOR_EMBEDDING_SOURCE = "knowledge"
+        NEXUSIM_VECTOR_EMBEDDING_PRODUCER_SOURCE = "knowledge"
         NEXUSIM_KNOWLEDGE_INGESTION_GRPC_ADDR = $KnowledgeGrpcAddr
-        NEXUSIM_MODEL_GATEWAY_GRPC_ADDR = $ModelGatewayGrpcAddr
         NEXUSIM_VECTOR_EMBEDDING_TENANT_ID = $prepareSummary.tenant_id
         NEXUSIM_VECTOR_EMBEDDING_SOURCE_ID = $prepareSummary.knowledge_source_id
         NEXUSIM_VECTOR_EMBEDDING_DOCUMENT_ID = $prepareSummary.document_id
         NEXUSIM_VECTOR_EMBEDDING_KNOWLEDGE_PAGE_SIZE = "10"
         NEXUSIM_VECTOR_EMBEDDING_MODEL_REF = $prepareSummary.embedding_model_ref
         NEXUSIM_VECTOR_EMBEDDING_DIMENSION = [string]$prepareSummary.embedding_dimension
+        NEXUSIM_VECTOR_EMBEDDING_BATCH_SIZE = "10"
+        NEXUSIM_VECTOR_EMBEDDING_POLL_INTERVAL = "200ms"
+        NEXUSIM_VECTOR_EMBEDDING_ERROR_BACKOFF = "200ms"
+        NEXUSIM_VECTOR_EMBEDDING_TRACE_ID = "trace-$RunName"
+    }
+
+    $processes += Start-NexusProcess -Name "vector-index-embedding-worker" -FilePath (Join-Path $repoRoot "bin\vector-index-service.exe") -Env @{
+        NEXUSIM_VECTOR_INDEX_SERVICE_MODE = "embedding-worker"
+        NEXUSIM_PG_DSN = $PgDsn
+        NEXUSIM_VECTOR_INDEX_DEBUG_ADDR = ""
+        NEXUSIM_VECTOR_EMBEDDING_SOURCE = "postgres"
+        NEXUSIM_MODEL_GATEWAY_GRPC_ADDR = $ModelGatewayGrpcAddr
+        NEXUSIM_VECTOR_EMBEDDING_TENANT_ID = $prepareSummary.tenant_id
+        NEXUSIM_VECTOR_EMBEDDING_CLAIM_TIMEOUT = "30s"
         NEXUSIM_VECTOR_EMBEDDING_BATCH_SIZE = "10"
         NEXUSIM_VECTOR_EMBEDDING_POLL_INTERVAL = "200ms"
         NEXUSIM_VECTOR_EMBEDDING_ERROR_BACKOFF = "200ms"

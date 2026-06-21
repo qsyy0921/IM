@@ -53,6 +53,8 @@ func run(ctx context.Context) error {
 		return runRebuildWorker(ctx)
 	case "embedding-worker":
 		return runEmbeddingWorker(ctx)
+	case "embedding-producer":
+		return runEmbeddingProducer(ctx)
 	default:
 		return fmt.Errorf("unsupported NEXUSIM_VECTOR_INDEX_SERVICE_MODE %q", mode)
 	}
@@ -265,43 +267,122 @@ func runEmbeddingWorker(ctx context.Context) error {
 	return worker.Run(ctx)
 }
 
+func runEmbeddingProducer(ctx context.Context) error {
+	debugAddr, err := vectorIndexDebugAddrFromEnv()
+	if err != nil {
+		return err
+	}
+	stopDebug, err := startDebugServer(ctx, debugAddr)
+	if err != nil {
+		return err
+	}
+	defer stopDebug()
+
+	pool, err := openPGPool(ctx)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	source, closeSource, err := newEmbeddingProducerSource(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if closeSource != nil {
+			if closeErr := closeSource(); closeErr != nil {
+				log.Printf("vector-index-service embedding producer source close failed: %v", closeErr)
+			}
+		}
+	}()
+	queue := postgresinfra.NewEmbeddingTaskSource(pool, postgresinfra.EmbeddingTaskSourceConfig{})
+	producer := embedding.NewProducer(
+		source,
+		queue,
+		embedding.Config{
+			BatchSize:    envInt("NEXUSIM_VECTOR_EMBEDDING_BATCH_SIZE", 50),
+			PollInterval: envDuration("NEXUSIM_VECTOR_EMBEDDING_POLL_INTERVAL", time.Second),
+			ErrorBackoff: envDuration("NEXUSIM_VECTOR_EMBEDDING_ERROR_BACKOFF", time.Second),
+			Logf:         log.Printf,
+		},
+	)
+	log.Printf("vector-index-service embedding producer started with %s task source", embeddingProducerSourceModeFromEnv())
+	return producer.Run(ctx)
+}
+
 func newEmbeddingTaskSource(ctx context.Context, pool *pgxpool.Pool) (embedding.TaskSource, func() error, error) {
 	sourceMode := embeddingTaskSourceModeFromEnv()
 	switch sourceMode {
 	case "file":
-		taskFile := strings.TrimSpace(os.Getenv("NEXUSIM_VECTOR_EMBEDDING_TASKS_FILE"))
-		source, err := embeddinginfra.NewFileTaskSource(taskFile)
-		return source, nil, err
+		return newFileEmbeddingTaskSource()
 	case "postgres":
 		return postgresinfra.NewEmbeddingTaskSource(pool, postgresinfra.EmbeddingTaskSourceConfig{
 			TenantID:     envString("NEXUSIM_VECTOR_EMBEDDING_TENANT_ID", ""),
 			ClaimTimeout: envDuration("NEXUSIM_VECTOR_EMBEDDING_CLAIM_TIMEOUT", 30*time.Second),
 		}), nil, nil
 	case "knowledge":
-		source, closeSource, err := rpcinfra.DialKnowledgeChunkTaskSource(
-			ctx,
-			strings.TrimSpace(os.Getenv("NEXUSIM_KNOWLEDGE_INGESTION_GRPC_ADDR")),
-			rpcinfra.KnowledgeChunkSourceConfig{
-				TenantID:          envString("NEXUSIM_VECTOR_EMBEDDING_TENANT_ID", ""),
-				SourceID:          envString("NEXUSIM_VECTOR_EMBEDDING_SOURCE_ID", ""),
-				DocumentID:        envString("NEXUSIM_VECTOR_EMBEDDING_DOCUMENT_ID", ""),
-				PageSize:          envInt("NEXUSIM_VECTOR_EMBEDDING_KNOWLEDGE_PAGE_SIZE", 50),
-				EmbeddingModelRef: envString("NEXUSIM_VECTOR_EMBEDDING_MODEL_REF", "deterministic-embedding-v1"),
-				Dimension:         envInt("NEXUSIM_VECTOR_EMBEDDING_DIMENSION", 8),
-				VisibilityVersion: int64(envInt("NEXUSIM_VECTOR_EMBEDDING_VISIBILITY_VERSION", 1)),
-				TraceID:           envString("NEXUSIM_VECTOR_EMBEDDING_TRACE_ID", ""),
-			},
-			envDuration("NEXUSIM_VECTOR_EMBEDDING_KNOWLEDGE_TIMEOUT", 5*time.Second),
-		)
-		return source, closeSource, err
+		return newKnowledgeEmbeddingTaskSource(ctx)
 	default:
 		return nil, nil, fmt.Errorf("unsupported NEXUSIM_VECTOR_EMBEDDING_SOURCE %q", sourceMode)
 	}
 }
 
+func newEmbeddingProducerSource(ctx context.Context) (embedding.TaskSource, func() error, error) {
+	sourceMode := embeddingProducerSourceModeFromEnv()
+	switch sourceMode {
+	case "file":
+		return newFileEmbeddingTaskSource()
+	case "knowledge":
+		return newKnowledgeEmbeddingTaskSource(ctx)
+	case "postgres":
+		return nil, nil, errors.New("NEXUSIM_VECTOR_EMBEDDING_PRODUCER_SOURCE cannot be postgres; producer must read an upstream source and enqueue postgres tasks")
+	default:
+		return nil, nil, fmt.Errorf("unsupported NEXUSIM_VECTOR_EMBEDDING_PRODUCER_SOURCE %q", sourceMode)
+	}
+}
+
+func newFileEmbeddingTaskSource() (embedding.TaskSource, func() error, error) {
+	taskFile := strings.TrimSpace(os.Getenv("NEXUSIM_VECTOR_EMBEDDING_TASKS_FILE"))
+	source, err := embeddinginfra.NewFileTaskSource(taskFile)
+	return source, nil, err
+}
+
+func newKnowledgeEmbeddingTaskSource(ctx context.Context) (embedding.TaskSource, func() error, error) {
+	return rpcinfra.DialKnowledgeChunkTaskSource(
+		ctx,
+		strings.TrimSpace(os.Getenv("NEXUSIM_KNOWLEDGE_INGESTION_GRPC_ADDR")),
+		rpcinfra.KnowledgeChunkSourceConfig{
+			TenantID:          envString("NEXUSIM_VECTOR_EMBEDDING_TENANT_ID", ""),
+			SourceID:          envString("NEXUSIM_VECTOR_EMBEDDING_SOURCE_ID", ""),
+			DocumentID:        envString("NEXUSIM_VECTOR_EMBEDDING_DOCUMENT_ID", ""),
+			PageSize:          envInt("NEXUSIM_VECTOR_EMBEDDING_KNOWLEDGE_PAGE_SIZE", 50),
+			EmbeddingModelRef: envString("NEXUSIM_VECTOR_EMBEDDING_MODEL_REF", "deterministic-embedding-v1"),
+			Dimension:         envInt("NEXUSIM_VECTOR_EMBEDDING_DIMENSION", 8),
+			VisibilityVersion: int64(envInt("NEXUSIM_VECTOR_EMBEDDING_VISIBILITY_VERSION", 1)),
+			TraceID:           envString("NEXUSIM_VECTOR_EMBEDDING_TRACE_ID", ""),
+		},
+		envDuration("NEXUSIM_VECTOR_EMBEDDING_KNOWLEDGE_TIMEOUT", 5*time.Second),
+	)
+}
+
 func embeddingTaskSourceModeFromEnv() string {
 	mode := strings.ToLower(strings.TrimSpace(os.Getenv("NEXUSIM_VECTOR_EMBEDDING_SOURCE")))
 	if mode != "" {
+		return mode
+	}
+	if strings.TrimSpace(os.Getenv("NEXUSIM_KNOWLEDGE_INGESTION_GRPC_ADDR")) != "" {
+		return "knowledge"
+	}
+	return "file"
+}
+
+func embeddingProducerSourceModeFromEnv() string {
+	mode := strings.ToLower(strings.TrimSpace(os.Getenv("NEXUSIM_VECTOR_EMBEDDING_PRODUCER_SOURCE")))
+	if mode != "" {
+		return mode
+	}
+	mode = strings.ToLower(strings.TrimSpace(os.Getenv("NEXUSIM_VECTOR_EMBEDDING_SOURCE")))
+	if mode != "" && mode != "postgres" {
 		return mode
 	}
 	if strings.TrimSpace(os.Getenv("NEXUSIM_KNOWLEDGE_INGESTION_GRPC_ADDR")) != "" {
@@ -320,7 +401,7 @@ func vectorIndexModeFromEnv() string {
 
 func validateVectorIndexMode(mode string) error {
 	switch mode {
-	case "noop", "grpc", "outbox-relay", "rebuild-worker", "embedding-worker":
+	case "noop", "grpc", "outbox-relay", "rebuild-worker", "embedding-worker", "embedding-producer":
 		return nil
 	default:
 		return fmt.Errorf("unsupported NEXUSIM_VECTOR_INDEX_SERVICE_MODE %q", mode)

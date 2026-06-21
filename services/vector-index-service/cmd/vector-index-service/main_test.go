@@ -3,7 +3,7 @@ package main
 import "testing"
 
 func TestValidateVectorIndexMode(t *testing.T) {
-	for _, mode := range []string{"noop", "grpc", "outbox-relay", "rebuild-worker", "embedding-worker"} {
+	for _, mode := range []string{"noop", "grpc", "outbox-relay", "rebuild-worker", "embedding-worker", "embedding-producer"} {
 		if err := validateVectorIndexMode(mode); err != nil {
 			t.Fatalf("mode %s: %v", mode, err)
 		}
@@ -30,6 +30,27 @@ func TestEmbeddingTaskSourceModeFromEnv(t *testing.T) {
 	t.Setenv("NEXUSIM_VECTOR_EMBEDDING_SOURCE", "postgres")
 	if got := embeddingTaskSourceModeFromEnv(); got != "postgres" {
 		t.Fatalf("explicit postgres source should win, got %s", got)
+	}
+}
+
+func TestEmbeddingProducerSourceModeFromEnv(t *testing.T) {
+	t.Setenv("NEXUSIM_VECTOR_EMBEDDING_PRODUCER_SOURCE", "")
+	t.Setenv("NEXUSIM_VECTOR_EMBEDDING_SOURCE", "")
+	t.Setenv("NEXUSIM_KNOWLEDGE_INGESTION_GRPC_ADDR", "")
+	if got := embeddingProducerSourceModeFromEnv(); got != "file" {
+		t.Fatalf("expected file fallback, got %s", got)
+	}
+	t.Setenv("NEXUSIM_KNOWLEDGE_INGESTION_GRPC_ADDR", "127.0.0.1:10740")
+	if got := embeddingProducerSourceModeFromEnv(); got != "knowledge" {
+		t.Fatalf("expected knowledge auto source, got %s", got)
+	}
+	t.Setenv("NEXUSIM_VECTOR_EMBEDDING_SOURCE", "postgres")
+	if got := embeddingProducerSourceModeFromEnv(); got != "knowledge" {
+		t.Fatalf("worker postgres source should not make producer self-loop, got %s", got)
+	}
+	t.Setenv("NEXUSIM_VECTOR_EMBEDDING_PRODUCER_SOURCE", "file")
+	if got := embeddingProducerSourceModeFromEnv(); got != "file" {
+		t.Fatalf("explicit producer source should win, got %s", got)
 	}
 }
 

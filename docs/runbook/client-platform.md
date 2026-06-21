@@ -91,6 +91,9 @@ First slice:
   Dry-run tests cover the runner contract without building an APK or touching a
   device; real execution still waits on a collected debuggable APK, ADB, WebView
   devtools and a clientweb fixture.
+- `loadtest/clientweb/run-local-smoke.ps1` can now opt into Android login-level
+  WebView smoke with `-RunAndroidWebViewLoginSmoke`; the default path still runs
+  only the shared Web/BFF/push smoke and does not build/install an Android app.
 - `web/index.html` loads `nexusim-shell-config.js` before the app bundle.
   Browser mode uses the checked-in empty placeholder; desktop / Android shell
   builds can render their low-sensitive `shell-config.example.json` through

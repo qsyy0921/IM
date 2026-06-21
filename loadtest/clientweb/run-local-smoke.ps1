@@ -7,7 +7,9 @@ param(
     [string]$RunName = "",
     [switch]$SkipBuild,
     [switch]$RunDesktopWebViewLoginSmoke,
-    [switch]$DesktopWebViewSkipWebBuild
+    [switch]$DesktopWebViewSkipWebBuild,
+    [switch]$RunAndroidWebViewLoginSmoke,
+    [switch]$AndroidWebViewSkipWebBuild
 )
 
 $ErrorActionPreference = "Stop"
@@ -407,6 +409,52 @@ try {
             }
         } finally {
             Remove-Item -LiteralPath $desktopFixturePath -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    if ($RunAndroidWebViewLoginSmoke) {
+        $androidFixturePath = Join-Path ([System.IO.Path]::GetTempPath()) ("nexusim-android-webview-login-" + [System.Guid]::NewGuid().ToString("N") + ".json")
+        $androidSummaryPath = Join-Path $resultDir "android-webview-login-summary.json"
+        try {
+            $androidFixture = [ordered]@{
+                apiBaseURL = $bffBaseURL
+                pushWebSocketURL = $pushURL
+                tenantID = $tenantId
+                userID = $receiverUserId
+                authProof = $receiverPassword
+                deviceID = "android-webview-login-device"
+                conversationID = $conversationId
+                senderUserID = $senderUserId
+                senderAuthProof = $senderPassword
+                senderDeviceID = "android-webview-login-sender"
+                messageText = "NexusIM Android WebView login smoke $safeRunName"
+            }
+            [System.IO.File]::WriteAllText(
+                $androidFixturePath,
+                ($androidFixture | ConvertTo-Json -Depth 4),
+                [System.Text.UTF8Encoding]::new($false)
+            )
+
+            $androidSmokeArgs = @(
+                "--prefix", "clients",
+                "run", "smoke:android-webview-login",
+                "--",
+                "--fixture", $androidFixturePath,
+                "--run-id", "android-webview-login-$safeRunName",
+                "--output", $androidSummaryPath
+            )
+            if ($AndroidWebViewSkipWebBuild) {
+                $androidSmokeArgs += "--skip-web-build"
+            }
+            & npm @androidSmokeArgs
+            if ($LASTEXITCODE -ne 0) {
+                throw "Android WebView login smoke failed with exit code $LASTEXITCODE"
+            }
+            if (-not (Test-Path $androidSummaryPath)) {
+                throw "Android WebView login smoke did not write summary"
+            }
+        } finally {
+            Remove-Item -LiteralPath $androidFixturePath -Force -ErrorAction SilentlyContinue
         }
     }
 } finally {

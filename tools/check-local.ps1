@@ -80,6 +80,9 @@ try {
     Write-Host "== message compliance proof manifest =="
     Invoke-LocalCheck "check-message-compliance-proof-manifest.ps1"
 
+    Write-Host "== workflow decision manifest =="
+    Invoke-LocalCheck "check-workflow-decision-manifest.ps1"
+
     Write-Host "== ddd boundaries =="
     Invoke-LocalCheck "check-ddd-boundaries.ps1"
 

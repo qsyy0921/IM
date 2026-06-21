@@ -33,6 +33,7 @@ assert(result.prerequisites.some(item => item.name === "debuggable-apk"), "debug
 assert(result.prerequisites.some(item => item.name === "webview-devtools-socket"), "WebView devtools prerequisite missing");
 assert(result.commands.devtoolsDiscovery.includes("report:android-webview-devtools-readiness"), "WebView devtools readiness command missing");
 assert(result.commands.runner.includes("smoke:android-webview-login"), "runner command missing");
+assert(result.selectorContract.required.includes("native-store-readiness"), "native store readiness selector missing");
 assert(result.selectorContract.required.includes("ack-status"), "ack selector contract missing");
 assert(!serialized.match(/[A-Z]:\\\\/), "plan leaked Windows absolute path");
 assert(!serialized.includes("\\\\?"), "plan leaked extended Windows path");

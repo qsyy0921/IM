@@ -186,7 +186,8 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   `npm --prefix clients run smoke:android-webview-login -- --fixture <clientweb-fixture.json>`；
   dry-run 覆盖 debuggable APK、ADB、WebView devtools、clientweb fixture 和公共 UI
   selector 契约，不构建 APK、不连接设备，也不声称 login / PullInbox / AckDelivery
-  已在 Android WebView 内通过。WebView devtools socket parser 已新增 focused
+  已在 Android WebView 内通过。该 selector 契约现在包含 `native-store-readiness`，
+  真实 runner 后续会记录 Android local-store readiness 低敏证据。WebView devtools socket parser 已新增 focused
   fixture test，后续真机 runner 发现 socket 失败时可先用同一解析规则排查，而不需要
   启动完整 APK smoke。`npm --prefix clients run report:android-webview-devtools-readiness`
   现在提供低敏 WebView devtools readiness report，会读取 ADB 的 `/proc/net/unix`
@@ -202,7 +203,9 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
 - PC Web shell 已新增登录级自动化前置：Web UI 暴露稳定 `data-testid`
   automation contract 和 `ack-status` 诊断，`npm --prefix clients run
   smoke:desktop-webview-login` 可通过 WebView2/CDP 外部驱动 Tauri WebView 登录、
-  接收 externally-triggered `delivery.notify`、PullInbox 并 AckDelivery；现有
+  接收 externally-triggered `delivery.notify`、PullInbox 并 AckDelivery；该 runner
+  现在也要求 `native-store-readiness` selector，并在真实执行时记录 desktop
+  local-store readiness 低敏证据；现有
   `loadtest/clientweb/run-local-smoke.ps1 -RunDesktopWebViewLoginSmoke` 会在本地
   BFF / push 栈存活期间生成临时 fixture 并调用该 driver。2026-06-22 已在提交
   `c72ea512` 上完成 clean 登录级 Tauri WebView smoke，归档见

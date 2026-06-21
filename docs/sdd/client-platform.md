@@ -267,7 +267,7 @@ Responsibilities:
 - Android login-level WebView smoke must remain a separate step from metadata
   smoke. The first-stage plan records the debuggable APK, authorized ADB
   device, WebView devtools socket, clientweb fixture and public UI selector
-  prerequisites before running the real runner. The runner may use CDP through
+  prerequisites, including `native-store-readiness`, before running the real runner. The runner may use CDP through
   ADB WebView devtools forwarding to drive the public UI, but dry-run output
   must not claim login, PullInbox, WebSocket or AckDelivery evidence by itself.
 - Android WebView devtools readiness reporting may read `/proc/net/unix`
@@ -487,7 +487,9 @@ need hardened token storage per platform.
   token, filesystem or message API.
 - PC / Android WebView UI should use shared `ClientShellActions` for login,
   refresh, restore and logout so native shells do not grow separate auth
-  lifecycle behavior.
+  lifecycle behavior. Login-level WebView smoke should also verify the
+  low-sensitive `native-store-readiness` UI diagnostic when native metadata is
+  available, without treating it as a storage capability.
 - Android must use encrypted platform storage before production and must treat
   FCM/APNs-style push as wakeup only, never as delivered message truth.
 - Android native WebView bridge must remain single-method read-only

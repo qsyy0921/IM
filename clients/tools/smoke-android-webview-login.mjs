@@ -44,6 +44,13 @@ async function main(argv) {
     automation: {
       driver: "android-webview-cdp-via-adb-forward",
       uiSelectorContract: "clients/web/src/App.tsx data-testid",
+      requiredSelectors: [
+        "login-submit",
+        "native-store-readiness",
+        "runtime-status",
+        "push-status",
+        "ack-status"
+      ],
       lowSensitiveOutput: true
     },
     verdict: {
@@ -88,6 +95,7 @@ async function main(argv) {
     forwardWebViewDevtools(forwardedPort, devtoolsSocket);
     cdp = await connectWebViewCDP(forwardedPort, options.holdMs);
     await driveLogin(cdp, fixture, options);
+    const nativeStoreReadiness = await waitForNativeStoreReadiness(cdp, options.holdMs);
     const sent = await triggerExternalSenderMessage(fixture, runID);
     await waitForWebViewMessage(cdp, sent.text, sent.conversationSeq, options.holdMs);
     const ack = await waitForAck(cdp, sent.conversationSeq, options.holdMs);
@@ -113,6 +121,8 @@ async function main(argv) {
         loginOK: true,
         pushConnected: true,
         openedConversation: true,
+        nativeStoreReadinessDisplayed: true,
+        nativeStoreReadiness,
         sentConversationSeq: sent.conversationSeq,
         observedMessage: true,
         ackSeq: ack.seq
@@ -369,6 +379,32 @@ async function driveLogin(cdp, fixture, options) {
   await setInput(cdp, "conversation-id-input", fixture.conversationID);
   await click(cdp, "open-conversation");
   await waitForText(cdp, "runtime-status", value => value === "open conversation ok", "open conversation ok", options.holdMs);
+}
+
+async function waitForNativeStoreReadiness(cdp, timeoutMs) {
+  return waitForEval(cdp, value => {
+    const text = String(value?.text ?? "");
+    const ok = text.includes("local-storage -> sqlite") &&
+      text.includes("sqlite-native-bridge-unavailable") &&
+      text.includes("android-sqlite");
+    return ok
+      ? {
+          ok: true,
+          currentDefault: "local-storage",
+          productionTarget: "sqlite",
+          nativeStoreReady: false,
+          nativeStoreReason: "sqlite-native-bridge-unavailable",
+          nativeStoreBridge: "android-sqlite"
+        }
+      : { ok: false };
+  }, {
+    label: "native store readiness in Android WebView",
+    timeoutMs,
+    expression: `(() => {
+      const text = document.querySelector('[data-testid="native-store-readiness"]')?.textContent || "";
+      return { ok: false, text };
+    })()`
+  });
 }
 
 async function triggerExternalSenderMessage(fixture, runID) {
@@ -709,6 +745,7 @@ async function pageDiagnostics(cdp) {
       title: document.title,
       runtimeStatus: document.querySelector('[data-testid="runtime-status"]')?.textContent || "",
       pushStatus: document.querySelector('[data-testid="push-status"]')?.textContent || "",
+      nativeStoreReadiness: document.querySelector('[data-testid="native-store-readiness"]')?.textContent || "",
       error: document.querySelector('[data-testid="error-banner"]')?.textContent || "",
       bodyTextPrefix: (document.body?.textContent || "").slice(0, 300)
     }))()`);

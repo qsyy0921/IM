@@ -50,6 +50,8 @@ try {
   assert(result.build.freshBuildRequired === true, "fresh build marker missing");
   assert(result.adb.webviewDevtoolsForwardRequired === true, "WebView devtools forward marker missing");
   assert(result.automation.driver === "android-webview-cdp-via-adb-forward", "driver mismatch");
+  assert(result.automation.requiredSelectors.includes("native-store-readiness"), "native store readiness selector missing");
+  assert(result.automation.requiredSelectors.includes("ack-status"), "ack selector missing");
   assert(result.verdict.loginLevelAndroidUISmoke === false, "dry-run must not claim login smoke");
   assert(result.verdict.deliveryNotifyInWebView === false, "dry-run must not claim notify smoke");
   assert(result.verdict.pullInboxInWebView === false, "dry-run must not claim PullInbox smoke");

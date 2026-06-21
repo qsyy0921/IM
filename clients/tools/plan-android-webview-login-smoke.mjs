@@ -70,6 +70,7 @@ export function buildAndroidWebViewLoginSmokePlan(options = {}) {
         "login-tenant",
         "login-user",
         "login-submit",
+        "native-store-readiness",
         "runtime-status",
         "push-status",
         "conversation-id-input",

@@ -88,9 +88,10 @@ First slice:
 - Android login-level WebView smoke now has a low-sensitive plan entry
   `npm --prefix clients run plan:android-webview-login-smoke` and a real runner
   entry `npm --prefix clients run smoke:android-webview-login -- --fixture <clientweb-fixture.json>`.
-  Dry-run tests cover the runner contract without building an APK or touching a
-  device; real execution still waits on a collected debuggable APK, ADB, WebView
-  devtools and a clientweb fixture.
+  Dry-run tests cover the runner contract, including the `native-store-readiness`
+  UI selector, without building an APK or touching a device; real execution
+  still waits on a collected debuggable APK, ADB, WebView devtools and a
+  clientweb fixture.
 - `loadtest/clientweb/run-local-smoke.ps1` can now opt into Android login-level
   WebView smoke with `-RunAndroidWebViewLoginSmoke`; the default path still runs
   only the shared Web/BFF/push smoke and does not build/install an Android app.
@@ -148,6 +149,9 @@ First slice:
   capability readiness, the panel shows the low-sensitive current store, target
   store, bridge and unavailable reason. This is diagnostics only; it does not
   grant Web code native capabilities.
+- Desktop and Android login-level WebView smoke runners now require the same
+  `native-store-readiness` selector and record low-sensitive readiness evidence
+  when the real smoke can run.
 - PC desktop and Android can reuse the same `@nexusim/client-core` BFF adapter
   instead of copying Web-private HTTP mapping code.
 - PC desktop and Android can also reuse the same `@nexusim/client-core`

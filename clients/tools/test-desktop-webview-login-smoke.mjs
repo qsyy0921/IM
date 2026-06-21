@@ -48,6 +48,8 @@ try {
   assert(result.runID === "desktop-webview-login-test", "run id mismatch");
   assert(result.input.externalMessageTrigger === true, "external sender trigger marker missing");
   assert(result.automation.driver === "webview2-cdp", "driver mismatch");
+  assert(result.automation.requiredSelectors.includes("native-store-readiness"), "native store readiness selector missing");
+  assert(result.automation.requiredSelectors.includes("ack-status"), "ack selector missing");
   assert(result.verdict.loginLevelDesktopUISmoke === false, "dry-run must not claim login smoke");
   assert(result.verdict.deliveryNotifyInWebView === false, "dry-run must not claim notify smoke");
   assert(!serialized.match(/[A-Z]:\\\\/), "dry-run leaked Windows absolute path");

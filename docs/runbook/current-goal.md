@@ -109,6 +109,9 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   metadata、错误 target 和 malformed JSON 的 fail-closed 行为。该 bridge 不暴露
   token、storage、文件系统或 message API。Android WebView inspection 现在显式跟随
   平台 debuggable flag，仅用于 debug / smoke automation，不允许 release 无条件开启。
+  Android native validator 现在也锁住 DOM storage enabled、file access disabled
+  和 content access disabled，保证 WebView 能跑 shared runtime 但不打开原生文件 /
+  content 访问面。
 - Web shell 的运行入口面板已展示 shell target、PC Tauri `runtime_metadata`
   和 Android native bridge metadata；该展示只用于本地诊断，不改变客户端权限边界。
 - Web app 会在主 bundle 前加载 `nexusim-shell-config.js`；`clients/desktop` 和

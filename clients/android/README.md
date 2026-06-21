@@ -20,6 +20,9 @@ Flutter or native Kotlin for a concrete reason.
   exposes only one method, `runtimeMetadata()`, with runtime metadata (`target`,
   bridge version and label), and does not expose token, storage, file-system or
   message APIs.
+- The WebView uses `WebViewAssetLoader`, loads `appassets.androidplatform.net`,
+  enables DOM storage for the shared TypeScript runtime, and keeps raw file /
+  content access disabled.
 - `shell-config.example.json` records the low-permission WebView config bridge
   for local LAN endpoints and Android runtime identity. It can be rendered to
   `web/public/nexusim-shell-config.js` before a shell build.
@@ -41,6 +44,9 @@ Flutter or native Kotlin for a concrete reason.
 - `NexusIMNative` is a single-method metadata bridge only. It must stay
   read-only until a separate ADR defines native capability commands and their
   audit boundary.
+- File and content access must stay disabled in the native WebView shell.
+  Local LAN API / WebSocket endpoints are supplied through shell config and must
+  still flow through `api-gateway` and `push-gateway`.
 - Current local message cache is in-memory only; production cache should use
   SQLite behind `LocalMessageStore`.
 - Push notification integration must not bypass PullInbox reconciliation.

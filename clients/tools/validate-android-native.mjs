@@ -57,7 +57,9 @@ assert(manifest.includes('android:name=".MainActivity"'), "Android MainActivity 
 const mainActivity = read("android/native/app/src/main/java/com/nexusim/android/MainActivity.kt");
 assert(mainActivity.includes("WebViewAssetLoader"), "Android shell must use WebViewAssetLoader");
 assert(mainActivity.includes("appassets.androidplatform.net"), "Android shell must load appassets URL");
+assert(mainActivity.includes("domStorageEnabled = true"), "Android shell must enable DOM storage for the shared WebView runtime");
 assert(mainActivity.includes("allowFileAccess = false"), "Android shell must disable file access");
+assert(mainActivity.includes("allowContentAccess = false"), "Android shell must disable content access");
 assert(mainActivity.includes('addJavascriptInterface(NexusIMBridge(), "NexusIMNative")'), "Android shell must register low-permission native metadata bridge");
 assert(mainActivity.includes("WebView.setWebContentsDebuggingEnabled"), "Android shell must explicitly gate WebView inspection");
 assert(mainActivity.includes("ApplicationInfo.FLAG_DEBUGGABLE"), "Android WebView inspection must follow application debuggable flag");

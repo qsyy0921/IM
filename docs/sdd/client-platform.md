@@ -273,6 +273,10 @@ Responsibilities:
   through ADB after a debuggable shell is launched, but it must only output
   aggregate socket counts, short socket hashes and next actions. It must not
   print raw socket names, raw device identifiers, local paths or auth material.
+- Android WebView shell must keep file and content access disabled while using
+  `WebViewAssetLoader` / `appassets.androidplatform.net`; DOM storage is allowed
+  because the first-stage shared runtime still uses WebView-local cache and
+  session adapters.
 - Android asset preparation must clean the WebView asset output directory before
   copying a new build, so APKs do not carry stale Web bundles.
 - Android asset preparation uses the same low-sensitive shell asset manifest as

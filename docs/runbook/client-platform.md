@@ -160,7 +160,9 @@ First slice:
 - `npm --prefix clients run test:shell-web-assets` validates the target asset
   prep wrapper without requiring Tauri CLI, Android SDK or a live backend. It
   also checks stale bundle cleanup so Android / desktop shell outputs do not
-  retain old Web assets across builds.
+  retain old Web assets across builds, and verifies the low-sensitive
+  `nexusim-shell-assets-manifest.json` with relative paths, byte sizes and
+  SHA-256 hashes.
 - `npm --prefix clients run test:artifact-builders` validates the first-stage
   desktop artifact / Android APK build wrappers in dry-run mode. Real build
   commands are present as `build:desktop-artifact` and `build:android-apk`, but

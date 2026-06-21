@@ -82,6 +82,10 @@ npm --prefix clients run build:shell-assets:desktop
 npm --prefix clients run build:shell-assets:android
 ```
 
+The shell asset prep step writes `nexusim-shell-assets-manifest.json` next to the
+prepared Web assets. The manifest contains only target, relative file paths,
+byte sizes and SHA-256 hashes; it does not record local absolute paths.
+
 Check artifact build commands without requiring the heavy native toolchains:
 
 ```powershell

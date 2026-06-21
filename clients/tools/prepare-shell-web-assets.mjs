@@ -1,10 +1,12 @@
-import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { dirname, join, relative, resolve, sep } from "node:path";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { parseShellConfig, renderShellConfigScript } from "./render-shell-config.mjs";
 
 const clientsRoot = fileURLToPath(new URL("..", import.meta.url));
+const shellAssetsManifestFilename = "nexusim-shell-assets-manifest.json";
 
 const targetSpecs = {
   "windows-desktop": {
@@ -50,12 +52,48 @@ export function prepareShellWebAssets(options) {
   const shellConfigPath = resolve(outputDir, "nexusim-shell-config.js");
   mkdirSync(dirname(shellConfigPath), { recursive: true });
   writeFileSync(shellConfigPath, renderShellConfigScript(config), "utf8");
+  const manifestPath = resolve(outputDir, shellAssetsManifestFilename);
+  writeFileSync(manifestPath, JSON.stringify(buildShellAssetsManifest(target, outputDir), null, 2) + "\n", "utf8");
   return {
     target,
     configPath,
     outputDir,
-    shellConfigPath
+    shellConfigPath,
+    manifestPath
   };
+}
+
+function buildShellAssetsManifest(target, outputDir) {
+  return {
+    schemaVersion: "nexusim.shell-assets.v1",
+    target,
+    generatedAt: new Date().toISOString(),
+    files: listAssetFiles(outputDir).map(path => {
+      const bytes = readFileSync(join(outputDir, path));
+      return {
+        path,
+        bytes: bytes.length,
+        sha256: createHash("sha256").update(bytes).digest("hex")
+      };
+    })
+  };
+}
+
+function listAssetFiles(rootDir, dir = rootDir) {
+  const files = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const fullPath = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...listAssetFiles(rootDir, fullPath));
+      continue;
+    }
+    if (!entry.isFile() || entry.name === shellAssetsManifestFilename) {
+      continue;
+    }
+    const relativePath = relative(rootDir, fullPath).split(sep).join("/");
+    files.push(relativePath);
+  }
+  return files.sort();
 }
 
 function runWebBuild() {

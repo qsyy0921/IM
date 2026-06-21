@@ -1,4 +1,5 @@
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { prepareShellWebAssets } from "./prepare-shell-web-assets.mjs";
@@ -38,6 +39,7 @@ try {
   assert(desktopConfig.includes('"target": "windows-desktop"'), "desktop config not rendered");
   assert(!desktopConfig.match(/token|secret|password|credential|private/i), "desktop rendered config contains sensitive key");
   assert(!existsSync(join(desktopOut, "assets", "stale.js")), "desktop output must remove stale assets");
+  assertShellAssetsManifest(desktopOut, "windows-desktop");
 
   const androidOut = join(tempRoot, "android-out");
   mkdirSync(join(androidOut, "assets"), { recursive: true });
@@ -53,6 +55,7 @@ try {
   assert(readFileSync(join(androidOut, "assets", "index.js"), "utf8").includes("nexusim"), "android assets not copied");
   assert(androidConfig.includes('"target": "android"'), "android config not rendered");
   assert(!existsSync(join(androidOut, "assets", "stale.js")), "android output must remove stale assets");
+  assertShellAssetsManifest(androidOut, "android");
 
   let rejected = false;
   try {
@@ -70,4 +73,22 @@ try {
   console.log("shell web assets ok");
 } finally {
   rmSync(tempRoot, { recursive: true, force: true });
+}
+
+function assertShellAssetsManifest(outputDir, target) {
+  const manifest = JSON.parse(readFileSync(join(outputDir, "nexusim-shell-assets-manifest.json"), "utf8"));
+  const serialized = JSON.stringify(manifest);
+  assert(manifest.schemaVersion === "nexusim.shell-assets.v1", `${target} manifest schema mismatch`);
+  assert(manifest.target === target, `${target} manifest target mismatch`);
+  assert(!serialized.match(/[A-Z]:\\\\/), `${target} manifest leaked Windows absolute path`);
+  assert(!serialized.includes("\\\\?"), `${target} manifest leaked extended Windows path`);
+  const files = new Map(manifest.files.map(file => [file.path, file]));
+  for (const path of ["index.html", "assets/index.js", "nexusim-shell-config.js"]) {
+    const file = files.get(path);
+    assert(file, `${target} manifest missing ${path}`);
+    const bytes = readFileSync(join(outputDir, path));
+    assert(file.bytes === bytes.length, `${target} manifest byte size mismatch for ${path}`);
+    assert(file.sha256 === createHash("sha256").update(bytes).digest("hex"), `${target} manifest hash mismatch for ${path}`);
+  }
+  assert(!files.has("assets/stale.js"), `${target} manifest included stale asset`);
 }

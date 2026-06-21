@@ -194,6 +194,9 @@ Responsibilities:
 - Shell asset preparation must clean the target output directory before copying
   a new Web build when source and output differ, so packaged desktop shells do
   not retain stale JS / CSS bundles.
+- Shell asset preparation must write a low-sensitive manifest with relative
+  paths, byte sizes and SHA-256 hashes. The manifest must not include local
+  absolute paths, tokens, user ids or endpoint secrets.
 
 PC constraints:
 
@@ -224,6 +227,8 @@ Responsibilities:
   storage.
 - Android asset preparation must clean the WebView asset output directory before
   copying a new build, so APKs do not carry stale Web bundles.
+- Android asset preparation uses the same low-sensitive shell asset manifest as
+  desktop.
 
 Android constraints:
 

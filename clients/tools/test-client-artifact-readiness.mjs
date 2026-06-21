@@ -19,7 +19,9 @@ const serialized = JSON.stringify(report);
 
 assert(report.schemaVersion === "nexusim.client-artifact-readiness.v1", "schema version mismatch");
 assert(report.targets["windows-desktop"].buildCommand.includes("build:desktop-artifact:collect"), "desktop collect command missing");
+assert(typeof report.targets["windows-desktop"].shellAssets?.verified === "boolean", "desktop shell asset status missing");
 assert(report.targets.android.buildCommand.includes("build:android-apk:collect"), "android collect command missing");
+assert(typeof report.targets.android.shellAssets?.verified === "boolean", "android shell asset status missing");
 assert(report.targets.android.dockerBuilder.profile === "client-builders", "android builder profile mismatch");
 assert(report.targets.android.dockerBuilder.outputHint.endsWith("manifest.json"), "android builder manifest hint missing");
 assert(

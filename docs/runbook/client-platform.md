@@ -179,8 +179,9 @@ First slice:
 - `npm --prefix clients run report:artifact-readiness` prints a low-sensitive
   readiness matrix for local desktop, local Android and Android Docker builder
   paths. It reports missing capabilities and the exact next build command
-  without printing local absolute paths. It separates the Android Docker builder
-  image build command from the actual builder run command and emits low-sensitive
+  without printing local absolute paths. It also includes per-target prepared
+  shell asset verification status. It separates the Android Docker builder image
+  build command from the actual builder run command and emits low-sensitive
   `nextActions`; it never starts a download or build by itself.
 - `npm --prefix clients run validate:builder-profile` validates the Android
   Docker builder profile without building or pulling images. The profile lives
@@ -279,7 +280,8 @@ toolchains are missing. It is local-only: it does not install dependencies, pull
 packages, or use `npx` to resolve remote CLIs.
 
 The readiness report is non-failing and is useful before deciding whether to
-install native toolchains or run the Docker builder:
+install native toolchains or run the Docker builder. It also reports whether
+current prepared shell assets verify against `nexusim-shell-assets-manifest.json`:
 
 ```powershell
 npm --prefix clients run report:artifact-readiness

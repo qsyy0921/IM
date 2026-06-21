@@ -151,4 +151,5 @@ Current packaging status:
 - `report:artifact-readiness` prints the current low-sensitive readiness matrix
   for local desktop, local Android and Android Docker builder paths. It also
   emits `nextActions`, including the explicit Android builder image build command
-  before the run command when the image is absent.
+  before the run command when the image is absent, and includes whether prepared
+  shell assets currently verify against their manifest.

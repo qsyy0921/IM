@@ -6,6 +6,7 @@ import {
   runCommand,
   workspaceRoot
 } from "./client-build-env.mjs";
+import { verifyShellAssets } from "./verify-shell-assets.mjs";
 
 const androidBuilderImage = "nexusim/client-android-builder:local";
 const androidBuilderCompose = "deploy/local/docker-compose.client-builders.yml";
@@ -29,12 +30,14 @@ export function buildReadinessReport() {
       "windows-desktop": {
         ready: prereqs.desktopArtifactReady,
         missing: missingChecks(prereqs.checks, "desktop"),
+        shellAssets: shellAssetStatus("windows-desktop"),
         buildCommand: "npm --prefix clients run build:desktop-artifact:collect",
         dryRunCommand: "node clients/tools/build-desktop-artifact.mjs --dry-run --collect"
       },
       android: {
         ready: prereqs.androidApkReady,
         missing: missingChecks(prereqs.checks, "android"),
+        shellAssets: shellAssetStatus("android"),
         buildCommand: "npm --prefix clients run build:android-apk:collect",
         dryRunCommand: "node clients/tools/build-android-apk.mjs --dry-run --collect",
         dockerBuilder: {
@@ -123,6 +126,41 @@ function sanitizedChecks(checks) {
     }
     return result;
   });
+}
+
+function shellAssetStatus(target) {
+  try {
+    const result = verifyShellAssets({ target });
+    return {
+      verified: true,
+      fileCount: result.fileCount
+    };
+  } catch (error) {
+    return {
+      verified: false,
+      reason: shellAssetFailureReason(error)
+    };
+  }
+}
+
+function shellAssetFailureReason(error) {
+  const message = error instanceof Error ? error.message : String(error);
+  if (message.includes("missing shell asset manifest")) {
+    return "missing-manifest";
+  }
+  if (message.includes("file set mismatch")) {
+    return "file-set-mismatch";
+  }
+  if (message.includes("byte size mismatch")) {
+    return "byte-size-mismatch";
+  }
+  if (message.includes("hash mismatch")) {
+    return "hash-mismatch";
+  }
+  if (message.includes("leaked local path") || message.includes("leaked sensitive")) {
+    return "sensitive-manifest";
+  }
+  return "invalid-manifest";
 }
 
 function dockerStatus() {

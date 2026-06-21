@@ -31,7 +31,7 @@ assert(result.verdict.pullInboxInWebView === false, "plan must not claim PullInb
 assert(result.verdict.ackDeliveryInWebView === false, "plan must not claim AckDelivery smoke");
 assert(result.prerequisites.some(item => item.name === "debuggable-apk"), "debuggable APK prerequisite missing");
 assert(result.prerequisites.some(item => item.name === "webview-devtools-socket"), "WebView devtools prerequisite missing");
-assert(result.commands.futureRunner.includes("smoke:android-webview-login"), "future runner command missing");
+assert(result.commands.runner.includes("smoke:android-webview-login"), "runner command missing");
 assert(result.selectorContract.required.includes("ack-status"), "ack selector contract missing");
 assert(!serialized.match(/[A-Z]:\\\\/), "plan leaked Windows absolute path");
 assert(!serialized.includes("\\\\?"), "plan leaked extended Windows path");

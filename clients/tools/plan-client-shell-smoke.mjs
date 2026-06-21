@@ -148,6 +148,7 @@ function nativeCommands(target, readinessTarget) {
     deviceReadiness: "npm --prefix clients run report:android-device-readiness",
     webviewMetadataSmoke: "npm --prefix clients run smoke:android-webview-metadata",
     webviewLoginSmokePlan: "npm --prefix clients run plan:android-webview-login-smoke",
+    webviewLoginSmoke: "npm --prefix clients run smoke:android-webview-login -- --fixture <clientweb-fixture.json>",
     dockerBuilder: readinessTarget.dockerBuilder?.imagePresent
       ? readinessTarget.dockerBuilder.buildCommand
       : readinessTarget.dockerBuilder?.imageBuildCommand,
@@ -265,6 +266,11 @@ function nativeChecklist(target, readinessTarget, artifactStatus, installStatus)
       step: "plan-android-webview-login-smoke",
       command: nativeCommands(target, readinessTarget).webviewLoginSmokePlan,
       evidence: "login-level Android WebView smoke prerequisites, selector contract and low-sensitive execution steps are explicit before a real runner is enabled"
+    });
+    checklist.push({
+      step: "run-android-webview-login-smoke",
+      command: nativeCommands(target, readinessTarget).webviewLoginSmoke,
+      evidence: "Android WebView is externally driven through login, delivery.notify, PullInbox and AckDelivery while the clientweb local stack is alive"
     });
   }
 

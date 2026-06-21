@@ -62,7 +62,7 @@ export function buildAndroidWebViewLoginSmokePlan(options = {}) {
       installAndLaunch: "adb install -r <apk> && adb shell am start -n com.nexusim.android/.MainActivity",
       devtoolsDiscovery: "adb shell cat /proc/net/unix | findstr webview_devtools_remote",
       devtoolsForward: "adb forward tcp:<local-port> localabstract:<webview-devtools-socket>",
-      futureRunner: "npm --prefix clients run smoke:android-webview-login -- --fixture <clientweb-fixture.json>"
+      runner: "npm --prefix clients run smoke:android-webview-login -- --fixture <clientweb-fixture.json>"
     },
     selectorContract: {
       source: "clients/web/src/App.tsx data-testid",

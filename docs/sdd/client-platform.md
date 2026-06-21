@@ -266,8 +266,9 @@ Responsibilities:
 - Android login-level WebView smoke must remain a separate step from metadata
   smoke. The first-stage plan records the debuggable APK, authorized ADB
   device, WebView devtools socket, clientweb fixture and public UI selector
-  prerequisites before enabling a real runner; the plan must not claim login,
-  PullInbox, WebSocket or AckDelivery evidence by itself.
+  prerequisites before running the real runner. The runner may use CDP through
+  ADB WebView devtools forwarding to drive the public UI, but dry-run output
+  must not claim login, PullInbox, WebSocket or AckDelivery evidence by itself.
 - Android asset preparation must clean the WebView asset output directory before
   copying a new build, so APKs do not carry stale Web bundles.
 - Android asset preparation uses the same low-sensitive shell asset manifest as

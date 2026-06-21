@@ -172,9 +172,11 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   阻塞，尚未形成真实设备 baseline。由于 callback URL 在打包前注入 shell assets，
   该 metadata smoke 必须 fresh-build 当前 run 的 APK；普通旧 APK 不能作为
   callback path 证据。Android 登录级 WebView smoke 现在已有低敏 plan 入口
-  `npm --prefix clients run plan:android-webview-login-smoke`，会列出 debuggable APK、
-  ADB、WebView devtools、clientweb fixture 和公共 UI selector 前置条件；它不构建
-  APK、不连接设备，也不声称 login / PullInbox / AckDelivery 已在 Android WebView 内通过。
+  `npm --prefix clients run plan:android-webview-login-smoke` 和真实 runner 入口
+  `npm --prefix clients run smoke:android-webview-login -- --fixture <clientweb-fixture.json>`；
+  dry-run 覆盖 debuggable APK、ADB、WebView devtools、clientweb fixture 和公共 UI
+  selector 契约，不构建 APK、不连接设备，也不声称 login / PullInbox / AckDelivery
+  已在 Android WebView 内通过。真实执行仍等待 collected debuggable APK 和工具链 ready。
 - `clients/tools/report-android-device-readiness.mjs` 已提供低敏 Android 设备前置检查；
   `npm --prefix clients run report:android-device-readiness` 只运行 `adb devices -l`，
   输出 adb 是否可用、authorized / unauthorized / offline 计数和短 serial hash，

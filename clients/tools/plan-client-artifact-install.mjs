@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -17,15 +18,16 @@ function main(argv) {
 
 export function buildClientArtifactInstallPlan(options = {}) {
   const manifestPath = options.manifest ? resolve(options.manifest) : findLatestArtifactManifest(options.artifactsRoot ?? artifactsRoot);
+  const installPrereqs = options.installPrereqs ?? collectInstallPrereqs();
   if (!manifestPath) {
-    return emptyPlan();
+    return emptyPlan(installPrereqs);
   }
 
   const manifest = readManifest(manifestPath);
   const manifestDir = dirname(manifestPath);
   const targets = Object.fromEntries(targetNames.map(target => [
     target,
-    targetInstallPlan(target, manifest, manifestDir)
+    targetInstallPlan(target, manifest, manifestDir, installPrereqs)
   ]));
   const plan = {
     schemaVersion,
@@ -41,7 +43,7 @@ export function buildClientArtifactInstallPlan(options = {}) {
   return plan;
 }
 
-function emptyPlan() {
+function emptyPlan(installPrereqs) {
   return {
     schemaVersion,
     generatedAt: new Date().toISOString(),
@@ -52,8 +54,10 @@ function emptyPlan() {
     targets: Object.fromEntries(targetNames.map(target => [
       target,
       {
+        artifactReady: false,
         readyForInstall: false,
-        missing: ["artifact-manifest"],
+        installPrereqs: targetInstallPrereqs(target, installPrereqs),
+        missing: missingInstallInputs(target, installPrereqs, ["artifact-manifest"]),
         checklist: [
           {
             step: "build-and-collect-artifact",
@@ -68,12 +72,15 @@ function emptyPlan() {
   };
 }
 
-function targetInstallPlan(target, manifest, manifestDir) {
+function targetInstallPlan(target, manifest, manifestDir, installPrereqs) {
   const artifact = findArtifact(manifest, target);
+  const prereqs = targetInstallPrereqs(target, installPrereqs);
   if (!artifact) {
     return {
+      artifactReady: false,
       readyForInstall: false,
-      missing: [`${target}-artifact`],
+      installPrereqs: prereqs,
+      missing: missingInstallInputs(target, installPrereqs, [`${target}-artifact`]),
       checklist: [
         {
           step: "build-and-collect-artifact",
@@ -89,8 +96,12 @@ function targetInstallPlan(target, manifest, manifestDir) {
   const artifactPath = join(manifestDir, artifact.filename);
   validateArtifactFile(artifact, artifactPath);
   const artifactHint = safeHint(artifactPath);
+  const missing = missingInstallInputs(target, installPrereqs, []);
   return {
-    readyForInstall: true,
+    artifactReady: true,
+    readyForInstall: missing.length === 0,
+    installPrereqs: prereqs,
+    missing,
     artifact: {
       filename: artifact.filename,
       bytes: artifact.bytes,
@@ -99,6 +110,45 @@ function targetInstallPlan(target, manifest, manifestDir) {
     },
     checklist: installChecklist(target, artifactHint)
   };
+}
+
+function targetInstallPrereqs(target, installPrereqs) {
+  if (target === "android") {
+    return {
+      adbAvailable: Boolean(installPrereqs.adbAvailable)
+    };
+  }
+  return {
+    windowsInstallerLaunchSupported: Boolean(installPrereqs.windowsInstallerLaunchSupported)
+  };
+}
+
+function missingInstallInputs(target, installPrereqs, baseMissing) {
+  const missing = [...baseMissing];
+  if (target === "android" && !installPrereqs.adbAvailable) {
+    missing.push("adb");
+  }
+  if (target === "windows-desktop" && !installPrereqs.windowsInstallerLaunchSupported) {
+    missing.push("windows-installer-launch");
+  }
+  return missing;
+}
+
+function collectInstallPrereqs() {
+  return {
+    adbAvailable: commandAvailable("adb", ["version"]),
+    windowsInstallerLaunchSupported: process.platform === "win32"
+  };
+}
+
+function commandAvailable(command, args) {
+  const result = spawnSync(command, args, {
+    encoding: "utf8",
+    stdio: "ignore",
+    timeout: 3000,
+    windowsHide: true
+  });
+  return result.status === 0;
 }
 
 function installChecklist(target, artifactHint) {

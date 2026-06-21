@@ -75,7 +75,7 @@ adoption rules，不把服务数量、中间件或部署形态写死。
   prep，直接 Gradle build 仍会自动准备 assets；artifact / APK wrapper 已能 dry-run 输出命令和缺失工具链，Android
   builder profile 已能静态校验，readiness report 已显示 shell asset verification
   状态，artifact install plan 已能从 collected manifest 输出低敏 Windows / Android
-  安装 checklist 且不触碰设备，shell smoke plan 已能输出低敏 browser / desktop /
+  安装 checklist 和 install-side prereq readiness，且不触碰设备，shell smoke plan 已能输出低敏 browser / desktop /
   Android smoke 前置计划和 per-target manual checklist；
   下一步做本地 artifact / APK 和真实平台 shell smoke。
 - admin / audit / workflow：客户端切片完成后继续公开 API handoff、operator

@@ -130,8 +130,10 @@ ignored `clients/artifacts/<run-id>/` directory and writes a low-sensitive
 local absolute source paths. The `*:collect` build scripts run the same
 collection step automatically after a successful native build.
 `plan:artifact-install` reads that collected manifest and prints a low-sensitive
-Windows / Android install checklist. It does not install packages, connect to
-ADB, launch installers or print local absolute paths.
+Windows / Android install checklist. It also reports local install prerequisites
+such as Android `adb` availability and Windows installer launch support, but it
+does not install packages, connect to devices, launch installers or print local
+absolute paths.
 
 Android can also be built through the local Docker builder profile when the image
 is intentionally built:

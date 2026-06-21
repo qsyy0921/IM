@@ -182,7 +182,9 @@ First slice:
   first-stage install-plan tool. `npm --prefix clients run plan:artifact-install`
   reads a collected `clients/artifacts/<run-id>/manifest.json` and prints
   low-sensitive Windows installer / Android APK install checklist commands. It
-  does not launch installers, connect to ADB, install packages or print local
+  now also reports install-side readiness such as Android `adb` availability
+  and Windows local installer launch support, while still not launching
+  installers, contacting devices, installing packages or printing local
   absolute paths.
 - `npm --prefix clients run report:artifact-readiness` prints a low-sensitive
   readiness matrix for local desktop, local Android and Android Docker builder

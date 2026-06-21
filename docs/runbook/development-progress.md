@@ -72,7 +72,7 @@
   desktop / Android artifact build wrapper 已有 dry-run-tested command plan，
   readiness report 已显示 per-target shell asset verification 状态；
   artifact install plan 已能从 collected manifest 输出低敏 Windows / Android 安装
-  checklist 且不连接设备，shell smoke plan 已能输出低敏 browser / desktop / Android
+  checklist 和 install-side prereq readiness，且不连接设备，shell smoke plan 已能输出低敏 browser / desktop / Android
   smoke 前置计划和 per-target manual checklist；
   artifact collector 已能归档产物并生成低敏 SHA-256 manifest，build wrapper 已支持
   成功构建后自动归档，Android Docker builder

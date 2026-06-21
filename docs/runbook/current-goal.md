@@ -133,8 +133,9 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   产出后可用 `collect:client-artifacts` 写入 ignored `clients/artifacts/<run-id>/`
   并生成低敏 manifest；`build:desktop-artifact:collect` 和
   `build:android-apk:collect` 会在 native build 成功后自动执行该归档步骤。`plan:artifact-install`
-  会读取 collected manifest 并输出低敏 Windows / Android 安装 checklist；它不启动安装器、
-  不连接 ADB、不安装 APK，也不输出本机绝对路径。当前仍没有真实 installer / APK baseline。
+  会读取 collected manifest 并输出低敏 Windows / Android 安装 checklist；它现在也报告
+  Android `adb` availability 与 Windows installer launch support，但仍不启动安装器、
+  不连接设备、不安装 APK，也不输出本机绝对路径。当前仍没有真实 installer / APK baseline。
 - Android 已新增 opt-in Docker builder profile：
   `deploy/docker/client-android-builder.Dockerfile` 和
   `deploy/local/docker-compose.client-builders.yml`。`validate:builder-profile`

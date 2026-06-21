@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { createClientRuntime, validateRuntimeConfig } from "@nexusim/client-core";
+import { createClientRuntime, createClientShellActions, validateRuntimeConfig } from "@nexusim/client-core";
 import type { AuthSession, ConversationSummary, DeliveryNotifyFrame, MessageItem, ServerFrame } from "@nexusim/protocol";
 import { createBrowserPlatformAdapter } from "./platform-adapter";
 import type { BrowserPlatformAdapterOptions } from "./platform-adapter";
@@ -30,6 +30,7 @@ export function App() {
       }),
     [platform]
   );
+  const shellActions = useMemo(() => createClientShellActions(runtime), [runtime]);
   const store = platform.messageStore;
 
   const [tenantID, setTenantID] = useState("tenant-local");
@@ -81,7 +82,7 @@ export function App() {
   async function logout(): Promise<void> {
     await run("logout", async () => {
       try {
-        await runtime.logout();
+        await shellActions.logout();
       } finally {
         pushConnectionRef.current?.close();
         pushConnectionRef.current = null;
@@ -95,6 +96,20 @@ export function App() {
         setPushStatus("disconnected");
         await store.clear();
       }
+    });
+  }
+
+  async function restoreSession(): Promise<void> {
+    await run("restore session", async () => {
+      const state = await shellActions.restoreSession();
+      const restoredSession = runtime.auth.current();
+      if (!state.authenticated || !restoredSession) {
+        throw new Error("no saved session");
+      }
+      sessionRef.current = restoredSession;
+      setSession(restoredSession);
+      await connectPush(restoredSession);
+      await loadConversations(restoredSession);
     });
   }
 
@@ -294,6 +309,9 @@ export function App() {
           </button>
           <button className="secondary-button" type="button" onClick={() => void logout()} disabled={!session}>
             退出登录
+          </button>
+          <button className="secondary-button" type="button" onClick={() => void restoreSession()} disabled={!!session}>
+            恢复会话
           </button>
         </section>
 

@@ -60,7 +60,8 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   会调用 BFF logout、断开 push、清理 secure session store 和 local message store；
   shared runtime 现在也提供 `login` / `refresh` / `restoreSession`，登录和刷新会写入
   平台 secure session store，重启式 runtime 重新创建后可从平台 store hydrate
-  auth manager。
+  auth manager；Web shell 登录面板已通过 `ClientShellActions` 接入 restore /
+  logout action，PC / Android WebView 后续复用同一 UI action contract。
 - `clients` workspace 已新增本地构建前置检查
   `npm --prefix clients run check:build-prereqs`；该检查只读取本机 Rust /
   Tauri / JDK / Gradle / Android SDK 状态，不安装依赖、不拉包、不使用 `npx`
@@ -212,7 +213,7 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
 1. 补本地 Tauri CLI / Android JDK 17+ / Gradle / Android SDK，或显式运行 Android
    Docker builder profile，然后运行 `build:desktop-artifact:collect` /
    `build:android-apk:collect` 产出首个本地 artifact + manifest。
-2. 在真实 PC / Android shell UI 中接入现有 shell logout action，并在工具链 ready 后跑平台 shell smoke。
+2. 在真实 PC / Android shell UI 中接入现有 shell action，并在工具链 ready 后跑平台 shell smoke。
 3. 后续把 desktop / Android first-stage localStorage store 替换为 native
    SQLite bridge，并补真实平台 runtime smoke。
 4. 再回到 workflow compensation adapter / instruction approval UI / ops 管理；

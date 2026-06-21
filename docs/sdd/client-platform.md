@@ -455,9 +455,12 @@ action are explicit, while platform adapters do not expose native paths or
 tokens. Web runtime discovery may wrap native key-value storage only when
 metadata is explicitly ready and the fixed Tauri `local_store_*` commands or
 Android `NexusIMNative.localStore*` methods are present; current real shells
-still expose metadata only and remain on localStorage. `MemoryMessageStore`,
-`KeyValueMessageStore` and `IndexedDBMessageStore` share the same pending-send
-readback and accepted-send de-duplication contract.
+still expose metadata only and remain on localStorage. The Web shell platform
+adapter can now hand an Android ready native bridge to the shared
+`KeyValueMessageStore`; without ready metadata it keeps the browser IndexedDB /
+WebView localStorage path. `MemoryMessageStore`, `KeyValueMessageStore` and
+`IndexedDBMessageStore` share the same pending-send readback and accepted-send
+de-duplication contract.
 
 Minimum local entities:
 

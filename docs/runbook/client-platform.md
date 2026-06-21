@@ -172,10 +172,12 @@ First slice:
   `sqlite` config is reserved and fails fast through shared
   `NativeStoreReadiness` until that bridge exists. The readiness contract emits
   stable low-sensitive `reason`, expected bridge and next action fields, so
-  tools and runtime adapters do not need target-specific error strings.
-  `LocalMessageStore.clear`
-  is now part of the shared port so logout can remove cached messages, cursors
-  and pending sends consistently across targets.
+  tools and runtime adapters do not need target-specific error strings. Web
+  shell adapter wiring now accepts an Android ready native key-value bridge
+  and routes it through shared `KeyValueMessageStore`; the real Kotlin shell
+  still reports not-ready until the SQLite methods are implemented.
+  `LocalMessageStore.clear` is now part of the shared port so logout can remove
+  cached messages, cursors and pending sends consistently across targets.
 - `LocalMessageStore.listMessages` is now part of the shared port. Web,
   desktop and Android shell UI can read cached messages through the same local
   read-model boundary; `MemoryMessageStore`, `KeyValueMessageStore` and

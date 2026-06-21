@@ -86,8 +86,11 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   `sqlite` store path。Web runtime 现在也会严格发现 ready native store metadata：
   desktop 只接受 Tauri `local_store_*` 命令，Android 只接受
   `NexusIMNative.localStore*` 方法，缺方法或 readiness false 都保持 fail closed。
-  focused runtime test 用 fake native bridge 覆盖了 cursor / message 持久化和重开；
-  真实 Tauri / Kotlin SQLite 命令桥仍未实现，默认 shell 仍用 localStorage。
+  Web shell platform adapter 现在可在 Android metadata ready 且 bridge 方法齐全时
+  把 native bridge 交给 shared `KeyValueMessageStore`；否则保持 browser
+  IndexedDB / WebView localStorage 路径。focused runtime test 用 fake native bridge
+  覆盖了 cursor / message 持久化和重开；真实 Tauri / Kotlin SQLite 命令桥仍未实现，
+  默认 shell 仍用 localStorage。
 - `LocalMessageStore.listMessages` 已提升为 shared client-core port；
   `MemoryMessageStore`、`KeyValueMessageStore` 和 Web `IndexedDBMessageStore`
   现在都有同一读缓存语义，并补了 pending -> accepted-send 迁移去重测试。

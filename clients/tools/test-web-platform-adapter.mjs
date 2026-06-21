@@ -184,6 +184,35 @@ async function main() {
   assertEqual(androidNativeStorage?.getItem("android-key"), "android-value", "android native storage get item");
   androidNativeStorage?.removeItem("android-key");
   assertEqual(androidNativeStorage?.getItem("android-key"), null, "android native storage remove item");
+  const nativeStoreAdapter = createBrowserPlatformAdapter({
+    config: {
+      apiBaseURL: "http://127.0.0.1:8080",
+      pushWebSocketURL: "ws://127.0.0.1:8088/ws",
+      deviceID: "android-native-store"
+    },
+    target: "android",
+    nativeStorageBridge: androidNativeStorage
+  });
+  await nativeStoreAdapter.messageStore.upsertMessages([
+    message("conv-native", 9, "android-native-message")
+  ]);
+  assertEqual(
+    await nativeStoreAdapter.messageStore.getLastReceivedSeq("conv-native"),
+    9,
+    "webview adapter uses native storage bridge for cursor"
+  );
+  const reopenedNativeStoreAdapter = createBrowserPlatformAdapter({
+    config: {
+      apiBaseURL: "http://127.0.0.1:8080",
+      pushWebSocketURL: "ws://127.0.0.1:8088/ws",
+      deviceID: "android-native-store"
+    },
+    target: "android",
+    nativeStorageBridge: androidNativeStorage
+  });
+  const cachedMessages = await reopenedNativeStoreAdapter.messageStore.listMessages("conv-native");
+  assertEqual(cachedMessages.length, 1, "webview adapter reopens native storage bridge cache");
+  assertEqual(cachedMessages[0]?.messageID, "android-native-message", "webview adapter native bridge message id");
 
   globalThis.NexusIMNative = {
     runtimeMetadata() {
@@ -343,6 +372,20 @@ function session(accessToken) {
     sessionID: "session-1",
     accessToken,
     refreshToken: "refresh-1"
+  };
+}
+
+function message(conversationID, conversationSeq, messageID) {
+  return {
+    tenantID: "tenant-1",
+    conversationID,
+    messageID,
+    senderUserID: "user-1",
+    conversationSeq,
+    contentType: "TEXT",
+    text: "cached",
+    status: "DELIVERED",
+    createdAtMs: conversationSeq
   };
 }
 

@@ -29,8 +29,9 @@ Flutter or native Kotlin for a concrete reason.
   injected. The TypeScript-side bridge contract is in place and covered by
   focused tests. Web runtime discovery now only enables it when metadata reports
   ready and `NexusIMNative` exposes all `localStore*` methods; the current
-  WebView shell still uses localStorage persistence until the Android SQLite
-  bridge is implemented.
+  WebView shell can pass that ready bridge into the shared `KeyValueMessageStore`.
+  The current Kotlin shell still reports not-ready metadata and uses
+  localStorage persistence until the Android SQLite bridge is implemented.
 - `shell-config.example.json` records the low-permission WebView config bridge
   for local LAN endpoints and Android runtime identity. It can be rendered to
   `web/public/nexusim-shell-config.js` before a shell build.

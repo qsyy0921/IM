@@ -4,10 +4,13 @@ import type {
   ClientRuntimeConfig,
   ClientRuntimeTarget,
   ConnectivityState,
+  LocalMessageStore,
   NetworkStatePort,
+  NativeStringKeyValueBridge,
   SecureSessionStore,
   WakeupNotificationPort
 } from "@nexusim/client-core";
+import { KeyValueMessageStore, NativeBridgeStringKeyValueStorage } from "@nexusim/client-core";
 import type { AuthSession } from "@nexusim/protocol";
 import { IndexedDBMessageStore } from "./adapters/indexeddb-message-store";
 
@@ -17,14 +20,15 @@ export interface BrowserPlatformAdapterOptions {
   appVersion?: string;
   installationID?: string;
   sessionKey?: string;
-  messageStore?: IndexedDBMessageStore;
+  messageStore?: LocalMessageStore;
+  nativeStorageBridge?: NativeStringKeyValueBridge;
 }
 
 export type BrowserPlatformAdapter = ClientPlatformAdapter & {
   identity: ClientPlatformAdapter["identity"] & {
     target: ClientRuntimeTarget;
   };
-  messageStore: IndexedDBMessageStore;
+  messageStore: LocalMessageStore;
 };
 
 export function createBrowserPlatformAdapter(
@@ -39,11 +43,25 @@ export function createBrowserPlatformAdapter(
       appVersion: options.appVersion ?? "0.1.0"
     },
     secureSessionStore: new BrowserSessionStore(options.sessionKey),
-    messageStore: options.messageStore ?? new IndexedDBMessageStore(),
+    messageStore: options.messageStore ?? messageStoreForTarget(target, options.config, options.nativeStorageBridge),
     networkState: browserNetworkState(),
     lifecycle: browserLifecycle(),
     wakeupNotifications: unsupportedWakeupNotifications()
   };
+}
+
+function messageStoreForTarget(
+  target: ClientRuntimeTarget,
+  config: ClientRuntimeConfig,
+  nativeStorageBridge?: NativeStringKeyValueBridge
+): LocalMessageStore {
+  if (nativeStorageBridge) {
+    return new KeyValueMessageStore(
+      new NativeBridgeStringKeyValueStorage(nativeStorageBridge),
+      { namespace: `${target}:${config.deviceID}` }
+    );
+  }
+  return new IndexedDBMessageStore();
 }
 
 export class BrowserSessionStore implements SecureSessionStore {

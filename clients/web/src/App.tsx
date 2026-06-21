@@ -6,6 +6,7 @@ import type { BrowserPlatformAdapterOptions } from "./platform-adapter";
 import {
   loadRuntimeConfig,
   readAndroidNativeBridgeMetadata,
+  readAndroidNativeStorageBridge,
   readClientShellConfig,
   readDesktopNativeBridgeMetadata
 } from "./runtime-config";
@@ -520,6 +521,12 @@ function browserPlatformOptions(): BrowserPlatformAdapterOptions {
   }
   if (shellConfig.sessionKey) {
     options.sessionKey = shellConfig.sessionKey;
+  }
+  if (shellConfig.target === "android") {
+    const nativeStorageBridge = readAndroidNativeStorageBridge(androidNativeMetadata);
+    if (nativeStorageBridge) {
+      options.nativeStorageBridge = nativeStorageBridge;
+    }
   }
   return options;
 }

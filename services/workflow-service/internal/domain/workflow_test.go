@@ -51,6 +51,28 @@ func TestPrepareWorkflowAllowsAdminOperationType(t *testing.T) {
 	}
 }
 
+func TestPrepareWorkflowAllowsCompensationRequestType(t *testing.T) {
+	prepared, err := PrepareWorkflow(validCreateCommand(func(command *types.CreateWorkflowCommand) {
+		command.RequesterService = "admin-service"
+		command.WorkflowType = types.WorkflowTypeCompensationRequest
+		command.RiskLevel = types.RiskLevelHigh
+		command.TargetService = "control-plane-service"
+		command.TargetOperation = "CONFIG_ROLLBACK"
+		command.ApprovalPolicyRef = "admin.workflow.compensation.v1"
+		command.CompensationPolicyRef = "admin.compensation.control_plane.v1"
+		command.PayloadSchemaVersion = "admin.config_rollback.v1"
+	}), "wf_comp_1", "wfs_comp_1", time.Now())
+	if err != nil {
+		t.Fatalf("prepare compensation workflow: %v", err)
+	}
+	workflow := WorkflowFromPrepared(prepared)
+	if workflow.WorkflowType != types.WorkflowTypeCompensationRequest ||
+		workflow.CompensationPolicyRef != "admin.compensation.control_plane.v1" ||
+		workflow.TargetOperation != "CONFIG_ROLLBACK" {
+		t.Fatalf("unexpected compensation workflow: %+v", workflow)
+	}
+}
+
 func TestStatusAfterDecision(t *testing.T) {
 	status, terminal := StatusAfterDecision(types.DecisionTypeApprove)
 	if status != types.WorkflowStatusApproved || !terminal {

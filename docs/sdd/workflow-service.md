@@ -173,6 +173,10 @@ workflow_id, workflow_status, next_step_id, decision_id, outbox_event_id
 worker 只向 workflow-service 传 low-sensitive ref/hash，并把 workflow id 作为
 admin result 的 downstream ref。非 repair 的 `CRITICAL` admin operation 使用
 `ADMIN_OPERATION`，不能伪装成 repair approval。
+`admin-service compensation-request` operator 已接入第一版
+`COMPENSATION_REQUEST` workflow handoff：只传 low-sensitive target / payload /
+reason refs，并使用稳定 idempotency key；workflow-service 当前只持久化请求和审批等待，
+真实 compensation worker / provider-grade execution 后置。
 
 后续扩展：
 

@@ -161,10 +161,14 @@ model-gateway / workflow / knowledge-ingestion / vector-index
   `COMPENSATION_REQUESTED`，并写低敏
   `admin.operation.compensation_requested.v1` outbox。operator reason file 只落
   sha256 hash / ref，不落 reason 原文。
+- `admin-service` / `workflow-service` 已新增 first-stage compensation workflow handoff：
+  `compensation-request` 在设置 `NEXUSIM_WORKFLOW_GRPC_ADDR` 后会创建 / replay
+  `COMPENSATION_REQUEST` workflow；workflow-service 只保存低敏 target / payload /
+  reason refs，不执行真实补偿 mutation。
 
 ## 下一步
 
-- 默认继续 admin compensation workflow / worker，或补其它明确下游公开 admin API adapter。
+- 默认继续 admin compensation worker / provider-grade compensation execution，或补其它明确下游公开 admin API adapter。
 - 默认下一步可继续 vector-index provider backend：在镜像可用后跑 focused pgvector smoke、
   真实 Milvus / OpenSearch backend、provider backend repair / 真 provider backfill smoke，
   或继续 active future service 的 focused checks。

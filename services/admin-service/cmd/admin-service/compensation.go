@@ -15,6 +15,7 @@ import (
 
 	"github.com/qsyy0921/IM/services/admin-service/internal/domain"
 	postgresinfra "github.com/qsyy0921/IM/services/admin-service/internal/infrastructure/postgres"
+	rpcinfra "github.com/qsyy0921/IM/services/admin-service/internal/infrastructure/rpc"
 	"github.com/qsyy0921/IM/services/admin-service/internal/types"
 )
 
@@ -33,6 +34,7 @@ type adminCompensationSummary struct {
 	RequestedByHash       string    `json:"requested_by_hash"`
 	CompensationReasonRef string    `json:"compensation_reason_ref,omitempty"`
 	ReasonFileSHA256      string    `json:"reason_file_sha256,omitempty"`
+	WorkflowRef           string    `json:"workflow_ref,omitempty"`
 	GeneratedAt           time.Time `json:"generated_at"`
 }
 
@@ -75,6 +77,13 @@ func runCompensationRequest(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	workflowRef := ""
+	if !dryRun {
+		workflowRef, err = createCompensationWorkflowIfConfigured(ctx, operation, requestedBy, reasonRef)
+		if err != nil {
+			return err
+		}
+	}
 	previousStatus := operation.Status
 	if changed {
 		previousStatus = types.OperationStatusFailed
@@ -92,9 +101,27 @@ func runCompensationRequest(ctx context.Context) error {
 		RequestedByHash:       domain.HashText(requestedBy),
 		CompensationReasonRef: reasonRef,
 		ReasonFileSHA256:      reasonSHA,
+		WorkflowRef:           workflowRef,
 		GeneratedAt:           time.Now().UTC(),
 	}
 	return writeAdminCompensationSummary(summary, os.Getenv("NEXUSIM_ADMIN_COMPENSATION_OUTPUT"))
+}
+
+func createCompensationWorkflowIfConfigured(ctx context.Context, operation types.AdminOperation, requestedBy string, reasonRef string) (string, error) {
+	workflowAddr := strings.TrimSpace(os.Getenv("NEXUSIM_WORKFLOW_GRPC_ADDR"))
+	if workflowAddr == "" {
+		return "", nil
+	}
+	executor, closeWorkflow, err := rpcinfra.DialWorkflowExecutor(
+		ctx,
+		workflowAddr,
+		envDuration("NEXUSIM_ADMIN_COMPENSATION_WORKFLOW_RPC_TIMEOUT", envDuration("NEXUSIM_ADMIN_WORKFLOW_RPC_TIMEOUT", time.Second)),
+	)
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = closeWorkflow() }()
+	return executor.CreateCompensationWorkflow(ctx, operation, requestedBy, reasonRef)
 }
 
 func envBoolDefault(name string, fallback bool) (bool, error) {

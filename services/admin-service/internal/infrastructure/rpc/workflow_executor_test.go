@@ -126,6 +126,50 @@ func TestWorkflowExecutorUsesDefaultAdminPolicyForUnmappedCriticalOperation(t *t
 	}
 }
 
+func TestWorkflowExecutorCreatesCompensationWorkflow(t *testing.T) {
+	client := &fakeWorkflowClient{
+		response: &workflowv1.CreateWorkflowResponse{
+			Workflow: &workflowv1.Workflow{WorkflowId: "wf_admin_compensation_1"},
+		},
+	}
+	workflowExecutor := NewWorkflowExecutor(client, time.Second)
+
+	workflowRef, err := workflowExecutor.CreateCompensationWorkflow(context.Background(), types.AdminOperation{
+		TenantID:             "tenant-admin-rpc-test",
+		OperationID:          "admop_comp_1",
+		OperationType:        executor.OperationTypeConfigRollback,
+		TargetRefHash:        "sha256:target",
+		RiskLevel:            types.RiskLevelHigh,
+		PayloadSchemaVersion: "admin.config_rollback.v1",
+		PayloadHash:          "sha256:payload",
+		ReasonRef:            "reason:original",
+		EvidenceRefs:         []string{"evidence:one"},
+		RequestedBy:          "operator:creator",
+		CorrelationID:        "corr-1",
+		TraceID:              "trace-1",
+	}, "operator:compensator", "reason-sha256:compensation")
+	if err != nil {
+		t.Fatalf("create compensation workflow: %v", err)
+	}
+	if workflowRef != "workflow:wf_admin_compensation_1" {
+		t.Fatalf("unexpected workflow ref: %s", workflowRef)
+	}
+	request := client.request
+	if request.GetWorkflowType() != "COMPENSATION_REQUEST" ||
+		request.GetRequesterRef() != "operator:compensator" ||
+		request.GetTargetService() != "control-plane-service" ||
+		request.GetTargetOperation() != executor.OperationTypeConfigRollback ||
+		request.GetApprovalPolicyRef() != defaultCompensationPolicy ||
+		request.GetCompensationPolicyRef() != "admin.compensation.control_plane.v1" {
+		t.Fatalf("unexpected compensation workflow request: %+v", request)
+	}
+	if request.GetPayloadRefHash() != "sha256:payload" ||
+		request.GetReasonRef() != "reason-sha256:compensation" ||
+		request.GetIdempotencyKey() != "admin-compensation-workflow:admop_comp_1" {
+		t.Fatalf("request should only carry refs and stable idempotency: %+v", request)
+	}
+}
+
 func TestWorkflowExecutorRejectsUnsupportedNonCriticalOperationType(t *testing.T) {
 	workflowExecutor := NewWorkflowExecutor(&fakeWorkflowClient{}, time.Second)
 

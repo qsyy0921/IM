@@ -18,9 +18,11 @@ import (
 const (
 	workflowTypeRepairApproval = "REPAIR_APPROVAL"
 	workflowTypeAdminOperation = "ADMIN_OPERATION"
+	workflowTypeCompensation   = "COMPENSATION_REQUEST"
 
 	defaultWorkflowApprovalPolicy = "admin.workflow.repair.v1"
 	defaultAdminWorkflowPolicy    = "admin.workflow.operation.v1"
+	defaultCompensationPolicy     = "admin.workflow.compensation.v1"
 	defaultWorkflowTimeoutPolicy  = "admin.workflow.timeout.default.v1"
 )
 
@@ -121,6 +123,59 @@ func (executor WorkflowExecutor) Execute(ctx context.Context, operation types.Ad
 	}, nil
 }
 
+func (executor WorkflowExecutor) CreateCompensationWorkflow(
+	ctx context.Context,
+	operation types.AdminOperation,
+	requestedBy string,
+	reasonRef string,
+) (string, error) {
+	if executor.client == nil {
+		return "", types.NewUnavailable("workflow executor is not configured")
+	}
+	requestedBy = strings.TrimSpace(requestedBy)
+	reasonRef = strings.TrimSpace(reasonRef)
+	if requestedBy == "" || reasonRef == "" {
+		return "", types.NewInvalidArgument("admin compensation workflow request is incomplete")
+	}
+	callCtx, cancel := context.WithTimeout(ctx, executor.timeout)
+	defer cancel()
+	response, err := executor.client.CreateWorkflow(callCtx, &workflowv1.CreateWorkflowRequest{
+		AuthContext: &workflowv1.AuthContext{
+			TenantId:    string(operation.TenantID),
+			ServiceName: "admin-service",
+			InstanceRef: "compensation-request",
+			TraceId:     operation.TraceID,
+			RequestId:   operation.OperationID,
+		},
+		RequesterRef:          requestedBy,
+		RequesterService:      "admin-service",
+		WorkflowType:          workflowTypeCompensation,
+		RiskLevel:             operation.RiskLevel,
+		TargetRefHash:         operation.TargetRefHash,
+		TargetService:         workflowTargetService(operation),
+		TargetOperation:       operation.OperationType,
+		ApprovalPolicyRef:     defaultCompensationPolicy,
+		TimeoutPolicyRef:      defaultWorkflowTimeoutPolicy,
+		CompensationPolicyRef: compensationPolicy(operation),
+		PayloadSchemaVersion:  operation.PayloadSchemaVersion,
+		PayloadRefHash:        operation.PayloadHash,
+		ReasonRef:             reasonRef,
+		EvidenceRefs:          append([]string(nil), operation.EvidenceRefs...),
+		IdempotencyKey:        "admin-compensation-workflow:" + operation.OperationID,
+		CorrelationId:         operation.CorrelationID,
+		CausationId:           firstNonEmpty(operation.CausationID, operation.OperationID),
+		TraceId:               operation.TraceID,
+	})
+	if err != nil {
+		return "", mapWorkflowError(err)
+	}
+	workflow := response.GetWorkflow()
+	if workflow == nil || strings.TrimSpace(workflow.GetWorkflowId()) == "" {
+		return "", types.NewUnavailable("workflow response is incomplete")
+	}
+	return "workflow:" + workflow.GetWorkflowId(), nil
+}
+
 func workflowTypeForAdminOperation(operation types.AdminOperation) (string, error) {
 	if operation.OperationType == executor.OperationTypeRepairRequest {
 		return workflowTypeRepairApproval, nil
@@ -149,6 +204,16 @@ func workflowTargetService(operation types.AdminOperation) string {
 		return targetService
 	}
 	return "admin-service"
+}
+
+func compensationPolicy(operation types.AdminOperation) string {
+	targetService := workflowTargetService(operation)
+	if targetService == "admin-service" {
+		return "admin.compensation.default.v1"
+	}
+	targetService = strings.TrimSuffix(targetService, "-service")
+	targetService = strings.ReplaceAll(targetService, "-", "_")
+	return "admin.compensation." + targetService + ".v1"
 }
 
 func firstNonEmpty(values ...string) string {

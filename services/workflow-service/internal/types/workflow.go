@@ -6,9 +6,10 @@ import (
 )
 
 const (
-	WorkflowTypeActionApproval = "ACTION_APPROVAL"
-	WorkflowTypeRepairApproval = "REPAIR_APPROVAL"
-	WorkflowTypeAdminOperation = "ADMIN_OPERATION"
+	WorkflowTypeActionApproval      = "ACTION_APPROVAL"
+	WorkflowTypeRepairApproval      = "REPAIR_APPROVAL"
+	WorkflowTypeAdminOperation      = "ADMIN_OPERATION"
+	WorkflowTypeCompensationRequest = "COMPENSATION_REQUEST"
 
 	RiskLevelLow      = "LOW"
 	RiskLevelMedium   = "MEDIUM"
@@ -249,7 +250,8 @@ func (command GetWorkflowCommand) Validate() error {
 func isAllowedWorkflowType(value string) bool {
 	return value == WorkflowTypeActionApproval ||
 		value == WorkflowTypeRepairApproval ||
-		value == WorkflowTypeAdminOperation
+		value == WorkflowTypeAdminOperation ||
+		value == WorkflowTypeCompensationRequest
 }
 
 func isAllowedRiskLevel(value string) bool {

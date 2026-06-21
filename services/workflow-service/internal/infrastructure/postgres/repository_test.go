@@ -97,6 +97,34 @@ func TestRepositoryCreateAdminOperationWorkflowIntegration(t *testing.T) {
 	}
 }
 
+func TestRepositoryCreateCompensationRequestWorkflowIntegration(t *testing.T) {
+	ctx := context.Background()
+	pool := openWorkflowTestPool(t)
+	resetWorkflowTables(t, ctx, pool)
+	repository := NewRepository(pool)
+
+	prepared := prepareWorkflow(t, "wf-compensation-idem-1", "wf_compensation_1", "wfs_compensation_1")
+	prepared.Command.WorkflowType = types.WorkflowTypeCompensationRequest
+	prepared.Command.RiskLevel = types.RiskLevelHigh
+	prepared.Command.RequesterService = "admin-service"
+	prepared.Command.TargetService = "control-plane-service"
+	prepared.Command.TargetOperation = "CONFIG_ROLLBACK"
+	prepared.Command.ApprovalPolicyRef = "admin.workflow.compensation.v1"
+	prepared.Command.CompensationPolicyRef = "admin.compensation.control_plane.v1"
+	prepared.Command.PayloadSchemaVersion = "admin.config_rollback.v1"
+	prepared.CommandHash = domain.HashRef("compensation-request-workflow")
+
+	workflow, replayed, err := repository.CreateWorkflow(ctx, prepared)
+	if err != nil {
+		t.Fatalf("create compensation workflow: %v", err)
+	}
+	if replayed || workflow.WorkflowType != types.WorkflowTypeCompensationRequest ||
+		workflow.CompensationPolicyRef != "admin.compensation.control_plane.v1" ||
+		workflow.Status != types.WorkflowStatusWaitingDecision {
+		t.Fatalf("unexpected compensation workflow: replayed=%v %+v", replayed, workflow)
+	}
+}
+
 func prepareWorkflow(t *testing.T, idempotencyKey string, workflowID string, stepID string) domain.PreparedWorkflow {
 	t.Helper()
 	prepared, err := domain.PrepareWorkflow(types.CreateWorkflowCommand{

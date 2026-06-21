@@ -217,6 +217,9 @@ go run ./services/delivery-service/cmd/delivery-service
 `NEXUSIM_ADMIN_COMPENSATION_OUTPUT` 写低敏 JSON summary，输出只包含 tenant /
 operation / dry-run / status / reason ref / reason hash / operator hash，不输出
 operation payload、reason 原文、EvidencePack 或下游 response body。
+设置 `NEXUSIM_WORKFLOW_GRPC_ADDR` 后，非 dry-run 会通过 workflow-service public gRPC
+创建 / replay `COMPENSATION_REQUEST` workflow；该 workflow 只携带低敏 target /
+payload / reason refs，不代表真实补偿 mutation 已执行。
 
 `agent-service` 提供 `proposal-approval-audit` / `proposal-approval-approve`，用于审计和审批 Agent proposal。环境变量为 `NEXUSIM_AGENT_SERVICE_MODE`；`proposal-approval-audit` 默认只列 `PROPOSED` proposal，可按 tenant / proposal / user / status / tool / resource_type 过滤，可选 `NEXUSIM_AGENT_PROPOSAL_APPROVAL_AUDIT_OUTPUT` 写低敏 JSON；`proposal-approval-approve` 需要 `NEXUSIM_AGENT_PROPOSAL_APPROVAL_TENANT_ID`、`NEXUSIM_AGENT_PROPOSAL_APPROVAL_PROPOSAL_ID`、`NEXUSIM_AGENT_PROPOSAL_APPROVAL_APPROVED_BY_USER_ID`，默认 `NEXUSIM_AGENT_PROPOSAL_APPROVAL_DRY_RUN=true`，只有显式设为 false 才会调用服务内 approval workflow 并同事务写 approval outbox。审批 reason 应通过 `NEXUSIM_AGENT_PROPOSAL_APPROVAL_REASON_FILE` 读取；输出可选 `NEXUSIM_AGENT_PROPOSAL_APPROVAL_OUTPUT`，只包含 proposal / approval / skill / tool / resource / status 元数据和 `reason_present`，不输出 objective、proposal_text、citations、EvidencePack 或 reason 原文。
 

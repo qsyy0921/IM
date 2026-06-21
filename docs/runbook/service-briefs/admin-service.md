@@ -27,6 +27,10 @@
   dry-run 后只允许把 `FAILED` operation 标记为 `COMPENSATION_REQUESTED`，并写低敏
   `admin.operation.compensation_requested.v1` outbox；reason file 只落 hash / ref，
   不落 reason 原文。
+- `compensation-request` 已支持可选 workflow handoff：设置
+  `NEXUSIM_WORKFLOW_GRPC_ADDR` 后，会为同一 failed operation 创建 / replay
+  workflow-service 的 `COMPENSATION_REQUEST` workflow；不在 admin-service 内联执行
+  高风险补偿 mutation。
 - 已接入第一版 workflow 路由：`REPAIR_REQUEST` 创建
   `workflow-service` 的 `REPAIR_APPROVAL`，其它 `CRITICAL` operation 创建
   `ADMIN_OPERATION`；config / quota / policy / audit / notification 类 operation
@@ -77,4 +81,4 @@
 后续：
 
 - audit-service ingestion / export、admin UI、更多下游公开 admin API adapter、
-  compensation workflow / worker 和 provider-grade 运维。
+  compensation worker / provider-grade 运维。

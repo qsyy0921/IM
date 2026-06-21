@@ -23,6 +23,9 @@ retention、外部系统调用补偿和人工审批状态。
 - 已按 SDD 落 proto / migration / 六层 skeleton，并同步
   `docs/runbook/service-registry.json`。
 - 第一版支持 action approval、repair approval 和 generic admin operation 三类低敏 workflow。
+- 已支持 first-stage `COMPENSATION_REQUEST` workflow 类型，供 admin-service
+  `compensation-request` operator 通过公开 gRPC 创建 / replay 补偿请求；当前只保存低敏
+  target / payload / reason refs，不执行真实补偿 mutation。
 - 已被 admin-service operation worker 用于第一版 `REPAIR_REQUEST ->
   REPAIR_APPROVAL` 长审批入口；该路径只保存低敏 hash/ref，并由 admin-service
   result 记录 `workflow:<workflow_id>`。

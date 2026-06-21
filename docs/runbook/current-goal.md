@@ -36,8 +36,9 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   gateway facade 和鉴权 / trusted metadata 注入，不读内部服务私表；BFF HTTP 层已接
   first-stage route metrics / rate-limit adapter，复用 api-gateway 既有限流器和
   `/debug/metrics` / `/metrics` 低敏观测管线，指标 label 只含固定 route / method /
-  status_code；`/api/auth/logout` 先保留为显式 `UNIMPLEMENTED`，等待 identity
-  self-session revoke 契约。
+  status_code；`/api/auth/logout` 已接入当前 gateway token 绑定 session 的
+  self logout，BFF 只用鉴权上下文构造 identity `RevokeSession`，不接受客户端 body
+  指定任意 tenant / user / device / session。
 - `clients/web` 已新增 first-stage browser adapters：`BFFClient` 使用
   `api-gateway` HTTP/JSON BFF，`BrowserPushTransport` 使用 `push-gateway`
   WebSocket，`IndexedDBMessageStore` 作为 local cache / cursor store；Web shell

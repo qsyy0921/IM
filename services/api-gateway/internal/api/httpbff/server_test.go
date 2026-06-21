@@ -160,6 +160,92 @@ func TestMeEndpointAuthenticatesToken(t *testing.T) {
 	}
 }
 
+func TestLogoutRevokesCurrentAuthenticatedSession(t *testing.T) {
+	authenticator := &fakeAuthenticator{
+		auth: gatewayauth.AuthContext{
+			TenantID:  "tenant-token",
+			UserID:    "user-token",
+			DeviceID:  "device-token",
+			SessionID: "session-token",
+			TraceID:   "trace-token",
+			RequestID: "request-token",
+		},
+	}
+	gateway := &fakeGateway{
+		revokeSession: func(_ context.Context, request *identityv1.RevokeSessionRequest) (*identityv1.RevokeSessionResponse, error) {
+			if request.GetAdminContext().GetTenantId() != "tenant-token" ||
+				request.GetAdminContext().GetOperatorUserId() != "user-token" ||
+				request.GetAdminContext().GetTraceId() != "trace-token" ||
+				request.GetAdminContext().GetRequestId() != "request-token" {
+				t.Fatalf("unexpected admin context: %+v", request.GetAdminContext())
+			}
+			if request.GetUserId() != "user-token" ||
+				request.GetDeviceId() != "device-token" ||
+				request.GetSessionId() != "session-token" {
+				t.Fatalf("logout must target current authenticated session, got %+v", request)
+			}
+			if request.GetReason() != "client logout" {
+				t.Fatalf("logout reason=%q", request.GetReason())
+			}
+			return &identityv1.RevokeSessionResponse{
+				TenantId:        request.GetAdminContext().GetTenantId(),
+				UserId:          request.GetUserId(),
+				DeviceId:        request.GetDeviceId(),
+				SessionId:       request.GetSessionId(),
+				Status:          identityv1.SessionStatus_SESSION_STATUS_REVOKED,
+				RevokedAtUnixMs: 1_800_000_000_000,
+			}, nil
+		},
+	}
+	handler := NewServer(Config{Gateway: gateway, Authenticator: authenticator})
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/auth/logout", strings.NewReader(`{
+		"tenant_id":"tenant-body",
+		"user_id":"user-body",
+		"device_id":"device-body",
+		"session_id":"session-body"
+	}`))
+	request.Header.Set("X-NexusIM-Gateway-Token", "token-1")
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+	if authenticator.authorization != "Bearer token-1" {
+		t.Fatalf("authorization passed to authenticator=%q", authenticator.authorization)
+	}
+	if !strings.Contains(response.Body.String(), `"session_id":"session-token"`) ||
+		!strings.Contains(response.Body.String(), `"status":"SESSION_STATUS_REVOKED"`) {
+		t.Fatalf("expected revoke response, got %s", response.Body.String())
+	}
+}
+
+func TestLogoutRequiresAuthenticatedSession(t *testing.T) {
+	gatewayCalled := false
+	handler := NewServer(Config{
+		Authenticator: &fakeAuthenticator{err: gatewayauth.ErrPermissionDenied},
+		Gateway: &fakeGateway{
+			revokeSession: func(context.Context, *identityv1.RevokeSessionRequest) (*identityv1.RevokeSessionResponse, error) {
+				gatewayCalled = true
+				return &identityv1.RevokeSessionResponse{}, nil
+			},
+		},
+	})
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/auth/logout", nil)
+	request.Header.Set("Authorization", "Bearer invalid")
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusUnauthorized {
+		t.Fatalf("expected unauthorized logout, got status=%d body=%s", response.Code, response.Body.String())
+	}
+	if gatewayCalled {
+		t.Fatalf("gateway revoke should not be called when authentication fails")
+	}
+}
+
 func TestCORSPreflightRequiresAllowedOrigin(t *testing.T) {
 	handler := NewServer(Config{AllowedOrigins: []string{"http://localhost:5173"}})
 	response := httptest.NewRecorder()
@@ -275,6 +361,7 @@ type fakeGateway struct {
 	login             func(context.Context, *identityv1.LoginRequest) (*identityv1.LoginResponse, error)
 	refresh           func(context.Context, *identityv1.RefreshGatewayTokenRequest) (*identityv1.RefreshGatewayTokenResponse, error)
 	issueGatewayToken func(context.Context, *identityv1.IssueGatewayTokenRequest) (*identityv1.IssueGatewayTokenResponse, error)
+	revokeSession     func(context.Context, *identityv1.RevokeSessionRequest) (*identityv1.RevokeSessionResponse, error)
 	sendMessage       func(context.Context, *messagev1.SendMessageRequest) (*messagev1.SendMessageResponse, error)
 	pullInbox         func(context.Context, *deliveryv1.PullInboxRequest) (*deliveryv1.PullInboxResponse, error)
 	ackDelivery       func(context.Context, *deliveryv1.AckDeliveryRequest) (*deliveryv1.AckDeliveryResponse, error)
@@ -302,6 +389,13 @@ func (gateway *fakeGateway) IssueGatewayToken(ctx context.Context, request *iden
 		return nil, status.Error(codes.Unimplemented, "issue gateway token not implemented")
 	}
 	return gateway.issueGatewayToken(ctx, request)
+}
+
+func (gateway *fakeGateway) RevokeSession(ctx context.Context, request *identityv1.RevokeSessionRequest) (*identityv1.RevokeSessionResponse, error) {
+	if gateway.revokeSession == nil {
+		return nil, status.Error(codes.Unimplemented, "revoke session not implemented")
+	}
+	return gateway.revokeSession(ctx, request)
 }
 
 func (gateway *fakeGateway) SendMessage(ctx context.Context, request *messagev1.SendMessageRequest) (*messagev1.SendMessageResponse, error) {

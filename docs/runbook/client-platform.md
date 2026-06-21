@@ -55,6 +55,10 @@ First slice:
   service tables. The BFF now also has first-stage HTTP route metrics and
   rate-limit adapter wiring, reusing api-gateway's existing rate limiter and
   low-cardinality `/debug/metrics` / `/metrics` pipeline.
+  `/api/auth/logout` now revokes the current authenticated session by forwarding
+  to identity-service `RevokeSession`; the BFF derives tenant / user / device /
+  session only from the verified gateway token and ignores any caller-supplied
+  body target.
 - `clients/web` now has the first real browser adapters:
   - `BFFClient` maps HTTP/JSON BFF payloads into shared protocol types. It now
     lives in `@nexusim/client-core`; Web keeps only a compatibility re-export.
@@ -122,9 +126,9 @@ First slice:
   PC desktop also has a Tauri runner skeleton, and Android has a Kotlin native
   bridge skeleton. Neither target produces `.msi`, `.exe`, `.apk`, or `.aab`
   artifacts yet.
-- `/api/auth/logout` is reserved and currently returns `UNIMPLEMENTED`; identity
-  still needs a user self-session revoke contract before server-side logout is
-  real.
+- `/api/auth/logout` performs first-stage server-side logout for the current
+  authenticated session only. Broader device/session management remains an
+  identity/admin capability, not a client BFF target selector.
 
 ## BFF Runtime Config
 

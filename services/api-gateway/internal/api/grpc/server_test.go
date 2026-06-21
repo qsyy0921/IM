@@ -443,6 +443,44 @@ func TestGatewayIdentityRequestCorrelationTakesPrecedence(t *testing.T) {
 	})
 }
 
+func TestGatewayIdentityRevokeSessionForwardsAdminCorrelation(t *testing.T) {
+	fake := &fakeIdentityClient{}
+	server := NewServer(Config{
+		Identity:     fake,
+		NewTraceID:   func() string { return "trace-generated" },
+		NewRequestID: func() string { return "request-generated" },
+	})
+	ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs(
+		metadataTraceID, "trace-metadata",
+		metadataRequestID, "request-metadata",
+	))
+
+	response, err := server.RevokeSession(ctx, &identityv1.RevokeSessionRequest{
+		AdminContext: &identityv1.AdminContext{
+			TenantId:       "tenant-1",
+			OperatorUserId: "user-1",
+		},
+		UserId:    "user-1",
+		DeviceId:  "device-1",
+		SessionId: "session-1",
+		Reason:    "client logout",
+	})
+	if err != nil {
+		t.Fatalf("revoke session through gateway: %v", err)
+	}
+	if response.GetSessionId() != "session-1" || response.GetStatus() != identityv1.SessionStatus_SESSION_STATUS_REVOKED {
+		t.Fatalf("expected revoke response, got %+v", response)
+	}
+	if fake.revokeSession.GetAdminContext().GetTraceId() != "trace-metadata" ||
+		fake.revokeSession.GetAdminContext().GetRequestId() != "request-metadata" {
+		t.Fatalf("expected admin correlation to be injected, got %+v", fake.revokeSession.GetAdminContext())
+	}
+	assertOutgoingMetadata(t, fake.ctx, map[string]string{
+		metadataTraceID:   "trace-metadata",
+		metadataRequestID: "request-metadata",
+	})
+}
+
 func TestGatewayReturnsGeneratedCorrelationHeaders(t *testing.T) {
 	now := time.Unix(1_800_000_000, 0)
 	authenticator, err := gatewayauth.NewAuthenticator(gatewayauth.Config{
@@ -765,6 +803,7 @@ type fakeIdentityClient struct {
 	ctx                 context.Context
 	loginRequest        *identityv1.LoginRequest
 	requestVerification *identityv1.RequestVerificationChallengeRequest
+	revokeSession       *identityv1.RevokeSessionRequest
 }
 
 func (client *fakeIdentityClient) RegisterUser(context.Context, *identityv1.RegisterUserRequest, ...grpc.CallOption) (*identityv1.RegisterUserResponse, error) {
@@ -843,8 +882,17 @@ func (client *fakeIdentityClient) RevokeDevice(context.Context, *identityv1.Revo
 	return nil, status.Error(codes.Unimplemented, "not implemented")
 }
 
-func (client *fakeIdentityClient) RevokeSession(context.Context, *identityv1.RevokeSessionRequest, ...grpc.CallOption) (*identityv1.RevokeSessionResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "not implemented")
+func (client *fakeIdentityClient) RevokeSession(ctx context.Context, in *identityv1.RevokeSessionRequest, opts ...grpc.CallOption) (*identityv1.RevokeSessionResponse, error) {
+	client.ctx = ctx
+	client.revokeSession = in
+	return &identityv1.RevokeSessionResponse{
+		TenantId:        in.GetAdminContext().GetTenantId(),
+		UserId:          in.GetUserId(),
+		DeviceId:        in.GetDeviceId(),
+		SessionId:       in.GetSessionId(),
+		Status:          identityv1.SessionStatus_SESSION_STATUS_REVOKED,
+		RevokedAtUnixMs: 1_800_000_000_000,
+	}, nil
 }
 
 func (client *fakeIdentityClient) GetDeviceState(context.Context, *identityv1.GetDeviceStateRequest, ...grpc.CallOption) (*identityv1.GetDeviceStateResponse, error) {

@@ -151,6 +151,18 @@ func (server *Server) IssueGatewayToken(ctx context.Context, request *identityv1
 	return server.identity.IssueGatewayToken(outgoing, cloned)
 }
 
+func (server *Server) RevokeSession(ctx context.Context, request *identityv1.RevokeSessionRequest) (*identityv1.RevokeSessionResponse, error) {
+	admin := request.GetAdminContext()
+	outgoing, traceID, requestID := server.publicIdentityContext(ctx, admin.GetTraceId(), admin.GetRequestId())
+	cloned := proto.Clone(request).(*identityv1.RevokeSessionRequest)
+	if cloned.AdminContext == nil {
+		cloned.AdminContext = &identityv1.AdminContext{}
+	}
+	cloned.AdminContext.TraceId = traceID
+	cloned.AdminContext.RequestId = requestID
+	return server.identity.RevokeSession(outgoing, cloned)
+}
+
 func (server *Server) RequestVerificationChallenge(ctx context.Context, request *identityv1.RequestVerificationChallengeRequest) (*identityv1.RequestVerificationChallengeResponse, error) {
 	outgoing, traceID, requestID := server.publicIdentityContext(ctx, request.GetTraceId(), request.GetRequestId())
 	cloned := proto.Clone(request).(*identityv1.RequestVerificationChallengeRequest)

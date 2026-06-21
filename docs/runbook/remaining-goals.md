@@ -15,7 +15,7 @@
 ## 当前优先顺序
 
 1. 完成 client platform MVP foundation：PC desktop runtime、Android runtime、
-   三端共享 smoke、local store 测试和 logout 契约。
+   三端共享 smoke、local store 测试和三端 logout UX / local cleanup。
 2. 回到 AI / Agent 主线：group memory eval、EvidencePack、Agent 真实业务动作、
    Python AI Worker 候选算法。
 3. 继续 product-active 服务：workflow / audit / admin / notification / media /
@@ -48,8 +48,8 @@
   desktop / Android 已默认接 shared `KeyValueMessageStore` + WebView
   `localStorage` first-stage durable adapter，并有 cursor replay test；后续在
   native packaging/runtime ready 后替换为 SQLite bridge。
-- Auth lifecycle：`/api/auth/logout` 仍等待 identity user self-session revoke 契约；
-  完成后补 BFF logout 和客户端状态清理。
+- Auth lifecycle：BFF `/api/auth/logout` 已能撤销当前 gateway-token session；
+  后续补三端 logout UX、local session / cache 清理和 offline queue 处理。
 
 ## AI / Agent Platform 未完成
 

@@ -258,8 +258,11 @@ First-stage implementation note:
   the existing gateway facade and downstream trusted metadata injection.
 - `GET /api/conversations/{conversation_id}/messages` is backed by
   `delivery-service.PullInbox`, not by a direct message table read.
-- `/api/auth/logout` is reserved and currently fail-closed as `UNIMPLEMENTED`
-  until identity-service has a user self-session revoke contract.
+- `/api/auth/logout` revokes only the current gateway-token session. The BFF
+  derives tenant, user, device and session from the verified gateway token,
+  forwards identity-service `RevokeSession`, and ignores caller-supplied target
+  fields. Arbitrary device / session management remains an identity/admin
+  capability, not a client BFF selector.
 - HTTP-layer BFF metrics / rate-limit adapter is first-stage implemented. It
   reuses the api-gateway rate limiter and records fixed-route HTTP metrics into
   `/debug/metrics` and `/metrics`; labels do not include raw URL,

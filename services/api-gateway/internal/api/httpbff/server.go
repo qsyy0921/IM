@@ -36,6 +36,7 @@ type Gateway interface {
 	Login(ctx context.Context, request *identityv1.LoginRequest) (*identityv1.LoginResponse, error)
 	RefreshGatewayToken(ctx context.Context, request *identityv1.RefreshGatewayTokenRequest) (*identityv1.RefreshGatewayTokenResponse, error)
 	IssueGatewayToken(ctx context.Context, request *identityv1.IssueGatewayTokenRequest) (*identityv1.IssueGatewayTokenResponse, error)
+	RevokeSession(ctx context.Context, request *identityv1.RevokeSessionRequest) (*identityv1.RevokeSessionResponse, error)
 	SendMessage(ctx context.Context, request *messagev1.SendMessageRequest) (*messagev1.SendMessageResponse, error)
 	PullInbox(ctx context.Context, request *deliveryv1.PullInboxRequest) (*deliveryv1.PullInboxResponse, error)
 	AckDelivery(ctx context.Context, request *deliveryv1.AckDeliveryRequest) (*deliveryv1.AckDeliveryResponse, error)
@@ -203,7 +204,7 @@ func (server *Server) serveHTTP(response http.ResponseWriter, request *http.Requ
 	case request.Method == http.MethodPost && path == "/api/auth/refresh":
 		server.handleRefresh(response, request)
 	case request.Method == http.MethodPost && path == "/api/auth/logout":
-		writeError(response, status.Error(codes.Unimplemented, "logout is not implemented"))
+		server.handleLogout(response, request)
 	case request.Method == http.MethodGet && path == "/api/me":
 		server.handleMe(response, request)
 	case request.Method == http.MethodGet && path == "/api/conversations":
@@ -243,10 +244,45 @@ func (server *Server) handleRefresh(response http.ResponseWriter, request *http.
 	server.writeAuthResponseOrError(response, request, nil, output, err)
 }
 
-func (server *Server) handleMe(response http.ResponseWriter, request *http.Request) {
-	if server.authenticator == nil {
-		writeError(response, status.Error(codes.Internal, "gateway auth is not configured"))
+func (server *Server) handleLogout(response http.ResponseWriter, request *http.Request) {
+	auth, err := server.authenticateRequest(request)
+	if err != nil {
+		writeError(response, err)
 		return
+	}
+	input := &identityv1.RevokeSessionRequest{
+		AdminContext: &identityv1.AdminContext{
+			TenantId:       auth.TenantID,
+			OperatorUserId: auth.UserID,
+			TraceId:        auth.TraceID,
+			RequestId:      auth.RequestID,
+		},
+		UserId:    auth.UserID,
+		DeviceId:  auth.DeviceID,
+		SessionId: auth.SessionID,
+		Reason:    "client logout",
+	}
+	output, err := server.requireGateway().RevokeSession(contextFromRequest(request), input)
+	server.writeProtoOrError(response, output, err)
+}
+
+func (server *Server) handleMe(response http.ResponseWriter, request *http.Request) {
+	auth, err := server.authenticateRequest(request)
+	if err != nil {
+		writeError(response, err)
+		return
+	}
+	writeJSON(response, http.StatusOK, map[string]string{
+		"tenant_id":  auth.TenantID,
+		"user_id":    auth.UserID,
+		"device_id":  auth.DeviceID,
+		"session_id": auth.SessionID,
+	})
+}
+
+func (server *Server) authenticateRequest(request *http.Request) (gatewayauth.AuthContext, error) {
+	if server.authenticator == nil {
+		return gatewayauth.AuthContext{}, status.Error(codes.Internal, "gateway auth is not configured")
 	}
 	authRequest := request.Clone(request.Context())
 	if authRequest.Header.Get("Authorization") == "" {
@@ -256,15 +292,9 @@ func (server *Server) handleMe(response http.ResponseWriter, request *http.Reque
 	}
 	auth, err := server.authenticator.Authenticate(authRequest)
 	if err != nil {
-		writeError(response, publicAuthError(err))
-		return
+		return gatewayauth.AuthContext{}, publicAuthError(err)
 	}
-	writeJSON(response, http.StatusOK, map[string]string{
-		"tenant_id":  auth.TenantID,
-		"user_id":    auth.UserID,
-		"device_id":  auth.DeviceID,
-		"session_id": auth.SessionID,
-	})
+	return auth, nil
 }
 
 func (server *Server) handleListConversations(response http.ResponseWriter, request *http.Request) {
@@ -554,6 +584,9 @@ func (missingGateway) RefreshGatewayToken(context.Context, *identityv1.RefreshGa
 	return nil, status.Error(codes.Internal, "gateway is not configured")
 }
 func (missingGateway) IssueGatewayToken(context.Context, *identityv1.IssueGatewayTokenRequest) (*identityv1.IssueGatewayTokenResponse, error) {
+	return nil, status.Error(codes.Internal, "gateway is not configured")
+}
+func (missingGateway) RevokeSession(context.Context, *identityv1.RevokeSessionRequest) (*identityv1.RevokeSessionResponse, error) {
 	return nil, status.Error(codes.Internal, "gateway is not configured")
 }
 func (missingGateway) SendMessage(context.Context, *messagev1.SendMessageRequest) (*messagev1.SendMessageResponse, error) {

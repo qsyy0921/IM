@@ -1,103 +1,101 @@
-# NexusIM Complete Architecture Blueprint
+# NexusIM 完整目标架构蓝图
 
-This is the executable target architecture for NexusIM after the current IM
-backend is expanded into a complete messaging product, data platform and AI /
-Agent application platform. It is not a frozen list of services or middleware.
-It defines stable boundaries, ownership rules, data flows and evolution gates.
+本文是 NexusIM 的完整目标架构蓝图。它面向项目完善后的形态：不只是一个即时通信
+后端，而是一个包含 IM 主链路、业务平台、数据平台、AI / Agent 平台和中间件平台
+的分布式系统。
 
-## 1. Architecture Goal
+本文不是固定服务数量或中间件产品清单。服务和中间件可以持续演进，但必须遵守
+边界、所有权、事件、数据治理、安全审计和 ADR 规则。
 
-NexusIM is designed as:
+## 1. 架构目标
+
+NexusIM 的目标形态是：
 
 ```text
-high-concurrency IM backend
-  + reusable business platform
-  + governed data platform
-  + AI / RAG / Agent application platform
-  + platform-engineered middleware and operations layer
+高并发即时通信后端
+  + 可复用业务平台
+  + 可信数据平台
+  + AI / RAG / Agent 应用平台
+  + 平台工程化中间件与运维体系
 ```
 
-The system must support:
+系统需要支持：
 
-- real-time messaging, group chat, receipts, durable inbox and online wakeup;
-- Web, Windows PC and Android clients through stable BFF / push boundaries;
-- business reuse through identity, policy, contacts, media, notification,
-  admin, audit, workflow and control-plane capabilities;
-- AI use cases such as group memory, retrieval, RAG, summary and controlled
-  Agent actions;
-- local / interview-grade distributed demos now, and production-like HA,
-  observability and governance later without redesigning service boundaries.
+- 实时消息、群聊、回执、durable inbox、在线唤醒；
+- Web、Windows PC、Android 客户端通过稳定 BFF / push 边界接入；
+- identity、policy、contacts、media、notification、admin、audit、workflow、
+  control-plane 等业务能力复用；
+- 群组 memory、检索、RAG、总结、多 Agent 协作和真实业务动作；
+- 当前本地 / 双机 / 面试级分布式演示；
+- 后续生产级 HA、观测、数据治理和中间件替换，而不重写服务边界。
 
-## 2. External Design Inputs
+## 2. 设计依据
 
-The design follows these sources and architecture traditions:
+本架构综合参考以下一手资料和工程实践：
 
-- Microservices around business capabilities and independently owned data:
-  <https://martinfowler.com/articles/microservices.html>.
-- SLO / SLI driven reliability, not vague production claims:
-  <https://sre.google/sre-book/service-level-objectives/>.
-- Platform engineering as curated internal platform capabilities:
-  <https://tag-app-delivery.cncf.io/whitepapers/platform-eng-maturity-model/>.
-- Zero Trust, least privilege and explicit verification:
-  <https://csrc.nist.gov/pubs/sp/800/207/final>.
-- API authorization and object / property access safety:
-  <https://owasp.org/API-Security/editions/2023/en/0x11-t10/>.
-- Data mesh: domain-owned data products on shared self-service data
-  infrastructure: <https://martinfowler.com/articles/data-mesh-principles.html>.
-- Lakehouse / open table formats for governed BI and ML data:
+- 微服务按业务能力拆分，并拥有自己的数据边界：
+  <https://martinfowler.com/articles/microservices.html>
+- SLO / SLI 驱动可靠性判断，而不是模糊地宣称“生产级”：
+  <https://sre.google/sre-book/service-level-objectives/>
+- 平台工程把通用能力作为内部平台产品提供：
+  <https://tag-app-delivery.cncf.io/whitepapers/platform-eng-maturity-model/>
+- Zero Trust 要求显式验证、最小权限和不信任默认网络：
+  <https://csrc.nist.gov/pubs/sp/800/207/final>
+- API 安全需要对象级和字段级授权：
+  <https://owasp.org/API-Security/editions/2023/en/0x11-t10/>
+- Data Mesh 强调领域拥有数据产品，共享自助式数据基础设施：
+  <https://martinfowler.com/articles/data-mesh-principles.html>
+- Lakehouse / 开放表格式支撑统一 BI / ML 数据底座：
   <https://www.cidrdb.org/cidr2021/papers/cidr2021_paper17.pdf>,
-  <https://iceberg.apache.org/spec/>.
-- Transactional outbox and Saga patterns for microservice consistency:
-  <https://microservices.io/patterns/data/transactional-outbox.html>.
-- CloudEvents / AsyncAPI for long-term event contract governance:
-  <https://cloudevents.io/>, <https://www.asyncapi.com/>.
-- OpenTelemetry for vendor-neutral traces, metrics and logs:
-  <https://opentelemetry.io/docs/>.
-- MCP as a standard boundary for AI tools, resources and prompts:
-  <https://modelcontextprotocol.io/docs/getting-started/intro>.
-- Long-horizon collaborative memory: multi-party, multi-group, temporally
-  evolving facts need attribution and versioning, not only vector recall:
-  <https://arxiv.org/abs/2602.01313>.
-- RAG and multi-Agent systems require retrieval quality, grounding,
-  coordination, tool safety and eval:
+  <https://iceberg.apache.org/spec/>
+- Transactional Outbox / Saga 是微服务一致性的基础模式：
+  <https://microservices.io/patterns/data/transactional-outbox.html>
+- CloudEvents / AsyncAPI 用于长期事件契约治理：
+  <https://cloudevents.io/>, <https://www.asyncapi.com/>
+- OpenTelemetry 是可观测性的厂商中立基线：
+  <https://opentelemetry.io/docs/>
+- MCP 为 AI 工具、资源和 prompt 接入提供标准边界：
+  <https://modelcontextprotocol.io/docs/getting-started/intro>
+- 长程协作记忆需要处理多人、多群组、时间演化和归因，而不是只做向量召回：
+  <https://arxiv.org/abs/2602.01313>
+- RAG / Multi-Agent 系统需要检索质量、证据绑定、协作协议、工具安全和评测：
   <https://arxiv.org/abs/2506.00054>,
-  <https://arxiv.org/abs/2501.06322>.
+  <https://arxiv.org/abs/2501.06322>
 
-## 3. System Layers
+## 3. 总体分层
 
 ```text
-Clients
+客户端层
   Web / Windows PC / Android / future iOS
 
-Access Layer
+接入层
   api-gateway / client BFF / push-gateway / auth / rate limit / trusted metadata
 
-IM Core Platform
+IM 核心平台
   identity / policy / contacts / conversation / message / delivery / receipt
 
-Product Business Platform
+产品业务平台
   media / notification / presence / admin / audit / control-plane / workflow
 
-Event and Fact Layer
+事件与事实层
   per-service PostgreSQL / outbox / Kafka / schema contracts / DLQ / repair
 
-Data Platform
+数据平台
   CDC / ingestion / lakehouse / OLAP / data catalog / metrics / feature store
 
-AI and Agent Platform
+AI 与 Agent 平台
   search / vector-index / memory / retrieval / RAG / summary / agent
   skill-registry / MCP gateway / model-gateway / action-executor / ai-eval
 
-Middleware Platform
+中间件平台
   Redis / Kafka / PostgreSQL / OpenSearch / vector store / MinIO / Vault
   Keycloak / OpenFGA / Temporal / OTel / Prometheus / Grafana / future options
 ```
 
-The service layer owns business semantics. The middleware layer provides
-capabilities. A middleware product can be replaced without changing domain
-ownership.
+服务层拥有业务语义，中间件层提供能力。中间件产品可以替换，但领域所有权不能因为
+替换中间件而变化。
 
-## 4. Deployment View
+## 4. 部署视图
 
 ```text
                  +-----------------------------+
@@ -131,103 +129,98 @@ ownership.
 +--------------------+                      +--------------------+
 ```
 
-Local development uses Docker profiles. Production can later map the same
-boundaries to Kubernetes, managed databases and managed middleware.
+本地开发通过 Docker profile 组合启动。未来生产环境可以映射到 Kubernetes、
+托管数据库、托管 Kafka、托管对象存储和托管观测系统，但服务边界不应因此改变。
 
-## 5. Ownership Invariants
+## 5. 核心所有权不变量
 
-1. A service owns its database schema.
-2. No production code reads another service's private tables.
-3. Cross-service sync calls must use public APIs or explicit ports.
-4. Cross-service async integration uses public events with schema versioning.
-5. Kafka is an event propagation surface, not the authoritative fact store.
-6. Data platform consumes facts; it does not write business commands.
-7. AI / Agent services cannot bypass policy, EvidencePack, approval or audit.
-8. Python workers return candidates only; Go owns control, facts and audit.
-9. Client local storage is cache / offline queue, not server-side fact source.
-10. Middleware is introduced as a capability with adapter and runtime profile,
-    not as service-private sprawl.
+1. 每个服务拥有自己的数据库 schema。
+2. 生产代码不能读取其他服务的私有表。
+3. 跨服务同步调用只能走公开 API 或明确 port。
+4. 跨服务异步集成只能走公开事件和 schema 版本。
+5. Kafka 是事件传播面，不是权威事实源。
+6. 数据平台只消费事实，不执行业务 command。
+7. AI / Agent 不能绕过 policy、EvidencePack、approval 和 audit。
+8. Python worker 只返回候选结果；Go 服务拥有控制面、事实和审计。
+9. 客户端本地存储只是缓存 / 离线队列，不是服务端事实源。
+10. 中间件作为平台能力引入，不作为某个服务的私有堆叠。
 
-## 6. Domain Map
+## 6. 领域地图
 
-### 6.1 Access Domain
+### 6.1 接入域
 
-| Component | Responsibility |
+| 组件 | 职责 |
 | --- | --- |
-| `api-gateway` | Public API facade, client BFF, auth, quota, trusted metadata, low-sensitive observability. |
-| `push-gateway` | Online WebSocket wakeup, Redis route, session lifecycle, best-effort online notification. |
+| `api-gateway` | 公共 API facade、client BFF、鉴权、配额、trusted metadata、低敏观测。 |
+| `push-gateway` | WebSocket 在线唤醒、Redis route、session 生命周期、best-effort online notify。 |
 
-The access layer terminates public trust. Downstream services trust only
-gateway-minted metadata, not arbitrary client headers.
+接入层终结公网信任。下游服务只信任 gateway 生成或内部边界验证过的 metadata，
+不能信任客户端任意传入的 header。
 
-### 6.2 IM Core Domain
+### 6.2 IM 核心域
 
-| Service | Owned facts |
+| 服务 | 拥有的事实 |
 | --- | --- |
-| `identity-service` | users, credentials, sessions, refresh tokens, MFA, OIDC/JWKS/challenges. |
-| `policy-service` | authorization policies, ReBAC edges, policy decisions, risk/moderation policy. |
-| `contacts-service` | contact relationships, privacy settings, contact groups. |
-| `conversation-service` | conversations, group membership, roles, member boundaries, owner transfer. |
-| `message-service` | message log, edits, revoke/delete, attachments by reference, message outbox. |
-| `delivery-service` | durable user inbox, device cursors, delivery events, projection checkpoints. |
-| `receipt-service` | read/delivered receipts, unread foundations, conversation list summaries. |
+| `identity-service` | 用户、凭证、session、refresh token、MFA、OIDC / JWKS / challenge。 |
+| `policy-service` | 授权策略、ReBAC 边、policy decision、risk / moderation policy。 |
+| `contacts-service` | 联系人关系、隐私设置、联系人分组。 |
+| `conversation-service` | 会话、群、成员、角色、成员边界、owner transfer。 |
+| `message-service` | 消息日志、编辑、撤回、删除、附件引用、message outbox。 |
+| `delivery-service` | durable user inbox、device cursor、delivery event、projection checkpoint。 |
+| `receipt-service` | 已读 / 送达回执、未读基础、会话列表摘要。 |
 
-These services are the current foundation for IM product behavior.
+这些服务构成当前 IM 产品行为的核心底座。
 
-### 6.3 Product Business Domain
+### 6.3 产品业务域
 
-| Service | Responsibility |
+| 服务 | 职责 |
 | --- | --- |
-| `media-service` | Upload, object storage, thumbnails, virus scan, transcode, download policy. |
-| `notification-service` | Email, SMS, APNs/FCM, templates, provider routing, bounce/suppression. |
-| `presence-service` | Online state, typing, last-seen, device status, privacy-aware presence. |
-| `admin-service` | Tenant/admin APIs, repair approval, user moderation, operator actions. |
-| `audit-service` | Login, security, admin, Agent action and repair audit; export and retention. |
-| `control-plane-service` | Tenant config, feature flags, rollout, quota, policy/config publication. |
-| `workflow-service` | Long-running approvals, compensation, timers, external callbacks. |
+| `media-service` | 上传、对象存储、缩略图、病毒扫描、转码、下载策略。 |
+| `notification-service` | 邮件、短信、APNs / FCM、模板、provider routing、bounce / suppression。 |
+| `presence-service` | 在线状态、输入中、最后在线、设备状态、隐私感知 presence。 |
+| `admin-service` | 租户 / 管理 API、repair 审批、用户治理、operator action。 |
+| `audit-service` | 登录、安全、管理、Agent action、repair 审计、导出和 retention。 |
+| `control-plane-service` | 租户配置、功能开关、灰度、quota、策略 / 配置发布。 |
+| `workflow-service` | 长事务、审批、补偿、timer、external callback。 |
 
-These are business platform services. They are promoted only when product scope
-needs them, not because the architecture wants more services.
+这些是业务平台服务。只有产品范围真正需要时才逐个 promotion，不因为架构图好看而提前铺空服务。
 
-### 6.4 AI and Agent Domain
+### 6.4 AI 与 Agent 域
 
-| Service | Responsibility |
+| 服务 | 职责 |
 | --- | --- |
-| `search-service` | Search projection writes and keyword retrieval. |
-| `vector-index-service` | Vector projection writes, rebuild, pgvector/Milvus/OpenSearch adapters. |
-| `memory-service` | Personal/group/project memory state with attribution and lifecycle. |
-| `retrieval-gateway` | Hybrid retrieval, visibility filtering, EvidencePack construction. |
-| `rag-service` | Grounded answers from EvidencePack with citations and uncertainty. |
-| `summary-service` | Conversation, unread and project summaries with source references. |
-| `agent-service` | Planning, multi-Agent coordination and Agent run state. |
-| `skill-registry` | Tool/skill capability catalog, risk level and invocation metadata. |
-| `mcp-gateway` | MCP tool/resource/prompt boundary and consent enforcement. |
-| `model-gateway` | LLM, embedding and rerank provider routing, budget, fallback and audit. |
-| `action-executor` | Executes approved business actions through public APIs only. |
-| `ai-eval-service` | Regression datasets, RAG/memory/Agent eval, safety gates. |
+| `search-service` | 搜索投影写入和关键词检索。 |
+| `vector-index-service` | 向量投影写入、重建、pgvector / Milvus / OpenSearch adapter。 |
+| `memory-service` | 带 source refs 的个人 / 群组 / 项目长期记忆状态。 |
+| `retrieval-gateway` | 混合检索、可见性过滤、EvidencePack 构造。 |
+| `rag-service` | 基于 EvidencePack 回答，返回引用和不确定性。 |
+| `summary-service` | 会话、未读、项目总结，必须带 source references。 |
+| `agent-service` | 规划、多 Agent 协作和 Agent run state。 |
+| `skill-registry` | 工具 / skill 能力目录、风险等级、调用 metadata。 |
+| `mcp-gateway` | MCP tool / resource / prompt 边界和 consent enforcement。 |
+| `model-gateway` | LLM、embedding、rerank provider 路由、预算、fallback 和审计。 |
+| `action-executor` | 只通过公开 API 执行已审批的业务动作。 |
+| `ai-eval-service` | 数据集、回归运行、RAG / memory / Agent 评测、安全门禁。 |
 
-AI services consume projections and EvidencePack. They do not become alternate
-business fact sources.
+AI 服务消费投影和 EvidencePack，不能成为另一套业务事实源。
 
-### 6.5 Data Platform Domain
+### 6.5 数据平台域
 
-Future data platform services are introduced when analytics/RAG/ops needs exceed
-service-local debug metrics.
+当 analytics、RAG、风控、运营和 BI 的需求超过服务本地 debug metrics 时，再引入数据平台服务。
 
-| Service | Responsibility |
+| 服务 | 职责 |
 | --- | --- |
-| `data-ingestion-service` | Consume public events / CDC and write governed analytical records. |
-| `data-catalog-service` | Register data products, owners, schemas, lineage, retention, privacy class. |
-| `analytics-service` | Serve curated product, ops and business metrics. |
-| `feature-store-service` | Serve low-sensitive risk/ranking/Agent features. |
-| `data-quality-service` | Track freshness, missing events, schema drift and quality checks. |
+| `data-ingestion-service` | 消费公开事件 / CDC，写入治理后的分析记录。 |
+| `data-catalog-service` | 登记数据产品、owner、schema、血缘、retention、privacy class。 |
+| `analytics-service` | 提供产品、运营和业务指标 API。 |
+| `feature-store-service` | 提供低敏 risk / ranking / Agent feature。 |
+| `data-quality-service` | 监控 freshness、缺失事件、schema drift、质量检查。 |
 
-Data platform is read/analysis oriented. Commands still go through business
-services.
+数据平台偏读和分析。业务 command 仍必须回到业务服务。
 
-## 7. Core IM Flow
+## 7. IM 主链路
 
-### 7.1 Send Message
+### 7.1 发消息链路
 
 ```text
 client
@@ -242,10 +235,10 @@ client
   -> client PullInbox -> AckDelivery
 ```
 
-Message display is based on `delivery-service.PullInbox`, not WebSocket payload
-alone. WebSocket is wakeup, not durable data.
+客户端展示消息以 `delivery-service.PullInbox` 为准，不能只依赖 WebSocket payload。
+WebSocket 是在线唤醒，不是 durable data。
 
-### 7.2 Group Membership
+### 7.2 群成员链路
 
 ```text
 client/admin
@@ -257,10 +250,9 @@ client/admin
   -> audit / analytics / policy projections
 ```
 
-Membership windows must affect delivery, search, retrieval and memory. Current
-member state cannot be used to rewrite historical visibility.
+成员窗口必须影响 delivery、search、retrieval 和 memory。不能用当前成员状态去重写历史可见性。
 
-### 7.3 Read / Delivered Receipts
+### 7.3 回执链路
 
 ```text
 client AckDelivery / MarkRead
@@ -271,9 +263,9 @@ client AckDelivery / MarkRead
   -> notification / analytics / AI summary consumers
 ```
 
-## 8. Client Architecture
+## 8. 客户端架构
 
-Clients share TypeScript protocol and sync core:
+客户端共享 TypeScript 协议和同步核心：
 
 ```text
 clients/packages/protocol
@@ -283,21 +275,21 @@ clients/desktop
 clients/android
 ```
 
-Rules:
+规则：
 
-- Clients call only `api-gateway` BFF and `push-gateway`.
-- `client-core` owns local sync state, offline queue semantics and API models.
-- Browser uses Web APIs; PC uses Tauri as a thin shell; Android uses a thin
-  platform bridge.
-- Native bridges do not implement business decisions.
-- Local storage is cache and pending operation state only.
+- 客户端只调用 `api-gateway` BFF 和 `push-gateway`。
+- `client-core` 拥有本地同步状态、离线队列语义和 API model。
+- 浏览器使用 Web APIs。
+- PC 使用 Tauri 作为薄壳。
+- Android 使用薄平台 bridge。
+- Native bridge 不实现业务决策。
+- 本地存储只做缓存和 pending operation state。
 
-## 9. Event Architecture
+## 9. 事件架构
 
-Every event-producing service uses local transaction + outbox for first-stage
-reliability.
+每个产事件服务优先使用本地事务 + outbox，保证第一阶段可靠发布。
 
-Event envelope guidance:
+事件 envelope 建议：
 
 ```text
 event_id
@@ -316,18 +308,17 @@ trace_id
 payload_json/protobuf
 ```
 
-Long-term:
+长期要求：
 
-- use protobuf schemas for Kafka payloads;
-- register event docs with AsyncAPI-style channel descriptions;
-- keep CloudEvents-compatible metadata where useful;
-- support DLQ / retry / repair / replay for each event family;
-- keep sensitive raw payloads out of reports, metrics and review pages.
+- Kafka payload 使用 protobuf schema；
+- 事件文档逐步向 AsyncAPI 风格 channel 描述收敛；
+- 必要时保持 CloudEvents-compatible metadata；
+- 每类事件都需要 DLQ / retry / repair / replay 策略；
+- 敏感 payload 不能进入报告、metrics、review page 或低敏 manifest。
 
-## 10. Data Platform Architecture
+## 10. 数据平台架构
 
-The data platform is built from public events and CDC, not from direct joins over
-business private tables.
+数据平台基于公开事件和 CDC，不直接 join 业务私表。
 
 ```text
 Public events / CDC
@@ -338,7 +329,7 @@ Public events / CDC
   -> metrics / BI / risk / feature / RAG use cases
 ```
 
-Data product contract:
+数据产品契约：
 
 ```text
 name
@@ -353,14 +344,14 @@ consumer list
 repair / backfill procedure
 ```
 
-Do not build AI retrieval directly on arbitrary operational tables. Build
-search/vector/memory projections with explicit visibility and delete semantics.
+AI 检索不能直接构建在任意 operational table 上。必须通过明确的 search / vector /
+memory projection，并带上可见性、删除、撤回和 supersession 语义。
 
-## 11. AI / Memory / RAG Architecture
+## 11. AI / Memory / RAG 架构
 
-### 11.1 Group Memory Model
+### 11.1 群组 Memory 模型
 
-Memory records must preserve context:
+Memory record 必须保留上下文：
 
 ```text
 source_ref
@@ -380,15 +371,14 @@ review_state
 evidence_refs
 ```
 
-Rules:
+规则：
 
-- A group statement is not automatically a user preference.
-- A stale decision must be superseded, not merely appended.
-- Delete/revoke/member-leave events must affect search, vector and memory
-  visibility.
-- Retrieval must return source refs and reason for inclusion.
+- 群聊中的一句话不能自动升级成某个人的个人偏好。
+- 旧决策必须被 supersede，不能只是把新旧事实并列塞进向量库。
+- 删除、撤回、成员离开必须影响 search、vector 和 memory 的可见性。
+- 检索必须返回 source refs 和纳入原因。
 
-### 11.2 Retrieval and EvidencePack
+### 11.2 Retrieval 和 EvidencePack
 
 ```text
 request
@@ -402,7 +392,7 @@ request
   -> RAG / summary / Agent
 ```
 
-EvidencePack includes:
+EvidencePack 包含：
 
 ```text
 evidence_id
@@ -414,10 +404,10 @@ version / valid time
 redaction profile
 ```
 
-RAG and summary services cannot call search/vector stores directly when a
-policy-aware retrieval gateway is available.
+当 policy-aware retrieval gateway 已存在时，RAG 和 summary 不能直接调用 search /
+vector store。
 
-### 11.3 Agent Architecture
+### 11.3 Agent 架构
 
 ```text
 Agent request
@@ -432,76 +422,69 @@ Agent request
   -> event
 ```
 
-Agent roles may be multi-agent, but coordination is a service concern:
+可以使用 multi-agent 角色，但协作必须由服务编排：
 
-- planner;
-- retrieval specialist;
-- risk/policy reviewer;
-- tool/action executor;
-- evaluator/critic.
+- planner；
+- retrieval specialist；
+- risk / policy reviewer；
+- tool / action executor；
+- evaluator / critic。
 
-Only approved actions can mutate business state.
+只有审批通过的 action 才能修改业务状态。
 
-## 12. Middleware Platform
+## 12. 中间件平台
 
-Middleware is organized by capability. See
-`../platform/middleware-catalog.md` for the full catalog and adoption checklist.
+中间件按能力管理。完整 catalog 和引入 checklist 见：
+`../platform/middleware-catalog.md`。
 
-Runtime profiles:
+Runtime profile：
 
-| Profile | Scope |
+| Profile | 范围 |
 | --- | --- |
-| `core` | PostgreSQL, Kafka, Redis and core services. |
-| `client-demo` | Client BFF, push and client smoke path. |
-| `observability` | Prometheus, Grafana, Alertmanager, OTel collector. |
-| `search-rag` | OpenSearch/vector store/retrieval/RAG/model gateway. |
-| `media` | MinIO and media processing dependencies. |
-| `workflow-agent` | Workflow, Agent, skill, MCP and action execution. |
-| `security` | OIDC provider, Vault/KMS emulator, OpenFGA/OPA. |
-| `data-platform` | CDC, lakehouse, OLAP and analytics. |
-| `ai-runtime` | Local or remote model provider proxies. |
+| `core` | PostgreSQL、Kafka、Redis 和 IM core services。 |
+| `client-demo` | client BFF、push 和客户端 smoke 链路。 |
+| `observability` | Prometheus、Grafana、Alertmanager、OTel collector。 |
+| `search-rag` | OpenSearch / vector store / retrieval / RAG / model gateway。 |
+| `media` | MinIO 和 media processing 依赖。 |
+| `workflow-agent` | workflow、Agent、skill、MCP、action execution。 |
+| `security` | OIDC provider、Vault/KMS emulator、OpenFGA/OPA。 |
+| `data-platform` | CDC、lakehouse、OLAP、analytics。 |
+| `ai-runtime` | 本地或远程模型 provider proxy。 |
 
-Do not default-start all middleware. Each active slice chooses the smallest
-runtime profile needed for its smoke.
+不要默认启动所有中间件。每个 active slice 只选择它的最小 runtime profile。
 
-## 13. Security Architecture
+## 13. 安全架构
 
-Security boundaries:
+安全边界：
 
-- Public network boundary: `api-gateway`, `push-gateway`, client assets.
-- Identity boundary: `identity-service`, OIDC/JWKS, session/MFA.
-- Authorization boundary: `policy-service`, gateway metadata and per-service
-  ownership checks.
-- Data boundary: service-owned PostgreSQL, event contracts, data product privacy.
-- AI action boundary: retrieval, policy, workflow approval, action executor,
-  audit.
+- 公网边界：`api-gateway`、`push-gateway`、client assets。
+- 身份边界：`identity-service`、OIDC / JWKS、session / MFA。
+- 授权边界：`policy-service`、gateway metadata、每个服务自己的 ownership check。
+- 数据边界：服务自有 PostgreSQL、事件契约、数据产品隐私等级。
+- AI action 边界：retrieval、policy、workflow approval、action executor、audit。
 
-Security rules:
+安全规则：
 
-1. Public listeners must reject mock auth or plaintext secrets unless explicitly
-   local/private.
-2. Trusted metadata is minted only by gateway or verified internal boundary.
-3. Every public API must check object-level authorization.
-4. Sensitive values are not logged, exported, embedded in metrics or committed
-   into reports.
-5. Tool / MCP / Agent actions require capability metadata, policy and audit.
-6. KMS/HSM/Vault are capabilities behind adapters, not assumptions baked into
-   domain logic.
+1. 公网 listener 不能使用 mock auth 或明文 secret，除非显式限定 local / private。
+2. Trusted metadata 只能由 gateway 或已验证内部边界生成。
+3. 每个 public API 都必须做对象级授权。
+4. 敏感值不能进入日志、导出、metrics、报告或 Git 提交。
+5. Tool / MCP / Agent action 必须有 capability metadata、policy 和 audit。
+6. KMS/HSM/Vault 是 adapter 后面的能力，不是写死在 domain 里的假设。
 
-## 14. Reliability and Operations
+## 14. 可靠性和运维
 
-First-stage local evidence is not production SLO proof. The path to production
-requires:
+第一阶段本地证据不是生产 SLO 证明。走向生产需要：
 
-- SLIs for user-visible paths such as login, send, pull inbox, push wakeup,
-  search retrieval and Agent action latency;
-- SLOs only after enough operational data exists;
-- dashboards, alerts, runbooks and error budgets for critical paths;
-- DLQ, repair, replay and audit for every event-driven workflow;
-- backup, restore, failover and data integrity drills for each durable store;
-- canary / rollout / rollback gates for config and service changes.
+- 为用户可感知路径定义 SLI，例如 login、send、PullInbox、push wakeup、
+  search retrieval、Agent action latency；
+- 积累足够运行数据后再定义 SLO；
+- 为关键链路提供 dashboard、alert、runbook 和 error budget；
+- 每条事件驱动 workflow 都有 DLQ、repair、replay、audit；
+- 每个 durable store 都有 backup、restore、failover 和数据完整性演练；
+- 配置和服务变更有 canary、rollout、rollback gate。
 
-## 15. Code Organization
+## 15. 代码组织
 
 ```text
 services/<service>/
@@ -537,96 +520,95 @@ docs/
   runbook/
 ```
 
-Shared packages require at least two real callers and a stable contract. Do not
-extract abstractions merely to make diagrams symmetrical.
+共享包必须至少有两个真实调用方和稳定契约。不要为了让架构图对称而提前抽象。
 
-## 16. Language Boundary
+## 16. 语言边界
 
-| Area | Language |
+| 范围 | 语言 |
 | --- | --- |
-| Business services, BFF, control, audit, durable facts | Go |
-| Web / PC / Android shared client core and UI | TypeScript |
-| Tauri desktop bridge | Rust, thin bridge only |
-| Android platform bridge | Kotlin, thin bridge only |
-| iOS future bridge | Swift, thin bridge only |
-| AI workers, model algorithms, offline eval | Python |
+| 后端服务、BFF、控制面、审计、持久事实 | Go |
+| Web / PC / Android 共享客户端核心和 UI | TypeScript |
+| Tauri 桌面桥 | Rust，只做薄桥 |
+| Android 平台桥 | Kotlin，只做薄桥 |
+| iOS 未来平台桥 | Swift，只做薄桥 |
+| AI worker、模型算法、离线 eval | Python |
 
-Python cannot own business facts, security decisions or audit truth.
+Python 不能拥有业务事实、安全决策或审计真相。
 
-## 17. Evolution Roadmap
+## 17. 演进路线
 
-### Phase A: Stable IM and Client MVP
+### Phase A：稳定 IM 和客户端 MVP
 
-- Keep current IM services as the working backend.
-- Finish Web / PC / Android client shell on shared client core.
-- Keep BFF and push as the only client-facing backend surfaces.
+- 保持当前 IM 服务作为可运行后端。
+- 完成 Web / PC / Android 客户端 shell，共用 client core。
+- BFF 和 push 是唯一客户端后端入口。
 
-### Phase B: Product Platform Completion
+### Phase B：产品业务平台完善
 
-- Promote media, notification, presence, admin, audit, control-plane and
-  workflow by product need.
-- Keep each promotion service-by-service with SDD, migration, API, smoke and
-  docs.
+- 按产品需要逐步 promotion media、notification、presence、admin、audit、
+  control-plane、workflow。
+- 每个 promotion 都按服务切片闭环：SDD、migration、API、smoke、docs。
 
-### Phase C: AI Data Boundary
+### Phase C：AI 数据边界
 
-- Strengthen search, vector-index, memory and retrieval.
-- Enforce visibility, deletion, supersession and EvidencePack contracts.
+- 强化 search、vector-index、memory、retrieval。
+- 固定 visibility、delete、supersession 和 EvidencePack 契约。
 
-### Phase D: RAG and Agent Applications
+### Phase D：RAG 和 Agent 应用
 
-- Build RAG and summary on EvidencePack only.
-- Build Agent actions through workflow approval and action-executor.
-- Expand ai-eval before expanding autonomous actions.
+- RAG 和 summary 只能基于 EvidencePack。
+- Agent action 必须走 workflow approval 和 action-executor。
+- 扩 autonomous action 前先扩 ai-eval。
 
-### Phase E: Data Platform
+### Phase E：数据平台
 
-- Build ingestion and analytics from public events / CDC.
-- Add data catalog, quality checks and feature products.
+- 从公开事件 / CDC 构建 ingestion 和 analytics。
+- 增加 data catalog、quality checks、feature products。
 
-### Phase F: Production-Like Operations
+### Phase F：生产化运维
 
-- Replace local-only middleware with managed or HA profiles where needed.
-- Add SLOs, alerting, backup/restore, failover and rollout governance.
+- 按需要把 local-only 中间件替换成 managed 或 HA profile。
+- 补 SLO、告警、备份恢复、故障切换和 rollout 治理。
 
-## 18. Service / Middleware Addition Rule
+## 18. 服务 / 中间件新增规则
 
-Add a service or middleware only when at least one condition is true:
+新增服务或中间件至少满足一个条件：
 
-1. It owns an independent data model.
-2. It has an independent scaling profile.
-3. It has an independent failure or security boundary.
-4. Multiple services need the same capability.
-5. It significantly reduces existing service complexity.
+1. 拥有独立数据模型。
+2. 拥有独立伸缩特征。
+3. 拥有独立故障或安全边界。
+4. 多个服务需要同一种能力。
+5. 能显著降低现有服务复杂度。
 
-Every addition needs:
+每次新增必须包含：
 
-- ADR or SDD section.
-- Public API / event contract.
-- Data ownership statement.
-- Runtime profile or explicit deferred-runtime note.
-- Focused validation.
-- Rollback / migration / compatibility note.
+- ADR 或 SDD 章节；
+- public API / event contract；
+- 数据所有权说明；
+- runtime profile 或明确 deferred-runtime note；
+- focused validation；
+- rollback / migration / compatibility note。
 
-## 19. What This Architecture Avoids
+## 19. 本架构避免什么
 
-- One giant "middle platform" service.
-- AI services directly reading operational private tables.
-- Clients calling internal microservices.
-- Data platform becoming a hidden command side.
-- Middleware-specific code in domain/app layers.
-- Python workers owning durable business state.
-- Service count or middleware products frozen as the final answer.
+- 一个巨大的“中台服务”。
+- AI 服务直接读 operational private tables。
+- 客户端直接调用内部微服务。
+- 数据平台变成隐藏 command side。
+- domain / app 层依赖具体中间件 client。
+- Python worker 拥有持久业务状态。
+- 把服务数量或中间件产品写成终局答案。
 
-## 20. Interview Narrative
+## 20. 面试讲述口径
 
-NexusIM can be described as:
+NexusIM 可以这样描述：
 
 ```text
-A distributed IM backend with durable messaging, delivery and online wakeup,
-expanded into a reusable business platform and governed data platform, then
-layered with policy-aware retrieval, collaborative memory, RAG and controlled
-Agent actions. The architecture keeps business facts in Go services, analytical
-data in governed projections, AI evidence in retrieval packs, and real actions
-behind approval and audit.
+NexusIM 是一个以即时通信为核心的分布式后端系统。它先完成消息、会话、投递、
+在线通知和回执主链路，再沉淀身份、权限、媒体、通知、审计、控制面和 workflow
+等业务平台能力；同时通过公开事件和 CDC 构建数据平台；最后在权限过滤的
+EvidencePack 之上构建群组 memory、RAG、总结和可审计的 Agent action。
+
+系统把业务事实放在 Go 服务中，把分析数据放在治理后的数据产品中，把 AI 证据放在
+retrieval gateway 生成的 EvidencePack 中，把真实写动作放在 approval 和 audit 之后。
 ```

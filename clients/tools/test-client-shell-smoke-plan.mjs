@@ -22,6 +22,7 @@ assert(plan.schemaVersion === "nexusim.client-shell-smoke-plan.v1", "shell smoke
 assert(plan.targets.browser.readyForManualShellSmoke === true, "browser shell smoke should be available");
 assert(plan.targets.browser.launchCommand.includes("dev:web"), "browser launch command missing");
 assert(Array.isArray(plan.targets.browser.checklist) && plan.targets.browser.checklist.length >= 3, "browser checklist missing");
+assert(plan.targets.browser.checklist.some(item => item.step === "verify-shell-lifecycle-contract"), "browser shell lifecycle contract check missing");
 assert(plan.targets.browser.checklist.some(item => item.step === "verify-client-flow"), "browser flow verification missing");
 assert(plan.targets["windows-desktop"].commands.prepareAssets.includes("build:shell-assets:desktop"), "desktop prep command missing");
 assert(plan.targets["windows-desktop"].commands.verifyAssets.includes("windows-desktop"), "desktop verify command missing");
@@ -30,6 +31,7 @@ assert(plan.targets["windows-desktop"].install, "desktop install status missing"
 assert(typeof plan.targets["windows-desktop"].install.readyForInstall === "boolean", "desktop install readiness missing");
 assert(Array.isArray(plan.targets["windows-desktop"].install.missing), "desktop install missing list missing");
 assert(Array.isArray(plan.targets["windows-desktop"].checklist), "desktop checklist missing");
+assert(plan.targets["windows-desktop"].checklist.some(item => item.step === "verify-shell-lifecycle-contract"), "desktop shell lifecycle contract check missing");
 assert(plan.targets["windows-desktop"].checklist.some(item => item.step === "prepare-shell-assets"), "desktop asset prep checklist missing");
 assert(plan.targets["windows-desktop"].checklist.some(item => item.step === "verify-shell-assets"), "desktop asset verification checklist missing");
 assert(plan.targets.android.commands.prepareAssets.includes("build:shell-assets:android"), "android prep command missing");
@@ -40,6 +42,7 @@ assert(typeof plan.targets.android.install.readyForInstall === "boolean", "andro
 assert(typeof plan.targets.android.install.installPrereqs.adbAvailable === "boolean", "android adb prereq status missing");
 assert(Array.isArray(plan.targets.android.install.missing), "android install missing list missing");
 assert(Array.isArray(plan.targets.android.checklist), "android checklist missing");
+assert(plan.targets.android.checklist.some(item => item.step === "verify-shell-lifecycle-contract"), "android shell lifecycle contract check missing");
 assert(plan.targets.android.checklist.some(item => item.step === "prepare-shell-assets"), "android asset prep checklist missing");
 assert(plan.targets.android.checklist.some(item => item.step === "verify-shell-assets"), "android asset verification checklist missing");
 assert(Array.isArray(plan.targets.android.notes), "android notes missing");

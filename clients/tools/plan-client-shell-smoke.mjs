@@ -37,6 +37,11 @@ function browserTarget() {
     expectedBackend: "api-gateway BFF + push-gateway WebSocket",
     checklist: [
       {
+        step: "verify-shell-lifecycle-contract",
+        command: "npm --prefix clients run test:web-shell-actions",
+        evidence: "Web shell binds login, refresh, restore and logout through shared ClientShellActions"
+      },
+      {
         step: "start-shared-backend-smoke",
         command: "loadtest/clientweb/run-local-smoke.ps1 -BindHost 127.0.0.1 -ClientHost 127.0.0.1",
         evidence: "clientweb summary shows BFF login, push hello, SendMessage, PullInbox and AckDelivery"
@@ -145,6 +150,11 @@ function nativeCommands(target, readinessTarget) {
 function nativeChecklist(target, readinessTarget, artifactStatus, installStatus) {
   const label = target === "windows-desktop" ? "desktop" : "android";
   const checklist = [
+    {
+      step: "verify-shell-lifecycle-contract",
+      command: "npm --prefix clients run test:web-shell-actions",
+      evidence: "shared WebView shell action contract is guarded before platform smoke"
+    },
     {
       step: "prepare-shell-assets",
       command: nativeCommands(target, readinessTarget).prepareAssets,

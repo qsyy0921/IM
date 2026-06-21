@@ -23,5 +23,6 @@ Stage-switch 记录：`docs/runbook/stage-switch/media-service.md`。
 
 下一步：
 
-- 当前 active slice 已转向 future platform / product services promotion。
+- 当前 active slice 是 client platform MVP foundation；media-service 只处理阻塞
+  客户端或消息媒体引用链路的 P0/P1。
 - 真实 S3-compatible adapter、scanner、thumbnail / transcode provider 后置。

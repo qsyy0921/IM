@@ -17,8 +17,8 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
 
 ## 当前状态
 
-- 用户明确切入客户端平台；本轮从 product services promotion 临时转为
-  `client platform MVP foundation`。
+- 用户明确切入客户端平台；当前 active slice 固定为
+  `client platform MVP foundation`，直到 PC / Android runtime shell 或用户明确切换。
 - 目标是先按最高标准冻结三端客户端架构，不写临时 demo：浏览器先可运行，PC
   desktop 和 Android 从第一天保留 package / runtime / packaging 边界，三端复用
   `protocol` / `client-core`。

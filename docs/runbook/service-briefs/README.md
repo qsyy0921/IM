@@ -2,6 +2,9 @@
 
 本目录只放短状态索引。默认不要读全部服务文件；当前任务涉及哪个服务，就只读对应文件。
 
+当前长期架构基线：`docs/architecture/target-architecture-complete.md`。本目录只记录
+单服务当前事实，不替代完整架构、SDD 或 remaining goals。
+
 ## 已进入真实链路的 9 个服务
 
 [message](message-service.md) / [conversation](conversation-service.md) /
@@ -31,6 +34,8 @@ microservice: [client platform](../client-platform.md).
 ## 当前推进规则
 
 - 现有 9 个服务只做阻塞当前 client / AI 链路的必要收口。
+- 当前 active slice 是 client platform MVP foundation；client 细节看
+  `../client-platform.md` 和 `../../sdd/client-platform.md`。
 - client platform 只能通过 `api-gateway` / `push-gateway` 使用后端能力。
 - memory 必须按 group memory 设计：source refs、speaker / audience、validity、supersedes、confidence、review state。
 - Agent 写动作必须先走 policy tool precheck，默认 `Proposal -> Approval -> Executor -> Audit`。

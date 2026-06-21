@@ -1,8 +1,9 @@
 # NexusIM Codex Prompt
 
-## Codex 目标框短 Prompt
+## Codex 目标框内容
 
-把下面这段放进 Codex 目标框即可：
+目标框只保留下面这段通用文档入口。具体 active slice、优先级、待开发服务和边界都从
+仓库文档读取，不在目标框里写死。
 
 ```text
 持续推进 E:\development\IM 的 NexusIM。
@@ -26,7 +27,7 @@
 
 ## 文档路由
 
-- 本文件只维护 Codex 目标框短 Prompt 和每轮文档路由；具体目标见 `docs/runbook/current-goal.md`。
+- 本文件只维护 Codex 目标框内容和每轮文档路由；具体目标见 `docs/runbook/current-goal.md`。
 - Codex 目标框可能更新不及时；若目标框和仓库文档冲突，以 `current-goal.md` / `current-brief.md` / `remaining-goals.md` 为准。
 - `agent.md` 决定按需读取和维护哪些项目文档；阶段细节见 `docs/runbook/current-brief.md`。
 - 未完成工作见 `docs/runbook/remaining-goals.md`；单服务状态见 `docs/runbook/service-briefs/<service>.md`。

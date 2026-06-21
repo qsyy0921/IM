@@ -211,9 +211,10 @@ HTTP/JSON surface 已建立；Web fetch / WebSocket / local store first path 已
 clean baseline 已通过，BFF HTTP route metrics / rate-limit adapter 已落，下一步是
 PC / Android runtime。
 
-future platform / product services promotion 已作为后续主线保留：继续按服务推进
-媒体、通知、审计、控制面、presence、model 等产品化 / 平台服务，但不抢占当前
-客户端切片。
+future platform / product services 已作为长期产品化主线保留：继续按服务推进
+媒体、通知、审计、控制面、presence、model 等产品化 / 平台服务，并按
+`target-architecture-complete.md` 的业务平台 / 数据平台 / AI Agent 平台 /
+中间件平台边界演进；当前不抢占客户端切片。
 
 当前 10 个 future platform / product services 均已进入 product-active 第一版实现；
 后续继续按 service brief 推进 worker、relay、真实 provider / adapter 和 smoke。
@@ -255,7 +256,8 @@ future platform / product services promotion 已作为后续主线保留：继�
 -> 安全 / 观测 / repair / 运维 hardening
 ```
 
-Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发主线。
+Web / PC / Android 已进入当前 client platform MVP foundation；面试叙述仍优先讲
+后端 / 分布式 / AI，客户端作为产品化展示和端到端验证入口按需讲。
 
 ## 总体进度
 

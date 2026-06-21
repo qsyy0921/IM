@@ -14,6 +14,10 @@ Current scope:
 - WebView metadata smoke uses shell config `smokeCallbackURL` with loopback
   HTTP only. It is intended to prove native metadata is read from inside the
   shell; it does not include login form data or message flow.
+- Desktop WebView login smoke is driven externally through WebView2/CDP and a
+  local fixture file. It does not put auth input into shell config or output
+  reports. It is intended to run while `loadtest/clientweb/run-local-smoke.ps1`
+  keeps the BFF and push stack alive.
 
 Reports:
 
@@ -36,4 +40,5 @@ Useful command:
 ```powershell
 npm --prefix clients run smoke:desktop-composed -- --clientweb-summary <client-web-summary.json>
 npm --prefix clients run smoke:desktop-webview-metadata
+.\loadtest\clientweb\run-local-smoke.ps1 -RunDesktopWebViewLoginSmoke
 ```

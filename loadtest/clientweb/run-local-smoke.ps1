@@ -5,7 +5,9 @@ param(
     [string]$BindHost = "127.0.0.1",
     [string]$ClientHost = "",
     [string]$RunName = "",
-    [switch]$SkipBuild
+    [switch]$SkipBuild,
+    [switch]$RunDesktopWebViewLoginSmoke,
+    [switch]$DesktopWebViewSkipWebBuild
 )
 
 $ErrorActionPreference = "Stop"
@@ -337,7 +339,7 @@ try {
         NEXUSIM_API_GATEWAY_DELIVERY_ADDR = $deliveryTarget
         NEXUSIM_API_GATEWAY_RECEIPT_ADDR = $receiptTarget
         NEXUSIM_API_GATEWAY_BFF_ADDR = $bffListen
-        NEXUSIM_API_GATEWAY_BFF_ALLOWED_ORIGINS = "http://127.0.0.1:5173,http://localhost:5173,http://${ClientHost}:5173"
+        NEXUSIM_API_GATEWAY_BFF_ALLOWED_ORIGINS = "http://127.0.0.1:5173,http://localhost:5173,http://${ClientHost}:5173,http://tauri.localhost,https://tauri.localhost,tauri://localhost"
     }
     Wait-Tcp -HostName $ClientHost -Port $bffPort
 
@@ -360,6 +362,52 @@ try {
         --cleanup
     if ($LASTEXITCODE -ne 0) {
         throw "client web smoke runner failed with exit code $LASTEXITCODE"
+    }
+
+    if ($RunDesktopWebViewLoginSmoke) {
+        $desktopFixturePath = Join-Path ([System.IO.Path]::GetTempPath()) ("nexusim-desktop-webview-login-" + [System.Guid]::NewGuid().ToString("N") + ".json")
+        $desktopSummaryPath = Join-Path $resultDir "desktop-webview-login-summary.json"
+        try {
+            $desktopFixture = [ordered]@{
+                apiBaseURL = $bffBaseURL
+                pushWebSocketURL = $pushURL
+                tenantID = $tenantId
+                userID = $receiverUserId
+                authProof = $receiverPassword
+                deviceID = "desktop-webview-login-device"
+                conversationID = $conversationId
+                senderUserID = $senderUserId
+                senderAuthProof = $senderPassword
+                senderDeviceID = "desktop-webview-login-sender"
+                messageText = "NexusIM desktop WebView login smoke $safeRunName"
+            }
+            [System.IO.File]::WriteAllText(
+                $desktopFixturePath,
+                ($desktopFixture | ConvertTo-Json -Depth 4),
+                [System.Text.UTF8Encoding]::new($false)
+            )
+
+            $desktopSmokeArgs = @(
+                "--prefix", "clients",
+                "run", "smoke:desktop-webview-login",
+                "--",
+                "--fixture", $desktopFixturePath,
+                "--run-id", "desktop-webview-login-$safeRunName",
+                "--output", $desktopSummaryPath
+            )
+            if ($DesktopWebViewSkipWebBuild) {
+                $desktopSmokeArgs += "--skip-web-build"
+            }
+            & npm @desktopSmokeArgs
+            if ($LASTEXITCODE -ne 0) {
+                throw "desktop WebView login smoke failed with exit code $LASTEXITCODE"
+            }
+            if (-not (Test-Path $desktopSummaryPath)) {
+                throw "desktop WebView login smoke did not write summary"
+            }
+        } finally {
+            Remove-Item -LiteralPath $desktopFixturePath -Force -ErrorAction SilentlyContinue
+        }
     }
 } finally {
     foreach ($proc in $processes) {

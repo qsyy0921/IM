@@ -162,6 +162,13 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   `npm --prefix clients run smoke:desktop-webview-metadata`，证明 WebView 内能读取
   PC Tauri `runtime_metadata` 并回调低敏 report；该 smoke 仍不声明登录、
   PullInbox、WebSocket 或 AckDelivery 已在 Tauri WebView 内完成。
+- PC Web shell 已新增登录级自动化前置：Web UI 暴露稳定 `data-testid`
+  automation contract 和 `ack-status` 诊断，`npm --prefix clients run
+  smoke:desktop-webview-login` 可通过 WebView2/CDP 外部驱动 Tauri WebView 登录、
+  接收 externally-triggered `delivery.notify`、PullInbox 并 AckDelivery；现有
+  `loadtest/clientweb/run-local-smoke.ps1 -RunDesktopWebViewLoginSmoke` 会在本地
+  BFF / push 栈存活期间生成临时 fixture 并调用该 driver。该能力目前完成工具化
+  和 dry-run 校验，仍需实际跑一次真实 PC WebView login smoke 后才能写入通过结论。
 - Android 已新增 opt-in Docker builder profile：
   `deploy/docker/client-android-builder.Dockerfile` 和
   `deploy/local/docker-compose.client-builders.yml`。`validate:builder-profile`
@@ -258,9 +265,10 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
 ## 下一步优先级
 
 1. 继续 PC shell smoke：launch sanity、composed evidence 工具和真实 Tauri WebView
-   metadata callback smoke 已通过；下一步做 WebView 内 login、PullInbox、
-   delivery.notify 和 AckDelivery 验证；同时保留后续 MSI / NSIS installer bundle 为
-   hardening。
+   metadata callback smoke 已通过；login-level WebView driver 和
+   `run-local-smoke.ps1 -RunDesktopWebViewLoginSmoke` 可选入口已就绪，下一步实际运行并归档
+   WebView 内 login、PullInbox、delivery.notify 和 AckDelivery 结果；同时保留后续 MSI /
+   NSIS installer bundle 为 hardening。
 2. 补 Android JDK 17+ / Gradle / Android SDK，或显式运行 Android Docker builder
    profile，然后运行 `build:android-apk:collect` 产出首个 APK + manifest。
 3. 在真实 Android shell UI 中接入现有 shell action，并在工具链 ready 后跑平台 shell smoke。

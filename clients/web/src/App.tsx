@@ -49,6 +49,7 @@ export function App() {
   const [composerText, setComposerText] = useState("");
   const [status, setStatus] = useState("ready");
   const [pushStatus, setPushStatus] = useState("disconnected");
+  const [lastAck, setLastAck] = useState<{ conversationID: string; seq: number } | null>(null);
   const [error, setError] = useState("");
   const [desktopNativeMetadata, setDesktopNativeMetadata] = useState<NativeBridgeMetadata | undefined>();
   const [desktopNativeMetadataProbeFinished, setDesktopNativeMetadataProbeFinished] = useState(false);
@@ -286,6 +287,7 @@ export function App() {
     if (maxSeq > afterSeq) {
       runtime.ackQueue.recordReceived(conversationID, maxSeq);
       await runtime.ackQueue.flush(currentSession);
+      setLastAck({ conversationID, seq: maxSeq });
     }
   }
 
@@ -355,26 +357,49 @@ export function App() {
           <h2>登录</h2>
           <label>
             Tenant
-            <input value={tenantID} onChange={event => setTenantID(event.target.value)} />
+            <input data-testid="login-tenant" value={tenantID} onChange={event => setTenantID(event.target.value)} />
           </label>
           <label>
             User
-            <input value={userID} onChange={event => setUserID(event.target.value)} />
+            <input data-testid="login-user" value={userID} onChange={event => setUserID(event.target.value)} />
           </label>
           <label>
             Password
-            <input type="password" value={password} onChange={event => setPassword(event.target.value)} />
+            <input
+              data-testid="login-password"
+              type="password"
+              value={password}
+              onChange={event => setPassword(event.target.value)}
+            />
           </label>
-          <button type="button" onClick={() => void login()}>
+          <button data-testid="login-submit" type="button" onClick={() => void login()}>
             登录并连接
           </button>
-          <button className="secondary-button" type="button" onClick={() => void logout()} disabled={!session}>
+          <button
+            data-testid="logout-submit"
+            className="secondary-button"
+            type="button"
+            onClick={() => void logout()}
+            disabled={!session}
+          >
             退出登录
           </button>
-          <button className="secondary-button" type="button" onClick={() => void refreshSession()} disabled={!session}>
+          <button
+            data-testid="refresh-session"
+            className="secondary-button"
+            type="button"
+            onClick={() => void refreshSession()}
+            disabled={!session}
+          >
             刷新登录态
           </button>
-          <button className="secondary-button" type="button" onClick={() => void restoreSession()} disabled={!!session}>
+          <button
+            data-testid="restore-session"
+            className="secondary-button"
+            type="button"
+            onClick={() => void restoreSession()}
+            disabled={!!session}
+          >
             恢复会话
           </button>
         </section>
@@ -383,19 +408,25 @@ export function App() {
           <h2>会话</h2>
           <div className="manual-open">
             <input
+              data-testid="conversation-id-input"
               value={manualConversationID}
               onChange={event => setManualConversationID(event.target.value)}
               placeholder="conversation_id"
             />
-            <button type="button" onClick={() => void openManualConversation()}>
+            <button data-testid="open-conversation" type="button" onClick={() => void openManualConversation()}>
               打开
             </button>
           </div>
-          <button type="button" onClick={() => void run("load conversations", () => loadConversations())}>
+          <button
+            data-testid="refresh-conversations"
+            type="button"
+            onClick={() => void run("load conversations", () => loadConversations())}
+          >
             刷新会话
           </button>
           {conversations.map(conversation => (
             <button
+              data-testid="conversation-item"
               className={`conversation-item ${conversation.conversationID === activeConversationID ? "active" : ""}`}
               key={conversation.conversationID}
               onClick={() => void run("select conversation", () => selectConversation(conversation.conversationID))}
@@ -414,19 +445,22 @@ export function App() {
             <p>PullInbox 是事实源，WebSocket 只做在线唤醒。</p>
           </div>
           <div className="status-stack">
-            <span className="status-pill">{status}</span>
-            <span className="status-pill neutral">push {pushStatus}</span>
+            <span data-testid="runtime-status" className="status-pill">{status}</span>
+            <span data-testid="push-status" className="status-pill neutral">push {pushStatus}</span>
+            <span data-testid="ack-status" className="status-pill neutral">
+              {lastAck ? `ack ${lastAck.conversationID} #${lastAck.seq}` : "ack none"}
+            </span>
           </div>
         </header>
 
-        {error ? <div className="error-banner">{error}</div> : null}
+        {error ? <div data-testid="error-banner" className="error-banner">{error}</div> : null}
 
-        <div className="messages">
+        <div data-testid="message-list" className="messages">
           {messages.length === 0 ? (
             <div className="empty-state">登录后选择会话，或手动输入 conversation_id 拉取 PullInbox。</div>
           ) : (
             messages.map(message => (
-              <article className="message" key={message.messageID || message.clientMessageID}>
+              <article data-testid="message-item" className="message" key={message.messageID || message.clientMessageID}>
                 <header>
                   <strong>{message.senderUserID}</strong>
                   <span>#{message.conversationSeq || "pending"}</span>
@@ -446,12 +480,17 @@ export function App() {
           }}
         >
           <input
+            data-testid="message-composer"
             placeholder="输入文本消息"
             value={composerText}
             onChange={event => setComposerText(event.target.value)}
             disabled={!session || !activeConversationID}
           />
-          <button type="submit" disabled={!session || !activeConversationID || composerText.trim() === ""}>
+          <button
+            data-testid="send-message"
+            type="submit"
+            disabled={!session || !activeConversationID || composerText.trim() === ""}
+          >
             发送
           </button>
         </form>

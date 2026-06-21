@@ -135,7 +135,8 @@ function nativeCommands(target, readinessTarget) {
       installPlan: "npm --prefix clients run plan:artifact-install",
       launchSmoke: "npm --prefix clients run smoke:desktop-artifact-launch",
       composedSmoke: "npm --prefix clients run smoke:desktop-composed -- --clientweb-summary <client-web-summary.json>",
-      webviewMetadataSmoke: "npm --prefix clients run smoke:desktop-webview-metadata"
+      webviewMetadataSmoke: "npm --prefix clients run smoke:desktop-webview-metadata",
+      webviewLoginSmoke: ".\\loadtest\\clientweb\\run-local-smoke.ps1 -RunDesktopWebViewLoginSmoke"
     };
   }
   return {
@@ -236,6 +237,11 @@ function nativeChecklist(target, readinessTarget, artifactStatus, installStatus)
       step: "run-desktop-webview-metadata-smoke",
       command: nativeCommands(target, readinessTarget).webviewMetadataSmoke,
       evidence: "Tauri WebView loads the prepared shell, reads runtime_metadata via native bridge and posts low-sensitive metadata to a loopback callback"
+    });
+    checklist.push({
+      step: "run-desktop-webview-login-smoke",
+      command: nativeCommands(target, readinessTarget).webviewLoginSmoke,
+      evidence: "Tauri WebView is externally driven through login, delivery.notify, PullInbox and AckDelivery while the clientweb local stack is alive"
     });
   }
 

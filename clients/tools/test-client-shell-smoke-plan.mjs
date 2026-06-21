@@ -39,9 +39,11 @@ if (plan.targets["windows-desktop"].nativeToolchainReady) {
     assert(plan.targets["windows-desktop"].commands.launchSmoke?.includes("smoke:desktop-artifact-launch"), "desktop launch smoke command missing when smoke-ready");
     assert(plan.targets["windows-desktop"].commands.composedSmoke?.includes("smoke:desktop-composed"), "desktop composed smoke command missing when smoke-ready");
     assert(plan.targets["windows-desktop"].commands.webviewMetadataSmoke?.includes("smoke:desktop-webview-metadata"), "desktop WebView metadata smoke command missing when smoke-ready");
+    assert(plan.targets["windows-desktop"].commands.webviewLoginSmoke?.includes("-RunDesktopWebViewLoginSmoke"), "desktop WebView login smoke command missing when smoke-ready");
     assert(plan.targets["windows-desktop"].checklist.some(item => item.step === "launch-desktop-artifact-smoke"), "desktop artifact launch smoke checklist missing when smoke-ready");
     assert(plan.targets["windows-desktop"].checklist.some(item => item.step === "run-desktop-composed-smoke"), "desktop composed smoke checklist missing when smoke-ready");
     assert(plan.targets["windows-desktop"].checklist.some(item => item.step === "run-desktop-webview-metadata-smoke"), "desktop WebView metadata smoke checklist missing when smoke-ready");
+    assert(plan.targets["windows-desktop"].checklist.some(item => item.step === "run-desktop-webview-login-smoke"), "desktop WebView login smoke checklist missing when smoke-ready");
     assert(plan.targets["windows-desktop"].checklist.some(item => item.step === "run-platform-shell"), "desktop platform shell checklist missing when smoke-ready");
   } else {
     const desktopTarget = plan.targets["windows-desktop"];
@@ -154,6 +156,8 @@ assert(readyFromCollectedPlan.targets["windows-desktop"].readyForManualShellSmok
 assert(readyFromCollectedPlan.targets["windows-desktop"].artifact.present === true, "desktop artifact should be present from collected manifest");
 assert(readyFromCollectedPlan.targets["windows-desktop"].artifact.buildOutputPresent === false, "desktop build output should remain false");
 assert(readyFromCollectedPlan.targets["windows-desktop"].artifact.collectedArtifactReady === true, "desktop collected artifact should be ready");
+assert(readyFromCollectedPlan.targets["windows-desktop"].commands.webviewLoginSmoke.includes("-RunDesktopWebViewLoginSmoke"), "ready desktop plan should include WebView login smoke command");
+assert(readyFromCollectedPlan.targets["windows-desktop"].checklist.some(item => item.step === "run-desktop-webview-login-smoke"), "ready desktop plan should include WebView login smoke step");
 assert(readyFromCollectedPlan.targets.android.readyForManualShellSmoke === true, "android should be smoke-ready from collected artifact");
 assert(readyFromCollectedPlan.targets.android.artifact.collectedArtifactHint === "clients/artifacts/run/nexusim-android-debug.apk", "android collected artifact hint mismatch");
 

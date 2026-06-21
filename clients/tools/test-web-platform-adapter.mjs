@@ -15,7 +15,14 @@ async function main() {
     entryPath,
     `
       export { BrowserSessionStore, createBrowserPlatformAdapter } from "../web/src/platform-adapter";
-      export { loadRuntimeConfig, readAndroidNativeBridgeMetadata, readClientShellConfig, readDesktopNativeBridgeMetadata } from "../web/src/runtime-config";
+      export {
+        loadRuntimeConfig,
+        readAndroidNativeBridgeMetadata,
+        readAndroidNativeStorageBridge,
+        readClientShellConfig,
+        readDesktopNativeBridgeMetadata,
+        readDesktopNativeStorageBridge
+      } from "../web/src/runtime-config";
     `,
     "utf8"
   );
@@ -34,8 +41,10 @@ async function main() {
     createBrowserPlatformAdapter,
     loadRuntimeConfig,
     readAndroidNativeBridgeMetadata,
+    readAndroidNativeStorageBridge,
     readClientShellConfig,
-    readDesktopNativeBridgeMetadata
+    readDesktopNativeBridgeMetadata,
+    readDesktopNativeStorageBridge
   } = await import(
     pathToFileURL(bundlePath).href
   );
@@ -137,6 +146,71 @@ async function main() {
   assertEqual(nativeMetadata?.capabilities?.localStore?.ready, false, "android local store readiness");
   assertEqual(nativeMetadata?.capabilities?.localStore?.reason, "sqlite-native-bridge-unavailable", "android local store reason");
   assertEqual(nativeMetadata?.capabilities?.localStore?.bridge, "android-sqlite", "android local store bridge");
+  assertEqual(readAndroidNativeStorageBridge(nativeMetadata), undefined, "android native storage bridge rejects not-ready metadata");
+
+  const androidNativeItems = new Map();
+  globalThis.NexusIMNative = {
+    runtimeMetadata() {
+      return JSON.stringify({
+        target: "android",
+        nativeBridgeVersion: "0.2.0",
+        runtimeLabel: "NexusIM Android shell",
+        capabilities: {
+          localStore: {
+            currentDefault: "local-storage",
+            productionTarget: "sqlite",
+            nativeStoreReady: true,
+            nativeStoreReason: "",
+            nativeStoreBridge: "android-sqlite"
+          }
+        }
+      });
+    },
+    localStoreGetItem(key) {
+      return androidNativeItems.get(key) ?? null;
+    },
+    localStoreSetItem(key, value) {
+      androidNativeItems.set(key, value);
+    },
+    localStoreRemoveItem(key) {
+      androidNativeItems.delete(key);
+    }
+  };
+  const readyAndroidMetadata = readAndroidNativeBridgeMetadata();
+  assertEqual(readyAndroidMetadata?.capabilities?.localStore?.ready, true, "android ready native store metadata");
+  const androidNativeStorage = readAndroidNativeStorageBridge(readyAndroidMetadata);
+  assertEqual(typeof androidNativeStorage?.setItem, "function", "android ready native storage bridge");
+  androidNativeStorage?.setItem("android-key", "android-value");
+  assertEqual(androidNativeStorage?.getItem("android-key"), "android-value", "android native storage get item");
+  androidNativeStorage?.removeItem("android-key");
+  assertEqual(androidNativeStorage?.getItem("android-key"), null, "android native storage remove item");
+
+  globalThis.NexusIMNative = {
+    runtimeMetadata() {
+      return JSON.stringify({
+        target: "android",
+        nativeBridgeVersion: "0.2.0",
+        runtimeLabel: "NexusIM Android shell",
+        capabilities: {
+          localStore: {
+            currentDefault: "local-storage",
+            productionTarget: "sqlite",
+            nativeStoreReady: true,
+            nativeStoreReason: "",
+            nativeStoreBridge: "android-sqlite"
+          }
+        }
+      });
+    },
+    localStoreGetItem() {
+      return null;
+    }
+  };
+  assertEqual(
+    readAndroidNativeStorageBridge(readAndroidNativeBridgeMetadata()),
+    undefined,
+    "android native storage bridge requires all storage methods"
+  );
 
   globalThis.NexusIMNative = {
     runtimeMetadata() {
@@ -180,6 +254,56 @@ async function main() {
   assertEqual(desktopMetadata?.capabilities?.localStore?.ready, false, "desktop local store readiness");
   assertEqual(desktopMetadata?.capabilities?.localStore?.reason, "sqlite-native-bridge-unavailable", "desktop local store reason");
   assertEqual(desktopMetadata?.capabilities?.localStore?.bridge, "tauri-sqlite", "desktop local store bridge");
+  assertEqual(readDesktopNativeStorageBridge(desktopMetadata), undefined, "desktop native storage bridge rejects not-ready metadata");
+
+  const desktopNativeItems = new Map();
+  const desktopInvocations = [];
+  globalThis.__TAURI__ = {
+    core: {
+      async invoke(command, args = {}) {
+        desktopInvocations.push(command);
+        if (command === "runtime_metadata") {
+          return JSON.stringify({
+            target: "windows-desktop",
+            nativeBridgeVersion: "0.2.0",
+            runtimeLabel: "NexusIM desktop shell",
+            capabilities: {
+              localStore: {
+                currentDefault: "local-storage",
+                productionTarget: "sqlite",
+                nativeStoreReady: true,
+                nativeStoreReason: "",
+                nativeStoreBridge: "tauri-sqlite"
+              }
+            }
+          });
+        }
+        if (command === "local_store_get_item") {
+          return desktopNativeItems.get(args.key) ?? null;
+        }
+        if (command === "local_store_set_item") {
+          desktopNativeItems.set(args.key, args.value);
+          return null;
+        }
+        if (command === "local_store_remove_item") {
+          desktopNativeItems.delete(args.key);
+          return null;
+        }
+        throw new Error(`unexpected command ${command}`);
+      }
+    }
+  };
+  const readyDesktopMetadata = await readDesktopNativeBridgeMetadata();
+  assertEqual(readyDesktopMetadata?.capabilities?.localStore?.ready, true, "desktop ready native store metadata");
+  const desktopNativeStorage = readDesktopNativeStorageBridge(readyDesktopMetadata);
+  assertEqual(typeof desktopNativeStorage?.setItem, "function", "desktop ready native storage bridge");
+  await desktopNativeStorage?.setItem("desktop-key", "desktop-value");
+  assertEqual(await desktopNativeStorage?.getItem("desktop-key"), "desktop-value", "desktop native storage get item");
+  await desktopNativeStorage?.removeItem("desktop-key");
+  assertEqual(await desktopNativeStorage?.getItem("desktop-key"), null, "desktop native storage remove item");
+  assertEqual(desktopInvocations.includes("local_store_get_item"), true, "desktop bridge get command invoked");
+  assertEqual(desktopInvocations.includes("local_store_set_item"), true, "desktop bridge set command invoked");
+  assertEqual(desktopInvocations.includes("local_store_remove_item"), true, "desktop bridge remove command invoked");
 
   globalThis.__TAURI__ = {
     core: {

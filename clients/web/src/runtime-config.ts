@@ -1,6 +1,7 @@
 import type {
   ClientRuntimeConfig,
   ClientRuntimeTarget,
+  NativeStringKeyValueBridge,
   NativeStoreReadiness
 } from "@nexusim/client-core";
 
@@ -127,6 +128,76 @@ export function readAndroidNativeBridgeMetadata(): AndroidNativeBridgeMetadata |
   }
 }
 
+export function readDesktopNativeStorageBridge(
+  metadata?: DesktopNativeBridgeMetadata
+): NativeStringKeyValueBridge | undefined {
+  const tauri = (globalThis as {
+    __TAURI__?: {
+      core?: {
+        invoke?: (command: string, args?: Record<string, unknown>) => Promise<unknown>;
+      };
+    };
+  }).__TAURI__;
+  if (
+    metadata?.capabilities?.localStore?.ready !== true ||
+    metadata.capabilities.localStore.bridge !== "tauri-sqlite" ||
+    !tauri?.core ||
+    typeof tauri.core.invoke !== "function"
+  ) {
+    return undefined;
+  }
+  const invoke = tauri.core.invoke;
+  return {
+    async getItem(key: string): Promise<string | null> {
+      const value = await invoke("local_store_get_item", { key });
+      return typeof value === "string" ? value : null;
+    },
+    async setItem(key: string, value: string): Promise<void> {
+      await invoke("local_store_set_item", { key, value });
+    },
+    async removeItem(key: string): Promise<void> {
+      await invoke("local_store_remove_item", { key });
+    }
+  };
+}
+
+export function readAndroidNativeStorageBridge(
+  metadata?: AndroidNativeBridgeMetadata
+): NativeStringKeyValueBridge | undefined {
+  const bridge = (globalThis as {
+    NexusIMNative?: {
+      localStoreGetItem?: (key: string) => string | null;
+      localStoreSetItem?: (key: string, value: string) => void;
+      localStoreRemoveItem?: (key: string) => void;
+    };
+  }).NexusIMNative;
+  if (
+    metadata?.capabilities?.localStore?.ready !== true ||
+    metadata.capabilities.localStore.bridge !== "android-sqlite" ||
+    !bridge ||
+    typeof bridge.localStoreGetItem !== "function" ||
+    typeof bridge.localStoreSetItem !== "function" ||
+    typeof bridge.localStoreRemoveItem !== "function"
+  ) {
+    return undefined;
+  }
+  const getItem = bridge.localStoreGetItem;
+  const setItem = bridge.localStoreSetItem;
+  const removeItem = bridge.localStoreRemoveItem;
+  return {
+    getItem(key: string): string | null {
+      const value = getItem(key);
+      return typeof value === "string" ? value : null;
+    },
+    setItem(key: string, value: string): void {
+      setItem(key, value);
+    },
+    removeItem(key: string): void {
+      removeItem(key);
+    }
+  };
+}
+
 function nativeBridgeCapabilities(
   target: NativeBridgeMetadata["target"],
   value: unknown
@@ -151,11 +222,13 @@ function nativeLocalStoreReadiness(
   }
   const raw = value as Record<string, unknown>;
   const bridge = target === "windows-desktop" ? "tauri-sqlite" : "android-sqlite";
+  const ready = raw.nativeStoreReady === true;
+  const expectedReason = ready ? "" : "sqlite-native-bridge-unavailable";
   if (
     raw.currentDefault !== "local-storage" ||
     raw.productionTarget !== "sqlite" ||
     typeof raw.nativeStoreReady !== "boolean" ||
-    raw.nativeStoreReason !== "sqlite-native-bridge-unavailable" ||
+    raw.nativeStoreReason !== expectedReason ||
     raw.nativeStoreBridge !== bridge
   ) {
     return undefined;
@@ -163,8 +236,8 @@ function nativeLocalStoreReadiness(
   return {
     target,
     requestedStore: "sqlite",
-    ready: raw.nativeStoreReady,
-    reason: raw.nativeStoreReady ? "" : "sqlite-native-bridge-unavailable",
+    ready,
+    reason: ready ? "" : "sqlite-native-bridge-unavailable",
     bridge,
     nextAction: `${bridge} is required before ${target} can use sqlite local store`
   };

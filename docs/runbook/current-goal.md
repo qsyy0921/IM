@@ -83,9 +83,11 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   合约 fail-fast，返回稳定低敏 reason / bridge / next action；现在也已有 shared
   `NativeBridgeStringKeyValueStorage` 合约，desktop / Android 平台 adapter 在显式
   注入 native key-value bridge 时可用同一 `KeyValueMessageStore` 语义跑通
-  `sqlite` store path。focused runtime test 用 fake native bridge 覆盖了 cursor /
-  message 持久化和重开；真实 Tauri / Kotlin SQLite 命令桥仍未实现，默认 shell 仍用
-  localStorage。
+  `sqlite` store path。Web runtime 现在也会严格发现 ready native store metadata：
+  desktop 只接受 Tauri `local_store_*` 命令，Android 只接受
+  `NexusIMNative.localStore*` 方法，缺方法或 readiness false 都保持 fail closed。
+  focused runtime test 用 fake native bridge 覆盖了 cursor / message 持久化和重开；
+  真实 Tauri / Kotlin SQLite 命令桥仍未实现，默认 shell 仍用 localStorage。
 - `LocalMessageStore.listMessages` 已提升为 shared client-core port；
   `MemoryMessageStore`、`KeyValueMessageStore` 和 Web `IndexedDBMessageStore`
   现在都有同一读缓存语义，并补了 pending -> accepted-send 迁移去重测试。

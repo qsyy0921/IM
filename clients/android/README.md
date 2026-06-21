@@ -27,8 +27,10 @@ Flutter or native Kotlin for a concrete reason.
   `NativeStoreReadiness` with reason `sqlite-native-bridge-unavailable` and
   expected bridge `android-sqlite` unless an explicit native key-value bridge is
   injected. The TypeScript-side bridge contract is in place and covered by
-  focused tests, but the current WebView shell still uses localStorage
-  persistence until the Android SQLite bridge is implemented.
+  focused tests. Web runtime discovery now only enables it when metadata reports
+  ready and `NexusIMNative` exposes all `localStore*` methods; the current
+  WebView shell still uses localStorage persistence until the Android SQLite
+  bridge is implemented.
 - `shell-config.example.json` records the low-permission WebView config bridge
   for local LAN endpoints and Android runtime identity. It can be rendered to
   `web/public/nexusim-shell-config.js` before a shell build.

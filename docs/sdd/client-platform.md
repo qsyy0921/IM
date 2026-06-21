@@ -452,8 +452,12 @@ replace only the storage port with SQLite/native adapters while keeping
 `NativeStoreReadiness` until a real native bridge exists. That shared contract
 keeps the failure low-sensitive and stable: `reason`, expected bridge and next
 action are explicit, while platform adapters do not expose native paths or
-tokens. `MemoryMessageStore`, `KeyValueMessageStore` and `IndexedDBMessageStore`
-share the same pending-send readback and accepted-send de-duplication contract.
+tokens. Web runtime discovery may wrap native key-value storage only when
+metadata is explicitly ready and the fixed Tauri `local_store_*` commands or
+Android `NexusIMNative.localStore*` methods are present; current real shells
+still expose metadata only and remain on localStorage. `MemoryMessageStore`,
+`KeyValueMessageStore` and `IndexedDBMessageStore` share the same pending-send
+readback and accepted-send de-duplication contract.
 
 Minimum local entities:
 

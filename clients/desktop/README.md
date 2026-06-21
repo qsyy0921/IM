@@ -24,8 +24,10 @@ the native bridge can stay narrow and auditable.
   `NativeStoreReadiness` with reason `sqlite-native-bridge-unavailable` and
   expected bridge `tauri-sqlite` unless an explicit native key-value bridge is
   injected. The TypeScript-side bridge contract is in place and covered by
-  focused tests, but the current Tauri shell still uses localStorage
-  persistence until the Tauri SQLite command bridge is implemented.
+  focused tests. Web runtime discovery now only enables it when metadata reports
+  ready and Tauri exposes all `local_store_*` commands; the current Tauri shell
+  still uses localStorage persistence until that SQLite command bridge is
+  implemented.
 - `npm --prefix clients run build:desktop-artifact` is the first-stage artifact
   wrapper. It prepares and verifies Web assets, then runs the available Tauri
   CLI with `NEXUSIM_SKIP_SHELL_ASSET_PREP=true` so Tauri does not run the same

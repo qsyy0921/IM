@@ -16,6 +16,9 @@ Flutter or native Kotlin for a concrete reason.
 - First Kotlin native bridge skeleton exists under `native/`; it owns only the
   launch shell and bridge metadata, not session storage, local message facts or
   BFF calls.
+- The WebView registers `NexusIMNative` as a read-only JavaScript bridge. It
+  exposes only runtime metadata (`target`, bridge version and label), and does
+  not expose token, storage, file-system or message APIs.
 - `shell-config.example.json` records the low-permission WebView config bridge
   for local LAN endpoints and Android runtime identity. It can be rendered to
   `web/public/nexusim-shell-config.js` before a shell build.
@@ -34,6 +37,8 @@ Flutter or native Kotlin for a concrete reason.
 - Shell config is endpoint and identity metadata only. It must not contain
   gateway tokens, refresh tokens, passwords, private keys, or arbitrary native
   capability flags.
+- `NexusIMNative` is a metadata bridge only. It must stay read-only until a
+  separate ADR defines native capability commands and their audit boundary.
 - Current local message cache is in-memory only; production cache should use
   SQLite behind `LocalMessageStore`.
 - Push notification integration must not bypass PullInbox reconciliation.

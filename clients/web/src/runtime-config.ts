@@ -20,6 +20,12 @@ export interface ClientShellConfig {
   readonly sessionKey?: string;
 }
 
+export interface AndroidNativeBridgeMetadata {
+  readonly target: "android";
+  readonly nativeBridgeVersion: string;
+  readonly runtimeLabel: string;
+}
+
 export function loadRuntimeConfig(): ClientRuntimeConfig {
   const env = (import.meta as unknown as ViteImportMeta).env ?? {};
   const shell = readClientShellConfig();
@@ -28,6 +34,36 @@ export function loadRuntimeConfig(): ClientRuntimeConfig {
     pushWebSocketURL: shell.pushWebSocketURL ?? env.VITE_NEXUSIM_WS_URL ?? "ws://127.0.0.1:8088/ws",
     deviceID: shell.deviceID ?? env.VITE_NEXUSIM_DEVICE_ID ?? "web-local-device"
   };
+}
+
+export function readAndroidNativeBridgeMetadata(): AndroidNativeBridgeMetadata | undefined {
+  const bridge = (globalThis as {
+    NexusIMNative?: {
+      runtimeMetadata?: () => string;
+    };
+  }).NexusIMNative;
+  if (!bridge || typeof bridge.runtimeMetadata !== "function") {
+    return undefined;
+  }
+  try {
+    const raw = JSON.parse(bridge.runtimeMetadata()) as Record<string, unknown>;
+    if (
+      raw.target !== "android" ||
+      typeof raw.nativeBridgeVersion !== "string" ||
+      raw.nativeBridgeVersion.trim() === "" ||
+      typeof raw.runtimeLabel !== "string" ||
+      raw.runtimeLabel.trim() === ""
+    ) {
+      return undefined;
+    }
+    return {
+      target: "android",
+      nativeBridgeVersion: raw.nativeBridgeVersion,
+      runtimeLabel: raw.runtimeLabel
+    };
+  } catch {
+    return undefined;
+  }
 }
 
 export function readClientShellConfig(): ClientShellConfig {

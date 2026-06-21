@@ -114,6 +114,10 @@ First slice:
   It now uses an Android WebView asset shell through `WebViewAssetLoader`,
   loads the prepared local Web assets, and still does not own token storage,
   local message facts, BFF calls, or push delivery semantics.
+- Android WebView now registers the read-only `NexusIMNative` JavaScript bridge.
+  The Web runtime can parse `runtimeMetadata()` for diagnostics, and invalid
+  bridge payloads fail closed. The bridge exposes no token, storage,
+  file-system or message APIs.
 - PC desktop and Android can reuse the same `@nexusim/client-core` BFF adapter
   instead of copying Web-private HTTP mapping code.
 - PC desktop and Android can also reuse the same `@nexusim/client-core`

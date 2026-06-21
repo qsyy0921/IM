@@ -15,7 +15,7 @@ async function main() {
     entryPath,
     `
       export { BrowserSessionStore, createBrowserPlatformAdapter } from "../web/src/platform-adapter";
-      export { loadRuntimeConfig, readClientShellConfig } from "../web/src/runtime-config";
+      export { loadRuntimeConfig, readAndroidNativeBridgeMetadata, readClientShellConfig } from "../web/src/runtime-config";
     `,
     "utf8"
   );
@@ -33,6 +33,7 @@ async function main() {
     BrowserSessionStore,
     createBrowserPlatformAdapter,
     loadRuntimeConfig,
+    readAndroidNativeBridgeMetadata,
     readClientShellConfig
   } = await import(
     pathToFileURL(bundlePath).href
@@ -103,6 +104,34 @@ async function main() {
   });
   assertEqual(androidRuntimeConfig.deviceID, "android-webview", "android shell config overrides device id");
   assertEqual(androidAdapter.identity.target, "android", "webview shell uses android target");
+
+  globalThis.NexusIMNative = {
+    runtimeMetadata() {
+      return JSON.stringify({
+        target: "android",
+        nativeBridgeVersion: "0.1.0",
+        runtimeLabel: "NexusIM Android shell"
+      });
+    }
+  };
+  const nativeMetadata = readAndroidNativeBridgeMetadata();
+  assertEqual(nativeMetadata?.target, "android", "android native bridge metadata target");
+  assertEqual(nativeMetadata?.nativeBridgeVersion, "0.1.0", "android native bridge metadata version");
+  assertEqual(nativeMetadata?.runtimeLabel, "NexusIM Android shell", "android native bridge metadata label");
+
+  globalThis.NexusIMNative = {
+    runtimeMetadata() {
+      return JSON.stringify({ target: "windows-desktop" });
+    }
+  };
+  assertEqual(readAndroidNativeBridgeMetadata(), undefined, "android native bridge rejects non-android target");
+
+  globalThis.NexusIMNative = {
+    runtimeMetadata() {
+      return "not-json";
+    }
+  };
+  assertEqual(readAndroidNativeBridgeMetadata(), undefined, "android native bridge rejects malformed json");
 
   console.log("web platform adapter ok");
 }

@@ -31,6 +31,7 @@ class MainActivity : Activity() {
         webView.settings.cacheMode = WebSettings.LOAD_DEFAULT
         webView.settings.allowFileAccess = false
         webView.settings.allowContentAccess = false
+        webView.addJavascriptInterface(NexusIMBridge(), "NexusIMNative")
         setContentView(webView)
         webView.loadUrl("https://appassets.androidplatform.net/assets/nexusim/index.html")
     }

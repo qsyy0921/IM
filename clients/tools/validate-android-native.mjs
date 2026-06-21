@@ -55,11 +55,16 @@ const mainActivity = read("android/native/app/src/main/java/com/nexusim/android/
 assert(mainActivity.includes("WebViewAssetLoader"), "Android shell must use WebViewAssetLoader");
 assert(mainActivity.includes("appassets.androidplatform.net"), "Android shell must load appassets URL");
 assert(mainActivity.includes("allowFileAccess = false"), "Android shell must disable file access");
+assert(mainActivity.includes('addJavascriptInterface(NexusIMBridge(), "NexusIMNative")'), "Android shell must register low-permission native metadata bridge");
 
 const bridge = read("android/native/app/src/main/java/com/nexusim/android/NexusIMBridge.kt");
-assert(bridge.includes('runtimeTarget: String = "android"'), "Android runtime target marker missing");
+assert(bridge.includes("@JavascriptInterface"), "Android native bridge must expose only annotated methods");
+assert(bridge.includes("fun runtimeMetadata(): String"), "Android runtime metadata method missing");
+assert(bridge.includes('RUNTIME_TARGET: String = "android"'), "Android runtime target marker missing");
+assert(bridge.includes("JSONObject()"), "Android native bridge must return structured metadata JSON");
 assert(!bridge.includes("SharedPreferences"), "native bridge must not own session storage yet");
 assert(!bridge.includes("SQLite"), "native bridge must not own message store yet");
+assert(!bridge.match(/token|secret|password|credential|private/i), "native bridge must not contain sensitive fields");
 
 const shellConfig = JSON.parse(read("android/shell-config.example.json"));
 assert(shellConfig.target === "android", "Android shell config target mismatch");

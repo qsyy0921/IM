@@ -29,8 +29,10 @@ export interface AuthSession {
   deviceID: DeviceID;
   sessionID: SessionID;
   accessToken: string;
+  pushToken?: string;
   refreshToken?: string;
   expiresAtMs?: number;
+  pushExpiresAtMs?: number;
 }
 
 export interface LoginRequest {

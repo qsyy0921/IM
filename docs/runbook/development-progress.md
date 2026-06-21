@@ -34,8 +34,10 @@
   list / PullInbox-backed messages / send / ACK / contacts / receipts；
   `clients/web` 已接 first-stage BFF fetch / push WebSocket / IndexedDB local
   store adapters，并把 Web shell 接到 login / PullInbox / SendMessage /
-  AckDelivery flow；第一阶段下一步是局域网 Web MVP smoke，然后复用同一 core
-  接 PC installer 和 Android APK。
+  AckDelivery flow；`loadtest/clientweb` 已新增脚本化 BFF + push client-path
+  smoke runner 和本地私有启动脚本。2026-06-21 第一轮本地 Web MVP smoke 已通过并
+  归档到 `docs/runbook/loadtest/client-platform/`；该运行是 WIP dirty 验证，
+  提交后还需要重跑 clean baseline，然后复用同一 core 接 PC installer 和 Android APK。
 
 当前已开始的 AI 大模型应用底座能力：
 
@@ -198,7 +200,8 @@ Python Worker 候选接入边界和低敏 eval 持久化已经足够支撑算法
 用户已明确切入 client platform MVP foundation：三端客户端架构、可复用
 `protocol` / `client-core` skeleton 和 `api-gateway` client BFF first-stage
 HTTP/JSON surface 已建立；Web fetch / WebSocket / local store first path 已接，
-下一步是局域网 Web MVP smoke。
+第一轮本地 Web MVP smoke 已通过，下一步是 clean baseline / wired LAN smoke 和
+BFF HTTP 层治理。
 
 future platform / product services promotion 已作为后续主线保留：继续按服务推进
 媒体、通知、审计、控制面、presence、model 等产品化 / 平台服务，但不抢占当前

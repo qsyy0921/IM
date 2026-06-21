@@ -61,6 +61,15 @@ First slice:
     the `LocalMessageStore` port.
 - The Web shell is wired to login, connect push, list / manually open
   conversations, PullInbox, send text and AckDelivery through those adapters.
+- `loadtest/clientweb` provides the first scriptable client-path smoke. Setup
+  uses public gRPC APIs to register users, seed the conversation owner and create
+  the receiver JOIN; the verified client path then uses only HTTP BFF and
+  WebSocket: login, push hello, send, notify, PullInbox, conversation list and
+  AckDelivery. `loadtest/clientweb/run-local-smoke.ps1` starts a local private
+  non-TLS backend+BFF+push stack for this smoke. The first local smoke passed on
+  2026-06-21; report:
+  `docs/runbook/loadtest/client-platform/loadtest-report-20260621-client-web-bff-push-smoke.md`.
+  It does not replace existing secure mTLS gateway / push smoke coverage.
 - The PC desktop and Android packages currently define runtime / packaging
   contracts only. They do not yet produce `.msi`, `.exe`, `.apk`, or `.aab`
   artifacts.
@@ -84,7 +93,9 @@ rejected. For local LAN client smoke, prefer the wired `172.x.x.x` address.
 
 ## Next Work
 
-1. Run LAN smoke against Windows / Mac backend IP for the Web MVP path.
+1. Re-run `loadtest/clientweb/run-local-smoke.ps1` after the current WIP is
+   committed to produce a clean baseline report; then repeat against the
+   Windows / Mac wired LAN backend IP.
 2. Add HTTP-layer BFF metrics / rate-limit adapter; current BFF calls the
    gateway facade directly and does not pass through gRPC interceptors.
 3. Add PC desktop Tauri runner and first local Windows installer.

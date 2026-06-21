@@ -37,8 +37,10 @@ presence-service、vector-index-service、workflow-service。
 三端方式冻结可复用客户端架构：`clients/packages/protocol`、
 `clients/packages/client-core`、`clients/web`、`clients/desktop` 和
 `clients/android`。浏览器先可运行，PC / Android 复用同一协议和同步核心。
-`clients/` workspace skeleton 已创建并通过 focused validation；下一步是
-Web MVP 局域网 smoke、BFF HTTP 层治理，以及 PC / Android runtime shell。
+`clients/` workspace skeleton 已创建并通过 focused validation；`loadtest/clientweb`
+已提供脚本化 BFF + push client-path smoke runner 和本地私有进程启动脚本。第一轮
+本地 Web MVP smoke 已通过并归档，但该运行记录 `git_dirty=true`，提交后需要重跑
+clean baseline。下一步是 BFF HTTP 层治理，以及 PC / Android runtime shell。
 
 真实业务语言边界已经固定为：Go 负责后端微服务、client BFF、控制面、事实源和
 审计；TypeScript 负责 Web / PC / Android 的共享客户端协议、同步核心和 UI；
@@ -48,7 +50,8 @@ Rust / Kotlin 只做薄平台 bridge；Python 只做 AI worker、模型算法、
 当前短线重点：
 
 - client-platform：`api-gateway` client BFF 和 Web fetch / WebSocket /
-  IndexedDB adapter first path 已落，下一步跑局域网 smoke。
+  IndexedDB adapter first path 已落，`loadtest/clientweb` 本地 smoke 已通过并归档；
+  下一步提交后重跑 clean baseline，再做 wired LAN smoke 和 BFF HTTP 层治理。
 - admin / audit / workflow：客户端切片完成后继续公开 API handoff、operator
   workflow、低敏审批 review artifact 和补偿边界。
 - vector-index：继续 provider backend、pgvector / Milvus / OpenSearch 相关

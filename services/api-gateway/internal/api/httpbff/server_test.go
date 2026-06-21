@@ -25,18 +25,22 @@ func TestLoginEndpointUsesProtoJSON(t *testing.T) {
 			if request.GetTenantId() != "tenant-1" || request.GetUserId() != "user-1" || request.GetDeviceId() != "web-1" {
 				t.Fatalf("unexpected login request: %+v", request)
 			}
+			if request.GetAudience() != "api-gateway" {
+				t.Fatalf("expected BFF login to force api-gateway audience, got %q", request.GetAudience())
+			}
 			return &identityv1.LoginResponse{
 				TenantId:     request.GetTenantId(),
 				UserId:       request.GetUserId(),
 				DeviceId:     request.GetDeviceId(),
 				SessionId:    "session-1",
+				Audience:     request.GetAudience(),
 				TokenType:    "Bearer",
 				GatewayToken: "gateway-token",
 				RefreshToken: "refresh-token",
 			}, nil
 		},
 	}
-	handler := NewServer(Config{Gateway: gateway})
+	handler := NewServer(Config{Gateway: gateway, PushTokens: NewHMACPushTokenIssuer("push-secret", time.Minute)})
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(`{
 		"tenant_id":"tenant-1",
@@ -52,6 +56,10 @@ func TestLoginEndpointUsesProtoJSON(t *testing.T) {
 	}
 	if !strings.Contains(response.Body.String(), `"gateway_token":"gateway-token"`) {
 		t.Fatalf("expected proto json response, got %s", response.Body.String())
+	}
+	if !strings.Contains(response.Body.String(), `"push_gateway_token"`) ||
+		!strings.Contains(response.Body.String(), `"push_gateway_audience":"push-gateway"`) {
+		t.Fatalf("expected push gateway token fields, got %s", response.Body.String())
 	}
 }
 
@@ -204,6 +212,7 @@ func TestGatewayErrorMapsToHTTPStatus(t *testing.T) {
 type fakeGateway struct {
 	login             func(context.Context, *identityv1.LoginRequest) (*identityv1.LoginResponse, error)
 	refresh           func(context.Context, *identityv1.RefreshGatewayTokenRequest) (*identityv1.RefreshGatewayTokenResponse, error)
+	issueGatewayToken func(context.Context, *identityv1.IssueGatewayTokenRequest) (*identityv1.IssueGatewayTokenResponse, error)
 	sendMessage       func(context.Context, *messagev1.SendMessageRequest) (*messagev1.SendMessageResponse, error)
 	pullInbox         func(context.Context, *deliveryv1.PullInboxRequest) (*deliveryv1.PullInboxResponse, error)
 	ackDelivery       func(context.Context, *deliveryv1.AckDeliveryRequest) (*deliveryv1.AckDeliveryResponse, error)
@@ -224,6 +233,13 @@ func (gateway *fakeGateway) RefreshGatewayToken(ctx context.Context, request *id
 		return nil, status.Error(codes.Unimplemented, "refresh not implemented")
 	}
 	return gateway.refresh(ctx, request)
+}
+
+func (gateway *fakeGateway) IssueGatewayToken(ctx context.Context, request *identityv1.IssueGatewayTokenRequest) (*identityv1.IssueGatewayTokenResponse, error) {
+	if gateway.issueGatewayToken == nil {
+		return nil, status.Error(codes.Unimplemented, "issue gateway token not implemented")
+	}
+	return gateway.issueGatewayToken(ctx, request)
 }
 
 func (gateway *fakeGateway) SendMessage(ctx context.Context, request *messagev1.SendMessageRequest) (*messagev1.SendMessageResponse, error) {

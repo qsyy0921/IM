@@ -230,6 +230,7 @@ func runGRPC() error {
 	stopBFF, err := startBFFServer(ctx, bffAddr, httpbff.NewServer(httpbff.Config{
 		Gateway:        gateway,
 		Authenticator:  authenticator,
+		PushTokens:     newBFFPushTokenIssuerFromEnv(),
 		AllowedOrigins: splitCSV(os.Getenv("NEXUSIM_API_GATEWAY_BFF_ALLOWED_ORIGINS")),
 	}))
 	if err != nil {
@@ -335,6 +336,11 @@ func apiGatewayDebugAddr() string {
 
 func apiGatewayBFFAddr() string {
 	return envString("NEXUSIM_API_GATEWAY_BFF_ADDR", "")
+}
+
+func newBFFPushTokenIssuerFromEnv() httpbff.PushTokenIssuer {
+	secret := envString("NEXUSIM_API_GATEWAY_BFF_PUSH_TOKEN_HMAC_SECRET", os.Getenv("NEXUSIM_API_GATEWAY_AUTH_HMAC_SECRET"))
+	return httpbff.NewHMACPushTokenIssuer(secret, envDuration("NEXUSIM_API_GATEWAY_BFF_PUSH_TOKEN_TTL", 15*time.Minute))
 }
 
 func validateAPIGatewayBFFListenerConfig(addr string, authMode string, allowPublic bool) error {

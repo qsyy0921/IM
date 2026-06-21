@@ -36,6 +36,17 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   WebSocket，`IndexedDBMessageStore` 作为 local cache / cursor store；Web shell
   已能走 login -> push connect -> conversation / manual open -> PullInbox -> send
   -> AckDelivery 的真实 adapter flow。
+- `loadtest/clientweb` 已新增 first-stage scriptable client smoke runner：
+  准备阶段用 identity / api-gateway gRPC 注册用户、seed 会话并创建 JOIN；真实客户端
+  验证段只走 `api-gateway` HTTP BFF 和 `push-gateway` WebSocket，覆盖 BFF login、
+  push hello、BFF SendMessage、`delivery.notify`、BFF PullInbox、BFF conversation
+  list 和 BFF AckDelivery。`loadtest/clientweb/run-local-smoke.ps1` 可启动本地私有
+  非 TLS 后端+BFF+push 进程并运行该 runner；它是客户端链路 smoke 底座，不替代
+  既有 secure mTLS demo。
+- 2026-06-21 已跑通第一轮本地 Web client -> BFF -> push smoke，归档见
+  `docs/runbook/loadtest/client-platform/loadtest-report-20260621-client-web-bff-push-smoke.md`。
+  该报告记录 `git_dirty=true`，因此只能作为本轮 WIP 验证；提交后还需要重跑一次
+  clean baseline。
 - 真实业务语言选择：后端和 client BFF 继续使用 Go；浏览器、PC desktop 和
   Android 的共享协议 / 同步核心 / UI 使用 TypeScript；Tauri 的 Rust、Android
   Kotlin 只作为薄平台桥；Python 只用于 AI worker / eval / 离线工具，不进入
@@ -82,8 +93,9 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
 
 ## 下一步优先级
 
-1. 跑 Web client -> api-gateway BFF -> push-gateway 的局域网 smoke，验证
-   login / PullInbox / SendMessage / AckDelivery / WebSocket notify。
+1. 提交当前 client-platform WIP 前，重跑 `loadtest/clientweb/run-local-smoke.ps1`
+   形成 clean baseline；随后再按 172 wired LAN 地址重复 Web client -> BFF ->
+   push-gateway smoke。
 2. 给 client BFF 补 HTTP 层 metrics / rate-limit adapter；当前 BFF 已复用
    gateway facade 鉴权，但 HTTP 请求没有进入 gRPC interceptor。
 3. 后续按同一 core 接 PC desktop Tauri runner 和 Android runtime shell。

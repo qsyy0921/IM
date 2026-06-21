@@ -176,7 +176,9 @@ func runGRPCServer() error {
 	} else {
 		staticConversation := rpcinfra.NewStaticConversation()
 		staticConversation.MemberVersion = envInt64("NEXUSIM_MOCK_MEMBER_VERSION", staticConversation.MemberVersion)
-		staticConversation.PermissionVersion = staticPolicy.PermissionVersion
+		if staticPolicy.PermissionVersion > 0 {
+			staticConversation.PermissionVersion = staticPolicy.PermissionVersion
+		}
 		staticConversation.FanoutPolicyVersion = envInt64("NEXUSIM_MOCK_FANOUT_POLICY_VERSION", staticConversation.FanoutPolicyVersion)
 		conversation = staticConversation
 	}

@@ -143,6 +143,14 @@ func (server *Server) RefreshGatewayToken(ctx context.Context, request *identity
 	return server.identity.RefreshGatewayToken(outgoing, cloned)
 }
 
+func (server *Server) IssueGatewayToken(ctx context.Context, request *identityv1.IssueGatewayTokenRequest) (*identityv1.IssueGatewayTokenResponse, error) {
+	outgoing, traceID, requestID := server.publicIdentityContext(ctx, request.GetTraceId(), request.GetRequestId())
+	cloned := proto.Clone(request).(*identityv1.IssueGatewayTokenRequest)
+	cloned.TraceId = traceID
+	cloned.RequestId = requestID
+	return server.identity.IssueGatewayToken(outgoing, cloned)
+}
+
 func (server *Server) RequestVerificationChallenge(ctx context.Context, request *identityv1.RequestVerificationChallengeRequest) (*identityv1.RequestVerificationChallengeResponse, error) {
 	outgoing, traceID, requestID := server.publicIdentityContext(ctx, request.GetTraceId(), request.GetRequestId())
 	cloned := proto.Clone(request).(*identityv1.RequestVerificationChallengeRequest)

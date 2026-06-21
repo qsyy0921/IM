@@ -43,7 +43,7 @@ export class BrowserPushTransport implements PushTransport {
 
 function pushURL(input: PushConnectInput): string {
   const url = new URL(input.url);
-  url.searchParams.set("token", input.session.accessToken);
+  url.searchParams.set("token", input.session.pushToken ?? input.session.accessToken);
   url.searchParams.set("tenant_id", input.session.tenantID);
   url.searchParams.set("user_id", input.session.userID);
   url.searchParams.set("device_id", input.session.deviceID);

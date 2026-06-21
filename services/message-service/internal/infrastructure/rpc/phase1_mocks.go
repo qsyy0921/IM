@@ -16,45 +16,55 @@ type StaticPolicy struct {
 func NewStaticPolicy() StaticPolicy {
 	return StaticPolicy{
 		Allowed:           true,
-		PermissionVersion: 1,
+		PermissionVersion: 0,
 		Classification:    "INTERNAL",
 	}
 }
 
-func (p StaticPolicy) CheckSendPermission(context.Context, types.SendMessageCommand, types.ConversationSendContext) (types.PermissionDecision, error) {
+func (p StaticPolicy) CheckSendPermission(_ context.Context, _ types.SendMessageCommand, conversation types.ConversationSendContext) (types.PermissionDecision, error) {
 	return types.PermissionDecision{
 		Allowed:           p.Allowed,
 		Reason:            p.Reason,
-		PermissionVersion: p.PermissionVersion,
+		PermissionVersion: staticPolicyPermissionVersion(p.PermissionVersion, conversation.PermissionVersion),
 		Classification:    p.Classification,
 	}, nil
 }
 
-func (p StaticPolicy) CheckEditPermission(context.Context, types.EditMessageCommand, types.ConversationSendContext, types.MessagePolicyContext) (types.PermissionDecision, error) {
+func (p StaticPolicy) CheckEditPermission(_ context.Context, _ types.EditMessageCommand, conversation types.ConversationSendContext, _ types.MessagePolicyContext) (types.PermissionDecision, error) {
 	return types.PermissionDecision{
 		Allowed:           p.Allowed,
 		Reason:            p.Reason,
-		PermissionVersion: p.PermissionVersion,
+		PermissionVersion: staticPolicyPermissionVersion(p.PermissionVersion, conversation.PermissionVersion),
 		Classification:    p.Classification,
 	}, nil
 }
 
-func (p StaticPolicy) CheckRevokePermission(context.Context, types.RevokeMessageCommand, types.ConversationSendContext, types.MessagePolicyContext) (types.PermissionDecision, error) {
+func (p StaticPolicy) CheckRevokePermission(_ context.Context, _ types.RevokeMessageCommand, conversation types.ConversationSendContext, _ types.MessagePolicyContext) (types.PermissionDecision, error) {
 	return types.PermissionDecision{
 		Allowed:           p.Allowed,
 		Reason:            p.Reason,
-		PermissionVersion: p.PermissionVersion,
+		PermissionVersion: staticPolicyPermissionVersion(p.PermissionVersion, conversation.PermissionVersion),
 		Classification:    p.Classification,
 	}, nil
 }
 
-func (p StaticPolicy) CheckDeletePermission(context.Context, types.DeleteMessageCommand, types.ConversationSendContext, types.MessagePolicyContext) (types.PermissionDecision, error) {
+func (p StaticPolicy) CheckDeletePermission(_ context.Context, _ types.DeleteMessageCommand, conversation types.ConversationSendContext, _ types.MessagePolicyContext) (types.PermissionDecision, error) {
 	return types.PermissionDecision{
 		Allowed:           p.Allowed,
 		Reason:            p.Reason,
-		PermissionVersion: p.PermissionVersion,
+		PermissionVersion: staticPolicyPermissionVersion(p.PermissionVersion, conversation.PermissionVersion),
 		Classification:    p.Classification,
 	}, nil
+}
+
+func staticPolicyPermissionVersion(policyVersion int64, conversationVersion int64) int64 {
+	if policyVersion > 0 {
+		return policyVersion
+	}
+	if conversationVersion > 0 {
+		return conversationVersion
+	}
+	return 1
 }
 
 type StaticConversation struct {

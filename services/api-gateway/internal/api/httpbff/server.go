@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	contactsv1 "github.com/qsyy0921/IM/api/proto/nexusim/contacts/v1"
 	deliveryv1 "github.com/qsyy0921/IM/api/proto/nexusim/delivery/v1"
@@ -34,6 +35,7 @@ const (
 type Gateway interface {
 	Login(ctx context.Context, request *identityv1.LoginRequest) (*identityv1.LoginResponse, error)
 	RefreshGatewayToken(ctx context.Context, request *identityv1.RefreshGatewayTokenRequest) (*identityv1.RefreshGatewayTokenResponse, error)
+	IssueGatewayToken(ctx context.Context, request *identityv1.IssueGatewayTokenRequest) (*identityv1.IssueGatewayTokenResponse, error)
 	SendMessage(ctx context.Context, request *messagev1.SendMessageRequest) (*messagev1.SendMessageResponse, error)
 	PullInbox(ctx context.Context, request *deliveryv1.PullInboxRequest) (*deliveryv1.PullInboxResponse, error)
 	AckDelivery(ctx context.Context, request *deliveryv1.AckDeliveryRequest) (*deliveryv1.AckDeliveryResponse, error)
@@ -46,15 +48,85 @@ type Authenticator interface {
 	Authenticate(*http.Request) (gatewayauth.AuthContext, error)
 }
 
+type PushTokenIssuer interface {
+	IssuePushToken(context.Context, PushTokenRequest) (PushToken, error)
+}
+
+type PushTokenRequest struct {
+	TenantID   string
+	UserID     string
+	DeviceID   string
+	SessionID  string
+	TraceID    string
+	RequestID  string
+	TTLSeconds int64
+}
+
+type PushToken struct {
+	Token           string
+	Audience        string
+	ExpiresAtUnixMS int64
+}
+
+type HMACPushTokenIssuer struct {
+	secret string
+	ttl    time.Duration
+	now    func() time.Time
+}
+
+func NewHMACPushTokenIssuer(secret string, ttl time.Duration) *HMACPushTokenIssuer {
+	secret = strings.TrimSpace(secret)
+	if secret == "" {
+		return nil
+	}
+	if ttl <= 0 {
+		ttl = 15 * time.Minute
+	}
+	return &HMACPushTokenIssuer{
+		secret: secret,
+		ttl:    ttl,
+		now:    func() time.Time { return time.Now().UTC() },
+	}
+}
+
+func (issuer *HMACPushTokenIssuer) IssuePushToken(_ context.Context, request PushTokenRequest) (PushToken, error) {
+	if issuer == nil || strings.TrimSpace(issuer.secret) == "" {
+		return PushToken{}, nil
+	}
+	now := time.Now().UTC()
+	if issuer.now != nil {
+		now = issuer.now().UTC()
+	}
+	expiresAt := now.Add(issuer.ttl)
+	token, err := gatewayauth.SignGatewayToken(issuer.secret, map[string]string{
+		"tenant_id":  request.TenantID,
+		"user_id":    request.UserID,
+		"device_id":  request.DeviceID,
+		"session_id": request.SessionID,
+		"trace_id":   request.TraceID,
+		"aud":        "push-gateway",
+	}, expiresAt)
+	if err != nil {
+		return PushToken{}, status.Error(codes.Internal, "failed to issue push token")
+	}
+	return PushToken{
+		Token:           token,
+		Audience:        "push-gateway",
+		ExpiresAtUnixMS: expiresAt.UnixMilli(),
+	}, nil
+}
+
 type Config struct {
 	Gateway        Gateway
 	Authenticator  Authenticator
+	PushTokens     PushTokenIssuer
 	AllowedOrigins []string
 }
 
 type Server struct {
 	gateway        Gateway
 	authenticator  Authenticator
+	pushTokens     PushTokenIssuer
 	allowedOrigins map[string]struct{}
 	allowAnyOrigin bool
 	marshal        protojson.MarshalOptions
@@ -74,6 +146,7 @@ func NewServer(config Config) *Server {
 	server := &Server{
 		gateway:       config.Gateway,
 		authenticator: config.Authenticator,
+		pushTokens:    config.PushTokens,
 		marshal: protojson.MarshalOptions{
 			UseProtoNames:   true,
 			EmitUnpopulated: false,
@@ -138,8 +211,9 @@ func (server *Server) handleLogin(response http.ResponseWriter, request *http.Re
 	if !server.decode(response, request, &input) {
 		return
 	}
+	input.Audience = "api-gateway"
 	output, err := server.requireGateway().Login(contextFromRequest(request), &input)
-	server.writeProtoOrError(response, output, err)
+	server.writeAuthResponseOrError(response, request, output, nil, err)
 }
 
 func (server *Server) handleRefresh(response http.ResponseWriter, request *http.Request) {
@@ -147,8 +221,9 @@ func (server *Server) handleRefresh(response http.ResponseWriter, request *http.
 	if !server.decode(response, request, &input) {
 		return
 	}
+	input.Audience = "api-gateway"
 	output, err := server.requireGateway().RefreshGatewayToken(contextFromRequest(request), &input)
-	server.writeProtoOrError(response, output, err)
+	server.writeAuthResponseOrError(response, request, nil, output, err)
 }
 
 func (server *Server) handleMe(response http.ResponseWriter, request *http.Request) {
@@ -339,6 +414,86 @@ func (server *Server) writeProtoOrError(response http.ResponseWriter, message pr
 	_, _ = response.Write(data)
 }
 
+func (server *Server) writeAuthResponseOrError(
+	response http.ResponseWriter,
+	request *http.Request,
+	login *identityv1.LoginResponse,
+	refresh *identityv1.RefreshGatewayTokenResponse,
+	err error,
+) {
+	if err != nil {
+		writeError(response, err)
+		return
+	}
+	var message proto.Message
+	source := PushTokenRequest{}
+	switch {
+	case login != nil:
+		message = login
+		source = PushTokenRequest{
+			TenantID:  login.GetTenantId(),
+			UserID:    login.GetUserId(),
+			DeviceID:  login.GetDeviceId(),
+			SessionID: login.GetSessionId(),
+			TraceID:   strings.TrimSpace(request.Header.Get("X-NexusIM-Trace-ID")),
+			RequestID: strings.TrimSpace(request.Header.Get("X-NexusIM-Request-ID")),
+		}
+	case refresh != nil:
+		message = refresh
+		source = PushTokenRequest{
+			TenantID:  refresh.GetTenantId(),
+			UserID:    refresh.GetUserId(),
+			DeviceID:  refresh.GetDeviceId(),
+			SessionID: refresh.GetSessionId(),
+			TraceID:   strings.TrimSpace(request.Header.Get("X-NexusIM-Trace-ID")),
+			RequestID: strings.TrimSpace(request.Header.Get("X-NexusIM-Request-ID")),
+		}
+	default:
+		writeError(response, status.Error(codes.Internal, "empty gateway response"))
+		return
+	}
+	payload, err := server.protoJSONMap(message)
+	if err != nil {
+		writeError(response, status.Error(codes.Internal, "failed to encode response"))
+		return
+	}
+	push, err := server.issuePushToken(request.Context(), source)
+	if err != nil {
+		writeError(response, err)
+		return
+	}
+	if push.Token != "" {
+		payload["push_gateway_token"] = push.Token
+		payload["push_gateway_audience"] = push.Audience
+		if push.ExpiresAtUnixMS > 0 {
+			payload["push_gateway_expires_at_unix_ms"] = strconv.FormatInt(push.ExpiresAtUnixMS, 10)
+		}
+	}
+	writeJSON(response, http.StatusOK, payload)
+}
+
+func (server *Server) protoJSONMap(message proto.Message) (map[string]any, error) {
+	data, err := server.marshal.Marshal(message)
+	if err != nil {
+		return nil, err
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(data, &payload); err != nil {
+		return nil, err
+	}
+	return payload, nil
+}
+
+func (server *Server) issuePushToken(ctx context.Context, request PushTokenRequest) (PushToken, error) {
+	if server.pushTokens == nil {
+		return PushToken{}, nil
+	}
+	if request.TenantID == "" || request.UserID == "" || request.DeviceID == "" || request.SessionID == "" {
+		return PushToken{}, status.Error(codes.Internal, "gateway response is missing push token identity")
+	}
+	return server.pushTokens.IssuePushToken(ctx, request)
+}
+
 func (server *Server) requireGateway() Gateway {
 	if server.gateway != nil {
 		return server.gateway
@@ -379,6 +534,9 @@ func (missingGateway) Login(context.Context, *identityv1.LoginRequest) (*identit
 	return nil, status.Error(codes.Internal, "gateway is not configured")
 }
 func (missingGateway) RefreshGatewayToken(context.Context, *identityv1.RefreshGatewayTokenRequest) (*identityv1.RefreshGatewayTokenResponse, error) {
+	return nil, status.Error(codes.Internal, "gateway is not configured")
+}
+func (missingGateway) IssueGatewayToken(context.Context, *identityv1.IssueGatewayTokenRequest) (*identityv1.IssueGatewayTokenResponse, error) {
 	return nil, status.Error(codes.Internal, "gateway is not configured")
 }
 func (missingGateway) SendMessage(context.Context, *messagev1.SendMessageRequest) (*messagev1.SendMessageResponse, error) {

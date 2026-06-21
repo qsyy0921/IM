@@ -31,8 +31,10 @@ interface BFFLoginResponse {
   session_id?: string;
   token_type?: string;
   gateway_token?: string;
+  push_gateway_token?: string;
   refresh_token?: string;
   gateway_expires_at_unix_ms?: string | number;
+  push_gateway_expires_at_unix_ms?: string | number;
 }
 
 interface BFFConversationSummary {
@@ -269,9 +271,16 @@ function loginResponseToSession(response: BFFLoginResponse): AuthSession {
   if (response.refresh_token) {
     session.refreshToken = response.refresh_token;
   }
+  if (response.push_gateway_token) {
+    session.pushToken = response.push_gateway_token;
+  }
   const expiresAtMs = numberValue(response.gateway_expires_at_unix_ms);
   if (expiresAtMs > 0) {
     session.expiresAtMs = expiresAtMs;
+  }
+  const pushExpiresAtMs = numberValue(response.push_gateway_expires_at_unix_ms);
+  if (pushExpiresAtMs > 0) {
+    session.pushExpiresAtMs = pushExpiresAtMs;
   }
   return session;
 }

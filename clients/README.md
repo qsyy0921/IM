@@ -87,6 +87,8 @@ Check artifact build commands without requiring the heavy native toolchains:
 ```powershell
 npm --prefix clients run test:artifact-builders
 npm --prefix clients run test:artifact-collector
+npm --prefix clients run test:artifact-readiness
+npm --prefix clients run report:artifact-readiness
 node clients/tools/build-desktop-artifact.mjs --dry-run
 node clients/tools/build-android-apk.mjs --dry-run
 node clients/tools/collect-client-artifacts.mjs --target all --dry-run
@@ -131,3 +133,5 @@ Current packaging status:
   an APK build wrapper plus a Docker builder profile; no APK/AAB has been
   produced yet because the local native toolchain is missing and the Docker
   builder image has not been built in this slice.
+- `report:artifact-readiness` prints the current low-sensitive readiness matrix
+  for local desktop, local Android and Android Docker builder paths.

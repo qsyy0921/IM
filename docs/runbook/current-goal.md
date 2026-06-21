@@ -122,6 +122,11 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   只做静态校验，不拉镜像；该 profile 已接 `build:android-apk:collect`，成功构建后会把
   APK 和低敏 manifest 写入 `clients/artifacts/android/docker-android-debug/`；首次真正运行该 profile 会下载 Node / Android SDK
   toolchain。本轮未构建镜像，也未声称 APK baseline。
+- `clients/tools/report-client-artifact-readiness.mjs` 已提供低敏 readiness
+  report；`test:artifact-readiness` 覆盖 schema、无敏感字段和无本机绝对路径。当前报告显示
+  Docker / Compose 可用、Android builder profile 可解析，但
+  `nexusim/client-android-builder:local` image 尚未构建；desktop 仍缺 Tauri
+  CLI，Android 本地路径仍缺 JDK 17+ / Gradle / Android SDK。
 - `loadtest/clientweb` 已新增 first-stage scriptable client smoke runner：
   准备阶段用 identity / api-gateway gRPC 注册用户、seed 会话并创建 JOIN；真实客户端
   验证段只走 `api-gateway` HTTP BFF 和 `push-gateway` WebSocket，覆盖 BFF login、

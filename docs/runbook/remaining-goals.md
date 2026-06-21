@@ -51,7 +51,8 @@
   检查当前机器状态。`build:android-apk` wrapper 已落，会在工具链 ready 时准备
   shell assets 并执行 Gradle `:app:assembleDebug`；Android Docker builder profile
   已接 `build:android-apk:collect` 但尚未运行；artifact collector 已能归档产物并生成 SHA-256 manifest，
-  `build:android-apk:collect` 可在成功构建后自动归档，当前仍未产出 APK。
+  `build:android-apk:collect` 可在成功构建后自动归档；`report:artifact-readiness`
+  显示 Docker / Compose 可用但 builder image 尚未构建，当前仍未产出 APK。
 - 三端 smoke：Web / PC / Android 都只能连 `api-gateway` 和 `push-gateway`；
   PullInbox 是事实源，WebSocket 只做在线唤醒。
 - Local store：`IndexedDBMessageStore` 已有 first-stage persistence test；

@@ -162,6 +162,10 @@ First slice:
   file names, sizes and SHA-256 hashes, without recording local absolute source
   paths. `build:desktop-artifact:collect` and `build:android-apk:collect` run the
   collector automatically after a successful native build.
+- `npm --prefix clients run report:artifact-readiness` prints a low-sensitive
+  readiness matrix for local desktop, local Android and Android Docker builder
+  paths. It reports missing capabilities and the exact next build command
+  without printing local absolute paths.
 - `npm --prefix clients run validate:builder-profile` validates the Android
   Docker builder profile without building or pulling images. The profile lives
   in `deploy/local/docker-compose.client-builders.yml` and uses
@@ -244,12 +248,21 @@ npm --prefix clients run test:shell-config
 npm --prefix clients run test:shell-web-assets
 npm --prefix clients run test:artifact-builders
 npm --prefix clients run test:artifact-collector
+npm --prefix clients run test:artifact-readiness
+npm --prefix clients run report:artifact-readiness
 npm --prefix clients run validate:builder-profile
 ```
 
 This command reports readiness as JSON and exits non-zero when artifact / APK
 toolchains are missing. It is local-only: it does not install dependencies, pull
 packages, or use `npx` to resolve remote CLIs.
+
+The readiness report is non-failing and is useful before deciding whether to
+install native toolchains or run the Docker builder:
+
+```powershell
+npm --prefix clients run report:artifact-readiness
+```
 
 Artifact wrappers:
 

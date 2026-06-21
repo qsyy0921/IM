@@ -241,7 +241,10 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   `smoke:desktop-artifact-launch` 作为 launch sanity step。其 native artifact 状态现在区分 raw build output discovery 与
   collected artifact manifest readiness，避免已归档产物和本地 build 输出源混淆；Android
   plan 在 collected APK + adb ready 时会包含 `smoke:android-webview-metadata`
-  作为 metadata-only WebView bridge smoke。
+  作为 metadata-only WebView bridge smoke。desktop / Android plan 现在也输出
+  机器可读 WebView login evidence contract，要求登录级 smoke summary 记录
+  `native-store-readiness` selector 和 local-store readiness bridge / reason，避免后续
+  只证明登录流程却漏记平台本地存储边界。
 - `loadtest/clientweb` 已新增 first-stage scriptable client smoke runner：
   准备阶段用 identity / api-gateway gRPC 注册用户、seed 会话并创建 JOIN；真实客户端
   验证段只走 `api-gateway` HTTP BFF 和 `push-gateway` WebSocket，覆盖 BFF login、

@@ -77,6 +77,7 @@ function nativeTarget(target, readinessTarget, artifactPlan, installPlan) {
     nativeToolchainReady: readinessTarget.ready,
     missingToolchain: readinessTarget.missing,
     localStore: readinessTarget.localStore,
+    webviewLoginEvidence: webviewLoginEvidenceContract(target, readinessTarget),
     artifact: artifactStatus,
     install: installStatus,
     commands: nativeCommands(target, readinessTarget),
@@ -155,6 +156,46 @@ function nativeCommands(target, readinessTarget) {
       ? readinessTarget.dockerBuilder.buildCommand
       : readinessTarget.dockerBuilder?.imageBuildCommand,
     dockerBuilderDryRun: readinessTarget.dockerBuilder?.safeDryRunCommand
+  };
+}
+
+function webviewLoginEvidenceContract(target, readinessTarget) {
+  const metadataSource = target === "windows-desktop"
+    ? "Tauri runtime_metadata"
+    : "NexusIMNative.runtimeMetadata()";
+  return {
+    source: `${metadataSource} + clients/web/src/App.tsx data-testid`,
+    requiredSelectors: [
+      "login-tenant",
+      "login-user",
+      "login-submit",
+      "native-store-readiness",
+      "runtime-status",
+      "push-status",
+      "message-list",
+      "message-item",
+      "ack-status"
+    ],
+    requiredSummaryFields: [
+      "target",
+      "nativeStore.currentDefault",
+      "nativeStore.productionTarget",
+      "nativeStore.readiness.bridge",
+      "nativeStore.readiness.reason",
+      "deliveryNotifyObserved",
+      "pullInboxItemCount",
+      "ackLastReceivedSeq"
+    ],
+    localStore: {
+      currentDefault: readinessTarget.localStore?.currentDefault ?? "",
+      productionTarget: readinessTarget.localStore?.productionTarget ?? "",
+      nativeStoreReadiness: readinessTarget.localStore?.nativeStoreReadiness ?? {}
+    },
+    boundaries: [
+      "The WebView login smoke must record native-store-readiness before it can claim platform login evidence.",
+      "The summary stays low-sensitive: no auth input, message body, raw device identifier or local absolute path.",
+      "SQLite is not considered ready until the native bridge readiness contract reports ready=true."
+    ]
   };
 }
 
@@ -261,7 +302,7 @@ function nativeChecklist(target, readinessTarget, artifactStatus, installStatus)
     checklist.push({
       step: "run-desktop-webview-login-smoke",
       command: nativeCommands(target, readinessTarget).webviewLoginSmoke,
-      evidence: "Tauri WebView is externally driven through login, delivery.notify, PullInbox and AckDelivery while the clientweb local stack is alive"
+      evidence: "Tauri WebView is externally driven through login, delivery.notify, PullInbox and AckDelivery while the clientweb local stack is alive; summary includes native-store-readiness"
     });
   } else {
     checklist.push({
@@ -277,7 +318,7 @@ function nativeChecklist(target, readinessTarget, artifactStatus, installStatus)
     checklist.push({
       step: "run-android-webview-login-smoke",
       command: nativeCommands(target, readinessTarget).webviewLoginSmoke,
-      evidence: "Android WebView is externally driven through login, delivery.notify, PullInbox and AckDelivery while the clientweb local stack is alive"
+      evidence: "Android WebView is externally driven through login, delivery.notify, PullInbox and AckDelivery while the clientweb local stack is alive; summary includes native-store-readiness"
     });
   }
 

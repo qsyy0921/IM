@@ -29,6 +29,9 @@ assert(plan.targets["windows-desktop"].commands.verifyAssets.includes("windows-d
 assert(plan.targets["windows-desktop"].commands.installPlan.includes("plan:artifact-install"), "desktop install plan command missing");
 assert(plan.targets["windows-desktop"].install, "desktop install status missing");
 assert(plan.targets["windows-desktop"].localStore?.nativeStoreReadiness?.bridge === "tauri-sqlite", "desktop local store readiness missing");
+assert(plan.targets["windows-desktop"].webviewLoginEvidence?.requiredSelectors?.includes("native-store-readiness"), "desktop WebView login native-store selector evidence missing");
+assert(plan.targets["windows-desktop"].webviewLoginEvidence?.requiredSummaryFields?.includes("nativeStore.readiness.bridge"), "desktop WebView login native store summary field missing");
+assert(plan.targets["windows-desktop"].webviewLoginEvidence?.localStore?.nativeStoreReadiness?.bridge === "tauri-sqlite", "desktop WebView login local store bridge evidence missing");
 assert(plan.targets["windows-desktop"].notes.some(note => note.includes("Native SQLite local store is not ready")), "desktop native sqlite note missing");
 assert(typeof plan.targets["windows-desktop"].install.readyForInstall === "boolean", "desktop install readiness missing");
 assert(Array.isArray(plan.targets["windows-desktop"].install.missing), "desktop install missing list missing");
@@ -76,6 +79,9 @@ assert(plan.targets.android.commands.webviewDevtoolsReadiness.includes("report:a
 assert(plan.targets.android.commands.webviewMetadataSmoke.includes("smoke:android-webview-metadata"), "android WebView metadata smoke command missing");
 assert(plan.targets.android.install, "android install status missing");
 assert(plan.targets.android.localStore?.nativeStoreReadiness?.bridge === "android-sqlite", "android local store readiness missing");
+assert(plan.targets.android.webviewLoginEvidence?.requiredSelectors?.includes("native-store-readiness"), "android WebView login native-store selector evidence missing");
+assert(plan.targets.android.webviewLoginEvidence?.requiredSummaryFields?.includes("nativeStore.readiness.reason"), "android WebView login native store summary field missing");
+assert(plan.targets.android.webviewLoginEvidence?.localStore?.nativeStoreReadiness?.bridge === "android-sqlite", "android WebView login local store bridge evidence missing");
 assert(plan.targets.android.notes.some(note => note.includes("Native SQLite local store is not ready")), "android native sqlite note missing");
 assert(typeof plan.targets.android.install.readyForInstall === "boolean", "android install readiness missing");
 assert(typeof plan.targets.android.install.installPrereqs.adbAvailable === "boolean", "android adb prereq status missing");
@@ -193,9 +199,11 @@ assert(readyFromCollectedPlan.targets["windows-desktop"].artifact.buildOutputPre
 assert(readyFromCollectedPlan.targets["windows-desktop"].artifact.collectedArtifactReady === true, "desktop collected artifact should be ready");
 assert(readyFromCollectedPlan.targets["windows-desktop"].commands.webviewLoginSmoke.includes("-RunDesktopWebViewLoginSmoke"), "ready desktop plan should include WebView login smoke command");
 assert(readyFromCollectedPlan.targets["windows-desktop"].checklist.some(item => item.step === "run-desktop-webview-login-smoke"), "ready desktop plan should include WebView login smoke step");
+assert(readyFromCollectedPlan.targets["windows-desktop"].checklist.some(item => item.step === "run-desktop-webview-login-smoke" && item.evidence.includes("native-store-readiness")), "ready desktop plan should require native store evidence");
 assert(readyFromCollectedPlan.targets.android.readyForManualShellSmoke === true, "android should be smoke-ready from collected artifact");
 assert(readyFromCollectedPlan.targets.android.artifact.collectedArtifactHint === "clients/artifacts/run/nexusim-android-debug.apk", "android collected artifact hint mismatch");
 assert(readyFromCollectedPlan.targets.android.checklist.some(item => item.step === "run-android-webview-metadata-smoke"), "ready android plan should include WebView metadata smoke step");
+assert(readyFromCollectedPlan.targets.android.checklist.some(item => item.step === "run-android-webview-login-smoke" && item.evidence.includes("native-store-readiness")), "ready android plan should require native store evidence");
 
 const missingAdbPlan = buildClientShellSmokePlan({
   readiness: readyReadiness,

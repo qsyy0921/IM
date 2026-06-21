@@ -188,14 +188,26 @@ type VectorRebuildCheckpoint struct {
 }
 
 type VectorRebuildTask struct {
-	Job            VectorIndexJob
-	Checkpoint     VectorRebuildCheckpoint
-	CollectionType string
+	Job               VectorIndexJob
+	Checkpoint        VectorRebuildCheckpoint
+	CollectionType    string
+	BackendType       string
+	EmbeddingModelRef string
+	Dimension         int
 }
 
 type RebuildWorkerStats struct {
-	Claimed   int
-	Completed int
+	Claimed    int
+	Backfilled int
+	Embedded   int
+	Upserted   int
+	Completed  int
+}
+
+type RebuildBackfillStats struct {
+	Backfilled int
+	Embedded   int
+	Upserted   int
 }
 
 type VectorEmbeddingTask struct {

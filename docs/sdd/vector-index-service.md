@@ -266,8 +266,11 @@ pgvector profile。它会在 dedicated vector backend table 中保存实际 embe
 但默认普通 PostgreSQL migration 不启用该 adapter，避免没有 `vector` 扩展的本地开发库
 被强制要求安装 pgvector。`embedding-worker` 可通过
 `NEXUSIM_VECTOR_PROVIDER_BACKEND=pgvector` 显式启用该 backend sink；未配置时行为保持
-metadata-only。Milvus / OpenSearch adapter、真实 pgvector smoke 和 provider backend
-rebuild / repair 仍是后续项。
+metadata-only。`rebuild-worker` 可显式启用 first-stage provider backend backfill：从本服务
+自有 `vector_embedding_tasks` 中读取已完成的 redacted-preview task，重新调用
+model-gateway，再写入当前配置的 provider backend；它不读取上游私表，也不从 metadata 表伪造
+缺失的 vector array。Milvus / OpenSearch adapter、真实 pgvector smoke 和 provider backend
+repair 仍是后续项。
 
 ## 9. 核心流程
 
@@ -341,11 +344,16 @@ Rebuild：
 ```text
 RequestVectorRebuild
 -> create rebuild job and checkpoints
--> scan source refs from allowed upstream / event log
--> re-embed if model changed
--> upsert backend partition by partition
+-> optional first-stage backfill from completed vector_embedding_tasks
+-> re-embed redacted preview through model-gateway
+-> upsert configured provider backend partition by partition
 -> verify tombstones and visibility metadata
 ```
+
+第一版 provider backfill 是 bounded mode：如果 matching completed embedding tasks 超过
+`NEXUSIM_VECTOR_REBUILD_BACKFILL_BATCH_SIZE`，worker 会 fail closed，不会把 rebuild job 标记
+完成。生产级 rebuild / backfill 仍需要 checkpoint cursor、provider repair 和更完整 upstream
+replay。
 
 ## 10. 与 retrieval-gateway 的边界
 
@@ -505,6 +513,21 @@ NEXUSIM_VECTOR_PGVECTOR_ENSURE_SCHEMA=true
 所以普通开发 / CI 不应默认开启该 profile。可选本地 overlay 为
 `deploy/local/docker-compose.pgvector.yml`，会在 `localhost:15432` 暴露独立
 `nexusim-pgvector`，不替换默认 `nexusim-postgres`。
+
+Optional rebuild provider backfill 配置：
+
+```text
+NEXUSIM_VECTOR_INDEX_SERVICE_MODE=rebuild-worker
+NEXUSIM_VECTOR_REBUILD_BACKFILL_SOURCE=embedding-tasks
+NEXUSIM_VECTOR_REBUILD_BACKFILL_BATCH_SIZE=100
+NEXUSIM_MODEL_GATEWAY_GRPC_ADDR=127.0.0.1:10770
+NEXUSIM_VECTOR_PROVIDER_BACKEND=pgvector
+NEXUSIM_VECTOR_PGVECTOR_DSN=postgres://...
+```
+
+该模式只读取本服务 PostgreSQL queue 中 `COMPLETED` 的 `vector_embedding_tasks`，并重新
+embedding redacted preview 后写 provider backend。未配置 provider backend 时 fail-fast；默认
+`rebuild-worker` 不启用该 backfill。
 
 Knowledge source 配置：
 

@@ -72,6 +72,11 @@ vector 写入、rebuild 和 backfill 逻辑复杂到影响 retrieval / memory �
   overlay 和 `loadtest/vectorembedding/run-local-pgvector-smoke.ps1` wrapper；使用
   `-StartPgVector` 时脚本默认不拉镜像。本机未发现 `pgvector/pgvector:pg16` 镜像，真实
   pgvector focused smoke 后置。
+- `rebuild-worker` 已支持 first-stage provider backend backfill：显式配置
+  `NEXUSIM_VECTOR_REBUILD_BACKFILL_SOURCE=embedding-tasks` 时，从本服务已完成
+  `vector_embedding_tasks` 读取 redacted preview，重新经 model-gateway embedding 后写当前
+  provider backend；未配置 provider backend 会 fail-fast，默认不启用。该模式有 bounded
+  batch 保护，超过 `NEXUSIM_VECTOR_REBUILD_BACKFILL_BATCH_SIZE` 不会误标 rebuild complete。
 
 后续待办：memory / search chunk consumer、镜像可用后的 focused pgvector smoke、真实
-Milvus / OpenSearch backend、provider backend rebuild / backfill worker、provider backend repair。
+Milvus / OpenSearch backend、provider backend repair、checkpointed large rebuild / backfill。

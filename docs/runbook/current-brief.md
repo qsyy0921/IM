@@ -61,8 +61,10 @@ vector-index 内部 RPC client 已保留 `InvokeEmbedding.embedding_values`，�
 pgvector adapter 包；`embedding-worker` 可通过 `NEXUSIM_VECTOR_PROVIDER_BACKEND=pgvector`
 显式启用 pgvector backend sink，且已有可选 `docker-compose.pgvector.yml` overlay。
 `run-local-pgvector-smoke.ps1` wrapper 已准备；使用 `-StartPgVector` 时默认不拉镜像。
-本机未发现 `pgvector/pgvector:pg16` 镜像，所以真实 pgvector smoke 尚未执行。公开 API /
-PostgreSQL metadata / outbox / metrics 仍不暴露 raw vector array。
+本机未发现 `pgvector/pgvector:pg16` 镜像，所以真实 pgvector smoke 尚未执行。
+`rebuild-worker` 已新增显式 `embedding-tasks` provider backfill：只读取本服务 completed
+queue 中 redacted preview，重新 embedding 后写 provider backend；未配置 backend fail-fast，
+bounded batch 超限不误标 complete。公开 API / PostgreSQL metadata / outbox / metrics 仍不暴露 raw vector array。
 `admin-service` 已完成第一版
 `CreateAdminOperation` / `ApproveAdminOperation` / `GetAdminOperation` /
 `ListAdminOperations` path、`admin_outbox -> im.admin.events` outbox relay 和
@@ -79,7 +81,7 @@ control-plane-service.PublishConfigVersion(API_GATEWAY_TENANT_QUOTA)`。
 admin `Create -> operator approve -> operation-worker -> control-plane` 本地多进程
 publish / rollback / tenant quota smoke 已通过。下一步默认继续更多下游公开 admin API adapter、
 admin compensation operator，或在镜像可用后继续 focused pgvector smoke、Milvus /
-OpenSearch backend / provider rebuild / backfill worker。
+OpenSearch backend / provider repair / checkpointed large backfill。
 ```
 
 系统测试 / HA / 长压 / sizing 后置；总览、待办、单服务状态分别看

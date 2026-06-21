@@ -199,16 +199,28 @@ func runRebuildWorker(ctx context.Context) error {
 	}
 	defer pool.Close()
 
+	backfiller, closeBackfiller, err := newRebuildBackfiller(ctx, pool)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if closeBackfiller != nil {
+			if closeErr := closeBackfiller(); closeErr != nil {
+				log.Printf("vector-index-service rebuild backfiller close failed: %v", closeErr)
+			}
+		}
+	}()
 	worker := rebuild.NewWorker(
 		postgresinfra.NewRepository(pool),
 		rebuild.Config{
 			BatchSize:    envInt("NEXUSIM_VECTOR_REBUILD_BATCH_SIZE", 50),
 			PollInterval: envDuration("NEXUSIM_VECTOR_REBUILD_POLL_INTERVAL", time.Second),
 			ErrorBackoff: envDuration("NEXUSIM_VECTOR_REBUILD_ERROR_BACKOFF", time.Second),
+			Backfiller:   backfiller,
 			Logf:         log.Printf,
 		},
 	)
-	log.Printf("vector-index-service rebuild worker started")
+	log.Printf("vector-index-service rebuild worker started with %s backfill source", rebuildBackfillSourceModeFromEnv())
 	return worker.Run(ctx)
 }
 
@@ -452,6 +464,62 @@ func newKnowledgeEmbeddingTaskSource(ctx context.Context) (embedding.TaskSource,
 	)
 }
 
+func newRebuildBackfiller(ctx context.Context, pool *pgxpool.Pool) (rebuild.Backfiller, func() error, error) {
+	sourceMode := rebuildBackfillSourceModeFromEnv()
+	switch sourceMode {
+	case "", "none":
+		return nil, nil, nil
+	case "embedding-tasks":
+		modelClient, closeModel, err := rpcinfra.DialModelGatewayClient(
+			ctx,
+			strings.TrimSpace(os.Getenv("NEXUSIM_MODEL_GATEWAY_GRPC_ADDR")),
+			envDuration("NEXUSIM_VECTOR_REBUILD_MODEL_TIMEOUT", 5*time.Second),
+		)
+		if err != nil {
+			return nil, nil, err
+		}
+		vectorBackend, closeVectorBackend, err := newEmbeddingVectorBackend(ctx, pool)
+		if err != nil {
+			_ = closeModel()
+			return nil, nil, err
+		}
+		if vectorBackend == nil {
+			_ = closeModel()
+			if closeVectorBackend != nil {
+				_ = closeVectorBackend()
+			}
+			return nil, nil, errors.New("NEXUSIM_VECTOR_PROVIDER_BACKEND is required when NEXUSIM_VECTOR_REBUILD_BACKFILL_SOURCE=embedding-tasks")
+		}
+		repository := postgresinfra.NewRepository(pool)
+		backfiller := rebuild.NewEmbeddingTaskBackfiller(
+			postgresinfra.NewEmbeddingTaskSource(pool, postgresinfra.EmbeddingTaskSourceConfig{
+				TenantID: envString("NEXUSIM_VECTOR_REBUILD_TENANT_ID", ""),
+			}),
+			modelClient,
+			vectorUpsertAdapter{useCase: app.NewUpsertVectorItemUseCase(repository, app.NewRandomIDGenerator())},
+			vectorBackend,
+			rebuild.EmbeddingTaskBackfillerConfig{
+				BatchSize: envInt("NEXUSIM_VECTOR_REBUILD_BACKFILL_BATCH_SIZE", 100),
+			},
+		)
+		closeFn := func() error {
+			var result error
+			if closeErr := closeModel(); closeErr != nil {
+				result = closeErr
+			}
+			if closeVectorBackend != nil {
+				if closeErr := closeVectorBackend(); closeErr != nil && result == nil {
+					result = closeErr
+				}
+			}
+			return result
+		}
+		return backfiller, closeFn, nil
+	default:
+		return nil, nil, fmt.Errorf("unsupported NEXUSIM_VECTOR_REBUILD_BACKFILL_SOURCE %q", sourceMode)
+	}
+}
+
 func newEmbeddingVectorBackend(ctx context.Context, metadataPool *pgxpool.Pool) (embedding.VectorBackend, func() error, error) {
 	backendMode := vectorProviderBackendModeFromEnv()
 	switch backendMode {
@@ -526,6 +594,10 @@ func embeddingProducerSourceModeFromEnv() string {
 
 func vectorProviderBackendModeFromEnv() string {
 	return strings.ToLower(strings.TrimSpace(os.Getenv("NEXUSIM_VECTOR_PROVIDER_BACKEND")))
+}
+
+func rebuildBackfillSourceModeFromEnv() string {
+	return strings.ToLower(strings.TrimSpace(os.Getenv("NEXUSIM_VECTOR_REBUILD_BACKFILL_SOURCE")))
 }
 
 func vectorIndexModeFromEnv() string {

@@ -366,7 +366,7 @@ SELECT
     vj.trace_id, vj.created_at, vj.completed_at,
     vrc.tenant_id, vrc.rebuild_job_id, vrc.collection_id, vrc.source_service,
     vrc.partition_key, vrc.cursor_value, vrc.status, vrc.updated_at,
-    vc.collection_type
+    vc.collection_type, vc.backend_type, vc.embedding_model_ref, vc.dimension
 FROM vector_index_jobs vj
 JOIN vector_rebuild_checkpoints vrc
   ON vrc.tenant_id = vj.tenant_id
@@ -402,6 +402,7 @@ FOR UPDATE OF vj, vrc SKIP LOCKED
 			&task.Checkpoint.PartitionKey, &task.Checkpoint.CursorValue,
 			&task.Checkpoint.Status, &task.Checkpoint.UpdatedAt,
 			&task.CollectionType,
+			&task.BackendType, &task.EmbeddingModelRef, &task.Dimension,
 		)
 		if err != nil {
 			return nil, types.NewDBReadFailed(err.Error())

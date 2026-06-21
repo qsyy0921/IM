@@ -181,3 +181,26 @@ NEXUSIM_VECTOR_PGVECTOR_ENSURE_SCHEMA=true
   公开 API、metadata PostgreSQL、outbox、metrics 和 smoke summary 仍不得输出 raw
   vector array。
 - 当前 README 只记录 profile 和 wiring；真实 pgvector focused smoke 报告后续单独归档。
+
+## Optional Rebuild Provider Backfill
+
+第一版 `rebuild-worker` 默认只推进 rebuild checkpoint / outbox。需要验证 provider
+backend backfill 时必须显式开启：
+
+```powershell
+$env:NEXUSIM_VECTOR_INDEX_SERVICE_MODE = "rebuild-worker"
+$env:NEXUSIM_VECTOR_REBUILD_BACKFILL_SOURCE = "embedding-tasks"
+$env:NEXUSIM_VECTOR_REBUILD_BACKFILL_BATCH_SIZE = "100"
+$env:NEXUSIM_MODEL_GATEWAY_GRPC_ADDR = "127.0.0.1:10770"
+$env:NEXUSIM_VECTOR_PROVIDER_BACKEND = "pgvector"
+$env:NEXUSIM_VECTOR_PGVECTOR_DSN = "postgres://nexusim:nexusim@localhost:15432/nexusim?sslmode=disable"
+```
+
+边界：
+
+- 只读取 `vector-index-service` 自有 `vector_embedding_tasks` 中 `COMPLETED` 的
+  redacted-preview task。
+- 重新通过 `model-gateway.InvokeEmbedding` 生成 embedding，再写当前配置的 provider backend。
+- 不读取 knowledge / memory / search 私有表，不从 vector metadata 伪造缺失的 vector array。
+- 未配置 provider backend 时 fail-fast。
+- matching completed task 超过 batch size 时 fail-closed，不会误标 rebuild complete。

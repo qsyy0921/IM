@@ -13,6 +13,10 @@ type Store interface {
 	CompleteRebuildTask(ctx context.Context, task types.VectorRebuildTask) error
 }
 
+type Backfiller interface {
+	BackfillRebuildTask(ctx context.Context, task types.VectorRebuildTask) (types.RebuildBackfillStats, error)
+}
+
 type Worker struct {
 	store  Store
 	config Config
@@ -22,6 +26,7 @@ type Config struct {
 	BatchSize    int
 	PollInterval time.Duration
 	ErrorBackoff time.Duration
+	Backfiller   Backfiller
 	Logf         func(format string, args ...any)
 }
 
@@ -68,6 +73,15 @@ func (worker *Worker) RunOnce(ctx context.Context) (types.RebuildWorkerStats, er
 	}
 	stats := types.RebuildWorkerStats{Claimed: len(tasks)}
 	for _, task := range tasks {
+		if worker.config.Backfiller != nil {
+			backfillStats, err := worker.config.Backfiller.BackfillRebuildTask(ctx, task)
+			if err != nil {
+				return stats, err
+			}
+			stats.Backfilled += backfillStats.Backfilled
+			stats.Embedded += backfillStats.Embedded
+			stats.Upserted += backfillStats.Upserted
+		}
 		if err := worker.store.CompleteRebuildTask(ctx, task); err != nil {
 			return stats, err
 		}

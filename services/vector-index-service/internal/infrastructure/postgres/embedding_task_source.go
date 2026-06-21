@@ -149,6 +149,45 @@ WHERE tenant_id = $1
 	return nil
 }
 
+// ListCompletedEmbeddingTasks returns completed redacted-preview tasks for a rebuild job.
+// It intentionally reads only vector-index-service owned queue rows and never reaches
+// into upstream service private storage.
+func (source *EmbeddingTaskSource) ListCompletedEmbeddingTasks(
+	ctx context.Context,
+	task types.VectorRebuildTask,
+	limit int,
+) ([]types.VectorEmbeddingTask, error) {
+	if source == nil || source.pool == nil {
+		return nil, types.NewDBReadFailed("vector embedding task source is not configured")
+	}
+	if limit <= 0 {
+		limit = 100
+	}
+	rows, err := source.pool.Query(ctx, `
+SELECT
+    tenant_id, source_service, collection_type, source_ref_hash,
+    source_id, source_version, source_hash, chunk_hash, input_preview_redacted,
+    input_hash, input_schema_version, embedding_model_ref, dimension,
+    visibility_scope, visibility_version, policy_version, data_class, delete_proof_id,
+    retention_policy_ref, idempotency_key, correlation_id, causation_id, trace_id
+FROM vector_embedding_tasks
+WHERE tenant_id = $1
+  AND source_service = $2
+  AND collection_type = $3
+  AND embedding_model_ref = $4
+  AND dimension = $5
+  AND status = 'COMPLETED'
+ORDER BY completed_at NULLS LAST, created_at, task_id
+LIMIT $6
+`, string(task.Job.TenantID), task.Checkpoint.SourceService, task.CollectionType,
+		task.EmbeddingModelRef, task.Dimension, limit)
+	if err != nil {
+		return nil, types.NewDBReadFailed(err.Error())
+	}
+	defer rows.Close()
+	return scanEmbeddingTasks(rows)
+}
+
 func (source *EmbeddingTaskSource) embeddingTaskMatches(ctx context.Context, task types.VectorEmbeddingTask) (bool, error) {
 	var sourceRefHash string
 	var sourceHash string
@@ -204,6 +243,16 @@ FOR UPDATE SKIP LOCKED
 	}
 	defer rows.Close()
 
+	return scanEmbeddingTasks(rows)
+}
+
+type embeddingTaskRows interface {
+	Next() bool
+	Scan(dest ...any) error
+	Err() error
+}
+
+func scanEmbeddingTasks(rows embeddingTaskRows) ([]types.VectorEmbeddingTask, error) {
 	tasks := []types.VectorEmbeddingTask{}
 	for rows.Next() {
 		var task types.VectorEmbeddingTask

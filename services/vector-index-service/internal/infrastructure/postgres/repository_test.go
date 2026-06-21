@@ -230,7 +230,10 @@ func TestRepositoryClaimAndCompleteRebuildTaskIntegration(t *testing.T) {
 	if task.Job.JobID != job.JobID ||
 		task.Job.Status != types.JobStatusVectorUpserting ||
 		task.Checkpoint.Status != types.RebuildCheckpointStatusRunning ||
-		task.CollectionType != types.CollectionTypeKnowledgeChunk {
+		task.CollectionType != types.CollectionTypeKnowledgeChunk ||
+		task.EmbeddingModelRef != rebuild.Command.EmbeddingModelRef ||
+		task.Dimension != rebuild.Command.Dimension ||
+		task.BackendType != types.BackendTypePostgresTest {
 		t.Fatalf("unexpected claimed task: %+v", task)
 	}
 	claimedJob, err := repository.GetVectorIndexJob(ctx, types.GetVectorIndexJobCommand{
@@ -346,6 +349,81 @@ WHERE tenant_id = 'tenant-vector-test'
 	}
 }
 
+func TestEmbeddingTaskSourceListCompletedTasksForRebuildIntegration(t *testing.T) {
+	ctx := context.Background()
+	pool := openVectorTestPool(t)
+	resetVectorTables(t, ctx, pool)
+	repository := NewRepository(pool)
+	source := NewEmbeddingTaskSource(pool, EmbeddingTaskSourceConfig{
+		TenantID:     "tenant-vector-test",
+		ClaimTimeout: time.Minute,
+	})
+
+	upsert := prepareUpsert(t, "vector-rebuild-backfill-item", "vitem_rebuild_backfill_source", "vjob_rebuild_backfill_source")
+	if _, _, _, err := repository.UpsertVectorItem(ctx, upsert); err != nil {
+		t.Fatalf("seed vector collection: %v", err)
+	}
+	rebuild := prepareRebuild(t, "vector-rebuild-backfill-idem", "vjob_rebuild_backfill")
+	if _, _, _, err := repository.RequestVectorRebuild(ctx, rebuild); err != nil {
+		t.Fatalf("request vector rebuild: %v", err)
+	}
+	rebuildTasks, err := repository.ClaimRebuildTasks(ctx, 10)
+	if err != nil {
+		t.Fatalf("claim rebuild task: %v", err)
+	}
+	if len(rebuildTasks) != 1 {
+		t.Fatalf("expected one rebuild task, got %d", len(rebuildTasks))
+	}
+	rebuildTask := rebuildTasks[0]
+
+	completed := prepareEmbeddingTaskForRebuild("backfill-completed", "redacted completed rebuild chunk", rebuildTask)
+	if _, err := source.EnqueueEmbeddingTask(ctx, completed); err != nil {
+		t.Fatalf("enqueue completed candidate: %v", err)
+	}
+	claimed, err := source.ClaimEmbeddingTasks(ctx, 10)
+	if err != nil {
+		t.Fatalf("claim completed candidate: %v", err)
+	}
+	if len(claimed) != 1 {
+		t.Fatalf("expected one claimed embedding task, got %d", len(claimed))
+	}
+	if err := source.CompleteEmbeddingTask(ctx, claimed[0]); err != nil {
+		t.Fatalf("complete embedding task: %v", err)
+	}
+
+	pending := prepareEmbeddingTaskForRebuild("backfill-pending", "redacted pending rebuild chunk", rebuildTask)
+	if _, err := source.EnqueueEmbeddingTask(ctx, pending); err != nil {
+		t.Fatalf("enqueue pending candidate: %v", err)
+	}
+	wrongDimension := prepareEmbeddingTaskForRebuild("backfill-wrong-dimension", "redacted wrong dimension rebuild chunk", rebuildTask)
+	wrongDimension.Dimension = rebuildTask.Dimension + 1
+	if _, err := source.EnqueueEmbeddingTask(ctx, wrongDimension); err != nil {
+		t.Fatalf("enqueue wrong dimension candidate: %v", err)
+	}
+	claimed, err = source.ClaimEmbeddingTasks(ctx, 10)
+	if err != nil {
+		t.Fatalf("claim mixed candidates: %v", err)
+	}
+	for _, candidate := range claimed {
+		if candidate.IdempotencyKey == wrongDimension.IdempotencyKey {
+			if err := source.CompleteEmbeddingTask(ctx, candidate); err != nil {
+				t.Fatalf("complete wrong dimension candidate: %v", err)
+			}
+		}
+	}
+
+	listed, err := source.ListCompletedEmbeddingTasks(ctx, rebuildTask, 10)
+	if err != nil {
+		t.Fatalf("list completed rebuild embedding tasks: %v", err)
+	}
+	if len(listed) != 1 {
+		t.Fatalf("expected only completed matching task, got %+v", listed)
+	}
+	if listed[0].IdempotencyKey != completed.IdempotencyKey || listed[0].InputText != completed.InputText {
+		t.Fatalf("unexpected listed task: %+v", listed[0])
+	}
+}
+
 func prepareUpsert(t *testing.T, idempotencyKey string, vectorItemID string, jobID string) domain.PreparedUpsert {
 	t.Helper()
 	prepared, err := domain.PrepareUpsert(types.UpsertVectorItemCommand{
@@ -446,6 +524,15 @@ func prepareEmbeddingTask(id string, preview string) types.VectorEmbeddingTask {
 		CausationID:        "cause-vector-embedding-test",
 		TraceID:            "trace-vector-embedding-test",
 	}
+}
+
+func prepareEmbeddingTaskForRebuild(id string, preview string, rebuildTask types.VectorRebuildTask) types.VectorEmbeddingTask {
+	task := prepareEmbeddingTask(id, preview)
+	task.SourceService = rebuildTask.Checkpoint.SourceService
+	task.CollectionType = rebuildTask.CollectionType
+	task.EmbeddingModelRef = rebuildTask.EmbeddingModelRef
+	task.Dimension = rebuildTask.Dimension
+	return task
 }
 
 func openVectorTestPool(t *testing.T) *pgxpool.Pool {

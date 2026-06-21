@@ -47,6 +47,38 @@ func TestWorkerRunOnceRequiresStore(t *testing.T) {
 	}
 }
 
+func TestWorkerRunOnceBackfillsBeforeComplete(t *testing.T) {
+	task := testRebuildTask()
+	store := &fakeStore{tasks: []types.VectorRebuildTask{task}}
+	backfiller := &fakeBackfiller{stats: types.RebuildBackfillStats{Backfilled: 2, Embedded: 2, Upserted: 2}}
+	worker := NewWorker(store, Config{Backfiller: backfiller})
+	stats, err := worker.RunOnce(context.Background())
+	if err != nil {
+		t.Fatalf("run once: %v", err)
+	}
+	if stats.Claimed != 1 || stats.Backfilled != 2 || stats.Embedded != 2 || stats.Upserted != 2 || stats.Completed != 1 {
+		t.Fatalf("unexpected stats: %+v", stats)
+	}
+	if len(backfiller.tasks) != 1 || backfiller.tasks[0].Job.JobID != task.Job.JobID {
+		t.Fatalf("unexpected backfill tasks: %+v", backfiller.tasks)
+	}
+	if len(store.completed) != 1 {
+		t.Fatalf("expected completed task after backfill, got %+v", store.completed)
+	}
+}
+
+func TestWorkerRunOnceDoesNotCompleteWhenBackfillFails(t *testing.T) {
+	store := &fakeStore{tasks: []types.VectorRebuildTask{testRebuildTask()}}
+	worker := NewWorker(store, Config{Backfiller: &fakeBackfiller{err: errors.New("backfill failed")}})
+	stats, err := worker.RunOnce(context.Background())
+	if err == nil {
+		t.Fatal("expected backfill error")
+	}
+	if stats.Claimed != 1 || stats.Completed != 0 || len(store.completed) != 0 {
+		t.Fatalf("task should not complete after backfill error: stats=%+v completed=%+v", stats, store.completed)
+	}
+}
+
 func TestWorkerRunOncePropagatesCompleteError(t *testing.T) {
 	store := &fakeStore{
 		tasks: []types.VectorRebuildTask{{Job: types.VectorIndexJob{JobID: "vjob_rebuild_1"}}},
@@ -59,6 +91,57 @@ func TestWorkerRunOncePropagatesCompleteError(t *testing.T) {
 	}
 	if stats.Claimed != 1 || stats.Completed != 0 {
 		t.Fatalf("unexpected stats after error: %+v", stats)
+	}
+}
+
+func TestEmbeddingTaskBackfillerUpsertsProviderBackend(t *testing.T) {
+	task := testEmbeddingTask("redacted rebuild backfill input")
+	lister := &fakeEmbeddingTaskLister{tasks: []types.VectorEmbeddingTask{task}}
+	embedder := &fakeEmbedder{
+		result: types.VectorEmbeddingResult{
+			InvocationID:        "minv_rebuild_1",
+			ModelID:             "deterministic-embedding-v1",
+			EmbeddingValues:     []float32{0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8},
+			EmbeddingVectorHash: "sha256:embeddinghash",
+			Dimension:           8,
+			EmbeddingReturned:   true,
+		},
+	}
+	upserter := &fakeUpserter{}
+	backend := &fakeVectorBackend{}
+	backfiller := NewEmbeddingTaskBackfiller(lister, embedder, upserter, backend, EmbeddingTaskBackfillerConfig{BatchSize: 10})
+	stats, err := backfiller.BackfillRebuildTask(context.Background(), testRebuildTask())
+	if err != nil {
+		t.Fatalf("backfill rebuild task: %v", err)
+	}
+	if stats.Backfilled != 1 || stats.Embedded != 1 || stats.Upserted != 1 {
+		t.Fatalf("unexpected stats: %+v", stats)
+	}
+	if len(embedder.tasks) != 1 || embedder.tasks[0].InputText != task.InputText {
+		t.Fatalf("unexpected embedder tasks: %+v", embedder.tasks)
+	}
+	if len(upserter.commands) != 1 || upserter.commands[0].EmbeddingVectorHash != "sha256:embeddinghash" {
+		t.Fatalf("unexpected upsert commands: %+v", upserter.commands)
+	}
+	if len(backend.calls) != 1 || backend.calls[0].item.VectorItemID != "vitem_rebuild_backfill" {
+		t.Fatalf("unexpected backend calls: %+v", backend.calls)
+	}
+}
+
+func TestEmbeddingTaskBackfillerFailsBeforePartialWorkWhenLimitExceeded(t *testing.T) {
+	tasks := []types.VectorEmbeddingTask{
+		testEmbeddingTask("redacted rebuild backfill input one"),
+		testEmbeddingTask("redacted rebuild backfill input two"),
+	}
+	backfiller := NewEmbeddingTaskBackfiller(
+		&fakeEmbeddingTaskLister{tasks: tasks},
+		&fakeEmbedder{},
+		&fakeUpserter{},
+		&fakeVectorBackend{},
+		EmbeddingTaskBackfillerConfig{BatchSize: 1},
+	)
+	if _, err := backfiller.BackfillRebuildTask(context.Background(), testRebuildTask()); err == nil {
+		t.Fatal("expected backfill limit error")
 	}
 }
 
@@ -81,4 +164,144 @@ func (store *fakeStore) CompleteRebuildTask(_ context.Context, task types.Vector
 	}
 	store.completed = append(store.completed, task)
 	return nil
+}
+
+type fakeBackfiller struct {
+	stats types.RebuildBackfillStats
+	tasks []types.VectorRebuildTask
+	err   error
+}
+
+func (backfiller *fakeBackfiller) BackfillRebuildTask(_ context.Context, task types.VectorRebuildTask) (types.RebuildBackfillStats, error) {
+	if backfiller.err != nil {
+		return types.RebuildBackfillStats{}, backfiller.err
+	}
+	backfiller.tasks = append(backfiller.tasks, task)
+	return backfiller.stats, nil
+}
+
+type fakeEmbeddingTaskLister struct {
+	tasks []types.VectorEmbeddingTask
+}
+
+func (lister *fakeEmbeddingTaskLister) ListCompletedEmbeddingTasks(_ context.Context, _ types.VectorRebuildTask, limit int) ([]types.VectorEmbeddingTask, error) {
+	if limit < len(lister.tasks) {
+		return lister.tasks[:limit], nil
+	}
+	return lister.tasks, nil
+}
+
+type fakeEmbedder struct {
+	result types.VectorEmbeddingResult
+	tasks  []types.VectorEmbeddingTask
+	err    error
+}
+
+func (embedder *fakeEmbedder) Embed(_ context.Context, task types.VectorEmbeddingTask) (types.VectorEmbeddingResult, error) {
+	if embedder.err != nil {
+		return types.VectorEmbeddingResult{}, embedder.err
+	}
+	embedder.tasks = append(embedder.tasks, task)
+	return embedder.result, nil
+}
+
+type fakeUpserter struct {
+	commands []types.UpsertVectorItemCommand
+	err      error
+}
+
+func (upserter *fakeUpserter) UpsertVectorItem(_ context.Context, command types.UpsertVectorItemCommand) (types.VectorItem, bool, error) {
+	if upserter.err != nil {
+		return types.VectorItem{}, false, upserter.err
+	}
+	upserter.commands = append(upserter.commands, command)
+	return types.VectorItem{
+		TenantID:          command.AuthContext.TenantID,
+		VectorItemID:      "vitem_rebuild_backfill",
+		CollectionID:      "vcol_rebuild_backfill",
+		CollectionType:    command.CollectionType,
+		BackendVectorID:   "vitem_rebuild_backfill",
+		Dimension:         command.Dimension,
+		VisibilityScope:   command.VisibilityScope,
+		VisibilityVersion: command.VisibilityVersion,
+		PolicyVersion:     command.PolicyVersion,
+		DataClass:         command.DataClass,
+	}, false, nil
+}
+
+type backendCall struct {
+	task   types.VectorEmbeddingTask
+	result types.VectorEmbeddingResult
+	item   types.VectorItem
+}
+
+type fakeVectorBackend struct {
+	calls []backendCall
+	err   error
+}
+
+func (backend *fakeVectorBackend) UpsertEmbedding(
+	_ context.Context,
+	task types.VectorEmbeddingTask,
+	result types.VectorEmbeddingResult,
+	item types.VectorItem,
+) error {
+	if backend.err != nil {
+		return backend.err
+	}
+	backend.calls = append(backend.calls, backendCall{task: task, result: result, item: item})
+	return nil
+}
+
+func testRebuildTask() types.VectorRebuildTask {
+	return types.VectorRebuildTask{
+		Job: types.VectorIndexJob{
+			TenantID:     "tenant-vector",
+			JobID:        "vjob_rebuild_1",
+			CollectionID: "vcol_rebuild_1",
+			JobType:      types.JobTypeRebuild,
+			Status:       types.JobStatusVectorUpserting,
+		},
+		Checkpoint: types.VectorRebuildCheckpoint{
+			TenantID:      "tenant-vector",
+			RebuildJobID:  "vjob_rebuild_1",
+			CollectionID:  "vcol_rebuild_1",
+			SourceService: types.AllowedCallerKnowledgeIngestion,
+			PartitionKey:  "partition-1",
+			Status:        types.RebuildCheckpointStatusRunning,
+		},
+		CollectionType:    types.CollectionTypeKnowledgeChunk,
+		BackendType:       types.BackendTypePGVector,
+		EmbeddingModelRef: "deterministic-embedding-v1",
+		Dimension:         8,
+	}
+}
+
+func testEmbeddingTask(input string) types.VectorEmbeddingTask {
+	return types.VectorEmbeddingTask{
+		AuthContext: types.AuthContext{
+			TenantID:    "tenant-vector",
+			ServiceName: types.AllowedCallerVectorIndex,
+			RequestID:   "req-vector-rebuild-backfill",
+		},
+		SourceService:      types.AllowedCallerKnowledgeIngestion,
+		CollectionType:     types.CollectionTypeKnowledgeChunk,
+		SourceRefHash:      "sha256:sourceref",
+		SourceID:           "ksrc_1:kchunk_1",
+		SourceVersion:      1,
+		SourceHash:         "sha256:sourcehash",
+		ChunkHash:          "sha256:chunkhash",
+		InputText:          input,
+		InputHash:          sha256Ref(input),
+		InputSchemaVersion: 1,
+		EmbeddingModelRef:  "deterministic-embedding-v1",
+		Dimension:          8,
+		VisibilityScope:    "tenant:tenant-vector",
+		VisibilityVersion:  1,
+		PolicyVersion:      "policy-v1",
+		DataClass:          "BUSINESS_INTERNAL",
+		IdempotencyKey:     "idem-vector-rebuild-backfill",
+		CorrelationID:      "corr-vector-rebuild",
+		TraceID:            "trace-vector-rebuild",
+	}
 }

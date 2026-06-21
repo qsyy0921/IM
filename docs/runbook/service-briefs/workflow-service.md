@@ -26,7 +26,8 @@ admin operation approval、补偿请求和人工审批状态。
 - `loadtest/workflow` operator CLI：通过 workflow-service 公开 gRPC get workflow、
   record decision、查询低敏 instruction metadata，作为 workflow ops / UI 的
   first-stage 本地入口；`record-decision` 本地拒绝明显敏感的 decider / policy /
-  reason / evidence ref marker。
+  reason / evidence ref marker，并支持低敏 `decision-manifest` 作为第一版
+  external approval binding。
 - 已被 admin-service 用于 repair / critical / compensation handoff。
 
 后续：timer worker、更多 compensation adapter、instruction approval UI /

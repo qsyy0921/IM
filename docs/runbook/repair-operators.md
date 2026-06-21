@@ -228,6 +228,7 @@ workflow-service PostgreSQL 私表：
 ```powershell
 go run ./loadtest/workflow -mode get -workflow-id wf_123
 go run ./loadtest/workflow -mode record-decision -workflow-id wf_123 -step-id wfs_1 -decision APPROVE -decider-ref operator:a
+go run ./loadtest/workflow -mode record-decision -decision-manifest H:\NexusIM\operator-plans\workflow-decision.json
 go run ./loadtest/workflow -mode list-compensation-instructions -workflow-id wf_123 -status ACTIVE
 ```
 
@@ -239,7 +240,10 @@ operator reason 原文或 downstream response body。它是 first-stage ops visi
 不是正式审批 UI 或执行器。`record-decision` 还会在本地拒绝看起来像 secret /
 token / password / raw body / DSN 的 decider、policy、reason 或 evidence ref；
 真实原因和证据原文应留在独立 artifact / audit 系统中，只把低敏 ref 或 hash 传给
-workflow-service。
+workflow-service。`-decision-manifest` 可作为第一版外部审批系统交接文件，schema
+version 必须是 `nexusim.workflow.decision_manifest.v1`；manifest 只保存 workflow /
+step / decision / decider / policy / reason ref / evidence refs / idempotency /
+correlation refs，不保存审批 comment、EvidencePack、payload 或 provider body。
 
 `agent-service` 提供 `proposal-approval-audit` / `proposal-approval-approve`，用于审计和审批 Agent proposal。环境变量为 `NEXUSIM_AGENT_SERVICE_MODE`；`proposal-approval-audit` 默认只列 `PROPOSED` proposal，可按 tenant / proposal / user / status / tool / resource_type 过滤，可选 `NEXUSIM_AGENT_PROPOSAL_APPROVAL_AUDIT_OUTPUT` 写低敏 JSON；`proposal-approval-approve` 需要 `NEXUSIM_AGENT_PROPOSAL_APPROVAL_TENANT_ID`、`NEXUSIM_AGENT_PROPOSAL_APPROVAL_PROPOSAL_ID`、`NEXUSIM_AGENT_PROPOSAL_APPROVAL_APPROVED_BY_USER_ID`，默认 `NEXUSIM_AGENT_PROPOSAL_APPROVAL_DRY_RUN=true`，只有显式设为 false 才会调用服务内 approval workflow 并同事务写 approval outbox。审批 reason 应通过 `NEXUSIM_AGENT_PROPOSAL_APPROVAL_REASON_FILE` 读取；输出可选 `NEXUSIM_AGENT_PROPOSAL_APPROVAL_OUTPUT`，只包含 proposal / approval / skill / tool / resource / status 元数据和 `reason_present`，不输出 objective、proposal_text、citations、EvidencePack 或 reason 原文。
 

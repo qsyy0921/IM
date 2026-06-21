@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -17,25 +18,28 @@ import (
 )
 
 type config struct {
-	mode           string
-	target         string
-	requestTimeout time.Duration
-	tls            grpctls.Config
-	tenantID       string
-	userID         string
-	instanceRef    string
-	traceID        string
-	requestID      string
-	workflowID     string
-	stepID         string
-	deciderRef     string
-	decision       string
-	decisionPolicy string
-	reasonRef      string
-	evidenceRefs   []string
-	idempotencyKey string
-	status         string
-	pageSize       int32
+	mode                 string
+	target               string
+	requestTimeout       time.Duration
+	tls                  grpctls.Config
+	tenantID             string
+	userID               string
+	instanceRef          string
+	traceID              string
+	requestID            string
+	correlationID        string
+	causationID          string
+	workflowID           string
+	stepID               string
+	decisionManifestPath string
+	deciderRef           string
+	decision             string
+	decisionPolicy       string
+	reasonRef            string
+	evidenceRefs         []string
+	idempotencyKey       string
+	status               string
+	pageSize             int32
 }
 
 type commandResult struct {
@@ -108,6 +112,26 @@ type compensationInstructionRef struct {
 	UpdatedAtUnixMs int64  `json:"updated_at_unix_ms,omitempty"`
 }
 
+type decisionManifest struct {
+	SchemaVersion     string   `json:"schema_version"`
+	WorkflowID        string   `json:"workflow_id"`
+	StepID            string   `json:"step_id"`
+	Decision          string   `json:"decision"`
+	DeciderRef        string   `json:"decider_ref"`
+	DecisionPolicyRef string   `json:"decision_policy_ref"`
+	ReasonRef         string   `json:"reason_ref"`
+	EvidenceRefs      []string `json:"evidence_refs"`
+	IdempotencyKey    string   `json:"idempotency_key"`
+	CorrelationID     string   `json:"correlation_id"`
+	CausationID       string   `json:"causation_id"`
+	TraceID           string   `json:"trace_id"`
+}
+
+const (
+	decisionManifestSchemaVersion = "nexusim.workflow.decision_manifest.v1"
+	maxDecisionManifestBytes      = 64 * 1024
+)
+
 func main() {
 	cfg := parseFlags(os.Args[1:])
 	if err := run(context.Background(), cfg, os.Stdout); err != nil {
@@ -131,8 +155,11 @@ func parseFlags(args []string) config {
 	flags.StringVar(&cfg.instanceRef, "instance-ref", "workflow-operator-cli", "operator client instance ref")
 	flags.StringVar(&cfg.traceID, "trace-id", "", "trace id")
 	flags.StringVar(&cfg.requestID, "request-id", "", "request id")
+	flags.StringVar(&cfg.correlationID, "correlation-id", "", "optional correlation id for record-decision")
+	flags.StringVar(&cfg.causationID, "causation-id", "", "optional causation id for record-decision")
 	flags.StringVar(&cfg.workflowID, "workflow-id", "", "workflow id")
 	flags.StringVar(&cfg.stepID, "step-id", "", "workflow step id for record-decision")
+	flags.StringVar(&cfg.decisionManifestPath, "decision-manifest", "", "optional low-sensitive decision manifest JSON for record-decision")
 	flags.StringVar(&cfg.deciderRef, "decider-ref", "operator:workflow-cli", "low-sensitive decider ref for record-decision")
 	flags.StringVar(&cfg.decision, "decision", "APPROVE", "decision type for record-decision")
 	flags.StringVar(&cfg.decisionPolicy, "decision-policy-ref", "workflow.operator.cli.v1", "low-sensitive decision policy ref")
@@ -146,6 +173,11 @@ func parseFlags(args []string) config {
 	_ = flags.Parse(args)
 	cfg.mode = strings.ToLower(strings.TrimSpace(cfg.mode))
 	cfg.status = strings.ToUpper(strings.TrimSpace(cfg.status))
+	cfg.requestID = strings.TrimSpace(cfg.requestID)
+	cfg.traceID = strings.TrimSpace(cfg.traceID)
+	cfg.correlationID = strings.TrimSpace(cfg.correlationID)
+	cfg.causationID = strings.TrimSpace(cfg.causationID)
+	cfg.decisionManifestPath = strings.TrimSpace(cfg.decisionManifestPath)
 	cfg.workflowID = strings.TrimSpace(cfg.workflowID)
 	cfg.stepID = strings.TrimSpace(cfg.stepID)
 	cfg.deciderRef = strings.TrimSpace(cfg.deciderRef)
@@ -155,11 +187,21 @@ func parseFlags(args []string) config {
 	cfg.evidenceRefs = splitCSV(evidenceRefs)
 	cfg.idempotencyKey = strings.TrimSpace(cfg.idempotencyKey)
 	cfg.pageSize = int32(pageSize)
+	return fillDerivedDefaults(cfg)
+}
+
+func fillDerivedDefaults(cfg config) config {
 	if cfg.requestID == "" {
 		cfg.requestID = "workflow-operator-" + cfg.mode
 	}
 	if cfg.traceID == "" {
 		cfg.traceID = cfg.requestID
+	}
+	if cfg.correlationID == "" {
+		cfg.correlationID = cfg.requestID
+	}
+	if cfg.causationID == "" && cfg.mode == "record-decision" {
+		cfg.causationID = cfg.workflowID
 	}
 	if cfg.idempotencyKey == "" && cfg.mode == "record-decision" {
 		cfg.idempotencyKey = "decision:" + cfg.workflowID + ":" + cfg.stepID + ":" + cfg.decision + ":" + cfg.deciderRef
@@ -168,6 +210,11 @@ func parseFlags(args []string) config {
 }
 
 func run(ctx context.Context, cfg config, out io.Writer) error {
+	prepared, err := prepareConfig(cfg)
+	if err != nil {
+		return err
+	}
+	cfg = prepared
 	if err := cfg.validate(); err != nil {
 		return err
 	}
@@ -190,6 +237,65 @@ func run(ctx context.Context, cfg config, out io.Writer) error {
 	encoder := json.NewEncoder(out)
 	encoder.SetIndent("", "  ")
 	return encoder.Encode(result)
+}
+
+func prepareConfig(cfg config) (config, error) {
+	if strings.TrimSpace(cfg.decisionManifestPath) == "" {
+		return cfg, nil
+	}
+	if cfg.mode != "record-decision" {
+		return cfg, errors.New("decision-manifest is only supported for record-decision")
+	}
+	manifest, err := readDecisionManifest(cfg.decisionManifestPath)
+	if err != nil {
+		return cfg, err
+	}
+	cfg.workflowID = strings.TrimSpace(manifest.WorkflowID)
+	cfg.stepID = strings.TrimSpace(manifest.StepID)
+	cfg.deciderRef = strings.TrimSpace(manifest.DeciderRef)
+	cfg.decision = strings.ToUpper(strings.TrimSpace(manifest.Decision))
+	cfg.decisionPolicy = strings.TrimSpace(manifest.DecisionPolicyRef)
+	cfg.reasonRef = strings.TrimSpace(manifest.ReasonRef)
+	cfg.evidenceRefs = normalizeRefs(manifest.EvidenceRefs)
+	cfg.idempotencyKey = strings.TrimSpace(manifest.IdempotencyKey)
+	if strings.TrimSpace(manifest.CorrelationID) != "" {
+		cfg.correlationID = strings.TrimSpace(manifest.CorrelationID)
+	}
+	if strings.TrimSpace(manifest.CausationID) != "" {
+		cfg.causationID = strings.TrimSpace(manifest.CausationID)
+	}
+	if strings.TrimSpace(manifest.TraceID) != "" {
+		cfg.traceID = strings.TrimSpace(manifest.TraceID)
+	}
+	return fillDerivedDefaults(cfg), nil
+}
+
+func readDecisionManifest(path string) (decisionManifest, error) {
+	path = strings.TrimSpace(path)
+	info, err := os.Stat(path)
+	if err != nil {
+		return decisionManifest{}, fmt.Errorf("read decision manifest: %w", err)
+	}
+	if info.Size() > maxDecisionManifestBytes {
+		return decisionManifest{}, errors.New("decision manifest is too large")
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return decisionManifest{}, fmt.Errorf("read decision manifest: %w", err)
+	}
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.DisallowUnknownFields()
+	var manifest decisionManifest
+	if err := decoder.Decode(&manifest); err != nil {
+		return decisionManifest{}, fmt.Errorf("decode decision manifest: %w", err)
+	}
+	if decoder.Decode(&struct{}{}) != io.EOF {
+		return decisionManifest{}, errors.New("decision manifest must contain a single JSON object")
+	}
+	if strings.TrimSpace(manifest.SchemaVersion) != decisionManifestSchemaVersion {
+		return decisionManifest{}, fmt.Errorf("unsupported decision manifest schema_version %q", manifest.SchemaVersion)
+	}
+	return manifest, nil
 }
 
 func execute(ctx context.Context, cfg config, client workflowv1.WorkflowServiceClient) (commandResult, error) {
@@ -225,8 +331,8 @@ func execute(ctx context.Context, cfg config, client workflowv1.WorkflowServiceC
 			ReasonRef:         cfg.reasonRef,
 			EvidenceRefs:      append([]string(nil), cfg.evidenceRefs...),
 			IdempotencyKey:    cfg.idempotencyKey,
-			CorrelationId:     cfg.requestID,
-			CausationId:       cfg.workflowID,
+			CorrelationId:     cfg.correlationID,
+			CausationId:       cfg.causationID,
 			TraceId:           cfg.traceID,
 		})
 		if err != nil {
@@ -430,9 +536,13 @@ func isAllowedDecision(value string) bool {
 }
 
 func splitCSV(value string) []string {
+	return normalizeRefs(strings.Split(value, ","))
+}
+
+func normalizeRefs(values []string) []string {
 	seen := map[string]bool{}
 	result := []string{}
-	for _, item := range strings.Split(value, ",") {
+	for _, item := range values {
 		item = strings.TrimSpace(item)
 		if item == "" || seen[item] {
 			continue

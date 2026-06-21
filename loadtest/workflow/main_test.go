@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -51,6 +53,9 @@ func TestParseFlagsBuildsRecordDecisionDefaults(t *testing.T) {
 	if cfg.idempotencyKey != "decision:wf_1:wfs_1:APPROVE:operator:alice" {
 		t.Fatalf("idempotency key = %q", cfg.idempotencyKey)
 	}
+	if cfg.correlationID != cfg.requestID || cfg.causationID != "wf_1" {
+		t.Fatalf("unexpected correlation/causation ids: %+v", cfg)
+	}
 	wantEvidence := []string{"evidence:one", "evidence:two"}
 	if len(cfg.evidenceRefs) != len(wantEvidence) {
 		t.Fatalf("evidence refs = %+v", cfg.evidenceRefs)
@@ -62,6 +67,51 @@ func TestParseFlagsBuildsRecordDecisionDefaults(t *testing.T) {
 	}
 	if err := cfg.validate(); err != nil {
 		t.Fatalf("validate: %v", err)
+	}
+}
+
+func TestPrepareConfigLoadsDecisionManifest(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "decision.json")
+	manifest := `{
+		"schema_version": "nexusim.workflow.decision_manifest.v1",
+		"workflow_id": "wf_manifest",
+		"step_id": "wfs_manifest",
+		"decision": "approve",
+		"decider_ref": "operator:manifest",
+		"decision_policy_ref": "policy:external-approval",
+		"reason_ref": "reason-sha256:abc",
+		"evidence_refs": ["evidence:ticket-1", " evidence:ticket-1 ", "evidence:ticket-2"],
+		"idempotency_key": "external-approval:wf_manifest:wfs_manifest",
+		"correlation_id": "corr_external",
+		"causation_id": "approval_external",
+		"trace_id": "trace_external"
+	}`
+	if err := os.WriteFile(path, []byte(manifest), 0o600); err != nil {
+		t.Fatalf("write manifest: %v", err)
+	}
+	cfg := parseFlags([]string{
+		"-mode", "record-decision",
+		"-decision-manifest", path,
+	})
+	prepared, err := prepareConfig(cfg)
+	if err != nil {
+		t.Fatalf("prepare config: %v", err)
+	}
+	if err := prepared.validate(); err != nil {
+		t.Fatalf("validate: %v", err)
+	}
+	if prepared.workflowID != "wf_manifest" ||
+		prepared.stepID != "wfs_manifest" ||
+		prepared.decision != "APPROVE" ||
+		prepared.deciderRef != "operator:manifest" ||
+		prepared.idempotencyKey != "external-approval:wf_manifest:wfs_manifest" ||
+		prepared.correlationID != "corr_external" ||
+		prepared.causationID != "approval_external" ||
+		prepared.traceID != "trace_external" {
+		t.Fatalf("unexpected prepared config: %+v", prepared)
+	}
+	if got := strings.Join(prepared.evidenceRefs, ","); got != "evidence:ticket-1,evidence:ticket-2" {
+		t.Fatalf("evidence refs = %q", got)
 	}
 }
 

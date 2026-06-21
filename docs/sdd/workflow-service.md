@@ -432,6 +432,7 @@ workflow-outbox-repair
 ```powershell
 go run ./loadtest/workflow -mode get -workflow-id wf_123
 go run ./loadtest/workflow -mode record-decision -workflow-id wf_123 -step-id wfs_1 -decision APPROVE -decider-ref operator:a
+go run ./loadtest/workflow -mode record-decision -decision-manifest H:\NexusIM\operator-plans\workflow-decision.json
 go run ./loadtest/workflow -mode list-compensation-instructions -workflow-id wf_123 -status ACTIVE
 ```
 
@@ -440,7 +441,10 @@ go run ./loadtest/workflow -mode list-compensation-instructions -workflow-id wf_
 payload、instruction payload、reason 原文或 downstream response body。`record-decision`
 模式会在本机拒绝看起来像 secret / token / password / raw body / DSN 的
 `decider-ref`、`decision-policy-ref`、`reason-ref` 或 `evidence-refs`，避免
-operator 把敏感原文送入 gRPC 请求。
+operator 把敏感原文送入 gRPC 请求。`-decision-manifest` 是第一版 external
+approval binding：manifest 只允许 `nexusim.workflow.decision_manifest.v1` 中的
+workflow id、step id、decision、低敏 reason/evidence refs、idempotency key 和
+correlation refs，不保存审批 comment 或 payload 原文。
 
 ## 18. 验收标准
 

@@ -2,6 +2,7 @@ import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
 import { buildReadinessReport } from "./report-client-artifact-readiness.mjs";
 import { collectPlan, parseArgs as parseCollectArgs } from "./collect-client-artifacts.mjs";
+import { buildClientArtifactInstallPlan } from "./plan-client-artifact-install.mjs";
 
 const smokeSchemaVersion = "nexusim.client-shell-smoke-plan.v1";
 
@@ -12,13 +13,14 @@ function main() {
 export function buildClientShellSmokePlan() {
   const readiness = buildReadinessReport();
   const artifactPlan = collectPlan(parseCollectArgs(["--target", "all", "--dry-run", "--run-id", "shell-smoke-plan"]));
+  const installPlan = buildClientArtifactInstallPlan();
   return {
     schemaVersion: smokeSchemaVersion,
     generatedAt: new Date().toISOString(),
     targets: {
       browser: browserTarget(),
-      "windows-desktop": nativeTarget("windows-desktop", readiness.targets["windows-desktop"], artifactPlan),
-      android: nativeTarget("android", readiness.targets.android, artifactPlan)
+      "windows-desktop": nativeTarget("windows-desktop", readiness.targets["windows-desktop"], artifactPlan, installPlan),
+      android: nativeTarget("android", readiness.targets.android, artifactPlan, installPlan)
     },
     sharedSmoke: {
       backendCommand: "loadtest/clientweb/run-local-smoke.ps1 -BindHost 127.0.0.1 -ClientHost 127.0.0.1",
@@ -56,12 +58,13 @@ function browserTarget() {
   };
 }
 
-function nativeTarget(target, readinessTarget, artifactPlan) {
+function nativeTarget(target, readinessTarget, artifactPlan, installPlan) {
   const artifactStatus = artifactStatusFor(target, artifactPlan);
+  const installStatus = installStatusFor(target, installPlan);
   const readyForManualShellSmoke = Boolean(
     readinessTarget?.ready &&
     readinessTarget?.shellAssets?.verified &&
-    artifactStatus.present
+    installStatus.readyForInstall
   );
   return {
     readyForManualShellSmoke,
@@ -69,9 +72,10 @@ function nativeTarget(target, readinessTarget, artifactPlan) {
     nativeToolchainReady: readinessTarget.ready,
     missingToolchain: readinessTarget.missing,
     artifact: artifactStatus,
+    install: installStatus,
     commands: nativeCommands(target, readinessTarget),
-    checklist: nativeChecklist(target, readinessTarget, artifactStatus),
-    notes: nativeNotes(target, readinessTarget, artifactStatus)
+    checklist: nativeChecklist(target, readinessTarget, artifactStatus, installStatus),
+    notes: nativeNotes(target, readinessTarget, artifactStatus, installStatus)
   };
 }
 
@@ -89,6 +93,25 @@ function artifactStatusFor(target, artifactPlan) {
     present: sources.length > 0,
     sources,
     missing
+  };
+}
+
+function installStatusFor(target, installPlan) {
+  const targetPlan = installPlan.targets?.[target];
+  if (!targetPlan) {
+    return {
+      artifactReady: false,
+      readyForInstall: false,
+      missing: ["install-plan-target"],
+      installPrereqs: {}
+    };
+  }
+  return {
+    artifactReady: Boolean(targetPlan.artifactReady),
+    readyForInstall: Boolean(targetPlan.readyForInstall),
+    missing: Array.isArray(targetPlan.missing) ? targetPlan.missing : [],
+    installPrereqs: targetPlan.installPrereqs ?? {},
+    artifactHint: targetPlan.artifact?.artifactHint ?? ""
   };
 }
 
@@ -114,7 +137,7 @@ function nativeCommands(target, readinessTarget) {
   };
 }
 
-function nativeChecklist(target, readinessTarget, artifactStatus) {
+function nativeChecklist(target, readinessTarget, artifactStatus, installStatus) {
   const label = target === "windows-desktop" ? "desktop" : "android";
   const checklist = [
     {
@@ -157,11 +180,20 @@ function nativeChecklist(target, readinessTarget, artifactStatus) {
     evidence: "install plan reports low-sensitive commands for the collected artifact"
   });
 
-  if (!artifactStatus.present) {
+  if (!artifactStatus.present && !installStatus.artifactReady) {
     checklist.push({
       step: "collect-native-artifact",
       evidence: "artifact collector finds at least one native package for this target"
     });
+  }
+
+  if (!installStatus.readyForInstall) {
+    checklist.push({
+      step: "resolve-install-prereqs",
+      command: nativeCommands(target, readinessTarget).installPlan,
+      evidence: "install plan reports no missing artifact or install-side prerequisites"
+    });
+    return checklist;
   }
 
   checklist.push({
@@ -171,7 +203,7 @@ function nativeChecklist(target, readinessTarget, artifactStatus) {
   return checklist;
 }
 
-function nativeNotes(target, readinessTarget, artifactStatus) {
+function nativeNotes(target, readinessTarget, artifactStatus, installStatus) {
   const notes = [];
   if (!readinessTarget.shellAssets?.verified) {
     notes.push("Prepare and verify shell assets before native smoke.");
@@ -179,8 +211,11 @@ function nativeNotes(target, readinessTarget, artifactStatus) {
   if (!readinessTarget.ready) {
     notes.push("Native toolchain is not ready; run the dry-run command or install/build the reported toolchain first.");
   }
-  if (!artifactStatus.present) {
+  if (!artifactStatus.present && !installStatus.artifactReady) {
     notes.push("No native artifact is present yet; build and collect one before manual shell smoke.");
+  }
+  if (installStatus.artifactReady && !installStatus.readyForInstall) {
+    notes.push("A collected artifact exists, but the install plan still reports missing install-side prerequisites.");
   }
   if (target === "android" && readinessTarget.dockerBuilder && !readinessTarget.ready) {
     notes.push("Android can use the opt-in Docker builder path; the first image build may download toolchains.");

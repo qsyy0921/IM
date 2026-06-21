@@ -195,8 +195,9 @@ First slice:
   `nextActions`; it never starts a download or build by itself.
 - `npm --prefix clients run plan:shell-smoke` prints a low-sensitive browser /
   desktop / Android shell smoke plan. It combines toolchain readiness, prepared
-  asset verification, artifact presence, safe build commands and the shared BFF
-  / push smoke command; it does not launch services or install toolchains.
+  asset verification, artifact presence, collected-artifact install readiness,
+  safe build commands and the shared BFF / push smoke command; it does not
+  launch services, connect devices, install artifacts or install toolchains.
 - `npm --prefix clients run validate:builder-profile` validates the Android
   Docker builder profile without building or pulling images. The profile lives
   in `deploy/local/docker-compose.client-builders.yml` and uses

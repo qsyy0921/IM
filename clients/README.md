@@ -134,6 +134,9 @@ Windows / Android install checklist. It also reports local install prerequisites
 such as Android `adb` availability and Windows installer launch support, but it
 does not install packages, connect to devices, launch installers or print local
 absolute paths.
+`plan:shell-smoke` consumes the same install plan, so native shell smoke
+readiness is not marked ready until a collected artifact exists and its
+install-side prerequisites are available.
 
 Android can also be built through the local Docker builder profile when the image
 is intentionally built:

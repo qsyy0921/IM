@@ -152,9 +152,10 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   CLI，Android 本地路径仍缺 JDK 17+ / Gradle / Android SDK。
 - `clients/tools/plan-client-shell-smoke.mjs` 已提供低敏 browser / desktop /
   Android shell smoke plan；它汇总 toolchain readiness、prepared asset
-  verification、artifact presence、安全构建命令、artifact install plan 命令、
-  per-target manual smoke checklist 和 shared BFF / push smoke 命令，不启动服务、
-  不下载工具链、不连接设备、不声称已有 installer / APK。
+  verification、artifact presence、collected-artifact install readiness、安全构建命令、
+  artifact install plan 命令、per-target manual smoke checklist 和 shared BFF / push
+  smoke 命令，不启动服务、不下载工具链、不连接设备、不安装 artifact、不声称已有
+  installer / APK。
 - `loadtest/clientweb` 已新增 first-stage scriptable client smoke runner：
   准备阶段用 identity / api-gateway gRPC 注册用户、seed 会话并创建 JOIN；真实客户端
   验证段只走 `api-gateway` HTTP BFF 和 `push-gateway` WebSocket，覆盖 BFF login、

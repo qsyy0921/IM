@@ -251,6 +251,9 @@ Responsibilities:
   `adb devices`, `adb install -r` and package verification commands for the
   collected APK, but it must not contact the device or install anything by
   itself.
+- Android device readiness reporting may run `adb devices -l`, but it must
+  hash raw device serials, omit model names and avoid installing packages or
+  starting activities.
 - Platform shell smoke planning must use the same low-sensitive contract as PC.
 - Android metadata smoke may use `adb reverse` to expose a loopback callback to
   the device, install the collected APK, launch

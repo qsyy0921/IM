@@ -171,6 +171,11 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   阻塞，尚未形成真实设备 baseline。由于 callback URL 在打包前注入 shell assets，
   该 metadata smoke 必须 fresh-build 当前 run 的 APK；普通旧 APK 不能作为
   callback path 证据。
+- `clients/tools/report-android-device-readiness.mjs` 已提供低敏 Android 设备前置检查；
+  `npm --prefix clients run report:android-device-readiness` 只运行 `adb devices -l`，
+  输出 adb 是否可用、authorized / unauthorized / offline 计数和短 serial hash，
+  不输出 raw serial / model，不安装 APK、不启动 Activity、不访问网络。`plan:shell-smoke`
+  已把该 report 纳入 Android checklist。
 - PC Web shell 已新增登录级自动化前置：Web UI 暴露稳定 `data-testid`
   automation contract 和 `ack-status` 诊断，`npm --prefix clients run
   smoke:desktop-webview-login` 可通过 WebView2/CDP 外部驱动 Tauri WebView 登录、

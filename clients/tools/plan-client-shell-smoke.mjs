@@ -145,6 +145,7 @@ function nativeCommands(target, readinessTarget) {
     buildArtifact: readinessTarget.buildCommand,
     dryRunBuild: readinessTarget.dryRunCommand,
     installPlan: "npm --prefix clients run plan:artifact-install",
+    deviceReadiness: "npm --prefix clients run report:android-device-readiness",
     webviewMetadataSmoke: "npm --prefix clients run smoke:android-webview-metadata",
     dockerBuilder: readinessTarget.dockerBuilder?.imagePresent
       ? readinessTarget.dockerBuilder.buildCommand
@@ -172,6 +173,14 @@ function nativeChecklist(target, readinessTarget, artifactStatus, installStatus)
       evidence: `${label} shell asset manifest verifies before native build`
     }
   ];
+
+  if (target === "android") {
+    checklist.push({
+      step: "check-android-device-readiness",
+      command: nativeCommands(target, readinessTarget).deviceReadiness,
+      evidence: "adb is available and at least one authorized Android device is visible without exposing raw serial or model"
+    });
+  }
 
   if (!readinessTarget.ready) {
     if (target === "windows-desktop" && missingDesktopTauriCLI(readinessTarget)) {

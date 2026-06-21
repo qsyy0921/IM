@@ -210,6 +210,11 @@ First slice:
   and Windows local artifact launch support, while still not launching
   artifacts, contacting devices, installing packages or printing local
   absolute paths.
+- `npm --prefix clients run report:android-device-readiness` prints a
+  low-sensitive ADB/device readiness report for Android shell smoke. It runs
+  `adb devices -l`, hashes raw serials, omits model names, and reports whether
+  an authorized device is visible. It does not install APKs, start activities,
+  or contact network services.
 - `npm --prefix clients run report:artifact-readiness` prints a low-sensitive
   readiness matrix for local desktop, local Android and Android Docker builder
   paths. It reports missing capabilities and the exact next build command
@@ -357,6 +362,7 @@ npm --prefix clients run test:artifact-install-plan
 npm --prefix clients run test:artifact-readiness
 npm --prefix clients run test:android-docker-builder
 npm --prefix clients run test:android-webview-metadata-smoke
+npm --prefix clients run test:android-device-readiness
 npm --prefix clients run test:desktop-artifact-launch-smoke
 npm --prefix clients run test:shell-smoke-plan
 npm --prefix clients run report:artifact-readiness
@@ -373,6 +379,7 @@ current prepared shell assets verify against `nexusim-shell-assets-manifest.json
 
 ```powershell
 npm --prefix clients run report:artifact-readiness
+npm --prefix clients run report:android-device-readiness
 npm --prefix clients run plan:shell-smoke
 npm --prefix clients run plan:artifact-install
 npm --prefix clients run smoke:desktop-artifact-launch

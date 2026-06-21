@@ -373,8 +373,9 @@ PC desktop, and Android clients.
 
 ## Later Slices
 
-- `api-gateway` BFF implementation for the first client API.
-- Real IndexedDB adapter and persistence tests.
+- LAN smoke for the Web MVP path against `api-gateway` BFF and `push-gateway`.
+- HTTP-layer client BFF metrics / rate-limit middleware.
+- IndexedDB persistence tests beyond the first browser adapter.
 - PC desktop shell with Tauri and Windows `.msi` / `.exe` packaging.
 - Android runtime implementation and unsigned local `.apk` packaging.
 - Full group creation / group profile / invite / member-management UI.

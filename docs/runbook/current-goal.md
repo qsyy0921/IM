@@ -31,6 +31,11 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   `/api/delivery/ack`、`/api/contacts`、`/api/receipts`。BFF 复用既有
   gateway facade 和鉴权 / trusted metadata 注入，不读内部服务私表；`/api/auth/logout`
   先保留为显式 `UNIMPLEMENTED`，等待 identity self-session revoke 契约。
+- `clients/web` 已新增 first-stage browser adapters：`BFFClient` 使用
+  `api-gateway` HTTP/JSON BFF，`BrowserPushTransport` 使用 `push-gateway`
+  WebSocket，`IndexedDBMessageStore` 作为 local cache / cursor store；Web shell
+  已能走 login -> push connect -> conversation / manual open -> PullInbox -> send
+  -> AckDelivery 的真实 adapter flow。
 - 真实业务语言选择：后端和 client BFF 继续使用 Go；浏览器、PC desktop 和
   Android 的共享协议 / 同步核心 / UI 使用 TypeScript；Tauri 的 Rust、Android
   Kotlin 只作为薄平台桥；Python 只用于 AI worker / eval / 离线工具，不进入
@@ -77,7 +82,8 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
 
 ## 下一步优先级
 
-1. 接 Web fetch / WebSocket adapter、local store adapter 和局域网 smoke。
+1. 跑 Web client -> api-gateway BFF -> push-gateway 的局域网 smoke，验证
+   login / PullInbox / SendMessage / AckDelivery / WebSocket notify。
 2. 给 client BFF 补 HTTP 层 metrics / rate-limit adapter；当前 BFF 已复用
    gateway facade 鉴权，但 HTTP 请求没有进入 gRPC interceptor。
 3. 后续按同一 core 接 PC desktop Tauri runner 和 Android runtime shell。

@@ -19,6 +19,10 @@ input {
   font: inherit;
 }
 
+button {
+  cursor: pointer;
+}
+
 .shell {
   display: grid;
   grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
@@ -75,6 +79,8 @@ input {
 }
 
 .panel {
+  display: grid;
+  gap: 10px;
   border: 1px solid #d9e1e4;
   border-radius: 8px;
   padding: 14px;
@@ -103,8 +109,42 @@ input {
   font-size: 13px;
 }
 
+.panel label {
+  display: grid;
+  gap: 4px;
+  color: #5d6b73;
+  font-size: 13px;
+}
+
+.panel input,
+.manual-open input {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #cbd5d9;
+  border-radius: 8px;
+  padding: 9px 10px;
+  color: #172126;
+}
+
+.panel button,
+.manual-open button,
+.conversation-list > button {
+  border: 0;
+  border-radius: 8px;
+  background: #0f766e;
+  color: #ffffff;
+  padding: 10px 12px;
+  font-weight: 700;
+}
+
 .conversation-list {
   display: grid;
+  gap: 8px;
+}
+
+.manual-open {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 8px;
 }
 
@@ -123,6 +163,13 @@ input {
 .conversation-item.active {
   border-color: #0f766e;
   background: #ecfdf5;
+}
+
+.status-stack {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .chat {
@@ -156,11 +203,34 @@ input {
   font-weight: 700;
 }
 
+.status-pill.neutral {
+  border-color: #cbd5d9;
+  background: #f8fafc;
+  color: #304048;
+}
+
+.error-banner {
+  border-bottom: 1px solid #fecaca;
+  background: #fff1f2;
+  color: #9f1239;
+  padding: 10px 24px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
 .messages {
   display: flex;
   flex-direction: column;
   gap: 12px;
   min-width: 0;
+  padding: 24px;
+}
+
+.empty-state {
+  border: 1px dashed #cbd5d9;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #5d6b73;
   padding: 24px;
 }
 

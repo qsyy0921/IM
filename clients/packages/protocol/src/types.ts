@@ -63,6 +63,14 @@ export interface ConversationSummary {
   updatedAtMs: number;
 }
 
+export interface ContactItem {
+  contactUserID: UserID;
+  status: string;
+  remark: string;
+  groupName: string;
+  updatedAtMs: number;
+}
+
 export type MessageStatus = "PENDING" | "SENT" | "DELIVERED" | "FAILED";
 
 export interface MessageItem {

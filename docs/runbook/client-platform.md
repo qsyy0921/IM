@@ -48,13 +48,19 @@ First slice:
   - `web`
   - `desktop`
   - `android`
-- The Web app is a shell and dependency declaration. It is not yet connected to
-  the real backend until the client BFF endpoints are implemented.
 - `api-gateway` now exposes the first client BFF HTTP/JSON surface for login,
   refresh, `me`, conversation list, PullInbox-backed conversation messages,
   send, ACK, contacts and receipt lookup. The BFF reuses the existing gateway
   facade and injects trusted downstream metadata; it does not read internal
   service tables.
+- `clients/web` now has the first real browser adapters:
+  - `BFFClient` maps HTTP/JSON BFF payloads into shared protocol types.
+  - `BrowserPushTransport` connects to `push-gateway` WebSocket and handles
+    server frames as wakeups.
+  - `IndexedDBMessageStore` implements the local cache / cursor store behind
+    the `LocalMessageStore` port.
+- The Web shell is wired to login, connect push, list / manually open
+  conversations, PullInbox, send text and AckDelivery through those adapters.
 - The PC desktop and Android packages currently define runtime / packaging
   contracts only. They do not yet produce `.msi`, `.exe`, `.apk`, or `.aab`
   artifacts.
@@ -78,10 +84,8 @@ rejected. For local LAN client smoke, prefer the wired `172.x.x.x` address.
 
 ## Next Work
 
-1. Implement browser fetch / WebSocket adapters in `clients/web`.
-2. Add IndexedDB local store adapter.
-3. Add HTTP-layer BFF metrics / rate-limit adapter; current BFF calls the
+1. Run LAN smoke against Windows / Mac backend IP for the Web MVP path.
+2. Add HTTP-layer BFF metrics / rate-limit adapter; current BFF calls the
    gateway facade directly and does not pass through gRPC interceptors.
-4. Add PC desktop Tauri runner and first local Windows installer.
-5. Add Android runtime shell and first unsigned local APK.
-6. Run LAN smoke against Windows / Mac backend IP.
+3. Add PC desktop Tauri runner and first local Windows installer.
+4. Add Android runtime shell and first unsigned local APK.

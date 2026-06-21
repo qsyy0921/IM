@@ -13,10 +13,10 @@
 ## 当前未完成重点
 
 0. Client platform first slice：`api-gateway` client BFF first-stage HTTP/JSON
-   surface 已落，下一步接 `clients/web` 的真实 fetch / WebSocket adapter，落
-   IndexedDB local store，并跑 LAN smoke；随后补 BFF HTTP-layer metrics /
-   rate-limit adapter、接 PC desktop Tauri runner 和 Android runtime shell，产出
-   本地 Windows installer / unsigned APK；客户端只连 `api-gateway` /
+   surface 已落，`clients/web` 的真实 BFF fetch adapter、push WebSocket adapter
+   和 IndexedDB local store 已接入；下一步跑 Web MVP LAN smoke，随后补 BFF
+   HTTP-layer metrics / rate-limit adapter、接 PC desktop Tauri runner 和 Android
+   runtime shell，产出本地 Windows installer / unsigned APK；客户端只连 `api-gateway` /
    `push-gateway`，不能直连内部服务。`/api/auth/logout` 仍等待 identity
    user self-session revoke 契约。
 1. AI eval 回归扩展：继续增加低敏 case，区分 retrieval、reasoning、action

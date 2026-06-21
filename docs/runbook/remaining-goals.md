@@ -26,14 +26,15 @@
 ## Client Platform MVP 未完成
 
 - `clients/desktop`：first-stage TypeScript runtime adapter 和 Tauri runner
-  skeleton 已落；继续接 shared `BFFClient`，复用 `protocol` / `client-core`，跑通
+  skeleton 已落；继续接 shared `BFFClient` / `WebSocketPushTransport`，复用
+  `protocol` / `client-core`，跑通
   login、conversation list、PullInbox、send、ACK、push notify。
 - Windows packaging：产出本地可安装或可运行的 Windows artifact；不要求生产签名。
   当前本机尚缺 Tauri CLI / `cargo-tauri`，需要先补本地构建前置或通过
   Docker / CI builder 产物链路。
 - `clients/android`：first-stage TypeScript runtime adapter 和 Kotlin native
-  bridge skeleton 已落；继续接 shared `BFFClient` 并产出 unsigned APK，Kotlin
-  只做薄 bridge，业务协议和 sync core 复用 TypeScript。
+  bridge skeleton 已落；继续接 shared `BFFClient` / `WebSocketPushTransport`
+  并产出 unsigned APK，Kotlin 只做薄 bridge，业务协议和 sync core 复用 TypeScript。
 - Android packaging：产出本地 unsigned APK，并支持局域网 `api-gateway` /
   `push-gateway` 地址配置。当前本机尚缺 Gradle / Android SDK，且 `java`
   指向 JDK 8；需要 JDK 17+ 和 Android build toolchain，或通过

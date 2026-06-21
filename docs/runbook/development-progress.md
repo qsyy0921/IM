@@ -32,8 +32,9 @@
   PullInbox 是消息事实源，WebSocket 只做在线唤醒。`api-gateway` client BFF
   first-stage HTTP/JSON surface 已落，覆盖 login / refresh / me / conversation
   list / PullInbox-backed messages / send / ACK / contacts / receipts；
-  BFF HTTP adapter 已下沉到 `@nexusim/client-core`，Web 只保留兼容 re-export，
-  PC / Android 后续可复用同一 HTTP/JSON BFF mapping；`clients/web` 已接
+  BFF HTTP adapter 和 WebSocket push transport 已下沉到
+  `@nexusim/client-core`，Web 只保留兼容 re-export，PC / Android 后续可复用
+  同一 HTTP/JSON BFF mapping 和在线唤醒 transport；`clients/web` 已接
   first-stage BFF fetch / push WebSocket / IndexedDB local
   store adapters，并把 Web shell 接到 login / PullInbox / SendMessage /
   AckDelivery flow；`IndexedDBMessageStore` 已新增无外部依赖 first-stage

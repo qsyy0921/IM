@@ -8,3 +8,4 @@ export * from "./send-queue";
 export * from "./ack-queue";
 export * from "./development-adapters";
 export * from "./http-bff-client";
+export * from "./websocket-push-transport";

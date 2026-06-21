@@ -59,7 +59,9 @@ First slice:
   - `BFFClient` maps HTTP/JSON BFF payloads into shared protocol types. It now
     lives in `@nexusim/client-core`; Web keeps only a compatibility re-export.
   - `BrowserPushTransport` connects to `push-gateway` WebSocket and handles
-    server frames as wakeups.
+    server frames as wakeups. The shared implementation now lives in
+    `@nexusim/client-core` as `WebSocketPushTransport`; Web keeps only a
+    compatibility re-export.
   - `IndexedDBMessageStore` implements the local cache / cursor store behind
     the `LocalMessageStore` port.
 - `IndexedDBMessageStore` now has a dependency-free first-stage persistence
@@ -86,6 +88,8 @@ First slice:
   message facts, BFF calls, or push delivery semantics.
 - PC desktop and Android can reuse the same `@nexusim/client-core` BFF adapter
   instead of copying Web-private HTTP mapping code.
+- PC desktop and Android can also reuse the same `@nexusim/client-core`
+  WebSocket push transport for online wakeups.
 - `loadtest/clientweb` provides the first scriptable client-path smoke. Setup
   uses public gRPC APIs to register users, seed the conversation owner and create
   the receiver JOIN; the verified client path then uses only HTTP BFF and

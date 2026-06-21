@@ -303,12 +303,11 @@ Android constraints:
 - Android WebView inspection must be tied to the platform debuggable flag.
   Debug builds may enable WebView inspection for metadata / login smoke
   automation; release builds must not enable it unconditionally.
-- First-stage `NexusIMNative` JavaScript bridge is a single-method
-  metadata-only bridge. It may expose runtime target, bridge version, label and
-  low-sensitive local-store readiness through `runtimeMetadata()` for diagnostics,
-  but it must not expose tokens, storage APIs, file-system access, message facts
-  or write commands until a separate native capability ADR defines audit and
-  permission checks.
+- First-stage `NexusIMNative` JavaScript bridge is a narrow allowlist bridge.
+  It may expose `runtimeMetadata()` plus fixed-prefix local-store key-value
+  methods for the shared client message cache. It must not expose tokens,
+  arbitrary storage keys, file-system access, content-provider access, message
+  facts, BFF calls, push delivery semantics or general native command dispatch.
 - Offline sends must use idempotency keys and local pending queues.
 
 ## Platform Adapter Ports

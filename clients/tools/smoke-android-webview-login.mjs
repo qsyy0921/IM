@@ -383,20 +383,7 @@ async function driveLogin(cdp, fixture, options) {
 
 async function waitForNativeStoreReadiness(cdp, timeoutMs) {
   return waitForEval(cdp, value => {
-    const text = String(value?.text ?? "");
-    const ok = text.includes("local-storage -> sqlite") &&
-      text.includes("sqlite-native-bridge-unavailable") &&
-      text.includes("android-sqlite");
-    return ok
-      ? {
-          ok: true,
-          currentDefault: "local-storage",
-          productionTarget: "sqlite",
-          nativeStoreReady: false,
-          nativeStoreReason: "sqlite-native-bridge-unavailable",
-          nativeStoreBridge: "android-sqlite"
-        }
-      : { ok: false };
+    return parseAndroidNativeStoreReadinessText(String(value?.text ?? ""));
   }, {
     label: "native store readiness in Android WebView",
     timeoutMs,
@@ -405,6 +392,23 @@ async function waitForNativeStoreReadiness(cdp, timeoutMs) {
       return { ok: false, text };
     })()`
   });
+}
+
+export function parseAndroidNativeStoreReadinessText(text) {
+  const value = String(text ?? "");
+  const ok = value.includes("local-storage -> sqlite") &&
+    value.includes("; ready;") &&
+    value.includes("android-sqlite");
+  return ok
+    ? {
+        ok: true,
+        currentDefault: "local-storage",
+        productionTarget: "sqlite",
+        nativeStoreReady: true,
+        nativeStoreReason: "",
+        nativeStoreBridge: "android-sqlite"
+      }
+    : { ok: false };
 }
 
 async function triggerExternalSenderMessage(fixture, runID) {

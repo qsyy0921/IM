@@ -91,7 +91,9 @@ First slice:
   Dry-run tests cover the runner contract, including the `native-store-readiness`
   UI selector, without building an APK or touching a device; real execution
   still waits on a collected debuggable APK, ADB, WebView devtools and a
-  clientweb fixture.
+  clientweb fixture. The real runner now expects the WebView to display the
+  current Android native local-store bridge as `android-sqlite` ready evidence;
+  stale `sqlite-native-bridge-unavailable` evidence remains a failure.
 - `loadtest/clientweb/run-local-smoke.ps1` can now opt into Android login-level
   WebView smoke with `-RunAndroidWebViewLoginSmoke`; the default path still runs
   only the shared Web/BFF/push smoke and does not build/install an Android app.

@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { parseAndroidNativeStoreReadinessText } from "./smoke-android-webview-login.mjs";
 
 const toolsDir = dirname(fileURLToPath(import.meta.url));
 const smokeScript = join(toolsDir, "smoke-android-webview-login.mjs");
@@ -59,6 +60,16 @@ try {
   assert(!serialized.match(/[A-Z]:\\\\/), "dry-run leaked Windows absolute path");
   assert(!serialized.includes("\\\\?"), "dry-run leaked extended Windows path");
   assert(!serialized.match(/token|secret|password|credential|private/i), "dry-run leaked sensitive field name");
+
+  const readyNativeStore = parseAndroidNativeStoreReadinessText("local-storage -> sqlite; ready; android-sqlite");
+  assert(readyNativeStore.ok === true, "Android login smoke must accept ready native SQLite store evidence");
+  assert(readyNativeStore.nativeStoreReady === true, "Android native store must be reported ready");
+  assert(readyNativeStore.nativeStoreReason === "", "Android ready native store must not carry a failure reason");
+
+  const unavailableNativeStore = parseAndroidNativeStoreReadinessText(
+    "local-storage -> sqlite; sqlite-native-bridge-unavailable; android-sqlite"
+  );
+  assert(unavailableNativeStore.ok === false, "Android login smoke must not accept stale unavailable native store evidence");
 } finally {
   rmSync(tempRoot, { recursive: true, force: true });
 }

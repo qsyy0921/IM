@@ -197,8 +197,9 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   dry-run 覆盖 debuggable APK、ADB、WebView devtools、clientweb fixture 和公共 UI
   selector 契约，不构建 APK、不连接设备，也不声称 login / PullInbox / AckDelivery
   已在 Android WebView 内通过。该 selector 契约现在包含 `native-store-readiness`，
-  真实 runner 后续会记录 Android local-store readiness 低敏证据。WebView devtools socket parser 已新增 focused
-  fixture test，后续真机 runner 发现 socket 失败时可先用同一解析规则排查，而不需要
+  真实 runner 现在要求 WebView 中展示当前 Android `android-sqlite` ready 证据；
+  旧的 `sqlite-native-bridge-unavailable` 文本不会被当作通过。WebView devtools
+  socket parser 已新增 focused fixture test，后续真机 runner 发现 socket 失败时可先用同一解析规则排查，而不需要
   启动完整 APK smoke。`npm --prefix clients run report:android-webview-devtools-readiness`
   现在提供低敏 WebView devtools readiness report，会读取 ADB 的 `/proc/net/unix`
   输出并只报告 socket 数量 / 短 hash / nextActions，不输出 raw socket 名。`loadtest/clientweb/run-local-smoke.ps1` 也已新增显式

@@ -122,3 +122,46 @@
   vector_embedding_tasks` smoke，不启动 embedding worker，也不验证 vector search。
 - runner 只验证 public API handoff 和 queue 状态；不读 knowledge 私表，不写 raw text、
   source URI、object key 或 embedding vector array。
+
+## Optional pgvector Profile
+
+用途：
+
+- 为后续 `embedding-worker -> pgvector backend sink` focused smoke 提供本地
+  pgvector PostgreSQL。
+- 不替换默认 `nexusim-postgres`，不影响普通 metadata / outbox / queue smoke。
+
+启动：
+
+```powershell
+docker compose `
+  -f deploy\local\docker-compose.yml `
+  -f deploy\local\docker-compose.pgvector.yml `
+  --profile pgvector `
+  up -d pgvector
+```
+
+连接串：
+
+```text
+postgres://nexusim:nexusim@localhost:15432/nexusim?sslmode=disable
+```
+
+embedding worker 相关环境变量：
+
+```text
+NEXUSIM_VECTOR_PROVIDER_BACKEND=pgvector
+NEXUSIM_VECTOR_PGVECTOR_DSN=postgres://nexusim:nexusim@localhost:15432/nexusim?sslmode=disable
+NEXUSIM_VECTOR_PGVECTOR_TABLE=vector_embedding_items
+NEXUSIM_VECTOR_PGVECTOR_DIMENSION=8
+NEXUSIM_VECTOR_PGVECTOR_ENSURE_SCHEMA=true
+```
+
+边界：
+
+- `deploy/local/docker-compose.pgvector.yml` 是可选 overlay，默认不启动，也不在普通
+  `check-local` 中拉取镜像。
+- 该 profile 会在 dedicated pgvector backend table 中保存 embedding vector array；
+  公开 API、metadata PostgreSQL、outbox、metrics 和 smoke summary 仍不得输出 raw
+  vector array。
+- 当前 README 只记录 profile 和 wiring；真实 pgvector focused smoke 报告后续单独归档。

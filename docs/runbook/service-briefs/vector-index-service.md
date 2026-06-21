@@ -68,8 +68,8 @@ vector 写入、rebuild 和 backfill 逻辑复杂到影响 retrieval / memory �
   `services/vector-index-service/internal/infrastructure/pgvector`：提供 schema 初始化、
   upsert、delete、search 和 focused unit tests。`embedding-worker` 已支持通过
   `NEXUSIM_VECTOR_PROVIDER_BACKEND=pgvector` 显式启用 pgvector backend sink；默认不启用，
-  不进入普通 PostgreSQL migration；真实 pgvector compose profile / smoke 后置。
+  不进入普通 PostgreSQL migration。已新增可选 `deploy/local/docker-compose.pgvector.yml`
+  overlay；真实 pgvector focused smoke 后置。
 
-后续待办：memory / search chunk consumer、optional pgvector compose profile / focused
-pgvector smoke、真实 Milvus / OpenSearch backend、provider backend rebuild / backfill
-worker、provider backend repair。
+后续待办：memory / search chunk consumer、focused pgvector smoke、真实 Milvus /
+OpenSearch backend、provider backend rebuild / backfill worker、provider backend repair。

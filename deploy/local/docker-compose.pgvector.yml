@@ -1,0 +1,24 @@
+name: nexusim-local
+
+services:
+  pgvector:
+    image: pgvector/pgvector:pg16
+    container_name: nexusim-pgvector
+    profiles:
+      - pgvector
+    environment:
+      POSTGRES_USER: nexusim
+      POSTGRES_PASSWORD: nexusim
+      POSTGRES_DB: nexusim
+    ports:
+      - "15432:5432"
+    volumes:
+      - pgvector_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nexusim -d nexusim"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  pgvector_data:

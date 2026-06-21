@@ -89,9 +89,9 @@ Foundation backlog 锚点：`search-service`、`memory-service`、`retrieval-gat
   ACTIVE / DELETED 状态并让 Search fail-closed；内部 RPC client 已保留
   `InvokeEmbedding.embedding_values`，新增 optional pgvector adapter 包，并让
   `embedding-worker` 可通过 `NEXUSIM_VECTOR_PROVIDER_BACKEND=pgvector` 显式启用
-  pgvector backend sink。后续仍需 memory / search chunk consumer、optional pgvector
-  compose profile / focused pgvector smoke、真实 Milvus / OpenSearch backend，以及
-  provider backend rebuild / backfill worker。
+  pgvector backend sink；已新增可选 `docker-compose.pgvector.yml` overlay。后续仍需
+  memory / search chunk consumer、focused pgvector smoke、真实 Milvus / OpenSearch
+  backend，以及 provider backend rebuild / backfill worker。
 - `admin-service`：`REPAIR_REQUEST -> workflow-service REPAIR_APPROVAL`、
   `CRITICAL -> workflow-service ADMIN_OPERATION` 和第一版 operation-specific
   approval policy / target-service routing 已接；`CONFIG_PUBLISH` /

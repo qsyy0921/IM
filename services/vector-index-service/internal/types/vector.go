@@ -229,6 +229,7 @@ type VectorEmbeddingResult struct {
 	InvocationID        string
 	ProviderID          string
 	ModelID             string
+	EmbeddingValues     []float32
 	EmbeddingVectorHash string
 	Dimension           int
 	Replayed            bool

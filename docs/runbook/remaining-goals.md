@@ -86,9 +86,10 @@ Foundation backlog 锚点：`search-service`、`memory-service`、`retrieval-gat
   `knowledge.chunk.ready.v1` refs -> public `ListKnowledgeChunks` resolve -> embedding queue。
   `knowledge_outbox -> im.knowledge.events -> chunk-consumer -> embedding queue` 真实
   Kafka smoke 已通过；PostgreSQL backend state adapter 已显式记录 backend item
-  ACTIVE / DELETED 状态并让 Search fail-closed。后续仍需 memory / search chunk
-  consumer、真实 Milvus / pgvector / OpenSearch backend，以及 provider backend rebuild /
-  backfill worker。
+  ACTIVE / DELETED 状态并让 Search fail-closed；内部 RPC client 已保留
+  `InvokeEmbedding.embedding_values`，并新增 optional pgvector adapter 包。后续仍需
+  memory / search chunk consumer、pgvector runtime wiring / optional pgvector smoke、
+  真实 Milvus / OpenSearch backend，以及 provider backend rebuild / backfill worker。
 - `admin-service`：`REPAIR_REQUEST -> workflow-service REPAIR_APPROVAL`、
   `CRITICAL -> workflow-service ADMIN_OPERATION` 和第一版 operation-specific
   approval policy / target-service routing 已接；`CONFIG_PUBLISH` /

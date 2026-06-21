@@ -252,8 +252,19 @@ status, tombstone_status, indexed_at, deleted_at, updated_at
 
 该表不保存 raw text 或 embedding vector array，只记录低敏 backend state。`SearchVectors`
 必须同时满足 PostgreSQL metadata 和 backend state 为 ACTIVE；如果 backend state 缺失或
-已删除，必须 fail closed / 不返回该 ref。真实 pgvector / Milvus / OpenSearch adapter
-后续仍需要接入实际向量存储和 rebuild / repair。
+已删除，必须 fail closed / 不返回该 ref。
+
+First-stage pgvector adapter package:
+
+```text
+services/vector-index-service/internal/infrastructure/pgvector
+```
+
+该 adapter 提供可选 `EnsureSchema` / `Upsert` / `Delete` / `Search` 实现，面向后续
+pgvector profile。它会在 dedicated vector backend table 中保存实际 embedding vector，
+但默认 `cmd` / 普通 PostgreSQL migration 不启用该 adapter，避免没有 `vector` 扩展的
+本地开发库被强制要求安装 pgvector。Milvus / OpenSearch adapter、pgvector runtime
+wiring、真实 provider backend smoke 和 rebuild / repair 仍是后续项。
 
 ## 9. 核心流程
 
@@ -288,6 +299,7 @@ NEXUSIM_VECTOR_INDEX_SERVICE_MODE=embedding-worker
 -> postgres source claims persisted vector_embedding_tasks rows with FOR UPDATE SKIP LOCKED
 -> verify input_hash matches in-memory input_text before model call
 -> call model-gateway InvokeEmbedding
+-> keep embedding_values only inside vector-index internal worker/backend handoff
 -> write vector_items / vector_index_jobs / vector_outbox through existing UpsertVectorItem
 -> only persist source refs, input hash, embedding hash, dimension, model ref and visibility metadata
 ```

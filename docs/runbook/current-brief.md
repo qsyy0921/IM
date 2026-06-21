@@ -56,7 +56,10 @@ protobuf `KnowledgeEvent` 与旧 JSON fallback；`knowledge-ingestion-service` �
 `knowledge_outbox -> im.knowledge.events` first-stage relay 和低敏 schema，并已跑通
 真实 Kafka chunk-consumer 联调 smoke，把 2 个 knowledge chunk refs 写入
 `vector_embedding_tasks`；PostgreSQL backend state adapter 已显式记录 backend item
-ACTIVE / DELETED 状态，`SearchVectors` 必须 join ACTIVE backend state 才返回 refs。
+ACTIVE / DELETED 状态，`SearchVectors` 必须 join ACTIVE backend state 才返回 refs；
+vector-index 内部 RPC client 已保留 `InvokeEmbedding.embedding_values`，并新增 optional
+pgvector adapter 包用于后续 runtime wiring；公开 API / PostgreSQL metadata / outbox /
+metrics 仍不暴露 raw vector array。
 `admin-service` 已完成第一版
 `CreateAdminOperation` / `ApproveAdminOperation` / `GetAdminOperation` /
 `ListAdminOperations` path、`admin_outbox -> im.admin.events` outbox relay 和
@@ -72,8 +75,8 @@ control-plane-service.RollbackConfigVersion`；第三条 control-plane adapter �
 control-plane-service.PublishConfigVersion(API_GATEWAY_TENANT_QUOTA)`。
 admin `Create -> operator approve -> operation-worker -> control-plane` 本地多进程
 publish / rollback / tenant quota smoke 已通过。下一步默认继续更多下游公开 admin API adapter、
-admin compensation operator，或继续真实 pgvector / Milvus / OpenSearch backend /
-provider rebuild / backfill worker。
+admin compensation operator，或继续 pgvector runtime wiring / optional pgvector smoke、
+Milvus / OpenSearch backend / provider rebuild / backfill worker。
 ```
 
 系统测试 / HA / 长压 / sizing 后置；总览、待办、单服务状态分别看

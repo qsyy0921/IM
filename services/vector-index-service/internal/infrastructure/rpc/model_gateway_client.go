@@ -89,10 +89,15 @@ func (client ModelGatewayClient) Embed(
 	if response.GetEmbeddingHash() == "" || response.GetDimensions() <= 0 {
 		return types.VectorEmbeddingResult{}, types.NewUnavailable("model-gateway embedding response is incomplete")
 	}
+	values := append([]float32(nil), response.GetEmbeddingValues()...)
+	if response.GetEmbeddingReturned() && len(values) != int(response.GetDimensions()) {
+		return types.VectorEmbeddingResult{}, types.NewUnavailable("model-gateway embedding response is incomplete")
+	}
 	return types.VectorEmbeddingResult{
 		InvocationID:        response.GetInvocationId(),
 		ProviderID:          response.GetProviderId(),
 		ModelID:             response.GetModelId(),
+		EmbeddingValues:     values,
 		EmbeddingVectorHash: response.GetEmbeddingHash(),
 		Dimension:           int(response.GetDimensions()),
 		Replayed:            response.GetReplayed(),

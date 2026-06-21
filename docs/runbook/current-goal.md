@@ -92,6 +92,12 @@ model-gateway / workflow / knowledge-ingestion / vector-index
   再写入 PostgreSQL embedding queue；当前有 focused tests，并已跑通
   `knowledge_outbox -> im.knowledge.events -> chunk-consumer -> vector_embedding_tasks`
   真实 Kafka smoke。
+- `vector-index-service` 已补内部 embedding handoff：`ModelGatewayClient` 现在保留
+  `model-gateway.InvokeEmbedding` 返回的 `embedding_values`，但公开 API / PostgreSQL
+  metadata / outbox / metrics 仍只保存 hash / refs / dimension。已新增 optional
+  `internal/infrastructure/pgvector` adapter 包，覆盖 schema 初始化、upsert、delete、
+  search 和 focused unit tests；该 adapter 当前不接默认 runtime，也不进入普通 migration，
+  因为默认本地 PostgreSQL 镜像没有 `vector` 扩展。
 - `knowledge-ingestion-service` 已新增低敏 `im.knowledge.events` Kafka schema 和
   `knowledge_outbox -> im.knowledge.events` 第一版 `outbox-relay` runtime。relay 覆盖
   source-created、document-parsed、chunk-ready 现有 outbox 事件和 SDD 预留的
@@ -129,9 +135,9 @@ model-gateway / workflow / knowledge-ingestion / vector-index
 
 - 默认继续补更多下游公开 admin API adapter，或为 admin config / quota 增加
   compensation operator。
-- 默认下一步可继续 vector-index provider backend：真实 Milvus / pgvector /
-  OpenSearch backend、provider backend rebuild / backfill worker，或继续更多下游
-  admin API adapter。
+- 默认下一步可继续 vector-index provider backend：pgvector runtime wiring / optional
+  pgvector compose profile / focused pgvector smoke、真实 Milvus / OpenSearch backend、
+  provider backend rebuild / backfill worker，或继续更多下游 admin API adapter。
 - 也可以继续 notification SMTP / SMS / APNs / FCM adapter 或 bounce-suppression。
 
 ## 硬边界

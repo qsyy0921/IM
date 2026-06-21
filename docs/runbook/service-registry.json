@@ -354,6 +354,12 @@
       "service": "vector-index-service",
       "env": "NEXUSIM_VECTOR_INDEX_SERVICE_MODE",
       "value": "rebuild-worker"
+    },
+    {
+      "name": "workflow-service-compensation-worker",
+      "service": "workflow-service",
+      "env": "NEXUSIM_WORKFLOW_SERVICE_MODE",
+      "value": "compensation-worker"
     }
   ]
 }

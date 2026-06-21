@@ -39,6 +39,8 @@ that active slice.
 
 The stable Codex goal prompt intentionally does not name the active service or
 priority. Keep concrete scope in `current-goal.md`, not in the goal box.
+If the goal box is stale or conflicts with repository documents, trust
+`current-goal.md`, `current-brief.md`, and `remaining-goals.md`.
 Production HA drills, long load tests, sizing, provider-grade operations and
 broad backlog cleanup remain hardening backlog unless explicitly named or they
 block the active slice.

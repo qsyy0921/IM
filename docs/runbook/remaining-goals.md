@@ -105,7 +105,7 @@ Foundation backlog 锚点：`search-service`、`memory-service`、`retrieval-gat
   control-plane 公开 API；first-stage `compensation-request` 本地 operator 已接；
   `COMPENSATION_REQUEST` workflow handoff 已接；
   后续仍需 audit ingestion / export、admin UI、其它明确下游公开 admin API adapter、
-  compensation worker / provider-grade compensation execution 和 provider-grade 运维。
+  provider-grade compensation execution / 明确下游补偿 adapter 和 provider-grade 运维。
 
 ## 后置平台 / 产品化服务
 
@@ -113,9 +113,9 @@ Foundation backlog 锚点：`search-service`、`memory-service`、`retrieval-gat
 并通过 ADR / SDD v0.1。
 
 `workflow-service`：第一版 `CreateWorkflow` / `RecordWorkflowDecision` /
-`GetWorkflow` 后，继续补 timer worker、compensation worker、external callback
-wait、outbox relay、workflow repair operators 和完整 action / repair / admin
-operation smoke。
+`GetWorkflow` / compensation request materialization 后，继续补 timer worker、
+真实 compensation execution、external callback wait、outbox relay、workflow repair
+operators 和完整 action / repair / admin operation smoke。
 
 ## 后置 Hardening
 

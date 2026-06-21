@@ -9,6 +9,7 @@
 
 目标框只保留稳定工作规则，不写当前具体任务、服务清单或优先级。
 当前 active slice、边界、下一步和待开发服务必须从仓库文档读取。
+如果目标框旧内容和仓库文档冲突，以仓库文档为准。
 
 每轮开始：
 1. 执行 git status --short --branch --untracked-files=all。
@@ -24,6 +25,7 @@
 ## 文档路由
 
 - 本文件只维护 Codex 目标框短 Prompt 和每轮文档路由；具体目标见 `docs/runbook/current-goal.md`。
+- Codex 目标框可能更新不及时；若目标框和仓库文档冲突，以 `current-goal.md` / `current-brief.md` / `remaining-goals.md` 为准。
 - `agent.md` 决定按需读取和维护哪些项目文档；阶段细节见 `docs/runbook/current-brief.md`。
 - 未完成工作见 `docs/runbook/remaining-goals.md`；单服务状态见 `docs/runbook/service-briefs/<service>.md`。
 

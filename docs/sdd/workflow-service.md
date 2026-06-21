@@ -175,8 +175,10 @@ admin result 的 downstream ref。非 repair 的 `CRITICAL` admin operation 使�
 `ADMIN_OPERATION`，不能伪装成 repair approval。
 `admin-service compensation-request` operator 已接入第一版
 `COMPENSATION_REQUEST` workflow handoff：只传 low-sensitive target / payload /
-reason refs，并使用稳定 idempotency key；workflow-service 当前只持久化请求和审批等待，
-真实 compensation worker / provider-grade execution 后置。
+reason refs，并使用稳定 idempotency key；workflow-service 当前会在审批通过后由
+`compensation-worker` 物化 `workflow_compensations` 和
+`workflow.compensation.requested.v1` outbox，并把 workflow 推进到
+`COMPENSATION_PENDING`。真实 provider-grade compensation execution 后置。
 
 后续扩展：
 
@@ -411,7 +413,8 @@ workflow-outbox-repair
 进入 first smoke 前：
 
 - proto / migration / 六层 skeleton / cmd runtime 已落。
-- `ACTION_APPROVAL`、`REPAIR_APPROVAL` 和 `ADMIN_OPERATION` 最小 workflow tests 通过。
+- `ACTION_APPROVAL`、`REPAIR_APPROVAL`、`ADMIN_OPERATION` 和
+  `COMPENSATION_REQUEST` 物化最小 workflow tests 通过。
 - 高风险 workflow 无审批时 fail closed。
 - event、metrics、audit summary 不包含 reason 原文、payload 原文、EvidencePack、
   proposal 正文或 downstream response。

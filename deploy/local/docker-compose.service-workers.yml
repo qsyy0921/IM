@@ -188,6 +188,19 @@ services:
       - nexusim-services
       - nexusim-local
 
+  workflow-service-compensation-worker:
+    image: nexusim/workflow-service:local
+    container_name: nexusim-workflow-service-compensation-worker
+    environment:
+      NEXUSIM_WORKFLOW_SERVICE_MODE: compensation-worker
+      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@host.docker.internal:5432/nexusim?sslmode=disable
+      NEXUSIM_WORKFLOW_COMPENSATION_BATCH_SIZE: 50
+      NEXUSIM_WORKFLOW_COMPENSATION_POLL_INTERVAL: 1s
+    restart: unless-stopped
+    networks:
+      - nexusim-services
+      - nexusim-local
+
   search-service-timeline-consumer:
     image: nexusim/search-service:local
     container_name: nexusim-search-service-timeline-consumer

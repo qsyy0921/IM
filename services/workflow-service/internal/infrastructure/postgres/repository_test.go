@@ -125,6 +125,76 @@ func TestRepositoryCreateCompensationRequestWorkflowIntegration(t *testing.T) {
 	}
 }
 
+func TestRepositoryRequestApprovedCompensationsIntegration(t *testing.T) {
+	ctx := context.Background()
+	pool := openWorkflowTestPool(t)
+	resetWorkflowTables(t, ctx, pool)
+	repository := NewRepository(pool)
+
+	prepared := prepareWorkflow(t, "wf-compensation-worker-idem-1", "wf_compensation_worker_1", "wfs_compensation_worker_1")
+	prepared.Command.WorkflowType = types.WorkflowTypeCompensationRequest
+	prepared.Command.RiskLevel = types.RiskLevelHigh
+	prepared.Command.RequesterService = "admin-service"
+	prepared.Command.TargetService = "control-plane-service"
+	prepared.Command.TargetOperation = "CONFIG_ROLLBACK"
+	prepared.Command.TargetRefHash = "sha256:admin-operation"
+	prepared.Command.ApprovalPolicyRef = "admin.workflow.compensation.v1"
+	prepared.Command.CompensationPolicyRef = "admin.compensation.control_plane.v1"
+	prepared.Command.PayloadSchemaVersion = "admin.config_rollback.v1"
+	prepared.Command.PayloadRefHash = "sha256:rollback-payload"
+	prepared.Command.ReasonRef = "reason-sha256:compensation"
+	prepared.CommandHash = domain.HashRef("compensation-worker-workflow")
+
+	workflow, replayed, err := repository.CreateWorkflow(ctx, prepared)
+	if err != nil {
+		t.Fatalf("create compensation workflow: %v", err)
+	}
+	if replayed {
+		t.Fatal("new compensation workflow should not replay")
+	}
+	decisionPrepared := prepareDecision(t, workflow.WorkflowID, workflow.CurrentStepID, "wfd_compensation_worker_1", "operator:approver", "decision-compensation-worker")
+	if _, _, _, err := repository.RecordWorkflowDecision(ctx, decisionPrepared); err != nil {
+		t.Fatalf("approve compensation workflow: %v", err)
+	}
+
+	compensations, err := repository.RequestApprovedCompensations(ctx, 10)
+	if err != nil {
+		t.Fatalf("request approved compensations: %v", err)
+	}
+	if len(compensations) != 1 {
+		t.Fatalf("expected one compensation, got %d", len(compensations))
+	}
+	compensation := compensations[0]
+	if compensation.CompensationID != "wfc_"+workflow.WorkflowID ||
+		compensation.Status != types.WorkflowCompensationStatusRequested ||
+		compensation.TargetService != "control-plane-service" ||
+		compensation.TargetOperation != "CONFIG_ROLLBACK" ||
+		compensation.TargetRefHash != "sha256:admin-operation" {
+		t.Fatalf("unexpected compensation: %+v", compensation)
+	}
+
+	loaded, _, err := repository.GetWorkflow(ctx, types.GetWorkflowCommand{
+		AuthContext: types.AuthContext{TenantID: "tenant-workflow-test", ServiceName: "admin-service"},
+		WorkflowID:  workflow.WorkflowID,
+	})
+	if err != nil {
+		t.Fatalf("get workflow: %v", err)
+	}
+	if loaded.Status != types.WorkflowStatusCompensationPending || !loaded.CompletedAt.IsZero() {
+		t.Fatalf("workflow should be compensation pending with empty completed_at: %+v", loaded)
+	}
+
+	assertWorkflowCompensationRequested(t, ctx, pool, workflow.WorkflowID, compensation.CompensationID)
+	replayedCompensations, err := repository.RequestApprovedCompensations(ctx, 10)
+	if err != nil {
+		t.Fatalf("replay compensation worker: %v", err)
+	}
+	if len(replayedCompensations) != 0 {
+		t.Fatalf("expected no compensations on replay, got %d", len(replayedCompensations))
+	}
+	assertWorkflowCompensationRequested(t, ctx, pool, workflow.WorkflowID, compensation.CompensationID)
+}
+
 func prepareWorkflow(t *testing.T, idempotencyKey string, workflowID string, stepID string) domain.PreparedWorkflow {
 	t.Helper()
 	prepared, err := domain.PrepareWorkflow(types.CreateWorkflowCommand{
@@ -194,6 +264,7 @@ func openWorkflowTestPool(t *testing.T) *pgxpool.Pool {
 
 func applyWorkflowMigration(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
 	t.Helper()
+	clearWorkflowTablesIfPresent(ctx, pool)
 	pattern := filepath.Join("..", "..", "..", "..", "..", "migrations", "postgres", "workflow", "*.sql")
 	paths, err := filepath.Glob(pattern)
 	if err != nil {
@@ -211,6 +282,19 @@ func applyWorkflowMigration(t *testing.T, ctx context.Context, pool *pgxpool.Poo
 			t.Fatalf("apply workflow migration %s: %v", path, err)
 		}
 	}
+}
+
+func clearWorkflowTablesIfPresent(ctx context.Context, pool *pgxpool.Pool) {
+	_, _ = pool.Exec(ctx, `
+TRUNCATE
+    workflow_outbox,
+    workflow_compensations,
+    workflow_timers,
+    workflow_decisions,
+    workflow_steps,
+    workflow_requests
+CASCADE
+`)
 }
 
 func resetWorkflowTables(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
@@ -268,5 +352,44 @@ func assertWorkflowOutboxLowSensitive(t *testing.T, ctx context.Context, pool *p
 	}
 	if count != 2 {
 		t.Fatalf("expected two workflow outbox rows, got %d", count)
+	}
+}
+
+func assertWorkflowCompensationRequested(t *testing.T, ctx context.Context, pool *pgxpool.Pool, workflowID string, compensationID string) {
+	t.Helper()
+	var compensationCount int
+	var compensationStatus string
+	if err := pool.QueryRow(ctx, `
+SELECT count(*), COALESCE(max(status), '')
+FROM workflow_compensations
+WHERE tenant_id = 'tenant-workflow-test' AND workflow_id = $1 AND compensation_id = $2
+`, workflowID, compensationID).Scan(&compensationCount, &compensationStatus); err != nil {
+		t.Fatalf("query workflow compensation: %v", err)
+	}
+	if compensationCount != 1 || compensationStatus != types.WorkflowCompensationStatusRequested {
+		t.Fatalf("unexpected compensation row count=%d status=%s", compensationCount, compensationStatus)
+	}
+
+	var outboxCount int
+	var payload string
+	if err := pool.QueryRow(ctx, `
+SELECT count(*), COALESCE(max(payload_json::text), '')
+FROM workflow_outbox
+WHERE event_type = $1 AND workflow_id = $2
+`, types.WorkflowEventCompensationRequested, workflowID).Scan(&outboxCount, &payload); err != nil {
+		t.Fatalf("query workflow compensation outbox: %v", err)
+	}
+	if outboxCount != 1 {
+		t.Fatalf("expected one compensation outbox row, got %d", outboxCount)
+	}
+	for _, want := range []string{compensationID, types.WorkflowStatusCompensationPending, types.WorkflowCompensationStatusRequested, "sha256:admin-operation"} {
+		if !strings.Contains(payload, want) {
+			t.Fatalf("compensation outbox payload missing %q: %s", want, payload)
+		}
+	}
+	for _, forbidden := range []string{"secret", "token", "raw:", "rollback plaintext", "operator:approver"} {
+		if strings.Contains(payload, forbidden) {
+			t.Fatalf("compensation outbox leaked forbidden value %q: %s", forbidden, payload)
+		}
 	}
 }

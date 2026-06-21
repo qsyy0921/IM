@@ -18,6 +18,7 @@ import (
 	workflowgrpc "github.com/qsyy0921/IM/services/workflow-service/internal/api/grpc"
 	"github.com/qsyy0921/IM/services/workflow-service/internal/app"
 	postgresinfra "github.com/qsyy0921/IM/services/workflow-service/internal/infrastructure/postgres"
+	"github.com/qsyy0921/IM/services/workflow-service/internal/trigger/compensation"
 	"google.golang.org/grpc"
 )
 
@@ -40,6 +41,8 @@ func run(ctx context.Context) error {
 		return runNoop(ctx)
 	case "grpc":
 		return runGRPC(ctx)
+	case "compensation-worker":
+		return runCompensationWorker(ctx)
 	default:
 		return fmt.Errorf("unsupported NEXUSIM_WORKFLOW_SERVICE_MODE %q", mode)
 	}
@@ -113,6 +116,36 @@ func runGRPC(ctx context.Context) error {
 	}
 }
 
+func runCompensationWorker(ctx context.Context) error {
+	debugAddr, err := workflowDebugAddrFromEnv()
+	if err != nil {
+		return err
+	}
+	stopDebug, err := startDebugServer(ctx, debugAddr)
+	if err != nil {
+		return err
+	}
+	defer stopDebug()
+
+	pool, err := openPGPool(ctx)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	worker := compensation.NewWorker(postgresinfra.NewRepository(pool), compensation.Config{
+		BatchSize:    envInt("NEXUSIM_WORKFLOW_COMPENSATION_BATCH_SIZE", 50),
+		PollInterval: envDuration("NEXUSIM_WORKFLOW_COMPENSATION_POLL_INTERVAL", time.Second),
+		ErrorBackoff: envDuration("NEXUSIM_WORKFLOW_COMPENSATION_ERROR_BACKOFF", time.Second),
+		Logf:         log.Printf,
+	})
+	log.Println("workflow-service compensation-worker started")
+	if err := worker.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
+		return err
+	}
+	return nil
+}
+
 func workflowModeFromEnv() string {
 	mode := strings.TrimSpace(os.Getenv("NEXUSIM_WORKFLOW_SERVICE_MODE"))
 	if mode == "" {
@@ -123,7 +156,7 @@ func workflowModeFromEnv() string {
 
 func validateWorkflowMode(mode string) error {
 	switch mode {
-	case "noop", "grpc":
+	case "noop", "grpc", "compensation-worker":
 		return nil
 	default:
 		return fmt.Errorf("unsupported NEXUSIM_WORKFLOW_SERVICE_MODE %q", mode)
@@ -185,6 +218,30 @@ func envString(name string, fallback string) string {
 		return fallback
 	}
 	return value
+}
+
+func envInt(name string, fallback int) int {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		return fallback
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil || parsed <= 0 {
+		return fallback
+	}
+	return parsed
+}
+
+func envDuration(name string, fallback time.Duration) time.Duration {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		return fallback
+	}
+	parsed, err := time.ParseDuration(value)
+	if err != nil || parsed <= 0 {
+		return fallback
+	}
+	return parsed
 }
 
 func openPGPool(ctx context.Context) (*pgxpool.Pool, error) {

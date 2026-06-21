@@ -26,10 +26,15 @@ retention、外部系统调用补偿和人工审批状态。
 - 已支持 first-stage `COMPENSATION_REQUEST` workflow 类型，供 admin-service
   `compensation-request` operator 通过公开 gRPC 创建 / replay 补偿请求；当前只保存低敏
   target / payload / reason refs，不执行真实补偿 mutation。
+- 已新增 first-stage `compensation-worker` runtime：claim 已批准的
+  `COMPENSATION_REQUEST` workflow，写 `workflow_compensations`、
+  `workflow.compensation.requested.v1` outbox，并把 workflow 推进到
+  `COMPENSATION_PENDING`；真实 provider-grade 补偿执行仍后置。
 - 已被 admin-service operation worker 用于第一版 `REPAIR_REQUEST ->
   REPAIR_APPROVAL` 长审批入口；该路径只保存低敏 hash/ref，并由 admin-service
   result 记录 `workflow:<workflow_id>`。
 - 已通过 focused checks、真实 PostgreSQL integration 和完整 `check-local`。
 - 确认 reason / payload / EvidencePack / proposal 正文不进入事件或 metrics。
-- 第一版只做 `CreateWorkflow`、`RecordWorkflowDecision`、`GetWorkflow`；
-  timer / compensation worker、external callback wait 和 outbox relay 后置。
+- 第一版只做 `CreateWorkflow`、`RecordWorkflowDecision`、`GetWorkflow` 和
+  compensation request materialization；timer worker、真实补偿执行、
+  external callback wait 和 outbox relay 后置。

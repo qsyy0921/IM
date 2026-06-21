@@ -96,8 +96,11 @@
   approval 最小状态机和低敏 `workflow_outbox`；已作为 admin-service
   `REPAIR_REQUEST -> REPAIR_APPROVAL` 和 `CRITICAL -> ADMIN_OPERATION` 的长审批
   入口，并支撑 admin operation-specific approval policy / target-service routing；
-  focused checks、真实 PostgreSQL integration 和完整 `check-local` 已通过，不宣称
-  timer / compensation worker、external callback wait 或 outbox relay。
+  first-stage `compensation-worker` 已能把 approved `COMPENSATION_REQUEST` 物化为
+  `workflow_compensations`、低敏 `workflow.compensation.requested.v1` outbox 和
+  `COMPENSATION_PENDING` workflow 状态；既有 workflow 第一路径已通过完整
+  `check-local`，本 worker 切片按风险分层用 focused checks 收口；不宣称 timer worker、
+  真实 compensation execution、external callback wait 或 outbox relay。
 - `vector-index-service` product-active：SDD v0.1 和 stage-switch review 已通过，
   第一版 proto / migration / 六层 skeleton / `grpc` runtime / Docker /
   Prometheus / Grafana 覆盖已落；当前覆盖 `UpsertVectorItem`、

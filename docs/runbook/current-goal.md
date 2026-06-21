@@ -165,10 +165,14 @@ model-gateway / workflow / knowledge-ingestion / vector-index
   `compensation-request` 在设置 `NEXUSIM_WORKFLOW_GRPC_ADDR` 后会创建 / replay
   `COMPENSATION_REQUEST` workflow；workflow-service 只保存低敏 target / payload /
   reason refs，不执行真实补偿 mutation。
+- `workflow-service` 已新增 first-stage `compensation-worker`：claim 已批准的
+  `COMPENSATION_REQUEST` workflow，写 `workflow_compensations` 和低敏
+  `workflow.compensation.requested.v1` outbox，并把 workflow 推进到
+  `COMPENSATION_PENDING`；真实 provider-grade compensation execution 仍后置。
 
 ## 下一步
 
-- 默认继续 admin compensation worker / provider-grade compensation execution，或补其它明确下游公开 admin API adapter。
+- 默认继续 provider-grade compensation execution / 明确下游补偿 adapter，或补其它明确下游公开 admin API adapter。
 - 默认下一步可继续 vector-index provider backend：在镜像可用后跑 focused pgvector smoke、
   真实 Milvus / OpenSearch backend、provider backend repair / 真 provider backfill smoke，
   或继续 active future service 的 focused checks。

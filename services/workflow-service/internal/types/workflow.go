@@ -16,13 +16,18 @@ const (
 	RiskLevelHigh     = "HIGH"
 	RiskLevelCritical = "CRITICAL"
 
-	WorkflowStatusWaitingDecision = "WAITING_DECISION"
-	WorkflowStatusApproved        = "APPROVED"
-	WorkflowStatusRejected        = "REJECTED"
-	WorkflowStatusCanceled        = "CANCELED"
+	WorkflowStatusWaitingDecision     = "WAITING_DECISION"
+	WorkflowStatusApproved            = "APPROVED"
+	WorkflowStatusRejected            = "REJECTED"
+	WorkflowStatusCanceled            = "CANCELED"
+	WorkflowStatusCompensationPending = "COMPENSATION_PENDING"
 
 	WorkflowStepTypeApproval = "APPROVAL"
 	WorkflowStepStatusReady  = "READY"
+
+	WorkflowCompensationStatusRequested = "REQUESTED"
+
+	WorkflowEventCompensationRequested = "workflow.compensation.requested.v1"
 
 	DecisionTypeApprove        = "APPROVE"
 	DecisionTypeReject         = "REJECT"
@@ -127,6 +132,21 @@ type WorkflowDecision struct {
 	ReasonRef         string
 	EvidenceRefs      []string
 	CreatedAt         time.Time
+}
+
+type WorkflowCompensation struct {
+	TenantID        TenantID
+	WorkflowID      string
+	CompensationID  string
+	SourceStepID    string
+	TargetService   string
+	TargetOperation string
+	TargetRefHash   string
+	Status          string
+	FailureClass    string
+	PublicError     string
+	CreatedAt       time.Time
+	CompletedAt     time.Time
 }
 
 func (command CreateWorkflowCommand) Normalized() CreateWorkflowCommand {

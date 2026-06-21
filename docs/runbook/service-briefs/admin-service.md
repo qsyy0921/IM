@@ -81,4 +81,4 @@
 后续：
 
 - audit-service ingestion / export、admin UI、更多下游公开 admin API adapter、
-  compensation worker / provider-grade 运维。
+  provider-grade compensation execution / 运维。

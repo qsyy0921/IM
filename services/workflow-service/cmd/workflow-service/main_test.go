@@ -3,7 +3,7 @@ package main
 import "testing"
 
 func TestValidateWorkflowMode(t *testing.T) {
-	for _, mode := range []string{"noop", "grpc"} {
+	for _, mode := range []string{"noop", "grpc", "compensation-worker"} {
 		if err := validateWorkflowMode(mode); err != nil {
 			t.Fatalf("mode %s: %v", mode, err)
 		}

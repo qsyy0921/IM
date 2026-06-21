@@ -215,6 +215,10 @@ First slice:
   manifest that drives manual install readiness. When a Windows desktop
   artifact is collected, the plan includes `smoke:desktop-artifact-launch` as a
   process launch sanity check before the fuller login-level shell smoke.
+  `smoke:desktop-composed` can combine an existing `loadtest/clientweb`
+  BFF/push summary with desktop artifact launch evidence into one low-sensitive
+  JSON result. It is useful as an intermediate PC evidence bundle, but it is not
+  GUI automation and does not prove login inside the Tauri WebView.
   For Windows desktop, the plan now includes the explicit
   `install-declared-desktop-tauri-cli` step when the repo-declared local Tauri
   CLI has not been installed.
@@ -260,9 +264,11 @@ First slice:
   config and fail closed until native bridges exist. Windows desktop now
   produces a first-stage standalone `.exe` artifact and low-sensitive collected
   manifest; `smoke:desktop-artifact-launch` has verified the exe starts, stays
-  alive during the smoke hold window and terminates cleanly. It still does not
-  produce MSI / NSIS installer bundles, and the fuller login-level desktop UI
-  smoke remains pending. Android still does not produce `.apk` or `.aab`
+  alive during the smoke hold window and terminates cleanly.
+  `smoke:desktop-composed` can also combine that launch proof with a clientweb
+  BFF / push summary without leaking absolute paths or sensitive fields. It
+  still does not produce MSI / NSIS installer bundles, and the fuller
+  login-level desktop UI smoke remains pending. Android still does not produce `.apk` or `.aab`
   artifacts because the local toolchain / Docker builder image has not been completed.
 - `/api/auth/logout` performs first-stage server-side logout for the current
   authenticated session only. Broader device/session management remains an
@@ -285,7 +291,8 @@ rejected. For local LAN client smoke, prefer the wired `172.x.x.x` address.
 ## Next Work
 
 1. Run login-level real PC shell smoke against the collected standalone Windows
-   artifact; launch sanity smoke already passes.
+   artifact; launch sanity smoke already passes and composed smoke can already
+   merge desktop-launch evidence with a clientweb BFF / push summary.
 2. Add first unsigned local APK from the Android native bridge or Docker builder.
 3. Wire lifecycle UI controls into the real Android shell, and run platform-shell
    smoke once packaging/runtime tooling is ready.
@@ -335,6 +342,7 @@ npm --prefix clients run report:artifact-readiness
 npm --prefix clients run plan:shell-smoke
 npm --prefix clients run plan:artifact-install
 npm --prefix clients run smoke:desktop-artifact-launch
+npm --prefix clients run smoke:desktop-composed -- --clientweb-summary <client-web-summary.json>
 ```
 
 The report includes `nextActions`. When the Android Docker builder image is

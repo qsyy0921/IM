@@ -149,7 +149,11 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   `clients/artifacts/2026-06-21T202009Z/manifest.json`（ignored local artifact
   storage）；`npm --prefix clients run smoke:desktop-artifact-launch` 已验证该
   standalone exe 能启动为进程、保持 5 秒并被工具干净终止。该 launch sanity smoke
-  不等同于登录 / PullInbox / WebSocket 的完整 PC UI smoke；当前仍没有 Android APK baseline。
+  不等同于登录 / PullInbox / WebSocket 的完整 PC UI smoke；`npm --prefix clients run
+  smoke:desktop-composed` 已提供低敏组合 smoke，可消费现有 clientweb BFF / push
+  summary，并与 desktop artifact launch 结果合并。它证明公开客户端链路证据和
+  desktop 进程启动证据能被同一工具归档，但仍不声称 Tauri WebView 内完成登录级
+  GUI 自动化；当前仍没有 Android APK baseline。
 - Android 已新增 opt-in Docker builder profile：
   `deploy/docker/client-android-builder.Dockerfile` 和
   `deploy/local/docker-compose.client-builders.yml`。`validate:builder-profile`
@@ -245,9 +249,9 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
 
 ## 下一步优先级
 
-1. 继续 PC shell smoke：launch sanity 已通过；下一步验证 shell metadata、
-   login、PullInbox、delivery.notify 和 AckDelivery；同时保留后续 MSI / NSIS
-   installer bundle 为 hardening。
+1. 继续 PC shell smoke：launch sanity 和 composed evidence 工具已具备；下一步做
+   真实 Tauri WebView 内的 shell metadata、login、PullInbox、delivery.notify 和
+   AckDelivery 验证；同时保留后续 MSI / NSIS installer bundle 为 hardening。
 2. 补 Android JDK 17+ / Gradle / Android SDK，或显式运行 Android Docker builder
    profile，然后运行 `build:android-apk:collect` 产出首个 APK + manifest。
 3. 在真实 Android shell UI 中接入现有 shell action，并在工具链 ready 后跑平台 shell smoke。

@@ -133,7 +133,8 @@ function nativeCommands(target, readinessTarget) {
       buildArtifact: readinessTarget.buildCommand,
       dryRunBuild: readinessTarget.dryRunCommand,
       installPlan: "npm --prefix clients run plan:artifact-install",
-      launchSmoke: "npm --prefix clients run smoke:desktop-artifact-launch"
+      launchSmoke: "npm --prefix clients run smoke:desktop-artifact-launch",
+      composedSmoke: "npm --prefix clients run smoke:desktop-composed -- --clientweb-summary <client-web-summary.json>"
     };
   }
   return {
@@ -224,6 +225,11 @@ function nativeChecklist(target, readinessTarget, artifactStatus, installStatus)
       step: "launch-desktop-artifact-smoke",
       command: nativeCommands(target, readinessTarget).launchSmoke,
       evidence: "desktop artifact process starts, stays alive during the hold window and terminates cleanly"
+    });
+    checklist.push({
+      step: "run-desktop-composed-smoke",
+      command: nativeCommands(target, readinessTarget).composedSmoke,
+      evidence: "clientweb BFF/push summary and desktop artifact launch evidence are combined into one low-sensitive desktop composed smoke result"
     });
   }
 

@@ -37,7 +37,9 @@ if (plan.targets["windows-desktop"].nativeToolchainReady) {
   assert(plan.targets["windows-desktop"].checklist.some(item => item.step === "build-desktop-artifact"), "desktop artifact build checklist missing when ready");
   if (plan.targets["windows-desktop"].readyForManualShellSmoke) {
     assert(plan.targets["windows-desktop"].commands.launchSmoke?.includes("smoke:desktop-artifact-launch"), "desktop launch smoke command missing when smoke-ready");
+    assert(plan.targets["windows-desktop"].commands.composedSmoke?.includes("smoke:desktop-composed"), "desktop composed smoke command missing when smoke-ready");
     assert(plan.targets["windows-desktop"].checklist.some(item => item.step === "launch-desktop-artifact-smoke"), "desktop artifact launch smoke checklist missing when smoke-ready");
+    assert(plan.targets["windows-desktop"].checklist.some(item => item.step === "run-desktop-composed-smoke"), "desktop composed smoke checklist missing when smoke-ready");
     assert(plan.targets["windows-desktop"].checklist.some(item => item.step === "run-platform-shell"), "desktop platform shell checklist missing when smoke-ready");
   } else {
     assert(plan.targets["windows-desktop"].checklist.some(item => item.step === "resolve-install-prereqs" || item.step === "collect-native-artifact"), "desktop install-prereq checklist missing when artifact is not smoke-ready");

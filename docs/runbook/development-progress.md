@@ -57,6 +57,11 @@
 - Agent execution eval adapter + low-sensitive tool result projection + local safe tool adapter first path
 - Python AI Worker 边界已由 ADR-036 固定，且 foundation first path 已落：`ai/python` 目录、`IM` conda toolchain、candidate contract helpers、低敏 safety guard、contract validator、candidate-only worker CLI、malformed / unsafe output eval adapter、bad model-output rejection adapter、第一条 worker smoke、Go-side Python candidate adapter smoke，以及 `rag-service` / `summary-service` / `agent-service` 服务级 Python worker candidate guard；Python 只做模型 / 算法 / eval 候选层，Go 继续拥有控制面、状态、审计和持久化
 
+完整扩展后的长期架构已拆出独立文档：`docs/architecture/target-architecture-complete.md`
+定义业务平台、数据平台、AI / Agent 平台和中间件平台的边界；`docs/platform/middleware-catalog.md`
+定义中间件能力分类、runtime profile、adoption checklist 和登记模板。它们是长期演进约束，
+不把服务数量、中间件产品或部署形态写死。
+
 当前已开始的后续产品化 / 平台服务：
 
 - `media-service` product-active：SDD v0.1 和 stage-switch review 已通过，第一版

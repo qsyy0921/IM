@@ -36,6 +36,20 @@ Active AI foundation backlog 覆盖：`action-executor`、`agent-service`、
 `ai-eval-service`、`mcp-gateway`、`memory-service`、`rag-service`、
 `retrieval-gateway`、`search-service`、`skill-registry`、`summary-service`。
 
+## 平台能力 / 中间件待办
+
+- 后续新增中间件前，先按 `docs/platform/middleware-catalog.md` 登记 capability、
+  source-of-truth 语义、依赖服务、runtime profile、健康检查、最小 smoke、替换 /
+  迁移策略和安全边界。
+- 需要按 profile 拆 `deploy/local/`：core、client-demo、observability、search-rag、
+  media、workflow-agent、security、data-platform、ai-runtime；不要默认启动所有
+  中间件。
+- 中间件 adapter 只能落在对应服务的 `internal/infrastructure/<adapter>/`；domain /
+  app 层不能 import Kafka、Redis、OpenSearch、Milvus、MinIO、Temporal、Vault 等
+  具体 client。
+- 数据平台中间件只能消费公开事件 / CDC 构建分析和 AI 数据资产，不能成为业务事实
+  写入口。
+
 ## 9 个现有服务必要收口
 
 | 服务 | 未完成工作 |

@@ -48,6 +48,11 @@ rate-limit adapter 已落。下一步是 PC / Android runtime shell。
 Rust / Kotlin 只做薄平台 bridge；Python 只做 AI worker、模型算法、eval 和离线
 工具，不接管业务事实源。
 
+完整扩展后的业务平台 / 数据平台 / AI Agent 平台 / 中间件平台总览已补到
+`docs/architecture/target-architecture-complete.md`；中间件能力、runtime profile
+和引入规则见 `docs/platform/middleware-catalog.md`。这些文档只定义长期边界和
+adoption rules，不把服务数量、中间件或部署形态写死。
+
 当前短线重点：
 
 - client-platform：`api-gateway` client BFF 和 Web fetch / WebSocket /

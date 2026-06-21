@@ -15,6 +15,7 @@
 2. 再读 [timeline](./target-architecture-timeline.md)：消息写入、成员边界、Fanout、数据模型、Kafka、Redis 与长连接。
 3. 需要平台和长期演进时读 [platform](./target-architecture-platform.md)：权限、搜索、RAG、Agent、多 Region、审计、观测、ADR、阶段结论。
 4. 需要 AI / memory / Agent / Python AI Worker 的后续目标架构时读 [AI](./target-architecture-ai.md)：结构化记忆、画像、EvidencePack、检索流程、Python worker 边界和 AI eval。
+5. 需要完整扩展后的业务中台 / 数据中台 / AI 平台 / 中间件平台总览时读 [complete](./target-architecture-complete.md)。
 
 ## 文档范围
 
@@ -25,6 +26,7 @@
 | `target-architecture-timeline.md` | 第 5-9 章 |
 | `target-architecture-platform.md` | 第 10-16 章 |
 | `target-architecture-ai.md` | AI / memory / RAG / Agent / Python worker 后续目标架构 |
+| `target-architecture-complete.md` | 完善后完整目标架构：业务平台、数据平台、AI / Agent 平台和中间件平台 |
 
 ## 当前硬边界
 
@@ -34,6 +36,7 @@
 - 当前 9 个已实现服务作为 AI 主线可运行基础；生产级测试和 HA 证据作为后续加固项，不阻塞 AI 算法/eval。
 - AI 底座演进顺序为 `search-service -> memory-service -> retrieval-gateway -> rag-service / summary-service -> agent-service -> skill-registry / mcp-gateway -> action-executor -> ai-eval-service`；当前第一组 foundation-active 已形成 EvidencePack、proposal / approval / audit、Python Worker 候选边界和 40/40 optional stack gate，后续默认推进 collaborative-memory 算法/eval。
 - 后续服务和中间件都不是写死终局；新增必须符合独立数据模型、独立伸缩、独立故障、独立安全边界之一，或显著降低复杂度，并通过 ADR 和证据演进。
+- 中间件作为平台能力管理，登记和引入规则见 `../platform/middleware-catalog.md`；运行编排放 `deploy/`，服务代码只放 adapter。
 - 可以使用 multi sub-agent 推进互不重叠的服务、文档和验证任务；主 agent 负责统一方案、合并结果、最终检查和关闭 stale sub-agent。
 
 ## 快速定位

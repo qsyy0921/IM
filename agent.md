@@ -23,6 +23,7 @@ from them is needed.
 | Distributed smoke / fault evidence | relevant runbook README and exact report path | new report or summary only |
 | Interview narrative | `docs/interview/project-progress.md` | same |
 | Architecture / service split | `docs/architecture/target-architecture.md` | architecture doc or ADR |
+| Middleware / platform capability | `docs/platform/middleware-catalog.md` | same; add ADR for active adoption |
 
 Keep entrance docs short. Do not copy the same status into every file.
 

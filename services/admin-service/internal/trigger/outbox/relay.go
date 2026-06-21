@@ -223,6 +223,10 @@ func BuildAdminEvent(message types.OutboxMessage) (*admineventsv1.AdminEvent, er
 		event.Payload = &admineventsv1.AdminEvent_OperationFailed{
 			OperationFailed: adminOperationFailed(payload),
 		}
+	case types.AdminEventOperationCompensationRequested:
+		event.Payload = &admineventsv1.AdminEvent_OperationCompensationRequested{
+			OperationCompensationRequested: adminOperationCompensationRequested(payload),
+		}
 	default:
 		return nil, errors.New("unsupported admin outbox event type")
 	}
@@ -230,27 +234,29 @@ func BuildAdminEvent(message types.OutboxMessage) (*admineventsv1.AdminEvent, er
 }
 
 type adminPayload struct {
-	TenantID             string `json:"tenant_id"`
-	OperationID          string `json:"operation_id"`
-	OperationType        string `json:"operation_type"`
-	TargetRefHash        string `json:"target_ref_hash"`
-	RiskLevel            string `json:"risk_level"`
-	Status               string `json:"status"`
-	RequestedByHash      string `json:"requested_by_hash"`
-	ApprovedByHash       string `json:"approved_by_hash"`
-	ApprovalID           string `json:"approval_id"`
-	Decision             string `json:"decision"`
-	ResultID             string `json:"result_id"`
-	DownstreamService    string `json:"downstream_service"`
-	DownstreamRequestRef string `json:"downstream_request_ref"`
-	FailureClass         string `json:"failure_class"`
-	PublicError          string `json:"public_error"`
-	PayloadSchemaVersion string `json:"payload_schema_version"`
-	PayloadHash          string `json:"payload_hash"`
-	ReasonRef            string `json:"reason_ref"`
-	CorrelationID        string `json:"correlation_id"`
-	CausationID          string `json:"causation_id"`
-	TraceID              string `json:"trace_id"`
+	TenantID                    string `json:"tenant_id"`
+	OperationID                 string `json:"operation_id"`
+	OperationType               string `json:"operation_type"`
+	TargetRefHash               string `json:"target_ref_hash"`
+	RiskLevel                   string `json:"risk_level"`
+	Status                      string `json:"status"`
+	RequestedByHash             string `json:"requested_by_hash"`
+	ApprovedByHash              string `json:"approved_by_hash"`
+	ApprovalID                  string `json:"approval_id"`
+	Decision                    string `json:"decision"`
+	ResultID                    string `json:"result_id"`
+	DownstreamService           string `json:"downstream_service"`
+	DownstreamRequestRef        string `json:"downstream_request_ref"`
+	FailureClass                string `json:"failure_class"`
+	PublicError                 string `json:"public_error"`
+	PayloadSchemaVersion        string `json:"payload_schema_version"`
+	PayloadHash                 string `json:"payload_hash"`
+	ReasonRef                   string `json:"reason_ref"`
+	CompensationRequestedByHash string `json:"compensation_requested_by_hash"`
+	CompensationReasonRef       string `json:"compensation_reason_ref"`
+	CorrelationID               string `json:"correlation_id"`
+	CausationID                 string `json:"causation_id"`
+	TraceID                     string `json:"trace_id"`
 }
 
 func decodeAdminPayload(payloadJSON []byte) (adminPayload, error) {
@@ -295,6 +301,12 @@ func validateAdminPayloadForEvent(eventType string, payload adminPayload) error 
 			payload.FailureClass == "" ||
 			payload.PublicError == "" {
 			return errors.New("admin operation failed payload is incomplete")
+		}
+	case types.AdminEventOperationCompensationRequested:
+		if payload.ApprovedByHash == "" ||
+			payload.CompensationRequestedByHash == "" ||
+			payload.CompensationReasonRef == "" {
+			return errors.New("admin operation compensation requested payload is incomplete")
 		}
 	}
 	return nil
@@ -408,6 +420,22 @@ func adminOperationFailed(payload adminPayload) *admineventsv1.AdminOperationFai
 		FailureClass:         payload.FailureClass,
 		PublicError:          payload.PublicError,
 		PayloadHash:          payload.PayloadHash,
+	}
+}
+
+func adminOperationCompensationRequested(payload adminPayload) *admineventsv1.AdminOperationCompensationRequestedV1 {
+	return &admineventsv1.AdminOperationCompensationRequestedV1{
+		TenantId:                    payload.TenantID,
+		OperationId:                 payload.OperationID,
+		OperationType:               payload.OperationType,
+		TargetRefHash:               payload.TargetRefHash,
+		RiskLevel:                   payload.RiskLevel,
+		Status:                      payload.Status,
+		RequestedByHash:             payload.RequestedByHash,
+		ApprovedByHash:              payload.ApprovedByHash,
+		CompensationRequestedByHash: payload.CompensationRequestedByHash,
+		CompensationReasonRef:       payload.CompensationReasonRef,
+		PayloadHash:                 payload.PayloadHash,
 	}
 }
 

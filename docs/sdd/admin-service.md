@@ -228,12 +228,14 @@ policy precheck
 | `admin.operation.approved.v1` | `im.admin.events` | `tenant_id:operation_id` | 审批通过 |
 | `admin.operation.executed.v1` | `im.admin.events` | `tenant_id:operation_id` | 执行完成 |
 | `admin.operation.failed.v1` | `im.admin.events` | `tenant_id:operation_id` | 执行失败 |
+| `admin.operation.compensation_requested.v1` | `im.admin.events` | `tenant_id:operation_id` | 已请求补偿 |
 | `admin.operation.canceled.v1` | `im.admin.events` | `tenant_id:operation_id` | 已取消 |
 
 事件 payload 只包含 operation id、operation type、target ref hash、risk level、
 status、operator hash、approval hash / approval id、result id、downstream service、
-downstream request ref、failure_class、public_error、correlation/causation refs。禁止输出
-payload_json 原文、reason 原文、下游 response body 或 secret。
+downstream request ref、failure_class、public_error、compensation requester hash、
+compensation reason ref、correlation/causation refs。禁止输出 payload_json 原文、
+reason 原文、下游 response body 或 secret。
 
 ## 8. 数据库设计
 
@@ -391,6 +393,7 @@ NEXUSIM_ADMIN_SERVICE_MODE=grpc
 NEXUSIM_ADMIN_SERVICE_MODE=operation-worker
 NEXUSIM_ADMIN_SERVICE_MODE=outbox-relay
 NEXUSIM_ADMIN_SERVICE_MODE=cleanup
+NEXUSIM_ADMIN_SERVICE_MODE=compensation-request
 ```
 
 `operation-worker` 第一版配置：
@@ -418,10 +421,15 @@ loadtest/admin -mode reject
 loadtest/admin -mode get
 loadtest/admin -mode list
 admin-outbox-repair
+NEXUSIM_ADMIN_SERVICE_MODE=compensation-request
 ```
 
 `loadtest/admin` 只调用公开 admin gRPC，不读私表，不输出 payload 原文、reason
 原文、EvidencePack 正文或 downstream response body。
+`compensation-request` 是 first-stage 本地 operator，默认 dry-run。正式执行要求
+`NEXUSIM_ADMIN_COMPENSATION_REASON_REF` 或
+`NEXUSIM_ADMIN_COMPENSATION_REASON_FILE`；reason file 只计算 hash / ref，不会把
+reason 原文写入数据库、outbox 或 summary。
 
 ## 17. 验收标准
 

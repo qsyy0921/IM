@@ -127,6 +127,71 @@ func (repository *Repository) CompleteAdminOperation(
 	return completed, nil
 }
 
+func (repository *Repository) RequestAdminOperationCompensation(
+	ctx context.Context,
+	command types.RequestAdminOperationCompensationCommand,
+) (types.AdminOperation, bool, error) {
+	if repository.pool == nil {
+		return types.AdminOperation{}, false, types.NewDBWriteFailed("admin repository is not configured")
+	}
+	if command.TenantID == "" ||
+		command.OperationID == "" ||
+		command.RequestedBy == "" {
+		return types.AdminOperation{}, false, types.NewInvalidArgument("admin compensation request is incomplete")
+	}
+	tx, err := repository.pool.Begin(ctx)
+	if err != nil {
+		return types.AdminOperation{}, false, types.NewDBWriteFailed(err.Error())
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	locked, err := getOperationForUpdate(ctx, tx, command.TenantID, command.OperationID)
+	if err != nil {
+		return types.AdminOperation{}, false, err
+	}
+	if locked.Status == types.OperationStatusCompensationRequested {
+		if err := tx.Commit(ctx); err != nil {
+			return types.AdminOperation{}, false, types.NewDBWriteFailed(err.Error())
+		}
+		return locked, false, nil
+	}
+	if locked.Status != types.OperationStatusFailed {
+		return types.AdminOperation{}, false, types.NewFailedPrecondition("admin operation is not failed")
+	}
+	if command.DryRun {
+		if err := tx.Commit(ctx); err != nil {
+			return types.AdminOperation{}, false, types.NewDBWriteFailed(err.Error())
+		}
+		return locked, false, nil
+	}
+	if command.CompensationReasonRef == "" {
+		return types.AdminOperation{}, false, types.NewInvalidArgument("admin compensation request is incomplete")
+	}
+
+	now := time.Now().UTC()
+	_, err = tx.Exec(ctx, `
+UPDATE admin_operations
+SET status = $3,
+    updated_at = $4
+WHERE tenant_id = $1 AND operation_id = $2
+`, string(command.TenantID), command.OperationID, types.OperationStatusCompensationRequested, now)
+	if err != nil {
+		return types.AdminOperation{}, false, types.NewDBWriteFailed(err.Error())
+	}
+	locked.Status = types.OperationStatusCompensationRequested
+	locked.UpdatedAt = now
+	payload := adminOperationPayload(locked)
+	payload["compensation_requested_by_hash"] = domain.HashText(command.RequestedBy)
+	payload["compensation_reason_ref"] = command.CompensationReasonRef
+	if err := insertOperationOutbox(ctx, tx, "evt_"+locked.OperationID+"_compensation_requested", locked, types.AdminEventOperationCompensationRequested, payload); err != nil {
+		return types.AdminOperation{}, false, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return types.AdminOperation{}, false, types.NewDBWriteFailed(err.Error())
+	}
+	return locked, true, nil
+}
+
 func insertOperationResult(ctx context.Context, tx pgx.Tx, result types.AdminOperationResult) error {
 	_, err := tx.Exec(ctx, `
 INSERT INTO admin_operation_results (

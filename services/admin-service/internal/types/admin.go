@@ -20,11 +20,12 @@ const (
 	RiskLevelHigh     = "HIGH"
 	RiskLevelCritical = "CRITICAL"
 
-	AdminEventOperationSubmitted = "admin.operation.submitted.v1"
-	AdminEventOperationApproved  = "admin.operation.approved.v1"
-	AdminEventOperationRejected  = "admin.operation.rejected.v1"
-	AdminEventOperationExecuted  = "admin.operation.executed.v1"
-	AdminEventOperationFailed    = "admin.operation.failed.v1"
+	AdminEventOperationSubmitted             = "admin.operation.submitted.v1"
+	AdminEventOperationApproved              = "admin.operation.approved.v1"
+	AdminEventOperationRejected              = "admin.operation.rejected.v1"
+	AdminEventOperationExecuted              = "admin.operation.executed.v1"
+	AdminEventOperationFailed                = "admin.operation.failed.v1"
+	AdminEventOperationCompensationRequested = "admin.operation.compensation_requested.v1"
 
 	OutboxStatusPending   = "PENDING"
 	OutboxStatusPublished = "PUBLISHED"
@@ -73,6 +74,14 @@ type ListAdminOperationsCommand struct {
 	Status        string
 	OperationType string
 	PageSize      int
+}
+
+type RequestAdminOperationCompensationCommand struct {
+	TenantID              TenantID
+	OperationID           string
+	RequestedBy           string
+	CompensationReasonRef string
+	DryRun                bool
 }
 
 type AdminOperation struct {

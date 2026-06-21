@@ -141,6 +141,107 @@ WHERE tenant_id = $1 AND result_id = $2
 	})
 }
 
+func TestRepositoryAdminCompensationRequestIntegration(t *testing.T) {
+	ctx := context.Background()
+	pool := openAdminTestPool(t)
+	resetAdminTables(t, ctx, pool)
+	repository := NewRepository(pool)
+
+	prepared := prepareAdminOperation(t, "admin-comp-create-idem-1", "admop_comp_test_1", types.RiskLevelHigh)
+	operation, _, err := repository.CreateAdminOperation(ctx, prepared)
+	if err != nil {
+		t.Fatalf("create admin operation: %v", err)
+	}
+	approval := prepareApproval(t, operation.OperationID, "admin-comp-approve-idem-1", "admappr_comp_test_1", "admin:comp-approver", types.DecisionApprove)
+	if _, _, _, err := repository.ApproveAdminOperation(ctx, approval); err != nil {
+		t.Fatalf("approve admin operation: %v", err)
+	}
+	claimed, err := repository.ClaimApprovedOperations(ctx, 10, time.Minute)
+	if err != nil {
+		t.Fatalf("claim approved operations: %v", err)
+	}
+	if len(claimed) != 1 {
+		t.Fatalf("expected one claimed operation, got %+v", claimed)
+	}
+	failed, err := repository.CompleteAdminOperation(ctx, claimed[0], types.OperationExecutionResult{
+		DownstreamService:    "control-plane-service",
+		DownstreamRequestRef: "config:local:quota:v1",
+		Status:               types.OperationStatusFailed,
+		FailureClass:         "DOWNSTREAM_FAILED",
+		PublicError:          "admin operation execution failed",
+	}, "admres_comp_test_1")
+	if err != nil {
+		t.Fatalf("complete admin operation as failed: %v", err)
+	}
+	if failed.Status != types.OperationStatusFailed {
+		t.Fatalf("expected failed operation, got %+v", failed)
+	}
+
+	dryRun, changed, err := repository.RequestAdminOperationCompensation(ctx, types.RequestAdminOperationCompensationCommand{
+		TenantID:              failed.TenantID,
+		OperationID:           failed.OperationID,
+		RequestedBy:           "operator:compensator",
+		CompensationReasonRef: "reason:compensation-1",
+		DryRun:                true,
+	})
+	if err != nil {
+		t.Fatalf("dry-run compensation request: %v", err)
+	}
+	if changed || dryRun.Status != types.OperationStatusFailed {
+		t.Fatalf("dry-run should not change operation: changed=%v operation=%+v", changed, dryRun)
+	}
+
+	compensating, changed, err := repository.RequestAdminOperationCompensation(ctx, types.RequestAdminOperationCompensationCommand{
+		TenantID:              failed.TenantID,
+		OperationID:           failed.OperationID,
+		RequestedBy:           "operator:compensator",
+		CompensationReasonRef: "reason:compensation-1",
+	})
+	if err != nil {
+		t.Fatalf("request compensation: %v", err)
+	}
+	if !changed || compensating.Status != types.OperationStatusCompensationRequested {
+		t.Fatalf("unexpected compensation result changed=%v operation=%+v", changed, compensating)
+	}
+	replayed, changed, err := repository.RequestAdminOperationCompensation(ctx, types.RequestAdminOperationCompensationCommand{
+		TenantID:    failed.TenantID,
+		OperationID: failed.OperationID,
+		RequestedBy: "operator:compensator",
+	})
+	if err != nil {
+		t.Fatalf("replay compensation request: %v", err)
+	}
+	if changed || replayed.Status != types.OperationStatusCompensationRequested {
+		t.Fatalf("unexpected replay result changed=%v operation=%+v", changed, replayed)
+	}
+	assertAdminOutboxEventLowSensitive(t, ctx, pool, types.AdminEventOperationCompensationRequested, []string{
+		`"compensation_requested_by_hash"`,
+		`"compensation_reason_ref"`,
+	})
+}
+
+func TestRepositoryAdminCompensationRequiresFailedOperationIntegration(t *testing.T) {
+	ctx := context.Background()
+	pool := openAdminTestPool(t)
+	resetAdminTables(t, ctx, pool)
+	repository := NewRepository(pool)
+
+	prepared := prepareAdminOperation(t, "admin-comp-precond-create", "admop_comp_precond", types.RiskLevelMedium)
+	operation, _, err := repository.CreateAdminOperation(ctx, prepared)
+	if err != nil {
+		t.Fatalf("create admin operation: %v", err)
+	}
+	_, _, err = repository.RequestAdminOperationCompensation(ctx, types.RequestAdminOperationCompensationCommand{
+		TenantID:              operation.TenantID,
+		OperationID:           operation.OperationID,
+		RequestedBy:           "operator:compensator",
+		CompensationReasonRef: "reason:compensation-1",
+	})
+	if !errors.Is(err, types.ErrFailedPrecondition) {
+		t.Fatalf("expected failed precondition, got %v", err)
+	}
+}
+
 func prepareAdminOperation(t *testing.T, idempotencyKey string, operationID string, risk string) domain.PreparedOperation {
 	t.Helper()
 	prepared, err := domain.PrepareCreate(types.CreateAdminOperationCommand{

@@ -86,8 +86,11 @@ control-plane-service.PublishConfigVersion(API_GATEWAY_TENANT_QUOTA)`；第四�
 control-plane adapter 已支持非 `CRITICAL` `POLICY_RULE_CHANGE ->
 control-plane-service.PublishConfigVersion(POLICY_RULESET_REF)`。
 admin `Create -> operator approve -> operation-worker -> control-plane` 本地多进程
-publish / rollback / tenant quota / policy ruleset smoke 已通过。下一步默认继续
-admin compensation operator、其它明确下游公开 admin API adapter，或在镜像可用后继续 focused pgvector smoke、Milvus /
+publish / rollback / tenant quota / policy ruleset smoke 已通过。`admin-service`
+已新增 first-stage `compensation-request` 本地 operator：默认 dry-run，正式执行只把
+`FAILED` operation 标记为 `COMPENSATION_REQUESTED`，并写低敏
+`admin.operation.compensation_requested.v1` outbox，reason file 只落 hash / ref。
+下一步默认继续 admin compensation workflow / worker、其它明确下游公开 admin API adapter，或在镜像可用后继续 focused pgvector smoke、Milvus /
 OpenSearch backend / provider repair / 真 provider backfill smoke。
 ```
 

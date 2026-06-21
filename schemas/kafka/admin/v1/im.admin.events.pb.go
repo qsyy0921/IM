@@ -47,6 +47,7 @@ type AdminEvent struct {
 	//	*AdminEvent_OperationRejected
 	//	*AdminEvent_OperationExecuted
 	//	*AdminEvent_OperationFailed
+	//	*AdminEvent_OperationCompensationRequested
 	Payload       isAdminEvent_Payload `protobuf_oneof:"payload"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -225,6 +226,15 @@ func (x *AdminEvent) GetOperationFailed() *AdminOperationFailedV1 {
 	return nil
 }
 
+func (x *AdminEvent) GetOperationCompensationRequested() *AdminOperationCompensationRequestedV1 {
+	if x != nil {
+		if x, ok := x.Payload.(*AdminEvent_OperationCompensationRequested); ok {
+			return x.OperationCompensationRequested
+		}
+	}
+	return nil
+}
+
 type isAdminEvent_Payload interface {
 	isAdminEvent_Payload()
 }
@@ -249,6 +259,10 @@ type AdminEvent_OperationFailed struct {
 	OperationFailed *AdminOperationFailedV1 `protobuf:"bytes,24,opt,name=operation_failed,json=operationFailed,proto3,oneof"`
 }
 
+type AdminEvent_OperationCompensationRequested struct {
+	OperationCompensationRequested *AdminOperationCompensationRequestedV1 `protobuf:"bytes,25,opt,name=operation_compensation_requested,json=operationCompensationRequested,proto3,oneof"`
+}
+
 func (*AdminEvent_OperationSubmitted) isAdminEvent_Payload() {}
 
 func (*AdminEvent_OperationApproved) isAdminEvent_Payload() {}
@@ -258,6 +272,8 @@ func (*AdminEvent_OperationRejected) isAdminEvent_Payload() {}
 func (*AdminEvent_OperationExecuted) isAdminEvent_Payload() {}
 
 func (*AdminEvent_OperationFailed) isAdminEvent_Payload() {}
+
+func (*AdminEvent_OperationCompensationRequested) isAdminEvent_Payload() {}
 
 type AdminOperationSubmittedV1 struct {
 	state                protoimpl.MessageState `protogen:"open.v1"`
@@ -903,11 +919,135 @@ func (x *AdminOperationFailedV1) GetPayloadHash() string {
 	return ""
 }
 
+type AdminOperationCompensationRequestedV1 struct {
+	state                       protoimpl.MessageState `protogen:"open.v1"`
+	TenantId                    string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	OperationId                 string                 `protobuf:"bytes,2,opt,name=operation_id,json=operationId,proto3" json:"operation_id,omitempty"`
+	OperationType               string                 `protobuf:"bytes,3,opt,name=operation_type,json=operationType,proto3" json:"operation_type,omitempty"`
+	TargetRefHash               string                 `protobuf:"bytes,4,opt,name=target_ref_hash,json=targetRefHash,proto3" json:"target_ref_hash,omitempty"`
+	RiskLevel                   string                 `protobuf:"bytes,5,opt,name=risk_level,json=riskLevel,proto3" json:"risk_level,omitempty"`
+	Status                      string                 `protobuf:"bytes,6,opt,name=status,proto3" json:"status,omitempty"`
+	RequestedByHash             string                 `protobuf:"bytes,7,opt,name=requested_by_hash,json=requestedByHash,proto3" json:"requested_by_hash,omitempty"`
+	ApprovedByHash              string                 `protobuf:"bytes,8,opt,name=approved_by_hash,json=approvedByHash,proto3" json:"approved_by_hash,omitempty"`
+	CompensationRequestedByHash string                 `protobuf:"bytes,9,opt,name=compensation_requested_by_hash,json=compensationRequestedByHash,proto3" json:"compensation_requested_by_hash,omitempty"`
+	CompensationReasonRef       string                 `protobuf:"bytes,10,opt,name=compensation_reason_ref,json=compensationReasonRef,proto3" json:"compensation_reason_ref,omitempty"`
+	PayloadHash                 string                 `protobuf:"bytes,11,opt,name=payload_hash,json=payloadHash,proto3" json:"payload_hash,omitempty"`
+	unknownFields               protoimpl.UnknownFields
+	sizeCache                   protoimpl.SizeCache
+}
+
+func (x *AdminOperationCompensationRequestedV1) Reset() {
+	*x = AdminOperationCompensationRequestedV1{}
+	mi := &file_admin_v1_im_admin_events_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AdminOperationCompensationRequestedV1) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AdminOperationCompensationRequestedV1) ProtoMessage() {}
+
+func (x *AdminOperationCompensationRequestedV1) ProtoReflect() protoreflect.Message {
+	mi := &file_admin_v1_im_admin_events_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AdminOperationCompensationRequestedV1.ProtoReflect.Descriptor instead.
+func (*AdminOperationCompensationRequestedV1) Descriptor() ([]byte, []int) {
+	return file_admin_v1_im_admin_events_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *AdminOperationCompensationRequestedV1) GetTenantId() string {
+	if x != nil {
+		return x.TenantId
+	}
+	return ""
+}
+
+func (x *AdminOperationCompensationRequestedV1) GetOperationId() string {
+	if x != nil {
+		return x.OperationId
+	}
+	return ""
+}
+
+func (x *AdminOperationCompensationRequestedV1) GetOperationType() string {
+	if x != nil {
+		return x.OperationType
+	}
+	return ""
+}
+
+func (x *AdminOperationCompensationRequestedV1) GetTargetRefHash() string {
+	if x != nil {
+		return x.TargetRefHash
+	}
+	return ""
+}
+
+func (x *AdminOperationCompensationRequestedV1) GetRiskLevel() string {
+	if x != nil {
+		return x.RiskLevel
+	}
+	return ""
+}
+
+func (x *AdminOperationCompensationRequestedV1) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *AdminOperationCompensationRequestedV1) GetRequestedByHash() string {
+	if x != nil {
+		return x.RequestedByHash
+	}
+	return ""
+}
+
+func (x *AdminOperationCompensationRequestedV1) GetApprovedByHash() string {
+	if x != nil {
+		return x.ApprovedByHash
+	}
+	return ""
+}
+
+func (x *AdminOperationCompensationRequestedV1) GetCompensationRequestedByHash() string {
+	if x != nil {
+		return x.CompensationRequestedByHash
+	}
+	return ""
+}
+
+func (x *AdminOperationCompensationRequestedV1) GetCompensationReasonRef() string {
+	if x != nil {
+		return x.CompensationReasonRef
+	}
+	return ""
+}
+
+func (x *AdminOperationCompensationRequestedV1) GetPayloadHash() string {
+	if x != nil {
+		return x.PayloadHash
+	}
+	return ""
+}
+
 var File_admin_v1_im_admin_events_proto protoreflect.FileDescriptor
 
 const file_admin_v1_im_admin_events_proto_rawDesc = "" +
 	"\n" +
-	"\x1eadmin/v1/im.admin.events.proto\x12\x17nexusim.admin.events.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xde\a\n" +
+	"\x1eadmin/v1/im.admin.events.proto\x12\x17nexusim.admin.events.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xeb\b\n" +
 	"\n" +
 	"AdminEvent\x12\x19\n" +
 	"\bevent_id\x18\x01 \x01(\tR\aeventId\x12\x1d\n" +
@@ -930,7 +1070,8 @@ const file_admin_v1_im_admin_events_proto_rawDesc = "" +
 	"\x12operation_approved\x18\x15 \x01(\v21.nexusim.admin.events.v1.AdminOperationApprovedV1H\x00R\x11operationApproved\x12b\n" +
 	"\x12operation_rejected\x18\x16 \x01(\v21.nexusim.admin.events.v1.AdminOperationRejectedV1H\x00R\x11operationRejected\x12b\n" +
 	"\x12operation_executed\x18\x17 \x01(\v21.nexusim.admin.events.v1.AdminOperationExecutedV1H\x00R\x11operationExecuted\x12\\\n" +
-	"\x10operation_failed\x18\x18 \x01(\v2/.nexusim.admin.events.v1.AdminOperationFailedV1H\x00R\x0foperationFailedB\t\n" +
+	"\x10operation_failed\x18\x18 \x01(\v2/.nexusim.admin.events.v1.AdminOperationFailedV1H\x00R\x0foperationFailed\x12\x8a\x01\n" +
+	" operation_compensation_requested\x18\x19 \x01(\v2>.nexusim.admin.events.v1.AdminOperationCompensationRequestedV1H\x00R\x1eoperationCompensationRequestedB\t\n" +
 	"\apayload\"\x85\x03\n" +
 	"\x19AdminOperationSubmittedV1\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12!\n" +
@@ -1007,7 +1148,21 @@ const file_admin_v1_im_admin_events_proto_rawDesc = "" +
 	"\x16downstream_request_ref\x18\v \x01(\tR\x14downstreamRequestRef\x12#\n" +
 	"\rfailure_class\x18\f \x01(\tR\ffailureClass\x12!\n" +
 	"\fpublic_error\x18\r \x01(\tR\vpublicError\x12!\n" +
-	"\fpayload_hash\x18\x0e \x01(\tR\vpayloadHashB=Z;github.com/qsyy0921/IM/schemas/kafka/admin/v1;admineventsv1b\x06proto3"
+	"\fpayload_hash\x18\x0e \x01(\tR\vpayloadHash\"\xe3\x03\n" +
+	"%AdminOperationCompensationRequestedV1\x12\x1b\n" +
+	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12!\n" +
+	"\foperation_id\x18\x02 \x01(\tR\voperationId\x12%\n" +
+	"\x0eoperation_type\x18\x03 \x01(\tR\roperationType\x12&\n" +
+	"\x0ftarget_ref_hash\x18\x04 \x01(\tR\rtargetRefHash\x12\x1d\n" +
+	"\n" +
+	"risk_level\x18\x05 \x01(\tR\triskLevel\x12\x16\n" +
+	"\x06status\x18\x06 \x01(\tR\x06status\x12*\n" +
+	"\x11requested_by_hash\x18\a \x01(\tR\x0frequestedByHash\x12(\n" +
+	"\x10approved_by_hash\x18\b \x01(\tR\x0eapprovedByHash\x12C\n" +
+	"\x1ecompensation_requested_by_hash\x18\t \x01(\tR\x1bcompensationRequestedByHash\x126\n" +
+	"\x17compensation_reason_ref\x18\n" +
+	" \x01(\tR\x15compensationReasonRef\x12!\n" +
+	"\fpayload_hash\x18\v \x01(\tR\vpayloadHashB=Z;github.com/qsyy0921/IM/schemas/kafka/admin/v1;admineventsv1b\x06proto3"
 
 var (
 	file_admin_v1_im_admin_events_proto_rawDescOnce sync.Once
@@ -1021,28 +1176,30 @@ func file_admin_v1_im_admin_events_proto_rawDescGZIP() []byte {
 	return file_admin_v1_im_admin_events_proto_rawDescData
 }
 
-var file_admin_v1_im_admin_events_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_admin_v1_im_admin_events_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
 var file_admin_v1_im_admin_events_proto_goTypes = []any{
-	(*AdminEvent)(nil),                // 0: nexusim.admin.events.v1.AdminEvent
-	(*AdminOperationSubmittedV1)(nil), // 1: nexusim.admin.events.v1.AdminOperationSubmittedV1
-	(*AdminOperationApprovedV1)(nil),  // 2: nexusim.admin.events.v1.AdminOperationApprovedV1
-	(*AdminOperationRejectedV1)(nil),  // 3: nexusim.admin.events.v1.AdminOperationRejectedV1
-	(*AdminOperationExecutedV1)(nil),  // 4: nexusim.admin.events.v1.AdminOperationExecutedV1
-	(*AdminOperationFailedV1)(nil),    // 5: nexusim.admin.events.v1.AdminOperationFailedV1
-	(*timestamppb.Timestamp)(nil),     // 6: google.protobuf.Timestamp
+	(*AdminEvent)(nil),                            // 0: nexusim.admin.events.v1.AdminEvent
+	(*AdminOperationSubmittedV1)(nil),             // 1: nexusim.admin.events.v1.AdminOperationSubmittedV1
+	(*AdminOperationApprovedV1)(nil),              // 2: nexusim.admin.events.v1.AdminOperationApprovedV1
+	(*AdminOperationRejectedV1)(nil),              // 3: nexusim.admin.events.v1.AdminOperationRejectedV1
+	(*AdminOperationExecutedV1)(nil),              // 4: nexusim.admin.events.v1.AdminOperationExecutedV1
+	(*AdminOperationFailedV1)(nil),                // 5: nexusim.admin.events.v1.AdminOperationFailedV1
+	(*AdminOperationCompensationRequestedV1)(nil), // 6: nexusim.admin.events.v1.AdminOperationCompensationRequestedV1
+	(*timestamppb.Timestamp)(nil),                 // 7: google.protobuf.Timestamp
 }
 var file_admin_v1_im_admin_events_proto_depIdxs = []int32{
-	6, // 0: nexusim.admin.events.v1.AdminEvent.occurred_at:type_name -> google.protobuf.Timestamp
+	7, // 0: nexusim.admin.events.v1.AdminEvent.occurred_at:type_name -> google.protobuf.Timestamp
 	1, // 1: nexusim.admin.events.v1.AdminEvent.operation_submitted:type_name -> nexusim.admin.events.v1.AdminOperationSubmittedV1
 	2, // 2: nexusim.admin.events.v1.AdminEvent.operation_approved:type_name -> nexusim.admin.events.v1.AdminOperationApprovedV1
 	3, // 3: nexusim.admin.events.v1.AdminEvent.operation_rejected:type_name -> nexusim.admin.events.v1.AdminOperationRejectedV1
 	4, // 4: nexusim.admin.events.v1.AdminEvent.operation_executed:type_name -> nexusim.admin.events.v1.AdminOperationExecutedV1
 	5, // 5: nexusim.admin.events.v1.AdminEvent.operation_failed:type_name -> nexusim.admin.events.v1.AdminOperationFailedV1
-	6, // [6:6] is the sub-list for method output_type
-	6, // [6:6] is the sub-list for method input_type
-	6, // [6:6] is the sub-list for extension type_name
-	6, // [6:6] is the sub-list for extension extendee
-	0, // [0:6] is the sub-list for field type_name
+	6, // 6: nexusim.admin.events.v1.AdminEvent.operation_compensation_requested:type_name -> nexusim.admin.events.v1.AdminOperationCompensationRequestedV1
+	7, // [7:7] is the sub-list for method output_type
+	7, // [7:7] is the sub-list for method input_type
+	7, // [7:7] is the sub-list for extension type_name
+	7, // [7:7] is the sub-list for extension extendee
+	0, // [0:7] is the sub-list for field type_name
 }
 
 func init() { file_admin_v1_im_admin_events_proto_init() }
@@ -1056,6 +1213,7 @@ func file_admin_v1_im_admin_events_proto_init() {
 		(*AdminEvent_OperationRejected)(nil),
 		(*AdminEvent_OperationExecuted)(nil),
 		(*AdminEvent_OperationFailed)(nil),
+		(*AdminEvent_OperationCompensationRequested)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -1063,7 +1221,7 @@ func file_admin_v1_im_admin_events_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_admin_v1_im_admin_events_proto_rawDesc), len(file_admin_v1_im_admin_events_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   6,
+			NumMessages:   7,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

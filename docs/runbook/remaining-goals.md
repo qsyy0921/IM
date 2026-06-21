@@ -102,8 +102,9 @@ Foundation backlog 锚点：`search-service`、`memory-service`、`retrieval-gat
   `CRITICAL -> workflow-service ADMIN_OPERATION` 和第一版 operation-specific
   approval policy / target-service routing 已接；`CONFIG_PUBLISH` /
   `CONFIG_ROLLBACK` / `TENANT_QUOTA_CHANGE` / `POLICY_RULE_CHANGE` 已接
-  control-plane 公开 API；后续仍需 audit ingestion / export、admin UI、其它明确
-  下游公开 admin API adapter、compensation operator 和 provider-grade 运维。
+  control-plane 公开 API；first-stage `compensation-request` 本地 operator 已接；
+  后续仍需 audit ingestion / export、admin UI、其它明确下游公开 admin API adapter、
+  compensation workflow / worker 和 provider-grade 运维。
 
 ## 后置平台 / 产品化服务
 

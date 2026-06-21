@@ -156,10 +156,15 @@ model-gateway / workflow / knowledge-ingestion / vector-index
   `control-plane-service.PublishConfigVersion(POLICY_RULESET_REF)` 发布低敏规则集引用，
   并已跑通本地多进程 `Create -> approve -> policy ruleset publish ->
   GetConfigSnapshot` smoke。
+- `admin-service` 已新增 first-stage `compensation-request` 本地 operator：默认 dry-run；
+  显式关闭 dry-run 后只允许把 `FAILED` operation 标记为
+  `COMPENSATION_REQUESTED`，并写低敏
+  `admin.operation.compensation_requested.v1` outbox。operator reason file 只落
+  sha256 hash / ref，不落 reason 原文。
 
 ## 下一步
 
-- 默认继续 admin compensation operator，或补其它明确下游公开 admin API adapter。
+- 默认继续 admin compensation workflow / worker，或补其它明确下游公开 admin API adapter。
 - 默认下一步可继续 vector-index provider backend：在镜像可用后跑 focused pgvector smoke、
   真实 Milvus / OpenSearch backend、provider backend repair / 真 provider backfill smoke，
   或继续 active future service 的 focused checks。

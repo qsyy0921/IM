@@ -49,6 +49,8 @@ func run(ctx context.Context) error {
 		return runOperationWorker(ctx)
 	case "outbox-relay":
 		return runOutboxRelay(ctx)
+	case "compensation-request":
+		return runCompensationRequest(ctx)
 	default:
 		return fmt.Errorf("unsupported NEXUSIM_ADMIN_SERVICE_MODE %q", mode)
 	}
@@ -262,7 +264,7 @@ func adminModeFromEnv() string {
 
 func validateAdminMode(mode string) error {
 	switch mode {
-	case "noop", "grpc", "operation-worker", "outbox-relay":
+	case "noop", "grpc", "operation-worker", "outbox-relay", "compensation-request":
 		return nil
 	default:
 		return fmt.Errorf("unsupported NEXUSIM_ADMIN_SERVICE_MODE %q", mode)

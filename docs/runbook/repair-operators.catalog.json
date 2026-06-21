@@ -244,6 +244,22 @@
       "reason_file_envs": []
     },
     {
+      "service": "admin-service",
+      "mode_env": "NEXUSIM_ADMIN_SERVICE_MODE",
+      "modes": [
+        "compensation-request"
+      ],
+      "output_envs": [
+        "NEXUSIM_ADMIN_COMPENSATION_OUTPUT"
+      ],
+      "dry_run_envs": [
+        "NEXUSIM_ADMIN_COMPENSATION_DRY_RUN"
+      ],
+      "reason_file_envs": [
+        "NEXUSIM_ADMIN_COMPENSATION_REASON_FILE"
+      ]
+    },
+    {
       "service": "agent-service",
       "mode_env": "NEXUSIM_AGENT_SERVICE_MODE",
       "modes": [

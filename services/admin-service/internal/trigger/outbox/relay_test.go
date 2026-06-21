@@ -76,6 +76,24 @@ func TestBuildAdminEventExecutedAndFailed(t *testing.T) {
 	}
 }
 
+func TestBuildAdminEventCompensationRequested(t *testing.T) {
+	payload := approvedPayload(types.DecisionApprove)
+	payload["status"] = types.OperationStatusCompensationRequested
+	payload["compensation_requested_by_hash"] = "sha256:compensator"
+	payload["compensation_reason_ref"] = "reason-sha256:compensation"
+	event, err := BuildAdminEvent(adminOutboxMessage(types.AdminEventOperationCompensationRequested, payload))
+	if err != nil {
+		t.Fatalf("build compensation requested event: %v", err)
+	}
+	compensation := event.GetOperationCompensationRequested()
+	if compensation == nil ||
+		compensation.Status != types.OperationStatusCompensationRequested ||
+		compensation.CompensationRequestedByHash != "sha256:compensator" ||
+		compensation.CompensationReasonRef != "reason-sha256:compensation" {
+		t.Fatalf("unexpected compensation event: %+v", event)
+	}
+}
+
 func TestBuildAdminEventRejectsSensitivePayloadFields(t *testing.T) {
 	for _, field := range []string{"payload_json", "operation_payload_json", "operator_ref", "token", "secret", "provider_body"} {
 		payload := submittedPayload()

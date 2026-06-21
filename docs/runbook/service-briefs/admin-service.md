@@ -23,6 +23,10 @@
   local no-op executor 或 workflow-service -> 写 `admin_operation_results` ->
   operation 终态 `SUCCEEDED/FAILED` -> 写
   `admin.operation.executed/failed.v1` outbox。
+- 已提供 first-stage `compensation-request` 本地 operator：默认 dry-run，显式关闭
+  dry-run 后只允许把 `FAILED` operation 标记为 `COMPENSATION_REQUESTED`，并写低敏
+  `admin.operation.compensation_requested.v1` outbox；reason file 只落 hash / ref，
+  不落 reason 原文。
 - 已接入第一版 workflow 路由：`REPAIR_REQUEST` 创建
   `workflow-service` 的 `REPAIR_APPROVAL`，其它 `CRITICAL` operation 创建
   `ADMIN_OPERATION`；config / quota / policy / audit / notification 类 operation
@@ -73,4 +77,4 @@
 后续：
 
 - audit-service ingestion / export、admin UI、更多下游公开 admin API adapter、
-  compensation operator 和 provider-grade 运维。
+  compensation workflow / worker 和 provider-grade 运维。

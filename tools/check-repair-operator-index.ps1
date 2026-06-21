@@ -265,6 +265,23 @@ $operatorSpecs = @(
             "NEXUSIM_API_GATEWAY_TENANT_QUOTA_SET_DRY_RUN"
         )
         ReasonFileEnvs = @()
+    },
+    @{
+        Service = "admin-service"
+        Cmd = "services\admin-service\cmd\admin-service\main.go"
+        Env = "NEXUSIM_ADMIN_SERVICE_MODE"
+        Modes = @(
+            "compensation-request"
+        )
+        OutputEnvs = @(
+            "NEXUSIM_ADMIN_COMPENSATION_OUTPUT"
+        )
+        DryRunEnvs = @(
+            "NEXUSIM_ADMIN_COMPENSATION_DRY_RUN"
+        )
+        ReasonFileEnvs = @(
+            "NEXUSIM_ADMIN_COMPENSATION_REASON_FILE"
+        )
     }
 )
 
@@ -438,7 +455,7 @@ foreach ($spec in $operatorSpecs) {
     }
 }
 
-$operatorModePattern = "(audit|repair|cleanup|keyring-rotate|tenant-privacy-default-set|source-policy-set|tenant-quota-set)"
+$operatorModePattern = "(audit|repair|cleanup|keyring-rotate|tenant-privacy-default-set|source-policy-set|tenant-quota-set|compensation-request)"
 $serviceCommandFiles = Get-ChildItem -LiteralPath (Join-Path $repoRoot "services") -Recurse -Filter "main.go" -File |
     Where-Object { $_.FullName -like "*\cmd\*" } |
     Sort-Object FullName

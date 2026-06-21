@@ -136,7 +136,9 @@ does not install packages, connect to devices, launch installers or print local
 absolute paths.
 `plan:shell-smoke` consumes the same install plan, so native shell smoke
 readiness is not marked ready until a collected artifact exists and its
-install-side prerequisites are available.
+install-side prerequisites are available. Its artifact status distinguishes
+raw native build-output discovery from the collected artifact manifest used for
+manual install and smoke.
 
 Android can also be built through the local Docker builder profile when the image
 is intentionally built:

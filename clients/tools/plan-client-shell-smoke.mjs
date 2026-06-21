@@ -10,10 +10,10 @@ function main() {
   process.stdout.write(`${JSON.stringify(buildClientShellSmokePlan(), null, 2)}\n`);
 }
 
-export function buildClientShellSmokePlan() {
-  const readiness = buildReadinessReport();
-  const artifactPlan = collectPlan(parseCollectArgs(["--target", "all", "--dry-run", "--run-id", "shell-smoke-plan"]));
-  const installPlan = buildClientArtifactInstallPlan();
+export function buildClientShellSmokePlan(options = {}) {
+  const readiness = options.readiness ?? buildReadinessReport();
+  const artifactPlan = options.artifactPlan ?? collectPlan(parseCollectArgs(["--target", "all", "--dry-run", "--run-id", "shell-smoke-plan"]));
+  const installPlan = options.installPlan ?? buildClientArtifactInstallPlan();
   return {
     schemaVersion: smokeSchemaVersion,
     generatedAt: new Date().toISOString(),
@@ -59,8 +59,8 @@ function browserTarget() {
 }
 
 function nativeTarget(target, readinessTarget, artifactPlan, installPlan) {
-  const artifactStatus = artifactStatusFor(target, artifactPlan);
   const installStatus = installStatusFor(target, installPlan);
+  const artifactStatus = artifactStatusFor(target, artifactPlan, installStatus);
   const readyForManualShellSmoke = Boolean(
     readinessTarget?.ready &&
     readinessTarget?.shellAssets?.verified &&
@@ -79,7 +79,7 @@ function nativeTarget(target, readinessTarget, artifactPlan, installPlan) {
   };
 }
 
-function artifactStatusFor(target, artifactPlan) {
+function artifactStatusFor(target, artifactPlan, installStatus) {
   const sources = artifactPlan.sources
     .filter(source => source.target === target)
     .map(source => ({
@@ -89,8 +89,13 @@ function artifactStatusFor(target, artifactPlan) {
   const missing = artifactPlan.missing
     .filter(entry => entry.target === target)
     .flatMap(entry => entry.expected);
+  const buildOutputPresent = sources.length > 0;
+  const collectedArtifactReady = Boolean(installStatus.artifactReady);
   return {
-    present: sources.length > 0,
+    present: buildOutputPresent || collectedArtifactReady,
+    buildOutputPresent,
+    collectedArtifactReady,
+    collectedArtifactHint: installStatus.artifactHint,
     sources,
     missing
   };

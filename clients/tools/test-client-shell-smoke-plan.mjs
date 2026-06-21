@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { buildClientShellSmokePlan } from "./plan-client-shell-smoke.mjs";
 
 const toolsDir = dirname(fileURLToPath(import.meta.url));
 const planScript = join(toolsDir, "plan-client-shell-smoke.mjs");
@@ -47,5 +48,101 @@ assert(plan.sharedSmoke.wiredLanExample.includes("172.31.50.1"), "wired LAN smok
 assert(!serialized.match(/token|secret|password|credential|private/i), "shell smoke plan leaked sensitive names");
 assert(!serialized.match(/[A-Z]:\\\\/), "shell smoke plan leaked Windows absolute path");
 assert(!serialized.includes("\\\\?"), "shell smoke plan leaked extended Windows path");
+
+const readyReadiness = {
+  targets: {
+    "windows-desktop": {
+      ready: true,
+      shellAssets: {
+        verified: true,
+        fileCount: 4
+      },
+      missing: [],
+      buildCommand: "npm --prefix clients run build:desktop-artifact:collect",
+      dryRunCommand: "node clients/tools/build-desktop-artifact.mjs --dry-run --collect"
+    },
+    android: {
+      ready: true,
+      shellAssets: {
+        verified: true,
+        fileCount: 4
+      },
+      missing: [],
+      buildCommand: "npm --prefix clients run build:android-apk:collect",
+      dryRunCommand: "node clients/tools/build-android-apk.mjs --dry-run --collect"
+    }
+  }
+};
+const noBuildOutputArtifactPlan = {
+  sources: [],
+  missing: [
+    {
+      target: "windows-desktop",
+      expected: ["desktop/src-tauri/target/release/bundle"]
+    },
+    {
+      target: "android",
+      expected: ["android/native/app/build/outputs/apk/debug/app-debug.apk"]
+    }
+  ]
+};
+const collectedInstallPlan = {
+  targets: {
+    "windows-desktop": {
+      artifactReady: true,
+      readyForInstall: true,
+      missing: [],
+      installPrereqs: {
+        windowsInstallerLaunchSupported: true
+      },
+      artifact: {
+        artifactHint: "clients/artifacts/run/nexusim-windows-desktop.msi"
+      }
+    },
+    android: {
+      artifactReady: true,
+      readyForInstall: true,
+      missing: [],
+      installPrereqs: {
+        adbAvailable: true
+      },
+      artifact: {
+        artifactHint: "clients/artifacts/run/nexusim-android-debug.apk"
+      }
+    }
+  }
+};
+const readyFromCollectedPlan = buildClientShellSmokePlan({
+  readiness: readyReadiness,
+  artifactPlan: noBuildOutputArtifactPlan,
+  installPlan: collectedInstallPlan
+});
+assert(readyFromCollectedPlan.targets["windows-desktop"].readyForManualShellSmoke === true, "desktop should be smoke-ready from collected artifact");
+assert(readyFromCollectedPlan.targets["windows-desktop"].artifact.present === true, "desktop artifact should be present from collected manifest");
+assert(readyFromCollectedPlan.targets["windows-desktop"].artifact.buildOutputPresent === false, "desktop build output should remain false");
+assert(readyFromCollectedPlan.targets["windows-desktop"].artifact.collectedArtifactReady === true, "desktop collected artifact should be ready");
+assert(readyFromCollectedPlan.targets.android.readyForManualShellSmoke === true, "android should be smoke-ready from collected artifact");
+assert(readyFromCollectedPlan.targets.android.artifact.collectedArtifactHint === "clients/artifacts/run/nexusim-android-debug.apk", "android collected artifact hint mismatch");
+
+const missingAdbPlan = buildClientShellSmokePlan({
+  readiness: readyReadiness,
+  artifactPlan: noBuildOutputArtifactPlan,
+  installPlan: {
+    targets: {
+      "windows-desktop": collectedInstallPlan.targets["windows-desktop"],
+      android: {
+        ...collectedInstallPlan.targets.android,
+        readyForInstall: false,
+        missing: ["adb"],
+        installPrereqs: {
+          adbAvailable: false
+        }
+      }
+    }
+  }
+});
+assert(missingAdbPlan.targets.android.artifact.collectedArtifactReady === true, "android collected artifact should remain ready when adb is missing");
+assert(missingAdbPlan.targets.android.readyForManualShellSmoke === false, "android smoke should not be ready without adb");
+assert(missingAdbPlan.targets.android.checklist.some(item => item.step === "resolve-install-prereqs"), "android install-prereq checklist missing");
 
 console.log("client shell smoke plan ok");

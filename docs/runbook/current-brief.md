@@ -77,7 +77,8 @@ adoption rules，不把服务数量、中间件或部署形态写死。
   状态，artifact install plan 已能从 collected manifest 输出低敏 Windows / Android
   安装 checklist 和 install-side prereq readiness，且不触碰设备；shell smoke plan
   已消费同一 install readiness，并输出低敏 browser / desktop / Android smoke
-  前置计划和 per-target manual checklist；
+  前置计划和 per-target manual checklist，且区分 raw build output 与 collected
+  artifact manifest；
   下一步做本地 artifact / APK 和真实平台 shell smoke。
 - admin / audit / workflow：客户端切片完成后继续公开 API handoff、operator
   workflow、低敏审批 review artifact 和补偿边界。

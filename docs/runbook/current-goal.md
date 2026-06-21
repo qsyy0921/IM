@@ -155,7 +155,8 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   verification、artifact presence、collected-artifact install readiness、安全构建命令、
   artifact install plan 命令、per-target manual smoke checklist 和 shared BFF / push
   smoke 命令，不启动服务、不下载工具链、不连接设备、不安装 artifact、不声称已有
-  installer / APK。
+  installer / APK。其 native artifact 状态现在区分 raw build output discovery 与
+  collected artifact manifest readiness，避免已归档产物和本地 build 输出源混淆。
 - `loadtest/clientweb` 已新增 first-stage scriptable client smoke runner：
   准备阶段用 identity / api-gateway gRPC 注册用户、seed 会话并创建 JOIN；真实客户端
   验证段只走 `api-gateway` HTTP BFF 和 `push-gateway` WebSocket，覆盖 BFF login、

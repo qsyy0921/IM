@@ -198,6 +198,8 @@ First slice:
   asset verification, artifact presence, collected-artifact install readiness,
   safe build commands and the shared BFF / push smoke command; it does not
   launch services, connect devices, install artifacts or install toolchains.
+  Native artifact status distinguishes raw build-output discovery from the
+  collected artifact manifest that drives manual install readiness.
 - `npm --prefix clients run validate:builder-profile` validates the Android
   Docker builder profile without building or pulling images. The profile lives
   in `deploy/local/docker-compose.client-builders.yml` and uses

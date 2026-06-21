@@ -8,7 +8,10 @@ const allowedKeys = new Set([
   "deviceID",
   "installationID",
   "appVersion",
-  "sessionKey"
+  "sessionKey",
+  "smokeCallbackURL",
+  "smokeRunID",
+  "smokeMode"
 ]);
 const forbiddenKeyPattern = /(token|secret|password|credential|private)/i;
 
@@ -40,6 +43,12 @@ export function parseShellConfig(input) {
   }
   if (!output.pushWebSocketURL?.startsWith("ws://") && !output.pushWebSocketURL?.startsWith("wss://")) {
     throw new Error("shell config pushWebSocketURL must be ws(s)");
+  }
+  if (output.smokeCallbackURL && !isLoopbackHTTPURL(output.smokeCallbackURL)) {
+    throw new Error("shell config smokeCallbackURL must be loopback http");
+  }
+  if (output.smokeMode && output.smokeMode !== "metadata") {
+    throw new Error("shell config smokeMode must be metadata");
   }
   return output;
 }
@@ -74,6 +83,18 @@ function valueAfter(argv, name) {
     return undefined;
   }
   return argv[index + 1];
+}
+
+function isLoopbackHTTPURL(value) {
+  try {
+    const url = new URL(value);
+    return (
+      url.protocol === "http:" &&
+      (url.hostname === "127.0.0.1" || url.hostname === "localhost" || url.hostname === "[::1]")
+    );
+  } catch {
+    return false;
+  }
 }
 
 if (process.argv[1] && import.meta.url.endsWith(process.argv[1].replaceAll("\\", "/"))) {

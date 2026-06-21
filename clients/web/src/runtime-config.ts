@@ -18,6 +18,9 @@ export interface ClientShellConfig {
   readonly installationID?: string;
   readonly appVersion?: string;
   readonly sessionKey?: string;
+  readonly smokeCallbackURL?: string;
+  readonly smokeRunID?: string;
+  readonly smokeMode?: "metadata";
 }
 
 export interface AndroidNativeBridgeMetadata {
@@ -125,6 +128,9 @@ export function readClientShellConfig(): ClientShellConfig {
   assignIfPresent(output, "installationID", stringValue(raw.installationID));
   assignIfPresent(output, "appVersion", stringValue(raw.appVersion));
   assignIfPresent(output, "sessionKey", stringValue(raw.sessionKey));
+  assignIfPresent(output, "smokeCallbackURL", loopbackHTTPURL(raw.smokeCallbackURL));
+  assignIfPresent(output, "smokeRunID", stringValue(raw.smokeRunID));
+  assignIfPresent(output, "smokeMode", smokeMode(raw.smokeMode));
   return output;
 }
 
@@ -137,6 +143,28 @@ function shellTarget(value: unknown): ClientRuntimeTarget | undefined {
 
 function stringValue(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() !== "" ? value : undefined;
+}
+
+function loopbackHTTPURL(value: unknown): string | undefined {
+  if (typeof value !== "string" || value.trim() === "") {
+    return undefined;
+  }
+  try {
+    const url = new URL(value);
+    if (
+      url.protocol === "http:" &&
+      (url.hostname === "127.0.0.1" || url.hostname === "localhost" || url.hostname === "[::1]")
+    ) {
+      return url.toString();
+    }
+  } catch {
+    return undefined;
+  }
+  return undefined;
+}
+
+function smokeMode(value: unknown): "metadata" | undefined {
+  return value === "metadata" ? "metadata" : undefined;
 }
 
 function assignIfPresent<Key extends keyof ClientShellConfig>(

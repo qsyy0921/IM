@@ -71,11 +71,17 @@ async function main() {
     deviceID: "desktop-webview",
     installationID: "desktop-installation",
     appVersion: "0.2.0",
-    sessionKey: "nexusim:desktop-webview"
+    sessionKey: "nexusim:desktop-webview",
+    smokeCallbackURL: "http://127.0.0.1:49152/shell-smoke",
+    smokeRunID: "desktop-smoke-1",
+    smokeMode: "metadata"
   };
   const shellConfig = readClientShellConfig();
   const shellRuntimeConfig = loadRuntimeConfig();
   assertEqual(shellConfig.target, "windows-desktop", "shell config preserves desktop target");
+  assertEqual(shellConfig.smokeCallbackURL, "http://127.0.0.1:49152/shell-smoke", "shell config preserves loopback smoke callback");
+  assertEqual(shellConfig.smokeRunID, "desktop-smoke-1", "shell config preserves smoke run id");
+  assertEqual(shellConfig.smokeMode, "metadata", "shell config preserves smoke mode");
   assertEqual(shellRuntimeConfig.apiBaseURL, "http://172.31.50.1:8080", "shell config overrides api base");
   assertEqual(shellRuntimeConfig.pushWebSocketURL, "ws://172.31.50.1:8088/ws", "shell config overrides push url");
   assertEqual(shellRuntimeConfig.deviceID, "desktop-webview", "shell config overrides device id");

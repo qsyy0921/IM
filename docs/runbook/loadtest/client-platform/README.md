@@ -11,6 +11,9 @@ Current scope:
 - Desktop composed smoke can combine an existing `client-web-summary.json` with
   desktop artifact launch evidence, but it is an intermediate evidence bundle,
   not Tauri WebView GUI automation.
+- WebView metadata smoke uses shell config `smokeCallbackURL` with loopback
+  HTTP only. It is intended to prove native metadata is read from inside the
+  shell; it does not include login credentials or message flow.
 
 Reports:
 

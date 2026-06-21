@@ -10,6 +10,11 @@ import {
   readDesktopNativeBridgeMetadata
 } from "./runtime-config";
 import type { NativeBridgeMetadata } from "./runtime-config";
+import {
+  buildShellSmokeMetadataReport,
+  postShellSmokeMetadataReport,
+  shouldReportShellSmokeMetadata
+} from "./shell-smoke-report";
 
 const runtimeConfig = validateRuntimeConfig(loadRuntimeConfig());
 const shellConfig = readClientShellConfig();
@@ -50,6 +55,7 @@ export function App() {
   const sessionRef = useRef<AuthSession | null>(null);
   const activeConversationRef = useRef("");
   const pushConnectionRef = useRef<{ close(): void } | null>(null);
+  const shellSmokeReportedRef = useRef(false);
 
   useEffect(() => {
     let active = true;
@@ -62,6 +68,22 @@ export function App() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!shouldReportShellSmokeMetadata(shellConfig) || shellSmokeReportedRef.current) {
+      return;
+    }
+    const nativeMetadata = desktopNativeMetadata ?? androidNativeMetadata;
+    if ((shellConfig.target === "windows-desktop" || shellConfig.target === "android") && !nativeMetadata) {
+      return;
+    }
+    shellSmokeReportedRef.current = true;
+    const report = buildShellSmokeMetadataReport(shellConfig, runtimeConfig, nativeMetadata);
+    void postShellSmokeMetadataReport(shellConfig.smokeCallbackURL!, report).catch(caught => {
+      shellSmokeReportedRef.current = false;
+      setError(errorMessage(caught));
+    });
+  }, [desktopNativeMetadata]);
 
   async function login(): Promise<void> {
     await run("login", async () => {

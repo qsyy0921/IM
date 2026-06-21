@@ -48,9 +48,11 @@ profile 已接 collector 但尚未运行；readiness report 显示 Docker / Comp
 Tauri CLI 产出 first-stage standalone Windows exe，并写入 ignored artifact
 manifest；desktop launch sanity smoke 已验证 exe 能启动并干净终止；desktop composed
 smoke 工具已能把 existing clientweb BFF / push summary 和 desktop artifact launch
-证据合并成低敏 JSON，但它仍不是 Tauri WebView 内登录级 GUI 自动化；本机仍缺
-Android JDK 17+ / Gradle / SDK。下一步是跑登录级真实 PC shell smoke，并补
-Android 本地工具链或显式运行 builder profile 产出 Android unsigned APK。
+证据合并成低敏 JSON，但它仍不是 Tauri WebView 内登录级 GUI 自动化；WebView
+metadata smoke callback 契约已落，可用 loopback-only callback 收集 native metadata
+report；本机仍缺 Android JDK 17+ / Gradle / SDK。下一步先跑真实 Tauri WebView
+metadata callback smoke，再推进登录级真实 PC shell smoke，并补 Android 本地工具链
+或显式运行 builder profile 产出 Android unsigned APK。
 
 真实业务语言边界已经固定为：Go 负责后端微服务、client BFF、控制面、事实源和
 审计；TypeScript 负责 Web / PC / Android 的共享客户端协议、同步核心和 UI；
@@ -88,7 +90,8 @@ adoption rules，不把服务数量、中间件或部署形态写死。
   前置计划和 per-target manual checklist，且区分 raw build output 与 collected
   artifact manifest；Windows desktop 已产出 standalone exe artifact + manifest；
   launch sanity smoke 已通过；desktop composed smoke 工具已能合并 clientweb BFF /
-  push summary 与 desktop launch 证据；下一步做登录级真实 PC shell smoke、Android APK
+  push summary 与 desktop launch 证据；WebView metadata callback 契约已落；下一步
+  做真实 Tauri WebView metadata smoke、登录级真实 PC shell smoke、Android APK
   和真实 Android shell smoke。
 - admin / audit / workflow：客户端切片完成后继续公开 API handoff、operator
   workflow、低敏审批 review artifact 和补偿边界。

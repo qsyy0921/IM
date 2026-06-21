@@ -10,6 +10,15 @@ assertEqual(desktop.target, "windows-desktop", "desktop config target");
 assertNoSensitiveKeys(desktop, "desktop config");
 assertIncludes(renderShellConfigScript(desktop), "windows-desktop", "desktop script includes target");
 
+const desktopSmoke = parseShellConfig(JSON.stringify({
+  ...desktop,
+  smokeCallbackURL: "http://127.0.0.1:49152/shell-smoke",
+  smokeRunID: "desktop-webview-metadata-test",
+  smokeMode: "metadata"
+}));
+assertEqual(desktopSmoke.smokeMode, "metadata", "desktop smoke mode");
+assertIncludes(renderShellConfigScript(desktopSmoke), "smokeCallbackURL", "desktop smoke script includes callback");
+
 const android = parseShellConfig(read("android/shell-config.example.json"));
 assertEqual(android.target, "android", "android config target");
 assertNoSensitiveKeys(android, "android config");
@@ -24,6 +33,16 @@ assertThrows(
   () => parseShellConfig(JSON.stringify({ ...desktop, target: "ios" })),
   "shell config target",
   "unsupported target is rejected"
+);
+assertThrows(
+  () => parseShellConfig(JSON.stringify({ ...desktop, smokeCallbackURL: "https://example.com/smoke" })),
+  "smokeCallbackURL",
+  "non-loopback smoke callback is rejected"
+);
+assertThrows(
+  () => parseShellConfig(JSON.stringify({ ...desktop, smokeMode: "login" })),
+  "smokeMode",
+  "unsupported smoke mode is rejected"
 );
 
 const index = read("web/index.html");

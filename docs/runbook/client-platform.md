@@ -79,6 +79,12 @@ First slice:
   key so the same Web UI can identify itself as `windows-desktop` or `android`.
   This bridge is configuration-only: it does not expose file system access,
   broad native IPC or native token authority.
+- The same shell config now supports a first-stage metadata smoke callback:
+  `smokeCallbackURL`, `smokeRunID` and `smokeMode=metadata`. The callback URL
+  must be loopback `http://127.0.0.1`, `http://localhost` or `http://[::1]`.
+  When enabled, the WebView posts a low-sensitive report after reading native
+  bridge metadata. The report proves metadata wiring only; it does not submit
+  login credentials or run a message flow.
 - `web/index.html` loads `nexusim-shell-config.js` before the app bundle.
   Browser mode uses the checked-in empty placeholder; desktop / Android shell
   builds can render their low-sensitive `shell-config.example.json` through
@@ -292,7 +298,9 @@ rejected. For local LAN client smoke, prefer the wired `172.x.x.x` address.
 
 1. Run login-level real PC shell smoke against the collected standalone Windows
    artifact; launch sanity smoke already passes and composed smoke can already
-   merge desktop-launch evidence with a clientweb BFF / push summary.
+   merge desktop-launch evidence with a clientweb BFF / push summary. The
+   metadata callback contract is now present, so the next PC step can first
+   prove Tauri WebView native metadata from inside the rendered shell.
 2. Add first unsigned local APK from the Android native bridge or Docker builder.
 3. Wire lifecycle UI controls into the real Android shell, and run platform-shell
    smoke once packaging/runtime tooling is ready.

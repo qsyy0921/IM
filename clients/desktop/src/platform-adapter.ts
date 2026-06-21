@@ -43,6 +43,9 @@ function desktopMessageStore(config: DesktopRuntimeConfig): LocalMessageStore {
   if (config.localStore === "memory") {
     return new DesktopMemoryMessageStore();
   }
+  if (config.localStore === "sqlite") {
+    throw new Error("Desktop SQLite message store bridge is not available yet");
+  }
   return new DesktopPersistentMessageStore({
     namespace: `${config.os}:${config.deviceID}`
   });

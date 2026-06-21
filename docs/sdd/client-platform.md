@@ -358,8 +358,9 @@ First Web implementation uses IndexedDB through a `LocalMessageStore` port.
 PC desktop and Android now use shared `KeyValueMessageStore` with WebView
 `localStorage` as the first-stage durable cache. Production packaging should
 replace only the storage port with SQLite/native adapters while keeping
-`client-core` sync, send queue and ACK semantics shared. Android `sqlite`
-configuration is reserved and must fail fast until a real native bridge exists.
+`client-core` sync, send queue and ACK semantics shared. PC desktop and Android
+`sqlite` configuration is reserved and must fail fast until a real native bridge
+exists.
 
 Minimum local entities:
 

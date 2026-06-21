@@ -15,8 +15,10 @@ async function main() {
     `
       export { createDesktopClientRuntime } from "../desktop/src/runtime";
       export { createDesktopShellActions } from "../desktop/src/shell-actions";
+      export { createDesktopPlatformAdapter } from "../desktop/src/platform-adapter";
       export { createAndroidClientRuntime } from "../android/src/runtime";
       export { createAndroidShellActions } from "../android/src/shell-actions";
+      export { createAndroidPlatformAdapter } from "../android/src/platform-adapter";
     `,
     "utf8"
   );
@@ -32,8 +34,10 @@ async function main() {
 
   const {
     createDesktopClientRuntime,
+    createDesktopPlatformAdapter,
     createDesktopShellActions,
     createAndroidClientRuntime,
+    createAndroidPlatformAdapter,
     createAndroidShellActions
   } = await import(pathToFileURL(bundlePath).href);
 
@@ -56,6 +60,38 @@ async function main() {
     localStore: "memory",
     notificationProvider: "none"
   }, createAndroidShellActions);
+
+  assertThrows(
+    () => createDesktopPlatformAdapter({
+      config: {
+        apiBaseURL: "http://bff.local",
+        pushWebSocketURL: "ws://push.local/ws",
+        deviceID: "desktop-device",
+        os: "windows",
+        secureStorage: "development",
+        localStore: "sqlite",
+        shell: "tauri"
+      }
+    }),
+    "Desktop SQLite message store bridge is not available yet",
+    "desktop sqlite store must fail closed until native bridge exists"
+  );
+
+  assertThrows(
+    () => createAndroidPlatformAdapter({
+      config: {
+        apiBaseURL: "http://bff.local",
+        pushWebSocketURL: "ws://push.local/ws",
+        deviceID: "android-device",
+        platform: "android",
+        secureStorage: "development",
+        localStore: "sqlite",
+        notificationProvider: "none"
+      }
+    }),
+    "Android SQLite message store bridge is not available yet",
+    "android sqlite store must fail closed until native bridge exists"
+  );
 
   console.log("client runtime lifecycle ok");
 }
@@ -196,6 +232,19 @@ function assertEqual(actual, expected, message) {
   if (actual !== expected) {
     throw new Error(`${message}: expected ${String(expected)}, got ${String(actual)}`);
   }
+}
+
+function assertThrows(task, expectedMessage, message) {
+  try {
+    task();
+  } catch (error) {
+    if (error instanceof Error && error.message === expectedMessage) {
+      return;
+    }
+    const actual = error instanceof Error ? error.message : String(error);
+    throw new Error(`${message}: unexpected error ${actual}`);
+  }
+  throw new Error(`${message}: expected error`);
 }
 
 try {

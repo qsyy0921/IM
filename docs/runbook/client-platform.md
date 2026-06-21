@@ -137,8 +137,9 @@ First slice:
 - `@nexusim/client-core` now exposes `KeyValueMessageStore`, a reusable
   string-KV persistent store for non-browser targets. Desktop and Android use
   first-stage WebView `localStorage` wrappers by default; future native SQLite
-  adapters can replace only the storage/platform port. Android `sqlite` config
-  is reserved and fails fast until that bridge exists. `LocalMessageStore.clear`
+  adapters can replace only the storage/platform port. Desktop and Android
+  `sqlite` config is reserved and fails fast until that bridge exists.
+  `LocalMessageStore.clear`
   is now part of the shared port so logout can remove cached messages, cursors
   and pending sends consistently across targets.
 - `npm --prefix clients run test:runtime-lifecycle` is the first focused
@@ -208,9 +209,10 @@ First slice:
   It does not replace existing secure mTLS gateway / push smoke coverage.
 - PC desktop and Android now both have first-stage TypeScript runtime adapters.
   PC desktop also has a Tauri runner skeleton, and Android has a Kotlin native
-  WebView asset shell skeleton. Neither target produces `.msi`, `.exe`, `.apk`,
-  or `.aab` artifacts yet; the repository now has dry-run-tested build wrappers
-  for those future artifacts.
+  WebView asset shell skeleton. Both targets reserve native SQLite store config
+  and fail closed until native bridges exist. Neither target produces `.msi`,
+  `.exe`, `.apk`, or `.aab` artifacts yet; the repository now has dry-run-tested
+  build wrappers for those future artifacts.
 - `/api/auth/logout` performs first-stage server-side logout for the current
   authenticated session only. Broader device/session management remains an
   identity/admin capability, not a client BFF target selector.

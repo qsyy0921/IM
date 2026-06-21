@@ -5,7 +5,7 @@ export type DesktopOS = "windows" | "macos" | "linux";
 export interface DesktopRuntimeConfig extends ClientRuntimeConfig {
   os: DesktopOS;
   secureStorage: "windows-credential-manager" | "keychain" | "secret-service" | "development";
-  localStore: "local-storage" | "memory";
+  localStore: "sqlite" | "local-storage" | "memory";
   shell: "tauri";
 }
 

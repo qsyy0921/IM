@@ -21,6 +21,7 @@ const requiredPaths = [
   "packages/protocol/src/index.ts",
   "packages/client-core/package.json",
   "packages/client-core/src/index.ts",
+  "packages/client-core/src/development-adapters.ts",
   "web/package.json",
   "web/.env.example",
   "web/src/App.tsx",
@@ -31,7 +32,10 @@ const requiredPaths = [
   "desktop/src/runtime-config.ts",
   "desktop/src-tauri/tauri.conf.json",
   "android/package.json",
+  "android/src/index.ts",
   "android/src/platform-contract.ts",
+  "android/src/platform-adapter.ts",
+  "android/src/runtime-config.ts",
   "android/app.config.json"
 ];
 

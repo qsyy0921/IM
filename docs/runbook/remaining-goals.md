@@ -14,8 +14,8 @@
 
 ## 当前优先顺序
 
-1. 完成 client platform MVP foundation：PC desktop runtime、Android runtime、
-   三端共享 smoke、PC / Android 壳层 logout 入口和平台 local store smoke。
+1. 完成 client platform MVP foundation：PC desktop / Android 安装包或可运行
+   artifact、真实壳层 logout 入口、真实平台 shell smoke 和后续 native SQLite bridge。
 2. 回到 AI / Agent 主线：group memory eval、EvidencePack、Agent 真实业务动作、
    Python AI Worker 候选算法。
 3. 继续 product-active 服务：workflow / audit / admin / notification / media /
@@ -27,8 +27,9 @@
 
 - `clients/desktop`：first-stage TypeScript runtime adapter 和 Tauri runner
   skeleton 已落；`createDesktopClientRuntime` 已能组装 shared `BFFClient` /
-  `WebSocketPushTransport` / auth / inbox / send / ack queue；继续跑通
-  login、conversation list、PullInbox、send、ACK、push notify。
+  `WebSocketPushTransport` / auth / inbox / send / ack queue；shared runtime
+  lifecycle smoke 已覆盖 login / restore / refresh / logout 本地状态；继续接真实
+  desktop shell UI / artifact。
 - Windows packaging：产出本地可安装或可运行的 Windows artifact；不要求生产签名。
   当前本机尚缺 Tauri CLI / `cargo-tauri`，需要先补本地构建前置或通过
   Docker / CI builder 产物链路；可用 `npm --prefix clients run check:build-prereqs`
@@ -36,6 +37,7 @@
 - `clients/android`：first-stage TypeScript runtime adapter 和 Kotlin native
   bridge skeleton 已落；`createAndroidClientRuntime` 已能组装 shared
   `BFFClient` / `WebSocketPushTransport` / auth / inbox / send / ack queue；
+  shared runtime lifecycle smoke 已覆盖 login / restore / refresh / logout 本地状态；
   继续产出 unsigned APK，Kotlin 只做薄 bridge，业务协议和 sync core 复用 TypeScript。
 - Android packaging：产出本地 unsigned APK，并支持局域网 `api-gateway` /
   `push-gateway` 地址配置。当前本机尚缺 Gradle / Android SDK，且 `java`
@@ -48,9 +50,9 @@
   desktop / Android 已默认接 shared `KeyValueMessageStore` + WebView
   `localStorage` first-stage durable adapter，并有 cursor replay test；后续在
   native packaging/runtime ready 后替换为 SQLite bridge。
-- Auth lifecycle：BFF `/api/auth/logout`、shared runtime logout 编排和 Web
-  logout local cleanup 已落；后续在 PC / Android 真实 runtime shell 中接入
-  logout 入口并跑平台 smoke。
+- Auth lifecycle：BFF `/api/auth/logout`、shared runtime login / refresh /
+  restore / logout 编排和 Web logout local cleanup 已落；后续在 PC / Android
+  真实 runtime shell 中接入 logout 入口并跑平台 shell smoke。
 
 ## AI / Agent Platform 未完成
 

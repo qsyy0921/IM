@@ -55,7 +55,10 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   transport、auth session、inbox sync、send queue 和 ack queue；`clients/desktop`
   / `clients/android` 已分别新增 `createDesktopClientRuntime` /
   `createAndroidClientRuntime`；shared runtime 已提供 first-stage logout 编排，
-  会调用 BFF logout、断开 push、清理 secure session store 和 local message store。
+  会调用 BFF logout、断开 push、清理 secure session store 和 local message store；
+  shared runtime 现在也提供 `login` / `refresh` / `restoreSession`，登录和刷新会写入
+  平台 secure session store，重启式 runtime 重新创建后可从平台 store hydrate
+  auth manager。
 - `clients` workspace 已新增本地构建前置检查
   `npm --prefix clients run check:build-prereqs`；该检查只读取本机 Rust /
   Tauri / JDK / Gradle / Android SDK 状态，不安装依赖、不拉包、不使用 `npx`
@@ -70,6 +73,11 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   local cache；focused test 覆盖 store 实例重开后的 cursor persistence、pending
   send、accepted send 稳定 key 迁移、防 replay duplicate、failed-send 状态和
   conversations-needing-sync 列表。后续生产化再接 native SQLite bridge。
+- `clients` workspace 已新增 focused runtime lifecycle smoke：
+  `npm --prefix clients run test:runtime-lifecycle` 会编译并实例化 desktop /
+  Android runtime，验证 login 持久化 session、restoreSession hydrate auth manager、
+  refresh 更新持久 refresh token，以及 logout 清理 secure session store 和 local
+  message cache。该测试不依赖 Tauri CLI / Android SDK，不替代真实安装包或 APK。
 - `loadtest/clientweb` 已新增 first-stage scriptable client smoke runner：
   准备阶段用 identity / api-gateway gRPC 注册用户、seed 会话并创建 JOIN；真实客户端
   验证段只走 `api-gateway` HTTP BFF 和 `push-gateway` WebSocket，覆盖 BFF login、
@@ -144,17 +152,18 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
 ## 下一步优先级
 
 1. 后续按同一 core 接 PC desktop local Windows artifact 和 Android unsigned APK。
-2. 后续把 desktop / Android first-stage localStorage store 替换为 native
+2. 在真实 PC / Android shell 中接入 logout UI / action，并跑平台 shell smoke。
+3. 后续把 desktop / Android first-stage localStorage store 替换为 native
    SQLite bridge，并补真实平台 runtime smoke。
-3. 再回到 workflow compensation adapter / instruction approval UI / ops 管理；
+4. 再回到 workflow compensation adapter / instruction approval UI / ops 管理；
    当前已有本地 workflow get / decision / decision manifest / instruction list CLI，
    低敏 compensation instruction manifest 生成 / 校验，以及 catalog-backed import
    approval 链路、invocation preflight 和静态 review page；后续可接正式审批 UI。
-4. 继续明确其它下游公开 admin API adapter。
-5. 在镜像可用后补 vector-index focused pgvector smoke；后续再接 Milvus /
+5. 继续明确其它下游公开 admin API adapter。
+6. 在镜像可用后补 vector-index focused pgvector smoke；后续再接 Milvus /
    OpenSearch backend、provider repair 和真 provider backfill smoke。
-6. 可继续 notification SMTP / SMS / APNs / FCM adapter 或 bounce-suppression。
-7. 新发现待办写入 `docs/runbook/remaining-goals.md`。
+7. 可继续 notification SMTP / SMS / APNs / FCM adapter 或 bounce-suppression。
+8. 新发现待办写入 `docs/runbook/remaining-goals.md`。
 
 ## 工作方式
 

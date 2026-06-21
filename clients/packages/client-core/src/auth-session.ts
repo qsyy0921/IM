@@ -10,6 +10,10 @@ export class AuthSessionManager {
     return this.#session;
   }
 
+  hydrate(session: AuthSession | null): void {
+    this.#session = session ? { ...session } : null;
+  }
+
   requireSession(): AuthSession {
     if (!this.#session) {
       throw new Error("not authenticated");

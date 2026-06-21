@@ -8,6 +8,7 @@ import { InboxSyncEngine } from "./inbox-sync";
 import { PushConnectionManager } from "./push-connection";
 import { MessageSendQueue } from "./send-queue";
 import { WebSocketPushTransport } from "./websocket-push-transport";
+import type { AuthSession, LoginRequest } from "@nexusim/protocol";
 
 export interface ClientRuntime {
   config: ClientRuntimeConfig;
@@ -19,6 +20,9 @@ export interface ClientRuntime {
   pushConnection: PushConnectionManager;
   sendQueue: MessageSendQueue;
   ackQueue: AckQueue;
+  login(request: LoginRequest): Promise<AuthSession>;
+  refresh(): Promise<AuthSession>;
+  restoreSession(): Promise<AuthSession | null>;
   logout(): Promise<void>;
 }
 
@@ -67,6 +71,21 @@ export function createClientRuntime(options: CreateClientRuntimeOptions): Client
       deliveryAPI: bff,
       requestIDFactory: idFactory
     }),
+    async login(request: LoginRequest): Promise<AuthSession> {
+      const session = await auth.login(request);
+      await options.platform.secureSessionStore.saveSession(session);
+      return session;
+    },
+    async refresh(): Promise<AuthSession> {
+      const session = await auth.refresh();
+      await options.platform.secureSessionStore.saveSession(session);
+      return session;
+    },
+    async restoreSession(): Promise<AuthSession | null> {
+      const session = await options.platform.secureSessionStore.loadSession();
+      auth.hydrate(session);
+      return session;
+    },
     async logout(): Promise<void> {
       try {
         await auth.logout();

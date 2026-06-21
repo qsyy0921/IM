@@ -36,7 +36,10 @@
   `@nexusim/client-core`，Web 只保留兼容 re-export，PC / Android 后续可复用
   同一 HTTP/JSON BFF mapping 和在线唤醒 transport；`client-core` 已新增
   `createClientRuntime`，desktop / Android 已有 runtime factory 组装 auth /
-  inbox sync / push / send / ack queue；`clients/web` 已接
+  inbox sync / push / send / ack queue；shared runtime 已新增 login / refresh /
+  restoreSession / logout lifecycle，focused runtime smoke 已覆盖 desktop /
+  Android session persistence、restore、refresh persistence 和 logout local cleanup；
+  `clients/web` 已接
   first-stage BFF fetch / push WebSocket / IndexedDB local
   store adapters，并把 Web shell 接到 login / PullInbox / SendMessage /
   AckDelivery flow；`IndexedDBMessageStore` 已新增无外部依赖 first-stage
@@ -421,9 +424,10 @@ future platform / product services 已进入 product-active first-stage implemen
 当前 active slice 是 client platform MVP foundation：
 浏览器 Web first path、api-gateway client BFF、push path、本地和 wired 172 clean
 baseline 已通过，PC desktop / Android first-stage runtime adapter 已落，PC
-Tauri runner skeleton 和 Android native bridge skeleton 已有，下一步接 local
-Windows artifact 和 Android APK；Web IndexedDB local store 已补 first-stage
-persistence test。
+  Tauri runner skeleton 和 Android native bridge skeleton 已有，shared runtime
+  lifecycle smoke 已覆盖 desktop / Android 登录持久化、恢复、刷新和登出清理；
+  下一步接 local Windows artifact、Android APK 和真实壳层 logout smoke；Web
+  IndexedDB local store 已补 first-stage persistence test。
 长期后续按完整目标架构推进业务平台、数据平台、AI / Agent 平台、客户端平台和中间件平台；
 后续 AI 继续扩展低敏 collaborative-memory 算法/eval，优先 multi-hop / temporal update / profile aggregation 边界。
 短期生产级测试、完整 HA、长压和 sizing 不再作为当前转进阻塞，但仍留在 hardening backlog。

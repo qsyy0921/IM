@@ -100,8 +100,11 @@ First slice:
   push transport, auth session manager, inbox sync, send queue and ack queue.
   Desktop and Android expose `createDesktopClientRuntime` /
   `createAndroidClientRuntime` over their platform adapters. The shared runtime
-  also exposes first-stage logout orchestration: call BFF logout, disconnect
-  push, clear secure session storage and clear local message cache.
+  now owns the first-stage auth lifecycle: `login` and `refresh` persist the
+  returned session into the platform secure session store, `restoreSession`
+  hydrates the auth manager from that store after a runtime restart, and
+  `logout` calls BFF logout, disconnects push, clears secure session storage and
+  clears local message cache.
 - `@nexusim/client-core` now exposes `KeyValueMessageStore`, a reusable
   string-KV persistent store for non-browser targets. Desktop and Android use
   first-stage WebView `localStorage` wrappers by default; future native SQLite
@@ -109,6 +112,11 @@ First slice:
   is reserved and fails fast until that bridge exists. `LocalMessageStore.clear`
   is now part of the shared port so logout can remove cached messages, cursors
   and pending sends consistently across targets.
+- `npm --prefix clients run test:runtime-lifecycle` is the first focused
+  desktop / Android runtime lifecycle smoke. It compiles the TypeScript runtime
+  packages locally, instantiates both platform runtime factories, and verifies
+  login persistence, session restore, refresh-token persistence and logout cache
+  cleanup without requiring Tauri CLI, Android SDK or network access.
 - `loadtest/clientweb` provides the first scriptable client-path smoke. Setup
   uses public gRPC APIs to register users, seed the conversation owner and create
   the receiver JOIN; the verified client path then uses only HTTP BFF and
@@ -154,7 +162,9 @@ rejected. For local LAN client smoke, prefer the wired `172.x.x.x` address.
 
 1. Add first local Windows artifact from the PC desktop Tauri runner.
 2. Add first unsigned local APK from the Android native bridge.
-3. Replace first-stage desktop / Android localStorage stores with native SQLite
+3. Wire logout UI / action into the real desktop and Android shells and run a
+   platform-shell smoke once packaging/runtime tooling is ready.
+4. Replace first-stage desktop / Android localStorage stores with native SQLite
    bridge adapters when packaging/runtime tooling is ready.
 
 ## Local Build Prerequisites

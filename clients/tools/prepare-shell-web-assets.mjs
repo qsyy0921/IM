@@ -1,4 +1,4 @@
-import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -38,6 +38,7 @@ export function prepareShellWebAssets(options) {
   }
 
   if (sourceDir !== outputDir) {
+    rmSync(outputDir, { recursive: true, force: true });
     mkdirSync(outputDir, { recursive: true });
     cpSync(sourceDir, outputDir, { recursive: true, force: true });
   }

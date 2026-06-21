@@ -158,7 +158,9 @@ First slice:
   shell config templates and renderer, and rejects unsupported targets or
   sensitive fields such as token, secret and password.
 - `npm --prefix clients run test:shell-web-assets` validates the target asset
-  prep wrapper without requiring Tauri CLI, Android SDK or a live backend.
+  prep wrapper without requiring Tauri CLI, Android SDK or a live backend. It
+  also checks stale bundle cleanup so Android / desktop shell outputs do not
+  retain old Web assets across builds.
 - `npm --prefix clients run test:artifact-builders` validates the first-stage
   desktop artifact / Android APK build wrappers in dry-run mode. Real build
   commands are present as `build:desktop-artifact` and `build:android-apk`, but

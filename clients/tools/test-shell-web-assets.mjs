@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { prepareShellWebAssets } from "./prepare-shell-web-assets.mjs";
@@ -23,6 +23,8 @@ try {
   const sourceDir = createSourceDist(tempRoot);
 
   const desktopOut = join(tempRoot, "desktop-out");
+  mkdirSync(join(desktopOut, "assets"), { recursive: true });
+  writeFileSync(join(desktopOut, "assets", "stale.js"), "console.log('stale');\n", "utf8");
   const desktopResult = prepareShellWebAssets({
     target: "windows-desktop",
     sourceDir,
@@ -35,8 +37,11 @@ try {
   assert(readFileSync(join(desktopOut, "index.html"), "utf8").includes("nexusim-shell-config.js"), "desktop index not copied");
   assert(desktopConfig.includes('"target": "windows-desktop"'), "desktop config not rendered");
   assert(!desktopConfig.match(/token|secret|password|credential|private/i), "desktop rendered config contains sensitive key");
+  assert(!existsSync(join(desktopOut, "assets", "stale.js")), "desktop output must remove stale assets");
 
   const androidOut = join(tempRoot, "android-out");
+  mkdirSync(join(androidOut, "assets"), { recursive: true });
+  writeFileSync(join(androidOut, "assets", "stale.js"), "console.log('stale');\n", "utf8");
   prepareShellWebAssets({
     target: "android",
     sourceDir,
@@ -47,6 +52,7 @@ try {
   const androidConfig = readFileSync(join(androidOut, "nexusim-shell-config.js"), "utf8");
   assert(readFileSync(join(androidOut, "assets", "index.js"), "utf8").includes("nexusim"), "android assets not copied");
   assert(androidConfig.includes('"target": "android"'), "android config not rendered");
+  assert(!existsSync(join(androidOut, "assets", "stale.js")), "android output must remove stale assets");
 
   let rejected = false;
   try {

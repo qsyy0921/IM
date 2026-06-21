@@ -191,6 +191,9 @@ Responsibilities:
 - After an installer is produced, archive it through the client artifact
   collector and keep only the low-sensitive SHA-256 manifest under ignored local
   artifact storage.
+- Shell asset preparation must clean the target output directory before copying
+  a new Web build when source and output differ, so packaged desktop shells do
+  not retain stale JS / CSS bundles.
 
 PC constraints:
 
@@ -219,6 +222,8 @@ Responsibilities:
 - After an APK is produced, archive it through the client artifact collector and
   keep only the low-sensitive SHA-256 manifest under ignored local artifact
   storage.
+- Android asset preparation must clean the WebView asset output directory before
+  copying a new build, so APKs do not carry stale Web bundles.
 
 Android constraints:
 

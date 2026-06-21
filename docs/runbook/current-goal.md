@@ -110,7 +110,8 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   config 写入 `clients/web/dist/nexusim-shell-config.js`；`build:shell-assets:android`
   会构建 Web、复制到 Android app assets，并写入 `android` config。Android native
   skeleton 已改成 `WebViewAssetLoader` 加载本地 app assets，禁用 file / content
-  access；Gradle `preBuild` 会调用同一资产准备脚本。该流程已通过 focused
+  access；Gradle `preBuild` 会调用同一资产准备脚本。shell asset prep 会在
+  source / output 不同时先清理目标目录，避免 APK / shell 包混入旧 bundle。该流程已通过 focused
   `test:shell-web-assets`、desktop / Android validators 和实际 shell asset build。
 - `clients/tools/build-desktop-artifact.mjs` 与
   `clients/tools/build-android-apk.mjs` 已提供 first-stage artifact / APK build

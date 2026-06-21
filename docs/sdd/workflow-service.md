@@ -464,6 +464,9 @@ control-plane-service 或数据库。
 因此可复用本地 repair approval request / decision / invocation 链路生成低敏执行
 计划。该 operator 只导入 workflow-service 自有 instruction metadata，不直接执行
 control-plane rollback mutation。
+approved repair invocation 会在执行 import 前重新调用 instruction manifest validator；
+summary 只保存 manifest hash、path hash 和 instruction count，不输出 manifest 路径、
+payload ref 文件正文或 operator reason 原文。
 
 ## 18. 验收标准
 

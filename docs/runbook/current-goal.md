@@ -46,13 +46,16 @@ model-gateway / workflow / knowledge-ingestion / vector-index
 - `workflow-service compensation-instruction-import` 已纳入机器可读
   `repair-operators.catalog.json`，可进入本地 approval request / decision /
   invocation 链路；导入 instruction metadata，不直接执行 rollback mutation。
+- approved repair invocation 会在 `workflow-service compensation-instruction-import`
+  执行前校验 instruction manifest，只在 summary 中记录 manifest hash / count，
+  不输出 manifest 路径、payload ref 文件正文或 operator reason 原文。
 
 ## 下一步优先级
 
 1. 继续 workflow compensation adapter / instruction approval UI / ops 管理；
    当前已有本地 workflow get / decision / decision manifest / instruction list CLI，
    低敏 compensation instruction manifest 生成 / 校验，以及 catalog-backed import
-   approval 链路；后续可接审批 UI。
+   approval 链路和 invocation preflight；后续可接审批 UI。
 2. 继续明确其它下游公开 admin API adapter。
 3. 在镜像可用后补 vector-index focused pgvector smoke；后续再接 Milvus /
    OpenSearch backend、provider repair 和真 provider backfill smoke。

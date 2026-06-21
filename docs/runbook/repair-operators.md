@@ -266,6 +266,9 @@ invocation 链路引用。环境变量为 `NEXUSIM_WORKFLOW_SERVICE_MODE`；计�
 `NEXUSIM_WORKFLOW_COMPENSATION_INSTRUCTION_FILE`，后者应指向上面生成并校验过的
 仓库外 instruction manifest；该 operator 导入 instruction metadata，不直接执行
 rollback mutation。
+`invoke-approved-repair-operator.ps1` 会在执行该 mode 前再次校验 instruction
+manifest；preflight summary 只记录 manifest hash / path hash / instruction count，
+不输出 manifest 路径、payload ref 文件正文或 operator reason 原文。
 
 `agent-service` 提供 `proposal-approval-audit` / `proposal-approval-approve`，用于审计和审批 Agent proposal。环境变量为 `NEXUSIM_AGENT_SERVICE_MODE`；`proposal-approval-audit` 默认只列 `PROPOSED` proposal，可按 tenant / proposal / user / status / tool / resource_type 过滤，可选 `NEXUSIM_AGENT_PROPOSAL_APPROVAL_AUDIT_OUTPUT` 写低敏 JSON；`proposal-approval-approve` 需要 `NEXUSIM_AGENT_PROPOSAL_APPROVAL_TENANT_ID`、`NEXUSIM_AGENT_PROPOSAL_APPROVAL_PROPOSAL_ID`、`NEXUSIM_AGENT_PROPOSAL_APPROVAL_APPROVED_BY_USER_ID`，默认 `NEXUSIM_AGENT_PROPOSAL_APPROVAL_DRY_RUN=true`，只有显式设为 false 才会调用服务内 approval workflow 并同事务写 approval outbox。审批 reason 应通过 `NEXUSIM_AGENT_PROPOSAL_APPROVAL_REASON_FILE` 读取；输出可选 `NEXUSIM_AGENT_PROPOSAL_APPROVAL_OUTPUT`，只包含 proposal / approval / skill / tool / resource / status 元数据和 `reason_present`，不输出 objective、proposal_text、citations、EvidencePack 或 reason 原文。
 

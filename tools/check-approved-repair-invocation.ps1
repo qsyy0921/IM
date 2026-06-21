@@ -4,8 +4,9 @@ $plannerPath = Join-Path $PSScriptRoot "write-repair-operator-plan.ps1"
 $requestWriterPath = Join-Path $PSScriptRoot "write-repair-approval-request.ps1"
 $decisionWriterPath = Join-Path $PSScriptRoot "write-repair-approval-decision.ps1"
 $invokePath = Join-Path $PSScriptRoot "invoke-approved-repair-operator.ps1"
+$workflowInstructionWriterPath = Join-Path $PSScriptRoot "write-workflow-compensation-instruction-manifest.ps1"
 
-foreach ($path in @($plannerPath, $requestWriterPath, $decisionWriterPath, $invokePath)) {
+foreach ($path in @($plannerPath, $requestWriterPath, $decisionWriterPath, $invokePath, $workflowInstructionWriterPath)) {
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
         throw "Missing approved repair invocation test dependency: $path"
     }
@@ -117,6 +118,142 @@ try {
     }
     if ($mutatingExitCode -eq 0) {
         throw "approved invocation should reject execution without dry-run env unless AllowMutating is set."
+    }
+
+    $workflowReasonPath = Join-Path $tempRoot "workflow-reason.txt"
+    $workflowPayloadRefPath = Join-Path $tempRoot "workflow-payload-ref.txt"
+    $workflowInstructionPath = Join-Path $tempRoot "workflow-compensation-instruction.json"
+    "approved rollback reason" | Set-Content -LiteralPath $workflowReasonPath -Encoding UTF8
+    "external rollback payload reference" | Set-Content -LiteralPath $workflowPayloadRefPath -Encoding UTF8
+
+    & powershell -NoProfile -ExecutionPolicy Bypass -File $workflowInstructionWriterPath `
+        -OutputPath $workflowInstructionPath `
+        -WorkflowID "wf_invoke_1" `
+        -PayloadRefFile $workflowPayloadRefPath `
+        -Environment "local" `
+        -ConfigKind "API_GATEWAY_TENANT_QUOTA" `
+        -BundleKey "tenant-a" `
+        -TargetVersion "quota-v1" `
+        -OperatorRef "operator:rollback" `
+        -ReasonFile $workflowReasonPath | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        throw "write-workflow-compensation-instruction-manifest.ps1 failed while preparing approved invocation test"
+    }
+
+    $workflowPlanPath = Join-Path $tempRoot "workflow-plan.json"
+    $workflowPlanJson = & powershell -NoProfile -ExecutionPolicy Bypass -File $plannerPath `
+        -Service "workflow-service" `
+        -Mode "compensation-instruction-import" `
+        -Env "NEXUSIM_WORKFLOW_COMPENSATION_INSTRUCTION_TENANT_ID=tenant_1","NEXUSIM_WORKFLOW_COMPENSATION_INSTRUCTION_FILE=$workflowInstructionPath"
+    if ($LASTEXITCODE -ne 0) {
+        throw "write-repair-operator-plan.ps1 failed while preparing workflow approved invocation test"
+    }
+    $workflowPlanJson | Set-Content -LiteralPath $workflowPlanPath -Encoding UTF8
+
+    $workflowRequestPath = Join-Path $tempRoot "workflow-request.json"
+    & powershell -NoProfile -ExecutionPolicy Bypass -File $requestWriterPath `
+        -PlanPath $workflowPlanPath `
+        -RequestedBy "operator-a" `
+        -ApprovalID "approval-workflow-invoke-1" `
+        -OutputPath $workflowRequestPath
+    if ($LASTEXITCODE -ne 0) {
+        throw "write-repair-approval-request.ps1 failed while preparing workflow approved invocation test"
+    }
+
+    $workflowDecisionPath = Join-Path $tempRoot "workflow-decision.json"
+    & powershell -NoProfile -ExecutionPolicy Bypass -File $decisionWriterPath `
+        -RequestPath $workflowRequestPath `
+        -Decision "APPROVED" `
+        -DecidedBy "approver-a" `
+        -DecisionID "decision-workflow-invoke-1" `
+        -OutputPath $workflowDecisionPath
+    if ($LASTEXITCODE -ne 0) {
+        throw "write-repair-approval-decision.ps1 failed while preparing workflow approved invocation test"
+    }
+
+    $workflowSummaryPath = Join-Path $tempRoot "workflow-summary.json"
+    & powershell -NoProfile -ExecutionPolicy Bypass -File $invokePath `
+        -PlanPath $workflowPlanPath `
+        -RequestPath $workflowRequestPath `
+        -DecisionPath $workflowDecisionPath `
+        -OutputPath $workflowSummaryPath
+    if ($LASTEXITCODE -ne 0) {
+        throw "invoke-approved-repair-operator.ps1 failed workflow instruction manifest preflight"
+    }
+    $workflowSummaryRaw = Get-Content -LiteralPath $workflowSummaryPath -Raw
+    $workflowSummary = $workflowSummaryRaw | ConvertFrom-Json
+    if ($workflowSummary.service -ne "workflow-service" -or
+        $workflowSummary.mode -ne "compensation-instruction-import" -or
+        @($workflowSummary.preflight_checks).Count -ne 1 -or
+        $workflowSummary.preflight_checks[0].name -ne "workflow_compensation_instruction_manifest" -or
+        $workflowSummary.preflight_checks[0].instruction_count -ne 1) {
+        throw "workflow approved invocation summary should include a validated instruction manifest preflight check."
+    }
+    if ($workflowSummaryRaw.Contains($workflowInstructionPath) -or
+        $workflowSummaryRaw.Contains("approved rollback reason") -or
+        $workflowSummaryRaw.Contains("external rollback payload reference")) {
+        throw "workflow approved invocation summary leaked manifest path, reason, or payload ref body."
+    }
+
+    $badInstructionPath = Join-Path $tempRoot "workflow-compensation-instruction-bad.json"
+    @'
+{
+  "instructions": [
+    {
+      "workflow_id": "wf_invoke_1",
+      "payload_ref_hash": "sha256:payload",
+      "environment": "local",
+      "config_kind": "API_GATEWAY_TENANT_QUOTA",
+      "bundle_key": "tenant-a",
+      "target_version": "quota-v1",
+      "operator_ref": "operator:rollback",
+      "reason_ref": "reason-sha256:rollback",
+      "raw_payload": "must not be embedded"
+    }
+  ]
+}
+'@ | Set-Content -LiteralPath $badInstructionPath -Encoding UTF8
+    $badWorkflowPlanPath = Join-Path $tempRoot "workflow-plan-bad.json"
+    $badWorkflowPlanJson = & powershell -NoProfile -ExecutionPolicy Bypass -File $plannerPath `
+        -Service "workflow-service" `
+        -Mode "compensation-instruction-import" `
+        -Env "NEXUSIM_WORKFLOW_COMPENSATION_INSTRUCTION_TENANT_ID=tenant_1","NEXUSIM_WORKFLOW_COMPENSATION_INSTRUCTION_FILE=$badInstructionPath"
+    if ($LASTEXITCODE -ne 0) {
+        throw "write-repair-operator-plan.ps1 failed while preparing bad workflow approved invocation test"
+    }
+    $badWorkflowPlanJson | Set-Content -LiteralPath $badWorkflowPlanPath -Encoding UTF8
+    $badWorkflowRequestPath = Join-Path $tempRoot "workflow-request-bad.json"
+    & powershell -NoProfile -ExecutionPolicy Bypass -File $requestWriterPath `
+        -PlanPath $badWorkflowPlanPath `
+        -RequestedBy "operator-a" `
+        -ApprovalID "approval-workflow-invoke-bad" `
+        -OutputPath $badWorkflowRequestPath
+    if ($LASTEXITCODE -ne 0) {
+        throw "write-repair-approval-request.ps1 failed while preparing bad workflow approved invocation test"
+    }
+    $badWorkflowDecisionPath = Join-Path $tempRoot "workflow-decision-bad.json"
+    & powershell -NoProfile -ExecutionPolicy Bypass -File $decisionWriterPath `
+        -RequestPath $badWorkflowRequestPath `
+        -Decision "APPROVED" `
+        -DecidedBy "approver-a" `
+        -DecisionID "decision-workflow-invoke-bad" `
+        -OutputPath $badWorkflowDecisionPath
+    if ($LASTEXITCODE -ne 0) {
+        throw "write-repair-approval-decision.ps1 failed while preparing bad workflow approved invocation test"
+    }
+    $oldErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        & powershell -NoProfile -ExecutionPolicy Bypass -File $invokePath `
+            -PlanPath $badWorkflowPlanPath `
+            -RequestPath $badWorkflowRequestPath `
+            -DecisionPath $badWorkflowDecisionPath 2>$null | Out-Null
+        $badWorkflowExitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $oldErrorActionPreference
+    }
+    if ($badWorkflowExitCode -eq 0) {
+        throw "workflow approved invocation should reject invalid instruction manifest during preflight."
     }
 } finally {
     Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue

@@ -250,6 +250,23 @@ func TestRepositoryClaimAndCompleteRebuildTaskIntegration(t *testing.T) {
 		t.Fatalf("unexpected running checkpoint status: %s", got)
 	}
 
+	if err := repository.ContinueRebuildTask(ctx, task, "embedding-task:cursor-test"); err != nil {
+		t.Fatalf("continue rebuild task: %v", err)
+	}
+	if got := rebuildCheckpointCursor(t, ctx, pool, job.JobID, rebuild.Command.PartitionKey); got != "embedding-task:cursor-test" {
+		t.Fatalf("unexpected continued checkpoint cursor: %s", got)
+	}
+	tasks, err = repository.ClaimRebuildTasks(ctx, 10)
+	if err != nil {
+		t.Fatalf("claim running rebuild task: %v", err)
+	}
+	if len(tasks) != 1 || tasks[0].Checkpoint.CursorValue != "embedding-task:cursor-test" ||
+		tasks[0].Job.Status != types.JobStatusVectorUpserting ||
+		tasks[0].Checkpoint.Status != types.RebuildCheckpointStatusRunning {
+		t.Fatalf("unexpected running rebuild task reclaim: %+v", tasks)
+	}
+	task = tasks[0]
+
 	if err := repository.CompleteRebuildTask(ctx, task); err != nil {
 		t.Fatalf("complete rebuild task: %v", err)
 	}
@@ -421,6 +438,14 @@ func TestEmbeddingTaskSourceListCompletedTasksForRebuildIntegration(t *testing.T
 	}
 	if listed[0].IdempotencyKey != completed.IdempotencyKey || listed[0].InputText != completed.InputText {
 		t.Fatalf("unexpected listed task: %+v", listed[0])
+	}
+	rebuildTask.Checkpoint.CursorValue = "embedding-task:" + completed.IdempotencyKey
+	listed, err = source.ListCompletedEmbeddingTasks(ctx, rebuildTask, 10)
+	if err != nil {
+		t.Fatalf("list completed rebuild embedding tasks after cursor: %v", err)
+	}
+	if len(listed) != 0 {
+		t.Fatalf("cursor should exclude already backfilled task: %+v", listed)
 	}
 }
 
@@ -690,6 +715,21 @@ WHERE tenant_id = 'tenant-vector-test'
 		t.Fatalf("query rebuild checkpoint status: %v", err)
 	}
 	return status
+}
+
+func rebuildCheckpointCursor(t *testing.T, ctx context.Context, pool *pgxpool.Pool, jobID string, partitionKey string) string {
+	t.Helper()
+	var value string
+	if err := pool.QueryRow(ctx, `
+SELECT cursor_value
+FROM vector_rebuild_checkpoints
+WHERE tenant_id = 'tenant-vector-test'
+  AND rebuild_job_id = $1
+  AND partition_key = $2
+`, jobID, partitionKey).Scan(&value); err != nil {
+		t.Fatalf("query rebuild checkpoint cursor: %v", err)
+	}
+	return value
 }
 
 func assertRebuildOutboxLowSensitive(t *testing.T, ctx context.Context, pool *pgxpool.Pool, jobID string) {

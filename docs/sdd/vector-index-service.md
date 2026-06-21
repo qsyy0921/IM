@@ -350,10 +350,11 @@ RequestVectorRebuild
 -> verify tombstones and visibility metadata
 ```
 
-第一版 provider backfill 是 bounded mode：如果 matching completed embedding tasks 超过
-`NEXUSIM_VECTOR_REBUILD_BACKFILL_BATCH_SIZE`，worker 会 fail closed，不会把 rebuild job 标记
-完成。生产级 rebuild / backfill 仍需要 checkpoint cursor、provider repair 和更完整 upstream
-replay。
+第一版 provider backfill 支持 checkpoint cursor 分页续跑：每批最多处理
+`NEXUSIM_VECTOR_REBUILD_BACKFILL_BATCH_SIZE` 条 matching completed embedding task；如果还有
+下一页，会推进 `vector_rebuild_checkpoints.cursor_value` 并让后续 RunOnce 继续 claim
+RUNNING rebuild；只有没有下一页时才把 rebuild job 标记完成。生产级 rebuild / backfill 仍
+需要 provider repair、更多 upstream replay 和真实 provider smoke。
 
 ## 10. 与 retrieval-gateway 的边界
 

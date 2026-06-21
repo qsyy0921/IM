@@ -14,6 +14,7 @@ import (
 )
 
 const defaultEmbeddingTaskClaimTimeout = 30 * time.Second
+const embeddingTaskCursorPrefix = "embedding-task:"
 
 type EmbeddingTaskSourceConfig struct {
 	TenantID     string
@@ -163,6 +164,7 @@ func (source *EmbeddingTaskSource) ListCompletedEmbeddingTasks(
 	if limit <= 0 {
 		limit = 100
 	}
+	cursor := embeddingTaskCursorValue(task.Checkpoint.CursorValue)
 	rows, err := source.pool.Query(ctx, `
 SELECT
     tenant_id, source_service, collection_type, source_ref_hash,
@@ -177,15 +179,24 @@ WHERE tenant_id = $1
   AND embedding_model_ref = $4
   AND dimension = $5
   AND status = 'COMPLETED'
-ORDER BY completed_at NULLS LAST, created_at, task_id
-LIMIT $6
+  AND ($6 = '' OR idempotency_key > $6)
+ORDER BY idempotency_key, task_id
+LIMIT $7
 `, string(task.Job.TenantID), task.Checkpoint.SourceService, task.CollectionType,
-		task.EmbeddingModelRef, task.Dimension, limit)
+		task.EmbeddingModelRef, task.Dimension, cursor, limit)
 	if err != nil {
 		return nil, types.NewDBReadFailed(err.Error())
 	}
 	defer rows.Close()
 	return scanEmbeddingTasks(rows)
+}
+
+func embeddingTaskCursorValue(value string) string {
+	value = strings.TrimSpace(value)
+	if strings.HasPrefix(value, embeddingTaskCursorPrefix) {
+		return strings.TrimPrefix(value, embeddingTaskCursorPrefix)
+	}
+	return ""
 }
 
 func (source *EmbeddingTaskSource) embeddingTaskMatches(ctx context.Context, task types.VectorEmbeddingTask) (bool, error) {

@@ -201,6 +201,7 @@ type RebuildWorkerStats struct {
 	Backfilled int
 	Embedded   int
 	Upserted   int
+	Continued  int
 	Completed  int
 }
 
@@ -208,6 +209,8 @@ type RebuildBackfillStats struct {
 	Backfilled int
 	Embedded   int
 	Upserted   int
+	HasMore    bool
+	NextCursor string
 }
 
 type VectorEmbeddingTask struct {

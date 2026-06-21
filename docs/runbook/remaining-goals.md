@@ -91,9 +91,9 @@ Foundation backlog 锚点：`search-service`、`memory-service`、`retrieval-gat
   `embedding-worker` 可通过 `NEXUSIM_VECTOR_PROVIDER_BACKEND=pgvector` 显式启用
   pgvector backend sink；已新增可选 `docker-compose.pgvector.yml` overlay 和
   `run-local-pgvector-smoke.ps1` wrapper，使用 `-StartPgVector` 时脚本默认不拉镜像。
-  `rebuild-worker` 已支持显式 `embedding-tasks` provider backfill。后续仍需 memory / search
+  `rebuild-worker` 已支持显式 `embedding-tasks` provider backfill 和 checkpoint cursor 分页续跑。后续仍需 memory / search
   chunk consumer、镜像可用后的 focused pgvector smoke、真实 Milvus / OpenSearch backend，
-  provider backend repair，以及 checkpointed large rebuild / backfill。
+  provider backend repair，以及 backfill smoke。
 - `admin-service`：`REPAIR_REQUEST -> workflow-service REPAIR_APPROVAL`、
   `CRITICAL -> workflow-service ADMIN_OPERATION` 和第一版 operation-specific
   approval policy / target-service routing 已接；`CONFIG_PUBLISH` /

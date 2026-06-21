@@ -75,8 +75,9 @@ vector 写入、rebuild 和 backfill 逻辑复杂到影响 retrieval / memory �
 - `rebuild-worker` 已支持 first-stage provider backend backfill：显式配置
   `NEXUSIM_VECTOR_REBUILD_BACKFILL_SOURCE=embedding-tasks` 时，从本服务已完成
   `vector_embedding_tasks` 读取 redacted preview，重新经 model-gateway embedding 后写当前
-  provider backend；未配置 provider backend 会 fail-fast，默认不启用。该模式有 bounded
-  batch 保护，超过 `NEXUSIM_VECTOR_REBUILD_BACKFILL_BATCH_SIZE` 不会误标 rebuild complete。
+  provider backend；未配置 provider backend 会 fail-fast，默认不启用。该模式已支持
+  checkpoint cursor 分页续跑，每批推进 `vector_rebuild_checkpoints.cursor_value`，后续继续
+  claim RUNNING rebuild，直到没有下一页才标记 completed。
 
 后续待办：memory / search chunk consumer、镜像可用后的 focused pgvector smoke、真实
-Milvus / OpenSearch backend、provider backend repair、checkpointed large rebuild / backfill。
+Milvus / OpenSearch backend、provider backend repair、backfill smoke。

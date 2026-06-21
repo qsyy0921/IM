@@ -286,6 +286,10 @@ func (repository *Repository) ClaimRebuildTasks(ctx context.Context, limit int) 
 		return nil, err
 	}
 	for index := range tasks {
+		if tasks[index].Job.Status == types.JobStatusVectorUpserting &&
+			tasks[index].Checkpoint.Status == types.RebuildCheckpointStatusRunning {
+			continue
+		}
 		tasks[index].Job.Status = types.JobStatusVectorUpserting
 		tasks[index].Checkpoint.Status = types.RebuildCheckpointStatusRunning
 		tasks[index].Checkpoint.UpdatedAt = time.Now().UTC()
@@ -300,6 +304,26 @@ func (repository *Repository) ClaimRebuildTasks(ctx context.Context, limit int) 
 		return nil, types.NewDBWriteFailed(err.Error())
 	}
 	return tasks, nil
+}
+
+func (repository *Repository) ContinueRebuildTask(ctx context.Context, task types.VectorRebuildTask, cursorValue string) error {
+	if repository.pool == nil {
+		return types.NewDBWriteFailed("vector repository is not configured")
+	}
+	tx, err := repository.pool.Begin(ctx)
+	if err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	task.Checkpoint.CursorValue = cursorValue
+	task.Checkpoint.UpdatedAt = time.Now().UTC()
+	if err := markRebuildTaskContinued(ctx, tx, task); err != nil {
+		return err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	return nil
 }
 
 func (repository *Repository) CompleteRebuildTask(ctx context.Context, task types.VectorRebuildTask) error {
@@ -375,8 +399,10 @@ JOIN vector_collections vc
   ON vc.tenant_id = vj.tenant_id
  AND vc.collection_id = vj.collection_id
 WHERE vj.job_type = 'REBUILD'
-  AND vj.status = 'PENDING'
-  AND vrc.status = 'PENDING'
+  AND (
+    (vj.status = 'PENDING' AND vrc.status = 'PENDING') OR
+    (vj.status = 'VECTOR_UPSERTING' AND vrc.status = 'RUNNING')
+  )
   AND vc.status = 'ACTIVE'
 ORDER BY vj.created_at, vj.job_id
 LIMIT $1
@@ -447,6 +473,33 @@ WHERE tenant_id = $1
 	}
 	if tag.RowsAffected() != 1 {
 		return types.NewFailedPrecondition("vector rebuild checkpoint is not claimable")
+	}
+	return nil
+}
+
+func markRebuildTaskContinued(ctx context.Context, tx pgx.Tx, task types.VectorRebuildTask) error {
+	tag, err := tx.Exec(ctx, `
+UPDATE vector_rebuild_checkpoints
+SET cursor_value = $4,
+    updated_at = $5
+WHERE tenant_id = $1
+  AND rebuild_job_id = $2
+  AND partition_key = $3
+  AND status = 'RUNNING'
+  AND EXISTS (
+    SELECT 1
+    FROM vector_index_jobs vj
+    WHERE vj.tenant_id = $1
+      AND vj.job_id = $2
+      AND vj.job_type = 'REBUILD'
+      AND vj.status = 'VECTOR_UPSERTING'
+  )
+`, string(task.Checkpoint.TenantID), task.Checkpoint.RebuildJobID, task.Checkpoint.PartitionKey, task.Checkpoint.CursorValue, task.Checkpoint.UpdatedAt)
+	if err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	if tag.RowsAffected() != 1 {
+		return types.NewFailedPrecondition("vector rebuild checkpoint is not running")
 	}
 	return nil
 }

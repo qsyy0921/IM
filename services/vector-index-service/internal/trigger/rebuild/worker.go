@@ -10,6 +10,7 @@ import (
 
 type Store interface {
 	ClaimRebuildTasks(ctx context.Context, limit int) ([]types.VectorRebuildTask, error)
+	ContinueRebuildTask(ctx context.Context, task types.VectorRebuildTask, cursorValue string) error
 	CompleteRebuildTask(ctx context.Context, task types.VectorRebuildTask) error
 }
 
@@ -81,6 +82,13 @@ func (worker *Worker) RunOnce(ctx context.Context) (types.RebuildWorkerStats, er
 			stats.Backfilled += backfillStats.Backfilled
 			stats.Embedded += backfillStats.Embedded
 			stats.Upserted += backfillStats.Upserted
+			if backfillStats.HasMore {
+				if err := worker.store.ContinueRebuildTask(ctx, task, backfillStats.NextCursor); err != nil {
+					return stats, err
+				}
+				stats.Continued++
+				continue
+			}
 		}
 		if err := worker.store.CompleteRebuildTask(ctx, task); err != nil {
 			return stats, err

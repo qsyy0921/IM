@@ -70,8 +70,9 @@ func (backfiller EmbeddingTaskBackfiller) BackfillRebuildTask(
 	if err != nil {
 		return types.RebuildBackfillStats{}, err
 	}
-	if len(tasks) > limit {
-		return types.RebuildBackfillStats{}, types.NewFailedPrecondition("vector rebuild backfill limit exceeded")
+	hasMore := len(tasks) > limit
+	if hasMore {
+		tasks = tasks[:limit]
 	}
 	stats := types.RebuildBackfillStats{Backfilled: len(tasks)}
 	for _, embeddingTask := range tasks {
@@ -95,8 +96,22 @@ func (backfiller EmbeddingTaskBackfiller) BackfillRebuildTask(
 			return stats, err
 		}
 		stats.Upserted++
+		stats.NextCursor = embeddingTaskCursor(normalized)
+	}
+	if hasMore {
+		stats.HasMore = true
+		if stats.NextCursor == "" {
+			return stats, types.NewFailedPrecondition("vector rebuild backfill cursor is empty")
+		}
 	}
 	return stats, nil
+}
+
+func embeddingTaskCursor(task types.VectorEmbeddingTask) string {
+	if task.IdempotencyKey == "" {
+		return ""
+	}
+	return "embedding-task:" + task.IdempotencyKey
 }
 
 func upsertCommandFromEmbedding(task types.VectorEmbeddingTask, result types.VectorEmbeddingResult) types.UpsertVectorItemCommand {

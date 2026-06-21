@@ -67,6 +67,28 @@ func TestWorkerRunOnceBackfillsBeforeComplete(t *testing.T) {
 	}
 }
 
+func TestWorkerRunOnceContinuesWhenBackfillHasMore(t *testing.T) {
+	task := testRebuildTask()
+	store := &fakeStore{tasks: []types.VectorRebuildTask{task}}
+	backfiller := &fakeBackfiller{
+		stats: types.RebuildBackfillStats{Backfilled: 1, Embedded: 1, Upserted: 1, HasMore: true, NextCursor: "embedding-task:cursor-1"},
+	}
+	worker := NewWorker(store, Config{Backfiller: backfiller})
+	stats, err := worker.RunOnce(context.Background())
+	if err != nil {
+		t.Fatalf("run once: %v", err)
+	}
+	if stats.Claimed != 1 || stats.Continued != 1 || stats.Completed != 0 {
+		t.Fatalf("unexpected stats: %+v", stats)
+	}
+	if len(store.continued) != 1 || store.continued[0] != "embedding-task:cursor-1" {
+		t.Fatalf("unexpected continued cursors: %+v", store.continued)
+	}
+	if len(store.completed) != 0 {
+		t.Fatalf("task should not complete when backfill has more: %+v", store.completed)
+	}
+}
+
 func TestWorkerRunOnceDoesNotCompleteWhenBackfillFails(t *testing.T) {
 	store := &fakeStore{tasks: []types.VectorRebuildTask{testRebuildTask()}}
 	worker := NewWorker(store, Config{Backfiller: &fakeBackfiller{err: errors.New("backfill failed")}})
@@ -128,25 +150,44 @@ func TestEmbeddingTaskBackfillerUpsertsProviderBackend(t *testing.T) {
 	}
 }
 
-func TestEmbeddingTaskBackfillerFailsBeforePartialWorkWhenLimitExceeded(t *testing.T) {
+func TestEmbeddingTaskBackfillerPaginatesWhenLimitExceeded(t *testing.T) {
 	tasks := []types.VectorEmbeddingTask{
 		testEmbeddingTask("redacted rebuild backfill input one"),
 		testEmbeddingTask("redacted rebuild backfill input two"),
 	}
+	tasks[1].IdempotencyKey = "idem-vector-rebuild-backfill-2"
+	tasks[1].InputHash = sha256Ref(tasks[1].InputText)
+	upserter := &fakeUpserter{}
+	backend := &fakeVectorBackend{}
 	backfiller := NewEmbeddingTaskBackfiller(
 		&fakeEmbeddingTaskLister{tasks: tasks},
-		&fakeEmbedder{},
-		&fakeUpserter{},
-		&fakeVectorBackend{},
+		&fakeEmbedder{result: types.VectorEmbeddingResult{
+			InvocationID:        "minv_rebuild_page",
+			ModelID:             "deterministic-embedding-v1",
+			EmbeddingValues:     []float32{0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8},
+			EmbeddingVectorHash: "sha256:embeddinghash",
+			Dimension:           8,
+			EmbeddingReturned:   true,
+		}},
+		upserter,
+		backend,
 		EmbeddingTaskBackfillerConfig{BatchSize: 1},
 	)
-	if _, err := backfiller.BackfillRebuildTask(context.Background(), testRebuildTask()); err == nil {
-		t.Fatal("expected backfill limit error")
+	stats, err := backfiller.BackfillRebuildTask(context.Background(), testRebuildTask())
+	if err != nil {
+		t.Fatalf("backfill page: %v", err)
+	}
+	if !stats.HasMore || stats.NextCursor != "embedding-task:idem-vector-rebuild-backfill" {
+		t.Fatalf("unexpected page stats: %+v", stats)
+	}
+	if len(upserter.commands) != 1 || len(backend.calls) != 1 {
+		t.Fatalf("expected one partial page write, got upserts=%d backend=%d", len(upserter.commands), len(backend.calls))
 	}
 }
 
 type fakeStore struct {
 	tasks     []types.VectorRebuildTask
+	continued []string
 	completed []types.VectorRebuildTask
 	err       error
 }
@@ -156,6 +197,14 @@ func (store *fakeStore) ClaimRebuildTasks(_ context.Context, limit int) ([]types
 		return store.tasks[:limit], nil
 	}
 	return store.tasks, nil
+}
+
+func (store *fakeStore) ContinueRebuildTask(_ context.Context, _ types.VectorRebuildTask, cursorValue string) error {
+	if store.err != nil {
+		return store.err
+	}
+	store.continued = append(store.continued, cursorValue)
+	return nil
 }
 
 func (store *fakeStore) CompleteRebuildTask(_ context.Context, task types.VectorRebuildTask) error {

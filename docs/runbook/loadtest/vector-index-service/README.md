@@ -203,4 +203,6 @@ $env:NEXUSIM_VECTOR_PGVECTOR_DSN = "postgres://nexusim:nexusim@localhost:15432/n
 - 重新通过 `model-gateway.InvokeEmbedding` 生成 embedding，再写当前配置的 provider backend。
 - 不读取 knowledge / memory / search 私有表，不从 vector metadata 伪造缺失的 vector array。
 - 未配置 provider backend 时 fail-fast。
-- matching completed task 超过 batch size 时 fail-closed，不会误标 rebuild complete。
+- 每批最多处理 `NEXUSIM_VECTOR_REBUILD_BACKFILL_BATCH_SIZE` 条 matching completed task；
+  如果还有下一页，会推进 `vector_rebuild_checkpoints.cursor_value` 并等待下一轮继续 claim
+  RUNNING rebuild；只有没有下一页时才标记 rebuild complete。

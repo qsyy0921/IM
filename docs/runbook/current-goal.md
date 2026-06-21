@@ -107,8 +107,9 @@ model-gateway / workflow / knowledge-ingestion / vector-index
 - `vector-index-service` `rebuild-worker` 已支持 first-stage provider backend backfill：
   `NEXUSIM_VECTOR_REBUILD_BACKFILL_SOURCE=embedding-tasks` 会从本服务已完成
   `vector_embedding_tasks` 读取 redacted preview，重新经 model-gateway embedding，再写入
-  显式配置的 provider backend；默认不启用，未配置 provider backend fail-fast，超过 bounded
-  batch 不会误标 rebuild complete。
+  显式配置的 provider backend；默认不启用，未配置 provider backend fail-fast。backfill
+  已支持 checkpoint cursor 分页续跑：每批推进 `vector_rebuild_checkpoints.cursor_value`，
+  后续 RunOnce 继续 claim RUNNING rebuild，直到没有下一页才标记 completed。
 - `knowledge-ingestion-service` 已新增低敏 `im.knowledge.events` Kafka schema 和
   `knowledge_outbox -> im.knowledge.events` 第一版 `outbox-relay` runtime。relay 覆盖
   source-created、document-parsed、chunk-ready 现有 outbox 事件和 SDD 预留的
@@ -147,7 +148,7 @@ model-gateway / workflow / knowledge-ingestion / vector-index
 - 默认继续补更多下游公开 admin API adapter，或为 admin config / quota 增加
   compensation operator。
 - 默认下一步可继续 vector-index provider backend：在镜像可用后跑 focused pgvector smoke、
-  真实 Milvus / OpenSearch backend、provider backend repair / checkpointed large backfill，
+  真实 Milvus / OpenSearch backend、provider backend repair / backfill smoke，
   或继续更多下游 admin API adapter。
 - 也可以继续 notification SMTP / SMS / APNs / FCM adapter 或 bounce-suppression。
 

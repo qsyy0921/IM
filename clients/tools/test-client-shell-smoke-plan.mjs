@@ -69,6 +69,7 @@ assert(plan.targets["windows-desktop"].checklist.some(item => item.step === "ver
 assert(plan.targets.android.commands.prepareAssets.includes("build:shell-assets:android"), "android prep command missing");
 assert(plan.targets.android.commands.verifyAssets.includes("android"), "android verify command missing");
 assert(plan.targets.android.commands.installPlan.includes("plan:artifact-install"), "android install plan command missing");
+assert(plan.targets.android.commands.webviewMetadataSmoke.includes("smoke:android-webview-metadata"), "android WebView metadata smoke command missing");
 assert(plan.targets.android.install, "android install status missing");
 assert(typeof plan.targets.android.install.readyForInstall === "boolean", "android install readiness missing");
 assert(typeof plan.targets.android.install.installPrereqs.adbAvailable === "boolean", "android adb prereq status missing");
@@ -160,6 +161,7 @@ assert(readyFromCollectedPlan.targets["windows-desktop"].commands.webviewLoginSm
 assert(readyFromCollectedPlan.targets["windows-desktop"].checklist.some(item => item.step === "run-desktop-webview-login-smoke"), "ready desktop plan should include WebView login smoke step");
 assert(readyFromCollectedPlan.targets.android.readyForManualShellSmoke === true, "android should be smoke-ready from collected artifact");
 assert(readyFromCollectedPlan.targets.android.artifact.collectedArtifactHint === "clients/artifacts/run/nexusim-android-debug.apk", "android collected artifact hint mismatch");
+assert(readyFromCollectedPlan.targets.android.checklist.some(item => item.step === "run-android-webview-metadata-smoke"), "ready android plan should include WebView metadata smoke step");
 
 const missingAdbPlan = buildClientShellSmokePlan({
   readiness: readyReadiness,

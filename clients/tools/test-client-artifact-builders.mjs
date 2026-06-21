@@ -66,11 +66,23 @@ assert(android.args.join(" ").includes("assembleDebug"), "android build command 
 assert(android.args.includes("-Pnexusim.skipWebAssetPrep=true"), "android wrapper must skip duplicate Gradle asset prep after manifest verification");
 assert(!JSON.stringify(android).match(/token|secret|password|credential|private/i), "android build plan leaks sensitive names");
 assert(android.collectArtifacts.enabled === false, "android collector should be disabled by default");
+assert(android.shellConfig === "default", "android default shell config marker missing");
 
 const androidCollect = dryRunCollect("build-android-apk.mjs");
 assert(androidCollect.collectArtifacts.enabled === true, "android collector flag not reflected");
 assert(androidCollect.collectArtifacts.outputDir === "custom", "android collector custom output dir not reflected");
 assert(androidCollect.collectArtifacts.runId === "builder-test", "android collector run id not reflected");
 assert(!JSON.stringify(androidCollect).includes("C:\\local"), "android collect plan leaked absolute output dir");
+
+const androidCustomShell = JSON.parse(execFileSync(process.execPath, [
+  join(toolsDir, "build-android-apk.mjs"),
+  "--dry-run",
+  "--shell-config",
+  "C:\\local\\android-shell-config.json"
+], {
+  encoding: "utf8"
+}));
+assert(androidCustomShell.shellConfig === "custom", "android custom shell config not reflected");
+assert(!JSON.stringify(androidCustomShell).includes("C:\\local"), "android custom shell plan leaked absolute config path");
 
 console.log("client artifact builders ok");

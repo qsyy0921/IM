@@ -188,7 +188,8 @@ First slice:
   desktop can now build through the repo-local Tauri CLI after
   `npm --prefix clients install`; Android still fails fast with
   missing-toolchain JSON until the local Android toolchain or Docker builder
-  image exists.
+  image exists. Both desktop and Android wrappers accept a custom shell config
+  path for metadata-smoke builds; the path is never printed in dry-run output.
 - `npm --prefix clients run test:android-docker-builder` validates the safe
   Android Docker builder wrapper. `build:android-apk:docker` runs only when
   the local builder image already exists; `build:android-apk:docker:bootstrap`
@@ -235,6 +236,13 @@ First slice:
   For Windows desktop, the plan now includes the explicit
   `install-declared-desktop-tauri-cli` step when the repo-declared local Tauri
   CLI has not been installed.
+- `npm --prefix clients run smoke:android-webview-metadata` is the first Android
+  WebView metadata smoke runner. In dry-run mode it emits only low-sensitive
+  package / Activity / adb-reverse intent. In real mode it builds an APK with a
+  temporary loopback metadata shell config, installs it through `adb`, starts
+  `com.nexusim.android/.MainActivity`, and waits for the WebView to POST the
+  `NexusIMNative.runtimeMetadata()` report through `adb reverse`. It proves only
+  appassets + metadata bridge wiring, not login, PullInbox, WebSocket, or ACK.
 - `npm --prefix clients run validate:builder-profile` validates the Android
   Docker builder profile without building or pulling images. The profile lives
   in `deploy/local/docker-compose.client-builders.yml` and uses
@@ -287,8 +295,9 @@ First slice:
   loopback report from inside the rendered shell. The fuller login-level
   desktop UI smoke has also passed on clean commit `c72ea512`, covering WebView
   login, externally triggered `delivery.notify`, PullInbox, message observe and
-  AckDelivery. Android still does not produce `.apk` or `.aab` artifacts because
-  the local toolchain / Docker builder image has not been completed.
+  AckDelivery. Android now has the same metadata-smoke runner shape, but it
+  still does not produce `.apk` or `.aab` artifacts because the local toolchain /
+  Docker builder image has not been completed.
 - `/api/auth/logout` performs first-stage server-side logout for the current
   authenticated session only. Broader device/session management remains an
   identity/admin capability, not a client BFF target selector.
@@ -344,6 +353,7 @@ npm --prefix clients run test:artifact-collector
 npm --prefix clients run test:artifact-install-plan
 npm --prefix clients run test:artifact-readiness
 npm --prefix clients run test:android-docker-builder
+npm --prefix clients run test:android-webview-metadata-smoke
 npm --prefix clients run test:desktop-artifact-launch-smoke
 npm --prefix clients run test:shell-smoke-plan
 npm --prefix clients run report:artifact-readiness
@@ -365,6 +375,7 @@ npm --prefix clients run plan:artifact-install
 npm --prefix clients run smoke:desktop-artifact-launch
 npm --prefix clients run smoke:desktop-composed -- --clientweb-summary <client-web-summary.json>
 npm --prefix clients run smoke:desktop-webview-metadata
+npm --prefix clients run smoke:android-webview-metadata -- --dry-run
 ```
 
 The report includes `nextActions`. When the Android Docker builder image is

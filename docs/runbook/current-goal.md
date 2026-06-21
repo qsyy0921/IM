@@ -135,7 +135,9 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   wrapper；`test:artifact-builders` 覆盖 dry-run 命令计划和低敏输出。Windows
   desktop wrapper 已能用 repo-local Tauri CLI 构建 first-stage standalone
   `nexusim-desktop.exe`；当前仍未启用 MSI / NSIS installer bundle。Android 缺
-  JDK 17+ / Gradle / Android SDK，所以 local APK wrapper 仍会 fail fast。
+  JDK 17+ / Gradle / Android SDK，所以 local APK wrapper 仍会 fail fast。Android
+  wrapper 现在也支持 custom shell config path，可用于后续 metadata smoke 注入临时
+  loopback callback config，dry-run 不输出本机绝对路径。
 - `clients/tools/collect-client-artifacts.mjs` 已提供 first-stage artifact
   collector；`test:artifact-collector` 覆盖 fake APK / Windows artifact 归档、
   SHA-256 manifest、dry-run 不写文件和不泄露本机绝对路径。真实 artifact / APK
@@ -161,7 +163,12 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   2026-06-22 已跑通真实 Tauri WebView metadata callback smoke：
   `npm --prefix clients run smoke:desktop-webview-metadata`，证明 WebView 内能读取
   PC Tauri `runtime_metadata` 并回调低敏 report；该 smoke 仍不声明登录、
-  PullInbox、WebSocket 或 AckDelivery 已在 Tauri WebView 内完成。
+  PullInbox、WebSocket 或 AckDelivery 已在 Tauri WebView 内完成。Android 也已新增
+  `npm --prefix clients run smoke:android-webview-metadata` runner；dry-run 已可验证
+  低敏 plan，真实运行会构建注入临时 metadata callback 的 APK、通过 `adb reverse`
+  暴露 loopback callback、安装并启动 `com.nexusim.android/.MainActivity`，等待
+  `NexusIMNative.runtimeMetadata()` 回调。该 Android runner 仍受 APK toolchain
+  阻塞，尚未形成真实设备 baseline。
 - PC Web shell 已新增登录级自动化前置：Web UI 暴露稳定 `data-testid`
   automation contract 和 `ack-status` 诊断，`npm --prefix clients run
   smoke:desktop-webview-login` 可通过 WebView2/CDP 外部驱动 Tauri WebView 登录、
@@ -197,7 +204,9 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   smoke 命令，不启动服务、不下载工具链、不连接设备、不安装 artifact、不声称已有
   installer / APK。Windows desktop smoke plan 在 collected artifact ready 时会包含
   `smoke:desktop-artifact-launch` 作为 launch sanity step。其 native artifact 状态现在区分 raw build output discovery 与
-  collected artifact manifest readiness，避免已归档产物和本地 build 输出源混淆。
+  collected artifact manifest readiness，避免已归档产物和本地 build 输出源混淆；Android
+  plan 在 collected APK + adb ready 时会包含 `smoke:android-webview-metadata`
+  作为 metadata-only WebView bridge smoke。
 - `loadtest/clientweb` 已新增 first-stage scriptable client smoke runner：
   准备阶段用 identity / api-gateway gRPC 注册用户、seed 会话并创建 JOIN；真实客户端
   验证段只走 `api-gateway` HTTP BFF 和 `push-gateway` WebSocket，覆盖 BFF login、

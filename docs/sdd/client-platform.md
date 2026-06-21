@@ -201,6 +201,11 @@ Responsibilities:
   readiness, relative artifact hints, safe commands and per-target manual
   checklist steps, but must not print local absolute paths, tokens or private
   runtime state.
+- Platform metadata smoke runners may inject a temporary loopback
+  `smokeCallbackURL` shell config and verify native metadata from inside the
+  WebView. They must keep callback reports low-sensitive and must not claim
+  login, PullInbox, WebSocket or ACK coverage unless those actions are actually
+  driven inside the target WebView.
 - Shell asset preparation must clean the target output directory before copying
   a new Web build when source and output differ, so packaged desktop shells do
   not retain stale JS / CSS bundles.
@@ -247,6 +252,11 @@ Responsibilities:
   collected APK, but it must not contact the device or install anything by
   itself.
 - Platform shell smoke planning must use the same low-sensitive contract as PC.
+- Android metadata smoke may use `adb reverse` to expose a loopback callback to
+  the device, install the collected APK, launch
+  `com.nexusim.android/.MainActivity`, and wait for
+  `NexusIMNative.runtimeMetadata()` evidence. This is still a metadata-only
+  WebView smoke, not a login-level client smoke.
 - Android asset preparation must clean the WebView asset output directory before
   copying a new build, so APKs do not carry stale Web bundles.
 - Android asset preparation uses the same low-sensitive shell asset manifest as

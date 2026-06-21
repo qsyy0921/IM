@@ -28,6 +28,7 @@ function main(argv) {
 
   prepareShellWebAssets({
     target: "android",
+    configPath: options.shellConfigPath || undefined,
     build: !options.skipWebBuild
   });
   verifyShellAssets({ target: "android" });
@@ -60,6 +61,7 @@ function androidBuildPlan(prereqs, options) {
     cwdHint: "clients/android/native",
     outputHint: "clients/android/native/app/build/outputs/apk/debug/app-debug.apk",
     gradleWrapperDetected: hasGradleWrapper,
+    shellConfig: options.shellConfigPath ? "custom" : "default",
     collectArtifacts: collectPlanSummary("android", options)
   };
 }

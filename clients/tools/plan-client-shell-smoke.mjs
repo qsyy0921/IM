@@ -145,6 +145,7 @@ function nativeCommands(target, readinessTarget) {
     buildArtifact: readinessTarget.buildCommand,
     dryRunBuild: readinessTarget.dryRunCommand,
     installPlan: "npm --prefix clients run plan:artifact-install",
+    webviewMetadataSmoke: "npm --prefix clients run smoke:android-webview-metadata",
     dockerBuilder: readinessTarget.dockerBuilder?.imagePresent
       ? readinessTarget.dockerBuilder.buildCommand
       : readinessTarget.dockerBuilder?.imageBuildCommand,
@@ -243,6 +244,12 @@ function nativeChecklist(target, readinessTarget, artifactStatus, installStatus)
       step: "run-desktop-webview-login-smoke",
       command: nativeCommands(target, readinessTarget).webviewLoginSmoke,
       evidence: "Tauri WebView is externally driven through login, delivery.notify, PullInbox and AckDelivery while the clientweb local stack is alive"
+    });
+  } else {
+    checklist.push({
+      step: "run-android-webview-metadata-smoke",
+      command: nativeCommands(target, readinessTarget).webviewMetadataSmoke,
+      evidence: "Android WebView loads the prepared shell, reads NexusIMNative runtime metadata and posts a low-sensitive callback through adb reverse"
     });
   }
 

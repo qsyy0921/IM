@@ -255,12 +255,16 @@ AppendAuditRecord
 Kafka ingestion：
 
 ```text
-audit-consumer
--> fetch upstream audit event
--> map to low-sensitive AuditRecord
--> append record + checkpoint in one transaction
+admin-consumer
+-> fetch public im.admin.events
+-> map to low-sensitive ADMIN_OPERATION AuditRecord
+-> append record
 -> commit Kafka offset after DB commit
 ```
+
+第一版 `admin-consumer` 不读 admin-service 私有表，不持久化 raw admin payload /
+provider body / public error 文本。持久 `audit_ingestion_checkpoint` 和 rewind
+operator 保留给后续通用 ingestion consumer。
 
 导出：
 
@@ -377,7 +381,7 @@ attributes_json、record hash 原文或 object URL。
 
 ```text
 NEXUSIM_AUDIT_SERVICE_MODE=grpc
-NEXUSIM_AUDIT_SERVICE_MODE=audit-consumer
+NEXUSIM_AUDIT_SERVICE_MODE=admin-consumer
 NEXUSIM_AUDIT_SERVICE_MODE=segment-sealer
 NEXUSIM_AUDIT_SERVICE_MODE=export-worker
 NEXUSIM_AUDIT_SERVICE_MODE=outbox-relay
@@ -407,8 +411,8 @@ audit-outbox-repair
 进入 first smoke 前：
 
 - proto / migration / 六层 skeleton / cmd runtime 已落。
-- PostgreSQL append、hash-chain、redaction、consumer checkpoint 和 export manifest 测试通过。
+- PostgreSQL append、hash-chain、redaction 和 admin-consumer fail-closed 测试通过。
 - `AppendAuditRecord -> QueryAuditRecords -> VerifyAuditProof` 本地 smoke 通过。
-- malformed audit event fail closed，不推进 checkpoint，不写不完整 hash-chain。
+- malformed audit event fail closed，不提交 Kafka offset，不写不完整 hash-chain。
 - raw token、raw prompt、message body、provider body 和 SQL error 不会出现在事件、
   metrics、export manifest 或 repair summary。

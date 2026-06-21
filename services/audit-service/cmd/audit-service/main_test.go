@@ -3,7 +3,7 @@ package main
 import "testing"
 
 func TestValidateAuditServiceMode(t *testing.T) {
-	for _, mode := range []string{"noop", "grpc"} {
+	for _, mode := range []string{"noop", "grpc", "admin-consumer"} {
 		if err := validateAuditServiceMode(mode); err != nil {
 			t.Fatalf("mode %s should be valid: %v", mode, err)
 		}

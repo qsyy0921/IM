@@ -45,9 +45,10 @@ Active AI foundation backlog 覆盖：`action-executor`、`agent-service`、
   download policy。
 - `notification-service`：SMTP / SMS / APNs / FCM adapter、bounce / suppression、
   provider redrive / audit。
-- `audit-service`：Kafka ingestion、export worker / manifest、SIEM forwarding、
-  retention cleanup、segment sealing、provider-grade audit export。
-- `admin-service`：admin-event ingestion、admin UI、更多下游公开 API adapter、更多
+- `audit-service`：更多 Kafka ingestion source、持久 ingestion checkpoint / rewind
+  operator、export worker / manifest、SIEM forwarding、retention cleanup、segment
+  sealing、provider-grade audit export。
+- `admin-service`：admin UI、更多下游公开 API adapter、更多
   compensation adapter、provider-grade instruction 审批 / UI。
 - `control-plane-service`：outbox relay、drift monitor、expiry / cleanup worker、
   api-gateway quota consumer、provider-grade rollout。

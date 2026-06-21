@@ -17,7 +17,9 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	auditgrpc "github.com/qsyy0921/IM/services/audit-service/internal/api/grpc"
 	"github.com/qsyy0921/IM/services/audit-service/internal/app"
+	kafkainfra "github.com/qsyy0921/IM/services/audit-service/internal/infrastructure/kafka"
 	postgresinfra "github.com/qsyy0921/IM/services/audit-service/internal/infrastructure/postgres"
+	"github.com/qsyy0921/IM/services/audit-service/internal/trigger/adminevent"
 	"google.golang.org/grpc"
 )
 
@@ -40,6 +42,8 @@ func run(ctx context.Context) error {
 		return runNoop(ctx)
 	case "grpc":
 		return runGRPC(ctx)
+	case "admin-consumer":
+		return runAdminConsumer(ctx)
 	default:
 		return fmt.Errorf("unsupported NEXUSIM_AUDIT_SERVICE_MODE %q", mode)
 	}
@@ -115,6 +119,47 @@ func runGRPC(ctx context.Context) error {
 	}
 }
 
+func runAdminConsumer(ctx context.Context) error {
+	debugAddr, err := auditDebugAddrFromEnv()
+	if err != nil {
+		return err
+	}
+	stopDebug, err := startDebugServer(ctx, debugAddr)
+	if err != nil {
+		return err
+	}
+	defer stopDebug()
+
+	pool, err := openPGPool(ctx)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	consumer, err := kafkainfra.NewReaderConsumer(kafkainfra.ReaderConfig{
+		Brokers: auditKafkaBrokersFromEnv(),
+		Topic:   envString("NEXUSIM_AUDIT_ADMIN_TOPIC", adminevent.TopicAdminEvents),
+		GroupID: envString("NEXUSIM_AUDIT_ADMIN_CONSUMER_GROUP", "nexusim-audit-admin-consumer"),
+	})
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if closeErr := consumer.Close(); closeErr != nil {
+			log.Printf("audit-service admin consumer close failed: %v", closeErr)
+		}
+	}()
+
+	repository := postgresinfra.NewRepository(pool)
+	worker := adminevent.NewWorker(
+		consumer,
+		app.NewAppendAuditRecordUseCase(repository, app.NewRandomAuditIDGenerator()),
+		adminevent.Config{Logf: log.Printf},
+	)
+	log.Printf("audit-service admin-consumer consuming %s", envString("NEXUSIM_AUDIT_ADMIN_TOPIC", adminevent.TopicAdminEvents))
+	return worker.Run(ctx)
+}
+
 func auditServiceModeFromEnv() string {
 	mode := strings.TrimSpace(os.Getenv("NEXUSIM_AUDIT_SERVICE_MODE"))
 	if mode == "" {
@@ -125,7 +170,7 @@ func auditServiceModeFromEnv() string {
 
 func validateAuditServiceMode(mode string) error {
 	switch mode {
-	case "noop", "grpc":
+	case "noop", "grpc", "admin-consumer":
 		return nil
 	default:
 		return fmt.Errorf("unsupported NEXUSIM_AUDIT_SERVICE_MODE %q", mode)
@@ -187,6 +232,19 @@ func envString(name string, fallback string) string {
 		return fallback
 	}
 	return value
+}
+
+func auditKafkaBrokersFromEnv() []string {
+	raw := envString("NEXUSIM_AUDIT_KAFKA_BROKERS", envString("NEXUSIM_KAFKA_BROKERS", "localhost:9092"))
+	parts := strings.Split(raw, ",")
+	brokers := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			brokers = append(brokers, part)
+		}
+	}
+	return brokers
 }
 
 func openPGPool(ctx context.Context) (*pgxpool.Pool, error) {

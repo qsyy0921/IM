@@ -20,24 +20,51 @@ const (
 )
 
 var allowedAttributeKeys = map[string]struct{}{
-	"message_key":        {},
-	"conversation_key":   {},
-	"session_key":        {},
-	"device_key":         {},
-	"proposal_id":        {},
-	"approval_id":        {},
-	"prepared_audit_id":  {},
-	"execution_id":       {},
-	"policy_decision_id": {},
-	"failure_class":      {},
-	"provider_class":     {},
-	"operator_mode":      {},
-	"repair_outcome":     {},
-	"notification_key":   {},
-	"request_key":        {},
-	"export_id":          {},
-	"record_count":       {},
-	"source_ref":         {},
+	"message_key":                    {},
+	"conversation_key":               {},
+	"session_key":                    {},
+	"device_key":                     {},
+	"proposal_id":                    {},
+	"approval_id":                    {},
+	"prepared_audit_id":              {},
+	"execution_id":                   {},
+	"policy_decision_id":             {},
+	"failure_class":                  {},
+	"provider_class":                 {},
+	"operator_mode":                  {},
+	"repair_outcome":                 {},
+	"notification_key":               {},
+	"request_key":                    {},
+	"export_id":                      {},
+	"record_count":                   {},
+	"source_ref":                     {},
+	"event_type":                     {},
+	"aggregate_version":              {},
+	"partition_key":                  {},
+	"operation_id":                   {},
+	"operation_type":                 {},
+	"target_ref_hash":                {},
+	"risk_level":                     {},
+	"status":                         {},
+	"requested_by_hash":              {},
+	"approved_by_hash":               {},
+	"payload_hash":                   {},
+	"payload_schema_version":         {},
+	"reason_ref":                     {},
+	"decision":                       {},
+	"result_id":                      {},
+	"downstream_service":             {},
+	"downstream_request_ref":         {},
+	"compensation_requested_by_hash": {},
+	"compensation_reason_ref":        {},
+}
+
+type AdminEventMessage struct {
+	Topic     string
+	Partition int
+	Offset    int64
+	Key       []byte
+	Value     []byte
 }
 
 type AuditRecord struct {

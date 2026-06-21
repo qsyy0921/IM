@@ -27,11 +27,14 @@ model-gateway / workflow / knowledge-ingestion / vector-index
   job metadata API；只保存低敏 filter hash / redaction profile / requester refs。
 - `admin-service` 已新增 `AUDIT_EXPORT_REQUEST -> audit-service.CreateAuditExport`
   公开 API adapter；不读 audit-service 私有表。
+- `audit-service` 已新增 first-stage `admin-consumer`，消费公开
+  `im.admin.events` 并映射为低敏 `AppendAuditRecord`；Kafka offset 只在 append
+  成功后提交，持久 ingestion checkpoint / rewind 仍是后续项。
 
 ## 下一步优先级
 
-1. 继续明确下游公开 admin API adapter，或补 admin-event ingestion。
-2. 继续 workflow compensation adapter / instruction approval UI / ops 管理。
+1. 继续 workflow compensation adapter / instruction approval UI / ops 管理。
+2. 继续明确其它下游公开 admin API adapter。
 3. 在镜像可用后补 vector-index focused pgvector smoke；后续再接 Milvus /
    OpenSearch backend、provider repair 和真 provider backfill smoke。
 4. 可继续 notification SMTP / SMS / APNs / FCM adapter 或 bounce-suppression。

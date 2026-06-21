@@ -1,6 +1,7 @@
 # audit-service
 
-状态：product-active / first-stage append、query、export job metadata 和 proof 已落。
+状态：product-active / first-stage append、query、admin-event ingestion、export job
+metadata 和 proof 已落。
 
 定位：统一审计归档和证明服务，聚合登录、安全、管理操作、策略决策和 Agent
 动作审计；对外导出必须低敏脱敏。
@@ -17,7 +18,10 @@
   filter hash / redaction profile / requester refs；不生成 manifest。
 - `VerifyAuditProof`：hash-chain proof verification。
 - 低敏 `audit.record.appended.v1` outbox。
+- `admin-consumer`：消费公开 `im.admin.events`，映射为低敏 admin audit record；
+  append 成功后才提交 Kafka offset。
 - 最小 gRPC smoke：`docs/runbook/loadtest/audit-service/`。
 
-后续：Kafka ingestion、export worker / manifest、SIEM forwarding、segment sealing、
-retention cleanup、provider-grade audit export。
+后续：更多 Kafka ingestion source、持久 ingestion checkpoint / rewind operator、
+export worker / manifest、SIEM forwarding、segment sealing、retention cleanup、
+provider-grade audit export。

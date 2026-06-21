@@ -1,0 +1,15 @@
+{
+  "name": "NexusIM",
+  "slug": "nexusim",
+  "package": "com.nexusim.android",
+  "version": "0.1.0",
+  "orientation": "portrait",
+  "android": {
+    "minSdkVersion": 26,
+    "targetSdkVersion": 35,
+    "permissions": [
+      "INTERNET",
+      "ACCESS_NETWORK_STATE"
+    ]
+  }
+}

@@ -19,6 +19,8 @@
 
 工作方式：按 current-goal 小切片闭环；可用多个 sub-agent 做互不重叠任务；主 agent 负责集成、检查和文档同步。不回滚用户已有修改。新发现待办写入 docs/runbook/remaining-goals.md。
 
+语言边界：Go 负责后端服务、BFF、控制面、事实源、审计和安全边界；TypeScript 负责 Web/PC/Android 共享客户端协议、同步核心和 UI；Rust/Kotlin/Swift 只做薄平台桥；Python 只做 AI worker、模型算法、eval 和离线工具，不能拥有业务事实源。
+
 门禁按风险分层：小改只跑相关测试 / 文档脚本；跨服务、生成代码、migration、service-registry、Docker/compose、安全边界或提交推送前才跑完整 check-local。
 ```
 
@@ -35,6 +37,7 @@
 2. 小切片闭环：设计、代码、必要测试、文档一起收；默认跑相关局部门禁，不频繁跑完整 `check-local`。
 3. 降低耦合并控制复杂度：不跨服务读内部表，不引入网状同步 RPC，接近行数阈值就拆同 package 文件。
 4. 新服务和中间件不写死；满足独立模型 / 伸缩 / 故障 / 安全边界或明显降复杂度时通过 ADR 新增。
-5. 可用多个 sub-agent，但必须拆分互不重叠职责；主 agent 负责集成和最终检查。
-6. 压测原始数据放 `H:\NexusIM\loadtest-results`；E 盘仓库只放报告和文档。
-7. 新发现待办写入 `docs/runbook/remaining-goals.md`；不回滚用户已有修改。
+5. 真实业务语言边界：Go 做后端服务 / BFF / 控制面；TypeScript 做客户端共享核心和 UI；Rust/Kotlin/Swift 只做薄 native adapter；Python 做 AI worker / eval，不接管业务状态。
+6. 可用多个 sub-agent，但必须拆分互不重叠职责；主 agent 负责集成和最终检查。
+7. 压测原始数据放 `H:\NexusIM\loadtest-results`；E 盘仓库只放报告和文档。
+8. 新发现待办写入 `docs/runbook/remaining-goals.md`；不回滚用户已有修改。

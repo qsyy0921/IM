@@ -23,9 +23,15 @@
 [knowledge-ingestion](knowledge-ingestion-service.md) /
 [workflow](workflow-service.md) / [vector-index](vector-index-service.md)
 
+## Client platform
+
+Client platform is tracked outside service briefs because it is not a backend
+microservice: [client platform](../client-platform.md).
+
 ## 当前推进规则
 
-- 现有 9 个服务只做阻塞 AI 链路的必要收口。
+- 现有 9 个服务只做阻塞当前 client / AI 链路的必要收口。
+- client platform 只能通过 `api-gateway` / `push-gateway` 使用后端能力。
 - memory 必须按 group memory 设计：source refs、speaker / audience、validity、supersedes、confidence、review state。
 - Agent 写动作必须先走 policy tool precheck，默认 `Proposal -> Approval -> Executor -> Audit`。
 - sub-agent 可并行推进，但不能同时修改同一服务文件。

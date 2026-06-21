@@ -7,11 +7,16 @@
 
 - 新发现待办追加到本文件；已完成后移除或改写为后续项。
 - 不记录已完成证据，不写长历史，不替代 SDD / ADR。
-- 当前 active slice：future platform / product services promotion。
+- 当前 active slice：client platform MVP foundation。
 - 生产级 HA、长压、sizing 和完整系统测试暂不作为当前阻塞。
 
 ## 当前未完成重点
 
+0. Client platform first slice：补 `api-gateway` client BFF endpoints，接
+   `clients/web` 的真实 fetch / WebSocket adapter，落 IndexedDB local store，并跑
+   LAN smoke；随后接 PC desktop Tauri runner 和 Android runtime shell，产出本地
+   Windows installer / unsigned APK；客户端只连 `api-gateway` / `push-gateway`，
+   不能直连内部服务。
 1. AI eval 回归扩展：继续增加低敏 case，区分 retrieval、reasoning、action
    boundary 和 memory lifecycle failure。
 2. Memory / retrieval 深化：继续 group / collaborative memory 的 source refs、

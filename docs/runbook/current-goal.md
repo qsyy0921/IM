@@ -6,18 +6,33 @@
 ## Active Slice
 
 ```text
-future platform / product services promotion
+client platform MVP foundation
 ```
 
-目标服务：
+目标：
 
 ```text
-media / notification / audit / admin / control-plane / presence
-model-gateway / workflow / knowledge-ingestion / vector-index
+Browser + PC + Android client architecture + client BFF contract + reusable client packages
 ```
 
 ## 当前状态
 
+- 用户明确切入客户端平台；本轮从 product services promotion 临时转为
+  `client platform MVP foundation`。
+- 目标是先按最高标准冻结三端客户端架构，不写临时 demo：浏览器先可运行，PC
+  desktop 和 Android 从第一天保留 package / runtime / packaging 边界，三端复用
+  `protocol` / `client-core`。
+- `clients/` workspace skeleton 已创建并通过 focused validation：`protocol`、
+  `client-core`、`web`、`desktop`、`android` 均有明确 package / runtime contract；
+  Web 端已有 Vite shell，PC / Android 仍是 packaging/runtime contract，不产出安装包。
+- 真实业务语言选择：后端和 client BFF 继续使用 Go；浏览器、PC desktop 和
+  Android 的共享协议 / 同步核心 / UI 使用 TypeScript；Tauri 的 Rust、Android
+  Kotlin 只作为薄平台桥；Python 只用于 AI worker / eval / 离线工具，不进入
+  客户端主链路和后端事实源。
+- 客户端只面向 `api-gateway` 和 `push-gateway`；PullInbox 是消息事实源，WebSocket
+  是在线唤醒。
+- v0.1 SDD 见 `docs/sdd/client-platform.md`，短 brief 见
+  `docs/runbook/client-platform.md`。
 - 10 个目标服务的 SDD v0.1 draft 已存在，组合 promotion 边界见
   `docs/sdd/future-platform-services.md`。
 - 10 个目标服务均已进入 product-active first-stage implementation。
@@ -56,15 +71,19 @@ model-gateway / workflow / knowledge-ingestion / vector-index
 
 ## 下一步优先级
 
-1. 继续 workflow compensation adapter / instruction approval UI / ops 管理；
+1. 实现 `api-gateway` client BFF v0.1 endpoints：auth、conversation list、
+   messages、PullInbox、ACK、contacts、receipts。
+2. 接 Web fetch / WebSocket adapter、local store adapter 和局域网 smoke。
+3. 后续按同一 core 接 PC desktop Tauri runner 和 Android runtime shell。
+4. 再回到 workflow compensation adapter / instruction approval UI / ops 管理；
    当前已有本地 workflow get / decision / decision manifest / instruction list CLI，
    低敏 compensation instruction manifest 生成 / 校验，以及 catalog-backed import
    approval 链路、invocation preflight 和静态 review page；后续可接正式审批 UI。
-2. 继续明确其它下游公开 admin API adapter。
-3. 在镜像可用后补 vector-index focused pgvector smoke；后续再接 Milvus /
+5. 继续明确其它下游公开 admin API adapter。
+6. 在镜像可用后补 vector-index focused pgvector smoke；后续再接 Milvus /
    OpenSearch backend、provider repair 和真 provider backfill smoke。
-4. 可继续 notification SMTP / SMS / APNs / FCM adapter 或 bounce-suppression。
-5. 新发现待办写入 `docs/runbook/remaining-goals.md`。
+7. 可继续 notification SMTP / SMS / APNs / FCM adapter 或 bounce-suppression。
+8. 新发现待办写入 `docs/runbook/remaining-goals.md`。
 
 ## 工作方式
 
@@ -76,6 +95,8 @@ model-gateway / workflow / knowledge-ingestion / vector-index
 ## 硬边界
 
 - 不把媒体二进制塞回 message-service。
+- 客户端不直接调用内部微服务，不读取任何服务私表。
+- 客户端 local store 只做缓存 / 离线队列，不成为服务端事实源。
 - 不把 identity 局部 webhook / SMTP 扩成完整 notification-service 的生产承诺。
 - admin / control-plane / workflow / audit 之间只能走公开 API、事件或明确 port。
 - model / vector / ingestion 不得绕过 retrieval、policy、EvidencePack、approval 和 audit。

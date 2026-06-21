@@ -1,0 +1,64 @@
+import { existsSync, readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { join } from "node:path";
+
+const root = fileURLToPath(new URL("..", import.meta.url));
+
+function readJSON(path) {
+  return JSON.parse(readFileSync(path, "utf8"));
+}
+
+function assert(condition, message) {
+  if (!condition) {
+    throw new Error(message);
+  }
+}
+
+const requiredPaths = [
+  "package.json",
+  "tsconfig.base.json",
+  "packages/protocol/package.json",
+  "packages/protocol/src/index.ts",
+  "packages/client-core/package.json",
+  "packages/client-core/src/index.ts",
+  "web/package.json",
+  "web/.env.example",
+  "web/src/App.tsx",
+  "desktop/package.json",
+  "desktop/src/platform-contract.ts",
+  "desktop/src-tauri/tauri.conf.json",
+  "android/package.json",
+  "android/src/platform-contract.ts",
+  "android/app.config.json"
+];
+
+for (const relativePath of requiredPaths) {
+  assert(existsSync(join(root, relativePath)), `missing ${relativePath}`);
+}
+
+const workspacePackage = readJSON(join(root, "package.json"));
+assert(workspacePackage.private === true, "clients workspace must be private");
+assert(Array.isArray(workspacePackage.workspaces), "workspaces must be declared");
+assert(workspacePackage.workspaces.includes("packages/*"), "packages/* workspace missing");
+assert(workspacePackage.workspaces.includes("web"), "web workspace missing");
+assert(workspacePackage.workspaces.includes("desktop"), "desktop workspace missing");
+assert(workspacePackage.workspaces.includes("android"), "android workspace missing");
+
+const protocolPackage = readJSON(join(root, "packages/protocol/package.json"));
+const corePackage = readJSON(join(root, "packages/client-core/package.json"));
+const webPackage = readJSON(join(root, "web/package.json"));
+const desktopPackage = readJSON(join(root, "desktop/package.json"));
+const androidPackage = readJSON(join(root, "android/package.json"));
+
+assert(protocolPackage.name === "@nexusim/protocol", "protocol package name mismatch");
+assert(corePackage.name === "@nexusim/client-core", "client-core package name mismatch");
+assert(webPackage.dependencies["@nexusim/protocol"] === "0.1.0", "web must depend on protocol");
+assert(webPackage.dependencies["@nexusim/client-core"] === "0.1.0", "web must depend on client-core");
+assert(desktopPackage.name === "@nexusim/desktop", "desktop package name mismatch");
+assert(androidPackage.name === "@nexusim/android", "android package name mismatch");
+assert(desktopPackage.dependencies["@nexusim/protocol"] === "0.1.0", "desktop must depend on protocol");
+assert(desktopPackage.dependencies["@nexusim/client-core"] === "0.1.0", "desktop must depend on client-core");
+assert(androidPackage.dependencies["@nexusim/protocol"] === "0.1.0", "android must depend on protocol");
+assert(androidPackage.dependencies["@nexusim/client-core"] === "0.1.0", "android must depend on client-core");
+
+console.log("client workspace skeleton ok");

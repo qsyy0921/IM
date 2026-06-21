@@ -54,6 +54,13 @@ base: search, memory, retrieval, RAG, summary, agent, skill-registry,
 mcp-gateway, action-executor and ai-eval. Details live in service briefs and
 progress docs.
 
+Language boundary: Go owns backend services, BFF endpoints, control-plane
+decisions, durable state, authorization, audit and repair. TypeScript owns Web,
+desktop and Android shared client contracts, sync core and UI. Rust, Kotlin and
+Swift are thin platform adapters only. Python owns AI workers, model/algorithm
+candidates, eval and offline tooling; it does not own durable business facts or
+security decisions.
+
 Current active targets live in `current-goal.md`. Promote future services
 service-by-service; do not create every planned service directory in one change.
 
@@ -95,6 +102,9 @@ practical.
 - Do not introduce mesh-like synchronous RPC dependencies.
 - Do not create shared packages until at least two real callers need a stable contract.
 - Keep abstractions local until the second real use case appears.
+- Keep language boundaries explicit: Go for business/control services,
+  TypeScript for client product code, Python for AI/eval candidates, native
+  languages only for small runtime bridges.
 - Split production files near 2500 lines; split tests or runners near 3000 lines.
 - Refresh legitimate file-size baseline drift with `tools/update-file-size-hotspot-baseline.ps1`.
 - Raw loadtest data belongs under `H:\NexusIM\loadtest-results`; repo stores

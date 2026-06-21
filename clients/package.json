@@ -1,0 +1,27 @@
+{
+  "name": "@nexusim/clients",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "web",
+    "desktop",
+    "android"
+  ],
+  "scripts": {
+    "validate": "node ./tools/validate-client-workspace.mjs",
+    "dev:web": "npm --workspace @nexusim/web run dev",
+    "build:web": "npm --workspace @nexusim/web run build",
+    "typecheck:desktop": "npm --workspace @nexusim/desktop run typecheck",
+    "typecheck:android": "npm --workspace @nexusim/android run typecheck",
+    "typecheck": "npm --workspaces --if-present run typecheck"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "typescript": "^5.9.0",
+    "vite": "^7.0.0"
+  }
+}

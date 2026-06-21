@@ -41,7 +41,15 @@ GitHub 首页只放当前总览。每轮 Codex 继续开发时，目标框只复
 | `action-executor` | approved execution audit、proposal / approval / prepare audit 校验、本地安全 adapter、guarded external HTTP provider adapter、eval smoke。 |
 | `ai/python` | Python AI Worker 候选层：contract guard、低敏 safety guard、candidate-only worker CLI、`IM` conda toolchain。 |
 
-当前默认主线不是继续泛化清理 9 服务 P2 backlog，而是继续完善 AI 大模型应用底座：
+已启动的客户端平台：
+
+| 模块 | 当前状态 |
+| --- | --- |
+| `clients/` | Browser / PC / Android client platform first slice：`protocol`、`client-core`、Web shell、PC desktop shell contract 和 Android runtime contract 已建立并通过 focused validation；客户端只连 `api-gateway` / `push-gateway`，PullInbox 是消息事实源，WebSocket 只做在线唤醒。 |
+
+当前默认主线不是继续泛化清理 9 服务 P2 backlog，而是先推进客户端平台 MVP：
+`api-gateway` client BFF v0.1、Web fetch / WebSocket / local store、局域网 smoke，
+然后复用同一 core 接 Windows PC 和 Android。AI 大模型应用底座作为后续主线保留：
 
 ```text
 group memory
@@ -194,7 +202,8 @@ python -m mypy nexusim_ai_common scripts tests
 - 统一生产观测平台、Alertmanager 路由、日志汇聚、SLO 和长期 retention。
 - provider-grade OIDC / KMS / HSM / email / SMS / WebAuthn / complete risk engine。
 - provider-grade ReBAC DSL、外部 audit sink、运维 UI、批量 repair 审批系统。
-- 完整 Web / App / 桌面客户端。
+- 完整 Web / App / 桌面客户端；当前已启动 Web-first client platform first slice，
+  但还缺 `api-gateway` client BFF、真实 Web adapter、Windows installer 和 Android APK。
 - 完整 media / notification / admin / audit 等产品化平台服务。
 
 当前最准确表述：

@@ -13,6 +13,7 @@
 ## 服务 SDD
 
 - `message-service.md`
+- `client-platform.md`
 - `media-service.md`
 - `notification-service.md`
 - `audit-service.md`

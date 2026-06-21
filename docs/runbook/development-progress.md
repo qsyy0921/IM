@@ -23,6 +23,15 @@
 - `contacts-service`
 - `policy-service`
 
+当前已启动的客户端平台：
+
+- `client-platform`：v0.1 SDD 已冻结浏览器、PC、Android 三端架构；`clients/`
+  workspace 已创建并通过 focused validation / typecheck / Web build，承载
+  `protocol`、`client-core`、Web shell、PC desktop shell contract 和 Android
+  runtime contract。客户端只连 `api-gateway` / `push-gateway`，
+  PullInbox 是消息事实源，WebSocket 只做在线唤醒。第一阶段目标是局域网 Web MVP，
+  然后复用同一 core 接 PC installer 和 Android APK。
+
 当前已开始的 AI 大模型应用底座能力：
 
 - `search-service`
@@ -180,9 +189,14 @@
   不宣称其它真实下游 mutation、admin UI 或 provider-grade 运维。
 
 当前 Go 侧服务底座、控制面、EvidencePack、proposal / approval / audit、
-Python Worker 候选接入边界和低敏 eval 持久化已经足够支撑算法切片；
-当前 active slice 已转为 future platform / product services promotion，继续按服务
-推进媒体、通知、审计、控制面、presence、model 等产品化 / 平台服务，不再泛化清九服务 P2。
+Python Worker 候选接入边界和低敏 eval 持久化已经足够支撑算法切片。
+用户已明确切入 client platform MVP foundation：三端客户端架构和可复用
+`protocol` / `client-core` skeleton 已建立；下一步是实现 `api-gateway`
+client BFF v0.1，再接 Web fetch / WebSocket / local store 和局域网 smoke。
+
+future platform / product services promotion 已作为后续主线保留：继续按服务推进
+媒体、通知、审计、控制面、presence、model 等产品化 / 平台服务，但不抢占当前
+客户端切片。
 
 当前 10 个 future platform / product services 均已进入 product-active 第一版实现；
 后续继续按 service brief 推进 worker、relay、真实 provider / adapter 和 smoke。

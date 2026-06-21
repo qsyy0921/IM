@@ -30,6 +30,12 @@ __pycache__/
 .venv/
 venv/
 
+# Node / client build outputs
+node_modules/
+clients/**/node_modules/
+clients/**/dist/
+clients/**/.vite/
+
 # Local Docker data
 deploy/local/data/
 

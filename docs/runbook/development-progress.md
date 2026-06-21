@@ -34,7 +34,9 @@
   list / PullInbox-backed messages / send / ACK / contacts / receipts；
   BFF HTTP adapter 和 WebSocket push transport 已下沉到
   `@nexusim/client-core`，Web 只保留兼容 re-export，PC / Android 后续可复用
-  同一 HTTP/JSON BFF mapping 和在线唤醒 transport；`clients/web` 已接
+  同一 HTTP/JSON BFF mapping 和在线唤醒 transport；`client-core` 已新增
+  `createClientRuntime`，desktop / Android 已有 runtime factory 组装 auth /
+  inbox sync / push / send / ack queue；`clients/web` 已接
   first-stage BFF fetch / push WebSocket / IndexedDB local
   store adapters，并把 Web shell 接到 login / PullInbox / SendMessage /
   AckDelivery flow；`IndexedDBMessageStore` 已新增无外部依赖 first-stage

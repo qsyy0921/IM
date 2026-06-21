@@ -90,6 +90,10 @@ First slice:
   instead of copying Web-private HTTP mapping code.
 - PC desktop and Android can also reuse the same `@nexusim/client-core`
   WebSocket push transport for online wakeups.
+- `@nexusim/client-core` now exposes `createClientRuntime`, wiring BFF API,
+  push transport, auth session manager, inbox sync, send queue and ack queue.
+  Desktop and Android expose `createDesktopClientRuntime` /
+  `createAndroidClientRuntime` over their platform adapters.
 - `loadtest/clientweb` provides the first scriptable client-path smoke. Setup
   uses public gRPC APIs to register users, seed the conversation owner and create
   the receiver JOIN; the verified client path then uses only HTTP BFF and

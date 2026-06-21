@@ -239,8 +239,8 @@ First slice:
   Docker builder profile without building or pulling images. The profile lives
   in `deploy/local/docker-compose.client-builders.yml` and uses
   `deploy/docker/client-android-builder.Dockerfile`; it is opt-in because the
-  first image build downloads Node and Android SDK components. The profile now
-  runs `build:android-apk:collect`, so a successful container build writes the
+  first image build downloads Node, Gradle and Android SDK components. The
+  profile now runs `build:android-apk:collect`, so a successful container build writes the
   APK and low-sensitive `manifest.json` under
   `clients/artifacts/android/docker-android-debug/` by default.
 - `@nexusim/client-core` now exposes `ClientShellActions`; desktop and Android
@@ -325,7 +325,9 @@ rejected. For local LAN client smoke, prefer the wired `172.x.x.x` address.
   and collected manifest.
 - Android APK build needs JDK 17+ plus Gradle / Android SDK. If those are not
   installed locally, use a Docker / CI builder profile instead of claiming an
-  APK baseline.
+  APK baseline. The Docker builder image installs pinned Node, Gradle and
+  Android SDK tools; the first actual builder run may still download npm /
+  Gradle project dependencies.
 - The repository now includes an Android Docker builder profile wired to the
   same artifact collector, but it has not been run in this slice and therefore
   does not prove an APK baseline yet.

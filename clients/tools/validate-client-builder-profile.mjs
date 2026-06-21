@@ -19,6 +19,10 @@ for (const relativePath of requiredPaths) {
 const dockerfile = read("deploy/docker/client-android-builder.Dockerfile");
 assert(dockerfile.includes("eclipse-temurin:17-jdk"), "Android builder must use JDK 17+ base image");
 assert(dockerfile.includes("ANDROID_HOME"), "Android builder must set ANDROID_HOME");
+assert(dockerfile.includes("GRADLE_HOME"), "Android builder must set GRADLE_HOME");
+assert(dockerfile.includes("ARG GRADLE_VERSION"), "Android builder must pin Gradle version");
+assert(dockerfile.includes("services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip"), "Android builder must install Gradle distribution");
+assert(dockerfile.includes("gradle --version"), "Android builder must verify Gradle installation");
 assert(dockerfile.includes("sdkmanager"), "Android builder must install SDK packages with sdkmanager");
 assert(dockerfile.includes("android-${ANDROID_COMPILE_SDK}"), "Android builder must use compile SDK arg");
 assert(dockerfile.includes("npm --prefix clients ci"), "Android builder must use reproducible npm ci");

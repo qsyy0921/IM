@@ -1,13 +1,15 @@
 FROM eclipse-temurin:17-jdk-jammy
 
 ARG NODE_VERSION=22.17.0
+ARG GRADLE_VERSION=8.10.2
 ARG ANDROID_COMMANDLINE_TOOLS_VERSION=11076708
 ARG ANDROID_COMPILE_SDK=35
 ARG ANDROID_BUILD_TOOLS=35.0.0
 
 ENV ANDROID_HOME=/opt/android-sdk \
     ANDROID_SDK_ROOT=/opt/android-sdk \
-    PATH=/opt/android-sdk/cmdline-tools/latest/bin:/opt/android-sdk/platform-tools:/opt/node/bin:$PATH
+    GRADLE_HOME=/opt/gradle \
+    PATH=/opt/gradle/bin:/opt/android-sdk/cmdline-tools/latest/bin:/opt/android-sdk/platform-tools:/opt/node/bin:$PATH
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates curl unzip xz-utils git \
@@ -16,6 +18,12 @@ RUN apt-get update \
 RUN curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.xz" \
     | tar -xJ -C /opt \
     && mv "/opt/node-v${NODE_VERSION}-linux-x64" /opt/node
+
+RUN curl -fsSL "https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip" -o /tmp/gradle.zip \
+    && unzip -q /tmp/gradle.zip -d /opt \
+    && mv "/opt/gradle-${GRADLE_VERSION}" /opt/gradle \
+    && rm /tmp/gradle.zip \
+    && gradle --version >/dev/null
 
 RUN mkdir -p "${ANDROID_HOME}/cmdline-tools" \
     && curl -fsSL "https://dl.google.com/android/repository/commandlinetools-linux-${ANDROID_COMMANDLINE_TOOLS_VERSION}_latest.zip" -o /tmp/android-commandline-tools.zip \

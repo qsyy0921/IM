@@ -28,6 +28,9 @@ admin operation approval、补偿请求和人工审批状态。
   first-stage 本地入口；`record-decision` 本地拒绝明显敏感的 decider / policy /
   reason / evidence ref marker，并支持低敏 `decision-manifest` 作为第一版
   external approval binding。
+- `write-workflow-decision-manifest.ps1` / `validate-workflow-decision-manifest.ps1`：
+  生成和校验仓库外低敏 decision manifest，不保存审批 comment、EvidencePack 或
+  payload 原文。
 - 已被 admin-service 用于 repair / critical / compensation handoff。
 
 后续：timer worker、更多 compensation adapter、instruction approval UI /

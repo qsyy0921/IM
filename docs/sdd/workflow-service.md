@@ -430,6 +430,8 @@ workflow-outbox-repair
 第一版本地 workflow operator 入口：
 
 ```powershell
+.\tools\write-workflow-decision-manifest.ps1 -OutputPath H:\NexusIM\operator-plans\workflow-decision.json -WorkflowID wf_123 -StepID wfs_1 -Decision APPROVE -DeciderRef operator-a -ReasonFile H:\NexusIM\operator-plans\workflow-decision-reason.txt -EvidenceRef evidence:ticket-123
+.\tools\validate-workflow-decision-manifest.ps1 -ManifestPath H:\NexusIM\operator-plans\workflow-decision.json -ExpectedWorkflowID wf_123 -ExpectedStepID wfs_1 -ExpectedDecision APPROVE
 go run ./loadtest/workflow -mode get -workflow-id wf_123
 go run ./loadtest/workflow -mode record-decision -workflow-id wf_123 -step-id wfs_1 -decision APPROVE -decider-ref operator:a
 go run ./loadtest/workflow -mode record-decision -decision-manifest H:\NexusIM\operator-plans\workflow-decision.json
@@ -444,7 +446,8 @@ payload、instruction payload、reason 原文或 downstream response body。`rec
 operator 把敏感原文送入 gRPC 请求。`-decision-manifest` 是第一版 external
 approval binding：manifest 只允许 `nexusim.workflow.decision_manifest.v1` 中的
 workflow id、step id、decision、低敏 reason/evidence refs、idempotency key 和
-correlation refs，不保存审批 comment 或 payload 原文。
+correlation refs，不保存审批 comment 或 payload 原文。writer / validator 只处理
+仓库外低敏 JSON artifact，不调用服务、不读取数据库。
 
 ## 18. 验收标准
 

@@ -37,7 +37,8 @@ model-gateway / workflow / knowledge-ingestion / vector-index
   公开 gRPC get workflow、record decision、查询 compensation instruction metadata；
   它只输出低敏 refs / version / status，不输出 payload / reason 原文，并在
   `record-decision` 本地拒绝明显敏感的 decider / policy / reason / evidence ref；
-  `-decision-manifest` 可作为 first-stage external approval binding。
+  `-decision-manifest` 可作为 first-stage external approval binding；本地 writer /
+  validator 可生成和校验仓库外低敏 decision manifest。
 
 ## 下一步优先级
 

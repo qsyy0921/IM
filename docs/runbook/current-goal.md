@@ -94,7 +94,10 @@ model-gateway / workflow / knowledge-ingestion / vector-index
   真实 Kafka smoke。
 - `vector-index-service` 已补内部 embedding handoff：`ModelGatewayClient` 现在保留
   `model-gateway.InvokeEmbedding` 返回的 `embedding_values`，但公开 API / PostgreSQL
-  metadata / outbox / metrics 仍只保存 hash / refs / dimension。已新增 optional
+  metadata / outbox / metrics 仍只保存 hash / refs / dimension。已新增
+  `NEXUSIM_VECTOR_PROVIDER_BACKEND=postgres-test` 本地 provider sink：它只确认
+  `vector_backend_items` ACTIVE 状态和 hash / dimension，不保存 raw vector array，用于
+  本地 embedding / rebuild backfill 验证。已新增 optional
   `internal/infrastructure/pgvector` adapter 包，覆盖 schema 初始化、upsert、delete、
   search 和 focused unit tests；`embedding-worker` 可通过
   `NEXUSIM_VECTOR_PROVIDER_BACKEND=pgvector` 显式启用 pgvector backend sink。该 adapter
@@ -148,7 +151,7 @@ model-gateway / workflow / knowledge-ingestion / vector-index
 - 默认继续补更多下游公开 admin API adapter，或为 admin config / quota 增加
   compensation operator。
 - 默认下一步可继续 vector-index provider backend：在镜像可用后跑 focused pgvector smoke、
-  真实 Milvus / OpenSearch backend、provider backend repair / backfill smoke，
+  真实 Milvus / OpenSearch backend、provider backend repair / 真实 provider backfill smoke，
   或继续更多下游 admin API adapter。
 - 也可以继续 notification SMTP / SMS / APNs / FCM adapter 或 bounce-suppression。
 

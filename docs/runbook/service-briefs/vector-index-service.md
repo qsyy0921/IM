@@ -64,6 +64,10 @@ vector 写入、rebuild 和 backfill 逻辑复杂到影响 retrieval / memory �
 - vector-index 内部 `ModelGatewayClient` 已保留 `InvokeEmbedding.embedding_values`
   用于后续真实 vector backend handoff；公开 API / metadata PostgreSQL / outbox / metrics
   仍只暴露 hash / ref / dimension 等低敏字段。
+- `NEXUSIM_VECTOR_PROVIDER_BACKEND=postgres-test` 已可启用本地 metadata-backed
+  provider sink：它不保存 raw vector array，只确认 owned `vector_backend_items`
+  backend state 已由 `UpsertVectorItem` 写成 ACTIVE，并校验 embedding hash / dimension。
+  该模式用于本地 embedding / rebuild backfill smoke，不代表真实 vector store。
 - first-stage optional pgvector adapter 包已落在
   `services/vector-index-service/internal/infrastructure/pgvector`：提供 schema 初始化、
   upsert、delete、search 和 focused unit tests。`embedding-worker` 已支持通过
@@ -80,4 +84,4 @@ vector 写入、rebuild 和 backfill 逻辑复杂到影响 retrieval / memory �
   claim RUNNING rebuild，直到没有下一页才标记 completed。
 
 后续待办：memory / search chunk consumer、镜像可用后的 focused pgvector smoke、真实
-Milvus / OpenSearch backend、provider backend repair、backfill smoke。
+Milvus / OpenSearch backend、provider backend repair、真实 provider backfill smoke。

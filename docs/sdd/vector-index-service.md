@@ -264,9 +264,11 @@ services/vector-index-service/internal/infrastructure/pgvector
 该 adapter 提供可选 `EnsureSchema` / `Upsert` / `Delete` / `Search` 实现，面向
 pgvector profile。它会在 dedicated vector backend table 中保存实际 embedding vector，
 但默认普通 PostgreSQL migration 不启用该 adapter，避免没有 `vector` 扩展的本地开发库
-被强制要求安装 pgvector。`embedding-worker` 可通过
-`NEXUSIM_VECTOR_PROVIDER_BACKEND=pgvector` 显式启用该 backend sink；未配置时行为保持
-metadata-only。`rebuild-worker` 可显式启用 first-stage provider backend backfill：从本服务
+被强制要求安装 pgvector。`NEXUSIM_VECTOR_PROVIDER_BACKEND=postgres-test` 可启用本地
+metadata-backed provider sink：它只确认 owned `vector_backend_items` ACTIVE 状态和 hash /
+dimension，不保存 raw vector array，用于本地 embedding / rebuild backfill smoke。
+`embedding-worker` 可通过 `NEXUSIM_VECTOR_PROVIDER_BACKEND=pgvector` 显式启用真实 pgvector
+backend sink；未配置时行为保持 metadata-only。`rebuild-worker` 可显式启用 first-stage provider backend backfill：从本服务
 自有 `vector_embedding_tasks` 中读取已完成的 redacted-preview task，重新调用
 model-gateway，再写入当前配置的 provider backend；它不读取上游私表，也不从 metadata 表伪造
 缺失的 vector array。Milvus / OpenSearch adapter、真实 pgvector smoke 和 provider backend
@@ -502,6 +504,10 @@ NEXUSIM_VECTOR_EMBEDDING_MODEL_TIMEOUT=5s
 Optional provider backend 配置：
 
 ```text
+# Local metadata-backed verification backend; no raw vector array is persisted.
+NEXUSIM_VECTOR_PROVIDER_BACKEND=postgres-test
+
+# Real optional pgvector backend.
 NEXUSIM_VECTOR_PROVIDER_BACKEND=pgvector
 NEXUSIM_VECTOR_PGVECTOR_DSN=postgres://...   # optional; empty uses NEXUSIM_PG_DSN
 NEXUSIM_VECTOR_PGVECTOR_TABLE=vector_embedding_items
@@ -522,12 +528,16 @@ NEXUSIM_VECTOR_INDEX_SERVICE_MODE=rebuild-worker
 NEXUSIM_VECTOR_REBUILD_BACKFILL_SOURCE=embedding-tasks
 NEXUSIM_VECTOR_REBUILD_BACKFILL_BATCH_SIZE=100
 NEXUSIM_MODEL_GATEWAY_GRPC_ADDR=127.0.0.1:10770
-NEXUSIM_VECTOR_PROVIDER_BACKEND=pgvector
+NEXUSIM_VECTOR_PROVIDER_BACKEND=postgres-test
+
+# Or for real pgvector backend:
+# NEXUSIM_VECTOR_PROVIDER_BACKEND=pgvector
 NEXUSIM_VECTOR_PGVECTOR_DSN=postgres://...
 ```
 
 该模式只读取本服务 PostgreSQL queue 中 `COMPLETED` 的 `vector_embedding_tasks`，并重新
-embedding redacted preview 后写 provider backend。未配置 provider backend 时 fail-fast；默认
+embedding redacted preview 后写 provider backend。未配置 provider backend 时 fail-fast；
+`postgres-test` 只确认 metadata backend state，不保存 raw vector array；默认
 `rebuild-worker` 不启用该 backfill。
 
 Knowledge source 配置：

@@ -63,6 +63,10 @@ func TestVectorProviderBackendModeFromEnv(t *testing.T) {
 	if got := vectorProviderBackendModeFromEnv(); got != "pgvector" {
 		t.Fatalf("expected normalized pgvector mode, got %s", got)
 	}
+	t.Setenv("NEXUSIM_VECTOR_PROVIDER_BACKEND", "POSTGRES-TEST")
+	if got := vectorProviderBackendModeFromEnv(); got != "postgres-test" {
+		t.Fatalf("expected normalized postgres-test mode, got %s", got)
+	}
 }
 
 func TestValidateVectorIndexDebugListenerConfigAllowsEmptyOrPrivateAddress(t *testing.T) {

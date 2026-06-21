@@ -57,8 +57,10 @@ protobuf `KnowledgeEvent` 与旧 JSON fallback；`knowledge-ingestion-service` �
 真实 Kafka chunk-consumer 联调 smoke，把 2 个 knowledge chunk refs 写入
 `vector_embedding_tasks`；PostgreSQL backend state adapter 已显式记录 backend item
 ACTIVE / DELETED 状态，`SearchVectors` 必须 join ACTIVE backend state 才返回 refs；
-vector-index 内部 RPC client 已保留 `InvokeEmbedding.embedding_values`，并新增 optional
-pgvector adapter 包；`embedding-worker` 可通过 `NEXUSIM_VECTOR_PROVIDER_BACKEND=pgvector`
+vector-index 内部 RPC client 已保留 `InvokeEmbedding.embedding_values`，并新增
+`postgres-test` 本地 provider sink，可确认 owned backend state ACTIVE 但不保存 raw vector
+array；同时新增 optional pgvector adapter 包；`embedding-worker` 可通过
+`NEXUSIM_VECTOR_PROVIDER_BACKEND=pgvector`
 显式启用 pgvector backend sink，且已有可选 `docker-compose.pgvector.yml` overlay。
 `run-local-pgvector-smoke.ps1` wrapper 已准备；使用 `-StartPgVector` 时默认不拉镜像。
 本机未发现 `pgvector/pgvector:pg16` 镜像，所以真实 pgvector smoke 尚未执行。
@@ -81,7 +83,7 @@ control-plane-service.PublishConfigVersion(API_GATEWAY_TENANT_QUOTA)`。
 admin `Create -> operator approve -> operation-worker -> control-plane` 本地多进程
 publish / rollback / tenant quota smoke 已通过。下一步默认继续更多下游公开 admin API adapter、
 admin compensation operator，或在镜像可用后继续 focused pgvector smoke、Milvus /
-OpenSearch backend / provider repair / backfill smoke。
+OpenSearch backend / provider repair / 真实 provider backfill smoke。
 ```
 
 系统测试 / HA / 长压 / sizing 后置；总览、待办、单服务状态分别看

@@ -523,8 +523,10 @@ func newRebuildBackfiller(ctx context.Context, pool *pgxpool.Pool) (rebuild.Back
 func newEmbeddingVectorBackend(ctx context.Context, metadataPool *pgxpool.Pool) (embedding.VectorBackend, func() error, error) {
 	backendMode := vectorProviderBackendModeFromEnv()
 	switch backendMode {
-	case "", "none", "postgres-test":
+	case "", "none":
 		return nil, nil, nil
+	case "postgres-test":
+		return embeddinginfra.NewPostgresTestBackend(postgresinfra.NewBackendStateStore(metadataPool)), nil, nil
 	case "pgvector":
 		dsn := strings.TrimSpace(os.Getenv("NEXUSIM_VECTOR_PGVECTOR_DSN"))
 		pool := metadataPool

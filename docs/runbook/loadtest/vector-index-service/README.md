@@ -192,6 +192,12 @@ $env:NEXUSIM_VECTOR_INDEX_SERVICE_MODE = "rebuild-worker"
 $env:NEXUSIM_VECTOR_REBUILD_BACKFILL_SOURCE = "embedding-tasks"
 $env:NEXUSIM_VECTOR_REBUILD_BACKFILL_BATCH_SIZE = "100"
 $env:NEXUSIM_MODEL_GATEWAY_GRPC_ADDR = "127.0.0.1:10770"
+$env:NEXUSIM_VECTOR_PROVIDER_BACKEND = "postgres-test" # local metadata-backed verification
+```
+
+真实 pgvector backend smoke 时改用：
+
+```powershell
 $env:NEXUSIM_VECTOR_PROVIDER_BACKEND = "pgvector"
 $env:NEXUSIM_VECTOR_PGVECTOR_DSN = "postgres://nexusim:nexusim@localhost:15432/nexusim?sslmode=disable"
 ```
@@ -202,7 +208,8 @@ $env:NEXUSIM_VECTOR_PGVECTOR_DSN = "postgres://nexusim:nexusim@localhost:15432/n
   redacted-preview task。
 - 重新通过 `model-gateway.InvokeEmbedding` 生成 embedding，再写当前配置的 provider backend。
 - 不读取 knowledge / memory / search 私有表，不从 vector metadata 伪造缺失的 vector array。
-- 未配置 provider backend 时 fail-fast。
+- 未配置 provider backend 时 fail-fast；`postgres-test` 只确认 metadata backend state 和
+  hash / dimension，不保存 raw vector array，不代表真实 vector store。
 - 每批最多处理 `NEXUSIM_VECTOR_REBUILD_BACKFILL_BATCH_SIZE` 条 matching completed task；
   如果还有下一页，会推进 `vector_rebuild_checkpoints.cursor_value` 并等待下一轮继续 claim
   RUNNING rebuild；只有没有下一页时才标记 rebuild complete。

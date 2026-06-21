@@ -200,6 +200,44 @@ WHERE tenant_id = 'tenant-vector-test'
 	}
 }
 
+func TestBackendStateStoreConfirmActiveBackendItemIntegration(t *testing.T) {
+	ctx := context.Background()
+	pool := openVectorTestPool(t)
+	resetVectorTables(t, ctx, pool)
+	repository := NewRepository(pool)
+
+	prepared := prepareUpsert(t, "vector-backend-state-store", "vitem_backend_state_store", "vjob_backend_state_store")
+	item, _, _, err := repository.UpsertVectorItem(ctx, prepared)
+	if err != nil {
+		t.Fatalf("seed vector item: %v", err)
+	}
+	store := NewBackendStateStore(pool)
+	if err := store.ConfirmActiveBackendItem(ctx, item); err != nil {
+		t.Fatalf("confirm active backend item: %v", err)
+	}
+
+	item.EmbeddingVectorHash = "sha256:wrong"
+	if err := store.ConfirmActiveBackendItem(ctx, item); err == nil {
+		t.Fatal("expected embedding hash mismatch to fail")
+	}
+
+	if _, err := pool.Exec(ctx, `
+UPDATE vector_backend_items
+SET status = 'DELETED',
+    tombstone_status = 'TOMBSTONED',
+    deleted_at = now(),
+    updated_at = now()
+WHERE tenant_id = 'tenant-vector-test'
+  AND vector_item_id = 'vitem_backend_state_store'
+`); err != nil {
+		t.Fatalf("mark backend item deleted: %v", err)
+	}
+	item.EmbeddingVectorHash = prepared.Command.EmbeddingVectorHash
+	if err := store.ConfirmActiveBackendItem(ctx, item); err == nil {
+		t.Fatal("expected deleted backend item to fail")
+	}
+}
+
 func TestRepositoryClaimAndCompleteRebuildTaskIntegration(t *testing.T) {
 	ctx := context.Background()
 	pool := openVectorTestPool(t)

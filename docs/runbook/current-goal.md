@@ -27,7 +27,8 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   Web 端已有 Vite shell；PC desktop 和 Android 均已有 first-stage TypeScript
   runtime adapter（development session store、in-memory message store、static
   lifecycle/network ports）；PC desktop 已有 Tauri v2 runner skeleton（无 IPC
-  command、bundle inactive），但仍不产出安装包 / APK。
+  command、bundle inactive）；Android 已有 Kotlin native bridge skeleton（只做
+  launch shell / metadata，不拥有 token 或消息事实），但仍不产出安装包 / APK。
 - `api-gateway` 已新增 first-stage client BFF HTTP/JSON surface：`/api/auth/login`、
   `/api/auth/refresh`、`/api/me`、`/api/conversations`、
   `/api/conversations/{conversation_id}/messages`、`/api/messages/send`、
@@ -115,8 +116,7 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
 
 ## 下一步优先级
 
-1. 后续按同一 core 接 PC desktop local Windows artifact 和 Android native bridge /
-   unsigned APK。
+1. 后续按同一 core 接 PC desktop local Windows artifact 和 Android unsigned APK。
 2. 补 IndexedDB persistence tests beyond first browser adapter；后续再把
    desktop / Android memory store 换成持久 store。
 3. 再回到 workflow compensation adapter / instruction approval UI / ops 管理；

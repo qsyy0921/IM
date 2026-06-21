@@ -13,6 +13,9 @@ Flutter or native Kotlin for a concrete reason.
 - The shell includes development-only session storage, an in-memory message
   cache, static lifecycle/network ports, and unsupported push/local wakeup
   notifications.
+- First Kotlin native bridge skeleton exists under `native/`; it owns only the
+  launch shell and bridge metadata, not session storage, local message facts or
+  BFF calls.
 - No APK or AAB is produced yet.
 - `app.config.json` records the intended first Android package metadata.
 
@@ -24,3 +27,10 @@ Flutter or native Kotlin for a concrete reason.
   SQLite behind `LocalMessageStore`.
 - Push notification integration must not bypass PullInbox reconciliation.
 - Background sync must use server cursors and idempotency keys.
+
+## Focused Checks
+
+```powershell
+npm --prefix clients run typecheck:android
+npm --prefix clients run validate:android-native
+```

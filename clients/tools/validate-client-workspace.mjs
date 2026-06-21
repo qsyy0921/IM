@@ -39,6 +39,11 @@ const requiredPaths = [
   "android/src/platform-contract.ts",
   "android/src/platform-adapter.ts",
   "android/src/runtime-config.ts",
+  "android/native/settings.gradle.kts",
+  "android/native/app/build.gradle.kts",
+  "android/native/app/src/main/AndroidManifest.xml",
+  "android/native/app/src/main/java/com/nexusim/android/MainActivity.kt",
+  "android/native/app/src/main/java/com/nexusim/android/NexusIMBridge.kt",
   "android/app.config.json"
 ];
 

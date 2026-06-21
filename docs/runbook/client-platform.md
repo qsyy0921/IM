@@ -76,6 +76,9 @@ First slice:
   session storage, in-memory message cache, static network/lifecycle ports and
   unsupported push/local wakeup notifications. This moves Android beyond a pure
   contract, but it is not a native bridge or APK yet.
+- `clients/android/native` now has a first-stage Kotlin native bridge skeleton.
+  It owns only launch shell / metadata and does not own token storage, local
+  message facts, BFF calls, or push delivery semantics.
 - `loadtest/clientweb` provides the first scriptable client-path smoke. Setup
   uses public gRPC APIs to register users, seed the conversation owner and create
   the receiver JOIN; the verified client path then uses only HTTP BFF and
@@ -96,8 +99,9 @@ First slice:
   `docs/runbook/loadtest/client-platform/loadtest-report-20260621-client-web-bff-push-wired-172-clean-baseline.md`.
   It does not replace existing secure mTLS gateway / push smoke coverage.
 - PC desktop and Android now both have first-stage TypeScript runtime adapters.
-  PC desktop also has a Tauri runner skeleton. Neither target produces `.msi`,
-  `.exe`, `.apk`, or `.aab` artifacts yet.
+  PC desktop also has a Tauri runner skeleton, and Android has a Kotlin native
+  bridge skeleton. Neither target produces `.msi`, `.exe`, `.apk`, or `.aab`
+  artifacts yet.
 - `/api/auth/logout` is reserved and currently returns `UNIMPLEMENTED`; identity
   still needs a user self-session revoke contract before server-side logout is
   real.
@@ -119,6 +123,6 @@ rejected. For local LAN client smoke, prefer the wired `172.x.x.x` address.
 ## Next Work
 
 1. Add first local Windows artifact from the PC desktop Tauri runner.
-2. Add Android native bridge and first unsigned local APK.
+2. Add first unsigned local APK from the Android native bridge.
 3. Add IndexedDB persistence tests beyond the first browser adapter, then move
    desktop / Android from in-memory development stores to durable platform stores.

@@ -29,8 +29,9 @@
   skeleton 已落；继续接 BFF client，复用 `protocol` / `client-core`，跑通
   login、conversation list、PullInbox、send、ACK、push notify。
 - Windows packaging：产出本地可安装或可运行的 Windows artifact；不要求生产签名。
-- `clients/android`：first-stage TypeScript runtime adapter 已落；继续接
-  Android native bridge，Kotlin 只做薄 bridge，业务协议和 sync core 复用 TypeScript。
+- `clients/android`：first-stage TypeScript runtime adapter 和 Kotlin native
+  bridge skeleton 已落；继续产出 unsigned APK，Kotlin 只做薄 bridge，业务协议和
+  sync core 复用 TypeScript。
 - Android packaging：产出本地 unsigned APK，并支持局域网 `api-gateway` /
   `push-gateway` 地址配置。
 - 三端 smoke：Web / PC / Android 都只能连 `api-gateway` 和 `push-gateway`；

@@ -194,8 +194,9 @@ Responsibilities:
   collector and keep only the low-sensitive SHA-256 manifest under ignored local
   artifact storage.
 - Platform shell smoke planning must remain low-sensitive: it may report
-  readiness, relative artifact hints and safe commands, but must not print local
-  absolute paths, tokens or private runtime state.
+  readiness, relative artifact hints, safe commands and per-target manual
+  checklist steps, but must not print local absolute paths, tokens or private
+  runtime state.
 - Shell asset preparation must clean the target output directory before copying
   a new Web build when source and output differ, so packaged desktop shells do
   not retain stale JS / CSS bundles.

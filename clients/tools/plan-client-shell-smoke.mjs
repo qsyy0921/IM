@@ -33,6 +33,22 @@ function browserTarget() {
     readyForManualShellSmoke: true,
     launchCommand: "npm --prefix clients run dev:web",
     expectedBackend: "api-gateway BFF + push-gateway WebSocket",
+    checklist: [
+      {
+        step: "start-shared-backend-smoke",
+        command: "loadtest/clientweb/run-local-smoke.ps1 -BindHost 127.0.0.1 -ClientHost 127.0.0.1",
+        evidence: "clientweb summary shows BFF login, push hello, SendMessage, PullInbox and AckDelivery"
+      },
+      {
+        step: "start-web-shell",
+        command: "npm --prefix clients run dev:web",
+        evidence: "browser opens the Web shell against api-gateway BFF and push-gateway"
+      },
+      {
+        step: "verify-client-flow",
+        evidence: "shell can sign in, open a conversation, send, receive delivery.notify, pull inbox and ack"
+      }
+    ],
     notes: [
       "Browser smoke uses the existing Web shell and clientweb runner.",
       "It does not prove PC installer or Android APK packaging."
@@ -54,6 +70,7 @@ function nativeTarget(target, readinessTarget, artifactPlan) {
     missingToolchain: readinessTarget.missing,
     artifact: artifactStatus,
     commands: nativeCommands(target, readinessTarget),
+    checklist: nativeChecklist(target, readinessTarget, artifactStatus),
     notes: nativeNotes(target, readinessTarget, artifactStatus)
   };
 }
@@ -93,6 +110,57 @@ function nativeCommands(target, readinessTarget) {
       ? readinessTarget.dockerBuilder.buildCommand
       : readinessTarget.dockerBuilder?.imageBuildCommand
   };
+}
+
+function nativeChecklist(target, readinessTarget, artifactStatus) {
+  const label = target === "windows-desktop" ? "desktop" : "android";
+  const checklist = [
+    {
+      step: "prepare-shell-assets",
+      command: nativeCommands(target, readinessTarget).prepareAssets,
+      evidence: `${label} shell asset manifest is generated`
+    },
+    {
+      step: "verify-shell-assets",
+      command: nativeCommands(target, readinessTarget).verifyAssets,
+      evidence: `${label} shell asset manifest verifies before native build`
+    }
+  ];
+
+  if (!readinessTarget.ready) {
+    checklist.push({
+      step: "resolve-native-toolchain",
+      command: nativeCommands(target, readinessTarget).dryRunBuild,
+      evidence: "dry-run reports remaining toolchain gaps without downloading tools"
+    });
+    if (target === "android" && readinessTarget.dockerBuilder) {
+      checklist.push({
+        step: readinessTarget.dockerBuilder.imagePresent ? "run-android-builder" : "build-android-builder-image",
+        command: nativeCommands(target, readinessTarget).dockerBuilder,
+        evidence: "Android builder path produces a collected APK manifest when explicitly run"
+      });
+    }
+    return checklist;
+  }
+
+  checklist.push({
+    step: target === "windows-desktop" ? "build-desktop-artifact" : "build-android-apk",
+    command: nativeCommands(target, readinessTarget).buildArtifact,
+    evidence: "native artifact is collected with a SHA-256 manifest"
+  });
+
+  if (!artifactStatus.present) {
+    checklist.push({
+      step: "collect-native-artifact",
+      evidence: "artifact collector finds at least one native package for this target"
+    });
+  }
+
+  checklist.push({
+    step: "run-platform-shell",
+    evidence: `shell metadata reports target=${target} and the app can sign in, pull inbox, receive wakeup and ack`
+  });
+  return checklist;
 }
 
 function nativeNotes(target, readinessTarget, artifactStatus) {

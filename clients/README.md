@@ -157,5 +157,5 @@ Current packaging status:
   shell assets currently verify against their manifest.
 - `plan:shell-smoke` prints a low-sensitive browser / desktop / Android shell
   smoke plan. It lists prepared asset status, artifact presence, safe build
-  commands and the shared BFF / push smoke command without launching services or
-  installing toolchains.
+  commands, per-target manual smoke checklists and the shared BFF / push smoke
+  command without launching services or installing toolchains.

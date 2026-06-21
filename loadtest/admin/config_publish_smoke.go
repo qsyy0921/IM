@@ -139,6 +139,7 @@ func runConfigPublishWorkflow(
 	summary *configPublishSmokeSummary,
 ) error {
 	version := "quota-" + sanitizeRunName(cfg.runName)
+	snapshot := quotaSnapshotExpectation()
 	if cfg.mode == "tenant-quota-smoke" {
 		quota, err := submitAdminOperation(
 			ctx,
@@ -159,7 +160,31 @@ func runConfigPublishWorkflow(
 		summary.ReplayedCreate = quota.ReplayedCreate
 		summary.ReplayedApproval = quota.ReplayedApproval
 		summary.PublishedVersion = version
-		return assertConfigSnapshot(ctx, cfg, controlClient, version, summary)
+		return assertConfigSnapshot(ctx, cfg, controlClient, snapshot, version, summary)
+	}
+	if cfg.mode == "policy-ruleset-smoke" {
+		version = "policy-" + sanitizeRunName(cfg.runName)
+		snapshot = policyRulesetSnapshotExpectation()
+		policy, err := submitAdminOperation(
+			ctx,
+			cfg,
+			adminClient,
+			"POLICY_RULE_CHANGE",
+			"admin.policy_rule_change.v1",
+			policyRuleChangeOperationPayload(version),
+			"policy-ruleset:"+version,
+		)
+		if err != nil {
+			return err
+		}
+		summary.OperationID = policy.OperationID
+		summary.CreatedStatus = policy.CreatedStatus
+		summary.ApprovedStatus = policy.ApprovedStatus
+		summary.FinalStatus = policy.FinalStatus
+		summary.ReplayedCreate = policy.ReplayedCreate
+		summary.ReplayedApproval = policy.ReplayedApproval
+		summary.PublishedVersion = version
+		return assertConfigSnapshot(ctx, cfg, controlClient, snapshot, version, summary)
 	}
 	if cfg.mode == "config-rollback-smoke" {
 		version += "-v1"
@@ -183,7 +208,7 @@ func runConfigPublishWorkflow(
 	summary.ReplayedCreate = publish.ReplayedCreate
 	summary.ReplayedApproval = publish.ReplayedApproval
 	summary.PublishedVersion = version
-	if err := assertConfigSnapshot(ctx, cfg, controlClient, version, summary); err != nil {
+	if err := assertConfigSnapshot(ctx, cfg, controlClient, snapshot, version, summary); err != nil {
 		return err
 	}
 	if cfg.mode != "config-rollback-smoke" {
@@ -206,7 +231,7 @@ func runConfigPublishWorkflow(
 	summary.SecondOperationID = candidate.OperationID
 	summary.SecondFinalStatus = candidate.FinalStatus
 	summary.CandidateVersion = candidateVersion
-	if err := assertConfigSnapshot(ctx, cfg, controlClient, candidateVersion, summary); err != nil {
+	if err := assertConfigSnapshot(ctx, cfg, controlClient, snapshot, candidateVersion, summary); err != nil {
 		return err
 	}
 
@@ -225,7 +250,7 @@ func runConfigPublishWorkflow(
 	summary.RollbackOperationID = rollback.OperationID
 	summary.RollbackFinalStatus = rollback.FinalStatus
 	summary.RollbackTarget = version
-	return assertConfigSnapshot(ctx, cfg, controlClient, version, summary)
+	return assertConfigSnapshot(ctx, cfg, controlClient, snapshot, version, summary)
 }
 
 type submittedOperation struct {
@@ -317,6 +342,7 @@ func assertConfigSnapshot(
 	ctx context.Context,
 	cfg config,
 	controlClient controlv1.ControlPlaneServiceClient,
+	expect snapshotExpectation,
 	wantVersion string,
 	summary *configPublishSmokeSummary,
 ) error {
@@ -324,16 +350,16 @@ func assertConfigSnapshot(
 	snapshot, err := controlClient.GetConfigSnapshot(requestCtx, &controlv1.GetConfigSnapshotRequest{
 		AuthContext: &controlv1.AuthContext{
 			TenantId:    cfg.tenantID,
-			ServiceName: "api-gateway",
-			InstanceRef: "api-gateway-admin-smoke",
+			ServiceName: expect.serviceName,
+			InstanceRef: expect.instanceRef,
 			TraceId:     "trace-admin-config-smoke",
 			RequestId:   "request-admin-config-smoke-snapshot",
 		},
 		Environment:    "local",
-		ServiceName:    "api-gateway",
-		ConfigKind:     "API_GATEWAY_TENANT_QUOTA",
-		BundleKey:      "api-gateway/default",
-		InstanceRef:    "api-gateway-admin-smoke",
+		ServiceName:    expect.serviceName,
+		ConfigKind:     expect.configKind,
+		BundleKey:      expect.bundleKey,
+		InstanceRef:    expect.instanceRef,
 		ServiceVersion: "local",
 	})
 	cancel()
@@ -353,6 +379,31 @@ func assertConfigSnapshot(
 		return errors.New("config snapshot checksum is empty")
 	}
 	return nil
+}
+
+type snapshotExpectation struct {
+	serviceName string
+	configKind  string
+	bundleKey   string
+	instanceRef string
+}
+
+func quotaSnapshotExpectation() snapshotExpectation {
+	return snapshotExpectation{
+		serviceName: "api-gateway",
+		configKind:  "API_GATEWAY_TENANT_QUOTA",
+		bundleKey:   "api-gateway/default",
+		instanceRef: "api-gateway-admin-smoke",
+	}
+}
+
+func policyRulesetSnapshotExpectation() snapshotExpectation {
+	return snapshotExpectation{
+		serviceName: "policy-service",
+		configKind:  "POLICY_RULESET_REF",
+		bundleKey:   "policy/default",
+		instanceRef: "policy-service-admin-smoke",
+	}
 }
 
 func waitForAdminOperationStatus(
@@ -427,6 +478,18 @@ func tenantQuotaOperationPayload(version string) string {
 		"tenant_ref":           "tenant-free",
 		"quota_rps":            20,
 		"quota_burst":          40,
+		"effective_at_unix_ms": time.Now().Add(-time.Minute).UTC().UnixMilli(),
+	}
+	encoded, _ := json.Marshal(payload)
+	return string(encoded)
+}
+
+func policyRuleChangeOperationPayload(version string) string {
+	payload := map[string]any{
+		"environment":          "local",
+		"bundle_key":           "policy/default",
+		"config_version":       version,
+		"policy_rule_ref":      "policy-ruleset:tenant-default:" + version,
 		"effective_at_unix_ms": time.Now().Add(-time.Minute).UTC().UnixMilli(),
 	}
 	encoded, _ := json.Marshal(payload)

@@ -35,4 +35,8 @@ Stage-switch 记录：`docs/runbook/stage-switch/control-plane-service.md`。
   `CreateAdminOperation -> ApproveAdminOperation -> operation-worker` 间接发布
   `API_GATEWAY_TENANT_QUOTA` 配置：
   `docs/runbook/loadtest/admin-service/loadtest-report-20260621-admin-tenant-quota-smoke.md`。
+- 已被 admin-service policy ruleset smoke 验证为可通过
+  `CreateAdminOperation -> ApproveAdminOperation -> operation-worker` 间接发布低敏
+  `POLICY_RULESET_REF` 配置引用：
+  `docs/runbook/loadtest/admin-service/loadtest-report-20260621-admin-policy-ruleset-smoke.md`。
 - 与 api-gateway quota snapshot gate 对齐。

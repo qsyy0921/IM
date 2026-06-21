@@ -107,7 +107,7 @@ func main() {
 func parseFlags(args []string) config {
 	cfg := config{}
 	flags := flag.NewFlagSet("admin-operator", flag.ExitOnError)
-	flags.StringVar(&cfg.mode, "mode", "approve", "mode: create, approve, reject, get, list, config-publish-smoke, config-rollback-smoke, or tenant-quota-smoke")
+	flags.StringVar(&cfg.mode, "mode", "approve", "mode: create, approve, reject, get, list, config-publish-smoke, config-rollback-smoke, tenant-quota-smoke, or policy-ruleset-smoke")
 	flags.StringVar(&cfg.target, "target", envOr("NEXUSIM_ADMIN_GRPC_ADDR", "127.0.0.1:10770"), "admin-service gRPC target")
 	flags.DurationVar(&cfg.requestTimeout, "request-timeout", 5*time.Second, "request timeout")
 	flags.StringVar(&cfg.tls.CAFile, "admin-tls-ca-file", os.Getenv("NEXUSIM_ADMIN_TLS_CA_FILE"), "CA PEM for admin-service gRPC TLS")
@@ -355,7 +355,7 @@ func (cfg config) validate() error {
 		if cfg.pageSize <= 0 {
 			return errors.New("--page-size must be positive")
 		}
-	case "config-publish-smoke", "config-rollback-smoke", "tenant-quota-smoke":
+	case "config-publish-smoke", "config-rollback-smoke", "tenant-quota-smoke", "policy-ruleset-smoke":
 		if strings.TrimSpace(cfg.controlPlaneTarget) == "" {
 			return errors.New("--control-plane-target is required")
 		}
@@ -375,7 +375,7 @@ func (cfg config) validate() error {
 			return errors.New("--poll-interval must be positive")
 		}
 	default:
-		return fmt.Errorf("--mode must be create, approve, reject, get, list, config-publish-smoke, config-rollback-smoke, or tenant-quota-smoke")
+		return fmt.Errorf("--mode must be create, approve, reject, get, list, config-publish-smoke, config-rollback-smoke, tenant-quota-smoke, or policy-ruleset-smoke")
 	}
 	return nil
 }
@@ -383,7 +383,8 @@ func (cfg config) validate() error {
 func isControlPlaneAdminSmokeMode(mode string) bool {
 	return mode == "config-publish-smoke" ||
 		mode == "config-rollback-smoke" ||
-		mode == "tenant-quota-smoke"
+		mode == "tenant-quota-smoke" ||
+		mode == "policy-ruleset-smoke"
 }
 
 func authContext(cfg config) *adminv1.AuthContext {

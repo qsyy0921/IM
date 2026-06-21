@@ -185,6 +185,55 @@ func TestControlPlaneConfigPublishExecutorChangesTenantQuota(t *testing.T) {
 	}
 }
 
+func TestControlPlaneConfigPublishExecutorPublishesPolicyRulesetRef(t *testing.T) {
+	client := &fakeControlPlaneClient{
+		response: &controlplanev1.PublishConfigVersionResponse{
+			Version: &controlplanev1.ConfigVersion{Version: "policy-v1"},
+		},
+	}
+	executor := NewControlPlaneConfigPublishExecutor(client, time.Second)
+
+	result, err := executor.Execute(context.Background(), types.AdminOperation{
+		TenantID:      "tenant-admin",
+		OperationID:   "admop_policy_rule",
+		OperationType: "POLICY_RULE_CHANGE",
+		PayloadJSON: `{
+			"environment":"local",
+			"bundle_key":"policy/default",
+			"config_version":"policy-v1",
+			"policy_rule_ref":"policy-ruleset-v1",
+			"effective_at_unix_ms":1000
+		}`,
+		ReasonRef:     "reason:policy-ticket-1",
+		RequestedBy:   "admin:operator-1",
+		CorrelationID: "corr-policy",
+		CausationID:   "cause-policy",
+		TraceID:       "trace-policy",
+	})
+	if err != nil {
+		t.Fatalf("execute policy rule change: %v", err)
+	}
+	if result.DownstreamService != "control-plane-service" ||
+		result.DownstreamRequestRef != "policy-ruleset-ref:local:policy/default:policy-ruleset-v1:policy-v1" ||
+		result.Status != types.OperationStatusSucceeded {
+		t.Fatalf("unexpected result: %+v", result)
+	}
+	request := client.request
+	if request.GetConfigKind() != "POLICY_RULESET_REF" ||
+		request.GetBundleKey() != "policy/default" ||
+		request.GetVersion() != "policy-v1" ||
+		request.GetSchemaVersion() != "policy-ruleset-ref-v1" ||
+		request.GetPayloadJson() != `{"policy_ruleset_ref":"policy-ruleset-v1"}` ||
+		request.GetEffectiveAtUnixMs() != 1000 ||
+		request.GetIdempotencyKey() != "admin-control-plane-policy-rule:admop_policy_rule" ||
+		request.GetApprovalRef() != "admin-operation:admop_policy_rule" {
+		t.Fatalf("unexpected policy rule publish request: %+v", request)
+	}
+	if client.rollbackRequest != nil {
+		t.Fatal("policy rule operation should not call RollbackConfigVersion")
+	}
+}
+
 func TestControlPlaneConfigPublishExecutorRejectsMalformedTenantQuotaPayload(t *testing.T) {
 	client := &fakeControlPlaneClient{}
 	executor := NewControlPlaneConfigPublishExecutor(client, time.Second)
@@ -199,6 +248,23 @@ func TestControlPlaneConfigPublishExecutorRejectsMalformedTenantQuotaPayload(t *
 	}
 	if client.request != nil {
 		t.Fatalf("malformed tenant quota payload should not call control-plane")
+	}
+}
+
+func TestControlPlaneConfigPublishExecutorRejectsMalformedPolicyRulePayload(t *testing.T) {
+	client := &fakeControlPlaneClient{}
+	executor := NewControlPlaneConfigPublishExecutor(client, time.Second)
+
+	_, err := executor.Execute(context.Background(), types.AdminOperation{
+		OperationID:   "admop_policy_rule_bad",
+		OperationType: "POLICY_RULE_CHANGE",
+		PayloadJSON:   `{"environment":"local","bundle_key":"policy/default","config_version":"policy-v1"}`,
+	})
+	if !errors.Is(err, types.ErrInvalidArgument) {
+		t.Fatalf("expected invalid argument, got %v", err)
+	}
+	if client.request != nil {
+		t.Fatalf("malformed policy rule payload should not call control-plane")
 	}
 }
 

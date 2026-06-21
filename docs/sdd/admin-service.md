@@ -154,7 +154,8 @@ operator reason raw text
 | --- | --- |
 | `DEVICE_REVOKE` / `SESSION_REVOKE` | 调 identity-service admin RPC |
 | `CONTACT_REQUEST_REVIEW` | 调 contacts-service review RPC / operator port |
-| `POLICY_RULE_CHANGE` / `REBAC_RELATION_CHANGE` | 调 policy-service operator port |
+| `POLICY_RULE_CHANGE` | 第一阶段发布低敏 `POLICY_RULESET_REF` 配置引用到 control-plane-service；后续完整 policy mutation 再接 policy-service operator port |
+| `REBAC_RELATION_CHANGE` | 调 policy-service operator port |
 | `TENANT_QUOTA_CHANGE` / `CONFIG_PUBLISH` / `CONFIG_ROLLBACK` | 调 control-plane-service |
 | `REPAIR_REQUEST` | 创建 workflow request 或生成服务专用 operator command |
 | `AUDIT_EXPORT_REQUEST` | 调 audit-service export API |
@@ -173,13 +174,14 @@ ref/hash；admin-service result 只记录 `workflow:<workflow_id>`。未配置
 本地 no-op executor，必须 fail-closed。
 
 第一版 workflow request 会按 operation 类型写入专用 approval policy 和 target
-service：`CONFIG_PUBLISH` / `CONFIG_ROLLBACK` / `TENANT_QUOTA_CHANGE` 指向
-`control-plane-service`，policy / ReBAC 操作指向 `policy-service`，
+service：`CONFIG_PUBLISH` / `CONFIG_ROLLBACK` / `TENANT_QUOTA_CHANGE` /
+`POLICY_RULE_CHANGE` 指向 `control-plane-service`，完整 policy mutation / ReBAC
+操作指向 `policy-service`，
 `AUDIT_EXPORT_REQUEST` 指向 `audit-service`，`NOTIFICATION_SUPPRESSION_CHANGE`
 指向 `notification-service`。未映射的 `CRITICAL` operation 仍使用
 `admin.workflow.operation.v1` 和 `admin-service` target，等待后续专用 adapter。
 
-第一版真实下游 adapter 已覆盖三类非 `CRITICAL` 的 control-plane operation：
+第一版真实下游 adapter 已覆盖四类非 `CRITICAL` 的 control-plane operation：
 
 ```text
 operation-worker
@@ -195,6 +197,11 @@ operation-worker
 operation-worker
 -> parse operation_payload_json as admin.tenant_quota_change.v1
 -> control-plane-service.PublishConfigVersion(API_GATEWAY_TENANT_QUOTA)
+-> admin result downstream_service=control-plane-service
+
+operation-worker
+-> parse operation_payload_json as admin.policy_rule_change.v1
+-> control-plane-service.PublishConfigVersion(POLICY_RULESET_REF)
 -> admin result downstream_service=control-plane-service
 ```
 
@@ -398,7 +405,8 @@ NEXUSIM_ADMIN_CONTROL_PLANE_RPC_TIMEOUT=1s
 未设置 `NEXUSIM_WORKFLOW_GRPC_ADDR` 时，`REPAIR_REQUEST` / `CRITICAL` operation 会
 fail-closed 并记录失败结果，不会被本地 no-op executor 标记为成功。
 未设置 `NEXUSIM_CONTROL_PLANE_GRPC_ADDR` 时，非 critical `CONFIG_PUBLISH` /
-`CONFIG_ROLLBACK` / `TENANT_QUOTA_CHANGE` 仍保持第一阶段 local executor fallback；
+`CONFIG_ROLLBACK` / `TENANT_QUOTA_CHANGE` / `POLICY_RULE_CHANGE` 仍保持第一阶段
+local executor fallback；
 设置后才调用 control-plane public gRPC。
 
 operator：

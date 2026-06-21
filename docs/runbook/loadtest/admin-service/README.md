@@ -47,6 +47,7 @@ list
 config-publish-smoke
 config-rollback-smoke
 tenant-quota-smoke
+policy-ruleset-smoke
 ```
 
 边界：
@@ -94,4 +95,13 @@ tenant-quota-smoke
 - tenant quota smoke 会创建并审批 `TENANT_QUOTA_CHANGE` operation，由
   operation-worker 调 `control-plane-service.PublishConfigVersion` 发布
   `API_GATEWAY_TENANT_QUOTA` 配置，并用 `GetConfigSnapshot` 验证当前 snapshot。
+- policy ruleset smoke 可运行：
+
+```powershell
+.\loadtest\admin\run-local-smoke.ps1 -SmokeMode policy-ruleset-smoke
+```
+
+- policy ruleset smoke 会创建并审批 `POLICY_RULE_CHANGE` operation，由
+  operation-worker 调 `control-plane-service.PublishConfigVersion` 发布低敏
+  `POLICY_RULESET_REF` 配置引用，并用 `GetConfigSnapshot` 验证当前 snapshot。
 - 仍不替代 admin UI、审批系统或 provider-grade 运维平台。

@@ -51,6 +51,16 @@ type tenantQuotaChangePayload struct {
 	ExpiresAtUnixMS   int64   `json:"expires_at_unix_ms"`
 }
 
+type policyRuleChangePayload struct {
+	Environment       string `json:"environment"`
+	BundleKey         string `json:"bundle_key"`
+	Version           string `json:"version"`
+	ConfigVersion     string `json:"config_version"`
+	PolicyRuleRef     string `json:"policy_rule_ref"`
+	EffectiveAtUnixMS int64  `json:"effective_at_unix_ms"`
+	ExpiresAtUnixMS   int64  `json:"expires_at_unix_ms"`
+}
+
 func NewControlPlaneConfigPublishExecutor(
 	client controlplanev1.ControlPlaneServiceClient,
 	timeout time.Duration,
@@ -92,6 +102,8 @@ func (executor ControlPlaneConfigPublishExecutor) Execute(
 		return executor.executeRollback(ctx, operation)
 	case "TENANT_QUOTA_CHANGE":
 		return executor.executeTenantQuotaChange(ctx, operation)
+	case "POLICY_RULE_CHANGE":
+		return executor.executePolicyRuleChange(ctx, operation)
 	}
 	payload, err := parseConfigPublishPayload(operation.PayloadJSON)
 	if err != nil {
@@ -204,6 +216,66 @@ func (executor ControlPlaneConfigPublishExecutor) executeTenantQuotaChange(
 	}, nil
 }
 
+func (executor ControlPlaneConfigPublishExecutor) executePolicyRuleChange(
+	ctx context.Context,
+	operation types.AdminOperation,
+) (types.OperationExecutionResult, error) {
+	payload, err := parsePolicyRuleChangePayload(operation.PayloadJSON)
+	if err != nil {
+		return types.OperationExecutionResult{}, err
+	}
+	payloadJSON, err := policyRulePayloadJSON(payload)
+	if err != nil {
+		return types.OperationExecutionResult{}, err
+	}
+	version := firstNonEmpty(payload.Version, payload.ConfigVersion)
+	callCtx, cancel := context.WithTimeout(ctx, executor.timeout)
+	defer cancel()
+	response, err := executor.client.PublishConfigVersion(callCtx, &controlplanev1.PublishConfigVersionRequest{
+		AuthContext: &controlplanev1.AuthContext{
+			TenantId:    string(operation.TenantID),
+			UserId:      operation.RequestedBy,
+			ServiceName: "admin-service",
+			InstanceRef: "operation-worker",
+			TraceId:     operation.TraceID,
+			RequestId:   operation.OperationID,
+		},
+		Environment:       payload.Environment,
+		ConfigKind:        "POLICY_RULESET_REF",
+		BundleKey:         payload.BundleKey,
+		Version:           version,
+		SchemaVersion:     "policy-ruleset-ref-v1",
+		PayloadJson:       payloadJSON,
+		EffectiveAtUnixMs: payload.EffectiveAtUnixMS,
+		ExpiresAtUnixMs:   payload.ExpiresAtUnixMS,
+		ApprovalRef:       "admin-operation:" + operation.OperationID,
+		OperatorRef:       operation.RequestedBy,
+		ReasonRef:         operation.ReasonRef,
+		IdempotencyKey:    "admin-control-plane-policy-rule:" + operation.OperationID,
+		CorrelationId:     operation.CorrelationID,
+		CausationId:       firstNonEmpty(operation.CausationID, operation.OperationID),
+		TraceId:           operation.TraceID,
+	})
+	if err != nil {
+		return types.OperationExecutionResult{}, mapControlPlaneError(err)
+	}
+	published := response.GetVersion()
+	if published == nil || strings.TrimSpace(published.GetVersion()) == "" {
+		return types.OperationExecutionResult{}, types.NewUnavailable("control-plane response is incomplete")
+	}
+	return types.OperationExecutionResult{
+		DownstreamService: "control-plane-service",
+		DownstreamRequestRef: fmt.Sprintf(
+			"policy-ruleset-ref:%s:%s:%s:%s",
+			payload.Environment,
+			payload.BundleKey,
+			payload.PolicyRuleRef,
+			version,
+		),
+		Status: types.OperationStatusSucceeded,
+	}, nil
+}
+
 func (executor ControlPlaneConfigPublishExecutor) executeRollback(
 	ctx context.Context,
 	operation types.AdminOperation,
@@ -253,6 +325,46 @@ func (executor ControlPlaneConfigPublishExecutor) executeRollback(
 		),
 		Status: types.OperationStatusSucceeded,
 	}, nil
+}
+
+func parsePolicyRuleChangePayload(raw string) (policyRuleChangePayload, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return policyRuleChangePayload{}, types.NewInvalidArgument("policy rule payload is required")
+	}
+	var payload policyRuleChangePayload
+	if err := json.Unmarshal([]byte(raw), &payload); err != nil {
+		return policyRuleChangePayload{}, types.NewInvalidArgument("policy rule payload is malformed")
+	}
+	payload.Environment = strings.TrimSpace(payload.Environment)
+	payload.BundleKey = strings.TrimSpace(payload.BundleKey)
+	payload.Version = strings.TrimSpace(payload.Version)
+	payload.ConfigVersion = strings.TrimSpace(payload.ConfigVersion)
+	payload.PolicyRuleRef = strings.TrimSpace(payload.PolicyRuleRef)
+	version := firstNonEmpty(payload.Version, payload.ConfigVersion)
+	if payload.Environment == "" ||
+		payload.BundleKey == "" ||
+		version == "" ||
+		payload.PolicyRuleRef == "" {
+		return policyRuleChangePayload{}, types.NewInvalidArgument("policy rule payload is incomplete")
+	}
+	if payload.EffectiveAtUnixMS <= 0 {
+		return policyRuleChangePayload{}, types.NewInvalidArgument("policy rule effective_at is required")
+	}
+	if payload.ExpiresAtUnixMS > 0 && payload.ExpiresAtUnixMS <= payload.EffectiveAtUnixMS {
+		return policyRuleChangePayload{}, types.NewInvalidArgument("policy rule expires_at must be after effective_at")
+	}
+	return payload, nil
+}
+
+func policyRulePayloadJSON(payload policyRuleChangePayload) (string, error) {
+	encoded, err := json.Marshal(map[string]any{
+		"policy_ruleset_ref": payload.PolicyRuleRef,
+	})
+	if err != nil {
+		return "", types.NewInvalidArgument("policy rule payload is invalid")
+	}
+	return string(encoded), nil
 }
 
 func parseConfigPublishPayload(raw string) (configPublishPayload, error) {

@@ -162,8 +162,9 @@ func runOperationWorker(ctx context.Context) error {
 			executorinfra.OperationTypeConfigPublish:     executor,
 			executorinfra.OperationTypeConfigRollback:    executor,
 			executorinfra.OperationTypeTenantQuotaChange: executor,
+			executorinfra.OperationTypePolicyRuleChange:  executor,
 		})
-		log.Printf("admin-service operation worker routing CONFIG_PUBLISH/CONFIG_ROLLBACK/TENANT_QUOTA_CHANGE to control-plane-service at %s", controlPlaneAddr)
+		log.Printf("admin-service operation worker routing CONFIG_PUBLISH/CONFIG_ROLLBACK/TENANT_QUOTA_CHANGE/POLICY_RULE_CHANGE to control-plane-service at %s", controlPlaneAddr)
 	}
 	var workflowExecutor executorinfra.OperationExecutor
 	workflowAddr := strings.TrimSpace(os.Getenv("NEXUSIM_WORKFLOW_GRPC_ADDR"))

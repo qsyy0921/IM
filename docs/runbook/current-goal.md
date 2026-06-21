@@ -151,14 +151,18 @@ model-gateway / workflow / knowledge-ingestion / vector-index
   `CRITICAL` 的 `TENANT_QUOTA_CHANGE` 通过 operation-worker 调
   `control-plane-service.PublishConfigVersion(API_GATEWAY_TENANT_QUOTA)`，并已跑通
   本地多进程 `Create -> approve -> tenant quota publish -> GetConfigSnapshot` smoke。
+- `admin-service` / `control-plane-service` 已新增 policy ruleset ref path：非
+  `CRITICAL` 的 `POLICY_RULE_CHANGE` 通过 operation-worker 调
+  `control-plane-service.PublishConfigVersion(POLICY_RULESET_REF)` 发布低敏规则集引用，
+  并已跑通本地多进程 `Create -> approve -> policy ruleset publish ->
+  GetConfigSnapshot` smoke。
 
 ## 下一步
 
-- 默认继续补更多下游公开 admin API adapter，或为 admin config / quota 增加
-  compensation operator。
+- 默认继续 admin compensation operator，或补其它明确下游公开 admin API adapter。
 - 默认下一步可继续 vector-index provider backend：在镜像可用后跑 focused pgvector smoke、
   真实 Milvus / OpenSearch backend、provider backend repair / 真 provider backfill smoke，
-  或继续更多下游 admin API adapter。
+  或继续 active future service 的 focused checks。
 - 也可以继续 notification SMTP / SMS / APNs / FCM adapter 或 bounce-suppression。
 
 ## 硬边界

@@ -82,10 +82,12 @@ approve / reject / get / list；第一条真实下游 adapter 已支持非 `CRIT
 adapter 已支持非 `CRITICAL` `CONFIG_ROLLBACK ->
 control-plane-service.RollbackConfigVersion`；第三条 control-plane adapter 已支持非
 `CRITICAL` `TENANT_QUOTA_CHANGE ->
-control-plane-service.PublishConfigVersion(API_GATEWAY_TENANT_QUOTA)`。
+control-plane-service.PublishConfigVersion(API_GATEWAY_TENANT_QUOTA)`；第四条
+control-plane adapter 已支持非 `CRITICAL` `POLICY_RULE_CHANGE ->
+control-plane-service.PublishConfigVersion(POLICY_RULESET_REF)`。
 admin `Create -> operator approve -> operation-worker -> control-plane` 本地多进程
-publish / rollback / tenant quota smoke 已通过。下一步默认继续更多下游公开 admin API adapter、
-admin compensation operator，或在镜像可用后继续 focused pgvector smoke、Milvus /
+publish / rollback / tenant quota / policy ruleset smoke 已通过。下一步默认继续
+admin compensation operator、其它明确下游公开 admin API adapter，或在镜像可用后继续 focused pgvector smoke、Milvus /
 OpenSearch backend / provider repair / 真 provider backfill smoke。
 ```
 

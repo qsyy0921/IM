@@ -49,6 +49,11 @@
   `TENANT_QUOTA_CHANGE` 在配置 `NEXUSIM_CONTROL_PLANE_GRPC_ADDR` 后由
   operation-worker 调 `control-plane-service.PublishConfigVersion` 发布
   `API_GATEWAY_TENANT_QUOTA` 配置。
+- 已新增第四条 control-plane 下游公开 API adapter：非 `CRITICAL` 的
+  `POLICY_RULE_CHANGE` 在配置 `NEXUSIM_CONTROL_PLANE_GRPC_ADDR` 后由
+  operation-worker 调 `control-plane-service.PublishConfigVersion` 发布低敏
+  `POLICY_RULESET_REF` 配置引用；admin-service 不承载 policy 规则正文，也不写
+  policy-service 私有表。
 - 已新增并跑通本地多进程 config publish smoke：通过公开 gRPC 执行
   `CreateAdminOperation -> operator approve -> operation-worker ->
   control-plane PublishConfigVersion -> GetConfigSnapshot`，报告见
@@ -60,6 +65,10 @@
   `TENANT_QUOTA_CHANGE -> control-plane PublishConfigVersion(API_GATEWAY_TENANT_QUOTA)`
   并用 `GetConfigSnapshot` 验证生效版本，报告见
   `docs/runbook/loadtest/admin-service/loadtest-report-20260621-admin-tenant-quota-smoke.md`。
+- 已新增并跑通本地多进程 policy ruleset smoke：通过公开 gRPC 执行
+  `POLICY_RULE_CHANGE -> control-plane PublishConfigVersion(POLICY_RULESET_REF)`
+  并用 `GetConfigSnapshot` 验证生效版本，报告见
+  `docs/runbook/loadtest/admin-service/loadtest-report-20260621-admin-policy-ruleset-smoke.md`。
 
 后续：
 

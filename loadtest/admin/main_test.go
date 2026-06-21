@@ -140,6 +140,23 @@ func TestParseFlagsBuildsTenantQuotaSmokeDefaults(t *testing.T) {
 	}
 }
 
+func TestParseFlagsBuildsPolicyRulesetSmokeDefaults(t *testing.T) {
+	cfg := parseFlags([]string{
+		"-mode", "policy-ruleset-smoke",
+		"-tenant-id", "tenant-admin-smoke",
+		"-run-name", "admin policy ruleset smoke",
+	})
+	if cfg.mode != "policy-ruleset-smoke" {
+		t.Fatalf("mode = %q", cfg.mode)
+	}
+	if cfg.runName != "admin policy ruleset smoke" {
+		t.Fatalf("run name = %q", cfg.runName)
+	}
+	if err := cfg.validate(); err != nil {
+		t.Fatalf("validate: %v", err)
+	}
+}
+
 func TestConfigPublishOperationPayloadDoesNotExposeSecretFields(t *testing.T) {
 	payload := configPublishOperationPayload("quota-v1")
 	var decoded map[string]any
@@ -192,6 +209,25 @@ func TestTenantQuotaOperationPayloadUsesLowSensitiveFields(t *testing.T) {
 	for _, forbidden := range []string{"payload_json", "secret", "token", "password"} {
 		if _, ok := decoded[forbidden]; ok {
 			t.Fatalf("tenant quota payload leaked %q", forbidden)
+		}
+	}
+}
+
+func TestPolicyRuleChangeOperationPayloadUsesLowSensitiveFields(t *testing.T) {
+	payload := policyRuleChangeOperationPayload("policy-v1")
+	var decoded map[string]any
+	if err := json.Unmarshal([]byte(payload), &decoded); err != nil {
+		t.Fatalf("payload json: %v", err)
+	}
+	if decoded["config_version"] != "policy-v1" ||
+		decoded["bundle_key"] != "policy/default" ||
+		decoded["policy_rule_ref"] != "policy-ruleset:tenant-default:policy-v1" ||
+		decoded["effective_at_unix_ms"].(float64) <= 0 {
+		t.Fatalf("unexpected payload: %+v", decoded)
+	}
+	for _, forbidden := range []string{"payload_json", "secret", "token", "password", "private_key"} {
+		if _, ok := decoded[forbidden]; ok {
+			t.Fatalf("policy ruleset payload leaked %q", forbidden)
 		}
 	}
 }

@@ -43,6 +43,9 @@ const (
 	MaxChunkPreviewBytes = 256
 	MaxChunkManifestSize = 1000
 	MaxListPageSize      = 200
+
+	OutboxStatusPublished = "PUBLISHED"
+	OutboxStatusDLQ       = "DLQ"
 )
 
 type KnowledgeSource struct {
@@ -132,6 +135,36 @@ type KnowledgeIngestionJob struct {
 	TraceID            string
 	CreatedAt          time.Time
 	CompletedAt        time.Time
+}
+
+type OutboxMessage struct {
+	EventID          string
+	TenantID         TenantID
+	AggregateType    string
+	AggregateID      string
+	EventType        string
+	EventVersion     int
+	PartitionKey     string
+	Producer         string
+	PayloadJSON      []byte
+	RetryCount       int
+	OccurredAt       time.Time
+	AggregateVersion int64
+	CorrelationID    string
+	CausationID      string
+	TraceID          string
+}
+
+type OutboxRelayStats struct {
+	Fetched      int
+	Published    int
+	Retried      int
+	DeadLettered int
+}
+
+type KafkaPublishRecord struct {
+	Key   []byte
+	Value []byte
 }
 
 type ChunkManifestItem struct {

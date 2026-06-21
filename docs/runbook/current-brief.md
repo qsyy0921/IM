@@ -51,8 +51,10 @@ claim redacted-preview task 并 complete；`embedding-producer` 可从 file / kn
 source 读取 redacted-preview task 写入该 queue，`loadtest/vectorembedding` 已跑通
 producer -> queue -> worker 链路；`chunk-consumer` runtime 已能消费低敏
 `knowledge.chunk.ready.v1` refs，经 `ListKnowledgeChunks` 公开 API resolve redacted
-preview 后入 embedding queue，当前覆盖 focused tests，真实 Kafka smoke 待 knowledge
-outbox relay / schema。`admin-service` 已完成第一版
+preview 后入 embedding queue，当前覆盖 focused tests，并已支持 `im.knowledge.events`
+protobuf `KnowledgeEvent` 与旧 JSON fallback；`knowledge-ingestion-service` 已补
+`knowledge_outbox -> im.knowledge.events` first-stage relay 和低敏 schema，真实 Kafka
+chunk-consumer 联调 smoke 待跑。`admin-service` 已完成第一版
 `CreateAdminOperation` / `ApproveAdminOperation` / `GetAdminOperation` /
 `ListAdminOperations` path、`admin_outbox -> im.admin.events` outbox relay 和
 `operation-worker` risk routing 执行闭环；`REPAIR_REQUEST` 已接入
@@ -67,7 +69,7 @@ control-plane-service.RollbackConfigVersion`；第三条 control-plane adapter �
 control-plane-service.PublishConfigVersion(API_GATEWAY_TENANT_QUOTA)`。
 admin `Create -> operator approve -> operation-worker -> control-plane` 本地多进程
 publish / rollback / tenant quota smoke 已通过。下一步默认继续更多下游公开 admin API adapter、
-admin compensation operator，或继续 vector knowledge outbox relay / real chunk-consumer
+admin compensation operator，或继续 knowledge relay -> vector chunk-consumer 真实 Kafka
 smoke / provider backend worker。
 ```
 

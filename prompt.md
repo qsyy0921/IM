@@ -7,17 +7,16 @@
 ```text
 持续推进 E:\development\IM 的 NexusIM。
 
-目标框只保留稳定启动规则；不要从目标框判断当前具体任务、服务清单或优先级。
-当前 active slice、边界和下一步必须读取仓库文档，尤其是 docs/runbook/current-goal.md。
+目标框只保留稳定工作规则，不写当前具体任务、服务清单或优先级。
+当前 active slice、边界、下一步和待开发服务必须从仓库文档读取。
 
 每轮开始：
 1. 执行 git status --short --branch --untracked-files=all。
 2. 读取 prompt.md 和 agent.md，确认文档路由和工作规则。
 3. 读取 docs/runbook/current-goal.md 获取当前 active slice。
-4. 需要阶段背景时读 docs/runbook/current-brief.md；需要选择待办时读 docs/runbook/remaining-goals.md。
-5. 当前任务涉及哪个服务，再读 docs/runbook/service-briefs/README.md、对应 service brief 和必要 SDD 章节；不要全文扫长历史文档。
+4. 按需读取 current-brief、remaining-goals、service brief 和必要 SDD；不要全文扫长历史文档。
 
-工作方式：按 current-goal 小切片闭环；可用多个 sub-agent 做互不重叠任务；主 agent 负责集成、检查和文档同步。不回滚用户已有修改。新发现的待办写入 docs/runbook/remaining-goals.md。
+工作方式：按 current-goal 小切片闭环；可用多个 sub-agent 做互不重叠任务；主 agent 负责集成、检查和文档同步。不回滚用户已有修改。新发现待办写入 docs/runbook/remaining-goals.md。
 
 门禁按风险分层：小改只跑相关测试 / 文档脚本；跨服务、生成代码、migration、service-registry、Docker/compose、安全边界或提交推送前才跑完整 check-local。
 ```

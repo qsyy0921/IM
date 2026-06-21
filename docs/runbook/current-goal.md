@@ -87,8 +87,13 @@ model-gateway / workflow / knowledge-ingestion / vector-index
   `NEXUSIM_VECTOR_INDEX_SERVICE_MODE=chunk-consumer` 消费低敏
   `knowledge.chunk.ready.v1` refs 后，通过
   `knowledge-ingestion-service.ListKnowledgeChunks` 公开 API resolve redacted preview，
-  再写入 PostgreSQL embedding queue；当前有 focused tests，真实 Kafka smoke 待
-  knowledge outbox relay / schema 收口。
+  再写入 PostgreSQL embedding queue；当前有 focused tests。
+- `knowledge-ingestion-service` 已新增低敏 `im.knowledge.events` Kafka schema 和
+  `knowledge_outbox -> im.knowledge.events` 第一版 `outbox-relay` runtime。relay 覆盖
+  source-created、document-parsed、chunk-ready 现有 outbox 事件和 SDD 预留的
+  tombstone / failed / delete-proof 事件 schema；payload 不包含 source URI、object key、
+  chunk preview / chunk text、connector secret 或 parser raw error。`vector-index-service`
+  `chunk-consumer` 已支持 protobuf `KnowledgeEvent`，同时保留 JSON fallback。
 - `admin-service` 已从 stage-switch 进入 product-active 第一版 implementation
   slice，覆盖 `CreateAdminOperation`、`ApproveAdminOperation`、
   `GetAdminOperation`、`ListAdminOperations`、PostgreSQL operation / approval
@@ -120,8 +125,8 @@ model-gateway / workflow / knowledge-ingestion / vector-index
 
 - 默认继续补更多下游公开 admin API adapter，或为 admin config / quota 增加
   compensation operator。
-- 默认下一步可继续 `vector-index-service` knowledge outbox relay / schema 后的真实
-  Kafka chunk-consumer smoke、Milvus / pgvector backend / provider backend rebuild；
+- 默认下一步可继续 `knowledge_outbox -> im.knowledge.events -> vector chunk-consumer
+  -> embedding queue` 真实 Kafka smoke、Milvus / pgvector backend / provider backend rebuild；
   也可以继续更多下游 admin API adapter。
 - 也可以继续 notification SMTP / SMS / APNs / FCM adapter 或 bounce-suppression。
 

@@ -6,7 +6,9 @@ import (
 	"errors"
 	"testing"
 
+	knowledgeeventsv1 "github.com/qsyy0921/IM/schemas/kafka/knowledge/v1"
 	"github.com/qsyy0921/IM/services/vector-index-service/internal/types"
+	"google.golang.org/protobuf/proto"
 )
 
 func TestWorkerRunOnceEnqueuesResolvedKnowledgeChunkTask(t *testing.T) {
@@ -62,6 +64,48 @@ func TestDecodeKnowledgeChunkReadyUsesEventTypeFromPayload(t *testing.T) {
 		t.Fatalf("decode event: %v", err)
 	}
 	if event.TenantID != "tenant-vector" || event.ChunkID != "kchunk_1" {
+		t.Fatalf("unexpected event: %+v", event)
+	}
+}
+
+func TestDecodeKnowledgeChunkReadyFromKnowledgeEventProto(t *testing.T) {
+	encoded, err := proto.Marshal(&knowledgeeventsv1.KnowledgeEvent{
+		EventId:       "evt_kchunk_proto",
+		EventType:     EventKnowledgeChunkReady,
+		TenantId:      "tenant-vector",
+		CorrelationId: "corr-vector",
+		CausationId:   "cause-vector",
+		TraceId:       "trace-vector",
+		Payload: &knowledgeeventsv1.KnowledgeEvent_ChunkReady{
+			ChunkReady: &knowledgeeventsv1.KnowledgeChunkReadyV1{
+				TenantId:        "tenant-vector",
+				ChunkId:         "kchunk_proto",
+				DocumentId:      "kdoc_1",
+				SourceId:        "ksrc_1",
+				SourceVersion:   "2",
+				ChunkIndex:      0,
+				ChunkHash:       "sha256:chunkhash",
+				VisibilityScope: "tenant:tenant-vector",
+				DataClass:       "BUSINESS_INTERNAL",
+				PolicyVersion:   "policy-v1",
+				ChunkVersion:    "chunk-v1",
+				TombstoneStatus: "ACTIVE",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("marshal proto: %v", err)
+	}
+	event, err := DecodeKnowledgeChunkReady(types.ChunkEventMessage{
+		Topic: TopicKnowledgeEvents,
+		Value: encoded,
+	})
+	if err != nil {
+		t.Fatalf("decode proto event: %v", err)
+	}
+	if event.EventID != "evt_kchunk_proto" ||
+		event.ChunkID != "kchunk_proto" ||
+		event.CorrelationID != "corr-vector" {
 		t.Fatalf("unexpected event: %+v", event)
 	}
 }

@@ -105,4 +105,10 @@ protoc `
     -I $KafkaSchemaDir `
     --go_out=$KafkaSchemaDir `
     --go_opt=paths=source_relative `
+    "$KafkaSchemaDir/knowledge/v1/im.knowledge.events.proto"
+
+protoc `
+    -I $KafkaSchemaDir `
+    --go_out=$KafkaSchemaDir `
+    --go_opt=paths=source_relative `
     "$KafkaSchemaDir/vector/v1/im.vector.events.proto"

@@ -85,8 +85,10 @@
   `SubmitIngestionJob`、`GetIngestionJob`、`ListKnowledgeChunks`、本地 metadata +
   chunk manifest、低敏 `knowledge_outbox`；真实 PG 集成测试已验证 source + job +
   chunks + outbox 同事务，且 outbox 不含 source URI、object key、chunk text 或
-  parser raw error；`loadtest/knowledgevector` 已通过公开 gRPC 证明 chunk manifest
-  可 handoff 到 `vector-index-service`。
+  parser raw error；`im.knowledge.events` 低敏 Kafka schema 和
+  `knowledge_outbox -> im.knowledge.events` first-stage relay 已落；
+  `loadtest/knowledgevector` 已通过公开 gRPC 证明 chunk manifest 可 handoff 到
+  `vector-index-service`。
 - `workflow-service` product-active：SDD v0.1 和 stage-switch review 已通过，
   第一版 proto / migration / 六层 skeleton / `grpc` runtime / Docker /
   Prometheus / Grafana 覆盖已落；当前覆盖 `CreateWorkflow`、
@@ -116,7 +118,8 @@
   -> PostgreSQL queue，`loadtest/vectorembedding` 已跑通 producer -> queue -> worker
   链路；first-stage `chunk-consumer` runtime 已支持 `knowledge.chunk.ready.v1` refs
   -> public `ListKnowledgeChunks` resolve -> embedding queue，并覆盖 focused tests；
-  不宣称 knowledge outbox relay / schema 后的真实 Kafka chunk-consumer smoke、Milvus /
+  `chunk-consumer` 已支持 protobuf `KnowledgeEvent` 与旧 JSON fallback；不宣称
+  knowledge relay 后的真实 Kafka chunk-consumer smoke、Milvus /
   pgvector / OpenSearch 或 provider backend rebuild。
 - `admin-service` product-active：SDD v0.1 和 stage-switch review 已通过，
   第一版 proto / migration / 六层 skeleton / `grpc` runtime / Docker /

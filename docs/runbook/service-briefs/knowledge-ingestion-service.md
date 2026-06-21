@@ -26,8 +26,12 @@ pipeline、权限 metadata、增量重建和导入审计。
   embedding / crawler / vector provider。
 - 真实 PG 集成测试覆盖 source + job + chunks + low-sensitive outbox transaction。
 - outbox payload 不包含 source URI、object key、chunk text、parser raw error。
+- `im.knowledge.events` Kafka schema 和 `knowledge_outbox -> im.knowledge.events`
+  first-stage outbox relay 已落：支持 source-created、document-parsed、chunk-ready
+  现有事件，以及 tombstone / failed / delete-proof 预留 schema；relay payload 继续只发布
+  low-sensitive refs，不发布 chunk preview / source URI / object key / parser raw error。
 - `loadtest/knowledgevector` 已通过公开 gRPC 证明 knowledge source / chunk
   manifest 可 handoff 到 `vector-index-service.UpsertVectorItem`，并由
   `SearchVectors` 搜到。
-- 后续补 parser worker、embedding handoff、tombstone/delete proof、outbox relay
-  和真实 connector。
+- 后续补 parser worker、embedding handoff、tombstone/delete proof、真实 connector，以及
+  `knowledge_outbox -> im.knowledge.events -> vector chunk-consumer` 真实 Kafka smoke。

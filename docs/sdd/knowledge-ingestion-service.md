@@ -206,6 +206,12 @@ retention_policy_ref
 data class、failure class、trace refs。禁止包含原文件、chunk 正文、网页正文、provider body、
 parser raw error、private URL query、credential 或 token。
 
+第一版已实现 `im.knowledge.events` protobuf schema 和
+`knowledge_outbox -> im.knowledge.events` outbox relay。当前生产写入路径已产生
+`source.created`、`document.parsed` 和 `chunk.ready`；`chunk.tombstoned`、
+`ingestion.failed`、`delete_proof.recorded` 先作为低敏 schema contract 预留，待
+tombstone / delete-proof worker 落地后接入。
+
 ## 8. 数据库设计
 
 第一版表：
@@ -427,6 +433,9 @@ NEXUSIM_KNOWLEDGE_INGESTION_SERVICE_MODE=embedding-worker
 NEXUSIM_KNOWLEDGE_INGESTION_SERVICE_MODE=outbox-relay
 NEXUSIM_KNOWLEDGE_INGESTION_SERVICE_MODE=cleanup
 ```
+
+当前 first-stage runtime 已实现 `grpc` 和 `outbox-relay`；parser / embedding /
+cleanup worker 是后续切片，不得在 smoke 报告中提前宣称完成。
 
 operator：
 

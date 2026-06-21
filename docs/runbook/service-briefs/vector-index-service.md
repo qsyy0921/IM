@@ -56,8 +56,9 @@ vector 写入、rebuild 和 backfill 逻辑复杂到影响 retrieval / memory �
   `knowledge.chunk.ready.v1` refs 后，通过
   `knowledge-ingestion-service.ListKnowledgeChunks` 公开 API resolve redacted preview，
   再写入 PostgreSQL embedding queue；unsupported / malformed event fail-closed。
-  当前覆盖 focused tests，真实 Kafka smoke 待 knowledge outbox relay / schema 收口。
+  当前覆盖 focused tests，并已支持 schema 化 protobuf `KnowledgeEvent` 与旧 JSON fallback；
+  真实 Kafka smoke 待 knowledge relay 联调。
 
-后续待办：knowledge outbox relay / schema 后的真实 Kafka chunk-consumer smoke、memory /
-search chunk consumer、真实 Milvus / pgvector / OpenSearch backend、provider backend
-rebuild / backfill worker、provider backend repair。
+后续待办：`knowledge_outbox -> im.knowledge.events -> chunk-consumer -> embedding queue`
+真实 Kafka smoke、memory / search chunk consumer、真实 Milvus / pgvector / OpenSearch
+backend、provider backend rebuild / backfill worker、provider backend repair。

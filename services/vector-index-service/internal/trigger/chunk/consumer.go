@@ -7,7 +7,9 @@ import (
 	"strings"
 	"time"
 
+	knowledgeeventsv1 "github.com/qsyy0921/IM/schemas/kafka/knowledge/v1"
 	"github.com/qsyy0921/IM/services/vector-index-service/internal/types"
+	"google.golang.org/protobuf/proto"
 )
 
 const (
@@ -94,6 +96,9 @@ func (worker *Worker) RunOnce(ctx context.Context) error {
 }
 
 func DecodeKnowledgeChunkReady(message types.ChunkEventMessage) (types.KnowledgeChunkReadyEvent, error) {
+	if event, ok, err := decodeKnowledgeChunkReadyProto(message); ok || err != nil {
+		return event, err
+	}
 	eventType := strings.TrimSpace(message.EventType)
 	var payload knowledgeChunkReadyPayload
 	if err := json.Unmarshal(message.Value, &payload); err != nil {
@@ -127,6 +132,46 @@ func DecodeKnowledgeChunkReady(message types.ChunkEventMessage) (types.Knowledge
 		return types.KnowledgeChunkReadyEvent{}, err
 	}
 	return event, nil
+}
+
+func decodeKnowledgeChunkReadyProto(message types.ChunkEventMessage) (types.KnowledgeChunkReadyEvent, bool, error) {
+	var envelope knowledgeeventsv1.KnowledgeEvent
+	if err := proto.Unmarshal(message.Value, &envelope); err != nil {
+		return types.KnowledgeChunkReadyEvent{}, false, nil
+	}
+	if envelope.GetEventId() == "" && envelope.GetEventType() == "" && envelope.GetPayload() == nil {
+		return types.KnowledgeChunkReadyEvent{}, false, nil
+	}
+	eventType := firstNonEmpty(message.EventType, envelope.GetEventType())
+	if eventType != EventKnowledgeChunkReady {
+		return types.KnowledgeChunkReadyEvent{}, true, types.NewInvalidArgument("unsupported knowledge chunk event type")
+	}
+	payload := envelope.GetChunkReady()
+	if payload == nil {
+		return types.KnowledgeChunkReadyEvent{}, true, types.NewInvalidArgument("malformed knowledge chunk event payload")
+	}
+	event := types.KnowledgeChunkReadyEvent{
+		EventID:         envelope.GetEventId(),
+		TenantID:        types.TenantID(firstNonEmpty(payload.GetTenantId(), envelope.GetTenantId())),
+		ChunkID:         payload.GetChunkId(),
+		DocumentID:      payload.GetDocumentId(),
+		SourceID:        payload.GetSourceId(),
+		SourceVersion:   payload.GetSourceVersion(),
+		ChunkIndex:      int(payload.GetChunkIndex()),
+		ChunkHash:       payload.GetChunkHash(),
+		VisibilityScope: payload.GetVisibilityScope(),
+		DataClass:       payload.GetDataClass(),
+		PolicyVersion:   payload.GetPolicyVersion(),
+		ChunkVersion:    payload.GetChunkVersion(),
+		TombstoneStatus: payload.GetTombstoneStatus(),
+		CorrelationID:   envelope.GetCorrelationId(),
+		CausationID:     envelope.GetCausationId(),
+		TraceID:         envelope.GetTraceId(),
+	}.Normalized()
+	if err := event.Validate(); err != nil {
+		return types.KnowledgeChunkReadyEvent{}, true, err
+	}
+	return event, true, nil
 }
 
 type knowledgeChunkReadyPayload struct {

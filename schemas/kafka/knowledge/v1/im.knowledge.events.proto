@@ -1,0 +1,108 @@
+syntax = "proto3";
+
+package nexusim.knowledge.events.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/qsyy0921/IM/schemas/kafka/knowledge/v1;knowledgeeventsv1";
+
+// Topic: im.knowledge.events
+// Partition key: tenant_id + ":" + aggregate_id
+// Producer: knowledge-ingestion-service outbox relay
+//
+// Payloads must stay low-sensitive. Do not include raw file content, chunk text,
+// source URI, object key, connector credentials, private URL query, or parser
+// raw error strings.
+message KnowledgeEvent {
+  string event_id = 1;
+  string event_type = 2;
+  int32 event_version = 3;
+
+  string tenant_id = 4;
+  string aggregate_type = 5;
+  string aggregate_id = 6;
+  int64 aggregate_version = 7;
+
+  string partition_key = 8;
+  string trace_id = 9;
+  string correlation_id = 10;
+  string causation_id = 11;
+  string producer = 12;
+  google.protobuf.Timestamp occurred_at = 13;
+
+  oneof payload {
+    KnowledgeSourceCreatedV1 source_created = 20;
+    KnowledgeDocumentParsedV1 document_parsed = 21;
+    KnowledgeChunkReadyV1 chunk_ready = 22;
+    KnowledgeChunkTombstonedV1 chunk_tombstoned = 23;
+    KnowledgeIngestionFailedV1 ingestion_failed = 24;
+    KnowledgeDeleteProofRecordedV1 delete_proof_recorded = 25;
+  }
+}
+
+message KnowledgeSourceCreatedV1 {
+  string tenant_id = 1;
+  string source_id = 2;
+  string source_type = 3;
+  string source_ref_hash = 4;
+  string visibility_scope = 5;
+  string data_class = 6;
+  string content_hash = 7;
+  string source_version = 8;
+}
+
+message KnowledgeDocumentParsedV1 {
+  string tenant_id = 1;
+  string document_id = 2;
+  string source_id = 3;
+  string source_version = 4;
+  string document_hash = 5;
+  string parser_profile = 6;
+  string mime_type = 7;
+  int32 page_count = 8;
+  int32 chunk_count = 9;
+}
+
+message KnowledgeChunkReadyV1 {
+  string tenant_id = 1;
+  string chunk_id = 2;
+  string document_id = 3;
+  string source_id = 4;
+  string source_version = 5;
+  int32 chunk_index = 6;
+  string chunk_hash = 7;
+  string visibility_scope = 8;
+  string data_class = 9;
+  string policy_version = 10;
+  string chunk_version = 11;
+  string tombstone_status = 12;
+}
+
+message KnowledgeChunkTombstonedV1 {
+  string tenant_id = 1;
+  string chunk_id = 2;
+  string document_id = 3;
+  string source_id = 4;
+  string chunk_hash = 5;
+  string delete_proof_id = 6;
+  string reason_class = 7;
+  string tombstone_status = 8;
+}
+
+message KnowledgeIngestionFailedV1 {
+  string tenant_id = 1;
+  string job_id = 2;
+  string source_id = 3;
+  string source_version = 4;
+  string failure_class = 5;
+  string public_error = 6;
+}
+
+message KnowledgeDeleteProofRecordedV1 {
+  string tenant_id = 1;
+  string delete_proof_id = 2;
+  string source_id = 3;
+  string proof_type = 4;
+  string proof_ref_hash = 5;
+  string reason_class = 6;
+}

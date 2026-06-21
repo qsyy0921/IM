@@ -179,7 +179,8 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   `nexusim/client-android-builder:local` 已存在，不会隐式下载 toolchain；
   `build:android-apk:docker:bootstrap` 是显式 bootstrap 入口，会在缺镜像时下载 /
   构建 Node、Gradle 与 Android SDK toolchain。该 profile 已接 `build:android-apk:collect`，成功构建后会把
-  APK 和低敏 manifest 写入 `clients/artifacts/android/docker-android-debug/`。当前仍未构建镜像，也未声称 APK baseline。
+  APK 和低敏 manifest 写入 `clients/artifacts/android/docker-android-debug/`；镜像 build context 已缩到
+  `deploy/docker`，避免发送整个仓库。当前仍未构建镜像，也未声称 APK baseline。
 - `clients/tools/report-client-artifact-readiness.mjs` 已提供低敏 readiness
   report；`test:artifact-readiness` 覆盖 schema、无敏感字段和无本机绝对路径。
   报告已区分 Android Docker builder image build command 与实际 builder run command，

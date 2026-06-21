@@ -240,8 +240,9 @@ First slice:
   in `deploy/local/docker-compose.client-builders.yml` and uses
   `deploy/docker/client-android-builder.Dockerfile`; it is opt-in because the
   first image build downloads Node, Gradle and Android SDK components. The
-  profile now runs `build:android-apk:collect`, so a successful container build writes the
-  APK and low-sensitive `manifest.json` under
+  image build context is intentionally limited to `deploy/docker`; the repository
+  is mounted only at container runtime under `/workspace`. The profile now runs
+  `build:android-apk:collect`, so a successful container build writes the APK and low-sensitive `manifest.json` under
   `clients/artifacts/android/docker-android-debug/` by default.
 - `@nexusim/client-core` now exposes `ClientShellActions`; desktop and Android
   export thin `createDesktopShellActions` / `createAndroidShellActions` wrappers.

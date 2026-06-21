@@ -31,7 +31,8 @@ assert(dockerfile.includes("npm --prefix clients run build:android-apk:collect")
 const compose = read("deploy/local/docker-compose.client-builders.yml");
 assert(compose.includes("client-android-apk-builder"), "compose must define Android APK builder service");
 assert(compose.includes("client-builders"), "compose must hide builder behind client-builders profile");
-assert(compose.includes("deploy/docker/client-android-builder.Dockerfile"), "compose must reference Android builder Dockerfile");
+assert(compose.includes("context: ../docker"), "compose must keep Android builder image context narrow");
+assert(compose.includes("dockerfile: client-android-builder.Dockerfile"), "compose must reference Android builder Dockerfile inside deploy/docker");
 assert(compose.includes("NEXUSIM_CLIENT_ARTIFACTS_DIR"), "compose must expose artifact output directory override");
 assert(compose.includes("NEXUSIM_CLIENT_ARTIFACT_RUN_ID"), "compose must expose stable artifact run id");
 assert(compose.includes("build:android-apk:collect"), "compose must call APK build wrapper with artifact collector");

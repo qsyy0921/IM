@@ -5,8 +5,8 @@ services:
     profiles:
       - client-builders
     build:
-      context: ../..
-      dockerfile: deploy/docker/client-android-builder.Dockerfile
+      context: ../docker
+      dockerfile: client-android-builder.Dockerfile
     image: nexusim/client-android-builder:local
     working_dir: /workspace
     environment:

@@ -8,3 +8,10 @@ Current scope:
   WebSocket.
 - Durable facts are still verified through BFF `PullInbox` / `AckDelivery`.
 - Reports in this directory are not capacity or production SLO evidence.
+
+Reports:
+
+- `loadtest-report-20260621-client-web-bff-push-smoke.md`: first WIP smoke,
+  recorded with `git_dirty=true`.
+- `loadtest-report-20260621-client-web-bff-push-clean-baseline.md`: first clean
+  committed baseline for the browser MVP path.

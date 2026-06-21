@@ -45,8 +45,11 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   既有 secure mTLS demo。
 - 2026-06-21 已跑通第一轮本地 Web client -> BFF -> push smoke，归档见
   `docs/runbook/loadtest/client-platform/loadtest-report-20260621-client-web-bff-push-smoke.md`。
-  该报告记录 `git_dirty=true`，因此只能作为本轮 WIP 验证；提交后还需要重跑一次
-  clean baseline。
+  该报告记录 `git_dirty=true`，只能作为本轮 WIP 验证。
+- 2026-06-21 已在提交 `6069b45a` 上重跑 clean baseline，归档见
+  `docs/runbook/loadtest/client-platform/loadtest-report-20260621-client-web-bff-push-clean-baseline.md`；
+  summary 记录 `git_dirty=false`，覆盖 BFF login、push hello、BFF SendMessage、
+  `delivery.notify`、BFF PullInbox、BFF conversation list 和 BFF AckDelivery。
 - 真实业务语言选择：后端和 client BFF 继续使用 Go；浏览器、PC desktop 和
   Android 的共享协议 / 同步核心 / UI 使用 TypeScript；Tauri 的 Rust、Android
   Kotlin 只作为薄平台桥；Python 只用于 AI worker / eval / 离线工具，不进入
@@ -93,9 +96,7 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
 
 ## 下一步优先级
 
-1. 提交当前 client-platform WIP 前，重跑 `loadtest/clientweb/run-local-smoke.ps1`
-   形成 clean baseline；随后再按 172 wired LAN 地址重复 Web client -> BFF ->
-   push-gateway smoke。
+1. 按 172 wired LAN 地址重复 Web client -> BFF -> push-gateway smoke。
 2. 给 client BFF 补 HTTP 层 metrics / rate-limit adapter；当前 BFF 已复用
    gateway facade 鉴权，但 HTTP 请求没有进入 gRPC interceptor。
 3. 后续按同一 core 接 PC desktop Tauri runner 和 Android runtime shell。

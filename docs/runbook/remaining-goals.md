@@ -16,8 +16,8 @@
    surface 已落，`clients/web` 的真实 BFF fetch adapter、push WebSocket adapter
    和 IndexedDB local store 已接入；`loadtest/clientweb` 已提供脚本化 BFF + push
    client-path smoke runner 和本地私有启动脚本；第一轮本地 Web MVP smoke 已通过
-   并归档，但记录为 WIP dirty run。剩余：提交后重跑 clean baseline，重复 wired
-   LAN smoke，补 BFF HTTP-layer metrics / rate-limit adapter、接 PC desktop Tauri
+   并归档，提交后的 clean baseline 也已通过并归档。剩余：重复 wired LAN smoke，
+   补 BFF HTTP-layer metrics / rate-limit adapter、接 PC desktop Tauri
    runner 和 Android runtime shell，产出本地 Windows installer / unsigned APK；
    客户端只连 `api-gateway` / `push-gateway`，不能直连内部服务。`/api/auth/logout`
    仍等待 identity user self-session revoke 契约。

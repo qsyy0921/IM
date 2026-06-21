@@ -34,13 +34,14 @@ model-gateway / workflow / knowledge-ingestion / vector-index
   `ListWorkflowCompensationInstructions` 公开查询 API，按 workflow 返回低敏
   compensation instruction refs / version / status；不读 admin-service 私表。
 - `loadtest/workflow` 已新增 first-stage workflow operator CLI，通过 workflow-service
-  公开 gRPC 查询 compensation instruction metadata；它只输出低敏 refs / version /
-  status，不输出 payload / reason 原文。
+  公开 gRPC get workflow、record decision、查询 compensation instruction metadata；
+  它只输出低敏 refs / version / status，不输出 payload / reason 原文。
 
 ## 下一步优先级
 
 1. 继续 workflow compensation adapter / instruction approval UI / ops 管理；
-   当前已有本地 list CLI，后续可接审批 UI / external approval binding。
+   当前已有本地 workflow get / decision / instruction list CLI，后续可接审批 UI /
+   external approval binding。
 2. 继续明确其它下游公开 admin API adapter。
 3. 在镜像可用后补 vector-index focused pgvector smoke；后续再接 Milvus /
    OpenSearch backend、provider repair 和真 provider backfill smoke。

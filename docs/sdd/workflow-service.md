@@ -427,15 +427,17 @@ workflow-compensation-instruction-list
 workflow-outbox-repair
 ```
 
-第一版本地 compensation instruction list 入口：
+第一版本地 workflow operator 入口：
 
 ```powershell
+go run ./loadtest/workflow -mode get -workflow-id wf_123
+go run ./loadtest/workflow -mode record-decision -workflow-id wf_123 -step-id wfs_1 -decision APPROVE -decider-ref operator:a
 go run ./loadtest/workflow -mode list-compensation-instructions -workflow-id wf_123 -status ACTIVE
 ```
 
-该 CLI 只通过 workflow-service 公开 gRPC 查询低敏 instruction refs / version /
-status，不读 PostgreSQL 私表，不输出 instruction payload、reason 原文或 downstream
-response body。
+该 CLI 只通过 workflow-service 公开 gRPC get workflow、record decision 和查询
+低敏 instruction refs / version / status，不读 PostgreSQL 私表，不输出 workflow
+payload、instruction payload、reason 原文或 downstream response body。
 
 ## 18. 验收标准
 

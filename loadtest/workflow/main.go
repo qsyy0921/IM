@@ -27,6 +27,13 @@ type config struct {
 	traceID        string
 	requestID      string
 	workflowID     string
+	stepID         string
+	deciderRef     string
+	decision       string
+	decisionPolicy string
+	reasonRef      string
+	evidenceRefs   []string
+	idempotencyKey string
 	status         string
 	pageSize       int32
 }
@@ -37,8 +44,50 @@ type commandResult struct {
 	TenantID     string                       `json:"tenant_id"`
 	WorkflowID   string                       `json:"workflow_id"`
 	Status       string                       `json:"status,omitempty"`
-	Instructions []compensationInstructionRef `json:"instructions"`
+	Workflow     *workflowRef                 `json:"workflow,omitempty"`
+	Decision     *decisionRef                 `json:"decision,omitempty"`
+	Decisions    []decisionRef                `json:"decisions,omitempty"`
+	Instructions []compensationInstructionRef `json:"instructions,omitempty"`
+	Replayed     bool                         `json:"replayed,omitempty"`
 	CheckedAt    time.Time                    `json:"checked_at"`
+}
+
+type workflowRef struct {
+	WorkflowID            string   `json:"workflow_id"`
+	WorkflowType          string   `json:"workflow_type"`
+	RiskLevel             string   `json:"risk_level"`
+	RequesterRef          string   `json:"requester_ref,omitempty"`
+	RequesterService      string   `json:"requester_service,omitempty"`
+	TargetService         string   `json:"target_service,omitempty"`
+	TargetOperation       string   `json:"target_operation,omitempty"`
+	TargetRefHash         string   `json:"target_ref_hash,omitempty"`
+	PayloadSchemaVersion  string   `json:"payload_schema_version,omitempty"`
+	PayloadRefHash        string   `json:"payload_ref_hash,omitempty"`
+	ApprovalPolicyRef     string   `json:"approval_policy_ref,omitempty"`
+	TimeoutPolicyRef      string   `json:"timeout_policy_ref,omitempty"`
+	CompensationPolicyRef string   `json:"compensation_policy_ref,omitempty"`
+	ReasonRef             string   `json:"reason_ref,omitempty"`
+	EvidenceRefs          []string `json:"evidence_refs,omitempty"`
+	Status                string   `json:"status"`
+	CurrentStepID         string   `json:"current_step_id,omitempty"`
+	CorrelationID         string   `json:"correlation_id,omitempty"`
+	CausationID           string   `json:"causation_id,omitempty"`
+	TraceID               string   `json:"trace_id,omitempty"`
+	CreatedAtUnixMs       int64    `json:"created_at_unix_ms,omitempty"`
+	UpdatedAtUnixMs       int64    `json:"updated_at_unix_ms,omitempty"`
+	CompletedAtUnixMs     int64    `json:"completed_at_unix_ms,omitempty"`
+}
+
+type decisionRef struct {
+	DecisionID        string   `json:"decision_id"`
+	WorkflowID        string   `json:"workflow_id"`
+	StepID            string   `json:"step_id"`
+	DeciderRef        string   `json:"decider_ref"`
+	DecisionType      string   `json:"decision_type"`
+	DecisionPolicyRef string   `json:"decision_policy_ref,omitempty"`
+	ReasonRef         string   `json:"reason_ref,omitempty"`
+	EvidenceRefs      []string `json:"evidence_refs,omitempty"`
+	CreatedAtUnixMs   int64    `json:"created_at_unix_ms,omitempty"`
 }
 
 type compensationInstructionRef struct {
@@ -70,7 +119,7 @@ func main() {
 func parseFlags(args []string) config {
 	cfg := config{}
 	flags := flag.NewFlagSet("workflow-operator", flag.ExitOnError)
-	flags.StringVar(&cfg.mode, "mode", "list-compensation-instructions", "mode: list-compensation-instructions")
+	flags.StringVar(&cfg.mode, "mode", "get", "mode: get, record-decision, list-compensation-instructions")
 	flags.StringVar(&cfg.target, "target", envOr("NEXUSIM_WORKFLOW_GRPC_ADDR", "127.0.0.1:10750"), "workflow-service gRPC target")
 	flags.DurationVar(&cfg.requestTimeout, "request-timeout", 5*time.Second, "request timeout")
 	flags.StringVar(&cfg.tls.CAFile, "workflow-tls-ca-file", os.Getenv("NEXUSIM_WORKFLOW_TLS_CA_FILE"), "CA PEM for workflow-service gRPC TLS")
@@ -83,6 +132,14 @@ func parseFlags(args []string) config {
 	flags.StringVar(&cfg.traceID, "trace-id", "", "trace id")
 	flags.StringVar(&cfg.requestID, "request-id", "", "request id")
 	flags.StringVar(&cfg.workflowID, "workflow-id", "", "workflow id")
+	flags.StringVar(&cfg.stepID, "step-id", "", "workflow step id for record-decision")
+	flags.StringVar(&cfg.deciderRef, "decider-ref", "operator:workflow-cli", "low-sensitive decider ref for record-decision")
+	flags.StringVar(&cfg.decision, "decision", "APPROVE", "decision type for record-decision")
+	flags.StringVar(&cfg.decisionPolicy, "decision-policy-ref", "workflow.operator.cli.v1", "low-sensitive decision policy ref")
+	flags.StringVar(&cfg.reasonRef, "reason-ref", "reason:workflow-cli", "low-sensitive reason ref")
+	var evidenceRefs string
+	flags.StringVar(&evidenceRefs, "evidence-refs", "evidence:workflow-cli", "comma-separated low-sensitive evidence refs")
+	flags.StringVar(&cfg.idempotencyKey, "idempotency-key", "", "idempotency key for record-decision")
 	flags.StringVar(&cfg.status, "status", "", "optional instruction status filter")
 	var pageSize int
 	flags.IntVar(&pageSize, "page-size", 50, "list page size")
@@ -90,12 +147,22 @@ func parseFlags(args []string) config {
 	cfg.mode = strings.ToLower(strings.TrimSpace(cfg.mode))
 	cfg.status = strings.ToUpper(strings.TrimSpace(cfg.status))
 	cfg.workflowID = strings.TrimSpace(cfg.workflowID)
+	cfg.stepID = strings.TrimSpace(cfg.stepID)
+	cfg.deciderRef = strings.TrimSpace(cfg.deciderRef)
+	cfg.decision = strings.ToUpper(strings.TrimSpace(cfg.decision))
+	cfg.decisionPolicy = strings.TrimSpace(cfg.decisionPolicy)
+	cfg.reasonRef = strings.TrimSpace(cfg.reasonRef)
+	cfg.evidenceRefs = splitCSV(evidenceRefs)
+	cfg.idempotencyKey = strings.TrimSpace(cfg.idempotencyKey)
 	cfg.pageSize = int32(pageSize)
 	if cfg.requestID == "" {
 		cfg.requestID = "workflow-operator-" + cfg.mode
 	}
 	if cfg.traceID == "" {
 		cfg.traceID = cfg.requestID
+	}
+	if cfg.idempotencyKey == "" && cfg.mode == "record-decision" {
+		cfg.idempotencyKey = "decision:" + cfg.workflowID + ":" + cfg.stepID + ":" + cfg.decision + ":" + cfg.deciderRef
 	}
 	return cfg
 }
@@ -135,6 +202,40 @@ func execute(ctx context.Context, cfg config, client workflowv1.WorkflowServiceC
 		CheckedAt:  time.Now().UTC(),
 	}
 	switch cfg.mode {
+	case "get":
+		response, err := client.GetWorkflow(ctx, &workflowv1.GetWorkflowRequest{
+			AuthContext: authContext(cfg),
+			WorkflowId:  cfg.workflowID,
+		})
+		if err != nil {
+			return commandResult{}, fmt.Errorf("get workflow: %w", err)
+		}
+		result.Workflow = summarizeWorkflow(response.GetWorkflow())
+		for _, decision := range response.GetDecisions() {
+			result.Decisions = append(result.Decisions, summarizeDecision(decision))
+		}
+	case "record-decision":
+		response, err := client.RecordWorkflowDecision(ctx, &workflowv1.RecordWorkflowDecisionRequest{
+			AuthContext:       authContext(cfg),
+			WorkflowId:        cfg.workflowID,
+			StepId:            cfg.stepID,
+			DecisionType:      cfg.decision,
+			DeciderRef:        cfg.deciderRef,
+			DecisionPolicyRef: cfg.decisionPolicy,
+			ReasonRef:         cfg.reasonRef,
+			EvidenceRefs:      append([]string(nil), cfg.evidenceRefs...),
+			IdempotencyKey:    cfg.idempotencyKey,
+			CorrelationId:     cfg.requestID,
+			CausationId:       cfg.workflowID,
+			TraceId:           cfg.traceID,
+		})
+		if err != nil {
+			return commandResult{}, fmt.Errorf("record workflow decision: %w", err)
+		}
+		result.Workflow = summarizeWorkflow(response.GetWorkflow())
+		decision := summarizeDecision(response.GetDecision())
+		result.Decision = &decision
+		result.Replayed = response.GetReplayed()
 	case "list-compensation-instructions":
 		response, err := client.ListWorkflowCompensationInstructions(ctx, &workflowv1.ListWorkflowCompensationInstructionsRequest{
 			AuthContext: authContext(cfg),
@@ -167,10 +268,24 @@ func (cfg config) validate() error {
 	if strings.TrimSpace(cfg.workflowID) == "" {
 		return errors.New("workflow-id is required")
 	}
-	if cfg.mode != "list-compensation-instructions" {
+	if !isAllowedMode(cfg.mode) {
 		return fmt.Errorf("unsupported mode %q", cfg.mode)
 	}
-	if cfg.pageSize <= 0 {
+	if cfg.mode == "record-decision" {
+		if strings.TrimSpace(cfg.stepID) == "" {
+			return errors.New("step-id is required for record-decision")
+		}
+		if strings.TrimSpace(cfg.deciderRef) == "" {
+			return errors.New("decider-ref is required for record-decision")
+		}
+		if !isAllowedDecision(cfg.decision) {
+			return errors.New("decision must be APPROVE, REJECT, REQUEST_CHANGES, or CANCEL")
+		}
+		if strings.TrimSpace(cfg.idempotencyKey) == "" {
+			return errors.New("idempotency-key is required for record-decision")
+		}
+	}
+	if cfg.mode == "list-compensation-instructions" && cfg.pageSize <= 0 {
 		return errors.New("page-size must be greater than zero")
 	}
 	return nil
@@ -184,6 +299,54 @@ func authContext(cfg config) *workflowv1.AuthContext {
 		InstanceRef: cfg.instanceRef,
 		TraceId:     cfg.traceID,
 		RequestId:   cfg.requestID,
+	}
+}
+
+func summarizeWorkflow(workflow *workflowv1.Workflow) *workflowRef {
+	if workflow == nil {
+		return nil
+	}
+	return &workflowRef{
+		WorkflowID:            workflow.GetWorkflowId(),
+		WorkflowType:          workflow.GetWorkflowType(),
+		RiskLevel:             workflow.GetRiskLevel(),
+		RequesterRef:          workflow.GetRequesterRef(),
+		RequesterService:      workflow.GetRequesterService(),
+		TargetService:         workflow.GetTargetService(),
+		TargetOperation:       workflow.GetTargetOperation(),
+		TargetRefHash:         workflow.GetTargetRefHash(),
+		PayloadSchemaVersion:  workflow.GetPayloadSchemaVersion(),
+		PayloadRefHash:        workflow.GetPayloadRefHash(),
+		ApprovalPolicyRef:     workflow.GetApprovalPolicyRef(),
+		TimeoutPolicyRef:      workflow.GetTimeoutPolicyRef(),
+		CompensationPolicyRef: workflow.GetCompensationPolicyRef(),
+		ReasonRef:             workflow.GetReasonRef(),
+		EvidenceRefs:          append([]string(nil), workflow.GetEvidenceRefs()...),
+		Status:                workflow.GetStatus(),
+		CurrentStepID:         workflow.GetCurrentStepId(),
+		CorrelationID:         workflow.GetCorrelationId(),
+		CausationID:           workflow.GetCausationId(),
+		TraceID:               workflow.GetTraceId(),
+		CreatedAtUnixMs:       workflow.GetCreatedAtUnixMs(),
+		UpdatedAtUnixMs:       workflow.GetUpdatedAtUnixMs(),
+		CompletedAtUnixMs:     workflow.GetCompletedAtUnixMs(),
+	}
+}
+
+func summarizeDecision(decision *workflowv1.WorkflowDecision) decisionRef {
+	if decision == nil {
+		return decisionRef{}
+	}
+	return decisionRef{
+		DecisionID:        decision.GetDecisionId(),
+		WorkflowID:        decision.GetWorkflowId(),
+		StepID:            decision.GetStepId(),
+		DeciderRef:        decision.GetDeciderRef(),
+		DecisionType:      decision.GetDecisionType(),
+		DecisionPolicyRef: decision.GetDecisionPolicyRef(),
+		ReasonRef:         decision.GetReasonRef(),
+		EvidenceRefs:      append([]string(nil), decision.GetEvidenceRefs()...),
+		CreatedAtUnixMs:   decision.GetCreatedAtUnixMs(),
 	}
 }
 
@@ -208,6 +371,35 @@ func summarizeInstruction(instruction *workflowv1.WorkflowCompensationInstructio
 		CreatedAtUnixMs: instruction.GetCreatedAtUnixMs(),
 		UpdatedAtUnixMs: instruction.GetUpdatedAtUnixMs(),
 	}
+}
+
+func isAllowedMode(value string) bool {
+	return value == "get" ||
+		value == "record-decision" ||
+		value == "list-compensation-instructions"
+}
+
+func isAllowedDecision(value string) bool {
+	switch value {
+	case "APPROVE", "REJECT", "REQUEST_CHANGES", "CANCEL":
+		return true
+	default:
+		return false
+	}
+}
+
+func splitCSV(value string) []string {
+	seen := map[string]bool{}
+	result := []string{}
+	for _, item := range strings.Split(value, ",") {
+		item = strings.TrimSpace(item)
+		if item == "" || seen[item] {
+			continue
+		}
+		seen[item] = true
+		result = append(result, item)
+	}
+	return result
 }
 
 func envOr(key string, fallback string) string {

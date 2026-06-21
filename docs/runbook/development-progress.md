@@ -108,8 +108,8 @@
   `compensation-instruction-import` 可导入 / replay 低敏 rollback instruction，并要求
   DB instruction 绑定具体已批准 / 待补偿 `COMPENSATION_REQUEST` workflow；既有
   `ListWorkflowCompensationInstructions` 已提供按 workflow 的低敏 instruction refs /
-  version / status 查询 API，`loadtest/workflow` 已提供 first-stage 本地 list
-  operator CLI，给 operator UI / ops 管理后续接入；
+  version / status 查询 API，`loadtest/workflow` 已提供 first-stage 本地 get /
+  record-decision / instruction-list operator CLI，给 operator UI / ops 管理后续接入；
   workflow 第一路径已通过完整 `check-local`，本 worker / executor / registry 切片按
   风险分层用 focused checks 收口；不宣称 timer worker、多 adapter compensation
   platform、provider-grade instruction UI / external approval binding、external

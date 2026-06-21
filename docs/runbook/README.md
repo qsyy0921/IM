@@ -6,6 +6,9 @@
 
 - 当前用户明确切入 client platform MVP foundation：Web-first 客户端架构、client
   BFF 契约、可复用 `protocol` / `client-core` 和局域网 Web MVP。
+- 长期完整架构以 `../architecture/target-architecture-complete.md` 为准；
+  业务平台、数据平台、AI / Agent 平台、客户端平台和中间件平台的新开发都要按该文档
+  的边界推进，不把服务数量、中间件产品或部署形态写死。
 - AI 大模型应用底座仍是后续主线：group memory、EvidencePack、RAG、summary、
   Agent、skill registry、MCP/tool gateway、action-executor、approval/audit 和
   ai-eval。
@@ -28,6 +31,8 @@
 - 开发进度总览：`development-progress.md`
 - 剩余目标 / P2 backlog：`remaining-goals.md`
 - 开发过程与阶段顺序：`development-process.md`
+- 完整目标架构：`../architecture/target-architecture-complete.md`
+- 中间件能力目录：`../platform/middleware-catalog.md`
 - 服务设计：`../sdd/<service>.md`
 - smoke / 压测证据：`loadtest/<service>/`
 - 本地分布式 / Docker / 观测 / 压测：`distributed-local.md`、`mac-arm64-docker-images.md`、`observability-local.md`、`local-loadtest.md`

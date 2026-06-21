@@ -4,11 +4,18 @@ NexusIM 是面向企业协同场景的分布式 IM + AI 协作平台。当前仓
 
 ```text
 本地 / 双机可运行的分布式 IM 后端
+-> Web / PC / Android client platform first slice
 -> group memory / EvidencePack / RAG / summary / Agent 应用底座
 -> skill registry / MCP gateway / action executor / proposal approval / audit
+-> 完整目标架构：业务平台 + 数据平台 + AI / Agent 平台 + 中间件平台
 ```
 
 GitHub 首页只放当前总览。每轮 Codex 继续开发时，目标框只复制 [prompt.md](prompt.md) 中的短 Prompt；具体进度入口看 [agent.md](agent.md)、[current-brief.md](docs/runbook/current-brief.md) 和 [remaining-goals.md](docs/runbook/remaining-goals.md)。
+
+长期完整架构以 [target-architecture-complete.md](docs/architecture/target-architecture-complete.md)
+为准。后续新增业务服务、数据平台服务、AI / Agent 服务或中间件时，都要按这份蓝图的
+所有权、事件、数据、安全和演进规则推进；中间件能力登记见
+[middleware-catalog.md](docs/platform/middleware-catalog.md)。
 
 ## 当前状态
 
@@ -48,8 +55,9 @@ GitHub 首页只放当前总览。每轮 Codex 继续开发时，目标框只复
 | `clients/` | Browser / PC / Android client platform first slice：`protocol`、`client-core`、Web shell、PC desktop shell contract 和 Android runtime contract 已建立并通过 focused validation；`api-gateway` client BFF first-stage HTTP/JSON surface 已落；Web BFF fetch / push WebSocket / IndexedDB local store adapters 已接；客户端只连 `api-gateway` / `push-gateway`，PullInbox 是消息事实源，WebSocket 只做在线唤醒。 |
 
 当前默认主线不是继续泛化清理 9 服务 P2 backlog，而是先推进客户端平台 MVP：
-Web client -> `api-gateway` client BFF -> `push-gateway` WebSocket 的局域网 smoke，
-然后复用同一 core 接 Windows PC 和 Android。AI 大模型应用底座作为后续主线保留：
+Web client -> `api-gateway` client BFF -> `push-gateway` WebSocket 的本地 / 局域网
+smoke 已通过，下一步复用同一 core 接 Windows PC 和 Android。AI 大模型应用底座
+作为后续主线保留：
 
 ```text
 group memory
@@ -101,7 +109,9 @@ group memory
 | [docs/runbook/remaining-goals.md](docs/runbook/remaining-goals.md) | 只记录还没有完成的工作。 |
 | [docs/runbook/service-briefs/README.md](docs/runbook/service-briefs/README.md) | 服务 brief 索引。 |
 | [docs/architecture/target-architecture.md](docs/architecture/target-architecture.md) | 总体目标架构。 |
+| [docs/architecture/target-architecture-complete.md](docs/architecture/target-architecture-complete.md) | 完整目标架构蓝图：业务平台、数据平台、AI / Agent 平台、中间件平台和演进路线。 |
 | [docs/architecture/target-architecture-ai.md](docs/architecture/target-architecture-ai.md) | AI / RAG / Agent 目标架构。 |
+| [docs/platform/middleware-catalog.md](docs/platform/middleware-catalog.md) | 中间件能力分类、runtime profile 和引入规则。 |
 | [docs/runbook/ai-eval/README.md](docs/runbook/ai-eval/README.md) | AI eval case schema、adapter 和运行入口。 |
 
 ## 六层 DDD 约束
@@ -202,9 +212,10 @@ python -m mypy nexusim_ai_common scripts tests
 - 统一生产观测平台、Alertmanager 路由、日志汇聚、SLO 和长期 retention。
 - provider-grade OIDC / KMS / HSM / email / SMS / WebAuthn / complete risk engine。
 - provider-grade ReBAC DSL、外部 audit sink、运维 UI、批量 repair 审批系统。
-- 完整 Web / App / 桌面客户端；当前已启动 Web-first client platform first slice，
-  且 `api-gateway` client BFF first-stage surface 和 Web adapters first path 已落，
-  但还缺局域网 Web MVP smoke、Windows installer 和 Android APK。
+- 完整 Web / App / 桌面客户端；当前 Web-first client platform first slice、
+  `api-gateway` client BFF first-stage surface、Web adapters first path、本地 /
+  wired LAN smoke 和 BFF HTTP metrics / rate-limit adapter 已落，但还缺 Windows
+  installer 和 Android APK。
 - 完整 media / notification / admin / audit 等产品化平台服务。
 
 当前最准确表述：

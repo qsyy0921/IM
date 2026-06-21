@@ -22,7 +22,7 @@ from them is needed.
 | Repair / DLQ / operator | `docs/runbook/repair-operators.md`, service brief | same |
 | Distributed smoke / fault evidence | relevant runbook README and exact report path | new report or summary only |
 | Interview narrative | `docs/interview/project-progress.md` | same |
-| Architecture / service split | `docs/architecture/target-architecture.md` | architecture doc or ADR |
+| Architecture / service split | `docs/architecture/target-architecture.md`, then `docs/architecture/target-architecture-complete.md` | architecture doc or ADR |
 | Middleware / platform capability | `docs/platform/middleware-catalog.md` | same; add ADR for active adoption |
 
 Keep entrance docs short. Do not copy the same status into every file.
@@ -49,6 +49,11 @@ block the active slice.
 Existing real services: `api-gateway`, `identity-service`, `message-service`,
 `conversation-service`, `delivery-service`, `push-gateway`, `receipt-service`,
 `contacts-service`, and `policy-service`.
+
+The long-term architecture baseline is `docs/architecture/target-architecture-complete.md`.
+New business-platform, data-platform, AI / Agent-platform, client-platform and
+middleware-platform work must follow that document's ownership, event, data,
+security and evolution rules.
 
 AI foundation services already landed enough first paths to act as a usable
 base: search, memory, retrieval, RAG, summary, agent, skill-registry,

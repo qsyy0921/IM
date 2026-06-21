@@ -220,7 +220,8 @@ future platform / product services promotion 已作为后续主线保留：继�
 
 当前可以采用 multi sub-agent 方式加快后续 AI 底座开发，但只允许拆分互不重叠的服务、文档或验证范围；主 agent 保持最终方案、集成和检查责任。
 
-当前面试主线只覆盖：
+当前面试叙述优先覆盖后端、分布式可靠性和 AI / Agent 应用后端；客户端平台作为
+产品化展示层和端到端验证入口按需补充，不替代主线：
 
 ```text
 后端微服务主链路
@@ -398,14 +399,14 @@ Web / App / 桌面端属于后续产品化展示层，暂不纳入当前开发�
 
 ```text
 前 9 个微服务已经能跑通 IM 主链路，
-现在处于“Go 底座已支撑 AI 算法/eval，正式推进 collaborative-memory 算法切片”，
-search-service v0.1 第一实现切片已继续推进到 PG repository / SearchMessages / grpc runtime / timeline consumer，并已跑通 clean projection smoke；
-memory-service 已从 contract 切到 foundation-active implementation 并跑通 clean projection smoke；
-retrieval-gateway / EvidencePack 第一轮真实 smoke、policy precheck、EvidencePack 字段 hardening 和 cross-group / temporal retrieval smoke 已落；
-rag-service / summary-service / agent-service 已落 first path、真实 adapter smoke 和 Python worker candidate guard；
-skill-registry、mcp-gateway、action-executor 和 ai-eval-service 已形成 Agent controlled execution / eval first-stage 闭环；
-external MCP fallback、guarded external HTTP provider、tool output safety、profile / Agent output safety、RAG / Summary citation regression、Agent output regression、action preflight / rate-limit / DLQ-repair safety eval、action provider failure worker / redrive safety eval、memory group fixture eval、current-memory service-stack live gate、cross-group / temporal memory fixture eval、retrieval smoke、RAG / Summary / Agent stack consumption smoke 和 optional stack gate 已落；
-后续继续扩展低敏 collaborative-memory 算法/eval，优先 multi-hop / temporal update / profile aggregation 边界。
+AI foundation 已形成 search / memory / retrieval / RAG / summary / Agent / skill /
+MCP / action-executor / ai-eval first-stage 闭环，
+future platform / product services 已进入 product-active first-stage implementation，
+当前 active slice 是 client platform MVP foundation：
+浏览器 Web first path、api-gateway client BFF、push path、本地和 wired 172 clean
+baseline 已通过，下一步接 PC / Android runtime。
+长期后续按完整目标架构推进业务平台、数据平台、AI / Agent 平台、客户端平台和中间件平台；
+后续 AI 继续扩展低敏 collaborative-memory 算法/eval，优先 multi-hop / temporal update / profile aggregation 边界。
 短期生产级测试、完整 HA、长压和 sizing 不再作为当前转进阻塞，但仍留在 hardening backlog。
 ```
 

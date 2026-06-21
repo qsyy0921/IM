@@ -29,5 +29,7 @@
 ## 变更规则
 
 - 不允许在 `add.md` 或 `tadd.md` 中引入与 `target-architecture.md`、ADR、SDD 或 runbook 冲突的新决策。
+- 完整扩展后的新服务、中间件、客户端和 AI / Agent 能力，优先对齐
+  `target-architecture-complete.md`；短索引只负责路由，不重复维护长内容。
 - 服务级细节优先写入 `docs/sdd/`，不要继续塞回总架构。
 - 接口、事件和数据库结构必须落到 `api/`、`schemas/`、`migrations/`，不能只停留在文档描述。

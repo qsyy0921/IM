@@ -6,7 +6,9 @@
 
 - 核心不变量、服务边界、演进原则保留，但不把服务数量、中间件和部署形态写死。
 - 服务级设计继续进入 `docs/sdd/`；接口、事件和 migration 继续落到 `api/`、`schemas/`、`migrations/`。
-- 短期阶段不以生产级 HA、全量压测、混沌和跨 Region 验证作为继续推进的阻塞；当前 9 个 IM 后端服务已作为可运行底座，AI 大模型应用底座已进入 collaborative-memory 算法/eval 切片。
+- 短期阶段不以生产级 HA、全量压测、混沌和跨 Region 验证作为继续推进的阻塞；
+  当前 9 个 IM 后端服务已作为可运行底座，AI 大模型应用底座已形成 first-stage
+  闭环，当前工程切片按 `current-goal.md` 推进客户端平台 MVP foundation。
 - 新服务或替换中间件必须说明兼容、迁移、回滚和验证证据，并通过 ADR。
 
 ## 阅读路由
@@ -33,7 +35,8 @@
 - 总架构只写跨服务不变量、边界和演进准则。
 - 服务级实现细节不重新堆回总架构。
 - Codex 每轮执行目标不写在架构文档里，统一读取 `../runbook/current-goal.md`。
-- 当前 9 个已实现服务作为 AI 主线可运行基础；生产级测试和 HA 证据作为后续加固项，不阻塞 AI 算法/eval。
+- 当前 9 个已实现服务作为 IM / AI / 客户端平台可运行基础；生产级测试和 HA
+  证据作为后续加固项，不阻塞当前短线切片。
 - AI 底座演进顺序为 `search-service -> memory-service -> retrieval-gateway -> rag-service / summary-service -> agent-service -> skill-registry / mcp-gateway -> action-executor -> ai-eval-service`；当前第一组 foundation-active 已形成 EvidencePack、proposal / approval / audit、Python Worker 候选边界和 40/40 optional stack gate，后续默认推进 collaborative-memory 算法/eval。
 - 后续服务和中间件都不是写死终局；新增必须符合独立数据模型、独立伸缩、独立故障、独立安全边界之一，或显著降低复杂度，并通过 ADR 和证据演进。
 - 中间件作为平台能力管理，登记和引入规则见 `../platform/middleware-catalog.md`；运行编排放 `deploy/`，服务代码只放 adapter。

@@ -8,6 +8,7 @@
 - 新发现待办追加到本文件；已完成后移除或改写为后续项。
 - 不记录已完成证据，不写长历史，不替代 SDD / ADR。
 - 当前 active slice：client platform MVP foundation。
+- 长期完整架构基线：`docs/architecture/target-architecture-complete.md`。
 - 生产级 HA、长压、sizing 和完整系统测试暂不作为当前阻塞。
 
 ## 当前未完成重点
@@ -38,6 +39,8 @@ Active AI foundation backlog 覆盖：`action-executor`、`agent-service`、
 
 ## 平台能力 / 中间件待办
 
+- 新增服务、数据平台能力、AI / Agent 能力或中间件前，先确认是否符合完整架构的
+  service split / data ownership / security / event boundary；不符合时先补 ADR / SDD。
 - 后续新增中间件前，先按 `docs/platform/middleware-catalog.md` 登记 capability、
   source-of-truth 语义、依赖服务、runtime profile、健康检查、最小 smoke、替换 /
   迁移策略和安全边界。

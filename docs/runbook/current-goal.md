@@ -72,6 +72,8 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   是在线唤醒。
 - v0.1 SDD 见 `docs/sdd/client-platform.md`，短 brief 见
   `docs/runbook/client-platform.md`。
+- 长期完整架构以 `docs/architecture/target-architecture-complete.md` 为准；客户端、
+  业务平台、数据平台、AI / Agent 平台和中间件平台的后续开发必须对齐该文档的边界。
 - 10 个目标服务的 SDD v0.1 draft 已存在，组合 promotion 边界见
   `docs/sdd/future-platform-services.md`。
 - 10 个目标服务均已进入 product-active first-stage implementation。
@@ -142,6 +144,8 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
 ## 文档路由
 
 - 当前阶段背景：`docs/runbook/current-brief.md`
+- 长期完整架构：`docs/architecture/target-architecture-complete.md`
+- 中间件能力目录：`docs/platform/middleware-catalog.md`
 - 剩余待办：`docs/runbook/remaining-goals.md`
 - 服务入口：`docs/runbook/service-briefs/<service>.md`
 - 总览：`docs/runbook/development-progress.md`

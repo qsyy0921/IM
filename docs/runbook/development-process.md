@@ -24,8 +24,9 @@ NexusIM 的开发顺序不是“先把所有功能铺开”，而是：
 -> 建 search / memory / retrieval / EvidencePack
 -> 建 RAG / summary / Agent / skill-registry / mcp-gateway / action-executor / Python AI Worker
 -> 进入 collaborative-memory 算法/eval
+-> 建 client platform MVP foundation，让 Web / PC / Android 复用协议和同步核心
+-> 按完整目标架构继续补业务平台、数据平台、AI / Agent 平台和中间件平台
 -> 分布式可靠性和生产级完整测试按风险持续补强
--> 最后按需要做客户端和产品化展示
 ```
 
 核心原则：
@@ -35,9 +36,10 @@ NexusIM 的开发顺序不是“先把所有功能铺开”，而是：
 3. 不在基础链路没收稳前同时铺太多新服务。
 4. 功能能跑不等于阶段完成，必须有 smoke / audit / repair / hardening 证据。
 5. 代码复杂度要持续治理，不能把单个核心文件继续堆成大文件。
-6. 当前面试主线只覆盖后端、分布式可靠性和 AI 应用后端；客户端暂不作为当前开发主线。
-7. 短期转进 AI 大模型应用后端不以生产级完整系统测试或生产级 HA 为阻塞，但当前切片仍必须有本地检查、最小 smoke 或等价证据。
+6. 当前工程主线以 `current-goal.md` 为准；面试叙述仍优先强调后端、分布式可靠性和 AI 应用后端，客户端作为产品化展示层按需讲。
+7. 短期转进客户端、AI 大模型应用或产品平台服务不以生产级完整系统测试或生产级 HA 为阻塞，但当前切片仍必须有本地检查、最小 smoke 或等价证据。
 8. 可以使用 multi sub-agent 并行开发，但只能拆分互不重叠的服务、文档或测试面；主 agent 负责集成、最终验证和关闭 stale agents。
+9. 长期完整架构以 `docs/architecture/target-architecture-complete.md` 为准；新增服务、中间件和客户端能力必须按该文档的边界和 ADR / SDD 规则演进。
 
 ## 1. 第一阶段：最小 IM 主链路
 
@@ -107,7 +109,7 @@ NexusIM 的开发顺序不是“先把所有功能铺开”，而是：
 - 关键文档、service brief、runbook 已经稳定
 - 不要求生产级完整系统测试或生产级 HA 全部完成后才启动 `search-service` v0.1
 
-当前阶段已经完成到可支撑 AI 算法切片；后续只在阻塞 AI 主线时回补九服务收口。
+当前阶段已经完成到可支撑 AI 算法切片和客户端平台 first slice；后续只在阻塞当前 client / AI / 产品平台主线时回补九服务收口。
 
 当前执行规则：
 
@@ -279,20 +281,20 @@ NexusIM 的开发顺序不是“先把所有功能铺开”，而是：
 - `knowledge-ingestion-service`
 - `vector-index-service`
 
-## 8. 暂不纳入当前面试主线：客户端
+## 8. 客户端平台 first slice
 
 ```text
-Web / App / 桌面端是后续产品化展示层，
-不是当前后端开发和面试主线。
+Web / PC / Android 是当前产品化展示层切片，
+但不能变成临时 demo 或绕过后端事实源。
 ```
 
-进入客户端主线前，后端至少要做到：
+客户端平台必须遵守：
 
-- 主链路稳定；
-- 鉴权边界稳定；
-- 投递 / ACK / notify 契约稳定；
-- search / RAG 后端边界清楚；
-- 不再频繁改核心 API 语义。
+- 只连接 `api-gateway` 和 `push-gateway`；
+- PullInbox 是消息事实源，WebSocket 只做在线唤醒；
+- 浏览器、PC、Android 复用 `protocol` / `client-core`；
+- PC / Android 先保留 runtime / packaging 边界，逐步补 installer / APK；
+- 客户端本地存储只做缓存和离线队列，不成为服务端事实源。
 
 ## 9. 阶段切换规则
 
@@ -303,6 +305,7 @@ Web / App / 桌面端是后续产品化展示层，
 3. P2 hardening 不要求全部为零，但不能继续失控积压。
 4. 文档、runbook、service brief 能准确描述当前事实。
 5. 对 `search-service` v0.1 这类 AI 后端转进切片，生产级完整系统测试和生产级 HA 不作为硬门槛；本地检查、最小 smoke、权限过滤和证据边界必须闭环。
+6. 对客户端平台切片，至少需要 focused typecheck / build / BFF + push smoke 或等价证据；不要求立即产出三端生产安装包。
 
 什么时候不能切下一阶段：
 
@@ -319,12 +322,14 @@ Web / App / 桌面端是后续产品化展示层，
 保留 9 个 IM 服务作为可运行底座
 -> 在已落 search / memory / retrieval / RAG / summary / Agent / tool / eval 链路上
    扩展 collaborative-memory 算法/eval
--> 生产级 HA、生产级完整系统测试和客户端产品化继续后置
--> 后续再按需要补 media / notification / audit / admin / 客户端
+-> 当前推进 client platform MVP foundation，先让 Web / PC / Android 共享协议和同步核心
+-> 按完整架构继续补 media / notification / audit / admin / control-plane / presence /
+   data-platform / AI-runtime / middleware profile 等产品和平台能力
+-> 生产级 HA、生产级完整系统测试、长压和 sizing 继续按风险后置
 ```
 
 这条顺序的关键点只有一个：
 
 ```text
-先用低敏 eval 把 AI 会依赖的数据、权限、证据和审计边界证明清楚，再迭代算法；短期不等待生产级完整系统测试全部完成。
+不要为了追求终局形态一次性铺开所有能力；每一层都先跑通最小真实链路，再按完整目标架构补产品化、平台化和生产化证据。
 ```

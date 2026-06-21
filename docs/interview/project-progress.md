@@ -5,13 +5,13 @@
 - 已经开发了哪些后端能力；
 - 当前系统能证明什么；
 - 还差哪些生产化和产品化能力；
-- 当前如何从 Go 微服务底座进入搜索、记忆、检索和大模型算法/eval。
+- 当前如何从 Go 微服务底座进入搜索、记忆、检索、大模型算法/eval、Agent 和客户端产品化 first slice。
 
 它不是每轮 Codex 工作入口，也不是工程待办来源；每轮工作仍先看 `docs/runbook/current-brief.md`，当前未完成工作以 `docs/runbook/remaining-goals.md` 为准。
 
 ## 项目定位
 
-NexusIM 是一个以 Go 微服务为主的分布式 IM 后端项目。当前目标不是做一个简单聊天 demo，而是逐步实现：
+NexusIM 是一个以 Go 微服务为主的分布式 IM + AI 应用平台项目。当前目标不是做一个简单聊天 demo，而是逐步实现：
 
 ```text
 身份认证
@@ -23,16 +23,21 @@ NexusIM 是一个以 Go 微服务为主的分布式 IM 后端项目。当前目�
 -> ACK / 回执 / 联系人 / 策略权限
 -> search-service v0.1
 -> memory / retrieval / RAG / summary / Agent / skill-registry / MCP gateway / action-executor
+-> Web / PC / Android client platform MVP
+-> 业务平台 / 数据平台 / AI Agent 平台 / 中间件平台的完整目标架构
 ```
 
 语言和运行时边界：生产后端控制面继续以 Go 为主；Python 后续只作为 AI Worker
 层，用于 LLM、embedding、rerank、memory extraction、planner prototype 和 eval
-candidate，不直接写 IM 业务库，不绕过 policy / approval / audit。
+candidate，不直接写 IM 业务库，不绕过 policy / approval / audit。浏览器、PC
+desktop 和 Android 的共享协议、同步核心和 UI 使用 TypeScript；Rust / Kotlin 只做
+薄平台 bridge。
 
 当前可以准确表述为：
 
 ```text
-本地 / 双机可运行的最小分布式 IM 后端。
+本地 / 双机可运行的分布式 IM 后端 + AI / Agent 应用底座 +
+Web-first 客户端平台 first slice。
 ```
 
 不能过度表述为：
@@ -51,16 +56,20 @@ candidate，不直接写 IM 业务库，不绕过 policy / approval / audit。
 第三阶段：补 delivery-service 和 push-gateway，把 durable inbox、PullInbox、AckDelivery、在线通知和跨实例 route 串起来。
 第四阶段：补 receipt-service、contacts-service、policy-service 和 api-gateway，把已读/未读、联系人、权限决策和统一入口补齐。
 第五阶段：集中治理分布式可靠性、安全启动门禁、trusted metadata / TLS 边界、repair / audit / cleanup、debug metrics 和代码复杂度。
-第六阶段：search / memory / retrieval / RAG / summary / Agent / skill-registry / MCP gateway / action-executor / ai-eval first paths 已落，EvidencePack、proposal / approval / audit、Python AI Worker 候选边界和 40/40 optional stack gate 已验证；当前正式进入 collaborative-memory 算法/eval，优先 multi-hop、temporal update 和 profile aggregation。
+第六阶段：search / memory / retrieval / RAG / summary / Agent / skill-registry / MCP gateway / action-executor / ai-eval first paths 已落，EvidencePack、proposal / approval / audit、Python AI Worker 候选边界和 optional stack gate 已验证。
+第七阶段：按完整目标架构补 product-active 平台服务和 client platform MVP foundation；Web first path、client BFF、push path、本地 / wired smoke 已通过，下一步接 PC / Android runtime。
 ```
 
-当前项目已经进入第六阶段的算法/eval 切片：
+当前项目已经进入“完整架构同步后的产品化 + AI 应用底座”阶段：
 
 ```text
 9 个后端服务已经能跑通主链路，并作为 AI 主线的 Go 底座；
 短期不以生产级完整系统测试或生产级 HA 作为算法/eval 前置阻塞，验证重点放在低敏 cases、EvidencePack、权限过滤、source refs、时间版本和审计边界；
 search / memory / retrieval / RAG / summary / Agent / skill / MCP / executor / ai-eval first paths 已落，RAG / Summary / Agent stack 已通过 cross-group / temporal optional gate；
-后续按 low-sensitive collaborative-memory 算法/eval 推进，优先 multi-hop / temporal update / profile aggregation；
+future platform / product services 已进入 product-active first-stage implementation；
+client platform MVP foundation 已启动：Web first path、api-gateway client BFF、push path、本地和 wired 172 clean baseline 已通过，下一步接 PC / Android runtime；
+完整目标架构以 docs/architecture/target-architecture-complete.md 为基线，后续按业务平台、数据平台、AI / Agent 平台、客户端平台和中间件平台演进；
+后续 AI 按 low-sensitive collaborative-memory 算法/eval 推进，优先 multi-hop / temporal update / profile aggregation；
 api-gateway 已补 first-stage tenant-scoped rate limit、静态 tenant plan override、tenant plan 文件热更新、版本化 quota URL source、DB-backed tenant plan snapshot source、本地 tenant quota audit / set operator、tenant quota approval manifest 强制校验、URL bearer token / HTTPS guard、URL source CA / client cert TLS 边界、可选 checksum-required gate、applied quota snapshot stale 观测和 quota snapshot gate；
 api-gateway 已补 legacy/facade traffic metrics，以及 legacy observation-window / removal-plan 低敏 evidence manifest，用于旧 descriptor 迁移观察和归档；
 legacy descriptor 已收敛为显式 opt-in 默认；
@@ -69,7 +78,7 @@ api-gateway 已补 first-stage OpenTelemetry 入口 server span 和下游 gRPC c
 本地 OTel collector debug 入口和 policy OTLP smoke 脚本已补，可用于面试演示 OTLP trace 链路，但还不是生产告警平台；
 search-service v0.1 / group memory / retrieval / RAG / summary / Agent / skill / MCP / action-executor / ai-eval 已分别完成 first path、smoke 或 eval gate；当前 Go 底座已足够支撑算法切片，下一步进入 low-sensitive collaborative-memory 算法/eval；
 后续开发可以使用 multi sub-agent 并行推进，但以服务 / 文档 / 测试面拆分，最终由主 agent 统一集成和验证；
-客户端暂不纳入当前面试主线。
+面试叙述仍优先强调后端、分布式和 AI / Agent；客户端作为产品化展示层和端到端验证入口按需讲。
 ```
 
 ## 已完成的后端服务
@@ -163,14 +172,17 @@ search-service v0.1 / group memory / retrieval / RAG / summary / Agent / skill /
 
 这里按面试表达分层。当前没有已知 P0 / P1 阻塞；下面主要是还没完成的产品能力、生产化能力和大模型应用能力。
 
-### 当前：AI 大模型应用底座算法/eval
+### 当前：客户端平台 first slice + AI / Agent 底座继续演进
 
-当前 9 个服务作为 Go 底座，默认只回补阻塞 AI 主线的 P0/P1；不以生产级完整系统测试或生产级 HA 作为算法/eval 阻塞：
+当前 9 个服务作为 Go 底座，默认只回补阻塞 client / AI / product platform 主线的
+P0/P1；不以生产级完整系统测试或生产级 HA 作为当前切片阻塞：
 
 统一推进顺序：
 
-1. 扩展 low-sensitive collaborative-memory eval cases。
-2. 优先 multi-hop / temporal update / profile aggregation。
+1. 当前先完成 client platform MVP foundation：Web -> PC -> Android，共用
+   `protocol` / `client-core`，客户端只连 `api-gateway` / `push-gateway`。
+2. AI 继续扩展 low-sensitive collaborative-memory eval cases，优先 multi-hop /
+   temporal update / profile aggregation。
 3. 让 Python AI Worker 输出算法候选，Go 继续做权限、状态、审批、审计和 eval。
 4. 保持 EvidencePack、source refs、visibility、review state 和 proposal / approval / audit 不回退。
 5. 生产级完整系统测试和生产级 HA 深水区继续后置。
@@ -187,9 +199,11 @@ search-service v0.1 / group memory / retrieval / RAG / summary / Agent / skill /
 | `contacts-service` | 收紧联系人隐私、字段级 profile visibility、联系人搜索、分组和来源审批对 memory / profile projection / retrieval 的影响；组织级策略和 admin/config 正式权限面归入后续平台能力 |
 | `policy-service` | first-stage tool policy precheck 已落地；继续收紧 decision_source、relationship gate、contacts projection 和 decision audit 对 retrieval / Agent 的可解释权限边界；provider-grade ReBAC graph / DSL、moderation / risk scoring、tool policy operator / approval integration 和外部 audit pipeline 归入后置 hardening |
 
-### 下一阶段：AI 大模型应用底座
+### AI 大模型应用底座
 
-AI 能力先按依赖逐步进入。`search-service` / group memory / retrieval 是前置基础，先把搜索、可见性、证据和版本语义做好，再进入 RAG 和 Agent。服务数量不写死，只有满足独立数据模型、独立伸缩需求、独立故障边界或能明显降低现有服务复杂度时才拆。
+AI 能力按依赖逐步进入。`search-service` / group memory / retrieval 是前置基础，
+先把搜索、可见性、证据和版本语义做好，再进入 RAG 和 Agent。服务数量不写死，
+只有满足独立数据模型、独立伸缩需求、独立故障边界或能明显降低现有服务复杂度时才拆。
 
 | 待开发服务 / 能力 | 目标 |
 | --- | --- |
@@ -206,9 +220,9 @@ AI 能力先按依赖逐步进入。`search-service` / group memory / retrieval 
 | evidence pack | AI 输出必须携带 source message id、conversation seq、conversation id |
 | Agent 写动作链路 | Proposal -> Approval -> Executor -> Audit，避免 Agent 直接改业务事实 |
 
-### 后续：完整 IM 产品后端
+### 后续：完整 IM 产品和平台服务
 
-产品级后端按边界拆分，不阻塞 search / memory / retrieval 的第一阶段实现。
+产品级后端按完整目标架构拆分，不阻塞当前 client platform MVP 或 AI 底座继续推进。
 
 | 待开发服务 / 能力 | 目标 |
 | --- | --- |
@@ -237,17 +251,19 @@ AI 能力先按依赖逐步进入。`search-service` / group memory / retrieval 
 - 灰度发布、部署编排、配置治理；
 - 运维 UI / repair approval workflow。
 
-## 当前不纳入面试主线
+## 客户端和产品化展示
 
-Web / App / 桌面端属于后续产品化展示层，不作为当前面试文档重点。
+Web / PC / Android 已进入当前工程切片；面试时是否重点讲，取决于岗位侧重点。
+如果岗位偏后端 / 大模型应用，客户端只作为端到端展示入口简述即可。
 
-面试时只讲下面四类能力：
+面试时优先讲下面能力：
 
 ```text
 后端微服务主链路；
 分布式可靠性；
 安全、观测、repair 和运维 hardening；
-search / RAG / Agent 后端能力。
+search / memory / retrieval / RAG / Agent 后端能力；
+完整目标架构下的业务平台、数据平台、AI / Agent 平台和中间件平台边界。
 ```
 
 ## 当前开发阶段
@@ -255,16 +271,20 @@ search / RAG / Agent 后端能力。
 当前阶段是：
 
 ```text
-Go 微服务底座已支撑 AI 算法/eval，当前推进 collaborative-memory。
+Go 微服务底座已支撑 AI / Agent 和客户端平台 first slice；
+当前推进 client platform MVP foundation，同时保持 collaborative-memory 算法/eval
+和完整目标架构作为后续主线。
 ```
 
 短期优先级：
 
-1. 扩展 multi-hop / temporal update / profile aggregation 低敏 cases；
-2. 做 memory extraction / rerank / planner / eval 候选算法；
-3. 保持 RAG / Summary / Agent 只消费 EvidencePack；
-4. 保持真实写动作必须走 policy、proposal / approval、executor 和 audit；
-5. 控制代码复杂度，避免核心文件继续变大。
+1. client platform：接 PC desktop Tauri runner 和 Android runtime shell；
+2. AI / Agent：继续扩展 collaborative-memory eval，优先 multi-hop / temporal
+   update / profile aggregation；
+3. 平台服务：按完整架构推进 product-active 服务的 worker / relay / provider
+   adapter / smoke；
+4. 对 9 个既有服务只回补阻塞 client / AI / product platform 主线的 P0/P1；
+5. 生产级完整系统测试、长压和 sizing 后置。
 
 ## 面试讲述线
 
@@ -275,7 +295,7 @@ Go 微服务底座已支撑 AI 算法/eval，当前推进 collaborative-memory�
 
 在身份侧，我实现了登录、Refresh Token、MFA、recovery code、JWKS、challenge delivery outbox、SMTP / webhook challenge sender 和启动安全门禁。系统也补了 health、ready、debug metrics、repair、audit、cleanup、worker retry 和多种本地故障 smoke。
 
-现在 Go 微服务底座已经支撑 AI 应用链路：search、memory、retrieval、RAG、summary、Agent、skill-registry、mcp-gateway、action-executor 和 ai-eval 都有 first path 或 smoke，RAG / Summary / Agent 已通过 cross-group / temporal optional stack gate。下一步不是继续泛化清九服务 P2，而是做 collaborative-memory 算法/eval：multi-hop、temporal update、profile aggregation。大模型只能通过权限过滤后的 EvidencePack 访问聊天记录，Agent 写动作必须走 proposal、approval、executor 和 audit，Python AI Worker 只返回候选，Go 继续拥有权限、状态、审计和持久化。
+现在 Go 微服务底座已经支撑 AI 应用链路：search、memory、retrieval、RAG、summary、Agent、skill-registry、mcp-gateway、action-executor 和 ai-eval 都有 first path 或 smoke，RAG / Summary / Agent 已通过 cross-group / temporal optional stack gate。完整目标架构已经扩展到业务平台、数据平台、AI / Agent 平台、客户端平台和中间件平台；当前工程切片是客户端平台 MVP，Web first path、api-gateway client BFF、push path、本地和 wired 172 clean baseline 已通过，下一步接 PC / Android runtime。大模型只能通过权限过滤后的 EvidencePack 访问聊天记录，Agent 写动作必须走 proposal、approval、executor 和 audit，Python AI Worker 只返回候选，Go 继续拥有权限、状态、审计和持久化。
 ```
 
 ## 维护规则

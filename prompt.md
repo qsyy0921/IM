@@ -38,6 +38,7 @@
 3. 降低耦合并控制复杂度：不跨服务读内部表，不引入网状同步 RPC，接近行数阈值就拆同 package 文件。
 4. 新服务和中间件不写死；满足独立模型 / 伸缩 / 故障 / 安全边界或明显降复杂度时通过 ADR 新增。
 5. 真实业务语言边界：Go 做后端服务 / BFF / 控制面；TypeScript 做客户端共享核心和 UI；Rust/Kotlin/Swift 只做薄 native adapter；Python 做 AI worker / eval，不接管业务状态。
-6. 可用多个 sub-agent，但必须拆分互不重叠职责；主 agent 负责集成和最终检查。
-7. 压测原始数据放 `H:\NexusIM\loadtest-results`；E 盘仓库只放报告和文档。
-8. 新发现待办写入 `docs/runbook/remaining-goals.md`；不回滚用户已有修改。
+6. 长期完整架构以 `docs/architecture/target-architecture-complete.md` 为准；业务平台、数据平台、AI / Agent 平台和中间件平台的新开发都必须遵守其中的边界。
+7. 可用多个 sub-agent，但必须拆分互不重叠职责；主 agent 负责集成和最终检查。
+8. 压测原始数据放 `H:\NexusIM\loadtest-results`；E 盘仓库只放报告和文档。
+9. 新发现待办写入 `docs/runbook/remaining-goals.md`；不回滚用户已有修改。

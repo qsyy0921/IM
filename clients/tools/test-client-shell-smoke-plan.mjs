@@ -32,6 +32,7 @@ assert(typeof plan.targets["windows-desktop"].install.readyForInstall === "boole
 assert(Array.isArray(plan.targets["windows-desktop"].install.missing), "desktop install missing list missing");
 assert(Array.isArray(plan.targets["windows-desktop"].checklist), "desktop checklist missing");
 assert(plan.targets["windows-desktop"].checklist.some(item => item.step === "verify-shell-lifecycle-contract"), "desktop shell lifecycle contract check missing");
+assert(plan.targets["windows-desktop"].checklist.some(item => item.step === "install-declared-desktop-tauri-cli"), "desktop repo-local Tauri CLI install checklist missing");
 assert(plan.targets["windows-desktop"].checklist.some(item => item.step === "prepare-shell-assets"), "desktop asset prep checklist missing");
 assert(plan.targets["windows-desktop"].checklist.some(item => item.step === "verify-shell-assets"), "desktop asset verification checklist missing");
 assert(plan.targets.android.commands.prepareAssets.includes("build:shell-assets:android"), "android prep command missing");

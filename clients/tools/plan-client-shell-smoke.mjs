@@ -168,6 +168,13 @@ function nativeChecklist(target, readinessTarget, artifactStatus, installStatus)
   ];
 
   if (!readinessTarget.ready) {
+    if (target === "windows-desktop" && missingDesktopTauriCLI(readinessTarget)) {
+      checklist.push({
+        step: "install-declared-desktop-tauri-cli",
+        command: "npm --prefix clients install",
+        evidence: "repo-declared @tauri-apps/cli is installed into clients/node_modules before artifact build"
+      });
+    }
     checklist.push({
       step: "resolve-native-toolchain",
       command: nativeCommands(target, readinessTarget).dryRunBuild,
@@ -216,6 +223,11 @@ function nativeChecklist(target, readinessTarget, artifactStatus, installStatus)
     evidence: `shell metadata reports target=${target} and the app can sign in, pull inbox, receive wakeup and ack`
   });
   return checklist;
+}
+
+function missingDesktopTauriCLI(readinessTarget) {
+  const missing = readinessTarget.missing ?? [];
+  return missing.some(item => item.name === "local:tauri" || item.name === "cargo tauri");
 }
 
 function nativeNotes(target, readinessTarget, artifactStatus, installStatus) {

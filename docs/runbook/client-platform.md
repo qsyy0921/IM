@@ -211,6 +211,9 @@ First slice:
   connect devices, install artifacts or install toolchains. Native artifact
   status distinguishes raw build-output discovery from the collected artifact
   manifest that drives manual install readiness.
+  For Windows desktop, the plan now includes the explicit
+  `install-declared-desktop-tauri-cli` step when the repo-declared local Tauri
+  CLI has not been installed.
 - `npm --prefix clients run validate:builder-profile` validates the Android
   Docker builder profile without building or pulling images. The profile lives
   in `deploy/local/docker-compose.client-builders.yml` and uses

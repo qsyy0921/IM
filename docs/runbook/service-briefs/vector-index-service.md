@@ -69,7 +69,9 @@ vector 写入、rebuild 和 backfill 逻辑复杂到影响 retrieval / memory �
   upsert、delete、search 和 focused unit tests。`embedding-worker` 已支持通过
   `NEXUSIM_VECTOR_PROVIDER_BACKEND=pgvector` 显式启用 pgvector backend sink；默认不启用，
   不进入普通 PostgreSQL migration。已新增可选 `deploy/local/docker-compose.pgvector.yml`
-  overlay；真实 pgvector focused smoke 后置。
+  overlay 和 `loadtest/vectorembedding/run-local-pgvector-smoke.ps1` wrapper；使用
+  `-StartPgVector` 时脚本默认不拉镜像。本机未发现 `pgvector/pgvector:pg16` 镜像，真实
+  pgvector focused smoke 后置。
 
-后续待办：memory / search chunk consumer、focused pgvector smoke、真实 Milvus /
-OpenSearch backend、provider backend rebuild / backfill worker、provider backend repair。
+后续待办：memory / search chunk consumer、镜像可用后的 focused pgvector smoke、真实
+Milvus / OpenSearch backend、provider backend rebuild / backfill worker、provider backend repair。

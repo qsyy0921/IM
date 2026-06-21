@@ -5,6 +5,9 @@ param(
     [string]$KnowledgeGrpcAddr = "",
     [string]$ModelGatewayGrpcAddr = "",
     [string]$VectorGrpcAddr = "",
+    [string]$VectorProviderBackend = "",
+    [string]$PgVectorDsn = "",
+    [string]$PgVectorTable = "vector_embedding_items",
     [switch]$SkipBuild
 )
 
@@ -118,6 +121,9 @@ if (-not $ModelGatewayGrpcAddr) {
 if (-not $VectorGrpcAddr) {
     $VectorGrpcAddr = "127.0.0.1:" + (Get-FreeTcpPort)
 }
+if ($PgVectorDsn -and -not $VectorProviderBackend) {
+    $VectorProviderBackend = "pgvector"
+}
 $knowledgeGrpcPort = [int]($KnowledgeGrpcAddr.Split(":")[-1])
 $modelGatewayGrpcPort = [int]($ModelGatewayGrpcAddr.Split(":")[-1])
 $vectorGrpcPort = [int]($VectorGrpcAddr.Split(":")[-1])
@@ -190,22 +196,32 @@ try {
         NEXUSIM_VECTOR_EMBEDDING_POLL_INTERVAL = "200ms"
         NEXUSIM_VECTOR_EMBEDDING_ERROR_BACKOFF = "200ms"
         NEXUSIM_VECTOR_EMBEDDING_TRACE_ID = "trace-$RunName"
+        NEXUSIM_VECTOR_PROVIDER_BACKEND = $VectorProviderBackend
+        NEXUSIM_VECTOR_PGVECTOR_DSN = $PgVectorDsn
+        NEXUSIM_VECTOR_PGVECTOR_TABLE = $PgVectorTable
+        NEXUSIM_VECTOR_PGVECTOR_DIMENSION = [string]$prepareSummary.embedding_dimension
+        NEXUSIM_VECTOR_PGVECTOR_ENSURE_SCHEMA = "true"
     }
 
-    & $runner `
-        --phase verify `
-        --pg-dsn $PgDsn `
-        --knowledge-target $KnowledgeGrpcAddr `
-        --vector-target $VectorGrpcAddr `
-        --result-root $ResultRoot `
-        --run-name $RunName `
-        --tenant-id $prepareSummary.tenant_id `
-        --source-id $prepareSummary.knowledge_source_id `
-        --document-id $prepareSummary.document_id `
-        --visibility-scope $prepareSummary.visibility_scope `
-        --policy-version $prepareSummary.policy_version `
-        --expected-count $prepareSummary.chunk_count `
-        --wait-timeout "20s"
+    $verifyArgs = @(
+        "--phase", "verify",
+        "--pg-dsn", $PgDsn,
+        "--knowledge-target", $KnowledgeGrpcAddr,
+        "--vector-target", $VectorGrpcAddr,
+        "--result-root", $ResultRoot,
+        "--run-name", $RunName,
+        "--tenant-id", $prepareSummary.tenant_id,
+        "--source-id", $prepareSummary.knowledge_source_id,
+        "--document-id", $prepareSummary.document_id,
+        "--visibility-scope", $prepareSummary.visibility_scope,
+        "--policy-version", $prepareSummary.policy_version,
+        "--expected-count", $prepareSummary.chunk_count,
+        "--wait-timeout", "20s"
+    )
+    if ($PgVectorDsn) {
+        $verifyArgs += @("--pgvector-dsn", $PgVectorDsn, "--pgvector-table", $PgVectorTable)
+    }
+    & $runner @verifyArgs
     if ($LASTEXITCODE -ne 0) {
         throw "vector embedding smoke verify failed with exit code $LASTEXITCODE"
     }

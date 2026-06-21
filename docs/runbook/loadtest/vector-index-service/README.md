@@ -147,6 +147,22 @@ docker compose `
 postgres://nexusim:nexusim@localhost:15432/nexusim?sslmode=disable
 ```
 
+Focused smoke：
+
+```powershell
+.\loadtest\vectorembedding\run-local-pgvector-smoke.ps1 `
+  -StartPgVector `
+  -PgDsn "postgres://nexusim:nexusim@localhost:5432/nexusim?sslmode=disable" `
+  -PgVectorDsn "postgres://nexusim:nexusim@localhost:15432/nexusim?sslmode=disable" `
+  -ResultRoot "H:\NexusIM\loadtest-results"
+```
+
+默认行为：
+
+- 使用 `-StartPgVector` 时，脚本会先检查本机是否已有 `pgvector/pgvector:pg16` 镜像。
+- `-StartPgVector` 且没有镜像时默认失败退出，不自动拉取，避免误耗外网流量。
+- 如确实允许拉取，可显式加 `-AllowPull`。
+
 embedding worker 相关环境变量：
 
 ```text

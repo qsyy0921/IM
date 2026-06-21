@@ -28,6 +28,8 @@ type config struct {
 	knowledgeTarget string
 	vectorTarget    string
 	pgDSN           string
+	pgVectorDSN     string
+	pgVectorTable   string
 	resultDir       string
 	requestTimeout  time.Duration
 	waitTimeout     time.Duration
@@ -68,6 +70,12 @@ type summary struct {
 	ChunkCount             int       `json:"chunk_count"`
 	ExpectedCount          int       `json:"expected_count"`
 	VectorSearchCount      int       `json:"vector_search_count"`
+	PGVectorConfigured     bool      `json:"pgvector_configured"`
+	PGVectorTable          string    `json:"pgvector_table,omitempty"`
+	PGVectorItemCount      int       `json:"pgvector_item_count"`
+	PGVectorActiveCount    int       `json:"pgvector_active_count"`
+	PGVectorMinDimension   int       `json:"pgvector_min_dimension"`
+	PGVectorMaxDimension   int       `json:"pgvector_max_dimension"`
 	EmbeddingTaskCount     int       `json:"embedding_task_count"`
 	EmbeddingTaskPending   int       `json:"embedding_task_pending"`
 	EmbeddingTaskRunning   int       `json:"embedding_task_running"`
@@ -94,6 +102,8 @@ func parseConfig() config {
 	flag.StringVar(&cfg.knowledgeTarget, "knowledge-target", envOr("NEXUSIM_KNOWLEDGE_INGESTION_GRPC_ADDR", "127.0.0.1:10740"), "knowledge-ingestion-service gRPC target")
 	flag.StringVar(&cfg.vectorTarget, "vector-target", envOr("NEXUSIM_VECTOR_INDEX_GRPC_ADDR", "127.0.0.1:10760"), "vector-index-service gRPC target")
 	flag.StringVar(&cfg.pgDSN, "pg-dsn", envOr("NEXUSIM_PG_DSN", "postgres://nexusim:nexusim@localhost:5432/nexusim?sslmode=disable"), "PostgreSQL DSN")
+	flag.StringVar(&cfg.pgVectorDSN, "pgvector-dsn", envOr("NEXUSIM_VECTOR_PGVECTOR_DSN", ""), "optional pgvector backend DSN for verify phase")
+	flag.StringVar(&cfg.pgVectorTable, "pgvector-table", envOr("NEXUSIM_VECTOR_PGVECTOR_TABLE", "vector_embedding_items"), "optional pgvector backend table for verify phase")
 	flag.StringVar(&resultRoot, "result-root", defaultResultRoot, "external result root for raw smoke output")
 	flag.StringVar(&runName, "run-name", "", "run name under result-root")
 	flag.DurationVar(&cfg.requestTimeout, "request-timeout", 5*time.Second, "per request timeout")
@@ -166,6 +176,8 @@ func run(cfg config) error {
 		ExpectedCount:      cfg.expectedCount,
 		EmbeddingModelRef:  cfg.embeddingModel,
 		EmbeddingDimension: cfg.embeddingDim,
+		PGVectorConfigured: strings.TrimSpace(cfg.pgVectorDSN) != "",
+		PGVectorTable:      strings.TrimSpace(cfg.pgVectorTable),
 	}
 	result.GitDirty = strings.TrimSpace(result.GitStatusShort) != ""
 	defer func() {
@@ -357,6 +369,7 @@ func verify(ctx context.Context, cfg config, result *summary) error {
 	deadline := time.Now().Add(cfg.waitTimeout)
 	for {
 		search, err := searchVectors(ctx, client, cfg)
+		lastErr := err
 		if err == nil {
 			result.VectorSearchCount = len(search.GetResults())
 			result.VisibilityScope = cfg.visibilityScope
@@ -366,12 +379,30 @@ func verify(ctx context.Context, cfg config, result *summary) error {
 			result.ChunkCount = cfg.expectedCount
 			result.ExpectedCount = cfg.expectedCount
 			if result.VectorSearchCount >= cfg.expectedCount {
-				return nil
+				if strings.TrimSpace(cfg.pgVectorDSN) != "" {
+					counts, err := readPGVectorCounts(ctx, cfg)
+					if err != nil {
+						lastErr = err
+					} else {
+						result.PGVectorItemCount = counts.total
+						result.PGVectorActiveCount = counts.active
+						result.PGVectorMinDimension = counts.minDimension
+						result.PGVectorMaxDimension = counts.maxDimension
+						if counts.active >= cfg.expectedCount && counts.minDimension == cfg.embeddingDim && counts.maxDimension == cfg.embeddingDim {
+							return nil
+						}
+						lastErr = fmt.Errorf("expected at least %d active pgvector items with dimension %d, got active=%d min_dimension=%d max_dimension=%d",
+							cfg.expectedCount, cfg.embeddingDim, counts.active, counts.minDimension, counts.maxDimension)
+					}
+					err = lastErr
+				} else {
+					return nil
+				}
 			}
 		}
 		if time.Now().After(deadline) {
-			if err != nil {
-				return fmt.Errorf("wait for vector search results: %w", err)
+			if lastErr != nil {
+				return fmt.Errorf("wait for vector search and pgvector results: %w", lastErr)
 			}
 			return fmt.Errorf("expected at least %d vector search results, got %d", cfg.expectedCount, result.VectorSearchCount)
 		}
@@ -383,6 +414,38 @@ func verify(ctx context.Context, cfg config, result *summary) error {
 		case <-timer.C:
 		}
 	}
+}
+
+type pgVectorCounts struct {
+	total        int
+	active       int
+	minDimension int
+	maxDimension int
+}
+
+func readPGVectorCounts(ctx context.Context, cfg config) (pgVectorCounts, error) {
+	pool, err := pgxpool.New(ctx, cfg.pgVectorDSN)
+	if err != nil {
+		return pgVectorCounts{}, fmt.Errorf("open pgvector postgres: %w", err)
+	}
+	defer pool.Close()
+	table, err := quoteSQLIdentifier(cfg.pgVectorTable)
+	if err != nil {
+		return pgVectorCounts{}, err
+	}
+	var counts pgVectorCounts
+	query := fmt.Sprintf(`
+SELECT count(*),
+       count(*) FILTER (WHERE status = 'ACTIVE'),
+       COALESCE(min(dimension), 0),
+       COALESCE(max(dimension), 0)
+FROM %s
+WHERE tenant_id = $1
+`, table)
+	if err := pool.QueryRow(ctx, query, cfg.tenantID).Scan(&counts.total, &counts.active, &counts.minDimension, &counts.maxDimension); err != nil {
+		return pgVectorCounts{}, fmt.Errorf("read pgvector backend rows: %w", err)
+	}
+	return counts, nil
 }
 
 func createKnowledgeSource(ctx context.Context, client knowledgev1.KnowledgeIngestionServiceClient, cfg config) (*knowledgev1.CreateKnowledgeSourceResponse, error) {
@@ -595,7 +658,40 @@ func validateConfig(cfg config) error {
 	if strings.TrimSpace(cfg.tenantID) == "" || strings.TrimSpace(cfg.userID) == "" {
 		return errors.New("tenant-id and user-id are required")
 	}
+	if strings.TrimSpace(cfg.pgVectorDSN) != "" && strings.TrimSpace(cfg.pgVectorTable) == "" {
+		return errors.New("pgvector-table is required when pgvector-dsn is set")
+	}
 	return nil
+}
+
+func quoteSQLIdentifier(value string) (string, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "", errors.New("sql identifier is required")
+	}
+	parts := strings.Split(value, ".")
+	for _, part := range parts {
+		if !isSafeSQLIdentifier(part) {
+			return "", fmt.Errorf("unsafe sql identifier %q", value)
+		}
+	}
+	for index, part := range parts {
+		parts[index] = `"` + part + `"`
+	}
+	return strings.Join(parts, "."), nil
+}
+
+func isSafeSQLIdentifier(value string) bool {
+	if value == "" {
+		return false
+	}
+	for index, r := range value {
+		if r == '_' || r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || index > 0 && r >= '0' && r <= '9' {
+			continue
+		}
+		return false
+	}
+	return true
 }
 
 func writeSummary(resultDir string, result summary) error {

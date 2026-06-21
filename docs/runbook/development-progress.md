@@ -125,8 +125,10 @@
   `ModelGatewayClient` 已保留 `InvokeEmbedding.embedding_values`，并新增 optional
   `internal/infrastructure/pgvector` adapter 包和 focused unit tests；`embedding-worker`
   可通过 `NEXUSIM_VECTOR_PROVIDER_BACKEND=pgvector` 显式启用 pgvector backend sink；
-  已新增可选 `deploy/local/docker-compose.pgvector.yml` overlay；不宣称 focused
-  pgvector smoke、Milvus / OpenSearch 或 provider backend rebuild。
+  已新增可选 `deploy/local/docker-compose.pgvector.yml` overlay 和
+  `loadtest/vectorembedding/run-local-pgvector-smoke.ps1` wrapper；使用 `-StartPgVector`
+  时脚本默认不拉镜像，本机未发现 `pgvector/pgvector:pg16`，因此不宣称 focused pgvector smoke、Milvus /
+  OpenSearch 或 provider backend rebuild。
 - `admin-service` product-active：SDD v0.1 和 stage-switch review 已通过，
   第一版 proto / migration / 六层 skeleton / `grpc` runtime / Docker /
   Prometheus / Grafana 覆盖已落；当前覆盖 `CreateAdminOperation`、

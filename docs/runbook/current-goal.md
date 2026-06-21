@@ -100,7 +100,10 @@ model-gateway / workflow / knowledge-ingestion / vector-index
   `NEXUSIM_VECTOR_PROVIDER_BACKEND=pgvector` 显式启用 pgvector backend sink。该 adapter
   默认不启用，也不进入普通 migration，因为默认本地 PostgreSQL 镜像没有 `vector`
   扩展。已新增可选 `deploy/local/docker-compose.pgvector.yml` profile，单独启动
-  `nexusim-pgvector`，不替换默认 `nexusim-postgres`。
+  `nexusim-pgvector`，不替换默认 `nexusim-postgres`。已新增
+  `loadtest/vectorembedding/run-local-pgvector-smoke.ps1`；使用 `-StartPgVector` 时脚本会
+  检查本机镜像但不自动拉取。本机当前未发现 `pgvector/pgvector:pg16` 镜像，因此真实
+  pgvector smoke 仍未执行。
 - `knowledge-ingestion-service` 已新增低敏 `im.knowledge.events` Kafka schema 和
   `knowledge_outbox -> im.knowledge.events` 第一版 `outbox-relay` runtime。relay 覆盖
   source-created、document-parsed、chunk-ready 现有 outbox 事件和 SDD 预留的
@@ -138,9 +141,9 @@ model-gateway / workflow / knowledge-ingestion / vector-index
 
 - 默认继续补更多下游公开 admin API adapter，或为 admin config / quota 增加
   compensation operator。
-- 默认下一步可继续 vector-index provider backend：focused pgvector smoke、真实 Milvus /
-  OpenSearch backend、provider backend rebuild / backfill worker，或继续更多下游
-  admin API adapter。
+- 默认下一步可继续 vector-index provider backend：在镜像可用后跑 focused pgvector smoke、
+  真实 Milvus / OpenSearch backend、provider backend rebuild / backfill worker，或继续更多
+  下游 admin API adapter。
 - 也可以继续 notification SMTP / SMS / APNs / FCM adapter 或 bounce-suppression。
 
 ## 硬边界

@@ -223,7 +223,7 @@ func runEmbeddingWorker(ctx context.Context) error {
 	}
 	defer pool.Close()
 
-	source, closeSource, err := newEmbeddingTaskSource(ctx)
+	source, closeSource, err := newEmbeddingTaskSource(ctx, pool)
 	if err != nil {
 		return err
 	}
@@ -265,13 +265,18 @@ func runEmbeddingWorker(ctx context.Context) error {
 	return worker.Run(ctx)
 }
 
-func newEmbeddingTaskSource(ctx context.Context) (embedding.TaskSource, func() error, error) {
+func newEmbeddingTaskSource(ctx context.Context, pool *pgxpool.Pool) (embedding.TaskSource, func() error, error) {
 	sourceMode := embeddingTaskSourceModeFromEnv()
 	switch sourceMode {
 	case "file":
 		taskFile := strings.TrimSpace(os.Getenv("NEXUSIM_VECTOR_EMBEDDING_TASKS_FILE"))
 		source, err := embeddinginfra.NewFileTaskSource(taskFile)
 		return source, nil, err
+	case "postgres":
+		return postgresinfra.NewEmbeddingTaskSource(pool, postgresinfra.EmbeddingTaskSourceConfig{
+			TenantID:     envString("NEXUSIM_VECTOR_EMBEDDING_TENANT_ID", ""),
+			ClaimTimeout: envDuration("NEXUSIM_VECTOR_EMBEDDING_CLAIM_TIMEOUT", 30*time.Second),
+		}), nil, nil
 	case "knowledge":
 		source, closeSource, err := rpcinfra.DialKnowledgeChunkTaskSource(
 			ctx,

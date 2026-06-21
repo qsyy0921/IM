@@ -44,7 +44,11 @@ vector 写入、rebuild 和 backfill 逻辑复杂到影响 retrieval / memory �
 - `loadtest/vectorembedding` 已跑通 embedding worker 真实进程 smoke：公开 gRPC
   准备 knowledge chunk manifest，启动 embedding worker，经 `model-gateway.InvokeEmbedding`
   写入 vector metadata，再通过 `SearchVectors` 验证结果；runner 不手工 upsert，也不读私表。
+- first-stage PostgreSQL embedding task queue 已落：`vector_embedding_tasks` 只保存
+  redacted preview、input hash 和低敏 source / visibility metadata；`embedding-worker`
+  支持 `NEXUSIM_VECTOR_EMBEDDING_SOURCE=postgres`，使用 `FOR UPDATE SKIP LOCKED` claim、
+  claim-timeout retry 和 `COMPLETED` 标记。
 
 后续待办：Kafka / outbox 驱动的真实 knowledge / memory / search chunk consumer、真实
 Milvus / pgvector / OpenSearch backend、provider backend rebuild / backfill worker、
-embedding task 持久队列。
+embedding task producer。

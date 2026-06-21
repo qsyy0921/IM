@@ -111,8 +111,9 @@
   JSONL task source 和 `knowledge-ingestion-service.ListKnowledgeChunks` 公开 API source，
   并已跑通 `loadtest/vectorembedding` 真实进程 smoke，验证
   `knowledge-ingestion -> model-gateway.InvokeEmbedding -> vector-index SearchVectors`
-  边界；不宣称 Kafka / outbox chunk consumer、Milvus / pgvector / OpenSearch、
-  embedding task 持久队列或 provider backend rebuild。
+  边界；first-stage PostgreSQL embedding task queue 已支持 claim / complete /
+  claim-timeout retry；不宣称 Kafka / outbox chunk consumer、Milvus / pgvector /
+  OpenSearch、embedding task producer 或 provider backend rebuild。
 - `admin-service` product-active：SDD v0.1 和 stage-switch review 已通过，
   第一版 proto / migration / 六层 skeleton / `grpc` runtime / Docker /
   Prometheus / Grafana 覆盖已落；当前覆盖 `CreateAdminOperation`、

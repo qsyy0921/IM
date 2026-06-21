@@ -78,7 +78,7 @@
 当前边界：
 
 - 这是 first-stage worker / public API / model-gateway handoff smoke，不是
-  Kafka / outbox chunk consumer、embedding task persistent queue、provider backend
+  Kafka / outbox chunk consumer、embedding task producer、provider backend
   rebuild 或 Milvus / pgvector / OpenSearch backend smoke。
 - runner 不手工调用 `UpsertVectorItem`，也不读其它服务私有表；验证只走
   `SearchVectors`。

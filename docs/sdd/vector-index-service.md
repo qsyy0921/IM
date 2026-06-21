@@ -261,6 +261,7 @@ NEXUSIM_VECTOR_INDEX_SERVICE_MODE=embedding-worker
 -> choose NEXUSIM_VECTOR_EMBEDDING_SOURCE=file|knowledge
 -> file source reads controlled JSONL embedding tasks from NEXUSIM_VECTOR_EMBEDDING_TASKS_FILE
 -> knowledge source calls knowledge-ingestion-service.ListKnowledgeChunks and uses redacted preview
+-> postgres source claims persisted vector_embedding_tasks rows with FOR UPDATE SKIP LOCKED
 -> verify input_hash matches in-memory input_text before model call
 -> call model-gateway InvokeEmbedding
 -> write vector_items / vector_index_jobs / vector_outbox through existing UpsertVectorItem
@@ -268,8 +269,10 @@ NEXUSIM_VECTOR_INDEX_SERVICE_MODE=embedding-worker
 ```
 
 该 worker 是 first-stage worker 边界验证入口，不是 Kafka / outbox 驱动的生产 chunk
-consumer。它不得新增 raw text 公共 API，也不得把 `input_text` 或 embedding vector array
-写入 PostgreSQL、outbox、metrics、logs 或 Kafka payload。
+consumer。JSONL / knowledge source 不得把 `input_text` 或 embedding vector array 写入
+PostgreSQL、outbox、metrics、logs 或 Kafka payload；PostgreSQL task source 只允许持久化
+`input_preview_redacted`、input hash 和低敏 source / visibility metadata，不允许保存 raw
+document、source URI、object key 或 embedding vector array。
 
 Tombstone：
 
@@ -411,7 +414,7 @@ NEXUSIM_VECTOR_INDEX_SERVICE_MODE=embedding-worker
 ```text
 NEXUSIM_PG_DSN=...
 NEXUSIM_MODEL_GATEWAY_GRPC_ADDR=127.0.0.1:10770
-NEXUSIM_VECTOR_EMBEDDING_SOURCE=file
+NEXUSIM_VECTOR_EMBEDDING_SOURCE=file|knowledge|postgres
 NEXUSIM_VECTOR_EMBEDDING_TASKS_FILE=H:\NexusIM\loadtest-results\vector-embedding-tasks.jsonl
 NEXUSIM_VECTOR_EMBEDDING_BATCH_SIZE=50
 NEXUSIM_VECTOR_EMBEDDING_MODEL_TIMEOUT=5s
@@ -430,8 +433,17 @@ NEXUSIM_VECTOR_EMBEDDING_DIMENSION=8
 ```
 
 JSONL 任务文件和 knowledge redacted-preview source 只用于 first-stage worker 验证；
-生产级 embedding task 需要由 knowledge / memory / search 的受控 producer 或持久 task
-queue 提供。
+PostgreSQL task source 是第一版持久 task queue，可 claim / complete / claim-timeout retry，
+但 producer 仍需由 knowledge / memory / search 的受控 producer 或 Kafka / outbox chunk
+consumer 接入。
+
+PostgreSQL task source 配置：
+
+```text
+NEXUSIM_VECTOR_EMBEDDING_SOURCE=postgres
+NEXUSIM_VECTOR_EMBEDDING_TENANT_ID=tenant_1   # optional local scope
+NEXUSIM_VECTOR_EMBEDDING_CLAIM_TIMEOUT=30s
+```
 
 operator：
 

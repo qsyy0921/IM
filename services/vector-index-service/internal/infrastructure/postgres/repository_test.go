@@ -221,6 +221,86 @@ func TestRepositoryClaimAndCompleteRebuildTaskIntegration(t *testing.T) {
 	assertRebuildOutboxLowSensitive(t, ctx, pool, job.JobID)
 }
 
+func TestEmbeddingTaskSourceClaimCompleteIntegration(t *testing.T) {
+	ctx := context.Background()
+	pool := openVectorTestPool(t)
+	resetVectorTables(t, ctx, pool)
+	source := NewEmbeddingTaskSource(pool, EmbeddingTaskSourceConfig{
+		TenantID:     "tenant-vector-test",
+		ClaimTimeout: time.Minute,
+	})
+	task := prepareEmbeddingTask("queue-1", "redacted queue chunk")
+
+	replayed, err := source.EnqueueEmbeddingTask(ctx, task)
+	if err != nil {
+		t.Fatalf("enqueue embedding task: %v", err)
+	}
+	if replayed {
+		t.Fatal("first enqueue should not replay")
+	}
+	replayed, err = source.EnqueueEmbeddingTask(ctx, task)
+	if err != nil {
+		t.Fatalf("replay enqueue embedding task: %v", err)
+	}
+	if !replayed {
+		t.Fatal("second enqueue should replay")
+	}
+	conflict := task
+	conflict.ChunkHash = sha256Ref("different-chunk")
+	if _, err := source.EnqueueEmbeddingTask(ctx, conflict); !errors.Is(err, types.ErrAlreadyExists) {
+		t.Fatalf("expected idempotency conflict, got %v", err)
+	}
+
+	tasks, err := source.ClaimEmbeddingTasks(ctx, 10)
+	if err != nil {
+		t.Fatalf("claim embedding task: %v", err)
+	}
+	if len(tasks) != 1 {
+		t.Fatalf("expected one claimed task, got %d", len(tasks))
+	}
+	claimed := tasks[0]
+	if claimed.InputText != "redacted queue chunk" || claimed.InputHash != sha256Ref("redacted queue chunk") {
+		t.Fatalf("unexpected claimed task input: %+v", claimed)
+	}
+	assertEmbeddingTaskState(t, ctx, pool, task.IdempotencyKey, types.EmbeddingTaskStatusRunning, 1)
+
+	tasks, err = source.ClaimEmbeddingTasks(ctx, 10)
+	if err != nil {
+		t.Fatalf("claim before deadline: %v", err)
+	}
+	if len(tasks) != 0 {
+		t.Fatalf("task should not be reclaimed before claim deadline: %+v", tasks)
+	}
+	if _, err := pool.Exec(ctx, `
+UPDATE vector_embedding_tasks
+SET claim_deadline = now() - interval '1 second'
+WHERE tenant_id = 'tenant-vector-test'
+  AND idempotency_key = $1
+`, task.IdempotencyKey); err != nil {
+		t.Fatalf("expire claim deadline: %v", err)
+	}
+	tasks, err = source.ClaimEmbeddingTasks(ctx, 10)
+	if err != nil {
+		t.Fatalf("reclaim expired embedding task: %v", err)
+	}
+	if len(tasks) != 1 {
+		t.Fatalf("expected expired task to be reclaimed, got %d", len(tasks))
+	}
+	assertEmbeddingTaskState(t, ctx, pool, task.IdempotencyKey, types.EmbeddingTaskStatusRunning, 2)
+
+	if err := source.CompleteEmbeddingTask(ctx, tasks[0]); err != nil {
+		t.Fatalf("complete embedding task: %v", err)
+	}
+	assertEmbeddingTaskState(t, ctx, pool, task.IdempotencyKey, types.EmbeddingTaskStatusComplete, 2)
+	tasks, err = source.ClaimEmbeddingTasks(ctx, 10)
+	if err != nil {
+		t.Fatalf("claim after complete: %v", err)
+	}
+	if len(tasks) != 0 {
+		t.Fatalf("completed task should not be claimed: %+v", tasks)
+	}
+}
+
 func prepareUpsert(t *testing.T, idempotencyKey string, vectorItemID string, jobID string) domain.PreparedUpsert {
 	t.Helper()
 	prepared, err := domain.PrepareUpsert(types.UpsertVectorItemCommand{
@@ -292,6 +372,37 @@ func prepareTombstone(t *testing.T, vectorItemID string, idempotencyKey string, 
 	return prepared
 }
 
+func prepareEmbeddingTask(id string, preview string) types.VectorEmbeddingTask {
+	return types.VectorEmbeddingTask{
+		AuthContext: types.AuthContext{
+			TenantID:    "tenant-vector-test",
+			ServiceName: types.AllowedCallerVectorIndex,
+			TraceID:     "trace-vector-embedding-test",
+			RequestID:   "request-vector-embedding-test",
+		},
+		SourceService:      types.AllowedCallerKnowledgeIngestion,
+		CollectionType:     types.CollectionTypeKnowledgeChunk,
+		SourceRefHash:      sha256Ref("source-ref-" + id),
+		SourceID:           "knowledge-source:document:" + id,
+		SourceVersion:      1,
+		SourceHash:         sha256Ref("source-" + id),
+		ChunkHash:          sha256Ref("chunk-" + id),
+		InputText:          preview,
+		InputHash:          sha256Ref(preview),
+		InputSchemaVersion: 1,
+		EmbeddingModelRef:  "deterministic-embedding-v1",
+		Dimension:          8,
+		VisibilityScope:    "conversation:vector-embedding-test",
+		VisibilityVersion:  1,
+		PolicyVersion:      "policy-vector-embedding-test",
+		DataClass:          "BUSINESS_INTERNAL",
+		IdempotencyKey:     "embedding-task-" + id,
+		CorrelationID:      "corr-vector-embedding-test",
+		CausationID:        "cause-vector-embedding-test",
+		TraceID:            "trace-vector-embedding-test",
+	}
+}
+
 func openVectorTestPool(t *testing.T) *pgxpool.Pool {
 	t.Helper()
 	dsn := os.Getenv("NEXUSIM_PG_DSN")
@@ -330,6 +441,7 @@ func resetVectorTables(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
 	t.Helper()
 	_, err := pool.Exec(ctx, `
 TRUNCATE
+    vector_embedding_tasks,
     vector_outbox,
     vector_rebuild_checkpoints,
     vector_tombstones,
@@ -385,6 +497,29 @@ func assertVectorOutboxLowSensitive(t *testing.T, ctx context.Context, pool *pgx
 	}
 	if count != 2 {
 		t.Fatalf("expected two vector outbox rows, got %d", count)
+	}
+}
+
+func assertEmbeddingTaskState(t *testing.T, ctx context.Context, pool *pgxpool.Pool, idempotencyKey string, expectedStatus string, expectedAttempts int) {
+	t.Helper()
+	var status string
+	var attempts int
+	var preview string
+	if err := pool.QueryRow(ctx, `
+SELECT status, attempt_count, input_preview_redacted
+FROM vector_embedding_tasks
+WHERE tenant_id = 'tenant-vector-test'
+  AND idempotency_key = $1
+`, idempotencyKey).Scan(&status, &attempts, &preview); err != nil {
+		t.Fatalf("query embedding task state: %v", err)
+	}
+	if status != expectedStatus || attempts != expectedAttempts {
+		t.Fatalf("unexpected task state: status=%s attempts=%d", status, attempts)
+	}
+	for _, forbidden := range []string{"http://", "https://", "s3://", "object-key", "secret"} {
+		if strings.Contains(preview, forbidden) {
+			t.Fatalf("embedding task preview leaked forbidden raw ref %q: %s", forbidden, preview)
+		}
 	}
 }
 

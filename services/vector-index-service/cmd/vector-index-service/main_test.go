@@ -27,6 +27,10 @@ func TestEmbeddingTaskSourceModeFromEnv(t *testing.T) {
 	if got := embeddingTaskSourceModeFromEnv(); got != "file" {
 		t.Fatalf("explicit source should win, got %s", got)
 	}
+	t.Setenv("NEXUSIM_VECTOR_EMBEDDING_SOURCE", "postgres")
+	if got := embeddingTaskSourceModeFromEnv(); got != "postgres" {
+		t.Fatalf("explicit postgres source should win, got %s", got)
+	}
 }
 
 func TestValidateVectorIndexDebugListenerConfigAllowsEmptyOrPrivateAddress(t *testing.T) {

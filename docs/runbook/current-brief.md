@@ -45,7 +45,9 @@ first-stage `embedding-worker`：本地 JSONL 任务源或
 `model-gateway.InvokeEmbedding` -> vector upsert hash / metadata。`loadtest/vectorembedding`
 真实进程 smoke 已跑通，用公开 gRPC 准备 knowledge chunk manifest，
 再启动 embedding worker 经 `model-gateway.InvokeEmbedding` 写 vector metadata，并通过
-`SearchVectors` 验证；该 smoke 入口不手工 upsert、不读私表。`admin-service` 已完成第一版
+`SearchVectors` 验证；该 smoke 入口不手工 upsert、不读私表。PostgreSQL embedding
+task queue 已新增，`embedding-worker` 可用 `NEXUSIM_VECTOR_EMBEDDING_SOURCE=postgres`
+claim redacted-preview task 并 complete。`admin-service` 已完成第一版
 `CreateAdminOperation` / `ApproveAdminOperation` / `GetAdminOperation` /
 `ListAdminOperations` path、`admin_outbox -> im.admin.events` outbox relay 和
 `operation-worker` risk routing 执行闭环；`REPAIR_REQUEST` 已接入

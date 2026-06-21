@@ -43,7 +43,8 @@ presence-service、vector-index-service、workflow-service。
 Windows wired `172.31.50.1` clean baseline 已通过并归档；BFF HTTP route metrics /
 rate-limit adapter 已落。PC / Android runtime shell 已进入 assets prep / native
 shell 骨架阶段；artifact / APK build wrapper 已有 dry-run-tested command plan，
-Android Docker builder profile 已落但尚未运行。本机仍缺 Tauri CLI 与 Android
+artifact collector 已能生成低敏 SHA-256 manifest，Android Docker builder
+profile 已落但尚未运行。本机仍缺 Tauri CLI 与 Android
 JDK 17+ / Gradle / SDK。下一步是补本地工具链或显式运行 builder profile，产出本地
 Windows artifact、Android unsigned APK 和真实壳层 smoke。
 

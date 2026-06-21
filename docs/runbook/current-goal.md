@@ -110,6 +110,11 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   `check:build-prereqs` 仍显示 desktop 缺 Tauri CLI / `cargo-tauri`，Android 缺
   JDK 17+ / Gradle / Android SDK，所以 wrapper 会 fail fast，尚未产出 installer
   或 APK。
+- `clients/tools/collect-client-artifacts.mjs` 已提供 first-stage artifact
+  collector；`test:artifact-collector` 覆盖 fake APK / Windows installer 归档、
+  SHA-256 manifest、dry-run 不写文件和不泄露本机绝对路径。真实 artifact / APK
+  产出后可用 `collect:client-artifacts` 写入 ignored `clients/artifacts/<run-id>/`
+  并生成低敏 manifest；当前仍没有真实 installer / APK baseline。
 - Android 已新增 opt-in Docker builder profile：
   `deploy/docker/client-android-builder.Dockerfile` 和
   `deploy/local/docker-compose.client-builders.yml`。`validate:builder-profile`

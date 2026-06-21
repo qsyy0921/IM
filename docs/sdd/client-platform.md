@@ -188,6 +188,9 @@ Responsibilities:
   runtime should replace that storage port with SQLite behind `LocalMessageStore`.
 - Keep native IPC as explicit commands only.
 - Produce local `.msi` / `.exe` installer after the Web MVP is connected.
+- After an installer is produced, archive it through the client artifact
+  collector and keep only the low-sensitive SHA-256 manifest under ignored local
+  artifact storage.
 
 PC constraints:
 
@@ -208,6 +211,9 @@ Responsibilities:
   runtime should replace that storage port with SQLite behind `LocalMessageStore`.
 - Integrate FCM later as wakeup only.
 - Produce a local unsigned `.apk` before signed distribution.
+- After an APK is produced, archive it through the client artifact collector and
+  keep only the low-sensitive SHA-256 manifest under ignored local artifact
+  storage.
 
 Android constraints:
 

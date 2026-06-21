@@ -155,6 +155,12 @@ First slice:
   commands are present as `build:desktop-artifact` and `build:android-apk`, but
   they fail fast with missing-toolchain JSON until the local Tauri / Android
   toolchains are installed.
+- `npm --prefix clients run test:artifact-collector` validates the first-stage
+  artifact collector. Once a real desktop installer or Android APK exists,
+  `npm --prefix clients run collect:client-artifacts` copies it into ignored
+  `clients/artifacts/<run-id>/` storage and writes a low-sensitive manifest with
+  file names, sizes and SHA-256 hashes, without recording local absolute source
+  paths.
 - `npm --prefix clients run validate:builder-profile` validates the Android
   Docker builder profile without building or pulling images. The profile lives
   in `deploy/local/docker-compose.client-builders.yml` and uses
@@ -232,6 +238,7 @@ npm --prefix clients run check:build-prereqs
 npm --prefix clients run test:shell-config
 npm --prefix clients run test:shell-web-assets
 npm --prefix clients run test:artifact-builders
+npm --prefix clients run test:artifact-collector
 npm --prefix clients run validate:builder-profile
 ```
 
@@ -244,7 +251,9 @@ Artifact wrappers:
 ```powershell
 node clients/tools/build-desktop-artifact.mjs --dry-run
 node clients/tools/build-android-apk.mjs --dry-run
+node clients/tools/collect-client-artifacts.mjs --target all --dry-run
 npm --prefix clients run build:desktop-artifact
 npm --prefix clients run build:android-apk
+npm --prefix clients run collect:client-artifacts
 docker compose -f deploy/local/docker-compose.client-builders.yml --profile client-builders run --rm client-android-apk-builder
 ```

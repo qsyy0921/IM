@@ -282,6 +282,9 @@ Android constraints:
 - Background sync must use PullInbox and device cursor state.
 - First-stage Android shell loads prepared local Web assets through
   `WebViewAssetLoader` instead of granting broad `file://` access to Web code.
+- Android WebView inspection must be tied to the platform debuggable flag.
+  Debug builds may enable WebView inspection for metadata / login smoke
+  automation; release builds must not enable it unconditionally.
 - First-stage `NexusIMNative` JavaScript bridge is a single-method
   metadata-only bridge. It may expose runtime target, bridge version and label
   through `runtimeMetadata()` for diagnostics, but it must not expose tokens,

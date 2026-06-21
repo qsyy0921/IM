@@ -107,7 +107,8 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
 - Android WebView 已注册只读 `NexusIMNative` JavaScript bridge；该 bridge 现在只暴露
   单个 `runtimeMetadata()` 方法。Web 端可读取它用于诊断，且 focused test 覆盖合法
   metadata、错误 target 和 malformed JSON 的 fail-closed 行为。该 bridge 不暴露
-  token、storage、文件系统或 message API。
+  token、storage、文件系统或 message API。Android WebView inspection 现在显式跟随
+  平台 debuggable flag，仅用于 debug / smoke automation，不允许 release 无条件开启。
 - Web shell 的运行入口面板已展示 shell target、PC Tauri `runtime_metadata`
   和 Android native bridge metadata；该展示只用于本地诊断，不改变客户端权限边界。
 - Web app 会在主 bundle 前加载 `nexusim-shell-config.js`；`clients/desktop` 和

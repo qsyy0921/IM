@@ -59,6 +59,9 @@ assert(mainActivity.includes("WebViewAssetLoader"), "Android shell must use WebV
 assert(mainActivity.includes("appassets.androidplatform.net"), "Android shell must load appassets URL");
 assert(mainActivity.includes("allowFileAccess = false"), "Android shell must disable file access");
 assert(mainActivity.includes('addJavascriptInterface(NexusIMBridge(), "NexusIMNative")'), "Android shell must register low-permission native metadata bridge");
+assert(mainActivity.includes("WebView.setWebContentsDebuggingEnabled"), "Android shell must explicitly gate WebView inspection");
+assert(mainActivity.includes("ApplicationInfo.FLAG_DEBUGGABLE"), "Android WebView inspection must follow application debuggable flag");
+assert(!/setWebContentsDebuggingEnabled\s*\(\s*true\s*\)/.test(mainActivity), "Android WebView inspection must not be enabled unconditionally");
 
 const bridge = read("android/native/app/src/main/java/com/nexusim/android/NexusIMBridge.kt");
 assert(bridge.includes("@JavascriptInterface"), "Android native bridge must expose only annotated methods");

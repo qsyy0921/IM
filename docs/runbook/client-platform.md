@@ -128,6 +128,9 @@ First slice:
   It exposes only the single `runtimeMetadata()` method. The Web runtime can
   parse that metadata for diagnostics, and invalid bridge payloads fail closed.
   The bridge exposes no token, storage, file-system or message APIs.
+- Android WebView inspection is explicitly gated by the platform debuggable
+  flag. This keeps dev / smoke automation possible while avoiding an
+  unconditional release debugging path.
 - The Web shell runtime panel now displays shell target plus PC Tauri or Android
   native bridge metadata when present. This is diagnostics only; it does not
   grant Web code native capabilities.

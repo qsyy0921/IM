@@ -2,6 +2,7 @@ package com.nexusim.android
 
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.content.pm.ApplicationInfo
 import android.os.Bundle
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
@@ -14,6 +15,7 @@ class MainActivity : Activity() {
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        configureDebugWebViewInspection()
         val assetLoader = WebViewAssetLoader.Builder()
             .addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(this))
             .build()
@@ -34,5 +36,10 @@ class MainActivity : Activity() {
         webView.addJavascriptInterface(NexusIMBridge(), "NexusIMNative")
         setContentView(webView)
         webView.loadUrl("https://appassets.androidplatform.net/assets/nexusim/index.html")
+    }
+
+    private fun configureDebugWebViewInspection() {
+        val debuggable = (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
+        WebView.setWebContentsDebuggingEnabled(debuggable)
     }
 }

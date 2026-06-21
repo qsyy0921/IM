@@ -123,8 +123,10 @@
   真实 Kafka smoke；PostgreSQL backend state adapter 已显式记录 backend item ACTIVE /
   DELETED 状态，Search 必须 join ACTIVE backend state 才返回 refs；内部
   `ModelGatewayClient` 已保留 `InvokeEmbedding.embedding_values`，并新增 optional
-  `internal/infrastructure/pgvector` adapter 包和 focused unit tests；不宣称 pgvector
-  runtime wiring / smoke、Milvus / OpenSearch 或 provider backend rebuild。
+  `internal/infrastructure/pgvector` adapter 包和 focused unit tests；`embedding-worker`
+  可通过 `NEXUSIM_VECTOR_PROVIDER_BACKEND=pgvector` 显式启用 pgvector backend sink；
+  不宣称 optional pgvector compose profile / smoke、Milvus / OpenSearch 或 provider
+  backend rebuild。
 - `admin-service` product-active：SDD v0.1 和 stage-switch review 已通过，
   第一版 proto / migration / 六层 skeleton / `grpc` runtime / Docker /
   Prometheus / Grafana 覆盖已落；当前覆盖 `CreateAdminOperation`、

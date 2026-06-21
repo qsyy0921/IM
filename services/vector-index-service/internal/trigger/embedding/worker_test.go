@@ -16,6 +16,7 @@ func TestWorkerRunOnceEmbedsAndUpsertsHashOnlyMetadata(t *testing.T) {
 		result: types.VectorEmbeddingResult{
 			InvocationID:        "minv_embed_1",
 			ModelID:             "deterministic-embedding-v1",
+			EmbeddingValues:     []float32{0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8},
 			EmbeddingVectorHash: "sha256:embeddinghash",
 			Dimension:           8,
 			EmbeddingReturned:   true,
@@ -46,6 +47,42 @@ func TestWorkerRunOnceEmbedsAndUpsertsHashOnlyMetadata(t *testing.T) {
 	}
 	if len(source.completed) != 1 || source.completed[0].IdempotencyKey != task.IdempotencyKey {
 		t.Fatalf("task was not completed: %+v", source.completed)
+	}
+}
+
+func TestWorkerRunOnceUpsertsOptionalBackend(t *testing.T) {
+	input := "redacted chunk text for backend handoff"
+	task := testEmbeddingTask(input)
+	source := &fakeSource{tasks: []types.VectorEmbeddingTask{task}}
+	embedder := &fakeEmbedder{
+		result: types.VectorEmbeddingResult{
+			InvocationID:        "minv_embed_1",
+			ModelID:             "deterministic-embedding-v1",
+			EmbeddingValues:     []float32{0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8},
+			EmbeddingVectorHash: "sha256:embeddinghash",
+			Dimension:           8,
+			EmbeddingReturned:   true,
+		},
+	}
+	backend := &fakeBackend{}
+	worker := NewWorker(source, embedder, &fakeUpserter{}, Config{BatchSize: 10, Backend: backend})
+
+	stats, err := worker.RunOnce(context.Background())
+	if err != nil {
+		t.Fatalf("run once: %v", err)
+	}
+	if stats.Upserted != 1 || stats.Completed != 1 {
+		t.Fatalf("unexpected stats: %+v", stats)
+	}
+	if len(backend.calls) != 1 {
+		t.Fatalf("expected one backend call, got %d", len(backend.calls))
+	}
+	call := backend.calls[0]
+	if call.item.VectorItemID != "vitem_fake" || call.result.EmbeddingVectorHash != "sha256:embeddinghash" {
+		t.Fatalf("unexpected backend handoff: %+v", call)
+	}
+	if len(call.result.EmbeddingValues) != 8 || call.task.InputText != input {
+		t.Fatalf("backend did not receive embedding values and worker task: %+v", call)
 	}
 }
 
@@ -162,10 +199,45 @@ type fakeUpserter struct {
 	err      error
 }
 
-func (upserter *fakeUpserter) UpsertVectorItem(_ context.Context, command types.UpsertVectorItemCommand) error {
+func (upserter *fakeUpserter) UpsertVectorItem(_ context.Context, command types.UpsertVectorItemCommand) (types.VectorItem, bool, error) {
 	if upserter.err != nil {
-		return upserter.err
+		return types.VectorItem{}, false, upserter.err
 	}
 	upserter.commands = append(upserter.commands, command)
+	return types.VectorItem{
+		TenantID:          command.AuthContext.TenantID,
+		VectorItemID:      "vitem_fake",
+		CollectionID:      "vcol_fake",
+		CollectionType:    command.CollectionType,
+		BackendVectorID:   "vitem_fake",
+		Dimension:         command.Dimension,
+		VisibilityScope:   command.VisibilityScope,
+		VisibilityVersion: command.VisibilityVersion,
+		PolicyVersion:     command.PolicyVersion,
+		DataClass:         command.DataClass,
+	}, false, nil
+}
+
+type backendCall struct {
+	task   types.VectorEmbeddingTask
+	result types.VectorEmbeddingResult
+	item   types.VectorItem
+}
+
+type fakeBackend struct {
+	calls []backendCall
+	err   error
+}
+
+func (backend *fakeBackend) UpsertEmbedding(
+	_ context.Context,
+	task types.VectorEmbeddingTask,
+	result types.VectorEmbeddingResult,
+	item types.VectorItem,
+) error {
+	if backend.err != nil {
+		return backend.err
+	}
+	backend.calls = append(backend.calls, backendCall{task: task, result: result, item: item})
 	return nil
 }

@@ -19,6 +19,7 @@ import (
 	"github.com/qsyy0921/IM/services/vector-index-service/internal/app"
 	embeddinginfra "github.com/qsyy0921/IM/services/vector-index-service/internal/infrastructure/embedding"
 	kafkainfra "github.com/qsyy0921/IM/services/vector-index-service/internal/infrastructure/kafka"
+	pgvectorinfra "github.com/qsyy0921/IM/services/vector-index-service/internal/infrastructure/pgvector"
 	postgresinfra "github.com/qsyy0921/IM/services/vector-index-service/internal/infrastructure/postgres"
 	rpcinfra "github.com/qsyy0921/IM/services/vector-index-service/internal/infrastructure/rpc"
 	"github.com/qsyy0921/IM/services/vector-index-service/internal/trigger/chunk"
@@ -255,6 +256,17 @@ func runEmbeddingWorker(ctx context.Context) error {
 	}()
 
 	repository := postgresinfra.NewRepository(pool)
+	vectorBackend, closeVectorBackend, err := newEmbeddingVectorBackend(ctx, pool)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if closeVectorBackend != nil {
+			if closeErr := closeVectorBackend(); closeErr != nil {
+				log.Printf("vector-index-service embedding vector backend close failed: %v", closeErr)
+			}
+		}
+	}()
 	worker := embedding.NewWorker(
 		source,
 		modelClient,
@@ -263,10 +275,11 @@ func runEmbeddingWorker(ctx context.Context) error {
 			BatchSize:    envInt("NEXUSIM_VECTOR_EMBEDDING_BATCH_SIZE", 50),
 			PollInterval: envDuration("NEXUSIM_VECTOR_EMBEDDING_POLL_INTERVAL", time.Second),
 			ErrorBackoff: envDuration("NEXUSIM_VECTOR_EMBEDDING_ERROR_BACKOFF", time.Second),
+			Backend:      vectorBackend,
 			Logf:         log.Printf,
 		},
 	)
-	log.Printf("vector-index-service embedding worker started with %s task source", embeddingTaskSourceModeFromEnv())
+	log.Printf("vector-index-service embedding worker started with %s task source and %s provider backend", embeddingTaskSourceModeFromEnv(), vectorProviderBackendModeFromEnv())
 	return worker.Run(ctx)
 }
 
@@ -439,6 +452,52 @@ func newKnowledgeEmbeddingTaskSource(ctx context.Context) (embedding.TaskSource,
 	)
 }
 
+func newEmbeddingVectorBackend(ctx context.Context, metadataPool *pgxpool.Pool) (embedding.VectorBackend, func() error, error) {
+	backendMode := vectorProviderBackendModeFromEnv()
+	switch backendMode {
+	case "", "none", "postgres-test":
+		return nil, nil, nil
+	case "pgvector":
+		dsn := strings.TrimSpace(os.Getenv("NEXUSIM_VECTOR_PGVECTOR_DSN"))
+		pool := metadataPool
+		closePool := func() error { return nil }
+		if dsn != "" && dsn != strings.TrimSpace(os.Getenv("NEXUSIM_PG_DSN")) {
+			var err error
+			pool, err = openPGPoolFromDSN(ctx, dsn)
+			if err != nil {
+				return nil, nil, err
+			}
+			closePool = func() error {
+				pool.Close()
+				return nil
+			}
+		}
+		store, err := pgvectorinfra.NewStore(pool, envString("NEXUSIM_VECTOR_PGVECTOR_TABLE", ""))
+		if err != nil {
+			_ = closePool()
+			return nil, nil, err
+		}
+		ensureSchema, present, err := envOptionalBool("NEXUSIM_VECTOR_PGVECTOR_ENSURE_SCHEMA")
+		if err != nil {
+			_ = closePool()
+			return nil, nil, err
+		}
+		if !present {
+			ensureSchema = true
+		}
+		if ensureSchema {
+			dimension := envInt("NEXUSIM_VECTOR_PGVECTOR_DIMENSION", envInt("NEXUSIM_VECTOR_EMBEDDING_DIMENSION", 8))
+			if err := store.EnsureSchema(ctx, dimension); err != nil {
+				_ = closePool()
+				return nil, nil, err
+			}
+		}
+		return embeddinginfra.NewPGVectorBackend(store), closePool, nil
+	default:
+		return nil, nil, fmt.Errorf("unsupported NEXUSIM_VECTOR_PROVIDER_BACKEND %q", backendMode)
+	}
+}
+
 func embeddingTaskSourceModeFromEnv() string {
 	mode := strings.ToLower(strings.TrimSpace(os.Getenv("NEXUSIM_VECTOR_EMBEDDING_SOURCE")))
 	if mode != "" {
@@ -463,6 +522,10 @@ func embeddingProducerSourceModeFromEnv() string {
 		return "knowledge"
 	}
 	return "file"
+}
+
+func vectorProviderBackendModeFromEnv() string {
+	return strings.ToLower(strings.TrimSpace(os.Getenv("NEXUSIM_VECTOR_PROVIDER_BACKEND")))
 }
 
 func vectorIndexModeFromEnv() string {
@@ -580,6 +643,10 @@ func openPGPool(ctx context.Context) (*pgxpool.Pool, error) {
 	if dsn == "" {
 		return nil, errors.New("NEXUSIM_PG_DSN is required")
 	}
+	return openPGPoolFromDSN(ctx, dsn)
+}
+
+func openPGPoolFromDSN(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
 	config, err := pgxpool.ParseConfig(dsn)
 	if err != nil {
 		return nil, err
@@ -642,7 +709,7 @@ type vectorUpsertAdapter struct {
 	useCase app.UpsertVectorItemUseCase
 }
 
-func (adapter vectorUpsertAdapter) UpsertVectorItem(ctx context.Context, command types.UpsertVectorItemCommand) error {
-	_, err := adapter.useCase.Execute(ctx, command)
-	return err
+func (adapter vectorUpsertAdapter) UpsertVectorItem(ctx context.Context, command types.UpsertVectorItemCommand) (types.VectorItem, bool, error) {
+	result, err := adapter.useCase.Execute(ctx, command)
+	return result.Item, result.Replayed, err
 }

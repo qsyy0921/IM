@@ -70,7 +70,7 @@ model-gateway / workflow / knowledge-ingestion / vector-index
   preview 的 knowledge 任务源；随后调用 `model-gateway.InvokeEmbedding`，再经现有 app
   usecase 写 vector item metadata。该切片用于验证 worker / model-gateway /
   knowledge public API / vector upsert 边界，不新增 raw text 公共 API，也不把 raw text
-  或 embedding vector array 落入 PostgreSQL / outbox / metrics。
+  或 embedding vector array 落入 metadata PostgreSQL / outbox / metrics。
 - `vector-index-service` 已跑通 `loadtest/vectorembedding` embedding worker 真实进程
   smoke：公开 gRPC 准备 knowledge source / job / chunk manifest，启动
   `embedding-worker` 通过 `ListKnowledgeChunks` 拉 redacted preview，经
@@ -96,8 +96,10 @@ model-gateway / workflow / knowledge-ingestion / vector-index
   `model-gateway.InvokeEmbedding` 返回的 `embedding_values`，但公开 API / PostgreSQL
   metadata / outbox / metrics 仍只保存 hash / refs / dimension。已新增 optional
   `internal/infrastructure/pgvector` adapter 包，覆盖 schema 初始化、upsert、delete、
-  search 和 focused unit tests；该 adapter 当前不接默认 runtime，也不进入普通 migration，
-  因为默认本地 PostgreSQL 镜像没有 `vector` 扩展。
+  search 和 focused unit tests；`embedding-worker` 可通过
+  `NEXUSIM_VECTOR_PROVIDER_BACKEND=pgvector` 显式启用 pgvector backend sink。该 adapter
+  默认不启用，也不进入普通 migration，因为默认本地 PostgreSQL 镜像没有 `vector`
+  扩展。
 - `knowledge-ingestion-service` 已新增低敏 `im.knowledge.events` Kafka schema 和
   `knowledge_outbox -> im.knowledge.events` 第一版 `outbox-relay` runtime。relay 覆盖
   source-created、document-parsed、chunk-ready 现有 outbox 事件和 SDD 预留的
@@ -135,9 +137,9 @@ model-gateway / workflow / knowledge-ingestion / vector-index
 
 - 默认继续补更多下游公开 admin API adapter，或为 admin config / quota 增加
   compensation operator。
-- 默认下一步可继续 vector-index provider backend：pgvector runtime wiring / optional
-  pgvector compose profile / focused pgvector smoke、真实 Milvus / OpenSearch backend、
-  provider backend rebuild / backfill worker，或继续更多下游 admin API adapter。
+- 默认下一步可继续 vector-index provider backend：optional pgvector compose profile /
+  focused pgvector smoke、真实 Milvus / OpenSearch backend、provider backend rebuild /
+  backfill worker，或继续更多下游 admin API adapter。
 - 也可以继续 notification SMTP / SMS / APNs / FCM adapter 或 bounce-suppression。
 
 ## 硬边界

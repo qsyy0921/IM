@@ -58,8 +58,9 @@ protobuf `KnowledgeEvent` 与旧 JSON fallback；`knowledge-ingestion-service` �
 `vector_embedding_tasks`；PostgreSQL backend state adapter 已显式记录 backend item
 ACTIVE / DELETED 状态，`SearchVectors` 必须 join ACTIVE backend state 才返回 refs；
 vector-index 内部 RPC client 已保留 `InvokeEmbedding.embedding_values`，并新增 optional
-pgvector adapter 包用于后续 runtime wiring；公开 API / PostgreSQL metadata / outbox /
-metrics 仍不暴露 raw vector array。
+pgvector adapter 包；`embedding-worker` 可通过 `NEXUSIM_VECTOR_PROVIDER_BACKEND=pgvector`
+显式启用 pgvector backend sink。公开 API / PostgreSQL metadata / outbox / metrics
+仍不暴露 raw vector array。
 `admin-service` 已完成第一版
 `CreateAdminOperation` / `ApproveAdminOperation` / `GetAdminOperation` /
 `ListAdminOperations` path、`admin_outbox -> im.admin.events` outbox relay 和
@@ -75,8 +76,8 @@ control-plane-service.RollbackConfigVersion`；第三条 control-plane adapter �
 control-plane-service.PublishConfigVersion(API_GATEWAY_TENANT_QUOTA)`。
 admin `Create -> operator approve -> operation-worker -> control-plane` 本地多进程
 publish / rollback / tenant quota smoke 已通过。下一步默认继续更多下游公开 admin API adapter、
-admin compensation operator，或继续 pgvector runtime wiring / optional pgvector smoke、
-Milvus / OpenSearch backend / provider rebuild / backfill worker。
+admin compensation operator，或继续 optional pgvector compose profile / focused pgvector
+smoke、Milvus / OpenSearch backend / provider rebuild / backfill worker。
 ```
 
 系统测试 / HA / 长压 / sizing 后置；总览、待办、单服务状态分别看

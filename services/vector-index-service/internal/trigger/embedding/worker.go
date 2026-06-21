@@ -20,7 +20,11 @@ type Embedder interface {
 }
 
 type Upserter interface {
-	UpsertVectorItem(ctx context.Context, command types.UpsertVectorItemCommand) error
+	UpsertVectorItem(ctx context.Context, command types.UpsertVectorItemCommand) (types.VectorItem, bool, error)
+}
+
+type VectorBackend interface {
+	UpsertEmbedding(ctx context.Context, task types.VectorEmbeddingTask, result types.VectorEmbeddingResult, item types.VectorItem) error
 }
 
 type Worker struct {
@@ -34,6 +38,7 @@ type Config struct {
 	BatchSize    int
 	PollInterval time.Duration
 	ErrorBackoff time.Duration
+	Backend      VectorBackend
 	Logf         func(format string, args ...any)
 }
 
@@ -98,8 +103,14 @@ func (worker *Worker) RunOnce(ctx context.Context) (types.EmbeddingWorkerStats, 
 		}
 		stats.Embedded++
 		command := upsertCommandFromEmbedding(normalized, result)
-		if err := worker.upserter.UpsertVectorItem(ctx, command); err != nil {
+		item, _, err := worker.upserter.UpsertVectorItem(ctx, command)
+		if err != nil {
 			return stats, err
+		}
+		if worker.config.Backend != nil {
+			if err := worker.config.Backend.UpsertEmbedding(ctx, normalized, result, item); err != nil {
+				return stats, err
+			}
 		}
 		stats.Upserted++
 		if err := worker.source.CompleteEmbeddingTask(ctx, normalized); err != nil {

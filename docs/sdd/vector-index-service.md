@@ -238,8 +238,9 @@ tenant_id, rebuild_job_id, collection_id, source_service,
 partition_key, cursor_value, status, updated_at
 ```
 
-PostgreSQL 不保存 raw vector array；vector backend 保存实际向量和低敏 metadata。若本地测试 adapter
-必须保存 vector array，也必须限制为 test profile，并禁止进入 events / metrics。
+Vector metadata PostgreSQL / outbox 不保存 raw vector array；vector backend 保存实际向量
+和低敏 metadata。若本地测试 adapter 必须保存 vector array，也必须限制为 test profile，
+并禁止进入 events / metrics。
 
 First-stage PostgreSQL backend state adapter:
 
@@ -260,11 +261,13 @@ First-stage pgvector adapter package:
 services/vector-index-service/internal/infrastructure/pgvector
 ```
 
-该 adapter 提供可选 `EnsureSchema` / `Upsert` / `Delete` / `Search` 实现，面向后续
+该 adapter 提供可选 `EnsureSchema` / `Upsert` / `Delete` / `Search` 实现，面向
 pgvector profile。它会在 dedicated vector backend table 中保存实际 embedding vector，
-但默认 `cmd` / 普通 PostgreSQL migration 不启用该 adapter，避免没有 `vector` 扩展的
-本地开发库被强制要求安装 pgvector。Milvus / OpenSearch adapter、pgvector runtime
-wiring、真实 provider backend smoke 和 rebuild / repair 仍是后续项。
+但默认普通 PostgreSQL migration 不启用该 adapter，避免没有 `vector` 扩展的本地开发库
+被强制要求安装 pgvector。`embedding-worker` 可通过
+`NEXUSIM_VECTOR_PROVIDER_BACKEND=pgvector` 显式启用该 backend sink；未配置时行为保持
+metadata-only。Milvus / OpenSearch adapter、真实 pgvector smoke 和 provider backend
+rebuild / repair 仍是后续项。
 
 ## 9. 核心流程
 
@@ -486,6 +489,20 @@ NEXUSIM_VECTOR_EMBEDDING_TASKS_FILE=H:\NexusIM\loadtest-results\vector-embedding
 NEXUSIM_VECTOR_EMBEDDING_BATCH_SIZE=50
 NEXUSIM_VECTOR_EMBEDDING_MODEL_TIMEOUT=5s
 ```
+
+Optional provider backend 配置：
+
+```text
+NEXUSIM_VECTOR_PROVIDER_BACKEND=pgvector
+NEXUSIM_VECTOR_PGVECTOR_DSN=postgres://...   # optional; empty uses NEXUSIM_PG_DSN
+NEXUSIM_VECTOR_PGVECTOR_TABLE=vector_embedding_items
+NEXUSIM_VECTOR_PGVECTOR_DIMENSION=8
+NEXUSIM_VECTOR_PGVECTOR_ENSURE_SCHEMA=true
+```
+
+该模式要求目标 PostgreSQL 已安装 `vector` extension，或者允许 `EnsureSchema` 执行
+`CREATE EXTENSION IF NOT EXISTS vector`。默认本地 `postgres:16-alpine` 不带 pgvector，
+所以普通开发 / CI 不应默认开启该 profile。
 
 Knowledge source 配置：
 

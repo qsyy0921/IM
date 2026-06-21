@@ -40,8 +40,9 @@ vector 写入、rebuild 和 backfill 逻辑复杂到影响 retrieval / memory �
   `knowledge-ingestion-service.ListKnowledgeChunks` 公开 API 拉取 redacted preview 的
   knowledge 任务源；随后调 `model-gateway.InvokeEmbedding`，再调用现有 vector upsert
   写入 hash / refs / visibility metadata。PostgreSQL、outbox、metrics 和 relay payload
-  仍不保存 raw text 或 embedding vector array。该模式用于本地 smoke / worker 边界验证，
-  不是生产 parser / chunk consumer。
+  仍不保存 raw text 或 embedding vector array；pgvector profile 的 dedicated backend
+  table 例外，且必须显式启用。该模式用于本地 smoke / worker 边界验证，不是生产 parser /
+  chunk consumer。
 - `loadtest/vectorembedding` 已跑通 embedding worker 真实进程 smoke：公开 gRPC
   准备 knowledge chunk manifest，启动 embedding worker，经 `model-gateway.InvokeEmbedding`
   写入 vector metadata，再通过 `SearchVectors` 验证结果；runner 不手工 upsert，也不读私表。
@@ -65,9 +66,10 @@ vector 写入、rebuild 和 backfill 逻辑复杂到影响 retrieval / memory �
   仍只暴露 hash / ref / dimension 等低敏字段。
 - first-stage optional pgvector adapter 包已落在
   `services/vector-index-service/internal/infrastructure/pgvector`：提供 schema 初始化、
-  upsert、delete、search 和 focused unit tests。该 adapter 当前不接默认 `cmd`，不进入
-  普通 PostgreSQL migration；真实 pgvector profile / smoke 后置。
+  upsert、delete、search 和 focused unit tests。`embedding-worker` 已支持通过
+  `NEXUSIM_VECTOR_PROVIDER_BACKEND=pgvector` 显式启用 pgvector backend sink；默认不启用，
+  不进入普通 PostgreSQL migration；真实 pgvector compose profile / smoke 后置。
 
-后续待办：memory / search chunk consumer、pgvector runtime wiring / smoke、
-真实 Milvus / OpenSearch backend、provider backend rebuild / backfill worker、
-provider backend repair。
+后续待办：memory / search chunk consumer、optional pgvector compose profile / focused
+pgvector smoke、真实 Milvus / OpenSearch backend、provider backend rebuild / backfill
+worker、provider backend repair。

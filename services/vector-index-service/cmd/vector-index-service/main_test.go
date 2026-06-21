@@ -54,6 +54,17 @@ func TestEmbeddingProducerSourceModeFromEnv(t *testing.T) {
 	}
 }
 
+func TestVectorProviderBackendModeFromEnv(t *testing.T) {
+	t.Setenv("NEXUSIM_VECTOR_PROVIDER_BACKEND", "")
+	if got := vectorProviderBackendModeFromEnv(); got != "" {
+		t.Fatalf("expected empty backend mode, got %s", got)
+	}
+	t.Setenv("NEXUSIM_VECTOR_PROVIDER_BACKEND", "PGVECTOR")
+	if got := vectorProviderBackendModeFromEnv(); got != "pgvector" {
+		t.Fatalf("expected normalized pgvector mode, got %s", got)
+	}
+}
+
 func TestValidateVectorIndexDebugListenerConfigAllowsEmptyOrPrivateAddress(t *testing.T) {
 	if err := validateVectorIndexDebugListenerConfig("", false); err != nil {
 		t.Fatalf("empty debug listener should be allowed: %v", err)

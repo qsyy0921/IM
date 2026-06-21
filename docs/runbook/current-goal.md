@@ -25,6 +25,12 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
 - `clients/` workspace skeleton 已创建并通过 focused validation：`protocol`、
   `client-core`、`web`、`desktop`、`android` 均有明确 package / runtime contract；
   Web 端已有 Vite shell，PC / Android 仍是 packaging/runtime contract，不产出安装包。
+- `api-gateway` 已新增 first-stage client BFF HTTP/JSON surface：`/api/auth/login`、
+  `/api/auth/refresh`、`/api/me`、`/api/conversations`、
+  `/api/conversations/{conversation_id}/messages`、`/api/messages/send`、
+  `/api/delivery/ack`、`/api/contacts`、`/api/receipts`。BFF 复用既有
+  gateway facade 和鉴权 / trusted metadata 注入，不读内部服务私表；`/api/auth/logout`
+  先保留为显式 `UNIMPLEMENTED`，等待 identity self-session revoke 契约。
 - 真实业务语言选择：后端和 client BFF 继续使用 Go；浏览器、PC desktop 和
   Android 的共享协议 / 同步核心 / UI 使用 TypeScript；Tauri 的 Rust、Android
   Kotlin 只作为薄平台桥；Python 只用于 AI worker / eval / 离线工具，不进入
@@ -71,9 +77,9 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
 
 ## 下一步优先级
 
-1. 实现 `api-gateway` client BFF v0.1 endpoints：auth、conversation list、
-   messages、PullInbox、ACK、contacts、receipts。
-2. 接 Web fetch / WebSocket adapter、local store adapter 和局域网 smoke。
+1. 接 Web fetch / WebSocket adapter、local store adapter 和局域网 smoke。
+2. 给 client BFF 补 HTTP 层 metrics / rate-limit adapter；当前 BFF 已复用
+   gateway facade 鉴权，但 HTTP 请求没有进入 gRPC interceptor。
 3. 后续按同一 core 接 PC desktop Tauri runner 和 Android runtime shell。
 4. 再回到 workflow compensation adapter / instruction approval UI / ops 管理；
    当前已有本地 workflow get / decision / decision manifest / instruction list CLI，

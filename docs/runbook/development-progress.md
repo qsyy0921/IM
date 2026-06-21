@@ -29,8 +29,10 @@
   workspace 已创建并通过 focused validation / typecheck / Web build，承载
   `protocol`、`client-core`、Web shell、PC desktop shell contract 和 Android
   runtime contract。客户端只连 `api-gateway` / `push-gateway`，
-  PullInbox 是消息事实源，WebSocket 只做在线唤醒。第一阶段目标是局域网 Web MVP，
-  然后复用同一 core 接 PC installer 和 Android APK。
+  PullInbox 是消息事实源，WebSocket 只做在线唤醒。`api-gateway` client BFF
+  first-stage HTTP/JSON surface 已落，覆盖 login / refresh / me / conversation
+  list / PullInbox-backed messages / send / ACK / contacts / receipts；第一阶段
+  目标是局域网 Web MVP，然后复用同一 core 接 PC installer 和 Android APK。
 
 当前已开始的 AI 大模型应用底座能力：
 
@@ -190,9 +192,10 @@
 
 当前 Go 侧服务底座、控制面、EvidencePack、proposal / approval / audit、
 Python Worker 候选接入边界和低敏 eval 持久化已经足够支撑算法切片。
-用户已明确切入 client platform MVP foundation：三端客户端架构和可复用
-`protocol` / `client-core` skeleton 已建立；下一步是实现 `api-gateway`
-client BFF v0.1，再接 Web fetch / WebSocket / local store 和局域网 smoke。
+用户已明确切入 client platform MVP foundation：三端客户端架构、可复用
+`protocol` / `client-core` skeleton 和 `api-gateway` client BFF first-stage
+HTTP/JSON surface 已建立；下一步是接 Web fetch / WebSocket / local store 和
+局域网 smoke。
 
 future platform / product services promotion 已作为后续主线保留：继续按服务推进
 媒体、通知、审计、控制面、presence、model 等产品化 / 平台服务，但不抢占当前

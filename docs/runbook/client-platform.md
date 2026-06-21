@@ -50,16 +50,38 @@ First slice:
   - `android`
 - The Web app is a shell and dependency declaration. It is not yet connected to
   the real backend until the client BFF endpoints are implemented.
+- `api-gateway` now exposes the first client BFF HTTP/JSON surface for login,
+  refresh, `me`, conversation list, PullInbox-backed conversation messages,
+  send, ACK, contacts and receipt lookup. The BFF reuses the existing gateway
+  facade and injects trusted downstream metadata; it does not read internal
+  service tables.
 - The PC desktop and Android packages currently define runtime / packaging
   contracts only. They do not yet produce `.msi`, `.exe`, `.apk`, or `.aab`
   artifacts.
+- `/api/auth/logout` is reserved and currently returns `UNIMPLEMENTED`; identity
+  still needs a user self-session revoke contract before server-side logout is
+  real.
+
+## BFF Runtime Config
+
+The BFF is disabled by default and starts inside `api-gateway` `grpc` mode when
+`NEXUSIM_API_GATEWAY_BFF_ADDR` is set.
+
+```powershell
+$env:NEXUSIM_API_GATEWAY_BFF_ADDR="172.31.50.10:8080"
+$env:NEXUSIM_API_GATEWAY_BFF_ALLOWED_ORIGINS="http://localhost:5173,http://172.31.50.10:5173"
+```
+
+Binding to `0.0.0.0` or another non-private listener requires
+`NEXUSIM_API_GATEWAY_BFF_ALLOW_PUBLIC=true`, and public mock auth is still
+rejected. For local LAN client smoke, prefer the wired `172.x.x.x` address.
 
 ## Next Work
 
-1. Add `api-gateway` client BFF v0.1 endpoints for auth, conversations, messages,
-   PullInbox and ACK.
-2. Implement browser fetch / WebSocket adapters in `clients/web`.
-3. Add IndexedDB local store adapter.
+1. Implement browser fetch / WebSocket adapters in `clients/web`.
+2. Add IndexedDB local store adapter.
+3. Add HTTP-layer BFF metrics / rate-limit adapter; current BFF calls the
+   gateway facade directly and does not pass through gRPC interceptors.
 4. Add PC desktop Tauri runner and first local Windows installer.
 5. Add Android runtime shell and first unsigned local APK.
 6. Run LAN smoke against Windows / Mac backend IP.

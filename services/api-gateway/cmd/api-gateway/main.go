@@ -24,6 +24,7 @@ import (
 	receiptv1 "github.com/qsyy0921/IM/api/proto/nexusim/receipt/v1"
 	gatewayauth "github.com/qsyy0921/IM/internal/gatewayauth"
 	apigrpc "github.com/qsyy0921/IM/services/api-gateway/internal/api/grpc"
+	httpbff "github.com/qsyy0921/IM/services/api-gateway/internal/api/httpbff"
 	monitoringinfra "github.com/qsyy0921/IM/services/api-gateway/internal/infrastructure/monitoring"
 	ratelimitinfra "github.com/qsyy0921/IM/services/api-gateway/internal/infrastructure/ratelimit"
 	"github.com/redis/go-redis/v9"
@@ -218,6 +219,24 @@ func runGRPC() error {
 		Delivery:      deliveryv1.NewDeliveryServiceClient(deliveryConn),
 		Receipt:       receiptv1.NewReceiptServiceClient(receiptConn),
 	})
+	bffAddr := apiGatewayBFFAddr()
+	bffAllowPublic, _, err := envOptionalBool("NEXUSIM_API_GATEWAY_BFF_ALLOW_PUBLIC")
+	if err != nil {
+		return err
+	}
+	if err := validateAPIGatewayBFFListenerConfig(bffAddr, envString("NEXUSIM_API_GATEWAY_AUTH_MODE", "hmac"), bffAllowPublic); err != nil {
+		return err
+	}
+	stopBFF, err := startBFFServer(ctx, bffAddr, httpbff.NewServer(httpbff.Config{
+		Gateway:        gateway,
+		Authenticator:  authenticator,
+		AllowedOrigins: splitCSV(os.Getenv("NEXUSIM_API_GATEWAY_BFF_ALLOWED_ORIGINS")),
+	}))
+	if err != nil {
+		return err
+	}
+	defer stopBFF()
+
 	serverOptions := []grpcgo.ServerOption{grpcgo.ChainUnaryInterceptor(
 		grpcMetrics.UnaryServerInterceptor(log.Default()),
 		traceRuntime.UnaryServerInterceptor(),
@@ -278,8 +297,60 @@ func startDebugServer(ctx context.Context, addr string, handler http.Handler) (f
 	}, nil
 }
 
+func startBFFServer(ctx context.Context, addr string, handler http.Handler) (func(), error) {
+	if strings.TrimSpace(addr) == "" {
+		return func() {}, nil
+	}
+	server := &http.Server{
+		Addr:              addr,
+		Handler:           handler,
+		ReadHeaderTimeout: 5 * time.Second,
+	}
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		return nil, err
+	}
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		if err := server.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Printf("api-gateway client BFF server stopped with error: %v", err)
+		}
+	}()
+	log.Printf("api-gateway client BFF server started on %s", addr)
+	return func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = server.Shutdown(shutdownCtx)
+		select {
+		case <-done:
+		case <-ctx.Done():
+		}
+	}, nil
+}
+
 func apiGatewayDebugAddr() string {
 	return envString("NEXUSIM_API_GATEWAY_DEBUG_ADDR", envString("NEXUSIM_DEBUG_ADDR", ""))
+}
+
+func apiGatewayBFFAddr() string {
+	return envString("NEXUSIM_API_GATEWAY_BFF_ADDR", "")
+}
+
+func validateAPIGatewayBFFListenerConfig(addr string, authMode string, allowPublic bool) error {
+	if strings.TrimSpace(addr) == "" {
+		return nil
+	}
+	if backendAddrTrustedWithoutMTLS(addr) {
+		return nil
+	}
+	if usesMockGatewayAuth(authMode) {
+		return errors.New("api-gateway client BFF uses mock auth on non-private listener address")
+	}
+	if allowPublic {
+		return nil
+	}
+	return errors.New("api-gateway client BFF listener address is non-private; set NEXUSIM_API_GATEWAY_BFF_ALLOW_PUBLIC=true to allow")
 }
 
 func validateAPIGatewayDebugListenerConfig(addr string, allowPublic bool) error {

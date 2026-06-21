@@ -248,6 +248,17 @@ GET  /api/contacts
 GET  /api/receipts
 ```
 
+First-stage implementation note:
+
+- `api-gateway` exposes these as HTTP/JSON client BFF endpoints while reusing
+  the existing gateway facade and downstream trusted metadata injection.
+- `GET /api/conversations/{conversation_id}/messages` is backed by
+  `delivery-service.PullInbox`, not by a direct message table read.
+- `/api/auth/logout` is reserved and currently fail-closed as `UNIMPLEMENTED`
+  until identity-service has a user self-session revoke contract.
+- HTTP-layer BFF metrics / rate-limit middleware remains a follow-up; the first
+  slice keeps the service boundary correct and reuses gateway authentication.
+
 `push-gateway` remains WebSocket-based:
 
 ```text

@@ -364,6 +364,34 @@ func TestValidateAPIGatewayDebugListenerConfigAllowsExplicitPublicOptIn(t *testi
 	}
 }
 
+func TestValidateAPIGatewayBFFListenerConfigAllowsEmptyOrPrivateAddress(t *testing.T) {
+	for _, addr := range []string{"", "127.0.0.1:8080", "172.31.50.10:8080"} {
+		if err := validateAPIGatewayBFFListenerConfig(addr, "hmac", false); err != nil {
+			t.Fatalf("expected BFF listener %q to be allowed: %v", addr, err)
+		}
+	}
+}
+
+func TestValidateAPIGatewayBFFListenerConfigRejectsPublicAddressByDefault(t *testing.T) {
+	for _, addr := range []string{"0.0.0.0:8080", ":8080", "8.8.8.8:8080"} {
+		if err := validateAPIGatewayBFFListenerConfig(addr, "hmac", false); err == nil {
+			t.Fatalf("expected BFF listener %q to be rejected by default", addr)
+		}
+	}
+}
+
+func TestValidateAPIGatewayBFFListenerConfigAllowsExplicitPublicOptIn(t *testing.T) {
+	if err := validateAPIGatewayBFFListenerConfig("0.0.0.0:8080", "jwt", true); err != nil {
+		t.Fatalf("expected explicit public BFF opt-in to be allowed: %v", err)
+	}
+}
+
+func TestValidateAPIGatewayBFFListenerConfigRejectsPublicMockAuth(t *testing.T) {
+	if err := validateAPIGatewayBFFListenerConfig("0.0.0.0:8080", "mock", true); err == nil {
+		t.Fatalf("expected public BFF mock auth to be rejected")
+	}
+}
+
 func TestValidateTrustedMetadataBackendConfigCoversIdentityService(t *testing.T) {
 	err := validateTrustedMetadataBackendConfig(
 		"identity-service",

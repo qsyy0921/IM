@@ -35,6 +35,10 @@ assert(
 assert(Array.isArray(report.checks), "checks must be an array");
 assert(Array.isArray(report.nextActions), "nextActions must be an array");
 assert(
+  report.nextActions.some(action => action.target === "windows-desktop" && typeof action.command === "string"),
+  "desktop next action command missing"
+);
+assert(
   report.nextActions.some(action => action.target === "android" && typeof action.command === "string"),
   "android next action command missing"
 );

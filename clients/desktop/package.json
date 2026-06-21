@@ -16,5 +16,8 @@
   "dependencies": {
     "@nexusim/client-core": "0.1.0",
     "@nexusim/protocol": "0.1.0"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.11.3"
   }
 }

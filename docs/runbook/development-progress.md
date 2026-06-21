@@ -75,7 +75,8 @@
   asset prep，直接 Tauri build 仍保留自动准备路径；Android APK wrapper 会在已验证
   manifest 后跳过 Gradle 内重复 asset prep，直接 Gradle build 仍保留自动准备路径；
   desktop / Android artifact build wrapper 已有 dry-run-tested command plan，
-  readiness report 已显示 per-target shell asset verification 状态；
+  readiness report 已显示 per-target shell asset verification 状态；desktop 已声明
+  repo-local `@tauri-apps/cli`，但本 checkout 尚未安装本地 CLI 二进制；
   artifact install plan 已能从 collected manifest 输出低敏 Windows / Android 安装
   checklist 和 install-side prereq readiness，且不连接设备；shell smoke plan 已消费同一
   install readiness，并输出低敏 browser / desktop / Android smoke 前置计划和
@@ -83,8 +84,8 @@
   artifact collector 已能归档产物并生成低敏 SHA-256 manifest，build wrapper 已支持
   成功构建后自动归档，Android Docker builder
   profile 已接同一 collector 但尚未运行，readiness report 显示 Docker / Compose
-  可用但 builder image 尚未构建；本机仍缺 Tauri CLI / Android
-  JDK 17+ / Gradle / SDK；下一步补工具链或显式运行 builder profile 后复用同一 core 接
+  可用但 builder image 尚未构建；本机仍缺 Android
+  JDK 17+ / Gradle / SDK；下一步显式安装 repo-declared Tauri CLI、补 Android 工具链或显式运行 builder profile 后复用同一 core 接
   local Windows artifact 和 Android APK。
 
 当前已开始的 AI 大模型应用底座能力：

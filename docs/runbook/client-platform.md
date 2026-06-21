@@ -275,15 +275,17 @@ rejected. For local LAN client smoke, prefer the wired `172.x.x.x` address.
 
 1. Add first local Windows artifact from the PC desktop Tauri runner.
 2. Add first unsigned local APK from the Android native bridge.
-3. Wire logout UI controls into the real desktop and Android shells, and run a
-   platform-shell smoke once packaging/runtime tooling is ready.
+3. Wire lifecycle UI controls into the real desktop and Android shells, and run
+   a platform-shell smoke once packaging/runtime tooling is ready.
 4. Replace first-stage desktop / Android localStorage stores with native SQLite
    bridge adapters when packaging/runtime tooling is ready.
 
 ## Local Build Prerequisites
 
 - PC artifact build needs Tauri CLI / `cargo-tauri`; the current repository has
-  the runner skeleton and validator, not the local CLI dependency.
+  the runner skeleton, validator and repo-declared `@tauri-apps/cli`
+  dependency. Run `npm --prefix clients install` explicitly when you are ready
+  to download the local Tauri CLI binary for artifact builds.
 - Android APK build needs JDK 17+ plus Gradle / Android SDK. If those are not
   installed locally, use a Docker / CI builder profile instead of claiming an
   APK baseline.

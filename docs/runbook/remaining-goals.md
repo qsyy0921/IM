@@ -33,8 +33,9 @@
   `createDesktopShellActions` 已接 shared login / refresh / restore / logout 编排；继续接真实 desktop
   shell UI / artifact。
 - Windows packaging：产出本地可安装或可运行的 Windows artifact；不要求生产签名。
-  当前本机尚缺 Tauri CLI / `cargo-tauri`，需要先补本地构建前置或通过
-  Docker / CI builder 产物链路；可用 `npm --prefix clients run check:build-prereqs`
+  desktop workspace 已声明 repo-local `@tauri-apps/cli`，但本 checkout 尚未运行
+  `npm --prefix clients install` 安装本地 CLI 二进制；也可通过 Docker / CI
+  builder 产物链路；可用 `npm --prefix clients run check:build-prereqs`
   检查当前机器状态。`build:desktop-artifact` wrapper 已落，会在工具链 ready 时
   准备 shell assets 并执行 Tauri build；artifact collector 已能归档产物并生成
   SHA-256 manifest，`build:desktop-artifact:collect` 可在成功构建后自动归档；当前仍未产出 installer。

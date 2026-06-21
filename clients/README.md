@@ -101,6 +101,7 @@ npm --prefix clients run test:artifact-builders
 npm --prefix clients run test:artifact-collector
 npm --prefix clients run test:artifact-install-plan
 npm --prefix clients run test:artifact-readiness
+npm --prefix clients run test:web-shell-actions
 npm --prefix clients run test:shell-smoke-plan
 npm --prefix clients run report:artifact-readiness
 node clients/tools/plan-client-shell-smoke.mjs
@@ -164,7 +165,10 @@ Current packaging status:
   has a build wrapper. Direct Tauri builds still run shell asset prep, while the
   NexusIM wrapper sets `NEXUSIM_SKIP_SHELL_ASSET_PREP=true` after it has already
   prepared and verified the manifest so wrapper builds do not run the same Web
-  build twice. No installer exists yet because this machine lacks Tauri CLI.
+  build twice. The desktop workspace now declares `@tauri-apps/cli`; run
+  `npm --prefix clients install` when you are ready to download the local Tauri
+  CLI and then run `build:desktop-artifact:collect`. No installer exists yet
+  because the local Tauri CLI binary has not been installed in this checkout.
 - Android: native WebView shell can prepare target-specific Web assets and has
   an APK build wrapper plus a Docker builder profile; no APK/AAB has been
   produced yet because the local native toolchain is missing and the Docker
@@ -177,5 +181,5 @@ Current packaging status:
 - `plan:shell-smoke` prints a low-sensitive browser / desktop / Android shell
   smoke plan. It lists prepared asset status, artifact presence, safe build
   commands, install-plan commands, per-target manual smoke checklists and the
-  shared BFF / push smoke command without launching services or installing
-  toolchains.
+  shared lifecycle guard / BFF / push smoke command without launching services
+  or installing toolchains.

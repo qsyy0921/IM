@@ -73,8 +73,10 @@ function nextActions(prereqs, docker) {
   } else {
     actions.push({
       target: "windows-desktop",
-      action: "install-desktop-toolchain",
+      action: "install-declared-desktop-tauri-cli",
       missing: missingChecks(prereqs.checks, "desktop"),
+      command: "npm --prefix clients install",
+      downloadsToolchain: true,
       safeDryRunCommand: "node clients/tools/build-desktop-artifact.mjs --dry-run --collect"
     });
   }

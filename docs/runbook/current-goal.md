@@ -67,8 +67,9 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
 - `clients` workspace 已新增本地构建前置检查
   `npm --prefix clients run check:build-prereqs`；该检查只读取本机 Rust /
   Tauri / JDK / Gradle / Android SDK 状态，不安装依赖、不拉包、不使用 `npx`
-  远程解析。当前机器可用 `rustc` / `cargo`，但缺 `cargo-tauri` / 本地 npm
-  Tauri CLI，Android 侧仍是 JDK 8 且缺 Gradle / Android SDK，因此 PC artifact
+  远程解析。当前机器可用 `rustc` / `cargo`；desktop workspace 已声明
+  repo-local `@tauri-apps/cli`，但本 checkout 尚未运行安装步骤，所以本地 Tauri
+  CLI 二进制仍未 ready。Android 侧仍是 JDK 8 且缺 Gradle / Android SDK，因此 PC artifact
   和 Android APK 仍未 ready。
 - `IndexedDBMessageStore` 已有 first-stage persistence test harness，覆盖
   cursor persistence、message seq ordering、pending send、send accepted 后稳定
@@ -132,7 +133,7 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
 - `clients/tools/build-desktop-artifact.mjs` 与
   `clients/tools/build-android-apk.mjs` 已提供 first-stage artifact / APK build
   wrapper；`test:artifact-builders` 覆盖 dry-run 命令计划和低敏输出。当前机器
-  `check:build-prereqs` 仍显示 desktop 缺 Tauri CLI / `cargo-tauri`，Android 缺
+  `check:build-prereqs` 仍显示 desktop 缺已安装的 Tauri CLI / `cargo-tauri`，Android 缺
   JDK 17+ / Gradle / Android SDK，所以 wrapper 会 fail fast，尚未产出 installer
   或 APK。
 - `clients/tools/collect-client-artifacts.mjs` 已提供 first-stage artifact
@@ -156,8 +157,8 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   会显示 prepared shell asset manifest verification 状态，并输出低敏
   `nextActions`，不会自动下载或构建。当前报告显示
   Docker / Compose 可用、Android builder profile 可解析，但
-  `nexusim/client-android-builder:local` image 尚未构建；desktop 仍缺 Tauri
-  CLI，Android 本地路径仍缺 JDK 17+ / Gradle / Android SDK。
+  `nexusim/client-android-builder:local` image 尚未构建；desktop 已有 repo-declared
+  Tauri CLI 依赖但尚未安装本地 CLI 二进制，Android 本地路径仍缺 JDK 17+ / Gradle / Android SDK。
 - `clients/tools/plan-client-shell-smoke.mjs` 已提供低敏 browser / desktop /
   Android shell smoke plan；它汇总 toolchain readiness、prepared asset
   verification、artifact presence、collected-artifact install readiness、安全构建命令、
@@ -238,7 +239,7 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
 
 ## 下一步优先级
 
-1. 补本地 Tauri CLI / Android JDK 17+ / Gradle / Android SDK，或显式运行 Android
+1. 显式运行 `npm --prefix clients install` 安装 repo-declared Tauri CLI，补 Android JDK 17+ / Gradle / Android SDK，或显式运行 Android
    Docker builder profile，然后运行 `build:desktop-artifact:collect` /
    `build:android-apk:collect` 产出首个本地 artifact + manifest。
 2. 在真实 PC / Android shell UI 中接入现有 shell action，并在工具链 ready 后跑平台 shell smoke。

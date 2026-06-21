@@ -26,6 +26,10 @@ the native bridge can stay narrow and auditable.
   assets through `prepare-shell-web-assets-if-needed.mjs`. Use
   `node clients/tools/build-desktop-artifact.mjs --dry-run` to inspect the
   command and missing toolchain without building.
+- `@tauri-apps/cli` is declared as a desktop workspace dev dependency. This
+  makes the Windows artifact path repo-local after `npm --prefix clients
+  install`; no global Tauri CLI is required. The install step may download the
+  platform CLI binary and should be run explicitly before a real artifact build.
 - No Windows installer is produced yet.
 - `src-tauri/tauri.conf.json` records the intended shell boundary.
 

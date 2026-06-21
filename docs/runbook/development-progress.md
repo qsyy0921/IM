@@ -64,7 +64,8 @@
   Web shell 登录面板已通过 shared `ClientShellActions` 接入 restore / logout，
   供 PC / Android WebView 复用同一 UI action contract；
   shell asset prep 已先清理目标目录再复制，并写低敏 relative-path / SHA-256
-  manifest，避免旧 Web bundle 混入后续 shell 包；
+  manifest，artifact wrapper 会在 native build 前验证 manifest，避免旧 Web bundle
+  混入后续 shell 包；
   desktop / Android artifact build wrapper 已有 dry-run-tested command plan，
   artifact collector 已能归档产物并生成低敏 SHA-256 manifest，build wrapper 已支持
   成功构建后自动归档，Android Docker builder

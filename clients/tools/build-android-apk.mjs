@@ -8,6 +8,7 @@ import {
   parseArtifactBuildOptions
 } from "./client-artifact-build-options.mjs";
 import { prepareShellWebAssets } from "./prepare-shell-web-assets.mjs";
+import { verifyShellAssets } from "./verify-shell-assets.mjs";
 
 const androidNativeRoot = join(workspaceRoot, "android", "native");
 
@@ -29,6 +30,7 @@ function main(argv) {
     target: "android",
     build: !options.skipWebBuild
   });
+  verifyShellAssets({ target: "android" });
   execFileSync(plan.command, plan.args, {
     cwd: androidNativeRoot,
     stdio: "inherit",

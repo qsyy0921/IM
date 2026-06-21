@@ -112,7 +112,8 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   skeleton 已改成 `WebViewAssetLoader` 加载本地 app assets，禁用 file / content
   access；Gradle `preBuild` 会调用同一资产准备脚本。shell asset prep 会在
   source / output 不同时先清理目标目录，避免 APK / shell 包混入旧 bundle，并写入
-  低敏 `nexusim-shell-assets-manifest.json`（relative path / bytes / SHA-256）。该流程已通过 focused
+  低敏 `nexusim-shell-assets-manifest.json`（relative path / bytes / SHA-256）。artifact
+  build wrapper 会在调用 Tauri / Gradle 前验证 prepared assets 与 manifest 一致。该流程已通过 focused
   `test:shell-web-assets`、desktop / Android validators 和实际 shell asset build。
 - `clients/tools/build-desktop-artifact.mjs` 与
   `clients/tools/build-android-apk.mjs` 已提供 first-stage artifact / APK build

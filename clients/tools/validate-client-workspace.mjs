@@ -37,6 +37,7 @@ const requiredPaths = [
   "tools/client-build-env.mjs",
   "tools/build-desktop-artifact.mjs",
   "tools/build-android-apk.mjs",
+  "tools/verify-shell-assets.mjs",
   "tools/test-client-artifact-builders.mjs",
   "desktop/package.json",
   "desktop/src/index.ts",

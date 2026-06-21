@@ -162,7 +162,8 @@ First slice:
   also checks stale bundle cleanup so Android / desktop shell outputs do not
   retain old Web assets across builds, and verifies the low-sensitive
   `nexusim-shell-assets-manifest.json` with relative paths, byte sizes and
-  SHA-256 hashes.
+  SHA-256 hashes. Native artifact wrappers call the same manifest verifier
+  after preparing assets and before invoking Tauri / Gradle.
 - `npm --prefix clients run test:artifact-builders` validates the first-stage
   desktop artifact / Android APK build wrappers in dry-run mode. Real build
   commands are present as `build:desktop-artifact` and `build:android-apk`, but
@@ -303,3 +304,7 @@ npm --prefix clients run collect:client-artifacts
 docker compose -f deploy/local/docker-compose.client-builders.yml --profile client-builders build client-android-apk-builder
 docker compose -f deploy/local/docker-compose.client-builders.yml --profile client-builders run --rm client-android-apk-builder
 ```
+
+After preparing both shell targets, `node clients/tools/verify-shell-assets.mjs --target all`
+checks both prepared asset directories. Per-target native build wrappers run the
+matching verifier automatically after asset prep.

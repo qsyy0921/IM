@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { prepareShellWebAssets } from "./prepare-shell-web-assets.mjs";
+import { verifyShellAssets } from "./verify-shell-assets.mjs";
 
 function assert(condition, message) {
   if (!condition) {
@@ -40,6 +41,8 @@ try {
   assert(!desktopConfig.match(/token|secret|password|credential|private/i), "desktop rendered config contains sensitive key");
   assert(!existsSync(join(desktopOut, "assets", "stale.js")), "desktop output must remove stale assets");
   assertShellAssetsManifest(desktopOut, "windows-desktop");
+  const desktopVerification = verifyShellAssets({ target: "windows-desktop", outputDir: desktopOut });
+  assert(desktopVerification.fileCount === 3, "desktop verifier file count mismatch");
 
   const androidOut = join(tempRoot, "android-out");
   mkdirSync(join(androidOut, "assets"), { recursive: true });
@@ -56,6 +59,17 @@ try {
   assert(androidConfig.includes('"target": "android"'), "android config not rendered");
   assert(!existsSync(join(androidOut, "assets", "stale.js")), "android output must remove stale assets");
   assertShellAssetsManifest(androidOut, "android");
+  const androidVerification = verifyShellAssets({ target: "android", outputDir: androidOut });
+  assert(androidVerification.fileCount === 3, "android verifier file count mismatch");
+
+  writeFileSync(join(androidOut, "assets", "unexpected.js"), "console.log('unexpected');\n", "utf8");
+  let rejectedStaleAsset = false;
+  try {
+    verifyShellAssets({ target: "android", outputDir: androidOut });
+  } catch {
+    rejectedStaleAsset = true;
+  }
+  assert(rejectedStaleAsset, "shell asset verifier should reject files missing from manifest");
 
   let rejected = false;
   try {

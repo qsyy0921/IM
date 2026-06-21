@@ -197,6 +197,8 @@ Responsibilities:
 - Shell asset preparation must write a low-sensitive manifest with relative
   paths, byte sizes and SHA-256 hashes. The manifest must not include local
   absolute paths, tokens, user ids or endpoint secrets.
+- Native artifact build wrappers must verify prepared assets against this
+  manifest before invoking Tauri or Gradle.
 
 PC constraints:
 
@@ -229,6 +231,8 @@ Responsibilities:
   copying a new build, so APKs do not carry stale Web bundles.
 - Android asset preparation uses the same low-sensitive shell asset manifest as
   desktop.
+- Android APK build wrappers must verify prepared assets against this manifest
+  before invoking Gradle.
 
 Android constraints:
 

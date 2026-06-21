@@ -17,6 +17,7 @@
     "test:web-platform": "node ./tools/test-web-platform-adapter.mjs",
     "test:shell-config": "node ./tools/test-shell-config-contract.mjs",
     "test:shell-web-assets": "node ./tools/test-shell-web-assets.mjs",
+    "verify:shell-assets": "node ./tools/verify-shell-assets.mjs --target all",
     "test:artifact-builders": "node ./tools/test-client-artifact-builders.mjs",
     "test:artifact-collector": "node ./tools/test-client-artifact-collector.mjs",
     "test:artifact-readiness": "node ./tools/test-client-artifact-readiness.mjs",

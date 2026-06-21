@@ -14,6 +14,7 @@ import {
   parseArtifactBuildOptions
 } from "./client-artifact-build-options.mjs";
 import { prepareShellWebAssets } from "./prepare-shell-web-assets.mjs";
+import { verifyShellAssets } from "./verify-shell-assets.mjs";
 
 const desktopRoot = join(workspaceRoot, "desktop");
 
@@ -35,6 +36,7 @@ function main(argv) {
     target: "windows-desktop",
     build: !options.skipWebBuild
   });
+  verifyShellAssets({ target: "windows-desktop" });
   execFileSync(plan.command, plan.args, {
     cwd: desktopRoot,
     stdio: "inherit",

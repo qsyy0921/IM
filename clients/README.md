@@ -85,6 +85,10 @@ npm --prefix clients run build:shell-assets:android
 The shell asset prep step writes `nexusim-shell-assets-manifest.json` next to the
 prepared Web assets. The manifest contains only target, relative file paths,
 byte sizes and SHA-256 hashes; it does not record local absolute paths.
+`npm --prefix clients run verify:shell-assets` verifies prepared desktop /
+Android assets against that manifest before a native artifact build. Use
+`--target all` only after preparing both shell targets; per-target native build
+wrappers run the matching verifier automatically.
 
 Check artifact build commands without requiring the heavy native toolchains:
 
@@ -107,6 +111,12 @@ npm --prefix clients run build:android-apk
 npm --prefix clients run build:desktop-artifact:collect
 npm --prefix clients run build:android-apk:collect
 npm --prefix clients run collect:client-artifacts
+```
+
+After preparing both shell targets, verify both prepared asset directories:
+
+```powershell
+node clients/tools/verify-shell-assets.mjs --target all
 ```
 
 `collect:client-artifacts` copies produced desktop / Android artifacts into the

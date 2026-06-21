@@ -143,7 +143,7 @@ const readyReadiness = {
           ready: true,
           reason: "",
           bridge: "android-sqlite",
-          nextAction: "android-sqlite is required before android can use sqlite local store"
+          nextAction: ""
         },
         currentSmokeStore: "native-sqlite"
       }

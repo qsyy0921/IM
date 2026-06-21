@@ -37,6 +37,7 @@ assert(report.targets.android.localStore?.productionTarget === "sqlite", "androi
 assert(report.targets.android.localStore?.nativeStoreReadiness?.ready === true, "android native store source readiness mismatch");
 assert(report.targets.android.localStore?.nativeStoreReadiness?.reason === "", "android native store ready reason mismatch");
 assert(report.targets.android.localStore?.nativeStoreReadiness?.bridge === "android-sqlite", "android native store bridge mismatch");
+assert(report.targets.android.localStore?.nativeStoreReadiness?.nextAction === "", "android ready native store next action mismatch");
 assert(report.targets.android.localStore?.currentSmokeStore === "native-sqlite", "android current smoke store mismatch");
 assert(report.targets.android.dockerBuilder.profile === "client-builders", "android builder profile mismatch");
 assert(report.targets.android.dockerBuilder.outputHint.endsWith("manifest.json"), "android builder manifest hint missing");

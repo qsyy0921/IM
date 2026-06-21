@@ -251,8 +251,10 @@ First slice:
   without printing local absolute paths. It also includes per-target prepared
   shell asset verification status and per-target local store readiness. The
   local store section records the current first-stage `local-storage` cache,
-  target `sqlite` production store and missing native bridge reason without
-  treating that as a blocker for current shell smoke. It separates the Android Docker builder image
+  target `sqlite` production store and native bridge readiness without treating
+  desktop's missing SQLite bridge as a blocker for current shell smoke. Android
+  source now reports `android-sqlite` ready, but APK build and real-device smoke
+  are still required before treating it as a runtime baseline. It separates the Android Docker builder image
   build command from the actual builder run command and emits low-sensitive
   `nextActions`; it never starts a download or build by itself. When the image
   is missing, the next action points at `build:android-apk:docker:bootstrap`,

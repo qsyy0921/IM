@@ -203,7 +203,7 @@ function localStoreReadiness(target) {
       ready,
       reason,
       bridge,
-      nextAction: `${bridge} is required before ${target} can use sqlite local store`
+      nextAction: ready ? "" : `${bridge} is required before ${target} can use sqlite local store`
     },
     currentSmokeStore: ready ? "native-sqlite" : "local-storage"
   };

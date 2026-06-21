@@ -448,10 +448,10 @@ PC desktop and Android now use shared `KeyValueMessageStore` with WebView
 replace only the storage port with SQLite/native adapters while keeping
 `client-core` sync, send queue and ACK semantics shared. PC desktop and Android
 `sqlite` configuration is reserved and must fail fast through
-`NativeStoreReadiness` until a real native bridge exists. That shared contract
-keeps the failure low-sensitive and stable: `reason`, expected bridge and next
-action are explicit, while platform adapters do not expose native paths or
-tokens. Web runtime discovery may wrap native key-value storage only when
+`NativeStoreReadiness` until the matching native bridge is present. That shared
+contract keeps the failure low-sensitive and stable: `reason`, expected bridge
+and next action are explicit, while platform adapters do not expose native paths
+or tokens. Web runtime discovery may wrap native key-value storage only when
 metadata is explicitly ready and the fixed Tauri `local_store_*` commands or
 Android `NexusIMNative.localStore*` methods are present; desktop still exposes
 metadata only, while Android source now exposes a fixed-prefix SQLite

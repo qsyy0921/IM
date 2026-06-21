@@ -116,11 +116,12 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   API / WebSocket 地址、device / installation / app version 和 session key；当前
   focused test 覆盖 `windows-desktop` 与 `android` target selection。该 bridge 只
   做 runtime identity / config 选择，不授予文件系统或 native token 权限。
-- Android WebView 已注册只读 `NexusIMNative` JavaScript bridge；该 bridge 现在只暴露
-  单个 `runtimeMetadata()` 方法。Web 端可读取它用于诊断，且 focused test 覆盖合法
-  metadata、错误 target 和 malformed JSON 的 fail-closed 行为。metadata 现在包含
-  低敏 local-store capability readiness（当前 localStorage、目标 sqlite、bridge
-  unavailable reason），但该 bridge 不暴露 token、storage API、文件系统或 message API。Android WebView inspection 现在显式跟随
+- Android WebView 已注册窄能力 `NexusIMNative` JavaScript bridge；该 bridge 暴露
+  `runtimeMetadata()` 以及固定前缀 `localStoreGetItem` / `localStoreSetItem` /
+  `localStoreRemoveItem` 方法。Web 端可读取 metadata 用于诊断，且 focused test 覆盖合法
+  metadata、错误 target、malformed JSON 和缺失方法的 fail-closed 行为。metadata 现在包含
+  低敏 local-store capability readiness（当前 localStorage、目标 sqlite、bridge / reason），
+  但该 bridge 不暴露 token、任意 storage key、文件系统、content provider、BFF 调用或 message API。Android WebView inspection 现在显式跟随
   平台 debuggable flag，仅用于 debug / smoke automation，不允许 release 无条件开启。
   Android native validator 现在也锁住 DOM storage enabled、file access disabled
   和 content access disabled，保证 WebView 能跑 shared runtime 但不打开原生文件 /
@@ -236,8 +237,9 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   report；`test:artifact-readiness` 覆盖 schema、无敏感字段和无本机绝对路径。
   报告已区分 Android Docker builder image build command 与实际 builder run command，
   会显示 prepared shell asset manifest verification 状态、desktop / Android local store
-  readiness（当前默认 `local-storage`，目标 `sqlite`，native bridge 未实现时输出
-  `sqlite-native-bridge-unavailable`），并输出低敏
+  readiness（当前默认 `local-storage`，目标 `sqlite`；desktop 仍输出
+  `sqlite-native-bridge-unavailable`，Android 源码侧已报告 `android-sqlite` ready 但仍等待 APK /
+  真机 smoke），并输出低敏
   `nextActions`，不会自动下载或构建。当前报告显示 Windows desktop ready
  （通过 repo-local `local:tauri`），Docker / Compose 可用、Android builder profile
   可解析，但 `nexusim/client-android-builder:local` image 尚未构建；Android 本地路径

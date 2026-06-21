@@ -117,7 +117,16 @@ async function main() {
       return JSON.stringify({
         target: "android",
         nativeBridgeVersion: "0.1.0",
-        runtimeLabel: "NexusIM Android shell"
+        runtimeLabel: "NexusIM Android shell",
+        capabilities: {
+          localStore: {
+            currentDefault: "local-storage",
+            productionTarget: "sqlite",
+            nativeStoreReady: false,
+            nativeStoreReason: "sqlite-native-bridge-unavailable",
+            nativeStoreBridge: "android-sqlite"
+          }
+        }
       });
     }
   };
@@ -125,6 +134,9 @@ async function main() {
   assertEqual(nativeMetadata?.target, "android", "android native bridge metadata target");
   assertEqual(nativeMetadata?.nativeBridgeVersion, "0.1.0", "android native bridge metadata version");
   assertEqual(nativeMetadata?.runtimeLabel, "NexusIM Android shell", "android native bridge metadata label");
+  assertEqual(nativeMetadata?.capabilities?.localStore?.ready, false, "android local store readiness");
+  assertEqual(nativeMetadata?.capabilities?.localStore?.reason, "sqlite-native-bridge-unavailable", "android local store reason");
+  assertEqual(nativeMetadata?.capabilities?.localStore?.bridge, "android-sqlite", "android local store bridge");
 
   globalThis.NexusIMNative = {
     runtimeMetadata() {
@@ -147,7 +159,16 @@ async function main() {
         return JSON.stringify({
           target: "windows-desktop",
           nativeBridgeVersion: "0.1.0",
-          runtimeLabel: "NexusIM desktop shell"
+          runtimeLabel: "NexusIM desktop shell",
+          capabilities: {
+            localStore: {
+              currentDefault: "local-storage",
+              productionTarget: "sqlite",
+              nativeStoreReady: false,
+              nativeStoreReason: "sqlite-native-bridge-unavailable",
+              nativeStoreBridge: "tauri-sqlite"
+            }
+          }
         });
       }
     }
@@ -156,6 +177,9 @@ async function main() {
   assertEqual(desktopMetadata?.target, "windows-desktop", "desktop native bridge metadata target");
   assertEqual(desktopMetadata?.nativeBridgeVersion, "0.1.0", "desktop native bridge metadata version");
   assertEqual(desktopMetadata?.runtimeLabel, "NexusIM desktop shell", "desktop native bridge metadata label");
+  assertEqual(desktopMetadata?.capabilities?.localStore?.ready, false, "desktop local store readiness");
+  assertEqual(desktopMetadata?.capabilities?.localStore?.reason, "sqlite-native-bridge-unavailable", "desktop local store reason");
+  assertEqual(desktopMetadata?.capabilities?.localStore?.bridge, "tauri-sqlite", "desktop local store bridge");
 
   globalThis.__TAURI__ = {
     core: {

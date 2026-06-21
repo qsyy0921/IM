@@ -18,8 +18,8 @@ Flutter or native Kotlin for a concrete reason.
   BFF calls.
 - The WebView registers `NexusIMNative` as a read-only JavaScript bridge. It
   exposes only one method, `runtimeMetadata()`, with runtime metadata (`target`,
-  bridge version and label), and does not expose token, storage, file-system or
-  message APIs.
+  bridge version, label and local-store bridge readiness), and does not expose
+  token, storage API, file-system or message API.
 - The WebView uses `WebViewAssetLoader`, loads `appassets.androidplatform.net`,
   enables DOM storage for the shared TypeScript runtime, and keeps raw file /
   content access disabled.

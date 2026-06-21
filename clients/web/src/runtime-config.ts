@@ -1,4 +1,8 @@
-import type { ClientRuntimeConfig, ClientRuntimeTarget } from "@nexusim/client-core";
+import type {
+  ClientRuntimeConfig,
+  ClientRuntimeTarget,
+  NativeStoreReadiness
+} from "@nexusim/client-core";
 
 interface ViteImportMetaEnv {
   readonly VITE_NEXUSIM_API_BASE?: string;
@@ -27,15 +31,21 @@ export interface AndroidNativeBridgeMetadata {
   readonly target: "android";
   readonly nativeBridgeVersion: string;
   readonly runtimeLabel: string;
+  readonly capabilities?: NativeBridgeCapabilities;
 }
 
 export interface DesktopNativeBridgeMetadata {
   readonly target: "windows-desktop";
   readonly nativeBridgeVersion: string;
   readonly runtimeLabel: string;
+  readonly capabilities?: NativeBridgeCapabilities;
 }
 
 export type NativeBridgeMetadata = AndroidNativeBridgeMetadata | DesktopNativeBridgeMetadata;
+
+export interface NativeBridgeCapabilities {
+  readonly localStore?: NativeStoreReadiness;
+}
 
 export function loadRuntimeConfig(): ClientRuntimeConfig {
   const env = (import.meta as unknown as ViteImportMeta).env ?? {};
@@ -73,10 +83,12 @@ export async function readDesktopNativeBridgeMetadata(): Promise<DesktopNativeBr
     ) {
       return undefined;
     }
+    const capabilities = nativeBridgeCapabilities("windows-desktop", raw.capabilities);
     return {
       target: "windows-desktop",
       nativeBridgeVersion: raw.nativeBridgeVersion,
-      runtimeLabel: raw.runtimeLabel
+      runtimeLabel: raw.runtimeLabel,
+      ...(capabilities ? { capabilities } : {})
     };
   } catch {
     return undefined;
@@ -103,14 +115,59 @@ export function readAndroidNativeBridgeMetadata(): AndroidNativeBridgeMetadata |
     ) {
       return undefined;
     }
+    const capabilities = nativeBridgeCapabilities("android", raw.capabilities);
     return {
       target: "android",
       nativeBridgeVersion: raw.nativeBridgeVersion,
-      runtimeLabel: raw.runtimeLabel
+      runtimeLabel: raw.runtimeLabel,
+      ...(capabilities ? { capabilities } : {})
     };
   } catch {
     return undefined;
   }
+}
+
+function nativeBridgeCapabilities(
+  target: NativeBridgeMetadata["target"],
+  value: unknown
+): NativeBridgeCapabilities | undefined {
+  if (typeof value !== "object" || value === null) {
+    return undefined;
+  }
+  const raw = value as Record<string, unknown>;
+  const localStore = nativeLocalStoreReadiness(target, raw.localStore);
+  if (!localStore) {
+    return undefined;
+  }
+  return { localStore };
+}
+
+function nativeLocalStoreReadiness(
+  target: NativeBridgeMetadata["target"],
+  value: unknown
+): NativeStoreReadiness | undefined {
+  if (typeof value !== "object" || value === null) {
+    return undefined;
+  }
+  const raw = value as Record<string, unknown>;
+  const bridge = target === "windows-desktop" ? "tauri-sqlite" : "android-sqlite";
+  if (
+    raw.currentDefault !== "local-storage" ||
+    raw.productionTarget !== "sqlite" ||
+    typeof raw.nativeStoreReady !== "boolean" ||
+    raw.nativeStoreReason !== "sqlite-native-bridge-unavailable" ||
+    raw.nativeStoreBridge !== bridge
+  ) {
+    return undefined;
+  }
+  return {
+    target,
+    requestedStore: "sqlite",
+    ready: raw.nativeStoreReady,
+    reason: raw.nativeStoreReady ? "" : "sqlite-native-bridge-unavailable",
+    bridge,
+    nextAction: `${bridge} is required before ${target} can use sqlite local store`
+  };
 }
 
 export function readClientShellConfig(): ClientShellConfig {

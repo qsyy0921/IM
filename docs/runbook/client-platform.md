@@ -118,7 +118,9 @@ First slice:
   network/lifecycle ports and unsupported local wakeup notifications. This
   moves desktop beyond a pure contract, but it is not an installer yet.
 - `clients/desktop/src-tauri` now has a first-stage Tauri v2 Rust runner
-  skeleton with only a read-only `runtime_metadata` IPC command. `bundle.active`
+  skeleton with only a read-only `runtime_metadata` IPC command. The command
+  can include low-sensitive capability readiness such as local-store bridge
+  status, but it does not expose native storage APIs. `bundle.active`
   remains `false`, so the current native output is a standalone exe rather than
   an MSI / NSIS installer. The Web shell can invoke this command for diagnostics
   and fails closed on malformed metadata.
@@ -135,8 +137,9 @@ First slice:
   local message facts, BFF calls, or push delivery semantics.
 - Android WebView now registers the read-only `NexusIMNative` JavaScript bridge.
   It exposes only the single `runtimeMetadata()` method. The Web runtime can
-  parse that metadata for diagnostics, and invalid bridge payloads fail closed.
-  The bridge exposes no token, storage, file-system or message APIs.
+  parse that metadata for diagnostics, including low-sensitive local-store
+  bridge readiness, and invalid bridge payloads fail closed. The bridge exposes
+  no token, storage API, file-system or message API.
 - Android WebView inspection is explicitly gated by the platform debuggable
   flag. This keeps dev / smoke automation possible while avoiding an
   unconditional release debugging path.
@@ -318,7 +321,8 @@ First slice:
   still does not produce MSI / NSIS installer bundles. `npm --prefix clients run
   smoke:desktop-webview-metadata` now proves the Tauri WebView can load the
   prepared shell, read the PC `runtime_metadata` IPC and POST a low-sensitive
-  loopback report from inside the rendered shell. The fuller login-level
+  loopback report from inside the rendered shell. The report includes the
+  native local-store readiness diagnostic but not a storage API. The fuller login-level
   desktop UI smoke has also passed on clean commit `c72ea512`, covering WebView
   login, externally triggered `delivery.notify`, PullInbox, message observe and
   AckDelivery. Android now has the same metadata-smoke runner shape, but it

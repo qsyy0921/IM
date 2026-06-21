@@ -75,8 +75,13 @@ assert(countMatches(bridge, /@JavascriptInterface/g) === 1, "Android native brid
 assert(bridge.includes("fun runtimeMetadata(): String"), "Android runtime metadata method missing");
 assert(bridge.includes('RUNTIME_TARGET: String = "android"'), "Android runtime target marker missing");
 assert(bridge.includes("JSONObject()"), "Android native bridge must return structured metadata JSON");
+assert(bridge.includes('LOCAL_STORE_CURRENT: String = "local-storage"'), "Android local store current marker missing");
+assert(bridge.includes('LOCAL_STORE_TARGET: String = "sqlite"'), "Android local store target marker missing");
+assert(bridge.includes("NATIVE_STORE_READY: Boolean = false"), "Android native store readiness marker missing");
+assert(bridge.includes('NATIVE_STORE_REASON: String = "sqlite-native-bridge-unavailable"'), "Android native store reason marker missing");
+assert(bridge.includes('NATIVE_STORE_BRIDGE: String = "android-sqlite"'), "Android native store bridge marker missing");
 assert(!bridge.includes("SharedPreferences"), "native bridge must not own session storage yet");
-assert(!bridge.includes("SQLite"), "native bridge must not own message store yet");
+assert(!bridge.includes("SQLiteDatabase"), "native bridge must not open a native message store yet");
 assert(!bridge.match(/token|secret|password|credential|private/i), "native bridge must not contain sensitive fields");
 
 const shellConfig = JSON.parse(read("android/shell-config.example.json"));

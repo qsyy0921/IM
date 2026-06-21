@@ -363,6 +363,11 @@ function isExpectedMetadataReport(report, runID) {
     report.native.nativeBridgeVersion.trim() !== "" &&
     typeof report?.native?.runtimeLabel === "string" &&
     report.native.runtimeLabel.trim() !== "" &&
+    report?.native?.localStore?.currentDefault === "local-storage" &&
+    report?.native?.localStore?.productionTarget === "sqlite" &&
+    report?.native?.localStore?.nativeStoreReady === false &&
+    report?.native?.localStore?.nativeStoreReason === "sqlite-native-bridge-unavailable" &&
+    report?.native?.localStore?.nativeStoreBridge === "android-sqlite" &&
     report?.runtimeConfig?.apiConfigured === true &&
     report?.runtimeConfig?.pushConfigured === true
   );
@@ -378,7 +383,14 @@ function summarizeMetadataReport(report) {
     native: {
       target: report.native.target,
       nativeBridgeVersion: report.native.nativeBridgeVersion,
-      runtimeLabel: report.native.runtimeLabel
+      runtimeLabel: report.native.runtimeLabel,
+      localStore: {
+        currentDefault: report.native.localStore.currentDefault,
+        productionTarget: report.native.localStore.productionTarget,
+        nativeStoreReady: report.native.localStore.nativeStoreReady,
+        nativeStoreReason: report.native.localStore.nativeStoreReason,
+        nativeStoreBridge: report.native.localStore.nativeStoreBridge
+      }
     },
     runtimeConfig: {
       apiConfigured: report.runtimeConfig.apiConfigured,

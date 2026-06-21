@@ -51,6 +51,11 @@ assert(main.includes("fn runtime_metadata() -> String"), "desktop runtime metada
 assert(main.includes("tauri::generate_handler![runtime_metadata]"), "desktop invoke handler must only register runtime_metadata");
 assert(main.includes('RUNTIME_TARGET: &str = "windows-desktop"'), "desktop runtime target marker missing");
 assert(main.includes('NATIVE_BRIDGE_VERSION: &str = "0.1.0"'), "desktop native bridge version marker missing");
+assert(main.includes('LOCAL_STORE_CURRENT: &str = "local-storage"'), "desktop local store current marker missing");
+assert(main.includes('LOCAL_STORE_TARGET: &str = "sqlite"'), "desktop local store target marker missing");
+assert(main.includes('NATIVE_STORE_READY: &str = "false"'), "desktop native store readiness marker missing");
+assert(main.includes('NATIVE_STORE_REASON: &str = "sqlite-native-bridge-unavailable"'), "desktop native store reason marker missing");
+assert(main.includes('NATIVE_STORE_BRIDGE: &str = "tauri-sqlite"'), "desktop native store bridge marker missing");
 assert(!main.match(/std::fs|File::|Command::|process::|token|secret|password|credential|message_id/i), "desktop metadata bridge must not expose sensitive or broad native capability");
 
 const config = readJSON("desktop/src-tauri/tauri.conf.json");

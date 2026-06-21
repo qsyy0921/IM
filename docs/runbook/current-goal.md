@@ -108,8 +108,9 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   做 runtime identity / config 选择，不授予文件系统或 native token 权限。
 - Android WebView 已注册只读 `NexusIMNative` JavaScript bridge；该 bridge 现在只暴露
   单个 `runtimeMetadata()` 方法。Web 端可读取它用于诊断，且 focused test 覆盖合法
-  metadata、错误 target 和 malformed JSON 的 fail-closed 行为。该 bridge 不暴露
-  token、storage、文件系统或 message API。Android WebView inspection 现在显式跟随
+  metadata、错误 target 和 malformed JSON 的 fail-closed 行为。metadata 现在包含
+  低敏 local-store capability readiness（当前 localStorage、目标 sqlite、bridge
+  unavailable reason），但该 bridge 不暴露 token、storage API、文件系统或 message API。Android WebView inspection 现在显式跟随
   平台 debuggable flag，仅用于 debug / smoke automation，不允许 release 无条件开启。
   Android native validator 现在也锁住 DOM storage enabled、file access disabled
   和 content access disabled，保证 WebView 能跑 shared runtime 但不打开原生文件 /
@@ -117,7 +118,8 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   placeholder 控制：debug APK 保留局域网 HTTP / WebSocket smoke 能力，release
   默认禁用明文流量。
 - Web shell 的运行入口面板已展示 shell target、PC Tauri `runtime_metadata`
-  和 Android native bridge metadata；该展示只用于本地诊断，不改变客户端权限边界。
+  和 Android native bridge metadata；metadata smoke report 也会携带低敏 local-store
+  readiness。该展示只用于本地诊断，不改变客户端权限边界。
 - Web app 会在主 bundle 前加载 `nexusim-shell-config.js`；`clients/desktop` 和
   `clients/android` 已各自提供低敏 `shell-config.example.json`，并由
   `clients/tools/render-shell-config.mjs` 渲染成注入脚本。`test:shell-config` 和

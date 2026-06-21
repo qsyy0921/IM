@@ -226,8 +226,9 @@ PC constraints:
   runtime metadata until a separate native capability ADR defines commands,
   audit and permission checks.
 - Web shell may call only the fixed `runtime_metadata` command for diagnostics.
-  It must not construct arbitrary native command names or pass business payloads
-  into the native bridge.
+  It may read low-sensitive capability readiness such as native local-store
+  bridge status, but it must not construct arbitrary native command names or
+  pass business payloads into the native bridge.
 - No arbitrary file-system access from Web code.
 - No auto-update before signing and update-channel governance are defined.
 
@@ -303,10 +304,11 @@ Android constraints:
   Debug builds may enable WebView inspection for metadata / login smoke
   automation; release builds must not enable it unconditionally.
 - First-stage `NexusIMNative` JavaScript bridge is a single-method
-  metadata-only bridge. It may expose runtime target, bridge version and label
-  through `runtimeMetadata()` for diagnostics, but it must not expose tokens,
-  storage, file-system access, message facts or write commands until a separate
-  native capability ADR defines audit and permission checks.
+  metadata-only bridge. It may expose runtime target, bridge version, label and
+  low-sensitive local-store readiness through `runtimeMetadata()` for diagnostics,
+  but it must not expose tokens, storage APIs, file-system access, message facts
+  or write commands until a separate native capability ADR defines audit and
+  permission checks.
 - Offline sends must use idempotency keys and local pending queues.
 
 ## Platform Adapter Ports

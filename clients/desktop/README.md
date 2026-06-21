@@ -15,7 +15,8 @@ the native bridge can stay narrow and auditable.
   notifications.
 - First Tauri v2 Rust runner skeleton exists under `src-tauri`; it exposes only
   the read-only `runtime_metadata` command. The shared Web shell can read this
-  metadata for diagnostics and must fail closed on malformed bridge output.
+  metadata for diagnostics, including local-store bridge readiness, and must
+  fail closed on malformed bridge output.
 - `shell-config.example.json` records the low-permission WebView config bridge
   for local LAN endpoints and desktop runtime identity. It can be rendered to
   `web/public/nexusim-shell-config.js` before a shell build.

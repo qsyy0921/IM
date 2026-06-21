@@ -13,6 +13,13 @@ export interface ShellSmokeMetadataReport {
     readonly target: NativeBridgeMetadata["target"];
     readonly nativeBridgeVersion: string;
     readonly runtimeLabel: string;
+    readonly localStore?: {
+      readonly currentDefault: "local-storage";
+      readonly productionTarget: "sqlite";
+      readonly nativeStoreReady: boolean;
+      readonly nativeStoreReason: string;
+      readonly nativeStoreBridge: string;
+    };
   };
   readonly runtimeConfig: {
     readonly apiConfigured: boolean;
@@ -41,12 +48,24 @@ export function buildShellSmokeMetadataReport(
     }
   };
   if (nativeMetadata) {
+    const localStore = nativeMetadata.capabilities?.localStore;
     return withCheckedReport({
       ...report,
       native: {
         target: nativeMetadata.target,
         nativeBridgeVersion: nativeMetadata.nativeBridgeVersion,
-        runtimeLabel: nativeMetadata.runtimeLabel
+        runtimeLabel: nativeMetadata.runtimeLabel,
+        ...(localStore
+          ? {
+              localStore: {
+                currentDefault: "local-storage",
+                productionTarget: "sqlite",
+                nativeStoreReady: localStore.ready,
+                nativeStoreReason: localStore.reason,
+                nativeStoreBridge: localStore.bridge
+              }
+            }
+          : {})
       }
     });
   }

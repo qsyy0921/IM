@@ -18,6 +18,7 @@
     "validate:desktop-tauri": "npm --workspace @nexusim/desktop run validate:tauri",
     "typecheck:android": "npm --workspace @nexusim/android run typecheck",
     "validate:android-native": "npm --workspace @nexusim/android run validate:native",
+    "check:build-prereqs": "node ./tools/check-client-build-prereqs.mjs",
     "typecheck": "npm --workspaces --if-present run typecheck"
   },
   "devDependencies": {

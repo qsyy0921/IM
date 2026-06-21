@@ -52,6 +52,12 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   transport、auth session、inbox sync、send queue 和 ack queue；`clients/desktop`
   / `clients/android` 已分别新增 `createDesktopClientRuntime` /
   `createAndroidClientRuntime`。
+- `clients` workspace 已新增本地构建前置检查
+  `npm --prefix clients run check:build-prereqs`；该检查只读取本机 Rust /
+  Tauri / JDK / Gradle / Android SDK 状态，不安装依赖、不拉包、不使用 `npx`
+  远程解析。当前机器可用 `rustc` / `cargo`，但缺 `cargo-tauri` / 本地 npm
+  Tauri CLI，Android 侧仍是 JDK 8 且缺 Gradle / Android SDK，因此 PC artifact
+  和 Android APK 仍未 ready。
 - `IndexedDBMessageStore` 已有 first-stage persistence test harness，覆盖
   cursor persistence、message seq ordering、pending send、send accepted 后稳定
   seq key 迁移、防 replay duplicate，以及 send failed 本地状态。

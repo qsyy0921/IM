@@ -31,6 +31,7 @@ const requiredPaths = [
   "web/src/adapters/bff-client.ts",
   "web/src/adapters/browser-push-transport.ts",
   "tools/test-indexeddb-message-store.mjs",
+  "tools/check-client-build-prereqs.mjs",
   "desktop/package.json",
   "desktop/src/index.ts",
   "desktop/src/platform-contract.ts",

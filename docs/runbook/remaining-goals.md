@@ -31,7 +31,8 @@
   login、conversation list、PullInbox、send、ACK、push notify。
 - Windows packaging：产出本地可安装或可运行的 Windows artifact；不要求生产签名。
   当前本机尚缺 Tauri CLI / `cargo-tauri`，需要先补本地构建前置或通过
-  Docker / CI builder 产物链路。
+  Docker / CI builder 产物链路；可用 `npm --prefix clients run check:build-prereqs`
+  检查当前机器状态。
 - `clients/android`：first-stage TypeScript runtime adapter 和 Kotlin native
   bridge skeleton 已落；`createAndroidClientRuntime` 已能组装 shared
   `BFFClient` / `WebSocketPushTransport` / auth / inbox / send / ack queue；
@@ -39,7 +40,8 @@
 - Android packaging：产出本地 unsigned APK，并支持局域网 `api-gateway` /
   `push-gateway` 地址配置。当前本机尚缺 Gradle / Android SDK，且 `java`
   指向 JDK 8；需要 JDK 17+ 和 Android build toolchain，或通过
-  Docker / CI builder 产物链路。
+  Docker / CI builder 产物链路；可用 `npm --prefix clients run check:build-prereqs`
+  检查当前机器状态。
 - 三端 smoke：Web / PC / Android 都只能连 `api-gateway` 和 `push-gateway`；
   PullInbox 是事实源，WebSocket 只做在线唤醒。
 - Local store：`IndexedDBMessageStore` 已有 first-stage persistence test；继续补

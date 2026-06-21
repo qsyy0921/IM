@@ -149,3 +149,13 @@ rejected. For local LAN client smoke, prefer the wired `172.x.x.x` address.
 - Android APK build needs JDK 17+ plus Gradle / Android SDK. If those are not
   installed locally, use a Docker / CI builder profile instead of claiming an
   APK baseline.
+
+Focused local check:
+
+```powershell
+npm --prefix clients run check:build-prereqs
+```
+
+This command reports readiness as JSON and exits non-zero when artifact / APK
+toolchains are missing. It is local-only: it does not install dependencies, pull
+packages, or use `npx` to resolve remote CLIs.

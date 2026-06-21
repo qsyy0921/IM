@@ -79,8 +79,9 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   local cache；focused test 覆盖 store 实例重开后的 cursor persistence、pending
   send、accepted send 稳定 key 迁移、防 replay duplicate、failed-send 状态和
   conversations-needing-sync 列表。desktop / Android 均已预留 `sqlite` store
-  config，且在 native bridge 未实现前通过 shared `NativeStoreReadiness`
-  合约 fail-fast，返回稳定低敏 reason / bridge / next action；现在也已有 shared
+  config；desktop 在 native bridge 未实现前通过 shared `NativeStoreReadiness`
+  合约 fail-fast，Android 源码侧已实现固定前缀 SQLite key-value bridge 但仍未产出
+  APK / 真机 smoke baseline；现在也已有 shared
   `NativeBridgeStringKeyValueStorage` 合约，desktop / Android 平台 adapter 在显式
   注入 native key-value bridge 时可用同一 `KeyValueMessageStore` 语义跑通
   `sqlite` store path。Web runtime 现在也会严格发现 ready native store metadata：
@@ -89,8 +90,8 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   Web shell platform adapter 现在可在 Android metadata ready 且 bridge 方法齐全时
   把 native bridge 交给 shared `KeyValueMessageStore`；否则保持 browser
   IndexedDB / WebView localStorage 路径。focused runtime test 用 fake native bridge
-  覆盖了 cursor / message 持久化和重开；真实 Tauri / Kotlin SQLite 命令桥仍未实现，
-  默认 shell 仍用 localStorage。
+  覆盖了 cursor / message 持久化和重开；真实 Tauri SQLite 命令桥仍未实现，
+  Android SQLite bridge 仍等待 APK 构建和真机 WebView smoke 证明。
 - `LocalMessageStore.listMessages` 已提升为 shared client-core port；
   `MemoryMessageStore`、`KeyValueMessageStore` 和 Web `IndexedDBMessageStore`
   现在都有同一读缓存语义，并补了 pending -> accepted-send 迁移去重测试。

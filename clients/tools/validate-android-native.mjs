@@ -64,25 +64,32 @@ assert(mainActivity.includes("appassets.androidplatform.net"), "Android shell mu
 assert(mainActivity.includes("domStorageEnabled = true"), "Android shell must enable DOM storage for the shared WebView runtime");
 assert(mainActivity.includes("allowFileAccess = false"), "Android shell must disable file access");
 assert(mainActivity.includes("allowContentAccess = false"), "Android shell must disable content access");
-assert(mainActivity.includes('addJavascriptInterface(NexusIMBridge(), "NexusIMNative")'), "Android shell must register low-permission native metadata bridge");
+assert(mainActivity.includes('addJavascriptInterface(NexusIMBridge(this), "NexusIMNative")'), "Android shell must register low-permission native bridge with activity context");
 assert(mainActivity.includes("WebView.setWebContentsDebuggingEnabled"), "Android shell must explicitly gate WebView inspection");
 assert(mainActivity.includes("ApplicationInfo.FLAG_DEBUGGABLE"), "Android WebView inspection must follow application debuggable flag");
 assert(!/setWebContentsDebuggingEnabled\s*\(\s*true\s*\)/.test(mainActivity), "Android WebView inspection must not be enabled unconditionally");
 
 const bridge = read("android/native/app/src/main/java/com/nexusim/android/NexusIMBridge.kt");
 assert(bridge.includes("@JavascriptInterface"), "Android native bridge must expose only annotated methods");
-assert(countMatches(bridge, /@JavascriptInterface/g) === 1, "Android native bridge must expose only runtimeMetadata");
+assert(countMatches(bridge, /@JavascriptInterface/g) === 4, "Android native bridge must expose only metadata and fixed localStore methods");
 assert(bridge.includes("fun runtimeMetadata(): String"), "Android runtime metadata method missing");
+assert(bridge.includes("fun localStoreGetItem(key: String): String?"), "Android local store get method missing");
+assert(bridge.includes("fun localStoreSetItem(key: String, value: String)"), "Android local store set method missing");
+assert(bridge.includes("fun localStoreRemoveItem(key: String)"), "Android local store remove method missing");
 assert(bridge.includes('RUNTIME_TARGET: String = "android"'), "Android runtime target marker missing");
 assert(bridge.includes("JSONObject()"), "Android native bridge must return structured metadata JSON");
 assert(bridge.includes('LOCAL_STORE_CURRENT: String = "local-storage"'), "Android local store current marker missing");
 assert(bridge.includes('LOCAL_STORE_TARGET: String = "sqlite"'), "Android local store target marker missing");
-assert(bridge.includes("NATIVE_STORE_READY: Boolean = false"), "Android native store readiness marker missing");
-assert(bridge.includes('NATIVE_STORE_REASON: String = "sqlite-native-bridge-unavailable"'), "Android native store reason marker missing");
+assert(bridge.includes("NATIVE_STORE_READY: Boolean = true"), "Android native store readiness marker missing");
+assert(bridge.includes('NATIVE_STORE_REASON: String = ""'), "Android native store ready reason must be empty");
 assert(bridge.includes('NATIVE_STORE_BRIDGE: String = "android-sqlite"'), "Android native store bridge marker missing");
+assert(bridge.includes('ALLOWED_LOCAL_STORE_KEY_PREFIX: String = "nexusim:client-message-store:v1:"'), "Android native store key prefix guard missing");
+assert(bridge.includes("isAllowedLocalStoreKey"), "Android native store must guard key namespace");
+assert(bridge.includes("SQLiteOpenHelper"), "Android native store must use SQLiteOpenHelper");
+assert(bridge.includes("CREATE TABLE IF NOT EXISTS local_store"), "Android native store schema missing");
+assert(bridge.includes("insertWithOnConflict"), "Android native store upsert path missing");
 assert(!bridge.includes("SharedPreferences"), "native bridge must not own session storage yet");
-assert(!bridge.includes("SQLiteDatabase"), "native bridge must not open a native message store yet");
-assert(!bridge.match(/token|secret|password|credential|private/i), "native bridge must not contain sensitive fields");
+assert(!bridge.match(/token|secret|password|credential|private_key/i), "native bridge must not contain sensitive fields");
 
 const shellConfig = JSON.parse(read("android/shell-config.example.json"));
 assert(shellConfig.target === "android", "Android shell config target mismatch");

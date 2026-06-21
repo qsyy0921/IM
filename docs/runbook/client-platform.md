@@ -136,11 +136,12 @@ First slice:
   It now uses an Android WebView asset shell through `WebViewAssetLoader`,
   loads the prepared local Web assets, and still does not own token storage,
   local message facts, BFF calls, or push delivery semantics.
-- Android WebView now registers the read-only `NexusIMNative` JavaScript bridge.
-  It exposes only the single `runtimeMetadata()` method. The Web runtime can
-  parse that metadata for diagnostics, including low-sensitive local-store
-  bridge readiness, and invalid bridge payloads fail closed. The bridge exposes
-  no token, storage API, file-system or message API.
+- Android WebView now registers a narrow `NexusIMNative` JavaScript bridge.
+  It exposes `runtimeMetadata()` plus fixed local-store key-value methods. The
+  Web runtime can parse metadata for diagnostics, including low-sensitive
+  local-store bridge readiness, and invalid bridge payloads fail closed. The
+  local-store methods are limited to the shared client message cache prefix and
+  expose no token, file-system, content-provider or arbitrary message API.
 - Android WebView inspection is explicitly gated by the platform debuggable
   flag. This keeps dev / smoke automation possible while avoiding an
   unconditional release debugging path.
@@ -174,8 +175,9 @@ First slice:
   stable low-sensitive `reason`, expected bridge and next action fields, so
   tools and runtime adapters do not need target-specific error strings. Web
   shell adapter wiring now accepts an Android ready native key-value bridge
-  and routes it through shared `KeyValueMessageStore`; the real Kotlin shell
-  still reports not-ready until the SQLite methods are implemented.
+  and routes it through shared `KeyValueMessageStore`; the Kotlin source bridge
+  now reports ready but still needs APK build and real-device WebView smoke
+  evidence before it becomes a runtime baseline.
   `LocalMessageStore.clear` is now part of the shared port so logout can remove
   cached messages, cursors and pending sends consistently across targets.
 - `LocalMessageStore.listMessages` is now part of the shared port. Web,

@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -191,19 +191,42 @@ function shellAssetFailureReason(error) {
 
 function localStoreReadiness(target) {
   const bridge = target === "windows-desktop" ? "tauri-sqlite" : "android-sqlite";
+  const androidSourceReady = target === "android" && androidNativeStoreSourceReady();
+  const ready = androidSourceReady ? true : false;
+  const reason = ready ? "" : "sqlite-native-bridge-unavailable";
   return {
     currentDefault: "local-storage",
     productionTarget: "sqlite",
     nativeStoreReadiness: {
       target,
       requestedStore: "sqlite",
-      ready: false,
-      reason: "sqlite-native-bridge-unavailable",
+      ready,
+      reason,
       bridge,
       nextAction: `${bridge} is required before ${target} can use sqlite local store`
     },
-    currentSmokeStore: "local-storage"
+    currentSmokeStore: ready ? "native-sqlite" : "local-storage"
   };
+}
+
+function androidNativeStoreSourceReady() {
+  try {
+    const bridge = readFileSync(
+      join(workspaceRoot, "android/native/app/src/main/java/com/nexusim/android/NexusIMBridge.kt"),
+      "utf8"
+    );
+    return (
+      bridge.includes("NATIVE_STORE_READY: Boolean = true") &&
+      bridge.includes('NATIVE_STORE_REASON: String = ""') &&
+      bridge.includes("fun localStoreGetItem(key: String): String?") &&
+      bridge.includes("fun localStoreSetItem(key: String, value: String)") &&
+      bridge.includes("fun localStoreRemoveItem(key: String)") &&
+      bridge.includes("SQLiteOpenHelper") &&
+      bridge.includes('ALLOWED_LOCAL_STORE_KEY_PREFIX: String = "nexusim:client-message-store:v1:"')
+    );
+  } catch {
+    return false;
+  }
 }
 
 function dockerStatus() {

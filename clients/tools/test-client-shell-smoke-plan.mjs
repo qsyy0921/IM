@@ -82,7 +82,8 @@ assert(plan.targets.android.localStore?.nativeStoreReadiness?.bridge === "androi
 assert(plan.targets.android.webviewLoginEvidence?.requiredSelectors?.includes("native-store-readiness"), "android WebView login native-store selector evidence missing");
 assert(plan.targets.android.webviewLoginEvidence?.requiredSummaryFields?.includes("nativeStore.readiness.reason"), "android WebView login native store summary field missing");
 assert(plan.targets.android.webviewLoginEvidence?.localStore?.nativeStoreReadiness?.bridge === "android-sqlite", "android WebView login local store bridge evidence missing");
-assert(plan.targets.android.notes.some(note => note.includes("Native SQLite local store is not ready")), "android native sqlite note missing");
+assert(plan.targets.android.localStore?.nativeStoreReadiness?.ready === true, "android native sqlite source readiness should be true");
+assert(!plan.targets.android.notes.some(note => note.includes("Native SQLite local store is not ready")), "android native sqlite not-ready note should be absent once source bridge is ready");
 assert(typeof plan.targets.android.install.readyForInstall === "boolean", "android install readiness missing");
 assert(typeof plan.targets.android.install.installPrereqs.adbAvailable === "boolean", "android adb prereq status missing");
 assert(Array.isArray(plan.targets.android.install.missing), "android install missing list missing");
@@ -139,12 +140,12 @@ const readyReadiness = {
         nativeStoreReadiness: {
           target: "android",
           requestedStore: "sqlite",
-          ready: false,
-          reason: "sqlite-native-bridge-unavailable",
+          ready: true,
+          reason: "",
           bridge: "android-sqlite",
           nextAction: "android-sqlite is required before android can use sqlite local store"
         },
-        currentSmokeStore: "local-storage"
+        currentSmokeStore: "native-sqlite"
       }
     }
   }

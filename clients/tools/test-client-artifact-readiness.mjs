@@ -34,8 +34,10 @@ assert(report.targets.android.buildCommand.includes("build:android-apk:collect")
 assert(typeof report.targets.android.shellAssets?.verified === "boolean", "android shell asset status missing");
 assert(report.targets.android.localStore?.currentDefault === "local-storage", "android local store default missing");
 assert(report.targets.android.localStore?.productionTarget === "sqlite", "android local store production target missing");
-assert(report.targets.android.localStore?.nativeStoreReadiness?.reason === "sqlite-native-bridge-unavailable", "android native store readiness reason mismatch");
+assert(report.targets.android.localStore?.nativeStoreReadiness?.ready === true, "android native store source readiness mismatch");
+assert(report.targets.android.localStore?.nativeStoreReadiness?.reason === "", "android native store ready reason mismatch");
 assert(report.targets.android.localStore?.nativeStoreReadiness?.bridge === "android-sqlite", "android native store bridge mismatch");
+assert(report.targets.android.localStore?.currentSmokeStore === "native-sqlite", "android current smoke store mismatch");
 assert(report.targets.android.dockerBuilder.profile === "client-builders", "android builder profile mismatch");
 assert(report.targets.android.dockerBuilder.outputHint.endsWith("manifest.json"), "android builder manifest hint missing");
 assert(

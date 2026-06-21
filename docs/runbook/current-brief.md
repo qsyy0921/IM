@@ -70,7 +70,7 @@ adoption rules，不把服务数量、中间件或部署形态写死。
   `frontendDist` 指向 shared prepared Web dist；Android 已用
   WebViewAssetLoader 加载本地 assets，并已注册只读单方法 `NexusIMNative`
   metadata bridge，Web shell 已能展示 PC / Android native metadata，并已通过 shared
-  `ClientShellActions` 接入 login / restore / logout，desktop / Android thin
+  `ClientShellActions` 接入 login / refresh / restore / logout，desktop / Android thin
   shell actions 已覆盖 login / refresh / restore / logout；shell asset prep 已清理 stale
   bundle、写低敏 hash manifest，并在 artifact wrapper 中验证 manifest；desktop
   artifact wrapper 已在 manifest 校验后跳过 Tauri 内重复 asset prep，直接 Tauri build

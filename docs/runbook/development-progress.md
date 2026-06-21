@@ -65,7 +65,7 @@
   Android 已有 Kotlin WebView asset shell skeleton（通过
   WebViewAssetLoader 加载本地 Web assets，并注册只读单方法 `NexusIMNative`
   runtime metadata bridge）；
-  Web shell 登录面板已通过 shared `ClientShellActions` 接入 login / restore / logout，
+  Web shell 登录面板已通过 shared `ClientShellActions` 接入 login / refresh / restore / logout，
   desktop / Android thin shell actions 已覆盖 login / refresh / restore / logout，
   供 PC / Android WebView 复用同一 UI action contract；
   shell asset prep 已先清理目标目录再复制，并写低敏 relative-path / SHA-256

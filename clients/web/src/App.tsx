@@ -103,6 +103,24 @@ export function App() {
     });
   }
 
+  async function refreshSession(): Promise<void> {
+    await run("refresh session", async () => {
+      if (!sessionRef.current) {
+        throw new Error("login first");
+      }
+      pushConnectionRef.current?.close();
+      const refreshState = await shellActions.refresh();
+      const refreshedSession = runtime.auth.current();
+      if (!refreshState.authenticated || !refreshedSession) {
+        throw new Error("refresh did not create session");
+      }
+      sessionRef.current = refreshedSession;
+      setSession(refreshedSession);
+      await connectPush(refreshedSession);
+      await loadConversations(refreshedSession);
+    });
+  }
+
   async function restoreSession(): Promise<void> {
     await run("restore session", async () => {
       const state = await shellActions.restoreSession();
@@ -313,6 +331,9 @@ export function App() {
           </button>
           <button className="secondary-button" type="button" onClick={() => void logout()} disabled={!session}>
             退出登录
+          </button>
+          <button className="secondary-button" type="button" onClick={() => void refreshSession()} disabled={!session}>
+            刷新登录态
           </button>
           <button className="secondary-button" type="button" onClick={() => void restoreSession()} disabled={!!session}>
             恢复会话

@@ -62,7 +62,7 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   shared runtime 现在也提供 `login` / `refresh` / `restoreSession`，登录和刷新会写入
   平台 secure session store，重启式 runtime 重新创建后可从平台 store hydrate
   auth manager；`ClientShellActions` 现在覆盖 login / refresh / restore /
-  logout，Web shell 登录面板已通过该 contract 执行登录、恢复和登出，
+  logout，Web shell 登录面板已通过该 contract 执行登录、刷新、恢复和登出，
   PC / Android WebView 后续复用同一 UI action contract。
 - `clients` workspace 已新增本地构建前置检查
   `npm --prefix clients run check:build-prereqs`；该检查只读取本机 Rust /

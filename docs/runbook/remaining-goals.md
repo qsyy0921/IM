@@ -61,7 +61,7 @@
   native packaging/runtime ready 后替换为 SQLite bridge。
 - Auth lifecycle：BFF `/api/auth/logout`、shared runtime login / refresh /
   restore / logout 编排、desktop / Android shell action wrapper 和 Web logout local
-  cleanup 已落；Web shell 已通过 shared action 执行 login / restore / logout；后续在 PC / Android 真实 shell UI 中接入 lifecycle controls 并跑平台 shell smoke。
+  cleanup 已落；Web shell 已通过 shared action 执行 login / refresh / restore / logout；后续在 PC / Android 真实 shell UI 中接入 lifecycle controls 并跑平台 shell smoke。
 - Web hardening：browser platform adapter 当前使用 first-stage tab-scoped
   `sessionStorage` session store；生产 Web 鉴权后续需要 httpOnly cookie /
   provider-grade session 策略，避免把 token 长期放在 Web storage。

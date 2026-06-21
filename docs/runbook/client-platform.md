@@ -217,9 +217,9 @@ First slice:
   export thin `createDesktopShellActions` / `createAndroidShellActions` wrappers.
   These wrappers do not own business logic; they only bind shell UI actions to
   the shared runtime lifecycle. The Web shell login panel now uses the shared
-  shell action contract for login, restore and logout, while desktop / Android
-  thin shell actions are covered for login, refresh, restore and logout. PC /
-  Android WebView shells do not need a separate UI lifecycle path.
+  shell action contract for login, refresh, restore and logout, matching the
+  desktop / Android thin shell action coverage. PC / Android WebView shells do
+  not need a separate UI lifecycle path.
 - `loadtest/clientweb` provides the first scriptable client-path smoke. Setup
   uses public gRPC APIs to register users, seed the conversation owner and create
   the receiver JOIN; the verified client path then uses only HTTP BFF and

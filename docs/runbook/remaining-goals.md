@@ -75,8 +75,8 @@ Foundation backlog 锚点：`search-service`、`memory-service`、`retrieval-gat
   route-refresh worker、budget-reset worker 和 cleanup worker。
 - `knowledge-ingestion-service`：`im.knowledge.events` schema 和
   `knowledge_outbox -> im.knowledge.events` first-stage relay 已落；后续仍需 parser
-  worker、embedding handoff、tombstone / delete proof、真实 connector，以及
-  `knowledge_outbox -> im.knowledge.events -> vector chunk-consumer` 真实 Kafka smoke。
+  worker、tombstone / delete proof、真实 connector、provider parser / crawler handoff
+  和完整 ingestion repair。
 - `vector-index-service`：first-stage rebuild checkpoint worker、JSONL task source 和
   `knowledge-ingestion-service.ListKnowledgeChunks` 公开 API source 的
   `embedding-worker -> model-gateway.InvokeEmbedding -> vector upsert` 已落，并已补
@@ -84,9 +84,9 @@ Foundation backlog 锚点：`search-service`、`memory-service`、`retrieval-gat
   已支持 claim / complete / claim-timeout retry；first-stage `embedding-producer` 已支持
   file / knowledge source -> PostgreSQL queue；first-stage `chunk-consumer` runtime 已支持
   `knowledge.chunk.ready.v1` refs -> public `ListKnowledgeChunks` resolve -> embedding queue。
-  后续仍需 `knowledge_outbox -> im.knowledge.events -> chunk-consumer -> embedding queue`
-  真实 Kafka smoke、memory / search chunk consumer、真实 Milvus / pgvector / OpenSearch
-  backend，以及 provider backend rebuild / backfill worker。
+  `knowledge_outbox -> im.knowledge.events -> chunk-consumer -> embedding queue` 真实
+  Kafka smoke 已通过。后续仍需 memory / search chunk consumer、真实 Milvus /
+  pgvector / OpenSearch backend，以及 provider backend rebuild / backfill worker。
 - `admin-service`：`REPAIR_REQUEST -> workflow-service REPAIR_APPROVAL`、
   `CRITICAL -> workflow-service ADMIN_OPERATION` 和第一版 operation-specific
   approval policy / target-service routing 已接；`CONFIG_PUBLISH` /

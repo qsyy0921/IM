@@ -118,9 +118,9 @@
   -> PostgreSQL queue，`loadtest/vectorembedding` 已跑通 producer -> queue -> worker
   链路；first-stage `chunk-consumer` runtime 已支持 `knowledge.chunk.ready.v1` refs
   -> public `ListKnowledgeChunks` resolve -> embedding queue，并覆盖 focused tests；
-  `chunk-consumer` 已支持 protobuf `KnowledgeEvent` 与旧 JSON fallback；不宣称
-  knowledge relay 后的真实 Kafka chunk-consumer smoke、Milvus /
-  pgvector / OpenSearch 或 provider backend rebuild。
+  `chunk-consumer` 已支持 protobuf `KnowledgeEvent` 与旧 JSON fallback；已跑通
+  `knowledge_outbox -> im.knowledge.events -> chunk-consumer -> vector_embedding_tasks`
+  真实 Kafka smoke；不宣称 Milvus / pgvector / OpenSearch 或 provider backend rebuild。
 - `admin-service` product-active：SDD v0.1 和 stage-switch review 已通过，
   第一版 proto / migration / 六层 skeleton / `grpc` runtime / Docker /
   Prometheus / Grafana 覆盖已落；当前覆盖 `CreateAdminOperation`、

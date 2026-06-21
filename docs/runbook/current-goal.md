@@ -87,7 +87,9 @@ model-gateway / workflow / knowledge-ingestion / vector-index
   `NEXUSIM_VECTOR_INDEX_SERVICE_MODE=chunk-consumer` 消费低敏
   `knowledge.chunk.ready.v1` refs 后，通过
   `knowledge-ingestion-service.ListKnowledgeChunks` 公开 API resolve redacted preview，
-  再写入 PostgreSQL embedding queue；当前有 focused tests。
+  再写入 PostgreSQL embedding queue；当前有 focused tests，并已跑通
+  `knowledge_outbox -> im.knowledge.events -> chunk-consumer -> vector_embedding_tasks`
+  真实 Kafka smoke。
 - `knowledge-ingestion-service` 已新增低敏 `im.knowledge.events` Kafka schema 和
   `knowledge_outbox -> im.knowledge.events` 第一版 `outbox-relay` runtime。relay 覆盖
   source-created、document-parsed、chunk-ready 现有 outbox 事件和 SDD 预留的
@@ -125,9 +127,8 @@ model-gateway / workflow / knowledge-ingestion / vector-index
 
 - 默认继续补更多下游公开 admin API adapter，或为 admin config / quota 增加
   compensation operator。
-- 默认下一步可继续 `knowledge_outbox -> im.knowledge.events -> vector chunk-consumer
-  -> embedding queue` 真实 Kafka smoke、Milvus / pgvector backend / provider backend rebuild；
-  也可以继续更多下游 admin API adapter。
+- 默认下一步可继续 vector-index provider backend：Milvus / pgvector backend /
+  provider backend rebuild / backfill worker，或继续更多下游 admin API adapter。
 - 也可以继续 notification SMTP / SMS / APNs / FCM adapter 或 bounce-suppression。
 
 ## 硬边界

@@ -33,5 +33,8 @@ pipeline、权限 metadata、增量重建和导入审计。
 - `loadtest/knowledgevector` 已通过公开 gRPC 证明 knowledge source / chunk
   manifest 可 handoff 到 `vector-index-service.UpsertVectorItem`，并由
   `SearchVectors` 搜到。
-- 后续补 parser worker、embedding handoff、tombstone/delete proof、真实 connector，以及
-  `knowledge_outbox -> im.knowledge.events -> vector chunk-consumer` 真实 Kafka smoke。
+- `knowledge_outbox -> im.knowledge.events -> vector chunk-consumer ->
+  vector_embedding_tasks` 真实 Kafka smoke 已通过，证明低敏 chunk-ready refs 可进入
+  vector embedding queue。
+- 后续补 parser worker、tombstone/delete proof、真实 connector、provider parser /
+  crawler handoff 和完整 ingestion repair。

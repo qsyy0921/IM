@@ -81,12 +81,44 @@
 当前边界：
 
 - 这是 first-stage producer / PostgreSQL queue / worker / public API /
-  model-gateway handoff smoke，不是 Kafka / outbox chunk consumer、provider
-  backend rebuild 或 Milvus / pgvector / OpenSearch backend smoke。
-- `chunk-consumer` runtime 已有 focused tests，能消费低敏
-  `knowledge.chunk.ready.v1` refs 后通过 `ListKnowledgeChunks` resolve redacted preview
-  并入 PostgreSQL queue；但本 smoke 还不覆盖真实 Kafka `im.knowledge.events`。
+  model-gateway handoff smoke，不是 Kafka chunk consumer、provider backend rebuild 或
+  Milvus / pgvector / OpenSearch backend smoke。
 - runner 不手工调用 `UpsertVectorItem`，也不读其它服务私有表；验证只走
   `SearchVectors`。
 - PostgreSQL / outbox / metrics / summary 不保存 raw document、source URI、object key
   或 embedding vector array。
+
+## Knowledge Chunk Consumer Smoke
+
+用途：
+
+- 启动 `knowledge-ingestion-service` gRPC 进程。
+- 准备一个 knowledge source / ingestion job / chunk manifest。
+- 启动 `knowledge-ingestion-service` outbox relay，把低敏 `knowledge_outbox`
+  发布到独立 Kafka `im.knowledge.events.<run>` topic。
+- 启动 `vector-index-service` chunk-consumer，消费 `KnowledgeEvent` protobuf。
+- 验证 consumer 跳过 `source.created` / `document.parsed`，只处理
+  `knowledge.chunk.ready.v1`，通过 `ListKnowledgeChunks` 公开 API resolve redacted
+  preview，并写入 PostgreSQL `vector_embedding_tasks` queue。
+
+运行：
+
+```powershell
+.\loadtest\vectorembedding\run-local-chunk-consumer-smoke.ps1
+```
+
+常用参数：
+
+```powershell
+.\loadtest\vectorembedding\run-local-chunk-consumer-smoke.ps1 `
+  -PgDsn "postgres://nexusim:nexusim@localhost:5432/nexusim?sslmode=disable" `
+  -KafkaBrokers "localhost:9092" `
+  -ResultRoot "H:\NexusIM\loadtest-results"
+```
+
+当前边界：
+
+- 这是 `knowledge_outbox -> im.knowledge.events -> chunk-consumer ->
+  vector_embedding_tasks` smoke，不启动 embedding worker，也不验证 vector search。
+- runner 只验证 public API handoff 和 queue 状态；不读 knowledge 私表，不写 raw text、
+  source URI、object key 或 embedding vector array。

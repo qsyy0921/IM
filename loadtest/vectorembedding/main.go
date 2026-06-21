@@ -48,30 +48,34 @@ type config struct {
 }
 
 type summary struct {
-	Phase              string    `json:"phase"`
-	Commit             string    `json:"commit"`
-	CommitFull         string    `json:"commit_full"`
-	GitDirty           bool      `json:"git_dirty"`
-	GitStatusShort     string    `json:"git_status_short,omitempty"`
-	ResultDir          string    `json:"result_dir"`
-	KnowledgeTarget    string    `json:"knowledge_target,omitempty"`
-	VectorTarget       string    `json:"vector_target,omitempty"`
-	TenantID           string    `json:"tenant_id"`
-	UserID             string    `json:"user_id"`
-	StartedAt          time.Time `json:"started_at"`
-	FinishedAt         time.Time `json:"finished_at"`
-	Success            bool      `json:"success"`
-	Error              string    `json:"error,omitempty"`
-	KnowledgeSourceID  string    `json:"knowledge_source_id,omitempty"`
-	KnowledgeJobID     string    `json:"knowledge_job_id,omitempty"`
-	DocumentID         string    `json:"document_id,omitempty"`
-	ChunkCount         int       `json:"chunk_count"`
-	ExpectedCount      int       `json:"expected_count"`
-	VectorSearchCount  int       `json:"vector_search_count"`
-	VisibilityScope    string    `json:"visibility_scope,omitempty"`
-	PolicyVersion      string    `json:"policy_version,omitempty"`
-	EmbeddingModelRef  string    `json:"embedding_model_ref"`
-	EmbeddingDimension int       `json:"embedding_dimension"`
+	Phase                  string    `json:"phase"`
+	Commit                 string    `json:"commit"`
+	CommitFull             string    `json:"commit_full"`
+	GitDirty               bool      `json:"git_dirty"`
+	GitStatusShort         string    `json:"git_status_short,omitempty"`
+	ResultDir              string    `json:"result_dir"`
+	KnowledgeTarget        string    `json:"knowledge_target,omitempty"`
+	VectorTarget           string    `json:"vector_target,omitempty"`
+	TenantID               string    `json:"tenant_id"`
+	UserID                 string    `json:"user_id"`
+	StartedAt              time.Time `json:"started_at"`
+	FinishedAt             time.Time `json:"finished_at"`
+	Success                bool      `json:"success"`
+	Error                  string    `json:"error,omitempty"`
+	KnowledgeSourceID      string    `json:"knowledge_source_id,omitempty"`
+	KnowledgeJobID         string    `json:"knowledge_job_id,omitempty"`
+	DocumentID             string    `json:"document_id,omitempty"`
+	ChunkCount             int       `json:"chunk_count"`
+	ExpectedCount          int       `json:"expected_count"`
+	VectorSearchCount      int       `json:"vector_search_count"`
+	EmbeddingTaskCount     int       `json:"embedding_task_count"`
+	EmbeddingTaskPending   int       `json:"embedding_task_pending"`
+	EmbeddingTaskRunning   int       `json:"embedding_task_running"`
+	EmbeddingTaskCompleted int       `json:"embedding_task_completed"`
+	VisibilityScope        string    `json:"visibility_scope,omitempty"`
+	PolicyVersion          string    `json:"policy_version,omitempty"`
+	EmbeddingModelRef      string    `json:"embedding_model_ref"`
+	EmbeddingDimension     int       `json:"embedding_dimension"`
 }
 
 func main() {
@@ -183,12 +187,102 @@ func run(cfg config) error {
 			result.Error = err.Error()
 			return err
 		}
+	case "verify-queue":
+		if err := verifyQueue(ctx, cfg, &result); err != nil {
+			result.Error = err.Error()
+			return err
+		}
 	default:
 		result.Error = "unsupported phase"
 		return fmt.Errorf("unsupported phase %q", cfg.phase)
 	}
 	result.Success = true
 	return nil
+}
+
+func verifyQueue(ctx context.Context, cfg config, result *summary) error {
+	pool, err := pgxpool.New(ctx, cfg.pgDSN)
+	if err != nil {
+		return fmt.Errorf("open postgres: %w", err)
+	}
+	defer pool.Close()
+	deadline := time.Now().Add(cfg.waitTimeout)
+	for {
+		counts, err := readEmbeddingTaskCounts(ctx, pool, cfg)
+		if err == nil {
+			result.EmbeddingTaskCount = counts.total
+			result.EmbeddingTaskPending = counts.pending
+			result.EmbeddingTaskRunning = counts.running
+			result.EmbeddingTaskCompleted = counts.completed
+			result.KnowledgeSourceID = cfg.sourceID
+			result.DocumentID = cfg.documentID
+			result.ChunkCount = cfg.expectedCount
+			result.ExpectedCount = cfg.expectedCount
+			if counts.total >= cfg.expectedCount && counts.pending >= cfg.expectedCount {
+				return nil
+			}
+		}
+		if time.Now().After(deadline) {
+			if err != nil {
+				return fmt.Errorf("wait for vector embedding queue tasks: %w", err)
+			}
+			return fmt.Errorf("expected at least %d pending vector embedding tasks, got total=%d pending=%d running=%d completed=%d",
+				cfg.expectedCount, result.EmbeddingTaskCount, result.EmbeddingTaskPending, result.EmbeddingTaskRunning, result.EmbeddingTaskCompleted)
+		}
+		timer := time.NewTimer(cfg.pollInterval)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return ctx.Err()
+		case <-timer.C:
+		}
+	}
+}
+
+type embeddingTaskCounts struct {
+	total     int
+	pending   int
+	running   int
+	completed int
+}
+
+func readEmbeddingTaskCounts(ctx context.Context, pool *pgxpool.Pool, cfg config) (embeddingTaskCounts, error) {
+	prefix := strings.Trim(strings.TrimSpace(cfg.sourceID)+":"+strings.TrimSpace(cfg.documentID), ":")
+	rows, err := pool.Query(ctx, `
+SELECT status, count(*)
+FROM vector_embedding_tasks
+WHERE tenant_id = $1
+  AND source_service = 'knowledge-ingestion-service'
+  AND collection_type = 'KNOWLEDGE_CHUNK'
+  AND embedding_model_ref = $2
+  AND ($3 = '' OR source_id LIKE $3 || ':%')
+GROUP BY status
+`, cfg.tenantID, cfg.embeddingModel, prefix)
+	if err != nil {
+		return embeddingTaskCounts{}, fmt.Errorf("query vector embedding tasks: %w", err)
+	}
+	defer rows.Close()
+	counts := embeddingTaskCounts{}
+	for rows.Next() {
+		var status string
+		var count int
+		if err := rows.Scan(&status, &count); err != nil {
+			return embeddingTaskCounts{}, fmt.Errorf("scan vector embedding tasks: %w", err)
+		}
+		counts.total += count
+		switch status {
+		case "PENDING":
+			counts.pending = count
+		case "RUNNING":
+			counts.running = count
+		case "COMPLETED":
+			counts.completed = count
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return embeddingTaskCounts{}, fmt.Errorf("read vector embedding task rows: %w", err)
+	}
+	return counts, nil
 }
 
 func prepare(ctx context.Context, cfg config, result *summary) error {
@@ -442,6 +536,7 @@ func applyMigrations(ctx context.Context, pool *pgxpool.Pool) error {
 
 func cleanupTenant(ctx context.Context, pool *pgxpool.Pool, tenantID string) error {
 	queries := []string{
+		`DELETE FROM vector_embedding_tasks WHERE tenant_id = $1`,
 		`DELETE FROM vector_outbox WHERE tenant_id = $1`,
 		`DELETE FROM vector_rebuild_checkpoints WHERE tenant_id = $1`,
 		`DELETE FROM vector_tombstones WHERE tenant_id = $1`,
@@ -483,6 +578,13 @@ func validateConfig(cfg config) error {
 		}
 		if strings.TrimSpace(cfg.visibilityScope) == "" || strings.TrimSpace(cfg.policyVersion) == "" {
 			return errors.New("visibility-scope and policy-version are required for verify")
+		}
+		if cfg.expectedCount <= 0 {
+			return errors.New("expected-count must be positive")
+		}
+	case "verify-queue":
+		if strings.TrimSpace(cfg.pgDSN) == "" {
+			return errors.New("pg-dsn is required")
 		}
 		if cfg.expectedCount <= 0 {
 			return errors.New("expected-count must be positive")

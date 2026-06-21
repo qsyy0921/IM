@@ -32,15 +32,27 @@ func TestWorkerRunOnceEnqueuesResolvedKnowledgeChunkTask(t *testing.T) {
 	}
 }
 
-func TestWorkerRunOnceRejectsUnsupportedEventWithoutCommit(t *testing.T) {
-	consumer := &fakeConsumer{message: knowledgeChunkMessage("knowledge.source.created.v1")}
+func TestWorkerRunOnceSkipsKnownNonChunkEventWithCommit(t *testing.T) {
+	consumer := &fakeConsumer{message: knowledgeChunkMessage(EventKnowledgeSourceCreated)}
+	worker := NewWorker(consumer, &fakeResolver{task: testChunkTask()}, &fakeQueue{}, Config{})
+
+	if err := worker.RunOnce(context.Background()); err != nil {
+		t.Fatalf("known non-chunk event should be skipped: %v", err)
+	}
+	if consumer.commits != 1 {
+		t.Fatalf("known non-chunk event should commit, got %d", consumer.commits)
+	}
+}
+
+func TestWorkerRunOnceRejectsUnknownEventWithoutCommit(t *testing.T) {
+	consumer := &fakeConsumer{message: knowledgeChunkMessage("knowledge.unknown.v1")}
 	worker := NewWorker(consumer, &fakeResolver{task: testChunkTask()}, &fakeQueue{}, Config{})
 
 	if err := worker.RunOnce(context.Background()); err == nil {
-		t.Fatal("expected unsupported event error")
+		t.Fatal("expected unknown event error")
 	}
 	if consumer.commits != 0 {
-		t.Fatalf("unsupported event must not commit, got %d", consumer.commits)
+		t.Fatalf("unknown event must not commit, got %d", consumer.commits)
 	}
 }
 

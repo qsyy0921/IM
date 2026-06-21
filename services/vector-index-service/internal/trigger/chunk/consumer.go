@@ -13,10 +13,16 @@ import (
 )
 
 const (
-	TopicKnowledgeEvents         = "im.knowledge.events"
-	EventKnowledgeChunkReady     = "knowledge.chunk.ready.v1"
-	EventKnowledgeChunkTombstone = "knowledge.chunk.tombstoned.v1"
+	TopicKnowledgeEvents              = "im.knowledge.events"
+	EventKnowledgeSourceCreated       = "knowledge.source.created.v1"
+	EventKnowledgeDocumentParsed      = "knowledge.document.parsed.v1"
+	EventKnowledgeChunkReady          = "knowledge.chunk.ready.v1"
+	EventKnowledgeChunkTombstone      = "knowledge.chunk.tombstoned.v1"
+	EventKnowledgeIngestionFailed     = "knowledge.ingestion.failed.v1"
+	EventKnowledgeDeleteProofRecorded = "knowledge.delete_proof.recorded.v1"
 )
+
+var errIgnoredKnowledgeEvent = errors.New("ignored knowledge event")
 
 type Consumer interface {
 	Fetch(context.Context) (types.ChunkEventMessage, error)
@@ -83,6 +89,9 @@ func (worker *Worker) RunOnce(ctx context.Context) error {
 	}
 	event, err := DecodeKnowledgeChunkReady(message)
 	if err != nil {
+		if errors.Is(err, errIgnoredKnowledgeEvent) {
+			return worker.consumer.Commit(ctx, message)
+		}
 		return err
 	}
 	task, err := worker.resolver.ResolveKnowledgeChunkTask(ctx, event)
@@ -108,6 +117,9 @@ func DecodeKnowledgeChunkReady(message types.ChunkEventMessage) (types.Knowledge
 		eventType = strings.TrimSpace(payload.EventType)
 	}
 	if eventType != EventKnowledgeChunkReady {
+		if isKnownNonChunkKnowledgeEvent(eventType) {
+			return types.KnowledgeChunkReadyEvent{}, errIgnoredKnowledgeEvent
+		}
 		return types.KnowledgeChunkReadyEvent{}, types.NewInvalidArgument("unsupported knowledge chunk event type")
 	}
 	event := types.KnowledgeChunkReadyEvent{
@@ -144,6 +156,9 @@ func decodeKnowledgeChunkReadyProto(message types.ChunkEventMessage) (types.Know
 	}
 	eventType := firstNonEmpty(message.EventType, envelope.GetEventType())
 	if eventType != EventKnowledgeChunkReady {
+		if isKnownNonChunkKnowledgeEvent(eventType) {
+			return types.KnowledgeChunkReadyEvent{}, true, errIgnoredKnowledgeEvent
+		}
 		return types.KnowledgeChunkReadyEvent{}, true, types.NewInvalidArgument("unsupported knowledge chunk event type")
 	}
 	payload := envelope.GetChunkReady()
@@ -172,6 +187,19 @@ func decodeKnowledgeChunkReadyProto(message types.ChunkEventMessage) (types.Know
 		return types.KnowledgeChunkReadyEvent{}, true, err
 	}
 	return event, true, nil
+}
+
+func isKnownNonChunkKnowledgeEvent(eventType string) bool {
+	switch strings.TrimSpace(eventType) {
+	case EventKnowledgeSourceCreated,
+		EventKnowledgeDocumentParsed,
+		EventKnowledgeChunkTombstone,
+		EventKnowledgeIngestionFailed,
+		EventKnowledgeDeleteProofRecorded:
+		return true
+	default:
+		return false
+	}
 }
 
 type knowledgeChunkReadyPayload struct {

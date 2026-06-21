@@ -55,6 +55,12 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   `172.31.50.1` 跑通第一轮 WIP wired-address smoke，归档见
   `docs/runbook/loadtest/client-platform/loadtest-report-20260621-client-web-bff-push-wired-172-smoke.md`；
   summary 记录 `git_dirty=true`，只作为脚本改动验证，仍需提交后 clean 复跑。
+- 2026-06-21 已在提交 `4148e3c9` 上重跑 `172.31.50.1` wired-address clean
+  baseline，归档见
+  `docs/runbook/loadtest/client-platform/loadtest-report-20260621-client-web-bff-push-wired-172-clean-baseline.md`；
+  summary 记录 `git_dirty=false`，覆盖同一 BFF login、push hello、BFF
+  SendMessage、`delivery.notify`、BFF PullInbox、BFF conversation list 和 BFF
+  AckDelivery 链路。
 - 真实业务语言选择：后端和 client BFF 继续使用 Go；浏览器、PC desktop 和
   Android 的共享协议 / 同步核心 / UI 使用 TypeScript；Tauri 的 Rust、Android
   Kotlin 只作为薄平台桥；Python 只用于 AI worker / eval / 离线工具，不进入
@@ -101,20 +107,18 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
 
 ## 下一步优先级
 
-1. 提交 wired-address runner 支持后，按 `172.31.50.1` clean 复跑
-   Web client -> BFF -> push-gateway smoke 并归档 baseline。
-2. 给 client BFF 补 HTTP 层 metrics / rate-limit adapter；当前 BFF 已复用
+1. 给 client BFF 补 HTTP 层 metrics / rate-limit adapter；当前 BFF 已复用
    gateway facade 鉴权，但 HTTP 请求没有进入 gRPC interceptor。
-3. 后续按同一 core 接 PC desktop Tauri runner 和 Android runtime shell。
-4. 再回到 workflow compensation adapter / instruction approval UI / ops 管理；
+2. 后续按同一 core 接 PC desktop Tauri runner 和 Android runtime shell。
+3. 再回到 workflow compensation adapter / instruction approval UI / ops 管理；
    当前已有本地 workflow get / decision / decision manifest / instruction list CLI，
    低敏 compensation instruction manifest 生成 / 校验，以及 catalog-backed import
    approval 链路、invocation preflight 和静态 review page；后续可接正式审批 UI。
-5. 继续明确其它下游公开 admin API adapter。
-6. 在镜像可用后补 vector-index focused pgvector smoke；后续再接 Milvus /
+4. 继续明确其它下游公开 admin API adapter。
+5. 在镜像可用后补 vector-index focused pgvector smoke；后续再接 Milvus /
    OpenSearch backend、provider repair 和真 provider backfill smoke。
-7. 可继续 notification SMTP / SMS / APNs / FCM adapter 或 bounce-suppression。
-8. 新发现待办写入 `docs/runbook/remaining-goals.md`。
+6. 可继续 notification SMTP / SMS / APNs / FCM adapter 或 bounce-suppression。
+7. 新发现待办写入 `docs/runbook/remaining-goals.md`。
 
 ## 工作方式
 

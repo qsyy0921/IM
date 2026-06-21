@@ -76,6 +76,9 @@ First slice:
   A WIP `172.31.50.1` wired-address smoke also passed on 2026-06-21, but it was
   recorded with `git_dirty=true`; clean committed rerun remains required before
   using it as a baseline.
+  The clean committed `172.31.50.1` wired-address baseline passed on 2026-06-21;
+  report:
+  `docs/runbook/loadtest/client-platform/loadtest-report-20260621-client-web-bff-push-wired-172-clean-baseline.md`.
   It does not replace existing secure mTLS gateway / push smoke coverage.
 - The PC desktop and Android packages currently define runtime / packaging
   contracts only. They do not yet produce `.msi`, `.exe`, `.apk`, or `.aab`
@@ -100,10 +103,7 @@ rejected. For local LAN client smoke, prefer the wired `172.x.x.x` address.
 
 ## Next Work
 
-1. Rerun `loadtest/clientweb/run-local-smoke.ps1 -BindHost 172.31.50.1
-   -ClientHost 172.31.50.1` from a clean commit and archive the wired-address
-   baseline.
-2. Add HTTP-layer BFF metrics / rate-limit adapter; current BFF calls the
+1. Add HTTP-layer BFF metrics / rate-limit adapter; current BFF calls the
    gateway facade directly and does not pass through gRPC interceptors.
-3. Add PC desktop Tauri runner and first local Windows installer.
-4. Add Android runtime shell and first unsigned local APK.
+2. Add PC desktop Tauri runner and first local Windows installer.
+3. Add Android runtime shell and first unsigned local APK.

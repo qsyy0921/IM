@@ -18,3 +18,6 @@ Reports:
 - `loadtest-report-20260621-client-web-bff-push-wired-172-smoke.md`: first WIP
   private `172.31.50.1` wired-address smoke, recorded with `git_dirty=true`;
   clean committed rerun is still required.
+- `loadtest-report-20260621-client-web-bff-push-wired-172-clean-baseline.md`:
+  first clean committed baseline for the browser MVP path on the Windows wired
+  `172.31.50.1` address.

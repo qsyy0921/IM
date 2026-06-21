@@ -67,10 +67,10 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
 - `clients` workspace 已新增本地构建前置检查
   `npm --prefix clients run check:build-prereqs`；该检查只读取本机 Rust /
   Tauri / JDK / Gradle / Android SDK 状态，不安装依赖、不拉包、不使用 `npx`
-  远程解析。当前机器可用 `rustc` / `cargo`；desktop workspace 已声明
-  repo-local `@tauri-apps/cli`，但本 checkout 尚未运行安装步骤，所以本地 Tauri
-  CLI 二进制仍未 ready。Android 侧仍是 JDK 8 且缺 Gradle / Android SDK，因此 PC artifact
-  和 Android APK 仍未 ready。
+  远程解析。当前机器可用 `rustc` / `cargo`，且已通过
+  `npm --prefix clients install` 安装 repo-local `@tauri-apps/cli`；readiness
+  已能识别 `local:tauri`，Windows desktop artifact path ready。Android 侧仍是
+  JDK 8 且缺 Gradle / Android SDK，因此 Android APK 仍未 ready。
 - `IndexedDBMessageStore` 已有 first-stage persistence test harness，覆盖
   cursor persistence、message seq ordering、pending send、send accepted 后稳定
   seq key 迁移、防 replay duplicate，以及 send failed 本地状态。
@@ -132,19 +132,22 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   `test:shell-web-assets`、desktop / Android validators 和实际 shell asset build。
 - `clients/tools/build-desktop-artifact.mjs` 与
   `clients/tools/build-android-apk.mjs` 已提供 first-stage artifact / APK build
-  wrapper；`test:artifact-builders` 覆盖 dry-run 命令计划和低敏输出。当前机器
-  `check:build-prereqs` 仍显示 desktop 缺已安装的 Tauri CLI / `cargo-tauri`，Android 缺
-  JDK 17+ / Gradle / Android SDK，所以 wrapper 会 fail fast，尚未产出 installer
-  或 APK。
+  wrapper；`test:artifact-builders` 覆盖 dry-run 命令计划和低敏输出。Windows
+  desktop wrapper 已能用 repo-local Tauri CLI 构建 first-stage standalone
+  `nexusim-desktop.exe`；当前仍未启用 MSI / NSIS installer bundle。Android 缺
+  JDK 17+ / Gradle / Android SDK，所以 local APK wrapper 仍会 fail fast。
 - `clients/tools/collect-client-artifacts.mjs` 已提供 first-stage artifact
-  collector；`test:artifact-collector` 覆盖 fake APK / Windows installer 归档、
+  collector；`test:artifact-collector` 覆盖 fake APK / Windows artifact 归档、
   SHA-256 manifest、dry-run 不写文件和不泄露本机绝对路径。真实 artifact / APK
   产出后可用 `collect:client-artifacts` 写入 ignored `clients/artifacts/<run-id>/`
   并生成低敏 manifest；`build:desktop-artifact:collect` 和
   `build:android-apk:collect` 会在 native build 成功后自动执行该归档步骤。`plan:artifact-install`
   会读取 collected manifest 并输出低敏 Windows / Android 安装 checklist；它现在也报告
   Android `adb` availability 与 Windows installer launch support，但仍不启动安装器、
-  不连接设备、不安装 APK，也不输出本机绝对路径。当前仍没有真实 installer / APK baseline。
+  不连接设备、不安装 APK，也不输出本机绝对路径。2026-06-21 已产出第一份
+  Windows desktop standalone exe 归档 manifest：
+  `clients/artifacts/2026-06-21T202009Z/manifest.json`（ignored local artifact
+  storage）；当前仍没有 Android APK baseline。
 - Android 已新增 opt-in Docker builder profile：
   `deploy/docker/client-android-builder.Dockerfile` 和
   `deploy/local/docker-compose.client-builders.yml`。`validate:builder-profile`
@@ -155,10 +158,10 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   report；`test:artifact-readiness` 覆盖 schema、无敏感字段和无本机绝对路径。
   报告已区分 Android Docker builder image build command 与实际 builder run command，
   会显示 prepared shell asset manifest verification 状态，并输出低敏
-  `nextActions`，不会自动下载或构建。当前报告显示
-  Docker / Compose 可用、Android builder profile 可解析，但
-  `nexusim/client-android-builder:local` image 尚未构建；desktop 已有 repo-declared
-  Tauri CLI 依赖但尚未安装本地 CLI 二进制，Android 本地路径仍缺 JDK 17+ / Gradle / Android SDK。
+  `nextActions`，不会自动下载或构建。当前报告显示 Windows desktop ready
+ （通过 repo-local `local:tauri`），Docker / Compose 可用、Android builder profile
+  可解析，但 `nexusim/client-android-builder:local` image 尚未构建；Android 本地路径
+  仍缺 JDK 17+ / Gradle / Android SDK。
 - `clients/tools/plan-client-shell-smoke.mjs` 已提供低敏 browser / desktop /
   Android shell smoke plan；它汇总 toolchain readiness、prepared asset
   verification、artifact presence、collected-artifact install readiness、安全构建命令、
@@ -239,21 +242,23 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
 
 ## 下一步优先级
 
-1. 显式运行 `npm --prefix clients install` 安装 repo-declared Tauri CLI，补 Android JDK 17+ / Gradle / Android SDK，或显式运行 Android
-   Docker builder profile，然后运行 `build:desktop-artifact:collect` /
-   `build:android-apk:collect` 产出首个本地 artifact + manifest。
-2. 在真实 PC / Android shell UI 中接入现有 shell action，并在工具链 ready 后跑平台 shell smoke。
-3. 后续把 desktop / Android first-stage localStorage store 替换为 native
+1. 在真实 PC shell 中启动刚产出的 standalone artifact，验证 shell metadata、
+   login、PullInbox、delivery.notify 和 AckDelivery；同时保留后续 MSI / NSIS
+   installer bundle 为 hardening。
+2. 补 Android JDK 17+ / Gradle / Android SDK，或显式运行 Android Docker builder
+   profile，然后运行 `build:android-apk:collect` 产出首个 APK + manifest。
+3. 在真实 Android shell UI 中接入现有 shell action，并在工具链 ready 后跑平台 shell smoke。
+4. 后续把 desktop / Android first-stage localStorage store 替换为 native
    SQLite bridge，并补真实平台 runtime smoke。
-4. 再回到 workflow compensation adapter / instruction approval UI / ops 管理；
+5. 再回到 workflow compensation adapter / instruction approval UI / ops 管理；
    当前已有本地 workflow get / decision / decision manifest / instruction list CLI，
    低敏 compensation instruction manifest 生成 / 校验，以及 catalog-backed import
    approval 链路、invocation preflight 和静态 review page；后续可接正式审批 UI。
-5. 继续明确其它下游公开 admin API adapter。
-6. 在镜像可用后补 vector-index focused pgvector smoke；后续再接 Milvus /
+6. 继续明确其它下游公开 admin API adapter。
+7. 在镜像可用后补 vector-index focused pgvector smoke；后续再接 Milvus /
    OpenSearch backend、provider repair 和真 provider backfill smoke。
-7. 可继续 notification SMTP / SMS / APNs / FCM adapter 或 bounce-suppression。
-8. 新发现待办写入 `docs/runbook/remaining-goals.md`。
+8. 可继续 notification SMTP / SMS / APNs / FCM adapter 或 bounce-suppression。
+9. 新发现待办写入 `docs/runbook/remaining-goals.md`。
 
 ## 工作方式
 

@@ -30,7 +30,10 @@ the native bridge can stay narrow and auditable.
   makes the Windows artifact path repo-local after `npm --prefix clients
   install`; no global Tauri CLI is required. The install step may download the
   platform CLI binary and should be run explicitly before a real artifact build.
-- No Windows installer is produced yet.
+- The first-stage collected artifact is a standalone
+  `nexusim-windows-desktop.exe` plus low-sensitive manifest under ignored
+  `clients/artifacts/<run-id>/`. MSI / NSIS installer bundling is not enabled
+  yet.
 - `src-tauri/tauri.conf.json` records the intended shell boundary.
 
 ## Security Rules

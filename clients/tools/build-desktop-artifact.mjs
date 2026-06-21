@@ -5,7 +5,6 @@ import {
   collectClientBuildPrereqs,
   commandSucceeded,
   localNodeBin,
-  quoteCommand,
   workspaceRoot
 } from "./client-build-env.mjs";
 import {
@@ -69,11 +68,11 @@ function desktopBuildPlan(prereqs, options) {
       missing,
       command: process.platform === "win32" ? "cmd.exe" : localTauri,
       args: process.platform === "win32"
-        ? ["/d", "/s", "/c", quoteCommand(localTauri, ["build"])]
+        ? ["/d", "/c", localTauri, "build"]
         : ["build"],
       shell: false,
       skipShellAssetPrepEnv: "NEXUSIM_SKIP_SHELL_ASSET_PREP",
-      outputHint: "clients/desktop/src-tauri/target/release/bundle",
+      outputHint: "clients/desktop/src-tauri/target/release/nexusim-desktop.exe or bundle",
       collectArtifacts: collectPlanSummary("windows-desktop", options)
     };
   }
@@ -85,7 +84,7 @@ function desktopBuildPlan(prereqs, options) {
     args: ["tauri", "build"],
     shell: false,
     skipShellAssetPrepEnv: "NEXUSIM_SKIP_SHELL_ASSET_PREP",
-    outputHint: "clients/desktop/src-tauri/target/release/bundle",
+    outputHint: "clients/desktop/src-tauri/target/release/nexusim-desktop.exe or bundle",
     cargoTauriDetected: hasCargoTauri,
     collectArtifacts: collectPlanSummary("windows-desktop", options)
   };

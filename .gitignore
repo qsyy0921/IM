@@ -36,6 +36,7 @@ clients/**/node_modules/
 clients/**/dist/
 clients/**/.vite/
 clients/android/native/app/src/main/assets/nexusim/
+clients/desktop/src-tauri/gen/
 clients/desktop/src-tauri/target/
 clients/android/native/.gradle/
 clients/android/native/app/build/

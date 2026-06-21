@@ -104,8 +104,9 @@ First slice:
   moves desktop beyond a pure contract, but it is not an installer yet.
 - `clients/desktop/src-tauri` now has a first-stage Tauri v2 Rust runner
   skeleton with only a read-only `runtime_metadata` IPC command. `bundle.active`
-  remains `false`, so this is not a local Windows artifact yet. The Web shell
-  can invoke this command for diagnostics and fails closed on malformed metadata.
+  remains `false`, so the current native output is a standalone exe rather than
+  an MSI / NSIS installer. The Web shell can invoke this command for diagnostics
+  and fails closed on malformed metadata.
   Its `frontendDist` resolves to the shared prepared `clients/web/dist`, not a
   desktop-local duplicate Web build.
 - `clients/android` now has a first-stage TypeScript runtime adapter:
@@ -177,12 +178,13 @@ First slice:
   SHA-256 hashes. Native artifact wrappers call the same manifest verifier
   after preparing assets and before invoking Tauri / Gradle.
 - `npm --prefix clients run test:artifact-builders` validates the first-stage
-  desktop artifact / Android APK build wrappers in dry-run mode. Real build
-  commands are present as `build:desktop-artifact` and `build:android-apk`, but
-  they fail fast with missing-toolchain JSON until the local Tauri / Android
-  toolchains are installed.
+  desktop artifact / Android APK build wrappers in dry-run mode. Windows
+  desktop can now build through the repo-local Tauri CLI after
+  `npm --prefix clients install`; Android still fails fast with
+  missing-toolchain JSON until the local Android toolchain or Docker builder
+  image exists.
 - `npm --prefix clients run test:artifact-collector` validates the first-stage
-  artifact collector. Once a real desktop installer or Android APK exists,
+  artifact collector. Once a real desktop artifact or Android APK exists,
   `npm --prefix clients run collect:client-artifacts` copies it into ignored
   `clients/artifacts/<run-id>/` storage and writes a low-sensitive manifest with
   file names, sizes and SHA-256 hashes, without recording local absolute source
@@ -253,9 +255,11 @@ First slice:
   WebView asset shell skeleton. PC exposes only read-only runtime metadata IPC
   and Web can read it for diagnostics; Android exposes only a single-method
   read-only metadata JavaScript bridge. Both targets reserve native SQLite store
-  config and fail closed until native bridges exist. Neither target produces
-  `.msi`, `.exe`, `.apk`, or `.aab` artifacts yet; the repository now has
-  dry-run-tested build wrappers for those future artifacts.
+  config and fail closed until native bridges exist. Windows desktop now
+  produces a first-stage standalone `.exe` artifact and low-sensitive collected
+  manifest; it still does not produce MSI / NSIS installer bundles. Android
+  still does not produce `.apk` or `.aab` artifacts because the local toolchain /
+  Docker builder image has not been completed.
 - `/api/auth/logout` performs first-stage server-side logout for the current
   authenticated session only. Broader device/session management remains an
   identity/admin capability, not a client BFF target selector.
@@ -276,10 +280,10 @@ rejected. For local LAN client smoke, prefer the wired `172.x.x.x` address.
 
 ## Next Work
 
-1. Add first local Windows artifact from the PC desktop Tauri runner.
-2. Add first unsigned local APK from the Android native bridge.
-3. Wire lifecycle UI controls into the real desktop and Android shells, and run
-   a platform-shell smoke once packaging/runtime tooling is ready.
+1. Run real PC shell smoke against the collected standalone Windows artifact.
+2. Add first unsigned local APK from the Android native bridge or Docker builder.
+3. Wire lifecycle UI controls into the real Android shell, and run platform-shell
+   smoke once packaging/runtime tooling is ready.
 4. Replace first-stage desktop / Android localStorage stores with native SQLite
    bridge adapters when packaging/runtime tooling is ready.
 
@@ -287,8 +291,9 @@ rejected. For local LAN client smoke, prefer the wired `172.x.x.x` address.
 
 - PC artifact build needs Tauri CLI / `cargo-tauri`; the current repository has
   the runner skeleton, validator and repo-declared `@tauri-apps/cli`
-  dependency. Run `npm --prefix clients install` explicitly when you are ready
-  to download the local Tauri CLI binary for artifact builds.
+  dependency. `npm --prefix clients install` installs the repo-local Tauri CLI;
+  `build:desktop-artifact:collect` then produces a first-stage standalone exe
+  and collected manifest.
 - Android APK build needs JDK 17+ plus Gradle / Android SDK. If those are not
   installed locally, use a Docker / CI builder profile instead of claiming an
   APK baseline.

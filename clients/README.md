@@ -111,8 +111,9 @@ node clients/tools/collect-client-artifacts.mjs --target all --dry-run
 npm --prefix clients run plan:artifact-install
 ```
 
-Real artifact commands are present, but they fail fast until the local toolchain
-is ready:
+Real artifact commands are present. Windows desktop is ready on this machine
+after `npm --prefix clients install`; Android still fails fast until the Android
+toolchain or Docker builder image exists:
 
 ```powershell
 npm --prefix clients run build:desktop-artifact
@@ -166,9 +167,11 @@ Current packaging status:
   NexusIM wrapper sets `NEXUSIM_SKIP_SHELL_ASSET_PREP=true` after it has already
   prepared and verified the manifest so wrapper builds do not run the same Web
   build twice. The desktop workspace now declares `@tauri-apps/cli`; run
-  `npm --prefix clients install` when you are ready to download the local Tauri
-  CLI and then run `build:desktop-artifact:collect`. No installer exists yet
-  because the local Tauri CLI binary has not been installed in this checkout.
+  `npm --prefix clients install` to download the local Tauri CLI, then run
+  `build:desktop-artifact:collect`. The first-stage output is a standalone
+  `nexusim-windows-desktop.exe` collected under ignored
+  `clients/artifacts/<run-id>/` with a low-sensitive manifest. MSI / NSIS
+  installer bundling is still future hardening.
 - Android: native WebView shell can prepare target-specific Web assets and has
   an APK build wrapper plus a Docker builder profile; no APK/AAB has been
   produced yet because the local native toolchain is missing and the Docker

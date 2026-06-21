@@ -51,10 +51,6 @@ export function runCommand(command, args, options = {}) {
   });
 }
 
-export function quoteCommand(command, args) {
-  return [`"${command}"`, ...args.map(arg => `"${arg.replaceAll("\"", "\\\"")}"`)].join(" ");
-}
-
 function isOK(checks, name) {
   return checks.some(check => check.name === name && check.ok);
 }
@@ -85,7 +81,7 @@ function checkLocalNodeBin(binaryName, args, target, label) {
     };
   }
   const executed = process.platform === "win32"
-    ? runCommand("cmd.exe", ["/d", "/s", "/c", quoteCommand(binaryPath, args)])
+    ? runCommand("cmd.exe", ["/d", "/c", binaryPath, ...args])
     : runCommand(binaryPath, args);
   return {
     name: `local:${binaryName}`,

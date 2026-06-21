@@ -34,6 +34,14 @@ const desktopBundleRoot = join(
   "release",
   "bundle"
 );
+const desktopStandaloneExe = join(
+  workspaceRoot,
+  "desktop",
+  "src-tauri",
+  "target",
+  "release",
+  "nexusim-desktop.exe"
+);
 const desktopExtensions = new Set([".msi", ".exe", ".msix", ".dmg", ".appimage", ".deb", ".rpm"]);
 const targetNames = new Set(["android", "windows-desktop", "all"]);
 
@@ -189,17 +197,22 @@ function defaultSourcesForTarget(target) {
     return [androidDefaultArtifact];
   }
   if (target === "windows-desktop") {
-    return findDesktopArtifacts(desktopBundleRoot);
+    return findDesktopArtifacts();
   }
   throw new Error(`unsupported target: ${target}`);
 }
 
-function findDesktopArtifacts(root) {
-  if (!existsSync(root)) {
-    return [root];
-  }
+function findDesktopArtifacts() {
   const found = [];
-  walk(root, found);
+  if (existsSync(desktopBundleRoot)) {
+    walk(desktopBundleRoot, found);
+  }
+  if (existsSync(desktopStandaloneExe) && statSync(desktopStandaloneExe).isFile()) {
+    found.push(desktopStandaloneExe);
+  }
+  if (found.length === 0) {
+    return [desktopBundleRoot, desktopStandaloneExe];
+  }
   return found.sort((left, right) => left.localeCompare(right));
 }
 

@@ -76,7 +76,8 @@
   manifest 后跳过 Gradle 内重复 asset prep，直接 Gradle build 仍保留自动准备路径；
   desktop / Android artifact build wrapper 已有 dry-run-tested command plan，
   readiness report 已显示 per-target shell asset verification 状态；desktop 已通过
-  repo-local `@tauri-apps/cli` 产出 first-stage standalone exe artifact；
+  repo-local `@tauri-apps/cli` 产出 first-stage standalone exe artifact，且 launch
+  sanity smoke 已验证 exe 可启动并干净终止；
   artifact install plan 已能从 collected manifest 输出低敏 Windows / Android 安装
   checklist 和 install-side prereq readiness，且不连接设备；shell smoke plan 已消费同一
   install readiness，并输出低敏 browser / desktop / Android smoke 前置计划和
@@ -85,7 +86,7 @@
   成功构建后自动归档，Android Docker builder
   profile 已接同一 collector 但尚未运行，readiness report 显示 Docker / Compose
   可用但 builder image 尚未构建；本机仍缺 Android
-  JDK 17+ / Gradle / SDK；下一步跑真实 PC shell smoke，并补 Android 工具链或显式运行 builder profile 后复用同一 core 产出
+  JDK 17+ / Gradle / SDK；下一步跑登录级真实 PC shell smoke，并补 Android 工具链或显式运行 builder profile 后复用同一 core 产出
   Android APK。
 
 当前已开始的 AI 大模型应用底座能力：
@@ -258,7 +259,7 @@ HTTP/JSON surface 已建立；Web fetch / WebSocket / local store first path 已
 clean baseline 已通过，BFF HTTP route metrics / rate-limit adapter 已落，PC
 Tauri read-only metadata runner skeleton、Web 端 Tauri metadata 诊断读取和
 Android read-only native metadata bridge skeleton 已有，Windows desktop first-stage
-standalone artifact 已产出，下一步是真实 PC shell smoke / Android APK；Web IndexedDB local store 已补
+standalone artifact 已产出，launch sanity smoke 已通过，下一步是登录级真实 PC shell smoke / Android APK；Web IndexedDB local store 已补
 first-stage persistence test。
 
 future platform / product services 已作为长期产品化主线保留：继续按服务推进
@@ -460,7 +461,7 @@ baseline 已通过，PC desktop / Android first-stage runtime adapter 已落，P
   Tauri runner skeleton 和 Android WebView asset shell skeleton 已有，shared runtime
   lifecycle smoke 已覆盖 desktop / Android 登录持久化、恢复、刷新和登出清理，
   且 thin shell actions 已接入 shared login / refresh / restore / logout contract；Windows desktop
-  standalone artifact 已产出，下一步接真实 PC shell smoke、Android APK 和真实壳层 UI / WebView bridge smoke；Web
+  standalone artifact 已产出且 launch sanity smoke 已通过，下一步接登录级真实 PC shell smoke、Android APK 和真实壳层 UI / WebView bridge smoke；Web
   IndexedDB local store、browser platform adapter、shell config contract 和
   target shell Web assets prep / artifact builder dry-run / Android builder profile
   静态校验已补 first-stage focused tests。

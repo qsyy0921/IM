@@ -147,7 +147,9 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   不连接设备、不安装 APK，也不输出本机绝对路径。2026-06-21 已产出第一份
   Windows desktop standalone exe 归档 manifest：
   `clients/artifacts/2026-06-21T202009Z/manifest.json`（ignored local artifact
-  storage）；当前仍没有 Android APK baseline。
+  storage）；`npm --prefix clients run smoke:desktop-artifact-launch` 已验证该
+  standalone exe 能启动为进程、保持 5 秒并被工具干净终止。该 launch sanity smoke
+  不等同于登录 / PullInbox / WebSocket 的完整 PC UI smoke；当前仍没有 Android APK baseline。
 - Android 已新增 opt-in Docker builder profile：
   `deploy/docker/client-android-builder.Dockerfile` 和
   `deploy/local/docker-compose.client-builders.yml`。`validate:builder-profile`
@@ -167,7 +169,8 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   verification、artifact presence、collected-artifact install readiness、安全构建命令、
   artifact install plan 命令、per-target manual smoke checklist 和 shared BFF / push
   smoke 命令，不启动服务、不下载工具链、不连接设备、不安装 artifact、不声称已有
-  installer / APK。其 native artifact 状态现在区分 raw build output discovery 与
+  installer / APK。Windows desktop smoke plan 在 collected artifact ready 时会包含
+  `smoke:desktop-artifact-launch` 作为 launch sanity step。其 native artifact 状态现在区分 raw build output discovery 与
   collected artifact manifest readiness，避免已归档产物和本地 build 输出源混淆。
 - `loadtest/clientweb` 已新增 first-stage scriptable client smoke runner：
   准备阶段用 identity / api-gateway gRPC 注册用户、seed 会话并创建 JOIN；真实客户端
@@ -242,7 +245,7 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
 
 ## 下一步优先级
 
-1. 在真实 PC shell 中启动刚产出的 standalone artifact，验证 shell metadata、
+1. 继续 PC shell smoke：launch sanity 已通过；下一步验证 shell metadata、
    login、PullInbox、delivery.notify 和 AckDelivery；同时保留后续 MSI / NSIS
    installer bundle 为 hardening。
 2. 补 Android JDK 17+ / Gradle / Android SDK，或显式运行 Android Docker builder

@@ -35,7 +35,8 @@
 - Windows packaging：产出本地可安装或可运行的 Windows artifact；不要求生产签名。
   desktop workspace 已通过 repo-local `@tauri-apps/cli` 产出 first-stage standalone
   `nexusim-windows-desktop.exe`，并由 artifact collector 写入 ignored
-  `clients/artifacts/<run-id>/manifest.json`。剩余工作是运行真实 PC shell smoke、
+  `clients/artifacts/<run-id>/manifest.json`。`smoke:desktop-artifact-launch` 已验证
+  exe 启动 / 保持 / 终止的 launch sanity。剩余工作是运行登录级真实 PC shell smoke、
   打磨真实 UI lifecycle，以及后续启用 MSI / NSIS installer bundling / 签名。
 - `clients/android`：first-stage TypeScript runtime adapter 和 Kotlin WebView
   asset shell skeleton 已落；`createAndroidClientRuntime` 已能组装 shared

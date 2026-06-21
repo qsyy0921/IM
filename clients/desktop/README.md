@@ -33,7 +33,9 @@ the native bridge can stay narrow and auditable.
 - The first-stage collected artifact is a standalone
   `nexusim-windows-desktop.exe` plus low-sensitive manifest under ignored
   `clients/artifacts/<run-id>/`. MSI / NSIS installer bundling is not enabled
-  yet.
+  yet. `npm --prefix clients run smoke:desktop-artifact-launch` verifies the
+  collected exe starts, remains alive during the hold window and terminates
+  cleanly; it is not a login-level UI smoke.
 - `src-tauri/tauri.conf.json` records the intended shell boundary.
 
 ## Security Rules
@@ -58,6 +60,8 @@ npm --prefix clients run validate:desktop-tauri
 npm --prefix clients run test:shell-config
 npm --prefix clients run test:shell-asset-prep-wrapper
 npm --prefix clients run test:artifact-builders
+npm --prefix clients run test:desktop-artifact-launch-smoke
 node clients/tools/render-shell-config.mjs --input clients/desktop/shell-config.example.json
 node clients/tools/build-desktop-artifact.mjs --dry-run
+npm --prefix clients run smoke:desktop-artifact-launch
 ```

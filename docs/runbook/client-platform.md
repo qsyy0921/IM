@@ -193,10 +193,10 @@ First slice:
 - `npm --prefix clients run test:artifact-install-plan` validates the
   first-stage install-plan tool. `npm --prefix clients run plan:artifact-install`
   reads a collected `clients/artifacts/<run-id>/manifest.json` and prints
-  low-sensitive Windows installer / Android APK install checklist commands. It
+  low-sensitive Windows desktop artifact / Android APK install checklist commands. It
   now also reports install-side readiness such as Android `adb` availability
-  and Windows local installer launch support, while still not launching
-  installers, contacting devices, installing packages or printing local
+  and Windows local artifact launch support, while still not launching
+  artifacts, contacting devices, installing packages or printing local
   absolute paths.
 - `npm --prefix clients run report:artifact-readiness` prints a low-sensitive
   readiness matrix for local desktop, local Android and Android Docker builder
@@ -212,7 +212,9 @@ First slice:
   `test:web-shell-actions` lifecycle guard; it does not launch services,
   connect devices, install artifacts or install toolchains. Native artifact
   status distinguishes raw build-output discovery from the collected artifact
-  manifest that drives manual install readiness.
+  manifest that drives manual install readiness. When a Windows desktop
+  artifact is collected, the plan includes `smoke:desktop-artifact-launch` as a
+  process launch sanity check before the fuller login-level shell smoke.
   For Windows desktop, the plan now includes the explicit
   `install-declared-desktop-tauri-cli` step when the repo-declared local Tauri
   CLI has not been installed.
@@ -257,9 +259,11 @@ First slice:
   read-only metadata JavaScript bridge. Both targets reserve native SQLite store
   config and fail closed until native bridges exist. Windows desktop now
   produces a first-stage standalone `.exe` artifact and low-sensitive collected
-  manifest; it still does not produce MSI / NSIS installer bundles. Android
-  still does not produce `.apk` or `.aab` artifacts because the local toolchain /
-  Docker builder image has not been completed.
+  manifest; `smoke:desktop-artifact-launch` has verified the exe starts, stays
+  alive during the smoke hold window and terminates cleanly. It still does not
+  produce MSI / NSIS installer bundles, and the fuller login-level desktop UI
+  smoke remains pending. Android still does not produce `.apk` or `.aab`
+  artifacts because the local toolchain / Docker builder image has not been completed.
 - `/api/auth/logout` performs first-stage server-side logout for the current
   authenticated session only. Broader device/session management remains an
   identity/admin capability, not a client BFF target selector.
@@ -280,7 +284,8 @@ rejected. For local LAN client smoke, prefer the wired `172.x.x.x` address.
 
 ## Next Work
 
-1. Run real PC shell smoke against the collected standalone Windows artifact.
+1. Run login-level real PC shell smoke against the collected standalone Windows
+   artifact; launch sanity smoke already passes.
 2. Add first unsigned local APK from the Android native bridge or Docker builder.
 3. Wire lifecycle UI controls into the real Android shell, and run platform-shell
    smoke once packaging/runtime tooling is ready.
@@ -311,6 +316,7 @@ npm --prefix clients run test:artifact-builders
 npm --prefix clients run test:artifact-collector
 npm --prefix clients run test:artifact-install-plan
 npm --prefix clients run test:artifact-readiness
+npm --prefix clients run test:desktop-artifact-launch-smoke
 npm --prefix clients run test:shell-smoke-plan
 npm --prefix clients run report:artifact-readiness
 npm --prefix clients run validate:builder-profile
@@ -328,6 +334,7 @@ current prepared shell assets verify against `nexusim-shell-assets-manifest.json
 npm --prefix clients run report:artifact-readiness
 npm --prefix clients run plan:shell-smoke
 npm --prefix clients run plan:artifact-install
+npm --prefix clients run smoke:desktop-artifact-launch
 ```
 
 The report includes `nextActions`. When the Android Docker builder image is

@@ -178,9 +178,9 @@ function installChecklist(target, artifactHint) {
 
   return [
     {
-      step: "launch-installer",
+      step: "launch-desktop-artifact",
       command: `Start-Process ${artifactHint}`,
-      evidence: "Windows installer launches without SmartScreen or signer policy failures in the local test profile"
+      evidence: "Windows desktop artifact launches without SmartScreen or signer policy failures in the local test profile"
     },
     {
       step: "verify-installed-shell",

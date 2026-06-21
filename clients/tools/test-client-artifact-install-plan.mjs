@@ -68,6 +68,7 @@ try {
   assert(plan.targets["windows-desktop"].artifactReady === true, "desktop artifact should be ready");
   assert(plan.targets["windows-desktop"].readyForInstall === true, "desktop install plan should be ready");
   assert(plan.targets["windows-desktop"].installPrereqs.windowsInstallerLaunchSupported === true, "desktop install prereq should be true");
+  assert(plan.targets["windows-desktop"].checklist.some(item => item.step === "launch-desktop-artifact"), "desktop launch step missing");
   assert(plan.targets["windows-desktop"].checklist.some(item => item.command?.includes("Start-Process clients/artifacts/install-plan-test/nexusim-windows-desktop.msi")), "desktop launch command missing");
   assert(!serialized.match(/[A-Z]:\\\\/), "install plan leaked Windows absolute path");
   assert(!serialized.includes("\\\\?"), "install plan leaked extended Windows path");

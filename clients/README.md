@@ -135,9 +135,9 @@ ignored `clients/artifacts/<run-id>/` directory and writes a low-sensitive
 local absolute source paths. The `*:collect` build scripts run the same
 collection step automatically after a successful native build.
 `plan:artifact-install` reads that collected manifest and prints a low-sensitive
-Windows / Android install checklist. It also reports local install prerequisites
-such as Android `adb` availability and Windows installer launch support, but it
-does not install packages, connect to devices, launch installers or print local
+Windows desktop artifact / Android install checklist. It also reports local install prerequisites
+such as Android `adb` availability and Windows artifact launch support, but it
+does not install packages, connect to devices, launch artifacts or print local
 absolute paths.
 `plan:shell-smoke` consumes the same install plan, so native shell smoke
 readiness is not marked ready until a collected artifact exists and its
@@ -171,7 +171,9 @@ Current packaging status:
   `build:desktop-artifact:collect`. The first-stage output is a standalone
   `nexusim-windows-desktop.exe` collected under ignored
   `clients/artifacts/<run-id>/` with a low-sensitive manifest. MSI / NSIS
-  installer bundling is still future hardening.
+  installer bundling is still future hardening. Use
+  `npm --prefix clients run smoke:desktop-artifact-launch` for the first launch
+  sanity check; it starts the collected exe, waits briefly, then terminates it.
 - Android: native WebView shell can prepare target-specific Web assets and has
   an APK build wrapper plus a Docker builder profile; no APK/AAB has been
   produced yet because the local native toolchain is missing and the Docker

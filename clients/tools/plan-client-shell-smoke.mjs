@@ -132,7 +132,8 @@ function nativeCommands(target, readinessTarget) {
       verifyAssets: "node clients/tools/verify-shell-assets.mjs --target windows-desktop",
       buildArtifact: readinessTarget.buildCommand,
       dryRunBuild: readinessTarget.dryRunCommand,
-      installPlan: "npm --prefix clients run plan:artifact-install"
+      installPlan: "npm --prefix clients run plan:artifact-install",
+      launchSmoke: "npm --prefix clients run smoke:desktop-artifact-launch"
     };
   }
   return {
@@ -216,6 +217,14 @@ function nativeChecklist(target, readinessTarget, artifactStatus, installStatus)
       evidence: "install plan reports no missing artifact or install-side prerequisites"
     });
     return checklist;
+  }
+
+  if (target === "windows-desktop") {
+    checklist.push({
+      step: "launch-desktop-artifact-smoke",
+      command: nativeCommands(target, readinessTarget).launchSmoke,
+      evidence: "desktop artifact process starts, stays alive during the hold window and terminates cleanly"
+    });
   }
 
   checklist.push({

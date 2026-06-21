@@ -46,8 +46,9 @@ shell 骨架阶段；artifact / APK build wrapper 已有 dry-run-tested command 
 artifact collector 已能生成低敏 SHA-256 manifest，且 build wrapper 已支持成功构建后自动归档；Android Docker builder
 profile 已接 collector 但尚未运行；readiness report 显示 Docker / Compose 可用但 builder image 尚未构建。desktop 已通过 repo-local
 Tauri CLI 产出 first-stage standalone Windows exe，并写入 ignored artifact
-manifest；本机仍缺 Android JDK 17+ / Gradle / SDK。下一步是跑真实 PC shell
-smoke，并补 Android 本地工具链或显式运行 builder profile 产出 Android unsigned APK。
+manifest；desktop launch sanity smoke 已验证 exe 能启动并干净终止；本机仍缺
+Android JDK 17+ / Gradle / SDK。下一步是跑登录级真实 PC shell smoke，并补 Android
+本地工具链或显式运行 builder profile 产出 Android unsigned APK。
 
 真实业务语言边界已经固定为：Go 负责后端微服务、client BFF、控制面、事实源和
 审计；TypeScript 负责 Web / PC / Android 的共享客户端协议、同步核心和 UI；
@@ -84,7 +85,7 @@ adoption rules，不把服务数量、中间件或部署形态写死。
   已消费同一 install readiness，并输出低敏 browser / desktop / Android smoke
   前置计划和 per-target manual checklist，且区分 raw build output 与 collected
   artifact manifest；Windows desktop 已产出 standalone exe artifact + manifest；
-  下一步做真实 PC shell smoke、Android APK 和真实 Android shell smoke。
+  launch sanity smoke 已通过；下一步做登录级真实 PC shell smoke、Android APK 和真实 Android shell smoke。
 - admin / audit / workflow：客户端切片完成后继续公开 API handoff、operator
   workflow、低敏审批 review artifact 和补偿边界。
 - vector-index：继续 provider backend、pgvector / Milvus / OpenSearch 相关

@@ -427,6 +427,16 @@ workflow-compensation-instruction-list
 workflow-outbox-repair
 ```
 
+第一版本地 compensation instruction list 入口：
+
+```powershell
+go run ./loadtest/workflow -mode list-compensation-instructions -workflow-id wf_123 -status ACTIVE
+```
+
+该 CLI 只通过 workflow-service 公开 gRPC 查询低敏 instruction refs / version /
+status，不读 PostgreSQL 私表，不输出 instruction payload、reason 原文或 downstream
+response body。
+
 ## 18. 验收标准
 
 进入编码前：

@@ -56,7 +56,8 @@ First slice:
   rate-limit adapter wiring, reusing api-gateway's existing rate limiter and
   low-cardinality `/debug/metrics` / `/metrics` pipeline.
 - `clients/web` now has the first real browser adapters:
-  - `BFFClient` maps HTTP/JSON BFF payloads into shared protocol types.
+  - `BFFClient` maps HTTP/JSON BFF payloads into shared protocol types. It now
+    lives in `@nexusim/client-core`; Web keeps only a compatibility re-export.
   - `BrowserPushTransport` connects to `push-gateway` WebSocket and handles
     server frames as wakeups.
   - `IndexedDBMessageStore` implements the local cache / cursor store behind
@@ -83,6 +84,8 @@ First slice:
 - `clients/android/native` now has a first-stage Kotlin native bridge skeleton.
   It owns only launch shell / metadata and does not own token storage, local
   message facts, BFF calls, or push delivery semantics.
+- PC desktop and Android can reuse the same `@nexusim/client-core` BFF adapter
+  instead of copying Web-private HTTP mapping code.
 - `loadtest/clientweb` provides the first scriptable client-path smoke. Setup
   uses public gRPC APIs to register users, seed the conversation owner and create
   the receiver JOIN; the verified client path then uses only HTTP BFF and

@@ -43,6 +43,8 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   WebSocket，`IndexedDBMessageStore` 作为 local cache / cursor store；Web shell
   已能走 login -> push connect -> conversation / manual open -> PullInbox -> send
   -> AckDelivery 的真实 adapter flow。
+- `BFFClient` 已下沉到 `@nexusim/client-core`，Web 原路径仅 re-export；
+  PC desktop / Android 后续复用同一 HTTP/JSON BFF adapter，不复制 Web 私有代码。
 - `IndexedDBMessageStore` 已有 first-stage persistence test harness，覆盖
   cursor persistence、message seq ordering、pending send、send accepted 后稳定
   seq key 迁移、防 replay duplicate，以及 send failed 本地状态。

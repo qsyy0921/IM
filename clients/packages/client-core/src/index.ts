@@ -7,3 +7,4 @@ export * from "./inbox-sync";
 export * from "./send-queue";
 export * from "./ack-queue";
 export * from "./development-adapters";
+export * from "./http-bff-client";

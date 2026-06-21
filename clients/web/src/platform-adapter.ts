@@ -2,6 +2,7 @@ import type {
   AppLifecyclePort,
   ClientPlatformAdapter,
   ClientRuntimeConfig,
+  ClientRuntimeTarget,
   ConnectivityState,
   NetworkStatePort,
   SecureSessionStore,
@@ -12,6 +13,7 @@ import { IndexedDBMessageStore } from "./adapters/indexeddb-message-store";
 
 export interface BrowserPlatformAdapterOptions {
   config: ClientRuntimeConfig;
+  target?: ClientRuntimeTarget;
   appVersion?: string;
   installationID?: string;
   sessionKey?: string;
@@ -20,7 +22,7 @@ export interface BrowserPlatformAdapterOptions {
 
 export type BrowserPlatformAdapter = ClientPlatformAdapter & {
   identity: ClientPlatformAdapter["identity"] & {
-    target: "browser";
+    target: ClientRuntimeTarget;
   };
   messageStore: IndexedDBMessageStore;
 };
@@ -28,11 +30,12 @@ export type BrowserPlatformAdapter = ClientPlatformAdapter & {
 export function createBrowserPlatformAdapter(
   options: BrowserPlatformAdapterOptions
 ): BrowserPlatformAdapter {
+  const target = options.target ?? "browser";
   return {
     identity: {
-      target: "browser",
+      target,
       deviceID: options.config.deviceID,
-      installationID: options.installationID ?? `browser:${options.config.deviceID}`,
+      installationID: options.installationID ?? `${target}:${options.config.deviceID}`,
       appVersion: options.appVersion ?? "0.1.0"
     },
     secureSessionStore: new BrowserSessionStore(options.sessionKey),

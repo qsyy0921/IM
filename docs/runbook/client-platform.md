@@ -73,6 +73,12 @@ First slice:
   lifecycle. The browser session store is first-stage tab-scoped
   `sessionStorage`; production Web auth still needs an httpOnly-cookie or
   equivalent hardened session strategy.
+- The Web shell accepts a narrow WebView bridge config through
+  `globalThis.__NEXUSIM_CLIENT_SHELL__`. PC and Android shells can inject target,
+  API / WebSocket addresses, device id, installation id, app version and session
+  key so the same Web UI can identify itself as `windows-desktop` or `android`.
+  This bridge is configuration-only: it does not expose file system access,
+  broad native IPC or native token authority.
 - `IndexedDBMessageStore` now has a dependency-free first-stage persistence
   test harness covering cursor persistence, message ordering, pending send,
   accepted send stable-key migration, replay de-duplication and failed-send
@@ -126,7 +132,8 @@ First slice:
   UI can call for restore/logout.
 - `npm --prefix clients run test:web-platform` covers browser session storage,
   browser runtime identity, network/lifecycle ports and unsupported wakeup
-  boundaries without requiring a live browser or backend.
+  boundaries, plus WebView bridge target selection for desktop and Android,
+  without requiring a live browser or backend.
 - `@nexusim/client-core` now exposes `ClientShellActions`; desktop and Android
   export thin `createDesktopShellActions` / `createAndroidShellActions` wrappers.
   These wrappers do not own business logic; they only bind shell UI actions to

@@ -2,12 +2,17 @@ import { useMemo, useRef, useState } from "react";
 import { createClientRuntime, validateRuntimeConfig } from "@nexusim/client-core";
 import type { AuthSession, ConversationSummary, DeliveryNotifyFrame, MessageItem, ServerFrame } from "@nexusim/protocol";
 import { createBrowserPlatformAdapter } from "./platform-adapter";
-import { loadRuntimeConfig } from "./runtime-config";
+import type { BrowserPlatformAdapterOptions } from "./platform-adapter";
+import { loadRuntimeConfig, readClientShellConfig } from "./runtime-config";
 
 const runtimeConfig = validateRuntimeConfig(loadRuntimeConfig());
+const shellConfig = readClientShellConfig();
 
 export function App() {
-  const platform = useMemo(() => createBrowserPlatformAdapter({ config: runtimeConfig }), []);
+  const platform = useMemo(
+    () => createBrowserPlatformAdapter(browserPlatformOptions()),
+    []
+  );
   const runtime = useMemo(
     () =>
       createClientRuntime({
@@ -340,6 +345,23 @@ export function App() {
       </section>
     </main>
   );
+}
+
+function browserPlatformOptions(): BrowserPlatformAdapterOptions {
+  const options: BrowserPlatformAdapterOptions = { config: runtimeConfig };
+  if (shellConfig.target) {
+    options.target = shellConfig.target;
+  }
+  if (shellConfig.appVersion) {
+    options.appVersion = shellConfig.appVersion;
+  }
+  if (shellConfig.installationID) {
+    options.installationID = shellConfig.installationID;
+  }
+  if (shellConfig.sessionKey) {
+    options.sessionKey = shellConfig.sessionKey;
+  }
+  return options;
 }
 
 function newID(): string {

@@ -15,6 +15,7 @@ async function main() {
     entryPath,
     `
       export { BrowserSessionStore, createBrowserPlatformAdapter } from "../web/src/platform-adapter";
+      export { loadRuntimeConfig, readClientShellConfig } from "../web/src/runtime-config";
     `,
     "utf8"
   );
@@ -28,7 +29,12 @@ async function main() {
     logLevel: "silent"
   });
 
-  const { BrowserSessionStore, createBrowserPlatformAdapter } = await import(
+  const {
+    BrowserSessionStore,
+    createBrowserPlatformAdapter,
+    loadRuntimeConfig,
+    readClientShellConfig
+  } = await import(
     pathToFileURL(bundlePath).href
   );
 
@@ -55,6 +61,48 @@ async function main() {
   assertEqual(await adapter.networkState.current(), "ONLINE", "browser adapter reports online");
   assertEqual(adapter.lifecycle.current(), "ACTIVE", "browser adapter reports active lifecycle");
   assertEqual(await adapter.wakeupNotifications.requestPermission(), "UNSUPPORTED", "browser wakeup is unsupported");
+
+  globalThis.__NEXUSIM_CLIENT_SHELL__ = {
+    target: "windows-desktop",
+    apiBaseURL: "http://172.31.50.1:8080",
+    pushWebSocketURL: "ws://172.31.50.1:8088/ws",
+    deviceID: "desktop-webview",
+    installationID: "desktop-installation",
+    appVersion: "0.2.0",
+    sessionKey: "nexusim:desktop-webview"
+  };
+  const shellConfig = readClientShellConfig();
+  const shellRuntimeConfig = loadRuntimeConfig();
+  assertEqual(shellConfig.target, "windows-desktop", "shell config preserves desktop target");
+  assertEqual(shellRuntimeConfig.apiBaseURL, "http://172.31.50.1:8080", "shell config overrides api base");
+  assertEqual(shellRuntimeConfig.pushWebSocketURL, "ws://172.31.50.1:8088/ws", "shell config overrides push url");
+  assertEqual(shellRuntimeConfig.deviceID, "desktop-webview", "shell config overrides device id");
+
+  const shellAdapter = createBrowserPlatformAdapter({
+    config: shellRuntimeConfig,
+    target: shellConfig.target,
+    installationID: shellConfig.installationID,
+    appVersion: shellConfig.appVersion,
+    sessionKey: shellConfig.sessionKey
+  });
+  assertEqual(shellAdapter.identity.target, "windows-desktop", "webview shell uses desktop target");
+  assertEqual(shellAdapter.identity.installationID, "desktop-installation", "webview shell uses injected installation id");
+  assertEqual(shellAdapter.identity.appVersion, "0.2.0", "webview shell uses injected app version");
+
+  globalThis.__NEXUSIM_CLIENT_SHELL__ = {
+    target: "android",
+    deviceID: "android-webview",
+    sessionKey: "nexusim:android-webview"
+  };
+  const androidShellConfig = readClientShellConfig();
+  const androidRuntimeConfig = loadRuntimeConfig();
+  const androidAdapter = createBrowserPlatformAdapter({
+    config: androidRuntimeConfig,
+    target: androidShellConfig.target,
+    sessionKey: androidShellConfig.sessionKey
+  });
+  assertEqual(androidRuntimeConfig.deviceID, "android-webview", "android shell config overrides device id");
+  assertEqual(androidAdapter.identity.target, "android", "webview shell uses android target");
 
   console.log("web platform adapter ok");
 }

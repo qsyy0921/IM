@@ -87,6 +87,11 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   browser platform identity、network / lifecycle ports 和 unsupported wakeup
   boundary；Web session store 仅作为 first-stage tab-scoped sessionStorage
   adapter，后续生产 Web 鉴权仍需 httpOnly cookie / provider-grade session 策略。
+- Web shell 支持 first-stage WebView bridge config：
+  `globalThis.__NEXUSIM_CLIENT_SHELL__` 可由 PC / Android 壳层注入 target、
+  API / WebSocket 地址、device / installation / app version 和 session key；当前
+  focused test 覆盖 `windows-desktop` 与 `android` target selection。该 bridge 只
+  做 runtime identity / config 选择，不授予文件系统或 native token 权限。
 - `loadtest/clientweb` 已新增 first-stage scriptable client smoke runner：
   准备阶段用 identity / api-gateway gRPC 注册用户、seed 会话并创建 JOIN；真实客户端
   验证段只走 `api-gateway` HTTP BFF 和 `push-gateway` WebSocket，覆盖 BFF login、

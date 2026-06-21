@@ -60,6 +60,9 @@
 - Web hardening：browser platform adapter 当前使用 first-stage tab-scoped
   `sessionStorage` session store；生产 Web 鉴权后续需要 httpOnly cookie /
   provider-grade session 策略，避免把 token 长期放在 Web storage。
+- WebView bridge：`globalThis.__NEXUSIM_CLIENT_SHELL__` 已能选择
+  `windows-desktop` / `android` target 和 LAN endpoint；后续需要由真实 Tauri /
+  Android shell 注入该对象，并用真实壳层 smoke 验证。
 
 ## AI / Agent Platform 未完成
 

@@ -73,6 +73,47 @@ LIMIT 1
 	return instruction, true, nil
 }
 
+func (repository *Repository) ListWorkflowCompensationInstructions(
+	ctx context.Context,
+	command types.ListWorkflowCompensationInstructionsCommand,
+) ([]types.WorkflowCompensationInstruction, error) {
+	if repository.pool == nil {
+		return nil, types.NewDBReadFailed("workflow repository is not configured")
+	}
+	normalized := command.Normalized()
+	if err := normalized.Validate(); err != nil {
+		return nil, err
+	}
+	rows, err := repository.pool.Query(ctx, `
+SELECT tenant_id, instruction_id, workflow_id, payload_ref_hash, target_service, target_operation,
+       instruction_type, environment, config_kind, bundle_key, target_version, operator_ref,
+       reason_ref, status, created_at, updated_at
+FROM workflow_compensation_instructions
+WHERE tenant_id = $1
+  AND workflow_id = $2
+  AND ($3 = '' OR status = $3)
+ORDER BY updated_at DESC, instruction_id DESC
+LIMIT $4
+`, string(normalized.AuthContext.TenantID), normalized.WorkflowID, normalized.Status, normalized.PageSize)
+	if err != nil {
+		return nil, types.NewDBReadFailed(err.Error())
+	}
+	defer rows.Close()
+
+	instructions := make([]types.WorkflowCompensationInstruction, 0, normalized.PageSize)
+	for rows.Next() {
+		instruction, err := scanWorkflowCompensationInstruction(rows)
+		if err != nil {
+			return nil, types.NewDBReadFailed(err.Error())
+		}
+		instructions = append(instructions, instruction)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, types.NewDBReadFailed(err.Error())
+	}
+	return instructions, nil
+}
+
 func validateWorkflowCompensationInstructionBinding(
 	ctx context.Context,
 	tx pgx.Tx,

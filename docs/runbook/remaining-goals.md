@@ -58,8 +58,9 @@ Active AI foundation backlog 覆盖：`action-executor`、`agent-service`、
   rerank、outbox relay、route-refresh、budget-reset、cleanup worker。
 - `knowledge-ingestion-service`：parser worker、tombstone / delete proof、真实 connector、
   parser / crawler provider handoff、ingestion repair。
-- `workflow-service`：timer worker、更多 compensation adapter、instruction UI /
-  external approval binding、external callback wait、outbox relay、repair operators。
+- `workflow-service`：timer worker、更多 compensation adapter、instruction approval
+  UI、external approval binding、external callback wait、outbox relay、repair
+  operators。
 - `vector-index-service`：memory / search chunk consumer、pgvector smoke、Milvus /
   OpenSearch backend、provider repair、真 provider backfill smoke。
 

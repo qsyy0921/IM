@@ -106,6 +106,28 @@ func (useCase GetWorkflowUseCase) Execute(ctx context.Context, command types.Get
 	return useCase.repository.GetWorkflow(ctx, normalized)
 }
 
+type ListWorkflowCompensationInstructionsUseCase struct {
+	repository WorkflowRepository
+}
+
+func NewListWorkflowCompensationInstructionsUseCase(repository WorkflowRepository) ListWorkflowCompensationInstructionsUseCase {
+	return ListWorkflowCompensationInstructionsUseCase{repository: repository}
+}
+
+func (useCase ListWorkflowCompensationInstructionsUseCase) Execute(
+	ctx context.Context,
+	command types.ListWorkflowCompensationInstructionsCommand,
+) ([]types.WorkflowCompensationInstruction, error) {
+	if useCase.repository == nil {
+		return nil, types.NewUnavailable("workflow repository is not configured")
+	}
+	normalized := command.Normalized()
+	if err := normalized.Validate(); err != nil {
+		return nil, err
+	}
+	return useCase.repository.ListWorkflowCompensationInstructions(ctx, normalized)
+}
+
 func randomHex(size int) string {
 	buffer := make([]byte, size)
 	if _, err := rand.Read(buffer); err != nil {

@@ -30,6 +30,9 @@ model-gateway / workflow / knowledge-ingestion / vector-index
 - `audit-service` 已新增 first-stage `admin-consumer`，消费公开
   `im.admin.events` 并映射为低敏 `AppendAuditRecord`；Kafka offset 只在 append
   成功后提交，持久 ingestion checkpoint / rewind 仍是后续项。
+- `workflow-service` 已新增 first-stage
+  `ListWorkflowCompensationInstructions` 公开查询 API，按 workflow 返回低敏
+  compensation instruction refs / version / status；不读 admin-service 私表。
 
 ## 下一步优先级
 

@@ -25,22 +25,29 @@ type GetWorkflowExecutor interface {
 	Execute(context.Context, types.GetWorkflowCommand) (types.Workflow, []types.WorkflowDecision, error)
 }
 
+type ListWorkflowCompensationInstructionsExecutor interface {
+	Execute(context.Context, types.ListWorkflowCompensationInstructionsCommand) ([]types.WorkflowCompensationInstruction, error)
+}
+
 type Server struct {
 	workflowv1.UnimplementedWorkflowServiceServer
-	createWorkflow CreateWorkflowExecutor
-	recordDecision RecordWorkflowDecisionExecutor
-	getWorkflow    GetWorkflowExecutor
+	createWorkflow   CreateWorkflowExecutor
+	recordDecision   RecordWorkflowDecisionExecutor
+	getWorkflow      GetWorkflowExecutor
+	listInstructions ListWorkflowCompensationInstructionsExecutor
 }
 
 func NewServer(
 	createWorkflow CreateWorkflowExecutor,
 	recordDecision RecordWorkflowDecisionExecutor,
 	getWorkflow GetWorkflowExecutor,
+	listInstructions ListWorkflowCompensationInstructionsExecutor,
 ) *Server {
 	return &Server{
-		createWorkflow: createWorkflow,
-		recordDecision: recordDecision,
-		getWorkflow:    getWorkflow,
+		createWorkflow:   createWorkflow,
+		recordDecision:   recordDecision,
+		getWorkflow:      getWorkflow,
+		listInstructions: listInstructions,
 	}
 }
 
@@ -149,6 +156,33 @@ func (server *Server) GetWorkflow(
 	return response, nil
 }
 
+func (server *Server) ListWorkflowCompensationInstructions(
+	ctx context.Context,
+	request *workflowv1.ListWorkflowCompensationInstructionsRequest,
+) (*workflowv1.ListWorkflowCompensationInstructionsResponse, error) {
+	if request == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+	auth, ok := authFromProto(ctx, request.GetAuthContext())
+	if !ok {
+		return nil, status.Error(codes.InvalidArgument, "auth_context is required")
+	}
+	instructions, err := server.listInstructions.Execute(ctx, types.ListWorkflowCompensationInstructionsCommand{
+		AuthContext: auth,
+		WorkflowID:  request.GetWorkflowId(),
+		Status:      request.GetStatus(),
+		PageSize:    int(request.GetPageSize()),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	response := &workflowv1.ListWorkflowCompensationInstructionsResponse{}
+	for _, instruction := range instructions {
+		response.Instructions = append(response.Instructions, instructionToProto(instruction))
+	}
+	return response, nil
+}
+
 func authFromProto(ctx context.Context, auth *workflowv1.AuthContext) (types.AuthContext, bool) {
 	if verified, ok := verifiedAuthFromContext(ctx); ok {
 		return verified, true
@@ -164,6 +198,27 @@ func authFromProto(ctx context.Context, auth *workflowv1.AuthContext) (types.Aut
 		TraceID:     auth.GetTraceId(),
 		RequestID:   auth.GetRequestId(),
 	}, true
+}
+
+func instructionToProto(instruction types.WorkflowCompensationInstruction) *workflowv1.WorkflowCompensationInstruction {
+	return &workflowv1.WorkflowCompensationInstruction{
+		TenantId:        string(instruction.TenantID),
+		InstructionId:   instruction.InstructionID,
+		WorkflowId:      instruction.WorkflowID,
+		PayloadRefHash:  instruction.PayloadRefHash,
+		TargetService:   instruction.TargetService,
+		TargetOperation: instruction.TargetOperation,
+		InstructionType: instruction.InstructionType,
+		Environment:     instruction.Environment,
+		ConfigKind:      instruction.ConfigKind,
+		BundleKey:       instruction.BundleKey,
+		TargetVersion:   instruction.TargetVersion,
+		OperatorRef:     instruction.OperatorRef,
+		ReasonRef:       instruction.ReasonRef,
+		Status:          instruction.Status,
+		CreatedAtUnixMs: timeToUnixMillis(instruction.CreatedAt),
+		UpdatedAtUnixMs: timeToUnixMillis(instruction.UpdatedAt),
+	}
 }
 
 func workflowToProto(workflow types.Workflow) *workflowv1.Workflow {

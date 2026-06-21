@@ -8,6 +8,7 @@ service WorkflowService {
   rpc CreateWorkflow(CreateWorkflowRequest) returns (CreateWorkflowResponse);
   rpc RecordWorkflowDecision(RecordWorkflowDecisionRequest) returns (RecordWorkflowDecisionResponse);
   rpc GetWorkflow(GetWorkflowRequest) returns (GetWorkflowResponse);
+  rpc ListWorkflowCompensationInstructions(ListWorkflowCompensationInstructionsRequest) returns (ListWorkflowCompensationInstructionsResponse);
 }
 
 message AuthContext {
@@ -57,6 +58,25 @@ message WorkflowDecision {
   string reason_ref = 8;
   repeated string evidence_refs = 9;
   int64 created_at_unix_ms = 10;
+}
+
+message WorkflowCompensationInstruction {
+  string tenant_id = 1;
+  string instruction_id = 2;
+  string workflow_id = 3;
+  string payload_ref_hash = 4;
+  string target_service = 5;
+  string target_operation = 6;
+  string instruction_type = 7;
+  string environment = 8;
+  string config_kind = 9;
+  string bundle_key = 10;
+  string target_version = 11;
+  string operator_ref = 12;
+  string reason_ref = 13;
+  string status = 14;
+  int64 created_at_unix_ms = 15;
+  int64 updated_at_unix_ms = 16;
 }
 
 message CreateWorkflowRequest {
@@ -115,4 +135,15 @@ message GetWorkflowRequest {
 message GetWorkflowResponse {
   Workflow workflow = 1;
   repeated WorkflowDecision decisions = 2;
+}
+
+message ListWorkflowCompensationInstructionsRequest {
+  AuthContext auth_context = 1;
+  string workflow_id = 2;
+  string status = 3;
+  int32 page_size = 4;
+}
+
+message ListWorkflowCompensationInstructionsResponse {
+  repeated WorkflowCompensationInstruction instructions = 1;
 }

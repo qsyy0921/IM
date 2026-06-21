@@ -87,6 +87,13 @@ type GetWorkflowCommand struct {
 	WorkflowID  string
 }
 
+type ListWorkflowCompensationInstructionsCommand struct {
+	AuthContext AuthContext
+	WorkflowID  string
+	Status      string
+	PageSize    int
+}
+
 type Workflow struct {
 	TenantID              TenantID
 	WorkflowID            string
@@ -307,6 +314,35 @@ func (command GetWorkflowCommand) Validate() error {
 	}
 	if command.WorkflowID == "" {
 		return NewInvalidArgument("workflow_id is required")
+	}
+	return nil
+}
+
+func (command ListWorkflowCompensationInstructionsCommand) Normalized() ListWorkflowCompensationInstructionsCommand {
+	command.AuthContext = command.AuthContext.Normalized()
+	command.WorkflowID = strings.TrimSpace(command.WorkflowID)
+	command.Status = strings.ToUpper(strings.TrimSpace(command.Status))
+	if command.PageSize <= 0 {
+		command.PageSize = 50
+	}
+	if command.PageSize > 200 {
+		command.PageSize = 200
+	}
+	return command
+}
+
+func (command ListWorkflowCompensationInstructionsCommand) Validate() error {
+	command = command.Normalized()
+	if err := command.AuthContext.Validate(); err != nil {
+		return err
+	}
+	if command.WorkflowID == "" {
+		return NewInvalidArgument("workflow_id is required")
+	}
+	if command.Status != "" &&
+		command.Status != WorkflowCompensationInstructionStatusActive &&
+		command.Status != WorkflowCompensationInstructionStatusDisabled {
+		return NewInvalidArgument("workflow compensation instruction status is unsupported")
 	}
 	return nil
 }

@@ -185,8 +185,10 @@ operator 先导入低敏 instruction，再用 `payload_ref_hash` 匹配 workflow
 调用 control-plane-service 公开 `RollbackConfigVersion`；缺 instruction 或 unsupported
 target fail closed。DB registry instruction 必须绑定具体 `COMPENSATION_REQUEST`
 workflow，导入时校验 workflow 已批准或待补偿、target / payload refs 一致；resolve
-时只匹配同一 workflow。更多下游 adapter、provider-grade instruction UI / external
-approval binding 和运维后置。
+时只匹配同一 workflow。`ListWorkflowCompensationInstructions` 提供按 workflow 的
+低敏 instruction refs / version / status 查询面，供后续 operator UI 使用；它不暴露
+payload 原文、reason 原文或 downstream body。更多下游 adapter、provider-grade
+instruction UI / external approval binding 和运维后置。
 
 后续扩展：
 
@@ -421,6 +423,7 @@ workflow-decision-record
 workflow-cancel
 workflow-retry-step
 workflow-compensation-audit
+workflow-compensation-instruction-list
 workflow-outbox-repair
 ```
 

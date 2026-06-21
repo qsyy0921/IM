@@ -325,6 +325,94 @@ func TestRepositoryWorkflowCompensationInstructionRegistryIntegration(t *testing
 	}
 }
 
+func TestRepositoryListWorkflowCompensationInstructionsIntegration(t *testing.T) {
+	ctx := context.Background()
+	pool := openWorkflowTestPool(t)
+	resetWorkflowTables(t, ctx, pool)
+	repository := NewRepository(pool)
+	workflow := createApprovedCompensationWorkflow(t, ctx, repository)
+	if _, err := repository.RequestApprovedCompensations(ctx, 10); err != nil {
+		t.Fatalf("request approved compensation: %v", err)
+	}
+
+	instruction := types.WorkflowCompensationInstruction{
+		TenantID:        "tenant-workflow-test",
+		InstructionID:   "wfci_list_1",
+		WorkflowID:      workflow.WorkflowID,
+		PayloadRefHash:  "sha256:rollback-payload",
+		TargetService:   "control-plane-service",
+		TargetOperation: "CONFIG_ROLLBACK",
+		InstructionType: types.WorkflowCompensationInstructionTypeControlPlaneRollback,
+		Environment:     "local",
+		ConfigKind:      "API_GATEWAY_TENANT_QUOTA",
+		BundleKey:       "tenant-a",
+		TargetVersion:   "v1",
+		OperatorRef:     "operator:rollback",
+		ReasonRef:       "reason-sha256:rollback",
+		Status:          types.WorkflowCompensationInstructionStatusActive,
+	}
+	if _, err := repository.UpsertWorkflowCompensationInstructions(ctx, []types.WorkflowCompensationInstruction{instruction}); err != nil {
+		t.Fatalf("upsert active instruction: %v", err)
+	}
+	instruction.InstructionID = "wfci_list_2"
+	instruction.Status = types.WorkflowCompensationInstructionStatusDisabled
+	instruction.TargetVersion = "v2"
+	if _, err := repository.UpsertWorkflowCompensationInstructions(ctx, []types.WorkflowCompensationInstruction{instruction}); err != nil {
+		t.Fatalf("upsert disabled instruction: %v", err)
+	}
+
+	listed, err := repository.ListWorkflowCompensationInstructions(ctx, types.ListWorkflowCompensationInstructionsCommand{
+		AuthContext: types.AuthContext{TenantID: "tenant-workflow-test", ServiceName: "admin-service"},
+		WorkflowID:  workflow.WorkflowID,
+		PageSize:    10,
+	})
+	if err != nil {
+		t.Fatalf("list instructions: %v", err)
+	}
+	if len(listed) != 2 {
+		t.Fatalf("expected two instructions, got %d: %+v", len(listed), listed)
+	}
+	for _, got := range listed {
+		if got.WorkflowID != workflow.WorkflowID ||
+			got.PayloadRefHash != "sha256:rollback-payload" ||
+			got.TargetService != "control-plane-service" ||
+			got.OperatorRef != "operator:rollback" {
+			t.Fatalf("unexpected instruction: %+v", got)
+		}
+		for _, forbidden := range []string{"secret", "token", "raw:", "rollback plaintext"} {
+			if strings.Contains(got.PayloadRefHash, forbidden) ||
+				strings.Contains(got.ReasonRef, forbidden) ||
+				strings.Contains(got.BundleKey, forbidden) {
+				t.Fatalf("instruction leaked forbidden value %q: %+v", forbidden, got)
+			}
+		}
+	}
+
+	activeOnly, err := repository.ListWorkflowCompensationInstructions(ctx, types.ListWorkflowCompensationInstructionsCommand{
+		AuthContext: types.AuthContext{TenantID: "tenant-workflow-test", ServiceName: "admin-service"},
+		WorkflowID:  workflow.WorkflowID,
+		Status:      types.WorkflowCompensationInstructionStatusActive,
+		PageSize:    10,
+	})
+	if err != nil {
+		t.Fatalf("list active instructions: %v", err)
+	}
+	if len(activeOnly) != 1 || activeOnly[0].InstructionID != "wfci_list_1" {
+		t.Fatalf("unexpected active-only list: %+v", activeOnly)
+	}
+	otherWorkflow, err := repository.ListWorkflowCompensationInstructions(ctx, types.ListWorkflowCompensationInstructionsCommand{
+		AuthContext: types.AuthContext{TenantID: "tenant-workflow-test", ServiceName: "admin-service"},
+		WorkflowID:  "wf_other",
+		PageSize:    10,
+	})
+	if err != nil {
+		t.Fatalf("list other workflow instructions: %v", err)
+	}
+	if len(otherWorkflow) != 0 {
+		t.Fatalf("other workflow should not see instructions: %+v", otherWorkflow)
+	}
+}
+
 func prepareWorkflow(t *testing.T, idempotencyKey string, workflowID string, stepID string) domain.PreparedWorkflow {
 	t.Helper()
 	prepared, err := domain.PrepareWorkflow(types.CreateWorkflowCommand{

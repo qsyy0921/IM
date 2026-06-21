@@ -433,7 +433,9 @@ reason 原文写入数据库、outbox 或 summary。
 设置 `NEXUSIM_WORKFLOW_GRPC_ADDR` 后，`compensation-request` 会创建 / replay
 workflow-service `COMPENSATION_REQUEST`，用于后续人工审批和 workflow-service
 `compensation-worker` 物化补偿请求；admin-service 不在该 mode 内联执行真实补偿
-mutation。
+mutation。workflow-service 第一版 `compensation-executor` 可通过显式 instruction file
+执行 control-plane rollback compensation；admin-service 仍只提供 operation 入口和
+低敏 refs。
 
 ## 17. 验收标准
 

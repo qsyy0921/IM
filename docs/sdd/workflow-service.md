@@ -178,7 +178,11 @@ admin result 的 downstream ref。非 repair 的 `CRITICAL` admin operation 使�
 reason refs，并使用稳定 idempotency key；workflow-service 当前会在审批通过后由
 `compensation-worker` 物化 `workflow_compensations` 和
 `workflow.compensation.requested.v1` outbox，并把 workflow 推进到
-`COMPENSATION_PENDING`。真实 provider-grade compensation execution 后置。
+`COMPENSATION_PENDING`。第一版 `compensation-executor` 支持显式
+`control-plane-rollback-file` adapter：operator 提供 instruction file，用
+`payload_ref_hash` 匹配低敏 workflow compensation，再调用 control-plane-service 公开
+`RollbackConfigVersion`；缺 instruction 或 unsupported target fail closed。更多下游
+adapter、instruction registry 和 provider-grade 运维后置。
 
 后续扩展：
 
@@ -387,6 +391,7 @@ NEXUSIM_WORKFLOW_SERVICE_MODE=grpc
 NEXUSIM_WORKFLOW_SERVICE_MODE=workflow-worker
 NEXUSIM_WORKFLOW_SERVICE_MODE=timer-worker
 NEXUSIM_WORKFLOW_SERVICE_MODE=compensation-worker
+NEXUSIM_WORKFLOW_SERVICE_MODE=compensation-executor
 NEXUSIM_WORKFLOW_SERVICE_MODE=outbox-relay
 NEXUSIM_WORKFLOW_SERVICE_MODE=cleanup
 ```

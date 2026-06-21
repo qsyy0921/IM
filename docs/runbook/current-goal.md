@@ -169,10 +169,15 @@ model-gateway / workflow / knowledge-ingestion / vector-index
   `COMPENSATION_REQUEST` workflow，写 `workflow_compensations` 和低敏
   `workflow.compensation.requested.v1` outbox，并把 workflow 推进到
   `COMPENSATION_PENDING`；真实 provider-grade compensation execution 仍后置。
+- `workflow-service` 已新增 first-stage `compensation-executor`：
+  `control-plane-rollback-file` adapter 只在显式配置 instruction file 时执行
+  control-plane-service 公开 `RollbackConfigVersion`；缺失 instruction 或 unsupported
+  target 会 fail closed，不读取 admin-service 私有表，也不把 raw payload 写入
+  workflow DB / outbox。
 
 ## 下一步
 
-- 默认继续 provider-grade compensation execution / 明确下游补偿 adapter，或补其它明确下游公开 admin API adapter。
+- 默认继续更多明确下游补偿 adapter / compensation instruction 管理，或补其它明确下游公开 admin API adapter。
 - 默认下一步可继续 vector-index provider backend：在镜像可用后跑 focused pgvector smoke、
   真实 Milvus / OpenSearch backend、provider backend repair / 真 provider backfill smoke，
   或继续 active future service 的 focused checks。

@@ -169,7 +169,9 @@ func TestRepositoryRequestApprovedCompensationsIntegration(t *testing.T) {
 		compensation.Status != types.WorkflowCompensationStatusRequested ||
 		compensation.TargetService != "control-plane-service" ||
 		compensation.TargetOperation != "CONFIG_ROLLBACK" ||
-		compensation.TargetRefHash != "sha256:admin-operation" {
+		compensation.TargetRefHash != "sha256:admin-operation" ||
+		compensation.PayloadRefHash != "sha256:rollback-payload" ||
+		compensation.CompensationPolicyRef != "admin.compensation.control_plane.v1" {
 		t.Fatalf("unexpected compensation: %+v", compensation)
 	}
 
@@ -193,6 +195,57 @@ func TestRepositoryRequestApprovedCompensationsIntegration(t *testing.T) {
 		t.Fatalf("expected no compensations on replay, got %d", len(replayedCompensations))
 	}
 	assertWorkflowCompensationRequested(t, ctx, pool, workflow.WorkflowID, compensation.CompensationID)
+}
+
+func TestRepositoryExecuteWorkflowCompensationIntegration(t *testing.T) {
+	ctx := context.Background()
+	pool := openWorkflowTestPool(t)
+	resetWorkflowTables(t, ctx, pool)
+	repository := NewRepository(pool)
+
+	workflow := createApprovedCompensationWorkflow(t, ctx, repository)
+	requested, err := repository.RequestApprovedCompensations(ctx, 10)
+	if err != nil {
+		t.Fatalf("request approved compensation: %v", err)
+	}
+	if len(requested) != 1 {
+		t.Fatalf("expected one requested compensation, got %d", len(requested))
+	}
+	claimed, err := repository.ClaimRequestedCompensations(ctx, 10, time.Minute)
+	if err != nil {
+		t.Fatalf("claim requested compensation: %v", err)
+	}
+	if len(claimed) != 1 {
+		t.Fatalf("expected one claimed compensation, got %d", len(claimed))
+	}
+	if claimed[0].Status != types.WorkflowCompensationStatusExecuting {
+		t.Fatalf("unexpected claimed status: %+v", claimed[0])
+	}
+
+	completed, err := repository.CompleteWorkflowCompensation(ctx, claimed[0], types.WorkflowCompensationExecutionResult{
+		DownstreamService:    "control-plane-service",
+		DownstreamRequestRef: "config-rollback:prod:API_GATEWAY_TENANT_QUOTA:tenant-a:v1",
+		Status:               types.WorkflowCompensationStatusSucceeded,
+	})
+	if err != nil {
+		t.Fatalf("complete workflow compensation: %v", err)
+	}
+	if completed.Status != types.WorkflowCompensationStatusSucceeded ||
+		completed.DownstreamRequestRef != "config-rollback:prod:API_GATEWAY_TENANT_QUOTA:tenant-a:v1" ||
+		completed.CompletedAt.IsZero() {
+		t.Fatalf("unexpected completed compensation: %+v", completed)
+	}
+	loaded, _, err := repository.GetWorkflow(ctx, types.GetWorkflowCommand{
+		AuthContext: types.AuthContext{TenantID: "tenant-workflow-test", ServiceName: "admin-service"},
+		WorkflowID:  workflow.WorkflowID,
+	})
+	if err != nil {
+		t.Fatalf("get workflow: %v", err)
+	}
+	if loaded.Status != types.WorkflowStatusCompensated || loaded.CompletedAt.IsZero() {
+		t.Fatalf("workflow should be compensated: %+v", loaded)
+	}
+	assertWorkflowCompensationResultOutbox(t, ctx, pool, workflow.WorkflowID, completed.CompensationID, types.WorkflowEventCompensationSucceeded)
 }
 
 func prepareWorkflow(t *testing.T, idempotencyKey string, workflowID string, stepID string) domain.PreparedWorkflow {
@@ -222,6 +275,36 @@ func prepareWorkflow(t *testing.T, idempotencyKey string, workflowID string, ste
 		t.Fatalf("prepare workflow: %v", err)
 	}
 	return prepared
+}
+
+func createApprovedCompensationWorkflow(t *testing.T, ctx context.Context, repository *Repository) types.Workflow {
+	t.Helper()
+	prepared := prepareWorkflow(t, "wf-compensation-execution-idem-1", "wf_compensation_execution_1", "wfs_compensation_execution_1")
+	prepared.Command.WorkflowType = types.WorkflowTypeCompensationRequest
+	prepared.Command.RiskLevel = types.RiskLevelHigh
+	prepared.Command.RequesterService = "admin-service"
+	prepared.Command.TargetService = "control-plane-service"
+	prepared.Command.TargetOperation = "CONFIG_ROLLBACK"
+	prepared.Command.TargetRefHash = "sha256:admin-operation"
+	prepared.Command.ApprovalPolicyRef = "admin.workflow.compensation.v1"
+	prepared.Command.CompensationPolicyRef = "admin.compensation.control_plane.v1"
+	prepared.Command.PayloadSchemaVersion = "admin.config_rollback.v1"
+	prepared.Command.PayloadRefHash = "sha256:rollback-payload"
+	prepared.Command.ReasonRef = "reason-sha256:compensation"
+	prepared.CommandHash = domain.HashRef("compensation-execution-workflow")
+
+	workflow, replayed, err := repository.CreateWorkflow(ctx, prepared)
+	if err != nil {
+		t.Fatalf("create compensation workflow: %v", err)
+	}
+	if replayed {
+		t.Fatal("new compensation workflow should not replay")
+	}
+	decisionPrepared := prepareDecision(t, workflow.WorkflowID, workflow.CurrentStepID, "wfd_compensation_execution_1", "operator:approver", "decision-compensation-execution")
+	if _, _, _, err := repository.RecordWorkflowDecision(ctx, decisionPrepared); err != nil {
+		t.Fatalf("approve compensation workflow: %v", err)
+	}
+	return workflow
 }
 
 func prepareDecision(t *testing.T, workflowID string, stepID string, decisionID string, deciderRef string, idempotencyKey string) domain.PreparedDecision {
@@ -390,6 +473,32 @@ WHERE event_type = $1 AND workflow_id = $2
 	for _, forbidden := range []string{"secret", "token", "raw:", "rollback plaintext", "operator:approver"} {
 		if strings.Contains(payload, forbidden) {
 			t.Fatalf("compensation outbox leaked forbidden value %q: %s", forbidden, payload)
+		}
+	}
+}
+
+func assertWorkflowCompensationResultOutbox(t *testing.T, ctx context.Context, pool *pgxpool.Pool, workflowID string, compensationID string, eventType string) {
+	t.Helper()
+	var outboxCount int
+	var payload string
+	if err := pool.QueryRow(ctx, `
+SELECT count(*), COALESCE(max(payload_json::text), '')
+FROM workflow_outbox
+WHERE event_type = $1 AND workflow_id = $2
+`, eventType, workflowID).Scan(&outboxCount, &payload); err != nil {
+		t.Fatalf("query workflow compensation result outbox: %v", err)
+	}
+	if outboxCount != 1 {
+		t.Fatalf("expected one compensation result outbox row, got %d", outboxCount)
+	}
+	for _, want := range []string{compensationID, types.WorkflowStatusCompensated, types.WorkflowCompensationStatusSucceeded, "control-plane-service", "config-rollback:"} {
+		if !strings.Contains(payload, want) {
+			t.Fatalf("compensation result outbox payload missing %q: %s", want, payload)
+		}
+	}
+	for _, forbidden := range []string{"secret", "token", "raw:", "rollback plaintext", "operator:approver"} {
+		if strings.Contains(payload, forbidden) {
+			t.Fatalf("compensation result outbox leaked forbidden value %q: %s", forbidden, payload)
 		}
 	}
 }

@@ -92,9 +92,10 @@ publish / rollback / tenant quota / policy ruleset smoke 已通过。`admin-serv
 `admin.operation.compensation_requested.v1` outbox，reason file 只落 hash / ref；
 设置 `NEXUSIM_WORKFLOW_GRPC_ADDR` 时会创建 / replay workflow-service
 `COMPENSATION_REQUEST` workflow；workflow-service `compensation-worker` 已能物化
-已批准补偿请求到 `workflow_compensations` 和低敏 outbox。下一步默认继续
-provider-grade compensation execution / 明确下游补偿 adapter、其它明确下游公开 admin API
-adapter，或在镜像可用后继续 focused pgvector smoke、Milvus /
+已批准补偿请求到 `workflow_compensations` 和低敏 outbox。`compensation-executor`
+已支持显式 instruction file 驱动的 control-plane rollback adapter，缺失 instruction /
+unsupported target fail closed。下一步默认继续更多明确下游补偿 adapter /
+compensation instruction 管理、其它明确下游公开 admin API adapter，或在镜像可用后继续 focused pgvector smoke、Milvus /
 OpenSearch backend / provider repair / 真 provider backfill smoke。
 ```
 

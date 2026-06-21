@@ -18,6 +18,7 @@ import (
 	workflowgrpc "github.com/qsyy0921/IM/services/workflow-service/internal/api/grpc"
 	"github.com/qsyy0921/IM/services/workflow-service/internal/app"
 	postgresinfra "github.com/qsyy0921/IM/services/workflow-service/internal/infrastructure/postgres"
+	rpcinfra "github.com/qsyy0921/IM/services/workflow-service/internal/infrastructure/rpc"
 	"github.com/qsyy0921/IM/services/workflow-service/internal/trigger/compensation"
 	"google.golang.org/grpc"
 )
@@ -43,6 +44,8 @@ func run(ctx context.Context) error {
 		return runGRPC(ctx)
 	case "compensation-worker":
 		return runCompensationWorker(ctx)
+	case "compensation-executor":
+		return runCompensationExecutor(ctx)
 	default:
 		return fmt.Errorf("unsupported NEXUSIM_WORKFLOW_SERVICE_MODE %q", mode)
 	}
@@ -146,6 +149,64 @@ func runCompensationWorker(ctx context.Context) error {
 	return nil
 }
 
+func runCompensationExecutor(ctx context.Context) error {
+	debugAddr, err := workflowDebugAddrFromEnv()
+	if err != nil {
+		return err
+	}
+	stopDebug, err := startDebugServer(ctx, debugAddr)
+	if err != nil {
+		return err
+	}
+	defer stopDebug()
+
+	pool, err := openPGPool(ctx)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	executor, cleanup, err := workflowCompensationExecutorFromEnv(ctx)
+	if err != nil {
+		return err
+	}
+	if cleanup != nil {
+		defer func() { _ = cleanup() }()
+	}
+	worker := compensation.NewExecutionWorker(postgresinfra.NewRepository(pool), executor, compensation.Config{
+		BatchSize:    envInt("NEXUSIM_WORKFLOW_COMPENSATION_EXECUTION_BATCH_SIZE", 50),
+		PollInterval: envDuration("NEXUSIM_WORKFLOW_COMPENSATION_EXECUTION_POLL_INTERVAL", time.Second),
+		ErrorBackoff: envDuration("NEXUSIM_WORKFLOW_COMPENSATION_EXECUTION_ERROR_BACKOFF", time.Second),
+		Logf:         log.Printf,
+	})
+	log.Println("workflow-service compensation-executor started")
+	if err := worker.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
+		return err
+	}
+	return nil
+}
+
+func workflowCompensationExecutorFromEnv(ctx context.Context) (compensation.Executor, func() error, error) {
+	mode := envString("NEXUSIM_WORKFLOW_COMPENSATION_EXECUTOR_MODE", "")
+	switch mode {
+	case "control-plane-rollback-file":
+		instructions, err := rpcinfra.LoadControlPlaneRollbackInstructions(os.Getenv("NEXUSIM_WORKFLOW_COMPENSATION_INSTRUCTION_FILE"))
+		if err != nil {
+			return nil, nil, err
+		}
+		return rpcinfra.DialControlPlaneCompensationExecutor(
+			ctx,
+			os.Getenv("NEXUSIM_CONTROL_PLANE_GRPC_ADDR"),
+			envDuration("NEXUSIM_WORKFLOW_COMPENSATION_RPC_TIMEOUT", time.Second),
+			instructions,
+		)
+	case "":
+		return nil, nil, errors.New("NEXUSIM_WORKFLOW_COMPENSATION_EXECUTOR_MODE is required")
+	default:
+		return nil, nil, fmt.Errorf("unsupported NEXUSIM_WORKFLOW_COMPENSATION_EXECUTOR_MODE %q", mode)
+	}
+}
+
 func workflowModeFromEnv() string {
 	mode := strings.TrimSpace(os.Getenv("NEXUSIM_WORKFLOW_SERVICE_MODE"))
 	if mode == "" {
@@ -156,7 +217,7 @@ func workflowModeFromEnv() string {
 
 func validateWorkflowMode(mode string) error {
 	switch mode {
-	case "noop", "grpc", "compensation-worker":
+	case "noop", "grpc", "compensation-worker", "compensation-executor":
 		return nil
 	default:
 		return fmt.Errorf("unsupported NEXUSIM_WORKFLOW_SERVICE_MODE %q", mode)

@@ -21,13 +21,19 @@ const (
 	WorkflowStatusRejected            = "REJECTED"
 	WorkflowStatusCanceled            = "CANCELED"
 	WorkflowStatusCompensationPending = "COMPENSATION_PENDING"
+	WorkflowStatusCompensated         = "COMPENSATED"
 
 	WorkflowStepTypeApproval = "APPROVAL"
 	WorkflowStepStatusReady  = "READY"
 
 	WorkflowCompensationStatusRequested = "REQUESTED"
+	WorkflowCompensationStatusExecuting = "EXECUTING"
+	WorkflowCompensationStatusSucceeded = "SUCCEEDED"
+	WorkflowCompensationStatusFailed    = "FAILED"
 
 	WorkflowEventCompensationRequested = "workflow.compensation.requested.v1"
+	WorkflowEventCompensationSucceeded = "workflow.compensation.succeeded.v1"
+	WorkflowEventCompensationFailed    = "workflow.compensation.failed.v1"
 
 	DecisionTypeApprove        = "APPROVE"
 	DecisionTypeReject         = "REJECT"
@@ -135,18 +141,33 @@ type WorkflowDecision struct {
 }
 
 type WorkflowCompensation struct {
-	TenantID        TenantID
-	WorkflowID      string
-	CompensationID  string
-	SourceStepID    string
-	TargetService   string
-	TargetOperation string
-	TargetRefHash   string
-	Status          string
-	FailureClass    string
-	PublicError     string
-	CreatedAt       time.Time
-	CompletedAt     time.Time
+	TenantID              TenantID
+	WorkflowID            string
+	CompensationID        string
+	SourceStepID          string
+	TargetService         string
+	TargetOperation       string
+	TargetRefHash         string
+	PayloadSchemaVersion  string
+	PayloadRefHash        string
+	CompensationPolicyRef string
+	ReasonRef             string
+	DownstreamService     string
+	DownstreamRequestRef  string
+	Status                string
+	FailureClass          string
+	PublicError           string
+	CreatedAt             time.Time
+	UpdatedAt             time.Time
+	CompletedAt           time.Time
+}
+
+type WorkflowCompensationExecutionResult struct {
+	DownstreamService    string
+	DownstreamRequestRef string
+	Status               string
+	FailureClass         string
+	PublicError          string
 }
 
 func (command CreateWorkflowCommand) Normalized() CreateWorkflowCommand {

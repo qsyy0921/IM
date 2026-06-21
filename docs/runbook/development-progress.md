@@ -98,9 +98,11 @@
   入口，并支撑 admin operation-specific approval policy / target-service routing；
   first-stage `compensation-worker` 已能把 approved `COMPENSATION_REQUEST` 物化为
   `workflow_compensations`、低敏 `workflow.compensation.requested.v1` outbox 和
-  `COMPENSATION_PENDING` workflow 状态；既有 workflow 第一路径已通过完整
-  `check-local`，本 worker 切片按风险分层用 focused checks 收口；不宣称 timer worker、
-  真实 compensation execution、external callback wait 或 outbox relay。
+  `COMPENSATION_PENDING` workflow 状态；first-stage `compensation-executor` 已支持
+  显式 instruction file 驱动的 control-plane rollback adapter，缺失 instruction /
+  unsupported target fail closed；既有 workflow 第一路径已通过完整 `check-local`，
+  本 worker / executor 切片按风险分层用 focused checks 收口；不宣称 timer worker、
+  多 adapter compensation platform、external callback wait 或 outbox relay。
 - `vector-index-service` product-active：SDD v0.1 和 stage-switch review 已通过，
   第一版 proto / migration / 六层 skeleton / `grpc` runtime / Docker /
   Prometheus / Grafana 覆盖已落；当前覆盖 `UpsertVectorItem`、

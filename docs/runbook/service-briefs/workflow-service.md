@@ -30,11 +30,16 @@ retention、外部系统调用补偿和人工审批状态。
   `COMPENSATION_REQUEST` workflow，写 `workflow_compensations`、
   `workflow.compensation.requested.v1` outbox，并把 workflow 推进到
   `COMPENSATION_PENDING`；真实 provider-grade 补偿执行仍后置。
+- 已新增 first-stage `compensation-executor` runtime：显式配置
+  `NEXUSIM_WORKFLOW_COMPENSATION_EXECUTOR_MODE=control-plane-rollback-file` 和
+  instruction file 后，可把 `CONFIG_ROLLBACK` compensation 通过
+  control-plane-service 公开 `RollbackConfigVersion` 执行；无指令 / 不支持 target
+  fail closed，不读取 admin-service 私有表。
 - 已被 admin-service operation worker 用于第一版 `REPAIR_REQUEST ->
   REPAIR_APPROVAL` 长审批入口；该路径只保存低敏 hash/ref，并由 admin-service
   result 记录 `workflow:<workflow_id>`。
 - 已通过 focused checks、真实 PostgreSQL integration 和完整 `check-local`。
 - 确认 reason / payload / EvidencePack / proposal 正文不进入事件或 metrics。
 - 第一版只做 `CreateWorkflow`、`RecordWorkflowDecision`、`GetWorkflow` 和
-  compensation request materialization；timer worker、真实补偿执行、
-  external callback wait 和 outbox relay 后置。
+  compensation request materialization / 显式 control-plane rollback compensation；
+  timer worker、更多补偿 adapter、external callback wait 和 outbox relay 后置。

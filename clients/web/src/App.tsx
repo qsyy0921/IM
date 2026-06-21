@@ -3,10 +3,11 @@ import { createClientRuntime, validateRuntimeConfig } from "@nexusim/client-core
 import type { AuthSession, ConversationSummary, DeliveryNotifyFrame, MessageItem, ServerFrame } from "@nexusim/protocol";
 import { createBrowserPlatformAdapter } from "./platform-adapter";
 import type { BrowserPlatformAdapterOptions } from "./platform-adapter";
-import { loadRuntimeConfig, readClientShellConfig } from "./runtime-config";
+import { loadRuntimeConfig, readAndroidNativeBridgeMetadata, readClientShellConfig } from "./runtime-config";
 
 const runtimeConfig = validateRuntimeConfig(loadRuntimeConfig());
 const shellConfig = readClientShellConfig();
+const androidNativeMetadata = readAndroidNativeBridgeMetadata();
 
 export function App() {
   const platform = useMemo(
@@ -241,6 +242,16 @@ export function App() {
               <dt>Device</dt>
               <dd>{runtimeConfig.deviceID}</dd>
             </div>
+            <div>
+              <dt>Target</dt>
+              <dd>{shellConfig.target ?? "browser"}</dd>
+            </div>
+            {androidNativeMetadata ? (
+              <div>
+                <dt>Native</dt>
+                <dd>{`${androidNativeMetadata.runtimeLabel} ${androidNativeMetadata.nativeBridgeVersion}`}</dd>
+              </div>
+            ) : null}
           </dl>
         </section>
 

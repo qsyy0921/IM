@@ -118,6 +118,9 @@ First slice:
   The Web runtime can parse `runtimeMetadata()` for diagnostics, and invalid
   bridge payloads fail closed. The bridge exposes no token, storage,
   file-system or message APIs.
+- The Web shell runtime panel now displays shell target and Android native
+  bridge metadata when present. This is diagnostics only; it does not grant Web
+  code native capabilities.
 - PC desktop and Android can reuse the same `@nexusim/client-core` BFF adapter
   instead of copying Web-private HTTP mapping code.
 - PC desktop and Android can also reuse the same `@nexusim/client-core`

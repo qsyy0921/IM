@@ -96,6 +96,8 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   `runtimeMetadata()` 用于诊断，且 focused test 覆盖合法 metadata、错误 target 和
   malformed JSON 的 fail-closed 行为。该 bridge 不暴露 token、storage、文件系统或
   message API。
+- Web shell 的运行入口面板已展示 shell target 和 Android native bridge metadata；
+  该展示只用于本地诊断，不改变客户端权限边界。
 - Web app 会在主 bundle 前加载 `nexusim-shell-config.js`；`clients/desktop` 和
   `clients/android` 已各自提供低敏 `shell-config.example.json`，并由
   `clients/tools/render-shell-config.mjs` 渲染成注入脚本。`test:shell-config` 和

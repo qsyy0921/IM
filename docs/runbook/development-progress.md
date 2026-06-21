@@ -34,7 +34,10 @@
   list / PullInbox-backed messages / send / ACK / contacts / receipts；
   `clients/web` 已接 first-stage BFF fetch / push WebSocket / IndexedDB local
   store adapters，并把 Web shell 接到 login / PullInbox / SendMessage /
-  AckDelivery flow；`loadtest/clientweb` 已新增脚本化 BFF + push client-path
+  AckDelivery flow；`IndexedDBMessageStore` 已新增无外部依赖 first-stage
+  persistence test harness，覆盖 cursor、ordering、pending/accepted key
+  migration、replay de-duplication 和 failed-send 状态；`loadtest/clientweb`
+  已新增脚本化 BFF + push client-path
   smoke runner 和本地私有启动脚本。2026-06-21 第一轮本地 Web MVP smoke 已通过并
   归档到 `docs/runbook/loadtest/client-platform/`；同日提交后 loopback clean
   baseline 和 Windows wired `172.31.50.1` clean baseline 均已通过；BFF HTTP
@@ -214,7 +217,8 @@ HTTP/JSON surface 已建立；Web fetch / WebSocket / local store first path 已
 第一轮本地 Web MVP smoke、loopback clean baseline 和 Windows wired `172.31.50.1`
 clean baseline 已通过，BFF HTTP route metrics / rate-limit adapter 已落，PC
 Tauri runner skeleton 和 Android native bridge skeleton 已有，下一步是
-local Windows artifact / Android APK。
+local Windows artifact / Android APK；Web IndexedDB local store 已补
+first-stage persistence test。
 
 future platform / product services 已作为长期产品化主线保留：继续按服务推进
 媒体、通知、审计、控制面、presence、model 等产品化 / 平台服务，并按
@@ -413,7 +417,8 @@ future platform / product services 已进入 product-active first-stage implemen
 浏览器 Web first path、api-gateway client BFF、push path、本地和 wired 172 clean
 baseline 已通过，PC desktop / Android first-stage runtime adapter 已落，PC
 Tauri runner skeleton 和 Android native bridge skeleton 已有，下一步接 local
-Windows artifact 和 Android APK。
+Windows artifact 和 Android APK；Web IndexedDB local store 已补 first-stage
+persistence test。
 长期后续按完整目标架构推进业务平台、数据平台、AI / Agent 平台、客户端平台和中间件平台；
 后续 AI 继续扩展低敏 collaborative-memory 算法/eval，优先 multi-hop / temporal update / profile aggregation 边界。
 短期生产级测试、完整 HA、长压和 sizing 不再作为当前转进阻塞，但仍留在 hardening backlog。

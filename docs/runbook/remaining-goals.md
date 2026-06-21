@@ -36,9 +36,9 @@
   `push-gateway` 地址配置。
 - 三端 smoke：Web / PC / Android 都只能连 `api-gateway` 和 `push-gateway`；
   PullInbox 是事实源，WebSocket 只做在线唤醒。
-- Local store：补 IndexedDB / desktop durable store / Android durable store 的
-  persistence 和 cursor replay tests；当前 desktop / Android store 仍是
-  development in-memory adapter。
+- Local store：`IndexedDBMessageStore` 已有 first-stage persistence test；继续补
+  desktop durable store / Android durable store 的 persistence 和 cursor replay
+  tests；当前 desktop / Android store 仍是 development in-memory adapter。
 - Auth lifecycle：`/api/auth/logout` 仍等待 identity user self-session revoke 契约；
   完成后补 BFF logout 和客户端状态清理。
 

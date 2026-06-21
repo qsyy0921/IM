@@ -43,6 +43,9 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   WebSocket，`IndexedDBMessageStore` 作为 local cache / cursor store；Web shell
   已能走 login -> push connect -> conversation / manual open -> PullInbox -> send
   -> AckDelivery 的真实 adapter flow。
+- `IndexedDBMessageStore` 已有 first-stage persistence test harness，覆盖
+  cursor persistence、message seq ordering、pending send、send accepted 后稳定
+  seq key 迁移、防 replay duplicate，以及 send failed 本地状态。
 - `loadtest/clientweb` 已新增 first-stage scriptable client smoke runner：
   准备阶段用 identity / api-gateway gRPC 注册用户、seed 会话并创建 JOIN；真实客户端
   验证段只走 `api-gateway` HTTP BFF 和 `push-gateway` WebSocket，覆盖 BFF login、
@@ -117,8 +120,8 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
 ## 下一步优先级
 
 1. 后续按同一 core 接 PC desktop local Windows artifact 和 Android unsigned APK。
-2. 补 IndexedDB persistence tests beyond first browser adapter；后续再把
-   desktop / Android memory store 换成持久 store。
+2. 后续把 desktop / Android memory store 换成持久 store，并补对应 cursor
+   replay tests。
 3. 再回到 workflow compensation adapter / instruction approval UI / ops 管理；
    当前已有本地 workflow get / decision / decision manifest / instruction list CLI，
    低敏 compensation instruction manifest 生成 / 校验，以及 catalog-backed import

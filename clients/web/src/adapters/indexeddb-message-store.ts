@@ -60,8 +60,10 @@ export class IndexedDBMessageStore implements LocalMessageStore {
 
   async markSendAccepted(localID: string, response: SendMessageResponse): Promise<void> {
     const db = await this.#db();
-    await txDone(db, [MESSAGE_STORE], "readwrite", transaction => {
+    const currentSeq = await this.getLastReceivedSeq(response.conversationID);
+    await txDone(db, [MESSAGE_STORE, CURSOR_STORE], "readwrite", transaction => {
       const store = transaction.objectStore(MESSAGE_STORE);
+      const cursorStore = transaction.objectStore(CURSOR_STORE);
       const index = store.index("clientMessageID");
       const request = index.get(localID);
       request.onsuccess = () => {
@@ -69,12 +71,20 @@ export class IndexedDBMessageStore implements LocalMessageStore {
         if (!existing) {
           return;
         }
-        store.put({
+        store.delete(existing.localKey);
+        const accepted = storedMessage({
           ...existing,
           messageID: response.messageID,
+          conversationID: response.conversationID,
           conversationSeq: response.conversationSeq,
           status: "SENT"
-        } satisfies StoredMessage);
+        });
+        store.put(accepted);
+        cursorStore.put({
+          conversationID: response.conversationID,
+          lastReceivedSeq: Math.max(currentSeq, response.conversationSeq),
+          updatedAtMs: Date.now()
+        } satisfies StoredCursor);
       };
     });
   }
@@ -174,7 +184,7 @@ function idbGetAll<T>(db: IDBDatabase, storeName: string): Promise<T[]> {
 function storedMessage(message: MessageItem): StoredMessage {
   return {
     ...message,
-    localKey: message.messageID
+    localKey: message.status !== "PENDING" && message.messageID
       ? `${message.conversationID}:seq:${message.conversationSeq}`
       : `${message.conversationID}:pending:${message.clientMessageID ?? Date.now()}`
   };

@@ -25,6 +25,7 @@ const requiredPaths = [
   "web/package.json",
   "web/.env.example",
   "web/src/App.tsx",
+  "tools/test-indexeddb-message-store.mjs",
   "desktop/package.json",
   "desktop/src/index.ts",
   "desktop/src/platform-contract.ts",

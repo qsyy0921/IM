@@ -61,6 +61,10 @@ First slice:
     server frames as wakeups.
   - `IndexedDBMessageStore` implements the local cache / cursor store behind
     the `LocalMessageStore` port.
+- `IndexedDBMessageStore` now has a dependency-free first-stage persistence
+  test harness covering cursor persistence, message ordering, pending send,
+  accepted send stable-key migration, replay de-duplication and failed-send
+  state.
 - The Web shell is wired to login, connect push, list / manually open
   conversations, PullInbox, send text and AckDelivery through those adapters.
 - `clients/desktop` now has a first-stage TypeScript runtime adapter:
@@ -124,5 +128,5 @@ rejected. For local LAN client smoke, prefer the wired `172.x.x.x` address.
 
 1. Add first local Windows artifact from the PC desktop Tauri runner.
 2. Add first unsigned local APK from the Android native bridge.
-3. Add IndexedDB persistence tests beyond the first browser adapter, then move
-   desktop / Android from in-memory development stores to durable platform stores.
+3. Move desktop / Android from in-memory development stores to durable platform
+   stores and add cursor replay tests for those stores.

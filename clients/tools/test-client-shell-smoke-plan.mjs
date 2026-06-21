@@ -24,11 +24,13 @@ assert(Array.isArray(plan.targets.browser.checklist) && plan.targets.browser.che
 assert(plan.targets.browser.checklist.some(item => item.step === "verify-client-flow"), "browser flow verification missing");
 assert(plan.targets["windows-desktop"].commands.prepareAssets.includes("build:shell-assets:desktop"), "desktop prep command missing");
 assert(plan.targets["windows-desktop"].commands.verifyAssets.includes("windows-desktop"), "desktop verify command missing");
+assert(plan.targets["windows-desktop"].commands.installPlan.includes("plan:artifact-install"), "desktop install plan command missing");
 assert(Array.isArray(plan.targets["windows-desktop"].checklist), "desktop checklist missing");
 assert(plan.targets["windows-desktop"].checklist.some(item => item.step === "prepare-shell-assets"), "desktop asset prep checklist missing");
 assert(plan.targets["windows-desktop"].checklist.some(item => item.step === "verify-shell-assets"), "desktop asset verification checklist missing");
 assert(plan.targets.android.commands.prepareAssets.includes("build:shell-assets:android"), "android prep command missing");
 assert(plan.targets.android.commands.verifyAssets.includes("android"), "android verify command missing");
+assert(plan.targets.android.commands.installPlan.includes("plan:artifact-install"), "android install plan command missing");
 assert(Array.isArray(plan.targets.android.checklist), "android checklist missing");
 assert(plan.targets.android.checklist.some(item => item.step === "prepare-shell-assets"), "android asset prep checklist missing");
 assert(plan.targets.android.checklist.some(item => item.step === "verify-shell-assets"), "android asset verification checklist missing");

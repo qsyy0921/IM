@@ -193,6 +193,9 @@ Responsibilities:
 - After an installer is produced, archive it through the client artifact
   collector and keep only the low-sensitive SHA-256 manifest under ignored local
   artifact storage.
+- The install plan may read the collected artifact manifest and print relative
+  installer / APK commands, but it must not launch installers, call ADB,
+  install packages or print local absolute paths.
 - Platform shell smoke planning must remain low-sensitive: it may report
   readiness, relative artifact hints, safe commands and per-target manual
   checklist steps, but must not print local absolute paths, tokens or private
@@ -238,6 +241,9 @@ Responsibilities:
 - After an APK is produced, archive it through the client artifact collector and
   keep only the low-sensitive SHA-256 manifest under ignored local artifact
   storage.
+- The Android install plan may print `adb devices`, `adb install -r` and package
+  verification commands for the collected APK, but it must not contact the
+  device or install anything by itself.
 - Platform shell smoke planning must use the same low-sensitive contract as PC.
 - Android asset preparation must clean the WebView asset output directory before
   copying a new build, so APKs do not carry stale Web bundles.

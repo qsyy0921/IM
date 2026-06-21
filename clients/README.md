@@ -96,6 +96,7 @@ Check artifact build commands without requiring the heavy native toolchains:
 ```powershell
 npm --prefix clients run test:artifact-builders
 npm --prefix clients run test:artifact-collector
+npm --prefix clients run test:artifact-install-plan
 npm --prefix clients run test:artifact-readiness
 npm --prefix clients run test:shell-smoke-plan
 npm --prefix clients run report:artifact-readiness
@@ -103,6 +104,7 @@ node clients/tools/plan-client-shell-smoke.mjs
 node clients/tools/build-desktop-artifact.mjs --dry-run
 node clients/tools/build-android-apk.mjs --dry-run
 node clients/tools/collect-client-artifacts.mjs --target all --dry-run
+npm --prefix clients run plan:artifact-install
 ```
 
 Real artifact commands are present, but they fail fast until the local toolchain
@@ -127,6 +129,9 @@ ignored `clients/artifacts/<run-id>/` directory and writes a low-sensitive
 `manifest.json` with file names, sizes and SHA-256 hashes. It does not record
 local absolute source paths. The `*:collect` build scripts run the same
 collection step automatically after a successful native build.
+`plan:artifact-install` reads that collected manifest and prints a low-sensitive
+Windows / Android install checklist. It does not install packages, connect to
+ADB, launch installers or print local absolute paths.
 
 Android can also be built through the local Docker builder profile when the image
 is intentionally built:
@@ -161,5 +166,6 @@ Current packaging status:
   shell assets currently verify against their manifest.
 - `plan:shell-smoke` prints a low-sensitive browser / desktop / Android shell
   smoke plan. It lists prepared asset status, artifact presence, safe build
-  commands, per-target manual smoke checklists and the shared BFF / push smoke
-  command without launching services or installing toolchains.
+  commands, install-plan commands, per-target manual smoke checklists and the
+  shared BFF / push smoke command without launching services or installing
+  toolchains.

@@ -132,7 +132,9 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   SHA-256 manifest、dry-run 不写文件和不泄露本机绝对路径。真实 artifact / APK
   产出后可用 `collect:client-artifacts` 写入 ignored `clients/artifacts/<run-id>/`
   并生成低敏 manifest；`build:desktop-artifact:collect` 和
-  `build:android-apk:collect` 会在 native build 成功后自动执行该归档步骤。当前仍没有真实 installer / APK baseline。
+  `build:android-apk:collect` 会在 native build 成功后自动执行该归档步骤。`plan:artifact-install`
+  会读取 collected manifest 并输出低敏 Windows / Android 安装 checklist；它不启动安装器、
+  不连接 ADB、不安装 APK，也不输出本机绝对路径。当前仍没有真实 installer / APK baseline。
 - Android 已新增 opt-in Docker builder profile：
   `deploy/docker/client-android-builder.Dockerfile` 和
   `deploy/local/docker-compose.client-builders.yml`。`validate:builder-profile`
@@ -149,9 +151,9 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   CLI，Android 本地路径仍缺 JDK 17+ / Gradle / Android SDK。
 - `clients/tools/plan-client-shell-smoke.mjs` 已提供低敏 browser / desktop /
   Android shell smoke plan；它汇总 toolchain readiness、prepared asset
-  verification、artifact presence、安全构建命令、per-target manual smoke
-  checklist 和 shared BFF / push smoke 命令，不启动服务、不下载工具链、不声称已有
-  installer / APK。
+  verification、artifact presence、安全构建命令、artifact install plan 命令、
+  per-target manual smoke checklist 和 shared BFF / push smoke 命令，不启动服务、
+  不下载工具链、不连接设备、不声称已有 installer / APK。
 - `loadtest/clientweb` 已新增 first-stage scriptable client smoke runner：
   准备阶段用 identity / api-gateway gRPC 注册用户、seed 会话并创建 JOIN；真实客户端
   验证段只走 `api-gateway` HTTP BFF 和 `push-gateway` WebSocket，覆盖 BFF login、

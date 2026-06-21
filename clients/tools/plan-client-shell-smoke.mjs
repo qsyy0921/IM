@@ -98,7 +98,8 @@ function nativeCommands(target, readinessTarget) {
       prepareAssets: "npm --prefix clients run build:shell-assets:desktop",
       verifyAssets: "node clients/tools/verify-shell-assets.mjs --target windows-desktop",
       buildArtifact: readinessTarget.buildCommand,
-      dryRunBuild: readinessTarget.dryRunCommand
+      dryRunBuild: readinessTarget.dryRunCommand,
+      installPlan: "npm --prefix clients run plan:artifact-install"
     };
   }
   return {
@@ -106,6 +107,7 @@ function nativeCommands(target, readinessTarget) {
     verifyAssets: "node clients/tools/verify-shell-assets.mjs --target android",
     buildArtifact: readinessTarget.buildCommand,
     dryRunBuild: readinessTarget.dryRunCommand,
+    installPlan: "npm --prefix clients run plan:artifact-install",
     dockerBuilder: readinessTarget.dockerBuilder?.imagePresent
       ? readinessTarget.dockerBuilder.buildCommand
       : readinessTarget.dockerBuilder?.imageBuildCommand
@@ -147,6 +149,12 @@ function nativeChecklist(target, readinessTarget, artifactStatus) {
     step: target === "windows-desktop" ? "build-desktop-artifact" : "build-android-apk",
     command: nativeCommands(target, readinessTarget).buildArtifact,
     evidence: "native artifact is collected with a SHA-256 manifest"
+  });
+
+  checklist.push({
+    step: "plan-artifact-install",
+    command: nativeCommands(target, readinessTarget).installPlan,
+    evidence: "install plan reports low-sensitive commands for the collected artifact"
   });
 
   if (!artifactStatus.present) {

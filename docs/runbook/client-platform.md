@@ -178,6 +178,12 @@ First slice:
   file names, sizes and SHA-256 hashes, without recording local absolute source
   paths. `build:desktop-artifact:collect` and `build:android-apk:collect` run the
   collector automatically after a successful native build.
+- `npm --prefix clients run test:artifact-install-plan` validates the
+  first-stage install-plan tool. `npm --prefix clients run plan:artifact-install`
+  reads a collected `clients/artifacts/<run-id>/manifest.json` and prints
+  low-sensitive Windows installer / Android APK install checklist commands. It
+  does not launch installers, connect to ADB, install packages or print local
+  absolute paths.
 - `npm --prefix clients run report:artifact-readiness` prints a low-sensitive
   readiness matrix for local desktop, local Android and Android Docker builder
   paths. It reports missing capabilities and the exact next build command
@@ -276,6 +282,7 @@ npm --prefix clients run test:shell-config
 npm --prefix clients run test:shell-web-assets
 npm --prefix clients run test:artifact-builders
 npm --prefix clients run test:artifact-collector
+npm --prefix clients run test:artifact-install-plan
 npm --prefix clients run test:artifact-readiness
 npm --prefix clients run test:shell-smoke-plan
 npm --prefix clients run report:artifact-readiness
@@ -293,6 +300,7 @@ current prepared shell assets verify against `nexusim-shell-assets-manifest.json
 ```powershell
 npm --prefix clients run report:artifact-readiness
 npm --prefix clients run plan:shell-smoke
+npm --prefix clients run plan:artifact-install
 ```
 
 The report includes `nextActions`. When the Android Docker builder image is

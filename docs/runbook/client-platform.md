@@ -183,6 +183,10 @@ First slice:
   shell asset verification status. It separates the Android Docker builder image
   build command from the actual builder run command and emits low-sensitive
   `nextActions`; it never starts a download or build by itself.
+- `npm --prefix clients run plan:shell-smoke` prints a low-sensitive browser /
+  desktop / Android shell smoke plan. It combines toolchain readiness, prepared
+  asset verification, artifact presence, safe build commands and the shared BFF
+  / push smoke command; it does not launch services or install toolchains.
 - `npm --prefix clients run validate:builder-profile` validates the Android
   Docker builder profile without building or pulling images. The profile lives
   in `deploy/local/docker-compose.client-builders.yml` and uses
@@ -271,6 +275,7 @@ npm --prefix clients run test:shell-web-assets
 npm --prefix clients run test:artifact-builders
 npm --prefix clients run test:artifact-collector
 npm --prefix clients run test:artifact-readiness
+npm --prefix clients run test:shell-smoke-plan
 npm --prefix clients run report:artifact-readiness
 npm --prefix clients run validate:builder-profile
 ```
@@ -285,6 +290,7 @@ current prepared shell assets verify against `nexusim-shell-assets-manifest.json
 
 ```powershell
 npm --prefix clients run report:artifact-readiness
+npm --prefix clients run plan:shell-smoke
 ```
 
 The report includes `nextActions`. When the Android Docker builder image is

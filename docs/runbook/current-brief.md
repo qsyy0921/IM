@@ -70,7 +70,8 @@ adoption rules，不把服务数量、中间件或部署形态写死。
   `ClientShellActions` 接入 restore / logout；shell asset prep 已清理 stale
   bundle、写低敏 hash manifest，并在 artifact wrapper 中验证 manifest；artifact / APK wrapper 已能 dry-run 输出命令和缺失工具链，Android
   builder profile 已能静态校验，readiness report 已显示 shell asset verification
-  状态，下一步做本地 artifact / APK 和真实平台 shell smoke。
+  状态，shell smoke plan 已能输出低敏 browser / desktop / Android smoke 前置计划；
+  下一步做本地 artifact / APK 和真实平台 shell smoke。
 - admin / audit / workflow：客户端切片完成后继续公开 API handoff、operator
   workflow、低敏审批 review artifact 和补偿边界。
 - vector-index：继续 provider backend、pgvector / Milvus / OpenSearch 相关

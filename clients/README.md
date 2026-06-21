@@ -96,7 +96,9 @@ Check artifact build commands without requiring the heavy native toolchains:
 npm --prefix clients run test:artifact-builders
 npm --prefix clients run test:artifact-collector
 npm --prefix clients run test:artifact-readiness
+npm --prefix clients run test:shell-smoke-plan
 npm --prefix clients run report:artifact-readiness
+node clients/tools/plan-client-shell-smoke.mjs
 node clients/tools/build-desktop-artifact.mjs --dry-run
 node clients/tools/build-android-apk.mjs --dry-run
 node clients/tools/collect-client-artifacts.mjs --target all --dry-run
@@ -153,3 +155,7 @@ Current packaging status:
   emits `nextActions`, including the explicit Android builder image build command
   before the run command when the image is absent, and includes whether prepared
   shell assets currently verify against their manifest.
+- `plan:shell-smoke` prints a low-sensitive browser / desktop / Android shell
+  smoke plan. It lists prepared asset status, artifact presence, safe build
+  commands and the shared BFF / push smoke command without launching services or
+  installing toolchains.

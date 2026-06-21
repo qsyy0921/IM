@@ -191,6 +191,9 @@ Responsibilities:
 - After an installer is produced, archive it through the client artifact
   collector and keep only the low-sensitive SHA-256 manifest under ignored local
   artifact storage.
+- Platform shell smoke planning must remain low-sensitive: it may report
+  readiness, relative artifact hints and safe commands, but must not print local
+  absolute paths, tokens or private runtime state.
 - Shell asset preparation must clean the target output directory before copying
   a new Web build when source and output differ, so packaged desktop shells do
   not retain stale JS / CSS bundles.
@@ -227,6 +230,7 @@ Responsibilities:
 - After an APK is produced, archive it through the client artifact collector and
   keep only the low-sensitive SHA-256 manifest under ignored local artifact
   storage.
+- Platform shell smoke planning must use the same low-sensitive contract as PC.
 - Android asset preparation must clean the WebView asset output directory before
   copying a new build, so APKs do not carry stale Web bundles.
 - Android asset preparation uses the same low-sensitive shell asset manifest as

@@ -182,6 +182,8 @@ PC desktop is the first packaged desktop target. The default shell is Tauri.
 Responsibilities:
 
 - Reuse Web UI and `client-core`.
+- Tauri `frontendDist` must resolve to the shared prepared `clients/web/dist`;
+  desktop must not maintain a duplicate local Web build tree.
 - Store tokens through Windows Credential Manager before production release.
 - First-stage runtime may use a WebView `localStorage` backed
   `KeyValueMessageStore` for cursor / cache persistence. Target production

@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 
@@ -53,7 +53,9 @@ assert(!main.match(/std::fs|File::|Command::|process::|token|secret|password|cre
 const config = readJSON("desktop/src-tauri/tauri.conf.json");
 assert(config.productName === "NexusIM", "desktop product name mismatch");
 assert(config.identifier === "com.nexusim.desktop", "desktop identifier mismatch");
-assert(config.build?.frontendDist === "../web/dist", "desktop frontendDist mismatch");
+assert(config.build?.frontendDist === "../../web/dist", "desktop frontendDist mismatch");
+const frontendDist = resolve(root, "desktop", "src-tauri", config.build.frontendDist);
+assert(frontendDist === resolve(root, "web", "dist"), "desktop frontendDist must resolve to shared web/dist");
 assert(config.build?.beforeBuildCommand?.includes("build:shell-assets:desktop"), "desktop build must prepare shell web assets");
 assert(config.bundle?.active === false, "desktop bundle must stay inactive until artifact build slice");
 

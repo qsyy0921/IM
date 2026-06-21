@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "identifier": "com.nexusim.desktop",
   "build": {
-    "frontendDist": "../web/dist",
+    "frontendDist": "../../web/dist",
     "beforeBuildCommand": "npm --prefix .. run build:shell-assets:desktop"
   },
   "app": {

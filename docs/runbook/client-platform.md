@@ -106,6 +106,8 @@ First slice:
   skeleton with only a read-only `runtime_metadata` IPC command. `bundle.active`
   remains `false`, so this is not a local Windows artifact yet. The Web shell
   can invoke this command for diagnostics and fails closed on malformed metadata.
+  Its `frontendDist` resolves to the shared prepared `clients/web/dist`, not a
+  desktop-local duplicate Web build.
 - `clients/android` now has a first-stage TypeScript runtime adapter:
   `loadAndroidRuntimeConfig`, `createAndroidPlatformAdapter`, development-only
   session storage, localStorage-backed persistent message cache, static

@@ -460,6 +460,11 @@ payload / reason 可从仓库外文件计算 hash，但 manifest 不复制 paylo
 或本机路径。validator 只做 schema / 低敏字段校验，不调用 workflow-service、
 control-plane-service 或数据库。
 
+`compensation-instruction-import` 已纳入机器可读 `repair-operators.catalog.json`，
+因此可复用本地 repair approval request / decision / invocation 链路生成低敏执行
+计划。该 operator 只导入 workflow-service 自有 instruction metadata，不直接执行
+control-plane rollback mutation。
+
 ## 18. 验收标准
 
 进入编码前：

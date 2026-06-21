@@ -282,6 +282,17 @@ $operatorSpecs = @(
         ReasonFileEnvs = @(
             "NEXUSIM_ADMIN_COMPENSATION_REASON_FILE"
         )
+    },
+    @{
+        Service = "workflow-service"
+        Cmd = "services\workflow-service\cmd\workflow-service\main.go"
+        Env = "NEXUSIM_WORKFLOW_SERVICE_MODE"
+        Modes = @(
+            "compensation-instruction-import"
+        )
+        OutputEnvs = @()
+        DryRunEnvs = @()
+        ReasonFileEnvs = @()
     }
 )
 
@@ -455,7 +466,7 @@ foreach ($spec in $operatorSpecs) {
     }
 }
 
-$operatorModePattern = "(audit|repair|cleanup|keyring-rotate|tenant-privacy-default-set|source-policy-set|tenant-quota-set|compensation-request)"
+$operatorModePattern = "(audit|repair|cleanup|keyring-rotate|tenant-privacy-default-set|source-policy-set|tenant-quota-set|compensation-request|compensation-instruction-import)"
 $serviceCommandFiles = Get-ChildItem -LiteralPath (Join-Path $repoRoot "services") -Recurse -Filter "main.go" -File |
     Where-Object { $_.FullName -like "*\cmd\*" } |
     Sort-Object FullName

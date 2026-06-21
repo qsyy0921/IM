@@ -125,22 +125,27 @@ if ([string]::IsNullOrWhiteSpace($ReasonFilePath) -and -not [string]::IsNullOrWh
     throw "ReasonFileEnv requires ReasonFilePath."
 }
 
-foreach ($entry in @($Env)) {
-    if ([string]::IsNullOrWhiteSpace($entry)) {
+foreach ($entryGroup in @($Env)) {
+    if ([string]::IsNullOrWhiteSpace($entryGroup)) {
         continue
     }
-    $parts = $entry.Split("=", 2)
-    if ($parts.Count -ne 2 -or [string]::IsNullOrWhiteSpace($parts[0])) {
-        throw "Env entries must use KEY=VALUE format: $entry"
+    foreach ($entry in ([string]$entryGroup).Split(",")) {
+        if ([string]::IsNullOrWhiteSpace($entry)) {
+            continue
+        }
+        $parts = $entry.Split("=", 2)
+        if ($parts.Count -ne 2 -or [string]::IsNullOrWhiteSpace($parts[0])) {
+            throw "Env entries must use KEY=VALUE format: $entry"
+        }
+        if ($parts[0] -match "_REASON$") {
+            throw "Refusing to write raw operator reason into repair operator plan: $($parts[0]). Use -ReasonFilePath and -ReasonFileEnv instead."
+        }
+        Assert-LowSensitiveRepairAdHocEnv -Key $parts[0] -Value $parts[1]
+        if ($environment.Contains($parts[0])) {
+            throw "Env entry duplicates a catalog-managed environment key. Use the dedicated parameter for: $($parts[0])"
+        }
+        $environment[$parts[0]] = $parts[1]
     }
-    if ($parts[0] -match "_REASON$") {
-        throw "Refusing to write raw operator reason into repair operator plan: $($parts[0]). Use -ReasonFilePath and -ReasonFileEnv instead."
-    }
-    Assert-LowSensitiveRepairAdHocEnv -Key $parts[0] -Value $parts[1]
-    if ($environment.Contains($parts[0])) {
-        throw "Env entry duplicates a catalog-managed environment key. Use the dedicated parameter for: $($parts[0])"
-    }
-    $environment[$parts[0]] = $parts[1]
 }
 
 $relativeCommand = ".\services\$Service\cmd\$Service"

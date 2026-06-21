@@ -96,6 +96,20 @@ try {
         throw "policy-service tenant-quota-set repair operator plan has unexpected environment."
     }
 
+    $workflowPlanJson = & powershell -NoProfile -ExecutionPolicy Bypass -File $plannerPath `
+        -Service "workflow-service" `
+        -Mode "compensation-instruction-import" `
+        -Env "NEXUSIM_WORKFLOW_COMPENSATION_INSTRUCTION_TENANT_ID=tenant_1","NEXUSIM_WORKFLOW_COMPENSATION_INSTRUCTION_FILE=H:\NexusIM\operator-plans\workflow-compensation-instruction.json"
+    if ($LASTEXITCODE -ne 0) {
+        throw "write-repair-operator-plan.ps1 failed for workflow-service compensation-instruction-import"
+    }
+    $workflowPlan = $workflowPlanJson | ConvertFrom-Json
+    if ($workflowPlan.environment.NEXUSIM_WORKFLOW_SERVICE_MODE -ne "compensation-instruction-import" -or
+        $workflowPlan.environment.NEXUSIM_WORKFLOW_COMPENSATION_INSTRUCTION_TENANT_ID -ne "tenant_1" -or
+        $workflowPlan.environment.NEXUSIM_WORKFLOW_COMPENSATION_INSTRUCTION_FILE -ne "H:\NexusIM\operator-plans\workflow-compensation-instruction.json") {
+        throw "workflow-service compensation-instruction-import repair operator plan has unexpected environment."
+    }
+
     $previousErrorActionPreference = $ErrorActionPreference
     $ErrorActionPreference = "Continue"
     try {

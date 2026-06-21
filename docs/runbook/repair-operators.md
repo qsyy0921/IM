@@ -259,6 +259,14 @@ compensation executor 使用的 control-plane rollback instruction JSON。该 ma
 first-stage operator handoff，不是正式 instruction approval UI，也不调用
 workflow-service、control-plane-service 或数据库。
 
+`workflow-service` 的 `compensation-instruction-import` 已纳入
+`repair-operators.catalog.json`，可被本地 repair approval request / decision /
+invocation 链路引用。环境变量为 `NEXUSIM_WORKFLOW_SERVICE_MODE`；计划文件需要通过低敏 env 指定
+`NEXUSIM_WORKFLOW_COMPENSATION_INSTRUCTION_TENANT_ID` 和
+`NEXUSIM_WORKFLOW_COMPENSATION_INSTRUCTION_FILE`，后者应指向上面生成并校验过的
+仓库外 instruction manifest；该 operator 导入 instruction metadata，不直接执行
+rollback mutation。
+
 `agent-service` 提供 `proposal-approval-audit` / `proposal-approval-approve`，用于审计和审批 Agent proposal。环境变量为 `NEXUSIM_AGENT_SERVICE_MODE`；`proposal-approval-audit` 默认只列 `PROPOSED` proposal，可按 tenant / proposal / user / status / tool / resource_type 过滤，可选 `NEXUSIM_AGENT_PROPOSAL_APPROVAL_AUDIT_OUTPUT` 写低敏 JSON；`proposal-approval-approve` 需要 `NEXUSIM_AGENT_PROPOSAL_APPROVAL_TENANT_ID`、`NEXUSIM_AGENT_PROPOSAL_APPROVAL_PROPOSAL_ID`、`NEXUSIM_AGENT_PROPOSAL_APPROVAL_APPROVED_BY_USER_ID`，默认 `NEXUSIM_AGENT_PROPOSAL_APPROVAL_DRY_RUN=true`，只有显式设为 false 才会调用服务内 approval workflow 并同事务写 approval outbox。审批 reason 应通过 `NEXUSIM_AGENT_PROPOSAL_APPROVAL_REASON_FILE` 读取；输出可选 `NEXUSIM_AGENT_PROPOSAL_APPROVAL_OUTPUT`，只包含 proposal / approval / skill / tool / resource / status 元数据和 `reason_present`，不输出 objective、proposal_text、citations、EvidencePack 或 reason 原文。
 
 `policy-service` 还提供 `rebac-relation-audit` / `rebac-relation-set`，用于审计和设置 first-stage ReBAC relation gate 规则。规则按 tenant / action / relation_type / conversation_scope 要求 `DIRECT_CONTACT_ACTIVE` 或 `CONVERSATION_MEMBER_ACTIVE` 关系，在 exact / tenant allow 规则前 fail-closed deny；`rebac-relation-audit` 可选 `NEXUSIM_POLICY_REBAC_RELATION_AUDIT_OUTPUT` 写低敏 JSON，`rebac-relation-set` 可选 `NEXUSIM_POLICY_REBAC_RELATION_SET_OUTPUT` 写低敏 JSON。`rebac-relation-set` 支持 `NEXUSIM_POLICY_REBAC_RELATION_SET_REASON_FILE` 读取 operator reason 原文，避免把 reason 写进 operator plan / shell env；输出只包含规则元数据和 reason-present，不输出 operator reason 原文。该能力不是 provider-grade ReBAC graph / policy DSL。

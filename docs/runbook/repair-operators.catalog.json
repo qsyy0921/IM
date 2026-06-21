@@ -260,6 +260,16 @@
       ]
     },
     {
+      "service": "workflow-service",
+      "mode_env": "NEXUSIM_WORKFLOW_SERVICE_MODE",
+      "modes": [
+        "compensation-instruction-import"
+      ],
+      "output_envs": [],
+      "dry_run_envs": [],
+      "reason_file_envs": []
+    },
+    {
       "service": "agent-service",
       "mode_env": "NEXUSIM_AGENT_SERVICE_MODE",
       "modes": [

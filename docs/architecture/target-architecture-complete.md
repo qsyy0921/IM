@@ -1,242 +1,601 @@
-# NexusIM Complete Target Architecture
+# NexusIM Complete Architecture Blueprint
 
-This document defines the complete target architecture after NexusIM is
-expanded beyond the current IM backend into business platform, data platform,
-AI / Agent platform and middleware platform capabilities. It is intentionally
-not a frozen service count. New services and middleware remain subject to ADR,
-evidence and migration rules.
+This is the executable target architecture for NexusIM after the current IM
+backend is expanded into a complete messaging product, data platform and AI /
+Agent application platform. It is not a frozen list of services or middleware.
+It defines stable boundaries, ownership rules, data flows and evolution gates.
 
-## Design Inputs
+## 1. Architecture Goal
 
-The design follows these external architecture references:
+NexusIM is designed as:
 
-- Microservices should be organized around business capabilities and own their
-  data boundaries: <https://martinfowler.com/articles/microservices.html>.
-- SLOs / SLIs should drive reliability decisions rather than vague "production
-  grade" claims: <https://sre.google/sre-book/service-level-objectives/>.
-- Platform engineering should expose curated capabilities as an internal
-  platform product: <https://tag-app-delivery.cncf.io/whitepapers/platform-eng-maturity-model/>.
-- Zero Trust requires explicit verification and least privilege instead of
-  implicit network trust: <https://csrc.nist.gov/pubs/sp/800/207/final>.
-- API design must protect object-level and property-level authorization:
+```text
+high-concurrency IM backend
+  + reusable business platform
+  + governed data platform
+  + AI / RAG / Agent application platform
+  + platform-engineered middleware and operations layer
+```
+
+The system must support:
+
+- real-time messaging, group chat, receipts, durable inbox and online wakeup;
+- Web, Windows PC and Android clients through stable BFF / push boundaries;
+- business reuse through identity, policy, contacts, media, notification,
+  admin, audit, workflow and control-plane capabilities;
+- AI use cases such as group memory, retrieval, RAG, summary and controlled
+  Agent actions;
+- local / interview-grade distributed demos now, and production-like HA,
+  observability and governance later without redesigning service boundaries.
+
+## 2. External Design Inputs
+
+The design follows these sources and architecture traditions:
+
+- Microservices around business capabilities and independently owned data:
+  <https://martinfowler.com/articles/microservices.html>.
+- SLO / SLI driven reliability, not vague production claims:
+  <https://sre.google/sre-book/service-level-objectives/>.
+- Platform engineering as curated internal platform capabilities:
+  <https://tag-app-delivery.cncf.io/whitepapers/platform-eng-maturity-model/>.
+- Zero Trust, least privilege and explicit verification:
+  <https://csrc.nist.gov/pubs/sp/800/207/final>.
+- API authorization and object / property access safety:
   <https://owasp.org/API-Security/editions/2023/en/0x11-t10/>.
-- Data mesh treats analytical data as domain-owned data products on top of
-  shared self-service data infrastructure:
-  <https://martinfowler.com/articles/data-mesh-principles.html>.
-- Lakehouse architecture and open table formats support BI / ML over shared
-  governed data: <https://www.cidrdb.org/cidr2021/papers/cidr2021_paper17.pdf>,
+- Data mesh: domain-owned data products on shared self-service data
+  infrastructure: <https://martinfowler.com/articles/data-mesh-principles.html>.
+- Lakehouse / open table formats for governed BI and ML data:
+  <https://www.cidrdb.org/cidr2021/papers/cidr2021_paper17.pdf>,
   <https://iceberg.apache.org/spec/>.
-- Transactional outbox remains the preferred first-stage boundary between local
-  database transactions and event publication:
+- Transactional outbox and Saga patterns for microservice consistency:
   <https://microservices.io/patterns/data/transactional-outbox.html>.
-- CloudEvents / AsyncAPI shape long-term event interoperability:
+- CloudEvents / AsyncAPI for long-term event contract governance:
   <https://cloudevents.io/>, <https://www.asyncapi.com/>.
-- OpenTelemetry is the vendor-neutral telemetry baseline:
+- OpenTelemetry for vendor-neutral traces, metrics and logs:
   <https://opentelemetry.io/docs/>.
-- MCP standardizes AI access to tools, resources and prompts:
+- MCP as a standard boundary for AI tools, resources and prompts:
   <https://modelcontextprotocol.io/docs/getting-started/intro>.
-- Long-horizon collaborative memory must model multi-party, multi-group,
-  temporally evolving facts, not only vector snippets:
+- Long-horizon collaborative memory: multi-party, multi-group, temporally
+  evolving facts need attribution and versioning, not only vector recall:
   <https://arxiv.org/abs/2602.01313>.
-- Modern RAG / multi-agent systems need retrieval quality, grounding,
+- RAG and multi-Agent systems require retrieval quality, grounding,
   coordination, tool safety and eval:
   <https://arxiv.org/abs/2506.00054>,
   <https://arxiv.org/abs/2501.06322>.
 
-## Layered Target
+## 3. System Layers
 
 ```text
 Clients
   Web / Windows PC / Android / future iOS
 
-Access and edge
+Access Layer
   api-gateway / client BFF / push-gateway / auth / rate limit / trusted metadata
 
-Business platform
+IM Core Platform
   identity / policy / contacts / conversation / message / delivery / receipt
+
+Product Business Platform
   media / notification / presence / admin / audit / control-plane / workflow
 
-Event and transactional facts
-  PostgreSQL per service / transactional outbox / Kafka / schema registry
-  DLQ / repair / audit / public event contracts
+Event and Fact Layer
+  per-service PostgreSQL / outbox / Kafka / schema contracts / DLQ / repair
 
-Data platform
-  Kafka / CDC ingestion / lakehouse / OLAP / metrics / feature store
-  data catalog / data quality / BI / low-sensitive data products
+Data Platform
+  CDC / ingestion / lakehouse / OLAP / data catalog / metrics / feature store
 
-AI and Agent platform
+AI and Agent Platform
   search / vector-index / memory / retrieval / RAG / summary / agent
   skill-registry / MCP gateway / model-gateway / action-executor / ai-eval
 
-Middleware platform
+Middleware Platform
   Redis / Kafka / PostgreSQL / OpenSearch / vector store / MinIO / Vault
   Keycloak / OpenFGA / Temporal / OTel / Prometheus / Grafana / future options
 ```
 
-## Business Platform
+The service layer owns business semantics. The middleware layer provides
+capabilities. A middleware product can be replaced without changing domain
+ownership.
 
-The business platform is a set of reusable business capabilities. It is not one
-large "middle platform" service.
-
-| Capability | Owning service boundary |
-| --- | --- |
-| Identity, MFA, sessions, OIDC and gateway token keys | `identity-service` |
-| Authorization, ReBAC and policy decisions | `policy-service` |
-| Contacts, privacy and relationship graph | `contacts-service` |
-| Conversations, groups, members and owner transfer | `conversation-service` |
-| Message facts, edits, revoke, delete and attachment refs | `message-service` |
-| Durable inbox, PullInbox and device ACK | `delivery-service` |
-| Read / delivered receipts and unread foundations | `receipt-service` |
-| Online WebSocket wakeup and route fanout | `push-gateway` |
-| Media upload, object storage, thumbnails and transcoding | `media-service` |
-| Email, SMS, APNs / FCM and notification templates | `notification-service` |
-| Online status, typing and last-seen | `presence-service` |
-| Tenant config, feature flags, quota and rollout control | `control-plane-service` |
-| Admin APIs, repair approval and operator control | `admin-service` |
-| Security, admin and Agent action audit | `audit-service` |
-| Long workflows, approvals and compensation | `workflow-service` |
-
-Business services own transactional facts. They do not read other services'
-private tables. Cross-service communication uses public APIs, public events or
-explicit ports.
-
-## Data Platform
-
-The data platform consumes events and CDC. It must not become a hidden write path
-for business facts.
+## 4. Deployment View
 
 ```text
-business outbox / Kafka / CDC
-  -> ingestion jobs
-  -> ODS raw events
-  -> DWD domain facts
-  -> DWS subject aggregates
-  -> ADS metrics / BI / feature / RAG data products
+                 +-----------------------------+
+                 | Web / PC / Android clients  |
+                 +--------------+--------------+
+                                |
+                 +--------------v--------------+
+                 | api-gateway / client BFF    |
+                 | auth, quota, trusted meta   |
+                 +--------------+--------------+
+                                |
+          +---------------------+----------------------+
+          |                                            |
++---------v----------+                      +----------v---------+
+| IM business APIs   |                      | push-gateway       |
+| gRPC / HTTP BFF    |                      | WebSocket wakeup   |
++---------+----------+                      +----------+---------+
+          |                                            |
+          +---------------------+----------------------+
+                                |
+                 +--------------v--------------+
+                 | service-owned PostgreSQL    |
+                 | outbox -> Kafka -> workers  |
+                 +--------------+--------------+
+                                |
+          +---------------------+----------------------+
+          |                                            |
++---------v----------+                      +----------v---------+
+| data platform      |                      | AI / Agent platform|
+| analytics / BI     |                      | retrieval / action |
++--------------------+                      +--------------------+
 ```
 
-First-stage data platform services may include:
+Local development uses Docker profiles. Production can later map the same
+boundaries to Kubernetes, managed databases and managed middleware.
+
+## 5. Ownership Invariants
+
+1. A service owns its database schema.
+2. No production code reads another service's private tables.
+3. Cross-service sync calls must use public APIs or explicit ports.
+4. Cross-service async integration uses public events with schema versioning.
+5. Kafka is an event propagation surface, not the authoritative fact store.
+6. Data platform consumes facts; it does not write business commands.
+7. AI / Agent services cannot bypass policy, EvidencePack, approval or audit.
+8. Python workers return candidates only; Go owns control, facts and audit.
+9. Client local storage is cache / offline queue, not server-side fact source.
+10. Middleware is introduced as a capability with adapter and runtime profile,
+    not as service-private sprawl.
+
+## 6. Domain Map
+
+### 6.1 Access Domain
+
+| Component | Responsibility |
+| --- | --- |
+| `api-gateway` | Public API facade, client BFF, auth, quota, trusted metadata, low-sensitive observability. |
+| `push-gateway` | Online WebSocket wakeup, Redis route, session lifecycle, best-effort online notification. |
+
+The access layer terminates public trust. Downstream services trust only
+gateway-minted metadata, not arbitrary client headers.
+
+### 6.2 IM Core Domain
+
+| Service | Owned facts |
+| --- | --- |
+| `identity-service` | users, credentials, sessions, refresh tokens, MFA, OIDC/JWKS/challenges. |
+| `policy-service` | authorization policies, ReBAC edges, policy decisions, risk/moderation policy. |
+| `contacts-service` | contact relationships, privacy settings, contact groups. |
+| `conversation-service` | conversations, group membership, roles, member boundaries, owner transfer. |
+| `message-service` | message log, edits, revoke/delete, attachments by reference, message outbox. |
+| `delivery-service` | durable user inbox, device cursors, delivery events, projection checkpoints. |
+| `receipt-service` | read/delivered receipts, unread foundations, conversation list summaries. |
+
+These services are the current foundation for IM product behavior.
+
+### 6.3 Product Business Domain
 
 | Service | Responsibility |
 | --- | --- |
-| `data-ingestion-service` | Consume public events / CDC and write governed analytical data. |
-| `data-catalog-service` | Register data products, owners, schemas, lineage and retention. |
-| `analytics-service` | Serve product and ops metrics from curated aggregates. |
-| `feature-store-service` | Serve low-sensitive features for risk, ranking and Agent decisions. |
-| `data-quality-service` | Monitor schema drift, delay, missing events and quality checks. |
+| `media-service` | Upload, object storage, thumbnails, virus scan, transcode, download policy. |
+| `notification-service` | Email, SMS, APNs/FCM, templates, provider routing, bounce/suppression. |
+| `presence-service` | Online state, typing, last-seen, device status, privacy-aware presence. |
+| `admin-service` | Tenant/admin APIs, repair approval, user moderation, operator actions. |
+| `audit-service` | Login, security, admin, Agent action and repair audit; export and retention. |
+| `control-plane-service` | Tenant config, feature flags, rollout, quota, policy/config publication. |
+| `workflow-service` | Long-running approvals, compensation, timers, external callbacks. |
 
-Data products must declare owner, source events, schema version, freshness,
-retention, privacy class, downstream consumers and repair procedure.
+These are business platform services. They are promoted only when product scope
+needs them, not because the architecture wants more services.
 
-## AI and Agent Platform
-
-AI services are split by control responsibility:
+### 6.4 AI and Agent Domain
 
 | Service | Responsibility |
 | --- | --- |
-| `search-service` | Full-text indexing and query API. It is the only writer to its search index. |
-| `vector-index-service` | Vector index writes, rebuilds and provider adapters. |
-| `memory-service` | Long-horizon personal, group and project memory state with source refs. |
-| `retrieval-gateway` | Policy-aware hybrid retrieval and EvidencePack generation. |
-| `rag-service` | Answers only from EvidencePack and returns citations / uncertainty. |
+| `search-service` | Search projection writes and keyword retrieval. |
+| `vector-index-service` | Vector projection writes, rebuild, pgvector/Milvus/OpenSearch adapters. |
+| `memory-service` | Personal/group/project memory state with attribution and lifecycle. |
+| `retrieval-gateway` | Hybrid retrieval, visibility filtering, EvidencePack construction. |
+| `rag-service` | Grounded answers from EvidencePack with citations and uncertainty. |
 | `summary-service` | Conversation, unread and project summaries with source references. |
-| `agent-service` | Planning, role coordination and Agent run state. |
-| `skill-registry` | Tool / skill metadata, risk level and capability catalog. |
-| `mcp-gateway` | MCP tools/resources/prompts boundary and consent enforcement. |
-| `model-gateway` | LLM / embedding / rerank provider routing, cost, fallback and audit. |
-| `action-executor` | Executes approved real business actions through public APIs only. |
-| `ai-eval-service` | Eval datasets, regression runs, Agent/RAG/memory scoring. |
+| `agent-service` | Planning, multi-Agent coordination and Agent run state. |
+| `skill-registry` | Tool/skill capability catalog, risk level and invocation metadata. |
+| `mcp-gateway` | MCP tool/resource/prompt boundary and consent enforcement. |
+| `model-gateway` | LLM, embedding and rerank provider routing, budget, fallback and audit. |
+| `action-executor` | Executes approved business actions through public APIs only. |
+| `ai-eval-service` | Regression datasets, RAG/memory/Agent eval, safety gates. |
 
-### Collaborative Memory Invariants
+AI services consume projections and EvidencePack. They do not become alternate
+business fact sources.
 
-Group memory must model:
+### 6.5 Data Platform Domain
+
+Future data platform services are introduced when analytics/RAG/ops needs exceed
+service-local debug metrics.
+
+| Service | Responsibility |
+| --- | --- |
+| `data-ingestion-service` | Consume public events / CDC and write governed analytical records. |
+| `data-catalog-service` | Register data products, owners, schemas, lineage, retention, privacy class. |
+| `analytics-service` | Serve curated product, ops and business metrics. |
+| `feature-store-service` | Serve low-sensitive risk/ranking/Agent features. |
+| `data-quality-service` | Track freshness, missing events, schema drift and quality checks. |
+
+Data platform is read/analysis oriented. Commands still go through business
+services.
+
+## 7. Core IM Flow
+
+### 7.1 Send Message
+
+```text
+client
+  -> api-gateway BFF / GatewayService
+  -> message-service.SendMessage
+  -> conversation-service.GetSendContext
+  -> message_log + message_outbox in local transaction
+  -> outbox relay -> Kafka conversation.timeline.events
+  -> delivery-service projection -> user_inbox + delivery_outbox
+  -> delivery outbox relay -> Kafka im.delivery.events
+  -> push-gateway -> WebSocket delivery.notify
+  -> client PullInbox -> AckDelivery
+```
+
+Message display is based on `delivery-service.PullInbox`, not WebSocket payload
+alone. WebSocket is wakeup, not durable data.
+
+### 7.2 Group Membership
+
+```text
+client/admin
+  -> conversation-service.CreateMemberChange
+  -> local saga + membership state + timeline event + outbox
+  -> Kafka member boundary event
+  -> delivery membership projection
+  -> search/memory visibility projection
+  -> audit / analytics / policy projections
+```
+
+Membership windows must affect delivery, search, retrieval and memory. Current
+member state cannot be used to rewrite historical visibility.
+
+### 7.3 Read / Delivered Receipts
+
+```text
+client AckDelivery / MarkRead
+  -> delivery-service / receipt-service
+  -> device cursor / receipt facts
+  -> receipt events
+  -> conversation list / unread projection
+  -> notification / analytics / AI summary consumers
+```
+
+## 8. Client Architecture
+
+Clients share TypeScript protocol and sync core:
+
+```text
+clients/packages/protocol
+clients/packages/client-core
+clients/web
+clients/desktop
+clients/android
+```
+
+Rules:
+
+- Clients call only `api-gateway` BFF and `push-gateway`.
+- `client-core` owns local sync state, offline queue semantics and API models.
+- Browser uses Web APIs; PC uses Tauri as a thin shell; Android uses a thin
+  platform bridge.
+- Native bridges do not implement business decisions.
+- Local storage is cache and pending operation state only.
+
+## 9. Event Architecture
+
+Every event-producing service uses local transaction + outbox for first-stage
+reliability.
+
+Event envelope guidance:
+
+```text
+event_id
+tenant_id
+producer
+aggregate_type
+aggregate_id
+aggregate_version
+event_type
+event_version
+partition_key
+occurred_at
+correlation_id
+causation_id
+trace_id
+payload_json/protobuf
+```
+
+Long-term:
+
+- use protobuf schemas for Kafka payloads;
+- register event docs with AsyncAPI-style channel descriptions;
+- keep CloudEvents-compatible metadata where useful;
+- support DLQ / retry / repair / replay for each event family;
+- keep sensitive raw payloads out of reports, metrics and review pages.
+
+## 10. Data Platform Architecture
+
+The data platform is built from public events and CDC, not from direct joins over
+business private tables.
+
+```text
+Public events / CDC
+  -> ingestion validation
+  -> raw event store
+  -> domain normalized tables
+  -> aggregate data products
+  -> metrics / BI / risk / feature / RAG use cases
+```
+
+Data product contract:
+
+```text
+name
+owner
+source events / source systems
+schema version
+freshness target
+privacy class
+retention
+quality checks
+consumer list
+repair / backfill procedure
+```
+
+Do not build AI retrieval directly on arbitrary operational tables. Build
+search/vector/memory projections with explicit visibility and delete semantics.
+
+## 11. AI / Memory / RAG Architecture
+
+### 11.1 Group Memory Model
+
+Memory records must preserve context:
 
 ```text
 source_ref
-tenant_id / conversation_id / group_id / project_id
-speaker_id / actor_ids
-scope: personal | group | project | tenant
-fact_type: task | decision | preference | blocker | status | file | policy
+tenant_id
+conversation_id / group_id / project_id
+speaker_id
+audience_scope
+fact_type
+fact_text
 status: draft | active | superseded | archived | deleted
 valid_from / valid_to
-supersedes / related_events
+supersedes
+related_events
 visibility_window
 confidence
 review_state
 evidence_refs
 ```
 
-It must not upgrade a group fact into a personal preference without review, and
-must not return facts after revoke / delete / membership-window invalidation.
+Rules:
 
-### Controlled Agent Actions
+- A group statement is not automatically a user preference.
+- A stale decision must be superseded, not merely appended.
+- Delete/revoke/member-leave events must affect search, vector and memory
+  visibility.
+- Retrieval must return source refs and reason for inclusion.
 
-Agent write actions follow this path:
-
-```text
-Agent plan
-  -> retrieval-gateway EvidencePack
-  -> policy-service authorization
-  -> workflow-service proposal
-  -> human or policy approval
-  -> action-executor public API call
-  -> audit-service record
-  -> outbox event
-```
-
-No Python worker, MCP server or model provider may directly mutate business
-facts. Python returns candidates, rankings or draft plans; Go services own
-authorization, workflow state, durable facts and audit.
-
-## Middleware Platform
-
-Middleware is managed as platform capability, not as service-private sprawl.
+### 11.2 Retrieval and EvidencePack
 
 ```text
-deploy/local/
-  docker-compose.core.yml
-  docker-compose.observability.yml
-  docker-compose.search.yml
-  docker-compose.vector.yml
-  docker-compose.media.yml
-  docker-compose.workflow.yml
-  docker-compose.security.yml
-  docker-compose.data-platform.yml
-  docker-compose.ai-runtime.yml
+request
+  -> policy check
+  -> structural filters: tenant / group / user / time / visibility
+  -> keyword search
+  -> vector search
+  -> graph / related-event expansion
+  -> rerank
+  -> EvidencePack
+  -> RAG / summary / Agent
 ```
 
-Service code contains only adapters under `internal/infrastructure/<adapter>`.
-Deployment, port, data directory and local profile ownership belong in
-`deploy/` and `docs/platform/`.
+EvidencePack includes:
 
-## Security and Governance
+```text
+evidence_id
+source_refs
+conversation_seq / message_id / object refs
+visibility proof
+retrieval score
+version / valid time
+redaction profile
+```
 
-- Public listeners must not use mock auth or plaintext secrets.
-- Trusted metadata must be minted only at the gateway / verified boundary.
-- Object-level and property-level authorization is mandatory for public APIs.
-- mTLS, OIDC, KMS/HSM, OpenFGA/OPA and Vault remain replaceable capabilities,
-  not hard-coded one-off choices.
-- AI tool execution requires capability metadata, consent, policy check,
-  approval for risky writes and audit.
-- Sensitive values are not emitted in logs, metrics, reports, manifests or
-  review pages.
+RAG and summary services cannot call search/vector stores directly when a
+policy-aware retrieval gateway is available.
 
-## Observability and Reliability
+### 11.3 Agent Architecture
 
-- Use SLIs / SLOs for product-critical paths only after enough operational
-  evidence exists.
-- Local Prometheus / Grafana / OTel remains development and interview evidence,
-  not production SLO proof.
-- Every new service should expose health, readiness, low-sensitive metrics,
-  structured logs and trace context.
-- Repair / DLQ / replay paths are part of service design, not afterthoughts.
+```text
+Agent request
+  -> intent classification
+  -> retrieval EvidencePack
+  -> plan candidate
+  -> policy precheck
+  -> proposal
+  -> approval if needed
+  -> action-executor
+  -> audit
+  -> event
+```
 
-## Evolution Rules
+Agent roles may be multi-agent, but coordination is a service concern:
+
+- planner;
+- retrieval specialist;
+- risk/policy reviewer;
+- tool/action executor;
+- evaluator/critic.
+
+Only approved actions can mutate business state.
+
+## 12. Middleware Platform
+
+Middleware is organized by capability. See
+`../platform/middleware-catalog.md` for the full catalog and adoption checklist.
+
+Runtime profiles:
+
+| Profile | Scope |
+| --- | --- |
+| `core` | PostgreSQL, Kafka, Redis and core services. |
+| `client-demo` | Client BFF, push and client smoke path. |
+| `observability` | Prometheus, Grafana, Alertmanager, OTel collector. |
+| `search-rag` | OpenSearch/vector store/retrieval/RAG/model gateway. |
+| `media` | MinIO and media processing dependencies. |
+| `workflow-agent` | Workflow, Agent, skill, MCP and action execution. |
+| `security` | OIDC provider, Vault/KMS emulator, OpenFGA/OPA. |
+| `data-platform` | CDC, lakehouse, OLAP and analytics. |
+| `ai-runtime` | Local or remote model provider proxies. |
+
+Do not default-start all middleware. Each active slice chooses the smallest
+runtime profile needed for its smoke.
+
+## 13. Security Architecture
+
+Security boundaries:
+
+- Public network boundary: `api-gateway`, `push-gateway`, client assets.
+- Identity boundary: `identity-service`, OIDC/JWKS, session/MFA.
+- Authorization boundary: `policy-service`, gateway metadata and per-service
+  ownership checks.
+- Data boundary: service-owned PostgreSQL, event contracts, data product privacy.
+- AI action boundary: retrieval, policy, workflow approval, action executor,
+  audit.
+
+Security rules:
+
+1. Public listeners must reject mock auth or plaintext secrets unless explicitly
+   local/private.
+2. Trusted metadata is minted only by gateway or verified internal boundary.
+3. Every public API must check object-level authorization.
+4. Sensitive values are not logged, exported, embedded in metrics or committed
+   into reports.
+5. Tool / MCP / Agent actions require capability metadata, policy and audit.
+6. KMS/HSM/Vault are capabilities behind adapters, not assumptions baked into
+   domain logic.
+
+## 14. Reliability and Operations
+
+First-stage local evidence is not production SLO proof. The path to production
+requires:
+
+- SLIs for user-visible paths such as login, send, pull inbox, push wakeup,
+  search retrieval and Agent action latency;
+- SLOs only after enough operational data exists;
+- dashboards, alerts, runbooks and error budgets for critical paths;
+- DLQ, repair, replay and audit for every event-driven workflow;
+- backup, restore, failover and data integrity drills for each durable store;
+- canary / rollout / rollback gates for config and service changes.
+
+## 15. Code Organization
+
+```text
+services/<service>/
+  cmd/
+  internal/api/
+  internal/app/
+  internal/domain/
+  internal/infrastructure/
+  internal/trigger/
+  internal/types/
+
+clients/
+  packages/protocol/
+  packages/client-core/
+  web/
+  desktop/
+  android/
+
+ai/python/
+  workers/
+  eval/
+  algorithms/
+  tools/
+
+deploy/
+  local/
+  docker/
+
+docs/
+  architecture/
+  platform/
+  sdd/
+  runbook/
+```
+
+Shared packages require at least two real callers and a stable contract. Do not
+extract abstractions merely to make diagrams symmetrical.
+
+## 16. Language Boundary
+
+| Area | Language |
+| --- | --- |
+| Business services, BFF, control, audit, durable facts | Go |
+| Web / PC / Android shared client core and UI | TypeScript |
+| Tauri desktop bridge | Rust, thin bridge only |
+| Android platform bridge | Kotlin, thin bridge only |
+| iOS future bridge | Swift, thin bridge only |
+| AI workers, model algorithms, offline eval | Python |
+
+Python cannot own business facts, security decisions or audit truth.
+
+## 17. Evolution Roadmap
+
+### Phase A: Stable IM and Client MVP
+
+- Keep current IM services as the working backend.
+- Finish Web / PC / Android client shell on shared client core.
+- Keep BFF and push as the only client-facing backend surfaces.
+
+### Phase B: Product Platform Completion
+
+- Promote media, notification, presence, admin, audit, control-plane and
+  workflow by product need.
+- Keep each promotion service-by-service with SDD, migration, API, smoke and
+  docs.
+
+### Phase C: AI Data Boundary
+
+- Strengthen search, vector-index, memory and retrieval.
+- Enforce visibility, deletion, supersession and EvidencePack contracts.
+
+### Phase D: RAG and Agent Applications
+
+- Build RAG and summary on EvidencePack only.
+- Build Agent actions through workflow approval and action-executor.
+- Expand ai-eval before expanding autonomous actions.
+
+### Phase E: Data Platform
+
+- Build ingestion and analytics from public events / CDC.
+- Add data catalog, quality checks and feature products.
+
+### Phase F: Production-Like Operations
+
+- Replace local-only middleware with managed or HA profiles where needed.
+- Add SLOs, alerting, backup/restore, failover and rollout governance.
+
+## 18. Service / Middleware Addition Rule
 
 Add a service or middleware only when at least one condition is true:
 
-1. Independent data model.
-2. Independent scaling profile.
-3. Independent failure or security boundary.
+1. It owns an independent data model.
+2. It has an independent scaling profile.
+3. It has an independent failure or security boundary.
 4. Multiple services need the same capability.
 5. It significantly reduces existing service complexity.
 
@@ -244,20 +603,30 @@ Every addition needs:
 
 - ADR or SDD section.
 - Public API / event contract.
-- Local run profile or explicit deferred-runtime note.
-- Focused checks.
-- Rollback / migration / compatibility statement.
+- Data ownership statement.
+- Runtime profile or explicit deferred-runtime note.
+- Focused validation.
+- Rollback / migration / compatibility note.
 
-## Near-Term Roadmap
+## 19. What This Architecture Avoids
 
-1. Finish client platform MVP foundation: Web, PC shell and Android shell on the
-   same client core.
-2. Add middleware catalog and runtime profiles before introducing more
-   middleware.
-3. Continue search / memory / retrieval / vector-index as the AI data boundary.
-4. Build RAG / summary only on EvidencePack and visibility-filtered retrieval.
-5. Expand Agent actions through workflow approval and audit.
-6. Add data platform MVP from public events to low-sensitive metrics and feature
-   products.
-7. Promote media / notification / presence / control-plane / admin as product
-   needs become active, one service slice at a time.
+- One giant "middle platform" service.
+- AI services directly reading operational private tables.
+- Clients calling internal microservices.
+- Data platform becoming a hidden command side.
+- Middleware-specific code in domain/app layers.
+- Python workers owning durable business state.
+- Service count or middleware products frozen as the final answer.
+
+## 20. Interview Narrative
+
+NexusIM can be described as:
+
+```text
+A distributed IM backend with durable messaging, delivery and online wakeup,
+expanded into a reusable business platform and governed data platform, then
+layered with policy-aware retrieval, collaborative memory, RAG and controlled
+Agent actions. The architecture keeps business facts in Go services, analytical
+data in governed projections, AI evidence in retrieval packs, and real actions
+behind approval and audit.
+```

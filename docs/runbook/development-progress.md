@@ -66,7 +66,8 @@
   供 PC / Android WebView 复用同一 UI action contract；
   shell asset prep 已先清理目标目录再复制，并写低敏 relative-path / SHA-256
   manifest，artifact wrapper 会在 native build 前验证 manifest，避免旧 Web bundle
-  混入后续 shell 包；
+  混入后续 shell 包；Android APK wrapper 会在已验证 manifest 后跳过 Gradle 内重复
+  asset prep，直接 Gradle build 仍保留自动准备路径；
   desktop / Android artifact build wrapper 已有 dry-run-tested command plan，
   readiness report 已显示 per-target shell asset verification 状态；
   shell smoke plan 已能输出低敏 browser / desktop / Android smoke 前置计划；

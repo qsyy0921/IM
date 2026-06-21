@@ -49,6 +49,7 @@ const android = dryRun("build-android-apk.mjs");
 assert(android.target === "android", "android target mismatch");
 assert(android.outputHint.endsWith("app-debug.apk"), "android output hint mismatch");
 assert(android.args.join(" ").includes("assembleDebug"), "android build command missing assembleDebug");
+assert(android.args.includes("-Pnexusim.skipWebAssetPrep=true"), "android wrapper must skip duplicate Gradle asset prep after manifest verification");
 assert(!JSON.stringify(android).match(/token|secret|password|credential|private/i), "android build plan leaks sensitive names");
 assert(android.collectArtifacts.enabled === false, "android collector should be disabled by default");
 

@@ -4,6 +4,9 @@ plugins {
 }
 
 val npmExecutable = if (System.getProperty("os.name").lowercase().contains("windows")) "npm.cmd" else "npm"
+val skipNexusIMWebAssetPrep = providers.gradleProperty("nexusim.skipWebAssetPrep")
+    .map { it.equals("true", ignoreCase = true) }
+    .orElse(false)
 
 android {
     namespace = "com.nexusim.android"
@@ -23,6 +26,7 @@ dependencies {
 }
 
 tasks.register<Exec>("prepareNexusIMWebAssets") {
+    onlyIf { !skipNexusIMWebAssetPrep.get() }
     workingDir = file("../../..")
     commandLine(npmExecutable, "run", "build:shell-assets:android")
 }

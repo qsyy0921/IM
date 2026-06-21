@@ -45,6 +45,9 @@ assert(appBuild.includes("minSdk = 26"), "Android minSdk mismatch");
 assert(appBuild.includes("targetSdk = 35"), "Android targetSdk mismatch");
 assert(appBuild.includes("prepareNexusIMWebAssets"), "Android web asset prep task missing");
 assert(appBuild.includes("build:shell-assets:android"), "Android build must prepare shell web assets");
+assert(appBuild.includes('gradleProperty("nexusim.skipWebAssetPrep")'), "Android Gradle task must support wrapper skip property");
+assert(appBuild.includes("onlyIf { !skipNexusIMWebAssetPrep.get() }"), "Android Gradle task must skip duplicate asset prep when wrapper already verified assets");
+assert(appBuild.includes('workingDir = file("../../..")'), "Android web asset prep must run from clients workspace root");
 
 const manifest = read("android/native/app/src/main/AndroidManifest.xml");
 assert(manifest.includes("android.permission.INTERNET"), "Android INTERNET permission missing");

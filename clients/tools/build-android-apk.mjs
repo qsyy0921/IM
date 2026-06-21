@@ -55,7 +55,7 @@ function androidBuildPlan(prereqs, options) {
     ready: prereqs.androidApkReady,
     missing,
     command: hasGradleWrapper ? gradlew : "gradle",
-    args: [":app:assembleDebug"],
+    args: ["-Pnexusim.skipWebAssetPrep=true", ":app:assembleDebug"],
     shell: false,
     cwdHint: "clients/android/native",
     outputHint: "clients/android/native/app/build/outputs/apk/debug/app-debug.apk",

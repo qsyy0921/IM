@@ -239,6 +239,11 @@ Responsibilities:
   desktop.
 - Android APK build wrappers must verify prepared assets against this manifest
   before invoking Gradle.
+- Direct Gradle builds must still run `prepareNexusIMWebAssets` from the
+  `clients` workspace root. The NexusIM APK wrapper may pass
+  `-Pnexusim.skipWebAssetPrep=true` only after it has already prepared and
+  verified the shell asset manifest, so wrapper builds do not run the same Web
+  build twice.
 
 Android constraints:
 

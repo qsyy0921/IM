@@ -116,9 +116,9 @@ First slice:
   loads the prepared local Web assets, and still does not own token storage,
   local message facts, BFF calls, or push delivery semantics.
 - Android WebView now registers the read-only `NexusIMNative` JavaScript bridge.
-  The Web runtime can parse `runtimeMetadata()` for diagnostics, and invalid
-  bridge payloads fail closed. The bridge exposes no token, storage,
-  file-system or message APIs.
+  It exposes only the single `runtimeMetadata()` method. The Web runtime can
+  parse that metadata for diagnostics, and invalid bridge payloads fail closed.
+  The bridge exposes no token, storage, file-system or message APIs.
 - The Web shell runtime panel now displays shell target plus PC Tauri or Android
   native bridge metadata when present. This is diagnostics only; it does not
   grant Web code native capabilities.
@@ -213,11 +213,11 @@ First slice:
 - PC desktop and Android now both have first-stage TypeScript runtime adapters.
   PC desktop also has a Tauri runner skeleton, and Android has a Kotlin native
   WebView asset shell skeleton. PC exposes only read-only runtime metadata IPC
-  and Web can read it for diagnostics; Android exposes only read-only metadata
-  JavaScript bridge. Both targets reserve native SQLite store config and fail
-  closed until native bridges exist. Neither target produces `.msi`, `.exe`,
-  `.apk`, or `.aab` artifacts yet; the repository now has dry-run-tested build
-  wrappers for those future artifacts.
+  and Web can read it for diagnostics; Android exposes only a single-method
+  read-only metadata JavaScript bridge. Both targets reserve native SQLite store
+  config and fail closed until native bridges exist. Neither target produces
+  `.msi`, `.exe`, `.apk`, or `.aab` artifacts yet; the repository now has
+  dry-run-tested build wrappers for those future artifacts.
 - `/api/auth/logout` performs first-stage server-side logout for the current
   authenticated session only. Broader device/session management remains an
   identity/admin capability, not a client BFF target selector.

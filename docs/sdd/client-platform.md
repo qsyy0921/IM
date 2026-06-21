@@ -227,10 +227,11 @@ Android constraints:
 - Background sync must use PullInbox and device cursor state.
 - First-stage Android shell loads prepared local Web assets through
   `WebViewAssetLoader` instead of granting broad `file://` access to Web code.
-- First-stage `NexusIMNative` JavaScript bridge is metadata-only. It may expose
-  runtime target, bridge version and label for diagnostics, but it must not
-  expose tokens, storage, file-system access, message facts or write commands
-  until a separate native capability ADR defines audit and permission checks.
+- First-stage `NexusIMNative` JavaScript bridge is a single-method
+  metadata-only bridge. It may expose runtime target, bridge version and label
+  through `runtimeMetadata()` for diagnostics, but it must not expose tokens,
+  storage, file-system access, message facts or write commands until a separate
+  native capability ADR defines audit and permission checks.
 - Offline sends must use idempotency keys and local pending queues.
 
 ## Platform Adapter Ports
@@ -396,16 +397,16 @@ need hardened token storage per platform.
 - Sensitive data should not appear in local logs or telemetry.
 - PC desktop shell must restrict IPC and file-system access; Web code cannot get
   a broad native bridge.
-- PC desktop Tauri command surface must stay metadata-only until a dedicated
-  native capability contract exists.
+- PC desktop Tauri command surface must stay single-command metadata-only until
+  a dedicated native capability contract exists.
 - PC Web code may display Tauri metadata for local diagnostics, but the metadata
   bridge must not become a storage, token, filesystem or message API.
 - PC / Android WebView UI should use shared `ClientShellActions` for restore and
   logout so native shells do not grow separate auth lifecycle behavior.
 - Android must use encrypted platform storage before production and must treat
   FCM/APNs-style push as wakeup only, never as delivered message truth.
-- Android native WebView bridge must remain read-only metadata-only until a
-  dedicated native capability contract exists.
+- Android native WebView bridge must remain single-method read-only
+  metadata-only until a dedicated native capability contract exists.
 
 ## MVP Acceptance
 

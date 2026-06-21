@@ -43,6 +43,7 @@ assert(build.includes("tauri_build::build()"), "Tauri build hook missing");
 const main = read("desktop/src-tauri/src/main.rs");
 assert(main.includes("tauri::Builder::default()"), "Tauri Builder entrypoint missing");
 assert(main.includes("#[tauri::command]"), "desktop shell must expose only audited Tauri commands");
+assert(countMatches(main, /#\[tauri::command\]/g) === 1, "desktop shell must expose only runtime_metadata");
 assert(main.includes("fn runtime_metadata() -> String"), "desktop runtime metadata command missing");
 assert(main.includes("tauri::generate_handler![runtime_metadata]"), "desktop invoke handler must only register runtime_metadata");
 assert(main.includes('RUNTIME_TARGET: &str = "windows-desktop"'), "desktop runtime target marker missing");
@@ -66,3 +67,7 @@ const shellConfigPlaceholder = read("web/public/nexusim-shell-config.js");
 assert(shellConfigPlaceholder.includes("__NEXUSIM_CLIENT_SHELL__"), "web shell config placeholder missing");
 
 console.log("desktop tauri runner skeleton ok");
+
+function countMatches(text, pattern) {
+  return Array.from(text.matchAll(pattern)).length;
+}

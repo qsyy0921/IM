@@ -59,7 +59,8 @@
   store 和 static lifecycle/network runtime adapter；PC desktop 已有 Tauri v2
   runner skeleton（仅只读 `runtime_metadata` command、bundle inactive，Web shell 可读
   该 metadata 作为诊断）；Android 已有 Kotlin WebView asset shell skeleton（通过
-  WebViewAssetLoader 加载本地 Web assets，并注册只读 `NexusIMNative` runtime metadata bridge）；
+  WebViewAssetLoader 加载本地 Web assets，并注册只读单方法 `NexusIMNative`
+  runtime metadata bridge）；
   Web shell 登录面板已通过 shared `ClientShellActions` 接入 restore / logout，
   供 PC / Android WebView 复用同一 UI action contract；
   desktop / Android artifact build wrapper 已有 dry-run-tested command plan，

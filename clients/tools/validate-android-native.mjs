@@ -59,6 +59,7 @@ assert(mainActivity.includes('addJavascriptInterface(NexusIMBridge(), "NexusIMNa
 
 const bridge = read("android/native/app/src/main/java/com/nexusim/android/NexusIMBridge.kt");
 assert(bridge.includes("@JavascriptInterface"), "Android native bridge must expose only annotated methods");
+assert(countMatches(bridge, /@JavascriptInterface/g) === 1, "Android native bridge must expose only runtimeMetadata");
 assert(bridge.includes("fun runtimeMetadata(): String"), "Android runtime metadata method missing");
 assert(bridge.includes('RUNTIME_TARGET: String = "android"'), "Android runtime target marker missing");
 assert(bridge.includes("JSONObject()"), "Android native bridge must return structured metadata JSON");
@@ -76,3 +77,7 @@ const shellConfigPlaceholder = read("web/public/nexusim-shell-config.js");
 assert(shellConfigPlaceholder.includes("__NEXUSIM_CLIENT_SHELL__"), "web shell config placeholder missing");
 
 console.log("android native bridge skeleton ok");
+
+function countMatches(text, pattern) {
+  return Array.from(text.matchAll(pattern)).length;
+}

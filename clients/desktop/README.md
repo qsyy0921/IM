@@ -29,9 +29,9 @@ the native bridge can stay narrow and auditable.
 ## Security Rules
 
 - Desktop IPC must expose only explicit commands.
-- Current IPC is metadata-only. It must not expose tokens, storage, file-system
-  access or message APIs until a separate native capability ADR defines the
-  audit and permission boundary.
+- Current IPC is a single-command metadata bridge. It must not expose tokens,
+  storage, file-system access or message APIs until a separate native capability
+  ADR defines the audit and permission boundary.
 - Shell config is endpoint and identity metadata only. It must not contain
   gateway tokens, refresh tokens, passwords, private keys, or arbitrary native
   capability flags.

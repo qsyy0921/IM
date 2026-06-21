@@ -65,8 +65,8 @@ adoption rules，不把服务数量、中间件或部署形态写死。
   loopback clean baseline 和 Windows wired `172.31.50.1` clean baseline 已通过，
   BFF HTTP route metrics / rate-limit adapter 已落；PC desktop / Android 已有
   target shell Web assets prep，PC 已有只读 `runtime_metadata` IPC，Android 已用
-  WebViewAssetLoader 加载本地 assets，并已注册只读 `NexusIMNative` metadata
-  bridge，Web shell 已能展示 PC / Android native metadata，并已通过 shared
+  WebViewAssetLoader 加载本地 assets，并已注册只读单方法 `NexusIMNative`
+  metadata bridge，Web shell 已能展示 PC / Android native metadata，并已通过 shared
   `ClientShellActions` 接入 restore / logout；artifact / APK wrapper 已能
   dry-run 输出命令和缺失工具链，Android builder profile
   已能静态校验，下一步做本地 artifact / APK 和真实平台 shell smoke。

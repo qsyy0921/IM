@@ -13,11 +13,6 @@ class NexusIMBridge {
             .toString()
     }
 
-    @JavascriptInterface
-    fun target(): String {
-        return RUNTIME_TARGET
-    }
-
     companion object {
         const val RUNTIME_TARGET: String = "android"
         const val NATIVE_BRIDGE_VERSION: String = "0.1.0"

@@ -94,10 +94,10 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   API / WebSocket 地址、device / installation / app version 和 session key；当前
   focused test 覆盖 `windows-desktop` 与 `android` target selection。该 bridge 只
   做 runtime identity / config 选择，不授予文件系统或 native token 权限。
-- Android WebView 已注册只读 `NexusIMNative` JavaScript bridge；Web 端可读取
-  `runtimeMetadata()` 用于诊断，且 focused test 覆盖合法 metadata、错误 target 和
-  malformed JSON 的 fail-closed 行为。该 bridge 不暴露 token、storage、文件系统或
-  message API。
+- Android WebView 已注册只读 `NexusIMNative` JavaScript bridge；该 bridge 现在只暴露
+  单个 `runtimeMetadata()` 方法。Web 端可读取它用于诊断，且 focused test 覆盖合法
+  metadata、错误 target 和 malformed JSON 的 fail-closed 行为。该 bridge 不暴露
+  token、storage、文件系统或 message API。
 - Web shell 的运行入口面板已展示 shell target、PC Tauri `runtime_metadata`
   和 Android native bridge metadata；该展示只用于本地诊断，不改变客户端权限边界。
 - Web app 会在主 bundle 前加载 `nexusim-shell-config.js`；`clients/desktop` 和

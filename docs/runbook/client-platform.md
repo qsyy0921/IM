@@ -66,11 +66,16 @@ First slice:
   the receiver JOIN; the verified client path then uses only HTTP BFF and
   WebSocket: login, push hello, send, notify, PullInbox, conversation list and
   AckDelivery. `loadtest/clientweb/run-local-smoke.ps1` starts a local private
-  non-TLS backend+BFF+push stack for this smoke. The first WIP local smoke
+  non-TLS backend+BFF+push stack for this smoke. The script supports
+  `-BindHost` and `-ClientHost` so the same client path can bind to a private
+  wired LAN address such as `172.31.50.1` instead of loopback. The first WIP local smoke
   passed on 2026-06-21; report:
   `docs/runbook/loadtest/client-platform/loadtest-report-20260621-client-web-bff-push-smoke.md`.
   The first clean committed baseline also passed on 2026-06-21; report:
   `docs/runbook/loadtest/client-platform/loadtest-report-20260621-client-web-bff-push-clean-baseline.md`.
+  A WIP `172.31.50.1` wired-address smoke also passed on 2026-06-21, but it was
+  recorded with `git_dirty=true`; clean committed rerun remains required before
+  using it as a baseline.
   It does not replace existing secure mTLS gateway / push smoke coverage.
 - The PC desktop and Android packages currently define runtime / packaging
   contracts only. They do not yet produce `.msi`, `.exe`, `.apk`, or `.aab`
@@ -95,8 +100,9 @@ rejected. For local LAN client smoke, prefer the wired `172.x.x.x` address.
 
 ## Next Work
 
-1. Repeat `loadtest/clientweb/run-local-smoke.ps1` against the Windows / Mac
-   wired LAN backend IP.
+1. Rerun `loadtest/clientweb/run-local-smoke.ps1 -BindHost 172.31.50.1
+   -ClientHost 172.31.50.1` from a clean commit and archive the wired-address
+   baseline.
 2. Add HTTP-layer BFF metrics / rate-limit adapter; current BFF calls the
    gateway facade directly and does not pass through gRPC interceptors.
 3. Add PC desktop Tauri runner and first local Windows installer.

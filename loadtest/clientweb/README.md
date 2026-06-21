@@ -26,6 +26,20 @@ Run locally:
 .\loadtest\clientweb\run-local-smoke.ps1
 ```
 
+Run against a private LAN address, for example the Windows wired `172.x`
+interface:
+
+```powershell
+.\loadtest\clientweb\run-local-smoke.ps1 `
+  -BindHost 172.31.50.1 `
+  -ClientHost 172.31.50.1
+```
+
+`BindHost` controls where local service listeners bind. `ClientHost` controls
+the address used by the smoke client and service-to-service targets. Keep both
+on a private address unless the corresponding gateway public-listener guards are
+explicitly configured for a separate test.
+
 Raw summaries and logs are written under `H:\NexusIM\loadtest-results` by
 default. The repository should only store reports or short runbook summaries.
 

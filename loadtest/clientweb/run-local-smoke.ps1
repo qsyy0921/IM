@@ -2,6 +2,8 @@ param(
     [string]$PgDsn = "postgres://nexusim:nexusim@localhost:5432/nexusim?sslmode=disable",
     [string]$KafkaBrokers = "localhost:9092",
     [string]$ResultRoot = "H:\NexusIM\loadtest-results",
+    [string]$BindHost = "127.0.0.1",
+    [string]$ClientHost = "",
     [string]$RunName = "",
     [switch]$SkipBuild
 )
@@ -16,6 +18,10 @@ $repo = Resolve-Path (Join-Path $PSScriptRoot "..\..")
 Set-Location $repo
 
 . .\tools\go-env.ps1
+
+if ([string]::IsNullOrWhiteSpace($ClientHost)) {
+    $ClientHost = $BindHost
+}
 
 if ([string]::IsNullOrWhiteSpace($RunName)) {
     $RunName = "client-web-bff-push-smoke-" + (Get-Date -Format "yyyyMMdd-HHmmss")
@@ -37,7 +43,9 @@ New-Item -ItemType Directory -Force $resultDir | Out-Null
 New-Item -ItemType Directory -Force $logDir | Out-Null
 
 function Get-FreeTcpPort {
-    $listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
+    param([string]$HostName)
+    $bindAddress = [System.Net.IPAddress]::Parse($HostName)
+    $listener = [System.Net.Sockets.TcpListener]::new($bindAddress, 0)
     try {
         $listener.Start()
         return $listener.LocalEndpoint.Port
@@ -76,6 +84,7 @@ function Start-NexusProcess {
         [string]$FilePath,
         [hashtable]$Env,
         [int]$Port = 0,
+        [string]$WaitHost = "127.0.0.1",
         [string[]]$ArgumentList = @()
     )
     $out = Join-Path $logDir "$Name.out.log"
@@ -105,7 +114,7 @@ function Start-NexusProcess {
     $proc.StandardOutput.BaseStream.CopyToAsync([System.IO.File]::Open($out, [System.IO.FileMode]::Create, [System.IO.FileAccess]::Write, [System.IO.FileShare]::ReadWrite)) | Out-Null
     $proc.StandardError.BaseStream.CopyToAsync([System.IO.File]::Open($err, [System.IO.FileMode]::Create, [System.IO.FileAccess]::Write, [System.IO.FileShare]::ReadWrite)) | Out-Null
     if ($Port -gt 0) {
-        Wait-Tcp -HostName "127.0.0.1" -Port $Port
+        Wait-Tcp -HostName $WaitHost -Port $Port
     } else {
         Start-Sleep -Milliseconds 800
     }
@@ -169,23 +178,32 @@ if (-not $SkipBuild) {
     go build -o bin\nexusim-client-web-smoke.exe ./loadtest/clientweb
 }
 
-$identityPort = Get-FreeTcpPort
-$conversationPort = Get-FreeTcpPort
-$messagePort = Get-FreeTcpPort
-$deliveryPort = Get-FreeTcpPort
-$receiptPort = Get-FreeTcpPort
-$pushPort = Get-FreeTcpPort
-$apiGatewayPort = Get-FreeTcpPort
-$bffPort = Get-FreeTcpPort
+$identityPort = Get-FreeTcpPort -HostName $BindHost
+$conversationPort = Get-FreeTcpPort -HostName $BindHost
+$messagePort = Get-FreeTcpPort -HostName $BindHost
+$deliveryPort = Get-FreeTcpPort -HostName $BindHost
+$receiptPort = Get-FreeTcpPort -HostName $BindHost
+$pushPort = Get-FreeTcpPort -HostName $BindHost
+$apiGatewayPort = Get-FreeTcpPort -HostName $BindHost
+$bffPort = Get-FreeTcpPort -HostName $BindHost
 
-$identityTarget = "127.0.0.1:$identityPort"
-$conversationTarget = "127.0.0.1:$conversationPort"
-$messageTarget = "127.0.0.1:$messagePort"
-$deliveryTarget = "127.0.0.1:$deliveryPort"
-$receiptTarget = "127.0.0.1:$receiptPort"
-$pushTarget = "127.0.0.1:$pushPort"
-$apiGatewayTarget = "127.0.0.1:$apiGatewayPort"
-$bffTarget = "127.0.0.1:$bffPort"
+$identityListen = "${BindHost}:$identityPort"
+$conversationListen = "${BindHost}:$conversationPort"
+$messageListen = "${BindHost}:$messagePort"
+$deliveryListen = "${BindHost}:$deliveryPort"
+$receiptListen = "${BindHost}:$receiptPort"
+$pushListen = "${BindHost}:$pushPort"
+$apiGatewayListen = "${BindHost}:$apiGatewayPort"
+$bffListen = "${BindHost}:$bffPort"
+
+$identityTarget = "${ClientHost}:$identityPort"
+$conversationTarget = "${ClientHost}:$conversationPort"
+$messageTarget = "${ClientHost}:$messagePort"
+$deliveryTarget = "${ClientHost}:$deliveryPort"
+$receiptTarget = "${ClientHost}:$receiptPort"
+$pushTarget = "${ClientHost}:$pushPort"
+$apiGatewayTarget = "${ClientHost}:$apiGatewayPort"
+$bffTarget = "${ClientHost}:$bffPort"
 $bffBaseURL = "http://$bffTarget"
 $pushURL = "ws://$pushTarget/ws"
 
@@ -233,17 +251,17 @@ try {
     $apiGateway = Join-Path $repo "bin\api-gateway.exe"
     $runner = Join-Path $repo "bin\nexusim-client-web-smoke.exe"
 
-    $processes += Start-NexusProcess -Name "identity-grpc" -FilePath $identityService -Port $identityPort -Env @{
+    $processes += Start-NexusProcess -Name "identity-grpc" -FilePath $identityService -Port $identityPort -WaitHost $ClientHost -Env @{
         NEXUSIM_IDENTITY_SERVICE_MODE = "grpc"
-        NEXUSIM_IDENTITY_GRPC_ADDR = $identityTarget
+        NEXUSIM_IDENTITY_GRPC_ADDR = $identityListen
         NEXUSIM_PG_DSN = $PgDsn
         NEXUSIM_IDENTITY_GATEWAY_TOKEN_SECRET = $gatewayAuthSecret
         NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_MODE = "noop"
         NEXUSIM_IDENTITY_DEV_RETURN_CHALLENGE_TOKEN = "false"
     }
-    $processes += Start-NexusProcess -Name "conversation-grpc" -FilePath $conversationService -Port $conversationPort -Env @{
+    $processes += Start-NexusProcess -Name "conversation-grpc" -FilePath $conversationService -Port $conversationPort -WaitHost $ClientHost -Env @{
         NEXUSIM_CONVERSATION_SERVICE_MODE = "grpc"
-        NEXUSIM_CONVERSATION_GRPC_ADDR = $conversationTarget
+        NEXUSIM_CONVERSATION_GRPC_ADDR = $conversationListen
         NEXUSIM_CONVERSATION_AUTH_MODE = "metadata"
         NEXUSIM_PG_DSN = $PgDsn
     }
@@ -254,9 +272,9 @@ try {
         NEXUSIM_TIMELINE_TOPIC = $timelineTopic
         NEXUSIM_DELIVERY_CONSUMER_GROUP = $deliveryConsumerGroup
     }
-    $processes += Start-NexusProcess -Name "delivery-grpc" -FilePath $deliveryService -Port $deliveryPort -Env @{
+    $processes += Start-NexusProcess -Name "delivery-grpc" -FilePath $deliveryService -Port $deliveryPort -WaitHost $ClientHost -Env @{
         NEXUSIM_DELIVERY_SERVICE_MODE = "grpc"
-        NEXUSIM_DELIVERY_GRPC_ADDR = $deliveryTarget
+        NEXUSIM_DELIVERY_GRPC_ADDR = $deliveryListen
         NEXUSIM_DELIVERY_AUTH_MODE = "metadata"
         NEXUSIM_PG_DSN = $PgDsn
     }
@@ -274,9 +292,9 @@ try {
         NEXUSIM_DELIVERY_EVENTS_TOPIC = $deliveryTopic
         NEXUSIM_RECEIPT_CONSUMER_GROUP = $receiptConsumerGroup
     }
-    $processes += Start-NexusProcess -Name "receipt-grpc" -FilePath $receiptService -Port $receiptPort -Env @{
+    $processes += Start-NexusProcess -Name "receipt-grpc" -FilePath $receiptService -Port $receiptPort -WaitHost $ClientHost -Env @{
         NEXUSIM_RECEIPT_SERVICE_MODE = "grpc"
-        NEXUSIM_RECEIPT_GRPC_ADDR = $receiptTarget
+        NEXUSIM_RECEIPT_GRPC_ADDR = $receiptListen
         NEXUSIM_RECEIPT_AUTH_MODE = "metadata"
         NEXUSIM_PG_DSN = $PgDsn
     }
@@ -287,16 +305,16 @@ try {
         NEXUSIM_KAFKA_TOPIC = $timelineTopic
         NEXUSIM_OUTBOX_POLL_INTERVAL = "200ms"
     }
-    $processes += Start-NexusProcess -Name "message-grpc" -FilePath $messageService -Port $messagePort -Env @{
+    $processes += Start-NexusProcess -Name "message-grpc" -FilePath $messageService -Port $messagePort -WaitHost $ClientHost -Env @{
         NEXUSIM_MESSAGE_SERVICE_MODE = "grpc"
-        NEXUSIM_GRPC_ADDR = $messageTarget
+        NEXUSIM_GRPC_ADDR = $messageListen
         NEXUSIM_MESSAGE_AUTH_MODE = "metadata"
         NEXUSIM_PG_DSN = $PgDsn
         NEXUSIM_CONVERSATION_SERVICE_ADDR = $conversationTarget
     }
-    $processes += Start-NexusProcess -Name "push-gateway" -FilePath $pushGateway -Port $pushPort -Env @{
+    $processes += Start-NexusProcess -Name "push-gateway" -FilePath $pushGateway -Port $pushPort -WaitHost $ClientHost -Env @{
         NEXUSIM_PUSH_GATEWAY_MODE = "all"
-        NEXUSIM_PUSH_WS_ADDR = $pushTarget
+        NEXUSIM_PUSH_WS_ADDR = $pushListen
         NEXUSIM_PUSH_AUTH_MODE = "hmac"
         NEXUSIM_PUSH_AUTH_HMAC_SECRET = $gatewayAuthSecret
         NEXUSIM_DELIVERY_GRPC_ADDR = $deliveryTarget
@@ -306,9 +324,9 @@ try {
         NEXUSIM_PUSH_CONSUMER_GROUP = $pushConsumerGroup
         NEXUSIM_PUSH_IDENTITY_CONSUMER_GROUP = $pushIdentityConsumerGroup
     }
-    $processes += Start-NexusProcess -Name "api-gateway" -FilePath $apiGateway -Port $apiGatewayPort -Env @{
+    $processes += Start-NexusProcess -Name "api-gateway" -FilePath $apiGateway -Port $apiGatewayPort -WaitHost $ClientHost -Env @{
         NEXUSIM_API_GATEWAY_MODE = "grpc"
-        NEXUSIM_API_GATEWAY_GRPC_ADDR = $apiGatewayTarget
+        NEXUSIM_API_GATEWAY_GRPC_ADDR = $apiGatewayListen
         NEXUSIM_API_GATEWAY_AUTH_MODE = "hmac"
         NEXUSIM_API_GATEWAY_AUTH_HMAC_SECRET = $gatewayAuthSecret
         NEXUSIM_API_GATEWAY_AUTH_AUDIENCE = "api-gateway"
@@ -318,10 +336,10 @@ try {
         NEXUSIM_API_GATEWAY_MESSAGE_ADDR = $messageTarget
         NEXUSIM_API_GATEWAY_DELIVERY_ADDR = $deliveryTarget
         NEXUSIM_API_GATEWAY_RECEIPT_ADDR = $receiptTarget
-        NEXUSIM_API_GATEWAY_BFF_ADDR = $bffTarget
-        NEXUSIM_API_GATEWAY_BFF_ALLOWED_ORIGINS = "http://127.0.0.1:5173,http://localhost:5173"
+        NEXUSIM_API_GATEWAY_BFF_ADDR = $bffListen
+        NEXUSIM_API_GATEWAY_BFF_ALLOWED_ORIGINS = "http://127.0.0.1:5173,http://localhost:5173,http://${ClientHost}:5173"
     }
-    Wait-Tcp -HostName "127.0.0.1" -Port $bffPort
+    Wait-Tcp -HostName $ClientHost -Port $bffPort
 
     & $runner `
         --pg-dsn $PgDsn `
@@ -352,6 +370,8 @@ try {
 }
 
 Write-Host "result_dir=$resultDir"
+Write-Host "bind_host=$BindHost"
+Write-Host "client_host=$ClientHost"
 Write-Host "bff_base_url=$bffBaseURL"
 Write-Host "push_url=$pushURL"
 Write-Host "timeline_topic=$timelineTopic"

@@ -27,8 +27,8 @@
 
 - `client-platform`：v0.1 SDD 已冻结浏览器、PC、Android 三端架构；`clients/`
   workspace 已创建并通过 focused validation / typecheck / Web build，承载
-  `protocol`、`client-core`、Web shell、PC desktop shell contract 和 Android
-  runtime contract。客户端只连 `api-gateway` / `push-gateway`，
+  `protocol`、`client-core`、Web shell、PC desktop first-stage TypeScript
+  runtime adapter 和 Android runtime contract。客户端只连 `api-gateway` / `push-gateway`，
   PullInbox 是消息事实源，WebSocket 只做在线唤醒。`api-gateway` client BFF
   first-stage HTTP/JSON surface 已落，覆盖 login / refresh / me / conversation
   list / PullInbox-backed messages / send / ACK / contacts / receipts；
@@ -39,7 +39,9 @@
   归档到 `docs/runbook/loadtest/client-platform/`；同日提交后 loopback clean
   baseline 和 Windows wired `172.31.50.1` clean baseline 均已通过；BFF HTTP
   route metrics / rate-limit adapter 已接入 api-gateway 低敏观测和限流管线。
-  下一步复用同一 core 接 PC installer 和 Android APK。
+  PC desktop 已新增 development session store、in-memory message store 和
+  static lifecycle/network runtime adapter；下一步复用同一 core 接 Tauri runner /
+  local Windows artifact 和 Android APK。
 
 当前已开始的 AI 大模型应用底座能力：
 
@@ -205,11 +207,11 @@
 当前 Go 侧服务底座、控制面、EvidencePack、proposal / approval / audit、
 Python Worker 候选接入边界和低敏 eval 持久化已经足够支撑算法切片。
 用户已明确切入 client platform MVP foundation：三端客户端架构、可复用
-`protocol` / `client-core` skeleton 和 `api-gateway` client BFF first-stage
+`protocol` / `client-core` skeleton、PC desktop first-stage runtime adapter 和 `api-gateway` client BFF first-stage
 HTTP/JSON surface 已建立；Web fetch / WebSocket / local store first path 已接，
 第一轮本地 Web MVP smoke、loopback clean baseline 和 Windows wired `172.31.50.1`
 clean baseline 已通过，BFF HTTP route metrics / rate-limit adapter 已落，下一步是
-PC / Android runtime。
+PC Tauri runner / Android runtime。
 
 future platform / product services 已作为长期产品化主线保留：继续按服务推进
 媒体、通知、审计、控制面、presence、model 等产品化 / 平台服务，并按
@@ -406,7 +408,8 @@ MCP / action-executor / ai-eval first-stage 闭环，
 future platform / product services 已进入 product-active first-stage implementation，
 当前 active slice 是 client platform MVP foundation：
 浏览器 Web first path、api-gateway client BFF、push path、本地和 wired 172 clean
-baseline 已通过，下一步接 PC / Android runtime。
+baseline 已通过，PC desktop first-stage runtime adapter 已落，下一步接 PC
+Tauri runner / local Windows artifact 和 Android runtime。
 长期后续按完整目标架构推进业务平台、数据平台、AI / Agent 平台、客户端平台和中间件平台；
 后续 AI 继续扩展低敏 collaborative-memory 算法/eval，优先 multi-hop / temporal update / profile aggregation 边界。
 短期生产级测试、完整 HA、长压和 sizing 不再作为当前转进阻塞，但仍留在 hardening backlog。

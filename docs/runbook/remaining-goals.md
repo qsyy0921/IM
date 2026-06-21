@@ -25,9 +25,9 @@
 
 ## Client Platform MVP 未完成
 
-- `clients/desktop`：接 PC desktop Tauri runtime shell，复用 `protocol` /
-  `client-core` / BFF client，跑通 login、conversation list、PullInbox、send、
-  ACK、push notify。
+- `clients/desktop`：first-stage TypeScript runtime adapter 已落；继续接 PC
+  desktop Tauri runner / BFF client，复用 `protocol` / `client-core`，跑通
+  login、conversation list、PullInbox、send、ACK、push notify。
 - Windows packaging：产出本地可安装或可运行的 Windows artifact；不要求生产签名。
 - `clients/android`：接 Android runtime shell，Kotlin 只做薄 bridge，业务协议和
   sync core 复用 TypeScript。
@@ -35,8 +35,9 @@
   `push-gateway` 地址配置。
 - 三端 smoke：Web / PC / Android 都只能连 `api-gateway` 和 `push-gateway`；
   PullInbox 是事实源，WebSocket 只做在线唤醒。
-- Local store：补 IndexedDB / desktop store / Android store 的 persistence 和
-  cursor replay tests。
+- Local store：补 IndexedDB / desktop durable store / Android store 的
+  persistence 和 cursor replay tests；当前 desktop store 仍是 development
+  in-memory adapter。
 - Auth lifecycle：`/api/auth/logout` 仍等待 identity user self-session revoke 契约；
   完成后补 BFF logout 和客户端状态清理。
 

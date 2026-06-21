@@ -63,6 +63,11 @@ First slice:
     the `LocalMessageStore` port.
 - The Web shell is wired to login, connect push, list / manually open
   conversations, PullInbox, send text and AckDelivery through those adapters.
+- `clients/desktop` now has a first-stage TypeScript runtime adapter:
+  `loadDesktopRuntimeConfig`, `createDesktopPlatformAdapter`, development-only
+  session storage, in-memory message cache, static network/lifecycle ports and
+  unsupported local wakeup notifications. This moves desktop beyond a pure
+  contract, but it is not a Tauri runner or installer yet.
 - `loadtest/clientweb` provides the first scriptable client-path smoke. Setup
   uses public gRPC APIs to register users, seed the conversation owner and create
   the receiver JOIN; the verified client path then uses only HTTP BFF and
@@ -82,9 +87,9 @@ First slice:
   report:
   `docs/runbook/loadtest/client-platform/loadtest-report-20260621-client-web-bff-push-wired-172-clean-baseline.md`.
   It does not replace existing secure mTLS gateway / push smoke coverage.
-- The PC desktop and Android packages currently define runtime / packaging
-  contracts only. They do not yet produce `.msi`, `.exe`, `.apk`, or `.aab`
-  artifacts.
+- Android currently defines runtime / packaging contracts only. PC desktop has
+  a first-stage TypeScript runtime adapter. Neither target produces `.msi`,
+  `.exe`, `.apk`, or `.aab` artifacts yet.
 - `/api/auth/logout` is reserved and currently returns `UNIMPLEMENTED`; identity
   still needs a user self-session revoke contract before server-side logout is
   real.
@@ -105,6 +110,7 @@ rejected. For local LAN client smoke, prefer the wired `172.x.x.x` address.
 
 ## Next Work
 
-1. Add PC desktop Tauri runner and first local Windows installer.
+1. Add PC desktop Tauri runner and first local Windows artifact.
 2. Add Android runtime shell and first unsigned local APK.
-3. Add IndexedDB persistence tests beyond the first browser adapter.
+3. Add IndexedDB persistence tests beyond the first browser adapter, then move
+   desktop from in-memory development store to a durable platform store.

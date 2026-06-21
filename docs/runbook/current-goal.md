@@ -24,7 +24,10 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   `protocol` / `client-core`。
 - `clients/` workspace skeleton 已创建并通过 focused validation：`protocol`、
   `client-core`、`web`、`desktop`、`android` 均有明确 package / runtime contract；
-  Web 端已有 Vite shell，PC / Android 仍是 packaging/runtime contract，不产出安装包。
+  Web 端已有 Vite shell；PC desktop 已有 first-stage TypeScript runtime
+  adapter（development session store、in-memory message store、static
+  lifecycle/network ports），但仍不产出安装包；Android 仍是 packaging/runtime
+  contract。
 - `api-gateway` 已新增 first-stage client BFF HTTP/JSON surface：`/api/auth/login`、
   `/api/auth/refresh`、`/api/me`、`/api/conversations`、
   `/api/conversations/{conversation_id}/messages`、`/api/messages/send`、
@@ -112,8 +115,10 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
 
 ## 下一步优先级
 
-1. 后续按同一 core 接 PC desktop Tauri runner 和 Android runtime shell。
-2. 补 IndexedDB persistence tests beyond first browser adapter。
+1. 后续按同一 core 接 PC desktop Tauri runner / local Windows artifact 和
+   Android runtime shell。
+2. 补 IndexedDB persistence tests beyond first browser adapter；后续再把
+   desktop memory store 换成持久 store。
 3. 再回到 workflow compensation adapter / instruction approval UI / ops 管理；
    当前已有本地 workflow get / decision / decision manifest / instruction list CLI，
    低敏 compensation instruction manifest 生成 / 校验，以及 catalog-backed import

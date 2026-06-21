@@ -3,9 +3,10 @@ import type {
   ConnectivityState,
   LocalMessageStore,
   NetworkStatePort,
+  NativeStringKeyValueBridge,
   WakeupNotificationPort
 } from "@nexusim/client-core";
-import { assertNativeStoreReady } from "@nexusim/client-core";
+import { assertNativeStoreReady, NativeBridgeStringKeyValueStorage } from "@nexusim/client-core";
 import type { DesktopPlatformAdapter, DesktopRuntimeConfig } from "./platform-contract";
 import { DesktopDevelopmentSessionStore } from "./development-session-store";
 import { DesktopMemoryMessageStore } from "./memory-message-store";
@@ -18,6 +19,7 @@ export interface DesktopPlatformAdapterOptions {
   installationID?: string;
   initialNetworkState?: ConnectivityState;
   messageStore?: LocalMessageStore;
+  nativeStorageBridge?: NativeStringKeyValueBridge;
 }
 
 export function createDesktopPlatformAdapter(
@@ -33,21 +35,29 @@ export function createDesktopPlatformAdapter(
       appVersion: options.appVersion ?? "0.1.0"
     },
     secureSessionStore: new DesktopDevelopmentSessionStore(),
-    messageStore: options.messageStore ?? desktopMessageStore(config),
+    messageStore: options.messageStore ?? desktopMessageStore(config, options.nativeStorageBridge),
     networkState: staticNetworkState(options.initialNetworkState ?? "UNKNOWN"),
     lifecycle: staticLifecycle(),
     wakeupNotifications: unsupportedWakeupNotifications()
   };
 }
 
-function desktopMessageStore(config: DesktopRuntimeConfig): LocalMessageStore {
+function desktopMessageStore(
+  config: DesktopRuntimeConfig,
+  nativeStorageBridge?: NativeStringKeyValueBridge
+): LocalMessageStore {
   if (config.localStore === "memory") {
     return new DesktopMemoryMessageStore();
   }
   if (config.localStore === "sqlite") {
     assertNativeStoreReady({
       target: "windows-desktop",
-      requestedStore: "sqlite"
+      requestedStore: "sqlite",
+      nativeBridgeAvailable: Boolean(nativeStorageBridge)
+    });
+    return new DesktopPersistentMessageStore({
+      namespace: `${config.os}:${config.deviceID}`,
+      storage: new NativeBridgeStringKeyValueStorage(nativeStorageBridge!)
     });
   }
   return new DesktopPersistentMessageStore({

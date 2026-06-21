@@ -80,8 +80,12 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   send、accepted send 稳定 key 迁移、防 replay duplicate、failed-send 状态和
   conversations-needing-sync 列表。desktop / Android 均已预留 `sqlite` store
   config，且在 native bridge 未实现前通过 shared `NativeStoreReadiness`
-  合约 fail-fast，返回稳定低敏 reason / bridge / next action；后续生产化再接
-  native SQLite bridge。
+  合约 fail-fast，返回稳定低敏 reason / bridge / next action；现在也已有 shared
+  `NativeBridgeStringKeyValueStorage` 合约，desktop / Android 平台 adapter 在显式
+  注入 native key-value bridge 时可用同一 `KeyValueMessageStore` 语义跑通
+  `sqlite` store path。focused runtime test 用 fake native bridge 覆盖了 cursor /
+  message 持久化和重开；真实 Tauri / Kotlin SQLite 命令桥仍未实现，默认 shell 仍用
+  localStorage。
 - `LocalMessageStore.listMessages` 已提升为 shared client-core port；
   `MemoryMessageStore`、`KeyValueMessageStore` 和 Web `IndexedDBMessageStore`
   现在都有同一读缓存语义，并补了 pending -> accepted-send 迁移去重测试。
@@ -322,9 +326,9 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
    `npm --prefix clients run build:android-apk:docker:bootstrap` 构建 Android Docker builder
    image；镜像存在后运行 `npm --prefix clients run build:android-apk:docker` 产出首个 APK + manifest。
 2. 在真实 Android shell UI 中接入现有 shell action，并在工具链 ready 后跑平台 shell smoke。
-3. 后续把 desktop / Android first-stage localStorage store 替换为 native
-   SQLite bridge，并补真实平台 runtime smoke；当前 shared readiness 合约已固定
-   `sqlite-native-bridge-unavailable` 语义，后续只替换桥实现，不改 sync core。
+3. 后续实现真实 Tauri / Android SQLite native key-value command bridge，把
+   desktop / Android first-stage localStorage store 替换为 native SQLite，并补真实平台 runtime smoke；当前 shared readiness 和
+   native bridge storage 合约已固定，后续只替换平台桥实现，不改 sync core。
 4. 再回到 workflow compensation adapter / instruction approval UI / ops 管理；
    当前已有本地 workflow get / decision / decision manifest / instruction list CLI，
    低敏 compensation instruction manifest 生成 / 校验，以及 catalog-backed import

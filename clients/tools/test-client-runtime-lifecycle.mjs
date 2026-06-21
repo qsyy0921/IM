@@ -77,6 +77,16 @@ async function main() {
     "desktop sqlite store must fail closed until native bridge exists"
   );
 
+  await exerciseNativeBridgeStore("desktop", createDesktopPlatformAdapter, {
+    apiBaseURL: "http://bff.local",
+    pushWebSocketURL: "ws://push.local/ws",
+    deviceID: "desktop-device",
+    os: "windows",
+    secureStorage: "development",
+    localStore: "sqlite",
+    shell: "tauri"
+  });
+
   assertThrows(
     () => createAndroidPlatformAdapter({
       config: {
@@ -92,6 +102,16 @@ async function main() {
     "reason=sqlite-native-bridge-unavailable; bridge=android-sqlite",
     "android sqlite store must fail closed until native bridge exists"
   );
+
+  await exerciseNativeBridgeStore("android", createAndroidPlatformAdapter, {
+    apiBaseURL: "http://bff.local",
+    pushWebSocketURL: "ws://push.local/ws",
+    deviceID: "android-device",
+    platform: "android",
+    secureStorage: "development",
+    localStore: "sqlite",
+    notificationProvider: "none"
+  });
 
   console.log("client runtime lifecycle ok");
 }
@@ -165,6 +185,68 @@ async function exerciseRuntime(label, createRuntime, config, createShellActions)
     `Bearer ${label}-gateway-token-2`,
     `${label} logout uses current refreshed token`
   );
+}
+
+async function exerciseNativeBridgeStore(label, createPlatformAdapter, config) {
+  const bridge = new FakeNativeKeyValueBridge();
+  const first = createPlatformAdapter({
+    config,
+    nativeStorageBridge: bridge
+  });
+  await first.messageStore.upsertMessages([
+    {
+      tenantID: "tenant-1",
+      conversationID: "conv-native",
+      messageID: `${label}-native-msg-1`,
+      senderUserID: "user-1",
+      conversationSeq: 11,
+      contentType: "TEXT",
+      text: "native-cache",
+      status: "DELIVERED",
+      createdAtMs: 11
+    }
+  ]);
+  assertEqual(
+    await first.messageStore.getLastReceivedSeq("conv-native"),
+    11,
+    `${label} native bridge store records cursor`
+  );
+
+  const reopened = createPlatformAdapter({
+    config,
+    nativeStorageBridge: bridge
+  });
+  assertEqual(
+    await reopened.messageStore.getLastReceivedSeq("conv-native"),
+    11,
+    `${label} native bridge store persists cursor across platform adapter reopen`
+  );
+  const messages = await reopened.messageStore.listMessages("conv-native");
+  assertEqual(messages.length, 1, `${label} native bridge store persists message`);
+  assertEqual(messages[0]?.messageID, `${label}-native-msg-1`, `${label} native bridge message id mismatch`);
+
+  await reopened.messageStore.clear();
+  assertEqual(
+    await first.messageStore.getLastReceivedSeq("conv-native"),
+    0,
+    `${label} native bridge store clear is visible across adapters`
+  );
+}
+
+class FakeNativeKeyValueBridge {
+  #items = new Map();
+
+  getItem(key) {
+    return this.#items.get(key) ?? null;
+  }
+
+  setItem(key, value) {
+    this.#items.set(key, value);
+  }
+
+  removeItem(key) {
+    this.#items.delete(key);
+  }
 }
 
 function installFetchStub(label) {

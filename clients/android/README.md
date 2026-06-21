@@ -25,7 +25,9 @@ Flutter or native Kotlin for a concrete reason.
   content access disabled.
 - The reserved `sqlite` local store config fails closed through shared
   `NativeStoreReadiness` with reason `sqlite-native-bridge-unavailable` and
-  expected bridge `android-sqlite`. The current shell still uses localStorage
+  expected bridge `android-sqlite` unless an explicit native key-value bridge is
+  injected. The TypeScript-side bridge contract is in place and covered by
+  focused tests, but the current WebView shell still uses localStorage
   persistence until the Android SQLite bridge is implemented.
 - `shell-config.example.json` records the low-permission WebView config bridge
   for local LAN endpoints and Android runtime identity. It can be rendered to
@@ -57,8 +59,9 @@ Flutter or native Kotlin for a concrete reason.
 - Cleartext traffic is a debug-only allowance for local LAN testing. Release
   Android builds must keep cleartext disabled unless a later ADR introduces a
   narrower production transport policy.
-- Current local message cache is in-memory only; production cache should use
-  SQLite behind `LocalMessageStore`.
+- Current local message cache uses the shared TypeScript localStorage-backed
+  store in the WebView shell; production cache should use SQLite behind
+  `LocalMessageStore`.
 - Push notification integration must not bypass PullInbox reconciliation.
 - Background sync must use server cursors and idempotency keys.
 

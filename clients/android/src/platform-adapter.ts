@@ -3,9 +3,10 @@ import type {
   ConnectivityState,
   LocalMessageStore,
   NetworkStatePort,
+  NativeStringKeyValueBridge,
   WakeupNotificationPort
 } from "@nexusim/client-core";
-import { assertNativeStoreReady } from "@nexusim/client-core";
+import { assertNativeStoreReady, NativeBridgeStringKeyValueStorage } from "@nexusim/client-core";
 import type { AndroidPlatformAdapter, AndroidRuntimeConfig } from "./platform-contract";
 import { AndroidDevelopmentSessionStore } from "./development-session-store";
 import { AndroidMemoryMessageStore } from "./memory-message-store";
@@ -18,6 +19,7 @@ export interface AndroidPlatformAdapterOptions {
   installationID?: string;
   initialNetworkState?: ConnectivityState;
   messageStore?: LocalMessageStore;
+  nativeStorageBridge?: NativeStringKeyValueBridge;
 }
 
 export function createAndroidPlatformAdapter(
@@ -32,21 +34,29 @@ export function createAndroidPlatformAdapter(
       appVersion: options.appVersion ?? "0.1.0"
     },
     secureSessionStore: new AndroidDevelopmentSessionStore(),
-    messageStore: options.messageStore ?? androidMessageStore(config),
+    messageStore: options.messageStore ?? androidMessageStore(config, options.nativeStorageBridge),
     networkState: staticNetworkState(options.initialNetworkState ?? "UNKNOWN"),
     lifecycle: staticLifecycle(),
     wakeupNotifications: androidWakeupNotifications(config.notificationProvider)
   };
 }
 
-function androidMessageStore(config: AndroidRuntimeConfig): LocalMessageStore {
+function androidMessageStore(
+  config: AndroidRuntimeConfig,
+  nativeStorageBridge?: NativeStringKeyValueBridge
+): LocalMessageStore {
   if (config.localStore === "memory") {
     return new AndroidMemoryMessageStore();
   }
   if (config.localStore === "sqlite") {
     assertNativeStoreReady({
       target: "android",
-      requestedStore: "sqlite"
+      requestedStore: "sqlite",
+      nativeBridgeAvailable: Boolean(nativeStorageBridge)
+    });
+    return new AndroidPersistentMessageStore({
+      namespace: `${config.platform}:${config.deviceID}`,
+      storage: new NativeBridgeStringKeyValueStorage(nativeStorageBridge!)
     });
   }
   return new AndroidPersistentMessageStore({

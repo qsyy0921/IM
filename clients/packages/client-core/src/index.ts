@@ -8,6 +8,7 @@ export * from "./send-queue";
 export * from "./ack-queue";
 export * from "./development-adapters";
 export * from "./key-value-message-store";
+export * from "./native-key-value-storage";
 export * from "./http-bff-client";
 export * from "./websocket-push-transport";
 export * from "./runtime";

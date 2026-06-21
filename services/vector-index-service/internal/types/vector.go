@@ -243,6 +243,33 @@ type EmbeddingProducerStats struct {
 	Completed int
 }
 
+type KnowledgeChunkReadyEvent struct {
+	EventID         string
+	TenantID        TenantID
+	ChunkID         string
+	DocumentID      string
+	SourceID        string
+	SourceVersion   string
+	ChunkIndex      int
+	ChunkHash       string
+	VisibilityScope string
+	DataClass       string
+	PolicyVersion   string
+	ChunkVersion    string
+	TombstoneStatus string
+	CorrelationID   string
+	CausationID     string
+	TraceID         string
+}
+
+type ChunkEventMessage struct {
+	Topic     string
+	Partition int
+	Offset    int64
+	EventType string
+	Value     []byte
+}
+
 type VectorTombstone struct {
 	TenantID            TenantID
 	TombstoneID         string
@@ -543,6 +570,42 @@ func (task VectorEmbeddingTask) Validate() error {
 	}
 	if containsSensitiveValue(task.SourceService, task.SourceID, task.EmbeddingModelRef, task.VisibilityScope, task.PolicyVersion, task.DataClass, task.DeleteProofID, task.RetentionPolicyRef) {
 		return NewInvalidArgument("embedding task metadata must use low-sensitive refs")
+	}
+	return nil
+}
+
+func (event KnowledgeChunkReadyEvent) Normalized() KnowledgeChunkReadyEvent {
+	event.EventID = strings.TrimSpace(event.EventID)
+	event.TenantID = TenantID(strings.TrimSpace(string(event.TenantID)))
+	event.ChunkID = strings.TrimSpace(event.ChunkID)
+	event.DocumentID = strings.TrimSpace(event.DocumentID)
+	event.SourceID = strings.TrimSpace(event.SourceID)
+	event.SourceVersion = strings.TrimSpace(event.SourceVersion)
+	event.ChunkHash = strings.TrimSpace(event.ChunkHash)
+	event.VisibilityScope = strings.TrimSpace(event.VisibilityScope)
+	event.DataClass = strings.ToUpper(strings.TrimSpace(event.DataClass))
+	event.PolicyVersion = strings.TrimSpace(event.PolicyVersion)
+	event.ChunkVersion = strings.TrimSpace(event.ChunkVersion)
+	event.TombstoneStatus = strings.ToUpper(strings.TrimSpace(event.TombstoneStatus))
+	event.CorrelationID = strings.TrimSpace(event.CorrelationID)
+	event.CausationID = strings.TrimSpace(event.CausationID)
+	event.TraceID = strings.TrimSpace(event.TraceID)
+	return event
+}
+
+func (event KnowledgeChunkReadyEvent) Validate() error {
+	event = event.Normalized()
+	if event.TenantID == "" || event.ChunkID == "" {
+		return NewInvalidArgument("knowledge chunk event tenant and chunk are required")
+	}
+	if event.SourceID == "" && event.DocumentID == "" {
+		return NewInvalidArgument("knowledge chunk event source or document is required")
+	}
+	if event.ChunkHash == "" || !looksHash(event.ChunkHash) {
+		return NewInvalidArgument("knowledge chunk event chunk hash is required")
+	}
+	if event.TombstoneStatus != "" && event.TombstoneStatus != "ACTIVE" {
+		return NewFailedPrecondition("knowledge chunk event is not active")
 	}
 	return nil
 }

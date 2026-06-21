@@ -114,8 +114,10 @@
   边界；first-stage PostgreSQL embedding task queue 已支持 claim / complete /
   claim-timeout retry；first-stage `embedding-producer` 已支持 file / knowledge source
   -> PostgreSQL queue，`loadtest/vectorembedding` 已跑通 producer -> queue -> worker
-  链路；不宣称 Kafka / outbox chunk consumer、Milvus / pgvector / OpenSearch 或
-  provider backend rebuild。
+  链路；first-stage `chunk-consumer` runtime 已支持 `knowledge.chunk.ready.v1` refs
+  -> public `ListKnowledgeChunks` resolve -> embedding queue，并覆盖 focused tests；
+  不宣称 knowledge outbox relay / schema 后的真实 Kafka chunk-consumer smoke、Milvus /
+  pgvector / OpenSearch 或 provider backend rebuild。
 - `admin-service` product-active：SDD v0.1 和 stage-switch review 已通过，
   第一版 proto / migration / 六层 skeleton / `grpc` runtime / Docker /
   Prometheus / Grafana 覆盖已落；当前覆盖 `CreateAdminOperation`、

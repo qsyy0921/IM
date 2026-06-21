@@ -101,6 +101,113 @@ func TestKnowledgeChunkTaskSourceSkipsChunksWithoutPreview(t *testing.T) {
 	}
 }
 
+func TestKnowledgeChunkResolverResolvesOnlyRequestedChunk(t *testing.T) {
+	client := &fakeKnowledgeClient{
+		pages: []*knowledgev1.ListKnowledgeChunksResponse{
+			{
+				Chunks: []*knowledgev1.KnowledgeChunk{
+					{
+						TenantId:             "tenant-vector",
+						ChunkId:              "kchunk_other",
+						SourceId:             "ksrc_1",
+						DocumentId:           "kdoc_1",
+						ChunkHash:            "sha256:other",
+						ChunkPreviewRedacted: "redacted other preview",
+						SourceVersion:        "2",
+						VisibilityScope:      "tenant:tenant-vector",
+						DataClass:            "BUSINESS_INTERNAL",
+						Status:               "READY",
+						TombstoneStatus:      "ACTIVE",
+						PolicyVersion:        "policy-v1",
+					},
+					{
+						TenantId:             "tenant-vector",
+						ChunkId:              "kchunk_1",
+						SourceId:             "ksrc_1",
+						DocumentId:           "kdoc_1",
+						ChunkHash:            "sha256:chunkhash",
+						ChunkPreviewRedacted: "redacted requested preview",
+						SourceVersion:        "2",
+						VisibilityScope:      "tenant:tenant-vector",
+						DataClass:            "BUSINESS_INTERNAL",
+						Status:               "READY",
+						TombstoneStatus:      "ACTIVE",
+						PolicyVersion:        "policy-v1",
+					},
+				},
+			},
+		},
+	}
+	resolver, err := NewKnowledgeChunkResolver(client, KnowledgeChunkResolverConfig{
+		EmbeddingModelRef: "deterministic-embedding-v1",
+		Dimension:         8,
+		TraceID:           "trace-event",
+	}, 0)
+	if err != nil {
+		t.Fatalf("new resolver: %v", err)
+	}
+
+	task, err := resolver.ResolveKnowledgeChunkTask(context.Background(), types.KnowledgeChunkReadyEvent{
+		TenantID:        "tenant-vector",
+		ChunkID:         "kchunk_1",
+		DocumentID:      "kdoc_1",
+		SourceID:        "ksrc_1",
+		SourceVersion:   "2",
+		ChunkHash:       "sha256:chunkhash",
+		TombstoneStatus: "ACTIVE",
+		CorrelationID:   "corr-event",
+		EventID:         "evt_kchunk_1",
+	})
+	if err != nil {
+		t.Fatalf("resolve chunk task: %v", err)
+	}
+	if task.SourceID != "ksrc_1:kdoc_1:kchunk_1" || task.InputText != "redacted requested preview" {
+		t.Fatalf("unexpected task: %+v", task)
+	}
+	if task.CorrelationID != "corr-event" || task.CausationID != "evt_kchunk_1" {
+		t.Fatalf("event refs should be carried to task: %+v", task)
+	}
+}
+
+func TestKnowledgeChunkResolverRejectsHashMismatch(t *testing.T) {
+	client := &fakeKnowledgeClient{
+		pages: []*knowledgev1.ListKnowledgeChunksResponse{
+			{
+				Chunks: []*knowledgev1.KnowledgeChunk{
+					{
+						TenantId:             "tenant-vector",
+						ChunkId:              "kchunk_1",
+						SourceId:             "ksrc_1",
+						DocumentId:           "kdoc_1",
+						ChunkHash:            "sha256:actual",
+						ChunkPreviewRedacted: "redacted requested preview",
+						SourceVersion:        "2",
+						VisibilityScope:      "tenant:tenant-vector",
+						DataClass:            "BUSINESS_INTERNAL",
+						Status:               "READY",
+						TombstoneStatus:      "ACTIVE",
+						PolicyVersion:        "policy-v1",
+					},
+				},
+			},
+		},
+	}
+	resolver, err := NewKnowledgeChunkResolver(client, KnowledgeChunkResolverConfig{}, 0)
+	if err != nil {
+		t.Fatalf("new resolver: %v", err)
+	}
+	if _, err := resolver.ResolveKnowledgeChunkTask(context.Background(), types.KnowledgeChunkReadyEvent{
+		TenantID:        "tenant-vector",
+		ChunkID:         "kchunk_1",
+		DocumentID:      "kdoc_1",
+		SourceID:        "ksrc_1",
+		ChunkHash:       "sha256:expected",
+		TombstoneStatus: "ACTIVE",
+	}); err == nil {
+		t.Fatal("expected hash mismatch error")
+	}
+}
+
 type fakeKnowledgeClient struct {
 	knowledgev1.KnowledgeIngestionServiceClient
 	pages []*knowledgev1.ListKnowledgeChunksResponse

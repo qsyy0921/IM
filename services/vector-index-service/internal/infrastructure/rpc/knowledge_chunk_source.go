@@ -28,10 +28,24 @@ type KnowledgeChunkTaskSource struct {
 	processed map[string]struct{}
 }
 
+type KnowledgeChunkResolver struct {
+	client  knowledgev1.KnowledgeIngestionServiceClient
+	config  KnowledgeChunkResolverConfig
+	timeout time.Duration
+}
+
 type KnowledgeChunkSourceConfig struct {
 	TenantID          string
 	SourceID          string
 	DocumentID        string
+	PageSize          int
+	EmbeddingModelRef string
+	Dimension         int
+	VisibilityVersion int64
+	TraceID           string
+}
+
+type KnowledgeChunkResolverConfig struct {
 	PageSize          int
 	EmbeddingModelRef string
 	Dimension         int
@@ -87,6 +101,46 @@ func DialKnowledgeChunkTaskSource(
 	return source, conn.Close, nil
 }
 
+func NewKnowledgeChunkResolver(
+	client knowledgev1.KnowledgeIngestionServiceClient,
+	config KnowledgeChunkResolverConfig,
+	timeout time.Duration,
+) (*KnowledgeChunkResolver, error) {
+	if client == nil {
+		return nil, errors.New("knowledge-ingestion client is required")
+	}
+	config = normalizeKnowledgeChunkResolverConfig(config)
+	if timeout <= 0 {
+		timeout = 5 * time.Second
+	}
+	return &KnowledgeChunkResolver{client: client, config: config, timeout: timeout}, nil
+}
+
+func DialKnowledgeChunkResolver(
+	_ context.Context,
+	addr string,
+	config KnowledgeChunkResolverConfig,
+	timeout time.Duration,
+) (*KnowledgeChunkResolver, func() error, error) {
+	addr = strings.TrimSpace(addr)
+	if addr == "" {
+		return nil, nil, errors.New("knowledge-ingestion-service address is required")
+	}
+	conn, err := grpc.NewClient(
+		"passthrough:///"+addr,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+	resolver, err := NewKnowledgeChunkResolver(knowledgev1.NewKnowledgeIngestionServiceClient(conn), config, timeout)
+	if err != nil {
+		_ = conn.Close()
+		return nil, nil, err
+	}
+	return resolver, conn.Close, nil
+}
+
 func (source *KnowledgeChunkTaskSource) ClaimEmbeddingTasks(
 	ctx context.Context,
 	limit int,
@@ -125,7 +179,14 @@ func (source *KnowledgeChunkTaskSource) ClaimEmbeddingTasks(
 			return nil, mapKnowledgeError(err)
 		}
 		for _, chunk := range response.GetChunks() {
-			task, ok := source.taskFromChunk(chunk)
+			task, ok := vectorEmbeddingTaskFromKnowledgeChunk(chunk, knowledgeChunkTaskConfig{
+				TenantID:          source.config.TenantID,
+				EmbeddingModelRef: source.config.EmbeddingModelRef,
+				Dimension:         source.config.Dimension,
+				VisibilityVersion: source.config.VisibilityVersion,
+				TraceID:           source.config.TraceID,
+				InstanceRef:       "vector-embedding-worker",
+			})
 			if !ok {
 				continue
 			}
@@ -158,8 +219,80 @@ func (source *KnowledgeChunkTaskSource) CompleteEmbeddingTask(
 	return nil
 }
 
-func (source *KnowledgeChunkTaskSource) taskFromChunk(
+func (resolver *KnowledgeChunkResolver) ResolveKnowledgeChunkTask(
+	ctx context.Context,
+	event types.KnowledgeChunkReadyEvent,
+) (types.VectorEmbeddingTask, error) {
+	if resolver == nil || resolver.client == nil {
+		return types.VectorEmbeddingTask{}, types.NewUnavailable("knowledge chunk resolver is not configured")
+	}
+	event = event.Normalized()
+	if err := event.Validate(); err != nil {
+		return types.VectorEmbeddingTask{}, err
+	}
+	pageToken := ""
+	for {
+		callCtx, cancel := context.WithTimeout(ctx, resolver.timeout)
+		response, err := resolver.client.ListKnowledgeChunks(callCtx, &knowledgev1.ListKnowledgeChunksRequest{
+			AuthContext: &knowledgev1.AuthContext{
+				TenantId:    string(event.TenantID),
+				ServiceName: types.AllowedCallerVectorIndex,
+				InstanceRef: "vector-chunk-consumer",
+				TraceId:     firstNonEmpty(event.TraceID, resolver.config.TraceID),
+				RequestId:   "vector-chunk-consumer-" + event.ChunkID,
+			},
+			SourceId:   event.SourceID,
+			DocumentId: event.DocumentID,
+			PageSize:   int32(resolver.config.PageSize),
+			PageToken:  pageToken,
+		})
+		cancel()
+		if err != nil {
+			return types.VectorEmbeddingTask{}, mapKnowledgeError(err)
+		}
+		for _, chunk := range response.GetChunks() {
+			if strings.TrimSpace(chunk.GetChunkId()) != event.ChunkID {
+				continue
+			}
+			if strings.TrimSpace(chunk.GetChunkHash()) != event.ChunkHash {
+				return types.VectorEmbeddingTask{}, types.NewFailedPrecondition("knowledge chunk hash mismatch")
+			}
+			task, ok := vectorEmbeddingTaskFromKnowledgeChunk(chunk, knowledgeChunkTaskConfig{
+				TenantID:          string(event.TenantID),
+				EmbeddingModelRef: resolver.config.EmbeddingModelRef,
+				Dimension:         resolver.config.Dimension,
+				VisibilityVersion: resolver.config.VisibilityVersion,
+				TraceID:           firstNonEmpty(event.TraceID, resolver.config.TraceID),
+				InstanceRef:       "vector-chunk-consumer",
+			})
+			if !ok {
+				return types.VectorEmbeddingTask{}, types.NewFailedPrecondition("knowledge chunk preview is not available")
+			}
+			task.CorrelationID = firstNonEmpty(event.CorrelationID, task.CorrelationID)
+			task.CausationID = firstNonEmpty(event.EventID, event.CausationID, task.CausationID)
+			task.TraceID = firstNonEmpty(event.TraceID, task.TraceID)
+			return task.Normalized(), nil
+		}
+		pageToken = strings.TrimSpace(response.GetNextPageToken())
+		if pageToken == "" {
+			break
+		}
+	}
+	return types.VectorEmbeddingTask{}, types.NewNotFound("knowledge chunk not found")
+}
+
+type knowledgeChunkTaskConfig struct {
+	TenantID          string
+	EmbeddingModelRef string
+	Dimension         int
+	VisibilityVersion int64
+	TraceID           string
+	InstanceRef       string
+}
+
+func vectorEmbeddingTaskFromKnowledgeChunk(
 	chunk *knowledgev1.KnowledgeChunk,
+	config knowledgeChunkTaskConfig,
 ) (types.VectorEmbeddingTask, bool) {
 	if chunk == nil || strings.TrimSpace(chunk.GetChunkPreviewRedacted()) == "" {
 		return types.VectorEmbeddingTask{}, false
@@ -172,10 +305,10 @@ func (source *KnowledgeChunkTaskSource) taskFromChunk(
 	preview := strings.TrimSpace(chunk.GetChunkPreviewRedacted())
 	return types.VectorEmbeddingTask{
 		AuthContext: types.AuthContext{
-			TenantID:    types.TenantID(source.config.TenantID),
+			TenantID:    types.TenantID(config.TenantID),
 			ServiceName: types.AllowedCallerVectorIndex,
-			InstanceRef: "vector-embedding-worker",
-			TraceID:     firstNonEmpty(source.config.TraceID, "trace-vector-embedding"),
+			InstanceRef: firstNonEmpty(config.InstanceRef, "vector-embedding-worker"),
+			TraceID:     firstNonEmpty(config.TraceID, "trace-vector-embedding"),
 			RequestID:   "vector-embedding-" + chunkID,
 		},
 		SourceService:      types.AllowedCallerKnowledgeIngestion,
@@ -188,17 +321,17 @@ func (source *KnowledgeChunkTaskSource) taskFromChunk(
 		InputText:          preview,
 		InputHash:          sha256Ref(preview),
 		InputSchemaVersion: 1,
-		EmbeddingModelRef:  source.config.EmbeddingModelRef,
-		Dimension:          source.config.Dimension,
+		EmbeddingModelRef:  config.EmbeddingModelRef,
+		Dimension:          config.Dimension,
 		VisibilityScope:    chunk.GetVisibilityScope(),
-		VisibilityVersion:  source.config.VisibilityVersion,
+		VisibilityVersion:  config.VisibilityVersion,
 		PolicyVersion:      chunk.GetPolicyVersion(),
 		DataClass:          chunk.GetDataClass(),
 		DeleteProofID:      chunk.GetDeleteProofId(),
-		IdempotencyKey:     "knowledge-chunk:" + chunkID + ":" + source.config.EmbeddingModelRef,
+		IdempotencyKey:     "knowledge-chunk:" + chunkID + ":" + config.EmbeddingModelRef,
 		CorrelationID:      "knowledge-chunk:" + chunkID,
 		CausationID:        chunkID,
-		TraceID:            source.config.TraceID,
+		TraceID:            config.TraceID,
 	}, true
 }
 
@@ -206,6 +339,24 @@ func normalizeKnowledgeChunkSourceConfig(config KnowledgeChunkSourceConfig) Know
 	config.TenantID = strings.TrimSpace(config.TenantID)
 	config.SourceID = strings.TrimSpace(config.SourceID)
 	config.DocumentID = strings.TrimSpace(config.DocumentID)
+	config.EmbeddingModelRef = strings.TrimSpace(config.EmbeddingModelRef)
+	if config.EmbeddingModelRef == "" {
+		config.EmbeddingModelRef = "deterministic-embedding-v1"
+	}
+	if config.Dimension <= 0 {
+		config.Dimension = 8
+	}
+	if config.PageSize <= 0 {
+		config.PageSize = 50
+	}
+	if config.VisibilityVersion <= 0 {
+		config.VisibilityVersion = 1
+	}
+	config.TraceID = strings.TrimSpace(config.TraceID)
+	return config
+}
+
+func normalizeKnowledgeChunkResolverConfig(config KnowledgeChunkResolverConfig) KnowledgeChunkResolverConfig {
 	config.EmbeddingModelRef = strings.TrimSpace(config.EmbeddingModelRef)
 	if config.EmbeddingModelRef == "" {
 		config.EmbeddingModelRef = "deterministic-embedding-v1"

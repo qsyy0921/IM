@@ -81,9 +81,11 @@ Foundation backlog 锚点：`search-service`、`memory-service`、`retrieval-gat
   `embedding-worker -> model-gateway.InvokeEmbedding -> vector upsert` 已落，并已补
   `loadtest/vectorembedding` 真实进程 smoke；first-stage PostgreSQL embedding task queue
   已支持 claim / complete / claim-timeout retry；first-stage `embedding-producer` 已支持
-  file / knowledge source -> PostgreSQL queue。后续仍需 Kafka / outbox 驱动的真实
-  knowledge / memory / search chunk consumer、真实 Milvus / pgvector / OpenSearch
-  backend，以及 provider backend rebuild / backfill worker。
+  file / knowledge source -> PostgreSQL queue；first-stage `chunk-consumer` runtime 已支持
+  `knowledge.chunk.ready.v1` refs -> public `ListKnowledgeChunks` resolve -> embedding queue。
+  后续仍需 knowledge outbox relay / schema 后的真实 Kafka chunk-consumer smoke、memory /
+  search chunk consumer、真实 Milvus / pgvector / OpenSearch backend，以及 provider backend
+  rebuild / backfill worker。
 - `admin-service`：`REPAIR_REQUEST -> workflow-service REPAIR_APPROVAL`、
   `CRITICAL -> workflow-service ADMIN_OPERATION` 和第一版 operation-specific
   approval policy / target-service routing 已接；`CONFIG_PUBLISH` /

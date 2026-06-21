@@ -21,6 +21,7 @@ import (
 	kafkainfra "github.com/qsyy0921/IM/services/vector-index-service/internal/infrastructure/kafka"
 	postgresinfra "github.com/qsyy0921/IM/services/vector-index-service/internal/infrastructure/postgres"
 	rpcinfra "github.com/qsyy0921/IM/services/vector-index-service/internal/infrastructure/rpc"
+	"github.com/qsyy0921/IM/services/vector-index-service/internal/trigger/chunk"
 	"github.com/qsyy0921/IM/services/vector-index-service/internal/trigger/embedding"
 	"github.com/qsyy0921/IM/services/vector-index-service/internal/trigger/outbox"
 	"github.com/qsyy0921/IM/services/vector-index-service/internal/trigger/rebuild"
@@ -55,6 +56,8 @@ func run(ctx context.Context) error {
 		return runEmbeddingWorker(ctx)
 	case "embedding-producer":
 		return runEmbeddingProducer(ctx)
+	case "chunk-consumer":
+		return runChunkConsumer(ctx)
 	default:
 		return fmt.Errorf("unsupported NEXUSIM_VECTOR_INDEX_SERVICE_MODE %q", mode)
 	}
@@ -310,6 +313,77 @@ func runEmbeddingProducer(ctx context.Context) error {
 	return producer.Run(ctx)
 }
 
+func runChunkConsumer(ctx context.Context) error {
+	debugAddr, err := vectorIndexDebugAddrFromEnv()
+	if err != nil {
+		return err
+	}
+	stopDebug, err := startDebugServer(ctx, debugAddr)
+	if err != nil {
+		return err
+	}
+	defer stopDebug()
+
+	pool, err := openPGPool(ctx)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	brokers := splitCSV(os.Getenv("NEXUSIM_KAFKA_BROKERS"))
+	if len(brokers) == 0 {
+		return errors.New("NEXUSIM_KAFKA_BROKERS is required")
+	}
+	consumerGroup := envString("NEXUSIM_VECTOR_CHUNK_CONSUMER_GROUP", "nexusim-vector-index-chunk-consumer")
+	topic := envString("NEXUSIM_VECTOR_CHUNK_TOPIC", chunk.TopicKnowledgeEvents)
+	consumer, err := kafkainfra.NewReaderConsumer(kafkainfra.ReaderConfig{
+		Brokers: brokers,
+		Topic:   topic,
+		GroupID: consumerGroup,
+	})
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if closeErr := consumer.Close(); closeErr != nil {
+			log.Printf("vector-index-service chunk consumer close failed: %v", closeErr)
+		}
+	}()
+
+	resolver, closeResolver, err := rpcinfra.DialKnowledgeChunkResolver(
+		ctx,
+		strings.TrimSpace(os.Getenv("NEXUSIM_KNOWLEDGE_INGESTION_GRPC_ADDR")),
+		rpcinfra.KnowledgeChunkResolverConfig{
+			PageSize:          envInt("NEXUSIM_VECTOR_CHUNK_KNOWLEDGE_PAGE_SIZE", 50),
+			EmbeddingModelRef: envString("NEXUSIM_VECTOR_EMBEDDING_MODEL_REF", "deterministic-embedding-v1"),
+			Dimension:         envInt("NEXUSIM_VECTOR_EMBEDDING_DIMENSION", 8),
+			VisibilityVersion: int64(envInt("NEXUSIM_VECTOR_EMBEDDING_VISIBILITY_VERSION", 1)),
+			TraceID:           envString("NEXUSIM_VECTOR_EMBEDDING_TRACE_ID", ""),
+		},
+		envDuration("NEXUSIM_VECTOR_CHUNK_KNOWLEDGE_TIMEOUT", 5*time.Second),
+	)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if closeErr := closeResolver(); closeErr != nil {
+			log.Printf("vector-index-service chunk resolver close failed: %v", closeErr)
+		}
+	}()
+
+	worker := chunk.NewWorker(
+		consumer,
+		resolver,
+		postgresinfra.NewEmbeddingTaskSource(pool, postgresinfra.EmbeddingTaskSourceConfig{}),
+		chunk.Config{
+			ErrorBackoff: envDuration("NEXUSIM_VECTOR_CHUNK_ERROR_BACKOFF", time.Second),
+			Logf:         log.Printf,
+		},
+	)
+	log.Printf("vector-index-service chunk consumer started topic=%s group=%s", topic, consumerGroup)
+	return worker.Run(ctx)
+}
+
 func newEmbeddingTaskSource(ctx context.Context, pool *pgxpool.Pool) (embedding.TaskSource, func() error, error) {
 	sourceMode := embeddingTaskSourceModeFromEnv()
 	switch sourceMode {
@@ -401,7 +475,7 @@ func vectorIndexModeFromEnv() string {
 
 func validateVectorIndexMode(mode string) error {
 	switch mode {
-	case "noop", "grpc", "outbox-relay", "rebuild-worker", "embedding-worker", "embedding-producer":
+	case "noop", "grpc", "outbox-relay", "rebuild-worker", "embedding-worker", "embedding-producer", "chunk-consumer":
 		return nil
 	default:
 		return fmt.Errorf("unsupported NEXUSIM_VECTOR_INDEX_SERVICE_MODE %q", mode)

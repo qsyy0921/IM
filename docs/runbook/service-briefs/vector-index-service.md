@@ -50,9 +50,14 @@ vector 写入、rebuild 和 backfill 逻辑复杂到影响 retrieval / memory �
   claim-timeout retry 和 `COMPLETED` 标记。
 - first-stage `embedding-producer` 已落：支持从 file / knowledge source 读取
   redacted-preview task 并写入 PostgreSQL queue；producer 不允许使用 postgres source，
-  避免 self-loop。`loadtest/vectorembedding` 已改为 producer -> queue -> worker
+  避免 self-loop。`loadtest/vectorembedding` 已跑通 producer -> queue -> worker
   的本地多进程链路。
+- first-stage `chunk-consumer` runtime 已落：消费低敏
+  `knowledge.chunk.ready.v1` refs 后，通过
+  `knowledge-ingestion-service.ListKnowledgeChunks` 公开 API resolve redacted preview，
+  再写入 PostgreSQL embedding queue；unsupported / malformed event fail-closed。
+  当前覆盖 focused tests，真实 Kafka smoke 待 knowledge outbox relay / schema 收口。
 
-后续待办：Kafka / outbox 驱动的真实 knowledge / memory / search chunk consumer、真实
-Milvus / pgvector / OpenSearch backend、provider backend rebuild / backfill worker、
-provider backend repair。
+后续待办：knowledge outbox relay / schema 后的真实 Kafka chunk-consumer smoke、memory /
+search chunk consumer、真实 Milvus / pgvector / OpenSearch backend、provider backend
+rebuild / backfill worker、provider backend repair。

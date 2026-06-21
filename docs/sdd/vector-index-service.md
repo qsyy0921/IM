@@ -257,6 +257,12 @@ knowledge.chunk.ready.v1
 First-stage embedding worker：
 
 ```text
+NEXUSIM_VECTOR_INDEX_SERVICE_MODE=chunk-consumer
+-> consume knowledge.chunk.ready.v1 from im.knowledge.events
+-> event carries low-sensitive refs only, no chunk preview / raw text
+-> resolve target chunk via knowledge-ingestion-service.ListKnowledgeChunks
+-> enqueue redacted-preview task into vector_embedding_tasks
+
 NEXUSIM_VECTOR_INDEX_SERVICE_MODE=embedding-producer
 -> choose NEXUSIM_VECTOR_EMBEDDING_PRODUCER_SOURCE=file|knowledge
 -> file source reads controlled JSONL embedding tasks from NEXUSIM_VECTOR_EMBEDDING_TASKS_FILE
@@ -272,8 +278,9 @@ NEXUSIM_VECTOR_INDEX_SERVICE_MODE=embedding-worker
 -> only persist source refs, input hash, embedding hash, dimension, model ref and visibility metadata
 ```
 
-该 producer / worker 是 first-stage worker 边界验证入口，不是 Kafka / outbox 驱动的生产 chunk
-consumer。JSONL / knowledge source 不得把 `input_text` 或 embedding vector array 写入
+该 chunk-consumer / producer / worker 是 first-stage worker 边界验证入口。`chunk-consumer`
+不从事件中获取 preview，而是用低敏 event refs 调 `ListKnowledgeChunks` resolve
+redacted preview；JSONL / knowledge source 不得把 `input_text` 或 embedding vector array 写入
 PostgreSQL、outbox、metrics、logs 或 Kafka payload；PostgreSQL task source 只允许持久化
 `input_preview_redacted`、input hash 和低敏 source / visibility metadata，不允许保存 raw
 document、source URI、object key 或 embedding vector array。
@@ -406,13 +413,30 @@ source_ref_hash、chunk_hash、backend_vector_id、trace_id 或 request_id。
 NEXUSIM_VECTOR_INDEX_SERVICE_MODE=grpc
 NEXUSIM_VECTOR_INDEX_SERVICE_MODE=rebuild-worker
 NEXUSIM_VECTOR_INDEX_SERVICE_MODE=outbox-relay
+NEXUSIM_VECTOR_INDEX_SERVICE_MODE=chunk-consumer
 NEXUSIM_VECTOR_INDEX_SERVICE_MODE=embedding-producer
 NEXUSIM_VECTOR_INDEX_SERVICE_MODE=embedding-worker
 ```
 
 当前已实现 runtime mode：`noop`、`grpc`、`rebuild-worker`、`outbox-relay`、
-`embedding-producer`、`embedding-worker`。`chunk-consumer`、`backend-worker`、`cleanup` 仍是目标态规划，
+`chunk-consumer`、`embedding-producer`、`embedding-worker`。`backend-worker`、`cleanup` 仍是目标态规划，
 不应写入当前本地 smoke 命令。
+
+`chunk-consumer` 第一版必需配置：
+
+```text
+NEXUSIM_KAFKA_BROKERS=127.0.0.1:9092
+NEXUSIM_VECTOR_CHUNK_TOPIC=im.knowledge.events
+NEXUSIM_VECTOR_CHUNK_CONSUMER_GROUP=nexusim-vector-index-chunk-consumer
+NEXUSIM_KNOWLEDGE_INGESTION_GRPC_ADDR=127.0.0.1:10740
+NEXUSIM_VECTOR_EMBEDDING_MODEL_REF=deterministic-embedding-v1
+NEXUSIM_VECTOR_EMBEDDING_DIMENSION=8
+```
+
+`chunk-consumer` 当前只支持 `knowledge.chunk.ready.v1`，unsupported / malformed
+event fail-closed，不 commit Kafka offset。由于 `knowledge-ingestion-service`
+尚无独立 Kafka schema / relay smoke，本模式当前只有 focused tests，不宣称端到端
+Kafka chunk-consumer smoke 已完成。
 
 `embedding-producer` 第一版必需配置：
 
@@ -452,7 +476,9 @@ NEXUSIM_VECTOR_EMBEDDING_DIMENSION=8
 JSONL 任务文件和 knowledge redacted-preview source 只用于 first-stage worker 验证；
 PostgreSQL task source 是第一版持久 task queue，可 claim / complete / claim-timeout retry，
 并已有 first-stage `embedding-producer` 能把 file / knowledge source 转入该 queue。
-Kafka / outbox chunk consumer 仍未落地，不能把该 producer 宣称为生产 chunk consumer。
+first-stage `chunk-consumer` 能消费低敏 `knowledge.chunk.ready.v1` refs 并通过公开 API
+resolve redacted preview 入队；完整 Kafka / outbox chunk consumer smoke 仍依赖
+knowledge outbox relay / schema 后续收口，不能宣称为生产 chunk consumer。
 
 PostgreSQL task source 配置：
 

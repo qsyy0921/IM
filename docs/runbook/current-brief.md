@@ -49,7 +49,10 @@ first-stage `embedding-worker`：本地 JSONL 任务源或
 task queue 已新增，`embedding-worker` 可用 `NEXUSIM_VECTOR_EMBEDDING_SOURCE=postgres`
 claim redacted-preview task 并 complete；`embedding-producer` 可从 file / knowledge
 source 读取 redacted-preview task 写入该 queue，`loadtest/vectorembedding` 已跑通
-producer -> queue -> worker 链路。`admin-service` 已完成第一版
+producer -> queue -> worker 链路；`chunk-consumer` runtime 已能消费低敏
+`knowledge.chunk.ready.v1` refs，经 `ListKnowledgeChunks` 公开 API resolve redacted
+preview 后入 embedding queue，当前覆盖 focused tests，真实 Kafka smoke 待 knowledge
+outbox relay / schema。`admin-service` 已完成第一版
 `CreateAdminOperation` / `ApproveAdminOperation` / `GetAdminOperation` /
 `ListAdminOperations` path、`admin_outbox -> im.admin.events` outbox relay 和
 `operation-worker` risk routing 执行闭环；`REPAIR_REQUEST` 已接入
@@ -64,7 +67,8 @@ control-plane-service.RollbackConfigVersion`；第三条 control-plane adapter �
 control-plane-service.PublishConfigVersion(API_GATEWAY_TENANT_QUOTA)`。
 admin `Create -> operator approve -> operation-worker -> control-plane` 本地多进程
 publish / rollback / tenant quota smoke 已通过。下一步默认继续更多下游公开 admin API adapter、
-admin compensation operator，或继续 vector Kafka / outbox chunk consumer / provider backend worker。
+admin compensation operator，或继续 vector knowledge outbox relay / real chunk-consumer
+smoke / provider backend worker。
 ```
 
 系统测试 / HA / 长压 / sizing 后置；总览、待办、单服务状态分别看

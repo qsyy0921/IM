@@ -83,6 +83,9 @@
 - 这是 first-stage producer / PostgreSQL queue / worker / public API /
   model-gateway handoff smoke，不是 Kafka / outbox chunk consumer、provider
   backend rebuild 或 Milvus / pgvector / OpenSearch backend smoke。
+- `chunk-consumer` runtime 已有 focused tests，能消费低敏
+  `knowledge.chunk.ready.v1` refs 后通过 `ListKnowledgeChunks` resolve redacted preview
+  并入 PostgreSQL queue；但本 smoke 还不覆盖真实 Kafka `im.knowledge.events`。
 - runner 不手工调用 `UpsertVectorItem`，也不读其它服务私有表；验证只走
   `SearchVectors`。
 - PostgreSQL / outbox / metrics / summary 不保存 raw document、source URI、object key

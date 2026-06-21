@@ -118,7 +118,9 @@ docker compose -f deploy/local/docker-compose.client-builders.yml --profile clie
 ```
 
 The Docker profile is not run by default and may download the Android / Node
-toolchain the first time it is built.
+toolchain the first time it is built. It runs `build:android-apk:collect`, so a
+successful build writes the APK and `manifest.json` under
+`clients/artifacts/android/docker-android-debug/` by default.
 
 Current packaging status:
 

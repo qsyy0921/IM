@@ -30,4 +30,4 @@ RUN mkdir -p "${ANDROID_HOME}/cmdline-tools" \
 
 WORKDIR /workspace
 
-CMD ["bash", "-lc", "npm --prefix clients ci && npm --prefix clients run build:android-apk"]
+CMD ["bash", "-lc", "npm --prefix clients ci && npm --prefix clients run build:android-apk:collect"]

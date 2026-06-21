@@ -119,7 +119,8 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
 - Android 已新增 opt-in Docker builder profile：
   `deploy/docker/client-android-builder.Dockerfile` 和
   `deploy/local/docker-compose.client-builders.yml`。`validate:builder-profile`
-  只做静态校验，不拉镜像；首次真正运行该 profile 会下载 Node / Android SDK
+  只做静态校验，不拉镜像；该 profile 已接 `build:android-apk:collect`，成功构建后会把
+  APK 和低敏 manifest 写入 `clients/artifacts/android/docker-android-debug/`；首次真正运行该 profile 会下载 Node / Android SDK
   toolchain。本轮未构建镜像，也未声称 APK baseline。
 - `loadtest/clientweb` 已新增 first-stage scriptable client smoke runner：
   准备阶段用 identity / api-gateway gRPC 注册用户、seed 会话并创建 JOIN；真实客户端
@@ -195,8 +196,8 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
 ## 下一步优先级
 
 1. 补本地 Tauri CLI / Android JDK 17+ / Gradle / Android SDK，或显式运行 Android
-   Docker builder profile，然后运行 `build:desktop-artifact` / `build:android-apk`
-   产出首个本地 artifact。
+   Docker builder profile，然后运行 `build:desktop-artifact:collect` /
+   `build:android-apk:collect` 产出首个本地 artifact + manifest。
 2. 在真实 PC / Android shell UI 中接入现有 shell logout action，并在工具链 ready 后跑平台 shell smoke。
 3. 后续把 desktop / Android first-stage localStorage store 替换为 native
    SQLite bridge，并补真实平台 runtime smoke。

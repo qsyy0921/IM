@@ -22,14 +22,17 @@ assert(dockerfile.includes("ANDROID_HOME"), "Android builder must set ANDROID_HO
 assert(dockerfile.includes("sdkmanager"), "Android builder must install SDK packages with sdkmanager");
 assert(dockerfile.includes("android-${ANDROID_COMPILE_SDK}"), "Android builder must use compile SDK arg");
 assert(dockerfile.includes("npm --prefix clients ci"), "Android builder must use reproducible npm ci");
-assert(dockerfile.includes("npm --prefix clients run build:android-apk"), "Android builder must call APK build wrapper");
+assert(dockerfile.includes("npm --prefix clients run build:android-apk:collect"), "Android builder must call APK build wrapper with artifact collector");
 
 const compose = read("deploy/local/docker-compose.client-builders.yml");
 assert(compose.includes("client-android-apk-builder"), "compose must define Android APK builder service");
 assert(compose.includes("client-builders"), "compose must hide builder behind client-builders profile");
 assert(compose.includes("deploy/docker/client-android-builder.Dockerfile"), "compose must reference Android builder Dockerfile");
 assert(compose.includes("NEXUSIM_CLIENT_ARTIFACTS_DIR"), "compose must expose artifact output directory override");
-assert(compose.includes("nexusim-debug.apk"), "compose must copy APK to a stable output filename");
+assert(compose.includes("NEXUSIM_CLIENT_ARTIFACT_RUN_ID"), "compose must expose stable artifact run id");
+assert(compose.includes("build:android-apk:collect"), "compose must call APK build wrapper with artifact collector");
+assert(compose.includes("--artifact-output-dir"), "compose must pass collector output directory");
+assert(compose.includes("--run-id"), "compose must pass collector run id");
 assert(!compose.match(/token|secret|password|credential|private/i), "builder compose must not contain sensitive fields");
 assert(!dockerfile.match(/token|secret|password|credential|private/i), "builder Dockerfile must not contain sensitive fields");
 

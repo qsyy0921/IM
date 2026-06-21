@@ -11,6 +11,7 @@ services:
     working_dir: /workspace
     environment:
       NEXUSIM_CLIENT_ARTIFACT_DIR: /artifacts/android
+      NEXUSIM_CLIENT_ARTIFACT_RUN_ID: docker-android-debug
     volumes:
       - ../..:/workspace
       - ${NEXUSIM_CLIENT_ARTIFACTS_DIR:-../../clients/artifacts}:/artifacts
@@ -19,6 +20,4 @@ services:
       - -lc
       - >
         npm --prefix clients ci &&
-        npm --prefix clients run build:android-apk &&
-        mkdir -p "$${NEXUSIM_CLIENT_ARTIFACT_DIR}" &&
-        cp clients/android/native/app/build/outputs/apk/debug/app-debug.apk "$${NEXUSIM_CLIENT_ARTIFACT_DIR}/nexusim-debug.apk"
+        npm --prefix clients run build:android-apk:collect -- --artifact-output-dir "$${NEXUSIM_CLIENT_ARTIFACT_DIR}" --run-id "$${NEXUSIM_CLIENT_ARTIFACT_RUN_ID}"

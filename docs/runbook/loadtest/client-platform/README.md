@@ -34,6 +34,10 @@ Reports:
 - `loadtest-report-20260622-desktop-webview-metadata-smoke.md`: first real
   Tauri WebView metadata callback smoke; proves the rendered PC shell can read
   native runtime metadata and post a low-sensitive loopback report.
+- `loadtest-report-20260622-desktop-webview-login-smoke.md`: first clean
+  login-level Tauri WebView smoke; proves the rendered PC shell can log in,
+  receive `delivery.notify`, PullInbox and AckDelivery through public client
+  paths.
 
 Useful command:
 

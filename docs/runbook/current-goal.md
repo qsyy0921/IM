@@ -167,8 +167,11 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   smoke:desktop-webview-login` 可通过 WebView2/CDP 外部驱动 Tauri WebView 登录、
   接收 externally-triggered `delivery.notify`、PullInbox 并 AckDelivery；现有
   `loadtest/clientweb/run-local-smoke.ps1 -RunDesktopWebViewLoginSmoke` 会在本地
-  BFF / push 栈存活期间生成临时 fixture 并调用该 driver。该能力目前完成工具化
-  和 dry-run 校验，仍需实际跑一次真实 PC WebView login smoke 后才能写入通过结论。
+  BFF / push 栈存活期间生成临时 fixture 并调用该 driver。2026-06-22 已在提交
+  `c72ea512` 上完成 clean 登录级 Tauri WebView smoke，归档见
+  `docs/runbook/loadtest/client-platform/loadtest-report-20260622-desktop-webview-login-smoke.md`；
+  summary 记录 `git_dirty=false`，覆盖 WebView 内 login、externally-triggered
+  `delivery.notify`、PullInbox、message observe 和 AckDelivery。
 - Android 已新增 opt-in Docker builder profile：
   `deploy/docker/client-android-builder.Dockerfile` 和
   `deploy/local/docker-compose.client-builders.yml`。`validate:builder-profile`
@@ -264,25 +267,20 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
 
 ## 下一步优先级
 
-1. 继续 PC shell smoke：launch sanity、composed evidence 工具和真实 Tauri WebView
-   metadata callback smoke 已通过；login-level WebView driver 和
-   `run-local-smoke.ps1 -RunDesktopWebViewLoginSmoke` 可选入口已就绪，下一步实际运行并归档
-   WebView 内 login、PullInbox、delivery.notify 和 AckDelivery 结果；同时保留后续 MSI /
-   NSIS installer bundle 为 hardening。
-2. 补 Android JDK 17+ / Gradle / Android SDK，或显式运行 Android Docker builder
+1. 补 Android JDK 17+ / Gradle / Android SDK，或显式运行 Android Docker builder
    profile，然后运行 `build:android-apk:collect` 产出首个 APK + manifest。
-3. 在真实 Android shell UI 中接入现有 shell action，并在工具链 ready 后跑平台 shell smoke。
-4. 后续把 desktop / Android first-stage localStorage store 替换为 native
+2. 在真实 Android shell UI 中接入现有 shell action，并在工具链 ready 后跑平台 shell smoke。
+3. 后续把 desktop / Android first-stage localStorage store 替换为 native
    SQLite bridge，并补真实平台 runtime smoke。
-5. 再回到 workflow compensation adapter / instruction approval UI / ops 管理；
+4. 再回到 workflow compensation adapter / instruction approval UI / ops 管理；
    当前已有本地 workflow get / decision / decision manifest / instruction list CLI，
    低敏 compensation instruction manifest 生成 / 校验，以及 catalog-backed import
    approval 链路、invocation preflight 和静态 review page；后续可接正式审批 UI。
-6. 继续明确其它下游公开 admin API adapter。
-7. 在镜像可用后补 vector-index focused pgvector smoke；后续再接 Milvus /
+5. 继续明确其它下游公开 admin API adapter。
+6. 在镜像可用后补 vector-index focused pgvector smoke；后续再接 Milvus /
    OpenSearch backend、provider repair 和真 provider backfill smoke。
-8. 可继续 notification SMTP / SMS / APNs / FCM adapter 或 bounce-suppression。
-9. 新发现待办写入 `docs/runbook/remaining-goals.md`。
+7. 可继续 notification SMTP / SMS / APNs / FCM adapter 或 bounce-suppression。
+8. 新发现待办写入 `docs/runbook/remaining-goals.md`。
 
 ## 工作方式
 

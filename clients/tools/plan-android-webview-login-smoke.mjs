@@ -44,7 +44,7 @@ export function buildAndroidWebViewLoginSmokePlan(options = {}) {
       {
         name: "webview-devtools-socket",
         required: true,
-        evidence: "adb exposes a webview_devtools_remote socket after launching com.nexusim.android/.MainActivity."
+        evidence: "npm --prefix clients run report:android-webview-devtools-readiness reports a WebView devtools socket after launching com.nexusim.android/.MainActivity, without exposing raw socket names."
       }
     ],
     plannedFlow: [
@@ -60,7 +60,7 @@ export function buildAndroidWebViewLoginSmokePlan(options = {}) {
       deviceReadiness: "npm --prefix clients run report:android-device-readiness",
       buildDebugAPK: "npm --prefix clients run build:android-apk:docker",
       installAndLaunch: "adb install -r <apk> && adb shell am start -n com.nexusim.android/.MainActivity",
-      devtoolsDiscovery: "adb shell cat /proc/net/unix | findstr webview_devtools_remote",
+      devtoolsDiscovery: "npm --prefix clients run report:android-webview-devtools-readiness",
       devtoolsForward: "adb forward tcp:<local-port> localabstract:<webview-devtools-socket>",
       runner: "npm --prefix clients run smoke:android-webview-login -- --fixture <clientweb-fixture.json>"
     },

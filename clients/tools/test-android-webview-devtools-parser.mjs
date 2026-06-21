@@ -1,4 +1,7 @@
-import { parseWebViewDevtoolsSocket } from "./smoke-android-webview-login.mjs";
+import {
+  parseWebViewDevtoolsSocket,
+  parseWebViewDevtoolsSockets
+} from "./smoke-android-webview-login.mjs";
 
 function assertEqual(actual, expected, message) {
   if (actual !== expected) {
@@ -28,6 +31,11 @@ assertEqual(
   parseWebViewDevtoolsSocket(multipleWebViews),
   "webview_devtools_remote_111",
   "failed to choose first WebView devtools socket"
+);
+assertEqual(
+  JSON.stringify(parseWebViewDevtoolsSockets(multipleWebViews)),
+  JSON.stringify(["webview_devtools_remote_111", "webview_devtools_remote_222"]),
+  "failed to parse all WebView devtools sockets"
 );
 assertEqual(
   parseWebViewDevtoolsSocket("Num RefCount Protocol Flags Type St Inode Path\n@chrome_devtools_remote\n"),

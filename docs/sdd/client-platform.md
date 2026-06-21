@@ -269,6 +269,10 @@ Responsibilities:
   prerequisites before running the real runner. The runner may use CDP through
   ADB WebView devtools forwarding to drive the public UI, but dry-run output
   must not claim login, PullInbox, WebSocket or AckDelivery evidence by itself.
+- Android WebView devtools readiness reporting may read `/proc/net/unix`
+  through ADB after a debuggable shell is launched, but it must only output
+  aggregate socket counts, short socket hashes and next actions. It must not
+  print raw socket names, raw device identifiers, local paths or auth material.
 - Android asset preparation must clean the WebView asset output directory before
   copying a new build, so APKs do not carry stale Web bundles.
 - Android asset preparation uses the same low-sensitive shell asset manifest as

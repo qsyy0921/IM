@@ -146,6 +146,7 @@ function nativeCommands(target, readinessTarget) {
     dryRunBuild: readinessTarget.dryRunCommand,
     installPlan: "npm --prefix clients run plan:artifact-install",
     deviceReadiness: "npm --prefix clients run report:android-device-readiness",
+    webviewDevtoolsReadiness: "npm --prefix clients run report:android-webview-devtools-readiness",
     webviewMetadataSmoke: "npm --prefix clients run smoke:android-webview-metadata",
     webviewLoginSmokePlan: "npm --prefix clients run plan:android-webview-login-smoke",
     webviewLoginSmoke: "npm --prefix clients run smoke:android-webview-login -- --fixture <clientweb-fixture.json>",
@@ -181,6 +182,11 @@ function nativeChecklist(target, readinessTarget, artifactStatus, installStatus)
       step: "check-android-device-readiness",
       command: nativeCommands(target, readinessTarget).deviceReadiness,
       evidence: "adb is available and at least one authorized Android device is visible without exposing raw serial or model"
+    });
+    checklist.push({
+      step: "check-android-webview-devtools-readiness",
+      command: nativeCommands(target, readinessTarget).webviewDevtoolsReadiness,
+      evidence: "after launching the debuggable Android shell, adb can see a WebView devtools socket without exposing raw socket names"
     });
   }
 

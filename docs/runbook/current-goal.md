@@ -178,7 +178,9 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   selector 契约，不构建 APK、不连接设备，也不声称 login / PullInbox / AckDelivery
   已在 Android WebView 内通过。WebView devtools socket parser 已新增 focused
   fixture test，后续真机 runner 发现 socket 失败时可先用同一解析规则排查，而不需要
-  启动完整 APK smoke。`loadtest/clientweb/run-local-smoke.ps1` 也已新增显式
+  启动完整 APK smoke。`npm --prefix clients run report:android-webview-devtools-readiness`
+  现在提供低敏 WebView devtools readiness report，会读取 ADB 的 `/proc/net/unix`
+  输出并只报告 socket 数量 / 短 hash / nextActions，不输出 raw socket 名。`loadtest/clientweb/run-local-smoke.ps1` 也已新增显式
   `-RunAndroidWebViewLoginSmoke` 入口，可在本地 BFF / push 栈存活期间生成临时 fixture
   并调用 Android runner；默认不执行该路径。真实执行仍等待 collected debuggable APK
   和工具链 ready。

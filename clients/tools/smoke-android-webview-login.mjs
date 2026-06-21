@@ -290,14 +290,17 @@ async function waitForWebViewDevtoolsSocket(timeoutMs) {
 }
 
 export function parseWebViewDevtoolsSocket(output) {
-  const sockets = output
+  return parseWebViewDevtoolsSockets(output)[0] ?? "";
+}
+
+export function parseWebViewDevtoolsSockets(output) {
+  return output
     .split(/\r?\n/)
     .map(line => {
       const match = line.match(/@?(webview_devtools_remote[^\s]*)/);
       return match?.[1] ?? "";
     })
     .filter(Boolean);
-  return sockets[0] ?? "";
 }
 
 function forwardWebViewDevtools(port, socketName) {

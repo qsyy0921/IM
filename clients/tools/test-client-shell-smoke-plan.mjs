@@ -70,6 +70,7 @@ assert(plan.targets.android.commands.prepareAssets.includes("build:shell-assets:
 assert(plan.targets.android.commands.verifyAssets.includes("android"), "android verify command missing");
 assert(plan.targets.android.commands.installPlan.includes("plan:artifact-install"), "android install plan command missing");
 assert(plan.targets.android.commands.deviceReadiness.includes("report:android-device-readiness"), "android device readiness command missing");
+assert(plan.targets.android.commands.webviewDevtoolsReadiness.includes("report:android-webview-devtools-readiness"), "android WebView devtools readiness command missing");
 assert(plan.targets.android.commands.webviewMetadataSmoke.includes("smoke:android-webview-metadata"), "android WebView metadata smoke command missing");
 assert(plan.targets.android.install, "android install status missing");
 assert(typeof plan.targets.android.install.readyForInstall === "boolean", "android install readiness missing");
@@ -78,6 +79,7 @@ assert(Array.isArray(plan.targets.android.install.missing), "android install mis
 assert(Array.isArray(plan.targets.android.checklist), "android checklist missing");
 assert(plan.targets.android.checklist.some(item => item.step === "verify-shell-lifecycle-contract"), "android shell lifecycle contract check missing");
 assert(plan.targets.android.checklist.some(item => item.step === "check-android-device-readiness"), "android device readiness checklist missing");
+assert(plan.targets.android.checklist.some(item => item.step === "check-android-webview-devtools-readiness"), "android WebView devtools readiness checklist missing");
 assert(plan.targets.android.checklist.some(item => item.step === "prepare-shell-assets"), "android asset prep checklist missing");
 assert(plan.targets.android.checklist.some(item => item.step === "verify-shell-assets"), "android asset verification checklist missing");
 assert(Array.isArray(plan.targets.android.notes), "android notes missing");

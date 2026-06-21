@@ -277,6 +277,9 @@ Responsibilities:
   `WebViewAssetLoader` / `appassets.androidplatform.net`; DOM storage is allowed
   because the first-stage shared runtime still uses WebView-local cache and
   session adapters.
+- Android debug builds may allow cleartext HTTP / WebSocket traffic for local
+  LAN smoke against `api-gateway` and `push-gateway`; release builds must set
+  the same manifest placeholder to disable cleartext traffic by default.
 - Android asset preparation must clean the WebView asset output directory before
   copying a new build, so APKs do not carry stale Web bundles.
 - Android asset preparation uses the same low-sensitive shell asset manifest as

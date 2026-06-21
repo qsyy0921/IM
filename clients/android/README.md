@@ -31,6 +31,9 @@ Flutter or native Kotlin for a concrete reason.
   and Android SDK are available. Use
   `node clients/tools/build-android-apk.mjs --dry-run` to inspect the command
   and missing toolchain without building.
+- Debug APKs explicitly allow cleartext HTTP / WebSocket traffic for local LAN
+  smoke. Release builds set the same manifest placeholder to disallow
+  cleartext by default.
 - No APK or AAB is produced yet.
 - `app.config.json` records the intended first Android package metadata.
 
@@ -47,6 +50,9 @@ Flutter or native Kotlin for a concrete reason.
 - File and content access must stay disabled in the native WebView shell.
   Local LAN API / WebSocket endpoints are supplied through shell config and must
   still flow through `api-gateway` and `push-gateway`.
+- Cleartext traffic is a debug-only allowance for local LAN testing. Release
+  Android builds must keep cleartext disabled unless a later ADR introduces a
+  narrower production transport policy.
 - Current local message cache is in-memory only; production cache should use
   SQLite behind `LocalMessageStore`.
 - Push notification integration must not bypass PullInbox reconciliation.

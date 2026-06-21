@@ -43,6 +43,8 @@ assert(appBuild.includes('namespace = "com.nexusim.android"'), "Android namespac
 assert(appBuild.includes('applicationId = "com.nexusim.android"'), "Android applicationId mismatch");
 assert(appBuild.includes("minSdk = 26"), "Android minSdk mismatch");
 assert(appBuild.includes("targetSdk = 35"), "Android targetSdk mismatch");
+assert(appBuild.includes('manifestPlaceholders["nexusimCleartextTraffic"] = "true"'), "Android debug build must allow local cleartext LAN smoke explicitly");
+assert(appBuild.includes('manifestPlaceholders["nexusimCleartextTraffic"] = "false"'), "Android release build must disable cleartext traffic");
 assert(appBuild.includes("prepareNexusIMWebAssets"), "Android web asset prep task missing");
 assert(appBuild.includes("build:shell-assets:android"), "Android build must prepare shell web assets");
 assert(appBuild.includes('gradleProperty("nexusim.skipWebAssetPrep")'), "Android Gradle task must support wrapper skip property");
@@ -53,6 +55,8 @@ const manifest = read("android/native/app/src/main/AndroidManifest.xml");
 assert(manifest.includes("android.permission.INTERNET"), "Android INTERNET permission missing");
 assert(manifest.includes("android.permission.ACCESS_NETWORK_STATE"), "Android network state permission missing");
 assert(manifest.includes('android:name=".MainActivity"'), "Android MainActivity missing");
+assert(manifest.includes('android:usesCleartextTraffic="${nexusimCleartextTraffic}"'), "Android cleartext traffic must be controlled by build-type placeholder");
+assert(!manifest.includes('android:usesCleartextTraffic="true"'), "Android manifest must not enable cleartext traffic unconditionally");
 
 const mainActivity = read("android/native/app/src/main/java/com/nexusim/android/MainActivity.kt");
 assert(mainActivity.includes("WebViewAssetLoader"), "Android shell must use WebViewAssetLoader");

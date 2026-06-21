@@ -2,17 +2,21 @@ import { existsSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { join } from "node:path";
 import { collectClientBuildPrereqs, workspaceRoot } from "./client-build-env.mjs";
+import {
+  collectArgs,
+  collectPlanSummary,
+  parseArtifactBuildOptions
+} from "./client-artifact-build-options.mjs";
 import { prepareShellWebAssets } from "./prepare-shell-web-assets.mjs";
 
 const androidNativeRoot = join(workspaceRoot, "android", "native");
 
 function main(argv) {
-  const dryRun = argv.includes("--dry-run");
-  const skipWebBuild = argv.includes("--skip-web-build");
+  const options = parseArtifactBuildOptions(argv);
   const prereqs = collectClientBuildPrereqs();
-  const plan = androidBuildPlan(prereqs);
+  const plan = androidBuildPlan(prereqs, options);
 
-  if (dryRun) {
+  if (options.dryRun) {
     console.log(JSON.stringify(plan, null, 2));
     return;
   }
@@ -23,16 +27,22 @@ function main(argv) {
 
   prepareShellWebAssets({
     target: "android",
-    build: !skipWebBuild
+    build: !options.skipWebBuild
   });
   execFileSync(plan.command, plan.args, {
     cwd: androidNativeRoot,
     stdio: "inherit",
     shell: plan.shell
   });
+  if (options.collect) {
+    execFileSync(process.execPath, collectArgs("android", options), {
+      cwd: workspaceRoot,
+      stdio: "inherit"
+    });
+  }
 }
 
-function androidBuildPlan(prereqs) {
+function androidBuildPlan(prereqs, options) {
   const gradlew = join(androidNativeRoot, process.platform === "win32" ? "gradlew.bat" : "gradlew");
   const hasGradleWrapper = existsSync(gradlew);
   const missing = prereqs.checks
@@ -43,10 +53,12 @@ function androidBuildPlan(prereqs) {
     ready: prereqs.androidApkReady,
     missing,
     command: hasGradleWrapper ? gradlew : "gradle",
-    args: hasGradleWrapper ? [":app:assembleDebug"] : ["-p", androidNativeRoot, ":app:assembleDebug"],
+    args: [":app:assembleDebug"],
     shell: false,
+    cwdHint: "clients/android/native",
     outputHint: "clients/android/native/app/build/outputs/apk/debug/app-debug.apk",
-    gradleWrapperDetected: hasGradleWrapper
+    gradleWrapperDetected: hasGradleWrapper,
+    collectArtifacts: collectPlanSummary("android", options)
   };
 }
 

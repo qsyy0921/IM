@@ -98,13 +98,16 @@ is ready:
 ```powershell
 npm --prefix clients run build:desktop-artifact
 npm --prefix clients run build:android-apk
+npm --prefix clients run build:desktop-artifact:collect
+npm --prefix clients run build:android-apk:collect
 npm --prefix clients run collect:client-artifacts
 ```
 
 `collect:client-artifacts` copies produced desktop / Android artifacts into the
 ignored `clients/artifacts/<run-id>/` directory and writes a low-sensitive
 `manifest.json` with file names, sizes and SHA-256 hashes. It does not record
-local absolute source paths.
+local absolute source paths. The `*:collect` build scripts run the same
+collection step automatically after a successful native build.
 
 Android can also be built through the local Docker builder profile when the image
 is intentionally built:

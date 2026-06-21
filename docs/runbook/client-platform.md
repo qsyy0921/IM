@@ -160,7 +160,8 @@ First slice:
   `npm --prefix clients run collect:client-artifacts` copies it into ignored
   `clients/artifacts/<run-id>/` storage and writes a low-sensitive manifest with
   file names, sizes and SHA-256 hashes, without recording local absolute source
-  paths.
+  paths. `build:desktop-artifact:collect` and `build:android-apk:collect` run the
+  collector automatically after a successful native build.
 - `npm --prefix clients run validate:builder-profile` validates the Android
   Docker builder profile without building or pulling images. The profile lives
   in `deploy/local/docker-compose.client-builders.yml` and uses
@@ -254,6 +255,8 @@ node clients/tools/build-android-apk.mjs --dry-run
 node clients/tools/collect-client-artifacts.mjs --target all --dry-run
 npm --prefix clients run build:desktop-artifact
 npm --prefix clients run build:android-apk
+npm --prefix clients run build:desktop-artifact:collect
+npm --prefix clients run build:android-apk:collect
 npm --prefix clients run collect:client-artifacts
 docker compose -f deploy/local/docker-compose.client-builders.yml --profile client-builders run --rm client-android-apk-builder
 ```

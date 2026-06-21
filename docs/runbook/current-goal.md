@@ -114,7 +114,8 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   collector；`test:artifact-collector` 覆盖 fake APK / Windows installer 归档、
   SHA-256 manifest、dry-run 不写文件和不泄露本机绝对路径。真实 artifact / APK
   产出后可用 `collect:client-artifacts` 写入 ignored `clients/artifacts/<run-id>/`
-  并生成低敏 manifest；当前仍没有真实 installer / APK baseline。
+  并生成低敏 manifest；`build:desktop-artifact:collect` 和
+  `build:android-apk:collect` 会在 native build 成功后自动执行该归档步骤。当前仍没有真实 installer / APK baseline。
 - Android 已新增 opt-in Docker builder profile：
   `deploy/docker/client-android-builder.Dockerfile` 和
   `deploy/local/docker-compose.client-builders.yml`。`validate:builder-profile`

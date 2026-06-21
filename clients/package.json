@@ -26,6 +26,8 @@
     "build:shell-assets:android": "node ./tools/prepare-shell-web-assets.mjs --target android",
     "build:desktop-artifact": "node ./tools/build-desktop-artifact.mjs",
     "build:android-apk": "node ./tools/build-android-apk.mjs",
+    "build:desktop-artifact:collect": "node ./tools/build-desktop-artifact.mjs --collect",
+    "build:android-apk:collect": "node ./tools/build-android-apk.mjs --collect",
     "collect:client-artifacts": "node ./tools/collect-client-artifacts.mjs",
     "typecheck:desktop": "npm --workspace @nexusim/desktop run typecheck",
     "validate:desktop-tauri": "npm --workspace @nexusim/desktop run validate:tauri",

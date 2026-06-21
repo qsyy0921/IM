@@ -60,7 +60,8 @@
   runner skeleton（无 IPC command、bundle inactive）；Android 已有 Kotlin
   WebView asset shell skeleton（通过 WebViewAssetLoader 加载本地 Web assets）；
   desktop / Android artifact build wrapper 已有 dry-run-tested command plan，
-  artifact collector 已能归档产物并生成低敏 SHA-256 manifest，Android Docker builder
+  artifact collector 已能归档产物并生成低敏 SHA-256 manifest，build wrapper 已支持
+  成功构建后自动归档，Android Docker builder
   profile 已落但尚未运行；本机仍缺 Tauri CLI / Android
   JDK 17+ / Gradle / SDK；下一步补工具链或显式运行 builder profile 后复用同一 core 接
   local Windows artifact 和 Android APK。

@@ -8,17 +8,21 @@ import {
   quoteCommand,
   workspaceRoot
 } from "./client-build-env.mjs";
+import {
+  collectArgs,
+  collectPlanSummary,
+  parseArtifactBuildOptions
+} from "./client-artifact-build-options.mjs";
 import { prepareShellWebAssets } from "./prepare-shell-web-assets.mjs";
 
 const desktopRoot = join(workspaceRoot, "desktop");
 
 function main(argv) {
-  const dryRun = argv.includes("--dry-run");
-  const skipWebBuild = argv.includes("--skip-web-build");
+  const options = parseArtifactBuildOptions(argv);
   const prereqs = collectClientBuildPrereqs();
-  const plan = desktopBuildPlan(prereqs);
+  const plan = desktopBuildPlan(prereqs, options);
 
-  if (dryRun) {
+  if (options.dryRun) {
     console.log(JSON.stringify(plan, null, 2));
     return;
   }
@@ -29,16 +33,22 @@ function main(argv) {
 
   prepareShellWebAssets({
     target: "windows-desktop",
-    build: !skipWebBuild
+    build: !options.skipWebBuild
   });
   execFileSync(plan.command, plan.args, {
     cwd: desktopRoot,
     stdio: "inherit",
     shell: plan.shell
   });
+  if (options.collect) {
+    execFileSync(process.execPath, collectArgs("windows-desktop", options), {
+      cwd: workspaceRoot,
+      stdio: "inherit"
+    });
+  }
 }
 
-function desktopBuildPlan(prereqs) {
+function desktopBuildPlan(prereqs, options) {
   const localTauri = localNodeBin("tauri");
   const hasLocalTauri = existsSync(localTauri);
   const hasCargoTauri = commandSucceeded("cargo", ["tauri", "--version"]);
@@ -56,7 +66,8 @@ function desktopBuildPlan(prereqs) {
         ? ["/d", "/s", "/c", quoteCommand(localTauri, ["build"])]
         : ["build"],
       shell: false,
-      outputHint: "clients/desktop/src-tauri/target/release/bundle"
+      outputHint: "clients/desktop/src-tauri/target/release/bundle",
+      collectArtifacts: collectPlanSummary("windows-desktop", options)
     };
   }
   return {
@@ -67,7 +78,8 @@ function desktopBuildPlan(prereqs) {
     args: ["tauri", "build"],
     shell: false,
     outputHint: "clients/desktop/src-tauri/target/release/bundle",
-    cargoTauriDetected: hasCargoTauri
+    cargoTauriDetected: hasCargoTauri,
+    collectArtifacts: collectPlanSummary("windows-desktop", options)
   };
 }
 

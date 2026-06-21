@@ -37,7 +37,7 @@
   Docker / CI builder 产物链路；可用 `npm --prefix clients run check:build-prereqs`
   检查当前机器状态。`build:desktop-artifact` wrapper 已落，会在工具链 ready 时
   准备 shell assets 并执行 Tauri build；artifact collector 已能归档产物并生成
-  SHA-256 manifest；当前仍未产出 installer。
+  SHA-256 manifest，`build:desktop-artifact:collect` 可在成功构建后自动归档；当前仍未产出 installer。
 - `clients/android`：first-stage TypeScript runtime adapter 和 Kotlin WebView
   asset shell skeleton 已落；`createAndroidClientRuntime` 已能组装 shared
   `BFFClient` / `WebSocketPushTransport` / auth / inbox / send / ack queue；
@@ -50,7 +50,8 @@
   Docker / CI builder 产物链路；可用 `npm --prefix clients run check:build-prereqs`
   检查当前机器状态。`build:android-apk` wrapper 已落，会在工具链 ready 时准备
   shell assets 并执行 Gradle `:app:assembleDebug`；Android Docker builder profile
-  已落但尚未运行；artifact collector 已能归档产物并生成 SHA-256 manifest，当前仍未产出 APK。
+  已落但尚未运行；artifact collector 已能归档产物并生成 SHA-256 manifest，
+  `build:android-apk:collect` 可在成功构建后自动归档，当前仍未产出 APK。
 - 三端 smoke：Web / PC / Android 都只能连 `api-gateway` 和 `push-gateway`；
   PullInbox 是事实源，WebSocket 只做在线唤醒。
 - Local store：`IndexedDBMessageStore` 已有 first-stage persistence test；

@@ -10,6 +10,10 @@ import {
 const androidBuilderImage = "nexusim/client-android-builder:local";
 const androidBuilderCompose = "deploy/local/docker-compose.client-builders.yml";
 const androidBuilderDockerfile = "deploy/docker/client-android-builder.Dockerfile";
+const androidBuilderImageBuildCommand =
+  "docker compose -f deploy/local/docker-compose.client-builders.yml --profile client-builders build client-android-apk-builder";
+const androidBuilderRunCommand =
+  "docker compose -f deploy/local/docker-compose.client-builders.yml --profile client-builders run --rm client-android-apk-builder";
 
 function main() {
   console.log(JSON.stringify(buildReadinessReport(), null, 2));
@@ -44,14 +48,57 @@ export function buildReadinessReport() {
           composeAvailable: docker.composeAvailable,
           imagePresent: docker.imagePresent,
           outputHint: "clients/artifacts/android/docker-android-debug/manifest.json",
-          buildCommand:
-            "docker compose -f deploy/local/docker-compose.client-builders.yml --profile client-builders run --rm client-android-apk-builder"
+          imageBuildCommand: androidBuilderImageBuildCommand,
+          buildCommand: androidBuilderRunCommand
         }
       }
     },
     checks: sanitizedChecks(prereqs.checks),
-    docker
+    docker,
+    nextActions: nextActions(prereqs, docker)
   };
+}
+
+function nextActions(prereqs, docker) {
+  const actions = [];
+  if (prereqs.desktopArtifactReady) {
+    actions.push({
+      target: "windows-desktop",
+      action: "build-desktop-artifact",
+      command: "npm --prefix clients run build:desktop-artifact:collect"
+    });
+  } else {
+    actions.push({
+      target: "windows-desktop",
+      action: "install-desktop-toolchain",
+      missing: missingChecks(prereqs.checks, "desktop"),
+      safeDryRunCommand: "node clients/tools/build-desktop-artifact.mjs --dry-run --collect"
+    });
+  }
+
+  if (prereqs.androidApkReady) {
+    actions.push({
+      target: "android",
+      action: "build-android-apk-local",
+      command: "npm --prefix clients run build:android-apk:collect"
+    });
+  } else if (docker.dockerAvailable && docker.composeAvailable && docker.composeFilePresent && docker.dockerfilePresent) {
+    actions.push({
+      target: "android",
+      action: docker.imagePresent ? "run-android-docker-builder" : "build-android-docker-builder-image",
+      command: docker.imagePresent ? androidBuilderRunCommand : androidBuilderImageBuildCommand,
+      downloadsToolchain: !docker.imagePresent,
+      outputHint: "clients/artifacts/android/docker-android-debug/manifest.json"
+    });
+  } else {
+    actions.push({
+      target: "android",
+      action: "install-android-toolchain",
+      missing: missingChecks(prereqs.checks, "android"),
+      safeDryRunCommand: "node clients/tools/build-android-apk.mjs --dry-run --collect"
+    });
+  }
+  return actions;
 }
 
 function missingChecks(checks, target) {

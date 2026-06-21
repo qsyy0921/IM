@@ -172,7 +172,9 @@ First slice:
 - `npm --prefix clients run report:artifact-readiness` prints a low-sensitive
   readiness matrix for local desktop, local Android and Android Docker builder
   paths. It reports missing capabilities and the exact next build command
-  without printing local absolute paths.
+  without printing local absolute paths. It separates the Android Docker builder
+  image build command from the actual builder run command and emits low-sensitive
+  `nextActions`; it never starts a download or build by itself.
 - `npm --prefix clients run validate:builder-profile` validates the Android
   Docker builder profile without building or pulling images. The profile lives
   in `deploy/local/docker-compose.client-builders.yml` and uses
@@ -271,6 +273,11 @@ install native toolchains or run the Docker builder:
 npm --prefix clients run report:artifact-readiness
 ```
 
+The report includes `nextActions`. When the Android Docker builder image is
+missing, the first Android next action is the explicit image build command. After
+the image exists, the next action becomes the builder run command that writes the
+APK and manifest.
+
 Artifact wrappers:
 
 ```powershell
@@ -282,5 +289,6 @@ npm --prefix clients run build:android-apk
 npm --prefix clients run build:desktop-artifact:collect
 npm --prefix clients run build:android-apk:collect
 npm --prefix clients run collect:client-artifacts
+docker compose -f deploy/local/docker-compose.client-builders.yml --profile client-builders build client-android-apk-builder
 docker compose -f deploy/local/docker-compose.client-builders.yml --profile client-builders run --rm client-android-apk-builder
 ```

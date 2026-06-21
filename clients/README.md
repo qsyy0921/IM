@@ -116,6 +116,7 @@ is intentionally built:
 
 ```powershell
 npm --prefix clients run validate:builder-profile
+docker compose -f deploy/local/docker-compose.client-builders.yml --profile client-builders build client-android-apk-builder
 docker compose -f deploy/local/docker-compose.client-builders.yml --profile client-builders run --rm client-android-apk-builder
 ```
 
@@ -134,4 +135,6 @@ Current packaging status:
   produced yet because the local native toolchain is missing and the Docker
   builder image has not been built in this slice.
 - `report:artifact-readiness` prints the current low-sensitive readiness matrix
-  for local desktop, local Android and Android Docker builder paths.
+  for local desktop, local Android and Android Docker builder paths. It also
+  emits `nextActions`, including the explicit Android builder image build command
+  before the run command when the image is absent.

@@ -22,7 +22,20 @@ assert(report.targets["windows-desktop"].buildCommand.includes("build:desktop-ar
 assert(report.targets.android.buildCommand.includes("build:android-apk:collect"), "android collect command missing");
 assert(report.targets.android.dockerBuilder.profile === "client-builders", "android builder profile mismatch");
 assert(report.targets.android.dockerBuilder.outputHint.endsWith("manifest.json"), "android builder manifest hint missing");
+assert(
+  report.targets.android.dockerBuilder.imageBuildCommand.includes("build client-android-apk-builder"),
+  "android builder image build command missing"
+);
+assert(
+  report.targets.android.dockerBuilder.buildCommand.includes("run --rm client-android-apk-builder"),
+  "android builder run command missing"
+);
 assert(Array.isArray(report.checks), "checks must be an array");
+assert(Array.isArray(report.nextActions), "nextActions must be an array");
+assert(
+  report.nextActions.some(action => action.target === "android" && typeof action.command === "string"),
+  "android next action command missing"
+);
 assert(!serialized.match(/token|secret|password|credential|private/i), "readiness report leaked sensitive names");
 assert(!serialized.match(/[A-Z]:\\\\/), "readiness report leaked Windows absolute path");
 assert(!serialized.includes("\\\\?"), "readiness report leaked extended Windows path");

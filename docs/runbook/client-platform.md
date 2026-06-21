@@ -85,6 +85,11 @@ First slice:
   When enabled, the WebView posts a low-sensitive report after reading native
   bridge metadata. The report proves metadata wiring only; it does not submit
   login form data or run a message flow.
+- Android login-level WebView smoke now has a low-sensitive plan entry:
+  `npm --prefix clients run plan:android-webview-login-smoke`. It records the
+  required debuggable APK, ADB, WebView devtools, clientweb fixture and public
+  UI selector prerequisites, but it does not build an APK, connect to a device
+  or claim login / PullInbox / AckDelivery evidence.
 - `web/index.html` loads `nexusim-shell-config.js` before the app bundle.
   Browser mode uses the checked-in empty placeholder; desktop / Android shell
   builds can render their low-sensitive `shell-config.example.json` through

@@ -147,6 +147,7 @@ function nativeCommands(target, readinessTarget) {
     installPlan: "npm --prefix clients run plan:artifact-install",
     deviceReadiness: "npm --prefix clients run report:android-device-readiness",
     webviewMetadataSmoke: "npm --prefix clients run smoke:android-webview-metadata",
+    webviewLoginSmokePlan: "npm --prefix clients run plan:android-webview-login-smoke",
     dockerBuilder: readinessTarget.dockerBuilder?.imagePresent
       ? readinessTarget.dockerBuilder.buildCommand
       : readinessTarget.dockerBuilder?.imageBuildCommand,
@@ -259,6 +260,11 @@ function nativeChecklist(target, readinessTarget, artifactStatus, installStatus)
       step: "run-android-webview-metadata-smoke",
       command: nativeCommands(target, readinessTarget).webviewMetadataSmoke,
       evidence: "Android WebView loads the prepared shell, reads NexusIMNative runtime metadata and posts a low-sensitive callback through adb reverse"
+    });
+    checklist.push({
+      step: "plan-android-webview-login-smoke",
+      command: nativeCommands(target, readinessTarget).webviewLoginSmokePlan,
+      evidence: "login-level Android WebView smoke prerequisites, selector contract and low-sensitive execution steps are explicit before a real runner is enabled"
     });
   }
 

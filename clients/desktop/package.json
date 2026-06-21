@@ -6,11 +6,12 @@
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "validate:tauri": "node ../tools/validate-desktop-tauri.mjs",
-    "prepare:web-assets": "npm --prefix .. run build:shell-assets:desktop",
+    "prepare:shell-assets:desktop": "node ../tools/prepare-shell-web-assets-if-needed.mjs --target windows-desktop",
+    "prepare:web-assets": "npm run prepare:shell-assets:desktop",
     "build:shell-assets:desktop": "npm --prefix .. run build:shell-assets:desktop",
     "build:artifact": "npm --prefix .. run build:desktop-artifact",
     "tauri:dev": "tauri dev",
-    "tauri:build": "npm run prepare:web-assets && tauri build"
+    "tauri:build": "tauri build"
   },
   "dependencies": {
     "@nexusim/client-core": "0.1.0",

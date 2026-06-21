@@ -36,6 +36,7 @@ const desktop = dryRun("build-desktop-artifact.mjs");
 assert(desktop.target === "windows-desktop", "desktop target mismatch");
 assert(desktop.outputHint.includes("clients/desktop"), "desktop output hint mismatch");
 assert(Array.isArray(desktop.args) && desktop.args.includes("build"), "desktop build command missing build arg");
+assert(desktop.skipShellAssetPrepEnv === "NEXUSIM_SKIP_SHELL_ASSET_PREP", "desktop wrapper skip env missing");
 assert(!JSON.stringify(desktop).match(/token|secret|password|credential|private/i), "desktop build plan leaks sensitive names");
 assert(desktop.collectArtifacts.enabled === false, "desktop collector should be disabled by default");
 

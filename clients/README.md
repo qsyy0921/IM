@@ -71,6 +71,7 @@ dependencies:
 npm --prefix clients run validate
 npm --prefix clients run test:shell-config
 npm --prefix clients run test:shell-web-assets
+npm --prefix clients run test:shell-asset-prep-wrapper
 npm --prefix clients run validate:desktop-tauri
 npm --prefix clients run validate:android-native
 ```
@@ -145,7 +146,10 @@ Current packaging status:
 
 - Browser: Vite dev/build shell exists.
 - PC desktop: Tauri shell skeleton can prepare target-specific Web assets and
-  has a build wrapper; no installer yet because this machine lacks Tauri CLI.
+  has a build wrapper. Direct Tauri builds still run shell asset prep, while the
+  NexusIM wrapper sets `NEXUSIM_SKIP_SHELL_ASSET_PREP=true` after it has already
+  prepared and verified the manifest so wrapper builds do not run the same Web
+  build twice. No installer exists yet because this machine lacks Tauri CLI.
 - Android: native WebView shell can prepare target-specific Web assets and has
   an APK build wrapper plus a Docker builder profile; no APK/AAB has been
   produced yet because the local native toolchain is missing and the Docker

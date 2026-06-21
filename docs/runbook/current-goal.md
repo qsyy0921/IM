@@ -114,10 +114,13 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   access；Gradle `preBuild` 会调用同一资产准备脚本。shell asset prep 会在
   source / output 不同时先清理目标目录，避免 APK / shell 包混入旧 bundle，并写入
   低敏 `nexusim-shell-assets-manifest.json`（relative path / bytes / SHA-256）。artifact
-  build wrapper 会在调用 Tauri / Gradle 前验证 prepared assets 与 manifest 一致；Android
-  wrapper 会在已准备并校验 manifest 后传 `-Pnexusim.skipWebAssetPrep=true`，避免 Gradle
-  `preBuild` 重复跑同一 Web build，而直接运行 Gradle 仍会自动准备 assets。该流程已通过
-  focused `test:shell-web-assets`、desktop / Android validators 和实际 shell asset build。
+  build wrapper 会在调用 Tauri / Gradle 前验证 prepared assets 与 manifest 一致；desktop
+  wrapper 会在已准备并校验 manifest 后设置
+  `NEXUSIM_SKIP_SHELL_ASSET_PREP=true`，避免 Tauri `beforeBuildCommand` 重复跑同一
+  Web build，而直接运行 Tauri 仍会自动准备 assets；Android wrapper 会在已准备并校验
+  manifest 后传 `-Pnexusim.skipWebAssetPrep=true`，避免 Gradle `preBuild` 重复跑同一
+  Web build，而直接运行 Gradle 仍会自动准备 assets。该流程已通过 focused
+  `test:shell-web-assets`、desktop / Android validators 和实际 shell asset build。
 - `clients/tools/build-desktop-artifact.mjs` 与
   `clients/tools/build-android-apk.mjs` 已提供 first-stage artifact / APK build
   wrapper；`test:artifact-builders` 覆盖 dry-run 命令计划和低敏输出。当前机器

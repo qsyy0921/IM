@@ -5,7 +5,7 @@
   "identifier": "com.nexusim.desktop",
   "build": {
     "frontendDist": "../../web/dist",
-    "beforeBuildCommand": "npm --prefix .. run build:shell-assets:desktop"
+    "beforeBuildCommand": "npm --prefix .. run prepare:shell-assets:desktop"
   },
   "app": {
     "windows": [

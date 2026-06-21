@@ -20,7 +20,10 @@ the native bridge can stay narrow and auditable.
   for local LAN endpoints and desktop runtime identity. It can be rendered to
   `web/public/nexusim-shell-config.js` before a shell build.
 - `npm --prefix clients run build:desktop-artifact` is the first-stage artifact
-  wrapper. It prepares Web assets and then runs the available Tauri CLI. Use
+  wrapper. It prepares and verifies Web assets, then runs the available Tauri
+  CLI with `NEXUSIM_SKIP_SHELL_ASSET_PREP=true` so Tauri does not run the same
+  Web build again. Direct Tauri builds still use `beforeBuildCommand` to prepare
+  assets through `prepare-shell-web-assets-if-needed.mjs`. Use
   `node clients/tools/build-desktop-artifact.mjs --dry-run` to inspect the
   command and missing toolchain without building.
 - No Windows installer is produced yet.
@@ -46,6 +49,7 @@ the native bridge can stay narrow and auditable.
 npm --prefix clients run typecheck:desktop
 npm --prefix clients run validate:desktop-tauri
 npm --prefix clients run test:shell-config
+npm --prefix clients run test:shell-asset-prep-wrapper
 npm --prefix clients run test:artifact-builders
 node clients/tools/render-shell-config.mjs --input clients/desktop/shell-config.example.json
 node clients/tools/build-desktop-artifact.mjs --dry-run

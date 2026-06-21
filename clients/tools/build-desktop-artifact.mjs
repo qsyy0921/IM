@@ -40,7 +40,11 @@ function main(argv) {
   execFileSync(plan.command, plan.args, {
     cwd: desktopRoot,
     stdio: "inherit",
-    shell: plan.shell
+    shell: plan.shell,
+    env: {
+      ...process.env,
+      NEXUSIM_SKIP_SHELL_ASSET_PREP: "true"
+    }
   });
   if (options.collect) {
     execFileSync(process.execPath, collectArgs("windows-desktop", options), {
@@ -68,6 +72,7 @@ function desktopBuildPlan(prereqs, options) {
         ? ["/d", "/s", "/c", quoteCommand(localTauri, ["build"])]
         : ["build"],
       shell: false,
+      skipShellAssetPrepEnv: "NEXUSIM_SKIP_SHELL_ASSET_PREP",
       outputHint: "clients/desktop/src-tauri/target/release/bundle",
       collectArtifacts: collectPlanSummary("windows-desktop", options)
     };
@@ -79,6 +84,7 @@ function desktopBuildPlan(prereqs, options) {
     command: "cargo",
     args: ["tauri", "build"],
     shell: false,
+    skipShellAssetPrepEnv: "NEXUSIM_SKIP_SHELL_ASSET_PREP",
     outputHint: "clients/desktop/src-tauri/target/release/bundle",
     cargoTauriDetected: hasCargoTauri,
     collectArtifacts: collectPlanSummary("windows-desktop", options)

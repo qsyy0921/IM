@@ -24,6 +24,7 @@ const requiredPaths = [
   "desktop/src-tauri/src/main.rs",
   "desktop/src-tauri/tauri.conf.json",
   "desktop/shell-config.example.json",
+  "tools/prepare-shell-web-assets-if-needed.mjs",
   "tools/prepare-shell-web-assets.mjs",
   "web/public/nexusim-shell-config.js"
 ];
@@ -56,8 +57,14 @@ assert(config.identifier === "com.nexusim.desktop", "desktop identifier mismatch
 assert(config.build?.frontendDist === "../../web/dist", "desktop frontendDist mismatch");
 const frontendDist = resolve(root, "desktop", "src-tauri", config.build.frontendDist);
 assert(frontendDist === resolve(root, "web", "dist"), "desktop frontendDist must resolve to shared web/dist");
-assert(config.build?.beforeBuildCommand?.includes("build:shell-assets:desktop"), "desktop build must prepare shell web assets");
+assert(config.build?.beforeBuildCommand === "npm --prefix .. run prepare:shell-assets:desktop", "desktop build must use stable npm shell asset prep entrypoint");
 assert(config.bundle?.active === false, "desktop bundle must stay inactive until artifact build slice");
+
+const clientsPackage = readJSON("package.json");
+assert(clientsPackage.scripts?.["prepare:shell-assets:desktop"]?.includes("prepare-shell-web-assets-if-needed.mjs"), "clients package must expose desktop shell asset prep entrypoint");
+const desktopPackage = readJSON("desktop/package.json");
+assert(desktopPackage.scripts?.["prepare:shell-assets:desktop"]?.includes("prepare-shell-web-assets-if-needed.mjs"), "desktop package must expose shell asset prep entrypoint");
+assert(desktopPackage.scripts?.["tauri:build"] === "tauri build", "desktop tauri build script must rely on Tauri beforeBuildCommand");
 
 const shellConfig = readJSON("desktop/shell-config.example.json");
 assert(shellConfig.target === "windows-desktop", "desktop shell config target mismatch");

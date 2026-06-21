@@ -205,6 +205,11 @@ Responsibilities:
   absolute paths, tokens, user ids or endpoint secrets.
 - Native artifact build wrappers must verify prepared assets against this
   manifest before invoking Tauri or Gradle.
+- Direct Tauri builds must still prepare shell assets through
+  `beforeBuildCommand`. The NexusIM desktop artifact wrapper may set
+  `NEXUSIM_SKIP_SHELL_ASSET_PREP=true` only after it has already prepared and
+  verified the shell asset manifest, so wrapper builds do not run the same Web
+  build twice.
 
 PC constraints:
 

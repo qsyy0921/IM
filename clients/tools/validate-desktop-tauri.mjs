@@ -21,6 +21,8 @@ function assert(condition, message) {
 const requiredPaths = [
   "desktop/src-tauri/Cargo.toml",
   "desktop/src-tauri/build.rs",
+  "desktop/src-tauri/capabilities/default.json",
+  "desktop/src-tauri/permissions/runtime_metadata.toml",
   "desktop/src-tauri/src/main.rs",
   "desktop/src-tauri/tauri.conf.json",
   "desktop/shell-config.example.json",
@@ -55,10 +57,25 @@ const config = readJSON("desktop/src-tauri/tauri.conf.json");
 assert(config.productName === "NexusIM", "desktop product name mismatch");
 assert(config.identifier === "com.nexusim.desktop", "desktop identifier mismatch");
 assert(config.build?.frontendDist === "../../web/dist", "desktop frontendDist mismatch");
+assert(config.app?.withGlobalTauri === true, "desktop shell must expose the audited Tauri global bridge for WebView metadata smoke");
 const frontendDist = resolve(root, "desktop", "src-tauri", config.build.frontendDist);
 assert(frontendDist === resolve(root, "web", "dist"), "desktop frontendDist must resolve to shared web/dist");
 assert(config.build?.beforeBuildCommand === "npm --prefix .. run prepare:shell-assets:desktop", "desktop build must use stable npm shell asset prep entrypoint");
 assert(config.bundle?.active === false, "desktop bundle must stay inactive until artifact build slice");
+
+const capability = readJSON("desktop/src-tauri/capabilities/default.json");
+assert(capability.identifier === "main-shell-metadata", "desktop capability identifier mismatch");
+assert(Array.isArray(capability.windows) && capability.windows.length === 1 && capability.windows[0] === "main", "desktop capability must target only the main window");
+assert(Array.isArray(capability.permissions), "desktop capability permissions missing");
+assert(capability.permissions.includes("core:default"), "desktop capability must include core default IPC permission set");
+assert(capability.permissions.includes("allow-runtime-metadata"), "desktop capability must allow only runtime_metadata app command");
+assert(capability.permissions.length === 2, "desktop capability must not grant additional native commands");
+
+const runtimeMetadataPermission = read("desktop/src-tauri/permissions/runtime_metadata.toml");
+assert(runtimeMetadataPermission.includes('identifier = "allow-runtime-metadata"'), "desktop runtime metadata allow permission missing");
+assert(runtimeMetadataPermission.includes('commands.allow = ["runtime_metadata"]'), "desktop runtime metadata command allow missing");
+assert(runtimeMetadataPermission.includes('identifier = "deny-runtime-metadata"'), "desktop runtime metadata deny permission missing");
+assert(!runtimeMetadataPermission.match(/std::fs|File::|Command::|process::|token|secret|password|credential|message_id/i), "desktop runtime metadata permission must not mention broad native capability");
 
 const clientsPackage = readJSON("package.json");
 assert(clientsPackage.scripts?.["prepare:shell-assets:desktop"]?.includes("prepare-shell-web-assets-if-needed.mjs"), "clients package must expose desktop shell asset prep entrypoint");

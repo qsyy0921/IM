@@ -57,7 +57,7 @@ Web-first 客户端平台 first slice。
 第四阶段：补 receipt-service、contacts-service、policy-service 和 api-gateway，把已读/未读、联系人、权限决策和统一入口补齐。
 第五阶段：集中治理分布式可靠性、安全启动门禁、trusted metadata / TLS 边界、repair / audit / cleanup、debug metrics 和代码复杂度。
 第六阶段：search / memory / retrieval / RAG / summary / Agent / skill-registry / MCP gateway / action-executor / ai-eval first paths 已落，EvidencePack、proposal / approval / audit、Python AI Worker 候选边界和 optional stack gate 已验证。
-第七阶段：按完整目标架构补 product-active 平台服务和 client platform MVP foundation；Web first path、client BFF、push path、本地 / wired smoke 已通过，下一步接 PC / Android runtime。
+第七阶段：按完整目标架构补 product-active 平台服务和 client platform MVP foundation；Web first path、client BFF、push path、本地 / wired smoke 已通过，PC Tauri WebView metadata smoke 已通过，下一步做登录级 PC shell smoke 和 Android APK。
 ```
 
 当前项目已经进入“完整架构同步后的产品化 + AI 应用底座”阶段：
@@ -67,7 +67,7 @@ Web-first 客户端平台 first slice。
 短期不以生产级完整系统测试或生产级 HA 作为算法/eval 前置阻塞，验证重点放在低敏 cases、EvidencePack、权限过滤、source refs、时间版本和审计边界；
 search / memory / retrieval / RAG / summary / Agent / skill / MCP / executor / ai-eval first paths 已落，RAG / Summary / Agent stack 已通过 cross-group / temporal optional gate；
 future platform / product services 已进入 product-active first-stage implementation；
-client platform MVP foundation 已启动：Web first path、api-gateway client BFF、push path、本地和 wired 172 clean baseline 已通过，下一步接 PC / Android runtime；
+client platform MVP foundation 已启动：Web first path、api-gateway client BFF、push path、本地和 wired 172 clean baseline 已通过，PC Tauri WebView metadata smoke 已通过，下一步做登录级 PC shell smoke 和 Android APK；
 完整目标架构以 docs/architecture/target-architecture-complete.md 为基线，后续按业务平台、数据平台、AI / Agent 平台、客户端平台和中间件平台演进；
 后续 AI 按 low-sensitive collaborative-memory 算法/eval 推进，优先 multi-hop / temporal update / profile aggregation；
 api-gateway 已补 first-stage tenant-scoped rate limit、静态 tenant plan override、tenant plan 文件热更新、版本化 quota URL source、DB-backed tenant plan snapshot source、本地 tenant quota audit / set operator、tenant quota approval manifest 强制校验、URL bearer token / HTTPS guard、URL source CA / client cert TLS 边界、可选 checksum-required gate、applied quota snapshot stale 观测和 quota snapshot gate；

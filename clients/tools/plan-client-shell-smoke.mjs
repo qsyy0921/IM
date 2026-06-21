@@ -134,7 +134,8 @@ function nativeCommands(target, readinessTarget) {
       dryRunBuild: readinessTarget.dryRunCommand,
       installPlan: "npm --prefix clients run plan:artifact-install",
       launchSmoke: "npm --prefix clients run smoke:desktop-artifact-launch",
-      composedSmoke: "npm --prefix clients run smoke:desktop-composed -- --clientweb-summary <client-web-summary.json>"
+      composedSmoke: "npm --prefix clients run smoke:desktop-composed -- --clientweb-summary <client-web-summary.json>",
+      webviewMetadataSmoke: "npm --prefix clients run smoke:desktop-webview-metadata"
     };
   }
   return {
@@ -230,6 +231,11 @@ function nativeChecklist(target, readinessTarget, artifactStatus, installStatus)
       step: "run-desktop-composed-smoke",
       command: nativeCommands(target, readinessTarget).composedSmoke,
       evidence: "clientweb BFF/push summary and desktop artifact launch evidence are combined into one low-sensitive desktop composed smoke result"
+    });
+    checklist.push({
+      step: "run-desktop-webview-metadata-smoke",
+      command: nativeCommands(target, readinessTarget).webviewMetadataSmoke,
+      evidence: "Tauri WebView loads the prepared shell, reads runtime_metadata via native bridge and posts low-sensitive metadata to a loopback callback"
     });
   }
 

@@ -9,7 +9,8 @@ export function parseArtifactBuildOptions(argv) {
     skipWebBuild: false,
     collect: false,
     artifactOutputDir: "",
-    runId: ""
+    runId: "",
+    shellConfigPath: ""
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -33,6 +34,11 @@ export function parseArtifactBuildOptions(argv) {
     }
     if (arg === "--run-id") {
       options.runId = requiredValue(argv, index, arg);
+      index += 1;
+      continue;
+    }
+    if (arg === "--shell-config") {
+      options.shellConfigPath = requiredValue(argv, index, arg);
       index += 1;
       continue;
     }

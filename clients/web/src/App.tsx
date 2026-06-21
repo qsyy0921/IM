@@ -51,6 +51,7 @@ export function App() {
   const [pushStatus, setPushStatus] = useState("disconnected");
   const [error, setError] = useState("");
   const [desktopNativeMetadata, setDesktopNativeMetadata] = useState<NativeBridgeMetadata | undefined>();
+  const [desktopNativeMetadataProbeFinished, setDesktopNativeMetadataProbeFinished] = useState(false);
 
   const sessionRef = useRef<AuthSession | null>(null);
   const activeConversationRef = useRef("");
@@ -59,13 +60,26 @@ export function App() {
 
   useEffect(() => {
     let active = true;
-    void readDesktopNativeBridgeMetadata().then(metadata => {
-      if (active) {
-        setDesktopNativeMetadata(metadata);
+    let retryTimer: ReturnType<typeof window.setTimeout> | undefined;
+    const deadlineMs = Date.now() + 5000;
+    const readMetadata = async () => {
+      const metadata = await readDesktopNativeBridgeMetadata();
+      if (!active) {
+        return;
       }
-    });
+      if (metadata || Date.now() >= deadlineMs) {
+        setDesktopNativeMetadata(metadata);
+        setDesktopNativeMetadataProbeFinished(true);
+        return;
+      }
+      retryTimer = window.setTimeout(() => void readMetadata(), 100);
+    };
+    void readMetadata();
     return () => {
       active = false;
+      if (retryTimer !== undefined) {
+        window.clearTimeout(retryTimer);
+      }
     };
   }, []);
 
@@ -74,7 +88,10 @@ export function App() {
       return;
     }
     const nativeMetadata = desktopNativeMetadata ?? androidNativeMetadata;
-    if ((shellConfig.target === "windows-desktop" || shellConfig.target === "android") && !nativeMetadata) {
+    if (shellConfig.target === "windows-desktop" && !nativeMetadata && !desktopNativeMetadataProbeFinished) {
+      return;
+    }
+    if (shellConfig.target === "android" && !nativeMetadata) {
       return;
     }
     shellSmokeReportedRef.current = true;
@@ -83,7 +100,7 @@ export function App() {
       shellSmokeReportedRef.current = false;
       setError(errorMessage(caught));
     });
-  }, [desktopNativeMetadata]);
+  }, [desktopNativeMetadata, desktopNativeMetadataProbeFinished]);
 
   async function login(): Promise<void> {
     await run("login", async () => {

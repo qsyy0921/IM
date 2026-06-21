@@ -38,11 +38,23 @@ if (plan.targets["windows-desktop"].nativeToolchainReady) {
   if (plan.targets["windows-desktop"].readyForManualShellSmoke) {
     assert(plan.targets["windows-desktop"].commands.launchSmoke?.includes("smoke:desktop-artifact-launch"), "desktop launch smoke command missing when smoke-ready");
     assert(plan.targets["windows-desktop"].commands.composedSmoke?.includes("smoke:desktop-composed"), "desktop composed smoke command missing when smoke-ready");
+    assert(plan.targets["windows-desktop"].commands.webviewMetadataSmoke?.includes("smoke:desktop-webview-metadata"), "desktop WebView metadata smoke command missing when smoke-ready");
     assert(plan.targets["windows-desktop"].checklist.some(item => item.step === "launch-desktop-artifact-smoke"), "desktop artifact launch smoke checklist missing when smoke-ready");
     assert(plan.targets["windows-desktop"].checklist.some(item => item.step === "run-desktop-composed-smoke"), "desktop composed smoke checklist missing when smoke-ready");
+    assert(plan.targets["windows-desktop"].checklist.some(item => item.step === "run-desktop-webview-metadata-smoke"), "desktop WebView metadata smoke checklist missing when smoke-ready");
     assert(plan.targets["windows-desktop"].checklist.some(item => item.step === "run-platform-shell"), "desktop platform shell checklist missing when smoke-ready");
   } else {
-    assert(plan.targets["windows-desktop"].checklist.some(item => item.step === "resolve-install-prereqs" || item.step === "collect-native-artifact"), "desktop install-prereq checklist missing when artifact is not smoke-ready");
+    const desktopTarget = plan.targets["windows-desktop"];
+    if (!desktopTarget.shellAssets?.verified) {
+      assert(desktopTarget.checklist.some(item => item.step === "prepare-shell-assets"), "desktop asset prep checklist missing when shell assets are not smoke-ready");
+      assert(desktopTarget.checklist.some(item => item.step === "verify-shell-assets"), "desktop asset verify checklist missing when shell assets are not smoke-ready");
+    }
+    if (!desktopTarget.artifact.present) {
+      assert(desktopTarget.checklist.some(item => item.step === "collect-native-artifact"), "desktop artifact collection checklist missing when artifact is not smoke-ready");
+    }
+    if (!desktopTarget.install.readyForInstall) {
+      assert(desktopTarget.checklist.some(item => item.step === "resolve-install-prereqs"), "desktop install-prereq checklist missing when install is not smoke-ready");
+    }
   }
 } else {
   if (desktopMissingToolchain.some(item => item.name === "local:tauri")) {

@@ -1,0 +1,9 @@
+[[permission]]
+identifier = "allow-runtime-metadata"
+description = "Enables the audited runtime_metadata command without any pre-configured scope."
+commands.allow = ["runtime_metadata"]
+
+[[permission]]
+identifier = "deny-runtime-metadata"
+description = "Denies the audited runtime_metadata command without any pre-configured scope."
+commands.deny = ["runtime_metadata"]

@@ -84,7 +84,7 @@ First slice:
   must be loopback `http://127.0.0.1`, `http://localhost` or `http://[::1]`.
   When enabled, the WebView posts a low-sensitive report after reading native
   bridge metadata. The report proves metadata wiring only; it does not submit
-  login credentials or run a message flow.
+  login form data or run a message flow.
 - `web/index.html` loads `nexusim-shell-config.js` before the app bundle.
   Browser mode uses the checked-in empty placeholder; desktop / Android shell
   builds can render their low-sensitive `shell-config.example.json` through
@@ -273,9 +273,13 @@ First slice:
   alive during the smoke hold window and terminates cleanly.
   `smoke:desktop-composed` can also combine that launch proof with a clientweb
   BFF / push summary without leaking absolute paths or sensitive fields. It
-  still does not produce MSI / NSIS installer bundles, and the fuller
-  login-level desktop UI smoke remains pending. Android still does not produce `.apk` or `.aab`
-  artifacts because the local toolchain / Docker builder image has not been completed.
+  still does not produce MSI / NSIS installer bundles. `npm --prefix clients run
+  smoke:desktop-webview-metadata` now proves the Tauri WebView can load the
+  prepared shell, read the PC `runtime_metadata` IPC and POST a low-sensitive
+  loopback report from inside the rendered shell. The fuller login-level
+  desktop UI smoke remains pending. Android still does not produce `.apk` or
+  `.aab` artifacts because the local toolchain / Docker builder image has not
+  been completed.
 - `/api/auth/logout` performs first-stage server-side logout for the current
   authenticated session only. Broader device/session management remains an
   identity/admin capability, not a client BFF target selector.
@@ -297,10 +301,9 @@ rejected. For local LAN client smoke, prefer the wired `172.x.x.x` address.
 ## Next Work
 
 1. Run login-level real PC shell smoke against the collected standalone Windows
-   artifact; launch sanity smoke already passes and composed smoke can already
-   merge desktop-launch evidence with a clientweb BFF / push summary. The
-   metadata callback contract is now present, so the next PC step can first
-   prove Tauri WebView native metadata from inside the rendered shell.
+   artifact; launch sanity smoke, composed evidence and Tauri WebView metadata
+   callback smoke already pass. The next PC step should verify login,
+   PullInbox, delivery notify and AckDelivery inside the rendered Tauri shell.
 2. Add first unsigned local APK from the Android native bridge or Docker builder.
 3. Wire lifecycle UI controls into the real Android shell, and run platform-shell
    smoke once packaging/runtime tooling is ready.
@@ -351,6 +354,7 @@ npm --prefix clients run plan:shell-smoke
 npm --prefix clients run plan:artifact-install
 npm --prefix clients run smoke:desktop-artifact-launch
 npm --prefix clients run smoke:desktop-composed -- --clientweb-summary <client-web-summary.json>
+npm --prefix clients run smoke:desktop-webview-metadata
 ```
 
 The report includes `nextActions`. When the Android Docker builder image is

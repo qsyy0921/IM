@@ -77,7 +77,9 @@
   desktop / Android artifact build wrapper 已有 dry-run-tested command plan，
   readiness report 已显示 per-target shell asset verification 状态；desktop 已通过
   repo-local `@tauri-apps/cli` 产出 first-stage standalone exe artifact，且 launch
-  sanity smoke 已验证 exe 可启动并干净终止；
+  sanity smoke 已验证 exe 可启动并干净终止；真实 Tauri WebView metadata callback
+  smoke 已通过，证明 PC shell WebView 能读取只读 `runtime_metadata` IPC 并回调低敏
+  metadata report；
   artifact install plan 已能从 collected manifest 输出低敏 Windows / Android 安装
   checklist 和 install-side prereq readiness，且不连接设备；shell smoke plan 已消费同一
   install readiness，并输出低敏 browser / desktop / Android smoke 前置计划和

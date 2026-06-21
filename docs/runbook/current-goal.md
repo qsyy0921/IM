@@ -158,7 +158,10 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   config 可注入 loopback-only `smokeCallbackURL` / `smokeRunID` / `smokeMode=metadata`，
   WebView 内部读到 PC Tauri 或 Android bridge metadata 后会 POST 低敏 metadata
   report；该 report 不包含 token / password / 本机路径，也不执行登录或业务动作。
-  这为下一步真实 Tauri WebView metadata smoke 提供可自动收集的回调面。
+  2026-06-22 已跑通真实 Tauri WebView metadata callback smoke：
+  `npm --prefix clients run smoke:desktop-webview-metadata`，证明 WebView 内能读取
+  PC Tauri `runtime_metadata` 并回调低敏 report；该 smoke 仍不声明登录、
+  PullInbox、WebSocket 或 AckDelivery 已在 Tauri WebView 内完成。
 - Android 已新增 opt-in Docker builder profile：
   `deploy/docker/client-android-builder.Dockerfile` 和
   `deploy/local/docker-compose.client-builders.yml`。`validate:builder-profile`
@@ -254,10 +257,10 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
 
 ## 下一步优先级
 
-1. 继续 PC shell smoke：launch sanity、composed evidence 工具和 WebView metadata
-   callback 契约已具备；下一步先跑真实 Tauri WebView metadata callback smoke，再做
-   WebView 内 login、PullInbox、delivery.notify 和 AckDelivery 验证；同时保留后续
-   MSI / NSIS installer bundle 为 hardening。
+1. 继续 PC shell smoke：launch sanity、composed evidence 工具和真实 Tauri WebView
+   metadata callback smoke 已通过；下一步做 WebView 内 login、PullInbox、
+   delivery.notify 和 AckDelivery 验证；同时保留后续 MSI / NSIS installer bundle 为
+   hardening。
 2. 补 Android JDK 17+ / Gradle / Android SDK，或显式运行 Android Docker builder
    profile，然后运行 `build:android-apk:collect` 产出首个 APK + manifest。
 3. 在真实 Android shell UI 中接入现有 shell action，并在工具链 ready 后跑平台 shell smoke。

@@ -47,6 +47,7 @@ assertThrows(
 
 const index = read("web/index.html");
 assertIncludes(index, "/nexusim-shell-config.js", "web index loads shell config before app bundle");
+assert(index.indexOf("/nexusim-shell-config.js") < index.indexOf("</head>"), "web shell config must load in head before Vite moves the app bundle");
 const placeholder = read("web/public/nexusim-shell-config.js");
 assertIncludes(placeholder, "__NEXUSIM_CLIENT_SHELL__", "web placeholder declares shell global");
 
@@ -67,6 +68,12 @@ function assertNoSensitiveKeys(config, message) {
 function assertIncludes(value, expected, message) {
   if (!value.includes(expected)) {
     throw new Error(`${message}: expected ${expected}`);
+  }
+}
+
+function assert(condition, message) {
+  if (!condition) {
+    throw new Error(message);
   }
 }
 

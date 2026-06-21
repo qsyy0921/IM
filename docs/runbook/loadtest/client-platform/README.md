@@ -13,7 +13,7 @@ Current scope:
   not Tauri WebView GUI automation.
 - WebView metadata smoke uses shell config `smokeCallbackURL` with loopback
   HTTP only. It is intended to prove native metadata is read from inside the
-  shell; it does not include login credentials or message flow.
+  shell; it does not include login form data or message flow.
 
 Reports:
 
@@ -27,9 +27,13 @@ Reports:
 - `loadtest-report-20260621-client-web-bff-push-wired-172-clean-baseline.md`:
   first clean committed baseline for the browser MVP path on the Windows wired
   `172.31.50.1` address.
+- `loadtest-report-20260622-desktop-webview-metadata-smoke.md`: first real
+  Tauri WebView metadata callback smoke; proves the rendered PC shell can read
+  native runtime metadata and post a low-sensitive loopback report.
 
 Useful command:
 
 ```powershell
 npm --prefix clients run smoke:desktop-composed -- --clientweb-summary <client-web-summary.json>
+npm --prefix clients run smoke:desktop-webview-metadata
 ```

@@ -1,6 +1,6 @@
-import { existsSync } from "node:fs";
+import { existsSync, readdirSync, rmSync } from "node:fs";
 import { execFileSync } from "node:child_process";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import {
   collectClientBuildPrereqs,
   commandSucceeded,
@@ -16,6 +16,7 @@ import { prepareShellWebAssets } from "./prepare-shell-web-assets.mjs";
 import { verifyShellAssets } from "./verify-shell-assets.mjs";
 
 const desktopRoot = join(workspaceRoot, "desktop");
+const desktopTauriRoot = join(desktopRoot, "src-tauri");
 
 function main(argv) {
   const options = parseArtifactBuildOptions(argv);
@@ -33,9 +34,13 @@ function main(argv) {
 
   prepareShellWebAssets({
     target: "windows-desktop",
+    configPath: options.shellConfigPath || undefined,
     build: !options.skipWebBuild
   });
   verifyShellAssets({ target: "windows-desktop" });
+  if (options.shellConfigPath) {
+    cleanDesktopPackageForCustomShellConfig();
+  }
   execFileSync(plan.command, plan.args, {
     cwd: desktopRoot,
     stdio: "inherit",
@@ -72,6 +77,8 @@ function desktopBuildPlan(prereqs, options) {
         : ["build"],
       shell: false,
       skipShellAssetPrepEnv: "NEXUSIM_SKIP_SHELL_ASSET_PREP",
+      shellConfig: options.shellConfigPath ? "custom" : "default",
+      forceFreshTauriAssets: Boolean(options.shellConfigPath),
       outputHint: "clients/desktop/src-tauri/target/release/nexusim-desktop.exe or bundle",
       collectArtifacts: collectPlanSummary("windows-desktop", options)
     };
@@ -84,10 +91,42 @@ function desktopBuildPlan(prereqs, options) {
     args: ["tauri", "build"],
     shell: false,
     skipShellAssetPrepEnv: "NEXUSIM_SKIP_SHELL_ASSET_PREP",
+    shellConfig: options.shellConfigPath ? "custom" : "default",
+    forceFreshTauriAssets: Boolean(options.shellConfigPath),
     outputHint: "clients/desktop/src-tauri/target/release/nexusim-desktop.exe or bundle",
     cargoTauriDetected: hasCargoTauri,
     collectArtifacts: collectPlanSummary("windows-desktop", options)
   };
+}
+
+function cleanDesktopPackageForCustomShellConfig() {
+  const releaseRoot = join(desktopTauriRoot, "target", "release");
+  removeMatchingEntries(join(releaseRoot, "build"), /^nexusim-desktop-/);
+  removeMatchingEntries(join(releaseRoot, ".fingerprint"), /^nexusim-desktop-/);
+  removeMatchingEntries(join(releaseRoot, "deps"), /^nexusim[_-]desktop/);
+  for (const filename of ["nexusim-desktop.exe", "nexusim-desktop.d", "nexusim_desktop.pdb"]) {
+    removeBuildPath(join(releaseRoot, filename));
+  }
+}
+
+function removeMatchingEntries(root, pattern) {
+  if (!existsSync(root)) {
+    return;
+  }
+  for (const entry of readdirSync(root, { withFileTypes: true })) {
+    if (pattern.test(entry.name)) {
+      removeBuildPath(join(root, entry.name));
+    }
+  }
+}
+
+function removeBuildPath(path) {
+  const resolved = resolve(path);
+  const releaseRoot = resolve(desktopTauriRoot, "target", "release");
+  if (resolved !== releaseRoot && !resolved.startsWith(`${releaseRoot}\\`) && !resolved.startsWith(`${releaseRoot}/`)) {
+    throw new Error("refusing to remove a path outside desktop release build output");
+  }
+  rmSync(resolved, { recursive: true, force: true });
 }
 
 try {

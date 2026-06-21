@@ -64,23 +64,26 @@ The exact ports must match the local `api-gateway` and `push-gateway` runtime.
 
 ## Validation
 
-The current skeleton can be validated without downloading npm dependencies:
+The current skeleton can be validated after installing the local workspace
+dependencies:
 
 ```powershell
-cd clients
-npm run validate
+npm --prefix clients run validate
+npm --prefix clients run test:shell-config
+npm --prefix clients run test:shell-web-assets
+npm --prefix clients run validate:desktop-tauri
+npm --prefix clients run validate:android-native
 ```
 
-Install dependencies only when starting real Web development:
+Build target-specific Web assets for a local shell:
 
 ```powershell
-cd clients
-npm install
-npm run dev:web
+npm --prefix clients run build:shell-assets:desktop
+npm --prefix clients run build:shell-assets:android
 ```
 
 Current packaging status:
 
 - Browser: Vite dev/build shell exists.
-- PC desktop: package boundary exists, no installer yet.
-- Android: package boundary exists, no APK/AAB yet.
+- PC desktop: Tauri shell skeleton can prepare target-specific Web assets, no installer yet.
+- Android: native WebView shell can prepare target-specific Web assets, no APK/AAB yet.

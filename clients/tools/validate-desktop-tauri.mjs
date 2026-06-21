@@ -24,6 +24,7 @@ const requiredPaths = [
   "desktop/src-tauri/src/main.rs",
   "desktop/src-tauri/tauri.conf.json",
   "desktop/shell-config.example.json",
+  "tools/prepare-shell-web-assets.mjs",
   "web/public/nexusim-shell-config.js"
 ];
 
@@ -47,6 +48,7 @@ const config = readJSON("desktop/src-tauri/tauri.conf.json");
 assert(config.productName === "NexusIM", "desktop product name mismatch");
 assert(config.identifier === "com.nexusim.desktop", "desktop identifier mismatch");
 assert(config.build?.frontendDist === "../web/dist", "desktop frontendDist mismatch");
+assert(config.build?.beforeBuildCommand?.includes("build:shell-assets:desktop"), "desktop build must prepare shell web assets");
 assert(config.bundle?.active === false, "desktop bundle must stay inactive until artifact build slice");
 
 const shellConfig = readJSON("desktop/shell-config.example.json");

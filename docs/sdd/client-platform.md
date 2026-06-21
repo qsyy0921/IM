@@ -104,6 +104,12 @@ consumer. `desktop` records the Tauri shell boundary for PC packaging. `android`
 records Android runtime and packaging constraints before the full native app is
 created.
 
+Desktop and Android shell builds use the same Web UI bundle. A target-specific
+`nexusim-shell-config.js` is rendered from low-sensitive shell config JSON before
+packaging. The config may identify runtime target, LAN API / WebSocket endpoints,
+device id, installation id, app version and session namespace only; it must not
+carry auth tokens, secrets, credentials or broad native permissions.
+
 ## Implementation Languages
 
 The production business split is intentionally boring and explicit:
@@ -208,6 +214,8 @@ Android constraints:
 - Android push notification payload must not be treated as delivered message
   content.
 - Background sync must use PullInbox and device cursor state.
+- First-stage Android shell loads prepared local Web assets through
+  `WebViewAssetLoader` instead of granting broad `file://` access to Web code.
 - Offline sends must use idempotency keys and local pending queues.
 
 ## Platform Adapter Ports

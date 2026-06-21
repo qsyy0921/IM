@@ -27,8 +27,8 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   Web 端已有 Vite shell；PC desktop 和 Android 均已有 first-stage TypeScript
   runtime adapter（development session store、localStorage-backed persistent
   message store、static lifecycle/network ports）；PC desktop 已有 Tauri v2 runner skeleton（无 IPC
-  command、bundle inactive）；Android 已有 Kotlin native bridge skeleton（只做
-  launch shell / metadata，不拥有 token 或消息事实），但仍不产出安装包 / APK。
+  command、bundle inactive）；Android 已有 Kotlin WebView asset shell / metadata
+  bridge skeleton（不拥有 token 或消息事实），但仍不产出安装包 / APK。
 - `api-gateway` 已新增 first-stage client BFF HTTP/JSON surface：`/api/auth/login`、
   `/api/auth/refresh`、`/api/me`、`/api/conversations`、
   `/api/conversations/{conversation_id}/messages`、`/api/messages/send`、
@@ -97,6 +97,13 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   `clients/tools/render-shell-config.mjs` 渲染成注入脚本。`test:shell-config` 和
   desktop / Android skeleton validator 会拒绝 unsupported target 与 token /
   secret / password 等敏感字段。
+- `clients/tools/prepare-shell-web-assets.mjs` 已把 Web build 与目标 shell config
+  注入串起来：`build:shell-assets:desktop` 会构建 Web 并把 `windows-desktop`
+  config 写入 `clients/web/dist/nexusim-shell-config.js`；`build:shell-assets:android`
+  会构建 Web、复制到 Android app assets，并写入 `android` config。Android native
+  skeleton 已改成 `WebViewAssetLoader` 加载本地 app assets，禁用 file / content
+  access；Gradle `preBuild` 会调用同一资产准备脚本。该流程已通过 focused
+  `test:shell-web-assets`、desktop / Android validators 和实际 shell asset build。
 - `loadtest/clientweb` 已新增 first-stage scriptable client smoke runner：
   准备阶段用 identity / api-gateway gRPC 注册用户、seed 会话并创建 JOIN；真实客户端
   验证段只走 `api-gateway` HTTP BFF 和 `push-gateway` WebSocket，覆盖 BFF login、
@@ -171,8 +178,7 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
 ## 下一步优先级
 
 1. 后续按同一 core 接 PC desktop local Windows artifact 和 Android unsigned APK。
-2. 在真实 PC / Android shell build 中使用 shell config renderer 注入
-   `nexusim-shell-config.js`，接入现有 shell logout action，并跑平台 shell smoke。
+2. 在真实 PC / Android shell UI 中接入现有 shell logout action，并在工具链 ready 后跑平台 shell smoke。
 3. 后续把 desktop / Android first-stage localStorage store 替换为 native
    SQLite bridge，并补真实平台 runtime smoke。
 4. 再回到 workflow compensation adapter / instruction approval UI / ops 管理；

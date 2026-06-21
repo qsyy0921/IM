@@ -36,8 +36,8 @@
   当前本机尚缺 Tauri CLI / `cargo-tauri`，需要先补本地构建前置或通过
   Docker / CI builder 产物链路；可用 `npm --prefix clients run check:build-prereqs`
   检查当前机器状态。
-- `clients/android`：first-stage TypeScript runtime adapter 和 Kotlin native
-  bridge skeleton 已落；`createAndroidClientRuntime` 已能组装 shared
+- `clients/android`：first-stage TypeScript runtime adapter 和 Kotlin WebView
+  asset shell skeleton 已落；`createAndroidClientRuntime` 已能组装 shared
   `BFFClient` / `WebSocketPushTransport` / auth / inbox / send / ack queue；
   shared runtime lifecycle smoke 已覆盖 login / restore / refresh / logout 本地状态；
   thin `createAndroidShellActions` 已接 shared restore / logout 编排；继续产出 unsigned
@@ -62,8 +62,9 @@
   provider-grade session 策略，避免把 token 长期放在 Web storage。
 - WebView bridge：`globalThis.__NEXUSIM_CLIENT_SHELL__` 已能选择
   `windows-desktop` / `android` target 和 LAN endpoint；desktop / Android
-  `shell-config.example.json` 与 renderer 已落；后续需要真实 Tauri / Android shell
-  build 使用 renderer 产物，并用真实壳层 smoke 验证。
+  `shell-config.example.json`、renderer 与 target shell Web assets prep 已落；
+  后续需要真实 Tauri / Android shell UI 接入现有 shell action，并用真实壳层 smoke
+  验证。
 
 ## AI / Agent Platform 未完成
 

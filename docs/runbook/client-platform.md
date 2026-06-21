@@ -84,6 +84,11 @@ First slice:
   builds can render their low-sensitive `shell-config.example.json` through
   `clients/tools/render-shell-config.mjs` and replace that placeholder for a
   local shell build.
+- `clients/tools/prepare-shell-web-assets.mjs` is the target asset-prep
+  wrapper for real shells. `npm --prefix clients run build:shell-assets:desktop`
+  builds Web and injects the `windows-desktop` shell config into `web/dist`.
+  `npm --prefix clients run build:shell-assets:android` builds Web, copies the
+  dist into Android app assets, and injects the `android` shell config there.
 - `IndexedDBMessageStore` now has a dependency-free first-stage persistence
   test harness covering cursor persistence, message ordering, pending send,
   accepted send stable-key migration, replay de-duplication and failed-send
@@ -106,8 +111,9 @@ First slice:
   network/lifecycle ports and unsupported push/local wakeup notifications. This
   moves Android beyond a pure contract, but it is not an APK yet.
 - `clients/android/native` now has a first-stage Kotlin native bridge skeleton.
-  It owns only launch shell / metadata and does not own token storage, local
-  message facts, BFF calls, or push delivery semantics.
+  It now uses an Android WebView asset shell through `WebViewAssetLoader`,
+  loads the prepared local Web assets, and still does not own token storage,
+  local message facts, BFF calls, or push delivery semantics.
 - PC desktop and Android can reuse the same `@nexusim/client-core` BFF adapter
   instead of copying Web-private HTTP mapping code.
 - PC desktop and Android can also reuse the same `@nexusim/client-core`
@@ -142,6 +148,8 @@ First slice:
 - `npm --prefix clients run test:shell-config` validates the desktop / Android
   shell config templates and renderer, and rejects unsupported targets or
   sensitive fields such as token, secret and password.
+- `npm --prefix clients run test:shell-web-assets` validates the target asset
+  prep wrapper without requiring Tauri CLI, Android SDK or a live backend.
 - `@nexusim/client-core` now exposes `ClientShellActions`; desktop and Android
   export thin `createDesktopShellActions` / `createAndroidShellActions` wrappers.
   These wrappers do not own business logic; they only bind shell UI actions to
@@ -167,8 +175,8 @@ First slice:
   It does not replace existing secure mTLS gateway / push smoke coverage.
 - PC desktop and Android now both have first-stage TypeScript runtime adapters.
   PC desktop also has a Tauri runner skeleton, and Android has a Kotlin native
-  bridge skeleton. Neither target produces `.msi`, `.exe`, `.apk`, or `.aab`
-  artifacts yet.
+  WebView asset shell skeleton. Neither target produces `.msi`, `.exe`, `.apk`,
+  or `.aab` artifacts yet.
 - `/api/auth/logout` performs first-stage server-side logout for the current
   authenticated session only. Broader device/session management remains an
   identity/admin capability, not a client BFF target selector.
@@ -191,9 +199,8 @@ rejected. For local LAN client smoke, prefer the wired `172.x.x.x` address.
 
 1. Add first local Windows artifact from the PC desktop Tauri runner.
 2. Add first unsigned local APK from the Android native bridge.
-3. Render target-specific `nexusim-shell-config.js`, wire logout UI controls
-   into the real desktop and Android shells, and run a platform-shell smoke once
-   packaging/runtime tooling is ready.
+3. Wire logout UI controls into the real desktop and Android shells, and run a
+   platform-shell smoke once packaging/runtime tooling is ready.
 4. Replace first-stage desktop / Android localStorage stores with native SQLite
    bridge adapters when packaging/runtime tooling is ready.
 
@@ -210,6 +217,7 @@ Focused local check:
 ```powershell
 npm --prefix clients run check:build-prereqs
 npm --prefix clients run test:shell-config
+npm --prefix clients run test:shell-web-assets
 ```
 
 This command reports readiness as JSON and exits non-zero when artifact / APK

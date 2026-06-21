@@ -22,6 +22,7 @@ const requiredPaths = [
   "android/native/app/src/main/java/com/nexusim/android/MainActivity.kt",
   "android/native/app/src/main/java/com/nexusim/android/NexusIMBridge.kt",
   "android/shell-config.example.json",
+  "tools/prepare-shell-web-assets.mjs",
   "web/public/nexusim-shell-config.js"
 ];
 
@@ -42,11 +43,18 @@ assert(appBuild.includes('namespace = "com.nexusim.android"'), "Android namespac
 assert(appBuild.includes('applicationId = "com.nexusim.android"'), "Android applicationId mismatch");
 assert(appBuild.includes("minSdk = 26"), "Android minSdk mismatch");
 assert(appBuild.includes("targetSdk = 35"), "Android targetSdk mismatch");
+assert(appBuild.includes("prepareNexusIMWebAssets"), "Android web asset prep task missing");
+assert(appBuild.includes("build:shell-assets:android"), "Android build must prepare shell web assets");
 
 const manifest = read("android/native/app/src/main/AndroidManifest.xml");
 assert(manifest.includes("android.permission.INTERNET"), "Android INTERNET permission missing");
 assert(manifest.includes("android.permission.ACCESS_NETWORK_STATE"), "Android network state permission missing");
 assert(manifest.includes('android:name=".MainActivity"'), "Android MainActivity missing");
+
+const mainActivity = read("android/native/app/src/main/java/com/nexusim/android/MainActivity.kt");
+assert(mainActivity.includes("WebViewAssetLoader"), "Android shell must use WebViewAssetLoader");
+assert(mainActivity.includes("appassets.androidplatform.net"), "Android shell must load appassets URL");
+assert(mainActivity.includes("allowFileAccess = false"), "Android shell must disable file access");
 
 const bridge = read("android/native/app/src/main/java/com/nexusim/android/NexusIMBridge.kt");
 assert(bridge.includes('runtimeTarget: String = "android"'), "Android runtime target marker missing");

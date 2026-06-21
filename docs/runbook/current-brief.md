@@ -41,7 +41,9 @@ presence-service、vector-index-service、workflow-service。
 已提供脚本化 BFF + push client-path smoke runner 和本地私有进程启动脚本。第一轮
 本地 Web MVP smoke 已通过并归档；提交后的 clean baseline 也已通过并归档；
 Windows wired `172.31.50.1` clean baseline 已通过并归档；BFF HTTP route metrics /
-rate-limit adapter 已落。下一步是 PC / Android runtime shell。
+rate-limit adapter 已落。PC / Android runtime shell 已进入 assets prep / native
+shell 骨架阶段，下一步是本地 Windows artifact、Android unsigned APK 和真实壳层
+smoke。
 
 真实业务语言边界已经固定为：Go 负责后端微服务、client BFF、控制面、事实源和
 审计；TypeScript 负责 Web / PC / Android 的共享客户端协议、同步核心和 UI；
@@ -58,7 +60,9 @@ adoption rules，不把服务数量、中间件或部署形态写死。
 - client-platform：`api-gateway` client BFF 和 Web fetch / WebSocket /
   IndexedDB adapter first path 已落，`loadtest/clientweb` 本地 smoke 已通过并归档；
   loopback clean baseline 和 Windows wired `172.31.50.1` clean baseline 已通过，
-  BFF HTTP route metrics / rate-limit adapter 已落，下一步做 PC / Android runtime。
+  BFF HTTP route metrics / rate-limit adapter 已落；PC desktop / Android 已有
+  target shell Web assets prep，Android 已用 WebViewAssetLoader 加载本地 assets，
+  下一步做本地 artifact / APK 和真实平台 shell smoke。
 - admin / audit / workflow：客户端切片完成后继续公开 API handoff、operator
   workflow、低敏审批 review artifact 和补偿边界。
 - vector-index：继续 provider backend、pgvector / Milvus / OpenSearch 相关

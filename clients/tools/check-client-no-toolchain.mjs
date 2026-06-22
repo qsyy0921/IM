@@ -10,6 +10,16 @@ const checkPlan = [
     reason: "guards browser, desktop and Android shell smoke checklist shape"
   },
   {
+    name: "artifact-readiness-contract",
+    script: "test:artifact-readiness",
+    reason: "guards low-sensitive native artifact readiness reporting without building artifacts"
+  },
+  {
+    name: "artifact-install-plan-contract",
+    script: "test:artifact-install-plan",
+    reason: "guards collected artifact install plans without installing packages or contacting devices"
+  },
+  {
     name: "clientweb-smoke-hooks",
     script: "test:clientweb-smoke-hooks",
     reason: "guards clientweb run-local-smoke WebView opt-in hooks without starting services"

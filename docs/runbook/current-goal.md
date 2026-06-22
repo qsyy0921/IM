@@ -50,7 +50,9 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   `README-windows-desktop.txt`；standalone `.exe` package 会额外写入
   `launch-nexusim-windows.ps1`，install plan 会校验这些 support files 并把人工启动
   步骤指向 package-local launcher。`bundle:desktop` 已能把 collected Windows desktop
-  package 打成 unsigned local portable zip，并写低敏 summary。它仍不是生产签名
+  package 打成 unsigned local portable zip，并写低敏 summary。`plan:desktop-signing`
+  已能基于 collected desktop manifest 检查显式 `signtool`、证书来源和 timestamp URL
+  是否齐备，且只输出低敏 plan，不签名、不下载、不安装、不启动。它仍不是生产签名
   installer。
 - Android 已有 WebView shell / bridge / APK 历史产物和 metadata smoke；当前 shell
   不宣称 F 盘 Android toolchain ready，后续切回 Android 时再重新加载 toolchain env。

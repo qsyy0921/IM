@@ -170,6 +170,7 @@ npm --prefix clients run test:artifact-collector
 npm --prefix clients run test:artifact-install-plan
 npm --prefix clients run test:artifact-readiness
 npm --prefix clients run test:desktop-bundle
+npm --prefix clients run test:desktop-signing-plan
 npm --prefix clients run test:web-shell-actions
 npm --prefix clients run test:shell-smoke-plan
 npm --prefix clients run report:artifact-readiness
@@ -192,6 +193,7 @@ npm --prefix clients run build:android-apk:collect
 npm --prefix clients run collect:client-artifacts
 npm --prefix clients run bundle:desktop:dry-run
 npm --prefix clients run bundle:desktop
+npm --prefix clients run plan:desktop-signing
 ```
 
 After preparing both shell targets, verify both prepared asset directories:
@@ -227,6 +229,13 @@ ignored `clients/artifacts/desktop-bundles/<run-id>/`. This bundle is explicitly
 `unsigned-local-dev`; it does not sign, install or launch anything. If the
 latest collected manifest is for Android, pass the desktop manifest explicitly:
 `npm --prefix clients run bundle:desktop -- --manifest clients/artifacts/<desktop-run>/manifest.json`.
+`plan:desktop-signing` reads the collected Windows desktop manifest and reports
+whether explicit signing inputs are present: `signtool`, one certificate source
+and a timestamp URL. It validates the collected artifact hash and prints a
+low-sensitive command template only when ready. It does not sign artifacts,
+download tools, install packages, launch the desktop app or print local absolute
+paths. Missing signing inputs fail closed as `readyToSign=false`; there is no
+placeholder signature path.
 
 Android can also be built through the local Docker builder profile when the image
 is intentionally built:
@@ -255,8 +264,10 @@ Current packaging status:
   `nexusim-windows-desktop.exe` collected under ignored
   `clients/artifacts/<run-id>/` with a low-sensitive manifest,
   `README-windows-desktop.txt` and `launch-nexusim-windows.ps1`. A portable
-  unsigned local zip bundle can be produced with `bundle:desktop`. MSI / NSIS
-  installer bundling and real code signing are still future hardening. Use
+  unsigned local zip bundle can be produced with `bundle:desktop`.
+  `plan:desktop-signing` now checks explicit code-signing readiness and produces
+  only a low-sensitive plan; MSI / NSIS installer bundling and actual signing
+  execution are still future hardening. Use
   `npm --prefix clients run smoke:desktop-artifact-launch` for the first launch
   sanity check; it starts the collected exe, waits briefly, then terminates it.
 - Android: native WebView shell can prepare target-specific Web assets and has
@@ -295,7 +306,7 @@ Current packaging status:
   local-store / IndexedDB contracts, Web shell lifecycle / automation /
   smoke-report contracts, shell asset prep, desktop artifact launch / composed
   smoke dry-run contracts, artifact readiness / install-plan / builder /
-  collector contracts, Android builder profile / wrapper contracts, desktop
+  collector / desktop signing plan contracts, Android builder profile / wrapper contracts, desktop
   WebView metadata / login dry-run contracts, Android metadata / login dry-run
   contracts, Android device / WebView devtools readiness and parser contracts and
   reads low-sensitive ADB / device readiness state through the Android platform

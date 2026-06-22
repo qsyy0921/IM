@@ -32,7 +32,7 @@
    smoke，验证好友私聊和群聊 first path；群成员列表、移除成员、角色变更和
    owner transfer 第一路径已接入 BFF / client-core / Web shell，`loadtest/clientweb`
    也已扩展并在 clean committed smoke 中跑通这些群管理动作。继续补 PC MSI / NSIS
-   installer 和真实 code-signing pipeline、更完整群设置、成员搜索 / 分页和后续 native SQLite bridge。
+   installer 和真实 code-signing execution pipeline、更完整群设置、成员搜索 / 分页和后续 native SQLite bridge。
    Android APK / 真机 WebView smoke 后置到用户明确切回。
 2. 回到 AI / Agent 主线：group memory eval、EvidencePack、Agent 真实业务动作、
    Python AI Worker 候选算法。
@@ -77,8 +77,9 @@
   clientweb BFF / push summary 与 desktop launch 证据合并成低敏 JSON，但仍不是 GUI
   自动化。真实 Tauri WebView metadata callback smoke 已通过；Web / PC shell 已接
   登录、注册、好友、好友私聊、群聊列表、建群、消息列表和发送 first path。剩余工作是
-  跑真实双用户客户端 smoke、打磨真实 UI lifecycle，以及后续启用 MSI / NSIS installer
-  bundling 和真实 code signing。
+  打磨真实 UI lifecycle，以及后续启用 MSI / NSIS installer bundling 和真实 code
+  signing execution。`plan:desktop-signing` 已能检查显式 `signtool`、证书来源和
+  timestamp URL readiness；它不签名，也不替代真实签名流水线。
 - `clients/android`：first-stage TypeScript runtime adapter 和 Kotlin WebView
   asset shell skeleton 已落；`createAndroidClientRuntime` 已能组装 shared
   `BFFClient` / `WebSocketPushTransport` / auth / inbox / send / ack queue；

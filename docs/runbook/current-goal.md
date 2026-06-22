@@ -73,7 +73,10 @@ platform readiness 和 shell smoke plan checks；它不构建 native artifact
 `plan:shell-smoke` 也会把它作为默认 focused gate 暴露出来。需要定位失败时再跑
 单项脚本。Android Docker builder bootstrap 若出现在 shell smoke plan 中，必须带有
 `downloadsToolchain=true` 和 `requiresExplicitUserOptIn=true`，只能作为显式用户
-同意后的下一步，不属于 no-toolchain gate。
+同意后的下一步，不属于 no-toolchain gate。`plan:artifact-install` 输出的
+`adb install` / `Start-Process` 也只是 manual checklist，相关步骤必须带
+`manualOnly=true` 和安装 / 启动 / 设备接触风险字段，脚本本身不得安装或启动
+artifact。
 
 只有跨服务、生成代码、migration、service-registry、Docker / compose、安全边界、
 提交推送前或用户明确要求时，才扩大到完整 `.\tools\check-local.ps1`。

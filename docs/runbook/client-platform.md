@@ -417,6 +417,11 @@ First slice:
   `requiresExplicitUserOptIn=true`, plus a safe dry-run command. This keeps the
   shell plan useful while preventing Codex or automation from treating image
   bootstrap as part of the no-toolchain client gate.
+- `plan:artifact-install` now marks install / launch checklist entries as
+  `manualOnly=true` with explicit device, install, Activity-start or desktop
+  process risk flags. The plan can show `adb install` and `Start-Process`
+  commands for humans, but the script does not install APKs, launch desktop
+  artifacts, start Android activities or contact devices by itself.
 - `/api/auth/logout` performs first-stage server-side logout for the current
   authenticated session only. Broader device/session management remains an
   identity/admin capability, not a client BFF target selector.

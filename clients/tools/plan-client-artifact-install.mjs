@@ -64,6 +64,9 @@ function emptyPlan(installPrereqs) {
             command: target === "android"
               ? "npm --prefix clients run build:android-apk:collect"
               : "npm --prefix clients run build:desktop-artifact:collect",
+            manualOnly: true,
+            buildsNativeArtifacts: true,
+            requiresExplicitUserAction: true,
             evidence: "collector writes clients/artifacts/<run-id>/manifest.json"
           }
         ]
@@ -87,6 +90,9 @@ function targetInstallPlan(target, manifest, manifestDir, installPrereqs) {
           command: target === "android"
             ? "npm --prefix clients run build:android-apk:collect"
             : "npm --prefix clients run build:desktop-artifact:collect",
+          manualOnly: true,
+          buildsNativeArtifacts: true,
+          requiresExplicitUserAction: true,
           evidence: `collector manifest includes target=${target}`
         }
       ]
@@ -157,20 +163,37 @@ function installChecklist(target, artifactHint) {
       {
         step: "verify-adb-device",
         command: "adb devices",
+        manualOnly: true,
+        contactsDevice: true,
+        installsArtifacts: false,
+        startsDeviceActivities: false,
         evidence: "target Android device appears as device, not unauthorized"
       },
       {
         step: "install-apk",
         command: `adb install -r ${artifactHint}`,
+        manualOnly: true,
+        contactsDevice: true,
+        installsArtifacts: true,
+        startsDeviceActivities: false,
+        requiresExplicitUserAction: true,
         evidence: "adb returns Success"
       },
       {
         step: "verify-installed-package",
         command: "adb shell pm path com.nexusim.android",
+        manualOnly: true,
+        contactsDevice: true,
+        installsArtifacts: false,
+        startsDeviceActivities: false,
         evidence: "package manager returns a NexusIM package path"
       },
       {
         step: "run-client-smoke",
+        manualOnly: true,
+        contactsDevice: true,
+        startsDeviceActivities: true,
+        requiresExplicitUserAction: true,
         evidence: "Android shell metadata reports target=android and can login, pull inbox, receive wakeup and ack"
       }
     ];
@@ -180,14 +203,25 @@ function installChecklist(target, artifactHint) {
     {
       step: "launch-desktop-artifact",
       command: `Start-Process ${artifactHint}`,
+      manualOnly: true,
+      launchesDesktopArtifact: true,
+      startsLocalProcess: true,
+      requiresExplicitUserAction: true,
       evidence: "Windows desktop artifact launches without SmartScreen or signer policy failures in the local test profile"
     },
     {
       step: "verify-installed-shell",
+      manualOnly: true,
+      launchesDesktopArtifact: false,
+      startsLocalProcess: false,
       evidence: "desktop shell metadata reports target=windows-desktop"
     },
     {
       step: "run-client-smoke",
+      manualOnly: true,
+      launchesDesktopArtifact: true,
+      startsLocalProcess: true,
+      requiresExplicitUserAction: true,
       evidence: "desktop shell can login, pull inbox, receive wakeup and ack"
     }
   ];

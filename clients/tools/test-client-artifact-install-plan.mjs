@@ -64,12 +64,27 @@ try {
   assert(plan.targets.android.readyForInstall === true, "android install plan should be ready");
   assert(plan.targets.android.installPrereqs.adbAvailable === true, "android adb prereq should be true");
   assert(plan.targets.android.artifact.artifactHint === "clients/artifacts/install-plan-test/nexusim-android-debug.apk", "android artifact hint mismatch");
-  assert(plan.targets.android.checklist.some(item => item.command?.includes("adb install -r clients/artifacts/install-plan-test/nexusim-android-debug.apk")), "android install command missing");
+  const androidInstallStep = plan.targets.android.checklist.find(item => item.step === "install-apk");
+  assert(androidInstallStep?.command?.includes("adb install -r clients/artifacts/install-plan-test/nexusim-android-debug.apk"), "android install command missing");
+  assert(androidInstallStep.manualOnly === true, "android install step should be manual-only");
+  assert(androidInstallStep.contactsDevice === true, "android install step should be marked as contacting a device");
+  assert(androidInstallStep.installsArtifacts === true, "android install step should be marked as installing artifacts");
+  assert(androidInstallStep.startsDeviceActivities === false, "android install step should not be marked as starting activities");
+  assert(androidInstallStep.requiresExplicitUserAction === true, "android install step should require explicit user action");
+  const androidSmokeStep = plan.targets.android.checklist.find(item => item.step === "run-client-smoke");
+  assert(androidSmokeStep?.manualOnly === true, "android smoke step should be manual-only");
+  assert(androidSmokeStep.contactsDevice === true, "android smoke step should be marked as contacting a device");
+  assert(androidSmokeStep.startsDeviceActivities === true, "android smoke step should be marked as starting device activities");
   assert(plan.targets["windows-desktop"].artifactReady === true, "desktop artifact should be ready");
   assert(plan.targets["windows-desktop"].readyForInstall === true, "desktop install plan should be ready");
   assert(plan.targets["windows-desktop"].installPrereqs.windowsInstallerLaunchSupported === true, "desktop install prereq should be true");
-  assert(plan.targets["windows-desktop"].checklist.some(item => item.step === "launch-desktop-artifact"), "desktop launch step missing");
-  assert(plan.targets["windows-desktop"].checklist.some(item => item.command?.includes("Start-Process clients/artifacts/install-plan-test/nexusim-windows-desktop.msi")), "desktop launch command missing");
+  const desktopLaunchStep = plan.targets["windows-desktop"].checklist.find(item => item.step === "launch-desktop-artifact");
+  assert(desktopLaunchStep, "desktop launch step missing");
+  assert(desktopLaunchStep.command?.includes("Start-Process clients/artifacts/install-plan-test/nexusim-windows-desktop.msi"), "desktop launch command missing");
+  assert(desktopLaunchStep.manualOnly === true, "desktop launch step should be manual-only");
+  assert(desktopLaunchStep.launchesDesktopArtifact === true, "desktop launch step should be marked as launching the artifact");
+  assert(desktopLaunchStep.startsLocalProcess === true, "desktop launch step should be marked as starting a local process");
+  assert(desktopLaunchStep.requiresExplicitUserAction === true, "desktop launch step should require explicit user action");
   assert(!serialized.match(/[A-Z]:\\\\/), "install plan leaked Windows absolute path");
   assert(!serialized.includes("\\\\?"), "install plan leaked extended Windows path");
   assert(!serialized.match(/token|secret|password|credential|private/i), "install plan leaked sensitive field name");
@@ -127,6 +142,10 @@ try {
   assert(emptyPlan.targets.android.missing.includes("artifact-manifest"), "empty android plan should miss manifest");
   assert(emptyPlan.targets.android.missing.includes("adb"), "empty android plan should include adb prereq");
   assert(emptyPlan.targets["windows-desktop"].missing.includes("windows-installer-launch"), "empty desktop plan should include installer launch prereq");
+  const emptyAndroidBuildStep = emptyPlan.targets.android.checklist.find(item => item.step === "build-and-collect-artifact");
+  assert(emptyAndroidBuildStep?.manualOnly === true, "empty android build step should be manual-only");
+  assert(emptyAndroidBuildStep.buildsNativeArtifacts === true, "empty android build step should be marked as building artifacts");
+  assert(emptyAndroidBuildStep.requiresExplicitUserAction === true, "empty android build step should require explicit user action");
 
   writeFileSync(join(runDir, "manifest.json"), `${JSON.stringify({
     schemaVersion: "nexusim.client-artifacts.v1",

@@ -216,6 +216,13 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   输出 adb 是否可用、authorized / unauthorized / offline 计数和短 serial hash，
   不输出 raw serial / model，不安装 APK、不启动 Activity、不访问网络。`plan:shell-smoke`
   已把该 report 纳入 Android checklist。
+- `clients/tools/report-android-platform-readiness.mjs` 已提供 Android 聚合前置检查；
+  `npm --prefix clients run report:android-platform-readiness` 会合并本地 JDK /
+  Gradle / Android SDK、Docker builder profile / image 和 ADB device readiness。
+  该 report 不下载、不构建、不安装、不输出 raw serial / model / 本机绝对路径；
+  当前环境显示 ADB 已看到 1 台 authorized USB device，但本地构建仍缺 JDK 17+ /
+  Gradle / Android SDK，Docker / Compose profile ready 且
+  `nexusim/client-android-builder:local` image 尚未构建。
 - PC Web shell 已新增登录级自动化前置：Web UI 暴露稳定 `data-testid`
   automation contract 和 `ack-status` 诊断，`npm --prefix clients run
   smoke:desktop-webview-login` 可通过 WebView2/CDP 外部驱动 Tauri WebView 登录、
@@ -248,8 +255,8 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   report；`test:artifact-readiness` 覆盖 schema、无敏感字段和无本机绝对路径。
   报告已区分 Android Docker builder image build command 与实际 builder run command，
   会显示 prepared shell asset manifest verification 状态、desktop / Android local store
-  readiness（当前默认 `local-storage`，目标 `sqlite`；desktop 仍输出
-  `sqlite-native-bridge-unavailable`，Android 源码侧已报告 `android-sqlite` ready 但仍等待 APK /
+  readiness（当前默认 `local-storage`，目标 `sqlite`；desktop 源码和 runtime smoke
+  已报告 `tauri-sqlite` ready，Android 源码侧已报告 `android-sqlite` ready 但仍等待 APK /
   真机 smoke），并输出低敏
   `nextActions`，不会自动下载或构建。当前报告显示 Windows desktop ready
  （通过 repo-local `local:tauri`），Docker / Compose 可用、Android builder profile
@@ -342,7 +349,10 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
 
 ## 下一步优先级
 
-1. 补 Android JDK 17+ / Gradle / Android SDK，或显式运行
+1. 先跑 `npm --prefix clients run report:android-platform-readiness` 确认本机
+   Android toolchain / Docker builder image / ADB device 三类状态；当前已知 device
+   ready，但本地 JDK 17+ / Gradle / Android SDK 不 ready，Docker builder image 未构建。
+   若确认可以下载工具链，再显式运行
    `npm --prefix clients run build:android-apk:docker:bootstrap` 构建 Android Docker builder
    image；镜像存在后运行 `npm --prefix clients run build:android-apk:docker` 产出首个 APK + manifest。
 2. 在真实 Android shell UI 中接入现有 shell action，并在工具链 ready 后跑平台 shell smoke。

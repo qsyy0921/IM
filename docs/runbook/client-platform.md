@@ -249,6 +249,12 @@ First slice:
   `adb devices -l`, hashes raw serials, omits model names, and reports whether
   an authorized device is visible. It does not install APKs, start activities,
   or contact network services.
+- `npm --prefix clients run report:android-platform-readiness` prints a
+  combined low-sensitive Android readiness report across local JDK / Gradle /
+  Android SDK, Docker builder profile / image and ADB device state. It is the
+  preferred preflight before deciding whether to spend bandwidth on
+  `build:android-apk:docker:bootstrap`; it does not download, build, install or
+  expose raw serials / model names / local absolute paths.
 - `npm --prefix clients run report:artifact-readiness` prints a low-sensitive
   readiness matrix for local desktop, local Android and Android Docker builder
   paths. It reports missing capabilities and the exact next build command
@@ -372,8 +378,8 @@ rejected. For local LAN client smoke, prefer the wired `172.x.x.x` address.
 ## Next Work
 
 1. Add first unsigned local APK from the Android native bridge or Docker builder.
-   Use the safe Docker wrapper dry-run first, then explicitly bootstrap the
-   builder image only when toolchain download is acceptable.
+   Run `report:android-platform-readiness` first, then explicitly bootstrap the
+   Docker builder image only when toolchain download is acceptable.
 2. Wire lifecycle UI controls into the real Android shell, and run platform-shell
    smoke once packaging/runtime tooling is ready.
 3. Validate Android `android-sqlite` on a real APK once packaging/runtime
@@ -428,6 +434,7 @@ current prepared shell assets verify against `nexusim-shell-assets-manifest.json
 
 ```powershell
 npm --prefix clients run report:artifact-readiness
+npm --prefix clients run report:android-platform-readiness
 npm --prefix clients run report:android-device-readiness
 npm --prefix clients run plan:shell-smoke
 npm --prefix clients run plan:artifact-install

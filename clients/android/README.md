@@ -64,9 +64,10 @@ Flutter or native Kotlin for a concrete reason.
 - Cleartext traffic is a debug-only allowance for local LAN testing. Release
   Android builds must keep cleartext disabled unless a later ADR introduces a
   narrower production transport policy.
-- Current local message cache uses the shared TypeScript localStorage-backed
-  store in the WebView shell; production cache should use SQLite behind
-  `LocalMessageStore`.
+- Current Android source includes the fixed-prefix SQLite local-store bridge,
+  but APK build and real-device WebView smoke still have to prove it as a
+  runtime baseline. Until then, the WebView shell may fall back to the shared
+  TypeScript localStorage-backed store.
 - Push notification integration must not bypass PullInbox reconciliation.
 - Background sync must use server cursors and idempotency keys.
 
@@ -77,6 +78,8 @@ npm --prefix clients run typecheck:android
 npm --prefix clients run validate:android-native
 npm --prefix clients run test:shell-config
 npm --prefix clients run test:artifact-builders
+npm --prefix clients run test:android-platform-readiness
+npm --prefix clients run report:android-platform-readiness
 node clients/tools/render-shell-config.mjs --input clients/android/shell-config.example.json
 node clients/tools/build-android-apk.mjs --dry-run
 ```

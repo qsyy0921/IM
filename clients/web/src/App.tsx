@@ -561,7 +561,11 @@ function nativeLocalStoreStatus(localStore: NonNullable<NativeBridgeMetadata["ca
 
 function errorMessage(error: unknown): string {
   if (typeof error === "object" && error !== null && "message" in error) {
-    return String((error as { message: unknown }).message);
+    const message = String((error as { message: unknown }).message);
+    if (message === "Failed to fetch" || message.includes("NetworkError")) {
+      return `无法连接本地 NexusIM 服务，请先启动客户端后端。API: ${runtimeConfig.apiBaseURL}，WebSocket: ${runtimeConfig.pushWebSocketURL}`;
+    }
+    return message;
   }
   return String(error);
 }

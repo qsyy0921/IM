@@ -35,6 +35,7 @@ const missingToolchain = buildAndroidPlatformReadinessReport({
 });
 
 assert(missingToolchain.schemaVersion === "nexusim.android-platform-readiness.v1", "schema mismatch");
+assertPlatformReadinessPolicy(missingToolchain.executionPolicy);
 assert(missingToolchain.localToolchain.ready === false, "local toolchain should be false");
 assert(missingToolchain.localToolchain.missing.some(item => item.name === "java>=17"), "missing JDK not reported");
 assert(missingToolchain.dockerBuilder.readyToRun === false, "docker image should not be ready");
@@ -85,3 +86,24 @@ assert(!serialized.match(/token|secret|password|credential|private/i), "report l
 assert(!serialized.match(/nova|huawei|honor|xiaomi|samsung|pixel/i), "report leaked device model");
 
 console.log("Android platform readiness report ok");
+
+function assertPlatformReadinessPolicy(policy) {
+  assert(policy?.reportOnly === true, "platform readiness should be report-only");
+  assert(policy.planOnly === false, "platform readiness is an actual local readiness probe");
+  assert(policy.runsReadinessCommands === true, "platform readiness should run readiness commands");
+  assert(policy.readsLocalToolchainState === true, "platform readiness should read local toolchain state");
+  assert(policy.readsDockerBuilderState === true, "platform readiness should read Docker builder state");
+  assert(policy.readsAdbDeviceList === true, "platform readiness should include adb device readiness");
+  assert(policy.contactsDeviceReadOnly === true, "platform readiness should mark read-only device contact");
+  assert(policy.readsWebViewDevtoolsSockets === false, "platform readiness should not read WebView devtools sockets");
+  assert(policy.buildsNativeArtifacts === false, "platform readiness must not build artifacts");
+  assert(policy.startsServices === false, "platform readiness must not start services");
+  assert(policy.startsDocker === false, "platform readiness must not start Docker");
+  assert(policy.buildsDockerImages === false, "platform readiness must not build Docker images");
+  assert(policy.installsArtifacts === false, "platform readiness must not install artifacts");
+  assert(policy.startsDeviceActivities === false, "platform readiness must not start activities");
+  assert(policy.opensAdbReverse === false, "platform readiness must not open adb reverse");
+  assert(policy.opensAdbForward === false, "platform readiness must not open adb forward");
+  assert(policy.downloadsToolchain === false, "platform readiness must not download toolchains");
+  assert(policy.exposesRawDeviceIdentifiers === false, "platform readiness must not expose raw device identifiers");
+}

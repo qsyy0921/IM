@@ -25,6 +25,7 @@ export function buildAndroidWebViewDevtoolsReadinessReport(options = {}) {
   const report = {
     schemaVersion,
     generatedAt: new Date().toISOString(),
+    executionPolicy: readinessExecutionPolicy(source),
     inputSource: source.source,
     adbAvailable: source.status !== "missing-adb",
     procNetUnixReadable: source.status === 0,
@@ -42,6 +43,31 @@ export function buildAndroidWebViewDevtoolsReadinessReport(options = {}) {
   };
   assertLowSensitive(report);
   return report;
+}
+
+function readinessExecutionPolicy(source) {
+  const usesAdb = source.source === "adb";
+  return {
+    reportOnly: true,
+    planOnly: false,
+    runsReadinessCommands: usesAdb,
+    readsAdbDeviceList: false,
+    contactsDeviceReadOnly: usesAdb,
+    readsLocalToolchainState: false,
+    readsDockerBuilderState: false,
+    readsWebViewDevtoolsSockets: true,
+    buildsNativeArtifacts: false,
+    startsServices: false,
+    startsDocker: false,
+    buildsDockerImages: false,
+    installsArtifacts: false,
+    startsDeviceActivities: false,
+    opensAdbReverse: false,
+    opensAdbForward: false,
+    downloadsToolchain: false,
+    exposesRawDeviceIdentifiers: false,
+    exposesRawWebViewSocketNames: false
+  };
 }
 
 function parseArgs(argv) {

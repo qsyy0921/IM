@@ -34,6 +34,7 @@ List of devices attached
 });
 const readyText = JSON.stringify(ready);
 assert(ready.schemaVersion === "nexusim.android-device-readiness.v1", "schema mismatch");
+assertDeviceReadinessPolicy(ready.executionPolicy);
 assert(ready.adbAvailable === true, "adb should be available");
 assert(ready.readyForInstallSmoke === true, "device state should make install smoke ready");
 assert(ready.counts.device === 1, "device count mismatch");
@@ -78,3 +79,24 @@ assert(missingAdb.readyForInstallSmoke === false, "missing adb should not be ins
 assert(missingAdb.nextActions.some(action => action.action === "install-android-platform-tools"), "platform tools next action missing");
 
 console.log("Android device readiness report ok");
+
+function assertDeviceReadinessPolicy(policy) {
+  assert(policy?.reportOnly === true, "device readiness should be report-only");
+  assert(policy.planOnly === false, "device readiness is an actual local readiness probe");
+  assert(policy.runsReadinessCommands === true, "device readiness should run readiness commands");
+  assert(policy.readsAdbDeviceList === true, "device readiness should read adb devices");
+  assert(policy.contactsDeviceReadOnly === true, "device readiness should mark read-only device contact");
+  assert(policy.readsLocalToolchainState === false, "device readiness should not read local toolchain state");
+  assert(policy.readsDockerBuilderState === false, "device readiness should not read Docker builder state");
+  assert(policy.readsWebViewDevtoolsSockets === false, "device readiness should not read WebView devtools sockets");
+  assert(policy.buildsNativeArtifacts === false, "device readiness must not build artifacts");
+  assert(policy.startsServices === false, "device readiness must not start services");
+  assert(policy.startsDocker === false, "device readiness must not start Docker");
+  assert(policy.buildsDockerImages === false, "device readiness must not build Docker images");
+  assert(policy.installsArtifacts === false, "device readiness must not install artifacts");
+  assert(policy.startsDeviceActivities === false, "device readiness must not start activities");
+  assert(policy.opensAdbReverse === false, "device readiness must not open adb reverse");
+  assert(policy.opensAdbForward === false, "device readiness must not open adb forward");
+  assert(policy.downloadsToolchain === false, "device readiness must not download toolchains");
+  assert(policy.exposesRawDeviceIdentifiers === false, "device readiness must not expose raw device identifiers");
+}

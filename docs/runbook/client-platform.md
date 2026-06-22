@@ -303,13 +303,19 @@ First slice:
   low-sensitive ADB/device readiness report for Android shell smoke. It runs
   `adb devices -l`, hashes raw serials, omits model names, and reports whether
   an authorized device is visible. It does not install APKs, start activities,
-  or contact network services.
+  or contact network services. Its execution policy marks the report as an
+  actual local readiness probe that only reads the ADB device list and never
+  downloads toolchains, builds artifacts, installs packages, starts activities,
+  opens adb reverse / forward or exposes raw device identifiers.
 - `npm --prefix clients run report:android-platform-readiness` prints a
   combined low-sensitive Android readiness report across local JDK / Gradle /
   Android SDK, Docker builder profile / image and ADB device state. It is the
   preferred preflight before deciding whether to spend bandwidth on
   `build:android-apk:docker:bootstrap`; it does not download, build, install or
-  expose raw serials / model names / local absolute paths.
+  expose raw serials / model names / local absolute paths. Its execution policy
+  declares that it reads local toolchain state, Docker builder state and ADB
+  device readiness only; it does not start Docker, build a Docker image, build
+  an APK, install, launch activities or open adb tunnels.
 - `npm --prefix clients run report:artifact-readiness` prints a low-sensitive
   readiness matrix for local desktop, local Android and Android Docker builder
   paths. It reports missing capabilities and the exact next build command
@@ -369,7 +375,11 @@ First slice:
   Activity, open adb forward, drive WebView automation, contact the BFF or send
   messages. The real runner still requires a built APK, ADB install / Activity
   launch, WebView CDP over adb forward, public BFF login / SendMessage and
-  AckDelivery observation.
+  AckDelivery observation. `report:android-webview-devtools-readiness` is a
+  separate report-only preflight for that CDP step: it can read fixture data or
+  query `/proc/net/unix` through adb to detect WebView devtools sockets, but its
+  execution policy forbids opening adb forward / reverse, installing APKs,
+  starting activities, downloading toolchains or exposing raw socket names.
 - `npm --prefix clients run validate:builder-profile` validates the Android
   Docker builder profile without building or pulling images. The profile lives
   in `deploy/local/docker-compose.client-builders.yml` and uses

@@ -15,6 +15,7 @@ export function buildAndroidDeviceReadinessReport(options = {}) {
   const report = {
     schemaVersion,
     generatedAt: new Date().toISOString(),
+    executionPolicy: readinessExecutionPolicy(),
     adbAvailable: adbResult.status === 0,
     readyForInstallSmoke: devices.some(device => device.state === "device"),
     counts: {
@@ -131,6 +132,29 @@ function nextActions(adbAvailable, devices) {
       command: "adb devices -l"
     }
   ];
+}
+
+function readinessExecutionPolicy() {
+  return {
+    reportOnly: true,
+    planOnly: false,
+    runsReadinessCommands: true,
+    readsAdbDeviceList: true,
+    contactsDeviceReadOnly: true,
+    readsLocalToolchainState: false,
+    readsDockerBuilderState: false,
+    readsWebViewDevtoolsSockets: false,
+    buildsNativeArtifacts: false,
+    startsServices: false,
+    startsDocker: false,
+    buildsDockerImages: false,
+    installsArtifacts: false,
+    startsDeviceActivities: false,
+    opensAdbReverse: false,
+    opensAdbForward: false,
+    downloadsToolchain: false,
+    exposesRawDeviceIdentifiers: false
+  };
 }
 
 function runAdbDevices() {

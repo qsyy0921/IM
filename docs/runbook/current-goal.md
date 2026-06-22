@@ -104,6 +104,11 @@ APK、不会安装、不会启动 Activity、不会打开 `adb reverse`、不会
 Android login-level WebView smoke runner 的 `--dry-run` 输出也必须带 execution
 policy，声明不会构建或收集 APK、不会安装、不会启动 Activity、不会打开 adb
 forward、不会连接 BFF 或发送消息。
+Android platform / device / WebView devtools readiness reports 也必须带
+execution policy，声明它们是 report-only 本机状态探测；可只读查询本机工具链、
+Docker builder 状态、ADB device list 或 WebView devtools socket evidence，但不得
+下载工具链、构建 artifact / Docker image、安装 APK、启动 Activity、打开 adb
+reverse / forward 或泄露 raw device / socket identifier。
 
 只有跨服务、生成代码、migration、service-registry、Docker / compose、安全边界、
 提交推送前或用户明确要求时，才扩大到完整 `.\tools\check-local.ps1`。

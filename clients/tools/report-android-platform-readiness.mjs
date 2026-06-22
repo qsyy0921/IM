@@ -21,6 +21,7 @@ export function buildAndroidPlatformReadinessReport(options = {}) {
     schemaVersion,
     generatedAt: new Date().toISOString(),
     target: "android",
+    executionPolicy: readinessExecutionPolicy(),
     localToolchain: {
       ready: localApkReady,
       missing: androidChecks.filter(check => !check.ok).map(check => ({
@@ -62,6 +63,29 @@ export function buildAndroidPlatformReadinessReport(options = {}) {
   };
   assertLowSensitive(report);
   return report;
+}
+
+function readinessExecutionPolicy() {
+  return {
+    reportOnly: true,
+    planOnly: false,
+    runsReadinessCommands: true,
+    readsLocalToolchainState: true,
+    readsDockerBuilderState: true,
+    readsAdbDeviceList: true,
+    contactsDeviceReadOnly: true,
+    readsWebViewDevtoolsSockets: false,
+    buildsNativeArtifacts: false,
+    startsServices: false,
+    startsDocker: false,
+    buildsDockerImages: false,
+    installsArtifacts: false,
+    startsDeviceActivities: false,
+    opensAdbReverse: false,
+    opensAdbForward: false,
+    downloadsToolchain: false,
+    exposesRawDeviceIdentifiers: false
+  };
 }
 
 function sanitizeAndroidChecks(checks) {

@@ -17,6 +17,7 @@ export function buildClientShellSmokePlan(options = {}) {
   return {
     schemaVersion: smokeSchemaVersion,
     generatedAt: new Date().toISOString(),
+    executionPolicy: planExecutionPolicy(),
     focusedGate: focusedGate(),
     targets: {
       browser: browserTarget(),
@@ -28,6 +29,23 @@ export function buildClientShellSmokePlan(options = {}) {
       wiredLanExample: "loadtest/clientweb/run-local-smoke.ps1 -BindHost 172.31.50.1 -ClientHost 172.31.50.1",
       evidence: "docs/runbook/loadtest/client-platform/"
     }
+  };
+}
+
+function planExecutionPolicy() {
+  return {
+    planOnly: true,
+    executesChecklistCommands: false,
+    startsServices: false,
+    buildsNativeArtifacts: false,
+    installsArtifacts: false,
+    launchesDesktopArtifacts: false,
+    startsDeviceActivities: false,
+    opensAdbReverse: false,
+    startsDocker: false,
+    contactsDevices: false,
+    downloadsToolchain: false,
+    readsLocalReadiness: true
   };
 }
 

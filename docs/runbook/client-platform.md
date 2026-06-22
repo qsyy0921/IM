@@ -416,7 +416,10 @@ First slice:
   `build-android-builder-image` step carries `downloadsToolchain=true` and
   `requiresExplicitUserOptIn=true`, plus a safe dry-run command. This keeps the
   shell plan useful while preventing Codex or automation from treating image
-  bootstrap as part of the no-toolchain client gate.
+  bootstrap as part of the no-toolchain client gate. The plan also exposes
+  top-level `executionPolicy.planOnly=true` so automation can reject accidental
+  service-start, Docker, install or device-touching paths before reading
+  per-target checklists.
 - `plan:artifact-install` now marks install / launch checklist entries as
   `manualOnly=true` with explicit device, install, Activity-start or desktop
   process risk flags. The plan can show `adb install` and `Start-Process`

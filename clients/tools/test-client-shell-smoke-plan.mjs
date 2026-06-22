@@ -19,6 +19,7 @@ const plan = JSON.parse(output);
 const serialized = JSON.stringify(plan);
 
 assert(plan.schemaVersion === "nexusim.client-shell-smoke-plan.v1", "shell smoke plan schema mismatch");
+assertShellSmokePlanExecutionPolicy(plan.executionPolicy);
 assert(plan.focusedGate?.command === "npm --prefix clients run check:no-toolchain", "focused no-toolchain gate command missing");
 assert(plan.focusedGate.downloadsToolchain === false, "focused gate must not download toolchains");
 assert(plan.focusedGate.buildsNativeArtifacts === false, "focused gate must not build native artifacts");
@@ -260,3 +261,18 @@ assert(missingAdbPlan.targets.android.readyForManualShellSmoke === false, "andro
 assert(missingAdbPlan.targets.android.checklist.some(item => item.step === "resolve-install-prereqs"), "android install-prereq checklist missing");
 
 console.log("client shell smoke plan ok");
+
+function assertShellSmokePlanExecutionPolicy(policy) {
+  assert(policy?.planOnly === true, "shell smoke plan should be marked plan-only");
+  assert(policy.executesChecklistCommands === false, "shell smoke plan should not execute checklist commands");
+  assert(policy.startsServices === false, "shell smoke plan should not start services");
+  assert(policy.buildsNativeArtifacts === false, "shell smoke plan should not build native artifacts");
+  assert(policy.installsArtifacts === false, "shell smoke plan should not install artifacts");
+  assert(policy.launchesDesktopArtifacts === false, "shell smoke plan should not launch desktop artifacts");
+  assert(policy.startsDeviceActivities === false, "shell smoke plan should not start device activities");
+  assert(policy.opensAdbReverse === false, "shell smoke plan should not open adb reverse");
+  assert(policy.startsDocker === false, "shell smoke plan should not start Docker");
+  assert(policy.contactsDevices === false, "shell smoke plan should not contact devices");
+  assert(policy.downloadsToolchain === false, "shell smoke plan should not download toolchains");
+  assert(policy.readsLocalReadiness === true, "shell smoke plan should only read local readiness state");
+}

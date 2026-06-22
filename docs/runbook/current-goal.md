@@ -70,8 +70,10 @@ Android device / WebView devtools readiness and parser contracts、Android
 platform readiness 和 shell smoke plan checks；它不构建 native artifact
 或 APK、不启动 Docker、不安装 APK、不启动 Activity、不打开 `adb reverse`、
 不下载工具链。它会通过 Android readiness report 只读查询 ADB / device state。
-`plan:shell-smoke` 也会把它作为默认 focused gate 暴露出来。需要定位失败时再跑
-单项脚本。Android Docker builder bootstrap 若出现在 shell smoke plan 中，必须带有
+`plan:shell-smoke` 也会把它作为默认 focused gate 暴露出来，并且顶层
+`executionPolicy.planOnly=true` 必须声明它不会执行 checklist 命令、不会启动服务、
+不会下载工具链、不会启动 Docker、不会接触设备。需要定位失败时再跑单项脚本。
+Android Docker builder bootstrap 若出现在 shell smoke plan 中，必须带有
 `downloadsToolchain=true` 和 `requiresExplicitUserOptIn=true`，只能作为显式用户
 同意后的下一步，不属于 no-toolchain gate。`plan:artifact-install` 输出的
 `adb install` / `Start-Process` 也只是 manual checklist，相关步骤必须带

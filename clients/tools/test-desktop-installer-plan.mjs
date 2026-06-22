@@ -153,6 +153,38 @@ try {
   assert(unsupported.readyToBuildInstaller === false, "unsupported target should not be ready");
   assert(unsupported.missing.includes("supported-installer-target"), "unsupported target should be reported");
 
+  const artifactsRoot = join(tempRoot, "artifacts");
+  const desktopRun = join(artifactsRoot, "desktop-old");
+  const androidRun = join(artifactsRoot, "android-new");
+  mkdirSync(desktopRun, { recursive: true });
+  mkdirSync(androidRun, { recursive: true });
+  writeFileSync(join(desktopRun, "nexusim-windows-desktop.exe"), exe);
+  writeJSON(join(desktopRun, "manifest.json"), manifest);
+  writeFileSync(join(androidRun, "nexusim-android-debug.apk"), "apk");
+  writeJSON(join(androidRun, "manifest.json"), {
+    ...manifest,
+    runId: "android-newer",
+    artifacts: [
+      {
+        target: "android",
+        filename: "nexusim-android-debug.apk",
+        bytes: 3,
+        sha256: sha256("apk")
+      }
+    ]
+  });
+  const targetSelected = buildDesktopInstallerPlan({
+    artifactsRoot,
+    tauriConfig: activeConfigPath,
+    target: "msi",
+    signToolPath: fakeSignTool,
+    certFile: fakePfx,
+    timestampURL: "https://timestamp.example.test",
+    pfxPassEnvPresent: true
+  });
+  assert(targetSelected.readyToBuildInstaller === true, "default installer plan should select latest desktop manifest, not latest android manifest");
+  assert(targetSelected.artifactBaseline.runId === "desktop-installer-test", "default installer plan selected the wrong manifest");
+
   const cliPlan = runPlanner([
     "--manifest",
     manifestPath,

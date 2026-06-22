@@ -233,20 +233,21 @@ ignored `clients/artifacts/desktop-bundles/<run-id>/`. This bundle is explicitly
 `unsigned-local-dev`; it does not sign, install or launch anything. If the
 latest collected manifest is for Android, pass the desktop manifest explicitly:
 `npm --prefix clients run bundle:desktop -- --manifest clients/artifacts/<desktop-run>/manifest.json`.
-`plan:desktop-signing` reads the collected Windows desktop manifest and reports
-whether explicit signing inputs are present: `signtool`, one certificate source
-and a timestamp URL. It validates the collected artifact hash and prints a
-low-sensitive command template only when ready. It does not sign artifacts,
-download tools, install packages, launch the desktop app or print local absolute
-paths. Missing signing inputs fail closed as `readyToSign=false`; there is no
-placeholder signature path.
+`plan:desktop-signing` reads the latest collected `windows-desktop` manifest and
+reports whether explicit signing inputs are present: `signtool`, one certificate
+source and a timestamp URL. It skips newer Android-only manifests, validates the
+collected desktop artifact hash and prints a low-sensitive command template only
+when ready. It does not sign artifacts, download tools, install packages, launch
+the desktop app or print local absolute paths. Missing signing inputs fail
+closed as `readyToSign=false`; there is no placeholder signature path.
 `plan:desktop-installer` reads the repository installer Tauri profile, the
 collected Windows desktop manifest and the signing readiness plan, then reports
 whether MSI / NSIS installer bundling can run. It is also plan-only: it does not
 run Tauri, sign, install, launch or download anything. The default development
 Tauri config stays `bundle.active=false`; installer bundling uses the separate
-`src-tauri/tauri.installer.conf.json` profile. The plan remains not ready until
-a desktop artifact manifest is selected and signing readiness is true.
+`src-tauri/tauri.installer.conf.json` profile. The plan selects the latest
+`windows-desktop` manifest automatically and remains not ready until signing
+readiness is true.
 `build:desktop-installer` wraps that plan as the explicit execution entry. By
 default it is still plan-only. It runs Tauri with the explicit bundle target and
 then collects the resulting Windows desktop artifact only when run with

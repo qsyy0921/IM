@@ -83,8 +83,9 @@
   `tauri.installer.conf.json` profile、installer target、desktop artifact baseline
   和 signing readiness；默认开发 config 仍保持不打包。它们不 build、不签名，
   也不替代真实 installer / signing 流水线。`build:desktop-installer` 已补显式
-  `--execute` 门控的 installer build 包装器，默认仍只输出计划；真实 MSI / NSIS
-  构建仍要先满足 desktop artifact baseline 和 signing readiness。
+  `--execute` 门控的 installer build 包装器，默认仍只输出计划；desktop installer
+  planner 现在会按 `windows-desktop` 目标自动选择 collected manifest，不会被更新的
+  Android manifest 遮住；真实 MSI / NSIS 构建仍要先满足 signing readiness。
 - `clients/android`：first-stage TypeScript runtime adapter 和 Kotlin WebView
   asset shell skeleton 已落；`createAndroidClientRuntime` 已能组装 shared
   `BFFClient` / `WebSocketPushTransport` / auth / inbox / send / ack queue；

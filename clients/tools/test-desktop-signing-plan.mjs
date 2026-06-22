@@ -143,6 +143,25 @@ try {
   assert(androidOnly.readyToSign === false, "android-only manifest should not be ready for desktop signing");
   assert(androidOnly.missing.includes("windows-desktop-artifact"), "android-only manifest should report missing desktop artifact");
 
+  const artifactsRoot = join(tempRoot, "artifacts");
+  const desktopRun = join(artifactsRoot, "desktop-old");
+  const androidRun = join(artifactsRoot, "android-new");
+  mkdirSync(desktopRun, { recursive: true });
+  mkdirSync(androidRun, { recursive: true });
+  writeFileSync(join(desktopRun, "nexusim-windows-desktop.exe"), exe);
+  writeFileSync(join(desktopRun, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
+  writeFileSync(join(androidRun, "nexusim-android-debug.apk"), "apk");
+  writeFileSync(join(androidRun, "manifest.json"), `${JSON.stringify(androidManifest, null, 2)}\n`);
+  const targetSelected = buildDesktopSigningPlan({
+    artifactsRoot,
+    signToolPath: fakeSignTool,
+    certFile: fakePfx,
+    timestampURL: "https://timestamp.example.test",
+    pfxPassEnvPresent: true
+  });
+  assert(targetSelected.readyToSign === true, "default signing plan should select latest desktop manifest, not latest android manifest");
+  assert(targetSelected.artifactManifest.runId === "desktop-signing-test", "default signing plan selected the wrong manifest");
+
   const unsignedText = JSON.stringify(missing);
   assert(!unsignedText.includes(tempRoot), "missing signing plan leaked absolute temp path");
   assert(existsSync(fakeSignTool), "fixture signtool should exist");

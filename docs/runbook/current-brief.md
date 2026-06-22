@@ -52,9 +52,10 @@ NexusIM 已有本地 / 双机可运行的最小分布式 IM 后端，并已扩�
    zip bundle 工具；`plan:desktop-installer` / `plan:desktop-signing` 已能检查
    Tauri installer 和显式签名输入 readiness；installer 已有独立仓库 profile，
    不再要求打开默认开发 config 的 `bundle.active`；`build:desktop-installer` 已提供显式
-   `--execute` 门控的 installer build 包装器，并用该 profile 调用 Tauri。artifact /
-   signing readiness 不满足时仍 fail-closed，不执行 bundling 或签名；下一步继续
-   MSI / NSIS 和真实 code-signing execution pipeline。
+   `--execute` 门控的 installer build 包装器，并用该 profile 调用 Tauri。desktop
+   signing / installer planner 会按 `windows-desktop` 目标选择 collected manifest；
+   当前本机 dry-run 只剩 signing readiness 不满足，因此不执行 bundling 或签名；下一步
+   继续 MSI / NSIS 和真实 code-signing execution pipeline。
    `loadtest/clientweb` 已扩展到群成员列表、
    角色变更、owner transfer 和移除成员的 BFF 链路；2026-06-23 clean committed
    smoke 已通过。

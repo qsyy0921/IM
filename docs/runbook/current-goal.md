@@ -56,7 +56,9 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   已改为读取仓库内显式 `tauri.installer.conf.json` profile：默认开发 Tauri config
   继续 `bundle.active=false`，installer profile 才启用 MSI target。`build:desktop-installer`
   会用 `--config src-tauri/tauri.installer.conf.json` 调用 Tauri，并继续由显式
-  `--execute` 门控；当前 artifact baseline / signing readiness 不满足时仍 fail-closed。
+  `--execute` 门控。desktop signing / installer planner 现在按 `windows-desktop`
+  目标选择最新 collected manifest，不会被更新的 Android manifest 遮住；当前本机
+  dry-run 已找到 desktop artifact baseline，只剩 signing readiness 不满足而 fail-closed。
   它们仍不是生产签名 installer。
 - Android 已有 WebView shell / bridge / APK 历史产物和 metadata smoke；当前 shell
   不宣称 F 盘 Android toolchain ready，后续切回 Android 时再重新加载 toolchain env。

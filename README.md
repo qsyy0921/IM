@@ -162,7 +162,8 @@ package-local PowerShell launcher，install plan 会校验这些 support files �
 `plan:desktop-installer` / `plan:desktop-signing` 可以检查 Tauri installer 和显式
 签名输入 readiness；`build:desktop-installer` 已提供显式 `--execute` 门控的
 installer build 包装器，并通过独立仓库 installer profile 调用 Tauri。默认开发
-Tauri config 仍保持不打包；artifact / signing readiness 不满足时 fail-closed。
+Tauri config 仍保持不打包；planner 会按 `windows-desktop` 目标选择 collected
+manifest，signing readiness 不满足时 fail-closed。
 
 本地调试入口：
 

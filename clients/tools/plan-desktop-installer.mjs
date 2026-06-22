@@ -44,7 +44,7 @@ export function buildDesktopInstallerPlan(options = {}) {
 
   const artifactManifestPath = options.manifest
     ? resolve(options.manifest)
-    : findLatestArtifactManifest(options.artifactsRoot ?? artifactsRoot);
+    : findLatestArtifactManifest(options.artifactsRoot ?? artifactsRoot, "windows-desktop");
   const artifactState = artifactManifestPath
     ? readDesktopArtifactState(artifactManifestPath)
     : {
@@ -149,15 +149,7 @@ function readTauriConfig(path) {
 }
 
 function readDesktopArtifactState(manifestPath) {
-  const raw = readFileSync(manifestPath, "utf8");
-  assertLowSensitiveText(raw, "artifact manifest");
-  const manifest = JSON.parse(raw);
-  if (manifest.schemaVersion !== artifactManifestSchema) {
-    throw new Error("artifact manifest schema mismatch");
-  }
-  if (!Array.isArray(manifest.artifacts)) {
-    throw new Error("artifact manifest artifacts missing");
-  }
+  const manifest = readManifest(manifestPath);
   const artifact = manifest.artifacts.find(candidate => candidate?.target === "windows-desktop");
   if (!artifact) {
     return {
@@ -178,6 +170,19 @@ function readDesktopArtifactState(manifestPath) {
     desktopArtifactPresent: true,
     artifact: artifactInfo
   };
+}
+
+function readManifest(manifestPath) {
+  const raw = readFileSync(manifestPath, "utf8");
+  assertLowSensitiveText(raw, "artifact manifest");
+  const manifest = JSON.parse(raw);
+  if (manifest.schemaVersion !== artifactManifestSchema) {
+    throw new Error("artifact manifest schema mismatch");
+  }
+  if (!Array.isArray(manifest.artifacts)) {
+    throw new Error("artifact manifest artifacts missing");
+  }
+  return manifest;
 }
 
 function validateArtifact(artifact, artifactPath) {
@@ -283,14 +288,19 @@ function parseArgs(argv, env) {
   return options;
 }
 
-function findLatestArtifactManifest(root) {
+function findLatestArtifactManifest(root, target) {
   if (!existsSync(root)) {
     return "";
   }
   const candidates = [];
   collectManifestCandidates(root, candidates);
   candidates.sort((left, right) => right.mtimeMs - left.mtimeMs);
-  return candidates[0]?.path ?? "";
+  for (const candidate of candidates) {
+    if (manifestContainsTarget(candidate.path, target)) {
+      return candidate.path;
+    }
+  }
+  return "";
 }
 
 function collectManifestCandidates(dir, candidates) {
@@ -307,6 +317,11 @@ function collectManifestCandidates(dir, candidates) {
     }
     collectManifestCandidates(fullPath, candidates);
   }
+}
+
+function manifestContainsTarget(manifestPath, target) {
+  const manifest = readManifest(manifestPath);
+  return manifest.artifacts.some(artifact => artifact?.target === target);
 }
 
 function normalizeTarget(value) {

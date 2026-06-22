@@ -216,8 +216,9 @@ First slice:
   cache-bypass rules for API / WebSocket / shell config paths.
 - `npm --prefix clients run check:no-toolchain` runs the no-toolchain client
   shell guard set in one command: shell smoke plan, Web PWA, shell web assets,
-  Web shell lifecycle / automation / smoke-report contracts, clientweb smoke
-  hook contract, artifact readiness / install-plan contracts, desktop / Android
+  shell config, Web platform, shared runtime / local-store contracts, Web shell
+  lifecycle / automation / smoke-report contracts, clientweb smoke hook
+  contract, artifact readiness / install-plan contracts, desktop / Android
   action assets, desktop WebView metadata / login dry-run contracts, Android
   metadata / login smoke dry-run contracts, Android device / WebView devtools
   readiness parsers and Android platform readiness. It does not build native

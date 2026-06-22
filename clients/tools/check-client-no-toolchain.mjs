@@ -30,6 +30,36 @@ const checkPlan = [
     reason: "guards browser manifest and service-worker cache boundary"
   },
   {
+    name: "shell-config-contract",
+    script: "test:shell-config",
+    reason: "guards desktop and Android shell config parsing without privileged fields"
+  },
+  {
+    name: "web-platform-contract",
+    script: "test:web-platform",
+    reason: "guards browser and WebView platform adapter boundaries"
+  },
+  {
+    name: "local-message-store-contract",
+    script: "test:local-message-store",
+    reason: "guards shared local message cache semantics"
+  },
+  {
+    name: "key-value-message-store-contract",
+    script: "test:key-value-store",
+    reason: "guards persistent key-value message cache semantics"
+  },
+  {
+    name: "native-store-readiness-contract",
+    script: "test:native-store-readiness",
+    reason: "guards native SQLite bridge readiness contract"
+  },
+  {
+    name: "runtime-lifecycle-contract",
+    script: "test:runtime-lifecycle",
+    reason: "guards shared desktop and Android runtime lifecycle without services"
+  },
+  {
     name: "web-shell-lifecycle-contract",
     script: "test:web-shell-actions",
     reason: "guards Web shell lifecycle actions through shared client-core"

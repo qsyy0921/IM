@@ -12,6 +12,7 @@ export const defaultInstallerTauriConfig = join(workspaceRoot, "desktop", "src-t
 export const defaultInstallerTauriConfigCommandArg = "src-tauri/tauri.installer.conf.json";
 const artifactsRoot = join(workspaceRoot, "artifacts");
 const supportedTargets = new Set(["msi", "nsis"]);
+const desktopExecutableArtifactKind = "desktop-executable";
 
 function main(argv) {
   const options = parseArgs(argv, process.env);
@@ -45,7 +46,7 @@ export function buildDesktopInstallerPlan(options = {}) {
 
   const artifactManifestPath = options.manifest
     ? resolve(options.manifest)
-    : findLatestArtifactManifest(options.artifactsRoot ?? artifactsRoot, "windows-desktop");
+    : findLatestArtifactManifest(options.artifactsRoot ?? artifactsRoot, "windows-desktop", desktopExecutableArtifactKind);
   const artifactState = artifactManifestPath
     ? readDesktopArtifactState(artifactManifestPath)
     : {
@@ -177,7 +178,7 @@ function readTauriConfig(path) {
 
 function readDesktopArtifactState(manifestPath) {
   const manifest = readManifest(manifestPath);
-  const artifact = manifest.artifacts.find(candidate => candidate?.target === "windows-desktop");
+  const artifact = findDesktopBaselineArtifact(manifest);
   if (!artifact) {
     return {
       present: true,
@@ -197,6 +198,12 @@ function readDesktopArtifactState(manifestPath) {
     desktopArtifactPresent: true,
     artifact: artifactInfo
   };
+}
+
+function findDesktopBaselineArtifact(manifest) {
+  return manifest.artifacts.find(
+    candidate => candidate?.target === "windows-desktop" && candidate.artifactKind === desktopExecutableArtifactKind
+  ) ?? manifest.artifacts.find(candidate => candidate?.target === "windows-desktop");
 }
 
 function readManifest(manifestPath) {
@@ -317,19 +324,24 @@ function parseArgs(argv, env) {
   return options;
 }
 
-function findLatestArtifactManifest(root, target) {
+function findLatestArtifactManifest(root, target, artifactKind) {
   if (!existsSync(root)) {
     return "";
   }
   const candidates = [];
   collectManifestCandidates(root, candidates);
   candidates.sort((left, right) => right.mtimeMs - left.mtimeMs);
+  let firstTargetManifest = "";
   for (const candidate of candidates) {
-    if (manifestContainsTarget(candidate.path, target)) {
+    const status = manifestTargetStatus(candidate.path, target, artifactKind);
+    if (status.exact) {
       return candidate.path;
     }
+    if (status.target && !firstTargetManifest) {
+      firstTargetManifest = candidate.path;
+    }
   }
-  return "";
+  return firstTargetManifest;
 }
 
 function collectManifestCandidates(dir, candidates) {
@@ -348,9 +360,12 @@ function collectManifestCandidates(dir, candidates) {
   }
 }
 
-function manifestContainsTarget(manifestPath, target) {
+function manifestTargetStatus(manifestPath, target, artifactKind) {
   const manifest = readManifest(manifestPath);
-  return manifest.artifacts.some(artifact => artifact?.target === target);
+  return {
+    target: manifest.artifacts.some(artifact => artifact?.target === target),
+    exact: manifest.artifacts.some(artifact => artifact?.target === target && artifact.artifactKind === artifactKind)
+  };
 }
 
 function normalizeTarget(value) {

@@ -87,13 +87,15 @@
   签名还需要本机 `signtool`、timestamp URL、证书来源和 signed artifact 验证。
   collected manifest 已区分 `desktop-executable` / `desktop-installer`，portable
   bundle 只接受 executable，不把 installer 产物混进本地 zip 包。
-  `verify:desktop-signature` 已补只读 Authenticode 验证入口，当前 collected baseline
-  实测为 `NotSigned`；`sign:desktop-artifact --execute --require-valid` 已能在签名后
+  `verify:desktop-signature` 已补只读 Authenticode 验证入口；当前仓库旧 collected
+  desktop baseline 缺 `artifactKind`，新规则会 fail-closed，需要先重新 collect 新格式
+  desktop artifact；`sign:desktop-artifact --execute --require-valid` 已能在签名后
   立即执行 fail-closed 验证，release profile 仍需提供真实签名材料并产出 valid signature。
   `build:desktop-installer` 已补显式
-  `--execute` 门控的 installer build 包装器，默认仍只输出计划；desktop installer
-  planner 现在会按 `windows-desktop` 目标自动选择 collected manifest，不会被更新的
-  Android manifest 遮住；真实 MSI / NSIS 构建仍要先满足 signing readiness 和
+  `--execute` 门控的 installer build 包装器，默认仍只输出计划；desktop signing /
+  signature verification / installer planner 现在会按 `artifactKind` 自动选择 collected
+  artifact，默认 executable，installer 需要显式请求，不会被更新的 Android manifest
+  或混合 desktop manifest 里的 installer artifact 遮住 executable baseline；真实 MSI / NSIS 构建仍要先满足 signing readiness 和
   valid Authenticode signature。
   generic install plan 已按 manifest `artifactKind` fail-closed：缺 kind 的旧 manifest
   要重新 collect，`desktop-installer` 只进入 installer checklist，不再被当作

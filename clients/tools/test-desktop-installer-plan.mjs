@@ -151,6 +151,43 @@ try {
   assert(!readyJSON.includes(tempRoot), "ready installer plan leaked absolute temp path");
   assert(!readyJSON.match(/token|secret|password|credential|private/i), "ready installer plan leaked sensitive names");
 
+  const installerArtifact = "fake msi bytes";
+  writeFileSync(join(collectedDir, "nexusim-windows-desktop-installer.msi"), installerArtifact);
+  const mixedManifestPath = join(collectedDir, "manifest-mixed.json");
+  writeJSON(mixedManifestPath, {
+    ...manifest,
+    runId: "desktop-installer-mixed",
+    artifacts: [
+      {
+        target: "windows-desktop",
+        artifactKind: "desktop-installer",
+        filename: "nexusim-windows-desktop-installer.msi",
+        bytes: Buffer.byteLength(installerArtifact),
+        sha256: sha256(installerArtifact),
+        sourcePathHash: sha256("desktop-installer-source"),
+        sourceHint: "desktop/src-tauri/target/release/bundle/msi/nexusim.msi"
+      },
+      ...manifest.artifacts
+    ]
+  });
+  const mixedReady = buildDesktopInstallerPlan({
+    manifest: mixedManifestPath,
+    tauriConfig: activeConfigPath,
+    target: "msi",
+    signToolPath: fakeSignTool,
+    certFile: fakePfx,
+    timestampURL: "https://timestamp.example.test",
+    pfxPassEnvPresent: true,
+    mockSignatureStatus: {
+      status: "Valid",
+      signerSubject: "CN=NexusIM Test Code Signing",
+      signerThumbprint: "0123456789abcdef0123456789abcdef01234567"
+    }
+  });
+  assert(mixedReady.readyToBuildInstaller === true, "mixed manifest should select executable baseline");
+  assert(mixedReady.artifactBaseline.artifact.artifactKind === "desktop-executable", "mixed manifest selected wrong baseline kind");
+  assert(mixedReady.artifactBaseline.artifact.filename === "nexusim-windows-desktop.exe", "mixed manifest selected wrong baseline filename");
+
   const nsisReady = buildDesktopInstallerPlan({
     manifest: manifestPath,
     tauriConfig: activeConfigPath,
@@ -204,8 +241,6 @@ try {
   assert(unsupported.readyToBuildInstaller === false, "unsupported target should not be ready");
   assert(unsupported.missing.includes("supported-installer-target"), "unsupported target should be reported");
 
-  const installerArtifact = "fake msi bytes";
-  writeFileSync(join(collectedDir, "nexusim-windows-desktop-installer.msi"), installerArtifact);
   writeJSON(manifestPath, {
     ...manifest,
     artifacts: [

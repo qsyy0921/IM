@@ -61,15 +61,21 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   release signing 可额外使用 `--require-valid`，签名后立即读取 Authenticode public
   status，若 artifact 仍不是 valid signature 则 fail-closed。
   `verify:desktop-signature` 已补为只读签名验证入口：校验 collected artifact hash 后读取
-  Windows Authenticode public status，不签名、不安装、不启动、不下载；当前 collected
-  desktop baseline 实测为 `NotSigned`。
+  Windows Authenticode public status，不签名、不安装、不启动、不下载；当前仓库里的旧
+  collected desktop baseline 缺 `artifactKind`，按新规则会 fail-closed，需要先重新
+  collect 新格式 desktop artifact。desktop signing / signing execution /
+  signature verification 现在都按 `artifactKind` 精确选择 artifact，默认只处理
+  `desktop-executable`；要签名或验证 installer 必须显式传
+  `--artifact-kind desktop-installer`。
   `plan:desktop-installer`
   已改为读取仓库内显式 `tauri.installer.conf.json` profile：默认开发 Tauri config
   继续 `bundle.active=false`，installer profile 显式启用 MSI + NSIS targets。`build:desktop-installer`
   会用 `--config src-tauri/tauri.installer.conf.json` 调用 Tauri，并继续由显式
-  `--execute` 门控。desktop signing / installer planner 现在按 `windows-desktop`
-  目标选择最新 collected manifest，不会被更新的 Android manifest 遮住；当前本机
-  dry-run 已找到 desktop artifact baseline，只剩 signing readiness / valid signature 不满足而 fail-closed。
+  `--execute` 门控。desktop signing / signature verification / installer planner 现在按 `artifactKind`
+  选择最新 collected manifest，不会被更新的 Android manifest 或混合 desktop
+  manifest 里的 installer artifact 遮住 executable baseline；当前本机 dry-run 已找到
+  旧 desktop artifact baseline 并提示重新 collect；重新 collect 后再进入 signing
+  readiness / valid signature 收口。
   generic install plan 已按 `artifactKind` 区分 executable 和 installer：
   stale manifest 缺 `artifactKind` 时要求重新 collect，`desktop-installer` 不再进入
   portable launcher / direct shell-smoke 路径。
@@ -81,7 +87,7 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
 
 ## 下一步优先级
 
-1. Windows PC 端继续真实 signing input 接入、valid signed artifact、
+1. Windows PC 端先重新 collect 新格式 `desktop-executable` artifact，然后继续真实 signing input 接入、valid signed artifact、
    MSI / NSIS installer 和签名 installer 体验，并保持
    Web / PC shell 的 UI 细节随真实调试反馈继续收口。
 2. 若继续客户端产品能力，优先补成员搜索 / 分页、邀请来源提示、完整群设置和

@@ -52,6 +52,7 @@ try {
     artifacts: [
       {
         target: "windows-desktop",
+        artifactKind: "desktop-executable",
         filename: "nexusim-windows-desktop.exe",
         bytes: Buffer.byteLength(exe),
         sha256: sha256(exe),
@@ -124,6 +125,58 @@ try {
   });
   assert(invalidTimestamp.readyToSign === false, "invalid timestamp URL should not be ready");
   assert(invalidTimestamp.missing.includes("timestamp-url-valid"), "invalid timestamp should be reported");
+
+  const installer = "fake desktop installer bytes";
+  writeFileSync(join(collectedDir, "nexusim-windows-desktop-installer.msi"), installer);
+  const mixedManifest = {
+    ...manifest,
+    runId: "desktop-signing-mixed",
+    artifacts: [
+      {
+        target: "windows-desktop",
+        artifactKind: "desktop-installer",
+        filename: "nexusim-windows-desktop-installer.msi",
+        bytes: Buffer.byteLength(installer),
+        sha256: sha256(installer),
+        sourcePathHash: sha256("desktop-installer-source"),
+        sourceHint: "desktop/src-tauri/target/release/bundle/msi/nexusim.msi"
+      },
+      ...manifest.artifacts
+    ]
+  };
+  const mixedManifestPath = join(collectedDir, "manifest-mixed.json");
+  writeFileSync(mixedManifestPath, `${JSON.stringify(mixedManifest, null, 2)}\n`);
+  const mixedDefault = buildDesktopSigningPlan({
+    manifest: mixedManifestPath,
+    signToolPath: fakeSignTool,
+    certFile: fakePfx,
+    timestampURL: "https://timestamp.example.test",
+    pfxPassEnvPresent: true
+  });
+  assert(mixedDefault.readyToSign === true, "mixed manifest default signing should be ready");
+  assert(mixedDefault.artifact.artifactKind === "desktop-executable", "default signing must select desktop executable");
+  assert(mixedDefault.artifact.filename === "nexusim-windows-desktop.exe", "default signing selected wrong artifact filename");
+  const mixedInstaller = buildDesktopSigningPlan({
+    manifest: mixedManifestPath,
+    artifactKind: "desktop-installer",
+    signToolPath: fakeSignTool,
+    certFile: fakePfx,
+    timestampURL: "https://timestamp.example.test",
+    pfxPassEnvPresent: true
+  });
+  assert(mixedInstaller.readyToSign === true, "explicit installer signing should be ready");
+  assert(mixedInstaller.artifact.artifactKind === "desktop-installer", "explicit signing should select desktop installer");
+
+  const legacyManifest = {
+    ...manifest,
+    runId: "legacy-missing-artifact-kind",
+    artifacts: manifest.artifacts.map(({ artifactKind, ...artifact }) => artifact)
+  };
+  const legacyManifestPath = join(collectedDir, "manifest-legacy.json");
+  writeFileSync(legacyManifestPath, `${JSON.stringify(legacyManifest, null, 2)}\n`);
+  const legacyPlan = buildDesktopSigningPlan({ manifest: legacyManifestPath });
+  assert(legacyPlan.readyToSign === false, "legacy manifest without artifactKind should fail closed");
+  assert(legacyPlan.missing.includes("desktop-artifact-kind"), "legacy manifest should require explicit artifactKind");
 
   const androidManifest = {
     ...manifest,

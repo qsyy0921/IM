@@ -495,11 +495,13 @@ First slice:
   manifest and package-local README / launcher support files;
   `bundle:desktop` can package those collected files into an unsigned local
   portable zip with a low-sensitive summary;
-  `plan:desktop-signing` can read that collected desktop manifest, verify the
-  artifact hash and report whether explicit `signtool`, certificate and
-  timestamp URL inputs are present. It is plan-only: it does not sign, download
-  tools, install packages, launch the desktop app or print local absolute paths.
-  Missing inputs remain fail-closed as `readyToSign=false`.
+  `plan:desktop-signing` can read the collected desktop manifest for the
+  requested `artifactKind`, verify the selected artifact hash and report whether
+  explicit `signtool`, certificate and timestamp URL inputs are present. It
+  defaults to `desktop-executable`; `desktop-installer` must be requested
+  explicitly. It is plan-only: it does not sign, download tools, install
+  packages, launch the desktop app or print local absolute paths. Missing kind
+  or signing inputs remain fail-closed as `readyToSign=false`.
   `sign:desktop-artifact` is the explicit execution wrapper for that plan. Its
   default output remains plan-only and low-sensitive; it invokes `signtool` only
   with `--execute` after the collected artifact hash, explicit `signtool`,
@@ -508,21 +510,27 @@ First slice:
   `--require-valid`; then the wrapper reruns read-only Authenticode verification
   after signing and fails closed if the artifact is still not valid.
   `verify:desktop-signature` is the read-only post-signing verification wrapper.
-  It validates the collected artifact hash and reads Windows Authenticode public
+  It validates the selected artifact hash and reads Windows Authenticode public
   status without signing, installing, launching, starting services or downloading
-  toolchains. The current collected baseline reports `NotSigned`, so release
+  toolchains. It also defaults to `desktop-executable`; installer verification
+  must pass `--artifact-kind desktop-installer`. The old collected desktop
+  baseline currently in the repo lacks `artifactKind`, so these tools fail
+  closed until a new desktop artifact is recollected; after recollection, release
   profiles must sign first and then rerun verification with `--require-valid`.
-  `plan:desktop-signing` and `plan:desktop-installer` now select the latest
-  collected `windows-desktop` manifest instead of blindly using the newest
-  manifest, so newer Android artifacts do not hide an existing desktop baseline.
+  `plan:desktop-signing`,
+  `verify:desktop-signature` and `plan:desktop-installer` now select artifacts by
+  `artifactKind` instead of blindly using the first `windows-desktop` artifact,
+  so newer Android artifacts and mixed desktop manifests do not hide or swap the
+  intended executable baseline.
   `plan:desktop-installer` can read the repository installer Tauri profile, the
   collected desktop manifest, signing readiness and signature verification
   status, then report whether MSI / NSIS installer bundling is ready. The
   default dev config remains inactive, while `tauri.installer.conf.json` is the
   explicit MSI + NSIS profile. The plan still reports not ready until signing
   readiness and a valid Authenticode signature are present on an explicit
-  `desktop-executable` baseline instead of treating the unsigned portable zip
-  or an already collected installer as an installer build input.
+  `desktop-executable` baseline instead of treating the unsigned portable zip,
+  a stale no-kind manifest, or an already collected installer as an installer
+  build input.
   The generic client install plan now also keeps collected `desktop-installer`
   artifacts out of the portable launcher path, so `plan:shell-smoke` only marks
   Windows direct shell smoke ready for `desktop-executable` artifacts.

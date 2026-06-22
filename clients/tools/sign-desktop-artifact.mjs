@@ -10,6 +10,8 @@ import { buildDesktopSignatureVerificationReport } from "./verify-desktop-signat
 const schemaVersion = "nexusim.desktop-signing-execution.v1";
 const artifactManifestSchema = "nexusim.client-artifacts.v1";
 const artifactsRoot = join(workspaceRoot, "artifacts");
+const defaultDesktopArtifactKind = "desktop-executable";
+const desktopArtifactKinds = new Set(["desktop-executable", "desktop-installer"]);
 
 function main(argv) {
   const options = parseArgs(argv, process.env);
@@ -28,6 +30,7 @@ function main(argv) {
   if (options.requireValid) {
     const verification = buildDesktopSignatureVerificationReport({
       manifest: signedInput.manifestPath,
+      artifactKind: options.artifactKind,
       requireValid: true
     });
     if (!verification.readyForSignedDistribution) {
@@ -112,16 +115,22 @@ function runSigningCommand(options) {
 }
 
 function resolveSigningInput(options) {
+  const artifactKind = normalizeArtifactKind(options.artifactKind);
+  if (!desktopArtifactKinds.has(artifactKind)) {
+    throw new Error("desktop artifact kind invalid");
+  }
   const manifestPath = options.manifest
     ? resolve(options.manifest)
-    : findLatestArtifactManifest(artifactsRoot, "windows-desktop");
+    : findLatestArtifactManifest(artifactsRoot, "windows-desktop", artifactKind);
   if (!manifestPath) {
     throw new Error("desktop artifact manifest missing");
   }
   const manifest = readManifest(manifestPath);
-  const artifact = manifest.artifacts.find(candidate => candidate?.target === "windows-desktop");
+  const artifact = manifest.artifacts.find(
+    candidate => candidate?.target === "windows-desktop" && candidate.artifactKind === artifactKind
+  );
   if (!artifact) {
-    throw new Error("windows desktop artifact missing");
+    throw new Error(`windows desktop ${artifactKind} artifact missing`);
   }
   const artifactPath = join(dirname(manifestPath), artifact.filename);
   validateArtifact(artifact, artifactPath);
@@ -170,19 +179,24 @@ function readManifest(manifestPath) {
   return manifest;
 }
 
-function findLatestArtifactManifest(root, target) {
+function findLatestArtifactManifest(root, target, artifactKind) {
   if (!existsSync(root)) {
     return "";
   }
   const candidates = [];
   collectManifestCandidates(root, candidates);
   candidates.sort((left, right) => right.mtimeMs - left.mtimeMs);
+  let firstTargetManifest = "";
   for (const candidate of candidates) {
-    if (manifestContainsTarget(candidate.path, target)) {
+    const status = manifestTargetStatus(candidate.path, target, artifactKind);
+    if (status.exact) {
       return candidate.path;
     }
+    if (status.target && !firstTargetManifest) {
+      firstTargetManifest = candidate.path;
+    }
   }
-  return "";
+  return firstTargetManifest;
 }
 
 function collectManifestCandidates(dir, candidates) {
@@ -201,15 +215,19 @@ function collectManifestCandidates(dir, candidates) {
   }
 }
 
-function manifestContainsTarget(manifestPath, target) {
+function manifestTargetStatus(manifestPath, target, artifactKind) {
   const manifest = readManifest(manifestPath);
-  return manifest.artifacts.some(artifact => artifact?.target === target);
+  return {
+    target: manifest.artifacts.some(artifact => artifact?.target === target),
+    exact: manifest.artifacts.some(artifact => artifact?.target === target && artifact.artifactKind === artifactKind)
+  };
 }
 
 function parseArgs(argv, env) {
   const options = {
     execute: false,
     manifest: "",
+    artifactKind: defaultDesktopArtifactKind,
     signToolPath: env.NEXUSIM_DESKTOP_SIGNTOOL ?? "",
     certFile: env.NEXUSIM_DESKTOP_SIGN_CERT_FILE ?? "",
     certSHA1: env.NEXUSIM_DESKTOP_SIGN_CERT_SHA1 ?? "",
@@ -229,6 +247,11 @@ function parseArgs(argv, env) {
     }
     if (arg === "--manifest") {
       options.manifest = requiredValue(argv, index, arg);
+      index += 1;
+      continue;
+    }
+    if (arg === "--artifact-kind") {
+      options.artifactKind = requiredValue(argv, index, arg);
       index += 1;
       continue;
     }
@@ -297,6 +320,10 @@ function assertLowSensitiveOutput(output) {
 
 function sha256Buffer(buffer) {
   return createHash("sha256").update(buffer).digest("hex");
+}
+
+function normalizeArtifactKind(value) {
+  return typeof value === "string" && value.length > 0 ? value : defaultDesktopArtifactKind;
 }
 
 const thisFile = fileURLToPath(import.meta.url);

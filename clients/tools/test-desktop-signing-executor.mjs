@@ -53,6 +53,7 @@ try {
     artifacts: [
       {
         target: "windows-desktop",
+        artifactKind: "desktop-executable",
         filename: "nexusim-windows-desktop.exe",
         bytes: Buffer.byteLength(exe),
         sha256: sha256(exe),
@@ -132,6 +133,51 @@ try {
   assert(cliRequireValidPlan.readyToSign === true, "require-valid CLI dry-run should still be ready to sign");
   assert(cliRequireValidPlan.executionPolicy.requiresValidSignatureAfterSigning === true, "require-valid dry-run should declare valid-signature requirement");
   assert(cliRequireValidPlan.executionPolicy.verifiesSignatureAfterSigning === false, "require-valid dry-run must not verify before execute");
+
+  const installer = "fake desktop installer bytes";
+  writeFileSync(join(collectedDir, "nexusim-windows-desktop-installer.msi"), installer);
+  const mixedManifest = {
+    ...manifest,
+    runId: "desktop-signing-executor-mixed",
+    artifacts: [
+      {
+        target: "windows-desktop",
+        artifactKind: "desktop-installer",
+        filename: "nexusim-windows-desktop-installer.msi",
+        bytes: Buffer.byteLength(installer),
+        sha256: sha256(installer),
+        sourcePathHash: sha256("desktop-installer-source"),
+        sourceHint: "desktop/src-tauri/target/release/bundle/msi/nexusim.msi"
+      },
+      ...manifest.artifacts
+    ]
+  };
+  const mixedManifestPath = join(collectedDir, "manifest-mixed.json");
+  writeFileSync(mixedManifestPath, `${JSON.stringify(mixedManifest, null, 2)}\n`);
+  const mixedDefaultPlan = buildDesktopSigningPlan({
+    manifest: mixedManifestPath,
+    signToolPath: fakeSignTool,
+    certFile: fakePfx,
+    timestampURL: "https://timestamp.example.test",
+    pfxPassEnvPresent: true
+  });
+  const mixedDefaultOutput = buildSigningOutput(mixedDefaultPlan, { execute: false });
+  assert(mixedDefaultOutput.signingPlan.artifact.artifactKind === "desktop-executable", "default signing executor should expose executable artifact");
+  const mixedInstallerPlan = runSigner([
+    "--manifest",
+    mixedManifestPath,
+    "--artifact-kind",
+    "desktop-installer",
+    "--signtool",
+    fakeSignTool,
+    "--cert-file",
+    fakePfx,
+    "--timestamp-url",
+    "https://timestamp.example.test"
+  ], {
+    NEXUSIM_DESKTOP_SIGN_PFX_PASS: "present"
+  });
+  assert(mixedInstallerPlan.signingPlan.artifact.artifactKind === "desktop-installer", "explicit installer signing dry-run should expose installer artifact");
 
   const notReady = spawnSync(process.execPath, [
     signer,

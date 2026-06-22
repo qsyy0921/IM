@@ -49,6 +49,7 @@ try {
     artifacts: [
       {
         target: "windows-desktop",
+        artifactKind: "desktop-executable",
         filename: "nexusim-windows-desktop.exe",
         bytes: Buffer.byteLength(exe),
         sha256: sha256(exe),
@@ -88,6 +89,51 @@ try {
   assert(unsigned.readyForSignedDistribution === false, "unsigned artifact should not be ready");
   assert(unsigned.missing.includes("valid-authenticode-signature"), "unsigned artifact should require a valid signature");
   assert(unsigned.signature.signed === false, "unsigned artifact should report signed=false");
+
+  const installer = "fake desktop installer bytes";
+  writeFileSync(join(collectedDir, "nexusim-windows-desktop-installer.msi"), installer);
+  const mixedManifest = {
+    ...manifest,
+    runId: "desktop-signature-verifier-mixed",
+    artifacts: [
+      {
+        target: "windows-desktop",
+        artifactKind: "desktop-installer",
+        filename: "nexusim-windows-desktop-installer.msi",
+        bytes: Buffer.byteLength(installer),
+        sha256: sha256(installer),
+        sourcePathHash: sha256("desktop-installer-source"),
+        sourceHint: "desktop/src-tauri/target/release/bundle/msi/nexusim.msi"
+      },
+      ...manifest.artifacts
+    ]
+  };
+  const mixedManifestPath = join(collectedDir, "manifest-mixed.json");
+  writeFileSync(mixedManifestPath, `${JSON.stringify(mixedManifest, null, 2)}\n`);
+  const mixedDefault = buildDesktopSignatureVerificationReport({
+    manifest: mixedManifestPath,
+    mockSignatureStatus: { status: "NotSigned" }
+  });
+  assert(mixedDefault.artifact.artifactKind === "desktop-executable", "default verifier must select desktop executable");
+  assert(mixedDefault.artifact.filename === "nexusim-windows-desktop.exe", "default verifier selected wrong filename");
+  const mixedInstaller = buildDesktopSignatureVerificationReport({
+    manifest: mixedManifestPath,
+    artifactKind: "desktop-installer",
+    mockSignatureStatus: { status: "Valid" }
+  });
+  assert(mixedInstaller.readyForSignedDistribution === true, "explicit installer verifier should accept valid signature");
+  assert(mixedInstaller.artifact.artifactKind === "desktop-installer", "explicit verifier should select desktop installer");
+
+  const legacyManifest = {
+    ...manifest,
+    runId: "legacy-missing-artifact-kind",
+    artifacts: manifest.artifacts.map(({ artifactKind, ...artifact }) => artifact)
+  };
+  const legacyManifestPath = join(collectedDir, "manifest-legacy.json");
+  writeFileSync(legacyManifestPath, `${JSON.stringify(legacyManifest, null, 2)}\n`);
+  const legacyReport = buildDesktopSignatureVerificationReport({ manifest: legacyManifestPath });
+  assert(legacyReport.readyForSignedDistribution === false, "legacy verifier manifest should fail closed");
+  assert(legacyReport.missing.includes("desktop-artifact-kind"), "legacy verifier manifest should require explicit artifactKind");
 
   const cliReport = runVerifier(["--manifest", manifestPath]);
   assert(cliReport.readyForSignedDistribution === false, "fixture artifact should not be treated as signed");

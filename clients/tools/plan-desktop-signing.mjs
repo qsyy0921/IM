@@ -8,6 +8,8 @@ const schemaVersion = "nexusim.desktop-signing-plan.v1";
 const artifactManifestSchema = "nexusim.client-artifacts.v1";
 const artifactsRoot = join(workspaceRoot, "artifacts");
 const signableExtensions = new Set([".exe", ".msi", ".msix"]);
+const defaultDesktopArtifactKind = "desktop-executable";
+const desktopArtifactKinds = new Set(["desktop-executable", "desktop-installer"]);
 
 function main(argv) {
   const options = parseArgs(argv, process.env);
@@ -16,12 +18,15 @@ function main(argv) {
 }
 
 export function buildDesktopSigningPlan(options = {}) {
+  const artifactKind = normalizeArtifactKind(options.artifactKind);
+  const artifactKindSupported = desktopArtifactKinds.has(artifactKind);
   const manifestPath = options.manifest
     ? resolve(options.manifest)
-    : findLatestArtifactManifest(options.artifactsRoot ?? artifactsRoot, "windows-desktop");
+    : findLatestArtifactManifest(options.artifactsRoot ?? artifactsRoot, "windows-desktop", artifactKind);
   const base = {
     schemaVersion,
     generatedAt: new Date().toISOString(),
+    artifactKind,
     executionPolicy: executionPolicy()
   };
   if (!manifestPath) {
@@ -38,12 +43,12 @@ export function buildDesktopSigningPlan(options = {}) {
 
   const manifest = readManifest(manifestPath);
   const manifestDir = dirname(manifestPath);
-  const artifact = findDesktopArtifact(manifest);
+  const artifact = artifactKindSupported ? findDesktopArtifact(manifest, artifactKind) : null;
   if (!artifact) {
     return {
       ...base,
       readyToSign: false,
-      missing: ["windows-desktop-artifact"],
+      missing: [desktopArtifactMissingReason(manifest, artifactKind, artifactKindSupported)],
       artifactManifest: artifactManifestInfo(manifest, manifestPath)
     };
   }
@@ -51,6 +56,9 @@ export function buildDesktopSigningPlan(options = {}) {
   const artifactPath = join(manifestDir, artifact.filename);
   const artifactInfo = validateArtifact(artifact, artifactPath);
   const missing = [];
+  if (!artifactKindSupported) {
+    missing.push("desktop-artifact-kind");
+  }
   if (!signableExtensions.has(extname(artifact.filename).toLowerCase())) {
     missing.push("signable-windows-artifact");
   }
@@ -217,6 +225,7 @@ function validateArtifact(artifact, artifactPath) {
   }
   return {
     filename: artifact.filename,
+    artifactKind: typeof artifact.artifactKind === "string" ? artifact.artifactKind : "",
     bytes: artifact.bytes,
     sha256: artifact.sha256,
     artifactHint: safeHint(artifactPath),
@@ -251,23 +260,44 @@ function artifactManifestInfo(manifest, manifestPath) {
   };
 }
 
-function findDesktopArtifact(manifest) {
-  return manifest.artifacts.find(artifact => artifact?.target === "windows-desktop");
+function findDesktopArtifact(manifest, artifactKind) {
+  return manifest.artifacts.find(
+    artifact => artifact?.target === "windows-desktop" && artifact.artifactKind === artifactKind
+  );
 }
 
-function findLatestArtifactManifest(root, target) {
+function desktopArtifactMissingReason(manifest, artifactKind, artifactKindSupported) {
+  if (!artifactKindSupported) {
+    return "desktop-artifact-kind";
+  }
+  const desktopArtifacts = manifest.artifacts.filter(artifact => artifact?.target === "windows-desktop");
+  if (desktopArtifacts.length === 0) {
+    return "windows-desktop-artifact";
+  }
+  if (desktopArtifacts.some(artifact => typeof artifact.artifactKind !== "string" || artifact.artifactKind.length === 0)) {
+    return "desktop-artifact-kind";
+  }
+  return `${artifactKind}-artifact`;
+}
+
+function findLatestArtifactManifest(root, target, artifactKind) {
   if (!existsSync(root)) {
     return "";
   }
   const candidates = [];
   collectManifestCandidates(root, candidates);
   candidates.sort((left, right) => right.mtimeMs - left.mtimeMs);
+  let firstTargetManifest = "";
   for (const candidate of candidates) {
-    if (manifestContainsTarget(candidate.path, target)) {
+    const status = manifestTargetStatus(candidate.path, target, artifactKind);
+    if (status.exact) {
       return candidate.path;
     }
+    if (status.target && !firstTargetManifest) {
+      firstTargetManifest = candidate.path;
+    }
   }
-  return "";
+  return firstTargetManifest;
 }
 
 function collectManifestCandidates(dir, candidates) {
@@ -286,14 +316,18 @@ function collectManifestCandidates(dir, candidates) {
   }
 }
 
-function manifestContainsTarget(manifestPath, target) {
+function manifestTargetStatus(manifestPath, target, artifactKind) {
   const manifest = readManifest(manifestPath);
-  return manifest.artifacts.some(artifact => artifact?.target === target);
+  return {
+    target: manifest.artifacts.some(artifact => artifact?.target === target),
+    exact: manifest.artifacts.some(artifact => artifact?.target === target && artifact.artifactKind === artifactKind)
+  };
 }
 
 function parseArgs(argv, env) {
   const options = {
     manifest: "",
+    artifactKind: defaultDesktopArtifactKind,
     signToolPath: env.NEXUSIM_DESKTOP_SIGNTOOL ?? "",
     certFile: env.NEXUSIM_DESKTOP_SIGN_CERT_FILE ?? "",
     certSHA1: env.NEXUSIM_DESKTOP_SIGN_CERT_SHA1 ?? "",
@@ -304,6 +338,11 @@ function parseArgs(argv, env) {
     const arg = argv[index];
     if (arg === "--manifest") {
       options.manifest = requiredValue(argv, index, arg);
+      index += 1;
+      continue;
+    }
+    if (arg === "--artifact-kind") {
+      options.artifactKind = requiredValue(argv, index, arg);
       index += 1;
       continue;
     }
@@ -377,6 +416,10 @@ function requiredValue(argv, index, name) {
 
 function stringValue(value) {
   return typeof value === "string" ? value : "";
+}
+
+function normalizeArtifactKind(value) {
+  return stringValue(value) || defaultDesktopArtifactKind;
 }
 
 function sha256Buffer(buffer) {

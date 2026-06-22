@@ -49,6 +49,7 @@ assert(commands.includes("npm --prefix clients run test:shell-asset-prep-wrapper
 assert(commands.includes("npm --prefix clients run test:desktop-shell-action-assets"), "desktop action asset check missing");
 assert(commands.includes("npm --prefix clients run test:desktop-artifact-launch-smoke"), "desktop artifact launch smoke contract check missing");
 assert(commands.includes("npm --prefix clients run test:desktop-bundle"), "desktop bundle contract check missing");
+assert(commands.includes("npm --prefix clients run test:desktop-installer-plan"), "desktop installer plan contract check missing");
 assert(commands.includes("npm --prefix clients run test:desktop-signing-plan"), "desktop signing plan contract check missing");
 assert(commands.includes("npm --prefix clients run test:desktop-composed-smoke"), "desktop composed smoke contract check missing");
 assert(commands.includes("npm --prefix clients run test:desktop-webview-metadata-smoke"), "desktop WebView metadata runner contract check missing");

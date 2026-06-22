@@ -264,8 +264,8 @@ First slice:
   local-store / IndexedDB contracts, Web shell lifecycle / automation /
   smoke-report contracts, clientweb smoke hook contract, desktop artifact launch
   / composed smoke dry-run contracts, artifact readiness / install-plan / builder
-  / collector contracts, desktop signing readiness plan contract, Android builder
-  profile / wrapper contracts, desktop / Android action assets, desktop WebView
+  / collector contracts, desktop installer / signing readiness plan contracts,
+  Android builder profile / wrapper contracts, desktop / Android action assets, desktop WebView
   metadata / login dry-run contracts,
   Android metadata / login smoke dry-run contracts, Android device / WebView
   devtools readiness and parser contracts and Android platform readiness. It does not build native
@@ -493,6 +493,11 @@ First slice:
   timestamp URL inputs are present. It is plan-only: it does not sign, download
   tools, install packages, launch the desktop app or print local absolute paths.
   Missing inputs remain fail-closed as `readyToSign=false`.
+  `plan:desktop-installer` can read Tauri `bundle` config, the collected
+  desktop manifest and signing readiness, then report whether MSI / NSIS
+  installer bundling is ready. Current config has `bundle.active=false`, so the
+  plan correctly reports not ready instead of treating the unsigned portable zip
+  as an installer.
   `smoke:desktop-artifact-launch` has verified the exe starts, stays alive
   during the smoke hold window and terminates cleanly.
   Its dry-run output carries an execution policy proving it only reads the
@@ -570,8 +575,8 @@ rejected. For local LAN client smoke, prefer the wired `172.x.x.x` address.
    send, PullInbox and ACK.
 2. Produce the next Windows package step when needed: MSI / NSIS installer
    script and real code-signing pipeline on top of the existing standalone exe,
-   package-local launcher, unsigned local zip bundle, explicit signing readiness
-   plan and login-level WebView smoke.
+   package-local launcher, unsigned local zip bundle, explicit installer /
+   signing readiness plans and login-level WebView smoke.
 3. Return to Android only when explicitly prioritized: run login-level Android
    WebView smoke on the installed APK, then record the Android baseline.
 
@@ -613,6 +618,7 @@ npm --prefix clients run test:artifact-collector
 npm --prefix clients run test:artifact-install-plan
 npm --prefix clients run test:artifact-readiness
 npm --prefix clients run test:desktop-bundle
+npm --prefix clients run test:desktop-installer-plan
 npm --prefix clients run test:desktop-signing-plan
 npm --prefix clients run test:android-docker-builder
 npm --prefix clients run test:native-store-readiness
@@ -645,6 +651,7 @@ npm --prefix clients run plan:shell-smoke
 npm --prefix clients run plan:artifact-install
 npm --prefix clients run bundle:desktop:dry-run
 npm --prefix clients run bundle:desktop
+npm --prefix clients run plan:desktop-installer
 npm --prefix clients run plan:desktop-signing
 npm --prefix clients run smoke:desktop-artifact-launch
 npm --prefix clients run smoke:desktop-composed -- --clientweb-summary <client-web-summary.json>

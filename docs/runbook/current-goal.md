@@ -52,8 +52,10 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   步骤指向 package-local launcher。`bundle:desktop` 已能把 collected Windows desktop
   package 打成 unsigned local portable zip，并写低敏 summary。`plan:desktop-signing`
   已能基于 collected desktop manifest 检查显式 `signtool`、证书来源和 timestamp URL
-  是否齐备，且只输出低敏 plan，不签名、不下载、不安装、不启动。它仍不是生产签名
-  installer。
+  是否齐备，且只输出低敏 plan，不签名、不下载、不安装、不启动。`plan:desktop-installer`
+  已能读取 Tauri bundle config、collected desktop manifest 和 signing readiness，
+  对 MSI / NSIS installer readiness 做 fail-closed 检查；当前 `bundle.active=false`
+  时会明确 not ready。它们仍不是生产签名 installer。
 - Android 已有 WebView shell / bridge / APK 历史产物和 metadata smoke；当前 shell
   不宣称 F 盘 Android toolchain ready，后续切回 Android 时再重新加载 toolchain env。
 

@@ -165,6 +165,11 @@ const checkPlan = [
     reason: "guards portable desktop bundle packaging and unsigned-local boundary without signing or launching"
   },
   {
+    name: "desktop-installer-plan-contract",
+    script: "test:desktop-installer-plan",
+    reason: "guards MSI/NSIS installer readiness without building or signing installers"
+  },
+  {
     name: "desktop-signing-plan-contract",
     script: "test:desktop-signing-plan",
     reason: "guards explicit desktop code-signing readiness without signing artifacts"

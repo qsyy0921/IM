@@ -170,6 +170,7 @@ npm --prefix clients run test:artifact-collector
 npm --prefix clients run test:artifact-install-plan
 npm --prefix clients run test:artifact-readiness
 npm --prefix clients run test:desktop-bundle
+npm --prefix clients run test:desktop-installer-plan
 npm --prefix clients run test:desktop-signing-plan
 npm --prefix clients run test:web-shell-actions
 npm --prefix clients run test:shell-smoke-plan
@@ -193,6 +194,7 @@ npm --prefix clients run build:android-apk:collect
 npm --prefix clients run collect:client-artifacts
 npm --prefix clients run bundle:desktop:dry-run
 npm --prefix clients run bundle:desktop
+npm --prefix clients run plan:desktop-installer
 npm --prefix clients run plan:desktop-signing
 ```
 
@@ -236,6 +238,12 @@ low-sensitive command template only when ready. It does not sign artifacts,
 download tools, install packages, launch the desktop app or print local absolute
 paths. Missing signing inputs fail closed as `readyToSign=false`; there is no
 placeholder signature path.
+`plan:desktop-installer` reads the Tauri config, the collected Windows desktop
+manifest and the signing readiness plan, then reports whether MSI / NSIS
+installer bundling can run. It is also plan-only: it does not enable
+`bundle.active`, run Tauri, sign, install, launch or download anything. Current
+repo config intentionally reports not ready until Tauri bundling is explicitly
+enabled, a desktop artifact manifest is selected and signing readiness is true.
 
 Android can also be built through the local Docker builder profile when the image
 is intentionally built:
@@ -266,8 +274,9 @@ Current packaging status:
   `README-windows-desktop.txt` and `launch-nexusim-windows.ps1`. A portable
   unsigned local zip bundle can be produced with `bundle:desktop`.
   `plan:desktop-signing` now checks explicit code-signing readiness and produces
-  only a low-sensitive plan; MSI / NSIS installer bundling and actual signing
-  execution are still future hardening. Use
+  only a low-sensitive plan. `plan:desktop-installer` now checks Tauri MSI /
+  NSIS readiness and correctly fails closed while `bundle.active=false`; actual
+  MSI / NSIS build execution and signing execution are still future hardening. Use
   `npm --prefix clients run smoke:desktop-artifact-launch` for the first launch
   sanity check; it starts the collected exe, waits briefly, then terminates it.
 - Android: native WebView shell can prepare target-specific Web assets and has
@@ -306,7 +315,7 @@ Current packaging status:
   local-store / IndexedDB contracts, Web shell lifecycle / automation /
   smoke-report contracts, shell asset prep, desktop artifact launch / composed
   smoke dry-run contracts, artifact readiness / install-plan / builder /
-  collector / desktop signing plan contracts, Android builder profile / wrapper contracts, desktop
+  collector / desktop installer / signing plan contracts, Android builder profile / wrapper contracts, desktop
   WebView metadata / login dry-run contracts, Android metadata / login dry-run
   contracts, Android device / WebView devtools readiness and parser contracts and
   reads low-sensitive ADB / device readiness state through the Android platform

@@ -49,8 +49,9 @@ NexusIM 已有本地 / 双机可运行的最小分布式 IM 后端，并已扩�
    first path；Web / PC shell 已补第一版会话展示标题、空态、常见错误中文文案、
    显式本地启动脚本和群设置操作区。Windows desktop collected package 已补
    package-local README / launcher support files，并已有 unsigned local portable
-   zip bundle 工具；`plan:desktop-signing` 已能检查显式签名输入 readiness，但不执行
-   签名；下一步继续 MSI / NSIS 和真实 code-signing execution pipeline。
+   zip bundle 工具；`plan:desktop-installer` / `plan:desktop-signing` 已能检查
+   Tauri installer 和显式签名输入 readiness，但不执行 bundling 或签名；下一步继续
+   MSI / NSIS 和真实 code-signing execution pipeline。
    `loadtest/clientweb` 已扩展到群成员列表、
    角色变更、owner transfer 和移除成员的 BFF 链路；2026-06-23 clean committed
    smoke 已通过。

@@ -148,7 +148,8 @@ First slice:
   `loadAndroidRuntimeConfig`, `createAndroidPlatformAdapter`, development-only
   session storage, localStorage-backed persistent message cache, static
   network/lifecycle ports and unsupported push/local wakeup notifications. This
-  moves Android beyond a pure contract, but it is not an APK yet.
+  moves Android beyond a pure contract, and the first local debug APK baseline
+  now builds from the native shell.
 - `clients/android/native` now has a first-stage Kotlin native bridge skeleton.
   It now uses an Android WebView asset shell through `WebViewAssetLoader`,
   loads the prepared local Web assets, and still does not own token storage,
@@ -269,10 +270,10 @@ First slice:
 - `npm --prefix clients run test:artifact-builders` validates the first-stage
   desktop artifact / Android APK build wrappers in dry-run mode. Windows
   desktop can now build through the repo-local Tauri CLI after
-  `npm --prefix clients install`; Android still fails fast with
-  missing-toolchain JSON until the local Android toolchain or Docker builder
-  image exists. Both desktop and Android wrappers accept a custom shell config
-  path for metadata-smoke builds; the path is never printed in dry-run output.
+  `npm --prefix clients install`; Android now also builds locally when the
+  F-drive JDK / Gradle / Android SDK environment is present. Both desktop and
+  Android wrappers accept a custom shell config path for metadata-smoke builds;
+  the path is never printed in dry-run output.
   Both wrapper dry-runs now emit an execution policy proving they do not execute
   Tauri / Gradle builds, prepare or verify shell assets, collect artifacts,
   start Docker, install artifacts, contact devices or download toolchains.
@@ -459,9 +460,10 @@ First slice:
   login, externally triggered `delivery.notify`, PullInbox, message observe and
   AckDelivery. The desktop SQLite bridge rerun on commit `2b67b0e1` also proves
   `tauri-sqlite` ready evidence in both metadata-only and login-level WebView
-  smoke. Android now has the same metadata-smoke runner shape, but it
-  still does not produce `.apk` or `.aab` artifacts because the local toolchain /
-  Docker builder image has not been completed.
+  smoke. Android now has the same metadata-smoke runner shape and a first
+  collected debug APK artifact. Real Android metadata / login WebView smoke is
+  still pending because installing the APK and starting the Activity remains an
+  explicit user/device action.
 - `plan:shell-smoke` now marks the Android Docker builder path with
   machine-readable risk flags. If the local builder image is missing, the
   `build-android-builder-image` step carries `downloadsToolchain=true` and
@@ -498,17 +500,17 @@ rejected. For local LAN client smoke, prefer the wired `172.x.x.x` address.
 
 ## Next Work
 
-1. Add first unsigned local APK from the Android native bridge or Docker builder.
-   Run `report:android-platform-readiness` first, then explicitly bootstrap the
-   Docker builder image only when toolchain download is acceptable.
-2. Run Android platform-shell smoke once packaging/runtime tooling is ready.
-   Lifecycle UI selectors are already guarded in the Android WebView asset
-   contract; the remaining proof is real APK/WebView execution.
-3. Validate Android `android-sqlite` on a real APK once packaging/runtime
-   tooling is ready. Desktop `tauri-sqlite` metadata / login WebView reruns are
-   complete on commit `2b67b0e1`; the shared `NativeStoreReadiness` contract is
-   already in place, so remaining work is Android platform smoke, not changing
-   client-core sync semantics.
+1. Run Android platform-shell metadata smoke against the collected debug APK.
+   `plan:artifact-install` already reports the APK as ready and prints the
+   manual `adb install` checklist; Codex / scripts should not install or start
+   the app without explicit user action.
+2. Run Android login-level WebView smoke after metadata smoke passes. Lifecycle
+   UI selectors are already guarded in the Android WebView asset contract; the
+   remaining proof is real APK/WebView execution.
+3. Validate Android `android-sqlite` on the real APK. Desktop `tauri-sqlite`
+   metadata / login WebView reruns are complete on commit `2b67b0e1`; the shared
+   `NativeStoreReadiness` contract is already in place, so remaining work is
+   Android platform smoke, not changing client-core sync semantics.
 
 ## Local Build Prerequisites
 
@@ -517,14 +519,21 @@ rejected. For local LAN client smoke, prefer the wired `172.x.x.x` address.
   dependency. `npm --prefix clients install` installs the repo-local Tauri CLI;
   `build:desktop-artifact:collect` then produces a first-stage standalone exe
   and collected manifest.
-- Android APK build needs JDK 17+ plus Gradle / Android SDK. If those are not
-  installed locally, use a Docker / CI builder profile instead of claiming an
-  APK baseline. The Docker builder image installs pinned Node, Gradle and
-  Android SDK tools; the first actual builder run may still download npm /
-  Gradle project dependencies.
-- The repository now includes an Android Docker builder profile wired to the
-  same artifact collector, but it has not been run in this slice and therefore
-  does not prove an APK baseline yet.
+- Android APK build needs JDK 17+ plus Gradle / Android SDK. The Windows local
+  baseline now uses `F:\IM\toolchains`: Temurin JDK 17, Gradle 8.10.2,
+  Android SDK commandline-tools, platform-tools, `platforms;android-35` and
+  `build-tools;35.0.0`. `GRADLE_USER_HOME` is also pinned under `F:\IM` so
+  Gradle dependency caches do not default to C drive.
+- `npm --prefix clients run build:android-apk:collect` produced the first
+  collected Android debug APK manifest at
+  `clients/artifacts/2026-06-22T034017Z/manifest.json` with
+  `nexusim-android-debug.apk`
+  (`sha256=f931053736f0e4168417b1187fe2c6058b86dc8db8dbca7a1e9b1fec1a901dba`).
+- The repository still includes an Android Docker builder profile wired to the
+  same artifact collector, but it is no longer the default next step for this
+  Windows host. Use it only when containerized Android builds are explicitly
+  requested; the first image build downloads Node, Gradle and Android SDK
+  components.
 
 Focused local check:
 

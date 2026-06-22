@@ -45,10 +45,35 @@ export function commandSucceeded(command, args) {
 }
 
 export function runCommand(command, args, options = {}) {
-  return spawnSync(command, args, {
+  const result = spawnSync(command, args, {
     encoding: "utf8",
     ...options
   });
+  if (process.platform !== "win32" || result.error?.code !== "ENOENT" || command.match(/[\\/]/)) {
+    return result;
+  }
+  for (const extension of [".cmd", ".bat", ".exe"]) {
+    const fallbackCommand = `${command}${extension}`;
+    const located = spawnSync("where.exe", [fallbackCommand], {
+      encoding: "utf8"
+    });
+    if (located.status !== 0) {
+      continue;
+    }
+    const fallback = extension === ".cmd" || extension === ".bat"
+      ? spawnSync("cmd.exe", ["/d", "/c", fallbackCommand, ...args], {
+        encoding: "utf8",
+        ...options
+      })
+      : spawnSync(fallbackCommand, args, {
+        encoding: "utf8",
+        ...options
+      });
+    if (fallback.error?.code !== "ENOENT") {
+      return fallback;
+    }
+  }
+  return result;
 }
 
 function isOK(checks, name) {

@@ -67,15 +67,21 @@ function dryRunExecutionPolicy() {
 function androidBuildPlan(prereqs, options) {
   const gradlew = join(androidNativeRoot, process.platform === "win32" ? "gradlew.bat" : "gradlew");
   const hasGradleWrapper = existsSync(gradlew);
+  const gradleArgs = ["-Pnexusim.skipWebAssetPrep=true", ":app:assembleDebug"];
+  const gradleCommand = hasGradleWrapper ? gradlew : "gradle";
   const missing = prereqs.checks
     .filter(check => check.target === "android" && !check.ok)
     .map(check => check.name);
+  const command = process.platform === "win32" && !hasGradleWrapper ? "cmd.exe" : gradleCommand;
+  const args = process.platform === "win32" && !hasGradleWrapper
+    ? ["/d", "/c", "gradle.bat", ...gradleArgs]
+    : gradleArgs;
   return {
     target: "android",
     ready: prereqs.androidApkReady,
     missing,
-    command: hasGradleWrapper ? gradlew : "gradle",
-    args: ["-Pnexusim.skipWebAssetPrep=true", ":app:assembleDebug"],
+    command,
+    args,
     shell: false,
     cwdHint: "clients/android/native",
     outputHint: "clients/android/native/app/build/outputs/apk/debug/app-debug.apk",

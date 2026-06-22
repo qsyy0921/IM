@@ -12,6 +12,11 @@ android {
     namespace = "com.nexusim.android"
     compileSdk = 35
 
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
     defaultConfig {
         applicationId = "com.nexusim.android"
         minSdk = 26
@@ -28,6 +33,10 @@ android {
             manifestPlaceholders["nexusimCleartextTraffic"] = "false"
         }
     }
+}
+
+kotlin {
+    jvmToolchain(17)
 }
 
 dependencies {

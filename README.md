@@ -52,12 +52,12 @@ GitHub 首页只放当前总览。每轮 Codex 继续开发时，目标框只复
 
 | 模块 | 当前状态 |
 | --- | --- |
-| `clients/` | Browser / PC / Android client platform first slice：`protocol`、`client-core`、Web shell、PC desktop shell contract 和 Android runtime contract 已建立并通过 focused validation；`api-gateway` client BFF first-stage HTTP/JSON surface 已落；Web BFF fetch / push WebSocket / IndexedDB local store adapters 已接；客户端只连 `api-gateway` / `push-gateway`，PullInbox 是消息事实源，WebSocket 只做在线唤醒。 |
+| `clients/` | Browser / PC / Android client platform first slice：`protocol`、`client-core`、Web shell、PC desktop shell contract 和 Android runtime contract 已建立并通过 focused validation；`api-gateway` client BFF first-stage HTTP/JSON surface 已落；Web BFF fetch / push WebSocket / IndexedDB local store adapters 已接；PC standalone exe 和 Android debug APK baseline 已产出；客户端只连 `api-gateway` / `push-gateway`，PullInbox 是消息事实源，WebSocket 只做在线唤醒。 |
 
 当前默认主线不是继续泛化清理 9 服务 P2 backlog，而是先推进客户端平台 MVP：
 Web client -> `api-gateway` client BFF -> `push-gateway` WebSocket 的本地 / 局域网
-smoke 已通过，下一步复用同一 core 接 Windows PC 和 Android。AI 大模型应用底座
-作为后续主线保留：
+smoke 已通过，PC WebView login smoke 已通过，Android debug APK 已能本机构建；
+下一步是 Android 真机 metadata / login WebView smoke。AI 大模型应用底座作为后续主线保留：
 
 ```text
 group memory
@@ -71,7 +71,7 @@ group memory
 -> ai-eval
 ```
 
-下一步默认看 [current-goal.md](docs/runbook/current-goal.md)。截至当前主线，下一步是跑 Web client -> client BFF -> push-gateway 的局域网 Web MVP smoke；随后补 BFF HTTP 层 metrics / rate-limit，并复用同一 core 接 Windows PC 和 Android。
+下一步默认看 [current-goal.md](docs/runbook/current-goal.md)。截至当前主线，下一步是基于已收集的 Android debug APK 跑真机 metadata / login WebView smoke；APK 安装和 Activity 启动仍需要显式用户动作。
 
 ## 不变量
 
@@ -214,8 +214,9 @@ python -m mypy nexusim_ai_common scripts tests
 - provider-grade ReBAC DSL、外部 audit sink、运维 UI、批量 repair 审批系统。
 - 完整 Web / App / 桌面客户端；当前 Web-first client platform first slice、
   `api-gateway` client BFF first-stage surface、Web adapters first path、本地 /
-  wired LAN smoke 和 BFF HTTP metrics / rate-limit adapter 已落，但还缺 Windows
-  installer 和 Android APK。
+  wired LAN smoke、BFF HTTP metrics / rate-limit adapter、PC standalone exe 和
+  Android debug APK baseline 已落，但还缺 Windows installer、Android 真机 smoke
+  和正式移动端发布链路。
 - 完整 media / notification / admin / audit 等产品化平台服务。
 
 当前最准确表述：

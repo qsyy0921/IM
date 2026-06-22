@@ -45,19 +45,20 @@
   asset shell skeleton 已落；`createAndroidClientRuntime` 已能组装 shared
   `BFFClient` / `WebSocketPushTransport` / auth / inbox / send / ack queue；
   shared runtime lifecycle smoke 已覆盖 login / restore / refresh / logout 本地状态；
-  thin `createAndroidShellActions` 已接 shared login / refresh / restore / logout 编排；继续产出 unsigned
-  APK，Kotlin 只做薄 bridge，业务协议和 sync core 复用 TypeScript。
+  thin `createAndroidShellActions` 已接 shared login / refresh / restore / logout 编排；
+  Windows 本机 debug APK baseline 已产出，Kotlin 只做薄 bridge，业务协议和
+  sync core 复用 TypeScript。
 - Android packaging：产出本地 unsigned APK，并支持局域网 `api-gateway` /
-  `push-gateway` 地址配置。当前本机尚缺 Gradle / Android SDK，且 `java`
-  指向 JDK 8；需要 JDK 17+ 和 Android build toolchain，或通过
-  Docker / CI builder 产物链路；可用 `npm --prefix clients run check:build-prereqs`
-  检查当前机器状态。`build:android-apk` wrapper 已落，会在工具链 ready 时准备
-  shell assets 并执行 Gradle `:app:assembleDebug`；Android Docker builder profile
-  已接 `build:android-apk:collect` 但尚未运行；artifact collector 已能归档产物并生成 SHA-256 manifest，
-  `build:android-apk:collect` 可在成功构建后自动归档；`report:artifact-readiness`
-  显示 Docker / Compose 可用但 builder image 尚未构建，当前仍未产出 APK。
-  `build:android-apk:docker` 是安全 wrapper，默认不隐式构建缺失镜像；需要下载
-  Node / Gradle / Android SDK toolchain 时必须显式运行 `build:android-apk:docker:bootstrap`。
+  `push-gateway` 地址配置。当前 Windows 本机工具链已按用户要求安装在
+  `F:\IM\toolchains`，包含 JDK 17、Gradle 8.10.2、Android SDK android-35 /
+  build-tools 35.0.0；`GRADLE_USER_HOME` 也指向 F 盘。`build:android-apk`
+  wrapper 已能准备 shell assets 并执行 Gradle `:app:assembleDebug`；
+  `build:android-apk:collect` 已产出
+  `clients/artifacts/2026-06-22T034017Z/nexusim-android-debug.apk` 和
+  SHA-256 manifest。下一步是用户确认后执行真机 `adb install`、Android
+  metadata WebView smoke 和 login-level WebView smoke。Android Docker builder
+  profile 仍保留为容器化构建后备；需要下载 Node / Gradle / Android SDK
+  toolchain 时必须显式运行 `build:android-apk:docker:bootstrap`。
 - 三端 smoke：Web / PC / Android 都只能连 `api-gateway` 和 `push-gateway`；
   PullInbox 是事实源，WebSocket 只做在线唤醒。
 - Local store：`IndexedDBMessageStore` 已有 first-stage persistence test；

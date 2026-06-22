@@ -48,6 +48,10 @@ Reports:
 - `loadtest-report-20260622-desktop-webview-login-prereqs-baseline.md`: clean
   rerun after the build-prerequisites report hardening; proves the PC WebView
   login path still works with `git_dirty=false` on commit `bad96bf7`.
+- `loadtest-report-20260622-android-local-apk-build.md`: first Windows local
+  Android debug APK build baseline using the F-drive JDK / Gradle / Android SDK
+  toolchain; proves packaging and artifact collection only, not device install
+  or WebView login smoke.
 
 Useful command:
 

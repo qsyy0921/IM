@@ -31,19 +31,24 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
 - Android 已有 WebView asset shell、native metadata / SQLite bridge contract、
   no-toolchain action asset contract、ADB readiness report、Docker builder profile
   和登录级 WebView smoke safe preflight plan。
-- 当前 Android 阻塞点仍是 APK baseline：本机缺 JDK 17+ / Gradle / Android SDK，
-  Docker builder image `nexusim/client-android-builder:local` 尚未构建。
-- 不要隐式下载 Android toolchain；只有用户明确接受下载时，才运行
-  `npm --prefix clients run build:android-apk:docker:bootstrap`。
+- Windows 本机 Android toolchain 已按用户要求落到 `F:\IM\toolchains`：
+  JDK 17、Gradle 8.10.2、Android SDK platform-tools / android-35 /
+  build-tools 35.0.0；`GRADLE_USER_HOME` 也指向 F 盘。
+- Android debug APK 已能本机构建并收集 manifest：
+  `clients/artifacts/2026-06-22T034017Z/nexusim-android-debug.apk`。
+- APK 安装到真机仍需要显式用户动作；`plan:artifact-install` 只输出
+  `adb install` checklist，不会自动安装或启动 Activity。
+- 不要隐式下载 Android Docker builder toolchain；本机工具链已可优先使用，
+  Docker builder 只在用户明确要求容器化构建时再运行 bootstrap。
 
 ## 下一步优先级
 
-1. 继续做不需要下载工具链的 Android / desktop shell contract、plan、readiness
-   和 smoke runner hardening。
-2. 若用户明确接受 Android toolchain 下载，运行 Docker builder bootstrap，产出
-   first unsigned APK + collected manifest。
-3. APK ready 后跑 Android metadata / login WebView smoke，并验证
-   `android-sqlite` 真机路径。
+1. 用户确认后把 `clients/artifacts/2026-06-22T034017Z/nexusim-android-debug.apk`
+   安装到已授权 Android 设备，先跑 metadata WebView smoke，再跑 login-level
+   Android WebView smoke。
+2. Android 真机 smoke 通过后，补客户端报告并收口 Android APK baseline。
+3. 需要 Windows 安装包时，再产出 PC installer；当前 PC 已有 standalone exe
+   和 WebView login smoke 证据。
 4. 客户端切片收口后，再回到 workflow compensation adapter / instruction approval
    UI / ops 管理。
 5. 新发现待办写入 `docs/runbook/remaining-goals.md`，不要把长待办复制回本文件。

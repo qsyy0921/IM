@@ -20,6 +20,10 @@ assert(plan.startsServices === false, "no-toolchain plan must not start services
 assert(commands.includes("npm --prefix clients run test:shell-smoke-plan"), "shell smoke plan check missing");
 assert(commands.includes("npm --prefix clients run test:artifact-readiness"), "artifact readiness contract check missing");
 assert(commands.includes("npm --prefix clients run test:artifact-install-plan"), "artifact install plan contract check missing");
+assert(commands.includes("npm --prefix clients run test:artifact-builders"), "artifact builder contract check missing");
+assert(commands.includes("npm --prefix clients run test:artifact-collector"), "artifact collector contract check missing");
+assert(commands.includes("npm --prefix clients run validate:builder-profile"), "client builder profile contract check missing");
+assert(commands.includes("npm --prefix clients run test:android-docker-builder"), "android builder wrapper contract check missing");
 assert(commands.includes("npm --prefix clients run test:clientweb-smoke-hooks"), "clientweb smoke hook check missing");
 assert(commands.includes("npm --prefix clients run test:web-pwa"), "web PWA check missing");
 assert(commands.includes("npm --prefix clients run test:shell-config"), "shell config contract check missing");
@@ -42,6 +46,7 @@ assert(commands.includes("npm --prefix clients run test:android-webview-login-sm
 assert(commands.includes("npm --prefix clients run test:android-platform-readiness"), "android platform readiness schema check missing");
 assert(commands.includes("npm --prefix clients run test:android-device-readiness"), "android device readiness parser check missing");
 assert(commands.includes("npm --prefix clients run test:android-webview-devtools-readiness"), "android WebView devtools readiness parser check missing");
+assert(commands.includes("npm --prefix clients run test:android-webview-devtools-parser"), "android WebView devtools socket parser check missing");
 assert(commands.includes("npm --prefix clients run report:android-platform-readiness"), "android platform readiness report missing");
 
 for (const forbidden of [

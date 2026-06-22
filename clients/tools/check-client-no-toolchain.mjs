@@ -20,6 +20,26 @@ const checkPlan = [
     reason: "guards collected artifact install plans without installing packages or contacting devices"
   },
   {
+    name: "artifact-builder-contract",
+    script: "test:artifact-builders",
+    reason: "guards desktop and Android artifact builder dry-run plans"
+  },
+  {
+    name: "artifact-collector-contract",
+    script: "test:artifact-collector",
+    reason: "guards low-sensitive collected artifact manifest semantics"
+  },
+  {
+    name: "client-builder-profile-contract",
+    script: "validate:builder-profile",
+    reason: "guards Android builder profile files without running the builder"
+  },
+  {
+    name: "android-builder-wrapper-contract",
+    script: "test:android-docker-builder",
+    reason: "guards Android builder wrapper dry-run output"
+  },
+  {
     name: "clientweb-smoke-hooks",
     script: "test:clientweb-smoke-hooks",
     reason: "guards clientweb run-local-smoke WebView opt-in hooks without starting services"
@@ -128,6 +148,11 @@ const checkPlan = [
     name: "android-webview-devtools-readiness-contract",
     script: "test:android-webview-devtools-readiness",
     reason: "guards low-sensitive Android WebView devtools readiness parsing without opening device tunnels"
+  },
+  {
+    name: "android-webview-devtools-parser-contract",
+    script: "test:android-webview-devtools-parser",
+    reason: "guards Android WebView devtools socket parser contract"
   },
   {
     name: "android-platform-readiness-report",

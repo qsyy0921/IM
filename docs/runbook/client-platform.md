@@ -218,10 +218,11 @@ First slice:
   shell guard set in one command: shell smoke plan, Web PWA, shell web assets,
   shell config, Web platform, shared runtime / local-store contracts, Web shell
   lifecycle / automation / smoke-report contracts, clientweb smoke hook
-  contract, artifact readiness / install-plan contracts, desktop / Android
-  action assets, desktop WebView metadata / login dry-run contracts, Android
-  metadata / login smoke dry-run contracts, Android device / WebView devtools
-  readiness parsers and Android platform readiness. It does not build native
+  contract, artifact readiness / install-plan / builder / collector contracts,
+  Android builder profile / wrapper contracts, desktop / Android action assets,
+  desktop WebView metadata / login dry-run contracts, Android metadata / login
+  smoke dry-run contracts, Android device / WebView devtools readiness and
+  parser contracts and Android platform readiness. It does not build native
   artifacts or APKs, launch Docker, install APKs, start activities, open
   `adb reverse` or install toolchains; it does read low-sensitive ADB / device readiness state through
   `report:android-platform-readiness`. Run the individual scripts only when a

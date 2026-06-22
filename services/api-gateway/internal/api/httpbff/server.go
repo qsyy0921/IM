@@ -43,6 +43,7 @@ type Gateway interface {
 	IssueGatewayToken(ctx context.Context, request *identityv1.IssueGatewayTokenRequest) (*identityv1.IssueGatewayTokenResponse, error)
 	RevokeSession(ctx context.Context, request *identityv1.RevokeSessionRequest) (*identityv1.RevokeSessionResponse, error)
 	CreateConversation(ctx context.Context, request *conversationv1.CreateConversationRequest) (*conversationv1.CreateConversationResponse, error)
+	CreateMemberChange(ctx context.Context, request *conversationv1.CreateMemberChangeRequest) (*conversationv1.CreateMemberChangeResponse, error)
 	SendMessage(ctx context.Context, request *messagev1.SendMessageRequest) (*messagev1.SendMessageResponse, error)
 	PullInbox(ctx context.Context, request *deliveryv1.PullInboxRequest) (*deliveryv1.PullInboxResponse, error)
 	AckDelivery(ctx context.Context, request *deliveryv1.AckDeliveryRequest) (*deliveryv1.AckDeliveryResponse, error)
@@ -168,6 +169,13 @@ type openDirectConversationRequest struct {
 	IdempotencyKey string `json:"idempotency_key"`
 }
 
+type conversationMemberChangeRequest struct {
+	TargetUserID    string `json:"target_user_id"`
+	IdempotencyKey  string `json:"idempotency_key"`
+	Reason          string `json:"reason"`
+	ExpectedVersion int64  `json:"expected_member_version"`
+}
+
 func NewServer(config Config) *Server {
 	server := &Server{
 		gateway:       config.Gateway,
@@ -236,6 +244,10 @@ func (server *Server) serveHTTP(response http.ResponseWriter, request *http.Requ
 		server.handleCreateConversation(response, request)
 	case request.Method == http.MethodPost && path == "/api/conversations/direct":
 		server.handleOpenDirectConversation(response, request)
+	case request.Method == http.MethodPost && isConversationMemberActionPath(request.URL.EscapedPath(), "/members/invite"):
+		server.handleInviteConversationMember(response, request)
+	case request.Method == http.MethodPost && isConversationMemberActionPath(request.URL.EscapedPath(), "/members/leave"):
+		server.handleLeaveConversation(response, request)
 	case request.Method == http.MethodGet && isConversationMessagesPath(request.URL.EscapedPath()):
 		server.handleConversationMessages(response, request)
 	case request.Method == http.MethodPost && path == "/api/messages/send":
@@ -433,6 +445,73 @@ func (server *Server) handleOpenDirectConversation(response http.ResponseWriter,
 		ConversationType: conversationv1.ConversationType_CONVERSATION_TYPE_DIRECT,
 		IdempotencyKey:   idempotencyKey,
 		DirectPeerUserId: peerUserID,
+	})
+	server.writeProtoOrError(response, output, err)
+}
+
+func (server *Server) handleInviteConversationMember(response http.ResponseWriter, request *http.Request) {
+	if _, err := server.authenticateRequest(request); err != nil {
+		writeError(response, err)
+		return
+	}
+	conversationID, err := conversationIDFromMemberActionPath(request.URL.EscapedPath(), "/members/invite")
+	if err != nil {
+		writeError(response, err)
+		return
+	}
+	var input conversationMemberChangeRequest
+	if !server.decodeJSON(response, request, &input) {
+		return
+	}
+	targetUserID := strings.TrimSpace(input.TargetUserID)
+	if targetUserID == "" {
+		writeError(response, status.Error(codes.InvalidArgument, "target_user_id is required"))
+		return
+	}
+	idempotencyKey := strings.TrimSpace(input.IdempotencyKey)
+	if idempotencyKey == "" {
+		idempotencyKey = "member-join:" + conversationID + ":" + targetUserID
+	}
+	output, err := server.requireGateway().CreateMemberChange(contextFromRequest(request), &conversationv1.CreateMemberChangeRequest{
+		ConversationId:        conversationID,
+		TargetUserId:          targetUserID,
+		ChangeType:            conversationv1.MemberChangeType_MEMBER_CHANGE_TYPE_JOIN,
+		TargetRole:            conversationv1.MemberRole_MEMBER_ROLE_MEMBER,
+		ExpectedMemberVersion: input.ExpectedVersion,
+		IdempotencyKey:        idempotencyKey,
+		ConflictPolicy:        conversationv1.MemberChangeConflictPolicy_MEMBER_CHANGE_CONFLICT_POLICY_REJECT,
+		Reason:                strings.TrimSpace(input.Reason),
+	})
+	server.writeProtoOrError(response, output, err)
+}
+
+func (server *Server) handleLeaveConversation(response http.ResponseWriter, request *http.Request) {
+	auth, err := server.authenticateRequest(request)
+	if err != nil {
+		writeError(response, err)
+		return
+	}
+	conversationID, err := conversationIDFromMemberActionPath(request.URL.EscapedPath(), "/members/leave")
+	if err != nil {
+		writeError(response, err)
+		return
+	}
+	var input conversationMemberChangeRequest
+	if !server.decodeJSON(response, request, &input) {
+		return
+	}
+	idempotencyKey := strings.TrimSpace(input.IdempotencyKey)
+	if idempotencyKey == "" {
+		idempotencyKey = "member-leave:" + conversationID + ":" + auth.UserID
+	}
+	output, err := server.requireGateway().CreateMemberChange(contextFromRequest(request), &conversationv1.CreateMemberChangeRequest{
+		ConversationId:        conversationID,
+		TargetUserId:          auth.UserID,
+		ChangeType:            conversationv1.MemberChangeType_MEMBER_CHANGE_TYPE_LEAVE,
+		ExpectedMemberVersion: input.ExpectedVersion,
+		IdempotencyKey:        idempotencyKey,
+		ConflictPolicy:        conversationv1.MemberChangeConflictPolicy_MEMBER_CHANGE_CONFLICT_POLICY_REJECT,
+		Reason:                strings.TrimSpace(input.Reason),
 	})
 	server.writeProtoOrError(response, output, err)
 }
@@ -851,6 +930,9 @@ func (missingGateway) RevokeSession(context.Context, *identityv1.RevokeSessionRe
 func (missingGateway) CreateConversation(context.Context, *conversationv1.CreateConversationRequest) (*conversationv1.CreateConversationResponse, error) {
 	return nil, status.Error(codes.Internal, "gateway is not configured")
 }
+func (missingGateway) CreateMemberChange(context.Context, *conversationv1.CreateMemberChangeRequest) (*conversationv1.CreateMemberChangeResponse, error) {
+	return nil, status.Error(codes.Internal, "gateway is not configured")
+}
 func (missingGateway) SendMessage(context.Context, *messagev1.SendMessageRequest) (*messagev1.SendMessageResponse, error) {
 	return nil, status.Error(codes.Internal, "gateway is not configured")
 }
@@ -937,6 +1019,28 @@ func conversationIDFromMessagesPath(escapedPath string) (string, error) {
 	const prefix = "/api/conversations/"
 	const suffix = "/messages"
 	if !isConversationMessagesPath(escapedPath) {
+		return "", status.Error(codes.NotFound, "endpoint not found")
+	}
+	encoded := strings.Trim(strings.TrimSuffix(strings.TrimPrefix(escapedPath, prefix), suffix), "/")
+	decoded, err := url.PathUnescape(encoded)
+	if err != nil || strings.TrimSpace(decoded) == "" {
+		return "", status.Error(codes.InvalidArgument, "conversation_id is invalid")
+	}
+	return decoded, nil
+}
+
+func isConversationMemberActionPath(escapedPath string, suffix string) bool {
+	const prefix = "/api/conversations/"
+	if !strings.HasPrefix(escapedPath, prefix) || !strings.HasSuffix(escapedPath, suffix) {
+		return false
+	}
+	encoded := strings.TrimSuffix(strings.TrimPrefix(escapedPath, prefix), suffix)
+	return strings.Trim(encoded, "/") != ""
+}
+
+func conversationIDFromMemberActionPath(escapedPath string, suffix string) (string, error) {
+	const prefix = "/api/conversations/"
+	if !isConversationMemberActionPath(escapedPath, suffix) {
 		return "", status.Error(codes.NotFound, "endpoint not found")
 	}
 	encoded := strings.Trim(strings.TrimSuffix(strings.TrimPrefix(escapedPath, prefix), suffix), "/")

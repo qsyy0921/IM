@@ -77,6 +77,10 @@
   `GetContactState` 校验 ACTIVE 好友关系，再调用 conversation-service
   `CreateConversation(CONVERSATION_TYPE_DIRECT)` 创建或复用双人会话，消息继续走
   SendMessage -> PullInbox -> AckDelivery 主链路；
+  群成员添加 / 退群 first path 已接入同一套 client BFF / client-core：
+  Web / PC shell 在选中 GROUP 会话时调用 dedicated BFF members endpoints，
+  BFF 再转 conversation-service `CreateMemberChange(JOIN/LEAVE)`，客户端不直连
+  conversation-service 私有接口；
   当前浏览器 / Windows PC 优先的可见 UI 已收敛为账号密码登录和 IM 主界面，
   隐藏 tenant / endpoint / device 等调试配置；2026-06-22 Windows Tauri
   WebView 登录级 smoke 证明该 UI 仍能完成登录、收到 `delivery.notify`、
@@ -279,10 +283,10 @@ rate-limit adapter 已落，PC Tauri read-only metadata runner skeleton、Web �
 metadata 诊断读取和 Android read-only native metadata bridge skeleton 已有，Windows
 desktop first-stage standalone artifact 已产出，launch sanity smoke 已通过，Web / PC
 shell 已接账号密码登录、注册、好友工作台、点击好友进入私聊、群聊列表、建群、点击
-群聊进入会话、消息列表、发送后本地状态刷新、PullInbox / ACK 和登录过期清理；
-下一步是跑真实双用户客户端 smoke，验证好友私聊和群聊 first path。Android APK /
-真机 WebView smoke 后置到用户明确切回；Web IndexedDB local store 已补 first-stage
-persistence test。
+群聊进入会话、群成员添加 / 退群 first path、最小群设置信息条、消息列表、发送后
+本地状态刷新、PullInbox / ACK 和登录过期清理；真实双用户客户端 smoke 已验证好友
+私聊和群聊 first path。Android APK / 真机 WebView smoke 后置到用户明确切回；Web
+IndexedDB local store 已补 first-stage persistence test。
 
 future platform / product services 已作为长期产品化主线保留：继续按服务推进
 媒体、通知、审计、控制面、presence、model 等产品化 / 平台服务，并按

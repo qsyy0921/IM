@@ -10,8 +10,11 @@ import {
   type ContactRequestItem,
   type CreateConversationRequest,
   type CreateConversationResponse,
+  type ConversationMemberChangeResponse,
   type ListContactRequestsInput,
   type ListContactsInput,
+  type InviteConversationMemberRequest,
+  type LeaveConversationRequest,
   type RespondContactRequestInput,
   type SendContactRequestInput,
   type ConversationSummary,
@@ -68,11 +71,25 @@ interface BFFCreateConversationResponse {
   idempotent_replay?: boolean;
 }
 
+interface BFFConversationMemberChangeResponse {
+  change_id?: string;
+  tenant_id?: string;
+  conversation_id?: string;
+  target_user_id?: string;
+  change_type?: string;
+  status?: string;
+  boundary_seq?: string | number;
+  member_version?: string | number;
+  permission_version?: string | number;
+  idempotent_replay?: boolean;
+}
+
 interface BFFConversationSummary {
   conversation_id?: string;
   last_visible_seq?: string | number;
   last_message_id?: string;
   last_sender_id?: string;
+  member_version?: string | number;
   unread_count?: string | number;
   updated_at_unix_ms?: string | number;
   archived?: boolean;
@@ -272,6 +289,41 @@ export class BFFClient implements AuthAPI, ConversationAPI, MessagingAPI, Delive
       idempotentReplay: response.idempotent_replay === true,
       ...optionalDirectPeerUserID(response)
     };
+  }
+
+  async inviteConversationMember(
+    request: InviteConversationMemberRequest,
+    session: AuthSession
+  ): Promise<ConversationMemberChangeResponse> {
+    const response = await this.#request<BFFConversationMemberChangeResponse>(
+      "POST",
+      CLIENT_API_ENDPOINTS.inviteConversationMember(request.conversationID),
+      {
+        target_user_id: request.targetUserID,
+        expected_member_version: request.expectedMemberVersion,
+        idempotency_key: request.idempotencyKey ?? newClientID("member-invite"),
+        reason: request.reason
+      },
+      session
+    );
+    return memberChangeFromBFF(response);
+  }
+
+  async leaveConversation(
+    request: LeaveConversationRequest,
+    session: AuthSession
+  ): Promise<ConversationMemberChangeResponse> {
+    const response = await this.#request<BFFConversationMemberChangeResponse>(
+      "POST",
+      CLIENT_API_ENDPOINTS.leaveConversation(request.conversationID),
+      {
+        expected_member_version: request.expectedMemberVersion,
+        idempotency_key: request.idempotencyKey ?? newClientID("member-leave"),
+        reason: request.reason
+      },
+      session
+    );
+    return memberChangeFromBFF(response);
   }
 
   async sendMessage(request: SendMessageRequest, session: AuthSession): Promise<SendMessageResponse> {
@@ -524,6 +576,7 @@ function conversationSummaryFromBFF(item: BFFConversationSummary, session: AuthS
     status: archived ? "ARCHIVED" : "ACTIVE",
     title: item.conversation_id ? `Conversation ${item.conversation_id}` : "Conversation",
     lastSeq: numberValue(item.last_visible_seq),
+    memberVersion: numberValue(item.member_version),
     unreadCount: numberValue(item.unread_count),
     muted: item.muted === true,
     pinned: item.pinned === true,
@@ -538,6 +591,21 @@ function conversationTypeToBFF(value: string): string {
 function conversationTypeFromBFF(value: string | undefined): "DIRECT" | "GROUP" {
   const trimmed = trimEnumPrefix(value, "CONVERSATION_TYPE_");
   return trimmed === "DIRECT" ? "DIRECT" : "GROUP";
+}
+
+function memberChangeFromBFF(response: BFFConversationMemberChangeResponse): ConversationMemberChangeResponse {
+  return {
+    changeID: requiredString(response.change_id, "change_id"),
+    tenantID: requiredString(response.tenant_id, "tenant_id"),
+    conversationID: requiredString(response.conversation_id, "conversation_id"),
+    targetUserID: requiredString(response.target_user_id, "target_user_id"),
+    changeType: trimEnumPrefix(response.change_type, "MEMBER_CHANGE_TYPE_") || "UNSPECIFIED",
+    status: trimEnumPrefix(response.status, "MEMBER_CHANGE_STATUS_") || "UNSPECIFIED",
+    boundarySeq: numberValue(response.boundary_seq),
+    memberVersion: numberValue(response.member_version),
+    permissionVersion: numberValue(response.permission_version),
+    idempotentReplay: response.idempotent_replay === true
+  };
 }
 
 function inboxItemFromBFF(item: BFFInboxItem, session: AuthSession): MessageItem {

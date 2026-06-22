@@ -10,6 +10,9 @@ import type {
   RegisterResponse,
   CreateConversationRequest,
   CreateConversationResponse,
+  ConversationMemberChangeResponse,
+  InviteConversationMemberRequest,
+  LeaveConversationRequest,
   OpenDirectConversationRequest,
   MessageItem,
   PullInboxRequest,
@@ -32,6 +35,14 @@ export interface ConversationAPI {
     request: OpenDirectConversationRequest,
     session: AuthSession
   ): Promise<CreateConversationResponse>;
+  inviteConversationMember(
+    request: InviteConversationMemberRequest,
+    session: AuthSession
+  ): Promise<ConversationMemberChangeResponse>;
+  leaveConversation(
+    request: LeaveConversationRequest,
+    session: AuthSession
+  ): Promise<ConversationMemberChangeResponse>;
 }
 
 export interface MessagingAPI {

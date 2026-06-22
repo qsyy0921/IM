@@ -28,10 +28,10 @@
 
 ## 当前优先顺序
 
-1. 完成 client platform MVP foundation：Web / Windows PC 先完成真实双用户客户端
-   smoke，验证好友私聊和群聊 first path；继续补会话标题、空态、错误文案、启动脚本、
-   PC 可运行包体验和后续 native SQLite bridge。Android APK / 真机 WebView smoke
-   后置到用户明确切回。
+1. 完成 client platform MVP foundation：Web / Windows PC 已完成真实双用户客户端
+   smoke，验证好友私聊和群聊 first path；继续补 PC 可运行包 / installer 体验、
+   群成员列表 / 角色变更 / owner transfer / 移除成员等群管理 UI，以及后续 native
+   SQLite bridge。Android APK / 真机 WebView smoke 后置到用户明确切回。
 2. 回到 AI / Agent 主线：group memory eval、EvidencePack、Agent 真实业务动作、
    Python AI Worker 候选算法。
 3. 继续 product-active 服务：workflow / audit / admin / notification / media /
@@ -95,10 +95,11 @@
   删除、拉黑 / 取消拉黑，并已接好友直聊 first path：BFF 校验 ACTIVE 好友关系后
   创建 / 复用 DIRECT 会话。后续需要真实双用户客户端 smoke、隐私设置 UI、来源策略 /
   review-required 管理 UI、好友会话标题 / 头像等 richer read model。
-- Group chat UI：注册账号和创建群聊 first path 已接入 client BFF / client-core /
-  Web / PC shell；创建群聊通过 conversation-service `CreateConversation` 创建当前用户
-  OWNER，不绕过服务私表。后续继续补邀请成员、成员列表、角色变更、owner transfer、
-  退出 / 移除、群设置和双用户客户端 smoke。
+- Group chat UI：注册账号、创建群聊、添加成员和退群 first paths 已接入
+  api-gateway BFF / client-core / Web / PC shell；创建群聊通过 conversation-service
+  `CreateConversation` 创建当前用户 OWNER，添加成员 / 退群通过 conversation-service
+  `CreateMemberChange`，不绕过服务私表。后续继续补成员列表、角色变更、
+  owner transfer、移除成员、更完整群设置和对应真实客户端 smoke。
 - Local store：`IndexedDBMessageStore` 已有 first-stage persistence test；
   desktop / Android 已默认接 shared `KeyValueMessageStore` + WebView
   `localStorage` first-stage durable adapter，并有 cursor replay test；后续在

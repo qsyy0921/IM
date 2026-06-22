@@ -129,9 +129,12 @@ First slice:
   clears IndexedDB local cache and resets UI session state.
 - The Web / PC shell now has first-stage product interactions for clickable
   friend-to-direct-chat, clickable conversation selection, group creation,
+  group member invite / leave through api-gateway BFF member-change commands,
   selected-conversation preservation during refresh, local message-state refresh
   after send, and gateway-token-expired cleanup that clears the local session
-  and asks the user to log in again.
+  and asks the user to log in again. The group settings surface is currently a
+  minimal information / action bar; member list, role changes, owner transfer
+  and full group settings remain follow-up client product work.
 - The Web / PC shell now also keeps explicit display-title and UX copy rules:
   direct / group titles learned from user actions survive conversation refresh,
   unknown server summaries render as short explicit conversation IDs, empty

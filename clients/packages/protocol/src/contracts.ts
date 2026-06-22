@@ -7,6 +7,10 @@ export const CLIENT_API_ENDPOINTS = {
   conversations: "/api/conversations",
   createConversation: "/api/conversations/create",
   directConversation: "/api/conversations/direct",
+  inviteConversationMember: (conversationID: string) =>
+    `/api/conversations/${encodeURIComponent(conversationID)}/members/invite`,
+  leaveConversation: (conversationID: string) =>
+    `/api/conversations/${encodeURIComponent(conversationID)}/members/leave`,
   conversationMessages: (conversationID: string) =>
     `/api/conversations/${encodeURIComponent(conversationID)}/messages`,
   sendMessage: "/api/messages/send",

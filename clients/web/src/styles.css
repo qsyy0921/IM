@@ -644,6 +644,76 @@ button {
   overflow-wrap: anywhere;
 }
 
+.group-settings {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) minmax(220px, 360px) auto;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid #d8e0e4;
+  background: #ffffff;
+  padding: 10px 22px;
+}
+
+.group-settings-copy {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.group-settings-copy strong,
+.group-settings-copy span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.group-settings-copy strong {
+  color: #172126;
+  font-size: 13px;
+}
+
+.group-settings-copy span {
+  color: #6b7a83;
+  font-size: 12px;
+}
+
+.group-member-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  min-width: 0;
+}
+
+.group-member-form input {
+  min-width: 0;
+  border: 1px solid #cbd6dc;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #182126;
+  outline: 0;
+  padding: 8px 10px;
+}
+
+.group-member-form button,
+.danger-inline-button {
+  border: 0;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.group-member-form button {
+  background: #19b37c;
+  color: #ffffff;
+}
+
+.danger-inline-button {
+  background: #fff1f2;
+  color: #9f1239;
+}
+
 .message-panel {
   display: flex;
   flex: 1;

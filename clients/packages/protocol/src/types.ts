@@ -77,6 +77,45 @@ export interface OpenDirectConversationRequest {
   idempotencyKey?: string;
 }
 
+export type MemberChangeType = "JOIN" | "LEAVE" | "REMOVE" | "ROLE_CHANGED" | "OWNER_TRANSFER" | string;
+export type MemberChangeStatus =
+  | "PENDING_BOUNDARY"
+  | "BOUNDARY_ALLOCATED"
+  | "MEMBER_UPDATED"
+  | "OUTBOX_ENQUEUED"
+  | "EVENT_PUBLISHED"
+  | "DONE"
+  | "FAILED_COMPENSATED"
+  | string;
+
+export interface InviteConversationMemberRequest {
+  conversationID: ConversationID;
+  targetUserID: UserID;
+  expectedMemberVersion?: number;
+  idempotencyKey?: string;
+  reason?: string;
+}
+
+export interface LeaveConversationRequest {
+  conversationID: ConversationID;
+  expectedMemberVersion?: number;
+  idempotencyKey?: string;
+  reason?: string;
+}
+
+export interface ConversationMemberChangeResponse {
+  changeID: string;
+  tenantID: TenantID;
+  conversationID: ConversationID;
+  targetUserID: UserID;
+  changeType: MemberChangeType;
+  status: MemberChangeStatus;
+  boundarySeq: number;
+  memberVersion: number;
+  permissionVersion: number;
+  idempotentReplay: boolean;
+}
+
 export interface CreateConversationResponse {
   tenantID: TenantID;
   conversationID: ConversationID;
@@ -95,6 +134,7 @@ export interface ConversationSummary {
   status: ConversationStatus;
   title: string;
   lastSeq: number;
+  memberVersion: number;
   unreadCount: number;
   muted: boolean;
   pinned: boolean;

@@ -20,6 +20,9 @@ const requiredTestIDs = [
   "create-group",
   "conversation-item",
   "friend-conversation-item",
+  "group-invite-user",
+  "group-invite-submit",
+  "group-leave-submit",
   "runtime-status",
   "push-status",
   "ack-status",
@@ -38,6 +41,9 @@ for (const testID of requiredTestIDs) {
 assertIncludes(appSource, "setLastAck({ conversationID, seq: maxSeq })", "web shell must expose AckDelivery progress after sync");
 assertIncludes(appSource, "runtime.ackQueue.flush(currentSession)", "web shell must keep AckDelivery inside shared runtime path");
 assertIncludes(appSource, "openDirectConversation(contact)", "web shell must let users click a friend to open direct chat");
+assertIncludes(appSource, "inviteGroupMember", "web shell must expose group member invite action");
+assertIncludes(appSource, "leaveGroupConversation", "web shell must expose group leave action");
+assertIncludes(appSource, "requireActiveGroupConversation", "web shell must gate group actions to group conversations");
 assertIncludes(appSource, "chooseActiveConversationID", "web shell must preserve selected conversation during refresh");
 assertIncludes(appSource, "clearExpiredSession", "web shell must clear UI state when gateway token expires");
 assertIncludes(appSource, "nativeMetadata?.capabilities?.localStore", "web shell must display native local-store readiness when available");

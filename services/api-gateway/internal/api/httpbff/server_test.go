@@ -284,6 +284,112 @@ func TestOpenDirectConversationRejectsInactiveContact(t *testing.T) {
 	}
 }
 
+func TestInviteConversationMemberForwardsJoinCommand(t *testing.T) {
+	authenticator := &fakeAuthenticator{auth: gatewayauth.AuthContext{
+		TenantID:  "tenant-1",
+		UserID:    "owner-1",
+		DeviceID:  "web-1",
+		SessionID: "session-1",
+	}}
+	gateway := &fakeGateway{
+		createMemberChange: func(ctx context.Context, request *conversationv1.CreateMemberChangeRequest) (*conversationv1.CreateMemberChangeResponse, error) {
+			md, ok := metadata.FromIncomingContext(ctx)
+			if !ok || firstMetadata(md, "authorization") != "Bearer token-1" {
+				t.Fatalf("expected forwarded auth metadata, got %+v", md)
+			}
+			if request.GetConversationId() != "conv/group" ||
+				request.GetTargetUserId() != "user-b" ||
+				request.GetChangeType() != conversationv1.MemberChangeType_MEMBER_CHANGE_TYPE_JOIN ||
+				request.GetTargetRole() != conversationv1.MemberRole_MEMBER_ROLE_MEMBER ||
+				request.GetExpectedMemberVersion() != 7 ||
+				request.GetIdempotencyKey() != "idem-join-1" ||
+				request.GetConflictPolicy() != conversationv1.MemberChangeConflictPolicy_MEMBER_CHANGE_CONFLICT_POLICY_REJECT ||
+				request.GetReason() != "invite from client" {
+				t.Fatalf("unexpected member join request: %+v", request)
+			}
+			return &conversationv1.CreateMemberChangeResponse{
+				ChangeId:          "change-1",
+				TenantId:          "tenant-1",
+				ConversationId:    request.GetConversationId(),
+				TargetUserId:      request.GetTargetUserId(),
+				ChangeType:        request.GetChangeType(),
+				Status:            conversationv1.MemberChangeStatus_MEMBER_CHANGE_STATUS_OUTBOX_ENQUEUED,
+				BoundarySeq:       8,
+				MemberVersion:     8,
+				PermissionVersion: 2,
+			}, nil
+		},
+	}
+	handler := NewServer(Config{Gateway: gateway, Authenticator: authenticator})
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/conversations/conv%2Fgroup/members/invite", strings.NewReader(`{
+		"target_user_id":"user-b",
+		"expected_member_version":7,
+		"idempotency_key":"idem-join-1",
+		"reason":"invite from client"
+	}`))
+	request.Header.Set("Authorization", "Bearer token-1")
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+	if !strings.Contains(response.Body.String(), `"change_id":"change-1"`) ||
+		!strings.Contains(response.Body.String(), `"member_version":"8"`) {
+		t.Fatalf("expected member change response, got %s", response.Body.String())
+	}
+}
+
+func TestLeaveConversationTargetsAuthenticatedUser(t *testing.T) {
+	authenticator := &fakeAuthenticator{auth: gatewayauth.AuthContext{
+		TenantID:  "tenant-1",
+		UserID:    "user-a",
+		DeviceID:  "web-1",
+		SessionID: "session-1",
+	}}
+	gateway := &fakeGateway{
+		createMemberChange: func(ctx context.Context, request *conversationv1.CreateMemberChangeRequest) (*conversationv1.CreateMemberChangeResponse, error) {
+			md, ok := metadata.FromIncomingContext(ctx)
+			if !ok || firstMetadata(md, "authorization") != "Bearer token-1" {
+				t.Fatalf("expected forwarded auth metadata, got %+v", md)
+			}
+			if request.GetConversationId() != "group-1" ||
+				request.GetTargetUserId() != "user-a" ||
+				request.GetChangeType() != conversationv1.MemberChangeType_MEMBER_CHANGE_TYPE_LEAVE ||
+				request.GetTargetRole() != conversationv1.MemberRole_MEMBER_ROLE_UNSPECIFIED ||
+				request.GetIdempotencyKey() != "idem-leave-1" ||
+				request.GetConflictPolicy() != conversationv1.MemberChangeConflictPolicy_MEMBER_CHANGE_CONFLICT_POLICY_REJECT {
+				t.Fatalf("unexpected member leave request: %+v", request)
+			}
+			return &conversationv1.CreateMemberChangeResponse{
+				ChangeId:       "change-leave-1",
+				TenantId:       "tenant-1",
+				ConversationId: request.GetConversationId(),
+				TargetUserId:   request.GetTargetUserId(),
+				ChangeType:     request.GetChangeType(),
+				Status:         conversationv1.MemberChangeStatus_MEMBER_CHANGE_STATUS_OUTBOX_ENQUEUED,
+			}, nil
+		},
+	}
+	handler := NewServer(Config{Gateway: gateway, Authenticator: authenticator})
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/conversations/group-1/members/leave", strings.NewReader(`{
+		"target_user_id":"user-b",
+		"idempotency_key":"idem-leave-1"
+	}`))
+	request.Header.Set("Authorization", "Bearer token-1")
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+	if !strings.Contains(response.Body.String(), `"target_user_id":"user-a"`) {
+		t.Fatalf("expected leave response for authenticated user, got %s", response.Body.String())
+	}
+}
+
 func TestConversationMessagesMapsToPullInbox(t *testing.T) {
 	gateway := &fakeGateway{
 		pullInbox: func(_ context.Context, request *deliveryv1.PullInboxRequest) (*deliveryv1.PullInboxResponse, error) {
@@ -626,6 +732,7 @@ type fakeGateway struct {
 	issueGatewayToken     func(context.Context, *identityv1.IssueGatewayTokenRequest) (*identityv1.IssueGatewayTokenResponse, error)
 	revokeSession         func(context.Context, *identityv1.RevokeSessionRequest) (*identityv1.RevokeSessionResponse, error)
 	createConversation    func(context.Context, *conversationv1.CreateConversationRequest) (*conversationv1.CreateConversationResponse, error)
+	createMemberChange    func(context.Context, *conversationv1.CreateMemberChangeRequest) (*conversationv1.CreateMemberChangeResponse, error)
 	sendMessage           func(context.Context, *messagev1.SendMessageRequest) (*messagev1.SendMessageResponse, error)
 	pullInbox             func(context.Context, *deliveryv1.PullInboxRequest) (*deliveryv1.PullInboxResponse, error)
 	ackDelivery           func(context.Context, *deliveryv1.AckDeliveryRequest) (*deliveryv1.AckDeliveryResponse, error)
@@ -684,6 +791,13 @@ func (gateway *fakeGateway) CreateConversation(ctx context.Context, request *con
 		return nil, status.Error(codes.Unimplemented, "create conversation not implemented")
 	}
 	return gateway.createConversation(ctx, request)
+}
+
+func (gateway *fakeGateway) CreateMemberChange(ctx context.Context, request *conversationv1.CreateMemberChangeRequest) (*conversationv1.CreateMemberChangeResponse, error) {
+	if gateway.createMemberChange == nil {
+		return nil, status.Error(codes.Unimplemented, "create member change not implemented")
+	}
+	return gateway.createMemberChange(ctx, request)
 }
 
 func (gateway *fakeGateway) SendMessage(ctx context.Context, request *messagev1.SendMessageRequest) (*messagev1.SendMessageResponse, error) {

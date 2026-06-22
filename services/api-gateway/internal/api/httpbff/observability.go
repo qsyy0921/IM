@@ -95,6 +95,10 @@ func RouteName(request *http.Request) string {
 		return "conversations.create"
 	case request.Method == http.MethodPost && path == "/api/conversations/direct":
 		return "conversations.direct"
+	case request.Method == http.MethodPost && isConversationMemberActionPath(request.URL.EscapedPath(), "/members/invite"):
+		return "conversations.members.invite"
+	case request.Method == http.MethodPost && isConversationMemberActionPath(request.URL.EscapedPath(), "/members/leave"):
+		return "conversations.members.leave"
 	case request.Method == http.MethodGet && isConversationMessagesPath(request.URL.EscapedPath()):
 		return "conversation.messages"
 	case request.Method == http.MethodPost && path == "/api/messages/send":

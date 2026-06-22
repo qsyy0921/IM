@@ -59,6 +59,7 @@ export function App() {
   const [messages, setMessages] = useState<MessageItem[]>([]);
   const [composerText, setComposerText] = useState("");
   const [newGroupName, setNewGroupName] = useState("");
+  const [groupInviteUserID, setGroupInviteUserID] = useState("");
   const [status, setStatus] = useState("ready");
   const [activeView, setActiveView] = useState<ActiveView>("conversations");
   const [contacts, setContacts] = useState<ContactItem[]>([]);
@@ -418,6 +419,7 @@ export function App() {
         status: "ACTIVE",
         title: displayName,
         lastSeq: created.boundarySeq,
+        memberVersion: created.memberVersion,
         unreadCount: 0,
         muted: false,
         pinned: false,
@@ -449,6 +451,7 @@ export function App() {
         status: "ACTIVE",
         title: displayName,
         lastSeq: created.boundarySeq,
+        memberVersion: created.memberVersion,
         unreadCount: 0,
         muted: false,
         pinned: false,
@@ -456,6 +459,53 @@ export function App() {
       };
       upsertConversationSummary(directSummary);
       await selectConversation(created.conversationID, currentSession);
+    });
+  }
+
+  async function inviteGroupMember(): Promise<void> {
+    await run("invite group member", async () => {
+      const currentSession = requireSession();
+      const conversation = requireActiveGroupConversation();
+      const targetUserID = groupInviteUserID.trim();
+      if (!targetUserID) {
+        throw new Error("target user id is required");
+      }
+      const result = await runtime.bff.inviteConversationMember(
+        {
+          conversationID: conversation.conversationID,
+          targetUserID,
+          expectedMemberVersion: conversation.memberVersion,
+          reason: "client group invite"
+        },
+        currentSession
+      );
+      setGroupInviteUserID("");
+      updateConversationMemberVersion(result.conversationID, result.memberVersion);
+      await loadConversations(currentSession);
+      if (result.conversationID) {
+        await selectConversation(result.conversationID, currentSession);
+      }
+    });
+  }
+
+  async function leaveGroupConversation(): Promise<void> {
+    await run("leave group", async () => {
+      const currentSession = requireSession();
+      const conversation = requireActiveGroupConversation();
+      const result = await runtime.bff.leaveConversation(
+        {
+          conversationID: conversation.conversationID,
+          expectedMemberVersion: conversation.memberVersion,
+          reason: "client leave group"
+        },
+        currentSession
+      );
+      setConversations(current => current.filter(item => item.conversationID !== result.conversationID));
+      activeConversationRef.current = "";
+      setActiveConversationID("");
+      setManualConversationID("");
+      setMessages([]);
+      await loadConversations(currentSession);
     });
   }
 
@@ -618,6 +668,17 @@ export function App() {
     return currentSession;
   }
 
+  function requireActiveGroupConversation(): ConversationSummary {
+    const conversation = conversations.find(item => item.conversationID === activeConversationRef.current);
+    if (!conversation) {
+      throw new Error("select a group conversation first");
+    }
+    if (conversation.type !== "GROUP") {
+      throw new Error("group conversation required");
+    }
+    return conversation;
+  }
+
   function clearSessionViewState(): void {
     pushConnectionRef.current?.close();
     pushConnectionRef.current = null;
@@ -660,6 +721,19 @@ export function App() {
     );
   }
 
+  function updateConversationMemberVersion(conversationID: string, memberVersion: number): void {
+    if (memberVersion <= 0) {
+      return;
+    }
+    setConversations(current =>
+      current.map(item =>
+        item.conversationID === conversationID
+          ? { ...item, memberVersion: Math.max(item.memberVersion, memberVersion), updatedAtMs: Date.now() }
+          : item
+      )
+    );
+  }
+
   async function showCachedMessages(conversationID: string): Promise<void> {
     const cachedMessages = await store.listMessages(conversationID);
     if (activeConversationRef.current === conversationID) {
@@ -679,6 +753,7 @@ export function App() {
       ? "请选择左侧好友或群聊"
       : "请先登录";
   const emptyState = emptyMessageState(Boolean(session), Boolean(activeConversationID));
+  const activeGroupConversation = activeConversation?.type === "GROUP" ? activeConversation : undefined;
   const visibleContacts = contacts
     .filter(contact => contact.status !== "DELETED")
     .sort((left, right) => contactDisplayName(left).localeCompare(contactDisplayName(right)));
@@ -1084,6 +1159,45 @@ export function App() {
         </header>
 
         {error ? <div data-testid="error-banner" className="error-banner">{error}</div> : null}
+
+        {activeGroupConversation ? (
+          <section className="group-settings" aria-label="群设置">
+            <div className="group-settings-copy">
+              <strong>群设置</strong>
+              <span>
+                {compactConversationID(activeGroupConversation.conversationID)} · member v
+                {activeGroupConversation.memberVersion}
+              </span>
+            </div>
+            <form
+              className="group-member-form"
+              onSubmit={event => {
+                event.preventDefault();
+                void inviteGroupMember();
+              }}
+            >
+              <input
+                data-testid="group-invite-user"
+                placeholder="添加成员用户 ID"
+                value={groupInviteUserID}
+                onChange={event => setGroupInviteUserID(event.target.value)}
+                disabled={!session}
+              />
+              <button data-testid="group-invite-submit" type="submit" disabled={!session || groupInviteUserID.trim() === ""}>
+                添加成员
+              </button>
+            </form>
+            <button
+              data-testid="group-leave-submit"
+              className="danger-inline-button"
+              type="button"
+              onClick={() => void leaveGroupConversation()}
+              disabled={!session}
+            >
+              退群
+            </button>
+          </section>
+        ) : null}
 
         <section className="message-panel" aria-label="消息列表">
           <div className="message-list-header">

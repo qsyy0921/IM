@@ -22,6 +22,8 @@ async function main() {
       register: "/api/auth/register",
       createConversation: "/api/conversations/create",
       directConversation: "/api/conversations/direct",
+      inviteConversationMember: conversationID => "/api/conversations/" + encodeURIComponent(conversationID) + "/members/invite",
+      leaveConversation: conversationID => "/api/conversations/" + encodeURIComponent(conversationID) + "/members/leave",
       conversationMessages: conversationID => "/api/conversations/" + encodeURIComponent(conversationID) + "/messages"
     };`
   );
@@ -93,6 +95,53 @@ async function main() {
         { status: 200, headers: { "content-type": "application/json; charset=utf-8" } }
       );
     }
+    if (url.endsWith("/api/conversations/group-client-local/members/invite")) {
+      assert.equal(init?.method, "POST");
+      assert.equal(init?.headers?.Authorization, "Bearer gateway-token");
+      assert.deepEqual(JSON.parse(String(init?.body)), {
+        target_user_id: "user-c",
+        expected_member_version: 2,
+        idempotency_key: "idem-invite",
+        reason: "client invite"
+      });
+      return new Response(
+        JSON.stringify({
+          change_id: "change-invite-1",
+          tenant_id: "tenant-client-local",
+          conversation_id: "group-client-local",
+          target_user_id: "user-c",
+          change_type: "MEMBER_CHANGE_TYPE_JOIN",
+          status: "MEMBER_CHANGE_STATUS_OUTBOX_ENQUEUED",
+          boundary_seq: "3",
+          member_version: "3",
+          permission_version: "2"
+        }),
+        { status: 200, headers: { "content-type": "application/json; charset=utf-8" } }
+      );
+    }
+    if (url.endsWith("/api/conversations/group-client-local/members/leave")) {
+      assert.equal(init?.method, "POST");
+      assert.equal(init?.headers?.Authorization, "Bearer gateway-token");
+      assert.deepEqual(JSON.parse(String(init?.body)), {
+        expected_member_version: 3,
+        idempotency_key: "idem-leave",
+        reason: "client leave"
+      });
+      return new Response(
+        JSON.stringify({
+          change_id: "change-leave-1",
+          tenant_id: "tenant-client-local",
+          conversation_id: "group-client-local",
+          target_user_id: "user-a",
+          change_type: "MEMBER_CHANGE_TYPE_LEAVE",
+          status: "MEMBER_CHANGE_STATUS_OUTBOX_ENQUEUED",
+          boundary_seq: "4",
+          member_version: "4",
+          permission_version: "2"
+        }),
+        { status: 200, headers: { "content-type": "application/json; charset=utf-8" } }
+      );
+    }
     assert.equal(url, "http://bff.local/api/conversations/conv-client-local/messages?after_seq=0&limit=10");
     assert.equal(init?.method, "GET");
     return new Response(
@@ -144,13 +193,36 @@ async function main() {
     assert.equal(direct.type, "DIRECT");
     assert.equal(direct.directPeerUserID, "user-b");
     assert.equal(direct.boundarySeq, 2);
+    const invited = await client.inviteConversationMember(
+      {
+        conversationID: "group-client-local",
+        targetUserID: "user-c",
+        expectedMemberVersion: 2,
+        idempotencyKey: "idem-invite",
+        reason: "client invite"
+      },
+      session()
+    );
+    assert.equal(invited.changeType, "JOIN");
+    assert.equal(invited.memberVersion, 3);
+    const left = await client.leaveConversation(
+      {
+        conversationID: "group-client-local",
+        expectedMemberVersion: 3,
+        idempotencyKey: "idem-leave",
+        reason: "client leave"
+      },
+      session()
+    );
+    assert.equal(left.changeType, "LEAVE");
+    assert.equal(left.targetUserID, "user-a");
     const response = await client.pullInbox(
       { conversationID: "conv-client-local", afterSeq: 0, limit: 10 },
       session()
     );
     assert.equal(response.items[0]?.text, expectedText);
     assert.equal(response.nextSeq, 11);
-    assert.equal(calls.length, 4);
+    assert.equal(calls.length, 6);
   } finally {
     globalThis.fetch = originalFetch;
   }

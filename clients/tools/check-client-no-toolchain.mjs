@@ -5,6 +5,11 @@ import { fileURLToPath } from "node:url";
 const clientsRoot = fileURLToPath(new URL("..", import.meta.url));
 const checkPlan = [
   {
+    name: "client-workspace-validation",
+    script: "validate",
+    reason: "guards client workspace skeleton and package boundaries"
+  },
+  {
     name: "shell-smoke-plan",
     script: "test:shell-smoke-plan",
     reason: "guards browser, desktop and Android shell smoke checklist shape"
@@ -65,6 +70,11 @@ const checkPlan = [
     reason: "guards shared local message cache semantics"
   },
   {
+    name: "indexeddb-message-store-contract",
+    script: "test:indexeddb-store",
+    reason: "guards browser IndexedDB message cache semantics"
+  },
+  {
     name: "key-value-message-store-contract",
     script: "test:key-value-store",
     reason: "guards persistent key-value message cache semantics"
@@ -98,6 +108,11 @@ const checkPlan = [
     name: "shell-web-assets",
     script: "test:shell-web-assets",
     reason: "guards target shell asset manifest and PWA asset propagation"
+  },
+  {
+    name: "shell-asset-prep-wrapper-contract",
+    script: "test:shell-asset-prep-wrapper",
+    reason: "guards shell asset prep wrapper without native builds"
   },
   {
     name: "desktop-shell-action-assets",

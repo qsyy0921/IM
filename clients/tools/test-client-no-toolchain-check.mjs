@@ -17,6 +17,7 @@ assert(plan.installsArtifacts === false, "no-toolchain plan must not install art
 assert(plan.startsDeviceActivities === false, "no-toolchain plan must not start device activities");
 assert(plan.opensAdbReverse === false, "no-toolchain plan must not open adb reverse");
 assert(plan.startsServices === false, "no-toolchain plan must not start services");
+assert(commands.includes("npm --prefix clients run validate"), "client workspace validation missing");
 assert(commands.includes("npm --prefix clients run test:shell-smoke-plan"), "shell smoke plan check missing");
 assert(commands.includes("npm --prefix clients run test:artifact-readiness"), "artifact readiness contract check missing");
 assert(commands.includes("npm --prefix clients run test:artifact-install-plan"), "artifact install plan contract check missing");
@@ -29,6 +30,7 @@ assert(commands.includes("npm --prefix clients run test:web-pwa"), "web PWA chec
 assert(commands.includes("npm --prefix clients run test:shell-config"), "shell config contract check missing");
 assert(commands.includes("npm --prefix clients run test:web-platform"), "web platform contract check missing");
 assert(commands.includes("npm --prefix clients run test:local-message-store"), "local message store contract check missing");
+assert(commands.includes("npm --prefix clients run test:indexeddb-store"), "indexeddb message store contract check missing");
 assert(commands.includes("npm --prefix clients run test:key-value-store"), "key-value message store contract check missing");
 assert(commands.includes("npm --prefix clients run test:native-store-readiness"), "native store readiness contract check missing");
 assert(commands.includes("npm --prefix clients run test:runtime-lifecycle"), "runtime lifecycle contract check missing");
@@ -36,6 +38,7 @@ assert(commands.includes("npm --prefix clients run test:web-shell-actions"), "we
 assert(commands.includes("npm --prefix clients run test:web-shell-automation"), "web shell automation contract check missing");
 assert(commands.includes("npm --prefix clients run test:web-shell-smoke-report"), "web shell smoke report contract check missing");
 assert(commands.includes("npm --prefix clients run test:shell-web-assets"), "shell asset check missing");
+assert(commands.includes("npm --prefix clients run test:shell-asset-prep-wrapper"), "shell asset prep wrapper check missing");
 assert(commands.includes("npm --prefix clients run test:desktop-shell-action-assets"), "desktop action asset check missing");
 assert(commands.includes("npm --prefix clients run test:desktop-webview-metadata-smoke"), "desktop WebView metadata runner contract check missing");
 assert(commands.includes("npm --prefix clients run test:desktop-webview-login-smoke"), "desktop WebView login runner contract check missing");

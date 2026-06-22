@@ -105,6 +105,11 @@ const checkPlan = [
     reason: "guards persistent key-value message cache semantics"
   },
   {
+    name: "http-bff-client-contract",
+    script: "test:http-bff-client",
+    reason: "guards BFF payload decoding and shared HTTP client mapping"
+  },
+  {
     name: "native-store-readiness-contract",
     script: "test:native-store-readiness",
     reason: "guards native SQLite bridge readiness contract"

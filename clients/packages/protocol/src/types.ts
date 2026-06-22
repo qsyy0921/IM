@@ -49,8 +49,44 @@ export interface LoginResponse {
   session: AuthSession;
 }
 
+export interface RegisterRequest {
+  tenantID: TenantID;
+  userID: UserID;
+  password: string;
+}
+
+export interface RegisterResponse {
+  tenantID: TenantID;
+  userID: UserID;
+  status: string;
+  createdAtMs: number;
+}
+
 export type ConversationType = "DIRECT" | "GROUP";
 export type ConversationStatus = "ACTIVE" | "ARCHIVED" | "DELETED";
+
+export interface CreateConversationRequest {
+  tenantID: TenantID;
+  conversationID?: ConversationID;
+  type: ConversationType;
+  idempotencyKey?: string;
+}
+
+export interface OpenDirectConversationRequest {
+  peerUserID: UserID;
+  idempotencyKey?: string;
+}
+
+export interface CreateConversationResponse {
+  tenantID: TenantID;
+  conversationID: ConversationID;
+  type: ConversationType;
+  directPeerUserID?: UserID;
+  boundarySeq: number;
+  memberVersion: number;
+  permissionVersion: number;
+  idempotentReplay: boolean;
+}
 
 export interface ConversationSummary {
   tenantID: TenantID;
@@ -71,6 +107,76 @@ export interface ContactItem {
   remark: string;
   groupName: string;
   updatedAtMs: number;
+}
+
+export type ContactRequestStatus =
+  | "PENDING"
+  | "ACCEPTED"
+  | "DECLINED"
+  | "CANCELED"
+  | "EXPIRED"
+  | "REVIEW_REQUIRED"
+  | string;
+
+export type ContactRequestDirection = "INCOMING" | "OUTGOING";
+export type ContactDecision = "ACCEPT" | "DECLINE";
+export type ContactRequestSourceType = "DIRECT" | "SEARCH" | "GROUP" | "INVITE_LINK" | "QR_CODE" | "IMPORT";
+export type ContactRequestRiskLevel = "LOW" | "MEDIUM" | "HIGH" | string;
+
+export interface ContactRequestItem {
+  requestID: string;
+  senderUserID: UserID;
+  receiverUserID: UserID;
+  status: ContactRequestStatus;
+  message: string;
+  createdAtMs: number;
+  updatedAtMs: number;
+  decidedAtMs: number;
+  sourceType: ContactRequestSourceType | string;
+  sourceRef: string;
+  riskLevel: ContactRequestRiskLevel;
+  reviewRequired: boolean;
+}
+
+export interface ListContactsInput {
+  pageSize?: number;
+  pageToken?: string;
+  query?: string;
+  groupName?: string;
+}
+
+export interface ListContactRequestsInput {
+  direction: ContactRequestDirection;
+  status?: ContactRequestStatus;
+  pageSize?: number;
+  pageToken?: string;
+}
+
+export interface SendContactRequestInput {
+  targetUserID: UserID;
+  message?: string;
+  sourceType?: ContactRequestSourceType;
+  sourceRef?: string;
+  idempotencyKey?: string;
+}
+
+export interface RespondContactRequestInput {
+  requestID: string;
+  decision: ContactDecision;
+  idempotencyKey?: string;
+}
+
+export interface CancelContactRequestInput {
+  requestID: string;
+  idempotencyKey?: string;
+}
+
+export interface ContactActionInput {
+  contactUserID: UserID;
+  idempotencyKey?: string;
+  reason?: string;
+  remark?: string;
+  groupName?: string;
 }
 
 export type MessageStatus = "PENDING" | "SENT" | "DELIVERED" | "FAILED";

@@ -15,6 +15,10 @@ type GetSendContextExecutor interface {
 	Execute(context.Context, types.GetSendContextCommand) (types.ConversationSendContext, error)
 }
 
+type CreateConversationExecutor interface {
+	Execute(context.Context, types.CreateConversationCommand) (types.CreateConversationResult, error)
+}
+
 type CreateMemberChangeExecutor interface {
 	Execute(context.Context, types.CreateMemberChangeCommand) (types.MemberChangeResult, error)
 }
@@ -36,6 +40,7 @@ type Option func(*Server)
 type Server struct {
 	conversationv1.UnimplementedConversationServiceServer
 	getSendContext         GetSendContextExecutor
+	createConversation     CreateConversationExecutor
 	createMemberChange     CreateMemberChangeExecutor
 	transferOwner          TransferConversationOwnerExecutor
 	getMemberChange        GetMemberChangeExecutor
@@ -53,6 +58,12 @@ func NewServer(getSendContext GetSendContextExecutor, opts ...Option) *Server {
 func WithCreateMemberChange(executor CreateMemberChangeExecutor) Option {
 	return func(server *Server) {
 		server.createMemberChange = executor
+	}
+}
+
+func WithCreateConversation(executor CreateConversationExecutor) Option {
+	return func(server *Server) {
+		server.createConversation = executor
 	}
 }
 
@@ -104,6 +115,42 @@ func (s *Server) GetSendContext(
 		FanoutPolicyVersion: result.FanoutPolicyVersion,
 		CurrentSeqShard:     result.CurrentSeqShard,
 		DirectPeerUserId:    string(result.DirectPeerUserID),
+	}, nil
+}
+
+func (s *Server) CreateConversation(
+	ctx context.Context,
+	request *conversationv1.CreateConversationRequest,
+) (*conversationv1.CreateConversationResponse, error) {
+	if request == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+	if s.createConversation == nil {
+		return nil, status.Error(codes.Unimplemented, "create conversation is not configured")
+	}
+	auth, ok := authFromProto(ctx, request.GetAuthContext())
+	if !ok {
+		return nil, status.Error(codes.InvalidArgument, "auth_context is required")
+	}
+	result, err := s.createConversation.Execute(ctx, types.CreateConversationCommand{
+		AuthContext:      auth,
+		ConversationID:   types.ConversationID(request.GetConversationId()),
+		ConversationType: fromProtoConversationType(request.GetConversationType()),
+		DirectPeerUserID: types.UserID(request.GetDirectPeerUserId()),
+		IdempotencyKey:   request.GetIdempotencyKey(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	return &conversationv1.CreateConversationResponse{
+		TenantId:          string(result.TenantID),
+		ConversationId:    string(result.ConversationID),
+		ConversationType:  toProtoConversationType(result.ConversationType),
+		DirectPeerUserId:  string(result.DirectPeerUserID),
+		BoundarySeq:       result.BoundarySeq,
+		MemberVersion:     result.MemberVersion,
+		PermissionVersion: result.PermissionVersion,
+		IdempotentReplay:  result.IdempotentReplay,
 	}, nil
 }
 
@@ -338,6 +385,28 @@ func toProtoConversationMode(mode types.ConversationMode) conversationv1.Convers
 		return conversationv1.ConversationMode_CONVERSATION_MODE_SEQUENCER_BLOCK
 	default:
 		return conversationv1.ConversationMode_CONVERSATION_MODE_UNSPECIFIED
+	}
+}
+
+func fromProtoConversationType(value conversationv1.ConversationType) types.ConversationType {
+	switch value {
+	case conversationv1.ConversationType_CONVERSATION_TYPE_GROUP:
+		return types.ConversationTypeGroup
+	case conversationv1.ConversationType_CONVERSATION_TYPE_DIRECT:
+		return types.ConversationTypeDirect
+	default:
+		return ""
+	}
+}
+
+func toProtoConversationType(value types.ConversationType) conversationv1.ConversationType {
+	switch value {
+	case types.ConversationTypeGroup:
+		return conversationv1.ConversationType_CONVERSATION_TYPE_GROUP
+	case types.ConversationTypeDirect:
+		return conversationv1.ConversationType_CONVERSATION_TYPE_DIRECT
+	default:
+		return conversationv1.ConversationType_CONVERSATION_TYPE_UNSPECIFIED
 	}
 }
 

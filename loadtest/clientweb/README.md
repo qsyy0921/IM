@@ -26,6 +26,32 @@ Run locally:
 .\loadtest\clientweb\run-local-smoke.ps1
 ```
 
+Run as a fixed local backend for browser / Windows desktop client debugging:
+
+```powershell
+.\loadtest\clientweb\run-local-dev.ps1
+```
+
+This wrapper keeps the seeded local services alive on:
+
+- API BFF: `http://127.0.0.1:8080`
+- push WebSocket: `ws://127.0.0.1:8088/ws`
+
+The local backend includes `contacts-service` because the browser and desktop
+clients use the contact read model for friend lists and direct-chat permission
+checks before opening a one-to-one conversation.
+
+Use the first-stage local account:
+
+```text
+tenant_id: tenant-client-local
+user_id: user-a
+password: ClientWebReceiverPassw0rd!
+conversation_id: conv-client-local
+```
+
+Stop the printed process ids when the local client debug session is finished.
+
 Run against a private LAN address, for example the Windows wired `172.x`
 interface:
 

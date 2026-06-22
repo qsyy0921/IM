@@ -12,7 +12,7 @@ First slice:
 - Shared `protocol` and `client-core` packages.
 - LAN-friendly config for `api-gateway` and `push-gateway`.
 - Minimal MVP path: login, open conversation, send text, receive notify,
-  PullInbox, AckDelivery, reconnect fallback.
+  PullInbox, AckDelivery, reconnect recovery.
 
 ## Boundaries
 

@@ -78,10 +78,10 @@ func registerTLSFlags(prefix string, envPrefix string, serviceName string, confi
 	flag.StringVar(&config.ClientKeyFile, prefix+"-client-key-file", os.Getenv(envPrefix+"_CLIENT_KEY_FILE"), "client private key PEM for "+serviceName)
 }
 
-func envString(name string, fallback string) string {
+func envString(name string, defaultValue string) string {
 	value := strings.TrimSpace(os.Getenv(name))
 	if value == "" {
-		return fallback
+		return defaultValue
 	}
 	return value
 }

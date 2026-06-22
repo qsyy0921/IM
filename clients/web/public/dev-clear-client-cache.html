@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NexusIM Cache Reset</title>
+  </head>
+  <body>
+    <p>正在清理 NexusIM 本地开发缓存...</p>
+    <script>
+      (async () => {
+        const allowedHosts = new Set(["127.0.0.1", "localhost", "::1"]);
+        if (!allowedHosts.has(location.hostname)) {
+          document.body.textContent = "This local cache reset page is only available on loopback hosts.";
+          return;
+        }
+        if ("serviceWorker" in navigator) {
+          const registrations = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(registrations.map(registration => registration.unregister()));
+        }
+        if ("caches" in window) {
+          const names = await caches.keys();
+          await Promise.all(names.filter(name => name.startsWith("nexusim-")).map(name => caches.delete(name)));
+        }
+        if ("indexedDB" in window) {
+          await Promise.all([
+            deleteDatabase("nexusim-web-client"),
+            deleteDatabase("nexusim-web-client-v2")
+          ]);
+        }
+        const nextURL = new URL("/", location.origin);
+        nextURL.searchParams.set("t", `cache-reset-${Date.now()}`);
+        location.replace(nextURL.toString());
+      })().catch(error => {
+        document.body.textContent = `缓存清理失败: ${error instanceof Error ? error.message : String(error)}`;
+      });
+
+      function deleteDatabase(name) {
+        return new Promise(resolve => {
+          const request = indexedDB.deleteDatabase(name);
+          request.onsuccess = () => resolve();
+          request.onerror = () => resolve();
+          request.onblocked = () => resolve();
+        });
+      }
+    </script>
+  </body>
+</html>

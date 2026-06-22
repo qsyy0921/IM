@@ -2,16 +2,20 @@ package httpbff
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
 
 	contactsv1 "github.com/qsyy0921/IM/api/proto/nexusim/contacts/v1"
+	conversationv1 "github.com/qsyy0921/IM/api/proto/nexusim/conversation/v1"
 	deliveryv1 "github.com/qsyy0921/IM/api/proto/nexusim/delivery/v1"
 	identityv1 "github.com/qsyy0921/IM/api/proto/nexusim/identity/v1"
 	messagev1 "github.com/qsyy0921/IM/api/proto/nexusim/message/v1"
@@ -33,16 +37,28 @@ const (
 )
 
 type Gateway interface {
+	RegisterUser(ctx context.Context, request *identityv1.RegisterUserRequest) (*identityv1.RegisterUserResponse, error)
 	Login(ctx context.Context, request *identityv1.LoginRequest) (*identityv1.LoginResponse, error)
 	RefreshGatewayToken(ctx context.Context, request *identityv1.RefreshGatewayTokenRequest) (*identityv1.RefreshGatewayTokenResponse, error)
 	IssueGatewayToken(ctx context.Context, request *identityv1.IssueGatewayTokenRequest) (*identityv1.IssueGatewayTokenResponse, error)
 	RevokeSession(ctx context.Context, request *identityv1.RevokeSessionRequest) (*identityv1.RevokeSessionResponse, error)
+	CreateConversation(ctx context.Context, request *conversationv1.CreateConversationRequest) (*conversationv1.CreateConversationResponse, error)
 	SendMessage(ctx context.Context, request *messagev1.SendMessageRequest) (*messagev1.SendMessageResponse, error)
 	PullInbox(ctx context.Context, request *deliveryv1.PullInboxRequest) (*deliveryv1.PullInboxResponse, error)
 	AckDelivery(ctx context.Context, request *deliveryv1.AckDeliveryRequest) (*deliveryv1.AckDeliveryResponse, error)
 	ListConversations(ctx context.Context, request *receiptv1.ListConversationsRequest) (*receiptv1.ListConversationsResponse, error)
 	ListReceiptStates(ctx context.Context, request *receiptv1.ListReceiptStatesRequest) (*receiptv1.ListReceiptStatesResponse, error)
+	SendContactRequest(ctx context.Context, request *contactsv1.SendContactRequestRequest) (*contactsv1.SendContactRequestResponse, error)
+	RespondContactRequest(ctx context.Context, request *contactsv1.RespondContactRequestRequest) (*contactsv1.RespondContactRequestResponse, error)
+	CancelContactRequest(ctx context.Context, request *contactsv1.CancelContactRequestRequest) (*contactsv1.CancelContactRequestResponse, error)
+	ListContactRequests(ctx context.Context, request *contactsv1.ListContactRequestsRequest) (*contactsv1.ListContactRequestsResponse, error)
 	ListContacts(ctx context.Context, request *contactsv1.ListContactsRequest) (*contactsv1.ListContactsResponse, error)
+	GetContactState(ctx context.Context, request *contactsv1.GetContactStateRequest) (*contactsv1.GetContactStateResponse, error)
+	DeleteContact(ctx context.Context, request *contactsv1.DeleteContactRequest) (*contactsv1.DeleteContactResponse, error)
+	BlockContact(ctx context.Context, request *contactsv1.BlockContactRequest) (*contactsv1.BlockContactResponse, error)
+	UnblockContact(ctx context.Context, request *contactsv1.UnblockContactRequest) (*contactsv1.UnblockContactResponse, error)
+	UpdateContactRemark(ctx context.Context, request *contactsv1.UpdateContactRemarkRequest) (*contactsv1.UpdateContactRemarkResponse, error)
+	UpdateContactGroup(ctx context.Context, request *contactsv1.UpdateContactGroupRequest) (*contactsv1.UpdateContactGroupResponse, error)
 }
 
 type Authenticator interface {
@@ -147,6 +163,11 @@ type publicError struct {
 	Message string `json:"message"`
 }
 
+type openDirectConversationRequest struct {
+	PeerUserID     string `json:"peer_user_id"`
+	IdempotencyKey string `json:"idempotency_key"`
+}
+
 func NewServer(config Config) *Server {
 	server := &Server{
 		gateway:       config.Gateway,
@@ -201,6 +222,8 @@ func (server *Server) serveHTTP(response http.ResponseWriter, request *http.Requ
 		writeJSON(response, http.StatusOK, map[string]string{"status": "ok"})
 	case request.Method == http.MethodPost && path == "/api/auth/login":
 		server.handleLogin(response, request)
+	case request.Method == http.MethodPost && path == "/api/auth/register":
+		server.handleRegister(response, request)
 	case request.Method == http.MethodPost && path == "/api/auth/refresh":
 		server.handleRefresh(response, request)
 	case request.Method == http.MethodPost && path == "/api/auth/logout":
@@ -209,14 +232,38 @@ func (server *Server) serveHTTP(response http.ResponseWriter, request *http.Requ
 		server.handleMe(response, request)
 	case request.Method == http.MethodGet && path == "/api/conversations":
 		server.handleListConversations(response, request)
+	case request.Method == http.MethodPost && path == "/api/conversations/create":
+		server.handleCreateConversation(response, request)
+	case request.Method == http.MethodPost && path == "/api/conversations/direct":
+		server.handleOpenDirectConversation(response, request)
 	case request.Method == http.MethodGet && isConversationMessagesPath(request.URL.EscapedPath()):
 		server.handleConversationMessages(response, request)
 	case request.Method == http.MethodPost && path == "/api/messages/send":
 		server.handleSendMessage(response, request)
 	case request.Method == http.MethodPost && path == "/api/delivery/ack":
 		server.handleAckDelivery(response, request)
+	case request.Method == http.MethodGet && path == "/api/contact-requests":
+		server.handleListContactRequests(response, request)
+	case request.Method == http.MethodPost && path == "/api/contact-requests/send":
+		server.handleSendContactRequest(response, request)
+	case request.Method == http.MethodPost && path == "/api/contact-requests/respond":
+		server.handleRespondContactRequest(response, request)
+	case request.Method == http.MethodPost && path == "/api/contact-requests/cancel":
+		server.handleCancelContactRequest(response, request)
 	case request.Method == http.MethodGet && path == "/api/contacts":
 		server.handleListContacts(response, request)
+	case request.Method == http.MethodGet && path == "/api/contacts/state":
+		server.handleGetContactState(response, request)
+	case request.Method == http.MethodPost && path == "/api/contacts/delete":
+		server.handleDeleteContact(response, request)
+	case request.Method == http.MethodPost && path == "/api/contacts/block":
+		server.handleBlockContact(response, request)
+	case request.Method == http.MethodPost && path == "/api/contacts/unblock":
+		server.handleUnblockContact(response, request)
+	case request.Method == http.MethodPost && path == "/api/contacts/remark":
+		server.handleUpdateContactRemark(response, request)
+	case request.Method == http.MethodPost && path == "/api/contacts/group":
+		server.handleUpdateContactGroup(response, request)
 	case request.Method == http.MethodGet && path == "/api/receipts":
 		server.handleListReceiptStates(response, request)
 	default:
@@ -232,6 +279,15 @@ func (server *Server) handleLogin(response http.ResponseWriter, request *http.Re
 	input.Audience = "api-gateway"
 	output, err := server.requireGateway().Login(contextFromRequest(request), &input)
 	server.writeAuthResponseOrError(response, request, output, nil, err)
+}
+
+func (server *Server) handleRegister(response http.ResponseWriter, request *http.Request) {
+	var input identityv1.RegisterUserRequest
+	if !server.decode(response, request, &input) {
+		return
+	}
+	output, err := server.requireGateway().RegisterUser(contextFromRequest(request), &input)
+	server.writeProtoOrError(response, output, err)
 }
 
 func (server *Server) handleRefresh(response http.ResponseWriter, request *http.Request) {
@@ -328,6 +384,59 @@ func (server *Server) handleListConversations(response http.ResponseWriter, requ
 	server.writeProtoOrError(response, output, err)
 }
 
+func (server *Server) handleCreateConversation(response http.ResponseWriter, request *http.Request) {
+	var input conversationv1.CreateConversationRequest
+	if !server.decode(response, request, &input) {
+		return
+	}
+	output, err := server.requireGateway().CreateConversation(contextFromRequest(request), &input)
+	server.writeProtoOrError(response, output, err)
+}
+
+func (server *Server) handleOpenDirectConversation(response http.ResponseWriter, request *http.Request) {
+	auth, err := server.authenticateRequest(request)
+	if err != nil {
+		writeError(response, err)
+		return
+	}
+	var input openDirectConversationRequest
+	if !server.decodeJSON(response, request, &input) {
+		return
+	}
+	peerUserID := strings.TrimSpace(input.PeerUserID)
+	if peerUserID == "" {
+		writeError(response, status.Error(codes.InvalidArgument, "peer_user_id is required"))
+		return
+	}
+	if peerUserID == auth.UserID {
+		writeError(response, status.Error(codes.InvalidArgument, "peer_user_id must differ from current user"))
+		return
+	}
+	contact, err := server.requireGateway().GetContactState(contextFromRequest(request), &contactsv1.GetContactStateRequest{
+		OtherUserId: peerUserID,
+	})
+	if err != nil {
+		writeError(response, err)
+		return
+	}
+	if contact.GetStatus() != contactsv1.ContactEdgeStatus_CONTACT_EDGE_STATUS_ACTIVE {
+		writeError(response, status.Error(codes.PermissionDenied, "contact is not active"))
+		return
+	}
+	conversationID := directConversationID(auth.TenantID, auth.UserID, peerUserID)
+	idempotencyKey := strings.TrimSpace(input.IdempotencyKey)
+	if idempotencyKey == "" {
+		idempotencyKey = "direct:" + conversationID
+	}
+	output, err := server.requireGateway().CreateConversation(contextFromRequest(request), &conversationv1.CreateConversationRequest{
+		ConversationId:   conversationID,
+		ConversationType: conversationv1.ConversationType_CONVERSATION_TYPE_DIRECT,
+		IdempotencyKey:   idempotencyKey,
+		DirectPeerUserId: peerUserID,
+	})
+	server.writeProtoOrError(response, output, err)
+}
+
 func (server *Server) handleConversationMessages(response http.ResponseWriter, request *http.Request) {
 	conversationID, err := conversationIDFromMessagesPath(request.URL.EscapedPath())
 	if err != nil {
@@ -389,6 +498,133 @@ func (server *Server) handleListContacts(response http.ResponseWriter, request *
 	server.writeProtoOrError(response, output, err)
 }
 
+func (server *Server) handleSendContactRequest(response http.ResponseWriter, request *http.Request) {
+	var input contactsv1.SendContactRequestRequest
+	if !server.decode(response, request, &input) {
+		return
+	}
+	output, err := server.requireGateway().SendContactRequest(contextFromRequest(request), &input)
+	server.writeProtoOrError(response, output, err)
+}
+
+func (server *Server) handleRespondContactRequest(response http.ResponseWriter, request *http.Request) {
+	var input contactsv1.RespondContactRequestRequest
+	if !server.decode(response, request, &input) {
+		return
+	}
+	output, err := server.requireGateway().RespondContactRequest(contextFromRequest(request), &input)
+	server.writeProtoOrError(response, output, err)
+}
+
+func (server *Server) handleCancelContactRequest(response http.ResponseWriter, request *http.Request) {
+	var input contactsv1.CancelContactRequestRequest
+	if !server.decode(response, request, &input) {
+		return
+	}
+	output, err := server.requireGateway().CancelContactRequest(contextFromRequest(request), &input)
+	server.writeProtoOrError(response, output, err)
+}
+
+func (server *Server) handleListContactRequests(response http.ResponseWriter, request *http.Request) {
+	query := request.URL.Query()
+	pageSize, err := int32Query(query, "page_size", "pageSize")
+	if err != nil {
+		writeError(response, err)
+		return
+	}
+	direction, err := contactRequestDirectionQuery(firstQuery(query, "direction"))
+	if err != nil {
+		writeError(response, err)
+		return
+	}
+	statusFilter, err := contactRequestStatusQuery(firstQuery(query, "status"))
+	if err != nil {
+		writeError(response, err)
+		return
+	}
+	sourceTypeFilter, err := contactRequestSourceTypeQuery(firstQuery(query, "source_type_filter", "sourceTypeFilter"))
+	if err != nil {
+		writeError(response, err)
+		return
+	}
+	riskLevelFilter, err := contactRequestRiskLevelQuery(firstQuery(query, "risk_level_filter", "riskLevelFilter"))
+	if err != nil {
+		writeError(response, err)
+		return
+	}
+	input := &contactsv1.ListContactRequestsRequest{
+		Direction:        direction,
+		Status:           statusFilter,
+		PageSize:         pageSize,
+		PageToken:        firstQuery(query, "page_token", "pageToken"),
+		SourceTypeFilter: sourceTypeFilter,
+		RiskLevelFilter:  riskLevelFilter,
+	}
+	if value := firstQuery(query, "review_required_filter", "reviewRequiredFilter"); value != "" {
+		enabled := boolQuery(query, "review_required_filter", "reviewRequiredFilter")
+		input.ReviewRequiredFilter = &enabled
+	}
+	output, err := server.requireGateway().ListContactRequests(contextFromRequest(request), input)
+	server.writeProtoOrError(response, output, err)
+}
+
+func (server *Server) handleGetContactState(response http.ResponseWriter, request *http.Request) {
+	otherUserID := firstQuery(request.URL.Query(), "other_user_id", "otherUserId")
+	if otherUserID == "" {
+		writeError(response, status.Error(codes.InvalidArgument, "other_user_id is required"))
+		return
+	}
+	output, err := server.requireGateway().GetContactState(contextFromRequest(request), &contactsv1.GetContactStateRequest{
+		OtherUserId: otherUserID,
+	})
+	server.writeProtoOrError(response, output, err)
+}
+
+func (server *Server) handleDeleteContact(response http.ResponseWriter, request *http.Request) {
+	var input contactsv1.DeleteContactRequest
+	if !server.decode(response, request, &input) {
+		return
+	}
+	output, err := server.requireGateway().DeleteContact(contextFromRequest(request), &input)
+	server.writeProtoOrError(response, output, err)
+}
+
+func (server *Server) handleBlockContact(response http.ResponseWriter, request *http.Request) {
+	var input contactsv1.BlockContactRequest
+	if !server.decode(response, request, &input) {
+		return
+	}
+	output, err := server.requireGateway().BlockContact(contextFromRequest(request), &input)
+	server.writeProtoOrError(response, output, err)
+}
+
+func (server *Server) handleUnblockContact(response http.ResponseWriter, request *http.Request) {
+	var input contactsv1.UnblockContactRequest
+	if !server.decode(response, request, &input) {
+		return
+	}
+	output, err := server.requireGateway().UnblockContact(contextFromRequest(request), &input)
+	server.writeProtoOrError(response, output, err)
+}
+
+func (server *Server) handleUpdateContactRemark(response http.ResponseWriter, request *http.Request) {
+	var input contactsv1.UpdateContactRemarkRequest
+	if !server.decode(response, request, &input) {
+		return
+	}
+	output, err := server.requireGateway().UpdateContactRemark(contextFromRequest(request), &input)
+	server.writeProtoOrError(response, output, err)
+}
+
+func (server *Server) handleUpdateContactGroup(response http.ResponseWriter, request *http.Request) {
+	var input contactsv1.UpdateContactGroupRequest
+	if !server.decode(response, request, &input) {
+		return
+	}
+	output, err := server.requireGateway().UpdateContactGroup(contextFromRequest(request), &input)
+	server.writeProtoOrError(response, output, err)
+}
+
 func (server *Server) handleListReceiptStates(response http.ResponseWriter, request *http.Request) {
 	query := request.URL.Query()
 	receivedDeviceLimit, err := int32Query(query, "received_device_limit", "receivedDeviceLimit")
@@ -418,21 +654,8 @@ func (server *Server) handleListReceiptStates(response http.ResponseWriter, requ
 }
 
 func (server *Server) decode(response http.ResponseWriter, request *http.Request, message proto.Message) bool {
-	if request.Body == nil {
-		writeError(response, status.Error(codes.InvalidArgument, "request body is required"))
-		return false
-	}
-	body, err := io.ReadAll(io.LimitReader(request.Body, maxBodyBytes+1))
-	if err != nil {
-		writeError(response, status.Error(codes.InvalidArgument, "failed to read request body"))
-		return false
-	}
-	if len(body) > maxBodyBytes {
-		writeError(response, status.Error(codes.ResourceExhausted, "request body is too large"))
-		return false
-	}
-	if len(strings.TrimSpace(string(body))) == 0 {
-		writeError(response, status.Error(codes.InvalidArgument, "request body is required"))
+	body, ok := readRequestBody(response, request)
+	if !ok {
 		return false
 	}
 	if err := server.unmarshal.Unmarshal(body, message); err != nil {
@@ -440,6 +663,39 @@ func (server *Server) decode(response http.ResponseWriter, request *http.Request
 		return false
 	}
 	return true
+}
+
+func (server *Server) decodeJSON(response http.ResponseWriter, request *http.Request, target any) bool {
+	body, ok := readRequestBody(response, request)
+	if !ok {
+		return false
+	}
+	if err := json.Unmarshal(body, target); err != nil {
+		writeError(response, status.Error(codes.InvalidArgument, "invalid json request"))
+		return false
+	}
+	return true
+}
+
+func readRequestBody(response http.ResponseWriter, request *http.Request) ([]byte, bool) {
+	if request.Body == nil {
+		writeError(response, status.Error(codes.InvalidArgument, "request body is required"))
+		return nil, false
+	}
+	body, err := io.ReadAll(io.LimitReader(request.Body, maxBodyBytes+1))
+	if err != nil {
+		writeError(response, status.Error(codes.InvalidArgument, "failed to read request body"))
+		return nil, false
+	}
+	if len(body) > maxBodyBytes {
+		writeError(response, status.Error(codes.ResourceExhausted, "request body is too large"))
+		return nil, false
+	}
+	if len(strings.TrimSpace(string(body))) == 0 {
+		writeError(response, status.Error(codes.InvalidArgument, "request body is required"))
+		return nil, false
+	}
+	return body, true
 }
 
 func (server *Server) writeProtoOrError(response http.ResponseWriter, message proto.Message, err error) {
@@ -577,6 +833,9 @@ func (server *Server) originAllowed(origin string) bool {
 
 type missingGateway struct{}
 
+func (missingGateway) RegisterUser(context.Context, *identityv1.RegisterUserRequest) (*identityv1.RegisterUserResponse, error) {
+	return nil, status.Error(codes.Internal, "gateway is not configured")
+}
 func (missingGateway) Login(context.Context, *identityv1.LoginRequest) (*identityv1.LoginResponse, error) {
 	return nil, status.Error(codes.Internal, "gateway is not configured")
 }
@@ -587,6 +846,9 @@ func (missingGateway) IssueGatewayToken(context.Context, *identityv1.IssueGatewa
 	return nil, status.Error(codes.Internal, "gateway is not configured")
 }
 func (missingGateway) RevokeSession(context.Context, *identityv1.RevokeSessionRequest) (*identityv1.RevokeSessionResponse, error) {
+	return nil, status.Error(codes.Internal, "gateway is not configured")
+}
+func (missingGateway) CreateConversation(context.Context, *conversationv1.CreateConversationRequest) (*conversationv1.CreateConversationResponse, error) {
 	return nil, status.Error(codes.Internal, "gateway is not configured")
 }
 func (missingGateway) SendMessage(context.Context, *messagev1.SendMessageRequest) (*messagev1.SendMessageResponse, error) {
@@ -604,7 +866,37 @@ func (missingGateway) ListConversations(context.Context, *receiptv1.ListConversa
 func (missingGateway) ListReceiptStates(context.Context, *receiptv1.ListReceiptStatesRequest) (*receiptv1.ListReceiptStatesResponse, error) {
 	return nil, status.Error(codes.Internal, "gateway is not configured")
 }
+func (missingGateway) SendContactRequest(context.Context, *contactsv1.SendContactRequestRequest) (*contactsv1.SendContactRequestResponse, error) {
+	return nil, status.Error(codes.Internal, "gateway is not configured")
+}
+func (missingGateway) RespondContactRequest(context.Context, *contactsv1.RespondContactRequestRequest) (*contactsv1.RespondContactRequestResponse, error) {
+	return nil, status.Error(codes.Internal, "gateway is not configured")
+}
+func (missingGateway) CancelContactRequest(context.Context, *contactsv1.CancelContactRequestRequest) (*contactsv1.CancelContactRequestResponse, error) {
+	return nil, status.Error(codes.Internal, "gateway is not configured")
+}
+func (missingGateway) ListContactRequests(context.Context, *contactsv1.ListContactRequestsRequest) (*contactsv1.ListContactRequestsResponse, error) {
+	return nil, status.Error(codes.Internal, "gateway is not configured")
+}
 func (missingGateway) ListContacts(context.Context, *contactsv1.ListContactsRequest) (*contactsv1.ListContactsResponse, error) {
+	return nil, status.Error(codes.Internal, "gateway is not configured")
+}
+func (missingGateway) GetContactState(context.Context, *contactsv1.GetContactStateRequest) (*contactsv1.GetContactStateResponse, error) {
+	return nil, status.Error(codes.Internal, "gateway is not configured")
+}
+func (missingGateway) DeleteContact(context.Context, *contactsv1.DeleteContactRequest) (*contactsv1.DeleteContactResponse, error) {
+	return nil, status.Error(codes.Internal, "gateway is not configured")
+}
+func (missingGateway) BlockContact(context.Context, *contactsv1.BlockContactRequest) (*contactsv1.BlockContactResponse, error) {
+	return nil, status.Error(codes.Internal, "gateway is not configured")
+}
+func (missingGateway) UnblockContact(context.Context, *contactsv1.UnblockContactRequest) (*contactsv1.UnblockContactResponse, error) {
+	return nil, status.Error(codes.Internal, "gateway is not configured")
+}
+func (missingGateway) UpdateContactRemark(context.Context, *contactsv1.UpdateContactRemarkRequest) (*contactsv1.UpdateContactRemarkResponse, error) {
+	return nil, status.Error(codes.Internal, "gateway is not configured")
+}
+func (missingGateway) UpdateContactGroup(context.Context, *contactsv1.UpdateContactGroupRequest) (*contactsv1.UpdateContactGroupResponse, error) {
 	return nil, status.Error(codes.Internal, "gateway is not configured")
 }
 
@@ -655,6 +947,13 @@ func conversationIDFromMessagesPath(escapedPath string) (string, error) {
 	return decoded, nil
 }
 
+func directConversationID(tenantID, currentUserID, peerUserID string) string {
+	users := []string{strings.TrimSpace(currentUserID), strings.TrimSpace(peerUserID)}
+	sort.Strings(users)
+	sum := sha256.Sum256([]byte(strings.TrimSpace(tenantID) + "\x1f" + users[0] + "\x1f" + users[1]))
+	return "direct-" + hex.EncodeToString(sum[:])[:32]
+}
+
 func int32Query(query url.Values, keys ...string) (int32, error) {
 	value := firstQuery(query, keys...)
 	if value == "" {
@@ -691,6 +990,84 @@ func firstQuery(query url.Values, keys ...string) string {
 		}
 	}
 	return ""
+}
+
+func contactRequestDirectionQuery(value string) (contactsv1.ContactRequestListDirection, error) {
+	switch normalizeContactEnumQuery(value) {
+	case "":
+		return contactsv1.ContactRequestListDirection_CONTACT_REQUEST_LIST_DIRECTION_UNSPECIFIED, nil
+	case "INCOMING", "CONTACT_REQUEST_LIST_DIRECTION_INCOMING":
+		return contactsv1.ContactRequestListDirection_CONTACT_REQUEST_LIST_DIRECTION_INCOMING, nil
+	case "OUTGOING", "CONTACT_REQUEST_LIST_DIRECTION_OUTGOING":
+		return contactsv1.ContactRequestListDirection_CONTACT_REQUEST_LIST_DIRECTION_OUTGOING, nil
+	default:
+		return contactsv1.ContactRequestListDirection_CONTACT_REQUEST_LIST_DIRECTION_UNSPECIFIED,
+			status.Error(codes.InvalidArgument, "direction is invalid")
+	}
+}
+
+func contactRequestStatusQuery(value string) (contactsv1.ContactRequestStatus, error) {
+	switch normalizeContactEnumQuery(value) {
+	case "":
+		return contactsv1.ContactRequestStatus_CONTACT_REQUEST_STATUS_UNSPECIFIED, nil
+	case "PENDING", "CONTACT_REQUEST_STATUS_PENDING":
+		return contactsv1.ContactRequestStatus_CONTACT_REQUEST_STATUS_PENDING, nil
+	case "ACCEPTED", "CONTACT_REQUEST_STATUS_ACCEPTED":
+		return contactsv1.ContactRequestStatus_CONTACT_REQUEST_STATUS_ACCEPTED, nil
+	case "DECLINED", "CONTACT_REQUEST_STATUS_DECLINED":
+		return contactsv1.ContactRequestStatus_CONTACT_REQUEST_STATUS_DECLINED, nil
+	case "CANCELED", "CONTACT_REQUEST_STATUS_CANCELED":
+		return contactsv1.ContactRequestStatus_CONTACT_REQUEST_STATUS_CANCELED, nil
+	case "EXPIRED", "CONTACT_REQUEST_STATUS_EXPIRED":
+		return contactsv1.ContactRequestStatus_CONTACT_REQUEST_STATUS_EXPIRED, nil
+	case "REVIEW_REQUIRED", "CONTACT_REQUEST_STATUS_REVIEW_REQUIRED":
+		return contactsv1.ContactRequestStatus_CONTACT_REQUEST_STATUS_REVIEW_REQUIRED, nil
+	default:
+		return contactsv1.ContactRequestStatus_CONTACT_REQUEST_STATUS_UNSPECIFIED,
+			status.Error(codes.InvalidArgument, "status is invalid")
+	}
+}
+
+func contactRequestSourceTypeQuery(value string) (contactsv1.ContactRequestSourceType, error) {
+	switch normalizeContactEnumQuery(value) {
+	case "":
+		return contactsv1.ContactRequestSourceType_CONTACT_REQUEST_SOURCE_TYPE_UNSPECIFIED, nil
+	case "DIRECT", "CONTACT_REQUEST_SOURCE_TYPE_DIRECT":
+		return contactsv1.ContactRequestSourceType_CONTACT_REQUEST_SOURCE_TYPE_DIRECT, nil
+	case "SEARCH", "CONTACT_REQUEST_SOURCE_TYPE_SEARCH":
+		return contactsv1.ContactRequestSourceType_CONTACT_REQUEST_SOURCE_TYPE_SEARCH, nil
+	case "GROUP", "CONTACT_REQUEST_SOURCE_TYPE_GROUP":
+		return contactsv1.ContactRequestSourceType_CONTACT_REQUEST_SOURCE_TYPE_GROUP, nil
+	case "INVITE_LINK", "CONTACT_REQUEST_SOURCE_TYPE_INVITE_LINK":
+		return contactsv1.ContactRequestSourceType_CONTACT_REQUEST_SOURCE_TYPE_INVITE_LINK, nil
+	case "QR_CODE", "CONTACT_REQUEST_SOURCE_TYPE_QR_CODE":
+		return contactsv1.ContactRequestSourceType_CONTACT_REQUEST_SOURCE_TYPE_QR_CODE, nil
+	case "IMPORT", "CONTACT_REQUEST_SOURCE_TYPE_IMPORT":
+		return contactsv1.ContactRequestSourceType_CONTACT_REQUEST_SOURCE_TYPE_IMPORT, nil
+	default:
+		return contactsv1.ContactRequestSourceType_CONTACT_REQUEST_SOURCE_TYPE_UNSPECIFIED,
+			status.Error(codes.InvalidArgument, "source_type_filter is invalid")
+	}
+}
+
+func contactRequestRiskLevelQuery(value string) (contactsv1.ContactRequestRiskLevel, error) {
+	switch normalizeContactEnumQuery(value) {
+	case "":
+		return contactsv1.ContactRequestRiskLevel_CONTACT_REQUEST_RISK_LEVEL_UNSPECIFIED, nil
+	case "LOW", "CONTACT_REQUEST_RISK_LEVEL_LOW":
+		return contactsv1.ContactRequestRiskLevel_CONTACT_REQUEST_RISK_LEVEL_LOW, nil
+	case "MEDIUM", "CONTACT_REQUEST_RISK_LEVEL_MEDIUM":
+		return contactsv1.ContactRequestRiskLevel_CONTACT_REQUEST_RISK_LEVEL_MEDIUM, nil
+	case "HIGH", "CONTACT_REQUEST_RISK_LEVEL_HIGH":
+		return contactsv1.ContactRequestRiskLevel_CONTACT_REQUEST_RISK_LEVEL_HIGH, nil
+	default:
+		return contactsv1.ContactRequestRiskLevel_CONTACT_REQUEST_RISK_LEVEL_UNSPECIFIED,
+			status.Error(codes.InvalidArgument, "risk_level_filter is invalid")
+	}
+}
+
+func normalizeContactEnumQuery(value string) string {
+	return strings.ToUpper(strings.TrimSpace(value))
 }
 
 func publicAuthError(err error) error {

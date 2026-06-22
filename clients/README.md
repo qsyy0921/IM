@@ -56,10 +56,56 @@ Platform-specific code implements:
 - wakeup notification bridge;
 - runtime device identity.
 
+## Current Product Surface
+
+The first client product surface is deliberately thin and service-backed:
+
+- account/password register, login, refresh, restore and logout go through `api-gateway`
+  BFF auth endpoints;
+- group creation goes through the BFF `CreateConversation` path and creates the
+  current user as the initial OWNER;
+- message display uses PullInbox-backed conversation messages;
+- sending text messages goes through the BFF `SendMessage` path;
+- WebSocket push is only an online wakeup path;
+- ACK uses the BFF `AckDelivery` path;
+- contacts/friends now use contacts-service through api-gateway BFF, covering
+  request send, accept/decline, cancel, list, remark, group, delete, block and
+  unblock actions;
+- direct friend messaging uses the BFF `/api/conversations/direct` path: the BFF
+  verifies an ACTIVE contact edge through contacts-service, then creates or
+  reuses a conversation-service `DIRECT` conversation before normal SendMessage /
+  PullInbox / AckDelivery flow continues.
+
+Invitation, member role management and group settings are not implemented in the
+client UI yet. They must be added through dedicated conversation BFF contracts
+instead of direct service-private calls.
+
 ## LAN Configuration
 
-Use the wired `172.x.x.x` address when Windows and Mac communicate over the
-direct cable.
+For local Windows desktop debugging, use the fixed local client backend wrapper:
+
+```powershell
+.\loadtest\clientweb\run-local-dev.ps1
+```
+
+It keeps the BFF and push listeners alive on:
+
+```text
+http://127.0.0.1:8080
+ws://127.0.0.1:8088/ws
+```
+
+The seeded local login is:
+
+```text
+tenant_id: tenant-client-local
+user_id: user-a
+password: ClientWebReceiverPassw0rd!
+conversation_id: conv-client-local
+```
+
+Use the wired `172.x.x.x` address only when another device or another machine
+must reach the Windows host over the direct cable.
 
 ```powershell
 $env:VITE_NEXUSIM_API_BASE="http://172.16.10.1:8080"
@@ -181,9 +227,11 @@ Current packaging status:
   `npm --prefix clients run smoke:desktop-artifact-launch` for the first launch
   sanity check; it starts the collected exe, waits briefly, then terminates it.
 - Android: native WebView shell can prepare target-specific Web assets and has
-  an APK build wrapper plus a Docker builder profile; no APK/AAB has been
-  produced yet because the local native toolchain is missing and the Docker
-  builder image has not been built in this slice.
+  an APK build wrapper plus a Docker builder profile. A first debug APK manifest
+  exists from an earlier local build, but the current PowerShell environment
+  still reports Java 8 and missing Gradle / `ANDROID_HOME` / `ANDROID_SDK_ROOT`;
+  reload the F-drive toolchain environment or explicitly use the Docker builder
+  before running the next Android build / WebView login smoke.
 - `report:artifact-readiness` prints the current low-sensitive readiness matrix
   for local desktop, local Android and Android Docker builder paths. It also
   emits `nextActions`, including the explicit Android builder image build command

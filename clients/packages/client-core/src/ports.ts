@@ -6,6 +6,11 @@ import type {
   DeliveryNotifyFrame,
   LoginRequest,
   LoginResponse,
+  RegisterRequest,
+  RegisterResponse,
+  CreateConversationRequest,
+  CreateConversationResponse,
+  OpenDirectConversationRequest,
   MessageItem,
   PullInboxRequest,
   PullInboxResponse,
@@ -15,9 +20,18 @@ import type {
 } from "@nexusim/protocol";
 
 export interface AuthAPI {
+  register(request: RegisterRequest): Promise<RegisterResponse>;
   login(request: LoginRequest): Promise<LoginResponse>;
   refresh(session: AuthSession): Promise<LoginResponse>;
   logout(session: AuthSession): Promise<void>;
+}
+
+export interface ConversationAPI {
+  createConversation(request: CreateConversationRequest, session: AuthSession): Promise<CreateConversationResponse>;
+  openDirectConversation(
+    request: OpenDirectConversationRequest,
+    session: AuthSession
+  ): Promise<CreateConversationResponse>;
 }
 
 export interface MessagingAPI {

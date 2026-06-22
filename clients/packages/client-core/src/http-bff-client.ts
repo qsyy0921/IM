@@ -3,19 +3,32 @@ import {
   type AckDeliveryRequest,
   type AckDeliveryResponse,
   type AuthSession,
+  type CancelContactRequestInput,
+  type ContactActionInput,
+  type ContactDecision,
   type ContactItem,
+  type ContactRequestItem,
+  type CreateConversationRequest,
+  type CreateConversationResponse,
+  type ListContactRequestsInput,
+  type ListContactsInput,
+  type RespondContactRequestInput,
+  type SendContactRequestInput,
   type ConversationSummary,
   type LoginRequest,
   type LoginResponse,
   type MessageItem,
+  type OpenDirectConversationRequest,
   type PublicError,
   type PublicErrorCode,
   type PullInboxRequest,
   type PullInboxResponse,
+  type RegisterRequest,
+  type RegisterResponse,
   type SendMessageRequest,
   type SendMessageResponse
 } from "@nexusim/protocol";
-import type { AuthAPI, DeliveryAPI, MessagingAPI } from "./ports";
+import type { AuthAPI, ConversationAPI, DeliveryAPI, MessagingAPI } from "./ports";
 
 interface BFFErrorPayload {
   error?: {
@@ -35,6 +48,24 @@ interface BFFLoginResponse {
   refresh_token?: string;
   gateway_expires_at_unix_ms?: string | number;
   push_gateway_expires_at_unix_ms?: string | number;
+}
+
+interface BFFRegisterResponse {
+  tenant_id?: string;
+  user_id?: string;
+  status?: string;
+  created_at_unix_ms?: string | number;
+}
+
+interface BFFCreateConversationResponse {
+  tenant_id?: string;
+  conversation_id?: string;
+  conversation_type?: string;
+  direct_peer_user_id?: string;
+  boundary_seq?: string | number;
+  member_version?: string | number;
+  permission_version?: string | number;
+  idempotent_replay?: boolean;
 }
 
 interface BFFConversationSummary {
@@ -93,11 +124,44 @@ interface BFFListContactsResponse {
   contacts?: BFFContactItem[];
 }
 
-export class BFFClient implements AuthAPI, MessagingAPI, DeliveryAPI {
+interface BFFContactRequestItem {
+  request_id?: string;
+  sender_user_id?: string;
+  receiver_user_id?: string;
+  status?: string;
+  message?: string;
+  created_at_unix_ms?: string | number;
+  updated_at_unix_ms?: string | number;
+  decided_at_unix_ms?: string | number;
+  source_type?: string;
+  source_ref?: string;
+  risk_level?: string;
+  review_required?: boolean;
+}
+
+interface BFFListContactRequestsResponse {
+  requests?: BFFContactRequestItem[];
+}
+
+export class BFFClient implements AuthAPI, ConversationAPI, MessagingAPI, DeliveryAPI {
   readonly #apiBaseURL: string;
 
   constructor(apiBaseURL: string) {
     this.#apiBaseURL = apiBaseURL.replace(/\/+$/, "");
+  }
+
+  async register(request: RegisterRequest): Promise<RegisterResponse> {
+    const response = await this.#request<BFFRegisterResponse>("POST", CLIENT_API_ENDPOINTS.register, {
+      tenant_id: request.tenantID,
+      user_id: request.userID,
+      password: request.password
+    });
+    return {
+      tenantID: requiredString(response.tenant_id, "tenant_id"),
+      userID: requiredString(response.user_id, "user_id"),
+      status: trimEnumPrefix(response.status, "USER_STATUS_") || "UNSPECIFIED",
+      createdAtMs: numberValue(response.created_at_unix_ms)
+    };
   }
 
   async login(request: LoginRequest): Promise<LoginResponse> {
@@ -158,6 +222,58 @@ export class BFFClient implements AuthAPI, MessagingAPI, DeliveryAPI {
     return (response.items ?? []).map(item => conversationSummaryFromBFF(item, session));
   }
 
+  async createConversation(
+    request: CreateConversationRequest,
+    session: AuthSession
+  ): Promise<CreateConversationResponse> {
+    const conversationID = request.conversationID ?? newClientID("group");
+    const response = await this.#request<BFFCreateConversationResponse>(
+      "POST",
+      CLIENT_API_ENDPOINTS.createConversation,
+      {
+        conversation_id: conversationID,
+        conversation_type: conversationTypeToBFF(request.type),
+        idempotency_key: request.idempotencyKey ?? newClientID("create-conversation")
+      },
+      session
+    );
+    return {
+      tenantID: requiredString(response.tenant_id, "tenant_id"),
+      conversationID: requiredString(response.conversation_id, "conversation_id"),
+      type: conversationTypeFromBFF(response.conversation_type),
+      boundarySeq: numberValue(response.boundary_seq),
+      memberVersion: numberValue(response.member_version),
+      permissionVersion: numberValue(response.permission_version),
+      idempotentReplay: response.idempotent_replay === true,
+      ...optionalDirectPeerUserID(response)
+    };
+  }
+
+  async openDirectConversation(
+    request: OpenDirectConversationRequest,
+    session: AuthSession
+  ): Promise<CreateConversationResponse> {
+    const response = await this.#request<BFFCreateConversationResponse>(
+      "POST",
+      CLIENT_API_ENDPOINTS.directConversation,
+      {
+        peer_user_id: request.peerUserID,
+        idempotency_key: request.idempotencyKey
+      },
+      session
+    );
+    return {
+      tenantID: requiredString(response.tenant_id, "tenant_id"),
+      conversationID: requiredString(response.conversation_id, "conversation_id"),
+      type: conversationTypeFromBFF(response.conversation_type),
+      boundarySeq: numberValue(response.boundary_seq),
+      memberVersion: numberValue(response.member_version),
+      permissionVersion: numberValue(response.permission_version),
+      idempotentReplay: response.idempotent_replay === true,
+      ...optionalDirectPeerUserID(response)
+    };
+  }
+
   async sendMessage(request: SendMessageRequest, session: AuthSession): Promise<SendMessageResponse> {
     const response = await this.#request<BFFSendMessageResponse>(
       "POST",
@@ -212,9 +328,123 @@ export class BFFClient implements AuthAPI, MessagingAPI, DeliveryAPI {
     };
   }
 
-  async listContacts(session: AuthSession): Promise<ContactItem[]> {
-    const response = await this.#request<BFFListContactsResponse>("GET", CLIENT_API_ENDPOINTS.contacts, undefined, session);
+  async listContacts(session: AuthSession, input: ListContactsInput = {}): Promise<ContactItem[]> {
+    const query = new URLSearchParams();
+    if (input.pageSize && input.pageSize > 0) {
+      query.set("page_size", String(input.pageSize));
+    }
+    if (input.pageToken) {
+      query.set("page_token", input.pageToken);
+    }
+    if (input.query) {
+      query.set("query", input.query);
+    }
+    if (input.groupName) {
+      query.set("group_name", input.groupName);
+    }
+    const suffix = query.toString();
+    const response = await this.#request<BFFListContactsResponse>(
+      "GET",
+      suffix ? `${CLIENT_API_ENDPOINTS.contacts}?${suffix}` : CLIENT_API_ENDPOINTS.contacts,
+      undefined,
+      session
+    );
     return (response.contacts ?? []).map(contactFromBFF);
+  }
+
+  async listContactRequests(session: AuthSession, input: ListContactRequestsInput): Promise<ContactRequestItem[]> {
+    const query = new URLSearchParams({ direction: input.direction });
+    if (input.status) {
+      query.set("status", input.status);
+    }
+    if (input.pageSize && input.pageSize > 0) {
+      query.set("page_size", String(input.pageSize));
+    }
+    if (input.pageToken) {
+      query.set("page_token", input.pageToken);
+    }
+    const response = await this.#request<BFFListContactRequestsResponse>(
+      "GET",
+      `${CLIENT_API_ENDPOINTS.contactRequests}?${query.toString()}`,
+      undefined,
+      session
+    );
+    return (response.requests ?? []).map(contactRequestFromBFF);
+  }
+
+  async sendContactRequest(session: AuthSession, input: SendContactRequestInput): Promise<void> {
+    await this.#request<unknown>(
+      "POST",
+      CLIENT_API_ENDPOINTS.sendContactRequest,
+      {
+        target_user_id: input.targetUserID,
+        idempotency_key: input.idempotencyKey ?? newClientID("contact-request"),
+        message: input.message,
+        source_type: contactSourceTypeToBFF(input.sourceType ?? "DIRECT"),
+        source_ref: input.sourceRef
+      },
+      session
+    );
+  }
+
+  async respondContactRequest(session: AuthSession, input: RespondContactRequestInput): Promise<void> {
+    await this.#request<unknown>(
+      "POST",
+      CLIENT_API_ENDPOINTS.respondContactRequest,
+      {
+        request_id: input.requestID,
+        decision: contactDecisionToBFF(input.decision),
+        idempotency_key: input.idempotencyKey ?? newClientID("contact-respond")
+      },
+      session
+    );
+  }
+
+  async cancelContactRequest(session: AuthSession, input: CancelContactRequestInput): Promise<void> {
+    await this.#request<unknown>(
+      "POST",
+      CLIENT_API_ENDPOINTS.cancelContactRequest,
+      {
+        request_id: input.requestID,
+        idempotency_key: input.idempotencyKey ?? newClientID("contact-cancel")
+      },
+      session
+    );
+  }
+
+  async deleteContact(session: AuthSession, input: ContactActionInput): Promise<void> {
+    await this.#contactAction(session, CLIENT_API_ENDPOINTS.deleteContact, input);
+  }
+
+  async blockContact(session: AuthSession, input: ContactActionInput): Promise<void> {
+    await this.#contactAction(session, CLIENT_API_ENDPOINTS.blockContact, input);
+  }
+
+  async unblockContact(session: AuthSession, input: ContactActionInput): Promise<void> {
+    await this.#contactAction(session, CLIENT_API_ENDPOINTS.unblockContact, input);
+  }
+
+  async updateContactRemark(session: AuthSession, input: ContactActionInput): Promise<void> {
+    await this.#contactAction(session, CLIENT_API_ENDPOINTS.updateContactRemark, input);
+  }
+
+  async updateContactGroup(session: AuthSession, input: ContactActionInput): Promise<void> {
+    await this.#contactAction(session, CLIENT_API_ENDPOINTS.updateContactGroup, input);
+  }
+
+  async #contactAction(session: AuthSession, path: string, input: ContactActionInput): Promise<void> {
+    await this.#request<unknown>(
+      "POST",
+      path,
+      {
+        contact_user_id: input.contactUserID,
+        idempotency_key: input.idempotencyKey ?? newClientID(`contact-${input.contactUserID}`),
+        reason: input.reason,
+        remark: input.remark,
+        group_name: input.groupName
+      },
+      session
+    );
   }
 
   async #request<T>(method: "GET" | "POST", path: string, body?: unknown, session?: AuthSession): Promise<T> {
@@ -301,6 +531,15 @@ function conversationSummaryFromBFF(item: BFFConversationSummary, session: AuthS
   };
 }
 
+function conversationTypeToBFF(value: string): string {
+  return value.startsWith("CONVERSATION_TYPE_") ? value : `CONVERSATION_TYPE_${value}`;
+}
+
+function conversationTypeFromBFF(value: string | undefined): "DIRECT" | "GROUP" {
+  const trimmed = trimEnumPrefix(value, "CONVERSATION_TYPE_");
+  return trimmed === "DIRECT" ? "DIRECT" : "GROUP";
+}
+
 function inboxItemFromBFF(item: BFFInboxItem, session: AuthSession): MessageItem {
   const payload = decodePayloadJSON(item.payload_json);
   const message: MessageItem = {
@@ -323,11 +562,53 @@ function inboxItemFromBFF(item: BFFInboxItem, session: AuthSession): MessageItem
 function contactFromBFF(item: BFFContactItem): ContactItem {
   return {
     contactUserID: requiredString(item.contact_user_id, "contact_user_id"),
-    status: item.status ?? "CONTACT_EDGE_STATUS_UNSPECIFIED",
+    status: trimEnumPrefix(item.status, "CONTACT_EDGE_STATUS_") || "UNSPECIFIED",
     remark: item.remark ?? "",
     groupName: item.group_name ?? "",
     updatedAtMs: numberValue(item.updated_at_unix_ms)
   };
+}
+
+function contactRequestFromBFF(item: BFFContactRequestItem): ContactRequestItem {
+  return {
+    requestID: requiredString(item.request_id, "request_id"),
+    senderUserID: requiredString(item.sender_user_id, "sender_user_id"),
+    receiverUserID: requiredString(item.receiver_user_id, "receiver_user_id"),
+    status: trimEnumPrefix(item.status, "CONTACT_REQUEST_STATUS_") || "UNSPECIFIED",
+    message: item.message ?? "",
+    createdAtMs: numberValue(item.created_at_unix_ms),
+    updatedAtMs: numberValue(item.updated_at_unix_ms),
+    decidedAtMs: numberValue(item.decided_at_unix_ms),
+    sourceType: trimEnumPrefix(item.source_type, "CONTACT_REQUEST_SOURCE_TYPE_") || "UNSPECIFIED",
+    sourceRef: item.source_ref ?? "",
+    riskLevel: trimEnumPrefix(item.risk_level, "CONTACT_REQUEST_RISK_LEVEL_") || "UNSPECIFIED",
+    reviewRequired: item.review_required === true
+  };
+}
+
+function contactSourceTypeToBFF(sourceType: string): string {
+  return sourceType.startsWith("CONTACT_REQUEST_SOURCE_TYPE_")
+    ? sourceType
+    : `CONTACT_REQUEST_SOURCE_TYPE_${sourceType}`;
+}
+
+function contactDecisionToBFF(decision: ContactDecision): string {
+  return decision.startsWith("CONTACT_DECISION_") ? decision : `CONTACT_DECISION_${decision}`;
+}
+
+function trimEnumPrefix(value: string | undefined, prefix: string): string {
+  if (!value) {
+    return "";
+  }
+  return value.startsWith(prefix) ? value.slice(prefix.length) : value;
+}
+
+function newClientID(prefix: string): string {
+  const normalizedPrefix = prefix.replace(/[^a-zA-Z0-9_-]+/g, "-").replace(/^-+|-+$/g, "") || "client";
+  if (globalThis.crypto?.randomUUID) {
+    return `${normalizedPrefix}-${globalThis.crypto.randomUUID()}`;
+  }
+  return `${normalizedPrefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
 function decodePayloadJSON(value: string | undefined): unknown {
@@ -335,7 +616,7 @@ function decodePayloadJSON(value: string | undefined): unknown {
     return {};
   }
   try {
-    return JSON.parse(atob(value));
+    return JSON.parse(utf8FromBase64(value));
   } catch {
     try {
       return JSON.parse(value);
@@ -343,6 +624,15 @@ function decodePayloadJSON(value: string | undefined): unknown {
       return {};
     }
   }
+}
+
+function utf8FromBase64(value: string): string {
+  const binary = atob(value);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return new TextDecoder("utf-8", { fatal: false }).decode(bytes);
 }
 
 function textFromPayload(payload: unknown): string {
@@ -384,6 +674,18 @@ function requiredString(value: string | undefined, field: string): string {
     throw publicError("SERVER_BUSY", `BFF response missing ${field}`, false);
   }
   return value;
+}
+
+function optionalString(value: string | undefined): string | undefined {
+  if (!value || value.trim() === "") {
+    return undefined;
+  }
+  return value;
+}
+
+function optionalDirectPeerUserID(response: BFFCreateConversationResponse): { directPeerUserID: string } | Record<string, never> {
+  const directPeerUserID = optionalString(response.direct_peer_user_id);
+  return directPeerUserID ? { directPeerUserID } : {};
 }
 
 function numberValue(value: string | number | undefined): number {

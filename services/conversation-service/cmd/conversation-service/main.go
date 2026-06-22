@@ -117,6 +117,7 @@ func runGRPCServer() error {
 		server,
 		grpcapi.NewServer(
 			app.NewGetSendContextUseCase(repository),
+			grpcapi.WithCreateConversation(app.NewCreateConversationUseCase(repository)),
 			grpcapi.WithCreateMemberChange(app.NewCreateMemberChangeUseCase(repository)),
 			grpcapi.WithTransferConversationOwner(app.NewTransferConversationOwnerUseCase(repository)),
 			grpcapi.WithGetMemberChange(app.NewGetMemberChangeUseCase(repository)),
@@ -639,10 +640,10 @@ func openPGPool(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
 	return pgxpool.NewWithConfig(ctx, config)
 }
 
-func envString(name string, fallback string) string {
+func envString(name string, defaultValue string) string {
 	value := strings.TrimSpace(os.Getenv(name))
 	if value == "" {
-		return fallback
+		return defaultValue
 	}
 	return value
 }
@@ -808,14 +809,14 @@ func envOptionalBool(name string) (bool, bool, error) {
 	}
 }
 
-func envInt(name string, fallback int) int {
+func envInt(name string, defaultValue int) int {
 	value := strings.TrimSpace(os.Getenv(name))
 	if value == "" {
-		return fallback
+		return defaultValue
 	}
 	parsed, err := strconv.Atoi(value)
 	if err != nil || parsed <= 0 {
-		return fallback
+		return defaultValue
 	}
 	return parsed
 }
@@ -854,14 +855,14 @@ func formatOptionalInt64(value int64, ok bool) string {
 	return strconv.FormatInt(value, 10)
 }
 
-func envDuration(name string, fallback time.Duration) time.Duration {
+func envDuration(name string, defaultValue time.Duration) time.Duration {
 	value := strings.TrimSpace(os.Getenv(name))
 	if value == "" {
-		return fallback
+		return defaultValue
 	}
 	parsed, err := time.ParseDuration(value)
 	if err != nil || parsed <= 0 {
-		return fallback
+		return defaultValue
 	}
 	return parsed
 }

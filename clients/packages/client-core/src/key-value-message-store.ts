@@ -13,7 +13,7 @@ export interface KeyValueMessageStoreOptions {
 }
 
 interface StoredSnapshot {
-  version: 1;
+  version: 2;
   messagesByKey: Record<string, MessageItem>;
   pendingKeyByLocalID: Record<string, string>;
   lastReceivedSeqByConversation: Record<string, number>;
@@ -25,7 +25,7 @@ export class KeyValueMessageStore implements LocalMessageStore {
 
   constructor(storage: StringKeyValueStorage, options: KeyValueMessageStoreOptions = {}) {
     this.#storage = storage;
-    const keyPrefix = options.keyPrefix ?? "nexusim:client-message-store:v1";
+    const keyPrefix = options.keyPrefix ?? "nexusim:client-message-store:v2";
     const namespace = options.namespace ?? "default";
     this.#storageKey = `${keyPrefix}:${namespace}`;
   }
@@ -137,11 +137,11 @@ export class KeyValueMessageStore implements LocalMessageStore {
       return emptySnapshot();
     }
     const parsed = JSON.parse(raw) as Partial<StoredSnapshot>;
-    if (parsed.version !== 1) {
+    if (parsed.version !== 2) {
       return emptySnapshot();
     }
     return {
-      version: 1,
+      version: 2,
       messagesByKey: parsed.messagesByKey ?? {},
       pendingKeyByLocalID: parsed.pendingKeyByLocalID ?? {},
       lastReceivedSeqByConversation: parsed.lastReceivedSeqByConversation ?? {}
@@ -185,7 +185,7 @@ export class MemoryStringKeyValueStorage implements StringKeyValueStorage {
 
 function emptySnapshot(): StoredSnapshot {
   return {
-    version: 1,
+    version: 2,
     messagesByKey: {},
     pendingKeyByLocalID: {},
     lastReceivedSeqByConversation: {}

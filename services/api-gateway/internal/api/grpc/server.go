@@ -245,6 +245,16 @@ func (server *Server) CreateMemberChange(ctx context.Context, request *conversat
 	return server.conversation.CreateMemberChange(outgoing, cloned)
 }
 
+func (server *Server) CreateConversation(ctx context.Context, request *conversationv1.CreateConversationRequest) (*conversationv1.CreateConversationResponse, error) {
+	auth, outgoing, err := server.authenticate(ctx)
+	if err != nil {
+		return nil, err
+	}
+	cloned := proto.Clone(request).(*conversationv1.CreateConversationRequest)
+	cloned.AuthContext = conversationAuth(auth)
+	return server.conversation.CreateConversation(outgoing, cloned)
+}
+
 func (server *Server) GetMemberChange(ctx context.Context, request *conversationv1.GetMemberChangeRequest) (*conversationv1.GetMemberChangeResponse, error) {
 	auth, outgoing, err := server.authenticate(ctx)
 	if err != nil {

@@ -38,6 +38,7 @@ assert(commands.includes("npm --prefix clients run test:web-platform"), "web pla
 assert(commands.includes("npm --prefix clients run test:local-message-store"), "local message store contract check missing");
 assert(commands.includes("npm --prefix clients run test:indexeddb-store"), "indexeddb message store contract check missing");
 assert(commands.includes("npm --prefix clients run test:key-value-store"), "key-value message store contract check missing");
+assert(commands.includes("npm --prefix clients run test:http-bff-client"), "http bff client contract check missing");
 assert(commands.includes("npm --prefix clients run test:native-store-readiness"), "native store readiness contract check missing");
 assert(commands.includes("npm --prefix clients run test:runtime-lifecycle"), "runtime lifecycle contract check missing");
 assert(commands.includes("npm --prefix clients run test:web-shell-actions"), "web shell lifecycle contract check missing");

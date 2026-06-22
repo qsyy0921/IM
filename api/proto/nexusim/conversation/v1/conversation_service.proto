@@ -6,6 +6,7 @@ option go_package = "github.com/qsyy0921/IM/api/proto/nexusim/conversation/v1;co
 
 service ConversationService {
   rpc GetSendContext(GetSendContextRequest) returns (GetSendContextResponse);
+  rpc CreateConversation(CreateConversationRequest) returns (CreateConversationResponse);
   rpc CreateMemberChange(CreateMemberChangeRequest) returns (CreateMemberChangeResponse);
   rpc GetMemberChange(GetMemberChangeRequest) returns (GetMemberChangeResponse);
   rpc ListConversationMembers(ListConversationMembersRequest) returns (ListConversationMembersResponse);
@@ -31,6 +32,12 @@ enum FanoutMode {
   FANOUT_MODE_HYBRID_FANOUT = 2;
   FANOUT_MODE_READ_FANOUT = 3;
   FANOUT_MODE_BROADCAST_SIGNAL = 4;
+}
+
+enum ConversationType {
+  CONVERSATION_TYPE_UNSPECIFIED = 0;
+  CONVERSATION_TYPE_DIRECT = 1;
+  CONVERSATION_TYPE_GROUP = 2;
 }
 
 enum MemberChangeType {
@@ -93,6 +100,25 @@ message AuthContext {
   string session_id = 4;
   string trace_id = 5;
   string request_id = 6;
+}
+
+message CreateConversationRequest {
+  AuthContext auth_context = 1;
+  string conversation_id = 2;
+  ConversationType conversation_type = 3;
+  string idempotency_key = 4;
+  string direct_peer_user_id = 5;
+}
+
+message CreateConversationResponse {
+  string tenant_id = 1;
+  string conversation_id = 2;
+  ConversationType conversation_type = 3;
+  int64 boundary_seq = 4;
+  int64 member_version = 5;
+  int64 permission_version = 6;
+  bool idempotent_replay = 7;
+  string direct_peer_user_id = 8;
 }
 
 message CreateMemberChangeRequest {

@@ -6,6 +6,14 @@
     sans-serif;
 }
 
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -26,8 +34,10 @@ button {
 .shell {
   display: grid;
   grid-template-columns: 64px minmax(280px, 360px) minmax(0, 1fr);
-  height: 100vh;
-  min-height: 640px;
+  width: 100%;
+  height: 100dvh;
+  min-height: 0;
+  min-width: 0;
   overflow: hidden;
   background: #edf2f4;
 }
@@ -209,13 +219,248 @@ button {
 }
 
 .conversation-list {
+  display: grid;
+  align-content: start;
+  gap: 12px;
   min-width: 0;
   overflow: auto;
-  padding: 8px;
+  padding: 10px;
+}
+
+.list-section {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  border: 1px solid #d8e0e4;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 10px;
+}
+
+.list-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.list-section-header h2,
+.list-section-header p,
+.message-list-header h3,
+.message-list-header p {
+  margin: 0;
+}
+
+.list-section-header h2 {
+  color: #172126;
+  font-size: 14px;
+  line-height: 1.25;
+}
+
+.list-section-header p,
+.message-list-header p {
+  color: #6b7a83;
+  font-size: 12px;
+}
+
+.list-section-header button,
+.message-list-header button {
+  flex: none;
+  border: 1px solid #cbd6dc;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #2f3d45;
+  padding: 7px 10px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.compact-list,
+.friend-list {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.group-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.group-form input {
+  min-width: 0;
+  border: 1px solid #cbd6dc;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #182126;
+  outline: 0;
+  padding: 9px 10px;
+}
+
+.group-form button {
+  border: 0;
+  border-radius: 8px;
+  background: #19b37c;
+  color: #ffffff;
+  padding: 9px 12px;
+  font-weight: 800;
+}
+
+.contacts-panel,
+.settings-panel {
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  padding: 10px;
+}
+
+.contacts-toolbar,
+.contact-form {
+  display: grid;
+  gap: 8px;
+}
+
+.contacts-toolbar {
+  grid-template-columns: minmax(0, 1fr) minmax(88px, 0.5fr) auto;
+}
+
+.contact-form {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  margin-top: 10px;
+}
+
+.contacts-toolbar input,
+.contact-form input,
+.contact-item input {
+  min-width: 0;
+  border: 1px solid #cbd6dc;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #182126;
+  outline: 0;
+  padding: 9px 10px;
+}
+
+.contacts-toolbar button,
+.contact-form button,
+.contact-actions button,
+.request-item button {
+  border: 0;
+  border-radius: 8px;
+  background: #19b37c;
+  color: #ffffff;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.contact-section-title {
+  margin: 16px 2px 8px;
+  color: #33434a;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.contacts-error {
+  margin-top: 10px;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  background: #fff1f2;
+  color: #9f1239;
+  padding: 9px 10px;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.request-list,
+.contact-list {
+  display: grid;
+  gap: 8px;
+}
+
+.request-item,
+.contact-item {
+  display: grid;
+  gap: 10px;
+  border: 1px solid #d8e0e4;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 10px;
+}
+
+.request-item {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.request-item div,
+.contact-item header {
+  min-width: 0;
+}
+
+.request-item strong,
+.request-item span,
+.contact-item strong,
+.contact-item small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.request-item span,
+.contact-item small,
+.contact-item label {
+  color: #6b7a83;
+  font-size: 12px;
+}
+
+.contact-item header {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+}
+
+.contact-item label {
+  display: grid;
+  gap: 5px;
+}
+
+.contact-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.contact-actions .ghost-button,
+.request-item .ghost-button {
+  border: 1px solid #cbd6dc;
+  background: #ffffff;
+  color: #2f3d45;
+}
+
+.contact-actions .danger-button {
+  background: #fff1f2;
+  color: #9f1239;
+}
+
+.mini-empty {
+  border: 1px dashed #cbd6dc;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #6b7a83;
+  padding: 12px;
+  text-align: center;
+  font-size: 13px;
 }
 
 .conversation-empty {
-  margin: 8px;
   border: 1px dashed #cbd6dc;
   border-radius: 8px;
   background: #ffffff;
@@ -266,6 +511,49 @@ button {
   white-space: nowrap;
 }
 
+.friend-item {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  border-radius: 8px;
+  background: #f8fafb;
+  padding: 9px;
+}
+
+.friend-status {
+  border: 1px solid #a7f3d0;
+  border-radius: 999px;
+  background: #ecfdf5;
+  color: #047857;
+  padding: 4px 7px;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.friend-status.blocked {
+  border-color: #fecaca;
+  background: #fff1f2;
+  color: #9f1239;
+}
+
+.friend-message-button {
+  min-width: 58px;
+  border: 1px solid #cbd6dc;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #2f3d45;
+  padding: 7px 9px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.friend-message-button:disabled {
+  opacity: 0.45;
+}
+
 .automation-controls,
 .automation-input,
 .system-probes {
@@ -288,6 +576,7 @@ button {
 .chat-header {
   min-height: 72px;
   padding: 14px 22px;
+  min-width: 0;
 }
 
 .chat-title {
@@ -306,6 +595,7 @@ button {
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 6px;
+  min-width: 0;
   max-width: 44%;
 }
 
@@ -333,6 +623,33 @@ button {
   padding: 10px 22px;
   font-size: 13px;
   font-weight: 800;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.message-panel {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.message-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex: none;
+  border-bottom: 1px solid #d8e0e4;
+  background: rgba(255, 255, 255, 0.58);
+  padding: 12px 22px;
+}
+
+.message-list-header h3 {
+  color: #172126;
+  font-size: 14px;
+  line-height: 1.25;
 }
 
 .messages {
@@ -486,6 +803,17 @@ button {
 
   .conversation-item {
     min-width: 220px;
+  }
+
+  .contacts-panel,
+  .settings-panel {
+    max-height: 44vh;
+  }
+
+  .contacts-toolbar,
+  .contact-form,
+  .request-item {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .chat {

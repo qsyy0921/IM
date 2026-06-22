@@ -81,6 +81,8 @@ func RouteName(request *http.Request) string {
 		return "health"
 	case request.Method == http.MethodPost && path == "/api/auth/login":
 		return "auth.login"
+	case request.Method == http.MethodPost && path == "/api/auth/register":
+		return "auth.register"
 	case request.Method == http.MethodPost && path == "/api/auth/refresh":
 		return "auth.refresh"
 	case request.Method == http.MethodPost && path == "/api/auth/logout":
@@ -89,14 +91,38 @@ func RouteName(request *http.Request) string {
 		return "me"
 	case request.Method == http.MethodGet && path == "/api/conversations":
 		return "conversations.list"
+	case request.Method == http.MethodPost && path == "/api/conversations/create":
+		return "conversations.create"
+	case request.Method == http.MethodPost && path == "/api/conversations/direct":
+		return "conversations.direct"
 	case request.Method == http.MethodGet && isConversationMessagesPath(request.URL.EscapedPath()):
 		return "conversation.messages"
 	case request.Method == http.MethodPost && path == "/api/messages/send":
 		return "messages.send"
 	case request.Method == http.MethodPost && path == "/api/delivery/ack":
 		return "delivery.ack"
+	case request.Method == http.MethodGet && path == "/api/contact-requests":
+		return "contact_requests.list"
+	case request.Method == http.MethodPost && path == "/api/contact-requests/send":
+		return "contact_requests.send"
+	case request.Method == http.MethodPost && path == "/api/contact-requests/respond":
+		return "contact_requests.respond"
+	case request.Method == http.MethodPost && path == "/api/contact-requests/cancel":
+		return "contact_requests.cancel"
 	case request.Method == http.MethodGet && path == "/api/contacts":
 		return "contacts.list"
+	case request.Method == http.MethodGet && path == "/api/contacts/state":
+		return "contacts.state"
+	case request.Method == http.MethodPost && path == "/api/contacts/delete":
+		return "contacts.delete"
+	case request.Method == http.MethodPost && path == "/api/contacts/block":
+		return "contacts.block"
+	case request.Method == http.MethodPost && path == "/api/contacts/unblock":
+		return "contacts.unblock"
+	case request.Method == http.MethodPost && path == "/api/contacts/remark":
+		return "contacts.remark"
+	case request.Method == http.MethodPost && path == "/api/contacts/group":
+		return "contacts.group"
 	case request.Method == http.MethodGet && path == "/api/receipts":
 		return "receipts.list"
 	default:

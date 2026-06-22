@@ -4,7 +4,16 @@ param(
     [string]$ResultRoot = "H:\NexusIM\loadtest-results",
     [string]$BindHost = "127.0.0.1",
     [string]$ClientHost = "",
+    [int]$BffPort = 0,
+    [int]$PushPort = 0,
+    [string]$ClientTenantId = "",
+    [string]$ClientConversationId = "",
+    [string]$ClientSenderUserId = "",
+    [string]$ClientSenderPassword = "",
+    [string]$ClientReceiverUserId = "",
+    [string]$ClientReceiverPassword = "",
     [string]$RunName = "",
+    [switch]$KeepAlive,
     [switch]$SkipBuild,
     [switch]$RunDesktopWebViewLoginSmoke,
     [switch]$DesktopWebViewSkipWebBuild,
@@ -41,6 +50,25 @@ $senderPassword = "ClientWebSenderPassw0rd!"
 $receiverPassword = "ClientWebReceiverPassw0rd!"
 $gatewayAuthSecret = "client-web-gateway-secret-$safeRunName"
 
+if (-not [string]::IsNullOrWhiteSpace($ClientTenantId)) {
+    $tenantId = $ClientTenantId
+}
+if (-not [string]::IsNullOrWhiteSpace($ClientConversationId)) {
+    $conversationId = $ClientConversationId
+}
+if (-not [string]::IsNullOrWhiteSpace($ClientSenderUserId)) {
+    $senderUserId = $ClientSenderUserId
+}
+if (-not [string]::IsNullOrWhiteSpace($ClientSenderPassword)) {
+    $senderPassword = $ClientSenderPassword
+}
+if (-not [string]::IsNullOrWhiteSpace($ClientReceiverUserId)) {
+    $receiverUserId = $ClientReceiverUserId
+}
+if (-not [string]::IsNullOrWhiteSpace($ClientReceiverPassword)) {
+    $receiverPassword = $ClientReceiverPassword
+}
+
 $resultDir = Join-Path $ResultRoot $RunName
 $logDir = Join-Path $resultDir "logs"
 New-Item -ItemType Directory -Force $resultDir | Out-Null
@@ -53,6 +81,26 @@ function Get-FreeTcpPort {
     try {
         $listener.Start()
         return $listener.LocalEndpoint.Port
+    } finally {
+        $listener.Stop()
+    }
+}
+
+function Assert-TcpPortAvailable {
+    param(
+        [string]$HostName,
+        [int]$Port,
+        [string]$Name
+    )
+    if ($Port -le 0) {
+        return
+    }
+    $bindAddress = [System.Net.IPAddress]::Parse($HostName)
+    $listener = [System.Net.Sockets.TcpListener]::new($bindAddress, $Port)
+    try {
+        $listener.Start()
+    } catch {
+        throw "$Name port ${HostName}:${Port} is already in use"
     } finally {
         $listener.Stop()
     }
@@ -174,6 +222,7 @@ function Reset-ConsumerGroupToLatest {
 if (-not $SkipBuild) {
     go build -o bin\identity-service.exe ./services/identity-service/cmd/identity-service
     go build -o bin\conversation-service.exe ./services/conversation-service/cmd/conversation-service
+    go build -o bin\contacts-service.exe ./services/contacts-service/cmd/contacts-service
     go build -o bin\message-service.exe ./services/message-service/cmd/message-service
     go build -o bin\delivery-service.exe ./services/delivery-service/cmd/delivery-service
     go build -o bin\receipt-service.exe ./services/receipt-service/cmd/receipt-service
@@ -184,15 +233,19 @@ if (-not $SkipBuild) {
 
 $identityPort = Get-FreeTcpPort -HostName $BindHost
 $conversationPort = Get-FreeTcpPort -HostName $BindHost
+$contactsPort = Get-FreeTcpPort -HostName $BindHost
 $messagePort = Get-FreeTcpPort -HostName $BindHost
 $deliveryPort = Get-FreeTcpPort -HostName $BindHost
 $receiptPort = Get-FreeTcpPort -HostName $BindHost
-$pushPort = Get-FreeTcpPort -HostName $BindHost
+Assert-TcpPortAvailable -HostName $BindHost -Port $PushPort -Name "push-gateway"
+Assert-TcpPortAvailable -HostName $BindHost -Port $BffPort -Name "client BFF"
+$pushPort = if ($PushPort -gt 0) { $PushPort } else { Get-FreeTcpPort -HostName $BindHost }
 $apiGatewayPort = Get-FreeTcpPort -HostName $BindHost
-$bffPort = Get-FreeTcpPort -HostName $BindHost
+$bffPort = if ($BffPort -gt 0) { $BffPort } else { Get-FreeTcpPort -HostName $BindHost }
 
 $identityListen = "${BindHost}:$identityPort"
 $conversationListen = "${BindHost}:$conversationPort"
+$contactsListen = "${BindHost}:$contactsPort"
 $messageListen = "${BindHost}:$messagePort"
 $deliveryListen = "${BindHost}:$deliveryPort"
 $receiptListen = "${BindHost}:$receiptPort"
@@ -202,6 +255,7 @@ $bffListen = "${BindHost}:$bffPort"
 
 $identityTarget = "${ClientHost}:$identityPort"
 $conversationTarget = "${ClientHost}:$conversationPort"
+$contactsTarget = "${ClientHost}:$contactsPort"
 $messageTarget = "${ClientHost}:$messagePort"
 $deliveryTarget = "${ClientHost}:$deliveryPort"
 $receiptTarget = "${ClientHost}:$receiptPort"
@@ -237,6 +291,9 @@ try {
     foreach ($migration in Get-ChildItem -Path "migrations\postgres\identity" -Filter "*.sql" | Sort-Object Name) {
         Apply-PostgresMigration -Path $migration.FullName -Name ("nexusim_identity_" + $migration.Name)
     }
+    foreach ($migration in Get-ChildItem -Path "migrations\postgres\contacts" -Filter "*.sql" | Sort-Object Name) {
+        Apply-PostgresMigration -Path $migration.FullName -Name ("nexusim_contacts_" + $migration.Name)
+    }
 
     Ensure-KafkaTopic -Topic $timelineTopic
     Ensure-KafkaTopic -Topic $deliveryTopic
@@ -248,6 +305,7 @@ try {
 
     $identityService = Join-Path $repo "bin\identity-service.exe"
     $conversationService = Join-Path $repo "bin\conversation-service.exe"
+    $contactsService = Join-Path $repo "bin\contacts-service.exe"
     $messageService = Join-Path $repo "bin\message-service.exe"
     $deliveryService = Join-Path $repo "bin\delivery-service.exe"
     $receiptService = Join-Path $repo "bin\receipt-service.exe"
@@ -267,6 +325,12 @@ try {
         NEXUSIM_CONVERSATION_SERVICE_MODE = "grpc"
         NEXUSIM_CONVERSATION_GRPC_ADDR = $conversationListen
         NEXUSIM_CONVERSATION_AUTH_MODE = "metadata"
+        NEXUSIM_PG_DSN = $PgDsn
+    }
+    $processes += Start-NexusProcess -Name "contacts-grpc" -FilePath $contactsService -Port $contactsPort -WaitHost $ClientHost -Env @{
+        NEXUSIM_CONTACTS_SERVICE_MODE = "grpc"
+        NEXUSIM_CONTACTS_GRPC_ADDR = $contactsListen
+        NEXUSIM_CONTACTS_AUTH_MODE = "metadata"
         NEXUSIM_PG_DSN = $PgDsn
     }
     $processes += Start-NexusProcess -Name "delivery-timeline-consumer" -FilePath $deliveryService -Env @{
@@ -337,6 +401,7 @@ try {
         NEXUSIM_API_GATEWAY_REGISTER_LEGACY_DESCRIPTORS = "false"
         NEXUSIM_API_GATEWAY_IDENTITY_ADDR = $identityTarget
         NEXUSIM_API_GATEWAY_CONVERSATION_ADDR = $conversationTarget
+        NEXUSIM_API_GATEWAY_CONTACTS_ADDR = $contactsTarget
         NEXUSIM_API_GATEWAY_MESSAGE_ADDR = $messageTarget
         NEXUSIM_API_GATEWAY_DELIVERY_ADDR = $deliveryTarget
         NEXUSIM_API_GATEWAY_RECEIPT_ADDR = $receiptTarget
@@ -458,9 +523,16 @@ try {
         }
     }
 } finally {
-    foreach ($proc in $processes) {
-        if ($null -ne $proc -and -not $proc.HasExited) {
-            Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+    if ($KeepAlive) {
+        $runningProcessIds = @($processes | Where-Object { $null -ne $_ -and -not $_.HasExited } | ForEach-Object { $_.Id })
+        Write-Host "keep_alive=true"
+        Write-Host ("process_ids=" + ($runningProcessIds -join ","))
+        Write-Host "logs=$logDir"
+    } else {
+        foreach ($proc in $processes) {
+            if ($null -ne $proc -and -not $proc.HasExited) {
+                Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+            }
         }
     }
 }
@@ -470,6 +542,9 @@ Write-Host "bind_host=$BindHost"
 Write-Host "client_host=$ClientHost"
 Write-Host "bff_base_url=$bffBaseURL"
 Write-Host "push_url=$pushURL"
+Write-Host "tenant_id=$tenantId"
+Write-Host "receiver_user_id=$receiverUserId"
+Write-Host "conversation_id=$conversationId"
 Write-Host "timeline_topic=$timelineTopic"
 Write-Host "delivery_topic=$deliveryTopic"
 Write-Host "delivery_consumer_group=$deliveryConsumerGroup"

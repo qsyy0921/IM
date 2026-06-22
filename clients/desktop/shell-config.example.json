@@ -1,7 +1,7 @@
 {
   "target": "windows-desktop",
-  "apiBaseURL": "http://172.31.50.1:8080",
-  "pushWebSocketURL": "ws://172.31.50.1:8088/ws",
+  "apiBaseURL": "http://127.0.0.1:8080",
+  "pushWebSocketURL": "ws://127.0.0.1:8088/ws",
   "deviceID": "desktop-local-device",
   "installationID": "desktop:windows:desktop-local-device",
   "appVersion": "0.1.0",

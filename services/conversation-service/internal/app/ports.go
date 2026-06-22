@@ -10,6 +10,10 @@ type ConversationRepository interface {
 	GetSendContext(ctx context.Context, command types.GetSendContextCommand) (types.ConversationSendContext, error)
 }
 
+type CreateConversationRepository interface {
+	CreateConversation(ctx context.Context, command types.CreateConversationCommand) (types.CreateConversationResult, error)
+}
+
 type CreateMemberChangeRepository interface {
 	CreateMemberChange(ctx context.Context, command types.CreateMemberChangeCommand) (types.MemberChangeResult, error)
 }

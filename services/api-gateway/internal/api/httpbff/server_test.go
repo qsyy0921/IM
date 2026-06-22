@@ -9,6 +9,7 @@ import (
 	"time"
 
 	contactsv1 "github.com/qsyy0921/IM/api/proto/nexusim/contacts/v1"
+	conversationv1 "github.com/qsyy0921/IM/api/proto/nexusim/conversation/v1"
 	deliveryv1 "github.com/qsyy0921/IM/api/proto/nexusim/delivery/v1"
 	identityv1 "github.com/qsyy0921/IM/api/proto/nexusim/identity/v1"
 	messagev1 "github.com/qsyy0921/IM/api/proto/nexusim/message/v1"
@@ -63,6 +64,38 @@ func TestLoginEndpointUsesProtoJSON(t *testing.T) {
 	}
 }
 
+func TestRegisterEndpointForwardsPublicIdentityRequest(t *testing.T) {
+	gateway := &fakeGateway{
+		registerUser: func(_ context.Context, request *identityv1.RegisterUserRequest) (*identityv1.RegisterUserResponse, error) {
+			if request.GetTenantId() != "tenant-1" || request.GetUserId() != "user-new" || request.GetPassword() != "pw" {
+				t.Fatalf("unexpected register request: %+v", request)
+			}
+			return &identityv1.RegisterUserResponse{
+				TenantId:        request.GetTenantId(),
+				UserId:          request.GetUserId(),
+				Status:          identityv1.UserStatus_USER_STATUS_ACTIVE,
+				CreatedAtUnixMs: 11,
+			}, nil
+		},
+	}
+	handler := NewServer(Config{Gateway: gateway})
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/auth/register", strings.NewReader(`{
+		"tenant_id":"tenant-1",
+		"user_id":"user-new",
+		"password":"pw"
+	}`))
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+	if !strings.Contains(response.Body.String(), `"user_id":"user-new"`) {
+		t.Fatalf("expected register response, got %s", response.Body.String())
+	}
+}
+
 func TestSendMessageForwardsAuthMetadata(t *testing.T) {
 	gateway := &fakeGateway{
 		sendMessage: func(ctx context.Context, request *messagev1.SendMessageRequest) (*messagev1.SendMessageResponse, error) {
@@ -104,6 +137,150 @@ func TestSendMessageForwardsAuthMetadata(t *testing.T) {
 	}
 	if !strings.Contains(response.Body.String(), `"conversation_seq":"7"`) {
 		t.Fatalf("expected int64 proto json string response, got %s", response.Body.String())
+	}
+}
+
+func TestCreateConversationEndpointForwardsRequest(t *testing.T) {
+	gateway := &fakeGateway{
+		createConversation: func(ctx context.Context, request *conversationv1.CreateConversationRequest) (*conversationv1.CreateConversationResponse, error) {
+			md, ok := metadata.FromIncomingContext(ctx)
+			if !ok || firstMetadata(md, "authorization") != "Bearer token-1" {
+				t.Fatalf("expected auth metadata, got %+v", md)
+			}
+			if request.GetConversationId() != "group-1" ||
+				request.GetConversationType() != conversationv1.ConversationType_CONVERSATION_TYPE_GROUP ||
+				request.GetIdempotencyKey() != "idem-1" {
+				t.Fatalf("unexpected create conversation request: %+v", request)
+			}
+			return &conversationv1.CreateConversationResponse{
+				TenantId:          "tenant-1",
+				ConversationId:    request.GetConversationId(),
+				ConversationType:  request.GetConversationType(),
+				BoundarySeq:       1,
+				MemberVersion:     1,
+				PermissionVersion: 1,
+			}, nil
+		},
+	}
+	handler := NewServer(Config{Gateway: gateway})
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/conversations/create", strings.NewReader(`{
+		"conversation_id":"group-1",
+		"conversation_type":"CONVERSATION_TYPE_GROUP",
+		"idempotency_key":"idem-1"
+	}`))
+	request.Header.Set("Authorization", "Bearer token-1")
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+	if !strings.Contains(response.Body.String(), `"boundary_seq":"1"`) {
+		t.Fatalf("expected create conversation response, got %s", response.Body.String())
+	}
+}
+
+func TestOpenDirectConversationRequiresActiveContact(t *testing.T) {
+	authenticator := &fakeAuthenticator{auth: gatewayauth.AuthContext{
+		TenantID:  "tenant-1",
+		UserID:    "user-a",
+		DeviceID:  "web-1",
+		SessionID: "session-1",
+	}}
+	expectedConversationID := directConversationID("tenant-1", "user-a", "user-b")
+	gateway := &fakeGateway{
+		getContactState: func(ctx context.Context, request *contactsv1.GetContactStateRequest) (*contactsv1.GetContactStateResponse, error) {
+			md, ok := metadata.FromIncomingContext(ctx)
+			if !ok || firstMetadata(md, "authorization") != "Bearer token-1" {
+				t.Fatalf("expected forwarded auth metadata, got %+v", md)
+			}
+			if request.GetOtherUserId() != "user-b" {
+				t.Fatalf("unexpected contact state request: %+v", request)
+			}
+			return &contactsv1.GetContactStateResponse{
+				TenantId:      "tenant-1",
+				OwnerUserId:   "user-a",
+				ContactUserId: "user-b",
+				Status:        contactsv1.ContactEdgeStatus_CONTACT_EDGE_STATUS_ACTIVE,
+			}, nil
+		},
+		createConversation: func(ctx context.Context, request *conversationv1.CreateConversationRequest) (*conversationv1.CreateConversationResponse, error) {
+			md, ok := metadata.FromIncomingContext(ctx)
+			if !ok || firstMetadata(md, "authorization") != "Bearer token-1" {
+				t.Fatalf("expected forwarded auth metadata, got %+v", md)
+			}
+			if request.GetConversationId() != expectedConversationID ||
+				request.GetConversationType() != conversationv1.ConversationType_CONVERSATION_TYPE_DIRECT ||
+				request.GetDirectPeerUserId() != "user-b" ||
+				request.GetIdempotencyKey() != "direct:"+expectedConversationID {
+				t.Fatalf("unexpected direct create request: %+v", request)
+			}
+			return &conversationv1.CreateConversationResponse{
+				TenantId:          "tenant-1",
+				ConversationId:    expectedConversationID,
+				ConversationType:  request.GetConversationType(),
+				DirectPeerUserId:  request.GetDirectPeerUserId(),
+				BoundarySeq:       2,
+				MemberVersion:     2,
+				PermissionVersion: 2,
+			}, nil
+		},
+	}
+	handler := NewServer(Config{Gateway: gateway, Authenticator: authenticator})
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/conversations/direct", strings.NewReader(`{
+		"peer_user_id":"user-b"
+	}`))
+	request.Header.Set("Authorization", "Bearer token-1")
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+	if !strings.Contains(response.Body.String(), `"conversation_id":"`+expectedConversationID+`"`) ||
+		!strings.Contains(response.Body.String(), `"direct_peer_user_id":"user-b"`) {
+		t.Fatalf("expected direct conversation response, got %s", response.Body.String())
+	}
+}
+
+func TestOpenDirectConversationRejectsInactiveContact(t *testing.T) {
+	authenticator := &fakeAuthenticator{auth: gatewayauth.AuthContext{
+		TenantID:  "tenant-1",
+		UserID:    "user-a",
+		DeviceID:  "web-1",
+		SessionID: "session-1",
+	}}
+	createCalled := false
+	gateway := &fakeGateway{
+		getContactState: func(context.Context, *contactsv1.GetContactStateRequest) (*contactsv1.GetContactStateResponse, error) {
+			return &contactsv1.GetContactStateResponse{
+				TenantId:      "tenant-1",
+				OwnerUserId:   "user-a",
+				ContactUserId: "user-b",
+				Status:        contactsv1.ContactEdgeStatus_CONTACT_EDGE_STATUS_DELETED,
+			}, nil
+		},
+		createConversation: func(context.Context, *conversationv1.CreateConversationRequest) (*conversationv1.CreateConversationResponse, error) {
+			createCalled = true
+			return &conversationv1.CreateConversationResponse{}, nil
+		},
+	}
+	handler := NewServer(Config{Gateway: gateway, Authenticator: authenticator})
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/conversations/direct", strings.NewReader(`{
+		"peer_user_id":"user-b"
+	}`))
+	request.Header.Set("Authorization", "Bearer token-1")
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusForbidden {
+		t.Fatalf("expected forbidden, got status=%d body=%s", response.Code, response.Body.String())
+	}
+	if createCalled {
+		t.Fatalf("create conversation should not be called for inactive contact")
 	}
 }
 
@@ -295,6 +472,91 @@ func TestGatewayErrorMapsToHTTPStatus(t *testing.T) {
 	}
 }
 
+func TestListContactRequestsMapsQueryEnums(t *testing.T) {
+	gateway := &fakeGateway{
+		listContactRequests: func(_ context.Context, request *contactsv1.ListContactRequestsRequest) (*contactsv1.ListContactRequestsResponse, error) {
+			if request.GetDirection() != contactsv1.ContactRequestListDirection_CONTACT_REQUEST_LIST_DIRECTION_INCOMING {
+				t.Fatalf("direction=%v", request.GetDirection())
+			}
+			if request.GetStatus() != contactsv1.ContactRequestStatus_CONTACT_REQUEST_STATUS_PENDING {
+				t.Fatalf("status=%v", request.GetStatus())
+			}
+			if request.GetPageSize() != 20 || request.GetPageToken() != "cursor-1" {
+				t.Fatalf("unexpected paging: %+v", request)
+			}
+			return &contactsv1.ListContactRequestsResponse{
+				TenantId:  "tenant-1",
+				UserId:    "user-1",
+				Direction: request.GetDirection(),
+				Status:    request.GetStatus(),
+				Requests: []*contactsv1.ContactRequestItem{{
+					RequestId:      "request-1",
+					SenderUserId:   "user-b",
+					ReceiverUserId: "user-1",
+					Status:         request.GetStatus(),
+				}},
+			}, nil
+		},
+	}
+	handler := NewServer(Config{Gateway: gateway})
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/api/contact-requests?direction=incoming&status=pending&page_size=20&page_token=cursor-1", nil)
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+	if !strings.Contains(response.Body.String(), `"direction":"CONTACT_REQUEST_LIST_DIRECTION_INCOMING"`) ||
+		!strings.Contains(response.Body.String(), `"request_id":"request-1"`) {
+		t.Fatalf("expected contact request list response, got %s", response.Body.String())
+	}
+}
+
+func TestSendContactRequestForwardsProtoJSON(t *testing.T) {
+	gateway := &fakeGateway{
+		sendContactRequest: func(ctx context.Context, request *contactsv1.SendContactRequestRequest) (*contactsv1.SendContactRequestResponse, error) {
+			if request.GetTargetUserId() != "user-b" ||
+				request.GetIdempotencyKey() != "idem-1" ||
+				request.GetMessage() != "hello" ||
+				request.GetSourceType() != contactsv1.ContactRequestSourceType_CONTACT_REQUEST_SOURCE_TYPE_DIRECT {
+				t.Fatalf("unexpected contact request: %+v", request)
+			}
+			md, ok := metadata.FromIncomingContext(ctx)
+			if !ok || firstMetadata(md, "authorization") != "Bearer token-1" {
+				t.Fatalf("expected forwarded auth metadata, got %+v", md)
+			}
+			return &contactsv1.SendContactRequestResponse{
+				RequestId:      "request-1",
+				TenantId:       "tenant-1",
+				SenderUserId:   "user-a",
+				ReceiverUserId: "user-b",
+				Status:         contactsv1.ContactRequestStatus_CONTACT_REQUEST_STATUS_PENDING,
+				SourceType:     request.GetSourceType(),
+			}, nil
+		},
+	}
+	handler := NewServer(Config{Gateway: gateway})
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/contact-requests/send", strings.NewReader(`{
+		"target_user_id":"user-b",
+		"idempotency_key":"idem-1",
+		"message":"hello",
+		"source_type":"CONTACT_REQUEST_SOURCE_TYPE_DIRECT"
+	}`))
+	request.Header.Set("Authorization", "Bearer token-1")
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+	if !strings.Contains(response.Body.String(), `"request_id":"request-1"`) ||
+		!strings.Contains(response.Body.String(), `"status":"CONTACT_REQUEST_STATUS_PENDING"`) {
+		t.Fatalf("expected send contact request response, got %s", response.Body.String())
+	}
+}
+
 func TestHTTPBFFMetricsRecordsLowCardinalityRoute(t *testing.T) {
 	metrics := &fakeMetricsRecorder{}
 	handler := NewServer(Config{Metrics: metrics})
@@ -358,16 +620,35 @@ func TestRateLimiterRejectsBFFRequestBeforeGatewayCall(t *testing.T) {
 }
 
 type fakeGateway struct {
-	login             func(context.Context, *identityv1.LoginRequest) (*identityv1.LoginResponse, error)
-	refresh           func(context.Context, *identityv1.RefreshGatewayTokenRequest) (*identityv1.RefreshGatewayTokenResponse, error)
-	issueGatewayToken func(context.Context, *identityv1.IssueGatewayTokenRequest) (*identityv1.IssueGatewayTokenResponse, error)
-	revokeSession     func(context.Context, *identityv1.RevokeSessionRequest) (*identityv1.RevokeSessionResponse, error)
-	sendMessage       func(context.Context, *messagev1.SendMessageRequest) (*messagev1.SendMessageResponse, error)
-	pullInbox         func(context.Context, *deliveryv1.PullInboxRequest) (*deliveryv1.PullInboxResponse, error)
-	ackDelivery       func(context.Context, *deliveryv1.AckDeliveryRequest) (*deliveryv1.AckDeliveryResponse, error)
-	listConversations func(context.Context, *receiptv1.ListConversationsRequest) (*receiptv1.ListConversationsResponse, error)
-	listReceiptStates func(context.Context, *receiptv1.ListReceiptStatesRequest) (*receiptv1.ListReceiptStatesResponse, error)
-	listContacts      func(context.Context, *contactsv1.ListContactsRequest) (*contactsv1.ListContactsResponse, error)
+	registerUser          func(context.Context, *identityv1.RegisterUserRequest) (*identityv1.RegisterUserResponse, error)
+	login                 func(context.Context, *identityv1.LoginRequest) (*identityv1.LoginResponse, error)
+	refresh               func(context.Context, *identityv1.RefreshGatewayTokenRequest) (*identityv1.RefreshGatewayTokenResponse, error)
+	issueGatewayToken     func(context.Context, *identityv1.IssueGatewayTokenRequest) (*identityv1.IssueGatewayTokenResponse, error)
+	revokeSession         func(context.Context, *identityv1.RevokeSessionRequest) (*identityv1.RevokeSessionResponse, error)
+	createConversation    func(context.Context, *conversationv1.CreateConversationRequest) (*conversationv1.CreateConversationResponse, error)
+	sendMessage           func(context.Context, *messagev1.SendMessageRequest) (*messagev1.SendMessageResponse, error)
+	pullInbox             func(context.Context, *deliveryv1.PullInboxRequest) (*deliveryv1.PullInboxResponse, error)
+	ackDelivery           func(context.Context, *deliveryv1.AckDeliveryRequest) (*deliveryv1.AckDeliveryResponse, error)
+	listConversations     func(context.Context, *receiptv1.ListConversationsRequest) (*receiptv1.ListConversationsResponse, error)
+	listReceiptStates     func(context.Context, *receiptv1.ListReceiptStatesRequest) (*receiptv1.ListReceiptStatesResponse, error)
+	sendContactRequest    func(context.Context, *contactsv1.SendContactRequestRequest) (*contactsv1.SendContactRequestResponse, error)
+	respondContactRequest func(context.Context, *contactsv1.RespondContactRequestRequest) (*contactsv1.RespondContactRequestResponse, error)
+	cancelContactRequest  func(context.Context, *contactsv1.CancelContactRequestRequest) (*contactsv1.CancelContactRequestResponse, error)
+	listContactRequests   func(context.Context, *contactsv1.ListContactRequestsRequest) (*contactsv1.ListContactRequestsResponse, error)
+	listContacts          func(context.Context, *contactsv1.ListContactsRequest) (*contactsv1.ListContactsResponse, error)
+	getContactState       func(context.Context, *contactsv1.GetContactStateRequest) (*contactsv1.GetContactStateResponse, error)
+	deleteContact         func(context.Context, *contactsv1.DeleteContactRequest) (*contactsv1.DeleteContactResponse, error)
+	blockContact          func(context.Context, *contactsv1.BlockContactRequest) (*contactsv1.BlockContactResponse, error)
+	unblockContact        func(context.Context, *contactsv1.UnblockContactRequest) (*contactsv1.UnblockContactResponse, error)
+	updateContactRemark   func(context.Context, *contactsv1.UpdateContactRemarkRequest) (*contactsv1.UpdateContactRemarkResponse, error)
+	updateContactGroup    func(context.Context, *contactsv1.UpdateContactGroupRequest) (*contactsv1.UpdateContactGroupResponse, error)
+}
+
+func (gateway *fakeGateway) RegisterUser(ctx context.Context, request *identityv1.RegisterUserRequest) (*identityv1.RegisterUserResponse, error) {
+	if gateway.registerUser == nil {
+		return nil, status.Error(codes.Unimplemented, "register user not implemented")
+	}
+	return gateway.registerUser(ctx, request)
 }
 
 func (gateway *fakeGateway) Login(ctx context.Context, request *identityv1.LoginRequest) (*identityv1.LoginResponse, error) {
@@ -396,6 +677,13 @@ func (gateway *fakeGateway) RevokeSession(ctx context.Context, request *identity
 		return nil, status.Error(codes.Unimplemented, "revoke session not implemented")
 	}
 	return gateway.revokeSession(ctx, request)
+}
+
+func (gateway *fakeGateway) CreateConversation(ctx context.Context, request *conversationv1.CreateConversationRequest) (*conversationv1.CreateConversationResponse, error) {
+	if gateway.createConversation == nil {
+		return nil, status.Error(codes.Unimplemented, "create conversation not implemented")
+	}
+	return gateway.createConversation(ctx, request)
 }
 
 func (gateway *fakeGateway) SendMessage(ctx context.Context, request *messagev1.SendMessageRequest) (*messagev1.SendMessageResponse, error) {
@@ -433,11 +721,81 @@ func (gateway *fakeGateway) ListReceiptStates(ctx context.Context, request *rece
 	return gateway.listReceiptStates(ctx, request)
 }
 
+func (gateway *fakeGateway) SendContactRequest(ctx context.Context, request *contactsv1.SendContactRequestRequest) (*contactsv1.SendContactRequestResponse, error) {
+	if gateway.sendContactRequest == nil {
+		return nil, status.Error(codes.Unimplemented, "send contact request not implemented")
+	}
+	return gateway.sendContactRequest(ctx, request)
+}
+
+func (gateway *fakeGateway) RespondContactRequest(ctx context.Context, request *contactsv1.RespondContactRequestRequest) (*contactsv1.RespondContactRequestResponse, error) {
+	if gateway.respondContactRequest == nil {
+		return nil, status.Error(codes.Unimplemented, "respond contact request not implemented")
+	}
+	return gateway.respondContactRequest(ctx, request)
+}
+
+func (gateway *fakeGateway) CancelContactRequest(ctx context.Context, request *contactsv1.CancelContactRequestRequest) (*contactsv1.CancelContactRequestResponse, error) {
+	if gateway.cancelContactRequest == nil {
+		return nil, status.Error(codes.Unimplemented, "cancel contact request not implemented")
+	}
+	return gateway.cancelContactRequest(ctx, request)
+}
+
+func (gateway *fakeGateway) ListContactRequests(ctx context.Context, request *contactsv1.ListContactRequestsRequest) (*contactsv1.ListContactRequestsResponse, error) {
+	if gateway.listContactRequests == nil {
+		return nil, status.Error(codes.Unimplemented, "list contact requests not implemented")
+	}
+	return gateway.listContactRequests(ctx, request)
+}
+
 func (gateway *fakeGateway) ListContacts(ctx context.Context, request *contactsv1.ListContactsRequest) (*contactsv1.ListContactsResponse, error) {
 	if gateway.listContacts == nil {
 		return nil, status.Error(codes.Unimplemented, "list contacts not implemented")
 	}
 	return gateway.listContacts(ctx, request)
+}
+
+func (gateway *fakeGateway) GetContactState(ctx context.Context, request *contactsv1.GetContactStateRequest) (*contactsv1.GetContactStateResponse, error) {
+	if gateway.getContactState == nil {
+		return nil, status.Error(codes.Unimplemented, "get contact state not implemented")
+	}
+	return gateway.getContactState(ctx, request)
+}
+
+func (gateway *fakeGateway) DeleteContact(ctx context.Context, request *contactsv1.DeleteContactRequest) (*contactsv1.DeleteContactResponse, error) {
+	if gateway.deleteContact == nil {
+		return nil, status.Error(codes.Unimplemented, "delete contact not implemented")
+	}
+	return gateway.deleteContact(ctx, request)
+}
+
+func (gateway *fakeGateway) BlockContact(ctx context.Context, request *contactsv1.BlockContactRequest) (*contactsv1.BlockContactResponse, error) {
+	if gateway.blockContact == nil {
+		return nil, status.Error(codes.Unimplemented, "block contact not implemented")
+	}
+	return gateway.blockContact(ctx, request)
+}
+
+func (gateway *fakeGateway) UnblockContact(ctx context.Context, request *contactsv1.UnblockContactRequest) (*contactsv1.UnblockContactResponse, error) {
+	if gateway.unblockContact == nil {
+		return nil, status.Error(codes.Unimplemented, "unblock contact not implemented")
+	}
+	return gateway.unblockContact(ctx, request)
+}
+
+func (gateway *fakeGateway) UpdateContactRemark(ctx context.Context, request *contactsv1.UpdateContactRemarkRequest) (*contactsv1.UpdateContactRemarkResponse, error) {
+	if gateway.updateContactRemark == nil {
+		return nil, status.Error(codes.Unimplemented, "update contact remark not implemented")
+	}
+	return gateway.updateContactRemark(ctx, request)
+}
+
+func (gateway *fakeGateway) UpdateContactGroup(ctx context.Context, request *contactsv1.UpdateContactGroupRequest) (*contactsv1.UpdateContactGroupResponse, error) {
+	if gateway.updateContactGroup == nil {
+		return nil, status.Error(codes.Unimplemented, "update contact group not implemented")
+	}
+	return gateway.updateContactGroup(ctx, request)
 }
 
 type fakeAuthenticator struct {

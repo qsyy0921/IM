@@ -1,8 +1,8 @@
 import type { ConversationID, MessageItem, SendMessageResponse } from "@nexusim/protocol";
 import type { LocalMessageStore } from "@nexusim/client-core";
 
-const DB_NAME = "nexusim-web-client";
-const DB_VERSION = 1;
+const DB_NAME = "nexusim-web-client-v2";
+const DB_VERSION = 2;
 const MESSAGE_STORE = "messages";
 const CURSOR_STORE = "cursors";
 
@@ -142,8 +142,13 @@ export class IndexedDBMessageStore implements LocalMessageStore {
 function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
-    request.onupgradeneeded = () => {
+    request.onupgradeneeded = event => {
       const db = request.result;
+      const oldVersion = event?.oldVersion ?? 0;
+      if (oldVersion > 0 && oldVersion < 2) {
+        deleteStoreIfExists(db, MESSAGE_STORE);
+        deleteStoreIfExists(db, CURSOR_STORE);
+      }
       if (!db.objectStoreNames.contains(MESSAGE_STORE)) {
         const store = db.createObjectStore(MESSAGE_STORE, { keyPath: "localKey" });
         store.createIndex("clientMessageID", "clientMessageID", { unique: false });
@@ -156,6 +161,12 @@ function openDB(): Promise<IDBDatabase> {
     request.onerror = () => reject(request.error ?? new Error("open indexeddb failed"));
     request.onsuccess = () => resolve(request.result);
   });
+}
+
+function deleteStoreIfExists(db: IDBDatabase, storeName: string): void {
+  if (db.objectStoreNames.contains(storeName)) {
+    db.deleteObjectStore(storeName);
+  }
 }
 
 function txDone(

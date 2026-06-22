@@ -43,7 +43,7 @@ try {
   for (const action of ["login", "refresh", "restoreSession", "logout"]) {
     assert(bundleText.includes(action), `android shell bundle missing lifecycle action ${action}`);
   }
-  assert(bundleText.includes("PullInbox"), "android shell bundle must keep PullInbox as the display fact source");
+  assert(bundleText.includes("pullInbox"), "android shell bundle must keep PullInbox as the display fact source");
 
   const serializedManifest = readFileSync(join(androidAssets, "nexusim-shell-assets-manifest.json"), "utf8");
   for (const path of ["manifest.webmanifest", "nexusim-sw.js", "pwa-icon.svg"]) {

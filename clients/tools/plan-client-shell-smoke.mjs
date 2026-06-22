@@ -42,6 +42,11 @@ function browserTarget() {
         evidence: "Web shell binds login, refresh, restore and logout through shared ClientShellActions"
       },
       {
+        step: "verify-browser-pwa-contract",
+        command: "npm --prefix clients run test:web-pwa",
+        evidence: "Browser PWA manifest and service worker cache boundary are guarded before browser shell smoke"
+      },
+      {
         step: "start-shared-backend-smoke",
         command: "loadtest/clientweb/run-local-smoke.ps1 -BindHost 127.0.0.1 -ClientHost 127.0.0.1",
         evidence: "clientweb summary shows BFF login, push hello, SendMessage, PullInbox and AckDelivery"

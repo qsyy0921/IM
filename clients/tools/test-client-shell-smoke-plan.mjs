@@ -23,6 +23,8 @@ assert(plan.targets.browser.readyForManualShellSmoke === true, "browser shell sm
 assert(plan.targets.browser.launchCommand.includes("dev:web"), "browser launch command missing");
 assert(Array.isArray(plan.targets.browser.checklist) && plan.targets.browser.checklist.length >= 3, "browser checklist missing");
 assert(plan.targets.browser.checklist.some(item => item.step === "verify-shell-lifecycle-contract"), "browser shell lifecycle contract check missing");
+assert(plan.targets.browser.checklist.some(item => item.step === "verify-browser-pwa-contract"), "browser PWA contract check missing");
+assert(plan.targets.browser.checklist.some(item => item.command === "npm --prefix clients run test:web-pwa"), "browser PWA test command missing");
 assert(plan.targets.browser.checklist.some(item => item.step === "verify-client-flow"), "browser flow verification missing");
 assert(plan.targets["windows-desktop"].commands.prepareAssets.includes("build:shell-assets:desktop"), "desktop prep command missing");
 assert(plan.targets["windows-desktop"].commands.verifyAssets.includes("windows-desktop"), "desktop verify command missing");

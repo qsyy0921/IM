@@ -121,7 +121,8 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   `windows-desktop` 与 Android WebView target 会跳过 service worker。service
   worker 只缓存 same-origin shell 静态资源，显式绕过 `/api/`、`/ws`、
   `nexusim-shell-config.js` 和自身脚本，不缓存 token、session、BFF response 或
-  WebSocket 数据。
+  WebSocket 数据。`npm --prefix clients run plan:shell-smoke` 也已把该检查列入
+  browser checklist，确保 browser shell smoke 前先验证 PWA cache boundary。
 - `clients` workspace 已新增 Android shell action asset contract：
   `npm --prefix clients run test:android-shell-action-assets` 会临时构建 Web
   shell、按 Android shell config 准备临时 WebView assets、校验 shell asset

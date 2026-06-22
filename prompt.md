@@ -1,8 +1,8 @@
 # NexusIM Agent Entry
 
 本文件是 NexusIM 的项目入口和文档路由说明，只维护可持续更新的
-项目事实、阶段目标、架构边界、工作原则和待办清单。
-不要在本文件保存任何 UI 短提示正文、历史副本或临时粘贴内容。
+项目事实、架构边界、工作原则和待办清单入口。
+不要在本文件保存临时粘贴内容、历史副本或具体切片正文。
 
 Codex 每轮仍应读取本文件，因为这里维护的是文档入口和工作原则。具体 active
 slice、推进策略、架构边界、优先级和阶段结论由对应进度文档维护。
@@ -14,8 +14,6 @@ slice、推进策略、架构边界、优先级和阶段结论由对应进度文
   `docs/architecture/target-architecture-complete.md`。
 - 根目录 `README.md` 是 GitHub 首页总览，阶段、架构、客户端能力、新服务、
   新中间件或下一步状态变化时必须同步维护。
-- Codex UI 中的临时短提示可能更新不及时；若它和仓库文档冲突，以
-  `current-goal.md` / `current-brief.md` / `remaining-goals.md` 为准。
 - `agent.md` 决定按需读取和维护哪些项目文档；阶段细节见 `docs/runbook/current-brief.md`。
 - 未完成工作见 `docs/runbook/remaining-goals.md`；单服务状态见 `docs/runbook/service-briefs/<service>.md`。
 

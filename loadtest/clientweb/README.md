@@ -18,6 +18,10 @@ surfaces as the Web / PC shell:
 - `GET /api/contacts/state`
 - `POST /api/conversations/direct`
 - `POST /api/conversations/create`
+- `GET /api/conversations/{conversation_id}/members`
+- `POST /api/conversations/{conversation_id}/members/role`
+- `POST /api/conversations/{conversation_id}/owner/transfer`
+- `POST /api/conversations/{conversation_id}/members/remove`
 - `POST /api/messages/send`
 - `GET /api/conversations/{conversation_id}/messages`
 - `GET /api/conversations`
@@ -30,6 +34,8 @@ It verifies two user-visible conversations in one run:
   through push + PullInbox + ACK;
 - group conversation created -> receiver joined -> group message visible through
   push + PullInbox + ACK.
+- group membership actions through BFF: active member list -> role change ->
+  owner transfer -> remove previous owner -> final active member list.
 
 It does not read private service tables for product behavior. PostgreSQL is used
 only by the loadtest for setup cleanup and final invariant checks.

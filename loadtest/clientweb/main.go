@@ -138,6 +138,11 @@ func runClientWebSmoke(ctx context.Context, cfg config, result *summary) error {
 	group.MemberChangeID = join.GetChangeId()
 	group.MemberBoundarySeq = join.GetBoundarySeq()
 	result.GroupChat = group
+	memberActions, err := runGroupMemberActions(ctx, cfg, sender, receiver, groupID)
+	if err != nil {
+		return fmt.Errorf("group member actions: %w", err)
+	}
+	result.GroupMemberActions = memberActions
 	result.Success = true
 	return nil
 }
@@ -440,6 +445,310 @@ func bffCreateGroupConversation(ctx context.Context, cfg config, session authSes
 		return "", fmt.Errorf("BFF group conversation returned invalid response: %+v", response)
 	}
 	return response.ConversationID, nil
+}
+
+func runGroupMemberActions(
+	ctx context.Context,
+	cfg config,
+	sender authSession,
+	receiver authSession,
+	conversationID string,
+) (groupMemberActionsSummary, error) {
+	var result groupMemberActionsSummary
+	initial, err := waitGroupMemberRole(ctx, cfg, sender, conversationID, cfg.receiverUserID, "MEMBER_ROLE_MEMBER")
+	if err != nil {
+		return result, fmt.Errorf("initial member list: %w", err)
+	}
+	if err := requireGroupMemberRole(initial, cfg.senderUserID, "MEMBER_ROLE_OWNER"); err != nil {
+		return result, err
+	}
+	result.Initial = initial
+
+	roleChange, err := bffUpdateGroupMemberRole(ctx, cfg, sender, conversationID, cfg.receiverUserID, "ADMIN", initial.MemberVersion)
+	if err != nil {
+		return result, fmt.Errorf("role change receiver to admin: %w", err)
+	}
+	result.RoleChange = roleChange
+	afterRole, err := waitGroupMemberRole(ctx, cfg, sender, conversationID, cfg.receiverUserID, "MEMBER_ROLE_ADMIN")
+	if err != nil {
+		return result, fmt.Errorf("after role change member list: %w", err)
+	}
+	result.AfterRoleChange = afterRole
+
+	transfer, err := bffTransferGroupOwner(ctx, cfg, sender, conversationID, cfg.receiverUserID, afterRole.MemberVersion)
+	if err != nil {
+		return result, fmt.Errorf("transfer owner to receiver: %w", err)
+	}
+	result.OwnerTransfer = transfer
+	afterTransfer, err := waitGroupMemberRole(ctx, cfg, receiver, conversationID, cfg.receiverUserID, "MEMBER_ROLE_OWNER")
+	if err != nil {
+		return result, fmt.Errorf("after owner transfer member list: %w", err)
+	}
+	if err := requireGroupMemberRole(afterTransfer, cfg.senderUserID, "MEMBER_ROLE_ADMIN"); err != nil {
+		return result, err
+	}
+	result.AfterTransfer = afterTransfer
+
+	removed, err := bffRemoveGroupMember(ctx, cfg, receiver, conversationID, cfg.senderUserID, afterTransfer.MemberVersion)
+	if err != nil {
+		return result, fmt.Errorf("remove previous owner: %w", err)
+	}
+	result.RemoveMember = removed
+	final, err := waitGroupMemberAbsent(ctx, cfg, receiver, conversationID, cfg.senderUserID)
+	if err != nil {
+		return result, fmt.Errorf("final member list: %w", err)
+	}
+	if err := requireGroupMemberRole(final, cfg.receiverUserID, "MEMBER_ROLE_OWNER"); err != nil {
+		return result, err
+	}
+	result.Final = final
+	return result, nil
+}
+
+func waitGroupMemberRole(ctx context.Context, cfg config, session authSession, conversationID string, userID string, role string) (groupMemberListSummary, error) {
+	deadline := time.Now().Add(cfg.waitTimeout)
+	var last groupMemberListSummary
+	for {
+		list, err := bffListGroupMembers(ctx, cfg, session, conversationID)
+		if err != nil {
+			return groupMemberListSummary{}, err
+		}
+		last = list
+		if hasGroupMemberRole(list, userID, role) {
+			return list, nil
+		}
+		if time.Now().After(deadline) {
+			return last, fmt.Errorf("member %s did not reach role %s", userID, role)
+		}
+		time.Sleep(cfg.pollInterval)
+	}
+}
+
+func waitGroupMemberAbsent(ctx context.Context, cfg config, session authSession, conversationID string, userID string) (groupMemberListSummary, error) {
+	deadline := time.Now().Add(cfg.waitTimeout)
+	var last groupMemberListSummary
+	for {
+		list, err := bffListGroupMembers(ctx, cfg, session, conversationID)
+		if err != nil {
+			return groupMemberListSummary{}, err
+		}
+		last = list
+		if !hasGroupMember(list, userID) {
+			return list, nil
+		}
+		if time.Now().After(deadline) {
+			return last, fmt.Errorf("member %s still appears in active member list", userID)
+		}
+		time.Sleep(cfg.pollInterval)
+	}
+}
+
+func bffListGroupMembers(ctx context.Context, cfg config, session authSession, conversationID string) (groupMemberListSummary, error) {
+	var response struct {
+		ConversationID    string          `json:"conversation_id"`
+		MemberVersion     json.RawMessage `json:"member_version"`
+		PermissionVersion json.RawMessage `json:"permission_version"`
+		Members           []struct {
+			UserID            string          `json:"user_id"`
+			Role              string          `json:"role"`
+			Status            string          `json:"status"`
+			JoinSeq           json.RawMessage `json:"join_seq"`
+			LeaveSeq          json.RawMessage `json:"leave_seq"`
+			MemberVersion     json.RawMessage `json:"member_version"`
+			PermissionVersion json.RawMessage `json:"permission_version"`
+		} `json:"members"`
+	}
+	path := fmt.Sprintf("/api/conversations/%s/members?page_size=100", url.PathEscape(conversationID))
+	if err := bffJSON(ctx, cfg, http.MethodGet, path, session.GatewayToken, nil, &response); err != nil {
+		return groupMemberListSummary{}, err
+	}
+	if response.ConversationID != conversationID {
+		return groupMemberListSummary{}, fmt.Errorf("BFF members returned conversation_id %s, want %s", response.ConversationID, conversationID)
+	}
+	memberVersion, err := int64JSON(response.MemberVersion)
+	if err != nil {
+		return groupMemberListSummary{}, fmt.Errorf("parse member version: %w", err)
+	}
+	permissionVersion, err := int64JSON(response.PermissionVersion)
+	if err != nil {
+		return groupMemberListSummary{}, fmt.Errorf("parse permission version: %w", err)
+	}
+	result := groupMemberListSummary{
+		ConversationID:    response.ConversationID,
+		MemberVersion:     memberVersion,
+		PermissionVersion: permissionVersion,
+		Members:           []groupMemberSummaryMember{},
+	}
+	for _, item := range response.Members {
+		joinSeq, err := int64JSON(item.JoinSeq)
+		if err != nil {
+			return groupMemberListSummary{}, fmt.Errorf("parse join seq: %w", err)
+		}
+		leaveSeq, err := int64JSON(item.LeaveSeq)
+		if err != nil {
+			return groupMemberListSummary{}, fmt.Errorf("parse leave seq: %w", err)
+		}
+		itemMemberVersion, err := int64JSON(item.MemberVersion)
+		if err != nil {
+			return groupMemberListSummary{}, fmt.Errorf("parse item member version: %w", err)
+		}
+		itemPermissionVersion, err := int64JSON(item.PermissionVersion)
+		if err != nil {
+			return groupMemberListSummary{}, fmt.Errorf("parse item permission version: %w", err)
+		}
+		result.Members = append(result.Members, groupMemberSummaryMember{
+			UserID:            item.UserID,
+			Role:              item.Role,
+			Status:            item.Status,
+			JoinSeq:           joinSeq,
+			LeaveSeq:          leaveSeq,
+			MemberVersion:     itemMemberVersion,
+			PermissionVersion: itemPermissionVersion,
+		})
+	}
+	result.ItemCount = len(result.Members)
+	return result, nil
+}
+
+func bffUpdateGroupMemberRole(ctx context.Context, cfg config, session authSession, conversationID string, targetUserID string, targetRole string, expectedMemberVersion int64) (memberActionSummary, error) {
+	var response struct {
+		ChangeID      string          `json:"change_id"`
+		TargetUserID  string          `json:"target_user_id"`
+		ChangeType    string          `json:"change_type"`
+		Status        string          `json:"status"`
+		MemberVersion json.RawMessage `json:"member_version"`
+		BoundarySeq   json.RawMessage `json:"boundary_seq"`
+	}
+	path := fmt.Sprintf("/api/conversations/%s/members/role", url.PathEscape(conversationID))
+	err := bffJSON(ctx, cfg, http.MethodPost, path, session.GatewayToken, map[string]any{
+		"target_user_id":          targetUserID,
+		"target_role":             targetRole,
+		"expected_member_version": expectedMemberVersion,
+		"idempotency_key":         "client-web-smoke-role-" + conversationID + "-" + targetUserID + "-" + targetRole,
+		"reason":                  "client web smoke role change",
+	}, &response)
+	if err != nil {
+		return memberActionSummary{}, err
+	}
+	if response.TargetUserID != targetUserID || response.ChangeType != "MEMBER_CHANGE_TYPE_ROLE_CHANGED" {
+		return memberActionSummary{}, fmt.Errorf("BFF role change returned invalid response: %+v", response)
+	}
+	return memberActionFromBFF(response.ChangeID, response.TargetUserID, response.ChangeType, response.Status, response.MemberVersion, response.BoundarySeq)
+}
+
+func bffRemoveGroupMember(ctx context.Context, cfg config, session authSession, conversationID string, targetUserID string, expectedMemberVersion int64) (memberActionSummary, error) {
+	var response struct {
+		ChangeID      string          `json:"change_id"`
+		TargetUserID  string          `json:"target_user_id"`
+		ChangeType    string          `json:"change_type"`
+		Status        string          `json:"status"`
+		MemberVersion json.RawMessage `json:"member_version"`
+		BoundarySeq   json.RawMessage `json:"boundary_seq"`
+	}
+	path := fmt.Sprintf("/api/conversations/%s/members/remove", url.PathEscape(conversationID))
+	err := bffJSON(ctx, cfg, http.MethodPost, path, session.GatewayToken, map[string]any{
+		"target_user_id":          targetUserID,
+		"expected_member_version": expectedMemberVersion,
+		"idempotency_key":         "client-web-smoke-remove-" + conversationID + "-" + targetUserID,
+		"reason":                  "client web smoke remove previous owner",
+	}, &response)
+	if err != nil {
+		return memberActionSummary{}, err
+	}
+	if response.TargetUserID != targetUserID || response.ChangeType != "MEMBER_CHANGE_TYPE_REMOVE" {
+		return memberActionSummary{}, fmt.Errorf("BFF remove returned invalid response: %+v", response)
+	}
+	return memberActionFromBFF(response.ChangeID, response.TargetUserID, response.ChangeType, response.Status, response.MemberVersion, response.BoundarySeq)
+}
+
+func bffTransferGroupOwner(ctx context.Context, cfg config, session authSession, conversationID string, newOwnerUserID string, expectedMemberVersion int64) (ownerTransferSummary, error) {
+	var response struct {
+		ChangeID            string          `json:"change_id"`
+		PreviousOwnerUserID string          `json:"previous_owner_user_id"`
+		NewOwnerUserID      string          `json:"new_owner_user_id"`
+		Status              string          `json:"status"`
+		MemberVersion       json.RawMessage `json:"member_version"`
+		BoundarySeq         json.RawMessage `json:"boundary_seq"`
+	}
+	path := fmt.Sprintf("/api/conversations/%s/owner/transfer", url.PathEscape(conversationID))
+	err := bffJSON(ctx, cfg, http.MethodPost, path, session.GatewayToken, map[string]any{
+		"new_owner_user_id":       newOwnerUserID,
+		"expected_member_version": expectedMemberVersion,
+		"idempotency_key":         "client-web-smoke-owner-transfer-" + conversationID + "-" + newOwnerUserID,
+		"reason":                  "client web smoke owner transfer",
+	}, &response)
+	if err != nil {
+		return ownerTransferSummary{}, err
+	}
+	if response.PreviousOwnerUserID != session.UserID || response.NewOwnerUserID != newOwnerUserID {
+		return ownerTransferSummary{}, fmt.Errorf("BFF owner transfer returned invalid response: %+v", response)
+	}
+	memberVersion, err := int64JSON(response.MemberVersion)
+	if err != nil {
+		return ownerTransferSummary{}, fmt.Errorf("parse transfer member version: %w", err)
+	}
+	boundarySeq, err := int64JSON(response.BoundarySeq)
+	if err != nil {
+		return ownerTransferSummary{}, fmt.Errorf("parse transfer boundary seq: %w", err)
+	}
+	if response.ChangeID == "" || memberVersion <= 0 || boundarySeq <= 0 {
+		return ownerTransferSummary{}, fmt.Errorf("BFF owner transfer returned incomplete response: %+v", response)
+	}
+	return ownerTransferSummary{
+		ChangeID:            response.ChangeID,
+		PreviousOwnerUserID: response.PreviousOwnerUserID,
+		NewOwnerUserID:      response.NewOwnerUserID,
+		Status:              response.Status,
+		MemberVersion:       memberVersion,
+		BoundarySeq:         boundarySeq,
+	}, nil
+}
+
+func memberActionFromBFF(changeID string, targetUserID string, changeType string, statusValue string, rawMemberVersion json.RawMessage, rawBoundarySeq json.RawMessage) (memberActionSummary, error) {
+	memberVersion, err := int64JSON(rawMemberVersion)
+	if err != nil {
+		return memberActionSummary{}, fmt.Errorf("parse action member version: %w", err)
+	}
+	boundarySeq, err := int64JSON(rawBoundarySeq)
+	if err != nil {
+		return memberActionSummary{}, fmt.Errorf("parse action boundary seq: %w", err)
+	}
+	if changeID == "" || memberVersion <= 0 || boundarySeq <= 0 {
+		return memberActionSummary{}, fmt.Errorf("BFF member action returned incomplete response: change_id=%s member_version=%d boundary_seq=%d", changeID, memberVersion, boundarySeq)
+	}
+	return memberActionSummary{
+		ChangeID:      changeID,
+		TargetUserID:  targetUserID,
+		ChangeType:    changeType,
+		Status:        statusValue,
+		MemberVersion: memberVersion,
+		BoundarySeq:   boundarySeq,
+	}, nil
+}
+
+func requireGroupMemberRole(list groupMemberListSummary, userID string, role string) error {
+	if hasGroupMemberRole(list, userID, role) {
+		return nil
+	}
+	return fmt.Errorf("member %s does not have role %s in %+v", userID, role, list.Members)
+}
+
+func hasGroupMemberRole(list groupMemberListSummary, userID string, role string) bool {
+	for _, member := range list.Members {
+		if member.UserID == userID && member.Role == role && member.Status == "MEMBER_STATUS_ACTIVE" {
+			return true
+		}
+	}
+	return false
+}
+
+func hasGroupMember(list groupMemberListSummary, userID string) bool {
+	for _, member := range list.Members {
+		if member.UserID == userID {
+			return true
+		}
+	}
+	return false
 }
 
 func runConversationScenario(

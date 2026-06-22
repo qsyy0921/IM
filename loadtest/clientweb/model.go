@@ -3,28 +3,29 @@ package main
 import "time"
 
 type summary struct {
-	Commit              string          `json:"commit"`
-	CommitFull          string          `json:"commit_full"`
-	GitDirty            bool            `json:"git_dirty"`
-	ResultDir           string          `json:"result_dir"`
-	TenantID            string          `json:"tenant_id"`
-	GroupConversationID string          `json:"group_conversation_id"`
-	SenderUserID        string          `json:"sender_user_id"`
-	ReceiverUserID      string          `json:"receiver_user_id"`
-	ReceiverDevice      string          `json:"receiver_device_id"`
-	BFFBaseURL          string          `json:"bff_base_url"`
-	PushURL             string          `json:"push_url"`
-	StartedAt           time.Time       `json:"started_at"`
-	FinishedAt          time.Time       `json:"finished_at"`
-	Success             bool            `json:"success"`
-	Error               string          `json:"error,omitempty"`
-	Setup               setupSummary    `json:"setup"`
-	Contact             contactSummary  `json:"contact"`
-	SenderLogin         loginSummary    `json:"sender_login"`
-	ReceiverLogin       loginSummary    `json:"receiver_login"`
-	ServerHello         serverFrame     `json:"server_hello"`
-	DirectChat          scenarioSummary `json:"direct_chat"`
-	GroupChat           scenarioSummary `json:"group_chat"`
+	Commit              string                    `json:"commit"`
+	CommitFull          string                    `json:"commit_full"`
+	GitDirty            bool                      `json:"git_dirty"`
+	ResultDir           string                    `json:"result_dir"`
+	TenantID            string                    `json:"tenant_id"`
+	GroupConversationID string                    `json:"group_conversation_id"`
+	SenderUserID        string                    `json:"sender_user_id"`
+	ReceiverUserID      string                    `json:"receiver_user_id"`
+	ReceiverDevice      string                    `json:"receiver_device_id"`
+	BFFBaseURL          string                    `json:"bff_base_url"`
+	PushURL             string                    `json:"push_url"`
+	StartedAt           time.Time                 `json:"started_at"`
+	FinishedAt          time.Time                 `json:"finished_at"`
+	Success             bool                      `json:"success"`
+	Error               string                    `json:"error,omitempty"`
+	Setup               setupSummary              `json:"setup"`
+	Contact             contactSummary            `json:"contact"`
+	SenderLogin         loginSummary              `json:"sender_login"`
+	ReceiverLogin       loginSummary              `json:"receiver_login"`
+	ServerHello         serverFrame               `json:"server_hello"`
+	DirectChat          scenarioSummary           `json:"direct_chat"`
+	GroupChat           scenarioSummary           `json:"group_chat"`
+	GroupMemberActions  groupMemberActionsSummary `json:"group_member_actions"`
 }
 
 type setupSummary struct {
@@ -49,6 +50,52 @@ type scenarioSummary struct {
 	ListConversations conversationSummary `json:"list_conversations"`
 	AckDelivery       ackSummary          `json:"ack_delivery"`
 	Postgres          postgresSummary     `json:"postgres"`
+}
+
+type groupMemberActionsSummary struct {
+	Initial         groupMemberListSummary `json:"initial"`
+	RoleChange      memberActionSummary    `json:"role_change"`
+	AfterRoleChange groupMemberListSummary `json:"after_role_change"`
+	OwnerTransfer   ownerTransferSummary   `json:"owner_transfer"`
+	AfterTransfer   groupMemberListSummary `json:"after_transfer"`
+	RemoveMember    memberActionSummary    `json:"remove_member"`
+	Final           groupMemberListSummary `json:"final"`
+}
+
+type groupMemberListSummary struct {
+	ConversationID    string                     `json:"conversation_id"`
+	MemberVersion     int64                      `json:"member_version"`
+	PermissionVersion int64                      `json:"permission_version"`
+	ItemCount         int                        `json:"item_count"`
+	Members           []groupMemberSummaryMember `json:"members"`
+}
+
+type groupMemberSummaryMember struct {
+	UserID            string `json:"user_id"`
+	Role              string `json:"role"`
+	Status            string `json:"status"`
+	JoinSeq           int64  `json:"join_seq"`
+	LeaveSeq          int64  `json:"leave_seq"`
+	MemberVersion     int64  `json:"member_version"`
+	PermissionVersion int64  `json:"permission_version"`
+}
+
+type memberActionSummary struct {
+	ChangeID      string `json:"change_id"`
+	TargetUserID  string `json:"target_user_id"`
+	ChangeType    string `json:"change_type"`
+	Status        string `json:"status"`
+	MemberVersion int64  `json:"member_version"`
+	BoundarySeq   int64  `json:"boundary_seq"`
+}
+
+type ownerTransferSummary struct {
+	ChangeID            string `json:"change_id"`
+	PreviousOwnerUserID string `json:"previous_owner_user_id"`
+	NewOwnerUserID      string `json:"new_owner_user_id"`
+	Status              string `json:"status"`
+	MemberVersion       int64  `json:"member_version"`
+	BoundarySeq         int64  `json:"boundary_seq"`
 }
 
 type loginSummary struct {

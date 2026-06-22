@@ -135,8 +135,12 @@ First slice:
   after send, and gateway-token-expired cleanup that clears the local session
   and asks the user to log in again. Group membership facts still come from
   conversation-service through BFF; the shell does not keep a fake member list.
-  Remaining group product work is member search / pagination, richer group
-  settings, avatar / title read models and real multi-user UI smoke coverage.
+  `loadtest/clientweb` now also verifies group member list, role change,
+  owner transfer, remove member and final member list through the same public
+  BFF surface. The first WIP real smoke for that path passed on 2026-06-23 with
+  `git_dirty=true`; a clean committed baseline rerun remains pending. Remaining
+  group product work is member search / pagination, richer group settings,
+  avatar / title read models and richer real multi-user UI smoke coverage.
 - The Web / PC shell now also keeps explicit display-title and UX copy rules:
   direct / group titles learned from user actions survive conversation refresh,
   unknown server summaries render as short explicit conversation IDs, empty
@@ -148,8 +152,12 @@ First slice:
 - `loadtest/clientweb` now verifies the two-user client first path through
   public client-facing surfaces: register/login, contact request send/accept,
   BFF direct-conversation open, direct message notify/PullInbox/ACK, BFF group
-  creation, receiver JOIN, and group message notify/PullInbox/ACK. The
-  2026-06-23 clean run passed with `commit=6a08fb14` and `git_dirty=false`.
+  creation, receiver JOIN, group message notify/PullInbox/ACK, and BFF group
+  member actions: active member list, role change, owner transfer, remove
+  previous owner and final active member list. The 2026-06-23 clean run passed
+  the direct + group message first path with `commit=6a08fb14` and
+  `git_dirty=false`; the 2026-06-23 WIP run passed the extended group member
+  action path with `commit=28b0dc33` and `git_dirty=true`.
 - The visible Web / desktop shell now presents an account-password first IM
   surface: tenant, device, endpoint and native diagnostic controls are kept out
   of the normal user path, while smoke selectors remain stable. The

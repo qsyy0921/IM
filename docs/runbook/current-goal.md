@@ -80,6 +80,9 @@ Android Docker builder bootstrap 若出现在 shell smoke plan 中，必须带�
 `manualOnly=true` 和安装 / 启动 / 设备接触风险字段，脚本本身不得安装或启动
 artifact；顶层 `executionPolicy.planOnly=true` 必须声明它不会执行 checklist
 命令、不会下载工具链、不会启动 Docker、不会接触设备。
+Desktop / Android artifact builder 的 `--dry-run` 输出也必须带 execution policy，
+声明不会执行 Tauri / Gradle build、不会准备或验证 shell assets、不会收集 artifact、
+不会启动 Docker、不会安装或接触设备。
 `plan:android-webview-login-smoke` 也是 plan-only：它可以列出 APK build、adb
 install、Activity start、adb forward 和 runner 命令，但顶层 execution policy
 必须声明这些命令不会被 plan 脚本执行。

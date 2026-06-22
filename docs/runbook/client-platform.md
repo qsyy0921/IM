@@ -270,6 +270,9 @@ First slice:
   missing-toolchain JSON until the local Android toolchain or Docker builder
   image exists. Both desktop and Android wrappers accept a custom shell config
   path for metadata-smoke builds; the path is never printed in dry-run output.
+  Both wrapper dry-runs now emit an execution policy proving they do not execute
+  Tauri / Gradle builds, prepare or verify shell assets, collect artifacts,
+  start Docker, install artifacts, contact devices or download toolchains.
 - `npm --prefix clients run test:android-docker-builder` validates the safe
   Android Docker builder wrapper. `build:android-apk:docker` runs only when
   the local builder image already exists; `build:android-apk:docker:bootstrap`

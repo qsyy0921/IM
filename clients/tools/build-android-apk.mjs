@@ -18,7 +18,10 @@ function main(argv) {
   const plan = androidBuildPlan(prereqs, options);
 
   if (options.dryRun) {
-    console.log(JSON.stringify(plan, null, 2));
+    console.log(JSON.stringify({
+      ...plan,
+      executionPolicy: dryRunExecutionPolicy()
+    }, null, 2));
     return;
   }
   if (!plan.ready) {
@@ -43,6 +46,22 @@ function main(argv) {
       stdio: "inherit"
     });
   }
+}
+
+function dryRunExecutionPolicy() {
+  return {
+    planOnly: true,
+    executesBuildCommand: false,
+    preparesShellAssets: false,
+    verifiesShellAssets: false,
+    collectsArtifacts: false,
+    writesBuildOutput: false,
+    startsDocker: false,
+    installsArtifacts: false,
+    startsActivity: false,
+    contactsDevice: false,
+    downloadsToolchain: false
+  };
 }
 
 function androidBuildPlan(prereqs, options) {

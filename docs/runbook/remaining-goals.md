@@ -31,8 +31,9 @@
 1. 完成 client platform MVP foundation：Web / Windows PC 已完成真实双用户客户端
    smoke，验证好友私聊和群聊 first path；群成员列表、移除成员、角色变更和
    owner transfer 第一路径已接入 BFF / client-core / Web shell，`loadtest/clientweb`
-   也已扩展并在 clean committed smoke 中跑通这些群管理动作。继续补 PC MSI / NSIS
-   installer、真实 signing input / signed artifact 验证、更完整群设置、成员搜索 / 分页和后续 native SQLite bridge。
+   也已扩展并在 clean committed smoke 中跑通这些群管理动作；Web / PC shell 已补
+   BFF-backed 成员搜索 / 角色过滤 / 分页。继续补 PC MSI / NSIS
+   installer、真实 signing input / signed artifact 验证、更完整群设置和后续 native SQLite bridge。
    Android APK / 真机 WebView smoke 后置到用户明确切回。
 2. 回到 AI / Agent 主线：group memory eval、EvidencePack、Agent 真实业务动作、
    Python AI Worker 候选算法。
@@ -127,14 +128,14 @@
   删除、拉黑 / 取消拉黑，并已接好友直聊 first path：BFF 校验 ACTIVE 好友关系后
   创建 / 复用 DIRECT 会话。后续需要真实双用户客户端 smoke、隐私设置 UI、来源策略 /
   review-required 管理 UI、好友会话标题 / 头像等 richer read model。
-- Group chat UI：注册账号、创建群聊、添加成员、退群、成员列表、移除成员、
-  角色变更和 owner transfer first paths 已接入
+- Group chat UI：注册账号、创建群聊、添加成员、退群、成员列表、成员搜索 /
+  角色过滤 / 分页、移除成员、角色变更和 owner transfer first paths 已接入
   api-gateway BFF / client-core / Web / PC shell；创建群聊通过 conversation-service
   `CreateConversation` 创建当前用户 OWNER，添加成员 / 退群通过 conversation-service
   `CreateMemberChange`，成员读取通过 `ListConversationMembers`，owner transfer
   通过 `TransferConversationOwner`，不绕过服务私表。`loadtest/clientweb` 已覆盖
   成员列表、角色变更、owner transfer、移除成员和最终成员列表，且已有 clean
-  committed smoke；后续继续补成员搜索 / 分页、更完整群设置、群标题 / 头像 read model。
+  committed smoke；后续继续补更完整群设置、群标题 / 头像 read model。
 - Local store：`IndexedDBMessageStore` 已有 first-stage persistence test；
   desktop / Android 已默认接 shared `KeyValueMessageStore` + WebView
   `localStorage` first-stage durable adapter，并有 cursor replay test；后续在

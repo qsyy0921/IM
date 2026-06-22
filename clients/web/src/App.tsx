@@ -8,6 +8,7 @@ import type {
   ConversationMember,
   ConversationSummary,
   DeliveryNotifyFrame,
+  ListConversationMembersRequest,
   MemberRole,
   MessageItem,
   ServerFrame
@@ -32,6 +33,17 @@ const runtimeConfig = validateRuntimeConfig(loadRuntimeConfig());
 const shellConfig = readClientShellConfig();
 const androidNativeMetadata = readAndroidNativeBridgeMetadata();
 type ActiveView = "conversations" | "contacts" | "settings";
+type GroupMemberRoleFilter = "ALL" | "OWNER" | "ADMIN" | "MEMBER";
+
+const GROUP_MEMBER_PAGE_SIZE = 8;
+
+interface LoadGroupMembersOptions {
+  pageToken?: string;
+  pageTokens?: string[];
+  pageIndex?: number;
+  query?: string;
+  roleFilter?: GroupMemberRoleFilter;
+}
 
 export function App() {
   const platform = useMemo(
@@ -65,6 +77,11 @@ export function App() {
   const [groupMembers, setGroupMembers] = useState<ConversationMember[]>([]);
   const [groupMembersConversationID, setGroupMembersConversationID] = useState("");
   const [groupMembersError, setGroupMembersError] = useState("");
+  const [groupMemberQuery, setGroupMemberQuery] = useState("");
+  const [groupMemberRoleFilter, setGroupMemberRoleFilter] = useState<GroupMemberRoleFilter>("ALL");
+  const [groupMemberNextPageToken, setGroupMemberNextPageToken] = useState("");
+  const [groupMemberPageTokens, setGroupMemberPageTokens] = useState<string[]>([]);
+  const [groupMemberPageIndex, setGroupMemberPageIndex] = useState(0);
   const [status, setStatus] = useState("ready");
   const [activeView, setActiveView] = useState<ActiveView>("conversations");
   const [contacts, setContacts] = useState<ContactItem[]>([]);
@@ -393,7 +410,13 @@ export function App() {
     await showCachedMessages(conversationID);
     await syncConversation(conversationID, currentSession);
     if (selectedConversation?.type === "GROUP") {
-      await loadGroupMembers(conversationID, currentSession);
+      await loadGroupMembers(conversationID, currentSession, {
+        query: "",
+        roleFilter: "ALL",
+        pageToken: "",
+        pageTokens: [],
+        pageIndex: 0
+      });
     } else {
       clearGroupMemberState();
     }
@@ -476,7 +499,8 @@ export function App() {
 
   async function loadGroupMembers(
     conversationID = activeConversationRef.current,
-    currentSession = sessionRef.current
+    currentSession = sessionRef.current,
+    options: LoadGroupMembersOptions = {}
   ): Promise<void> {
     if (!currentSession) {
       throw new Error("login first");
@@ -484,24 +508,114 @@ export function App() {
     if (!conversationID) {
       throw new Error("conversation id is required");
     }
+    const query = (options.query ?? groupMemberQuery).trim();
+    const roleFilter = options.roleFilter ?? groupMemberRoleFilter;
+    const pageToken = options.pageToken ?? "";
+    const pageTokens = options.pageTokens ?? [];
+    const pageIndex = options.pageIndex ?? 0;
     try {
-      const response = await runtime.bff.listConversationMembers(
-        {
-          conversationID,
-          pageSize: 100
-        },
-        currentSession
-      );
+      const request: ListConversationMembersRequest = {
+        conversationID,
+        pageSize: GROUP_MEMBER_PAGE_SIZE
+      };
+      if (pageToken) {
+        request.pageToken = pageToken;
+      }
+      if (roleFilter !== "ALL") {
+        request.roleFilter = roleFilter;
+      }
+      if (query) {
+        request.userIDPrefix = query;
+      }
+      const response = await runtime.bff.listConversationMembers(request, currentSession);
       setGroupMembers(response.members);
       setGroupMembersConversationID(response.conversationID);
       setGroupMembersError("");
+      setGroupMemberQuery(query);
+      setGroupMemberRoleFilter(roleFilter);
+      setGroupMemberNextPageToken(response.nextPageToken);
+      setGroupMemberPageTokens(pageTokens);
+      setGroupMemberPageIndex(pageIndex);
       updateConversationMemberVersion(response.conversationID, response.memberVersion);
     } catch (caught) {
       setGroupMembers([]);
       setGroupMembersConversationID(conversationID);
       setGroupMembersError(errorMessage(caught));
+      setGroupMemberNextPageToken("");
       throw caught;
     }
+  }
+
+  async function applyGroupMemberFilters(): Promise<void> {
+    await run("filter group members", async () => {
+      const currentSession = requireSession();
+      const conversation = requireActiveGroupConversation();
+      await loadGroupMembers(conversation.conversationID, currentSession, {
+        query: groupMemberQuery,
+        roleFilter: groupMemberRoleFilter,
+        pageToken: "",
+        pageTokens: [],
+        pageIndex: 0
+      });
+    });
+  }
+
+  async function resetGroupMemberFilters(): Promise<void> {
+    await run("reset group member filters", async () => {
+      const currentSession = requireSession();
+      const conversation = requireActiveGroupConversation();
+      await loadGroupMembers(conversation.conversationID, currentSession, {
+        query: "",
+        roleFilter: "ALL",
+        pageToken: "",
+        pageTokens: [],
+        pageIndex: 0
+      });
+    });
+  }
+
+  async function loadNextGroupMemberPage(): Promise<void> {
+    if (!groupMemberNextPageToken) {
+      return;
+    }
+    await run("load next group member page", async () => {
+      const currentSession = requireSession();
+      const conversation = requireActiveGroupConversation();
+      const nextPageTokens = [...groupMemberPageTokens, groupMemberNextPageToken];
+      await loadGroupMembers(conversation.conversationID, currentSession, {
+        query: groupMemberQuery,
+        roleFilter: groupMemberRoleFilter,
+        pageToken: groupMemberNextPageToken,
+        pageTokens: nextPageTokens,
+        pageIndex: groupMemberPageIndex + 1
+      });
+    });
+  }
+
+  async function loadPreviousGroupMemberPage(): Promise<void> {
+    if (groupMemberPageIndex <= 0) {
+      return;
+    }
+    await run("load previous group member page", async () => {
+      const currentSession = requireSession();
+      const conversation = requireActiveGroupConversation();
+      const previousPageIndex = groupMemberPageIndex - 1;
+      let previousPageToken = "";
+      if (previousPageIndex > 0) {
+        const previousTokenCandidate = groupMemberPageTokens[previousPageIndex - 1];
+        if (!previousTokenCandidate) {
+          throw new Error("group member page token is required");
+        }
+        previousPageToken = previousTokenCandidate;
+      }
+      await loadGroupMembers(conversation.conversationID, currentSession, {
+        query: groupMemberQuery,
+        roleFilter: groupMemberRoleFilter,
+        pageToken: previousPageToken,
+        pageTokens: groupMemberPageTokens.slice(0, previousPageIndex),
+        pageIndex: previousPageIndex
+      });
+    });
   }
 
   async function inviteGroupMember(): Promise<void> {
@@ -803,6 +917,11 @@ export function App() {
     setGroupMembers([]);
     setGroupMembersConversationID("");
     setGroupMembersError("");
+    setGroupMemberQuery("");
+    setGroupMemberRoleFilter("ALL");
+    setGroupMemberNextPageToken("");
+    setGroupMemberPageTokens([]);
+    setGroupMemberPageIndex(0);
   }
 
   async function clearExpiredSession(caught: unknown): Promise<void> {
@@ -1286,11 +1405,48 @@ export function App() {
               data-testid="group-members-refresh"
               className="ghost-button"
               type="button"
-              onClick={() => void run("load group members", () => loadGroupMembers(activeGroupConversation.conversationID))}
+              onClick={() => void applyGroupMemberFilters()}
               disabled={!session}
             >
               刷新成员
             </button>
+            <form
+              className="group-member-toolbar"
+              onSubmit={event => {
+                event.preventDefault();
+                void applyGroupMemberFilters();
+              }}
+            >
+              <input
+                data-testid="group-member-search"
+                placeholder="按用户 ID 前缀搜索"
+                value={groupMemberQuery}
+                onChange={event => setGroupMemberQuery(event.target.value)}
+                disabled={!session}
+              />
+              <select
+                data-testid="group-member-role-filter"
+                value={groupMemberRoleFilter}
+                onChange={event => setGroupMemberRoleFilter(event.target.value as GroupMemberRoleFilter)}
+                disabled={!session}
+              >
+                <option value="ALL">全部角色</option>
+                <option value="OWNER">群主</option>
+                <option value="ADMIN">管理员</option>
+                <option value="MEMBER">成员</option>
+              </select>
+              <button data-testid="group-member-filter-submit" type="submit" disabled={!session}>
+                筛选
+              </button>
+              <button
+                data-testid="group-member-filter-reset"
+                type="button"
+                onClick={() => void resetGroupMemberFilters()}
+                disabled={!session}
+              >
+                清空
+              </button>
+            </form>
             <form
               className="group-member-form"
               onSubmit={event => {
@@ -1319,9 +1475,33 @@ export function App() {
               退群
             </button>
             {groupMembersError ? <div className="group-members-error">{groupMembersError}</div> : null}
+            <div className="group-member-pagination" aria-label="群成员分页">
+              <span data-testid="group-member-page-status">
+                第 {groupMemberPageIndex + 1} 页 · 本页 {groupMembersForActive.length} 人
+                {groupMemberNextPageToken ? " · 还有更多" : ""}
+              </span>
+              <div>
+                <button
+                  data-testid="group-member-prev-page"
+                  type="button"
+                  onClick={() => void loadPreviousGroupMemberPage()}
+                  disabled={!session || groupMemberPageIndex <= 0}
+                >
+                  上一页
+                </button>
+                <button
+                  data-testid="group-member-next-page"
+                  type="button"
+                  onClick={() => void loadNextGroupMemberPage()}
+                  disabled={!session || !groupMemberNextPageToken}
+                >
+                  下一页
+                </button>
+              </div>
+            </div>
             <div className="group-member-list" aria-label="群成员列表">
               {groupMembersForActive.length === 0 && !groupMembersError ? (
-                <div className="mini-empty">暂无成员数据</div>
+                <div className="mini-empty">当前筛选下暂无成员数据</div>
               ) : null}
               {groupMembersForActive.map(member => (
                 <article className="group-member-item" key={member.userID} data-testid="group-member-item">

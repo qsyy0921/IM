@@ -129,8 +129,9 @@ First slice:
   clears IndexedDB local cache and resets UI session state.
 - The Web / PC shell now has first-stage product interactions for clickable
   friend-to-direct-chat, clickable conversation selection, group creation,
-  group member invite / leave, member list, member removal, ADMIN / MEMBER role
-  changes and owner transfer through api-gateway BFF conversation contracts,
+  group member invite / leave, member list, member search, role filter,
+  page-token pagination, member removal, ADMIN / MEMBER role changes and owner
+  transfer through api-gateway BFF conversation contracts,
   selected-conversation preservation during refresh, local message-state refresh
   after send, and gateway-token-expired cleanup that clears the local session
   and asks the user to log in again. Group membership facts still come from
@@ -138,9 +139,10 @@ First slice:
   `loadtest/clientweb` now also verifies group member list, role change,
   owner transfer, remove member and final member list through the same public
   BFF surface. The clean committed real smoke for that path passed on 2026-06-23
-  with `commit=3b13c5c6` and `git_dirty=false`. Remaining
-  group product work is member search / pagination, richer group settings,
-  avatar / title read models and richer real multi-user UI smoke coverage.
+  with `commit=3b13c5c6` and `git_dirty=false`. The Web / PC shell now also
+  exposes BFF-backed member search / role filter / page-token pagination.
+  Remaining group product work is richer group settings, avatar / title read
+  models and richer real multi-user UI smoke coverage.
 - The Web / PC shell now also keeps explicit display-title and UX copy rules:
   direct / group titles learned from user actions survive conversation refresh,
   unknown server summaries render as short explicit conversation IDs, empty

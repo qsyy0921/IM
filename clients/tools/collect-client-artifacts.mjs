@@ -49,7 +49,10 @@ function main(argv) {
   const options = parseArgs(argv);
   const plan = collectPlan(options);
   if (options.dryRun) {
-    console.log(JSON.stringify(plan, null, 2));
+    console.log(JSON.stringify({
+      ...plan,
+      executionPolicy: dryRunExecutionPolicy()
+    }, null, 2));
     return;
   }
   if (plan.sources.length === 0) {
@@ -59,6 +62,22 @@ function main(argv) {
 
   const result = writeArtifactBundle(plan, options);
   console.log(JSON.stringify(result, null, 2));
+}
+
+function dryRunExecutionPolicy() {
+  return {
+    planOnly: true,
+    discoversArtifactSources: true,
+    readsArtifactMetadata: true,
+    readsArtifactBytes: false,
+    copiesArtifacts: false,
+    createsOutputDirectory: false,
+    writesManifest: false,
+    executesGit: false,
+    installsArtifacts: false,
+    contactsDevice: false,
+    downloadsToolchain: false
+  };
 }
 
 export function parseArgs(argv) {

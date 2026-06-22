@@ -286,7 +286,11 @@ First slice:
   `clients/artifacts/<run-id>/` storage and writes a low-sensitive manifest with
   file names, sizes and SHA-256 hashes, without recording local absolute source
   paths. `build:desktop-artifact:collect` and `build:android-apk:collect` run the
-  collector automatically after a successful native build.
+  collector automatically after a successful native build. The collector
+  `--dry-run` output carries an execution policy proving it only discovers
+  candidate sources and reads metadata; it does not copy artifacts, create
+  output directories, write manifests, install artifacts, contact devices or
+  download toolchains.
 - `npm --prefix clients run test:artifact-install-plan` validates the
   first-stage install-plan tool. `npm --prefix clients run plan:artifact-install`
   reads a collected `clients/artifacts/<run-id>/manifest.json` and prints

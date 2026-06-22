@@ -58,6 +58,7 @@ try {
     "--dry-run"
   ]);
   assert(dryRun.dryRun === true, "dry-run flag not reflected");
+  assertCollectorDryRunExecutionPolicy(dryRun.executionPolicy);
   assert(dryRun.sources.length === 1, "dry-run should find one source");
   assert(!existsSync(join(outputDir, "dry-run")), "dry-run must not write output");
   assert(!JSON.stringify(dryRun).includes(tempRoot), "dry-run leaked absolute temp path");
@@ -104,3 +105,17 @@ try {
 }
 
 console.log("client artifact collector ok");
+
+function assertCollectorDryRunExecutionPolicy(policy) {
+  assert(policy?.planOnly === true, "collector dry-run should be marked plan-only");
+  assert(policy.discoversArtifactSources === true, "collector dry-run should discover artifact sources");
+  assert(policy.readsArtifactMetadata === true, "collector dry-run should only read artifact metadata");
+  assert(policy.readsArtifactBytes === false, "collector dry-run should not read artifact bytes");
+  assert(policy.copiesArtifacts === false, "collector dry-run should not copy artifacts");
+  assert(policy.createsOutputDirectory === false, "collector dry-run should not create output directories");
+  assert(policy.writesManifest === false, "collector dry-run should not write manifests");
+  assert(policy.executesGit === false, "collector dry-run should not execute git");
+  assert(policy.installsArtifacts === false, "collector dry-run should not install artifacts");
+  assert(policy.contactsDevice === false, "collector dry-run should not contact devices");
+  assert(policy.downloadsToolchain === false, "collector dry-run should not download toolchains");
+}

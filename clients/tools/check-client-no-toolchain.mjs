@@ -5,6 +5,11 @@ import { fileURLToPath } from "node:url";
 const clientsRoot = fileURLToPath(new URL("..", import.meta.url));
 const checkPlan = [
   {
+    name: "no-toolchain-plan-self-check",
+    script: "test:no-toolchain-check",
+    reason: "guards this aggregate gate against unsafe operations"
+  },
+  {
     name: "client-workspace-validation",
     script: "validate",
     reason: "guards client workspace skeleton and package boundaries"

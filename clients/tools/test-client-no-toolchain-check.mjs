@@ -17,6 +17,7 @@ assert(plan.installsArtifacts === false, "no-toolchain plan must not install art
 assert(plan.startsDeviceActivities === false, "no-toolchain plan must not start device activities");
 assert(plan.opensAdbReverse === false, "no-toolchain plan must not open adb reverse");
 assert(plan.startsServices === false, "no-toolchain plan must not start services");
+assert(commands.includes("npm --prefix clients run test:no-toolchain-check"), "no-toolchain self-check missing");
 assert(commands.includes("npm --prefix clients run validate"), "client workspace validation missing");
 assert(commands.includes("npm --prefix clients run test:shell-smoke-plan"), "shell smoke plan check missing");
 assert(commands.includes("npm --prefix clients run test:artifact-readiness"), "artifact readiness contract check missing");

@@ -57,9 +57,10 @@ npm --prefix clients run check:no-toolchain
 git diff --check; git diff --cached --check
 ```
 
-`check:no-toolchain` 聚合 client workspace validation、workspace TypeScript、
-Web PWA、shell config、desktop / Android native skeleton validation、Web platform、
-shared runtime / local-store / IndexedDB contracts、Web shell lifecycle /
+`check:no-toolchain` 先验证自身 dry-run plan 不含下载 / 安装 / 启动设备类操作，
+再聚合 client workspace validation、workspace TypeScript、Web PWA、shell config、
+desktop / Android native skeleton validation、Web platform、shared runtime /
+local-store / IndexedDB contracts、Web shell lifecycle /
 automation / smoke-report contracts、shell asset / prep-wrapper、desktop /
 Android action asset、desktop artifact launch / composed smoke dry-run contracts、
 clientweb smoke hook contract、artifact readiness / install-plan / builder /

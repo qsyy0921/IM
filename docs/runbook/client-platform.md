@@ -214,9 +214,10 @@ First slice:
 - `npm --prefix clients run test:web-pwa` validates the Browser PWA contract:
   manifest, icon, service worker registration, WebView target skip and
   cache-bypass rules for API / WebSocket / shell config paths.
-- `npm --prefix clients run check:no-toolchain` runs the no-toolchain client
-  shell guard set in one command: client workspace validation, shell smoke plan,
-  workspace TypeScript, Web PWA, shell web assets / prep wrapper, shell config,
+- `npm --prefix clients run check:no-toolchain` first validates its own dry-run
+  plan for unsafe operations, then runs the no-toolchain client shell guard set
+  in one command: client workspace validation, shell smoke plan, workspace
+  TypeScript, Web PWA, shell web assets / prep wrapper, shell config,
   desktop / Android native skeleton validation, Web platform, shared runtime /
   local-store / IndexedDB contracts, Web shell lifecycle / automation /
   smoke-report contracts, clientweb smoke hook contract, desktop artifact launch

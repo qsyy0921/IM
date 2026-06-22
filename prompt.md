@@ -1,9 +1,10 @@
-# NexusIM Prompt Routing
+# NexusIM Agent Entry
 
-本文件不保存 Codex 目标框正文。目标框内容只存在于 Codex 目标框本身，避免
-目标框、仓库文档和进度文档三处重复维护导致漂移。
+本文件是 NexusIM 的项目入口和文档路由说明，不保存任何 Codex 目标正文。
+Codex 的目标正文只放在 Codex UI 的目标输入框中；仓库内只维护可持续更新的
+项目事实、阶段目标、架构边界和待办清单。
 
-Codex 每轮仍应读取本文件，因为这里维护的是文档路由和工作原则；具体 active
+Codex 每轮仍应读取本文件，因为这里维护的是文档入口和工作原则；具体 active
 slice、推进策略、架构边界、优先级和阶段结论由对应进度文档维护。
 
 ## 文档路由
@@ -13,7 +14,8 @@ slice、推进策略、架构边界、优先级和阶段结论由对应进度文
   `docs/architecture/target-architecture-complete.md`。
 - 根目录 `README.md` 是 GitHub 首页总览，阶段、架构、客户端能力、新服务、
   新中间件或下一步状态变化时必须同步维护。
-- Codex 目标框可能更新不及时；若目标框和仓库文档冲突，以 `current-goal.md` / `current-brief.md` / `remaining-goals.md` 为准。
+- Codex UI 中的临时目标可能更新不及时；若它和仓库文档冲突，以
+  `current-goal.md` / `current-brief.md` / `remaining-goals.md` 为准。
 - `agent.md` 决定按需读取和维护哪些项目文档；阶段细节见 `docs/runbook/current-brief.md`。
 - 未完成工作见 `docs/runbook/remaining-goals.md`；单服务状态见 `docs/runbook/service-briefs/<service>.md`。
 

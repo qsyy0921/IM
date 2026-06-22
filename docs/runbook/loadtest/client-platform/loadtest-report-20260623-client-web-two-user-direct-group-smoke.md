@@ -12,14 +12,15 @@ Scope:
 Source summary:
 
 ```text
-H:\NexusIM\loadtest-results\client-web-bff-push-smoke-20260623-014942\client-web-summary.json
+H:\NexusIM\loadtest-results\client-web-bff-push-smoke-20260623-015417\client-web-summary.json
 ```
 
-Git state recorded by the runner:
+Clean baseline:
 
 ```text
-commit=56456920
-git_dirty=true
+H:\NexusIM\loadtest-results\client-web-bff-push-smoke-20260623-015417\client-web-summary.json
+commit=6a08fb14
+git_dirty=false
 success=true
 ```
 
@@ -54,8 +55,6 @@ Fixes validated by this smoke:
 
 Limits:
 
-- The summary was produced with uncommitted local changes; rerun after commit if
-  a clean baseline is needed.
 - Android WebView login and Windows installer packaging were not part of this
   run.
 - This run does not validate production HA, public TLS, long soak, sizing or

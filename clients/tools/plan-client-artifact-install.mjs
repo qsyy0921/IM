@@ -119,22 +119,56 @@ function targetInstallPlan(target, manifest, manifestDir, installPrereqs) {
 
   const artifactPath = join(manifestDir, artifact.filename);
   validateArtifactFile(artifact, artifactPath);
+  const artifactKindStatus = artifactKindStatusForTarget(target, artifact);
+  const artifactKind = artifactKindStatus.artifactKind;
+  const installMode = installModeForArtifact(target, artifactKind);
   const artifactHint = safeHint(artifactPath);
   const supportFiles = supportFilesForTarget(manifest, target, manifestDir);
-  const missing = missingInstallInputs(target, installPrereqs, []);
+  if (!artifactKindStatus.ready) {
+    return {
+      artifactReady: true,
+      readyForInstall: false,
+      installMode,
+      installPrereqs: prereqs,
+      missing: missingInstallInputs(target, installPrereqs, [artifactKindStatus.missing]),
+      artifact: {
+        filename: artifact.filename,
+        artifactKind,
+        bytes: artifact.bytes,
+        sha256: artifact.sha256,
+        artifactHint
+      },
+      supportFiles,
+      checklist: [
+        {
+          step: "recollect-artifact-with-kind",
+          command: target === "android"
+            ? "npm --prefix clients run build:android-apk:collect"
+            : "npm --prefix clients run build:desktop-artifact:collect",
+          manualOnly: true,
+          buildsNativeArtifacts: true,
+          requiresExplicitUserAction: true,
+          evidence: "collector manifest must include an explicit artifactKind before install or launch planning"
+        }
+      ]
+    };
+  }
+  const missing = missingInstallInputs(target, installPrereqs, [], artifactKind);
   return {
     artifactReady: true,
     readyForInstall: missing.length === 0,
+    installMode,
     installPrereqs: prereqs,
     missing,
     artifact: {
       filename: artifact.filename,
+      artifactKind,
       bytes: artifact.bytes,
       sha256: artifact.sha256,
       artifactHint
     },
     supportFiles,
-    checklist: installChecklist(target, artifactHint, supportFiles)
+    checklist: installChecklist(target, artifactHint, supportFiles, artifactKind)
   };
 }
 
@@ -218,7 +252,7 @@ function commandAvailable(command, args) {
   return result.status === 0;
 }
 
-function installChecklist(target, artifactHint, supportFiles = []) {
+function installChecklist(target, artifactHint, supportFiles = [], artifactKind = "") {
   if (target === "android") {
     return [
       {
@@ -259,6 +293,43 @@ function installChecklist(target, artifactHint, supportFiles = []) {
       }
     ];
   }
+  if (artifactKind === "desktop-installer") {
+    return [
+      {
+        step: "verify-desktop-installer-signature",
+        manualOnly: true,
+        launchesDesktopArtifact: false,
+        startsLocalProcess: false,
+        installsArtifacts: false,
+        evidence: "desktop installer artifact must verify as Authenticode-valid before manual installation"
+      },
+      {
+        step: "install-desktop-installer",
+        command: `Start-Process ${artifactHint}`,
+        manualOnly: true,
+        launchesDesktopArtifact: false,
+        startsLocalProcess: true,
+        installsArtifacts: true,
+        requiresExplicitUserAction: true,
+        evidence: "signed desktop installer completes through explicit user action"
+      },
+      {
+        step: "verify-installed-shell",
+        manualOnly: true,
+        launchesDesktopArtifact: true,
+        startsLocalProcess: true,
+        evidence: "installed desktop shell starts from the OS-installed application entry, not from a collected portable launcher"
+      },
+      {
+        step: "run-client-smoke",
+        manualOnly: true,
+        launchesDesktopArtifact: true,
+        startsLocalProcess: true,
+        requiresExplicitUserAction: true,
+        evidence: "installed desktop shell can login, pull inbox, receive wakeup and ack"
+      }
+    ];
+  }
 
   const launcher = supportFiles.find(file => file.filename === "launch-nexusim-windows.ps1");
   const launchCommand = launcher
@@ -292,6 +363,51 @@ function installChecklist(target, artifactHint, supportFiles = []) {
       evidence: "desktop shell can login, pull inbox, receive wakeup and ack"
     }
   ];
+}
+
+function artifactKindStatusForTarget(target, artifact) {
+  const kind = artifact.artifactKind;
+  if (typeof kind !== "string" || kind.length === 0) {
+    return {
+      ready: false,
+      artifactKind: "",
+      missing: `${target}-artifact-kind`
+    };
+  }
+  if (target === "android") {
+    if (kind !== "android-debug-apk") {
+      return {
+        ready: false,
+        artifactKind: kind,
+        missing: "android-artifact-kind"
+      };
+    }
+    return { ready: true, artifactKind: kind, missing: "" };
+  }
+  if (target === "windows-desktop") {
+    if (kind !== "desktop-executable" && kind !== "desktop-installer") {
+      return {
+        ready: false,
+        artifactKind: kind,
+        missing: "windows-desktop-artifact-kind"
+      };
+    }
+    return { ready: true, artifactKind: kind, missing: "" };
+  }
+  throw new Error(`unsupported install target: ${target}`);
+}
+
+function installModeForArtifact(target, artifactKind) {
+  if (target === "android") {
+    return "android-apk";
+  }
+  if (artifactKind === "desktop-executable") {
+    return "portable-executable";
+  }
+  if (artifactKind === "desktop-installer") {
+    return "signed-installer";
+  }
+  return "unknown";
 }
 
 function readManifest(manifestPath) {

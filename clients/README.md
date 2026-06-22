@@ -222,15 +222,20 @@ collection step automatically after a successful native build.
 `plan:artifact-install` reads that collected manifest and prints a low-sensitive
 Windows desktop artifact / Android install checklist. It validates any collected
 support files and, for standalone Windows desktop exe packages, points the
-manual launch step at `launch-nexusim-windows.ps1`. It also reports local
-install prerequisites such as Android `adb` availability and Windows artifact
-launch support, but it does not install packages, connect to devices, launch
-artifacts or print local absolute paths.
+manual launch step at `launch-nexusim-windows.ps1`. Desktop installer artifacts
+now stay on an install-oriented checklist and are not treated as portable
+launchable packages. Stale manifests without an explicit `artifactKind` fail
+closed and must be recollected. It also reports local install prerequisites such
+as Android `adb` availability and Windows artifact launch support, but it does
+not install packages, connect to devices, launch artifacts or print local
+absolute paths.
 `plan:shell-smoke` consumes the same install plan, so native shell smoke
 readiness is not marked ready until a collected artifact exists and its
-install-side prerequisites are available. Its artifact status distinguishes
-raw native build-output discovery from the collected artifact manifest used for
-manual install and smoke.
+install-side prerequisites are available. For Windows, direct shell-smoke
+readiness requires `desktop-executable`; `desktop-installer` requires the signed
+installer path first. Its artifact status distinguishes raw native build-output
+discovery from the collected artifact manifest used for manual install and
+smoke.
 `bundle:desktop` reads the collected Windows desktop manifest, requires the
 package-local README and launcher support files, and writes a portable
 `nexusim-windows-desktop-bundle.zip` plus `desktop-bundle-summary.json` under

@@ -343,10 +343,12 @@ First slice:
   low-sensitive Windows desktop artifact / Android APK install checklist commands.
   It validates collected support files and, for standalone Windows `.exe`
   packages, points the manual launch command at `launch-nexusim-windows.ps1`.
-  It now also reports install-side readiness such as Android `adb` availability
-  and Windows local artifact launch support, while still not launching
-  artifacts, contacting devices, installing packages or printing local
-  absolute paths.
+  Desktop installer artifacts stay on an install-oriented checklist and are not
+  treated as portable launchable packages; stale manifests without explicit
+  `artifactKind` fail closed and must be recollected. It now also reports
+  install-side readiness such as Android `adb` availability and Windows local
+  artifact launch support, while still not launching artifacts, contacting
+  devices, installing packages or printing local absolute paths.
 - `npm --prefix clients run test:desktop-bundle` validates the first-stage
   portable Windows desktop bundle tool. `npm --prefix clients run bundle:desktop`
   reads a collected Windows desktop artifact manifest, requires the package-local
@@ -520,6 +522,9 @@ First slice:
   explicit MSI + NSIS profile. The plan still reports not ready until signing
   readiness and a valid Authenticode signature are present instead of treating
   the unsigned portable zip as an installer.
+  The generic client install plan now also keeps collected `desktop-installer`
+  artifacts out of the portable launcher path, so `plan:shell-smoke` only marks
+  Windows direct shell smoke ready for `desktop-executable` artifacts.
   `build:desktop-installer` is the explicit execution wrapper over that plan.
   Its default output is plan-only; `--execute` is required before it runs Tauri
   with the explicit bundle target and installer profile, then collects the

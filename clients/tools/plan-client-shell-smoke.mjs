@@ -107,7 +107,7 @@ function nativeTarget(target, readinessTarget, artifactPlan, installPlan) {
   const readyForManualShellSmoke = Boolean(
     readinessTarget?.ready &&
     readinessTarget?.shellAssets?.verified &&
-    installStatus.readyForInstall
+    nativeInstallReadyForShellSmoke(target, installStatus)
   );
   return {
     readyForManualShellSmoke,
@@ -161,8 +161,20 @@ function installStatusFor(target, installPlan) {
     readyForInstall: Boolean(targetPlan.readyForInstall),
     missing: Array.isArray(targetPlan.missing) ? targetPlan.missing : [],
     installPrereqs: targetPlan.installPrereqs ?? {},
-    artifactHint: targetPlan.artifact?.artifactHint ?? ""
+    artifactHint: targetPlan.artifact?.artifactHint ?? "",
+    artifactKind: targetPlan.artifact?.artifactKind ?? "",
+    installMode: targetPlan.installMode ?? ""
   };
+}
+
+function nativeInstallReadyForShellSmoke(target, installStatus) {
+  if (!installStatus.readyForInstall) {
+    return false;
+  }
+  if (target !== "windows-desktop") {
+    return true;
+  }
+  return installStatus.artifactKind === "desktop-executable";
 }
 
 function nativeCommands(target, readinessTarget) {
@@ -347,6 +359,14 @@ function nativeChecklist(target, readinessTarget, artifactStatus, installStatus)
     });
     return checklist;
   }
+  if (target === "windows-desktop" && installStatus.artifactKind === "desktop-installer") {
+    checklist.push({
+      step: "install-signed-desktop-installer-before-shell-smoke",
+      command: nativeCommands(target, readinessTarget).installPlan,
+      evidence: "collected desktop artifact is an installer; install it through the signed installer path before running shell smoke"
+    });
+    return checklist;
+  }
 
   if (target === "windows-desktop") {
     checklist.push({
@@ -412,6 +432,9 @@ function nativeNotes(target, readinessTarget, artifactStatus, installStatus) {
   }
   if (installStatus.artifactReady && !installStatus.readyForInstall) {
     notes.push("A collected artifact exists, but the install plan still reports missing install-side prerequisites.");
+  }
+  if (target === "windows-desktop" && installStatus.artifactKind === "desktop-installer") {
+    notes.push("Collected desktop artifact is an installer; direct desktop launch smoke requires a desktop-executable artifact or a completed signed installer install path.");
   }
   if (target === "android" && readinessTarget.dockerBuilder && !readinessTarget.ready) {
     notes.push("Android can use the opt-in Docker builder path; the first image build may download toolchains.");

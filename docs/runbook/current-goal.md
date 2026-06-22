@@ -70,6 +70,9 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   `--execute` 门控。desktop signing / installer planner 现在按 `windows-desktop`
   目标选择最新 collected manifest，不会被更新的 Android manifest 遮住；当前本机
   dry-run 已找到 desktop artifact baseline，只剩 signing readiness / valid signature 不满足而 fail-closed。
+  generic install plan 已按 `artifactKind` 区分 executable 和 installer：
+  stale manifest 缺 `artifactKind` 时要求重新 collect，`desktop-installer` 不再进入
+  portable launcher / direct shell-smoke 路径。
   它们仍不是生产签名 installer。
 - Android 已有 WebView shell / bridge / APK 历史产物和 metadata smoke；当前 shell
   不宣称 F 盘 Android toolchain ready，后续切回 Android 时再重新加载 toolchain env。

@@ -33,6 +33,7 @@ try {
     artifacts: [
       {
         target: "android",
+        artifactKind: "android-debug-apk",
         filename: "nexusim-android-debug.apk",
         bytes: Buffer.byteLength(apk),
         sha256: sha256(apk),
@@ -41,6 +42,7 @@ try {
       },
       {
         target: "windows-desktop",
+        artifactKind: "desktop-executable",
         filename: "nexusim-windows-desktop.exe",
         bytes: Buffer.byteLength(exe),
         sha256: sha256(exe),
@@ -73,6 +75,8 @@ try {
   assert(plan.artifactManifest.manifestHint === "clients/artifacts/install-plan-test/manifest.json", "manifest hint mismatch");
   assert(plan.targets.android.artifactReady === true, "android artifact should be ready");
   assert(plan.targets.android.readyForInstall === true, "android install plan should be ready");
+  assert(plan.targets.android.installMode === "android-apk", "android install mode mismatch");
+  assert(plan.targets.android.artifact.artifactKind === "android-debug-apk", "android artifact kind mismatch");
   assert(plan.targets.android.installPrereqs.adbAvailable === true, "android adb prereq should be true");
   assert(plan.targets.android.artifact.artifactHint === "clients/artifacts/install-plan-test/nexusim-android-debug.apk", "android artifact hint mismatch");
   const androidInstallStep = plan.targets.android.checklist.find(item => item.step === "install-apk");
@@ -88,6 +92,8 @@ try {
   assert(androidSmokeStep.startsDeviceActivities === true, "android smoke step should be marked as starting device activities");
   assert(plan.targets["windows-desktop"].artifactReady === true, "desktop artifact should be ready");
   assert(plan.targets["windows-desktop"].readyForInstall === true, "desktop install plan should be ready");
+  assert(plan.targets["windows-desktop"].installMode === "portable-executable", "desktop executable install mode mismatch");
+  assert(plan.targets["windows-desktop"].artifact.artifactKind === "desktop-executable", "desktop executable artifact kind mismatch");
   assert(plan.targets["windows-desktop"].installPrereqs.windowsInstallerLaunchSupported === true, "desktop install prereq should be true");
   assert(plan.targets["windows-desktop"].supportFiles.length === 1, "desktop support files should be exposed");
   assert(plan.targets["windows-desktop"].supportFiles[0].supportHint === "clients/artifacts/install-plan-test/launch-nexusim-windows.ps1", "desktop support hint mismatch");
@@ -98,6 +104,7 @@ try {
   assert(desktopLaunchStep.launchesDesktopArtifact === true, "desktop launch step should be marked as launching the artifact");
   assert(desktopLaunchStep.startsLocalProcess === true, "desktop launch step should be marked as starting a local process");
   assert(desktopLaunchStep.requiresExplicitUserAction === true, "desktop launch step should require explicit user action");
+  assert(!plan.targets["windows-desktop"].checklist.some(item => item.step === "install-desktop-installer"), "desktop executable plan should not use installer checklist");
   assert(!serialized.match(/[A-Z]:\\\\/), "install plan leaked Windows absolute path");
   assert(!serialized.includes("\\\\?"), "install plan leaked extended Windows path");
   assert(!serialized.match(/token|secret|password|credential|private/i), "install plan leaked sensitive field name");
@@ -114,6 +121,7 @@ try {
     artifacts: [
       {
         target: "android",
+        artifactKind: "android-debug-apk",
         filename: "nexusim-android-debug.apk",
         bytes: Buffer.byteLength(apk),
         sha256: sha256(apk),
@@ -144,6 +152,72 @@ try {
   assert(missingAdbPlan.targets.android.missing.includes("adb"), "android missing list should include adb");
   assert(missingAdbPlan.targets.android.installPrereqs.adbAvailable === false, "android adb prereq should be false");
 
+  const installer = "fake msi bytes";
+  writeFileSync(join(runDir, "nexusim-windows-desktop-installer.msi"), installer);
+  writeFileSync(join(runDir, "manifest.json"), `${JSON.stringify({
+    schemaVersion: "nexusim.client-artifacts.v1",
+    generatedAt: "2026-06-22T00:00:00.000Z",
+    gitCommit: "test",
+    runId: "install-plan-test",
+    artifacts: [
+      {
+        target: "windows-desktop",
+        artifactKind: "desktop-installer",
+        filename: "nexusim-windows-desktop-installer.msi",
+        bytes: Buffer.byteLength(installer),
+        sha256: sha256(installer),
+        sourcePathHash: sha256("desktop-installer-source"),
+        sourceHint: "desktop/src-tauri/target/release/bundle/msi/nexusim.msi"
+      }
+    ]
+  }, null, 2)}\n`);
+  const installerPlan = buildClientArtifactInstallPlan({
+    manifest: join(runDir, "manifest.json"),
+    installPrereqs: {
+      adbAvailable: true,
+      windowsInstallerLaunchSupported: true
+    }
+  });
+  assert(installerPlan.targets["windows-desktop"].artifactReady === true, "desktop installer artifact should be ready");
+  assert(installerPlan.targets["windows-desktop"].readyForInstall === true, "desktop installer install plan should be ready");
+  assert(installerPlan.targets["windows-desktop"].installMode === "signed-installer", "desktop installer install mode mismatch");
+  assert(installerPlan.targets["windows-desktop"].artifact.artifactKind === "desktop-installer", "desktop installer artifact kind mismatch");
+  assert(installerPlan.targets["windows-desktop"].checklist.some(item => item.step === "verify-desktop-installer-signature"), "desktop installer signature verification step missing");
+  const installerStep = installerPlan.targets["windows-desktop"].checklist.find(item => item.step === "install-desktop-installer");
+  assert(installerStep?.command === "Start-Process clients/artifacts/install-plan-test/nexusim-windows-desktop-installer.msi", "desktop installer command mismatch");
+  assert(installerStep.installsArtifacts === true, "desktop installer step should install artifacts");
+  assert(installerStep.launchesDesktopArtifact === false, "desktop installer step should not be marked as launching the app");
+  assert(!installerPlan.targets["windows-desktop"].checklist.some(item => item.step === "launch-desktop-artifact"), "desktop installer plan should not use portable launch step");
+
+  writeFileSync(join(runDir, "manifest.json"), `${JSON.stringify({
+    schemaVersion: "nexusim.client-artifacts.v1",
+    generatedAt: "2026-06-22T00:00:00.000Z",
+    gitCommit: "test",
+    runId: "install-plan-test",
+    artifacts: [
+      {
+        target: "windows-desktop",
+        filename: "nexusim-windows-desktop.exe",
+        bytes: Buffer.byteLength(exe),
+        sha256: sha256(exe),
+        sourcePathHash: sha256("legacy-desktop-source"),
+        sourceHint: "desktop/src-tauri/target/release/nexusim.exe"
+      }
+    ]
+  }, null, 2)}\n`);
+  const legacyKindPlan = buildClientArtifactInstallPlan({
+    manifest: join(runDir, "manifest.json"),
+    installPrereqs: {
+      adbAvailable: true,
+      windowsInstallerLaunchSupported: true
+    }
+  });
+  assert(legacyKindPlan.targets["windows-desktop"].artifactReady === true, "legacy desktop artifact file should still be visible");
+  assert(legacyKindPlan.targets["windows-desktop"].readyForInstall === false, "legacy desktop manifest without artifactKind must not be install-ready");
+  assert(legacyKindPlan.targets["windows-desktop"].missing.includes("windows-desktop-artifact-kind"), "legacy desktop missing list should require artifact kind");
+  assert(legacyKindPlan.targets["windows-desktop"].checklist.some(item => item.step === "recollect-artifact-with-kind"), "legacy desktop manifest should require recollecting with artifact kind");
+  assert(!legacyKindPlan.targets["windows-desktop"].checklist.some(item => item.step === "launch-desktop-artifact"), "legacy desktop manifest should not produce a launch step");
+
   const emptyPlan = buildClientArtifactInstallPlan({
     artifactsRoot: join(runDir, "missing-artifacts"),
     installPrereqs: {
@@ -167,6 +241,7 @@ try {
     artifacts: [
       {
         target: "android",
+        artifactKind: "android-debug-apk",
         filename: "nexusim-android-debug.apk",
         bytes: Buffer.byteLength(apk),
         sha256: sha256("wrong"),

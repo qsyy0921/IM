@@ -206,8 +206,10 @@ const collectedInstallPlan = {
         windowsInstallerLaunchSupported: true
       },
       artifact: {
-        artifactHint: "clients/artifacts/run/nexusim-windows-desktop.msi"
-      }
+        artifactKind: "desktop-executable",
+        artifactHint: "clients/artifacts/run/nexusim-windows-desktop.exe"
+      },
+      installMode: "portable-executable"
     },
     android: {
       artifactReady: true,
@@ -259,6 +261,30 @@ const missingAdbPlan = buildClientShellSmokePlan({
 assert(missingAdbPlan.targets.android.artifact.collectedArtifactReady === true, "android collected artifact should remain ready when adb is missing");
 assert(missingAdbPlan.targets.android.readyForManualShellSmoke === false, "android smoke should not be ready without adb");
 assert(missingAdbPlan.targets.android.checklist.some(item => item.step === "resolve-install-prereqs"), "android install-prereq checklist missing");
+
+const installerOnlyPlan = buildClientShellSmokePlan({
+  readiness: readyReadiness,
+  artifactPlan: noBuildOutputArtifactPlan,
+  installPlan: {
+    targets: {
+      "windows-desktop": {
+        ...collectedInstallPlan.targets["windows-desktop"],
+        artifact: {
+          artifactKind: "desktop-installer",
+          artifactHint: "clients/artifacts/run/nexusim-windows-desktop-installer.msi"
+        },
+        installMode: "signed-installer"
+      },
+      android: collectedInstallPlan.targets.android
+    }
+  }
+});
+assert(installerOnlyPlan.targets["windows-desktop"].artifact.collectedArtifactReady === true, "desktop installer artifact should remain collected");
+assert(installerOnlyPlan.targets["windows-desktop"].install.artifactKind === "desktop-installer", "desktop installer kind should be exposed");
+assert(installerOnlyPlan.targets["windows-desktop"].readyForManualShellSmoke === false, "desktop installer should not be direct shell-smoke ready");
+assert(installerOnlyPlan.targets["windows-desktop"].checklist.some(item => item.step === "install-signed-desktop-installer-before-shell-smoke"), "desktop installer pre-smoke install step missing");
+assert(!installerOnlyPlan.targets["windows-desktop"].checklist.some(item => item.step === "launch-desktop-artifact-smoke"), "desktop installer should not add direct launch smoke step");
+assert(installerOnlyPlan.targets["windows-desktop"].notes.some(note => note.includes("installer")), "desktop installer note missing");
 
 console.log("client shell smoke plan ok");
 

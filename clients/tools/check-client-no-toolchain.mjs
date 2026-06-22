@@ -35,6 +35,11 @@ const checkPlan = [
     reason: "guards Android login-level WebView smoke plan and safe preflight without APK, Docker or device execution"
   },
   {
+    name: "android-webview-login-runner-contract",
+    script: "test:android-webview-login-smoke",
+    reason: "guards Android login-level WebView smoke dry-run output and native-store readiness parsing without APK, Docker or device execution"
+  },
+  {
     name: "android-platform-readiness-contract",
     script: "test:android-platform-readiness",
     reason: "guards low-sensitive Android platform readiness schema"

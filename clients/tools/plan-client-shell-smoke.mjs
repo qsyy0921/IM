@@ -285,10 +285,18 @@ function nativeChecklist(target, readinessTarget, artifactStatus, installStatus)
       evidence: "dry-run reports remaining toolchain gaps without downloading tools"
     });
     if (target === "android" && readinessTarget.dockerBuilder) {
+      const imagePresent = Boolean(readinessTarget.dockerBuilder.imagePresent);
       checklist.push({
-        step: readinessTarget.dockerBuilder.imagePresent ? "run-android-builder" : "build-android-builder-image",
+        step: imagePresent ? "run-android-builder" : "build-android-builder-image",
         command: nativeCommands(target, readinessTarget).dockerBuilder,
-        evidence: "Android builder path produces a collected APK manifest when explicitly run"
+        safeDryRunCommand: nativeCommands(target, readinessTarget).dockerBuilderDryRun,
+        startsDocker: true,
+        buildsNativeArtifacts: true,
+        downloadsToolchain: !imagePresent,
+        requiresExplicitUserOptIn: !imagePresent,
+        evidence: imagePresent
+          ? "Android builder path produces a collected APK manifest when explicitly run"
+          : "Android builder image bootstrap may download Node, Gradle and Android SDK components; run only after explicit user opt-in"
       });
     }
     return checklist;

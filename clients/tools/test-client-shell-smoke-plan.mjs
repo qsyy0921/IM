@@ -111,6 +111,20 @@ assert(plan.targets.android.checklist.some(item => item.step === "check-android-
 assert(plan.targets.android.checklist.some(item => item.step === "check-android-webview-devtools-readiness"), "android WebView devtools readiness checklist missing");
 assert(plan.targets.android.checklist.some(item => item.step === "prepare-shell-assets"), "android asset prep checklist missing");
 assert(plan.targets.android.checklist.some(item => item.step === "verify-shell-assets"), "android asset verification checklist missing");
+const androidDockerStep = plan.targets.android.checklist.find(item => item.step === "build-android-builder-image" || item.step === "run-android-builder");
+if (androidDockerStep) {
+  assert(androidDockerStep.startsDocker === true, "android Docker builder step should be marked as starting Docker");
+  assert(androidDockerStep.buildsNativeArtifacts === true, "android Docker builder step should be marked as building a native artifact");
+  assert(androidDockerStep.safeDryRunCommand?.includes("run-android-docker-builder.mjs --dry-run"), "android Docker builder step should expose a safe dry-run command");
+  if (androidDockerStep.step === "build-android-builder-image") {
+    assert(androidDockerStep.downloadsToolchain === true, "android builder image bootstrap should be marked as downloading toolchains");
+    assert(androidDockerStep.requiresExplicitUserOptIn === true, "android builder image bootstrap should require explicit user opt-in");
+    assert(androidDockerStep.evidence.includes("explicit user opt-in"), "android builder image bootstrap evidence should mention explicit user opt-in");
+  } else {
+    assert(androidDockerStep.downloadsToolchain === false, "existing android builder image run should not be marked as downloading toolchains");
+    assert(androidDockerStep.requiresExplicitUserOptIn === false, "existing android builder image run should not require bootstrap opt-in");
+  }
+}
 assert(Array.isArray(plan.targets.android.notes), "android notes missing");
 assert(plan.sharedSmoke.backendCommand.includes("run-local-smoke.ps1"), "shared backend smoke command missing");
 assert(plan.sharedSmoke.wiredLanExample.includes("172.31.50.1"), "wired LAN smoke example missing");

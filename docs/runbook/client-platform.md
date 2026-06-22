@@ -411,6 +411,12 @@ First slice:
   smoke. Android now has the same metadata-smoke runner shape, but it
   still does not produce `.apk` or `.aab` artifacts because the local toolchain /
   Docker builder image has not been completed.
+- `plan:shell-smoke` now marks the Android Docker builder path with
+  machine-readable risk flags. If the local builder image is missing, the
+  `build-android-builder-image` step carries `downloadsToolchain=true` and
+  `requiresExplicitUserOptIn=true`, plus a safe dry-run command. This keeps the
+  shell plan useful while preventing Codex or automation from treating image
+  bootstrap as part of the no-toolchain client gate.
 - `/api/auth/logout` performs first-stage server-side logout for the current
   authenticated session only. Broader device/session management remains an
   identity/admin capability, not a client BFF target selector.

@@ -264,7 +264,8 @@ First slice:
   local-store / IndexedDB contracts, Web shell lifecycle / automation /
   smoke-report contracts, clientweb smoke hook contract, desktop artifact launch
   / composed smoke dry-run contracts, artifact readiness / install-plan / builder
-  / collector contracts, desktop installer / signing readiness plan contracts,
+  / collector contracts, desktop installer builder / installer readiness /
+  signing readiness plan contracts,
   Android builder profile / wrapper contracts, desktop / Android action assets, desktop WebView
   metadata / login dry-run contracts,
   Android metadata / login smoke dry-run contracts, Android device / WebView
@@ -498,6 +499,12 @@ First slice:
   installer bundling is ready. Current config has `bundle.active=false`, so the
   plan correctly reports not ready instead of treating the unsigned portable zip
   as an installer.
+  `build:desktop-installer` is the explicit execution wrapper over that plan.
+  Its default output is plan-only; `--execute` is required before it invokes the
+  desktop artifact collection build, and it still fails closed while installer
+  readiness is false. It does not sign, install, launch, start services or
+  download toolchains. Real execution uses the repository Tauri config; custom
+  `--tauri-config` remains a planning fixture input and blocks `--execute`.
   `smoke:desktop-artifact-launch` has verified the exe starts, stays alive
   during the smoke hold window and terminates cleanly.
   Its dry-run output carries an execution policy proving it only reads the
@@ -618,6 +625,7 @@ npm --prefix clients run test:artifact-collector
 npm --prefix clients run test:artifact-install-plan
 npm --prefix clients run test:artifact-readiness
 npm --prefix clients run test:desktop-bundle
+npm --prefix clients run test:desktop-installer-builder
 npm --prefix clients run test:desktop-installer-plan
 npm --prefix clients run test:desktop-signing-plan
 npm --prefix clients run test:android-docker-builder
@@ -651,6 +659,7 @@ npm --prefix clients run plan:shell-smoke
 npm --prefix clients run plan:artifact-install
 npm --prefix clients run bundle:desktop:dry-run
 npm --prefix clients run bundle:desktop
+npm --prefix clients run build:desktop-installer
 npm --prefix clients run plan:desktop-installer
 npm --prefix clients run plan:desktop-signing
 npm --prefix clients run smoke:desktop-artifact-launch

@@ -81,7 +81,10 @@
   signing execution。`plan:desktop-signing` 已能检查显式 `signtool`、证书来源和
   timestamp URL readiness；`plan:desktop-installer` 已能检查 Tauri `bundle.active`、
   installer target、desktop artifact baseline 和 signing readiness；它们不 build、
-  不签名，也不替代真实 installer / signing 流水线。
+  不签名，也不替代真实 installer / signing 流水线。`build:desktop-installer`
+  已补显式 `--execute` 门控的 installer build 包装器，默认仍只输出计划；
+  真实 MSI / NSIS 构建仍要先满足 Tauri bundle、desktop artifact baseline 和
+  signing readiness。
 - `clients/android`：first-stage TypeScript runtime adapter 和 Kotlin WebView
   asset shell skeleton 已落；`createAndroidClientRuntime` 已能组装 shared
   `BFFClient` / `WebSocketPushTransport` / auth / inbox / send / ack queue；

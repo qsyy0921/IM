@@ -170,6 +170,11 @@ const checkPlan = [
     reason: "guards MSI/NSIS installer readiness without building or signing installers"
   },
   {
+    name: "desktop-installer-builder-contract",
+    script: "test:desktop-installer-builder",
+    reason: "guards explicit installer build execution opt-in without building installers by default"
+  },
+  {
     name: "desktop-signing-plan-contract",
     script: "test:desktop-signing-plan",
     reason: "guards explicit desktop code-signing readiness without signing artifacts"

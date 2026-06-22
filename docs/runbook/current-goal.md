@@ -55,7 +55,9 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   是否齐备，且只输出低敏 plan，不签名、不下载、不安装、不启动。`plan:desktop-installer`
   已能读取 Tauri bundle config、collected desktop manifest 和 signing readiness，
   对 MSI / NSIS installer readiness 做 fail-closed 检查；当前 `bundle.active=false`
-  时会明确 not ready。它们仍不是生产签名 installer。
+  时会明确 not ready。`build:desktop-installer` 已提供显式 `--execute` 门控的
+  installer build 包装器，默认仍只输出低敏计划，并在 readiness 不满足时 fail-closed。
+  它们仍不是生产签名 installer。
 - Android 已有 WebView shell / bridge / APK 历史产物和 metadata smoke；当前 shell
   不宣称 F 盘 Android toolchain ready，后续切回 Android 时再重新加载 toolchain env。
 

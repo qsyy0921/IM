@@ -11,6 +11,8 @@
 - 客户端细节：`docs/runbook/client-platform.md`
 - 完整目标架构：`docs/architecture/target-architecture-complete.md`
 - Fail-closed 规则：`docs/architecture/fail-closed-policy.md`
+- 可变推进策略和架构边界：先看 `agent.md` 的 owner table，再读对应 owner document。
+- 新功能开发流程：`agent.md` 的 `Feature Development Protocol`。
 - 历史证据：按关键词查 `docs/runbook/loadtest/`、`docs/runbook/archive/`
   或 `docs/runbook/history/`。
 
@@ -44,8 +46,12 @@ NexusIM 已有本地 / 双机可运行的最小分布式 IM 后端，并已扩�
    私聊、群聊列表、建群、点击群聊进入会话、消息列表、发送后本地状态刷新、
    PullInbox / ACK 和本机可运行包体验。
 2. 所有客户端能力只走 api-gateway BFF 和 push-gateway，不直连内部服务。
-3. 不引入隐藏备用路径；依赖、权限、事实源或投影不确定时 fail-closed，并使用显式
-   repair / retry 或重新读取对应事实源。
+3. 新功能先做简短架构分析，再编码；必须判断是否需要新技术、新中间件、新 provider
+   或新服务，并把新增内容归入正确平台层。边界变化要同步 README、middleware catalog、
+   service brief、SDD / ADR、current-goal / current-brief / remaining-goals 等 owner docs。
+4. 不引入隐藏备用路径；依赖、权限、事实源或投影不确定时 fail-closed，并使用显式
+   repair / retry 或重新读取对应事实源。开发相关路径时持续删除旧隐藏兜底 /
+   fallback-like 分支，新发现但无法本轮清掉的项写入 `remaining-goals.md`。
 
 ## 不变量
 

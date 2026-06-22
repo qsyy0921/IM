@@ -35,6 +35,11 @@ Codex 目标框只放根目录 `../prompt.md` 里的短 Prompt，不复制具体
 11. `sdd/<service>.md`：服务设计，按服务名读取。
 12. `runbook/loadtest/<service>/`：smoke / 压测证据，只有任务需要具体证据时读取。
 
+新功能开发前先做简短架构分析，再编码。需要判断是否新增技术、中间件、provider、
+runtime 或 service，并把新增内容放到正确平台层：中间件平台、数据平台、AI / Agent
+平台、业务 / 产品平台、客户端平台或 ops / control-plane 平台。边界变化时同步
+README、目标架构、service brief、SDD / ADR、middleware catalog 和进度文档。
+
 ## 文档职责边界
 
 - `development-progress.md` 只写当前进度和已完成阶段，不维护待办。

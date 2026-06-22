@@ -19,12 +19,14 @@ from them is needed.
 | Understand phase | `docs/runbook/current-brief.md` | `docs/runbook/current-brief.md` |
 | Choose unfinished work | `docs/runbook/remaining-goals.md` | `docs/runbook/remaining-goals.md` |
 | Public project overview | `README.md` | `README.md` when active slice, service promotion, client capability, AI boundary or next-step status changes |
+| New feature architecture analysis | `docs/runbook/current-goal.md`, relevant service brief / SDD, target architecture when boundary changes | current-goal/current-brief/remaining-goals, service brief, SDD/ADR, README when public capability changes |
 | Work on one service | `docs/runbook/service-briefs/README.md`, then service brief | service brief; `development-progress.md` only for public progress |
 | Repair / DLQ / operator | `docs/runbook/repair-operators.md`, service brief | same |
 | Distributed smoke / fault evidence | relevant runbook README and exact report path | new report or summary only |
 | Interview narrative | `docs/interview/project-progress.md` | same |
 | Architecture / service split | `docs/architecture/target-architecture.md`, then `docs/architecture/target-architecture-complete.md` | architecture doc or ADR |
-| Middleware / platform capability | `docs/platform/middleware-catalog.md` | same; add ADR for active adoption |
+| New service promotion | `docs/architecture/target-architecture-complete.md`, `docs/runbook/service-briefs/README.md` | README, service brief, SDD/ADR, service registry/docs/runbook progress |
+| Middleware / platform capability | `docs/platform/middleware-catalog.md` | same; add ADR/SDD and runtime profile for active adoption |
 | Fail-closed / local-test / compat question | `docs/architecture/fail-closed-policy.md` | same; update SDD only when a concrete service boundary changes |
 
 Keep entrance docs short. Do not copy the same status into every file.
@@ -47,6 +49,21 @@ If the goal box is stale or conflicts with repository documents, trust
 Production HA drills, long load tests, sizing, provider-grade operations and
 broad backlog cleanup remain hardening backlog unless explicitly named or they
 block the active slice.
+
+## Mutable Strategy And Boundary Owners
+
+推进策略和架构边界会随项目演进而变化，不写进 Codex 目标框。需要变更时更新下面的
+owner document，而不是复制到所有入口文件。
+
+| Concern | Owner document |
+| --- | --- |
+| Active slice and immediate order | `docs/runbook/current-goal.md` |
+| Phase summary and current short direction | `docs/runbook/current-brief.md` |
+| Unfinished work and postponed hardening | `docs/runbook/remaining-goals.md` |
+| Complete target architecture and service split | `docs/architecture/target-architecture-complete.md` |
+| Middleware adoption / replacement rules | `docs/platform/middleware-catalog.md` |
+| Hidden fallback / fail-closed governance | `docs/architecture/fail-closed-policy.md` |
+| Public overview | `README.md` |
 
 Existing real services: `api-gateway`, `identity-service`, `message-service`,
 `conversation-service`, `delivery-service`, `push-gateway`, `receipt-service`,
@@ -85,6 +102,30 @@ be kept aligned with current architecture and progress, but it should stay short
 New work goes into `remaining-goals.md`; promote it to `current-goal.md` only
 when active.
 
+## Feature Development Protocol
+
+Before coding a new feature, write or state a compact architecture analysis and
+then implement. The analysis must identify:
+
+1. owner service / package and whether a new service is justified;
+2. data ownership, migration impact, and whether the state is fact or projection;
+3. public API, event, outbox, worker, or client contract changes;
+4. authorization, audit, trusted metadata, and fail-closed behavior;
+5. whether a new technology, middleware, provider, runtime, or platform component is needed;
+6. platform placement: middleware platform, data platform, AI / Agent platform,
+   business / product platform, client platform, or operations platform;
+7. runtime profile, Docker/compose, deployment, and observability impact;
+8. documents to update.
+
+If a new microservice is promoted, update `README.md`, target architecture,
+`service-briefs/README.md`, the new service brief, relevant SDD / ADR and
+progress docs. If a new middleware or provider is introduced, update
+`docs/platform/middleware-catalog.md`, runtime profile docs, relevant SDD / ADR
+and README when it changes the public overview. Middleware belongs in the
+middleware platform; data processing belongs in the data platform; AI runtime
+or model-facing pieces belong in the AI / Agent platform; product-facing
+business capabilities belong in the business / product platform.
+
 ## Work Selection
 
 Prefer:
@@ -108,11 +149,17 @@ practical.
 ## Engineering Rules
 
 - Do not revert user changes.
+- Do architecture analysis before coding new features; keep it proportional to
+  risk and write the durable version into the owning docs when boundaries change.
 - Do not read another service's private tables from production code.
 - Do not introduce mesh-like synchronous RPC dependencies.
 - Do not introduce hidden business alternate paths. Unknown dependency, permission,
   projection, provider or fact-source state must fail closed, retry, repair, or
   recover from the owning fact source. Read `docs/architecture/fail-closed-policy.md`.
+- When touching a code path, remove nearby old hidden fallback / fallback-like
+  branches if they are not explicitly allowed by `fail-closed-policy.md`.
+  If cleanup is too large for the slice, record it in `docs/runbook/remaining-goals.md`
+  with the owning service and risk.
 - Do not create shared packages until at least two real callers need a stable contract.
 - Keep abstractions local until the second real use case appears.
 - Keep language boundaries explicit: Go for business/control services,

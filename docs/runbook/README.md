@@ -47,4 +47,8 @@
 
 - 当前入口和索引必须保持短；每轮只读取本轮必要文档，不默认全文扫长历史。
 - 历史事实写入 archive / history / loadtest 报告，不回填到入口文档。
+- 新功能开发先按 `../../agent.md` 的 `Feature Development Protocol` 做简短架构分析，
+  再编码；如果需要新增技术、中间件、provider、runtime 或 service，必须确认平台
+  归属并同步 README、目标架构、middleware catalog、service brief、SDD / ADR 和相关
+  进度文档。
 - 每轮结束按本轮风险运行必要检查；生产级测试不是短期默认收口条件。

@@ -62,12 +62,25 @@ git diff --check; git diff --cached --check
 
 ## 硬边界
 
+- 每个新客户端功能先做简短架构分析再编码：确认是否属于 client-core、Web / PC
+  shell、api-gateway BFF、push-gateway 或某个后端服务；确认数据事实源、API / 事件、
+  权限、审计、失败语义、是否需要新技术 / 新中间件 / 新 provider，以及需要维护的文档。
+- 如果新功能需要新增中间件，必须归入中间件平台并同步
+  `docs/platform/middleware-catalog.md`；需要数据处理能力则归入数据平台；需要模型 /
+  Agent 能力则归入 AI / Agent 平台；需要产品业务能力则归入对应业务 / 产品平台。
 - 客户端 local store 只做缓存 / 离线队列，不成为服务端事实源。
 - 客户端不得直接调用内部微服务，不读取任何服务私表。
 - PullInbox 是消息展示事实源；WebSocket 只做在线唤醒。
 - 不引入隐藏备用路径。客户端、BFF 或服务端遇到依赖、权限、事实源、投影或
   provider 不确定时，按 `docs/architecture/fail-closed-policy.md` fail-closed，
   使用显式 retry / repair，或重新读取对应事实源。
+- 开发当前客户端链路时，遇到相关旧隐藏兜底 / fallback-like 分支要顺手删除；
+  如果清理范围超过当前切片，必须把 owning service、文件范围和风险写入
+  `docs/runbook/remaining-goals.md`，不能继续扩散。
+- 新代码不得新增隐藏兜底；本地测试 adapter、compat window、repair / redrive
+  必须显式命名、显式 profile、显式文档边界。
 - TypeScript 负责三端共享客户端协议、同步核心和 UI；Rust / Kotlin 只做薄平台桥。
 - Python 只做 AI worker / eval / 离线工具，不接管客户端主链路或业务事实源。
+- 如果当前切片新增服务、服务能力、中间件或 runtime profile，必须同步根 README、
+  对应 service brief、相关 SDD / ADR、`current-brief.md` 和 `remaining-goals.md`。
 - 不回滚用户已有修改。

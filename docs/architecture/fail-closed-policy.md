@@ -7,6 +7,17 @@ NexusIM 不允许隐藏业务兜底。依赖、权限、事实源、投影或 pr
 本文只约束当前和未来代码。历史 loadtest 报告、旧架构草案和归档文档可以保留当时
 的原文，但不能作为新实现的依据。
 
+## 0. 持续治理规则
+
+- 新代码不得新增隐藏业务兜底、fallback-like 分支或模糊“可用就继续”的路径。
+- 每个 active slice 触达的相关代码，如果发现旧隐藏兜底，应优先删除或改成显式
+  fail-closed / retry / repair / redrive / local-test adapter。
+- 如果旧兜底清理会扩大当前切片范围，必须把 owning service、文件范围、风险和建议
+  处理方式写入 `docs/runbook/remaining-goals.md`，不能继续复制或扩散。
+- 允许的 local-test adapter、compat window、repair / redrive 必须有显式名称、
+  显式 profile、明确审计 / 指标 / 移除边界。
+- Codex 目标框不维护本策略正文；本文件是隐藏兜底治理的 owner document。
+
 ## 1. 禁止的做法
 
 - 权限 / policy / ReBAC / ownership check 失败后改走 allow 分支。

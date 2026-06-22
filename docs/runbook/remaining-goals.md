@@ -11,6 +11,19 @@
 - 长期完整架构基线：`docs/architecture/target-architecture-complete.md`。
 - 中间件引入和替换规则：`docs/platform/middleware-catalog.md`。
 - Fail-closed 治理规则：`docs/architecture/fail-closed-policy.md`。
+- 推进策略和架构边界会持续更新；目标框不维护这些细节，按 `agent.md` 的 owner
+  table 找到对应文档后再修改。
+- 新功能开发前必须做架构分析；如果需要新增 / promotion 微服务或引入新中间件，
+  先确认 owner、平台归属、数据模型、API / 事件、权限 / 审计、runtime profile、
+  观测 / 部署影响和文档影响。
+- 新增微服务必须进入根 README、目标架构、`service-briefs/README.md`、对应
+  service brief、相关 SDD / ADR 和进度文档。
+- 新增中间件 / provider 必须进入 `docs/platform/middleware-catalog.md`、相关
+  runtime profile / compose / runbook、SDD / ADR；若影响 GitHub 首页总览，同步 README。
+- 平台归属规则：中间件放入中间件平台；数据摄取 / 加工 / 分析放入数据平台；
+  模型、向量、检索、RAG、Agent 和 Python worker 放入 AI / Agent 平台；
+  客户端交互放入客户端平台；业务产品能力放入业务 / 产品平台；运维控制能力放入
+  control-plane / ops 平台。
 - 生产级 HA、长压、sizing 和完整系统测试暂不作为当前阻塞。
 
 ## 当前优先顺序
@@ -28,11 +41,16 @@
 
 ## Fail-Closed Governance 未完成
 
+- 开发任一切片时，都要清理该切片触达范围内的隐藏兜底 / fallback-like 代码；
+  不能清理完的项必须在本节追加 owning service、文件范围、风险和建议处理方式。
+- 新代码不得新增隐藏业务兜底。允许的 local-test adapter、compat window、repair /
+  redrive 必须按 `docs/architecture/fail-closed-policy.md` 显式命名、显式 profile、
+  显式审计 / 文档边界。
 - 历史代码中仍有 `recovery` 命名和历史文档表述；不在当前客户端脏工作区里一次性
   全量重命名，避免误改 smoke 证据和正在开发的客户端切片。
 - 新增 `tools/check-fail-closed-policy.ps1` 后，后续新增 / 修改行不得继续引入隐藏
-  recovery 术语；确需 local-test adapter、compat window、recovery 或 repair / redrive
-  时，必须按 fail-closed policy 显式命名。
+  recovery 术语；确需 local-test adapter、compat window、repair / redrive 时，
+  必须按 fail-closed policy 显式命名。
 - 后续按服务逐步消除旧的业务 recovery 命名：优先 policy / auth / public gateway /
   AI action path；配置默认值类 `defaultValue` 可以机械重命名，不作为业务风险。
 

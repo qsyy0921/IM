@@ -199,6 +199,13 @@ message / conversation / policy events -> search-service + memory-service projec
 - RAG / summary / Agent 不能直接读 message / conversation 私表，只能消费权限过滤后的 EvidencePack。
 - Agent 真实写动作必须经过 policy、proposal、approval、action-executor 和 audit。
 - 新服务和中间件不写死，必须满足独立数据模型、独立伸缩、独立故障边界、独立安全边界或明显降低复杂度。
+- 每个新功能先做简短架构分析，再编码；先确认 owner、数据所有权、API / 事件、
+  权限 / 审计、是否需要新技术 / 新中间件 / 新 provider、平台归属和文档影响。
+- 新增中间件进入中间件平台；数据处理进入数据平台；模型、向量、检索、RAG、
+  Agent 和 Python worker 进入 AI / Agent 平台；客户端交互进入客户端平台；
+  业务产品能力进入业务 / 产品平台；运维控制能力进入 ops / control-plane 平台。
+- 开发相关路径时持续清理不符合 fail-closed policy 的隐藏备用路径；新代码不得新增
+  隐藏业务备用路径。
 
 ## 当前状态
 
@@ -285,6 +292,10 @@ Android APK / 真机 smoke 不作为当前默认阻塞。
 - Python 只做 LLM / embedding / rerank / memory extraction / planner / eval 候选层；Go 负责控制面、权限、状态、审计和持久化。
 - push-gateway 不拥有 durable inbox；断线和慢连接恢复以 delivery-service `PullInbox` 为准。
 - 新服务和中间件不写死；只有当独立数据模型、伸缩、故障、安全边界或复杂度收益成立时才通过 ADR 新增。
+- 新功能、新服务和新中间件先做架构分析再编码，并同步 README、目标架构、
+  service brief、SDD / ADR、middleware catalog 和进度文档中的相关事实。
+- 不新增隐藏兜底路径；触达相关旧路径时优先删除或改成显式 fail-closed、
+  retry / repair / redrive / local-test adapter。
 - 压测 / smoke 原始输出放 `H:\NexusIM\loadtest-results`，仓库只保存低敏报告、summary 和索引。
 
 ## 目录结构

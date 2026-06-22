@@ -1,4 +1,4 @@
-# policy-service contact block decision smoke - 2026-06-13
+﻿# policy-service contact block decision smoke - 2026-06-13
 
 ## Scope
 
@@ -12,7 +12,7 @@ conversation-service GetSendContext(direct_peer_user_id)
 -> allow / CONTACT_BLOCKED deny
 ```
 
-It is a functional smoke, not a capacity result. The test uses `policy-service` PostgreSQL evaluator by setting `NEXUSIM_POLICY_RULES_ENABLED=true`; that evaluator now checks hard contact-block denies before exact message action rules and static fallback.
+It is a functional smoke, not a capacity result. The test uses `policy-service` PostgreSQL evaluator by setting `NEXUSIM_POLICY_RULES_ENABLED=true`; that evaluator now checks hard contact-block denies before exact message action rules and static default.
 
 ## Run
 
@@ -70,7 +70,7 @@ contact.edge.unblocked.v1
   allowed=true classification=POLICY_STATIC_ALLOW permission_version=1
 ```
 
-The blocked decision is a hard deny. It is evaluated before exact message action rules or static fallback, and it checks either directed edge between the sender and direct peer for `BLOCKED`.
+The blocked decision is a hard deny. It is evaluated before exact message action rules or static default, and it checks either directed edge between the sender and direct peer for `BLOCKED`.
 
 ## Boundaries
 

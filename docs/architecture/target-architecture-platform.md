@@ -35,7 +35,7 @@ Retrieval 权限规则：
 - `acl_version` 过期、缺失或投影延迟超阈值时，必须回源 policy-service。
 - 用户退群后，`leave_seq` 之后的 chunk 不能被召回。
 - 成员 join/leave 的可见窗口必须进入搜索和向量检索过滤，不能只看当前成员状态。
-- 消息撤回、删除、保留期清理必须产生 tombstone / delete event，搜索和 RAG 在投影完成前进入 strict fallback 或冻结相关结果。
+- 消息撤回、删除、保留期清理必须产生 tombstone / delete event，搜索和 RAG 在投影完成前进入 strict recovery 或冻结相关结果。
 - Agent 继承用户权限，并叠加 `agent_delegate` 与 tool policy。
 
 强一致授权矩阵：
@@ -442,7 +442,7 @@ RAG/summary/Agent 进入生产发布前必须跑安全评测。短期建设 AI �
 
 | 已验证 | 未宣称 |
 | --- | --- |
-| 双机 Docker、多实例 push route、durable PullInbox fallback、基础 Redis route smoke | Kafka 多 broker HA、PostgreSQL 主从/failover、Redis Sentinel quorum/网络分区、Kubernetes 灰度和自动恢复 |
+| 双机 Docker、多实例 push route、durable PullInbox recovery、基础 Redis route smoke | Kafka 多 broker HA、PostgreSQL 主从/failover、Redis Sentinel quorum/网络分区、Kubernetes 灰度和自动恢复 |
 
 未宣称的生产 HA 能力必须在正式上线前补证据，但不阻塞短期完成 9 服务必要收口并启动 AI 大模型应用底座。
 

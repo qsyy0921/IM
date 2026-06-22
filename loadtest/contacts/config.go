@@ -89,23 +89,23 @@ func parseConfig() config {
 	}
 	return cfg
 }
-func envBool(name string, fallback bool) bool {
+func envBool(name string, defaultValue bool) bool {
 	switch strings.ToLower(strings.TrimSpace(os.Getenv(name))) {
 	case "":
-		return fallback
+		return defaultValue
 	case "1", "true", "yes", "y", "on":
 		return true
 	case "0", "false", "no", "n", "off":
 		return false
 	default:
-		return fallback
+		return defaultValue
 	}
 }
 
-func envString(name string, fallback string) string {
+func envString(name string, defaultValue string) string {
 	value := strings.TrimSpace(os.Getenv(name))
 	if value == "" {
-		return fallback
+		return defaultValue
 	}
 	return value
 }

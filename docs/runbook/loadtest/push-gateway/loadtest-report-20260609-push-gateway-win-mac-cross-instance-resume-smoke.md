@@ -161,7 +161,7 @@ delivery_outbox pending=0
 delivery_outbox DLQ=0
 ```
 
-如果 Redis resume miss，但 PullInbox 和 ACK 成功，结论应是“在线体验退化，可靠投递未丢”。当前 clean run 中 cross-instance replay 和 durable fallback 两层都成立。
+如果 Redis resume miss，但 PullInbox 和 ACK 成功，结论应是“在线体验退化，可靠投递未丢”。当前 clean run 中 cross-instance replay 和 durable recovery 两层都成立。
 
 ## 面试讲法
 

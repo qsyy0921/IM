@@ -239,7 +239,7 @@ flowchart TB
 | mcp-gateway/tool-gateway | tool_call_log、tool route config | MCP/内部工具调用入口、schema 校验、tool policy、调用路由 | 不绕过 policy/approval 执行高风险动作 |
 | action-executor | action_execution_attempts、Temporal workflow state | 执行低风险 allowlist 或已审批动作、调用公开业务 API、写执行结果 | 不接收未授权高风险动作、不绕过业务 API |
 | ai-eval-service | eval datasets、eval runs、failure records | 权限、证据、时间版本、tool policy 和模型/prompt/retrieval 变更门禁 | 不参与线上热路径 |
-| model-gateway | provider config、cost audit | 模型 provider、embedding、rerank、fallback、成本和低敏审计 | 不拥有 IM 事实或 Agent approval |
+| model-gateway | provider config、cost audit | 模型 provider、embedding、rerank、recovery、成本和低敏审计 | 不拥有 IM 事实或 Agent approval |
 | workflow-service | workflow state、approval wait、compensation state | 长事务、审批等待、retention、repair 和外部补偿 | 不进入 IM 热路径 |
 | knowledge-ingestion-service | ingestion jobs、chunk manifests | 文件 / 网页 / 知识库导入、chunking、embedding pipeline | 不绕过 media / policy / retrieval 边界 |
 | vector-index-service | vector refs、index rebuild jobs | 向量写入、重建、backfill 和 delete proof | 不作为 retrieval 入口 |
@@ -250,7 +250,7 @@ flowchart TB
 | 范围 | 当前状态 | 后续差距 |
 | --- | --- | --- |
 | 9 个主链路服务 | `api-gateway`、`identity`、`message`、`conversation`、`delivery`、`push`、`receipt`、`contacts`、`policy` 已有真实链路或最小闭环 | 短期补齐 AI 依赖的必要 IM 语义、安全边界、事件契约和本地可验证闭环；生产级治理、故障验证和容量基线作为后续加固项 |
-| 本地/双机分布式 | Win/Mac Docker smoke 已验证跨实例 route、resume、PullInbox fallback | Kafka HA、PostgreSQL failover、Redis quorum / 网络分区、K8s rollout 未验证，但不阻塞先进入 AI 大模型应用底座 |
+| 本地/双机分布式 | Win/Mac Docker smoke 已验证跨实例 route、resume、PullInbox recovery | Kafka HA、PostgreSQL failover、Redis quorum / 网络分区、K8s rollout 未验证，但不阻塞先进入 AI 大模型应用底座 |
 | 后续新增服务 | AI 层以 search、memory、retrieval、RAG、summary、Agent、skill、tool、executor、eval 为基线方向 | 不预设最终数量；满足拆分准则并通过 ADR 后再立项，不一次性拆碎 |
 
 工程分层约定为：

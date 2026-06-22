@@ -125,4 +125,4 @@ Sentinel 模式下，WebSocket gateway 和 delivery consumer gateway 仍能通�
 - 未验证 Redis Cluster。
 - 未做容量压测。
 
-下一步应补 Redis Sentinel failover smoke：在已有 WebSocket route 注册后触发 master 切换，验证 failover 后新连接、route publish、resume replay 或 `PullInbox` fallback 都能恢复。
+下一步应补 Redis Sentinel failover smoke：在已有 WebSocket route 注册后触发 master 切换，验证 failover 后新连接、route publish、resume replay 或 `PullInbox` recovery 都能恢复。

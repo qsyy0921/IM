@@ -28,7 +28,7 @@ GitHub 首页只放当前总览。每轮 Codex 继续开发时，目标框只复
 | `message-service` | 发消息、编辑 / 撤回 / 删除、timeline / outbox。 |
 | `conversation-service` | 会话、成员边界、owner transfer、发送上下文。 |
 | `delivery-service` | durable inbox、`PullInbox`、`AckDelivery`、delivery outbox。 |
-| `push-gateway` | WebSocket 在线通知、Redis route、resume / PullInbox fallback。 |
+| `push-gateway` | WebSocket 在线通知、Redis route、resume / PullInbox recovery。 |
 | `receipt-service` | 已读 / 送达回执、会话列表、未读 / 置顶 / 静音等读模型。 |
 | `contacts-service` | 联系人请求、隐私策略、分组 / 搜索、来源风险。 |
 | `policy-service` | 策略决策、ReBAC first path、moderation、tenant quota、tool policy precheck。 |

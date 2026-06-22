@@ -108,5 +108,5 @@ NEXUSIM_MESSAGE_GRPC_TLS_CLIENT_ALLOWED_DNS_NAMES=api-gateway.nexusim.local
 - 这是 message-service 单服务静态 mTLS smoke，不代表全服务 mTLS rollout。
 - 证书是本地临时生成材料，不代表生产证书签发、轮换、撤销或分发体系。
 - client allowlist 是第一阶段 exact-match DNS / URI SAN 校验，不是动态服务身份注册或服务网格。
-- 本轮使用 message-service 的 static conversation / policy fallback，不覆盖真实 conversation-service 或 policy-service RPC mTLS；那些服务间 TLS 能力已有独立配置和 smoke 证据继续补齐。
+- 本轮使用 message-service 的 static conversation / policy recovery，不覆盖真实 conversation-service 或 policy-service RPC mTLS；那些服务间 TLS 能力已有独立配置和 smoke 证据继续补齐。
 - 本轮不是容量压测；1 VU / 1s 只用于验证 mTLS transport 和主写链路闭环。

@@ -110,7 +110,7 @@ Costs:
 - Cross-language contracts need protobuf / JSON schema discipline.
 - Local dev and Docker runtime need an additional Python toolchain.
 - Evaluation must cover worker timeout, malformed output, unsafe output and
-  provider failure fallback.
+  provider failure recovery.
 
 ## Validation
 
@@ -121,6 +121,6 @@ Before introducing any Python worker into a real path:
 - Add timeout, cancellation and retry budget.
 - Add output sanitizer / PII-secret filter where text leaves the worker.
 - Prove Go caller rejects malformed, missing, unsafe or policy-invalid results.
-- Add eval cases for provider failure fallback and unsafe output.
+- Add eval cases for provider failure recovery and unsafe output.
 - Keep raw model/provider artifacts outside the repository and outside business
   fact tables.

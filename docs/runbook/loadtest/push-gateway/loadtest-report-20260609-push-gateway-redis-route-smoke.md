@@ -97,5 +97,5 @@ NEXUSIM_PUSH_ROUTE_TTL=90s
 
 1. 补 Redis route TTL 续期 / cleanup。
 2. 补 Redis route 故障语义测试。
-3. 设计跨实例 resume buffer 或明确跨实例只使用 `PullInbox` fallback。
+3. 设计跨实例 resume buffer 或明确跨实例只使用 `PullInbox` recovery。
 4. 后续再做 Redis route 多设备 / 慢连接组合 smoke。

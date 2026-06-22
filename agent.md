@@ -24,6 +24,7 @@ from them is needed.
 | Interview narrative | `docs/interview/project-progress.md` | same |
 | Architecture / service split | `docs/architecture/target-architecture.md`, then `docs/architecture/target-architecture-complete.md` | architecture doc or ADR |
 | Middleware / platform capability | `docs/platform/middleware-catalog.md` | same; add ADR for active adoption |
+| Fail-closed / local-test / compat question | `docs/architecture/fail-closed-policy.md` | same; update SDD only when a concrete service boundary changes |
 
 Keep entrance docs short. Do not copy the same status into every file.
 
@@ -106,6 +107,9 @@ practical.
 - Do not revert user changes.
 - Do not read another service's private tables from production code.
 - Do not introduce mesh-like synchronous RPC dependencies.
+- Do not introduce hidden business alternate paths. Unknown dependency, permission,
+  projection, provider or fact-source state must fail closed, retry, repair, or
+  recover from the owning fact source. Read `docs/architecture/fail-closed-policy.md`.
 - Do not create shared packages until at least two real callers need a stable contract.
 - Keep abstractions local until the second real use case appears.
 - Keep language boundaries explicit: Go for business/control services,

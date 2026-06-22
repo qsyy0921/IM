@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$PgDsn = "postgres://nexusim:nexusim@localhost:5432/nexusim?sslmode=disable",
     [string]$KafkaBrokers = "localhost:9092",
     [string]$ResultRoot = "H:\NexusIM\loadtest-results",
@@ -150,7 +150,7 @@ try {
         NEXUSIM_POLICY_MESSAGE_ALLOWED = "false"
         NEXUSIM_POLICY_PERMISSION_VERSION = "1"
         NEXUSIM_POLICY_CLASSIFICATION = "POLICY_STATIC_DENY"
-        NEXUSIM_POLICY_DENY_REASON = "static fallback should not decide role smoke"
+        NEXUSIM_POLICY_DENY_REASON = "static default should not decide role smoke"
     }
     Wait-Tcp -HostName "127.0.0.1" -Port $policyGrpcPort
     Start-Sleep -Milliseconds 800

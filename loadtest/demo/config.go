@@ -58,23 +58,23 @@ func registerTLSFlags(prefix string, envPrefix string, serviceName string, confi
 	flag.StringVar(&config.ClientKeyFile, prefix+"-client-key-file", os.Getenv(envPrefix+"_CLIENT_KEY_FILE"), "client private key PEM for "+serviceName+" gRPC mTLS")
 }
 
-func envBool(name string, fallback bool) bool {
+func envBool(name string, defaultValue bool) bool {
 	switch strings.ToLower(strings.TrimSpace(os.Getenv(name))) {
 	case "":
-		return fallback
+		return defaultValue
 	case "1", "true", "yes", "y", "on":
 		return true
 	case "0", "false", "no", "n", "off":
 		return false
 	default:
-		return fallback
+		return defaultValue
 	}
 }
 
-func envString(name string, fallback string) string {
+func envString(name string, defaultValue string) string {
 	value := strings.TrimSpace(os.Getenv(name))
 	if value == "" {
-		return fallback
+		return defaultValue
 	}
 	return value
 }

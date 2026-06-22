@@ -10,6 +10,7 @@
 - 当前 active slice：`client platform MVP foundation`。
 - 长期完整架构基线：`docs/architecture/target-architecture-complete.md`。
 - 中间件引入和替换规则：`docs/platform/middleware-catalog.md`。
+- Fail-closed 治理规则：`docs/architecture/fail-closed-policy.md`。
 - 生产级 HA、长压、sizing 和完整系统测试暂不作为当前阻塞。
 
 ## 当前优先顺序
@@ -23,6 +24,16 @@
    vector / model / knowledge / presence / control-plane。
 4. 按完整架构补数据平台和中间件 profile，但不抢占当前客户端切片。
 5. 9 个既有 IM 服务只回补阻塞 client / AI / product platform 的 P0/P1 或用户点名项。
+
+## Fail-Closed Governance 未完成
+
+- 历史代码中仍有 `recovery` 命名和历史文档表述；不在当前客户端脏工作区里一次性
+  全量重命名，避免误改 smoke 证据和正在开发的客户端切片。
+- 新增 `tools/check-fail-closed-policy.ps1` 后，后续新增 / 修改行不得继续引入隐藏
+  recovery 术语；确需 local-test adapter、compat window、recovery 或 repair / redrive
+  时，必须按 fail-closed policy 显式命名。
+- 后续按服务逐步消除旧的业务 recovery 命名：优先 policy / auth / public gateway /
+  AI action path；配置默认值类 `defaultValue` 可以机械重命名，不作为业务风险。
 
 ## Client Platform MVP 未完成
 
@@ -49,18 +60,25 @@
   Windows 本机 debug APK baseline 已产出，Kotlin 只做薄 bridge，业务协议和
   sync core 复用 TypeScript。
 - Android packaging：产出本地 unsigned APK，并支持局域网 `api-gateway` /
-  `push-gateway` 地址配置。当前 Windows 本机工具链已按用户要求安装在
-  `F:\IM\toolchains`，包含 JDK 17、Gradle 8.10.2、Android SDK android-35 /
-  build-tools 35.0.0；`GRADLE_USER_HOME` 也指向 F 盘。`build:android-apk`
-  wrapper 已能准备 shell assets 并执行 Gradle `:app:assembleDebug`；
-  `build:android-apk:collect` 已产出
-  `clients/artifacts/2026-06-22T034017Z/nexusim-android-debug.apk` 和
-  SHA-256 manifest。下一步是用户确认后执行真机 `adb install`、Android
-  metadata WebView smoke 和 login-level WebView smoke。Android Docker builder
-  profile 仍保留为容器化构建后备；需要下载 Node / Gradle / Android SDK
-  toolchain 时必须显式运行 `build:android-apk:docker:bootstrap`。
+  `push-gateway` 地址配置。`F:\IM\toolchains` 下存在 JDK / Gradle /
+  Android SDK 文件目录，但当前 PowerShell / no-toolchain readiness 仍检测到
+  Java 8，且 Gradle / `ANDROID_HOME` / `ANDROID_SDK_ROOT` 未就绪；继续 APK /
+  Android WebView login smoke 前，需要先重新加载 F 盘 toolchain env 或显式使用
+  Docker builder。既有 debug APK manifest 可作为历史产物参考，但当前 shell
+  不能直接宣称 Android build readiness 已通过。Android Docker builder profile
+  仍保留为容器化构建后备；需要下载 Node / Gradle / Android SDK toolchain 时必须
+  显式运行 `build:android-apk:docker:bootstrap`。
 - 三端 smoke：Web / PC / Android 都只能连 `api-gateway` 和 `push-gateway`；
   PullInbox 是事实源，WebSocket 只做在线唤醒。
+- Contacts / friends UI：api-gateway BFF、client-core 和 Web / PC shell 已接
+  first-stage contacts workbench，覆盖联系人申请、接受 / 拒绝 / 取消、备注、分组、
+  删除、拉黑 / 取消拉黑，并已接好友直聊 first path：BFF 校验 ACTIVE 好友关系后
+  创建 / 复用 DIRECT 会话。后续需要真实双用户客户端 smoke、隐私设置 UI、来源策略 /
+  review-required 管理 UI、好友会话标题 / 头像等 richer read model。
+- Group chat UI：注册账号和创建群聊 first path 已接入 client BFF / client-core /
+  Web / PC shell；创建群聊通过 conversation-service `CreateConversation` 创建当前用户
+  OWNER，不绕过服务私表。后续继续补邀请成员、成员列表、角色变更、owner transfer、
+  退出 / 移除、群设置和双用户客户端 smoke。
 - Local store：`IndexedDBMessageStore` 已有 first-stage persistence test；
   desktop / Android 已默认接 shared `KeyValueMessageStore` + WebView
   `localStorage` first-stage durable adapter，并有 cursor replay test；后续在
@@ -87,7 +105,7 @@
 - `retrieval-gateway`：继续结构过滤、BM25 / vector / graph expansion、rerank、
   EvidencePack 覆盖率和 source coverage 口径。
 - `rag-service` / `summary-service`：继续拒答、引用校验、source-ref regression、
-  provider fallback 和 unsafe output fail-closed cases。
+  provider recovery 和 unsafe output fail-closed cases。
 - `agent-service`：真实业务动作继续走
   `policy -> skill contract -> prepare audit -> proposal -> approval -> executor -> audit`；
   不允许 Agent 直接写业务库。

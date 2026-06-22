@@ -1,4 +1,4 @@
-# policy-service tenant message action rule smoke - 2026-06-13
+﻿# policy-service tenant message action rule smoke - 2026-06-13
 
 ## Scope
 
@@ -89,10 +89,10 @@ Decision priority is:
 direct contact block
 -> exact policy_message_action_rules row
 -> tenant policy_tenant_message_action_rules row
--> static fallback
+-> static default
 ```
 
-Exact rules intentionally override tenant defaults. The evaluator also treats a missing tenant-rule table as a clean tenant-rule miss, so a deployment that has not applied migration `000007_policy_tenant_message_action_rules.sql` yet does not break the older exact-rule / static-fallback path. Other PostgreSQL errors still fail closed as policy unavailable.
+Exact rules intentionally override tenant defaults. The evaluator also treats a missing tenant-rule table as a clean tenant-rule miss, so a deployment that has not applied migration `000007_policy_tenant_message_action_rules.sql` yet does not break the older exact-rule / static-recovery path. Other PostgreSQL errors still fail closed as policy unavailable.
 
 ## Conclusion
 

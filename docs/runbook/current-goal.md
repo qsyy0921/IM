@@ -21,41 +21,28 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
 
 ## 当前事实
 
-- 该 active slice 继续有效；当前用户明确要求先做浏览器端和 Windows PC 端，
-  方便本机调试，Android 登录级 smoke 暂缓。
-- 浏览器、PC desktop、Android 共用 `clients/packages/protocol` 和
-  `clients/packages/client-core`；客户端只连 `api-gateway` 和 `push-gateway`。
-- `api-gateway` 已有 first-stage client BFF surface；Web shell 已能通过 BFF /
-  push path 跑通本地 smoke。
-- PC desktop 已有 Tauri shell、desktop SQLite bridge、standalone artifact、
-  metadata smoke 和登录级 WebView smoke 证据；账号密码优先的 IM shell UI
-  已通过 Windows Tauri WebView 登录级 smoke。
-- Android 已有 WebView asset shell、native metadata / SQLite bridge contract、
-  no-toolchain action asset contract、ADB readiness report、Docker builder profile
-  和登录级 WebView smoke safe preflight plan；真机 APK 已安装并通过
-  Android WebView metadata smoke，登录级 Android smoke 后置。
-- Windows 本机 Android toolchain 已按用户要求落到 `F:\IM\toolchains`：
-  JDK 17、Gradle 8.10.2、Android SDK platform-tools / android-35 /
-  build-tools 35.0.0；`GRADLE_USER_HOME` 也指向 F 盘。
-- Android debug APK 已能本机构建并收集 manifest：
-  `clients/artifacts/2026-06-22T034017Z/nexusim-android-debug.apk`。
-- `plan:artifact-install` 仍只输出 `adb install` checklist，不会自动安装或
-  启动 Activity；已安装设备上的后续登录 smoke 需要用户重新切回 Android
-  优先级时再执行。
-- 不要隐式下载 Android Docker builder toolchain；本机工具链已可优先使用，
-  Docker builder 只在用户明确要求容器化构建时再运行 bootstrap。
+- 该 active slice 继续有效；当前优先浏览器端和 Windows PC 端，Android 登录级
+  smoke 后置。
+- Web / PC / Android 共用 `clients/packages/protocol` 和
+  `clients/packages/client-core`；客户端只连 `api-gateway` BFF 和 `push-gateway`。
+- Web / PC shell 已接账号密码登录、注册、好友工作台、好友直聊 first path、
+  建群 first path、收发消息、PullInbox 和 ACK。
+- 本地调试默认使用 `127.0.0.1:8080/8088`；`loadtest/clientweb/run-local-dev.ps1`
+  负责留住本机 client backend。
+- Android 已有 WebView shell / bridge / APK 历史产物和 metadata smoke；当前 shell
+  不宣称 F 盘 Android toolchain ready，后续切回 Android 时再重新加载 toolchain env。
 
 ## 下一步优先级
 
-1. 先收口浏览器端 / Windows PC 端账号密码 IM shell：保持复杂配置隐藏，
-   继续用 BFF / push 公共路径做登录、会话、收发、PullInbox 和 ACK 调试。
-2. Windows PC 端下一步是 installer / 启动脚本 / 更像真实客户端的本机
-   可运行包；当前已有 standalone exe 和登录级 WebView smoke 证据。
-3. Android 后续只在用户切回时继续：login-level WebView smoke、APK baseline
+1. 收口 Web / Windows PC shell 可用性：登录、好友直聊、建群、消息列表、发送、
+   PullInbox / ACK 和错误提示。
+2. 补真实双用户客户端 smoke，验证好友直聊和群聊 first path。
+3. Windows PC 端继续 installer / 启动脚本 / 可运行包体验。
+4. Android 后续只在用户切回时继续：login-level WebView smoke、APK baseline
    报告和真机 UI polish。
-4. 客户端切片阶段性收口后，再回到 workflow compensation adapter / instruction approval
+5. 客户端切片阶段性收口后，再回到 workflow compensation adapter / instruction approval
    UI / ops 管理。
-5. 新发现待办写入 `docs/runbook/remaining-goals.md`，不要把长待办复制回本文件。
+6. 新发现待办写入 `docs/runbook/remaining-goals.md`，不要把长待办复制回本文件。
 
 ## Focused Checks
 
@@ -66,69 +53,8 @@ npm --prefix clients run check:no-toolchain
 git diff --check; git diff --cached --check
 ```
 
-`check:no-toolchain` 先验证自身 dry-run plan 不含下载 / 安装 / 启动设备类操作，
-且该 dry-run plan 必须带 `executionPolicy.planOnly=true`，声明它只描述 focused
-gate，不执行 checks、不运行 npm scripts、不读取设备状态。
-再聚合 client workspace validation、workspace TypeScript、Web PWA、shell config、
-desktop / Android native skeleton validation、Web platform、shared runtime /
-local-store / IndexedDB contracts、Web shell lifecycle /
-automation / smoke-report contracts、shell asset / prep-wrapper、desktop /
-Android action asset、desktop artifact launch / composed smoke dry-run contracts、
-clientweb smoke hook contract、artifact readiness / install-plan / builder /
-collector contracts、Android builder profile / wrapper contracts、desktop WebView
-metadata / login dry-run contracts、Android metadata / login dry-run contracts、
-Android device / WebView devtools readiness and parser contracts、Android
-platform readiness 和 shell smoke plan checks；它不构建 native artifact
-或 APK、不启动 Docker、不安装 APK、不启动 Activity、不打开 `adb reverse`、
-不下载工具链。它会通过 Android readiness report 只读查询 ADB / device state。
-`plan:shell-smoke` 也会把它作为默认 focused gate 暴露出来，并且顶层
-`executionPolicy.planOnly=true` 必须声明它不会执行 checklist 命令、不会启动服务、
-不会下载工具链、不会启动 Docker、不会接触设备。需要定位失败时再跑单项脚本。
-Android Docker builder bootstrap 若出现在 shell smoke plan 中，必须带有
-`downloadsToolchain=true` 和 `requiresExplicitUserOptIn=true`，只能作为显式用户
-同意后的下一步，不属于 no-toolchain gate。Android Docker builder plan / dry-run
-本身也必须带 execution policy，声明 dry-run 只读 Docker builder 状态、不运行 Docker
-命令、不构建 image / APK、不写 artifact manifest、不安装或接触设备；bootstrap 路径
-必须暴露 `plannedDownloadsToolchain=true`，但 dry-run 不能实际下载。`plan:artifact-install` 输出的
-`adb install` / `Start-Process` 也只是 manual checklist，相关步骤必须带
-`manualOnly=true` 和安装 / 启动 / 设备接触风险字段，脚本本身不得安装或启动
-artifact；顶层 `executionPolicy.planOnly=true` 必须声明它不会执行 checklist
-命令、不会下载工具链、不会启动 Docker、不会接触设备。
-Build prerequisites report 必须带 execution policy，声明它是 report-only 本机能力
-探测；可运行本机工具链版本检查、读取环境变量和 repo-local node bin 状态，但不得
-构建 artifact、启动服务 / Docker、安装或接触设备、下载工具链、泄露本地绝对路径或
-原始 command output。
-Artifact readiness report 必须带 execution policy，声明它是 report-only 本机状态
-探测；可读取本机工具链、Docker builder、shell asset manifest 和 native-store
-source readiness，但不得构建 artifact / Docker image、准备或收集 artifact、写
-manifest、启动服务 / Docker、安装或接触设备、下载工具链或泄露本地绝对路径。
-Desktop / Android artifact builder 的 `--dry-run` 输出也必须带 execution policy，
-声明不会执行 Tauri / Gradle build、不会准备或验证 shell assets、不会收集 artifact、
-不会启动 Docker、不会安装或接触设备。
-Artifact collector 的 `--dry-run` 输出必须带 execution policy，声明它只发现候选
-artifact source 并读取元数据，不复制 artifact、不创建输出目录、不写 manifest。
-Desktop artifact launch smoke 的 `--dry-run` 输出必须带 execution policy，声明它会
-只读校验 manifest / artifact hash，但不会启动或终止 artifact 进程。
-Desktop composed smoke 在 `--clientweb-summary + --launch-dry-run` 模式下也必须带
-execution policy，声明它只读取既有 clientweb summary、只读校验 artifact manifest /
-bytes、嵌套 desktop launch dry-run，不启动服务、不启动 desktop artifact、不联网、
-不启动 Docker、不安装或接触设备、不下载工具链。
-`plan:android-webview-login-smoke` 也是 plan-only：它可以列出 APK build、adb
-install、Activity start、adb forward 和 runner 命令，但顶层 execution policy
-必须声明这些命令不会被 plan 脚本执行。
-Desktop WebView metadata / login smoke 的 `--dry-run` 输出也必须带 execution
-policy，声明不会构建 artifact、不会启动 artifact、不会启动 callback / CDP
-自动化、不会连接 BFF 或发送消息。
-Android metadata smoke 的 `--dry-run` 输出也必须带 execution policy，声明不会构建
-APK、不会安装、不会启动 Activity、不会打开 `adb reverse`、不会接触设备。
-Android login-level WebView smoke runner 的 `--dry-run` 输出也必须带 execution
-policy，声明不会构建或收集 APK、不会安装、不会启动 Activity、不会打开 adb
-forward、不会连接 BFF 或发送消息。
-Android platform / device / WebView devtools readiness reports 也必须带
-execution policy，声明它们是 report-only 本机状态探测；可只读查询本机工具链、
-Docker builder 状态、ADB device list 或 WebView devtools socket evidence，但不得
-下载工具链、构建 artifact / Docker image、安装 APK、启动 Activity、打开 adb
-reverse / forward 或泄露 raw device / socket identifier。
+详细 no-toolchain、artifact、Android 和 desktop dry-run 执行策略见
+`docs/runbook/client-platform.md` 与 `clients/README.md`，不要复制回本文件。
 
 只有跨服务、生成代码、migration、service-registry、Docker / compose、安全边界、
 提交推送前或用户明确要求时，才扩大到完整 `.\tools\check-local.ps1`。
@@ -138,6 +64,9 @@ reverse / forward 或泄露 raw device / socket identifier。
 - 客户端 local store 只做缓存 / 离线队列，不成为服务端事实源。
 - 客户端不得直接调用内部微服务，不读取任何服务私表。
 - PullInbox 是消息展示事实源；WebSocket 只做在线唤醒。
+- 不引入隐藏 recovery。客户端、BFF 或服务端遇到依赖、权限、事实源、投影或
+  provider 不确定时，按 `docs/architecture/fail-closed-policy.md` fail-closed、
+  retry / repair，或回到对应事实源 recovery。
 - TypeScript 负责三端共享客户端协议、同步核心和 UI；Rust / Kotlin 只做薄平台桥。
 - Python 只做 AI worker / eval / 离线工具，不接管客户端主链路或业务事实源。
 - 不回滚用户已有修改。

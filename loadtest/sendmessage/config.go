@@ -85,58 +85,58 @@ func parseConfig(args []string, getenv func(string) string) (config, error) {
 	return cfg, nil
 }
 
-func envString(getenv func(string) string, name string, fallback string) string {
+func envString(getenv func(string) string, name string, defaultValue string) string {
 	value := strings.TrimSpace(getenv(name))
 	if value == "" {
-		return fallback
+		return defaultValue
 	}
 	return value
 }
 
-func envInt(getenv func(string) string, name string, fallback int) int {
+func envInt(getenv func(string) string, name string, defaultValue int) int {
 	value := strings.TrimSpace(getenv(name))
 	if value == "" {
-		return fallback
+		return defaultValue
 	}
 	parsed, err := strconv.Atoi(value)
 	if err != nil || parsed <= 0 {
-		return fallback
+		return defaultValue
 	}
 	return parsed
 }
 
-func envBool(getenv func(string) string, name string, fallback bool) bool {
+func envBool(getenv func(string) string, name string, defaultValue bool) bool {
 	value := strings.TrimSpace(getenv(name))
 	if value == "" {
-		return fallback
+		return defaultValue
 	}
 	parsed, err := strconv.ParseBool(value)
 	if err != nil {
-		return fallback
+		return defaultValue
 	}
 	return parsed
 }
 
-func envDuration(getenv func(string) string, name string, fallback time.Duration) time.Duration {
+func envDuration(getenv func(string) string, name string, defaultValue time.Duration) time.Duration {
 	value := strings.TrimSpace(getenv(name))
 	if value == "" {
-		return fallback
+		return defaultValue
 	}
 	parsed, err := time.ParseDuration(value)
 	if err != nil || parsed <= 0 {
-		return fallback
+		return defaultValue
 	}
 	return parsed
 }
 
-func envDurationAllowZero(getenv func(string) string, name string, fallback time.Duration) time.Duration {
+func envDurationAllowZero(getenv func(string) string, name string, defaultValue time.Duration) time.Duration {
 	value := strings.TrimSpace(getenv(name))
 	if value == "" {
-		return fallback
+		return defaultValue
 	}
 	parsed, err := time.ParseDuration(value)
 	if err != nil || parsed < 0 {
-		return fallback
+		return defaultValue
 	}
 	return parsed
 }

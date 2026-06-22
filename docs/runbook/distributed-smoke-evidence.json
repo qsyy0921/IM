@@ -4,12 +4,12 @@
   "scope": "Local distributed smoke evidence index for NexusIM. These entries are local/development evidence, not production HA or SLO claims.",
   "entries": [
     {
-      "name": "push-gateway redis route fallback",
+      "name": "push-gateway redis route recovery",
       "kind": "pushgateway-full",
       "summary_path": "H:\\NexusIM\\loadtest-results\\push-gateway-redis-fault-smoke-20260609-195200\\pushgateway-summary.json",
       "expected_scenario": "redis-fault",
       "require_clean_git": false,
-      "note": "Local Redis route fault fallback; PullInbox remains authoritative."
+      "note": "Local Redis route fault recovery; PullInbox remains authoritative."
     },
     {
       "name": "redis sentinel quorum loss",
@@ -18,7 +18,7 @@
       "expected_redis_mode": "sentinel",
       "expected_scenario": "redis-sentinel-quorum-loss",
       "require_clean_git": false,
-      "note": "Local Sentinel quorum-loss fallback evidence."
+      "note": "Local Sentinel quorum-loss recovery evidence."
     },
     {
       "name": "redis cluster failover",

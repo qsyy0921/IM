@@ -83,7 +83,7 @@ and package verification.
 
 ## Code Fixes Required During Bring-Up
 
-- Windows command probes now resolve `.cmd` / `.bat` fallbacks before marking
+- Windows command probes now resolve `.cmd` / `.bat` recoverys before marking
   Gradle missing.
 - Android APK build wrapper now invokes `gradle.bat` through `cmd.exe` on
   Windows when no Gradle wrapper is present.

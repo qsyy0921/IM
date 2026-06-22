@@ -22,6 +22,8 @@
 
 语言边界：Go 负责后端服务、BFF、控制面、事实源、审计和安全边界；TypeScript 负责 Web/PC/Android 共享客户端协议、同步核心和 UI；Rust/Kotlin/Swift 只做薄平台桥；Python 只做 AI worker、模型算法、eval 和离线工具，不能拥有业务事实源。
 
+Fail-closed 边界：不写隐藏业务兜底；依赖、权限、事实源、投影或 provider 不确定时 fail-closed、retry / repair，或回到事实源恢复。需要判断时读取 docs/architecture/fail-closed-policy.md。
+
 门禁按风险分层：小改只跑相关测试 / 文档脚本；跨服务、生成代码、migration、service-registry、Docker/compose、安全边界或提交推送前才跑完整 check-local。
 ```
 
@@ -37,9 +39,10 @@
 1. 主线阶段以 `current-goal.md` 和 `current-brief.md` 为准；不要在本文件维护当前 active slice 细节。
 2. 小切片闭环：设计、代码、必要测试、文档一起收；默认跑相关局部门禁，不频繁跑完整 `check-local`。
 3. 降低耦合并控制复杂度：不跨服务读内部表，不引入网状同步 RPC，接近行数阈值就拆同 package 文件。
-4. 新服务和中间件不写死；满足独立模型 / 伸缩 / 故障 / 安全边界或明显降复杂度时通过 ADR 新增。
-5. 真实业务语言边界：Go 做后端服务 / BFF / 控制面；TypeScript 做客户端共享核心和 UI；Rust/Kotlin/Swift 只做薄 native adapter；Python 做 AI worker / eval，不接管业务状态。
-6. 长期完整架构以 `docs/architecture/target-architecture-complete.md` 为准；业务平台、数据平台、AI / Agent 平台和中间件平台的新开发都必须遵守其中的边界。
-7. 可用多个 sub-agent，但必须拆分互不重叠职责；主 agent 负责集成和最终检查。
-8. 压测原始数据放 `H:\NexusIM\loadtest-results`；E 盘仓库只放报告和文档。
-9. 新发现待办写入 `docs/runbook/remaining-goals.md`；不回滚用户已有修改。
+4. 不引入隐藏业务兜底；local-test adapter、compat window、显式恢复、repair / redrive 必须按 `docs/architecture/fail-closed-policy.md` 显式命名和隔离。
+5. 新服务和中间件不写死；满足独立模型 / 伸缩 / 故障 / 安全边界或明显降复杂度时通过 ADR 新增。
+6. 真实业务语言边界：Go 做后端服务 / BFF / 控制面；TypeScript 做客户端共享核心和 UI；Rust/Kotlin/Swift 只做薄 native adapter；Python 做 AI worker / eval，不接管业务状态。
+7. 长期完整架构以 `docs/architecture/target-architecture-complete.md` 为准；业务平台、数据平台、AI / Agent 平台和中间件平台的新开发都必须遵守其中的边界。
+8. 可用多个 sub-agent，但必须拆分互不重叠职责；主 agent 负责集成和最终检查。
+9. 压测原始数据放 `H:\NexusIM\loadtest-results`；E 盘仓库只放报告和文档。
+10. 新发现待办写入 `docs/runbook/remaining-goals.md`；不回滚用户已有修改。

@@ -1,6 +1,6 @@
-# push-gateway Redis Sentinel quorum-loss fallback smoke - 2026-06-14
+# push-gateway Redis Sentinel quorum-loss recovery smoke - 2026-06-14
 
-本轮在 clean commit `a511de5` 上验证了本地三 Redis / 三 Sentinel 拓扑下的 quorum-loss fallback：
+本轮在 clean commit `a511de5` 上验证了本地三 Redis / 三 Sentinel 拓扑下的 quorum-loss recovery：
 
 ```text
 route registered
@@ -128,7 +128,7 @@ sentinel_master_after_restore=172.31.50.1:6380
 - 不代表真实网络分区已经验证完成。
 - 不代表 Redis Cluster 或生产级 Redis HA 已完成。
 - 不代表 split-brain、跨机链路抖动、Sentinel 配置漂移或多用户并发都已覆盖。
-- 不代表在线 notify 在所有 Redis 故障窗口里都严格丢失或严格恢复；本轮只证明当前脚本下的 quorum-loss fallback。
+- 不代表在线 notify 在所有 Redis 故障窗口里都严格丢失或严格恢复；本轮只证明当前脚本下的 quorum-loss recovery。
 
 ## 下一步
 

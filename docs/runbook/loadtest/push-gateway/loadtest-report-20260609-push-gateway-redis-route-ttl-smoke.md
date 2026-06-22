@@ -121,5 +121,5 @@ WebSocket 连接在一个 gateway 进程，Kafka delivery event 被另一个 gat
 
 1. 补 Redis route 故障语义 smoke：connect/write route 失败、lookup 失败、publish 失败、subscriber down / stale route。
 2. 补 route cleanup ticker 或 stale user set cleanup 指标。
-3. 决定跨实例 resume：Redis-backed resume buffer，或明确跨实例只支持 `PullInbox` fallback。
+3. 决定跨实例 resume：Redis-backed resume buffer，或明确跨实例只支持 `PullInbox` recovery。
 4. 后续再做 Redis route 多设备 / 慢连接组合 smoke。

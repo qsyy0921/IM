@@ -240,7 +240,7 @@ func TestAuthenticatorJWTRefreshesRemoteJWKSet(t *testing.T) {
 	t.Fatalf("expected refreshed remote jwks to accept rotated key")
 }
 
-func TestAuthenticatorJWTRejectsUnavailableRemoteJWKSetWithoutStaticFallback(t *testing.T) {
+func TestAuthenticatorJWTRejectsUnavailableRemoteJWKSetWithoutStaticRecovery(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		http.Error(writer, "unavailable", http.StatusInternalServerError)
 	}))
@@ -252,7 +252,7 @@ func TestAuthenticatorJWTRejectsUnavailableRemoteJWKSetWithoutStaticFallback(t *
 		Now:       func() time.Time { return time.Unix(1_800_000_000, 0) },
 	})
 	if err == nil {
-		t.Fatalf("expected remote jwks startup failure without static fallback")
+		t.Fatalf("expected remote jwks startup failure without static default")
 	}
 }
 
@@ -270,7 +270,7 @@ func TestAuthenticatorJWTKeepsStaticJWKSetWhenInitialRemoteFetchFails(t *testing
 		Now:            func() time.Time { return time.Unix(1_800_000_000, 0) },
 	})
 	if err != nil {
-		t.Fatalf("new authenticator with static fallback: %v", err)
+		t.Fatalf("new authenticator with static default: %v", err)
 	}
 	defer authenticator.Close()
 	stats := authenticator.JWKStats()

@@ -4,7 +4,7 @@
 
 Passed.
 
-This smoke validates Redis-backed resume fallback behavior for negative paths. It is not a capacity test and does not prove production Redis HA.
+This smoke validates Redis-backed resume recovery behavior for negative paths. It is not a capacity test and does not prove production Redis HA.
 
 ## Environment
 

@@ -39,7 +39,7 @@ The runner starts:
 - `policy-service` in `grpc` mode with `NEXUSIM_POLICY_RULES_ENABLED=true`;
 - `message-service` in `grpc` mode with `NEXUSIM_POLICY_SERVICE_ADDR` set;
 - static conversation mock with `NEXUSIM_MOCK_PERMISSION_VERSION` aligned to the scenario;
-- local static policy fallback with opposite sentinel values so a missed RPC path cannot pass silently.
+- local static policy recovery with opposite sentinel values so a missed RPC path cannot pass silently.
 
 ## Results
 

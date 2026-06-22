@@ -132,7 +132,7 @@ NexusIM 的开发顺序不是“先把所有功能铺开”，而是：
 
 - 多进程 / 多实例 smoke
 - Win / Mac 双机 smoke
-- Redis route / resume / fallback
+- Redis route / resume / recovery
 - PostgreSQL failover smoke
 - Kafka failover smoke
 - Redis Sentinel / quorum / 网络故障 smoke

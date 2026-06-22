@@ -111,6 +111,6 @@ delivery_outbox pending=0
 ## 限制
 
 - 本轮是单实例 `all` mode，不证明 Redis route / 多实例在线路由。
-- 本轮不证明 resume buffer replay、resume buffer TTL，也不证明跨实例 resume。runner 在重连前已经通过 `PullInbox` 拉到 `max_seq=129`，因此验收点是 durable inbox fallback，而不是短时 buffer 重放。
+- 本轮不证明 resume buffer replay、resume buffer TTL，也不证明跨实例 resume。runner 在重连前已经通过 `PullInbox` 拉到 `max_seq=129`，因此验收点是 durable inbox recovery，而不是短时 buffer 重放。
 - 本轮通过测试写延迟稳定制造慢连接，不代表生产默认写路径有该延迟。
 - `/debug/metrics` 是当前单实例调试指标，不是最终 Prometheus 体系。

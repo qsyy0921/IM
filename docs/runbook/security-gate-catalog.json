@@ -1,4 +1,4 @@
-{
+﻿{
   "schema_version": 1,
   "updated_at": "2026-06-21",
   "scope": "Local startup/security boundary gate catalog for NexusIM. These gates protect local development and CI-style checks; they are not a substitute for production identity, network policy, mTLS rollout, or external audit controls.",
@@ -111,7 +111,7 @@
       "category": "identity-security",
       "script": "tools/check-identity-production-key-guard.ps1",
       "check_local_label": "identity production key guard",
-      "note": "Production-like identity startup must reject legacy / HS256 gateway token mode and local fallback identity key material."
+      "note": "Production-like identity startup must reject legacy / HS256 gateway token mode and local shared identity key material."
     },
     {
       "name": "repair operator catalog",

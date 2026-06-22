@@ -1,4 +1,4 @@
-# policy-service Loadtest Reports
+﻿# policy-service Loadtest Reports
 
 This directory is the entry point for `policy-service` smoke reports. The current implementation is not a capacity-tested policy engine; it is a first-stage service boundary for message action decisions.
 
@@ -10,7 +10,7 @@ Implemented:
 - Static first-stage message action decision configured by environment.
 - Optional exact-match PostgreSQL message action rule store through `NEXUSIM_POLICY_RULES_ENABLED=true`.
 - Optional message-service RPC adapter through `NEXUSIM_POLICY_SERVICE_ADDR`.
-- message-service fallback to legacy `StaticPolicy` when no policy-service address is configured.
+- message-service compatibility path to legacy `StaticPolicy` when no policy-service address is configured.
 - Optional debug server through `NEXUSIM_POLICY_DEBUG_ADDR` with `/healthz`, `/readyz`, `/debug/metrics`, first-stage Prometheus text `/metrics`, aggregate gRPC metrics, aggregate decision metrics and PostgreSQL rule-store summaries.
 - message-service policy RPC trace / request metadata propagation for policy-service structured gRPC logs.
 - Contacts event projection consumer through `NEXUSIM_POLICY_SERVICE_MODE=contact-consumer`, storing directed contact edges in `policy_contact_edges_projection`.
@@ -190,9 +190,9 @@ policy-service grpc
 -> message-service normal transaction / public deny
 ```
 
-When testing through `message-service`, keep the policy permission version aligned with conversation permission version to avoid expected dependency-version mismatch. The integration smoke intentionally sets local mock policy opposite to remote policy decision so fallback cannot produce a false positive. Do not treat these smokes as proof of contacts / role / tenant / risk policy behavior.
+When testing through `message-service`, keep the policy permission version aligned with conversation permission version to avoid expected dependency-version mismatch. The integration smoke intentionally sets local mock policy opposite to remote policy decision so compatibility path cannot produce a false positive. Do not treat these smokes as proof of contacts / role / tenant / risk policy behavior.
 
-The rule-store smoke also sets local static fallback opposite to the seeded PostgreSQL rule. That makes a rule miss visible: allow would become deny, and deny would become an unexpected write. The tenant-rule smoke uses the same guard but seeds tenant-scoped `tenant_id + action` defaults. For mutation actions, it also seeds a tenant-level `SEND / POLICY_SEND_SEED` allow rule so the baseline message can be created before `EDIT` / `REVOKE` / `DELETE` is tested.
+The rule-store smoke also sets local static default opposite to the seeded PostgreSQL rule. That makes a rule miss visible: allow would become deny, and deny would become an unexpected write. The tenant-rule smoke uses the same guard but seeds tenant-scoped `tenant_id + action` defaults. For mutation actions, it also seeds a tenant-level `SEND / POLICY_SEND_SEED` allow rule so the baseline message can be created before `EDIT` / `REVOKE` / `DELETE` is tested.
 
 The observability smoke reads `/debug/metrics` after both allow and deny scenarios. Decision metrics are recorded at the final `CheckMessageAction` use-case boundary, so they include normal evaluator decisions plus first-stage message ownership denies and `ownership_override=true` allows. `policy_rule_store` is also a low-cardinality rule inventory: exact rules and tenant rules are grouped by action and allow/deny, while conversation role and ownership override rules are grouped by action and minimum role. `policy_projection` summarizes policy-owned contact edges, conversation member projection rows and Kafka checkpoint topics without listing tenants, users, conversations or partitions. Metrics are aggregate debug snapshots only: they do not expose tenant id, user id, conversation id, message id, policy request bodies, rule parameters, deny reason text or classification strings. Trace id and request id are propagated for structured gRPC logs, not as metrics labels.
 

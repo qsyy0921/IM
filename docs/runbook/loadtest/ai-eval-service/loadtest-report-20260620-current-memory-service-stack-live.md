@@ -90,7 +90,7 @@ Adapter counts:
 | --- | ---: | ---: |
 | profile-agent-safety | 14 | 14 |
 | action-external-http-provider | 2 | 2 |
-| action-external-mcp-fallback | 4 | 4 |
+| action-external-mcp-recovery | 4 | 4 |
 | rag-service | 6 | 6 |
 | summary-service | 4 | 4 |
 | agent-action-executor | 8 | 8 |

@@ -1,4 +1,4 @@
-# policy-service message ownership override smoke
+﻿# policy-service message ownership override smoke
 
 Date: 2026-06-13
 
@@ -56,7 +56,7 @@ This keeps the low-coupling boundary:
 
 - message-service still owns message facts and reads the original sender from `message_log`;
 - policy-service owns policy rules, projected conversation roles, and audit;
-- exact rules, tenant rules, and static fallback cannot silently bypass sender ownership;
+- exact rules, tenant rules, and static default cannot silently bypass sender ownership;
 - missing or stale conversation member projection fails closed before an override can be issued.
 
 ## Remaining Work

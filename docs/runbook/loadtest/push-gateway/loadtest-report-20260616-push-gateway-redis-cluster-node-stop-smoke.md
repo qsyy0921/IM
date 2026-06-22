@@ -1,4 +1,4 @@
-# push-gateway Redis Cluster node-stop fallback smoke
+# push-gateway Redis Cluster node-stop recovery smoke
 
 Date: 2026-06-16
 
@@ -110,7 +110,7 @@ This proves:
 - If route lookup fails during the fault window, the online wakeup can be
   missed without losing the durable delivery fact.
 - `delivery-service PullInbox` remains the recovery source of truth.
-- `AckDelivery` can still advance the device cursor after fallback recovery.
+- `AckDelivery` can still advance the device cursor after recovery recovery.
 - The delivery outbox relay drains successfully: no pending or DLQ rows remain.
 
 This does not prove:

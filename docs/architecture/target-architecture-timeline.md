@@ -493,7 +493,7 @@ push-gateway keeps last N seconds / N messages unacked push buffer per session
 client reconnects within server_push_buffer_window
 -> resume from push buffer
 else
--> fallback to delivery-service pull
+-> recovery to delivery-service pull
 ```
 
 约束：

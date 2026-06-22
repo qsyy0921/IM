@@ -144,6 +144,9 @@ AI 与 Agent 平台
 8. Python worker 只返回候选结果；Go 服务拥有控制面、事实和审计。
 9. 客户端本地存储只是缓存 / 离线队列，不是服务端事实源。
 10. 中间件作为平台能力引入，不作为某个服务的私有堆叠。
+11. NexusIM 不使用 recovery 作为隐藏业务语义；依赖、权限、事实源或投影不确定时必须
+    fail-closed、retry / repair，或回到对应事实源执行 recovery。详细规则见
+    `docs/architecture/fail-closed-policy.md`。
 
 ## 6. 领域地图
 
@@ -198,7 +201,7 @@ AI 与 Agent 平台
 | `agent-service` | 规划、多 Agent 协作和 Agent run state。 |
 | `skill-registry` | 工具 / skill 能力目录、风险等级、调用 metadata。 |
 | `mcp-gateway` | MCP tool / resource / prompt 边界和 consent enforcement。 |
-| `model-gateway` | LLM、embedding、rerank provider 路由、预算、fallback 和审计。 |
+| `model-gateway` | LLM、embedding、rerank provider 路由、预算、recovery 和审计。 |
 | `action-executor` | 只通过公开 API 执行已审批的业务动作。 |
 | `ai-eval-service` | 数据集、回归运行、RAG / memory / Agent 评测、安全门禁。 |
 

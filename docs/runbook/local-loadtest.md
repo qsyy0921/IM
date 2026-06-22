@@ -185,8 +185,8 @@ seed 工具只写本地压测 fixture 租户：`tenant-capacity-message`、`tena
 
 | 角色 | 地址 | 用途 |
 | --- | --- | --- |
-| Windows 本机 Wi-Fi | `192.168.0.141` | 上网、SSH fallback |
-| MacBook Wi-Fi | `192.168.0.182` | 上网、SSH fallback |
+| Windows 本机 Wi-Fi | `192.168.0.141` | 上网、SSH recovery |
+| MacBook Wi-Fi | `192.168.0.182` | 上网、SSH recovery |
 | Windows 本机有线直连 | `172.31.50.1` | Win-Mac 压测服务端 / 客户端 |
 | MacBook 有线直连 | `172.31.50.2` | Win-Mac 压测客户端 / callback/mock receiver |
 

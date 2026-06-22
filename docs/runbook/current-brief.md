@@ -1,109 +1,55 @@
 # NexusIM Current Brief
 
-本文件是每轮低 token 入口，只回答“现在处于什么阶段、下一步去哪里看”。
-不要在这里维护长历史或完整待办。
+本文件是低 token 阶段入口，只回答“现在在哪个阶段、下一步读哪里”。不要在这里维护
+长历史、完整证据或全部待办。
 
 ## 按需读取
 
 - 当前执行目标：`docs/runbook/current-goal.md`
 - 剩余目标：`docs/runbook/remaining-goals.md`
-- 服务细节：先读 `docs/runbook/service-briefs/README.md`，再读对应 service brief。
+- 单服务事实：`docs/runbook/service-briefs/README.md`，再读对应 service brief。
+- 客户端细节：`docs/runbook/client-platform.md`
+- 完整目标架构：`docs/architecture/target-architecture-complete.md`
+- Fail-closed 规则：`docs/architecture/fail-closed-policy.md`
 - 历史证据：按关键词查 `docs/runbook/loadtest/`、`docs/runbook/archive/`
   或 `docs/runbook/history/`。
 
 ## 当前阶段
 
-NexusIM 已有本地 / 双机可运行的最小分布式 IM 后端。
-
-当前 active slice：
-
 ```text
 client platform MVP foundation
 ```
 
-Core services：api-gateway、contacts-service、conversation-service、delivery-service、
-identity-service、message-service、policy-service、push-gateway、receipt-service。
+NexusIM 已有本地 / 双机可运行的最小分布式 IM 后端，并已扩展到 AI foundation
+和 product-active 服务 first paths。当前用户已切入客户端平台，短线优先浏览器端
+和 Windows PC 端；Android 后置到用户明确切回。
 
-AI foundation：action-executor、agent-service、ai-eval-service、mcp-gateway、
-memory-service、rag-service、retrieval-gateway、search-service、skill-registry、
-summary-service。
+## 已有服务层级
 
-future platform / product services 的 10 个目标服务已经进入 product-active
-first-stage implementation：admin-service、audit-service、control-plane-service、
-knowledge-ingestion-service、media-service、model-gateway、notification-service、
-presence-service、vector-index-service、workflow-service。
+- Core IM services：api-gateway、identity-service、message-service、
+  conversation-service、delivery-service、push-gateway、receipt-service、
+  contacts-service、policy-service。
+- AI foundation：search-service、memory-service、retrieval-gateway、rag-service、
+  summary-service、agent-service、skill-registry、mcp-gateway、action-executor、
+  ai-eval-service。
+- Product-active first paths：admin-service、audit-service、control-plane-service、
+  knowledge-ingestion-service、media-service、model-gateway、notification-service、
+  presence-service、vector-index-service、workflow-service。
+- Client platform：Web / Windows PC / Android 共用 TypeScript protocol 和
+  client-core；native shell 只做薄平台 bridge。
 
-用户已明确切入客户端平台。当前短线不做临时 demo，而是先以浏览器、PC、Android
-三端方式冻结可复用客户端架构：`clients/packages/protocol`、
-`clients/packages/client-core`、`clients/web`、`clients/desktop` 和
-`clients/android`。浏览器先可运行，PC / Android 复用同一协议和同步核心。
-`clients/` workspace skeleton 已创建并通过 focused validation；`loadtest/clientweb`
-已提供脚本化 BFF + push client-path smoke runner 和本地私有进程启动脚本。第一轮
-本地 Web MVP smoke 已通过并归档；提交后的 clean baseline 也已通过并归档；
-Windows wired `172.31.50.1` clean baseline 已通过并归档；BFF HTTP route metrics /
-rate-limit adapter 已落。PC / Android runtime shell 已进入 assets prep / native
-shell 骨架阶段；artifact / APK build wrapper 已有 dry-run-tested command plan，
-artifact collector 已能生成低敏 SHA-256 manifest，且 build wrapper 已支持成功构建后自动归档；Android Docker builder
-profile 已接 collector 但尚未运行；readiness report 显示 Docker / Compose 可用但 builder image 尚未构建。desktop 已通过 repo-local
-Tauri CLI 产出 first-stage standalone Windows exe，并写入 ignored artifact
-manifest；desktop launch sanity smoke 已验证 exe 能启动并干净终止；desktop composed
-smoke 工具已能把 existing clientweb BFF / push summary 和 desktop artifact launch
-证据合并成低敏 JSON，但它仍不是 Tauri WebView 内登录级 GUI 自动化；真实 Tauri
-WebView metadata callback smoke 已通过，可用 loopback-only callback 证明 WebView
-内能读取 PC Tauri `runtime_metadata` 并回调低敏 report；本机仍缺 Android JDK 17+ /
-Gradle / SDK。下一步推进登录级真实 PC shell smoke，并补 Android 本地工具链或显式运行
-builder profile 产出 Android unsigned APK。
+## 当前短线
 
-真实业务语言边界已经固定为：Go 负责后端微服务、client BFF、控制面、事实源和
-审计；TypeScript 负责 Web / PC / Android 的共享客户端协议、同步核心和 UI；
-Rust / Kotlin 只做薄平台 bridge；Python 只做 AI worker、模型算法、eval 和离线
-工具，不接管业务事实源。
-
-完整扩展后的业务平台 / 数据平台 / AI Agent 平台 / 中间件平台总览已补到
-`docs/architecture/target-architecture-complete.md`；中间件能力、runtime profile
-和引入规则见 `docs/platform/middleware-catalog.md`。这些文档只定义长期边界和
-adoption rules，不把服务数量、中间件或部署形态写死。
-
-当前短线重点：
-
-- client-platform：`api-gateway` client BFF 和 Web fetch / WebSocket /
-  IndexedDB adapter first path 已落，`loadtest/clientweb` 本地 smoke 已通过并归档；
-  loopback clean baseline 和 Windows wired `172.31.50.1` clean baseline 已通过，
-  BFF HTTP route metrics / rate-limit adapter 已落；PC desktop / Android 已有
-  shared `LocalMessageStore.listMessages` 读缓存 port 和一致的 pending -> accepted
-  send 迁移语义；
-  target shell Web assets prep，PC 已有只读 `runtime_metadata` IPC，且
-  `frontendDist` 指向 shared prepared Web dist；Android 已用
-  WebViewAssetLoader 加载本地 assets，并已注册只读单方法 `NexusIMNative`
-  metadata bridge，Web shell 已能展示 PC / Android native metadata，并已通过 shared
-  `ClientShellActions` 接入 login / refresh / restore / logout，desktop / Android thin
-  shell actions 已覆盖 login / refresh / restore / logout；`test:web-shell-actions`
-  已防止 Web shell 绕过 shared lifecycle contract；shell asset prep 已清理 stale
-  bundle、写低敏 hash manifest，并在 artifact wrapper 中验证 manifest；desktop
-  artifact wrapper 已在 manifest 校验后跳过 Tauri 内重复 asset prep，直接 Tauri build
-  仍会自动准备 assets；Android APK wrapper 已在 manifest 校验后跳过 Gradle 内重复 asset
-  prep，直接 Gradle build 仍会自动准备 assets；artifact / APK wrapper 已能 dry-run 输出命令和缺失工具链，Android
-  builder profile 已能静态校验，readiness report 已显示 shell asset verification
-  状态，artifact install plan 已能从 collected manifest 输出低敏 Windows / Android
-  安装 checklist 和 install-side prereq readiness，且不触碰设备；shell smoke plan
-  已消费同一 install readiness，并输出低敏 browser / desktop / Android smoke
-  前置计划和 per-target manual checklist，且区分 raw build output 与 collected
-  artifact manifest；Windows desktop 已产出 standalone exe artifact + manifest；
-  launch sanity smoke 已通过；desktop composed smoke 工具已能合并 clientweb BFF /
-  push summary 与 desktop launch 证据；真实 Tauri WebView metadata callback smoke
-  已通过；下一步做登录级真实 PC shell smoke、Android APK 和真实 Android shell
-  smoke。
-- admin / audit / workflow：客户端切片完成后继续公开 API handoff、operator
-  workflow、低敏审批 review artifact 和补偿边界。
-- vector-index：继续 provider backend、pgvector / Milvus / OpenSearch 相关
-  focused smoke。
+1. 收口 Web / Windows PC 客户端：登录、好友、好友直聊、建群、消息列表、发送、
+   PullInbox / ACK 和本机可运行包体验。
+2. 所有客户端能力只走 api-gateway BFF 和 push-gateway，不直连内部服务。
+3. 不引入隐藏 recovery；依赖、权限、事实源或投影不确定时 fail-closed、repair /
+   retry，或回到对应事实源 recovery。
 
 ## 不变量
 
+- PullInbox 是消息展示事实源，WebSocket 只是在线唤醒。
 - RAG / summary / Agent 只能消费权限过滤后的 EvidencePack。
 - 真实写动作必须走 policy、proposal / approval、executor 和 audit。
-- Python AI Worker 只做模型 / 算法 / eval 候选层；Go 负责控制面、状态和审计。
-- future 服务之间不得读私有表，必须通过公开 API、事件或明确 port 串联。
-- 客户端只连 `api-gateway` / `push-gateway`；PullInbox 是事实源，WebSocket 只是
-  在线唤醒。
+- Python AI Worker 只做候选算法和 eval；Go 拥有控制面、状态和审计。
 - 新发现待完成工作写入 `docs/runbook/remaining-goals.md`。

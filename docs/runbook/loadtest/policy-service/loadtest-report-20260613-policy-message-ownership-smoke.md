@@ -1,4 +1,4 @@
-# policy-service message ownership integration smoke - 2026-06-13
+﻿# policy-service message ownership integration smoke - 2026-06-13
 
 ## Scope
 
@@ -43,10 +43,10 @@ The runner starts:
 
 - `policy-service` in `grpc` mode with `NEXUSIM_POLICY_RULES_ENABLED=true`;
 - `message-service` in `grpc` mode with `NEXUSIM_POLICY_SERVICE_ADDR` set;
-- local static policy fallback as allow with `classification=POLICY_OWNERSHIP_FALLTHROUGH_ALLOWED`;
+- local static policy recovery as allow with `classification=POLICY_OWNERSHIP_FALLTHROUGH_ALLOWED`;
 - no exact or tenant policy rules.
 
-This setup makes non-sender denies prove the ownership gate: if the ownership gate did not run, the static fallback would allow the mutation.
+This setup makes non-sender denies prove the ownership gate: if the ownership gate did not run, the static default would allow the mutation.
 
 ## Results
 
@@ -92,11 +92,11 @@ timeline event type matches message.edited.v1 / message.revoked.v1 / message.del
 
 The allow scenarios prove that the original sender can still mutate their own message when policy falls through to allow.
 
-The deny scenarios prove that a different actor is rejected by `policy-service` before rule/static fallback. The latest audit row for each target mutation is `MESSAGE_OWNERSHIP_DENIED`, has `message_id_present=true`, and has a non-empty stable `message_key`. This prevents the result from being confused with message-service's final transactional sender check.
+The deny scenarios prove that a different actor is rejected by `policy-service` before rule/static default. The latest audit row for each target mutation is `MESSAGE_OWNERSHIP_DENIED`, has `message_id_present=true`, and has a non-empty stable `message_key`. This prevents the result from being confused with message-service's final transactional sender check.
 
 ## Limits
 
-This is a targeted real-process smoke, not a capacity result. It uses message-service's static conversation context and policy-service's static allow fallback. It proves sender-only ownership enforcement for message mutation actions, not a complete moderation or authorization model.
+This is a targeted real-process smoke, not a capacity result. It uses message-service's static conversation context and policy-service's static allow recovery. It proves sender-only ownership enforcement for message mutation actions, not a complete moderation or authorization model.
 
 Remaining future work:
 

@@ -216,13 +216,13 @@ H:\NexusIM\loadtest-results\push-gateway-redis-sentinel-route-resume-final-20260
 
 该 run 使用 clean commit `7bc35a5`，`git_dirty=false`。拓扑为本地三 Redis / 三 Sentinel，push-gateway 使用 `NEXUSIM_PUSH_REDIS_MODE=sentinel` 和 `mymaster` 发现 master；Sentinel 返回 master `172.31.50.1:6380`，启动脚本已验证该地址可从宿主机 TCP 连接、可从 Sentinel 容器内 `PING`。结果：consumer gateway `redis_resume_append_count=1`、`redis_route_remote_publish_call_count=1`、`redis_route_remote_publish_error_count=0`，重连 gateway `redis_resume_replay_count=1 / redis_resume_miss_count=0`，随后 `PullInbox item_count=1/max_seq=2`，`delivery.ack.ok last_received_seq=2`，`delivery_outbox PUBLISHED=2/PENDING=0/DLQ=0`。这证明 Sentinel discovery 正常路径可用，不证明 master failover / Redis HA。
 
-当前 Redis Sentinel quorum-loss fallback smoke 原始结果：
+当前 Redis Sentinel quorum-loss recovery smoke 原始结果：
 
 ```text
 H:\NexusIM\loadtest-results\redis-sentinel-quorum-loss-smoke-20260614f\pushgateway-summary.json
 ```
 
-该 run 使用 clean commit `a511de5`，`git_dirty=false`。拓扑仍为本地三 Redis / 三 Sentinel，但故障脚本会在 WebSocket route 已注册后停止 `nexusim-redis-sentinel-2`、`nexusim-redis-sentinel-3` 和当前 master 容器 `nexusim-redis-ha-master`，因此 Sentinel 1 仍可返回旧 master 地址 `172.31.50.1:6380`，但已经没有 quorum 也没有可用 master。结果：`delivery.notify` 在 1 秒观察窗内超时，consumer gateway `redis_route_remote_publish_call_count=1 / redis_route_remote_no_subscriber_count=1 / redis_route_remote_enqueued_sessions=0`，随后 `PullInbox item_count=1/max_seq=2`、`delivery.ack.ok last_received_seq=2`、`delivery_outbox PUBLISHED=2/PENDING=0/DLQ=0`。这证明本地 Sentinel quorum-loss 下，在线通知可以退化，但 durable `PullInbox + AckDelivery` fallback 仍可恢复；它不代表真实网络分区、Redis Cluster、split-brain 或生产级 Redis HA。
+该 run 使用 clean commit `a511de5`，`git_dirty=false`。拓扑仍为本地三 Redis / 三 Sentinel，但故障脚本会在 WebSocket route 已注册后停止 `nexusim-redis-sentinel-2`、`nexusim-redis-sentinel-3` 和当前 master 容器 `nexusim-redis-ha-master`，因此 Sentinel 1 仍可返回旧 master 地址 `172.31.50.1:6380`，但已经没有 quorum 也没有可用 master。结果：`delivery.notify` 在 1 秒观察窗内超时，consumer gateway `redis_route_remote_publish_call_count=1 / redis_route_remote_no_subscriber_count=1 / redis_route_remote_enqueued_sessions=0`，随后 `PullInbox item_count=1/max_seq=2`、`delivery.ack.ok last_received_seq=2`、`delivery_outbox PUBLISHED=2/PENDING=0/DLQ=0`。这证明本地 Sentinel quorum-loss 下，在线通知可以退化，但 durable `PullInbox + AckDelivery` recovery 仍可恢复；它不代表真实网络分区、Redis Cluster、split-brain 或生产级 Redis HA。
 
 当前 PostgreSQL failover smoke 原始结果：
 
@@ -429,7 +429,7 @@ Redis Sentinel / Cluster smoke 结果可以用下面的离线 validator 校验 w
   -RequireCleanGit
 ```
 
-该 validator 只验证本地 smoke 证据格式、Redis route fallback / failover / capacity summary 不变量，不证明生产 Redis HA、长时间容量曲线或容量 SLO。
+该 validator 只验证本地 smoke 证据格式、Redis route recovery / failover / capacity summary 不变量，不证明生产 Redis HA、长时间容量曲线或容量 SLO。
 
 分布式 smoke 证据索引维护在：
 
@@ -465,10 +465,10 @@ docs/runbook/distributed-smoke-evidence.json
 
 ## 7. 已知缺口
 
-- Redis route 已做一次真实 stop/start fault smoke，证明 online notify 可丢但 `PullInbox + AckDelivery` 可恢复；push-gateway 已在三 Redis / 三 Sentinel 拓扑上跑通 Sentinel discovery、手动 failover、master-stop recovery、quorum-loss fallback 和 network-partition fallback smoke，也跑通过 Redis Cluster topology / node-stop / failover / 短容量 smoke，且 summary 格式已有离线 validator；这些仍不是生产 Redis HA、长时间容量曲线或生产级高可用结论。
+- Redis route 已做一次真实 stop/start fault smoke，证明 online notify 可丢但 `PullInbox + AckDelivery` 可恢复；push-gateway 已在三 Redis / 三 Sentinel 拓扑上跑通 Sentinel discovery、手动 failover、master-stop recovery、quorum-loss recovery 和 network-partition recovery smoke，也跑通过 Redis Cluster topology / node-stop / failover / 短容量 smoke，且 summary 格式已有离线 validator；这些仍不是生产 Redis HA、长时间容量曲线或生产级高可用结论。
 - PostgreSQL 当前已补本地 `repmgr + pgpool` failover smoke、quorum observation smoke 和 summary 离线 validator，证明同一个 pgpool DSN 在 primary 切换前后仍可跑通最小分布式链路，并能离线复核 wrapper / linked pushgateway summary 的关键不变量；但这仍不是 Patroni / etcd / 云托管 PostgreSQL 的生产级 HA 验收，也不覆盖 split-brain、quorum、防抖、自动回切或 in-flight transaction continuity。
 - Redis route 已有 TTL 续期和后台 stale route cleanup；异常进程退出后 session route 仍依赖 TTL 过期，user route set 中的 stale 成员由 lookup / cleanup loop 移除。
-- `push-gateway` Redis-backed cross-instance resume buffer 已有本机跨进程 smoke 和 Win-Mac Docker smoke；跨实例 replay miss、Redis error 或 token mismatch 时仍必须 fallback `PullInbox`。
+- `push-gateway` Redis-backed cross-instance resume buffer 已有本机跨进程 smoke 和 Win-Mac Docker smoke；跨实例 replay miss、Redis error 或 token mismatch 时仍必须 recovery `PullInbox`。
 - `push-gateway` `/debug/metrics` 仍是本地 smoke 调试端点，不是正式 Prometheus 指标。
 - 真实生产部署还未接入 Kubernetes / service discovery / mTLS / OTel。
 - Mac Docker CLI / SSH 已可用；双机 Docker Compose profile 尚未完成配置和验证。Mac `Desktop/IM` 有本地变更，后续跨机 smoke 前需选择 fast-forward 更新或新建干净 smoke checkout。

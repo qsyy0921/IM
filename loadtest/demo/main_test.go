@@ -43,7 +43,7 @@ func TestEnvBool(t *testing.T) {
 	}
 	t.Setenv("NEXUSIM_TEST_BOOL", "invalid")
 	if !envBool("NEXUSIM_TEST_BOOL", true) {
-		t.Fatal("expected invalid env bool to keep fallback")
+		t.Fatal("expected invalid env bool to keep recovery")
 	}
 }
 

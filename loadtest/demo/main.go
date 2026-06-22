@@ -337,6 +337,10 @@ func (client gatewayConversationClient) GetSendContext(context.Context, *convers
 	return nil, status.Error(codes.Unimplemented, "GetSendContext is service-internal")
 }
 
+func (client gatewayConversationClient) CreateConversation(context.Context, *conversationv1.CreateConversationRequest, ...grpc.CallOption) (*conversationv1.CreateConversationResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "CreateConversation is not used by the demo facade path")
+}
+
 func createReceiverJoin(ctx context.Context, cfg config, client conversationv1.ConversationServiceClient) (*conversationv1.CreateMemberChangeResponse, error) {
 	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
 	defer cancel()

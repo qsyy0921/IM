@@ -81,7 +81,7 @@ EverMemBench 只是设计输入之一。它强调多人、多群、多时间版�
 
 | 服务 | 触发拆分条件 |
 | --- | --- |
-| `model-gateway` | 多模型 provider、embedding / rerank、成本、fallback、prompt policy 和低敏审计需要统一治理 |
+| `model-gateway` | 多模型 provider、embedding / rerank、成本、recovery、prompt policy 和低敏审计需要统一治理 |
 | `workflow-service` | Agent approval、repair、retention、外部补偿等长事务需要独立状态机 |
 | `knowledge-ingestion-service` | 文件 / 网页 / 企业知识库导入、chunking、embedding pipeline 和导入审计独立成面 |
 | `vector-index-service` | Milvus / pgvector / OpenSearch vector 写入、重建、backfill 和 delete proof 需要独立扩缩容 |
@@ -658,7 +658,7 @@ message tombstone
 -> delete proof / audit
 ```
 
-如果删除传播失败，retrieval-gateway 必须冻结相关 scope 或进入 strict fallback。
+如果删除传播失败，retrieval-gateway 必须冻结相关 scope 或进入 strict recovery。
 
 ### 8.3 成本治理
 

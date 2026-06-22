@@ -155,7 +155,8 @@ flowchart TB
 群成员添加 / 退群、成员列表、成员搜索 / 角色过滤 / 分页、移除成员、角色变更 / owner transfer 第一路径、
 群资料卡、邀请来源提示、权限感知群设置操作区、群标题 / 头像 URI read-update、消息列表、
 发送后本地状态刷新、PullInbox 和 ACK。2026-06-23 的
-clean smoke 已验证双用户好友直聊和群聊 first path；随后 Web / PC shell 又补了
+clean smoke 已验证双用户好友直聊、群聊 first path、群资料 BFF read/update 和群成员动作；
+随后 Web / PC shell 又补了
 第一版会话展示标题、空态、常见错误中文文案和显式本地启动脚本。Windows desktop
 collected package 现在包含低敏 README；standalone exe package 还包含
 package-local PowerShell launcher，install plan 会校验这些 support files 并给出人工启动命令；
@@ -305,7 +306,7 @@ message / conversation / policy events -> search-service + memory-service projec
 Web / Windows PC 客户端的 IM MVP 交互做实：账号注册登录、好友关系、好友私聊、群聊、
 群成员管理第一路径、消息列表、发送、PullInbox / AckDelivery 和局域网可运行体验。本地 / 局域网 Web smoke、
 PC WebView login smoke、真实双用户 direct + group client smoke、PC standalone exe package、
-unsigned local desktop bundle、desktop installer / signing readiness plans、显式 signing wrapper、只读 signature verifier、显式 installer build 包装器、artifactKind-aware install / signing / verification / installer plans 和 Android debug APK baseline 已有；`loadtest/clientweb` 已扩展到群成员列表、移除、
+unsigned local desktop bundle、desktop installer / signing readiness plans、显式 signing wrapper、只读 signature verifier、显式 installer build 包装器、artifactKind-aware install / signing / verification / installer plans 和 Android debug APK baseline 已有；`loadtest/clientweb` 已扩展到群资料 BFF read/update、群成员列表、移除、
 角色变更和 owner transfer，并已通过 clean committed 真实 smoke；Web / PC shell 已补
 BFF-backed 成员搜索 / 角色过滤 / 分页，并已有第一版群资料卡、邀请来源提示和群标题 /
 头像 URI read-update。下一步是 Windows PC MSI / NSIS installer 与真实 signing input /

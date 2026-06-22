@@ -3,29 +3,30 @@ package main
 import "time"
 
 type summary struct {
-	Commit              string                    `json:"commit"`
-	CommitFull          string                    `json:"commit_full"`
-	GitDirty            bool                      `json:"git_dirty"`
-	ResultDir           string                    `json:"result_dir"`
-	TenantID            string                    `json:"tenant_id"`
-	GroupConversationID string                    `json:"group_conversation_id"`
-	SenderUserID        string                    `json:"sender_user_id"`
-	ReceiverUserID      string                    `json:"receiver_user_id"`
-	ReceiverDevice      string                    `json:"receiver_device_id"`
-	BFFBaseURL          string                    `json:"bff_base_url"`
-	PushURL             string                    `json:"push_url"`
-	StartedAt           time.Time                 `json:"started_at"`
-	FinishedAt          time.Time                 `json:"finished_at"`
-	Success             bool                      `json:"success"`
-	Error               string                    `json:"error,omitempty"`
-	Setup               setupSummary              `json:"setup"`
-	Contact             contactSummary            `json:"contact"`
-	SenderLogin         loginSummary              `json:"sender_login"`
-	ReceiverLogin       loginSummary              `json:"receiver_login"`
-	ServerHello         serverFrame               `json:"server_hello"`
-	DirectChat          scenarioSummary           `json:"direct_chat"`
-	GroupChat           scenarioSummary           `json:"group_chat"`
-	GroupMemberActions  groupMemberActionsSummary `json:"group_member_actions"`
+	Commit              string                     `json:"commit"`
+	CommitFull          string                     `json:"commit_full"`
+	GitDirty            bool                       `json:"git_dirty"`
+	ResultDir           string                     `json:"result_dir"`
+	TenantID            string                     `json:"tenant_id"`
+	GroupConversationID string                     `json:"group_conversation_id"`
+	SenderUserID        string                     `json:"sender_user_id"`
+	ReceiverUserID      string                     `json:"receiver_user_id"`
+	ReceiverDevice      string                     `json:"receiver_device_id"`
+	BFFBaseURL          string                     `json:"bff_base_url"`
+	PushURL             string                     `json:"push_url"`
+	StartedAt           time.Time                  `json:"started_at"`
+	FinishedAt          time.Time                  `json:"finished_at"`
+	Success             bool                       `json:"success"`
+	Error               string                     `json:"error,omitempty"`
+	Setup               setupSummary               `json:"setup"`
+	Contact             contactSummary             `json:"contact"`
+	SenderLogin         loginSummary               `json:"sender_login"`
+	ReceiverLogin       loginSummary               `json:"receiver_login"`
+	ServerHello         serverFrame                `json:"server_hello"`
+	DirectChat          scenarioSummary            `json:"direct_chat"`
+	GroupChat           scenarioSummary            `json:"group_chat"`
+	GroupProfile        groupProfileActionsSummary `json:"group_profile"`
+	GroupMemberActions  groupMemberActionsSummary  `json:"group_member_actions"`
 }
 
 type setupSummary struct {
@@ -60,6 +61,19 @@ type groupMemberActionsSummary struct {
 	AfterTransfer   groupMemberListSummary `json:"after_transfer"`
 	RemoveMember    memberActionSummary    `json:"remove_member"`
 	Final           groupMemberListSummary `json:"final"`
+}
+
+type groupProfileActionsSummary struct {
+	Initial conversationProfileSummary `json:"initial"`
+	Updated conversationProfileSummary `json:"updated"`
+}
+
+type conversationProfileSummary struct {
+	ConversationID  string `json:"conversation_id"`
+	Title           string `json:"title"`
+	AvatarURI       string `json:"avatar_uri"`
+	ProfileVersion  int64  `json:"profile_version"`
+	UpdatedAtUnixMs int64  `json:"updated_at_unix_ms"`
 }
 
 type groupMemberListSummary struct {

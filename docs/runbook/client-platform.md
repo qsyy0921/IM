@@ -136,9 +136,9 @@ First slice:
   after send, and gateway-token-expired cleanup that clears the local session
   and asks the user to log in again. Group membership facts still come from
   conversation-service through BFF; the shell does not keep a fake member list.
-  `loadtest/clientweb` now also verifies group member list, role change,
-  owner transfer, remove member and final member list through the same public
-  BFF surface. The clean committed real smoke for that path passed on 2026-06-23
+  `loadtest/clientweb` now also verifies group profile read / update, group
+  member list, role change, owner transfer, remove member and final member list
+  through the same public BFF surface. The clean committed real smoke for that path passed on 2026-06-23
   with `commit=3b13c5c6` and `git_dirty=false`. The Web / PC shell now also
   exposes BFF-backed member search / role filter / page-token pagination,
   group profile summary, invite source hints and first-stage group title /
@@ -161,8 +161,8 @@ First slice:
   public client-facing surfaces: register/login, contact request send/accept,
   BFF direct-conversation open, direct message notify/PullInbox/ACK, BFF group
   creation, receiver JOIN, group message notify/PullInbox/ACK, and BFF group
-  member actions: active member list, role change, owner transfer, remove
-  previous owner and final active member list. The 2026-06-23 clean run passed
+  profile read/update plus member actions: active member list, role change,
+  owner transfer, remove previous owner and final active member list. The 2026-06-23 clean run passed
   the direct + group message first path with `commit=6a08fb14` and
   `git_dirty=false`; the 2026-06-23 clean run passed the extended group member
   action path with `commit=3b13c5c6` and `git_dirty=false`.

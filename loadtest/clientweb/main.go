@@ -138,6 +138,11 @@ func runClientWebSmoke(ctx context.Context, cfg config, result *summary) error {
 	group.MemberChangeID = join.GetChangeId()
 	group.MemberBoundarySeq = join.GetBoundarySeq()
 	result.GroupChat = group
+	groupProfile, err := runGroupProfileActions(ctx, cfg, sender, groupID)
+	if err != nil {
+		return fmt.Errorf("group profile actions: %w", err)
+	}
+	result.GroupProfile = groupProfile
 	memberActions, err := runGroupMemberActions(ctx, cfg, sender, receiver, groupID)
 	if err != nil {
 		return fmt.Errorf("group member actions: %w", err)
@@ -445,6 +450,99 @@ func bffCreateGroupConversation(ctx context.Context, cfg config, session authSes
 		return "", fmt.Errorf("BFF group conversation returned invalid response: %+v", response)
 	}
 	return response.ConversationID, nil
+}
+
+func runGroupProfileActions(ctx context.Context, cfg config, session authSession, conversationID string) (groupProfileActionsSummary, error) {
+	initial, err := bffGetConversationProfile(ctx, cfg, session, conversationID)
+	if err != nil {
+		return groupProfileActionsSummary{}, fmt.Errorf("get initial profile: %w", err)
+	}
+	title := "NexusIM client web smoke group"
+	avatarURI := "nexusim://avatar/client-web-smoke"
+	updated, err := bffUpdateConversationProfile(ctx, cfg, session, conversationID, title, avatarURI, initial.ProfileVersion)
+	if err != nil {
+		return groupProfileActionsSummary{}, fmt.Errorf("update profile: %w", err)
+	}
+	if updated.Title != title || updated.AvatarURI != avatarURI {
+		return groupProfileActionsSummary{}, fmt.Errorf("BFF profile update returned wrong profile: %+v", updated)
+	}
+	if updated.ProfileVersion <= initial.ProfileVersion {
+		return groupProfileActionsSummary{}, fmt.Errorf("BFF profile version did not advance: initial=%d updated=%d", initial.ProfileVersion, updated.ProfileVersion)
+	}
+	confirmed, err := bffGetConversationProfile(ctx, cfg, session, conversationID)
+	if err != nil {
+		return groupProfileActionsSummary{}, fmt.Errorf("get updated profile: %w", err)
+	}
+	if confirmed != updated {
+		return groupProfileActionsSummary{}, fmt.Errorf("BFF profile read after update mismatch: updated=%+v confirmed=%+v", updated, confirmed)
+	}
+	return groupProfileActionsSummary{Initial: initial, Updated: updated}, nil
+}
+
+func bffGetConversationProfile(ctx context.Context, cfg config, session authSession, conversationID string) (conversationProfileSummary, error) {
+	var response struct {
+		Profile bffConversationProfile `json:"profile"`
+	}
+	path := fmt.Sprintf("/api/conversations/%s/profile", url.PathEscape(conversationID))
+	if err := bffJSON(ctx, cfg, http.MethodGet, path, session.GatewayToken, nil, &response); err != nil {
+		return conversationProfileSummary{}, err
+	}
+	return conversationProfileFromBFF(response.Profile, conversationID)
+}
+
+func bffUpdateConversationProfile(
+	ctx context.Context,
+	cfg config,
+	session authSession,
+	conversationID string,
+	title string,
+	avatarURI string,
+	expectedProfileVersion int64,
+) (conversationProfileSummary, error) {
+	var response struct {
+		Profile bffConversationProfile `json:"profile"`
+	}
+	path := fmt.Sprintf("/api/conversations/%s/profile", url.PathEscape(conversationID))
+	if err := bffJSON(ctx, cfg, http.MethodPost, path, session.GatewayToken, map[string]any{
+		"title":                    title,
+		"avatar_uri":               avatarURI,
+		"expected_profile_version": expectedProfileVersion,
+	}, &response); err != nil {
+		return conversationProfileSummary{}, err
+	}
+	return conversationProfileFromBFF(response.Profile, conversationID)
+}
+
+type bffConversationProfile struct {
+	ConversationID  string          `json:"conversation_id"`
+	Title           string          `json:"title"`
+	AvatarURI       string          `json:"avatar_uri"`
+	ProfileVersion  json.RawMessage `json:"profile_version"`
+	UpdatedAtUnixMs json.RawMessage `json:"updated_at_unix_ms"`
+}
+
+func conversationProfileFromBFF(profile bffConversationProfile, conversationID string) (conversationProfileSummary, error) {
+	if profile.ConversationID != conversationID {
+		return conversationProfileSummary{}, fmt.Errorf("BFF profile returned conversation_id %s, want %s", profile.ConversationID, conversationID)
+	}
+	version, err := int64JSON(profile.ProfileVersion)
+	if err != nil {
+		return conversationProfileSummary{}, fmt.Errorf("parse profile version: %w", err)
+	}
+	updatedAt, err := int64JSON(profile.UpdatedAtUnixMs)
+	if err != nil {
+		return conversationProfileSummary{}, fmt.Errorf("parse profile updated_at_unix_ms: %w", err)
+	}
+	if version <= 0 {
+		return conversationProfileSummary{}, fmt.Errorf("BFF profile returned invalid version: %+v", profile)
+	}
+	return conversationProfileSummary{
+		ConversationID:  profile.ConversationID,
+		Title:           profile.Title,
+		AvatarURI:       profile.AvatarURI,
+		ProfileVersion:  version,
+		UpdatedAtUnixMs: updatedAt,
+	}, nil
 }
 
 func runGroupMemberActions(

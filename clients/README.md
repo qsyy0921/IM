@@ -327,6 +327,10 @@ Current packaging status:
   public status. A new `desktop-executable` artifact was recollected at
   `clients/artifacts/2026-06-22T214826Z/manifest.json`; it verifies artifact kind
   and hash correctly, and its current Authenticode status is `NotSigned`.
+  A 2026-06-23 read-only signing plan confirmed local Windows Kits `signtool`
+  can be selected explicitly; after passing a timestamp URL, the remaining
+  signing blocker is a real code-signing certificate source and a valid
+  Authenticode signature.
   `plan:desktop-installer` now checks the repository
   installer Tauri profile, MSI / NSIS target, artifact baseline, signing
   readiness and valid signature status; actual `build:desktop-installer` now provides the explicit

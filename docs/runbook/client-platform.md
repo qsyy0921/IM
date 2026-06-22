@@ -517,8 +517,11 @@ First slice:
   artifact was recollected on 2026-06-23 at
   `clients/artifacts/2026-06-22T214826Z/manifest.json`; it now passes artifact
   kind and hash selection, and read-only Authenticode verification reports
-  `NotSigned`. Release profiles must provide real signing inputs, sign first and
-  then rerun verification with `--require-valid`.
+  `NotSigned`. A 2026-06-23 read-only signing plan confirmed that local Windows
+  Kits `signtool` can be selected explicitly; after passing a timestamp URL, the
+  remaining release blocker is a real code-signing certificate source plus a
+  valid Authenticode signature. Release profiles must provide real signing
+  inputs, sign first and then rerun verification with `--require-valid`.
   `plan:desktop-signing`,
   `verify:desktop-signature` and `plan:desktop-installer` now select artifacts by
   `artifactKind` instead of blindly using the first `windows-desktop` artifact,

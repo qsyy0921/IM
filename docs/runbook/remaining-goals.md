@@ -83,8 +83,9 @@
   targets；`plan:desktop-installer` 已改为检查仓库内 profile、installer target、desktop artifact baseline
   和 signing readiness；默认开发 config 仍保持不打包。它们不 build、不签名，
   也不替代真实 installer / signing 流水线。`sign:desktop-artifact` 已补显式
-  `--execute` 门控的 signing wrapper，默认仍只输出低敏 execution policy；真实
-  签名还需要本机 `signtool`、timestamp URL、证书来源和 signed artifact 验证。
+  `--execute` 门控的 signing wrapper，默认仍只输出低敏 execution policy；
+  2026-06-23 只读 signing plan 已确认本机 Windows Kits `signtool` 可显式定位，
+  传入 timestamp URL 后真实签名仍需要代码签名证书来源和 signed artifact 验证。
   collected manifest 已区分 `desktop-executable` / `desktop-installer`，portable
   bundle 只接受 executable，不把 installer 产物混进本地 zip 包。
   `verify:desktop-signature` 已补只读 Authenticode 验证入口；2026-06-23 已重新

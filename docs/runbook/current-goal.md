@@ -75,8 +75,9 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   `--execute` 门控。desktop signing / signature verification / installer planner 现在按 `artifactKind`
   选择最新 collected manifest，不会被更新的 Android manifest 或混合 desktop
   manifest 里的 installer artifact 遮住 executable baseline；当前本机 dry-run 已找到
-  新 `desktop-executable` baseline，剩余阻塞是缺少真实 `signtool`、timestamp URL、
-  证书来源和 valid Authenticode signature。
+  新 `desktop-executable` baseline。2026-06-23 只读 signing plan 已确认本机
+  Windows Kits `signtool` 可显式定位，传入 timestamp URL 后剩余阻塞收敛为
+  缺少代码签名证书来源和 valid Authenticode signature。
   generic install plan 已按 `artifactKind` 区分 executable 和 installer：
   stale manifest 缺 `artifactKind` 时要求重新 collect，`desktop-installer` 不再进入
   portable launcher / direct shell-smoke 路径。

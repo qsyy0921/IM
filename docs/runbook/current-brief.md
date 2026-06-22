@@ -65,8 +65,9 @@ NexusIM 已有本地 / 双机可运行的最小分布式 IM 后端，并已扩�
    旧 manifest 要重新 collect，installer 不进入 portable launcher 或 direct shell-smoke；
    installer planner 也只接受显式 `desktop-executable` 作为 MSI / NSIS build baseline，
    旧 manifest 或 `desktop-installer` 不会被当作 installer build 输入；
-   当前本机 dry-run 已找到新 executable baseline，但缺真实 signing input 和 valid
-   signature，因此不执行 bundling 或签名；下一步继续真实 signing input、valid signed artifact 和 MSI / NSIS installer 体验。
+   当前本机 dry-run 已找到新 executable baseline；2026-06-23 只读 signing plan
+   已确认本机 Windows Kits `signtool` 可显式定位，传入 timestamp URL 后剩余阻塞是
+   代码签名证书来源和 valid signature，因此不执行 bundling 或签名；下一步继续真实 signing input、valid signed artifact 和 MSI / NSIS installer 体验。
    `loadtest/clientweb` 已扩展到群成员列表、
    角色变更、owner transfer 和移除成员的 BFF 链路；2026-06-23 clean committed
    smoke 已通过。

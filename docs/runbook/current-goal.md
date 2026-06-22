@@ -83,6 +83,8 @@ artifact；顶层 `executionPolicy.planOnly=true` 必须声明它不会执行 ch
 `plan:android-webview-login-smoke` 也是 plan-only：它可以列出 APK build、adb
 install、Activity start、adb forward 和 runner 命令，但顶层 execution policy
 必须声明这些命令不会被 plan 脚本执行。
+Android metadata smoke 的 `--dry-run` 输出也必须带 execution policy，声明不会构建
+APK、不会安装、不会启动 Activity、不会打开 `adb reverse`、不会接触设备。
 
 只有跨服务、生成代码、migration、service-registry、Docker / compose、安全边界、
 提交推送前或用户明确要求时，才扩大到完整 `.\tools\check-local.ps1`。

@@ -344,8 +344,10 @@ First slice:
   CLI has not been installed.
 - `npm --prefix clients run smoke:android-webview-metadata` is the first Android
   WebView metadata smoke runner. In dry-run mode it emits only low-sensitive
-  package / Activity / adb-reverse intent. In real mode it builds an APK with a
-  temporary loopback metadata shell config, installs it through `adb`, starts
+  package / Activity / adb-reverse intent plus an execution policy proving the
+  dry-run does not build an APK, install, start an Activity, open `adb reverse`
+  or contact a device. In real mode it builds an APK with a temporary loopback
+  metadata shell config, installs it through `adb`, starts
   `com.nexusim.android/.MainActivity`, and waits for the WebView to POST the
   `NexusIMNative.runtimeMetadata()` report through `adb reverse`. It proves only
   appassets + metadata bridge wiring, not login, PullInbox, WebSocket, or ACK.

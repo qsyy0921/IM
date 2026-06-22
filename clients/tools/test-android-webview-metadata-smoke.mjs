@@ -24,6 +24,7 @@ const serialized = JSON.stringify(result);
 
 assert(result.schemaVersion === "nexusim.android-webview-metadata-smoke.v1", "schema mismatch");
 assert(result.dryRun === true, "dry-run flag missing");
+assertDryRunExecutionPolicy(result.executionPolicy);
 assert(result.runID === "android-webview-metadata-test", "run id mismatch");
 assert(result.build.shellConfig === "temporary-loopback-metadata", "temporary shell config marker missing");
 assert(result.build.freshBuildRequired === true, "Android metadata smoke must require a fresh callback-config build");
@@ -39,3 +40,16 @@ assert(!serialized.includes("\\\\?"), "dry-run leaked extended Windows path");
 assert(!serialized.match(/token|secret|password|credential|private/i), "dry-run leaked sensitive field name");
 
 console.log("Android WebView metadata smoke dry-run ok");
+
+function assertDryRunExecutionPolicy(policy) {
+  assert(policy?.planOnly === true, "Android metadata dry-run should be marked plan-only");
+  assert(policy.executesPlannedCommands === false, "Android metadata dry-run should not execute planned commands");
+  assert(policy.buildsAPK === false, "Android metadata dry-run should not build APKs");
+  assert(policy.installsAPK === false, "Android metadata dry-run should not install APKs");
+  assert(policy.startsActivity === false, "Android metadata dry-run should not start activities");
+  assert(policy.opensAdbReverse === false, "Android metadata dry-run should not open adb reverse");
+  assert(policy.contactsDevice === false, "Android metadata dry-run should not contact devices");
+  assert(policy.startsCallbackServer === false, "Android metadata dry-run should not start callback server");
+  assert(policy.opensNetworkConnection === false, "Android metadata dry-run should not open network connections");
+  assert(policy.downloadsToolchain === false, "Android metadata dry-run should not download toolchains");
+}

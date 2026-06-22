@@ -47,8 +47,12 @@ async function main(argv) {
   };
 
   if (options.dryRun) {
-    assertLowSensitive(plan);
-    process.stdout.write(`${JSON.stringify(plan, null, 2)}\n`);
+    const dryRunPlan = {
+      ...plan,
+      executionPolicy: dryRunExecutionPolicy()
+    };
+    assertLowSensitive(dryRunPlan);
+    process.stdout.write(`${JSON.stringify(dryRunPlan, null, 2)}\n`);
     return;
   }
 
@@ -114,6 +118,21 @@ async function main(argv) {
     }
     rmSync(tempRoot, { recursive: true, force: true });
   }
+}
+
+function dryRunExecutionPolicy() {
+  return {
+    planOnly: true,
+    executesPlannedCommands: false,
+    buildsAPK: false,
+    installsAPK: false,
+    startsActivity: false,
+    opensAdbReverse: false,
+    contactsDevice: false,
+    startsCallbackServer: false,
+    opensNetworkConnection: false,
+    downloadsToolchain: false
+  };
 }
 
 function parseArgs(argv) {

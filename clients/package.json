@@ -34,6 +34,7 @@
     "test:android-webview-metadata-smoke": "node ./tools/test-android-webview-metadata-smoke.mjs",
     "test:android-webview-login-smoke-plan": "node ./tools/test-android-webview-login-smoke-plan.mjs",
     "test:android-webview-login-smoke": "node ./tools/test-android-webview-login-smoke.mjs",
+    "test:android-shell-action-assets": "node ./tools/test-android-shell-action-assets.mjs",
     "test:android-webview-devtools-parser": "node ./tools/test-android-webview-devtools-parser.mjs",
     "test:android-webview-devtools-readiness": "node ./tools/test-android-webview-devtools-readiness.mjs",
     "test:clientweb-smoke-hooks": "node ./tools/test-clientweb-run-local-smoke-hooks.mjs",

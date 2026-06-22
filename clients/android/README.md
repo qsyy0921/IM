@@ -77,6 +77,7 @@ Flutter or native Kotlin for a concrete reason.
 npm --prefix clients run typecheck:android
 npm --prefix clients run validate:android-native
 npm --prefix clients run test:shell-config
+npm --prefix clients run test:android-shell-action-assets
 npm --prefix clients run test:artifact-builders
 npm --prefix clients run test:android-platform-readiness
 npm --prefix clients run report:android-platform-readiness

@@ -207,6 +207,12 @@ First slice:
   and logout through shared `ClientShellActions` and does not call runtime auth
   lifecycle methods directly, so PC / Android WebView shells can keep the same
   UI action path.
+- `npm --prefix clients run test:android-shell-action-assets` builds the Web
+  shell into a temporary directory, prepares temporary Android WebView assets
+  with the Android shell config, verifies the shell asset manifest, and checks
+  that the packaged Android bundle contains the login / refresh / restore /
+  logout selectors plus `native-store-readiness`. It requires Node/Vite only;
+  it does not require Gradle, Android SDK, ADB, an APK or a device.
 - `npm --prefix clients run test:shell-config` validates the desktop / Android
   shell config templates and renderer, and rejects unsupported targets or
   sensitive fields such as token, secret and password.
@@ -312,7 +318,9 @@ First slice:
   the shared runtime lifecycle. The Web shell login panel now uses the shared
   shell action contract for login, refresh, restore and logout, matching the
   desktop / Android thin shell action coverage. PC / Android WebView shells do
-  not need a separate UI lifecycle path.
+  not need a separate UI lifecycle path. The Android temporary asset contract
+  test now verifies that those selectors survive the Web build and Android
+  asset preparation path before any APK is built.
 - `loadtest/clientweb` provides the first scriptable client-path smoke. Setup
   uses public gRPC APIs to register users, seed the conversation owner and create
   the receiver JOIN; the verified client path then uses only HTTP BFF and
@@ -380,8 +388,9 @@ rejected. For local LAN client smoke, prefer the wired `172.x.x.x` address.
 1. Add first unsigned local APK from the Android native bridge or Docker builder.
    Run `report:android-platform-readiness` first, then explicitly bootstrap the
    Docker builder image only when toolchain download is acceptable.
-2. Wire lifecycle UI controls into the real Android shell, and run platform-shell
-   smoke once packaging/runtime tooling is ready.
+2. Run Android platform-shell smoke once packaging/runtime tooling is ready.
+   Lifecycle UI selectors are already guarded in the Android WebView asset
+   contract; the remaining proof is real APK/WebView execution.
 3. Validate Android `android-sqlite` on a real APK once packaging/runtime
    tooling is ready. Desktop `tauri-sqlite` metadata / login WebView reruns are
    complete on commit `2b67b0e1`; the shared `NativeStoreReadiness` contract is
@@ -410,6 +419,7 @@ Focused local check:
 npm --prefix clients run check:build-prereqs
 npm --prefix clients run test:shell-config
 npm --prefix clients run test:shell-web-assets
+npm --prefix clients run test:android-shell-action-assets
 npm --prefix clients run test:artifact-builders
 npm --prefix clients run test:artifact-collector
 npm --prefix clients run test:artifact-install-plan

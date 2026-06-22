@@ -115,6 +115,12 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   `npm --prefix clients run test:web-shell-actions` 会确认 Web shell 通过 shared
   `ClientShellActions` 调用 login / refresh / restore / logout，且不直接调用
   runtime auth lifecycle 方法，避免 PC / Android WebView 后续出现另一套 UI action path。
+- `clients` workspace 已新增 Android shell action asset contract：
+  `npm --prefix clients run test:android-shell-action-assets` 会临时构建 Web
+  shell、按 Android shell config 准备临时 WebView assets、校验 shell asset
+  manifest，并确认 Android bundle 中包含 login / refresh / restore / logout
+  selectors 与 `native-store-readiness`。该检查不需要 Gradle、Android SDK、
+  ADB、APK 或真机，证明 Android 打包资产层已承接共享 shell action path。
 - Web shell 支持 first-stage WebView bridge config：
   `globalThis.__NEXUSIM_CLIENT_SHELL__` 可由 PC / Android 壳层注入 target、
   API / WebSocket 地址、device / installation / app version 和 session key；当前
@@ -355,7 +361,9 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
    若确认可以下载工具链，再显式运行
    `npm --prefix clients run build:android-apk:docker:bootstrap` 构建 Android Docker builder
    image；镜像存在后运行 `npm --prefix clients run build:android-apk:docker` 产出首个 APK + manifest。
-2. 在真实 Android shell UI 中接入现有 shell action，并在工具链 ready 后跑平台 shell smoke。
+2. 工具链 ready 后跑 Android platform-shell smoke；Android WebView assets
+   已有 focused contract 证明会携带共享 lifecycle UI selectors，剩余 proof
+   是真实 APK / WebView 执行。
 3. 在 Android APK 工具链 ready 后验证 `android-sqlite` 真机路径。当前 shared
    readiness 和 native bridge storage 合约已固定，后续只替换 / 验证平台桥实现，
    不改 sync core；desktop `tauri-sqlite` metadata / login WebView rerun 已在

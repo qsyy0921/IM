@@ -199,6 +199,12 @@ Current packaging status:
   `report:android-platform-readiness`, so local JDK / Gradle / Android SDK,
   Docker builder image and ADB device state are visible before any APK or
   WebView smoke step.
+- `plan:android-webview-login-smoke` prints the Android login-level WebView
+  smoke contract and now includes a `safePreflight` block for
+  `check:no-toolchain`, `report:android-platform-readiness` and
+  `plan:artifact-install`. It remains a plan artifact only: it does not build
+  an APK, launch Docker, install packages, start an Activity or open
+  `adb reverse`.
 - `check:no-toolchain` runs the fast client shell guard set without launching
   Docker, building APKs, installing APKs, starting Android activities, opening
   `adb reverse` or installing toolchains. It does read low-sensitive ADB /

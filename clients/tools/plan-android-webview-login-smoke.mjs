@@ -20,6 +20,18 @@ export function buildAndroidWebViewLoginSmokePlan(options = {}) {
     runID,
     target: "android",
     objective: "Drive the rendered Android WebView through login, delivery.notify, PullInbox and AckDelivery using the same public UI action contract as browser and desktop.",
+    safePreflight: {
+      focusedGate: "npm --prefix clients run check:no-toolchain",
+      platformReadiness: "npm --prefix clients run report:android-platform-readiness",
+      artifactInstallPlan: "npm --prefix clients run plan:artifact-install",
+      downloadsToolchain: false,
+      buildsAPK: false,
+      startsDocker: false,
+      installsAPK: false,
+      startsActivity: false,
+      opensAdbReverse: false,
+      evidence: "Use these commands to prove shell contracts, Android platform state and collected artifact install readiness before running the real Android WebView login smoke."
+    },
     prerequisites: [
       {
         name: "debuggable-apk",

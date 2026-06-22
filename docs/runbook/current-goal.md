@@ -29,7 +29,8 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
 - PC desktop 已有 Tauri shell、desktop SQLite bridge、standalone artifact、
   metadata smoke 和登录级 WebView smoke 证据。
 - Android 已有 WebView asset shell、native metadata / SQLite bridge contract、
-  no-toolchain action asset contract、ADB readiness report 和 Docker builder profile。
+  no-toolchain action asset contract、ADB readiness report、Docker builder profile
+  和登录级 WebView smoke safe preflight plan。
 - 当前 Android 阻塞点仍是 APK baseline：本机缺 JDK 17+ / Gradle / Android SDK，
   Docker builder image `nexusim/client-android-builder:local` 尚未构建。
 - 不要隐式下载 Android toolchain；只有用户明确接受下载时，才运行

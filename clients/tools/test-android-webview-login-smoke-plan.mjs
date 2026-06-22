@@ -29,6 +29,15 @@ assert(result.verdict.loginLevelAndroidUISmoke === false, "plan must not claim l
 assert(result.verdict.deliveryNotifyInWebView === false, "plan must not claim notify smoke");
 assert(result.verdict.pullInboxInWebView === false, "plan must not claim PullInbox smoke");
 assert(result.verdict.ackDeliveryInWebView === false, "plan must not claim AckDelivery smoke");
+assert(result.safePreflight?.focusedGate === "npm --prefix clients run check:no-toolchain", "safe preflight focused gate missing");
+assert(result.safePreflight.platformReadiness.includes("report:android-platform-readiness"), "safe preflight platform readiness command missing");
+assert(result.safePreflight.artifactInstallPlan.includes("plan:artifact-install"), "safe preflight artifact install plan command missing");
+assert(result.safePreflight.downloadsToolchain === false, "safe preflight must not download toolchains");
+assert(result.safePreflight.buildsAPK === false, "safe preflight must not build APKs");
+assert(result.safePreflight.startsDocker === false, "safe preflight must not start Docker");
+assert(result.safePreflight.installsAPK === false, "safe preflight must not install APKs");
+assert(result.safePreflight.startsActivity === false, "safe preflight must not start Android activities");
+assert(result.safePreflight.opensAdbReverse === false, "safe preflight must not open adb reverse");
 assert(result.prerequisites.some(item => item.name === "debuggable-apk"), "debuggable APK prerequisite missing");
 assert(result.prerequisites.some(item => item.name === "webview-devtools-socket"), "WebView devtools prerequisite missing");
 assert(result.commands.devtoolsDiscovery.includes("report:android-webview-devtools-readiness"), "WebView devtools readiness command missing");

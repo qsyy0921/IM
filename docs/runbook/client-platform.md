@@ -217,7 +217,8 @@ First slice:
 - `npm --prefix clients run check:no-toolchain` runs the no-toolchain client
   shell guard set in one command: client workspace validation, shell smoke plan,
   Web PWA, shell web assets / prep wrapper, shell config, Web platform, shared
-  runtime / local-store / IndexedDB contracts, Web shell lifecycle / automation /
+  desktop / Android TypeScript and native skeleton validation, runtime /
+  local-store / IndexedDB contracts, Web shell lifecycle / automation /
   smoke-report contracts, clientweb smoke hook contract, desktop artifact launch
   / composed smoke dry-run contracts, artifact readiness / install-plan / builder
   / collector contracts, Android builder profile / wrapper contracts, desktop /

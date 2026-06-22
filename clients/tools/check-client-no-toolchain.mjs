@@ -59,7 +59,10 @@ export function buildDryRunPlan() {
   return {
     schemaVersion: "nexusim.client-no-toolchain-check.v1",
     downloadsToolchain: false,
-    touchesDevice: false,
+    readsDeviceReadiness: true,
+    installsArtifacts: false,
+    startsDeviceActivities: false,
+    opensAdbReverse: false,
     startsServices: false,
     checks: checkPlan.map(check => ({
       name: check.name,

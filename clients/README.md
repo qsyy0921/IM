@@ -198,5 +198,7 @@ Current packaging status:
   Docker builder image and ADB device state are visible before any APK or
   WebView smoke step.
 - `check:no-toolchain` runs the fast client shell guard set without launching
-  Docker, connecting devices, building APKs or installing toolchains. Use it as
-  the default focused client gate before reaching for a broader local gate.
+  Docker, building APKs, installing APKs, starting Android activities, opening
+  `adb reverse` or installing toolchains. It does read low-sensitive ADB /
+  device readiness state through the Android platform readiness report. Use it
+  as the default focused client gate before reaching for a broader local gate.

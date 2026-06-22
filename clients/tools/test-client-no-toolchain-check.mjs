@@ -12,7 +12,10 @@ const commands = plan.checks.map(check => check.command);
 
 assert(plan.schemaVersion === "nexusim.client-no-toolchain-check.v1", "schema version mismatch");
 assert(plan.downloadsToolchain === false, "no-toolchain plan must not download toolchains");
-assert(plan.touchesDevice === false, "no-toolchain plan must not touch devices");
+assert(plan.readsDeviceReadiness === true, "no-toolchain plan should report read-only device readiness");
+assert(plan.installsArtifacts === false, "no-toolchain plan must not install artifacts");
+assert(plan.startsDeviceActivities === false, "no-toolchain plan must not start device activities");
+assert(plan.opensAdbReverse === false, "no-toolchain plan must not open adb reverse");
 assert(plan.startsServices === false, "no-toolchain plan must not start services");
 assert(commands.includes("npm --prefix clients run test:shell-smoke-plan"), "shell smoke plan check missing");
 assert(commands.includes("npm --prefix clients run test:web-pwa"), "web PWA check missing");

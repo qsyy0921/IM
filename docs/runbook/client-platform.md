@@ -127,6 +127,11 @@ First slice:
   conversations, PullInbox, send text, AckDelivery and logout through those
   adapters. Logout calls BFF current-session revoke, disconnects WebSocket,
   clears IndexedDB local cache and resets UI session state.
+- The Web / PC shell now has first-stage product interactions for clickable
+  friend-to-direct-chat, clickable conversation selection, group creation,
+  selected-conversation preservation during refresh, local message-state refresh
+  after send, and gateway-token-expired cleanup that clears the local session
+  and asks the user to log in again.
 - The visible Web / desktop shell now presents an account-password first IM
   surface: tenant, device, endpoint and native diagnostic controls are kept out
   of the normal user path, while smoke selectors remain stable. The

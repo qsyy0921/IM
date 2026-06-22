@@ -17,6 +17,189 @@ GitHub 首页只放当前总览。每轮 Codex 继续开发时，目标框只复
 所有权、事件、数据、安全和演进规则推进；中间件能力登记见
 [middleware-catalog.md](docs/platform/middleware-catalog.md)。
 
+README 是 GitHub 首页和面试前快速入口，必须跟随当前开发进度维护。凡是 active slice、
+服务 promotion、客户端能力、AI / Agent 平台边界或“下一步”发生实质变化，都要同步
+更新本文件；长历史证据仍放 `docs/runbook/loadtest/` 和 `docs/runbook/archive/`。
+
+## 当前架构设计
+
+NexusIM 当前按“事实源清晰、事件驱动、读模型独立、AI 受控执行”的方式组织。根 README
+只放架构总览；完整分层、数据平台和 AI / Agent 设计见
+[target-architecture-complete.md](docs/architecture/target-architecture-complete.md)。
+
+### 中文架构示意图
+
+下面几张图用于快速讲解架构设计，采用白皮书 / 白板风格，不作为精确接口契约；
+精确的服务边界、字段、事件和运行门禁以本文表格、SDD、ADR 和 runbook 为准。
+
+![NexusIM 完整架构](docs/assets/architecture/nexusim-architecture-cn.png)
+
+![NexusIM 消息主链路](docs/assets/architecture/nexusim-message-flow-cn.png)
+
+![NexusIM AI Agent 受控架构](docs/assets/architecture/nexusim-ai-agent-cn.png)
+
+![NexusIM 技术与中间件能力目录](docs/assets/architecture/nexusim-middleware-cn.png)
+
+```mermaid
+flowchart TB
+  subgraph Client["客户端层"]
+    Web["Web"]
+    PC["Windows PC"]
+    Android["Android"]
+  end
+
+  subgraph Access["接入层"]
+    BFF["api-gateway / Client BFF"]
+    Push["push-gateway / WebSocket"]
+  end
+
+  subgraph Core["IM 核心事实层"]
+    Identity["identity-service"]
+    Policy["policy-service"]
+    Contacts["contacts-service"]
+    Conversation["conversation-service"]
+    Message["message-service"]
+    Delivery["delivery-service"]
+    Receipt["receipt-service"]
+  end
+
+  subgraph Event["事件与投影层"]
+    PG["Service-owned PostgreSQL"]
+    Outbox["Transactional Outbox"]
+    Kafka["Kafka topics"]
+    ReadModel["Durable read models"]
+  end
+
+  subgraph Product["产品平台服务"]
+    Media["media-service"]
+    Notification["notification-service"]
+    Presence["presence-service"]
+    Admin["admin-service"]
+    Audit["audit-service"]
+    Control["control-plane-service"]
+    Workflow["workflow-service"]
+  end
+
+  subgraph AI["AI / Agent 平台"]
+    Search["search-service"]
+    Memory["memory-service"]
+    Retrieval["retrieval-gateway / EvidencePack"]
+    RAG["rag-service / summary-service"]
+    Agent["agent-service"]
+    Skill["skill-registry / mcp-gateway"]
+    Executor["action-executor"]
+    Eval["ai-eval-service"]
+    Python["Python AI Worker"]
+  end
+
+  Web --> BFF
+  PC --> BFF
+  Android --> BFF
+  Web --> Push
+  PC --> Push
+  Android --> Push
+
+  BFF --> Identity
+  BFF --> Policy
+  BFF --> Contacts
+  BFF --> Conversation
+  BFF --> Message
+  BFF --> Delivery
+  BFF --> Receipt
+  Push --> Delivery
+
+  Core --> PG
+  Product --> PG
+  PG --> Outbox
+  Outbox --> Kafka
+  Kafka --> ReadModel
+  Kafka --> Search
+  Kafka --> Memory
+  Kafka --> Audit
+
+  Search --> Retrieval
+  Memory --> Retrieval
+  Policy --> Retrieval
+  Retrieval --> RAG
+  Retrieval --> Agent
+  Skill --> Agent
+  Agent --> Workflow
+  Agent --> Executor
+  Executor --> Audit
+  Python --> RAG
+  Python --> Agent
+  Eval --> RAG
+  Eval --> Agent
+```
+
+### 分层职责
+
+| 层级 | 当前设计 |
+| --- | --- |
+| 客户端层 | Web / Windows PC / Android 共用 TypeScript `protocol` 和 `client-core`；native shell 只做薄平台 bridge。 |
+| 接入层 | `api-gateway` 提供 client BFF、鉴权、quota、trusted metadata；`push-gateway` 只做在线唤醒，不拥有 durable inbox。 |
+| IM 核心层 | 9 个 IM 服务分别拥有身份、策略、联系人、会话、消息、投递、回执等事实和读模型。 |
+| 事件与投影层 | 每个服务拥有自己的 PostgreSQL schema；跨服务事实传播走 outbox -> Kafka -> projection / worker。 |
+| 产品平台层 | media、notification、audit、admin、control-plane、presence、workflow 等按独立数据模型和故障边界逐步 promotion。 |
+| AI / Agent 层 | search / memory 产出可见投影，retrieval-gateway 构造 EvidencePack，RAG / summary / Agent 只能基于 EvidencePack 工作。 |
+| Python AI Worker | 只做模型、算法、embedding、rerank、memory extraction、planner 和 eval 候选；Go 继续拥有权限、状态、审批、审计和持久化。 |
+| 中间件平台 | PostgreSQL、Kafka、Redis、OpenSearch / vector store、对象存储、观测、安全组件、数据平台和 AI runtime 都按能力与 runtime profile 引入，不写死产品。 |
+
+### 当前技术 / 中间件能力目录
+
+NexusIM 的中间件和技术栈会随着功能持续增加。README 只记录当前判断和引入规则，
+不是终局清单；新增或替换中间件时必须同步
+[middleware-catalog.md](docs/platform/middleware-catalog.md)、对应 SDD / ADR、runtime
+profile 和最小 smoke。
+
+| 能力 | 当前已用 / 已有路径 | 后续可替换或增强方向 | 边界 |
+| --- | --- | --- | --- |
+| 交易事实源 | PostgreSQL；每个服务拥有自己的 schema 和 migration | 云 PostgreSQL、分片、只读副本、HA / failover | 业务事实归服务所有，不跨服务读私表。 |
+| 事件传播 | Kafka + protobuf schema + transactional outbox relay | Schema Registry、AsyncAPI / CloudEvents 元数据、Pulsar 候选 | Kafka 是传播面，不是权威事实源。 |
+| 临时状态 / 路由 / 缓存 | Redis single / Sentinel / Cluster；push route、resume、quota / presence 场景 | Redis Cluster 深化、托管 Redis、局部内存 cache | Redis 不保存 durable business facts。 |
+| 搜索 | search-service projection；当前以服务内 adapter / PostgreSQL first path 为主 | OpenSearch、Elasticsearch、Meilisearch | 只有 search-service 写搜索索引。 |
+| 向量索引 | vector-index-service；PostgreSQL metadata、pgvector optional adapter、embedding queue | Milvus、Qdrant、Weaviate、OpenSearch vector | 向量是可重建 projection，不是消息事实源。 |
+| 对象存储 / 媒体 | media-service fake object-store port；MinIO / S3-compatible 预留 | S3、MinIO、Ceph、病毒扫描、缩略图、转码 provider | 二进制不放 message-service。 |
+| 工作流 / 审批 | workflow-service 内部状态机、compensation instruction registry | Temporal、Cadence、Argo Workflows | 审批和补偿审计归 workflow / audit 所有。 |
+| 身份 / 联邦 | identity-service、JWKS、OIDC discovery first path | Keycloak、OIDC providers、多 issuer、WebAuthn/passkeys | api-gateway 仍负责 trusted metadata 边界。 |
+| 策略 / ReBAC | policy-service、tool policy precheck、关系投影 first path | OpenFGA、OPA、DSL / quota 策略中心 | 外部策略引擎只能作为 adapter，不能绕过 policy-service。 |
+| 密钥 / 机密 | 本地 env / 文件 guard；生产语义已预留 | Vault、云 KMS、HSM、密钥轮换 | secret 不写入 docs、metrics、报告或事件 payload。 |
+| 可观测性 | `/metrics`、Prometheus rules、Grafana dashboard、OTel first-stage wiring | OTel Collector、Loki、Tempo、Alertmanager、SLO / retention | 本地观测是开发证据，不等于生产 SLO。 |
+| 数据平台 | 当前仍是目标架构能力；公开事件 / CDC 消费边界已定义 | Debezium、Flink、Iceberg、Delta、Trino、ClickHouse / Doris | 数据平台不能成为业务 command 写入口。 |
+| AI runtime | model-gateway、Python AI Worker、mock / guarded external HTTP provider | OpenAI / Claude / 本地模型、vLLM、Ollama、Triton、LiteLLM | 业务服务不直连模型 provider。 |
+| 图 / 知识关系 | memory-service 结构化 memory、source refs、supersedes、profile aggregate | Neo4j、图投影、关系图索引 | 只有关系查询收益明确时才引入独立图能力。 |
+| MCP / 工具 | skill-registry、mcp-gateway prepare、action-executor | 更多 MCP tool servers、外部业务工具 | 工具调用必须经过 skill metadata、policy、approval 和 audit。 |
+
+### 关键链路
+
+```text
+发消息：
+client -> api-gateway -> policy-service -> conversation-service -> message-service
+-> PostgreSQL message_log + message_outbox -> Kafka conversation.timeline.events
+-> delivery-service projection -> user_inbox -> PullInbox / AckDelivery
+-> delivery_outbox -> im.delivery.events -> push-gateway online notify
+```
+
+```text
+AI / RAG / Agent：
+message / conversation / policy events -> search-service + memory-service projections
+-> retrieval-gateway policy check + visibility filter + EvidencePack
+-> rag-service / summary-service answer with citations
+-> agent-service proposal
+-> workflow approval
+-> action-executor approved action
+-> audit-service durable audit
+```
+
+### 架构原则
+
+- 不跨服务读私有表；跨服务只走公开 API、事件或明确 port。
+- 业务事务不直接 publish Kafka；统一走 transactional outbox。
+- 客户端展示消息以 `PullInbox` 为事实源，WebSocket 只做在线通知。
+- RAG / summary / Agent 不能直接读 message / conversation 私表，只能消费权限过滤后的 EvidencePack。
+- Agent 真实写动作必须经过 policy、proposal、approval、action-executor 和 audit。
+- 新服务和中间件不写死，必须满足独立数据模型、独立伸缩、独立故障边界、独立安全边界或明显降低复杂度。
+
 ## 当前状态
 
 已进入真实链路的 9 个 IM 后端服务：
@@ -48,16 +231,35 @@ GitHub 首页只放当前总览。每轮 Codex 继续开发时，目标框只复
 | `action-executor` | approved execution audit、proposal / approval / prepare audit 校验、本地安全 adapter、guarded external HTTP provider adapter、eval smoke。 |
 | `ai/python` | Python AI Worker 候选层：contract guard、低敏 safety guard、candidate-only worker CLI、`IM` conda toolchain。 |
 
+已进入 product-active first-stage 的平台 / 产品服务：
+
+| 服务 | 当前状态 |
+| --- | --- |
+| `media-service` | 上传会话、完成上传、资产查询、下载 URL、删除、media outbox relay、mock processing worker first path。 |
+| `notification-service` | 通知请求事实源、状态查询、取消、accepted outbox、notification outbox relay、noop / webhook delivery worker first path。 |
+| `audit-service` | append / query、hash-chain proof、admin-event ingestion、first-stage export job metadata。 |
+| `admin-service` | 管理操作创建 / 审批 / 查询、operation worker、outbox relay、control-plane / audit adapter、workflow compensation request handoff。 |
+| `control-plane-service` | config publish / rollback / snapshot / ACK、DB-backed quota / feature snapshot。 |
+| `presence-service` | `UpdatePresence`、`GetPresence`、`UpdateTyping`、PostgreSQL presence projection、低敏 presence outbox。 |
+| `model-gateway` | text generation / embedding invocation metadata、mock provider、低敏 invocation outbox，不持久化 raw prompt 或 embedding vector。 |
+| `knowledge-ingestion-service` | knowledge source、ingestion job、chunk manifest、knowledge outbox relay、vector handoff first path。 |
+| `workflow-service` | workflow creation / decision、approval状态机、compensation request / instruction registry / rollback adapter first path。 |
+| `vector-index-service` | vector metadata、tombstone、search、rebuild request / checkpoint、embedding queue / worker、knowledge chunk consumer first path。 |
+
 已启动的客户端平台：
 
 | 模块 | 当前状态 |
 | --- | --- |
-| `clients/` | Browser / PC / Android client platform first slice：`protocol`、`client-core`、Web shell、PC desktop shell contract 和 Android runtime contract 已建立并通过 focused validation；`api-gateway` client BFF first-stage HTTP/JSON surface 已落；Web BFF fetch / push WebSocket / IndexedDB local store adapters 已接；PC standalone exe 和 Android debug APK baseline 已产出；客户端只连 `api-gateway` / `push-gateway`，PullInbox 是消息事实源，WebSocket 只做在线唤醒。 |
+| `clients/` | Browser / Windows PC / Android client platform first slice：`protocol`、`client-core`、Web shell、PC desktop shell contract 和 Android runtime contract 已建立并通过 focused validation；`api-gateway` client BFF first-stage HTTP/JSON surface 已落；Web / PC shell 已接账号密码登录、注册、好友列表、好友申请、点击好友发起私聊、群聊列表、建群、点击群聊进入会话、消息列表、发送后本地状态刷新、PullInbox / AckDelivery；PC standalone exe 和 Android debug APK baseline 已产出。客户端只连 `api-gateway` / `push-gateway`，PullInbox 是消息事实源，WebSocket 只做在线唤醒。 |
 
-当前默认主线不是继续泛化清理 9 服务 P2 backlog，而是先推进客户端平台 MVP：
-Web client -> `api-gateway` client BFF -> `push-gateway` WebSocket 的本地 / 局域网
-smoke 已通过，PC WebView login smoke 已通过，Android debug APK 已能本机构建；
-下一步是 Android 真机 metadata / login WebView smoke。AI 大模型应用底座作为后续主线保留：
+当前默认主线不是继续泛化清理 9 服务 P2 backlog，也不是做生产级 HA 长测，而是先把
+Web / Windows PC 客户端的 IM MVP 交互做实：账号注册登录、好友关系、好友私聊、群聊、
+消息列表、发送、PullInbox / AckDelivery 和局域网可运行体验。本地 / 局域网 Web smoke、
+PC WebView login smoke、PC standalone exe baseline 和 Android debug APK baseline 已有；
+下一步是跑真实双用户客户端 smoke，验证好友私聊和群聊 first path。Android 真机 WebView
+login smoke、Windows installer 和完整移动端发布链路后置到用户明确切回。
+
+AI 大模型应用底座作为后续主线保留：
 
 ```text
 group memory
@@ -71,7 +273,9 @@ group memory
 -> ai-eval
 ```
 
-下一步默认看 [current-goal.md](docs/runbook/current-goal.md)。截至当前主线，下一步是基于已收集的 Android debug APK 跑真机 metadata / login WebView smoke；APK 安装和 Activity 启动仍需要显式用户动作。
+下一步默认看 [current-goal.md](docs/runbook/current-goal.md)。截至当前主线，下一步是围绕
+Web / Windows PC 客户端跑真实双用户 smoke，并继续补会话标题、空态、错误文案和启动脚本。
+Android APK / 真机 smoke 不作为当前默认阻塞。
 
 ## 不变量
 
@@ -212,16 +416,19 @@ python -m mypy nexusim_ai_common scripts tests
 - 统一生产观测平台、Alertmanager 路由、日志汇聚、SLO 和长期 retention。
 - provider-grade OIDC / KMS / HSM / email / SMS / WebAuthn / complete risk engine。
 - provider-grade ReBAC DSL、外部 audit sink、运维 UI、批量 repair 审批系统。
-- 完整 Web / App / 桌面客户端；当前 Web-first client platform first slice、
-  `api-gateway` client BFF first-stage surface、Web adapters first path、本地 /
-  wired LAN smoke、BFF HTTP metrics / rate-limit adapter、PC standalone exe 和
-  Android debug APK baseline 已落，但还缺 Windows installer、Android 真机 smoke
-  和正式移动端发布链路。
-- 完整 media / notification / admin / audit 等产品化平台服务。
+- 完整 Web / App / 桌面客户端；当前 Web / Windows PC shell 已有账号登录、注册、好友、
+  群聊和消息 first path，`api-gateway` client BFF first-stage surface、Web adapters first path、
+  本地 / wired LAN smoke、BFF HTTP metrics / rate-limit adapter、PC standalone exe 和
+  Android debug APK baseline 已落，但还缺真实双用户客户端 smoke、Windows installer、
+  Android 真机 smoke 和正式移动端发布链路。
+- 完整 media / notification / admin / audit / workflow / control-plane 等产品化平台能力；
+  当前这些服务已有 first-stage 路径，但 provider-grade adapter、UI、长周期运维和生产化
+  仍未完成。
 
 当前最准确表述：
 
 ```text
 NexusIM 已完成 9 个 IM 后端服务的主链路和一批本地 / 双机分布式 smoke，
-并正在这些事实源、投递、策略和审计边界之上构建 AI / RAG / Agent 应用底座。
+已形成 AI / RAG / Agent first-stage 应用底座和 product-active 平台服务 first paths，
+当前正优先收口 Web / Windows PC 客户端 IM MVP。
 ```

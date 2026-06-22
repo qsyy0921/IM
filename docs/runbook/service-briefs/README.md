@@ -34,8 +34,9 @@ microservice: [client platform](../client-platform.md).
 ## 当前推进规则
 
 - 现有 9 个服务只做阻塞当前 client / AI 链路的必要收口。
-- 当前 active slice 是 client platform MVP foundation；client 细节看
-  `../client-platform.md` 和 `../../sdd/client-platform.md`。
+- 当前 active slice 是 client platform MVP foundation；短线优先 Web / Windows PC 的
+  好友私聊、群聊和消息 first path。client 细节看 `../client-platform.md` 和
+  `../../sdd/client-platform.md`。
 - client platform 只能通过 `api-gateway` / `push-gateway` 使用后端能力。
 - memory 必须按 group memory 设计：source refs、speaker / audience、validity、supersedes、confidence、review state。
 - Agent 写动作必须先走 policy tool precheck，默认 `Proposal -> Approval -> Executor -> Audit`。

@@ -15,9 +15,10 @@
 
 ## 当前优先顺序
 
-1. 完成 client platform MVP foundation：PC desktop / Android 安装包或可运行
-   artifact、真实壳层 UI 接入现有 shell lifecycle actions、真实平台 shell smoke 和后续
-   native SQLite bridge。
+1. 完成 client platform MVP foundation：Web / Windows PC 先完成真实双用户客户端
+   smoke，验证好友私聊和群聊 first path；继续补会话标题、空态、错误文案、启动脚本、
+   PC 可运行包体验和后续 native SQLite bridge。Android APK / 真机 WebView smoke
+   后置到用户明确切回。
 2. 回到 AI / Agent 主线：group memory eval、EvidencePack、Agent 真实业务动作、
    Python AI Worker 候选算法。
 3. 继续 product-active 服务：workflow / audit / admin / notification / media /
@@ -49,8 +50,9 @@
   `clients/artifacts/<run-id>/manifest.json`。`smoke:desktop-artifact-launch` 已验证
   exe 启动 / 保持 / 终止的 launch sanity。`smoke:desktop-composed` 已能把
   clientweb BFF / push summary 与 desktop launch 证据合并成低敏 JSON，但仍不是 GUI
-  自动化。真实 Tauri WebView metadata callback smoke 已通过，剩余工作是运行登录级
-  真实 PC shell smoke、打磨真实 UI lifecycle，以及后续启用 MSI / NSIS installer
+  自动化。真实 Tauri WebView metadata callback smoke 已通过；Web / PC shell 已接
+  登录、注册、好友、好友私聊、群聊列表、建群、消息列表和发送 first path。剩余工作是
+  跑真实双用户客户端 smoke、打磨真实 UI lifecycle，以及后续启用 MSI / NSIS installer
   bundling / 签名。
 - `clients/android`：first-stage TypeScript runtime adapter 和 Kotlin WebView
   asset shell skeleton 已落；`createAndroidClientRuntime` 已能组装 shared

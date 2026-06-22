@@ -40,11 +40,12 @@ NexusIM 已有本地 / 双机可运行的最小分布式 IM 后端，并已扩�
 
 ## 当前短线
 
-1. 收口 Web / Windows PC 客户端：登录、好友、好友直聊、建群、消息列表、发送、
+1. 收口 Web / Windows PC 客户端：账号登录 / 注册、好友列表、好友申请、点击好友发起
+   私聊、群聊列表、建群、点击群聊进入会话、消息列表、发送后本地状态刷新、
    PullInbox / ACK 和本机可运行包体验。
 2. 所有客户端能力只走 api-gateway BFF 和 push-gateway，不直连内部服务。
-3. 不引入隐藏 recovery；依赖、权限、事实源或投影不确定时 fail-closed、repair /
-   retry，或回到对应事实源 recovery。
+3. 不引入隐藏备用路径；依赖、权限、事实源或投影不确定时 fail-closed，并使用显式
+   repair / retry 或重新读取对应事实源。
 
 ## 不变量
 

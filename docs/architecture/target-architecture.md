@@ -8,7 +8,8 @@
 - 服务级设计继续进入 `docs/sdd/`；接口、事件和 migration 继续落到 `api/`、`schemas/`、`migrations/`。
 - 短期阶段不以生产级 HA、全量压测、混沌和跨 Region 验证作为继续推进的阻塞；
   当前 9 个 IM 后端服务已作为可运行底座，AI 大模型应用底座已形成 first-stage
-  闭环，当前工程切片按 `current-goal.md` 推进客户端平台 MVP foundation。
+  闭环，当前工程切片按 `current-goal.md` 推进客户端平台 MVP foundation，短线优先
+  Web / Windows PC 的好友私聊、群聊和消息 first path。
 - 新服务或替换中间件必须说明兼容、迁移、回滚和验证证据，并通过 ADR。
 
 ## 阅读路由

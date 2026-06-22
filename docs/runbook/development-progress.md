@@ -103,8 +103,9 @@
   成功构建后自动归档，Android Docker builder
   profile 已接同一 collector 但尚未运行，readiness report 显示 Docker / Compose
   可用但 builder image 尚未构建；本机仍缺 Android
-  JDK 17+ / Gradle / SDK；下一步跑登录级真实 PC shell smoke，并补 Android 工具链或显式运行 builder profile 后复用同一 core 产出
-  Android APK。
+  JDK 17+ / Gradle / SDK；当前默认不把 Android 工具链作为阻塞，短线继续围绕
+  Web / Windows PC 客户端的好友私聊、群聊、消息列表、发送、PullInbox / ACK 和真实
+  双用户 smoke 收口。
 
 当前已开始的 AI 大模型应用底座能力：
 
@@ -270,14 +271,18 @@
 当前 Go 侧服务底座、控制面、EvidencePack、proposal / approval / audit、
 Python Worker 候选接入边界和低敏 eval 持久化已经足够支撑算法切片。
 用户已明确切入 client platform MVP foundation：三端客户端架构、可复用
-`protocol` / `client-core` skeleton、PC desktop / Android first-stage runtime adapter 和 `api-gateway` client BFF first-stage
-HTTP/JSON surface 已建立；Web fetch / WebSocket / local store first path 已接，
-第一轮本地 Web MVP smoke、loopback clean baseline 和 Windows wired `172.31.50.1`
-clean baseline 已通过，BFF HTTP route metrics / rate-limit adapter 已落，PC
-Tauri read-only metadata runner skeleton、Web 端 Tauri metadata 诊断读取和
-Android read-only native metadata bridge skeleton 已有，Windows desktop first-stage
-standalone artifact 已产出，launch sanity smoke 已通过，下一步是登录级真实 PC shell smoke / Android APK；Web IndexedDB local store 已补
-first-stage persistence test。
+`protocol` / `client-core` skeleton、PC desktop / Android first-stage runtime adapter 和
+`api-gateway` client BFF first-stage HTTP/JSON surface 已建立；Web fetch / WebSocket /
+local store first path 已接，第一轮本地 Web MVP smoke、loopback clean baseline 和
+Windows wired `172.31.50.1` clean baseline 已通过，BFF HTTP route metrics /
+rate-limit adapter 已落，PC Tauri read-only metadata runner skeleton、Web 端 Tauri
+metadata 诊断读取和 Android read-only native metadata bridge skeleton 已有，Windows
+desktop first-stage standalone artifact 已产出，launch sanity smoke 已通过，Web / PC
+shell 已接账号密码登录、注册、好友工作台、点击好友进入私聊、群聊列表、建群、点击
+群聊进入会话、消息列表、发送后本地状态刷新、PullInbox / ACK 和登录过期清理；
+下一步是跑真实双用户客户端 smoke，验证好友私聊和群聊 first path。Android APK /
+真机 WebView smoke 后置到用户明确切回；Web IndexedDB local store 已补 first-stage
+persistence test。
 
 future platform / product services 已作为长期产品化主线保留：继续按服务推进
 媒体、通知、审计、控制面、presence、model 等产品化 / 平台服务，并按
@@ -478,10 +483,12 @@ baseline 已通过，PC desktop / Android first-stage runtime adapter 已落，P
   Tauri runner skeleton 和 Android WebView asset shell skeleton 已有，shared runtime
   lifecycle smoke 已覆盖 desktop / Android 登录持久化、恢复、刷新和登出清理，
   且 thin shell actions 已接入 shared login / refresh / restore / logout contract；Windows desktop
-  standalone artifact 已产出且 launch sanity smoke 已通过，下一步接登录级真实 PC shell smoke、Android APK 和真实壳层 UI / WebView bridge smoke；Web
-  IndexedDB local store、browser platform adapter、shell config contract 和
-  target shell Web assets prep / artifact builder dry-run / Android builder profile
-  静态校验已补 first-stage focused tests。
+  standalone artifact 已产出且 launch sanity smoke 已通过；Web / PC shell 已接注册、
+  好友列表、好友申请、好友私聊、群聊列表、建群、会话选择、消息列表、发送后本地状态刷新、
+  PullInbox / ACK 和登录过期清理；下一步跑真实双用户客户端 smoke，验证好友私聊和群聊
+  first path。Android APK / 真机 WebView smoke 后置到用户明确切回；Web IndexedDB
+  local store、browser platform adapter、shell config contract 和 target shell Web assets
+  prep / artifact builder dry-run / Android builder profile 静态校验已补 first-stage focused tests。
 长期后续按完整目标架构推进业务平台、数据平台、AI / Agent 平台、客户端平台和中间件平台；
 后续 AI 继续扩展低敏 collaborative-memory 算法/eval，优先 multi-hop / temporal update / profile aggregation 边界。
 短期生产级测试、完整 HA、长压和 sizing 不再作为当前转进阻塞，但仍留在 hardening backlog。

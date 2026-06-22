@@ -188,6 +188,7 @@ export function App() {
 
   async function performLogin(): Promise<void> {
     pushConnectionRef.current?.close();
+    clearSessionViewState();
     const loginState = await shellActions.login({
       tenantID,
       userID,
@@ -210,20 +211,8 @@ export function App() {
       try {
         await shellActions.logout();
       } finally {
-        pushConnectionRef.current?.close();
-        pushConnectionRef.current = null;
-        sessionRef.current = null;
-        activeConversationRef.current = "";
-        setSession(null);
-        setConversations([]);
-        setContacts([]);
-        setIncomingRequests([]);
-        setOutgoingRequests([]);
-        setContactsError("");
-        setActiveConversationID("");
-        setMessages([]);
+        clearSessionViewState();
         setComposerText("");
-        setPushStatus("disconnected");
         await store.clear();
       }
     });
@@ -258,10 +247,14 @@ export function App() {
     }
     const items = await runtime.bff.listConversations(currentSession, { limit: 50 });
     setConversations(items);
-    if (items.length > 0) {
-      const firstConversationID = items[0]!.conversationID;
-      await selectConversation(firstConversationID, currentSession);
+    const nextActiveID = chooseActiveConversationID(items, activeConversationRef.current);
+    if (!nextActiveID) {
+      activeConversationRef.current = "";
+      setActiveConversationID("");
+      setMessages([]);
+      return;
     }
+    await selectConversation(nextActiveID, currentSession);
   }
 
   async function loadContacts(currentSession = sessionRef.current): Promise<void> {
@@ -387,6 +380,9 @@ export function App() {
     }
     activeConversationRef.current = conversationID;
     setActiveConversationID(conversationID);
+    setManualConversationID(conversationID);
+    setActiveView("conversations");
+    await showCachedMessages(conversationID);
     await syncConversation(conversationID, currentSession);
   }
 
@@ -426,12 +422,9 @@ export function App() {
         pinned: false,
         updatedAtMs: Date.now()
       };
-      setConversations(current => [optimistic, ...current.filter(item => item.conversationID !== created.conversationID)]);
-      setManualConversationID(created.conversationID);
+      upsertConversationSummary(optimistic);
       setNewGroupName("");
-      activeConversationRef.current = created.conversationID;
-      setActiveConversationID(created.conversationID);
-      setMessages([]);
+      await selectConversation(created.conversationID, currentSession);
     });
   }
 
@@ -460,16 +453,8 @@ export function App() {
         pinned: false,
         updatedAtMs: Date.now()
       };
-      setConversations(current => [
-        directSummary,
-        ...current.filter(item => item.conversationID !== created.conversationID)
-      ]);
-      setManualConversationID(created.conversationID);
-      setActiveView("conversations");
-      activeConversationRef.current = created.conversationID;
-      setActiveConversationID(created.conversationID);
-      setMessages([]);
-      await syncConversation(created.conversationID, currentSession);
+      upsertConversationSummary(directSummary);
+      await selectConversation(created.conversationID, currentSession);
     });
   }
 
@@ -485,7 +470,14 @@ export function App() {
         return;
       }
       setComposerText("");
-      await runtime.sendQueue.sendText({ session: currentSession, conversationID, text });
+      try {
+        const sent = await runtime.sendQueue.sendText({ session: currentSession, conversationID, text });
+        updateConversationLastSeq(conversationID, sent.conversationSeq);
+      } catch (caught) {
+        await showCachedMessages(conversationID);
+        throw caught;
+      }
+      await showCachedMessages(conversationID);
       await syncConversation(conversationID, currentSession);
     });
   }
@@ -551,6 +543,7 @@ export function App() {
       setMessages(nextMessages);
     }
     const maxSeq = nextMessages.reduce((max, message) => Math.max(max, message.conversationSeq), afterSeq);
+    updateConversationLastSeq(conversationID, maxSeq);
     if (maxSeq > afterSeq) {
       runtime.ackQueue.recordReceived(conversationID, maxSeq);
       await runtime.ackQueue.flush(currentSession);
@@ -577,6 +570,10 @@ export function App() {
         } catch (retried) {
           caught = retried;
         }
+      }
+      if (isUnauthenticated(caught) && sessionRef.current) {
+        await clearExpiredSession(caught);
+        return;
       }
       setStatus(`${label} failed`);
       setError(errorMessage(caught));
@@ -618,6 +615,55 @@ export function App() {
       throw new Error("login first");
     }
     return currentSession;
+  }
+
+  function clearSessionViewState(): void {
+    pushConnectionRef.current?.close();
+    pushConnectionRef.current = null;
+    sessionRef.current = null;
+    activeConversationRef.current = "";
+    setSession(null);
+    setConversations([]);
+    setContacts([]);
+    setIncomingRequests([]);
+    setOutgoingRequests([]);
+    setContactsError("");
+    setActiveConversationID("");
+    setMessages([]);
+    setLastAck(null);
+    setPushStatus("disconnected");
+  }
+
+  async function clearExpiredSession(caught: unknown): Promise<void> {
+    await shellActions.logout().catch(() => undefined);
+    clearSessionViewState();
+    setComposerText("");
+    setStatus("login expired");
+    setError(`登录态已过期，请重新登录。${errorMessage(caught)}`);
+  }
+
+  function upsertConversationSummary(summary: ConversationSummary): void {
+    setConversations(current => [summary, ...current.filter(item => item.conversationID !== summary.conversationID)]);
+  }
+
+  function updateConversationLastSeq(conversationID: string, seq: number): void {
+    if (seq <= 0) {
+      return;
+    }
+    setConversations(current =>
+      current.map(item =>
+        item.conversationID === conversationID
+          ? { ...item, lastSeq: Math.max(item.lastSeq, seq), updatedAtMs: Date.now() }
+          : item
+      )
+    );
+  }
+
+  async function showCachedMessages(conversationID: string): Promise<void> {
+    const cachedMessages = await store.listMessages(conversationID);
+    if (activeConversationRef.current === conversationID) {
+      setMessages(cachedMessages);
+    }
   }
 
   const activeConversation = conversations.find(item => item.conversationID === activeConversationID);
@@ -811,7 +857,14 @@ export function App() {
               <div className="friend-list">
                 {visibleContacts.length === 0 ? <div className="mini-empty">暂无好友</div> : null}
                 {visibleContacts.map(contact => (
-                  <article className="friend-item" key={contact.contactUserID}>
+                  <button
+                    data-testid="friend-conversation-item"
+                    className="friend-item"
+                    key={contact.contactUserID}
+                    type="button"
+                    onClick={() => void openDirectConversation(contact)}
+                    disabled={!session || contact.status !== "ACTIVE"}
+                  >
                     <span className="conversation-avatar">{contactLabel(contact)}</span>
                     <span className="conversation-copy">
                       <strong>{contactDisplayName(contact)}</strong>
@@ -823,15 +876,7 @@ export function App() {
                     <span className={`friend-status ${contact.status === "BLOCKED" ? "blocked" : ""}`}>
                       {contact.status === "BLOCKED" ? "已拉黑" : "好友"}
                     </span>
-                    <button
-                      className="friend-message-button"
-                      type="button"
-                      onClick={() => void openDirectConversation(contact)}
-                      disabled={!session || contact.status !== "ACTIVE"}
-                    >
-                      发消息
-                    </button>
-                  </article>
+                  </button>
                 ))}
               </div>
             </section>
@@ -1168,6 +1213,13 @@ function contactLabel(contact: ContactItem): string {
 
 function contactDisplayName(contact: ContactItem): string {
   return contact.remark.trim() || contact.contactUserID;
+}
+
+function chooseActiveConversationID(conversations: ConversationSummary[], preferredID: string): string {
+  if (preferredID && conversations.some(conversation => conversation.conversationID === preferredID)) {
+    return preferredID;
+  }
+  return conversations[0]?.conversationID ?? "";
 }
 
 function nativeLocalStoreStatus(localStore: NonNullable<NativeBridgeMetadata["capabilities"]>["localStore"]): string {

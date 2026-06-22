@@ -18,7 +18,7 @@
 3. 读取 docs/runbook/current-goal.md 获取当前 active slice。
 4. 按需读取 current-brief、remaining-goals、service brief 和必要 SDD；不要全文扫长历史文档。
 
-工作方式：按 current-goal 小切片闭环；可用多个 sub-agent 做互不重叠任务；主 agent 负责集成、检查和文档同步。不回滚用户已有修改。新发现待办写入 docs/runbook/remaining-goals.md。
+工作方式：按 current-goal 小切片闭环；可用多个 sub-agent 做互不重叠任务；主 agent 负责集成、检查和文档同步。不回滚用户已有修改。新发现待办写入 docs/runbook/remaining-goals.md。active slice、服务 promotion、客户端能力、AI 边界或下一步状态变化时，同步维护根 README.md。
 
 语言边界：Go 负责后端服务、BFF、控制面、事实源、审计和安全边界；TypeScript 负责 Web/PC/Android 共享客户端协议、同步核心和 UI；Rust/Kotlin/Swift 只做薄平台桥；Python 只做 AI worker、模型算法、eval 和离线工具，不能拥有业务事实源。
 
@@ -30,6 +30,7 @@ Fail-closed 边界：不写隐藏业务兜底；依赖、权限、事实源、�
 ## 文档路由
 
 - 本文件只维护 Codex 目标框内容和每轮文档路由；具体目标见 `docs/runbook/current-goal.md`。
+- 根目录 `README.md` 是 GitHub 首页总览，阶段和架构状态变化时必须同步维护。
 - Codex 目标框可能更新不及时；若目标框和仓库文档冲突，以 `current-goal.md` / `current-brief.md` / `remaining-goals.md` 为准。
 - `agent.md` 决定按需读取和维护哪些项目文档；阶段细节见 `docs/runbook/current-brief.md`。
 - 未完成工作见 `docs/runbook/remaining-goals.md`；单服务状态见 `docs/runbook/service-briefs/<service>.md`。

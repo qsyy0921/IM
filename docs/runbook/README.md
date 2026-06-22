@@ -4,8 +4,9 @@
 
 ## 当前主线
 
-- 当前用户明确切入 client platform MVP foundation：Web-first 客户端架构、client
-  BFF 契约、可复用 `protocol` / `client-core` 和局域网 Web MVP。
+- 当前用户明确切入 client platform MVP foundation：Web / Windows PC 优先，围绕
+  client BFF、可复用 `protocol` / `client-core`、好友私聊、群聊、消息列表和局域网
+  Web / PC MVP 收口；Android 后置到用户明确切回。
 - 长期完整架构以 `../architecture/target-architecture-complete.md` 为准；
   业务平台、数据平台、AI / Agent 平台、客户端平台和中间件平台的新开发都要按该文档
   的边界推进，不把服务数量、中间件产品或部署形态写死。

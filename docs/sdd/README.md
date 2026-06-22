@@ -10,7 +10,9 @@
 - 长期完整架构以 `docs/architecture/target-architecture-complete.md` 为准；新增
   服务 SDD 必须对齐其中的业务平台、数据平台、AI / Agent 平台、客户端平台和
   中间件平台边界。
-- 当前 AI 底座路线已进入 search / memory / retrieval / RAG / eval 边界；后续新增 summary、Agent、skill / MCP / action 服务时再补对应 SDD，不从旧文档推断目标。
+- 当前 AI 底座路线已进入 search / memory / retrieval / RAG / summary / Agent /
+  skill-registry / MCP / action-executor / ai-eval 边界；这些服务已有 SDD 时以对应
+  SDD 为准，不从旧文档推断目标。
 - 可以用 multi sub-agent 分别审查不同 SDD 或测试缺口，但同一 SDD、proto、migration 只能由一个 agent 修改，主 agent 负责最终集成。
 
 ## 服务 SDD

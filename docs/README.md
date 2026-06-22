@@ -16,7 +16,9 @@
 
 Codex 目标框只放根目录 `../prompt.md` 里的短 Prompt，不复制具体长目标。长期完整架构以
 `architecture/target-architecture-complete.md` 为准；当前 active slice 以
-`runbook/current-goal.md` 为准。短期生产级测试、长周期演练和完整生产就绪验证后置到明确阶段或用户指定任务。
+`runbook/current-goal.md` 为准。当前客户端主线短线优先 Web / Windows PC 的好友私聊、
+群聊和消息 first path；Android 后置到用户明确切回。短期生产级测试、长周期演练和
+完整生产就绪验证后置到明确阶段或用户指定任务。
 
 每轮 Codex 工作先读仓库根目录 `prompt.md` 和 `agent.md`，再按任务路由读取必要短文档；不要为了了解全局而全文扫 SDD、archive、history 或 loadtest 长文档。
 

@@ -18,6 +18,7 @@ from them is needed.
 | Continue active goal | `docs/runbook/current-goal.md` | `docs/runbook/current-goal.md` |
 | Understand phase | `docs/runbook/current-brief.md` | `docs/runbook/current-brief.md` |
 | Choose unfinished work | `docs/runbook/remaining-goals.md` | `docs/runbook/remaining-goals.md` |
+| Public project overview | `README.md` | `README.md` when active slice, service promotion, client capability, AI boundary or next-step status changes |
 | Work on one service | `docs/runbook/service-briefs/README.md`, then service brief | service brief; `development-progress.md` only for public progress |
 | Repair / DLQ / operator | `docs/runbook/repair-operators.md`, service brief | same |
 | Distributed smoke / fault evidence | relevant runbook README and exact report path | new report or summary only |
@@ -79,8 +80,10 @@ workers only return candidates, while Go owns control, state and audit.
 ## Progress Documents
 
 Use the routing table above as the source of truth. When facts change, update
-only the owning document. New work goes into `remaining-goals.md`; promote it to
-`current-goal.md` only when active.
+only the owning document. Root `README.md` is the public GitHub overview and must
+be kept aligned with current architecture and progress, but it should stay short.
+New work goes into `remaining-goals.md`; promote it to `current-goal.md` only
+when active.
 
 ## Work Selection
 

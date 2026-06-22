@@ -10,6 +10,9 @@ and Android.
 - The client talks to `api-gateway` and `push-gateway` only.
 - `delivery-service` PullInbox is the reliable source of delivered messages.
 - WebSocket `delivery.notify` frames are wakeups, not durable message facts.
+- Browser mode ships a first-stage PWA install shell. Its service worker is not
+  registered in PC desktop or Android WebView targets, and it never caches API,
+  WebSocket or shell-config traffic.
 
 ## Languages
 
@@ -73,6 +76,7 @@ dependencies:
 ```powershell
 npm --prefix clients run validate
 npm --prefix clients run test:shell-config
+npm --prefix clients run test:web-pwa
 npm --prefix clients run test:shell-web-assets
 npm --prefix clients run test:shell-asset-prep-wrapper
 npm --prefix clients run validate:desktop-tauri

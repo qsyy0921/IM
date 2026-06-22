@@ -115,6 +115,13 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   `npm --prefix clients run test:web-shell-actions` 会确认 Web shell 通过 shared
   `ClientShellActions` 调用 login / refresh / restore / logout，且不直接调用
   runtime auth lifecycle 方法，避免 PC / Android WebView 后续出现另一套 UI action path。
+- `clients` workspace 已新增 focused Browser PWA contract：
+  `npm --prefix clients run test:web-pwa` 会校验 browser manifest、SVG icon、
+  service worker 注册和缓存边界。该 PWA 只在 browser target 注册；PC
+  `windows-desktop` 与 Android WebView target 会跳过 service worker。service
+  worker 只缓存 same-origin shell 静态资源，显式绕过 `/api/`、`/ws`、
+  `nexusim-shell-config.js` 和自身脚本，不缓存 token、session、BFF response 或
+  WebSocket 数据。
 - `clients` workspace 已新增 Android shell action asset contract：
   `npm --prefix clients run test:android-shell-action-assets` 会临时构建 Web
   shell、按 Android shell config 准备临时 WebView assets、校验 shell asset

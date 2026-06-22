@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="NexusIM">
+  <rect width="128" height="128" rx="24" fill="#0f766e"/>
+  <path d="M33 91V37h15l32 31V37h15v54H81L48 59v32H33z" fill="#f8fafc"/>
+  <circle cx="94" cy="34" r="9" fill="#fbbf24"/>
+</svg>

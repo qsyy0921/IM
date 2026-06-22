@@ -102,6 +102,12 @@ First slice:
   builds can render their low-sensitive `shell-config.example.json` through
   `clients/tools/render-shell-config.mjs` and replace that placeholder for a
   local shell build.
+- Browser mode now ships a first-stage PWA install boundary:
+  `manifest.webmanifest`, `pwa-icon.svg` and `nexusim-sw.js`. Registration is
+  skipped for `windows-desktop` and `android` WebView targets. The service
+  worker only caches same-origin shell static assets and bypasses `/api/`,
+  `/ws`, `nexusim-shell-config.js` and itself, so BFF responses, WebSocket data,
+  auth/session material and target-specific shell config remain network-only.
 - `clients/tools/prepare-shell-web-assets.mjs` is the target asset-prep
   wrapper for real shells. `npm --prefix clients run build:shell-assets:desktop`
   builds Web and injects the `windows-desktop` shell config into `web/dist`.
@@ -202,6 +208,9 @@ First slice:
   browser runtime identity, network/lifecycle ports and unsupported wakeup
   boundaries, plus WebView bridge target selection for desktop and Android,
   without requiring a live browser or backend.
+- `npm --prefix clients run test:web-pwa` validates the Browser PWA contract:
+  manifest, icon, service worker registration, WebView target skip and
+  cache-bypass rules for API / WebSocket / shell config paths.
 - `npm --prefix clients run test:web-shell-actions` guards the Web shell
   lifecycle contract. It verifies the Web shell binds login, refresh, restore
   and logout through shared `ClientShellActions` and does not call runtime auth
@@ -421,6 +430,7 @@ Focused local check:
 ```powershell
 npm --prefix clients run check:build-prereqs
 npm --prefix clients run test:shell-config
+npm --prefix clients run test:web-pwa
 npm --prefix clients run test:shell-web-assets
 npm --prefix clients run test:android-shell-action-assets
 npm --prefix clients run test:artifact-builders

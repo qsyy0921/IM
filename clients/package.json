@@ -18,6 +18,7 @@
     "test:web-shell-actions": "node ./tools/test-web-shell-lifecycle-contract.mjs",
     "test:web-shell-automation": "node ./tools/test-web-shell-automation-contract.mjs",
     "test:web-shell-smoke-report": "node ./tools/test-web-shell-smoke-report.mjs",
+    "test:web-pwa": "node ./tools/test-web-pwa-contract.mjs",
     "test:shell-config": "node ./tools/test-shell-config-contract.mjs",
     "test:shell-web-assets": "node ./tools/test-shell-web-assets.mjs",
     "test:shell-asset-prep-wrapper": "node ./tools/test-shell-asset-prep-wrapper.mjs",

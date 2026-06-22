@@ -20,7 +20,7 @@ function main(argv) {
     const reasons = [...plan.missing, ...output.executionBlockers].join(",");
     throw new Error(`desktop installer build is not ready: ${reasons}`);
   }
-  runBuildCommand();
+  runBuildCommand(plan.target);
 }
 
 export function buildInstallerOutput(plan, options = {}) {
@@ -51,7 +51,28 @@ export function buildInstallerOutput(plan, options = {}) {
       readsSigningConfig: true,
       validatesArtifactHashes: true
     },
-    command: "npm --prefix clients run build:desktop-artifact:collect",
+    commands: plan.commandTemplate ?? {
+      build: [
+        "npm",
+        "--workspace",
+        "@nexusim/desktop",
+        "run",
+        "tauri:build",
+        "--",
+        "--bundles",
+        plan.target
+      ],
+      collect: [
+        "npm",
+        "--prefix",
+        "clients",
+        "run",
+        "collect:client-artifacts",
+        "--",
+        "--target",
+        "windows-desktop"
+      ]
+    },
     installerPlan: {
       schemaVersion: plan.schemaVersion,
       target: plan.target,
@@ -78,15 +99,31 @@ function buildExecutionBlockers(options) {
   return blockers;
 }
 
-function runBuildCommand() {
+function runBuildCommand(target) {
   const npmExecPath = process.env.npm_execpath;
   if (npmExecPath) {
+    execFileSync(process.execPath, [
+      npmExecPath,
+      "--workspace",
+      "@nexusim/desktop",
+      "run",
+      "tauri:build",
+      "--",
+      "--bundles",
+      target
+    ], {
+      cwd: workspaceRoot,
+      stdio: "inherit"
+    });
     execFileSync(process.execPath, [
       npmExecPath,
       "--prefix",
       "clients",
       "run",
-      "build:desktop-artifact:collect"
+      "collect:client-artifacts",
+      "--",
+      "--target",
+      "windows-desktop"
     ], {
       cwd: workspaceRoot,
       stdio: "inherit"
@@ -95,7 +132,12 @@ function runBuildCommand() {
   }
 
   const npm = process.platform === "win32" ? "npm.cmd" : "npm";
-  execFileSync(npm, ["--prefix", "clients", "run", "build:desktop-artifact:collect"], {
+  execFileSync(npm, ["--workspace", "@nexusim/desktop", "run", "tauri:build", "--", "--bundles", target], {
+    cwd: workspaceRoot,
+    stdio: "inherit",
+    shell: process.platform === "win32"
+  });
+  execFileSync(npm, ["--prefix", "clients", "run", "collect:client-artifacts", "--", "--target", "windows-desktop"], {
     cwd: workspaceRoot,
     stdio: "inherit",
     shell: process.platform === "win32"

@@ -82,13 +82,28 @@ export function buildDesktopInstallerPlan(options = {}) {
       mode: signingPlan.signing?.mode ?? "none"
     },
     commandTemplate: readyToBuildInstaller
-      ? [
-          "npm",
-          "--prefix",
-          "clients",
-          "run",
-          "build:desktop-artifact:collect"
-        ]
+      ? {
+          build: [
+            "npm",
+            "--workspace",
+            "@nexusim/desktop",
+            "run",
+            "tauri:build",
+            "--",
+            "--bundles",
+            target
+          ],
+          collect: [
+            "npm",
+            "--prefix",
+            "clients",
+            "run",
+            "collect:client-artifacts",
+            "--",
+            "--target",
+            "windows-desktop"
+          ]
+        }
       : null,
     expectedOutputHint: `clients/desktop/src-tauri/target/release/bundle/${target}/`,
     nextAction: readyToBuildInstaller

@@ -500,11 +500,12 @@ First slice:
   plan correctly reports not ready instead of treating the unsigned portable zip
   as an installer.
   `build:desktop-installer` is the explicit execution wrapper over that plan.
-  Its default output is plan-only; `--execute` is required before it invokes the
-  desktop artifact collection build, and it still fails closed while installer
-  readiness is false. It does not sign, install, launch, start services or
-  download toolchains. Real execution uses the repository Tauri config; custom
-  `--tauri-config` remains a planning fixture input and blocks `--execute`.
+  Its default output is plan-only; `--execute` is required before it runs Tauri
+  with the explicit bundle target and then collects the resulting Windows
+  desktop artifact. It still fails closed while installer readiness is false. It
+  does not sign, install, launch, start services or download toolchains. Real
+  execution uses the repository Tauri config; custom `--tauri-config` remains a
+  planning fixture input and blocks `--execute`.
   `smoke:desktop-artifact-launch` has verified the exe starts, stays alive
   during the smoke hold window and terminates cleanly.
   Its dry-run output carries an execution policy proving it only reads the

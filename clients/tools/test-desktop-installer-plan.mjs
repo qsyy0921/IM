@@ -117,7 +117,12 @@ try {
   const readyJSON = JSON.stringify(ready);
   assert(ready.readyToBuildInstaller === true, "active MSI config with signing inputs should be ready");
   assert(ready.target === "msi", "ready plan target mismatch");
-  assert(Array.isArray(ready.commandTemplate), "ready plan should include command template");
+  assert(Array.isArray(ready.commandTemplate?.build), "ready plan should include build command template");
+  assert(ready.commandTemplate.build.includes("tauri:build"), "ready build command should invoke Tauri build");
+  assert(ready.commandTemplate.build.includes("--bundles"), "ready build command should select bundle target");
+  assert(ready.commandTemplate.build.includes("msi"), "ready build command should include MSI target");
+  assert(Array.isArray(ready.commandTemplate?.collect), "ready plan should include collect command template");
+  assert(ready.commandTemplate.collect.includes("collect:client-artifacts"), "ready collect command should collect artifacts");
   assert(ready.expectedOutputHint.endsWith("/msi/"), "ready plan output hint should point at MSI bundle output");
   assert(!readyJSON.includes(tempRoot), "ready installer plan leaked absolute temp path");
   assert(!readyJSON.match(/token|secret|password|credential|private/i), "ready installer plan leaked sensitive names");

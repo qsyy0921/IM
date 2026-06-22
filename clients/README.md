@@ -247,10 +247,11 @@ installer bundling can run. It is also plan-only: it does not enable
 repo config intentionally reports not ready until Tauri bundling is explicitly
 enabled, a desktop artifact manifest is selected and signing readiness is true.
 `build:desktop-installer` wraps that plan as the explicit execution entry. By
-default it is still plan-only. It only invokes the desktop artifact collection
-build when run with `--execute` and the installer plan is ready; otherwise it
-fails closed and prints the missing readiness gates. It does not sign artifacts,
-install installers, launch the app, start services or download toolchains.
+default it is still plan-only. It runs Tauri with the explicit bundle target and
+then collects the resulting Windows desktop artifact only when run with
+`--execute` and the installer plan is ready; otherwise it fails closed and
+prints the missing readiness gates. It does not sign artifacts, install
+installers, launch the app, start services or download toolchains.
 Execution uses the repository Tauri config; custom `--tauri-config` is accepted
 for planning fixtures only and blocks real `--execute`.
 

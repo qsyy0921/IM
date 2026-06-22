@@ -99,6 +99,9 @@ try {
   assert(dryRun.executionPolicy.executesBuildCommand === false, "default installer builder must not execute build");
   assert(dryRun.executionPolicy.executeRequested === false, "default installer builder should not request execution");
   assert(dryRun.executionPolicy.requiresExplicitExecuteFlag === true, "execute flag requirement missing");
+  assert(dryRun.commands.build.includes("tauri:build"), "installer builder should plan a Tauri bundle build");
+  assert(dryRun.commands.build.includes("--bundles"), "installer builder should plan an explicit bundle target");
+  assert(dryRun.commands.collect.includes("collect:client-artifacts"), "installer builder should plan artifact collection after build");
   assert(!dryRunJSON.includes(tempRoot), "dry-run installer builder output leaked absolute temp path");
   assert(!dryRunJSON.match(/token|secret|password|credential|private/i), "dry-run installer builder output leaked sensitive names");
 

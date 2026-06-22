@@ -600,6 +600,7 @@ button {
 }
 
 .chat-header h2 {
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -686,6 +687,8 @@ button {
   justify-items: center;
   margin: auto;
   color: #65757d;
+  padding: 0 16px;
+  text-align: center;
 }
 
 .empty-state strong {
@@ -720,6 +723,7 @@ button {
 .message p {
   color: #172126;
   line-height: 1.55;
+  overflow-wrap: anywhere;
   white-space: pre-wrap;
 }
 

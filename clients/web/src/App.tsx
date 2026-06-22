@@ -246,8 +246,9 @@ export function App() {
       throw new Error("login first");
     }
     const items = await runtime.bff.listConversations(currentSession, { limit: 50 });
-    setConversations(items);
-    const nextActiveID = chooseActiveConversationID(items, activeConversationRef.current);
+    const mergedItems = mergeConversationSummaries(conversations, items);
+    setConversations(mergedItems);
+    const nextActiveID = chooseActiveConversationID(mergedItems, activeConversationRef.current);
     if (!nextActiveID) {
       activeConversationRef.current = "";
       setActiveConversationID("");
@@ -667,6 +668,17 @@ export function App() {
   }
 
   const activeConversation = conversations.find(item => item.conversationID === activeConversationID);
+  const activeConversationTitle = activeConversation
+    ? conversationDisplayTitle(activeConversation)
+    : activeConversationID
+      ? titleFromConversationID(activeConversationID, "GROUP")
+      : "选择一个会话";
+  const activeConversationSubtitle = activeConversation
+    ? conversationSubtitle(activeConversation)
+    : session
+      ? "请选择左侧好友或群聊"
+      : "请先登录";
+  const emptyState = emptyMessageState(Boolean(session), Boolean(activeConversationID));
   const visibleContacts = contacts
     .filter(contact => contact.status !== "DELETED")
     .sort((left, right) => contactDisplayName(left).localeCompare(contactDisplayName(right)));
@@ -834,10 +846,10 @@ export function App() {
                     key={conversation.conversationID}
                     onClick={() => void run("select conversation", () => selectConversation(conversation.conversationID))}
                   >
-                    <span className="conversation-avatar">{conversation.title.slice(0, 1).toUpperCase()}</span>
+                    <span className="conversation-avatar">{conversationAvatarText(conversation)}</span>
                     <span className="conversation-copy">
-                      <strong>{conversation.title}</strong>
-                      <small>最新 #{conversation.lastSeq}</small>
+                      <strong>{conversationDisplayTitle(conversation)}</strong>
+                      <small>{conversationSubtitle(conversation)}</small>
                     </span>
                   </button>
                 ))}
@@ -1059,8 +1071,8 @@ export function App() {
       <section className="chat">
         <header className="chat-header">
           <div className="chat-title">
-            <h2>{(activeConversation?.title ?? activeConversationID) || "选择一个会话"}</h2>
-            <p>{session ? "在线" : "未登录"}</p>
+            <h2>{activeConversationTitle}</h2>
+            <p>{activeConversationSubtitle}</p>
           </div>
           <div className="status-stack" aria-label="连接状态">
             <span data-testid="runtime-status" className="status-pill">{status}</span>
@@ -1080,7 +1092,9 @@ export function App() {
               <p>
                 {activeConversationID
                   ? `${messages.length} 条消息${latestMessageSeq > 0 ? ` / 最新 #${latestMessageSeq}` : ""}`
-                  : "请选择群聊或会话"}
+                  : session
+                    ? "请选择左侧好友或群聊"
+                    : "登录后即可同步消息"}
               </p>
             </div>
             <button
@@ -1094,8 +1108,8 @@ export function App() {
           <div data-testid="message-list" className="messages">
             {messages.length === 0 ? (
               <div className="empty-state">
-                <strong>{session ? "还没有消息" : "登录后查看消息"}</strong>
-                <span>{session ? "选择会话后即可收发文本消息。" : "输入账号和密码即可进入 NexusIM。"}</span>
+                <strong>{emptyState.title}</strong>
+                <span>{emptyState.body}</span>
               </div>
             ) : (
               messages.map(message => {
@@ -1215,6 +1229,79 @@ function contactDisplayName(contact: ContactItem): string {
   return contact.remark.trim() || contact.contactUserID;
 }
 
+function mergeConversationSummaries(
+  current: ConversationSummary[],
+  incoming: ConversationSummary[]
+): ConversationSummary[] {
+  const currentByID = new Map(current.map(item => [item.conversationID, item]));
+  return incoming.map(item => {
+    const existing = currentByID.get(item.conversationID);
+    if (!existing || !isGenericConversationTitle(item.title)) {
+      return item;
+    }
+    if (isGenericConversationTitle(existing.title)) {
+      return item;
+    }
+    return { ...item, title: existing.title };
+  });
+}
+
+function conversationDisplayTitle(conversation: ConversationSummary): string {
+  if (!isGenericConversationTitle(conversation.title)) {
+    return conversation.title;
+  }
+  return titleFromConversationID(conversation.conversationID, conversation.type);
+}
+
+function titleFromConversationID(conversationID: string, type: ConversationSummary["type"]): string {
+  const shortID = compactConversationID(conversationID);
+  if (type === "DIRECT") {
+    return `私聊 ${shortID}`;
+  }
+  return `群聊 ${shortID}`;
+}
+
+function conversationSubtitle(conversation: ConversationSummary): string {
+  const kind = conversation.type === "DIRECT" ? "私聊" : "群聊";
+  const seq = conversation.lastSeq > 0 ? `最新 #${conversation.lastSeq}` : "暂无消息";
+  return `${kind} · ${seq}`;
+}
+
+function conversationAvatarText(conversation: ConversationSummary): string {
+  const title = conversationDisplayTitle(conversation).trim();
+  return (title.slice(0, 1) || "会").toUpperCase();
+}
+
+function isGenericConversationTitle(title: string): boolean {
+  return title.trim() === "" || title.startsWith("Conversation ");
+}
+
+function compactConversationID(conversationID: string): string {
+  if (conversationID.length <= 14) {
+    return conversationID;
+  }
+  return `${conversationID.slice(0, 6)}...${conversationID.slice(-6)}`;
+}
+
+function emptyMessageState(hasSession: boolean, hasActiveConversation: boolean): { title: string; body: string } {
+  if (!hasSession) {
+    return {
+      title: "登录后查看消息",
+      body: "输入账号和密码即可进入 NexusIM。"
+    };
+  }
+  if (!hasActiveConversation) {
+    return {
+      title: "请选择一个会话",
+      body: "点击左侧好友发起私聊，或选择 / 创建群聊。"
+    };
+  }
+  return {
+    title: "这里还没有消息",
+    body: "发送第一条消息，或点击同步从 PullInbox 拉取最新消息。"
+  };
+}
+
 function chooseActiveConversationID(conversations: ConversationSummary[], preferredID: string): string {
   if (preferredID && conversations.some(conversation => conversation.conversationID === preferredID)) {
     return preferredID;
@@ -1245,10 +1332,53 @@ function isUnauthenticated(error: unknown): boolean {
 function errorMessage(error: unknown): string {
   if (typeof error === "object" && error !== null && "message" in error) {
     const message = String((error as { message: unknown }).message);
+    const code = "code" in error ? String((error as { code: unknown }).code) : "";
+    const publicMessage = publicErrorMessage(code, message);
+    if (publicMessage) {
+      return publicMessage;
+    }
     if (message === "Failed to fetch" || message.includes("NetworkError")) {
       return `无法连接本地 NexusIM 服务，请先启动客户端后端。API: ${runtimeConfig.apiBaseURL}，WebSocket: ${runtimeConfig.pushWebSocketURL}`;
     }
     return message;
   }
-  return String(error);
+  return publicErrorMessage("", String(error)) ?? String(error);
+}
+
+function publicErrorMessage(code: string, message: string): string | null {
+  const normalized = message.trim().toLowerCase();
+  if (code === "UNAUTHENTICATED" || normalized.includes("token expired")) {
+    return "登录态已过期，请重新登录。";
+  }
+  if (code === "PERMISSION_DENIED") {
+    return "当前账号没有执行该操作的权限。";
+  }
+  if (code === "INVALID_ARGUMENT") {
+    return `输入内容不符合要求：${message}`;
+  }
+  if (message === "login first") {
+    return "请先登录。";
+  }
+  if (message === "logout first") {
+    return "当前已有登录账号，请先退出后再注册。";
+  }
+  if (message === "account is required") {
+    return "请输入账号。";
+  }
+  if (message === "password is required") {
+    return "请输入密码。";
+  }
+  if (message === "conversation id is required") {
+    return "请先选择一个会话。";
+  }
+  if (message === "contact user id is required") {
+    return "请输入要添加的用户 ID。";
+  }
+  if (message === "contact is not active") {
+    return "该联系人当前不是可聊天状态。";
+  }
+  if (normalized === "endpoint not found") {
+    return "当前客户端接口在后端未启用，请重启最新本地客户端后端。";
+  }
+  return null;
 }

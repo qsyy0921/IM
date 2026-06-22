@@ -60,6 +60,11 @@ const checkPlan = [
     reason: "guards clientweb run-local-smoke WebView opt-in hooks without starting services"
   },
   {
+    name: "client-start-scripts",
+    script: "test:client-start-scripts",
+    reason: "guards local Web/backend start scripts without starting services"
+  },
+  {
     name: "web-pwa-contract",
     script: "test:web-pwa",
     reason: "guards browser manifest and service-worker cache boundary"

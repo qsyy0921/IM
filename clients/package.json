@@ -43,6 +43,7 @@
     "test:android-webview-devtools-parser": "node ./tools/test-android-webview-devtools-parser.mjs",
     "test:android-webview-devtools-readiness": "node ./tools/test-android-webview-devtools-readiness.mjs",
     "test:clientweb-smoke-hooks": "node ./tools/test-clientweb-run-local-smoke-hooks.mjs",
+    "test:client-start-scripts": "node ./tools/test-client-start-scripts.mjs",
     "test:android-device-readiness": "node ./tools/test-android-device-readiness.mjs",
     "test:android-platform-readiness": "node ./tools/test-android-platform-readiness.mjs",
     "test:shell-smoke-plan": "node ./tools/test-client-shell-smoke-plan.mjs",

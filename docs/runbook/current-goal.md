@@ -29,20 +29,25 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   点击群聊进入会话、建群、消息列表、发送后本地状态刷新、PullInbox 和 ACK。
 - 会话刷新会保留当前选中；gateway token 过期会清理本地 session / push /
   会话展示状态并提示重新登录。
+- Web / PC shell 已补第一版会话展示标题、空态、常见错误中文文案和本地
+  `clients/start-local-backend.ps1` / `clients/start-local-web.ps1` 启动入口；
+  这些都是客户端展示 / 本地开发体验，不改变服务端事实源。
 - 2026-06-23 clean committed smoke 已跑通真实双用户 client path：
   注册 -> 登录 -> 好友申请 / 接受 -> BFF 打开 direct 会话 -> direct 消息 notify /
   PullInbox / ACK；以及建群 -> receiver JOIN -> group 消息 notify / PullInbox / ACK。
   原始结果在 `H:\NexusIM\loadtest-results\client-web-bff-push-smoke-20260623-015417\client-web-summary.json`，
   记录 `commit=6a08fb14`、`git_dirty=false`。
-- 本地调试默认使用 `127.0.0.1:8080/8088`；`loadtest/clientweb/run-local-dev.ps1`
-  负责留住本机 client backend。
+- 本地调试默认使用 `127.0.0.1:8080/8088`；`clients/start-local-backend.ps1`
+  显式启动本机 client backend，`clients/start-local-web.ps1` 显式启动 Web UI。
 - Android 已有 WebView shell / bridge / APK 历史产物和 metadata smoke；当前 shell
   不宣称 F 盘 Android toolchain ready，后续切回 Android 时再重新加载 toolchain env。
 
 ## 下一步优先级
 
-1. 收口 Web / Windows PC shell 的剩余体验：会话标题、空态、错误文案和启动脚本。
-2. Windows PC 端继续 installer / 启动脚本 / 可运行包体验。
+1. Windows PC 端继续 installer / 可运行包体验，并保持 Web / PC shell 的 UI 细节
+   随真实调试反馈继续收口。
+2. 若继续客户端产品能力，优先补群成员邀请 / 退群 / 群设置的 BFF 契约和 UI，而不是
+   直接调用 conversation-service 私有接口。
 3. Android 后续只在用户切回时继续：login-level WebView smoke、APK baseline
    报告和真机 UI polish。
 4. 客户端切片阶段性收口后，再回到 workflow compensation adapter / instruction approval

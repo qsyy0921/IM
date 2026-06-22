@@ -132,6 +132,14 @@ First slice:
   selected-conversation preservation during refresh, local message-state refresh
   after send, and gateway-token-expired cleanup that clears the local session
   and asks the user to log in again.
+- The Web / PC shell now also keeps explicit display-title and UX copy rules:
+  direct / group titles learned from user actions survive conversation refresh,
+  unknown server summaries render as short explicit conversation IDs, empty
+  message states point users to the next action, and common public errors are
+  mapped to user-facing Chinese copy without adding hidden fallback paths.
+- `clients/start-local-backend.ps1` and `clients/start-local-web.ps1` are the
+  current local startup pair. They start backend and frontend explicitly in
+  separate terminals instead of hiding backend startup behind the Web launcher.
 - `loadtest/clientweb` now verifies the two-user client first path through
   public client-facing surfaces: register/login, contact request send/accept,
   BFF direct-conversation open, direct message notify/PullInbox/ACK, BFF group

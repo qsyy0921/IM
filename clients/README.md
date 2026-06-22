@@ -75,6 +75,13 @@ The first client product surface is deliberately thin and service-backed:
   verifies an ACTIVE contact edge through contacts-service, then creates or
   reuses a conversation-service `DIRECT` conversation before normal SendMessage /
   PullInbox / AckDelivery flow continues.
+- the Web / PC shell preserves user-facing local display titles produced by
+  click-to-direct-chat and group creation. Unknown server summaries are shown as
+  explicit short conversation IDs; the client does not treat those display names
+  as server facts.
+- empty states and common public errors are mapped to user-facing Chinese copy
+  while preserving fail-closed behavior. Missing endpoints, expired tokens,
+  missing login and permission errors do not trigger hidden alternate paths.
 
 Invitation, member role management and group settings are not implemented in the
 client UI yet. They must be added through dedicated conversation BFF contracts
@@ -82,13 +89,16 @@ instead of direct service-private calls.
 
 ## LAN Configuration
 
-For local Windows desktop debugging, use the fixed local client backend wrapper:
+For local Windows desktop debugging, start the backend and Web UI explicitly in
+separate terminals:
 
 ```powershell
-.\loadtest\clientweb\run-local-dev.ps1
+.\clients\start-local-backend.ps1
+.\clients\start-local-web.ps1
 ```
 
-It keeps the BFF and push listeners alive on:
+The backend wrapper delegates to `loadtest/clientweb/run-local-dev.ps1` and keeps
+the BFF and push listeners alive on:
 
 ```text
 http://127.0.0.1:8080

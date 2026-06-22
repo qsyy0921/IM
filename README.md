@@ -4,7 +4,7 @@ NexusIM 是面向企业协同场景的分布式 IM + AI 协作平台。当前仓
 
 ```text
 本地 / 双机可运行的分布式 IM 后端
--> Web / PC / Android client platform first slice
+-> Web / Windows PC / Android client platform first slice
 -> group memory / EvidencePack / RAG / summary / Agent 应用底座
 -> skill registry / MCP gateway / action executor / proposal approval / audit
 -> 完整目标架构：业务平台 + 数据平台 + AI / Agent 平台 + 中间件平台
@@ -148,6 +148,24 @@ flowchart TB
 | Python AI Worker | 只做模型、算法、embedding、rerank、memory extraction、planner 和 eval 候选；Go 继续拥有权限、状态、审批、审计和持久化。 |
 | 中间件平台 | PostgreSQL、Kafka、Redis、OpenSearch / vector store、对象存储、观测、安全组件、数据平台和 AI runtime 都按能力与 runtime profile 引入，不写死产品。 |
 
+### 当前客户端状态
+
+客户端当前主线是 Web / Windows PC 优先、Android 后置。Web / PC shell 已接账号登录、
+注册、好友申请、好友列表、点击好友发起私聊、群聊列表、建群、点击群聊进入会话、
+消息列表、发送后本地状态刷新、PullInbox 和 ACK。2026-06-23 的 clean smoke 已验证
+双用户好友直聊和群聊 first path；随后 Web / PC shell 又补了第一版会话展示标题、
+空态、常见错误中文文案和显式本地启动脚本。
+
+本地调试入口：
+
+```powershell
+.\clients\start-local-backend.ps1
+.\clients\start-local-web.ps1
+```
+
+客户端仍只连接 `api-gateway` BFF 和 `push-gateway`，不直连内部服务；PullInbox 是
+消息展示事实源，WebSocket 只做在线唤醒。
+
 ### 当前技术 / 中间件能力目录
 
 NexusIM 的中间件和技术栈会随着功能持续增加。README 只记录当前判断和引入规则，
@@ -260,14 +278,15 @@ message / conversation / policy events -> search-service + memory-service projec
 
 | 模块 | 当前状态 |
 | --- | --- |
-| `clients/` | Browser / Windows PC / Android client platform first slice：`protocol`、`client-core`、Web shell、PC desktop shell contract 和 Android runtime contract 已建立并通过 focused validation；`api-gateway` client BFF first-stage HTTP/JSON surface 已落；Web / PC shell 已接账号密码登录、注册、好友列表、好友申请、点击好友发起私聊、群聊列表、建群、点击群聊进入会话、消息列表、发送后本地状态刷新、PullInbox / AckDelivery；PC standalone exe 和 Android debug APK baseline 已产出。客户端只连 `api-gateway` / `push-gateway`，PullInbox 是消息事实源，WebSocket 只做在线唤醒。 |
+| `clients/` | Browser / Windows PC / Android client platform first slice：`protocol`、`client-core`、Web shell、PC desktop shell contract 和 Android runtime contract 已建立并通过 focused validation；`api-gateway` client BFF first-stage HTTP/JSON surface 已落；Web / PC shell 已接账号密码登录、注册、好友列表、好友申请、点击好友发起私聊、群聊列表、建群、点击群聊进入会话、消息列表、发送后本地状态刷新、PullInbox / AckDelivery；真实双用户 direct + group client smoke 已通过；PC standalone exe 和 Android debug APK baseline 已产出。客户端只连 `api-gateway` / `push-gateway`，PullInbox 是消息事实源，WebSocket 只做在线唤醒。 |
 
 当前默认主线不是继续泛化清理 9 服务 P2 backlog，也不是做生产级 HA 长测，而是先把
 Web / Windows PC 客户端的 IM MVP 交互做实：账号注册登录、好友关系、好友私聊、群聊、
 消息列表、发送、PullInbox / AckDelivery 和局域网可运行体验。本地 / 局域网 Web smoke、
-PC WebView login smoke、PC standalone exe baseline 和 Android debug APK baseline 已有；
-下一步是跑真实双用户客户端 smoke，验证好友私聊和群聊 first path。Android 真机 WebView
-login smoke、Windows installer 和完整移动端发布链路后置到用户明确切回。
+PC WebView login smoke、真实双用户 direct + group client smoke、PC standalone exe baseline
+和 Android debug APK baseline 已有；下一步是 Windows PC 可运行包 / installer 体验，以及
+群成员邀请、退群和群设置等下一批客户端产品能力的 BFF 契约。Android 真机 WebView login
+smoke 和正式移动端发布链路后置到用户明确切回。
 
 AI 大模型应用底座作为后续主线保留：
 
@@ -284,8 +303,8 @@ group memory
 ```
 
 下一步默认看 [current-goal.md](docs/runbook/current-goal.md)。截至当前主线，下一步是围绕
-Web / Windows PC 客户端跑真实双用户 smoke，并继续补会话标题、空态、错误文案和启动脚本。
-Android APK / 真机 smoke 不作为当前默认阻塞。
+Windows PC 可运行包 / installer 体验继续收口；若继续客户端产品能力，则优先补群成员
+邀请、退群和群设置的 BFF 契约与 UI。Android APK / 真机 smoke 不作为当前默认阻塞。
 
 ## 不变量
 
@@ -433,8 +452,8 @@ python -m mypy nexusim_ai_common scripts tests
 - 完整 Web / App / 桌面客户端；当前 Web / Windows PC shell 已有账号登录、注册、好友、
   群聊和消息 first path，`api-gateway` client BFF first-stage surface、Web adapters first path、
   本地 / wired LAN smoke、BFF HTTP metrics / rate-limit adapter、PC standalone exe 和
-  Android debug APK baseline 已落，但还缺真实双用户客户端 smoke、Windows installer、
-  Android 真机 smoke 和正式移动端发布链路。
+  Android debug APK baseline 已落，真实双用户 direct + group client smoke 已通过；仍缺
+  Windows installer、Android 真机 smoke、正式移动端发布链路以及更完整的群管理 UI。
 - 完整 media / notification / admin / audit / workflow / control-plane 等产品化平台能力；
   当前这些服务已有 first-stage 路径，但 provider-grade adapter、UI、长周期运维和生产化
   仍未完成。

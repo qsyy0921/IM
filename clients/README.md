@@ -324,8 +324,9 @@ Current packaging status:
   only a low-sensitive plan. `sign:desktop-artifact` is the explicit
   `--execute`-gated signing wrapper over that plan and fails closed until real
   signing inputs are present. `verify:desktop-signature` reads Authenticode
-  public status; the old collected baseline in the repo lacks `artifactKind`, so
-  it now fails closed until a new desktop artifact is recollected.
+  public status. A new `desktop-executable` artifact was recollected at
+  `clients/artifacts/2026-06-22T214826Z/manifest.json`; it verifies artifact kind
+  and hash correctly, and its current Authenticode status is `NotSigned`.
   `plan:desktop-installer` now checks the repository
   installer Tauri profile, MSI / NSIS target, artifact baseline, signing
   readiness and valid signature status; actual `build:desktop-installer` now provides the explicit

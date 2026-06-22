@@ -164,7 +164,8 @@ artifact manifest 现在区分 `desktop-executable` / `desktop-installer`；
 签名输入 readiness；`sign:desktop-artifact` 已提供显式 `--execute` 门控的签名
 执行入口，默认仍只输出低敏 plan，release signing 可加 `--require-valid` 在签名后
 立即执行 fail-closed 验证；`verify:desktop-signature` 已提供只读
-Authenticode 验证入口；当前仓库旧 desktop collected baseline 缺 `artifactKind`，新规则会 fail-closed，需要重新 collect 后再验证签名；`build:desktop-installer` 已提供显式 `--execute` 门控的
+Authenticode 验证入口；2026-06-23 已重新 collect 新格式 `desktop-executable`
+artifact，manifest 为 `clients/artifacts/2026-06-22T214826Z/manifest.json`，当前签名状态为 `NotSigned`；`build:desktop-installer` 已提供显式 `--execute` 门控的
 installer build 包装器，并通过独立仓库 installer profile 调用 Tauri。默认开发
 Tauri config 仍保持不打包；installer profile 显式启用 MSI + NSIS targets；signing /
 signature verification / installer planner 会按 `artifactKind` 精确选择 collected

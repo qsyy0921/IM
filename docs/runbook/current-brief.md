@@ -54,8 +54,9 @@ NexusIM 已有本地 / 双机可运行的最小分布式 IM 后端，并已扩�
    Tauri installer 和显式签名输入 readiness；`sign:desktop-artifact` 已补为显式
    `--execute` 门控的签名执行入口，默认仍是低敏 plan-only，release signing 可加
    `--require-valid` 在签名后立即 fail-closed 验证；`verify:desktop-signature`
-   已补为只读 Authenticode 验证入口；当前仓库旧 collected desktop baseline 缺
-   `artifactKind`，新规则会 fail-closed，需要重新 collect 后再验证签名；
+   已补为只读 Authenticode 验证入口；2026-06-23 已重新 collect 新格式
+   `desktop-executable` artifact，manifest 为
+   `clients/artifacts/2026-06-22T214826Z/manifest.json`，签名状态为 `NotSigned`；
    installer 已有独立仓库
    profile，不再要求打开默认开发 config 的 `bundle.active`；`build:desktop-installer` 已提供显式
    `--execute` 门控的 installer build 包装器，并用该 profile 调用 Tauri。desktop
@@ -64,8 +65,8 @@ NexusIM 已有本地 / 双机可运行的最小分布式 IM 后端，并已扩�
    旧 manifest 要重新 collect，installer 不进入 portable launcher 或 direct shell-smoke；
    installer planner 也只接受显式 `desktop-executable` 作为 MSI / NSIS build baseline，
    旧 manifest 或 `desktop-installer` 不会被当作 installer build 输入；
-   当前本机 dry-run 会先要求重新 collect 新格式 desktop artifact，因此不执行 bundling 或签名；下一步
-   先重新 collect，再继续真实 signing input、valid signed artifact 和 MSI / NSIS installer 体验。
+   当前本机 dry-run 已找到新 executable baseline，但缺真实 signing input 和 valid
+   signature，因此不执行 bundling 或签名；下一步继续真实 signing input、valid signed artifact 和 MSI / NSIS installer 体验。
    `loadtest/clientweb` 已扩展到群成员列表、
    角色变更、owner transfer 和移除成员的 BFF 链路；2026-06-23 clean committed
    smoke 已通过。

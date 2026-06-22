@@ -87,10 +87,11 @@
   签名还需要本机 `signtool`、timestamp URL、证书来源和 signed artifact 验证。
   collected manifest 已区分 `desktop-executable` / `desktop-installer`，portable
   bundle 只接受 executable，不把 installer 产物混进本地 zip 包。
-  `verify:desktop-signature` 已补只读 Authenticode 验证入口；当前仓库旧 collected
-  desktop baseline 缺 `artifactKind`，新规则会 fail-closed，需要先重新 collect 新格式
-  desktop artifact；`sign:desktop-artifact --execute --require-valid` 已能在签名后
-  立即执行 fail-closed 验证，release profile 仍需提供真实签名材料并产出 valid signature。
+  `verify:desktop-signature` 已补只读 Authenticode 验证入口；2026-06-23 已重新
+  collect 新格式 `desktop-executable` artifact，manifest 为
+  `clients/artifacts/2026-06-22T214826Z/manifest.json`，签名状态为 `NotSigned`；
+  `sign:desktop-artifact --execute --require-valid` 已能在签名后立即执行
+  fail-closed 验证，release profile 仍需提供真实签名材料并产出 valid signature。
   `build:desktop-installer` 已补显式
   `--execute` 门控的 installer build 包装器，默认仍只输出计划；desktop signing /
   signature verification / installer planner 现在会按 `artifactKind` 自动选择 collected

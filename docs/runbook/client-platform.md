@@ -513,10 +513,12 @@ First slice:
   It validates the selected artifact hash and reads Windows Authenticode public
   status without signing, installing, launching, starting services or downloading
   toolchains. It also defaults to `desktop-executable`; installer verification
-  must pass `--artifact-kind desktop-installer`. The old collected desktop
-  baseline currently in the repo lacks `artifactKind`, so these tools fail
-  closed until a new desktop artifact is recollected; after recollection, release
-  profiles must sign first and then rerun verification with `--require-valid`.
+  must pass `--artifact-kind desktop-installer`. A new `desktop-executable`
+  artifact was recollected on 2026-06-23 at
+  `clients/artifacts/2026-06-22T214826Z/manifest.json`; it now passes artifact
+  kind and hash selection, and read-only Authenticode verification reports
+  `NotSigned`. Release profiles must provide real signing inputs, sign first and
+  then rerun verification with `--require-valid`.
   `plan:desktop-signing`,
   `verify:desktop-signature` and `plan:desktop-installer` now select artifacts by
   `artifactKind` instead of blindly using the first `windows-desktop` artifact,

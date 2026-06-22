@@ -207,6 +207,7 @@ Current packaging status:
   `adb reverse`.
 - `check:no-toolchain` runs the fast client shell guard set without launching
   Docker, building APKs, installing APKs, starting Android activities, opening
-  `adb reverse` or installing toolchains. It does read low-sensitive ADB /
-  device readiness state through the Android platform readiness report. Use it
-  as the default focused client gate before reaching for a broader local gate.
+  `adb reverse` or installing toolchains. It includes the Android login-level
+  WebView smoke plan-only contract and reads low-sensitive ADB / device
+  readiness state through the Android platform readiness report. Use it as the
+  default focused client gate before reaching for a broader local gate.

@@ -30,6 +30,11 @@ const checkPlan = [
     reason: "guards Android WebView assets without Gradle, SDK, APK or device"
   },
   {
+    name: "android-webview-login-plan",
+    script: "test:android-webview-login-smoke-plan",
+    reason: "guards Android login-level WebView smoke plan and safe preflight without APK, Docker or device execution"
+  },
+  {
     name: "android-platform-readiness-contract",
     script: "test:android-platform-readiness",
     reason: "guards low-sensitive Android platform readiness schema"

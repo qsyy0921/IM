@@ -22,6 +22,7 @@ assert(commands.includes("npm --prefix clients run test:web-pwa"), "web PWA chec
 assert(commands.includes("npm --prefix clients run test:shell-web-assets"), "shell asset check missing");
 assert(commands.includes("npm --prefix clients run test:desktop-shell-action-assets"), "desktop action asset check missing");
 assert(commands.includes("npm --prefix clients run test:android-shell-action-assets"), "android action asset check missing");
+assert(commands.includes("npm --prefix clients run test:android-webview-login-smoke-plan"), "android WebView login plan check missing");
 assert(commands.includes("npm --prefix clients run test:android-platform-readiness"), "android platform readiness schema check missing");
 assert(commands.includes("npm --prefix clients run report:android-platform-readiness"), "android platform readiness report missing");
 

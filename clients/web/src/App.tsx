@@ -5,8 +5,10 @@ import type {
   ContactDecision,
   ContactItem,
   ContactRequestItem,
+  ConversationMember,
   ConversationSummary,
   DeliveryNotifyFrame,
+  MemberRole,
   MessageItem,
   ServerFrame
 } from "@nexusim/protocol";
@@ -60,6 +62,9 @@ export function App() {
   const [composerText, setComposerText] = useState("");
   const [newGroupName, setNewGroupName] = useState("");
   const [groupInviteUserID, setGroupInviteUserID] = useState("");
+  const [groupMembers, setGroupMembers] = useState<ConversationMember[]>([]);
+  const [groupMembersConversationID, setGroupMembersConversationID] = useState("");
+  const [groupMembersError, setGroupMembersError] = useState("");
   const [status, setStatus] = useState("ready");
   const [activeView, setActiveView] = useState<ActiveView>("conversations");
   const [contacts, setContacts] = useState<ContactItem[]>([]);
@@ -380,12 +385,18 @@ export function App() {
     if (!currentSession) {
       throw new Error("login first");
     }
+    const selectedConversation = conversations.find(item => item.conversationID === conversationID);
     activeConversationRef.current = conversationID;
     setActiveConversationID(conversationID);
     setManualConversationID(conversationID);
     setActiveView("conversations");
     await showCachedMessages(conversationID);
     await syncConversation(conversationID, currentSession);
+    if (selectedConversation?.type === "GROUP") {
+      await loadGroupMembers(conversationID, currentSession);
+    } else {
+      clearGroupMemberState();
+    }
   }
 
   async function openManualConversation(): Promise<void> {
@@ -428,6 +439,7 @@ export function App() {
       upsertConversationSummary(optimistic);
       setNewGroupName("");
       await selectConversation(created.conversationID, currentSession);
+      await loadGroupMembers(created.conversationID, currentSession);
     });
   }
 
@@ -462,6 +474,36 @@ export function App() {
     });
   }
 
+  async function loadGroupMembers(
+    conversationID = activeConversationRef.current,
+    currentSession = sessionRef.current
+  ): Promise<void> {
+    if (!currentSession) {
+      throw new Error("login first");
+    }
+    if (!conversationID) {
+      throw new Error("conversation id is required");
+    }
+    try {
+      const response = await runtime.bff.listConversationMembers(
+        {
+          conversationID,
+          pageSize: 100
+        },
+        currentSession
+      );
+      setGroupMembers(response.members);
+      setGroupMembersConversationID(response.conversationID);
+      setGroupMembersError("");
+      updateConversationMemberVersion(response.conversationID, response.memberVersion);
+    } catch (caught) {
+      setGroupMembers([]);
+      setGroupMembersConversationID(conversationID);
+      setGroupMembersError(errorMessage(caught));
+      throw caught;
+    }
+  }
+
   async function inviteGroupMember(): Promise<void> {
     await run("invite group member", async () => {
       const currentSession = requireSession();
@@ -481,6 +523,7 @@ export function App() {
       );
       setGroupInviteUserID("");
       updateConversationMemberVersion(result.conversationID, result.memberVersion);
+      await loadGroupMembers(result.conversationID, currentSession);
       await loadConversations(currentSession);
       if (result.conversationID) {
         await selectConversation(result.conversationID, currentSession);
@@ -505,6 +548,65 @@ export function App() {
       setActiveConversationID("");
       setManualConversationID("");
       setMessages([]);
+      clearGroupMemberState();
+      await loadConversations(currentSession);
+    });
+  }
+
+  async function removeGroupMember(member: ConversationMember): Promise<void> {
+    await run("remove group member", async () => {
+      const currentSession = requireSession();
+      const conversation = requireActiveGroupConversation();
+      const result = await runtime.bff.removeConversationMember(
+        {
+          conversationID: conversation.conversationID,
+          targetUserID: member.userID,
+          expectedMemberVersion: conversation.memberVersion,
+          reason: "client remove group member"
+        },
+        currentSession
+      );
+      updateConversationMemberVersion(result.conversationID, result.memberVersion);
+      await loadGroupMembers(result.conversationID, currentSession);
+      await loadConversations(currentSession);
+    });
+  }
+
+  async function updateGroupMemberRole(member: ConversationMember, targetRole: MemberRole): Promise<void> {
+    await run("update group member role", async () => {
+      const currentSession = requireSession();
+      const conversation = requireActiveGroupConversation();
+      const result = await runtime.bff.updateConversationMemberRole(
+        {
+          conversationID: conversation.conversationID,
+          targetUserID: member.userID,
+          targetRole,
+          expectedMemberVersion: conversation.memberVersion,
+          reason: `client set member role ${targetRole}`
+        },
+        currentSession
+      );
+      updateConversationMemberVersion(result.conversationID, result.memberVersion);
+      await loadGroupMembers(result.conversationID, currentSession);
+      await loadConversations(currentSession);
+    });
+  }
+
+  async function transferGroupOwner(member: ConversationMember): Promise<void> {
+    await run("transfer group owner", async () => {
+      const currentSession = requireSession();
+      const conversation = requireActiveGroupConversation();
+      const result = await runtime.bff.transferConversationOwner(
+        {
+          conversationID: conversation.conversationID,
+          newOwnerUserID: member.userID,
+          expectedMemberVersion: conversation.memberVersion,
+          reason: "client transfer group owner"
+        },
+        currentSession
+      );
+      updateConversationMemberVersion(result.conversationID, result.memberVersion);
+      await loadGroupMembers(result.conversationID, currentSession);
       await loadConversations(currentSession);
     });
   }
@@ -692,8 +794,15 @@ export function App() {
     setContactsError("");
     setActiveConversationID("");
     setMessages([]);
+    clearGroupMemberState();
     setLastAck(null);
     setPushStatus("disconnected");
+  }
+
+  function clearGroupMemberState(): void {
+    setGroupMembers([]);
+    setGroupMembersConversationID("");
+    setGroupMembersError("");
   }
 
   async function clearExpiredSession(caught: unknown): Promise<void> {
@@ -754,6 +863,10 @@ export function App() {
       : "请先登录";
   const emptyState = emptyMessageState(Boolean(session), Boolean(activeConversationID));
   const activeGroupConversation = activeConversation?.type === "GROUP" ? activeConversation : undefined;
+  const groupMembersForActive =
+    activeGroupConversation && groupMembersConversationID === activeGroupConversation.conversationID
+      ? groupMembers
+      : [];
   const visibleContacts = contacts
     .filter(contact => contact.status !== "DELETED")
     .sort((left, right) => contactDisplayName(left).localeCompare(contactDisplayName(right)));
@@ -1166,9 +1279,18 @@ export function App() {
               <strong>群设置</strong>
               <span>
                 {compactConversationID(activeGroupConversation.conversationID)} · member v
-                {activeGroupConversation.memberVersion}
+                {activeGroupConversation.memberVersion} · {groupMembersForActive.length} 人
               </span>
             </div>
+            <button
+              data-testid="group-members-refresh"
+              className="ghost-button"
+              type="button"
+              onClick={() => void run("load group members", () => loadGroupMembers(activeGroupConversation.conversationID))}
+              disabled={!session}
+            >
+              刷新成员
+            </button>
             <form
               className="group-member-form"
               onSubmit={event => {
@@ -1196,6 +1318,59 @@ export function App() {
             >
               退群
             </button>
+            {groupMembersError ? <div className="group-members-error">{groupMembersError}</div> : null}
+            <div className="group-member-list" aria-label="群成员列表">
+              {groupMembersForActive.length === 0 && !groupMembersError ? (
+                <div className="mini-empty">暂无成员数据</div>
+              ) : null}
+              {groupMembersForActive.map(member => (
+                <article className="group-member-item" key={member.userID} data-testid="group-member-item">
+                  <div className="group-member-copy">
+                    <strong>{member.userID}</strong>
+                    <span>
+                      {memberRoleLabel(member.role)} · {memberStatusLabel(member.status)}
+                    </span>
+                  </div>
+                  <div className="group-member-actions">
+                    {member.role !== "ADMIN" ? (
+                      <button
+                        type="button"
+                        onClick={() => void updateGroupMemberRole(member, "ADMIN")}
+                        disabled={!session || member.status !== "ACTIVE" || member.role === "OWNER"}
+                      >
+                        设管理员
+                      </button>
+                    ) : null}
+                    {member.role !== "MEMBER" ? (
+                      <button
+                        type="button"
+                        onClick={() => void updateGroupMemberRole(member, "MEMBER")}
+                        disabled={!session || member.status !== "ACTIVE" || member.role === "OWNER"}
+                      >
+                        设成员
+                      </button>
+                    ) : null}
+                    {member.role !== "OWNER" ? (
+                      <button
+                        type="button"
+                        onClick={() => void transferGroupOwner(member)}
+                        disabled={!session || member.status !== "ACTIVE"}
+                      >
+                        转让群主
+                      </button>
+                    ) : null}
+                    <button
+                      className="danger-inline-button"
+                      type="button"
+                      onClick={() => void removeGroupMember(member)}
+                      disabled={!session || member.status !== "ACTIVE" || member.userID === session?.userID}
+                    >
+                      移除
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
           </section>
         ) : null}
 
@@ -1337,6 +1512,32 @@ function draftsFromContacts(contacts: ContactItem[], field: "remark" | "groupNam
 function contactLabel(contact: ContactItem): string {
   const display = contactDisplayName(contact);
   return display.slice(0, 1).toUpperCase();
+}
+
+function memberRoleLabel(role: string): string {
+  switch (role) {
+    case "OWNER":
+      return "群主";
+    case "ADMIN":
+      return "管理员";
+    case "MEMBER":
+      return "成员";
+    default:
+      return role || "未知角色";
+  }
+}
+
+function memberStatusLabel(status: string): string {
+  switch (status) {
+    case "ACTIVE":
+      return "活跃";
+    case "LEFT":
+      return "已离开";
+    case "BANNED":
+      return "已封禁";
+    default:
+      return status || "未知状态";
+  }
 }
 
 function contactDisplayName(contact: ContactItem): string {

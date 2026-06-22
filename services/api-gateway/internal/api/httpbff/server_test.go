@@ -213,7 +213,7 @@ func TestOpenDirectConversationRequiresActiveContact(t *testing.T) {
 			if request.GetConversationId() != expectedConversationID ||
 				request.GetConversationType() != conversationv1.ConversationType_CONVERSATION_TYPE_DIRECT ||
 				request.GetDirectPeerUserId() != "user-b" ||
-				request.GetIdempotencyKey() != "direct:"+expectedConversationID {
+				request.GetIdempotencyKey() != "idem-direct-1" {
 				t.Fatalf("unexpected direct create request: %+v", request)
 			}
 			return &conversationv1.CreateConversationResponse{
@@ -230,7 +230,8 @@ func TestOpenDirectConversationRequiresActiveContact(t *testing.T) {
 	handler := NewServer(Config{Gateway: gateway, Authenticator: authenticator})
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/api/conversations/direct", strings.NewReader(`{
-		"peer_user_id":"user-b"
+		"peer_user_id":"user-b",
+		"idempotency_key":"idem-direct-1"
 	}`))
 	request.Header.Set("Authorization", "Bearer token-1")
 
@@ -281,6 +282,48 @@ func TestOpenDirectConversationRejectsInactiveContact(t *testing.T) {
 	}
 	if createCalled {
 		t.Fatalf("create conversation should not be called for inactive contact")
+	}
+}
+
+func TestOpenDirectConversationRequiresIdempotencyKey(t *testing.T) {
+	authenticator := &fakeAuthenticator{auth: gatewayauth.AuthContext{
+		TenantID:  "tenant-1",
+		UserID:    "user-a",
+		DeviceID:  "web-1",
+		SessionID: "session-1",
+	}}
+	createCalled := false
+	gateway := &fakeGateway{
+		getContactState: func(context.Context, *contactsv1.GetContactStateRequest) (*contactsv1.GetContactStateResponse, error) {
+			return &contactsv1.GetContactStateResponse{
+				TenantId:      "tenant-1",
+				OwnerUserId:   "user-a",
+				ContactUserId: "user-b",
+				Status:        contactsv1.ContactEdgeStatus_CONTACT_EDGE_STATUS_ACTIVE,
+			}, nil
+		},
+		createConversation: func(context.Context, *conversationv1.CreateConversationRequest) (*conversationv1.CreateConversationResponse, error) {
+			createCalled = true
+			return nil, status.Error(codes.Internal, "should not create direct conversation")
+		},
+	}
+	handler := NewServer(Config{Gateway: gateway, Authenticator: authenticator})
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/conversations/direct", strings.NewReader(`{
+		"peer_user_id":"user-b"
+	}`))
+	request.Header.Set("Authorization", "Bearer token-1")
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("expected bad request, got status=%d body=%s", response.Code, response.Body.String())
+	}
+	if createCalled {
+		t.Fatalf("create conversation should not be called without idempotency key")
+	}
+	if !strings.Contains(response.Body.String(), "idempotency_key is required") {
+		t.Fatalf("expected idempotency error, got %s", response.Body.String())
 	}
 }
 
@@ -387,6 +430,214 @@ func TestLeaveConversationTargetsAuthenticatedUser(t *testing.T) {
 	}
 	if !strings.Contains(response.Body.String(), `"target_user_id":"user-a"`) {
 		t.Fatalf("expected leave response for authenticated user, got %s", response.Body.String())
+	}
+}
+
+func TestListConversationMembersForwardsQuery(t *testing.T) {
+	authenticator := &fakeAuthenticator{auth: gatewayauth.AuthContext{
+		TenantID:  "tenant-1",
+		UserID:    "owner-1",
+		DeviceID:  "web-1",
+		SessionID: "session-1",
+	}}
+	gateway := &fakeGateway{
+		listConversationMembers: func(ctx context.Context, request *conversationv1.ListConversationMembersRequest) (*conversationv1.ListConversationMembersResponse, error) {
+			md, ok := metadata.FromIncomingContext(ctx)
+			if !ok || firstMetadata(md, "authorization") != "Bearer token-1" {
+				t.Fatalf("expected forwarded auth metadata, got %+v", md)
+			}
+			if request.GetConversationId() != "group/1" ||
+				request.GetPageSize() != 20 ||
+				request.GetPageToken() != "cursor-1" ||
+				request.GetRoleFilter() != conversationv1.MemberRole_MEMBER_ROLE_ADMIN ||
+				request.GetUserIdPrefix() != "user-" ||
+				request.GetSort() != conversationv1.ConversationMemberListSort_CONVERSATION_MEMBER_LIST_SORT_ROLE_USER_ID_ASC {
+				t.Fatalf("unexpected list members request: %+v", request)
+			}
+			return &conversationv1.ListConversationMembersResponse{
+				TenantId:          "tenant-1",
+				ConversationId:    request.GetConversationId(),
+				MemberVersion:     9,
+				PermissionVersion: 3,
+				Members: []*conversationv1.ConversationMember{
+					{
+						UserId:            "owner-1",
+						Role:              conversationv1.MemberRole_MEMBER_ROLE_OWNER,
+						Status:            conversationv1.MemberStatus_MEMBER_STATUS_ACTIVE,
+						JoinSeq:           1,
+						MemberVersion:     9,
+						PermissionVersion: 3,
+					},
+				},
+			}, nil
+		},
+	}
+	handler := NewServer(Config{Gateway: gateway, Authenticator: authenticator})
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/api/conversations/group%2F1/members?page_size=20&page_token=cursor-1&role=ADMIN&user_id_prefix=user-", nil)
+	request.Header.Set("Authorization", "Bearer token-1")
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+	if !strings.Contains(response.Body.String(), `"user_id":"owner-1"`) ||
+		!strings.Contains(response.Body.String(), `"member_version":"9"`) {
+		t.Fatalf("expected members response, got %s", response.Body.String())
+	}
+}
+
+func TestRemoveConversationMemberForwardsRemoveCommand(t *testing.T) {
+	authenticator := &fakeAuthenticator{auth: gatewayauth.AuthContext{
+		TenantID:  "tenant-1",
+		UserID:    "owner-1",
+		DeviceID:  "web-1",
+		SessionID: "session-1",
+	}}
+	gateway := &fakeGateway{
+		createMemberChange: func(_ context.Context, request *conversationv1.CreateMemberChangeRequest) (*conversationv1.CreateMemberChangeResponse, error) {
+			if request.GetConversationId() != "group-1" ||
+				request.GetTargetUserId() != "user-b" ||
+				request.GetChangeType() != conversationv1.MemberChangeType_MEMBER_CHANGE_TYPE_REMOVE ||
+				request.GetExpectedMemberVersion() != 9 ||
+				request.GetIdempotencyKey() != "idem-remove-1" ||
+				request.GetConflictPolicy() != conversationv1.MemberChangeConflictPolicy_MEMBER_CHANGE_CONFLICT_POLICY_REJECT {
+				t.Fatalf("unexpected remove request: %+v", request)
+			}
+			return &conversationv1.CreateMemberChangeResponse{
+				ChangeId:       "change-remove-1",
+				TenantId:       "tenant-1",
+				ConversationId: request.GetConversationId(),
+				TargetUserId:   request.GetTargetUserId(),
+				ChangeType:     request.GetChangeType(),
+				Status:         conversationv1.MemberChangeStatus_MEMBER_CHANGE_STATUS_OUTBOX_ENQUEUED,
+				MemberVersion:  10,
+			}, nil
+		},
+	}
+	handler := NewServer(Config{Gateway: gateway, Authenticator: authenticator})
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/conversations/group-1/members/remove", strings.NewReader(`{
+		"target_user_id":"user-b",
+		"expected_member_version":9,
+		"idempotency_key":"idem-remove-1"
+	}`))
+	request.Header.Set("Authorization", "Bearer token-1")
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+	if !strings.Contains(response.Body.String(), `"change_type":"MEMBER_CHANGE_TYPE_REMOVE"`) {
+		t.Fatalf("expected remove response, got %s", response.Body.String())
+	}
+}
+
+func TestUpdateConversationMemberRoleRejectsOwnerRole(t *testing.T) {
+	authenticator := &fakeAuthenticator{auth: gatewayauth.AuthContext{UserID: "owner-1"}}
+	gateway := &fakeGateway{
+		createMemberChange: func(context.Context, *conversationv1.CreateMemberChangeRequest) (*conversationv1.CreateMemberChangeResponse, error) {
+			t.Fatalf("create member change should not be called for owner role change")
+			return nil, nil
+		},
+	}
+	handler := NewServer(Config{Gateway: gateway, Authenticator: authenticator})
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/conversations/group-1/members/role", strings.NewReader(`{
+		"target_user_id":"user-b",
+		"target_role":"OWNER"
+	}`))
+	request.Header.Set("Authorization", "Bearer token-1")
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("expected bad request, got status=%d body=%s", response.Code, response.Body.String())
+	}
+}
+
+func TestUpdateConversationMemberRoleForwardsRoleChange(t *testing.T) {
+	authenticator := &fakeAuthenticator{auth: gatewayauth.AuthContext{UserID: "owner-1"}}
+	gateway := &fakeGateway{
+		createMemberChange: func(_ context.Context, request *conversationv1.CreateMemberChangeRequest) (*conversationv1.CreateMemberChangeResponse, error) {
+			if request.GetConversationId() != "group-1" ||
+				request.GetTargetUserId() != "user-b" ||
+				request.GetChangeType() != conversationv1.MemberChangeType_MEMBER_CHANGE_TYPE_ROLE_CHANGED ||
+				request.GetTargetRole() != conversationv1.MemberRole_MEMBER_ROLE_ADMIN ||
+				request.GetExpectedMemberVersion() != 10 ||
+				request.GetIdempotencyKey() != "idem-role-1" {
+				t.Fatalf("unexpected role request: %+v", request)
+			}
+			return &conversationv1.CreateMemberChangeResponse{
+				ChangeId:       "change-role-1",
+				TenantId:       "tenant-1",
+				ConversationId: request.GetConversationId(),
+				TargetUserId:   request.GetTargetUserId(),
+				ChangeType:     request.GetChangeType(),
+				Status:         conversationv1.MemberChangeStatus_MEMBER_CHANGE_STATUS_OUTBOX_ENQUEUED,
+				MemberVersion:  11,
+			}, nil
+		},
+	}
+	handler := NewServer(Config{Gateway: gateway, Authenticator: authenticator})
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/conversations/group-1/members/role", strings.NewReader(`{
+		"target_user_id":"user-b",
+		"target_role":"ADMIN",
+		"expected_member_version":10,
+		"idempotency_key":"idem-role-1"
+	}`))
+	request.Header.Set("Authorization", "Bearer token-1")
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+	if !strings.Contains(response.Body.String(), `"change_type":"MEMBER_CHANGE_TYPE_ROLE_CHANGED"`) {
+		t.Fatalf("expected role response, got %s", response.Body.String())
+	}
+}
+
+func TestTransferConversationOwnerForwardsTransfer(t *testing.T) {
+	authenticator := &fakeAuthenticator{auth: gatewayauth.AuthContext{UserID: "owner-1"}}
+	gateway := &fakeGateway{
+		transferConversationOwner: func(_ context.Context, request *conversationv1.TransferConversationOwnerRequest) (*conversationv1.TransferConversationOwnerResponse, error) {
+			if request.GetConversationId() != "group-1" ||
+				request.GetNewOwnerUserId() != "user-b" ||
+				request.GetExpectedMemberVersion() != 11 ||
+				request.GetIdempotencyKey() != "idem-transfer-1" {
+				t.Fatalf("unexpected transfer request: %+v", request)
+			}
+			return &conversationv1.TransferConversationOwnerResponse{
+				ChangeId:            "change-transfer-1",
+				TenantId:            "tenant-1",
+				ConversationId:      request.GetConversationId(),
+				PreviousOwnerUserId: "owner-1",
+				NewOwnerUserId:      request.GetNewOwnerUserId(),
+				Status:              conversationv1.MemberChangeStatus_MEMBER_CHANGE_STATUS_OUTBOX_ENQUEUED,
+				MemberVersion:       12,
+			}, nil
+		},
+	}
+	handler := NewServer(Config{Gateway: gateway, Authenticator: authenticator})
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/conversations/group-1/owner/transfer", strings.NewReader(`{
+		"new_owner_user_id":"user-b",
+		"expected_member_version":11,
+		"idempotency_key":"idem-transfer-1"
+	}`))
+	request.Header.Set("Authorization", "Bearer token-1")
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+	if !strings.Contains(response.Body.String(), `"new_owner_user_id":"user-b"`) {
+		t.Fatalf("expected transfer response, got %s", response.Body.String())
 	}
 }
 
@@ -726,29 +977,31 @@ func TestRateLimiterRejectsBFFRequestBeforeGatewayCall(t *testing.T) {
 }
 
 type fakeGateway struct {
-	registerUser          func(context.Context, *identityv1.RegisterUserRequest) (*identityv1.RegisterUserResponse, error)
-	login                 func(context.Context, *identityv1.LoginRequest) (*identityv1.LoginResponse, error)
-	refresh               func(context.Context, *identityv1.RefreshGatewayTokenRequest) (*identityv1.RefreshGatewayTokenResponse, error)
-	issueGatewayToken     func(context.Context, *identityv1.IssueGatewayTokenRequest) (*identityv1.IssueGatewayTokenResponse, error)
-	revokeSession         func(context.Context, *identityv1.RevokeSessionRequest) (*identityv1.RevokeSessionResponse, error)
-	createConversation    func(context.Context, *conversationv1.CreateConversationRequest) (*conversationv1.CreateConversationResponse, error)
-	createMemberChange    func(context.Context, *conversationv1.CreateMemberChangeRequest) (*conversationv1.CreateMemberChangeResponse, error)
-	sendMessage           func(context.Context, *messagev1.SendMessageRequest) (*messagev1.SendMessageResponse, error)
-	pullInbox             func(context.Context, *deliveryv1.PullInboxRequest) (*deliveryv1.PullInboxResponse, error)
-	ackDelivery           func(context.Context, *deliveryv1.AckDeliveryRequest) (*deliveryv1.AckDeliveryResponse, error)
-	listConversations     func(context.Context, *receiptv1.ListConversationsRequest) (*receiptv1.ListConversationsResponse, error)
-	listReceiptStates     func(context.Context, *receiptv1.ListReceiptStatesRequest) (*receiptv1.ListReceiptStatesResponse, error)
-	sendContactRequest    func(context.Context, *contactsv1.SendContactRequestRequest) (*contactsv1.SendContactRequestResponse, error)
-	respondContactRequest func(context.Context, *contactsv1.RespondContactRequestRequest) (*contactsv1.RespondContactRequestResponse, error)
-	cancelContactRequest  func(context.Context, *contactsv1.CancelContactRequestRequest) (*contactsv1.CancelContactRequestResponse, error)
-	listContactRequests   func(context.Context, *contactsv1.ListContactRequestsRequest) (*contactsv1.ListContactRequestsResponse, error)
-	listContacts          func(context.Context, *contactsv1.ListContactsRequest) (*contactsv1.ListContactsResponse, error)
-	getContactState       func(context.Context, *contactsv1.GetContactStateRequest) (*contactsv1.GetContactStateResponse, error)
-	deleteContact         func(context.Context, *contactsv1.DeleteContactRequest) (*contactsv1.DeleteContactResponse, error)
-	blockContact          func(context.Context, *contactsv1.BlockContactRequest) (*contactsv1.BlockContactResponse, error)
-	unblockContact        func(context.Context, *contactsv1.UnblockContactRequest) (*contactsv1.UnblockContactResponse, error)
-	updateContactRemark   func(context.Context, *contactsv1.UpdateContactRemarkRequest) (*contactsv1.UpdateContactRemarkResponse, error)
-	updateContactGroup    func(context.Context, *contactsv1.UpdateContactGroupRequest) (*contactsv1.UpdateContactGroupResponse, error)
+	registerUser              func(context.Context, *identityv1.RegisterUserRequest) (*identityv1.RegisterUserResponse, error)
+	login                     func(context.Context, *identityv1.LoginRequest) (*identityv1.LoginResponse, error)
+	refresh                   func(context.Context, *identityv1.RefreshGatewayTokenRequest) (*identityv1.RefreshGatewayTokenResponse, error)
+	issueGatewayToken         func(context.Context, *identityv1.IssueGatewayTokenRequest) (*identityv1.IssueGatewayTokenResponse, error)
+	revokeSession             func(context.Context, *identityv1.RevokeSessionRequest) (*identityv1.RevokeSessionResponse, error)
+	createConversation        func(context.Context, *conversationv1.CreateConversationRequest) (*conversationv1.CreateConversationResponse, error)
+	createMemberChange        func(context.Context, *conversationv1.CreateMemberChangeRequest) (*conversationv1.CreateMemberChangeResponse, error)
+	listConversationMembers   func(context.Context, *conversationv1.ListConversationMembersRequest) (*conversationv1.ListConversationMembersResponse, error)
+	transferConversationOwner func(context.Context, *conversationv1.TransferConversationOwnerRequest) (*conversationv1.TransferConversationOwnerResponse, error)
+	sendMessage               func(context.Context, *messagev1.SendMessageRequest) (*messagev1.SendMessageResponse, error)
+	pullInbox                 func(context.Context, *deliveryv1.PullInboxRequest) (*deliveryv1.PullInboxResponse, error)
+	ackDelivery               func(context.Context, *deliveryv1.AckDeliveryRequest) (*deliveryv1.AckDeliveryResponse, error)
+	listConversations         func(context.Context, *receiptv1.ListConversationsRequest) (*receiptv1.ListConversationsResponse, error)
+	listReceiptStates         func(context.Context, *receiptv1.ListReceiptStatesRequest) (*receiptv1.ListReceiptStatesResponse, error)
+	sendContactRequest        func(context.Context, *contactsv1.SendContactRequestRequest) (*contactsv1.SendContactRequestResponse, error)
+	respondContactRequest     func(context.Context, *contactsv1.RespondContactRequestRequest) (*contactsv1.RespondContactRequestResponse, error)
+	cancelContactRequest      func(context.Context, *contactsv1.CancelContactRequestRequest) (*contactsv1.CancelContactRequestResponse, error)
+	listContactRequests       func(context.Context, *contactsv1.ListContactRequestsRequest) (*contactsv1.ListContactRequestsResponse, error)
+	listContacts              func(context.Context, *contactsv1.ListContactsRequest) (*contactsv1.ListContactsResponse, error)
+	getContactState           func(context.Context, *contactsv1.GetContactStateRequest) (*contactsv1.GetContactStateResponse, error)
+	deleteContact             func(context.Context, *contactsv1.DeleteContactRequest) (*contactsv1.DeleteContactResponse, error)
+	blockContact              func(context.Context, *contactsv1.BlockContactRequest) (*contactsv1.BlockContactResponse, error)
+	unblockContact            func(context.Context, *contactsv1.UnblockContactRequest) (*contactsv1.UnblockContactResponse, error)
+	updateContactRemark       func(context.Context, *contactsv1.UpdateContactRemarkRequest) (*contactsv1.UpdateContactRemarkResponse, error)
+	updateContactGroup        func(context.Context, *contactsv1.UpdateContactGroupRequest) (*contactsv1.UpdateContactGroupResponse, error)
 }
 
 func (gateway *fakeGateway) RegisterUser(ctx context.Context, request *identityv1.RegisterUserRequest) (*identityv1.RegisterUserResponse, error) {
@@ -798,6 +1051,20 @@ func (gateway *fakeGateway) CreateMemberChange(ctx context.Context, request *con
 		return nil, status.Error(codes.Unimplemented, "create member change not implemented")
 	}
 	return gateway.createMemberChange(ctx, request)
+}
+
+func (gateway *fakeGateway) ListConversationMembers(ctx context.Context, request *conversationv1.ListConversationMembersRequest) (*conversationv1.ListConversationMembersResponse, error) {
+	if gateway.listConversationMembers == nil {
+		return nil, status.Error(codes.Unimplemented, "list conversation members not implemented")
+	}
+	return gateway.listConversationMembers(ctx, request)
+}
+
+func (gateway *fakeGateway) TransferConversationOwner(ctx context.Context, request *conversationv1.TransferConversationOwnerRequest) (*conversationv1.TransferConversationOwnerResponse, error) {
+	if gateway.transferConversationOwner == nil {
+		return nil, status.Error(codes.Unimplemented, "transfer conversation owner not implemented")
+	}
+	return gateway.transferConversationOwner(ctx, request)
 }
 
 func (gateway *fakeGateway) SendMessage(ctx context.Context, request *messagev1.SendMessageRequest) (*messagev1.SendMessageResponse, error) {

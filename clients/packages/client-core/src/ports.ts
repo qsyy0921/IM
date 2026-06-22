@@ -10,9 +10,15 @@ import type {
   RegisterResponse,
   CreateConversationRequest,
   CreateConversationResponse,
+  ListConversationMembersRequest,
+  ListConversationMembersResponse,
   ConversationMemberChangeResponse,
   InviteConversationMemberRequest,
   LeaveConversationRequest,
+  RemoveConversationMemberRequest,
+  TransferConversationOwnerRequest,
+  TransferConversationOwnerResponse,
+  UpdateConversationMemberRoleRequest,
   OpenDirectConversationRequest,
   MessageItem,
   PullInboxRequest,
@@ -35,6 +41,10 @@ export interface ConversationAPI {
     request: OpenDirectConversationRequest,
     session: AuthSession
   ): Promise<CreateConversationResponse>;
+  listConversationMembers(
+    request: ListConversationMembersRequest,
+    session: AuthSession
+  ): Promise<ListConversationMembersResponse>;
   inviteConversationMember(
     request: InviteConversationMemberRequest,
     session: AuthSession
@@ -43,6 +53,18 @@ export interface ConversationAPI {
     request: LeaveConversationRequest,
     session: AuthSession
   ): Promise<ConversationMemberChangeResponse>;
+  removeConversationMember(
+    request: RemoveConversationMemberRequest,
+    session: AuthSession
+  ): Promise<ConversationMemberChangeResponse>;
+  updateConversationMemberRole(
+    request: UpdateConversationMemberRoleRequest,
+    session: AuthSession
+  ): Promise<ConversationMemberChangeResponse>;
+  transferConversationOwner(
+    request: TransferConversationOwnerRequest,
+    session: AuthSession
+  ): Promise<TransferConversationOwnerResponse>;
 }
 
 export interface MessagingAPI {

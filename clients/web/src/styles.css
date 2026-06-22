@@ -209,6 +209,16 @@ button {
   font-weight: 700;
 }
 
+.ghost-button {
+  border: 1px solid #cbd6dc;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #2f3d45;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .automation-button {
   position: absolute;
   width: 1px;
@@ -646,8 +656,8 @@ button {
 
 .group-settings {
   display: grid;
-  grid-template-columns: minmax(160px, 1fr) minmax(220px, 360px) auto;
-  align-items: center;
+  grid-template-columns: minmax(160px, 1fr) auto minmax(220px, 360px) auto;
+  align-items: start;
   gap: 10px;
   border-bottom: 1px solid #d8e0e4;
   background: #ffffff;
@@ -710,6 +720,83 @@ button {
 }
 
 .danger-inline-button {
+  background: #fff1f2;
+  color: #9f1239;
+}
+
+.group-members-error {
+  grid-column: 1 / -1;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  background: #fff1f2;
+  color: #9f1239;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.group-member-list {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: 8px;
+  max-height: 180px;
+  overflow: auto;
+}
+
+.group-member-item {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid #d8e0e4;
+  border-radius: 8px;
+  background: #f8fafb;
+  padding: 8px 10px;
+}
+
+.group-member-copy {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.group-member-copy strong,
+.group-member-copy span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.group-member-copy strong {
+  color: #172126;
+  font-size: 13px;
+}
+
+.group-member-copy span {
+  color: #6b7a83;
+  font-size: 12px;
+}
+
+.group-member-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.group-member-actions button {
+  border: 1px solid #cbd6dc;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #2f3d45;
+  padding: 6px 8px;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.group-member-actions .danger-inline-button {
+  border-color: #fecaca;
   background: #fff1f2;
   color: #9f1239;
 }

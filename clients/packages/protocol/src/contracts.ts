@@ -7,10 +7,18 @@ export const CLIENT_API_ENDPOINTS = {
   conversations: "/api/conversations",
   createConversation: "/api/conversations/create",
   directConversation: "/api/conversations/direct",
+  conversationMembers: (conversationID: string) =>
+    `/api/conversations/${encodeURIComponent(conversationID)}/members`,
   inviteConversationMember: (conversationID: string) =>
     `/api/conversations/${encodeURIComponent(conversationID)}/members/invite`,
   leaveConversation: (conversationID: string) =>
     `/api/conversations/${encodeURIComponent(conversationID)}/members/leave`,
+  removeConversationMember: (conversationID: string) =>
+    `/api/conversations/${encodeURIComponent(conversationID)}/members/remove`,
+  updateConversationMemberRole: (conversationID: string) =>
+    `/api/conversations/${encodeURIComponent(conversationID)}/members/role`,
+  transferConversationOwner: (conversationID: string) =>
+    `/api/conversations/${encodeURIComponent(conversationID)}/owner/transfer`,
   conversationMessages: (conversationID: string) =>
     `/api/conversations/${encodeURIComponent(conversationID)}/messages`,
   sendMessage: "/api/messages/send",

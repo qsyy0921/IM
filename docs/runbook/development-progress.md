@@ -77,10 +77,12 @@
   `GetContactState` 校验 ACTIVE 好友关系，再调用 conversation-service
   `CreateConversation(CONVERSATION_TYPE_DIRECT)` 创建或复用双人会话，消息继续走
   SendMessage -> PullInbox -> AckDelivery 主链路；
-  群成员添加 / 退群 first path 已接入同一套 client BFF / client-core：
+  群成员添加 / 退群 / 成员列表 / 移除成员 / 角色变更 / owner transfer first path
+  已接入同一套 client BFF / client-core：
   Web / PC shell 在选中 GROUP 会话时调用 dedicated BFF members endpoints，
-  BFF 再转 conversation-service `CreateMemberChange(JOIN/LEAVE)`，客户端不直连
-  conversation-service 私有接口；
+  BFF 再转 conversation-service `CreateMemberChange(JOIN/LEAVE/REMOVE/ROLE_CHANGED)`、
+  `ListConversationMembers` 和 `TransferConversationOwner`，客户端不直连
+  conversation-service 私有接口，也不维护伪成员列表；
   当前浏览器 / Windows PC 优先的可见 UI 已收敛为账号密码登录和 IM 主界面，
   隐藏 tenant / endpoint / device 等调试配置；2026-06-22 Windows Tauri
   WebView 登录级 smoke 证明该 UI 仍能完成登录、收到 `delivery.notify`、
@@ -108,8 +110,8 @@
   profile 已接同一 collector 但尚未运行，readiness report 显示 Docker / Compose
   可用但 builder image 尚未构建；本机仍缺 Android
   JDK 17+ / Gradle / SDK；当前默认不把 Android 工具链作为阻塞，短线继续围绕
-  Web / Windows PC 客户端的好友私聊、群聊、消息列表、发送、PullInbox / ACK 和真实
-  双用户 smoke 收口。
+  Web / Windows PC 客户端的好友私聊、群聊、群成员管理第一路径、消息列表、发送、
+  PullInbox / ACK 和真实双用户 smoke 收口。
 
 当前已开始的 AI 大模型应用底座能力：
 
@@ -283,8 +285,8 @@ rate-limit adapter 已落，PC Tauri read-only metadata runner skeleton、Web �
 metadata 诊断读取和 Android read-only native metadata bridge skeleton 已有，Windows
 desktop first-stage standalone artifact 已产出，launch sanity smoke 已通过，Web / PC
 shell 已接账号密码登录、注册、好友工作台、点击好友进入私聊、群聊列表、建群、点击
-群聊进入会话、群成员添加 / 退群 first path、最小群设置信息条、消息列表、发送后
-本地状态刷新、PullInbox / ACK 和登录过期清理；真实双用户客户端 smoke 已验证好友
+群聊进入会话、群成员添加 / 退群、成员列表、移除成员、角色变更 / owner transfer
+first path、群设置操作区、消息列表、发送后本地状态刷新、PullInbox / ACK 和登录过期清理；真实双用户客户端 smoke 已验证好友
 私聊和群聊 first path。Android APK / 真机 WebView smoke 后置到用户明确切回；Web
 IndexedDB local store 已补 first-stage persistence test。
 
@@ -488,9 +490,10 @@ baseline 已通过，PC desktop / Android first-stage runtime adapter 已落，P
   lifecycle smoke 已覆盖 desktop / Android 登录持久化、恢复、刷新和登出清理，
   且 thin shell actions 已接入 shared login / refresh / restore / logout contract；Windows desktop
   standalone artifact 已产出且 launch sanity smoke 已通过；Web / PC shell 已接注册、
-  好友列表、好友申请、好友私聊、群聊列表、建群、会话选择、消息列表、发送后本地状态刷新、
-  PullInbox / ACK 和登录过期清理；下一步跑真实双用户客户端 smoke，验证好友私聊和群聊
-  first path。Android APK / 真机 WebView smoke 后置到用户明确切回；Web IndexedDB
+  好友列表、好友申请、好友私聊、群聊列表、建群、会话选择、群成员添加 / 退群、
+  成员列表、移除成员、角色变更 / owner transfer、消息列表、发送后本地状态刷新、
+  PullInbox / ACK 和登录过期清理；下一步跑真实多用户客户端 smoke，验证群成员管理动作。
+  Android APK / 真机 WebView smoke 后置到用户明确切回；Web IndexedDB
   local store、browser platform adapter、shell config contract 和 target shell Web assets
   prep / artifact builder dry-run / Android builder profile 静态校验已补 first-stage focused tests。
 长期后续按完整目标架构推进业务平台、数据平台、AI / Agent 平台、客户端平台和中间件平台；

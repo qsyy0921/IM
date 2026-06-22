@@ -10,13 +10,20 @@ import {
   type ContactRequestItem,
   type CreateConversationRequest,
   type CreateConversationResponse,
+  type ConversationMember,
   type ConversationMemberChangeResponse,
+  type ListConversationMembersRequest,
+  type ListConversationMembersResponse,
   type ListContactRequestsInput,
   type ListContactsInput,
   type InviteConversationMemberRequest,
   type LeaveConversationRequest,
+  type RemoveConversationMemberRequest,
   type RespondContactRequestInput,
   type SendContactRequestInput,
+  type TransferConversationOwnerRequest,
+  type TransferConversationOwnerResponse,
+  type UpdateConversationMemberRoleRequest,
   type ConversationSummary,
   type LoginRequest,
   type LoginResponse,
@@ -77,6 +84,39 @@ interface BFFConversationMemberChangeResponse {
   conversation_id?: string;
   target_user_id?: string;
   change_type?: string;
+  status?: string;
+  boundary_seq?: string | number;
+  member_version?: string | number;
+  permission_version?: string | number;
+  idempotent_replay?: boolean;
+}
+
+interface BFFConversationMember {
+  user_id?: string;
+  role?: string;
+  status?: string;
+  join_seq?: string | number;
+  leave_seq?: string | number;
+  member_version?: string | number;
+  permission_version?: string | number;
+  updated_at_unix_ms?: string | number;
+}
+
+interface BFFListConversationMembersResponse {
+  tenant_id?: string;
+  conversation_id?: string;
+  member_version?: string | number;
+  permission_version?: string | number;
+  members?: BFFConversationMember[];
+  next_page_token?: string;
+}
+
+interface BFFTransferConversationOwnerResponse {
+  change_id?: string;
+  tenant_id?: string;
+  conversation_id?: string;
+  previous_owner_user_id?: string;
+  new_owner_user_id?: string;
   status?: string;
   boundary_seq?: string | number;
   member_version?: string | number;
@@ -291,6 +331,34 @@ export class BFFClient implements AuthAPI, ConversationAPI, MessagingAPI, Delive
     };
   }
 
+  async listConversationMembers(
+    request: ListConversationMembersRequest,
+    session: AuthSession
+  ): Promise<ListConversationMembersResponse> {
+    const query = new URLSearchParams();
+    if (request.pageSize && request.pageSize > 0) {
+      query.set("page_size", String(request.pageSize));
+    }
+    if (request.pageToken) {
+      query.set("page_token", request.pageToken);
+    }
+    if (request.roleFilter) {
+      query.set("role", request.roleFilter);
+    }
+    if (request.userIDPrefix) {
+      query.set("user_id_prefix", request.userIDPrefix);
+    }
+    const suffix = query.toString();
+    const endpoint = CLIENT_API_ENDPOINTS.conversationMembers(request.conversationID);
+    const response = await this.#request<BFFListConversationMembersResponse>(
+      "GET",
+      suffix ? `${endpoint}?${suffix}` : endpoint,
+      undefined,
+      session
+    );
+    return listConversationMembersFromBFF(response);
+  }
+
   async inviteConversationMember(
     request: InviteConversationMemberRequest,
     session: AuthSession
@@ -324,6 +392,61 @@ export class BFFClient implements AuthAPI, ConversationAPI, MessagingAPI, Delive
       session
     );
     return memberChangeFromBFF(response);
+  }
+
+  async removeConversationMember(
+    request: RemoveConversationMemberRequest,
+    session: AuthSession
+  ): Promise<ConversationMemberChangeResponse> {
+    const response = await this.#request<BFFConversationMemberChangeResponse>(
+      "POST",
+      CLIENT_API_ENDPOINTS.removeConversationMember(request.conversationID),
+      {
+        target_user_id: request.targetUserID,
+        expected_member_version: request.expectedMemberVersion,
+        idempotency_key: request.idempotencyKey ?? newClientID("member-remove"),
+        reason: request.reason
+      },
+      session
+    );
+    return memberChangeFromBFF(response);
+  }
+
+  async updateConversationMemberRole(
+    request: UpdateConversationMemberRoleRequest,
+    session: AuthSession
+  ): Promise<ConversationMemberChangeResponse> {
+    const response = await this.#request<BFFConversationMemberChangeResponse>(
+      "POST",
+      CLIENT_API_ENDPOINTS.updateConversationMemberRole(request.conversationID),
+      {
+        target_user_id: request.targetUserID,
+        target_role: memberRoleToBFF(request.targetRole),
+        expected_member_version: request.expectedMemberVersion,
+        idempotency_key: request.idempotencyKey ?? newClientID("member-role"),
+        reason: request.reason
+      },
+      session
+    );
+    return memberChangeFromBFF(response);
+  }
+
+  async transferConversationOwner(
+    request: TransferConversationOwnerRequest,
+    session: AuthSession
+  ): Promise<TransferConversationOwnerResponse> {
+    const response = await this.#request<BFFTransferConversationOwnerResponse>(
+      "POST",
+      CLIENT_API_ENDPOINTS.transferConversationOwner(request.conversationID),
+      {
+        new_owner_user_id: request.newOwnerUserID,
+        expected_member_version: request.expectedMemberVersion,
+        idempotency_key: request.idempotencyKey ?? newClientID("owner-transfer"),
+        reason: request.reason
+      },
+      session
+    );
+    return transferOwnerFromBFF(response);
   }
 
   async sendMessage(request: SendMessageRequest, session: AuthSession): Promise<SendMessageResponse> {
@@ -606,6 +729,49 @@ function memberChangeFromBFF(response: BFFConversationMemberChangeResponse): Con
     permissionVersion: numberValue(response.permission_version),
     idempotentReplay: response.idempotent_replay === true
   };
+}
+
+function listConversationMembersFromBFF(response: BFFListConversationMembersResponse): ListConversationMembersResponse {
+  return {
+    tenantID: requiredString(response.tenant_id, "tenant_id"),
+    conversationID: requiredString(response.conversation_id, "conversation_id"),
+    memberVersion: numberValue(response.member_version),
+    permissionVersion: numberValue(response.permission_version),
+    members: (response.members ?? []).map(memberFromBFF),
+    nextPageToken: response.next_page_token ?? ""
+  };
+}
+
+function memberFromBFF(item: BFFConversationMember): ConversationMember {
+  return {
+    userID: requiredString(item.user_id, "user_id"),
+    role: trimEnumPrefix(item.role, "MEMBER_ROLE_") || "UNSPECIFIED",
+    status: trimEnumPrefix(item.status, "MEMBER_STATUS_") || "UNSPECIFIED",
+    joinSeq: numberValue(item.join_seq),
+    leaveSeq: numberValue(item.leave_seq),
+    memberVersion: numberValue(item.member_version),
+    permissionVersion: numberValue(item.permission_version),
+    updatedAtMs: numberValue(item.updated_at_unix_ms)
+  };
+}
+
+function transferOwnerFromBFF(response: BFFTransferConversationOwnerResponse): TransferConversationOwnerResponse {
+  return {
+    changeID: requiredString(response.change_id, "change_id"),
+    tenantID: requiredString(response.tenant_id, "tenant_id"),
+    conversationID: requiredString(response.conversation_id, "conversation_id"),
+    previousOwnerUserID: requiredString(response.previous_owner_user_id, "previous_owner_user_id"),
+    newOwnerUserID: requiredString(response.new_owner_user_id, "new_owner_user_id"),
+    status: trimEnumPrefix(response.status, "MEMBER_CHANGE_STATUS_") || "UNSPECIFIED",
+    boundarySeq: numberValue(response.boundary_seq),
+    memberVersion: numberValue(response.member_version),
+    permissionVersion: numberValue(response.permission_version),
+    idempotentReplay: response.idempotent_replay === true
+  };
+}
+
+function memberRoleToBFF(role: string): string {
+  return role.startsWith("MEMBER_ROLE_") ? role : `MEMBER_ROLE_${role}`;
 }
 
 function inboxItemFromBFF(item: BFFInboxItem, session: AuthSession): MessageItem {

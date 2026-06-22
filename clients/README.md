@@ -75,9 +75,11 @@ The first client product surface is deliberately thin and service-backed:
   verifies an ACTIVE contact edge through contacts-service, then creates or
   reuses a conversation-service `DIRECT` conversation before normal SendMessage /
   PullInbox / AckDelivery flow continues.
-- group member add / leave first paths use dedicated BFF endpoints backed by
-  conversation-service `CreateMemberChange`; the Web / PC shell never calls
-  conversation-service private APIs directly.
+- group member add / leave, member list, member removal, ADMIN / MEMBER role
+  change and owner transfer first paths use dedicated BFF endpoints backed by
+  conversation-service `CreateMemberChange`, `ListConversationMembers` and
+  `TransferConversationOwner`; the Web / PC shell never calls conversation-service
+  private APIs directly.
 - the Web / PC shell preserves user-facing local display titles produced by
   click-to-direct-chat and group creation. Unknown server summaries are shown as
   explicit short conversation IDs; the client does not treat those display names
@@ -86,9 +88,10 @@ The first client product surface is deliberately thin and service-backed:
   while preserving fail-closed behavior. Missing endpoints, expired tokens,
   missing login and permission errors do not trigger hidden alternate paths.
 
-Member list, member removal, role management, owner transfer and full group
-settings are not implemented in the client UI yet. They must be added through
-dedicated conversation BFF contracts instead of direct service-private calls.
+Full group settings are still first-stage. Remaining work is member search /
+pagination, richer group title / avatar read models, invite source UX and
+real multi-user client smoke coverage for member removal, role changes and
+owner transfer.
 
 ## LAN Configuration
 

@@ -44,6 +44,8 @@ type Gateway interface {
 	RevokeSession(ctx context.Context, request *identityv1.RevokeSessionRequest) (*identityv1.RevokeSessionResponse, error)
 	CreateConversation(ctx context.Context, request *conversationv1.CreateConversationRequest) (*conversationv1.CreateConversationResponse, error)
 	CreateMemberChange(ctx context.Context, request *conversationv1.CreateMemberChangeRequest) (*conversationv1.CreateMemberChangeResponse, error)
+	ListConversationMembers(ctx context.Context, request *conversationv1.ListConversationMembersRequest) (*conversationv1.ListConversationMembersResponse, error)
+	TransferConversationOwner(ctx context.Context, request *conversationv1.TransferConversationOwnerRequest) (*conversationv1.TransferConversationOwnerResponse, error)
 	SendMessage(ctx context.Context, request *messagev1.SendMessageRequest) (*messagev1.SendMessageResponse, error)
 	PullInbox(ctx context.Context, request *deliveryv1.PullInboxRequest) (*deliveryv1.PullInboxResponse, error)
 	AckDelivery(ctx context.Context, request *deliveryv1.AckDeliveryRequest) (*deliveryv1.AckDeliveryResponse, error)
@@ -171,6 +173,14 @@ type openDirectConversationRequest struct {
 
 type conversationMemberChangeRequest struct {
 	TargetUserID    string `json:"target_user_id"`
+	TargetRole      string `json:"target_role"`
+	IdempotencyKey  string `json:"idempotency_key"`
+	Reason          string `json:"reason"`
+	ExpectedVersion int64  `json:"expected_member_version"`
+}
+
+type transferConversationOwnerRequest struct {
+	NewOwnerUserID  string `json:"new_owner_user_id"`
 	IdempotencyKey  string `json:"idempotency_key"`
 	Reason          string `json:"reason"`
 	ExpectedVersion int64  `json:"expected_member_version"`
@@ -244,10 +254,18 @@ func (server *Server) serveHTTP(response http.ResponseWriter, request *http.Requ
 		server.handleCreateConversation(response, request)
 	case request.Method == http.MethodPost && path == "/api/conversations/direct":
 		server.handleOpenDirectConversation(response, request)
+	case request.Method == http.MethodGet && isConversationMemberActionPath(request.URL.EscapedPath(), "/members"):
+		server.handleListConversationMembers(response, request)
 	case request.Method == http.MethodPost && isConversationMemberActionPath(request.URL.EscapedPath(), "/members/invite"):
 		server.handleInviteConversationMember(response, request)
 	case request.Method == http.MethodPost && isConversationMemberActionPath(request.URL.EscapedPath(), "/members/leave"):
 		server.handleLeaveConversation(response, request)
+	case request.Method == http.MethodPost && isConversationMemberActionPath(request.URL.EscapedPath(), "/members/remove"):
+		server.handleRemoveConversationMember(response, request)
+	case request.Method == http.MethodPost && isConversationMemberActionPath(request.URL.EscapedPath(), "/members/role"):
+		server.handleUpdateConversationMemberRole(response, request)
+	case request.Method == http.MethodPost && isConversationMemberActionPath(request.URL.EscapedPath(), "/owner/transfer"):
+		server.handleTransferConversationOwner(response, request)
 	case request.Method == http.MethodGet && isConversationMessagesPath(request.URL.EscapedPath()):
 		server.handleConversationMessages(response, request)
 	case request.Method == http.MethodPost && path == "/api/messages/send":
@@ -436,9 +454,10 @@ func (server *Server) handleOpenDirectConversation(response http.ResponseWriter,
 		return
 	}
 	conversationID := directConversationID(auth.TenantID, auth.UserID, peerUserID)
-	idempotencyKey := strings.TrimSpace(input.IdempotencyKey)
-	if idempotencyKey == "" {
-		idempotencyKey = "direct:" + conversationID
+	idempotencyKey, err := requiredIdempotencyKey(input.IdempotencyKey)
+	if err != nil {
+		writeError(response, err)
+		return
 	}
 	output, err := server.requireGateway().CreateConversation(contextFromRequest(request), &conversationv1.CreateConversationRequest{
 		ConversationId:   conversationID,
@@ -468,9 +487,10 @@ func (server *Server) handleInviteConversationMember(response http.ResponseWrite
 		writeError(response, status.Error(codes.InvalidArgument, "target_user_id is required"))
 		return
 	}
-	idempotencyKey := strings.TrimSpace(input.IdempotencyKey)
-	if idempotencyKey == "" {
-		idempotencyKey = "member-join:" + conversationID + ":" + targetUserID
+	idempotencyKey, err := requiredIdempotencyKey(input.IdempotencyKey)
+	if err != nil {
+		writeError(response, err)
+		return
 	}
 	output, err := server.requireGateway().CreateMemberChange(contextFromRequest(request), &conversationv1.CreateMemberChangeRequest{
 		ConversationId:        conversationID,
@@ -482,6 +502,39 @@ func (server *Server) handleInviteConversationMember(response http.ResponseWrite
 		ConflictPolicy:        conversationv1.MemberChangeConflictPolicy_MEMBER_CHANGE_CONFLICT_POLICY_REJECT,
 		Reason:                strings.TrimSpace(input.Reason),
 	})
+	server.writeProtoOrError(response, output, err)
+}
+
+func (server *Server) handleListConversationMembers(response http.ResponseWriter, request *http.Request) {
+	if _, err := server.authenticateRequest(request); err != nil {
+		writeError(response, err)
+		return
+	}
+	conversationID, err := conversationIDFromMemberActionPath(request.URL.EscapedPath(), "/members")
+	if err != nil {
+		writeError(response, err)
+		return
+	}
+	query := request.URL.Query()
+	pageSize, err := int32Query(query, "page_size", "pageSize")
+	if err != nil {
+		writeError(response, err)
+		return
+	}
+	roleFilter, err := memberRoleFromString(firstQuery(query, "role_filter", "role"))
+	if err != nil {
+		writeError(response, err)
+		return
+	}
+	input := &conversationv1.ListConversationMembersRequest{
+		ConversationId: conversationID,
+		PageSize:       pageSize,
+		PageToken:      strings.TrimSpace(firstQuery(query, "page_token", "pageToken")),
+		RoleFilter:     roleFilter,
+		UserIdPrefix:   strings.TrimSpace(firstQuery(query, "user_id_prefix", "userIdPrefix")),
+		Sort:           conversationv1.ConversationMemberListSort_CONVERSATION_MEMBER_LIST_SORT_ROLE_USER_ID_ASC,
+	}
+	output, err := server.requireGateway().ListConversationMembers(contextFromRequest(request), input)
 	server.writeProtoOrError(response, output, err)
 }
 
@@ -500,9 +553,10 @@ func (server *Server) handleLeaveConversation(response http.ResponseWriter, requ
 	if !server.decodeJSON(response, request, &input) {
 		return
 	}
-	idempotencyKey := strings.TrimSpace(input.IdempotencyKey)
-	if idempotencyKey == "" {
-		idempotencyKey = "member-leave:" + conversationID + ":" + auth.UserID
+	idempotencyKey, err := requiredIdempotencyKey(input.IdempotencyKey)
+	if err != nil {
+		writeError(response, err)
+		return
 	}
 	output, err := server.requireGateway().CreateMemberChange(contextFromRequest(request), &conversationv1.CreateMemberChangeRequest{
 		ConversationId:        conversationID,
@@ -511,6 +565,122 @@ func (server *Server) handleLeaveConversation(response http.ResponseWriter, requ
 		ExpectedMemberVersion: input.ExpectedVersion,
 		IdempotencyKey:        idempotencyKey,
 		ConflictPolicy:        conversationv1.MemberChangeConflictPolicy_MEMBER_CHANGE_CONFLICT_POLICY_REJECT,
+		Reason:                strings.TrimSpace(input.Reason),
+	})
+	server.writeProtoOrError(response, output, err)
+}
+
+func (server *Server) handleRemoveConversationMember(response http.ResponseWriter, request *http.Request) {
+	if _, err := server.authenticateRequest(request); err != nil {
+		writeError(response, err)
+		return
+	}
+	conversationID, err := conversationIDFromMemberActionPath(request.URL.EscapedPath(), "/members/remove")
+	if err != nil {
+		writeError(response, err)
+		return
+	}
+	var input conversationMemberChangeRequest
+	if !server.decodeJSON(response, request, &input) {
+		return
+	}
+	targetUserID := strings.TrimSpace(input.TargetUserID)
+	if targetUserID == "" {
+		writeError(response, status.Error(codes.InvalidArgument, "target_user_id is required"))
+		return
+	}
+	idempotencyKey, err := requiredIdempotencyKey(input.IdempotencyKey)
+	if err != nil {
+		writeError(response, err)
+		return
+	}
+	output, err := server.requireGateway().CreateMemberChange(contextFromRequest(request), &conversationv1.CreateMemberChangeRequest{
+		ConversationId:        conversationID,
+		TargetUserId:          targetUserID,
+		ChangeType:            conversationv1.MemberChangeType_MEMBER_CHANGE_TYPE_REMOVE,
+		ExpectedMemberVersion: input.ExpectedVersion,
+		IdempotencyKey:        idempotencyKey,
+		ConflictPolicy:        conversationv1.MemberChangeConflictPolicy_MEMBER_CHANGE_CONFLICT_POLICY_REJECT,
+		Reason:                strings.TrimSpace(input.Reason),
+	})
+	server.writeProtoOrError(response, output, err)
+}
+
+func (server *Server) handleUpdateConversationMemberRole(response http.ResponseWriter, request *http.Request) {
+	if _, err := server.authenticateRequest(request); err != nil {
+		writeError(response, err)
+		return
+	}
+	conversationID, err := conversationIDFromMemberActionPath(request.URL.EscapedPath(), "/members/role")
+	if err != nil {
+		writeError(response, err)
+		return
+	}
+	var input conversationMemberChangeRequest
+	if !server.decodeJSON(response, request, &input) {
+		return
+	}
+	targetUserID := strings.TrimSpace(input.TargetUserID)
+	if targetUserID == "" {
+		writeError(response, status.Error(codes.InvalidArgument, "target_user_id is required"))
+		return
+	}
+	targetRole, err := memberRoleFromString(input.TargetRole)
+	if err != nil {
+		writeError(response, err)
+		return
+	}
+	if targetRole != conversationv1.MemberRole_MEMBER_ROLE_ADMIN && targetRole != conversationv1.MemberRole_MEMBER_ROLE_MEMBER {
+		writeError(response, status.Error(codes.InvalidArgument, "target_role must be ADMIN or MEMBER"))
+		return
+	}
+	idempotencyKey, err := requiredIdempotencyKey(input.IdempotencyKey)
+	if err != nil {
+		writeError(response, err)
+		return
+	}
+	output, err := server.requireGateway().CreateMemberChange(contextFromRequest(request), &conversationv1.CreateMemberChangeRequest{
+		ConversationId:        conversationID,
+		TargetUserId:          targetUserID,
+		ChangeType:            conversationv1.MemberChangeType_MEMBER_CHANGE_TYPE_ROLE_CHANGED,
+		TargetRole:            targetRole,
+		ExpectedMemberVersion: input.ExpectedVersion,
+		IdempotencyKey:        idempotencyKey,
+		ConflictPolicy:        conversationv1.MemberChangeConflictPolicy_MEMBER_CHANGE_CONFLICT_POLICY_REJECT,
+		Reason:                strings.TrimSpace(input.Reason),
+	})
+	server.writeProtoOrError(response, output, err)
+}
+
+func (server *Server) handleTransferConversationOwner(response http.ResponseWriter, request *http.Request) {
+	if _, err := server.authenticateRequest(request); err != nil {
+		writeError(response, err)
+		return
+	}
+	conversationID, err := conversationIDFromMemberActionPath(request.URL.EscapedPath(), "/owner/transfer")
+	if err != nil {
+		writeError(response, err)
+		return
+	}
+	var input transferConversationOwnerRequest
+	if !server.decodeJSON(response, request, &input) {
+		return
+	}
+	newOwnerUserID := strings.TrimSpace(input.NewOwnerUserID)
+	if newOwnerUserID == "" {
+		writeError(response, status.Error(codes.InvalidArgument, "new_owner_user_id is required"))
+		return
+	}
+	idempotencyKey, err := requiredIdempotencyKey(input.IdempotencyKey)
+	if err != nil {
+		writeError(response, err)
+		return
+	}
+	output, err := server.requireGateway().TransferConversationOwner(contextFromRequest(request), &conversationv1.TransferConversationOwnerRequest{
+		ConversationId:        conversationID,
+		NewOwnerUserId:        newOwnerUserID,
+		ExpectedMemberVersion: input.ExpectedVersion,
+		IdempotencyKey:        idempotencyKey,
 		Reason:                strings.TrimSpace(input.Reason),
 	})
 	server.writeProtoOrError(response, output, err)
@@ -933,6 +1103,12 @@ func (missingGateway) CreateConversation(context.Context, *conversationv1.Create
 func (missingGateway) CreateMemberChange(context.Context, *conversationv1.CreateMemberChangeRequest) (*conversationv1.CreateMemberChangeResponse, error) {
 	return nil, status.Error(codes.Internal, "gateway is not configured")
 }
+func (missingGateway) ListConversationMembers(context.Context, *conversationv1.ListConversationMembersRequest) (*conversationv1.ListConversationMembersResponse, error) {
+	return nil, status.Error(codes.Internal, "gateway is not configured")
+}
+func (missingGateway) TransferConversationOwner(context.Context, *conversationv1.TransferConversationOwnerRequest) (*conversationv1.TransferConversationOwnerResponse, error) {
+	return nil, status.Error(codes.Internal, "gateway is not configured")
+}
 func (missingGateway) SendMessage(context.Context, *messagev1.SendMessageRequest) (*messagev1.SendMessageResponse, error) {
 	return nil, status.Error(codes.Internal, "gateway is not configured")
 }
@@ -1049,6 +1225,31 @@ func conversationIDFromMemberActionPath(escapedPath string, suffix string) (stri
 		return "", status.Error(codes.InvalidArgument, "conversation_id is invalid")
 	}
 	return decoded, nil
+}
+
+func memberRoleFromString(value string) (conversationv1.MemberRole, error) {
+	normalized := strings.ToUpper(strings.TrimSpace(value))
+	normalized = strings.TrimPrefix(normalized, "MEMBER_ROLE_")
+	switch normalized {
+	case "":
+		return conversationv1.MemberRole_MEMBER_ROLE_UNSPECIFIED, nil
+	case "OWNER":
+		return conversationv1.MemberRole_MEMBER_ROLE_OWNER, nil
+	case "ADMIN":
+		return conversationv1.MemberRole_MEMBER_ROLE_ADMIN, nil
+	case "MEMBER":
+		return conversationv1.MemberRole_MEMBER_ROLE_MEMBER, nil
+	default:
+		return conversationv1.MemberRole_MEMBER_ROLE_UNSPECIFIED, status.Error(codes.InvalidArgument, "member role is invalid")
+	}
+}
+
+func requiredIdempotencyKey(value string) (string, error) {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return "", status.Error(codes.InvalidArgument, "idempotency_key is required")
+	}
+	return trimmed, nil
 }
 
 func directConversationID(tenantID, currentUserID, peerUserID string) string {

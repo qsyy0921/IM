@@ -78,6 +78,8 @@ export interface OpenDirectConversationRequest {
 }
 
 export type MemberChangeType = "JOIN" | "LEAVE" | "REMOVE" | "ROLE_CHANGED" | "OWNER_TRANSFER" | string;
+export type MemberRole = "OWNER" | "ADMIN" | "MEMBER" | "UNSPECIFIED" | string;
+export type MemberStatus = "ACTIVE" | "LEFT" | "BANNED" | "UNSPECIFIED" | string;
 export type MemberChangeStatus =
   | "PENDING_BOUNDARY"
   | "BOUNDARY_ALLOCATED"
@@ -101,6 +103,72 @@ export interface LeaveConversationRequest {
   expectedMemberVersion?: number;
   idempotencyKey?: string;
   reason?: string;
+}
+
+export interface ListConversationMembersRequest {
+  conversationID: ConversationID;
+  pageSize?: number;
+  pageToken?: string;
+  roleFilter?: MemberRole;
+  userIDPrefix?: string;
+}
+
+export interface ConversationMember {
+  userID: UserID;
+  role: MemberRole;
+  status: MemberStatus;
+  joinSeq: number;
+  leaveSeq: number;
+  memberVersion: number;
+  permissionVersion: number;
+  updatedAtMs: number;
+}
+
+export interface ListConversationMembersResponse {
+  tenantID: TenantID;
+  conversationID: ConversationID;
+  memberVersion: number;
+  permissionVersion: number;
+  members: ConversationMember[];
+  nextPageToken: string;
+}
+
+export interface RemoveConversationMemberRequest {
+  conversationID: ConversationID;
+  targetUserID: UserID;
+  expectedMemberVersion?: number;
+  idempotencyKey?: string;
+  reason?: string;
+}
+
+export interface UpdateConversationMemberRoleRequest {
+  conversationID: ConversationID;
+  targetUserID: UserID;
+  targetRole: Exclude<MemberRole, "OWNER">;
+  expectedMemberVersion?: number;
+  idempotencyKey?: string;
+  reason?: string;
+}
+
+export interface TransferConversationOwnerRequest {
+  conversationID: ConversationID;
+  newOwnerUserID: UserID;
+  expectedMemberVersion?: number;
+  idempotencyKey?: string;
+  reason?: string;
+}
+
+export interface TransferConversationOwnerResponse {
+  changeID: string;
+  tenantID: TenantID;
+  conversationID: ConversationID;
+  previousOwnerUserID: UserID;
+  newOwnerUserID: UserID;
+  status: MemberChangeStatus;
+  boundarySeq: number;
+  memberVersion: number;
+  permissionVersion: number;
+  idempotentReplay: boolean;
 }
 
 export interface ConversationMemberChangeResponse {

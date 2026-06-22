@@ -27,9 +27,12 @@ assert(commands.includes("npm --prefix clients run test:desktop-shell-action-ass
 assert(commands.includes("npm --prefix clients run test:desktop-webview-metadata-smoke"), "desktop WebView metadata runner contract check missing");
 assert(commands.includes("npm --prefix clients run test:desktop-webview-login-smoke"), "desktop WebView login runner contract check missing");
 assert(commands.includes("npm --prefix clients run test:android-shell-action-assets"), "android action asset check missing");
+assert(commands.includes("npm --prefix clients run test:android-webview-metadata-smoke"), "android WebView metadata runner contract check missing");
 assert(commands.includes("npm --prefix clients run test:android-webview-login-smoke-plan"), "android WebView login plan check missing");
 assert(commands.includes("npm --prefix clients run test:android-webview-login-smoke"), "android WebView login runner contract check missing");
 assert(commands.includes("npm --prefix clients run test:android-platform-readiness"), "android platform readiness schema check missing");
+assert(commands.includes("npm --prefix clients run test:android-device-readiness"), "android device readiness parser check missing");
+assert(commands.includes("npm --prefix clients run test:android-webview-devtools-readiness"), "android WebView devtools readiness parser check missing");
 assert(commands.includes("npm --prefix clients run report:android-platform-readiness"), "android platform readiness report missing");
 
 for (const forbidden of [

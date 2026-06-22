@@ -209,8 +209,8 @@ Current packaging status:
   Docker, building APKs, installing APKs, starting Android activities, opening
   `adb reverse` or installing toolchains. It includes the clientweb smoke hook
   contract, artifact readiness / install-plan contracts, desktop WebView
-  metadata / login dry-run contracts, the Android login-level WebView smoke
-  plan-only contract, the Android dry-run runner contract and reads
+  metadata / login dry-run contracts, Android metadata / login dry-run
+  contracts, Android device / WebView devtools readiness parsers and reads
   low-sensitive ADB / device readiness state through the Android platform
   readiness report. Use it as the default focused client gate before reaching
   for a broader local gate.

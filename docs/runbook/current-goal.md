@@ -59,11 +59,11 @@ git diff --check; git diff --cached --check
 
 `check:no-toolchain` 聚合 Web PWA、shell asset、desktop / Android action asset、
 clientweb smoke hook contract、artifact readiness / install-plan contracts、
-desktop WebView metadata / login dry-run contracts、Android login smoke plan、
-Android login dry-run runner contract、Android platform readiness 和 shell smoke
-plan checks；它不构建 native artifact 或 APK、不启动 Docker、不安装 APK、
-不启动 Activity、不打开 `adb reverse`、不下载工具链。它会通过 Android
-readiness report 只读查询 ADB / device state。
+desktop WebView metadata / login dry-run contracts、Android metadata / login
+dry-run contracts、Android device / WebView devtools readiness parsers、
+Android platform readiness 和 shell smoke plan checks；它不构建 native artifact
+或 APK、不启动 Docker、不安装 APK、不启动 Activity、不打开 `adb reverse`、
+不下载工具链。它会通过 Android readiness report 只读查询 ADB / device state。
 `plan:shell-smoke` 也会把它作为默认 focused gate 暴露出来。需要定位失败时再跑
 单项脚本。
 

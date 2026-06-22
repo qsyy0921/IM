@@ -185,6 +185,11 @@ const checkPlan = [
     reason: "guards explicit desktop code-signing execution opt-in without signing artifacts by default"
   },
   {
+    name: "desktop-signature-verifier-contract",
+    script: "test:desktop-signature-verifier",
+    reason: "guards read-only desktop Authenticode verification without signing, installing or launching artifacts"
+  },
+  {
     name: "desktop-composed-smoke-runner-contract",
     script: "test:desktop-composed-smoke",
     reason: "guards desktop composed smoke dry-run summary without starting services"

@@ -500,6 +500,11 @@ First slice:
   with `--execute` after the collected artifact hash, explicit `signtool`,
   timestamp URL and certificate source are ready. It does not install artifacts,
   launch the app, start services or download toolchains.
+  `verify:desktop-signature` is the read-only post-signing verification wrapper.
+  It validates the collected artifact hash and reads Windows Authenticode public
+  status without signing, installing, launching, starting services or downloading
+  toolchains. The current collected baseline reports `NotSigned`, so release
+  profiles must sign first and then rerun verification with `--require-valid`.
   `plan:desktop-signing` and `plan:desktop-installer` now select the latest
   collected `windows-desktop` manifest instead of blindly using the newest
   manifest, so newer Android artifacts do not hide an existing desktop baseline.
@@ -675,6 +680,7 @@ npm --prefix clients run build:desktop-installer
 npm --prefix clients run plan:desktop-installer
 npm --prefix clients run plan:desktop-signing
 npm --prefix clients run sign:desktop-artifact
+npm --prefix clients run verify:desktop-signature
 npm --prefix clients run smoke:desktop-artifact-launch
 npm --prefix clients run smoke:desktop-composed -- --clientweb-summary <client-web-summary.json>
 npm --prefix clients run smoke:desktop-webview-metadata

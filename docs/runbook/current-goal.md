@@ -56,21 +56,24 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   `sign:desktop-artifact` 已补为显式 `--execute` 门控的签名执行入口：默认仍只输出
   低敏 execution policy，只有 collected artifact hash、`signtool`、timestamp URL 和
   证书来源都 ready 时才会调用签名工具，且不安装、不启动、不下载 toolchain。
+  `verify:desktop-signature` 已补为只读签名验证入口：校验 collected artifact hash 后读取
+  Windows Authenticode public status，不签名、不安装、不启动、不下载；当前 collected
+  desktop baseline 实测为 `NotSigned`。
   `plan:desktop-installer`
   已改为读取仓库内显式 `tauri.installer.conf.json` profile：默认开发 Tauri config
   继续 `bundle.active=false`，installer profile 才启用 MSI target。`build:desktop-installer`
   会用 `--config src-tauri/tauri.installer.conf.json` 调用 Tauri，并继续由显式
   `--execute` 门控。desktop signing / installer planner 现在按 `windows-desktop`
   目标选择最新 collected manifest，不会被更新的 Android manifest 遮住；当前本机
-  dry-run 已找到 desktop artifact baseline，只剩 signing readiness 不满足而 fail-closed。
+  dry-run 已找到 desktop artifact baseline，只剩 signing readiness / valid signature 不满足而 fail-closed。
   它们仍不是生产签名 installer。
 - Android 已有 WebView shell / bridge / APK 历史产物和 metadata smoke；当前 shell
   不宣称 F 盘 Android toolchain ready，后续切回 Android 时再重新加载 toolchain env。
 
 ## 下一步优先级
 
-1. Windows PC 端继续真实 signing input 接入、MSI / NSIS installer 和签名 installer
-   体验，并保持
+1. Windows PC 端继续真实 signing input 接入、签名后 `--require-valid` 验证、
+   MSI / NSIS installer 和签名 installer 体验，并保持
    Web / PC shell 的 UI 细节随真实调试反馈继续收口。
 2. 若继续客户端产品能力，优先补成员搜索 / 分页、邀请来源提示、完整群设置和
    更丰富的群 read model。不得直接调用 conversation-service 私有接口。

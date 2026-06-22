@@ -174,6 +174,7 @@ npm --prefix clients run test:desktop-installer-builder
 npm --prefix clients run test:desktop-installer-plan
 npm --prefix clients run test:desktop-signing-executor
 npm --prefix clients run test:desktop-signing-plan
+npm --prefix clients run test:desktop-signature-verifier
 npm --prefix clients run test:web-shell-actions
 npm --prefix clients run test:shell-smoke-plan
 npm --prefix clients run report:artifact-readiness
@@ -199,6 +200,8 @@ npm --prefix clients run bundle:desktop
 npm --prefix clients run build:desktop-installer
 npm --prefix clients run plan:desktop-installer
 npm --prefix clients run plan:desktop-signing
+npm --prefix clients run sign:desktop-artifact
+npm --prefix clients run verify:desktop-signature
 ```
 
 After preparing both shell targets, verify both prepared asset directories:
@@ -247,6 +250,11 @@ only invokes `signtool` when run with `--execute` and when the collected desktop
 artifact hash, explicit `signtool`, timestamp URL and certificate source are all
 ready. It does not install artifacts, launch the app, start services or download
 toolchains.
+`verify:desktop-signature` is the read-only verification wrapper after signing.
+It reads the collected desktop manifest, validates the artifact hash and reads
+Windows Authenticode public status. It does not sign, install, launch, start
+services or download toolchains. Use `--require-valid` in a release profile to
+fail closed when the collected desktop artifact is not Authenticode-valid.
 `plan:desktop-installer` reads the repository installer Tauri profile, the
 collected Windows desktop manifest and the signing readiness plan, then reports
 whether MSI / NSIS installer bundling can run. It is also plan-only: it does not
@@ -296,7 +304,9 @@ Current packaging status:
   `plan:desktop-signing` now checks explicit code-signing readiness and produces
   only a low-sensitive plan. `sign:desktop-artifact` is the explicit
   `--execute`-gated signing wrapper over that plan and fails closed until real
-  signing inputs are present. `plan:desktop-installer` now checks the repository
+  signing inputs are present. `verify:desktop-signature` reads Authenticode
+  public status and currently reports the collected baseline as `NotSigned`.
+  `plan:desktop-installer` now checks the repository
   installer Tauri profile, MSI / NSIS target, artifact baseline and signing
   readiness; actual `build:desktop-installer` now provides the explicit
   `--execute`-gated build entry and runs Tauri with that profile only when

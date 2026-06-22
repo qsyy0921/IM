@@ -271,7 +271,7 @@ func scanMessageLegalHoldRow(scanner messageLegalHoldScanner) (MessageLegalHoldM
 	return row, nil
 }
 
-func normalizeMessageLegalHoldMutationOptions(options MessageLegalHoldMutationOptions, fallbackNow time.Time) MessageLegalHoldMutationOptions {
+func normalizeMessageLegalHoldMutationOptions(options MessageLegalHoldMutationOptions, defaultNow time.Time) MessageLegalHoldMutationOptions {
 	options.TenantID = strings.TrimSpace(options.TenantID)
 	options.ConversationID = strings.TrimSpace(options.ConversationID)
 	options.MessageID = strings.TrimSpace(options.MessageID)
@@ -279,7 +279,7 @@ func normalizeMessageLegalHoldMutationOptions(options MessageLegalHoldMutationOp
 	options.OperatorID = strings.TrimSpace(options.OperatorID)
 	options.Reason = strings.TrimSpace(options.Reason)
 	if options.Now.IsZero() {
-		options.Now = fallbackNow
+		options.Now = defaultNow
 	}
 	return options
 }

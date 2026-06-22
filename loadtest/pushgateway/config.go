@@ -55,7 +55,7 @@ func parseConfig() config {
 	flag.StringVar(&cfg.pushConsumerGatewayID, "push-consumer-gateway-id", "", "delivery consumer gateway id used by cross-instance route smoke")
 	flag.StringVar(&cfg.identityRevokeScope, "identity-revoke-scope", "device", "identity-revoke target scope: device or session")
 	flag.StringVar(&cfg.redisFaultCommand, "redis-fault-command", "", "optional command executed after WebSocket route registration and before SendMessage in redis-fault scenario")
-	flag.StringVar(&cfg.redisRestoreCommand, "redis-restore-command", "", "optional command executed after PullInbox recovery and before reconnect/ACK in redis-fault scenario")
+	flag.StringVar(&cfg.redisRestoreCommand, "redis-restore-command", "", "optional command executed after PullInbox catch-up and before reconnect/ACK in redis-fault scenario")
 	flag.BoolVar(&cfg.verifiedAuthMetadata, "verified-auth-metadata", envBool(false, "NEXUSIM_PUSHGATEWAY_LOADTEST_VERIFIED_AUTH_METADATA", "NEXUSIM_CONVERSATION_LOADTEST_VERIFIED_AUTH_METADATA", "NEXUSIM_MESSAGE_LOADTEST_VERIFIED_AUTH_METADATA", "NEXUSIM_DELIVERY_LOADTEST_VERIFIED_AUTH_METADATA"), "send gateway verified identity through user-facing gRPC metadata")
 	flag.BoolVar(&cfg.cleanup, "cleanup", true, "delete existing rows for tenant before running")
 	flag.Parse()

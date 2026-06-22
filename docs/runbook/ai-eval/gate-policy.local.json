@@ -10,7 +10,7 @@
     "required_adapters": [
       "profile-agent-safety",
       "action-external-http-provider",
-      "action-external-mcp-fallback"
+      "action-external-mcp-failure"
     ]
   },
   "adapters": [
@@ -31,11 +31,11 @@
       "requires_service_stack": false
     },
     {
-      "name": "action-external-mcp-fallback",
+      "name": "action-external-mcp-failure",
       "required": true,
-      "script": "run-ai-eval-action-mcp-fallback-adapter.ps1",
-      "run_suffix": "action-external-mcp-fallback",
-      "summary_file": "action-external-mcp-fallback-eval-summary.json",
+      "script": "run-ai-eval-action-mcp-failure-adapter.ps1",
+      "run_suffix": "action-external-mcp-failure",
+      "summary_file": "action-external-mcp-failure-eval-summary.json",
       "requires_service_stack": false
     }
   ],

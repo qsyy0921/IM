@@ -416,7 +416,7 @@ func sha256Ref(value string) string {
 	return "sha256:" + hex.EncodeToString(sum[:])
 }
 
-func sourceVersionNumber(value string, updatedAt int64, fallback int64) int64 {
+func sourceVersionNumber(value string, updatedAt int64, defaultValue int64) int64 {
 	value = strings.TrimSpace(value)
 	if parsed, err := strconv.ParseInt(value, 10, 64); err == nil && parsed > 0 {
 		return parsed
@@ -424,8 +424,8 @@ func sourceVersionNumber(value string, updatedAt int64, fallback int64) int64 {
 	if updatedAt > 0 {
 		return updatedAt
 	}
-	if fallback > 0 {
-		return fallback
+	if defaultValue > 0 {
+		return defaultValue
 	}
 	return 1
 }

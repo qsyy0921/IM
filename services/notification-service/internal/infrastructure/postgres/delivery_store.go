@@ -386,15 +386,15 @@ func normalizeDeliveryFailure(failure types.DeliveryFailure) types.DeliveryFailu
 	return failure
 }
 
-func sanitizeDeliveryText(value string, fallback string) string {
+func sanitizeDeliveryText(value string, defaultValue string) string {
 	value = strings.TrimSpace(value)
 	if value == "" {
-		return fallback
+		return defaultValue
 	}
 	lowered := strings.ToLower(value)
 	for _, marker := range []string{"authorization", "smtp", "provider_body", "provider_response", "reset_token", "challenge", "totp", "recovery", "secret"} {
 		if strings.Contains(lowered, marker) {
-			return fallback
+			return defaultValue
 		}
 	}
 	if len(value) > 128 {

@@ -766,7 +766,7 @@ func writeSummary(resultDir string, result summary) error {
 	return nil
 }
 
-func envBool(fallback bool, names ...string) bool {
+func envBool(defaultValue bool, names ...string) bool {
 	for _, name := range names {
 		value := strings.TrimSpace(os.Getenv(name))
 		if value == "" {
@@ -774,11 +774,11 @@ func envBool(fallback bool, names ...string) bool {
 		}
 		parsed, err := strconv.ParseBool(value)
 		if err != nil {
-			return fallback
+			return defaultValue
 		}
 		return parsed
 	}
-	return fallback
+	return defaultValue
 }
 
 func splitCSV(value string) []string {

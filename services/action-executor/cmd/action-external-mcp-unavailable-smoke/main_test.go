@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestActionExternalMCPFallbackSmokeParseConfig(t *testing.T) {
+func TestActionExternalMCPFailureSmokeParseConfig(t *testing.T) {
 	output := filepath.Join(t.TempDir(), "summary.json")
 	cfg, err := parseConfig([]string{"--output", output})
 	if err != nil {

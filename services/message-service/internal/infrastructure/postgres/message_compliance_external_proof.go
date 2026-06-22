@@ -208,14 +208,14 @@ FOR UPDATE
 	return nil
 }
 
-func normalizeComplianceExternalProofOptions(options MessageComplianceExternalProofMutationOptions, fallbackNow time.Time) MessageComplianceExternalProofMutationOptions {
+func normalizeComplianceExternalProofOptions(options MessageComplianceExternalProofMutationOptions, defaultNow time.Time) MessageComplianceExternalProofMutationOptions {
 	options.TenantID = strings.TrimSpace(options.TenantID)
 	options.ExternalProofRef = strings.TrimSpace(options.ExternalProofRef)
 	options.Provider = strings.TrimSpace(options.Provider)
 	options.ProofHash = strings.TrimSpace(options.ProofHash)
 	options.OperatorID = strings.TrimSpace(options.OperatorID)
 	if options.Now.IsZero() {
-		options.Now = fallbackNow
+		options.Now = defaultNow
 	}
 	return options
 }

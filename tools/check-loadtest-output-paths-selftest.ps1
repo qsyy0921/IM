@@ -71,7 +71,7 @@ try {
 
     $cleanEmptyDefaultResult = Invoke-OutputPathCheck -RepoRoot $tempRoot
     if ($cleanEmptyDefaultResult.ExitCode -ne 0) {
-        Write-Host "FAIL fixture with early H-drive fallback should pass loadtest output path guard." -ForegroundColor Red
+        Write-Host "FAIL fixture with early H-drive recovery should pass loadtest output path guard." -ForegroundColor Red
         if ($cleanEmptyDefaultResult.Output) {
             Write-Host $cleanEmptyDefaultResult.Output -ForegroundColor Red
         }
@@ -116,8 +116,8 @@ try {
     }
 
     Remove-Item -LiteralPath $commentOnly -Force
-    $lateFallback = Join-Path $tempRoot "loadtest\demo\bad-late-fallback.ps1"
-    Set-FixtureFile -Path $lateFallback -Lines @(
+    $lateRecovery = Join-Path $tempRoot "loadtest\demo\bad-late-recovery.ps1"
+    Set-FixtureFile -Path $lateRecovery -Lines @(
         "param(",
         "    [string]`$ResultRoot = """"",
         ")",
@@ -128,16 +128,16 @@ try {
         "}"
     )
 
-    $lateFallbackResult = Invoke-OutputPathCheck -RepoRoot $tempRoot
-    if ($lateFallbackResult.ExitCode -eq 0 -or $lateFallbackResult.Output -notmatch "fallback after Assert-ExternalOutputRoot") {
-        Write-Host "FAIL fixture with late H-drive fallback should fail loadtest output path guard." -ForegroundColor Red
-        if ($lateFallbackResult.Output) {
-            Write-Host $lateFallbackResult.Output -ForegroundColor Red
+    $lateRecoveryResult = Invoke-OutputPathCheck -RepoRoot $tempRoot
+    if ($lateRecoveryResult.ExitCode -eq 0 -or $lateRecoveryResult.Output -notmatch "recovery after Assert-ExternalOutputRoot") {
+        Write-Host "FAIL fixture with late H-drive recovery should fail loadtest output path guard." -ForegroundColor Red
+        if ($lateRecoveryResult.Output) {
+            Write-Host $lateRecoveryResult.Output -ForegroundColor Red
         }
         exit 1
     }
 
-    Remove-Item -LiteralPath $lateFallback -Force
+    Remove-Item -LiteralPath $lateRecovery -Force
     $repoLocalReference = Join-Path $tempRoot "loadtest\demo\main.go"
     Set-FixtureFile -Path $repoLocalReference -Lines @(
         "package main",
@@ -160,4 +160,4 @@ finally {
     }
 }
 
-Write-Host "OK   loadtest output path guard self-test covers helper, active guard, fallback order, and repo-local path requirements."
+Write-Host "OK   loadtest output path guard self-test covers helper, active guard, recovery order, and repo-local path requirements."

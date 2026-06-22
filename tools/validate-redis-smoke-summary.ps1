@@ -102,7 +102,7 @@ if ($null -ne $push.redis_fault) {
         Assert-Condition ([bool]$push.redis_fault.notify_received) "redis-cluster-failover must receive online notify after promoted master."
     }
     elseif ($scenario -match "quorum-loss|network-partition|node-stop|redis-fault") {
-        Assert-Condition (-not [bool]$push.redis_fault.notify_received) "$scenario should prove PullInbox fallback after online notify miss."
+        Assert-Condition (-not [bool]$push.redis_fault.notify_received) "$scenario should prove PullInbox recovery after online notify miss."
     }
 }
 

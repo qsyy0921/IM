@@ -43,7 +43,7 @@ func TestValidateActionExecutorDebugListenerConfigAllowsExplicitPublicOptIn(t *t
 }
 
 func TestNewToolExecutorFromEnvDefaultsToUnsupportedExternalTool(t *testing.T) {
-	t.Setenv("NEXUSIM_ACTION_EXECUTOR_EXTERNAL_MCP_FALLBACK_MODE", "")
+	t.Setenv("NEXUSIM_ACTION_EXECUTOR_EXTERNAL_MCP_FAILURE_MODE", "")
 	executor, err := newToolExecutorFromEnv()
 	if err != nil {
 		t.Fatalf("new executor: %v", err)
@@ -54,15 +54,15 @@ func TestNewToolExecutorFromEnvDefaultsToUnsupportedExternalTool(t *testing.T) {
 	}
 }
 
-func TestNewToolExecutorFromEnvCanEnableExternalMCPFailureFallback(t *testing.T) {
-	t.Setenv("NEXUSIM_ACTION_EXECUTOR_EXTERNAL_MCP_FALLBACK_MODE", "timeout")
+func TestNewToolExecutorFromEnvCanEnableExternalMCPFailureMode(t *testing.T) {
+	t.Setenv("NEXUSIM_ACTION_EXECUTOR_EXTERNAL_MCP_FAILURE_MODE", "timeout")
 	executor, err := newToolExecutorFromEnv()
 	if err != nil {
 		t.Fatalf("new executor: %v", err)
 	}
 	_, err = executor.ExecuteTool(context.Background(), types.ToolExecutionCommand{ToolName: "external.tool"})
 	if !errors.Is(err, types.ErrToolExecutionTimeout) {
-		t.Fatalf("expected timeout fallback, got %v", err)
+		t.Fatalf("expected timeout failure, got %v", err)
 	}
 }
 
@@ -121,9 +121,9 @@ func TestNewToolExecutorFromEnvRejectsUnknownExternalMCPAdapterMode(t *testing.T
 	}
 }
 
-func TestNewToolExecutorFromEnvRejectsUnknownExternalMCPFallbackMode(t *testing.T) {
-	t.Setenv("NEXUSIM_ACTION_EXECUTOR_EXTERNAL_MCP_FALLBACK_MODE", "live")
+func TestNewToolExecutorFromEnvRejectsUnknownExternalMCPFailureMode(t *testing.T) {
+	t.Setenv("NEXUSIM_ACTION_EXECUTOR_EXTERNAL_MCP_FAILURE_MODE", "live")
 	if _, err := newToolExecutorFromEnv(); err == nil {
-		t.Fatal("expected unknown fallback mode to fail closed")
+		t.Fatal("expected unknown failure mode to fail closed")
 	}
 }

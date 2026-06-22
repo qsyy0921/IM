@@ -283,7 +283,6 @@ type ModelInvocation struct {
 	EstimatedCostMicrounits int64
 	Status                  string
 	FailureClass            string
-	FallbackUsed            bool
 	ProviderLatency         time.Duration
 	Timeout                 time.Duration
 	MaxOutputTokens         int

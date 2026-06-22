@@ -79,11 +79,11 @@ func TestAuthenticatorMapsInvalidMockRequest(t *testing.T) {
 	}
 }
 
-func TestNilAuthenticatorKeepsMockFallback(t *testing.T) {
+func TestNilAuthenticatorKeepsMockRecovery(t *testing.T) {
 	var authenticator *Authenticator
 	auth, err := authenticator.Authenticate(httptest.NewRequest("GET", "/ws?token=tenant-1:user-1:device-1", nil))
 	if err != nil {
-		t.Fatalf("authenticate nil fallback: %v", err)
+		t.Fatalf("authenticate nil recovery: %v", err)
 	}
 	if auth.TenantID != "tenant-1" || auth.UserID != "user-1" || auth.DeviceID != "device-1" {
 		t.Fatalf("unexpected auth: %+v", auth)

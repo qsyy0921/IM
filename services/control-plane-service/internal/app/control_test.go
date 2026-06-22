@@ -66,7 +66,7 @@ func TestRollbackConfigVersionRejectsMissingTarget(t *testing.T) {
 
 type fixedEventID string
 
-func (id fixedEventID) NewEventID() string { return string(id) }
+func (id fixedEventID) NewEventID() (string, error) { return string(id), nil }
 
 type fakeRepository struct{}
 

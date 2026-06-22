@@ -73,8 +73,8 @@ func TestToolPolicyEvaluatorFallsBackWhenNoRuleIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("decide tool action: %v", err)
 	}
-	if decision.Allowed || decision.PermissionVersion != 9 || decision.Classification != "TOOL_STATIC_DENY" || decision.DecisionSource != types.PolicyDecisionSourceFallback {
-		t.Fatalf("expected static fallback deny, got %+v", decision)
+	if decision.Allowed || decision.PermissionVersion != 9 || decision.Classification != "TOOL_STATIC_DENY" || decision.DecisionSource != types.PolicyDecisionSourceStaticDefault {
+		t.Fatalf("expected static default deny, got %+v", decision)
 	}
 }
 

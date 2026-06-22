@@ -180,34 +180,34 @@ func envOptionalBool(name string) (bool, bool, error) {
 	return value, true, nil
 }
 
-func envString(name string, fallback string) string {
+func envString(name string, defaultValue string) string {
 	value := strings.TrimSpace(os.Getenv(name))
 	if value == "" {
-		return fallback
+		return defaultValue
 	}
 	return value
 }
 
-func envDuration(name string, fallback time.Duration) time.Duration {
+func envDuration(name string, defaultValue time.Duration) time.Duration {
 	value := strings.TrimSpace(os.Getenv(name))
 	if value == "" {
-		return fallback
+		return defaultValue
 	}
 	parsed, err := time.ParseDuration(value)
 	if err != nil {
-		return fallback
+		return defaultValue
 	}
 	return parsed
 }
 
-func envInt(name string, fallback int) int {
+func envInt(name string, defaultValue int) int {
 	value := strings.TrimSpace(os.Getenv(name))
 	if value == "" {
-		return fallback
+		return defaultValue
 	}
 	parsed, err := strconv.Atoi(value)
 	if err != nil {
-		return fallback
+		return defaultValue
 	}
 	return parsed
 }

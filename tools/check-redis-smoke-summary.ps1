@@ -145,7 +145,7 @@ try {
     $sentinelSummary = New-WrapperSummary -RunDir $sentinelDir -Scenario "redis-sentinel-quorum-loss" -RedisMode "sentinel"
     $sentinelResult = Invoke-Validator -SummaryPath $sentinelSummary -ExpectedRedisMode "sentinel" -ExpectedScenario "redis-sentinel-quorum-loss"
     if ($sentinelResult.ExitCode -ne 0) {
-        Write-Host "FAIL sentinel fallback fixture should pass." -ForegroundColor Red
+        Write-Host "FAIL sentinel recovery fixture should pass." -ForegroundColor Red
         Write-Host $sentinelResult.Output -ForegroundColor Red
         exit 1
     }
@@ -184,10 +184,10 @@ try {
     $badSummary = New-WrapperSummary -RunDir $badDir -Scenario "redis-sentinel-network-partition" -RedisMode "sentinel"
     $badResult = Invoke-Validator -SummaryPath $badSummary -ExpectedRedisMode "sentinel" -ExpectedScenario "redis-sentinel-network-partition"
     if ($badResult.ExitCode -eq 0) {
-        Write-Host "FAIL sentinel fallback fixture with unexpected notify should fail." -ForegroundColor Red
+        Write-Host "FAIL sentinel recovery fixture with unexpected notify should fail." -ForegroundColor Red
         exit 1
     }
-    if (-not $badResult.Output.Contains("PullInbox fallback")) {
+    if (-not $badResult.Output.Contains("PullInbox recovery")) {
         Write-Host "FAIL bad sentinel fixture returned unexpected error." -ForegroundColor Red
         Write-Host $badResult.Output -ForegroundColor Red
         exit 1

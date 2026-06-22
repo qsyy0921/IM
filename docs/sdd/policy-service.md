@@ -33,7 +33,7 @@ message-service
 -> static first-stage policy decision
 ```
 
-The first slice keeps the legacy message-service `StaticPolicy` fallback for local smoke. When `NEXUSIM_POLICY_SERVICE_ADDR` is set, message-service calls policy-service over gRPC instead.
+The first slice keeps an explicit message-service `StaticPolicy` default for local smoke. When `NEXUSIM_POLICY_SERVICE_ADDR` is set, message-service calls policy-service over gRPC instead.
 
 The second slice adds an optional policy-service owned PostgreSQL rule table. The first table is exact-match only:
 
@@ -141,9 +141,9 @@ ownership_override=true
 permission_version=<conversation_permission_version>
 ```
 
-The `ownership_override` response field is a typed internal proof from policy-service to message-service. message-service rejects ownership override on `SEND`, on denied decisions, or on mismatched responses; mutation repositories use this boolean, not the classification string, to allow a non-sender transaction. Static fallback, exact rules and tenant rules cannot by themselves override message ownership.
+The `ownership_override` response field is a typed internal proof from policy-service to message-service. message-service rejects ownership override on `SEND`, on denied decisions, or on mismatched responses; mutation repositories use this boolean, not the classification string, to allow a non-sender transaction. Static default, exact rules and tenant rules cannot by themselves override message ownership.
 
-PostgreSQL lookup errors do not fall back; they return policy unavailable so a broken rule store cannot silently bypass a deny rule. The user restriction table, tenant rule table and role rule table are backward-compatible during rollout: if a table has not been migrated yet, a lookup miss due to the missing relation is treated as no rule and the request continues to the next decision step.
+PostgreSQL lookup errors return policy unavailable so a broken rule store cannot silently bypass a deny rule. The user restriction table, tenant rule table and role rule table are backward-compatible during rollout: if a table has not been migrated yet, a lookup miss due to the missing relation is treated as no rule and the request continues to the next decision step.
 
 The contacts projection slice consumes `im.contact.events` into policy-service owned tables:
 
@@ -156,7 +156,7 @@ im.contact.events
 
 `contact.request.accepted.v1` writes both directed edges as `ACTIVE`. `contact.edge.blocked.v1`, `contact.edge.unblocked.v1`, `contact.edge.deleted.v1` and `contact.edge.remark_updated.v1` update only the owner-scoped directed edge. Updates apply only when the incoming `edge_version` is newer than the stored version, so duplicate or stale contact events are no-ops. This projection does not read contacts-service internal tables and remains rebuildable from `im.contact.events`.
 
-For direct conversations, `conversation-service` derives `direct_peer_user_id` from its own membership facts, `message-service` forwards that context to `policy-service`, and `CheckMessageAction(SEND)` checks the contact projection before exact message rules, tenant action defaults or static fallback. If either directed edge between sender and direct peer is `BLOCKED`, policy-service returns:
+For direct conversations, `conversation-service` derives `direct_peer_user_id` from its own membership facts, `message-service` forwards that context to `policy-service`, and `CheckMessageAction(SEND)` checks the contact projection before exact message rules, tenant action defaults or static default. If either directed edge between sender and direct peer is `BLOCKED`, policy-service returns:
 
 ```text
 allowed=false
@@ -196,7 +196,7 @@ Audit rows must not store message content, raw session id, raw device id, raw di
 
 For the first-stage ownership gate, audit rows identify ownership denies by `classification=MESSAGE_OWNERSHIP_DENIED` / `reason_code=MESSAGE_OWNERSHIP_DENIED` and ownership overrides by `classification=MESSAGE_OWNERSHIP_ROLE_OVERRIDE`. Audit rows keep the stable `message_key` and intentionally do not store raw message sender id in this slice. A future audit schema can add a low-sensitive `message_sender_context_present` flag, ownership override flag or sender stable key if operations needs more ownership-specific attribution.
 
-`decision_source` is low-sensitive path metadata. Current values include `FALLBACK`, `EXACT_RULE`, `TENANT_RULE`, `USER_RESTRICTION`, `TENANT_QUOTA`, `REBAC_RELATION`, `CONVERSATION_ROLE`, `CONTACT_PROJECTION`, `MESSAGE_OWNERSHIP`, `OWNERSHIP_OVERRIDE` and `CONTENT_MODERATION`. It is not a free-text reason and must not contain provider body, message content, raw rule parameters or raw user identifiers.
+`decision_source` is low-sensitive path metadata. Current values include `STATIC_DEFAULT`, `EXACT_RULE`, `TENANT_RULE`, `USER_RESTRICTION`, `TENANT_QUOTA`, `REBAC_RELATION`, `CONVERSATION_ROLE`, `CONTACT_PROJECTION`, `MESSAGE_OWNERSHIP`, `OWNERSHIP_OVERRIDE` and `CONTENT_MODERATION`. It is not a free-text reason and must not contain provider body, message content, raw rule parameters or raw user identifiers.
 
 Configuration:
 
@@ -338,7 +338,7 @@ The response is a decision record. `allowed=false` is returned as a successful g
 - `permission_version`;
 - `classification`;
 - public `reason`;
-- `decision_source`, currently `TOOL_RULE` or `FALLBACK`.
+- `decision_source`, currently `TOOL_RULE` or `STATIC_DEFAULT`.
 
 ## Message-Service Integration
 
@@ -365,7 +365,7 @@ When `NEXUSIM_POLICY_DEBUG_ADDR` is set, policy-service exposes:
 
 The debug metrics include aggregate gRPC request counts and status codes, aggregate final `CheckMessageAction` decision counts, per-action aggregate decision counts, optional PostgreSQL pool stats, optional rule-store row counts, optional projection row counts / checkpoints and optional decision audit outbox status counts. Decision metrics are recorded at the use-case boundary, so they include static / exact / user-restriction / tenant / role / relationship decisions as well as first-stage ownership denies and `ownership_override=true` allows. The `policy_rule_store` snapshot includes low-cardinality row counts for exact message action rules, user message action restrictions, tenant action defaults, conversation role gate rules, ownership override rules and ReBAC relationship rules, grouped only by action / allow-deny / min-role / relation type / conversation scope where applicable. The `policy_projection` snapshot includes contact edge status counts, conversation member status / role counts and Kafka checkpoint topic aggregates. `/metrics` renders the same low-sensitive aggregate snapshot as Prometheus text for local scrape / dashboard prototypes. The local scrape target is `host.docker.internal:11916` when the service debug listener runs as `NEXUSIM_POLICY_DEBUG_ADDR=127.0.0.1:11916`. They intentionally do not expose tenant id, user id, conversation id, message id, device id, session id, request / response payloads, raw rule parameters, deny reason text, classification strings, DSNs or SQL error text.
 
-The debug HTTP listener is intended for local smoke and private operational access. `NEXUSIM_POLICY_DEBUG_ADDR` may fall back to `NEXUSIM_DEBUG_ADDR`; by default the listener only allows loopback / RFC1918 private addresses. Binding the debug listener to a public or unspecified address requires explicit `NEXUSIM_POLICY_DEBUG_ALLOW_PUBLIC=true`.
+The debug HTTP listener is intended for local smoke and private operational access. `NEXUSIM_POLICY_DEBUG_ADDR` is the service-specific setting; if it is unset, the shared `NEXUSIM_DEBUG_ADDR` value is used explicitly by the startup config. By default the listener only allows loopback / RFC1918 private addresses. Binding the debug listener to a public or unspecified address requires explicit `NEXUSIM_POLICY_DEBUG_ALLOW_PUBLIC=true`.
 
 `allowed=false` is counted as a decision deny, while the gRPC method remains `codes.OK`. Transport errors are counted separately.
 

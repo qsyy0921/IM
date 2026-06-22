@@ -226,10 +226,10 @@ func envOptionalBool(name string) (bool, bool, error) {
 	return value, true, nil
 }
 
-func envString(name string, fallback string) string {
+func envString(name string, defaultValue string) string {
 	value := strings.TrimSpace(os.Getenv(name))
 	if value == "" {
-		return fallback
+		return defaultValue
 	}
 	return value
 }

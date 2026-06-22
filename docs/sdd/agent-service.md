@@ -19,7 +19,7 @@ proposal 元数据，并提供 approval / execution preflight 校验；它仍不
 - 调用 `mcp-gateway.PrepareToolCall` 做 tool action prepare / precheck。
 - 调用 `retrieval-gateway.RetrieveEvidence` 获取 EvidencePack。
 - 可选 `at_conversation_seq` 显式传给 retrieval-gateway，用于固定 memory
-  current-only 查询时点；未传时允许 retrieval-gateway 使用 search hit fallback。
+  current-only 查询时点；未传时允许 retrieval-gateway 使用 search hit recovery。
 - 第一版通过 `ProposalProvider` port 生成 deterministic extractive proposal；
   默认实现不调用外部 LLM provider。
 - 可选 `python-worker` provider mode 只作为第一阶段 planner candidate
@@ -109,5 +109,5 @@ Agent 不允许绕过 mcp-gateway / policy，也不允许直接执行 mutation�
   approval / executor / audit 串接。
 - 补 external review UI；当前 approval operator 和 approval outbox relay 已有 first path。
 - 外部 LLM / MCP provider adapter 接入时增加 prompt boundary、token budget、
-  PII / secret filter、tool-call schema validation、provider failure fallback
+  PII / secret filter、tool-call schema validation、provider failure recovery
   和 tool output safety cases。

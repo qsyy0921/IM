@@ -75,7 +75,7 @@ func TestRiskRoutingExecutorRejectsCriticalWhenWorkflowMissing(t *testing.T) {
 }
 
 func TestOperationTypeRoutingExecutorDelegatesMappedOperation(t *testing.T) {
-	fallback := &fakeExecutor{}
+	recovery := &fakeExecutor{}
 	configPublisher := &fakeExecutor{
 		result: types.OperationExecutionResult{
 			DownstreamService:    "control-plane-service",
@@ -83,7 +83,7 @@ func TestOperationTypeRoutingExecutorDelegatesMappedOperation(t *testing.T) {
 			Status:               types.OperationStatusSucceeded,
 		},
 	}
-	router := NewOperationTypeRoutingExecutor(fallback, map[string]OperationExecutor{
+	router := NewOperationTypeRoutingExecutor(recovery, map[string]OperationExecutor{
 		OperationTypeConfigPublish: configPublisher,
 	})
 
@@ -98,20 +98,20 @@ func TestOperationTypeRoutingExecutorDelegatesMappedOperation(t *testing.T) {
 	if result.DownstreamService != "control-plane-service" {
 		t.Fatalf("unexpected result: %+v", result)
 	}
-	if configPublisher.calls != 1 || fallback.calls != 0 {
-		t.Fatalf("unexpected calls config=%d fallback=%d", configPublisher.calls, fallback.calls)
+	if configPublisher.calls != 1 || recovery.calls != 0 {
+		t.Fatalf("unexpected calls config=%d recovery=%d", configPublisher.calls, recovery.calls)
 	}
 }
 
 func TestOperationTypeRoutingExecutorFallsBackForUnmappedOperation(t *testing.T) {
-	fallback := &fakeExecutor{
+	recovery := &fakeExecutor{
 		result: types.OperationExecutionResult{
 			DownstreamService:    "local",
 			DownstreamRequestRef: "operation:admop_user_ban",
 			Status:               types.OperationStatusSucceeded,
 		},
 	}
-	router := NewOperationTypeRoutingExecutor(fallback, nil)
+	router := NewOperationTypeRoutingExecutor(recovery, nil)
 
 	result, err := router.Execute(context.Background(), types.AdminOperation{
 		OperationID:   "admop_user_ban",
@@ -121,8 +121,8 @@ func TestOperationTypeRoutingExecutorFallsBackForUnmappedOperation(t *testing.T)
 	if err != nil {
 		t.Fatalf("execute: %v", err)
 	}
-	if result.DownstreamService != "local" || fallback.calls != 1 {
-		t.Fatalf("unexpected fallback result=%+v calls=%d", result, fallback.calls)
+	if result.DownstreamService != "local" || recovery.calls != 1 {
+		t.Fatalf("unexpected recovery result=%+v calls=%d", result, recovery.calls)
 	}
 }
 

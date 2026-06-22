@@ -188,7 +188,7 @@ func effectiveRiskLevel(requested string, skillRisk string) string {
 func newAuditID() string {
 	var buf [16]byte
 	if _, err := rand.Read(buf[:]); err != nil {
-		return "mcp_audit_fallback"
+		return "mcp_audit_recovery"
 	}
 	return "mcp_audit_" + hex.EncodeToString(buf[:])
 }

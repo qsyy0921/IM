@@ -204,7 +204,7 @@ WHERE id = $1
 		t.Fatalf("expected no fetched messages before repair, got %+v", stats)
 	}
 
-	repairStats, err := store.RepairDLQEvents(ctx, []string{"policy-audit-store-repair-low", "policy-audit-store-repair-low", "missing-event"}, "policy-operator", "operator retried after kafka recovery", validatePolicyAuditOutboxMessageForTest)
+	repairStats, err := store.RepairDLQEvents(ctx, []string{"policy-audit-store-repair-low", "policy-audit-store-repair-low", "missing-event"}, "policy-operator", "operator retried after kafka repair", validatePolicyAuditOutboxMessageForTest)
 	if err != nil {
 		t.Fatalf("repair dlq: %v", err)
 	}
@@ -212,7 +212,7 @@ WHERE id = $1
 		t.Fatalf("unexpected repair stats: %+v", repairStats)
 	}
 	assertPolicyAuditOutboxState(t, ctx, pool, lowID, types.OutboxStatusPending, 0)
-	assertPolicyAuditOutboxRepairAudit(t, ctx, pool, "policy-audit-store-repair-low", "policy-operator", "operator retried after kafka recovery", "policy audit outbox publish broker unavailable", 3, "REPAIRED", "", "user1@example.com", "secret-token", "broker body")
+	assertPolicyAuditOutboxRepairAudit(t, ctx, pool, "policy-audit-store-repair-low", "policy-operator", "operator retried after kafka repair", "policy audit outbox publish broker unavailable", 3, "REPAIRED", "", "user1@example.com", "secret-token", "broker body")
 
 	var published []string
 	stats, err = store.ProcessReadyBatch(ctx, 10, 3, time.Millisecond, func(ctx context.Context, messages []types.OutboxMessage) []error {

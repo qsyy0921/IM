@@ -10,12 +10,12 @@ import (
 )
 
 const (
-	ExternalMCPFallbackDisabled            = "disabled"
-	ExternalMCPFallbackProviderUnavailable = "provider-unavailable"
-	ExternalMCPFallbackTimeout             = "timeout"
-	ExternalMCPFallbackRateLimited         = "rate-limited"
-	ExternalMCPFallbackPermissionDenied    = "permission-denied"
-	ExternalMCPFallbackFailed              = "failed"
+	ExternalMCPFailureDisabled            = "disabled"
+	ExternalMCPFailureProviderUnavailable = "provider-unavailable"
+	ExternalMCPFailureTimeout             = "timeout"
+	ExternalMCPFailureRateLimited         = "rate-limited"
+	ExternalMCPFailurePermissionDenied    = "permission-denied"
+	ExternalMCPFailureFailed              = "failed"
 )
 
 type ExecutorChain struct {
@@ -46,26 +46,26 @@ func (chain ExecutorChain) ExecuteTool(
 	return types.ToolExecutionResult{}, types.ErrToolExecutionUnsupported
 }
 
-type ExternalMCPFallbackExecutor struct {
+type ExternalMCPFailureExecutor struct {
 	mode string
 }
 
-func NewExternalMCPFallbackExecutor(mode string) (ExternalMCPFallbackExecutor, error) {
-	mode = normalizeExternalMCPFallbackMode(mode)
+func NewExternalMCPFailureExecutor(mode string) (ExternalMCPFailureExecutor, error) {
+	mode = normalizeExternalMCPFailureMode(mode)
 	switch mode {
-	case ExternalMCPFallbackDisabled,
-		ExternalMCPFallbackProviderUnavailable,
-		ExternalMCPFallbackTimeout,
-		ExternalMCPFallbackRateLimited,
-		ExternalMCPFallbackPermissionDenied,
-		ExternalMCPFallbackFailed:
-		return ExternalMCPFallbackExecutor{mode: mode}, nil
+	case ExternalMCPFailureDisabled,
+		ExternalMCPFailureProviderUnavailable,
+		ExternalMCPFailureTimeout,
+		ExternalMCPFailureRateLimited,
+		ExternalMCPFailurePermissionDenied,
+		ExternalMCPFailureFailed:
+		return ExternalMCPFailureExecutor{mode: mode}, nil
 	default:
-		return ExternalMCPFallbackExecutor{}, fmt.Errorf("unsupported external MCP fallback mode %q", mode)
+		return ExternalMCPFailureExecutor{}, fmt.Errorf("unsupported external MCP failure mode %q", mode)
 	}
 }
 
-func (executor ExternalMCPFallbackExecutor) ExecuteTool(
+func (executor ExternalMCPFailureExecutor) ExecuteTool(
 	_ context.Context,
 	command types.ToolExecutionCommand,
 ) (types.ToolExecutionResult, error) {
@@ -73,25 +73,25 @@ func (executor ExternalMCPFallbackExecutor) ExecuteTool(
 		return types.ToolExecutionResult{}, types.ErrToolExecutionUnsupported
 	}
 	switch executor.mode {
-	case ExternalMCPFallbackProviderUnavailable:
+	case ExternalMCPFailureProviderUnavailable:
 		return types.ToolExecutionResult{}, types.ErrToolProviderUnavailable
-	case ExternalMCPFallbackTimeout:
+	case ExternalMCPFailureTimeout:
 		return types.ToolExecutionResult{}, types.ErrToolExecutionTimeout
-	case ExternalMCPFallbackRateLimited:
+	case ExternalMCPFailureRateLimited:
 		return types.ToolExecutionResult{}, types.ErrToolProviderRateLimited
-	case ExternalMCPFallbackPermissionDenied:
+	case ExternalMCPFailurePermissionDenied:
 		return types.ToolExecutionResult{}, types.ErrToolProviderPermissionDenied
-	case ExternalMCPFallbackFailed:
+	case ExternalMCPFailureFailed:
 		return types.ToolExecutionResult{}, types.ErrToolExecutionFailed
 	default:
 		return types.ToolExecutionResult{}, types.ErrToolExecutionUnsupported
 	}
 }
 
-func normalizeExternalMCPFallbackMode(mode string) string {
+func normalizeExternalMCPFailureMode(mode string) string {
 	mode = strings.ToLower(strings.TrimSpace(mode))
 	if mode == "" {
-		return ExternalMCPFallbackDisabled
+		return ExternalMCPFailureDisabled
 	}
 	mode = strings.ReplaceAll(mode, "_", "-")
 	return mode

@@ -2,7 +2,6 @@ package app
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/qsyy0921/IM/internal/ai/llmboundary"
@@ -14,9 +13,8 @@ type ExternalAnswerLLM interface {
 }
 
 type GuardedLLMAnswerProvider struct {
-	client   ExternalAnswerLLM
-	fallback AnswerProvider
-	options  llmboundary.Options
+	client  ExternalAnswerLLM
+	options llmboundary.Options
 }
 
 func NewGuardedLLMAnswerProvider(
@@ -24,9 +22,8 @@ func NewGuardedLLMAnswerProvider(
 	options llmboundary.Options,
 ) GuardedLLMAnswerProvider {
 	return GuardedLLMAnswerProvider{
-		client:   client,
-		fallback: ExtractiveAnswerProvider{},
-		options:  llmboundary.NormalizeOptions(options),
+		client:  client,
+		options: llmboundary.NormalizeOptions(options),
 	}
 }
 
@@ -34,11 +31,8 @@ func (provider GuardedLLMAnswerProvider) GenerateAnswer(
 	ctx context.Context,
 	request types.AnswerGenerationRequest,
 ) (types.AnswerGenerationResult, error) {
-	if provider.fallback == nil {
-		provider.fallback = ExtractiveAnswerProvider{}
-	}
 	if provider.client == nil {
-		return provider.fallback.GenerateAnswer(ctx, request)
+		return types.AnswerGenerationResult{}, types.ErrRAGUnavailable
 	}
 	prompt, err := llmboundary.BuildPrompt(
 		"Answer the question using only the provided EvidencePack. Return citations by evidence_id.",
@@ -47,14 +41,11 @@ func (provider GuardedLLMAnswerProvider) GenerateAnswer(
 		provider.options,
 	)
 	if err != nil {
-		if isLLMInputFallbackError(err) {
-			return provider.fallback.GenerateAnswer(ctx, request)
-		}
 		return types.AnswerGenerationResult{}, fmt.Errorf("%w: %v", types.ErrRAGUnavailable, err)
 	}
 	candidate, err := provider.client.GenerateCandidate(ctx, prompt)
 	if err != nil {
-		return provider.fallback.GenerateAnswer(ctx, request)
+		return types.AnswerGenerationResult{}, fmt.Errorf("%w: model provider failed", types.ErrRAGUnavailable)
 	}
 	allowedIDs := evidenceIDSet(request.EvidencePack.Items)
 	if err := llmboundary.ValidateCandidate(candidate, allowedIDs); err != nil {
@@ -71,11 +62,6 @@ func (provider GuardedLLMAnswerProvider) GenerateAnswer(
 		Citations:      citations,
 		GeneratedByLLM: true,
 	}, nil
-}
-
-func isLLMInputFallbackError(err error) bool {
-	return errors.Is(err, llmboundary.ErrUnsafeInput) ||
-		errors.Is(err, llmboundary.ErrMalformedOutput)
 }
 
 func answerBoundaryEvidence(items []types.EvidenceItem) []llmboundary.Evidence {

@@ -11,17 +11,17 @@ import (
 	"github.com/qsyy0921/IM/services/policy-service/internal/types"
 )
 
-type fallbackEvaluator interface {
+type staticDefaultEvaluator interface {
 	DecideMessageAction(context.Context, types.CheckMessageActionCommand) (types.MessageActionDecision, error)
 }
 
 type MessagePolicyEvaluator struct {
-	pool     *pgxpool.Pool
-	fallback fallbackEvaluator
+	pool          *pgxpool.Pool
+	staticDefault staticDefaultEvaluator
 }
 
-func NewMessagePolicyEvaluator(pool *pgxpool.Pool, fallback fallbackEvaluator) MessagePolicyEvaluator {
-	return MessagePolicyEvaluator{pool: pool, fallback: fallback}
+func NewMessagePolicyEvaluator(pool *pgxpool.Pool, staticDefault staticDefaultEvaluator) MessagePolicyEvaluator {
+	return MessagePolicyEvaluator{pool: pool, staticDefault: staticDefault}
 }
 
 func (e MessagePolicyEvaluator) DecideMessageAction(
@@ -29,7 +29,7 @@ func (e MessagePolicyEvaluator) DecideMessageAction(
 	command types.CheckMessageActionCommand,
 ) (types.MessageActionDecision, error) {
 	if e.pool == nil {
-		return e.fallbackDecision(ctx, command)
+		return e.staticDefaultDecision(ctx, command)
 	}
 
 	blocked, edgeVersion, err := e.lookupContactBlock(ctx, command)
@@ -97,7 +97,7 @@ func (e MessagePolicyEvaluator) DecideMessageAction(
 	if found {
 		return decision, nil
 	}
-	return e.fallbackDecision(ctx, command)
+	return e.staticDefaultDecision(ctx, command)
 }
 
 func (e MessagePolicyEvaluator) lookupUserRestriction(
@@ -145,14 +145,14 @@ WHERE tenant_id = $1
 	return decision, true, nil
 }
 
-func (e MessagePolicyEvaluator) fallbackDecision(
+func (e MessagePolicyEvaluator) staticDefaultDecision(
 	ctx context.Context,
 	command types.CheckMessageActionCommand,
 ) (types.MessageActionDecision, error) {
-	if e.fallback == nil {
-		return types.MessageActionDecision{}, types.NewDependencyUnavailable("policy fallback is not configured")
+	if e.staticDefault == nil {
+		return types.MessageActionDecision{}, types.NewDependencyUnavailable("policy static default is not configured")
 	}
-	return e.fallback.DecideMessageAction(ctx, command)
+	return e.staticDefault.DecideMessageAction(ctx, command)
 }
 
 func (e MessagePolicyEvaluator) lookupRule(

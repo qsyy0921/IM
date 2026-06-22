@@ -11,17 +11,17 @@ import (
 	"github.com/qsyy0921/IM/services/policy-service/internal/types"
 )
 
-type fallbackToolEvaluator interface {
+type staticDefaultToolEvaluator interface {
 	DecideToolAction(context.Context, types.CheckToolActionCommand) (types.ToolActionDecision, error)
 }
 
 type ToolPolicyEvaluator struct {
-	pool     *pgxpool.Pool
-	fallback fallbackToolEvaluator
+	pool          *pgxpool.Pool
+	staticDefault staticDefaultToolEvaluator
 }
 
-func NewToolPolicyEvaluator(pool *pgxpool.Pool, fallback fallbackToolEvaluator) ToolPolicyEvaluator {
-	return ToolPolicyEvaluator{pool: pool, fallback: fallback}
+func NewToolPolicyEvaluator(pool *pgxpool.Pool, staticDefault staticDefaultToolEvaluator) ToolPolicyEvaluator {
+	return ToolPolicyEvaluator{pool: pool, staticDefault: staticDefault}
 }
 
 func (e ToolPolicyEvaluator) DecideToolAction(
@@ -29,7 +29,7 @@ func (e ToolPolicyEvaluator) DecideToolAction(
 	command types.CheckToolActionCommand,
 ) (types.ToolActionDecision, error) {
 	if e.pool == nil {
-		return e.fallbackDecision(ctx, command)
+		return e.staticDefaultDecision(ctx, command)
 	}
 	decision := types.ToolActionDecision{
 		TenantID:       command.AuthContext.TenantID,
@@ -65,10 +65,10 @@ LIMIT 1
 		&decision.Reason,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return e.fallbackDecision(ctx, command)
+		return e.staticDefaultDecision(ctx, command)
 	}
 	if isUndefinedTable(err) {
-		return e.fallbackDecision(ctx, command)
+		return e.staticDefaultDecision(ctx, command)
 	}
 	if err != nil {
 		return types.ToolActionDecision{}, types.NewDependencyUnavailable("tool policy rule lookup failed")
@@ -87,14 +87,14 @@ LIMIT 1
 	return decision, nil
 }
 
-func (e ToolPolicyEvaluator) fallbackDecision(
+func (e ToolPolicyEvaluator) staticDefaultDecision(
 	ctx context.Context,
 	command types.CheckToolActionCommand,
 ) (types.ToolActionDecision, error) {
-	if e.fallback == nil {
-		return types.ToolActionDecision{}, types.NewDependencyUnavailable("tool policy fallback is not configured")
+	if e.staticDefault == nil {
+		return types.ToolActionDecision{}, types.NewDependencyUnavailable("tool policy static default is not configured")
 	}
-	return e.fallback.DecideToolAction(ctx, command)
+	return e.staticDefault.DecideToolAction(ctx, command)
 }
 
 type ToolDecisionAudit struct {

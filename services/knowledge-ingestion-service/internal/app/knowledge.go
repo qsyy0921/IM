@@ -156,7 +156,7 @@ func (RandomIDGenerator) NewChunkID(index int) string {
 func randomHex() string {
 	var value [12]byte
 	if _, err := rand.Read(value[:]); err != nil {
-		return "fallback"
+		return "recovery"
 	}
 	return hex.EncodeToString(value[:])
 }

@@ -381,7 +381,7 @@ retrieval-gateway 完成。
 ## 11. 与 model-gateway / knowledge-ingestion 的边界
 
 - `knowledge-ingestion-service` 拥有 source / chunk lifecycle 和 delete proof。
-- `model-gateway` 拥有 embedding provider route、budget、fallback 和 provider metadata。
+- `model-gateway` 拥有 embedding provider route、budget、fail-closed 和 provider metadata。
 - `vector-index-service` 拥有 vector backend metadata、upsert/delete/rebuild 状态。
 
 Embedding 输入必须来自受控 source / chunk refs；vector-index 不接受任意 caller 提交 raw text。

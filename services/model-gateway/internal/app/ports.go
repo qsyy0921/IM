@@ -24,5 +24,5 @@ type EmbeddingProvider interface {
 }
 
 type InvocationIDGenerator interface {
-	NewInvocationID() string
+	NewInvocationID() (string, error)
 }

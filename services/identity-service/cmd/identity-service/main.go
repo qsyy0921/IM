@@ -189,7 +189,7 @@ func runGRPC() error {
 		return err
 	}
 	mfaRiskPolicy := identityMFARiskPolicyFromEnv()
-	mfaRecoveryRiskPolicy := identityMFARecoveryRiskPolicyFromEnv(mfaRiskPolicy)
+	mfaRecoveryRiskPolicy := identityMFARecoveryRiskPolicyFromEnv()
 	identitygrpc.Register(server, identitygrpc.NewServer(
 		app.NewRegisterUserUseCase(repository, passwords),
 		app.NewLoginUseCase(

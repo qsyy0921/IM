@@ -19,8 +19,8 @@ $deliveryServiceBrief = Get-Content -LiteralPath $deliveryServiceBriefPath -Raw
 $pushGatewayBrief = Get-Content -LiteralPath $pushGatewayBriefPath -Raw
 $distributedLocal = Get-Content -LiteralPath $distributedLocalPath -Raw
 
-$pushGatewayNetworkPartitionComplete = $developmentProgress.Contains("Redis Sentinel network-partition fallback smoke") -and
-    $pushGatewayBrief.Contains("network-partition fallback")
+$pushGatewayNetworkPartitionComplete = $developmentProgress.Contains("Redis Sentinel network-partition recovery smoke") -and
+    $pushGatewayBrief.Contains("network-partition recovery")
 
 if ($pushGatewayNetworkPartitionComplete -and $remainingGoals.Contains("Redis 网络分区组合 smoke")) {
     throw "remaining-goals.md still lists push-gateway Redis network-partition smoke even though progress and push-gateway brief mark it complete."

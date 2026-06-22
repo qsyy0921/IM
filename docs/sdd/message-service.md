@@ -168,7 +168,7 @@ accepted_at
 
 ### 4.2 同步调用治理
 
-| 调用 | deadline | retry | fallback |
+| 调用 | deadline | retry | failure handling |
 | --- | ---: | --- | --- |
 | api-gateway -> message-service.SendMessage | 100ms | 服务端不自动重试写请求；客户端复用 `client_msg_id` 重试 | 返回 retryable error |
 | message-service -> policy-service | 30ms | 短重试 1 次，仅限幂等读取 | fail closed，返回 `PERMISSION_DENIED` 或 retryable policy error |
@@ -188,7 +188,7 @@ accepted_at
 
 - 写请求不做透明服务端重试，避免放大重试风暴。
 - 所有 retry 必须带 trace，并可从 metrics 区分依赖失败和业务失败。
-- fallback 不能绕过权限、成员版本或 seq 分配事实源。
+- 失败处理不能绕过权限、成员版本或 seq 分配事实源。
 
 ### 4.3 EditMessage
 
@@ -351,10 +351,10 @@ RETURNING current_seq;
 ```text
 conversation-service 创建会话时初始化 conversation_seq(current_seq=0)。
 message-service 首次发送发现 conversation_seq 缺失时，可以在同事务内幂等补建，但必须记录 metric 和 repair log。
-兜底补建只能在 `ConversationQueryPort` 确认 conversation 存在且 `PolicyCheckPort` 确认当前操作者可发送后执行。
+补建只能在 `ConversationQueryPort` 确认 conversation 存在且 `PolicyCheckPort` 确认当前操作者可发送后执行。
 ```
 
-兜底补建 SQL：
+补建 SQL：
 
 ```sql
 INSERT INTO conversation_seq (tenant_id, conversation_id, current_seq)
@@ -707,7 +707,7 @@ commit
 mark seq_allocation_journal(COMMITTED)
 ```
 
-并发兜底：
+并发幂等处理：
 
 ```text
 if two requests pass pre-check concurrently:
@@ -903,7 +903,7 @@ x-nexusim-trace-id
 x-nexusim-request-id
 ```
 
-metadata 模式下 `SendMessage / EditMessage / RevokeMessage / DeleteMessage` 的 `tenant_id / user_id / device_id / session_id` 只来自 verified metadata，不信任 request body 中可伪造的身份字段；`trace_id / request_id` 可以在 metadata 缺失时从 body 兜底用于排障相关性。该模式只定义 message-service 对 gateway verified metadata 的消费边界，不等同于完整 API gateway、token exchange、服务发现或全服务统一身份治理。
+metadata 模式下 `SendMessage / EditMessage / RevokeMessage / DeleteMessage` 的 `tenant_id / user_id / device_id / session_id` 只来自 verified metadata，不信任 request body 中可伪造的身份字段；`trace_id / request_id` 可以在 metadata 缺失时从 body 读取，只用于排障相关性。该模式只定义 message-service 对 gateway verified metadata 的消费边界，不等同于完整 API gateway、token exchange、服务发现或全服务统一身份治理。
 
 gRPC server 支持第一阶段静态 TLS / mTLS 配置：
 

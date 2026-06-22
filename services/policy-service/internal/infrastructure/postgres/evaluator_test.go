@@ -81,9 +81,9 @@ func TestMessagePolicyEvaluatorFallsBackWhenNoRuleIntegration(t *testing.T) {
 		t.Fatalf("decide message action: %v", err)
 	}
 	if !decision.Allowed || decision.PermissionVersion != 9 || decision.Classification != "STATIC_ALLOW" {
-		t.Fatalf("expected static fallback decision, got %+v", decision)
+		t.Fatalf("expected static default decision, got %+v", decision)
 	}
-	assertPolicyDecisionSource(t, decision, types.PolicyDecisionSourceFallback)
+	assertPolicyDecisionSource(t, decision, types.PolicyDecisionSourceStaticDefault)
 }
 
 func TestMessagePolicyEvaluatorUsesTenantRuleIntegration(t *testing.T) {
@@ -770,11 +770,11 @@ func TestMessagePolicyEvaluatorIgnoresContactProjectionWithoutDirectPeerIntegrat
 		t.Fatalf("decide message action: %v", err)
 	}
 	if !decision.Allowed || decision.PermissionVersion != 9 || decision.Classification != "STATIC_ALLOW" {
-		t.Fatalf("expected fallback allow without direct peer, got %+v", decision)
+		t.Fatalf("expected static default allow without direct peer, got %+v", decision)
 	}
 }
 
-func TestMessagePolicyEvaluatorDoesNotFallbackOnDatabaseErrorIntegration(t *testing.T) {
+func TestMessagePolicyEvaluatorDoesNotUseStaticDefaultOnDatabaseErrorIntegration(t *testing.T) {
 	pool := openTestPool(t)
 	pool.Close()
 	evaluator := NewMessagePolicyEvaluator(pool, domain.StaticMessagePolicy{
@@ -785,7 +785,7 @@ func TestMessagePolicyEvaluatorDoesNotFallbackOnDatabaseErrorIntegration(t *test
 
 	_, err := evaluator.DecideMessageAction(context.Background(), testPolicyCommand(types.MessageActionSend))
 	if !errors.Is(err, types.ErrDependencyUnavailable) {
-		t.Fatalf("expected dependency unavailable without static fallback, got %v", err)
+		t.Fatalf("expected dependency unavailable without static default, got %v", err)
 	}
 }
 

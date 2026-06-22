@@ -236,8 +236,16 @@ func (usecase ExecuteApprovedActionUseCase) insertAudit(
 	providerFailure *types.ProviderFailureProjection,
 ) (types.ExecuteApprovedActionResult, error) {
 	result.Status = status
-	result.ExecutionID = newExecutionID()
-	result.ResultID = newResultID()
+	executionID, err := newExecutionID()
+	if err != nil {
+		return types.ExecuteApprovedActionResult{}, err
+	}
+	resultID, err := newResultID()
+	if err != nil {
+		return types.ExecuteApprovedActionResult{}, err
+	}
+	result.ExecutionID = executionID
+	result.ResultID = resultID
 	result.ResultStatus = resultStatusForExecution(status, result.Executed)
 	result.ResultRef = resultRef(result.ExecutionID, result.ResultID)
 	audit := types.ExecutionAudit{
@@ -288,7 +296,10 @@ func (usecase ExecuteApprovedActionUseCase) insertAudit(
 		OutputSHA256:    audit.OutputSHA256,
 	}
 	if providerFailure != nil {
-		providerFailure = providerFailureProjection(command, result)
+		providerFailure, err = providerFailureProjection(command, result)
+		if err != nil {
+			return types.ExecuteApprovedActionResult{}, err
+		}
 	}
 	if err := usecase.audit.RecordExecution(ctx, audit, projection, providerFailure); err != nil {
 		return types.ExecuteApprovedActionResult{}, err
@@ -381,28 +392,28 @@ func containsRepairOrDLQToken(value string) bool {
 	return strings.Contains(normalized, "dead_letter") || strings.Contains(normalized, "deadletter")
 }
 
-func nonEmpty(value string, fallback string) string {
+func nonEmpty(value string, defaultValue string) string {
 	value = strings.TrimSpace(value)
 	if value == "" {
-		return fallback
+		return defaultValue
 	}
 	return value
 }
 
-func newExecutionID() string {
+func newExecutionID() (string, error) {
 	var buf [16]byte
 	if _, err := rand.Read(buf[:]); err != nil {
-		return "act_exec_fallback"
+		return "", types.ErrExecutionAuditFailed
 	}
-	return "act_exec_" + hex.EncodeToString(buf[:])
+	return "act_exec_" + hex.EncodeToString(buf[:]), nil
 }
 
-func newResultID() string {
+func newResultID() (string, error) {
 	var buf [16]byte
 	if _, err := rand.Read(buf[:]); err != nil {
-		return "act_result_fallback"
+		return "", types.ErrExecutionAuditFailed
 	}
-	return "act_result_" + hex.EncodeToString(buf[:])
+	return "act_result_" + hex.EncodeToString(buf[:]), nil
 }
 
 func resultStatusForExecution(status string, executed bool) string {
@@ -425,15 +436,19 @@ func resultRef(executionID string, resultID string) string {
 func providerFailureProjection(
 	command types.ExecuteApprovedActionCommand,
 	result types.ExecuteApprovedActionResult,
-) *types.ProviderFailureProjection {
+) (*types.ProviderFailureProjection, error) {
 	status, retryable := providerFailureStatus(result.Classification)
 	if status == "" {
-		return nil
+		return nil, nil
+	}
+	providerFailureID, err := newProviderFailureID()
+	if err != nil {
+		return nil, err
 	}
 	now := time.Now().UTC()
 	projection := types.ProviderFailureProjection{
 		TenantID:          command.AuthContext.TenantID,
-		ProviderFailureID: newProviderFailureID(),
+		ProviderFailureID: providerFailureID,
 		ExecutionID:       result.ExecutionID,
 		ResultID:          result.ResultID,
 		ProposalID:        command.ProposalID,
@@ -456,7 +471,7 @@ func providerFailureProjection(
 		projection.DeadLetteredAt = now
 	}
 	projection.FailureRef = providerFailureRef(result.ExecutionID, projection.ProviderFailureID)
-	return &projection
+	return &projection, nil
 }
 
 func providerFailureStatus(classification string) (string, bool) {
@@ -470,12 +485,12 @@ func providerFailureStatus(classification string) (string, bool) {
 	}
 }
 
-func newProviderFailureID() string {
+func newProviderFailureID() (string, error) {
 	var buf [16]byte
 	if _, err := rand.Read(buf[:]); err != nil {
-		return "act_provider_failure_fallback"
+		return "", types.ErrExecutionAuditFailed
 	}
-	return "act_provider_failure_" + hex.EncodeToString(buf[:])
+	return "act_provider_failure_" + hex.EncodeToString(buf[:]), nil
 }
 
 func providerFailureRef(executionID string, providerFailureID string) string {

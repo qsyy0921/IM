@@ -10,11 +10,11 @@ import (
 func TestIdentityOperatorReasonFromEnvDefault(t *testing.T) {
 	t.Setenv("NEXUSIM_IDENTITY_TEST_REASON", "")
 	t.Setenv("NEXUSIM_IDENTITY_TEST_REASON_FILE", "")
-	reason, err := identityOperatorReasonFromEnv("NEXUSIM_IDENTITY_TEST_REASON", "NEXUSIM_IDENTITY_TEST_REASON_FILE", "manual fallback")
+	reason, err := identityOperatorReasonFromEnv("NEXUSIM_IDENTITY_TEST_REASON", "NEXUSIM_IDENTITY_TEST_REASON_FILE", "manual reason")
 	if err != nil {
 		t.Fatalf("resolve default reason: %v", err)
 	}
-	if reason != "manual fallback" {
+	if reason != "manual reason" {
 		t.Fatalf("unexpected default reason: %q", reason)
 	}
 }
@@ -22,7 +22,7 @@ func TestIdentityOperatorReasonFromEnvDefault(t *testing.T) {
 func TestIdentityOperatorReasonFromEnvValue(t *testing.T) {
 	t.Setenv("NEXUSIM_IDENTITY_TEST_REASON", " direct operator reason ")
 	t.Setenv("NEXUSIM_IDENTITY_TEST_REASON_FILE", "")
-	reason, err := identityOperatorReasonFromEnv("NEXUSIM_IDENTITY_TEST_REASON", "NEXUSIM_IDENTITY_TEST_REASON_FILE", "manual fallback")
+	reason, err := identityOperatorReasonFromEnv("NEXUSIM_IDENTITY_TEST_REASON", "NEXUSIM_IDENTITY_TEST_REASON_FILE", "manual reason")
 	if err != nil {
 		t.Fatalf("resolve env reason: %v", err)
 	}
@@ -38,7 +38,7 @@ func TestIdentityOperatorReasonFromFile(t *testing.T) {
 	}
 	t.Setenv("NEXUSIM_IDENTITY_TEST_REASON", "")
 	t.Setenv("NEXUSIM_IDENTITY_TEST_REASON_FILE", reasonPath)
-	reason, err := identityOperatorReasonFromEnv("NEXUSIM_IDENTITY_TEST_REASON", "NEXUSIM_IDENTITY_TEST_REASON_FILE", "manual fallback")
+	reason, err := identityOperatorReasonFromEnv("NEXUSIM_IDENTITY_TEST_REASON", "NEXUSIM_IDENTITY_TEST_REASON_FILE", "manual reason")
 	if err != nil {
 		t.Fatalf("resolve file reason: %v", err)
 	}
@@ -54,7 +54,7 @@ func TestIdentityOperatorReasonRejectsAmbiguousEnvAndFile(t *testing.T) {
 	}
 	t.Setenv("NEXUSIM_IDENTITY_TEST_REASON", "direct reason")
 	t.Setenv("NEXUSIM_IDENTITY_TEST_REASON_FILE", reasonPath)
-	if _, err := identityOperatorReasonFromEnv("NEXUSIM_IDENTITY_TEST_REASON", "NEXUSIM_IDENTITY_TEST_REASON_FILE", "manual fallback"); err == nil {
+	if _, err := identityOperatorReasonFromEnv("NEXUSIM_IDENTITY_TEST_REASON", "NEXUSIM_IDENTITY_TEST_REASON_FILE", "manual reason"); err == nil {
 		t.Fatal("expected ambiguous env/file reason to fail")
 	}
 }
@@ -66,7 +66,7 @@ func TestIdentityOperatorReasonRejectsEmptyFile(t *testing.T) {
 	}
 	t.Setenv("NEXUSIM_IDENTITY_TEST_REASON", "")
 	t.Setenv("NEXUSIM_IDENTITY_TEST_REASON_FILE", reasonPath)
-	if _, err := identityOperatorReasonFromEnv("NEXUSIM_IDENTITY_TEST_REASON", "NEXUSIM_IDENTITY_TEST_REASON_FILE", "manual fallback"); err == nil {
+	if _, err := identityOperatorReasonFromEnv("NEXUSIM_IDENTITY_TEST_REASON", "NEXUSIM_IDENTITY_TEST_REASON_FILE", "manual reason"); err == nil {
 		t.Fatal("expected empty reason file to fail")
 	}
 }
@@ -79,7 +79,7 @@ func TestIdentityOperatorReasonRejectsLargeFile(t *testing.T) {
 	}
 	t.Setenv("NEXUSIM_IDENTITY_TEST_REASON", "")
 	t.Setenv("NEXUSIM_IDENTITY_TEST_REASON_FILE", reasonPath)
-	if _, err := identityOperatorReasonFromEnv("NEXUSIM_IDENTITY_TEST_REASON", "NEXUSIM_IDENTITY_TEST_REASON_FILE", "manual fallback"); err == nil {
+	if _, err := identityOperatorReasonFromEnv("NEXUSIM_IDENTITY_TEST_REASON", "NEXUSIM_IDENTITY_TEST_REASON_FILE", "manual reason"); err == nil {
 		t.Fatal("expected oversized reason file to fail")
 	}
 }

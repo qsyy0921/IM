@@ -448,7 +448,7 @@ server-accepted view.
 
 First Web implementation uses IndexedDB through a `LocalMessageStore` port.
 PC desktop and Android share `KeyValueMessageStore` with a WebView
-`localStorage` fallback for early shell smoke, while native SQLite bridges are
+`localStorage` recovery for early shell smoke, while native SQLite bridges are
 now the intended packaged-client cache path. PC desktop source exposes fixed
 Tauri `local_store_*` commands backed by an app-local-data SQLite key-value
 table and guarded by the `nexusim:client-message-store:v1:` key prefix. Android
@@ -517,7 +517,7 @@ login
 -> receive delivery.notify
 -> PullInbox returns the message
 -> AckDelivery succeeds
--> reconnect triggers PullInbox fallback
+-> reconnect triggers PullInbox recovery
 ```
 
 This is not a full product client. It is the architectural base for Web,

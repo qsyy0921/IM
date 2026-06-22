@@ -51,9 +51,9 @@ func TestLocalSafeExecutorRejectsUnsupportedOrHigherRiskTool(t *testing.T) {
 }
 
 func TestExecutorChainFallsBackToExternalMCPFailureMode(t *testing.T) {
-	external, err := NewExternalMCPFallbackExecutor("provider_unavailable")
+	external, err := NewExternalMCPFailureExecutor("provider_unavailable")
 	if err != nil {
-		t.Fatalf("new external fallback: %v", err)
+		t.Fatalf("new external failure executor: %v", err)
 	}
 	executor := NewExecutorChain(NewLocalSafeExecutor(), external)
 	_, err = executor.ExecuteTool(context.Background(), types.ToolExecutionCommand{
@@ -64,14 +64,14 @@ func TestExecutorChainFallsBackToExternalMCPFailureMode(t *testing.T) {
 		ResourceID:   "conv-1",
 	})
 	if !errors.Is(err, types.ErrToolProviderUnavailable) {
-		t.Fatalf("expected provider unavailable fallback, got %v", err)
+		t.Fatalf("expected provider unavailable failure, got %v", err)
 	}
 }
 
 func TestExecutorChainKeepsLocalSafeToolExecution(t *testing.T) {
-	external, err := NewExternalMCPFallbackExecutor("provider-unavailable")
+	external, err := NewExternalMCPFailureExecutor("provider-unavailable")
 	if err != nil {
-		t.Fatalf("new external fallback: %v", err)
+		t.Fatalf("new external failure executor: %v", err)
 	}
 	executor := NewExecutorChain(NewLocalSafeExecutor(), external)
 	result, err := executor.ExecuteTool(context.Background(), types.ToolExecutionCommand{
@@ -82,14 +82,14 @@ func TestExecutorChainKeepsLocalSafeToolExecution(t *testing.T) {
 		Skill:       types.SkillDefinition{AllowedActions: []string{types.ToolActionExecute}},
 	})
 	if err != nil {
-		t.Fatalf("local safe tool should execute before external fallback: %v", err)
+		t.Fatalf("local safe tool should execute before external failure executor: %v", err)
 	}
 	if !result.Executed {
 		t.Fatalf("expected local safe execution: %+v", result)
 	}
 }
 
-func TestExternalMCPFallbackModes(t *testing.T) {
+func TestExternalMCPFailureModes(t *testing.T) {
 	cases := []struct {
 		mode string
 		err  error
@@ -102,9 +102,9 @@ func TestExternalMCPFallbackModes(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.mode, func(t *testing.T) {
-			executor, err := NewExternalMCPFallbackExecutor(testCase.mode)
+			executor, err := NewExternalMCPFailureExecutor(testCase.mode)
 			if err != nil {
-				t.Fatalf("new external fallback: %v", err)
+				t.Fatalf("new external failure executor: %v", err)
 			}
 			_, err = executor.ExecuteTool(context.Background(), types.ToolExecutionCommand{ToolName: "external.tool"})
 			if !errors.Is(err, testCase.err) {
@@ -114,8 +114,8 @@ func TestExternalMCPFallbackModes(t *testing.T) {
 	}
 }
 
-func TestExternalMCPFallbackRejectsUnknownMode(t *testing.T) {
-	if _, err := NewExternalMCPFallbackExecutor("execute-for-real"); err == nil {
-		t.Fatal("expected unknown external fallback mode to fail closed")
+func TestExternalMCPFailureRejectsUnknownMode(t *testing.T) {
+	if _, err := NewExternalMCPFailureExecutor("execute-for-real"); err == nil {
+		t.Fatal("expected unknown external failure mode to fail closed")
 	}
 }

@@ -48,7 +48,6 @@ func (MockTextProvider) GenerateText(
 		TokenUsage:              types.TokenUsage{InputTokens: inputTokens, OutputTokens: outputTokens, TotalTokens: inputTokens + outputTokens},
 		EstimatedCostMicrounits: int64(inputTokens+outputTokens) * 10,
 		Latency:                 time.Since(started),
-		FallbackUsed:            false,
 	}, nil
 }
 
@@ -81,7 +80,6 @@ func (MockEmbeddingProvider) Embed(
 		TokenUsage:              types.TokenUsage{InputTokens: inputTokens, OutputTokens: 0, TotalTokens: inputTokens},
 		EstimatedCostMicrounits: int64(inputTokens) * 5,
 		Latency:                 time.Since(started),
-		FallbackUsed:            false,
 	}, nil
 }
 

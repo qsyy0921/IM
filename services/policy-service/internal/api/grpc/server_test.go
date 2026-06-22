@@ -65,7 +65,7 @@ func TestServerCheckMessageActionWithStaticPolicy(t *testing.T) {
 	if err != nil {
 		t.Fatalf("check message action: %v", err)
 	}
-	if !response.GetAllowed() || response.GetPermissionVersion() != 9 || response.GetAction() != policyv1.MessageAction_MESSAGE_ACTION_SEND || response.GetDecisionSource() != string(types.PolicyDecisionSourceFallback) {
+	if !response.GetAllowed() || response.GetPermissionVersion() != 9 || response.GetAction() != policyv1.MessageAction_MESSAGE_ACTION_SEND || response.GetDecisionSource() != string(types.PolicyDecisionSourceStaticDefault) {
 		t.Fatalf("unexpected response: %+v", response)
 	}
 }

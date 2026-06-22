@@ -498,10 +498,10 @@ INSERT INTO delivery_projection_failure_resolution_audit (
 	return nil
 }
 
-func normalizeProjectionFailureResolveText(value string, fallback string) string {
+func normalizeProjectionFailureResolveText(value string, defaultText string) string {
 	value = strings.TrimSpace(value)
 	if value == "" {
-		return fallback
+		return defaultValue
 	}
 	return value
 }

@@ -992,10 +992,10 @@ func normalizeOutboxIDs(ids []int64) []int64 {
 	return result
 }
 
-func normalizeOutboxRepairText(value string, fallback string) string {
+func normalizeOutboxRepairText(value string, defaultText string) string {
 	value = strings.TrimSpace(value)
 	if value == "" {
-		return fallback
+		return defaultValue
 	}
 	return value
 }

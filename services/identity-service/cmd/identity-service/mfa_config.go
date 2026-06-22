@@ -21,10 +21,7 @@ func newMFASecretManager() (app.MFASecretManager, error) {
 	} else if ok {
 		return mfainfra.NewTOTPManagerWithKeyRing(keyRing.Current, keyRing.Keys)
 	}
-	secret := envString(
-		"NEXUSIM_IDENTITY_MFA_SECRET_KEY",
-		envString("NEXUSIM_IDENTITY_GATEWAY_TOKEN_SECRET", envString("NEXUSIM_PUSH_AUTH_HMAC_SECRET", "")),
-	)
+	secret := envString("NEXUSIM_IDENTITY_MFA_SECRET_KEY", "")
 	if secret == "" {
 		return disabledMFASecretManager{}, nil
 	}
@@ -88,10 +85,7 @@ func loadSecretKeyRingConfig(jsonEnv string, fileEnv string) (secretKeyRingConfi
 }
 
 func newMFARecoveryCodeManager() (app.MFARecoveryCodeManager, error) {
-	secret := envString(
-		"NEXUSIM_IDENTITY_MFA_RECOVERY_CODE_SECRET",
-		envString("NEXUSIM_IDENTITY_MFA_SECRET_KEY", ""),
-	)
+	secret := envString("NEXUSIM_IDENTITY_MFA_RECOVERY_CODE_SECRET", "")
 	if secret == "" {
 		return disabledMFARecoveryCodeManager{}, nil
 	}
@@ -106,11 +100,11 @@ func identityMFARiskPolicyFromEnv() app.LoginRiskPolicy {
 	}
 }
 
-func identityMFARecoveryRiskPolicyFromEnv(fallback app.LoginRiskPolicy) app.LoginRiskPolicy {
+func identityMFARecoveryRiskPolicyFromEnv() app.LoginRiskPolicy {
 	return app.LoginRiskPolicy{
-		MaxFailedAttempts: envInt("NEXUSIM_IDENTITY_MFA_RECOVERY_MAX_FAILED_ATTEMPTS", fallback.MaxFailedAttempts),
-		FailureWindow:     envDuration("NEXUSIM_IDENTITY_MFA_RECOVERY_FAILURE_WINDOW", fallback.FailureWindow),
-		LockDuration:      envDuration("NEXUSIM_IDENTITY_MFA_RECOVERY_LOCK_DURATION", fallback.LockDuration),
+		MaxFailedAttempts: envInt("NEXUSIM_IDENTITY_MFA_RECOVERY_MAX_FAILED_ATTEMPTS", app.DefaultMFAMaxFailedAttempts),
+		FailureWindow:     envDuration("NEXUSIM_IDENTITY_MFA_RECOVERY_FAILURE_WINDOW", app.DefaultMFAFailureWindow),
+		LockDuration:      envDuration("NEXUSIM_IDENTITY_MFA_RECOVERY_LOCK_DURATION", app.DefaultMFALockDuration),
 	}
 }
 

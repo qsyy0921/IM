@@ -635,7 +635,7 @@ func firstNonEmpty(values ...string) string {
 	return ""
 }
 
-func envBool(fallback bool, names ...string) bool {
+func envBool(defaultValue bool, names ...string) bool {
 	for _, name := range names {
 		value := strings.TrimSpace(os.Getenv(name))
 		if value == "" {
@@ -643,9 +643,9 @@ func envBool(fallback bool, names ...string) bool {
 		}
 		parsed, err := strconv.ParseBool(value)
 		if err != nil {
-			return fallback
+			return defaultValue
 		}
 		return parsed
 	}
-	return fallback
+	return defaultValue
 }

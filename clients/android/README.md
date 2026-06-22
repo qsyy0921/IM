@@ -66,8 +66,9 @@ Flutter or native Kotlin for a concrete reason.
   narrower production transport policy.
 - Current Android source includes the fixed-prefix SQLite local-store bridge,
   but APK build and real-device WebView smoke still have to prove it as a
-  runtime baseline. Until then, the WebView shell may fall back to the shared
-  TypeScript localStorage-backed store.
+  runtime baseline. Until then, Android uses the explicitly configured shared
+  TypeScript localStorage-backed store and must not silently switch storage
+  backends.
 - Push notification integration must not bypass PullInbox reconciliation.
 - Background sync must use server cursors and idempotency keys.
 

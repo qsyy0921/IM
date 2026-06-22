@@ -25,5 +25,5 @@
 
 ## 下一步
 
-- 真实 MCP adapter 必须继续走 skill catalog、policy、rate limit、audit 和 failure fallback。
+- 真实 MCP adapter 必须继续走 skill catalog、policy、rate limit、audit 和 failure recovery。
 - 与 action-executor 继续串接 approval / result handoff。

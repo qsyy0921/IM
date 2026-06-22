@@ -350,7 +350,7 @@ func TestLimiterUpdateTenantPlansRejectsInvalidPlanWithoutReplacingOldPlan(t *te
 	}
 }
 
-func TestLimiterTenantScopeFallbackDoesNotChargeTenantOnIdentityError(t *testing.T) {
+func TestLimiterTenantScopeRecoveryDoesNotChargeTenantOnIdentityError(t *testing.T) {
 	now := time.Unix(1_800_000_000, 0)
 	limiter, err := New(Config{
 		Enabled:           true,
@@ -368,11 +368,11 @@ func TestLimiterTenantScopeFallbackDoesNotChargeTenantOnIdentityError(t *testing
 	ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs("authorization", "Bearer token-1"))
 	allowed, _, err := limiter.allow(ctx, "/method")
 	if err != nil || !allowed {
-		t.Fatalf("fallback request should pass, allowed=%v err=%v", allowed, err)
+		t.Fatalf("recovery request should pass, allowed=%v err=%v", allowed, err)
 	}
 	snapshot := limiter.Snapshot()
 	if snapshot.IdentityErrors != 1 || snapshot.TrackedKeys != 1 || snapshot.TotalAccepted != 1 {
-		t.Fatalf("unexpected fallback snapshot: %+v", snapshot)
+		t.Fatalf("unexpected recovery snapshot: %+v", snapshot)
 	}
 }
 

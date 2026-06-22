@@ -32,7 +32,7 @@ func (usecase ApproveAgentProposalUseCase) Execute(
 func newApprovalID() string {
 	var buf [16]byte
 	if _, err := rand.Read(buf[:]); err != nil {
-		return "appr_fallback"
+		return "appr_recovery"
 	}
 	return "appr_" + hex.EncodeToString(buf[:])
 }

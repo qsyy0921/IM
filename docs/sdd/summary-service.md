@@ -11,7 +11,7 @@
 - 对外提供 `GenerateConversationSummary`。
 - 调用 `retrieval-gateway.RetrieveEvidence` 获取 EvidencePack。
 - 可选 `at_conversation_seq` 显式传给 retrieval-gateway，用于固定 memory
-  current-only 查询时点；未传时允许 retrieval-gateway 使用 search hit fallback。
+  current-only 查询时点；未传时 retrieval-gateway 必须使用显式查询策略，不能从 search hit 隐式推断查询时点。
 - 第一版通过 `SummaryProvider` port 生成 deterministic extractive summary；
   默认实现不调用外部 LLM provider。
 - 可选 `external-http` provider mode 只作为第一阶段外部 LLM boundary：它仍走
@@ -65,6 +65,6 @@ citation verifier。
 ## 后续
 
 - 后续接 provider-specific LLM / Python worker 时继续复用 prompt boundary、
-  token budget、PII / secret filter、provider failure fallback、hash / citation
+  token budget、PII / secret filter、provider failure fail-closed、hash / citation
   metadata 校验和 citation verifier。
 - 与 `agent-service` 对接时仍只暴露 EvidencePack summary，不授予业务写权限。

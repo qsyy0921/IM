@@ -4,7 +4,7 @@
 
 `action-executor` 是 NexusIM AI 应用底座中的受控动作执行边界。它承接 Agent proposal、approval 和 `mcp-gateway` prepare 之后的动作执行请求，把真实写动作纳入 policy precheck、审批关联和低敏 audit。
 
-当前第一阶段记录 approved execution boundary，并在同一事务内写低敏 tool result projection。已支持本地安全 `nexusim.local.echo` adapter first path，用于验证真实低敏 output hash / result projection；已支持外部 MCP fallback 稳定失败分类、tool output safety first path，以及显式开启的外部 HTTP provider adapter guarded first path。默认不连接外部 MCP / provider；外部 HTTP adapter 只允许 allowlist 内的 `LOW` risk tool，只发送 tool metadata / `input_sha256`，不发送 raw `input_json`，provider output 仍必须经过安全门禁后才写 hash / projection。工具 provider 失败和 unsafe output 已有 first-stage `provider_failures` 状态投影和 bounded retry bookkeeping worker，可区分 `RETRY_PENDING` 与 `DLQ`，但尚未实现 redrive API、operator UI 或真实 provider replay。
+当前第一阶段记录 approved execution boundary，并在同一事务内写低敏 tool result projection。已支持本地安全 `nexusim.local.echo` adapter first path，用于验证真实低敏 output hash / result projection；已支持外部 MCP failure 稳定失败分类、tool output safety first path，以及显式开启的外部 HTTP provider adapter guarded first path。默认不连接外部 MCP / provider；外部 HTTP adapter 只允许 allowlist 内的 `LOW` risk tool，只发送 tool metadata / `input_sha256`，不发送 raw `input_json`，provider output 仍必须经过安全门禁后才写 hash / projection。工具 provider 失败和 unsafe output 已有 first-stage `provider_failures` 状态投影和 bounded retry bookkeeping worker，可区分 `RETRY_PENDING` 与 `DLQ`，但尚未实现 redrive API、operator UI 或真实 provider replay。
 
 ## 职责
 
@@ -44,7 +44,7 @@
     `input_sha256`
   - 不发送 raw `input_json`、provider secret、用户 PII 或业务私表内容
   - provider 返回 body 必须是安全 JSON object，才会生成 `output_sha256`
-- 对显式启用的外部 MCP fallback，只返回 timeout / unavailable / rate-limit /
+- 对显式启用的外部 MCP failure，只返回 timeout / unavailable / rate-limit /
   permission-denied / failed 等稳定分类，不保存 provider 原始错误。
 - 对工具 provider 失败 / unsafe output，同一事务写入低敏
   `action_executor_provider_failures`：
@@ -141,7 +141,7 @@ agent-service proposal
   公网 endpoint 必须使用 HTTPS。
 - 外部 HTTP adapter 只发送 provider 所需的低敏 metadata 和 `input_sha256`，
   不发送 raw `input_json`。
-- 外部 MCP fallback 使用 `NEXUSIM_ACTION_EXECUTOR_EXTERNAL_MCP_FALLBACK_MODE`
+- 外部 MCP failure 使用 `NEXUSIM_ACTION_EXECUTOR_EXTERNAL_MCP_FAILURE_MODE`
   显式开启；默认 `disabled`，保持不执行外部工具。
 - unsafe tool output 必须 fail closed 为 `TOOL_OUTPUT_UNSAFE`，不写
   `output_sha256`，响应只返回 `{}`。

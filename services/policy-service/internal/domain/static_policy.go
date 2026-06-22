@@ -51,7 +51,7 @@ func (p StaticMessagePolicy) DecideMessageAction(
 		PermissionVersion: permissionVersion,
 		Classification:    classification,
 		Reason:            reason,
-		DecisionSource:    types.PolicyDecisionSourceFallback,
+		DecisionSource:    types.PolicyDecisionSourceStaticDefault,
 	}, nil
 }
 
@@ -91,7 +91,7 @@ func (p StaticToolPolicy) DecideToolAction(
 		PermissionVersion: permissionVersion,
 		Classification:    classification,
 		Reason:            reason,
-		DecisionSource:    types.PolicyDecisionSourceFallback,
+		DecisionSource:    types.PolicyDecisionSourceStaticDefault,
 	}, nil
 }
 

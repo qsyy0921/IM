@@ -804,10 +804,10 @@ func normalizeMemberWindowRepairLimit(limit int) int {
 	return limit
 }
 
-func normalizeMemberWindowRepairText(value string, fallback string) string {
+func normalizeMemberWindowRepairText(value string, defaultText string) string {
 	value = strings.TrimSpace(value)
 	if value == "" {
-		value = fallback
+		value = defaultText
 	}
 	if len(value) > 200 {
 		value = value[:200]

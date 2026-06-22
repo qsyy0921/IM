@@ -9,7 +9,7 @@ import (
 
 const identityOperatorReasonMaxBytes = 16 * 1024
 
-func identityOperatorReasonFromEnv(reasonEnv string, reasonFileEnv string, fallback string) (string, error) {
+func identityOperatorReasonFromEnv(reasonEnv string, reasonFileEnv string, defaultValue string) (string, error) {
 	reasonPath := strings.TrimSpace(os.Getenv(reasonFileEnv))
 	reasonValue, hasReasonValue := os.LookupEnv(reasonEnv)
 	reasonValue = strings.TrimSpace(reasonValue)
@@ -22,7 +22,7 @@ func identityOperatorReasonFromEnv(reasonEnv string, reasonFileEnv string, fallb
 	if hasReasonValue && reasonValue != "" {
 		return reasonValue, nil
 	}
-	return strings.TrimSpace(fallback), nil
+	return strings.TrimSpace(defaultValue), nil
 }
 
 func identityOperatorReasonFromFile(envName string, path string) (string, error) {

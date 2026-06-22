@@ -33,7 +33,7 @@ func TestAuthFromProtoPrefersVerifiedMetadata(t *testing.T) {
 			t.Fatalf("expected trusted device id, got %q", auth.DeviceID)
 		}
 		if auth.TraceID != "body-trace" {
-			t.Fatalf("expected trace fallback from body, got %q", auth.TraceID)
+			t.Fatalf("expected trace propagation from body, got %q", auth.TraceID)
 		}
 		return nil, nil
 	})

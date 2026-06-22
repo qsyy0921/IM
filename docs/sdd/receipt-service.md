@@ -46,7 +46,7 @@
 
 权限来源必须显式化：app 层通过 `ReceiptAccessPort` 调用 conversation / policy 能力，第一阶段可以用本地 mock，但接口必须表达 `CanMarkRead` 和 `CanViewReceiptState` 两种语义。该端口返回 visibility mode、permission version 和必要的 membership window；无权限返回 `PERMISSION_DENIED`。不能用 receipt projection 的存在性替代权限判断。
 
-`receipt-service grpc` 支持第一阶段 gateway verified metadata auth mode：`NEXUSIM_RECEIPT_AUTH_MODE=metadata` / `verified-metadata` 时，`MarkRead / GetReceiptState / ListReceiptStates / ListConversations / ArchiveConversation / PinConversation / MuteConversation / SetConversationTags / SetConversationDraft` 的 `tenant_id / user_id / device_id / session_id` 只来自 gRPC metadata，不信任 request body 中可伪造的身份字段；`trace_id / request_id` 可在 metadata 缺失时从 body 兜底用于排障相关性。默认 `body` 模式仅用于兼容历史 smoke。该模式只定义 receipt-service 如何消费已验证身份，不等同完整 API gateway、token exchange、服务发现或全服务统一身份治理。
+`receipt-service grpc` 支持第一阶段 gateway verified metadata auth mode：`NEXUSIM_RECEIPT_AUTH_MODE=metadata` / `verified-metadata` 时，`MarkRead / GetReceiptState / ListReceiptStates / ListConversations / ArchiveConversation / PinConversation / MuteConversation / SetConversationTags / SetConversationDraft` 的 `tenant_id / user_id / device_id / session_id` 只来自 gRPC metadata，不信任 request body 中可伪造的身份字段；`trace_id / request_id` 可在 metadata 缺失时从 body 读取，只用于排障相关性。默认 `body` 模式仅用于兼容历史 smoke。该模式只定义 receipt-service 如何消费已验证身份，不等同完整 API gateway、token exchange、服务发现或全服务统一身份治理。
 
 `receipt-service grpc` 默认仍以 plaintext 启动，兼容现有 receipt smoke、demo 和内部客户端。第一阶段可选开启静态 TLS / mTLS：
 

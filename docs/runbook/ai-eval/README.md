@@ -14,8 +14,8 @@ summary, Agent and tool/action boundaries.
   `tools/run-ai-eval-profile-agent-safety.ps1`
 - action-executor external HTTP adapter eval:
   `tools/run-ai-eval-action-external-adapter.ps1`
-- action-executor external MCP fallback adapter eval:
-  `tools/run-ai-eval-action-mcp-fallback-adapter.ps1`
+- action-executor external MCP failure adapter eval:
+  `tools/run-ai-eval-action-mcp-failure-adapter.ps1`
 - action-executor preflight safety adapter eval:
   `tools/run-ai-eval-action-preflight-safety-adapter.ps1`
 - Agent output regression adapter:
@@ -155,14 +155,14 @@ LOW-risk success, stable provider failure classification, unsafe output
 suppression, raw input non-disclosure and output-hash-only projection. It does
 not call real external networks, arbitrary MCP servers or production tools.
 
-First-stage action-executor external MCP fallback eval:
+First-stage action-executor external MCP failure eval:
 
 ```powershell
-.\tools\run-ai-eval-action-mcp-fallback-adapter.ps1
+.\tools\run-ai-eval-action-mcp-failure-adapter.ps1
 ```
 
 This adapter runs the real action-executor app usecase against the local
-external MCP fallback executor. It verifies unavailable, timeout, rate-limit
+external MCP failure executor. It verifies unavailable, timeout, rate-limit
 and permission-denied failure classifications, no external execution, no output
 hash, raw input non-disclosure and no raw provider output persistence. It does
 not call real MCP servers, external networks, databases or production tools.
@@ -240,7 +240,7 @@ failure count, `GetEvalRun` / `ListEvalRuns` readback requirements, forbidden
 persisted fields, and optional service-stack adapters for later RAG / Agent /
 Python worker coverage. The smoke runs the required profile / Agent output
 safety, action-executor external HTTP adapter and action-executor external MCP
-fallback evals, records those summaries into `ai-eval-service`, then writes a
+failure evals, records those summaries into `ai-eval-service`, then writes a
 low-sensitive suite-level gate summary. It
 is a local regression gate skeleton, not a production CI gate and not a
 model-quality benchmark.
@@ -321,7 +321,7 @@ The 2026-06-20 RAG / Summary citation regression added source-ref integrity
 cases and low-sensitive `citation_refs` fields to the RAG / Summary smoke
 summaries. This proves adapter-level citation anchoring only; it is not a live
 service-stack rerun by itself.
-The 2026-06-20 action-executor external MCP fallback eval added 4 CI-safe cases
+The 2026-06-20 action-executor external MCP failure eval added 4 CI-safe cases
 for unavailable, timeout, rate-limit and permission-denied classifications with
 no execution, no output hash and no raw provider output persistence.
 The 2026-06-20 Agent output regression added 4 optional Python-worker provider

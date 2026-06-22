@@ -357,10 +357,10 @@ func sanitizeRunName(value string) string {
 	return replacer.Replace(value)
 }
 
-func envOr(name string, fallback string) string {
+func envOr(name string, defaultValue string) string {
 	value := strings.TrimSpace(os.Getenv(name))
 	if value == "" {
-		return fallback
+		return defaultValue
 	}
 	return value
 }

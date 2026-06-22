@@ -3,7 +3,6 @@ package app
 import (
 	"context"
 	"errors"
-	"strings"
 	"testing"
 	"time"
 
@@ -40,20 +39,14 @@ func TestGuardedLLMAnswerProviderUsesGroundedCandidate(t *testing.T) {
 	}
 }
 
-func TestGuardedLLMAnswerProviderFallsBackOnProviderFailure(t *testing.T) {
+func TestGuardedLLMAnswerProviderFailsClosedOnProviderFailure(t *testing.T) {
 	client := &fakeAnswerLLM{err: errors.New("provider unavailable")}
-	result, err := NewGuardedLLMAnswerProvider(client, llmboundary.Options{}).GenerateAnswer(
+	_, err := NewGuardedLLMAnswerProvider(client, llmboundary.Options{}).GenerateAnswer(
 		context.Background(),
 		types.AnswerGenerationRequest{Question: "what changed?", EvidencePack: answerEvidencePack(time.Time{})},
 	)
-	if err != nil {
-		t.Fatalf("GenerateAnswer returned error: %v", err)
-	}
-	if result.GeneratedByLLM {
-		t.Fatalf("provider failure must fall back to non-LLM extractive answer: %+v", result)
-	}
-	if !strings.Contains(result.AnswerText, "blue-green") {
-		t.Fatalf("fallback did not use evidence text: %q", result.AnswerText)
+	if !errors.Is(err, types.ErrRAGUnavailable) {
+		t.Fatalf("expected rag unavailable for provider failure, got %v", err)
 	}
 }
 
@@ -61,18 +54,15 @@ func TestGuardedLLMAnswerProviderDoesNotCallExternalWithSensitiveInput(t *testin
 	client := &fakeAnswerLLM{}
 	pack := answerEvidencePack(time.Time{})
 	pack.Items[0].Text = "contact alice@example.com for launch"
-	result, err := NewGuardedLLMAnswerProvider(client, llmboundary.Options{}).GenerateAnswer(
+	_, err := NewGuardedLLMAnswerProvider(client, llmboundary.Options{}).GenerateAnswer(
 		context.Background(),
 		types.AnswerGenerationRequest{Question: "who owns launch?", EvidencePack: pack},
 	)
-	if err != nil {
-		t.Fatalf("GenerateAnswer returned error: %v", err)
+	if !errors.Is(err, types.ErrRAGUnavailable) {
+		t.Fatalf("expected rag unavailable for sensitive input, got %v", err)
 	}
 	if client.called {
 		t.Fatal("external LLM client must not be called with sensitive EvidencePack text")
-	}
-	if result.GeneratedByLLM {
-		t.Fatalf("sensitive input fallback must not claim LLM generation: %+v", result)
 	}
 }
 

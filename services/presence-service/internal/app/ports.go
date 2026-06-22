@@ -14,5 +14,5 @@ type Repository interface {
 }
 
 type EventIDGenerator interface {
-	NewEventID() string
+	NewEventID() (string, error)
 }

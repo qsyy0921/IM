@@ -9,7 +9,7 @@ import (
 
 const policyOperatorReasonMaxBytes = 16 * 1024
 
-func policyOperatorReasonFromEnv(reasonEnv string, reasonFileEnv string, fallback string) (string, error) {
+func policyOperatorReasonFromEnv(reasonEnv string, reasonFileEnv string, defaultValue string) (string, error) {
 	reasonPath := strings.TrimSpace(os.Getenv(reasonFileEnv))
 	reasonValue, hasReasonValue := os.LookupEnv(reasonEnv)
 	reasonValue = strings.TrimSpace(reasonValue)
@@ -22,7 +22,7 @@ func policyOperatorReasonFromEnv(reasonEnv string, reasonFileEnv string, fallbac
 	if hasReasonValue && reasonValue != "" {
 		return reasonValue, nil
 	}
-	return strings.TrimSpace(fallback), nil
+	return strings.TrimSpace(defaultValue), nil
 }
 
 func policyOperatorReasonFromFile(envName string, path string) (string, error) {

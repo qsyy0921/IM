@@ -35,7 +35,7 @@ type smokeSummary struct {
 type smokeCase struct {
 	ID                    string `json:"id"`
 	Passed                bool   `json:"passed"`
-	FallbackMode          string `json:"fallback_mode"`
+	FailureMode           string `json:"failure_mode"`
 	ExecutionStatus       string `json:"execution_status"`
 	ResultStatus          string `json:"result_status"`
 	Classification        string `json:"classification"`
@@ -47,7 +47,7 @@ type smokeCase struct {
 
 func main() {
 	if err := run(context.Background(), os.Args[1:]); err != nil {
-		fmt.Fprintf(os.Stderr, "action external MCP fallback smoke failed: %v\n", err)
+		fmt.Fprintf(os.Stderr, "action external MCP failure smoke failed: %v\n", err)
 		os.Exit(1)
 	}
 }
@@ -79,7 +79,7 @@ func run(ctx context.Context, args []string) error {
 
 func parseConfig(args []string) (smokeConfig, error) {
 	var cfg smokeConfig
-	flagSet := flag.NewFlagSet("action-external-mcp-fallback-smoke", flag.ContinueOnError)
+	flagSet := flag.NewFlagSet("action-external-mcp-unavailable-smoke", flag.ContinueOnError)
 	flagSet.StringVar(&cfg.outputPath, "output", "", "optional summary output path")
 	if err := flagSet.Parse(args); err != nil {
 		return smokeConfig{}, err
@@ -96,29 +96,29 @@ func runSmoke(ctx context.Context) (smokeSummary, error) {
 	}{
 		{
 			id:             "external-mcp-provider-unavailable",
-			mode:           tool.ExternalMCPFallbackProviderUnavailable,
+			mode:           tool.ExternalMCPFailureProviderUnavailable,
 			classification: "TOOL_PROVIDER_UNAVAILABLE",
 		},
 		{
 			id:             "external-mcp-provider-timeout",
-			mode:           tool.ExternalMCPFallbackTimeout,
+			mode:           tool.ExternalMCPFailureTimeout,
 			classification: "TOOL_EXECUTION_TIMEOUT",
 		},
 		{
 			id:             "external-mcp-provider-rate-limited",
-			mode:           tool.ExternalMCPFallbackRateLimited,
+			mode:           tool.ExternalMCPFailureRateLimited,
 			classification: "TOOL_PROVIDER_RATE_LIMITED",
 		},
 		{
 			id:             "external-mcp-provider-permission-denied",
-			mode:           tool.ExternalMCPFallbackPermissionDenied,
+			mode:           tool.ExternalMCPFailurePermissionDenied,
 			classification: "TOOL_PROVIDER_PERMISSION_DENIED",
 		},
 	}
 
 	cases := make([]smokeCase, 0, len(caseSpecs))
 	for _, spec := range caseSpecs {
-		result, err := runFallbackCase(ctx, spec.id, spec.mode)
+		result, err := runFailureCase(ctx, spec.id, spec.mode)
 		if err != nil {
 			return smokeSummary{}, err
 		}
@@ -127,16 +127,16 @@ func runSmoke(ctx context.Context) (smokeSummary, error) {
 			result.Classification != spec.classification ||
 			result.Executed || result.OutputSHA256Present ||
 			result.RawInputSent || result.ProviderBodyPersisted {
-			return smokeSummary{}, fmt.Errorf("unexpected MCP fallback result for %s: %+v", spec.id, result)
+			return smokeSummary{}, fmt.Errorf("unexpected MCP failure result for %s: %+v", spec.id, result)
 		}
 		cases = append(cases, result)
 	}
 
 	return smokeSummary{
 		SchemaVersion: 1,
-		Adapter:       "action-external-mcp-fallback",
+		Adapter:       "action-external-mcp-failure",
 		GeneratedAt:   time.Now().UTC().Format(time.RFC3339Nano),
-		Scope:         "local low-sensitive external MCP fallback smoke; no external network, no database, no real MCP server, no business write",
+		Scope:         "local low-sensitive external MCP failure smoke; no external network, no database, no real MCP server, no business write",
 		CaseCount:     len(cases),
 		Cases:         cases,
 		Verified: []string{
@@ -149,8 +149,8 @@ func runSmoke(ctx context.Context) (smokeSummary, error) {
 	}, nil
 }
 
-func runFallbackCase(ctx context.Context, id string, mode string) (smokeCase, error) {
-	executor, err := tool.NewExternalMCPFallbackExecutor(mode)
+func runFailureCase(ctx context.Context, id string, mode string) (smokeCase, error) {
+	executor, err := tool.NewExternalMCPFailureExecutor(mode)
 	if err != nil {
 		return smokeCase{}, err
 	}
@@ -174,7 +174,7 @@ func runFallbackCase(ctx context.Context, id string, mode string) (smokeCase, er
 	return smokeCase{
 		ID:                    id,
 		Passed:                true,
-		FallbackMode:          mode,
+		FailureMode:           mode,
 		ExecutionStatus:       result.Status,
 		ResultStatus:          result.ResultStatus,
 		Classification:        result.Classification,
@@ -201,9 +201,9 @@ func validCommand(caseID string) types.ExecuteApprovedActionCommand {
 		ResourceType:    "diagnostic",
 		ResourceID:      "diagnostic-" + caseID,
 		RiskLevel:       "LOW",
-		Intent:          "run external MCP fallback smoke",
+		Intent:          "run external MCP failure smoke",
 		InputJSON:       `{"payload":"raw-input-value"}`,
-		IdempotencyKey:  "action-external-mcp-fallback-" + caseID,
+		IdempotencyKey:  "action-external-mcp-failure-" + caseID,
 	}
 }
 

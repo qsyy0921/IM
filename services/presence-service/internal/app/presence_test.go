@@ -73,6 +73,6 @@ func (repository *fakeRepository) UpdateTyping(
 
 type fixedEventIDGenerator struct{}
 
-func (fixedEventIDGenerator) NewEventID() string {
-	return "evt_presence_test"
+func (fixedEventIDGenerator) NewEventID() (string, error) {
+	return "evt_presence_test", nil
 }

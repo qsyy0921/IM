@@ -17,7 +17,7 @@ create the service directory in the same coherent change.
   provider failures and model outbox are not owned by RAG, summary, agent,
   retrieval, ai-eval, policy or control-plane services.
 - Independent scale profile: text generation, embedding, rerank, provider
-  timeout, fallback and budget accounting scale differently from IM facts,
+  timeout, recovery and budget accounting scale differently from IM facts,
   search projection, memory projection and Agent approval.
 - Independent failure boundary: model provider outage, budget exhaustion or
   circuit breaker state must not break durable IM delivery, search / memory
@@ -27,7 +27,7 @@ create the service directory in the same coherent change.
   with fail-closed defaults.
 - Complexity reduction: keeping OpenAI / Claude / local-model adapters inside
   RAG, summary, agent, ingestion and eval would duplicate allowlist, timeout,
-  budget, fallback and redaction logic across services.
+  budget, recovery and redaction logic across services.
 
 ## Boundary Checks
 

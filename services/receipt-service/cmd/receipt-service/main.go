@@ -477,10 +477,10 @@ func openPGPool(ctx context.Context) (*pgxpool.Pool, error) {
 	return pgxpool.NewWithConfig(ctx, config)
 }
 
-func envString(name string, fallback string) string {
+func envString(name string, defaultValue string) string {
 	value := strings.TrimSpace(os.Getenv(name))
 	if value == "" {
-		return fallback
+		return defaultValue
 	}
 	return value
 }
@@ -681,14 +681,14 @@ func verifyAllowedReceiptGRPCClient(allowedDNSNames map[string]struct{}, allowed
 	}
 }
 
-func envInt(name string, fallback int) int {
+func envInt(name string, defaultValue int) int {
 	value := strings.TrimSpace(os.Getenv(name))
 	if value == "" {
-		return fallback
+		return defaultValue
 	}
 	parsed, err := strconv.Atoi(value)
 	if err != nil || parsed <= 0 {
-		return fallback
+		return defaultValue
 	}
 	return parsed
 }
@@ -804,22 +804,22 @@ func envOptionalBool(name string) (bool, bool, error) {
 	}
 }
 
-func envDuration(name string, fallback time.Duration) time.Duration {
+func envDuration(name string, defaultValue time.Duration) time.Duration {
 	value := strings.TrimSpace(os.Getenv(name))
 	if value == "" {
-		return fallback
+		return defaultValue
 	}
 	parsed, err := time.ParseDuration(value)
 	if err != nil || parsed <= 0 {
-		return fallback
+		return defaultValue
 	}
 	return parsed
 }
 
-func envPositiveDuration(name string, fallback time.Duration) (time.Duration, error) {
+func envPositiveDuration(name string, defaultValue time.Duration) (time.Duration, error) {
 	value := strings.TrimSpace(os.Getenv(name))
 	if value == "" {
-		return fallback, nil
+		return defaultValue, nil
 	}
 	parsed, err := time.ParseDuration(value)
 	if err != nil || parsed <= 0 {
@@ -840,22 +840,22 @@ func splitCSV(value string) []string {
 	return result
 }
 
-func envInt64AllowZero(name string, fallback int64) int64 {
+func envInt64AllowZero(name string, defaultValue int64) int64 {
 	value := strings.TrimSpace(os.Getenv(name))
 	if value == "" {
-		return fallback
+		return defaultValue
 	}
 	parsed, err := strconv.ParseInt(value, 10, 64)
 	if err != nil || parsed < 0 {
-		return fallback
+		return defaultValue
 	}
 	return parsed
 }
 
-func envPositiveInt(name string, fallback int) (int, error) {
+func envPositiveInt(name string, defaultValue int) (int, error) {
 	value := strings.TrimSpace(os.Getenv(name))
 	if value == "" {
-		return fallback, nil
+		return defaultValue, nil
 	}
 	parsed, err := strconv.Atoi(value)
 	if err != nil || parsed <= 0 {
@@ -877,14 +877,14 @@ func envOptionalRFC3339Time(name string) (*time.Time, error) {
 	return &utc, nil
 }
 
-func envBool(name string, fallback bool) bool {
+func envBool(name string, defaultValue bool) bool {
 	value := strings.TrimSpace(os.Getenv(name))
 	if value == "" {
-		return fallback
+		return defaultValue
 	}
 	parsed, err := strconv.ParseBool(value)
 	if err != nil {
-		return fallback
+		return defaultValue
 	}
 	return parsed
 }

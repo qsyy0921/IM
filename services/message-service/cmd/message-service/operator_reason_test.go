@@ -10,11 +10,11 @@ import (
 func TestMessageOperatorReasonFromEnvDefault(t *testing.T) {
 	t.Setenv("NEXUSIM_TEST_REASON", "")
 	t.Setenv("NEXUSIM_TEST_REASON_FILE", "")
-	reason, err := messageOperatorReasonFromEnv("NEXUSIM_TEST_REASON", "NEXUSIM_TEST_REASON_FILE", "manual fallback")
+	reason, err := messageOperatorReasonFromEnv("NEXUSIM_TEST_REASON", "NEXUSIM_TEST_REASON_FILE", "manual reason")
 	if err != nil {
 		t.Fatalf("resolve default reason: %v", err)
 	}
-	if reason != "manual fallback" {
+	if reason != "manual reason" {
 		t.Fatalf("unexpected default reason: %q", reason)
 	}
 }
@@ -22,7 +22,7 @@ func TestMessageOperatorReasonFromEnvDefault(t *testing.T) {
 func TestMessageOperatorReasonFromEnvValue(t *testing.T) {
 	t.Setenv("NEXUSIM_TEST_REASON", " direct operator reason ")
 	t.Setenv("NEXUSIM_TEST_REASON_FILE", "")
-	reason, err := messageOperatorReasonFromEnv("NEXUSIM_TEST_REASON", "NEXUSIM_TEST_REASON_FILE", "manual fallback")
+	reason, err := messageOperatorReasonFromEnv("NEXUSIM_TEST_REASON", "NEXUSIM_TEST_REASON_FILE", "manual reason")
 	if err != nil {
 		t.Fatalf("resolve env reason: %v", err)
 	}
@@ -38,7 +38,7 @@ func TestMessageOperatorReasonFromFile(t *testing.T) {
 	}
 	t.Setenv("NEXUSIM_TEST_REASON", "")
 	t.Setenv("NEXUSIM_TEST_REASON_FILE", reasonPath)
-	reason, err := messageOperatorReasonFromEnv("NEXUSIM_TEST_REASON", "NEXUSIM_TEST_REASON_FILE", "manual fallback")
+	reason, err := messageOperatorReasonFromEnv("NEXUSIM_TEST_REASON", "NEXUSIM_TEST_REASON_FILE", "manual reason")
 	if err != nil {
 		t.Fatalf("resolve file reason: %v", err)
 	}
@@ -54,7 +54,7 @@ func TestMessageOperatorReasonRejectsAmbiguousEnvAndFile(t *testing.T) {
 	}
 	t.Setenv("NEXUSIM_TEST_REASON", "direct reason")
 	t.Setenv("NEXUSIM_TEST_REASON_FILE", reasonPath)
-	if _, err := messageOperatorReasonFromEnv("NEXUSIM_TEST_REASON", "NEXUSIM_TEST_REASON_FILE", "manual fallback"); err == nil {
+	if _, err := messageOperatorReasonFromEnv("NEXUSIM_TEST_REASON", "NEXUSIM_TEST_REASON_FILE", "manual reason"); err == nil {
 		t.Fatal("expected ambiguous env/file reason to fail")
 	}
 }
@@ -66,7 +66,7 @@ func TestMessageOperatorReasonRejectsEmptyFile(t *testing.T) {
 	}
 	t.Setenv("NEXUSIM_TEST_REASON", "")
 	t.Setenv("NEXUSIM_TEST_REASON_FILE", reasonPath)
-	if _, err := messageOperatorReasonFromEnv("NEXUSIM_TEST_REASON", "NEXUSIM_TEST_REASON_FILE", "manual fallback"); err == nil {
+	if _, err := messageOperatorReasonFromEnv("NEXUSIM_TEST_REASON", "NEXUSIM_TEST_REASON_FILE", "manual reason"); err == nil {
 		t.Fatal("expected empty reason file to fail")
 	}
 }
@@ -79,7 +79,7 @@ func TestMessageOperatorReasonRejectsLargeFile(t *testing.T) {
 	}
 	t.Setenv("NEXUSIM_TEST_REASON", "")
 	t.Setenv("NEXUSIM_TEST_REASON_FILE", reasonPath)
-	if _, err := messageOperatorReasonFromEnv("NEXUSIM_TEST_REASON", "NEXUSIM_TEST_REASON_FILE", "manual fallback"); err == nil {
+	if _, err := messageOperatorReasonFromEnv("NEXUSIM_TEST_REASON", "NEXUSIM_TEST_REASON_FILE", "manual reason"); err == nil {
 		t.Fatal("expected oversized reason file to fail")
 	}
 }

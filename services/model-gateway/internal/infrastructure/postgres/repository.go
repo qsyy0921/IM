@@ -183,9 +183,8 @@ SET output_hash = $3,
     estimated_cost_microunits = $8,
     status = $9,
     failure_class = $10,
-    fallback_used = $11,
-    provider_latency_ms = $12,
-    completed_at = $13
+    provider_latency_ms = $11,
+    completed_at = $12
 WHERE tenant_id = $1
   AND invocation_id = $2
   AND status = 'PENDING'
@@ -193,7 +192,7 @@ WHERE tenant_id = $1
 		invocation.OutputSchemaVersion, invocation.TokenUsage.InputTokens,
 		invocation.TokenUsage.OutputTokens, invocation.TokenUsage.TotalTokens,
 		invocation.EstimatedCostMicrounits, invocation.Status, invocation.FailureClass,
-		invocation.FallbackUsed, invocation.ProviderLatency.Milliseconds(), invocation.CompletedAt)
+		invocation.ProviderLatency.Milliseconds(), invocation.CompletedAt)
 	if err != nil {
 		return types.NewDBWriteFailed(err.Error())
 	}
@@ -226,7 +225,6 @@ func insertModelOutbox(ctx context.Context, tx pgx.Tx, invocation types.ModelInv
 		"estimated_cost_microunits": invocation.EstimatedCostMicrounits,
 		"status":                    invocation.Status,
 		"failure_class":             invocation.FailureClass,
-		"fallback_used":             invocation.FallbackUsed,
 		"provider_latency_ms":       invocation.ProviderLatency.Milliseconds(),
 		"correlation_id":            invocation.CorrelationID,
 		"causation_id":              invocation.CausationID,
@@ -276,7 +274,7 @@ SELECT tenant_id, invocation_id, idempotency_key, command_hash, caller_service,
        caller_use_case, request_type, data_class, provider_id, model_id,
        route_version, prompt_hash, output_hash, output_schema_version,
        input_tokens, output_tokens, total_tokens, estimated_cost_microunits,
-       status, failure_class, fallback_used, provider_latency_ms, timeout_ms,
+       status, failure_class, provider_latency_ms, timeout_ms,
        max_output_tokens, prompt_schema_version, correlation_id, causation_id,
        trace_id, created_at, completed_at
 FROM model_invocations
@@ -298,7 +296,7 @@ func scanInvocation(row invocationScanner) (types.ModelInvocation, error) {
 		&invocation.ProviderID, &invocation.ModelID, &invocation.RouteVersion, &invocation.PromptHash,
 		&invocation.OutputHash, &invocation.OutputSchemaVersion, &invocation.TokenUsage.InputTokens,
 		&invocation.TokenUsage.OutputTokens, &invocation.TokenUsage.TotalTokens, &invocation.EstimatedCostMicrounits,
-		&invocation.Status, &invocation.FailureClass, &invocation.FallbackUsed, &providerLatencyMs,
+		&invocation.Status, &invocation.FailureClass, &providerLatencyMs,
 		&timeoutMs, &invocation.MaxOutputTokens, &invocation.PromptSchemaVersion, &invocation.CorrelationID,
 		&invocation.CausationID, &invocation.TraceID, &invocation.CreatedAt, &completedAt,
 	); err != nil {

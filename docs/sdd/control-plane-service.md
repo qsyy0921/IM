@@ -32,7 +32,7 @@ applied-version ACK。
 | 下游 pull | api-gateway | tenant quota / rate-limit snapshot |
 | 下游 pull | policy-service | tenant policy DSL / quota / moderation rule references |
 | 下游 pull | notification-service | tenant channel policy / template allowlist |
-| 下游 pull | model-gateway | provider policy、成本上限、fallback 策略 |
+| 下游 pull | model-gateway | provider policy、成本上限、recovery 策略 |
 | 异步下游 | audit-service | publish / rollback / applied ACK audit |
 | 事实源 | PostgreSQL | bundle、version、rollout、ack、outbox |
 

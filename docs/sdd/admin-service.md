@@ -206,7 +206,7 @@ operation-worker
 ```
 
 该 adapter 只在配置 `NEXUSIM_CONTROL_PLANE_GRPC_ADDR` 时启用；未配置时保留
-first-stage local no-op fallback。`CRITICAL` risk 的 control-plane operation 仍按上面的
+first-stage local no-op recovery。`CRITICAL` risk 的 control-plane operation 仍按上面的
 workflow 路由处理，不在 admin-service 内联执行。
 
 高风险 operation 默认走：
@@ -409,7 +409,7 @@ NEXUSIM_ADMIN_CONTROL_PLANE_RPC_TIMEOUT=1s
 fail-closed 并记录失败结果，不会被本地 no-op executor 标记为成功。
 未设置 `NEXUSIM_CONTROL_PLANE_GRPC_ADDR` 时，非 critical `CONFIG_PUBLISH` /
 `CONFIG_ROLLBACK` / `TENANT_QUOTA_CHANGE` / `POLICY_RULE_CHANGE` 仍保持第一阶段
-local executor fallback；
+local executor recovery；
 设置后才调用 control-plane public gRPC。
 
 operator：

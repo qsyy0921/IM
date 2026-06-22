@@ -750,10 +750,10 @@ func normalizeChallengeDeliveryIDs(deliveryIDs []int64) []int64 {
 	return ids
 }
 
-func normalizeChallengeDeliveryRepairText(value string, fallback string) string {
+func normalizeChallengeDeliveryRepairText(value string, defaultText string) string {
 	value = strings.TrimSpace(value)
 	if value == "" {
-		value = fallback
+		value = defaultText
 	}
 	if len(value) > 256 {
 		return value[:256]

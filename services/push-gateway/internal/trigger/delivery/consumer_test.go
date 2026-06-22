@@ -79,7 +79,7 @@ func TestWorkerDefaultsMissingSourceEventTypeForOlderEvents(t *testing.T) {
 		t.Fatalf("run: %v", err)
 	}
 	if notifier.command.Notification.SourceEventType != SourceEventMessagePersisted {
-		t.Fatalf("expected persisted fallback, got %+v", notifier.command.Notification)
+		t.Fatalf("expected persisted recovery, got %+v", notifier.command.Notification)
 	}
 }
 

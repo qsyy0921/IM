@@ -243,7 +243,6 @@ type ModelInvocation struct {
 	EstimatedCostMicrounits int64                  `protobuf:"varint,14,opt,name=estimated_cost_microunits,json=estimatedCostMicrounits,proto3" json:"estimated_cost_microunits,omitempty"`
 	Status                  string                 `protobuf:"bytes,15,opt,name=status,proto3" json:"status,omitempty"`
 	FailureClass            string                 `protobuf:"bytes,16,opt,name=failure_class,json=failureClass,proto3" json:"failure_class,omitempty"`
-	FallbackUsed            bool                   `protobuf:"varint,17,opt,name=fallback_used,json=fallbackUsed,proto3" json:"fallback_used,omitempty"`
 	ProviderLatencyMs       int64                  `protobuf:"varint,18,opt,name=provider_latency_ms,json=providerLatencyMs,proto3" json:"provider_latency_ms,omitempty"`
 	CorrelationId           string                 `protobuf:"bytes,19,opt,name=correlation_id,json=correlationId,proto3" json:"correlation_id,omitempty"`
 	CausationId             string                 `protobuf:"bytes,20,opt,name=causation_id,json=causationId,proto3" json:"causation_id,omitempty"`
@@ -394,13 +393,6 @@ func (x *ModelInvocation) GetFailureClass() string {
 		return x.FailureClass
 	}
 	return ""
-}
-
-func (x *ModelInvocation) GetFallbackUsed() bool {
-	if x != nil {
-		return x.FallbackUsed
-	}
-	return false
 }
 
 func (x *ModelInvocation) GetProviderLatencyMs() int64 {
@@ -660,7 +652,6 @@ type InvokeTextGenerationResponse struct {
 	TokenUsage              *TokenUsage            `protobuf:"bytes,7,opt,name=token_usage,json=tokenUsage,proto3" json:"token_usage,omitempty"`
 	EstimatedCostMicrounits int64                  `protobuf:"varint,8,opt,name=estimated_cost_microunits,json=estimatedCostMicrounits,proto3" json:"estimated_cost_microunits,omitempty"`
 	FailureClass            string                 `protobuf:"bytes,9,opt,name=failure_class,json=failureClass,proto3" json:"failure_class,omitempty"`
-	FallbackUsed            bool                   `protobuf:"varint,10,opt,name=fallback_used,json=fallbackUsed,proto3" json:"fallback_used,omitempty"`
 	ProviderLatencyMs       int64                  `protobuf:"varint,11,opt,name=provider_latency_ms,json=providerLatencyMs,proto3" json:"provider_latency_ms,omitempty"`
 	Replayed                bool                   `protobuf:"varint,12,opt,name=replayed,proto3" json:"replayed,omitempty"`
 	OutputReturned          bool                   `protobuf:"varint,13,opt,name=output_returned,json=outputReturned,proto3" json:"output_returned,omitempty"`
@@ -759,13 +750,6 @@ func (x *InvokeTextGenerationResponse) GetFailureClass() string {
 		return x.FailureClass
 	}
 	return ""
-}
-
-func (x *InvokeTextGenerationResponse) GetFallbackUsed() bool {
-	if x != nil {
-		return x.FallbackUsed
-	}
-	return false
 }
 
 func (x *InvokeTextGenerationResponse) GetProviderLatencyMs() int64 {
@@ -972,7 +956,6 @@ type InvokeEmbeddingResponse struct {
 	TokenUsage              *TokenUsage            `protobuf:"bytes,7,opt,name=token_usage,json=tokenUsage,proto3" json:"token_usage,omitempty"`
 	EstimatedCostMicrounits int64                  `protobuf:"varint,8,opt,name=estimated_cost_microunits,json=estimatedCostMicrounits,proto3" json:"estimated_cost_microunits,omitempty"`
 	FailureClass            string                 `protobuf:"bytes,9,opt,name=failure_class,json=failureClass,proto3" json:"failure_class,omitempty"`
-	FallbackUsed            bool                   `protobuf:"varint,10,opt,name=fallback_used,json=fallbackUsed,proto3" json:"fallback_used,omitempty"`
 	ProviderLatencyMs       int64                  `protobuf:"varint,11,opt,name=provider_latency_ms,json=providerLatencyMs,proto3" json:"provider_latency_ms,omitempty"`
 	Replayed                bool                   `protobuf:"varint,12,opt,name=replayed,proto3" json:"replayed,omitempty"`
 	EmbeddingReturned       bool                   `protobuf:"varint,13,opt,name=embedding_returned,json=embeddingReturned,proto3" json:"embedding_returned,omitempty"`
@@ -1071,13 +1054,6 @@ func (x *InvokeEmbeddingResponse) GetFailureClass() string {
 		return x.FailureClass
 	}
 	return ""
-}
-
-func (x *InvokeEmbeddingResponse) GetFallbackUsed() bool {
-	if x != nil {
-		return x.FallbackUsed
-	}
-	return false
 }
 
 func (x *InvokeEmbeddingResponse) GetProviderLatencyMs() int64 {
@@ -1219,7 +1195,7 @@ const file_nexusim_model_v1_model_gateway_service_proto_rawDesc = "" +
 	"TokenUsage\x12!\n" +
 	"\finput_tokens\x18\x01 \x01(\x05R\vinputTokens\x12#\n" +
 	"\routput_tokens\x18\x02 \x01(\x05R\foutputTokens\x12!\n" +
-	"\ftotal_tokens\x18\x03 \x01(\x05R\vtotalTokens\"\x80\a\n" +
+	"\ftotal_tokens\x18\x03 \x01(\x05R\vtotalTokens\"\xe1\x06\n" +
 	"\x0fModelInvocation\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12#\n" +
 	"\rinvocation_id\x18\x02 \x01(\tR\finvocationId\x12'\n" +
@@ -1242,14 +1218,13 @@ const file_nexusim_model_v1_model_gateway_service_proto_rawDesc = "" +
 	"tokenUsage\x12:\n" +
 	"\x19estimated_cost_microunits\x18\x0e \x01(\x03R\x17estimatedCostMicrounits\x12\x16\n" +
 	"\x06status\x18\x0f \x01(\tR\x06status\x12#\n" +
-	"\rfailure_class\x18\x10 \x01(\tR\ffailureClass\x12#\n" +
-	"\rfallback_used\x18\x11 \x01(\bR\ffallbackUsed\x12.\n" +
+	"\rfailure_class\x18\x10 \x01(\tR\ffailureClass\x12.\n" +
 	"\x13provider_latency_ms\x18\x12 \x01(\x03R\x11providerLatencyMs\x12%\n" +
 	"\x0ecorrelation_id\x18\x13 \x01(\tR\rcorrelationId\x12!\n" +
 	"\fcausation_id\x18\x14 \x01(\tR\vcausationId\x12\x19\n" +
 	"\btrace_id\x18\x15 \x01(\tR\atraceId\x12+\n" +
 	"\x12created_at_unix_ms\x18\x16 \x01(\x03R\x0fcreatedAtUnixMs\x12/\n" +
-	"\x14completed_at_unix_ms\x18\x17 \x01(\x03R\x11completedAtUnixMs\"\xe8\x06\n" +
+	"\x14completed_at_unix_ms\x18\x17 \x01(\x03R\x11completedAtUnixMsJ\x04\b\x11\x10\x12\"\xe8\x06\n" +
 	"\x1bInvokeTextGenerationRequest\x12@\n" +
 	"\fauth_context\x18\x01 \x01(\v2\x1d.nexusim.model.v1.AuthContextR\vauthContext\x12%\n" +
 	"\x0ecaller_service\x18\x02 \x01(\tR\rcallerService\x12&\n" +
@@ -1277,7 +1252,7 @@ const file_nexusim_model_v1_model_gateway_service_proto_rawDesc = "" +
 	"timeout_ms\x18\x12 \x01(\x03R\ttimeoutMs\x12%\n" +
 	"\x0ecorrelation_id\x18\x13 \x01(\tR\rcorrelationId\x12!\n" +
 	"\fcausation_id\x18\x14 \x01(\tR\vcausationId\x12\x19\n" +
-	"\btrace_id\x18\x15 \x01(\tR\atraceId\"\xaf\x04\n" +
+	"\btrace_id\x18\x15 \x01(\tR\atraceId\"\x90\x04\n" +
 	"\x1cInvokeTextGenerationResponse\x12#\n" +
 	"\rinvocation_id\x18\x01 \x01(\tR\finvocationId\x12\x1f\n" +
 	"\vprovider_id\x18\x02 \x01(\tR\n" +
@@ -1291,12 +1266,11 @@ const file_nexusim_model_v1_model_gateway_service_proto_rawDesc = "" +
 	"\vtoken_usage\x18\a \x01(\v2\x1c.nexusim.model.v1.TokenUsageR\n" +
 	"tokenUsage\x12:\n" +
 	"\x19estimated_cost_microunits\x18\b \x01(\x03R\x17estimatedCostMicrounits\x12#\n" +
-	"\rfailure_class\x18\t \x01(\tR\ffailureClass\x12#\n" +
-	"\rfallback_used\x18\n" +
-	" \x01(\bR\ffallbackUsed\x12.\n" +
+	"\rfailure_class\x18\t \x01(\tR\ffailureClass\x12.\n" +
 	"\x13provider_latency_ms\x18\v \x01(\x03R\x11providerLatencyMs\x12\x1a\n" +
 	"\breplayed\x18\f \x01(\bR\breplayed\x12'\n" +
-	"\x0foutput_returned\x18\r \x01(\bR\x0eoutputReturned\"\x91\x05\n" +
+	"\x0foutput_returned\x18\r \x01(\bR\x0eoutputReturnedJ\x04\b\n" +
+	"\x10\v\"\x91\x05\n" +
 	"\x16InvokeEmbeddingRequest\x12@\n" +
 	"\fauth_context\x18\x01 \x01(\v2\x1d.nexusim.model.v1.AuthContextR\vauthContext\x12%\n" +
 	"\x0ecaller_service\x18\x02 \x01(\tR\rcallerService\x12&\n" +
@@ -1323,7 +1297,7 @@ const file_nexusim_model_v1_model_gateway_service_proto_rawDesc = "" +
 	"timeout_ms\x18\x0e \x01(\x03R\ttimeoutMs\x12%\n" +
 	"\x0ecorrelation_id\x18\x0f \x01(\tR\rcorrelationId\x12!\n" +
 	"\fcausation_id\x18\x10 \x01(\tR\vcausationId\x12\x19\n" +
-	"\btrace_id\x18\x11 \x01(\tR\atraceId\"\xac\x04\n" +
+	"\btrace_id\x18\x11 \x01(\tR\atraceId\"\x8d\x04\n" +
 	"\x17InvokeEmbeddingResponse\x12#\n" +
 	"\rinvocation_id\x18\x01 \x01(\tR\finvocationId\x12\x1f\n" +
 	"\vprovider_id\x18\x02 \x01(\tR\n" +
@@ -1337,12 +1311,11 @@ const file_nexusim_model_v1_model_gateway_service_proto_rawDesc = "" +
 	"\vtoken_usage\x18\a \x01(\v2\x1c.nexusim.model.v1.TokenUsageR\n" +
 	"tokenUsage\x12:\n" +
 	"\x19estimated_cost_microunits\x18\b \x01(\x03R\x17estimatedCostMicrounits\x12#\n" +
-	"\rfailure_class\x18\t \x01(\tR\ffailureClass\x12#\n" +
-	"\rfallback_used\x18\n" +
-	" \x01(\bR\ffallbackUsed\x12.\n" +
+	"\rfailure_class\x18\t \x01(\tR\ffailureClass\x12.\n" +
 	"\x13provider_latency_ms\x18\v \x01(\x03R\x11providerLatencyMs\x12\x1a\n" +
 	"\breplayed\x18\f \x01(\bR\breplayed\x12-\n" +
-	"\x12embedding_returned\x18\r \x01(\bR\x11embeddingReturned\"\x82\x01\n" +
+	"\x12embedding_returned\x18\r \x01(\bR\x11embeddingReturnedJ\x04\b\n" +
+	"\x10\v\"\x82\x01\n" +
 	"\x19GetModelInvocationRequest\x12@\n" +
 	"\fauth_context\x18\x01 \x01(\v2\x1d.nexusim.model.v1.AuthContextR\vauthContext\x12#\n" +
 	"\rinvocation_id\x18\x02 \x01(\tR\finvocationId\"_\n" +

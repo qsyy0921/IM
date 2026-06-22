@@ -49,7 +49,11 @@ func (useCase *InvokeTextGenerationUseCase) Execute(
 	if useCase.provider == nil {
 		return types.TextGenerationResult{}, types.NewUnavailable("model provider is not configured")
 	}
-	prepared, err := domain.PrepareTextGeneration(command, useCase.ids.NewInvocationID(), time.Now())
+	invocationID, err := useCase.ids.NewInvocationID()
+	if err != nil {
+		return types.TextGenerationResult{}, err
+	}
+	prepared, err := domain.PrepareTextGeneration(command, invocationID, time.Now())
 	if err != nil {
 		return types.TextGenerationResult{}, err
 	}
@@ -104,7 +108,11 @@ func (useCase *InvokeEmbeddingUseCase) Execute(
 	if useCase.provider == nil {
 		return types.EmbeddingResult{}, types.NewUnavailable("model provider is not configured")
 	}
-	prepared, err := domain.PrepareEmbedding(command, useCase.ids.NewInvocationID(), time.Now())
+	invocationID, err := useCase.ids.NewInvocationID()
+	if err != nil {
+		return types.EmbeddingResult{}, err
+	}
+	prepared, err := domain.PrepareEmbedding(command, invocationID, time.Now())
 	if err != nil {
 		return types.EmbeddingResult{}, err
 	}
@@ -177,10 +185,10 @@ func NewRandomInvocationIDGenerator() RandomInvocationIDGenerator {
 	return RandomInvocationIDGenerator{}
 }
 
-func (RandomInvocationIDGenerator) NewInvocationID() string {
+func (RandomInvocationIDGenerator) NewInvocationID() (string, error) {
 	var value [16]byte
 	if _, err := rand.Read(value[:]); err != nil {
-		return "minv_fallback"
+		return "", types.NewUnavailable("model invocation id generation failed")
 	}
-	return "minv_" + hex.EncodeToString(value[:])
+	return "minv_" + hex.EncodeToString(value[:]), nil
 }

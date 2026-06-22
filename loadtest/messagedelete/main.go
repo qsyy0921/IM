@@ -832,7 +832,7 @@ func withVerifiedAuthMetadata(ctx context.Context, cfg config, auth verifiedAuth
 	return metadata.NewOutgoingContext(ctx, metadata.Pairs(pairs...))
 }
 
-func envBool(fallback bool, names ...string) bool {
+func envBool(defaultValue bool, names ...string) bool {
 	for _, name := range names {
 		value := strings.TrimSpace(os.Getenv(name))
 		if value == "" {
@@ -840,11 +840,11 @@ func envBool(fallback bool, names ...string) bool {
 		}
 		parsed, err := strconv.ParseBool(value)
 		if err != nil {
-			return fallback
+			return defaultValue
 		}
 		return parsed
 	}
-	return fallback
+	return defaultValue
 }
 
 func finish(cfg config, result *summary, runErr error) error {

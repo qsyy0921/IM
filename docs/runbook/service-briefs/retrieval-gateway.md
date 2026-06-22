@@ -23,7 +23,7 @@
   `source_coverage` 已落地，app / gRPC tests 覆盖排序、去重和覆盖统计。
 - EvidencePack -> memory-service current-only query 已落：默认 memory status 收敛为
   ACTIVE，显式 `at_conversation_seq` 透传给 memory-service；未传时使用 search hit
-  最大 conversation seq 作为 first-stage fallback。
+  最大 conversation seq 作为 first-stage recovery。
 
 下一步：把 selected cross-group / temporal cases 扩到 RAG / summary / Agent
 service-stack consumption；后续不绕过 retrieval-gateway。

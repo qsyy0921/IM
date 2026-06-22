@@ -114,8 +114,8 @@ func validEmbeddingCommand() types.EmbeddingCommand {
 
 type fixedIDs string
 
-func (ids fixedIDs) NewInvocationID() string {
-	return string(ids)
+func (ids fixedIDs) NewInvocationID() (string, error) {
+	return string(ids), nil
 }
 
 type fakeProvider struct {

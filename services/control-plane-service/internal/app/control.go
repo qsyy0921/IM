@@ -35,7 +35,11 @@ func (useCase *PublishConfigVersionUseCase) Execute(
 	if err != nil {
 		return types.ConfigVersion{}, err
 	}
-	return useCase.repository.PublishConfigVersion(ctx, prepared, useCase.eventIDs.NewEventID())
+	eventID, err := useCase.eventIDs.NewEventID()
+	if err != nil {
+		return types.ConfigVersion{}, err
+	}
+	return useCase.repository.PublishConfigVersion(ctx, prepared, eventID)
 }
 
 func (useCase *RollbackConfigVersionUseCase) Execute(
@@ -46,7 +50,11 @@ func (useCase *RollbackConfigVersionUseCase) Execute(
 	if err != nil {
 		return types.ConfigVersion{}, false, err
 	}
-	return useCase.repository.RollbackConfigVersion(ctx, prepared, useCase.eventIDs.NewEventID())
+	eventID, err := useCase.eventIDs.NewEventID()
+	if err != nil {
+		return types.ConfigVersion{}, false, err
+	}
+	return useCase.repository.RollbackConfigVersion(ctx, prepared, eventID)
 }
 
 type GetConfigSnapshotUseCase struct {
@@ -83,7 +91,11 @@ func (useCase *AckAppliedConfigVersionUseCase) Execute(
 	if err := command.Validate(); err != nil {
 		return types.AppliedConfigVersion{}, err
 	}
-	return useCase.repository.AckAppliedConfigVersion(ctx, command.Normalized(), useCase.eventIDs.NewEventID())
+	eventID, err := useCase.eventIDs.NewEventID()
+	if err != nil {
+		return types.AppliedConfigVersion{}, err
+	}
+	return useCase.repository.AckAppliedConfigVersion(ctx, command.Normalized(), eventID)
 }
 
 type RandomEventIDGenerator struct{}
@@ -92,10 +104,10 @@ func NewRandomEventIDGenerator() RandomEventIDGenerator {
 	return RandomEventIDGenerator{}
 }
 
-func (RandomEventIDGenerator) NewEventID() string {
+func (RandomEventIDGenerator) NewEventID() (string, error) {
 	var value [16]byte
 	if _, err := rand.Read(value[:]); err != nil {
-		return "evt_control_fallback"
+		return "", types.NewFailedPrecondition("control event id generation failed")
 	}
-	return "evt_control_" + hex.EncodeToString(value[:])
+	return "evt_control_" + hex.EncodeToString(value[:]), nil
 }

@@ -32,6 +32,7 @@ message TokenUsage {
 }
 
 message ModelInvocation {
+  reserved 17;
   string tenant_id = 1;
   string invocation_id = 2;
   string idempotency_key = 3;
@@ -48,7 +49,6 @@ message ModelInvocation {
   int64 estimated_cost_microunits = 14;
   string status = 15;
   string failure_class = 16;
-  bool fallback_used = 17;
   int64 provider_latency_ms = 18;
   string correlation_id = 19;
   string causation_id = 20;
@@ -82,6 +82,7 @@ message InvokeTextGenerationRequest {
 }
 
 message InvokeTextGenerationResponse {
+  reserved 10;
   string invocation_id = 1;
   string provider_id = 2;
   string model_id = 3;
@@ -91,7 +92,6 @@ message InvokeTextGenerationResponse {
   TokenUsage token_usage = 7;
   int64 estimated_cost_microunits = 8;
   string failure_class = 9;
-  bool fallback_used = 10;
   int64 provider_latency_ms = 11;
   bool replayed = 12;
   bool output_returned = 13;
@@ -118,6 +118,7 @@ message InvokeEmbeddingRequest {
 }
 
 message InvokeEmbeddingResponse {
+  reserved 10;
   string invocation_id = 1;
   string provider_id = 2;
   string model_id = 3;
@@ -127,7 +128,6 @@ message InvokeEmbeddingResponse {
   TokenUsage token_usage = 7;
   int64 estimated_cost_microunits = 8;
   string failure_class = 9;
-  bool fallback_used = 10;
   int64 provider_latency_ms = 11;
   bool replayed = 12;
   bool embedding_returned = 13;

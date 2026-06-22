@@ -102,7 +102,7 @@ func (executor AuditExportExecutor) Execute(
 	}, nil
 }
 
-func parseAuditExportPayload(raw string, fallbackRequestedBy string) (auditExportPayload, error) {
+func parseAuditExportPayload(raw string, recoveryRequestedBy string) (auditExportPayload, error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
 		return auditExportPayload{}, types.NewInvalidArgument("audit export payload is required")
@@ -118,7 +118,7 @@ func parseAuditExportPayload(raw string, fallbackRequestedBy string) (auditExpor
 	payload.RedactionProfile = strings.TrimSpace(payload.RedactionProfile)
 	payload.RequestedByRef = strings.TrimSpace(payload.RequestedByRef)
 	if payload.RequestedByRef == "" {
-		payload.RequestedByRef = strings.TrimSpace(fallbackRequestedBy)
+		payload.RequestedByRef = strings.TrimSpace(recoveryRequestedBy)
 	}
 	if payload.FilterHash == "" || payload.RedactionProfile == "" || payload.RequestedByRef == "" {
 		return auditExportPayload{}, types.NewInvalidArgument("audit export payload is incomplete")

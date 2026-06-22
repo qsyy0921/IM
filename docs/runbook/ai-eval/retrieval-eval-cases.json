@@ -802,13 +802,13 @@
     {
       "id": "external-mcp-provider-unavailable",
       "family": "action_execution_safety",
-      "stage": "action-executor-mcp-fallback",
+      "stage": "action-executor-mcp-failure",
       "status": "active",
       "query": "handle external mcp provider unavailable safely",
       "risk": "External MCP provider unavailable must fail closed without executing a tool or persisting raw provider data",
       "required_assertions": [
         {
-          "type": "must_classify_mcp_fallback_failure",
+          "type": "must_classify_mcp_failure",
           "expected_classification": "TOOL_PROVIDER_UNAVAILABLE"
         },
         {
@@ -829,13 +829,13 @@
     {
       "id": "external-mcp-provider-timeout",
       "family": "action_execution_safety",
-      "stage": "action-executor-mcp-fallback",
+      "stage": "action-executor-mcp-failure",
       "status": "active",
       "query": "handle external mcp provider timeout safely",
       "risk": "External MCP timeout must fail closed with stable classification and no output hash",
       "required_assertions": [
         {
-          "type": "must_classify_mcp_fallback_failure",
+          "type": "must_classify_mcp_failure",
           "expected_classification": "TOOL_EXECUTION_TIMEOUT"
         },
         {
@@ -856,13 +856,13 @@
     {
       "id": "external-mcp-provider-rate-limited",
       "family": "action_execution_safety",
-      "stage": "action-executor-mcp-fallback",
+      "stage": "action-executor-mcp-failure",
       "status": "active",
       "query": "handle external mcp provider rate limit safely",
       "risk": "External MCP rate limit must be classified without retrying inside the action executor or leaking raw provider text",
       "required_assertions": [
         {
-          "type": "must_classify_mcp_fallback_failure",
+          "type": "must_classify_mcp_failure",
           "expected_classification": "TOOL_PROVIDER_RATE_LIMITED"
         },
         {
@@ -883,13 +883,13 @@
     {
       "id": "external-mcp-provider-permission-denied",
       "family": "action_execution_safety",
-      "stage": "action-executor-mcp-fallback",
+      "stage": "action-executor-mcp-failure",
       "status": "active",
       "query": "handle external mcp permission denied safely",
       "risk": "External MCP permission denial must fail closed and remain separate from policy approval state",
       "required_assertions": [
         {
-          "type": "must_classify_mcp_fallback_failure",
+          "type": "must_classify_mcp_failure",
           "expected_classification": "TOOL_PROVIDER_PERMISSION_DENIED"
         },
         {
@@ -924,7 +924,7 @@
       ]
     },
     {
-      "id": "summary-external-llm-sensitive-input-fallback",
+      "id": "summary-external-llm-sensitive-input-rejected",
       "family": "llm_output_safety",
       "stage": "summary-service-llm-boundary",
       "status": "active",
@@ -935,7 +935,7 @@
           "type": "must_not_send_sensitive_prompt"
         },
         {
-          "type": "must_fallback_to_extractive"
+          "type": "must_reject_sensitive_provider_prompt"
         },
         {
           "type": "must_not_claim_llm_generation"

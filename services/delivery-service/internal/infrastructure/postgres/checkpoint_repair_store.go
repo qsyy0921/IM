@@ -562,10 +562,10 @@ func normalizeProjectionRepairOutcome(outcome string) string {
 	}
 }
 
-func normalizeProjectionRepairText(value string, fallback string) string {
+func normalizeProjectionRepairText(value string, defaultText string) string {
 	value = strings.TrimSpace(value)
 	if value == "" {
-		return fallback
+		return defaultValue
 	}
 	return value
 }

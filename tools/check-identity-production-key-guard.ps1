@@ -63,8 +63,8 @@ Assert-Contains $config "NEXUSIM_IDENTITY_CHALLENGE_REQUEST_LIMIT_SECRET" "ident
 Assert-Contains $config "NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_TOKEN_KEYRING_JSON" "identity production key guard must accept challenge delivery keyring JSON."
 Assert-Contains $config "NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_TOKEN_KEYRING_FILE" "identity production key guard must accept challenge delivery keyring file."
 Assert-Contains $config "NEXUSIM_IDENTITY_CHALLENGE_DELIVERY_TOKEN_KEY" "identity production key guard must require explicit challenge delivery token key."
-Assert-NotContains $config "NEXUSIM_IDENTITY_GATEWAY_TOKEN_SECRET" "identity production key guard must not accept gateway-token secret fallback as MFA/recovery key material."
-Assert-NotContains $config "NEXUSIM_PUSH_AUTH_HMAC_SECRET" "identity production key guard must not accept push auth secret fallback as identity key material."
+Assert-NotContains $config "NEXUSIM_IDENTITY_GATEWAY_TOKEN_SECRET" "identity production key guard must not accept gateway-token secret recovery as MFA/recovery key material."
+Assert-NotContains $config "NEXUSIM_PUSH_AUTH_HMAC_SECRET" "identity production key guard must not accept push auth secret recovery as identity key material."
 
 Assert-Contains $main "validateIdentityProductionKeyGuardFromEnv(identityRuntimeKeyGuardScope{" "identity production key guard must be wired into identity-service startup."
 Assert-Contains $main "GatewayToken:" "identity grpc mode must validate gateway-token key mode."
@@ -76,7 +76,7 @@ Assert-Contains $main "ChallengeDeliveryToken: true" "challenge-delivery-worker 
 
 foreach ($testName in @(
     "TestIdentityProductionKeyGuardDefaultsToDisabled",
-    "TestIdentityProductionKeyGuardRejectsLocalCompatibilityKeys",
+    "TestIdentityProductionKeyGuardRejectsNonProductionKeyModes",
     "TestIdentityProductionKeyGuardAcceptsExplicitDedicatedKeys",
     "TestIdentityProductionKeyGuardWorkerScopeDoesNotRequireGatewayKeys"
 )) {

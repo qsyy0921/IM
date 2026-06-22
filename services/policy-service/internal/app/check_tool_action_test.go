@@ -19,7 +19,7 @@ func TestCheckToolActionUseCaseDeniesStaticDefault(t *testing.T) {
 	if err != nil {
 		t.Fatalf("check tool action: %v", err)
 	}
-	if result.Allowed || result.PermissionVersion != 7 || result.Classification != "TOOL_STATIC_DENY" || result.DecisionSource != types.PolicyDecisionSourceFallback {
+	if result.Allowed || result.PermissionVersion != 7 || result.Classification != "TOOL_STATIC_DENY" || result.DecisionSource != types.PolicyDecisionSourceStaticDefault {
 		t.Fatalf("unexpected decision: %+v", result)
 	}
 }

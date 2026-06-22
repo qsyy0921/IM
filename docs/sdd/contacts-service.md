@@ -670,7 +670,7 @@ SetContactPrivacy
 
 `GetContactPrivacy` 缺省返回 `allow_contact_requests=true, allow_search_contact_requests=true, allow_profile_visibility=true, version=0`。该设置只影响新建好友申请和第一阶段 profile visibility 偏好：关闭 `allow_contact_requests` 后所有来源的 `SendContactRequest` 返回 `PERMISSION_DENIED`；只关闭 `allow_search_contact_requests` 时，`SEARCH` 来源返回 `PERMISSION_DENIED`，DIRECT / GROUP / INVITE 等其它来源仍继续按总开关和租户来源策略判断；`allow_profile_visibility=false` 不 gate `SendContactRequest`，只由后续 profile / search / policy projection 作为陌生人资料展示偏好使用；拒绝时不写 `contact_requests` 或 outbox。已存在联系人、已存在 pending request、消息发送权限和会话成员事实不被 contacts-service 直接修改。
 
-租户默认值第一阶段只作为 contacts-service 自有 read path 的 fallback policy：当用户没有 `contact_privacy_settings` 行时，`GetContactPrivacy` 和 `SendContactRequest` 会读取 `contact_tenant_privacy_defaults`；用户一旦执行 `SetContactPrivacy`，用户级设置优先于租户默认。当前通过本地 operator mode 审计 / 设置租户默认值，不开放普通 gRPC admin RPC；正式 admin/config service 权限面后续接入，当前不新增跨服务同步依赖。
+租户默认值第一阶段只作为 contacts-service 自有 read path 的 recovery policy：当用户没有 `contact_privacy_settings` 行时，`GetContactPrivacy` 和 `SendContactRequest` 会读取 `contact_tenant_privacy_defaults`；用户一旦执行 `SetContactPrivacy`，用户级设置优先于租户默认。当前通过本地 operator mode 审计 / 设置租户默认值，不开放普通 gRPC admin RPC；正式 admin/config service 权限面后续接入，当前不新增跨服务同步依赖。
 
 租户来源策略第一阶段只作为 contacts-service 自有 `SendContactRequest` gate 和审计标注：`contact_tenant_request_source_policies` 缺省允许所有来源，显式禁用某个 `source_type` 后，该来源的新建申请返回 `PERMISSION_DENIED`，不影响其它来源、不删除已有申请、不修改联系人事实，也不直接改变 message / conversation / delivery 权限。`risk_level` 只允许 `LOW / MEDIUM / HIGH`，`review_required=true` 只表示申请需要后续 operator / admin 审核关注；当前不会阻止 receiver 通过现有 `RespondContactRequest` 响应，也不表示正式审批状态机已完成。当前通过本地 operator mode 审计 / 设置来源策略；正式 admin/config service 权限面和 approval workflow 后续接入。
 

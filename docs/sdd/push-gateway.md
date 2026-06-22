@@ -253,7 +253,7 @@ GET /ws?token=...&device_id=...
 | `PERMISSION_DENIED` | 当前 session 无权执行 ACK 或访问资源 | 停止重试，重新同步权限或重新登录 | 否 |
 | `RATE_LIMITED` | 连接或 frame 超限 | 按 `retry_after_ms` 退避 | 是 |
 | `SERVER_BUSY` | gateway 过载 | 指数退避重连 | 是 |
-| `DELIVERY_UNAVAILABLE` | delivery-service 暂不可用 | 稍后重试 / pull fallback | 是 |
+| `DELIVERY_UNAVAILABLE` | delivery-service 暂不可用 | 稍后重试 / pull recovery | 是 |
 | `ACK_OUT_OF_VISIBLE_RANGE` | ACK 超出可见范围 | 触发 `PullInbox` 同步 | 否 |
 | `SEQ_GAP` | 客户端报告或本地 buffer 发现 gap | 调用 `PullInbox` | 是 |
 
@@ -272,7 +272,7 @@ GET /ws?token=...&device_id=...
 消费规则：
 
 - Kafka consumer 只能在 notification 已成功交给本地 session queue 或确认目标用户不在线后提交 offset。
-- 对没有历史提交位点的新 consumer group，push-gateway 从 latest delivery event 开始消费；它不负责重放历史在线通知，历史缺口由客户端 `PullInbox` 兜底。
+- 对没有历史提交位点的新 consumer group，push-gateway 从 latest delivery event 开始消费；它不负责重放历史在线通知，历史缺口由客户端 `PullInbox` 补拉。
 - `delivery.inbox_item.created.v1` 和 `delivery.inbox_item.hidden.v1` 都是 user 级 delivery 事件；push-gateway 应向该 user 当前所有在线 device/session 发送对应 `delivery.notify` / `delivery.hide`，同一 device/session 通过 `event_id` 去重。
 - 如果目标用户不在线，事件可直接视为已处理；离线补拉由 `user_inbox` 保证。
 - 如果发送队列满，不能无限阻塞 Kafka consumer；应标记 session slow，发送 `server.resume_hint` 或断开连接，让客户端回源 `PullInbox`。
@@ -339,7 +339,7 @@ push:resume:token:{resume_token}:frames -> list(delivery.notify frame)
 - buffer miss 必须回退到 delivery-service `PullInbox`。
 - `resume_token` 第一阶段为 in-memory opaque token，绑定 `tenant_id / user_id / device_id`；重连会创建新的 `session_id`，但可以复用同一 token 读取单实例 buffer。TTL 与 resume buffer TTL 一致。
 - `resume_token` 必须由服务端签发。客户端携带未知 token 时，服务端返回 `server.resume_hint(reason=buffer_miss)`，并签发新的 opaque token；不能把客户端自带 token 注册成有效 token。
-- 服务重启、token 过期或 buffer miss 时，服务端返回 `server.resume_hint`，客户端 fallback `PullInbox`；已知 token 绑定身份不匹配时返回 `PERMISSION_DENIED`。
+- 服务重启、token 过期或 buffer miss 时，服务端返回 `server.resume_hint`，客户端 recovery `PullInbox`；已知 token 绑定身份不匹配时返回 `PERMISSION_DENIED`。
 - 当前单实例第一版已实现 in-memory、按条数和 TTL 裁剪的 best-effort resume buffer；活跃 session 会续住 token，断线后的非活跃 token 到期后返回 `server.resume_hint(reason=buffer_miss)` 并签发新 token。
 - 启用 `NEXUSIM_PUSH_ROUTE_BACKEND=redis` 时，Redis route 会把 session route 中的 `resume_token` 作为跨实例 resume 索引。任意 gateway 在处理 `delivery.notify` 时，会为 Redis route 中命中的在线 session 写入 `push:resume:token:{resume_token}:frames`；客户端带同一 token 重连到其他 gateway 时，只要 Redis buffer 覆盖 `last_received` 之后的通知，就可以 replay。
 - Redis-backed resume buffer 仍是 best-effort 体验优化，不是可靠投递层。Redis meta / frames miss、TTL 到期、JSON 损坏、buffer gap、Redis 读写错误或 token 身份不匹配时，不得伪造送达；应返回 `server.resume_hint(reason=buffer_miss)` 或 `PERMISSION_DENIED`，最终回退到 durable `PullInbox`。
@@ -515,7 +515,7 @@ push_notify_sent_count
 push_notify_dropped_count
 push_slow_session_evicted_count
 push_ack_forward_latency_ms
-push_delivery_pull_fallback_count
+push_delivery_pull_recovery_count
 ```
 
 ## 13. 测试方案
@@ -661,7 +661,7 @@ NEXUSIM_PUSH_AUTH_JWKS_REFRESH_INTERVAL=5m
 NEXUSIM_PUSH_AUTH_TRUSTED_ISSUERS=nexusim-identity
 ```
 
-identity debug server 会暴露 `/.well-known/jwks.json` 和 `/jwks.json`。该 JWKS 只用于 RS256 公钥发现：HS256 对称密钥只能通过双方本地配置共享，不会作为 `oct` JWK 暴露。RS256 JWK 只包含公钥 `n/e`，可供 push-gateway 本地验签。identity-service 可用 `NEXUSIM_IDENTITY_GATEWAY_TOKEN_ADDITIONAL_JWKS_JSON` / `NEXUSIM_IDENTITY_GATEWAY_TOKEN_ADDITIONAL_JWKS_FILE` 在轮换窗口额外暴露旧公钥；额外 JWKS 只接受 RS256 RSA 公钥，当前签名 key 的 `kid` 优先。`NEXUSIM_PUSH_AUTH_JWKS_URL` 会在启动时拉取一次；如果没有静态 fallback 且拉取失败则 fail-closed，如果已有静态 key set 则记录失败并继续启动。后台定期刷新失败时保留上一份可用 key set，并在 `/debug/metrics.auth_jwks` 记录失败计数。当前仍不等于生产级自动轮换、KMS/HSM 私钥托管或完整 issuer federation。
+identity debug server 会暴露 `/.well-known/jwks.json` 和 `/jwks.json`。该 JWKS 只用于 RS256 公钥发现：HS256 对称密钥只能通过双方本地配置共享，不会作为 `oct` JWK 暴露。RS256 JWK 只包含公钥 `n/e`，可供 push-gateway 本地验签。identity-service 可用 `NEXUSIM_IDENTITY_GATEWAY_TOKEN_ADDITIONAL_JWKS_JSON` / `NEXUSIM_IDENTITY_GATEWAY_TOKEN_ADDITIONAL_JWKS_FILE` 在轮换窗口额外暴露旧公钥；额外 JWKS 只接受 RS256 RSA 公钥，当前签名 key 的 `kid` 优先。`NEXUSIM_PUSH_AUTH_JWKS_URL` 会在启动时拉取一次；如果没有静态 recovery 且拉取失败则 fail-closed，如果已有静态 key set 则记录失败并继续启动。后台定期刷新失败时保留上一份可用 key set，并在 `/debug/metrics.auth_jwks` 记录失败计数。当前仍不等于生产级自动轮换、KMS/HSM 私钥托管或完整 issuer federation。
 
 Redis route 可选参数：
 

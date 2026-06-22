@@ -23,7 +23,7 @@ const (
 type PolicyDecisionSource string
 
 const (
-	PolicyDecisionSourceFallback          PolicyDecisionSource = "FALLBACK"
+	PolicyDecisionSourceStaticDefault     PolicyDecisionSource = "STATIC_DEFAULT"
 	PolicyDecisionSourceExactRule         PolicyDecisionSource = "EXACT_RULE"
 	PolicyDecisionSourceTenantRule        PolicyDecisionSource = "TENANT_RULE"
 	PolicyDecisionSourceUserRestriction   PolicyDecisionSource = "USER_RESTRICTION"

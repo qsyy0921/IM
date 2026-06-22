@@ -2,7 +2,6 @@ package app
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/qsyy0921/IM/internal/ai/llmboundary"
@@ -14,9 +13,8 @@ type ExternalSummaryLLM interface {
 }
 
 type GuardedLLMSummaryProvider struct {
-	client   ExternalSummaryLLM
-	fallback SummaryProvider
-	options  llmboundary.Options
+	client  ExternalSummaryLLM
+	options llmboundary.Options
 }
 
 func NewGuardedLLMSummaryProvider(
@@ -24,9 +22,8 @@ func NewGuardedLLMSummaryProvider(
 	options llmboundary.Options,
 ) GuardedLLMSummaryProvider {
 	return GuardedLLMSummaryProvider{
-		client:   client,
-		fallback: ExtractiveSummaryProvider{},
-		options:  llmboundary.NormalizeOptions(options),
+		client:  client,
+		options: llmboundary.NormalizeOptions(options),
 	}
 }
 
@@ -34,11 +31,8 @@ func (provider GuardedLLMSummaryProvider) GenerateSummary(
 	ctx context.Context,
 	request types.SummaryGenerationRequest,
 ) (types.SummaryGenerationResult, error) {
-	if provider.fallback == nil {
-		provider.fallback = ExtractiveSummaryProvider{}
-	}
 	if provider.client == nil {
-		return provider.fallback.GenerateSummary(ctx, request)
+		return types.SummaryGenerationResult{}, types.ErrSummaryUnavailable
 	}
 	prompt, err := llmboundary.BuildPrompt(
 		"Summarize the conversation using only the provided EvidencePack. Return citations by evidence_id.",
@@ -47,15 +41,11 @@ func (provider GuardedLLMSummaryProvider) GenerateSummary(
 		provider.options,
 	)
 	if err != nil {
-		if errors.Is(err, llmboundary.ErrUnsafeInput) ||
-			errors.Is(err, llmboundary.ErrMalformedOutput) {
-			return provider.fallback.GenerateSummary(ctx, request)
-		}
 		return types.SummaryGenerationResult{}, fmt.Errorf("%w: %v", types.ErrSummaryUnavailable, err)
 	}
 	candidate, err := provider.client.GenerateCandidate(ctx, prompt)
 	if err != nil {
-		return provider.fallback.GenerateSummary(ctx, request)
+		return types.SummaryGenerationResult{}, fmt.Errorf("%w: model provider failed", types.ErrSummaryUnavailable)
 	}
 	allowedIDs := summaryEvidenceIDSet(request.EvidencePack.Items)
 	if err := llmboundary.ValidateCandidate(candidate, allowedIDs); err != nil {

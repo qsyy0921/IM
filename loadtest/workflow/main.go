@@ -553,9 +553,9 @@ func normalizeRefs(values []string) []string {
 	return result
 }
 
-func envOr(key string, fallback string) string {
+func envOr(key string, defaultValue string) string {
 	if value := strings.TrimSpace(os.Getenv(key)); value != "" {
 		return value
 	}
-	return fallback
+	return defaultValue
 }

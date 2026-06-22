@@ -107,7 +107,7 @@ func TestAgentOperatorReasonFromFile(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Setenv("NEXUSIM_AGENT_TEST_REASON_FILE", reasonPath)
-	reason, err := agentOperatorReasonFromEnv("NEXUSIM_AGENT_TEST_REASON", "NEXUSIM_AGENT_TEST_REASON_FILE", "fallback")
+	reason, err := agentOperatorReasonFromEnv("NEXUSIM_AGENT_TEST_REASON", "NEXUSIM_AGENT_TEST_REASON_FILE", "recovery")
 	if err != nil {
 		t.Fatal(err)
 	}

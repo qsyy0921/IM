@@ -441,7 +441,7 @@ message-service / conversation-service 发布 timeline event
 ## 11. 权限和安全
 
 - `PullInbox`、`AckDelivery` 和 `HideInboxItem` 必须使用 authenticated `tenant_id/user_id/device_id`，不信任请求体裸 user。
-- gRPC API 支持第一阶段 gateway verified metadata auth mode：`NEXUSIM_DELIVERY_AUTH_MODE=metadata` / `verified-metadata` 时，`PullInbox`、`AckDelivery` 和 `HideInboxItem` 的 `tenant_id / user_id / device_id / session_id` 只来自 gRPC metadata，不信任 request body 中可伪造的身份字段；`trace_id / request_id` 可在 metadata 缺失时从 body 兜底用于排障相关性。默认 `body` 模式仅用于兼容历史 smoke。
+- gRPC API 支持第一阶段 gateway verified metadata auth mode：`NEXUSIM_DELIVERY_AUTH_MODE=metadata` / `verified-metadata` 时，`PullInbox`、`AckDelivery` 和 `HideInboxItem` 的 `tenant_id / user_id / device_id / session_id` 只来自 gRPC metadata，不信任 request body 中可伪造的身份字段；`trace_id / request_id` 可在 metadata 缺失时从 body 读取，只用于排障相关性。默认 `body` 模式仅用于兼容历史 smoke。
 - `HideInboxItem` 只隐藏当前用户的 `user_inbox` 视图，不修改 `message_log`、不写 conversation timeline、不发布 `message.deleted.v1` 或新的 inbox-created 事实。首次隐藏会在同一事务写 `delivery.inbox_item.hidden.v1` 到 delivery outbox，用于同一 user 的其它在线设备收到轻量 `delivery.hide` 后更新本地视图；重复隐藏返回 `already_hidden=true` 且不重复写 outbox。它用于 `DeleteMessage SELF_VIEW` 类产品语义；会话级删除和合规删除仍属于 message-service / retention workflow。
 - 第一阶段可以通过 `user_inbox` 是否存在判断可见性；没有 inbox item 不等于 conversation 不存在。
 - 成员边界事件决定投递可见窗口，不能用当前成员表回写历史可见性。

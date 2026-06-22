@@ -55,7 +55,7 @@ type gatewayTokenRS256CurrentKey struct {
 }
 
 func newGatewayTokenSigner() (gatewayTokenSigner, error) {
-	secret := envString("NEXUSIM_IDENTITY_GATEWAY_TOKEN_SECRET", envString("NEXUSIM_PUSH_AUTH_HMAC_SECRET", ""))
+	secret := envString("NEXUSIM_IDENTITY_GATEWAY_TOKEN_SECRET", "")
 	switch strings.ToLower(envString("NEXUSIM_IDENTITY_GATEWAY_TOKEN_FORMAT", "legacy")) {
 	case "legacy", "hmac", "custom":
 		return tokeninfra.NewHMACSigner(secret)

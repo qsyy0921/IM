@@ -584,46 +584,46 @@ func loadJWKSetJSON() (string, error) {
 	return string(raw), nil
 }
 
-func envString(key string, fallback string) string {
+func envString(key string, defaultValue string) string {
 	value := strings.TrimSpace(os.Getenv(key))
 	if value == "" {
-		return fallback
+		return defaultValue
 	}
 	return value
 }
 
-func envDuration(key string, fallback time.Duration) time.Duration {
+func envDuration(key string, defaultValue time.Duration) time.Duration {
 	raw := strings.TrimSpace(os.Getenv(key))
 	if raw == "" {
-		return fallback
+		return defaultValue
 	}
 	value, err := time.ParseDuration(raw)
 	if err != nil || value <= 0 {
-		return fallback
+		return defaultValue
 	}
 	return value
 }
 
-func envFloat64(key string, fallback float64) float64 {
+func envFloat64(key string, defaultValue float64) float64 {
 	raw := strings.TrimSpace(os.Getenv(key))
 	if raw == "" {
-		return fallback
+		return defaultValue
 	}
 	value, err := strconv.ParseFloat(raw, 64)
 	if err != nil || value <= 0 {
-		return fallback
+		return defaultValue
 	}
 	return value
 }
 
-func envInt(key string, fallback int) int {
+func envInt(key string, defaultValue int) int {
 	raw := strings.TrimSpace(os.Getenv(key))
 	if raw == "" {
-		return fallback
+		return defaultValue
 	}
 	value, err := strconv.Atoi(raw)
 	if err != nil || value <= 0 {
-		return fallback
+		return defaultValue
 	}
 	return value
 }

@@ -85,21 +85,21 @@ function Add-EmptyDefaultGuardFailures {
 
     foreach ($match in [regex]::Matches($Text, '\[string\]\$(ResultRoot|OutputRoot)\s*=\s*""')) {
         $parameterName = $match.Groups[1].Value
-        $fallbackPattern = 'if\s*\(-not\s*\$' + [regex]::Escape($parameterName) + '\)\s*\{[\s\S]{0,300}?H:\\NexusIM\\loadtest-results'
+        $recoveryPattern = 'if\s*\(-not\s*\$' + [regex]::Escape($parameterName) + '\)\s*\{[\s\S]{0,300}?H:\\NexusIM\\loadtest-results'
         $guardPattern = '(?m)^\s*Assert-ExternalOutputRoot\b[^\r\n]*-Value\s+\$' + [regex]::Escape($parameterName) + '\b'
-        $fallbackMatch = [regex]::Match($Text, $fallbackPattern)
+        $recoveryMatch = [regex]::Match($Text, $recoveryPattern)
         $guardMatch = [regex]::Match($Text, $guardPattern)
 
-        if (-not $fallbackMatch.Success) {
+        if (-not $recoveryMatch.Success) {
             [void]$Failures.Add([pscustomobject]@{
                 Path = $RelativePath
-                Text = "$parameterName has an empty default and must set an H:\NexusIM\loadtest-results fallback before validation"
+                Text = "$parameterName has an empty default and must set an H:\NexusIM\loadtest-results recovery before validation"
             })
         }
-        elseif ($guardMatch.Success -and $fallbackMatch.Index -gt $guardMatch.Index) {
+        elseif ($guardMatch.Success -and $recoveryMatch.Index -gt $guardMatch.Index) {
             [void]$Failures.Add([pscustomobject]@{
                 Path = $RelativePath
-                Text = "$parameterName sets the H:\NexusIM\loadtest-results fallback after Assert-ExternalOutputRoot"
+                Text = "$parameterName sets the H:\NexusIM\loadtest-results recovery after Assert-ExternalOutputRoot"
             })
         }
     }

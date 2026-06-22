@@ -27,7 +27,11 @@ func (useCase *UpdatePresenceUseCase) Execute(
 	if err != nil {
 		return types.PresenceState{}, err
 	}
-	return useCase.repository.UpdatePresence(ctx, prepared, useCase.eventIDs.NewEventID())
+	eventID, err := useCase.eventIDs.NewEventID()
+	if err != nil {
+		return types.PresenceState{}, err
+	}
+	return useCase.repository.UpdatePresence(ctx, prepared, eventID)
 }
 
 type GetPresenceUseCase struct {
@@ -70,7 +74,11 @@ func (useCase *UpdateTypingUseCase) Execute(
 	if err != nil {
 		return types.TypingIndicator{}, err
 	}
-	return useCase.repository.UpdateTyping(ctx, prepared, useCase.eventIDs.NewEventID())
+	eventID, err := useCase.eventIDs.NewEventID()
+	if err != nil {
+		return types.TypingIndicator{}, err
+	}
+	return useCase.repository.UpdateTyping(ctx, prepared, eventID)
 }
 
 type RandomEventIDGenerator struct{}
@@ -79,10 +87,10 @@ func NewRandomEventIDGenerator() RandomEventIDGenerator {
 	return RandomEventIDGenerator{}
 }
 
-func (RandomEventIDGenerator) NewEventID() string {
+func (RandomEventIDGenerator) NewEventID() (string, error) {
 	var value [16]byte
 	if _, err := rand.Read(value[:]); err != nil {
-		return "evt_presence_fallback"
+		return "", types.NewFailedPrecondition("presence event id generation failed")
 	}
-	return "evt_presence_" + hex.EncodeToString(value[:])
+	return "evt_presence_" + hex.EncodeToString(value[:]), nil
 }

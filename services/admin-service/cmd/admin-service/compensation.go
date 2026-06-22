@@ -124,10 +124,10 @@ func createCompensationWorkflowIfConfigured(ctx context.Context, operation types
 	return executor.CreateCompensationWorkflow(ctx, operation, requestedBy, reasonRef)
 }
 
-func envBoolDefault(name string, fallback bool) (bool, error) {
+func envBoolDefault(name string, defaultValue bool) (bool, error) {
 	raw := strings.TrimSpace(os.Getenv(name))
 	if raw == "" {
-		return fallback, nil
+		return defaultValue, nil
 	}
 	value, err := strconv.ParseBool(raw)
 	if err != nil {

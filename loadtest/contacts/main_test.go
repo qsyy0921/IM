@@ -19,18 +19,18 @@ func TestEnvBool(t *testing.T) {
 	}
 	t.Setenv("NEXUSIM_TEST_BOOL", "invalid")
 	if !envBool("NEXUSIM_TEST_BOOL", true) {
-		t.Fatal("expected invalid value to keep fallback")
+		t.Fatal("expected invalid value to keep default")
 	}
 }
 
 func TestEnvString(t *testing.T) {
 	t.Setenv("NEXUSIM_TEST_STRING", " value ")
-	if got := envString("NEXUSIM_TEST_STRING", "fallback"); got != "value" {
+	if got := envString("NEXUSIM_TEST_STRING", "default"); got != "value" {
 		t.Fatalf("envString = %q, want value", got)
 	}
 	t.Setenv("NEXUSIM_TEST_STRING", " ")
-	if got := envString("NEXUSIM_TEST_STRING", "fallback"); got != "fallback" {
-		t.Fatalf("envString fallback = %q, want fallback", got)
+	if got := envString("NEXUSIM_TEST_STRING", "default"); got != "default" {
+		t.Fatalf("envString default value = %q, want default", got)
 	}
 }
 

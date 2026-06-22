@@ -271,7 +271,7 @@ FOR UPDATE
 	return nil
 }
 
-func normalizeComplianceDeleteApprovalOptions(options MessageComplianceDeleteApprovalMutationOptions, fallbackNow time.Time) MessageComplianceDeleteApprovalMutationOptions {
+func normalizeComplianceDeleteApprovalOptions(options MessageComplianceDeleteApprovalMutationOptions, defaultNow time.Time) MessageComplianceDeleteApprovalMutationOptions {
 	options.TenantID = strings.TrimSpace(options.TenantID)
 	options.ConversationID = strings.TrimSpace(options.ConversationID)
 	options.MessageID = strings.TrimSpace(options.MessageID)
@@ -280,7 +280,7 @@ func normalizeComplianceDeleteApprovalOptions(options MessageComplianceDeleteApp
 	options.OperatorID = strings.TrimSpace(options.OperatorID)
 	options.Reason = strings.TrimSpace(options.Reason)
 	if options.Now.IsZero() {
-		options.Now = fallbackNow
+		options.Now = defaultNow
 	}
 	return options
 }

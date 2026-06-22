@@ -56,7 +56,6 @@ type ProviderTextResult struct {
 	TokenUsage              types.TokenUsage
 	EstimatedCostMicrounits int64
 	Latency                 time.Duration
-	FallbackUsed            bool
 }
 
 type ProviderEmbeddingResult struct {
@@ -66,7 +65,6 @@ type ProviderEmbeddingResult struct {
 	TokenUsage              types.TokenUsage
 	EstimatedCostMicrounits int64
 	Latency                 time.Duration
-	FallbackUsed            bool
 }
 
 func PrepareTextGeneration(
@@ -234,7 +232,6 @@ func InvocationFromSuccess(
 	started.EstimatedCostMicrounits = result.EstimatedCostMicrounits
 	started.Status = types.InvocationStatusSucceeded
 	started.FailureClass = types.FailureClassNone
-	started.FallbackUsed = result.FallbackUsed
 	started.ProviderLatency = result.Latency
 	started.CompletedAt = completedAt.UTC()
 	return started
@@ -251,7 +248,6 @@ func InvocationFromEmbeddingSuccess(
 	started.EstimatedCostMicrounits = result.EstimatedCostMicrounits
 	started.Status = types.InvocationStatusSucceeded
 	started.FailureClass = types.FailureClassNone
-	started.FallbackUsed = result.FallbackUsed
 	started.ProviderLatency = result.Latency
 	started.CompletedAt = completedAt.UTC()
 	return started

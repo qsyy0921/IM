@@ -76,6 +76,6 @@ agent-service proposal
 - Agent proposal 前调用 mcp-gateway prepare。
 - 输入 schema validation。
 - per tenant / per tool rate limit。
-- real MCP adapter + provider failure fallback。
+- real MCP adapter + provider failure handling。
 - 与 action-executor 串接 approved action execution。
 - 统一外部 audit sink。

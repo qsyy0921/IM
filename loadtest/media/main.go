@@ -723,10 +723,10 @@ func randomSuffix() string {
 	return hex.EncodeToString(data[:])
 }
 
-func envOr(name string, fallback string) string {
+func envOr(name string, defaultValue string) string {
 	value := strings.TrimSpace(os.Getenv(name))
 	if value == "" {
-		return fallback
+		return defaultValue
 	}
 	return value
 }

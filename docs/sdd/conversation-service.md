@@ -138,7 +138,7 @@ NEXUSIM_CONVERSATION_AUTH_MODE=metadata          # read tenant/user/device/sessi
 NEXUSIM_CONVERSATION_AUTH_MODE=verified-metadata # alias of metadata
 ```
 
-In `metadata` / `verified-metadata` mode, `CreateMemberChange`, `GetMemberChange`, `TransferConversationOwner`, and `ListConversationMembers` ignore caller-supplied `AuthContext.tenant_id/user_id/device_id/session_id` and use gateway-injected metadata keys instead. `trace_id/request_id` may still fall back to the request body for observability. `GetSendContext` remains the message-service service-to-service read path and keeps its request contract. When `NEXUSIM_CONVERSATION_AUTH_MODE=metadata|verified-metadata`, a non-loopback / non-RFC1918 gRPC listen address without mTLS client-certificate verification must fail startup; first-stage trusted metadata is only allowed on private listeners unless transport auth is enabled. This is not a full API gateway or centralized identity-governance implementation.
+In `metadata` / `verified-metadata` mode, `CreateMemberChange`, `GetMemberChange`, `TransferConversationOwner`, and `ListConversationMembers` ignore caller-supplied `AuthContext.tenant_id/user_id/device_id/session_id` and use gateway-injected metadata keys instead. `trace_id/request_id` may still be read from the request body for observability only. `GetSendContext` remains the message-service service-to-service read path and keeps its request contract. When `NEXUSIM_CONVERSATION_AUTH_MODE=metadata|verified-metadata`, a non-loopback / non-RFC1918 gRPC listen address without mTLS client-certificate verification must fail startup; first-stage trusted metadata is only allowed on private listeners unless transport auth is enabled. This is not a full API gateway or centralized identity-governance implementation.
 
 第一阶段本地运维观测保持低敏：
 
@@ -198,4 +198,4 @@ NEXUSIM_CONVERSATION_OTEL_TRACES_SAMPLING_RATIO=1
 - 角色变更。
 - `member_change_saga` 状态机。
 - 成员边界 timeline event。
-- ACL 投影与 strict ACL fallback。
+- ACL 投影与 strict ACL verification / repair。

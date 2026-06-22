@@ -11,9 +11,9 @@ import (
 	"time"
 )
 
-func parseDeviceIDs(list string, fallback string) []string {
+func parseDeviceIDs(list string, defaultDeviceID string) []string {
 	if strings.TrimSpace(list) == "" {
-		return []string{fallback}
+		return []string{defaultDeviceID}
 	}
 	seen := map[string]struct{}{}
 	result := make([]string, 0)
@@ -29,7 +29,7 @@ func parseDeviceIDs(list string, fallback string) []string {
 		result = append(result, deviceID)
 	}
 	if len(result) == 0 {
-		return []string{fallback}
+		return []string{defaultDeviceID}
 	}
 	return result
 }
@@ -259,7 +259,7 @@ func gitStatusShort() string {
 	return strings.TrimSpace(string(out))
 }
 
-func envBool(fallback bool, names ...string) bool {
+func envBool(defaultValue bool, names ...string) bool {
 	for _, name := range names {
 		value := strings.TrimSpace(os.Getenv(name))
 		if value == "" {
@@ -267,9 +267,9 @@ func envBool(fallback bool, names ...string) bool {
 		}
 		parsed, err := strconv.ParseBool(value)
 		if err != nil {
-			return fallback
+			return defaultValue
 		}
 		return parsed
 	}
-	return fallback
+	return defaultValue
 }

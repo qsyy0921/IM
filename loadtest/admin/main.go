@@ -457,10 +457,10 @@ func splitCSV(value string) []string {
 	return items
 }
 
-func envOr(key string, fallback string) string {
+func envOr(key string, defaultValue string) string {
 	value := strings.TrimSpace(os.Getenv(key))
 	if value == "" {
-		return fallback
+		return defaultValue
 	}
 	return value
 }

@@ -3,7 +3,7 @@
 ## 1. 服务定位
 
 `model-gateway` 是 NexusIM AI 应用底座中的模型 provider 统一入口。它负责文本生成、
-embedding、rerank、provider route、超时、重试、fallback、成本预算、限流和低敏调用
+embedding、rerank、provider route、超时、显式重试、fail-closed、成本预算、限流和低敏调用
 审计。
 
 职责：
@@ -31,7 +31,7 @@ embedding、rerank、provider route、超时、重试、fallback、成本预算�
 | 上游 | agent-service | 提交 planner / proposal candidate 请求；不提交 approval 决策 |
 | 上游 | ai-eval-service | 提交受控 eval model invocation |
 | 上游 | knowledge-ingestion-service | 提交 chunk summary / metadata extraction / embedding 请求 |
-| 同步依赖 | control-plane-service | provider route、budget、fallback、model allowlist 配置 |
+| 同步依赖 | control-plane-service | provider route、budget、model allowlist、retry policy 配置 |
 | 同步依赖 | policy-service | tenant / action / data-class model invocation precheck |
 | 同步依赖 | external providers | OpenAI-compatible、Claude-compatible、本地模型、embedding、rerank |
 | 异步下游 | audit-service / ai-eval-service | 低敏 model invocation events |
@@ -121,7 +121,7 @@ invocation_id, provider_id, model_id
 output_text
 output_hash, output_schema_version
 token_usage, cost_estimate
-failure_class, fallback_used
+failure_class
 provider_latency_ms
 ```
 
@@ -156,7 +156,7 @@ rerank_policy, top_k, timeout_ms
 响应字段：
 
 ```text
-invocation_id, ranked_item_refs[], scores[], model_id, fallback_used
+invocation_id, ranked_item_refs[], scores[], model_id
 ```
 
 错误码：
@@ -180,7 +180,7 @@ request route_policy
 -> tenant / data_class / use_case allowlist
 -> provider health / circuit breaker
 -> budget window
--> fallback chain
+-> provider route decision
 ```
 
 预算维度：
@@ -204,14 +204,14 @@ output_tokens
 embedding_tokens
 estimated_cost_microunits
 failure_count
-fallback_count
+failure_count
 ```
 
 超额策略：
 
 | 场景 | 策略 |
 | --- | --- |
-| optional generation | fallback extractive / local provider |
+| optional generation | fail closed；调用方决定是否拒答或改走显式非模型策略 |
 | required generation | `RESOURCE_EXHAUSTED` |
 | embedding pipeline | pause ingestion / retry later |
 | eval judge | mark eval as blocked / skipped |
@@ -226,7 +226,7 @@ fallback_count
 | `model.provider.circuit_opened.v1` | `im.model.events` | `provider_id` | provider 熔断 |
 
 事件 payload 只包含 invocation id、caller service、use case、provider / model id、data class、
-token usage、cost estimate、latency、failure class、fallback flag、hash refs 和 trace refs。
+token usage、cost estimate、latency、failure class、hash refs 和 trace refs。
 禁止包含 raw prompt、raw output、EvidencePack 正文、provider body、secret、tenant PII 或用户内容。
 
 ## 8. 数据库设计
@@ -249,7 +249,7 @@ tenant_id, invocation_id, idempotency_key, caller_service, caller_use_case,
 request_type, data_class, provider_id, model_id, route_version,
 prompt_hash, output_hash, evidence_pack_ref_hash,
 input_tokens, output_tokens, estimated_cost_microunits,
-status, failure_class, fallback_used, latency_ms,
+status, failure_class, latency_ms,
 correlation_id, causation_id, trace_id, created_at, completed_at
 
 model_budget_windows:
@@ -258,7 +258,7 @@ window_start, window_end, request_count, token_count, estimated_cost_microunits
 
 model_provider_route_snapshots:
 tenant_id, route_version, caller_service, caller_use_case,
-provider_id, model_id, fallback_chain_json, policy_hash, status
+provider_id, model_id, policy_hash, status
 
 model_provider_failures:
 tenant_id, provider_id, model_id, failure_class, failure_count,
@@ -303,7 +303,7 @@ Rerank：
 RerankEvidence
 -> validate evidence refs came from retrieval boundary
 -> policy + budget check
--> call rerank provider or deterministic fallback
+-> call rerank provider or fail closed
 -> return ranked refs / scores
 ```
 
@@ -331,7 +331,7 @@ retrieval-gateway -> EvidencePack -> prompt builder -> model-gateway
 citation verifier
 schema verifier
 allowed output class verifier
-fallback / refusal policy
+refusal / caller-owned non-model policy
 low-sensitive audit linkage
 ```
 
@@ -346,13 +346,13 @@ low-sensitive audit linkage
 - `USER_CONTENT` 默认要求 caller 提供 EvidencePack / source refs / retention policy。
 - metrics 禁止输出 tenant_id、user_id、conversation_id、message_id、prompt hash、output hash 或 provider body。
 
-## 12. 幂等、重试和 fallback
+## 12. 幂等、重试和失败处理
 
-| 场景 | 幂等键 | 重试策略 | fallback |
+| 场景 | 幂等键 | 重试策略 | 失败处理 |
 | --- | --- | --- | --- |
-| Text generation | caller + idempotency_key | provider timeout / 5xx bounded retry | extractive / local model / fail closed |
+| Text generation | caller + idempotency_key | provider timeout / 5xx bounded retry | fail closed；上游决定拒答或显式非模型路径 |
 | Embedding | chunk hash + model_id | retry with same chunk hashes | pause ingestion |
-| Rerank | query hash + evidence refs | bounded retry | deterministic BM25 / retrieval score |
+| Rerank | query hash + evidence refs | bounded retry | fail closed；上游继续使用原 retrieval score 时必须显式记录 |
 | OutboxRelay | event_id | bounded retry + DLQ | repair operator |
 
 Kafka publish 仍通过 outbox relay；模型 provider 调用不是 Kafka exactly-once 事务的一部分。调用方需要按
@@ -388,7 +388,7 @@ model_provider_latency_ms{provider_id,model_id,request_type}
 model_token_total{provider_id,model_id,request_type}
 model_cost_estimate_microunits_total{provider_id,model_id}
 model_budget_exhausted_total{caller_service,request_type}
-model_fallback_total{caller_service,request_type,from_provider,to_provider}
+model_provider_failure_total{caller_service,request_type,failure_class}
 model_outbox_total{status}
 ```
 
@@ -399,7 +399,7 @@ prompt_hash、output_hash、provider URL、provider body 或 request_id。
 
 | 测试 | 目标 |
 | --- | --- |
-| domain unit | route selection、budget exceed、fallback chain、failure class |
+| domain unit | route selection、budget exceed、failure class |
 | app unit | policy deny、budget deny、provider timeout、idempotency |
 | provider adapter | OpenAI-compatible / local HTTP response parsing、malformed fail closed |
 | PostgreSQL integration | invocation metadata + budget window + outbox 同事务 |
@@ -448,6 +448,6 @@ model-outbox-repair
 进入 first smoke 前：
 
 - proto / migration / 六层 skeleton / cmd runtime 已落。
-- provider allowlist、budget、timeout、fallback 和 raw prompt/output 不落库测试通过。
+- provider allowlist、budget、timeout、fail-closed 和 raw prompt/output 不落库测试通过。
 - RAG 或 Summary 通过 model-gateway mock provider 的 focused smoke 通过。
 - provider failure 不污染 caller citation verifier，不泄露 provider body。

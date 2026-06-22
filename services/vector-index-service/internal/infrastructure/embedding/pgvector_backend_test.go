@@ -58,7 +58,7 @@ func TestPGVectorBackendUpsertsEmbeddingValues(t *testing.T) {
 		t.Fatalf("embedding values were not handed off: %+v", item)
 	}
 	if item.CorrelationID != "corr-task" || item.CausationID != "cause-task" || item.TraceID != "trace-task" {
-		t.Fatalf("fallback trace metadata missing: %+v", item)
+		t.Fatalf("recovery trace metadata missing: %+v", item)
 	}
 }
 

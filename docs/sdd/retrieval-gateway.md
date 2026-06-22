@@ -38,7 +38,7 @@ RAG / summary / Agent 必须消费 `EvidencePack`，不能绕过 retrieval-gatew
 - `query`、`conversation_id`。
 - `at_conversation_seq`：可选当前会话时点，用于调用 memory-service 的
   `QueryMemoryEvents.at_conversation_seq`；未传时第一版使用返回 search hit 的
-  最大 `conversation_seq` 作为 fallback。
+  最大 `conversation_seq` 作为显式查询边界。
 - `items`：
   - `SEARCH_MESSAGE`：来自 search-service 的 message hit。
   - `MEMORY_EVENT`：来自 memory-service 的 StructuredMemoryEvent。

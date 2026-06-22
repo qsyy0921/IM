@@ -29,6 +29,9 @@ try {
     Write-Host "== future service boundary =="
     Invoke-LocalCheck "check-future-service-boundary.ps1"
 
+    Write-Host "== fail-closed policy =="
+    Invoke-LocalCheck "check-fail-closed-policy.ps1"
+
     Write-Host "== check-local coverage =="
     Invoke-LocalCheck "check-local-coverage.ps1"
 

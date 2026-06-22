@@ -815,25 +815,25 @@ func hashRef(value string) string {
 	return "sha256:" + hex.EncodeToString(sum[:])
 }
 
-func envOr(name string, fallback string) string {
+func envOr(name string, defaultValue string) string {
 	value := strings.TrimSpace(os.Getenv(name))
 	if value == "" {
-		return fallback
+		return defaultValue
 	}
 	return value
 }
 
-func envBool(name string, fallback bool) bool {
+func envBool(name string, defaultValue bool) bool {
 	value := strings.ToLower(strings.TrimSpace(os.Getenv(name)))
 	switch value {
 	case "":
-		return fallback
+		return defaultValue
 	case "1", "true", "yes", "y", "on":
 		return true
 	case "0", "false", "no", "n", "off":
 		return false
 	default:
-		return fallback
+		return defaultValue
 	}
 }
 

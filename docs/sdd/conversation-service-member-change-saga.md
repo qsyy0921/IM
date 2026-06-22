@@ -359,7 +359,7 @@ api CreateMemberChange
 - 这不是让 conversation-service 修改 message-service 的消息事实；它只追加 conversation timeline 边界事件。
 - 不允许启动第二套 relay 竞争同一张 `message_outbox`；必须升级现有统一 outbox relay，使 message/member timeline event 经同一条发布路径输出。
 - 如果暂时没有扩展 Kafka schema 和 relay builder，`member_change_saga` 最多只能记录命令，不得声明成员事件已进入 `conversation.timeline.events` 全序流。
-- `DONE` 是 conversation-service 本地 saga 完成态，只表示成员事实更新完成且边界事件已经通过 outbox 发布到 Kafka；它不表示 delivery、retrieval/search ACL projection、audit sink 都已完成。下游 projection lag / checksum mismatch 由各 consumer、strict ACL fallback 和独立 repair 处理。
+- `DONE` 是 conversation-service 本地 saga 完成态，只表示成员事实更新完成且边界事件已经通过 outbox 发布到 Kafka；它不表示 delivery、retrieval/search ACL projection、audit sink 都已完成。下游 projection lag / checksum mismatch 由各 consumer、strict ACL verification 和独立 repair 处理。
 
 ## 9. 一致性和事务
 
@@ -413,7 +413,7 @@ audit sink
 | 成员更新失败 | `change_id` | 回滚事务 | 不产生边界 event |
 | outbox 写失败 | `change_id` | 回滚事务 | 不更新成员事实 |
 | Kafka publish 失败 | `event_id` | outbox relay retry | 超限 DLQ，saga 不进入 `DONE` |
-| ACL 投影失败 | `change_id` | 下游 consumer retry | retrieval-gateway strict ACL fallback |
+| ACL 投影失败 | `change_id` | 下游 consumer retry | retrieval-gateway strict ACL verification / repair |
 
 Outbox / DLQ repair：
 
@@ -456,7 +456,7 @@ Owner transfer v0.1 采用专用流程，不复用 `ROLE_CHANGED`：
 - 所有冲突、拒绝、补偿和人工 repair 必须进入 audit。
 - 对外错误 message 使用稳定文案，不暴露 SQL、constraint、内部状态机细节。
 - OpenSearch / Milvus 中的 ACL 字段只作为加速投影，不是最终授权事实。
-- 用户退群后，`leave_seq` 之后的消息和 RAG chunk 不得通过检索返回；投影不确定时必须走 strict ACL fallback。
+- 用户退群后，`leave_seq` 之后的消息和 RAG chunk 不得通过检索返回；投影不确定时必须走 strict ACL verification 或显式 repair。
 
 ## 12. SLO 和指标
 

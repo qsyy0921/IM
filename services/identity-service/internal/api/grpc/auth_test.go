@@ -30,7 +30,7 @@ func TestAdminFromProtoPrefersVerifiedMetadata(t *testing.T) {
 			t.Fatalf("verified metadata should override body admin context: %+v", admin)
 		}
 		if admin.TraceID != "body-trace" || admin.RequestID != "body-request" {
-			t.Fatalf("expected trace/request fallback from body, got %+v", admin)
+			t.Fatalf("expected trace/request recovery from body, got %+v", admin)
 		}
 		return nil, nil
 	})

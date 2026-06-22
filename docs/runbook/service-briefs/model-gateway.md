@@ -6,7 +6,7 @@
 设计入口：`docs/sdd/model-gateway.md`；stage-switch / smoke 见对应 runbook。
 
 定位：统一模型 provider 入口，负责 OpenAI / Claude / 本地模型 / embedding /
-rerank provider 的路由、限流、成本、fallback、prompt policy 和低敏审计。
+rerank provider 的路由、限流、成本、fail-closed、prompt policy 和低敏审计。
 
 当前第一版：
 

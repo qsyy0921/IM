@@ -484,11 +484,11 @@ func validateAPIGatewayTenantID(tenantID string) error {
 	return nil
 }
 
-func envPositiveFloat64(name string, fallback float64) (float64, error) {
+func envPositiveFloat64(name string, defaultValue float64) (float64, error) {
 	raw := strings.TrimSpace(os.Getenv(name))
 	if raw == "" {
-		if fallback > 0 {
-			return fallback, nil
+		if defaultValue > 0 {
+			return defaultValue, nil
 		}
 		return 0, errors.New(name + " is required")
 	}
@@ -499,11 +499,11 @@ func envPositiveFloat64(name string, fallback float64) (float64, error) {
 	return value, nil
 }
 
-func envPositiveInt(name string, fallback int) (int, error) {
+func envPositiveInt(name string, defaultValue int) (int, error) {
 	raw := strings.TrimSpace(os.Getenv(name))
 	if raw == "" {
-		if fallback > 0 {
-			return fallback, nil
+		if defaultValue > 0 {
+			return defaultValue, nil
 		}
 		return 0, errors.New(name + " is required")
 	}

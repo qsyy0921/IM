@@ -18,6 +18,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/qsyy0921/IM/services/identity-service/internal/app"
 	notificationinfra "github.com/qsyy0921/IM/services/identity-service/internal/infrastructure/notification"
 	tokeninfra "github.com/qsyy0921/IM/services/identity-service/internal/infrastructure/token"
 	"github.com/qsyy0921/IM/services/identity-service/internal/types"
@@ -130,10 +131,9 @@ func TestIdentityProductionKeyGuardDefaultsToDisabled(t *testing.T) {
 	}
 }
 
-func TestIdentityProductionKeyGuardRejectsLocalCompatibilityKeys(t *testing.T) {
+func TestIdentityProductionKeyGuardRejectsNonProductionKeyModes(t *testing.T) {
 	t.Setenv("NEXUSIM_IDENTITY_PRODUCTION_KEY_GUARD", "true")
 	t.Setenv("NEXUSIM_IDENTITY_GATEWAY_TOKEN_FORMAT", "legacy")
-	t.Setenv("NEXUSIM_PUSH_AUTH_HMAC_SECRET", "shared-local-secret")
 
 	err := validateIdentityProductionKeyGuardFromEnv(identityRuntimeKeyGuardScope{
 		GatewayToken:           true,
@@ -143,7 +143,7 @@ func TestIdentityProductionKeyGuardRejectsLocalCompatibilityKeys(t *testing.T) {
 		ChallengeDeliveryToken: true,
 	})
 	if err == nil {
-		t.Fatal("expected production key guard to reject local compatibility config")
+		t.Fatal("expected production key guard to reject non-production key modes")
 	}
 	message := err.Error()
 	for _, want := range []string{
@@ -191,7 +191,7 @@ func TestIdentityProductionKeyGuardWorkerScopeDoesNotRequireGatewayKeys(t *testi
 	}
 }
 
-func TestIdentityMFARecoveryRiskPolicyDefaultsToMFAEnv(t *testing.T) {
+func TestIdentityMFARecoveryRiskPolicyUsesDedicatedDefaults(t *testing.T) {
 	t.Setenv("NEXUSIM_IDENTITY_MFA_MAX_FAILED_ATTEMPTS", "7")
 	t.Setenv("NEXUSIM_IDENTITY_MFA_FAILURE_WINDOW", "21m")
 	t.Setenv("NEXUSIM_IDENTITY_MFA_LOCK_DURATION", "22m")
@@ -200,10 +200,15 @@ func TestIdentityMFARecoveryRiskPolicyDefaultsToMFAEnv(t *testing.T) {
 	t.Setenv("NEXUSIM_IDENTITY_MFA_RECOVERY_LOCK_DURATION", "")
 
 	mfa := identityMFARiskPolicyFromEnv()
-	recovery := identityMFARecoveryRiskPolicyFromEnv(mfa)
+	recovery := identityMFARecoveryRiskPolicyFromEnv()
 
-	if recovery.MaxFailedAttempts != 7 || recovery.FailureWindow != 21*time.Minute || recovery.LockDuration != 22*time.Minute {
-		t.Fatalf("expected recovery risk to inherit MFA env policy, got %+v", recovery)
+	if recovery.MaxFailedAttempts != app.DefaultMFAMaxFailedAttempts ||
+		recovery.FailureWindow != app.DefaultMFAFailureWindow ||
+		recovery.LockDuration != app.DefaultMFALockDuration {
+		t.Fatalf("expected recovery risk to use dedicated defaults, got %+v", recovery)
+	}
+	if mfa.MaxFailedAttempts != 7 || mfa.FailureWindow != 21*time.Minute || mfa.LockDuration != 22*time.Minute {
+		t.Fatalf("expected MFA risk policy to remain independently configurable, got %+v", mfa)
 	}
 }
 
@@ -216,7 +221,7 @@ func TestIdentityMFARecoveryRiskPolicyOverridesMFAEnv(t *testing.T) {
 	t.Setenv("NEXUSIM_IDENTITY_MFA_RECOVERY_LOCK_DURATION", "4m")
 
 	mfa := identityMFARiskPolicyFromEnv()
-	recovery := identityMFARecoveryRiskPolicyFromEnv(mfa)
+	recovery := identityMFARecoveryRiskPolicyFromEnv()
 
 	if recovery.MaxFailedAttempts != 2 || recovery.FailureWindow != 3*time.Minute || recovery.LockDuration != 4*time.Minute {
 		t.Fatalf("expected recovery risk to use dedicated env policy, got %+v", recovery)

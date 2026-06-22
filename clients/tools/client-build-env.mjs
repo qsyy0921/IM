@@ -1,4 +1,4 @@
-import { spawnSync } from "node:child_process";
+﻿import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -53,24 +53,24 @@ export function runCommand(command, args, options = {}) {
     return result;
   }
   for (const extension of [".cmd", ".bat", ".exe"]) {
-    const fallbackCommand = `${command}${extension}`;
-    const located = spawnSync("where.exe", [fallbackCommand], {
+    const candidateCommand = `${command}${extension}`;
+    const located = spawnSync("where.exe", [candidateCommand], {
       encoding: "utf8"
     });
     if (located.status !== 0) {
       continue;
     }
-    const fallback = extension === ".cmd" || extension === ".bat"
-      ? spawnSync("cmd.exe", ["/d", "/c", fallbackCommand, ...args], {
+    const candidateResult = extension === ".cmd" || extension === ".bat"
+      ? spawnSync("cmd.exe", ["/d", "/c", candidateCommand, ...args], {
         encoding: "utf8",
         ...options
       })
-      : spawnSync(fallbackCommand, args, {
+      : spawnSync(candidateCommand, args, {
         encoding: "utf8",
         ...options
       });
-    if (fallback.error?.code !== "ENOENT") {
-      return fallback;
+    if (candidateResult.error?.code !== "ENOENT") {
+      return candidateResult;
     }
   }
   return result;

@@ -26,6 +26,7 @@ export function buildReadinessReport() {
   return {
     schemaVersion: "nexusim.client-artifact-readiness.v1",
     generatedAt: new Date().toISOString(),
+    executionPolicy: readinessExecutionPolicy(),
     targets: {
       "windows-desktop": {
         ready: prereqs.desktopArtifactReady,
@@ -63,6 +64,32 @@ export function buildReadinessReport() {
     checks: sanitizedChecks(prereqs.checks),
     docker,
     nextActions: nextActions(prereqs, docker)
+  };
+}
+
+function readinessExecutionPolicy() {
+  return {
+    reportOnly: true,
+    planOnly: false,
+    runsReadinessCommands: true,
+    readsLocalToolchainState: true,
+    readsDockerBuilderState: true,
+    readsShellAssetManifest: true,
+    readsNativeStoreSource: true,
+    buildsNativeArtifacts: false,
+    preparesShellAssets: false,
+    collectsArtifacts: false,
+    writesArtifactManifest: false,
+    startsServices: false,
+    startsDocker: false,
+    buildsDockerImages: false,
+    installsArtifacts: false,
+    contactsDevice: false,
+    startsDeviceActivities: false,
+    opensAdbReverse: false,
+    opensAdbForward: false,
+    downloadsToolchain: false,
+    exposesLocalAbsolutePaths: false
   };
 }
 

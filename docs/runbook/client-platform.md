@@ -330,7 +330,12 @@ First slice:
   build command from the actual builder run command and emits low-sensitive
   `nextActions`; it never starts a download or build by itself. When the image
   is missing, the next action points at `build:android-apk:docker:bootstrap`,
-  making the toolchain download explicit instead of accidental.
+  making the toolchain download explicit instead of accidental. Its execution
+  policy declares it as report-only: it may read local toolchain state, Docker
+  builder state, shell asset manifests and native-store source readiness, but it
+  does not build native artifacts, prepare or collect shell assets, write
+  artifact manifests, start services / Docker, build Docker images, install
+  artifacts, contact devices or download toolchains.
 - `npm --prefix clients run plan:shell-smoke` prints a low-sensitive browser /
   desktop / Android shell smoke plan. It combines toolchain readiness, prepared
   asset verification, artifact presence, collected-artifact install readiness,

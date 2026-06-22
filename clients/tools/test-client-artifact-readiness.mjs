@@ -18,6 +18,7 @@ const report = JSON.parse(output);
 const serialized = JSON.stringify(report);
 
 assert(report.schemaVersion === "nexusim.client-artifact-readiness.v1", "schema version mismatch");
+assertArtifactReadinessPolicy(report.executionPolicy);
 assert(report.targets["windows-desktop"].buildCommand.includes("build:desktop-artifact:collect"), "desktop collect command missing");
 assert(typeof report.targets["windows-desktop"].shellAssets?.verified === "boolean", "desktop shell asset status missing");
 assert(report.targets["windows-desktop"].localStore?.currentDefault === "local-storage", "desktop local store default missing");
@@ -71,3 +72,27 @@ assert(!serialized.match(/[A-Z]:\\\\/), "readiness report leaked Windows absolut
 assert(!serialized.includes("\\\\?"), "readiness report leaked extended Windows path");
 
 console.log("client artifact readiness report ok");
+
+function assertArtifactReadinessPolicy(policy) {
+  assert(policy?.reportOnly === true, "artifact readiness should be report-only");
+  assert(policy.planOnly === false, "artifact readiness is an actual local readiness probe");
+  assert(policy.runsReadinessCommands === true, "artifact readiness should run local readiness commands");
+  assert(policy.readsLocalToolchainState === true, "artifact readiness should read local toolchain state");
+  assert(policy.readsDockerBuilderState === true, "artifact readiness should read Docker builder state");
+  assert(policy.readsShellAssetManifest === true, "artifact readiness should read shell asset manifests");
+  assert(policy.readsNativeStoreSource === true, "artifact readiness should read native store source readiness");
+  assert(policy.buildsNativeArtifacts === false, "artifact readiness must not build native artifacts");
+  assert(policy.preparesShellAssets === false, "artifact readiness must not prepare shell assets");
+  assert(policy.collectsArtifacts === false, "artifact readiness must not collect artifacts");
+  assert(policy.writesArtifactManifest === false, "artifact readiness must not write artifact manifests");
+  assert(policy.startsServices === false, "artifact readiness must not start services");
+  assert(policy.startsDocker === false, "artifact readiness must not start Docker");
+  assert(policy.buildsDockerImages === false, "artifact readiness must not build Docker images");
+  assert(policy.installsArtifacts === false, "artifact readiness must not install artifacts");
+  assert(policy.contactsDevice === false, "artifact readiness must not contact devices");
+  assert(policy.startsDeviceActivities === false, "artifact readiness must not start device activities");
+  assert(policy.opensAdbReverse === false, "artifact readiness must not open adb reverse");
+  assert(policy.opensAdbForward === false, "artifact readiness must not open adb forward");
+  assert(policy.downloadsToolchain === false, "artifact readiness must not download toolchains");
+  assert(policy.exposesLocalAbsolutePaths === false, "artifact readiness must not expose local absolute paths");
+}

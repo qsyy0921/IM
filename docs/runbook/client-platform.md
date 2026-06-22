@@ -219,8 +219,9 @@ First slice:
   cache-bypass rules for API / WebSocket / shell config paths.
 - `npm --prefix clients run check:no-toolchain` first validates its own dry-run
   plan for unsafe operations, then runs the no-toolchain client shell guard set
-  in one command: client workspace validation, shell smoke plan, workspace
-  TypeScript, Web PWA, shell web assets / prep wrapper, shell config,
+  in one command: client workspace validation, shell smoke plan, build
+  prerequisite report contract, workspace TypeScript, Web PWA, shell web assets
+  / prep wrapper, shell config,
   desktop / Android native skeleton validation, Web platform, shared runtime /
   local-store / IndexedDB contracts, Web shell lifecycle / automation /
   smoke-report contracts, clientweb smoke hook contract, desktop artifact launch
@@ -551,7 +552,12 @@ npm --prefix clients run validate:builder-profile
 
 This command reports readiness as JSON and exits non-zero when artifact / APK
 toolchains are missing. It is local-only: it does not install dependencies, pull
-packages, or use `npx` to resolve remote CLIs.
+packages, or use `npx` to resolve remote CLIs. Its output is now
+`nexusim.client-build-prereqs.v1` with an execution policy: it may run local
+toolchain/version probes, read environment variables and inspect repo-local
+Node bins, but it does not build artifacts, start services / Docker, install or
+contact devices, download toolchains, or print raw command output / local
+absolute paths.
 
 The readiness report is non-failing and is useful before deciding whether to
 install native toolchains or run the Docker builder. It also reports whether

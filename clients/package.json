@@ -24,6 +24,7 @@
     "test:shell-config": "node ./tools/test-shell-config-contract.mjs",
     "test:shell-web-assets": "node ./tools/test-shell-web-assets.mjs",
     "test:shell-asset-prep-wrapper": "node ./tools/test-shell-asset-prep-wrapper.mjs",
+    "test:build-prereqs": "node ./tools/test-client-build-prereqs.mjs",
     "test:desktop-shell-action-assets": "node ./tools/test-desktop-shell-action-assets.mjs",
     "verify:shell-assets": "node ./tools/verify-shell-assets.mjs --target all",
     "prepare:shell-assets:desktop": "node ./tools/prepare-shell-web-assets-if-needed.mjs --target windows-desktop",

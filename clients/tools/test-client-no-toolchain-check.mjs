@@ -21,6 +21,7 @@ assert(plan.startsServices === false, "no-toolchain plan must not start services
 assert(commands.includes("npm --prefix clients run test:no-toolchain-check"), "no-toolchain self-check missing");
 assert(commands.includes("npm --prefix clients run validate"), "client workspace validation missing");
 assert(commands.includes("npm --prefix clients run test:shell-smoke-plan"), "shell smoke plan check missing");
+assert(commands.includes("npm --prefix clients run test:build-prereqs"), "build prereqs report contract check missing");
 assert(commands.includes("npm --prefix clients run test:artifact-readiness"), "artifact readiness contract check missing");
 assert(commands.includes("npm --prefix clients run test:artifact-install-plan"), "artifact install plan contract check missing");
 assert(commands.includes("npm --prefix clients run test:artifact-builders"), "artifact builder contract check missing");

@@ -82,6 +82,10 @@ Android Docker builder bootstrap 若出现在 shell smoke plan 中，必须带�
 `manualOnly=true` 和安装 / 启动 / 设备接触风险字段，脚本本身不得安装或启动
 artifact；顶层 `executionPolicy.planOnly=true` 必须声明它不会执行 checklist
 命令、不会下载工具链、不会启动 Docker、不会接触设备。
+Build prerequisites report 必须带 execution policy，声明它是 report-only 本机能力
+探测；可运行本机工具链版本检查、读取环境变量和 repo-local node bin 状态，但不得
+构建 artifact、启动服务 / Docker、安装或接触设备、下载工具链、泄露本地绝对路径或
+原始 command output。
 Artifact readiness report 必须带 execution policy，声明它是 report-only 本机状态
 探测；可读取本机工具链、Docker builder、shell asset manifest 和 native-store
 source readiness，但不得构建 artifact / Docker image、准备或收集 artifact、写

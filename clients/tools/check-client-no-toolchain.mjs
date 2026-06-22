@@ -20,6 +20,11 @@ const checkPlan = [
     reason: "guards browser, desktop and Android shell smoke checklist shape"
   },
   {
+    name: "build-prereqs-report-contract",
+    script: "test:build-prereqs",
+    reason: "guards low-sensitive local build prerequisite reporting without building artifacts"
+  },
+  {
     name: "artifact-readiness-contract",
     script: "test:artifact-readiness",
     reason: "guards low-sensitive native artifact readiness reporting without building artifacts"

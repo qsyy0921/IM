@@ -52,6 +52,7 @@ export function buildInstallerOutput(plan, options = {}) {
       readsTauriConfig: true,
       readsCollectedArtifactManifest: true,
       readsSigningConfig: true,
+      readsAuthenticodeSignature: true,
       validatesArtifactHashes: true
     },
     commands: plan.commandTemplate ?? {
@@ -86,6 +87,7 @@ export function buildInstallerOutput(plan, options = {}) {
       expectedOutputHint: plan.expectedOutputHint,
       tauri: plan.tauri,
       signing: plan.signing,
+      signatureVerification: plan.signatureVerification,
       artifactBaseline: plan.artifactBaseline
     },
     nextAction: readyToExecuteInstallerBuild

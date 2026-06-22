@@ -90,7 +90,8 @@
   `build:desktop-installer` 已补显式
   `--execute` 门控的 installer build 包装器，默认仍只输出计划；desktop installer
   planner 现在会按 `windows-desktop` 目标自动选择 collected manifest，不会被更新的
-  Android manifest 遮住；真实 MSI / NSIS 构建仍要先满足 signing readiness。
+  Android manifest 遮住；真实 MSI / NSIS 构建仍要先满足 signing readiness 和
+  valid Authenticode signature。
 - `clients/android`：first-stage TypeScript runtime adapter 和 Kotlin WebView
   asset shell skeleton 已落；`createAndroidClientRuntime` 已能组装 shared
   `BFFClient` / `WebSocketPushTransport` / auth / inbox / send / ack queue；

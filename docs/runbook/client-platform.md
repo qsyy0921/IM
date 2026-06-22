@@ -509,16 +509,17 @@ First slice:
   collected `windows-desktop` manifest instead of blindly using the newest
   manifest, so newer Android artifacts do not hide an existing desktop baseline.
   `plan:desktop-installer` can read the repository installer Tauri profile, the
-  collected desktop manifest and signing readiness, then report whether MSI /
-  NSIS installer bundling is ready. The default dev config remains inactive,
-  while `tauri.installer.conf.json` is the explicit MSI profile. The plan still
-  reports not ready until signing readiness is present instead of treating the
-  unsigned portable zip as an installer.
+  collected desktop manifest, signing readiness and signature verification
+  status, then report whether MSI / NSIS installer bundling is ready. The
+  default dev config remains inactive, while `tauri.installer.conf.json` is the
+  explicit MSI profile. The plan still reports not ready until signing
+  readiness and a valid Authenticode signature are present instead of treating
+  the unsigned portable zip as an installer.
   `build:desktop-installer` is the explicit execution wrapper over that plan.
   Its default output is plan-only; `--execute` is required before it runs Tauri
   with the explicit bundle target and installer profile, then collects the
   resulting Windows desktop artifact. It still fails closed while installer
-  readiness is false. It
+  readiness, signing input readiness or signature validity is false. It
   does not sign, install, launch, start services or download toolchains. Real
   execution uses the repository installer profile; custom `--tauri-config`
   remains a planning fixture input and blocks `--execute`.

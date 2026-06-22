@@ -90,7 +90,12 @@ try {
     signToolPath: fakeSignTool,
     certFile: fakePfx,
     timestampURL: "https://timestamp.example.test",
-    pfxPassEnvPresent: true
+    pfxPassEnvPresent: true,
+    mockSignatureStatus: {
+      status: "Valid",
+      signerSubject: "CN=NexusIM Test Code Signing",
+      signerThumbprint: "0123456789abcdef0123456789abcdef01234567"
+    }
   });
   const dryRun = buildInstallerOutput(readyPlan, { execute: false });
   const dryRunJSON = JSON.stringify(dryRun);
@@ -103,6 +108,7 @@ try {
   assert(dryRun.commands.build.includes("--bundles"), "installer builder should plan an explicit bundle target");
   assert(dryRun.commands.build.includes("--config"), "installer builder should plan an explicit Tauri config");
   assert(dryRun.commands.collect.includes("collect:client-artifacts"), "installer builder should plan artifact collection after build");
+  assert(dryRun.installerPlan.signatureVerification.readyForSignedDistribution === true, "installer builder should require a valid signature");
   assert(!dryRunJSON.includes(tempRoot), "dry-run installer builder output leaked absolute temp path");
   assert(!dryRunJSON.match(/token|secret|password|credential|private/i), "dry-run installer builder output leaked sensitive names");
 
@@ -122,11 +128,11 @@ try {
   ], {
     NEXUSIM_DESKTOP_SIGN_PFX_PASS: "present"
   });
-  assert(cliPlan.readyToBuildInstaller === true, "CLI dry-run should be ready");
+  assert(cliPlan.readyToBuildInstaller === false, "CLI dry-run should not be ready for unsigned fixtures");
+  assert(cliPlan.missing.includes("desktop-signature-valid"), "CLI dry-run should report signature readiness");
   assert(cliPlan.executionPolicy.planOnly === true, "CLI default should be plan-only");
   assert(cliPlan.executionPolicy.executesBuildCommand === false, "CLI default should not execute build");
   assert(cliPlan.commands.build.includes("--config"), "CLI dry-run should expose the Tauri config argument");
-  assert(cliPlan.executionBlockers.includes("repository-tauri-config-required"), "CLI custom config dry-run should require repository config before execution");
 
   const notReady = spawnSync(process.execPath, [
     installerBuilder,
@@ -173,10 +179,10 @@ try {
   });
   assert(customConfigExecute.status === 2, "execute with custom tauri config should fail closed");
   const customConfigOutput = JSON.parse(customConfigExecute.stdout);
-  assert(customConfigOutput.readyToBuildInstaller === true, "custom config plan should be build-ready");
+  assert(customConfigOutput.readyToBuildInstaller === false, "custom config plan should not be build-ready while unsigned");
   assert(customConfigOutput.readyToExecuteInstallerBuild === false, "custom config execute should be blocked");
   assert(customConfigOutput.executionPolicy.executesBuildCommand === false, "custom config execute must not run build command");
-  assert(customConfigOutput.executionBlockers.includes("repository-tauri-config-required"), "custom config execute should report repository config blocker");
+  assert(customConfigOutput.missing.includes("desktop-signature-valid"), "custom config execute should report signature blocker");
 
   assert(readFileSync(fakePfx, "utf8") === "fake pfx", "fixture pfx should still exist");
 } finally {

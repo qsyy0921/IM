@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { workspaceRoot } from "./client-build-env.mjs";
 import { buildDesktopSigningPlan } from "./plan-desktop-signing.mjs";
+import { buildDesktopSignatureVerificationReport } from "./verify-desktop-signature.mjs";
 
 const schemaVersion = "nexusim.desktop-installer-plan.v1";
 const artifactManifestSchema = "nexusim.client-artifacts.v1";
@@ -68,6 +69,22 @@ export function buildDesktopInstallerPlan(options = {}) {
   if (!signingPlan.readyToSign) {
     missing.push("desktop-signing-ready");
   }
+  const signatureVerification = artifactManifestPath
+    ? buildDesktopSignatureVerificationReport({
+        manifest: artifactManifestPath,
+        mockSignatureStatus: options.mockSignatureStatus
+      })
+    : {
+        readyForSignedDistribution: false,
+        missing: ["artifact-manifest"],
+        signature: {
+          checked: false,
+          status: "UNAVAILABLE"
+        }
+      };
+  if (!signatureVerification.readyForSignedDistribution) {
+    missing.push("desktop-signature-valid");
+  }
 
   const readyToBuildInstaller = missing.length === 0;
   const plan = {
@@ -81,6 +98,13 @@ export function buildDesktopInstallerPlan(options = {}) {
       readyToSign: signingPlan.readyToSign,
       missing: signingPlan.missing ?? [],
       mode: signingPlan.signing?.mode ?? "none"
+    },
+    signatureVerification: {
+      readyForSignedDistribution: signatureVerification.readyForSignedDistribution,
+      missing: signatureVerification.missing ?? [],
+      status: signatureVerification.signature?.status ?? "UNKNOWN",
+      signed: Boolean(signatureVerification.signature?.signed),
+      trusted: Boolean(signatureVerification.signature?.trusted)
     },
     commandTemplate: readyToBuildInstaller
       ? {
@@ -111,7 +135,7 @@ export function buildDesktopInstallerPlan(options = {}) {
     expectedOutputHint: `clients/desktop/src-tauri/target/release/bundle/${target}/`,
     nextAction: readyToBuildInstaller
       ? "run the installer build in a dedicated Windows packaging profile"
-      : "provide an explicit repository installer profile, desktop artifact baseline, and signing inputs before building an installer"
+      : "provide an explicit repository installer profile, desktop artifact baseline, signing inputs, and a valid signed artifact before building an installer"
   };
   assertLowSensitivePlan(plan);
   return plan;
@@ -230,6 +254,7 @@ function executionPolicy() {
     readsTauriConfig: true,
     readsCollectedArtifactManifest: true,
     readsSigningConfig: true,
+    readsAuthenticodeSignature: true,
     validatesArtifactHashes: true
   };
 }

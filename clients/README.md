@@ -256,13 +256,14 @@ Windows Authenticode public status. It does not sign, install, launch, start
 services or download toolchains. Use `--require-valid` in a release profile to
 fail closed when the collected desktop artifact is not Authenticode-valid.
 `plan:desktop-installer` reads the repository installer Tauri profile, the
-collected Windows desktop manifest and the signing readiness plan, then reports
-whether MSI / NSIS installer bundling can run. It is also plan-only: it does not
-run Tauri, sign, install, launch or download anything. The default development
-Tauri config stays `bundle.active=false`; installer bundling uses the separate
+collected Windows desktop manifest, the signing readiness plan and the
+read-only signature verification report, then reports whether MSI / NSIS
+installer bundling can run. It is also plan-only: it does not run Tauri, sign,
+install, launch or download anything. The default development Tauri config
+stays `bundle.active=false`; installer bundling uses the separate
 `src-tauri/tauri.installer.conf.json` profile. The plan selects the latest
 `windows-desktop` manifest automatically and remains not ready until signing
-readiness is true.
+readiness is true and the collected artifact verifies as Authenticode-valid.
 `build:desktop-installer` wraps that plan as the explicit execution entry. By
 default it is still plan-only. It runs Tauri with the explicit bundle target and
 then collects the resulting Windows desktop artifact only when run with
@@ -307,8 +308,8 @@ Current packaging status:
   signing inputs are present. `verify:desktop-signature` reads Authenticode
   public status and currently reports the collected baseline as `NotSigned`.
   `plan:desktop-installer` now checks the repository
-  installer Tauri profile, MSI / NSIS target, artifact baseline and signing
-  readiness; actual `build:desktop-installer` now provides the explicit
+  installer Tauri profile, MSI / NSIS target, artifact baseline, signing
+  readiness and valid signature status; actual `build:desktop-installer` now provides the explicit
   `--execute`-gated build entry and runs Tauri with that profile only when
   readiness is true. Real signed installer execution, install and launch remain
   future hardening. Use

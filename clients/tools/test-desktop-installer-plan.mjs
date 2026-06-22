@@ -86,8 +86,10 @@ try {
   assert(inactive.readyToBuildInstaller === false, "inactive bundle config should not be ready");
   assert(inactive.missing.includes("tauri-bundle-active"), "inactive bundle should be reported");
   assert(inactive.missing.includes("desktop-signing-ready"), "missing signing config should be reported");
+  assert(inactive.missing.includes("desktop-signature-valid"), "missing valid signature should be reported");
   assert(inactive.executionPolicy.planOnly === true, "installer plan should be plan-only");
   assert(inactive.executionPolicy.buildsInstaller === false, "installer plan should not build installers");
+  assert(inactive.executionPolicy.readsAuthenticodeSignature === true, "installer plan should read signature state");
 
   const activeConfigPath = join(tempRoot, "tauri-active.json");
   writeJSON(activeConfigPath, {
@@ -112,7 +114,12 @@ try {
     signToolPath: fakeSignTool,
     certFile: fakePfx,
     timestampURL: "https://timestamp.example.test",
-    pfxPassEnvPresent: true
+    pfxPassEnvPresent: true,
+    mockSignatureStatus: {
+      status: "Valid",
+      signerSubject: "CN=NexusIM Test Code Signing",
+      signerThumbprint: "0123456789abcdef0123456789abcdef01234567"
+    }
   });
   const readyJSON = JSON.stringify(ready);
   assert(ready.readyToBuildInstaller === true, "active MSI config with signing inputs should be ready");
@@ -126,6 +133,8 @@ try {
   assert(Array.isArray(ready.commandTemplate?.collect), "ready plan should include collect command template");
   assert(ready.commandTemplate.collect.includes("collect:client-artifacts"), "ready collect command should collect artifacts");
   assert(ready.expectedOutputHint.endsWith("/msi/"), "ready plan output hint should point at MSI bundle output");
+  assert(ready.signatureVerification.readyForSignedDistribution === true, "ready plan should require a valid signature");
+  assert(ready.signatureVerification.status === "Valid", "ready plan should carry signature status");
   assert(!readyJSON.includes(tempRoot), "ready installer plan leaked absolute temp path");
   assert(!readyJSON.match(/token|secret|password|credential|private/i), "ready installer plan leaked sensitive names");
 
@@ -136,7 +145,12 @@ try {
     signToolPath: fakeSignTool,
     certFile: fakePfx,
     timestampURL: "https://timestamp.example.test",
-    pfxPassEnvPresent: true
+    pfxPassEnvPresent: true,
+    mockSignatureStatus: {
+      status: "Valid",
+      signerSubject: "CN=NexusIM Test Code Signing",
+      signerThumbprint: "0123456789abcdef0123456789abcdef01234567"
+    }
   });
   assert(nsisMissing.readyToBuildInstaller === false, "undeclared NSIS target should not be ready");
   assert(nsisMissing.missing.includes("installer-target-declared"), "undeclared target should be reported");
@@ -148,7 +162,12 @@ try {
     signToolPath: fakeSignTool,
     certFile: fakePfx,
     timestampURL: "https://timestamp.example.test",
-    pfxPassEnvPresent: true
+    pfxPassEnvPresent: true,
+    mockSignatureStatus: {
+      status: "Valid",
+      signerSubject: "CN=NexusIM Test Code Signing",
+      signerThumbprint: "0123456789abcdef0123456789abcdef01234567"
+    }
   });
   assert(unsupported.readyToBuildInstaller === false, "unsupported target should not be ready");
   assert(unsupported.missing.includes("supported-installer-target"), "unsupported target should be reported");
@@ -180,7 +199,12 @@ try {
     signToolPath: fakeSignTool,
     certFile: fakePfx,
     timestampURL: "https://timestamp.example.test",
-    pfxPassEnvPresent: true
+    pfxPassEnvPresent: true,
+    mockSignatureStatus: {
+      status: "Valid",
+      signerSubject: "CN=NexusIM Test Code Signing",
+      signerThumbprint: "0123456789abcdef0123456789abcdef01234567"
+    }
   });
   assert(targetSelected.readyToBuildInstaller === true, "default installer plan should select latest desktop manifest, not latest android manifest");
   assert(targetSelected.artifactBaseline.runId === "desktop-installer-test", "default installer plan selected the wrong manifest");
@@ -201,7 +225,9 @@ try {
   ], {
     NEXUSIM_DESKTOP_SIGN_PFX_PASS: "present"
   });
-  assert(cliPlan.readyToBuildInstaller === true, "CLI installer plan should be ready");
+  assert(cliPlan.readyToBuildInstaller === false, "CLI installer plan should not be ready for unsigned fixtures");
+  assert(cliPlan.missing.includes("desktop-signature-valid"), "CLI installer plan should require valid signature");
+  assert(cliPlan.signatureVerification.trusted === false, "CLI installer plan should not trust unsigned fixtures");
   assert(!JSON.stringify(cliPlan).includes(tempRoot), "CLI installer plan leaked absolute temp path");
 
   assert(readFileSync(fakePfx, "utf8") === "fake pfx", "fixture pfx should still exist");

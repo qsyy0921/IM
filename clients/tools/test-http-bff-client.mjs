@@ -22,6 +22,7 @@ async function main() {
       register: "/api/auth/register",
       createConversation: "/api/conversations/create",
       directConversation: "/api/conversations/direct",
+      conversationProfile: conversationID => "/api/conversations/" + encodeURIComponent(conversationID) + "/profile",
       conversationMembers: conversationID => "/api/conversations/" + encodeURIComponent(conversationID) + "/members",
       inviteConversationMember: conversationID => "/api/conversations/" + encodeURIComponent(conversationID) + "/members/invite",
       leaveConversation: conversationID => "/api/conversations/" + encodeURIComponent(conversationID) + "/members/leave",
@@ -95,6 +96,49 @@ async function main() {
           boundary_seq: "2",
           member_version: "2",
           permission_version: "2"
+        }),
+        { status: 200, headers: { "content-type": "application/json; charset=utf-8" } }
+      );
+    }
+    if (url.endsWith("/api/conversations/group-client-local/profile") && init?.method === "GET") {
+      assert.equal(init?.headers?.Authorization, "Bearer gateway-token");
+      return new Response(
+        JSON.stringify({
+          profile: {
+            tenant_id: "tenant-client-local",
+            conversation_id: "group-client-local",
+            conversation_type: "CONVERSATION_TYPE_GROUP",
+            title: "研发群",
+            avatar_uri: "media://avatar/group-client-local",
+            profile_version: "7",
+            member_version: "3",
+            permission_version: "2",
+            updated_at_unix_ms: "1782112000200"
+          }
+        }),
+        { status: 200, headers: { "content-type": "application/json; charset=utf-8" } }
+      );
+    }
+    if (url.endsWith("/api/conversations/group-client-local/profile") && init?.method === "POST") {
+      assert.equal(init?.headers?.Authorization, "Bearer gateway-token");
+      assert.deepEqual(JSON.parse(String(init?.body)), {
+        title: "研发二群",
+        avatar_uri: "media://avatar/group-client-local-v2",
+        expected_profile_version: 7
+      });
+      return new Response(
+        JSON.stringify({
+          profile: {
+            tenant_id: "tenant-client-local",
+            conversation_id: "group-client-local",
+            conversation_type: "CONVERSATION_TYPE_GROUP",
+            title: "研发二群",
+            avatar_uri: "media://avatar/group-client-local-v2",
+            profile_version: "8",
+            member_version: "3",
+            permission_version: "2",
+            updated_at_unix_ms: "1782112000300"
+          }
         }),
         { status: 200, headers: { "content-type": "application/json; charset=utf-8" } }
       );
@@ -304,6 +348,21 @@ async function main() {
     assert.equal(direct.type, "DIRECT");
     assert.equal(direct.directPeerUserID, "user-b");
     assert.equal(direct.boundarySeq, 2);
+    const profile = await client.getConversationProfile("group-client-local", session());
+    assert.equal(profile.title, "研发群");
+    assert.equal(profile.avatarURI, "media://avatar/group-client-local");
+    assert.equal(profile.profileVersion, 7);
+    const updatedProfile = await client.updateConversationProfile(
+      {
+        conversationID: "group-client-local",
+        title: "研发二群",
+        avatarURI: "media://avatar/group-client-local-v2",
+        expectedProfileVersion: 7
+      },
+      session()
+    );
+    assert.equal(updatedProfile.title, "研发二群");
+    assert.equal(updatedProfile.profileVersion, 8);
     const invited = await client.inviteConversationMember(
       {
         conversationID: "group-client-local",
@@ -379,7 +438,7 @@ async function main() {
     );
     assert.equal(response.items[0]?.text, expectedText);
     assert.equal(response.nextSeq, 11);
-    assert.equal(calls.length, 10);
+    assert.equal(calls.length, 12);
   } finally {
     globalThis.fetch = originalFetch;
   }

@@ -13,6 +13,10 @@ if ([string]::IsNullOrWhiteSpace($ClientHost)) {
     $ClientHost = $BindHost
 }
 
+$nexusIMRepoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+. (Join-Path $nexusIMRepoRoot "tools\output-root-safety.ps1")
+Assert-ExternalOutputRoot -Value $ResultRoot -RepositoryRoot $nexusIMRepoRoot -Name "ResultRoot"
+
 $smokeArgs = @{
     PgDsn = $PgDsn
     KafkaBrokers = $KafkaBrokers

@@ -30,6 +30,10 @@ const requiredTestIDs = [
   "group-profile-subtitle",
   "group-profile-id",
   "group-profile-member-count",
+  "group-profile-title-input",
+  "group-profile-avatar-input",
+  "group-profile-save",
+  "group-profile-error",
   "group-members-refresh",
   "group-member-search",
   "group-member-role-filter",
@@ -60,6 +64,10 @@ assertIncludes(appSource, "openDirectConversation(contact)", "web shell must let
 assertIncludes(appSource, "inviteGroupMember", "web shell must expose group member invite action");
 assertIncludes(appSource, "leaveGroupConversation", "web shell must expose group leave action");
 assertIncludes(appSource, "loadGroupMembers", "web shell must load real group members through BFF");
+assertIncludes(appSource, "loadGroupProfile", "web shell must load group profile through BFF");
+assertIncludes(appSource, "saveGroupProfile", "web shell must expose group profile update action");
+assertIncludes(appSource, "updateConversationProfile", "web shell must update group profile through client-core BFF");
+assertIncludes(appSource, "getConversationProfile", "web shell must read group profile through client-core BFF");
 assertIncludes(appSource, "userIDPrefix", "web shell must use public BFF member search instead of local-only fake filtering");
 assertIncludes(appSource, "pageToken", "web shell must use public BFF member pagination tokens");
 assertIncludes(appSource, "roleFilter", "web shell must use public BFF member role filter");

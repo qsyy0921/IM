@@ -46,6 +46,8 @@ type Gateway interface {
 	CreateMemberChange(ctx context.Context, request *conversationv1.CreateMemberChangeRequest) (*conversationv1.CreateMemberChangeResponse, error)
 	ListConversationMembers(ctx context.Context, request *conversationv1.ListConversationMembersRequest) (*conversationv1.ListConversationMembersResponse, error)
 	TransferConversationOwner(ctx context.Context, request *conversationv1.TransferConversationOwnerRequest) (*conversationv1.TransferConversationOwnerResponse, error)
+	GetConversationProfile(ctx context.Context, request *conversationv1.GetConversationProfileRequest) (*conversationv1.GetConversationProfileResponse, error)
+	UpdateConversationProfile(ctx context.Context, request *conversationv1.UpdateConversationProfileRequest) (*conversationv1.UpdateConversationProfileResponse, error)
 	SendMessage(ctx context.Context, request *messagev1.SendMessageRequest) (*messagev1.SendMessageResponse, error)
 	PullInbox(ctx context.Context, request *deliveryv1.PullInboxRequest) (*deliveryv1.PullInboxResponse, error)
 	AckDelivery(ctx context.Context, request *deliveryv1.AckDeliveryRequest) (*deliveryv1.AckDeliveryResponse, error)
@@ -186,6 +188,12 @@ type transferConversationOwnerRequest struct {
 	ExpectedVersion int64  `json:"expected_member_version"`
 }
 
+type updateConversationProfileRequest struct {
+	Title                  string `json:"title"`
+	AvatarURI              string `json:"avatar_uri"`
+	ExpectedProfileVersion int64  `json:"expected_profile_version"`
+}
+
 func NewServer(config Config) *Server {
 	server := &Server{
 		gateway:       config.Gateway,
@@ -266,6 +274,10 @@ func (server *Server) serveHTTP(response http.ResponseWriter, request *http.Requ
 		server.handleUpdateConversationMemberRole(response, request)
 	case request.Method == http.MethodPost && isConversationMemberActionPath(request.URL.EscapedPath(), "/owner/transfer"):
 		server.handleTransferConversationOwner(response, request)
+	case request.Method == http.MethodGet && isConversationMemberActionPath(request.URL.EscapedPath(), "/profile"):
+		server.handleGetConversationProfile(response, request)
+	case request.Method == http.MethodPost && isConversationMemberActionPath(request.URL.EscapedPath(), "/profile"):
+		server.handleUpdateConversationProfile(response, request)
 	case request.Method == http.MethodGet && isConversationMessagesPath(request.URL.EscapedPath()):
 		server.handleConversationMessages(response, request)
 	case request.Method == http.MethodPost && path == "/api/messages/send":
@@ -682,6 +694,45 @@ func (server *Server) handleTransferConversationOwner(response http.ResponseWrit
 		ExpectedMemberVersion: input.ExpectedVersion,
 		IdempotencyKey:        idempotencyKey,
 		Reason:                strings.TrimSpace(input.Reason),
+	})
+	server.writeProtoOrError(response, output, err)
+}
+
+func (server *Server) handleGetConversationProfile(response http.ResponseWriter, request *http.Request) {
+	if _, err := server.authenticateRequest(request); err != nil {
+		writeError(response, err)
+		return
+	}
+	conversationID, err := conversationIDFromMemberActionPath(request.URL.EscapedPath(), "/profile")
+	if err != nil {
+		writeError(response, err)
+		return
+	}
+	output, err := server.requireGateway().GetConversationProfile(contextFromRequest(request), &conversationv1.GetConversationProfileRequest{
+		ConversationId: conversationID,
+	})
+	server.writeProtoOrError(response, output, err)
+}
+
+func (server *Server) handleUpdateConversationProfile(response http.ResponseWriter, request *http.Request) {
+	if _, err := server.authenticateRequest(request); err != nil {
+		writeError(response, err)
+		return
+	}
+	conversationID, err := conversationIDFromMemberActionPath(request.URL.EscapedPath(), "/profile")
+	if err != nil {
+		writeError(response, err)
+		return
+	}
+	var input updateConversationProfileRequest
+	if !server.decodeJSON(response, request, &input) {
+		return
+	}
+	output, err := server.requireGateway().UpdateConversationProfile(contextFromRequest(request), &conversationv1.UpdateConversationProfileRequest{
+		ConversationId:         conversationID,
+		Title:                  input.Title,
+		AvatarUri:              input.AvatarURI,
+		ExpectedProfileVersion: input.ExpectedProfileVersion,
 	})
 	server.writeProtoOrError(response, output, err)
 }
@@ -1107,6 +1158,12 @@ func (missingGateway) ListConversationMembers(context.Context, *conversationv1.L
 	return nil, status.Error(codes.Internal, "gateway is not configured")
 }
 func (missingGateway) TransferConversationOwner(context.Context, *conversationv1.TransferConversationOwnerRequest) (*conversationv1.TransferConversationOwnerResponse, error) {
+	return nil, status.Error(codes.Internal, "gateway is not configured")
+}
+func (missingGateway) GetConversationProfile(context.Context, *conversationv1.GetConversationProfileRequest) (*conversationv1.GetConversationProfileResponse, error) {
+	return nil, status.Error(codes.Internal, "gateway is not configured")
+}
+func (missingGateway) UpdateConversationProfile(context.Context, *conversationv1.UpdateConversationProfileRequest) (*conversationv1.UpdateConversationProfileResponse, error) {
 	return nil, status.Error(codes.Internal, "gateway is not configured")
 }
 func (missingGateway) SendMessage(context.Context, *messagev1.SendMessageRequest) (*messagev1.SendMessageResponse, error) {

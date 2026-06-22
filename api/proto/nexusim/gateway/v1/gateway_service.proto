@@ -31,6 +31,8 @@ service GatewayService {
   rpc GetMemberChange(nexusim.conversation.v1.GetMemberChangeRequest) returns (nexusim.conversation.v1.GetMemberChangeResponse);
   rpc ListConversationMembers(nexusim.conversation.v1.ListConversationMembersRequest) returns (nexusim.conversation.v1.ListConversationMembersResponse);
   rpc TransferConversationOwner(nexusim.conversation.v1.TransferConversationOwnerRequest) returns (nexusim.conversation.v1.TransferConversationOwnerResponse);
+  rpc GetConversationProfile(nexusim.conversation.v1.GetConversationProfileRequest) returns (nexusim.conversation.v1.GetConversationProfileResponse);
+  rpc UpdateConversationProfile(nexusim.conversation.v1.UpdateConversationProfileRequest) returns (nexusim.conversation.v1.UpdateConversationProfileResponse);
 
   rpc SendMessage(nexusim.message.v1.SendMessageRequest) returns (nexusim.message.v1.SendMessageResponse);
   rpc EditMessage(nexusim.message.v1.EditMessageRequest) returns (nexusim.message.v1.MessageChangeResponse);

@@ -1,7 +1,7 @@
 ﻿{
-    "created_at":  "2026-06-21T05:25:03.6019802Z",
+    "created_at":  "2026-06-22T23:12:35.6849070Z",
     "scope":  "handwritten Go/Markdown/PowerShell/Bash file-size budget snapshot; not a code-quality score",
-    "file_count":  1935,
+    "file_count":  1992,
     "thresholds":  {
                        "production_warn_lines":  2500,
                        "production_max_lines":  3500,
@@ -65,6 +65,15 @@
                           "MaxRatio":  0.512
                       },
                       {
+                          "Path":  "docs\\runbook\\client-platform.md",
+                          "Lines":  747,
+                          "Kind":  "docs",
+                          "Warn":  1200,
+                          "Max":  1500,
+                          "WarnRatio":  0.6225,
+                          "MaxRatio":  0.498
+                      },
+                      {
                           "Path":  "docs\\sdd\\push-gateway.md",
                           "Lines":  743,
                           "Kind":  "docs",
@@ -83,6 +92,15 @@
                           "MaxRatio":  0.4893
                       },
                       {
+                          "Path":  "services\\api-gateway\\internal\\api\\httpbff\\server_test.go",
+                          "Lines":  1343,
+                          "Kind":  "test/runner",
+                          "Warn":  2500,
+                          "Max":  3000,
+                          "WarnRatio":  0.5372,
+                          "MaxRatio":  0.4477
+                      },
+                      {
                           "Path":  "tools\\run-loadtest-capacity-baseline-suite.ps1",
                           "Lines":  669,
                           "Kind":  "script/runner",
@@ -90,24 +108,6 @@
                           "Max":  1500,
                           "WarnRatio":  0.669,
                           "MaxRatio":  0.446
-                      },
-                      {
-                          "Path":  "services\\identity-service\\cmd\\identity-service\\main_test.go",
-                          "Lines":  1272,
-                          "Kind":  "test/runner",
-                          "Warn":  2500,
-                          "Max":  3000,
-                          "WarnRatio":  0.5088,
-                          "MaxRatio":  0.424
-                      },
-                      {
-                          "Path":  "loadtest\\contacts\\main.go",
-                          "Lines":  1246,
-                          "Kind":  "test/runner",
-                          "Warn":  2500,
-                          "Max":  3000,
-                          "WarnRatio":  0.4984,
-                          "MaxRatio":  0.4153
                       }
                   ],
     "hotspots":  [

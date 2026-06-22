@@ -41,6 +41,8 @@ const (
 	GatewayService_GetMemberChange_FullMethodName              = "/nexusim.gateway.v1.GatewayService/GetMemberChange"
 	GatewayService_ListConversationMembers_FullMethodName      = "/nexusim.gateway.v1.GatewayService/ListConversationMembers"
 	GatewayService_TransferConversationOwner_FullMethodName    = "/nexusim.gateway.v1.GatewayService/TransferConversationOwner"
+	GatewayService_GetConversationProfile_FullMethodName       = "/nexusim.gateway.v1.GatewayService/GetConversationProfile"
+	GatewayService_UpdateConversationProfile_FullMethodName    = "/nexusim.gateway.v1.GatewayService/UpdateConversationProfile"
 	GatewayService_SendMessage_FullMethodName                  = "/nexusim.gateway.v1.GatewayService/SendMessage"
 	GatewayService_EditMessage_FullMethodName                  = "/nexusim.gateway.v1.GatewayService/EditMessage"
 	GatewayService_RevokeMessage_FullMethodName                = "/nexusim.gateway.v1.GatewayService/RevokeMessage"
@@ -92,6 +94,8 @@ type GatewayServiceClient interface {
 	GetMemberChange(ctx context.Context, in *v11.GetMemberChangeRequest, opts ...grpc.CallOption) (*v11.GetMemberChangeResponse, error)
 	ListConversationMembers(ctx context.Context, in *v11.ListConversationMembersRequest, opts ...grpc.CallOption) (*v11.ListConversationMembersResponse, error)
 	TransferConversationOwner(ctx context.Context, in *v11.TransferConversationOwnerRequest, opts ...grpc.CallOption) (*v11.TransferConversationOwnerResponse, error)
+	GetConversationProfile(ctx context.Context, in *v11.GetConversationProfileRequest, opts ...grpc.CallOption) (*v11.GetConversationProfileResponse, error)
+	UpdateConversationProfile(ctx context.Context, in *v11.UpdateConversationProfileRequest, opts ...grpc.CallOption) (*v11.UpdateConversationProfileResponse, error)
 	SendMessage(ctx context.Context, in *v12.SendMessageRequest, opts ...grpc.CallOption) (*v12.SendMessageResponse, error)
 	EditMessage(ctx context.Context, in *v12.EditMessageRequest, opts ...grpc.CallOption) (*v12.MessageChangeResponse, error)
 	RevokeMessage(ctx context.Context, in *v12.RevokeMessageRequest, opts ...grpc.CallOption) (*v12.MessageChangeResponse, error)
@@ -282,6 +286,26 @@ func (c *gatewayServiceClient) TransferConversationOwner(ctx context.Context, in
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(v11.TransferConversationOwnerResponse)
 	err := c.cc.Invoke(ctx, GatewayService_TransferConversationOwner_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gatewayServiceClient) GetConversationProfile(ctx context.Context, in *v11.GetConversationProfileRequest, opts ...grpc.CallOption) (*v11.GetConversationProfileResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(v11.GetConversationProfileResponse)
+	err := c.cc.Invoke(ctx, GatewayService_GetConversationProfile_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gatewayServiceClient) UpdateConversationProfile(ctx context.Context, in *v11.UpdateConversationProfileRequest, opts ...grpc.CallOption) (*v11.UpdateConversationProfileResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(v11.UpdateConversationProfileResponse)
+	err := c.cc.Invoke(ctx, GatewayService_UpdateConversationProfile_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -571,6 +595,8 @@ type GatewayServiceServer interface {
 	GetMemberChange(context.Context, *v11.GetMemberChangeRequest) (*v11.GetMemberChangeResponse, error)
 	ListConversationMembers(context.Context, *v11.ListConversationMembersRequest) (*v11.ListConversationMembersResponse, error)
 	TransferConversationOwner(context.Context, *v11.TransferConversationOwnerRequest) (*v11.TransferConversationOwnerResponse, error)
+	GetConversationProfile(context.Context, *v11.GetConversationProfileRequest) (*v11.GetConversationProfileResponse, error)
+	UpdateConversationProfile(context.Context, *v11.UpdateConversationProfileRequest) (*v11.UpdateConversationProfileResponse, error)
 	SendMessage(context.Context, *v12.SendMessageRequest) (*v12.SendMessageResponse, error)
 	EditMessage(context.Context, *v12.EditMessageRequest) (*v12.MessageChangeResponse, error)
 	RevokeMessage(context.Context, *v12.RevokeMessageRequest) (*v12.MessageChangeResponse, error)
@@ -654,6 +680,12 @@ func (UnimplementedGatewayServiceServer) ListConversationMembers(context.Context
 }
 func (UnimplementedGatewayServiceServer) TransferConversationOwner(context.Context, *v11.TransferConversationOwnerRequest) (*v11.TransferConversationOwnerResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method TransferConversationOwner not implemented")
+}
+func (UnimplementedGatewayServiceServer) GetConversationProfile(context.Context, *v11.GetConversationProfileRequest) (*v11.GetConversationProfileResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetConversationProfile not implemented")
+}
+func (UnimplementedGatewayServiceServer) UpdateConversationProfile(context.Context, *v11.UpdateConversationProfileRequest) (*v11.UpdateConversationProfileResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateConversationProfile not implemented")
 }
 func (UnimplementedGatewayServiceServer) SendMessage(context.Context, *v12.SendMessageRequest) (*v12.SendMessageResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method SendMessage not implemented")
@@ -1038,6 +1070,42 @@ func _GatewayService_TransferConversationOwner_Handler(srv interface{}, ctx cont
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(GatewayServiceServer).TransferConversationOwner(ctx, req.(*v11.TransferConversationOwnerRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GatewayService_GetConversationProfile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(v11.GetConversationProfileRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GatewayServiceServer).GetConversationProfile(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GatewayService_GetConversationProfile_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GatewayServiceServer).GetConversationProfile(ctx, req.(*v11.GetConversationProfileRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GatewayService_UpdateConversationProfile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(v11.UpdateConversationProfileRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GatewayServiceServer).UpdateConversationProfile(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GatewayService_UpdateConversationProfile_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GatewayServiceServer).UpdateConversationProfile(ctx, req.(*v11.UpdateConversationProfileRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1580,6 +1648,14 @@ var GatewayService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "TransferConversationOwner",
 			Handler:    _GatewayService_TransferConversationOwner_Handler,
+		},
+		{
+			MethodName: "GetConversationProfile",
+			Handler:    _GatewayService_GetConversationProfile_Handler,
+		},
+		{
+			MethodName: "UpdateConversationProfile",
+			Handler:    _GatewayService_UpdateConversationProfile_Handler,
 		},
 		{
 			MethodName: "SendMessage",

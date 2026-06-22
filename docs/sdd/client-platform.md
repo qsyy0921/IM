@@ -360,6 +360,8 @@ POST /api/auth/logout
 GET  /api/me
 GET  /api/conversations
 GET  /api/conversations/{conversation_id}/messages?after_seq=&limit=
+GET  /api/conversations/{conversation_id}/profile
+POST /api/conversations/{conversation_id}/profile
 POST /api/messages/send
 POST /api/delivery/ack
 GET  /api/contacts
@@ -372,6 +374,10 @@ First-stage implementation note:
   the existing gateway facade and downstream trusted metadata injection.
 - `GET /api/conversations/{conversation_id}/messages` is backed by
   `delivery-service.PullInbox`, not by a direct message table read.
+- `GET/POST /api/conversations/{conversation_id}/profile` forwards to
+  `conversation-service` through api-gateway BFF. Group title and avatar URI are
+  conversation-service facts; the client does not persist them as server truth
+  and avatar upload remains a later `media-service` integration.
 - `/api/auth/logout` revokes only the current gateway-token session. The BFF
   derives tenant, user, device and session from the verified gateway token,
   forwards identity-service `RevokeSession`, and ignores caller-supplied target
@@ -531,6 +537,7 @@ PC desktop, and Android clients.
   local-store bridge is ready at runtime, plus Android APK / real-device smoke
   for the matching `android-sqlite` path.
 - Android runtime implementation and unsigned local `.apk` packaging.
-- Full group creation / group profile / invite / member-management UI.
+- Richer group settings and real multi-user UI smoke for group creation,
+  profile editing, invite and member management.
 - Media upload and preview after `media-service` provider path is ready.
 - Client e2e smoke over local LAN and wired `172.x.x.x` network.

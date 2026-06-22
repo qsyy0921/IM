@@ -1,30 +1,28 @@
 # conversation-service
 
-## 当前状态
-
-- 已有 `GetSendContext`、`CreateMemberChange`、`GetMemberChange`、`ListConversationMembers` 当前 ACTIVE roster 分页 / legacy 单 role 和多 role OR 过滤 / `USER_ID_ASC` 与 `ROLE_USER_ID_ASC` 排序 / `user_id_prefix` 轻量前缀过滤、owner transfer。
+- 会话和成员事实源；其它服务不得跨表读取 `conversation_members`。
+- 已有 `GetSendContext`、`CreateMemberChange`、`GetMemberChange`、
+  `ListConversationMembers`、owner transfer。
+- conversation profile 是群标题 / 头像 URI 的事实源；`GetConversationProfile`
+  要求当前 ACTIVE 成员可读，`UpdateConversationProfile` 只允许 ACTIVE OWNER /
+  ADMIN 更新 GROUP conversation，并用 `expected_profile_version` fail-closed。
 - 成员变更走 shared timeline/outbox，保持 `conversation_seq` 顺序。
-- 是会话成员事实源，其它服务不要跨表读取 `conversation_members`。
-- 已补第一阶段本地观测：`/healthz`、`/readyz`、`/debug/metrics` 和 Prometheus text `/metrics`，包含低敏 gRPC、PG pool、`conversations` / `conversation_members` / `member_change_saga` 聚合快照；debug HTTP 监听默认只允许 loopback / 私网，公网或未指定地址必须显式 `NEXUSIM_CONVERSATION_DEBUG_ALLOW_PUBLIC=true`。
-- 本地 Prometheus alert rules / Grafana dashboard 原型已接入，默认 scrape target 为 `host.docker.internal:11911`，用于开发和面试演示，不等同于生产告警体系。
-- 已补 first-stage OpenTelemetry gRPC server span，默认关闭；启用后可输出 stdout 或 OTLP gRPC trace，并从入口 metadata 提取 W3C `traceparent`。
-- gRPC access log 只记录低敏 `trace_id/request_id`，并对入口 metadata 做 trim、长度上限和字符白名单过滤，避免把 token / 邮箱 / 原始认证头写入结构化日志。
-- `member-change-worker` 遇到非取消错误不再直接退出；当前会按 `error_backoff` 退避重试，且进度 batch size 会归一化到安全上限，避免 PostgreSQL 瞬时失败或误配置超大批次把 worker 打死。
-- worker 模式的 `/debug/metrics` 现已额外暴露 `member_change_worker` retry 快照，便于区分持续重试、最近成功和最近推进批次。
-- `MarkPublishedMemberChanges` 只接受同 tenant / conversation、`producer='conversation-service'` 且 event_type 属于 `conversation.member.*` 的已发布 outbox 行推进 saga，异常 outbox 行 fail-closed。
-- owner transfer 已补真实 PostgreSQL 负向回归：目标成员 inactive 或目标已是 owner 时必须拒绝，且不能提交 `conversation_seq`、`member_change_saga`、timeline、outbox 或 roster mutation。
-- JOIN / rejoin 写路径会刷新 `join_seq` 并清空旧 `leave_seq`，避免 LEFT 后重新加入的成员在当前窗口 cache 中残留历史离开边界。
-- 已补 `member-change-audit` 只读 operator，可按 `change_id`、tenant、conversation、target user、operator、change type、status、outbox event、`updated_at` RFC3339 时间窗口过滤 `member_change_saga`；支持 `NEXUSIM_CONVERSATION_MEMBER_CHANGE_AUDIT_OUTPUT` 写低敏 JSON 结果，并对 `last_error` 使用稳定公开文案，避免泄露 SQL / Kafka / repair 内部错误文本。
-- 已补 `member-window-audit` 只读 operator，用于发现 `conversation_members` 当前窗口 cache 异常；覆盖 ACTIVE 无 join_seq、ACTIVE 带 leave_seq、inactive 无 leave_seq、leave_seq 早于 join_seq、成员版本高于会话版本、非 ACTIVE 会话仍有 ACTIVE 成员、ACTIVE 会话无 ACTIVE OWNER、ACTIVE 会话多个 ACTIVE OWNER 等 issue class；支持 `updated_at` RFC3339 时间窗口过滤和 `NEXUSIM_CONVERSATION_MEMBER_WINDOW_AUDIT_OUTPUT` 低敏 JSON 结果。
-- 已补 `member-window-repair` / `member-window-repair-audit`，支持保守修复 `ACTIVE_WITHOUT_JOIN_SEQ`、`ACTIVE_WITH_LEAVE_SEQ`、`INACTIVE_WITHOUT_LEAVE_SEQ`、inactive `LEAVE_BEFORE_JOIN`、`MEMBER_VERSION_AHEAD_CONVERSATION`、`PERMISSION_VERSION_AHEAD_CONVERSATION` 和 `ACTIVE_MEMBER_IN_INACTIVE_CONVERSATION`：分别把安全候选的 ACTIVE 成员 `join_seq` 补为 `member_version`、清空 ACTIVE 成员残留 `leave_seq`、在 inactive 成员有合法 `join_seq` / `member_version` 时补 `leave_seq = member_version`、把 inactive 成员早于 `join_seq` 的 `leave_seq` clamp 到 `join_seq`、把 conversation 版本 floor 提升到当前成员最大版本，以及把非 ACTIVE 会话内仍 ACTIVE 且窗口合法的成员标为 `LEFT` 并补 `leave_seq = member_version`；默认 dry-run，支持 `NEXUSIM_CONVERSATION_MEMBER_WINDOW_REPAIR_REASON_FILE` 读取 reason 原文，mutate 时会写 `conversation_member_window_repair_audit`；repair audit 支持 `repaired_at` RFC3339 时间窗口过滤和低敏 JSON filters。
-- 当 `NEXUSIM_CONVERSATION_AUTH_MODE=metadata|verified-metadata` 时，公网监听地址 + 无 gRPC mTLS client cert 的危险组合会在启动前直接失败；私网 / loopback 仍保留第一阶段 trusted metadata 直连。
-- PostgreSQL repository 已按当前窗口成员列表、成员变更写路径、发布推进和通用工具同 package 拆分，避免主 `repository.go` 继续承载所有 SQL helper。
-- PostgreSQL owner-transfer、成员列表、成员变更 / 发布推进集成测试已拆到独立同 package 文件，避免成员变更、owner transfer、成员列表和发布推进场景继续堆进单个仓储测试文件。
-- `loadtest/memberchange` summary 已输出 `capacity_summary`，包含运行时长、VUs、请求 / 成功 / 错误计数、成功率、RPS、latency avg/p95/p99、成员变更类型、saga / timeline / outbox / roster / conversation_seq 聚合；后续容量验证可直接复用该结构。
-- `loadtest/capacityseed` 已能准备 `tenant-capacity-conversation` 下的 ACTIVE owner fixture；`capacity-baseline-seeded-20260616` 本地 seeded 短基线中 `memberchange` 成功 214、`requests_per_second=42.8`，报告见 `loadtest/distributed/loadtest-report-20260616-seeded-capacity-baseline.md`；`conversation-service-longrun-slice-20260618` 本地 seeded 30m 长跑中 `success_count=51633`、`success_rate=99.998%`、`requests_per_second=28.686`，报告见 `loadtest/conversation-service/loadtest-report-20260618-conversation-longrun-slice.md`。
+- 成员列表支持当前 ACTIVE roster 分页、legacy 单 role、多 role OR、`USER_ID_ASC` /
+  `ROLE_USER_ID_ASC`、`user_id_prefix`。
+- 本地观测已有 `/healthz`、`/readyz`、`/debug/metrics`、Prometheus `/metrics`、
+  first-stage OTel gRPC span、低敏 access log 和 worker retry metrics。
+- `member-change-worker` 非取消错误按 backoff 重试，batch size 会归一化到安全上限。
+- `MarkPublishedMemberChanges` 只接受同 tenant / conversation、正确 producer 和
+  `conversation.member.*` event type 的已发布 outbox 行推进 saga。
+- owner transfer、成员列表、成员变更 / 发布推进已有真实 PostgreSQL 回归。
+- JOIN / rejoin 会刷新 `join_seq` 并清旧 `leave_seq`。
+- 已有只读 `member-change-audit`、`member-window-audit` 和保守
+  `member-window-repair` / repair audit operator。
+- metadata / verified-metadata auth 模式在公网监听 + 无 gRPC mTLS client cert 时启动失败。
+- PostgreSQL repository / tests 已按当前窗口、成员变更、发布推进、owner transfer 等拆同 package 文件。
+- `loadtest/memberchange` 已输出 `capacity_summary`；seeded 短基线和 30m longrun 报告已归档。
 
-## 后续
-
-- AI 底座转进前的必要收口：继续确保 owner transfer、成员历史可见窗口和 member boundary event 能支撑 search visibility、group memory 和 EvidencePack。
-- 更完整群管理产品化、完整历史窗口 / targeted replay repair 仍需后续设计；当前 `member-window-audit` 已能发现 owner 数量异常，但 `member-window-repair` 只修 conversation-service 当前窗口 cache 中可保守推导的窗口 / 版本问题，不自动修复 owner 数量冲突。
-- OTel collector / 生产级 alerting / SLO dashboard、更完整容量曲线仍属于后续统一观测治理。
+- 支撑 search visibility、group memory 和 EvidencePack 前，继续关注 owner transfer、
+  成员历史可见窗口和 member boundary event。
+- 更完整群管理产品化、完整历史窗口 / targeted replay repair 后续设计。
+- OTel collector、生产 alerting / SLO dashboard 和更完整容量曲线后置统一观测治理。

@@ -74,6 +74,21 @@ GetSendContext(tenant_id, conversation_id, user_id, trace_id)
 -> current_seq_shard
 ```
 
+已实现的客户端群管理扩展 RPC：
+
+```text
+GetConversationProfile(auth_context, conversation_id)
+-> title / avatar_uri / profile_version / member_version / permission_version
+
+UpdateConversationProfile(auth_context, conversation_id, title, avatar_uri, expected_profile_version)
+-> updated profile
+```
+
+`conversation-service` 拥有群标题和头像 URI 的 profile 事实。读取要求调用者是当前
+ACTIVE 成员；更新只允许 GROUP conversation 的 ACTIVE OWNER / ADMIN，并使用
+`expected_profile_version` 防止并发覆盖。头像字段当前只是 URI，不包含上传、缩略图、
+对象存储或 media-service 调用。
+
 错误语义：
 
 | 条件 | gRPC code | 说明 |
@@ -138,7 +153,7 @@ NEXUSIM_CONVERSATION_AUTH_MODE=metadata          # read tenant/user/device/sessi
 NEXUSIM_CONVERSATION_AUTH_MODE=verified-metadata # alias of metadata
 ```
 
-In `metadata` / `verified-metadata` mode, `CreateMemberChange`, `GetMemberChange`, `TransferConversationOwner`, and `ListConversationMembers` ignore caller-supplied `AuthContext.tenant_id/user_id/device_id/session_id` and use gateway-injected metadata keys instead. `trace_id/request_id` may still be read from the request body for observability only. `GetSendContext` remains the message-service service-to-service read path and keeps its request contract. When `NEXUSIM_CONVERSATION_AUTH_MODE=metadata|verified-metadata`, a non-loopback / non-RFC1918 gRPC listen address without mTLS client-certificate verification must fail startup; first-stage trusted metadata is only allowed on private listeners unless transport auth is enabled. This is not a full API gateway or centralized identity-governance implementation.
+In `metadata` / `verified-metadata` mode, `CreateMemberChange`, `GetMemberChange`, `TransferConversationOwner`, `ListConversationMembers`, `GetConversationProfile`, and `UpdateConversationProfile` ignore caller-supplied `AuthContext.tenant_id/user_id/device_id/session_id` and use gateway-injected metadata keys instead. `trace_id/request_id` may still be read from the request body for observability only. `GetSendContext` remains the message-service service-to-service read path and keeps its request contract. When `NEXUSIM_CONVERSATION_AUTH_MODE=metadata|verified-metadata`, a non-loopback / non-RFC1918 gRPC listen address without mTLS client-certificate verification must fail startup; first-stage trusted metadata is only allowed on private listeners unless transport auth is enabled. This is not a full API gateway or centralized identity-governance implementation.
 
 第一阶段本地运维观测保持低敏：
 

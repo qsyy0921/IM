@@ -19,6 +19,8 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 $excludedDirectories = @(
     ".git",
     "bin",
+    "node_modules",
+    "clients\node_modules",
     "deploy\local\data",
     "loadtest\results"
 )

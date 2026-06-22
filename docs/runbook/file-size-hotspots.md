@@ -1,8 +1,8 @@
 ﻿# File Size Budget Hotspots
 
-- Created at: 2026-06-21T05:25:03.6019802Z
+- Created at: 2026-06-22T23:12:35.6849070Z
 - Scope: handwritten Go/Markdown/PowerShell/Bash file-size budget snapshot; not a code-quality score
-- Files checked: 1935
+- Files checked: 1992
 - Warnings: 0
 - Failures: 0
 - Hotspots at >= 80% of warning threshold: 1
@@ -14,10 +14,10 @@
 | loadtest\agent\main.go | test/runner | 1745 | 2500 | 3000 | 69.8 | 58.2 |
 | docs\architecture\target-architecture-ai.md | docs | 776 | 1200 | 1500 | 64.7 | 51.7 |
 | docs\runbook\local-loadtest.md | docs | 768 | 1200 | 1500 | 64 | 51.2 |
+| docs\runbook\client-platform.md | docs | 747 | 1200 | 1500 | 62.3 | 49.8 |
 | docs\sdd\push-gateway.md | docs | 743 | 1200 | 1500 | 61.9 | 49.5 |
 | loadtest\demo\run-local-secure-demo.ps1 | script/runner | 734 | 1000 | 1500 | 73.4 | 48.9 |
+| services\api-gateway\internal\api\httpbff\server_test.go | test/runner | 1343 | 2500 | 3000 | 53.7 | 44.8 |
 | tools\run-loadtest-capacity-baseline-suite.ps1 | script/runner | 669 | 1000 | 1500 | 66.9 | 44.6 |
-| services\identity-service\cmd\identity-service\main_test.go | test/runner | 1272 | 2500 | 3000 | 50.9 | 42.4 |
-| loadtest\contacts\main.go | test/runner | 1246 | 2500 | 3000 | 49.8 | 41.5 |
 
 This is a complexity governance snapshot only. Large files are review priorities, not automatic design failures.

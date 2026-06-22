@@ -171,6 +171,25 @@ export interface TransferConversationOwnerResponse {
   idempotentReplay: boolean;
 }
 
+export interface ConversationProfile {
+  tenantID: TenantID;
+  conversationID: ConversationID;
+  type: ConversationType;
+  title: string;
+  avatarURI: string;
+  profileVersion: number;
+  memberVersion: number;
+  permissionVersion: number;
+  updatedAtMs: number;
+}
+
+export interface UpdateConversationProfileRequest {
+  conversationID: ConversationID;
+  title: string;
+  avatarURI?: string;
+  expectedProfileVersion?: number;
+}
+
 export interface ConversationMemberChangeResponse {
   changeID: string;
   tenantID: TenantID;

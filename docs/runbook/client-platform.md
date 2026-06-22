@@ -141,9 +141,11 @@ First slice:
   BFF surface. The clean committed real smoke for that path passed on 2026-06-23
   with `commit=3b13c5c6` and `git_dirty=false`. The Web / PC shell now also
   exposes BFF-backed member search / role filter / page-token pagination,
-  group profile summary and invite source hints. Remaining group product work
-  is richer group settings, avatar / title read models and editing, and richer
-  real multi-user UI smoke coverage.
+  group profile summary, invite source hints and first-stage group title /
+  avatar URI read-update. Conversation profile facts are owned by
+  `conversation-service`; Web / PC shell only uses the api-gateway BFF. Remaining
+  group product work is richer group settings, media-service-backed avatar upload
+  and richer real multi-user UI smoke coverage.
 - The Web / PC shell now also keeps explicit display-title and UX copy rules:
   direct / group titles learned from user actions survive conversation refresh,
   unknown server summaries render as short explicit conversation IDs, empty
@@ -624,7 +626,7 @@ rejected. For local LAN client smoke, prefer the wired `172.x.x.x` address.
 1. Continue browser / Windows PC first: polish the account-password IM shell,
    keep complex endpoint / tenant / device controls hidden, and preserve the
    public BFF / push client path for login, contacts, direct chat, group chat,
-   send, PullInbox and ACK.
+   group profile editing, send, PullInbox and ACK.
 2. Produce the next Windows package step when needed: MSI / NSIS installer
    script and real code-signing pipeline on top of the existing standalone exe,
    package-local launcher, unsigned local zip bundle, explicit installer /

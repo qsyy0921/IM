@@ -30,6 +30,14 @@ type ListConversationMembersRepository interface {
 	ListConversationMembers(ctx context.Context, command types.ListConversationMembersCommand) (types.ListConversationMembersResult, error)
 }
 
+type GetConversationProfileRepository interface {
+	GetConversationProfile(ctx context.Context, command types.GetConversationProfileCommand) (types.ConversationProfileResult, error)
+}
+
+type UpdateConversationProfileRepository interface {
+	UpdateConversationProfile(ctx context.Context, command types.UpdateConversationProfileCommand) (types.ConversationProfileResult, error)
+}
+
 type MemberChangeProgressRepository interface {
 	MarkPublishedMemberChanges(ctx context.Context, limit int) (types.MemberChangePublishProgressStats, error)
 }

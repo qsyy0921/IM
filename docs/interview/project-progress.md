@@ -57,7 +57,7 @@ Web-first 客户端平台 first slice。
 第四阶段：补 receipt-service、contacts-service、policy-service 和 api-gateway，把已读/未读、联系人、权限决策和统一入口补齐。
 第五阶段：集中治理分布式可靠性、安全启动门禁、trusted metadata / TLS 边界、repair / audit / cleanup、debug metrics 和代码复杂度。
 第六阶段：search / memory / retrieval / RAG / summary / Agent / skill-registry / MCP gateway / action-executor / ai-eval first paths 已落，EvidencePack、proposal / approval / audit、Python AI Worker 候选边界和 optional stack gate 已验证。
-第七阶段：按完整目标架构补 product-active 平台服务和 client platform MVP foundation；Web first path、client BFF、push path、本地 / wired smoke 已通过，PC Tauri WebView metadata smoke 已通过，Web / PC shell 已接账号登录、注册、好友、好友私聊、群聊、消息列表和发送 first path，下一步做真实双用户客户端 smoke。
+第七阶段：按完整目标架构补 product-active 平台服务和 client platform MVP foundation；Web first path、client BFF、push path、本地 / wired smoke 已通过，PC Tauri WebView metadata smoke 已通过，Web / PC shell 已接账号登录、注册、好友、好友私聊、群聊、群成员管理、群资料、消息列表和发送 first path，真实双用户 direct + group client smoke 已通过。
 ```
 
 当前项目已经进入“完整架构同步后的产品化 + AI 应用底座”阶段：
@@ -67,7 +67,7 @@ Web-first 客户端平台 first slice。
 短期不以生产级完整系统测试或生产级 HA 作为算法/eval 前置阻塞，验证重点放在低敏 cases、EvidencePack、权限过滤、source refs、时间版本和审计边界；
 search / memory / retrieval / RAG / summary / Agent / skill / MCP / executor / ai-eval first paths 已落，RAG / Summary / Agent stack 已通过 cross-group / temporal optional gate；
 future platform / product services 已进入 product-active first-stage implementation；
-client platform MVP foundation 已启动：Web first path、api-gateway client BFF、push path、本地和 wired 172 clean baseline 已通过，PC Tauri WebView metadata smoke 已通过，Web / PC shell 已接账号登录、注册、好友、好友私聊、群聊、消息列表和发送 first path，下一步做真实双用户客户端 smoke；Android APK / 真机 smoke 后置到用户明确切回；
+client platform MVP foundation 已启动：Web first path、api-gateway client BFF、push path、本地和 wired 172 clean baseline 已通过，PC Tauri WebView metadata smoke 已通过，Web / PC shell 已接账号登录、注册、好友、好友私聊、群聊、群成员管理、群标题 / 头像 URI read-update、消息列表和发送 first path，真实双用户 direct + group client smoke 已通过；Android APK / 真机 smoke 后置到用户明确切回；
 完整目标架构以 docs/architecture/target-architecture-complete.md 为基线，后续按业务平台、数据平台、AI / Agent 平台、客户端平台和中间件平台演进；
 后续 AI 按 low-sensitive collaborative-memory 算法/eval 推进，优先 multi-hop / temporal update / profile aggregation；
 api-gateway 已补 first-stage tenant-scoped rate limit、静态 tenant plan override、tenant plan 文件热更新、版本化 quota URL source、DB-backed tenant plan snapshot source、本地 tenant quota audit / set operator、tenant quota approval manifest 强制校验、URL bearer token / HTTPS guard、URL source CA / client cert TLS 边界、可选 checksum-required gate、applied quota snapshot stale 观测和 quota snapshot gate；
@@ -295,7 +295,7 @@ Go 微服务底座已支撑 AI / Agent 和客户端平台 first slice；
 
 在身份侧，我实现了登录、Refresh Token、MFA、recovery code、JWKS、challenge delivery outbox、SMTP / webhook challenge sender 和启动安全门禁。系统也补了 health、ready、debug metrics、repair、audit、cleanup、worker retry 和多种本地故障 smoke。
 
-现在 Go 微服务底座已经支撑 AI 应用链路：search、memory、retrieval、RAG、summary、Agent、skill-registry、mcp-gateway、action-executor 和 ai-eval 都有 first path 或 smoke，RAG / Summary / Agent 已通过 cross-group / temporal optional stack gate。完整目标架构已经扩展到业务平台、数据平台、AI / Agent 平台、客户端平台和中间件平台；当前工程切片是客户端平台 MVP，Web first path、api-gateway client BFF、push path、本地和 wired 172 clean baseline 已通过，下一步接 PC / Android runtime。大模型只能通过权限过滤后的 EvidencePack 访问聊天记录，Agent 写动作必须走 proposal、approval、executor 和 audit，Python AI Worker 只返回候选，Go 继续拥有权限、状态、审计和持久化。
+现在 Go 微服务底座已经支撑 AI 应用链路：search、memory、retrieval、RAG、summary、Agent、skill-registry、mcp-gateway、action-executor 和 ai-eval 都有 first path 或 smoke，RAG / Summary / Agent 已通过 cross-group / temporal optional stack gate。完整目标架构已经扩展到业务平台、数据平台、AI / Agent 平台、客户端平台和中间件平台；当前工程切片是客户端平台 MVP，Web first path、api-gateway client BFF、push path、本地和 wired 172 clean baseline 已通过，Web / PC 已具备好友私聊、群聊、群成员管理、群资料和消息 first path，PC / Android runtime skeleton 已落。大模型只能通过权限过滤后的 EvidencePack 访问聊天记录，Agent 写动作必须走 proposal、approval、executor 和 audit，Python AI Worker 只返回候选，Go 继续拥有权限、状态、审计和持久化。
 ```
 
 ## 维护规则

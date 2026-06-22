@@ -35,6 +35,14 @@ type ListConversationMembersExecutor interface {
 	Execute(context.Context, types.ListConversationMembersCommand) (types.ListConversationMembersResult, error)
 }
 
+type GetConversationProfileExecutor interface {
+	Execute(context.Context, types.GetConversationProfileCommand) (types.ConversationProfileResult, error)
+}
+
+type UpdateConversationProfileExecutor interface {
+	Execute(context.Context, types.UpdateConversationProfileCommand) (types.ConversationProfileResult, error)
+}
+
 type Option func(*Server)
 
 type Server struct {
@@ -45,6 +53,8 @@ type Server struct {
 	transferOwner          TransferConversationOwnerExecutor
 	getMemberChange        GetMemberChangeExecutor
 	listConversationMember ListConversationMembersExecutor
+	getConversationProfile GetConversationProfileExecutor
+	updateProfile          UpdateConversationProfileExecutor
 }
 
 func NewServer(getSendContext GetSendContextExecutor, opts ...Option) *Server {
@@ -82,6 +92,18 @@ func WithGetMemberChange(executor GetMemberChangeExecutor) Option {
 func WithListConversationMembers(executor ListConversationMembersExecutor) Option {
 	return func(server *Server) {
 		server.listConversationMember = executor
+	}
+}
+
+func WithGetConversationProfile(executor GetConversationProfileExecutor) Option {
+	return func(server *Server) {
+		server.getConversationProfile = executor
+	}
+}
+
+func WithUpdateConversationProfile(executor UpdateConversationProfileExecutor) Option {
+	return func(server *Server) {
+		server.updateProfile = executor
 	}
 }
 
@@ -325,6 +347,61 @@ func (s *Server) ListConversationMembers(
 	}, nil
 }
 
+func (s *Server) GetConversationProfile(
+	ctx context.Context,
+	request *conversationv1.GetConversationProfileRequest,
+) (*conversationv1.GetConversationProfileResponse, error) {
+	if request == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+	if s.getConversationProfile == nil {
+		return nil, status.Error(codes.Unimplemented, "get conversation profile is not configured")
+	}
+	auth, ok := authFromProto(ctx, request.GetAuthContext())
+	if !ok {
+		return nil, status.Error(codes.InvalidArgument, "auth_context is required")
+	}
+	result, err := s.getConversationProfile.Execute(ctx, types.GetConversationProfileCommand{
+		AuthContext:    auth,
+		ConversationID: types.ConversationID(request.GetConversationId()),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	return &conversationv1.GetConversationProfileResponse{
+		Profile: toProtoConversationProfile(result),
+	}, nil
+}
+
+func (s *Server) UpdateConversationProfile(
+	ctx context.Context,
+	request *conversationv1.UpdateConversationProfileRequest,
+) (*conversationv1.UpdateConversationProfileResponse, error) {
+	if request == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+	if s.updateProfile == nil {
+		return nil, status.Error(codes.Unimplemented, "update conversation profile is not configured")
+	}
+	auth, ok := authFromProto(ctx, request.GetAuthContext())
+	if !ok {
+		return nil, status.Error(codes.InvalidArgument, "auth_context is required")
+	}
+	result, err := s.updateProfile.Execute(ctx, types.UpdateConversationProfileCommand{
+		AuthContext:            auth,
+		ConversationID:         types.ConversationID(request.GetConversationId()),
+		Title:                  request.GetTitle(),
+		AvatarURI:              request.GetAvatarUri(),
+		ExpectedProfileVersion: request.GetExpectedProfileVersion(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	return &conversationv1.UpdateConversationProfileResponse{
+		Profile: toProtoConversationProfile(result),
+	}, nil
+}
+
 func authFromProto(ctx context.Context, auth *conversationv1.AuthContext) (types.AuthContext, bool) {
 	if verified, ok := verifiedAuthFromContext(ctx); ok {
 		if auth != nil {
@@ -364,6 +441,8 @@ func grpcError(err error) error {
 		return status.Error(codes.PermissionDenied, "permission denied")
 	case errors.Is(err, types.ErrMemberConflict):
 		return status.Error(codes.FailedPrecondition, "member conflict")
+	case errors.Is(err, types.ErrProfileConflict):
+		return status.Error(codes.FailedPrecondition, "conversation profile conflict")
 	case errors.Is(err, types.ErrDBReadFailed):
 		return status.Error(codes.Unavailable, "conversation read failed")
 	case errors.Is(err, types.ErrDBWriteFailed):
@@ -374,6 +453,20 @@ func grpcError(err error) error {
 		return status.Error(codes.Unavailable, "sequencer unavailable")
 	default:
 		return status.Error(codes.Internal, "conversation service internal error")
+	}
+}
+
+func toProtoConversationProfile(result types.ConversationProfileResult) *conversationv1.ConversationProfile {
+	return &conversationv1.ConversationProfile{
+		TenantId:          string(result.TenantID),
+		ConversationId:    string(result.ConversationID),
+		ConversationType:  toProtoConversationType(result.ConversationType),
+		Title:             result.Title,
+		AvatarUri:         result.AvatarURI,
+		ProfileVersion:    result.ProfileVersion,
+		MemberVersion:     result.MemberVersion,
+		PermissionVersion: result.PermissionVersion,
+		UpdatedAtUnixMs:   result.UpdatedAt.UnixMilli(),
 	}
 }
 

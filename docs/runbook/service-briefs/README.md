@@ -1,49 +1,39 @@
 # NexusIM Service Briefs
 
-本目录只放短状态索引。默认不要读全部服务文件；当前任务涉及哪个服务，就只读对应文件。
-
-当前长期架构基线：`docs/architecture/target-architecture-complete.md`。本目录只记录
-单服务当前事实，不替代完整架构、SDD 或 remaining goals。
+短状态索引。当前任务涉及哪个服务，就只读对应 brief；完整架构基线：
+`docs/architecture/target-architecture-complete.md`。
 
 ## 已进入真实链路的 9 个服务
 
-[message](message-service.md) / [conversation](conversation-service.md) /
-[delivery](delivery-service.md) / [push](push-gateway.md) /
-[receipt](receipt-service.md) / [contacts](contacts-service.md) /
-[identity](identity-service.md) / [policy](policy-service.md) /
-[api-gateway](api-gateway.md)
+[message](message-service.md) / [conversation](conversation-service.md) / [delivery](delivery-service.md) /
+[push](push-gateway.md) / [receipt](receipt-service.md) / [contacts](contacts-service.md) /
+[identity](identity-service.md) / [policy](policy-service.md) / [api-gateway](api-gateway.md)
 
 ## Foundation-active AI 服务
 
-[search](search-service.md) / [memory](memory-service.md) / [retrieval](retrieval-gateway.md) / [rag](rag-service.md) / [summary](summary-service.md) / [agent](agent-service.md) / [skill-registry](skill-registry.md) / [mcp](mcp-gateway.md) / [action-executor](action-executor.md) / [ai-eval](ai-eval-service.md)
+[search](search-service.md) / [memory](memory-service.md) / [retrieval](retrieval-gateway.md) /
+[rag](rag-service.md) / [summary](summary-service.md) / [agent](agent-service.md) /
+[skill-registry](skill-registry.md) / [mcp](mcp-gateway.md) / [action-executor](action-executor.md) / [ai-eval](ai-eval-service.md)
 
 ## Product-active platform / product services
 
 [media](media-service.md) / [notification](notification-service.md) /
 [audit](audit-service.md) / [admin](admin-service.md) /
-[control-plane](control-plane-service.md) /
-[presence](presence-service.md) / [model-gateway](model-gateway.md) /
+[control-plane](control-plane-service.md) / [presence](presence-service.md) /
+[model-gateway](model-gateway.md) /
 [knowledge-ingestion](knowledge-ingestion-service.md) /
 [workflow](workflow-service.md) / [vector-index](vector-index-service.md)
 
 ## Client platform
 
-Client platform is tracked outside service briefs because it is not a backend
-microservice: [client platform](../client-platform.md).
+Client platform is tracked in [client platform](../client-platform.md), not in
+backend service briefs.
 
 ## 当前推进规则
 
+- 当前 active slice 是 client platform MVP foundation；client 细节看
+  `../client-platform.md` 和 `../../sdd/client-platform.md`。
 - 现有 9 个服务只做阻塞当前 client / AI 链路的必要收口。
-- 当前 active slice 是 client platform MVP foundation；短线优先 Web / Windows PC 的
-  好友私聊、群聊和消息 first path。client 细节看 `../client-platform.md` 和
-  `../../sdd/client-platform.md`。
 - client platform 只能通过 `api-gateway` / `push-gateway` 使用后端能力。
-- memory 必须按 group memory 设计：source refs、speaker / audience、validity、supersedes、confidence、review state。
-- Agent 写动作必须先走 policy tool precheck，默认 `Proposal -> Approval -> Executor -> Audit`。
-- sub-agent 可并行推进，但不能同时修改同一服务文件。
-
-## 查询规则
-
-- 当前任务入口：`docs/runbook/current-brief.md`；剩余目标：`docs/runbook/remaining-goals.md`。
-- 服务状态读本目录相关 brief；服务设计读对应 SDD 相关章节。
-- smoke / 压测证据按关键词查 `docs/runbook/loadtest/<service>/`；历史长文档查 archive，不要全文读。
+- memory 必须保留 source refs、speaker / audience、validity、supersedes、confidence、review state。
+- Agent 写动作必须走 policy precheck 和 `Proposal -> Approval -> Executor -> Audit`。

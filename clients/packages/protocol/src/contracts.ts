@@ -19,6 +19,8 @@ export const CLIENT_API_ENDPOINTS = {
     `/api/conversations/${encodeURIComponent(conversationID)}/members/role`,
   transferConversationOwner: (conversationID: string) =>
     `/api/conversations/${encodeURIComponent(conversationID)}/owner/transfer`,
+  conversationProfile: (conversationID: string) =>
+    `/api/conversations/${encodeURIComponent(conversationID)}/profile`,
   conversationMessages: (conversationID: string) =>
     `/api/conversations/${encodeURIComponent(conversationID)}/messages`,
   sendMessage: "/api/messages/send",

@@ -1853,6 +1853,330 @@ func (x *TransferConversationOwnerResponse) GetIdempotentReplay() bool {
 	return false
 }
 
+type GetConversationProfileRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	AuthContext    *AuthContext           `protobuf:"bytes,1,opt,name=auth_context,json=authContext,proto3" json:"auth_context,omitempty"`
+	ConversationId string                 `protobuf:"bytes,2,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *GetConversationProfileRequest) Reset() {
+	*x = GetConversationProfileRequest{}
+	mi := &file_nexusim_conversation_v1_conversation_service_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetConversationProfileRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetConversationProfileRequest) ProtoMessage() {}
+
+func (x *GetConversationProfileRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_nexusim_conversation_v1_conversation_service_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetConversationProfileRequest.ProtoReflect.Descriptor instead.
+func (*GetConversationProfileRequest) Descriptor() ([]byte, []int) {
+	return file_nexusim_conversation_v1_conversation_service_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *GetConversationProfileRequest) GetAuthContext() *AuthContext {
+	if x != nil {
+		return x.AuthContext
+	}
+	return nil
+}
+
+func (x *GetConversationProfileRequest) GetConversationId() string {
+	if x != nil {
+		return x.ConversationId
+	}
+	return ""
+}
+
+type ConversationProfile struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	TenantId          string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	ConversationId    string                 `protobuf:"bytes,2,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
+	ConversationType  ConversationType       `protobuf:"varint,3,opt,name=conversation_type,json=conversationType,proto3,enum=nexusim.conversation.v1.ConversationType" json:"conversation_type,omitempty"`
+	Title             string                 `protobuf:"bytes,4,opt,name=title,proto3" json:"title,omitempty"`
+	AvatarUri         string                 `protobuf:"bytes,5,opt,name=avatar_uri,json=avatarUri,proto3" json:"avatar_uri,omitempty"`
+	ProfileVersion    int64                  `protobuf:"varint,6,opt,name=profile_version,json=profileVersion,proto3" json:"profile_version,omitempty"`
+	MemberVersion     int64                  `protobuf:"varint,7,opt,name=member_version,json=memberVersion,proto3" json:"member_version,omitempty"`
+	PermissionVersion int64                  `protobuf:"varint,8,opt,name=permission_version,json=permissionVersion,proto3" json:"permission_version,omitempty"`
+	UpdatedAtUnixMs   int64                  `protobuf:"varint,9,opt,name=updated_at_unix_ms,json=updatedAtUnixMs,proto3" json:"updated_at_unix_ms,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *ConversationProfile) Reset() {
+	*x = ConversationProfile{}
+	mi := &file_nexusim_conversation_v1_conversation_service_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ConversationProfile) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ConversationProfile) ProtoMessage() {}
+
+func (x *ConversationProfile) ProtoReflect() protoreflect.Message {
+	mi := &file_nexusim_conversation_v1_conversation_service_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ConversationProfile.ProtoReflect.Descriptor instead.
+func (*ConversationProfile) Descriptor() ([]byte, []int) {
+	return file_nexusim_conversation_v1_conversation_service_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *ConversationProfile) GetTenantId() string {
+	if x != nil {
+		return x.TenantId
+	}
+	return ""
+}
+
+func (x *ConversationProfile) GetConversationId() string {
+	if x != nil {
+		return x.ConversationId
+	}
+	return ""
+}
+
+func (x *ConversationProfile) GetConversationType() ConversationType {
+	if x != nil {
+		return x.ConversationType
+	}
+	return ConversationType_CONVERSATION_TYPE_UNSPECIFIED
+}
+
+func (x *ConversationProfile) GetTitle() string {
+	if x != nil {
+		return x.Title
+	}
+	return ""
+}
+
+func (x *ConversationProfile) GetAvatarUri() string {
+	if x != nil {
+		return x.AvatarUri
+	}
+	return ""
+}
+
+func (x *ConversationProfile) GetProfileVersion() int64 {
+	if x != nil {
+		return x.ProfileVersion
+	}
+	return 0
+}
+
+func (x *ConversationProfile) GetMemberVersion() int64 {
+	if x != nil {
+		return x.MemberVersion
+	}
+	return 0
+}
+
+func (x *ConversationProfile) GetPermissionVersion() int64 {
+	if x != nil {
+		return x.PermissionVersion
+	}
+	return 0
+}
+
+func (x *ConversationProfile) GetUpdatedAtUnixMs() int64 {
+	if x != nil {
+		return x.UpdatedAtUnixMs
+	}
+	return 0
+}
+
+type GetConversationProfileResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Profile       *ConversationProfile   `protobuf:"bytes,1,opt,name=profile,proto3" json:"profile,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetConversationProfileResponse) Reset() {
+	*x = GetConversationProfileResponse{}
+	mi := &file_nexusim_conversation_v1_conversation_service_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetConversationProfileResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetConversationProfileResponse) ProtoMessage() {}
+
+func (x *GetConversationProfileResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_nexusim_conversation_v1_conversation_service_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetConversationProfileResponse.ProtoReflect.Descriptor instead.
+func (*GetConversationProfileResponse) Descriptor() ([]byte, []int) {
+	return file_nexusim_conversation_v1_conversation_service_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *GetConversationProfileResponse) GetProfile() *ConversationProfile {
+	if x != nil {
+		return x.Profile
+	}
+	return nil
+}
+
+type UpdateConversationProfileRequest struct {
+	state                  protoimpl.MessageState `protogen:"open.v1"`
+	AuthContext            *AuthContext           `protobuf:"bytes,1,opt,name=auth_context,json=authContext,proto3" json:"auth_context,omitempty"`
+	ConversationId         string                 `protobuf:"bytes,2,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
+	Title                  string                 `protobuf:"bytes,3,opt,name=title,proto3" json:"title,omitempty"`
+	AvatarUri              string                 `protobuf:"bytes,4,opt,name=avatar_uri,json=avatarUri,proto3" json:"avatar_uri,omitempty"`
+	ExpectedProfileVersion int64                  `protobuf:"varint,5,opt,name=expected_profile_version,json=expectedProfileVersion,proto3" json:"expected_profile_version,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
+}
+
+func (x *UpdateConversationProfileRequest) Reset() {
+	*x = UpdateConversationProfileRequest{}
+	mi := &file_nexusim_conversation_v1_conversation_service_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateConversationProfileRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateConversationProfileRequest) ProtoMessage() {}
+
+func (x *UpdateConversationProfileRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_nexusim_conversation_v1_conversation_service_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateConversationProfileRequest.ProtoReflect.Descriptor instead.
+func (*UpdateConversationProfileRequest) Descriptor() ([]byte, []int) {
+	return file_nexusim_conversation_v1_conversation_service_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *UpdateConversationProfileRequest) GetAuthContext() *AuthContext {
+	if x != nil {
+		return x.AuthContext
+	}
+	return nil
+}
+
+func (x *UpdateConversationProfileRequest) GetConversationId() string {
+	if x != nil {
+		return x.ConversationId
+	}
+	return ""
+}
+
+func (x *UpdateConversationProfileRequest) GetTitle() string {
+	if x != nil {
+		return x.Title
+	}
+	return ""
+}
+
+func (x *UpdateConversationProfileRequest) GetAvatarUri() string {
+	if x != nil {
+		return x.AvatarUri
+	}
+	return ""
+}
+
+func (x *UpdateConversationProfileRequest) GetExpectedProfileVersion() int64 {
+	if x != nil {
+		return x.ExpectedProfileVersion
+	}
+	return 0
+}
+
+type UpdateConversationProfileResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Profile       *ConversationProfile   `protobuf:"bytes,1,opt,name=profile,proto3" json:"profile,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateConversationProfileResponse) Reset() {
+	*x = UpdateConversationProfileResponse{}
+	mi := &file_nexusim_conversation_v1_conversation_service_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateConversationProfileResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateConversationProfileResponse) ProtoMessage() {}
+
+func (x *UpdateConversationProfileResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_nexusim_conversation_v1_conversation_service_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateConversationProfileResponse.ProtoReflect.Descriptor instead.
+func (*UpdateConversationProfileResponse) Descriptor() ([]byte, []int) {
+	return file_nexusim_conversation_v1_conversation_service_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *UpdateConversationProfileResponse) GetProfile() *ConversationProfile {
+	if x != nil {
+		return x.Profile
+	}
+	return nil
+}
+
 var File_nexusim_conversation_v1_conversation_service_proto protoreflect.FileDescriptor
 
 const file_nexusim_conversation_v1_conversation_service_proto_rawDesc = "" +
@@ -1990,7 +2314,32 @@ const file_nexusim_conversation_v1_conversation_service_proto_rawDesc = "" +
 	"\x0emember_version\x18\b \x01(\x03R\rmemberVersion\x12-\n" +
 	"\x12permission_version\x18\t \x01(\x03R\x11permissionVersion\x12+\n" +
 	"\x11idempotent_replay\x18\n" +
-	" \x01(\bR\x10idempotentReplay*\x82\x01\n" +
+	" \x01(\bR\x10idempotentReplay\"\x91\x01\n" +
+	"\x1dGetConversationProfileRequest\x12G\n" +
+	"\fauth_context\x18\x01 \x01(\v2$.nexusim.conversation.v1.AuthContextR\vauthContext\x12'\n" +
+	"\x0fconversation_id\x18\x02 \x01(\tR\x0econversationId\"\x94\x03\n" +
+	"\x13ConversationProfile\x12\x1b\n" +
+	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12'\n" +
+	"\x0fconversation_id\x18\x02 \x01(\tR\x0econversationId\x12V\n" +
+	"\x11conversation_type\x18\x03 \x01(\x0e2).nexusim.conversation.v1.ConversationTypeR\x10conversationType\x12\x14\n" +
+	"\x05title\x18\x04 \x01(\tR\x05title\x12\x1d\n" +
+	"\n" +
+	"avatar_uri\x18\x05 \x01(\tR\tavatarUri\x12'\n" +
+	"\x0fprofile_version\x18\x06 \x01(\x03R\x0eprofileVersion\x12%\n" +
+	"\x0emember_version\x18\a \x01(\x03R\rmemberVersion\x12-\n" +
+	"\x12permission_version\x18\b \x01(\x03R\x11permissionVersion\x12+\n" +
+	"\x12updated_at_unix_ms\x18\t \x01(\x03R\x0fupdatedAtUnixMs\"h\n" +
+	"\x1eGetConversationProfileResponse\x12F\n" +
+	"\aprofile\x18\x01 \x01(\v2,.nexusim.conversation.v1.ConversationProfileR\aprofile\"\x83\x02\n" +
+	" UpdateConversationProfileRequest\x12G\n" +
+	"\fauth_context\x18\x01 \x01(\v2$.nexusim.conversation.v1.AuthContextR\vauthContext\x12'\n" +
+	"\x0fconversation_id\x18\x02 \x01(\tR\x0econversationId\x12\x14\n" +
+	"\x05title\x18\x03 \x01(\tR\x05title\x12\x1d\n" +
+	"\n" +
+	"avatar_uri\x18\x04 \x01(\tR\tavatarUri\x128\n" +
+	"\x18expected_profile_version\x18\x05 \x01(\x03R\x16expectedProfileVersion\"k\n" +
+	"!UpdateConversationProfileResponse\x12F\n" +
+	"\aprofile\x18\x01 \x01(\v2,.nexusim.conversation.v1.ConversationProfileR\aprofile*\x82\x01\n" +
 	"\x10ConversationMode\x12!\n" +
 	"\x1dCONVERSATION_MODE_UNSPECIFIED\x10\x00\x12$\n" +
 	" CONVERSATION_MODE_LOCAL_ROW_LOCK\x10\x01\x12%\n" +
@@ -2041,14 +2390,16 @@ const file_nexusim_conversation_v1_conversation_service_proto_rawDesc = "" +
 	"\x1aConversationMemberListSort\x12-\n" +
 	")CONVERSATION_MEMBER_LIST_SORT_UNSPECIFIED\x10\x00\x12-\n" +
 	")CONVERSATION_MEMBER_LIST_SORT_USER_ID_ASC\x10\x01\x122\n" +
-	".CONVERSATION_MEMBER_LIST_SORT_ROLE_USER_ID_ASC\x10\x022\xa0\x06\n" +
+	".CONVERSATION_MEMBER_LIST_SORT_ROLE_USER_ID_ASC\x10\x022\xc1\b\n" +
 	"\x13ConversationService\x12q\n" +
 	"\x0eGetSendContext\x12..nexusim.conversation.v1.GetSendContextRequest\x1a/.nexusim.conversation.v1.GetSendContextResponse\x12}\n" +
 	"\x12CreateConversation\x122.nexusim.conversation.v1.CreateConversationRequest\x1a3.nexusim.conversation.v1.CreateConversationResponse\x12}\n" +
 	"\x12CreateMemberChange\x122.nexusim.conversation.v1.CreateMemberChangeRequest\x1a3.nexusim.conversation.v1.CreateMemberChangeResponse\x12t\n" +
 	"\x0fGetMemberChange\x12/.nexusim.conversation.v1.GetMemberChangeRequest\x1a0.nexusim.conversation.v1.GetMemberChangeResponse\x12\x8c\x01\n" +
 	"\x17ListConversationMembers\x127.nexusim.conversation.v1.ListConversationMembersRequest\x1a8.nexusim.conversation.v1.ListConversationMembersResponse\x12\x92\x01\n" +
-	"\x19TransferConversationOwner\x129.nexusim.conversation.v1.TransferConversationOwnerRequest\x1a:.nexusim.conversation.v1.TransferConversationOwnerResponseBIZGgithub.com/qsyy0921/IM/api/proto/nexusim/conversation/v1;conversationv1b\x06proto3"
+	"\x19TransferConversationOwner\x129.nexusim.conversation.v1.TransferConversationOwnerRequest\x1a:.nexusim.conversation.v1.TransferConversationOwnerResponse\x12\x89\x01\n" +
+	"\x16GetConversationProfile\x126.nexusim.conversation.v1.GetConversationProfileRequest\x1a7.nexusim.conversation.v1.GetConversationProfileResponse\x12\x92\x01\n" +
+	"\x19UpdateConversationProfile\x129.nexusim.conversation.v1.UpdateConversationProfileRequest\x1a:.nexusim.conversation.v1.UpdateConversationProfileResponseBIZGgithub.com/qsyy0921/IM/api/proto/nexusim/conversation/v1;conversationv1b\x06proto3"
 
 var (
 	file_nexusim_conversation_v1_conversation_service_proto_rawDescOnce sync.Once
@@ -2063,7 +2414,7 @@ func file_nexusim_conversation_v1_conversation_service_proto_rawDescGZIP() []byt
 }
 
 var file_nexusim_conversation_v1_conversation_service_proto_enumTypes = make([]protoimpl.EnumInfo, 9)
-var file_nexusim_conversation_v1_conversation_service_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
+var file_nexusim_conversation_v1_conversation_service_proto_msgTypes = make([]protoimpl.MessageInfo, 19)
 var file_nexusim_conversation_v1_conversation_service_proto_goTypes = []any{
 	(ConversationMode)(0),                     // 0: nexusim.conversation.v1.ConversationMode
 	(FanoutMode)(0),                           // 1: nexusim.conversation.v1.FanoutMode
@@ -2088,6 +2439,11 @@ var file_nexusim_conversation_v1_conversation_service_proto_goTypes = []any{
 	(*ListConversationMembersResponse)(nil),   // 20: nexusim.conversation.v1.ListConversationMembersResponse
 	(*TransferConversationOwnerRequest)(nil),  // 21: nexusim.conversation.v1.TransferConversationOwnerRequest
 	(*TransferConversationOwnerResponse)(nil), // 22: nexusim.conversation.v1.TransferConversationOwnerResponse
+	(*GetConversationProfileRequest)(nil),     // 23: nexusim.conversation.v1.GetConversationProfileRequest
+	(*ConversationProfile)(nil),               // 24: nexusim.conversation.v1.ConversationProfile
+	(*GetConversationProfileResponse)(nil),    // 25: nexusim.conversation.v1.GetConversationProfileResponse
+	(*UpdateConversationProfileRequest)(nil),  // 26: nexusim.conversation.v1.UpdateConversationProfileRequest
+	(*UpdateConversationProfileResponse)(nil), // 27: nexusim.conversation.v1.UpdateConversationProfileResponse
 }
 var file_nexusim_conversation_v1_conversation_service_proto_depIdxs = []int32{
 	0,  // 0: nexusim.conversation.v1.GetSendContextResponse.conversation_mode:type_name -> nexusim.conversation.v1.ConversationMode
@@ -2115,23 +2471,32 @@ var file_nexusim_conversation_v1_conversation_service_proto_depIdxs = []int32{
 	19, // 22: nexusim.conversation.v1.ListConversationMembersResponse.members:type_name -> nexusim.conversation.v1.ConversationMember
 	11, // 23: nexusim.conversation.v1.TransferConversationOwnerRequest.auth_context:type_name -> nexusim.conversation.v1.AuthContext
 	7,  // 24: nexusim.conversation.v1.TransferConversationOwnerResponse.status:type_name -> nexusim.conversation.v1.MemberChangeStatus
-	9,  // 25: nexusim.conversation.v1.ConversationService.GetSendContext:input_type -> nexusim.conversation.v1.GetSendContextRequest
-	12, // 26: nexusim.conversation.v1.ConversationService.CreateConversation:input_type -> nexusim.conversation.v1.CreateConversationRequest
-	14, // 27: nexusim.conversation.v1.ConversationService.CreateMemberChange:input_type -> nexusim.conversation.v1.CreateMemberChangeRequest
-	16, // 28: nexusim.conversation.v1.ConversationService.GetMemberChange:input_type -> nexusim.conversation.v1.GetMemberChangeRequest
-	18, // 29: nexusim.conversation.v1.ConversationService.ListConversationMembers:input_type -> nexusim.conversation.v1.ListConversationMembersRequest
-	21, // 30: nexusim.conversation.v1.ConversationService.TransferConversationOwner:input_type -> nexusim.conversation.v1.TransferConversationOwnerRequest
-	10, // 31: nexusim.conversation.v1.ConversationService.GetSendContext:output_type -> nexusim.conversation.v1.GetSendContextResponse
-	13, // 32: nexusim.conversation.v1.ConversationService.CreateConversation:output_type -> nexusim.conversation.v1.CreateConversationResponse
-	15, // 33: nexusim.conversation.v1.ConversationService.CreateMemberChange:output_type -> nexusim.conversation.v1.CreateMemberChangeResponse
-	17, // 34: nexusim.conversation.v1.ConversationService.GetMemberChange:output_type -> nexusim.conversation.v1.GetMemberChangeResponse
-	20, // 35: nexusim.conversation.v1.ConversationService.ListConversationMembers:output_type -> nexusim.conversation.v1.ListConversationMembersResponse
-	22, // 36: nexusim.conversation.v1.ConversationService.TransferConversationOwner:output_type -> nexusim.conversation.v1.TransferConversationOwnerResponse
-	31, // [31:37] is the sub-list for method output_type
-	25, // [25:31] is the sub-list for method input_type
-	25, // [25:25] is the sub-list for extension type_name
-	25, // [25:25] is the sub-list for extension extendee
-	0,  // [0:25] is the sub-list for field type_name
+	11, // 25: nexusim.conversation.v1.GetConversationProfileRequest.auth_context:type_name -> nexusim.conversation.v1.AuthContext
+	2,  // 26: nexusim.conversation.v1.ConversationProfile.conversation_type:type_name -> nexusim.conversation.v1.ConversationType
+	24, // 27: nexusim.conversation.v1.GetConversationProfileResponse.profile:type_name -> nexusim.conversation.v1.ConversationProfile
+	11, // 28: nexusim.conversation.v1.UpdateConversationProfileRequest.auth_context:type_name -> nexusim.conversation.v1.AuthContext
+	24, // 29: nexusim.conversation.v1.UpdateConversationProfileResponse.profile:type_name -> nexusim.conversation.v1.ConversationProfile
+	9,  // 30: nexusim.conversation.v1.ConversationService.GetSendContext:input_type -> nexusim.conversation.v1.GetSendContextRequest
+	12, // 31: nexusim.conversation.v1.ConversationService.CreateConversation:input_type -> nexusim.conversation.v1.CreateConversationRequest
+	14, // 32: nexusim.conversation.v1.ConversationService.CreateMemberChange:input_type -> nexusim.conversation.v1.CreateMemberChangeRequest
+	16, // 33: nexusim.conversation.v1.ConversationService.GetMemberChange:input_type -> nexusim.conversation.v1.GetMemberChangeRequest
+	18, // 34: nexusim.conversation.v1.ConversationService.ListConversationMembers:input_type -> nexusim.conversation.v1.ListConversationMembersRequest
+	21, // 35: nexusim.conversation.v1.ConversationService.TransferConversationOwner:input_type -> nexusim.conversation.v1.TransferConversationOwnerRequest
+	23, // 36: nexusim.conversation.v1.ConversationService.GetConversationProfile:input_type -> nexusim.conversation.v1.GetConversationProfileRequest
+	26, // 37: nexusim.conversation.v1.ConversationService.UpdateConversationProfile:input_type -> nexusim.conversation.v1.UpdateConversationProfileRequest
+	10, // 38: nexusim.conversation.v1.ConversationService.GetSendContext:output_type -> nexusim.conversation.v1.GetSendContextResponse
+	13, // 39: nexusim.conversation.v1.ConversationService.CreateConversation:output_type -> nexusim.conversation.v1.CreateConversationResponse
+	15, // 40: nexusim.conversation.v1.ConversationService.CreateMemberChange:output_type -> nexusim.conversation.v1.CreateMemberChangeResponse
+	17, // 41: nexusim.conversation.v1.ConversationService.GetMemberChange:output_type -> nexusim.conversation.v1.GetMemberChangeResponse
+	20, // 42: nexusim.conversation.v1.ConversationService.ListConversationMembers:output_type -> nexusim.conversation.v1.ListConversationMembersResponse
+	22, // 43: nexusim.conversation.v1.ConversationService.TransferConversationOwner:output_type -> nexusim.conversation.v1.TransferConversationOwnerResponse
+	25, // 44: nexusim.conversation.v1.ConversationService.GetConversationProfile:output_type -> nexusim.conversation.v1.GetConversationProfileResponse
+	27, // 45: nexusim.conversation.v1.ConversationService.UpdateConversationProfile:output_type -> nexusim.conversation.v1.UpdateConversationProfileResponse
+	38, // [38:46] is the sub-list for method output_type
+	30, // [30:38] is the sub-list for method input_type
+	30, // [30:30] is the sub-list for extension type_name
+	30, // [30:30] is the sub-list for extension extendee
+	0,  // [0:30] is the sub-list for field type_name
 }
 
 func init() { file_nexusim_conversation_v1_conversation_service_proto_init() }
@@ -2145,7 +2510,7 @@ func file_nexusim_conversation_v1_conversation_service_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_nexusim_conversation_v1_conversation_service_proto_rawDesc), len(file_nexusim_conversation_v1_conversation_service_proto_rawDesc)),
 			NumEnums:      9,
-			NumMessages:   14,
+			NumMessages:   19,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

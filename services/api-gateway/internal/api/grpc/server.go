@@ -285,6 +285,26 @@ func (server *Server) TransferConversationOwner(ctx context.Context, request *co
 	return server.conversation.TransferConversationOwner(outgoing, cloned)
 }
 
+func (server *Server) GetConversationProfile(ctx context.Context, request *conversationv1.GetConversationProfileRequest) (*conversationv1.GetConversationProfileResponse, error) {
+	auth, outgoing, err := server.authenticate(ctx)
+	if err != nil {
+		return nil, err
+	}
+	cloned := proto.Clone(request).(*conversationv1.GetConversationProfileRequest)
+	cloned.AuthContext = conversationAuth(auth)
+	return server.conversation.GetConversationProfile(outgoing, cloned)
+}
+
+func (server *Server) UpdateConversationProfile(ctx context.Context, request *conversationv1.UpdateConversationProfileRequest) (*conversationv1.UpdateConversationProfileResponse, error) {
+	auth, outgoing, err := server.authenticate(ctx)
+	if err != nil {
+		return nil, err
+	}
+	cloned := proto.Clone(request).(*conversationv1.UpdateConversationProfileRequest)
+	cloned.AuthContext = conversationAuth(auth)
+	return server.conversation.UpdateConversationProfile(outgoing, cloned)
+}
+
 func (server *Server) SendMessage(ctx context.Context, request *messagev1.SendMessageRequest) (*messagev1.SendMessageResponse, error) {
 	auth, outgoing, err := server.authenticate(ctx)
 	if err != nil {

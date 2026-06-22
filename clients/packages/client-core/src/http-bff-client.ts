@@ -12,6 +12,7 @@ import {
   type CreateConversationResponse,
   type ConversationMember,
   type ConversationMemberChangeResponse,
+  type ConversationProfile,
   type ListConversationMembersRequest,
   type ListConversationMembersResponse,
   type ListContactRequestsInput,
@@ -23,6 +24,7 @@ import {
   type SendContactRequestInput,
   type TransferConversationOwnerRequest,
   type TransferConversationOwnerResponse,
+  type UpdateConversationProfileRequest,
   type UpdateConversationMemberRoleRequest,
   type ConversationSummary,
   type LoginRequest,
@@ -122,6 +124,22 @@ interface BFFTransferConversationOwnerResponse {
   member_version?: string | number;
   permission_version?: string | number;
   idempotent_replay?: boolean;
+}
+
+interface BFFConversationProfile {
+  tenant_id?: string;
+  conversation_id?: string;
+  conversation_type?: string;
+  title?: string;
+  avatar_uri?: string;
+  profile_version?: string | number;
+  member_version?: string | number;
+  permission_version?: string | number;
+  updated_at_unix_ms?: string | number;
+}
+
+interface BFFConversationProfileResponse {
+  profile?: BFFConversationProfile;
 }
 
 interface BFFConversationSummary {
@@ -449,6 +467,33 @@ export class BFFClient implements AuthAPI, ConversationAPI, MessagingAPI, Delive
     return transferOwnerFromBFF(response);
   }
 
+  async getConversationProfile(conversationID: string, session: AuthSession): Promise<ConversationProfile> {
+    const response = await this.#request<BFFConversationProfileResponse>(
+      "GET",
+      CLIENT_API_ENDPOINTS.conversationProfile(conversationID),
+      undefined,
+      session
+    );
+    return conversationProfileFromBFF(requiredObject(response.profile, "profile"));
+  }
+
+  async updateConversationProfile(
+    request: UpdateConversationProfileRequest,
+    session: AuthSession
+  ): Promise<ConversationProfile> {
+    const response = await this.#request<BFFConversationProfileResponse>(
+      "POST",
+      CLIENT_API_ENDPOINTS.conversationProfile(request.conversationID),
+      {
+        title: request.title,
+        avatar_uri: request.avatarURI,
+        expected_profile_version: request.expectedProfileVersion
+      },
+      session
+    );
+    return conversationProfileFromBFF(requiredObject(response.profile, "profile"));
+  }
+
   async sendMessage(request: SendMessageRequest, session: AuthSession): Promise<SendMessageResponse> {
     const response = await this.#request<BFFSendMessageResponse>(
       "POST",
@@ -770,6 +815,20 @@ function transferOwnerFromBFF(response: BFFTransferConversationOwnerResponse): T
   };
 }
 
+function conversationProfileFromBFF(response: BFFConversationProfile): ConversationProfile {
+  return {
+    tenantID: requiredString(response.tenant_id, "tenant_id"),
+    conversationID: requiredString(response.conversation_id, "conversation_id"),
+    type: conversationTypeFromBFF(response.conversation_type),
+    title: response.title ?? "",
+    avatarURI: response.avatar_uri ?? "",
+    profileVersion: numberValue(response.profile_version),
+    memberVersion: numberValue(response.member_version),
+    permissionVersion: numberValue(response.permission_version),
+    updatedAtMs: numberValue(response.updated_at_unix_ms)
+  };
+}
+
 function memberRoleToBFF(role: string): string {
   return role.startsWith("MEMBER_ROLE_") ? role : `MEMBER_ROLE_${role}`;
 }
@@ -905,6 +964,13 @@ function publicError(code: PublicErrorCode, message: string, retryable: boolean)
 
 function requiredString(value: string | undefined, field: string): string {
   if (!value) {
+    throw publicError("SERVER_BUSY", `BFF response missing ${field}`, false);
+  }
+  return value;
+}
+
+function requiredObject<T>(value: T | undefined, field: string): T {
+  if (value === undefined || value === null) {
     throw publicError("SERVER_BUSY", `BFF response missing ${field}`, false);
   }
   return value;

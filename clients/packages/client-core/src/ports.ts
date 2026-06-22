@@ -13,11 +13,13 @@ import type {
   ListConversationMembersRequest,
   ListConversationMembersResponse,
   ConversationMemberChangeResponse,
+  ConversationProfile,
   InviteConversationMemberRequest,
   LeaveConversationRequest,
   RemoveConversationMemberRequest,
   TransferConversationOwnerRequest,
   TransferConversationOwnerResponse,
+  UpdateConversationProfileRequest,
   UpdateConversationMemberRoleRequest,
   OpenDirectConversationRequest,
   MessageItem,
@@ -65,6 +67,11 @@ export interface ConversationAPI {
     request: TransferConversationOwnerRequest,
     session: AuthSession
   ): Promise<TransferConversationOwnerResponse>;
+  getConversationProfile(conversationID: ConversationID, session: AuthSession): Promise<ConversationProfile>;
+  updateConversationProfile(
+    request: UpdateConversationProfileRequest,
+    session: AuthSession
+  ): Promise<ConversationProfile>;
 }
 
 export interface MessagingAPI {

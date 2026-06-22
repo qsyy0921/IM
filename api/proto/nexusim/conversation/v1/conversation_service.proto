@@ -11,6 +11,8 @@ service ConversationService {
   rpc GetMemberChange(GetMemberChangeRequest) returns (GetMemberChangeResponse);
   rpc ListConversationMembers(ListConversationMembersRequest) returns (ListConversationMembersResponse);
   rpc TransferConversationOwner(TransferConversationOwnerRequest) returns (TransferConversationOwnerResponse);
+  rpc GetConversationProfile(GetConversationProfileRequest) returns (GetConversationProfileResponse);
+  rpc UpdateConversationProfile(UpdateConversationProfileRequest) returns (UpdateConversationProfileResponse);
 }
 
 message GetSendContextRequest {
@@ -226,4 +228,37 @@ message TransferConversationOwnerResponse {
   int64 member_version = 8;
   int64 permission_version = 9;
   bool idempotent_replay = 10;
+}
+
+message GetConversationProfileRequest {
+  AuthContext auth_context = 1;
+  string conversation_id = 2;
+}
+
+message ConversationProfile {
+  string tenant_id = 1;
+  string conversation_id = 2;
+  ConversationType conversation_type = 3;
+  string title = 4;
+  string avatar_uri = 5;
+  int64 profile_version = 6;
+  int64 member_version = 7;
+  int64 permission_version = 8;
+  int64 updated_at_unix_ms = 9;
+}
+
+message GetConversationProfileResponse {
+  ConversationProfile profile = 1;
+}
+
+message UpdateConversationProfileRequest {
+  AuthContext auth_context = 1;
+  string conversation_id = 2;
+  string title = 3;
+  string avatar_uri = 4;
+  int64 expected_profile_version = 5;
+}
+
+message UpdateConversationProfileResponse {
+  ConversationProfile profile = 1;
 }

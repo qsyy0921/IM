@@ -107,6 +107,10 @@ func RouteName(request *http.Request) string {
 		return "conversations.members.role"
 	case request.Method == http.MethodPost && isConversationMemberActionPath(request.URL.EscapedPath(), "/owner/transfer"):
 		return "conversations.owner.transfer"
+	case request.Method == http.MethodGet && isConversationMemberActionPath(request.URL.EscapedPath(), "/profile"):
+		return "conversations.profile.get"
+	case request.Method == http.MethodPost && isConversationMemberActionPath(request.URL.EscapedPath(), "/profile"):
+		return "conversations.profile.update"
 	case request.Method == http.MethodGet && isConversationMessagesPath(request.URL.EscapedPath()):
 		return "conversation.messages"
 	case request.Method == http.MethodPost && path == "/api/messages/send":

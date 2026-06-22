@@ -641,6 +641,100 @@ func TestTransferConversationOwnerForwardsTransfer(t *testing.T) {
 	}
 }
 
+func TestConversationProfileEndpointsForwardRequests(t *testing.T) {
+	getCalled := false
+	updateCalled := false
+	authenticator := &fakeAuthenticator{auth: gatewayauth.AuthContext{
+		TenantID:  "tenant-1",
+		UserID:    "owner-1",
+		DeviceID:  "web-1",
+		SessionID: "session-1",
+	}}
+	gateway := &fakeGateway{
+		getConversationProfile: func(ctx context.Context, request *conversationv1.GetConversationProfileRequest) (*conversationv1.GetConversationProfileResponse, error) {
+			getCalled = true
+			md, ok := metadata.FromIncomingContext(ctx)
+			if !ok || firstMetadata(md, "authorization") != "Bearer token-1" {
+				t.Fatalf("expected forwarded auth metadata, got %+v", md)
+			}
+			if request.GetConversationId() != "group/1" {
+				t.Fatalf("unexpected get profile request: %+v", request)
+			}
+			return &conversationv1.GetConversationProfileResponse{
+				Profile: &conversationv1.ConversationProfile{
+					TenantId:          "tenant-1",
+					ConversationId:    request.GetConversationId(),
+					ConversationType:  conversationv1.ConversationType_CONVERSATION_TYPE_GROUP,
+					Title:             "群聊一",
+					AvatarUri:         "nexusim://avatar/group-1",
+					ProfileVersion:    3,
+					MemberVersion:     5,
+					PermissionVersion: 7,
+					UpdatedAtUnixMs:   11,
+				},
+			}, nil
+		},
+		updateConversationProfile: func(ctx context.Context, request *conversationv1.UpdateConversationProfileRequest) (*conversationv1.UpdateConversationProfileResponse, error) {
+			updateCalled = true
+			md, ok := metadata.FromIncomingContext(ctx)
+			if !ok || firstMetadata(md, "authorization") != "Bearer token-1" {
+				t.Fatalf("expected forwarded auth metadata, got %+v", md)
+			}
+			if request.GetConversationId() != "group/1" ||
+				request.GetTitle() != "新群名" ||
+				request.GetAvatarUri() != "nexusim://avatar/new" ||
+				request.GetExpectedProfileVersion() != 3 {
+				t.Fatalf("unexpected update profile request: %+v", request)
+			}
+			return &conversationv1.UpdateConversationProfileResponse{
+				Profile: &conversationv1.ConversationProfile{
+					TenantId:          "tenant-1",
+					ConversationId:    request.GetConversationId(),
+					ConversationType:  conversationv1.ConversationType_CONVERSATION_TYPE_GROUP,
+					Title:             request.GetTitle(),
+					AvatarUri:         request.GetAvatarUri(),
+					ProfileVersion:    4,
+					MemberVersion:     5,
+					PermissionVersion: 7,
+					UpdatedAtUnixMs:   12,
+				},
+			}, nil
+		},
+	}
+	handler := NewServer(Config{Gateway: gateway, Authenticator: authenticator})
+
+	getResponse := httptest.NewRecorder()
+	getRequest := httptest.NewRequest(http.MethodGet, "/api/conversations/group%2F1/profile", nil)
+	getRequest.Header.Set("Authorization", "Bearer token-1")
+	handler.ServeHTTP(getResponse, getRequest)
+	if getResponse.Code != http.StatusOK {
+		t.Fatalf("get status=%d body=%s", getResponse.Code, getResponse.Body.String())
+	}
+	if !strings.Contains(getResponse.Body.String(), `"title":"群聊一"`) ||
+		!strings.Contains(getResponse.Body.String(), `"profile_version":"3"`) {
+		t.Fatalf("expected get profile response, got %s", getResponse.Body.String())
+	}
+
+	updateResponse := httptest.NewRecorder()
+	updateRequest := httptest.NewRequest(http.MethodPost, "/api/conversations/group%2F1/profile", strings.NewReader(`{
+		"title":"新群名",
+		"avatar_uri":"nexusim://avatar/new",
+		"expected_profile_version":3
+	}`))
+	updateRequest.Header.Set("Authorization", "Bearer token-1")
+	handler.ServeHTTP(updateResponse, updateRequest)
+	if updateResponse.Code != http.StatusOK {
+		t.Fatalf("update status=%d body=%s", updateResponse.Code, updateResponse.Body.String())
+	}
+	if !strings.Contains(updateResponse.Body.String(), `"title":"新群名"`) ||
+		!strings.Contains(updateResponse.Body.String(), `"profile_version":"4"`) {
+		t.Fatalf("expected update profile response, got %s", updateResponse.Body.String())
+	}
+	if !getCalled || !updateCalled {
+		t.Fatalf("expected both profile handlers to be called: get=%v update=%v", getCalled, updateCalled)
+	}
+}
+
 func TestConversationMessagesMapsToPullInbox(t *testing.T) {
 	gateway := &fakeGateway{
 		pullInbox: func(_ context.Context, request *deliveryv1.PullInboxRequest) (*deliveryv1.PullInboxResponse, error) {
@@ -986,6 +1080,8 @@ type fakeGateway struct {
 	createMemberChange        func(context.Context, *conversationv1.CreateMemberChangeRequest) (*conversationv1.CreateMemberChangeResponse, error)
 	listConversationMembers   func(context.Context, *conversationv1.ListConversationMembersRequest) (*conversationv1.ListConversationMembersResponse, error)
 	transferConversationOwner func(context.Context, *conversationv1.TransferConversationOwnerRequest) (*conversationv1.TransferConversationOwnerResponse, error)
+	getConversationProfile    func(context.Context, *conversationv1.GetConversationProfileRequest) (*conversationv1.GetConversationProfileResponse, error)
+	updateConversationProfile func(context.Context, *conversationv1.UpdateConversationProfileRequest) (*conversationv1.UpdateConversationProfileResponse, error)
 	sendMessage               func(context.Context, *messagev1.SendMessageRequest) (*messagev1.SendMessageResponse, error)
 	pullInbox                 func(context.Context, *deliveryv1.PullInboxRequest) (*deliveryv1.PullInboxResponse, error)
 	ackDelivery               func(context.Context, *deliveryv1.AckDeliveryRequest) (*deliveryv1.AckDeliveryResponse, error)
@@ -1065,6 +1161,20 @@ func (gateway *fakeGateway) TransferConversationOwner(ctx context.Context, reque
 		return nil, status.Error(codes.Unimplemented, "transfer conversation owner not implemented")
 	}
 	return gateway.transferConversationOwner(ctx, request)
+}
+
+func (gateway *fakeGateway) GetConversationProfile(ctx context.Context, request *conversationv1.GetConversationProfileRequest) (*conversationv1.GetConversationProfileResponse, error) {
+	if gateway.getConversationProfile == nil {
+		return nil, status.Error(codes.Unimplemented, "get conversation profile not implemented")
+	}
+	return gateway.getConversationProfile(ctx, request)
+}
+
+func (gateway *fakeGateway) UpdateConversationProfile(ctx context.Context, request *conversationv1.UpdateConversationProfileRequest) (*conversationv1.UpdateConversationProfileResponse, error) {
+	if gateway.updateConversationProfile == nil {
+		return nil, status.Error(codes.Unimplemented, "update conversation profile not implemented")
+	}
+	return gateway.updateConversationProfile(ctx, request)
 }
 
 func (gateway *fakeGateway) SendMessage(ctx context.Context, request *messagev1.SendMessageRequest) (*messagev1.SendMessageResponse, error) {

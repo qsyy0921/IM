@@ -5,6 +5,7 @@ import type {
   ContactDecision,
   ContactItem,
   ContactRequestItem,
+  ConversationProfile,
   ConversationMember,
   ConversationSummary,
   DeliveryNotifyFrame,
@@ -82,6 +83,10 @@ export function App() {
   const [groupMemberNextPageToken, setGroupMemberNextPageToken] = useState("");
   const [groupMemberPageTokens, setGroupMemberPageTokens] = useState<string[]>([]);
   const [groupMemberPageIndex, setGroupMemberPageIndex] = useState(0);
+  const [conversationProfiles, setConversationProfiles] = useState<Record<string, ConversationProfile>>({});
+  const [groupProfileTitleDraft, setGroupProfileTitleDraft] = useState("");
+  const [groupProfileAvatarDraft, setGroupProfileAvatarDraft] = useState("");
+  const [groupProfileError, setGroupProfileError] = useState("");
   const [status, setStatus] = useState("ready");
   const [activeView, setActiveView] = useState<ActiveView>("conversations");
   const [contacts, setContacts] = useState<ContactItem[]>([]);
@@ -278,7 +283,11 @@ export function App() {
       setMessages([]);
       return;
     }
-    await selectConversation(nextActiveID, currentSession);
+    await selectConversation(
+      nextActiveID,
+      currentSession,
+      mergedItems.find(item => item.conversationID === nextActiveID)
+    );
   }
 
   async function loadContacts(currentSession = sessionRef.current): Promise<void> {
@@ -398,11 +407,15 @@ export function App() {
     });
   }
 
-  async function selectConversation(conversationID: string, currentSession = sessionRef.current): Promise<void> {
+  async function selectConversation(
+    conversationID: string,
+    currentSession = sessionRef.current,
+    knownConversation?: ConversationSummary
+  ): Promise<void> {
     if (!currentSession) {
       throw new Error("login first");
     }
-    const selectedConversation = conversations.find(item => item.conversationID === conversationID);
+    const selectedConversation = knownConversation ?? conversations.find(item => item.conversationID === conversationID);
     activeConversationRef.current = conversationID;
     setActiveConversationID(conversationID);
     setManualConversationID(conversationID);
@@ -410,6 +423,7 @@ export function App() {
     await showCachedMessages(conversationID);
     await syncConversation(conversationID, currentSession);
     if (selectedConversation?.type === "GROUP") {
+      await loadGroupProfile(conversationID, currentSession);
       await loadGroupMembers(conversationID, currentSession, {
         query: "",
         roleFilter: "ALL",
@@ -446,12 +460,25 @@ export function App() {
         },
         currentSession
       );
+      const profile = await runtime.bff.updateConversationProfile(
+        {
+          conversationID: created.conversationID,
+          title: displayName,
+          avatarURI: "",
+          expectedProfileVersion: 0
+        },
+        currentSession
+      );
+      applyGroupProfile(profile);
+      setGroupProfileTitleDraft(profile.title);
+      setGroupProfileAvatarDraft(profile.avatarURI);
+      setGroupProfileError("");
       const optimistic: ConversationSummary = {
         tenantID: currentSession.tenantID,
         conversationID: created.conversationID,
         type: created.type,
         status: "ACTIVE",
-        title: displayName,
+        title: profile.title,
         lastSeq: created.boundarySeq,
         memberVersion: created.memberVersion,
         unreadCount: 0,
@@ -461,8 +488,61 @@ export function App() {
       };
       upsertConversationSummary(optimistic);
       setNewGroupName("");
-      await selectConversation(created.conversationID, currentSession);
+      await selectConversation(created.conversationID, currentSession, optimistic);
       await loadGroupMembers(created.conversationID, currentSession);
+    });
+  }
+
+  async function loadGroupProfile(
+    conversationID = activeConversationRef.current,
+    currentSession = sessionRef.current
+  ): Promise<ConversationProfile> {
+    if (!currentSession) {
+      throw new Error("login first");
+    }
+    if (!conversationID) {
+      throw new Error("conversation id is required");
+    }
+    try {
+      const profile = await runtime.bff.getConversationProfile(conversationID, currentSession);
+      applyGroupProfile(profile);
+      if (activeConversationRef.current === conversationID) {
+        setGroupProfileTitleDraft(profile.title);
+        setGroupProfileAvatarDraft(profile.avatarURI);
+      }
+      setGroupProfileError("");
+      return profile;
+    } catch (caught) {
+      setGroupProfileError(errorMessage(caught));
+      throw caught;
+    }
+  }
+
+  async function saveGroupProfile(): Promise<void> {
+    await run("update group profile", async () => {
+      const currentSession = requireSession();
+      const conversation = requireActiveGroupConversation();
+      const profile = conversationProfiles[conversation.conversationID];
+      if (!profile) {
+        throw new Error("group profile must be loaded before update");
+      }
+      const title = groupProfileTitleDraft.trim();
+      if (!title) {
+        throw new Error("group title is required");
+      }
+      const updated = await runtime.bff.updateConversationProfile(
+        {
+          conversationID: conversation.conversationID,
+          title,
+          avatarURI: groupProfileAvatarDraft.trim(),
+          expectedProfileVersion: profile.profileVersion
+        },
+        currentSession
+      );
+      applyGroupProfile(updated);
+      setGroupProfileTitleDraft(updated.title);
+      setGroupProfileAvatarDraft(updated.avatarURI);
+      setGroupProfileError("");
     });
   }
 
@@ -493,7 +573,7 @@ export function App() {
         updatedAtMs: Date.now()
       };
       upsertConversationSummary(directSummary);
-      await selectConversation(created.conversationID, currentSession);
+      await selectConversation(created.conversationID, currentSession, directSummary);
     });
   }
 
@@ -909,6 +989,7 @@ export function App() {
     setActiveConversationID("");
     setMessages([]);
     clearGroupMemberState();
+    clearGroupProfileState();
     setLastAck(null);
     setPushStatus("disconnected");
   }
@@ -922,6 +1003,24 @@ export function App() {
     setGroupMemberNextPageToken("");
     setGroupMemberPageTokens([]);
     setGroupMemberPageIndex(0);
+  }
+
+  function clearGroupProfileState(): void {
+    setConversationProfiles({});
+    setGroupProfileTitleDraft("");
+    setGroupProfileAvatarDraft("");
+    setGroupProfileError("");
+  }
+
+  function applyGroupProfile(profile: ConversationProfile): void {
+    setConversationProfiles(current => ({ ...current, [profile.conversationID]: profile }));
+    setConversations(current =>
+      current.map(item =>
+        item.conversationID === profile.conversationID
+          ? { ...item, title: profile.title, updatedAtMs: profile.updatedAtMs }
+          : item
+      )
+    );
   }
 
   async function clearExpiredSession(caught: unknown): Promise<void> {
@@ -962,6 +1061,19 @@ export function App() {
     );
   }
 
+  function displayConversationTitle(conversation: ConversationSummary): string {
+    const profile = conversation.type === "GROUP" ? conversationProfiles[conversation.conversationID] : undefined;
+    if (profile?.title.trim()) {
+      return profile.title;
+    }
+    return conversationDisplayTitle(conversation);
+  }
+
+  function displayConversationAvatarText(conversation: ConversationSummary): string {
+    const title = displayConversationTitle(conversation).trim();
+    return (title.slice(0, 1) || "会").toUpperCase();
+  }
+
   async function showCachedMessages(conversationID: string): Promise<void> {
     const cachedMessages = await store.listMessages(conversationID);
     if (activeConversationRef.current === conversationID) {
@@ -971,7 +1083,7 @@ export function App() {
 
   const activeConversation = conversations.find(item => item.conversationID === activeConversationID);
   const activeConversationTitle = activeConversation
-    ? conversationDisplayTitle(activeConversation)
+    ? displayConversationTitle(activeConversation)
     : activeConversationID
       ? titleFromConversationID(activeConversationID, "GROUP")
       : "选择一个会话";
@@ -982,6 +1094,9 @@ export function App() {
       : "请先登录";
   const emptyState = emptyMessageState(Boolean(session), Boolean(activeConversationID));
   const activeGroupConversation = activeConversation?.type === "GROUP" ? activeConversation : undefined;
+  const activeGroupProfile = activeGroupConversation
+    ? conversationProfiles[activeGroupConversation.conversationID]
+    : undefined;
   const groupMembersForActive =
     activeGroupConversation && groupMembersConversationID === activeGroupConversation.conversationID
       ? groupMembers
@@ -1153,9 +1268,9 @@ export function App() {
                     key={conversation.conversationID}
                     onClick={() => void run("select conversation", () => selectConversation(conversation.conversationID))}
                   >
-                    <span className="conversation-avatar">{conversationAvatarText(conversation)}</span>
+                    <span className="conversation-avatar">{displayConversationAvatarText(conversation)}</span>
                     <span className="conversation-copy">
-                      <strong>{conversationDisplayTitle(conversation)}</strong>
+                      <strong>{displayConversationTitle(conversation)}</strong>
                       <small>{conversationSubtitle(conversation)}</small>
                     </span>
                   </button>
@@ -1396,13 +1511,14 @@ export function App() {
           <section className="group-settings" aria-label="群设置">
             <div className="group-profile-card" data-testid="group-profile-card">
               <span className="group-profile-avatar" data-testid="group-profile-avatar">
-                {conversationAvatarText(activeGroupConversation)}
+                {displayConversationAvatarText(activeGroupConversation)}
               </span>
               <div className="group-profile-copy">
-                <strong data-testid="group-profile-title">{conversationDisplayTitle(activeGroupConversation)}</strong>
+                <strong data-testid="group-profile-title">{displayConversationTitle(activeGroupConversation)}</strong>
                 <span data-testid="group-profile-subtitle">
                   {conversationStatusLabel(activeGroupConversation.status)} · 最新 #
                   {activeGroupConversation.lastSeq || 0} · member v{activeGroupConversation.memberVersion}
+                  {activeGroupProfile ? ` · profile v${activeGroupProfile.profileVersion}` : ""}
                 </span>
               </div>
               <div className="group-profile-badges" aria-label="群状态">
@@ -1415,6 +1531,48 @@ export function App() {
                 ) : null}
               </div>
             </div>
+            <form
+              className="group-profile-edit"
+              onSubmit={event => {
+                event.preventDefault();
+                void saveGroupProfile();
+              }}
+            >
+              <label>
+                群名称
+                <input
+                  data-testid="group-profile-title-input"
+                  maxLength={128}
+                  placeholder="群名称"
+                  value={groupProfileTitleDraft}
+                  onChange={event => setGroupProfileTitleDraft(event.target.value)}
+                  disabled={!session || !activeGroupProfile}
+                />
+              </label>
+              <label>
+                头像 URI
+                <input
+                  data-testid="group-profile-avatar-input"
+                  maxLength={512}
+                  placeholder="https://... 或 media://..."
+                  value={groupProfileAvatarDraft}
+                  onChange={event => setGroupProfileAvatarDraft(event.target.value)}
+                  disabled={!session || !activeGroupProfile}
+                />
+              </label>
+              <button
+                data-testid="group-profile-save"
+                type="submit"
+                disabled={!session || !activeGroupProfile || groupProfileTitleDraft.trim() === ""}
+              >
+                保存资料
+              </button>
+              {groupProfileError ? (
+                <div data-testid="group-profile-error" className="group-profile-error">
+                  {groupProfileError}
+                </div>
+              ) : null}
+            </form>
             <button
               data-testid="group-members-refresh"
               className="ghost-button"
@@ -1790,11 +1948,6 @@ function conversationStatusLabel(status: string): string {
     default:
       return status || "未知状态";
   }
-}
-
-function conversationAvatarText(conversation: ConversationSummary): string {
-  const title = conversationDisplayTitle(conversation).trim();
-  return (title.slice(0, 1) || "会").toUpperCase();
 }
 
 function isGenericConversationTitle(title: string): boolean {

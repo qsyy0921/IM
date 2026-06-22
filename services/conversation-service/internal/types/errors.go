@@ -11,6 +11,7 @@ var (
 	ErrMemberChangeNotFound = errors.New("member change not found")
 	ErrMemberNotActive      = errors.New("conversation member is not active")
 	ErrMemberConflict       = errors.New("member conflict")
+	ErrProfileConflict      = errors.New("conversation profile conflict")
 	ErrPermissionDenied     = errors.New("permission denied")
 	ErrDBReadFailed         = errors.New("db read failed")
 	ErrDBWriteFailed        = errors.New("db write failed")
@@ -51,6 +52,13 @@ func NewMemberConflict(reason string) error {
 		return ErrMemberConflict
 	}
 	return fmt.Errorf("%w: %s", ErrMemberConflict, reason)
+}
+
+func NewProfileConflict(reason string) error {
+	if reason == "" {
+		return ErrProfileConflict
+	}
+	return fmt.Errorf("%w: %s", ErrProfileConflict, reason)
 }
 
 func NewPermissionDenied(reason string) error {

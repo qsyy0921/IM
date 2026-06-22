@@ -17,6 +17,7 @@ export function buildClientShellSmokePlan(options = {}) {
   return {
     schemaVersion: smokeSchemaVersion,
     generatedAt: new Date().toISOString(),
+    focusedGate: focusedGate(),
     targets: {
       browser: browserTarget(),
       "windows-desktop": nativeTarget("windows-desktop", readiness.targets["windows-desktop"], artifactPlan, installPlan),
@@ -27,6 +28,20 @@ export function buildClientShellSmokePlan(options = {}) {
       wiredLanExample: "loadtest/clientweb/run-local-smoke.ps1 -BindHost 172.31.50.1 -ClientHost 172.31.50.1",
       evidence: "docs/runbook/loadtest/client-platform/"
     }
+  };
+}
+
+function focusedGate() {
+  return {
+    command: "npm --prefix clients run check:no-toolchain",
+    downloadsToolchain: false,
+    buildsNativeArtifacts: false,
+    startsDocker: false,
+    installsArtifacts: false,
+    startsDeviceActivities: false,
+    opensAdbReverse: false,
+    readsDeviceReadiness: true,
+    evidence: "Fast client gate for Web PWA, shell assets, desktop and Android action assets, Android readiness and this shell smoke plan before any APK, Docker or device-install path."
   };
 }
 

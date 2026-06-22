@@ -19,6 +19,15 @@ const plan = JSON.parse(output);
 const serialized = JSON.stringify(plan);
 
 assert(plan.schemaVersion === "nexusim.client-shell-smoke-plan.v1", "shell smoke plan schema mismatch");
+assert(plan.focusedGate?.command === "npm --prefix clients run check:no-toolchain", "focused no-toolchain gate command missing");
+assert(plan.focusedGate.downloadsToolchain === false, "focused gate must not download toolchains");
+assert(plan.focusedGate.buildsNativeArtifacts === false, "focused gate must not build native artifacts");
+assert(plan.focusedGate.startsDocker === false, "focused gate must not start Docker");
+assert(plan.focusedGate.installsArtifacts === false, "focused gate must not install artifacts");
+assert(plan.focusedGate.startsDeviceActivities === false, "focused gate must not start device activities");
+assert(plan.focusedGate.opensAdbReverse === false, "focused gate must not open adb reverse");
+assert(plan.focusedGate.readsDeviceReadiness === true, "focused gate should read low-sensitive Android readiness state");
+assert(plan.focusedGate.evidence.includes("shell smoke plan"), "focused gate evidence should mention shell smoke plan coverage");
 assert(plan.targets.browser.readyForManualShellSmoke === true, "browser shell smoke should be available");
 assert(plan.targets.browser.launchCommand.includes("dev:web"), "browser launch command missing");
 assert(Array.isArray(plan.targets.browser.checklist) && plan.targets.browser.checklist.length >= 3, "browser checklist missing");

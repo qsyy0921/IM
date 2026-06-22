@@ -304,13 +304,13 @@ First slice:
 - `npm --prefix clients run plan:shell-smoke` prints a low-sensitive browser /
   desktop / Android shell smoke plan. It combines toolchain readiness, prepared
   asset verification, artifact presence, collected-artifact install readiness,
-  safe build commands, the shared BFF / push smoke command and the shared
-  `test:web-shell-actions` lifecycle guard; it does not launch services,
-  connect devices, install artifacts or install toolchains. Native artifact
-  status distinguishes raw build-output discovery from the collected artifact
-  manifest that drives manual install readiness. When a Windows desktop
-  artifact is collected, the plan includes `smoke:desktop-artifact-launch` as a
-  process launch sanity check before the fuller login-level shell smoke.
+  safe build commands, the shared BFF / push smoke command and the default
+  `check:no-toolchain` focused gate; it does not launch services, connect
+  devices, install artifacts or install toolchains. Native artifact status
+  distinguishes raw build-output discovery from the collected artifact manifest
+  that drives manual install readiness. When a Windows desktop artifact is
+  collected, the plan includes `smoke:desktop-artifact-launch` as a process
+  launch sanity check before the fuller login-level shell smoke.
   Browser plans include `test:web-pwa` before manual shell smoke, so the PWA
   manifest and service-worker cache boundary are verified before browser
   install testing. Desktop plans include `test:desktop-shell-action-assets`

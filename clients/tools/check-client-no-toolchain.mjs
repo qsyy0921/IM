@@ -60,19 +60,14 @@ const checkPlan = [
     reason: "guards desktop and Android shell config parsing without privileged fields"
   },
   {
-    name: "desktop-typescript-contract",
-    script: "typecheck:desktop",
-    reason: "guards desktop TypeScript shell contracts without native builds"
+    name: "client-typescript-workspace-contract",
+    script: "typecheck",
+    reason: "guards protocol, core, Web, desktop and Android TypeScript contracts"
   },
   {
     name: "desktop-native-skeleton-contract",
     script: "validate:desktop-tauri",
     reason: "guards desktop native shell skeleton without building the artifact"
-  },
-  {
-    name: "android-typescript-contract",
-    script: "typecheck:android",
-    reason: "guards Android TypeScript shell contracts without native builds"
   },
   {
     name: "android-native-skeleton-contract",

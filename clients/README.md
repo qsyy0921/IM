@@ -208,8 +208,8 @@ Current packaging status:
 - `check:no-toolchain` runs the fast client shell guard set without launching
   Docker, building APKs, installing APKs, starting Android activities, opening
   `adb reverse` or installing toolchains. It includes client workspace
-  validation, the clientweb smoke hook contract, shell config, Web platform,
-  desktop / Android TypeScript and native skeleton validation, shared runtime /
+  validation, workspace TypeScript, the clientweb smoke hook contract, shell
+  config, Web platform, desktop / Android native skeleton validation, shared runtime /
   local-store / IndexedDB contracts, Web shell lifecycle / automation /
   smoke-report contracts, shell asset prep, desktop artifact launch / composed
   smoke dry-run contracts, artifact readiness / install-plan / builder /

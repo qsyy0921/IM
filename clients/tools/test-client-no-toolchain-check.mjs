@@ -28,9 +28,8 @@ assert(commands.includes("npm --prefix clients run test:android-docker-builder")
 assert(commands.includes("npm --prefix clients run test:clientweb-smoke-hooks"), "clientweb smoke hook check missing");
 assert(commands.includes("npm --prefix clients run test:web-pwa"), "web PWA check missing");
 assert(commands.includes("npm --prefix clients run test:shell-config"), "shell config contract check missing");
-assert(commands.includes("npm --prefix clients run typecheck:desktop"), "desktop TypeScript contract check missing");
+assert(commands.includes("npm --prefix clients run typecheck"), "client workspace TypeScript contract check missing");
 assert(commands.includes("npm --prefix clients run validate:desktop-tauri"), "desktop native skeleton contract check missing");
-assert(commands.includes("npm --prefix clients run typecheck:android"), "android TypeScript contract check missing");
 assert(commands.includes("npm --prefix clients run validate:android-native"), "android native skeleton contract check missing");
 assert(commands.includes("npm --prefix clients run test:web-platform"), "web platform contract check missing");
 assert(commands.includes("npm --prefix clients run test:local-message-store"), "local message store contract check missing");

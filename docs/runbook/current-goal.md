@@ -89,6 +89,10 @@ Artifact collector 的 `--dry-run` 输出必须带 execution policy，声明它�
 artifact source 并读取元数据，不复制 artifact、不创建输出目录、不写 manifest。
 Desktop artifact launch smoke 的 `--dry-run` 输出必须带 execution policy，声明它会
 只读校验 manifest / artifact hash，但不会启动或终止 artifact 进程。
+Desktop composed smoke 在 `--clientweb-summary + --launch-dry-run` 模式下也必须带
+execution policy，声明它只读取既有 clientweb summary、只读校验 artifact manifest /
+bytes、嵌套 desktop launch dry-run，不启动服务、不启动 desktop artifact、不联网、
+不启动 Docker、不安装或接触设备、不下载工具链。
 `plan:android-webview-login-smoke` 也是 plan-only：它可以列出 APK build、adb
 install、Activity start、adb forward 和 runner 命令，但顶层 execution policy
 必须声明这些命令不会被 plan 脚本执行。

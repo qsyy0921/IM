@@ -423,7 +423,12 @@ First slice:
   artifacts, contact devices or download toolchains.
   `smoke:desktop-composed` can also combine that launch proof with a clientweb
   BFF / push summary without leaking absolute paths or sensitive fields. It
-  still does not produce MSI / NSIS installer bundles. `npm --prefix clients run
+  now emits an execution policy: with `--clientweb-summary + --launch-dry-run`
+  it only reads the existing clientweb summary, validates the manifest /
+  artifact bytes through the nested launch dry-run, and does not start services,
+  launch the desktop artifact, open network connections, start Docker, install
+  or contact devices, or download toolchains. It still does not produce MSI /
+  NSIS installer bundles. `npm --prefix clients run
   smoke:desktop-webview-metadata` now proves the Tauri WebView can load the
   prepared shell, read the PC `runtime_metadata` IPC and POST a low-sensitive
   loopback report from inside the rendered shell. The report includes the

@@ -23,6 +23,7 @@ function main(argv) {
       ranClientWeb: options.runClientWeb,
       launchDryRun: options.launchDryRun
     },
+    executionPolicy: buildExecutionPolicy(options),
     clientWeb: clientWebSummary,
     desktop: summarizeDesktopLaunch(desktopLaunch),
     verdict: buildVerdict(clientWebSummary, desktopLaunch),
@@ -112,6 +113,25 @@ function parseArgs(argv) {
     throw new Error("provide --clientweb-summary or --run-clientweb");
   }
   return options;
+}
+
+function buildExecutionPolicy(options) {
+  return {
+    planOnly: options.launchDryRun === true && options.runClientWeb !== true,
+    readsClientWebSummary: options.clientWebSummary !== "",
+    runsClientWebSmoke: options.runClientWeb === true,
+    startsServices: options.runClientWeb === true,
+    readsArtifactManifest: true,
+    validatesArtifactFile: true,
+    runsDesktopLaunchSmoke: true,
+    desktopLaunchDryRun: options.launchDryRun === true,
+    startsDesktopArtifact: options.launchDryRun !== true,
+    opensNetworkConnection: options.runClientWeb === true,
+    installsArtifacts: false,
+    contactsDevice: false,
+    startsDocker: false,
+    downloadsToolchain: false
+  };
 }
 
 function resolveClientWebSummary(options) {

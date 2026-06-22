@@ -93,9 +93,9 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   把 native bridge 交给 shared `KeyValueMessageStore`；否则保持 browser
   IndexedDB / WebView localStorage 路径。focused runtime test 用 fake native bridge
   覆盖了 cursor / message 持久化和重开；Tauri SQLite 命令桥已通过 Rust unit
-  test 和 desktop validator，但仍需要重新跑真实 Tauri WebView metadata / login
-  smoke 作为运行时 baseline；Android SQLite bridge 仍等待 APK 构建和真机 WebView
-  smoke 证明。
+  test、desktop validator、真实 Tauri WebView metadata smoke 和登录级 WebView smoke；
+  两个 runtime smoke 都记录了 `tauri-sqlite` ready 证据。Android SQLite bridge
+  仍等待 APK 构建和真机 WebView smoke 证明。
 - `LocalMessageStore.listMessages` 已提升为 shared client-core port；
   `MemoryMessageStore`、`KeyValueMessageStore` 和 Web `IndexedDBMessageStore`
   现在都有同一读缓存语义，并补了 pending -> accepted-send 迁移去重测试。
@@ -227,7 +227,14 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   `c72ea512` 上完成 clean 登录级 Tauri WebView smoke，归档见
   `docs/runbook/loadtest/client-platform/loadtest-report-20260622-desktop-webview-login-smoke.md`；
   summary 记录 `git_dirty=false`，覆盖 WebView 内 login、externally-triggered
-  `delivery.notify`、PullInbox、message observe 和 AckDelivery。
+  `delivery.notify`、PullInbox、message observe 和 AckDelivery。2026-06-22
+  在提交 `2b67b0e1` 上又完成了 desktop SQLite bridge 之后的 metadata / login
+  rerun，归档见
+  `docs/runbook/loadtest/client-platform/loadtest-report-20260622-desktop-webview-metadata-sqlite-smoke.md`
+  和
+  `docs/runbook/loadtest/client-platform/loadtest-report-20260622-desktop-webview-login-sqlite-smoke.md`；
+  两份报告均记录 `tauri-sqlite` ready，login rerun 也覆盖 WebView 内 login、
+  `delivery.notify`、PullInbox 和 AckDelivery。
 - Android 已新增 opt-in Docker builder profile：
   `deploy/docker/client-android-builder.Dockerfile` 和
   `deploy/local/docker-compose.client-builders.yml`。`validate:builder-profile`
@@ -339,10 +346,10 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
    `npm --prefix clients run build:android-apk:docker:bootstrap` 构建 Android Docker builder
    image；镜像存在后运行 `npm --prefix clients run build:android-apk:docker` 产出首个 APK + manifest。
 2. 在真实 Android shell UI 中接入现有 shell action，并在工具链 ready 后跑平台 shell smoke。
-3. 重新跑 desktop Tauri WebView metadata / login smoke，确认真实 WebView 内
-   `tauri-sqlite` ready 证据与本轮源码 bridge 一致；Android 仍需在 APK 工具链 ready
-   后验证 `android-sqlite` 真机路径。当前 shared readiness 和 native bridge storage
-   合约已固定，后续只替换 / 验证平台桥实现，不改 sync core。
+3. 在 Android APK 工具链 ready 后验证 `android-sqlite` 真机路径。当前 shared
+   readiness 和 native bridge storage 合约已固定，后续只替换 / 验证平台桥实现，
+   不改 sync core；desktop `tauri-sqlite` metadata / login WebView rerun 已在
+   提交 `2b67b0e1` 上完成。
 4. 再回到 workflow compensation adapter / instruction approval UI / ops 管理；
    当前已有本地 workflow get / decision / decision manifest / instruction list CLI，
    低敏 compensation instruction manifest 生成 / 校验，以及 catalog-backed import

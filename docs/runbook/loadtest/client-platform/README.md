@@ -38,6 +38,13 @@ Reports:
   login-level Tauri WebView smoke; proves the rendered PC shell can log in,
   receive `delivery.notify`, PullInbox and AckDelivery through public client
   paths.
+- `loadtest-report-20260622-desktop-webview-metadata-sqlite-smoke.md`: rerun
+  after the desktop SQLite bridge landed; proves rendered Tauri WebView metadata
+  reports `nativeBridgeVersion=0.2.0` and `tauri-sqlite` ready.
+- `loadtest-report-20260622-desktop-webview-login-sqlite-smoke.md`: rerun
+  login-level Tauri WebView smoke after the SQLite bridge landed; proves login,
+  notify, PullInbox and AckDelivery while the WebView displays `tauri-sqlite`
+  native-store readiness.
 
 Useful command:
 

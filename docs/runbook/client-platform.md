@@ -180,10 +180,10 @@ First slice:
   contract emits stable low-sensitive `reason`, expected bridge and next action
   fields, so tools and runtime adapters do not need target-specific error
   strings. Web shell adapter wiring accepts ready native key-value bridges and
-  routes them through shared `KeyValueMessageStore`; desktop still needs a fresh
-  WebView smoke with `tauri-sqlite` ready evidence, and Android still needs APK
-  build plus real-device WebView smoke before either runtime path becomes a
-  packaged baseline.
+  routes them through shared `KeyValueMessageStore`; desktop now has fresh
+  WebView `tauri-sqlite` ready evidence, while Android still needs APK build
+  plus real-device WebView smoke before that runtime path becomes a packaged
+  baseline.
   `LocalMessageStore.clear` is now part of the shared port so logout can remove
   cached messages, cursors and pending sends consistently across targets.
 - `LocalMessageStore.listMessages` is now part of the shared port. Web,
@@ -256,9 +256,9 @@ First slice:
   shell asset verification status and per-target local store readiness. The
   local store section records the current first-stage `local-storage` cache,
   target `sqlite` production store and native bridge readiness. Desktop source
-  now reports `tauri-sqlite` ready, but earlier real WebView smoke reports
-  should be rerun to capture that updated evidence. Android source now reports
-  `android-sqlite` ready, but APK build and real-device smoke are still
+  now reports `tauri-sqlite` ready, and the 2026-06-22 desktop WebView metadata
+  / login rerun captured that updated runtime evidence. Android source now
+  reports `android-sqlite` ready, but APK build and real-device smoke are still
   required before treating it as a runtime baseline. It separates the Android Docker builder image
   build command from the actual builder run command and emits low-sensitive
   `nextActions`; it never starts a download or build by itself. When the image
@@ -346,7 +346,9 @@ First slice:
   The fuller login-level
   desktop UI smoke has also passed on clean commit `c72ea512`, covering WebView
   login, externally triggered `delivery.notify`, PullInbox, message observe and
-  AckDelivery. Android now has the same metadata-smoke runner shape, but it
+  AckDelivery. The desktop SQLite bridge rerun on commit `2b67b0e1` also proves
+  `tauri-sqlite` ready evidence in both metadata-only and login-level WebView
+  smoke. Android now has the same metadata-smoke runner shape, but it
   still does not produce `.apk` or `.aab` artifacts because the local toolchain /
   Docker builder image has not been completed.
 - `/api/auth/logout` performs first-stage server-side logout for the current
@@ -374,11 +376,11 @@ rejected. For local LAN client smoke, prefer the wired `172.x.x.x` address.
    builder image only when toolchain download is acceptable.
 2. Wire lifecycle UI controls into the real Android shell, and run platform-shell
    smoke once packaging/runtime tooling is ready.
-3. Rerun desktop Tauri WebView metadata / login smoke to capture the new
-   `tauri-sqlite` ready evidence, then validate Android `android-sqlite` on a
-   real APK once packaging/runtime tooling is ready. The shared
-   `NativeStoreReadiness` contract is already in place; the remaining work is
-   platform smoke, not changing client-core sync semantics.
+3. Validate Android `android-sqlite` on a real APK once packaging/runtime
+   tooling is ready. Desktop `tauri-sqlite` metadata / login WebView reruns are
+   complete on commit `2b67b0e1`; the shared `NativeStoreReadiness` contract is
+   already in place, so remaining work is Android platform smoke, not changing
+   client-core sync semantics.
 
 ## Local Build Prerequisites
 

@@ -231,8 +231,10 @@ First slice:
   devtools readiness and parser contracts and Android platform readiness. It does not build native
   artifacts or APKs, launch Docker, install APKs, start activities, open
   `adb reverse` or install toolchains; it does read low-sensitive ADB / device readiness state through
-  `report:android-platform-readiness`. Run the individual scripts only when a
-  specific guard fails.
+  `report:android-platform-readiness`. Its `--dry-run` output now carries a
+  plan-only execution policy proving that the dry-run itself only describes the
+  focused gate and does not execute checks, run npm scripts or read device
+  state. Run the individual scripts only when a specific guard fails.
 - `npm --prefix clients run test:web-shell-actions` guards the Web shell
   lifecycle contract. It verifies the Web shell binds login, refresh, restore
   and logout through shared `ClientShellActions` and does not call runtime auth

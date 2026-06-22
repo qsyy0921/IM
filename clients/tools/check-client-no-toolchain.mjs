@@ -223,6 +223,7 @@ function main() {
 export function buildDryRunPlan() {
   return {
     schemaVersion: "nexusim.client-no-toolchain-check.v1",
+    executionPolicy: dryRunExecutionPolicy(),
     downloadsToolchain: false,
     readsDeviceReadiness: true,
     installsArtifacts: false,
@@ -234,6 +235,22 @@ export function buildDryRunPlan() {
       command: `npm --prefix clients run ${check.script}`,
       reason: check.reason
     }))
+  };
+}
+
+function dryRunExecutionPolicy() {
+  return {
+    planOnly: true,
+    describesFocusedGate: true,
+    executesChecks: false,
+    runsNpmScripts: false,
+    readsDeviceReadiness: false,
+    installsArtifacts: false,
+    startsDeviceActivities: false,
+    opensAdbReverse: false,
+    startsServices: false,
+    startsDocker: false,
+    downloadsToolchain: false
   };
 }
 

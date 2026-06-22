@@ -58,6 +58,8 @@ git diff --check; git diff --cached --check
 ```
 
 `check:no-toolchain` 先验证自身 dry-run plan 不含下载 / 安装 / 启动设备类操作，
+且该 dry-run plan 必须带 `executionPolicy.planOnly=true`，声明它只描述 focused
+gate，不执行 checks、不运行 npm scripts、不读取设备状态。
 再聚合 client workspace validation、workspace TypeScript、Web PWA、shell config、
 desktop / Android native skeleton validation、Web platform、shared runtime /
 local-store / IndexedDB contracts、Web shell lifecycle /

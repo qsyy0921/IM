@@ -11,6 +11,7 @@ const serialized = JSON.stringify(plan);
 const commands = plan.checks.map(check => check.command);
 
 assert(plan.schemaVersion === "nexusim.client-no-toolchain-check.v1", "schema version mismatch");
+assertDryRunExecutionPolicy(plan.executionPolicy);
 assert(plan.downloadsToolchain === false, "no-toolchain plan must not download toolchains");
 assert(plan.readsDeviceReadiness === true, "no-toolchain plan should report read-only device readiness");
 assert(plan.installsArtifacts === false, "no-toolchain plan must not install artifacts");
@@ -77,3 +78,17 @@ assert(!serialized.includes("\\\\?"), "no-toolchain plan leaked an extended Wind
 assert(!serialized.match(/token|secret|password|credential|private/i), "no-toolchain plan leaked sensitive names");
 
 console.log("client no-toolchain check plan ok");
+
+function assertDryRunExecutionPolicy(policy) {
+  assert(policy?.planOnly === true, "no-toolchain dry-run should be marked plan-only");
+  assert(policy.describesFocusedGate === true, "no-toolchain dry-run should describe the focused gate");
+  assert(policy.executesChecks === false, "no-toolchain dry-run should not execute checks");
+  assert(policy.runsNpmScripts === false, "no-toolchain dry-run should not run npm scripts");
+  assert(policy.readsDeviceReadiness === false, "no-toolchain dry-run should not read device readiness");
+  assert(policy.installsArtifacts === false, "no-toolchain dry-run should not install artifacts");
+  assert(policy.startsDeviceActivities === false, "no-toolchain dry-run should not start device activities");
+  assert(policy.opensAdbReverse === false, "no-toolchain dry-run should not open adb reverse");
+  assert(policy.startsServices === false, "no-toolchain dry-run should not start services");
+  assert(policy.startsDocker === false, "no-toolchain dry-run should not start Docker");
+  assert(policy.downloadsToolchain === false, "no-toolchain dry-run should not download toolchains");
+}

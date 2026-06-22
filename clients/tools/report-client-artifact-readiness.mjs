@@ -3,9 +3,9 @@ import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   collectClientBuildPrereqs,
-  runCommand,
   workspaceRoot
 } from "./client-build-env.mjs";
+import { buildAndroidDockerBuilderPlan } from "./run-android-docker-builder.mjs";
 import { verifyShellAssets } from "./verify-shell-assets.mjs";
 
 const androidBuilderImage = "nexusim/client-android-builder:local";
@@ -53,6 +53,7 @@ export function buildReadinessReport() {
           dockerAvailable: docker.dockerAvailable,
           composeAvailable: docker.composeAvailable,
           imagePresent: docker.imagePresent,
+          executionPolicy: docker.executionPolicy,
           outputHint: "clients/artifacts/android/docker-android-debug/manifest.json",
           imageBuildCommand: androidBuilderImageBuildCommand,
           buildCommand: androidBuilderRunCommand,
@@ -278,15 +279,14 @@ function androidNativeStoreSourceReady() {
 }
 
 function dockerStatus() {
-  const dockerVersion = runCommand("docker", ["version", "--format", "{{.Server.Version}}"]);
-  const composeVersion = runCommand("docker", ["compose", "version", "--short"]);
-  const imageInspect = runCommand("docker", ["image", "inspect", androidBuilderImage]);
+  const plan = buildAndroidDockerBuilderPlan({ dryRun: true });
   return {
-    dockerAvailable: dockerVersion.status === 0,
-    composeAvailable: composeVersion.status === 0,
+    dockerAvailable: plan.dockerAvailable,
+    composeAvailable: plan.composeAvailable,
     composeFilePresent: existsSync(join(workspaceRoot, "..", androidBuilderCompose)),
     dockerfilePresent: existsSync(join(workspaceRoot, "..", androidBuilderDockerfile)),
-    imagePresent: imageInspect.status === 0
+    imagePresent: plan.imagePresent,
+    executionPolicy: plan.executionPolicy
   };
 }
 

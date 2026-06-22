@@ -578,7 +578,11 @@ npm --prefix clients run smoke:android-webview-metadata -- --dry-run
 The report includes `nextActions`. When the Android Docker builder image is
 missing, the first Android next action is the explicit bootstrap command. After
 the image exists, the next action becomes the safe builder run command that
-writes the APK and manifest.
+writes the APK and manifest. The Android Docker builder dry-run also emits an
+execution policy: dry-run only reads Docker builder state; it does not start
+Docker, build images / APKs, write manifests, install artifacts or contact
+devices. Bootstrap dry-run may report `plannedDownloadsToolchain=true`, but
+actual downloads only happen through the explicit bootstrap command.
 
 Artifact wrappers:
 

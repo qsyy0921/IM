@@ -45,6 +45,9 @@ Reports:
   login-level Tauri WebView smoke after the SQLite bridge landed; proves login,
   notify, PullInbox and AckDelivery while the WebView displays `tauri-sqlite`
   native-store readiness.
+- `loadtest-report-20260622-desktop-webview-login-prereqs-baseline.md`: clean
+  rerun after the build-prerequisites report hardening; proves the PC WebView
+  login path still works with `git_dirty=false` on commit `bad96bf7`.
 
 Useful command:
 

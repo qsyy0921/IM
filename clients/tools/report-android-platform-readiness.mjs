@@ -38,6 +38,7 @@ export function buildAndroidPlatformReadinessReport(options = {}) {
       profileReady: Boolean(dockerBuilder.profileReady),
       image: dockerBuilder.image,
       imagePresent: Boolean(dockerBuilder.imagePresent),
+      executionPolicy: dockerBuilder.executionPolicy,
       downloadsToolchainByDefault: false,
       bootstrapDownloadsToolchain: !dockerBuilder.imagePresent,
       outputHint: dockerBuilder.outputHint,

@@ -46,12 +46,19 @@ export function buildAndroidDockerBuilderPlan(options = {}) {
   const dockerfilePresent = existsSync(join(repoRoot, dockerfile));
   const imagePresent = imageInspect.status === 0;
   const allowImageBuild = Boolean(options.allowImageBuild);
+  const buildImageOnly = Boolean(options.buildImageOnly);
   return {
     schemaVersion: "nexusim.android-docker-builder-plan.v1",
     generatedAt: new Date().toISOString(),
+    executionPolicy: dockerBuilderExecutionPolicy({
+      dryRun: Boolean(options.dryRun),
+      imagePresent,
+      allowImageBuild,
+      buildImageOnly
+    }),
     dryRun: Boolean(options.dryRun),
     allowImageBuild,
-    buildImageOnly: Boolean(options.buildImageOnly),
+    buildImageOnly,
     safeDefaultNoImageBuild: !allowImageBuild,
     dockerAvailable: dockerVersion.status === 0,
     composeAvailable: composeVersion.status === 0,
@@ -69,6 +76,32 @@ export function buildAndroidDockerBuilderPlan(options = {}) {
       runBuilderArgs: ["compose", "-f", composeFile, "--profile", profile, "run", "--rm", service]
     },
     nextAction: nextAction({ imagePresent, allowImageBuild })
+  };
+}
+
+function dockerBuilderExecutionPolicy({ dryRun, imagePresent, allowImageBuild, buildImageOnly }) {
+  const canBuildImage = !imagePresent && allowImageBuild;
+  const canRunBuilder = !buildImageOnly && (imagePresent || allowImageBuild);
+  return {
+    planOnly: dryRun,
+    reportOnly: dryRun,
+    readsDockerBuilderState: true,
+    runsDockerCommands: !dryRun,
+    startsDocker: !dryRun && (canBuildImage || canRunBuilder),
+    buildsDockerImages: !dryRun && canBuildImage,
+    startsBuilderContainer: !dryRun && canRunBuilder,
+    buildsAndroidApk: !dryRun && canRunBuilder,
+    collectsArtifacts: !dryRun && canRunBuilder,
+    writesArtifactManifest: !dryRun && canRunBuilder,
+    installsArtifacts: false,
+    contactsDevice: false,
+    startsDeviceActivities: false,
+    opensAdbReverse: false,
+    opensAdbForward: false,
+    downloadsToolchain: !dryRun && canBuildImage,
+    plannedDownloadsToolchain: canBuildImage,
+    requiresExplicitUserOptInForDownloads: !imagePresent,
+    exposesLocalAbsolutePaths: false
   };
 }
 
@@ -134,4 +167,3 @@ if (resolve(process.argv[1] ?? "") === thisFile) {
     process.exitCode = 2;
   }
 }
-

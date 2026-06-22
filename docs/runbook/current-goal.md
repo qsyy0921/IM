@@ -77,7 +77,10 @@ platform readiness 和 shell smoke plan checks；它不构建 native artifact
 不会下载工具链、不会启动 Docker、不会接触设备。需要定位失败时再跑单项脚本。
 Android Docker builder bootstrap 若出现在 shell smoke plan 中，必须带有
 `downloadsToolchain=true` 和 `requiresExplicitUserOptIn=true`，只能作为显式用户
-同意后的下一步，不属于 no-toolchain gate。`plan:artifact-install` 输出的
+同意后的下一步，不属于 no-toolchain gate。Android Docker builder plan / dry-run
+本身也必须带 execution policy，声明 dry-run 只读 Docker builder 状态、不运行 Docker
+命令、不构建 image / APK、不写 artifact manifest、不安装或接触设备；bootstrap 路径
+必须暴露 `plannedDownloadsToolchain=true`，但 dry-run 不能实际下载。`plan:artifact-install` 输出的
 `adb install` / `Start-Process` 也只是 manual checklist，相关步骤必须带
 `manualOnly=true` 和安装 / 启动 / 设备接触风险字段，脚本本身不得安装或启动
 artifact；顶层 `executionPolicy.planOnly=true` 必须声明它不会执行 checklist

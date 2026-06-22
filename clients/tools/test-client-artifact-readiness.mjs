@@ -44,6 +44,9 @@ assert(report.targets.android.localStore?.nativeStoreReadiness?.bridge === "andr
 assert(report.targets.android.localStore?.nativeStoreReadiness?.nextAction === "", "android ready native store next action mismatch");
 assert(report.targets.android.localStore?.currentSmokeStore === "native-sqlite", "android current smoke store mismatch");
 assert(report.targets.android.dockerBuilder.profile === "client-builders", "android builder profile mismatch");
+assert(report.targets.android.dockerBuilder.executionPolicy?.planOnly === true, "android builder dry-run policy missing");
+assert(report.targets.android.dockerBuilder.executionPolicy?.runsDockerCommands === false, "android builder dry-run should not run Docker commands");
+assert(report.targets.android.dockerBuilder.executionPolicy?.downloadsToolchain === false, "android builder dry-run should not download toolchains");
 assert(report.targets.android.dockerBuilder.outputHint.endsWith("manifest.json"), "android builder manifest hint missing");
 assert(
   report.targets.android.dockerBuilder.imageBuildCommand.includes("build:android-apk:docker:bootstrap"),

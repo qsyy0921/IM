@@ -60,10 +60,11 @@ git diff --check; git diff --cached --check
 `check:no-toolchain` 聚合 client workspace validation、Web PWA、shell config、
 Web platform、shared runtime / local-store / IndexedDB contracts、Web shell
 lifecycle / automation / smoke-report contracts、shell asset / prep-wrapper、
-desktop / Android action asset、clientweb smoke hook contract、artifact readiness /
-install-plan / builder / collector contracts、Android builder profile / wrapper
-contracts、desktop WebView metadata / login dry-run contracts、Android metadata /
-login dry-run contracts、Android device / WebView devtools readiness and parser
+desktop / Android action asset、desktop artifact launch / composed smoke dry-run
+contracts、clientweb smoke hook contract、artifact readiness / install-plan /
+builder / collector contracts、Android builder profile / wrapper contracts、
+desktop WebView metadata / login dry-run contracts、Android metadata / login
+dry-run contracts、Android device / WebView devtools readiness and parser
 contracts、Android platform readiness 和 shell smoke plan checks；它不构建 native artifact
 或 APK、不启动 Docker、不安装 APK、不启动 Activity、不打开 `adb reverse`、
 不下载工具链。它会通过 Android readiness report 只读查询 ADB / device state。

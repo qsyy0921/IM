@@ -120,6 +120,16 @@ const checkPlan = [
     reason: "guards desktop WebView assets without Tauri or installer"
   },
   {
+    name: "desktop-artifact-launch-runner-contract",
+    script: "test:desktop-artifact-launch-smoke",
+    reason: "guards desktop artifact launch smoke dry-run output without launching the desktop artifact"
+  },
+  {
+    name: "desktop-composed-smoke-runner-contract",
+    script: "test:desktop-composed-smoke",
+    reason: "guards desktop composed smoke dry-run summary without starting services"
+  },
+  {
     name: "desktop-webview-metadata-runner-contract",
     script: "test:desktop-webview-metadata-smoke",
     reason: "guards desktop WebView metadata smoke dry-run output without building or launching the desktop artifact"

@@ -40,6 +40,8 @@ assert(commands.includes("npm --prefix clients run test:web-shell-smoke-report")
 assert(commands.includes("npm --prefix clients run test:shell-web-assets"), "shell asset check missing");
 assert(commands.includes("npm --prefix clients run test:shell-asset-prep-wrapper"), "shell asset prep wrapper check missing");
 assert(commands.includes("npm --prefix clients run test:desktop-shell-action-assets"), "desktop action asset check missing");
+assert(commands.includes("npm --prefix clients run test:desktop-artifact-launch-smoke"), "desktop artifact launch smoke contract check missing");
+assert(commands.includes("npm --prefix clients run test:desktop-composed-smoke"), "desktop composed smoke contract check missing");
 assert(commands.includes("npm --prefix clients run test:desktop-webview-metadata-smoke"), "desktop WebView metadata runner contract check missing");
 assert(commands.includes("npm --prefix clients run test:desktop-webview-login-smoke"), "desktop WebView login runner contract check missing");
 assert(commands.includes("npm --prefix clients run test:android-shell-action-assets"), "android action asset check missing");

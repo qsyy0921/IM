@@ -210,10 +210,11 @@ Current packaging status:
   `adb reverse` or installing toolchains. It includes client workspace
   validation, the clientweb smoke hook contract, shell config, Web platform,
   shared runtime / local-store / IndexedDB contracts, Web shell lifecycle /
-  automation / smoke-report contracts, shell asset prep, artifact readiness /
-  install-plan / builder / collector contracts, Android builder profile /
-  wrapper contracts, desktop WebView metadata / login dry-run contracts, Android
-  metadata / login dry-run contracts, Android device / WebView devtools readiness
-  and parser contracts and reads low-sensitive ADB / device readiness state
-  through the Android platform readiness report. Use it as the default focused
-  client gate before reaching for a broader local gate.
+  automation / smoke-report contracts, shell asset prep, desktop artifact launch
+  / composed smoke dry-run contracts, artifact readiness / install-plan / builder
+  / collector contracts, Android builder profile / wrapper contracts, desktop
+  WebView metadata / login dry-run contracts, Android metadata / login dry-run
+  contracts, Android device / WebView devtools readiness and parser contracts and
+  reads low-sensitive ADB / device readiness state through the Android platform
+  readiness report. Use it as the default focused client gate before reaching for
+  a broader local gate.

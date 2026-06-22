@@ -161,7 +161,8 @@ package-local PowerShell launcher，install plan 会校验这些 support files �
 `bundle:desktop` 可以产出 unsigned local portable zip 和低敏 summary；
 `plan:desktop-installer` / `plan:desktop-signing` 可以检查 Tauri installer 和显式
 签名输入 readiness；`sign:desktop-artifact` 已提供显式 `--execute` 门控的签名
-执行入口，默认仍只输出低敏 plan；`verify:desktop-signature` 已提供只读
+执行入口，默认仍只输出低敏 plan，release signing 可加 `--require-valid` 在签名后
+立即执行 fail-closed 验证；`verify:desktop-signature` 已提供只读
 Authenticode 验证入口，当前 baseline 实测为 `NotSigned`；`build:desktop-installer` 已提供显式 `--execute` 门控的
 installer build 包装器，并通过独立仓库 installer profile 调用 Tauri。默认开发
 Tauri config 仍保持不打包；planner 会按 `windows-desktop` 目标选择 collected
@@ -297,7 +298,7 @@ Web / Windows PC 客户端的 IM MVP 交互做实：账号注册登录、好友�
 PC WebView login smoke、真实双用户 direct + group client smoke、PC standalone exe package、
 unsigned local desktop bundle、desktop installer / signing readiness plans、显式 signing wrapper、只读 signature verifier、显式 installer build 包装器和 Android debug APK baseline 已有；`loadtest/clientweb` 已扩展到群成员列表、移除、
 角色变更和 owner transfer，并已通过 clean committed 真实 smoke。下一步是
-Windows PC MSI / NSIS installer 与真实 signing input / `--require-valid` signed artifact 验证、成员搜索 / 分页、群标题 / 头像 read model
+Windows PC MSI / NSIS installer 与真实 signing input / valid signed artifact、成员搜索 / 分页、群标题 / 头像 read model
 和更完整群设置。Android 真机 WebView login smoke 和正式移动端发布链路后置到用户明确切回。
 
 AI 大模型应用底座作为后续主线保留：
@@ -315,7 +316,7 @@ group memory
 ```
 
 下一步默认看 [current-goal.md](docs/runbook/current-goal.md)。截至当前主线，下一步是围绕
-Windows PC MSI / NSIS installer 与真实 signing input / `--require-valid` signed artifact 验证继续收口；若继续客户端产品能力，则优先补群成员
+Windows PC MSI / NSIS installer 与真实 signing input / valid signed artifact 继续收口；若继续客户端产品能力，则优先补群成员
 列表 / 移除 / 角色 / owner transfer 的真实多用户 smoke、成员搜索 / 分页、群标题 /
 头像 read model 和更完整群设置。Android APK /
 真机 smoke 不作为当前默认阻塞。
@@ -468,7 +469,7 @@ python -m mypy nexusim_ai_common scripts tests
   第一路径和消息 first path，`api-gateway` client BFF first-stage surface、Web adapters first path、
   本地 / wired LAN smoke、BFF HTTP metrics / rate-limit adapter、PC standalone exe、
   package-local README / launcher support files、unsigned local portable zip bundle、desktop installer / signing readiness plans、独立 installer profile、显式 signing wrapper、只读 signature verifier、显式 installer build 包装器、Android debug APK baseline 已落，真实双用户 direct + group client smoke 已通过；仍缺
-  Windows signed installer / MSI / NSIS、真实 signing input 和 `--require-valid` signed artifact 验证、Android 真机 smoke、正式移动端发布链路以及成员搜索 / 分页、
+  Windows signed installer / MSI / NSIS、真实 signing input 和 valid signed artifact、Android 真机 smoke、正式移动端发布链路以及成员搜索 / 分页、
   群标题 / 头像 read model 和更完整群设置。
 - 完整 media / notification / admin / audit / workflow / control-plane 等产品化平台能力；
   当前这些服务已有 first-stage 路径，但 provider-grade adapter、UI、长周期运维和生产化

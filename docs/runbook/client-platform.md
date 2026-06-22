@@ -499,7 +499,9 @@ First slice:
   default output remains plan-only and low-sensitive; it invokes `signtool` only
   with `--execute` after the collected artifact hash, explicit `signtool`,
   timestamp URL and certificate source are ready. It does not install artifacts,
-  launch the app, start services or download toolchains.
+  launch the app, start services or download toolchains. Release signing may add
+  `--require-valid`; then the wrapper reruns read-only Authenticode verification
+  after signing and fails closed if the artifact is still not valid.
   `verify:desktop-signature` is the read-only post-signing verification wrapper.
   It validates the collected artifact hash and reads Windows Authenticode public
   status without signing, installing, launching, starting services or downloading

@@ -56,6 +56,8 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   `sign:desktop-artifact` 已补为显式 `--execute` 门控的签名执行入口：默认仍只输出
   低敏 execution policy，只有 collected artifact hash、`signtool`、timestamp URL 和
   证书来源都 ready 时才会调用签名工具，且不安装、不启动、不下载 toolchain。
+  release signing 可额外使用 `--require-valid`，签名后立即读取 Authenticode public
+  status，若 artifact 仍不是 valid signature 则 fail-closed。
   `verify:desktop-signature` 已补为只读签名验证入口：校验 collected artifact hash 后读取
   Windows Authenticode public status，不签名、不安装、不启动、不下载；当前 collected
   desktop baseline 实测为 `NotSigned`。
@@ -72,7 +74,7 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
 
 ## 下一步优先级
 
-1. Windows PC 端继续真实 signing input 接入、签名后 `--require-valid` 验证、
+1. Windows PC 端继续真实 signing input 接入、valid signed artifact、
    MSI / NSIS installer 和签名 installer 体验，并保持
    Web / PC shell 的 UI 细节随真实调试反馈继续收口。
 2. 若继续客户端产品能力，优先补成员搜索 / 分页、邀请来源提示、完整群设置和

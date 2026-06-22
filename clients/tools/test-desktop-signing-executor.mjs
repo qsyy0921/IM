@@ -93,6 +93,8 @@ try {
   assert(dryRun.readyToExecuteSigning === true, "dry-run output should be executable when readiness is true");
   assert(dryRun.executionPolicy.planOnly === true, "default signing output should be plan-only");
   assert(dryRun.executionPolicy.executesSignCommand === false, "default signing output must not execute signtool");
+  assert(dryRun.executionPolicy.requiresValidSignatureAfterSigning === false, "default signing output should not require post-signature verification");
+  assert(dryRun.executionPolicy.verifiesSignatureAfterSigning === false, "default signing dry-run should not verify signatures");
   assert(dryRun.commandTemplate.includes("<signtool>"), "dry-run output should expose low-sensitive signtool placeholder");
   assert(!dryRunJSON.includes(tempRoot), "dry-run signing output leaked absolute temp path");
   assert(!dryRunJSON.match(/token|secret|password|credential|private/i), "dry-run signing output leaked sensitive names");
@@ -113,6 +115,23 @@ try {
   assert(cliPlan.readyToSign === true, "CLI signing dry-run should be ready");
   assert(cliPlan.executionPolicy.executesSignCommand === false, "CLI dry-run should not execute signing");
   assert(!JSON.stringify(cliPlan).includes(tempRoot), "CLI signing dry-run leaked absolute temp path");
+
+  const cliRequireValidPlan = runSigner([
+    "--require-valid",
+    "--manifest",
+    manifestPath,
+    "--signtool",
+    fakeSignTool,
+    "--cert-file",
+    fakePfx,
+    "--timestamp-url",
+    "https://timestamp.example.test"
+  ], {
+    NEXUSIM_DESKTOP_SIGN_PFX_PASS: "present"
+  });
+  assert(cliRequireValidPlan.readyToSign === true, "require-valid CLI dry-run should still be ready to sign");
+  assert(cliRequireValidPlan.executionPolicy.requiresValidSignatureAfterSigning === true, "require-valid dry-run should declare valid-signature requirement");
+  assert(cliRequireValidPlan.executionPolicy.verifiesSignatureAfterSigning === false, "require-valid dry-run must not verify before execute");
 
   const notReady = spawnSync(process.execPath, [
     signer,
@@ -153,6 +172,33 @@ try {
     });
     assert(readyExecute.status === 0, `ready execute should run fake signing tool: ${readyExecute.stderr}`);
     assert(readFileSync(join(tempRoot, "signed.txt"), "utf8").trim() === "signed", "ready execute should invoke the signing tool");
+
+    rmSync(join(tempRoot, "signed.txt"), { force: true });
+    const readyExecuteRequireValid = spawnSync(process.execPath, [
+      signer,
+      "--execute",
+      "--require-valid",
+      "--manifest",
+      manifestPath,
+      "--signtool",
+      fakeSignTool,
+      "--cert-file",
+      fakePfx,
+      "--timestamp-url",
+      "https://timestamp.example.test"
+    ], {
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        NEXUSIM_DESKTOP_SIGN_PFX_PASS: "present"
+      }
+    });
+    assert(readyExecuteRequireValid.status === 2, "require-valid execute should fail closed when fake signer leaves an invalid signature");
+    assert(readFileSync(join(tempRoot, "signed.txt"), "utf8").trim() === "signed", "require-valid execute should still invoke signing before verification");
+    assert(
+      readyExecuteRequireValid.stderr.includes("desktop artifact signature is not valid after signing"),
+      `require-valid execute should report invalid post-signature state: ${readyExecuteRequireValid.stderr}`
+    );
   }
 } finally {
   rmSync(tempRoot, { recursive: true, force: true });

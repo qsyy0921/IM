@@ -5,6 +5,7 @@ import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { workspaceRoot } from "./client-build-env.mjs";
 import { buildDesktopSigningPlan } from "./plan-desktop-signing.mjs";
+import { buildDesktopSignatureVerificationReport } from "./verify-desktop-signature.mjs";
 
 const schemaVersion = "nexusim.desktop-signing-execution.v1";
 const artifactManifestSchema = "nexusim.client-artifacts.v1";
@@ -23,7 +24,17 @@ function main(argv) {
     const reasons = [...plan.missing, ...output.executionBlockers].join(",");
     throw new Error(`desktop artifact signing is not ready: ${reasons}`);
   }
-  runSigningCommand(options);
+  const signedInput = runSigningCommand(options);
+  if (options.requireValid) {
+    const verification = buildDesktopSignatureVerificationReport({
+      manifest: signedInput.manifestPath,
+      requireValid: true
+    });
+    if (!verification.readyForSignedDistribution) {
+      const missing = verification.missing.length > 0 ? verification.missing.join(",") : "valid-authenticode-signature";
+      throw new Error(`desktop artifact signature is not valid after signing: ${missing}`);
+    }
+  }
 }
 
 export function buildSigningOutput(plan, options = {}) {
@@ -49,7 +60,10 @@ export function buildSigningOutput(plan, options = {}) {
       downloadsToolchain: false,
       readsCollectedArtifactManifest: true,
       readsSigningConfig: true,
-      validatesArtifactHashes: true
+      validatesArtifactHashes: true,
+      readsAuthenticodeSignature: Boolean(options.requireValid),
+      requiresValidSignatureAfterSigning: Boolean(options.requireValid),
+      verifiesSignatureAfterSigning: execute && readyToExecuteSigning && Boolean(options.requireValid)
     },
     commandTemplate: plan.commandTemplate,
     signingPlan: {
@@ -61,7 +75,7 @@ export function buildSigningOutput(plan, options = {}) {
       signing: plan.signing
     },
     nextAction: readyToExecuteSigning
-      ? "rerun with --execute in an explicit Windows signing profile"
+      ? "rerun with --execute in an explicit Windows signing profile; add --require-valid for release signing"
       : "resolve signing readiness before running with --execute"
   };
   assertLowSensitiveOutput(output);
@@ -94,6 +108,7 @@ function runSigningCommand(options) {
     stdio: "inherit",
     shell: process.platform === "win32"
   });
+  return input;
 }
 
 function resolveSigningInput(options) {
@@ -199,12 +214,17 @@ function parseArgs(argv, env) {
     certFile: env.NEXUSIM_DESKTOP_SIGN_CERT_FILE ?? "",
     certSHA1: env.NEXUSIM_DESKTOP_SIGN_CERT_SHA1 ?? "",
     timestampURL: env.NEXUSIM_DESKTOP_SIGN_TIMESTAMP_URL ?? "",
-    pfxPassEnvPresent: Boolean(env.NEXUSIM_DESKTOP_SIGN_PFX_PASS)
+    pfxPassEnvPresent: Boolean(env.NEXUSIM_DESKTOP_SIGN_PFX_PASS),
+    requireValid: false
   };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === "--execute") {
       options.execute = true;
+      continue;
+    }
+    if (arg === "--require-valid") {
+      options.requireValid = true;
       continue;
     }
     if (arg === "--manifest") {

@@ -32,7 +32,7 @@
    smoke，验证好友私聊和群聊 first path；群成员列表、移除成员、角色变更和
    owner transfer 第一路径已接入 BFF / client-core / Web shell，`loadtest/clientweb`
    也已扩展并在 clean committed smoke 中跑通这些群管理动作。继续补 PC MSI / NSIS
-   installer、真实 signing input / `--require-valid` signed artifact 验证、更完整群设置、成员搜索 / 分页和后续 native SQLite bridge。
+   installer、真实 signing input / signed artifact 验证、更完整群设置、成员搜索 / 分页和后续 native SQLite bridge。
    Android APK / 真机 WebView smoke 后置到用户明确切回。
 2. 回到 AI / Agent 主线：group memory eval、EvidencePack、Agent 真实业务动作、
    Python AI Worker 候选算法。
@@ -86,7 +86,8 @@
   `--execute` 门控的 signing wrapper，默认仍只输出低敏 execution policy；真实
   签名还需要本机 `signtool`、timestamp URL、证书来源和 signed artifact 验证。
   `verify:desktop-signature` 已补只读 Authenticode 验证入口，当前 collected baseline
-  实测为 `NotSigned`；release profile 仍需签名后用 `--require-valid` fail-closed 验证。
+  实测为 `NotSigned`；`sign:desktop-artifact --execute --require-valid` 已能在签名后
+  立即执行 fail-closed 验证，release profile 仍需提供真实签名材料并产出 valid signature。
   `build:desktop-installer` 已补显式
   `--execute` 门控的 installer build 包装器，默认仍只输出计划；desktop installer
   planner 现在会按 `windows-desktop` 目标自动选择 collected manifest，不会被更新的

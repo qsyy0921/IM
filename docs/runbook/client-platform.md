@@ -286,6 +286,9 @@ First slice:
   manifest that drives manual install readiness. When a Windows desktop
   artifact is collected, the plan includes `smoke:desktop-artifact-launch` as a
   process launch sanity check before the fuller login-level shell smoke.
+  Android plans include `test:android-shell-action-assets` before any APK build
+  step, so shared lifecycle selectors are verified in Android WebView assets
+  without Gradle / Android SDK / ADB.
   `smoke:desktop-composed` can combine an existing `loadtest/clientweb`
   BFF/push summary with desktop artifact launch evidence into one low-sensitive
   JSON result. It is useful as an intermediate PC evidence bundle, but it is not

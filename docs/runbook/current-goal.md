@@ -121,6 +121,9 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   manifest，并确认 Android bundle 中包含 login / refresh / restore / logout
   selectors 与 `native-store-readiness`。该检查不需要 Gradle、Android SDK、
   ADB、APK 或真机，证明 Android 打包资产层已承接共享 shell action path。
+  `npm --prefix clients run plan:shell-smoke` 现在也会把该检查列入 Android
+  checklist，确保任何 Android platform smoke 都先经过无 SDK 的 action asset
+  contract。
 - Web shell 支持 first-stage WebView bridge config：
   `globalThis.__NEXUSIM_CLIENT_SHELL__` 可由 PC / Android 壳层注入 target、
   API / WebSocket 地址、device / installation / app version 和 session key；当前

@@ -144,6 +144,7 @@ function nativeCommands(target, readinessTarget) {
   return {
     prepareAssets: "npm --prefix clients run build:shell-assets:android",
     verifyAssets: "node clients/tools/verify-shell-assets.mjs --target android",
+    verifyActionAssets: "npm --prefix clients run test:android-shell-action-assets",
     buildArtifact: readinessTarget.buildCommand,
     dryRunBuild: readinessTarget.dryRunCommand,
     installPlan: "npm --prefix clients run plan:artifact-install",
@@ -220,6 +221,11 @@ function nativeChecklist(target, readinessTarget, artifactStatus, installStatus)
   ];
 
   if (target === "android") {
+    checklist.push({
+      step: "verify-android-shell-action-assets",
+      command: nativeCommands(target, readinessTarget).verifyActionAssets,
+      evidence: "temporary Android WebView assets contain the shared login, refresh, restore, logout and native-store-readiness selectors before APK build"
+    });
     checklist.push({
       step: "check-android-device-readiness",
       command: nativeCommands(target, readinessTarget).deviceReadiness,

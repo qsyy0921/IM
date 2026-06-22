@@ -408,6 +408,11 @@ First slice:
   prepared shell, read the PC `runtime_metadata` IPC and POST a low-sensitive
   loopback report from inside the rendered shell. The report includes the
   native local-store readiness diagnostic and the fixed storage command surface.
+  Its dry-run output carries an execution policy proving it does not build or
+  launch the desktop artifact, start callback / WebView automation, open network
+  connections or download toolchains. The login-level desktop WebView smoke
+  dry-run carries the same plan-only boundary, plus explicit markers that it
+  does not contact the BFF or send messages.
   The fuller login-level
   desktop UI smoke has also passed on clean commit `c72ea512`, covering WebView
   login, externally triggered `delivery.notify`, PullInbox, message observe and

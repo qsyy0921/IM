@@ -45,6 +45,7 @@ try {
 
   assert(result.schemaVersion === "nexusim.desktop-webview-login-smoke.v1", "schema mismatch");
   assert(result.dryRun === true, "dry-run flag missing");
+  assertDryRunExecutionPolicy(result.executionPolicy);
   assert(result.runID === "desktop-webview-login-test", "run id mismatch");
   assert(result.input.externalMessageTrigger === true, "external sender trigger marker missing");
   assert(result.automation.driver === "webview2-cdp", "driver mismatch");
@@ -60,3 +61,16 @@ try {
 }
 
 console.log("desktop WebView login smoke dry-run ok");
+
+function assertDryRunExecutionPolicy(policy) {
+  assert(policy?.planOnly === true, "desktop login dry-run should be marked plan-only");
+  assert(policy.executesPlannedCommands === false, "desktop login dry-run should not execute planned commands");
+  assert(policy.buildsArtifact === false, "desktop login dry-run should not build artifacts");
+  assert(policy.startsArtifact === false, "desktop login dry-run should not start artifacts");
+  assert(policy.opensWebViewDebugPort === false, "desktop login dry-run should not open WebView debug port");
+  assert(policy.usesWebViewAutomation === false, "desktop login dry-run should not use WebView automation");
+  assert(policy.contactsBFF === false, "desktop login dry-run should not contact BFF");
+  assert(policy.sendsMessages === false, "desktop login dry-run should not send messages");
+  assert(policy.opensNetworkConnection === false, "desktop login dry-run should not open network connections");
+  assert(policy.downloadsToolchain === false, "desktop login dry-run should not download toolchains");
+}

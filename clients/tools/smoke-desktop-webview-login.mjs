@@ -53,8 +53,12 @@ async function main(argv) {
   };
 
   if (options.dryRun) {
-    assertLowSensitive(plan);
-    emitResult(plan, options);
+    const dryRunPlan = {
+      ...plan,
+      executionPolicy: dryRunExecutionPolicy()
+    };
+    assertLowSensitive(dryRunPlan);
+    emitResult(dryRunPlan, options);
     return;
   }
 
@@ -135,6 +139,21 @@ async function main(argv) {
     }
     rmSync(tempRoot, { recursive: true, force: true });
   }
+}
+
+function dryRunExecutionPolicy() {
+  return {
+    planOnly: true,
+    executesPlannedCommands: false,
+    buildsArtifact: false,
+    startsArtifact: false,
+    opensWebViewDebugPort: false,
+    usesWebViewAutomation: false,
+    contactsBFF: false,
+    sendsMessages: false,
+    opensNetworkConnection: false,
+    downloadsToolchain: false
+  };
 }
 
 function parseArgs(argv) {

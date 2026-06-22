@@ -24,6 +24,7 @@ const serialized = JSON.stringify(result);
 
 assert(result.schemaVersion === "nexusim.desktop-webview-metadata-smoke.v1", "schema mismatch");
 assert(result.dryRun === true, "dry-run flag missing");
+assertDryRunExecutionPolicy(result.executionPolicy);
 assert(result.runID === "desktop-webview-metadata-test", "run id mismatch");
 assert(result.build.shellConfig === "temporary-loopback-metadata", "temporary shell config marker missing");
 assert(result.callback.loopbackOnly === true, "loopback callback marker missing");
@@ -34,3 +35,14 @@ assert(!serialized.includes("\\\\?"), "dry-run leaked extended Windows path");
 assert(!serialized.match(/token|secret|password|credential|private/i), "dry-run leaked sensitive field name");
 
 console.log("desktop WebView metadata smoke dry-run ok");
+
+function assertDryRunExecutionPolicy(policy) {
+  assert(policy?.planOnly === true, "desktop metadata dry-run should be marked plan-only");
+  assert(policy.executesPlannedCommands === false, "desktop metadata dry-run should not execute planned commands");
+  assert(policy.buildsArtifact === false, "desktop metadata dry-run should not build artifacts");
+  assert(policy.startsArtifact === false, "desktop metadata dry-run should not start artifacts");
+  assert(policy.startsCallbackServer === false, "desktop metadata dry-run should not start callback servers");
+  assert(policy.opensNetworkConnection === false, "desktop metadata dry-run should not open network connections");
+  assert(policy.usesWebViewAutomation === false, "desktop metadata dry-run should not use WebView automation");
+  assert(policy.downloadsToolchain === false, "desktop metadata dry-run should not download toolchains");
+}

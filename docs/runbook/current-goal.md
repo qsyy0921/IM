@@ -83,6 +83,9 @@ artifact；顶层 `executionPolicy.planOnly=true` 必须声明它不会执行 ch
 `plan:android-webview-login-smoke` 也是 plan-only：它可以列出 APK build、adb
 install、Activity start、adb forward 和 runner 命令，但顶层 execution policy
 必须声明这些命令不会被 plan 脚本执行。
+Desktop WebView metadata / login smoke 的 `--dry-run` 输出也必须带 execution
+policy，声明不会构建 artifact、不会启动 artifact、不会启动 callback / CDP
+自动化、不会连接 BFF 或发送消息。
 Android metadata smoke 的 `--dry-run` 输出也必须带 execution policy，声明不会构建
 APK、不会安装、不会启动 Activity、不会打开 `adb reverse`、不会接触设备。
 

@@ -41,9 +41,9 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   记录 `commit=6a08fb14`、`git_dirty=false`。
 - `loadtest/clientweb` 已扩展到 BFF 群成员动作链路：成员列表、receiver 角色变更为
   ADMIN、owner transfer 到 receiver、receiver 移除前 owner、最终成员列表确认。
-  2026-06-23 WIP smoke 已跑通该路径，原始结果在
-  `H:\NexusIM\loadtest-results\client-web-bff-push-smoke-20260623-030744\client-web-summary.json`，
-  记录 `commit=28b0dc33`、`git_dirty=true`；提交后仍需 clean baseline rerun。
+  2026-06-23 clean committed smoke 已跑通该路径，原始结果在
+  `H:\NexusIM\loadtest-results\client-web-bff-push-smoke-20260623-031234\client-web-summary.json`，
+  记录 `commit=3b13c5c6`、`git_dirty=false`。
 - 本地调试默认使用 `127.0.0.1:8080/8088`；`clients/start-local-backend.ps1`
   显式启动本机 client backend，`clients/start-local-web.ps1` 显式启动 Web UI。
 - Android 已有 WebView shell / bridge / APK 历史产物和 metadata smoke；当前 shell
@@ -53,9 +53,8 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
 
 1. Windows PC 端继续 installer / 可运行包体验，并保持 Web / PC shell 的 UI 细节
    随真实调试反馈继续收口。
-2. 若继续客户端产品能力，优先把群成员动作 smoke 做成 clean committed baseline；
-   随后补成员搜索 / 分页、邀请来源提示、完整群设置和更丰富的群 read model。
-   不得直接调用 conversation-service 私有接口。
+2. 若继续客户端产品能力，优先补成员搜索 / 分页、邀请来源提示、完整群设置和
+   更丰富的群 read model。不得直接调用 conversation-service 私有接口。
 3. Android 后续只在用户切回时继续：login-level WebView smoke、APK baseline
    报告和真机 UI polish。
 4. 客户端切片阶段性收口后，再回到 workflow compensation adapter / instruction approval

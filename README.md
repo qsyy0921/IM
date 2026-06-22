@@ -286,9 +286,9 @@ Web / Windows PC 客户端的 IM MVP 交互做实：账号注册登录、好友�
 群成员管理第一路径、消息列表、发送、PullInbox / AckDelivery 和局域网可运行体验。本地 / 局域网 Web smoke、
 PC WebView login smoke、真实双用户 direct + group client smoke、PC standalone exe baseline
 和 Android debug APK baseline 已有；`loadtest/clientweb` 已扩展到群成员列表、移除、
-角色变更和 owner transfer，并在 WIP 真实 smoke 中跑通，clean committed baseline
-仍需提交后重跑。下一步是 Windows PC 可运行包 / installer 体验、成员搜索 / 分页、
-群标题 / 头像 read model 和更完整群设置。Android 真机 WebView login smoke 和正式移动端发布链路后置到用户明确切回。
+角色变更和 owner transfer，并已通过 clean committed 真实 smoke。下一步是
+Windows PC 可运行包 / installer 体验、成员搜索 / 分页、群标题 / 头像 read model
+和更完整群设置。Android 真机 WebView login smoke 和正式移动端发布链路后置到用户明确切回。
 
 AI 大模型应用底座作为后续主线保留：
 

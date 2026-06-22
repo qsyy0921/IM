@@ -137,8 +137,8 @@ First slice:
   conversation-service through BFF; the shell does not keep a fake member list.
   `loadtest/clientweb` now also verifies group member list, role change,
   owner transfer, remove member and final member list through the same public
-  BFF surface. The first WIP real smoke for that path passed on 2026-06-23 with
-  `git_dirty=true`; a clean committed baseline rerun remains pending. Remaining
+  BFF surface. The clean committed real smoke for that path passed on 2026-06-23
+  with `commit=3b13c5c6` and `git_dirty=false`. Remaining
   group product work is member search / pagination, richer group settings,
   avatar / title read models and richer real multi-user UI smoke coverage.
 - The Web / PC shell now also keeps explicit display-title and UX copy rules:
@@ -156,8 +156,8 @@ First slice:
   member actions: active member list, role change, owner transfer, remove
   previous owner and final active member list. The 2026-06-23 clean run passed
   the direct + group message first path with `commit=6a08fb14` and
-  `git_dirty=false`; the 2026-06-23 WIP run passed the extended group member
-  action path with `commit=28b0dc33` and `git_dirty=true`.
+  `git_dirty=false`; the 2026-06-23 clean run passed the extended group member
+  action path with `commit=3b13c5c6` and `git_dirty=false`.
 - The visible Web / desktop shell now presents an account-password first IM
   surface: tenant, device, endpoint and native diagnostic controls are kept out
   of the normal user path, while smoke selectors remain stable. The

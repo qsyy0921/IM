@@ -96,7 +96,10 @@ First slice:
   ADB, WebView devtools and a clientweb fixture. The real runner now expects
   the WebView to display the current Android native local-store bridge as
   `android-sqlite` ready evidence; stale `sqlite-native-bridge-unavailable`
-  evidence remains a failure.
+  evidence remains a failure. The plan now also exposes top-level
+  `executionPolicy.planOnly=true`, explicitly stating that listed APK build,
+  `adb install`, Activity start, `adb forward` and runner commands are not
+  executed by the plan script.
 - `loadtest/clientweb/run-local-smoke.ps1` can now opt into Android login-level
   WebView smoke with `-RunAndroidWebViewLoginSmoke`; the default path still runs
   only the shared Web/BFF/push smoke and does not build/install an Android app.

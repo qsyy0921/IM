@@ -22,6 +22,7 @@ const result = JSON.parse(output);
 const serialized = JSON.stringify(result);
 
 assert(result.schemaVersion === "nexusim.android-webview-login-smoke-plan.v1", "schema mismatch");
+assertAndroidLoginPlanExecutionPolicy(result.executionPolicy);
 assert(result.runID === "android-webview-login-plan-test", "run id mismatch");
 assert(result.target === "android", "target mismatch");
 assert(result.verdict.planOnly === true, "plan-only marker missing");
@@ -49,3 +50,18 @@ assert(!serialized.includes("\\\\?"), "plan leaked extended Windows path");
 assert(!serialized.match(/token|secret|password|credential|private/i), "plan leaked sensitive field name");
 
 console.log("Android WebView login smoke plan ok");
+
+function assertAndroidLoginPlanExecutionPolicy(policy) {
+  assert(policy?.planOnly === true, "Android WebView login plan should be marked plan-only");
+  assert(policy.executesPlannedCommands === false, "Android WebView login plan should not execute planned commands");
+  assert(policy.startsServices === false, "Android WebView login plan should not start services");
+  assert(policy.buildsAPK === false, "Android WebView login plan should not build APKs");
+  assert(policy.installsAPK === false, "Android WebView login plan should not install APKs");
+  assert(policy.startsActivity === false, "Android WebView login plan should not start activities");
+  assert(policy.opensAdbForward === false, "Android WebView login plan should not open adb forward");
+  assert(policy.startsDocker === false, "Android WebView login plan should not start Docker");
+  assert(policy.contactsDevice === false, "Android WebView login plan should not contact devices");
+  assert(policy.opensNetworkConnection === false, "Android WebView login plan should not open network connections");
+  assert(policy.downloadsToolchain === false, "Android WebView login plan should not download toolchains");
+  assert(policy.readsLocalReadiness === false, "Android WebView login plan should not read live readiness state directly");
+}

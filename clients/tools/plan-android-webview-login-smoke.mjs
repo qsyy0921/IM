@@ -17,6 +17,7 @@ export function buildAndroidWebViewLoginSmokePlan(options = {}) {
   return {
     schemaVersion,
     generatedAt: new Date().toISOString(),
+    executionPolicy: planExecutionPolicy(),
     runID,
     target: "android",
     objective: "Drive the rendered Android WebView through login, delivery.notify, PullInbox and AckDelivery using the same public UI action contract as browser and desktop.",
@@ -105,6 +106,23 @@ export function buildAndroidWebViewLoginSmokePlan(options = {}) {
       "The future runner must keep output low-sensitive and must not expose auth material, raw serial/model values or local absolute paths.",
       "The Android client remains a WebView shell over the shared TypeScript UI; Kotlin stays a thin platform bridge."
     ]
+  };
+}
+
+function planExecutionPolicy() {
+  return {
+    planOnly: true,
+    executesPlannedCommands: false,
+    startsServices: false,
+    buildsAPK: false,
+    installsAPK: false,
+    startsActivity: false,
+    opensAdbForward: false,
+    startsDocker: false,
+    contactsDevice: false,
+    opensNetworkConnection: false,
+    downloadsToolchain: false,
+    readsLocalReadiness: false
   };
 }
 

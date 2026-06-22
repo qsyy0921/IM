@@ -49,7 +49,8 @@ NexusIM 已有本地 / 双机可运行的最小分布式 IM 后端，并已扩�
    first path；Web / PC shell 已补第一版会话展示标题、空态、常见错误中文文案、
    显式本地启动脚本和群设置操作区。Windows desktop collected package 已补
    package-local README / launcher support files，并已有 unsigned local portable
-   zip bundle 工具；`plan:desktop-installer` / `plan:desktop-signing` 已能检查
+   zip bundle 工具；artifact manifest 已区分 desktop executable / installer，
+   portable bundle 只接受 executable；`plan:desktop-installer` / `plan:desktop-signing` 已能检查
    Tauri installer 和显式签名输入 readiness；`sign:desktop-artifact` 已补为显式
    `--execute` 门控的签名执行入口，默认仍是低敏 plan-only，release signing 可加
    `--require-valid` 在签名后立即 fail-closed 验证；`verify:desktop-signature`

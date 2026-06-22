@@ -43,6 +43,7 @@ try {
     artifacts: [
       {
         target: "windows-desktop",
+        artifactKind: "desktop-executable",
         filename: "nexusim-windows-desktop.exe",
         bytes: Buffer.byteLength(exe),
         sha256: sha256(exe),
@@ -122,6 +123,33 @@ try {
     failed = String(error).includes("desktop launcher support file missing");
   }
   assert(failed, "desktop bundle should require launcher support file for exe packages");
+
+  const installerOnly = "fake desktop installer bytes";
+  writeFileSync(join(collectedDir, "nexusim-windows-desktop-installer.msi"), installerOnly);
+  const installerOnlyManifest = {
+    ...manifest,
+    artifacts: [
+      {
+        target: "windows-desktop",
+        artifactKind: "desktop-installer",
+        filename: "nexusim-windows-desktop-installer.msi",
+        bytes: Buffer.byteLength(installerOnly),
+        sha256: sha256(installerOnly),
+        sourcePathHash: sha256("installer-source"),
+        sourceHint: "desktop/src-tauri/target/release/bundle/msi/nexusim.msi"
+      }
+    ],
+    supportFiles: manifest.supportFiles.filter(file => file.filename === "README-windows-desktop.txt")
+  };
+  const installerOnlyManifestPath = join(collectedDir, "manifest-installer-only.json");
+  writeFileSync(installerOnlyManifestPath, `${JSON.stringify(installerOnlyManifest, null, 2)}\n`);
+  const installerOnlyPlan = buildDesktopBundlePlan({
+    manifest: installerOnlyManifestPath,
+    outputDir,
+    runId: "installer-only"
+  });
+  assert(installerOnlyPlan.ready === false, "desktop portable bundle should not accept installer-only manifests");
+  assert(installerOnlyPlan.missing.includes("windows-desktop-artifact"), "installer-only manifest should report missing desktop executable");
 } finally {
   rmSync(tempRoot, { recursive: true, force: true });
 }

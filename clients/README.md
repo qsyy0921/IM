@@ -212,8 +212,9 @@ node clients/tools/verify-shell-assets.mjs --target all
 
 `collect:client-artifacts` copies produced desktop / Android artifacts into the
 ignored `clients/artifacts/<run-id>/` directory and writes a low-sensitive
-`manifest.json` with file names, sizes and SHA-256 hashes. It does not record
-local absolute source paths. For Windows desktop artifacts it also writes
+`manifest.json` with file names, sizes, SHA-256 hashes and a low-sensitive
+artifact kind such as `desktop-executable`, `desktop-installer` or
+`android-debug-apk`. It does not record local absolute source paths. For Windows desktop artifacts it also writes
 `README-windows-desktop.txt`; when the collected desktop artifact is a
 standalone `.exe`, it writes `launch-nexusim-windows.ps1` that starts the exe
 through a package-relative path. The `*:collect` build scripts run the same
@@ -234,8 +235,9 @@ manual install and smoke.
 package-local README and launcher support files, and writes a portable
 `nexusim-windows-desktop-bundle.zip` plus `desktop-bundle-summary.json` under
 ignored `clients/artifacts/desktop-bundles/<run-id>/`. This bundle is explicitly
-`unsigned-local-dev`; it does not sign, install or launch anything. If the
-latest collected manifest is for Android, pass the desktop manifest explicitly:
+`unsigned-local-dev`; it only accepts `desktop-executable` artifacts and does
+not package installer artifacts, sign, install or launch anything. If the latest
+collected manifest is for Android, pass the desktop manifest explicitly:
 `npm --prefix clients run bundle:desktop -- --manifest clients/artifacts/<desktop-run>/manifest.json`.
 `plan:desktop-signing` reads the latest collected `windows-desktop` manifest and
 reports whether explicit signing inputs are present: `signtool`, one certificate

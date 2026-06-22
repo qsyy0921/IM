@@ -158,7 +158,8 @@ clean smoke 已验证双用户好友直聊和群聊 first path；随后 Web / PC
 第一版会话展示标题、空态、常见错误中文文案和显式本地启动脚本。Windows desktop
 collected package 现在包含低敏 README；standalone exe package 还包含
 package-local PowerShell launcher，install plan 会校验这些 support files 并给出人工启动命令；
-`bundle:desktop` 可以产出 unsigned local portable zip 和低敏 summary；
+artifact manifest 现在区分 `desktop-executable` / `desktop-installer`；
+`bundle:desktop` 只打包 `desktop-executable`，可以产出 unsigned local portable zip 和低敏 summary；
 `plan:desktop-installer` / `plan:desktop-signing` 可以检查 Tauri installer 和显式
 签名输入 readiness；`sign:desktop-artifact` 已提供显式 `--execute` 门控的签名
 执行入口，默认仍只输出低敏 plan，release signing 可加 `--require-valid` 在签名后

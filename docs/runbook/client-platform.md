@@ -326,8 +326,9 @@ First slice:
   artifact collector. Once a real desktop artifact or Android APK exists,
   `npm --prefix clients run collect:client-artifacts` copies it into ignored
   `clients/artifacts/<run-id>/` storage and writes a low-sensitive manifest with
-  file names, sizes and SHA-256 hashes, without recording local absolute source
-  paths. Windows desktop collection also writes `README-windows-desktop.txt`;
+  file names, sizes, SHA-256 hashes and low-sensitive artifact kind
+  (`desktop-executable`, `desktop-installer` or `android-debug-apk`), without
+  recording local absolute source paths. Windows desktop collection also writes `README-windows-desktop.txt`;
   standalone `.exe` packages additionally get `launch-nexusim-windows.ps1`
   with package-relative launch logic. `build:desktop-artifact:collect` and
   `build:android-apk:collect` run the collector automatically after a successful
@@ -349,12 +350,14 @@ First slice:
 - `npm --prefix clients run test:desktop-bundle` validates the first-stage
   portable Windows desktop bundle tool. `npm --prefix clients run bundle:desktop`
   reads a collected Windows desktop artifact manifest, requires the package-local
-  README / launcher support files for standalone exe packages, writes
+  README / launcher support files for standalone exe packages, accepts only
+  `desktop-executable` artifacts, writes
   `nexusim-windows-desktop-bundle.zip` and `desktop-bundle-summary.json` under
   ignored `clients/artifacts/desktop-bundles/<run-id>/`, and marks the result
-  as `unsigned-local-dev`. It does not sign, install, launch, start services,
-  contact devices or download toolchains. If the latest collected manifest is
-  Android-only, pass `--manifest clients/artifacts/<desktop-run>/manifest.json`
+  as `unsigned-local-dev`. It does not package installer artifacts, sign,
+  install, launch, start services, contact devices or download toolchains. If
+  the latest collected manifest is Android-only, pass
+  `--manifest clients/artifacts/<desktop-run>/manifest.json`
   explicitly.
 - `npm --prefix clients run report:android-device-readiness` prints a
   low-sensitive ADB/device readiness report for Android shell smoke. It runs

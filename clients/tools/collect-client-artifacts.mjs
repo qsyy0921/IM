@@ -150,6 +150,7 @@ export function collectPlan(options) {
       const sourceEntry = {
         target,
         sourceHint: safeRelativeSource(source),
+        artifactKind: artifactKindForSource(target, source),
         outputFilename: uniqueArtifactFilename(target, source, sources)
       };
       Object.defineProperty(sourceEntry, "source", {
@@ -184,6 +185,7 @@ export function writeArtifactBundle(plan, options) {
     const bytes = statSync(outputPath).size;
     return {
       target: source.target,
+      artifactKind: source.artifactKind,
       filename: source.outputFilename,
       bytes,
       sha256: sha256File(outputPath),
@@ -245,10 +247,15 @@ function writeSupportFile(outputDir, filename, body, supportFiles) {
 
 function desktopReadme(artifacts) {
   const filenames = artifacts.map(artifact => `- ${artifact.filename}`).join("\n");
-  const hasExe = artifacts.some(artifact => extname(artifact.filename).toLowerCase() === ".exe");
+  const executableArtifacts = artifacts.filter(artifact => artifact.artifactKind === "desktop-executable");
+  const installerArtifacts = artifacts.filter(artifact => artifact.artifactKind === "desktop-installer");
+  const hasExe = executableArtifacts.some(artifact => extname(artifact.filename).toLowerCase() === ".exe");
   const launchLine = hasExe
     ? "Run .\\launch-nexusim-windows.ps1 from this directory, or start the exe directly."
-    : "Use the installer artifact according to the install plan before running NexusIM.";
+    : "Use the installer artifact according to the signed installer plan before running NexusIM.";
+  const installerLine = installerArtifacts.length > 0
+    ? "Installer artifacts must be signed and verified before distribution."
+    : "No installer artifact is included in this package.";
   return [
     "NexusIM Windows desktop local package",
     "",
@@ -260,6 +267,7 @@ function desktopReadme(artifacts) {
     "",
     "How to run:",
     launchLine,
+    installerLine,
     "",
     "Before login, start the local NexusIM backend and Web client support services as documented in clients/README.md.",
     "The desktop shell talks only to api-gateway BFF and push-gateway.",
@@ -323,6 +331,9 @@ function artifactFilename(target, source) {
     return "nexusim-android-debug.apk";
   }
   const ext = extname(source).toLowerCase() || ".artifact";
+  if (artifactKindForSource(target, source) === "desktop-installer") {
+    return `nexusim-windows-desktop-installer${ext}`;
+  }
   return `nexusim-windows-desktop${ext}`;
 }
 
@@ -348,6 +359,24 @@ function safeRelativeSource(source) {
     return `${basename(source)}#${sha256Text(resolve(source)).slice(0, 12)}`;
   }
   return relativePath;
+}
+
+function artifactKindForSource(target, source) {
+  if (target === "android") {
+    return "android-debug-apk";
+  }
+  if (target !== "windows-desktop") {
+    return "unknown";
+  }
+  const ext = extname(source).toLowerCase();
+  const normalized = resolve(source).toLowerCase().replaceAll("\\", "/");
+  if (ext === ".msi" || ext === ".msix" || normalized.includes("/bundle/")) {
+    return "desktop-installer";
+  }
+  if (ext === ".exe") {
+    return "desktop-executable";
+  }
+  return "desktop-installer";
 }
 
 function sha256File(path) {

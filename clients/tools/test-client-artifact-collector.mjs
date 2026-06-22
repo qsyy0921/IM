@@ -83,6 +83,7 @@ try {
   assert(androidCopy === apkBody, "android artifact copy mismatch");
   assert(androidManifest.artifacts[0].sha256 === sha256(apkBody), "android artifact hash mismatch");
   assert(androidManifest.artifacts[0].filename === "nexusim-android-debug.apk", "android filename mismatch");
+  assert(androidManifest.artifacts[0].artifactKind === "android-debug-apk", "android artifact kind mismatch");
   assert(!JSON.stringify(androidManifest).includes(tempRoot), "android manifest leaked absolute temp path");
 
   const desktop = runCollector([
@@ -97,11 +98,12 @@ try {
   ]);
   const desktopDir = join(outputDir, "desktop-test");
   const desktopManifest = JSON.parse(readFileSync(join(desktopDir, "manifest.json"), "utf8"));
-  const desktopCopy = readFileSync(join(desktopDir, "nexusim-windows-desktop.msi"), "utf8");
+  const desktopCopy = readFileSync(join(desktopDir, "nexusim-windows-desktop-installer.msi"), "utf8");
   assert(desktop.artifacts.length === 1, "desktop collector result should include one artifact");
   assert(desktopCopy === msiBody, "desktop artifact copy mismatch");
   assert(desktopManifest.artifacts[0].sha256 === sha256(msiBody), "desktop artifact hash mismatch");
-  assert(desktopManifest.artifacts[0].filename === "nexusim-windows-desktop.msi", "desktop filename mismatch");
+  assert(desktopManifest.artifacts[0].filename === "nexusim-windows-desktop-installer.msi", "desktop filename mismatch");
+  assert(desktopManifest.artifacts[0].artifactKind === "desktop-installer", "desktop MSI artifact kind mismatch");
   assert(Array.isArray(desktopManifest.supportFiles), "desktop manifest supportFiles missing");
   assert(desktopManifest.supportFiles.length === 1, "desktop msi package should include one support file");
   assert(desktopManifest.supportFiles[0].filename === "README-windows-desktop.txt", "desktop readme support file missing");
@@ -124,6 +126,7 @@ try {
   const launcher = readFileSync(join(desktopExeDir, "launch-nexusim-windows.ps1"), "utf8");
   assert(desktopExe.artifacts.length === 1, "desktop exe collector result should include one artifact");
   assert(desktopExeCopy === exeBody, "desktop exe artifact copy mismatch");
+  assert(desktopExeManifest.artifacts[0].artifactKind === "desktop-executable", "desktop exe artifact kind mismatch");
   assert(desktopExeManifest.supportFiles.length === 2, "desktop exe package should include readme and launcher");
   assert(desktopExeManifest.supportFiles.some(file => file.filename === "README-windows-desktop.txt"), "desktop exe readme missing");
   assert(desktopExeManifest.supportFiles.some(file => file.filename === "launch-nexusim-windows.ps1"), "desktop exe launcher missing");

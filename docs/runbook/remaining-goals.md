@@ -85,6 +85,8 @@
   也不替代真实 installer / signing 流水线。`sign:desktop-artifact` 已补显式
   `--execute` 门控的 signing wrapper，默认仍只输出低敏 execution policy；真实
   签名还需要本机 `signtool`、timestamp URL、证书来源和 signed artifact 验证。
+  collected manifest 已区分 `desktop-executable` / `desktop-installer`，portable
+  bundle 只接受 executable，不把 installer 产物混进本地 zip 包。
   `verify:desktop-signature` 已补只读 Authenticode 验证入口，当前 collected baseline
   实测为 `NotSigned`；`sign:desktop-artifact --execute --require-valid` 已能在签名后
   立即执行 fail-closed 验证，release profile 仍需提供真实签名材料并产出 valid signature。

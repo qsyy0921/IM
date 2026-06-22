@@ -49,8 +49,10 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
 - Windows desktop artifact collector 已能在 collected package 中写入
   `README-windows-desktop.txt`；standalone `.exe` package 会额外写入
   `launch-nexusim-windows.ps1`，install plan 会校验这些 support files 并把人工启动
-  步骤指向 package-local launcher。`bundle:desktop` 已能把 collected Windows desktop
-  package 打成 unsigned local portable zip，并写低敏 summary。`plan:desktop-signing`
+  步骤指向 package-local launcher。collected artifact manifest 已区分
+  `desktop-executable` / `desktop-installer`；`bundle:desktop` 只接受 executable
+  artifact，已能把 collected Windows desktop package 打成 unsigned local portable
+  zip，并写低敏 summary。`plan:desktop-signing`
   已能基于 collected desktop manifest 检查显式 `signtool`、证书来源和 timestamp URL
   是否齐备，且只输出低敏 plan，不签名、不下载、不安装、不启动。
   `sign:desktop-artifact` 已补为显式 `--execute` 门控的签名执行入口：默认仍只输出

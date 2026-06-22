@@ -297,7 +297,11 @@ function readManifest(manifestPath) {
 }
 
 function findDesktopArtifact(manifest) {
-  return manifest.artifacts.find(artifact => artifact?.target === "windows-desktop");
+  return manifest.artifacts.find(artifact =>
+    artifact?.target === "windows-desktop" &&
+    (artifact.artifactKind === "desktop-executable" ||
+      (!artifact.artifactKind && extname(artifact.filename).toLowerCase() === ".exe"))
+  );
 }
 
 function createZip(files) {

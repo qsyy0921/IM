@@ -421,7 +421,9 @@ First slice:
   `manualOnly=true` with explicit device, install, Activity-start or desktop
   process risk flags. The plan can show `adb install` and `Start-Process`
   commands for humans, but the script does not install APKs, launch desktop
-  artifacts, start Android activities or contact devices by itself.
+  artifacts, start Android activities or contact devices by itself. The plan
+  also exposes a top-level `executionPolicy.planOnly=true` block so automation
+  can reject accidental execution paths before reading per-step checklist data.
 - `/api/auth/logout` performs first-stage server-side logout for the current
   authenticated session only. Broader device/session management remains an
   identity/admin capability, not a client BFF target selector.

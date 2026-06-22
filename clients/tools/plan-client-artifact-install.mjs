@@ -32,6 +32,7 @@ export function buildClientArtifactInstallPlan(options = {}) {
   const plan = {
     schemaVersion,
     generatedAt: new Date().toISOString(),
+    executionPolicy: planExecutionPolicy(),
     artifactManifest: {
       present: true,
       manifestHint: safeHint(manifestPath),
@@ -47,6 +48,7 @@ function emptyPlan(installPrereqs) {
   return {
     schemaVersion,
     generatedAt: new Date().toISOString(),
+    executionPolicy: planExecutionPolicy(),
     artifactManifest: {
       present: false,
       manifestHint: "clients/artifacts/<run-id>/manifest.json"
@@ -72,6 +74,22 @@ function emptyPlan(installPrereqs) {
         ]
       }
     ]))
+  };
+}
+
+function planExecutionPolicy() {
+  return {
+    planOnly: true,
+    executesChecklistCommands: false,
+    buildsNativeArtifacts: false,
+    installsArtifacts: false,
+    launchesDesktopArtifacts: false,
+    startsDeviceActivities: false,
+    opensAdbReverse: false,
+    startsDocker: false,
+    contactsDevices: false,
+    downloadsToolchain: false,
+    readsLocalInstallPrereqs: true
   };
 }
 

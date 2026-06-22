@@ -58,6 +58,7 @@ try {
   const serialized = JSON.stringify(plan);
 
   assert(plan.schemaVersion === "nexusim.client-artifact-install-plan.v1", "install plan schema mismatch");
+  assertInstallPlanExecutionPolicy(plan.executionPolicy);
   assert(plan.artifactManifest.present === true, "manifest should be present");
   assert(plan.artifactManifest.manifestHint === "clients/artifacts/install-plan-test/manifest.json", "manifest hint mismatch");
   assert(plan.targets.android.artifactReady === true, "android artifact should be ready");
@@ -139,6 +140,7 @@ try {
     }
   });
   assert(emptyPlan.artifactManifest.present === false, "empty plan should report missing manifest");
+  assertInstallPlanExecutionPolicy(emptyPlan.executionPolicy);
   assert(emptyPlan.targets.android.missing.includes("artifact-manifest"), "empty android plan should miss manifest");
   assert(emptyPlan.targets.android.missing.includes("adb"), "empty android plan should include adb prereq");
   assert(emptyPlan.targets["windows-desktop"].missing.includes("windows-installer-launch"), "empty desktop plan should include installer launch prereq");
@@ -179,4 +181,18 @@ try {
   console.log("client artifact install plan ok");
 } finally {
   rmSync(runDir, { recursive: true, force: true });
+}
+
+function assertInstallPlanExecutionPolicy(policy) {
+  assert(policy?.planOnly === true, "install plan should be marked plan-only");
+  assert(policy.executesChecklistCommands === false, "install plan should not execute checklist commands");
+  assert(policy.buildsNativeArtifacts === false, "install plan should not build native artifacts");
+  assert(policy.installsArtifacts === false, "install plan should not install artifacts");
+  assert(policy.launchesDesktopArtifacts === false, "install plan should not launch desktop artifacts");
+  assert(policy.startsDeviceActivities === false, "install plan should not start device activities");
+  assert(policy.opensAdbReverse === false, "install plan should not open adb reverse");
+  assert(policy.startsDocker === false, "install plan should not start Docker");
+  assert(policy.contactsDevices === false, "install plan should not contact devices");
+  assert(policy.downloadsToolchain === false, "install plan should not download toolchains");
+  assert(policy.readsLocalInstallPrereqs === true, "install plan should only read local install prerequisites");
 }

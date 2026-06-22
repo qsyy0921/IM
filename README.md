@@ -10,7 +10,10 @@ NexusIM 是面向企业协同场景的分布式 IM + AI 协作平台。当前仓
 -> 完整目标架构：业务平台 + 数据平台 + AI / Agent 平台 + 中间件平台
 ```
 
-GitHub 首页只放当前总览。每轮 Codex 继续开发时，目标框只复制 [prompt.md](prompt.md) 中的短 Prompt；具体进度入口看 [agent.md](agent.md)、[current-brief.md](docs/runbook/current-brief.md) 和 [remaining-goals.md](docs/runbook/remaining-goals.md)。
+GitHub 首页只放当前总览。Codex 目标框正文只保存在目标框本身，不在仓库里重复维护；
+每轮继续开发时按 [prompt.md](prompt.md) 和 [agent.md](agent.md) 路由读取
+[current-goal.md](docs/runbook/current-goal.md)、[current-brief.md](docs/runbook/current-brief.md)
+和 [remaining-goals.md](docs/runbook/remaining-goals.md)。
 
 长期完整架构以 [target-architecture-complete.md](docs/architecture/target-architecture-complete.md)
 为准。后续新增业务服务、数据平台服务、AI / Agent 服务或中间件时，都要按这份蓝图的
@@ -316,7 +319,7 @@ Android APK / 真机 smoke 不作为当前默认阻塞。
 
 | 文档 | 用途 |
 | --- | --- |
-| [prompt.md](prompt.md) | Codex 目标框短 Prompt 的唯一维护源。 |
+| [prompt.md](prompt.md) | Codex 文档路由入口；不保存目标框正文。 |
 | [agent.md](agent.md) | Codex / sub-agent 每轮读取和维护文档的路由规则。 |
 | [docs/runbook/current-brief.md](docs/runbook/current-brief.md) | 低 token 当前阶段入口。 |
 | [docs/runbook/current-goal.md](docs/runbook/current-goal.md) | 当前 active slice。 |

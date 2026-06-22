@@ -1,48 +1,14 @@
-# NexusIM Codex Prompt
+# NexusIM Prompt Routing
 
-## Codex 目标框内容
+本文件不保存 Codex 目标框正文。目标框内容只存在于 Codex 目标框本身，避免
+目标框、仓库文档和进度文档三处重复维护导致漂移。
 
-目标框只保留下面这段通用文档入口。具体 active slice、推进策略、架构边界、
-优先级、待开发服务和治理规则都从仓库文档读取，不在目标框里写死。
-
-```text
-持续推进 E:\development\IM 的 NexusIM。
-
-目标框只保留稳定文档入口，不写当前具体任务、服务清单、推进策略、架构边界、
-优先级或阶段结论。
-当前 active slice、下一步、待开发服务、推进策略和架构边界必须从仓库文档读取并维护。
-如果目标框旧内容和仓库文档冲突，以仓库文档为准。
-
-每轮开始：
-1. 执行 git status --short --branch --untracked-files=all。
-2. 读取 prompt.md 和 agent.md，确认文档路由和工作规则。
-3. 读取 docs/runbook/current-goal.md 获取当前 active slice。
-4. 按需读取 current-brief、remaining-goals、service brief、必要 SDD、目标架构或 fail-closed policy；不要全文扫长历史文档。
-
-工作方式：按 current-goal 小切片闭环；可用多个 sub-agent 做互不重叠任务；
-主 agent 负责集成、检查和文档同步。不回滚用户已有修改。
-新发现待办写入 docs/runbook/remaining-goals.md。
-active slice、推进策略、架构边界、服务 promotion、客户端能力、AI 边界或下一步状态变化时，
-同步维护对应进度文档和根 README.md。
-每个新功能先做简短架构分析，再编码：确认 owner service、数据所有权、API / 事件、
-权限 / 审计、是否需要新技术或新中间件、是否影响客户端 / AI / Agent 边界，以及需要同步哪些文档。
-新增内容必须归属到对应平台层：中间件归中间件平台，数据处理归数据平台，AI / Agent
-能力归 AI / Agent 平台，业务能力归业务 / 产品平台，客户端能力归客户端平台。
-新增或变更微服务 / 中间件 / provider / runtime 时，必须同步 README.md、相关架构文档、
-middleware catalog、service brief / SDD / ADR、current-goal / current-brief /
-remaining-goals 中的相关事实。
-
-语言、架构和 fail-closed 边界是可维护文档内容，不在目标框里展开。
-实现前按需读取 agent.md、docs/architecture/target-architecture-complete.md、
-docs/architecture/fail-closed-policy.md 和相关 SDD。
-持续清理相关切片里的隐藏兜底 / fallback 代码；新代码不得新增隐藏兜底路径。
-
-门禁按风险分层：小改只跑相关测试 / 文档脚本；跨服务、生成代码、migration、service-registry、Docker/compose、安全边界或提交推送前才跑完整 check-local。
-```
+Codex 每轮仍应读取本文件，因为这里维护的是文档路由和工作原则；具体 active
+slice、推进策略、架构边界、优先级和阶段结论由对应进度文档维护。
 
 ## 文档路由
 
-- 本文件只维护 Codex 目标框内容和每轮文档路由；具体目标、推进策略和架构边界见
+- 本文件只维护每轮文档路由和工作原则；具体目标、推进策略和架构边界见
   `docs/runbook/current-goal.md`、`docs/runbook/current-brief.md`、`agent.md` 和
   `docs/architecture/target-architecture-complete.md`。
 - 根目录 `README.md` 是 GitHub 首页总览，阶段、架构、客户端能力、新服务、

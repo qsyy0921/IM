@@ -19,7 +19,7 @@
 
 ## 默认入口
 
-- Codex 目标 prompt：`../../prompt.md`
+- Codex 文档路由入口：`../../prompt.md`，不保存目标框正文
 - Agent 进度管理规则：`../../agent.md`
 - Codex 具体执行目标：`current-goal.md`
 - 当前每轮入口：`current-brief.md`

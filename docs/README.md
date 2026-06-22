@@ -14,7 +14,8 @@
 
 ## 当前阅读路径
 
-Codex 目标框只放根目录 `../prompt.md` 里的短 Prompt，不复制具体长目标。长期完整架构以
+Codex 目标框正文只保存在目标框本身，仓库不复制目标框文本。根目录
+`../prompt.md` 只维护文档路由和工作原则。长期完整架构以
 `architecture/target-architecture-complete.md` 为准；当前 active slice 以
 `runbook/current-goal.md` 为准。当前客户端主线短线优先 Web / Windows PC 的好友私聊、
 群聊和消息 first path；Android 后置到用户明确切回。短期生产级测试、长周期演练和
@@ -22,7 +23,7 @@ Codex 目标框只放根目录 `../prompt.md` 里的短 Prompt，不复制具体
 
 每轮 Codex 工作先读仓库根目录 `prompt.md` 和 `agent.md`，再按任务路由读取必要短文档；不要为了了解全局而全文扫 SDD、archive、history 或 loadtest 长文档。
 
-1. `../prompt.md`：Codex 目标 prompt 的唯一维护源。
+1. `../prompt.md`：Codex 文档路由和工作原则入口；不保存目标框正文。
 2. `../agent.md`：Codex / sub-agent 文档路由、进度维护和并行协作规则。
 3. `runbook/current-brief.md`：低 token 当前入口，确认当前阶段和文档路由。
 4. `runbook/README.md`：runbook 短路由页。

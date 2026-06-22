@@ -343,6 +343,16 @@ First slice:
   and Windows local artifact launch support, while still not launching
   artifacts, contacting devices, installing packages or printing local
   absolute paths.
+- `npm --prefix clients run test:desktop-bundle` validates the first-stage
+  portable Windows desktop bundle tool. `npm --prefix clients run bundle:desktop`
+  reads a collected Windows desktop artifact manifest, requires the package-local
+  README / launcher support files for standalone exe packages, writes
+  `nexusim-windows-desktop-bundle.zip` and `desktop-bundle-summary.json` under
+  ignored `clients/artifacts/desktop-bundles/<run-id>/`, and marks the result
+  as `unsigned-local-dev`. It does not sign, install, launch, start services,
+  contact devices or download toolchains. If the latest collected manifest is
+  Android-only, pass `--manifest clients/artifacts/<desktop-run>/manifest.json`
+  explicitly.
 - `npm --prefix clients run report:android-device-readiness` prints a
   low-sensitive ADB/device readiness report for Android shell smoke. It runs
   `adb devices -l`, hashes raw serials, omits model names, and reports whether
@@ -475,6 +485,8 @@ First slice:
   APIs. Windows desktop now
   produces a first-stage standalone `.exe` artifact, low-sensitive collected
   manifest and package-local README / launcher support files;
+  `bundle:desktop` can package those collected files into an unsigned local
+  portable zip with a low-sensitive summary;
   `smoke:desktop-artifact-launch` has verified the exe starts, stays alive
   during the smoke hold window and terminates cleanly.
   Its dry-run output carries an execution policy proving it only reads the
@@ -550,9 +562,10 @@ rejected. For local LAN client smoke, prefer the wired `172.x.x.x` address.
    keep complex endpoint / tenant / device controls hidden, and preserve the
    public BFF / push client path for login, contacts, direct chat, group chat,
    send, PullInbox and ACK.
-2. Produce the next Windows package step when needed: installer script /
-   bundle plan / signed installer on top of the existing standalone exe,
-   package-local launcher and login-level WebView smoke.
+2. Produce the next Windows package step when needed: MSI / NSIS installer
+   script and real code-signing pipeline on top of the existing standalone exe,
+   package-local launcher, unsigned local zip bundle and login-level WebView
+   smoke.
 3. Return to Android only when explicitly prioritized: run login-level Android
    WebView smoke on the installed APK, then record the Android baseline.
 
@@ -593,6 +606,7 @@ npm --prefix clients run test:artifact-builders
 npm --prefix clients run test:artifact-collector
 npm --prefix clients run test:artifact-install-plan
 npm --prefix clients run test:artifact-readiness
+npm --prefix clients run test:desktop-bundle
 npm --prefix clients run test:android-docker-builder
 npm --prefix clients run test:native-store-readiness
 npm --prefix clients run test:android-webview-metadata-smoke
@@ -622,6 +636,8 @@ npm --prefix clients run report:android-platform-readiness
 npm --prefix clients run report:android-device-readiness
 npm --prefix clients run plan:shell-smoke
 npm --prefix clients run plan:artifact-install
+npm --prefix clients run bundle:desktop:dry-run
+npm --prefix clients run bundle:desktop
 npm --prefix clients run smoke:desktop-artifact-launch
 npm --prefix clients run smoke:desktop-composed -- --clientweb-summary <client-web-summary.json>
 npm --prefix clients run smoke:desktop-webview-metadata

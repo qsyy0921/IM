@@ -49,14 +49,16 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
 - Windows desktop artifact collector 已能在 collected package 中写入
   `README-windows-desktop.txt`；standalone `.exe` package 会额外写入
   `launch-nexusim-windows.ps1`，install plan 会校验这些 support files 并把人工启动
-  步骤指向 package-local launcher。它仍不是生产签名 installer。
+  步骤指向 package-local launcher。`bundle:desktop` 已能把 collected Windows desktop
+  package 打成 unsigned local portable zip，并写低敏 summary。它仍不是生产签名
+  installer。
 - Android 已有 WebView shell / bridge / APK 历史产物和 metadata smoke；当前 shell
   不宣称 F 盘 Android toolchain ready，后续切回 Android 时再重新加载 toolchain env。
 
 ## 下一步优先级
 
-1. Windows PC 端继续 installer / signed bundle 体验，并保持 Web / PC shell 的 UI
-   细节随真实调试反馈继续收口。
+1. Windows PC 端继续 MSI / NSIS installer 和真实 code-signing pipeline 体验，并保持
+   Web / PC shell 的 UI 细节随真实调试反馈继续收口。
 2. 若继续客户端产品能力，优先补成员搜索 / 分页、邀请来源提示、完整群设置和
    更丰富的群 read model。不得直接调用 conversation-service 私有接口。
 3. Android 后续只在用户切回时继续：login-level WebView smoke、APK baseline

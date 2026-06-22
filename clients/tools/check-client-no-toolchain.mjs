@@ -160,6 +160,11 @@ const checkPlan = [
     reason: "guards desktop artifact launch smoke dry-run output without launching the desktop artifact"
   },
   {
+    name: "desktop-bundle-contract",
+    script: "test:desktop-bundle",
+    reason: "guards portable desktop bundle packaging and unsigned-local boundary without signing or launching"
+  },
+  {
     name: "desktop-composed-smoke-runner-contract",
     script: "test:desktop-composed-smoke",
     reason: "guards desktop composed smoke dry-run summary without starting services"

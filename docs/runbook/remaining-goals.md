@@ -31,8 +31,8 @@
 1. 完成 client platform MVP foundation：Web / Windows PC 已完成真实双用户客户端
    smoke，验证好友私聊和群聊 first path；群成员列表、移除成员、角色变更和
    owner transfer 第一路径已接入 BFF / client-core / Web shell，`loadtest/clientweb`
-   也已扩展并在 clean committed smoke 中跑通这些群管理动作。继续补 PC signed
-   installer / bundle 体验、更完整群设置、成员搜索 / 分页和后续 native SQLite bridge。
+   也已扩展并在 clean committed smoke 中跑通这些群管理动作。继续补 PC MSI / NSIS
+   installer 和真实 code-signing pipeline、更完整群设置、成员搜索 / 分页和后续 native SQLite bridge。
    Android APK / 真机 WebView smoke 后置到用户明确切回。
 2. 回到 AI / Agent 主线：group memory eval、EvidencePack、Agent 真实业务动作、
    Python AI Worker 候选算法。
@@ -70,13 +70,15 @@
   `clients/artifacts/<run-id>/manifest.json`。collector 现在还会写
   `README-windows-desktop.txt`，standalone exe package 会写 package-local
   `launch-nexusim-windows.ps1`，install plan 会校验这些 support files 并给出人工启动命令。
+  `bundle:desktop` 已能基于 collected package 产出 unsigned local portable zip
+  和低敏 summary。
   `smoke:desktop-artifact-launch` 已验证 exe 启动 / 保持 / 终止的 launch sanity。
   `smoke:desktop-composed` 已能把
   clientweb BFF / push summary 与 desktop launch 证据合并成低敏 JSON，但仍不是 GUI
   自动化。真实 Tauri WebView metadata callback smoke 已通过；Web / PC shell 已接
   登录、注册、好友、好友私聊、群聊列表、建群、消息列表和发送 first path。剩余工作是
   跑真实双用户客户端 smoke、打磨真实 UI lifecycle，以及后续启用 MSI / NSIS installer
-  bundling / 签名。
+  bundling 和真实 code signing。
 - `clients/android`：first-stage TypeScript runtime adapter 和 Kotlin WebView
   asset shell skeleton 已落；`createAndroidClientRuntime` 已能组装 shared
   `BFFClient` / `WebSocketPushTransport` / auth / inbox / send / ack queue；

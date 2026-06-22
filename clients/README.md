@@ -169,6 +169,7 @@ npm --prefix clients run test:artifact-builders
 npm --prefix clients run test:artifact-collector
 npm --prefix clients run test:artifact-install-plan
 npm --prefix clients run test:artifact-readiness
+npm --prefix clients run test:desktop-bundle
 npm --prefix clients run test:web-shell-actions
 npm --prefix clients run test:shell-smoke-plan
 npm --prefix clients run report:artifact-readiness
@@ -189,6 +190,8 @@ npm --prefix clients run build:android-apk
 npm --prefix clients run build:desktop-artifact:collect
 npm --prefix clients run build:android-apk:collect
 npm --prefix clients run collect:client-artifacts
+npm --prefix clients run bundle:desktop:dry-run
+npm --prefix clients run bundle:desktop
 ```
 
 After preparing both shell targets, verify both prepared asset directories:
@@ -217,6 +220,13 @@ readiness is not marked ready until a collected artifact exists and its
 install-side prerequisites are available. Its artifact status distinguishes
 raw native build-output discovery from the collected artifact manifest used for
 manual install and smoke.
+`bundle:desktop` reads the collected Windows desktop manifest, requires the
+package-local README and launcher support files, and writes a portable
+`nexusim-windows-desktop-bundle.zip` plus `desktop-bundle-summary.json` under
+ignored `clients/artifacts/desktop-bundles/<run-id>/`. This bundle is explicitly
+`unsigned-local-dev`; it does not sign, install or launch anything. If the
+latest collected manifest is for Android, pass the desktop manifest explicitly:
+`npm --prefix clients run bundle:desktop -- --manifest clients/artifacts/<desktop-run>/manifest.json`.
 
 Android can also be built through the local Docker builder profile when the image
 is intentionally built:
@@ -244,8 +254,9 @@ Current packaging status:
   `build:desktop-artifact:collect`. The first-stage output is a standalone
   `nexusim-windows-desktop.exe` collected under ignored
   `clients/artifacts/<run-id>/` with a low-sensitive manifest,
-  `README-windows-desktop.txt` and `launch-nexusim-windows.ps1`. MSI / NSIS
-  installer bundling is still future hardening. Use
+  `README-windows-desktop.txt` and `launch-nexusim-windows.ps1`. A portable
+  unsigned local zip bundle can be produced with `bundle:desktop`. MSI / NSIS
+  installer bundling and real code signing are still future hardening. Use
   `npm --prefix clients run smoke:desktop-artifact-launch` for the first launch
   sanity check; it starts the collected exe, waits briefly, then terminates it.
 - Android: native WebView shell can prepare target-specific Web assets and has

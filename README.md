@@ -157,7 +157,8 @@ flowchart TB
 clean smoke 已验证双用户好友直聊和群聊 first path；随后 Web / PC shell 又补了
 第一版会话展示标题、空态、常见错误中文文案和显式本地启动脚本。Windows desktop
 collected package 现在包含低敏 README；standalone exe package 还包含
-package-local PowerShell launcher，install plan 会校验这些 support files 并给出人工启动命令。
+package-local PowerShell launcher，install plan 会校验这些 support files 并给出人工启动命令；
+`bundle:desktop` 可以产出 unsigned local portable zip 和低敏 summary。
 
 本地调试入口：
 
@@ -281,7 +282,7 @@ message / conversation / policy events -> search-service + memory-service projec
 
 | 模块 | 当前状态 |
 | --- | --- |
-| `clients/` | Browser / Windows PC / Android client platform first slice：`protocol`、`client-core`、Web shell、PC desktop shell contract 和 Android runtime contract 已建立并通过 focused validation；`api-gateway` client BFF first-stage HTTP/JSON surface 已落；Web / PC shell 已接账号密码登录、注册、好友列表、好友申请、点击好友发起私聊、群聊列表、建群、点击群聊进入会话、群成员添加 / 退群、成员列表、移除成员、角色变更 / owner transfer 第一路径、群设置操作区、消息列表、发送后本地状态刷新、PullInbox / AckDelivery；真实双用户 direct + group client smoke 已通过；PC standalone exe、package-local README / launcher support files 和 Android debug APK baseline 已产出。客户端只连 `api-gateway` / `push-gateway`，PullInbox 是消息事实源，WebSocket 只做在线唤醒。 |
+| `clients/` | Browser / Windows PC / Android client platform first slice：`protocol`、`client-core`、Web shell、PC desktop shell contract 和 Android runtime contract 已建立并通过 focused validation；`api-gateway` client BFF first-stage HTTP/JSON surface 已落；Web / PC shell 已接账号密码登录、注册、好友列表、好友申请、点击好友发起私聊、群聊列表、建群、点击群聊进入会话、群成员添加 / 退群、成员列表、移除成员、角色变更 / owner transfer 第一路径、群设置操作区、消息列表、发送后本地状态刷新、PullInbox / AckDelivery；真实双用户 direct + group client smoke 已通过；PC standalone exe、package-local README / launcher support files、unsigned local portable zip bundle 和 Android debug APK baseline 已产出。客户端只连 `api-gateway` / `push-gateway`，PullInbox 是消息事实源，WebSocket 只做在线唤醒。 |
 
 当前默认主线不是继续泛化清理 9 服务 P2 backlog，也不是做生产级 HA 长测，而是先把
 Web / Windows PC 客户端的 IM MVP 交互做实：账号注册登录、好友关系、好友私聊、群聊、
@@ -289,7 +290,7 @@ Web / Windows PC 客户端的 IM MVP 交互做实：账号注册登录、好友�
 PC WebView login smoke、真实双用户 direct + group client smoke、PC standalone exe package
 和 Android debug APK baseline 已有；`loadtest/clientweb` 已扩展到群成员列表、移除、
 角色变更和 owner transfer，并已通过 clean committed 真实 smoke。下一步是
-Windows PC signed installer / bundle 体验、成员搜索 / 分页、群标题 / 头像 read model
+Windows PC MSI / NSIS installer 与真实 code-signing pipeline、成员搜索 / 分页、群标题 / 头像 read model
 和更完整群设置。Android 真机 WebView login smoke 和正式移动端发布链路后置到用户明确切回。
 
 AI 大模型应用底座作为后续主线保留：
@@ -307,7 +308,7 @@ group memory
 ```
 
 下一步默认看 [current-goal.md](docs/runbook/current-goal.md)。截至当前主线，下一步是围绕
-Windows PC signed installer / bundle 体验继续收口；若继续客户端产品能力，则优先补群成员
+Windows PC MSI / NSIS installer 与真实 code-signing pipeline 继续收口；若继续客户端产品能力，则优先补群成员
 列表 / 移除 / 角色 / owner transfer 的真实多用户 smoke、成员搜索 / 分页、群标题 /
 头像 read model 和更完整群设置。Android APK /
 真机 smoke 不作为当前默认阻塞。
@@ -459,8 +460,8 @@ python -m mypy nexusim_ai_common scripts tests
   群聊、群成员添加 / 退群、成员列表、移除成员、角色变更 / owner transfer
   第一路径和消息 first path，`api-gateway` client BFF first-stage surface、Web adapters first path、
   本地 / wired LAN smoke、BFF HTTP metrics / rate-limit adapter、PC standalone exe 和
-  package-local README / launcher support files、Android debug APK baseline 已落，真实双用户 direct + group client smoke 已通过；仍缺
-  Windows signed installer、Android 真机 smoke、正式移动端发布链路以及成员搜索 / 分页、
+  package-local README / launcher support files、unsigned local portable zip bundle、Android debug APK baseline 已落，真实双用户 direct + group client smoke 已通过；仍缺
+  Windows signed installer / MSI / NSIS、Android 真机 smoke、正式移动端发布链路以及成员搜索 / 分页、
   群标题 / 头像 read model 和更完整群设置。
 - 完整 media / notification / admin / audit / workflow / control-plane 等产品化平台能力；
   当前这些服务已有 first-stage 路径，但 provider-grade adapter、UI、长周期运维和生产化

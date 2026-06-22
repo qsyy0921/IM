@@ -995,7 +995,7 @@ func normalizeOutboxIDs(ids []int64) []int64 {
 func normalizeOutboxRepairText(value string, defaultText string) string {
 	value = strings.TrimSpace(value)
 	if value == "" {
-		return defaultValue
+		return defaultText
 	}
 	return value
 }

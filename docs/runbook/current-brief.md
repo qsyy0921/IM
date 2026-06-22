@@ -44,7 +44,8 @@ NexusIM 已有本地 / 双机可运行的最小分布式 IM 后端，并已扩�
 
 1. 收口 Web / Windows PC 客户端：账号登录 / 注册、好友列表、好友申请、点击好友发起
    私聊、群聊列表、建群、点击群聊进入会话、消息列表、发送后本地状态刷新、
-   PullInbox / ACK 和本机可运行包体验。
+   PullInbox / ACK 和本机可运行包体验。2026-06-23 的开发 smoke 已验证双用户
+   好友直聊和群聊 first path；后续可按需补 clean baseline。
 2. 所有客户端能力只走 api-gateway BFF 和 push-gateway，不直连内部服务。
 3. 新功能先做简短架构分析，再编码；必须判断是否需要新技术、新中间件、新 provider
    或新服务，并把新增内容归入正确平台层。边界变化要同步 README、middleware catalog、

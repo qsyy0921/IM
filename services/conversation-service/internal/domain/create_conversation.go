@@ -120,6 +120,7 @@ func buildConversationCreateBoundaryEvents(
 		}
 		eventID := eventIDs[index]
 		payloadJSON, err := json.Marshal(map[string]any{
+			"change_id":          eventID,
 			"conversation_id":    command.ConversationID,
 			"boundary_seq":       seq,
 			"target_user_id":     member.UserID,

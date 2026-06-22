@@ -7,15 +7,29 @@ surfaces:
 api-gateway HTTP BFF + push-gateway WebSocket
 ```
 
-The runner setup phase may call public gRPC APIs to prepare test users and
-conversation membership. The verified client phase uses only:
+The runner setup phase may call public gRPC APIs to prepare test users and group
+membership. The verified client phase uses the same public client-facing BFF
+surfaces as the Web / PC shell:
 
+- `POST /api/auth/register`
 - `POST /api/auth/login`
+- `POST /api/contact-requests/send`
+- `POST /api/contact-requests/respond`
+- `GET /api/contacts/state`
+- `POST /api/conversations/direct`
+- `POST /api/conversations/create`
 - `POST /api/messages/send`
 - `GET /api/conversations/{conversation_id}/messages`
 - `GET /api/conversations`
 - `POST /api/delivery/ack`
 - `push-gateway` WebSocket `delivery.notify`
+
+It verifies two user-visible conversations in one run:
+
+- friend request accepted -> direct conversation opened -> direct message visible
+  through push + PullInbox + ACK;
+- group conversation created -> receiver joined -> group message visible through
+  push + PullInbox + ACK.
 
 It does not read private service tables for product behavior. PostgreSQL is used
 only by the loadtest for setup cleanup and final invariant checks.

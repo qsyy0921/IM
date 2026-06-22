@@ -565,7 +565,7 @@ func normalizeProjectionRepairOutcome(outcome string) string {
 func normalizeProjectionRepairText(value string, defaultText string) string {
 	value = strings.TrimSpace(value)
 	if value == "" {
-		return defaultValue
+		return defaultText
 	}
 	return value
 }

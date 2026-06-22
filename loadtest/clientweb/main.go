@@ -49,18 +49,18 @@ func main() {
 func run(ctx context.Context, cfg config) error {
 	started := time.Now().UTC()
 	result := summary{
-		Commit:         gitOutput("rev-parse", "--short", "HEAD"),
-		CommitFull:     gitOutput("rev-parse", "HEAD"),
-		GitDirty:       gitOutput("status", "--short") != "",
-		ResultDir:      cfg.resultDir,
-		TenantID:       cfg.tenantID,
-		ConversationID: cfg.conversationID,
-		SenderUserID:   cfg.senderUserID,
-		ReceiverUserID: cfg.receiverUserID,
-		ReceiverDevice: cfg.receiverDeviceID,
-		BFFBaseURL:     strings.TrimRight(cfg.bffBaseURL, "/"),
-		PushURL:        cfg.pushURL,
-		StartedAt:      started,
+		Commit:              gitOutput("rev-parse", "--short", "HEAD"),
+		CommitFull:          gitOutput("rev-parse", "HEAD"),
+		GitDirty:            gitOutput("status", "--short") != "",
+		ResultDir:           cfg.resultDir,
+		TenantID:            cfg.tenantID,
+		GroupConversationID: cfg.conversationID,
+		SenderUserID:        cfg.senderUserID,
+		ReceiverUserID:      cfg.receiverUserID,
+		ReceiverDevice:      cfg.receiverDeviceID,
+		BFFBaseURL:          strings.TrimRight(cfg.bffBaseURL, "/"),
+		PushURL:             cfg.pushURL,
+		StartedAt:           started,
 	}
 	runErr := runClientWebSmoke(ctx, cfg, &result)
 	return finish(cfg, &result, runErr)
@@ -80,19 +80,7 @@ func runClientWebSmoke(ctx context.Context, cfg config, result *summary) error {
 			return err
 		}
 	}
-	if err := seedConversation(ctx, pool, cfg); err != nil {
-		return err
-	}
 	if err := setupIdentityUsers(ctx, cfg, result); err != nil {
-		return err
-	}
-	join, err := createReceiverJoin(ctx, cfg)
-	if err != nil {
-		return fmt.Errorf("create receiver join: %w", err)
-	}
-	result.Setup.MemberChangeID = join.GetChangeId()
-	result.Setup.MemberBoundarySeq = join.GetBoundarySeq()
-	if err := waitMembership(ctx, pool, cfg); err != nil {
 		return err
 	}
 
@@ -106,6 +94,11 @@ func runClientWebSmoke(ctx context.Context, cfg config, result *summary) error {
 		return fmt.Errorf("bff receiver login: %w", err)
 	}
 	result.ReceiverLogin = loginSummaryFromSession(receiver)
+	contact, err := establishContact(ctx, cfg, sender, receiver)
+	if err != nil {
+		return fmt.Errorf("establish contact: %w", err)
+	}
+	result.Contact = contact
 
 	conn, hello, err := connectPush(ctx, cfg, receiver)
 	if err != nil {
@@ -114,37 +107,37 @@ func runClientWebSmoke(ctx context.Context, cfg config, result *summary) error {
 	defer conn.CloseNow()
 	result.ServerHello = hello
 
-	sent, err := bffSendMessage(ctx, cfg, sender)
+	directID, err := bffOpenDirectConversation(ctx, cfg, sender, cfg.receiverUserID)
 	if err != nil {
-		return fmt.Errorf("bff send message: %w", err)
+		return fmt.Errorf("open direct conversation: %w", err)
 	}
-	result.SendMessage = sent
-	notify, err := waitNotify(ctx, cfg, conn, sent.ConversationSeq, sent.MessageID)
-	if err != nil {
-		return fmt.Errorf("wait push notify: %w", err)
-	}
-	result.Notify = notify
-	pull, err := waitPullInbox(ctx, cfg, receiver, sent.ConversationSeq)
-	if err != nil {
-		return fmt.Errorf("bff pull inbox: %w", err)
-	}
-	result.PullInbox = pull
-	conversations, err := waitConversationList(ctx, cfg, receiver, sent.ConversationSeq)
-	if err != nil {
-		return fmt.Errorf("bff list conversations: %w", err)
-	}
-	result.ListConversations = conversations
-	ack, err := bffAckDelivery(ctx, cfg, receiver, pull.MaxSeq)
-	if err != nil {
-		return fmt.Errorf("bff ack delivery: %w", err)
-	}
-	result.AckDelivery = ack
-	if err := waitDeliveryCursor(ctx, pool, cfg, pull.MaxSeq); err != nil {
+	if err := waitMembership(ctx, pool, cfg, directID); err != nil {
 		return err
 	}
-	if err := fillPostgresStats(ctx, pool, cfg, result); err != nil {
+	direct, err := runConversationScenario(ctx, cfg, pool, conn, sender, receiver, directID, "DIRECT", "NexusIM direct client smoke message")
+	if err != nil {
+		return fmt.Errorf("direct chat scenario: %w", err)
+	}
+	result.DirectChat = direct
+
+	groupID, err := bffCreateGroupConversation(ctx, cfg, sender)
+	if err != nil {
+		return fmt.Errorf("create group conversation: %w", err)
+	}
+	join, err := createReceiverJoin(ctx, cfg, groupID)
+	if err != nil {
+		return fmt.Errorf("create receiver group join: %w", err)
+	}
+	if err := waitMembership(ctx, pool, cfg, groupID); err != nil {
 		return err
 	}
+	group, err := runConversationScenario(ctx, cfg, pool, conn, sender, receiver, groupID, "GROUP", "NexusIM group client smoke message")
+	if err != nil {
+		return fmt.Errorf("group chat scenario: %w", err)
+	}
+	group.MemberChangeID = join.GetChangeId()
+	group.MemberBoundarySeq = join.GetBoundarySeq()
+	result.GroupChat = group
 	result.Success = true
 	return nil
 }
@@ -187,7 +180,7 @@ func registerUser(ctx context.Context, cfg config, client identityv1.IdentitySer
 	return err
 }
 
-func createReceiverJoin(ctx context.Context, cfg config) (*conversationv1.CreateMemberChangeResponse, error) {
+func createReceiverJoin(ctx context.Context, cfg config, conversationID string) (*conversationv1.CreateMemberChangeResponse, error) {
 	dialOption, err := grpctls.DialOption(cfg.gatewayTLS, "gateway-tls")
 	if err != nil {
 		return nil, fmt.Errorf("configure api-gateway TLS: %w", err)
@@ -209,12 +202,12 @@ func createReceiverJoin(ctx context.Context, cfg config) (*conversationv1.Create
 		"x-nexusim-trace-id", "client-web-smoke-join",
 	))
 	return gatewayv1.NewGatewayServiceClient(conn).CreateMemberChange(requestCtx, &conversationv1.CreateMemberChangeRequest{
-		ConversationId:        cfg.conversationID,
+		ConversationId:        conversationID,
 		TargetUserId:          cfg.receiverUserID,
 		ChangeType:            conversationv1.MemberChangeType_MEMBER_CHANGE_TYPE_JOIN,
 		TargetRole:            conversationv1.MemberRole_MEMBER_ROLE_MEMBER,
 		ExpectedMemberVersion: 1,
-		IdempotencyKey:        "client-web-smoke-join-" + cfg.receiverUserID,
+		IdempotencyKey:        "client-web-smoke-join-" + conversationID + "-" + cfg.receiverUserID,
 		ConflictPolicy:        conversationv1.MemberChangeConflictPolicy_MEMBER_CHANGE_CONFLICT_POLICY_REJECT,
 		Reason:                "client web smoke receiver join",
 	})
@@ -229,27 +222,6 @@ func signSetupToken(cfg config, userID string, deviceID string, sessionID string
 		"trace_id":   "client-web-smoke",
 		"aud":        cfg.gatewayAuthAudience,
 	}, time.Now().Add(cfg.gatewayAuthTokenTTL))
-}
-
-func seedConversation(ctx context.Context, pool *pgxpool.Pool, cfg config) error {
-	_, err := pool.Exec(ctx, `
-INSERT INTO conversations (
-    tenant_id, conversation_id, conversation_type, status, conversation_mode,
-    fanout_mode, fanout_policy_version, member_version, permission_version, current_seq_shard
-) VALUES ($1, $2, 'GROUP', 'ACTIVE', 'LOCAL_ROW_LOCK', 'WRITE_FANOUT', 1, 1, 1, 'local')
-`, cfg.tenantID, cfg.conversationID)
-	if err != nil {
-		return fmt.Errorf("seed conversation: %w", err)
-	}
-	_, err = pool.Exec(ctx, `
-INSERT INTO conversation_members (
-    tenant_id, conversation_id, user_id, role, status, member_version, permission_version
-) VALUES ($1, $2, $3, 'OWNER', 'ACTIVE', 1, 1)
-`, cfg.tenantID, cfg.conversationID, cfg.senderUserID)
-	if err != nil {
-		return fmt.Errorf("seed sender member: %w", err)
-	}
-	return nil
 }
 
 func cleanupTenant(ctx context.Context, pool *pgxpool.Pool, tenantID string) error {
@@ -340,8 +312,186 @@ func bffLogin(ctx context.Context, cfg config, userID string, password string, d
 	return session, nil
 }
 
-func bffSendMessage(ctx context.Context, cfg config, session authSession) (sendSummary, error) {
-	payload, err := structpb.NewStruct(map[string]any{"text": "NexusIM client web smoke message"})
+func establishContact(ctx context.Context, cfg config, sender authSession, receiver authSession) (contactSummary, error) {
+	requestID, err := bffSendContactRequest(ctx, cfg, sender, cfg.receiverUserID)
+	if err != nil {
+		return contactSummary{}, err
+	}
+	if err := bffAcceptIncomingContactRequest(ctx, cfg, receiver, requestID); err != nil {
+		return contactSummary{}, err
+	}
+	if err := waitContactActive(ctx, cfg, sender, cfg.receiverUserID); err != nil {
+		return contactSummary{}, fmt.Errorf("sender contact state: %w", err)
+	}
+	if err := waitContactActive(ctx, cfg, receiver, cfg.senderUserID); err != nil {
+		return contactSummary{}, fmt.Errorf("receiver contact state: %w", err)
+	}
+	return contactSummary{RequestID: requestID, SenderActive: true, ReceiverActive: true}, nil
+}
+
+func bffSendContactRequest(ctx context.Context, cfg config, session authSession, targetUserID string) (string, error) {
+	var response struct {
+		RequestID string `json:"request_id"`
+		Status    string `json:"status"`
+	}
+	err := bffJSON(ctx, cfg, http.MethodPost, "/api/contact-requests/send", session.GatewayToken, map[string]any{
+		"target_user_id":  targetUserID,
+		"idempotency_key": "client-web-smoke-contact-" + session.UserID + "-" + targetUserID,
+		"message":         "client web smoke contact request",
+		"source_type":     "CONTACT_REQUEST_SOURCE_TYPE_DIRECT",
+	}, &response)
+	if err != nil {
+		return "", err
+	}
+	if response.RequestID == "" {
+		return "", fmt.Errorf("BFF contact request returned no request_id: %+v", response)
+	}
+	if response.Status != "" && response.Status != "CONTACT_REQUEST_STATUS_PENDING" && response.Status != "CONTACT_REQUEST_STATUS_ACCEPTED" {
+		return "", fmt.Errorf("BFF contact request returned unexpected status %s", response.Status)
+	}
+	return response.RequestID, nil
+}
+
+func bffAcceptIncomingContactRequest(ctx context.Context, cfg config, session authSession, requestID string) error {
+	var response struct {
+		RequestID string `json:"request_id"`
+		Status    string `json:"status"`
+	}
+	if err := bffJSON(ctx, cfg, http.MethodPost, "/api/contact-requests/respond", session.GatewayToken, map[string]any{
+		"request_id":      requestID,
+		"decision":        "CONTACT_DECISION_ACCEPT",
+		"idempotency_key": "client-web-smoke-contact-accept-" + requestID,
+	}, &response); err != nil {
+		return err
+	}
+	if response.RequestID != requestID || response.Status != "CONTACT_REQUEST_STATUS_ACCEPTED" {
+		return fmt.Errorf("BFF contact accept returned invalid response: %+v", response)
+	}
+	return nil
+}
+
+func waitContactActive(ctx context.Context, cfg config, session authSession, otherUserID string) error {
+	deadline := time.Now().Add(cfg.waitTimeout)
+	var lastStatus string
+	for time.Now().Before(deadline) {
+		statusValue, err := bffGetContactState(ctx, cfg, session, otherUserID)
+		if err != nil {
+			return err
+		}
+		lastStatus = statusValue
+		if statusValue == "CONTACT_EDGE_STATUS_ACTIVE" {
+			return nil
+		}
+		time.Sleep(cfg.pollInterval)
+	}
+	return fmt.Errorf("contact state for %s did not become ACTIVE, last=%s", otherUserID, lastStatus)
+}
+
+func bffGetContactState(ctx context.Context, cfg config, session authSession, otherUserID string) (string, error) {
+	var response struct {
+		ContactUserID string `json:"contact_user_id"`
+		Status        string `json:"status"`
+	}
+	path := "/api/contacts/state?other_user_id=" + url.QueryEscape(otherUserID)
+	if err := bffJSON(ctx, cfg, http.MethodGet, path, session.GatewayToken, nil, &response); err != nil {
+		return "", err
+	}
+	if response.ContactUserID != otherUserID {
+		return "", fmt.Errorf("BFF contact state returned wrong contact_user_id: %+v", response)
+	}
+	return response.Status, nil
+}
+
+func bffOpenDirectConversation(ctx context.Context, cfg config, session authSession, peerUserID string) (string, error) {
+	var response struct {
+		ConversationID   string `json:"conversation_id"`
+		ConversationType string `json:"conversation_type"`
+		DirectPeerUserID string `json:"direct_peer_user_id"`
+	}
+	err := bffJSON(ctx, cfg, http.MethodPost, "/api/conversations/direct", session.GatewayToken, map[string]any{
+		"peer_user_id":    peerUserID,
+		"idempotency_key": "client-web-smoke-direct-" + session.UserID + "-" + peerUserID,
+	}, &response)
+	if err != nil {
+		return "", err
+	}
+	if response.ConversationID == "" ||
+		response.ConversationType != "CONVERSATION_TYPE_DIRECT" ||
+		response.DirectPeerUserID != peerUserID {
+		return "", fmt.Errorf("BFF direct conversation returned invalid response: %+v", response)
+	}
+	return response.ConversationID, nil
+}
+
+func bffCreateGroupConversation(ctx context.Context, cfg config, session authSession) (string, error) {
+	var response struct {
+		ConversationID   string `json:"conversation_id"`
+		ConversationType string `json:"conversation_type"`
+	}
+	err := bffJSON(ctx, cfg, http.MethodPost, "/api/conversations/create", session.GatewayToken, map[string]any{
+		"conversation_id":   cfg.conversationID,
+		"conversation_type": "CONVERSATION_TYPE_GROUP",
+		"idempotency_key":   "client-web-smoke-group-" + cfg.conversationID,
+	}, &response)
+	if err != nil {
+		return "", err
+	}
+	if response.ConversationID != cfg.conversationID || response.ConversationType != "CONVERSATION_TYPE_GROUP" {
+		return "", fmt.Errorf("BFF group conversation returned invalid response: %+v", response)
+	}
+	return response.ConversationID, nil
+}
+
+func runConversationScenario(
+	ctx context.Context,
+	cfg config,
+	pool *pgxpool.Pool,
+	conn *nhooyr.Conn,
+	sender authSession,
+	receiver authSession,
+	conversationID string,
+	conversationType string,
+	text string,
+) (scenarioSummary, error) {
+	result := scenarioSummary{ConversationID: conversationID, ConversationType: conversationType}
+	sent, err := bffSendMessage(ctx, cfg, sender, conversationID, text)
+	if err != nil {
+		return result, fmt.Errorf("bff send message: %w", err)
+	}
+	result.SendMessage = sent
+	notify, err := waitNotify(ctx, cfg, conn, conversationID, sent.ConversationSeq, sent.MessageID)
+	if err != nil {
+		return result, fmt.Errorf("wait push notify: %w", err)
+	}
+	result.Notify = notify
+	pull, err := waitPullInbox(ctx, cfg, receiver, conversationID, sent.ConversationSeq)
+	if err != nil {
+		return result, fmt.Errorf("bff pull inbox: %w", err)
+	}
+	result.PullInbox = pull
+	conversations, err := waitConversationList(ctx, cfg, receiver, conversationID, sent.ConversationSeq)
+	if err != nil {
+		return result, fmt.Errorf("bff list conversations: %w", err)
+	}
+	result.ListConversations = conversations
+	ack, err := bffAckDelivery(ctx, cfg, receiver, conversationID, pull.MaxSeq)
+	if err != nil {
+		return result, fmt.Errorf("bff ack delivery: %w", err)
+	}
+	result.AckDelivery = ack
+	if err := waitDeliveryCursor(ctx, pool, cfg, conversationID, pull.MaxSeq); err != nil {
+		return result, err
+	}
+	postgres, err := postgresStats(ctx, pool, cfg, conversationID)
+	if err != nil {
+		return result, err
+	}
+	result.Postgres = postgres
+	return result, nil
+}
+
+func bffSendMessage(ctx context.Context, cfg config, session authSession, conversationID string, text string) (sendSummary, error) {
+	payload, err := structpb.NewStruct(map[string]any{"text": text})
 	if err != nil {
 		return sendSummary{}, err
 	}
@@ -351,7 +501,7 @@ func bffSendMessage(ctx context.Context, cfg config, session authSession) (sendS
 		ConversationSeq json.RawMessage `json:"conversation_seq"`
 	}
 	err = bffJSON(ctx, cfg, http.MethodPost, "/api/messages/send", session.GatewayToken, map[string]any{
-		"conversation_id": cfg.conversationID,
+		"conversation_id": conversationID,
 		"client_msg_id":   fmt.Sprintf("client-web-smoke-%d", time.Now().UnixNano()),
 		"message_type":    "TEXT",
 		"payload":         payload.AsMap(),
@@ -364,17 +514,17 @@ func bffSendMessage(ctx context.Context, cfg config, session authSession) (sendS
 	if err != nil {
 		return sendSummary{}, fmt.Errorf("parse conversation_seq: %w", err)
 	}
-	if response.MessageID == "" || response.ConversationID != cfg.conversationID || seq <= 0 {
+	if response.MessageID == "" || response.ConversationID != conversationID || seq <= 0 {
 		return sendSummary{}, fmt.Errorf("BFF send returned invalid response: %+v seq=%d", response, seq)
 	}
 	return sendSummary{MessageID: response.MessageID, ConversationSeq: seq}, nil
 }
 
-func waitPullInbox(ctx context.Context, cfg config, session authSession, minSeq int64) (pullSummary, error) {
+func waitPullInbox(ctx context.Context, cfg config, session authSession, conversationID string, minSeq int64) (pullSummary, error) {
 	deadline := time.Now().Add(cfg.waitTimeout)
 	var last pullSummary
 	for {
-		pull, err := bffPullInbox(ctx, cfg, session, 0)
+		pull, err := bffPullInbox(ctx, cfg, session, conversationID, 0)
 		if err != nil {
 			return pullSummary{}, err
 		}
@@ -389,7 +539,7 @@ func waitPullInbox(ctx context.Context, cfg config, session authSession, minSeq 
 	}
 }
 
-func bffPullInbox(ctx context.Context, cfg config, session authSession, afterSeq int64) (pullSummary, error) {
+func bffPullInbox(ctx context.Context, cfg config, session authSession, conversationID string, afterSeq int64) (pullSummary, error) {
 	var response struct {
 		Items []struct {
 			ConversationID  string          `json:"conversation_id"`
@@ -401,12 +551,15 @@ func bffPullInbox(ctx context.Context, cfg config, session authSession, afterSeq
 		} `json:"items"`
 		NextSeq json.RawMessage `json:"next_seq"`
 	}
-	path := fmt.Sprintf("/api/conversations/%s/messages?after_seq=%d&limit=100", url.PathEscape(cfg.conversationID), afterSeq)
+	path := fmt.Sprintf("/api/conversations/%s/messages?after_seq=%d&limit=100", url.PathEscape(conversationID), afterSeq)
 	if err := bffJSON(ctx, cfg, http.MethodGet, path, session.GatewayToken, nil, &response); err != nil {
 		return pullSummary{}, err
 	}
 	result := pullSummary{Items: []inboxItem{}}
 	for _, item := range response.Items {
+		if item.ConversationID != conversationID {
+			return pullSummary{}, fmt.Errorf("pull inbox returned conversation_id %s, want %s", item.ConversationID, conversationID)
+		}
 		seq, err := int64JSON(item.ConversationSeq)
 		if err != nil {
 			return pullSummary{}, fmt.Errorf("parse inbox seq: %w", err)
@@ -426,7 +579,7 @@ func bffPullInbox(ctx context.Context, cfg config, session authSession, afterSeq
 	return result, nil
 }
 
-func waitConversationList(ctx context.Context, cfg config, session authSession, minSeq int64) (conversationSummary, error) {
+func waitConversationList(ctx context.Context, cfg config, session authSession, conversationID string, minSeq int64) (conversationSummary, error) {
 	deadline := time.Now().Add(cfg.waitTimeout)
 	var last conversationSummary
 	for {
@@ -436,7 +589,7 @@ func waitConversationList(ctx context.Context, cfg config, session authSession, 
 		}
 		last = list
 		for _, item := range list.Items {
-			if item.ConversationID == cfg.conversationID && item.LastVisibleSeq >= minSeq {
+			if item.ConversationID == conversationID && item.LastVisibleSeq >= minSeq {
 				return list, nil
 			}
 		}
@@ -480,13 +633,13 @@ func bffListConversations(ctx context.Context, cfg config, session authSession) 
 	return result, nil
 }
 
-func bffAckDelivery(ctx context.Context, cfg config, session authSession, seq int64) (ackSummary, error) {
+func bffAckDelivery(ctx context.Context, cfg config, session authSession, conversationID string, seq int64) (ackSummary, error) {
 	var response struct {
 		ConversationID  string          `json:"conversation_id"`
 		LastReceivedSeq json.RawMessage `json:"last_received_seq"`
 	}
 	err := bffJSON(ctx, cfg, http.MethodPost, "/api/delivery/ack", session.GatewayToken, map[string]any{
-		"conversation_id": cfg.conversationID,
+		"conversation_id": conversationID,
 		"received_seq":    seq,
 	}, &response)
 	if err != nil {
@@ -498,6 +651,9 @@ func bffAckDelivery(ctx context.Context, cfg config, session authSession, seq in
 	}
 	if acked < seq {
 		return ackSummary{}, fmt.Errorf("ack seq %d before expected %d", acked, seq)
+	}
+	if response.ConversationID != conversationID {
+		return ackSummary{}, fmt.Errorf("ack returned conversation_id %s, want %s", response.ConversationID, conversationID)
 	}
 	return ackSummary{ConversationID: response.ConversationID, LastReceivedSeq: acked}, nil
 }
@@ -587,7 +743,7 @@ func connectPush(ctx context.Context, cfg config, session authSession) (*nhooyr.
 	return conn, hello, nil
 }
 
-func waitNotify(ctx context.Context, cfg config, conn *nhooyr.Conn, seq int64, messageID string) (serverFrame, error) {
+func waitNotify(ctx context.Context, cfg config, conn *nhooyr.Conn, conversationID string, seq int64, messageID string) (serverFrame, error) {
 	deadline := time.Now().Add(cfg.waitTimeout)
 	var last serverFrame
 	for time.Now().Before(deadline) {
@@ -602,14 +758,17 @@ func waitNotify(ctx context.Context, cfg config, conn *nhooyr.Conn, seq int64, m
 			continue
 		}
 		last = frame
-		if frame.Op == opDeliveryNotify && frame.ConversationSeq == seq && frame.MessageID == messageID {
+		if frame.Op == opDeliveryNotify &&
+			frame.ConversationID == conversationID &&
+			frame.ConversationSeq == seq &&
+			frame.MessageID == messageID {
 			return frame, nil
 		}
 	}
-	return last, fmt.Errorf("did not receive delivery.notify seq=%d message_id=%s", seq, messageID)
+	return last, fmt.Errorf("did not receive delivery.notify conversation_id=%s seq=%d message_id=%s", conversationID, seq, messageID)
 }
 
-func waitMembership(ctx context.Context, pool *pgxpool.Pool, cfg config) error {
+func waitMembership(ctx context.Context, pool *pgxpool.Pool, cfg config, conversationID string) error {
 	deadline := time.Now().Add(cfg.waitTimeout)
 	for time.Now().Before(deadline) {
 		var count int
@@ -620,16 +779,16 @@ WHERE tenant_id = $1
   AND conversation_id = $2
   AND user_id = $3
   AND status = 'ACTIVE'
-`, cfg.tenantID, cfg.conversationID, cfg.receiverUserID).Scan(&count)
+`, cfg.tenantID, conversationID, cfg.receiverUserID).Scan(&count)
 		if err == nil && count > 0 {
 			return nil
 		}
 		time.Sleep(cfg.pollInterval)
 	}
-	return fmt.Errorf("delivery membership projection not ready for %s", cfg.receiverUserID)
+	return fmt.Errorf("delivery membership projection not ready for %s in %s", cfg.receiverUserID, conversationID)
 }
 
-func waitDeliveryCursor(ctx context.Context, pool *pgxpool.Pool, cfg config, seq int64) error {
+func waitDeliveryCursor(ctx context.Context, pool *pgxpool.Pool, cfg config, conversationID string, seq int64) error {
 	deadline := time.Now().Add(cfg.waitTimeout)
 	for time.Now().Before(deadline) {
 		var got int64
@@ -640,24 +799,26 @@ WHERE tenant_id = $1
   AND conversation_id = $2
   AND user_id = $3
   AND device_id = $4
-`, cfg.tenantID, cfg.conversationID, cfg.receiverUserID, cfg.receiverDeviceID).Scan(&got)
+`, cfg.tenantID, conversationID, cfg.receiverUserID, cfg.receiverDeviceID).Scan(&got)
 		if err == nil && got >= seq {
 			return nil
 		}
 		time.Sleep(cfg.pollInterval)
 	}
-	return fmt.Errorf("delivery cursor did not reach seq %d", seq)
+	return fmt.Errorf("delivery cursor for %s did not reach seq %d", conversationID, seq)
 }
 
-func fillPostgresStats(ctx context.Context, pool *pgxpool.Pool, cfg config, result *summary) error {
-	if err := pool.QueryRow(ctx, `SELECT COUNT(*) FROM user_inbox WHERE tenant_id = $1 AND conversation_id = $2 AND user_id = $3`, cfg.tenantID, cfg.conversationID, cfg.receiverUserID).Scan(&result.Postgres.UserInboxCount); err != nil {
-		return err
+func postgresStats(ctx context.Context, pool *pgxpool.Pool, cfg config, conversationID string) (postgresSummary, error) {
+	var result postgresSummary
+	if err := pool.QueryRow(ctx, `SELECT COUNT(*) FROM user_inbox WHERE tenant_id = $1 AND conversation_id = $2 AND user_id = $3`, cfg.tenantID, conversationID, cfg.receiverUserID).Scan(&result.UserInboxCount); err != nil {
+		return result, err
 	}
-	return pool.QueryRow(ctx, `
+	err := pool.QueryRow(ctx, `
 SELECT COALESCE(MAX(last_received_seq), 0)
 FROM device_delivery_cursors
 WHERE tenant_id = $1 AND conversation_id = $2 AND user_id = $3 AND device_id = $4
-`, cfg.tenantID, cfg.conversationID, cfg.receiverUserID, cfg.receiverDeviceID).Scan(&result.Postgres.DeviceDeliveryCursorSeq)
+`, cfg.tenantID, conversationID, cfg.receiverUserID, cfg.receiverDeviceID).Scan(&result.DeviceDeliveryCursorSeq)
+	return result, err
 }
 
 func loginSummaryFromSession(session authSession) loginSummary {

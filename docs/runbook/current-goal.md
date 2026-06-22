@@ -29,6 +29,11 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   点击群聊进入会话、建群、消息列表、发送后本地状态刷新、PullInbox 和 ACK。
 - 会话刷新会保留当前选中；gateway token 过期会清理本地 session / push /
   会话展示状态并提示重新登录。
+- 2026-06-23 本轮开发 smoke 已跑通真实双用户 client path：
+  注册 -> 登录 -> 好友申请 / 接受 -> BFF 打开 direct 会话 -> direct 消息 notify /
+  PullInbox / ACK；以及建群 -> receiver JOIN -> group 消息 notify / PullInbox / ACK。
+  原始结果在 `H:\NexusIM\loadtest-results\client-web-bff-push-smoke-20260623-014942\client-web-summary.json`，
+  该次记录为 `git_dirty=true`，不能当作 clean baseline。
 - 本地调试默认使用 `127.0.0.1:8080/8088`；`loadtest/clientweb/run-local-dev.ps1`
   负责留住本机 client backend。
 - Android 已有 WebView shell / bridge / APK 历史产物和 metadata smoke；当前 shell
@@ -36,8 +41,9 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
 
 ## 下一步优先级
 
-1. 补真实双用户客户端 smoke，验证好友直聊和群聊 first path。
-2. 收口 Web / Windows PC shell 的剩余体验：会话标题、空态、错误文案和启动脚本。
+1. 收口 Web / Windows PC shell 的剩余体验：会话标题、空态、错误文案和启动脚本。
+2. 必要时提交后 rerun 一次 clean client smoke，把双用户 direct + group first path
+   归档成 clean baseline。
 3. Windows PC 端继续 installer / 启动脚本 / 可运行包体验。
 4. Android 后续只在用户切回时继续：login-level WebView smoke、APK baseline
    报告和真机 UI polish。

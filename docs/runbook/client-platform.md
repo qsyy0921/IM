@@ -132,6 +132,12 @@ First slice:
   selected-conversation preservation during refresh, local message-state refresh
   after send, and gateway-token-expired cleanup that clears the local session
   and asks the user to log in again.
+- `loadtest/clientweb` now verifies the two-user client first path through
+  public client-facing surfaces: register/login, contact request send/accept,
+  BFF direct-conversation open, direct message notify/PullInbox/ACK, BFF group
+  creation, receiver JOIN, and group message notify/PullInbox/ACK. The
+  2026-06-23 development run passed with `git_dirty=true`; it is functional
+  evidence for the current slice, not a clean committed baseline.
 - The visible Web / desktop shell now presents an account-password first IM
   surface: tenant, device, endpoint and native diagnostic controls are kept out
   of the normal user path, while smoke selectors remain stable. The
@@ -516,12 +522,15 @@ rejected. For local LAN client smoke, prefer the wired `172.x.x.x` address.
 
 1. Continue browser / Windows PC first: polish the account-password IM shell,
    keep complex endpoint / tenant / device controls hidden, and preserve the
-   public BFF / push client path for login, conversation, send, PullInbox and
-   ACK.
-2. Produce the next Windows package step when needed: installer script /
+   public BFF / push client path for login, contacts, direct chat, group chat,
+   send, PullInbox and ACK.
+2. If a clean evidence point is needed, rerun `loadtest/clientweb/run-local-smoke.ps1`
+   after committing the current client/direct-chat fixes and archive the clean
+   summary.
+3. Produce the next Windows package step when needed: installer script /
    bundle plan / launch shortcut on top of the existing standalone exe and
    login-level WebView smoke.
-3. Return to Android only when explicitly prioritized: run login-level Android
+4. Return to Android only when explicitly prioritized: run login-level Android
    WebView smoke on the installed APK, then record the Android baseline.
 
 ## Local Build Prerequisites

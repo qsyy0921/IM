@@ -56,6 +56,12 @@ Reports:
   Windows-priority UI pass; proves the account-password oriented IM shell still
   passes real Windows Tauri WebView login, notify, PullInbox and AckDelivery
   through public client paths.
+- `loadtest-report-20260623-client-web-two-user-direct-group-smoke.md`:
+  development smoke for the public BFF / push two-user path. It verifies
+  register/login, contact request acceptance, BFF direct-conversation open,
+  direct message notify/PullInbox/ACK, BFF group creation, receiver JOIN and
+  group message notify/PullInbox/ACK. Recorded with `git_dirty=true`; rerun
+  after commit before treating it as a clean baseline.
 
 Useful command:
 

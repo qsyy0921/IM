@@ -501,7 +501,7 @@ INSERT INTO delivery_projection_failure_resolution_audit (
 func normalizeProjectionFailureResolveText(value string, defaultText string) string {
 	value = strings.TrimSpace(value)
 	if value == "" {
-		return defaultValue
+		return defaultText
 	}
 	return value
 }

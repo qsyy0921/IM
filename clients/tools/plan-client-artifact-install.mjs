@@ -120,6 +120,7 @@ function targetInstallPlan(target, manifest, manifestDir, installPrereqs) {
   const artifactPath = join(manifestDir, artifact.filename);
   validateArtifactFile(artifact, artifactPath);
   const artifactHint = safeHint(artifactPath);
+  const supportFiles = supportFilesForTarget(manifest, target, manifestDir);
   const missing = missingInstallInputs(target, installPrereqs, []);
   return {
     artifactReady: true,
@@ -132,7 +133,49 @@ function targetInstallPlan(target, manifest, manifestDir, installPrereqs) {
       sha256: artifact.sha256,
       artifactHint
     },
-    checklist: installChecklist(target, artifactHint)
+    supportFiles,
+    checklist: installChecklist(target, artifactHint, supportFiles)
+  };
+}
+
+function supportFilesForTarget(manifest, target, manifestDir) {
+  if (!Array.isArray(manifest.supportFiles)) {
+    return [];
+  }
+  return manifest.supportFiles
+    .filter(file => file?.target === target)
+    .map(file => validateSupportFile(file, join(manifestDir, file.filename)));
+}
+
+function validateSupportFile(file, supportPath) {
+  if (typeof file.filename !== "string" || file.filename.length === 0) {
+    throw new Error("support filename missing");
+  }
+  if (file.filename.includes("/") || file.filename.includes("\\") || isAbsolute(file.filename)) {
+    throw new Error(`support filename is not relative-safe: ${file.filename}`);
+  }
+  if (!Number.isInteger(file.bytes) || file.bytes < 0) {
+    throw new Error(`support byte size invalid: ${file.filename}`);
+  }
+  if (typeof file.sha256 !== "string" || !file.sha256.match(/^[a-f0-9]{64}$/)) {
+    throw new Error(`support sha256 invalid: ${file.filename}`);
+  }
+  if (!existsSync(supportPath) || !statSync(supportPath).isFile()) {
+    throw new Error(`support file missing: ${file.filename}`);
+  }
+  const bytes = readFileSync(supportPath);
+  const sha256 = createHash("sha256").update(bytes).digest("hex");
+  if (bytes.length !== file.bytes) {
+    throw new Error(`support byte size mismatch: ${file.filename}`);
+  }
+  if (sha256 !== file.sha256) {
+    throw new Error(`support hash mismatch: ${file.filename}`);
+  }
+  return {
+    filename: file.filename,
+    bytes: file.bytes,
+    sha256: file.sha256,
+    supportHint: safeHint(supportPath)
   };
 }
 
@@ -175,7 +218,7 @@ function commandAvailable(command, args) {
   return result.status === 0;
 }
 
-function installChecklist(target, artifactHint) {
+function installChecklist(target, artifactHint, supportFiles = []) {
   if (target === "android") {
     return [
       {
@@ -217,15 +260,21 @@ function installChecklist(target, artifactHint) {
     ];
   }
 
+  const launcher = supportFiles.find(file => file.filename === "launch-nexusim-windows.ps1");
+  const launchCommand = launcher
+    ? `powershell -NoProfile -File ${launcher.supportHint}`
+    : `Start-Process ${artifactHint}`;
   return [
     {
       step: "launch-desktop-artifact",
-      command: `Start-Process ${artifactHint}`,
+      command: launchCommand,
       manualOnly: true,
       launchesDesktopArtifact: true,
       startsLocalProcess: true,
       requiresExplicitUserAction: true,
-      evidence: "Windows desktop artifact launches without SmartScreen or signer policy failures in the local test profile"
+      evidence: launcher
+        ? "Windows desktop launcher starts the collected exe from the local package directory"
+        : "Windows desktop artifact launches without SmartScreen or signer policy failures in the local test profile"
     },
     {
       step: "verify-installed-shell",

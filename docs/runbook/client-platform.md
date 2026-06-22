@@ -324,8 +324,11 @@ First slice:
   `npm --prefix clients run collect:client-artifacts` copies it into ignored
   `clients/artifacts/<run-id>/` storage and writes a low-sensitive manifest with
   file names, sizes and SHA-256 hashes, without recording local absolute source
-  paths. `build:desktop-artifact:collect` and `build:android-apk:collect` run the
-  collector automatically after a successful native build. The collector
+  paths. Windows desktop collection also writes `README-windows-desktop.txt`;
+  standalone `.exe` packages additionally get `launch-nexusim-windows.ps1`
+  with package-relative launch logic. `build:desktop-artifact:collect` and
+  `build:android-apk:collect` run the collector automatically after a successful
+  native build. The collector
   `--dry-run` output carries an execution policy proving it only discovers
   candidate sources and reads metadata; it does not copy artifacts, create
   output directories, write manifests, install artifacts, contact devices or
@@ -333,8 +336,10 @@ First slice:
 - `npm --prefix clients run test:artifact-install-plan` validates the
   first-stage install-plan tool. `npm --prefix clients run plan:artifact-install`
   reads a collected `clients/artifacts/<run-id>/manifest.json` and prints
-  low-sensitive Windows desktop artifact / Android APK install checklist commands. It
-  now also reports install-side readiness such as Android `adb` availability
+  low-sensitive Windows desktop artifact / Android APK install checklist commands.
+  It validates collected support files and, for standalone Windows `.exe`
+  packages, points the manual launch command at `launch-nexusim-windows.ps1`.
+  It now also reports install-side readiness such as Android `adb` availability
   and Windows local artifact launch support, while still not launching
   artifacts, contacting devices, installing packages or printing local
   absolute paths.
@@ -468,9 +473,10 @@ First slice:
   plus fixed-prefix SQLite local-store methods. Both targets keep native storage
   behind shared readiness and do not expose broad filesystem, token or message
   APIs. Windows desktop now
-  produces a first-stage standalone `.exe` artifact and low-sensitive collected
-  manifest; `smoke:desktop-artifact-launch` has verified the exe starts, stays
-  alive during the smoke hold window and terminates cleanly.
+  produces a first-stage standalone `.exe` artifact, low-sensitive collected
+  manifest and package-local README / launcher support files;
+  `smoke:desktop-artifact-launch` has verified the exe starts, stays alive
+  during the smoke hold window and terminates cleanly.
   Its dry-run output carries an execution policy proving it only reads the
   collected manifest and artifact bytes for hash validation; it does not start
   or terminate the artifact process, open network connections, install
@@ -545,8 +551,8 @@ rejected. For local LAN client smoke, prefer the wired `172.x.x.x` address.
    public BFF / push client path for login, contacts, direct chat, group chat,
    send, PullInbox and ACK.
 2. Produce the next Windows package step when needed: installer script /
-   bundle plan / launch shortcut on top of the existing standalone exe and
-   login-level WebView smoke.
+   bundle plan / signed installer on top of the existing standalone exe,
+   package-local launcher and login-level WebView smoke.
 3. Return to Android only when explicitly prioritized: run login-level Android
    WebView smoke on the installed APK, then record the Android baseline.
 
@@ -556,7 +562,7 @@ rejected. For local LAN client smoke, prefer the wired `172.x.x.x` address.
   the runner skeleton, validator and repo-declared `@tauri-apps/cli`
   dependency. `npm --prefix clients install` installs the repo-local Tauri CLI;
   `build:desktop-artifact:collect` then produces a first-stage standalone exe
-  and collected manifest.
+  plus collected manifest, README and launcher support files.
 - Android APK build needs JDK 17+ plus Gradle / Android SDK. The Windows local
   baseline now uses `F:\IM\toolchains`: Temurin JDK 17, Gradle 8.10.2,
   Android SDK commandline-tools, platform-tools, `platforms;android-35` and

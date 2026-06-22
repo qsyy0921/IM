@@ -39,12 +39,15 @@ try {
   const outputDir = join(tempRoot, "out");
   const fakeAPK = join(sourceDir, "fake-app-debug.apk");
   const fakeMSI = join(sourceDir, "fake-desktop.msi");
+  const fakeEXE = join(sourceDir, "fake-desktop.exe");
   const apkBody = "fake apk bytes";
   const msiBody = "fake desktop installer bytes";
+  const exeBody = "fake desktop executable bytes";
 
   mkdirSync(sourceDir, { recursive: true });
   writeFileSync(fakeAPK, apkBody);
   writeFileSync(fakeMSI, msiBody);
+  writeFileSync(fakeEXE, exeBody);
 
   const dryRun = runCollector([
     "--target",
@@ -99,7 +102,35 @@ try {
   assert(desktopCopy === msiBody, "desktop artifact copy mismatch");
   assert(desktopManifest.artifacts[0].sha256 === sha256(msiBody), "desktop artifact hash mismatch");
   assert(desktopManifest.artifacts[0].filename === "nexusim-windows-desktop.msi", "desktop filename mismatch");
+  assert(Array.isArray(desktopManifest.supportFiles), "desktop manifest supportFiles missing");
+  assert(desktopManifest.supportFiles.length === 1, "desktop msi package should include one support file");
+  assert(desktopManifest.supportFiles[0].filename === "README-windows-desktop.txt", "desktop readme support file missing");
+  assert(existsSync(join(desktopDir, "README-windows-desktop.txt")), "desktop readme file missing");
   assert(!JSON.stringify(desktopManifest).includes(tempRoot), "desktop manifest leaked absolute temp path");
+
+  const desktopExe = runCollector([
+    "--target",
+    "windows-desktop",
+    "--source",
+    fakeEXE,
+    "--output-dir",
+    outputDir,
+    "--run-id",
+    "desktop-exe-test"
+  ]);
+  const desktopExeDir = join(outputDir, "desktop-exe-test");
+  const desktopExeManifest = JSON.parse(readFileSync(join(desktopExeDir, "manifest.json"), "utf8"));
+  const desktopExeCopy = readFileSync(join(desktopExeDir, "nexusim-windows-desktop.exe"), "utf8");
+  const launcher = readFileSync(join(desktopExeDir, "launch-nexusim-windows.ps1"), "utf8");
+  assert(desktopExe.artifacts.length === 1, "desktop exe collector result should include one artifact");
+  assert(desktopExeCopy === exeBody, "desktop exe artifact copy mismatch");
+  assert(desktopExeManifest.supportFiles.length === 2, "desktop exe package should include readme and launcher");
+  assert(desktopExeManifest.supportFiles.some(file => file.filename === "README-windows-desktop.txt"), "desktop exe readme missing");
+  assert(desktopExeManifest.supportFiles.some(file => file.filename === "launch-nexusim-windows.ps1"), "desktop exe launcher missing");
+  assert(launcher.includes("$PSScriptRoot"), "desktop launcher should use package-relative path");
+  assert(launcher.includes("nexusim-windows-desktop.exe"), "desktop launcher should start collected exe");
+  assert(!launcher.includes(tempRoot), "desktop launcher leaked absolute temp path");
+  assert(!JSON.stringify(desktopExeManifest).includes(tempRoot), "desktop exe manifest leaked absolute temp path");
 } finally {
   rmSync(tempRoot, { recursive: true, force: true });
 }

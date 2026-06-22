@@ -191,13 +191,15 @@ export function writeArtifactBundle(plan, options) {
       sourceHint: source.sourceHint
     };
   });
+  const supportFiles = writeSupportFiles(outputDir, artifacts);
 
   const manifest = {
     schemaVersion,
     generatedAt: new Date().toISOString(),
     gitCommit: currentGitCommit(),
     runId: options.runId,
-    artifacts
+    artifacts,
+    supportFiles
   };
   const manifestPath = join(outputDir, "manifest.json");
   writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
@@ -207,8 +209,75 @@ export function writeArtifactBundle(plan, options) {
     runId: options.runId,
     outputDirHint: safeRelativeSource(outputDir),
     manifest: "manifest.json",
-    artifacts
+    artifacts,
+    supportFiles
   };
+}
+
+function writeSupportFiles(outputDir, artifacts) {
+  const supportFiles = [];
+  const desktopArtifacts = artifacts.filter(artifact => artifact.target === "windows-desktop");
+  if (desktopArtifacts.length === 0) {
+    return supportFiles;
+  }
+
+  const readme = desktopReadme(desktopArtifacts);
+  writeSupportFile(outputDir, "README-windows-desktop.txt", readme, supportFiles);
+
+  const desktopExe = desktopArtifacts.find(artifact => extname(artifact.filename).toLowerCase() === ".exe");
+  if (desktopExe) {
+    writeSupportFile(outputDir, "launch-nexusim-windows.ps1", desktopLauncher(desktopExe.filename), supportFiles);
+  }
+  return supportFiles;
+}
+
+function writeSupportFile(outputDir, filename, body, supportFiles) {
+  const outputPath = join(outputDir, filename);
+  writeFileSync(outputPath, body, "utf8");
+  const bytes = Buffer.byteLength(body, "utf8");
+  supportFiles.push({
+    target: "windows-desktop",
+    filename,
+    bytes,
+    sha256: sha256Text(body)
+  });
+}
+
+function desktopReadme(artifacts) {
+  const filenames = artifacts.map(artifact => `- ${artifact.filename}`).join("\n");
+  const hasExe = artifacts.some(artifact => extname(artifact.filename).toLowerCase() === ".exe");
+  const launchLine = hasExe
+    ? "Run .\\launch-nexusim-windows.ps1 from this directory, or start the exe directly."
+    : "Use the installer artifact according to the install plan before running NexusIM.";
+  return [
+    "NexusIM Windows desktop local package",
+    "",
+    "This directory is a local development package, not a signed production installer.",
+    "It contains the collected Windows desktop artifact plus low-sensitive hashes in manifest.json.",
+    "",
+    "Artifacts:",
+    filenames,
+    "",
+    "How to run:",
+    launchLine,
+    "",
+    "Before login, start the local NexusIM backend and Web client support services as documented in clients/README.md.",
+    "The desktop shell talks only to api-gateway BFF and push-gateway.",
+    ""
+  ].join("\n");
+}
+
+function desktopLauncher(exeFilename) {
+  const escaped = exeFilename.replaceAll("'", "''");
+  return [
+    "$ErrorActionPreference = 'Stop'",
+    `$exe = Join-Path -Path $PSScriptRoot -ChildPath '${escaped}'`,
+    "if (-not (Test-Path -LiteralPath $exe)) {",
+    "    throw 'NexusIM desktop executable is missing from this package.'",
+    "}",
+    "Start-Process -FilePath $exe",
+    ""
+  ].join("\r\n");
 }
 
 function defaultSourcesForTarget(target) {

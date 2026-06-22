@@ -47,7 +47,9 @@ NexusIM 已有本地 / 双机可运行的最小分布式 IM 后端，并已扩�
    角色变更 / owner transfer 第一路径、消息列表、发送后本地状态刷新、PullInbox /
    ACK 和本机可运行包体验。2026-06-23 的 clean smoke 已验证双用户好友直聊和群聊
    first path；Web / PC shell 已补第一版会话展示标题、空态、常见错误中文文案、
-   显式本地启动脚本和群设置操作区。`loadtest/clientweb` 已扩展到群成员列表、
+   显式本地启动脚本和群设置操作区。Windows desktop collected package 已补
+   package-local README / launcher support files，下一步继续 signed installer /
+   bundle。`loadtest/clientweb` 已扩展到群成员列表、
    角色变更、owner transfer 和移除成员的 BFF 链路；2026-06-23 clean committed
    smoke 已通过。
 2. 所有客户端能力只走 api-gateway BFF 和 push-gateway，不直连内部服务。

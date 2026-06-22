@@ -20,9 +20,11 @@ try {
   mkdirSync(runDir, { recursive: true });
 
   const apk = "fake apk bytes";
-  const msi = "fake msi bytes";
+  const exe = "fake exe bytes";
+  const launcher = "$ErrorActionPreference = 'Stop'\nStart-Process -FilePath (Join-Path $PSScriptRoot 'nexusim-windows-desktop.exe')\n";
   writeFileSync(join(runDir, "nexusim-android-debug.apk"), apk);
-  writeFileSync(join(runDir, "nexusim-windows-desktop.msi"), msi);
+  writeFileSync(join(runDir, "nexusim-windows-desktop.exe"), exe);
+  writeFileSync(join(runDir, "launch-nexusim-windows.ps1"), launcher);
   writeFileSync(join(runDir, "manifest.json"), `${JSON.stringify({
     schemaVersion: "nexusim.client-artifacts.v1",
     generatedAt: "2026-06-22T00:00:00.000Z",
@@ -39,11 +41,19 @@ try {
       },
       {
         target: "windows-desktop",
-        filename: "nexusim-windows-desktop.msi",
-        bytes: Buffer.byteLength(msi),
-        sha256: sha256(msi),
+        filename: "nexusim-windows-desktop.exe",
+        bytes: Buffer.byteLength(exe),
+        sha256: sha256(exe),
         sourcePathHash: sha256("desktop-source"),
-        sourceHint: "desktop/src-tauri/target/release/bundle/msi/nexusim.msi"
+        sourceHint: "desktop/src-tauri/target/release/nexusim.exe"
+      }
+    ],
+    supportFiles: [
+      {
+        target: "windows-desktop",
+        filename: "launch-nexusim-windows.ps1",
+        bytes: Buffer.byteLength(launcher),
+        sha256: sha256(launcher)
       }
     ]
   }, null, 2)}\n`);
@@ -79,9 +89,11 @@ try {
   assert(plan.targets["windows-desktop"].artifactReady === true, "desktop artifact should be ready");
   assert(plan.targets["windows-desktop"].readyForInstall === true, "desktop install plan should be ready");
   assert(plan.targets["windows-desktop"].installPrereqs.windowsInstallerLaunchSupported === true, "desktop install prereq should be true");
+  assert(plan.targets["windows-desktop"].supportFiles.length === 1, "desktop support files should be exposed");
+  assert(plan.targets["windows-desktop"].supportFiles[0].supportHint === "clients/artifacts/install-plan-test/launch-nexusim-windows.ps1", "desktop support hint mismatch");
   const desktopLaunchStep = plan.targets["windows-desktop"].checklist.find(item => item.step === "launch-desktop-artifact");
   assert(desktopLaunchStep, "desktop launch step missing");
-  assert(desktopLaunchStep.command?.includes("Start-Process clients/artifacts/install-plan-test/nexusim-windows-desktop.msi"), "desktop launch command missing");
+  assert(desktopLaunchStep.command === "powershell -NoProfile -File clients/artifacts/install-plan-test/launch-nexusim-windows.ps1", "desktop launcher command missing");
   assert(desktopLaunchStep.manualOnly === true, "desktop launch step should be manual-only");
   assert(desktopLaunchStep.launchesDesktopArtifact === true, "desktop launch step should be marked as launching the artifact");
   assert(desktopLaunchStep.startsLocalProcess === true, "desktop launch step should be marked as starting a local process");

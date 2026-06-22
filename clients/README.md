@@ -200,13 +200,18 @@ node clients/tools/verify-shell-assets.mjs --target all
 `collect:client-artifacts` copies produced desktop / Android artifacts into the
 ignored `clients/artifacts/<run-id>/` directory and writes a low-sensitive
 `manifest.json` with file names, sizes and SHA-256 hashes. It does not record
-local absolute source paths. The `*:collect` build scripts run the same
+local absolute source paths. For Windows desktop artifacts it also writes
+`README-windows-desktop.txt`; when the collected desktop artifact is a
+standalone `.exe`, it writes `launch-nexusim-windows.ps1` that starts the exe
+through a package-relative path. The `*:collect` build scripts run the same
 collection step automatically after a successful native build.
 `plan:artifact-install` reads that collected manifest and prints a low-sensitive
-Windows desktop artifact / Android install checklist. It also reports local install prerequisites
-such as Android `adb` availability and Windows artifact launch support, but it
-does not install packages, connect to devices, launch artifacts or print local
-absolute paths.
+Windows desktop artifact / Android install checklist. It validates any collected
+support files and, for standalone Windows desktop exe packages, points the
+manual launch step at `launch-nexusim-windows.ps1`. It also reports local
+install prerequisites such as Android `adb` availability and Windows artifact
+launch support, but it does not install packages, connect to devices, launch
+artifacts or print local absolute paths.
 `plan:shell-smoke` consumes the same install plan, so native shell smoke
 readiness is not marked ready until a collected artifact exists and its
 install-side prerequisites are available. Its artifact status distinguishes
@@ -238,7 +243,8 @@ Current packaging status:
   `npm --prefix clients install` to download the local Tauri CLI, then run
   `build:desktop-artifact:collect`. The first-stage output is a standalone
   `nexusim-windows-desktop.exe` collected under ignored
-  `clients/artifacts/<run-id>/` with a low-sensitive manifest. MSI / NSIS
+  `clients/artifacts/<run-id>/` with a low-sensitive manifest,
+  `README-windows-desktop.txt` and `launch-nexusim-windows.ps1`. MSI / NSIS
   installer bundling is still future hardening. Use
   `npm --prefix clients run smoke:desktop-artifact-launch` for the first launch
   sanity check; it starts the collected exe, waits briefly, then terminates it.

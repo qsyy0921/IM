@@ -169,7 +169,8 @@ installer build 包装器，并通过独立仓库 installer profile 调用 Tauri
 Tauri config 仍保持不打包；installer profile 显式启用 MSI + NSIS targets；planner 会按 `windows-desktop` 目标选择 collected
 manifest，signing readiness 或 valid signature 不满足时 fail-closed。generic install plan
 也按 `artifactKind` fail-closed：旧 manifest 缺 kind 时要求重新 collect，installer 不会被当作
-portable launcher 或 direct shell-smoke 输入。
+portable launcher 或 direct shell-smoke 输入；installer planner 也只接受显式
+`desktop-executable` 作为 MSI / NSIS build baseline。
 
 本地调试入口：
 
@@ -293,7 +294,7 @@ message / conversation / policy events -> search-service + memory-service projec
 
 | 模块 | 当前状态 |
 | --- | --- |
-| `clients/` | Browser / Windows PC / Android client platform first slice：`protocol`、`client-core`、Web shell、PC desktop shell contract 和 Android runtime contract 已建立并通过 focused validation；`api-gateway` client BFF first-stage HTTP/JSON surface 已落；Web / PC shell 已接账号密码登录、注册、好友列表、好友申请、点击好友发起私聊、群聊列表、建群、点击群聊进入会话、群成员添加 / 退群、成员列表、移除成员、角色变更 / owner transfer 第一路径、群设置操作区、消息列表、发送后本地状态刷新、PullInbox / AckDelivery；真实双用户 direct + group client smoke 已通过；PC standalone exe、package-local README / launcher support files、unsigned local portable zip bundle、desktop installer / signing readiness plans、显式 `--execute` 门控 signing wrapper、只读 signature verifier、显式 `--execute` 门控 installer build 包装器和 Android debug APK baseline 已产出；artifact install plan 已按 `artifactKind` 区分 executable / installer，不把 installer 当作 portable direct-launch 输入。客户端只连 `api-gateway` / `push-gateway`，PullInbox 是消息事实源，WebSocket 只做在线唤醒。 |
+| `clients/` | Browser / Windows PC / Android client platform first slice：`protocol`、`client-core`、Web shell、PC desktop shell contract 和 Android runtime contract 已建立并通过 focused validation；`api-gateway` client BFF first-stage HTTP/JSON surface 已落；Web / PC shell 已接账号密码登录、注册、好友列表、好友申请、点击好友发起私聊、群聊列表、建群、点击群聊进入会话、群成员添加 / 退群、成员列表、移除成员、角色变更 / owner transfer 第一路径、群设置操作区、消息列表、发送后本地状态刷新、PullInbox / AckDelivery；真实双用户 direct + group client smoke 已通过；PC standalone exe、package-local README / launcher support files、unsigned local portable zip bundle、desktop installer / signing readiness plans、显式 `--execute` 门控 signing wrapper、只读 signature verifier、显式 `--execute` 门控 installer build 包装器和 Android debug APK baseline 已产出；artifact install plan 已按 `artifactKind` 区分 executable / installer，不把 installer 当作 portable direct-launch 输入；installer planner 只接受 `desktop-executable` build baseline。客户端只连 `api-gateway` / `push-gateway`，PullInbox 是消息事实源，WebSocket 只做在线唤醒。 |
 
 当前默认主线不是继续泛化清理 9 服务 P2 backlog，也不是做生产级 HA 长测，而是先把
 Web / Windows PC 客户端的 IM MVP 交互做实：账号注册登录、好友关系、好友私聊、群聊、

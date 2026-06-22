@@ -57,6 +57,9 @@ export function buildDesktopInstallerPlan(options = {}) {
   if (!artifactState.desktopArtifactPresent) {
     missing.push("windows-desktop-artifact-baseline");
   }
+  if (artifactState.desktopArtifactPresent && artifactState.artifact?.artifactKind !== "desktop-executable") {
+    missing.push(artifactState.artifact?.artifactKind ? "desktop-executable-baseline" : "desktop-artifact-kind");
+  }
 
   const signingPlan = buildDesktopSigningPlan({
     manifest: artifactManifestPath || "",
@@ -235,6 +238,7 @@ function validateArtifact(artifact, artifactPath) {
   }
   return {
     filename: artifact.filename,
+    artifactKind: typeof artifact.artifactKind === "string" ? artifact.artifactKind : "",
     bytes: artifact.bytes,
     sha256: artifact.sha256,
     artifactHint: safeHint(artifactPath),

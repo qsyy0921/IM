@@ -520,8 +520,9 @@ First slice:
   status, then report whether MSI / NSIS installer bundling is ready. The
   default dev config remains inactive, while `tauri.installer.conf.json` is the
   explicit MSI + NSIS profile. The plan still reports not ready until signing
-  readiness and a valid Authenticode signature are present instead of treating
-  the unsigned portable zip as an installer.
+  readiness and a valid Authenticode signature are present on an explicit
+  `desktop-executable` baseline instead of treating the unsigned portable zip
+  or an already collected installer as an installer build input.
   The generic client install plan now also keeps collected `desktop-installer`
   artifacts out of the portable launcher path, so `plan:shell-smoke` only marks
   Windows direct shell smoke ready for `desktop-executable` artifacts.

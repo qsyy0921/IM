@@ -73,6 +73,8 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   generic install plan 已按 `artifactKind` 区分 executable 和 installer：
   stale manifest 缺 `artifactKind` 时要求重新 collect，`desktop-installer` 不再进入
   portable launcher / direct shell-smoke 路径。
+  installer planner 也要求 MSI / NSIS 输入 baseline 是显式 `desktop-executable`；
+  缺 kind 的旧 manifest 或 `desktop-installer` artifact 都不会被当作 installer build 输入。
   它们仍不是生产签名 installer。
 - Android 已有 WebView shell / bridge / APK 历史产物和 metadata smoke；当前 shell
   不宣称 F 盘 Android toolchain ready，后续切回 Android 时再重新加载 toolchain env。

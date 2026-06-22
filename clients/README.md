@@ -271,8 +271,11 @@ installer bundling can run. It is also plan-only: it does not run Tauri, sign,
 install, launch or download anything. The default development Tauri config
 stays `bundle.active=false`; installer bundling uses the separate
 `src-tauri/tauri.installer.conf.json` MSI + NSIS profile. The plan selects the latest
-`windows-desktop` manifest automatically and remains not ready until signing
-readiness is true and the collected artifact verifies as Authenticode-valid.
+`windows-desktop` manifest automatically, but the baseline must be an explicit
+`desktop-executable`; stale manifests without `artifactKind` or collected
+`desktop-installer` artifacts fail closed. The plan remains not ready until
+signing readiness is true and the executable baseline verifies as
+Authenticode-valid.
 `build:desktop-installer` wraps that plan as the explicit execution entry. By
 default it is still plan-only. It runs Tauri with the explicit bundle target and
 then collects the resulting Windows desktop artifact only when run with

@@ -55,6 +55,7 @@ try {
     artifacts: [
       {
         target: "windows-desktop",
+        artifactKind: "desktop-executable",
         filename: "nexusim-windows-desktop.exe",
         bytes: Buffer.byteLength(exe),
         sha256: sha256(exe),
@@ -144,6 +145,7 @@ try {
   assert(Array.isArray(ready.commandTemplate?.collect), "ready plan should include collect command template");
   assert(ready.commandTemplate.collect.includes("collect:client-artifacts"), "ready collect command should collect artifacts");
   assert(ready.expectedOutputHint.endsWith("/msi/"), "ready plan output hint should point at MSI bundle output");
+  assert(ready.artifactBaseline.artifact.artifactKind === "desktop-executable", "ready plan should expose executable artifact kind");
   assert(ready.signatureVerification.readyForSignedDistribution === true, "ready plan should require a valid signature");
   assert(ready.signatureVerification.status === "Valid", "ready plan should carry signature status");
   assert(!readyJSON.includes(tempRoot), "ready installer plan leaked absolute temp path");
@@ -201,6 +203,73 @@ try {
   });
   assert(unsupported.readyToBuildInstaller === false, "unsupported target should not be ready");
   assert(unsupported.missing.includes("supported-installer-target"), "unsupported target should be reported");
+
+  const installerArtifact = "fake msi bytes";
+  writeFileSync(join(collectedDir, "nexusim-windows-desktop-installer.msi"), installerArtifact);
+  writeJSON(manifestPath, {
+    ...manifest,
+    artifacts: [
+      {
+        target: "windows-desktop",
+        artifactKind: "desktop-installer",
+        filename: "nexusim-windows-desktop-installer.msi",
+        bytes: Buffer.byteLength(installerArtifact),
+        sha256: sha256(installerArtifact),
+        sourcePathHash: sha256("desktop-installer-source"),
+        sourceHint: "desktop/src-tauri/target/release/bundle/msi/nexusim.msi"
+      }
+    ]
+  });
+  const installerAsBaseline = buildDesktopInstallerPlan({
+    manifest: manifestPath,
+    tauriConfig: activeConfigPath,
+    target: "msi",
+    signToolPath: fakeSignTool,
+    certFile: fakePfx,
+    timestampURL: "https://timestamp.example.test",
+    pfxPassEnvPresent: true,
+    mockSignatureStatus: {
+      status: "Valid",
+      signerSubject: "CN=NexusIM Test Code Signing",
+      signerThumbprint: "0123456789abcdef0123456789abcdef01234567"
+    }
+  });
+  assert(installerAsBaseline.readyToBuildInstaller === false, "installer artifact must not be accepted as installer build baseline");
+  assert(installerAsBaseline.missing.includes("desktop-executable-baseline"), "installer artifact baseline should require executable baseline");
+  assert(installerAsBaseline.artifactBaseline.artifact.artifactKind === "desktop-installer", "installer baseline kind should be exposed");
+
+  writeJSON(manifestPath, {
+    ...manifest,
+    artifacts: [
+      {
+        target: "windows-desktop",
+        filename: "nexusim-windows-desktop.exe",
+        bytes: Buffer.byteLength(exe),
+        sha256: sha256(exe),
+        sourcePathHash: sha256("legacy-desktop-source"),
+        sourceHint: "desktop/src-tauri/target/release/nexusim.exe"
+      }
+    ]
+  });
+  const legacyArtifact = buildDesktopInstallerPlan({
+    manifest: manifestPath,
+    tauriConfig: activeConfigPath,
+    target: "msi",
+    signToolPath: fakeSignTool,
+    certFile: fakePfx,
+    timestampURL: "https://timestamp.example.test",
+    pfxPassEnvPresent: true,
+    mockSignatureStatus: {
+      status: "Valid",
+      signerSubject: "CN=NexusIM Test Code Signing",
+      signerThumbprint: "0123456789abcdef0123456789abcdef01234567"
+    }
+  });
+  assert(legacyArtifact.readyToBuildInstaller === false, "legacy artifact without kind must not be accepted as installer build baseline");
+  assert(legacyArtifact.missing.includes("desktop-artifact-kind"), "legacy artifact should require explicit artifact kind");
+  assert(legacyArtifact.artifactBaseline.artifact.artifactKind === "", "legacy baseline kind should be empty");
+
+  writeJSON(manifestPath, manifest);
 
   const artifactsRoot = join(tempRoot, "artifacts");
   const desktopRun = join(artifactsRoot, "desktop-old");

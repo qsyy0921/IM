@@ -56,6 +56,7 @@ try {
     artifacts: [
       {
         target: "windows-desktop",
+        artifactKind: "desktop-executable",
         filename: "nexusim-windows-desktop.exe",
         bytes: Buffer.byteLength(exe),
         sha256: sha256(exe),

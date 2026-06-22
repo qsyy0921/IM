@@ -98,6 +98,8 @@
   generic install plan 已按 manifest `artifactKind` fail-closed：缺 kind 的旧 manifest
   要重新 collect，`desktop-installer` 只进入 installer checklist，不再被当作
   portable executable 或 direct shell-smoke 输入。
+  installer planner 已同步要求 MSI / NSIS build baseline 是 `desktop-executable`；
+  旧 manifest 和 `desktop-installer` artifact 不再被当作 installer build 输入。
 - `clients/android`：first-stage TypeScript runtime adapter 和 Kotlin WebView
   asset shell skeleton 已落；`createAndroidClientRuntime` 已能组装 shared
   `BFFClient` / `WebSocketPushTransport` / auth / inbox / send / ack queue；

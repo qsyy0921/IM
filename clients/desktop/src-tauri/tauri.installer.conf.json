@@ -1,0 +1,30 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "NexusIM",
+  "version": "0.1.0",
+  "identifier": "com.nexusim.desktop",
+  "build": {
+    "frontendDist": "../../web/dist",
+    "beforeBuildCommand": "npm --prefix .. run prepare:shell-assets:desktop"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "title": "NexusIM",
+        "width": 1280,
+        "height": 800,
+        "minWidth": 960,
+        "minHeight": 640
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; connect-src 'self' http://127.0.0.1:* http://localhost:* http://[::1]:* http: https: ws: wss:; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline';"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["msi"],
+    "publisher": "NexusIM"
+  }
+}

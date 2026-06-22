@@ -79,12 +79,12 @@
   登录、注册、好友、好友私聊、群聊列表、建群、消息列表和发送 first path。剩余工作是
   打磨真实 UI lifecycle，以及后续启用 MSI / NSIS installer bundling 和真实 code
   signing execution。`plan:desktop-signing` 已能检查显式 `signtool`、证书来源和
-  timestamp URL readiness；`plan:desktop-installer` 已能检查 Tauri `bundle.active`、
-  installer target、desktop artifact baseline 和 signing readiness；它们不 build、
-  不签名，也不替代真实 installer / signing 流水线。`build:desktop-installer`
-  已补显式 `--execute` 门控的 installer build 包装器，默认仍只输出计划；
-  真实 MSI / NSIS 构建仍要先满足 Tauri bundle、desktop artifact baseline 和
-  signing readiness。
+  timestamp URL readiness；`plan:desktop-installer` 已改为检查仓库内
+  `tauri.installer.conf.json` profile、installer target、desktop artifact baseline
+  和 signing readiness；默认开发 config 仍保持不打包。它们不 build、不签名，
+  也不替代真实 installer / signing 流水线。`build:desktop-installer` 已补显式
+  `--execute` 门控的 installer build 包装器，默认仍只输出计划；真实 MSI / NSIS
+  构建仍要先满足 desktop artifact baseline 和 signing readiness。
 - `clients/android`：first-stage TypeScript runtime adapter 和 Kotlin WebView
   asset shell skeleton 已落；`createAndroidClientRuntime` 已能组装 shared
   `BFFClient` / `WebSocketPushTransport` / auth / inbox / send / ack queue；

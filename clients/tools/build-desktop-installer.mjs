@@ -2,10 +2,13 @@ import { execFileSync } from "node:child_process";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { workspaceRoot } from "./client-build-env.mjs";
-import { buildDesktopInstallerPlan } from "./plan-desktop-installer.mjs";
+import {
+  buildDesktopInstallerPlan,
+  defaultInstallerTauriConfig,
+  defaultInstallerTauriConfigCommandArg
+} from "./plan-desktop-installer.mjs";
 
 const schemaVersion = "nexusim.desktop-installer-build.v1";
-const defaultTauriConfig = resolve(workspaceRoot, "desktop", "src-tauri", "tauri.conf.json");
 
 function main(argv) {
   const options = parseArgs(argv, process.env);
@@ -20,7 +23,7 @@ function main(argv) {
     const reasons = [...plan.missing, ...output.executionBlockers].join(",");
     throw new Error(`desktop installer build is not ready: ${reasons}`);
   }
-  runBuildCommand(plan.target);
+  runBuildCommand(plan.target, plan.tauri?.commandArg ?? defaultInstallerTauriConfigCommandArg);
 }
 
 export function buildInstallerOutput(plan, options = {}) {
@@ -60,7 +63,9 @@ export function buildInstallerOutput(plan, options = {}) {
         "tauri:build",
         "--",
         "--bundles",
-        plan.target
+        plan.target,
+        "--config",
+        plan.installerPlan?.tauri?.commandArg ?? defaultInstallerTauriConfigCommandArg
       ],
       collect: [
         "npm",
@@ -93,13 +98,13 @@ export function buildInstallerOutput(plan, options = {}) {
 
 function buildExecutionBlockers(options) {
   const blockers = [];
-  if (options.tauriConfig && resolve(options.tauriConfig) !== defaultTauriConfig) {
+  if (options.tauriConfig && resolve(options.tauriConfig) !== resolve(defaultInstallerTauriConfig)) {
     blockers.push("repository-tauri-config-required");
   }
   return blockers;
 }
 
-function runBuildCommand(target) {
+function runBuildCommand(target, tauriConfigArg) {
   const npmExecPath = process.env.npm_execpath;
   if (npmExecPath) {
     execFileSync(process.execPath, [
@@ -110,7 +115,9 @@ function runBuildCommand(target) {
       "tauri:build",
       "--",
       "--bundles",
-      target
+      target,
+      "--config",
+      tauriConfigArg
     ], {
       cwd: workspaceRoot,
       stdio: "inherit"
@@ -132,7 +139,7 @@ function runBuildCommand(target) {
   }
 
   const npm = process.platform === "win32" ? "npm.cmd" : "npm";
-  execFileSync(npm, ["--workspace", "@nexusim/desktop", "run", "tauri:build", "--", "--bundles", target], {
+  execFileSync(npm, ["--workspace", "@nexusim/desktop", "run", "tauri:build", "--", "--bundles", target, "--config", tauriConfigArg], {
     cwd: workspaceRoot,
     stdio: "inherit",
     shell: process.platform === "win32"
@@ -149,7 +156,7 @@ function parseArgs(argv, env) {
     execute: false,
     manifest: "",
     target: "msi",
-    tauriConfig: undefined,
+    tauriConfig: defaultInstallerTauriConfig,
     tauriConfigExplicit: false,
     signToolPath: env.NEXUSIM_DESKTOP_SIGNTOOL ?? "",
     certFile: env.NEXUSIM_DESKTOP_SIGN_CERT_FILE ?? "",

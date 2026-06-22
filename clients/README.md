@@ -240,20 +240,22 @@ low-sensitive command template only when ready. It does not sign artifacts,
 download tools, install packages, launch the desktop app or print local absolute
 paths. Missing signing inputs fail closed as `readyToSign=false`; there is no
 placeholder signature path.
-`plan:desktop-installer` reads the Tauri config, the collected Windows desktop
-manifest and the signing readiness plan, then reports whether MSI / NSIS
-installer bundling can run. It is also plan-only: it does not enable
-`bundle.active`, run Tauri, sign, install, launch or download anything. Current
-repo config intentionally reports not ready until Tauri bundling is explicitly
-enabled, a desktop artifact manifest is selected and signing readiness is true.
+`plan:desktop-installer` reads the repository installer Tauri profile, the
+collected Windows desktop manifest and the signing readiness plan, then reports
+whether MSI / NSIS installer bundling can run. It is also plan-only: it does not
+run Tauri, sign, install, launch or download anything. The default development
+Tauri config stays `bundle.active=false`; installer bundling uses the separate
+`src-tauri/tauri.installer.conf.json` profile. The plan remains not ready until
+a desktop artifact manifest is selected and signing readiness is true.
 `build:desktop-installer` wraps that plan as the explicit execution entry. By
 default it is still plan-only. It runs Tauri with the explicit bundle target and
 then collects the resulting Windows desktop artifact only when run with
 `--execute` and the installer plan is ready; otherwise it fails closed and
 prints the missing readiness gates. It does not sign artifacts, install
 installers, launch the app, start services or download toolchains.
-Execution uses the repository Tauri config; custom `--tauri-config` is accepted
-for planning fixtures only and blocks real `--execute`.
+Execution uses the repository installer Tauri profile through
+`--config src-tauri/tauri.installer.conf.json`; custom `--tauri-config` is
+accepted for planning fixtures only and blocks real `--execute`.
 
 Android can also be built through the local Docker builder profile when the image
 is intentionally built:
@@ -284,10 +286,11 @@ Current packaging status:
   `README-windows-desktop.txt` and `launch-nexusim-windows.ps1`. A portable
   unsigned local zip bundle can be produced with `bundle:desktop`.
   `plan:desktop-signing` now checks explicit code-signing readiness and produces
-  only a low-sensitive plan. `plan:desktop-installer` now checks Tauri MSI /
-  NSIS readiness and correctly fails closed while `bundle.active=false`; actual
-  `build:desktop-installer` now provides the explicit `--execute`-gated build
-  entry and still fails closed until readiness is true. Signing execution,
+  only a low-sensitive plan. `plan:desktop-installer` now checks the repository
+  installer Tauri profile, MSI / NSIS target, artifact baseline and signing
+  readiness; actual `build:desktop-installer` now provides the explicit
+  `--execute`-gated build entry and runs Tauri with that profile only when
+  readiness is true. Signing execution,
   install and launch remain future hardening. Use
   `npm --prefix clients run smoke:desktop-artifact-launch` for the first launch
   sanity check; it starts the collected exe, waits briefly, then terminates it.

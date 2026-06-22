@@ -121,6 +121,8 @@ try {
   assert(ready.commandTemplate.build.includes("tauri:build"), "ready build command should invoke Tauri build");
   assert(ready.commandTemplate.build.includes("--bundles"), "ready build command should select bundle target");
   assert(ready.commandTemplate.build.includes("msi"), "ready build command should include MSI target");
+  assert(ready.commandTemplate.build.includes("--config"), "ready build command should use an explicit Tauri config");
+  assert(ready.commandTemplate.build.some(value => value.includes("tauri-active") || value.includes("tauri.installer.conf.json")), "ready build command should include a Tauri config hint");
   assert(Array.isArray(ready.commandTemplate?.collect), "ready plan should include collect command template");
   assert(ready.commandTemplate.collect.includes("collect:client-artifacts"), "ready collect command should collect artifacts");
   assert(ready.expectedOutputHint.endsWith("/msi/"), "ready plan output hint should point at MSI bundle output");

@@ -26,6 +26,7 @@ const requiredPaths = [
   "desktop/src-tauri/permissions/runtime_metadata.toml",
   "desktop/src-tauri/src/main.rs",
   "desktop/src-tauri/tauri.conf.json",
+  "desktop/src-tauri/tauri.installer.conf.json",
   "desktop/shell-config.example.json",
   "tools/prepare-shell-web-assets-if-needed.mjs",
   "tools/prepare-shell-web-assets.mjs",
@@ -70,6 +71,7 @@ assert(main.includes("app_local_data_dir()"), "desktop local store must use app-
 assert(!main.match(/Command::|process::|token|secret|password|credential|message_id/i), "desktop native bridge must not expose sensitive or broad process capability");
 
 const config = readJSON("desktop/src-tauri/tauri.conf.json");
+const installerConfig = readJSON("desktop/src-tauri/tauri.installer.conf.json");
 assert(config.productName === "NexusIM", "desktop product name mismatch");
 assert(config.identifier === "com.nexusim.desktop", "desktop identifier mismatch");
 assert(config.build?.frontendDist === "../../web/dist", "desktop frontendDist mismatch");
@@ -77,7 +79,15 @@ assert(config.app?.withGlobalTauri === true, "desktop shell must expose the audi
 const frontendDist = resolve(root, "desktop", "src-tauri", config.build.frontendDist);
 assert(frontendDist === resolve(root, "web", "dist"), "desktop frontendDist must resolve to shared web/dist");
 assert(config.build?.beforeBuildCommand === "npm --prefix .. run prepare:shell-assets:desktop", "desktop build must use stable npm shell asset prep entrypoint");
-assert(config.bundle?.active === false, "desktop bundle must stay inactive until artifact build slice");
+assert(config.bundle?.active === false, "desktop default bundle config must stay inactive for dev and standalone artifact builds");
+assert(installerConfig.productName === config.productName, "desktop installer product name must match default config");
+assert(installerConfig.version === config.version, "desktop installer version must match default config");
+assert(installerConfig.identifier === config.identifier, "desktop installer identifier must match default config");
+assert(JSON.stringify(installerConfig.build) === JSON.stringify(config.build), "desktop installer build config must match default config");
+assert(JSON.stringify(installerConfig.app) === JSON.stringify(config.app), "desktop installer app config must match default config");
+assert(installerConfig.bundle?.active === true, "desktop installer bundle config must be active");
+assert(Array.isArray(installerConfig.bundle?.targets), "desktop installer targets missing");
+assert(installerConfig.bundle.targets.includes("msi"), "desktop installer MSI target missing");
 
 const capability = readJSON("desktop/src-tauri/capabilities/default.json");
 assert(capability.identifier === "main-shell-metadata", "desktop capability identifier mismatch");

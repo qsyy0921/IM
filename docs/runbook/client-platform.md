@@ -175,10 +175,11 @@ First slice:
   commands. Those local-store commands use an app-local-data SQLite key-value
   table and accept only `nexusim:client-message-store:v1:` keys, so the bridge
   cannot become a token store, filesystem bridge or arbitrary SQL surface.
-  `bundle.active` remains `false`, so the current native output is a standalone
-  exe rather than an MSI / NSIS installer. The Web shell can invoke this command
-  set for diagnostics and local message cache persistence, and fails closed on
-  malformed metadata.
+  default `tauri.conf.json` keeps `bundle.active=false`, so normal native output
+  is a standalone exe rather than an MSI / NSIS installer. Installer builds use
+  the separate repository `tauri.installer.conf.json` profile. The Web shell can
+  invoke this command set for diagnostics and local message cache persistence,
+  and fails closed on malformed metadata.
   Its `frontendDist` resolves to the shared prepared `clients/web/dist`, not a
   desktop-local duplicate Web build.
 - `clients/android` now has a first-stage TypeScript runtime adapter:
@@ -494,18 +495,20 @@ First slice:
   timestamp URL inputs are present. It is plan-only: it does not sign, download
   tools, install packages, launch the desktop app or print local absolute paths.
   Missing inputs remain fail-closed as `readyToSign=false`.
-  `plan:desktop-installer` can read Tauri `bundle` config, the collected
-  desktop manifest and signing readiness, then report whether MSI / NSIS
-  installer bundling is ready. Current config has `bundle.active=false`, so the
-  plan correctly reports not ready instead of treating the unsigned portable zip
-  as an installer.
+  `plan:desktop-installer` can read the repository installer Tauri profile, the
+  collected desktop manifest and signing readiness, then report whether MSI /
+  NSIS installer bundling is ready. The default dev config remains inactive,
+  while `tauri.installer.conf.json` is the explicit MSI profile. The plan still
+  reports not ready until a desktop artifact baseline and signing readiness are
+  present instead of treating the unsigned portable zip as an installer.
   `build:desktop-installer` is the explicit execution wrapper over that plan.
   Its default output is plan-only; `--execute` is required before it runs Tauri
-  with the explicit bundle target and then collects the resulting Windows
-  desktop artifact. It still fails closed while installer readiness is false. It
+  with the explicit bundle target and installer profile, then collects the
+  resulting Windows desktop artifact. It still fails closed while installer
+  readiness is false. It
   does not sign, install, launch, start services or download toolchains. Real
-  execution uses the repository Tauri config; custom `--tauri-config` remains a
-  planning fixture input and blocks `--execute`.
+  execution uses the repository installer profile; custom `--tauri-config`
+  remains a planning fixture input and blocks `--execute`.
   `smoke:desktop-artifact-launch` has verified the exe starts, stays alive
   during the smoke hold window and terminates cleanly.
   Its dry-run output carries an execution policy proving it only reads the

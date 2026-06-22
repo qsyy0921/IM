@@ -7,7 +7,8 @@ import { buildDesktopSigningPlan } from "./plan-desktop-signing.mjs";
 
 const schemaVersion = "nexusim.desktop-installer-plan.v1";
 const artifactManifestSchema = "nexusim.client-artifacts.v1";
-const defaultTauriConfig = join(workspaceRoot, "desktop", "src-tauri", "tauri.conf.json");
+export const defaultInstallerTauriConfig = join(workspaceRoot, "desktop", "src-tauri", "tauri.installer.conf.json");
+export const defaultInstallerTauriConfigCommandArg = "src-tauri/tauri.installer.conf.json";
 const artifactsRoot = join(workspaceRoot, "artifacts");
 const supportedTargets = new Set(["msi", "nsis"]);
 
@@ -29,7 +30,7 @@ export function buildDesktopInstallerPlan(options = {}) {
     missing.push("supported-installer-target");
   }
 
-  const tauriConfigPath = resolve(options.tauriConfig ?? defaultTauriConfig);
+  const tauriConfigPath = resolve(options.tauriConfig ?? defaultInstallerTauriConfig);
   const tauriConfig = readTauriConfig(tauriConfigPath);
   if (!tauriConfig.present) {
     missing.push("tauri-config");
@@ -91,7 +92,9 @@ export function buildDesktopInstallerPlan(options = {}) {
             "tauri:build",
             "--",
             "--bundles",
-            target
+            target,
+            "--config",
+            tauriConfig.commandArg
           ],
           collect: [
             "npm",
@@ -108,7 +111,7 @@ export function buildDesktopInstallerPlan(options = {}) {
     expectedOutputHint: `clients/desktop/src-tauri/target/release/bundle/${target}/`,
     nextAction: readyToBuildInstaller
       ? "run the installer build in a dedicated Windows packaging profile"
-      : "enable the explicit Tauri bundle target and signing inputs before building an installer"
+      : "provide an explicit repository installer profile, desktop artifact baseline, and signing inputs before building an installer"
   };
   assertLowSensitivePlan(plan);
   return plan;
@@ -119,6 +122,7 @@ function readTauriConfig(path) {
     return {
       present: false,
       configHint: safeHint(path),
+      commandArg: safeCommandArg(path),
       bundle: {
         active: false,
         targets: []
@@ -132,6 +136,7 @@ function readTauriConfig(path) {
   return {
     present: true,
     configHint: safeHint(path),
+    commandArg: safeCommandArg(path),
     productName: stringValue(config.productName),
     version: stringValue(config.version),
     identifier: stringValue(config.identifier),
@@ -228,7 +233,7 @@ function parseArgs(argv, env) {
   const options = {
     manifest: "",
     target: "msi",
-    tauriConfig: defaultTauriConfig,
+    tauriConfig: defaultInstallerTauriConfig,
     artifactsRoot,
     signToolPath: env.NEXUSIM_DESKTOP_SIGNTOOL ?? "",
     certFile: env.NEXUSIM_DESKTOP_SIGN_CERT_FILE ?? "",
@@ -324,6 +329,13 @@ function safeHint(path) {
     return `${basename(path)}#${sha256Text(resolve(path)).slice(0, 12)}`;
   }
   return `clients/${relativePath}`;
+}
+
+function safeCommandArg(path) {
+  if (resolve(path) === resolve(defaultInstallerTauriConfig)) {
+    return defaultInstallerTauriConfigCommandArg;
+  }
+  return safeHint(path);
 }
 
 function assertLowSensitiveText(text, label) {

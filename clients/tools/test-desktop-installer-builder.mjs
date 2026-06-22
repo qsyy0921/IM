@@ -101,6 +101,7 @@ try {
   assert(dryRun.executionPolicy.requiresExplicitExecuteFlag === true, "execute flag requirement missing");
   assert(dryRun.commands.build.includes("tauri:build"), "installer builder should plan a Tauri bundle build");
   assert(dryRun.commands.build.includes("--bundles"), "installer builder should plan an explicit bundle target");
+  assert(dryRun.commands.build.includes("--config"), "installer builder should plan an explicit Tauri config");
   assert(dryRun.commands.collect.includes("collect:client-artifacts"), "installer builder should plan artifact collection after build");
   assert(!dryRunJSON.includes(tempRoot), "dry-run installer builder output leaked absolute temp path");
   assert(!dryRunJSON.match(/token|secret|password|credential|private/i), "dry-run installer builder output leaked sensitive names");
@@ -124,6 +125,7 @@ try {
   assert(cliPlan.readyToBuildInstaller === true, "CLI dry-run should be ready");
   assert(cliPlan.executionPolicy.planOnly === true, "CLI default should be plan-only");
   assert(cliPlan.executionPolicy.executesBuildCommand === false, "CLI default should not execute build");
+  assert(cliPlan.commands.build.includes("--config"), "CLI dry-run should expose the Tauri config argument");
   assert(cliPlan.executionBlockers.includes("repository-tauri-config-required"), "CLI custom config dry-run should require repository config before execution");
 
   const notReady = spawnSync(process.execPath, [

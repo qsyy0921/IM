@@ -161,7 +161,8 @@ package-local PowerShell launcher，install plan 会校验这些 support files �
 `bundle:desktop` 可以产出 unsigned local portable zip 和低敏 summary；
 `plan:desktop-installer` / `plan:desktop-signing` 可以检查 Tauri installer 和显式
 签名输入 readiness；`build:desktop-installer` 已提供显式 `--execute` 门控的
-installer build 包装器，默认仍只输出低敏计划，并在 readiness 不满足时 fail-closed。
+installer build 包装器，并通过独立仓库 installer profile 调用 Tauri。默认开发
+Tauri config 仍保持不打包；artifact / signing readiness 不满足时 fail-closed。
 
 本地调试入口：
 
@@ -463,7 +464,7 @@ python -m mypy nexusim_ai_common scripts tests
   群聊、群成员添加 / 退群、成员列表、移除成员、角色变更 / owner transfer
   第一路径和消息 first path，`api-gateway` client BFF first-stage surface、Web adapters first path、
   本地 / wired LAN smoke、BFF HTTP metrics / rate-limit adapter、PC standalone exe、
-  package-local README / launcher support files、unsigned local portable zip bundle、desktop installer / signing readiness plans、显式 installer build 包装器、Android debug APK baseline 已落，真实双用户 direct + group client smoke 已通过；仍缺
+  package-local README / launcher support files、unsigned local portable zip bundle、desktop installer / signing readiness plans、独立 installer profile、显式 installer build 包装器、Android debug APK baseline 已落，真实双用户 direct + group client smoke 已通过；仍缺
   Windows signed installer / MSI / NSIS、真实 signing execution、Android 真机 smoke、正式移动端发布链路以及成员搜索 / 分页、
   群标题 / 头像 read model 和更完整群设置。
 - 完整 media / notification / admin / audit / workflow / control-plane 等产品化平台能力；

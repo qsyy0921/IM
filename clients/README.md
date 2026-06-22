@@ -79,6 +79,7 @@ npm --prefix clients run test:shell-config
 npm --prefix clients run test:web-pwa
 npm --prefix clients run test:shell-web-assets
 npm --prefix clients run test:shell-asset-prep-wrapper
+npm --prefix clients run test:desktop-shell-action-assets
 npm --prefix clients run validate:desktop-tauri
 npm --prefix clients run validate:android-native
 ```

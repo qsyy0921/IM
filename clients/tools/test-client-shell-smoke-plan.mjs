@@ -29,6 +29,7 @@ assert(plan.targets.browser.checklist.some(item => item.step === "verify-client-
 assert(plan.targets["windows-desktop"].commands.prepareAssets.includes("build:shell-assets:desktop"), "desktop prep command missing");
 assert(plan.targets["windows-desktop"].commands.verifyAssets.includes("windows-desktop"), "desktop verify command missing");
 assert(plan.targets["windows-desktop"].commands.installPlan.includes("plan:artifact-install"), "desktop install plan command missing");
+assert(plan.targets["windows-desktop"].commands.verifyActionAssets.includes("test:desktop-shell-action-assets"), "desktop shell action asset contract command missing");
 assert(plan.targets["windows-desktop"].install, "desktop install status missing");
 assert(plan.targets["windows-desktop"].localStore?.nativeStoreReadiness?.bridge === "tauri-sqlite", "desktop local store readiness missing");
 assert(plan.targets["windows-desktop"].webviewLoginEvidence?.requiredSelectors?.includes("native-store-readiness"), "desktop WebView login native-store selector evidence missing");
@@ -40,6 +41,7 @@ assert(typeof plan.targets["windows-desktop"].install.readyForInstall === "boole
 assert(Array.isArray(plan.targets["windows-desktop"].install.missing), "desktop install missing list missing");
 assert(Array.isArray(plan.targets["windows-desktop"].checklist), "desktop checklist missing");
 assert(plan.targets["windows-desktop"].checklist.some(item => item.step === "verify-shell-lifecycle-contract"), "desktop shell lifecycle contract check missing");
+assert(plan.targets["windows-desktop"].checklist.some(item => item.step === "verify-desktop-shell-action-assets"), "desktop shell action asset contract checklist missing");
 const desktopMissingToolchain = plan.targets["windows-desktop"].missingToolchain ?? [];
 if (plan.targets["windows-desktop"].nativeToolchainReady) {
   assert(plan.targets["windows-desktop"].checklist.some(item => item.step === "build-desktop-artifact"), "desktop artifact build checklist missing when ready");

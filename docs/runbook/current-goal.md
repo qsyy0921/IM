@@ -129,9 +129,15 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   manifest，并确认 Android bundle 中包含 login / refresh / restore / logout
   selectors 与 `native-store-readiness`。该检查不需要 Gradle、Android SDK、
   ADB、APK 或真机，证明 Android 打包资产层已承接共享 shell action path。
-  `npm --prefix clients run plan:shell-smoke` 现在也会把该检查列入 Android
-  checklist，确保任何 Android platform smoke 都先经过无 SDK 的 action asset
-  contract。
+- `clients` workspace 已新增 PC desktop shell action asset contract：
+  `npm --prefix clients run test:desktop-shell-action-assets` 会临时构建 Web
+  shell、按 Windows desktop shell config 准备临时 WebView assets、校验 shell asset
+  manifest，并确认 desktop bundle 中包含 login / refresh / restore / logout
+  selectors、`native-store-readiness` 和 PWA 静态资产。该检查不需要 Tauri CLI 或
+  Windows installer，证明 PC 打包资产层已承接共享 shell action path。
+  `npm --prefix clients run plan:shell-smoke` 现在也会把 desktop / Android
+  action asset contract 分别列入对应目标 checklist，确保任何 native shell smoke
+  都先经过无原生工具链的 shared lifecycle asset contract。
 - Web shell 支持 first-stage WebView bridge config：
   `globalThis.__NEXUSIM_CLIENT_SHELL__` 可由 PC / Android 壳层注入 target、
   API / WebSocket 地址、device / installation / app version 和 session key；当前

@@ -216,6 +216,13 @@ First slice:
   and logout through shared `ClientShellActions` and does not call runtime auth
   lifecycle methods directly, so PC / Android WebView shells can keep the same
   UI action path.
+- `npm --prefix clients run test:desktop-shell-action-assets` builds the Web
+  shell into a temporary directory, prepares temporary Windows desktop WebView
+  assets with the desktop shell config, verifies the shell asset manifest, and
+  checks that the packaged desktop bundle contains the login / refresh /
+  restore / logout selectors plus `native-store-readiness` and PWA static
+  assets. It requires Node/Vite only; it does not require Tauri CLI, an
+  installer or a live backend.
 - `npm --prefix clients run test:android-shell-action-assets` builds the Web
   shell into a temporary directory, prepares temporary Android WebView assets
   with the Android shell config, verifies the shell asset manifest, and checks
@@ -299,9 +306,10 @@ First slice:
   process launch sanity check before the fuller login-level shell smoke.
   Browser plans include `test:web-pwa` before manual shell smoke, so the PWA
   manifest and service-worker cache boundary are verified before browser
-  install testing. Android plans include `test:android-shell-action-assets`
-  before any APK build step, so shared lifecycle selectors are verified in
-  Android WebView assets without Gradle / Android SDK / ADB.
+  install testing. Desktop plans include `test:desktop-shell-action-assets`
+  before Tauri build, and Android plans include `test:android-shell-action-assets`
+  before any APK build step, so shared lifecycle selectors are verified in target
+  WebView assets without native toolchains.
   `smoke:desktop-composed` can combine an existing `loadtest/clientweb`
   BFF/push summary with desktop artifact launch evidence into one low-sensitive
   JSON result. It is useful as an intermediate PC evidence bundle, but it is not
@@ -436,6 +444,7 @@ npm --prefix clients run check:build-prereqs
 npm --prefix clients run test:shell-config
 npm --prefix clients run test:web-pwa
 npm --prefix clients run test:shell-web-assets
+npm --prefix clients run test:desktop-shell-action-assets
 npm --prefix clients run test:android-shell-action-assets
 npm --prefix clients run test:artifact-builders
 npm --prefix clients run test:artifact-collector

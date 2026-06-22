@@ -140,6 +140,7 @@ function nativeCommands(target, readinessTarget) {
       buildArtifact: readinessTarget.buildCommand,
       dryRunBuild: readinessTarget.dryRunCommand,
       installPlan: "npm --prefix clients run plan:artifact-install",
+      verifyActionAssets: "npm --prefix clients run test:desktop-shell-action-assets",
       launchSmoke: "npm --prefix clients run smoke:desktop-artifact-launch",
       composedSmoke: "npm --prefix clients run smoke:desktop-composed -- --clientweb-summary <client-web-summary.json>",
       webviewMetadataSmoke: "npm --prefix clients run smoke:desktop-webview-metadata",
@@ -240,6 +241,12 @@ function nativeChecklist(target, readinessTarget, artifactStatus, installStatus)
       step: "check-android-webview-devtools-readiness",
       command: nativeCommands(target, readinessTarget).webviewDevtoolsReadiness,
       evidence: "after launching the debuggable Android shell, adb can see a WebView devtools socket without exposing raw socket names"
+    });
+  } else {
+    checklist.push({
+      step: "verify-desktop-shell-action-assets",
+      command: nativeCommands(target, readinessTarget).verifyActionAssets,
+      evidence: "temporary desktop WebView assets contain the shared login, refresh, restore, logout and native-store-readiness selectors before Tauri build"
     });
   }
 

@@ -22,6 +22,9 @@ assert(commands.includes("npm --prefix clients run test:artifact-readiness"), "a
 assert(commands.includes("npm --prefix clients run test:artifact-install-plan"), "artifact install plan contract check missing");
 assert(commands.includes("npm --prefix clients run test:clientweb-smoke-hooks"), "clientweb smoke hook check missing");
 assert(commands.includes("npm --prefix clients run test:web-pwa"), "web PWA check missing");
+assert(commands.includes("npm --prefix clients run test:web-shell-actions"), "web shell lifecycle contract check missing");
+assert(commands.includes("npm --prefix clients run test:web-shell-automation"), "web shell automation contract check missing");
+assert(commands.includes("npm --prefix clients run test:web-shell-smoke-report"), "web shell smoke report contract check missing");
 assert(commands.includes("npm --prefix clients run test:shell-web-assets"), "shell asset check missing");
 assert(commands.includes("npm --prefix clients run test:desktop-shell-action-assets"), "desktop action asset check missing");
 assert(commands.includes("npm --prefix clients run test:desktop-webview-metadata-smoke"), "desktop WebView metadata runner contract check missing");

@@ -30,6 +30,21 @@ const checkPlan = [
     reason: "guards browser manifest and service-worker cache boundary"
   },
   {
+    name: "web-shell-lifecycle-contract",
+    script: "test:web-shell-actions",
+    reason: "guards Web shell lifecycle actions through shared client-core"
+  },
+  {
+    name: "web-shell-automation-contract",
+    script: "test:web-shell-automation",
+    reason: "guards stable Web shell selectors for browser and WebView smoke automation"
+  },
+  {
+    name: "web-shell-smoke-report-contract",
+    script: "test:web-shell-smoke-report",
+    reason: "guards loopback-only Web shell metadata smoke report without starting services"
+  },
+  {
     name: "shell-web-assets",
     script: "test:shell-web-assets",
     reason: "guards target shell asset manifest and PWA asset propagation"

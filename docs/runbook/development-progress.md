@@ -66,6 +66,10 @@
   WebViewAssetLoader 加载本地 Web assets，并注册只读单方法 `NexusIMNative`
   runtime metadata bridge）；
   Web shell 登录面板已通过 shared `ClientShellActions` 接入 login / refresh / restore / logout，
+  当前浏览器 / Windows PC 优先的可见 UI 已收敛为账号密码登录和 IM 主界面，
+  隐藏 tenant / endpoint / device 等调试配置；2026-06-22 Windows Tauri
+  WebView 登录级 smoke 证明该 UI 仍能完成登录、收到 `delivery.notify`、
+  PullInbox 和 AckDelivery；
   desktop / Android thin shell actions 已覆盖 login / refresh / restore / logout，
   `test:web-shell-actions` 已防止 Web shell 绕过 shared lifecycle contract，
   供 PC / Android WebView 复用同一 UI action contract；

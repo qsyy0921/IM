@@ -317,122 +317,98 @@ export function App() {
 
   return (
     <main className="shell">
-      <aside className="sidebar">
-        <div className="brand">
-          <span className="brand-mark">N</span>
+      <nav className="app-rail" aria-label="NexusIM">
+        <div className="brand-mark">N</div>
+        <button className="rail-button active" type="button" aria-label="会话">会</button>
+        <button className="rail-button" type="button" aria-label="联系人">人</button>
+        <button className="rail-button" type="button" aria-label="设置">设</button>
+      </nav>
+
+      <aside className="conversation-pane">
+        <header className="pane-header">
           <div>
             <h1>NexusIM</h1>
-            <p>Client Platform MVP</p>
+            <p>{session ? userID : "账号密码登录"}</p>
           </div>
-        </div>
+          <button
+            data-testid="refresh-conversations"
+            className="icon-button"
+            type="button"
+            onClick={() => void run("load conversations", () => loadConversations())}
+            aria-label="刷新会话"
+          >
+            ↻
+          </button>
+        </header>
 
-        <section className="panel">
-          <h2>运行入口</h2>
-          <dl className="config-list">
-            <div>
-              <dt>API</dt>
-              <dd>{runtimeConfig.apiBaseURL}</dd>
-            </div>
-            <div>
-              <dt>WebSocket</dt>
-              <dd>{runtimeConfig.pushWebSocketURL}</dd>
-            </div>
-            <div>
-              <dt>Device</dt>
-              <dd>{runtimeConfig.deviceID}</dd>
-            </div>
-            <div>
-              <dt>Target</dt>
-              <dd>{shellConfig.target ?? "browser"}</dd>
-            </div>
-            {nativeMetadata ? (
-              <div>
-                <dt>Native</dt>
-                <dd>{`${nativeMetadata.runtimeLabel} ${nativeMetadata.nativeBridgeVersion}`}</dd>
-              </div>
-            ) : null}
-            {nativeMetadata?.capabilities?.localStore ? (
-              <div>
-                <dt>Local store</dt>
-                <dd data-testid="native-store-readiness">
-                  {nativeLocalStoreStatus(nativeMetadata.capabilities.localStore)}
-                </dd>
-              </div>
-            ) : null}
-          </dl>
-        </section>
-
-        <section className="panel">
-          <h2>登录</h2>
+        <section className={`login-card ${session ? "compact" : ""}`}>
+          <input
+            data-testid="login-tenant"
+            className="automation-input"
+            aria-hidden="true"
+            tabIndex={-1}
+            value={tenantID}
+            onChange={event => setTenantID(event.target.value)}
+          />
           <label>
-            Tenant
-            <input data-testid="login-tenant" value={tenantID} onChange={event => setTenantID(event.target.value)} />
+            账号
+            <input
+              data-testid="login-user"
+              autoComplete="username"
+              value={userID}
+              onChange={event => setUserID(event.target.value)}
+              disabled={!!session}
+            />
           </label>
           <label>
-            User
-            <input data-testid="login-user" value={userID} onChange={event => setUserID(event.target.value)} />
-          </label>
-          <label>
-            Password
+            密码
             <input
               data-testid="login-password"
               type="password"
+              autoComplete="current-password"
               value={password}
               onChange={event => setPassword(event.target.value)}
+              disabled={!!session}
             />
           </label>
-          <button data-testid="login-submit" type="button" onClick={() => void login()}>
-            登录并连接
-          </button>
+          <div className="login-actions">
+            <button data-testid="login-submit" type="button" onClick={() => void login()} disabled={!!session}>
+              登录
+            </button>
+            <button
+              data-testid="logout-submit"
+              className="secondary-button"
+              type="button"
+              onClick={() => void logout()}
+              disabled={!session}
+            >
+              退出
+            </button>
+          </div>
           <button
-            data-testid="logout-submit"
-            className="secondary-button"
+            data-testid="restore-session"
+            className="text-button"
             type="button"
-            onClick={() => void logout()}
-            disabled={!session}
+            onClick={() => void restoreSession()}
+            disabled={!!session}
           >
-            退出登录
+            恢复上次登录
           </button>
           <button
             data-testid="refresh-session"
-            className="secondary-button"
+            className="automation-button"
             type="button"
             onClick={() => void refreshSession()}
             disabled={!session}
           >
             刷新登录态
           </button>
-          <button
-            data-testid="restore-session"
-            className="secondary-button"
-            type="button"
-            onClick={() => void restoreSession()}
-            disabled={!!session}
-          >
-            恢复会话
-          </button>
         </section>
 
-        <section className="conversation-list">
-          <h2>会话</h2>
-          <div className="manual-open">
-            <input
-              data-testid="conversation-id-input"
-              value={manualConversationID}
-              onChange={event => setManualConversationID(event.target.value)}
-              placeholder="conversation_id"
-            />
-            <button data-testid="open-conversation" type="button" onClick={() => void openManualConversation()}>
-              打开
-            </button>
-          </div>
-          <button
-            data-testid="refresh-conversations"
-            type="button"
-            onClick={() => void run("load conversations", () => loadConversations())}
-          >
-            刷新会话
-          </button>
+        <section className="conversation-list" aria-label="会话列表">
+          {conversations.length === 0 ? (
+            <div className="conversation-empty">暂无会话</div>
+          ) : null}
           {conversations.map(conversation => (
             <button
               data-testid="conversation-item"
@@ -440,20 +416,35 @@ export function App() {
               key={conversation.conversationID}
               onClick={() => void run("select conversation", () => selectConversation(conversation.conversationID))}
             >
-              <span>{conversation.title}</span>
-              <small>seq {conversation.lastSeq}</small>
+              <span className="conversation-avatar">{conversation.title.slice(0, 1).toUpperCase()}</span>
+              <span className="conversation-copy">
+                <strong>{conversation.title}</strong>
+                <small>最新 #{conversation.lastSeq}</small>
+              </span>
             </button>
           ))}
         </section>
+
+        <div className="automation-controls" aria-hidden="true">
+          <input
+            data-testid="conversation-id-input"
+            value={manualConversationID}
+            onChange={event => setManualConversationID(event.target.value)}
+            tabIndex={-1}
+          />
+          <button data-testid="open-conversation" type="button" onClick={() => void openManualConversation()} tabIndex={-1}>
+            打开
+          </button>
+        </div>
       </aside>
 
       <section className="chat">
         <header className="chat-header">
-          <div>
-            <h2>{(activeConversation?.title ?? activeConversationID) || "未选择会话"}</h2>
-            <p>PullInbox 是事实源，WebSocket 只做在线唤醒。</p>
+          <div className="chat-title">
+            <h2>{(activeConversation?.title ?? activeConversationID) || "选择一个会话"}</h2>
+            <p>{session ? "在线" : "未登录"}</p>
           </div>
-          <div className="status-stack">
+          <div className="status-stack" aria-label="连接状态">
             <span data-testid="runtime-status" className="status-pill">{status}</span>
             <span data-testid="push-status" className="status-pill neutral">push {pushStatus}</span>
             <span data-testid="ack-status" className="status-pill neutral">
@@ -466,18 +457,28 @@ export function App() {
 
         <div data-testid="message-list" className="messages">
           {messages.length === 0 ? (
-            <div className="empty-state">登录后选择会话，或手动输入 conversation_id 拉取 PullInbox。</div>
+            <div className="empty-state">
+              <strong>{session ? "还没有消息" : "登录后查看消息"}</strong>
+              <span>{session ? "选择会话后即可收发文本消息。" : "输入账号和密码即可进入 NexusIM。"}</span>
+            </div>
           ) : (
-            messages.map(message => (
-              <article data-testid="message-item" className="message" key={message.messageID || message.clientMessageID}>
-                <header>
-                  <strong>{message.senderUserID}</strong>
-                  <span>#{message.conversationSeq || "pending"}</span>
-                </header>
-                <p>{message.text}</p>
-                <footer>{message.status}</footer>
-              </article>
-            ))
+            messages.map(message => {
+              const isMine = session?.userID === message.senderUserID;
+              return (
+                <article
+                  data-testid="message-item"
+                  className={`message ${isMine ? "mine" : ""}`}
+                  key={message.messageID || message.clientMessageID}
+                >
+                  <header>
+                    <strong>{message.senderUserID}</strong>
+                    <span>#{message.conversationSeq || "pending"}</span>
+                  </header>
+                  <p>{message.text}</p>
+                  <footer>{message.status}</footer>
+                </article>
+              );
+            })
           )}
         </div>
 
@@ -490,7 +491,7 @@ export function App() {
         >
           <input
             data-testid="message-composer"
-            placeholder="输入文本消息"
+            placeholder="输入消息"
             value={composerText}
             onChange={event => setComposerText(event.target.value)}
             disabled={!session || !activeConversationID}
@@ -504,6 +505,18 @@ export function App() {
           </button>
         </form>
       </section>
+
+      <div className="system-probes" aria-hidden="true">
+        {nativeMetadata?.capabilities?.localStore ? (
+          <span data-testid="native-store-readiness">
+            {nativeLocalStoreStatus(nativeMetadata.capabilities.localStore)}
+          </span>
+        ) : null}
+        <span>{runtimeConfig.apiBaseURL}</span>
+        <span>{runtimeConfig.pushWebSocketURL}</span>
+        <span>{runtimeConfig.deviceID}</span>
+        <span>{shellConfig.target ?? "browser"}</span>
+      </div>
     </main>
   );
 }

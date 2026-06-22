@@ -50,6 +50,7 @@ try {
   assert(result.runID === "android-webview-login-test", "run id mismatch");
   assert(result.input.externalMessageTrigger === true, "external sender trigger marker missing");
   assert(result.build.freshBuildRequired === true, "fresh build marker missing");
+  assert(result.adb.reverseLoopbackRequired === true, "ADB reverse loopback marker missing");
   assert(result.adb.webviewDevtoolsForwardRequired === true, "WebView devtools forward marker missing");
   assert(result.automation.driver === "android-webview-cdp-via-adb-forward", "driver mismatch");
   assert(result.automation.requiredSelectors.includes("native-store-readiness"), "native store readiness selector missing");
@@ -84,6 +85,7 @@ function assertDryRunExecutionPolicy(policy) {
   assert(policy.collectsArtifacts === false, "Android login dry-run should not collect artifacts");
   assert(policy.installsAPK === false, "Android login dry-run should not install APKs");
   assert(policy.startsActivity === false, "Android login dry-run should not start activities");
+  assert(policy.opensAdbReverse === false, "Android login dry-run should not open adb reverse");
   assert(policy.opensAdbForward === false, "Android login dry-run should not open adb forward");
   assert(policy.contactsDevice === false, "Android login dry-run should not contact devices");
   assert(policy.usesWebViewAutomation === false, "Android login dry-run should not use WebView automation");

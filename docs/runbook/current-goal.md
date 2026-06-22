@@ -21,35 +21,39 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
 
 ## 当前事实
 
-- 该 active slice 继续有效，直到 PC / Android runtime shell 或用户明确切换。
+- 该 active slice 继续有效；当前用户明确要求先做浏览器端和 Windows PC 端，
+  方便本机调试，Android 登录级 smoke 暂缓。
 - 浏览器、PC desktop、Android 共用 `clients/packages/protocol` 和
   `clients/packages/client-core`；客户端只连 `api-gateway` 和 `push-gateway`。
 - `api-gateway` 已有 first-stage client BFF surface；Web shell 已能通过 BFF /
   push path 跑通本地 smoke。
 - PC desktop 已有 Tauri shell、desktop SQLite bridge、standalone artifact、
-  metadata smoke 和登录级 WebView smoke 证据。
+  metadata smoke 和登录级 WebView smoke 证据；账号密码优先的 IM shell UI
+  已通过 Windows Tauri WebView 登录级 smoke。
 - Android 已有 WebView asset shell、native metadata / SQLite bridge contract、
   no-toolchain action asset contract、ADB readiness report、Docker builder profile
-  和登录级 WebView smoke safe preflight plan。
+  和登录级 WebView smoke safe preflight plan；真机 APK 已安装并通过
+  Android WebView metadata smoke，登录级 Android smoke 后置。
 - Windows 本机 Android toolchain 已按用户要求落到 `F:\IM\toolchains`：
   JDK 17、Gradle 8.10.2、Android SDK platform-tools / android-35 /
   build-tools 35.0.0；`GRADLE_USER_HOME` 也指向 F 盘。
 - Android debug APK 已能本机构建并收集 manifest：
   `clients/artifacts/2026-06-22T034017Z/nexusim-android-debug.apk`。
-- APK 安装到真机仍需要显式用户动作；`plan:artifact-install` 只输出
-  `adb install` checklist，不会自动安装或启动 Activity。
+- `plan:artifact-install` 仍只输出 `adb install` checklist，不会自动安装或
+  启动 Activity；已安装设备上的后续登录 smoke 需要用户重新切回 Android
+  优先级时再执行。
 - 不要隐式下载 Android Docker builder toolchain；本机工具链已可优先使用，
   Docker builder 只在用户明确要求容器化构建时再运行 bootstrap。
 
 ## 下一步优先级
 
-1. 用户确认后把 `clients/artifacts/2026-06-22T034017Z/nexusim-android-debug.apk`
-   安装到已授权 Android 设备，先跑 metadata WebView smoke，再跑 login-level
-   Android WebView smoke。
-2. Android 真机 smoke 通过后，补客户端报告并收口 Android APK baseline。
-3. 需要 Windows 安装包时，再产出 PC installer；当前 PC 已有 standalone exe
-   和 WebView login smoke 证据。
-4. 客户端切片收口后，再回到 workflow compensation adapter / instruction approval
+1. 先收口浏览器端 / Windows PC 端账号密码 IM shell：保持复杂配置隐藏，
+   继续用 BFF / push 公共路径做登录、会话、收发、PullInbox 和 ACK 调试。
+2. Windows PC 端下一步是 installer / 启动脚本 / 更像真实客户端的本机
+   可运行包；当前已有 standalone exe 和登录级 WebView smoke 证据。
+3. Android 后续只在用户切回时继续：login-level WebView smoke、APK baseline
+   报告和真机 UI polish。
+4. 客户端切片阶段性收口后，再回到 workflow compensation adapter / instruction approval
    UI / ops 管理。
 5. 新发现待办写入 `docs/runbook/remaining-goals.md`，不要把长待办复制回本文件。
 

@@ -52,6 +52,10 @@ Reports:
   Android debug APK build baseline using the F-drive JDK / Gradle / Android SDK
   toolchain; proves packaging and artifact collection only, not device install
   or WebView login smoke.
+- `loadtest-report-20260622-client-web-desktop-login-ui.md`: browser /
+  Windows-priority UI pass; proves the account-password oriented IM shell still
+  passes real Windows Tauri WebView login, notify, PullInbox and AckDelivery
+  through public client paths.
 
 Useful command:
 

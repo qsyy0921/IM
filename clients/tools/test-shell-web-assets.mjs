@@ -58,7 +58,10 @@ try {
     build: false
   });
   const androidConfig = readFileSync(join(androidOut, "nexusim-shell-config.js"), "utf8");
+  const androidIndex = readFileSync(join(androidOut, "index.html"), "utf8");
   assert(readFileSync(join(androidOut, "assets", "index.js"), "utf8").includes("nexusim"), "android assets not copied");
+  assert(androidIndex.includes('src="./nexusim-shell-config.js"'), "android index must load shell config relative to asset loader path");
+  assert(!androidIndex.match(/(?:src|href)="\//), "android index must not use root-absolute asset URLs");
   assert(androidConfig.includes('"target": "android"'), "android config not rendered");
   assert(!existsSync(join(androidOut, "assets", "stale.js")), "android output must remove stale assets");
   assertShellAssetsManifest(androidOut, "android");

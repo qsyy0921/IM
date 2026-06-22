@@ -39,6 +39,7 @@ async function main(argv) {
       packageName,
       mainActivity,
       installRequired: true,
+      reverseLoopbackRequired: true,
       webviewDevtoolsForwardRequired: true
     },
     automation: {
@@ -81,6 +82,7 @@ async function main(argv) {
   const tempRoot = mkdtempSync(join(tmpdir(), "nexusim-android-webview-login-"));
   let cdp;
   let forwardedPort = 0;
+  let reversedPorts = [];
   try {
     const shellConfigPath = join(tempRoot, "shell-config.json");
     writeShellConfig(shellConfigPath, fixture);
@@ -93,6 +95,7 @@ async function main(argv) {
     }
     const apkPath = artifactPathFromManifest(manifestPath);
 
+    reversedPorts = reverseFixtureLoopbackPorts(fixture);
     installAndLaunch(apkPath);
     const devtoolsSocket = await waitForWebViewDevtoolsSocket(options.holdMs);
     forwardedPort = await getFreePort();
@@ -115,6 +118,7 @@ async function main(argv) {
         ...plan.adb,
         installed: true,
         launched: true,
+        reverseLoopback: reversedPorts.length > 0,
         devtoolsForwarded: true
       },
       automation: {
@@ -152,6 +156,9 @@ async function main(argv) {
     if (forwardedPort > 0) {
       removeAdbForward(forwardedPort);
     }
+    for (const port of reversedPorts) {
+      removeAdbReverse(port);
+    }
     rmSync(tempRoot, { recursive: true, force: true });
   }
 }
@@ -164,6 +171,7 @@ function dryRunExecutionPolicy() {
     collectsArtifacts: false,
     installsAPK: false,
     startsActivity: false,
+    opensAdbReverse: false,
     opensAdbForward: false,
     contactsDevice: false,
     usesWebViewAutomation: false,
@@ -303,7 +311,58 @@ function artifactPathFromManifest(manifestPath) {
 function installAndLaunch(apkPath) {
   runAdb(["install", "-r", apkPath], "adb install failed");
   runAdb(["shell", "am", "force-stop", packageName], "adb force-stop failed");
+  runAdbBestEffort(["shell", "input", "keyevent", "KEYCODE_WAKEUP"]);
+  runAdbBestEffort(["shell", "wm", "dismiss-keyguard"]);
   runAdb(["shell", "am", "start", "-n", mainActivity], "adb activity launch failed");
+}
+
+function reverseFixtureLoopbackPorts(fixture) {
+  const ports = new Set();
+  addLoopbackPort(ports, fixture.apiBaseURL);
+  addLoopbackPort(ports, fixture.pushWebSocketURL);
+  const reversed = [...ports].sort((left, right) => left - right);
+  for (const port of reversed) {
+    reverseAdbLoopback(port);
+  }
+  return reversed;
+}
+
+function addLoopbackPort(ports, rawURL) {
+  const parsed = new URL(rawURL);
+  if (!isLoopbackHost(parsed.hostname)) {
+    return;
+  }
+  const port = parsed.port ? Number.parseInt(parsed.port, 10) : defaultPort(parsed.protocol);
+  if (!Number.isInteger(port) || port <= 0 || port > 65535) {
+    throw new Error(`invalid loopback port for ${parsed.protocol}`);
+  }
+  ports.add(port);
+}
+
+function isLoopbackHost(host) {
+  const normalized = String(host ?? "").toLowerCase();
+  return normalized === "127.0.0.1" || normalized === "localhost" || normalized === "::1" || normalized === "[::1]";
+}
+
+function defaultPort(protocol) {
+  if (protocol === "http:" || protocol === "ws:") {
+    return 80;
+  }
+  if (protocol === "https:" || protocol === "wss:") {
+    return 443;
+  }
+  return 0;
+}
+
+function reverseAdbLoopback(port) {
+  runAdb(["reverse", `tcp:${port}`, `tcp:${port}`], "adb reverse failed");
+}
+
+function removeAdbReverse(port) {
+  spawnSync("adb", ["reverse", "--remove", `tcp:${port}`], {
+    stdio: "ignore",
+    windowsHide: true
+  });
 }
 
 async function waitForWebViewDevtoolsSocket(timeoutMs) {
@@ -312,7 +371,7 @@ async function waitForWebViewDevtoolsSocket(timeoutMs) {
   while (Date.now() < deadline) {
     const output = runAdbCapture(["shell", "cat", "/proc/net/unix"]);
     lastOutput = output;
-    const socket = parseWebViewDevtoolsSocket(output);
+    const socket = parseCurrentAppWebViewDevtoolsSocket(output) || parseWebViewDevtoolsSocket(output);
     if (socket) {
       return socket;
     }
@@ -335,6 +394,16 @@ export function parseWebViewDevtoolsSockets(output) {
     .filter(Boolean);
 }
 
+function parseCurrentAppWebViewDevtoolsSocket(output) {
+  const pidOutput = runAdbCapture(["shell", "pidof", packageName]).trim();
+  const pid = pidOutput.split(/\s+/).find(value => /^\d+$/.test(value));
+  if (!pid) {
+    return "";
+  }
+  const expected = `webview_devtools_remote_${pid}`;
+  return parseWebViewDevtoolsSockets(output).find(socket => socket === expected) ?? "";
+}
+
 function forwardWebViewDevtools(port, socketName) {
   runAdb(["forward", `tcp:${port}`, `localabstract:${socketName}`], "adb forward WebView devtools failed");
 }
@@ -355,6 +424,14 @@ function runAdb(args, failureMessage) {
   if (completed.status !== 0) {
     throw new Error(failureMessage);
   }
+}
+
+function runAdbBestEffort(args) {
+  spawnSync("adb", args, {
+    encoding: "utf8",
+    stdio: "ignore",
+    windowsHide: true
+  });
 }
 
 function runAdbCapture(args) {
@@ -622,7 +699,20 @@ class CDPClient {
     const id = this.nextID++;
     const payload = JSON.stringify({ id, method, params });
     const response = new Promise((resolvePromise, rejectPromise) => {
-      this.pending.set(id, { resolve: resolvePromise, reject: rejectPromise });
+      const timer = setTimeout(() => {
+        this.pending.delete(id);
+        rejectPromise(new Error(`Android WebView debug command timed out: ${method}`));
+      }, 10000);
+      this.pending.set(id, {
+        resolve: value => {
+          clearTimeout(timer);
+          resolvePromise(value);
+        },
+        reject: error => {
+          clearTimeout(timer);
+          rejectPromise(error);
+        }
+      });
     });
     this.socket.send(payload);
     return response;

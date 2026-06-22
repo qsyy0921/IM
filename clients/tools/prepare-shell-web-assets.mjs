@@ -44,6 +44,9 @@ export function prepareShellWebAssets(options) {
     mkdirSync(outputDir, { recursive: true });
     cpSync(sourceDir, outputDir, { recursive: true, force: true });
   }
+  if (target === "android") {
+    rewriteAndroidIndexForAssetLoader(outputDir);
+  }
 
   const config = parseShellConfig(readFileSync(configPath, "utf8"));
   if (config.target !== spec.expectedTarget) {
@@ -112,6 +115,16 @@ function runWebBuild() {
     stdio: "inherit",
     shell: process.platform === "win32"
   });
+}
+
+function rewriteAndroidIndexForAssetLoader(outputDir) {
+  const indexPath = resolve(outputDir, "index.html");
+  if (!existsSync(indexPath)) {
+    throw new Error(`android shell index does not exist: ${indexPath}`);
+  }
+  const original = readFileSync(indexPath, "utf8");
+  const rewritten = original.replaceAll(/(src|href)="\/([^"]+)"/g, '$1="./$2"');
+  writeFileSync(indexPath, rewritten, "utf8");
 }
 
 function main(argv) {

@@ -33,13 +33,19 @@ class MainActivity : Activity() {
         webView.settings.cacheMode = WebSettings.LOAD_DEFAULT
         webView.settings.allowFileAccess = false
         webView.settings.allowContentAccess = false
+        if (isDebuggable()) {
+            webView.settings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+        }
         webView.addJavascriptInterface(NexusIMBridge(this), "NexusIMNative")
         setContentView(webView)
         webView.loadUrl("https://appassets.androidplatform.net/assets/nexusim/index.html")
     }
 
     private fun configureDebugWebViewInspection() {
-        val debuggable = (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
-        WebView.setWebContentsDebuggingEnabled(debuggable)
+        WebView.setWebContentsDebuggingEnabled(isDebuggable())
+    }
+
+    private fun isDebuggable(): Boolean {
+        return (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
     }
 }

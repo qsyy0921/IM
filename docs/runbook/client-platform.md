@@ -127,6 +127,12 @@ First slice:
   conversations, PullInbox, send text, AckDelivery and logout through those
   adapters. Logout calls BFF current-session revoke, disconnects WebSocket,
   clears IndexedDB local cache and resets UI session state.
+- The visible Web / desktop shell now presents an account-password first IM
+  surface: tenant, device, endpoint and native diagnostic controls are kept out
+  of the normal user path, while smoke selectors remain stable. The
+  2026-06-22 Windows Tauri WebView smoke proved this shell can still log in,
+  receive `delivery.notify`, PullInbox and AckDelivery through public BFF /
+  push paths.
 - `clients/desktop` now has a first-stage TypeScript runtime adapter:
   `loadDesktopRuntimeConfig`, `createDesktopPlatformAdapter`, development-only
   session storage, localStorage-backed persistent message cache, static
@@ -460,10 +466,13 @@ First slice:
   login, externally triggered `delivery.notify`, PullInbox, message observe and
   AckDelivery. The desktop SQLite bridge rerun on commit `2b67b0e1` also proves
   `tauri-sqlite` ready evidence in both metadata-only and login-level WebView
-  smoke. Android now has the same metadata-smoke runner shape and a first
-  collected debug APK artifact. Real Android metadata / login WebView smoke is
-  still pending because installing the APK and starting the Activity remains an
-  explicit user/device action.
+  smoke. The 2026-06-22 account-password shell UI rerun passed the same
+  login-level Windows WebView path and is recorded in
+  `docs/runbook/loadtest/client-platform/loadtest-report-20260622-client-web-desktop-login-ui.md`.
+  Android now has the same metadata-smoke runner shape, a collected debug APK
+  artifact, and an installed-device metadata smoke pass after Android asset URL
+  rewriting. Real Android login WebView smoke is deferred while the active
+  priority stays on browser / Windows PC.
 - `plan:shell-smoke` now marks the Android Docker builder path with
   machine-readable risk flags. If the local builder image is missing, the
   `build-android-builder-image` step carries `downloadsToolchain=true` and
@@ -500,17 +509,15 @@ rejected. For local LAN client smoke, prefer the wired `172.x.x.x` address.
 
 ## Next Work
 
-1. Run Android platform-shell metadata smoke against the collected debug APK.
-   `plan:artifact-install` already reports the APK as ready and prints the
-   manual `adb install` checklist; Codex / scripts should not install or start
-   the app without explicit user action.
-2. Run Android login-level WebView smoke after metadata smoke passes. Lifecycle
-   UI selectors are already guarded in the Android WebView asset contract; the
-   remaining proof is real APK/WebView execution.
-3. Validate Android `android-sqlite` on the real APK. Desktop `tauri-sqlite`
-   metadata / login WebView reruns are complete on commit `2b67b0e1`; the shared
-   `NativeStoreReadiness` contract is already in place, so remaining work is
-   Android platform smoke, not changing client-core sync semantics.
+1. Continue browser / Windows PC first: polish the account-password IM shell,
+   keep complex endpoint / tenant / device controls hidden, and preserve the
+   public BFF / push client path for login, conversation, send, PullInbox and
+   ACK.
+2. Produce the next Windows package step when needed: installer script /
+   bundle plan / launch shortcut on top of the existing standalone exe and
+   login-level WebView smoke.
+3. Return to Android only when explicitly prioritized: run login-level Android
+   WebView smoke on the installed APK, then record the Android baseline.
 
 ## Local Build Prerequisites
 

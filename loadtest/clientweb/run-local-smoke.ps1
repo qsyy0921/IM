@@ -341,7 +341,7 @@ try {
         NEXUSIM_API_GATEWAY_DELIVERY_ADDR = $deliveryTarget
         NEXUSIM_API_GATEWAY_RECEIPT_ADDR = $receiptTarget
         NEXUSIM_API_GATEWAY_BFF_ADDR = $bffListen
-        NEXUSIM_API_GATEWAY_BFF_ALLOWED_ORIGINS = "http://127.0.0.1:5173,http://localhost:5173,http://${ClientHost}:5173,http://tauri.localhost,https://tauri.localhost,tauri://localhost"
+        NEXUSIM_API_GATEWAY_BFF_ALLOWED_ORIGINS = "http://127.0.0.1:5173,http://localhost:5173,http://${ClientHost}:5173,http://tauri.localhost,https://tauri.localhost,tauri://localhost,https://appassets.androidplatform.net"
     }
     Wait-Tcp -HostName $ClientHost -Port $bffPort
 

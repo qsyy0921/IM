@@ -28,8 +28,10 @@ the native bridge can stay narrow and auditable.
   stable public error string on storage failures. The TypeScript-side bridge
   contract is in place and covered by focused tests. Web runtime discovery only
   enables the native store when metadata reports ready and Tauri exposes all
-  `local_store_*` commands. Fresh real WebView metadata / login smoke should be
-  rerun before treating this as the packaged desktop runtime baseline.
+  `local_store_*` commands. Real WebView metadata and login-level smoke have
+  been rerun for the SQLite bridge and again after the account-password shell UI
+  pass; the target is still a first-stage standalone development artifact, not a
+  signed installer.
 - `npm --prefix clients run build:desktop-artifact` is the first-stage artifact
   wrapper. It prepares and verifies Web assets, then runs the available Tauri
   CLI with `NEXUSIM_SKIP_SHELL_ASSET_PREP=true` so Tauri does not run the same

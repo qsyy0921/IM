@@ -46,6 +46,7 @@ try {
 
   assert(result.schemaVersion === "nexusim.android-webview-login-smoke.v1", "schema mismatch");
   assert(result.dryRun === true, "dry-run flag missing");
+  assertDryRunExecutionPolicy(result.executionPolicy);
   assert(result.runID === "android-webview-login-test", "run id mismatch");
   assert(result.input.externalMessageTrigger === true, "external sender trigger marker missing");
   assert(result.build.freshBuildRequired === true, "fresh build marker missing");
@@ -75,3 +76,19 @@ try {
 }
 
 console.log("Android WebView login smoke dry-run ok");
+
+function assertDryRunExecutionPolicy(policy) {
+  assert(policy?.planOnly === true, "Android login dry-run should be marked plan-only");
+  assert(policy.executesPlannedCommands === false, "Android login dry-run should not execute planned commands");
+  assert(policy.buildsAPK === false, "Android login dry-run should not build APKs");
+  assert(policy.collectsArtifacts === false, "Android login dry-run should not collect artifacts");
+  assert(policy.installsAPK === false, "Android login dry-run should not install APKs");
+  assert(policy.startsActivity === false, "Android login dry-run should not start activities");
+  assert(policy.opensAdbForward === false, "Android login dry-run should not open adb forward");
+  assert(policy.contactsDevice === false, "Android login dry-run should not contact devices");
+  assert(policy.usesWebViewAutomation === false, "Android login dry-run should not use WebView automation");
+  assert(policy.contactsBFF === false, "Android login dry-run should not contact BFF");
+  assert(policy.sendsMessages === false, "Android login dry-run should not send messages");
+  assert(policy.opensNetworkConnection === false, "Android login dry-run should not open network connections");
+  assert(policy.downloadsToolchain === false, "Android login dry-run should not download toolchains");
+}

@@ -357,6 +357,13 @@ First slice:
   This smoke intentionally requires a fresh APK build because the callback URL
   is injected into shell assets before packaging; a previously collected normal
   APK cannot prove the callback path unless it was built for the same callback.
+- `npm --prefix clients run smoke:android-webview-login -- --dry-run` emits a
+  low-sensitive login-level Android WebView smoke plan with an execution policy
+  proving the dry-run does not build or collect an APK, install, start an
+  Activity, open adb forward, drive WebView automation, contact the BFF or send
+  messages. The real runner still requires a built APK, ADB install / Activity
+  launch, WebView CDP over adb forward, public BFF login / SendMessage and
+  AckDelivery observation.
 - `npm --prefix clients run validate:builder-profile` validates the Android
   Docker builder profile without building or pulling images. The profile lives
   in `deploy/local/docker-compose.client-builders.yml` and uses

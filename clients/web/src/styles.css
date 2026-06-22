@@ -780,6 +780,26 @@ button {
   color: #ffffff;
 }
 
+.group-permission-note {
+  display: flex;
+  grid-column: 1 / -1;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  border: 1px solid #d8e0e4;
+  border-radius: 8px;
+  background: #f8fafb;
+  color: #52636d;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.group-permission-note span:first-child {
+  color: #172126;
+  font-weight: 900;
+}
+
 .group-profile-error {
   grid-column: 1 / -1;
   border: 1px solid #fecaca;

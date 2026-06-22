@@ -29,7 +29,7 @@
 - Windows PC：继续真实 signing input、valid signed artifact、MSI / NSIS installer、
   signed installer experience；当前 `signtool` 可定位，但仍缺代码签名证书和 valid
   Authenticode signature。
-- Web / PC shell：继续完整群设置、真实多用户 UI smoke、群头像上传链路；头像上传
+- Web / PC shell：继续更丰富群设置、真实多用户 UI smoke、群头像上传链路；头像上传
   需要后续接 media-service，不得直接写 conversation-service 私表。
 - Desktop runtime：继续真实 UI lifecycle 和 installer / signing 流水线；portable zip
   与 install plan 已有 first-stage 本地路径。

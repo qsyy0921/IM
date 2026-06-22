@@ -40,7 +40,7 @@ Android 后置到用户明确切回。
 ## 当前短线
 
 1. Web / Windows PC 客户端继续收口：登录、注册、好友申请、好友私聊、群聊、
-   群成员管理、群资料、消息列表、发送、PullInbox 和 ACK。
+   群成员管理、权限感知群设置、群资料、消息列表、发送、PullInbox 和 ACK。
 2. 已有 clean smoke 覆盖双用户好友直聊、群聊 first path 和群成员动作；详细证据见
    `client-platform.md` 与 `loadtest/clientweb` 报告。
 3. Windows desktop 已有本地 artifact / signing / installer plan first paths；下一步是真实

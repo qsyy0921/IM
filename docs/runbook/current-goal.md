@@ -26,7 +26,8 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   `clients/packages/client-core`；客户端只连 `api-gateway` BFF 和 `push-gateway`。
 - Web / PC shell 已接账号密码登录、注册、好友工作台、好友私聊、群聊列表、建群、
   群成员添加 / 退群、成员列表、移除成员、角色变更、owner transfer、成员搜索 /
-  角色过滤 / 分页、群资料卡、邀请来源提示、消息列表、发送、PullInbox 和 ACK。
+  角色过滤 / 分页、群资料卡、权限感知群设置入口、邀请来源提示、消息列表、发送、
+  PullInbox 和 ACK。
 - 群标题 / 头像 URI 已接 first-stage read/update：`conversation-service` 拥有事实，
   `api-gateway` 暴露 BFF，Web / PC shell 只通过 BFF 读写；媒体上传和完整群设置后置。
 - 会话刷新会保留当前选中；gateway token 过期会清理本地 session / push / 会话展示状态。
@@ -38,7 +39,7 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
 ## 下一步优先级
 
 1. Windows PC 端继续真实 signing input、valid signed artifact、MSI / NSIS installer 和签名 installer 体验。
-2. 客户端产品能力继续补完整群设置、更丰富真实多用户 UI smoke，以及接入 media-service 后的群头像上传链路。
+2. 客户端产品能力继续补更丰富群设置、真实多用户 UI smoke，以及接入 media-service 后的群头像上传链路。
 3. Android 后续只在用户切回时继续 login-level WebView smoke、APK baseline 报告和真机 UI polish。
 4. 客户端切片阶段性收口后，回到 workflow compensation adapter、instruction approval UI 和 ops 管理。
 5. 新发现待办写入 `docs/runbook/remaining-goals.md`，不要把长待办复制回本文件。

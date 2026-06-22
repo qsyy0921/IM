@@ -34,6 +34,8 @@ const requiredTestIDs = [
   "group-profile-avatar-input",
   "group-profile-save",
   "group-profile-error",
+  "group-permission-status",
+  "group-self-role",
   "group-members-refresh",
   "group-member-search",
   "group-member-role-filter",

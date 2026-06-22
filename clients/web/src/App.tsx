@@ -77,6 +77,9 @@ export function App() {
   const [groupInviteUserID, setGroupInviteUserID] = useState("");
   const [groupMembers, setGroupMembers] = useState<ConversationMember[]>([]);
   const [groupMembersConversationID, setGroupMembersConversationID] = useState("");
+  const [groupSelfMember, setGroupSelfMember] = useState<ConversationMember | null>(null);
+  const [groupSelfMemberConversationID, setGroupSelfMemberConversationID] = useState("");
+  const [groupSelfMemberError, setGroupSelfMemberError] = useState("");
   const [groupMembersError, setGroupMembersError] = useState("");
   const [groupMemberQuery, setGroupMemberQuery] = useState("");
   const [groupMemberRoleFilter, setGroupMemberRoleFilter] = useState<GroupMemberRoleFilter>("ALL");
@@ -424,6 +427,7 @@ export function App() {
     await syncConversation(conversationID, currentSession);
     if (selectedConversation?.type === "GROUP") {
       await loadGroupProfile(conversationID, currentSession);
+      await loadGroupSelfMember(conversationID, currentSession);
       await loadGroupMembers(conversationID, currentSession, {
         query: "",
         roleFilter: "ALL",
@@ -526,6 +530,9 @@ export function App() {
       if (!profile) {
         throw new Error("group profile must be loaded before update");
       }
+      if (!canManageActiveGroup) {
+        throw new Error("only group owner or admin can update group profile");
+      }
       const title = groupProfileTitleDraft.trim();
       if (!title) {
         throw new Error("group title is required");
@@ -626,6 +633,39 @@ export function App() {
     }
   }
 
+  async function loadGroupSelfMember(
+    conversationID = activeConversationRef.current,
+    currentSession = sessionRef.current
+  ): Promise<ConversationMember | null> {
+    if (!currentSession) {
+      throw new Error("login first");
+    }
+    if (!conversationID) {
+      throw new Error("conversation id is required");
+    }
+    try {
+      const response = await runtime.bff.listConversationMembers(
+        {
+          conversationID,
+          pageSize: 100,
+          userIDPrefix: currentSession.userID
+        },
+        currentSession
+      );
+      const selfMember = response.members.find(member => member.userID === currentSession.userID) ?? null;
+      setGroupSelfMember(selfMember);
+      setGroupSelfMemberConversationID(response.conversationID);
+      setGroupSelfMemberError(selfMember ? "" : "未找到当前账号的群成员身份，请刷新成员列表");
+      updateConversationMemberVersion(response.conversationID, response.memberVersion);
+      return selfMember;
+    } catch (caught) {
+      setGroupSelfMember(null);
+      setGroupSelfMemberConversationID(conversationID);
+      setGroupSelfMemberError(errorMessage(caught));
+      return null;
+    }
+  }
+
   async function applyGroupMemberFilters(): Promise<void> {
     await run("filter group members", async () => {
       const currentSession = requireSession();
@@ -702,6 +742,9 @@ export function App() {
     await run("invite group member", async () => {
       const currentSession = requireSession();
       const conversation = requireActiveGroupConversation();
+      if (!canManageActiveGroup) {
+        throw new Error("only group owner or admin can invite members");
+      }
       const targetUserID = groupInviteUserID.trim();
       if (!targetUserID) {
         throw new Error("target user id is required");
@@ -717,6 +760,7 @@ export function App() {
       );
       setGroupInviteUserID("");
       updateConversationMemberVersion(result.conversationID, result.memberVersion);
+      await loadGroupSelfMember(result.conversationID, currentSession);
       await loadGroupMembers(result.conversationID, currentSession);
       await loadConversations(currentSession);
       if (result.conversationID) {
@@ -751,6 +795,9 @@ export function App() {
     await run("remove group member", async () => {
       const currentSession = requireSession();
       const conversation = requireActiveGroupConversation();
+      if (!canManageActiveGroup) {
+        throw new Error("only group owner or admin can remove members");
+      }
       const result = await runtime.bff.removeConversationMember(
         {
           conversationID: conversation.conversationID,
@@ -761,6 +808,7 @@ export function App() {
         currentSession
       );
       updateConversationMemberVersion(result.conversationID, result.memberVersion);
+      await loadGroupSelfMember(result.conversationID, currentSession);
       await loadGroupMembers(result.conversationID, currentSession);
       await loadConversations(currentSession);
     });
@@ -770,6 +818,9 @@ export function App() {
     await run("update group member role", async () => {
       const currentSession = requireSession();
       const conversation = requireActiveGroupConversation();
+      if (!canManageActiveGroup) {
+        throw new Error("only group owner or admin can update member roles");
+      }
       const result = await runtime.bff.updateConversationMemberRole(
         {
           conversationID: conversation.conversationID,
@@ -781,6 +832,7 @@ export function App() {
         currentSession
       );
       updateConversationMemberVersion(result.conversationID, result.memberVersion);
+      await loadGroupSelfMember(result.conversationID, currentSession);
       await loadGroupMembers(result.conversationID, currentSession);
       await loadConversations(currentSession);
     });
@@ -790,6 +842,9 @@ export function App() {
     await run("transfer group owner", async () => {
       const currentSession = requireSession();
       const conversation = requireActiveGroupConversation();
+      if (!canTransferActiveGroupOwner) {
+        throw new Error("only group owner can transfer ownership");
+      }
       const result = await runtime.bff.transferConversationOwner(
         {
           conversationID: conversation.conversationID,
@@ -800,6 +855,7 @@ export function App() {
         currentSession
       );
       updateConversationMemberVersion(result.conversationID, result.memberVersion);
+      await loadGroupSelfMember(result.conversationID, currentSession);
       await loadGroupMembers(result.conversationID, currentSession);
       await loadConversations(currentSession);
     });
@@ -997,6 +1053,9 @@ export function App() {
   function clearGroupMemberState(): void {
     setGroupMembers([]);
     setGroupMembersConversationID("");
+    setGroupSelfMember(null);
+    setGroupSelfMemberConversationID("");
+    setGroupSelfMemberError("");
     setGroupMembersError("");
     setGroupMemberQuery("");
     setGroupMemberRoleFilter("ALL");
@@ -1101,6 +1160,18 @@ export function App() {
     activeGroupConversation && groupMembersConversationID === activeGroupConversation.conversationID
       ? groupMembers
       : [];
+  const groupSelfMemberForActive =
+    activeGroupConversation && groupSelfMemberConversationID === activeGroupConversation.conversationID
+      ? groupSelfMember
+      : null;
+  const groupSelfRole = groupSelfMemberForActive?.status === "ACTIVE" ? groupSelfMemberForActive.role : undefined;
+  const canManageActiveGroup = groupSelfRole === "OWNER" || groupSelfRole === "ADMIN";
+  const canTransferActiveGroupOwner = groupSelfRole === "OWNER";
+  const groupPermissionText = groupSelfRole
+    ? `当前身份：${memberRoleLabel(groupSelfRole)}`
+    : groupSelfMemberError
+      ? `管理权限未确认：${groupSelfMemberError}`
+      : "管理权限未确认，请刷新成员列表";
   const visibleContacts = contacts
     .filter(contact => contact.status !== "DELETED")
     .sort((left, right) => contactDisplayName(left).localeCompare(contactDisplayName(right)));
@@ -1538,6 +1609,10 @@ export function App() {
                 void saveGroupProfile();
               }}
             >
+              <div className="group-permission-note" data-testid="group-permission-status">
+                <span data-testid="group-self-role">{groupPermissionText}</span>
+                {!canManageActiveGroup ? <span>群资料和成员管理只对群主或管理员开放。</span> : null}
+              </div>
               <label>
                 群名称
                 <input
@@ -1546,7 +1621,7 @@ export function App() {
                   placeholder="群名称"
                   value={groupProfileTitleDraft}
                   onChange={event => setGroupProfileTitleDraft(event.target.value)}
-                  disabled={!session || !activeGroupProfile}
+                  disabled={!session || !activeGroupProfile || !canManageActiveGroup}
                 />
               </label>
               <label>
@@ -1557,13 +1632,13 @@ export function App() {
                   placeholder="https://... 或 media://..."
                   value={groupProfileAvatarDraft}
                   onChange={event => setGroupProfileAvatarDraft(event.target.value)}
-                  disabled={!session || !activeGroupProfile}
+                  disabled={!session || !activeGroupProfile || !canManageActiveGroup}
                 />
               </label>
               <button
                 data-testid="group-profile-save"
                 type="submit"
-                disabled={!session || !activeGroupProfile || groupProfileTitleDraft.trim() === ""}
+                disabled={!session || !activeGroupProfile || !canManageActiveGroup || groupProfileTitleDraft.trim() === ""}
               >
                 保存资料
               </button>
@@ -1631,9 +1706,13 @@ export function App() {
                 placeholder="添加成员用户 ID"
                 value={groupInviteUserID}
                 onChange={event => setGroupInviteUserID(event.target.value)}
-                disabled={!session}
+                disabled={!session || !canManageActiveGroup}
               />
-              <button data-testid="group-invite-submit" type="submit" disabled={!session || groupInviteUserID.trim() === ""}>
+              <button
+                data-testid="group-invite-submit"
+                type="submit"
+                disabled={!session || !canManageActiveGroup || groupInviteUserID.trim() === ""}
+              >
                 添加成员
               </button>
               <span data-testid="group-invite-source" className="group-invite-source">
@@ -1691,7 +1770,7 @@ export function App() {
                       <button
                         type="button"
                         onClick={() => void updateGroupMemberRole(member, "ADMIN")}
-                        disabled={!session || member.status !== "ACTIVE" || member.role === "OWNER"}
+                        disabled={!session || !canManageActiveGroup || member.status !== "ACTIVE" || member.role === "OWNER"}
                       >
                         设管理员
                       </button>
@@ -1700,7 +1779,7 @@ export function App() {
                       <button
                         type="button"
                         onClick={() => void updateGroupMemberRole(member, "MEMBER")}
-                        disabled={!session || member.status !== "ACTIVE" || member.role === "OWNER"}
+                        disabled={!session || !canManageActiveGroup || member.status !== "ACTIVE" || member.role === "OWNER"}
                       >
                         设成员
                       </button>
@@ -1709,7 +1788,7 @@ export function App() {
                       <button
                         type="button"
                         onClick={() => void transferGroupOwner(member)}
-                        disabled={!session || member.status !== "ACTIVE"}
+                        disabled={!session || !canTransferActiveGroupOwner || member.status !== "ACTIVE"}
                       >
                         转让群主
                       </button>
@@ -1718,7 +1797,7 @@ export function App() {
                       className="danger-inline-button"
                       type="button"
                       onClick={() => void removeGroupMember(member)}
-                      disabled={!session || member.status !== "ACTIVE" || member.userID === session?.userID}
+                      disabled={!session || !canManageActiveGroup || member.status !== "ACTIVE" || member.userID === session?.userID}
                     >
                       移除
                     </button>

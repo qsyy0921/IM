@@ -1,0 +1,290 @@
+import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { dirname, isAbsolute, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { workspaceRoot } from "./client-build-env.mjs";
+import { buildDesktopSigningPlan } from "./plan-desktop-signing.mjs";
+
+const schemaVersion = "nexusim.desktop-signing-execution.v1";
+const artifactManifestSchema = "nexusim.client-artifacts.v1";
+const artifactsRoot = join(workspaceRoot, "artifacts");
+
+function main(argv) {
+  const options = parseArgs(argv, process.env);
+  const plan = buildDesktopSigningPlan(options);
+  const output = buildSigningOutput(plan, options);
+  if (!options.execute) {
+    process.stdout.write(`${JSON.stringify(output, null, 2)}\n`);
+    return;
+  }
+  if (!output.readyToExecuteSigning) {
+    process.stdout.write(`${JSON.stringify(output, null, 2)}\n`);
+    const reasons = [...plan.missing, ...output.executionBlockers].join(",");
+    throw new Error(`desktop artifact signing is not ready: ${reasons}`);
+  }
+  runSigningCommand(options);
+}
+
+export function buildSigningOutput(plan, options = {}) {
+  const execute = Boolean(options.execute);
+  const executionBlockers = [];
+  const readyToExecuteSigning = plan.readyToSign && executionBlockers.length === 0;
+  const output = {
+    schemaVersion,
+    generatedAt: new Date().toISOString(),
+    readyToSign: plan.readyToSign,
+    readyToExecuteSigning,
+    missing: plan.missing,
+    executionBlockers,
+    executionPolicy: {
+      planOnly: !execute,
+      executeRequested: execute,
+      executesSignCommand: execute && readyToExecuteSigning,
+      requiresExplicitExecuteFlag: true,
+      signsArtifacts: execute && readyToExecuteSigning,
+      installsArtifacts: false,
+      launchesDesktopArtifacts: false,
+      startsServices: false,
+      downloadsToolchain: false,
+      readsCollectedArtifactManifest: true,
+      readsSigningConfig: true,
+      validatesArtifactHashes: true
+    },
+    commandTemplate: plan.commandTemplate,
+    signingPlan: {
+      schemaVersion: plan.schemaVersion,
+      readyToSign: plan.readyToSign,
+      missing: plan.missing,
+      artifactManifest: plan.artifactManifest,
+      artifact: plan.artifact,
+      signing: plan.signing
+    },
+    nextAction: readyToExecuteSigning
+      ? "rerun with --execute in an explicit Windows signing profile"
+      : "resolve signing readiness before running with --execute"
+  };
+  assertLowSensitiveOutput(output);
+  return output;
+}
+
+function runSigningCommand(options) {
+  const input = resolveSigningInput(options);
+  const signToolPath = resolve(requiredString(options.signToolPath, "signtool path"));
+  const timestampURL = requiredString(options.timestampURL, "timestamp URL");
+  const args = [
+    "sign",
+    "/fd",
+    "SHA256",
+    "/tr",
+    timestampURL,
+    "/td",
+    "SHA256"
+  ];
+
+  if (options.certFile) {
+    args.push("/f", resolve(options.certFile), "/p", requiredString(process.env.NEXUSIM_DESKTOP_SIGN_PFX_PASS, "PFX password env"));
+  } else {
+    args.push("/sha1", normalizeThumbprint(requiredString(options.certSHA1, "certificate SHA1")));
+  }
+  args.push(input.artifactPath);
+
+  execFileSync(signToolPath, args, {
+    cwd: workspaceRoot,
+    stdio: "inherit",
+    shell: process.platform === "win32"
+  });
+}
+
+function resolveSigningInput(options) {
+  const manifestPath = options.manifest
+    ? resolve(options.manifest)
+    : findLatestArtifactManifest(artifactsRoot, "windows-desktop");
+  if (!manifestPath) {
+    throw new Error("desktop artifact manifest missing");
+  }
+  const manifest = readManifest(manifestPath);
+  const artifact = manifest.artifacts.find(candidate => candidate?.target === "windows-desktop");
+  if (!artifact) {
+    throw new Error("windows desktop artifact missing");
+  }
+  const artifactPath = join(dirname(manifestPath), artifact.filename);
+  validateArtifact(artifact, artifactPath);
+  return {
+    manifestPath,
+    artifactPath
+  };
+}
+
+function validateArtifact(artifact, artifactPath) {
+  if (typeof artifact.filename !== "string" || artifact.filename.length === 0) {
+    throw new Error("artifact filename missing");
+  }
+  if (artifact.filename.includes("/") || artifact.filename.includes("\\") || isAbsolute(artifact.filename)) {
+    throw new Error(`artifact filename is not relative-safe: ${artifact.filename}`);
+  }
+  if (!Number.isInteger(artifact.bytes) || artifact.bytes < 0) {
+    throw new Error(`artifact byte size invalid: ${artifact.filename}`);
+  }
+  if (typeof artifact.sha256 !== "string" || !artifact.sha256.match(/^[a-f0-9]{64}$/)) {
+    throw new Error(`artifact sha256 invalid: ${artifact.filename}`);
+  }
+  if (!existsSync(artifactPath) || !statSync(artifactPath).isFile()) {
+    throw new Error(`artifact file missing: ${artifact.filename}`);
+  }
+  const bytes = readFileSync(artifactPath);
+  if (bytes.length !== artifact.bytes) {
+    throw new Error(`artifact byte size mismatch: ${artifact.filename}`);
+  }
+  const sha256 = sha256Buffer(bytes);
+  if (sha256 !== artifact.sha256) {
+    throw new Error(`artifact hash mismatch: ${artifact.filename}`);
+  }
+}
+
+function readManifest(manifestPath) {
+  const raw = readFileSync(manifestPath, "utf8");
+  assertLowSensitiveText(raw, "artifact manifest");
+  const manifest = JSON.parse(raw);
+  if (manifest.schemaVersion !== artifactManifestSchema) {
+    throw new Error("artifact manifest schema mismatch");
+  }
+  if (!Array.isArray(manifest.artifacts)) {
+    throw new Error("artifact manifest artifacts missing");
+  }
+  return manifest;
+}
+
+function findLatestArtifactManifest(root, target) {
+  if (!existsSync(root)) {
+    return "";
+  }
+  const candidates = [];
+  collectManifestCandidates(root, candidates);
+  candidates.sort((left, right) => right.mtimeMs - left.mtimeMs);
+  for (const candidate of candidates) {
+    if (manifestContainsTarget(candidate.path, target)) {
+      return candidate.path;
+    }
+  }
+  return "";
+}
+
+function collectManifestCandidates(dir, candidates) {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const fullPath = join(dir, entry.name);
+    if (!entry.isDirectory()) {
+      if (entry.isFile() && entry.name === "manifest.json") {
+        candidates.push({
+          path: fullPath,
+          mtimeMs: statSync(fullPath).mtimeMs
+        });
+      }
+      continue;
+    }
+    collectManifestCandidates(fullPath, candidates);
+  }
+}
+
+function manifestContainsTarget(manifestPath, target) {
+  const manifest = readManifest(manifestPath);
+  return manifest.artifacts.some(artifact => artifact?.target === target);
+}
+
+function parseArgs(argv, env) {
+  const options = {
+    execute: false,
+    manifest: "",
+    signToolPath: env.NEXUSIM_DESKTOP_SIGNTOOL ?? "",
+    certFile: env.NEXUSIM_DESKTOP_SIGN_CERT_FILE ?? "",
+    certSHA1: env.NEXUSIM_DESKTOP_SIGN_CERT_SHA1 ?? "",
+    timestampURL: env.NEXUSIM_DESKTOP_SIGN_TIMESTAMP_URL ?? "",
+    pfxPassEnvPresent: Boolean(env.NEXUSIM_DESKTOP_SIGN_PFX_PASS)
+  };
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index];
+    if (arg === "--execute") {
+      options.execute = true;
+      continue;
+    }
+    if (arg === "--manifest") {
+      options.manifest = requiredValue(argv, index, arg);
+      index += 1;
+      continue;
+    }
+    if (arg === "--signtool") {
+      options.signToolPath = requiredValue(argv, index, arg);
+      index += 1;
+      continue;
+    }
+    if (arg === "--cert-file") {
+      options.certFile = requiredValue(argv, index, arg);
+      index += 1;
+      continue;
+    }
+    if (arg === "--cert-sha1") {
+      options.certSHA1 = requiredValue(argv, index, arg);
+      index += 1;
+      continue;
+    }
+    if (arg === "--timestamp-url") {
+      options.timestampURL = requiredValue(argv, index, arg);
+      index += 1;
+      continue;
+    }
+    throw new Error(`unknown argument: ${arg}`);
+  }
+  return options;
+}
+
+function requiredValue(argv, index, name) {
+  const value = argv[index + 1];
+  if (!value || value.startsWith("--")) {
+    throw new Error(`${name} requires a value`);
+  }
+  return value;
+}
+
+function requiredString(value, label) {
+  if (typeof value !== "string" || value.length === 0) {
+    throw new Error(`${label} missing`);
+  }
+  return value;
+}
+
+function normalizeThumbprint(value) {
+  return value.replace(/\s+/g, "").toUpperCase();
+}
+
+function assertLowSensitiveText(text, label) {
+  if (text.match(/[A-Za-z]:\\\\/) || text.includes("\\\\?")) {
+    throw new Error(`${label} leaked a local absolute path`);
+  }
+  if (text.match(/(token|secret|password|credential|private)/i)) {
+    throw new Error(`${label} contains a sensitive field name`);
+  }
+}
+
+function assertLowSensitiveOutput(output) {
+  const serialized = JSON.stringify(output);
+  if (serialized.match(/[A-Za-z]:\\\\/) || serialized.includes("\\\\?")) {
+    throw new Error("desktop signing execution output leaked a local absolute path");
+  }
+  if (serialized.match(/(token|secret|password|credential|private)/i)) {
+    throw new Error("desktop signing execution output leaked a sensitive field name");
+  }
+}
+
+function sha256Buffer(buffer) {
+  return createHash("sha256").update(buffer).digest("hex");
+}
+
+const thisFile = fileURLToPath(import.meta.url);
+if (resolve(process.argv[1] ?? "") === thisFile) {
+  try {
+    main(process.argv.slice(2));
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exitCode = 2;
+  }
+}

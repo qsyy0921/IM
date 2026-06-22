@@ -172,6 +172,7 @@ npm --prefix clients run test:artifact-readiness
 npm --prefix clients run test:desktop-bundle
 npm --prefix clients run test:desktop-installer-builder
 npm --prefix clients run test:desktop-installer-plan
+npm --prefix clients run test:desktop-signing-executor
 npm --prefix clients run test:desktop-signing-plan
 npm --prefix clients run test:web-shell-actions
 npm --prefix clients run test:shell-smoke-plan
@@ -240,6 +241,12 @@ collected desktop artifact hash and prints a low-sensitive command template only
 when ready. It does not sign artifacts, download tools, install packages, launch
 the desktop app or print local absolute paths. Missing signing inputs fail
 closed as `readyToSign=false`; there is no placeholder signature path.
+`sign:desktop-artifact` is the explicit execution wrapper for that plan. By
+default it is also plan-only and prints a low-sensitive execution policy. It
+only invokes `signtool` when run with `--execute` and when the collected desktop
+artifact hash, explicit `signtool`, timestamp URL and certificate source are all
+ready. It does not install artifacts, launch the app, start services or download
+toolchains.
 `plan:desktop-installer` reads the repository installer Tauri profile, the
 collected Windows desktop manifest and the signing readiness plan, then reports
 whether MSI / NSIS installer bundling can run. It is also plan-only: it does not
@@ -287,12 +294,14 @@ Current packaging status:
   `README-windows-desktop.txt` and `launch-nexusim-windows.ps1`. A portable
   unsigned local zip bundle can be produced with `bundle:desktop`.
   `plan:desktop-signing` now checks explicit code-signing readiness and produces
-  only a low-sensitive plan. `plan:desktop-installer` now checks the repository
+  only a low-sensitive plan. `sign:desktop-artifact` is the explicit
+  `--execute`-gated signing wrapper over that plan and fails closed until real
+  signing inputs are present. `plan:desktop-installer` now checks the repository
   installer Tauri profile, MSI / NSIS target, artifact baseline and signing
   readiness; actual `build:desktop-installer` now provides the explicit
   `--execute`-gated build entry and runs Tauri with that profile only when
-  readiness is true. Signing execution,
-  install and launch remain future hardening. Use
+  readiness is true. Real signed installer execution, install and launch remain
+  future hardening. Use
   `npm --prefix clients run smoke:desktop-artifact-launch` for the first launch
   sanity check; it starts the collected exe, waits briefly, then terminates it.
 - Android: native WebView shell can prepare target-specific Web assets and has

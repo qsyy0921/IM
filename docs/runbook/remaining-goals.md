@@ -32,7 +32,7 @@
    smoke，验证好友私聊和群聊 first path；群成员列表、移除成员、角色变更和
    owner transfer 第一路径已接入 BFF / client-core / Web shell，`loadtest/clientweb`
    也已扩展并在 clean committed smoke 中跑通这些群管理动作。继续补 PC MSI / NSIS
-   installer 和真实 code-signing execution pipeline、更完整群设置、成员搜索 / 分页和后续 native SQLite bridge。
+   installer、真实 signing input / signed artifact 验证、更完整群设置、成员搜索 / 分页和后续 native SQLite bridge。
    Android APK / 真机 WebView smoke 后置到用户明确切回。
 2. 回到 AI / Agent 主线：group memory eval、EvidencePack、Agent 真实业务动作、
    Python AI Worker 候选算法。
@@ -77,12 +77,15 @@
   clientweb BFF / push summary 与 desktop launch 证据合并成低敏 JSON，但仍不是 GUI
   自动化。真实 Tauri WebView metadata callback smoke 已通过；Web / PC shell 已接
   登录、注册、好友、好友私聊、群聊列表、建群、消息列表和发送 first path。剩余工作是
-  打磨真实 UI lifecycle，以及后续启用 MSI / NSIS installer bundling 和真实 code
-  signing execution。`plan:desktop-signing` 已能检查显式 `signtool`、证书来源和
+  打磨真实 UI lifecycle，以及后续启用 MSI / NSIS installer bundling、真实 signing
+  input 和 signed artifact 验证。`plan:desktop-signing` 已能检查显式 `signtool`、证书来源和
   timestamp URL readiness；`plan:desktop-installer` 已改为检查仓库内
   `tauri.installer.conf.json` profile、installer target、desktop artifact baseline
   和 signing readiness；默认开发 config 仍保持不打包。它们不 build、不签名，
-  也不替代真实 installer / signing 流水线。`build:desktop-installer` 已补显式
+  也不替代真实 installer / signing 流水线。`sign:desktop-artifact` 已补显式
+  `--execute` 门控的 signing wrapper，默认仍只输出低敏 execution policy；真实
+  签名还需要本机 `signtool`、timestamp URL、证书来源和 signed artifact 验证。
+  `build:desktop-installer` 已补显式
   `--execute` 门控的 installer build 包装器，默认仍只输出计划；desktop installer
   planner 现在会按 `windows-desktop` 目标自动选择 collected manifest，不会被更新的
   Android manifest 遮住；真实 MSI / NSIS 构建仍要先满足 signing readiness。

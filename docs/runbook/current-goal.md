@@ -52,7 +52,11 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   步骤指向 package-local launcher。`bundle:desktop` 已能把 collected Windows desktop
   package 打成 unsigned local portable zip，并写低敏 summary。`plan:desktop-signing`
   已能基于 collected desktop manifest 检查显式 `signtool`、证书来源和 timestamp URL
-  是否齐备，且只输出低敏 plan，不签名、不下载、不安装、不启动。`plan:desktop-installer`
+  是否齐备，且只输出低敏 plan，不签名、不下载、不安装、不启动。
+  `sign:desktop-artifact` 已补为显式 `--execute` 门控的签名执行入口：默认仍只输出
+  低敏 execution policy，只有 collected artifact hash、`signtool`、timestamp URL 和
+  证书来源都 ready 时才会调用签名工具，且不安装、不启动、不下载 toolchain。
+  `plan:desktop-installer`
   已改为读取仓库内显式 `tauri.installer.conf.json` profile：默认开发 Tauri config
   继续 `bundle.active=false`，installer profile 才启用 MSI target。`build:desktop-installer`
   会用 `--config src-tauri/tauri.installer.conf.json` 调用 Tauri，并继续由显式
@@ -65,7 +69,8 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
 
 ## 下一步优先级
 
-1. Windows PC 端继续 MSI / NSIS installer 和真实 code-signing pipeline 体验，并保持
+1. Windows PC 端继续真实 signing input 接入、MSI / NSIS installer 和签名 installer
+   体验，并保持
    Web / PC shell 的 UI 细节随真实调试反馈继续收口。
 2. 若继续客户端产品能力，优先补成员搜索 / 分页、邀请来源提示、完整群设置和
    更丰富的群 read model。不得直接调用 conversation-service 私有接口。

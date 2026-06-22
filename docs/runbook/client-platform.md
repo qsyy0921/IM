@@ -495,6 +495,11 @@ First slice:
   timestamp URL inputs are present. It is plan-only: it does not sign, download
   tools, install packages, launch the desktop app or print local absolute paths.
   Missing inputs remain fail-closed as `readyToSign=false`.
+  `sign:desktop-artifact` is the explicit execution wrapper for that plan. Its
+  default output remains plan-only and low-sensitive; it invokes `signtool` only
+  with `--execute` after the collected artifact hash, explicit `signtool`,
+  timestamp URL and certificate source are ready. It does not install artifacts,
+  launch the app, start services or download toolchains.
   `plan:desktop-signing` and `plan:desktop-installer` now select the latest
   collected `windows-desktop` manifest instead of blindly using the newest
   manifest, so newer Android artifacts do not hide an existing desktop baseline.
@@ -669,6 +674,7 @@ npm --prefix clients run bundle:desktop
 npm --prefix clients run build:desktop-installer
 npm --prefix clients run plan:desktop-installer
 npm --prefix clients run plan:desktop-signing
+npm --prefix clients run sign:desktop-artifact
 npm --prefix clients run smoke:desktop-artifact-launch
 npm --prefix clients run smoke:desktop-composed -- --clientweb-summary <client-web-summary.json>
 npm --prefix clients run smoke:desktop-webview-metadata

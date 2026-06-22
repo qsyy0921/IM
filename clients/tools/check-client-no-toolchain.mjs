@@ -180,6 +180,11 @@ const checkPlan = [
     reason: "guards explicit desktop code-signing readiness without signing artifacts"
   },
   {
+    name: "desktop-signing-executor-contract",
+    script: "test:desktop-signing-executor",
+    reason: "guards explicit desktop code-signing execution opt-in without signing artifacts by default"
+  },
+  {
     name: "desktop-composed-smoke-runner-contract",
     script: "test:desktop-composed-smoke",
     reason: "guards desktop composed smoke dry-run summary without starting services"

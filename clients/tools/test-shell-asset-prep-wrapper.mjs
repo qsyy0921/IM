@@ -14,7 +14,10 @@ function createSourceDist(root) {
   mkdirSync(join(sourceDir, "assets"), { recursive: true });
   writeFileSync(join(sourceDir, "index.html"), "<html><script src=\"/nexusim-shell-config.js\"></script></html>", "utf8");
   writeFileSync(join(sourceDir, "assets", "index.js"), "console.log('nexusim');\n", "utf8");
+  writeFileSync(join(sourceDir, "manifest.webmanifest"), "{\"name\":\"NexusIM\"}\n", "utf8");
+  writeFileSync(join(sourceDir, "nexusim-sw.js"), "self.addEventListener('fetch', () => {});\n", "utf8");
   writeFileSync(join(sourceDir, "nexusim-shell-config.js"), "globalThis.__NEXUSIM_CLIENT_SHELL__ = {};\n", "utf8");
+  writeFileSync(join(sourceDir, "pwa-icon.svg"), "<svg xmlns=\"http://www.w3.org/2000/svg\"></svg>\n", "utf8");
   return sourceDir;
 }
 
@@ -41,7 +44,7 @@ try {
   });
   assert(skipped.skipped === true, "wrapper should skip preparation when requested");
   assert(skipped.verified === true, "wrapper skip path must verify existing manifest");
-  assert(skipped.fileCount === 3, "wrapper skip path verifier file count mismatch");
+  assert(skipped.fileCount === 6, "wrapper skip path verifier file count mismatch");
 
   rmSync(join(outputDir, "nexusim-shell-assets-manifest.json"), { force: true });
   let rejectedMissingManifest = false;

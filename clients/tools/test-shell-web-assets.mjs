@@ -16,7 +16,10 @@ function createSourceDist(root) {
   mkdirSync(join(sourceDir, "assets"), { recursive: true });
   writeFileSync(join(sourceDir, "index.html"), "<html><script src=\"/nexusim-shell-config.js\"></script></html>", "utf8");
   writeFileSync(join(sourceDir, "assets", "index.js"), "console.log('nexusim');\n", "utf8");
+  writeFileSync(join(sourceDir, "manifest.webmanifest"), "{\"name\":\"NexusIM\"}\n", "utf8");
+  writeFileSync(join(sourceDir, "nexusim-sw.js"), "self.addEventListener('fetch', () => {});\n", "utf8");
   writeFileSync(join(sourceDir, "nexusim-shell-config.js"), "globalThis.__NEXUSIM_CLIENT_SHELL__ = {};\n", "utf8");
+  writeFileSync(join(sourceDir, "pwa-icon.svg"), "<svg xmlns=\"http://www.w3.org/2000/svg\"></svg>\n", "utf8");
   return sourceDir;
 }
 
@@ -42,7 +45,7 @@ try {
   assert(!existsSync(join(desktopOut, "assets", "stale.js")), "desktop output must remove stale assets");
   assertShellAssetsManifest(desktopOut, "windows-desktop");
   const desktopVerification = verifyShellAssets({ target: "windows-desktop", outputDir: desktopOut });
-  assert(desktopVerification.fileCount === 3, "desktop verifier file count mismatch");
+  assert(desktopVerification.fileCount === 6, "desktop verifier file count mismatch");
 
   const androidOut = join(tempRoot, "android-out");
   mkdirSync(join(androidOut, "assets"), { recursive: true });
@@ -60,7 +63,7 @@ try {
   assert(!existsSync(join(androidOut, "assets", "stale.js")), "android output must remove stale assets");
   assertShellAssetsManifest(androidOut, "android");
   const androidVerification = verifyShellAssets({ target: "android", outputDir: androidOut });
-  assert(androidVerification.fileCount === 3, "android verifier file count mismatch");
+  assert(androidVerification.fileCount === 6, "android verifier file count mismatch");
 
   writeFileSync(join(androidOut, "assets", "unexpected.js"), "console.log('unexpected');\n", "utf8");
   let rejectedStaleAsset = false;
@@ -97,7 +100,14 @@ function assertShellAssetsManifest(outputDir, target) {
   assert(!serialized.match(/[A-Z]:\\\\/), `${target} manifest leaked Windows absolute path`);
   assert(!serialized.includes("\\\\?"), `${target} manifest leaked extended Windows path`);
   const files = new Map(manifest.files.map(file => [file.path, file]));
-  for (const path of ["index.html", "assets/index.js", "nexusim-shell-config.js"]) {
+  for (const path of [
+    "index.html",
+    "assets/index.js",
+    "manifest.webmanifest",
+    "nexusim-shell-config.js",
+    "nexusim-sw.js",
+    "pwa-icon.svg"
+  ]) {
     const file = files.get(path);
     assert(file, `${target} manifest missing ${path}`);
     const bytes = readFileSync(join(outputDir, path));

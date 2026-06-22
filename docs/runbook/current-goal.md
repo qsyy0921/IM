@@ -172,7 +172,9 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   Web build，而直接运行 Tauri 仍会自动准备 assets；Android wrapper 会在已准备并校验
   manifest 后传 `-Pnexusim.skipWebAssetPrep=true`，避免 Gradle `preBuild` 重复跑同一
   Web build，而直接运行 Gradle 仍会自动准备 assets。该流程已通过 focused
-  `test:shell-web-assets`、desktop / Android validators 和实际 shell asset build。
+  `test:shell-web-assets`、desktop / Android validators 和实际 shell asset build；
+  focused asset tests 现在也覆盖 PWA `manifest.webmanifest`、`nexusim-sw.js` 和
+  `pwa-icon.svg` 会进入目标 shell asset manifest。
 - `clients/tools/build-desktop-artifact.mjs` 与
   `clients/tools/build-android-apk.mjs` 已提供 first-stage artifact / APK build
   wrapper；`test:artifact-builders` 覆盖 dry-run 命令计划和低敏输出。Windows

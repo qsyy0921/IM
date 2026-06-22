@@ -230,8 +230,10 @@ First slice:
   also checks stale bundle cleanup so Android / desktop shell outputs do not
   retain old Web assets across builds, and verifies the low-sensitive
   `nexusim-shell-assets-manifest.json` with relative paths, byte sizes and
-  SHA-256 hashes. Native artifact wrappers call the same manifest verifier
-  after preparing assets and before invoking Tauri / Gradle.
+  SHA-256 hashes. The focused fixture includes the Browser PWA manifest,
+  service worker and icon so target shell asset manifests cannot silently drop
+  those files. Native artifact wrappers call the same manifest verifier after
+  preparing assets and before invoking Tauri / Gradle.
 - `npm --prefix clients run test:artifact-builders` validates the first-stage
   desktop artifact / Android APK build wrappers in dry-run mode. Windows
   desktop can now build through the repo-local Tauri CLI after

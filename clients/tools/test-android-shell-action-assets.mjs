@@ -46,6 +46,10 @@ try {
   assert(bundleText.includes("PullInbox"), "android shell bundle must keep PullInbox as the display fact source");
 
   const serializedManifest = readFileSync(join(androidAssets, "nexusim-shell-assets-manifest.json"), "utf8");
+  for (const path of ["manifest.webmanifest", "nexusim-sw.js", "pwa-icon.svg"]) {
+    assert(serializedManifest.includes(`"path": "${path}"`), `android shell asset manifest missing ${path}`);
+    assert(existsSync(join(androidAssets, path)), `android shell assets missing ${path}`);
+  }
   assert(!serializedManifest.match(/[A-Z]:\\\\/), "android shell asset manifest leaked a Windows absolute path");
   assert(!serializedManifest.includes("\\\\?"), "android shell asset manifest leaked an extended Windows path");
 

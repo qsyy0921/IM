@@ -211,6 +211,11 @@ First slice:
 - `npm --prefix clients run test:web-pwa` validates the Browser PWA contract:
   manifest, icon, service worker registration, WebView target skip and
   cache-bypass rules for API / WebSocket / shell config paths.
+- `npm --prefix clients run check:no-toolchain` runs the no-toolchain client
+  shell guard set in one command: shell smoke plan, Web PWA, shell web assets,
+  desktop / Android action assets and Android platform readiness. It does not
+  build APKs, launch Docker, connect devices or install toolchains; run the
+  individual scripts only when a specific guard fails.
 - `npm --prefix clients run test:web-shell-actions` guards the Web shell
   lifecycle contract. It verifies the Web shell binds login, refresh, restore
   and logout through shared `ClientShellActions` and does not call runtime auth
@@ -445,6 +450,7 @@ Focused local check:
 ```powershell
 npm --prefix clients run check:build-prereqs
 npm --prefix clients run test:shell-config
+npm --prefix clients run check:no-toolchain
 npm --prefix clients run test:web-pwa
 npm --prefix clients run test:shell-web-assets
 npm --prefix clients run test:desktop-shell-action-assets

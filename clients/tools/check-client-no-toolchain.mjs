@@ -1,0 +1,98 @@
+import { execFileSync } from "node:child_process";
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const clientsRoot = fileURLToPath(new URL("..", import.meta.url));
+const checkPlan = [
+  {
+    name: "shell-smoke-plan",
+    script: "test:shell-smoke-plan",
+    reason: "guards browser, desktop and Android shell smoke checklist shape"
+  },
+  {
+    name: "web-pwa-contract",
+    script: "test:web-pwa",
+    reason: "guards browser manifest and service-worker cache boundary"
+  },
+  {
+    name: "shell-web-assets",
+    script: "test:shell-web-assets",
+    reason: "guards target shell asset manifest and PWA asset propagation"
+  },
+  {
+    name: "desktop-shell-action-assets",
+    script: "test:desktop-shell-action-assets",
+    reason: "guards desktop WebView assets without Tauri or installer"
+  },
+  {
+    name: "android-shell-action-assets",
+    script: "test:android-shell-action-assets",
+    reason: "guards Android WebView assets without Gradle, SDK, APK or device"
+  },
+  {
+    name: "android-platform-readiness-contract",
+    script: "test:android-platform-readiness",
+    reason: "guards low-sensitive Android platform readiness schema"
+  },
+  {
+    name: "android-platform-readiness-report",
+    script: "report:android-platform-readiness",
+    reason: "reports local Android toolchain, Docker builder and ADB state without downloading"
+  }
+];
+
+function main() {
+  const args = new Set(process.argv.slice(2));
+  if (args.has("--dry-run")) {
+    process.stdout.write(`${JSON.stringify(buildDryRunPlan(), null, 2)}\n`);
+    return;
+  }
+
+  for (const check of checkPlan) {
+    console.log(`\n[client-no-toolchain] ${check.name}: npm --prefix clients run ${check.script}`);
+    runNpmScript(check.script);
+  }
+  console.log("\nclient no-toolchain checks ok");
+}
+
+export function buildDryRunPlan() {
+  return {
+    schemaVersion: "nexusim.client-no-toolchain-check.v1",
+    downloadsToolchain: false,
+    touchesDevice: false,
+    startsServices: false,
+    checks: checkPlan.map(check => ({
+      name: check.name,
+      command: `npm --prefix clients run ${check.script}`,
+      reason: check.reason
+    }))
+  };
+}
+
+function runNpmScript(script) {
+  const npmExecPath = process.env.npm_execpath;
+  if (npmExecPath) {
+    execFileSync(process.execPath, [npmExecPath, "--prefix", clientsRoot, "run", script], {
+      cwd: clientsRoot,
+      stdio: "inherit"
+    });
+    return;
+  }
+
+  const npm = process.platform === "win32" ? "npm.cmd" : "npm";
+  execFileSync(npm, ["--prefix", clientsRoot, "run", script], {
+    cwd: clientsRoot,
+    stdio: "inherit",
+    shell: process.platform === "win32"
+  });
+}
+
+const thisFile = fileURLToPath(import.meta.url);
+if (resolve(process.argv[1] ?? "") === thisFile) {
+  try {
+    main();
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exitCode = 2;
+  }
+}

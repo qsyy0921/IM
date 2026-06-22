@@ -18,6 +18,8 @@
     "test:web-shell-actions": "node ./tools/test-web-shell-lifecycle-contract.mjs",
     "test:web-shell-automation": "node ./tools/test-web-shell-automation-contract.mjs",
     "test:web-shell-smoke-report": "node ./tools/test-web-shell-smoke-report.mjs",
+    "test:no-toolchain-check": "node ./tools/test-client-no-toolchain-check.mjs",
+    "check:no-toolchain": "node ./tools/check-client-no-toolchain.mjs",
     "test:web-pwa": "node ./tools/test-web-pwa-contract.mjs",
     "test:shell-config": "node ./tools/test-shell-config-contract.mjs",
     "test:shell-web-assets": "node ./tools/test-shell-web-assets.mjs",

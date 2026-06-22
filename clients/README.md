@@ -76,6 +76,7 @@ dependencies:
 ```powershell
 npm --prefix clients run validate
 npm --prefix clients run test:shell-config
+npm --prefix clients run check:no-toolchain
 npm --prefix clients run test:web-pwa
 npm --prefix clients run test:shell-web-assets
 npm --prefix clients run test:shell-asset-prep-wrapper
@@ -196,3 +197,6 @@ Current packaging status:
   `report:android-platform-readiness`, so local JDK / Gradle / Android SDK,
   Docker builder image and ADB device state are visible before any APK or
   WebView smoke step.
+- `check:no-toolchain` runs the fast client shell guard set without launching
+  Docker, connecting devices, building APKs or installing toolchains. Use it as
+  the default focused client gate before reaching for a broader local gate.

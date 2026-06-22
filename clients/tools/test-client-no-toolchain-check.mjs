@@ -21,6 +21,8 @@ assert(commands.includes("npm --prefix clients run test:shell-smoke-plan"), "she
 assert(commands.includes("npm --prefix clients run test:web-pwa"), "web PWA check missing");
 assert(commands.includes("npm --prefix clients run test:shell-web-assets"), "shell asset check missing");
 assert(commands.includes("npm --prefix clients run test:desktop-shell-action-assets"), "desktop action asset check missing");
+assert(commands.includes("npm --prefix clients run test:desktop-webview-metadata-smoke"), "desktop WebView metadata runner contract check missing");
+assert(commands.includes("npm --prefix clients run test:desktop-webview-login-smoke"), "desktop WebView login runner contract check missing");
 assert(commands.includes("npm --prefix clients run test:android-shell-action-assets"), "android action asset check missing");
 assert(commands.includes("npm --prefix clients run test:android-webview-login-smoke-plan"), "android WebView login plan check missing");
 assert(commands.includes("npm --prefix clients run test:android-webview-login-smoke"), "android WebView login runner contract check missing");

@@ -25,6 +25,16 @@ const checkPlan = [
     reason: "guards desktop WebView assets without Tauri or installer"
   },
   {
+    name: "desktop-webview-metadata-runner-contract",
+    script: "test:desktop-webview-metadata-smoke",
+    reason: "guards desktop WebView metadata smoke dry-run output without building or launching the desktop artifact"
+  },
+  {
+    name: "desktop-webview-login-runner-contract",
+    script: "test:desktop-webview-login-smoke",
+    reason: "guards desktop login-level WebView smoke dry-run output without building or launching the desktop artifact"
+  },
+  {
     name: "android-shell-action-assets",
     script: "test:android-shell-action-assets",
     reason: "guards Android WebView assets without Gradle, SDK, APK or device"

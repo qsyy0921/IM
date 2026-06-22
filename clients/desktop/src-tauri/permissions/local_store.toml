@@ -1,0 +1,9 @@
+[[permission]]
+identifier = "allow-local-store"
+description = "Enables the audited local-store key-value commands without any pre-configured scope."
+commands.allow = ["local_store_get_item", "local_store_set_item", "local_store_remove_item"]
+
+[[permission]]
+identifier = "deny-local-store"
+description = "Denies the audited local-store key-value commands without any pre-configured scope."
+commands.deny = ["local_store_get_item", "local_store_set_item", "local_store_remove_item"]

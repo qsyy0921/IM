@@ -79,8 +79,10 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   local cache；focused test 覆盖 store 实例重开后的 cursor persistence、pending
   send、accepted send 稳定 key 迁移、防 replay duplicate、failed-send 状态和
   conversations-needing-sync 列表。desktop / Android 均已预留 `sqlite` store
-  config；desktop 在 native bridge 未实现前通过 shared `NativeStoreReadiness`
-  合约 fail-fast，Android 源码侧已实现固定前缀 SQLite key-value bridge 但仍未产出
+  config；desktop 源码侧现在已实现 Tauri `local_store_get_item` /
+  `local_store_set_item` / `local_store_remove_item` 固定命令，底层使用 app-local-data
+  下的 SQLite key-value 表，并只接受 `nexusim:client-message-store:v1:` 前缀 key；
+  Android 源码侧也已实现固定前缀 SQLite key-value bridge 但仍未产出
   APK / 真机 smoke baseline；现在也已有 shared
   `NativeBridgeStringKeyValueStorage` 合约，desktop / Android 平台 adapter 在显式
   注入 native key-value bridge 时可用同一 `KeyValueMessageStore` 语义跑通
@@ -90,8 +92,10 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   Web shell platform adapter 现在可在 Android metadata ready 且 bridge 方法齐全时
   把 native bridge 交给 shared `KeyValueMessageStore`；否则保持 browser
   IndexedDB / WebView localStorage 路径。focused runtime test 用 fake native bridge
-  覆盖了 cursor / message 持久化和重开；真实 Tauri SQLite 命令桥仍未实现，
-  Android SQLite bridge 仍等待 APK 构建和真机 WebView smoke 证明。
+  覆盖了 cursor / message 持久化和重开；Tauri SQLite 命令桥已通过 Rust unit
+  test 和 desktop validator，但仍需要重新跑真实 Tauri WebView metadata / login
+  smoke 作为运行时 baseline；Android SQLite bridge 仍等待 APK 构建和真机 WebView
+  smoke 证明。
 - `LocalMessageStore.listMessages` 已提升为 shared client-core port；
   `MemoryMessageStore`、`KeyValueMessageStore` 和 Web `IndexedDBMessageStore`
   现在都有同一读缓存语义，并补了 pending -> accepted-send 迁移去重测试。
@@ -335,9 +339,10 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
    `npm --prefix clients run build:android-apk:docker:bootstrap` 构建 Android Docker builder
    image；镜像存在后运行 `npm --prefix clients run build:android-apk:docker` 产出首个 APK + manifest。
 2. 在真实 Android shell UI 中接入现有 shell action，并在工具链 ready 后跑平台 shell smoke。
-3. 后续实现真实 Tauri / Android SQLite native key-value command bridge，把
-   desktop / Android first-stage localStorage store 替换为 native SQLite，并补真实平台 runtime smoke；当前 shared readiness 和
-   native bridge storage 合约已固定，后续只替换平台桥实现，不改 sync core。
+3. 重新跑 desktop Tauri WebView metadata / login smoke，确认真实 WebView 内
+   `tauri-sqlite` ready 证据与本轮源码 bridge 一致；Android 仍需在 APK 工具链 ready
+   后验证 `android-sqlite` 真机路径。当前 shared readiness 和 native bridge storage
+   合约已固定，后续只替换 / 验证平台桥实现，不改 sync core。
 4. 再回到 workflow compensation adapter / instruction approval UI / ops 管理；
    当前已有本地 workflow get / decision / decision manifest / instruction list CLI，
    低敏 compensation instruction manifest 生成 / 校验，以及 catalog-backed import

@@ -22,6 +22,7 @@ const requiredPaths = [
   "desktop/src-tauri/Cargo.toml",
   "desktop/src-tauri/build.rs",
   "desktop/src-tauri/capabilities/default.json",
+  "desktop/src-tauri/permissions/local_store.toml",
   "desktop/src-tauri/permissions/runtime_metadata.toml",
   "desktop/src-tauri/src/main.rs",
   "desktop/src-tauri/tauri.conf.json",
@@ -38,6 +39,7 @@ for (const relativePath of requiredPaths) {
 const cargo = read("desktop/src-tauri/Cargo.toml");
 assert(cargo.includes('name = "nexusim-desktop"'), "Cargo package name mismatch");
 assert(cargo.includes('tauri = { version = "2"'), "Tauri v2 dependency missing");
+assert(cargo.includes('rusqlite = { version = "0.32", features = ["bundled"] }'), "desktop SQLite key-value dependency missing");
 assert(cargo.includes('tauri-build = { version = "2"'), "Tauri v2 build dependency missing");
 
 const build = read("desktop/src-tauri/build.rs");
@@ -45,18 +47,27 @@ assert(build.includes("tauri_build::build()"), "Tauri build hook missing");
 
 const main = read("desktop/src-tauri/src/main.rs");
 assert(main.includes("tauri::Builder::default()"), "Tauri Builder entrypoint missing");
-assert(main.includes("#[tauri::command]"), "desktop shell must expose only audited Tauri commands");
-assert(countMatches(main, /#\[tauri::command\]/g) === 1, "desktop shell must expose only runtime_metadata");
+assert(main.includes("#[tauri::command]"), "desktop shell must expose audited Tauri commands");
+assert(countMatches(main, /#\[tauri::command\]/g) === 4, "desktop shell must expose only runtime_metadata and fixed local_store commands");
 assert(main.includes("fn runtime_metadata() -> String"), "desktop runtime metadata command missing");
-assert(main.includes("tauri::generate_handler![runtime_metadata]"), "desktop invoke handler must only register runtime_metadata");
+assert(main.includes("fn local_store_get_item("), "desktop local_store_get_item command missing");
+assert(main.includes("fn local_store_set_item("), "desktop local_store_set_item command missing");
+assert(main.includes("fn local_store_remove_item("), "desktop local_store_remove_item command missing");
+assert(main.includes("tauri::generate_handler!["), "desktop invoke handler missing");
+assert(main.includes("runtime_metadata,"), "desktop invoke handler must register runtime_metadata");
+assert(main.includes("local_store_get_item,"), "desktop invoke handler must register local_store_get_item");
+assert(main.includes("local_store_set_item,"), "desktop invoke handler must register local_store_set_item");
+assert(main.includes("local_store_remove_item"), "desktop invoke handler must register local_store_remove_item");
 assert(main.includes('RUNTIME_TARGET: &str = "windows-desktop"'), "desktop runtime target marker missing");
-assert(main.includes('NATIVE_BRIDGE_VERSION: &str = "0.1.0"'), "desktop native bridge version marker missing");
+assert(main.includes('NATIVE_BRIDGE_VERSION: &str = "0.2.0"'), "desktop native bridge version marker missing");
 assert(main.includes('LOCAL_STORE_CURRENT: &str = "local-storage"'), "desktop local store current marker missing");
 assert(main.includes('LOCAL_STORE_TARGET: &str = "sqlite"'), "desktop local store target marker missing");
-assert(main.includes('NATIVE_STORE_READY: &str = "false"'), "desktop native store readiness marker missing");
-assert(main.includes('NATIVE_STORE_REASON: &str = "sqlite-native-bridge-unavailable"'), "desktop native store reason marker missing");
+assert(main.includes('NATIVE_STORE_READY: &str = "true"'), "desktop native store readiness marker missing");
+assert(main.includes('NATIVE_STORE_REASON: &str = ""'), "desktop native store reason marker missing");
 assert(main.includes('NATIVE_STORE_BRIDGE: &str = "tauri-sqlite"'), "desktop native store bridge marker missing");
-assert(!main.match(/std::fs|File::|Command::|process::|token|secret|password|credential|message_id/i), "desktop metadata bridge must not expose sensitive or broad native capability");
+assert(main.includes('LOCAL_STORE_KEY_PREFIX: &str = "nexusim:client-message-store:v1:"'), "desktop local store key prefix guard missing");
+assert(main.includes("app_local_data_dir()"), "desktop local store must use app-local data directory");
+assert(!main.match(/Command::|process::|token|secret|password|credential|message_id/i), "desktop native bridge must not expose sensitive or broad process capability");
 
 const config = readJSON("desktop/src-tauri/tauri.conf.json");
 assert(config.productName === "NexusIM", "desktop product name mismatch");
@@ -73,14 +84,24 @@ assert(capability.identifier === "main-shell-metadata", "desktop capability iden
 assert(Array.isArray(capability.windows) && capability.windows.length === 1 && capability.windows[0] === "main", "desktop capability must target only the main window");
 assert(Array.isArray(capability.permissions), "desktop capability permissions missing");
 assert(capability.permissions.includes("core:default"), "desktop capability must include core default IPC permission set");
-assert(capability.permissions.includes("allow-runtime-metadata"), "desktop capability must allow only runtime_metadata app command");
-assert(capability.permissions.length === 2, "desktop capability must not grant additional native commands");
+assert(capability.permissions.includes("allow-runtime-metadata"), "desktop capability must allow runtime_metadata app command");
+assert(capability.permissions.includes("allow-local-store"), "desktop capability must allow fixed local-store commands");
+assert(capability.permissions.length === 3, "desktop capability must not grant additional native commands");
 
 const runtimeMetadataPermission = read("desktop/src-tauri/permissions/runtime_metadata.toml");
 assert(runtimeMetadataPermission.includes('identifier = "allow-runtime-metadata"'), "desktop runtime metadata allow permission missing");
 assert(runtimeMetadataPermission.includes('commands.allow = ["runtime_metadata"]'), "desktop runtime metadata command allow missing");
 assert(runtimeMetadataPermission.includes('identifier = "deny-runtime-metadata"'), "desktop runtime metadata deny permission missing");
-assert(!runtimeMetadataPermission.match(/std::fs|File::|Command::|process::|token|secret|password|credential|message_id/i), "desktop runtime metadata permission must not mention broad native capability");
+assert(!runtimeMetadataPermission.match(/File::|Command::|process::|token|secret|password|credential|message_id/i), "desktop runtime metadata permission must not mention broad native capability");
+
+const localStorePermission = read("desktop/src-tauri/permissions/local_store.toml");
+assert(localStorePermission.includes('identifier = "allow-local-store"'), "desktop local store allow permission missing");
+assert(
+  localStorePermission.includes('commands.allow = ["local_store_get_item", "local_store_set_item", "local_store_remove_item"]'),
+  "desktop local store command allow missing"
+);
+assert(localStorePermission.includes('identifier = "deny-local-store"'), "desktop local store deny permission missing");
+assert(!localStorePermission.match(/File::|Command::|process::|token|secret|password|credential|message_id/i), "desktop local store permission must not mention broad native capability");
 
 const clientsPackage = readJSON("package.json");
 assert(clientsPackage.scripts?.["prepare:shell-assets:desktop"]?.includes("prepare-shell-web-assets-if-needed.mjs"), "clients package must expose desktop shell asset prep entrypoint");

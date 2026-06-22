@@ -121,12 +121,15 @@ First slice:
   network/lifecycle ports and unsupported local wakeup notifications. This
   moves desktop beyond a pure contract, but it is not an installer yet.
 - `clients/desktop/src-tauri` now has a first-stage Tauri v2 Rust runner
-  skeleton with only a read-only `runtime_metadata` IPC command. The command
-  can include low-sensitive capability readiness such as local-store bridge
-  status, but it does not expose native storage APIs. `bundle.active`
-  remains `false`, so the current native output is a standalone exe rather than
-  an MSI / NSIS installer. The Web shell can invoke this command for diagnostics
-  and fails closed on malformed metadata.
+  skeleton with a read-only `runtime_metadata` IPC command plus fixed
+  `local_store_get_item` / `local_store_set_item` / `local_store_remove_item`
+  commands. Those local-store commands use an app-local-data SQLite key-value
+  table and accept only `nexusim:client-message-store:v1:` keys, so the bridge
+  cannot become a token store, filesystem bridge or arbitrary SQL surface.
+  `bundle.active` remains `false`, so the current native output is a standalone
+  exe rather than an MSI / NSIS installer. The Web shell can invoke this command
+  set for diagnostics and local message cache persistence, and fails closed on
+  malformed metadata.
   Its `frontendDist` resolves to the shared prepared `clients/web/dist`, not a
   desktop-local duplicate Web build.
 - `clients/android` now has a first-stage TypeScript runtime adapter:
@@ -170,16 +173,17 @@ First slice:
   clears local message cache.
 - `@nexusim/client-core` now exposes `KeyValueMessageStore`, a reusable
   string-KV persistent store for non-browser targets. Desktop and Android use
-  first-stage WebView `localStorage` wrappers by default; future native SQLite
-  adapters can replace only the storage/platform port. Desktop and Android
-  `sqlite` config is reserved and fails fast through shared
-  `NativeStoreReadiness` until that bridge exists. The readiness contract emits
-  stable low-sensitive `reason`, expected bridge and next action fields, so
-  tools and runtime adapters do not need target-specific error strings. Web
-  shell adapter wiring now accepts an Android ready native key-value bridge
-  and routes it through shared `KeyValueMessageStore`; the Kotlin source bridge
-  now reports ready but still needs APK build and real-device WebView smoke
-  evidence before it becomes a runtime baseline.
+  first-stage WebView `localStorage` wrappers by default, but both source trees
+  now have native SQLite key-value bridge implementations. Desktop exposes
+  fixed Tauri `local_store_*` commands backed by app-local-data SQLite; Android
+  exposes fixed-prefix `NexusIMNative.localStore*` methods. The readiness
+  contract emits stable low-sensitive `reason`, expected bridge and next action
+  fields, so tools and runtime adapters do not need target-specific error
+  strings. Web shell adapter wiring accepts ready native key-value bridges and
+  routes them through shared `KeyValueMessageStore`; desktop still needs a fresh
+  WebView smoke with `tauri-sqlite` ready evidence, and Android still needs APK
+  build plus real-device WebView smoke before either runtime path becomes a
+  packaged baseline.
   `LocalMessageStore.clear` is now part of the shared port so logout can remove
   cached messages, cursors and pending sends consistently across targets.
 - `LocalMessageStore.listMessages` is now part of the shared port. Web,
@@ -251,10 +255,11 @@ First slice:
   without printing local absolute paths. It also includes per-target prepared
   shell asset verification status and per-target local store readiness. The
   local store section records the current first-stage `local-storage` cache,
-  target `sqlite` production store and native bridge readiness without treating
-  desktop's missing SQLite bridge as a blocker for current shell smoke. Android
-  source now reports `android-sqlite` ready, but APK build and real-device smoke
-  are still required before treating it as a runtime baseline. It separates the Android Docker builder image
+  target `sqlite` production store and native bridge readiness. Desktop source
+  now reports `tauri-sqlite` ready, but earlier real WebView smoke reports
+  should be rerun to capture that updated evidence. Android source now reports
+  `android-sqlite` ready, but APK build and real-device smoke are still
+  required before treating it as a runtime baseline. It separates the Android Docker builder image
   build command from the actual builder run command and emits low-sensitive
   `nextActions`; it never starts a download or build by itself. When the image
   is missing, the next action points at `build:android-apk:docker:bootstrap`,
@@ -323,10 +328,11 @@ First slice:
   It does not replace existing secure mTLS gateway / push smoke coverage.
 - PC desktop and Android now both have first-stage TypeScript runtime adapters.
   PC desktop also has a Tauri runner skeleton, and Android has a Kotlin native
-  WebView asset shell skeleton. PC exposes only read-only runtime metadata IPC
-  and Web can read it for diagnostics; Android exposes only a single-method
-  read-only metadata JavaScript bridge. Both targets reserve native SQLite store
-  config and fail closed via shared readiness until native bridges exist. Windows desktop now
+  WebView asset shell skeleton. PC exposes read-only runtime metadata IPC and
+  fixed SQLite-backed local-store key-value commands; Android exposes metadata
+  plus fixed-prefix SQLite local-store methods. Both targets keep native storage
+  behind shared readiness and do not expose broad filesystem, token or message
+  APIs. Windows desktop now
   produces a first-stage standalone `.exe` artifact and low-sensitive collected
   manifest; `smoke:desktop-artifact-launch` has verified the exe starts, stays
   alive during the smoke hold window and terminates cleanly.
@@ -336,7 +342,8 @@ First slice:
   smoke:desktop-webview-metadata` now proves the Tauri WebView can load the
   prepared shell, read the PC `runtime_metadata` IPC and POST a low-sensitive
   loopback report from inside the rendered shell. The report includes the
-  native local-store readiness diagnostic but not a storage API. The fuller login-level
+  native local-store readiness diagnostic and the fixed storage command surface.
+  The fuller login-level
   desktop UI smoke has also passed on clean commit `c72ea512`, covering WebView
   login, externally triggered `delivery.notify`, PullInbox, message observe and
   AckDelivery. Android now has the same metadata-smoke runner shape, but it
@@ -367,10 +374,11 @@ rejected. For local LAN client smoke, prefer the wired `172.x.x.x` address.
    builder image only when toolchain download is acceptable.
 2. Wire lifecycle UI controls into the real Android shell, and run platform-shell
    smoke once packaging/runtime tooling is ready.
-3. Replace first-stage desktop / Android localStorage stores with native SQLite
-   bridge adapters when packaging/runtime tooling is ready. The shared
+3. Rerun desktop Tauri WebView metadata / login smoke to capture the new
+   `tauri-sqlite` ready evidence, then validate Android `android-sqlite` on a
+   real APK once packaging/runtime tooling is ready. The shared
    `NativeStoreReadiness` contract is already in place; the remaining work is
-   implementing the actual Tauri / Android SQLite bridge and platform smoke.
+   platform smoke, not changing client-core sync semantics.
 
 ## Local Build Prerequisites
 

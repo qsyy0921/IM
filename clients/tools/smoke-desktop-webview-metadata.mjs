@@ -336,8 +336,8 @@ function isExpectedMetadataReport(report, runID) {
     report.native.runtimeLabel.trim() !== "" &&
     report?.native?.localStore?.currentDefault === "local-storage" &&
     report?.native?.localStore?.productionTarget === "sqlite" &&
-    report?.native?.localStore?.nativeStoreReady === false &&
-    report?.native?.localStore?.nativeStoreReason === "sqlite-native-bridge-unavailable" &&
+    report?.native?.localStore?.nativeStoreReady === true &&
+    report?.native?.localStore?.nativeStoreReason === "" &&
     report?.native?.localStore?.nativeStoreBridge === "tauri-sqlite" &&
     report?.runtimeConfig?.apiConfigured === true &&
     report?.runtimeConfig?.pushConfigured === true

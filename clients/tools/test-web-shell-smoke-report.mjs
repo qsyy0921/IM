@@ -56,16 +56,16 @@ async function main() {
     },
     {
       target: "windows-desktop",
-      nativeBridgeVersion: "0.1.0",
+      nativeBridgeVersion: "0.2.0",
       runtimeLabel: "NexusIM desktop shell",
       capabilities: {
         localStore: {
           target: "windows-desktop",
           requestedStore: "sqlite",
-          ready: false,
-          reason: "sqlite-native-bridge-unavailable",
+          ready: true,
+          reason: "",
           bridge: "tauri-sqlite",
-          nextAction: "tauri-sqlite is required before windows-desktop can use sqlite local store"
+          nextAction: ""
         }
       }
     }
@@ -73,8 +73,8 @@ async function main() {
   assertEqual(report.schemaVersion, "nexusim.shell-webview-metadata-smoke.v1", "schema mismatch");
   assertEqual(report.nativeMetadataReady, true, "native metadata readiness mismatch");
   assertEqual(report.native?.target, "windows-desktop", "native target mismatch");
-  assertEqual(report.native?.localStore?.nativeStoreReady, false, "native store readiness mismatch");
-  assertEqual(report.native?.localStore?.nativeStoreReason, "sqlite-native-bridge-unavailable", "native store reason mismatch");
+  assertEqual(report.native?.localStore?.nativeStoreReady, true, "native store readiness mismatch");
+  assertEqual(report.native?.localStore?.nativeStoreReason, "", "native store reason mismatch");
   assertEqual(report.native?.localStore?.nativeStoreBridge, "tauri-sqlite", "native store bridge mismatch");
   assertEqual(report.runtimeConfig.apiConfigured, true, "api configured mismatch");
 

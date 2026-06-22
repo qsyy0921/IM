@@ -13,21 +13,23 @@ the native bridge can stay narrow and auditable.
 - The shell includes development-only session storage, an in-memory message
   cache, static lifecycle/network ports, and unsupported local wakeup
   notifications.
-- First Tauri v2 Rust runner skeleton exists under `src-tauri`; it exposes only
-  the read-only `runtime_metadata` command. The shared Web shell can read this
-  metadata for diagnostics, including local-store bridge readiness, and must
-  fail closed on malformed bridge output.
+- First Tauri v2 Rust runner skeleton exists under `src-tauri`; it exposes the
+  read-only `runtime_metadata` command plus fixed local-store key-value commands:
+  `local_store_get_item`, `local_store_set_item`, and
+  `local_store_remove_item`. The shared Web shell can read metadata for
+  diagnostics, including local-store bridge readiness, and must fail closed on
+  malformed bridge output.
 - `shell-config.example.json` records the low-permission WebView config bridge
   for local LAN endpoints and desktop runtime identity. It can be rendered to
   `web/public/nexusim-shell-config.js` before a shell build.
-- The reserved `sqlite` local store config fails closed through shared
-  `NativeStoreReadiness` with reason `sqlite-native-bridge-unavailable` and
-  expected bridge `tauri-sqlite` unless an explicit native key-value bridge is
-  injected. The TypeScript-side bridge contract is in place and covered by
-  focused tests. Web runtime discovery now only enables it when metadata reports
-  ready and Tauri exposes all `local_store_*` commands; the current Tauri shell
-  still uses localStorage persistence until that SQLite command bridge is
-  implemented.
+- The reserved `sqlite` local store config now has a Tauri implementation
+  backed by an app-local-data SQLite key-value table. The command bridge accepts
+  only the shared `nexusim:client-message-store:v1:` key namespace and returns a
+  stable public error string on storage failures. The TypeScript-side bridge
+  contract is in place and covered by focused tests. Web runtime discovery only
+  enables the native store when metadata reports ready and Tauri exposes all
+  `local_store_*` commands. Fresh real WebView metadata / login smoke should be
+  rerun before treating this as the packaged desktop runtime baseline.
 - `npm --prefix clients run build:desktop-artifact` is the first-stage artifact
   wrapper. It prepares and verifies Web assets, then runs the available Tauri
   CLI with `NEXUSIM_SKIP_SHELL_ASSET_PREP=true` so Tauri does not run the same
@@ -50,9 +52,9 @@ the native bridge can stay narrow and auditable.
 ## Security Rules
 
 - Desktop IPC must expose only explicit commands.
-- Current IPC is a single-command metadata bridge. It must not expose tokens,
-  storage, file-system access or message APIs until a separate native capability
-  ADR defines the audit and permission boundary.
+- Current IPC is limited to runtime metadata and fixed SQLite local-store
+  key-value commands. It must not expose tokens, arbitrary storage keys,
+  file-system access, process execution, arbitrary SQL or message APIs.
 - Shell config is endpoint and identity metadata only. It must not contain
   gateway tokens, refresh tokens, passwords, private keys, or arbitrary native
   capability flags.
@@ -66,6 +68,7 @@ the native bridge can stay narrow and auditable.
 ```powershell
 npm --prefix clients run typecheck:desktop
 npm --prefix clients run validate:desktop-tauri
+cargo test --manifest-path clients/desktop/src-tauri/Cargo.toml
 npm --prefix clients run test:shell-config
 npm --prefix clients run test:shell-asset-prep-wrapper
 npm --prefix clients run test:artifact-builders

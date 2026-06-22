@@ -32,7 +32,8 @@ assert(plan.targets["windows-desktop"].localStore?.nativeStoreReadiness?.bridge 
 assert(plan.targets["windows-desktop"].webviewLoginEvidence?.requiredSelectors?.includes("native-store-readiness"), "desktop WebView login native-store selector evidence missing");
 assert(plan.targets["windows-desktop"].webviewLoginEvidence?.requiredSummaryFields?.includes("nativeStore.readiness.bridge"), "desktop WebView login native store summary field missing");
 assert(plan.targets["windows-desktop"].webviewLoginEvidence?.localStore?.nativeStoreReadiness?.bridge === "tauri-sqlite", "desktop WebView login local store bridge evidence missing");
-assert(plan.targets["windows-desktop"].notes.some(note => note.includes("Native SQLite local store is not ready")), "desktop native sqlite note missing");
+assert(plan.targets["windows-desktop"].localStore?.nativeStoreReadiness?.ready === true, "desktop native sqlite source readiness should be true");
+assert(!plan.targets["windows-desktop"].notes.some(note => note.includes("Native SQLite local store is not ready")), "desktop native sqlite not-ready note should be absent once source bridge is ready");
 assert(typeof plan.targets["windows-desktop"].install.readyForInstall === "boolean", "desktop install readiness missing");
 assert(Array.isArray(plan.targets["windows-desktop"].install.missing), "desktop install missing list missing");
 assert(Array.isArray(plan.targets["windows-desktop"].checklist), "desktop checklist missing");
@@ -117,12 +118,12 @@ const readyReadiness = {
         nativeStoreReadiness: {
           target: "windows-desktop",
           requestedStore: "sqlite",
-          ready: false,
-          reason: "sqlite-native-bridge-unavailable",
+          ready: true,
+          reason: "",
           bridge: "tauri-sqlite",
-          nextAction: "tauri-sqlite is required before windows-desktop can use sqlite local store"
+          nextAction: ""
         },
-        currentSmokeStore: "local-storage"
+        currentSmokeStore: "native-sqlite"
       }
     },
     android: {

@@ -185,9 +185,10 @@ Responsibilities:
 - Tauri `frontendDist` must resolve to the shared prepared `clients/web/dist`;
   desktop must not maintain a duplicate local Web build tree.
 - Store tokens through Windows Credential Manager before production release.
-- First-stage runtime may use a WebView `localStorage` backed
-  `KeyValueMessageStore` for cursor / cache persistence. Target production
-  runtime should replace that storage port with SQLite behind `LocalMessageStore`.
+- First-stage source now includes a Tauri SQLite-backed key-value
+  `KeyValueMessageStore` bridge for cursor / cache persistence. It uses
+  app-local-data storage and is accepted only after focused source validation
+  and fresh WebView smoke evidence report the `tauri-sqlite` bridge ready.
 - Keep native IPC as explicit commands only.
 - Produce local `.msi` / `.exe` installer after the Web MVP is connected.
 - After an installer is produced, archive it through the client artifact
@@ -222,13 +223,16 @@ Responsibilities:
 
 PC constraints:
 
-- No broad native bridge. First-stage Tauri IPC may expose only read-only
-  runtime metadata until a separate native capability ADR defines commands,
-  audit and permission checks.
-- Web shell may call only the fixed `runtime_metadata` command for diagnostics.
-  It may read low-sensitive capability readiness such as native local-store
-  bridge status, but it must not construct arbitrary native command names or
-  pass business payloads into the native bridge.
+- No broad native bridge. First-stage Tauri IPC may expose only audited fixed
+  commands: `runtime_metadata`, `local_store_get_item`,
+  `local_store_set_item`, and `local_store_remove_item`.
+- The local-store commands must accept only the
+  `nexusim:client-message-store:v1:` namespace, return stable public errors,
+  and must not expose file paths, arbitrary SQL, tokens, credentials, process
+  execution, message APIs, or arbitrary native flags.
+- Web shell may call only those fixed commands for diagnostics and the shared
+  client message-cache port. It must not construct arbitrary native command
+  names or pass business actions into the native bridge.
 - No arbitrary file-system access from Web code.
 - No auto-update before signing and update-channel governance are defined.
 
@@ -339,7 +343,7 @@ lifecycle code.
 
 ```text
 browser  -> IndexedDB + fetch + WebSocket + browser lifecycle
-PC       -> localStorage first-stage, then SQLite + Tauri HTTP/WebSocket + OS credential store + native lifecycle
+PC       -> Tauri SQLite KV + Tauri HTTP/WebSocket + OS credential store + native lifecycle
 Android  -> localStorage first-stage, then SQLite + platform HTTP/WebSocket + Android Keystore + app lifecycle
 ```
 
@@ -443,22 +447,20 @@ server-accepted view.
 ## Local Storage
 
 First Web implementation uses IndexedDB through a `LocalMessageStore` port.
-PC desktop and Android now use shared `KeyValueMessageStore` with WebView
-`localStorage` as the first-stage durable cache. Production packaging should
-replace only the storage port with SQLite/native adapters while keeping
-`client-core` sync, send queue and ACK semantics shared. PC desktop and Android
-`sqlite` configuration is reserved and must fail fast through
-`NativeStoreReadiness` until the matching native bridge is present. That shared
-contract keeps the failure low-sensitive and stable: `reason`, expected bridge
-and next action are explicit, while platform adapters do not expose native paths
-or tokens. Web runtime discovery may wrap native key-value storage only when
-metadata is explicitly ready and the fixed Tauri `local_store_*` commands or
-Android `NexusIMNative.localStore*` methods are present; desktop still exposes
-metadata only, while Android source now exposes a fixed-prefix SQLite
-key-value cache bridge that still needs APK / real-device smoke evidence. The
-Web shell platform adapter can now hand an Android ready native bridge to the
-shared `KeyValueMessageStore`; without ready metadata it keeps the browser
-IndexedDB / WebView localStorage path. `MemoryMessageStore`, `KeyValueMessageStore` and
+PC desktop and Android share `KeyValueMessageStore` with a WebView
+`localStorage` fallback for early shell smoke, while native SQLite bridges are
+now the intended packaged-client cache path. PC desktop source exposes fixed
+Tauri `local_store_*` commands backed by an app-local-data SQLite key-value
+table and guarded by the `nexusim:client-message-store:v1:` key prefix. Android
+source exposes matching fixed-prefix `NexusIMNative.localStore*` methods, but
+still needs APK / real-device smoke evidence. The shared
+`NativeStoreReadiness` contract keeps failures low-sensitive and stable:
+`reason`, expected bridge and next action are explicit, while platform adapters
+do not expose native paths or tokens. Web runtime discovery may wrap native
+key-value storage only when metadata is explicitly ready and the fixed Tauri
+commands or Android bridge methods are present. Without ready metadata it keeps
+the browser IndexedDB / WebView localStorage path. `MemoryMessageStore`,
+`KeyValueMessageStore` and
 `IndexedDBMessageStore` share the same pending-send readback and accepted-send
 de-duplication contract.
 
@@ -487,11 +489,12 @@ need hardened token storage per platform.
 - Sensitive data should not appear in local logs or telemetry.
 - PC desktop shell must restrict IPC and file-system access; Web code cannot get
   a broad native bridge.
-- PC desktop Tauri command surface must stay single-command metadata-only until
-  a dedicated native capability contract exists.
+- PC desktop Tauri command surface must stay limited to `runtime_metadata` plus
+  fixed SQLite key-value local-store commands. It must not grow arbitrary
+  filesystem, SQL, token, process or message APIs.
 - PC Web code may display Tauri metadata and low-sensitive capability readiness
-  for local diagnostics, but the metadata bridge must not become a storage,
-  token, filesystem or message API.
+  for local diagnostics, and may use the fixed local-store commands only through
+  the shared `KeyValueMessageStore` port.
 - PC / Android WebView UI should use shared `ClientShellActions` for login,
   refresh, restore and logout so native shells do not grow separate auth
   lifecycle behavior. Login-level WebView smoke should also verify the
@@ -499,8 +502,9 @@ need hardened token storage per platform.
   available, without treating it as a storage capability.
 - Android must use encrypted platform storage before production and must treat
   FCM/APNs-style push as wakeup only, never as delivered message truth.
-- Android native WebView bridge must remain single-method read-only
-  metadata-only until a dedicated native capability contract exists.
+- Android native WebView bridge must stay limited to `runtimeMetadata()` plus
+  fixed-prefix local-store methods until a dedicated native capability contract
+  expands it.
 
 ## MVP Acceptance
 
@@ -523,7 +527,9 @@ PC desktop, and Android clients.
 
 - LAN smoke for the Web MVP path against `api-gateway` BFF and `push-gateway`.
 - PC desktop shell with Tauri and Windows `.msi` / `.exe` packaging.
-- Native SQLite store bridge and platform replay smoke for PC / Android.
+- Fresh PC Tauri WebView metadata / login smoke that proves the `tauri-sqlite`
+  local-store bridge is ready at runtime, plus Android APK / real-device smoke
+  for the matching `android-sqlite` path.
 - Android runtime implementation and unsigned local `.apk` packaging.
 - Full group creation / group profile / invite / member-management UI.
 - Media upload and preview after `media-service` provider path is ready.

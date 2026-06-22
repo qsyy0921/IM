@@ -22,8 +22,11 @@ assert(report.targets["windows-desktop"].buildCommand.includes("build:desktop-ar
 assert(typeof report.targets["windows-desktop"].shellAssets?.verified === "boolean", "desktop shell asset status missing");
 assert(report.targets["windows-desktop"].localStore?.currentDefault === "local-storage", "desktop local store default missing");
 assert(report.targets["windows-desktop"].localStore?.productionTarget === "sqlite", "desktop local store production target missing");
-assert(report.targets["windows-desktop"].localStore?.nativeStoreReadiness?.reason === "sqlite-native-bridge-unavailable", "desktop native store readiness reason mismatch");
+assert(report.targets["windows-desktop"].localStore?.nativeStoreReadiness?.ready === true, "desktop native store source readiness mismatch");
+assert(report.targets["windows-desktop"].localStore?.nativeStoreReadiness?.reason === "", "desktop native store ready reason mismatch");
 assert(report.targets["windows-desktop"].localStore?.nativeStoreReadiness?.bridge === "tauri-sqlite", "desktop native store bridge mismatch");
+assert(report.targets["windows-desktop"].localStore?.nativeStoreReadiness?.nextAction === "", "desktop ready native store next action mismatch");
+assert(report.targets["windows-desktop"].localStore?.currentSmokeStore === "native-sqlite", "desktop current smoke store mismatch");
 if (report.targets["windows-desktop"].ready) {
   assert(
     !report.targets["windows-desktop"].missing.some(item => item.name === "cargo tauri" || item.name === "local:tauri"),

@@ -307,15 +307,15 @@ async function waitForNativeStoreReadiness(cdp, timeoutMs) {
   return waitForEval(cdp, value => {
     const text = String(value?.text ?? "");
     const ok = text.includes("local-storage -> sqlite") &&
-      text.includes("sqlite-native-bridge-unavailable") &&
+      text.includes("ready") &&
       text.includes("tauri-sqlite");
     return ok
       ? {
           ok: true,
           currentDefault: "local-storage",
           productionTarget: "sqlite",
-          nativeStoreReady: false,
-          nativeStoreReason: "sqlite-native-bridge-unavailable",
+          nativeStoreReady: true,
+          nativeStoreReason: "",
           nativeStoreBridge: "tauri-sqlite"
         }
       : { ok: false };

@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "main-shell-metadata",
-  "description": "Allow the main desktop shell window to use only the audited Tauri core defaults and NexusIM runtime metadata command.",
+  "description": "Allow the main desktop shell window to use only audited Tauri core defaults, runtime metadata and the fixed NexusIM local-store key-value commands.",
   "windows": ["main"],
-  "permissions": ["core:default", "allow-runtime-metadata"]
+  "permissions": ["core:default", "allow-runtime-metadata", "allow-local-store"]
 }

@@ -191,8 +191,9 @@ function shellAssetFailureReason(error) {
 
 function localStoreReadiness(target) {
   const bridge = target === "windows-desktop" ? "tauri-sqlite" : "android-sqlite";
+  const desktopSourceReady = target === "windows-desktop" && desktopNativeStoreSourceReady();
   const androidSourceReady = target === "android" && androidNativeStoreSourceReady();
-  const ready = androidSourceReady ? true : false;
+  const ready = desktopSourceReady || androidSourceReady;
   const reason = ready ? "" : "sqlite-native-bridge-unavailable";
   return {
     currentDefault: "local-storage",
@@ -207,6 +208,26 @@ function localStoreReadiness(target) {
     },
     currentSmokeStore: ready ? "native-sqlite" : "local-storage"
   };
+}
+
+function desktopNativeStoreSourceReady() {
+  try {
+    const main = readFileSync(join(workspaceRoot, "desktop/src-tauri/src/main.rs"), "utf8");
+    const permissions = readFileSync(join(workspaceRoot, "desktop/src-tauri/permissions/local_store.toml"), "utf8");
+    return (
+      main.includes('NATIVE_STORE_READY: &str = "true"') &&
+      main.includes('NATIVE_STORE_REASON: &str = ""') &&
+      main.includes("fn local_store_get_item(") &&
+      main.includes("fn local_store_set_item(") &&
+      main.includes("fn local_store_remove_item(") &&
+      main.includes("rusqlite") &&
+      main.includes("app_local_data_dir()") &&
+      main.includes('LOCAL_STORE_KEY_PREFIX: &str = "nexusim:client-message-store:v1:"') &&
+      permissions.includes('commands.allow = ["local_store_get_item", "local_store_set_item", "local_store_remove_item"]')
+    );
+  } catch {
+    return false;
+  }
 }
 
 function androidNativeStoreSourceReady() {

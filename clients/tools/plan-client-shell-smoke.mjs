@@ -151,6 +151,7 @@ function nativeCommands(target, readinessTarget) {
     prepareAssets: "npm --prefix clients run build:shell-assets:android",
     verifyAssets: "node clients/tools/verify-shell-assets.mjs --target android",
     verifyActionAssets: "npm --prefix clients run test:android-shell-action-assets",
+    platformReadiness: "npm --prefix clients run report:android-platform-readiness",
     buildArtifact: readinessTarget.buildCommand,
     dryRunBuild: readinessTarget.dryRunCommand,
     installPlan: "npm --prefix clients run plan:artifact-install",
@@ -227,6 +228,11 @@ function nativeChecklist(target, readinessTarget, artifactStatus, installStatus)
   ];
 
   if (target === "android") {
+    checklist.push({
+      step: "check-android-platform-readiness",
+      command: nativeCommands(target, readinessTarget).platformReadiness,
+      evidence: "Android local toolchain, Docker builder image and ADB device readiness are reported without downloading tools or exposing raw device identifiers"
+    });
     checklist.push({
       step: "verify-android-shell-action-assets",
       command: nativeCommands(target, readinessTarget).verifyActionAssets,

@@ -79,6 +79,7 @@ assert(plan.targets["windows-desktop"].checklist.some(item => item.step === "ver
 assert(plan.targets.android.commands.prepareAssets.includes("build:shell-assets:android"), "android prep command missing");
 assert(plan.targets.android.commands.verifyAssets.includes("android"), "android verify command missing");
 assert(plan.targets.android.commands.verifyActionAssets.includes("test:android-shell-action-assets"), "android shell action asset contract command missing");
+assert(plan.targets.android.commands.platformReadiness.includes("report:android-platform-readiness"), "android platform readiness command missing");
 assert(plan.targets.android.commands.installPlan.includes("plan:artifact-install"), "android install plan command missing");
 assert(plan.targets.android.commands.deviceReadiness.includes("report:android-device-readiness"), "android device readiness command missing");
 assert(plan.targets.android.commands.webviewDevtoolsReadiness.includes("report:android-webview-devtools-readiness"), "android WebView devtools readiness command missing");
@@ -96,6 +97,7 @@ assert(Array.isArray(plan.targets.android.install.missing), "android install mis
 assert(Array.isArray(plan.targets.android.checklist), "android checklist missing");
 assert(plan.targets.android.checklist.some(item => item.step === "verify-shell-lifecycle-contract"), "android shell lifecycle contract check missing");
 assert(plan.targets.android.checklist.some(item => item.step === "verify-android-shell-action-assets"), "android shell action asset contract checklist missing");
+assert(plan.targets.android.checklist.some(item => item.step === "check-android-platform-readiness"), "android platform readiness checklist missing");
 assert(plan.targets.android.checklist.some(item => item.step === "check-android-device-readiness"), "android device readiness checklist missing");
 assert(plan.targets.android.checklist.some(item => item.step === "check-android-webview-devtools-readiness"), "android WebView devtools readiness checklist missing");
 assert(plan.targets.android.checklist.some(item => item.step === "prepare-shell-assets"), "android asset prep checklist missing");

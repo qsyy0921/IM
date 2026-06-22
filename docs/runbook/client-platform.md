@@ -309,7 +309,10 @@ First slice:
   install testing. Desktop plans include `test:desktop-shell-action-assets`
   before Tauri build, and Android plans include `test:android-shell-action-assets`
   before any APK build step, so shared lifecycle selectors are verified in target
-  WebView assets without native toolchains.
+  WebView assets without native toolchains. Android plans also include
+  `report:android-platform-readiness` before APK / WebView smoke, so local
+  toolchain, Docker builder image and ADB state are visible in one low-sensitive
+  report before any download-heavy or device-touching step.
   `smoke:desktop-composed` can combine an existing `loadtest/clientweb`
   BFF/push summary with desktop artifact launch evidence into one low-sensitive
   JSON result. It is useful as an intermediate PC evidence bundle, but it is not

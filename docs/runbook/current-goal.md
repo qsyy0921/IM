@@ -239,8 +239,7 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
 - `clients/tools/report-android-device-readiness.mjs` 已提供低敏 Android 设备前置检查；
   `npm --prefix clients run report:android-device-readiness` 只运行 `adb devices -l`，
   输出 adb 是否可用、authorized / unauthorized / offline 计数和短 serial hash，
-  不输出 raw serial / model，不安装 APK、不启动 Activity、不访问网络。`plan:shell-smoke`
-  已把该 report 纳入 Android checklist。
+  不输出 raw serial / model，不安装 APK、不启动 Activity、不访问网络。
 - `clients/tools/report-android-platform-readiness.mjs` 已提供 Android 聚合前置检查；
   `npm --prefix clients run report:android-platform-readiness` 会合并本地 JDK /
   Gradle / Android SDK、Docker builder profile / image 和 ADB device readiness。
@@ -248,6 +247,9 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   当前环境显示 ADB 已看到 1 台 authorized USB device，但本地构建仍缺 JDK 17+ /
   Gradle / Android SDK，Docker / Compose profile ready 且
   `nexusim/client-android-builder:local` image 尚未构建。
+  `npm --prefix clients run plan:shell-smoke` 已把该聚合 report 和 device-only
+  report 都列入 Android checklist，确保 APK / WebView smoke 前先得到低敏
+  platform readiness 证据。
 - PC Web shell 已新增登录级自动化前置：Web UI 暴露稳定 `data-testid`
   automation contract 和 `ack-status` 诊断，`npm --prefix clients run
   smoke:desktop-webview-login` 可通过 WebView2/CDP 外部驱动 Tauri WebView 登录、

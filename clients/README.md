@@ -192,4 +192,7 @@ Current packaging status:
   smoke plan. It lists prepared asset status, artifact presence, safe build
   commands, install-plan commands, per-target manual smoke checklists and the
   shared lifecycle guard / BFF / push smoke command without launching services
-  or installing toolchains.
+  or installing toolchains. The Android checklist starts with
+  `report:android-platform-readiness`, so local JDK / Gradle / Android SDK,
+  Docker builder image and ADB device state are visible before any APK or
+  WebView smoke step.

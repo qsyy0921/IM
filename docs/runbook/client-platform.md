@@ -417,6 +417,10 @@ First slice:
   produces a first-stage standalone `.exe` artifact and low-sensitive collected
   manifest; `smoke:desktop-artifact-launch` has verified the exe starts, stays
   alive during the smoke hold window and terminates cleanly.
+  Its dry-run output carries an execution policy proving it only reads the
+  collected manifest and artifact bytes for hash validation; it does not start
+  or terminate the artifact process, open network connections, install
+  artifacts, contact devices or download toolchains.
   `smoke:desktop-composed` can also combine that launch proof with a clientweb
   BFF / push summary without leaking absolute paths or sensitive fields. It
   still does not produce MSI / NSIS installer bundles. `npm --prefix clients run

@@ -56,6 +56,7 @@ try {
 
   assert(plan.schemaVersion === "nexusim.desktop-artifact-launch-smoke.v1", "desktop launch smoke schema mismatch");
   assert(plan.dryRun === true, "dry-run flag missing");
+  assertDryRunExecutionPolicy(plan.executionPolicy);
   assert(plan.launched === false, "dry-run must not launch");
   assert(plan.artifact.filename === "nexusim-windows-desktop.exe", "artifact filename mismatch");
   assert(plan.artifact.sha256 === sha256(exeBody), "artifact sha mismatch");
@@ -66,4 +67,18 @@ try {
   console.log("desktop artifact launch smoke ok");
 } finally {
   rmSync(tempRoot, { recursive: true, force: true });
+}
+
+function assertDryRunExecutionPolicy(policy) {
+  assert(policy?.planOnly === true, "desktop launch dry-run should be marked plan-only");
+  assert(policy.readsManifest === true, "desktop launch dry-run should read manifest");
+  assert(policy.validatesArtifactFile === true, "desktop launch dry-run should validate artifact file");
+  assert(policy.readsArtifactBytes === true, "desktop launch dry-run should read artifact bytes for hash checks");
+  assert(policy.startsArtifact === false, "desktop launch dry-run should not start artifact");
+  assert(policy.terminatesArtifact === false, "desktop launch dry-run should not terminate artifact");
+  assert(policy.startsServices === false, "desktop launch dry-run should not start services");
+  assert(policy.opensNetworkConnection === false, "desktop launch dry-run should not open network connections");
+  assert(policy.installsArtifacts === false, "desktop launch dry-run should not install artifacts");
+  assert(policy.contactsDevice === false, "desktop launch dry-run should not contact devices");
+  assert(policy.downloadsToolchain === false, "desktop launch dry-run should not download toolchains");
 }

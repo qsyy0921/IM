@@ -43,6 +43,7 @@ async function main(argv) {
   if (options.dryRun) {
     process.stdout.write(`${JSON.stringify({
       ...base,
+      executionPolicy: dryRunExecutionPolicy(),
       launched: false
     }, null, 2)}\n`);
     return;
@@ -62,6 +63,22 @@ async function main(argv) {
   };
   assertLowSensitive(result);
   process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+}
+
+function dryRunExecutionPolicy() {
+  return {
+    planOnly: true,
+    readsManifest: true,
+    validatesArtifactFile: true,
+    readsArtifactBytes: true,
+    startsArtifact: false,
+    terminatesArtifact: false,
+    startsServices: false,
+    opensNetworkConnection: false,
+    installsArtifacts: false,
+    contactsDevice: false,
+    downloadsToolchain: false
+  };
 }
 
 function parseArgs(argv) {

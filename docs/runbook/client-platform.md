@@ -140,9 +140,10 @@ First slice:
   owner transfer, remove member and final member list through the same public
   BFF surface. The clean committed real smoke for that path passed on 2026-06-23
   with `commit=3b13c5c6` and `git_dirty=false`. The Web / PC shell now also
-  exposes BFF-backed member search / role filter / page-token pagination.
-  Remaining group product work is richer group settings, avatar / title read
-  models and richer real multi-user UI smoke coverage.
+  exposes BFF-backed member search / role filter / page-token pagination,
+  group profile summary and invite source hints. Remaining group product work
+  is richer group settings, avatar / title read models and editing, and richer
+  real multi-user UI smoke coverage.
 - The Web / PC shell now also keeps explicit display-title and UX copy rules:
   direct / group titles learned from user actions survive conversation refresh,
   unknown server summaries render as short explicit conversation IDs, empty

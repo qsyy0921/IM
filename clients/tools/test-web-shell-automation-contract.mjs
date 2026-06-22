@@ -22,7 +22,14 @@ const requiredTestIDs = [
   "friend-conversation-item",
   "group-invite-user",
   "group-invite-submit",
+  "group-invite-source",
   "group-leave-submit",
+  "group-profile-card",
+  "group-profile-avatar",
+  "group-profile-title",
+  "group-profile-subtitle",
+  "group-profile-id",
+  "group-profile-member-count",
   "group-members-refresh",
   "group-member-search",
   "group-member-role-filter",
@@ -66,6 +73,7 @@ assertIncludes(appSource, "nativeMetadata?.capabilities?.localStore", "web shell
 assertIncludes(appSource, "nativeLocalStoreStatus", "web shell must keep local-store readiness formatting explicit");
 assertIncludes(appSource, "mergeConversationSummaries", "web shell must preserve local display titles across conversation refresh");
 assertIncludes(appSource, "conversationDisplayTitle", "web shell must keep conversation title formatting explicit");
+assertIncludes(appSource, "conversationStatusLabel", "web shell must keep conversation status formatting explicit");
 assertIncludes(appSource, "emptyMessageState", "web shell must keep empty-state copy explicit");
 assertIncludes(appSource, "publicErrorMessage", "web shell must map common public errors to user-facing copy");
 

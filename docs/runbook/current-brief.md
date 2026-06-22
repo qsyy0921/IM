@@ -47,7 +47,7 @@ NexusIM 已有本地 / 双机可运行的最小分布式 IM 后端，并已扩�
    角色过滤 / 分页、移除成员、角色变更 / owner transfer 第一路径、消息列表、发送后本地状态刷新、PullInbox /
    ACK 和本机可运行包体验。2026-06-23 的 clean smoke 已验证双用户好友直聊和群聊
    first path；Web / PC shell 已补第一版会话展示标题、空态、常见错误中文文案、
-   显式本地启动脚本和群设置操作区。Windows desktop collected package 已补
+   显式本地启动脚本、群资料卡、邀请来源提示和群设置操作区。Windows desktop collected package 已补
    package-local README / launcher support files，并已有 unsigned local portable
    zip bundle 工具；artifact manifest 已区分 desktop executable / installer，
    portable bundle 只接受 executable；`plan:desktop-installer` / `plan:desktop-signing` 已能检查

@@ -27,7 +27,7 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   `clients/packages/client-core`；客户端只连 `api-gateway` BFF 和 `push-gateway`。
 - Web / PC shell 已接账号密码登录、注册、好友工作台、点击好友打开私聊、
   点击群聊进入会话、建群、群成员添加 / 退群、群成员列表、移除成员、角色变更、
-  owner transfer 第一路径、群成员搜索 / 角色过滤 / 分页、群设置信息条、消息列表、发送后本地状态刷新、
+  owner transfer 第一路径、群成员搜索 / 角色过滤 / 分页、群资料卡、邀请来源提示、群设置操作区、消息列表、发送后本地状态刷新、
   PullInbox 和 ACK。
 - 会话刷新会保留当前选中；gateway token 过期会清理本地 session / push /
   会话展示状态并提示重新登录。
@@ -92,7 +92,7 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
 1. Windows PC 端继续真实 signing input 接入、valid signed artifact、
    MSI / NSIS installer 和签名 installer 体验，并保持
    Web / PC shell 的 UI 细节随真实调试反馈继续收口。
-2. 若继续客户端产品能力，优先补邀请来源提示、完整群设置和更丰富的群 read model。
+2. 若继续客户端产品能力，优先补群标题 / 头像 read model 编辑能力、完整群设置和更丰富的真实多用户 UI smoke。
    不得直接调用 conversation-service 私有接口。
 3. Android 后续只在用户切回时继续：login-level WebView smoke、APK baseline
    报告和真机 UI polish。

@@ -80,6 +80,9 @@ The first client product surface is deliberately thin and service-backed:
   transfer first paths use dedicated BFF endpoints backed by conversation-service
   `CreateMemberChange`, `ListConversationMembers` and `TransferConversationOwner`;
   the Web / PC shell never calls conversation-service private APIs directly.
+- group profile summary and invite source hints are first-stage UI only. They
+  render fields from `ConversationSummary` and the public member-list BFF
+  response, without inventing editable title / avatar state.
 - the Web / PC shell preserves user-facing local display titles produced by
   click-to-direct-chat and group creation. Unknown server summaries are shown as
   explicit short conversation IDs; the client does not treat those display names
@@ -89,8 +92,8 @@ The first client product surface is deliberately thin and service-backed:
   missing login and permission errors do not trigger hidden alternate paths.
 
 Full group settings are still first-stage. Remaining work is richer group title /
-avatar read models, invite source UX and real multi-user client smoke coverage
-for member removal, role changes and owner transfer.
+avatar read models and editing, plus real multi-user client smoke coverage for
+member removal, role changes and owner transfer.
 
 ## LAN Configuration
 

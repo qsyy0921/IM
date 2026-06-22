@@ -1394,12 +1394,26 @@ export function App() {
 
         {activeGroupConversation ? (
           <section className="group-settings" aria-label="群设置">
-            <div className="group-settings-copy">
-              <strong>群设置</strong>
-              <span>
-                {compactConversationID(activeGroupConversation.conversationID)} · member v
-                {activeGroupConversation.memberVersion} · {groupMembersForActive.length} 人
+            <div className="group-profile-card" data-testid="group-profile-card">
+              <span className="group-profile-avatar" data-testid="group-profile-avatar">
+                {conversationAvatarText(activeGroupConversation)}
               </span>
+              <div className="group-profile-copy">
+                <strong data-testid="group-profile-title">{conversationDisplayTitle(activeGroupConversation)}</strong>
+                <span data-testid="group-profile-subtitle">
+                  {conversationStatusLabel(activeGroupConversation.status)} · 最新 #
+                  {activeGroupConversation.lastSeq || 0} · member v{activeGroupConversation.memberVersion}
+                </span>
+              </div>
+              <div className="group-profile-badges" aria-label="群状态">
+                <span data-testid="group-profile-id">{compactConversationID(activeGroupConversation.conversationID)}</span>
+                <span data-testid="group-profile-member-count">{groupMembersForActive.length} 人</span>
+                {activeGroupConversation.pinned ? <span data-testid="group-profile-pinned">置顶</span> : null}
+                {activeGroupConversation.muted ? <span data-testid="group-profile-muted">免打扰</span> : null}
+                {activeGroupConversation.unreadCount > 0 ? (
+                  <span data-testid="group-profile-unread">未读 {activeGroupConversation.unreadCount}</span>
+                ) : null}
+              </div>
             </div>
             <button
               data-testid="group-members-refresh"
@@ -1464,6 +1478,9 @@ export function App() {
               <button data-testid="group-invite-submit" type="submit" disabled={!session || groupInviteUserID.trim() === ""}>
                 添加成员
               </button>
+              <span data-testid="group-invite-source" className="group-invite-source">
+                邀请来源：当前群 {compactConversationID(activeGroupConversation.conversationID)}
+              </span>
             </form>
             <button
               data-testid="group-leave-submit"
@@ -1760,6 +1777,19 @@ function conversationSubtitle(conversation: ConversationSummary): string {
   const kind = conversation.type === "DIRECT" ? "私聊" : "群聊";
   const seq = conversation.lastSeq > 0 ? `最新 #${conversation.lastSeq}` : "暂无消息";
   return `${kind} · ${seq}`;
+}
+
+function conversationStatusLabel(status: string): string {
+  switch (status) {
+    case "ACTIVE":
+      return "活跃";
+    case "ARCHIVED":
+      return "已归档";
+    case "DELETED":
+      return "已删除";
+    default:
+      return status || "未知状态";
+  }
 }
 
 function conversationAvatarText(conversation: ConversationSummary): string {

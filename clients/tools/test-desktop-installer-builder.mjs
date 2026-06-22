@@ -74,7 +74,7 @@ try {
     identifier: "com.nexusim.desktop",
     bundle: {
       active: true,
-      targets: ["msi"],
+      targets: ["msi", "nsis"],
       publisher: "NexusIM"
     }
   });
@@ -111,6 +111,26 @@ try {
   assert(dryRun.installerPlan.signatureVerification.readyForSignedDistribution === true, "installer builder should require a valid signature");
   assert(!dryRunJSON.includes(tempRoot), "dry-run installer builder output leaked absolute temp path");
   assert(!dryRunJSON.match(/token|secret|password|credential|private/i), "dry-run installer builder output leaked sensitive names");
+
+  const readyNSISPlan = buildDesktopInstallerPlan({
+    manifest: manifestPath,
+    tauriConfig: activeConfigPath,
+    target: "nsis",
+    signToolPath: fakeSignTool,
+    certFile: fakePfx,
+    timestampURL: "https://timestamp.example.test",
+    pfxPassEnvPresent: true,
+    mockSignatureStatus: {
+      status: "Valid",
+      signerSubject: "CN=NexusIM Test Code Signing",
+      signerThumbprint: "0123456789abcdef0123456789abcdef01234567"
+    }
+  });
+  const dryRunNSIS = buildInstallerOutput(readyNSISPlan, { execute: false });
+  assert(dryRunNSIS.readyToBuildInstaller === true, "NSIS dry-run output should preserve readiness");
+  assert(dryRunNSIS.target === "nsis", "NSIS dry-run target mismatch");
+  assert(dryRunNSIS.commands.build.includes("nsis"), "NSIS dry-run should plan an NSIS bundle build");
+  assert(dryRunNSIS.installerPlan.expectedOutputHint.endsWith("/nsis/"), "NSIS dry-run output hint should point at NSIS bundle output");
 
   const cliPlan = runBuilder([
     "--manifest",

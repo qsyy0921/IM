@@ -263,7 +263,7 @@ read-only signature verification report, then reports whether MSI / NSIS
 installer bundling can run. It is also plan-only: it does not run Tauri, sign,
 install, launch or download anything. The default development Tauri config
 stays `bundle.active=false`; installer bundling uses the separate
-`src-tauri/tauri.installer.conf.json` profile. The plan selects the latest
+`src-tauri/tauri.installer.conf.json` MSI + NSIS profile. The plan selects the latest
 `windows-desktop` manifest automatically and remains not ready until signing
 readiness is true and the collected artifact verifies as Authenticode-valid.
 `build:desktop-installer` wraps that plan as the explicit execution entry. By

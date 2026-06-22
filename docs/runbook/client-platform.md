@@ -514,7 +514,7 @@ First slice:
   collected desktop manifest, signing readiness and signature verification
   status, then report whether MSI / NSIS installer bundling is ready. The
   default dev config remains inactive, while `tauri.installer.conf.json` is the
-  explicit MSI profile. The plan still reports not ready until signing
+  explicit MSI + NSIS profile. The plan still reports not ready until signing
   readiness and a valid Authenticode signature are present instead of treating
   the unsigned portable zip as an installer.
   `build:desktop-installer` is the explicit execution wrapper over that plan.

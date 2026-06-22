@@ -98,6 +98,17 @@ try {
     identifier: "com.nexusim.desktop",
     bundle: {
       active: true,
+      targets: ["msi", "nsis"],
+      publisher: "NexusIM"
+    }
+  });
+  const msiOnlyConfigPath = join(tempRoot, "tauri-msi-only.json");
+  writeJSON(msiOnlyConfigPath, {
+    productName: "NexusIM",
+    version: "0.1.0",
+    identifier: "com.nexusim.desktop",
+    bundle: {
+      active: true,
       targets: ["msi"],
       publisher: "NexusIM"
     }
@@ -138,9 +149,28 @@ try {
   assert(!readyJSON.includes(tempRoot), "ready installer plan leaked absolute temp path");
   assert(!readyJSON.match(/token|secret|password|credential|private/i), "ready installer plan leaked sensitive names");
 
-  const nsisMissing = buildDesktopInstallerPlan({
+  const nsisReady = buildDesktopInstallerPlan({
     manifest: manifestPath,
     tauriConfig: activeConfigPath,
+    target: "nsis",
+    signToolPath: fakeSignTool,
+    certFile: fakePfx,
+    timestampURL: "https://timestamp.example.test",
+    pfxPassEnvPresent: true,
+    mockSignatureStatus: {
+      status: "Valid",
+      signerSubject: "CN=NexusIM Test Code Signing",
+      signerThumbprint: "0123456789abcdef0123456789abcdef01234567"
+    }
+  });
+  assert(nsisReady.readyToBuildInstaller === true, "active NSIS config with signing inputs should be ready");
+  assert(nsisReady.target === "nsis", "NSIS ready plan target mismatch");
+  assert(nsisReady.commandTemplate.build.includes("nsis"), "NSIS ready build command should include NSIS target");
+  assert(nsisReady.expectedOutputHint.endsWith("/nsis/"), "NSIS ready output hint should point at NSIS bundle output");
+
+  const nsisMissing = buildDesktopInstallerPlan({
+    manifest: manifestPath,
+    tauriConfig: msiOnlyConfigPath,
     target: "nsis",
     signToolPath: fakeSignTool,
     certFile: fakePfx,

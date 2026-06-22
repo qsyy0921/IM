@@ -165,7 +165,7 @@ package-local PowerShell launcher，install plan 会校验这些 support files �
 立即执行 fail-closed 验证；`verify:desktop-signature` 已提供只读
 Authenticode 验证入口，当前 baseline 实测为 `NotSigned`；`build:desktop-installer` 已提供显式 `--execute` 门控的
 installer build 包装器，并通过独立仓库 installer profile 调用 Tauri。默认开发
-Tauri config 仍保持不打包；planner 会按 `windows-desktop` 目标选择 collected
+Tauri config 仍保持不打包；installer profile 显式启用 MSI + NSIS targets；planner 会按 `windows-desktop` 目标选择 collected
 manifest，signing readiness 或 valid signature 不满足时 fail-closed。
 
 本地调试入口：

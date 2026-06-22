@@ -77,10 +77,10 @@
   clientweb BFF / push summary 与 desktop launch 证据合并成低敏 JSON，但仍不是 GUI
   自动化。真实 Tauri WebView metadata callback smoke 已通过；Web / PC shell 已接
   登录、注册、好友、好友私聊、群聊列表、建群、消息列表和发送 first path。剩余工作是
-  打磨真实 UI lifecycle，以及后续启用 MSI / NSIS installer bundling、真实 signing
+  打磨真实 UI lifecycle，以及后续真实运行 MSI / NSIS installer bundling、真实 signing
   input 和 signed artifact 验证。`plan:desktop-signing` 已能检查显式 `signtool`、证书来源和
-  timestamp URL readiness；`plan:desktop-installer` 已改为检查仓库内
-  `tauri.installer.conf.json` profile、installer target、desktop artifact baseline
+  timestamp URL readiness；`tauri.installer.conf.json` 已显式声明 MSI + NSIS
+  targets；`plan:desktop-installer` 已改为检查仓库内 profile、installer target、desktop artifact baseline
   和 signing readiness；默认开发 config 仍保持不打包。它们不 build、不签名，
   也不替代真实 installer / signing 流水线。`sign:desktop-artifact` 已补显式
   `--execute` 门控的 signing wrapper，默认仍只输出低敏 execution policy；真实

@@ -63,7 +63,7 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   desktop baseline 实测为 `NotSigned`。
   `plan:desktop-installer`
   已改为读取仓库内显式 `tauri.installer.conf.json` profile：默认开发 Tauri config
-  继续 `bundle.active=false`，installer profile 才启用 MSI target。`build:desktop-installer`
+  继续 `bundle.active=false`，installer profile 显式启用 MSI + NSIS targets。`build:desktop-installer`
   会用 `--config src-tauri/tauri.installer.conf.json` 调用 Tauri，并继续由显式
   `--execute` 门控。desktop signing / installer planner 现在按 `windows-desktop`
   目标选择最新 collected manifest，不会被更新的 Android manifest 遮住；当前本机

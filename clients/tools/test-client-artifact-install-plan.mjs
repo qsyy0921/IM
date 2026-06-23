@@ -179,15 +179,42 @@ try {
     }
   });
   assert(installerPlan.targets["windows-desktop"].artifactReady === true, "desktop installer artifact should be ready");
-  assert(installerPlan.targets["windows-desktop"].readyForInstall === true, "desktop installer install plan should be ready");
+  assert(installerPlan.targets["windows-desktop"].readyForInstall === false, "unsigned desktop installer install plan must not be ready");
   assert(installerPlan.targets["windows-desktop"].installMode === "signed-installer", "desktop installer install mode mismatch");
   assert(installerPlan.targets["windows-desktop"].artifact.artifactKind === "desktop-installer", "desktop installer artifact kind mismatch");
+  assert(installerPlan.targets["windows-desktop"].installerSignatureVerification.readyForSignedDistribution === false, "desktop installer signature verification should block unsigned fixtures");
+  assert(
+    installerPlan.targets["windows-desktop"].missing.includes("valid-authenticode-signature") ||
+      installerPlan.targets["windows-desktop"].missing.includes("windows-authenticode"),
+    "unsigned desktop installer missing list should require Authenticode verification"
+  );
   assert(installerPlan.targets["windows-desktop"].checklist.some(item => item.step === "verify-desktop-installer-signature"), "desktop installer signature verification step missing");
   const installerStep = installerPlan.targets["windows-desktop"].checklist.find(item => item.step === "install-desktop-installer");
   assert(installerStep?.command === "Start-Process clients/artifacts/install-plan-test/nexusim-windows-desktop-installer.msi", "desktop installer command mismatch");
   assert(installerStep.installsArtifacts === true, "desktop installer step should install artifacts");
   assert(installerStep.launchesDesktopArtifact === false, "desktop installer step should not be marked as launching the app");
   assert(!installerPlan.targets["windows-desktop"].checklist.some(item => item.step === "launch-desktop-artifact"), "desktop installer plan should not use portable launch step");
+
+  const signedInstallerPlan = buildClientArtifactInstallPlan({
+    manifest: join(runDir, "manifest.json"),
+    installPrereqs: {
+      adbAvailable: true,
+      windowsInstallerLaunchSupported: true
+    },
+    desktopInstallerSignatureVerification: {
+      readyForSignedDistribution: true,
+      missing: [],
+      signature: {
+        status: "Valid",
+        signed: true,
+        trusted: true
+      },
+      nextAction: "continue with signed installer install"
+    }
+  });
+  assert(signedInstallerPlan.targets["windows-desktop"].readyForInstall === true, "valid signed desktop installer install plan should be ready");
+  assert(signedInstallerPlan.targets["windows-desktop"].missing.length === 0, "valid signed desktop installer should have no missing inputs");
+  assert(signedInstallerPlan.targets["windows-desktop"].installerSignatureVerification.status === "Valid", "signed desktop installer status should be preserved");
 
   writeFileSync(join(runDir, "manifest.json"), `${JSON.stringify({
     schemaVersion: "nexusim.client-artifacts.v1",
@@ -282,4 +309,5 @@ function assertInstallPlanExecutionPolicy(policy) {
   assert(policy.contactsDevices === false, "install plan should not contact devices");
   assert(policy.downloadsToolchain === false, "install plan should not download toolchains");
   assert(policy.readsLocalInstallPrereqs === true, "install plan should only read local install prerequisites");
+  assert(policy.readsDesktopInstallerSignature === true, "install plan should declare desktop installer signature reads");
 }

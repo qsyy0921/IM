@@ -4,6 +4,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { workspaceRoot } from "./client-build-env.mjs";
+import { buildDesktopSignatureVerificationReport } from "./verify-desktop-signature.mjs";
 
 const schemaVersion = "nexusim.client-artifact-install-plan.v1";
 const artifactManifestSchema = "nexusim.client-artifacts.v1";
@@ -27,7 +28,7 @@ export function buildClientArtifactInstallPlan(options = {}) {
   const manifestDir = dirname(manifestPath);
   const targets = Object.fromEntries(targetNames.map(target => [
     target,
-    targetInstallPlan(target, manifest, manifestDir, installPrereqs)
+    targetInstallPlan(target, manifest, manifestDir, manifestPath, installPrereqs, options)
   ]));
   const plan = {
     schemaVersion,
@@ -89,11 +90,12 @@ function planExecutionPolicy() {
     startsDocker: false,
     contactsDevices: false,
     downloadsToolchain: false,
-    readsLocalInstallPrereqs: true
+    readsLocalInstallPrereqs: true,
+    readsDesktopInstallerSignature: true
   };
 }
 
-function targetInstallPlan(target, manifest, manifestDir, installPrereqs) {
+function targetInstallPlan(target, manifest, manifestDir, manifestPath, installPrereqs, options = {}) {
   const artifact = findArtifact(manifest, target);
   const prereqs = targetInstallPrereqs(target, installPrereqs);
   if (!artifact) {
@@ -153,7 +155,15 @@ function targetInstallPlan(target, manifest, manifestDir, installPrereqs) {
       ]
     };
   }
-  const missing = missingInstallInputs(target, installPrereqs, [], artifactKind);
+  const installerSignatureVerification = target === "windows-desktop" && artifactKind === "desktop-installer"
+    ? desktopInstallerSignatureVerification(manifestPath, options)
+    : null;
+  const signatureMissing = installerSignatureVerification && !installerSignatureVerification.readyForSignedDistribution
+    ? installerSignatureVerification.missing.length > 0
+      ? installerSignatureVerification.missing
+      : ["valid-authenticode-signature"]
+    : [];
+  const missing = missingInstallInputs(target, installPrereqs, signatureMissing, artifactKind);
   return {
     artifactReady: true,
     readyForInstall: missing.length === 0,
@@ -167,8 +177,25 @@ function targetInstallPlan(target, manifest, manifestDir, installPrereqs) {
       sha256: artifact.sha256,
       artifactHint
     },
+    installerSignatureVerification,
     supportFiles,
     checklist: installChecklist(target, artifactHint, supportFiles, artifactKind)
+  };
+}
+
+function desktopInstallerSignatureVerification(manifestPath, options) {
+  const report = options.desktopInstallerSignatureVerification ?? buildDesktopSignatureVerificationReport({
+    manifest: manifestPath,
+    artifactKind: "desktop-installer",
+    expectedSignerSubjectContains: options.expectedSignerSubjectContains
+  });
+  return {
+    readyForSignedDistribution: Boolean(report.readyForSignedDistribution),
+    missing: Array.isArray(report.missing) ? report.missing : [],
+    status: stringValue(report.signature?.status) || "UNKNOWN",
+    signed: Boolean(report.signature?.signed),
+    trusted: Boolean(report.signature?.trusted),
+    nextAction: stringValue(report.nextAction)
   };
 }
 
@@ -515,12 +542,18 @@ function sha256Text(value) {
 
 function parseArgs(argv) {
   const options = {
-    manifest: ""
+    manifest: "",
+    expectedSignerSubjectContains: ""
   };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === "--manifest") {
       options.manifest = requiredValue(argv, index, arg);
+      index += 1;
+      continue;
+    }
+    if (arg === "--expected-signer-subject") {
+      options.expectedSignerSubjectContains = requiredValue(argv, index, arg);
       index += 1;
       continue;
     }

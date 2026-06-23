@@ -228,7 +228,9 @@ Windows desktop artifact / Android install checklist. It validates any collected
 support files and, for standalone Windows desktop exe packages, points the
 manual launch step at `launch-nexusim-windows.ps1`. Desktop installer artifacts
 now stay on an install-oriented checklist and are not treated as portable
-launchable packages. Stale manifests without an explicit `artifactKind` fail
+launchable packages. They also require a read-only Authenticode-valid installer
+signature before `readyForInstall=true`; unsigned or unverifiable installer
+artifacts fail closed. Stale manifests without an explicit `artifactKind` fail
 closed and must be recollected. It also reports local install prerequisites such
 as Android `adb` availability and Windows artifact launch support, but it does
 not install packages, connect to devices, launch artifacts or print local
@@ -322,6 +324,8 @@ then collects the resulting Windows desktop artifact only when run with
 `--execute` and the installer plan is ready; otherwise it fails closed and
 prints the missing readiness gates. It does not sign artifacts, install
 installers, launch the app, start services or download toolchains.
+After collection, `plan:artifact-install` still blocks manual installer
+installation until the collected installer verifies as Authenticode-valid.
 Execution uses the repository installer Tauri profile through
 `--config src-tauri/tauri.installer.conf.json`; custom `--tauri-config` is
 accepted for planning fixtures only and blocks real `--execute`.

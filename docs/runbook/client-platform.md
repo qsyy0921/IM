@@ -353,10 +353,13 @@ First slice:
   packages, points the manual launch command at `launch-nexusim-windows.ps1`.
   Desktop installer artifacts stay on an install-oriented checklist and are not
   treated as portable launchable packages; stale manifests without explicit
-  `artifactKind` fail closed and must be recollected. It now also reports
-  install-side readiness such as Android `adb` availability and Windows local
-  artifact launch support, while still not launching artifacts, contacting
-  devices, installing packages or printing local absolute paths.
+  `artifactKind` fail closed and must be recollected. Installer install
+  readiness also requires read-only Authenticode verification to report a valid
+  signed installer; unsigned or unverifiable installer artifacts fail closed.
+  It now also reports install-side readiness such as Android `adb` availability
+  and Windows local artifact launch support, while still not launching
+  artifacts, contacting devices, installing packages or printing local absolute
+  paths.
 - `npm --prefix clients run test:desktop-bundle` validates the first-stage
   portable Windows desktop bundle tool. `npm --prefix clients run bundle:desktop`
   reads a collected Windows desktop artifact manifest, requires the package-local
@@ -578,7 +581,9 @@ First slice:
   build input.
   The generic client install plan now also keeps collected `desktop-installer`
   artifacts out of the portable launcher path, so `plan:shell-smoke` only marks
-  Windows direct shell smoke ready for `desktop-executable` artifacts.
+  Windows direct shell smoke ready for `desktop-executable` artifacts. It also
+  keeps installer install readiness blocked until the collected installer
+  verifies as Authenticode-valid.
   `build:desktop-installer` is the explicit execution wrapper over that plan.
   Its default output is plan-only; `--execute` is required before it runs Tauri
   with the explicit bundle target and installer profile, then collects the
@@ -637,7 +642,9 @@ First slice:
   `manualOnly=true` with explicit device, install, Activity-start or desktop
   process risk flags. The plan can show `adb install` and `Start-Process`
   commands for humans, but the script does not install APKs, launch desktop
-  artifacts, start Android activities or contact devices by itself. The plan
+  artifacts, start Android activities or contact devices by itself. For
+  `desktop-installer` artifacts it also reads only public Authenticode status
+  and refuses `readyForInstall` until the installer is validly signed. The plan
   also exposes a top-level `executionPolicy.planOnly=true` block so automation
   can reject accidental execution paths before reading per-step checklist data.
 - `/api/auth/logout` performs first-stage server-side logout for the current

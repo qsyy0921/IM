@@ -80,31 +80,50 @@ async function main(argv) {
   let webServer;
   const senderBrowser = { child: null, cdp: null, tempRoot: "" };
   const receiverBrowser = { child: null, cdp: null, tempRoot: "" };
+  let stage = "init";
+  let webServerStarted = false;
   try {
     if (options.startWeb) {
+      stage = "start-web";
       webServer = startWebDevServer(options.webURL);
+      webServerStarted = true;
       await waitForHTTP(options.webURL, options.holdMs);
     }
+    stage = "launch-sender-browser";
     await launchBrowserSession(senderBrowser, browserExecutable, options.webURL, "sender", options.holdMs);
+    stage = "launch-receiver-browser";
     await launchBrowserSession(receiverBrowser, browserExecutable, options.webURL, "receiver", options.holdMs);
 
+    stage = "sender-login";
     await driveLogin(senderBrowser.cdp, fixture.tenantID, fixture.senderUserID, fixture.senderLoginInput, options.holdMs);
+    stage = "receiver-login";
     await driveLogin(receiverBrowser.cdp, fixture.tenantID, fixture.receiverUserID, fixture.receiverLoginInput, options.holdMs);
 
+    stage = "open-direct-from-friend-list";
     const directConversationID = await openDirectFromFriendList(senderBrowser.cdp, fixture.receiverUserID, options.holdMs);
     const directText = `NexusIM browser UI direct ${runID}`;
+    stage = "send-direct-message";
     const directSeq = await sendText(senderBrowser.cdp, directText, options.holdMs);
+    stage = "receiver-open-direct";
     await openKnownConversation(receiverBrowser.cdp, directConversationID, options.holdMs);
+    stage = "receiver-direct-message-visible";
     await waitForMessage(receiverBrowser.cdp, directText, directSeq, options.holdMs);
+    stage = "receiver-direct-ack";
     const directAck = await waitForAck(receiverBrowser.cdp, directSeq, options.holdMs);
 
     const groupName = `NexusIM UI ${runID.slice(0, 12)}`;
+    stage = "create-group-through-ui";
     const groupConversationID = await createGroup(senderBrowser.cdp, groupName, options.holdMs);
+    stage = "invite-group-member-through-ui";
     await inviteGroupMember(senderBrowser.cdp, fixture.receiverUserID, options.holdMs);
+    stage = "receiver-open-group";
     await openKnownConversation(receiverBrowser.cdp, groupConversationID, options.holdMs);
     const groupText = `NexusIM browser UI group ${runID}`;
+    stage = "send-group-message";
     const groupSeq = await sendText(senderBrowser.cdp, groupText, options.holdMs);
+    stage = "receiver-group-message-visible";
     await waitForMessage(receiverBrowser.cdp, groupText, groupSeq, options.holdMs);
+    stage = "receiver-group-ack";
     const groupAck = await waitForAck(receiverBrowser.cdp, groupSeq, options.holdMs);
 
     const result = {
@@ -112,7 +131,7 @@ async function main(argv) {
       dryRun: false,
       web: {
         ...plan.web,
-        devServerStarted: Boolean(options.startWeb)
+        devServerStarted: webServerStarted
       },
       automation: {
         ...plan.automation,
@@ -145,6 +164,37 @@ async function main(argv) {
     };
     assertLowSensitive(result);
     emitResult(result, options);
+  } catch (error) {
+    const result = {
+      ...plan,
+      dryRun: false,
+      web: {
+        ...plan.web,
+        devServerStarted: webServerStarted
+      },
+      automation: {
+        ...plan.automation,
+        senderBrowserStarted: Boolean(senderBrowser.child?.pid),
+        receiverBrowserStarted: Boolean(receiverBrowser.child?.pid)
+      },
+      flow: {
+        stage
+      },
+      verdict: {
+        browserMultiUserUISmoke: false,
+        directChatThroughUI: false,
+        groupChatThroughUI: false,
+        groupInviteThroughUI: false,
+        receiverAckObserved: false
+      },
+      failure: {
+        stage,
+        message: safeFailureMessage(error)
+      }
+    };
+    assertLowSensitive(result);
+    emitResult(result, options);
+    process.exitCode = 1;
   } finally {
     for (const session of [senderBrowser, receiverBrowser]) {
       session.cdp?.close();
@@ -697,6 +747,7 @@ function terminateProcess(pid) {
   if (process.platform === "win32") {
     const completed = spawnSync("taskkill", ["/PID", String(pid), "/T", "/F"], {
       encoding: "utf8",
+      timeout: 10000,
       windowsHide: true
     });
     return completed.status === 0;
@@ -707,6 +758,14 @@ function terminateProcess(pid) {
   } catch {
     return false;
   }
+}
+
+function safeFailureMessage(error) {
+  const text = errorMessage(error).replace(/\s+/g, " ").trim().slice(0, 300);
+  if (text.match(/(token|secret|password|credential|private|[A-Za-z]:\\|\\\\\?)/i)) {
+    return "browser multi-user UI smoke failed with a sanitized local error";
+  }
+  return text || "browser multi-user UI smoke failed";
 }
 
 function requiredString(value, name) {

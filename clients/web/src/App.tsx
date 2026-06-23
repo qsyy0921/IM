@@ -127,6 +127,7 @@ export function App() {
   const pushConnectionRef = useRef<{ close(): void } | null>(null);
   const shellSmokeReportedRef = useRef(false);
   const autoRestoreAttemptedRef = useRef(false);
+  const runGenerationRef = useRef(0);
 
   useEffect(() => {
     let active = true;
@@ -292,7 +293,10 @@ export function App() {
       draftOnly: draftOnlyConversations,
       tagFilter: conversationTagFilter.trim()
     });
-    const mergedItems = mergeConversationSummaries(conversations, items);
+    const preserveConversationIDs = activeConversationRef.current
+      ? new Set([activeConversationRef.current])
+      : new Set<string>();
+    const mergedItems = mergeConversationSummaries(conversations, items, preserveConversationIDs);
     setConversations(mergedItems);
     const nextActiveID = chooseActiveConversationID(mergedItems, activeConversationRef.current);
     if (!nextActiveID) {
@@ -1120,6 +1124,9 @@ export function App() {
   }
 
   async function run(label: string, task: () => Promise<void>): Promise<void> {
+    const runGeneration = runGenerationRef.current + 1;
+    runGenerationRef.current = runGeneration;
+    const isCurrentRun = () => runGenerationRef.current === runGeneration;
     setStatus(label);
     setError("");
     try {
@@ -1127,17 +1134,24 @@ export function App() {
         await ensureFreshSession();
       }
       await task();
-      setStatus(`${label} ok`);
+      if (isCurrentRun()) {
+        setStatus(`${label} ok`);
+      }
     } catch (caught) {
       if (shouldRefreshBefore(label) && isUnauthenticated(caught) && sessionRef.current?.refreshToken) {
         try {
           await refreshAuthenticatedSession();
           await task();
-          setStatus(`${label} ok`);
+          if (isCurrentRun()) {
+            setStatus(`${label} ok`);
+          }
           return;
         } catch (retried) {
           caught = retried;
         }
+      }
+      if (!isCurrentRun()) {
+        return;
       }
       if (isUnauthenticated(caught) && sessionRef.current) {
         await clearExpiredSession(caught);
@@ -1740,16 +1754,19 @@ export function App() {
                 {conversations.length === 0 ? (
                   <div className="conversation-empty">暂无会话</div>
                 ) : null}
-                {conversations.map(conversation => (
+                {conversations.map(conversation => {
+                  const isActiveConversation = conversation.conversationID === activeConversationID;
+                  return (
                   <article
-                    className={`conversation-row ${conversation.conversationID === activeConversationID ? "active" : ""}`}
+                    className={`conversation-row ${isActiveConversation ? "active" : ""}`}
                     key={conversation.conversationID}
                   >
                     <button
                       data-testid="conversation-item"
                       data-conversation-id={conversation.conversationID}
                       data-conversation-type={conversation.type}
-                      className="conversation-item"
+                      data-active={isActiveConversation ? "true" : "false"}
+                      className={`conversation-item ${isActiveConversation ? "active" : ""}`}
                       type="button"
                       onClick={() => void run("select conversation", () => selectConversation(conversation.conversationID))}
                     >
@@ -1805,7 +1822,8 @@ export function App() {
                       </button>
                     </div>
                   </article>
-                ))}
+                  );
+                })}
               </div>
             </section>
 
@@ -2721,10 +2739,16 @@ function contactDisplayName(contact: ContactItem): string {
 
 function mergeConversationSummaries(
   current: ConversationSummary[],
-  incoming: ConversationSummary[]
+  incoming: ConversationSummary[],
+  preserveConversationIDs = new Set<string>()
 ): ConversationSummary[] {
   const currentByID = new Map(current.map(item => [item.conversationID, item]));
-  return sortConversationSummaries(incoming.map(item => mergeConversationSummary(currentByID.get(item.conversationID), item)));
+  const incomingIDs = new Set(incoming.map(item => item.conversationID));
+  const mergedIncoming = incoming.map(item => mergeConversationSummary(currentByID.get(item.conversationID), item));
+  const preservedCurrent = current.filter(
+    item => preserveConversationIDs.has(item.conversationID) && !incomingIDs.has(item.conversationID)
+  );
+  return sortConversationSummaries([...mergedIncoming, ...preservedCurrent]);
 }
 
 function mergeConversationSummary(

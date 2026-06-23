@@ -572,7 +572,7 @@ async function activeConversationID(cdp, timeoutMs) {
     label: "active conversation id",
     timeoutMs,
     expression: `(() => {
-      const active = document.querySelector('[data-testid="conversation-item"].active');
+      const active = document.querySelector('[data-testid="conversation-item"][data-active="true"]');
       return { ok: Boolean(active?.dataset?.conversationId), conversationID: active?.dataset?.conversationId || "" };
     })()`
   });
@@ -623,7 +623,7 @@ async function waitForActiveConversation(cdp, conversationID, timeoutMs) {
     label: `active conversation ${conversationID}`,
     timeoutMs,
     expression: `(() => {
-      const active = document.querySelector('[data-testid="conversation-item"].active');
+      const active = document.querySelector('[data-testid="conversation-item"][data-active="true"]');
       return { ok: active?.dataset?.conversationId === ${JSON.stringify(conversationID)} };
     })()`
   });
@@ -1046,7 +1046,7 @@ async function pageDiagnostics(cdp) {
       pushStatus: document.querySelector('[data-testid="push-status"]')?.textContent || "",
       ackStatus: document.querySelector('[data-testid="ack-status"]')?.textContent || "",
       error: (document.querySelector('[data-testid="error-banner"]')?.textContent || "").slice(0, 1000),
-      activeConversationID: document.querySelector('[data-testid="conversation-item"].active')?.dataset?.conversationId || "",
+      activeConversationID: document.querySelector('[data-testid="conversation-item"][data-active="true"]')?.dataset?.conversationId || "",
       bodyTextPrefix: (document.body?.textContent || "").slice(0, 300)
     }))()`);
     return {

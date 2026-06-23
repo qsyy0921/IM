@@ -1,15 +1,14 @@
 # NexusIM Project Routing
 
 本文件只维护 NexusIM 的项目入口、文档路由和通用协作原则。
-仓库文档只维护可持续更新的项目事实，不保存临时粘贴内容、历史副本或
-具体切片正文。
+它不是可执行切片正文的存放处，也不保存临时粘贴内容、历史副本或一次性提示词。
 
-具体 active slice、推进策略、架构边界、优先级和阶段结论由对应进度文档维护。
+当前阶段、推进策略、架构边界、优先级和阶段结论由对应进度文档维护。
 本文件只告诉后续 agent 应该去哪里读取项目事实，不替代进度文档。
 
 ## 文档路由
 
-- 本文件只维护每轮文档路由和工作原则；具体目标、推进策略和架构边界见
+- 本文件只维护每轮文档路由和工作原则；当前阶段、推进策略和架构边界见
   `docs/runbook/current-goal.md`、`docs/runbook/current-brief.md`、`agent.md` 和
   `docs/architecture/target-architecture-complete.md`。
 - 根目录 `README.md` 是 GitHub 首页总览，阶段、架构、客户端能力、新服务、
@@ -19,7 +18,7 @@
 
 ## 工作原则
 
-1. 主线阶段以 `current-goal.md` 和 `current-brief.md` 为准；不要在本文件维护当前 active slice 细节。
+1. 主线阶段以 `current-goal.md` 和 `current-brief.md` 为准；不要在本文件维护当前执行阶段细节。
 2. 小切片闭环：设计、代码、必要测试、文档一起收；默认跑相关局部门禁，不频繁跑完整 `check-local`。
 3. 降低耦合并控制复杂度：不跨服务读内部表，不引入网状同步 RPC，接近行数阈值就拆同 package 文件。
 4. 新功能先架构分析再编码；先判断是否需要新技术、新中间件、新服务或新 provider，

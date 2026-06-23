@@ -1144,7 +1144,7 @@ export function App() {
   const activeConversationTitle = activeConversation
     ? displayConversationTitle(activeConversation)
     : activeConversationID
-      ? titleFromConversationID(activeConversationID, "GROUP")
+      ? titleFromConversationID(activeConversationID, "UNKNOWN")
       : "选择一个会话";
   const activeConversationSubtitle = activeConversation
     ? conversationSubtitle(activeConversation)
@@ -1299,12 +1299,12 @@ export function App() {
         </section>
 
         {activeView === "conversations" ? (
-          <section className="conversation-list" aria-label="好友和群聊列表">
-            <section className="list-section" aria-label="群聊列表">
+          <section className="conversation-list" aria-label="好友和会话列表">
+            <section className="list-section" aria-label="会话列表">
               <div className="list-section-header">
                 <div>
-                  <h2>群聊列表</h2>
-                  <p>{session ? `${conversations.length} 个群聊 / 会话` : "登录后同步群聊"}</p>
+                  <h2>会话列表</h2>
+                  <p>{session ? `${conversations.length} 个会话` : "登录后同步会话"}</p>
                 </div>
                 <button type="button" onClick={() => void run("load conversations", () => loadConversations())} disabled={!session}>
                   刷新
@@ -1330,7 +1330,7 @@ export function App() {
               </form>
               <div className="compact-list">
                 {conversations.length === 0 ? (
-                  <div className="conversation-empty">暂无群聊</div>
+                  <div className="conversation-empty">暂无会话</div>
                 ) : null}
                 {conversations.map(conversation => (
                   <button
@@ -1983,16 +1983,22 @@ function mergeConversationSummaries(
   incoming: ConversationSummary[]
 ): ConversationSummary[] {
   const currentByID = new Map(current.map(item => [item.conversationID, item]));
-  return incoming.map(item => {
-    const existing = currentByID.get(item.conversationID);
-    if (!existing || !isGenericConversationTitle(item.title)) {
-      return item;
-    }
-    if (isGenericConversationTitle(existing.title)) {
-      return item;
-    }
-    return { ...item, title: existing.title };
-  });
+  return incoming.map(item => mergeConversationSummary(currentByID.get(item.conversationID), item));
+}
+
+function mergeConversationSummary(
+  existing: ConversationSummary | undefined,
+  incoming: ConversationSummary
+): ConversationSummary {
+  if (!existing) {
+    return incoming;
+  }
+  const type = incoming.type === "UNKNOWN" ? existing.type : incoming.type;
+  const title =
+    isGenericConversationTitle(incoming.title) && !isGenericConversationTitle(existing.title)
+      ? existing.title
+      : incoming.title;
+  return { ...incoming, type, title };
 }
 
 function conversationDisplayTitle(conversation: ConversationSummary): string {
@@ -2007,11 +2013,19 @@ function titleFromConversationID(conversationID: string, type: ConversationSumma
   if (type === "DIRECT") {
     return `私聊 ${shortID}`;
   }
+  if (type === "UNKNOWN") {
+    return `会话 ${shortID}`;
+  }
   return `群聊 ${shortID}`;
 }
 
 function conversationSubtitle(conversation: ConversationSummary): string {
-  const kind = conversation.type === "DIRECT" ? "私聊" : "群聊";
+  const kind =
+    conversation.type === "DIRECT"
+      ? "私聊"
+      : conversation.type === "GROUP"
+        ? "群聊"
+        : "会话";
   const seq = conversation.lastSeq > 0 ? `最新 #${conversation.lastSeq}` : "暂无消息";
   return `${kind} · ${seq}`;
 }

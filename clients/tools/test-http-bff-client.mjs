@@ -20,6 +20,7 @@ async function main() {
     /import\s+\{[\s\S]*?CLIENT_API_ENDPOINTS[\s\S]*?\}\s+from\s+"@nexusim\/protocol";/,
     `const CLIENT_API_ENDPOINTS = {
       register: "/api/auth/register",
+      conversations: "/api/conversations",
       createConversation: "/api/conversations/create",
       directConversation: "/api/conversations/direct",
       conversationProfile: conversationID => "/api/conversations/" + encodeURIComponent(conversationID) + "/profile",
@@ -96,6 +97,29 @@ async function main() {
           boundary_seq: "2",
           member_version: "2",
           permission_version: "2"
+        }),
+        { status: 200, headers: { "content-type": "application/json; charset=utf-8" } }
+      );
+    }
+    if (url === "http://bff.local/api/conversations?limit=20") {
+      assert.equal(init?.method, "GET");
+      assert.equal(init?.headers?.Authorization, "Bearer gateway-token");
+      return new Response(
+        JSON.stringify({
+          items: [
+            {
+              conversation_id: "direct-user-a-user-b",
+              conversation_type: "CONVERSATION_TYPE_DIRECT",
+              title: "user-b",
+              last_visible_seq: "12",
+              unread_count: "2"
+            },
+            {
+              conversation_id: "receipt-only-conversation",
+              last_visible_seq: "1",
+              unread_count: "0"
+            }
+          ]
         }),
         { status: 200, headers: { "content-type": "application/json; charset=utf-8" } }
       );
@@ -348,6 +372,13 @@ async function main() {
     assert.equal(direct.type, "DIRECT");
     assert.equal(direct.directPeerUserID, "user-b");
     assert.equal(direct.boundarySeq, 2);
+    const conversationList = await client.listConversations(session(), { limit: 20 });
+    assert.equal(conversationList[0]?.type, "DIRECT");
+    assert.equal(conversationList[0]?.title, "user-b");
+    assert.equal(conversationList[0]?.lastSeq, 12);
+    assert.equal(conversationList[0]?.unreadCount, 2);
+    assert.equal(conversationList[1]?.type, "UNKNOWN");
+    assert.equal(conversationList[1]?.title, "Conversation receipt-only-conversation");
     const profile = await client.getConversationProfile("group-client-local", session());
     assert.equal(profile.title, "研发群");
     assert.equal(profile.avatarURI, "media://avatar/group-client-local");
@@ -438,7 +469,7 @@ async function main() {
     );
     assert.equal(response.items[0]?.text, expectedText);
     assert.equal(response.nextSeq, 11);
-    assert.equal(calls.length, 12);
+    assert.equal(calls.length, 13);
   } finally {
     globalThis.fetch = originalFetch;
   }

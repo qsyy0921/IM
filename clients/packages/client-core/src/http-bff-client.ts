@@ -144,6 +144,8 @@ interface BFFConversationProfileResponse {
 
 interface BFFConversationSummary {
   conversation_id?: string;
+  conversation_type?: string;
+  title?: string;
   last_visible_seq?: string | number;
   last_message_id?: string;
   last_sender_id?: string;
@@ -737,12 +739,13 @@ function loginResponseToSession(response: BFFLoginResponse): AuthSession {
 
 function conversationSummaryFromBFF(item: BFFConversationSummary, session: AuthSession): ConversationSummary {
   const archived = item.archived === true;
+  const conversationID = requiredString(item.conversation_id, "conversation_id");
   return {
     tenantID: session.tenantID,
-    conversationID: requiredString(item.conversation_id, "conversation_id"),
-    type: "GROUP",
+    conversationID,
+    type: conversationSummaryTypeFromBFF(item.conversation_type),
     status: archived ? "ARCHIVED" : "ACTIVE",
-    title: item.conversation_id ? `Conversation ${item.conversation_id}` : "Conversation",
+    title: item.title?.trim() || `Conversation ${conversationID}`,
     lastSeq: numberValue(item.last_visible_seq),
     memberVersion: numberValue(item.member_version),
     unreadCount: numberValue(item.unread_count),
@@ -759,6 +762,14 @@ function conversationTypeToBFF(value: string): string {
 function conversationTypeFromBFF(value: string | undefined): "DIRECT" | "GROUP" {
   const trimmed = trimEnumPrefix(value, "CONVERSATION_TYPE_");
   return trimmed === "DIRECT" ? "DIRECT" : "GROUP";
+}
+
+function conversationSummaryTypeFromBFF(value: string | undefined): ConversationSummary["type"] {
+  const trimmed = trimEnumPrefix(value, "CONVERSATION_TYPE_");
+  if (trimmed === "DIRECT" || trimmed === "GROUP") {
+    return trimmed;
+  }
+  return "UNKNOWN";
 }
 
 function memberChangeFromBFF(response: BFFConversationMemberChangeResponse): ConversationMemberChangeResponse {

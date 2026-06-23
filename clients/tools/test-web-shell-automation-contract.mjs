@@ -82,6 +82,9 @@ assertIncludes(appSource, "clearExpiredSession", "web shell must clear UI state 
 assertIncludes(appSource, "nativeMetadata?.capabilities?.localStore", "web shell must display native local-store readiness when available");
 assertIncludes(appSource, "nativeLocalStoreStatus", "web shell must keep local-store readiness formatting explicit");
 assertIncludes(appSource, "mergeConversationSummaries", "web shell must preserve local display titles across conversation refresh");
+assertIncludes(appSource, "mergeConversationSummary", "web shell must merge server conversation summaries through one explicit helper");
+assertIncludes(appSource, "incoming.type === \"UNKNOWN\" ? existing.type : incoming.type", "web shell must not let receipt-only summaries overwrite known direct/group types");
+assertIncludes(appSource, "titleFromConversationID(activeConversationID, \"UNKNOWN\")", "web shell must not label unknown selected conversations as groups");
 assertIncludes(appSource, "conversationDisplayTitle", "web shell must keep conversation title formatting explicit");
 assertIncludes(appSource, "conversationStatusLabel", "web shell must keep conversation status formatting explicit");
 assertIncludes(appSource, "emptyMessageState", "web shell must keep empty-state copy explicit");

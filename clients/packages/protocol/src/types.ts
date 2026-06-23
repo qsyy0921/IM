@@ -63,6 +63,7 @@ export interface RegisterResponse {
 }
 
 export type ConversationType = "DIRECT" | "GROUP";
+export type ConversationSummaryType = ConversationType | "UNKNOWN";
 export type ConversationStatus = "ACTIVE" | "ARCHIVED" | "DELETED";
 
 export interface CreateConversationRequest {
@@ -217,7 +218,7 @@ export interface CreateConversationResponse {
 export interface ConversationSummary {
   tenantID: TenantID;
   conversationID: ConversationID;
-  type: ConversationType;
+  type: ConversationSummaryType;
   status: ConversationStatus;
   title: string;
   lastSeq: number;

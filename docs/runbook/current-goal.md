@@ -10,19 +10,19 @@
 ## Active Slice
 
 ```text
-client demo MVP closeout -> AI / Agent / RAG transition
+backend architecture + AI / Agent / RAG demo path
 ```
 
 目标：
 
 ```text
-Web + Windows PC demonstrable IM MVP, then switch active slice to backend architecture + AI / Agent / RAG
+IM messages -> search / memory projection -> EvidencePack -> RAG / Agent answer -> approval / audit
 ```
 
 ## 当前事实
 
-- 短线优先浏览器端和 Windows PC 端；Android 后置到用户明确切回。
-- 客户端当前只追“可演示 MVP”，不继续追完整产品级 UI、release signing、
+- Web / Windows PC 客户端演示 MVP 已达标；Android 后置到用户明确切回。
+- 客户端当前停在“可演示 MVP”，不继续追完整产品级 UI、release signing、
   MSI / NSIS installer、完整移动端、媒体体验或群管理深水区。
 - Web / PC / Android 共用 `clients/packages/protocol` 和
   `clients/packages/client-core`；客户端只连 `api-gateway` BFF 和 `push-gateway`。
@@ -53,7 +53,17 @@ Web + Windows PC demonstrable IM MVP, then switch active slice to backend archit
   `8782936b` 跑通 direct / group / invite 路径并归档报告；随后 clean commit
   `7e8a890b` 跑通 direct / group / invite + 会话标签 / 草稿 / 归档 round-trip
   的真实浏览器 / PC 多用户 UI smoke；clean commit `05b8aec6` 进一步验证会话
-  tag / draft / archived-only 筛选的匹配和排除路径。默认路径不启动浏览器。
+  tag / draft / archived-only 筛选的匹配和排除路径。2026-06-23 追加
+  `client-demo-mvp-browser-ui-20260623-231711` 真实验收，verdict 全部为 true：
+  direct chat、group chat、group invite、conversation management、receiver ACK。
+  默认路径不启动浏览器。
+- 2026-06-23 `client-demo-mvp-desktop-login-20260623-232819` 已通过 Windows
+  desktop WebView 登录级真实 smoke：Tauri WebView 登录、push connected、direct
+  conversation 外部消息触发、PullInbox、message observe、AckDelivery 和
+  `tauri-sqlite` native store readiness 全部为 true。此次修正了
+  `run-local-smoke.ps1` 桌面 smoke 错用群会话的问题：桌面 smoke 现在从
+  `client-web-summary.json` 显式读取双方仍 active 的 `direct_chat.conversation_id`，
+  读不到直接失败，不使用群会话兜底。
 - 已有 clean smoke 覆盖真实双用户好友直聊、群聊 first path、群资料 BFF
   read/update 和群成员动作链路；证据见 `docs/runbook/client-platform.md`。
 - Windows desktop 已有 artifact / signing / installer plan first paths；签名 / installer
@@ -93,9 +103,9 @@ Web + Windows PC demonstrable IM MVP, then switch active slice to backend archit
   installer 签名完成。
 - Android 已有 WebView shell / bridge / APK 历史产物和 metadata smoke；后续切回时重新加载 toolchain env 或 Docker builder。
 
-## 客户端演示 MVP 收口标准
+## 客户端演示 MVP 收口状态
 
-客户端达到以下程度即视为当前阶段完成，不再继续追完整产品级客户端：
+客户端已经达到以下阶段性标准，当前阶段不再继续追完整产品级客户端：
 
 1. Web / Windows PC 能登录、注册和恢复会话。
 2. 能展示好友列表、群聊列表和消息列表。
@@ -105,24 +115,29 @@ Web + Windows PC demonstrable IM MVP, then switch active slice to backend archit
 
 ## 下一步优先级
 
-1. 只修阻塞上述演示 MVP 的 Web / Windows PC 缺口。
-2. 客户端演示 MVP 达标后，立即更新本文件、`current-brief.md`、`remaining-goals.md`
-   和 README，把 active slice 切到后端架构完善与 AI / Agent / RAG。
+1. 从客户端主线切到后端架构完善与 AI / Agent / RAG 演示主线。
+2. 下一模块先做架构分析，再做代码：读取
+   `docs/architecture/target-architecture-complete.md`、
+   `docs/architecture/target-architecture-ai.md`、`docs/runbook/service-briefs/search-service.md`、
+   `memory-service.md`、`retrieval-gateway.md`、`rag-service.md`、`agent-service.md`
+   和 `action-executor.md`。
 3. 后端 / AI 演示主线优先做：
    `IM 消息 -> search / memory projection -> EvidencePack -> RAG / Agent answer -> approval / audit`。
-4. Windows release signing / MSI / NSIS installer、完整 Android、完整移动端发布、
+4. 客户端只作为演示入口；除非阻塞上述演示，不继续扩 UI 产品化。
+5. Windows release signing / MSI / NSIS installer、完整 Android、完整移动端发布、
    复杂 UI、群管理深水区和真实 media provider 链路全部后置到 backlog。
-5. 新发现待办写入 `docs/runbook/remaining-goals.md`，不要把长待办复制回本文件。
+6. 新发现待办写入 `docs/runbook/remaining-goals.md`，不要把长待办复制回本文件。
 
 ## Focused Checks
 
-客户端小切片优先跑：
+客户端后续小修优先跑：
 
 ```powershell
 npm --prefix clients run check:no-toolchain
 git diff --check; git diff --cached --check
 ```
 
+AI / Agent 或后端跨服务模块按影响面选择相关 Go / Python / TypeScript checks；
 跨服务、生成代码、migration、service-registry、Docker / compose、安全边界、
 提交推送前或用户明确要求时，扩大到完整 `.\tools\check-local.ps1`。
 

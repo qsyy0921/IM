@@ -17,14 +17,13 @@
 ## 当前阶段
 
 ```text
-client demo MVP closeout -> AI / Agent / RAG transition
+backend architecture + AI / Agent / RAG demo path
 ```
 
 NexusIM 已有本地 / 双机可运行的最小分布式 IM 后端，并已扩展到 AI foundation
-和 product-active 服务 first paths。当前短线只把浏览器端和 Windows PC 端收敛到
-可演示 IM MVP；Android、release signing、MSI / NSIS installer、完整移动端发布、
-复杂 UI 和深水区群管理全部后置。客户端演示达标后，主线切回后端架构完善和
-AI / Agent / RAG。
+和 product-active 服务 first paths。浏览器端和 Windows PC 端已经收敛到可演示
+IM MVP；Android、release signing、MSI / NSIS installer、完整移动端发布、复杂 UI
+和深水区群管理全部后置。当前主线切回后端架构完善和 AI / Agent / RAG。
 
 ## 已有服务层级
 
@@ -41,9 +40,9 @@ AI / Agent / RAG。
 
 ## 当前短线
 
-1. Web / Windows PC 客户端只按演示 MVP 收口：登录、注册、好友 / 群聊列表、
-   点击好友发起私聊、点击群聊进入会话、中文消息双向不乱码、消息列表、发送、
-   PullInbox、ACK、push 状态和清晰失败提示。
+1. 客户端只作为演示入口继续保留：Web / Windows PC 已有登录、注册、好友 / 群聊列表、
+   点击好友发起私聊、点击群聊进入会话、消息列表、发送、PullInbox、ACK、push
+   状态和清晰失败提示；不继续追完整产品级客户端。
 2. 已有 clean smoke 覆盖双用户好友直聊、群聊 first path、群资料 BFF
    read/update、群公告和群成员动作；当前群头像上传 / 展示已接 BFF -> media-service ->
    profile update / download URL 的本地 first path，头像更新会保留当前公告；详细证据见 `client-platform.md` 与
@@ -56,9 +55,16 @@ AI / Agent / RAG。
    clean commit `8782936b` 覆盖 direct / group / invite 路径；clean commit
    `7e8a890b` 进一步覆盖 direct / group / invite + 会话标签 / 草稿 / 归档
    round-trip 的真实浏览器 / PC 多用户 UI smoke；clean commit `05b8aec6`
-   已验证会话 tag / draft / archived-only 筛选的匹配和排除路径。默认路径不启动浏览器。
+   已验证会话 tag / draft / archived-only 筛选的匹配和排除路径。2026-06-23
+   `client-demo-mvp-browser-ui-20260623-231711` 追加验证 direct chat、group chat、
+   group invite、conversation management 和 receiver ACK 全为 true。默认路径不启动浏览器。
    Web / PC shell 的登录过期可见状态清理也已纳入 focused client contract。
-4. Windows desktop 已有本地 artifact / signing / installer plan first paths；签名 /
+4. 2026-06-23 `client-demo-mvp-desktop-login-20260623-232819` 已通过 Windows desktop
+   WebView 登录级真实 smoke：登录、push connected、direct conversation 外部消息触发、
+   PullInbox、message observe、AckDelivery 和 `tauri-sqlite` native store readiness
+   全部为 true。桌面 smoke 现在显式读取 `client-web-summary.json` 的
+   `direct_chat.conversation_id`，避免在群成员管理后用已失效群会话触发 403。
+5. Windows desktop 已有本地 artifact / signing / installer plan first paths；签名 /
    installer 工具已支持显式 local signing profile 输入，并有只读 release readiness
    report 汇总签名输入、低敏 `signtool` 候选提示、签名验证和 installer 阻塞；
    候选工具不会自动用于 readiness；timestamp URL 禁止携带账号密码、query 或
@@ -88,15 +94,14 @@ AI / Agent / RAG。
    副本、临时信任 CurrentUser code-signing certificate、验证 Authenticode `Valid` 并清理；
    2026-06-23 本机运行已通过，原 collected artifact 未变。这些能力保留为后置
    release backlog，不作为当前主线。
-5. 所有客户端能力只走 api-gateway BFF 和 push-gateway，不直连内部服务。
-6. 新功能先做简短架构分析再编码；新增服务 / 中间件 / provider 必须归属正确平台层并同步 owner docs。
-7. 不引入隐藏 fallback；开发相关路径时清理旧 fallback-like 分支，无法本轮清理的写入
+6. 所有客户端能力只走 api-gateway BFF 和 push-gateway，不直连内部服务。
+7. 新功能先做简短架构分析再编码；新增服务 / 中间件 / provider 必须归属正确平台层并同步 owner docs。
+8. 不引入隐藏 fallback；开发相关路径时清理旧 fallback-like 分支，无法本轮清理的写入
    `remaining-goals.md`。
 
-## 切回 AI / Agent 条件
+## 当前 AI / Agent 方向
 
-客户端满足登录 / 注册、好友和群聊展示、私聊 / 群聊发起、中文消息、消息列表、
-PullInbox / ACK / push 状态和 Windows PC 可打开演示后，立即把 active slice 切到：
+当前 active slice 已切到：
 
 ```text
 backend architecture + AI / Agent / RAG demo path

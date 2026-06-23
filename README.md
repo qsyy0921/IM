@@ -150,7 +150,7 @@ flowchart TB
 
 ### 当前客户端状态
 
-客户端当前只追 Web / Windows PC 可演示 MVP，Android、release signing、MSI / NSIS
+客户端当前停在 Web / Windows PC 可演示 MVP，Android、release signing、MSI / NSIS
 installer、完整移动端发布、复杂 UI、完整媒体体验和深水区群管理全部后置。Web / PC
 shell 已接账号登录、注册、好友申请、好友列表、点击好友发起私聊、群聊列表、建群、
 点击群聊进入会话、群成员添加 / 退群、从好友列表邀请入群、成员列表、成员搜索 /
@@ -165,13 +165,18 @@ read/update、群成员动作、群公告和群头像上传 / 展示 first path�
 驱动 Web shell 登录 sender / receiver、点击好友发起直聊、UI 建群、邀请成员、群聊发送、
 会话标签 / 草稿 / 归档 / 筛选、PullInbox 和 ACK；clean commit `8782936b`、
 `7e8a890b` 和 `05b8aec6` 已分别覆盖 direct / group / invite、会话管理 round-trip
-和筛选匹配 / 排除路径。
+和筛选匹配 / 排除路径。2026-06-23
+`client-demo-mvp-browser-ui-20260623-231711` 追加验证 direct chat、group chat、
+group invite、conversation management 和 receiver ACK 全部为 true。
 
 Windows desktop 已有 standalone exe package、package-local README / launcher support files、
 unsigned local portable zip bundle、desktop installer / signing readiness plans、desktop signing
 readiness report、显式 signing wrapper、只读 signature verifier、post-build installer 签名验证、
 installer build 包装器和本地开发签名 smoke。这些保留为后置 release backlog；当前演示只要求
-Windows PC shell 能打开并展示 IM 主链路。
+Windows PC shell 能打开并展示 IM 主链路。2026-06-23
+`client-demo-mvp-desktop-login-20260623-232819` 已通过 Windows desktop WebView
+登录级真实 smoke，覆盖登录、push、direct conversation 外部消息触发、PullInbox、消息观察、
+AckDelivery 和 `tauri-sqlite` native store readiness。
 
 本地调试入口：
 
@@ -297,11 +302,10 @@ message / conversation / policy events -> search-service + memory-service projec
 | --- | --- |
 | `clients/` | Browser / Windows PC / Android client platform first slice：`protocol`、`client-core`、Web shell、PC desktop shell contract 和 Android runtime contract 已建立并通过 focused validation；`api-gateway` client BFF first-stage HTTP/JSON surface 已落；Web / PC shell 已接账号密码登录、注册、好友列表、好友申请、点击好友发起私聊、群聊列表、建群、点击群聊进入会话、群成员添加 / 退群、从好友列表邀请入群、成员列表、成员搜索 / 角色过滤 / 分页、移除成员、角色变更 / owner transfer 第一路径、群资料卡、邀请来源提示、权限感知群设置操作区、群标题 / 头像 URI / 群公告 read-update、群头像上传 / 展示 first path、会话置顶 / 免打扰、归档、标签、草稿、会话筛选、消息列表、发送后本地状态刷新、PullInbox / AckDelivery；真实双用户 direct + group client smoke 已通过；`plan:browser-multiuser-ui-smoke` 可从成功的 `client-web-summary.json` 生成低敏浏览器 / PC 多用户 UI smoke 计划；`smoke:browser-multiuser-ui` 已提供显式 opt-in 的真实浏览器 / PC runner，使用两个隔离 Chromium profile 驱动 sender / receiver 完成直聊、UI 建群、邀请成员、群聊、会话标签 / 草稿 / 归档、tag / draft / archived-only 筛选、PullInbox 和 ACK；2026-06-23 已在 clean commit `8782936b` 实跑通过 direct / group / invite 路径，在 clean commit `7e8a890b` 实跑通过会话管理 round-trip，并在 clean commit `05b8aec6` 实跑通过会话筛选匹配 / 排除路径；默认 smoke 不启动浏览器；PC standalone exe、package-local README / launcher support files、unsigned local portable zip bundle、desktop installer / signing readiness plans、desktop signing readiness report、显式 `--execute` 门控 signing wrapper、只读 signature verifier、post-build installer 签名验证、显式 `--execute` 门控 installer build 包装器和 Android debug APK baseline 已产出；artifact install / signing / verification / installer plans 已按 `artifactKind` 区分 executable / installer，不把 installer 当作 portable direct-launch 输入，也不把 mixed manifest 里的 installer 当作 MSI / NSIS executable baseline，并且未通过只读 Authenticode 验证的 installer 不会被标为 install-ready。客户端只连 `api-gateway` / `push-gateway`，PullInbox 是消息事实源，WebSocket 只做在线唤醒。 |
 
-当前默认主线不是继续泛化清理 9 服务 P2 backlog，也不是做生产级 HA 长测或完整客户端产品化，
-而是先把 Web / Windows PC 客户端收敛到可演示 IM MVP：账号注册登录、好友关系、
-好友私聊、群聊、中文消息、消息列表、发送、PullInbox / AckDelivery、push 状态和局域网可运行体验。
-本地 / 局域网 Web smoke、PC WebView login smoke、真实双用户 direct + group client smoke、
-真实浏览器 / PC 多用户 UI smoke 和 PC standalone exe package 已有第一阶段证据。
+当前默认主线不是继续泛化清理 9 服务 P2 backlog，也不是做生产级 HA 长测或完整客户端产品化。
+Web / Windows PC 客户端已经足够作为演示入口：账号注册登录、好友关系、好友私聊、
+群聊、中文消息、消息列表、发送、PullInbox / AckDelivery、push 状态和局域网可运行体验已有
+第一阶段证据。下一步主线切回后端架构完善和 AI / Agent / RAG 演示链路。
 Windows signed installer / MSI / NSIS、真实 signing input、Android 真机 smoke、正式移动端发布、
 入群审批 / 禁言等深水区群设置和真实 media provider 链路全部后置。
 
@@ -319,10 +323,10 @@ group memory
 -> ai-eval
 ```
 
-下一步默认看 [current-goal.md](docs/runbook/current-goal.md)。截至当前主线，下一步只补
-Web / Windows PC 演示 MVP 的阻塞项；达到登录 / 注册、好友和群聊展示、私聊 / 群聊、
-中文消息、消息列表、PullInbox / ACK / push 状态和 PC shell 可演示后，主线切回
-后端架构完善与 AI / Agent / RAG。Windows release signing、MSI / NSIS installer、
+下一步默认看 [current-goal.md](docs/runbook/current-goal.md)。截至当前主线，客户端只修
+阻塞演示入口的问题；默认推进
+`IM 消息 -> search / memory projection -> EvidencePack -> RAG / Agent answer -> approval / audit`。
+Windows release signing、MSI / NSIS installer、
 Android APK / 真机 smoke、完整媒体体验和深水区群管理均不作为当前默认阻塞。
 
 ## 不变量
@@ -482,6 +486,6 @@ python -m mypy nexusim_ai_common scripts tests
 ```text
 NexusIM 已完成 9 个 IM 后端服务的主链路和一批本地 / 双机分布式 smoke，
 已形成 AI / RAG / Agent first-stage 应用底座和 product-active 平台服务 first paths，
-当前正优先收口 Web / Windows PC 客户端 IM MVP。
-客户端演示达标后，主线切回后端架构完善和 AI / Agent / RAG。
+Web / Windows PC 客户端已经满足当前演示入口标准。
+当前主线切回后端架构完善和 AI / Agent / RAG。
 ```

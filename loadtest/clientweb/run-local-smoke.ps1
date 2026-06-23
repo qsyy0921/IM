@@ -492,6 +492,15 @@ try {
         $desktopFixturePath = Join-Path ([System.IO.Path]::GetTempPath()) ("nexusim-desktop-webview-login-" + [System.Guid]::NewGuid().ToString("N") + ".json")
         $desktopSummaryPath = Join-Path $resultDir "desktop-webview-login-summary.json"
         try {
+            $clientWebSummaryPath = Join-Path $resultDir "client-web-summary.json"
+            if (-not (Test-Path $clientWebSummaryPath)) {
+                throw "client web summary is required before desktop WebView smoke"
+            }
+            $clientWebSummary = Get-Content -LiteralPath $clientWebSummaryPath -Raw | ConvertFrom-Json
+            $desktopConversationID = [string]$clientWebSummary.direct_chat.conversation_id
+            if ([string]::IsNullOrWhiteSpace($desktopConversationID)) {
+                throw "client web summary did not include direct_chat.conversation_id for desktop WebView smoke"
+            }
             $desktopFixture = [ordered]@{
                 apiBaseURL = $bffBaseURL
                 pushWebSocketURL = $pushURL
@@ -499,7 +508,7 @@ try {
                 userID = $receiverUserId
                 authProof = $receiverPassword
                 deviceID = "desktop-webview-login-device"
-                conversationID = $conversationId
+                conversationID = $desktopConversationID
                 senderUserID = $senderUserId
                 senderAuthProof = $senderPassword
                 senderDeviceID = "desktop-webview-login-sender"

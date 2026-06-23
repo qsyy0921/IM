@@ -16,18 +16,17 @@
 
 ## 当前优先顺序
 
-1. Client demo MVP closeout：只修 Web / Windows PC 演示阻塞，Android / installer / release signing 后置。
-2. 客户端演示 MVP 达标后切回 AI / Agent：group memory、EvidencePack、真实业务动作、
+1. AI / Agent demo path：group memory、EvidencePack、真实业务动作、
    Python AI Worker 候选算法和 eval gate。
-3. Product-active 服务按需推进：workflow、audit、admin、notification、media、
+2. Product-active 服务按需推进：workflow、audit、admin、notification、media、
    vector、model、knowledge、presence、control-plane。
-4. 数据平台和中间件 profile 按完整架构逐步补，不抢占客户端切片。
-5. 9 个既有 IM 服务只回补阻塞 client / AI / product platform 的 P0/P1 或用户点名项。
+3. 数据平台和中间件 profile 按完整架构逐步补，不抢占 AI / Agent 演示主线。
+4. 9 个既有 IM 服务只回补阻塞 AI / product platform 的 P0/P1 或用户点名项。
+5. 客户端只作为演示入口维护；除非阻塞演示，不继续扩完整产品级客户端。
 
-## Client Demo MVP
+## Client Demo Backlog
 
-- Web / PC shell：只补演示阻塞项：登录 / 注册、好友列表、群聊列表、点击好友发起私聊、
-  点击群聊进入会话、中文消息双向不乱码、消息列表、发送、PullInbox、ACK、push 状态和清晰失败提示。
+- Web / PC shell：演示 MVP 已达标。后续只修阻塞 AI / Agent 演示入口的问题。
 - Windows PC：只要求本地 PC shell 能打开并演示；release signing、MSI / NSIS installer、
   signed installer experience 不作为当前主线。
 - Android：后续切回时重新加载 F 盘 toolchain env 或显式 Docker builder，再跑 APK /

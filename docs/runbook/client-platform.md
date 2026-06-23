@@ -748,6 +748,11 @@ First slice:
   smoke. The 2026-06-22 account-password shell UI rerun passed the same
   login-level Windows WebView path and is recorded in
   `docs/runbook/loadtest/client-platform/loadtest-report-20260622-client-web-desktop-login-ui.md`.
+  The 2026-06-23 desktop rerun
+  `client-demo-mvp-desktop-login-20260623-232819` passed after the runner was
+  tightened to use the active direct conversation emitted by
+  `client-web-summary.json`; this keeps the smoke aligned with fail-closed
+  membership semantics after group member-management actions.
   Android now has the same metadata-smoke runner shape, a collected debug APK
   artifact, and an installed-device metadata smoke pass after Android asset URL
   rewriting. Real Android login WebView smoke is deferred while the active
@@ -793,12 +798,10 @@ rejected. For local LAN client smoke, prefer the wired `172.x.x.x` address.
 
 ## Next Work
 
-1. Continue browser / Windows PC first: polish the account-password IM shell,
-   keep complex endpoint / tenant / device controls hidden, and preserve the
-   public BFF / push client path for login, contacts, direct chat, group chat,
-   permission-aware group settings, group profile editing, send, PullInbox and
-   ACK.
-2. Produce the next Windows package step when needed: MSI / NSIS installer
+1. Client demo MVP is now sufficient for the current phase. Keep Web / Windows
+   PC as the demonstration entrypoint and only fix blockers found while showing
+   the AI / Agent path.
+2. Produce the next Windows package step only when explicitly needed: MSI / NSIS installer
    script and real code-signing pipeline on top of the existing standalone exe,
    package-local launcher, unsigned local zip bundle, explicit installer /
    signing readiness plans and login-level WebView smoke.

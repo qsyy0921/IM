@@ -31,6 +31,9 @@ assert(script.includes("smoke:android-webview-login"), "Android WebView login np
 assert(script.includes("browser-multiuser-ui-smoke-summary.json"), "browser multi-user UI summary path missing");
 assert(script.includes("desktop-webview-login-summary.json"), "desktop summary path missing");
 assert(script.includes("android-webview-login-summary.json"), "Android summary path missing");
+assert(script.includes("$clientWebSummaryPath = Join-Path $resultDir \"client-web-summary.json\""), "desktop smoke must read client web summary");
+assert(script.includes("$desktopConversationID = [string]$clientWebSummary.direct_chat.conversation_id"), "desktop smoke must use active direct conversation");
+assert(!script.includes("conversationID = $conversationId\r\n                senderUserID = $senderUserId"), "desktop smoke must not use group conversation after member-management smoke");
 assert(script.includes("Remove-Item -LiteralPath $browserFixturePath"), "browser multi-user UI fixture cleanup missing");
 assert(script.includes("Remove-Item -LiteralPath $androidFixturePath"), "Android fixture cleanup missing");
 assert(devScript.includes("BffPort = 8080"), "local dev wrapper must expose fixed BFF port 8080");

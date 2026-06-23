@@ -490,7 +490,7 @@ Web / PC / Android 已进入当前 client platform MVP foundation；面试叙述
 AI foundation 已形成 search / memory / retrieval / RAG / summary / Agent / skill /
 MCP / action-executor / ai-eval first-stage 闭环，
 future platform / product services 已进入 product-active first-stage implementation，
-当前 active slice 是 client platform MVP foundation：
+当前 active slice 是 backend architecture + AI / Agent / RAG demo path：
 浏览器 Web first path、api-gateway client BFF、push path、本地和 wired 172 clean
 baseline 已通过，PC desktop / Android first-stage runtime adapter 已落，PC
   Tauri runner skeleton 和 Android WebView asset shell skeleton 已有，shared runtime
@@ -507,6 +507,11 @@ baseline 已通过，PC desktop / Android first-stage runtime adapter 已落，P
   会话标签、草稿和归档 round-trip；clean commit `05b8aec6` 已通过 tag / draft /
   archived-only 筛选匹配和排除路径；当前客户端只收敛演示 MVP，
   不继续追完整 UI、Windows installer / signing、Android 发布或深水区群设置。
+  2026-06-23 `client-demo-mvp-browser-ui-20260623-231711` 已通过真实 browser
+  multi-user UI 验收，direct chat、group chat、group invite、conversation
+  management 和 receiver ACK 全部为 true；`client-demo-mvp-desktop-login-20260623-232819`
+  已通过 Windows desktop WebView 登录级真实 smoke，登录、push、PullInbox、消息观察、
+  AckDelivery 和 `tauri-sqlite` readiness 全部为 true。客户端已满足当前演示入口标准。
   2026-06-23 Windows desktop 本地开发签名 smoke 已通过：仅签临时 artifact 副本，
   临时信任后验证 Authenticode `Valid`，并清理临时证书；生产 release certificate /
   signed collected artifact / signed installer 仍是后置 backlog。
@@ -514,6 +519,8 @@ baseline 已通过，PC desktop / Android first-stage runtime adapter 已落，P
   local store、browser platform adapter、shell config contract 和 target shell Web assets
   prep / artifact builder dry-run / Android builder profile 静态校验已补 first-stage focused tests。
 长期后续按完整目标架构推进业务平台、数据平台、AI / Agent 平台、客户端平台和中间件平台；
+当前默认下一步是把客户端作为入口，推进
+`IM 消息 -> search / memory projection -> EvidencePack -> RAG / Agent answer -> approval / audit`。
 后续 AI 继续扩展低敏 collaborative-memory 算法/eval，优先 multi-hop / temporal update / profile aggregation 边界。
 短期生产级测试、完整 HA、长压和 sizing 不再作为当前转进阻塞，但仍留在 hardening backlog。
 ```

@@ -163,12 +163,13 @@ package-local PowerShell launcher，install plan 会校验这些 support files �
 artifact manifest 现在区分 `desktop-executable` / `desktop-installer`；
 `bundle:desktop` 只打包 `desktop-executable`，可以产出 unsigned local portable zip 和低敏 summary；
 `plan:desktop-installer` / `plan:desktop-signing` 可以检查 Tauri installer 和显式
-签名输入 readiness；`sign:desktop-artifact` 已提供显式 `--execute` 门控的签名
+签名输入 readiness；签名 / installer 工具已支持显式 local signing profile 输入；
+`sign:desktop-artifact` 已提供显式 `--execute` 门控的签名
 执行入口，默认仍只输出低敏 plan，release signing 可加 `--require-valid` 在签名后
 立即执行 fail-closed 验证；`verify:desktop-signature` 已提供只读
 Authenticode 验证入口；2026-06-23 已重新 collect 新格式 `desktop-executable`
 artifact，manifest 为 `clients/artifacts/2026-06-22T214826Z/manifest.json`，当前签名状态为 `NotSigned`；同日只读 signing plan 已确认本机 Windows Kits
-`signtool` 可显式定位，传入 timestamp URL 后剩余 release 阻塞是代码签名证书来源和 valid signature；`build:desktop-installer` 已提供显式 `--execute` 门控的
+`signtool` 可显式定位，传入 timestamp URL 后剩余 release 阻塞是代码签名证书来源和 valid signature；local signing profile 只引用本机 PFX / Windows 证书库和密码环境变量名，不把证书密码或私钥写入仓库；`build:desktop-installer` 已提供显式 `--execute` 门控的
 installer build 包装器，并通过独立仓库 installer profile 调用 Tauri。默认开发
 Tauri config 仍保持不打包；installer profile 显式启用 MSI + NSIS targets；signing /
 signature verification / installer planner 会按 `artifactKind` 精确选择 collected
@@ -306,7 +307,7 @@ message / conversation / policy events -> search-service + memory-service projec
 Web / Windows PC 客户端的 IM MVP 交互做实：账号注册登录、好友关系、好友私聊、群聊、
 群成员管理第一路径、消息列表、发送、PullInbox / AckDelivery 和局域网可运行体验。本地 / 局域网 Web smoke、
 PC WebView login smoke、真实双用户 direct + group client smoke、PC standalone exe package、
-unsigned local desktop bundle、desktop installer / signing readiness plans、显式 signing wrapper、只读 signature verifier、显式 installer build 包装器、artifactKind-aware install / signing / verification / installer plans 和 Android debug APK baseline 已有；`loadtest/clientweb` 已扩展到群资料 BFF read/update、群成员列表、移除、
+unsigned local desktop bundle、desktop installer / signing readiness plans、显式 local signing profile、显式 signing wrapper、只读 signature verifier、显式 installer build 包装器、artifactKind-aware install / signing / verification / installer plans 和 Android debug APK baseline 已有；`loadtest/clientweb` 已扩展到群资料 BFF read/update、群成员列表、移除、
 角色变更和 owner transfer，并已通过 clean committed 真实 smoke；Web / PC shell 已补
 BFF-backed 成员搜索 / 角色过滤 / 分页，并已有第一版群资料卡、邀请来源提示和群标题 /
 头像 URI read-update。下一步是 Windows PC MSI / NSIS installer 与真实 signing input /

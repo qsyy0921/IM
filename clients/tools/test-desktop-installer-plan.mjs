@@ -116,8 +116,19 @@ try {
   });
   const fakeSignTool = join(tempRoot, "signtool.exe");
   const fakePfx = join(tempRoot, "nexusim-signing.pfx");
+  const signingProfile = join(tempRoot, "desktop-signing-profile.json");
   writeFileSync(fakeSignTool, "fake signtool");
   writeFileSync(fakePfx, "fake pfx");
+  writeFileSync(signingProfile, `${JSON.stringify({
+    schemaVersion: "nexusim.desktop-signing-profile.v1",
+    signToolPath: fakeSignTool,
+    timestampURL: "https://timestamp.example.test",
+    certificate: {
+      source: "pfx-file",
+      certFile: fakePfx,
+      pfxPassEnv: "NEXUSIM_TEST_DESKTOP_PFX_PASS"
+    }
+  }, null, 2)}\n`);
 
   const ready = buildDesktopInstallerPlan({
     manifest: manifestPath,
@@ -363,6 +374,22 @@ try {
   assert(cliPlan.missing.includes("desktop-signature-valid"), "CLI installer plan should require valid signature");
   assert(cliPlan.signatureVerification.trusted === false, "CLI installer plan should not trust unsigned fixtures");
   assert(!JSON.stringify(cliPlan).includes(tempRoot), "CLI installer plan leaked absolute temp path");
+
+  const cliProfilePlan = runPlanner([
+    "--manifest",
+    manifestPath,
+    "--tauri-config",
+    activeConfigPath,
+    "--target",
+    "msi",
+    "--signing-profile",
+    signingProfile
+  ], {
+    NEXUSIM_TEST_DESKTOP_PFX_PASS: "present"
+  });
+  assert(cliProfilePlan.signing.readyToSign === true, "CLI installer profile plan should be signing-ready");
+  assert(cliProfilePlan.readyToBuildInstaller === false, "CLI installer profile plan should still require valid signature for unsigned fixtures");
+  assert(cliProfilePlan.missing.includes("desktop-signature-valid"), "CLI installer profile plan should require valid signature");
 
   assert(readFileSync(fakePfx, "utf8") === "fake pfx", "fixture pfx should still exist");
 } finally {

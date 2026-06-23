@@ -81,8 +81,19 @@ try {
   });
   const fakeSignTool = join(tempRoot, "signtool.exe");
   const fakePfx = join(tempRoot, "nexusim-signing.pfx");
+  const signingProfile = join(tempRoot, "desktop-signing-profile.json");
   writeFileSync(fakeSignTool, "fake signtool");
   writeFileSync(fakePfx, "fake pfx");
+  writeFileSync(signingProfile, `${JSON.stringify({
+    schemaVersion: "nexusim.desktop-signing-profile.v1",
+    signToolPath: fakeSignTool,
+    timestampURL: "https://timestamp.example.test",
+    certificate: {
+      source: "pfx-file",
+      certFile: fakePfx,
+      pfxPassEnv: "NEXUSIM_TEST_DESKTOP_PFX_PASS"
+    }
+  }, null, 2)}\n`);
 
   const readyPlan = buildDesktopInstallerPlan({
     manifest: manifestPath,
@@ -154,6 +165,21 @@ try {
   assert(cliPlan.executionPolicy.planOnly === true, "CLI default should be plan-only");
   assert(cliPlan.executionPolicy.executesBuildCommand === false, "CLI default should not execute build");
   assert(cliPlan.commands.build.includes("--config"), "CLI dry-run should expose the Tauri config argument");
+
+  const cliProfilePlan = runBuilder([
+    "--manifest",
+    manifestPath,
+    "--tauri-config",
+    activeConfigPath,
+    "--target",
+    "msi",
+    "--signing-profile",
+    signingProfile
+  ], {
+    NEXUSIM_TEST_DESKTOP_PFX_PASS: "present"
+  });
+  assert(cliProfilePlan.installerPlan.signing.readyToSign === true, "CLI installer builder profile plan should be signing-ready");
+  assert(cliProfilePlan.readyToBuildInstaller === false, "CLI installer builder profile plan should still require valid signature for unsigned fixtures");
 
   const notReady = spawnSync(process.execPath, [
     installerBuilder,

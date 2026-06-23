@@ -66,6 +66,7 @@ try {
   writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
   const fakeSignTool = join(tempRoot, process.platform === "win32" ? "signtool.cmd" : "signtool");
   const fakePfx = join(tempRoot, "nexusim-signing.pfx");
+  const signingProfile = join(tempRoot, "desktop-signing-profile.json");
   writeFileSync(fakePfx, "fake pfx");
   writeFileSync(
     fakeSignTool,
@@ -73,6 +74,16 @@ try {
       ? "@echo off\r\necho signed> \"%~dp0signed.txt\"\r\nexit /b 0\r\n"
       : "#!/bin/sh\nprintf signed > \"$(dirname \"$0\")/signed.txt\"\n"
   );
+  writeFileSync(signingProfile, `${JSON.stringify({
+    schemaVersion: "nexusim.desktop-signing-profile.v1",
+    signToolPath: fakeSignTool,
+    timestampURL: "https://timestamp.example.test",
+    certificate: {
+      source: "pfx-file",
+      certFile: fakePfx,
+      pfxPassEnv: "NEXUSIM_TEST_DESKTOP_PFX_PASS"
+    }
+  }, null, 2)}\n`);
 
   const missingPlan = buildDesktopSigningPlan({ manifest: manifestPath });
   const missingOutput = buildSigningOutput(missingPlan, { execute: false });
@@ -116,6 +127,19 @@ try {
   assert(cliPlan.readyToSign === true, "CLI signing dry-run should be ready");
   assert(cliPlan.executionPolicy.executesSignCommand === false, "CLI dry-run should not execute signing");
   assert(!JSON.stringify(cliPlan).includes(tempRoot), "CLI signing dry-run leaked absolute temp path");
+
+  const cliProfilePlan = runSigner([
+    "--manifest",
+    manifestPath,
+    "--signing-profile",
+    signingProfile
+  ], {
+    NEXUSIM_TEST_DESKTOP_PFX_PASS: "present"
+  });
+  assert(cliProfilePlan.readyToSign === true, "CLI signing profile dry-run should be ready");
+  assert(cliProfilePlan.executionPolicy.executesSignCommand === false, "CLI signing profile dry-run should not execute signing");
+  assert(cliProfilePlan.signingPlan.signing.certificate.pfxPassEnv === "NEXUSIM_TEST_DESKTOP_PFX_PASS", "executor should preserve profile pfx pass env");
+  assert(!JSON.stringify(cliProfilePlan).includes(tempRoot), "CLI signing profile dry-run leaked absolute temp path");
 
   const cliRequireValidPlan = runSigner([
     "--require-valid",
@@ -218,6 +242,24 @@ try {
     });
     assert(readyExecute.status === 0, `ready execute should run fake signing tool: ${readyExecute.stderr}`);
     assert(readFileSync(join(tempRoot, "signed.txt"), "utf8").trim() === "signed", "ready execute should invoke the signing tool");
+
+    rmSync(join(tempRoot, "signed.txt"), { force: true });
+    const readyExecuteProfile = spawnSync(process.execPath, [
+      signer,
+      "--execute",
+      "--manifest",
+      manifestPath,
+      "--signing-profile",
+      signingProfile
+    ], {
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        NEXUSIM_TEST_DESKTOP_PFX_PASS: "present"
+      }
+    });
+    assert(readyExecuteProfile.status === 0, `profile execute should run fake signing tool: ${readyExecuteProfile.stderr}`);
+    assert(readFileSync(join(tempRoot, "signed.txt"), "utf8").trim() === "signed", "profile execute should invoke the signing tool");
 
     rmSync(join(tempRoot, "signed.txt"), { force: true });
     const readyExecuteRequireValid = spawnSync(process.execPath, [

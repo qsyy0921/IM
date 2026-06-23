@@ -3,6 +3,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { workspaceRoot } from "./client-build-env.mjs";
+import { applyDesktopSigningProfile, defaultPfxPassEnv, signingProfileEnv } from "./desktop-signing-profile.mjs";
 
 const schemaVersion = "nexusim.desktop-signing-plan.v1";
 const artifactManifestSchema = "nexusim.client-artifacts.v1";
@@ -106,6 +107,7 @@ function signingConfig(options) {
 
   const certFile = stringValue(options.certFile);
   const certSHA1 = normalizeThumbprint(options.certSHA1);
+  const pfxPassEnv = stringValue(options.pfxPassEnv) || defaultPfxPassEnv;
   if (certFile && certSHA1) {
     missing.push("single-certificate-source");
   }
@@ -129,7 +131,7 @@ function signingConfig(options) {
     certificate = {
       source: "pfx-file",
       fileHint: safeHint(resolvedCert),
-      pfxPassEnv: "NEXUSIM_DESKTOP_SIGN_PFX_PASS",
+      pfxPassEnv,
       pfxPassEnvPresent: Boolean(options.pfxPassEnvPresent)
     };
   } else if (certSHA1) {
@@ -177,7 +179,7 @@ function commandTemplate(config, artifactInfo) {
     "SHA256"
   ];
   if (config.mode === "pfx") {
-    common.push("/f", "<pfx-file>", "/p", "%NEXUSIM_DESKTOP_SIGN_PFX_PASS%");
+    common.push("/f", "<pfx-file>", "/p", `%${config.certificate.pfxPassEnv}%`);
   } else if (config.mode === "cert-store-sha1") {
     common.push("/sha1", `${config.certificate.sha1Prefix}...${config.certificate.sha1Suffix}`);
   }
@@ -327,12 +329,14 @@ function manifestTargetStatus(manifestPath, target, artifactKind) {
 function parseArgs(argv, env) {
   const options = {
     manifest: "",
+    signingProfile: env[signingProfileEnv] ?? "",
     artifactKind: defaultDesktopArtifactKind,
     signToolPath: env.NEXUSIM_DESKTOP_SIGNTOOL ?? "",
     certFile: env.NEXUSIM_DESKTOP_SIGN_CERT_FILE ?? "",
     certSHA1: env.NEXUSIM_DESKTOP_SIGN_CERT_SHA1 ?? "",
     timestampURL: env.NEXUSIM_DESKTOP_SIGN_TIMESTAMP_URL ?? "",
-    pfxPassEnvPresent: Boolean(env.NEXUSIM_DESKTOP_SIGN_PFX_PASS)
+    pfxPassEnv: defaultPfxPassEnv,
+    pfxPassEnvPresent: Boolean(env[defaultPfxPassEnv])
   };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
@@ -343,6 +347,11 @@ function parseArgs(argv, env) {
     }
     if (arg === "--artifact-kind") {
       options.artifactKind = requiredValue(argv, index, arg);
+      index += 1;
+      continue;
+    }
+    if (arg === "--signing-profile") {
+      options.signingProfile = requiredValue(argv, index, arg);
       index += 1;
       continue;
     }
@@ -368,7 +377,7 @@ function parseArgs(argv, env) {
     }
     throw new Error(`unknown argument: ${arg}`);
   }
-  return options;
+  return applyDesktopSigningProfile(options, env);
 }
 
 function safeHint(path) {

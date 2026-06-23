@@ -44,8 +44,9 @@ Android 后置到用户明确切回。
 2. 已有 clean smoke 覆盖双用户好友直聊、群聊 first path、群资料 BFF
    read/update 和群成员动作；详细证据见 `client-platform.md` 与
    `loadtest/clientweb` 报告。
-3. Windows desktop 已有本地 artifact / signing / installer plan first paths；下一步是真实
-   signing input、valid signed artifact 和 MSI / NSIS installer 体验。
+3. Windows desktop 已有本地 artifact / signing / installer plan first paths；签名 /
+   installer 工具已支持显式 local signing profile 输入；下一步仍是真实证书输入、
+   valid signed artifact 和 MSI / NSIS installer 体验。
 4. 所有客户端能力只走 api-gateway BFF 和 push-gateway，不直连内部服务。
 5. 新功能先做简短架构分析再编码；新增服务 / 中间件 / provider 必须归属正确平台层并同步 owner docs。
 6. 不引入隐藏 fallback；开发相关路径时清理旧 fallback-like 分支，无法本轮清理的写入

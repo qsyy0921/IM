@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { workspaceRoot } from "./client-build-env.mjs";
 import { buildDesktopSigningPlan } from "./plan-desktop-signing.mjs";
 import { buildDesktopSignatureVerificationReport } from "./verify-desktop-signature.mjs";
+import { applyDesktopSigningProfile, defaultPfxPassEnv, signingProfileEnv } from "./desktop-signing-profile.mjs";
 
 const schemaVersion = "nexusim.desktop-signing-execution.v1";
 const artifactManifestSchema = "nexusim.client-artifacts.v1";
@@ -100,7 +101,8 @@ function runSigningCommand(options) {
   ];
 
   if (options.certFile) {
-    args.push("/f", resolve(options.certFile), "/p", requiredString(process.env.NEXUSIM_DESKTOP_SIGN_PFX_PASS, "PFX password env"));
+    const pfxPassEnv = options.pfxPassEnv || defaultPfxPassEnv;
+    args.push("/f", resolve(options.certFile), "/p", requiredString(process.env[pfxPassEnv], "PFX password env"));
   } else {
     args.push("/sha1", normalizeThumbprint(requiredString(options.certSHA1, "certificate SHA1")));
   }
@@ -227,12 +229,14 @@ function parseArgs(argv, env) {
   const options = {
     execute: false,
     manifest: "",
+    signingProfile: env[signingProfileEnv] ?? "",
     artifactKind: defaultDesktopArtifactKind,
     signToolPath: env.NEXUSIM_DESKTOP_SIGNTOOL ?? "",
     certFile: env.NEXUSIM_DESKTOP_SIGN_CERT_FILE ?? "",
     certSHA1: env.NEXUSIM_DESKTOP_SIGN_CERT_SHA1 ?? "",
     timestampURL: env.NEXUSIM_DESKTOP_SIGN_TIMESTAMP_URL ?? "",
-    pfxPassEnvPresent: Boolean(env.NEXUSIM_DESKTOP_SIGN_PFX_PASS),
+    pfxPassEnv: defaultPfxPassEnv,
+    pfxPassEnvPresent: Boolean(env[defaultPfxPassEnv]),
     requireValid: false
   };
   for (let index = 0; index < argv.length; index += 1) {
@@ -252,6 +256,11 @@ function parseArgs(argv, env) {
     }
     if (arg === "--artifact-kind") {
       options.artifactKind = requiredValue(argv, index, arg);
+      index += 1;
+      continue;
+    }
+    if (arg === "--signing-profile") {
+      options.signingProfile = requiredValue(argv, index, arg);
       index += 1;
       continue;
     }
@@ -277,7 +286,7 @@ function parseArgs(argv, env) {
     }
     throw new Error(`unknown argument: ${arg}`);
   }
-  return options;
+  return applyDesktopSigningProfile(options, env);
 }
 
 function requiredValue(argv, index, name) {

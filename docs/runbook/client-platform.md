@@ -505,8 +505,13 @@ First slice:
   portable zip with a low-sensitive summary;
   `plan:desktop-signing` can read the collected desktop manifest for the
   requested `artifactKind`, verify the selected artifact hash and report whether
-  explicit `signtool`, certificate and timestamp URL inputs are present. It
-  defaults to `desktop-executable`; `desktop-installer` must be requested
+  explicit `signtool`, certificate and timestamp URL inputs are present. The
+  signing / installer wrappers now also accept `--signing-profile` or
+  `NEXUSIM_DESKTOP_SIGNING_PROFILE` as a local-only profile contract for those
+  inputs. The profile references a local PFX file or Windows certificate-store
+  thumbprint plus a timestamp URL and PFX password environment variable name; it
+  must not contain certificate passwords, private key material or provider
+  credentials. It defaults to `desktop-executable`; `desktop-installer` must be requested
   explicitly. It is plan-only: it does not sign, download tools, install
   packages, launch the desktop app or print local absolute paths. Missing kind
   or signing inputs remain fail-closed as `readyToSign=false`.

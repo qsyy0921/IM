@@ -3,6 +3,7 @@ import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } 
 import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { workspaceRoot } from "./client-build-env.mjs";
+import { applyDesktopSigningProfile, defaultPfxPassEnv, signingProfileEnv } from "./desktop-signing-profile.mjs";
 import { buildDesktopSigningPlan } from "./plan-desktop-signing.mjs";
 import { buildDesktopSignatureVerificationReport } from "./verify-desktop-signature.mjs";
 
@@ -68,6 +69,7 @@ export function buildDesktopInstallerPlan(options = {}) {
     certFile: options.certFile,
     certSHA1: options.certSHA1,
     timestampURL: options.timestampURL,
+    pfxPassEnv: options.pfxPassEnv,
     pfxPassEnvPresent: options.pfxPassEnvPresent
   });
   if (!signingPlan.readyToSign) {
@@ -273,6 +275,7 @@ function executionPolicy() {
 function parseArgs(argv, env) {
   const options = {
     manifest: "",
+    signingProfile: env[signingProfileEnv] ?? "",
     target: "msi",
     tauriConfig: defaultInstallerTauriConfig,
     artifactsRoot,
@@ -280,7 +283,8 @@ function parseArgs(argv, env) {
     certFile: env.NEXUSIM_DESKTOP_SIGN_CERT_FILE ?? "",
     certSHA1: env.NEXUSIM_DESKTOP_SIGN_CERT_SHA1 ?? "",
     timestampURL: env.NEXUSIM_DESKTOP_SIGN_TIMESTAMP_URL ?? "",
-    pfxPassEnvPresent: Boolean(env.NEXUSIM_DESKTOP_SIGN_PFX_PASS)
+    pfxPassEnv: defaultPfxPassEnv,
+    pfxPassEnvPresent: Boolean(env[defaultPfxPassEnv])
   };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
@@ -296,6 +300,11 @@ function parseArgs(argv, env) {
     }
     if (arg === "--tauri-config") {
       options.tauriConfig = requiredValue(argv, index, arg);
+      index += 1;
+      continue;
+    }
+    if (arg === "--signing-profile") {
+      options.signingProfile = requiredValue(argv, index, arg);
       index += 1;
       continue;
     }
@@ -321,7 +330,7 @@ function parseArgs(argv, env) {
     }
     throw new Error(`unknown argument: ${arg}`);
   }
-  return options;
+  return applyDesktopSigningProfile(options, env);
 }
 
 function findLatestArtifactManifest(root, target, artifactKind) {

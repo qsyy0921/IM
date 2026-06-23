@@ -9,7 +9,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { dirname } from "node:path";
 import { buildDesktopSigningPlan } from "./plan-desktop-signing.mjs";
@@ -65,8 +65,30 @@ try {
   writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
   const fakeSignTool = join(tempRoot, "signtool.exe");
   const fakePfx = join(tempRoot, "nexusim-signing.pfx");
+  const signingProfile = join(tempRoot, "desktop-signing-profile.json");
+  const unsafeSigningProfile = join(tempRoot, "unsafe-desktop-signing-profile.json");
   writeFileSync(fakeSignTool, "fake signtool");
   writeFileSync(fakePfx, "fake pfx");
+  writeFileSync(signingProfile, `${JSON.stringify({
+    schemaVersion: "nexusim.desktop-signing-profile.v1",
+    signToolPath: fakeSignTool,
+    timestampURL: "https://timestamp.example.test",
+    certificate: {
+      source: "pfx-file",
+      certFile: fakePfx,
+      pfxPassEnv: "NEXUSIM_TEST_DESKTOP_PFX_PASS"
+    }
+  }, null, 2)}\n`);
+  writeFileSync(unsafeSigningProfile, `${JSON.stringify({
+    schemaVersion: "nexusim.desktop-signing-profile.v1",
+    signToolPath: fakeSignTool,
+    timestampURL: "https://timestamp.example.test",
+    certificate: {
+      source: "pfx-file",
+      certFile: fakePfx,
+      pfxPassword: "do-not-store"
+    }
+  }, null, 2)}\n`);
 
   const missing = buildDesktopSigningPlan({ manifest: manifestPath });
   assert(missing.readyToSign === false, "signing plan without config should not be ready");
@@ -106,6 +128,30 @@ try {
   });
   assert(cliPlan.readyToSign === true, "CLI signing plan should be ready");
   assert(!JSON.stringify(cliPlan).includes(tempRoot), "CLI signing plan leaked absolute temp path");
+
+  const cliProfilePlan = runPlanner([
+    "--manifest",
+    manifestPath,
+    "--signing-profile",
+    signingProfile
+  ], {
+    NEXUSIM_TEST_DESKTOP_PFX_PASS: "present"
+  });
+  assert(cliProfilePlan.readyToSign === true, "CLI signing profile plan should be ready");
+  assert(cliProfilePlan.signing.certificate.pfxPassEnv === "NEXUSIM_TEST_DESKTOP_PFX_PASS", "profile pfx pass env should be preserved");
+  assert(!JSON.stringify(cliProfilePlan).includes(tempRoot), "CLI signing profile plan leaked absolute temp path");
+
+  const unsafeProfileRun = spawnSync(process.execPath, [
+    signingPlanner,
+    "--manifest",
+    manifestPath,
+    "--signing-profile",
+    unsafeSigningProfile
+  ], {
+    encoding: "utf8"
+  });
+  assert(unsafeProfileRun.status === 2, "unsafe signing profile should fail closed");
+  assert(unsafeProfileRun.stderr.includes("desktop signing profile contains a sensitive field name"), "unsafe signing profile should report sensitive field");
 
   const invalidSHA1 = buildDesktopSigningPlan({
     manifest: manifestPath,

@@ -7,6 +7,7 @@ import {
   defaultInstallerTauriConfig,
   defaultInstallerTauriConfigCommandArg
 } from "./plan-desktop-installer.mjs";
+import { applyDesktopSigningProfile, defaultPfxPassEnv, signingProfileEnv } from "./desktop-signing-profile.mjs";
 
 const schemaVersion = "nexusim.desktop-installer-build.v1";
 
@@ -157,6 +158,7 @@ function parseArgs(argv, env) {
   const options = {
     execute: false,
     manifest: "",
+    signingProfile: env[signingProfileEnv] ?? "",
     target: "msi",
     tauriConfig: defaultInstallerTauriConfig,
     tauriConfigExplicit: false,
@@ -164,7 +166,8 @@ function parseArgs(argv, env) {
     certFile: env.NEXUSIM_DESKTOP_SIGN_CERT_FILE ?? "",
     certSHA1: env.NEXUSIM_DESKTOP_SIGN_CERT_SHA1 ?? "",
     timestampURL: env.NEXUSIM_DESKTOP_SIGN_TIMESTAMP_URL ?? "",
-    pfxPassEnvPresent: Boolean(env.NEXUSIM_DESKTOP_SIGN_PFX_PASS)
+    pfxPassEnv: defaultPfxPassEnv,
+    pfxPassEnvPresent: Boolean(env[defaultPfxPassEnv])
   };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
@@ -185,6 +188,11 @@ function parseArgs(argv, env) {
     if (arg === "--tauri-config") {
       options.tauriConfig = requiredValue(argv, index, arg);
       options.tauriConfigExplicit = true;
+      index += 1;
+      continue;
+    }
+    if (arg === "--signing-profile") {
+      options.signingProfile = requiredValue(argv, index, arg);
       index += 1;
       continue;
     }
@@ -213,7 +221,7 @@ function parseArgs(argv, env) {
   if (options.tauriConfig) {
     options.tauriConfig = resolve(options.tauriConfig);
   }
-  return options;
+  return applyDesktopSigningProfile(options, env);
 }
 
 function requiredValue(argv, index, name) {

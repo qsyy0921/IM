@@ -25,11 +25,12 @@ function sha256(value) {
   return createHash("sha256").update(value).digest("hex");
 }
 
-function runVerifier(args) {
+function runVerifier(args, env = {}) {
   const output = execFileSync(process.execPath, [verifier, ...args], {
     encoding: "utf8",
     env: {
-      ...process.env
+      ...process.env,
+      ...env
     }
   });
   return JSON.parse(output);
@@ -179,6 +180,22 @@ try {
   assert(cliProfileReport.missing.includes("expected-signer-subject"), "profile expected signer should block mismatched signatures");
   assert(!cliProfileJSON.includes(tempRoot), "CLI profile signature report leaked absolute temp path");
   assert(!cliProfileJSON.match(/token|secret|password|credential|private/i), "CLI profile signature report leaked sensitive names");
+
+  const cliEnvExpectedSigner = runVerifier(["--manifest", manifestPath], {
+    NEXUSIM_DESKTOP_SIGN_EXPECTED_SUBJECT: "NexusIM"
+  });
+  assert(
+    cliEnvExpectedSigner.executionPolicy.checksExpectedSignerSubject === true,
+    "env expected signer policy should be declared"
+  );
+  assert(
+    cliEnvExpectedSigner.signaturePolicy.expectedSignerSubjectConfigured === true,
+    "env expected signer should configure signature policy"
+  );
+  assert(
+    cliEnvExpectedSigner.missing.includes("expected-signer-subject"),
+    "env expected signer should block unsigned or mismatched signatures"
+  );
 
   const requireValid = spawnSync(process.execPath, [
     verifier,

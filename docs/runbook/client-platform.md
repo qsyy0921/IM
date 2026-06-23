@@ -577,10 +577,11 @@ First slice:
   toolchains. It also defaults to `desktop-executable`; installer verification
   must pass `--artifact-kind desktop-installer`. If an expected signer subject
   is configured, a merely valid Authenticode signature is not enough; the signer
-  subject must match that public release policy. `--signing-profile` or
-  `NEXUSIM_DESKTOP_SIGNING_PROFILE` can supply only that public signer subject
-  policy for read-only verification; the verifier does not use certificate
-  sources to sign or mutate artifacts. A new `desktop-executable`
+  subject must match that public release policy. `--expected-signer-subject`,
+  `NEXUSIM_DESKTOP_SIGN_EXPECTED_SUBJECT`, `--signing-profile`, or
+  `NEXUSIM_DESKTOP_SIGNING_PROFILE` can supply that public signer subject policy
+  for read-only verification; the verifier does not use certificate sources to
+  sign or mutate artifacts. A new `desktop-executable`
   artifact was recollected on 2026-06-23 at
   `clients/artifacts/2026-06-22T214826Z/manifest.json`; it now passes artifact
   kind and hash selection, and read-only Authenticode verification reports

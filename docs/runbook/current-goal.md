@@ -42,8 +42,9 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   是显式 copy helper，要求 `--source` 和 `--output`，不读取证书 / 密钥 / 密码；
   PFX 输入会做只读可读性 / signing key / 过期检查；Windows cert-store thumbprint
   会做只读本机证书 / signing key / 过期检查；profile 可声明预期公开 signer subject，
-  valid signature 必须匹配该发布者策略；`verify:desktop-signature` 也可读取 profile
-  中的公开 signer subject policy，但不会使用证书源签名或修改 artifact；signing executor
+  valid signature 必须匹配该发布者策略；`verify:desktop-signature` 也可通过 CLI、
+  `NEXUSIM_DESKTOP_SIGN_EXPECTED_SUBJECT` 或 profile 读取公开 signer subject policy，
+  但不会使用证书源签名或修改 artifact；signing executor
   的低敏 execution policy 会声明 profile 读取和 `--require-valid` 下的 signer subject enforcement；
   release readiness report 的 top-level 和 nested signing execution policy 也会声明 profile
   读取 / signer subject policy 检查，并会对已收集的

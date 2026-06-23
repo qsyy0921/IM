@@ -323,13 +323,13 @@ function manifestTargetStatus(manifestPath, target, artifactKind) {
   };
 }
 
-function parseArgs(argv) {
+function parseArgs(argv, env = process.env) {
   const options = {
     manifest: "",
     artifactKind: defaultDesktopArtifactKind,
     requireValid: false,
     signingProfile: "",
-    expectedSignerSubjectContains: ""
+    expectedSignerSubjectContains: stringValue(env.NEXUSIM_DESKTOP_SIGN_EXPECTED_SUBJECT)
   };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
@@ -359,7 +359,7 @@ function parseArgs(argv) {
     }
     throw new Error(`unknown argument: ${arg}`);
   }
-  const envProfile = stringValue(process.env[signingProfileEnv]);
+  const envProfile = stringValue(env[signingProfileEnv]);
   if (!options.signingProfile && envProfile) {
     options.signingProfile = envProfile;
   }

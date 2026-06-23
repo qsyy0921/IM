@@ -50,7 +50,8 @@ Android 后置到用户明确切回。
    候选工具不会自动用于 readiness；timestamp URL 禁止携带账号密码、query 或
    fragment；PFX 输入会做只读可读性 / signing key / 过期检查；Windows cert-store
    thumbprint 会做只读本机证书 / signing key / 过期检查；profile 可声明预期公开
-   signer subject，valid signature 必须匹配该发布者策略；
+   signer subject，valid signature 必须匹配该发布者策略；release readiness report
+   也会对已收集的 `desktop-installer` artifact 做独立 post-build 签名验证；
    下一步仍是真实证书输入、
    valid signed artifact 和 MSI / NSIS installer 体验。
 4. 所有客户端能力只走 api-gateway BFF 和 push-gateway，不直连内部服务。

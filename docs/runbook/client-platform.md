@@ -527,13 +527,16 @@ First slice:
   packages, launch the desktop app or print local absolute paths. Missing kind
   or signing inputs remain fail-closed as `readyToSign=false`.
   `report:desktop-signing-readiness` combines that signing plan, plan-only
-  signing execution state, read-only Authenticode verification and MSI / NSIS
-  installer blockers into one low-sensitive release-readiness JSON report. It
-  does not sign, build installers, install, launch, start services, start Docker
-  or download toolchains. It may include low-sensitive local `signtool`
-  candidate hints, but those hints are never used for readiness; the selected
-  path must still be copied into explicit signing config before use. Unsigned or
-  invalid artifacts remain blocked until a real signature verifies.
+  signing execution state, read-only executable Authenticode verification,
+  MSI / NSIS installer blockers and post-build `desktop-installer` signature
+  verification into one low-sensitive release-readiness JSON report. It does
+  not sign, build installers, install, launch, start services, start Docker or
+  download toolchains. It may include low-sensitive local `signtool` candidate
+  hints, but those hints are never used for readiness; the selected path must
+  still be copied into explicit signing config before use. If the executable
+  baseline and collected installer artifact are in different manifests, pass
+  `--installer-manifest` for the installer signature check. Unsigned or invalid
+  artifacts remain blocked until real signatures verify.
   `sign:desktop-artifact` is the explicit execution wrapper for that plan. Its
   default output remains plan-only and low-sensitive; it invokes `signtool` only
   with `--execute` after the collected artifact hash, explicit `signtool`,
@@ -577,9 +580,11 @@ First slice:
   Its default output is plan-only; `--execute` is required before it runs Tauri
   with the explicit bundle target and installer profile, then collects the
   resulting Windows desktop artifact. It still fails closed while installer
-  readiness, signing input readiness or signature validity is false. It
-  does not sign, install, launch, start services or download toolchains. Real
-  execution uses the repository installer profile; custom `--tauri-config`
+  readiness, signing input readiness or executable signature validity is false.
+  The release-readiness report then verifies any collected `desktop-installer`
+  artifact separately before distribution. It does not sign, install, launch,
+  start services or download toolchains. Real execution uses the repository
+  installer profile; custom `--tauri-config`
   remains a planning fixture input and blocks `--execute`.
   `smoke:desktop-artifact-launch` has verified the exe starts, stays alive
   during the smoke hold window and terminates cleanly.

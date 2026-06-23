@@ -11,6 +11,7 @@ import { buildDesktopSignatureVerificationReport } from "./verify-desktop-signat
 
 const schemaVersion = "nexusim.desktop-signing-readiness.v1";
 const defaultDesktopArtifactKind = "desktop-executable";
+const desktopInstallerArtifactKind = "desktop-installer";
 
 function main(argv) {
   const options = parseArgs(argv, process.env);
@@ -63,6 +64,14 @@ export function buildDesktopSigningReadinessReport(options = {}) {
     expectedSignerSubjectContains: options.expectedSignerSubjectContains,
     mockSignatureStatus: options.mockSignatureStatus
   });
+  const installerSignatureVerification = buildDesktopSignatureVerificationReport({
+    manifest: options.installerManifest || options.manifest,
+    artifactsRoot: options.artifactsRoot,
+    artifactKind: desktopInstallerArtifactKind,
+    expectedSignerSubjectContains: options.expectedSignerSubjectContains,
+    mockSignatureStatus: options.mockInstallerSignatureStatus ?? options.mockSignatureStatus
+  });
+  const installerArtifactPresent = Boolean(installerSignatureVerification.artifact);
   const report = {
     schemaVersion,
     generatedAt: new Date().toISOString(),
@@ -72,12 +81,14 @@ export function buildDesktopSigningReadinessReport(options = {}) {
     ready: {
       canAttemptSigning: Boolean(signingPlan.readyToSign),
       signatureValid: Boolean(signatureVerification.readyForSignedDistribution),
-      canBuildInstaller: Boolean(installerPlan.readyToBuildInstaller)
+      canBuildInstaller: Boolean(installerPlan.readyToBuildInstaller),
+      signedInstallerValid: installerArtifactPresent && Boolean(installerSignatureVerification.readyForSignedDistribution)
     },
     blockers: {
       signing: signingPlan.missing ?? [],
       signature: signatureVerification.missing ?? [],
-      installer: installerPlan.missing ?? []
+      installer: installerPlan.missing ?? [],
+      signedInstaller: installerSignatureVerification.missing ?? []
     },
     artifact: {
       manifest: signingPlan.artifactManifest ?? signatureVerification.artifactManifest,
@@ -114,15 +125,26 @@ export function buildDesktopSigningReadinessReport(options = {}) {
       tauri: installerPlan.tauri,
       commandTemplate: installerPlan.commandTemplate,
       expectedOutputHint: installerPlan.expectedOutputHint,
-      nextAction: installerPlan.nextAction
+      nextAction: installerPlan.nextAction,
+      postBuildSignatureVerification: {
+        artifactPresent: installerArtifactPresent,
+        readyForSignedDistribution: installerArtifactPresent && Boolean(installerSignatureVerification.readyForSignedDistribution),
+        missing: installerSignatureVerification.missing ?? [],
+        status: installerSignatureVerification.signature?.status ?? "UNKNOWN",
+        signed: Boolean(installerSignatureVerification.signature?.signed),
+        trusted: Boolean(installerSignatureVerification.signature?.trusted),
+        nextAction: installerArtifactPresent
+          ? installerSignatureVerification.nextAction
+          : "build and collect a desktop installer artifact before installer signature verification"
+      }
     },
-    nextActions: nextActions(signingPlan, signatureVerification, installerPlan)
+    nextActions: nextActions(signingPlan, signatureVerification, installerPlan, installerSignatureVerification)
   };
   assertLowSensitiveReport(report);
   return report;
 }
 
-function nextActions(signingPlan, signatureVerification, installerPlan) {
+function nextActions(signingPlan, signatureVerification, installerPlan, installerSignatureVerification) {
   const actions = [];
   if (signingPlan.artifactManifest?.present === false || signatureVerification.artifactManifest?.present === false) {
     actions.push("collect a windows desktop artifact manifest before release signing checks");
@@ -136,8 +158,14 @@ function nextActions(signingPlan, signatureVerification, installerPlan) {
   if (!installerPlan.readyToBuildInstaller) {
     actions.push("resolve installer readiness blockers before running the installer build execute path");
   }
+  if (installerPlan.readyToBuildInstaller && !installerSignatureVerification.artifact) {
+    actions.push("run the installer build execute path, then collect the desktop-installer artifact");
+  }
+  if (installerSignatureVerification.artifact && !installerSignatureVerification.readyForSignedDistribution) {
+    actions.push("sign the desktop-installer artifact, then rerun installer signature verification with require-valid enabled");
+  }
   if (actions.length === 0) {
-    actions.push("run the installer build execute path in the dedicated Windows packaging profile");
+    actions.push("release checks passed for the signed desktop executable and signed installer artifact");
   }
   return actions;
 }
@@ -158,6 +186,7 @@ function executionPolicy() {
     readsPfxCertificate: true,
     readsLocalToolHints: true,
     readsAuthenticodeSignature: true,
+    readsInstallerAuthenticodeSignature: true,
     validatesArtifactHashes: true
   };
 }
@@ -285,6 +314,7 @@ function uniqueByHint(candidates) {
 function parseArgs(argv, env) {
   const options = {
     manifest: "",
+    installerManifest: "",
     signingProfile: env[signingProfileEnv] ?? "",
     artifactKind: defaultDesktopArtifactKind,
     target: "msi",
@@ -301,6 +331,11 @@ function parseArgs(argv, env) {
     const arg = argv[index];
     if (arg === "--manifest") {
       options.manifest = requiredValue(argv, index, arg);
+      index += 1;
+      continue;
+    }
+    if (arg === "--installer-manifest") {
+      options.installerManifest = requiredValue(argv, index, arg);
       index += 1;
       continue;
     }

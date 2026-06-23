@@ -40,7 +40,9 @@ try {
   const collectedDir = join(tempRoot, "collected");
   mkdirSync(collectedDir, { recursive: true });
   const exe = "fake desktop executable bytes";
+  const installer = "fake desktop installer bytes";
   writeFileSync(join(collectedDir, "nexusim-windows-desktop.exe"), exe);
+  writeFileSync(join(collectedDir, "nexusim-windows-desktop-installer.msi"), installer);
   const manifest = {
     schemaVersion: "nexusim.client-artifacts.v1",
     generatedAt: "2026-06-23T00:00:00.000Z",
@@ -60,6 +62,24 @@ try {
   };
   const manifestPath = join(collectedDir, "manifest.json");
   writeJSON(manifestPath, manifest);
+  const installerManifest = {
+    ...manifest,
+    runId: "desktop-signing-readiness-installer-test",
+    artifacts: [
+      ...manifest.artifacts,
+      {
+        target: "windows-desktop",
+        artifactKind: "desktop-installer",
+        filename: "nexusim-windows-desktop-installer.msi",
+        bytes: Buffer.byteLength(installer),
+        sha256: sha256(installer),
+        sourcePathHash: sha256("desktop-installer-source"),
+        sourceHint: "desktop/src-tauri/target/release/bundle/msi/nexusim.msi"
+      }
+    ]
+  };
+  const installerManifestPath = join(collectedDir, "manifest-with-installer.json");
+  writeJSON(installerManifestPath, installerManifest);
 
   const activeConfigPath = join(tempRoot, "tauri-active.json");
   writeJSON(activeConfigPath, {
@@ -108,6 +128,8 @@ try {
   assert(missing.ready.canAttemptSigning === false, "missing signing inputs should not be signing-ready");
   assert(missing.ready.signatureValid === false, "unsigned fixture should not be signature-ready");
   assert(missing.ready.canBuildInstaller === false, "missing signing inputs should not be installer-ready");
+  assert(missing.ready.signedInstallerValid === false, "missing installer artifact should not be installer-signature-ready");
+  assert(missing.blockers.signedInstaller.includes("desktop-installer-artifact"), "missing installer artifact should be reported");
   assert(missing.blockers.signing.includes("signtool-path"), "missing signtool should be reported");
   assert(missing.blockers.signing.includes("timestamp-url"), "missing timestamp should be reported");
   assert(missing.blockers.signing.includes("certificate-source"), "missing certificate source should be reported");
@@ -156,11 +178,56 @@ try {
   assert(fullyReady.ready.canAttemptSigning === true, "valid fixture should be signing-ready");
   assert(fullyReady.ready.signatureValid === true, "valid fixture should be signature-ready");
   assert(fullyReady.ready.canBuildInstaller === true, "valid fixture should be installer-ready");
+  assert(fullyReady.ready.signedInstallerValid === false, "installer signature readiness should wait for an installer artifact");
   assert(fullyReady.signatureVerification.readyForSignedDistribution === true, "valid expected signer should pass signature verification");
+  assert(fullyReady.installer.postBuildSignatureVerification.artifactPresent === false, "installer artifact should not be present in exe-only manifest");
+  assert(fullyReady.installer.postBuildSignatureVerification.readyForSignedDistribution === false, "missing installer artifact should not be distribution-ready");
   assert(fullyReady.installer.target === "nsis", "installer target should be preserved");
   assert(Array.isArray(fullyReady.installer.commandTemplate?.build), "ready installer command template missing");
   assert(fullyReady.nextActions.length === 1, "ready report should contain a single next action");
   assert(fullyReady.nextActions[0].includes("installer build execute"), "ready report should point at installer execute path");
+
+  const fullySignedInstaller = buildDesktopSigningReadinessReport({
+    manifest: installerManifestPath,
+    tauriConfig: activeConfigPath,
+    target: "msi",
+    signToolPath: fakeSignTool,
+    timestampURL: "https://timestamp.example.test",
+    expectedSignerSubjectContains: "NexusIM",
+    ...readyPfxOptions,
+    mockSignatureStatus: {
+      status: "Valid",
+      signerSubject: "CN=NexusIM Test Code Signing",
+      signerThumbprint: "0123456789abcdef0123456789abcdef01234567"
+    }
+  });
+  assert(fullySignedInstaller.ready.canBuildInstaller === true, "signed installer manifest should keep installer build readiness");
+  assert(fullySignedInstaller.ready.signedInstallerValid === true, "valid installer artifact should be installer-signature-ready");
+  assert(fullySignedInstaller.installer.postBuildSignatureVerification.artifactPresent === true, "installer artifact should be detected");
+  assert(fullySignedInstaller.installer.postBuildSignatureVerification.readyForSignedDistribution === true, "valid installer artifact should be distribution-ready");
+  assert(fullySignedInstaller.nextActions.length === 1, "signed installer report should contain a single next action");
+  assert(fullySignedInstaller.nextActions[0].includes("release checks passed"), "signed installer report should report completed release checks");
+
+  const unsignedInstaller = buildDesktopSigningReadinessReport({
+    manifest: installerManifestPath,
+    tauriConfig: activeConfigPath,
+    target: "msi",
+    signToolPath: fakeSignTool,
+    timestampURL: "https://timestamp.example.test",
+    ...readyPfxOptions,
+    mockSignatureStatus: {
+      status: "Valid",
+      signerSubject: "CN=NexusIM Test Code Signing",
+      signerThumbprint: "0123456789abcdef0123456789abcdef01234567"
+    },
+    mockInstallerSignatureStatus: {
+      status: "NotSigned"
+    }
+  });
+  assert(unsignedInstaller.ready.canBuildInstaller === true, "unsigned installer fixture should not affect executable build readiness");
+  assert(unsignedInstaller.ready.signedInstallerValid === false, "unsigned installer artifact should not be installer-signature-ready");
+  assert(unsignedInstaller.blockers.signedInstaller.includes("valid-authenticode-signature"), "unsigned installer signature blocker missing");
+  assert(unsignedInstaller.nextActions.some(action => action.includes("sign the desktop-installer artifact")), "unsigned installer next action should request installer signing");
 
   const wrongSignerReport = buildDesktopSigningReadinessReport({
     manifest: manifestPath,
@@ -184,6 +251,8 @@ try {
   const cliProfileReport = runReporter([
     "--manifest",
     manifestPath,
+    "--installer-manifest",
+    installerManifestPath,
     "--tauri-config",
     activeConfigPath,
     "--signing-profile",
@@ -196,6 +265,7 @@ try {
   assert(cliProfileReport.ready.signatureValid === false, "CLI profile report should still require real signature");
   assert(cliProfileReport.signing.mode === "pfx", "CLI profile report should use pfx mode");
   assert(cliProfileReport.blockers.signature.includes("expected-signer-subject"), "CLI profile report should apply expected signer policy");
+  assert(cliProfileReport.installer.postBuildSignatureVerification.artifactPresent === true, "CLI installer manifest should drive post-build installer verification");
   assert(!cliJSON.includes(tempRoot), "CLI readiness report leaked absolute temp path");
   assert(!cliJSON.match(/token|secret|password|credential|private/i), "CLI readiness report leaked sensitive names");
   assert(readFileSync(fakePfx).length > 0, "fixture pfx should still exist");

@@ -39,7 +39,8 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   自动用于 readiness；timestamp URL 禁止携带账号密码、query 或 fragment；
   PFX 输入会做只读可读性 / signing key / 过期检查；Windows cert-store thumbprint
   会做只读本机证书 / signing key / 过期检查；profile 可声明预期公开 signer subject，
-  valid signature 必须匹配该发布者策略；当前不宣称已有生产签名 installer。
+  valid signature 必须匹配该发布者策略；release readiness report 也会对已收集的
+  `desktop-installer` artifact 做独立 post-build 签名验证；当前不宣称已有生产签名 installer。
 - Android 已有 WebView shell / bridge / APK 历史产物和 metadata smoke；后续切回时重新加载 toolchain env 或 Docker builder。
 
 ## 下一步优先级

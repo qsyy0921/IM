@@ -59,7 +59,8 @@ Android 后置到用户明确切回。
    也会对已收集的 `desktop-installer` artifact 做独立 post-build 签名验证；
    `build:desktop-installer` 执行后的收集步骤只读取选中 `bundle/<target>` 目录并要求
    `desktop-installer` artifact kind；installer plan / builder 的低敏 execution policy
-   也会声明 signing profile 读取和 signer subject policy 检查；
+   也会声明 signing profile 读取、signer subject policy 检查、artifact collection 和
+   manifest 写入；
    下一步仍是真实证书输入、
    valid signed artifact 和 MSI / NSIS installer 体验。
 4. 所有客户端能力只走 api-gateway BFF 和 push-gateway，不直连内部服务。

@@ -126,6 +126,8 @@ try {
   assert(dryRun.executionPolicy.executesBuildCommand === false, "default installer builder must not execute build");
   assert(dryRun.executionPolicy.executeRequested === false, "default installer builder should not request execution");
   assert(dryRun.executionPolicy.requiresExplicitExecuteFlag === true, "execute flag requirement missing");
+  assert(dryRun.executionPolicy.collectsArtifacts === false, "default installer builder must not collect artifacts");
+  assert(dryRun.executionPolicy.writesArtifactManifest === false, "default installer builder must not write artifact manifests");
   assert(dryRun.commands.build.includes("tauri:build"), "installer builder should plan a Tauri bundle build");
   assert(dryRun.commands.build.includes("--bundles"), "installer builder should plan an explicit bundle target");
   assert(dryRun.commands.build.includes("--config"), "installer builder should plan an explicit Tauri config");
@@ -137,6 +139,12 @@ try {
   assert(dryRun.installerPlan.signatureVerification.readyForSignedDistribution === true, "installer builder should require a valid signature");
   assert(!dryRunJSON.includes(tempRoot), "dry-run installer builder output leaked absolute temp path");
   assert(!dryRunJSON.match(/token|secret|password|credential|private/i), "dry-run installer builder output leaked sensitive names");
+
+  const readyExecuteOutput = buildInstallerOutput(readyPlan, { execute: true });
+  assert(readyExecuteOutput.readyToExecuteInstallerBuild === true, "ready execute output should be executable");
+  assert(readyExecuteOutput.executionPolicy.executesBuildCommand === true, "ready execute output should execute build command");
+  assert(readyExecuteOutput.executionPolicy.collectsArtifacts === true, "ready execute output should collect installer artifacts");
+  assert(readyExecuteOutput.executionPolicy.writesArtifactManifest === true, "ready execute output should write installer artifact manifest");
 
   const readyNSISPlan = buildDesktopInstallerPlan({
     manifest: manifestPath,
@@ -215,6 +223,8 @@ try {
   const notReadyOutput = JSON.parse(notReady.stdout);
   assert(notReadyOutput.executionPolicy.executeRequested === true, "execute attempt should report requested execute policy");
   assert(notReadyOutput.executionPolicy.executesBuildCommand === false, "not-ready execute must not run build command");
+  assert(notReadyOutput.executionPolicy.collectsArtifacts === false, "not-ready execute must not collect artifacts");
+  assert(notReadyOutput.executionPolicy.writesArtifactManifest === false, "not-ready execute must not write artifact manifests");
   assert(notReadyOutput.readyToBuildInstaller === false, "not-ready execute output should not be ready");
   assert(notReadyOutput.readyToExecuteInstallerBuild === false, "not-ready execute should not be executable");
   assert(notReadyOutput.missing.includes("desktop-signing-ready"), "not-ready execute should report signing readiness");

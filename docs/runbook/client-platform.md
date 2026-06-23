@@ -614,7 +614,8 @@ First slice:
   `bundle/<target>` output directory. It still fails closed while installer
   readiness, signing input readiness or executable signature validity is false.
   Its execution policy mirrors the installer plan's profile-read and
-  signer-policy declarations.
+  signer-policy declarations, and declares that `--execute` collects installer
+  artifacts and writes the collected artifact manifest.
   The release-readiness report then verifies any collected `desktop-installer`
   artifact separately before distribution. It does not sign, install, launch,
   start services or download toolchains. Real execution uses the repository

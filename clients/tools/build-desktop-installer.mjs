@@ -46,6 +46,8 @@ export function buildInstallerOutput(plan, options = {}) {
       executesBuildCommand: execute && readyToExecuteInstallerBuild,
       requiresExplicitExecuteFlag: true,
       buildsInstaller: execute && readyToExecuteInstallerBuild,
+      collectsArtifacts: execute && readyToExecuteInstallerBuild,
+      writesArtifactManifest: execute && readyToExecuteInstallerBuild,
       signsArtifacts: false,
       installsArtifacts: false,
       launchesDesktopArtifacts: false,

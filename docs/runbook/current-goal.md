@@ -36,7 +36,8 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   `conversation-service` profile update 串起来；头像展示会再通过 BFF 校验当前
   profile avatar URI 并向 `media-service` 换取短期 download URL；当前仍是本地 fake object HTTP adapter，
   不宣称真实 S3、缩略图、扫描或 CDN 已完成。
-- 会话刷新会保留当前选中；gateway token 过期会清理本地 session / push / 会话展示状态。
+- 会话刷新会保留当前选中；gateway token 过期会清理本地 session / push / 会话展示状态，
+  且 Web / PC shell expired-session cleanup contract 已纳入 client focused check。
 - 本地发送失败的消息会保留在消息列表中，并提供显式重新编辑或作为新消息重发入口；
   客户端不会把失败缓存项静默标记为成功。
 - `plan:browser-multiuser-ui-smoke` 已可从成功的 `loadtest/clientweb`

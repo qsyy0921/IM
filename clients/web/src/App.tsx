@@ -175,13 +175,8 @@ export function App() {
         await loadContactsSoft(currentSession);
         setStatus("restore session ok");
       } catch (caught) {
-        pushConnectionRef.current?.close();
-        pushConnectionRef.current = null;
-        sessionRef.current = null;
-        setSession(null);
-        await shellActions.logout().catch(() => undefined);
+        await clearExpiredSession(caught);
         setStatus("restore session failed");
-        setError(`登录态已过期，请重新登录。${errorMessage(caught)}`);
       }
     })();
   }, []);

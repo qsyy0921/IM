@@ -135,6 +135,11 @@ const checkPlan = [
     reason: "guards Web shell lifecycle actions through shared client-core"
   },
   {
+    name: "web-shell-expired-session-cleanup",
+    script: "test:web-shell-expired-session",
+    reason: "guards expired login cleanup of visible Web / PC shell state without services"
+  },
+  {
     name: "web-shell-automation-contract",
     script: "test:web-shell-automation",
     reason: "guards stable Web shell selectors for browser and WebView smoke automation"

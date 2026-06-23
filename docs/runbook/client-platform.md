@@ -203,6 +203,11 @@ First slice:
 - Failed local sends remain visible in the message list. Users can explicitly
   restore a failed message to the composer or send it again as a new message;
   the client does not silently mark failed local cache entries as successful.
+- Expired gateway sessions now use the same visible-state cleanup path in
+  normal authenticated task failures and auto-restore failures. The client
+  focused check includes a Web / PC shell contract that verifies push,
+  session, conversations, contacts, message list, group state, conversation
+  management drafts and ACK display are cleared instead of left as stale UI.
 - `clients/start-local-backend.ps1` and `clients/start-local-web.ps1` are the
   current local startup pair. They start backend and frontend explicitly in
   separate terminals instead of hiding backend startup behind the Web launcher.

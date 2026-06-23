@@ -17,6 +17,7 @@
     "test:web-platform": "node ./tools/test-web-platform-adapter.mjs",
     "test:web-shell-actions": "node ./tools/test-web-shell-lifecycle-contract.mjs",
     "test:web-shell-automation": "node ./tools/test-web-shell-automation-contract.mjs",
+    "test:web-shell-expired-session": "node ./tools/test-web-shell-expired-session-cleanup.mjs",
     "test:web-shell-smoke-report": "node ./tools/test-web-shell-smoke-report.mjs",
     "test:browser-multiuser-ui-smoke-plan": "node ./tools/test-browser-multiuser-ui-smoke-plan.mjs",
     "test:browser-multiuser-ui-smoke": "node ./tools/test-browser-multiuser-ui-smoke.mjs",

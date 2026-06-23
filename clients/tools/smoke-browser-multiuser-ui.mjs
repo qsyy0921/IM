@@ -33,6 +33,7 @@ async function main(argv) {
     automation: {
       driver: "chromium-cdp",
       uiSelectorContract: "clients/web/src/App.tsx data-testid + low-sensitive data-* ids",
+      runtimeEndpointSource: "fixture-shell-config",
       requiredSelectors: [
         "login-user",
         "login-submit",
@@ -90,9 +91,9 @@ async function main(argv) {
       await waitForHTTP(options.webURL, options.holdMs);
     }
     stage = "launch-sender-browser";
-    await launchBrowserSession(senderBrowser, browserExecutable, options.webURL, "sender", options.holdMs);
+    await launchBrowserSession(senderBrowser, browserExecutable, options.webURL, "sender", options.holdMs, fixture, runID);
     stage = "launch-receiver-browser";
-    await launchBrowserSession(receiverBrowser, browserExecutable, options.webURL, "receiver", options.holdMs);
+    await launchBrowserSession(receiverBrowser, browserExecutable, options.webURL, "receiver", options.holdMs, fixture, runID);
 
     stage = "sender-login";
     await driveLogin(senderBrowser.cdp, fixture.tenantID, fixture.senderUserID, fixture.senderLoginInput, options.holdMs);
@@ -190,6 +191,10 @@ async function main(argv) {
       failure: {
         stage,
         message: safeFailureMessage(error)
+      },
+      diagnostics: {
+        sender: await browserDiagnostics(senderBrowser),
+        receiver: await browserDiagnostics(receiverBrowser)
       }
     };
     assertLowSensitive(result);
@@ -316,7 +321,7 @@ function emitResult(result, options) {
   process.stdout.write(payload);
 }
 
-async function launchBrowserSession(session, executable, webURL, label, timeoutMs) {
+async function launchBrowserSession(session, executable, webURL, label, timeoutMs, fixture, runID) {
   session.tempRoot = mkdtempSync(join(tmpdir(), `nexusim-browser-ui-${label}-`));
   const debugPort = await getFreePort();
   session.child = spawn(executable, [
@@ -327,13 +332,27 @@ async function launchBrowserSession(session, executable, webURL, label, timeoutM
     "--disable-default-apps",
     "--disable-background-networking",
     "--new-window",
-    webURL
+    "about:blank"
   ], {
     stdio: "ignore",
     windowsHide: true
   });
   session.child.unref();
   session.cdp = await connectBrowserCDP(debugPort, timeoutMs);
+  await installClientShellConfig(session.cdp, fixture, label, runID);
+  await session.cdp.send("Page.navigate", { url: webURL });
+}
+
+async function installClientShellConfig(cdp, fixture, label, runID) {
+  const config = {
+    target: "browser",
+    apiBaseURL: fixture.apiBaseURL,
+    pushWebSocketURL: fixture.pushWebSocketURL,
+    deviceID: `browser-${label}-${sha256Text(runID).slice(0, 12)}`
+  };
+  await cdp.send("Page.addScriptToEvaluateOnNewDocument", {
+    source: `globalThis.__NEXUSIM_CLIENT_SHELL__ = ${JSON.stringify(config)};`
+  });
 }
 
 function startWebDevServer(webURL) {
@@ -547,6 +566,7 @@ class CDPClient {
     this.socket = socket;
     this.nextID = 1;
     this.pending = new Map();
+    this.networkIssues = [];
     socket.addEventListener("message", event => this.onMessage(event.data));
     socket.addEventListener("error", () => this.rejectAll(new Error("browser debug socket error")));
     socket.addEventListener("close", () => this.rejectAll(new Error("browser debug socket closed")));
@@ -616,6 +636,9 @@ class CDPClient {
 
   onMessage(data) {
     const message = JSON.parse(String(data));
+    if (message.method) {
+      this.recordEvent(message);
+    }
     if (!message.id) {
       return;
     }
@@ -645,6 +668,39 @@ class CDPClient {
       // best effort
     }
   }
+
+  recordEvent(message) {
+    if (message.method === "Network.responseReceived") {
+      const response = message.params?.response;
+      const status = Number(response?.status ?? 0);
+      if (status >= 400) {
+        this.pushNetworkIssue({
+          kind: "http-response",
+          status,
+          url: safeNetworkURL(response?.url)
+        });
+      }
+      return;
+    }
+    if (message.method === "Network.loadingFailed") {
+      this.pushNetworkIssue({
+        kind: "loading-failed",
+        errorText: safeNetworkText(message.params?.errorText),
+        url: safeNetworkURL(message.params?.request?.url)
+      });
+    }
+  }
+
+  pushNetworkIssue(issue) {
+    this.networkIssues.push(issue);
+    if (this.networkIssues.length > 12) {
+      this.networkIssues.shift();
+    }
+  }
+
+  recentNetworkIssues() {
+    return this.networkIssues.slice();
+  }
 }
 
 async function connectBrowserCDP(port, timeoutMs) {
@@ -659,6 +715,8 @@ async function connectBrowserCDP(port, timeoutMs) {
       if (page) {
         const client = await CDPClient.connect(page.webSocketDebuggerUrl);
         await client.send("Runtime.enable");
+        await client.send("Page.enable");
+        await client.send("Network.enable");
         return client;
       }
     } catch (error) {
@@ -839,19 +897,47 @@ function errorMessage(error) {
 
 async function pageDiagnostics(cdp) {
   try {
-    return await cdp.evaluate(`(() => ({
+    const page = await cdp.evaluate(`(() => ({
       url: location.href,
       title: document.title,
       runtimeStatus: document.querySelector('[data-testid="runtime-status"]')?.textContent || "",
       pushStatus: document.querySelector('[data-testid="push-status"]')?.textContent || "",
       ackStatus: document.querySelector('[data-testid="ack-status"]')?.textContent || "",
-      error: document.querySelector('[data-testid="error-banner"]')?.textContent || "",
+      error: (document.querySelector('[data-testid="error-banner"]')?.textContent || "").slice(0, 1000),
       activeConversationID: document.querySelector('[data-testid="conversation-item"].active')?.dataset?.conversationId || "",
       bodyTextPrefix: (document.body?.textContent || "").slice(0, 300)
     }))()`);
+    return {
+      ...page,
+      recentNetworkIssues: cdp.recentNetworkIssues()
+    };
   } catch (error) {
     return { error: errorMessage(error) };
   }
+}
+
+async function browserDiagnostics(session) {
+  if (!session.cdp) {
+    return { started: Boolean(session.child?.pid) };
+  }
+  return pageDiagnostics(session.cdp);
+}
+
+function safeNetworkURL(value) {
+  if (typeof value !== "string" || value.trim() === "") {
+    return "";
+  }
+  try {
+    const parsed = new URL(value);
+    const path = parsed.pathname.slice(0, 160);
+    return `${parsed.origin}${path}`;
+  } catch {
+    return "";
+  }
+}
+
+function safeNetworkText(value) {
+  return typeof value === "string" ? value.replace(/\s+/g, " ").trim().slice(0, 120) : "";
 }
 
 const thisFile = fileURLToPath(import.meta.url);

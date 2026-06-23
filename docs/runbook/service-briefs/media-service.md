@@ -20,9 +20,10 @@ Stage-switch 记录：`docs/runbook/stage-switch/media-service.md`。
 - `CreateUploadSession` / `CompleteUpload` / `GetMediaDownloadURL`。
 - PostgreSQL asset metadata + S3-compatible object storage port。
 - 图片 thumbnail 和 virus-scan 状态先做 mock adapter + audit。
-- 本地 fake object HTTP adapter 可用于 Web / PC 群头像上传 first path；浏览器显式
+- 本地 fake object HTTP adapter 可用于 Web / PC 群头像上传 / 展示 first path；浏览器显式
   PUT 到 media-service 返回的 upload URL，再由 api-gateway BFF 完成上传并更新
-  conversation profile。
+  conversation profile；展示时 BFF 通过 media-service 换取短期 download URL，fake
+  adapter 只在本地内存保存并返回已上传对象内容。
 
 下一步：
 

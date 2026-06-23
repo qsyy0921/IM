@@ -145,8 +145,11 @@ First slice:
   avatar URI read-update. Group avatar upload first path now uses
   api-gateway BFF endpoints to create a media-service upload session, PUT the
   image to the explicit upload URL, complete the upload, then update the
-  conversation-service profile to `media://asset/<asset_id>`. The local smoke
-  path uses media-service's fake object HTTP adapter; real S3-compatible
+  conversation-service profile to `media://asset/<asset_id>`. Displaying the
+  avatar uses another api-gateway BFF endpoint that first checks the current
+  conversation profile still references that media asset, then asks media-service
+  for a short-lived download URL. The local smoke path uses media-service's fake
+  object HTTP adapter with explicit PUT / GET semantics; real S3-compatible
   storage, scanner, thumbnails and CDN delivery remain media-service hardening.
   Group settings now use the caller's current
   conversation-member role from the public BFF member-list contract to enable
@@ -174,8 +177,8 @@ First slice:
   Conversation profile facts are owned by
   `conversation-service`; media upload session and asset metadata are owned by
   `media-service`; Web / PC shell only uses the api-gateway BFF. Remaining
-  group product work is richer group settings, avatar display polish and real
-  media providers / thumbnail pipeline.
+  group product work is richer group settings and real media providers /
+  thumbnail pipeline.
 - The Web / PC shell now also keeps explicit display-title and UX copy rules:
   direct / group titles learned from user actions survive conversation refresh,
   unknown server summaries render as short explicit conversation IDs, empty

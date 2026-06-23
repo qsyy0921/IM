@@ -41,6 +41,7 @@ func TestFakeHTTPHandlerAcceptsBrowserPut(t *testing.T) {
 	handler := NewFakeHTTPHandler()
 	request := httptest.NewRequest(http.MethodPut, "/media?op=put&token=opaque", strings.NewReader("avatar-bytes"))
 	request.Header.Set("x-nexusim-media-mode", "fake")
+	request.Header.Set("Content-Type", "image/png")
 	response := httptest.NewRecorder()
 
 	handler.ServeHTTP(response, request)
@@ -50,6 +51,18 @@ func TestFakeHTTPHandlerAcceptsBrowserPut(t *testing.T) {
 	}
 	if response.Header().Get("Access-Control-Allow-Origin") != "*" {
 		t.Fatalf("expected CORS header, got %q", response.Header().Get("Access-Control-Allow-Origin"))
+	}
+
+	getResponse := httptest.NewRecorder()
+	handler.ServeHTTP(getResponse, httptest.NewRequest(http.MethodGet, "/media?op=original&token=opaque", nil))
+	if getResponse.Code != http.StatusOK {
+		t.Fatalf("get status=%d body=%s", getResponse.Code, getResponse.Body.String())
+	}
+	if getResponse.Body.String() != "avatar-bytes" {
+		t.Fatalf("expected uploaded bytes, got %q", getResponse.Body.String())
+	}
+	if getResponse.Header().Get("Content-Type") != "image/png" {
+		t.Fatalf("expected image/png content-type, got %q", getResponse.Header().Get("Content-Type"))
 	}
 }
 

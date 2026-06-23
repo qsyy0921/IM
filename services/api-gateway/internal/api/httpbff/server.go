@@ -75,6 +75,7 @@ type Authenticator interface {
 type MediaClient interface {
 	CreateUploadSession(ctx context.Context, request *mediav1.CreateUploadSessionRequest, opts ...grpc.CallOption) (*mediav1.CreateUploadSessionResponse, error)
 	CompleteUpload(ctx context.Context, request *mediav1.CompleteUploadRequest, opts ...grpc.CallOption) (*mediav1.CompleteUploadResponse, error)
+	GetMediaDownloadURL(ctx context.Context, request *mediav1.GetMediaDownloadURLRequest, opts ...grpc.CallOption) (*mediav1.GetMediaDownloadURLResponse, error)
 }
 
 type PushTokenIssuer interface {
@@ -292,6 +293,8 @@ func (server *Server) serveHTTP(response http.ResponseWriter, request *http.Requ
 		server.handleCreateGroupAvatarUploadSession(response, request)
 	case request.Method == http.MethodPost && isConversationMemberActionPath(request.URL.EscapedPath(), "/avatar-upload-complete"):
 		server.handleCompleteGroupAvatarUpload(response, request)
+	case request.Method == http.MethodGet && isConversationMemberActionPath(request.URL.EscapedPath(), "/avatar-download-url"):
+		server.handleGetGroupAvatarDownloadURL(response, request)
 	case request.Method == http.MethodGet && isConversationMessagesPath(request.URL.EscapedPath()):
 		server.handleConversationMessages(response, request)
 	case request.Method == http.MethodPost && path == "/api/messages/send":

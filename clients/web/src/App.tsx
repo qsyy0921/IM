@@ -89,6 +89,7 @@ export function App() {
   const [groupMemberPageTokens, setGroupMemberPageTokens] = useState<string[]>([]);
   const [groupMemberPageIndex, setGroupMemberPageIndex] = useState(0);
   const [conversationProfiles, setConversationProfiles] = useState<Record<string, ConversationProfile>>({});
+  const [conversationAvatarURLs, setConversationAvatarURLs] = useState<Record<string, string>>({});
   const [groupProfileTitleDraft, setGroupProfileTitleDraft] = useState("");
   const [groupProfileAvatarDraft, setGroupProfileAvatarDraft] = useState("");
   const [groupProfileError, setGroupProfileError] = useState("");
@@ -477,6 +478,7 @@ export function App() {
         currentSession
       );
       applyGroupProfile(profile);
+      clearConversationAvatarURL(profile.conversationID);
       setGroupProfileTitleDraft(profile.title);
       setGroupProfileAvatarDraft(profile.avatarURI);
       setGroupProfileError("");
@@ -517,6 +519,7 @@ export function App() {
         setGroupProfileTitleDraft(profile.title);
         setGroupProfileAvatarDraft(profile.avatarURI);
       }
+      await resolveGroupAvatarDownloadURL(profile, currentSession);
       setGroupProfileError("");
       return profile;
     } catch (caught) {
@@ -540,16 +543,21 @@ export function App() {
       if (!title) {
         throw new Error("group title is required");
       }
+      const avatarURI = groupProfileAvatarDraft.trim();
+      if (avatarURI && !isMediaAssetURI(avatarURI)) {
+        throw new Error("group avatar uri must be a media asset");
+      }
       const updated = await runtime.bff.updateConversationProfile(
         {
           conversationID: conversation.conversationID,
           title,
-          avatarURI: groupProfileAvatarDraft.trim(),
+          avatarURI,
           expectedProfileVersion: profile.profileVersion
         },
         currentSession
       );
       applyGroupProfile(updated);
+      await resolveGroupAvatarDownloadURL(updated, currentSession);
       setGroupProfileTitleDraft(updated.title);
       setGroupProfileAvatarDraft(updated.avatarURI);
       setGroupProfileError("");
@@ -597,7 +605,7 @@ export function App() {
         setGroupAvatarUploadStatus("上传图片...");
         const uploadResponse = await fetch(uploadSession.uploadURL, {
           method: "PUT",
-          headers: uploadSession.requiredHeaders,
+          headers: { ...uploadSession.requiredHeaders, "Content-Type": file.type },
           body: bytes
         });
         if (!uploadResponse.ok) {
@@ -616,6 +624,7 @@ export function App() {
           currentSession
         );
         applyGroupProfile(completed.profile);
+        await resolveGroupAvatarDownloadURL(completed.profile, currentSession);
         setGroupProfileTitleDraft(completed.profile.title);
         setGroupProfileAvatarDraft(completed.avatarURI);
         setGroupProfileError("");
@@ -1191,6 +1200,7 @@ export function App() {
 
   function clearGroupProfileState(): void {
     setConversationProfiles({});
+    setConversationAvatarURLs({});
     setGroupProfileTitleDraft("");
     setGroupProfileAvatarDraft("");
     setGroupProfileError("");
@@ -1256,6 +1266,62 @@ export function App() {
   function displayConversationAvatarText(conversation: ConversationSummary): string {
     const title = displayConversationTitle(conversation).trim();
     return (title.slice(0, 1) || "会").toUpperCase();
+  }
+
+  function displayConversationAvatarURL(conversation: ConversationSummary): string {
+    if (conversation.type !== "GROUP") {
+      return "";
+    }
+    return conversationAvatarURLs[conversation.conversationID] ?? "";
+  }
+
+  async function resolveGroupAvatarDownloadURL(
+    profile: ConversationProfile,
+    currentSession = sessionRef.current
+  ): Promise<void> {
+    if (!currentSession || !profile.avatarURI.trim()) {
+      clearConversationAvatarURL(profile.conversationID);
+      return;
+    }
+    if (!isMediaAssetURI(profile.avatarURI)) {
+      clearConversationAvatarURL(profile.conversationID);
+      if (activeConversationRef.current === profile.conversationID) {
+        setGroupAvatarUploadStatus("群头像 URI 不是 media-service 资产，未显示图片");
+      }
+      return;
+    }
+    try {
+      const resolved = await runtime.bff.getGroupAvatarDownloadURL(
+        {
+          conversationID: profile.conversationID,
+          avatarURI: profile.avatarURI
+        },
+        currentSession
+      );
+      if (Object.keys(resolved.requiredHeaders).length > 0) {
+        throw new Error("group avatar download requires unsupported headers");
+      }
+      setConversationAvatarURLs(current => ({ ...current, [profile.conversationID]: resolved.downloadURL }));
+      if (activeConversationRef.current === profile.conversationID) {
+        setGroupAvatarUploadStatus("");
+      }
+    } catch (caught) {
+      clearConversationAvatarURL(profile.conversationID);
+      if (activeConversationRef.current === profile.conversationID) {
+        setGroupProfileError(`群头像无法显示：${errorMessage(caught)}`);
+      }
+    }
+  }
+
+  function clearConversationAvatarURL(conversationID: string): void {
+    setConversationAvatarURLs(current => {
+      if (!(conversationID in current)) {
+        return current;
+      }
+      const next = { ...current };
+      delete next[conversationID];
+      return next;
+    });
   }
 
   async function showCachedMessages(conversationID: string): Promise<void> {
@@ -1466,7 +1532,17 @@ export function App() {
                     key={conversation.conversationID}
                     onClick={() => void run("select conversation", () => selectConversation(conversation.conversationID))}
                   >
-                    <span className="conversation-avatar">{displayConversationAvatarText(conversation)}</span>
+                    <span className="conversation-avatar">
+                      {displayConversationAvatarURL(conversation) ? (
+                        <img
+                          alt=""
+                          src={displayConversationAvatarURL(conversation)}
+                          data-testid="conversation-avatar-image"
+                        />
+                      ) : (
+                        displayConversationAvatarText(conversation)
+                      )}
+                    </span>
                     <span className="conversation-copy">
                       <strong>{displayConversationTitle(conversation)}</strong>
                       <small>{conversationSubtitle(conversation)}</small>
@@ -1710,7 +1786,15 @@ export function App() {
           <section className="group-settings" aria-label="群设置">
             <div className="group-profile-card" data-testid="group-profile-card">
               <span className="group-profile-avatar" data-testid="group-profile-avatar">
-                {displayConversationAvatarText(activeGroupConversation)}
+                {displayConversationAvatarURL(activeGroupConversation) ? (
+                  <img
+                    alt=""
+                    src={displayConversationAvatarURL(activeGroupConversation)}
+                    data-testid="group-profile-avatar-image"
+                  />
+                ) : (
+                  displayConversationAvatarText(activeGroupConversation)
+                )}
               </span>
               <div className="group-profile-copy">
                 <strong data-testid="group-profile-title">{displayConversationTitle(activeGroupConversation)}</strong>
@@ -2288,6 +2372,11 @@ function compactConversationID(conversationID: string): string {
   return `${conversationID.slice(0, 6)}...${conversationID.slice(-6)}`;
 }
 
+function isMediaAssetURI(value: string): boolean {
+  const trimmed = value.trim();
+  return trimmed.startsWith("media://asset/") && trimmed.length > "media://asset/".length;
+}
+
 async function sha256Hex(bytes: ArrayBuffer): Promise<string> {
   if (!globalThis.crypto?.subtle) {
     throw new Error("browser crypto is required for media upload");
@@ -2394,6 +2483,12 @@ function publicErrorMessage(code: string, message: string): string | null {
   }
   if (message === "message text is required") {
     return "消息内容不能为空。";
+  }
+  if (message === "group avatar uri must be a media asset") {
+    return "群头像 URI 必须来自 media-service 上传结果。";
+  }
+  if (message === "group avatar download requires unsupported headers") {
+    return "当前头像下载地址需要额外请求头，浏览器图片标签无法直接显示。";
   }
   if (message === "contact user id is required") {
     return "请输入要添加的用户 ID。";

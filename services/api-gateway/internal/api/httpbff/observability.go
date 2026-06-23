@@ -115,6 +115,8 @@ func RouteName(request *http.Request) string {
 		return "conversations.avatar.upload_session"
 	case request.Method == http.MethodPost && isConversationMemberActionPath(request.URL.EscapedPath(), "/avatar-upload-complete"):
 		return "conversations.avatar.upload_complete"
+	case request.Method == http.MethodGet && isConversationMemberActionPath(request.URL.EscapedPath(), "/avatar-download-url"):
+		return "conversations.avatar.download_url"
 	case request.Method == http.MethodGet && isConversationMessagesPath(request.URL.EscapedPath()):
 		return "conversation.messages"
 	case request.Method == http.MethodPost && path == "/api/messages/send":

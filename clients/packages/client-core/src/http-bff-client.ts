@@ -13,6 +13,8 @@ import {
   type CreateGroupAvatarUploadSessionRequest,
   type CompleteGroupAvatarUploadRequest,
   type CompleteGroupAvatarUploadResponse,
+  type GetGroupAvatarDownloadURLRequest,
+  type GroupAvatarDownloadURL,
   type ConversationMember,
   type ConversationMemberChangeResponse,
   type ConversationProfile,
@@ -160,6 +162,14 @@ interface BFFGroupAvatarUploadCompleteResponse {
   asset_id?: string;
   avatar_uri?: string;
   profile?: BFFConversationProfile;
+}
+
+interface BFFGroupAvatarDownloadURLResponse {
+  asset_id?: string;
+  variant?: string;
+  download_url?: string;
+  required_headers?: Record<string, string>;
+  expires_at_unix_ms?: string | number;
 }
 
 interface BFFConversationSummary {
@@ -555,6 +565,26 @@ export class BFFClient implements AuthAPI, ConversationAPI, MessagingAPI, Delive
       assetID: requiredString(response.asset_id, "asset_id"),
       avatarURI: requiredString(response.avatar_uri, "avatar_uri"),
       profile: conversationProfileFromBFF(requiredObject(response.profile, "profile"))
+    };
+  }
+
+  async getGroupAvatarDownloadURL(
+    request: GetGroupAvatarDownloadURLRequest,
+    session: AuthSession
+  ): Promise<GroupAvatarDownloadURL> {
+    const query = new URLSearchParams({ avatar_uri: request.avatarURI });
+    const response = await this.#request<BFFGroupAvatarDownloadURLResponse>(
+      "GET",
+      `${CLIENT_API_ENDPOINTS.groupAvatarDownloadURL(request.conversationID)}?${query.toString()}`,
+      undefined,
+      session
+    );
+    return {
+      assetID: requiredString(response.asset_id, "asset_id"),
+      variant: response.variant ?? "",
+      downloadURL: requiredString(response.download_url, "download_url"),
+      requiredHeaders: response.required_headers ?? {},
+      expiresAtMs: numberValue(response.expires_at_unix_ms)
     };
   }
 

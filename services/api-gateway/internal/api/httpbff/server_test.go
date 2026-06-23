@@ -887,6 +887,88 @@ func TestCompleteGroupAvatarUploadUpdatesConversationProfile(t *testing.T) {
 	}
 }
 
+func TestGroupAvatarDownloadURLRequiresCurrentProfileAvatar(t *testing.T) {
+	authenticator := &fakeAuthenticator{auth: gatewayauth.AuthContext{
+		TenantID: "tenant-1",
+		UserID:   "owner-1",
+	}}
+	gateway := &fakeGateway{
+		getConversationProfile: func(_ context.Context, request *conversationv1.GetConversationProfileRequest) (*conversationv1.GetConversationProfileResponse, error) {
+			if request.GetConversationId() != "group/1" {
+				t.Fatalf("unexpected get profile request: %+v", request)
+			}
+			return &conversationv1.GetConversationProfileResponse{
+				Profile: &conversationv1.ConversationProfile{
+					TenantId:       "tenant-1",
+					ConversationId: request.GetConversationId(),
+					AvatarUri:      "media://asset/asset-1",
+					ProfileVersion: 7,
+				},
+			}, nil
+		},
+	}
+	media := &fakeMediaClient{
+		getMediaDownloadURL: func(_ context.Context, request *mediav1.GetMediaDownloadURLRequest) (*mediav1.GetMediaDownloadURLResponse, error) {
+			if request.GetAuthContext().GetTenantId() != "tenant-1" ||
+				request.GetAssetId() != "asset-1" ||
+				request.GetConversationId() != "group/1" ||
+				request.GetRequestedVariant() != mediav1.MediaVariant_MEDIA_VARIANT_ORIGINAL {
+				t.Fatalf("unexpected download URL request: %+v", request)
+			}
+			return &mediav1.GetMediaDownloadURLResponse{
+				AssetId:         request.GetAssetId(),
+				Variant:         mediav1.MediaVariant_MEDIA_VARIANT_ORIGINAL,
+				DownloadUrl:     "http://127.0.0.1:19080/media?op=original&token=opaque",
+				ExpiresAtUnixMs: 123,
+			}, nil
+		},
+	}
+	handler := NewServer(Config{Gateway: gateway, Media: media, Authenticator: authenticator})
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/api/conversations/group%2F1/avatar-download-url?avatar_uri=media%3A%2F%2Fasset%2Fasset-1", nil)
+	request.Header.Set("Authorization", "Bearer token-1")
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+	if !strings.Contains(response.Body.String(), `"asset_id":"asset-1"`) ||
+		!strings.Contains(response.Body.String(), `"download_url":"http://127.0.0.1:19080/media?op=original\u0026token=opaque"`) {
+		t.Fatalf("expected download URL response, got %s", response.Body.String())
+	}
+}
+
+func TestGroupAvatarDownloadURLRejectsStaleAvatarURI(t *testing.T) {
+	handler := NewServer(Config{
+		Gateway: &fakeGateway{
+			getConversationProfile: func(_ context.Context, _ *conversationv1.GetConversationProfileRequest) (*conversationv1.GetConversationProfileResponse, error) {
+				return &conversationv1.GetConversationProfileResponse{
+					Profile: &conversationv1.ConversationProfile{
+						TenantId:       "tenant-1",
+						ConversationId: "group-1",
+						AvatarUri:      "media://asset/current",
+					},
+				}, nil
+			},
+		},
+		Media:         &fakeMediaClient{},
+		Authenticator: &fakeAuthenticator{auth: gatewayauth.AuthContext{TenantID: "tenant-1", UserID: "owner-1"}},
+	})
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/api/conversations/group-1/avatar-download-url?avatar_uri=media%3A%2F%2Fasset%2Fstale", nil)
+	request.Header.Set("Authorization", "Bearer token-1")
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusPreconditionFailed {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+	if !strings.Contains(response.Body.String(), "conversation avatar uri changed") {
+		t.Fatalf("expected stale avatar error, got %s", response.Body.String())
+	}
+}
+
 func TestGroupAvatarUploadFailsClosedWhenMediaIsNotConfigured(t *testing.T) {
 	handler := NewServer(Config{
 		Gateway:       &fakeGateway{},
@@ -1250,6 +1332,7 @@ func TestRateLimiterRejectsBFFRequestBeforeGatewayCall(t *testing.T) {
 type fakeMediaClient struct {
 	createUploadSession func(context.Context, *mediav1.CreateUploadSessionRequest) (*mediav1.CreateUploadSessionResponse, error)
 	completeUpload      func(context.Context, *mediav1.CompleteUploadRequest) (*mediav1.CompleteUploadResponse, error)
+	getMediaDownloadURL func(context.Context, *mediav1.GetMediaDownloadURLRequest) (*mediav1.GetMediaDownloadURLResponse, error)
 }
 
 func (client *fakeMediaClient) CreateUploadSession(ctx context.Context, request *mediav1.CreateUploadSessionRequest, _ ...grpc.CallOption) (*mediav1.CreateUploadSessionResponse, error) {
@@ -1264,6 +1347,13 @@ func (client *fakeMediaClient) CompleteUpload(ctx context.Context, request *medi
 		return nil, status.Error(codes.Unimplemented, "complete upload not implemented")
 	}
 	return client.completeUpload(ctx, request)
+}
+
+func (client *fakeMediaClient) GetMediaDownloadURL(ctx context.Context, request *mediav1.GetMediaDownloadURLRequest, _ ...grpc.CallOption) (*mediav1.GetMediaDownloadURLResponse, error) {
+	if client.getMediaDownloadURL == nil {
+		return nil, status.Error(codes.Unimplemented, "get media download url not implemented")
+	}
+	return client.getMediaDownloadURL(ctx, request)
 }
 
 type fakeGateway struct {

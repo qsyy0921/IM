@@ -13,6 +13,8 @@ import type {
   CreateGroupAvatarUploadSessionRequest,
   CompleteGroupAvatarUploadRequest,
   CompleteGroupAvatarUploadResponse,
+  GetGroupAvatarDownloadURLRequest,
+  GroupAvatarDownloadURL,
   GroupAvatarUploadSession,
   ListConversationMembersRequest,
   ListConversationMembersResponse,
@@ -84,6 +86,10 @@ export interface ConversationAPI {
     request: CompleteGroupAvatarUploadRequest,
     session: AuthSession
   ): Promise<CompleteGroupAvatarUploadResponse>;
+  getGroupAvatarDownloadURL(
+    request: GetGroupAvatarDownloadURLRequest,
+    session: AuthSession
+  ): Promise<GroupAvatarDownloadURL>;
 }
 
 export interface MessagingAPI {

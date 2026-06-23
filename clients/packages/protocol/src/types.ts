@@ -225,6 +225,19 @@ export interface CompleteGroupAvatarUploadResponse {
   profile: ConversationProfile;
 }
 
+export interface GetGroupAvatarDownloadURLRequest {
+  conversationID: ConversationID;
+  avatarURI: string;
+}
+
+export interface GroupAvatarDownloadURL {
+  assetID: string;
+  variant: string;
+  downloadURL: string;
+  requiredHeaders: Record<string, string>;
+  expiresAtMs: number;
+}
+
 export interface ConversationMemberChangeResponse {
   changeID: string;
   tenantID: TenantID;

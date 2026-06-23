@@ -36,6 +36,7 @@ GET  /api/conversations/{conversation_id}/profile
 POST /api/conversations/{conversation_id}/profile
 POST /api/conversations/{conversation_id}/avatar-upload-session
 POST /api/conversations/{conversation_id}/avatar-upload-complete
+GET  /api/conversations/{conversation_id}/avatar-download-url?avatar_uri=
 ```
 
 api-gateway 只负责验证 gateway token、注入 trusted metadata 并转发到
@@ -44,6 +45,8 @@ conversation-service 私表，也不在 gateway 内持久化 profile。
 群头像上传由 api-gateway BFF 转发到 media-service 创建上传会话和完成上传，随后用
 conversation-service 的 profile contract 写入 `media://asset/<asset_id>`；media asset
 metadata 属于 media-service，profile 事实仍属于 conversation-service。
+头像展示同样不让客户端直连 media-service gRPC：BFF 会先读取当前 conversation profile，
+确认 `avatar_uri` 仍匹配请求，再向 media-service 获取短期 download URL。
 
 api-gateway 默认只注册 `nexusim.gateway.v1.GatewayService` public facade。确需兼容历史客户端或旧 smoke 时，必须显式设置 `NEXUSIM_API_GATEWAY_REGISTER_LEGACY_DESCRIPTORS=true`，才会额外注册 contacts / conversation / message / delivery / receipt 的 legacy service descriptor。gateway 内部仍调用对应下游 service client。
 

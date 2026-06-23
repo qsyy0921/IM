@@ -48,6 +48,14 @@ type groupAvatarUploadCompleteResponse struct {
 	Profile   conversationProfilePayload `json:"profile"`
 }
 
+type groupAvatarDownloadURLResponse struct {
+	AssetID         string            `json:"asset_id"`
+	Variant         string            `json:"variant"`
+	DownloadURL     string            `json:"download_url"`
+	RequiredHeaders map[string]string `json:"required_headers"`
+	ExpiresAtUnixMS int64             `json:"expires_at_unix_ms"`
+}
+
 type conversationProfilePayload struct {
 	TenantID          string `json:"tenant_id"`
 	ConversationID    string `json:"conversation_id"`
@@ -215,6 +223,63 @@ func (server *Server) handleCompleteGroupAvatarUpload(response http.ResponseWrit
 	})
 }
 
+func (server *Server) handleGetGroupAvatarDownloadURL(response http.ResponseWriter, request *http.Request) {
+	auth, err := server.authenticateRequest(request)
+	if err != nil {
+		writeError(response, err)
+		return
+	}
+	conversationID, err := conversationIDFromMemberActionPath(request.URL.EscapedPath(), "/avatar-download-url")
+	if err != nil {
+		writeError(response, err)
+		return
+	}
+	avatarURI := strings.TrimSpace(request.URL.Query().Get("avatar_uri"))
+	assetID, err := assetIDFromAvatarURI(avatarURI)
+	if err != nil {
+		writeError(response, err)
+		return
+	}
+	profileOutput, err := server.requireGateway().GetConversationProfile(contextFromRequest(request), &conversationv1.GetConversationProfileRequest{
+		ConversationId: conversationID,
+	})
+	if err != nil {
+		writeError(response, err)
+		return
+	}
+	currentProfile := profileOutput.GetProfile()
+	if currentProfile == nil {
+		writeError(response, status.Error(codes.Internal, "conversation profile is missing"))
+		return
+	}
+	if strings.TrimSpace(currentProfile.GetAvatarUri()) != avatarURI {
+		writeError(response, status.Error(codes.FailedPrecondition, "conversation avatar uri changed"))
+		return
+	}
+	media, err := server.requireMedia()
+	if err != nil {
+		writeError(response, err)
+		return
+	}
+	output, err := media.GetMediaDownloadURL(contextFromRequest(request), &mediav1.GetMediaDownloadURLRequest{
+		AuthContext:      mediaAuthContext(auth, request),
+		AssetId:          assetID,
+		ConversationId:   conversationID,
+		RequestedVariant: mediav1.MediaVariant_MEDIA_VARIANT_ORIGINAL,
+	})
+	if err != nil {
+		writeError(response, err)
+		return
+	}
+	writeJSON(response, http.StatusOK, groupAvatarDownloadURLResponse{
+		AssetID:         output.GetAssetId(),
+		Variant:         output.GetVariant().String(),
+		DownloadURL:     output.GetDownloadUrl(),
+		RequiredHeaders: output.GetRequiredHeaders(),
+		ExpiresAtUnixMS: output.GetExpiresAtUnixMs(),
+	})
+}
+
 func mediaAuthContext(auth gatewayauth.AuthContext, request *http.Request) *mediav1.AuthContext {
 	return &mediav1.AuthContext{
 		TenantId:  auth.TenantID,
@@ -253,6 +318,17 @@ func requiredFileName(value string) (string, error) {
 	return trimmed, nil
 }
 
+func assetIDFromAvatarURI(value string) (string, error) {
+	if !strings.HasPrefix(value, groupAvatarMediaURIPrefix) {
+		return "", status.Error(codes.InvalidArgument, "avatar_uri must reference a media asset")
+	}
+	assetID := strings.TrimSpace(strings.TrimPrefix(value, groupAvatarMediaURIPrefix))
+	if assetID == "" || strings.ContainsAny(assetID, "/?#") {
+		return "", status.Error(codes.InvalidArgument, "avatar_uri has invalid asset id")
+	}
+	return assetID, nil
+}
+
 func conversationProfilePayloadFromProto(profile *conversationv1.ConversationProfile) conversationProfilePayload {
 	return conversationProfilePayload{
 		TenantID:          profile.GetTenantId(),
@@ -285,5 +361,9 @@ func (missingMedia) CreateUploadSession(context.Context, *mediav1.CreateUploadSe
 }
 
 func (missingMedia) CompleteUpload(context.Context, *mediav1.CompleteUploadRequest, ...grpc.CallOption) (*mediav1.CompleteUploadResponse, error) {
+	return nil, status.Error(codes.Unavailable, "media service is not configured")
+}
+
+func (missingMedia) GetMediaDownloadURL(context.Context, *mediav1.GetMediaDownloadURLRequest, ...grpc.CallOption) (*mediav1.GetMediaDownloadURLResponse, error) {
 	return nil, status.Error(codes.Unavailable, "media service is not configured")
 }

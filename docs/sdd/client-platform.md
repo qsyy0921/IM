@@ -362,6 +362,9 @@ GET  /api/conversations
 GET  /api/conversations/{conversation_id}/messages?after_seq=&limit=
 GET  /api/conversations/{conversation_id}/profile
 POST /api/conversations/{conversation_id}/profile
+POST /api/conversations/{conversation_id}/avatar-upload-session
+POST /api/conversations/{conversation_id}/avatar-upload-complete
+GET  /api/conversations/{conversation_id}/avatar-download-url?avatar_uri=
 POST /api/messages/send
 POST /api/delivery/ack
 GET  /api/contacts
@@ -378,7 +381,10 @@ First-stage implementation note:
   `conversation-service` through api-gateway BFF. Group title and avatar URI are
   conversation-service facts; the client does not persist them as server truth
   and avatar upload is mediated by api-gateway BFF through `media-service`
-  upload session / completion before updating the conversation profile.
+  upload session / completion before updating the conversation profile. Avatar
+  display is also mediated by BFF: the BFF verifies the requested `avatar_uri`
+  still matches the current profile, then asks media-service for a short-lived
+  download URL.
 - `/api/auth/logout` revokes only the current gateway-token session. The BFF
   derives tenant, user, device and session from the verified gateway token,
   forwards identity-service `RevokeSession`, and ignores caller-supplied target

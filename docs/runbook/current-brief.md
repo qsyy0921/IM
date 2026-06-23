@@ -54,7 +54,8 @@ Android 后置到用户明确切回。
    `loadtest/clientweb/run-local-smoke.ps1 -RunBrowserMultiuserUISmoke` 跑通并归档报告；
    clean commit `8782936b` 覆盖 direct / group / invite 路径；clean commit
    `7e8a890b` 进一步覆盖 direct / group / invite + 会话标签 / 草稿 / 归档
-   round-trip 的真实浏览器 / PC 多用户 UI smoke。默认路径不启动浏览器。
+   round-trip 的真实浏览器 / PC 多用户 UI smoke；clean commit `05b8aec6`
+   已验证会话 tag / draft / archived-only 筛选的匹配和排除路径。默认路径不启动浏览器。
    Web / PC shell 的登录过期可见状态清理也已纳入 focused client contract。
 4. Windows desktop 已有本地 artifact / signing / installer plan first paths；签名 /
    installer 工具已支持显式 local signing profile 输入，并有只读 release readiness

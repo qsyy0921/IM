@@ -73,6 +73,11 @@ Reports:
   group invite, direct / group send, conversation tag update, draft save / clear,
   archive round-trip, PullInbox and ACK. Recorded with `commit=7e8a890b` and
   `git_dirty=false`.
+- `loadtest-report-20260623-browser-multiuser-ui-filter-smoke.md`: clean rerun
+  of the browser / PC Web shell UI smoke after tightening selected-conversation
+  preservation against active filters. It verifies tag, draft-only and
+  archived-only filters both include matching rows and exclude non-matching rows.
+  Recorded with `commit=05b8aec6` and `git_dirty=false`.
 
 Useful command:
 

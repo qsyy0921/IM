@@ -50,7 +50,8 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   可通过 `-RunBrowserMultiuserUISmoke` 调用。2026-06-23 已在 clean commit
   `8782936b` 跑通 direct / group / invite 路径并归档报告；随后 clean commit
   `7e8a890b` 跑通 direct / group / invite + 会话标签 / 草稿 / 归档 round-trip
-  的真实浏览器 / PC 多用户 UI smoke。默认路径不启动浏览器。
+  的真实浏览器 / PC 多用户 UI smoke；clean commit `05b8aec6` 进一步验证会话
+  tag / draft / archived-only 筛选的匹配和排除路径。默认路径不启动浏览器。
 - 已有 clean smoke 覆盖真实双用户好友直聊、群聊 first path、群资料 BFF
   read/update 和群成员动作链路；证据见 `docs/runbook/client-platform.md`。
 - Windows desktop 已有 artifact / signing / installer plan first paths；签名 / installer
@@ -86,13 +87,12 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
 
 ## 下一步优先级
 
-1. Web / Windows PC 端继续做完整客户端功能包验收：会话管理面板、会话筛选、私聊 / 群聊路径和登录过期清理都要通过 focused client checks 和后续真实 UI smoke。
-2. Windows PC 端后续再继续真实 signing input、valid signed artifact、MSI / NSIS installer 和签名 installer 体验。
-3. 客户端产品能力继续补入群审批 / 禁言等更深群设置，以及
+1. Windows PC 端继续真实 signing input、valid signed artifact、MSI / NSIS installer 和签名 installer 体验。
+2. 客户端产品能力继续补入群审批 / 禁言等更深群设置，以及
    media-service 真实 S3-compatible / thumbnail / scanner / CDN provider 后续链路。
-4. Android 后续只在用户切回时继续 login-level WebView smoke、APK baseline 报告和真机 UI polish。
-5. 客户端切片阶段性收口后，回到 workflow compensation adapter、instruction approval UI 和 ops 管理。
-6. 新发现待办写入 `docs/runbook/remaining-goals.md`，不要把长待办复制回本文件。
+3. Android 后续只在用户切回时继续 login-level WebView smoke、APK baseline 报告和真机 UI polish。
+4. 客户端切片阶段性收口后，回到 workflow compensation adapter、instruction approval UI 和 ops 管理。
+5. 新发现待办写入 `docs/runbook/remaining-goals.md`，不要把长待办复制回本文件。
 
 ## Focused Checks
 

@@ -12,6 +12,7 @@ import type {
   ListConversationMembersRequest,
   MemberRole,
   MessageItem,
+  MessageStatus,
   ServerFrame
 } from "@nexusim/protocol";
 import { createBrowserPlatformAdapter } from "./platform-adapter";
@@ -873,22 +874,64 @@ export function App() {
         return;
       }
       setComposerText("");
-      try {
-        const sent = await runtime.sendQueue.sendText({
-          session: currentSession,
-          conversationID,
-          text,
-          onPendingStored: async () => {
-            await showCachedMessages(conversationID);
-          }
-        });
-        updateConversationLastSeq(conversationID, sent.conversationSeq);
-      } catch (caught) {
-        await showCachedMessages(conversationID);
-        throw caught;
-      }
+      await sendTextToConversation(currentSession, conversationID, text);
       await showCachedMessages(conversationID);
       await syncConversation(conversationID, currentSession);
+    });
+  }
+
+  async function sendTextToConversation(
+    currentSession: AuthSession,
+    conversationID: string,
+    text: string
+  ): Promise<MessageItem> {
+    try {
+      const sent = await runtime.sendQueue.sendText({
+        session: currentSession,
+        conversationID,
+        text,
+        onPendingStored: async () => {
+          await showCachedMessages(conversationID);
+        }
+      });
+      updateConversationLastSeq(conversationID, sent.conversationSeq);
+      return sent;
+    } catch (caught) {
+      await showCachedMessages(conversationID);
+      throw caught;
+    }
+  }
+
+  function restoreFailedMessageToComposer(message: MessageItem): void {
+    if (message.status !== "FAILED") {
+      setError("只有发送失败的消息可以重新编辑。");
+      return;
+    }
+    if (activeConversationRef.current !== message.conversationID) {
+      setError("请先打开这条失败消息所在的会话。");
+      return;
+    }
+    setComposerText(message.text);
+    setError("");
+    setStatus("已恢复失败消息");
+  }
+
+  async function resendFailedMessageAsNew(message: MessageItem): Promise<void> {
+    await run("resend failed message as new", async () => {
+      const currentSession = requireSession();
+      if (message.status !== "FAILED") {
+        throw new Error("only failed messages can be resent");
+      }
+      if (activeConversationRef.current !== message.conversationID) {
+        throw new Error("open failed message conversation first");
+      }
+      const text = message.text.trim();
+      if (!text) {
+        throw new Error("message text is required");
+      }
+      await sendTextToConversation(currentSession, message.conversationID, text);
+      await showCachedMessages(message.conversationID);
+      await syncConversation(message.conversationID, currentSession);
     });
   }
 
@@ -1844,10 +1887,11 @@ export function App() {
             ) : (
               messages.map(message => {
                 const isMine = session?.userID === message.senderUserID;
+                const canRepairFailedMessage = isMine && message.status === "FAILED";
                 return (
                   <article
                     data-testid="message-item"
-                    className={`message ${isMine ? "mine" : ""}`}
+                    className={`message ${isMine ? "mine" : ""} ${message.status === "FAILED" ? "failed" : ""}`}
                     key={message.messageID || message.clientMessageID}
                   >
                     <header>
@@ -1855,7 +1899,29 @@ export function App() {
                       <span>#{message.conversationSeq || "pending"}</span>
                     </header>
                     <p>{message.text}</p>
-                    <footer>{message.status}</footer>
+                    <footer>
+                      <span data-testid="message-status">{messageStatusLabel(message.status)}</span>
+                      {canRepairFailedMessage ? (
+                        <span className="message-actions">
+                          <button
+                            data-testid="message-edit-failed"
+                            className="message-action-button"
+                            type="button"
+                            onClick={() => restoreFailedMessageToComposer(message)}
+                          >
+                            重新编辑
+                          </button>
+                          <button
+                            data-testid="message-resend-as-new"
+                            className="message-action-button primary"
+                            type="button"
+                            onClick={() => void resendFailedMessageAsNew(message)}
+                          >
+                            作为新消息重发
+                          </button>
+                        </span>
+                      ) : null}
+                    </footer>
                   </article>
                 );
               })
@@ -2050,6 +2116,19 @@ function conversationStatusLabel(status: string): string {
   }
 }
 
+function messageStatusLabel(status: MessageStatus): string {
+  switch (status) {
+    case "PENDING":
+      return "发送中";
+    case "SENT":
+      return "已发送";
+    case "DELIVERED":
+      return "已送达";
+    case "FAILED":
+      return "发送失败";
+  }
+}
+
 function isGenericConversationTitle(title: string): boolean {
   return title.trim() === "" || title.startsWith("Conversation ");
 }
@@ -2148,6 +2227,15 @@ function publicErrorMessage(code: string, message: string): string | null {
   }
   if (message === "conversation id is required") {
     return "请先选择一个会话。";
+  }
+  if (message === "only failed messages can be resent") {
+    return "只有发送失败的消息可以作为新消息重发。";
+  }
+  if (message === "open failed message conversation first") {
+    return "请先打开这条失败消息所在的会话。";
+  }
+  if (message === "message text is required") {
+    return "消息内容不能为空。";
   }
   if (message === "contact user id is required") {
     return "请输入要添加的用户 ID。";

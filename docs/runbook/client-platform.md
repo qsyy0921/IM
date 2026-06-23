@@ -154,6 +154,9 @@ First slice:
   unknown server summaries render as short explicit conversation IDs, empty
   message states point users to the next action, and common public errors are
   mapped to user-facing Chinese copy without adding hidden fallback paths.
+- Failed local sends remain visible in the message list. Users can explicitly
+  restore a failed message to the composer or send it again as a new message;
+  the client does not silently mark failed local cache entries as successful.
 - `clients/start-local-backend.ps1` and `clients/start-local-web.ps1` are the
   current local startup pair. They start backend and frontend explicitly in
   separate terminals instead of hiding backend startup behind the Web launcher.

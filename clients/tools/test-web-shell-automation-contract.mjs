@@ -52,6 +52,9 @@ const requiredTestIDs = [
   "error-banner",
   "message-list",
   "message-item",
+  "message-status",
+  "message-edit-failed",
+  "message-resend-as-new",
   "message-composer",
   "send-message"
 ];
@@ -87,6 +90,10 @@ assertIncludes(appSource, "incoming.type === \"UNKNOWN\" ? existing.type : incom
 assertIncludes(appSource, "titleFromConversationID(activeConversationID, \"UNKNOWN\")", "web shell must not label unknown selected conversations as groups");
 assertIncludes(appSource, "conversationDisplayTitle", "web shell must keep conversation title formatting explicit");
 assertIncludes(appSource, "conversationStatusLabel", "web shell must keep conversation status formatting explicit");
+assertIncludes(appSource, "messageStatusLabel", "web shell must keep message status formatting explicit");
+assertIncludes(appSource, "restoreFailedMessageToComposer", "web shell must let users explicitly edit failed sends");
+assertIncludes(appSource, "resendFailedMessageAsNew", "web shell must make failed-send resend a new explicit send");
+assertIncludes(appSource, "message.status === \"FAILED\"", "web shell must gate failed-message actions on FAILED status");
 assertIncludes(appSource, "emptyMessageState", "web shell must keep empty-state copy explicit");
 assertIncludes(appSource, "publicErrorMessage", "web shell must map common public errors to user-facing copy");
 

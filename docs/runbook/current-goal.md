@@ -31,6 +31,8 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
 - 群标题 / 头像 URI 已接 first-stage read/update：`conversation-service` 拥有事实，
   `api-gateway` 暴露 BFF，Web / PC shell 只通过 BFF 读写；媒体上传和完整群设置后置。
 - 会话刷新会保留当前选中；gateway token 过期会清理本地 session / push / 会话展示状态。
+- 本地发送失败的消息会保留在消息列表中，并提供显式重新编辑或作为新消息重发入口；
+  客户端不会把失败缓存项静默标记为成功。
 - 已有 clean smoke 覆盖真实双用户好友直聊、群聊 first path、群资料 BFF
   read/update 和群成员动作链路；证据见 `docs/runbook/client-platform.md`。
 - Windows desktop 已有 artifact / signing / installer plan first paths；签名 / installer

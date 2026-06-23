@@ -1085,6 +1085,15 @@ button {
   background: #d9fbe8;
 }
 
+.message.failed {
+  border: 1px solid #f0b6bc;
+  background: #fff5f5;
+}
+
+.message.mine.failed {
+  background: #fff0f0;
+}
+
 .message header {
   display: flex;
   justify-content: space-between;
@@ -1101,7 +1110,34 @@ button {
 }
 
 .message footer {
-  text-transform: lowercase;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  color: #61727a;
+  font-size: 13px;
+}
+
+.message-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.message-action-button {
+  border: 1px solid #cbd8de;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #31515e;
+  padding: 5px 8px;
+  font-size: 12px;
+}
+
+.message-action-button.primary {
+  border-color: #20b982;
+  background: #20b982;
+  color: #ffffff;
 }
 
 .composer {

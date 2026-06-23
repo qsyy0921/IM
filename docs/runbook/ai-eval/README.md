@@ -9,6 +9,8 @@ summary, Agent and tool/action boundaries.
 - Validator: `tools/validate-ai-eval-cases.ps1`
 - Memory-service execution adapter: `tools/run-ai-eval-memory-adapter.ps1`
 - Retrieval-gateway execution adapter: `tools/run-ai-eval-retrieval-adapter.ps1`
+- Retrieval-gateway negative / miss adapter:
+  `tools/run-ai-eval-retrieval-negative-adapter.ps1`
 - RAG execution adapter: `tools/run-ai-eval-rag-adapter.ps1`
 - Summary execution adapter: `tools/run-ai-eval-summary-adapter.ps1`
 - Agent execution adapter: `tools/run-ai-eval-agent-adapter.ps1`
@@ -82,7 +84,7 @@ active `memory-service` cases against runtime checks. It covers source refs,
 validity window, supersession, graph SUPPORTS edge preservation, reviewed
 multi-source profile activation and deleted-support profile exclusion.
 
-First-stage retrieval-gateway execution adapter:
+First-stage retrieval-gateway positive execution adapter:
 
 ```powershell
 .\tools\run-ai-eval-retrieval-adapter.ps1 `
@@ -92,9 +94,24 @@ First-stage retrieval-gateway execution adapter:
 
 This adapter runs `loadtest/retrieval`, which seeds low-sensitive search /
 memory projections, calls real `retrieval-gateway RetrieveEvidence`, and
-validates active `retrieval-gateway` cases against EvidencePack source type,
+validates the positive live `retrieval-gateway` case against EvidencePack source type,
 source refs, speaker attribution, stale / future memory exclusion,
 multi-hop actor/source chain and projection version checks.
+
+First-stage retrieval-gateway negative / miss adapter:
+
+```powershell
+.\tools\run-ai-eval-retrieval-negative-adapter.ps1 `
+  -PGDSN postgres://nexusim:nexusim@localhost:5432/nexusim?sslmode=disable `
+  -RetrievalTarget 127.0.0.1:10590
+```
+
+This adapter runs `loadtest/retrievalnegative`, which seeds low-sensitive
+negative / miss fixtures, calls real `retrieval-gateway RetrieveEvidence`, and
+validates `source_coverage_status=EMPTY`, superseded memory exclusion, source
+ref / dedupe reason requirements and cross-tenant evidence isolation. It is a
+separate adapter from the positive EvidencePack smoke so skipped negative cases
+are not hidden inside a positive-only run.
 
 First-stage RAG execution adapter:
 
@@ -350,11 +367,13 @@ RAG / Summary / Agent live adapters assert multi-hop actor/source-chain
 completeness. This is adapter wiring and focused verification; it does not mean
 the full live service-stack gate has been run for those new optional adapters.
 The 2026-06-24 live service-stack gate
-`ai-eval-service-stack-live-20260624-collab-memory-v4` ran 8 adapters / 51
-cases with 47 passed, 0 failed and 4 skipped. The skipped cases are
-retrieval-gateway negative / miss cases that require a dedicated negative
-fixture; they are not counted as covered by the positive EvidencePack live
-smoke.
+`ai-eval-service-stack-live-20260624-collab-memory-v4` first ran 8 adapters /
+51 cases with 47 passed, 0 failed and 4 skipped. The skipped cases were the
+retrieval-gateway negative / miss cases that required a dedicated negative
+fixture. The follow-up run
+`ai-eval-service-stack-live-20260624-retrieval-negative` added
+`retrieval-gateway-negative` and reached 9 adapters / 51 cases with 51 passed,
+0 failed and 0 skipped.
 The 2026-06-20 negative RAG / Agent service-stack run increased the live suite
 to 19 cases and added RAG no-evidence abstain plus Agent policy-denied blocked
 proposal checks.

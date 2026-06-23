@@ -330,9 +330,12 @@ supporting-memory delete 后 profile recompute 纳入低敏 fixture gate，并�
 memory-service / retrieval-gateway optional live adapter first pass；RAG /
 Summary / Agent live adapters 也会断言 multi-hop actor/source-chain
 completeness。2026-06-24 `ai-eval-service-stack-live-20260624-collab-memory-v4`
-已通过完整 live service-stack gate：8 adapters、51 cases、47 passed、0 failed、
-4 skipped。4 个 skipped 是 retrieval-gateway negative / miss cases，需要后续
-专门 adapter，不属于当前 positive EvidencePack live smoke 覆盖范围。
+先通过完整 live service-stack gate：8 adapters、51 cases、47 passed、0 failed、
+4 skipped；随后 `ai-eval-service-stack-live-20260624-retrieval-negative`
+补齐 retrieval-gateway negative / miss adapter，达到 9 adapters、51 cases、
+51 passed、0 failed、0 skipped。新增覆盖 empty memory source coverage、
+superseded memory 排除、source ref / dedupe reason 和 cross-tenant evidence
+isolation。
 
 下一步默认看 [current-goal.md](docs/runbook/current-goal.md)。截至当前主线，客户端只修
 阻塞演示入口的问题；默认推进

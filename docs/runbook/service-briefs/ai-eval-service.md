@@ -31,10 +31,14 @@ adapter、状态、计数、summary/report 引用和低敏 metadata。
   真实 service-stack gate：8 adapters、51 cases、47 passed、0 failed、4 skipped。
   通过范围包括 profile / action required adapters、memory-service、retrieval-gateway、
   rag-service、summary-service 和 agent-action-executor。4 个 skipped 是
-  retrieval-gateway negative / miss cases，需要后续专门 adapter，不属于当前
-  positive EvidencePack live smoke 覆盖范围。
+  当时尚未覆盖的 retrieval-gateway negative / miss cases，不属于 positive
+  EvidencePack live smoke 覆盖范围。
+- 2026-06-24 `ai-eval-service-stack-live-20260624-retrieval-negative` 已补齐
+  retrieval-gateway negative / miss adapter，并通过真实 service-stack gate：
+  9 adapters、51 cases、51 passed、0 failed、0 skipped。
 
 边界：不保存 raw EvidencePack、prompt、model output、用户正文、secret 或 tool input；不授权业务动作。
 
-下一步：补 retrieval negative / miss adapter，继续区分 retrieval failure、
-memory lifecycle failure 和 reasoning failure。
+下一步：继续扩展 group memory extraction / EvidencePack / RAG-Agent demo module，
+并保持 retrieval failure、memory lifecycle failure、reasoning failure 和 action
+boundary failure 的独立诊断。

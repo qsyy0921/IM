@@ -117,10 +117,13 @@ IM 消息 -> search / memory projection -> EvidencePack -> RAG / Agent answer ->
 20 个 profile-Agent safety fixture cases，并已完成 memory-service /
 retrieval-gateway optional live adapters 的第一轮接入；RAG / Summary / Agent
 live adapters 也会断言 multi-hop actor/source-chain completeness。2026-06-24
-`ai-eval-service-stack-live-20260624-collab-memory-v4` 已通过真实
+`ai-eval-service-stack-live-20260624-collab-memory-v4` 先通过真实
 service-stack gate：8 adapters、51 cases、47 passed、0 failed、4 skipped。
-4 个 skipped 是 retrieval-gateway negative / miss cases，需要后续专门 adapter，
-不计入当前 positive live EvidencePack smoke 的通过范围。
+随后 `ai-eval-service-stack-live-20260624-retrieval-negative` 补上
+retrieval-gateway negative / miss adapter，完整 service-stack gate 达到
+9 adapters、51 cases、51 passed、0 failed、0 skipped。当前检索边界已覆盖
+empty memory source coverage、superseded memory 排除、source refs / dedupe
+reason 和 cross-tenant evidence isolation。
 
 ## 不变量
 

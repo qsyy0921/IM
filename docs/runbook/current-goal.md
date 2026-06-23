@@ -75,8 +75,13 @@ IM messages -> search / memory projection -> EvidencePack -> RAG / Agent answer 
   service-stack gate：8 adapters、51 cases、47 passed、0 failed、4 skipped。
   通过范围包括 required profile / action safety adapters，以及 memory-service、
   retrieval-gateway、rag-service、summary-service、agent-action-executor live
-  adapters。4 个 skipped 是 retrieval-gateway negative / miss cases，需要后续专门
-  negative adapter，不计入当前 positive live EvidencePack smoke 的通过范围。
+  adapters。4 个 skipped 是当时尚未覆盖的 retrieval-gateway negative / miss
+  cases，不计入 positive live EvidencePack smoke 的通过范围。
+- 2026-06-24 `ai-eval-service-stack-live-20260624-retrieval-negative` 已补上
+  retrieval-gateway negative / miss 专用 adapter，并通过真实 service-stack gate：
+  9 adapters、51 cases、51 passed、0 failed、0 skipped。新增覆盖包括
+  `source_coverage_status=EMPTY`、superseded memory 排除、source ref / dedupe
+  reason 断言和 cross-tenant evidence 不泄漏。
 - 已有 clean smoke 覆盖真实双用户好友直聊、群聊 first path、群资料 BFF
   read/update 和群成员动作链路；证据见 `docs/runbook/client-platform.md`。
 - Windows desktop 已有 artifact / signing / installer plan first paths；签名 / installer
@@ -139,7 +144,7 @@ IM messages -> search / memory projection -> EvidencePack -> RAG / Agent answer 
    且完整 live service-stack gate 已归档低敏报告。
 4. 后端 / AI 演示主线优先做：
    `IM 消息 -> search / memory projection -> EvidencePack -> RAG / Agent answer -> approval / audit`。
-   下一步优先补 retrieval negative / miss adapter，随后进入更完整的 group memory
+   retrieval negative / miss adapter 已补齐；下一步进入更完整的 group memory
    extraction / EvidencePack / RAG-Agent demo module。
 5. 客户端只作为演示入口；除非阻塞上述演示，不继续扩 UI 产品化。
 6. Windows release signing / MSI / NSIS installer、完整 Android、完整移动端发布、

@@ -143,6 +143,16 @@ function Invoke-GateAdapter {
                 -OutputPath $SummaryPath `
                 -RequestTimeout $RequestTimeout
         }
+        "retrieval-gateway-negative" {
+            & $ScriptPath `
+                -CasePath $resolvedCasePath `
+                -PGDSN $PGDSN `
+                -RetrievalTarget $RetrievalTarget `
+                -ResultRoot $ResultRoot `
+                -RunName $AdapterRunName `
+                -OutputPath $SummaryPath `
+                -RequestTimeout $RequestTimeout
+        }
         "summary-service" {
             & $ScriptPath `
                 -CasePath $resolvedCasePath `

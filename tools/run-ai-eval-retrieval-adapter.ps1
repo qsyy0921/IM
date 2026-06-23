@@ -179,40 +179,11 @@ foreach ($case in @($caseDocument.cases)) {
     }
 
     $caseID = Get-JsonPropertyString -Object $case -Name "id"
-    $skipReason = ""
     if ($caseID -ne "retrieval-gateway-current-memory-live-preserves-chain") {
-        $skipReason = "case requires a dedicated retrieval negative or miss fixture; this adapter runs the positive live EvidencePack smoke"
-    }
-    foreach ($assertion in @($case.required_assertions)) {
-        $type = Get-JsonPropertyString -Object $assertion -Name "type"
-        if ($type -eq "source_coverage_status") {
-            $skipReason = "source_coverage_status requires a dedicated retrieval-miss fixture; this adapter runs the positive live EvidencePack smoke"
-            break
-        }
-    }
-
-    $assertionResults = New-Object System.Collections.Generic.List[object]
-    if ($skipReason.Length -gt 0) {
-        foreach ($assertion in @($case.required_assertions)) {
-            $assertionResults.Add([pscustomobject]@{
-                type = (Get-JsonPropertyString -Object $assertion -Name "type")
-                passed = $false
-                skipped = $true
-            })
-        }
-        $caseResults.Add([pscustomobject]@{
-            id = $caseID
-            family = $case.family
-            stage = $stage
-            status = "skipped"
-            passed = $false
-            skipped_reason = $skipReason
-            smoke_run_name = $RunName
-            assertions = $assertionResults
-        })
         continue
     }
 
+    $assertionResults = New-Object System.Collections.Generic.List[object]
     foreach ($assertion in @($case.required_assertions)) {
         $type = Get-JsonPropertyString -Object $assertion -Name "type"
         $passed = Test-RetrievalAssertion -Summary $summary -Assertion $assertion
@@ -234,7 +205,7 @@ foreach ($case in @($caseDocument.cases)) {
     })
 }
 
-Assert-Condition ($caseResults.Count -gt 0) "No active retrieval-gateway eval cases found in $resolvedCasePath"
+Assert-Condition ($caseResults.Count -eq 1) "Retrieval positive adapter must report exactly one positive live EvidencePack case"
 
 $adapterSummary = [pscustomobject]@{
     schema_version = 1

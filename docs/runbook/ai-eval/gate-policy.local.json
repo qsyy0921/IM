@@ -66,6 +66,19 @@
       ]
     },
     {
+      "name": "retrieval-gateway-negative",
+      "script": "run-ai-eval-retrieval-negative-adapter.ps1",
+      "run_suffix": "retrieval-gateway-negative",
+      "summary_file": "retrieval-negative-eval-adapter-summary.json",
+      "requires_service_stack": true,
+      "requires": [
+        "retrieval-gateway",
+        "search-service",
+        "memory-service",
+        "postgres"
+      ]
+    },
+    {
       "name": "rag-service",
       "script": "run-ai-eval-rag-adapter.ps1",
       "run_suffix": "rag-service",

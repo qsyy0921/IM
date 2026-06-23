@@ -184,6 +184,11 @@ if ($adapters -contains "retrieval-gateway") {
     Add-EndpointCheck -Checks $checks -Seen $seenChecks -Name "search-service" -Endpoint $SearchTarget -DefaultPort 10570
     Add-EndpointCheck -Checks $checks -Seen $seenChecks -Name "memory-service" -Endpoint $MemoryTarget -DefaultPort 10580
 }
+if ($adapters -contains "retrieval-gateway-negative") {
+    Add-EndpointCheck -Checks $checks -Seen $seenChecks -Name "retrieval-gateway" -Endpoint $RetrievalTarget -DefaultPort 10590
+    Add-EndpointCheck -Checks $checks -Seen $seenChecks -Name "search-service" -Endpoint $SearchTarget -DefaultPort 10570
+    Add-EndpointCheck -Checks $checks -Seen $seenChecks -Name "memory-service" -Endpoint $MemoryTarget -DefaultPort 10580
+}
 if ($adapters -contains "summary-service") {
     Add-EndpointCheck -Checks $checks -Seen $seenChecks -Name "summary-service" -Endpoint $SummaryTarget -DefaultPort 10620
     Add-EndpointCheck -Checks $checks -Seen $seenChecks -Name "retrieval-gateway" -Endpoint $RetrievalTarget -DefaultPort 10590

@@ -92,6 +92,8 @@ try {
   assert(inactive.executionPolicy.planOnly === true, "installer plan should be plan-only");
   assert(inactive.executionPolicy.buildsInstaller === false, "installer plan should not build installers");
   assert(inactive.executionPolicy.readsAuthenticodeSignature === true, "installer plan should read signature state");
+  assert(inactive.executionPolicy.readsSigningProfile === false, "installer plan without profile should not report profile reads");
+  assert(inactive.executionPolicy.checksExpectedSignerSubject === false, "installer plan without signer policy should not report signer checks");
 
   const activeConfigPath = join(tempRoot, "tauri-active.json");
   writeJSON(activeConfigPath, {
@@ -135,6 +137,9 @@ try {
       source: "pfx-file",
       certFile: fakePfx,
       pfxPassEnv: pfxFixture.pfxPassEnv
+    },
+    signature: {
+      expectedSignerSubjectContains: "NexusIM"
     }
   }, null, 2)}\n`);
 
@@ -413,6 +418,8 @@ try {
     ...pfxFixture.env
   });
   assert(cliProfilePlan.signing.readyToSign === true, "CLI installer profile plan should be signing-ready");
+  assert(cliProfilePlan.executionPolicy.readsSigningProfile === true, "CLI installer profile plan should declare profile reads");
+  assert(cliProfilePlan.executionPolicy.checksExpectedSignerSubject === true, "CLI installer profile plan should declare expected signer checks");
   assert(cliProfilePlan.readyToBuildInstaller === false, "CLI installer profile plan should still require valid signature for unsigned fixtures");
   assert(cliProfilePlan.missing.includes("desktop-signature-valid"), "CLI installer profile plan should require valid signature");
 

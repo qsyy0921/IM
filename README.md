@@ -181,7 +181,8 @@ fail-closed：旧 manifest 缺 kind 时要求重新 collect，installer 不会�
 portable launcher 或 direct shell-smoke 输入，且 `desktop-installer` 未通过只读
 Authenticode 验证时不会进入 `readyForInstall`；install plan 默认选择
 `desktop-executable`，installer 安装路径必须显式请求 `--artifact-kind
-desktop-installer`；installer planner 也只接受显式
+desktop-installer`；installer planner / builder 的低敏 execution policy 会声明 signing profile
+读取和 signer subject policy 检查；installer planner 也只接受显式
 `desktop-executable` 作为 MSI / NSIS build baseline。
 
 本地调试入口：

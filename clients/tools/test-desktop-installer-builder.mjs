@@ -100,6 +100,9 @@ try {
       source: "pfx-file",
       certFile: fakePfx,
       pfxPassEnv: pfxFixture.pfxPassEnv
+    },
+    signature: {
+      expectedSignerSubjectContains: "NexusIM"
     }
   }, null, 2)}\n`);
 
@@ -191,6 +194,8 @@ try {
     ...pfxFixture.env
   });
   assert(cliProfilePlan.installerPlan.signing.readyToSign === true, "CLI installer builder profile plan should be signing-ready");
+  assert(cliProfilePlan.executionPolicy.readsSigningProfile === true, "CLI installer builder profile plan should declare profile reads");
+  assert(cliProfilePlan.executionPolicy.checksExpectedSignerSubject === true, "CLI installer builder profile plan should declare expected signer checks");
   assert(cliProfilePlan.readyToBuildInstaller === false, "CLI installer builder profile plan should still require valid signature for unsigned fixtures");
 
   const notReady = spawnSync(process.execPath, [

@@ -337,13 +337,16 @@ automatically; if a manifest contains both installer and executable artifacts it
 still uses the executable baseline. Stale manifests without `artifactKind` or
 installer-only artifacts fail closed. The plan remains not ready until signing
 readiness is true and the executable baseline verifies as Authenticode-valid.
+Its low-sensitive `executionPolicy` declares whether a signing profile is read
+and whether expected signer subject policy is checked.
 `build:desktop-installer` wraps that plan as the explicit execution entry. By
 default it is still plan-only. It runs Tauri with the explicit bundle target and
 then collects only `desktop-installer` artifacts from the matching
 `bundle/<target>` output directory when run with `--execute` and the installer
 plan is ready; otherwise it fails closed and prints the missing readiness gates.
 It does not sign artifacts, install installers, launch the app, start services
-or download toolchains.
+or download toolchains. Its execution policy mirrors the installer plan's
+profile-read and signer-policy declarations.
 After collection, `plan:artifact-install` still blocks manual installer
 installation until the collected installer verifies as Authenticode-valid.
 Execution uses the repository installer Tauri profile through

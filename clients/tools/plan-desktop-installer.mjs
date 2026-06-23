@@ -26,7 +26,7 @@ export function buildDesktopInstallerPlan(options = {}) {
   const base = {
     schemaVersion,
     generatedAt: new Date().toISOString(),
-    executionPolicy: executionPolicy()
+    executionPolicy: executionPolicy(options)
   };
   const missing = [];
   if (!supportedTargets.has(target)) {
@@ -263,7 +263,7 @@ function validateArtifact(artifact, artifactPath) {
   };
 }
 
-function executionPolicy() {
+function executionPolicy(options = {}) {
   return {
     planOnly: true,
     buildsInstaller: false,
@@ -275,8 +275,10 @@ function executionPolicy() {
     readsTauriConfig: true,
     readsCollectedArtifactManifest: true,
     readsSigningConfig: true,
+    readsSigningProfile: Boolean(options.signingProfile),
     readsPfxCertificate: true,
     readsAuthenticodeSignature: true,
+    checksExpectedSignerSubject: Boolean(options.expectedSignerSubjectContains),
     validatesArtifactHashes: true
   };
 }

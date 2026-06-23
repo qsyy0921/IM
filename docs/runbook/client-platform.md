@@ -598,7 +598,8 @@ First slice:
   readiness and a valid Authenticode signature are present on an explicit
   `desktop-executable` baseline instead of treating the unsigned portable zip,
   a stale no-kind manifest, or an already collected installer as an installer
-  build input.
+  build input. Its low-sensitive `executionPolicy` declares whether a signing
+  profile is read and whether expected signer subject policy is checked.
   The generic client install plan now also keeps collected `desktop-installer`
   artifacts out of the portable launcher path, so `plan:shell-smoke` only marks
   Windows direct shell smoke ready for `desktop-executable` artifacts. It also
@@ -612,6 +613,8 @@ First slice:
   selected target's `desktop-installer` artifacts from the matching
   `bundle/<target>` output directory. It still fails closed while installer
   readiness, signing input readiness or executable signature validity is false.
+  Its execution policy mirrors the installer plan's profile-read and
+  signer-policy declarations.
   The release-readiness report then verifies any collected `desktop-installer`
   artifact separately before distribution. It does not sign, install, launch,
   start services or download toolchains. Real execution uses the repository

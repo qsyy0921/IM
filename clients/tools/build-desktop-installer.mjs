@@ -54,7 +54,9 @@ export function buildInstallerOutput(plan, options = {}) {
       readsTauriConfig: true,
       readsCollectedArtifactManifest: true,
       readsSigningConfig: true,
+      readsSigningProfile: Boolean(options.signingProfile),
       readsAuthenticodeSignature: true,
+      checksExpectedSignerSubject: Boolean(options.expectedSignerSubjectContains),
       validatesArtifactHashes: true
     },
     commands: plan.commandTemplate ?? {

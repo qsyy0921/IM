@@ -62,6 +62,11 @@ Reports:
   direct message notify/PullInbox/ACK, BFF group creation, receiver JOIN and
   group message notify/PullInbox/ACK. Recorded with `commit=6a08fb14` and
   `git_dirty=false`.
+- `loadtest-report-20260623-browser-multiuser-ui-smoke.md`: clean browser /
+  PC Web shell UI smoke. It drives two isolated Chromium profiles through the
+  rendered UI and verifies login, friend-click direct chat, UI group creation,
+  group invite, direct / group send, PullInbox and ACK. Recorded with
+  `commit=8782936b` and `git_dirty=false`.
 
 Useful command:
 

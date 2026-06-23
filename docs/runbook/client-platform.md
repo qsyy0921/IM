@@ -161,12 +161,13 @@ First slice:
   creates a group through UI, invites the receiver through group settings,
   sends direct and group messages, then verifies receiver PullInbox / ACK in
   the UI. `loadtest/clientweb/run-local-smoke.ps1 -RunBrowserMultiuserUISmoke`
-  wires a temporary local fixture and deletes it after the run. The default
-  clientweb smoke still does not launch browsers.
+  wires a temporary local fixture and deletes it after the run. The 2026-06-23
+  clean run passed on commit `8782936b` with `git_dirty=false`; report:
+  `docs/runbook/loadtest/client-platform/loadtest-report-20260623-browser-multiuser-ui-smoke.md`.
+  The default clientweb smoke still does not launch browsers.
   Conversation profile facts are owned by
   `conversation-service`; Web / PC shell only uses the api-gateway BFF. Remaining
-  group product work is richer group settings, media-service-backed avatar upload
-  and archiving the first real browser / PC UI smoke report.
+  group product work is richer group settings and media-service-backed avatar upload.
 - The Web / PC shell now also keeps explicit display-title and UX copy rules:
   direct / group titles learned from user actions survive conversation refresh,
   unknown server summaries render as short explicit conversation IDs, empty

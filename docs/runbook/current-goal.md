@@ -42,7 +42,8 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
 - `smoke:browser-multiuser-ui` 已提供显式 opt-in 的真实浏览器 / PC 多用户 UI runner：
   使用两个隔离 Chromium profile 通过 CDP 驱动 Web shell，覆盖登录、点击好友发起直聊、
   UI 建群、邀请成员、群聊发送、PullInbox 和 ACK；`loadtest/clientweb/run-local-smoke.ps1`
-  可通过 `-RunBrowserMultiuserUISmoke` 调用。默认路径不启动浏览器。
+  可通过 `-RunBrowserMultiuserUISmoke` 调用。2026-06-23 已在 clean commit
+  `8782936b` 跑通并归档报告；默认路径不启动浏览器。
 - 已有 clean smoke 覆盖真实双用户好友直聊、群聊 first path、群资料 BFF
   read/update 和群成员动作链路；证据见 `docs/runbook/client-platform.md`。
 - Windows desktop 已有 artifact / signing / installer plan first paths；签名 / installer
@@ -79,7 +80,7 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
 ## 下一步优先级
 
 1. Windows PC 端继续真实 signing input、valid signed artifact、MSI / NSIS installer 和签名 installer 体验。
-2. 客户端产品能力继续跑一次真实 `-RunBrowserMultiuserUISmoke` 并归档报告，然后补更丰富群设置和接入 media-service 后的群头像上传链路。
+2. 客户端产品能力继续补更丰富群设置和接入 media-service 后的群头像上传链路。
 3. Android 后续只在用户切回时继续 login-level WebView smoke、APK baseline 报告和真机 UI polish。
 4. 客户端切片阶段性收口后，回到 workflow compensation adapter、instruction approval UI 和 ops 管理。
 5. 新发现待办写入 `docs/runbook/remaining-goals.md`，不要把长待办复制回本文件。

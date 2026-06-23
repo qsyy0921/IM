@@ -348,7 +348,9 @@ still uses the executable baseline. Stale manifests without `artifactKind` or
 installer-only artifacts fail closed. The plan remains not ready until signing
 readiness is true and the executable baseline verifies as Authenticode-valid.
 Its low-sensitive `executionPolicy` declares whether a signing profile is read
-and whether expected signer subject policy is checked.
+and whether expected signer subject policy is checked; its signing summary also
+carries a low-sensitive `signaturePolicy` block so the installer plan does not
+hide public signer policy readiness behind only the Authenticode verifier.
 `build:desktop-installer` wraps that plan as the explicit execution entry. By
 default it is still plan-only. It runs Tauri with the explicit bundle target and
 then collects only `desktop-installer` artifacts from the matching

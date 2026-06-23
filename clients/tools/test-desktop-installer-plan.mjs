@@ -94,6 +94,8 @@ try {
   assert(inactive.executionPolicy.readsAuthenticodeSignature === true, "installer plan should read signature state");
   assert(inactive.executionPolicy.readsSigningProfile === false, "installer plan without profile should not report profile reads");
   assert(inactive.executionPolicy.checksExpectedSignerSubject === false, "installer plan without signer policy should not report signer checks");
+  assert(inactive.signing.signaturePolicy.expectedSignerSubjectConfigured === false, "installer plan without signer policy should expose absent signer policy");
+  assert(inactive.signing.signaturePolicy.enforcement === "not-configured", "installer plan without signer policy should not claim enforcement");
 
   const activeConfigPath = join(tempRoot, "tauri-active.json");
   writeJSON(activeConfigPath, {
@@ -174,6 +176,8 @@ try {
   assert(ready.commandTemplate.collect.includes("desktop-installer"), "ready collect command should collect installer artifacts only");
   assert(ready.expectedOutputHint.endsWith("/msi/"), "ready plan output hint should point at MSI bundle output");
   assert(ready.artifactBaseline.artifact.artifactKind === "desktop-executable", "ready plan should expose executable artifact kind");
+  assert(ready.signing.signaturePolicy.expectedSignerSubjectConfigured === true, "ready installer plan should expose configured signer policy in signing summary");
+  assert(ready.signing.signaturePolicy.enforcement === "post-signature-verification", "ready installer plan should defer signer policy to post-signature verification");
   assert(ready.signatureVerification.readyForSignedDistribution === true, "ready plan should require a valid signature");
   assert(ready.signatureVerification.status === "Valid", "ready plan should carry signature status");
   assert(!readyJSON.includes(tempRoot), "ready installer plan leaked absolute temp path");
@@ -195,6 +199,7 @@ try {
   });
   assert(wrongSigner.readyToBuildInstaller === false, "installer plan should reject unexpected signer");
   assert(wrongSigner.missing.includes("desktop-signature-valid"), "unexpected signer should block installer readiness");
+  assert(wrongSigner.signing.signaturePolicy.expectedSignerSubjectConfigured === true, "wrong signer plan should still expose configured signer policy in signing summary");
   assert(wrongSigner.signatureVerification.missing.includes("expected-signer-subject"), "unexpected signer should be reported by signature verifier");
 
   const installerArtifact = "fake msi bytes";
@@ -418,6 +423,8 @@ try {
     ...pfxFixture.env
   });
   assert(cliProfilePlan.signing.readyToSign === true, "CLI installer profile plan should be signing-ready");
+  assert(cliProfilePlan.signing.signaturePolicy.expectedSignerSubjectConfigured === true, "CLI installer profile plan should expose profile signer policy in signing summary");
+  assert(cliProfilePlan.signing.signaturePolicy.enforcement === "post-signature-verification", "CLI installer profile plan should defer signer policy to verification");
   assert(cliProfilePlan.executionPolicy.readsSigningProfile === true, "CLI installer profile plan should declare profile reads");
   assert(cliProfilePlan.executionPolicy.checksExpectedSignerSubject === true, "CLI installer profile plan should declare expected signer checks");
   assert(cliProfilePlan.readyToBuildInstaller === false, "CLI installer profile plan should still require valid signature for unsigned fixtures");

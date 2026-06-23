@@ -609,7 +609,10 @@ First slice:
   `desktop-executable` baseline instead of treating the unsigned portable zip,
   a stale no-kind manifest, or an already collected installer as an installer
   build input. Its low-sensitive `executionPolicy` declares whether a signing
-  profile is read and whether expected signer subject policy is checked.
+  profile is read and whether expected signer subject policy is checked; its
+  signing summary also carries a low-sensitive `signaturePolicy` block so the
+  installer plan does not hide public signer policy readiness behind only the
+  Authenticode verifier.
   The generic client install plan now also keeps collected `desktop-installer`
   artifacts out of the portable launcher path, so `plan:shell-smoke` only marks
   Windows direct shell smoke ready for `desktop-executable` artifacts. It also

@@ -73,7 +73,8 @@ export function buildDesktopInstallerPlan(options = {}) {
     pfxPassEnvPresent: options.pfxPassEnvPresent,
     pfxPassEnvValue: options.pfxPassEnvValue,
     pfxCertificateProbe: options.pfxCertificateProbe,
-    certificateStoreProbe: options.certificateStoreProbe
+    certificateStoreProbe: options.certificateStoreProbe,
+    expectedSignerSubjectContains: options.expectedSignerSubjectContains
   });
   if (!signingPlan.readyToSign) {
     missing.push("desktop-signing-ready");
@@ -107,7 +108,8 @@ export function buildDesktopInstallerPlan(options = {}) {
     signing: {
       readyToSign: signingPlan.readyToSign,
       missing: signingPlan.missing ?? [],
-      mode: signingPlan.signing?.mode ?? "none"
+      mode: signingPlan.signing?.mode ?? "none",
+      signaturePolicy: signingPlan.signaturePolicy ?? signaturePolicySummary(options)
     },
     signatureVerification: {
       readyForSignedDistribution: signatureVerification.readyForSignedDistribution,
@@ -153,6 +155,14 @@ export function buildDesktopInstallerPlan(options = {}) {
   };
   assertLowSensitivePlan(plan);
   return plan;
+}
+
+function signaturePolicySummary(options) {
+  const expectedSignerSubjectConfigured = Boolean(stringValue(options.expectedSignerSubjectContains));
+  return {
+    expectedSignerSubjectConfigured,
+    enforcement: expectedSignerSubjectConfigured ? "post-signature-verification" : "not-configured"
+  };
 }
 
 function readTauriConfig(path) {

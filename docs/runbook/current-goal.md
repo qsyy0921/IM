@@ -59,7 +59,8 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   执行后的 artifact 收集只读取选中 `bundle/<target>` 目录并要求
   `desktop-installer` kind，避免 standalone exe 混入 installer manifest；installer plan / builder
   的低敏 execution policy 也会声明 signing profile 读取、显式 expected signer subject policy 检查、artifact
-  collection 和 manifest 写入；当前不宣称已有生产签名 installer。
+  collection 和 manifest 写入；installer plan 的 signing summary 也会携带低敏
+  `signaturePolicy`；当前不宣称已有生产签名 installer。
 - Android 已有 WebView shell / bridge / APK 历史产物和 metadata smoke；后续切回时重新加载 toolchain env 或 Docker builder。
 
 ## 下一步优先级

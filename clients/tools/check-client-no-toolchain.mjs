@@ -225,6 +225,11 @@ const checkPlan = [
     reason: "guards read-only desktop Authenticode verification without signing, installing or launching artifacts"
   },
   {
+    name: "desktop-local-signing-smoke-contract",
+    script: "test:desktop-local-signing-smoke",
+    reason: "guards explicit local development signing smoke without modifying trust stores by default"
+  },
+  {
     name: "desktop-composed-smoke-runner-contract",
     script: "test:desktop-composed-smoke",
     reason: "guards desktop composed smoke dry-run summary without starting services"

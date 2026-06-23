@@ -507,6 +507,9 @@ baseline 已通过，PC desktop / Android first-stage runtime adapter 已落，P
   会话标签、草稿和归档 round-trip；clean commit `05b8aec6` 已通过 tag / draft /
   archived-only 筛选匹配和排除路径；下一步继续
   Windows installer / signing 或入群审批 / 禁言等更深群设置与真实 media provider 链路。
+  2026-06-23 Windows desktop 本地开发签名 smoke 已通过：仅签临时 artifact 副本，
+  临时信任后验证 Authenticode `Valid`，并清理临时证书；生产 release certificate /
+  signed collected artifact / signed installer 仍是后续。
   Android APK / 真机 WebView smoke 后置到用户明确切回；Web IndexedDB
   local store、browser platform adapter、shell config contract 和 target shell Web assets
   prep / artifact builder dry-run / Android builder profile 静态校验已补 first-stage focused tests。

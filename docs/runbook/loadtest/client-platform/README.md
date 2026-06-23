@@ -78,6 +78,12 @@ Reports:
   preservation against active filters. It verifies tag, draft-only and
   archived-only filters both include matching rows and exclude non-matching rows.
   Recorded with `commit=05b8aec6` and `git_dirty=false`.
+- `loadtest-report-20260623-desktop-local-signing-smoke.md`: explicit local
+  Windows Authenticode development signing smoke. It signs only a temporary
+  copy of the collected desktop executable with a temporary CurrentUser
+  code-signing certificate, temporarily trusts that certificate, verifies
+  `Valid`, then removes temporary certificate entries and files. It does not
+  mutate the collected artifact and is not a production signing claim.
 
 Useful command:
 

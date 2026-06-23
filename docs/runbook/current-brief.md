@@ -83,8 +83,10 @@ Android 后置到用户明确切回。
    `desktop-installer` artifact kind；installer plan / builder 的低敏 execution policy
    也会声明 signing profile 读取、显式 expected signer subject policy 检查、artifact collection 和
    manifest 写入；installer plan 的 signing summary 也会携带低敏 `signaturePolicy`；
-   下一步仍是真实证书输入、
-   valid signed artifact 和 MSI / NSIS installer 体验。
+   `smoke:desktop-local-signing` 已补显式本地开发签名 smoke，签名临时 artifact
+   副本、临时信任 CurrentUser code-signing certificate、验证 Authenticode `Valid` 并清理；
+   2026-06-23 本机运行已通过，原 collected artifact 未变。下一步仍是真实 release
+   证书输入、真实 collected artifact 签名和 MSI / NSIS signed installer 体验。
 5. 所有客户端能力只走 api-gateway BFF 和 push-gateway，不直连内部服务。
 6. 新功能先做简短架构分析再编码；新增服务 / 中间件 / provider 必须归属正确平台层并同步 owner docs。
 7. 不引入隐藏 fallback；开发相关路径时清理旧 fallback-like 分支，无法本轮清理的写入

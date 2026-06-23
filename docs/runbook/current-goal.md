@@ -83,11 +83,18 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   的低敏 execution policy 也会声明 signing profile 读取、显式 expected signer subject policy 检查、artifact
   collection 和 manifest 写入；installer plan 的 signing summary 也会携带低敏
   `signaturePolicy`；当前不宣称已有生产签名 installer。
+- Windows desktop 已有显式本地开发签名 smoke：默认 plan-only；只有
+  `--execute --allow-local-trust-store --require-valid` 才会签名临时 artifact 副本，
+  临时创建 / 信任 / 清理 CurrentUser code-signing certificate，并验证 Authenticode
+  `Valid`。2026-06-23 本机运行已得到 `validSignedArtifactCopy=true`，确认临时证书剩余
+  `0` 且原 collected artifact hash 未变。该能力只证明本地开发签名机制，不宣称生产签名或
+  installer 签名完成。
 - Android 已有 WebView shell / bridge / APK 历史产物和 metadata smoke；后续切回时重新加载 toolchain env 或 Docker builder。
 
 ## 下一步优先级
 
-1. Windows PC 端继续真实 signing input、valid signed artifact、MSI / NSIS installer 和签名 installer 体验。
+1. Windows PC 端继续真实 release certificate profile、`sign:desktop-artifact` 签真实 collected artifact、
+   `verify:desktop-signature --require-valid` 和 MSI / NSIS signed installer 体验。
 2. 客户端产品能力继续补入群审批 / 禁言等更深群设置，以及
    media-service 真实 S3-compatible / thumbnail / scanner / CDN provider 后续链路。
 3. Android 后续只在用户切回时继续 login-level WebView smoke、APK baseline 报告和真机 UI polish。

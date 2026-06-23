@@ -663,6 +663,20 @@ First slice:
   `artifactKind` instead of blindly using the first `windows-desktop` artifact,
   so newer Android artifacts and mixed desktop manifests do not hide or swap the
   intended executable baseline.
+  `smoke:desktop-local-signing` now provides an explicit local development
+  signing smoke. By default it is plan-only. With
+  `--execute --allow-local-trust-store --require-valid`, it copies the selected
+  collected desktop artifact to a temporary directory, creates a temporary
+  CurrentUser code-signing certificate, temporarily imports that certificate
+  into CurrentUser trusted root, signs the temporary copy, verifies
+  Authenticode `Valid`, then removes the temporary certificate entries and
+  temporary files. The 2026-06-23 run against
+  `clients/artifacts/2026-06-22T214826Z/manifest.json` produced
+  `validSignedArtifactCopy=true`, verified no temporary certificate remained and
+  confirmed the original collected artifact hash still matched the manifest.
+  This is a local development smoke only; real release signing still uses
+  explicit signing profiles, `sign:desktop-artifact` and
+  `verify:desktop-signature --require-valid`.
   `plan:desktop-installer` can read the repository installer Tauri profile, the
   collected desktop manifest, signing readiness and signature verification
   status, then report whether MSI / NSIS installer bundling is ready. The
@@ -871,6 +885,7 @@ npm --prefix clients run plan:desktop-signing
 npm --prefix clients run report:desktop-signing-readiness
 npm --prefix clients run sign:desktop-artifact
 npm --prefix clients run verify:desktop-signature -- --signing-profile clients/desktop/signing-profile.local.json
+npm --prefix clients run smoke:desktop-local-signing -- --manifest clients/artifacts/2026-06-22T214826Z/manifest.json
 npm --prefix clients run smoke:desktop-artifact-launch
 npm --prefix clients run smoke:desktop-composed -- --clientweb-summary <client-web-summary.json>
 npm --prefix clients run smoke:desktop-webview-metadata

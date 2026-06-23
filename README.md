@@ -196,7 +196,11 @@ Authenticode 验证时不会进入 `readyForInstall`；install plan 默认选择
 desktop-installer`，并且会在通过 CLI 或 `NEXUSIM_DESKTOP_SIGN_EXPECTED_SUBJECT`
 传入公开 expected signer subject policy 时声明该检查，installer 签名摘要也会输出低敏 `signaturePolicy`；installer planner / builder 的低敏 execution policy 会声明 signing profile
 读取、显式 expected signer subject policy 检查、artifact collection 和 manifest 写入，installer plan 的 signing summary 也会携带低敏 `signaturePolicy`；installer planner / builder 也只接受显式
-`desktop-executable` 作为 MSI / NSIS build baseline。
+`desktop-executable` 作为 MSI / NSIS build baseline。`smoke:desktop-local-signing`
+已提供显式本地开发签名 smoke：只签名临时 artifact 副本，临时信任 CurrentUser
+code-signing certificate，验证 Authenticode `Valid` 后清理临时证书和临时文件；
+2026-06-23 本机运行已证明 `validSignedArtifactCopy=true` 且原 collected artifact
+hash 未变。该 smoke 不是生产签名 release，也不是 signed installer 完成状态。
 
 本地调试入口：
 

@@ -124,14 +124,9 @@ func run(ctx context.Context, args []string) error {
 	if err != nil {
 		return fmt.Errorf("get eval run: %w", err)
 	}
-	listed, err := client.ListEvalRuns(ctx, &aievalv1.ListEvalRunsRequest{
-		AuthContext: auth,
-		SuiteId:     recorded.GetRun().GetSuiteId(),
-		Status:      recorded.GetRun().GetStatus(),
-		Limit:       20,
-	})
+	listContainsRun, err := listContainsRun(ctx, client, auth, recorded.GetRun())
 	if err != nil {
-		return fmt.Errorf("list eval runs: %w", err)
+		return err
 	}
 
 	result := smokeSummary{
@@ -149,12 +144,48 @@ func run(ctx context.Context, args []string) error {
 		FailedCount:     recorded.GetRun().GetFailedCount(),
 		SkippedCount:    recorded.GetRun().GetSkippedCount(),
 		GetRunMatched:   got.GetRun().GetRunId() == recorded.GetRun().GetRunId(),
-		ListContainsRun: containsRun(listed.GetRuns(), recorded.GetRun().GetRunId()),
+		ListContainsRun: listContainsRun,
 	}
 	if !result.GetRunMatched || !result.ListContainsRun {
 		return errors.New("recorded eval run was not readable through get/list")
 	}
 	return writeSmokeSummary(cfg.outputPath, result)
+}
+
+func listContainsRun(
+	ctx context.Context,
+	client aievalv1.AIEvalServiceClient,
+	auth *aievalv1.AuthContext,
+	run *aievalv1.EvalRun,
+) (bool, error) {
+	const pageLimit = int32(50)
+	const maxPages = 20
+
+	afterRunID := ""
+	for page := 0; page < maxPages; page++ {
+		listed, err := client.ListEvalRuns(ctx, &aievalv1.ListEvalRunsRequest{
+			AuthContext: auth,
+			SuiteId:     run.GetSuiteId(),
+			Status:      run.GetStatus(),
+			AfterRunId:  afterRunID,
+			Limit:       pageLimit,
+		})
+		if err != nil {
+			return false, fmt.Errorf("list eval runs: %w", err)
+		}
+		if containsRun(listed.GetRuns(), run.GetRunId()) {
+			return true, nil
+		}
+		nextCursor := strings.TrimSpace(listed.GetNextCursor())
+		if nextCursor == "" {
+			return false, nil
+		}
+		if nextCursor == afterRunID {
+			return false, fmt.Errorf("list eval runs returned a repeated cursor: %s", nextCursor)
+		}
+		afterRunID = nextCursor
+	}
+	return false, fmt.Errorf("list eval runs did not find run after %d pages", maxPages)
 }
 
 func parseFlags(args []string) (config, error) {

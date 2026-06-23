@@ -38,7 +38,7 @@
 - Codex 每轮执行目标不写在架构文档里，统一读取 `../runbook/current-goal.md`。
 - 当前 9 个已实现服务作为 IM / AI / 客户端平台可运行基础；生产级测试和 HA
   证据作为后续加固项，不阻塞当前短线切片。
-- AI 底座演进顺序为 `search-service -> memory-service -> retrieval-gateway -> rag-service / summary-service -> agent-service -> skill-registry / mcp-gateway -> action-executor -> ai-eval-service`；当前第一组 foundation-active 已形成 EvidencePack、proposal / approval / audit、Python Worker 候选边界和 40/40 optional stack gate，后续默认推进 collaborative-memory 算法/eval。
+- AI 底座演进顺序为 `search-service -> memory-service -> retrieval-gateway -> rag-service / summary-service -> agent-service -> skill-registry / mcp-gateway -> action-executor -> ai-eval-service`；当前第一组 foundation-active 已形成 EvidencePack、proposal / approval / audit、Python Worker 候选边界，并完成 2026-06-24 live service-stack gate（47/51 passed、0 failed、4 retrieval negative / miss cases skipped），后续默认推进 collaborative-memory 算法/eval 和 retrieval negative adapter。
 - 后续服务和中间件都不是写死终局；新增必须符合独立数据模型、独立伸缩、独立故障、独立安全边界之一，或显著降低复杂度，并通过 ADR 和证据演进。
 - 中间件作为平台能力管理，登记和引入规则见 `../platform/middleware-catalog.md`；运行编排放 `deploy/`，服务代码只放 adapter。
 - 可以使用 multi sub-agent 推进互不重叠的服务、文档和验证任务；主 agent 负责统一方案、合并结果、最终检查和关闭 stale sub-agent。

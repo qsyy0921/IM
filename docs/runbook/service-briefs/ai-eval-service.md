@@ -1,6 +1,6 @@
 # ai-eval-service
 
-状态：foundation-active / collaborative-memory live adapter first pass.
+状态：foundation-active / collaborative-memory live service-stack gate passed.
 
 定位：AI eval harness 的低敏持久化目录。它保存 eval run 的 suite、stage、
 adapter、状态、计数、summary/report 引用和低敏 metadata。
@@ -27,9 +27,14 @@ adapter、状态、计数、summary/report 引用和低敏 metadata。
   gate policy 和 service-stack wrapper 可选择 memory-service、retrieval-gateway、
   RAG、Summary、Agent adapter。RAG / Summary / Agent live adapters 同步断言
   multi-hop actor/source-chain completeness。
+- 2026-06-24 `ai-eval-service-stack-live-20260624-collab-memory-v4` 已通过
+  真实 service-stack gate：8 adapters、51 cases、47 passed、0 failed、4 skipped。
+  通过范围包括 profile / action required adapters、memory-service、retrieval-gateway、
+  rag-service、summary-service 和 agent-action-executor。4 个 skipped 是
+  retrieval-gateway negative / miss cases，需要后续专门 adapter，不属于当前
+  positive EvidencePack live smoke 覆盖范围。
 
 边界：不保存 raw EvidencePack、prompt、model output、用户正文、secret 或 tool input；不授权业务动作。
 
-下一步：在真实服务栈启动后运行 memory-service / retrieval-gateway / RAG /
-Summary / Agent optional service-stack gate，归档低敏报告；之后继续区分
-retrieval failure、memory lifecycle failure 和 reasoning failure。
+下一步：补 retrieval negative / miss adapter，继续区分 retrieval failure、
+memory lifecycle failure 和 reasoning failure。

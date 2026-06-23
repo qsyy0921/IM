@@ -44,6 +44,9 @@
   profile aggregation 正 / 负路径和 profile delete propagation；下一步把这些要求接到
   memory-service / retrieval / RAG / Agent live stack adapter，并继续区分 retrieval failure、
   reasoning failure、memory lifecycle failure、action boundary failure。
+- `ai-eval-service`：补 dedicated retrieval negative / miss adapter，覆盖
+  `source_coverage_status`、cross-tenant deny、source-ref exclusion 等当前 positive
+  EvidencePack live smoke 明确 skipped 的 retrieval-gateway cases。
 - `retrieval-gateway`：结构过滤、BM25 / vector / graph expansion、rerank、
   EvidencePack coverage。
 - `rag-service` / `summary-service`：拒答、引用校验、source-ref regression、unsafe

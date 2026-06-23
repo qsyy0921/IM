@@ -71,6 +71,12 @@ IM messages -> search / memory projection -> EvidencePack -> RAG / Agent answer 
   GetMemoryEvent graph edge、reviewed multi-source profile 和 deleted supporting
   memory 排除；retrieval adapter 覆盖 EvidencePack source refs、speaker
   attribution、temporal/current-memory 和 projection version。
+- 2026-06-24 `ai-eval-service-stack-live-20260624-collab-memory-v4` 已通过真实
+  service-stack gate：8 adapters、51 cases、47 passed、0 failed、4 skipped。
+  通过范围包括 required profile / action safety adapters，以及 memory-service、
+  retrieval-gateway、rag-service、summary-service、agent-action-executor live
+  adapters。4 个 skipped 是 retrieval-gateway negative / miss cases，需要后续专门
+  negative adapter，不计入当前 positive live EvidencePack smoke 的通过范围。
 - 已有 clean smoke 覆盖真实双用户好友直聊、群聊 first path、群资料 BFF
   read/update 和群成员动作链路；证据见 `docs/runbook/client-platform.md`。
 - Windows desktop 已有 artifact / signing / installer plan first paths；签名 / installer
@@ -129,10 +135,12 @@ IM messages -> search / memory projection -> EvidencePack -> RAG / Agent answer 
    `memory-service.md`、`retrieval-gateway.md`、`rag-service.md`、`agent-service.md`
    和 `action-executor.md`。
 3. 后端 / AI 演示主线已完成 collaborative-memory eval 到 memory-service /
-   retrieval-gateway / RAG / Summary / Agent optional live adapter 的第一轮提升；
-   下一步在真实服务栈启动后运行完整 service-stack gate，并归档低敏报告。
+   retrieval-gateway / RAG / Summary / Agent optional live adapter 的第一轮提升，
+   且完整 live service-stack gate 已归档低敏报告。
 4. 后端 / AI 演示主线优先做：
    `IM 消息 -> search / memory projection -> EvidencePack -> RAG / Agent answer -> approval / audit`。
+   下一步优先补 retrieval negative / miss adapter，随后进入更完整的 group memory
+   extraction / EvidencePack / RAG-Agent demo module。
 5. 客户端只作为演示入口；除非阻塞上述演示，不继续扩 UI 产品化。
 6. Windows release signing / MSI / NSIS installer、完整 Android、完整移动端发布、
    复杂 UI、群管理深水区和真实 media provider 链路全部后置到 backlog。

@@ -116,8 +116,11 @@ IM 消息 -> search / memory projection -> EvidencePack -> RAG / Agent answer ->
 2026-06-23 当前低敏 collaborative-memory eval 已扩到 73 个 catalog cases /
 20 个 profile-Agent safety fixture cases，并已完成 memory-service /
 retrieval-gateway optional live adapters 的第一轮接入；RAG / Summary / Agent
-live adapters 也会断言 multi-hop actor/source-chain completeness。下一步是在
-真实服务栈启动后运行完整 service-stack gate，并归档低敏报告。
+live adapters 也会断言 multi-hop actor/source-chain completeness。2026-06-24
+`ai-eval-service-stack-live-20260624-collab-memory-v4` 已通过真实
+service-stack gate：8 adapters、51 cases、47 passed、0 failed、4 skipped。
+4 个 skipped 是 retrieval-gateway negative / miss cases，需要后续专门 adapter，
+不计入当前 positive live EvidencePack smoke 的通过范围。
 
 ## 不变量
 

@@ -456,7 +456,7 @@ INSERT INTO memory_graph_edges (
 		'source_type', 'MESSAGE',
 		'source_id', 'msg-replacement',
 		'source_event_id', 'event-replacement',
-		'conversation_id', $2,
+		'conversation_id', $2::text,
 		'conversation_seq', 13
 	))
 )
@@ -524,9 +524,9 @@ INSERT INTO memory_profile_aggregates (
 	confidence,
 	updated_by_memory_event_id
 ) VALUES
-($1, $3 || '-profile-active', $4, 'SKILL', 'phoenix-launch', 'ACTIVE', 'APPROVED', 'reviewed multi-source profile with active supporting evidence', jsonb_build_array($3 || '-current', $3 || '-replacement'), 0.9100, $3 || '-replacement'),
-($1, $3 || '-profile-deleted-support', $4, 'SKILL', 'deleted-support', 'ACTIVE', 'APPROVED', 'profile with deleted support must not be returned as active', jsonb_build_array($3 || '-deleted-support'), 0.9200, $3 || '-deleted-support')
-`, cfg.tenantID, cfg.conversationID, eventPrefix, cfg.viewerUserID); err != nil {
+($1, $2 || '-profile-active', $3, 'SKILL', 'phoenix-launch', 'ACTIVE', 'APPROVED', 'reviewed multi-source profile with active supporting evidence', jsonb_build_array($2 || '-current', $2 || '-replacement'), 0.9100, $2 || '-replacement'),
+($1, $2 || '-profile-deleted-support', $3, 'SKILL', 'deleted-support', 'ACTIVE', 'APPROVED', 'profile with deleted support must not be returned as active', jsonb_build_array($2 || '-deleted-support'), 0.9200, $2 || '-deleted-support')
+`, cfg.tenantID, eventPrefix, cfg.viewerUserID); err != nil {
 		return fmt.Errorf("seed runtime profile aggregates: %w", err)
 	}
 	return nil

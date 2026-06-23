@@ -349,6 +349,12 @@ added optional `memory-service` / `retrieval-gateway` adapters. It also made
 RAG / Summary / Agent live adapters assert multi-hop actor/source-chain
 completeness. This is adapter wiring and focused verification; it does not mean
 the full live service-stack gate has been run for those new optional adapters.
+The 2026-06-24 live service-stack gate
+`ai-eval-service-stack-live-20260624-collab-memory-v4` ran 8 adapters / 51
+cases with 47 passed, 0 failed and 4 skipped. The skipped cases are
+retrieval-gateway negative / miss cases that require a dedicated negative
+fixture; they are not counted as covered by the positive EvidencePack live
+smoke.
 The 2026-06-20 negative RAG / Agent service-stack run increased the live suite
 to 19 cases and added RAG no-evidence abstain plus Agent policy-denied blocked
 proposal checks.

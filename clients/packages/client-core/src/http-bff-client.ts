@@ -2,6 +2,7 @@ import {
   CLIENT_API_ENDPOINTS,
   type AckDeliveryRequest,
   type AckDeliveryResponse,
+  type ArchiveConversationRequest,
   type AuthSession,
   type CancelContactRequestInput,
   type ContactActionInput,
@@ -30,6 +31,8 @@ import {
   type PinConversationRequest,
   type RespondContactRequestInput,
   type SendContactRequestInput,
+  type SetConversationDraftRequest,
+  type SetConversationTagsRequest,
   type TransferConversationOwnerRequest,
   type TransferConversationOwnerResponse,
   type UpdateConversationProfileRequest,
@@ -188,6 +191,9 @@ interface BFFConversationSummary {
   archived?: boolean;
   pinned?: boolean;
   muted?: boolean;
+  tags?: string[];
+  draft_text?: string;
+  draft_updated_at_unix_ms?: string | number;
 }
 
 interface BFFListConversationsResponse {
@@ -317,7 +323,15 @@ export class BFFClient implements AuthAPI, ConversationAPI, MessagingAPI, Delive
 
   async listConversations(
     session: AuthSession,
-    input: { limit?: number; pageCursor?: string } = {}
+    input: {
+      limit?: number;
+      pageCursor?: string;
+      includeArchived?: boolean;
+      archivedOnly?: boolean;
+      draftOnly?: boolean;
+      tagFilter?: string;
+      tagFilters?: string[];
+    } = {}
   ): Promise<ConversationSummary[]> {
     const query = new URLSearchParams();
     if (input.limit && input.limit > 0) {
@@ -325,6 +339,23 @@ export class BFFClient implements AuthAPI, ConversationAPI, MessagingAPI, Delive
     }
     if (input.pageCursor) {
       query.set("page_cursor", input.pageCursor);
+    }
+    if (input.includeArchived) {
+      query.set("include_archived", "true");
+    }
+    if (input.archivedOnly) {
+      query.set("archived_only", "true");
+    }
+    if (input.draftOnly) {
+      query.set("draft_only", "true");
+    }
+    if (input.tagFilter?.trim()) {
+      query.set("tag_filter", input.tagFilter.trim());
+    }
+    for (const tag of input.tagFilters ?? []) {
+      if (tag.trim()) {
+        query.append("tag_filters", tag.trim());
+      }
     }
     const suffix = query.toString();
     const response = await this.#request<BFFListConversationsResponse>(
@@ -403,6 +434,36 @@ export class BFFClient implements AuthAPI, ConversationAPI, MessagingAPI, Delive
       "POST",
       CLIENT_API_ENDPOINTS.muteConversation(request.conversationID),
       { muted: request.muted },
+      session
+    );
+    return conversationSummaryFromBFF(requiredObject(response.conversation, "conversation"), session);
+  }
+
+  async archiveConversation(request: ArchiveConversationRequest, session: AuthSession): Promise<ConversationSummary> {
+    const response = await this.#request<BFFConversationSummaryResponse>(
+      "POST",
+      CLIENT_API_ENDPOINTS.archiveConversation(request.conversationID),
+      { archived: request.archived },
+      session
+    );
+    return conversationSummaryFromBFF(requiredObject(response.conversation, "conversation"), session);
+  }
+
+  async setConversationTags(request: SetConversationTagsRequest, session: AuthSession): Promise<ConversationSummary> {
+    const response = await this.#request<BFFConversationSummaryResponse>(
+      "POST",
+      CLIENT_API_ENDPOINTS.setConversationTags(request.conversationID),
+      { tags: request.tags },
+      session
+    );
+    return conversationSummaryFromBFF(requiredObject(response.conversation, "conversation"), session);
+  }
+
+  async setConversationDraft(request: SetConversationDraftRequest, session: AuthSession): Promise<ConversationSummary> {
+    const response = await this.#request<BFFConversationSummaryResponse>(
+      "POST",
+      CLIENT_API_ENDPOINTS.setConversationDraft(request.conversationID),
+      { draft_text: request.draftText },
       session
     );
     return conversationSummaryFromBFF(requiredObject(response.conversation, "conversation"), session);
@@ -860,6 +921,7 @@ function loginResponseToSession(response: BFFLoginResponse): AuthSession {
 function conversationSummaryFromBFF(item: BFFConversationSummary, session: AuthSession): ConversationSummary {
   const archived = item.archived === true;
   const conversationID = requiredString(item.conversation_id, "conversation_id");
+  const tags = Array.isArray(item.tags) ? item.tags.filter(tag => typeof tag === "string" && tag.trim() !== "") : [];
   return {
     tenantID: session.tenantID,
     conversationID,
@@ -869,8 +931,12 @@ function conversationSummaryFromBFF(item: BFFConversationSummary, session: AuthS
     lastSeq: numberValue(item.last_visible_seq),
     memberVersion: numberValue(item.member_version),
     unreadCount: numberValue(item.unread_count),
+    archived,
     muted: item.muted === true,
     pinned: item.pinned === true,
+    tags: [...new Set(tags.map(tag => tag.trim()))],
+    draftText: typeof item.draft_text === "string" ? item.draft_text : "",
+    draftUpdatedAtMs: numberValue(item.draft_updated_at_unix_ms),
     updatedAtMs: numberValue(item.updated_at_unix_ms)
   };
 }

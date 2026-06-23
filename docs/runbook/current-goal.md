@@ -27,7 +27,7 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
 - Web / PC shell 已接账号密码登录、注册、好友工作台、好友私聊、群聊列表、建群、
   群成员添加 / 退群、从好友列表邀请入群、成员列表、移除成员、角色变更、owner
   transfer、成员搜索 / 角色过滤 / 分页、群资料卡、权限感知群设置入口、邀请来源提示、
-  群公告、会话置顶 / 免打扰、消息列表、发送、PullInbox 和 ACK。
+  群公告、会话置顶 / 免打扰、归档、标签、草稿、会话筛选、消息列表、发送、PullInbox 和 ACK。
 - 群设置 UI 已按资料、成员、操作分区；资料和成员事实仍只来自 conversation-service
   经 api-gateway BFF 暴露的公开接口，不维护本地假成员列表。
 - 群标题 / 头像 URI / 群公告已接 first-stage read/update：`conversation-service` 拥有事实，
@@ -83,12 +83,13 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
 
 ## 下一步优先级
 
-1. Windows PC 端继续真实 signing input、valid signed artifact、MSI / NSIS installer 和签名 installer 体验。
-2. 客户端产品能力继续补入群审批 / 禁言等更深群设置，以及
+1. Web / Windows PC 端继续做完整客户端功能包验收：会话管理面板、会话筛选、私聊 / 群聊路径和登录过期清理都要通过 focused client checks 和后续真实 UI smoke。
+2. Windows PC 端后续再继续真实 signing input、valid signed artifact、MSI / NSIS installer 和签名 installer 体验。
+3. 客户端产品能力继续补入群审批 / 禁言等更深群设置，以及
    media-service 真实 S3-compatible / thumbnail / scanner / CDN provider 后续链路。
-3. Android 后续只在用户切回时继续 login-level WebView smoke、APK baseline 报告和真机 UI polish。
-4. 客户端切片阶段性收口后，回到 workflow compensation adapter、instruction approval UI 和 ops 管理。
-5. 新发现待办写入 `docs/runbook/remaining-goals.md`，不要把长待办复制回本文件。
+4. Android 后续只在用户切回时继续 login-level WebView smoke、APK baseline 报告和真机 UI polish。
+5. 客户端切片阶段性收口后，回到 workflow compensation adapter、instruction approval UI 和 ops 管理。
+6. 新发现待办写入 `docs/runbook/remaining-goals.md`，不要把长待办复制回本文件。
 
 ## Focused Checks
 

@@ -116,7 +116,7 @@
   可用但 builder image 尚未构建；本机仍缺 Android
   JDK 17+ / Gradle / SDK；当前默认不把 Android 工具链作为阻塞，短线继续围绕
   Web / Windows PC 客户端的好友私聊、群聊、群成员管理第一路径、群资料编辑、群公告、
-  会话置顶 / 免打扰、消息列表、发送、PullInbox / ACK 和真实双用户 smoke 收口。
+  会话置顶 / 免打扰、归档、标签、草稿、会话筛选、消息列表、发送、PullInbox / ACK 和真实双用户 smoke 收口。
 
 当前已开始的 AI 大模型应用底座能力：
 
@@ -292,6 +292,7 @@ desktop first-stage standalone artifact 已产出，launch sanity smoke 已通�
 shell 已接账号密码登录、注册、好友工作台、点击好友进入私聊、群聊列表、建群、点击
 群聊进入会话、群成员添加 / 退群、成员列表、移除成员、角色变更 / owner transfer
 first path、群设置操作区、群标题 / 头像 URI / 群公告 read-update、会话置顶 / 免打扰、
+归档、标签、草稿、会话筛选、
 消息列表、发送后本地状态刷新、PullInbox / ACK 和登录过期清理；真实双用户客户端 smoke 已验证好友
 私聊和群聊 first path。Android APK / 真机 WebView smoke 后置到用户明确切回；Web
 IndexedDB local store 已补 first-stage persistence test。
@@ -498,6 +499,7 @@ baseline 已通过，PC desktop / Android first-stage runtime adapter 已落，P
   standalone artifact 已产出且 launch sanity smoke 已通过；Web / PC shell 已接注册、
   好友列表、好友申请、好友私聊、群聊列表、建群、会话选择、群成员添加 / 退群、
   从好友列表邀请入群、成员列表、移除成员、角色变更 / owner transfer、会话置顶 / 免打扰、
+  归档、标签、草稿、会话筛选、
   消息列表、发送后本地状态刷新、群标题 / 头像 URI / 群公告 read-update、
   PullInbox / ACK 和登录过期清理；真实双用户
   direct + group client smoke 已通过，群成员管理动作 smoke 已通过，群公告 first path 已接 conversation profile；下一步继续

@@ -286,6 +286,44 @@ func TestPinConversationEndpointForwardsReceiptRequest(t *testing.T) {
 	}
 }
 
+func TestArchiveConversationEndpointForwardsReceiptRequest(t *testing.T) {
+	authenticator := &fakeAuthenticator{auth: gatewayauth.AuthContext{TenantID: "tenant-1", UserID: "user-a"}}
+	gateway := &fakeGateway{
+		archiveConversation: func(ctx context.Context, request *receiptv1.ArchiveConversationRequest) (*receiptv1.ArchiveConversationResponse, error) {
+			md, ok := metadata.FromIncomingContext(ctx)
+			if !ok || firstMetadata(md, "authorization") != "Bearer token-1" {
+				t.Fatalf("expected forwarded auth metadata, got %+v", md)
+			}
+			if request.GetConversationId() != "conv/group" || !request.GetArchived() {
+				t.Fatalf("unexpected archive request: %+v", request)
+			}
+			return &receiptv1.ArchiveConversationResponse{
+				Conversation: &receiptv1.ConversationSummary{
+					ConversationId:  "conv/group",
+					LastVisibleSeq:  9,
+					UnreadCount:     2,
+					UpdatedAtUnixMs: 10,
+					Archived:        true,
+				},
+			}, nil
+		},
+	}
+	handler := NewServer(Config{Gateway: gateway, Authenticator: authenticator})
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/conversations/conv%2Fgroup/archive", strings.NewReader(`{"archived":true}`))
+	request.Header.Set("Authorization", "Bearer token-1")
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+	if !strings.Contains(response.Body.String(), `"conversation_id":"conv/group"`) ||
+		!strings.Contains(response.Body.String(), `"archived":true`) {
+		t.Fatalf("expected archived conversation response, got %s", response.Body.String())
+	}
+}
+
 func TestMuteConversationEndpointForwardsReceiptRequest(t *testing.T) {
 	authenticator := &fakeAuthenticator{auth: gatewayauth.AuthContext{TenantID: "tenant-1", UserID: "user-a"}}
 	gateway := &fakeGateway{
@@ -320,6 +358,84 @@ func TestMuteConversationEndpointForwardsReceiptRequest(t *testing.T) {
 	}
 	if !strings.Contains(response.Body.String(), `"conversation_id":"conv/group"`) {
 		t.Fatalf("expected muted conversation response, got %s", response.Body.String())
+	}
+}
+
+func TestSetConversationTagsEndpointForwardsReceiptRequest(t *testing.T) {
+	authenticator := &fakeAuthenticator{auth: gatewayauth.AuthContext{TenantID: "tenant-1", UserID: "user-a"}}
+	gateway := &fakeGateway{
+		setConversationTags: func(ctx context.Context, request *receiptv1.SetConversationTagsRequest) (*receiptv1.SetConversationTagsResponse, error) {
+			md, ok := metadata.FromIncomingContext(ctx)
+			if !ok || firstMetadata(md, "authorization") != "Bearer token-1" {
+				t.Fatalf("expected forwarded auth metadata, got %+v", md)
+			}
+			if request.GetConversationId() != "conv/group" ||
+				len(request.GetTags()) != 2 ||
+				request.GetTags()[0] != "work" ||
+				request.GetTags()[1] != "urgent" {
+				t.Fatalf("unexpected tags request: %+v", request)
+			}
+			return &receiptv1.SetConversationTagsResponse{
+				Conversation: &receiptv1.ConversationSummary{
+					ConversationId:  "conv/group",
+					LastVisibleSeq:  9,
+					UpdatedAtUnixMs: 13,
+					Tags:            []string{"work", "urgent"},
+				},
+			}, nil
+		},
+	}
+	handler := NewServer(Config{Gateway: gateway, Authenticator: authenticator})
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/conversations/conv%2Fgroup/tags", strings.NewReader(`{"tags":["work","urgent"]}`))
+	request.Header.Set("Authorization", "Bearer token-1")
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+	if !strings.Contains(response.Body.String(), `"tags":["`) ||
+		!strings.Contains(response.Body.String(), `"work"`) ||
+		!strings.Contains(response.Body.String(), `"urgent"`) {
+		t.Fatalf("expected tagged conversation response, got %s", response.Body.String())
+	}
+}
+
+func TestSetConversationDraftEndpointForwardsReceiptRequest(t *testing.T) {
+	authenticator := &fakeAuthenticator{auth: gatewayauth.AuthContext{TenantID: "tenant-1", UserID: "user-a"}}
+	gateway := &fakeGateway{
+		setConversationDraft: func(ctx context.Context, request *receiptv1.SetConversationDraftRequest) (*receiptv1.SetConversationDraftResponse, error) {
+			md, ok := metadata.FromIncomingContext(ctx)
+			if !ok || firstMetadata(md, "authorization") != "Bearer token-1" {
+				t.Fatalf("expected forwarded auth metadata, got %+v", md)
+			}
+			if request.GetConversationId() != "conv/group" || request.GetDraftText() != "hello draft" {
+				t.Fatalf("unexpected draft request: %+v", request)
+			}
+			return &receiptv1.SetConversationDraftResponse{
+				Conversation: &receiptv1.ConversationSummary{
+					ConversationId:       "conv/group",
+					LastVisibleSeq:       9,
+					UpdatedAtUnixMs:      14,
+					DraftText:            "hello draft",
+					DraftUpdatedAtUnixMs: 15,
+				},
+			}, nil
+		},
+	}
+	handler := NewServer(Config{Gateway: gateway, Authenticator: authenticator})
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/conversations/conv%2Fgroup/draft", strings.NewReader(`{"draft_text":"hello draft"}`))
+	request.Header.Set("Authorization", "Bearer token-1")
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+	if !strings.Contains(response.Body.String(), `"draft_text":"hello draft"`) {
+		t.Fatalf("expected draft conversation response, got %s", response.Body.String())
 	}
 }
 
@@ -1457,8 +1573,11 @@ type fakeGateway struct {
 	pullInbox                 func(context.Context, *deliveryv1.PullInboxRequest) (*deliveryv1.PullInboxResponse, error)
 	ackDelivery               func(context.Context, *deliveryv1.AckDeliveryRequest) (*deliveryv1.AckDeliveryResponse, error)
 	listConversations         func(context.Context, *receiptv1.ListConversationsRequest) (*receiptv1.ListConversationsResponse, error)
+	archiveConversation       func(context.Context, *receiptv1.ArchiveConversationRequest) (*receiptv1.ArchiveConversationResponse, error)
 	pinConversation           func(context.Context, *receiptv1.PinConversationRequest) (*receiptv1.PinConversationResponse, error)
 	muteConversation          func(context.Context, *receiptv1.MuteConversationRequest) (*receiptv1.MuteConversationResponse, error)
+	setConversationTags       func(context.Context, *receiptv1.SetConversationTagsRequest) (*receiptv1.SetConversationTagsResponse, error)
+	setConversationDraft      func(context.Context, *receiptv1.SetConversationDraftRequest) (*receiptv1.SetConversationDraftResponse, error)
 	listReceiptStates         func(context.Context, *receiptv1.ListReceiptStatesRequest) (*receiptv1.ListReceiptStatesResponse, error)
 	sendContactRequest        func(context.Context, *contactsv1.SendContactRequestRequest) (*contactsv1.SendContactRequestResponse, error)
 	respondContactRequest     func(context.Context, *contactsv1.RespondContactRequestRequest) (*contactsv1.RespondContactRequestResponse, error)
@@ -1578,6 +1697,13 @@ func (gateway *fakeGateway) ListConversations(ctx context.Context, request *rece
 	return gateway.listConversations(ctx, request)
 }
 
+func (gateway *fakeGateway) ArchiveConversation(ctx context.Context, request *receiptv1.ArchiveConversationRequest) (*receiptv1.ArchiveConversationResponse, error) {
+	if gateway.archiveConversation == nil {
+		return nil, status.Error(codes.Unimplemented, "archive conversation not implemented")
+	}
+	return gateway.archiveConversation(ctx, request)
+}
+
 func (gateway *fakeGateway) PinConversation(ctx context.Context, request *receiptv1.PinConversationRequest) (*receiptv1.PinConversationResponse, error) {
 	if gateway.pinConversation == nil {
 		return nil, status.Error(codes.Unimplemented, "pin conversation not implemented")
@@ -1590,6 +1716,20 @@ func (gateway *fakeGateway) MuteConversation(ctx context.Context, request *recei
 		return nil, status.Error(codes.Unimplemented, "mute conversation not implemented")
 	}
 	return gateway.muteConversation(ctx, request)
+}
+
+func (gateway *fakeGateway) SetConversationTags(ctx context.Context, request *receiptv1.SetConversationTagsRequest) (*receiptv1.SetConversationTagsResponse, error) {
+	if gateway.setConversationTags == nil {
+		return nil, status.Error(codes.Unimplemented, "set conversation tags not implemented")
+	}
+	return gateway.setConversationTags(ctx, request)
+}
+
+func (gateway *fakeGateway) SetConversationDraft(ctx context.Context, request *receiptv1.SetConversationDraftRequest) (*receiptv1.SetConversationDraftResponse, error) {
+	if gateway.setConversationDraft == nil {
+		return nil, status.Error(codes.Unimplemented, "set conversation draft not implemented")
+	}
+	return gateway.setConversationDraft(ctx, request)
 }
 
 func (gateway *fakeGateway) ListReceiptStates(ctx context.Context, request *receiptv1.ListReceiptStatesRequest) (*receiptv1.ListReceiptStatesResponse, error) {

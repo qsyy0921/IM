@@ -97,6 +97,12 @@ export function App() {
   const [groupProfileAnnouncementDraft, setGroupProfileAnnouncementDraft] = useState("");
   const [groupProfileError, setGroupProfileError] = useState("");
   const [groupAvatarUploadStatus, setGroupAvatarUploadStatus] = useState("");
+  const [conversationTagFilter, setConversationTagFilter] = useState("");
+  const [showArchivedConversations, setShowArchivedConversations] = useState(false);
+  const [archivedOnlyConversations, setArchivedOnlyConversations] = useState(false);
+  const [draftOnlyConversations, setDraftOnlyConversations] = useState(false);
+  const [conversationTagDraft, setConversationTagDraft] = useState("");
+  const [conversationDraftEditor, setConversationDraftEditor] = useState("");
   const [status, setStatus] = useState("ready");
   const [activeView, setActiveView] = useState<ActiveView>("conversations");
   const [groupSettingsTab, setGroupSettingsTab] = useState<GroupSettingsTab>("profile");
@@ -284,7 +290,13 @@ export function App() {
     if (!currentSession) {
       throw new Error("login first");
     }
-    const items = await runtime.bff.listConversations(currentSession, { limit: 50 });
+    const items = await runtime.bff.listConversations(currentSession, {
+      limit: 50,
+      includeArchived: showArchivedConversations || archivedOnlyConversations,
+      archivedOnly: archivedOnlyConversations,
+      draftOnly: draftOnlyConversations,
+      tagFilter: conversationTagFilter.trim()
+    });
     const mergedItems = mergeConversationSummaries(conversations, items);
     setConversations(mergedItems);
     const nextActiveID = chooseActiveConversationID(mergedItems, activeConversationRef.current);
@@ -431,6 +443,8 @@ export function App() {
     setActiveConversationID(conversationID);
     setManualConversationID(conversationID);
     setActiveView("conversations");
+    setConversationTagDraft((selectedConversation?.tags ?? []).join(", "));
+    setConversationDraftEditor(selectedConversation?.draftText ?? "");
     await showCachedMessages(conversationID);
     await syncConversation(conversationID, currentSession);
     if (selectedConversation?.type === "GROUP") {
@@ -498,6 +512,10 @@ export function App() {
         unreadCount: 0,
         muted: false,
         pinned: false,
+        archived: false,
+        tags: [],
+        draftText: "",
+        draftUpdatedAtMs: 0,
         updatedAtMs: Date.now()
       };
       upsertConversationSummary(optimistic);
@@ -671,6 +689,10 @@ export function App() {
         unreadCount: 0,
         muted: false,
         pinned: false,
+        archived: false,
+        tags: [],
+        draftText: "",
+        draftUpdatedAtMs: 0,
         updatedAtMs: Date.now()
       };
       upsertConversationSummary(directSummary);
@@ -1194,6 +1216,7 @@ export function App() {
     setMessages([]);
     clearGroupMemberState();
     clearGroupProfileState();
+    clearConversationManagementState();
     setGroupSettingsTab("profile");
     setLastAck(null);
     setPushStatus("disconnected");
@@ -1220,6 +1243,11 @@ export function App() {
     setGroupProfileAvatarDraft("");
     setGroupProfileAnnouncementDraft("");
     setGroupProfileError("");
+  }
+
+  function clearConversationManagementState(): void {
+    setConversationTagDraft("");
+    setConversationDraftEditor("");
   }
 
   function applyGroupProfile(profile: ConversationProfile): void {
@@ -1270,6 +1298,85 @@ export function App() {
         currentSession
       );
       upsertConversationSummary(mergeConversationSummary(conversation, updated));
+    });
+  }
+
+  async function setConversationArchived(conversation: ConversationSummary, archived: boolean): Promise<void> {
+    await run(archived ? "archive conversation" : "unarchive conversation", async () => {
+      const currentSession = requireSession();
+      const updated = await runtime.bff.archiveConversation(
+        {
+          conversationID: conversation.conversationID,
+          archived
+        },
+        currentSession
+      );
+      const merged = mergeConversationSummary(conversation, updated);
+      if (archived && !showArchivedConversations && !archivedOnlyConversations) {
+        setConversations(current => current.filter(item => item.conversationID !== conversation.conversationID));
+        if (activeConversationRef.current === conversation.conversationID) {
+          activeConversationRef.current = "";
+          setActiveConversationID("");
+          setMessages([]);
+          clearConversationManagementState();
+        }
+        return;
+      }
+      upsertConversationSummary(merged);
+      if (activeConversationRef.current === merged.conversationID) {
+        setConversationTagDraft(merged.tags.join(", "));
+        setConversationDraftEditor(merged.draftText);
+      }
+    });
+  }
+
+  async function saveConversationTags(conversation: ConversationSummary): Promise<void> {
+    await run("set conversation tags", async () => {
+      const currentSession = requireSession();
+      const tags = normalizeConversationTags(conversationTagDraft);
+      const updated = await runtime.bff.setConversationTags(
+        {
+          conversationID: conversation.conversationID,
+          tags
+        },
+        currentSession
+      );
+      const merged = mergeConversationSummary(conversation, updated);
+      upsertConversationSummary(merged);
+      setConversationTagDraft(merged.tags.join(", "));
+    });
+  }
+
+  async function saveConversationDraft(conversation: ConversationSummary): Promise<void> {
+    await run("set conversation draft", async () => {
+      const currentSession = requireSession();
+      const updated = await runtime.bff.setConversationDraft(
+        {
+          conversationID: conversation.conversationID,
+          draftText: conversationDraftEditor
+        },
+        currentSession
+      );
+      const merged = mergeConversationSummary(conversation, updated);
+      upsertConversationSummary(merged);
+      setConversationDraftEditor(merged.draftText);
+    });
+  }
+
+  async function clearConversationDraft(conversation: ConversationSummary): Promise<void> {
+    setConversationDraftEditor("");
+    await run("clear conversation draft", async () => {
+      const currentSession = requireSession();
+      const updated = await runtime.bff.setConversationDraft(
+        {
+          conversationID: conversation.conversationID,
+          draftText: ""
+        },
+        currentSession
+      );
+      const merged = mergeConversationSummary(conversation, updated);
+      upsertConversationSummary(merged);
+      setConversationDraftEditor("");
     });
   }
 
@@ -1569,6 +1676,54 @@ export function App() {
                 </button>
               </div>
               <form
+                className="conversation-filter-form"
+                onSubmit={event => {
+                  event.preventDefault();
+                  void run("load conversations", () => loadConversations());
+                }}
+              >
+                <input
+                  data-testid="conversation-tag-filter"
+                  placeholder="按标签筛选"
+                  value={conversationTagFilter}
+                  onChange={event => setConversationTagFilter(event.target.value)}
+                  disabled={!session}
+                />
+                <label>
+                  <input
+                    data-testid="conversation-include-archived"
+                    type="checkbox"
+                    checked={showArchivedConversations}
+                    onChange={event => setShowArchivedConversations(event.target.checked)}
+                    disabled={!session || archivedOnlyConversations}
+                  />
+                  含归档
+                </label>
+                <label>
+                  <input
+                    data-testid="conversation-archived-only"
+                    type="checkbox"
+                    checked={archivedOnlyConversations}
+                    onChange={event => setArchivedOnlyConversations(event.target.checked)}
+                    disabled={!session}
+                  />
+                  仅归档
+                </label>
+                <label>
+                  <input
+                    data-testid="conversation-draft-only"
+                    type="checkbox"
+                    checked={draftOnlyConversations}
+                    onChange={event => setDraftOnlyConversations(event.target.checked)}
+                    disabled={!session}
+                  />
+                  有草稿
+                </label>
+                <button type="submit" disabled={!session}>
+                  筛选
+                </button>
+              </form>
+              <form
                 className="group-form"
                 onSubmit={event => {
                   event.preventDefault();
@@ -1617,6 +1772,15 @@ export function App() {
                       <span className="conversation-copy">
                         <strong>{displayConversationTitle(conversation)}</strong>
                         <small>{conversationSubtitle(conversation)}</small>
+                        <span className="conversation-badges">
+                          {conversation.archived ? <span>归档</span> : null}
+                          {conversation.pinned ? <span>置顶</span> : null}
+                          {conversation.muted ? <span>免扰</span> : null}
+                          {conversation.tags.map(tag => (
+                            <span key={tag}>#{tag}</span>
+                          ))}
+                          {conversation.draftText.trim() ? <span>草稿</span> : null}
+                        </span>
                       </span>
                     </button>
                     <div className="conversation-inline-actions" aria-label="会话操作">
@@ -1635,6 +1799,14 @@ export function App() {
                         disabled={!session}
                       >
                         {conversation.muted ? "取消免扰" : "免扰"}
+                      </button>
+                      <button
+                        data-testid="conversation-archive-toggle"
+                        type="button"
+                        onClick={() => void setConversationArchived(conversation, !conversation.archived)}
+                        disabled={!session}
+                      >
+                        {conversation.archived ? "取消归档" : "归档"}
                       </button>
                     </div>
                   </article>
@@ -1871,6 +2043,98 @@ export function App() {
         </header>
 
         {error ? <div data-testid="error-banner" className="error-banner">{error}</div> : null}
+
+        {activeConversation ? (
+          <section className="conversation-management-panel" aria-label="会话管理">
+            <div className="conversation-management-header">
+              <div>
+                <strong>会话管理</strong>
+                <span>
+                  {activeConversation.type === "DIRECT" ? "私聊" : activeConversation.type === "GROUP" ? "群聊" : "会话"}
+                  {activeConversation.archived ? " · 已归档" : ""}
+                </span>
+              </div>
+              <div className="conversation-management-actions" data-testid="active-conversation-actions">
+                <button
+                  data-testid="active-conversation-pin-toggle"
+                  type="button"
+                  onClick={() => void setConversationPinned(activeConversation, !activeConversation.pinned)}
+                  disabled={!session}
+                >
+                  {activeConversation.pinned ? "取消置顶" : "置顶"}
+                </button>
+                <button
+                  data-testid="active-conversation-mute-toggle"
+                  type="button"
+                  onClick={() => void setConversationMuted(activeConversation, !activeConversation.muted)}
+                  disabled={!session}
+                >
+                  {activeConversation.muted ? "取消免扰" : "免扰"}
+                </button>
+                <button
+                  data-testid="active-conversation-archive-toggle"
+                  type="button"
+                  onClick={() => void setConversationArchived(activeConversation, !activeConversation.archived)}
+                  disabled={!session}
+                >
+                  {activeConversation.archived ? "取消归档" : "归档"}
+                </button>
+              </div>
+            </div>
+            <form
+              className="conversation-management-form"
+              onSubmit={event => {
+                event.preventDefault();
+                void saveConversationTags(activeConversation);
+              }}
+            >
+              <label>
+                标签
+                <input
+                  data-testid="conversation-tags-input"
+                  placeholder="用逗号分隔，例如 项目, 重要"
+                  value={conversationTagDraft}
+                  onChange={event => setConversationTagDraft(event.target.value)}
+                  disabled={!session}
+                />
+              </label>
+              <button data-testid="conversation-tags-save" type="submit" disabled={!session}>
+                保存标签
+              </button>
+            </form>
+            <form
+              className="conversation-management-form draft"
+              onSubmit={event => {
+                event.preventDefault();
+                void saveConversationDraft(activeConversation);
+              }}
+            >
+              <label>
+                草稿
+                <textarea
+                  data-testid="conversation-draft-input"
+                  placeholder="写下稍后发送前需要保留的草稿"
+                  value={conversationDraftEditor}
+                  onChange={event => setConversationDraftEditor(event.target.value)}
+                  disabled={!session}
+                />
+              </label>
+              <div className="conversation-management-actions">
+                <button data-testid="conversation-draft-save" type="submit" disabled={!session}>
+                  保存草稿
+                </button>
+                <button
+                  data-testid="conversation-draft-clear"
+                  type="button"
+                  onClick={() => void clearConversationDraft(activeConversation)}
+                  disabled={!session || !conversationDraftEditor}
+                >
+                  清空草稿
+                </button>
+              </div>
+            </form>
+          </section>
+        ) : null}
 
         {activeGroupConversation ? (
           <section className="group-settings" aria-label="群设置">
@@ -2521,7 +2785,17 @@ function conversationSubtitle(conversation: ConversationSummary): string {
         ? "群聊"
         : "会话";
   const seq = conversation.lastSeq > 0 ? `最新 #${conversation.lastSeq}` : "暂无消息";
-  return `${kind} · ${seq}`;
+  const flags: string[] = [kind, seq];
+  if (conversation.archived) {
+    flags.push("已归档");
+  }
+  if (conversation.draftText.trim()) {
+    flags.push("有草稿");
+  }
+  if (conversation.tags.length > 0) {
+    flags.push(conversation.tags.map(tag => `#${tag}`).join(" "));
+  }
+  return flags.join(" · ");
 }
 
 function conversationStatusLabel(status: string): string {
@@ -2600,6 +2874,20 @@ function chooseActiveConversationID(conversations: ConversationSummary[], prefer
     return preferredID;
   }
   return conversations[0]?.conversationID ?? "";
+}
+
+function normalizeConversationTags(value: string): string[] {
+  const seen = new Set<string>();
+  const tags: string[] = [];
+  for (const raw of value.split(/[,，\n]/)) {
+    const tag = raw.trim();
+    if (!tag || seen.has(tag)) {
+      continue;
+    }
+    seen.add(tag);
+    tags.push(tag);
+  }
+  return tags;
 }
 
 function nativeLocalStoreStatus(localStore: NonNullable<NativeBridgeMetadata["capabilities"]>["localStore"]): string {

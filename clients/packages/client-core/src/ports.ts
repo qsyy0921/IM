@@ -1,6 +1,7 @@
 import type {
   AckDeliveryRequest,
   AckDeliveryResponse,
+  ArchiveConversationRequest,
   AuthSession,
   ConversationID,
   DeliveryNotifyFrame,
@@ -36,6 +37,8 @@ import type {
   PullInboxResponse,
   SendMessageRequest,
   SendMessageResponse,
+  SetConversationDraftRequest,
+  SetConversationTagsRequest,
   ServerFrame
 } from "@nexusim/protocol";
 
@@ -54,6 +57,9 @@ export interface ConversationAPI {
   ): Promise<CreateConversationResponse>;
   pinConversation(request: PinConversationRequest, session: AuthSession): Promise<ConversationSummary>;
   muteConversation(request: MuteConversationRequest, session: AuthSession): Promise<ConversationSummary>;
+  archiveConversation(request: ArchiveConversationRequest, session: AuthSession): Promise<ConversationSummary>;
+  setConversationTags(request: SetConversationTagsRequest, session: AuthSession): Promise<ConversationSummary>;
+  setConversationDraft(request: SetConversationDraftRequest, session: AuthSession): Promise<ConversationSummary>;
   listConversationMembers(
     request: ListConversationMembersRequest,
     session: AuthSession

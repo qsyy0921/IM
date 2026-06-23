@@ -88,6 +88,21 @@ export interface MuteConversationRequest {
   muted: boolean;
 }
 
+export interface ArchiveConversationRequest {
+  conversationID: ConversationID;
+  archived: boolean;
+}
+
+export interface SetConversationTagsRequest {
+  conversationID: ConversationID;
+  tags: string[];
+}
+
+export interface SetConversationDraftRequest {
+  conversationID: ConversationID;
+  draftText: string;
+}
+
 export type MemberChangeType = "JOIN" | "LEAVE" | "REMOVE" | "ROLE_CHANGED" | "OWNER_TRANSFER" | string;
 export type MemberRole = "OWNER" | "ADMIN" | "MEMBER" | "UNSPECIFIED" | string;
 export type MemberStatus = "ACTIVE" | "LEFT" | "BANNED" | "UNSPECIFIED" | string;
@@ -283,8 +298,12 @@ export interface ConversationSummary {
   lastSeq: number;
   memberVersion: number;
   unreadCount: number;
+  archived: boolean;
   muted: boolean;
   pinned: boolean;
+  tags: string[];
+  draftText: string;
+  draftUpdatedAtMs: number;
   updatedAtMs: number;
 }
 

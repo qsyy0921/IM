@@ -50,7 +50,8 @@ First slice:
   - `android`
 - `api-gateway` now exposes the first client BFF HTTP/JSON surface for login,
   refresh, `me`, conversation list, PullInbox-backed conversation messages,
-  send, ACK, contacts and receipt lookup. The BFF reuses the existing gateway
+  send, ACK, contacts, receipt lookup and conversation summary mutations
+  including pin, mute, archive, tags and draft. The BFF reuses the existing gateway
   facade and injects trusted downstream metadata; it does not read internal
   service tables. The BFF now also has first-stage HTTP route metrics and
   rate-limit adapter wiring, reusing api-gateway's existing rate limiter and
@@ -157,10 +158,13 @@ First slice:
   OWNER / ADMIN management actions; unknown role state remains read-only. The
   group settings area now separates profile, member browsing / role management
   and explicit group actions into permission-aware sections instead of mixing
-  all controls in one block. Conversation pin / mute now uses receipt-service
-  conversation-summary facts through api-gateway BFF and client-core; Web / PC
+  all controls in one block. Conversation pin / mute / archive / tags / draft
+  now use receipt-service conversation-summary facts through api-gateway BFF
+  and client-core; Web / PC
   shell updates the conversation list from the returned server summary rather
-  than marking local-only success. The explicit actions section can now invite
+  than marking local-only success. The Web / PC shell also exposes conversation
+  filters for archived conversations, draft-only conversations and tag lookup.
+  The explicit actions section can now invite
   ACTIVE contacts from a searchable friend picker while excluding members
   already active in the current group; the actual mutation still goes through
   the existing api-gateway BFF conversation member-change endpoint.

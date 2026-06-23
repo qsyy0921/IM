@@ -144,6 +144,9 @@ try {
   assert(missing.executionPolicy.downloadsToolchain === false, "readiness report must not download toolchains");
   assert(missing.executionPolicy.readsSigningProfile === false, "missing report should not declare profile reads");
   assert(missing.executionPolicy.checksExpectedSignerSubject === false, "missing report should not declare signer policy checks");
+  assert(missing.signaturePolicy.expectedSignerSubjectConfigured === false, "missing report should expose absent signer policy");
+  assert(missing.signatureVerification.signaturePolicy.expectedSignerSubjectConfigured === false, "missing signature report should expose absent signer policy");
+  assert(missing.installer.postBuildSignatureVerification.signaturePolicy.expectedSignerSubjectConfigured === false, "missing installer signature report should expose absent signer policy");
 
   const signingReadyUnsigned = buildDesktopSigningReadinessReport({
     manifest: manifestPath,
@@ -181,9 +184,15 @@ try {
   assert(fullyReady.ready.signatureValid === true, "valid fixture should be signature-ready");
   assert(fullyReady.ready.canBuildInstaller === true, "valid fixture should be installer-ready");
   assert(fullyReady.ready.signedInstallerValid === false, "installer signature readiness should wait for an installer artifact");
+  assert(fullyReady.signaturePolicy.expectedSignerSubjectConfigured === true, "readiness report should expose configured signer policy");
+  assert(fullyReady.signaturePolicy.expectedSignerSubjectMatched === true, "readiness report should expose matched signer policy");
   assert(fullyReady.signatureVerification.readyForSignedDistribution === true, "valid expected signer should pass signature verification");
+  assert(fullyReady.signatureVerification.signaturePolicy.expectedSignerSubjectConfigured === true, "signature verification summary should expose signer policy");
+  assert(fullyReady.signatureVerification.signaturePolicy.expectedSignerSubjectMatched === true, "signature verification summary should expose signer match");
   assert(fullyReady.installer.postBuildSignatureVerification.artifactPresent === false, "installer artifact should not be present in exe-only manifest");
   assert(fullyReady.installer.postBuildSignatureVerification.readyForSignedDistribution === false, "missing installer artifact should not be distribution-ready");
+  assert(fullyReady.installer.postBuildSignatureVerification.signaturePolicy.expectedSignerSubjectConfigured === true, "missing installer artifact should still expose configured signer policy");
+  assert(fullyReady.installer.postBuildSignatureVerification.signaturePolicy.expectedSignerSubjectMatched === false, "missing installer artifact should not claim signer match");
   assert(fullyReady.installer.target === "nsis", "installer target should be preserved");
   assert(Array.isArray(fullyReady.installer.commandTemplate?.build), "ready installer command template missing");
   assert(fullyReady.nextActions.length === 1, "ready report should contain a single next action");
@@ -207,6 +216,8 @@ try {
   assert(fullySignedInstaller.ready.signedInstallerValid === true, "valid installer artifact should be installer-signature-ready");
   assert(fullySignedInstaller.installer.postBuildSignatureVerification.artifactPresent === true, "installer artifact should be detected");
   assert(fullySignedInstaller.installer.postBuildSignatureVerification.readyForSignedDistribution === true, "valid installer artifact should be distribution-ready");
+  assert(fullySignedInstaller.installer.postBuildSignatureVerification.signaturePolicy.expectedSignerSubjectConfigured === true, "valid installer artifact should expose configured signer policy");
+  assert(fullySignedInstaller.installer.postBuildSignatureVerification.signaturePolicy.expectedSignerSubjectMatched === true, "valid installer artifact should expose signer match");
   assert(fullySignedInstaller.nextActions.length === 1, "signed installer report should contain a single next action");
   assert(fullySignedInstaller.nextActions[0].includes("release checks passed"), "signed installer report should report completed release checks");
 
@@ -247,6 +258,8 @@ try {
   });
   assert(wrongSignerReport.ready.signatureValid === false, "wrong signer should block signature readiness");
   assert(wrongSignerReport.ready.canBuildInstaller === false, "wrong signer should block installer readiness");
+  assert(wrongSignerReport.signaturePolicy.expectedSignerSubjectConfigured === true, "wrong signer report should expose configured signer policy");
+  assert(wrongSignerReport.signaturePolicy.expectedSignerSubjectMatched === false, "wrong signer report should expose signer mismatch");
   assert(wrongSignerReport.blockers.signature.includes("expected-signer-subject"), "wrong signer should appear in signature blockers");
   assert(wrongSignerReport.blockers.installer.includes("desktop-signature-valid"), "wrong signer should block installer via signature validity");
 
@@ -268,6 +281,8 @@ try {
   assert(cliProfileReport.signing.mode === "pfx", "CLI profile report should use pfx mode");
   assert(cliProfileReport.executionPolicy.readsSigningProfile === true, "CLI profile report should declare profile reads");
   assert(cliProfileReport.executionPolicy.checksExpectedSignerSubject === true, "CLI profile report should declare expected signer checks");
+  assert(cliProfileReport.signaturePolicy.expectedSignerSubjectConfigured === true, "CLI profile report should expose signer policy");
+  assert(cliProfileReport.signaturePolicy.expectedSignerSubjectMatched === false, "CLI profile report should expose signer mismatch for unsigned fixture");
   assert(cliProfileReport.signingExecution.executionPolicy.readsSigningProfile === true, "CLI profile signing execution should declare profile reads");
   assert(cliProfileReport.signingExecution.executionPolicy.expectedSignerSubjectPolicyConfigured === true, "CLI profile signing execution should declare expected signer policy");
   assert(cliProfileReport.signingExecution.executionPolicy.requiresExpectedSignerSubjectAfterSigning === true, "CLI profile signing execution should require signer subject with require-valid");

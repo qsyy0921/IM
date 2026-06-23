@@ -328,7 +328,9 @@ start Docker or download toolchains. It may include low-sensitive local
 the selected path must still be provided through an explicit signing profile,
 CLI argument or environment variable. Its top-level execution policy and nested
 signing execution policy also declare signing profile reads and expected signer
-subject checks when those inputs are provided. If a collected `desktop-installer`
+subject checks when those inputs are provided; the report also exposes
+low-sensitive executable and installer `signaturePolicy` summaries so release
+checks can see whether that public signer policy is configured and matched. If a collected `desktop-installer`
 artifact is available, the report verifies that artifact separately; use
 `--installer-manifest` when the executable baseline and installer artifact live
 in different collected manifests. Unsigned / invalid artifacts stay blocked

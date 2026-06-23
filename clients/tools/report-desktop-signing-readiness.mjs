@@ -73,6 +73,8 @@ export function buildDesktopSigningReadinessReport(options = {}) {
     expectedSignerSubjectContains: options.expectedSignerSubjectContains,
     mockSignatureStatus: options.mockInstallerSignatureStatus ?? options.mockSignatureStatus
   });
+  const signaturePolicy = signaturePolicySummary(signatureVerification, options);
+  const installerSignaturePolicy = signaturePolicySummary(installerSignatureVerification, options);
   const installerArtifactPresent = Boolean(installerSignatureVerification.artifact);
   const report = {
     schemaVersion,
@@ -112,12 +114,14 @@ export function buildDesktopSigningReadinessReport(options = {}) {
       executionBlockers: signingExecution.executionBlockers ?? [],
       nextAction: signingExecution.nextAction
     },
+    signaturePolicy,
     signatureVerification: {
       readyForSignedDistribution: Boolean(signatureVerification.readyForSignedDistribution),
       missing: signatureVerification.missing ?? [],
       status: signatureVerification.signature?.status ?? "UNKNOWN",
       signed: Boolean(signatureVerification.signature?.signed),
       trusted: Boolean(signatureVerification.signature?.trusted),
+      signaturePolicy,
       nextAction: signatureVerification.nextAction
     },
     installer: {
@@ -135,6 +139,7 @@ export function buildDesktopSigningReadinessReport(options = {}) {
         status: installerSignatureVerification.signature?.status ?? "UNKNOWN",
         signed: Boolean(installerSignatureVerification.signature?.signed),
         trusted: Boolean(installerSignatureVerification.signature?.trusted),
+        signaturePolicy: installerSignaturePolicy,
         nextAction: installerArtifactPresent
           ? installerSignatureVerification.nextAction
           : "build and collect a desktop installer artifact before installer signature verification"
@@ -144,6 +149,17 @@ export function buildDesktopSigningReadinessReport(options = {}) {
   };
   assertLowSensitiveReport(report);
   return report;
+}
+
+function signaturePolicySummary(verification, options) {
+  if (verification?.signaturePolicy) {
+    return verification.signaturePolicy;
+  }
+  const expectedSignerSubjectConfigured = Boolean(stringValue(options.expectedSignerSubjectContains));
+  return {
+    expectedSignerSubjectConfigured,
+    expectedSignerSubjectMatched: expectedSignerSubjectConfigured ? false : true
+  };
 }
 
 function nextActions(signingPlan, signatureVerification, installerPlan, installerSignatureVerification) {

@@ -556,7 +556,10 @@ First slice:
   hints, but those hints are never used for readiness; the selected path must
   still be copied into explicit signing config before use. Its top-level
   execution policy and nested signing execution policy declare signing profile
-  reads and expected signer subject checks when those inputs are provided. If the executable
+  reads and expected signer subject checks when those inputs are provided; the
+  report also exposes low-sensitive executable and installer `signaturePolicy`
+  summaries so release checks can see whether that public signer policy is
+  configured and matched. If the executable
   baseline and collected installer artifact are in different manifests, pass
   `--installer-manifest` for the installer signature check. Unsigned or invalid
   artifacts remain blocked until real signatures verify.

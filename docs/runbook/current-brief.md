@@ -60,7 +60,9 @@ Android 后置到用户明确切回。
    但不会使用证书源签名；signing executor 也可读取同一公开策略；其低敏
    execution policy 会声明 profile 读取和 `--require-valid` 下的 signer subject enforcement；
    release readiness report 的 top-level 和 nested signing execution policy 也会声明
-   profile 读取 / signer subject policy 检查，并会对已收集的 `desktop-installer` artifact 做独立 post-build 签名验证；
+   profile 读取 / signer subject policy 检查，并输出低敏 executable / installer
+   `signaturePolicy` 摘要以表明公开 signer policy 是否配置和匹配；同时会对已收集的
+   `desktop-installer` artifact 做独立 post-build 签名验证；
    install plan 会在通过 CLI 或 `NEXUSIM_DESKTOP_SIGN_EXPECTED_SUBJECT`
    传入公开 expected signer subject policy 时声明该检查；
    `build:desktop-installer` 执行后的收集步骤只读取选中 `bundle/<target>` 目录并要求

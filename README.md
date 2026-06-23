@@ -152,8 +152,9 @@ flowchart TB
 
 客户端当前主线是 Web / Windows PC 优先、Android 后置。Web / PC shell 已接账号登录、
 注册、好友申请、好友列表、点击好友发起私聊、群聊列表、建群、点击群聊进入会话、
-群成员添加 / 退群、成员列表、成员搜索 / 角色过滤 / 分页、移除成员、角色变更 / owner transfer 第一路径、
-群资料卡、邀请来源提示、权限感知群设置操作区、群标题 / 头像 URI read-update、
+群成员添加 / 退群、从好友列表邀请入群、成员列表、成员搜索 / 角色过滤 / 分页、
+移除成员、角色变更 / owner transfer 第一路径、群资料卡、邀请来源提示、
+权限感知群设置操作区、群标题 / 头像 URI read-update、
 群头像上传 / 展示 first path、消息列表、
 发送后本地状态刷新、PullInbox 和 ACK。2026-06-23 的
 clean smoke 已验证双用户好友直聊、群聊 first path、群资料 BFF read/update 和群成员动作；
@@ -315,11 +316,11 @@ message / conversation / policy events -> search-service + memory-service projec
 
 | 模块 | 当前状态 |
 | --- | --- |
-| `clients/` | Browser / Windows PC / Android client platform first slice：`protocol`、`client-core`、Web shell、PC desktop shell contract 和 Android runtime contract 已建立并通过 focused validation；`api-gateway` client BFF first-stage HTTP/JSON surface 已落；Web / PC shell 已接账号密码登录、注册、好友列表、好友申请、点击好友发起私聊、群聊列表、建群、点击群聊进入会话、群成员添加 / 退群、成员列表、成员搜索 / 角色过滤 / 分页、移除成员、角色变更 / owner transfer 第一路径、群资料卡、邀请来源提示、权限感知群设置操作区、群标题 / 头像 URI read-update、群头像上传 / 展示 first path、消息列表、发送后本地状态刷新、PullInbox / AckDelivery；真实双用户 direct + group client smoke 已通过；`plan:browser-multiuser-ui-smoke` 可从成功的 `client-web-summary.json` 生成低敏浏览器 / PC 多用户 UI smoke 计划；`smoke:browser-multiuser-ui` 已提供显式 opt-in 的真实浏览器 / PC runner，使用两个隔离 Chromium profile 驱动 sender / receiver 完成直聊、UI 建群、邀请成员、群聊、PullInbox 和 ACK；2026-06-23 已在 clean commit `8782936b` 实跑通过并归档报告；默认 smoke 不启动浏览器；PC standalone exe、package-local README / launcher support files、unsigned local portable zip bundle、desktop installer / signing readiness plans、desktop signing readiness report、显式 `--execute` 门控 signing wrapper、只读 signature verifier、post-build installer 签名验证、显式 `--execute` 门控 installer build 包装器和 Android debug APK baseline 已产出；artifact install / signing / verification / installer plans 已按 `artifactKind` 区分 executable / installer，不把 installer 当作 portable direct-launch 输入，也不把 mixed manifest 里的 installer 当作 MSI / NSIS executable baseline，并且未通过只读 Authenticode 验证的 installer 不会被标为 install-ready。客户端只连 `api-gateway` / `push-gateway`，PullInbox 是消息事实源，WebSocket 只做在线唤醒。 |
+| `clients/` | Browser / Windows PC / Android client platform first slice：`protocol`、`client-core`、Web shell、PC desktop shell contract 和 Android runtime contract 已建立并通过 focused validation；`api-gateway` client BFF first-stage HTTP/JSON surface 已落；Web / PC shell 已接账号密码登录、注册、好友列表、好友申请、点击好友发起私聊、群聊列表、建群、点击群聊进入会话、群成员添加 / 退群、从好友列表邀请入群、成员列表、成员搜索 / 角色过滤 / 分页、移除成员、角色变更 / owner transfer 第一路径、群资料卡、邀请来源提示、权限感知群设置操作区、群标题 / 头像 URI read-update、群头像上传 / 展示 first path、消息列表、发送后本地状态刷新、PullInbox / AckDelivery；真实双用户 direct + group client smoke 已通过；`plan:browser-multiuser-ui-smoke` 可从成功的 `client-web-summary.json` 生成低敏浏览器 / PC 多用户 UI smoke 计划；`smoke:browser-multiuser-ui` 已提供显式 opt-in 的真实浏览器 / PC runner，使用两个隔离 Chromium profile 驱动 sender / receiver 完成直聊、UI 建群、邀请成员、群聊、PullInbox 和 ACK；2026-06-23 已在 clean commit `8782936b` 实跑通过并归档报告；默认 smoke 不启动浏览器；PC standalone exe、package-local README / launcher support files、unsigned local portable zip bundle、desktop installer / signing readiness plans、desktop signing readiness report、显式 `--execute` 门控 signing wrapper、只读 signature verifier、post-build installer 签名验证、显式 `--execute` 门控 installer build 包装器和 Android debug APK baseline 已产出；artifact install / signing / verification / installer plans 已按 `artifactKind` 区分 executable / installer，不把 installer 当作 portable direct-launch 输入，也不把 mixed manifest 里的 installer 当作 MSI / NSIS executable baseline，并且未通过只读 Authenticode 验证的 installer 不会被标为 install-ready。客户端只连 `api-gateway` / `push-gateway`，PullInbox 是消息事实源，WebSocket 只做在线唤醒。 |
 
 当前默认主线不是继续泛化清理 9 服务 P2 backlog，也不是做生产级 HA 长测，而是先把
 Web / Windows PC 客户端的 IM MVP 交互做实：账号注册登录、好友关系、好友私聊、群聊、
-群成员管理第一路径、消息列表、发送、PullInbox / AckDelivery 和局域网可运行体验。本地 / 局域网 Web smoke、
+群成员管理第一路径、从好友列表邀请入群、消息列表、发送、PullInbox / AckDelivery 和局域网可运行体验。本地 / 局域网 Web smoke、
 PC WebView login smoke、真实双用户 direct + group client smoke、PC standalone exe package、
 unsigned local desktop bundle、desktop installer / signing readiness plans、desktop signing readiness report、显式 local signing profile、显式 signing wrapper、只读 signature verifier、post-build installer 签名验证、显式 installer build 包装器、artifactKind-aware install / signing / verification / installer plans、installer install-ready Authenticode gate 和 Android debug APK baseline 已有；`loadtest/clientweb` 已扩展到群资料 BFF read/update、群成员列表、移除、
 角色变更和 owner transfer，并已通过 clean committed 真实 smoke；Web / PC shell 已补
@@ -327,7 +328,7 @@ BFF-backed 成员搜索 / 角色过滤 / 分页，并已有第一版群资料卡
 头像 URI read-update 和群头像上传 / 展示 first path；多用户 UI smoke 已有低敏计划生成器和显式 opt-in 的真实
 浏览器 / PC runner，并已在 2026-06-23 clean commit `8782936b` 实跑通过并归档报告。
 随后继续 Windows PC MSI / NSIS installer 与真实 signing input /
-valid signed artifact、更丰富群设置和真实 media provider 链路。Android 真机
+valid signed artifact、群公告 / 入群审批 / 禁言等更深群设置和真实 media provider 链路。Android 真机
 WebView login smoke 和正式移动端发布链路后置到用户明确切回。
 
 AI 大模型应用底座作为后续主线保留：
@@ -345,8 +346,8 @@ group memory
 ```
 
 下一步默认看 [current-goal.md](docs/runbook/current-goal.md)。截至当前主线，下一步是围绕
-Windows PC MSI / NSIS installer 与真实 signing input / valid signed artifact 继续收口；若继续客户端产品能力，则优先补
-更丰富群设置和真实 media provider 链路。Android APK /
+    Windows PC MSI / NSIS installer 与真实 signing input / valid signed artifact 继续收口；若继续客户端产品能力，则优先补
+群公告 / 入群审批 / 禁言等更深群设置和真实 media provider 链路。Android APK /
 真机 smoke 不作为当前默认阻塞。
 
 ## 不变量
@@ -493,12 +494,12 @@ python -m mypy nexusim_ai_common scripts tests
 - provider-grade OIDC / KMS / HSM / email / SMS / WebAuthn / complete risk engine。
 - provider-grade ReBAC DSL、外部 audit sink、运维 UI、批量 repair 审批系统。
 - 完整 Web / App / 桌面客户端；当前 Web / Windows PC shell 已有账号登录、注册、好友、
-  群聊、群成员添加 / 退群、成员列表、成员搜索 / 角色过滤 / 分页、移除成员、角色变更 / owner transfer、
+  群聊、群成员添加 / 退群、从好友列表邀请入群、成员列表、成员搜索 / 角色过滤 / 分页、移除成员、角色变更 / owner transfer、
   群资料卡、邀请来源提示、权限感知群设置、群标题 / 头像 URI read-update 第一路径以及消息 first path，`api-gateway` client BFF first-stage surface、Web adapters first path、
   本地 / wired LAN smoke、BFF HTTP metrics / rate-limit adapter、PC standalone exe、
   package-local README / launcher support files、unsigned local portable zip bundle、desktop installer / signing readiness plans、desktop signing readiness report、独立 installer profile、显式 signing wrapper、只读 signature verifier、post-build installer 签名验证、显式 installer build 包装器、artifactKind-aware install / signing / verification / installer plans、installer install-ready Authenticode gate、Android debug APK baseline 已落，真实双用户 direct + group client smoke 已通过；仍缺
   真实浏览器 / PC 多用户 UI smoke 已通过；仍缺 Windows signed installer / MSI / NSIS、真实 signing input 和 valid signed artifact、Android 真机 smoke、正式移动端发布链路以及
-  更丰富群设置和真实 media provider 链路。
+  更深群设置和真实 media provider 链路。
 - 完整 media / notification / admin / audit / workflow / control-plane 等产品化平台能力；
   当前这些服务已有 first-stage 路径，但 provider-grade adapter、UI、长周期运维和生产化
   仍未完成。

@@ -496,10 +496,10 @@ baseline 已通过，PC desktop / Android first-stage runtime adapter 已落，P
   且 thin shell actions 已接入 shared login / refresh / restore / logout contract；Windows desktop
   standalone artifact 已产出且 launch sanity smoke 已通过；Web / PC shell 已接注册、
   好友列表、好友申请、好友私聊、群聊列表、建群、会话选择、群成员添加 / 退群、
-  成员列表、移除成员、角色变更 / owner transfer、消息列表、发送后本地状态刷新、
-  群标题 / 头像 URI read-update、PullInbox / ACK 和登录过期清理；真实双用户
+  从好友列表邀请入群、成员列表、移除成员、角色变更 / owner transfer、消息列表、
+  发送后本地状态刷新、群标题 / 头像 URI read-update、PullInbox / ACK 和登录过期清理；真实双用户
   direct + group client smoke 已通过，群成员管理动作 smoke 已通过；下一步继续
-  Windows installer / signing 或更完整群设置与真实 media provider 链路。
+  Windows installer / signing 或群公告 / 入群审批 / 禁言等更深群设置与真实 media provider 链路。
   Android APK / 真机 WebView smoke 后置到用户明确切回；Web IndexedDB
   local store、browser platform adapter、shell config contract 和 target shell Web assets
   prep / artifact builder dry-run / Android builder profile 静态校验已补 first-stage focused tests。

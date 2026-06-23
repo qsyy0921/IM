@@ -29,8 +29,9 @@
 - Windows PC：继续真实 signing input、valid signed artifact、MSI / NSIS installer、
   signed installer experience；当前 `signtool` 可定位，但仍缺代码签名证书和 valid
   Authenticode signature。
-- Web / PC shell：继续更丰富群设置、上传状态 UX 和错误提示；群头像上传 / 展示
-  first path 已接 media-service BFF，不得直接写 conversation-service 私表。
+- Web / PC shell：继续群公告 / 入群审批 / 禁言等更深群设置、上传状态 UX 和错误提示；
+  群头像上传 / 展示 first path 已接 media-service BFF，从好友列表邀请入群已接
+  conversation BFF 成员变更，不得直接写 conversation-service 私表。
 - Desktop runtime：继续真实 UI lifecycle 和 installer / signing 流水线；portable zip
   与 install plan 已有 first-stage 本地路径。
 - Android：后续切回时重新加载 F 盘 toolchain env 或显式 Docker builder，再跑 APK /

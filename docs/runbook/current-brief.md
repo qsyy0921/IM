@@ -40,8 +40,8 @@ Android 后置到用户明确切回。
 ## 当前短线
 
 1. Web / Windows PC 客户端继续收口：登录、注册、好友申请、好友私聊、群聊、
-   群成员管理、权限感知群设置、群资料、群头像上传 / 展示 first path、消息列表、
-   发送、PullInbox 和 ACK。
+   群成员管理、从好友列表邀请入群、权限感知群设置、群资料、群头像上传 / 展示
+   first path、消息列表、发送、PullInbox 和 ACK。
 2. 已有 clean smoke 覆盖双用户好友直聊、群聊 first path、群资料 BFF
    read/update 和群成员动作；当前群头像上传 / 展示已接 BFF -> media-service ->
    profile update / download URL 的本地 first path；详细证据见 `client-platform.md` 与

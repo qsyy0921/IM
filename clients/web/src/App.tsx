@@ -77,6 +77,8 @@ export function App() {
   const [composerText, setComposerText] = useState("");
   const [newGroupName, setNewGroupName] = useState("");
   const [groupInviteUserID, setGroupInviteUserID] = useState("");
+  const [groupInviteContactQuery, setGroupInviteContactQuery] = useState("");
+  const [groupInviteStatus, setGroupInviteStatus] = useState("");
   const [groupMembers, setGroupMembers] = useState<ConversationMember[]>([]);
   const [groupMembersConversationID, setGroupMembersConversationID] = useState("");
   const [groupSelfMember, setGroupSelfMember] = useState<ConversationMember | null>(null);
@@ -822,17 +824,18 @@ export function App() {
     });
   }
 
-  async function inviteGroupMember(): Promise<void> {
+  async function inviteGroupMember(targetUserIDInput?: string): Promise<void> {
     await run("invite group member", async () => {
       const currentSession = requireSession();
       const conversation = requireActiveGroupConversation();
       if (!canManageActiveGroup) {
         throw new Error("only group owner or admin can invite members");
       }
-      const targetUserID = groupInviteUserID.trim();
+      const targetUserID = (targetUserIDInput ?? groupInviteUserID).trim();
       if (!targetUserID) {
         throw new Error("target user id is required");
       }
+      setGroupInviteStatus("");
       const result = await runtime.bff.inviteConversationMember(
         {
           conversationID: conversation.conversationID,
@@ -842,7 +845,11 @@ export function App() {
         },
         currentSession
       );
-      setGroupInviteUserID("");
+      if (targetUserIDInput === undefined) {
+        setGroupInviteUserID("");
+      }
+      setGroupInviteContactQuery("");
+      setGroupInviteStatus(`已邀请 ${targetUserID}`);
       updateConversationMemberVersion(result.conversationID, result.memberVersion);
       await loadGroupSelfMember(result.conversationID, currentSession);
       await loadGroupMembers(result.conversationID, currentSession);
@@ -1366,6 +1373,29 @@ export function App() {
   const visibleContacts = contacts
     .filter(contact => contact.status !== "DELETED")
     .sort((left, right) => contactDisplayName(left).localeCompare(contactDisplayName(right)));
+  const activeGroupMemberIDs = new Set(
+    groupMembersForActive.filter(member => member.status === "ACTIVE").map(member => member.userID)
+  );
+  const normalizedInviteContactQuery = groupInviteContactQuery.trim().toLowerCase();
+  const groupInviteContactCandidates = visibleContacts.filter(contact => {
+    if (contact.status !== "ACTIVE") {
+      return false;
+    }
+    if (contact.contactUserID === session?.userID || activeGroupMemberIDs.has(contact.contactUserID)) {
+      return false;
+    }
+    if (!normalizedInviteContactQuery) {
+      return true;
+    }
+    const displayName = contactDisplayName(contact).toLowerCase();
+    const userID = contact.contactUserID.toLowerCase();
+    const groupName = contact.groupName.toLowerCase();
+    return (
+      displayName.includes(normalizedInviteContactQuery) ||
+      userID.includes(normalizedInviteContactQuery) ||
+      groupName.includes(normalizedInviteContactQuery)
+    );
+  });
   const latestMessageSeq = messages.reduce((max, message) => Math.max(max, message.conversationSeq), 0);
   const nativeMetadata = desktopNativeMetadata ?? androidNativeMetadata;
 
@@ -2086,6 +2116,61 @@ export function App() {
                     邀请来源：当前群 {compactConversationID(activeGroupConversation.conversationID)}
                   </span>
                 </form>
+                <div className="group-invite-picker" data-testid="group-invite-contact-picker">
+                  <div className="group-invite-picker-header">
+                    <div>
+                      <strong>从好友邀请</strong>
+                      <span>只显示当前 ACTIVE 好友，并排除已在群内的成员。</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => void run("load contacts", () => loadContacts())}
+                      disabled={!session}
+                    >
+                      刷新好友
+                    </button>
+                  </div>
+                  <input
+                    data-testid="group-invite-contact-query"
+                    placeholder="搜索好友备注 / 用户 ID / 分组"
+                    value={groupInviteContactQuery}
+                    onChange={event => setGroupInviteContactQuery(event.target.value)}
+                    disabled={!session || !canManageActiveGroup}
+                  />
+                  {groupInviteStatus ? (
+                    <div className="group-invite-status" data-testid="group-invite-status">
+                      {groupInviteStatus}
+                    </div>
+                  ) : null}
+                  <div className="group-invite-contact-list">
+                    {groupInviteContactCandidates.length === 0 ? (
+                      <div className="mini-empty" data-testid="group-invite-contact-empty">
+                        暂无可邀请好友
+                      </div>
+                    ) : null}
+                    {groupInviteContactCandidates.map(contact => (
+                      <article className="group-invite-contact-item" key={contact.contactUserID}>
+                        <span className="conversation-avatar">{contactLabel(contact)}</span>
+                        <span className="conversation-copy">
+                          <strong>{contactDisplayName(contact)}</strong>
+                          <small>
+                            {contact.contactUserID}
+                            {contact.groupName ? ` · ${contact.groupName}` : ""}
+                          </small>
+                        </span>
+                        <button
+                          data-testid="group-invite-contact-submit"
+                          data-contact-user-id={contact.contactUserID}
+                          type="button"
+                          onClick={() => void inviteGroupMember(contact.contactUserID)}
+                          disabled={!session || !canManageActiveGroup}
+                        >
+                          邀请
+                        </button>
+                      </article>
+                    ))}
+                  </div>
+                </div>
                 <button
                   data-testid="group-leave-submit"
                   className="danger-inline-button"

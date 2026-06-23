@@ -982,6 +982,101 @@ button {
   color: #ffffff;
 }
 
+.group-invite-picker {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  border: 1px solid #d8e0e4;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 10px;
+}
+
+.group-invite-picker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+.group-invite-picker-header div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.group-invite-picker-header strong {
+  color: #172126;
+  font-size: 13px;
+}
+
+.group-invite-picker-header span {
+  color: #6b7a83;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.group-invite-picker-header button,
+.group-invite-contact-item button {
+  border: 0;
+  border-radius: 8px;
+  background: #e8f6f0;
+  color: #08724f;
+  padding: 7px 9px;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.group-invite-picker input {
+  min-width: 0;
+  border: 1px solid #cbd6dc;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #182126;
+  outline: 0;
+  padding: 8px 10px;
+}
+
+.group-invite-status {
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  background: #effef5;
+  color: #08724f;
+  padding: 7px 9px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.group-invite-contact-list {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.group-invite-contact-item {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  border: 1px solid #edf1f3;
+  border-radius: 8px;
+  background: #f8fafb;
+  padding: 8px;
+}
+
+.group-invite-contact-item .conversation-avatar {
+  width: 36px;
+  height: 36px;
+  font-size: 13px;
+}
+
+.group-invite-contact-item .conversation-copy {
+  min-width: 0;
+}
+
 .danger-inline-button {
   background: #fff1f2;
   color: #9f1239;

@@ -615,6 +615,8 @@ First slice:
   selected target's `desktop-installer` artifacts from the matching
   `bundle/<target>` output directory. It still fails closed while installer
   readiness, signing input readiness or executable signature validity is false.
+  It accepts the same explicit public `--expected-signer-subject` policy as the
+  installer plan.
   Its execution policy mirrors the installer plan's profile-read and
   signer-policy declarations, and declares that `--execute` collects installer
   artifacts and writes the collected artifact manifest.

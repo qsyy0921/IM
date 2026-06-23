@@ -347,7 +347,8 @@ then collects only `desktop-installer` artifacts from the matching
 `bundle/<target>` output directory when run with `--execute` and the installer
 plan is ready; otherwise it fails closed and prints the missing readiness gates.
 It does not sign artifacts, install installers, launch the app, start services
-or download toolchains. Its execution policy mirrors the installer plan's
+or download toolchains. It accepts the same explicit public
+`--expected-signer-subject` policy as the installer plan. Its execution policy mirrors the installer plan's
 profile-read and signer-policy declarations, and declares that `--execute`
 collects installer artifacts and writes the collected artifact manifest.
 After collection, `plan:artifact-install` still blocks manual installer

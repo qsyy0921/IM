@@ -179,7 +179,9 @@ try {
     "--cert-file",
     fakePfx,
     "--timestamp-url",
-    "https://timestamp.example.test"
+    "https://timestamp.example.test",
+    "--expected-signer-subject",
+    "NexusIM"
   ], {
     ...pfxFixture.env
   });
@@ -187,6 +189,7 @@ try {
   assert(cliPlan.missing.includes("desktop-signature-valid"), "CLI dry-run should report signature readiness");
   assert(cliPlan.executionPolicy.planOnly === true, "CLI default should be plan-only");
   assert(cliPlan.executionPolicy.executesBuildCommand === false, "CLI default should not execute build");
+  assert(cliPlan.executionPolicy.checksExpectedSignerSubject === true, "CLI explicit expected signer policy should be declared");
   assert(cliPlan.commands.build.includes("--config"), "CLI dry-run should expose the Tauri config argument");
 
   const cliProfilePlan = runBuilder([

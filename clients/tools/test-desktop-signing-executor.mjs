@@ -90,6 +90,9 @@ try {
       source: "pfx-file",
       certFile: fakePfx,
       pfxPassEnv: pfxFixture.pfxPassEnv
+    },
+    signature: {
+      expectedSignerSubjectContains: "NexusIM"
     }
   }, null, 2)}\n`);
 
@@ -145,6 +148,9 @@ try {
   });
   assert(cliProfilePlan.readyToSign === true, "CLI signing profile dry-run should be ready");
   assert(cliProfilePlan.executionPolicy.executesSignCommand === false, "CLI signing profile dry-run should not execute signing");
+  assert(cliProfilePlan.executionPolicy.readsSigningProfile === true, "executor should declare profile reads");
+  assert(cliProfilePlan.executionPolicy.expectedSignerSubjectPolicyConfigured === true, "executor should declare expected signer policy from profile");
+  assert(cliProfilePlan.executionPolicy.requiresExpectedSignerSubjectAfterSigning === false, "executor should only enforce signer policy with --require-valid");
   assert(cliProfilePlan.signingPlan.signing.certificate.pfxPassEnv === pfxFixture.pfxPassEnv, "executor should preserve profile pfx pass env");
   assert(!JSON.stringify(cliProfilePlan).includes(tempRoot), "CLI signing profile dry-run leaked absolute temp path");
 
@@ -164,6 +170,21 @@ try {
   assert(cliRequireValidPlan.readyToSign === true, "require-valid CLI dry-run should still be ready to sign");
   assert(cliRequireValidPlan.executionPolicy.requiresValidSignatureAfterSigning === true, "require-valid dry-run should declare valid-signature requirement");
   assert(cliRequireValidPlan.executionPolicy.verifiesSignatureAfterSigning === false, "require-valid dry-run must not verify before execute");
+
+  const cliProfileRequireValidPlan = runSigner([
+    "--require-valid",
+    "--manifest",
+    manifestPath,
+    "--signing-profile",
+    signingProfile
+  ], {
+    ...pfxFixture.env
+  });
+  assert(cliProfileRequireValidPlan.readyToSign === true, "require-valid profile dry-run should still be ready to sign");
+  assert(cliProfileRequireValidPlan.executionPolicy.readsSigningProfile === true, "require-valid profile dry-run should declare profile reads");
+  assert(cliProfileRequireValidPlan.executionPolicy.requiresValidSignatureAfterSigning === true, "require-valid profile dry-run should require signature verification");
+  assert(cliProfileRequireValidPlan.executionPolicy.expectedSignerSubjectPolicyConfigured === true, "require-valid profile dry-run should declare expected signer policy");
+  assert(cliProfileRequireValidPlan.executionPolicy.requiresExpectedSignerSubjectAfterSigning === true, "require-valid profile dry-run should enforce signer policy after signing");
 
   const installer = "fake desktop installer bytes";
   writeFileSync(join(collectedDir, "nexusim-windows-desktop-installer.msi"), installer);

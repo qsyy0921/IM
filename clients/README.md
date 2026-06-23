@@ -298,6 +298,8 @@ of relying on the default executable path. It does not install artifacts, launch
 the app, start services or download toolchains. Release signing can add
 `--require-valid`; in that mode the wrapper reruns read-only Authenticode
 verification after signing and fails closed unless the collected artifact is valid.
+The dry-run `executionPolicy` declares when a signing profile is read and when
+`--require-valid` also enforces the profile's public signer subject policy.
 `verify:desktop-signature` is the read-only verification wrapper after signing.
 It reads the collected desktop manifest for the requested `artifactKind`,
 validates the selected artifact hash and reads Windows Authenticode public

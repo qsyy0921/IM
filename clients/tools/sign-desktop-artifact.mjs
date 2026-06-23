@@ -65,9 +65,12 @@ export function buildSigningOutput(plan, options = {}) {
       downloadsToolchain: false,
       readsCollectedArtifactManifest: true,
       readsSigningConfig: true,
+      readsSigningProfile: Boolean(options.signingProfile),
       validatesArtifactHashes: true,
       readsAuthenticodeSignature: Boolean(options.requireValid),
       requiresValidSignatureAfterSigning: Boolean(options.requireValid),
+      expectedSignerSubjectPolicyConfigured: Boolean(options.expectedSignerSubjectContains),
+      requiresExpectedSignerSubjectAfterSigning: Boolean(options.requireValid && options.expectedSignerSubjectContains),
       verifiesSignatureAfterSigning: execute && readyToExecuteSigning && Boolean(options.requireValid)
     },
     commandTemplate: plan.commandTemplate,

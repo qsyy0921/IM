@@ -583,7 +583,9 @@ First slice:
   artifacts out of the portable launcher path, so `plan:shell-smoke` only marks
   Windows direct shell smoke ready for `desktop-executable` artifacts. It also
   keeps installer install readiness blocked until the collected installer
-  verifies as Authenticode-valid.
+  verifies as Authenticode-valid, and `plan:shell-smoke` now carries that
+  installer signature summary forward so shell-smoke preflight can show whether
+  the blocker is unsigned / unverifiable installer state.
   `build:desktop-installer` is the explicit execution wrapper over that plan.
   Its default output is plan-only; `--execute` is required before it runs Tauri
   with the explicit bundle target and installer profile, then collects the

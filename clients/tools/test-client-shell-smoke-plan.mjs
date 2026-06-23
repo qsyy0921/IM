@@ -273,7 +273,14 @@ const installerOnlyPlan = buildClientShellSmokePlan({
           artifactKind: "desktop-installer",
           artifactHint: "clients/artifacts/run/nexusim-windows-desktop-installer.msi"
         },
-        installMode: "signed-installer"
+        installMode: "signed-installer",
+        installerSignatureVerification: {
+          readyForSignedDistribution: true,
+          missing: [],
+          status: "Valid",
+          signed: true,
+          trusted: true
+        }
       },
       android: collectedInstallPlan.targets.android
     }
@@ -281,10 +288,43 @@ const installerOnlyPlan = buildClientShellSmokePlan({
 });
 assert(installerOnlyPlan.targets["windows-desktop"].artifact.collectedArtifactReady === true, "desktop installer artifact should remain collected");
 assert(installerOnlyPlan.targets["windows-desktop"].install.artifactKind === "desktop-installer", "desktop installer kind should be exposed");
+assert(installerOnlyPlan.targets["windows-desktop"].install.installerSignatureVerification.status === "Valid", "desktop installer signature status should be exposed");
 assert(installerOnlyPlan.targets["windows-desktop"].readyForManualShellSmoke === false, "desktop installer should not be direct shell-smoke ready");
 assert(installerOnlyPlan.targets["windows-desktop"].checklist.some(item => item.step === "install-signed-desktop-installer-before-shell-smoke"), "desktop installer pre-smoke install step missing");
 assert(!installerOnlyPlan.targets["windows-desktop"].checklist.some(item => item.step === "launch-desktop-artifact-smoke"), "desktop installer should not add direct launch smoke step");
 assert(installerOnlyPlan.targets["windows-desktop"].notes.some(note => note.includes("installer")), "desktop installer note missing");
+
+const unsignedInstallerShellPlan = buildClientShellSmokePlan({
+  readiness: readyReadiness,
+  artifactPlan: noBuildOutputArtifactPlan,
+  installPlan: {
+    targets: {
+      "windows-desktop": {
+        ...collectedInstallPlan.targets["windows-desktop"],
+        readyForInstall: false,
+        missing: ["valid-authenticode-signature"],
+        artifact: {
+          artifactKind: "desktop-installer",
+          artifactHint: "clients/artifacts/run/nexusim-windows-desktop-installer.msi"
+        },
+        installMode: "signed-installer",
+        installerSignatureVerification: {
+          readyForSignedDistribution: false,
+          missing: ["valid-authenticode-signature"],
+          status: "NotSigned",
+          signed: false,
+          trusted: false
+        }
+      },
+      android: collectedInstallPlan.targets.android
+    }
+  }
+});
+assert(unsignedInstallerShellPlan.targets["windows-desktop"].readyForManualShellSmoke === false, "unsigned installer must not be shell-smoke ready");
+assert(unsignedInstallerShellPlan.targets["windows-desktop"].install.installerSignatureVerification.status === "NotSigned", "unsigned installer signature status should be exposed");
+assert(unsignedInstallerShellPlan.targets["windows-desktop"].checklist.some(item => item.step === "resolve-install-prereqs"), "unsigned installer should require resolving install prereqs");
+assert(!unsignedInstallerShellPlan.targets["windows-desktop"].checklist.some(item => item.step === "install-signed-desktop-installer-before-shell-smoke"), "unsigned installer should not expose install step before signature validity");
+assert(unsignedInstallerShellPlan.targets["windows-desktop"].notes.some(note => note.includes("Authenticode-valid")), "unsigned installer should include an Authenticode note");
 
 console.log("client shell smoke plan ok");
 

@@ -163,7 +163,8 @@ function installStatusFor(target, installPlan) {
     installPrereqs: targetPlan.installPrereqs ?? {},
     artifactHint: targetPlan.artifact?.artifactHint ?? "",
     artifactKind: targetPlan.artifact?.artifactKind ?? "",
-    installMode: targetPlan.installMode ?? ""
+    installMode: targetPlan.installMode ?? "",
+    installerSignatureVerification: targetPlan.installerSignatureVerification ?? null
   };
 }
 
@@ -432,6 +433,14 @@ function nativeNotes(target, readinessTarget, artifactStatus, installStatus) {
   }
   if (installStatus.artifactReady && !installStatus.readyForInstall) {
     notes.push("A collected artifact exists, but the install plan still reports missing install-side prerequisites.");
+  }
+  if (
+    target === "windows-desktop" &&
+    installStatus.artifactKind === "desktop-installer" &&
+    !installStatus.readyForInstall &&
+    installStatus.missing.some(item => item === "valid-authenticode-signature" || item === "windows-authenticode")
+  ) {
+    notes.push("Collected desktop installer must verify as Authenticode-valid before install or shell smoke.");
   }
   if (target === "windows-desktop" && installStatus.artifactKind === "desktop-installer") {
     notes.push("Collected desktop artifact is an installer; direct desktop launch smoke requires a desktop-executable artifact or a completed signed installer install path.");

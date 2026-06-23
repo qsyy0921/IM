@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "nexusim.desktop-signing-profile.v1",
+  "signToolPath": "<local-signtool.exe>",
+  "timestampURL": "https://timestamp.example.test",
+  "signature": {
+    "expectedSignerSubjectContains": "NexusIM"
+  },
+  "certificate": {
+    "source": "windows-cert-store",
+    "certSHA1": "00112233445566778899AABBCCDDEEFF00112233"
+  }
+}

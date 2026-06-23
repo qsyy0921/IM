@@ -48,7 +48,8 @@ Android 后置到用户明确切回。
    installer 工具已支持显式 local signing profile 输入，并有只读 release readiness
    report 汇总签名输入、低敏 `signtool` 候选提示、签名验证和 installer 阻塞；
    候选工具不会自动用于 readiness；timestamp URL 禁止携带账号密码、query 或
-   fragment；PFX 输入会做只读可读性 / signing key / 过期检查；Windows cert-store
+   fragment；仓库已有 PFX 和 Windows cert-store 两个低敏 signing profile 示例；
+   PFX 输入会做只读可读性 / signing key / 过期检查；Windows cert-store
    thumbprint 会做只读本机证书 / signing key / 过期检查；profile 可声明预期公开
    signer subject，valid signature 必须匹配该发布者策略；release readiness report
    也会对已收集的 `desktop-installer` artifact 做独立 post-build 签名验证；

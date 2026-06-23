@@ -9,6 +9,7 @@ import {
   readDesktopSigningProfile,
   signingProfileEnv
 } from "./desktop-signing-profile.mjs";
+import { workspaceRoot } from "./client-build-env.mjs";
 
 function assert(condition, message) {
   if (!condition) {
@@ -109,6 +110,16 @@ try {
   assert(parsedStore.certFile === "", "store profile must not set pfx file");
   assert(parsedStore.certSHA1 === "AABBCCDDEEFF00112233445566778899AABBCCDD", "store thumbprint should normalize");
   assert(parsedStore.pfxPassEnv === defaultPfxPassEnv, "store profile should keep default pfx env for uniform output");
+
+  const examplePfx = readDesktopSigningProfile(join(workspaceRoot, "desktop", "signing-profile.pfx.example.json"));
+  assert(examplePfx.certFile === "<local-nexusim-code-signing.pfx>", "pfx example should point at a local pfx file placeholder");
+  assert(examplePfx.pfxPassEnv === defaultPfxPassEnv, "pfx example should use the standard env name");
+  assert(examplePfx.expectedSignerSubjectContains === "NexusIM", "pfx example should declare public signer subject policy");
+
+  const exampleStore = readDesktopSigningProfile(join(workspaceRoot, "desktop", "signing-profile.cert-store.example.json"));
+  assert(exampleStore.certFile === "", "cert-store example must not set pfx file");
+  assert(exampleStore.certSHA1 === "00112233445566778899AABBCCDDEEFF00112233", "cert-store example should normalize thumbprint");
+  assert(exampleStore.expectedSignerSubjectContains === "NexusIM", "cert-store example should declare public signer subject policy");
 
   const badSchema = join(tempRoot, "bad-schema.json");
   writeProfile(badSchema, {

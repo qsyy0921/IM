@@ -270,7 +270,11 @@ Windows certificate-store thumbprint, `signtool`, timestamp URL and the name of
 the PFX password environment variable. It must not contain certificate
 passwords, private key material or provider credentials. The timestamp URL must
 be plain `http` / `https` without embedded credentials, query string or
-fragment. When a PFX file is used, the plan performs a read-only local PFX check
+fragment. Low-sensitive templates are checked in as
+`clients/desktop/signing-profile.pfx.example.json` and
+`clients/desktop/signing-profile.cert-store.example.json`; copy one to a local
+untracked profile and replace only the local paths / thumbprint / timestamp
+policy before use. When a PFX file is used, the plan performs a read-only local PFX check
 with the named environment variable and remains not ready unless the PFX can be
 read, has a usable signing key and is not expired. When a Windows
 certificate-store thumbprint is used, the plan performs a read-only local

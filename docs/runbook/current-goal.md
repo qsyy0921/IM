@@ -37,6 +37,8 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   工具已支持显式 local signing profile 输入，并有只读 release readiness report 汇总
   签名输入、低敏 `signtool` 候选提示、签名验证和 installer 阻塞；候选工具不会
   自动用于 readiness；timestamp URL 禁止携带账号密码、query 或 fragment；
+  仓库已有 PFX 和 Windows cert-store 两个低敏 signing profile 示例，实际发布时需复制成
+  untracked 本机 profile 并填入真实本机路径 / thumbprint；
   PFX 输入会做只读可读性 / signing key / 过期检查；Windows cert-store thumbprint
   会做只读本机证书 / signing key / 过期检查；profile 可声明预期公开 signer subject，
   valid signature 必须匹配该发布者策略；release readiness report 也会对已收集的

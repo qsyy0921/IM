@@ -520,7 +520,12 @@ First slice:
   thumbprint plus a timestamp URL and PFX password environment variable name; it
   must not contain certificate passwords, private key material or provider
   credentials. The timestamp URL must be plain `http` / `https` without
-  embedded credentials, query string or fragment. When a PFX file is used, the
+  embedded credentials, query string or fragment. The repository now includes
+  low-sensitive example profiles:
+  `clients/desktop/signing-profile.pfx.example.json` and
+  `clients/desktop/signing-profile.cert-store.example.json`; copy one to a
+  local untracked profile and replace only local paths / thumbprint / timestamp
+  policy before use. When a PFX file is used, the
   plan performs a read-only local PFX check with the named environment variable
   and remains not ready unless the PFX can be read, has a usable signing key and
   is not expired. When a Windows certificate-store thumbprint is used, the plan

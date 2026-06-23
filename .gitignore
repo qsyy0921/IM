@@ -38,6 +38,8 @@ clients/**/.vite/
 clients/android/native/app/src/main/assets/nexusim/
 clients/desktop/src-tauri/gen/
 clients/desktop/src-tauri/target/
+clients/desktop/signing-profile*.json
+!clients/desktop/signing-profile*.example.json
 clients/android/native/.gradle/
 clients/android/native/app/build/
 clients/artifacts/

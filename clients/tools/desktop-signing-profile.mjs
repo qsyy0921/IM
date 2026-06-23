@@ -53,17 +53,36 @@ export function readDesktopSigningProfile(profilePath) {
   if (source === "windows-cert-store" && (!certSHA1 || certFile)) {
     throw new Error("desktop signing profile cert-store certificate invalid");
   }
+  const timestampURL = stringValue(profile.timestampURL);
+  if (timestampURL && !isSafeTimestampURL(timestampURL)) {
+    throw new Error("desktop signing profile timestamp URL invalid");
+  }
   const pfxPassEnv = stringValue(certificate.pfxPassEnv || defaultPfxPassEnv);
   if (!pfxPassEnv.match(/^[A-Z][A-Z0-9_]{2,}$/)) {
     throw new Error("desktop signing profile pfx pass env invalid");
   }
   return {
     signToolPath: stringValue(profile.signToolPath),
-    timestampURL: stringValue(profile.timestampURL),
+    timestampURL,
     certFile,
     certSHA1,
     pfxPassEnv
   };
+}
+
+export function isSafeTimestampURL(value) {
+  try {
+    const parsed = new URL(value);
+    return (
+      (parsed.protocol === "http:" || parsed.protocol === "https:") &&
+      parsed.username === "" &&
+      parsed.password === "" &&
+      parsed.search === "" &&
+      parsed.hash === ""
+    );
+  } catch {
+    return false;
+  }
 }
 
 function withPfxEnvPresence(options, env) {

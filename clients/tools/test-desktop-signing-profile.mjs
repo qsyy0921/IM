@@ -5,6 +5,7 @@ import {
   applyDesktopSigningProfile,
   defaultPfxPassEnv,
   desktopSigningProfileSchema,
+  isSafeTimestampURL,
   readDesktopSigningProfile,
   signingProfileEnv
 } from "./desktop-signing-profile.mjs";
@@ -55,6 +56,9 @@ try {
   assert(parsedPfx.certFile === fakePfx, "pfx profile cert file should parse");
   assert(parsedPfx.certSHA1 === "", "pfx profile must not set cert-store thumbprint");
   assert(parsedPfx.pfxPassEnv === "NEXUSIM_TEST_DESKTOP_PFX_PASS", "pfx profile env should parse");
+  assert(isSafeTimestampURL("https://timestamp.example.test/path"), "safe timestamp URL should pass");
+  assert(!isSafeTimestampURL("https://timestamp.example.test/path?token=abc"), "timestamp URL query should fail closed");
+  assert(!isSafeTimestampURL("https://user:pass@timestamp.example.test"), "timestamp URL credentials should fail closed");
 
   const mergedPfx = applyDesktopSigningProfile({ signingProfile: pfxProfile }, {
     NEXUSIM_TEST_DESKTOP_PFX_PASS: "present"
@@ -132,6 +136,19 @@ try {
     }
   });
   expectError(() => readDesktopSigningProfile(badEnv), "pfx pass env invalid");
+
+  const unsafeTimestamp = join(tempRoot, "unsafe-timestamp.json");
+  writeProfile(unsafeTimestamp, {
+    schemaVersion: desktopSigningProfileSchema,
+    signToolPath: fakeSignTool,
+    timestampURL: "https://timestamp.example.test/path?token=do-not-store",
+    certificate: {
+      source: "pfx-file",
+      certFile: fakePfx,
+      pfxPassEnv: "NEXUSIM_TEST_DESKTOP_PFX_PASS"
+    }
+  });
+  expectError(() => readDesktopSigningProfile(unsafeTimestamp), "timestamp URL invalid");
 
   const sensitiveField = join(tempRoot, "sensitive-field.json");
   writeProfile(sensitiveField, {

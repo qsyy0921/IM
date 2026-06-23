@@ -262,7 +262,9 @@ profile through `--signing-profile <profile.json>` or
 `NEXUSIM_DESKTOP_SIGNING_PROFILE`. The profile may reference a local PFX file or
 Windows certificate-store thumbprint, `signtool`, timestamp URL and the name of
 the PFX password environment variable. It must not contain certificate
-passwords, private key material or provider credentials.
+passwords, private key material or provider credentials. The timestamp URL must
+be plain `http` / `https` without embedded credentials, query string or
+fragment.
 `sign:desktop-artifact` is the explicit execution wrapper for that plan. By
 default it is also plan-only and prints a low-sensitive execution policy. It
 only invokes `signtool` when run with `--execute` and when the collected desktop

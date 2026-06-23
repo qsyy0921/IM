@@ -172,6 +172,17 @@ try {
   assert(invalidTimestamp.readyToSign === false, "invalid timestamp URL should not be ready");
   assert(invalidTimestamp.missing.includes("timestamp-url-valid"), "invalid timestamp should be reported");
 
+  const timestampWithQuery = buildDesktopSigningPlan({
+    manifest: manifestPath,
+    signToolPath: fakeSignTool,
+    certFile: fakePfx,
+    timestampURL: "https://timestamp.example.test/path?token=do-not-store",
+    pfxPassEnvPresent: true
+  });
+  assert(timestampWithQuery.readyToSign === false, "timestamp URL with query should not be ready");
+  assert(timestampWithQuery.missing.includes("timestamp-url-valid"), "timestamp query should be reported");
+  assert(!JSON.stringify(timestampWithQuery).includes("do-not-store"), "unsafe timestamp query must not be echoed");
+
   const installer = "fake desktop installer bytes";
   writeFileSync(join(collectedDir, "nexusim-windows-desktop-installer.msi"), installer);
   const mixedManifest = {

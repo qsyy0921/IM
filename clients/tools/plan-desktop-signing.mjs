@@ -3,7 +3,12 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { workspaceRoot } from "./client-build-env.mjs";
-import { applyDesktopSigningProfile, defaultPfxPassEnv, signingProfileEnv } from "./desktop-signing-profile.mjs";
+import {
+  applyDesktopSigningProfile,
+  defaultPfxPassEnv,
+  isSafeTimestampURL,
+  signingProfileEnv
+} from "./desktop-signing-profile.mjs";
 
 const schemaVersion = "nexusim.desktop-signing-plan.v1";
 const artifactManifestSchema = "nexusim.client-artifacts.v1";
@@ -99,9 +104,10 @@ function signingConfig(options) {
   }
 
   const timestampURL = stringValue(options.timestampURL);
+  const timestampURLSafe = timestampURL ? isSafeTimestampURL(timestampURL) : false;
   if (!timestampURL) {
     missing.push("timestamp-url");
-  } else if (!isHTTPURL(timestampURL)) {
+  } else if (!timestampURLSafe) {
     missing.push("timestamp-url-valid");
   }
 
@@ -162,7 +168,8 @@ function signingConfig(options) {
     certificate,
     timestamp: {
       configured: Boolean(timestampURL),
-      url: timestampURL
+      valid: timestampURLSafe,
+      url: timestampURLSafe ? timestampURL : ""
     }
   };
 }
@@ -400,15 +407,6 @@ function assertLowSensitivePlan(plan) {
 
 function normalizeThumbprint(value) {
   return stringValue(value).replace(/\s+/g, "").toUpperCase();
-}
-
-function isHTTPURL(value) {
-  try {
-    const parsed = new URL(value);
-    return parsed.protocol === "http:" || parsed.protocol === "https:";
-  } catch {
-    return false;
-  }
 }
 
 function unique(values) {

@@ -44,7 +44,11 @@ Android 后置到用户明确切回。
 2. 已有 clean smoke 覆盖双用户好友直聊、群聊 first path、群资料 BFF
    read/update 和群成员动作；详细证据见 `client-platform.md` 与
    `loadtest/clientweb` 报告。
-3. Windows desktop 已有本地 artifact / signing / installer plan first paths；签名 /
+3. `plan:browser-multiuser-ui-smoke` 已可从成功的 `client-web-summary.json` 生成
+   低敏浏览器 / PC 多用户 UI smoke 计划，覆盖直聊、群聊、群设置和稳定 selector；
+   它不保存密码或 token，也不宣称真实浏览器自动化已跑。下一步是把该计划跑成
+   真实浏览器 / PC UI run。
+4. Windows desktop 已有本地 artifact / signing / installer plan first paths；签名 /
    installer 工具已支持显式 local signing profile 输入，并有只读 release readiness
    report 汇总签名输入、低敏 `signtool` 候选提示、签名验证和 installer 阻塞；
    候选工具不会自动用于 readiness；timestamp URL 禁止携带账号密码、query 或
@@ -72,9 +76,9 @@ Android 后置到用户明确切回。
    manifest 写入；installer plan 的 signing summary 也会携带低敏 `signaturePolicy`；
    下一步仍是真实证书输入、
    valid signed artifact 和 MSI / NSIS installer 体验。
-4. 所有客户端能力只走 api-gateway BFF 和 push-gateway，不直连内部服务。
-5. 新功能先做简短架构分析再编码；新增服务 / 中间件 / provider 必须归属正确平台层并同步 owner docs。
-6. 不引入隐藏 fallback；开发相关路径时清理旧 fallback-like 分支，无法本轮清理的写入
+5. 所有客户端能力只走 api-gateway BFF 和 push-gateway，不直连内部服务。
+6. 新功能先做简短架构分析再编码；新增服务 / 中间件 / provider 必须归属正确平台层并同步 owner docs。
+7. 不引入隐藏 fallback；开发相关路径时清理旧 fallback-like 分支，无法本轮清理的写入
    `remaining-goals.md`。
 
 ## 不变量

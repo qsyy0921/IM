@@ -308,7 +308,7 @@ message / conversation / policy events -> search-service + memory-service projec
 
 | 模块 | 当前状态 |
 | --- | --- |
-| `clients/` | Browser / Windows PC / Android client platform first slice：`protocol`、`client-core`、Web shell、PC desktop shell contract 和 Android runtime contract 已建立并通过 focused validation；`api-gateway` client BFF first-stage HTTP/JSON surface 已落；Web / PC shell 已接账号密码登录、注册、好友列表、好友申请、点击好友发起私聊、群聊列表、建群、点击群聊进入会话、群成员添加 / 退群、成员列表、成员搜索 / 角色过滤 / 分页、移除成员、角色变更 / owner transfer 第一路径、群资料卡、邀请来源提示、权限感知群设置操作区、群标题 / 头像 URI read-update、消息列表、发送后本地状态刷新、PullInbox / AckDelivery；真实双用户 direct + group client smoke 已通过；PC standalone exe、package-local README / launcher support files、unsigned local portable zip bundle、desktop installer / signing readiness plans、desktop signing readiness report、显式 `--execute` 门控 signing wrapper、只读 signature verifier、post-build installer 签名验证、显式 `--execute` 门控 installer build 包装器和 Android debug APK baseline 已产出；artifact install / signing / verification / installer plans 已按 `artifactKind` 区分 executable / installer，不把 installer 当作 portable direct-launch 输入，也不把 mixed manifest 里的 installer 当作 MSI / NSIS executable baseline，并且未通过只读 Authenticode 验证的 installer 不会被标为 install-ready。客户端只连 `api-gateway` / `push-gateway`，PullInbox 是消息事实源，WebSocket 只做在线唤醒。 |
+| `clients/` | Browser / Windows PC / Android client platform first slice：`protocol`、`client-core`、Web shell、PC desktop shell contract 和 Android runtime contract 已建立并通过 focused validation；`api-gateway` client BFF first-stage HTTP/JSON surface 已落；Web / PC shell 已接账号密码登录、注册、好友列表、好友申请、点击好友发起私聊、群聊列表、建群、点击群聊进入会话、群成员添加 / 退群、成员列表、成员搜索 / 角色过滤 / 分页、移除成员、角色变更 / owner transfer 第一路径、群资料卡、邀请来源提示、权限感知群设置操作区、群标题 / 头像 URI read-update、消息列表、发送后本地状态刷新、PullInbox / AckDelivery；真实双用户 direct + group client smoke 已通过；`plan:browser-multiuser-ui-smoke` 可从成功的 `client-web-summary.json` 生成低敏浏览器 / PC 多用户 UI smoke 计划，但不保存密码或 token，也不宣称已跑真实浏览器自动化；PC standalone exe、package-local README / launcher support files、unsigned local portable zip bundle、desktop installer / signing readiness plans、desktop signing readiness report、显式 `--execute` 门控 signing wrapper、只读 signature verifier、post-build installer 签名验证、显式 `--execute` 门控 installer build 包装器和 Android debug APK baseline 已产出；artifact install / signing / verification / installer plans 已按 `artifactKind` 区分 executable / installer，不把 installer 当作 portable direct-launch 输入，也不把 mixed manifest 里的 installer 当作 MSI / NSIS executable baseline，并且未通过只读 Authenticode 验证的 installer 不会被标为 install-ready。客户端只连 `api-gateway` / `push-gateway`，PullInbox 是消息事实源，WebSocket 只做在线唤醒。 |
 
 当前默认主线不是继续泛化清理 9 服务 P2 backlog，也不是做生产级 HA 长测，而是先把
 Web / Windows PC 客户端的 IM MVP 交互做实：账号注册登录、好友关系、好友私聊、群聊、
@@ -317,7 +317,8 @@ PC WebView login smoke、真实双用户 direct + group client smoke、PC standa
 unsigned local desktop bundle、desktop installer / signing readiness plans、desktop signing readiness report、显式 local signing profile、显式 signing wrapper、只读 signature verifier、post-build installer 签名验证、显式 installer build 包装器、artifactKind-aware install / signing / verification / installer plans、installer install-ready Authenticode gate 和 Android debug APK baseline 已有；`loadtest/clientweb` 已扩展到群资料 BFF read/update、群成员列表、移除、
 角色变更和 owner transfer，并已通过 clean committed 真实 smoke；Web / PC shell 已补
 BFF-backed 成员搜索 / 角色过滤 / 分页，并已有第一版群资料卡、邀请来源提示和群标题 /
-头像 URI read-update。下一步是 Windows PC MSI / NSIS installer 与真实 signing input /
+头像 URI read-update；多用户 UI smoke 已有低敏计划生成器，下一步是把该计划跑成真实
+浏览器 / PC UI run。随后继续 Windows PC MSI / NSIS installer 与真实 signing input /
 valid signed artifact、更丰富群设置和 media-service-backed 头像上传链路。Android 真机
 WebView login smoke 和正式移动端发布链路后置到用户明确切回。
 
@@ -336,8 +337,8 @@ group memory
 ```
 
 下一步默认看 [current-goal.md](docs/runbook/current-goal.md)。截至当前主线，下一步是围绕
-Windows PC MSI / NSIS installer 与真实 signing input / valid signed artifact 继续收口；若继续客户端产品能力，则优先补
-更丰富群设置、media-service-backed 头像上传链路和真实多用户 UI smoke。Android APK /
+Windows PC MSI / NSIS installer 与真实 signing input / valid signed artifact 继续收口；若继续客户端产品能力，则优先把
+多用户 UI smoke 计划跑成真实浏览器 / PC UI run，再补更丰富群设置和 media-service-backed 头像上传链路。Android APK /
 真机 smoke 不作为当前默认阻塞。
 
 ## 不变量

@@ -145,6 +145,11 @@ const checkPlan = [
     reason: "guards loopback-only Web shell metadata smoke report without starting services"
   },
   {
+    name: "browser-multiuser-ui-smoke-plan",
+    script: "test:browser-multiuser-ui-smoke-plan",
+    reason: "guards low-sensitive browser / PC multi-user UI smoke planning from real clientweb smoke evidence"
+  },
+  {
     name: "shell-web-assets",
     script: "test:shell-web-assets",
     reason: "guards target shell asset manifest and PWA asset propagation"

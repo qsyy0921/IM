@@ -148,10 +148,17 @@ First slice:
   group settings area now separates profile, member browsing / role management
   and explicit group actions into permission-aware sections instead of mixing
   all controls in one block.
+  `plan:browser-multiuser-ui-smoke` can now derive a low-sensitive browser / PC
+  multi-user UI smoke plan from a successful `loadtest/clientweb`
+  `client-web-summary.json`. The plan carries BFF / push endpoints, user IDs,
+  direct / group conversation IDs, expected seq / message IDs and required UI
+  selectors, but deliberately does not persist passwords, gateway tokens, push
+  tokens or refresh tokens. It is a contract and operator checklist for the next
+  real browser / PC UI run; it does not claim browser automation has already run.
   Conversation profile facts are owned by
   `conversation-service`; Web / PC shell only uses the api-gateway BFF. Remaining
   group product work is richer group settings, media-service-backed avatar upload
-  and richer real multi-user UI smoke coverage.
+  and turning the multi-user UI smoke plan into a real browser / PC UI run.
 - The Web / PC shell now also keeps explicit display-title and UX copy rules:
   direct / group titles learned from user actions survive conversation refresh,
   unknown server summaries render as short explicit conversation IDs, empty
@@ -757,9 +764,11 @@ Focused local check:
 
 ```powershell
 npm --prefix clients run check:build-prereqs
+npm --prefix clients run plan:browser-multiuser-ui-smoke -- --result-dir <clientweb-result-dir> --output <clientweb-result-dir>\browser-ui-smoke-plan.json
 npm --prefix clients run test:shell-config
 npm --prefix clients run check:no-toolchain
 npm --prefix clients run test:web-pwa
+npm --prefix clients run test:browser-multiuser-ui-smoke-plan
 npm --prefix clients run test:shell-web-assets
 npm --prefix clients run test:desktop-shell-action-assets
 npm --prefix clients run test:android-shell-action-assets

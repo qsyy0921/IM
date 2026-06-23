@@ -35,6 +35,10 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
 - 会话刷新会保留当前选中；gateway token 过期会清理本地 session / push / 会话展示状态。
 - 本地发送失败的消息会保留在消息列表中，并提供显式重新编辑或作为新消息重发入口；
   客户端不会把失败缓存项静默标记为成功。
+- `plan:browser-multiuser-ui-smoke` 已可从成功的 `loadtest/clientweb`
+  `client-web-summary.json` 生成低敏浏览器 / PC 多用户 UI smoke 计划，覆盖直聊、
+  群聊、群设置和稳定 selector，不保存密码、gateway token、push token 或
+  refresh token；这仍是计划 / 契约，不宣称真实浏览器自动化已跑。
 - 已有 clean smoke 覆盖真实双用户好友直聊、群聊 first path、群资料 BFF
   read/update 和群成员动作链路；证据见 `docs/runbook/client-platform.md`。
 - Windows desktop 已有 artifact / signing / installer plan first paths；签名 / installer
@@ -71,7 +75,7 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
 ## 下一步优先级
 
 1. Windows PC 端继续真实 signing input、valid signed artifact、MSI / NSIS installer 和签名 installer 体验。
-2. 客户端产品能力继续补更丰富群设置、真实多用户 UI smoke，以及接入 media-service 后的群头像上传链路。
+2. 客户端产品能力继续补更丰富群设置，把多用户 UI smoke 计划推进成真实浏览器 / PC UI run，以及接入 media-service 后的群头像上传链路。
 3. Android 后续只在用户切回时继续 login-level WebView smoke、APK baseline 报告和真机 UI polish。
 4. 客户端切片阶段性收口后，回到 workflow compensation adapter、instruction approval UI 和 ops 管理。
 5. 新发现待办写入 `docs/runbook/remaining-goals.md`，不要把长待办复制回本文件。

@@ -42,7 +42,8 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   是显式 copy helper，要求 `--source` 和 `--output`，不读取证书 / 密钥 / 密码；
   PFX 输入会做只读可读性 / signing key / 过期检查；Windows cert-store thumbprint
   会做只读本机证书 / signing key / 过期检查；profile 可声明预期公开 signer subject，
-  valid signature 必须匹配该发布者策略；release readiness report 也会对已收集的
+  valid signature 必须匹配该发布者策略；`verify:desktop-signature` 也可读取 profile
+  中的公开 signer subject policy，但不会使用证书源签名或修改 artifact；release readiness report 也会对已收集的
   `desktop-installer` artifact 做独立 post-build 签名验证；install plan 也会在
   `desktop-installer` 未通过 read-only Authenticode 验证时 fail-closed，且 installer
   安装路径必须显式请求 `--artifact-kind desktop-installer`；`build:desktop-installer`

@@ -206,7 +206,7 @@ npm --prefix clients run init:desktop-signing-profile -- --source pfx-file --out
 npm --prefix clients run plan:desktop-signing
 npm --prefix clients run report:desktop-signing-readiness
 npm --prefix clients run sign:desktop-artifact
-npm --prefix clients run verify:desktop-signature
+npm --prefix clients run verify:desktop-signature -- --signing-profile clients/desktop/signing-profile.local.json
 ```
 
 After preparing both shell targets, verify both prepared asset directories:
@@ -307,6 +307,9 @@ launch, start services or download toolchains. Use `--require-valid` in a
 release profile to fail closed when the selected artifact is not
 Authenticode-valid. If an expected signer subject is configured, a merely valid
 signature is not enough; the signer subject must match that public policy.
+`--signing-profile` or `NEXUSIM_DESKTOP_SIGNING_PROFILE` can supply only that
+public signer subject policy for verification. The verifier does not use the
+profile's certificate source to sign or mutate artifacts.
 `report:desktop-signing-readiness` is the release-readiness summary over the
 same controls. It combines the signing plan, plan-only signing execution output,
 read-only executable Authenticode verification, MSI / NSIS installer plan and

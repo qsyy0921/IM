@@ -53,7 +53,8 @@ Android 后置到用户明确切回。
    证书 / 密钥 / 密码；
    PFX 输入会做只读可读性 / signing key / 过期检查；Windows cert-store
    thumbprint 会做只读本机证书 / signing key / 过期检查；profile 可声明预期公开
-   signer subject，valid signature 必须匹配该发布者策略；release readiness report
+   signer subject，valid signature 必须匹配该发布者策略；read-only verifier 也可读取
+   profile 中的公开 signer subject policy 但不会使用证书源签名；release readiness report
    也会对已收集的 `desktop-installer` artifact 做独立 post-build 签名验证；
    `build:desktop-installer` 执行后的收集步骤只读取选中 `bundle/<target>` 目录并要求
    `desktop-installer` artifact kind；

@@ -4,6 +4,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { workspaceRoot } from "./client-build-env.mjs";
+import { readDesktopSigningProfile, signingProfileEnv } from "./desktop-signing-profile.mjs";
 
 const schemaVersion = "nexusim.desktop-signature-verification.v1";
 const artifactManifestSchema = "nexusim.client-artifacts.v1";
@@ -195,6 +196,7 @@ function executionPolicy(options) {
     launchesDesktopArtifacts: false,
     startsServices: false,
     downloadsToolchain: false,
+    readsSigningProfile: Boolean(options.signingProfile),
     readsCollectedArtifactManifest: true,
     validatesArtifactHashes: true,
     readsAuthenticodeSignature: true,
@@ -326,6 +328,7 @@ function parseArgs(argv) {
     manifest: "",
     artifactKind: defaultDesktopArtifactKind,
     requireValid: false,
+    signingProfile: "",
     expectedSignerSubjectContains: ""
   };
   for (let index = 0; index < argv.length; index += 1) {
@@ -340,6 +343,11 @@ function parseArgs(argv) {
       index += 1;
       continue;
     }
+    if (arg === "--signing-profile") {
+      options.signingProfile = requiredValue(argv, index, arg);
+      index += 1;
+      continue;
+    }
     if (arg === "--require-valid") {
       options.requireValid = true;
       continue;
@@ -350,6 +358,15 @@ function parseArgs(argv) {
       continue;
     }
     throw new Error(`unknown argument: ${arg}`);
+  }
+  const envProfile = stringValue(process.env[signingProfileEnv]);
+  if (!options.signingProfile && envProfile) {
+    options.signingProfile = envProfile;
+  }
+  if (options.signingProfile) {
+    const profile = readDesktopSigningProfile(options.signingProfile);
+    options.expectedSignerSubjectContains =
+      options.expectedSignerSubjectContains || profile.expectedSignerSubjectContains;
   }
   return options;
 }

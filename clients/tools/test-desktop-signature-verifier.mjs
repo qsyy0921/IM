@@ -60,6 +60,19 @@ try {
   };
   const manifestPath = join(collectedDir, "manifest.json");
   writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+  const signingProfilePath = join(tempRoot, "signing-profile.local.json");
+  writeFileSync(signingProfilePath, `${JSON.stringify({
+    schemaVersion: "nexusim.desktop-signing-profile.v1",
+    signToolPath: "<local-signtool.exe>",
+    timestampURL: "https://timestamp.example.test",
+    signature: {
+      expectedSignerSubjectContains: "NexusIM"
+    },
+    certificate: {
+      source: "windows-cert-store",
+      certSHA1: "00112233445566778899AABBCCDDEEFF00112233"
+    }
+  }, null, 2)}\n`);
 
   const valid = buildDesktopSignatureVerificationReport({
     manifest: manifestPath,
@@ -157,6 +170,15 @@ try {
   assert(cliReport.executionPolicy.readOnly === true, "CLI verifier should be read-only");
   assert(cliReport.executionPolicy.signsArtifacts === false, "CLI verifier must not sign artifacts");
   assert(!JSON.stringify(cliReport).includes(tempRoot), "CLI signature report leaked absolute temp path");
+
+  const cliProfileReport = runVerifier(["--manifest", manifestPath, "--signing-profile", signingProfilePath]);
+  const cliProfileJSON = JSON.stringify(cliProfileReport);
+  assert(cliProfileReport.executionPolicy.readsSigningProfile === true, "CLI verifier should declare profile read");
+  assert(cliProfileReport.signaturePolicy.expectedSignerSubjectConfigured === true, "CLI profile should configure expected signer");
+  assert(cliProfileReport.readyForSignedDistribution === false, "unsigned fixture should remain blocked with profile");
+  assert(cliProfileReport.missing.includes("expected-signer-subject"), "profile expected signer should block mismatched signatures");
+  assert(!cliProfileJSON.includes(tempRoot), "CLI profile signature report leaked absolute temp path");
+  assert(!cliProfileJSON.match(/token|secret|password|credential|private/i), "CLI profile signature report leaked sensitive names");
 
   const requireValid = spawnSync(process.execPath, [
     verifier,

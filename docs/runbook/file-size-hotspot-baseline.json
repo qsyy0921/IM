@@ -1,7 +1,7 @@
 ﻿{
-    "created_at":  "2026-06-23T00:23:55.6741184Z",
+    "created_at":  "2026-06-23T09:20:23.5615635Z",
     "scope":  "handwritten Go/Markdown/PowerShell/Bash file-size budget snapshot; not a code-quality score",
-    "file_count":  1992,
+    "file_count":  1993,
     "thresholds":  {
                        "production_warn_lines":  2500,
                        "production_max_lines":  3500,
@@ -47,6 +47,15 @@
                           "MaxRatio":  0.5817
                       },
                       {
+                          "Path":  "docs\\runbook\\client-platform.md",
+                          "Lines":  866,
+                          "Kind":  "docs",
+                          "Warn":  1200,
+                          "Max":  1500,
+                          "WarnRatio":  0.7217,
+                          "MaxRatio":  0.5773
+                      },
+                      {
                           "Path":  "docs\\architecture\\target-architecture-ai.md",
                           "Lines":  776,
                           "Kind":  "docs",
@@ -63,15 +72,6 @@
                           "Max":  1500,
                           "WarnRatio":  0.64,
                           "MaxRatio":  0.512
-                      },
-                      {
-                          "Path":  "docs\\runbook\\client-platform.md",
-                          "Lines":  757,
-                          "Kind":  "docs",
-                          "Warn":  1200,
-                          "Max":  1500,
-                          "WarnRatio":  0.6308,
-                          "MaxRatio":  0.5047
                       },
                       {
                           "Path":  "docs\\sdd\\push-gateway.md",

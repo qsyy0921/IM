@@ -31,10 +31,6 @@
   Authenticode signature。
 - Web / PC shell：继续更丰富群设置和群头像上传链路；头像上传需要后续接
   media-service，不得直接写 conversation-service 私表。
-- Client smoke cleanup：重复跑本地 smoke 时
-  `migrations/postgres/conversation/000011_conversation_profile.sql` 的
-  `ck_conversations_title_length` 已存在会打印 PostgreSQL error；后续需要把该
-  constraint migration 改成幂等执行，避免真实 smoke 输出噪音。
 - Desktop runtime：继续真实 UI lifecycle 和 installer / signing 流水线；portable zip
   与 install plan 已有 first-stage 本地路径。
 - Android：后续切回时重新加载 F 盘 toolchain env 或显式 Docker builder，再跑 APK /

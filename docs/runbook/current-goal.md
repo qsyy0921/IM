@@ -64,11 +64,13 @@ IM messages -> search / memory projection -> EvidencePack -> RAG / Agent answer 
   `run-local-smoke.ps1` 桌面 smoke 错用群会话的问题：桌面 smoke 现在从
   `client-web-summary.json` 显式读取双方仍 active 的 `direct_chat.conversation_id`，
   读不到直接失败，不使用群会话兜底。
-- 2026-06-23 低敏 collaborative-memory eval 已扩展到 70 个 catalog cases / 20 个
-  profile-Agent safety fixture cases，新增 multi-hop actor-chain completeness、
-  workstream / decision dependency edge、reviewed multi-source profile activation
-  和 supporting-memory delete 后 profile recompute 检查；该 gate 不调用模型、
-  数据库或业务服务。
+- 2026-06-23 低敏 collaborative-memory eval 已扩展到 73 个 catalog cases / 20 个
+  profile-Agent safety fixture cases；新增 memory-service / retrieval-gateway
+  optional live adapters，并让 RAG / Summary / Agent live adapters 断言
+  multi-hop actor/source-chain completeness。memory-service adapter 覆盖
+  GetMemoryEvent graph edge、reviewed multi-source profile 和 deleted supporting
+  memory 排除；retrieval adapter 覆盖 EvidencePack source refs、speaker
+  attribution、temporal/current-memory 和 projection version。
 - 已有 clean smoke 覆盖真实双用户好友直聊、群聊 first path、群资料 BFF
   read/update 和群成员动作链路；证据见 `docs/runbook/client-platform.md`。
 - Windows desktop 已有 artifact / signing / installer plan first paths；签名 / installer
@@ -126,9 +128,9 @@ IM messages -> search / memory projection -> EvidencePack -> RAG / Agent answer 
    `docs/architecture/target-architecture-ai.md`、`docs/runbook/service-briefs/search-service.md`、
    `memory-service.md`、`retrieval-gateway.md`、`rag-service.md`、`agent-service.md`
    和 `action-executor.md`。
-3. 后端 / AI 演示主线下一步：
-   把新增 collaborative-memory eval 要求提升到 memory-service / retrieval /
-   RAG / Agent live stack adapter。
+3. 后端 / AI 演示主线已完成 collaborative-memory eval 到 memory-service /
+   retrieval-gateway / RAG / Summary / Agent optional live adapter 的第一轮提升；
+   下一步在真实服务栈启动后运行完整 service-stack gate，并归档低敏报告。
 4. 后端 / AI 演示主线优先做：
    `IM 消息 -> search / memory projection -> EvidencePack -> RAG / Agent answer -> approval / audit`。
 5. 客户端只作为演示入口；除非阻塞上述演示，不继续扩 UI 产品化。

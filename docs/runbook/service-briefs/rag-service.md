@@ -23,7 +23,12 @@
 - 2026-06-20 cross-group / temporal stack smoke 已验证跨群 source refs /
   speaker attribution 被保留，expired / superseded / future memory 不进入
   current EvidencePack。
+- 2026-06-23 RAG live adapter 已增加 multi-hop actor/source-chain completeness
+  断言；仍只基于 retrieval-gateway 返回的 EvidencePack 与 citation verifier
+  判断，不直接读 memory / search 私表。
 
 下一步：
 
-- 40/40 optional stack gate 已覆盖跨群 / 时间窗口断言；下一步扩展 multi-hop / temporal update / profile aggregation 场景，provider 仍走 port、guard 和 citation verifier。
+- 真实服务栈启动后与 memory-service / retrieval-gateway adapter 一起跑完整
+  optional gate；之后扩展 temporal update / profile aggregation 场景，provider
+  仍走 port、guard 和 citation verifier。

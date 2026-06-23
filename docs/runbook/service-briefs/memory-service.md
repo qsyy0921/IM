@@ -28,6 +28,11 @@
   workstream / decision dependency edge、reviewed multi-source profile activation、
   supporting-memory delete 后 profile recompute 已纳入 profile / Agent safety fixture；
   该覆盖仍是本地 eval gate，不调用模型、数据库或业务服务。
+- 2026-06-23 memory-service optional live adapter first pass 已落：
+  `ListProfileAggregates` 只返回 supporting memory 全部仍为 ACTIVE / APPROVED
+  的 ACTIVE profile aggregate；`loadtest/memory` 增加 GetMemoryEvent graph edge、
+  reviewed multi-source profile、supporting evidence 保留和 deleted support profile
+  排除检查；`run-ai-eval-memory-adapter.ps1` 可把这些结果映射到 ai-eval cases。
 
-下一步：把新增 collaborative-memory eval 要求接到 memory-service / retrieval /
-RAG / Agent live stack adapter，并继续保持“单条群消息不直接升级为 ACTIVE profile fact”。
+下一步：真实服务栈启动后运行 memory-service optional adapter 并归档报告；后续
+继续做 profile recompute / repair，而不是把单条群消息直接升级为 ACTIVE profile fact。

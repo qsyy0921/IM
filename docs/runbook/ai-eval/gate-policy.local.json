@@ -41,6 +41,31 @@
   ],
   "optional_service_stack_adapters": [
     {
+      "name": "memory-service",
+      "script": "run-ai-eval-memory-adapter.ps1",
+      "run_suffix": "memory-service",
+      "summary_file": "memory-eval-adapter-summary.json",
+      "requires_service_stack": true,
+      "requires": [
+        "memory-service",
+        "kafka",
+        "postgres"
+      ]
+    },
+    {
+      "name": "retrieval-gateway",
+      "script": "run-ai-eval-retrieval-adapter.ps1",
+      "run_suffix": "retrieval-gateway",
+      "summary_file": "retrieval-eval-adapter-summary.json",
+      "requires_service_stack": true,
+      "requires": [
+        "retrieval-gateway",
+        "search-service",
+        "memory-service",
+        "postgres"
+      ]
+    },
+    {
       "name": "rag-service",
       "script": "run-ai-eval-rag-adapter.ps1",
       "run_suffix": "rag-service",

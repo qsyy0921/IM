@@ -1,11 +1,12 @@
 param(
-    [string[]]$OptionalAdapter = @("rag-service", "agent-action-executor"),
+    [string[]]$OptionalAdapter = @("memory-service", "retrieval-gateway", "rag-service", "agent-action-executor"),
     [switch]$IncludePythonWorker,
     [switch]$PreflightOnly,
     [switch]$AllowMissing,
     [string]$CasePath = "docs/runbook/ai-eval/retrieval-eval-cases.json",
     [string]$GatePolicyPath = "docs/runbook/ai-eval/gate-policy.local.json",
     [string]$PGDSN = "postgres://nexusim:nexusim@localhost:5432/nexusim?sslmode=disable",
+    [string]$KafkaBrokers = "localhost:9092",
     [string]$RAGTarget = "127.0.0.1:10610",
     [string]$SummaryTarget = "127.0.0.1:10620",
     [string]$RetrievalTarget = "127.0.0.1:10590",
@@ -171,6 +172,18 @@ if ($adapters -contains "rag-service") {
     Add-EndpointCheck -Checks $checks -Seen $seenChecks -Name "search-service" -Endpoint $SearchTarget -DefaultPort 10570
     Add-EndpointCheck -Checks $checks -Seen $seenChecks -Name "memory-service" -Endpoint $MemoryTarget -DefaultPort 10580
 }
+if ($adapters -contains "memory-service") {
+    Add-EndpointCheck -Checks $checks -Seen $seenChecks -Name "memory-service" -Endpoint $MemoryTarget -DefaultPort 10580
+    $firstBroker = ($KafkaBrokers.Split(",") | Select-Object -First 1).Trim()
+    if ($firstBroker.Length -gt 0) {
+        Add-EndpointCheck -Checks $checks -Seen $seenChecks -Name "kafka" -Endpoint $firstBroker -DefaultPort 9092
+    }
+}
+if ($adapters -contains "retrieval-gateway") {
+    Add-EndpointCheck -Checks $checks -Seen $seenChecks -Name "retrieval-gateway" -Endpoint $RetrievalTarget -DefaultPort 10590
+    Add-EndpointCheck -Checks $checks -Seen $seenChecks -Name "search-service" -Endpoint $SearchTarget -DefaultPort 10570
+    Add-EndpointCheck -Checks $checks -Seen $seenChecks -Name "memory-service" -Endpoint $MemoryTarget -DefaultPort 10580
+}
 if ($adapters -contains "summary-service") {
     Add-EndpointCheck -Checks $checks -Seen $seenChecks -Name "summary-service" -Endpoint $SummaryTarget -DefaultPort 10620
     Add-EndpointCheck -Checks $checks -Seen $seenChecks -Name "retrieval-gateway" -Endpoint $RetrievalTarget -DefaultPort 10590
@@ -238,6 +251,9 @@ if ($NoApplyMigration) {
         -CasePath $CasePath `
         -GatePolicyPath $GatePolicyPath `
         -PGDSN $PGDSN `
+        -KafkaBrokers $KafkaBrokers `
+        -MemoryTarget $MemoryTarget `
+        -RetrievalTarget $RetrievalTarget `
         -RAGTarget $RAGTarget `
         -SummaryTarget $SummaryTarget `
         -AgentTarget $AgentTarget `
@@ -257,6 +273,9 @@ if ($NoApplyMigration) {
         -CasePath $CasePath `
         -GatePolicyPath $GatePolicyPath `
         -PGDSN $PGDSN `
+        -KafkaBrokers $KafkaBrokers `
+        -MemoryTarget $MemoryTarget `
+        -RetrievalTarget $RetrievalTarget `
         -RAGTarget $RAGTarget `
         -SummaryTarget $SummaryTarget `
         -AgentTarget $AgentTarget `

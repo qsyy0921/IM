@@ -4,6 +4,9 @@ param(
     [string[]]$OptionalAdapter = @(),
     [switch]$IncludeAllOptionalServiceStackAdapters,
     [string]$PGDSN = "postgres://nexusim:nexusim@localhost:5432/nexusim?sslmode=disable",
+    [string]$MemoryTarget = "127.0.0.1:10580",
+    [string]$KafkaBrokers = "localhost:9092",
+    [string]$RetrievalTarget = "127.0.0.1:10590",
     [string]$RAGTarget = "127.0.0.1:10610",
     [string]$SummaryTarget = "127.0.0.1:10620",
     [string]$AgentTarget = "127.0.0.1:10630",
@@ -109,11 +112,32 @@ function Invoke-GateAdapter {
     )
 
     switch ($AdapterName) {
+        "memory-service" {
+            & $ScriptPath `
+                -CasePath $resolvedCasePath `
+                -PGDSN $PGDSN `
+                -MemoryTarget $MemoryTarget `
+                -KafkaBrokers $KafkaBrokers `
+                -ResultRoot $ResultRoot `
+                -RunName $AdapterRunName `
+                -OutputPath $SummaryPath `
+                -RequestTimeout $RequestTimeout
+        }
         "rag-service" {
             & $ScriptPath `
                 -CasePath $resolvedCasePath `
                 -PGDSN $PGDSN `
                 -RAGTarget $RAGTarget `
+                -ResultRoot $ResultRoot `
+                -RunName $AdapterRunName `
+                -OutputPath $SummaryPath `
+                -RequestTimeout $RequestTimeout
+        }
+        "retrieval-gateway" {
+            & $ScriptPath `
+                -CasePath $resolvedCasePath `
+                -PGDSN $PGDSN `
+                -RetrievalTarget $RetrievalTarget `
                 -ResultRoot $ResultRoot `
                 -RunName $AdapterRunName `
                 -OutputPath $SummaryPath `

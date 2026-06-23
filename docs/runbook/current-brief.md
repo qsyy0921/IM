@@ -113,11 +113,11 @@ backend architecture + AI / Agent / RAG demo path
 IM 消息 -> search / memory projection -> EvidencePack -> RAG / Agent answer -> approval / audit
 ```
 
-2026-06-23 当前低敏 collaborative-memory eval 已扩到 70 个 catalog cases /
-20 个 profile-Agent safety fixture cases，覆盖 multi-hop actor-chain、
-workstream / decision dependency edge、reviewed multi-source profile activation
-和 supporting-memory delete 后 profile recompute。下一步是把这些 fixture
-要求提升到 memory-service / retrieval / RAG / Agent live stack adapter。
+2026-06-23 当前低敏 collaborative-memory eval 已扩到 73 个 catalog cases /
+20 个 profile-Agent safety fixture cases，并已完成 memory-service /
+retrieval-gateway optional live adapters 的第一轮接入；RAG / Summary / Agent
+live adapters 也会断言 multi-hop actor/source-chain completeness。下一步是在
+真实服务栈启动后运行完整 service-stack gate，并归档低敏报告。
 
 ## 不变量
 

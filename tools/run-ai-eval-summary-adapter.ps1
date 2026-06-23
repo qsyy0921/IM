@@ -144,6 +144,22 @@ function Test-SummaryAssertion {
                 -and (Get-JsonPropertyString -Object $Summary.seed -Name "sender_user_id").Length -gt 0 `
                 -and (Get-JsonPropertyString -Object $Summary.seed -Name "cross_group_actor_user_id").Length -gt 0
         }
+        "must_preserve_multi_hop_actor_chain" {
+            return `
+                [bool]$Summary.cross_group_source_refs_preserved `
+                -and [bool]$Summary.cross_group_speaker_attribution_preserved `
+                -and [int]$Summary.source_counts.search_message -gt 0 `
+                -and [int]$Summary.source_counts.memory_event -gt 0 `
+                -and (Get-JsonPropertyString -Object $Summary.seed -Name "sender_user_id").Length -gt 0 `
+                -and (Get-JsonPropertyString -Object $Summary.seed -Name "cross_group_actor_user_id").Length -gt 0
+        }
+        "must_require_complete_chain_before_answer" {
+            return `
+                [bool]$Summary.cross_group_source_refs_preserved `
+                -and [bool]$Summary.cross_group_speaker_attribution_preserved `
+                -and [int]$Summary.citation_count -gt 0 `
+                -and [int]$Summary.memory_item_count -gt 0
+        }
         "must_preserve_projection_versions" {
             return `
                 [int64]$Summary.search_projection_version -gt 0 `

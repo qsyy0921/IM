@@ -106,6 +106,10 @@ type checkRecord struct {
 	ValidityWindowCurrent bool `json:"validity_window_current"`
 	SupersededHidden      bool `json:"superseded_hidden"`
 	SupersessionLink      bool `json:"supersession_link"`
+	GraphEdgePreserved    bool `json:"graph_edge_preserved"`
+	ReviewedProfileActive bool `json:"reviewed_multi_source_profile_active"`
+	ProfileSupportKept    bool `json:"profile_supporting_evidence_preserved"`
+	DeletedSupportHidden  bool `json:"deleted_support_profile_excluded"`
 }
 
 type membershipRecord struct {
@@ -432,6 +436,99 @@ INSERT INTO memory_event_source_refs (
 `, cfg.tenantID, cfg.conversationID, eventPrefix); err != nil {
 		return fmt.Errorf("seed runtime memory source refs: %w", err)
 	}
+	if _, err := pool.Exec(ctx, `
+INSERT INTO memory_graph_edges (
+	tenant_id,
+	edge_id,
+	from_memory_event_id,
+	to_memory_event_id,
+	relation_type,
+	confidence,
+	source_refs
+) VALUES (
+	$1,
+	$3 || '-edge-supports',
+	$3 || '-replacement',
+	$3 || '-current',
+	'SUPPORTS',
+	0.9300,
+	jsonb_build_array(jsonb_build_object(
+		'source_type', 'MESSAGE',
+		'source_id', 'msg-replacement',
+		'source_event_id', 'event-replacement',
+		'conversation_id', $2,
+		'conversation_seq', 13
+	))
+)
+`, cfg.tenantID, cfg.conversationID, eventPrefix); err != nil {
+		return fmt.Errorf("seed runtime memory graph edge: %w", err)
+	}
+	if _, err := pool.Exec(ctx, `
+INSERT INTO memory_structured_events (
+	tenant_id,
+	memory_event_id,
+	scope_type,
+	scope_id,
+	conversation_id,
+	topic,
+	event_type,
+	status,
+	review_state,
+	fact_text,
+	actor_user_ids,
+	audience_user_ids,
+	valid_from_seq,
+	valid_to_seq,
+	supersedes_event_ids,
+	contradicts_event_ids,
+	confidence,
+	visibility_version,
+	extraction_version,
+	source_projection_version
+) VALUES (
+	$1,
+	$3 || '-deleted-support',
+	'CONVERSATION',
+	$2,
+	$2,
+	'profile-support',
+	'PROFILE_SIGNAL',
+	'DELETED',
+	'APPROVED',
+	'deleted support must not keep an active profile visible',
+	'["memory-sender-1"]'::jsonb,
+	'[]'::jsonb,
+	14,
+	NULL,
+	'[]'::jsonb,
+	'[]'::jsonb,
+	0.9000,
+	1,
+	'smoke-v1',
+	31
+)
+`, cfg.tenantID, cfg.conversationID, eventPrefix); err != nil {
+		return fmt.Errorf("seed deleted profile support memory: %w", err)
+	}
+	if _, err := pool.Exec(ctx, `
+INSERT INTO memory_profile_aggregates (
+	tenant_id,
+	profile_id,
+	subject_user_id,
+	aggregate_type,
+	aggregate_key,
+	status,
+	review_state,
+	summary_text,
+	supporting_memory_event_ids,
+	confidence,
+	updated_by_memory_event_id
+) VALUES
+($1, $3 || '-profile-active', $4, 'SKILL', 'phoenix-launch', 'ACTIVE', 'APPROVED', 'reviewed multi-source profile with active supporting evidence', jsonb_build_array($3 || '-current', $3 || '-replacement'), 0.9100, $3 || '-replacement'),
+($1, $3 || '-profile-deleted-support', $4, 'SKILL', 'deleted-support', 'ACTIVE', 'APPROVED', 'profile with deleted support must not be returned as active', jsonb_build_array($3 || '-deleted-support'), 0.9200, $3 || '-deleted-support')
+`, cfg.tenantID, cfg.conversationID, eventPrefix, cfg.viewerUserID); err != nil {
+		return fmt.Errorf("seed runtime profile aggregates: %w", err)
+	}
 	return nil
 }
 
@@ -474,9 +571,17 @@ func verifyRuntimeMemoryWindow(ctx context.Context, cfg config, client memoryv1.
 	if len(replacement.GetSupersedesEventIds()) != 1 || replacement.GetSupersedesEventIds()[0] != supersededID {
 		return fmt.Errorf("replacement should preserve supersession link: %+v", replacement.GetSupersedesEventIds())
 	}
+	details, err := getMemoryEvent(ctx, cfg, client, cfg.viewerUserID, replacementID)
+	if err != nil {
+		return fmt.Errorf("get replacement runtime memory: %w", err)
+	}
+	if !hasGraphEdge(details.GetGraphEdges(), eventPrefix+"-edge-supports", replacementID, currentID, "SUPPORTS") {
+		return fmt.Errorf("replacement should expose SUPPORTS graph edge: %+v", details.GetGraphEdges())
+	}
 	result.Checks.RuntimeSourceRef = true
 	result.Checks.SupersededHidden = true
 	result.Checks.SupersessionLink = true
+	result.Checks.GraphEdgePreserved = true
 
 	response, err = queryMemoryWithOptions(ctx, cfg, client, cfg.viewerUserID, queryMemoryOptions{
 		query:             "runtime memory",
@@ -496,8 +601,37 @@ func verifyRuntimeMemoryWindow(ctx context.Context, cfg config, client memoryv1.
 	if _, ok := items[currentID]; ok {
 		return fmt.Errorf("current runtime memory should expire after valid_to_seq: %+v", response.GetItems())
 	}
+	profiles, err := listProfileAggregatesWithStatuses(ctx, cfg, client, cfg.viewerUserID, []memoryv1.MemoryEventStatus{memoryv1.MemoryEventStatus_MEMORY_EVENT_STATUS_ACTIVE})
+	if err != nil {
+		return err
+	}
+	if len(profiles.GetItems()) != 1 {
+		return fmt.Errorf("expected one active reviewed profile with valid support, got %d: %+v", len(profiles.GetItems()), profiles.GetItems())
+	}
+	profile := profiles.GetItems()[0]
+	if profile.GetProfileId() != eventPrefix+"-profile-active" ||
+		profile.GetReviewState() != memoryv1.MemoryReviewState_MEMORY_REVIEW_STATE_APPROVED ||
+		len(profile.GetSupportingMemoryEventIds()) != 2 {
+		return fmt.Errorf("unexpected active reviewed profile: %+v", profile)
+	}
 	result.Checks.ValidityWindowCurrent = true
+	result.Checks.ReviewedProfileActive = true
+	result.Checks.ProfileSupportKept = true
+	result.Checks.DeletedSupportHidden = true
 	return nil
+}
+
+func hasGraphEdge(edges []*memoryv1.MemoryGraphEdge, edgeID string, fromID string, toID string, relation string) bool {
+	for _, edge := range edges {
+		if edge.GetEdgeId() == edgeID &&
+			edge.GetFromMemoryEventId() == fromID &&
+			edge.GetToMemoryEventId() == toID &&
+			edge.GetRelationType() == relation &&
+			len(edge.GetSourceRefs()) > 0 {
+			return true
+		}
+	}
+	return false
 }
 
 func memoryItemsByID(items []*memoryv1.StructuredMemoryEvent) map[string]*memoryv1.StructuredMemoryEvent {
@@ -686,12 +820,16 @@ func getMemoryEvent(ctx context.Context, cfg config, client memoryv1.MemoryServi
 }
 
 func listProfileAggregates(ctx context.Context, cfg config, client memoryv1.MemoryServiceClient, userID string) (*memoryv1.ListProfileAggregatesResponse, error) {
+	return listProfileAggregatesWithStatuses(ctx, cfg, client, userID, []memoryv1.MemoryEventStatus{memoryv1.MemoryEventStatus_MEMORY_EVENT_STATUS_PENDING})
+}
+
+func listProfileAggregatesWithStatuses(ctx context.Context, cfg config, client memoryv1.MemoryServiceClient, userID string, statuses []memoryv1.MemoryEventStatus) (*memoryv1.ListProfileAggregatesResponse, error) {
 	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
 	defer cancel()
 	return client.ListProfileAggregates(requestCtx, &memoryv1.ListProfileAggregatesRequest{
 		AuthContext:   auth(cfg, userID),
 		SubjectUserId: userID,
-		Statuses:      []memoryv1.MemoryEventStatus{memoryv1.MemoryEventStatus_MEMORY_EVENT_STATUS_PENDING},
+		Statuses:      statuses,
 		Limit:         20,
 	})
 }

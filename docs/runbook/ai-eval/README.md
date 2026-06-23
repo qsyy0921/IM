@@ -7,6 +7,8 @@ summary, Agent and tool/action boundaries.
 
 - Case file: `retrieval-eval-cases.json`
 - Validator: `tools/validate-ai-eval-cases.ps1`
+- Memory-service execution adapter: `tools/run-ai-eval-memory-adapter.ps1`
+- Retrieval-gateway execution adapter: `tools/run-ai-eval-retrieval-adapter.ps1`
 - RAG execution adapter: `tools/run-ai-eval-rag-adapter.ps1`
 - Summary execution adapter: `tools/run-ai-eval-summary-adapter.ps1`
 - Agent execution adapter: `tools/run-ai-eval-agent-adapter.ps1`
@@ -64,6 +66,35 @@ Optional report:
 .\tools\validate-ai-eval-cases.ps1 `
   -MarkdownPath H:\NexusIM\loadtest-results\ai-eval\ai-eval-cases.md
 ```
+
+First-stage memory-service execution adapter:
+
+```powershell
+.\tools\run-ai-eval-memory-adapter.ps1 `
+  -PGDSN postgres://nexusim:nexusim@localhost:5432/nexusim?sslmode=disable `
+  -MemoryTarget 127.0.0.1:10640 `
+  -KafkaBrokers 127.0.0.1:9092
+```
+
+This adapter runs `loadtest/memory`, which seeds low-sensitive structured
+memory events, source refs, graph edges and profile aggregates, then validates
+active `memory-service` cases against runtime checks. It covers source refs,
+validity window, supersession, graph SUPPORTS edge preservation, reviewed
+multi-source profile activation and deleted-support profile exclusion.
+
+First-stage retrieval-gateway execution adapter:
+
+```powershell
+.\tools\run-ai-eval-retrieval-adapter.ps1 `
+  -PGDSN postgres://nexusim:nexusim@localhost:5432/nexusim?sslmode=disable `
+  -RetrievalTarget 127.0.0.1:10600
+```
+
+This adapter runs `loadtest/retrieval`, which seeds low-sensitive search /
+memory projections, calls real `retrieval-gateway RetrieveEvidence`, and
+validates active `retrieval-gateway` cases against EvidencePack source type,
+source refs, speaker attribution, stale / future memory exclusion,
+multi-hop actor/source chain and projection version checks.
 
 First-stage RAG execution adapter:
 
@@ -269,10 +300,11 @@ command-level Agent output regression through `ai-eval-service`.
 `action-preflight-safety` can also be selected to record the in-memory
 action-executor preflight safety regression.
 
-`rag-service`, `summary-service` and `agent-action-executor` can also be selected through
-`-OptionalAdapter`, but they require their listed service stacks and targets to
-already be running. The gate runner records any selected optional adapter through
-`ai-eval-service` with the same low-sensitive summary-only boundary.
+`memory-service`, `retrieval-gateway`, `rag-service`, `summary-service` and
+`agent-action-executor` can also be selected through `-OptionalAdapter`, but
+they require their listed service stacks and targets to already be running. The
+gate runner records any selected optional adapter through `ai-eval-service`
+with the same low-sensitive summary-only boundary.
 
 RAG / Agent service-stack gate wrapper:
 
@@ -281,9 +313,9 @@ RAG / Agent service-stack gate wrapper:
 .\tools\run-ai-eval-service-stack-gate-smoke.ps1
 ```
 
-The preflight writes endpoint readiness only. It does not prove live RAG / Summary / Agent
-adapter behavior. Remove `-PreflightOnly` and `-AllowMissing` only after the
-selected service stack is running.
+The preflight writes endpoint readiness only. It does not prove live memory /
+retrieval / RAG / Summary / Agent adapter behavior. Remove `-PreflightOnly` and
+`-AllowMissing` only after the selected service stack is running.
 The first local live run passed with `profile-agent-safety`,
 `action-external-http-provider`, `rag-service` and `agent-action-executor`
 selected; see `docs/runbook/loadtest/ai-eval-service/`.
@@ -312,6 +344,11 @@ decision dependency edges, reviewed multi-source profile activation and
 supporting-memory delete / profile recompute checks. This is still a
 low-sensitive local eval gate; it does not call models, databases or business
 services.
+The 2026-06-23 live-adapter first pass increased the catalog to 73 cases and
+added optional `memory-service` / `retrieval-gateway` adapters. It also made
+RAG / Summary / Agent live adapters assert multi-hop actor/source-chain
+completeness. This is adapter wiring and focused verification; it does not mean
+the full live service-stack gate has been run for those new optional adapters.
 The 2026-06-20 negative RAG / Agent service-stack run increased the live suite
 to 19 cases and added RAG no-evidence abstain plus Agent policy-denied blocked
 proposal checks.

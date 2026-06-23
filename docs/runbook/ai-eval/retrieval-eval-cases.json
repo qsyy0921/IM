@@ -148,6 +148,46 @@
           "type": "must_preserve_speaker_attribution"
         },
         {
+          "type": "must_preserve_multi_hop_actor_chain"
+        },
+        {
+          "type": "must_require_complete_chain_before_answer"
+        },
+        {
+          "type": "must_preserve_projection_versions"
+        }
+      ]
+    },
+    {
+      "id": "retrieval-gateway-current-memory-live-preserves-chain",
+      "family": "collaborative_memory",
+      "stage": "retrieval-gateway",
+      "status": "active",
+      "query": "phoenix launch decision current evidence chain",
+      "risk": "Retrieval-gateway live smoke must prove EvidencePack preserves search and memory coverage, current memory filtering, cross-group source refs and actor attribution before RAG or Agent consumes it",
+      "required_assertions": [
+        {
+          "type": "must_preserve_evidencepack_source_coverage"
+        },
+        {
+          "type": "must_exclude_expired_superseded_memory_items"
+        },
+        {
+          "type": "must_not_return_future_memory_as_current"
+        },
+        {
+          "type": "must_preserve_cross_group_source_refs"
+        },
+        {
+          "type": "must_preserve_speaker_attribution"
+        },
+        {
+          "type": "must_preserve_multi_hop_actor_chain"
+        },
+        {
+          "type": "must_require_complete_chain_before_answer"
+        },
+        {
           "type": "must_preserve_projection_versions"
         }
       ]
@@ -297,6 +337,12 @@
           "type": "must_preserve_speaker_attribution"
         },
         {
+          "type": "must_preserve_multi_hop_actor_chain"
+        },
+        {
+          "type": "must_require_complete_chain_before_answer"
+        },
+        {
           "type": "must_preserve_projection_versions"
         }
       ]
@@ -392,6 +438,12 @@
         },
         {
           "type": "must_preserve_speaker_attribution"
+        },
+        {
+          "type": "must_preserve_multi_hop_actor_chain"
+        },
+        {
+          "type": "must_require_complete_chain_before_answer"
         },
         {
           "type": "must_preserve_projection_versions"
@@ -1024,6 +1076,50 @@
         },
         {
           "type": "must_not_return_raw_output"
+        }
+      ]
+    },
+    {
+      "id": "memory-service-live-current-and-graph",
+      "family": "collaborative_memory",
+      "stage": "memory-service",
+      "status": "active",
+      "query": "verify current memory window and graph dependency edge",
+      "risk": "Memory-service live smoke must prove source refs, validity windows, supersession and graph edges survive the public memory API",
+      "required_assertions": [
+        {
+          "type": "must_preserve_memory_source_refs"
+        },
+        {
+          "type": "must_preserve_memory_validity_window"
+        },
+        {
+          "type": "must_link_superseded_memory"
+        },
+        {
+          "type": "must_exclude_superseded_current_memory"
+        },
+        {
+          "type": "must_preserve_task_decision_dependency_edges"
+        }
+      ]
+    },
+    {
+      "id": "memory-service-live-reviewed-profile-and-deleted-support",
+      "family": "profile_overgeneralization",
+      "stage": "memory-service",
+      "status": "active",
+      "query": "verify reviewed profile support and deleted-support exclusion",
+      "risk": "Memory-service live smoke must prove reviewed multi-source profiles keep supporting memory ids and active profiles backed by deleted support are excluded",
+      "required_assertions": [
+        {
+          "type": "must_allow_reviewed_multi_source_profile"
+        },
+        {
+          "type": "must_preserve_profile_supporting_evidence"
+        },
+        {
+          "type": "must_expire_profile_when_supporting_memory_deleted"
         }
       ]
     },

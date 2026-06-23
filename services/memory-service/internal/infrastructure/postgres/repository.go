@@ -255,6 +255,22 @@ SELECT
 FROM memory_profile_aggregates
 WHERE `+strings.Join(filters, "\n  AND ")+`
   AND review_state <> 'REJECTED'
+  AND (
+	status <> 'ACTIVE'
+	OR jsonb_array_length(supporting_memory_event_ids) = 0
+	OR NOT EXISTS (
+		SELECT 1
+		FROM jsonb_array_elements_text(supporting_memory_event_ids) AS support(memory_event_id)
+		WHERE NOT EXISTS (
+			SELECT 1
+			FROM memory_structured_events e
+			WHERE e.tenant_id = memory_profile_aggregates.tenant_id
+			  AND e.memory_event_id = support.memory_event_id
+			  AND e.status = 'ACTIVE'
+			  AND e.review_state = 'APPROVED'
+		)
+	)
+  )
 ORDER BY updated_at DESC, profile_id ASC
 LIMIT $4
 `, args...)

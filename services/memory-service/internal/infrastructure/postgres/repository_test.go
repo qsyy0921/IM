@@ -183,6 +183,84 @@ func TestRepositoryQueryMemoryEventsAtConversationSeqIntegration(t *testing.T) {
 	}
 }
 
+func TestRepositoryListProfileAggregatesRequiresActiveSupportingMemoryIntegration(t *testing.T) {
+	ctx := context.Background()
+	pool := openMemoryTestPool(t)
+	resetMemoryTables(t, ctx, pool)
+	repository := NewRepository(pool)
+	seedRuntimeMemoryWindow(t, ctx, pool, "tenant-1", "conv-1")
+	if _, err := pool.Exec(ctx, `
+INSERT INTO memory_structured_events (
+	tenant_id,
+	memory_event_id,
+	scope_type,
+	scope_id,
+	conversation_id,
+	topic,
+	event_type,
+	status,
+	review_state,
+	fact_text,
+	actor_user_ids,
+	audience_user_ids,
+	valid_from_seq,
+	valid_to_seq,
+	supersedes_event_ids,
+	contradicts_event_ids,
+	confidence,
+	visibility_version,
+	extraction_version,
+	source_projection_version
+) VALUES
+($1, 'mem-deleted-support', 'CONVERSATION', $2, $2, 'runtime-memory', 'PROFILE_SIGNAL', 'DELETED', 'APPROVED', 'deleted support should not keep an active profile visible', '["user-1"]'::jsonb, '[]'::jsonb, 14, NULL, '[]'::jsonb, '[]'::jsonb, 0.9000, 1, 'test-v1', 30)
+`, "tenant-1", "conv-1"); err != nil {
+		t.Fatalf("seed deleted support: %v", err)
+	}
+	if _, err := pool.Exec(ctx, `
+INSERT INTO memory_profile_aggregates (
+	tenant_id,
+	profile_id,
+	subject_user_id,
+	aggregate_type,
+	aggregate_key,
+	status,
+	review_state,
+	summary_text,
+	supporting_memory_event_ids,
+	confidence,
+	updated_by_memory_event_id
+) VALUES
+($1, 'profile-active', 'user-1', 'SKILL', 'phoenix-launch', 'ACTIVE', 'APPROVED', 'reviewed multi-source profile with active supporting evidence', '["mem-current", "mem-replacement"]'::jsonb, 0.9100, 'mem-replacement'),
+($1, 'profile-stale-support', 'user-1', 'SKILL', 'deleted-support', 'ACTIVE', 'APPROVED', 'profile with deleted support must not be returned as active', '["mem-deleted-support"]'::jsonb, 0.9200, 'mem-deleted-support')
+`, "tenant-1"); err != nil {
+		t.Fatalf("seed profiles: %v", err)
+	}
+
+	items, err := repository.ListProfileAggregates(ctx, types.ListProfileAggregatesCommand{
+		AuthContext: types.AuthContext{
+			TenantID: "tenant-1",
+			UserID:   "user-1",
+			DeviceID: "device-1",
+		},
+		SubjectUserID: "user-1",
+		AggregateType: "SKILL",
+		Statuses:      []string{types.MemoryStatusActive},
+		Limit:         10,
+	}, 10)
+	if err != nil {
+		t.Fatalf("list profile aggregates: %v", err)
+	}
+	if len(items) != 1 {
+		t.Fatalf("expected only active profile with active support, got %d: %+v", len(items), items)
+	}
+	if items[0].ProfileID != "profile-active" {
+		t.Fatalf("unexpected profile returned: %+v", items[0])
+	}
+	if len(items[0].SupportingMemoryEventIDs) != 2 {
+		t.Fatalf("expected profile supporting memory ids to be preserved: %+v", items[0].SupportingMemoryEventIDs)
+	}
+}
+
 func TestRepositoryTombstonesMemoryByMessageIntegration(t *testing.T) {
 	ctx := context.Background()
 	pool := openMemoryTestPool(t)

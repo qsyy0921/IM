@@ -24,6 +24,11 @@
 - EvidencePack -> memory-service current-only query 已落：默认 memory status 收敛为
   ACTIVE，显式 `at_conversation_seq` 透传给 memory-service；未传时使用 search hit
   最大 conversation seq 作为 first-stage recovery。
+- 2026-06-23 retrieval-gateway optional live adapter first pass 已落：
+  `run-ai-eval-retrieval-adapter.ps1` 运行 `loadtest/retrieval` 并把 EvidencePack
+  source type、source refs、speaker attribution、stale/future memory exclusion、
+  multi-hop actor/source chain 和 projection version 检查映射到 ai-eval cases。
 
-下一步：把 selected cross-group / temporal cases 扩到 RAG / summary / Agent
-service-stack consumption；后续不绕过 retrieval-gateway。
+下一步：真实服务栈启动后运行 retrieval-gateway optional adapter 并归档报告；
+后续继续把 graph / profile 证据通过 EvidencePack 暴露给 RAG / summary / Agent，
+仍不绕过 retrieval-gateway。

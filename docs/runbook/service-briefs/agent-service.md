@@ -18,6 +18,9 @@ proposal 前调用 `mcp-gateway.PrepareToolCall` 做 skill / policy / prepare au
 - Agent adapter smoke、Agent -> mcp-gateway smoke、Agent execution eval adapter first path 和 Agent output safety fixture eval 已落。
 - `at_conversation_seq` 已透传到 EvidencePack；CI-safe regression 和 2026-06-20 live smoke 均验证 proposal 不引用 stale memory。
 - 2026-06-20 cross-group / temporal stack smoke 已验证 proposal path 保留跨群 source refs / speaker attribution，并排除 stale / future memory。
+- 2026-06-23 Agent live adapter 已增加 multi-hop actor/source-chain completeness
+  断言；仍只提交 proposal，不直接执行 tool / business mutation，不绕过
+  mcp-gateway、policy、approval 或 audit。
 
 ## 边界
 
@@ -26,4 +29,6 @@ proposal 前调用 `mcp-gateway.PrepareToolCall` 做 skill / policy / prepare au
 
 ## 下一步
 
-- 40/40 optional stack gate 已覆盖跨群 / 时间窗口断言；下一步扩展 multi-hop / temporal update / profile aggregation Agent 场景；仍只提交 proposal。
+- 真实服务栈启动后与 memory-service / retrieval-gateway adapter 一起跑完整
+  optional gate；之后扩展 temporal update / profile aggregation Agent 场景；
+  仍只提交 proposal。

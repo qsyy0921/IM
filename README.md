@@ -279,7 +279,7 @@ message / conversation / policy events -> search-service + memory-service projec
 | `skill-registry` | 技能目录、输入输出合约、风险等级、审批要求和审计元数据。 |
 | `mcp-gateway` | tool prepare 边界、skill catalog check、policy precheck、低敏 audit，不直接执行外部工具。 |
 | `action-executor` | approved execution audit、proposal / approval / prepare audit 校验、本地安全 adapter、guarded external HTTP provider adapter、eval smoke。 |
-| `ai-eval-service` | 低敏 eval catalog / recorder / gate；case catalog 70，profile-Agent safety fixture 20，覆盖 collaborative memory、profile aggregation、Agent output 和 action safety。 |
+| `ai-eval-service` | 低敏 eval catalog / recorder / gate；case catalog 73，profile-Agent safety fixture 20，并已有 memory-service / retrieval-gateway optional live adapter first pass，覆盖 collaborative memory、profile aggregation、EvidencePack、Agent output 和 action safety。 |
 | `ai/python` | Python AI Worker 候选层：contract guard、低敏 safety guard、candidate-only worker CLI、`IM` conda toolchain。 |
 
 已进入 product-active first-stage 的平台 / 产品服务：
@@ -326,8 +326,10 @@ group memory
 
 当前 AI eval 已把 collaborative memory 的 multi-hop actor chain、workstream /
 decision dependency edge、reviewed multi-source profile activation 和
-supporting-memory delete 后 profile recompute 纳入低敏 fixture gate；下一步是把这些
-fixture 要求提升到 memory-service / retrieval / RAG / Agent live stack adapter。
+supporting-memory delete 后 profile recompute 纳入低敏 fixture gate，并完成
+memory-service / retrieval-gateway optional live adapter first pass；RAG /
+Summary / Agent live adapters 也会断言 multi-hop actor/source-chain
+completeness。下一步是在真实服务栈启动后跑完整 optional service-stack gate。
 
 下一步默认看 [current-goal.md](docs/runbook/current-goal.md)。截至当前主线，客户端只修
 阻塞演示入口的问题；默认推进

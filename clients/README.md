@@ -176,6 +176,7 @@ npm --prefix clients run test:desktop-installer-builder
 npm --prefix clients run test:desktop-installer-plan
 npm --prefix clients run test:desktop-signing-executor
 npm --prefix clients run test:desktop-signing-plan
+npm --prefix clients run test:desktop-signing-readiness
 npm --prefix clients run test:desktop-signature-verifier
 npm --prefix clients run test:web-shell-actions
 npm --prefix clients run test:shell-smoke-plan
@@ -202,6 +203,7 @@ npm --prefix clients run bundle:desktop
 npm --prefix clients run build:desktop-installer
 npm --prefix clients run plan:desktop-installer
 npm --prefix clients run plan:desktop-signing
+npm --prefix clients run report:desktop-signing-readiness
 npm --prefix clients run sign:desktop-artifact
 npm --prefix clients run verify:desktop-signature
 ```
@@ -277,6 +279,12 @@ desktop-installer` when verifying an installer. It does not sign, install,
 launch, start services or download toolchains. Use `--require-valid` in a
 release profile to fail closed when the selected artifact is not
 Authenticode-valid.
+`report:desktop-signing-readiness` is the release-readiness summary over the
+same controls. It combines the signing plan, plan-only signing execution output,
+read-only Authenticode verification and MSI / NSIS installer plan into one
+low-sensitive JSON report. It does not sign, build installers, install, launch,
+start services, start Docker or download toolchains, and it keeps unsigned /
+invalid artifacts blocked until real signing input and a valid signature exist.
 `plan:desktop-installer` reads the repository installer Tauri profile, the
 collected Windows desktop manifest, the signing readiness plan and the
 read-only signature verification report, then reports whether MSI / NSIS
@@ -328,7 +336,9 @@ Current packaging status:
   `README-windows-desktop.txt` and `launch-nexusim-windows.ps1`. A portable
   unsigned local zip bundle can be produced with `bundle:desktop`.
   `plan:desktop-signing` now checks explicit code-signing readiness and produces
-  only a low-sensitive plan. `sign:desktop-artifact` is the explicit
+  only a low-sensitive plan. `report:desktop-signing-readiness` now summarizes
+  signing input readiness, read-only signature validity and installer blockers
+  without signing or building. `sign:desktop-artifact` is the explicit
   `--execute`-gated signing wrapper over that plan and fails closed until real
   signing inputs are present. `verify:desktop-signature` reads Authenticode
   public status. A new `desktop-executable` artifact was recollected at
@@ -382,7 +392,8 @@ Current packaging status:
   local-store / IndexedDB contracts, Web shell lifecycle / automation /
   smoke-report contracts, shell asset prep, desktop artifact launch / composed
   smoke dry-run contracts, artifact readiness / install-plan / builder /
-  collector / desktop installer builder / installer readiness / signing plan
+  collector / desktop installer builder / installer readiness / signing plan /
+  signing readiness report
   contracts, Android builder profile / wrapper contracts, desktop
   WebView metadata / login dry-run contracts, Android metadata / login dry-run
   contracts, Android device / WebView devtools readiness and parser contracts and

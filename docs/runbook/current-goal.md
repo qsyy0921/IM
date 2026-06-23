@@ -34,7 +34,8 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
 - 已有 clean smoke 覆盖真实双用户好友直聊、群聊 first path、群资料 BFF
   read/update 和群成员动作链路；证据见 `docs/runbook/client-platform.md`。
 - Windows desktop 已有 artifact / signing / installer plan first paths；签名 / installer
-  工具已支持显式 local signing profile 输入；当前不宣称已有生产签名 installer。
+  工具已支持显式 local signing profile 输入，并有只读 release readiness report 汇总
+  签名输入、签名验证和 installer 阻塞；当前不宣称已有生产签名 installer。
 - Android 已有 WebView shell / bridge / APK 历史产物和 metadata smoke；后续切回时重新加载 toolchain env 或 Docker builder。
 
 ## 下一步优先级

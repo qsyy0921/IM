@@ -185,6 +185,11 @@ const checkPlan = [
     reason: "guards explicit desktop code-signing readiness without signing artifacts"
   },
   {
+    name: "desktop-signing-readiness-report-contract",
+    script: "test:desktop-signing-readiness",
+    reason: "guards desktop release signing readiness reporting without signing artifacts"
+  },
+  {
     name: "desktop-signing-executor-contract",
     script: "test:desktop-signing-executor",
     reason: "guards explicit desktop code-signing execution opt-in without signing artifacts by default"

@@ -274,7 +274,7 @@ First slice:
   smoke-report contracts, clientweb smoke hook contract, desktop artifact launch
   / composed smoke dry-run contracts, artifact readiness / install-plan / builder
   / collector contracts, desktop installer builder / installer readiness /
-  signing profile / signing readiness plan contracts,
+  signing profile / signing readiness plan / signing readiness report contracts,
   Android builder profile / wrapper contracts, desktop / Android action assets, desktop WebView
   metadata / login dry-run contracts,
   Android metadata / login smoke dry-run contracts, Android device / WebView
@@ -515,6 +515,12 @@ First slice:
   explicitly. It is plan-only: it does not sign, download tools, install
   packages, launch the desktop app or print local absolute paths. Missing kind
   or signing inputs remain fail-closed as `readyToSign=false`.
+  `report:desktop-signing-readiness` combines that signing plan, plan-only
+  signing execution state, read-only Authenticode verification and MSI / NSIS
+  installer blockers into one low-sensitive release-readiness JSON report. It
+  does not sign, build installers, install, launch, start services, start Docker
+  or download toolchains; unsigned or invalid artifacts remain blocked until a
+  real signature verifies.
   `sign:desktop-artifact` is the explicit execution wrapper for that plan. Its
   default output remains plan-only and low-sensitive; it invokes `signtool` only
   with `--execute` after the collected artifact hash, explicit `signtool`,
@@ -685,6 +691,7 @@ npm --prefix clients run test:desktop-installer-builder
 npm --prefix clients run test:desktop-installer-plan
 npm --prefix clients run test:desktop-signing-profile
 npm --prefix clients run test:desktop-signing-plan
+npm --prefix clients run test:desktop-signing-readiness
 npm --prefix clients run test:android-docker-builder
 npm --prefix clients run test:native-store-readiness
 npm --prefix clients run test:android-webview-metadata-smoke
@@ -719,6 +726,7 @@ npm --prefix clients run bundle:desktop
 npm --prefix clients run build:desktop-installer
 npm --prefix clients run plan:desktop-installer
 npm --prefix clients run plan:desktop-signing
+npm --prefix clients run report:desktop-signing-readiness
 npm --prefix clients run sign:desktop-artifact
 npm --prefix clients run verify:desktop-signature
 npm --prefix clients run smoke:desktop-artifact-launch

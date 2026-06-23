@@ -15,6 +15,7 @@ param(
     [string]$RunName = "",
     [switch]$KeepAlive,
     [switch]$SkipBuild,
+    [switch]$RunBrowserMultiuserUISmoke,
     [switch]$RunDesktopWebViewLoginSmoke,
     [switch]$DesktopWebViewSkipWebBuild,
     [switch]$RunAndroidWebViewLoginSmoke,
@@ -429,6 +430,42 @@ try {
         --cleanup
     if ($LASTEXITCODE -ne 0) {
         throw "client web smoke runner failed with exit code $LASTEXITCODE"
+    }
+
+    if ($RunBrowserMultiuserUISmoke) {
+        $browserFixturePath = Join-Path ([System.IO.Path]::GetTempPath()) ("nexusim-browser-multiuser-ui-" + [System.Guid]::NewGuid().ToString("N") + ".json")
+        $browserSummaryPath = Join-Path $resultDir "browser-multiuser-ui-smoke-summary.json"
+        try {
+            $browserFixture = [ordered]@{
+                apiBaseURL = $bffBaseURL
+                pushWebSocketURL = $pushURL
+                tenantID = $tenantId
+                senderUserID = $senderUserId
+                senderLoginInput = $senderPassword
+                receiverUserID = $receiverUserId
+                receiverLoginInput = $receiverPassword
+            }
+            [System.IO.File]::WriteAllText(
+                $browserFixturePath,
+                ($browserFixture | ConvertTo-Json -Depth 4),
+                [System.Text.UTF8Encoding]::new($false)
+            )
+
+            & npm --prefix clients run smoke:browser-multiuser-ui -- `
+                --fixture $browserFixturePath `
+                --run-id "browser-multiuser-ui-$safeRunName" `
+                --output $browserSummaryPath `
+                --web-url "http://127.0.0.1:5173" `
+                --start-web
+            if ($LASTEXITCODE -ne 0) {
+                throw "browser multi-user UI smoke failed with exit code $LASTEXITCODE"
+            }
+            if (-not (Test-Path $browserSummaryPath)) {
+                throw "browser multi-user UI smoke did not write summary"
+            }
+        } finally {
+            Remove-Item -LiteralPath $browserFixturePath -Force -ErrorAction SilentlyContinue
+        }
     }
 
     if ($RunDesktopWebViewLoginSmoke) {

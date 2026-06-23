@@ -1389,6 +1389,8 @@ export function App() {
                 {conversations.map(conversation => (
                   <button
                     data-testid="conversation-item"
+                    data-conversation-id={conversation.conversationID}
+                    data-conversation-type={conversation.type}
                     className={`conversation-item ${conversation.conversationID === activeConversationID ? "active" : ""}`}
                     key={conversation.conversationID}
                     onClick={() => void run("select conversation", () => selectConversation(conversation.conversationID))}
@@ -1418,6 +1420,7 @@ export function App() {
                 {visibleContacts.map(contact => (
                   <button
                     data-testid="friend-conversation-item"
+                    data-contact-user-id={contact.contactUserID}
                     className="friend-item"
                     key={contact.contactUserID}
                     type="button"

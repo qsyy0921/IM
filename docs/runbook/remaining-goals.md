@@ -29,8 +29,8 @@
 - Windows PC：继续真实 signing input、valid signed artifact、MSI / NSIS installer、
   signed installer experience；当前 `signtool` 可定位，但仍缺代码签名证书和 valid
   Authenticode signature。
-- Web / PC shell：继续更丰富群设置，把 `plan:browser-multiuser-ui-smoke`
-  低敏计划推进成真实浏览器 / PC UI run，继续群头像上传链路；头像上传需要后续接
+- Web / PC shell：运行并归档 `-RunBrowserMultiuserUISmoke` 真实浏览器 / PC
+  UI smoke 报告；继续更丰富群设置和群头像上传链路；头像上传需要后续接
   media-service，不得直接写 conversation-service 私表。
 - Desktop runtime：继续真实 UI lifecycle 和 installer / signing 流水线；portable zip
   与 install plan 已有 first-stage 本地路径。

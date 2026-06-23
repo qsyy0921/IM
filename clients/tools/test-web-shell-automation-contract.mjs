@@ -72,6 +72,8 @@ for (const testID of requiredTestIDs) {
 assertIncludes(appSource, "setLastAck({ conversationID, seq: maxSeq })", "web shell must expose AckDelivery progress after sync");
 assertIncludes(appSource, "runtime.ackQueue.flush(currentSession)", "web shell must keep AckDelivery inside shared runtime path");
 assertIncludes(appSource, "openDirectConversation(contact)", "web shell must let users click a friend to open direct chat");
+assertIncludes(appSource, "data-conversation-id={conversation.conversationID}", "web shell must expose low-sensitive conversation id metadata for UI smoke automation");
+assertIncludes(appSource, "data-contact-user-id={contact.contactUserID}", "web shell must expose low-sensitive contact id metadata for UI smoke automation");
 assertIncludes(appSource, "inviteGroupMember", "web shell must expose group member invite action");
 assertIncludes(appSource, "leaveGroupConversation", "web shell must expose group leave action");
 assertIncludes(appSource, "loadGroupMembers", "web shell must load real group members through BFF");

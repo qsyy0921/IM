@@ -150,6 +150,11 @@ const checkPlan = [
     reason: "guards low-sensitive browser / PC multi-user UI smoke planning from real clientweb smoke evidence"
   },
   {
+    name: "browser-multiuser-ui-smoke-runner-contract",
+    script: "test:browser-multiuser-ui-smoke",
+    reason: "guards the real browser / PC multi-user UI smoke runner dry-run contract without launching browsers"
+  },
+  {
     name: "shell-web-assets",
     script: "test:shell-web-assets",
     reason: "guards target shell asset manifest and PWA asset propagation"

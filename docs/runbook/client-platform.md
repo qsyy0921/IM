@@ -155,10 +155,18 @@ First slice:
   selectors, but deliberately does not persist passwords, gateway tokens, push
   tokens or refresh tokens. It is a contract and operator checklist for the next
   real browser / PC UI run; it does not claim browser automation has already run.
+  `smoke:browser-multiuser-ui` is now the opt-in real runner for that plan. It
+  starts two isolated Chromium profiles, drives the rendered Web shell through
+  CDP, logs in sender / receiver, clicks the friend list to open direct chat,
+  creates a group through UI, invites the receiver through group settings,
+  sends direct and group messages, then verifies receiver PullInbox / ACK in
+  the UI. `loadtest/clientweb/run-local-smoke.ps1 -RunBrowserMultiuserUISmoke`
+  wires a temporary local fixture and deletes it after the run. The default
+  clientweb smoke still does not launch browsers.
   Conversation profile facts are owned by
   `conversation-service`; Web / PC shell only uses the api-gateway BFF. Remaining
   group product work is richer group settings, media-service-backed avatar upload
-  and turning the multi-user UI smoke plan into a real browser / PC UI run.
+  and archiving the first real browser / PC UI smoke report.
 - The Web / PC shell now also keeps explicit display-title and UX copy rules:
   direct / group titles learned from user actions survive conversation refresh,
   unknown server summaries render as short explicit conversation IDs, empty
@@ -765,6 +773,7 @@ Focused local check:
 ```powershell
 npm --prefix clients run check:build-prereqs
 npm --prefix clients run plan:browser-multiuser-ui-smoke -- --result-dir <clientweb-result-dir> --output <clientweb-result-dir>\browser-ui-smoke-plan.json
+npm --prefix clients run smoke:browser-multiuser-ui -- --dry-run --fixture <temporary-fixture.json>
 npm --prefix clients run test:shell-config
 npm --prefix clients run check:no-toolchain
 npm --prefix clients run test:web-pwa

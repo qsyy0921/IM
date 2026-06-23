@@ -79,8 +79,8 @@ try {
   writeFileSync(
     fakeSignTool,
     process.platform === "win32"
-      ? "@echo off\r\necho signed> \"%~dp0signed.txt\"\r\nexit /b 0\r\n"
-      : "#!/bin/sh\nprintf signed > \"$(dirname \"$0\")/signed.txt\"\n"
+      ? "@echo off\r\necho signed> \"%~dp0signed.txt\"\r\necho %*> \"%~dp0signed-args.txt\"\r\nexit /b 0\r\n"
+      : "#!/bin/sh\nprintf signed > \"$(dirname \"$0\")/signed.txt\"\nprintf '%s\\n' \"$*\" > \"$(dirname \"$0\")/signed-args.txt\"\n"
   );
   writeFileSync(signingProfile, `${JSON.stringify({
     schemaVersion: "nexusim.desktop-signing-profile.v1",
@@ -266,6 +266,34 @@ try {
     });
     assert(readyExecuteProfile.status === 0, `profile execute should run fake signing tool: ${readyExecuteProfile.stderr}`);
     assert(readFileSync(join(tempRoot, "signed.txt"), "utf8").trim() === "signed", "profile execute should invoke the signing tool");
+
+    rmSync(join(tempRoot, "signed.txt"), { force: true });
+    rmSync(join(tempRoot, "signed-args.txt"), { force: true });
+    const readyExecuteInstaller = spawnSync(process.execPath, [
+      signer,
+      "--execute",
+      "--manifest",
+      mixedManifestPath,
+      "--artifact-kind",
+      "desktop-installer",
+      "--signtool",
+      fakeSignTool,
+      "--cert-file",
+      fakePfx,
+      "--timestamp-url",
+      "https://timestamp.example.test"
+    ], {
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        ...pfxFixture.env
+      }
+    });
+    assert(readyExecuteInstaller.status === 0, `installer execute should run fake signing tool: ${readyExecuteInstaller.stderr}`);
+    assert(readFileSync(join(tempRoot, "signed.txt"), "utf8").trim() === "signed", "installer execute should invoke the signing tool");
+    const installerArgs = readFileSync(join(tempRoot, "signed-args.txt"), "utf8");
+    assert(installerArgs.includes("nexusim-windows-desktop-installer.msi"), "installer execute should sign the collected installer artifact");
+    assert(!installerArgs.includes("nexusim-windows-desktop.exe"), "installer execute must not sign the executable when artifact-kind is desktop-installer");
 
     rmSync(join(tempRoot, "signed.txt"), { force: true });
     const readyExecuteRequireValid = spawnSync(process.execPath, [

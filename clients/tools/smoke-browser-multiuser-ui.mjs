@@ -202,13 +202,14 @@ async function main(argv) {
         terminateProcess(session.child.pid);
       }
       if (session.tempRoot) {
-        rmSync(session.tempRoot, { recursive: true, force: true });
+        removeTempRoot(session.tempRoot);
       }
     }
     if (webServer?.pid) {
       terminateProcess(webServer.pid);
     }
   }
+  process.exit(process.exitCode ?? 0);
 }
 
 function dryRunExecutionPolicy() {
@@ -757,6 +758,15 @@ function terminateProcess(pid) {
     return true;
   } catch {
     return false;
+  }
+}
+
+function removeTempRoot(path) {
+  try {
+    rmSync(path, { recursive: true, force: true, maxRetries: 1, retryDelay: 100 });
+  } catch {
+    // Temp browser profiles are smoke-only artifacts. Cleanup is best-effort so
+    // a locked profile cannot hide the already emitted smoke verdict.
   }
 }
 

@@ -458,11 +458,9 @@ export function App() {
     await run("create group", async () => {
       const currentSession = requireSession();
       const displayName = newGroupName.trim() || "新群聊";
-      const conversationID = newConversationID(displayName);
       const created = await runtime.bff.createConversation(
         {
           tenantID: currentSession.tenantID,
-          conversationID,
           type: "GROUP",
           idempotencyKey: newID()
         },
@@ -2064,16 +2062,6 @@ function newID(): string {
     return globalThis.crypto.randomUUID();
   }
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-}
-
-function newConversationID(title: string): string {
-  const slug = title
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 24);
-  return `group-${slug || "chat"}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
 }
 
 function draftsFromContacts(contacts: ContactItem[], field: "remark" | "groupName"): Record<string, string> {

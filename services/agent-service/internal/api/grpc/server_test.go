@@ -39,6 +39,28 @@ func TestServerCreateAgentProposal(t *testing.T) {
 			PackID:         "pack-1",
 			TenantID:       "tenant-1",
 			ConversationID: "conv-1",
+			Items: []types.EvidenceItem{{
+				EvidenceID:      "memory:mem-1",
+				SourceType:      types.EvidenceSourceMemoryEvent,
+				SourceID:        "mem-1",
+				MemoryEventID:   "mem-1",
+				ConversationID:  "conv-1",
+				ConversationSeq: 2,
+				MemoryGraphEdges: []types.MemoryGraphEdge{{
+					EdgeID:            "edge-1",
+					FromMemoryEventID: "mem-1",
+					ToMemoryEventID:   "mem-2",
+					RelationType:      "SUPPORTS",
+					Confidence:        0.91,
+					SourceRefs: []types.EvidenceSourceRef{{
+						SourceType:      types.EvidenceSourceSearchMessage,
+						SourceID:        "message-1",
+						SourceEventID:   "event-1",
+						ConversationID:  "conv-1",
+						ConversationSeq: 2,
+					}},
+				}},
+			}},
 		},
 		AgentVersion:    types.AgentVersion,
 		GeneratedByLLM:  false,
@@ -78,6 +100,10 @@ func TestServerCreateAgentProposal(t *testing.T) {
 		response.GetPreparedAuditId() != "mcp-audit-1" ||
 		len(response.GetCitations()) != 1 {
 		t.Fatalf("unexpected response: %+v", response)
+	}
+	edges := response.GetEvidencePack().GetItems()[0].GetMemoryGraphEdges()
+	if len(edges) != 1 || edges[0].GetRelationType() != "SUPPORTS" || len(edges[0].GetSourceRefs()) != 1 {
+		t.Fatalf("memory graph edge not mapped: %+v", edges)
 	}
 	if executor.command.ToolAction != types.ToolActionCall ||
 		executor.command.SkillID != "conversation.note.create" ||

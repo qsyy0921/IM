@@ -12,6 +12,7 @@ type SearchPort interface {
 
 type MemoryPort interface {
 	QueryMemoryEvents(context.Context, types.MemoryQuery) (types.MemoryResult, error)
+	GetMemoryEvent(context.Context, types.MemoryEventLookup) (types.MemoryEventLookupResult, error)
 }
 
 type PolicyPort interface {

@@ -50,9 +50,56 @@ func TestMemoryClientSendsAtConversationSeq(t *testing.T) {
 	}
 }
 
+func TestMemoryClientGetsGraphEdges(t *testing.T) {
+	fake := &fakeMemoryServiceClient{
+		getResponse: &memoryv1.GetMemoryEventResponse{
+			Item: &memoryv1.StructuredMemoryEvent{
+				MemoryEventId: "mem-1",
+				Status:        memoryv1.MemoryEventStatus_MEMORY_EVENT_STATUS_ACTIVE,
+				FactText:      "memory fact",
+			},
+			GraphEdges: []*memoryv1.MemoryGraphEdge{{
+				EdgeId:            "edge-1",
+				FromMemoryEventId: "mem-1",
+				ToMemoryEventId:   "mem-2",
+				RelationType:      "SUPPORTS",
+				Confidence:        0.9,
+				SourceRefs: []*memoryv1.SourceRef{{
+					SourceType:      memoryv1.MemorySourceType_MEMORY_SOURCE_TYPE_MESSAGE,
+					SourceId:        "msg-1",
+					ConversationId:  "conv-1",
+					ConversationSeq: 2,
+				}},
+			}},
+		},
+	}
+	result, err := NewMemoryClient(fake, time.Second).GetMemoryEvent(context.Background(), types.MemoryEventLookup{
+		AuthContext: types.AuthContext{
+			TenantID: "tenant-1",
+			UserID:   "user-1",
+			DeviceID: "device-1",
+		},
+		MemoryEventID: "mem-1",
+	})
+	if err != nil {
+		t.Fatalf("GetMemoryEvent returned error: %v", err)
+	}
+	if fake.getRequest.GetMemoryEventId() != "mem-1" {
+		t.Fatalf("unexpected get request: %+v", fake.getRequest)
+	}
+	if result.Item.MemoryEventID != "mem-1" || len(result.GraphEdges) != 1 {
+		t.Fatalf("unexpected result: %+v", result)
+	}
+	if edge := result.GraphEdges[0]; edge.RelationType != "SUPPORTS" || len(edge.SourceRefs) != 1 || edge.SourceRefs[0].SourceID != "msg-1" {
+		t.Fatalf("unexpected graph edge: %+v", edge)
+	}
+}
+
 type fakeMemoryServiceClient struct {
-	request  *memoryv1.QueryMemoryEventsRequest
-	response *memoryv1.QueryMemoryEventsResponse
+	request     *memoryv1.QueryMemoryEventsRequest
+	response    *memoryv1.QueryMemoryEventsResponse
+	getRequest  *memoryv1.GetMemoryEventRequest
+	getResponse *memoryv1.GetMemoryEventResponse
 }
 
 func (client *fakeMemoryServiceClient) QueryMemoryEvents(
@@ -65,11 +112,12 @@ func (client *fakeMemoryServiceClient) QueryMemoryEvents(
 }
 
 func (client *fakeMemoryServiceClient) GetMemoryEvent(
-	context.Context,
-	*memoryv1.GetMemoryEventRequest,
-	...grpc.CallOption,
+	_ context.Context,
+	request *memoryv1.GetMemoryEventRequest,
+	_ ...grpc.CallOption,
 ) (*memoryv1.GetMemoryEventResponse, error) {
-	return nil, nil
+	client.getRequest = request
+	return client.getResponse, nil
 }
 
 func (client *fakeMemoryServiceClient) ListProfileAggregates(

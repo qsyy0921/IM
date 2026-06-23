@@ -125,6 +125,10 @@ func evidenceItemFromProto(item *retrievalv1.EvidenceItem) types.EvidenceItem {
 			OccurredAt:      unixMillisToTime(ref.GetOccurredAtUnixMs()),
 		})
 	}
+	graphEdges := make([]types.MemoryGraphEdge, 0, len(item.GetMemoryGraphEdges()))
+	for _, edge := range item.GetMemoryGraphEdges() {
+		graphEdges = append(graphEdges, memoryGraphEdgeFromProto(edge))
+	}
 	return types.EvidenceItem{
 		EvidenceID:        item.GetEvidenceId(),
 		SourceType:        sourceTypeFromProto(item.GetSourceType()),
@@ -148,6 +152,32 @@ func evidenceItemFromProto(item *retrievalv1.EvidenceItem) types.EvidenceItem {
 		ExtractionVersion: item.GetExtractionVersion(),
 		RerankScore:       item.GetRerankScore(),
 		DedupeReason:      item.GetDedupeReason(),
+		MemoryGraphEdges:  graphEdges,
+	}
+}
+
+func memoryGraphEdgeFromProto(edge *retrievalv1.EvidenceMemoryGraphEdge) types.MemoryGraphEdge {
+	if edge == nil {
+		return types.MemoryGraphEdge{}
+	}
+	sourceRefs := make([]types.EvidenceSourceRef, 0, len(edge.GetSourceRefs()))
+	for _, ref := range edge.GetSourceRefs() {
+		sourceRefs = append(sourceRefs, types.EvidenceSourceRef{
+			SourceType:      ref.GetSourceType(),
+			SourceID:        ref.GetSourceId(),
+			SourceEventID:   ref.GetSourceEventId(),
+			ConversationID:  types.ConversationID(ref.GetConversationId()),
+			ConversationSeq: ref.GetConversationSeq(),
+			OccurredAt:      unixMillisToTime(ref.GetOccurredAtUnixMs()),
+		})
+	}
+	return types.MemoryGraphEdge{
+		EdgeID:            edge.GetEdgeId(),
+		FromMemoryEventID: edge.GetFromMemoryEventId(),
+		ToMemoryEventID:   edge.GetToMemoryEventId(),
+		RelationType:      edge.GetRelationType(),
+		Confidence:        edge.GetConfidence(),
+		SourceRefs:        sourceRefs,
 	}
 }
 

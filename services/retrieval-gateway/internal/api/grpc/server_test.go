@@ -27,6 +27,19 @@ func TestRetrieveEvidenceMapsResult(t *testing.T) {
 				MessageID:       "msg-1",
 				RerankScore:     0.9,
 				DedupeReason:    types.EvidenceDedupeUniqueSource,
+				MemoryGraphEdges: []types.MemoryGraphEdge{{
+					EdgeID:            "edge-1",
+					FromMemoryEventID: "mem-1",
+					ToMemoryEventID:   "mem-2",
+					RelationType:      "SUPPORTS",
+					Confidence:        0.8,
+					SourceRefs: []types.EvidenceSourceRef{{
+						SourceType:      "MESSAGE",
+						SourceID:        "msg-1",
+						ConversationID:  "conv-1",
+						ConversationSeq: 2,
+					}},
+				}},
 			}},
 			SourceCoverage: []types.EvidenceSourceCoverage{{
 				SourceType:     types.EvidenceSourceSearchMessage,
@@ -53,6 +66,10 @@ func TestRetrieveEvidenceMapsResult(t *testing.T) {
 	}
 	if got := response.GetPack().GetItems()[0].GetDedupeReason(); got != types.EvidenceDedupeUniqueSource {
 		t.Fatalf("unexpected dedupe reason %q", got)
+	}
+	edges := response.GetPack().GetItems()[0].GetMemoryGraphEdges()
+	if len(edges) != 1 || edges[0].GetRelationType() != "SUPPORTS" || len(edges[0].GetSourceRefs()) != 1 {
+		t.Fatalf("unexpected graph edges: %+v", edges)
 	}
 	coverage := response.GetPack().GetSourceCoverage()
 	if len(coverage) != 1 {

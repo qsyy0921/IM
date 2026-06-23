@@ -76,6 +76,7 @@ type seededData struct {
 	MemoryEventID            string `json:"memory_event_id"`
 	MemorySourceRefID        string `json:"memory_source_ref_id"`
 	CrossGroupSourceRefID    string `json:"cross_group_source_ref_id,omitempty"`
+	MemoryGraphEdgeID        string `json:"memory_graph_edge_id,omitempty"`
 	ExpiredMemoryEventID     string `json:"expired_memory_event_id,omitempty"`
 	SupersededMemoryEventID  string `json:"superseded_memory_event_id,omitempty"`
 	FutureMemoryEventID      string `json:"future_memory_event_id,omitempty"`
@@ -136,6 +137,7 @@ type agentSmokeSummary struct {
 	FutureMemoryExcluded                  bool         `json:"future_memory_excluded"`
 	CrossGroupSourceRefsPreserved         bool         `json:"cross_group_source_refs_preserved"`
 	CrossGroupSpeakerAttributionPreserved bool         `json:"cross_group_speaker_attribution_preserved"`
+	MemoryGraphEdgesPreserved             bool         `json:"memory_graph_edges_preserved"`
 	SourceCounts                          sourceCounts `json:"source_counts"`
 	SearchProjectionVersion               int64        `json:"search_projection_version"`
 	MemoryProjectionVersion               int64        `json:"memory_projection_version"`
@@ -502,6 +504,7 @@ func seedProjectionRows(ctx context.Context, pool *pgxpool.Pool, cfg config) (se
 	memoryEventID := "mem-agent-" + randomSuffix()
 	sourceRefID := "ref-agent-" + randomSuffix()
 	crossGroupSourceRefID := "ref-agent-cross-" + randomSuffix()
+	memoryGraphEdgeID := "edge-agent-supports-" + randomSuffix()
 	expiredMemoryEventID := "mem-agent-expired-" + randomSuffix()
 	expiredSourceRefID := "ref-agent-expired-" + randomSuffix()
 	supersededMemoryEventID := "mem-agent-superseded-" + randomSuffix()
@@ -582,6 +585,34 @@ INSERT INTO memory_event_source_refs (
 	($1, $2, $3, 'MESSAGE', $4, $5, $6, $7, $10, $10),
 	($1, $2, $8, 'MESSAGE', $11, $12, $9, $13, $10, $10)
 `, cfg.tenantID, memoryEventID, sourceRefID, messageID, sourceEventID, cfg.conversationID, seq, crossGroupSourceRefID, crossGroupConversationID, now, crossGroupMessageID, crossGroupSourceEventID, seq+1); err != nil {
+		return seededData{}, err
+	}
+
+	if _, err := tx.Exec(ctx, `
+INSERT INTO memory_graph_edges (
+	tenant_id, edge_id, from_memory_event_id, to_memory_event_id,
+	relation_type, confidence, source_refs, created_at
+) VALUES (
+	$1, $2, $3, $4, 'SUPPORTS', 0.9100,
+	jsonb_build_array(
+		jsonb_build_object(
+			'source_type', 'MESSAGE',
+			'source_id', $5::text,
+			'source_event_id', $6::text,
+			'conversation_id', $7::text,
+			'conversation_seq', $8
+		),
+		jsonb_build_object(
+			'source_type', 'MESSAGE',
+			'source_id', $9::text,
+			'source_event_id', $10::text,
+			'conversation_id', $11::text,
+			'conversation_seq', $12
+		)
+	),
+	$13
+)
+`, cfg.tenantID, memoryGraphEdgeID, memoryEventID, supersededMemoryEventID, messageID, sourceEventID, cfg.conversationID, seq, crossGroupMessageID, crossGroupSourceEventID, crossGroupConversationID, seq+1, now); err != nil {
 		return seededData{}, err
 	}
 
@@ -667,6 +698,7 @@ INSERT INTO memory_event_source_refs (
 		MemoryEventID:            memoryEventID,
 		MemorySourceRefID:        sourceRefID,
 		CrossGroupSourceRefID:    crossGroupSourceRefID,
+		MemoryGraphEdgeID:        memoryGraphEdgeID,
 		ExpiredMemoryEventID:     expiredMemoryEventID,
 		SupersededMemoryEventID:  supersededMemoryEventID,
 		FutureMemoryEventID:      futureMemoryEventID,
@@ -951,6 +983,7 @@ func verifyWorkflow(
 	}
 	verified = append(verified, "memory evidence preserved with active temporal status and source ref")
 	verified = append(verified, "cross-group memory source refs and speaker attribution preserved in EvidencePack")
+	verified = append(verified, "memory graph edge preserved in EvidencePack")
 	currentCheck, err := verifyCurrentMemoryOnly(pack, seed)
 	if err != nil {
 		return agentSmokeSummary{}, err
@@ -1029,6 +1062,7 @@ func verifyWorkflow(
 		FutureMemoryExcluded:                  currentCheck.FutureMemoryExcluded,
 		CrossGroupSourceRefsPreserved:         true,
 		CrossGroupSpeakerAttributionPreserved: true,
+		MemoryGraphEdgesPreserved:             true,
 		SourceCounts:                          counts,
 		SearchProjectionVersion:               pack.GetSearchProjectionVersion(),
 		MemoryProjectionVersion:               pack.GetMemoryProjectionVersion(),
@@ -1506,6 +1540,17 @@ func verifyMemoryItem(item *retrievalv1.EvidenceItem, seed seededData) error {
 	}
 	if !stringSliceContains(item.GetAudienceUserIds(), seed.ViewerUserID) {
 		return fmt.Errorf("unexpected audience user ids: %v", item.GetAudienceUserIds())
+	}
+	if len(item.GetMemoryGraphEdges()) != 1 {
+		return fmt.Errorf("memory item should preserve one graph edge, got %+v", item.GetMemoryGraphEdges())
+	}
+	edge := item.GetMemoryGraphEdges()[0]
+	if edge.GetEdgeId() != seed.MemoryGraphEdgeID ||
+		edge.GetFromMemoryEventId() != seed.MemoryEventID ||
+		edge.GetToMemoryEventId() != seed.SupersededMemoryEventID ||
+		edge.GetRelationType() != "SUPPORTS" ||
+		len(edge.GetSourceRefs()) != 2 {
+		return fmt.Errorf("unexpected memory graph edge: %+v", edge)
 	}
 	return nil
 }

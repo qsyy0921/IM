@@ -127,6 +127,15 @@ type EvidenceSourceRef struct {
 	OccurredAt      time.Time
 }
 
+type MemoryGraphEdge struct {
+	EdgeID            string
+	FromMemoryEventID string
+	ToMemoryEventID   string
+	RelationType      string
+	Confidence        float64
+	SourceRefs        []EvidenceSourceRef
+}
+
 type EvidenceItem struct {
 	EvidenceID        string
 	SourceType        string
@@ -150,6 +159,7 @@ type EvidenceItem struct {
 	ExtractionVersion string
 	RerankScore       float64
 	DedupeReason      string
+	MemoryGraphEdges  []MemoryGraphEdge
 }
 
 type EvidenceSourceCount struct {

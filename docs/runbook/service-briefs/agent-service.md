@@ -21,6 +21,10 @@ proposal 前调用 `mcp-gateway.PrepareToolCall` 做 skill / policy / prepare au
 - 2026-06-23 Agent live adapter 已增加 multi-hop actor/source-chain completeness
   断言；仍只提交 proposal，不直接执行 tool / business mutation，不绕过
   mcp-gateway、policy、approval 或 audit。
+- 2026-06-24 Agent EvidencePack graph edge 透传已落：retrieval client 会保留
+  `EvidenceMemoryGraphEdge`，gRPC response 会继续向 action / UI 调用方返回该字段；
+  `loadtest/agent` 会断言跨群 source refs 与 `SUPPORTS` memory graph edge 被保留，
+  proposal 仍只基于 EvidencePack 和 citation verifier。
 
 ## 边界
 
@@ -30,5 +34,5 @@ proposal 前调用 `mcp-gateway.PrepareToolCall` 做 skill / policy / prepare au
 ## 下一步
 
 - 真实服务栈启动后与 memory-service / retrieval-gateway adapter 一起跑完整
-  optional gate；之后扩展 temporal update / profile aggregation Agent 场景；
-  仍只提交 proposal。
+  optional gate；之后扩展 temporal update / profile aggregation 和更完整
+  group-memory Agent proposal 场景；仍只提交 proposal。

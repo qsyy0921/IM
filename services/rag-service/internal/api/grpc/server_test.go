@@ -41,6 +41,20 @@ func TestAnswerQuestionMapsResult(t *testing.T) {
 				ConversationID:  "conv-1",
 				ConversationSeq: 4,
 				Text:            "answer",
+				MemoryGraphEdges: []types.MemoryGraphEdge{{
+					EdgeID:            "edge-1",
+					FromMemoryEventID: "mem-1",
+					ToMemoryEventID:   "mem-2",
+					RelationType:      "SUPPORTS",
+					Confidence:        0.91,
+					SourceRefs: []types.EvidenceSourceRef{{
+						SourceType:      types.EvidenceSourceSearchMessage,
+						SourceID:        "msg-1",
+						SourceEventID:   "evt-1",
+						ConversationID:  "conv-1",
+						ConversationSeq: 4,
+					}},
+				}},
 			}},
 		},
 		RAGVersion:     types.RAGVersion,
@@ -59,6 +73,10 @@ func TestAnswerQuestionMapsResult(t *testing.T) {
 	}
 	if response.GetEvidencePack().GetItems()[0].GetText() != "answer" {
 		t.Fatalf("evidence pack not mapped: %+v", response.GetEvidencePack())
+	}
+	edges := response.GetEvidencePack().GetItems()[0].GetMemoryGraphEdges()
+	if len(edges) != 1 || edges[0].GetRelationType() != "SUPPORTS" || len(edges[0].GetSourceRefs()) != 1 {
+		t.Fatalf("memory graph edge not mapped: %+v", edges)
 	}
 	if response.GetCitations()[0].GetSourceEventId() != "evt-1" {
 		t.Fatalf("citation not mapped: %+v", response.GetCitations()[0])

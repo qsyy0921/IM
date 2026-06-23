@@ -60,6 +60,15 @@ message EvidenceSourceRef {
   int64 occurred_at_unix_ms = 6;
 }
 
+message EvidenceMemoryGraphEdge {
+  string edge_id = 1;
+  string from_memory_event_id = 2;
+  string to_memory_event_id = 3;
+  string relation_type = 4;
+  double confidence = 5;
+  repeated EvidenceSourceRef source_refs = 6;
+}
+
 message EvidenceItem {
   string evidence_id = 1;
   EvidenceSourceType source_type = 2;
@@ -83,6 +92,7 @@ message EvidenceItem {
   string extraction_version = 20;
   double rerank_score = 21;
   string dedupe_reason = 22;
+  repeated EvidenceMemoryGraphEdge memory_graph_edges = 23;
 }
 
 message EvidenceSourceCount {

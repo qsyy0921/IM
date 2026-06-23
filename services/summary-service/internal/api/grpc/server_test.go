@@ -25,6 +25,33 @@ func TestGenerateConversationSummaryMapsResult(t *testing.T) {
 			ConversationID:  "conv-1",
 			ConversationSeq: 2,
 		}},
+		EvidencePack: types.EvidencePack{
+			PackID:         "pack-1",
+			TenantID:       "tenant-1",
+			ConversationID: "conv-1",
+			Items: []types.EvidenceItem{{
+				EvidenceID:      "memory:mem-1",
+				SourceType:      types.EvidenceSourceMemoryEvent,
+				SourceID:        "mem-1",
+				MemoryEventID:   "mem-1",
+				ConversationID:  "conv-1",
+				ConversationSeq: 2,
+				MemoryGraphEdges: []types.MemoryGraphEdge{{
+					EdgeID:            "edge-1",
+					FromMemoryEventID: "mem-1",
+					ToMemoryEventID:   "mem-2",
+					RelationType:      "SUPPORTS",
+					Confidence:        0.91,
+					SourceRefs: []types.EvidenceSourceRef{{
+						SourceType:      types.EvidenceSourceSearchMessage,
+						SourceID:        "msg-1",
+						SourceEventID:   "evt-1",
+						ConversationID:  "conv-1",
+						ConversationSeq: 2,
+					}},
+				}},
+			}},
+		},
 	}}
 	server := NewServer(executor)
 	response, err := server.GenerateConversationSummary(context.Background(), validRequest())
@@ -39,6 +66,10 @@ func TestGenerateConversationSummaryMapsResult(t *testing.T) {
 	}
 	if len(response.GetCitations()) != 1 {
 		t.Fatalf("expected citation, got %#v", response.GetCitations())
+	}
+	edges := response.GetEvidencePack().GetItems()[0].GetMemoryGraphEdges()
+	if len(edges) != 1 || edges[0].GetRelationType() != "SUPPORTS" || len(edges[0].GetSourceRefs()) != 1 {
+		t.Fatalf("memory graph edge not mapped: %+v", edges)
 	}
 	if executor.command.AtConversationSeq != 13 {
 		t.Fatalf("expected at_conversation_seq to be mapped, got %+v", executor.command)

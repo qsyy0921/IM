@@ -1,6 +1,6 @@
 # retrieval-gateway
 
-状态：foundation-active / first EvidencePack smoke passed / EvidencePack field hardening first pass。
+状态：foundation-active / EvidencePack graph edge expansion first pass passed。
 
 定位：统一 search + memory 的检索入口，向 RAG / summary / Agent 提供
 `EvidencePack`。它不直接读业务库，不调用 LLM，不执行 Agent 动作。
@@ -33,6 +33,12 @@
   通过真实 `RetrieveEvidence` 覆盖 empty memory `source_coverage=EMPTY`、
   superseded memory 排除、source ref / dedupe reason 和 cross-tenant evidence
   isolation。完整 AI service-stack gate 已达到 51 passed / 0 skipped。
+- 2026-06-24 EvidencePack memory graph edge 扩展已落：
+  `RetrieveEvidence` 会对 memory hit 调用 memory-service 公开 `GetMemoryEvent`
+  读取 current memory graph edges，并把 `EvidenceMemoryGraphEdge` 放入
+  EvidencePack。memory lookup 失败会 fail-closed，不静默返回缺少 graph edge
+  的证据包。app / gRPC / RPC focused tests 和 `loadtest/retrieval` 已覆盖
+  `SUPPORTS` graph edge、跨群 source refs 和 actor attribution。
 
-下一步：继续把 group memory extraction、graph / profile 证据通过 EvidencePack
-暴露给 RAG / summary / Agent，仍不绕过 retrieval-gateway。
+下一步：继续把 group memory extraction、profile 证据和后续 rerank / coverage
+增强通过 EvidencePack 暴露给 RAG / summary / Agent，仍不绕过 retrieval-gateway。

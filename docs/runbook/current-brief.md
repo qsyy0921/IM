@@ -123,7 +123,12 @@ service-stack gate：8 adapters、51 cases、47 passed、0 failed、4 skipped。
 retrieval-gateway negative / miss adapter，完整 service-stack gate 达到
 9 adapters、51 cases、51 passed、0 failed、0 skipped。当前检索边界已覆盖
 empty memory source coverage、superseded memory 排除、source refs / dedupe
-reason 和 cross-tenant evidence isolation。
+reason 和 cross-tenant evidence isolation。2026-06-24 EvidencePack memory
+graph edge 扩展已落地：retrieval-gateway 通过 memory-service 公开
+`GetMemoryEvent` 读取 current memory graph edges，并把
+`EvidenceMemoryGraphEdge` 透传给 RAG / Agent；`loadtest/retrieval`、
+`loadtest/rag`、`loadtest/agent` 会断言跨群 source refs 与 `SUPPORTS`
+graph edge 被保留，lookup 失败 fail-closed。
 
 ## 不变量
 

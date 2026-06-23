@@ -157,6 +157,16 @@ type MemoryResult struct {
 	ProjectionVersion int64
 }
 
+type MemoryEventLookup struct {
+	AuthContext   AuthContext
+	MemoryEventID string
+}
+
+type MemoryEventLookupResult struct {
+	Item       MemoryEventEvidence
+	GraphEdges []MemoryGraphEdge
+}
+
 type RetrievalPolicyCheck struct {
 	AuthContext    AuthContext
 	ConversationID ConversationID
@@ -187,6 +197,7 @@ type MemoryEventEvidence struct {
 	Confidence        float64
 	VisibilityVersion int64
 	ExtractionVersion string
+	GraphEdges        []MemoryGraphEdge
 }
 
 type EvidenceSourceRef struct {
@@ -196,6 +207,15 @@ type EvidenceSourceRef struct {
 	ConversationID  ConversationID
 	ConversationSeq int64
 	OccurredAt      time.Time
+}
+
+type MemoryGraphEdge struct {
+	EdgeID            string
+	FromMemoryEventID string
+	ToMemoryEventID   string
+	RelationType      string
+	Confidence        float64
+	SourceRefs        []EvidenceSourceRef
 }
 
 type EvidenceItem struct {
@@ -221,6 +241,7 @@ type EvidenceItem struct {
 	ExtractionVersion string
 	RerankScore       float64
 	DedupeReason      string
+	MemoryGraphEdges  []MemoryGraphEdge
 }
 
 type EvidenceSourceCount struct {

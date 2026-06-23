@@ -176,6 +176,10 @@ func evidenceItemToProto(item types.EvidenceItem) *retrievalv1.EvidenceItem {
 			OccurredAtUnixMs: unixMillis(ref.OccurredAt),
 		})
 	}
+	graphEdges := make([]*retrievalv1.EvidenceMemoryGraphEdge, 0, len(item.MemoryGraphEdges))
+	for _, edge := range item.MemoryGraphEdges {
+		graphEdges = append(graphEdges, memoryGraphEdgeToProto(edge))
+	}
 	return &retrievalv1.EvidenceItem{
 		EvidenceId:        item.EvidenceID,
 		SourceType:        sourceTypeToProto(item.SourceType),
@@ -199,6 +203,29 @@ func evidenceItemToProto(item types.EvidenceItem) *retrievalv1.EvidenceItem {
 		ExtractionVersion: item.ExtractionVersion,
 		RerankScore:       item.RerankScore,
 		DedupeReason:      item.DedupeReason,
+		MemoryGraphEdges:  graphEdges,
+	}
+}
+
+func memoryGraphEdgeToProto(edge types.MemoryGraphEdge) *retrievalv1.EvidenceMemoryGraphEdge {
+	sourceRefs := make([]*retrievalv1.EvidenceSourceRef, 0, len(edge.SourceRefs))
+	for _, ref := range edge.SourceRefs {
+		sourceRefs = append(sourceRefs, &retrievalv1.EvidenceSourceRef{
+			SourceType:       ref.SourceType,
+			SourceId:         ref.SourceID,
+			SourceEventId:    ref.SourceEventID,
+			ConversationId:   string(ref.ConversationID),
+			ConversationSeq:  ref.ConversationSeq,
+			OccurredAtUnixMs: unixMillis(ref.OccurredAt),
+		})
+	}
+	return &retrievalv1.EvidenceMemoryGraphEdge{
+		EdgeId:            edge.EdgeID,
+		FromMemoryEventId: edge.FromMemoryEventID,
+		ToMemoryEventId:   edge.ToMemoryEventID,
+		RelationType:      edge.RelationType,
+		Confidence:        edge.Confidence,
+		SourceRefs:        sourceRefs,
 	}
 }
 

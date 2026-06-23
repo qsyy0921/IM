@@ -456,37 +456,122 @@ func (x *EvidenceSourceRef) GetOccurredAtUnixMs() int64 {
 	return 0
 }
 
-type EvidenceItem struct {
+type EvidenceMemoryGraphEdge struct {
 	state             protoimpl.MessageState `protogen:"open.v1"`
-	EvidenceId        string                 `protobuf:"bytes,1,opt,name=evidence_id,json=evidenceId,proto3" json:"evidence_id,omitempty"`
-	SourceType        EvidenceSourceType     `protobuf:"varint,2,opt,name=source_type,json=sourceType,proto3,enum=nexusim.retrieval.v1.EvidenceSourceType" json:"source_type,omitempty"`
-	SourceId          string                 `protobuf:"bytes,3,opt,name=source_id,json=sourceId,proto3" json:"source_id,omitempty"`
-	ConversationId    string                 `protobuf:"bytes,4,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
-	ConversationSeq   int64                  `protobuf:"varint,5,opt,name=conversation_seq,json=conversationSeq,proto3" json:"conversation_seq,omitempty"`
-	Text              string                 `protobuf:"bytes,6,opt,name=text,proto3" json:"text,omitempty"`
-	Score             float64                `protobuf:"fixed64,7,opt,name=score,proto3" json:"score,omitempty"`
-	SpeakerUserId     string                 `protobuf:"bytes,8,opt,name=speaker_user_id,json=speakerUserId,proto3" json:"speaker_user_id,omitempty"`
-	MessageId         string                 `protobuf:"bytes,9,opt,name=message_id,json=messageId,proto3" json:"message_id,omitempty"`
-	MemoryEventId     string                 `protobuf:"bytes,10,opt,name=memory_event_id,json=memoryEventId,proto3" json:"memory_event_id,omitempty"`
-	OccurredAtUnixMs  int64                  `protobuf:"varint,11,opt,name=occurred_at_unix_ms,json=occurredAtUnixMs,proto3" json:"occurred_at_unix_ms,omitempty"`
-	ValidFromSeq      int64                  `protobuf:"varint,12,opt,name=valid_from_seq,json=validFromSeq,proto3" json:"valid_from_seq,omitempty"`
-	ValidToSeq        int64                  `protobuf:"varint,13,opt,name=valid_to_seq,json=validToSeq,proto3" json:"valid_to_seq,omitempty"`
-	VisibilityVersion int64                  `protobuf:"varint,14,opt,name=visibility_version,json=visibilityVersion,proto3" json:"visibility_version,omitempty"`
-	SourceRefs        []*EvidenceSourceRef   `protobuf:"bytes,15,rep,name=source_refs,json=sourceRefs,proto3" json:"source_refs,omitempty"`
-	ActorUserIds      []string               `protobuf:"bytes,16,rep,name=actor_user_ids,json=actorUserIds,proto3" json:"actor_user_ids,omitempty"`
-	AudienceUserIds   []string               `protobuf:"bytes,17,rep,name=audience_user_ids,json=audienceUserIds,proto3" json:"audience_user_ids,omitempty"`
-	TemporalStatus    string                 `protobuf:"bytes,18,opt,name=temporal_status,json=temporalStatus,proto3" json:"temporal_status,omitempty"`
-	ReviewState       string                 `protobuf:"bytes,19,opt,name=review_state,json=reviewState,proto3" json:"review_state,omitempty"`
-	ExtractionVersion string                 `protobuf:"bytes,20,opt,name=extraction_version,json=extractionVersion,proto3" json:"extraction_version,omitempty"`
-	RerankScore       float64                `protobuf:"fixed64,21,opt,name=rerank_score,json=rerankScore,proto3" json:"rerank_score,omitempty"`
-	DedupeReason      string                 `protobuf:"bytes,22,opt,name=dedupe_reason,json=dedupeReason,proto3" json:"dedupe_reason,omitempty"`
+	EdgeId            string                 `protobuf:"bytes,1,opt,name=edge_id,json=edgeId,proto3" json:"edge_id,omitempty"`
+	FromMemoryEventId string                 `protobuf:"bytes,2,opt,name=from_memory_event_id,json=fromMemoryEventId,proto3" json:"from_memory_event_id,omitempty"`
+	ToMemoryEventId   string                 `protobuf:"bytes,3,opt,name=to_memory_event_id,json=toMemoryEventId,proto3" json:"to_memory_event_id,omitempty"`
+	RelationType      string                 `protobuf:"bytes,4,opt,name=relation_type,json=relationType,proto3" json:"relation_type,omitempty"`
+	Confidence        float64                `protobuf:"fixed64,5,opt,name=confidence,proto3" json:"confidence,omitempty"`
+	SourceRefs        []*EvidenceSourceRef   `protobuf:"bytes,6,rep,name=source_refs,json=sourceRefs,proto3" json:"source_refs,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *EvidenceMemoryGraphEdge) Reset() {
+	*x = EvidenceMemoryGraphEdge{}
+	mi := &file_nexusim_retrieval_v1_retrieval_gateway_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EvidenceMemoryGraphEdge) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EvidenceMemoryGraphEdge) ProtoMessage() {}
+
+func (x *EvidenceMemoryGraphEdge) ProtoReflect() protoreflect.Message {
+	mi := &file_nexusim_retrieval_v1_retrieval_gateway_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EvidenceMemoryGraphEdge.ProtoReflect.Descriptor instead.
+func (*EvidenceMemoryGraphEdge) Descriptor() ([]byte, []int) {
+	return file_nexusim_retrieval_v1_retrieval_gateway_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *EvidenceMemoryGraphEdge) GetEdgeId() string {
+	if x != nil {
+		return x.EdgeId
+	}
+	return ""
+}
+
+func (x *EvidenceMemoryGraphEdge) GetFromMemoryEventId() string {
+	if x != nil {
+		return x.FromMemoryEventId
+	}
+	return ""
+}
+
+func (x *EvidenceMemoryGraphEdge) GetToMemoryEventId() string {
+	if x != nil {
+		return x.ToMemoryEventId
+	}
+	return ""
+}
+
+func (x *EvidenceMemoryGraphEdge) GetRelationType() string {
+	if x != nil {
+		return x.RelationType
+	}
+	return ""
+}
+
+func (x *EvidenceMemoryGraphEdge) GetConfidence() float64 {
+	if x != nil {
+		return x.Confidence
+	}
+	return 0
+}
+
+func (x *EvidenceMemoryGraphEdge) GetSourceRefs() []*EvidenceSourceRef {
+	if x != nil {
+		return x.SourceRefs
+	}
+	return nil
+}
+
+type EvidenceItem struct {
+	state             protoimpl.MessageState     `protogen:"open.v1"`
+	EvidenceId        string                     `protobuf:"bytes,1,opt,name=evidence_id,json=evidenceId,proto3" json:"evidence_id,omitempty"`
+	SourceType        EvidenceSourceType         `protobuf:"varint,2,opt,name=source_type,json=sourceType,proto3,enum=nexusim.retrieval.v1.EvidenceSourceType" json:"source_type,omitempty"`
+	SourceId          string                     `protobuf:"bytes,3,opt,name=source_id,json=sourceId,proto3" json:"source_id,omitempty"`
+	ConversationId    string                     `protobuf:"bytes,4,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
+	ConversationSeq   int64                      `protobuf:"varint,5,opt,name=conversation_seq,json=conversationSeq,proto3" json:"conversation_seq,omitempty"`
+	Text              string                     `protobuf:"bytes,6,opt,name=text,proto3" json:"text,omitempty"`
+	Score             float64                    `protobuf:"fixed64,7,opt,name=score,proto3" json:"score,omitempty"`
+	SpeakerUserId     string                     `protobuf:"bytes,8,opt,name=speaker_user_id,json=speakerUserId,proto3" json:"speaker_user_id,omitempty"`
+	MessageId         string                     `protobuf:"bytes,9,opt,name=message_id,json=messageId,proto3" json:"message_id,omitempty"`
+	MemoryEventId     string                     `protobuf:"bytes,10,opt,name=memory_event_id,json=memoryEventId,proto3" json:"memory_event_id,omitempty"`
+	OccurredAtUnixMs  int64                      `protobuf:"varint,11,opt,name=occurred_at_unix_ms,json=occurredAtUnixMs,proto3" json:"occurred_at_unix_ms,omitempty"`
+	ValidFromSeq      int64                      `protobuf:"varint,12,opt,name=valid_from_seq,json=validFromSeq,proto3" json:"valid_from_seq,omitempty"`
+	ValidToSeq        int64                      `protobuf:"varint,13,opt,name=valid_to_seq,json=validToSeq,proto3" json:"valid_to_seq,omitempty"`
+	VisibilityVersion int64                      `protobuf:"varint,14,opt,name=visibility_version,json=visibilityVersion,proto3" json:"visibility_version,omitempty"`
+	SourceRefs        []*EvidenceSourceRef       `protobuf:"bytes,15,rep,name=source_refs,json=sourceRefs,proto3" json:"source_refs,omitempty"`
+	ActorUserIds      []string                   `protobuf:"bytes,16,rep,name=actor_user_ids,json=actorUserIds,proto3" json:"actor_user_ids,omitempty"`
+	AudienceUserIds   []string                   `protobuf:"bytes,17,rep,name=audience_user_ids,json=audienceUserIds,proto3" json:"audience_user_ids,omitempty"`
+	TemporalStatus    string                     `protobuf:"bytes,18,opt,name=temporal_status,json=temporalStatus,proto3" json:"temporal_status,omitempty"`
+	ReviewState       string                     `protobuf:"bytes,19,opt,name=review_state,json=reviewState,proto3" json:"review_state,omitempty"`
+	ExtractionVersion string                     `protobuf:"bytes,20,opt,name=extraction_version,json=extractionVersion,proto3" json:"extraction_version,omitempty"`
+	RerankScore       float64                    `protobuf:"fixed64,21,opt,name=rerank_score,json=rerankScore,proto3" json:"rerank_score,omitempty"`
+	DedupeReason      string                     `protobuf:"bytes,22,opt,name=dedupe_reason,json=dedupeReason,proto3" json:"dedupe_reason,omitempty"`
+	MemoryGraphEdges  []*EvidenceMemoryGraphEdge `protobuf:"bytes,23,rep,name=memory_graph_edges,json=memoryGraphEdges,proto3" json:"memory_graph_edges,omitempty"`
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
 
 func (x *EvidenceItem) Reset() {
 	*x = EvidenceItem{}
-	mi := &file_nexusim_retrieval_v1_retrieval_gateway_proto_msgTypes[3]
+	mi := &file_nexusim_retrieval_v1_retrieval_gateway_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -498,7 +583,7 @@ func (x *EvidenceItem) String() string {
 func (*EvidenceItem) ProtoMessage() {}
 
 func (x *EvidenceItem) ProtoReflect() protoreflect.Message {
-	mi := &file_nexusim_retrieval_v1_retrieval_gateway_proto_msgTypes[3]
+	mi := &file_nexusim_retrieval_v1_retrieval_gateway_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -511,7 +596,7 @@ func (x *EvidenceItem) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EvidenceItem.ProtoReflect.Descriptor instead.
 func (*EvidenceItem) Descriptor() ([]byte, []int) {
-	return file_nexusim_retrieval_v1_retrieval_gateway_proto_rawDescGZIP(), []int{3}
+	return file_nexusim_retrieval_v1_retrieval_gateway_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *EvidenceItem) GetEvidenceId() string {
@@ -668,6 +753,13 @@ func (x *EvidenceItem) GetDedupeReason() string {
 	return ""
 }
 
+func (x *EvidenceItem) GetMemoryGraphEdges() []*EvidenceMemoryGraphEdge {
+	if x != nil {
+		return x.MemoryGraphEdges
+	}
+	return nil
+}
+
 type EvidenceSourceCount struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	SourceType    EvidenceSourceType     `protobuf:"varint,1,opt,name=source_type,json=sourceType,proto3,enum=nexusim.retrieval.v1.EvidenceSourceType" json:"source_type,omitempty"`
@@ -678,7 +770,7 @@ type EvidenceSourceCount struct {
 
 func (x *EvidenceSourceCount) Reset() {
 	*x = EvidenceSourceCount{}
-	mi := &file_nexusim_retrieval_v1_retrieval_gateway_proto_msgTypes[4]
+	mi := &file_nexusim_retrieval_v1_retrieval_gateway_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -690,7 +782,7 @@ func (x *EvidenceSourceCount) String() string {
 func (*EvidenceSourceCount) ProtoMessage() {}
 
 func (x *EvidenceSourceCount) ProtoReflect() protoreflect.Message {
-	mi := &file_nexusim_retrieval_v1_retrieval_gateway_proto_msgTypes[4]
+	mi := &file_nexusim_retrieval_v1_retrieval_gateway_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -703,7 +795,7 @@ func (x *EvidenceSourceCount) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EvidenceSourceCount.ProtoReflect.Descriptor instead.
 func (*EvidenceSourceCount) Descriptor() ([]byte, []int) {
-	return file_nexusim_retrieval_v1_retrieval_gateway_proto_rawDescGZIP(), []int{4}
+	return file_nexusim_retrieval_v1_retrieval_gateway_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *EvidenceSourceCount) GetSourceType() EvidenceSourceType {
@@ -734,7 +826,7 @@ type EvidenceSourceCoverage struct {
 
 func (x *EvidenceSourceCoverage) Reset() {
 	*x = EvidenceSourceCoverage{}
-	mi := &file_nexusim_retrieval_v1_retrieval_gateway_proto_msgTypes[5]
+	mi := &file_nexusim_retrieval_v1_retrieval_gateway_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -746,7 +838,7 @@ func (x *EvidenceSourceCoverage) String() string {
 func (*EvidenceSourceCoverage) ProtoMessage() {}
 
 func (x *EvidenceSourceCoverage) ProtoReflect() protoreflect.Message {
-	mi := &file_nexusim_retrieval_v1_retrieval_gateway_proto_msgTypes[5]
+	mi := &file_nexusim_retrieval_v1_retrieval_gateway_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -759,7 +851,7 @@ func (x *EvidenceSourceCoverage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EvidenceSourceCoverage.ProtoReflect.Descriptor instead.
 func (*EvidenceSourceCoverage) Descriptor() ([]byte, []int) {
-	return file_nexusim_retrieval_v1_retrieval_gateway_proto_rawDescGZIP(), []int{5}
+	return file_nexusim_retrieval_v1_retrieval_gateway_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *EvidenceSourceCoverage) GetSourceType() EvidenceSourceType {
@@ -822,7 +914,7 @@ type EvidencePack struct {
 
 func (x *EvidencePack) Reset() {
 	*x = EvidencePack{}
-	mi := &file_nexusim_retrieval_v1_retrieval_gateway_proto_msgTypes[6]
+	mi := &file_nexusim_retrieval_v1_retrieval_gateway_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -834,7 +926,7 @@ func (x *EvidencePack) String() string {
 func (*EvidencePack) ProtoMessage() {}
 
 func (x *EvidencePack) ProtoReflect() protoreflect.Message {
-	mi := &file_nexusim_retrieval_v1_retrieval_gateway_proto_msgTypes[6]
+	mi := &file_nexusim_retrieval_v1_retrieval_gateway_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -847,7 +939,7 @@ func (x *EvidencePack) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EvidencePack.ProtoReflect.Descriptor instead.
 func (*EvidencePack) Descriptor() ([]byte, []int) {
-	return file_nexusim_retrieval_v1_retrieval_gateway_proto_rawDescGZIP(), []int{6}
+	return file_nexusim_retrieval_v1_retrieval_gateway_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *EvidencePack) GetPackId() string {
@@ -929,7 +1021,7 @@ type RetrieveEvidenceResponse struct {
 
 func (x *RetrieveEvidenceResponse) Reset() {
 	*x = RetrieveEvidenceResponse{}
-	mi := &file_nexusim_retrieval_v1_retrieval_gateway_proto_msgTypes[7]
+	mi := &file_nexusim_retrieval_v1_retrieval_gateway_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -941,7 +1033,7 @@ func (x *RetrieveEvidenceResponse) String() string {
 func (*RetrieveEvidenceResponse) ProtoMessage() {}
 
 func (x *RetrieveEvidenceResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nexusim_retrieval_v1_retrieval_gateway_proto_msgTypes[7]
+	mi := &file_nexusim_retrieval_v1_retrieval_gateway_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -954,7 +1046,7 @@ func (x *RetrieveEvidenceResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RetrieveEvidenceResponse.ProtoReflect.Descriptor instead.
 func (*RetrieveEvidenceResponse) Descriptor() ([]byte, []int) {
-	return file_nexusim_retrieval_v1_retrieval_gateway_proto_rawDescGZIP(), []int{7}
+	return file_nexusim_retrieval_v1_retrieval_gateway_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *RetrieveEvidenceResponse) GetPack() *EvidencePack {
@@ -995,7 +1087,17 @@ const file_nexusim_retrieval_v1_retrieval_gateway_proto_rawDesc = "" +
 	"\x0fsource_event_id\x18\x03 \x01(\tR\rsourceEventId\x12'\n" +
 	"\x0fconversation_id\x18\x04 \x01(\tR\x0econversationId\x12)\n" +
 	"\x10conversation_seq\x18\x05 \x01(\x03R\x0fconversationSeq\x12-\n" +
-	"\x13occurred_at_unix_ms\x18\x06 \x01(\x03R\x10occurredAtUnixMs\"\x89\a\n" +
+	"\x13occurred_at_unix_ms\x18\x06 \x01(\x03R\x10occurredAtUnixMs\"\x9f\x02\n" +
+	"\x17EvidenceMemoryGraphEdge\x12\x17\n" +
+	"\aedge_id\x18\x01 \x01(\tR\x06edgeId\x12/\n" +
+	"\x14from_memory_event_id\x18\x02 \x01(\tR\x11fromMemoryEventId\x12+\n" +
+	"\x12to_memory_event_id\x18\x03 \x01(\tR\x0ftoMemoryEventId\x12#\n" +
+	"\rrelation_type\x18\x04 \x01(\tR\frelationType\x12\x1e\n" +
+	"\n" +
+	"confidence\x18\x05 \x01(\x01R\n" +
+	"confidence\x12H\n" +
+	"\vsource_refs\x18\x06 \x03(\v2'.nexusim.retrieval.v1.EvidenceSourceRefR\n" +
+	"sourceRefs\"\xe6\a\n" +
 	"\fEvidenceItem\x12\x1f\n" +
 	"\vevidence_id\x18\x01 \x01(\tR\n" +
 	"evidenceId\x12I\n" +
@@ -1024,7 +1126,8 @@ const file_nexusim_retrieval_v1_retrieval_gateway_proto_rawDesc = "" +
 	"\freview_state\x18\x13 \x01(\tR\vreviewState\x12-\n" +
 	"\x12extraction_version\x18\x14 \x01(\tR\x11extractionVersion\x12!\n" +
 	"\frerank_score\x18\x15 \x01(\x01R\vrerankScore\x12#\n" +
-	"\rdedupe_reason\x18\x16 \x01(\tR\fdedupeReason\"v\n" +
+	"\rdedupe_reason\x18\x16 \x01(\tR\fdedupeReason\x12[\n" +
+	"\x12memory_graph_edges\x18\x17 \x03(\v2-.nexusim.retrieval.v1.EvidenceMemoryGraphEdgeR\x10memoryGraphEdges\"v\n" +
 	"\x13EvidenceSourceCount\x12I\n" +
 	"\vsource_type\x18\x01 \x01(\x0e2(.nexusim.retrieval.v1.EvidenceSourceTypeR\n" +
 	"sourceType\x12\x14\n" +
@@ -1083,7 +1186,7 @@ func file_nexusim_retrieval_v1_retrieval_gateway_proto_rawDescGZIP() []byte {
 }
 
 var file_nexusim_retrieval_v1_retrieval_gateway_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_nexusim_retrieval_v1_retrieval_gateway_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_nexusim_retrieval_v1_retrieval_gateway_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_nexusim_retrieval_v1_retrieval_gateway_proto_goTypes = []any{
 	(EvidenceSourceType)(0),           // 0: nexusim.retrieval.v1.EvidenceSourceType
 	(EvidenceMemoryStatus)(0),         // 1: nexusim.retrieval.v1.EvidenceMemoryStatus
@@ -1091,31 +1194,34 @@ var file_nexusim_retrieval_v1_retrieval_gateway_proto_goTypes = []any{
 	(*AuthContext)(nil),               // 3: nexusim.retrieval.v1.AuthContext
 	(*RetrieveEvidenceRequest)(nil),   // 4: nexusim.retrieval.v1.RetrieveEvidenceRequest
 	(*EvidenceSourceRef)(nil),         // 5: nexusim.retrieval.v1.EvidenceSourceRef
-	(*EvidenceItem)(nil),              // 6: nexusim.retrieval.v1.EvidenceItem
-	(*EvidenceSourceCount)(nil),       // 7: nexusim.retrieval.v1.EvidenceSourceCount
-	(*EvidenceSourceCoverage)(nil),    // 8: nexusim.retrieval.v1.EvidenceSourceCoverage
-	(*EvidencePack)(nil),              // 9: nexusim.retrieval.v1.EvidencePack
-	(*RetrieveEvidenceResponse)(nil),  // 10: nexusim.retrieval.v1.RetrieveEvidenceResponse
+	(*EvidenceMemoryGraphEdge)(nil),   // 6: nexusim.retrieval.v1.EvidenceMemoryGraphEdge
+	(*EvidenceItem)(nil),              // 7: nexusim.retrieval.v1.EvidenceItem
+	(*EvidenceSourceCount)(nil),       // 8: nexusim.retrieval.v1.EvidenceSourceCount
+	(*EvidenceSourceCoverage)(nil),    // 9: nexusim.retrieval.v1.EvidenceSourceCoverage
+	(*EvidencePack)(nil),              // 10: nexusim.retrieval.v1.EvidencePack
+	(*RetrieveEvidenceResponse)(nil),  // 11: nexusim.retrieval.v1.RetrieveEvidenceResponse
 }
 var file_nexusim_retrieval_v1_retrieval_gateway_proto_depIdxs = []int32{
 	3,  // 0: nexusim.retrieval.v1.RetrieveEvidenceRequest.auth_context:type_name -> nexusim.retrieval.v1.AuthContext
 	1,  // 1: nexusim.retrieval.v1.RetrieveEvidenceRequest.memory_statuses:type_name -> nexusim.retrieval.v1.EvidenceMemoryStatus
-	0,  // 2: nexusim.retrieval.v1.EvidenceItem.source_type:type_name -> nexusim.retrieval.v1.EvidenceSourceType
-	5,  // 3: nexusim.retrieval.v1.EvidenceItem.source_refs:type_name -> nexusim.retrieval.v1.EvidenceSourceRef
-	0,  // 4: nexusim.retrieval.v1.EvidenceSourceCount.source_type:type_name -> nexusim.retrieval.v1.EvidenceSourceType
-	0,  // 5: nexusim.retrieval.v1.EvidenceSourceCoverage.source_type:type_name -> nexusim.retrieval.v1.EvidenceSourceType
-	2,  // 6: nexusim.retrieval.v1.EvidenceSourceCoverage.status:type_name -> nexusim.retrieval.v1.EvidenceSourceCoverageStatus
-	6,  // 7: nexusim.retrieval.v1.EvidencePack.items:type_name -> nexusim.retrieval.v1.EvidenceItem
-	7,  // 8: nexusim.retrieval.v1.EvidencePack.source_counts:type_name -> nexusim.retrieval.v1.EvidenceSourceCount
-	8,  // 9: nexusim.retrieval.v1.EvidencePack.source_coverage:type_name -> nexusim.retrieval.v1.EvidenceSourceCoverage
-	9,  // 10: nexusim.retrieval.v1.RetrieveEvidenceResponse.pack:type_name -> nexusim.retrieval.v1.EvidencePack
-	4,  // 11: nexusim.retrieval.v1.RetrievalGateway.RetrieveEvidence:input_type -> nexusim.retrieval.v1.RetrieveEvidenceRequest
-	10, // 12: nexusim.retrieval.v1.RetrievalGateway.RetrieveEvidence:output_type -> nexusim.retrieval.v1.RetrieveEvidenceResponse
-	12, // [12:13] is the sub-list for method output_type
-	11, // [11:12] is the sub-list for method input_type
-	11, // [11:11] is the sub-list for extension type_name
-	11, // [11:11] is the sub-list for extension extendee
-	0,  // [0:11] is the sub-list for field type_name
+	5,  // 2: nexusim.retrieval.v1.EvidenceMemoryGraphEdge.source_refs:type_name -> nexusim.retrieval.v1.EvidenceSourceRef
+	0,  // 3: nexusim.retrieval.v1.EvidenceItem.source_type:type_name -> nexusim.retrieval.v1.EvidenceSourceType
+	5,  // 4: nexusim.retrieval.v1.EvidenceItem.source_refs:type_name -> nexusim.retrieval.v1.EvidenceSourceRef
+	6,  // 5: nexusim.retrieval.v1.EvidenceItem.memory_graph_edges:type_name -> nexusim.retrieval.v1.EvidenceMemoryGraphEdge
+	0,  // 6: nexusim.retrieval.v1.EvidenceSourceCount.source_type:type_name -> nexusim.retrieval.v1.EvidenceSourceType
+	0,  // 7: nexusim.retrieval.v1.EvidenceSourceCoverage.source_type:type_name -> nexusim.retrieval.v1.EvidenceSourceType
+	2,  // 8: nexusim.retrieval.v1.EvidenceSourceCoverage.status:type_name -> nexusim.retrieval.v1.EvidenceSourceCoverageStatus
+	7,  // 9: nexusim.retrieval.v1.EvidencePack.items:type_name -> nexusim.retrieval.v1.EvidenceItem
+	8,  // 10: nexusim.retrieval.v1.EvidencePack.source_counts:type_name -> nexusim.retrieval.v1.EvidenceSourceCount
+	9,  // 11: nexusim.retrieval.v1.EvidencePack.source_coverage:type_name -> nexusim.retrieval.v1.EvidenceSourceCoverage
+	10, // 12: nexusim.retrieval.v1.RetrieveEvidenceResponse.pack:type_name -> nexusim.retrieval.v1.EvidencePack
+	4,  // 13: nexusim.retrieval.v1.RetrievalGateway.RetrieveEvidence:input_type -> nexusim.retrieval.v1.RetrieveEvidenceRequest
+	11, // 14: nexusim.retrieval.v1.RetrievalGateway.RetrieveEvidence:output_type -> nexusim.retrieval.v1.RetrieveEvidenceResponse
+	14, // [14:15] is the sub-list for method output_type
+	13, // [13:14] is the sub-list for method input_type
+	13, // [13:13] is the sub-list for extension type_name
+	13, // [13:13] is the sub-list for extension extendee
+	0,  // [0:13] is the sub-list for field type_name
 }
 
 func init() { file_nexusim_retrieval_v1_retrieval_gateway_proto_init() }
@@ -1129,7 +1235,7 @@ func file_nexusim_retrieval_v1_retrieval_gateway_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_nexusim_retrieval_v1_retrieval_gateway_proto_rawDesc), len(file_nexusim_retrieval_v1_retrieval_gateway_proto_rawDesc)),
 			NumEnums:      3,
-			NumMessages:   8,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

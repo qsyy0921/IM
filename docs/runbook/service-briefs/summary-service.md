@@ -26,9 +26,12 @@
 - 2026-06-23 Summary live adapter 已增加 multi-hop actor/source-chain completeness
   断言；仍只基于 retrieval-gateway 返回的 EvidencePack 与 citation verifier
   判断，不直接读 memory / search 私表。
+- 2026-06-24 Summary EvidencePack graph edge 透传已落：retrieval client 会保留
+  `EvidenceMemoryGraphEdge`，gRPC response 会继续向调用方返回该字段；service
+  仍只基于 EvidencePack 与 citation verifier 工作。
 
 下一步：
 
 - 真实服务栈启动后与 memory-service / retrieval-gateway adapter 一起跑完整
-  optional gate；之后扩展 temporal update / profile aggregation 摘要场景，
-  provider 仍走 port、guard、hash / citation 校验和 verifier。
+  optional gate；之后扩展 temporal update / profile aggregation 和更完整
+  group-memory 摘要场景，provider 仍走 port、guard、hash / citation 校验和 verifier。

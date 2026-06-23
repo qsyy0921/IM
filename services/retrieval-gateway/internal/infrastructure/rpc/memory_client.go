@@ -74,7 +74,40 @@ func (client MemoryClient) QueryMemoryEvents(ctx context.Context, query types.Me
 	}, nil
 }
 
+func (client MemoryClient) GetMemoryEvent(ctx context.Context, lookup types.MemoryEventLookup) (types.MemoryEventLookupResult, error) {
+	callCtx, cancel := context.WithTimeout(ctx, client.timeout)
+	defer cancel()
+	callCtx = outgoingMetadataContext(callCtx, lookup.AuthContext)
+	response, err := client.client.GetMemoryEvent(callCtx, &memoryv1.GetMemoryEventRequest{
+		AuthContext: &memoryv1.AuthContext{
+			TenantId:  string(lookup.AuthContext.TenantID),
+			UserId:    string(lookup.AuthContext.UserID),
+			DeviceId:  lookup.AuthContext.DeviceID,
+			SessionId: lookup.AuthContext.SessionID,
+			TraceId:   lookup.AuthContext.TraceID,
+			RequestId: lookup.AuthContext.RequestID,
+		},
+		MemoryEventId: lookup.MemoryEventID,
+	})
+	if err != nil {
+		return types.MemoryEventLookupResult{}, mapMemoryError(err)
+	}
+	edges := make([]types.MemoryGraphEdge, 0, len(response.GetGraphEdges()))
+	for _, edge := range response.GetGraphEdges() {
+		edges = append(edges, memoryGraphEdgeFromProto(edge))
+	}
+	item := memoryEventFromProto(response.GetItem())
+	item.GraphEdges = edges
+	return types.MemoryEventLookupResult{
+		Item:       item,
+		GraphEdges: edges,
+	}, nil
+}
+
 func memoryEventFromProto(item *memoryv1.StructuredMemoryEvent) types.MemoryEventEvidence {
+	if item == nil {
+		return types.MemoryEventEvidence{}
+	}
 	sourceRefs := make([]types.EvidenceSourceRef, 0, len(item.GetSourceRefs()))
 	for _, ref := range item.GetSourceRefs() {
 		sourceRefs = append(sourceRefs, types.EvidenceSourceRef{
@@ -102,6 +135,31 @@ func memoryEventFromProto(item *memoryv1.StructuredMemoryEvent) types.MemoryEven
 		Confidence:        item.GetConfidence(),
 		VisibilityVersion: item.GetVisibilityVersion(),
 		ExtractionVersion: item.GetExtractionVersion(),
+	}
+}
+
+func memoryGraphEdgeFromProto(edge *memoryv1.MemoryGraphEdge) types.MemoryGraphEdge {
+	if edge == nil {
+		return types.MemoryGraphEdge{}
+	}
+	sourceRefs := make([]types.EvidenceSourceRef, 0, len(edge.GetSourceRefs()))
+	for _, ref := range edge.GetSourceRefs() {
+		sourceRefs = append(sourceRefs, types.EvidenceSourceRef{
+			SourceType:      sourceTypeFromProto(ref.GetSourceType()),
+			SourceID:        ref.GetSourceId(),
+			SourceEventID:   ref.GetSourceEventId(),
+			ConversationID:  types.ConversationID(ref.GetConversationId()),
+			ConversationSeq: ref.GetConversationSeq(),
+			OccurredAt:      unixMillisToTime(ref.GetOccurredAtUnixMs()),
+		})
+	}
+	return types.MemoryGraphEdge{
+		EdgeID:            edge.GetEdgeId(),
+		FromMemoryEventID: edge.GetFromMemoryEventId(),
+		ToMemoryEventID:   edge.GetToMemoryEventId(),
+		RelationType:      edge.GetRelationType(),
+		Confidence:        edge.GetConfidence(),
+		SourceRefs:        sourceRefs,
 	}
 }
 

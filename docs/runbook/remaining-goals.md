@@ -45,10 +45,10 @@
   memory-service / retrieval / RAG / Agent live stack adapter，并继续区分 retrieval failure、
   reasoning failure、memory lifecycle failure、action boundary failure。
 - `ai-eval-service`：retrieval negative / miss adapter 已补齐；继续扩展 group
-  memory extraction、EvidencePack source-chain、RAG / Agent demo module 的真实
-  service-stack cases。
-- `retrieval-gateway`：结构过滤、BM25 / vector / graph expansion、rerank、
-  EvidencePack coverage。
+  memory extraction、profile evidence、EvidencePack source-chain、RAG / Agent
+  demo module 的真实 service-stack cases。
+- `retrieval-gateway`：memory graph edge 已进入 EvidencePack；继续做结构过滤、
+  BM25 / vector、profile evidence、rerank 和 EvidencePack coverage。
 - `rag-service` / `summary-service`：拒答、引用校验、source-ref regression、unsafe
   output fail-closed cases。
 - `agent-service`：真实业务动作继续走 policy、skill contract、proposal、approval、

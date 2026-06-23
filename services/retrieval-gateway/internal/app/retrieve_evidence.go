@@ -95,6 +95,17 @@ func (usecase RetrieveEvidenceUseCase) Execute(
 		memoryProjectionVersion = result.ProjectionVersion
 		coverage[types.EvidenceSourceMemoryEvent].CandidateCount = len(result.Items)
 		for _, event := range result.Items {
+			enriched, err := usecase.memory.GetMemoryEvent(ctx, types.MemoryEventLookup{
+				AuthContext:   command.AuthContext,
+				MemoryEventID: event.MemoryEventID,
+			})
+			if err != nil {
+				return types.RetrieveEvidenceResult{}, err
+			}
+			if enriched.Item.MemoryEventID != "" {
+				event = enriched.Item
+			}
+			event.GraphEdges = enriched.GraphEdges
 			item := memoryEventToEvidence(event)
 			appendEvidenceCandidate(&candidates, seen, coverage, item)
 		}
@@ -267,6 +278,7 @@ func memoryEventToEvidence(event types.MemoryEventEvidence) types.EvidenceItem {
 		TemporalStatus:    event.Status,
 		ReviewState:       event.ReviewState,
 		ExtractionVersion: event.ExtractionVersion,
+		MemoryGraphEdges:  event.GraphEdges,
 	}
 }
 

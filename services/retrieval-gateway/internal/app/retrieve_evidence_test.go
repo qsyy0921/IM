@@ -39,6 +39,30 @@ func TestRetrieveEvidenceMergesSearchAndMemory(t *testing.T) {
 			VisibilityVersion: 4,
 			ExtractionVersion: "memory.v1",
 		}},
+	}, details: map[string]types.MemoryEventLookupResult{
+		"mem-1": {
+			Item: types.MemoryEventEvidence{
+				MemoryEventID:     "mem-1",
+				ConversationID:    "conv-1",
+				Status:            types.MemoryStatusActive,
+				ReviewState:       "APPROVED",
+				FactText:          "memory fact",
+				ActorUserIDs:      []string{"user-a"},
+				SourceRefs:        []types.EvidenceSourceRef{{SourceType: "MESSAGE", SourceID: "msg-1", ConversationSeq: 10}},
+				ValidFromSeq:      10,
+				Confidence:        0.8,
+				VisibilityVersion: 4,
+				ExtractionVersion: "memory.v1",
+			},
+			GraphEdges: []types.MemoryGraphEdge{{
+				EdgeID:            "edge-1",
+				FromMemoryEventID: "mem-1",
+				ToMemoryEventID:   "mem-2",
+				RelationType:      "SUPPORTS",
+				Confidence:        0.7,
+				SourceRefs:        []types.EvidenceSourceRef{{SourceType: "MESSAGE", SourceID: "msg-1", ConversationSeq: 10}},
+			}},
+		},
 	}}
 
 	result, err := NewRetrieveEvidenceUseCase(&search, &memory).Execute(context.Background(), validCommand())
@@ -65,6 +89,9 @@ func TestRetrieveEvidenceMergesSearchAndMemory(t *testing.T) {
 	}
 	if result.Pack.Items[1].RerankScore != 0.8 || result.Pack.Items[1].DedupeReason != types.EvidenceDedupeUniqueSource {
 		t.Fatalf("unexpected memory item rank metadata: %+v", result.Pack.Items[1])
+	}
+	if got := result.Pack.Items[1].MemoryGraphEdges; len(got) != 1 || got[0].RelationType != "SUPPORTS" || len(got[0].SourceRefs) != 1 {
+		t.Fatalf("expected memory graph edge to be carried in evidence item: %+v", got)
 	}
 	if got := memory.query.AtConversationSeq; got != 10 {
 		t.Fatalf("expected memory current query at search seq 10, got %d", got)
@@ -222,6 +249,22 @@ func TestRetrieveEvidenceDedupeAndCoverage(t *testing.T) {
 	}
 }
 
+func TestRetrieveEvidenceFailsClosedWhenMemoryGraphLookupFails(t *testing.T) {
+	command := validCommand()
+	command.IncludeSearch = false
+	command.IncludeMemory = true
+	memory := fakeMemoryPort{
+		result: types.MemoryResult{
+			Items: []types.MemoryEventEvidence{{MemoryEventID: "mem-1", ConversationID: "conv-1", FactText: "memory", Confidence: 0.7}},
+		},
+		getErr: types.ErrMemoryUnavailable,
+	}
+	_, err := NewRetrieveEvidenceUseCase(&fakeSearchPort{}, &memory).Execute(context.Background(), command)
+	if !errors.Is(err, types.ErrMemoryUnavailable) {
+		t.Fatalf("expected memory unavailable from graph lookup, got %v", err)
+	}
+}
+
 func TestRetrieveEvidenceReranksBeforeTruncating(t *testing.T) {
 	command := validCommand()
 	command.IncludeSearch = false
@@ -287,16 +330,35 @@ func (port *fakeSearchPort) SearchMessages(context.Context, types.SearchQuery) (
 }
 
 type fakeMemoryPort struct {
-	result types.MemoryResult
-	err    error
-	called bool
-	query  types.MemoryQuery
+	result  types.MemoryResult
+	err     error
+	getErr  error
+	called  bool
+	query   types.MemoryQuery
+	details map[string]types.MemoryEventLookupResult
 }
 
 func (port *fakeMemoryPort) QueryMemoryEvents(_ context.Context, query types.MemoryQuery) (types.MemoryResult, error) {
 	port.called = true
 	port.query = query
 	return port.result, port.err
+}
+
+func (port *fakeMemoryPort) GetMemoryEvent(_ context.Context, lookup types.MemoryEventLookup) (types.MemoryEventLookupResult, error) {
+	if port.getErr != nil {
+		return types.MemoryEventLookupResult{}, port.getErr
+	}
+	if port.details != nil {
+		if result, ok := port.details[lookup.MemoryEventID]; ok {
+			return result, nil
+		}
+	}
+	for _, item := range port.result.Items {
+		if item.MemoryEventID == lookup.MemoryEventID {
+			return types.MemoryEventLookupResult{Item: item, GraphEdges: item.GraphEdges}, nil
+		}
+	}
+	return types.MemoryEventLookupResult{Item: types.MemoryEventEvidence{MemoryEventID: lookup.MemoryEventID}}, nil
 }
 
 type fakePolicyPort struct {

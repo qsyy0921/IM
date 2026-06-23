@@ -138,7 +138,11 @@ export function buildDesktopInstallerPlan(options = {}) {
             "collect:client-artifacts",
             "--",
             "--target",
-            "windows-desktop"
+            "windows-desktop",
+            "--source",
+            installerBundleSourceArg(target),
+            "--artifact-kind",
+            "desktop-installer"
           ]
         }
       : null,
@@ -275,6 +279,10 @@ function executionPolicy() {
     readsAuthenticodeSignature: true,
     validatesArtifactHashes: true
   };
+}
+
+export function installerBundleSourceArg(target) {
+  return `desktop/src-tauri/target/release/bundle/${target}`;
 }
 
 function parseArgs(argv, env) {

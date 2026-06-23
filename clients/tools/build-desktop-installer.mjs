@@ -5,7 +5,8 @@ import { workspaceRoot } from "./client-build-env.mjs";
 import {
   buildDesktopInstallerPlan,
   defaultInstallerTauriConfig,
-  defaultInstallerTauriConfigCommandArg
+  defaultInstallerTauriConfigCommandArg,
+  installerBundleSourceArg
 } from "./plan-desktop-installer.mjs";
 import { applyDesktopSigningProfile, defaultPfxPassEnv, signingProfileEnv } from "./desktop-signing-profile.mjs";
 
@@ -77,7 +78,11 @@ export function buildInstallerOutput(plan, options = {}) {
         "collect:client-artifacts",
         "--",
         "--target",
-        "windows-desktop"
+        "windows-desktop",
+        "--source",
+        installerBundleSourceArg(plan.target),
+        "--artifact-kind",
+        "desktop-installer"
       ]
     },
     installerPlan: {
@@ -133,7 +138,11 @@ function runBuildCommand(target, tauriConfigArg) {
       "collect:client-artifacts",
       "--",
       "--target",
-      "windows-desktop"
+      "windows-desktop",
+      "--source",
+      installerBundleSourceArg(target),
+      "--artifact-kind",
+      "desktop-installer"
     ], {
       cwd: workspaceRoot,
       stdio: "inherit"
@@ -147,7 +156,19 @@ function runBuildCommand(target, tauriConfigArg) {
     stdio: "inherit",
     shell: process.platform === "win32"
   });
-  execFileSync(npm, ["--prefix", "clients", "run", "collect:client-artifacts", "--", "--target", "windows-desktop"], {
+  execFileSync(npm, [
+    "--prefix",
+    "clients",
+    "run",
+    "collect:client-artifacts",
+    "--",
+    "--target",
+    "windows-desktop",
+    "--source",
+    installerBundleSourceArg(target),
+    "--artifact-kind",
+    "desktop-installer"
+  ], {
     cwd: workspaceRoot,
     stdio: "inherit",
     shell: process.platform === "win32"

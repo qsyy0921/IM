@@ -43,7 +43,9 @@ const desktopStandaloneExe = join(
   "nexusim-desktop.exe"
 );
 const desktopExtensions = new Set([".msi", ".exe", ".msix", ".dmg", ".appimage", ".deb", ".rpm"]);
+const androidExtensions = new Set([".apk"]);
 const targetNames = new Set(["android", "windows-desktop", "all"]);
+const artifactKindNames = new Set(["android-debug-apk", "desktop-executable", "desktop-installer"]);
 
 function main(argv) {
   const options = parseArgs(argv);
@@ -84,6 +86,7 @@ export function parseArgs(argv) {
   const options = {
     target: "all",
     source: "",
+    artifactKind: "",
     outputDir: artifactsRoot,
     runId: defaultRunID(),
     dryRun: false
@@ -102,6 +105,11 @@ export function parseArgs(argv) {
     }
     if (arg === "--source") {
       options.source = requiredValue(argv, index, arg);
+      index += 1;
+      continue;
+    }
+    if (arg === "--artifact-kind") {
+      options.artifactKind = requiredValue(argv, index, arg);
       index += 1;
       continue;
     }
@@ -124,6 +132,12 @@ export function parseArgs(argv) {
   if (options.source && options.target === "all") {
     throw new Error("--source requires --target android or --target windows-desktop");
   }
+  if (options.artifactKind && options.target === "all") {
+    throw new Error("--artifact-kind requires --target android or --target windows-desktop");
+  }
+  if (options.artifactKind && !artifactKindNames.has(options.artifactKind)) {
+    throw new Error(`unsupported artifact kind: ${options.artifactKind}`);
+  }
   options.outputDir = resolve(options.outputDir);
   options.runId = sanitizeRunID(options.runId);
   return options;
@@ -136,7 +150,7 @@ export function collectPlan(options) {
 
   for (const target of targets) {
     const targetSources = options.source
-      ? [resolve(options.source)]
+      ? explicitSourcesForTarget(target, options.source)
       : defaultSourcesForTarget(target);
     const existing = targetSources.filter(source => existsSync(source) && statSync(source).isFile());
     if (existing.length === 0) {
@@ -146,17 +160,21 @@ export function collectPlan(options) {
       });
       continue;
     }
-    for (const source of existing) {
-      const sourceEntry = {
+    const entries = existing.map(source => sourceEntryFor(target, source, sources));
+    const selectedEntries = options.artifactKind
+      ? entries.filter(entry => entry.artifactKind === options.artifactKind)
+      : entries;
+    if (selectedEntries.length === 0) {
+      missing.push({
         target,
-        sourceHint: safeRelativeSource(source),
-        artifactKind: artifactKindForSource(target, source),
-        outputFilename: uniqueArtifactFilename(target, source, sources)
-      };
-      Object.defineProperty(sourceEntry, "source", {
-        value: source,
-        enumerable: false
+        artifactKind: options.artifactKind,
+        expected: targetSources.map(source => safeRelativeSource(source)),
+        discoveredArtifactKinds: Array.from(new Set(entries.map(entry => entry.artifactKind))).sort()
       });
+      continue;
+    }
+    for (const selected of selectedEntries) {
+      const sourceEntry = sourceEntryFor(target, selected.source, sources);
       sources.push(sourceEntry);
     }
   }
@@ -169,6 +187,20 @@ export function collectPlan(options) {
     sources,
     missing
   };
+}
+
+function sourceEntryFor(target, source, existingSources) {
+  const entry = {
+    target,
+    sourceHint: safeRelativeSource(source),
+    artifactKind: artifactKindForSource(target, source),
+    outputFilename: uniqueArtifactFilename(target, source, existingSources)
+  };
+  Object.defineProperty(entry, "source", {
+    value: source,
+    enumerable: false
+  });
+  return entry;
 }
 
 export function writeArtifactBundle(plan, options) {
@@ -301,7 +333,7 @@ function defaultSourcesForTarget(target) {
 function findDesktopArtifacts() {
   const found = [];
   if (existsSync(desktopBundleRoot)) {
-    walk(desktopBundleRoot, found);
+    walkArtifacts(desktopBundleRoot, "windows-desktop", found);
   }
   if (existsSync(desktopStandaloneExe) && statSync(desktopStandaloneExe).isFile()) {
     found.push(desktopStandaloneExe);
@@ -312,18 +344,45 @@ function findDesktopArtifacts() {
   return found.sort((left, right) => left.localeCompare(right));
 }
 
-function walk(dir, found) {
+function explicitSourcesForTarget(target, source) {
+  const resolved = resolve(source);
+  if (!existsSync(resolved)) {
+    return [resolved];
+  }
+  const stats = statSync(resolved);
+  if (stats.isFile()) {
+    return [resolved];
+  }
+  if (!stats.isDirectory()) {
+    return [resolved];
+  }
+  const found = [];
+  walkArtifacts(resolved, target, found);
+  return found.length > 0 ? found.sort((left, right) => left.localeCompare(right)) : [resolved];
+}
+
+function walkArtifacts(dir, target, found) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const fullPath = join(dir, entry.name);
     if (entry.isDirectory()) {
-      walk(fullPath, found);
+      walkArtifacts(fullPath, target, found);
       continue;
     }
-    const ext = extname(entry.name).toLowerCase();
-    if (desktopExtensions.has(ext)) {
+    if (isArtifactFile(target, entry.name)) {
       found.push(fullPath);
     }
   }
+}
+
+function isArtifactFile(target, filename) {
+  const ext = extname(filename).toLowerCase();
+  if (target === "android") {
+    return androidExtensions.has(ext);
+  }
+  if (target === "windows-desktop") {
+    return desktopExtensions.has(ext);
+  }
+  return false;
 }
 
 function artifactFilename(target, source) {

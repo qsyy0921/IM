@@ -218,7 +218,9 @@ node clients/tools/verify-shell-assets.mjs --target all
 ignored `clients/artifacts/<run-id>/` directory and writes a low-sensitive
 `manifest.json` with file names, sizes, SHA-256 hashes and a low-sensitive
 artifact kind such as `desktop-executable`, `desktop-installer` or
-`android-debug-apk`. It does not record local absolute source paths. For Windows desktop artifacts it also writes
+`android-debug-apk`. It can take an explicit source file or source directory
+plus `--artifact-kind`, so package wrappers do not mix portable executables with
+installer outputs. It does not record local absolute source paths. For Windows desktop artifacts it also writes
 `README-windows-desktop.txt`; when the collected desktop artifact is a
 standalone `.exe`, it writes `launch-nexusim-windows.ps1` that starts the exe
 through a package-relative path. The `*:collect` build scripts run the same
@@ -322,10 +324,11 @@ installer-only artifacts fail closed. The plan remains not ready until signing
 readiness is true and the executable baseline verifies as Authenticode-valid.
 `build:desktop-installer` wraps that plan as the explicit execution entry. By
 default it is still plan-only. It runs Tauri with the explicit bundle target and
-then collects the resulting Windows desktop artifact only when run with
-`--execute` and the installer plan is ready; otherwise it fails closed and
-prints the missing readiness gates. It does not sign artifacts, install
-installers, launch the app, start services or download toolchains.
+then collects only `desktop-installer` artifacts from the matching
+`bundle/<target>` output directory when run with `--execute` and the installer
+plan is ready; otherwise it fails closed and prints the missing readiness gates.
+It does not sign artifacts, install installers, launch the app, start services
+or download toolchains.
 After collection, `plan:artifact-install` still blocks manual installer
 installation until the collected installer verifies as Authenticode-valid.
 Execution uses the repository installer Tauri profile through

@@ -40,14 +40,27 @@ try {
   const fakeAPK = join(sourceDir, "fake-app-debug.apk");
   const fakeMSI = join(sourceDir, "fake-desktop.msi");
   const fakeEXE = join(sourceDir, "fake-desktop.exe");
+  const filterDir = join(tempRoot, "filter-source");
+  const filterMSI = join(filterDir, "filter-desktop.msi");
+  const filterEXE = join(filterDir, "filter-desktop.exe");
+  const installerOutputDir = join(tempRoot, "bundle", "msi");
+  const builtInstaller = join(installerOutputDir, "nexusim-desktop_0.1.0_x64_en-US.msi");
   const apkBody = "fake apk bytes";
   const msiBody = "fake desktop installer bytes";
   const exeBody = "fake desktop executable bytes";
+  const filteredMsiBody = "filtered desktop installer bytes";
+  const filteredExeBody = "filtered desktop executable bytes";
+  const builtInstallerBody = "built installer bytes";
 
   mkdirSync(sourceDir, { recursive: true });
+  mkdirSync(filterDir, { recursive: true });
+  mkdirSync(installerOutputDir, { recursive: true });
   writeFileSync(fakeAPK, apkBody);
   writeFileSync(fakeMSI, msiBody);
   writeFileSync(fakeEXE, exeBody);
+  writeFileSync(filterMSI, filteredMsiBody);
+  writeFileSync(filterEXE, filteredExeBody);
+  writeFileSync(builtInstaller, builtInstallerBody);
 
   const dryRun = runCollector([
     "--target",
@@ -109,6 +122,42 @@ try {
   assert(desktopManifest.supportFiles[0].filename === "README-windows-desktop.txt", "desktop readme support file missing");
   assert(existsSync(join(desktopDir, "README-windows-desktop.txt")), "desktop readme file missing");
   assert(!JSON.stringify(desktopManifest).includes(tempRoot), "desktop manifest leaked absolute temp path");
+
+  const desktopFiltered = runCollector([
+    "--target",
+    "windows-desktop",
+    "--source",
+    filterDir,
+    "--artifact-kind",
+    "desktop-installer",
+    "--output-dir",
+    outputDir,
+    "--run-id",
+    "desktop-filtered-test"
+  ]);
+  const desktopFilteredDir = join(outputDir, "desktop-filtered-test");
+  const desktopFilteredManifest = JSON.parse(readFileSync(join(desktopFilteredDir, "manifest.json"), "utf8"));
+  assert(desktopFiltered.artifacts.length === 1, "desktop artifact-kind filter should keep only installer artifacts");
+  assert(desktopFilteredManifest.artifacts[0].artifactKind === "desktop-installer", "desktop filter should collect installer artifact kind");
+  assert(desktopFilteredManifest.artifacts[0].filename === "nexusim-windows-desktop-installer.msi", "desktop filter should keep installer filename");
+  assert(!existsSync(join(desktopFilteredDir, "nexusim-windows-desktop.exe")), "desktop filter must not collect executable artifacts");
+
+  const installerOutput = runCollector([
+    "--target",
+    "windows-desktop",
+    "--source",
+    installerOutputDir,
+    "--artifact-kind",
+    "desktop-installer",
+    "--output-dir",
+    outputDir,
+    "--run-id",
+    "desktop-installer-output-test"
+  ]);
+  const installerOutputManifest = JSON.parse(readFileSync(join(outputDir, "desktop-installer-output-test", "manifest.json"), "utf8"));
+  assert(installerOutput.artifacts.length === 1, "installer output directory should collect one installer");
+  assert(installerOutputManifest.artifacts[0].artifactKind === "desktop-installer", "installer output directory should preserve installer kind");
+  assert(!JSON.stringify(installerOutputManifest).includes(tempRoot), "installer output manifest leaked absolute temp path");
 
   const desktopExe = runCollector([
     "--target",

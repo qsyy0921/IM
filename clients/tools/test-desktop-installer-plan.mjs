@@ -163,6 +163,10 @@ try {
   assert(ready.commandTemplate.build.some(value => value.includes("tauri-active") || value.includes("tauri.installer.conf.json")), "ready build command should include a Tauri config hint");
   assert(Array.isArray(ready.commandTemplate?.collect), "ready plan should include collect command template");
   assert(ready.commandTemplate.collect.includes("collect:client-artifacts"), "ready collect command should collect artifacts");
+  assert(ready.commandTemplate.collect.includes("--source"), "ready collect command should pin the installer output directory");
+  assert(ready.commandTemplate.collect.includes("desktop/src-tauri/target/release/bundle/msi"), "ready collect command should target the MSI output directory");
+  assert(ready.commandTemplate.collect.includes("--artifact-kind"), "ready collect command should pin artifact kind");
+  assert(ready.commandTemplate.collect.includes("desktop-installer"), "ready collect command should collect installer artifacts only");
   assert(ready.expectedOutputHint.endsWith("/msi/"), "ready plan output hint should point at MSI bundle output");
   assert(ready.artifactBaseline.artifact.artifactKind === "desktop-executable", "ready plan should expose executable artifact kind");
   assert(ready.signatureVerification.readyForSignedDistribution === true, "ready plan should require a valid signature");
@@ -240,6 +244,8 @@ try {
   assert(nsisReady.readyToBuildInstaller === true, "active NSIS config with signing inputs should be ready");
   assert(nsisReady.target === "nsis", "NSIS ready plan target mismatch");
   assert(nsisReady.commandTemplate.build.includes("nsis"), "NSIS ready build command should include NSIS target");
+  assert(nsisReady.commandTemplate.collect.includes("desktop/src-tauri/target/release/bundle/nsis"), "NSIS collect command should target the NSIS output directory");
+  assert(nsisReady.commandTemplate.collect.includes("desktop-installer"), "NSIS collect command should collect installer artifacts only");
   assert(nsisReady.expectedOutputHint.endsWith("/nsis/"), "NSIS ready output hint should point at NSIS bundle output");
 
   const nsisMissing = buildDesktopInstallerPlan({

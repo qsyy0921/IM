@@ -127,6 +127,10 @@ try {
   assert(dryRun.commands.build.includes("--bundles"), "installer builder should plan an explicit bundle target");
   assert(dryRun.commands.build.includes("--config"), "installer builder should plan an explicit Tauri config");
   assert(dryRun.commands.collect.includes("collect:client-artifacts"), "installer builder should plan artifact collection after build");
+  assert(dryRun.commands.collect.includes("--source"), "installer builder should collect from the explicit bundle target directory");
+  assert(dryRun.commands.collect.includes("desktop/src-tauri/target/release/bundle/msi"), "MSI builder should collect only from the MSI bundle output");
+  assert(dryRun.commands.collect.includes("--artifact-kind"), "installer builder should pin collected artifact kind");
+  assert(dryRun.commands.collect.includes("desktop-installer"), "installer builder should collect installer artifacts only");
   assert(dryRun.installerPlan.signatureVerification.readyForSignedDistribution === true, "installer builder should require a valid signature");
   assert(!dryRunJSON.includes(tempRoot), "dry-run installer builder output leaked absolute temp path");
   assert(!dryRunJSON.match(/token|secret|password|credential|private/i), "dry-run installer builder output leaked sensitive names");
@@ -148,6 +152,8 @@ try {
   assert(dryRunNSIS.readyToBuildInstaller === true, "NSIS dry-run output should preserve readiness");
   assert(dryRunNSIS.target === "nsis", "NSIS dry-run target mismatch");
   assert(dryRunNSIS.commands.build.includes("nsis"), "NSIS dry-run should plan an NSIS bundle build");
+  assert(dryRunNSIS.commands.collect.includes("desktop/src-tauri/target/release/bundle/nsis"), "NSIS builder should collect only from the NSIS bundle output");
+  assert(dryRunNSIS.commands.collect.includes("desktop-installer"), "NSIS builder should collect installer artifacts only");
   assert(dryRunNSIS.installerPlan.expectedOutputHint.endsWith("/nsis/"), "NSIS dry-run output hint should point at NSIS bundle output");
 
   const cliPlan = runBuilder([

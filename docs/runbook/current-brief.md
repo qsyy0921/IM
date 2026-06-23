@@ -52,6 +52,8 @@ Android 后置到用户明确切回。
    thumbprint 会做只读本机证书 / signing key / 过期检查；profile 可声明预期公开
    signer subject，valid signature 必须匹配该发布者策略；release readiness report
    也会对已收集的 `desktop-installer` artifact 做独立 post-build 签名验证；
+   `build:desktop-installer` 执行后的收集步骤只读取选中 `bundle/<target>` 目录并要求
+   `desktop-installer` artifact kind；
    下一步仍是真实证书输入、
    valid signed artifact 和 MSI / NSIS installer 体验。
 4. 所有客户端能力只走 api-gateway BFF 和 push-gateway，不直连内部服务。

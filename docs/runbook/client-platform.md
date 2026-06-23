@@ -336,7 +336,9 @@ First slice:
   `clients/artifacts/<run-id>/` storage and writes a low-sensitive manifest with
   file names, sizes, SHA-256 hashes and low-sensitive artifact kind
   (`desktop-executable`, `desktop-installer` or `android-debug-apk`), without
-  recording local absolute source paths. Windows desktop collection also writes `README-windows-desktop.txt`;
+  recording local absolute source paths. The collector can take an explicit
+  source file or source directory plus `--artifact-kind`, so package wrappers do
+  not mix portable executables with installer outputs. Windows desktop collection also writes `README-windows-desktop.txt`;
   standalone `.exe` packages additionally get `launch-nexusim-windows.ps1`
   with package-relative launch logic. `build:desktop-artifact:collect` and
   `build:android-apk:collect` run the collector automatically after a successful
@@ -592,7 +594,8 @@ First slice:
   `build:desktop-installer` is the explicit execution wrapper over that plan.
   Its default output is plan-only; `--execute` is required before it runs Tauri
   with the explicit bundle target and installer profile, then collects the
-  resulting Windows desktop artifact. It still fails closed while installer
+  selected target's `desktop-installer` artifacts from the matching
+  `bundle/<target>` output directory. It still fails closed while installer
   readiness, signing input readiness or executable signature validity is false.
   The release-readiness report then verifies any collected `desktop-installer`
   artifact separately before distribution. It does not sign, install, launch,

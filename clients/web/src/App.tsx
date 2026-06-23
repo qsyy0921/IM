@@ -874,7 +874,14 @@ export function App() {
       }
       setComposerText("");
       try {
-        const sent = await runtime.sendQueue.sendText({ session: currentSession, conversationID, text });
+        const sent = await runtime.sendQueue.sendText({
+          session: currentSession,
+          conversationID,
+          text,
+          onPendingStored: async () => {
+            await showCachedMessages(conversationID);
+          }
+        });
         updateConversationLastSeq(conversationID, sent.conversationSeq);
       } catch (caught) {
         await showCachedMessages(conversationID);

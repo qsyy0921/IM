@@ -9,7 +9,10 @@ const root = fileURLToPath(new URL("..", import.meta.url));
 async function main() {
 installFakeIndexedDB();
 const sourcePath = join(root, "web/src/adapters/indexeddb-message-store.ts");
-const source = readFileSync(sourcePath, "utf8");
+const source = sourceWithMessageOrderHelper(
+  sourcePath,
+  /import \{ compareMessagesForDisplay \} from "@nexusim\/client-core";\r?\n/
+);
 const compiled = ts.transpileModule(source, {
   compilerOptions: {
     target: ts.ScriptTarget.ES2022,
@@ -57,8 +60,8 @@ await store.markPending({
 
 assertDeepEqual(
   (await store.listMessages("conv-1")).map(item => `${item.status}:${item.clientMessageID ?? item.messageID}`),
-  ["PENDING:local-1", "SENT:msg-1", "SENT:msg-2"],
-  "pending message is stored under local key"
+  ["SENT:msg-1", "SENT:msg-2", "PENDING:local-1"],
+  "pending message is stored under local key and displayed after confirmed messages"
 );
 
 await store.markSendAccepted("local-1", {
@@ -129,6 +132,11 @@ function assertDeepEqual(actual, expected, message) {
   if (actualJSON !== expectedJSON) {
     throw new Error(`${message}: expected ${expectedJSON}, got ${actualJSON}`);
   }
+}
+
+function sourceWithMessageOrderHelper(sourcePath, importPattern) {
+  const helperPath = join(root, "packages/client-core/src/message-order.ts");
+  return `${readFileSync(helperPath, "utf8")}\n${readFileSync(sourcePath, "utf8").replace(importPattern, "")}`;
 }
 
 function installFakeIndexedDB() {

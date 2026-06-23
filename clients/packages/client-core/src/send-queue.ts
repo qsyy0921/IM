@@ -16,6 +16,7 @@ export class MessageSendQueue {
     session: AuthSession;
     conversationID: string;
     text: string;
+    onPendingStored?(message: MessageItem): void | Promise<void>;
   }): Promise<MessageItem> {
     const clientMessageID = this.options.clientMessageIDFactory();
     const pending: MessageItem = {
@@ -32,6 +33,7 @@ export class MessageSendQueue {
     };
 
     await this.options.store.markPending(pending);
+    await input.onPendingStored?.({ ...pending });
 
     const request: SendMessageRequest = {
       tenantID: input.session.tenantID,

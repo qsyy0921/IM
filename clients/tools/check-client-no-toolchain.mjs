@@ -100,6 +100,11 @@ const checkPlan = [
     reason: "guards shared local message cache semantics"
   },
   {
+    name: "message-send-queue-contract",
+    script: "test:message-send-queue",
+    reason: "guards pending send visibility semantics without calling backend services"
+  },
+  {
     name: "indexeddb-message-store-contract",
     script: "test:indexeddb-store",
     reason: "guards browser IndexedDB message cache semantics"

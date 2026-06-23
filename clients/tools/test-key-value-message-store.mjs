@@ -8,7 +8,7 @@ const root = fileURLToPath(new URL("..", import.meta.url));
 
 async function main() {
   const sourcePath = join(root, "packages/client-core/src/key-value-message-store.ts");
-  const source = readFileSync(sourcePath, "utf8");
+  const source = sourceWithMessageOrderHelper(sourcePath, /import \{ compareMessagesForDisplay \} from "\.\/message-order";\r?\n/);
   const compiled = ts.transpileModule(source, {
     compilerOptions: {
       target: ts.ScriptTarget.ES2022,
@@ -54,6 +54,11 @@ async function main() {
     (await afterPendingRestart.listMessages("conv-1")).find(item => item.clientMessageID === "local-1")?.status,
     "PENDING",
     "pending send survives restart"
+  );
+  assertDeepEqual(
+    (await afterPendingRestart.listMessages("conv-1")).map(item => `${item.status}:${item.clientMessageID ?? item.messageID}`),
+    ["SENT:msg-1", "SENT:msg-2", "PENDING:local-1"],
+    "pending send is displayed after confirmed messages"
   );
 
   await afterPendingRestart.markSendAccepted("local-1", {
@@ -105,6 +110,11 @@ async function main() {
   assertDeepEqual(await afterClearRestart.listConversationsNeedingSync(), [], "clear removes sync cursors");
 
   console.log("key-value message store persistence ok");
+}
+
+function sourceWithMessageOrderHelper(sourcePath, importPattern) {
+  const helperPath = join(root, "packages/client-core/src/message-order.ts");
+  return `${readFileSync(helperPath, "utf8")}\n${readFileSync(sourcePath, "utf8").replace(importPattern, "")}`;
 }
 
 function message(conversationID, messageID, seq) {

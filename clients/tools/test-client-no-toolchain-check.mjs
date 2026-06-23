@@ -36,6 +36,7 @@ assert(commands.includes("npm --prefix clients run validate:desktop-tauri"), "de
 assert(commands.includes("npm --prefix clients run validate:android-native"), "android native skeleton contract check missing");
 assert(commands.includes("npm --prefix clients run test:web-platform"), "web platform contract check missing");
 assert(commands.includes("npm --prefix clients run test:local-message-store"), "local message store contract check missing");
+assert(commands.includes("npm --prefix clients run test:message-send-queue"), "message send queue contract check missing");
 assert(commands.includes("npm --prefix clients run test:indexeddb-store"), "indexeddb message store contract check missing");
 assert(commands.includes("npm --prefix clients run test:key-value-store"), "key-value message store contract check missing");
 assert(commands.includes("npm --prefix clients run test:http-bff-client"), "http bff client contract check missing");

@@ -1,4 +1,5 @@
 import type { ConversationID, MessageItem, SendMessageResponse } from "@nexusim/protocol";
+import { compareMessagesForDisplay } from "@nexusim/client-core";
 import type { LocalMessageStore } from "@nexusim/client-core";
 
 const DB_NAME = "nexusim-web-client-v2";
@@ -127,7 +128,7 @@ export class IndexedDBMessageStore implements LocalMessageStore {
     const messages = await idbGetAll<StoredMessage>(db, MESSAGE_STORE);
     return messages
       .filter(message => message.conversationID === conversationID)
-      .sort((left, right) => left.conversationSeq - right.conversationSeq)
+      .sort(compareMessagesForDisplay)
       .map(stripLocalKey);
   }
 

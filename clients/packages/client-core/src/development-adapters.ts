@@ -4,6 +4,7 @@ import type {
   MessageItem,
   SendMessageResponse
 } from "@nexusim/protocol";
+import { compareMessagesForDisplay } from "./message-order";
 import type { LocalMessageStore } from "./ports";
 import type { SecureSessionStore } from "./platform";
 
@@ -88,7 +89,7 @@ export class MemoryMessageStore implements LocalMessageStore {
       return [];
     }
     return Array.from(messages.values())
-      .sort(compareMessages)
+      .sort(compareMessagesForDisplay)
       .map(message => ({ ...message }));
   }
 
@@ -131,11 +132,4 @@ function messageKey(message: MessageItem): string {
 
 function localMessageID(message: MessageItem): string {
   return message.clientMessageID ?? message.messageID;
-}
-
-function compareMessages(left: MessageItem, right: MessageItem): number {
-  if (left.conversationSeq !== right.conversationSeq) {
-    return left.conversationSeq - right.conversationSeq;
-  }
-  return (left.createdAtMs ?? 0) - (right.createdAtMs ?? 0);
 }

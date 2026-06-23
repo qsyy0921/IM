@@ -1,4 +1,5 @@
 import type { ConversationID, MessageItem, SendMessageResponse } from "@nexusim/protocol";
+import { compareMessagesForDisplay } from "./message-order";
 import type { LocalMessageStore } from "./ports";
 
 export interface StringKeyValueStorage {
@@ -103,7 +104,7 @@ export class KeyValueMessageStore implements LocalMessageStore {
     const snapshot = await this.#load();
     return Object.values(snapshot.messagesByKey)
       .filter(message => message.conversationID === conversationID)
-      .sort((left, right) => left.conversationSeq - right.conversationSeq)
+      .sort(compareMessagesForDisplay)
       .map(message => ({ ...message }));
   }
 

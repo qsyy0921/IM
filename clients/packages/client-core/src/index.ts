@@ -2,6 +2,7 @@ export * from "./config";
 export * from "./ports";
 export * from "./platform";
 export * from "./auth-session";
+export * from "./message-order";
 export * from "./push-connection";
 export * from "./inbox-sync";
 export * from "./send-queue";

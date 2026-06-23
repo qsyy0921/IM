@@ -8,7 +8,7 @@ const root = fileURLToPath(new URL("..", import.meta.url));
 
 async function main() {
   const sourcePath = join(root, "packages/client-core/src/development-adapters.ts");
-  const source = readFileSync(sourcePath, "utf8");
+  const source = sourceWithMessageOrderHelper(sourcePath, /import \{ compareMessagesForDisplay \} from "\.\/message-order";\r?\n/);
   const compiled = ts.transpileModule(source, {
     compilerOptions: {
       target: ts.ScriptTarget.ES2022,
@@ -54,6 +54,11 @@ async function main() {
     "PENDING",
     "pending send is readable from shared store port"
   );
+  assertDeepEqual(
+    (await store.listMessages("conv-1")).map(item => `${item.status}:${item.clientMessageID ?? item.messageID}`),
+    ["SENT:msg-1", "SENT:msg-2", "PENDING:local-1"],
+    "pending send is displayed after confirmed messages"
+  );
 
   await store.markSendAccepted("local-1", {
     messageID: "msg-3",
@@ -72,6 +77,11 @@ async function main() {
   assertEqual(await store.getLastReceivedSeq("conv-1"), 0, "clear removes cursor");
 
   console.log("local message store contract ok");
+}
+
+function sourceWithMessageOrderHelper(sourcePath, importPattern) {
+  const helperPath = join(root, "packages/client-core/src/message-order.ts");
+  return `${readFileSync(helperPath, "utf8")}\n${readFileSync(sourcePath, "utf8").replace(importPattern, "")}`;
 }
 
 function message(conversationID, messageID, seq) {

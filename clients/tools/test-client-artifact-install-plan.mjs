@@ -71,6 +71,7 @@ try {
 
   assert(plan.schemaVersion === "nexusim.client-artifact-install-plan.v1", "install plan schema mismatch");
   assertInstallPlanExecutionPolicy(plan.executionPolicy);
+  assert(plan.executionPolicy.checksExpectedSignerSubject === false, "default install plan should not declare signer policy checks");
   assert(plan.artifactManifest.present === true, "manifest should be present");
   assert(plan.artifactManifest.manifestHint === "clients/artifacts/install-plan-test/manifest.json", "manifest hint mismatch");
   assert(plan.targets.android.artifactReady === true, "android artifact should be ready");
@@ -197,6 +198,7 @@ try {
 
   const signedInstallerPlan = buildClientArtifactInstallPlan({
     manifest: join(runDir, "manifest.json"),
+    expectedSignerSubjectContains: "NexusIM",
     installPrereqs: {
       adbAvailable: true,
       windowsInstallerLaunchSupported: true
@@ -213,6 +215,7 @@ try {
     }
   });
   assert(signedInstallerPlan.targets["windows-desktop"].readyForInstall === true, "valid signed desktop installer install plan should be ready");
+  assert(signedInstallerPlan.executionPolicy.checksExpectedSignerSubject === true, "explicit signer policy should be declared by install plan");
   assert(signedInstallerPlan.targets["windows-desktop"].missing.length === 0, "valid signed desktop installer should have no missing inputs");
   assert(signedInstallerPlan.targets["windows-desktop"].installerSignatureVerification.status === "Valid", "signed desktop installer status should be preserved");
 
@@ -304,6 +307,7 @@ try {
 
   const emptyPlan = buildClientArtifactInstallPlan({
     artifactsRoot: join(runDir, "missing-artifacts"),
+    expectedSignerSubjectContains: "NexusIM",
     installPrereqs: {
       adbAvailable: false,
       windowsInstallerLaunchSupported: false
@@ -311,6 +315,7 @@ try {
   });
   assert(emptyPlan.artifactManifest.present === false, "empty plan should report missing manifest");
   assertInstallPlanExecutionPolicy(emptyPlan.executionPolicy);
+  assert(emptyPlan.executionPolicy.checksExpectedSignerSubject === true, "empty explicit signer policy should be preserved");
   assert(emptyPlan.targets.android.missing.includes("artifact-manifest"), "empty android plan should miss manifest");
   assert(emptyPlan.targets.android.missing.includes("adb"), "empty android plan should include adb prereq");
   assert(emptyPlan.targets["windows-desktop"].missing.includes("windows-installer-launch"), "empty desktop plan should include installer launch prereq");

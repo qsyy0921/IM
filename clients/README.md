@@ -238,7 +238,8 @@ Authenticode-valid installer signature before `readyForInstall=true`; unsigned
 or unverifiable installer artifacts fail closed. Stale manifests without an
 explicit `artifactKind` fail closed and must be recollected. It also reports
 local install prerequisites such as Android `adb` availability and Windows
-artifact launch support, but it does not install packages, connect to devices,
+artifact launch support, and its execution policy declares expected signer
+subject checks when a public signer policy is provided, but it does not install packages, connect to devices,
 launch artifacts or print local absolute paths.
 `plan:shell-smoke` consumes the same install plan, so native shell smoke
 readiness is not marked ready until a collected artifact exists and its

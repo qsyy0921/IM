@@ -23,7 +23,7 @@ export function buildClientArtifactInstallPlan(options = {}) {
   const manifestPath = options.manifest ? resolve(options.manifest) : findLatestArtifactManifest(options.artifactsRoot ?? artifactsRoot);
   const installPrereqs = options.installPrereqs ?? collectInstallPrereqs();
   if (!manifestPath) {
-    return emptyPlan(installPrereqs);
+    return emptyPlan(installPrereqs, options);
   }
 
   const manifest = readManifest(manifestPath);
@@ -35,7 +35,7 @@ export function buildClientArtifactInstallPlan(options = {}) {
   const plan = {
     schemaVersion,
     generatedAt: new Date().toISOString(),
-    executionPolicy: planExecutionPolicy(),
+    executionPolicy: planExecutionPolicy(options),
     artifactManifest: {
       present: true,
       manifestHint: safeHint(manifestPath),
@@ -47,11 +47,11 @@ export function buildClientArtifactInstallPlan(options = {}) {
   return plan;
 }
 
-function emptyPlan(installPrereqs) {
+function emptyPlan(installPrereqs, options = {}) {
   return {
     schemaVersion,
     generatedAt: new Date().toISOString(),
-    executionPolicy: planExecutionPolicy(),
+    executionPolicy: planExecutionPolicy(options),
     artifactManifest: {
       present: false,
       manifestHint: "clients/artifacts/<run-id>/manifest.json"
@@ -80,7 +80,7 @@ function emptyPlan(installPrereqs) {
   };
 }
 
-function planExecutionPolicy() {
+function planExecutionPolicy(options = {}) {
   return {
     planOnly: true,
     executesChecklistCommands: false,
@@ -93,7 +93,8 @@ function planExecutionPolicy() {
     contactsDevices: false,
     downloadsToolchain: false,
     readsLocalInstallPrereqs: true,
-    readsDesktopInstallerSignature: true
+    readsDesktopInstallerSignature: true,
+    checksExpectedSignerSubject: Boolean(options.expectedSignerSubjectContains)
   };
 }
 

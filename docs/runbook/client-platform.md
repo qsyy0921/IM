@@ -186,9 +186,12 @@ First slice:
   `loadtest/clientweb/run-local-smoke.ps1 -RunBrowserMultiuserUISmoke`
   wires a temporary local fixture and deletes it after the run. The 2026-06-23
   clean run passed direct / group / invite paths on commit `8782936b` with
-  `git_dirty=false`; conversation management is currently covered by runner
-  contract and focused checks, not yet by a recorded real browser smoke. Report:
-  `docs/runbook/loadtest/client-platform/loadtest-report-20260623-browser-multiuser-ui-smoke.md`.
+  `git_dirty=false`. A later clean run on commit `7e8a890b` also passed the
+  conversation management UI path: tag update, draft save / clear and archive
+  round-trip for the active group conversation, with `git_dirty=false`. Reports:
+  `docs/runbook/loadtest/client-platform/loadtest-report-20260623-browser-multiuser-ui-smoke.md`
+  and
+  `docs/runbook/loadtest/client-platform/loadtest-report-20260623-browser-multiuser-ui-management-smoke.md`.
   The default clientweb smoke still does not launch browsers.
   Conversation profile facts are owned by
   `conversation-service`; media upload session and asset metadata are owned by

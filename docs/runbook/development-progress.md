@@ -502,7 +502,9 @@ baseline 已通过，PC desktop / Android first-stage runtime adapter 已落，P
   归档、标签、草稿、会话筛选、
   消息列表、发送后本地状态刷新、群标题 / 头像 URI / 群公告 read-update、
   PullInbox / ACK 和登录过期清理；真实双用户
-  direct + group client smoke 已通过，群成员管理动作 smoke 已通过，群公告 first path 已接 conversation profile；下一步继续
+  direct + group client smoke 已通过，群成员管理动作 smoke 已通过，群公告 first path 已接 conversation profile；
+  2026-06-23 clean commit `7e8a890b` 已通过浏览器 / PC 多用户 UI smoke 的直聊、群聊、邀请成员、
+  会话标签、草稿和归档 round-trip；下一步继续
   Windows installer / signing 或入群审批 / 禁言等更深群设置与真实 media provider 链路。
   Android APK / 真机 WebView smoke 后置到用户明确切回；Web IndexedDB
   local store、browser platform adapter、shell config contract 和 target shell Web assets

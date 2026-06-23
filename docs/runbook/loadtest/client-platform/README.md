@@ -67,6 +67,12 @@ Reports:
   rendered UI and verifies login, friend-click direct chat, UI group creation,
   group invite, direct / group send, PullInbox and ACK. Recorded with
   `commit=8782936b` and `git_dirty=false`.
+- `loadtest-report-20260623-browser-multiuser-ui-management-smoke.md`: clean
+  rerun of the browser / PC Web shell UI smoke after the conversation-management
+  state fixes. It verifies login, friend-click direct chat, UI group creation,
+  group invite, direct / group send, conversation tag update, draft save / clear,
+  archive round-trip, PullInbox and ACK. Recorded with `commit=7e8a890b` and
+  `git_dirty=false`.
 
 Useful command:
 

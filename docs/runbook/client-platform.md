@@ -551,7 +551,9 @@ First slice:
   not sign, build installers, install, launch, start services, start Docker or
   download toolchains. It may include low-sensitive local `signtool` candidate
   hints, but those hints are never used for readiness; the selected path must
-  still be copied into explicit signing config before use. If the executable
+  still be copied into explicit signing config before use. Its top-level
+  execution policy and nested signing execution policy declare signing profile
+  reads and expected signer subject checks when those inputs are provided. If the executable
   baseline and collected installer artifact are in different manifests, pass
   `--installer-manifest` for the installer signature check. Unsigned or invalid
   artifacts remain blocked until real signatures verify.

@@ -38,7 +38,9 @@ export function buildDesktopSigningReadinessReport(options = {}) {
   });
   const signingExecution = buildSigningOutput(signingPlan, {
     execute: false,
-    requireValid: true
+    requireValid: true,
+    signingProfile: options.signingProfile,
+    expectedSignerSubjectContains: options.expectedSignerSubjectContains
   });
   const signatureVerification = buildDesktopSignatureVerificationReport({
     manifest: options.manifest,
@@ -77,7 +79,7 @@ export function buildDesktopSigningReadinessReport(options = {}) {
     generatedAt: new Date().toISOString(),
     artifactKind,
     installerTarget,
-    executionPolicy: executionPolicy(),
+    executionPolicy: executionPolicy(options),
     ready: {
       canAttemptSigning: Boolean(signingPlan.readyToSign),
       signatureValid: Boolean(signatureVerification.readyForSignedDistribution),
@@ -170,7 +172,7 @@ function nextActions(signingPlan, signatureVerification, installerPlan, installe
   return actions;
 }
 
-function executionPolicy() {
+function executionPolicy(options = {}) {
   return {
     reportOnly: true,
     planOnly: true,
@@ -183,10 +185,12 @@ function executionPolicy() {
     downloadsToolchain: false,
     readsCollectedArtifactManifest: true,
     readsSigningConfig: true,
+    readsSigningProfile: Boolean(options.signingProfile),
     readsPfxCertificate: true,
     readsLocalToolHints: true,
     readsAuthenticodeSignature: true,
     readsInstallerAuthenticodeSignature: true,
+    checksExpectedSignerSubject: Boolean(options.expectedSignerSubjectContains),
     validatesArtifactHashes: true
   };
 }

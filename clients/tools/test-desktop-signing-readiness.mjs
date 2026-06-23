@@ -142,6 +142,8 @@ try {
   assert(missing.executionPolicy.buildsInstaller === false, "readiness report must not build installers");
   assert(missing.executionPolicy.installsArtifacts === false, "readiness report must not install artifacts");
   assert(missing.executionPolicy.downloadsToolchain === false, "readiness report must not download toolchains");
+  assert(missing.executionPolicy.readsSigningProfile === false, "missing report should not declare profile reads");
+  assert(missing.executionPolicy.checksExpectedSignerSubject === false, "missing report should not declare signer policy checks");
 
   const signingReadyUnsigned = buildDesktopSigningReadinessReport({
     manifest: manifestPath,
@@ -264,6 +266,11 @@ try {
   assert(cliProfileReport.ready.canAttemptSigning === true, "CLI profile report should be signing-ready");
   assert(cliProfileReport.ready.signatureValid === false, "CLI profile report should still require real signature");
   assert(cliProfileReport.signing.mode === "pfx", "CLI profile report should use pfx mode");
+  assert(cliProfileReport.executionPolicy.readsSigningProfile === true, "CLI profile report should declare profile reads");
+  assert(cliProfileReport.executionPolicy.checksExpectedSignerSubject === true, "CLI profile report should declare expected signer checks");
+  assert(cliProfileReport.signingExecution.executionPolicy.readsSigningProfile === true, "CLI profile signing execution should declare profile reads");
+  assert(cliProfileReport.signingExecution.executionPolicy.expectedSignerSubjectPolicyConfigured === true, "CLI profile signing execution should declare expected signer policy");
+  assert(cliProfileReport.signingExecution.executionPolicy.requiresExpectedSignerSubjectAfterSigning === true, "CLI profile signing execution should require signer subject with require-valid");
   assert(cliProfileReport.blockers.signature.includes("expected-signer-subject"), "CLI profile report should apply expected signer policy");
   assert(cliProfileReport.installer.postBuildSignatureVerification.artifactPresent === true, "CLI installer manifest should drive post-build installer verification");
   assert(!cliJSON.includes(tempRoot), "CLI readiness report leaked absolute temp path");

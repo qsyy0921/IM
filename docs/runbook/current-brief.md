@@ -55,8 +55,9 @@ Android 后置到用户明确切回。
    thumbprint 会做只读本机证书 / signing key / 过期检查；profile 可声明预期公开
    signer subject，valid signature 必须匹配该发布者策略；read-only verifier 也可读取
    profile 中的公开 signer subject policy 但不会使用证书源签名；signing executor 的
-   低敏 execution policy 会声明 profile 读取和 `--require-valid` 下的 signer subject enforcement；release readiness report
-   也会对已收集的 `desktop-installer` artifact 做独立 post-build 签名验证；
+   低敏 execution policy 会声明 profile 读取和 `--require-valid` 下的 signer subject enforcement；
+   release readiness report 的 top-level 和 nested signing execution policy 也会声明
+   profile 读取 / signer subject policy 检查，并会对已收集的 `desktop-installer` artifact 做独立 post-build 签名验证；
    `build:desktop-installer` 执行后的收集步骤只读取选中 `bundle/<target>` 目录并要求
    `desktop-installer` artifact kind；installer plan / builder 的低敏 execution policy
    也会声明 signing profile 读取、signer subject policy 检查、artifact collection 和

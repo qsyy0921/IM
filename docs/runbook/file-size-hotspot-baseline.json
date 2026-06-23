@@ -1,5 +1,5 @@
 ﻿{
-    "created_at":  "2026-06-22T23:40:43.6762376Z",
+    "created_at":  "2026-06-23T00:23:55.6741184Z",
     "scope":  "handwritten Go/Markdown/PowerShell/Bash file-size budget snapshot; not a code-quality score",
     "file_count":  1992,
     "thresholds":  {
@@ -66,12 +66,12 @@
                       },
                       {
                           "Path":  "docs\\runbook\\client-platform.md",
-                          "Lines":  751,
+                          "Lines":  757,
                           "Kind":  "docs",
                           "Warn":  1200,
                           "Max":  1500,
-                          "WarnRatio":  0.6258,
-                          "MaxRatio":  0.5007
+                          "WarnRatio":  0.6308,
+                          "MaxRatio":  0.5047
                       },
                       {
                           "Path":  "docs\\sdd\\push-gateway.md",

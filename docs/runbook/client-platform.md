@@ -686,7 +686,10 @@ First slice:
   commands for humans, but the script does not install APKs, launch desktop
   artifacts, start Android activities or contact devices by itself. For
   `desktop-installer` artifacts it also reads only public Authenticode status
-  and refuses `readyForInstall` until the installer is validly signed. The plan
+  and refuses `readyForInstall` until the installer is validly signed. When a
+  public expected signer policy is configured, the installer signature summary
+  also exposes low-sensitive `signaturePolicy` booleans for the manual install
+  decision. The plan
   also exposes a top-level `executionPolicy.planOnly=true` block so automation
   can reject accidental execution paths before reading per-step checklist data.
 - `/api/auth/logout` performs first-stage server-side logout for the current

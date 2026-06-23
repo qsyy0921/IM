@@ -198,7 +198,19 @@ function desktopInstallerSignatureVerification(manifestPath, options) {
     status: stringValue(report.signature?.status) || "UNKNOWN",
     signed: Boolean(report.signature?.signed),
     trusted: Boolean(report.signature?.trusted),
+    signaturePolicy: signaturePolicySummary(report, options),
     nextAction: stringValue(report.nextAction)
+  };
+}
+
+function signaturePolicySummary(report, options) {
+  if (report?.signaturePolicy) {
+    return report.signaturePolicy;
+  }
+  const expectedSignerSubjectConfigured = Boolean(stringValue(options.expectedSignerSubjectContains));
+  return {
+    expectedSignerSubjectConfigured,
+    expectedSignerSubjectMatched: expectedSignerSubjectConfigured ? false : true
   };
 }
 

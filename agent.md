@@ -53,9 +53,19 @@ services service-by-service; do not create all planned directories in one change
 
 ## Feature Development Protocol
 
-Before coding a new feature, do a compact architecture analysis, then implement.
-Identify owner, data ownership, API / event contracts, auth / audit, fail-closed
-behavior, platform placement, runtime / middleware impact, and docs to update.
+Default to feature-module slices, not one-field or one-sentence fragments. A
+slice should produce one user-visible or operator-visible capability unless the
+repository state makes that unsafe.
+
+Codex goals should name a full feature module, not a tiny implementation slice.
+Do not turn a field addition, sentence edit, helper output, or one-test tweak
+into the goal. If there are existing uncommitted changes, close and verify that
+work first before starting the next module.
+
+Before coding a new feature module, do a compact architecture analysis, then
+implement. Identify owner, data ownership, API / event contracts, auth / audit,
+fail-closed behavior, platform placement, runtime / middleware impact, and docs
+to update.
 
 Platform placement:
 
@@ -73,9 +83,11 @@ Platform placement:
 - Do not revert user changes.
 - Do not cross-read another service's private tables.
 - Do not introduce mesh-like synchronous RPC dependencies.
-- Do not add hidden business fallback paths. Unknown dependency, permission,
-  projection, provider or fact-source state must fail closed, retry explicitly,
-  repair, or recover from the owning fact source.
+- Do not add hidden business fallback paths. Do not use fake data, default
+  success, stale local cache, silent downgrade, or legacy endpoints to make a
+  broken path appear successful. Unknown dependency, permission, projection,
+  provider or fact-source state must fail closed, retry explicitly, repair, or
+  recover from the owning fact source.
 - When touching a path, remove nearby old hidden fallback-like branches if they
   are not allowed by `docs/architecture/fail-closed-policy.md`; otherwise record
   the cleanup in `remaining-goals.md`.
@@ -93,6 +105,13 @@ Prefer the active slice in `current-goal.md`. Treat unrelated hardening as
 backlog unless it is a P0/P1 fix, a user-explicit request, or required to unblock
 the active slice.
 
+Update documents only when phase, public capability, architecture boundary,
+service, middleware, provider, or operator workflow changes. Do not fan out
+documentation edits for every internal field-level implementation detail.
+
+Status reports should stay concrete: what changed, what was verified, and what
+remains.
+
 ## Sub-Agents
 
 Use sub-agents only for disjoint review, implementation or verification. Keep one
@@ -103,8 +122,11 @@ agents.
 
 Use tiered gates:
 
-1. Small docs or one-package code: focused tests/scripts.
-2. One-service changes: that service tests, build, and relevant smoke.
-3. Cross-service, generated code, migration, registry, Docker/compose, security
+1. Client module work: `npm --prefix clients run check:no-toolchain` and
+   `git diff --check; git diff --cached --check` unless the module crosses
+   generated code, migrations, Docker, service registry, or security boundaries.
+2. Small docs or one-package code: focused tests/scripts.
+3. One-service changes: that service tests, build, and relevant smoke.
+4. Cross-service, generated code, migration, registry, Docker/compose, security
    boundary, or pre-push changes: `.\tools\check-local.ps1`.
-4. End with `git status --short --branch --untracked-files=all`.
+5. End with `git status --short --branch --untracked-files=all`.

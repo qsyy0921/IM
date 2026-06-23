@@ -240,7 +240,9 @@ explicit `artifactKind` fail closed and must be recollected. It also reports
 local install prerequisites such as Android `adb` availability and Windows
 artifact launch support, and its execution policy declares expected signer
 subject checks when a public signer policy is provided by CLI or
-`NEXUSIM_DESKTOP_SIGN_EXPECTED_SUBJECT`, but it does not install packages, connect to devices,
+`NEXUSIM_DESKTOP_SIGN_EXPECTED_SUBJECT`. For installer artifacts, its signature
+summary also exposes low-sensitive `signaturePolicy` booleans for the manual
+install decision, but it does not install packages, connect to devices,
 launch artifacts or print local absolute paths.
 `plan:shell-smoke` consumes the same install plan, so native shell smoke
 readiness is not marked ready until a collected artifact exists and its

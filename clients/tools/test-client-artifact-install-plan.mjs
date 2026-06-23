@@ -196,6 +196,7 @@ try {
   assert(installerPlan.targets["windows-desktop"].installMode === "signed-installer", "desktop installer install mode mismatch");
   assert(installerPlan.targets["windows-desktop"].artifact.artifactKind === "desktop-installer", "desktop installer artifact kind mismatch");
   assert(installerPlan.targets["windows-desktop"].installerSignatureVerification.readyForSignedDistribution === false, "desktop installer signature verification should block unsigned fixtures");
+  assert(installerPlan.targets["windows-desktop"].installerSignatureVerification.signaturePolicy.expectedSignerSubjectConfigured === false, "unsigned installer plan should expose absent signer policy");
   assert(
     installerPlan.targets["windows-desktop"].missing.includes("valid-authenticode-signature") ||
       installerPlan.targets["windows-desktop"].missing.includes("windows-authenticode"),
@@ -223,6 +224,10 @@ try {
         signed: true,
         trusted: true
       },
+      signaturePolicy: {
+        expectedSignerSubjectConfigured: true,
+        expectedSignerSubjectMatched: true
+      },
       nextAction: "continue with signed installer install"
     }
   });
@@ -230,6 +235,8 @@ try {
   assert(signedInstallerPlan.executionPolicy.checksExpectedSignerSubject === true, "explicit signer policy should be declared by install plan");
   assert(signedInstallerPlan.targets["windows-desktop"].missing.length === 0, "valid signed desktop installer should have no missing inputs");
   assert(signedInstallerPlan.targets["windows-desktop"].installerSignatureVerification.status === "Valid", "signed desktop installer status should be preserved");
+  assert(signedInstallerPlan.targets["windows-desktop"].installerSignatureVerification.signaturePolicy.expectedSignerSubjectConfigured === true, "signed installer plan should expose configured signer policy");
+  assert(signedInstallerPlan.targets["windows-desktop"].installerSignatureVerification.signaturePolicy.expectedSignerSubjectMatched === true, "signed installer plan should expose signer policy match");
 
   const cliEnvSignerPlan = runInstallPlan([
     "--manifest",
@@ -240,6 +247,7 @@ try {
     NEXUSIM_DESKTOP_SIGN_EXPECTED_SUBJECT: "NexusIM"
   });
   assert(cliEnvSignerPlan.executionPolicy.checksExpectedSignerSubject === true, "CLI install plan should read expected signer policy from env");
+  assert(cliEnvSignerPlan.targets["windows-desktop"].installerSignatureVerification.signaturePolicy.expectedSignerSubjectConfigured === true, "CLI install plan should expose env signer policy");
 
   writeFileSync(join(runDir, "manifest.json"), `${JSON.stringify({
     schemaVersion: "nexusim.client-artifacts.v1",

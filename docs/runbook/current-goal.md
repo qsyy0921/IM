@@ -55,7 +55,8 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   `desktop-installer` artifact 做独立 post-build 签名验证；install plan 也会在
   `desktop-installer` 未通过 read-only Authenticode 验证时 fail-closed，且 installer
   安装路径必须显式请求 `--artifact-kind desktop-installer`，并会在通过 CLI 或
-  `NEXUSIM_DESKTOP_SIGN_EXPECTED_SUBJECT` 传入公开 expected signer subject policy 时声明该检查；`build:desktop-installer`
+  `NEXUSIM_DESKTOP_SIGN_EXPECTED_SUBJECT` 传入公开 expected signer subject policy 时声明该检查，
+  且 installer 签名摘要会输出低敏 `signaturePolicy`；`build:desktop-installer`
   执行后的 artifact 收集只读取选中 `bundle/<target>` 目录并要求
   `desktop-installer` kind，避免 standalone exe 混入 installer manifest；installer plan / builder
   的低敏 execution policy 也会声明 signing profile 读取、显式 expected signer subject policy 检查、artifact

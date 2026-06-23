@@ -64,7 +64,8 @@ Android 后置到用户明确切回。
    `signaturePolicy` 摘要以表明公开 signer policy 是否配置和匹配；同时会对已收集的
    `desktop-installer` artifact 做独立 post-build 签名验证；
    install plan 会在通过 CLI 或 `NEXUSIM_DESKTOP_SIGN_EXPECTED_SUBJECT`
-   传入公开 expected signer subject policy 时声明该检查；
+   传入公开 expected signer subject policy 时声明该检查，且 installer 签名摘要会输出低敏
+   `signaturePolicy`；
    `build:desktop-installer` 执行后的收集步骤只读取选中 `bundle/<target>` 目录并要求
    `desktop-installer` artifact kind；installer plan / builder 的低敏 execution policy
    也会声明 signing profile 读取、显式 expected signer subject policy 检查、artifact collection 和

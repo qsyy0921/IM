@@ -70,7 +70,10 @@ export function buildDesktopInstallerPlan(options = {}) {
     certSHA1: options.certSHA1,
     timestampURL: options.timestampURL,
     pfxPassEnv: options.pfxPassEnv,
-    pfxPassEnvPresent: options.pfxPassEnvPresent
+    pfxPassEnvPresent: options.pfxPassEnvPresent,
+    pfxPassEnvValue: options.pfxPassEnvValue,
+    pfxCertificateProbe: options.pfxCertificateProbe,
+    certificateStoreProbe: options.certificateStoreProbe
   });
   if (!signingPlan.readyToSign) {
     missing.push("desktop-signing-ready");
@@ -267,6 +270,7 @@ function executionPolicy() {
     readsTauriConfig: true,
     readsCollectedArtifactManifest: true,
     readsSigningConfig: true,
+    readsPfxCertificate: true,
     readsAuthenticodeSignature: true,
     validatesArtifactHashes: true
   };

@@ -129,17 +129,32 @@ function signingConfig(options) {
   if (certFile) {
     mode = "pfx";
     const resolvedCert = resolve(certFile);
-    if (!existsSync(resolvedCert) || !statSync(resolvedCert).isFile()) {
+    const certFilePresent = existsSync(resolvedCert) && statSync(resolvedCert).isFile();
+    if (!certFilePresent) {
       missing.push("certificate-file");
     }
     if (!options.pfxPassEnvPresent) {
       missing.push("pfx-pass-env");
     }
+    const pfxReadiness = certFilePresent && options.pfxPassEnvPresent
+      ? pfxCertificateReadiness(resolvedCert, pfxPassEnv, options)
+      : {
+          checked: false,
+          usable: false,
+          readable: false,
+          signingKeyAvailable: false,
+          notExpired: false,
+          reason: "missing-input"
+        };
+    if (certFilePresent && options.pfxPassEnvPresent && !pfxReadiness.usable) {
+      missing.push(pfxReadinessBlocker(pfxReadiness));
+    }
     certificate = {
       source: "pfx-file",
       fileHint: safeHint(resolvedCert),
       pfxPassEnv,
-      pfxPassEnvPresent: Boolean(options.pfxPassEnvPresent)
+      pfxPassEnvPresent: Boolean(options.pfxPassEnvPresent),
+      pfxReadiness
     };
   } else if (certSHA1) {
     mode = "cert-store-sha1";
@@ -221,9 +236,114 @@ function executionPolicy() {
     downloadsToolchain: false,
     readsCollectedArtifactManifest: true,
     readsSigningConfig: true,
+    readsPfxCertificate: true,
     readsWindowsCertificateStore: true,
     validatesArtifactHashes: true
   };
+}
+
+function pfxCertificateReadiness(certFile, pfxPassEnv, options) {
+  if (typeof options.pfxCertificateProbe === "function") {
+    return normalizePfxCertificateProbe(options.pfxCertificateProbe(certFile, pfxPassEnv));
+  }
+  const pfxValue = stringValue(options.pfxPassEnvValue) || stringValue(process.env[pfxPassEnv]);
+  if (!pfxValue) {
+    return {
+      checked: false,
+      usable: false,
+      readable: false,
+      signingKeyAvailable: false,
+      notExpired: false,
+      reason: "pass-env-missing"
+    };
+  }
+  if (process.platform !== "win32") {
+    return {
+      checked: false,
+      usable: false,
+      readable: false,
+      signingKeyAvailable: false,
+      notExpired: false,
+      reason: "windows-only"
+    };
+  }
+  try {
+    const script = [
+      "$ErrorActionPreference = 'Stop'",
+      "$path = $env:NEXUSIM_DESKTOP_PFX_PROBE_PATH",
+      "$value = $env:NEXUSIM_DESKTOP_PFX_PROBE_VALUE",
+      "$flags = [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::EphemeralKeySet",
+      "$cert = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new($path, $value, $flags)",
+      "$result = [pscustomobject]@{ readable = $true; signingKeyAvailable = [bool]$cert.HasPrivateKey; notAfter = $cert.NotAfter.ToUniversalTime().ToString('o') }",
+      "$result | ConvertTo-Json -Compress -Depth 3"
+    ].join("; ");
+    const output = execFileSync("powershell", ["-NoProfile", "-Command", script], {
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        NEXUSIM_DESKTOP_PFX_PROBE_PATH: certFile,
+        NEXUSIM_DESKTOP_PFX_PROBE_VALUE: pfxValue
+      },
+      windowsHide: true,
+      stdio: ["ignore", "pipe", "ignore"]
+    }).trim();
+    return normalizePfxCertificateProbe(output ? JSON.parse(output) : {});
+  } catch {
+    return {
+      checked: true,
+      usable: false,
+      readable: false,
+      signingKeyAvailable: false,
+      notExpired: false,
+      reason: "read-failed"
+    };
+  }
+}
+
+function normalizePfxCertificateProbe(value) {
+  const notAfter = stringValue(value?.notAfter);
+  const notAfterMs = notAfter ? Date.parse(notAfter) : Number.NaN;
+  const readable = value?.readable !== false && Boolean(value);
+  const signingKeyAvailable = Boolean(value?.signingKeyAvailable ?? value?.keyAvailable);
+  const notExpired = Number.isFinite(notAfterMs) ? notAfterMs > Date.now() : Boolean(value?.notExpired);
+  const usable = readable && signingKeyAvailable && notExpired;
+  return {
+    checked: value?.checked !== false,
+    usable,
+    readable,
+    signingKeyAvailable,
+    notExpired,
+    reason: usable ? "" : stringValue(value?.reason) || pfxCertificateReason({ readable, signingKeyAvailable, notExpired })
+  };
+}
+
+function pfxCertificateReason({ readable, signingKeyAvailable, notExpired }) {
+  if (!readable) {
+    return "read-failed";
+  }
+  if (!signingKeyAvailable) {
+    return "signing-key-unavailable";
+  }
+  if (!notExpired) {
+    return "expired";
+  }
+  return "not-usable";
+}
+
+function pfxReadinessBlocker(readiness) {
+  if (readiness.reason === "windows-only") {
+    return "pfx-certificate-windows";
+  }
+  if (!readiness.readable) {
+    return "pfx-certificate-readable";
+  }
+  if (!readiness.signingKeyAvailable) {
+    return "pfx-certificate-key-access";
+  }
+  if (!readiness.notExpired) {
+    return "pfx-certificate-expired";
+  }
+  return "pfx-certificate-check";
 }
 
 function certificateStoreReadiness(certSHA1, options) {

@@ -14,6 +14,7 @@ import { fileURLToPath } from "node:url";
 import { dirname } from "node:path";
 import { buildDesktopSigningPlan } from "./plan-desktop-signing.mjs";
 import { buildSigningOutput } from "./sign-desktop-artifact.mjs";
+import { createTemporaryCodeSigningPfx, testPfxValue } from "./test-desktop-signing-fixtures.mjs";
 
 const toolsDir = dirname(fileURLToPath(import.meta.url));
 const signer = join(toolsDir, "sign-desktop-artifact.mjs");
@@ -65,9 +66,16 @@ try {
   const manifestPath = join(collectedDir, "manifest.json");
   writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
   const fakeSignTool = join(tempRoot, process.platform === "win32" ? "signtool.cmd" : "signtool");
-  const fakePfx = join(tempRoot, "nexusim-signing.pfx");
+  const pfxFixture = createTemporaryCodeSigningPfx(tempRoot);
+  const fakePfx = pfxFixture.pfxPath;
+  const readyPfxOptions = {
+    certFile: fakePfx,
+    pfxPassEnv: pfxFixture.pfxPassEnv,
+    pfxPassEnvPresent: true,
+    pfxPassEnvValue: testPfxValue,
+    pfxCertificateProbe: pfxFixture.pfxCertificateProbe
+  };
   const signingProfile = join(tempRoot, "desktop-signing-profile.json");
-  writeFileSync(fakePfx, "fake pfx");
   writeFileSync(
     fakeSignTool,
     process.platform === "win32"
@@ -81,7 +89,7 @@ try {
     certificate: {
       source: "pfx-file",
       certFile: fakePfx,
-      pfxPassEnv: "NEXUSIM_TEST_DESKTOP_PFX_PASS"
+      pfxPassEnv: pfxFixture.pfxPassEnv
     }
   }, null, 2)}\n`);
 
@@ -95,9 +103,8 @@ try {
   const readyPlan = buildDesktopSigningPlan({
     manifest: manifestPath,
     signToolPath: fakeSignTool,
-    certFile: fakePfx,
     timestampURL: "https://timestamp.example.test",
-    pfxPassEnvPresent: true
+    ...readyPfxOptions
   });
   const dryRun = buildSigningOutput(readyPlan, { execute: false });
   const dryRunJSON = JSON.stringify(dryRun);
@@ -122,7 +129,7 @@ try {
     "--timestamp-url",
     "https://timestamp.example.test"
   ], {
-    NEXUSIM_DESKTOP_SIGN_PFX_PASS: "present"
+    ...pfxFixture.env
   });
   assert(cliPlan.readyToSign === true, "CLI signing dry-run should be ready");
   assert(cliPlan.executionPolicy.executesSignCommand === false, "CLI dry-run should not execute signing");
@@ -134,11 +141,11 @@ try {
     "--signing-profile",
     signingProfile
   ], {
-    NEXUSIM_TEST_DESKTOP_PFX_PASS: "present"
+    ...pfxFixture.env
   });
   assert(cliProfilePlan.readyToSign === true, "CLI signing profile dry-run should be ready");
   assert(cliProfilePlan.executionPolicy.executesSignCommand === false, "CLI signing profile dry-run should not execute signing");
-  assert(cliProfilePlan.signingPlan.signing.certificate.pfxPassEnv === "NEXUSIM_TEST_DESKTOP_PFX_PASS", "executor should preserve profile pfx pass env");
+  assert(cliProfilePlan.signingPlan.signing.certificate.pfxPassEnv === pfxFixture.pfxPassEnv, "executor should preserve profile pfx pass env");
   assert(!JSON.stringify(cliProfilePlan).includes(tempRoot), "CLI signing profile dry-run leaked absolute temp path");
 
   const cliRequireValidPlan = runSigner([
@@ -152,7 +159,7 @@ try {
     "--timestamp-url",
     "https://timestamp.example.test"
   ], {
-    NEXUSIM_DESKTOP_SIGN_PFX_PASS: "present"
+    ...pfxFixture.env
   });
   assert(cliRequireValidPlan.readyToSign === true, "require-valid CLI dry-run should still be ready to sign");
   assert(cliRequireValidPlan.executionPolicy.requiresValidSignatureAfterSigning === true, "require-valid dry-run should declare valid-signature requirement");
@@ -181,9 +188,8 @@ try {
   const mixedDefaultPlan = buildDesktopSigningPlan({
     manifest: mixedManifestPath,
     signToolPath: fakeSignTool,
-    certFile: fakePfx,
     timestampURL: "https://timestamp.example.test",
-    pfxPassEnvPresent: true
+    ...readyPfxOptions
   });
   const mixedDefaultOutput = buildSigningOutput(mixedDefaultPlan, { execute: false });
   assert(mixedDefaultOutput.signingPlan.artifact.artifactKind === "desktop-executable", "default signing executor should expose executable artifact");
@@ -199,7 +205,7 @@ try {
     "--timestamp-url",
     "https://timestamp.example.test"
   ], {
-    NEXUSIM_DESKTOP_SIGN_PFX_PASS: "present"
+    ...pfxFixture.env
   });
   assert(mixedInstallerPlan.signingPlan.artifact.artifactKind === "desktop-installer", "explicit installer signing dry-run should expose installer artifact");
 
@@ -237,7 +243,7 @@ try {
       encoding: "utf8",
       env: {
         ...process.env,
-        NEXUSIM_DESKTOP_SIGN_PFX_PASS: "present"
+        ...pfxFixture.env
       }
     });
     assert(readyExecute.status === 0, `ready execute should run fake signing tool: ${readyExecute.stderr}`);
@@ -255,7 +261,7 @@ try {
       encoding: "utf8",
       env: {
         ...process.env,
-        NEXUSIM_TEST_DESKTOP_PFX_PASS: "present"
+        ...pfxFixture.env
       }
     });
     assert(readyExecuteProfile.status === 0, `profile execute should run fake signing tool: ${readyExecuteProfile.stderr}`);
@@ -278,7 +284,7 @@ try {
       encoding: "utf8",
       env: {
         ...process.env,
-        NEXUSIM_DESKTOP_SIGN_PFX_PASS: "present"
+        ...pfxFixture.env
       }
     });
     assert(readyExecuteRequireValid.status === 2, "require-valid execute should fail closed when fake signer leaves an invalid signature");

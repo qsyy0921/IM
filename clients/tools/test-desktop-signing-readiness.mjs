@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildDesktopSigningReadinessReport } from "./report-desktop-signing-readiness.mjs";
+import { createTemporaryCodeSigningPfx, testPfxValue } from "./test-desktop-signing-fixtures.mjs";
 
 const toolsDir = dirname(fileURLToPath(import.meta.url));
 const readinessReporter = join(toolsDir, "report-desktop-signing-readiness.mjs");
@@ -73,10 +74,17 @@ try {
   });
 
   const fakeSignTool = join(tempRoot, "signtool.exe");
-  const fakePfx = join(tempRoot, "nexusim-signing.pfx");
+  const pfxFixture = createTemporaryCodeSigningPfx(tempRoot);
+  const fakePfx = pfxFixture.pfxPath;
+  const readyPfxOptions = {
+    certFile: fakePfx,
+    pfxPassEnv: pfxFixture.pfxPassEnv,
+    pfxPassEnvPresent: true,
+    pfxPassEnvValue: testPfxValue,
+    pfxCertificateProbe: pfxFixture.pfxCertificateProbe
+  };
   const signingProfile = join(tempRoot, "desktop-signing-profile.json");
   writeFileSync(fakeSignTool, "fake signtool");
-  writeFileSync(fakePfx, "fake pfx");
   writeJSON(signingProfile, {
     schemaVersion: "nexusim.desktop-signing-profile.v1",
     signToolPath: fakeSignTool,
@@ -84,7 +92,7 @@ try {
     certificate: {
       source: "pfx-file",
       certFile: fakePfx,
-      pfxPassEnv: "NEXUSIM_TEST_DESKTOP_PFX_PASS"
+      pfxPassEnv: pfxFixture.pfxPassEnv
     }
   });
 
@@ -114,9 +122,8 @@ try {
     manifest: manifestPath,
     tauriConfig: activeConfigPath,
     signToolPath: fakeSignTool,
-    certFile: fakePfx,
     timestampURL: "https://timestamp.example.test",
-    pfxPassEnvPresent: true,
+    ...readyPfxOptions,
     mockSignatureStatus: {
       status: "NotSigned"
     }
@@ -134,9 +141,8 @@ try {
     tauriConfig: activeConfigPath,
     target: "nsis",
     signToolPath: fakeSignTool,
-    certFile: fakePfx,
     timestampURL: "https://timestamp.example.test",
-    pfxPassEnvPresent: true,
+    ...readyPfxOptions,
     mockSignatureStatus: {
       status: "Valid",
       signerSubject: "CN=NexusIM Test Code Signing",
@@ -159,7 +165,7 @@ try {
     "--signing-profile",
     signingProfile
   ], {
-    NEXUSIM_TEST_DESKTOP_PFX_PASS: "present"
+    ...pfxFixture.env
   });
   const cliJSON = JSON.stringify(cliProfileReport);
   assert(cliProfileReport.ready.canAttemptSigning === true, "CLI profile report should be signing-ready");
@@ -167,7 +173,7 @@ try {
   assert(cliProfileReport.signing.mode === "pfx", "CLI profile report should use pfx mode");
   assert(!cliJSON.includes(tempRoot), "CLI readiness report leaked absolute temp path");
   assert(!cliJSON.match(/token|secret|password|credential|private/i), "CLI readiness report leaked sensitive names");
-  assert(readFileSync(fakePfx, "utf8") === "fake pfx", "fixture pfx should still exist");
+  assert(readFileSync(fakePfx).length > 0, "fixture pfx should still exist");
 } finally {
   rmSync(tempRoot, { recursive: true, force: true });
 }

@@ -171,7 +171,7 @@ artifact manifest 现在区分 `desktop-executable` / `desktop-installer`；
 立即执行 fail-closed 验证；`verify:desktop-signature` 已提供只读
 Authenticode 验证入口；2026-06-23 已重新 collect 新格式 `desktop-executable`
 artifact，manifest 为 `clients/artifacts/2026-06-22T214826Z/manifest.json`，当前签名状态为 `NotSigned`；同日只读 signing plan 已确认本机 Windows Kits
-`signtool` 可显式定位，传入 timestamp URL 后剩余 release 阻塞是代码签名证书来源和 valid signature；local signing profile 只引用本机 PFX / Windows 证书库和密码环境变量名，不把证书密码、私钥或带账号密码 / query / fragment 的 timestamp URL 写入仓库；Windows cert-store thumbprint 会做只读本机证书、signing key 和过期检查；`build:desktop-installer` 已提供显式 `--execute` 门控的
+`signtool` 可显式定位，传入 timestamp URL 后剩余 release 阻塞是代码签名证书来源和 valid signature；local signing profile 只引用本机 PFX / Windows 证书库和密码环境变量名，不把证书密码、私钥或带账号密码 / query / fragment 的 timestamp URL 写入仓库；PFX 输入会做只读可读性、signing key 和过期检查，Windows cert-store thumbprint 会做只读本机证书、signing key 和过期检查；`build:desktop-installer` 已提供显式 `--execute` 门控的
 installer build 包装器，并通过独立仓库 installer profile 调用 Tauri。默认开发
 Tauri config 仍保持不打包；installer profile 显式启用 MSI + NSIS targets；signing /
 signature verification / installer planner 会按 `artifactKind` 精确选择 collected

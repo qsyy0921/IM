@@ -30,7 +30,10 @@ export function buildDesktopSigningReadinessReport(options = {}) {
     certSHA1: options.certSHA1,
     timestampURL: options.timestampURL,
     pfxPassEnv: options.pfxPassEnv,
-    pfxPassEnvPresent: options.pfxPassEnvPresent
+    pfxPassEnvPresent: options.pfxPassEnvPresent,
+    pfxPassEnvValue: options.pfxPassEnvValue,
+    pfxCertificateProbe: options.pfxCertificateProbe,
+    certificateStoreProbe: options.certificateStoreProbe
   });
   const signingExecution = buildSigningOutput(signingPlan, {
     execute: false,
@@ -53,6 +56,9 @@ export function buildDesktopSigningReadinessReport(options = {}) {
     timestampURL: options.timestampURL,
     pfxPassEnv: options.pfxPassEnv,
     pfxPassEnvPresent: options.pfxPassEnvPresent,
+    pfxPassEnvValue: options.pfxPassEnvValue,
+    pfxCertificateProbe: options.pfxCertificateProbe,
+    certificateStoreProbe: options.certificateStoreProbe,
     mockSignatureStatus: options.mockSignatureStatus
   });
   const report = {
@@ -147,6 +153,7 @@ function executionPolicy() {
     downloadsToolchain: false,
     readsCollectedArtifactManifest: true,
     readsSigningConfig: true,
+    readsPfxCertificate: true,
     readsLocalToolHints: true,
     readsAuthenticodeSignature: true,
     validatesArtifactHashes: true

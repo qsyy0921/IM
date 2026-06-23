@@ -264,9 +264,12 @@ Windows certificate-store thumbprint, `signtool`, timestamp URL and the name of
 the PFX password environment variable. It must not contain certificate
 passwords, private key material or provider credentials. The timestamp URL must
 be plain `http` / `https` without embedded credentials, query string or
-fragment. When a Windows certificate-store thumbprint is used, the plan performs
-a read-only local certificate-store check and remains not ready unless the
-certificate exists, has a usable signing key and is not expired.
+fragment. When a PFX file is used, the plan performs a read-only local PFX check
+with the named environment variable and remains not ready unless the PFX can be
+read, has a usable signing key and is not expired. When a Windows
+certificate-store thumbprint is used, the plan performs a read-only local
+certificate-store check and remains not ready unless the certificate exists, has
+a usable signing key and is not expired.
 `sign:desktop-artifact` is the explicit execution wrapper for that plan. By
 default it is also plan-only and prints a low-sensitive execution policy. It
 only invokes `signtool` when run with `--execute` and when the collected desktop

@@ -13,6 +13,7 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { dirname } from "node:path";
 import { buildDesktopSigningPlan } from "./plan-desktop-signing.mjs";
+import { createTemporaryCodeSigningPfx, testPfxValue } from "./test-desktop-signing-fixtures.mjs";
 
 const toolsDir = dirname(fileURLToPath(import.meta.url));
 const signingPlanner = join(toolsDir, "plan-desktop-signing.mjs");
@@ -64,11 +65,18 @@ try {
   const manifestPath = join(collectedDir, "manifest.json");
   writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
   const fakeSignTool = join(tempRoot, "signtool.exe");
-  const fakePfx = join(tempRoot, "nexusim-signing.pfx");
+  const pfxFixture = createTemporaryCodeSigningPfx(tempRoot);
+  const fakePfx = pfxFixture.pfxPath;
+  const readyPfxOptions = {
+    certFile: fakePfx,
+    pfxPassEnv: pfxFixture.pfxPassEnv,
+    pfxPassEnvPresent: true,
+    pfxPassEnvValue: testPfxValue,
+    pfxCertificateProbe: pfxFixture.pfxCertificateProbe
+  };
   const signingProfile = join(tempRoot, "desktop-signing-profile.json");
   const unsafeSigningProfile = join(tempRoot, "unsafe-desktop-signing-profile.json");
   writeFileSync(fakeSignTool, "fake signtool");
-  writeFileSync(fakePfx, "fake pfx");
   writeFileSync(signingProfile, `${JSON.stringify({
     schemaVersion: "nexusim.desktop-signing-profile.v1",
     signToolPath: fakeSignTool,
@@ -76,7 +84,7 @@ try {
     certificate: {
       source: "pfx-file",
       certFile: fakePfx,
-      pfxPassEnv: "NEXUSIM_TEST_DESKTOP_PFX_PASS"
+      pfxPassEnv: pfxFixture.pfxPassEnv
     }
   }, null, 2)}\n`);
   writeFileSync(unsafeSigningProfile, `${JSON.stringify({
@@ -101,18 +109,31 @@ try {
   const ready = buildDesktopSigningPlan({
     manifest: manifestPath,
     signToolPath: fakeSignTool,
-    certFile: fakePfx,
     timestampURL: "https://timestamp.example.test",
-    pfxPassEnvPresent: true
+    ...readyPfxOptions
   });
   const readyJSON = JSON.stringify(ready);
   assert(ready.readyToSign === true, "complete signing config should be ready");
   assert(ready.signing.mode === "pfx", "pfx signing mode expected");
   assert(ready.signing.certificate.pfxPassEnvPresent === true, "pfx env presence expected");
+  assert(ready.signing.certificate.pfxReadiness.usable === true, "pfx readiness should be usable");
   assert(Array.isArray(ready.commandTemplate), "sign command template missing");
-  assert(ready.commandTemplate.includes("%NEXUSIM_DESKTOP_SIGN_PFX_PASS%"), "pfx env marker missing");
+  assert(ready.commandTemplate.includes(`%${pfxFixture.pfxPassEnv}%`), "pfx env marker missing");
   assert(!readyJSON.includes(tempRoot), "ready signing plan leaked absolute temp path");
   assert(!readyJSON.match(/token|secret|password|credential|private/i), "ready signing plan leaked sensitive names");
+
+  const invalidPfx = join(tempRoot, "invalid-signing.pfx");
+  writeFileSync(invalidPfx, "not a pfx");
+  const invalidPfxPlan = buildDesktopSigningPlan({
+    manifest: manifestPath,
+    signToolPath: fakeSignTool,
+    certFile: invalidPfx,
+    timestampURL: "https://timestamp.example.test",
+    pfxPassEnvPresent: true,
+    pfxPassEnvValue: testPfxValue
+  });
+  assert(invalidPfxPlan.readyToSign === false, "invalid pfx must not be signing-ready");
+  assert(invalidPfxPlan.missing.includes("pfx-certificate-readable"), "invalid pfx should report readability blocker");
 
   const cliPlan = runPlanner([
     "--manifest",
@@ -124,7 +145,7 @@ try {
     "--timestamp-url",
     "https://timestamp.example.test"
   ], {
-    NEXUSIM_DESKTOP_SIGN_PFX_PASS: "present"
+    ...pfxFixture.env
   });
   assert(cliPlan.readyToSign === true, "CLI signing plan should be ready");
   assert(!JSON.stringify(cliPlan).includes(tempRoot), "CLI signing plan leaked absolute temp path");
@@ -135,7 +156,7 @@ try {
     "--signing-profile",
     signingProfile
   ], {
-    NEXUSIM_TEST_DESKTOP_PFX_PASS: "present"
+    ...pfxFixture.env
   });
   assert(cliProfilePlan.readyToSign === true, "CLI signing profile plan should be ready");
   assert(cliProfilePlan.signing.certificate.pfxPassEnv === "NEXUSIM_TEST_DESKTOP_PFX_PASS", "profile pfx pass env should be preserved");
@@ -211,9 +232,8 @@ try {
   const invalidTimestamp = buildDesktopSigningPlan({
     manifest: manifestPath,
     signToolPath: fakeSignTool,
-    certFile: fakePfx,
     timestampURL: "timestamp.example.test",
-    pfxPassEnvPresent: true
+    ...readyPfxOptions
   });
   assert(invalidTimestamp.readyToSign === false, "invalid timestamp URL should not be ready");
   assert(invalidTimestamp.missing.includes("timestamp-url-valid"), "invalid timestamp should be reported");
@@ -221,9 +241,8 @@ try {
   const timestampWithQuery = buildDesktopSigningPlan({
     manifest: manifestPath,
     signToolPath: fakeSignTool,
-    certFile: fakePfx,
     timestampURL: "https://timestamp.example.test/path?token=do-not-store",
-    pfxPassEnvPresent: true
+    ...readyPfxOptions
   });
   assert(timestampWithQuery.readyToSign === false, "timestamp URL with query should not be ready");
   assert(timestampWithQuery.missing.includes("timestamp-url-valid"), "timestamp query should be reported");
@@ -252,9 +271,8 @@ try {
   const mixedDefault = buildDesktopSigningPlan({
     manifest: mixedManifestPath,
     signToolPath: fakeSignTool,
-    certFile: fakePfx,
     timestampURL: "https://timestamp.example.test",
-    pfxPassEnvPresent: true
+    ...readyPfxOptions
   });
   assert(mixedDefault.readyToSign === true, "mixed manifest default signing should be ready");
   assert(mixedDefault.artifact.artifactKind === "desktop-executable", "default signing must select desktop executable");
@@ -263,9 +281,8 @@ try {
     manifest: mixedManifestPath,
     artifactKind: "desktop-installer",
     signToolPath: fakeSignTool,
-    certFile: fakePfx,
     timestampURL: "https://timestamp.example.test",
-    pfxPassEnvPresent: true
+    ...readyPfxOptions
   });
   assert(mixedInstaller.readyToSign === true, "explicit installer signing should be ready");
   assert(mixedInstaller.artifact.artifactKind === "desktop-installer", "explicit signing should select desktop installer");
@@ -311,9 +328,8 @@ try {
   const targetSelected = buildDesktopSigningPlan({
     artifactsRoot,
     signToolPath: fakeSignTool,
-    certFile: fakePfx,
     timestampURL: "https://timestamp.example.test",
-    pfxPassEnvPresent: true
+    ...readyPfxOptions
   });
   assert(targetSelected.readyToSign === true, "default signing plan should select latest desktop manifest, not latest android manifest");
   assert(targetSelected.artifactManifest.runId === "desktop-signing-test", "default signing plan selected the wrong manifest");
@@ -321,7 +337,7 @@ try {
   const unsignedText = JSON.stringify(missing);
   assert(!unsignedText.includes(tempRoot), "missing signing plan leaked absolute temp path");
   assert(existsSync(fakeSignTool), "fixture signtool should exist");
-  assert(readFileSync(fakePfx, "utf8") === "fake pfx", "fixture pfx should exist");
+  assert(readFileSync(fakePfx).length > 0, "fixture pfx should exist");
 } finally {
   rmSync(tempRoot, { recursive: true, force: true });
 }

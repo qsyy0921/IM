@@ -12,6 +12,7 @@ import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { dirname } from "node:path";
 import { buildDesktopInstallerPlan } from "./plan-desktop-installer.mjs";
+import { createTemporaryCodeSigningPfx, testPfxValue } from "./test-desktop-signing-fixtures.mjs";
 
 const toolsDir = dirname(fileURLToPath(import.meta.url));
 const installerPlanner = join(toolsDir, "plan-desktop-installer.mjs");
@@ -115,10 +116,17 @@ try {
     }
   });
   const fakeSignTool = join(tempRoot, "signtool.exe");
-  const fakePfx = join(tempRoot, "nexusim-signing.pfx");
+  const pfxFixture = createTemporaryCodeSigningPfx(tempRoot);
+  const fakePfx = pfxFixture.pfxPath;
+  const readyPfxOptions = {
+    certFile: fakePfx,
+    pfxPassEnv: pfxFixture.pfxPassEnv,
+    pfxPassEnvPresent: true,
+    pfxPassEnvValue: testPfxValue,
+    pfxCertificateProbe: pfxFixture.pfxCertificateProbe
+  };
   const signingProfile = join(tempRoot, "desktop-signing-profile.json");
   writeFileSync(fakeSignTool, "fake signtool");
-  writeFileSync(fakePfx, "fake pfx");
   writeFileSync(signingProfile, `${JSON.stringify({
     schemaVersion: "nexusim.desktop-signing-profile.v1",
     signToolPath: fakeSignTool,
@@ -126,7 +134,7 @@ try {
     certificate: {
       source: "pfx-file",
       certFile: fakePfx,
-      pfxPassEnv: "NEXUSIM_TEST_DESKTOP_PFX_PASS"
+      pfxPassEnv: pfxFixture.pfxPassEnv
     }
   }, null, 2)}\n`);
 
@@ -135,9 +143,8 @@ try {
     tauriConfig: activeConfigPath,
     target: "msi",
     signToolPath: fakeSignTool,
-    certFile: fakePfx,
     timestampURL: "https://timestamp.example.test",
-    pfxPassEnvPresent: true,
+    ...readyPfxOptions,
     mockSignatureStatus: {
       status: "Valid",
       signerSubject: "CN=NexusIM Test Code Signing",
@@ -186,9 +193,8 @@ try {
     tauriConfig: activeConfigPath,
     target: "msi",
     signToolPath: fakeSignTool,
-    certFile: fakePfx,
     timestampURL: "https://timestamp.example.test",
-    pfxPassEnvPresent: true,
+    ...readyPfxOptions,
     mockSignatureStatus: {
       status: "Valid",
       signerSubject: "CN=NexusIM Test Code Signing",
@@ -204,9 +210,8 @@ try {
     tauriConfig: activeConfigPath,
     target: "nsis",
     signToolPath: fakeSignTool,
-    certFile: fakePfx,
     timestampURL: "https://timestamp.example.test",
-    pfxPassEnvPresent: true,
+    ...readyPfxOptions,
     mockSignatureStatus: {
       status: "Valid",
       signerSubject: "CN=NexusIM Test Code Signing",
@@ -223,9 +228,8 @@ try {
     tauriConfig: msiOnlyConfigPath,
     target: "nsis",
     signToolPath: fakeSignTool,
-    certFile: fakePfx,
     timestampURL: "https://timestamp.example.test",
-    pfxPassEnvPresent: true,
+    ...readyPfxOptions,
     mockSignatureStatus: {
       status: "Valid",
       signerSubject: "CN=NexusIM Test Code Signing",
@@ -240,9 +244,8 @@ try {
     tauriConfig: activeConfigPath,
     target: "portable",
     signToolPath: fakeSignTool,
-    certFile: fakePfx,
     timestampURL: "https://timestamp.example.test",
-    pfxPassEnvPresent: true,
+    ...readyPfxOptions,
     mockSignatureStatus: {
       status: "Valid",
       signerSubject: "CN=NexusIM Test Code Signing",
@@ -271,9 +274,8 @@ try {
     tauriConfig: activeConfigPath,
     target: "msi",
     signToolPath: fakeSignTool,
-    certFile: fakePfx,
     timestampURL: "https://timestamp.example.test",
-    pfxPassEnvPresent: true,
+    ...readyPfxOptions,
     mockSignatureStatus: {
       status: "Valid",
       signerSubject: "CN=NexusIM Test Code Signing",
@@ -302,9 +304,8 @@ try {
     tauriConfig: activeConfigPath,
     target: "msi",
     signToolPath: fakeSignTool,
-    certFile: fakePfx,
     timestampURL: "https://timestamp.example.test",
-    pfxPassEnvPresent: true,
+    ...readyPfxOptions,
     mockSignatureStatus: {
       status: "Valid",
       signerSubject: "CN=NexusIM Test Code Signing",
@@ -342,9 +343,8 @@ try {
     tauriConfig: activeConfigPath,
     target: "msi",
     signToolPath: fakeSignTool,
-    certFile: fakePfx,
     timestampURL: "https://timestamp.example.test",
-    pfxPassEnvPresent: true,
+    ...readyPfxOptions,
     mockSignatureStatus: {
       status: "Valid",
       signerSubject: "CN=NexusIM Test Code Signing",
@@ -368,7 +368,7 @@ try {
     "--timestamp-url",
     "https://timestamp.example.test"
   ], {
-    NEXUSIM_DESKTOP_SIGN_PFX_PASS: "present"
+    ...pfxFixture.env
   });
   assert(cliPlan.readyToBuildInstaller === false, "CLI installer plan should not be ready for unsigned fixtures");
   assert(cliPlan.missing.includes("desktop-signature-valid"), "CLI installer plan should require valid signature");
@@ -385,13 +385,13 @@ try {
     "--signing-profile",
     signingProfile
   ], {
-    NEXUSIM_TEST_DESKTOP_PFX_PASS: "present"
+    ...pfxFixture.env
   });
   assert(cliProfilePlan.signing.readyToSign === true, "CLI installer profile plan should be signing-ready");
   assert(cliProfilePlan.readyToBuildInstaller === false, "CLI installer profile plan should still require valid signature for unsigned fixtures");
   assert(cliProfilePlan.missing.includes("desktop-signature-valid"), "CLI installer profile plan should require valid signature");
 
-  assert(readFileSync(fakePfx, "utf8") === "fake pfx", "fixture pfx should still exist");
+  assert(readFileSync(fakePfx).length > 0, "fixture pfx should still exist");
 } finally {
   rmSync(tempRoot, { recursive: true, force: true });
 }

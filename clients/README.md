@@ -283,8 +283,11 @@ Authenticode-valid.
 same controls. It combines the signing plan, plan-only signing execution output,
 read-only Authenticode verification and MSI / NSIS installer plan into one
 low-sensitive JSON report. It does not sign, build installers, install, launch,
-start services, start Docker or download toolchains, and it keeps unsigned /
-invalid artifacts blocked until real signing input and a valid signature exist.
+start services, start Docker or download toolchains. It may include low-sensitive
+local `signtool` candidate hints, but those candidates are never used for
+readiness; the selected path must still be provided through an explicit signing
+profile, CLI argument or environment variable. Unsigned / invalid artifacts stay
+blocked until real signing input and a valid signature exist.
 `plan:desktop-installer` reads the repository installer Tauri profile, the
 collected Windows desktop manifest, the signing readiness plan and the
 read-only signature verification report, then reports whether MSI / NSIS
@@ -338,7 +341,8 @@ Current packaging status:
   `plan:desktop-signing` now checks explicit code-signing readiness and produces
   only a low-sensitive plan. `report:desktop-signing-readiness` now summarizes
   signing input readiness, read-only signature validity and installer blockers
-  without signing or building. `sign:desktop-artifact` is the explicit
+  without signing or building; any local `signtool` candidate remains a hint and
+  must be copied into explicit signing config before use. `sign:desktop-artifact` is the explicit
   `--execute`-gated signing wrapper over that plan and fails closed until real
   signing inputs are present. `verify:desktop-signature` reads Authenticode
   public status. A new `desktop-executable` artifact was recollected at

@@ -164,7 +164,8 @@ artifact manifest 现在区分 `desktop-executable` / `desktop-installer`；
 `bundle:desktop` 只打包 `desktop-executable`，可以产出 unsigned local portable zip 和低敏 summary；
 `plan:desktop-installer` / `plan:desktop-signing` 可以检查 Tauri installer 和显式
 签名输入 readiness；`report:desktop-signing-readiness` 会汇总签名输入、
-只读签名验证和 installer 阻塞；签名 / installer 工具已支持显式 local signing profile 输入；
+只读签名验证、低敏 `signtool` 候选提示和 installer 阻塞，但候选工具不会自动用于 readiness；
+签名 / installer 工具已支持显式 local signing profile 输入；
 `sign:desktop-artifact` 已提供显式 `--execute` 门控的签名
 执行入口，默认仍只输出低敏 plan，release signing 可加 `--require-valid` 在签名后
 立即执行 fail-closed 验证；`verify:desktop-signature` 已提供只读

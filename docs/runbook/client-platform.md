@@ -519,8 +519,10 @@ First slice:
   signing execution state, read-only Authenticode verification and MSI / NSIS
   installer blockers into one low-sensitive release-readiness JSON report. It
   does not sign, build installers, install, launch, start services, start Docker
-  or download toolchains; unsigned or invalid artifacts remain blocked until a
-  real signature verifies.
+  or download toolchains. It may include low-sensitive local `signtool`
+  candidate hints, but those hints are never used for readiness; the selected
+  path must still be copied into explicit signing config before use. Unsigned or
+  invalid artifacts remain blocked until a real signature verifies.
   `sign:desktop-artifact` is the explicit execution wrapper for that plan. Its
   default output remains plan-only and low-sensitive; it invokes `signtool` only
   with `--execute` after the collected artifact hash, explicit `signtool`,

@@ -90,7 +90,8 @@ try {
 
   const missing = buildDesktopSigningReadinessReport({
     manifest: manifestPath,
-    tauriConfig: activeConfigPath
+    tauriConfig: activeConfigPath,
+    signToolCandidatePaths: [fakeSignTool]
   });
   assert(missing.schemaVersion === "nexusim.desktop-signing-readiness.v1", "schema version mismatch");
   assert(missing.ready.canAttemptSigning === false, "missing signing inputs should not be signing-ready");
@@ -99,6 +100,10 @@ try {
   assert(missing.blockers.signing.includes("signtool-path"), "missing signtool should be reported");
   assert(missing.blockers.signing.includes("timestamp-url"), "missing timestamp should be reported");
   assert(missing.blockers.signing.includes("certificate-source"), "missing certificate source should be reported");
+  assert(missing.localToolHints.signtool.candidateCount >= 1, "signtool candidate hint should be reported");
+  assert(missing.localToolHints.signtool.candidatesUsedForReadiness === false, "signtool hints must not affect readiness");
+  assert(missing.localToolHints.signtool.candidates.some(candidate => candidate.source === "explicit-candidate"), "explicit candidate source should be reported");
+  assert(!JSON.stringify(missing.localToolHints).includes(tempRoot), "signtool hint leaked absolute temp path");
   assert(missing.executionPolicy.reportOnly === true, "readiness report should be report-only");
   assert(missing.executionPolicy.signsArtifacts === false, "readiness report must not sign artifacts");
   assert(missing.executionPolicy.buildsInstaller === false, "readiness report must not build installers");

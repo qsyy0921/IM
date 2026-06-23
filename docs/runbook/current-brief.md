@@ -46,7 +46,8 @@ Android 后置到用户明确切回。
    `loadtest/clientweb` 报告。
 3. Windows desktop 已有本地 artifact / signing / installer plan first paths；签名 /
    installer 工具已支持显式 local signing profile 输入，并有只读 release readiness
-   report 汇总签名输入、签名验证和 installer 阻塞；下一步仍是真实证书输入、
+   report 汇总签名输入、低敏 `signtool` 候选提示、签名验证和 installer 阻塞；
+   候选工具不会自动用于 readiness；下一步仍是真实证书输入、
    valid signed artifact 和 MSI / NSIS installer 体验。
 4. 所有客户端能力只走 api-gateway BFF 和 push-gateway，不直连内部服务。
 5. 新功能先做简短架构分析再编码；新增服务 / 中间件 / provider 必须归属正确平台层并同步 owner docs。

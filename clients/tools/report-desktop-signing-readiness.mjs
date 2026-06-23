@@ -1,5 +1,8 @@
 import { fileURLToPath } from "node:url";
-import { resolve } from "node:path";
+import { existsSync, readdirSync, statSync } from "node:fs";
+import { basename, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { createHash } from "node:crypto";
+import { workspaceRoot } from "./client-build-env.mjs";
 import { applyDesktopSigningProfile, defaultPfxPassEnv, signingProfileEnv } from "./desktop-signing-profile.mjs";
 import { buildDesktopInstallerPlan, defaultInstallerTauriConfig } from "./plan-desktop-installer.mjs";
 import { buildDesktopSigningPlan } from "./plan-desktop-signing.mjs";
@@ -81,6 +84,7 @@ export function buildDesktopSigningReadinessReport(options = {}) {
       timestamp: signingPlan.signing?.timestamp ?? { present: false },
       commandTemplate: signingPlan.commandTemplate
     },
+    localToolHints: localToolHints(options),
     signingExecution: {
       readyToExecuteSigning: Boolean(signingExecution.readyToExecuteSigning),
       executionPolicy: signingExecution.executionPolicy,
@@ -143,9 +147,130 @@ function executionPolicy() {
     downloadsToolchain: false,
     readsCollectedArtifactManifest: true,
     readsSigningConfig: true,
+    readsLocalToolHints: true,
     readsAuthenticodeSignature: true,
     validatesArtifactHashes: true
   };
+}
+
+function localToolHints(options) {
+  const probeIssues = [];
+  const candidates = collectSignToolCandidates(options, probeIssues);
+  return {
+    signtool: {
+      configured: Boolean(stringValue(options.signToolPath)),
+      candidatesUsedForReadiness: false,
+      candidateCount: candidates.length,
+      candidates,
+      probeIssues,
+      nextAction: candidates.length > 0
+        ? "copy the chosen local path into an explicit signing profile or NEXUSIM_DESKTOP_SIGNTOOL"
+        : "install Windows SDK signing tools or provide an explicit signtool path"
+    }
+  };
+}
+
+function collectSignToolCandidates(options, probeIssues) {
+  const explicitCandidates = Array.isArray(options.signToolCandidatePaths) ? options.signToolCandidatePaths : [];
+  const candidates = [];
+  for (const candidate of explicitCandidates) {
+    addSignToolCandidate(candidates, candidate, "explicit-candidate");
+  }
+  for (const root of defaultWindowsKitsRoots()) {
+    collectWindowsKitsSignTools(candidates, root, probeIssues);
+  }
+  return uniqueByHint(candidates).slice(0, 8);
+}
+
+function collectWindowsKitsSignTools(candidates, kitsRoot, probeIssues) {
+  if (!kitsRoot || !existsSync(kitsRoot)) {
+    return;
+  }
+  const binRoot = join(kitsRoot, "bin");
+  if (!existsSync(binRoot)) {
+    return;
+  }
+  for (const versionEntry of safeReadDir(binRoot, probeIssues)) {
+    if (!versionEntry.isDirectory()) {
+      continue;
+    }
+    for (const arch of ["x64", "x86", "arm64"]) {
+      addSignToolCandidate(candidates, join(binRoot, versionEntry.name, arch, "signtool.exe"), "windows-kits", {
+        versionHint: versionEntry.name,
+        arch
+      });
+    }
+  }
+  for (const arch of ["x64", "x86", "arm64"]) {
+    addSignToolCandidate(candidates, join(binRoot, arch, "signtool.exe"), "windows-kits", { arch });
+  }
+}
+
+function addSignToolCandidate(candidates, path, source, details = {}) {
+  if (!path || !existsSync(path)) {
+    return;
+  }
+  const stat = statSync(path);
+  if (!stat.isFile()) {
+    return;
+  }
+  candidates.push({
+    source,
+    hint: safeHint(path),
+    ...details
+  });
+}
+
+function defaultWindowsKitsRoots() {
+  const roots = [];
+  const programFilesX86 = process.env["ProgramFiles(x86)"] ?? "";
+  const programFiles = process.env.ProgramFiles ?? "";
+  if (programFilesX86) {
+    roots.push(join(programFilesX86, "Windows Kits", "10"));
+    roots.push(join(programFilesX86, "Windows Kits", "8.1"));
+  }
+  if (programFiles) {
+    roots.push(join(programFiles, "Windows Kits", "10"));
+    roots.push(join(programFiles, "Windows Kits", "8.1"));
+  }
+  return roots;
+}
+
+function safeReadDir(path, probeIssues) {
+  try {
+    return readdirSync(path, { withFileTypes: true });
+  } catch (error) {
+    probeIssues.push({
+      hint: safeHint(path),
+      code: error?.code ?? "READ_FAILED"
+    });
+    return [];
+  }
+}
+
+function safeHint(path) {
+  const relativePath = relative(workspaceRoot, resolve(path)).split(sep).join("/");
+  if (relativePath.startsWith("..") || isAbsolute(relativePath)) {
+    return `${basename(path)}#${sha256Text(resolve(path)).slice(0, 12)}`;
+  }
+  return `clients/${relativePath}`;
+}
+
+function sha256Text(value) {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+function uniqueByHint(candidates) {
+  const seen = new Set();
+  const unique = [];
+  for (const candidate of candidates) {
+    if (seen.has(candidate.hint)) {
+      continue;
+    }
+    seen.add(candidate.hint);
+    unique.push(candidate);
+  }
+  return unique;
 }
 
 function parseArgs(argv, env) {

@@ -286,17 +286,18 @@ export function App() {
     if (!currentSession) {
       throw new Error("login first");
     }
+    const filters = currentConversationListFilters();
     const items = await runtime.bff.listConversations(currentSession, {
       limit: 50,
-      includeArchived: showArchivedConversations || archivedOnlyConversations,
-      archivedOnly: archivedOnlyConversations,
-      draftOnly: draftOnlyConversations,
-      tagFilter: conversationTagFilter.trim()
+      includeArchived: filters.showArchived || filters.archivedOnly,
+      archivedOnly: filters.archivedOnly,
+      draftOnly: filters.draftOnly,
+      tagFilter: filters.tagFilter
     });
     const preserveConversationIDs = activeConversationRef.current
       ? new Set([activeConversationRef.current])
       : new Set<string>();
-    const mergedItems = mergeConversationSummaries(conversations, items, preserveConversationIDs);
+    const mergedItems = mergeConversationSummaries(conversations, items, preserveConversationIDs, filters);
     setConversations(mergedItems);
     const nextActiveID = chooseActiveConversationID(mergedItems, activeConversationRef.current);
     if (!nextActiveID) {
@@ -1279,7 +1280,28 @@ export function App() {
   }
 
   function upsertConversationSummary(summary: ConversationSummary): void {
-    setConversations(current => sortConversationSummaries([summary, ...current.filter(item => item.conversationID !== summary.conversationID)]));
+    const visible = conversationMatchesConversationFilters(summary, currentConversationListFilters());
+    setConversations(current => {
+      if (!visible) {
+        return current.filter(item => item.conversationID !== summary.conversationID);
+      }
+      return sortConversationSummaries([summary, ...current.filter(item => item.conversationID !== summary.conversationID)]);
+    });
+    if (!visible && activeConversationRef.current === summary.conversationID) {
+      activeConversationRef.current = "";
+      setActiveConversationID("");
+      setMessages([]);
+      clearConversationManagementState();
+    }
+  }
+
+  function currentConversationListFilters(): ConversationListFilters {
+    return {
+      showArchived: showArchivedConversations,
+      archivedOnly: archivedOnlyConversations,
+      draftOnly: draftOnlyConversations,
+      tagFilter: conversationTagFilter.trim()
+    };
   }
 
   async function setConversationPinned(conversation: ConversationSummary, pinned: boolean): Promise<void> {
@@ -1321,16 +1343,6 @@ export function App() {
         currentSession
       );
       const merged = mergeConversationSummary(conversation, updated);
-      if (archived && !showArchivedConversations && !archivedOnlyConversations) {
-        setConversations(current => current.filter(item => item.conversationID !== conversation.conversationID));
-        if (activeConversationRef.current === conversation.conversationID) {
-          activeConversationRef.current = "";
-          setActiveConversationID("");
-          setMessages([]);
-          clearConversationManagementState();
-        }
-        return;
-      }
       upsertConversationSummary(merged);
       if (activeConversationRef.current === merged.conversationID) {
         setConversationTagDraft(merged.tags.join(", "));
@@ -2740,15 +2752,46 @@ function contactDisplayName(contact: ContactItem): string {
 function mergeConversationSummaries(
   current: ConversationSummary[],
   incoming: ConversationSummary[],
-  preserveConversationIDs = new Set<string>()
+  preserveConversationIDs = new Set<string>(),
+  filters?: ConversationListFilters
 ): ConversationSummary[] {
   const currentByID = new Map(current.map(item => [item.conversationID, item]));
   const incomingIDs = new Set(incoming.map(item => item.conversationID));
   const mergedIncoming = incoming.map(item => mergeConversationSummary(currentByID.get(item.conversationID), item));
   const preservedCurrent = current.filter(
-    item => preserveConversationIDs.has(item.conversationID) && !incomingIDs.has(item.conversationID)
+    item =>
+      preserveConversationIDs.has(item.conversationID) &&
+      !incomingIDs.has(item.conversationID) &&
+      (!filters || conversationMatchesConversationFilters(item, filters))
   );
   return sortConversationSummaries([...mergedIncoming, ...preservedCurrent]);
+}
+
+interface ConversationListFilters {
+  showArchived: boolean;
+  archivedOnly: boolean;
+  draftOnly: boolean;
+  tagFilter: string;
+}
+
+function conversationMatchesConversationFilters(
+  conversation: ConversationSummary,
+  filters: ConversationListFilters
+): boolean {
+  if (filters.archivedOnly && !conversation.archived) {
+    return false;
+  }
+  if (!filters.archivedOnly && !filters.showArchived && conversation.archived) {
+    return false;
+  }
+  if (filters.draftOnly && !conversation.draftText.trim()) {
+    return false;
+  }
+  const tagFilter = filters.tagFilter.trim();
+  if (tagFilter && !conversation.tags.includes(tagFilter)) {
+    return false;
+  }
+  return true;
 }
 
 function mergeConversationSummary(

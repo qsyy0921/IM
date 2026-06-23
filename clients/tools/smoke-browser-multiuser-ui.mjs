@@ -513,6 +513,7 @@ async function waitForAck(cdp, minSeq, timeoutMs) {
 
 async function exerciseConversationManagement(cdp, conversationID, runID, timeoutMs) {
   const tag = "ui-smoke";
+  const missingTag = `missing-${sha256Text(runID).slice(0, 8)}`;
   const draftText = `NexusIM UI smoke draft ${runID}`;
   await clickConversationItem(cdp, conversationID, timeoutMs);
   await waitForSelector(cdp, "active-conversation-actions", timeoutMs);
@@ -523,7 +524,13 @@ async function exerciseConversationManagement(cdp, conversationID, runID, timeou
   await waitForConversationRowText(cdp, conversationID, `#${tag}`, timeoutMs);
 
   await setInput(cdp, "conversation-tag-filter", tag);
-  await click(cdp, "refresh-conversations");
+  await refreshConversations(cdp, timeoutMs);
+  await waitForConversationItem(cdp, conversationID, timeoutMs);
+  await setInput(cdp, "conversation-tag-filter", missingTag);
+  await refreshConversations(cdp, timeoutMs);
+  await waitForConversationItemAbsent(cdp, conversationID, timeoutMs);
+  await setInput(cdp, "conversation-tag-filter", tag);
+  await refreshConversations(cdp, timeoutMs);
   await waitForConversationItem(cdp, conversationID, timeoutMs);
   await clickConversationItem(cdp, conversationID, timeoutMs);
 
@@ -533,37 +540,47 @@ async function exerciseConversationManagement(cdp, conversationID, runID, timeou
   await waitForConversationRowText(cdp, conversationID, "草稿", timeoutMs);
 
   await setCheckbox(cdp, "conversation-draft-only", true);
-  await click(cdp, "refresh-conversations");
+  await refreshConversations(cdp, timeoutMs);
   await waitForConversationItem(cdp, conversationID, timeoutMs);
   await clickConversationItem(cdp, conversationID, timeoutMs);
   await click(cdp, "conversation-draft-clear");
   await waitForText(cdp, "runtime-status", value => value === "clear conversation draft ok", "clear conversation draft ok", timeoutMs);
+  await refreshConversations(cdp, timeoutMs);
+  await waitForConversationItemAbsent(cdp, conversationID, timeoutMs);
 
   await setInput(cdp, "conversation-tag-filter", "");
   await setCheckbox(cdp, "conversation-draft-only", false);
-  await click(cdp, "refresh-conversations");
+  await refreshConversations(cdp, timeoutMs);
   await waitForConversationItem(cdp, conversationID, timeoutMs);
   await clickConversationItem(cdp, conversationID, timeoutMs);
   await click(cdp, "active-conversation-archive-toggle");
   await waitForText(cdp, "runtime-status", value => value === "archive conversation ok", "archive conversation ok", timeoutMs);
 
   await setCheckbox(cdp, "conversation-archived-only", true);
-  await click(cdp, "refresh-conversations");
+  await refreshConversations(cdp, timeoutMs);
   await waitForConversationItem(cdp, conversationID, timeoutMs);
   await waitForConversationRowText(cdp, conversationID, "归档", timeoutMs);
   await clickConversationItem(cdp, conversationID, timeoutMs);
   await click(cdp, "active-conversation-archive-toggle");
   await waitForText(cdp, "runtime-status", value => value === "unarchive conversation ok", "unarchive conversation ok", timeoutMs);
+  await refreshConversations(cdp, timeoutMs);
+  await waitForConversationItemAbsent(cdp, conversationID, timeoutMs);
   await setCheckbox(cdp, "conversation-archived-only", false);
-  await click(cdp, "refresh-conversations");
+  await refreshConversations(cdp, timeoutMs);
   await waitForConversationItem(cdp, conversationID, timeoutMs);
 
   return {
     completed: true,
     conversationID,
     tag,
+    tagFilterMatched: true,
+    tagFilterExcludedMissingTag: true,
     draftSavedAndCleared: true,
-    archiveRoundTrip: true
+    draftOnlyFilterMatched: true,
+    draftOnlyFilterExcludedAfterClear: true,
+    archiveRoundTrip: true,
+    archivedOnlyFilterMatched: true,
+    archivedOnlyFilterExcludedAfterUnarchive: true
   };
 }
 
@@ -591,6 +608,18 @@ async function waitForConversationItem(cdp, conversationID, timeoutMs) {
   });
 }
 
+async function waitForConversationItemAbsent(cdp, conversationID, timeoutMs) {
+  await waitForEval(cdp, () => "", {
+    label: `conversation item absent ${conversationID}`,
+    timeoutMs,
+    expression: `(() => {
+      const item = Array.from(document.querySelectorAll('[data-testid="conversation-item"]'))
+        .find(node => node.dataset.conversationId === ${JSON.stringify(conversationID)});
+      return { ok: !item };
+    })()`
+  });
+}
+
 async function waitForConversationRowText(cdp, conversationID, expectedText, timeoutMs) {
   await waitForEval(cdp, () => "", {
     label: `conversation row ${conversationID} text ${expectedText}`,
@@ -601,6 +630,17 @@ async function waitForConversationRowText(cdp, conversationID, expectedText, tim
       return { ok: Boolean(item && (item.textContent || "").includes(${JSON.stringify(expectedText)})) };
     })()`
   });
+}
+
+async function refreshConversations(cdp, timeoutMs) {
+  await click(cdp, "refresh-conversations");
+  await waitForText(
+    cdp,
+    "runtime-status",
+    value => value === "load conversations ok" || value === "refresh conversations ok",
+    "load conversations ok",
+    timeoutMs
+  );
 }
 
 async function clickConversationItem(cdp, conversationID, timeoutMs) {

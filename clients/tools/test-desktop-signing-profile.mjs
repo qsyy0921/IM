@@ -45,6 +45,9 @@ try {
     schemaVersion: desktopSigningProfileSchema,
     signToolPath: fakeSignTool,
     timestampURL: "https://timestamp.example.test",
+    signature: {
+      expectedSignerSubjectContains: "NexusIM"
+    },
     certificate: {
       source: "pfx-file",
       certFile: fakePfx,
@@ -56,6 +59,7 @@ try {
   assert(parsedPfx.certFile === fakePfx, "pfx profile cert file should parse");
   assert(parsedPfx.certSHA1 === "", "pfx profile must not set cert-store thumbprint");
   assert(parsedPfx.pfxPassEnv === "NEXUSIM_TEST_DESKTOP_PFX_PASS", "pfx profile env should parse");
+  assert(parsedPfx.expectedSignerSubjectContains === "NexusIM", "expected signer subject should parse");
   assert(isSafeTimestampURL("https://timestamp.example.test/path"), "safe timestamp URL should pass");
   assert(!isSafeTimestampURL("https://timestamp.example.test/path?token=abc"), "timestamp URL query should fail closed");
   assert(!isSafeTimestampURL("https://user:pass@timestamp.example.test"), "timestamp URL credentials should fail closed");
@@ -65,6 +69,7 @@ try {
   });
   assert(mergedPfx.signToolPath === fakeSignTool, "pfx profile should merge signtool");
   assert(mergedPfx.certFile === fakePfx, "pfx profile should merge cert file");
+  assert(mergedPfx.expectedSignerSubjectContains === "NexusIM", "pfx profile should merge expected signer subject");
   assert(mergedPfx.pfxPassEnv === "NEXUSIM_TEST_DESKTOP_PFX_PASS", "pfx profile should merge custom env");
   assert(mergedPfx.pfxPassEnvPresent === true, "pfx profile should report env presence");
 
@@ -149,6 +154,19 @@ try {
     }
   });
   expectError(() => readDesktopSigningProfile(unsafeTimestamp), "timestamp URL invalid");
+
+  const badExpectedSigner = join(tempRoot, "bad-expected-signer.json");
+  writeProfile(badExpectedSigner, {
+    schemaVersion: desktopSigningProfileSchema,
+    signature: {
+      expectedSignerSubjectContains: "CN=Bad\nSigner"
+    },
+    certificate: {
+      source: "windows-cert-store",
+      certSHA1: "AABBCCDDEEFF00112233445566778899AABBCCDD"
+    }
+  });
+  expectError(() => readDesktopSigningProfile(badExpectedSigner), "expected signer subject invalid");
 
   const sensitiveField = join(tempRoot, "sensitive-field.json");
   writeProfile(sensitiveField, {

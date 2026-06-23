@@ -144,6 +144,7 @@ try {
     target: "msi",
     signToolPath: fakeSignTool,
     timestampURL: "https://timestamp.example.test",
+    expectedSignerSubjectContains: "NexusIM",
     ...readyPfxOptions,
     mockSignatureStatus: {
       status: "Valid",
@@ -168,6 +169,24 @@ try {
   assert(ready.signatureVerification.status === "Valid", "ready plan should carry signature status");
   assert(!readyJSON.includes(tempRoot), "ready installer plan leaked absolute temp path");
   assert(!readyJSON.match(/token|secret|password|credential|private/i), "ready installer plan leaked sensitive names");
+
+  const wrongSigner = buildDesktopInstallerPlan({
+    manifest: manifestPath,
+    tauriConfig: activeConfigPath,
+    target: "msi",
+    signToolPath: fakeSignTool,
+    timestampURL: "https://timestamp.example.test",
+    expectedSignerSubjectContains: "Other Publisher",
+    ...readyPfxOptions,
+    mockSignatureStatus: {
+      status: "Valid",
+      signerSubject: "CN=NexusIM Test Code Signing",
+      signerThumbprint: "0123456789abcdef0123456789abcdef01234567"
+    }
+  });
+  assert(wrongSigner.readyToBuildInstaller === false, "installer plan should reject unexpected signer");
+  assert(wrongSigner.missing.includes("desktop-signature-valid"), "unexpected signer should block installer readiness");
+  assert(wrongSigner.signatureVerification.missing.includes("expected-signer-subject"), "unexpected signer should be reported by signature verifier");
 
   const installerArtifact = "fake msi bytes";
   writeFileSync(join(collectedDir, "nexusim-windows-desktop-installer.msi"), installerArtifact);

@@ -89,6 +89,9 @@ try {
     schemaVersion: "nexusim.desktop-signing-profile.v1",
     signToolPath: fakeSignTool,
     timestampURL: "https://timestamp.example.test",
+    signature: {
+      expectedSignerSubjectContains: "NexusIM"
+    },
     certificate: {
       source: "pfx-file",
       certFile: fakePfx,
@@ -142,6 +145,7 @@ try {
     target: "nsis",
     signToolPath: fakeSignTool,
     timestampURL: "https://timestamp.example.test",
+    expectedSignerSubjectContains: "NexusIM",
     ...readyPfxOptions,
     mockSignatureStatus: {
       status: "Valid",
@@ -152,10 +156,30 @@ try {
   assert(fullyReady.ready.canAttemptSigning === true, "valid fixture should be signing-ready");
   assert(fullyReady.ready.signatureValid === true, "valid fixture should be signature-ready");
   assert(fullyReady.ready.canBuildInstaller === true, "valid fixture should be installer-ready");
+  assert(fullyReady.signatureVerification.readyForSignedDistribution === true, "valid expected signer should pass signature verification");
   assert(fullyReady.installer.target === "nsis", "installer target should be preserved");
   assert(Array.isArray(fullyReady.installer.commandTemplate?.build), "ready installer command template missing");
   assert(fullyReady.nextActions.length === 1, "ready report should contain a single next action");
   assert(fullyReady.nextActions[0].includes("installer build execute"), "ready report should point at installer execute path");
+
+  const wrongSignerReport = buildDesktopSigningReadinessReport({
+    manifest: manifestPath,
+    tauriConfig: activeConfigPath,
+    target: "nsis",
+    signToolPath: fakeSignTool,
+    timestampURL: "https://timestamp.example.test",
+    expectedSignerSubjectContains: "Other Publisher",
+    ...readyPfxOptions,
+    mockSignatureStatus: {
+      status: "Valid",
+      signerSubject: "CN=NexusIM Test Code Signing",
+      signerThumbprint: "0123456789abcdef0123456789abcdef01234567"
+    }
+  });
+  assert(wrongSignerReport.ready.signatureValid === false, "wrong signer should block signature readiness");
+  assert(wrongSignerReport.ready.canBuildInstaller === false, "wrong signer should block installer readiness");
+  assert(wrongSignerReport.blockers.signature.includes("expected-signer-subject"), "wrong signer should appear in signature blockers");
+  assert(wrongSignerReport.blockers.installer.includes("desktop-signature-valid"), "wrong signer should block installer via signature validity");
 
   const cliProfileReport = runReporter([
     "--manifest",
@@ -171,6 +195,7 @@ try {
   assert(cliProfileReport.ready.canAttemptSigning === true, "CLI profile report should be signing-ready");
   assert(cliProfileReport.ready.signatureValid === false, "CLI profile report should still require real signature");
   assert(cliProfileReport.signing.mode === "pfx", "CLI profile report should use pfx mode");
+  assert(cliProfileReport.blockers.signature.includes("expected-signer-subject"), "CLI profile report should apply expected signer policy");
   assert(!cliJSON.includes(tempRoot), "CLI readiness report leaked absolute temp path");
   assert(!cliJSON.match(/token|secret|password|credential|private/i), "CLI readiness report leaked sensitive names");
   assert(readFileSync(fakePfx).length > 0, "fixture pfx should still exist");

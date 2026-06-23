@@ -69,11 +69,15 @@ export function buildDesktopSignatureVerificationReport(options = {}) {
   const artifactPath = join(dirname(manifestPath), artifact.filename);
   const artifactInfo = validateArtifact(artifact, artifactPath);
   const signature = readSignatureStatus(artifactPath, options);
+  const signaturePolicy = signaturePolicyStatus(signature, options);
   const missing = [];
   if (!signature.authenticodeAvailable) {
     missing.push("windows-authenticode");
   } else if (signature.status !== "Valid") {
     missing.push("valid-authenticode-signature");
+  }
+  if (signaturePolicy.expectedSignerSubjectConfigured && !signaturePolicy.expectedSignerSubjectMatched) {
+    missing.push("expected-signer-subject");
   }
   const readyForSignedDistribution = missing.length === 0;
   return assertLowSensitiveOutput({
@@ -83,10 +87,23 @@ export function buildDesktopSignatureVerificationReport(options = {}) {
     artifactManifest: artifactManifestInfo(manifest, manifestPath),
     artifact: artifactInfo,
     signature,
+    signaturePolicy,
     nextAction: readyForSignedDistribution
       ? "continue installer packaging with a signed desktop artifact"
       : "sign the desktop artifact with sign:desktop-artifact, then rerun signature verification"
   });
+}
+
+function signaturePolicyStatus(signature, options) {
+  const expectedSignerSubjectContains = stringValue(options.expectedSignerSubjectContains);
+  const expectedSignerSubjectConfigured = expectedSignerSubjectContains.length > 0;
+  const signerSubject = stringValue(signature?.signer?.subject);
+  return {
+    expectedSignerSubjectConfigured,
+    expectedSignerSubjectMatched: expectedSignerSubjectConfigured
+      ? signerSubject.toLowerCase().includes(expectedSignerSubjectContains.toLowerCase())
+      : true
+  };
 }
 
 function readSignatureStatus(artifactPath, options) {
@@ -180,7 +197,8 @@ function executionPolicy(options) {
     downloadsToolchain: false,
     readsCollectedArtifactManifest: true,
     validatesArtifactHashes: true,
-    readsAuthenticodeSignature: true
+    readsAuthenticodeSignature: true,
+    checksExpectedSignerSubject: Boolean(options.expectedSignerSubjectContains)
   };
 }
 
@@ -307,7 +325,8 @@ function parseArgs(argv) {
   const options = {
     manifest: "",
     artifactKind: defaultDesktopArtifactKind,
-    requireValid: false
+    requireValid: false,
+    expectedSignerSubjectContains: ""
   };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
@@ -323,6 +342,11 @@ function parseArgs(argv) {
     }
     if (arg === "--require-valid") {
       options.requireValid = true;
+      continue;
+    }
+    if (arg === "--expected-signer-subject") {
+      options.expectedSignerSubjectContains = requiredValue(argv, index, arg);
+      index += 1;
       continue;
     }
     throw new Error(`unknown argument: ${arg}`);

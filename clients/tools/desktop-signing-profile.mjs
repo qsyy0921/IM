@@ -21,6 +21,7 @@ export function applyDesktopSigningProfile(options = {}, env = process.env) {
   merged.timestampURL = stringValue(merged.timestampURL) || profile.timestampURL;
   merged.certFile = stringValue(merged.certFile) || profile.certFile;
   merged.certSHA1 = stringValue(merged.certSHA1) || profile.certSHA1;
+  merged.expectedSignerSubjectContains = stringValue(merged.expectedSignerSubjectContains) || profile.expectedSignerSubjectContains;
   merged.pfxPassEnv = stringValue(merged.pfxPassEnv) || profile.pfxPassEnv || defaultPfxPassEnv;
   if (profile.pfxPassEnv && (!stringValue(options.pfxPassEnv) || stringValue(options.pfxPassEnv) === defaultPfxPassEnv)) {
     merged.pfxPassEnv = profile.pfxPassEnv;
@@ -57,6 +58,10 @@ export function readDesktopSigningProfile(profilePath) {
   if (timestampURL && !isSafeTimestampURL(timestampURL)) {
     throw new Error("desktop signing profile timestamp URL invalid");
   }
+  const expectedSignerSubjectContains = stringValue(profile.signature?.expectedSignerSubjectContains);
+  if (expectedSignerSubjectContains && !isSafeExpectedSignerSubject(expectedSignerSubjectContains)) {
+    throw new Error("desktop signing profile expected signer subject invalid");
+  }
   const pfxPassEnv = stringValue(certificate.pfxPassEnv || defaultPfxPassEnv);
   if (!pfxPassEnv.match(/^[A-Z][A-Z0-9_]{2,}$/)) {
     throw new Error("desktop signing profile pfx pass env invalid");
@@ -66,7 +71,8 @@ export function readDesktopSigningProfile(profilePath) {
     timestampURL,
     certFile,
     certSHA1,
-    pfxPassEnv
+    pfxPassEnv,
+    expectedSignerSubjectContains
   };
 }
 
@@ -92,6 +98,10 @@ function withPfxEnvPresence(options, env) {
     pfxPassEnv,
     pfxPassEnvPresent: Boolean(env[pfxPassEnv])
   };
+}
+
+function isSafeExpectedSignerSubject(value) {
+  return value.length >= 3 && value.length <= 160 && !value.match(/[\r\n]/);
 }
 
 function assertProfileText(raw) {

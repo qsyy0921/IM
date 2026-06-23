@@ -63,6 +63,7 @@ try {
 
   const valid = buildDesktopSignatureVerificationReport({
     manifest: manifestPath,
+    expectedSignerSubjectContains: "NexusIM",
     mockSignatureStatus: {
       status: "Valid",
       signerSubject: "CN=NexusIM Test Code Signing",
@@ -75,10 +76,26 @@ try {
   assert(valid.readyForSignedDistribution === true, "valid signature should be ready");
   assert(valid.signature.trusted === true, "valid signature should be trusted");
   assert(valid.signature.signer.thumbprintPrefix === "01234567", "signer prefix missing");
+  assert(valid.signaturePolicy.expectedSignerSubjectConfigured === true, "expected signer policy should be configured");
+  assert(valid.signaturePolicy.expectedSignerSubjectMatched === true, "expected signer should match");
+  assert(valid.executionPolicy.checksExpectedSignerSubject === true, "expected signer check should be declared");
   assert(valid.executionPolicy.signsArtifacts === false, "signature verifier must not sign artifacts");
   assert(valid.executionPolicy.installsArtifacts === false, "signature verifier must not install artifacts");
   assert(!validJSON.includes(tempRoot), "valid signature report leaked absolute temp path");
   assert(!validJSON.match(/token|secret|password|credential|private/i), "valid signature report leaked sensitive names");
+
+  const wrongSigner = buildDesktopSignatureVerificationReport({
+    manifest: manifestPath,
+    expectedSignerSubjectContains: "Other Publisher",
+    mockSignatureStatus: {
+      status: "Valid",
+      signerSubject: "CN=NexusIM Test Code Signing",
+      signerThumbprint: "0123456789abcdef0123456789abcdef01234567"
+    }
+  });
+  assert(wrongSigner.readyForSignedDistribution === false, "wrong signer should not be release-ready");
+  assert(wrongSigner.missing.includes("expected-signer-subject"), "wrong signer should report expected signer blocker");
+  assert(wrongSigner.signaturePolicy.expectedSignerSubjectMatched === false, "wrong signer policy should report mismatch");
 
   const unsigned = buildDesktopSignatureVerificationReport({
     manifest: manifestPath,
@@ -144,6 +161,8 @@ try {
   const requireValid = spawnSync(process.execPath, [
     verifier,
     "--require-valid",
+    "--expected-signer-subject",
+    "NexusIM",
     "--manifest",
     manifestPath
   ], {

@@ -517,7 +517,10 @@ First slice:
   and remains not ready unless the PFX can be read, has a usable signing key and
   is not expired. When a Windows certificate-store thumbprint is used, the plan
   performs a read-only local certificate-store check and remains not ready unless
-  the certificate exists, has a usable signing key and is not expired. It
+  the certificate exists, has a usable signing key and is not expired. A profile
+  may also declare an expected public signer subject substring; read-only
+  signature verification and installer readiness remain blocked if a valid
+  signature does not match it. It
   defaults to
   `desktop-executable`; `desktop-installer` must be requested
   explicitly. It is plan-only: it does not sign, download tools, install
@@ -542,7 +545,9 @@ First slice:
   It validates the selected artifact hash and reads Windows Authenticode public
   status without signing, installing, launching, starting services or downloading
   toolchains. It also defaults to `desktop-executable`; installer verification
-  must pass `--artifact-kind desktop-installer`. A new `desktop-executable`
+  must pass `--artifact-kind desktop-installer`. If an expected signer subject
+  is configured, a merely valid Authenticode signature is not enough; the signer
+  subject must match that public release policy. A new `desktop-executable`
   artifact was recollected on 2026-06-23 at
   `clients/artifacts/2026-06-22T214826Z/manifest.json`; it now passes artifact
   kind and hash selection, and read-only Authenticode verification reports

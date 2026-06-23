@@ -43,6 +43,7 @@ export function buildDesktopSigningReadinessReport(options = {}) {
     manifest: options.manifest,
     artifactsRoot: options.artifactsRoot,
     artifactKind,
+    expectedSignerSubjectContains: options.expectedSignerSubjectContains,
     mockSignatureStatus: options.mockSignatureStatus
   });
   const installerPlan = buildDesktopInstallerPlan({
@@ -59,6 +60,7 @@ export function buildDesktopSigningReadinessReport(options = {}) {
     pfxPassEnvValue: options.pfxPassEnvValue,
     pfxCertificateProbe: options.pfxCertificateProbe,
     certificateStoreProbe: options.certificateStoreProbe,
+    expectedSignerSubjectContains: options.expectedSignerSubjectContains,
     mockSignatureStatus: options.mockSignatureStatus
   });
   const report = {
@@ -291,6 +293,7 @@ function parseArgs(argv, env) {
     certFile: env.NEXUSIM_DESKTOP_SIGN_CERT_FILE ?? "",
     certSHA1: env.NEXUSIM_DESKTOP_SIGN_CERT_SHA1 ?? "",
     timestampURL: env.NEXUSIM_DESKTOP_SIGN_TIMESTAMP_URL ?? "",
+    expectedSignerSubjectContains: env.NEXUSIM_DESKTOP_SIGN_EXPECTED_SUBJECT ?? "",
     pfxPassEnv: defaultPfxPassEnv,
     pfxPassEnvPresent: Boolean(env[defaultPfxPassEnv])
   };
@@ -338,6 +341,11 @@ function parseArgs(argv, env) {
     }
     if (arg === "--timestamp-url") {
       options.timestampURL = requiredValue(argv, index, arg);
+      index += 1;
+      continue;
+    }
+    if (arg === "--expected-signer-subject") {
+      options.expectedSignerSubjectContains = requiredValue(argv, index, arg);
       index += 1;
       continue;
     }

@@ -269,7 +269,9 @@ with the named environment variable and remains not ready unless the PFX can be
 read, has a usable signing key and is not expired. When a Windows
 certificate-store thumbprint is used, the plan performs a read-only local
 certificate-store check and remains not ready unless the certificate exists, has
-a usable signing key and is not expired.
+a usable signing key and is not expired. A profile may also declare an expected
+public signer subject substring; read-only signature verification and installer
+readiness remain blocked if a valid signature does not match it.
 `sign:desktop-artifact` is the explicit execution wrapper for that plan. By
 default it is also plan-only and prints a low-sensitive execution policy. It
 only invokes `signtool` when run with `--execute` and when the collected desktop
@@ -285,7 +287,8 @@ status. It defaults to `desktop-executable`; use `--artifact-kind
 desktop-installer` when verifying an installer. It does not sign, install,
 launch, start services or download toolchains. Use `--require-valid` in a
 release profile to fail closed when the selected artifact is not
-Authenticode-valid.
+Authenticode-valid. If an expected signer subject is configured, a merely valid
+signature is not enough; the signer subject must match that public policy.
 `report:desktop-signing-readiness` is the release-readiness summary over the
 same controls. It combines the signing plan, plan-only signing execution output,
 read-only Authenticode verification and MSI / NSIS installer plan into one

@@ -2,30 +2,10 @@
 
 本文是 NexusIM 的短目标索引。每轮默认只读 `docs/runbook/current-brief.md`；只有需要长期原则、路线图、评审规则或历史索引时，才读取本文。历史流水已归档到 `docs/runbook/history/current-goal-archive-20260611.md`，不要每轮全文读取归档。
 
-## 0. 可复制短 Goal Prompt
+## 0. 历史目标框内容
 
-```text
-持续推进 E:\development\IM 的 NexusIM 项目。
-
-每轮开始：
-1. 执行 git status --short --branch。
-2. 读取 docs/runbook/current-brief.md。
-3. 不要每轮全文读取 current-goal.md、SDD、压测报告或历史文档。
-4. 需要哪类信息，就按关键词读取对应文档的相关片段：长期目标查 current-goal，服务设计查 docs/sdd/<service>.md，压测证据查 docs/runbook/loadtest/<service>/，实现细节用 rg 定位代码。
-5. 按 brief 和按需读取到的当前目标、硬边界、下一步优先级继续工作。
-6. 不回滚用户已有修改。
-
-工作原则：
-1. 优先把系统链路做完整，不把主要时间消耗在重型压测矩阵上。
-2. 除非用户明确要求，不再把流量诊断、代理用量归因、外网消耗排查列为当前任务；日常开发只保留“少下载、用已有镜像/依赖、服务间走本地有线”的约束。
-3. 每个微服务独立使用六层 DDD：api / app / domain / infrastructure / types / trigger。
-4. Kafka 事件只能通过 outbox relay 发布，业务事务不能直接 publish Kafka。
-5. 优先降低微服务耦合、控制代码复杂度：不跨服务读取内部表，不引入网状依赖，不为短期功能增加不必要同步 RPC、公共包或抽象层。
-6. 单个切片保持小闭环：契约 / migration / 本地事务 / consumer 或 relay / smoke 分阶段推进，不一次性横跨多个产品能力。
-7. 开发过程中主动使用可用 sub-agent 做设计、实现、测试、文档或风险复核；任务完成后及时关闭 sub-agent。
-8. 有意义的切片完成后运行必要检查，更新 current-brief.md；阶段状态变化时同步 current-goal.md、对应 SDD 和 runbook/loadtest 报告。
-9. 批量提交和推送 GitHub，不为低风险小改动频繁推送。
-```
+历史目标框正文已从仓库归档中移除。Codex UI 目标框正文只保存在目标框本身；
+仓库文档只维护项目事实、路由、架构、进度和待办。
 
 ## 1. 当前目标
 

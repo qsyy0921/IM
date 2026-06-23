@@ -2,34 +2,10 @@
 
 本文是 NexusIM 的完整持续目标档案，包含历史事实、风险、评审规则和报告索引。为节省 token，每轮默认先读短入口 `docs/runbook/current-brief.md`；只有需要细节、历史证据或风险上下文时，才按关键词查询本文。
 
-## 0. 可复制短 Goal Prompt
+## 0. 历史目标框内容
 
-```text
-持续推进 E:\development\IM 的 NexusIM 项目。
-
-每轮开始：
-1. 执行 git status --short --branch。
-2. 读取 docs/runbook/current-brief.md。
-3. 不要每轮全文读取 current-goal.md、SDD、压测报告或历史文档。
-4. 需要哪类信息，就按关键词读取对应文档的相关片段：长期目标查 current-goal，服务设计查 docs/sdd/<service>.md，压测证据查 docs/runbook/loadtest/<service>/，实现细节用 rg 定位代码。
-5. 按 brief 和按需读取到的当前目标、硬边界、下一步优先级继续工作。
-6. 不回滚用户已有修改。
-
-工作原则：
-1. 优先把系统链路做完整，不把主要时间消耗在重型压测矩阵上。
-2. 除非用户明确要求，不再把流量诊断、代理用量归因、外网消耗排查列为当前任务；日常开发只保留“少下载、用已有镜像/依赖、服务间走本地有线”的约束。
-3. 每个微服务独立使用六层 DDD：api / app / domain / infrastructure / types / trigger。
-4. 优先降低微服务耦合、控制代码复杂度：不跨服务读取内部表，不引入网状依赖，不为短期功能增加不必要同步 RPC、公共包或抽象层。
-5. 复杂度控制是硬约束：一个切片如果需要同时改多个服务、多条 Kafka 事件、多张核心表或多种用户语义，先拆小；一个 helper / port / 公共包如果没有两个以上真实调用方或不能明显降低复杂度，就留在单服务内。
-6. 新能力优先复用已有事实流、outbox、projection、read model 和端口；只有能减少重复、稳定边界或支撑真实链路时才新增服务、表或抽象。
-7. 单个切片保持小闭环：契约 / migration / 本地事务 / consumer 或 relay / smoke 分阶段推进，不一次性横跨多个产品能力。实现方案明显变复杂时，先补 SDD/契约并让 sub-agent 复核，再编码。
-8. 开发过程中主动使用可用 sub-agent 做设计、实现、测试、文档或风险复核，不等到最后才集中评审。
-9. sub-agent 完成任务后及时关闭，避免线程池被历史任务占满；如果线程池已满，优先复用或关闭不再需要的 sub-agent。
-10. 不把具体任务写死在 prompt 里；具体下一步以 current-brief.md 为准，current-goal.md 只作长档案和按需索引，不能作为每轮全文必读文档。
-11. 公共契约、migration、事务、幂等、消息顺序、错误码、可运行链路完成时，再按 current-goal.md 的评审规则邀请独立评审。
-12. 有意义的切片完成后运行必要检查，更新 current-brief.md；阶段状态变化时同步 current-goal.md 和对应 runbook/loadtest 报告。
-13. 按 current-goal.md 的 GitHub 同步策略批量提交和推送，不为低风险小改动频繁推送。
-```
+历史目标框正文已从仓库归档中移除。Codex UI 目标框正文只保存在目标框本身；
+仓库文档只维护项目事实、路由、架构、进度和待办。
 
 ## 1. 当前目标
 

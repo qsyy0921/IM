@@ -43,6 +43,7 @@ try {
   assert(duplicate.readyToWrite === false, "duplicate output should not be ready");
   assert(duplicate.blockers.includes("output-already-exists"), "duplicate output should report blocker");
   assert(duplicate.wroteProfile === false, "duplicate output must not overwrite");
+  assert(duplicate.executionPolicy.writesLocalProfile === false, "duplicate output must report no write");
 
   writeFileSync(pfxOutput, "not json", "utf8");
   const overwritten = initDesktopSigningProfile({
@@ -65,6 +66,7 @@ try {
   ]);
   assert(dryRun.readyToWrite === true, "dry-run should report ready");
   assert(dryRun.executionPolicy.dryRun === true, "dry-run policy missing");
+  assert(dryRun.executionPolicy.writesLocalProfile === false, "dry-run must report no write");
   assert(dryRun.wroteProfile === false, "dry-run must not write");
   assert(!existsSync(dryRunOutput), "dry-run output should not exist");
   const dryRunSerialized = JSON.stringify(dryRun);
@@ -77,6 +79,8 @@ try {
   });
   assert(missingSource.readyToWrite === false, "missing source should not be ready");
   assert(missingSource.blockers.includes("source-required"), "missing source blocker missing");
+  assert(!missingSource.blockers.includes("source-invalid"), "missing source should not also be source-invalid");
+  assert(missingSource.executionPolicy.writesLocalProfile === false, "missing source must report no write");
 
   const badOutput = initDesktopSigningProfile({
     source: "pfx-file",
@@ -84,6 +88,7 @@ try {
   });
   assert(badOutput.readyToWrite === false, "example output should be blocked");
   assert(badOutput.blockers.includes("output-must-not-be-example-profile"), "example output blocker missing");
+  assert(badOutput.executionPolicy.writesLocalProfile === false, "example output must report no write");
 
   const nestedOutput = join(tempRoot, "nested", "signing-profile.local.json");
   const nested = initDesktopSigningProfile({

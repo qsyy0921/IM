@@ -279,8 +279,8 @@ policy before use. The explicit helper
 `npm --prefix clients run init:desktop-signing-profile -- --source pfx-file --output clients/desktop/signing-profile.local.json`
 or `--source windows-cert-store` copies a chosen example to a local profile; it
 requires both `--source` and `--output`, refuses to overwrite unless
-`--overwrite` is passed, and does not read certificates, secrets, sign artifacts,
-build installers or download tools. When a PFX file is used, the plan performs a read-only local PFX check
+`--overwrite` is passed, and does not read certificates or protected signing
+material, sign artifacts, build installers or download tools. When a PFX file is used, the plan performs a read-only local PFX check
 with the named environment variable and remains not ready unless the PFX can be
 read, has a usable signing key and is not expired. When a Windows
 certificate-store thumbprint is used, the plan performs a read-only local

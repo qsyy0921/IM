@@ -528,7 +528,8 @@ First slice:
   policy before use. `init:desktop-signing-profile` is the explicit helper for
   this copy step: it requires both `--source` and `--output`, blocks example-file
   outputs and existing files unless `--overwrite` is passed, and does not read
-  certificates, secrets, sign artifacts, build installers or download tools.
+  certificates or protected signing material, sign artifacts, build installers
+  or download tools.
   When a PFX file is used, the
   plan performs a read-only local PFX check with the named environment variable
   and remains not ready unless the PFX can be read, has a usable signing key and

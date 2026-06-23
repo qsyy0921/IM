@@ -47,7 +47,7 @@ export function buildDesktopSigningProfileInitPlan(options = {}) {
   if (!source) {
     blockers.push("source-required");
   }
-  if (!templates[source]) {
+  if (source && !templates[source]) {
     blockers.push("source-invalid");
   }
   if (!outputPath) {
@@ -75,7 +75,7 @@ export function buildDesktopSigningProfileInitPlan(options = {}) {
     generatedAt: new Date().toISOString(),
     executionPolicy: {
       dryRun,
-      writesLocalProfile: !dryRun,
+      writesLocalProfile: !dryRun && blockers.length === 0,
       readsTemplateProfile: true,
       readsLocalCertificate: false,
       readsProtectedSigningMaterial: false,

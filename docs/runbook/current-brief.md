@@ -53,7 +53,9 @@ Android 后置到用户明确切回。
    证书 / 密钥 / 密码；
    PFX 输入会做只读可读性 / signing key / 过期检查；Windows cert-store
    thumbprint 会做只读本机证书 / signing key / 过期检查；profile 可声明预期公开
-   signer subject，valid signature 必须匹配该发布者策略；read-only verifier 也可通过
+   signer subject，valid signature 必须匹配该发布者策略；signing plan 可携带 CLI、
+   `NEXUSIM_DESKTOP_SIGN_EXPECTED_SUBJECT` 或 profile 中的公开 signer subject policy，但不宣称已验证；
+   read-only verifier 也可通过
    CLI、`NEXUSIM_DESKTOP_SIGN_EXPECTED_SUBJECT` 或 profile 读取公开 signer subject policy
    但不会使用证书源签名；signing executor 也可读取同一公开策略；其低敏
    execution policy 会声明 profile 读取和 `--require-valid` 下的 signer subject enforcement；

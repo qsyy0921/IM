@@ -287,9 +287,11 @@ with the named environment variable and remains not ready unless the PFX can be
 read, has a usable signing key and is not expired. When a Windows
 certificate-store thumbprint is used, the plan performs a read-only local
 certificate-store check and remains not ready unless the certificate exists, has
-a usable signing key and is not expired. A profile may also declare an expected
-public signer subject substring; read-only signature verification and installer
-readiness remain blocked if a valid signature does not match it.
+a usable signing key and is not expired. `plan:desktop-signing` can carry an
+expected public signer subject policy from CLI, env or profile, but it remains a
+plan-only report and does not claim that the signer has been verified. Read-only
+signature verification and installer readiness remain blocked if a valid
+signature does not match the configured public policy.
 `sign:desktop-artifact` is the explicit execution wrapper for that plan. By
 default it is also plan-only and prints a low-sensitive execution policy. It
 only invokes `signtool` when run with `--execute` and when the collected desktop

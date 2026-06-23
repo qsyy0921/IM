@@ -34,7 +34,7 @@ export function buildDesktopSigningPlan(options = {}) {
     schemaVersion,
     generatedAt: new Date().toISOString(),
     artifactKind,
-    executionPolicy: executionPolicy()
+    executionPolicy: executionPolicy(options)
   };
   if (!manifestPath) {
     return {
@@ -79,6 +79,7 @@ export function buildDesktopSigningPlan(options = {}) {
     missing,
     artifactManifest: artifactManifestInfo(manifest, manifestPath),
     artifact: artifactInfo,
+    signaturePolicy: signaturePolicyStatus(options),
     signing: {
       mode: config.mode,
       signTool: config.signTool,
@@ -226,7 +227,7 @@ function commandTemplate(config, artifactInfo) {
   return common;
 }
 
-function executionPolicy() {
+function executionPolicy(options = {}) {
   return {
     planOnly: true,
     signsArtifacts: false,
@@ -238,7 +239,18 @@ function executionPolicy() {
     readsSigningConfig: true,
     readsPfxCertificate: true,
     readsWindowsCertificateStore: true,
-    validatesArtifactHashes: true
+    validatesArtifactHashes: true,
+    carriesExpectedSignerSubjectPolicy: Boolean(stringValue(options.expectedSignerSubjectContains)),
+    checksExpectedSignerSubject: false
+  };
+}
+
+function signaturePolicyStatus(options) {
+  return {
+    expectedSignerSubjectConfigured: Boolean(stringValue(options.expectedSignerSubjectContains)),
+    enforcement: stringValue(options.expectedSignerSubjectContains)
+      ? "post-signature-verification"
+      : "not-configured"
   };
 }
 
@@ -598,6 +610,7 @@ function parseArgs(argv, env) {
     certFile: env.NEXUSIM_DESKTOP_SIGN_CERT_FILE ?? "",
     certSHA1: env.NEXUSIM_DESKTOP_SIGN_CERT_SHA1 ?? "",
     timestampURL: env.NEXUSIM_DESKTOP_SIGN_TIMESTAMP_URL ?? "",
+    expectedSignerSubjectContains: env.NEXUSIM_DESKTOP_SIGN_EXPECTED_SUBJECT ?? "",
     pfxPassEnv: defaultPfxPassEnv,
     pfxPassEnvPresent: Boolean(env[defaultPfxPassEnv])
   };
@@ -635,6 +648,11 @@ function parseArgs(argv, env) {
     }
     if (arg === "--timestamp-url") {
       options.timestampURL = requiredValue(argv, index, arg);
+      index += 1;
+      continue;
+    }
+    if (arg === "--expected-signer-subject") {
+      options.expectedSignerSubjectContains = requiredValue(argv, index, arg);
       index += 1;
       continue;
     }

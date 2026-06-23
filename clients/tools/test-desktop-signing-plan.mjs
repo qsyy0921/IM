@@ -81,6 +81,9 @@ try {
     schemaVersion: "nexusim.desktop-signing-profile.v1",
     signToolPath: fakeSignTool,
     timestampURL: "https://timestamp.example.test",
+    signature: {
+      expectedSignerSubjectContains: "NexusIM"
+    },
     certificate: {
       source: "pfx-file",
       certFile: fakePfx,
@@ -105,15 +108,22 @@ try {
   assert(missing.missing.includes("certificate-source"), "missing certificate should be reported");
   assert(missing.executionPolicy.planOnly === true, "signing plan should be plan-only");
   assert(missing.executionPolicy.signsArtifacts === false, "signing plan should not sign artifacts");
+  assert(missing.executionPolicy.carriesExpectedSignerSubjectPolicy === false, "missing signing plan should not carry signer policy");
+  assert(missing.executionPolicy.checksExpectedSignerSubject === false, "signing plan should not verify signer subject");
 
   const ready = buildDesktopSigningPlan({
     manifest: manifestPath,
     signToolPath: fakeSignTool,
     timestampURL: "https://timestamp.example.test",
+    expectedSignerSubjectContains: "NexusIM",
     ...readyPfxOptions
   });
   const readyJSON = JSON.stringify(ready);
   assert(ready.readyToSign === true, "complete signing config should be ready");
+  assert(ready.signaturePolicy.expectedSignerSubjectConfigured === true, "ready signing plan should carry expected signer policy");
+  assert(ready.signaturePolicy.enforcement === "post-signature-verification", "signer policy enforcement should be deferred to verification");
+  assert(ready.executionPolicy.carriesExpectedSignerSubjectPolicy === true, "ready signing plan should declare carried signer policy");
+  assert(ready.executionPolicy.checksExpectedSignerSubject === false, "signing plan should not claim read-only signer verification");
   assert(ready.signing.mode === "pfx", "pfx signing mode expected");
   assert(ready.signing.certificate.pfxPassEnvPresent === true, "pfx env presence expected");
   assert(ready.signing.certificate.pfxReadiness.usable === true, "pfx readiness should be usable");
@@ -150,6 +160,45 @@ try {
   assert(cliPlan.readyToSign === true, "CLI signing plan should be ready");
   assert(!JSON.stringify(cliPlan).includes(tempRoot), "CLI signing plan leaked absolute temp path");
 
+  const cliEnvSignerPolicy = runPlanner([
+    "--manifest",
+    manifestPath,
+    "--signtool",
+    fakeSignTool,
+    "--cert-file",
+    fakePfx,
+    "--timestamp-url",
+    "https://timestamp.example.test"
+  ], {
+    ...pfxFixture.env,
+    NEXUSIM_DESKTOP_SIGN_EXPECTED_SUBJECT: "NexusIM"
+  });
+  assert(cliEnvSignerPolicy.readyToSign === true, "CLI env signer policy plan should be ready");
+  assert(
+    cliEnvSignerPolicy.signaturePolicy.expectedSignerSubjectConfigured === true,
+    "CLI env signer policy should be configured"
+  );
+  assert(
+    cliEnvSignerPolicy.executionPolicy.carriesExpectedSignerSubjectPolicy === true,
+    "CLI env signer policy should be declared in execution policy"
+  );
+
+  const cliArgSignerPolicy = runPlanner([
+    "--manifest",
+    manifestPath,
+    "--signtool",
+    fakeSignTool,
+    "--cert-file",
+    fakePfx,
+    "--timestamp-url",
+    "https://timestamp.example.test",
+    "--expected-signer-subject",
+    "NexusIM"
+  ], {
+    ...pfxFixture.env
+  });
+  assert(cliArgSignerPolicy.signaturePolicy.expectedSignerSubjectConfigured === true, "CLI signer policy arg should be configured");
+
   const cliProfilePlan = runPlanner([
     "--manifest",
     manifestPath,
@@ -159,6 +208,8 @@ try {
     ...pfxFixture.env
   });
   assert(cliProfilePlan.readyToSign === true, "CLI signing profile plan should be ready");
+  assert(cliProfilePlan.signaturePolicy.expectedSignerSubjectConfigured === true, "profile expected signer policy should be configured");
+  assert(cliProfilePlan.executionPolicy.carriesExpectedSignerSubjectPolicy === true, "profile signer policy should be declared");
   assert(cliProfilePlan.signing.certificate.pfxPassEnv === "NEXUSIM_TEST_DESKTOP_PFX_PASS", "profile pfx pass env should be preserved");
   assert(!JSON.stringify(cliProfilePlan).includes(tempRoot), "CLI signing profile plan leaked absolute temp path");
 

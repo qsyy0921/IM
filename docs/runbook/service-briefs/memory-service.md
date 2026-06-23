@@ -24,5 +24,10 @@
   ai-eval gate，验证过期和 superseded memory 不应作为 current citation。
 - memory extraction confidence / review eval、cross-group attribution-chain 和
   temporal query-seq version selection eval 已接入 ai-eval gate。
+- 2026-06-23 低敏 collaborative-memory eval 继续扩展：multi-hop actor-chain completeness、
+  workstream / decision dependency edge、reviewed multi-source profile activation、
+  supporting-memory delete 后 profile recompute 已纳入 profile / Agent safety fixture；
+  该覆盖仍是本地 eval gate，不调用模型、数据库或业务服务。
 
-下一步：进入低敏 collaborative-memory 算法/eval，优先 multi-hop、temporal update 和 profile aggregation；第一版仍不把单条群消息直接升级为 ACTIVE profile fact。
+下一步：把新增 collaborative-memory eval 要求接到 memory-service / retrieval /
+RAG / Agent live stack adapter，并继续保持“单条群消息不直接升级为 ACTIVE profile fact”。

@@ -64,6 +64,11 @@ IM messages -> search / memory projection -> EvidencePack -> RAG / Agent answer 
   `run-local-smoke.ps1` 桌面 smoke 错用群会话的问题：桌面 smoke 现在从
   `client-web-summary.json` 显式读取双方仍 active 的 `direct_chat.conversation_id`，
   读不到直接失败，不使用群会话兜底。
+- 2026-06-23 低敏 collaborative-memory eval 已扩展到 70 个 catalog cases / 20 个
+  profile-Agent safety fixture cases，新增 multi-hop actor-chain completeness、
+  workstream / decision dependency edge、reviewed multi-source profile activation
+  和 supporting-memory delete 后 profile recompute 检查；该 gate 不调用模型、
+  数据库或业务服务。
 - 已有 clean smoke 覆盖真实双用户好友直聊、群聊 first path、群资料 BFF
   read/update 和群成员动作链路；证据见 `docs/runbook/client-platform.md`。
 - Windows desktop 已有 artifact / signing / installer plan first paths；签名 / installer
@@ -121,12 +126,15 @@ IM messages -> search / memory projection -> EvidencePack -> RAG / Agent answer 
    `docs/architecture/target-architecture-ai.md`、`docs/runbook/service-briefs/search-service.md`、
    `memory-service.md`、`retrieval-gateway.md`、`rag-service.md`、`agent-service.md`
    和 `action-executor.md`。
-3. 后端 / AI 演示主线优先做：
+3. 后端 / AI 演示主线下一步：
+   把新增 collaborative-memory eval 要求提升到 memory-service / retrieval /
+   RAG / Agent live stack adapter。
+4. 后端 / AI 演示主线优先做：
    `IM 消息 -> search / memory projection -> EvidencePack -> RAG / Agent answer -> approval / audit`。
-4. 客户端只作为演示入口；除非阻塞上述演示，不继续扩 UI 产品化。
-5. Windows release signing / MSI / NSIS installer、完整 Android、完整移动端发布、
+5. 客户端只作为演示入口；除非阻塞上述演示，不继续扩 UI 产品化。
+6. Windows release signing / MSI / NSIS installer、完整 Android、完整移动端发布、
    复杂 UI、群管理深水区和真实 media provider 链路全部后置到 backlog。
-6. 新发现待办写入 `docs/runbook/remaining-goals.md`，不要把长待办复制回本文件。
+7. 新发现待办写入 `docs/runbook/remaining-goals.md`，不要把长待办复制回本文件。
 
 ## Focused Checks
 

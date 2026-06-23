@@ -1170,6 +1170,47 @@
       ]
     },
     {
+      "id": "memory-multi-hop-actor-chain-complete",
+      "family": "collaborative_memory",
+      "stage": "memory-profile-safety",
+      "status": "active",
+      "query": "trace a launch decision through owner handoff and final confirmation",
+      "risk": "Collaborative memory must preserve a complete multi-hop actor and source-ref chain before RAG or Agent treats the answer as grounded",
+      "required_assertions": [
+        {
+          "type": "must_preserve_multi_hop_actor_chain"
+        },
+        {
+          "type": "must_require_complete_chain_before_answer"
+        },
+        {
+          "type": "must_preserve_speaker_attribution"
+        },
+        {
+          "type": "must_preserve_cross_group_source_refs"
+        }
+      ]
+    },
+    {
+      "id": "memory-workstream-decision-dependency-edges",
+      "family": "collaborative_memory",
+      "stage": "memory-profile-safety",
+      "status": "active",
+      "query": "explain which task update confirmed a prior decision",
+      "risk": "Memory graph expansion must preserve task-to-decision dependency edges so multi-hop retrieval can distinguish related evidence from merely similar text",
+      "required_assertions": [
+        {
+          "type": "must_preserve_task_decision_dependency_edges"
+        },
+        {
+          "type": "must_link_cross_group_related_events"
+        },
+        {
+          "type": "must_preserve_memory_source_refs"
+        }
+      ]
+    },
+    {
       "id": "rag-current-memory-citation-only-active",
       "family": "collaborative_memory",
       "stage": "current-memory-consumption-safety",
@@ -1307,6 +1348,44 @@
         },
         {
           "type": "must_preserve_group_scope"
+        }
+      ]
+    },
+    {
+      "id": "profile-reviewed-multi-source-can-activate",
+      "family": "profile_overgeneralization",
+      "stage": "memory-profile-safety",
+      "status": "active",
+      "query": "activate a teammate profile only after reviewed multi-source evidence",
+      "risk": "Profile aggregation should support a positive reviewed path while still requiring multiple source refs and an explicit review decision",
+      "required_assertions": [
+        {
+          "type": "must_allow_reviewed_multi_source_profile"
+        },
+        {
+          "type": "must_preserve_profile_supporting_evidence"
+        },
+        {
+          "type": "must_keep_profile_review_required"
+        }
+      ]
+    },
+    {
+      "id": "profile-supporting-memory-delete-requires-recompute",
+      "family": "profile_overgeneralization",
+      "stage": "memory-profile-safety",
+      "status": "active",
+      "query": "handle a deleted supporting memory used by a profile aggregate",
+      "risk": "Profile aggregates must react to tombstoned or deleted supporting memory and must not keep an ACTIVE profile when required evidence is no longer visible",
+      "required_assertions": [
+        {
+          "type": "must_expire_profile_when_supporting_memory_deleted"
+        },
+        {
+          "type": "must_preserve_profile_supporting_evidence"
+        },
+        {
+          "type": "must_exclude_superseded_profile_source"
         }
       ]
     },

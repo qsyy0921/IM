@@ -187,6 +187,24 @@ function Test-ProfileAgentAssertion {
                 -and ([int]$Fixture.memory.actor_count -ge 2) `
                 -and ([int]$Fixture.memory.speaker_source_ref_count -ge [int]$Fixture.memory.actor_count)
         }
+        "must_preserve_multi_hop_actor_chain" {
+            return `
+                [bool]$Fixture.memory.multi_hop_actor_chain_preserved `
+                -and ([int]$Fixture.memory.multi_hop_chain_hop_count -ge [int]$Fixture.memory.min_multi_hop_chain_hops) `
+                -and ([int]$Fixture.memory.multi_hop_chain_source_ref_count -ge [int]$Fixture.memory.multi_hop_chain_hop_count)
+        }
+        "must_require_complete_chain_before_answer" {
+            return `
+                (-not [bool]$Fixture.memory.incomplete_chain_answer_allowed) `
+                -and [bool]$Fixture.memory.incomplete_chain_abstained `
+                -and ([int]$Fixture.memory.incomplete_chain_hop_count -lt [int]$Fixture.memory.min_multi_hop_chain_hops)
+        }
+        "must_preserve_task_decision_dependency_edges" {
+            return `
+                [bool]$Fixture.memory.task_decision_dependency_preserved `
+                -and [bool]$Fixture.memory.decision_confirmed_by_later_group `
+                -and ([int]$Fixture.memory.dependency_edge_count -ge 2)
+        }
         "must_preserve_temporal_update_order" {
             return `
                 [bool]$Fixture.memory.temporal_update_order_preserved `
@@ -205,6 +223,25 @@ function Test-ProfileAgentAssertion {
                 (-not [bool]$Fixture.memory.future_memory_returned_before_valid_from) `
                 -and ([int64]$Fixture.memory.before_update_query_seq -lt [int64]$Fixture.memory.new_valid_from_seq) `
                 -and (Get-JsonPropertyString -Object $Fixture.memory -Name "before_update_selected_event_id") -ne (Get-JsonPropertyString -Object $Fixture.memory -Name "new_memory_event_id")
+        }
+        "must_allow_reviewed_multi_source_profile" {
+            return `
+                [bool]$Fixture.profile.reviewed_multi_source_profile_written `
+                -and (Get-JsonPropertyString -Object $Fixture.profile -Name "reviewed_profile_status") -eq "ACTIVE" `
+                -and ([int]$Fixture.profile.reviewed_profile_source_count -ge [int]$Fixture.profile.min_required_sources) `
+                -and [bool]$Fixture.profile.review_decision_recorded
+        }
+        "must_preserve_profile_supporting_evidence" {
+            return `
+                [bool]$Fixture.profile.profile_supporting_evidence_preserved `
+                -and ([int]$Fixture.profile.reviewed_profile_source_ref_count -ge [int]$Fixture.profile.reviewed_profile_source_count) `
+                -and [bool]$Fixture.profile.profile_source_scope_preserved
+        }
+        "must_expire_profile_when_supporting_memory_deleted" {
+            return `
+                [bool]$Fixture.profile.deleted_supporting_memory_propagated `
+                -and (Get-JsonPropertyString -Object $Fixture.profile -Name "profile_status_after_source_delete") -ne "ACTIVE" `
+                -and [bool]$Fixture.profile.profile_recompute_required_after_delete
         }
         "must_propagate_current_memory_query_seq" {
             $consumer = Get-CurrentMemoryConsumerFixture -Fixture $Fixture -Consumer (Get-JsonPropertyString -Object $Assertion -Name "consumer")
@@ -328,6 +365,16 @@ $fixture = [pscustomobject]@{
         superseded_source_temporal_status = "SUPERSEDED"
         active_profile_source_temporal_status = "ACTIVE"
         superseded_source_excluded = $true
+        reviewed_multi_source_profile_written = $true
+        reviewed_profile_status = "ACTIVE"
+        reviewed_profile_source_count = 3
+        reviewed_profile_source_ref_count = 3
+        profile_supporting_evidence_preserved = $true
+        profile_source_scope_preserved = $true
+        review_decision_recorded = $true
+        deleted_supporting_memory_propagated = $true
+        profile_status_after_source_delete = "PENDING_REVIEW"
+        profile_recompute_required_after_delete = $true
     }
     memory = [pscustomobject]@{
         source_refs_preserved = $true
@@ -373,6 +420,16 @@ $fixture = [pscustomobject]@{
         speaker_attribution_preserved = $true
         actor_count = 3
         speaker_source_ref_count = 3
+        multi_hop_actor_chain_preserved = $true
+        multi_hop_chain_hop_count = 4
+        min_multi_hop_chain_hops = 3
+        multi_hop_chain_source_ref_count = 4
+        incomplete_chain_answer_allowed = $false
+        incomplete_chain_abstained = $true
+        incomplete_chain_hop_count = 2
+        task_decision_dependency_preserved = $true
+        decision_confirmed_by_later_group = $true
+        dependency_edge_count = 3
         temporal_update_order_preserved = $true
         old_valid_from_seq = 10
         old_valid_to_seq = 20

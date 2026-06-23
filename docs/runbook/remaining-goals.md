@@ -40,8 +40,10 @@
 
 - `search-service`：继续 index projection、visibility filtering、query hardening 和 AI retrieval substrate；`memory-service`：group / collaborative memory 的 source refs、scope、validity、
   supersession、confidence、review state、profile aggregation。
-- `ai-eval-service`：区分 retrieval failure、reasoning failure、memory lifecycle
-  failure、action boundary failure。
+- `ai-eval-service`：已用低敏 fixture 覆盖 multi-hop actor chain、temporal version、
+  profile aggregation 正 / 负路径和 profile delete propagation；下一步把这些要求接到
+  memory-service / retrieval / RAG / Agent live stack adapter，并继续区分 retrieval failure、
+  reasoning failure、memory lifecycle failure、action boundary failure。
 - `retrieval-gateway`：结构过滤、BM25 / vector / graph expansion、rerank、
   EvidencePack coverage。
 - `rag-service` / `summary-service`：拒答、引用校验、source-ref regression、unsafe

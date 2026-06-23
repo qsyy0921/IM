@@ -306,6 +306,12 @@ action-executor hash-only audit checks.
 The 2026-06-20 cross-group / temporal memory eval run increased the CI-safe
 fixture adapter to 16 cases and added cross-group attribution-chain plus
 query-seq temporal-version selection checks.
+The 2026-06-23 collaborative-memory eval expansion increased the same fixture
+adapter to 20 cases and added multi-hop actor-chain completeness, workstream /
+decision dependency edges, reviewed multi-source profile activation and
+supporting-memory delete / profile recompute checks. This is still a
+low-sensitive local eval gate; it does not call models, databases or business
+services.
 The 2026-06-20 negative RAG / Agent service-stack run increased the live suite
 to 19 cases and added RAG no-evidence abstain plus Agent policy-denied blocked
 proposal checks.

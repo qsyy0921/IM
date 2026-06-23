@@ -113,6 +113,12 @@ backend architecture + AI / Agent / RAG demo path
 IM 消息 -> search / memory projection -> EvidencePack -> RAG / Agent answer -> approval / audit
 ```
 
+2026-06-23 当前低敏 collaborative-memory eval 已扩到 70 个 catalog cases /
+20 个 profile-Agent safety fixture cases，覆盖 multi-hop actor-chain、
+workstream / decision dependency edge、reviewed multi-source profile activation
+和 supporting-memory delete 后 profile recompute。下一步是把这些 fixture
+要求提升到 memory-service / retrieval / RAG / Agent live stack adapter。
+
 ## 不变量
 
 - PullInbox 是消息展示事实源，WebSocket 只是在线唤醒。

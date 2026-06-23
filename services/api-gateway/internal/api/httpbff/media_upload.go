@@ -62,6 +62,7 @@ type conversationProfilePayload struct {
 	ConversationType  string `json:"conversation_type"`
 	Title             string `json:"title"`
 	AvatarURI         string `json:"avatar_uri"`
+	Announcement      string `json:"announcement"`
 	ProfileVersion    int64  `json:"profile_version"`
 	MemberVersion     int64  `json:"member_version"`
 	PermissionVersion int64  `json:"permission_version"`
@@ -205,6 +206,7 @@ func (server *Server) handleCompleteGroupAvatarUpload(response http.ResponseWrit
 		ConversationId:         conversationID,
 		Title:                  currentProfile.GetTitle(),
 		AvatarUri:              avatarURI,
+		Announcement:           currentProfile.GetAnnouncement(),
 		ExpectedProfileVersion: currentProfile.GetProfileVersion(),
 	})
 	if err != nil {
@@ -336,6 +338,7 @@ func conversationProfilePayloadFromProto(profile *conversationv1.ConversationPro
 		ConversationType:  profile.GetConversationType().String(),
 		Title:             profile.GetTitle(),
 		AvatarURI:         profile.GetAvatarUri(),
+		Announcement:      profile.GetAnnouncement(),
 		ProfileVersion:    profile.GetProfileVersion(),
 		MemberVersion:     profile.GetMemberVersion(),
 		PermissionVersion: profile.GetPermissionVersion(),

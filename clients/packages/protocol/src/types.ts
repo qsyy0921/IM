@@ -178,6 +178,7 @@ export interface ConversationProfile {
   type: ConversationType;
   title: string;
   avatarURI: string;
+  announcement: string;
   profileVersion: number;
   memberVersion: number;
   permissionVersion: number;
@@ -188,6 +189,7 @@ export interface UpdateConversationProfileRequest {
   conversationID: ConversationID;
   title: string;
   avatarURI?: string;
+  announcement?: string;
   expectedProfileVersion?: number;
 }
 

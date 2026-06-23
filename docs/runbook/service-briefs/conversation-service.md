@@ -3,7 +3,7 @@
 - 会话和成员事实源；其它服务不得跨表读取 `conversation_members`。
 - 已有 `GetSendContext`、`CreateMemberChange`、`GetMemberChange`、
   `ListConversationMembers`、owner transfer。
-- conversation profile 是群标题 / 头像 URI 的事实源；`GetConversationProfile`
+- conversation profile 是群标题 / 头像 URI / 群公告的事实源；`GetConversationProfile`
   要求当前 ACTIVE 成员可读，`UpdateConversationProfile` 只允许 ACTIVE OWNER /
   ADMIN 更新 GROUP conversation，并用 `expected_profile_version` fail-closed。
 - 成员变更走 shared timeline/outbox，保持 `conversation_seq` 顺序。
@@ -14,7 +14,7 @@
 - `member-change-worker` 非取消错误按 backoff 重试，batch size 会归一化到安全上限。
 - `MarkPublishedMemberChanges` 只接受同 tenant / conversation、正确 producer 和
   `conversation.member.*` event type 的已发布 outbox 行推进 saga。
-- owner transfer、成员列表、成员变更 / 发布推进已有真实 PostgreSQL 回归。
+- owner transfer、成员列表、群公告 profile 读写、成员变更 / 发布推进已有真实 PostgreSQL 回归。
 - JOIN / rejoin 会刷新 `join_seq` 并清旧 `leave_seq`。
 - 已有只读 `member-change-audit`、`member-window-audit` 和保守
   `member-window-repair` / repair audit operator。

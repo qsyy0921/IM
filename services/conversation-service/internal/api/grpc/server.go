@@ -392,6 +392,7 @@ func (s *Server) UpdateConversationProfile(
 		ConversationID:         types.ConversationID(request.GetConversationId()),
 		Title:                  request.GetTitle(),
 		AvatarURI:              request.GetAvatarUri(),
+		Announcement:           request.GetAnnouncement(),
 		ExpectedProfileVersion: request.GetExpectedProfileVersion(),
 	})
 	if err != nil {
@@ -463,6 +464,7 @@ func toProtoConversationProfile(result types.ConversationProfileResult) *convers
 		ConversationType:  toProtoConversationType(result.ConversationType),
 		Title:             result.Title,
 		AvatarUri:         result.AvatarURI,
+		Announcement:      result.Announcement,
 		ProfileVersion:    result.ProfileVersion,
 		MemberVersion:     result.MemberVersion,
 		PermissionVersion: result.PermissionVersion,

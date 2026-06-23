@@ -245,6 +245,7 @@ message ConversationProfile {
   int64 member_version = 7;
   int64 permission_version = 8;
   int64 updated_at_unix_ms = 9;
+  string announcement = 10;
 }
 
 message GetConversationProfileResponse {
@@ -257,6 +258,7 @@ message UpdateConversationProfileRequest {
   string title = 3;
   string avatar_uri = 4;
   int64 expected_profile_version = 5;
+  string announcement = 6;
 }
 
 message UpdateConversationProfileResponse {

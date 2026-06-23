@@ -378,13 +378,14 @@ First-stage implementation note:
 - `GET /api/conversations/{conversation_id}/messages` is backed by
   `delivery-service.PullInbox`, not by a direct message table read.
 - `GET/POST /api/conversations/{conversation_id}/profile` forwards to
-  `conversation-service` through api-gateway BFF. Group title and avatar URI are
-  conversation-service facts; the client does not persist them as server truth
-  and avatar upload is mediated by api-gateway BFF through `media-service`
-  upload session / completion before updating the conversation profile. Avatar
-  display is also mediated by BFF: the BFF verifies the requested `avatar_uri`
-  still matches the current profile, then asks media-service for a short-lived
-  download URL.
+  `conversation-service` through api-gateway BFF. Group title, avatar URI and
+  announcement are conversation-service profile facts; the client does not
+  persist them as server truth. Avatar upload is mediated by api-gateway BFF
+  through `media-service` upload session / completion before updating the
+  conversation profile, and the BFF preserves the current announcement while
+  changing only the avatar URI. Avatar display is also mediated by BFF: the BFF
+  verifies the requested `avatar_uri` still matches the current profile, then
+  asks media-service for a short-lived download URL.
 - `/api/auth/logout` revokes only the current gateway-token session. The BFF
   derives tenant, user, device and session from the verified gateway token,
   forwards identity-service `RevokeSession`, and ignores caller-supplied target
@@ -544,7 +545,8 @@ PC desktop, and Android clients.
   local-store bridge is ready at runtime, plus Android APK / real-device smoke
   for the matching `android-sqlite` path.
 - Android runtime implementation and unsigned local `.apk` packaging.
-- Richer group settings and real multi-user UI smoke for group creation,
-  profile editing, invite and member management.
+- Richer group settings beyond profile editing, including join approval,
+  mute / moderation controls and real multi-user UI smoke coverage for those
+  product flows.
 - Media upload and preview after `media-service` provider path is ready.
 - Client e2e smoke over local LAN and wired `172.x.x.x` network.

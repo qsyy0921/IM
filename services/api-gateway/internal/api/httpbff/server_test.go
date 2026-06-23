@@ -669,6 +669,7 @@ func TestConversationProfileEndpointsForwardRequests(t *testing.T) {
 					ConversationType:  conversationv1.ConversationType_CONVERSATION_TYPE_GROUP,
 					Title:             "群聊一",
 					AvatarUri:         "nexusim://avatar/group-1",
+					Announcement:      "本周五例会",
 					ProfileVersion:    3,
 					MemberVersion:     5,
 					PermissionVersion: 7,
@@ -685,6 +686,7 @@ func TestConversationProfileEndpointsForwardRequests(t *testing.T) {
 			if request.GetConversationId() != "group/1" ||
 				request.GetTitle() != "新群名" ||
 				request.GetAvatarUri() != "nexusim://avatar/new" ||
+				request.GetAnnouncement() != "新公告" ||
 				request.GetExpectedProfileVersion() != 3 {
 				t.Fatalf("unexpected update profile request: %+v", request)
 			}
@@ -695,6 +697,7 @@ func TestConversationProfileEndpointsForwardRequests(t *testing.T) {
 					ConversationType:  conversationv1.ConversationType_CONVERSATION_TYPE_GROUP,
 					Title:             request.GetTitle(),
 					AvatarUri:         request.GetAvatarUri(),
+					Announcement:      request.GetAnnouncement(),
 					ProfileVersion:    4,
 					MemberVersion:     5,
 					PermissionVersion: 7,
@@ -713,6 +716,7 @@ func TestConversationProfileEndpointsForwardRequests(t *testing.T) {
 		t.Fatalf("get status=%d body=%s", getResponse.Code, getResponse.Body.String())
 	}
 	if !strings.Contains(getResponse.Body.String(), `"title":"群聊一"`) ||
+		!strings.Contains(getResponse.Body.String(), `"announcement":"本周五例会"`) ||
 		!strings.Contains(getResponse.Body.String(), `"profile_version":"3"`) {
 		t.Fatalf("expected get profile response, got %s", getResponse.Body.String())
 	}
@@ -721,6 +725,7 @@ func TestConversationProfileEndpointsForwardRequests(t *testing.T) {
 	updateRequest := httptest.NewRequest(http.MethodPost, "/api/conversations/group%2F1/profile", strings.NewReader(`{
 		"title":"新群名",
 		"avatar_uri":"nexusim://avatar/new",
+		"announcement":"新公告",
 		"expected_profile_version":3
 	}`))
 	updateRequest.Header.Set("Authorization", "Bearer token-1")
@@ -729,6 +734,7 @@ func TestConversationProfileEndpointsForwardRequests(t *testing.T) {
 		t.Fatalf("update status=%d body=%s", updateResponse.Code, updateResponse.Body.String())
 	}
 	if !strings.Contains(updateResponse.Body.String(), `"title":"新群名"`) ||
+		!strings.Contains(updateResponse.Body.String(), `"announcement":"新公告"`) ||
 		!strings.Contains(updateResponse.Body.String(), `"profile_version":"4"`) {
 		t.Fatalf("expected update profile response, got %s", updateResponse.Body.String())
 	}
@@ -842,6 +848,7 @@ func TestCompleteGroupAvatarUploadUpdatesConversationProfile(t *testing.T) {
 					ConversationType: conversationv1.ConversationType_CONVERSATION_TYPE_GROUP,
 					Title:            "群聊一",
 					AvatarUri:        "media://asset/old",
+					Announcement:     "头像变更时保留公告",
 					ProfileVersion:   9,
 				},
 			}, nil
@@ -850,6 +857,7 @@ func TestCompleteGroupAvatarUploadUpdatesConversationProfile(t *testing.T) {
 			if request.GetConversationId() != "group/1" ||
 				request.GetTitle() != "群聊一" ||
 				request.GetAvatarUri() != "media://asset/asset-1" ||
+				request.GetAnnouncement() != "头像变更时保留公告" ||
 				request.GetExpectedProfileVersion() != 9 {
 				t.Fatalf("unexpected update profile request: %+v", request)
 			}
@@ -860,6 +868,7 @@ func TestCompleteGroupAvatarUploadUpdatesConversationProfile(t *testing.T) {
 					ConversationType: conversationv1.ConversationType_CONVERSATION_TYPE_GROUP,
 					Title:            request.GetTitle(),
 					AvatarUri:        request.GetAvatarUri(),
+					Announcement:     request.GetAnnouncement(),
 					ProfileVersion:   10,
 				},
 			}, nil
@@ -882,6 +891,7 @@ func TestCompleteGroupAvatarUploadUpdatesConversationProfile(t *testing.T) {
 		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
 	}
 	if !strings.Contains(response.Body.String(), `"avatar_uri":"media://asset/asset-1"`) ||
+		!strings.Contains(response.Body.String(), `"announcement":"头像变更时保留公告"`) ||
 		!strings.Contains(response.Body.String(), `"profile_version":10`) {
 		t.Fatalf("expected completed avatar response, got %s", response.Body.String())
 	}

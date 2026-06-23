@@ -138,6 +138,7 @@ interface BFFConversationProfile {
   conversation_type?: string;
   title?: string;
   avatar_uri?: string;
+  announcement?: string;
   profile_version?: string | number;
   member_version?: string | number;
   permission_version?: string | number;
@@ -519,6 +520,7 @@ export class BFFClient implements AuthAPI, ConversationAPI, MessagingAPI, Delive
       {
         title: request.title,
         avatar_uri: request.avatarURI,
+        announcement: request.announcement,
         expected_profile_version: request.expectedProfileVersion
       },
       session
@@ -925,6 +927,7 @@ function conversationProfileFromBFF(response: BFFConversationProfile): Conversat
     type: conversationTypeFromBFF(response.conversation_type),
     title: response.title ?? "",
     avatarURI: response.avatar_uri ?? "",
+    announcement: response.announcement ?? "",
     profileVersion: numberValue(response.profile_version),
     memberVersion: numberValue(response.member_version),
     permissionVersion: numberValue(response.permission_version),

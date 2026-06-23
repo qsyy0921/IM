@@ -26,6 +26,7 @@ SELECT
     c.status,
     c.title,
     c.avatar_uri,
+    c.announcement,
     c.profile_version,
     c.member_version,
     c.permission_version,
@@ -49,6 +50,7 @@ WHERE c.tenant_id = $1
 		&conversationStatus,
 		&result.Title,
 		&result.AvatarURI,
+		&result.Announcement,
 		&result.ProfileVersion,
 		&result.MemberVersion,
 		&result.PermissionVersion,
@@ -147,9 +149,10 @@ FOR UPDATE OF c
 UPDATE conversations
 SET title = $3,
     avatar_uri = $4,
+    announcement = $5,
     profile_version = profile_version + 1,
-    profile_updated_at = $5,
-    updated_at = $5
+    profile_updated_at = $6,
+    updated_at = $6
 WHERE tenant_id = $1
   AND conversation_id = $2
 RETURNING
@@ -158,16 +161,18 @@ RETURNING
     conversation_type,
     title,
     avatar_uri,
+    announcement,
     profile_version,
     member_version,
     permission_version,
     profile_updated_at
-`, command.AuthContext.TenantID, command.ConversationID, command.NormalizedTitle(), command.NormalizedAvatarURI(), updatedAt).Scan(
+`, command.AuthContext.TenantID, command.ConversationID, command.NormalizedTitle(), command.NormalizedAvatarURI(), command.NormalizedAnnouncement(), updatedAt).Scan(
 		&current.TenantID,
 		&current.ConversationID,
 		&current.ConversationType,
 		&current.Title,
 		&current.AvatarURI,
+		&current.Announcement,
 		&current.ProfileVersion,
 		&current.MemberVersion,
 		&current.PermissionVersion,

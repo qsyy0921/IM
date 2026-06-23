@@ -1916,6 +1916,7 @@ type ConversationProfile struct {
 	MemberVersion     int64                  `protobuf:"varint,7,opt,name=member_version,json=memberVersion,proto3" json:"member_version,omitempty"`
 	PermissionVersion int64                  `protobuf:"varint,8,opt,name=permission_version,json=permissionVersion,proto3" json:"permission_version,omitempty"`
 	UpdatedAtUnixMs   int64                  `protobuf:"varint,9,opt,name=updated_at_unix_ms,json=updatedAtUnixMs,proto3" json:"updated_at_unix_ms,omitempty"`
+	Announcement      string                 `protobuf:"bytes,10,opt,name=announcement,proto3" json:"announcement,omitempty"`
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
@@ -2013,6 +2014,13 @@ func (x *ConversationProfile) GetUpdatedAtUnixMs() int64 {
 	return 0
 }
 
+func (x *ConversationProfile) GetAnnouncement() string {
+	if x != nil {
+		return x.Announcement
+	}
+	return ""
+}
+
 type GetConversationProfileResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Profile       *ConversationProfile   `protobuf:"bytes,1,opt,name=profile,proto3" json:"profile,omitempty"`
@@ -2064,6 +2072,7 @@ type UpdateConversationProfileRequest struct {
 	Title                  string                 `protobuf:"bytes,3,opt,name=title,proto3" json:"title,omitempty"`
 	AvatarUri              string                 `protobuf:"bytes,4,opt,name=avatar_uri,json=avatarUri,proto3" json:"avatar_uri,omitempty"`
 	ExpectedProfileVersion int64                  `protobuf:"varint,5,opt,name=expected_profile_version,json=expectedProfileVersion,proto3" json:"expected_profile_version,omitempty"`
+	Announcement           string                 `protobuf:"bytes,6,opt,name=announcement,proto3" json:"announcement,omitempty"`
 	unknownFields          protoimpl.UnknownFields
 	sizeCache              protoimpl.SizeCache
 }
@@ -2131,6 +2140,13 @@ func (x *UpdateConversationProfileRequest) GetExpectedProfileVersion() int64 {
 		return x.ExpectedProfileVersion
 	}
 	return 0
+}
+
+func (x *UpdateConversationProfileRequest) GetAnnouncement() string {
+	if x != nil {
+		return x.Announcement
+	}
+	return ""
 }
 
 type UpdateConversationProfileResponse struct {
@@ -2317,7 +2333,7 @@ const file_nexusim_conversation_v1_conversation_service_proto_rawDesc = "" +
 	" \x01(\bR\x10idempotentReplay\"\x91\x01\n" +
 	"\x1dGetConversationProfileRequest\x12G\n" +
 	"\fauth_context\x18\x01 \x01(\v2$.nexusim.conversation.v1.AuthContextR\vauthContext\x12'\n" +
-	"\x0fconversation_id\x18\x02 \x01(\tR\x0econversationId\"\x94\x03\n" +
+	"\x0fconversation_id\x18\x02 \x01(\tR\x0econversationId\"\xb8\x03\n" +
 	"\x13ConversationProfile\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12'\n" +
 	"\x0fconversation_id\x18\x02 \x01(\tR\x0econversationId\x12V\n" +
@@ -2328,16 +2344,19 @@ const file_nexusim_conversation_v1_conversation_service_proto_rawDesc = "" +
 	"\x0fprofile_version\x18\x06 \x01(\x03R\x0eprofileVersion\x12%\n" +
 	"\x0emember_version\x18\a \x01(\x03R\rmemberVersion\x12-\n" +
 	"\x12permission_version\x18\b \x01(\x03R\x11permissionVersion\x12+\n" +
-	"\x12updated_at_unix_ms\x18\t \x01(\x03R\x0fupdatedAtUnixMs\"h\n" +
+	"\x12updated_at_unix_ms\x18\t \x01(\x03R\x0fupdatedAtUnixMs\x12\"\n" +
+	"\fannouncement\x18\n" +
+	" \x01(\tR\fannouncement\"h\n" +
 	"\x1eGetConversationProfileResponse\x12F\n" +
-	"\aprofile\x18\x01 \x01(\v2,.nexusim.conversation.v1.ConversationProfileR\aprofile\"\x83\x02\n" +
+	"\aprofile\x18\x01 \x01(\v2,.nexusim.conversation.v1.ConversationProfileR\aprofile\"\xa7\x02\n" +
 	" UpdateConversationProfileRequest\x12G\n" +
 	"\fauth_context\x18\x01 \x01(\v2$.nexusim.conversation.v1.AuthContextR\vauthContext\x12'\n" +
 	"\x0fconversation_id\x18\x02 \x01(\tR\x0econversationId\x12\x14\n" +
 	"\x05title\x18\x03 \x01(\tR\x05title\x12\x1d\n" +
 	"\n" +
 	"avatar_uri\x18\x04 \x01(\tR\tavatarUri\x128\n" +
-	"\x18expected_profile_version\x18\x05 \x01(\x03R\x16expectedProfileVersion\"k\n" +
+	"\x18expected_profile_version\x18\x05 \x01(\x03R\x16expectedProfileVersion\x12\"\n" +
+	"\fannouncement\x18\x06 \x01(\tR\fannouncement\"k\n" +
 	"!UpdateConversationProfileResponse\x12F\n" +
 	"\aprofile\x18\x01 \x01(\v2,.nexusim.conversation.v1.ConversationProfileR\aprofile*\x82\x01\n" +
 	"\x10ConversationMode\x12!\n" +

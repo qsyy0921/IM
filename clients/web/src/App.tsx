@@ -94,6 +94,7 @@ export function App() {
   const [conversationAvatarURLs, setConversationAvatarURLs] = useState<Record<string, string>>({});
   const [groupProfileTitleDraft, setGroupProfileTitleDraft] = useState("");
   const [groupProfileAvatarDraft, setGroupProfileAvatarDraft] = useState("");
+  const [groupProfileAnnouncementDraft, setGroupProfileAnnouncementDraft] = useState("");
   const [groupProfileError, setGroupProfileError] = useState("");
   const [groupAvatarUploadStatus, setGroupAvatarUploadStatus] = useState("");
   const [status, setStatus] = useState("ready");
@@ -475,6 +476,7 @@ export function App() {
           conversationID: created.conversationID,
           title: displayName,
           avatarURI: "",
+          announcement: "",
           expectedProfileVersion: 0
         },
         currentSession
@@ -483,6 +485,7 @@ export function App() {
       clearConversationAvatarURL(profile.conversationID);
       setGroupProfileTitleDraft(profile.title);
       setGroupProfileAvatarDraft(profile.avatarURI);
+      setGroupProfileAnnouncementDraft(profile.announcement);
       setGroupProfileError("");
       const optimistic: ConversationSummary = {
         tenantID: currentSession.tenantID,
@@ -520,6 +523,7 @@ export function App() {
       if (activeConversationRef.current === conversationID) {
         setGroupProfileTitleDraft(profile.title);
         setGroupProfileAvatarDraft(profile.avatarURI);
+        setGroupProfileAnnouncementDraft(profile.announcement);
       }
       await resolveGroupAvatarDownloadURL(profile, currentSession);
       setGroupProfileError("");
@@ -549,11 +553,13 @@ export function App() {
       if (avatarURI && !isMediaAssetURI(avatarURI)) {
         throw new Error("group avatar uri must be a media asset");
       }
+      const announcement = groupProfileAnnouncementDraft.trim();
       const updated = await runtime.bff.updateConversationProfile(
         {
           conversationID: conversation.conversationID,
           title,
           avatarURI,
+          announcement,
           expectedProfileVersion: profile.profileVersion
         },
         currentSession
@@ -562,6 +568,7 @@ export function App() {
       await resolveGroupAvatarDownloadURL(updated, currentSession);
       setGroupProfileTitleDraft(updated.title);
       setGroupProfileAvatarDraft(updated.avatarURI);
+      setGroupProfileAnnouncementDraft(updated.announcement);
       setGroupProfileError("");
     });
   }
@@ -629,6 +636,7 @@ export function App() {
         await resolveGroupAvatarDownloadURL(completed.profile, currentSession);
         setGroupProfileTitleDraft(completed.profile.title);
         setGroupProfileAvatarDraft(completed.avatarURI);
+        setGroupProfileAnnouncementDraft(completed.profile.announcement);
         setGroupProfileError("");
         setGroupAvatarUploadStatus("群头像已更新");
       } catch (caught) {
@@ -1210,6 +1218,7 @@ export function App() {
     setConversationAvatarURLs({});
     setGroupProfileTitleDraft("");
     setGroupProfileAvatarDraft("");
+    setGroupProfileAnnouncementDraft("");
     setGroupProfileError("");
   }
 
@@ -1833,6 +1842,9 @@ export function App() {
                   {activeGroupConversation.lastSeq || 0} · member v{activeGroupConversation.memberVersion}
                   {activeGroupProfile ? ` · profile v${activeGroupProfile.profileVersion}` : ""}
                 </span>
+                <p className="group-profile-announcement" data-testid="group-profile-announcement">
+                  {activeGroupProfile?.announcement ? `公告：${activeGroupProfile.announcement}` : "暂无公告"}
+                </p>
               </div>
               <div className="group-profile-badges" aria-label="群状态">
                 <span data-testid="group-profile-id">{compactConversationID(activeGroupConversation.conversationID)}</span>
@@ -1927,6 +1939,17 @@ export function App() {
                       event.currentTarget.value = "";
                       void uploadGroupAvatar(file);
                     }}
+                  />
+                </label>
+                <label className="group-profile-announcement-edit">
+                  群公告
+                  <textarea
+                    data-testid="group-profile-announcement-input"
+                    maxLength={1024}
+                    placeholder="群公告"
+                    value={groupProfileAnnouncementDraft}
+                    onChange={event => setGroupProfileAnnouncementDraft(event.target.value)}
+                    disabled={!session || !activeGroupProfile || !canManageActiveGroup}
                   />
                 </label>
                 <button

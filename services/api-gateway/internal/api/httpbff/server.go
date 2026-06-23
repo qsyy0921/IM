@@ -201,6 +201,7 @@ type transferConversationOwnerRequest struct {
 type updateConversationProfileRequest struct {
 	Title                  string `json:"title"`
 	AvatarURI              string `json:"avatar_uri"`
+	Announcement           string `json:"announcement"`
 	ExpectedProfileVersion int64  `json:"expected_profile_version"`
 }
 
@@ -749,6 +750,7 @@ func (server *Server) handleUpdateConversationProfile(response http.ResponseWrit
 		ConversationId:         conversationID,
 		Title:                  input.Title,
 		AvatarUri:              input.AvatarURI,
+		Announcement:           input.Announcement,
 		ExpectedProfileVersion: input.ExpectedProfileVersion,
 	})
 	server.writeProtoOrError(response, output, err)

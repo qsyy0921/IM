@@ -78,16 +78,17 @@ GetSendContext(tenant_id, conversation_id, user_id, trace_id)
 
 ```text
 GetConversationProfile(auth_context, conversation_id)
--> title / avatar_uri / profile_version / member_version / permission_version
+-> title / avatar_uri / announcement / profile_version / member_version / permission_version
 
-UpdateConversationProfile(auth_context, conversation_id, title, avatar_uri, expected_profile_version)
+UpdateConversationProfile(auth_context, conversation_id, title, avatar_uri, announcement, expected_profile_version)
 -> updated profile
 ```
 
-`conversation-service` 拥有群标题和头像 URI 的 profile 事实。读取要求调用者是当前
+`conversation-service` 拥有群标题、头像 URI 和群公告的 profile 事实。读取要求调用者是当前
 ACTIVE 成员；更新只允许 GROUP conversation 的 ACTIVE OWNER / ADMIN，并使用
 `expected_profile_version` 防止并发覆盖。头像字段当前只是 URI，不包含上传、缩略图、
-对象存储或 media-service 调用。
+对象存储或 media-service 调用；公告字段为短文本 profile 事实，不是 message-service
+消息，也不是客户端本地状态。
 
 错误语义：
 

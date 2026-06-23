@@ -763,6 +763,17 @@ button {
   font-size: 12px;
 }
 
+.group-profile-announcement {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  color: #31515e;
+  font-size: 12px;
+  line-height: 1.45;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
 .group-profile-badges {
   display: flex;
   flex-wrap: wrap;
@@ -839,7 +850,8 @@ button {
   font-weight: 800;
 }
 
-.group-profile-edit input {
+.group-profile-edit input,
+.group-profile-edit textarea {
   min-width: 0;
   border: 1px solid #cbd6dc;
   border-radius: 8px;
@@ -847,6 +859,15 @@ button {
   color: #182126;
   outline: 0;
   padding: 8px 10px;
+}
+
+.group-profile-edit textarea {
+  min-height: 72px;
+  resize: vertical;
+}
+
+.group-profile-announcement-edit {
+  grid-column: 1 / -1;
 }
 
 .group-profile-upload input {

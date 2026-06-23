@@ -142,10 +142,11 @@ First slice:
   with `commit=3b13c5c6` and `git_dirty=false`. The Web / PC shell now also
   exposes BFF-backed member search / role filter / page-token pagination,
   group profile summary, invite source hints and first-stage group title /
-  avatar URI read-update. Group avatar upload first path now uses
+  avatar URI / group announcement read-update. Group avatar upload first path now uses
   api-gateway BFF endpoints to create a media-service upload session, PUT the
   image to the explicit upload URL, complete the upload, then update the
-  conversation-service profile to `media://asset/<asset_id>`. Displaying the
+  conversation-service profile to `media://asset/<asset_id>` while preserving
+  the current announcement. Displaying the
   avatar uses another api-gateway BFF endpoint that first checks the current
   conversation profile still references that media asset, then asks media-service
   for a short-lived download URL. The local smoke path uses media-service's fake

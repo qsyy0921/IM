@@ -6,8 +6,9 @@ import (
 )
 
 const (
-	MaxConversationProfileTitleLength     = 128
-	MaxConversationProfileAvatarURILength = 512
+	MaxConversationProfileTitleLength        = 128
+	MaxConversationProfileAvatarURILength    = 512
+	MaxConversationProfileAnnouncementLength = 1024
 )
 
 type GetConversationProfileCommand struct {
@@ -33,6 +34,7 @@ type UpdateConversationProfileCommand struct {
 	ConversationID         ConversationID
 	Title                  string
 	AvatarURI              string
+	Announcement           string
 	ExpectedProfileVersion int64
 }
 
@@ -58,7 +60,10 @@ func (c UpdateConversationProfileCommand) Validate() error {
 	if len(c.NormalizedAvatarURI()) > MaxConversationProfileAvatarURILength {
 		return NewInvalidArgument("avatar_uri is too long")
 	}
-	if containsNUL(c.Title) || containsNUL(c.AvatarURI) {
+	if len(c.NormalizedAnnouncement()) > MaxConversationProfileAnnouncementLength {
+		return NewInvalidArgument("announcement is too long")
+	}
+	if containsNUL(c.Title) || containsNUL(c.AvatarURI) || containsNUL(c.Announcement) {
 		return NewInvalidArgument("profile contains unsupported characters")
 	}
 	return nil
@@ -72,12 +77,17 @@ func (c UpdateConversationProfileCommand) NormalizedAvatarURI() string {
 	return strings.TrimSpace(c.AvatarURI)
 }
 
+func (c UpdateConversationProfileCommand) NormalizedAnnouncement() string {
+	return strings.TrimSpace(c.Announcement)
+}
+
 type ConversationProfileResult struct {
 	TenantID          TenantID
 	ConversationID    ConversationID
 	ConversationType  ConversationType
 	Title             string
 	AvatarURI         string
+	Announcement      string
 	ProfileVersion    int64
 	MemberVersion     int64
 	PermissionVersion int64

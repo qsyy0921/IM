@@ -351,9 +351,12 @@ First slice:
   low-sensitive Windows desktop artifact / Android APK install checklist commands.
   It validates collected support files and, for standalone Windows `.exe`
   packages, points the manual launch command at `launch-nexusim-windows.ps1`.
-  Desktop installer artifacts stay on an install-oriented checklist and are not
-  treated as portable launchable packages; stale manifests without explicit
-  `artifactKind` fail closed and must be recollected. Installer install
+  Desktop installer artifacts must be requested with
+  `--artifact-kind desktop-installer`; the default Windows path stays
+  `desktop-executable`, so mixed manifests do not accidentally enter the
+  installer path. Installer artifacts stay on an install-oriented checklist and
+  are not treated as portable launchable packages; stale manifests without
+  explicit `artifactKind` fail closed and must be recollected. Installer install
   readiness also requires read-only Authenticode verification to report a valid
   signed installer; unsigned or unverifiable installer artifacts fail closed.
   It now also reports install-side readiness such as Android `adb` availability

@@ -179,7 +179,9 @@ artifact，默认 executable，installer 必须显式请求；signing readiness 
 signature 不满足时 fail-closed。generic install plan 也按 `artifactKind`
 fail-closed：旧 manifest 缺 kind 时要求重新 collect，installer 不会被当作
 portable launcher 或 direct shell-smoke 输入，且 `desktop-installer` 未通过只读
-Authenticode 验证时不会进入 `readyForInstall`；installer planner 也只接受显式
+Authenticode 验证时不会进入 `readyForInstall`；install plan 默认选择
+`desktop-executable`，installer 安装路径必须显式请求 `--artifact-kind
+desktop-installer`；installer planner 也只接受显式
 `desktop-executable` 作为 MSI / NSIS build baseline。
 
 本地调试入口：

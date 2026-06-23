@@ -41,7 +41,8 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   会做只读本机证书 / signing key / 过期检查；profile 可声明预期公开 signer subject，
   valid signature 必须匹配该发布者策略；release readiness report 也会对已收集的
   `desktop-installer` artifact 做独立 post-build 签名验证；install plan 也会在
-  `desktop-installer` 未通过 read-only Authenticode 验证时 fail-closed；当前不宣称已有生产签名 installer。
+  `desktop-installer` 未通过 read-only Authenticode 验证时 fail-closed，且 installer
+  安装路径必须显式请求 `--artifact-kind desktop-installer`；当前不宣称已有生产签名 installer。
 - Android 已有 WebView shell / bridge / APK 历史产物和 metadata smoke；后续切回时重新加载 toolchain env 或 Docker builder。
 
 ## 下一步优先级

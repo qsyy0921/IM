@@ -10,6 +10,8 @@ const schemaVersion = "nexusim.client-artifact-install-plan.v1";
 const artifactManifestSchema = "nexusim.client-artifacts.v1";
 const artifactsRoot = join(workspaceRoot, "artifacts");
 const targetNames = ["windows-desktop", "android"];
+const desktopArtifactKinds = new Set(["desktop-executable", "desktop-installer"]);
+const defaultDesktopArtifactKind = "desktop-executable";
 
 function main(argv) {
   const options = parseArgs(argv);
@@ -96,7 +98,7 @@ function planExecutionPolicy() {
 }
 
 function targetInstallPlan(target, manifest, manifestDir, manifestPath, installPrereqs, options = {}) {
-  const artifact = findArtifact(manifest, target);
+  const artifact = findArtifact(manifest, target, options);
   const prereqs = targetInstallPrereqs(target, installPrereqs);
   if (!artifact) {
     return {
@@ -455,7 +457,18 @@ function readManifest(manifestPath) {
   return manifest;
 }
 
-function findArtifact(manifest, target) {
+function findArtifact(manifest, target, options = {}) {
+  if (target !== "windows-desktop") {
+    return manifest.artifacts.find(artifact => artifact?.target === target);
+  }
+  const requestedKind = normalizeDesktopArtifactKind(options.artifactKind);
+  const exact = manifest.artifacts.find(artifact => artifact?.target === target && artifact.artifactKind === requestedKind);
+  if (exact) {
+    return exact;
+  }
+  if (options.artifactKind) {
+    return null;
+  }
   return manifest.artifacts.find(artifact => artifact?.target === target);
 }
 
@@ -543,12 +556,18 @@ function sha256Text(value) {
 function parseArgs(argv) {
   const options = {
     manifest: "",
+    artifactKind: "",
     expectedSignerSubjectContains: ""
   };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === "--manifest") {
       options.manifest = requiredValue(argv, index, arg);
+      index += 1;
+      continue;
+    }
+    if (arg === "--artifact-kind") {
+      options.artifactKind = normalizeDesktopArtifactKind(requiredValue(argv, index, arg));
       index += 1;
       continue;
     }
@@ -568,6 +587,14 @@ function requiredValue(argv, index, name) {
     throw new Error(`${name} requires a value`);
   }
   return value;
+}
+
+function normalizeDesktopArtifactKind(value) {
+  const kind = stringValue(value) || defaultDesktopArtifactKind;
+  if (!desktopArtifactKinds.has(kind)) {
+    throw new Error("unsupported desktop artifact kind");
+  }
+  return kind;
 }
 
 const thisFile = fileURLToPath(import.meta.url);

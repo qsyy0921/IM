@@ -224,6 +224,63 @@ try {
     artifacts: [
       {
         target: "windows-desktop",
+        artifactKind: "desktop-installer",
+        filename: "nexusim-windows-desktop-installer.msi",
+        bytes: Buffer.byteLength(installer),
+        sha256: sha256(installer),
+        sourcePathHash: sha256("desktop-installer-source"),
+        sourceHint: "desktop/src-tauri/target/release/bundle/msi/nexusim.msi"
+      },
+      {
+        target: "windows-desktop",
+        artifactKind: "desktop-executable",
+        filename: "nexusim-windows-desktop.exe",
+        bytes: Buffer.byteLength(exe),
+        sha256: sha256(exe),
+        sourcePathHash: sha256("desktop-source"),
+        sourceHint: "desktop/src-tauri/target/release/nexusim.exe"
+      }
+    ]
+  }, null, 2)}\n`);
+  const mixedDefaultPlan = buildClientArtifactInstallPlan({
+    manifest: join(runDir, "manifest.json"),
+    installPrereqs: {
+      adbAvailable: true,
+      windowsInstallerLaunchSupported: true
+    }
+  });
+  assert(mixedDefaultPlan.targets["windows-desktop"].artifact.artifactKind === "desktop-executable", "mixed desktop manifest should default to executable install path");
+  assert(mixedDefaultPlan.targets["windows-desktop"].installMode === "portable-executable", "mixed desktop default install mode should be portable executable");
+  assert(mixedDefaultPlan.targets["windows-desktop"].checklist.some(item => item.step === "launch-desktop-artifact"), "mixed desktop default should keep direct launch checklist");
+  const mixedInstallerPlan = buildClientArtifactInstallPlan({
+    manifest: join(runDir, "manifest.json"),
+    artifactKind: "desktop-installer",
+    installPrereqs: {
+      adbAvailable: true,
+      windowsInstallerLaunchSupported: true
+    },
+    desktopInstallerSignatureVerification: {
+      readyForSignedDistribution: true,
+      missing: [],
+      signature: {
+        status: "Valid",
+        signed: true,
+        trusted: true
+      }
+    }
+  });
+  assert(mixedInstallerPlan.targets["windows-desktop"].artifact.artifactKind === "desktop-installer", "explicit mixed desktop installer plan should select installer");
+  assert(mixedInstallerPlan.targets["windows-desktop"].readyForInstall === true, "explicit signed mixed installer should be install-ready");
+  assert(mixedInstallerPlan.targets["windows-desktop"].checklist.some(item => item.step === "install-desktop-installer"), "explicit mixed installer checklist should include install step");
+
+  writeFileSync(join(runDir, "manifest.json"), `${JSON.stringify({
+    schemaVersion: "nexusim.client-artifacts.v1",
+    generatedAt: "2026-06-22T00:00:00.000Z",
+    gitCommit: "test",
+    runId: "install-plan-test",
+    artifacts: [
+      {
+        target: "windows-desktop",
         filename: "nexusim-windows-desktop.exe",
         bytes: Buffer.byteLength(exe),
         sha256: sha256(exe),

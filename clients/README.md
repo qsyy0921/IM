@@ -227,14 +227,16 @@ collection step automatically after a successful native build.
 Windows desktop artifact / Android install checklist. It validates any collected
 support files and, for standalone Windows desktop exe packages, points the
 manual launch step at `launch-nexusim-windows.ps1`. Desktop installer artifacts
-now stay on an install-oriented checklist and are not treated as portable
-launchable packages. They also require a read-only Authenticode-valid installer
-signature before `readyForInstall=true`; unsigned or unverifiable installer
-artifacts fail closed. Stale manifests without an explicit `artifactKind` fail
-closed and must be recollected. It also reports local install prerequisites such
-as Android `adb` availability and Windows artifact launch support, but it does
-not install packages, connect to devices, launch artifacts or print local
-absolute paths.
+must be requested with `--artifact-kind desktop-installer`; the default Windows
+path stays `desktop-executable` so mixed manifests do not accidentally enter the
+installer path. Installer artifacts stay on an install-oriented checklist and
+are not treated as portable launchable packages. They also require a read-only
+Authenticode-valid installer signature before `readyForInstall=true`; unsigned
+or unverifiable installer artifacts fail closed. Stale manifests without an
+explicit `artifactKind` fail closed and must be recollected. It also reports
+local install prerequisites such as Android `adb` availability and Windows
+artifact launch support, but it does not install packages, connect to devices,
+launch artifacts or print local absolute paths.
 `plan:shell-smoke` consumes the same install plan, so native shell smoke
 readiness is not marked ready until a collected artifact exists and its
 install-side prerequisites are available. For Windows, direct shell-smoke

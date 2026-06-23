@@ -142,7 +142,13 @@ First slice:
   with `commit=3b13c5c6` and `git_dirty=false`. The Web / PC shell now also
   exposes BFF-backed member search / role filter / page-token pagination,
   group profile summary, invite source hints and first-stage group title /
-  avatar URI read-update. Group settings now use the caller's current
+  avatar URI read-update. Group avatar upload first path now uses
+  api-gateway BFF endpoints to create a media-service upload session, PUT the
+  image to the explicit upload URL, complete the upload, then update the
+  conversation-service profile to `media://asset/<asset_id>`. The local smoke
+  path uses media-service's fake object HTTP adapter; real S3-compatible
+  storage, scanner, thumbnails and CDN delivery remain media-service hardening.
+  Group settings now use the caller's current
   conversation-member role from the public BFF member-list contract to enable
   OWNER / ADMIN management actions; unknown role state remains read-only. The
   group settings area now separates profile, member browsing / role management
@@ -166,8 +172,10 @@ First slice:
   `docs/runbook/loadtest/client-platform/loadtest-report-20260623-browser-multiuser-ui-smoke.md`.
   The default clientweb smoke still does not launch browsers.
   Conversation profile facts are owned by
-  `conversation-service`; Web / PC shell only uses the api-gateway BFF. Remaining
-  group product work is richer group settings and media-service-backed avatar upload.
+  `conversation-service`; media upload session and asset metadata are owned by
+  `media-service`; Web / PC shell only uses the api-gateway BFF. Remaining
+  group product work is richer group settings, avatar display polish and real
+  media providers / thumbnail pipeline.
 - The Web / PC shell now also keeps explicit display-title and UX copy rules:
   direct / group titles learned from user actions survive conversation refresh,
   unknown server summaries render as short explicit conversation IDs, empty

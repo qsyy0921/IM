@@ -10,9 +10,13 @@ import {
   type ContactRequestItem,
   type CreateConversationRequest,
   type CreateConversationResponse,
+  type CreateGroupAvatarUploadSessionRequest,
+  type CompleteGroupAvatarUploadRequest,
+  type CompleteGroupAvatarUploadResponse,
   type ConversationMember,
   type ConversationMemberChangeResponse,
   type ConversationProfile,
+  type GroupAvatarUploadSession,
   type ListConversationMembersRequest,
   type ListConversationMembersResponse,
   type ListContactRequestsInput,
@@ -139,6 +143,22 @@ interface BFFConversationProfile {
 }
 
 interface BFFConversationProfileResponse {
+  profile?: BFFConversationProfile;
+}
+
+interface BFFGroupAvatarUploadSessionResponse {
+  asset_id?: string;
+  upload_session_id?: string;
+  upload_url?: string;
+  required_headers?: Record<string, string>;
+  expires_at_unix_ms?: string | number;
+  max_size_bytes?: string | number;
+  accepted_content_types?: string[];
+}
+
+interface BFFGroupAvatarUploadCompleteResponse {
+  asset_id?: string;
+  avatar_uri?: string;
   profile?: BFFConversationProfile;
 }
 
@@ -496,6 +516,48 @@ export class BFFClient implements AuthAPI, ConversationAPI, MessagingAPI, Delive
     return conversationProfileFromBFF(requiredObject(response.profile, "profile"));
   }
 
+  async createGroupAvatarUploadSession(
+    request: CreateGroupAvatarUploadSessionRequest,
+    session: AuthSession
+  ): Promise<GroupAvatarUploadSession> {
+    const response = await this.#request<BFFGroupAvatarUploadSessionResponse>(
+      "POST",
+      CLIENT_API_ENDPOINTS.groupAvatarUploadSession(request.conversationID),
+      {
+        file_name: request.fileName,
+        content_type: request.contentType,
+        size_bytes: request.sizeBytes,
+        sha256: request.sha256,
+        idempotency_key: request.idempotencyKey ?? newClientID("group-avatar-upload")
+      },
+      session
+    );
+    return groupAvatarUploadSessionFromBFF(response);
+  }
+
+  async completeGroupAvatarUpload(
+    request: CompleteGroupAvatarUploadRequest,
+    session: AuthSession
+  ): Promise<CompleteGroupAvatarUploadResponse> {
+    const response = await this.#request<BFFGroupAvatarUploadCompleteResponse>(
+      "POST",
+      CLIENT_API_ENDPOINTS.groupAvatarUploadComplete(request.conversationID),
+      {
+        asset_id: request.assetID,
+        upload_session_id: request.uploadSessionID,
+        sha256: request.sha256,
+        size_bytes: request.sizeBytes,
+        expected_profile_version: request.expectedProfileVersion
+      },
+      session
+    );
+    return {
+      assetID: requiredString(response.asset_id, "asset_id"),
+      avatarURI: requiredString(response.avatar_uri, "avatar_uri"),
+      profile: conversationProfileFromBFF(requiredObject(response.profile, "profile"))
+    };
+  }
+
   async sendMessage(request: SendMessageRequest, session: AuthSession): Promise<SendMessageResponse> {
     const response = await this.#request<BFFSendMessageResponse>(
       "POST",
@@ -837,6 +899,18 @@ function conversationProfileFromBFF(response: BFFConversationProfile): Conversat
     memberVersion: numberValue(response.member_version),
     permissionVersion: numberValue(response.permission_version),
     updatedAtMs: numberValue(response.updated_at_unix_ms)
+  };
+}
+
+function groupAvatarUploadSessionFromBFF(response: BFFGroupAvatarUploadSessionResponse): GroupAvatarUploadSession {
+  return {
+    assetID: requiredString(response.asset_id, "asset_id"),
+    uploadSessionID: requiredString(response.upload_session_id, "upload_session_id"),
+    uploadURL: requiredString(response.upload_url, "upload_url"),
+    requiredHeaders: response.required_headers ?? {},
+    expiresAtMs: numberValue(response.expires_at_unix_ms),
+    maxSizeBytes: numberValue(response.max_size_bytes),
+    acceptedContentTypes: response.accepted_content_types ?? []
   };
 }
 

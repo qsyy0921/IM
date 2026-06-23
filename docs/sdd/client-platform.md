@@ -377,7 +377,8 @@ First-stage implementation note:
 - `GET/POST /api/conversations/{conversation_id}/profile` forwards to
   `conversation-service` through api-gateway BFF. Group title and avatar URI are
   conversation-service facts; the client does not persist them as server truth
-  and avatar upload remains a later `media-service` integration.
+  and avatar upload is mediated by api-gateway BFF through `media-service`
+  upload session / completion before updating the conversation profile.
 - `/api/auth/logout` revokes only the current gateway-token session. The BFF
   derives tenant, user, device and session from the verified gateway token,
   forwards identity-service `RevokeSession`, and ignores caller-supplied target

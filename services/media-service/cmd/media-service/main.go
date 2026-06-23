@@ -7,6 +7,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"strconv"
@@ -129,6 +130,11 @@ func runGRPC(ctx context.Context) error {
 	}
 	repository := postgresinfra.NewRepository(pool)
 	store := objectstore.NewFakeStore(os.Getenv("NEXUSIM_MEDIA_FAKE_OBJECT_BASE_URL"))
+	stopFakeObject, err := startFakeObjectServer(ctx, store.BaseURL)
+	if err != nil {
+		return err
+	}
+	defer stopFakeObject()
 	visibility := app.NewAllowAllVisibilityChecker()
 	server := grpc.NewServer()
 	mediagrpc.Register(server, mediagrpc.NewServer(
@@ -356,6 +362,52 @@ func startDebugServer(ctx context.Context, addr string) (func(), error) {
 			log.Printf("media-service debug server stopped: %v", err)
 		}
 	}()
+	return func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		_ = server.Shutdown(shutdownCtx)
+	}, nil
+}
+
+func startFakeObjectServer(ctx context.Context, baseURL string) (func(), error) {
+	parsed, err := url.Parse(strings.TrimSpace(baseURL))
+	if err != nil {
+		return nil, err
+	}
+	if parsed.Scheme != "http" || strings.TrimSpace(parsed.Host) == "" {
+		return nil, errors.New("media fake object base URL must be an http URL with host")
+	}
+	if path := strings.TrimRight(parsed.EscapedPath(), "/"); path != "" && path != "/media" {
+		return nil, errors.New("media fake object base URL path must be /media")
+	}
+	allowPublic, _, err := envOptionalBool("NEXUSIM_MEDIA_FAKE_OBJECT_ALLOW_PUBLIC")
+	if err != nil {
+		return nil, err
+	}
+	listenAddr := envString("NEXUSIM_MEDIA_FAKE_OBJECT_LISTEN_ADDR", parsed.Host)
+	if err := validateMediaDebugListenerConfig(listenAddr, allowPublic); err != nil {
+		return nil, err
+	}
+	listener, err := net.Listen("tcp", listenAddr)
+	if err != nil {
+		return nil, err
+	}
+	server := &http.Server{
+		Handler:           objectstore.NewFakeHTTPHandler(),
+		ReadHeaderTimeout: 5 * time.Second,
+	}
+	go func() {
+		<-ctx.Done()
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		_ = server.Shutdown(shutdownCtx)
+	}()
+	go func() {
+		if err := server.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Printf("media-service fake object server stopped: %v", err)
+		}
+	}()
+	log.Printf("media-service fake object store listening on %s for base URL %s", listenAddr, parsed.String())
 	return func() {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()

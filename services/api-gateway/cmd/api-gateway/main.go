@@ -20,6 +20,7 @@ import (
 	conversationv1 "github.com/qsyy0921/IM/api/proto/nexusim/conversation/v1"
 	deliveryv1 "github.com/qsyy0921/IM/api/proto/nexusim/delivery/v1"
 	identityv1 "github.com/qsyy0921/IM/api/proto/nexusim/identity/v1"
+	mediav1 "github.com/qsyy0921/IM/api/proto/nexusim/media/v1"
 	messagev1 "github.com/qsyy0921/IM/api/proto/nexusim/message/v1"
 	receiptv1 "github.com/qsyy0921/IM/api/proto/nexusim/receipt/v1"
 	gatewayauth "github.com/qsyy0921/IM/internal/gatewayauth"
@@ -137,6 +138,8 @@ func runGRPC() error {
 	contactsTLS := grpcClientTLSConfigFromEnv("NEXUSIM_API_GATEWAY_CONTACTS_TLS")
 	identityAddr := envString("NEXUSIM_API_GATEWAY_IDENTITY_ADDR", "127.0.0.1:10501")
 	identityTLS := grpcClientTLSConfigFromEnv("NEXUSIM_API_GATEWAY_IDENTITY_TLS")
+	mediaAddr := envString("NEXUSIM_API_GATEWAY_MEDIA_ADDR", "127.0.0.1:10680")
+	mediaTLS := grpcClientTLSConfigFromEnv("NEXUSIM_API_GATEWAY_MEDIA_TLS")
 
 	if err := validateTrustedMetadataBackendConfig("conversation-service", conversationAddr, envString("NEXUSIM_CONVERSATION_AUTH_MODE", "body"), conversationTLS); err != nil {
 		return err
@@ -154,6 +157,9 @@ func runGRPC() error {
 		return err
 	}
 	if err := validateTrustedMetadataBackendConfig("identity-service", identityAddr, envString("NEXUSIM_IDENTITY_ADMIN_AUTH_MODE", "body"), identityTLS); err != nil {
+		return err
+	}
+	if err := validateTrustedMetadataBackendConfig("media-service", mediaAddr, envString("NEXUSIM_MEDIA_AUTH_MODE", "body"), mediaTLS); err != nil {
 		return err
 	}
 
@@ -211,6 +217,15 @@ func runGRPC() error {
 		return err
 	}
 	defer identityConn.Close()
+	mediaConn, err := dialBackend(
+		mediaAddr,
+		mediaTLS,
+		traceRuntime.UnaryClientInterceptor(),
+	)
+	if err != nil {
+		return err
+	}
+	defer mediaConn.Close()
 
 	gateway := apigrpc.NewServer(apigrpc.Config{
 		Authenticator: authenticator,
@@ -231,6 +246,7 @@ func runGRPC() error {
 	}
 	stopBFF, err := startBFFServer(ctx, bffAddr, httpbff.NewServer(httpbff.Config{
 		Gateway:        gateway,
+		Media:          mediav1.NewMediaServiceClient(mediaConn),
 		Authenticator:  authenticator,
 		PushTokens:     newBFFPushTokenIssuerFromEnv(),
 		Metrics:        httpBFFMetrics,

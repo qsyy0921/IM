@@ -21,6 +21,10 @@ export const CLIENT_API_ENDPOINTS = {
     `/api/conversations/${encodeURIComponent(conversationID)}/owner/transfer`,
   conversationProfile: (conversationID: string) =>
     `/api/conversations/${encodeURIComponent(conversationID)}/profile`,
+  groupAvatarUploadSession: (conversationID: string) =>
+    `/api/conversations/${encodeURIComponent(conversationID)}/avatar-upload-session`,
+  groupAvatarUploadComplete: (conversationID: string) =>
+    `/api/conversations/${encodeURIComponent(conversationID)}/avatar-upload-complete`,
   conversationMessages: (conversationID: string) =>
     `/api/conversations/${encodeURIComponent(conversationID)}/messages`,
   sendMessage: "/api/messages/send",

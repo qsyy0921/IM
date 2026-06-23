@@ -18,9 +18,11 @@ import (
 	conversationv1 "github.com/qsyy0921/IM/api/proto/nexusim/conversation/v1"
 	deliveryv1 "github.com/qsyy0921/IM/api/proto/nexusim/delivery/v1"
 	identityv1 "github.com/qsyy0921/IM/api/proto/nexusim/identity/v1"
+	mediav1 "github.com/qsyy0921/IM/api/proto/nexusim/media/v1"
 	messagev1 "github.com/qsyy0921/IM/api/proto/nexusim/message/v1"
 	receiptv1 "github.com/qsyy0921/IM/api/proto/nexusim/receipt/v1"
 	gatewayauth "github.com/qsyy0921/IM/internal/gatewayauth"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
@@ -68,6 +70,11 @@ type Gateway interface {
 
 type Authenticator interface {
 	Authenticate(*http.Request) (gatewayauth.AuthContext, error)
+}
+
+type MediaClient interface {
+	CreateUploadSession(ctx context.Context, request *mediav1.CreateUploadSessionRequest, opts ...grpc.CallOption) (*mediav1.CreateUploadSessionResponse, error)
+	CompleteUpload(ctx context.Context, request *mediav1.CompleteUploadRequest, opts ...grpc.CallOption) (*mediav1.CompleteUploadResponse, error)
 }
 
 type PushTokenIssuer interface {
@@ -140,6 +147,7 @@ func (issuer *HMACPushTokenIssuer) IssuePushToken(_ context.Context, request Pus
 
 type Config struct {
 	Gateway        Gateway
+	Media          MediaClient
 	Authenticator  Authenticator
 	PushTokens     PushTokenIssuer
 	Metrics        MetricsRecorder
@@ -149,6 +157,7 @@ type Config struct {
 
 type Server struct {
 	gateway        Gateway
+	media          MediaClient
 	authenticator  Authenticator
 	pushTokens     PushTokenIssuer
 	metrics        MetricsRecorder
@@ -197,6 +206,7 @@ type updateConversationProfileRequest struct {
 func NewServer(config Config) *Server {
 	server := &Server{
 		gateway:       config.Gateway,
+		media:         config.Media,
 		authenticator: config.Authenticator,
 		pushTokens:    config.PushTokens,
 		metrics:       config.Metrics,
@@ -278,6 +288,10 @@ func (server *Server) serveHTTP(response http.ResponseWriter, request *http.Requ
 		server.handleGetConversationProfile(response, request)
 	case request.Method == http.MethodPost && isConversationMemberActionPath(request.URL.EscapedPath(), "/profile"):
 		server.handleUpdateConversationProfile(response, request)
+	case request.Method == http.MethodPost && isConversationMemberActionPath(request.URL.EscapedPath(), "/avatar-upload-session"):
+		server.handleCreateGroupAvatarUploadSession(response, request)
+	case request.Method == http.MethodPost && isConversationMemberActionPath(request.URL.EscapedPath(), "/avatar-upload-complete"):
+		server.handleCompleteGroupAvatarUpload(response, request)
 	case request.Method == http.MethodGet && isConversationMessagesPath(request.URL.EscapedPath()):
 		server.handleConversationMessages(response, request)
 	case request.Method == http.MethodPost && path == "/api/messages/send":
@@ -1102,6 +1116,13 @@ func (server *Server) requireGateway() Gateway {
 		return server.gateway
 	}
 	return missingGateway{}
+}
+
+func (server *Server) requireMedia() (MediaClient, error) {
+	if server.media == nil {
+		return nil, status.Error(codes.Unavailable, "media service is not configured")
+	}
+	return server.media, nil
 }
 
 func (server *Server) handleCORS(response http.ResponseWriter, request *http.Request) bool {

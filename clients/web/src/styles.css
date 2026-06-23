@@ -776,7 +776,7 @@ button {
 .group-profile-edit {
   display: grid;
   grid-column: 1 / -1;
-  grid-template-columns: minmax(140px, 1fr) minmax(160px, 1fr) auto;
+  grid-template-columns: minmax(140px, 1fr) minmax(160px, 1fr) minmax(160px, 0.8fr) auto;
   align-items: end;
   gap: 8px;
   min-width: 0;
@@ -840,6 +840,11 @@ button {
   padding: 8px 10px;
 }
 
+.group-profile-upload input {
+  min-height: 36px;
+  padding: 7px 10px;
+}
+
 .group-profile-edit button {
   border: 0;
   border-radius: 8px;
@@ -874,6 +879,17 @@ button {
 .group-permission-note span:first-child {
   color: #172126;
   font-weight: 900;
+}
+
+.group-profile-status {
+  grid-column: 1 / -1;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  background: #ecfdf5;
+  color: #08724f;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .group-profile-error {

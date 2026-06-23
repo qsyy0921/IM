@@ -12,9 +12,11 @@ import (
 	conversationv1 "github.com/qsyy0921/IM/api/proto/nexusim/conversation/v1"
 	deliveryv1 "github.com/qsyy0921/IM/api/proto/nexusim/delivery/v1"
 	identityv1 "github.com/qsyy0921/IM/api/proto/nexusim/identity/v1"
+	mediav1 "github.com/qsyy0921/IM/api/proto/nexusim/media/v1"
 	messagev1 "github.com/qsyy0921/IM/api/proto/nexusim/message/v1"
 	receiptv1 "github.com/qsyy0921/IM/api/proto/nexusim/receipt/v1"
 	gatewayauth "github.com/qsyy0921/IM/internal/gatewayauth"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
@@ -735,6 +737,181 @@ func TestConversationProfileEndpointsForwardRequests(t *testing.T) {
 	}
 }
 
+func TestGroupAvatarUploadSessionForwardsToMediaService(t *testing.T) {
+	authenticator := &fakeAuthenticator{auth: gatewayauth.AuthContext{
+		TenantID:  "tenant-1",
+		UserID:    "owner-1",
+		DeviceID:  "web-1",
+		SessionID: "session-1",
+		TraceID:   "trace-auth",
+		RequestID: "request-auth",
+	}}
+	media := &fakeMediaClient{
+		createUploadSession: func(ctx context.Context, request *mediav1.CreateUploadSessionRequest) (*mediav1.CreateUploadSessionResponse, error) {
+			md, ok := metadata.FromIncomingContext(ctx)
+			if !ok || firstMetadata(md, "authorization") != "Bearer token-1" {
+				t.Fatalf("expected forwarded auth metadata, got %+v", md)
+			}
+			if request.GetAuthContext().GetTenantId() != "tenant-1" ||
+				request.GetAuthContext().GetUserId() != "owner-1" ||
+				request.GetAuthContext().GetDeviceId() != "web-1" ||
+				request.GetAuthContext().GetSessionId() != "session-1" ||
+				request.GetConversationId() != "group/1" ||
+				request.GetMediaKind() != mediav1.MediaKind_MEDIA_KIND_IMAGE ||
+				request.GetFileName() != "avatar.png" ||
+				request.GetContentType() != "image/png" ||
+				request.GetSizeBytes() != 12 ||
+				request.GetSha256() != strings.Repeat("a", 64) ||
+				request.GetIdempotencyKey() != "idem-avatar-1" {
+				t.Fatalf("unexpected create upload session request: %+v", request)
+			}
+			return &mediav1.CreateUploadSessionResponse{
+				AssetId:              "asset-1",
+				UploadSessionId:      "upload-1",
+				UploadUrl:            "http://127.0.0.1:19080/media?op=put",
+				RequiredHeaders:      map[string]string{"x-nexusim-media-mode": "fake"},
+				ExpiresAtUnixMs:      123,
+				MaxSizeBytes:         2048,
+				AcceptedContentTypes: []string{"image/png"},
+			}, nil
+		},
+	}
+	handler := NewServer(Config{Gateway: &fakeGateway{}, Media: media, Authenticator: authenticator})
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/conversations/group%2F1/avatar-upload-session", strings.NewReader(`{
+		"file_name":"avatar.png",
+		"content_type":"image/png",
+		"size_bytes":12,
+		"sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		"idempotency_key":"idem-avatar-1"
+	}`))
+	request.Header.Set("Authorization", "Bearer token-1")
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+	if !strings.Contains(response.Body.String(), `"asset_id":"asset-1"`) ||
+		!strings.Contains(response.Body.String(), `"upload_session_id":"upload-1"`) ||
+		!strings.Contains(response.Body.String(), `"accepted_content_types":["image/png"]`) {
+		t.Fatalf("expected upload session response, got %s", response.Body.String())
+	}
+}
+
+func TestCompleteGroupAvatarUploadUpdatesConversationProfile(t *testing.T) {
+	authenticator := &fakeAuthenticator{auth: gatewayauth.AuthContext{
+		TenantID:  "tenant-1",
+		UserID:    "owner-1",
+		DeviceID:  "web-1",
+		SessionID: "session-1",
+	}}
+	media := &fakeMediaClient{
+		completeUpload: func(_ context.Context, request *mediav1.CompleteUploadRequest) (*mediav1.CompleteUploadResponse, error) {
+			if request.GetAuthContext().GetTenantId() != "tenant-1" ||
+				request.GetAssetId() != "asset-1" ||
+				request.GetUploadSessionId() != "upload-1" ||
+				request.GetSha256() != strings.Repeat("b", 64) ||
+				request.GetSizeBytes() != 128 {
+				t.Fatalf("unexpected complete upload request: %+v", request)
+			}
+			return &mediav1.CompleteUploadResponse{
+				Asset: &mediav1.MediaAsset{
+					TenantId:       "tenant-1",
+					AssetId:        request.GetAssetId(),
+					OwnerUserId:    "owner-1",
+					ConversationId: "group/1",
+					MediaKind:      mediav1.MediaKind_MEDIA_KIND_IMAGE,
+					ContentType:    "image/png",
+					FileName:       "avatar.png",
+					SizeBytes:      128,
+					Sha256:         request.GetSha256(),
+				},
+			}, nil
+		},
+	}
+	gateway := &fakeGateway{
+		getConversationProfile: func(_ context.Context, request *conversationv1.GetConversationProfileRequest) (*conversationv1.GetConversationProfileResponse, error) {
+			if request.GetConversationId() != "group/1" {
+				t.Fatalf("unexpected get profile request: %+v", request)
+			}
+			return &conversationv1.GetConversationProfileResponse{
+				Profile: &conversationv1.ConversationProfile{
+					TenantId:         "tenant-1",
+					ConversationId:   request.GetConversationId(),
+					ConversationType: conversationv1.ConversationType_CONVERSATION_TYPE_GROUP,
+					Title:            "群聊一",
+					AvatarUri:        "media://asset/old",
+					ProfileVersion:   9,
+				},
+			}, nil
+		},
+		updateConversationProfile: func(_ context.Context, request *conversationv1.UpdateConversationProfileRequest) (*conversationv1.UpdateConversationProfileResponse, error) {
+			if request.GetConversationId() != "group/1" ||
+				request.GetTitle() != "群聊一" ||
+				request.GetAvatarUri() != "media://asset/asset-1" ||
+				request.GetExpectedProfileVersion() != 9 {
+				t.Fatalf("unexpected update profile request: %+v", request)
+			}
+			return &conversationv1.UpdateConversationProfileResponse{
+				Profile: &conversationv1.ConversationProfile{
+					TenantId:         "tenant-1",
+					ConversationId:   request.GetConversationId(),
+					ConversationType: conversationv1.ConversationType_CONVERSATION_TYPE_GROUP,
+					Title:            request.GetTitle(),
+					AvatarUri:        request.GetAvatarUri(),
+					ProfileVersion:   10,
+				},
+			}, nil
+		},
+	}
+	handler := NewServer(Config{Gateway: gateway, Media: media, Authenticator: authenticator})
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/conversations/group%2F1/avatar-upload-complete", strings.NewReader(`{
+		"asset_id":"asset-1",
+		"upload_session_id":"upload-1",
+		"sha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+		"size_bytes":128,
+		"expected_profile_version":9
+	}`))
+	request.Header.Set("Authorization", "Bearer token-1")
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+	if !strings.Contains(response.Body.String(), `"avatar_uri":"media://asset/asset-1"`) ||
+		!strings.Contains(response.Body.String(), `"profile_version":10`) {
+		t.Fatalf("expected completed avatar response, got %s", response.Body.String())
+	}
+}
+
+func TestGroupAvatarUploadFailsClosedWhenMediaIsNotConfigured(t *testing.T) {
+	handler := NewServer(Config{
+		Gateway:       &fakeGateway{},
+		Authenticator: &fakeAuthenticator{auth: gatewayauth.AuthContext{TenantID: "tenant-1", UserID: "owner-1"}},
+	})
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/conversations/group-1/avatar-upload-session", strings.NewReader(`{
+		"file_name":"avatar.png",
+		"content_type":"image/png",
+		"size_bytes":12,
+		"sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		"idempotency_key":"idem-avatar-1"
+	}`))
+	request.Header.Set("Authorization", "Bearer token-1")
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+	if !strings.Contains(response.Body.String(), "media service is not configured") {
+		t.Fatalf("expected media unavailable error, got %s", response.Body.String())
+	}
+}
+
 func TestConversationMessagesMapsToPullInbox(t *testing.T) {
 	gateway := &fakeGateway{
 		pullInbox: func(_ context.Context, request *deliveryv1.PullInboxRequest) (*deliveryv1.PullInboxResponse, error) {
@@ -1068,6 +1245,25 @@ func TestRateLimiterRejectsBFFRequestBeforeGatewayCall(t *testing.T) {
 	if !strings.Contains(response.Body.String(), `"code":"ResourceExhausted"`) {
 		t.Fatalf("expected public rate-limit error body, got %s", response.Body.String())
 	}
+}
+
+type fakeMediaClient struct {
+	createUploadSession func(context.Context, *mediav1.CreateUploadSessionRequest) (*mediav1.CreateUploadSessionResponse, error)
+	completeUpload      func(context.Context, *mediav1.CompleteUploadRequest) (*mediav1.CompleteUploadResponse, error)
+}
+
+func (client *fakeMediaClient) CreateUploadSession(ctx context.Context, request *mediav1.CreateUploadSessionRequest, _ ...grpc.CallOption) (*mediav1.CreateUploadSessionResponse, error) {
+	if client.createUploadSession == nil {
+		return nil, status.Error(codes.Unimplemented, "create upload session not implemented")
+	}
+	return client.createUploadSession(ctx, request)
+}
+
+func (client *fakeMediaClient) CompleteUpload(ctx context.Context, request *mediav1.CompleteUploadRequest, _ ...grpc.CallOption) (*mediav1.CompleteUploadResponse, error) {
+	if client.completeUpload == nil {
+		return nil, status.Error(codes.Unimplemented, "complete upload not implemented")
+	}
+	return client.completeUpload(ctx, request)
 }
 
 type fakeGateway struct {

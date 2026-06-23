@@ -31,7 +31,10 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
 - 群设置 UI 已按资料、成员、操作分区；资料和成员事实仍只来自 conversation-service
   经 api-gateway BFF 暴露的公开接口，不维护本地假成员列表。
 - 群标题 / 头像 URI 已接 first-stage read/update：`conversation-service` 拥有事实，
-  `api-gateway` 暴露 BFF，Web / PC shell 只通过 BFF 读写；媒体上传和完整群设置后置。
+  `api-gateway` 暴露 BFF，Web / PC shell 只通过 BFF 读写。群头像上传 first path
+  已通过 `api-gateway` BFF -> `media-service` 上传会话 / 完成上传 ->
+  `conversation-service` profile update 串起来；当前仍是本地 fake object HTTP adapter，
+  不宣称真实 S3、缩略图、扫描或 CDN 已完成。
 - 会话刷新会保留当前选中；gateway token 过期会清理本地 session / push / 会话展示状态。
 - 本地发送失败的消息会保留在消息列表中，并提供显式重新编辑或作为新消息重发入口；
   客户端不会把失败缓存项静默标记为成功。
@@ -80,7 +83,8 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
 ## 下一步优先级
 
 1. Windows PC 端继续真实 signing input、valid signed artifact、MSI / NSIS installer 和签名 installer 体验。
-2. 客户端产品能力继续补更丰富群设置和接入 media-service 后的群头像上传链路。
+2. 客户端产品能力继续补更丰富群设置、群头像展示 polish，以及 media-service 真实
+   S3-compatible / thumbnail / scanner provider 后续链路。
 3. Android 后续只在用户切回时继续 login-level WebView smoke、APK baseline 报告和真机 UI polish。
 4. 客户端切片阶段性收口后，回到 workflow compensation adapter、instruction approval UI 和 ops 管理。
 5. 新发现待办写入 `docs/runbook/remaining-goals.md`，不要把长待办复制回本文件。

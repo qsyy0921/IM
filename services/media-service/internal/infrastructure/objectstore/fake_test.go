@@ -2,6 +2,8 @@ package objectstore
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -32,5 +34,33 @@ func TestFakeStoreDoesNotExposeObjectKey(t *testing.T) {
 		if !strings.Contains(rawURL, "token=") {
 			t.Fatalf("presigned URL should carry opaque token: %s", rawURL)
 		}
+	}
+}
+
+func TestFakeHTTPHandlerAcceptsBrowserPut(t *testing.T) {
+	handler := NewFakeHTTPHandler()
+	request := httptest.NewRequest(http.MethodPut, "/media?op=put&token=opaque", strings.NewReader("avatar-bytes"))
+	request.Header.Set("x-nexusim-media-mode", "fake")
+	response := httptest.NewRecorder()
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusNoContent {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+	if response.Header().Get("Access-Control-Allow-Origin") != "*" {
+		t.Fatalf("expected CORS header, got %q", response.Header().Get("Access-Control-Allow-Origin"))
+	}
+}
+
+func TestFakeHTTPHandlerRejectsMissingUploadHeader(t *testing.T) {
+	handler := NewFakeHTTPHandler()
+	request := httptest.NewRequest(http.MethodPut, "/media?op=put&token=opaque", strings.NewReader("avatar-bytes"))
+	response := httptest.NewRecorder()
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("expected bad request, got status=%d body=%s", response.Code, response.Body.String())
 	}
 }

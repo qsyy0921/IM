@@ -227,6 +227,7 @@ if (-not $SkipBuild) {
     go build -o bin\message-service.exe ./services/message-service/cmd/message-service
     go build -o bin\delivery-service.exe ./services/delivery-service/cmd/delivery-service
     go build -o bin\receipt-service.exe ./services/receipt-service/cmd/receipt-service
+    go build -o bin\media-service.exe ./services/media-service/cmd/media-service
     go build -o bin\push-gateway.exe ./services/push-gateway/cmd/push-gateway
     go build -o bin\api-gateway.exe ./services/api-gateway/cmd/api-gateway
     go build -o bin\nexusim-client-web-smoke.exe ./loadtest/clientweb
@@ -238,6 +239,8 @@ $contactsPort = Get-FreeTcpPort -HostName $BindHost
 $messagePort = Get-FreeTcpPort -HostName $BindHost
 $deliveryPort = Get-FreeTcpPort -HostName $BindHost
 $receiptPort = Get-FreeTcpPort -HostName $BindHost
+$mediaPort = Get-FreeTcpPort -HostName $BindHost
+$mediaFakeObjectPort = Get-FreeTcpPort -HostName $BindHost
 Assert-TcpPortAvailable -HostName $BindHost -Port $PushPort -Name "push-gateway"
 Assert-TcpPortAvailable -HostName $BindHost -Port $BffPort -Name "client BFF"
 $pushPort = if ($PushPort -gt 0) { $PushPort } else { Get-FreeTcpPort -HostName $BindHost }
@@ -250,6 +253,8 @@ $contactsListen = "${BindHost}:$contactsPort"
 $messageListen = "${BindHost}:$messagePort"
 $deliveryListen = "${BindHost}:$deliveryPort"
 $receiptListen = "${BindHost}:$receiptPort"
+$mediaListen = "${BindHost}:$mediaPort"
+$mediaFakeObjectListen = "${BindHost}:$mediaFakeObjectPort"
 $pushListen = "${BindHost}:$pushPort"
 $apiGatewayListen = "${BindHost}:$apiGatewayPort"
 $bffListen = "${BindHost}:$bffPort"
@@ -260,6 +265,8 @@ $contactsTarget = "${ClientHost}:$contactsPort"
 $messageTarget = "${ClientHost}:$messagePort"
 $deliveryTarget = "${ClientHost}:$deliveryPort"
 $receiptTarget = "${ClientHost}:$receiptPort"
+$mediaTarget = "${ClientHost}:$mediaPort"
+$mediaFakeObjectURL = "http://${ClientHost}:$mediaFakeObjectPort/media"
 $pushTarget = "${ClientHost}:$pushPort"
 $apiGatewayTarget = "${ClientHost}:$apiGatewayPort"
 $bffTarget = "${ClientHost}:$bffPort"
@@ -295,6 +302,9 @@ try {
     foreach ($migration in Get-ChildItem -Path "migrations\postgres\contacts" -Filter "*.sql" | Sort-Object Name) {
         Apply-PostgresMigration -Path $migration.FullName -Name ("nexusim_contacts_" + $migration.Name)
     }
+    foreach ($migration in Get-ChildItem -Path "migrations\postgres\media" -Filter "*.sql" | Sort-Object Name) {
+        Apply-PostgresMigration -Path $migration.FullName -Name ("nexusim_media_" + $migration.Name)
+    }
 
     Ensure-KafkaTopic -Topic $timelineTopic
     Ensure-KafkaTopic -Topic $deliveryTopic
@@ -310,6 +320,7 @@ try {
     $messageService = Join-Path $repo "bin\message-service.exe"
     $deliveryService = Join-Path $repo "bin\delivery-service.exe"
     $receiptService = Join-Path $repo "bin\receipt-service.exe"
+    $mediaService = Join-Path $repo "bin\media-service.exe"
     $pushGateway = Join-Path $repo "bin\push-gateway.exe"
     $apiGateway = Join-Path $repo "bin\api-gateway.exe"
     $runner = Join-Path $repo "bin\nexusim-client-web-smoke.exe"
@@ -367,6 +378,14 @@ try {
         NEXUSIM_RECEIPT_AUTH_MODE = "metadata"
         NEXUSIM_PG_DSN = $PgDsn
     }
+    $processes += Start-NexusProcess -Name "media-grpc" -FilePath $mediaService -Port $mediaPort -WaitHost $ClientHost -Env @{
+        NEXUSIM_MEDIA_SERVICE_MODE = "grpc"
+        NEXUSIM_MEDIA_GRPC_ADDR = $mediaListen
+        NEXUSIM_MEDIA_AUTH_MODE = "metadata"
+        NEXUSIM_PG_DSN = $PgDsn
+        NEXUSIM_MEDIA_FAKE_OBJECT_BASE_URL = $mediaFakeObjectURL
+        NEXUSIM_MEDIA_FAKE_OBJECT_LISTEN_ADDR = $mediaFakeObjectListen
+    }
     $processes += Start-NexusProcess -Name "message-relay" -FilePath $messageService -Env @{
         NEXUSIM_MESSAGE_SERVICE_MODE = "outbox-relay"
         NEXUSIM_PG_DSN = $PgDsn
@@ -406,6 +425,7 @@ try {
         NEXUSIM_API_GATEWAY_MESSAGE_ADDR = $messageTarget
         NEXUSIM_API_GATEWAY_DELIVERY_ADDR = $deliveryTarget
         NEXUSIM_API_GATEWAY_RECEIPT_ADDR = $receiptTarget
+        NEXUSIM_API_GATEWAY_MEDIA_ADDR = $mediaTarget
         NEXUSIM_API_GATEWAY_BFF_ADDR = $bffListen
         NEXUSIM_API_GATEWAY_BFF_ALLOWED_ORIGINS = "http://127.0.0.1:5173,http://localhost:5173,http://${ClientHost}:5173,http://tauri.localhost,https://tauri.localhost,tauri://localhost,https://appassets.androidplatform.net"
     }

@@ -10,6 +10,10 @@ import type {
   RegisterResponse,
   CreateConversationRequest,
   CreateConversationResponse,
+  CreateGroupAvatarUploadSessionRequest,
+  CompleteGroupAvatarUploadRequest,
+  CompleteGroupAvatarUploadResponse,
+  GroupAvatarUploadSession,
   ListConversationMembersRequest,
   ListConversationMembersResponse,
   ConversationMemberChangeResponse,
@@ -72,6 +76,14 @@ export interface ConversationAPI {
     request: UpdateConversationProfileRequest,
     session: AuthSession
   ): Promise<ConversationProfile>;
+  createGroupAvatarUploadSession(
+    request: CreateGroupAvatarUploadSessionRequest,
+    session: AuthSession
+  ): Promise<GroupAvatarUploadSession>;
+  completeGroupAvatarUpload(
+    request: CompleteGroupAvatarUploadRequest,
+    session: AuthSession
+  ): Promise<CompleteGroupAvatarUploadResponse>;
 }
 
 export interface MessagingAPI {

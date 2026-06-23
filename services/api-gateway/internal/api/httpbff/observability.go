@@ -111,6 +111,10 @@ func RouteName(request *http.Request) string {
 		return "conversations.profile.get"
 	case request.Method == http.MethodPost && isConversationMemberActionPath(request.URL.EscapedPath(), "/profile"):
 		return "conversations.profile.update"
+	case request.Method == http.MethodPost && isConversationMemberActionPath(request.URL.EscapedPath(), "/avatar-upload-session"):
+		return "conversations.avatar.upload_session"
+	case request.Method == http.MethodPost && isConversationMemberActionPath(request.URL.EscapedPath(), "/avatar-upload-complete"):
+		return "conversations.avatar.upload_complete"
 	case request.Method == http.MethodGet && isConversationMessagesPath(request.URL.EscapedPath()):
 		return "conversation.messages"
 	case request.Method == http.MethodPost && path == "/api/messages/send":

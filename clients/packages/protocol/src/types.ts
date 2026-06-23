@@ -191,6 +191,40 @@ export interface UpdateConversationProfileRequest {
   expectedProfileVersion?: number;
 }
 
+export interface CreateGroupAvatarUploadSessionRequest {
+  conversationID: ConversationID;
+  fileName: string;
+  contentType: string;
+  sizeBytes: number;
+  sha256: string;
+  idempotencyKey?: string;
+}
+
+export interface GroupAvatarUploadSession {
+  assetID: string;
+  uploadSessionID: string;
+  uploadURL: string;
+  requiredHeaders: Record<string, string>;
+  expiresAtMs: number;
+  maxSizeBytes: number;
+  acceptedContentTypes: string[];
+}
+
+export interface CompleteGroupAvatarUploadRequest {
+  conversationID: ConversationID;
+  assetID: string;
+  uploadSessionID: string;
+  sha256: string;
+  sizeBytes: number;
+  expectedProfileVersion?: number;
+}
+
+export interface CompleteGroupAvatarUploadResponse {
+  assetID: string;
+  avatarURI: string;
+  profile: ConversationProfile;
+}
+
 export interface ConversationMemberChangeResponse {
   changeID: string;
   tenantID: TenantID;

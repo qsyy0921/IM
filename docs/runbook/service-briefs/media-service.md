@@ -20,9 +20,13 @@ Stage-switch 记录：`docs/runbook/stage-switch/media-service.md`。
 - `CreateUploadSession` / `CompleteUpload` / `GetMediaDownloadURL`。
 - PostgreSQL asset metadata + S3-compatible object storage port。
 - 图片 thumbnail 和 virus-scan 状态先做 mock adapter + audit。
+- 本地 fake object HTTP adapter 可用于 Web / PC 群头像上传 first path；浏览器显式
+  PUT 到 media-service 返回的 upload URL，再由 api-gateway BFF 完成上传并更新
+  conversation profile。
 
 下一步：
 
 - 当前 active slice 是 client platform MVP foundation；media-service 只处理阻塞
   客户端或消息媒体引用链路的 P0/P1。
-- 真实 S3-compatible adapter、scanner、thumbnail / transcode provider 后置。
+- 真实 S3-compatible adapter、scanner、thumbnail / transcode provider 和 CDN /
+  download policy 后置。

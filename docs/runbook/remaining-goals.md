@@ -29,8 +29,8 @@
 - Windows PC：继续真实 signing input、valid signed artifact、MSI / NSIS installer、
   signed installer experience；当前 `signtool` 可定位，但仍缺代码签名证书和 valid
   Authenticode signature。
-- Web / PC shell：继续更丰富群设置和群头像上传链路；头像上传需要后续接
-  media-service，不得直接写 conversation-service 私表。
+- Web / PC shell：继续更丰富群设置、群头像展示 polish、上传状态 UX 和错误提示；
+  群头像上传 first path 已接 media-service BFF，不得直接写 conversation-service 私表。
 - Desktop runtime：继续真实 UI lifecycle 和 installer / signing 流水线；portable zip
   与 install plan 已有 first-stage 本地路径。
 - Android：后续切回时重新加载 F 盘 toolchain env 或显式 Docker builder，再跑 APK /
@@ -57,7 +57,7 @@
 
 ## Product-Active Services
 
-- `media-service`：S3-compatible adapter、scanner、thumbnail / transcode provider、
+- `media-service`：真实 S3-compatible adapter、scanner、thumbnail / transcode provider、
   download policy、retention / delete proof。
 - `notification-service`：SMTP / SMS / APNs / FCM adapter、bounce / suppression、
   provider redrive / audit、tenant template policy。

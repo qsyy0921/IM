@@ -84,8 +84,10 @@
   `ListConversationMembers` 和 `TransferConversationOwner`，客户端不直连
   conversation-service 私有接口，也不维护伪成员列表；
   群标题 / 头像 URI read-update 已接入同一套 conversation-service -> api-gateway
-  BFF -> client-core -> Web / PC shell 路径，头像上传和缩略图仍等待 media-service
-  产品化链路；
+  BFF -> client-core -> Web / PC shell 路径；群头像上传 first path 已通过
+  api-gateway BFF -> media-service 上传会话 / 完成上传 -> conversation-service
+  profile update 串起来，当前本地路径使用 media-service fake object HTTP adapter，
+  真实 S3-compatible provider、缩略图和扫描仍等待 media-service 产品化链路；
   当前浏览器 / Windows PC 优先的可见 UI 已收敛为账号密码登录和 IM 主界面，
   隐藏 tenant / endpoint / device 等调试配置；2026-06-22 Windows Tauri
   WebView 登录级 smoke 证明该 UI 仍能完成登录、收到 `delivery.notify`、
@@ -497,7 +499,8 @@ baseline 已通过，PC desktop / Android first-stage runtime adapter 已落，P
   成员列表、移除成员、角色变更 / owner transfer、消息列表、发送后本地状态刷新、
   群标题 / 头像 URI read-update、PullInbox / ACK 和登录过期清理；真实双用户
   direct + group client smoke 已通过，群成员管理动作 smoke 已通过；下一步继续
-  Windows installer / signing 或更完整群设置与 media-service-backed 头像上传链路。
+  Windows installer / signing 或更完整群设置、群头像展示 polish 与真实 media provider
+  链路。
   Android APK / 真机 WebView smoke 后置到用户明确切回；Web IndexedDB
   local store、browser platform adapter、shell config contract 和 target shell Web assets
   prep / artifact builder dry-run / Android builder profile 静态校验已补 first-stage focused tests。

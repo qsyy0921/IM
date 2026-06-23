@@ -92,6 +92,7 @@ export function App() {
   const [groupProfileTitleDraft, setGroupProfileTitleDraft] = useState("");
   const [groupProfileAvatarDraft, setGroupProfileAvatarDraft] = useState("");
   const [groupProfileError, setGroupProfileError] = useState("");
+  const [groupAvatarUploadStatus, setGroupAvatarUploadStatus] = useState("");
   const [status, setStatus] = useState("ready");
   const [activeView, setActiveView] = useState<ActiveView>("conversations");
   const [groupSettingsTab, setGroupSettingsTab] = useState<GroupSettingsTab>("profile");
@@ -552,6 +553,78 @@ export function App() {
       setGroupProfileTitleDraft(updated.title);
       setGroupProfileAvatarDraft(updated.avatarURI);
       setGroupProfileError("");
+    });
+  }
+
+  async function uploadGroupAvatar(file: File | undefined): Promise<void> {
+    if (!file) {
+      return;
+    }
+    await run("upload group avatar", async () => {
+      try {
+        const currentSession = requireSession();
+        const conversation = requireActiveGroupConversation();
+        const profile = conversationProfiles[conversation.conversationID];
+        if (!profile) {
+          throw new Error("group profile must be loaded before upload");
+        }
+        if (!canManageActiveGroup) {
+          throw new Error("only group owner or admin can update group profile");
+        }
+        if (!file.type.startsWith("image/")) {
+          throw new Error("avatar file must be an image");
+        }
+        if (file.size <= 0) {
+          throw new Error("avatar file is empty");
+        }
+        setGroupAvatarUploadStatus("计算文件指纹...");
+        const bytes = await file.arrayBuffer();
+        const sha256 = await sha256Hex(bytes);
+        setGroupAvatarUploadStatus("创建上传会话...");
+        const uploadSession = await runtime.bff.createGroupAvatarUploadSession(
+          {
+            conversationID: conversation.conversationID,
+            fileName: file.name,
+            contentType: file.type,
+            sizeBytes: file.size,
+            sha256
+          },
+          currentSession
+        );
+        if (uploadSession.acceptedContentTypes.length > 0 && !uploadSession.acceptedContentTypes.includes(file.type)) {
+          throw new Error("avatar content type is not accepted by media-service");
+        }
+        setGroupAvatarUploadStatus("上传图片...");
+        const uploadResponse = await fetch(uploadSession.uploadURL, {
+          method: "PUT",
+          headers: uploadSession.requiredHeaders,
+          body: bytes
+        });
+        if (!uploadResponse.ok) {
+          throw new Error(`avatar object upload failed: ${uploadResponse.status}`);
+        }
+        setGroupAvatarUploadStatus("更新群头像...");
+        const completed = await runtime.bff.completeGroupAvatarUpload(
+          {
+            conversationID: conversation.conversationID,
+            assetID: uploadSession.assetID,
+            uploadSessionID: uploadSession.uploadSessionID,
+            sha256,
+            sizeBytes: file.size,
+            expectedProfileVersion: profile.profileVersion
+          },
+          currentSession
+        );
+        applyGroupProfile(completed.profile);
+        setGroupProfileTitleDraft(completed.profile.title);
+        setGroupProfileAvatarDraft(completed.avatarURI);
+        setGroupProfileError("");
+        setGroupAvatarUploadStatus("群头像已更新");
+      } catch (caught) {
+        setGroupAvatarUploadStatus("");
+        setGroupProfileError(errorMessage(caught));
+        throw caught;
+      }
     });
   }
 
@@ -1728,6 +1801,20 @@ export function App() {
                     disabled={!session || !activeGroupProfile || !canManageActiveGroup}
                   />
                 </label>
+                <label className="group-profile-upload">
+                  上传群头像
+                  <input
+                    data-testid="group-profile-avatar-file"
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp,image/gif,image/avif"
+                    disabled={!session || !activeGroupProfile || !canManageActiveGroup}
+                    onChange={event => {
+                      const file = event.currentTarget.files?.[0];
+                      event.currentTarget.value = "";
+                      void uploadGroupAvatar(file);
+                    }}
+                  />
+                </label>
                 <button
                   data-testid="group-profile-save"
                   type="submit"
@@ -1735,6 +1822,11 @@ export function App() {
                 >
                   保存资料
                 </button>
+                {groupAvatarUploadStatus ? (
+                  <div data-testid="group-avatar-upload-status" className="group-profile-status">
+                    {groupAvatarUploadStatus}
+                  </div>
+                ) : null}
                 {groupProfileError ? (
                   <div data-testid="group-profile-error" className="group-profile-error">
                     {groupProfileError}
@@ -2194,6 +2286,16 @@ function compactConversationID(conversationID: string): string {
     return conversationID;
   }
   return `${conversationID.slice(0, 6)}...${conversationID.slice(-6)}`;
+}
+
+async function sha256Hex(bytes: ArrayBuffer): Promise<string> {
+  if (!globalThis.crypto?.subtle) {
+    throw new Error("browser crypto is required for media upload");
+  }
+  const digest = await globalThis.crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest))
+    .map(value => value.toString(16).padStart(2, "0"))
+    .join("");
 }
 
 function emptyMessageState(hasSession: boolean, hasActiveConversation: boolean): { title: string; body: string } {

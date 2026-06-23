@@ -202,6 +202,7 @@ npm --prefix clients run bundle:desktop:dry-run
 npm --prefix clients run bundle:desktop
 npm --prefix clients run build:desktop-installer
 npm --prefix clients run plan:desktop-installer
+npm --prefix clients run init:desktop-signing-profile -- --source pfx-file --output clients/desktop/signing-profile.local.json
 npm --prefix clients run plan:desktop-signing
 npm --prefix clients run report:desktop-signing-readiness
 npm --prefix clients run sign:desktop-artifact
@@ -274,7 +275,12 @@ fragment. Low-sensitive templates are checked in as
 `clients/desktop/signing-profile.pfx.example.json` and
 `clients/desktop/signing-profile.cert-store.example.json`; copy one to a local
 untracked profile and replace only the local paths / thumbprint / timestamp
-policy before use. When a PFX file is used, the plan performs a read-only local PFX check
+policy before use. The explicit helper
+`npm --prefix clients run init:desktop-signing-profile -- --source pfx-file --output clients/desktop/signing-profile.local.json`
+or `--source windows-cert-store` copies a chosen example to a local profile; it
+requires both `--source` and `--output`, refuses to overwrite unless
+`--overwrite` is passed, and does not read certificates, secrets, sign artifacts,
+build installers or download tools. When a PFX file is used, the plan performs a read-only local PFX check
 with the named environment variable and remains not ready unless the PFX can be
 read, has a usable signing key and is not expired. When a Windows
 certificate-store thumbprint is used, the plan performs a read-only local

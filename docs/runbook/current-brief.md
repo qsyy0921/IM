@@ -49,6 +49,8 @@ Android 后置到用户明确切回。
    report 汇总签名输入、低敏 `signtool` 候选提示、签名验证和 installer 阻塞；
    候选工具不会自动用于 readiness；timestamp URL 禁止携带账号密码、query 或
    fragment；仓库已有 PFX 和 Windows cert-store 两个低敏 signing profile 示例；
+   `init:desktop-signing-profile` 可显式复制示例到 untracked 本机 profile，且不读取
+   证书 / 密钥 / 密码；
    PFX 输入会做只读可读性 / signing key / 过期检查；Windows cert-store
    thumbprint 会做只读本机证书 / signing key / 过期检查；profile 可声明预期公开
    signer subject，valid signature 必须匹配该发布者策略；release readiness report

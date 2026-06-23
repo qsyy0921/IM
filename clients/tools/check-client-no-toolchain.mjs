@@ -180,6 +180,11 @@ const checkPlan = [
     reason: "guards local desktop signing profile parsing without printing or storing protected signing material"
   },
   {
+    name: "desktop-signing-profile-init-contract",
+    script: "test:desktop-signing-profile-init",
+    reason: "guards explicit local desktop signing profile initialization without touching protected signing material"
+  },
+  {
     name: "desktop-signing-plan-contract",
     script: "test:desktop-signing-plan",
     reason: "guards explicit desktop code-signing readiness without signing artifacts"

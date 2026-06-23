@@ -274,7 +274,7 @@ First slice:
   smoke-report contracts, clientweb smoke hook contract, desktop artifact launch
   / composed smoke dry-run contracts, artifact readiness / install-plan / builder
   / collector contracts, desktop installer builder / installer readiness /
-  signing readiness plan contracts,
+  signing profile / signing readiness plan contracts,
   Android builder profile / wrapper contracts, desktop / Android action assets, desktop WebView
   metadata / login dry-run contracts,
   Android metadata / login smoke dry-run contracts, Android device / WebView
@@ -683,6 +683,7 @@ npm --prefix clients run test:artifact-readiness
 npm --prefix clients run test:desktop-bundle
 npm --prefix clients run test:desktop-installer-builder
 npm --prefix clients run test:desktop-installer-plan
+npm --prefix clients run test:desktop-signing-profile
 npm --prefix clients run test:desktop-signing-plan
 npm --prefix clients run test:android-docker-builder
 npm --prefix clients run test:native-store-readiness

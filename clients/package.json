@@ -36,6 +36,7 @@
     "test:desktop-bundle": "node ./tools/test-desktop-bundle.mjs",
     "test:desktop-installer-builder": "node ./tools/test-desktop-installer-builder.mjs",
     "test:desktop-installer-plan": "node ./tools/test-desktop-installer-plan.mjs",
+    "test:desktop-signing-profile": "node ./tools/test-desktop-signing-profile.mjs",
     "test:desktop-signing-executor": "node ./tools/test-desktop-signing-executor.mjs",
     "test:desktop-signing-plan": "node ./tools/test-desktop-signing-plan.mjs",
     "test:desktop-signature-verifier": "node ./tools/test-desktop-signature-verifier.mjs",

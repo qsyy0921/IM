@@ -51,6 +51,7 @@ assert(commands.includes("npm --prefix clients run test:desktop-artifact-launch-
 assert(commands.includes("npm --prefix clients run test:desktop-bundle"), "desktop bundle contract check missing");
 assert(commands.includes("npm --prefix clients run test:desktop-installer-plan"), "desktop installer plan contract check missing");
 assert(commands.includes("npm --prefix clients run test:desktop-installer-builder"), "desktop installer builder contract check missing");
+assert(commands.includes("npm --prefix clients run test:desktop-signing-profile"), "desktop signing profile contract check missing");
 assert(commands.includes("npm --prefix clients run test:desktop-signing-plan"), "desktop signing plan contract check missing");
 assert(commands.includes("npm --prefix clients run test:desktop-signing-executor"), "desktop signing executor contract check missing");
 assert(commands.includes("npm --prefix clients run test:desktop-signature-verifier"), "desktop signature verifier contract check missing");

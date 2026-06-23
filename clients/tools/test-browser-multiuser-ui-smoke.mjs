@@ -49,9 +49,14 @@ try {
   assert(result.automation.requiredSelectors.includes("friend-conversation-item"), "friend selector missing");
   assert(result.automation.requiredSelectors.includes("group-invite-submit"), "group invite selector missing");
   assert(result.automation.requiredSelectors.includes("message-composer"), "message composer selector missing");
+  assert(result.automation.requiredSelectors.includes("conversation-tags-input"), "conversation tags selector missing");
+  assert(result.automation.requiredSelectors.includes("conversation-draft-input"), "conversation draft selector missing");
+  assert(result.automation.requiredSelectors.includes("active-conversation-archive-toggle"), "conversation archive selector missing");
+  assert(result.automation.requiredSelectors.includes("conversation-archived-only"), "archived filter selector missing");
   assert(result.verdict.browserMultiUserUISmoke === false, "dry-run must not claim real smoke");
   assert(result.verdict.directChatThroughUI === false, "dry-run must not claim direct UI smoke");
   assert(result.verdict.groupChatThroughUI === false, "dry-run must not claim group UI smoke");
+  assert(result.verdict.conversationManagementThroughUI === false, "dry-run must not claim conversation management smoke");
   assert(!serialized.includes("SenderPassw0rd") && !serialized.includes("ReceiverPassw0rd"), "dry-run leaked runtime login input");
   assert(!serialized.match(/[A-Z]:\\\\/), "dry-run leaked Windows absolute path");
   assert(!serialized.includes("\\\\?"), "dry-run leaked extended Windows path");

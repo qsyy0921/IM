@@ -41,13 +41,14 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   客户端不会把失败缓存项静默标记为成功。
 - `plan:browser-multiuser-ui-smoke` 已可从成功的 `loadtest/clientweb`
   `client-web-summary.json` 生成低敏浏览器 / PC 多用户 UI smoke 计划，覆盖直聊、
-  群聊、群设置和稳定 selector，不保存密码、gateway token、push token 或
+  群聊、群设置、会话管理（标签 / 草稿 / 归档 / 筛选）和稳定 selector，不保存密码、gateway token、push token 或
   refresh token；这仍是计划 / 契约，不宣称真实浏览器自动化已跑。
 - `smoke:browser-multiuser-ui` 已提供显式 opt-in 的真实浏览器 / PC 多用户 UI runner：
   使用两个隔离 Chromium profile 通过 CDP 驱动 Web shell，覆盖登录、点击好友发起直聊、
-  UI 建群、邀请成员、群聊发送、PullInbox 和 ACK；`loadtest/clientweb/run-local-smoke.ps1`
+  UI 建群、邀请成员、群聊发送、会话管理 controls、PullInbox 和 ACK；`loadtest/clientweb/run-local-smoke.ps1`
   可通过 `-RunBrowserMultiuserUISmoke` 调用。2026-06-23 已在 clean commit
-  `8782936b` 跑通并归档报告；默认路径不启动浏览器。
+  `8782936b` 跑通 direct / group / invite 路径并归档报告；会话管理 controls 已纳入 runner contract，
+  尚未宣称真实浏览器会话管理 smoke 已跑。默认路径不启动浏览器。
 - 已有 clean smoke 覆盖真实双用户好友直聊、群聊 first path、群资料 BFF
   read/update 和群成员动作链路；证据见 `docs/runbook/client-platform.md`。
 - Windows desktop 已有 artifact / signing / installer plan first paths；签名 / installer

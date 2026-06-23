@@ -43,7 +43,8 @@ export function buildBrowserMultiUserUISmokePlan(options = {}) {
     scenarios: {
       directChat: directScenario(summary),
       groupChat: groupScenario(summary),
-      groupSettings: groupSettingsScenario(summary)
+      groupSettings: groupSettingsScenario(summary),
+      conversationManagement: conversationManagementScenario(summary)
     },
     sensitiveInputPolicy: {
       persistsLoginInput: false,
@@ -151,6 +152,18 @@ function selectorContract() {
     "message-status",
     "message-composer",
     "send-message",
+    "conversation-tag-filter",
+    "conversation-include-archived",
+    "conversation-archived-only",
+    "conversation-draft-only",
+    "active-conversation-actions",
+    "active-conversation-archive-toggle",
+    "conversation-archive-toggle",
+    "conversation-tags-input",
+    "conversation-tags-save",
+    "conversation-draft-input",
+    "conversation-draft-save",
+    "conversation-draft-clear",
     "group-settings-tabs",
     "group-settings-profile-tab",
     "group-settings-members-tab",
@@ -218,6 +231,23 @@ function groupSettingsScenario(summary) {
       "use search, role filter and pagination controls without local fake members",
       "open group settings actions tab for invite, leave and owner-sensitive operations",
       "verify removed member is absent in final BFF member list evidence"
+    ]
+  };
+}
+
+function conversationManagementScenario(summary) {
+  const direct = requiredObject(summary.direct_chat, "summary.direct_chat");
+  const group = requiredObject(summary.group_chat, "summary.group_chat");
+  return {
+    directConversationID: requiredString(direct.conversation_id, "summary.direct_chat.conversation_id"),
+    groupConversationID: requiredString(group.conversation_id, "summary.group_chat.conversation_id"),
+    expectedTag: "ui-smoke",
+    expectedDraftText: "NexusIM UI smoke draft",
+    uiFlow: [
+      "select a real BFF conversation summary and open the active conversation management panel",
+      "save conversation tags through api-gateway BFF and verify the list can be filtered by that tag",
+      "save and clear a conversation draft through api-gateway BFF without treating local state as fact",
+      "archive the conversation, reload archived-only summaries, then unarchive it through the same BFF-backed control"
     ]
   };
 }

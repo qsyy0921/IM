@@ -83,6 +83,10 @@ function assertPlan(plan) {
   assert(plan.selectorContract.includes("friend-conversation-item"), "friend selector missing");
   assert(plan.selectorContract.includes("group-settings-members-tab"), "group member selector missing");
   assert(plan.selectorContract.includes("message-composer"), "message composer selector missing");
+  assert(plan.selectorContract.includes("conversation-tags-input"), "conversation tags selector missing");
+  assert(plan.selectorContract.includes("conversation-draft-input"), "conversation draft selector missing");
+  assert(plan.selectorContract.includes("active-conversation-archive-toggle"), "conversation archive selector missing");
+  assert(plan.selectorContract.includes("conversation-archived-only"), "archived-only filter selector missing");
   assert(plan.scenarios.directChat.conversationID === "direct-ui-smoke", "direct conversation mismatch");
   assert(plan.scenarios.directChat.expectedConversationSeq === 2, "direct seq mismatch");
   assert(plan.scenarios.directChat.uiFlow.some(step => step.includes("friend list")), "direct friend-click flow missing");
@@ -92,6 +96,11 @@ function assertPlan(plan) {
   assert(plan.scenarios.groupSettings.expectedFinalOwnerUserID === "receiver-ui-smoke", "final owner mismatch");
   assert(plan.scenarios.groupSettings.expectedRemovedUserID === "sender-ui-smoke", "removed member mismatch");
   assert(plan.scenarios.groupSettings.uiFlow.some(step => step.includes("without local fake members")), "group settings must reject fake members");
+  assert(plan.scenarios.conversationManagement.directConversationID === "direct-ui-smoke", "conversation management direct mismatch");
+  assert(plan.scenarios.conversationManagement.groupConversationID === "group-ui-smoke", "conversation management group mismatch");
+  assert(plan.scenarios.conversationManagement.expectedTag === "ui-smoke", "conversation management tag mismatch");
+  assert(plan.scenarios.conversationManagement.expectedDraftText === "NexusIM UI smoke draft", "conversation management draft mismatch");
+  assert(plan.scenarios.conversationManagement.uiFlow.some(step => step.includes("archived-only")), "conversation management archive flow missing");
   assert(plan.focusedGate.command === "npm --prefix clients run check:no-toolchain", "focused gate command mismatch");
   assert(plan.focusedGate.startsServices === false, "focused gate must not start services");
   assert(!serialized.match(/authProof|gatewayToken|pushToken|refreshToken|secret|credential|private/i), "plan leaked sensitive field names");

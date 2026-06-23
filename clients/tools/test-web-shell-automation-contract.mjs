@@ -17,8 +17,15 @@ const requiredTestIDs = [
   "conversation-id-input",
   "open-conversation",
   "refresh-conversations",
+  "conversation-tag-filter",
+  "conversation-include-archived",
+  "conversation-archived-only",
+  "conversation-draft-only",
   "create-group",
   "conversation-item",
+  "conversation-pin-toggle",
+  "conversation-mute-toggle",
+  "conversation-archive-toggle",
   "friend-conversation-item",
   "group-invite-user",
   "group-invite-submit",
@@ -66,6 +73,15 @@ const requiredTestIDs = [
   "message-status",
   "message-edit-failed",
   "message-resend-as-new",
+  "active-conversation-actions",
+  "active-conversation-pin-toggle",
+  "active-conversation-mute-toggle",
+  "active-conversation-archive-toggle",
+  "conversation-tags-input",
+  "conversation-tags-save",
+  "conversation-draft-input",
+  "conversation-draft-save",
+  "conversation-draft-clear",
   "message-composer",
   "send-message"
 ];
@@ -103,6 +119,13 @@ assertIncludes(appSource, "nativeMetadata?.capabilities?.localStore", "web shell
 assertIncludes(appSource, "nativeLocalStoreStatus", "web shell must keep local-store readiness formatting explicit");
 assertIncludes(appSource, "mergeConversationSummaries", "web shell must preserve local display titles across conversation refresh");
 assertIncludes(appSource, "mergeConversationSummary", "web shell must merge server conversation summaries through one explicit helper");
+assertIncludes(appSource, "setConversationArchived", "web shell must expose BFF-backed conversation archive controls");
+assertIncludes(appSource, "saveConversationTags", "web shell must expose BFF-backed conversation tag controls");
+assertIncludes(appSource, "saveConversationDraft", "web shell must expose BFF-backed conversation draft controls");
+assertIncludes(appSource, "clearConversationDraft", "web shell must expose explicit draft clear controls");
+assertIncludes(appSource, "runtime.bff.archiveConversation", "web shell archive action must go through client-core BFF");
+assertIncludes(appSource, "runtime.bff.setConversationTags", "web shell tag action must go through client-core BFF");
+assertIncludes(appSource, "runtime.bff.setConversationDraft", "web shell draft action must go through client-core BFF");
 assertIncludes(appSource, "incoming.type === \"UNKNOWN\" ? existing.type : incoming.type", "web shell must not let receipt-only summaries overwrite known direct/group types");
 assertIncludes(appSource, "titleFromConversationID(activeConversationID, \"UNKNOWN\")", "web shell must not label unknown selected conversations as groups");
 assertIncludes(appSource, "conversationDisplayTitle", "web shell must keep conversation title formatting explicit");

@@ -47,7 +47,18 @@ async function main(argv) {
         "message-composer",
         "send-message",
         "message-list",
-        "ack-status"
+        "ack-status",
+        "conversation-tag-filter",
+        "conversation-archived-only",
+        "conversation-draft-only",
+        "active-conversation-actions",
+        "active-conversation-archive-toggle",
+        "conversation-archive-toggle",
+        "conversation-tags-input",
+        "conversation-tags-save",
+        "conversation-draft-input",
+        "conversation-draft-save",
+        "conversation-draft-clear"
       ],
       lowSensitiveOutput: true
     },
@@ -56,6 +67,7 @@ async function main(argv) {
       directChatThroughUI: false,
       groupChatThroughUI: false,
       groupInviteThroughUI: false,
+      conversationManagementThroughUI: false,
       receiverAckObserved: false
     }
   };
@@ -126,6 +138,13 @@ async function main(argv) {
     await waitForMessage(receiverBrowser.cdp, groupText, groupSeq, options.holdMs);
     stage = "receiver-group-ack";
     const groupAck = await waitForAck(receiverBrowser.cdp, groupSeq, options.holdMs);
+    stage = "exercise-conversation-management";
+    const conversationManagement = await exerciseConversationManagement(
+      senderBrowser.cdp,
+      groupConversationID,
+      runID,
+      options.holdMs
+    );
 
     const result = {
       ...plan,
@@ -148,13 +167,15 @@ async function main(argv) {
         groupConversationID,
         groupName,
         groupMessageSeq: groupSeq,
-        groupAckSeq: groupAck.seq
+        groupAckSeq: groupAck.seq,
+        conversationManagement
       },
       verdict: {
         browserMultiUserUISmoke: true,
         directChatThroughUI: directAck.seq >= directSeq,
         groupChatThroughUI: groupAck.seq >= groupSeq,
         groupInviteThroughUI: true,
+        conversationManagementThroughUI: conversationManagement.completed === true,
         receiverAckObserved: directAck.seq >= directSeq && groupAck.seq >= groupSeq
       },
       caveats: [
@@ -186,6 +207,7 @@ async function main(argv) {
         directChatThroughUI: false,
         groupChatThroughUI: false,
         groupInviteThroughUI: false,
+        conversationManagementThroughUI: false,
         receiverAckObserved: false
       },
       failure: {
@@ -489,6 +511,62 @@ async function waitForAck(cdp, minSeq, timeoutMs) {
   });
 }
 
+async function exerciseConversationManagement(cdp, conversationID, runID, timeoutMs) {
+  const tag = "ui-smoke";
+  const draftText = `NexusIM UI smoke draft ${runID}`;
+  await clickConversationItem(cdp, conversationID, timeoutMs);
+  await waitForSelector(cdp, "active-conversation-actions", timeoutMs);
+
+  await setInput(cdp, "conversation-tags-input", tag);
+  await click(cdp, "conversation-tags-save");
+  await waitForText(cdp, "runtime-status", value => value === "set conversation tags ok", "set conversation tags ok", timeoutMs);
+  await waitForConversationRowText(cdp, conversationID, `#${tag}`, timeoutMs);
+
+  await setInput(cdp, "conversation-tag-filter", tag);
+  await click(cdp, "refresh-conversations");
+  await waitForConversationItem(cdp, conversationID, timeoutMs);
+  await clickConversationItem(cdp, conversationID, timeoutMs);
+
+  await setInput(cdp, "conversation-draft-input", draftText);
+  await click(cdp, "conversation-draft-save");
+  await waitForText(cdp, "runtime-status", value => value === "set conversation draft ok", "set conversation draft ok", timeoutMs);
+  await waitForConversationRowText(cdp, conversationID, "草稿", timeoutMs);
+
+  await setCheckbox(cdp, "conversation-draft-only", true);
+  await click(cdp, "refresh-conversations");
+  await waitForConversationItem(cdp, conversationID, timeoutMs);
+  await clickConversationItem(cdp, conversationID, timeoutMs);
+  await click(cdp, "conversation-draft-clear");
+  await waitForText(cdp, "runtime-status", value => value === "clear conversation draft ok", "clear conversation draft ok", timeoutMs);
+
+  await setInput(cdp, "conversation-tag-filter", "");
+  await setCheckbox(cdp, "conversation-draft-only", false);
+  await click(cdp, "refresh-conversations");
+  await waitForConversationItem(cdp, conversationID, timeoutMs);
+  await clickConversationItem(cdp, conversationID, timeoutMs);
+  await click(cdp, "active-conversation-archive-toggle");
+  await waitForText(cdp, "runtime-status", value => value === "archive conversation ok", "archive conversation ok", timeoutMs);
+
+  await setCheckbox(cdp, "conversation-archived-only", true);
+  await click(cdp, "refresh-conversations");
+  await waitForConversationItem(cdp, conversationID, timeoutMs);
+  await waitForConversationRowText(cdp, conversationID, "归档", timeoutMs);
+  await clickConversationItem(cdp, conversationID, timeoutMs);
+  await click(cdp, "active-conversation-archive-toggle");
+  await waitForText(cdp, "runtime-status", value => value === "unarchive conversation ok", "unarchive conversation ok", timeoutMs);
+  await setCheckbox(cdp, "conversation-archived-only", false);
+  await click(cdp, "refresh-conversations");
+  await waitForConversationItem(cdp, conversationID, timeoutMs);
+
+  return {
+    completed: true,
+    conversationID,
+    tag,
+    draftSavedAndCleared: true,
+    archiveRoundTrip: true
+  };
+}
+
 async function activeConversationID(cdp, timeoutMs) {
   const result = await waitForEval(cdp, value => value?.conversationID ? { ok: true, conversationID: value.conversationID } : { ok: false }, {
     label: "active conversation id",
@@ -499,6 +577,56 @@ async function activeConversationID(cdp, timeoutMs) {
     })()`
   });
   return result.conversationID;
+}
+
+async function waitForConversationItem(cdp, conversationID, timeoutMs) {
+  await waitForEval(cdp, () => "", {
+    label: `conversation item ${conversationID}`,
+    timeoutMs,
+    expression: `(() => {
+      const item = Array.from(document.querySelectorAll('[data-testid="conversation-item"]'))
+        .find(node => node.dataset.conversationId === ${JSON.stringify(conversationID)});
+      return { ok: Boolean(item) };
+    })()`
+  });
+}
+
+async function waitForConversationRowText(cdp, conversationID, expectedText, timeoutMs) {
+  await waitForEval(cdp, () => "", {
+    label: `conversation row ${conversationID} text ${expectedText}`,
+    timeoutMs,
+    expression: `(() => {
+      const item = Array.from(document.querySelectorAll('[data-testid="conversation-item"]'))
+        .find(node => node.dataset.conversationId === ${JSON.stringify(conversationID)});
+      return { ok: Boolean(item && (item.textContent || "").includes(${JSON.stringify(expectedText)})) };
+    })()`
+  });
+}
+
+async function clickConversationItem(cdp, conversationID, timeoutMs) {
+  await waitForEval(cdp, value => value?.conversationID ? { ok: true, conversationID: value.conversationID } : { ok: false }, {
+    label: `click conversation ${conversationID}`,
+    timeoutMs,
+    expression: `(() => {
+      const item = Array.from(document.querySelectorAll('[data-testid="conversation-item"]'))
+        .find(node => node.dataset.conversationId === ${JSON.stringify(conversationID)});
+      if (!item) return { ok: false };
+      item.click();
+      return { ok: true, conversationID: item.dataset.conversationId || "" };
+    })()`
+  });
+  await waitForActiveConversation(cdp, conversationID, timeoutMs);
+}
+
+async function waitForActiveConversation(cdp, conversationID, timeoutMs) {
+  await waitForEval(cdp, () => "", {
+    label: `active conversation ${conversationID}`,
+    timeoutMs,
+    expression: `(() => {
+      const active = document.querySelector('[data-testid="conversation-item"].active');
+      return { ok: active?.dataset?.conversationId === ${JSON.stringify(conversationID)} };
+    })()`
+  });
 }
 
 async function waitForSelector(cdp, testID, timeoutMs) {
@@ -517,6 +645,20 @@ async function setInput(cdp, testID, value) {
     const setter = Object.getOwnPropertyDescriptor(prototype, 'value').set;
     setter.call(element, ${JSON.stringify(value)});
     element.dispatchEvent(new Event('input', { bubbles: true }));
+    return true;
+  })()`);
+}
+
+async function setCheckbox(cdp, testID, checked) {
+  await cdp.evaluate(`(() => {
+    const element = document.querySelector('[data-testid="${testID}"]');
+    if (!element) throw new Error('missing checkbox ${testID}');
+    if (!(element instanceof HTMLInputElement) || element.type !== 'checkbox') {
+      throw new Error('selector is not checkbox ${testID}');
+    }
+    if (element.checked !== ${checked ? "true" : "false"}) {
+      element.click();
+    }
     return true;
   })()`);
 }

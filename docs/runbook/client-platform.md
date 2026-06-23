@@ -172,17 +172,22 @@ First slice:
   multi-user UI smoke plan from a successful `loadtest/clientweb`
   `client-web-summary.json`. The plan carries BFF / push endpoints, user IDs,
   direct / group conversation IDs, expected seq / message IDs and required UI
-  selectors, but deliberately does not persist passwords, gateway tokens, push
-  tokens or refresh tokens. It is a contract and operator checklist for the next
-  real browser / PC UI run; it does not claim browser automation has already run.
+  selectors, including conversation management selectors for tags, draft,
+  archive and filters, but deliberately does not persist passwords, gateway
+  tokens, push tokens or refresh tokens. It is a contract and operator checklist
+  for the next real browser / PC UI run; it does not claim browser automation
+  has already run.
   `smoke:browser-multiuser-ui` is now the opt-in real runner for that plan. It
   starts two isolated Chromium profiles, drives the rendered Web shell through
   CDP, logs in sender / receiver, clicks the friend list to open direct chat,
   creates a group through UI, invites the receiver through group settings,
-  sends direct and group messages, then verifies receiver PullInbox / ACK in
-  the UI. `loadtest/clientweb/run-local-smoke.ps1 -RunBrowserMultiuserUISmoke`
+  sends direct and group messages, exercises BFF-backed conversation management
+  controls, then verifies receiver PullInbox / ACK in the UI.
+  `loadtest/clientweb/run-local-smoke.ps1 -RunBrowserMultiuserUISmoke`
   wires a temporary local fixture and deletes it after the run. The 2026-06-23
-  clean run passed on commit `8782936b` with `git_dirty=false`; report:
+  clean run passed direct / group / invite paths on commit `8782936b` with
+  `git_dirty=false`; conversation management is currently covered by runner
+  contract and focused checks, not yet by a recorded real browser smoke. Report:
   `docs/runbook/loadtest/client-platform/loadtest-report-20260623-browser-multiuser-ui-smoke.md`.
   The default clientweb smoke still does not launch browsers.
   Conversation profile facts are owned by

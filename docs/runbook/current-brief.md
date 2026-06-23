@@ -50,9 +50,10 @@ Android 后置到用户明确切回。
 3. `plan:browser-multiuser-ui-smoke` 已可从成功的 `client-web-summary.json` 生成
    低敏浏览器 / PC 多用户 UI smoke 计划；`smoke:browser-multiuser-ui` 已提供显式
    opt-in 的真实 Chromium CDP runner，覆盖登录、点击好友发起直聊、UI 建群、邀请成员、
-   群聊发送、PullInbox 和 ACK。2026-06-23 已用
+   群聊发送、会话管理 controls、PullInbox 和 ACK。2026-06-23 已用
    `loadtest/clientweb/run-local-smoke.ps1 -RunBrowserMultiuserUISmoke` 跑通并归档报告；
-   默认路径不启动浏览器。
+   该报告覆盖 direct / group / invite 路径；会话管理 controls 当前已纳入 runner contract，
+   尚未宣称真实浏览器会话管理 smoke 已跑。默认路径不启动浏览器。
 4. Windows desktop 已有本地 artifact / signing / installer plan first paths；签名 /
    installer 工具已支持显式 local signing profile 输入，并有只读 release readiness
    report 汇总签名输入、低敏 `signtool` 候选提示、签名验证和 installer 阻塞；

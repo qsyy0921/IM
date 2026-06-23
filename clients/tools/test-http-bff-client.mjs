@@ -23,6 +23,11 @@ async function main() {
       conversations: "/api/conversations",
       createConversation: "/api/conversations/create",
       directConversation: "/api/conversations/direct",
+      pinConversation: conversationID => "/api/conversations/" + encodeURIComponent(conversationID) + "/pin",
+      muteConversation: conversationID => "/api/conversations/" + encodeURIComponent(conversationID) + "/mute",
+      archiveConversation: conversationID => "/api/conversations/" + encodeURIComponent(conversationID) + "/archive",
+      setConversationTags: conversationID => "/api/conversations/" + encodeURIComponent(conversationID) + "/tags",
+      setConversationDraft: conversationID => "/api/conversations/" + encodeURIComponent(conversationID) + "/draft",
       conversationProfile: conversationID => "/api/conversations/" + encodeURIComponent(conversationID) + "/profile",
       conversationMembers: conversationID => "/api/conversations/" + encodeURIComponent(conversationID) + "/members",
       inviteConversationMember: conversationID => "/api/conversations/" + encodeURIComponent(conversationID) + "/members/invite",
@@ -119,6 +124,93 @@ async function main() {
               unread_count: "0"
             }
           ]
+        }),
+        { status: 200, headers: { "content-type": "application/json; charset=utf-8" } }
+      );
+    }
+    if (
+      url ===
+      "http://bff.local/api/conversations?limit=50&include_archived=true&archived_only=true&draft_only=true&tag_filter=ui-smoke&tag_filters=urgent&tag_filters=later"
+    ) {
+      assert.equal(init?.method, "GET");
+      assert.equal(init?.headers?.Authorization, "Bearer gateway-token");
+      return new Response(
+        JSON.stringify({
+          items: [
+            {
+              conversation_id: "group-client-local",
+              conversation_type: "CONVERSATION_TYPE_GROUP",
+              title: "研发二群",
+              last_visible_seq: "14",
+              unread_count: "0",
+              archived: true,
+              pinned: true,
+              muted: true,
+              tags: ["ui-smoke", "urgent", "ui-smoke"],
+              draft_text: "待发送中文草稿",
+              draft_updated_at_unix_ms: "1782112000400"
+            }
+          ]
+        }),
+        { status: 200, headers: { "content-type": "application/json; charset=utf-8" } }
+      );
+    }
+    if (url.endsWith("/api/conversations/group-client-local/archive")) {
+      assert.equal(init?.method, "POST");
+      assert.equal(init?.headers?.Authorization, "Bearer gateway-token");
+      assert.deepEqual(JSON.parse(String(init?.body)), {
+        archived: true
+      });
+      return new Response(
+        JSON.stringify({
+          conversation: {
+            conversation_id: "group-client-local",
+            conversation_type: "CONVERSATION_TYPE_GROUP",
+            title: "研发二群",
+            last_visible_seq: "14",
+            archived: true,
+            tags: ["ui-smoke"],
+            draft_text: "待发送中文草稿"
+          }
+        }),
+        { status: 200, headers: { "content-type": "application/json; charset=utf-8" } }
+      );
+    }
+    if (url.endsWith("/api/conversations/group-client-local/tags")) {
+      assert.equal(init?.method, "POST");
+      assert.equal(init?.headers?.Authorization, "Bearer gateway-token");
+      assert.deepEqual(JSON.parse(String(init?.body)), {
+        tags: ["ui-smoke", "urgent"]
+      });
+      return new Response(
+        JSON.stringify({
+          conversation: {
+            conversation_id: "group-client-local",
+            conversation_type: "CONVERSATION_TYPE_GROUP",
+            title: "研发二群",
+            last_visible_seq: "14",
+            tags: ["ui-smoke", "urgent"]
+          }
+        }),
+        { status: 200, headers: { "content-type": "application/json; charset=utf-8" } }
+      );
+    }
+    if (url.endsWith("/api/conversations/group-client-local/draft")) {
+      assert.equal(init?.method, "POST");
+      assert.equal(init?.headers?.Authorization, "Bearer gateway-token");
+      assert.deepEqual(JSON.parse(String(init?.body)), {
+        draft_text: "待发送中文草稿"
+      });
+      return new Response(
+        JSON.stringify({
+          conversation: {
+            conversation_id: "group-client-local",
+            conversation_type: "CONVERSATION_TYPE_GROUP",
+            title: "研发二群",
+            last_visible_seq: "14",
+            draft_text: "待发送中文草稿",
+            draft_updated_at_unix_ms: "1782112000500"
+          }
         }),
         { status: 200, headers: { "content-type": "application/json; charset=utf-8" } }
       );
@@ -377,6 +469,45 @@ async function main() {
     assert.equal(conversationList[0]?.unreadCount, 2);
     assert.equal(conversationList[1]?.type, "UNKNOWN");
     assert.equal(conversationList[1]?.title, "Conversation receipt-only-conversation");
+    const managedList = await client.listConversations(session(), {
+      limit: 50,
+      includeArchived: true,
+      archivedOnly: true,
+      draftOnly: true,
+      tagFilter: "ui-smoke",
+      tagFilters: ["urgent", "later"]
+    });
+    assert.equal(managedList[0]?.conversationID, "group-client-local");
+    assert.equal(managedList[0]?.archived, true);
+    assert.equal(managedList[0]?.pinned, true);
+    assert.equal(managedList[0]?.muted, true);
+    assert.deepEqual(managedList[0]?.tags, ["ui-smoke", "urgent"]);
+    assert.equal(managedList[0]?.draftText, "待发送中文草稿");
+    assert.equal(managedList[0]?.draftUpdatedAtMs, 1782112000400);
+    const archivedConversation = await client.archiveConversation(
+      {
+        conversationID: "group-client-local",
+        archived: true
+      },
+      session()
+    );
+    assert.equal(archivedConversation.archived, true);
+    const taggedConversation = await client.setConversationTags(
+      {
+        conversationID: "group-client-local",
+        tags: ["ui-smoke", "urgent"]
+      },
+      session()
+    );
+    assert.deepEqual(taggedConversation.tags, ["ui-smoke", "urgent"]);
+    const draftConversation = await client.setConversationDraft(
+      {
+        conversationID: "group-client-local",
+        draftText: "待发送中文草稿"
+      },
+      session()
+    );
+    assert.equal(draftConversation.draftText, "待发送中文草稿");
     const profile = await client.getConversationProfile("group-client-local", session());
     assert.equal(profile.title, "研发群");
     assert.equal(profile.avatarURI, "media://avatar/group-client-local");
@@ -467,7 +598,7 @@ async function main() {
     );
     assert.equal(response.items[0]?.text, expectedText);
     assert.equal(response.nextSeq, 11);
-    assert.equal(calls.length, 13);
+    assert.equal(calls.length, 17);
   } finally {
     globalThis.fetch = originalFetch;
   }

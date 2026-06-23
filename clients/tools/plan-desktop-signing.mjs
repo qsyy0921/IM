@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -145,10 +146,26 @@ function signingConfig(options) {
     if (!certSHA1.match(/^[A-F0-9]{40}$/)) {
       missing.push("certificate-sha1");
     }
+    const storeReadiness = certSHA1.match(/^[A-F0-9]{40}$/)
+      ? certificateStoreReadiness(certSHA1, options)
+      : {
+          checked: false,
+          usable: false,
+          found: false,
+          signingKeyAvailable: false,
+          notExpired: false,
+          matchCount: 0,
+          storeScopes: [],
+          reason: "invalid-sha1"
+        };
+    if (certSHA1.match(/^[A-F0-9]{40}$/) && !storeReadiness.usable) {
+      missing.push(storeReadinessBlocker(storeReadiness));
+    }
     certificate = {
       source: "windows-cert-store",
       sha1Prefix: certSHA1.slice(0, 8),
-      sha1Suffix: certSHA1.slice(-8)
+      sha1Suffix: certSHA1.slice(-8),
+      storeReadiness
     };
   }
 
@@ -204,8 +221,127 @@ function executionPolicy() {
     downloadsToolchain: false,
     readsCollectedArtifactManifest: true,
     readsSigningConfig: true,
+    readsWindowsCertificateStore: true,
     validatesArtifactHashes: true
   };
+}
+
+function certificateStoreReadiness(certSHA1, options) {
+  if (typeof options.certificateStoreProbe === "function") {
+    return normalizeCertificateStoreProbe(options.certificateStoreProbe(certSHA1));
+  }
+  if (process.platform !== "win32") {
+    return {
+      checked: false,
+      usable: false,
+      found: false,
+      signingKeyAvailable: false,
+      notExpired: false,
+      matchCount: 0,
+      storeScopes: [],
+      reason: "windows-only"
+    };
+  }
+  try {
+    const script = [
+      "$ErrorActionPreference = 'Stop'",
+      `$thumb = '${certSHA1}'`,
+      "$stores = @('Cert:\\CurrentUser\\My', 'Cert:\\LocalMachine\\My')",
+      "$matches = @()",
+      "foreach ($store in $stores) {",
+      "  Get-ChildItem -Path $store -ErrorAction SilentlyContinue | Where-Object { ($_.Thumbprint -replace '\\s', '').ToUpperInvariant() -eq $thumb } | ForEach-Object {",
+      "    $matches += [pscustomobject]@{",
+      "      store = $store.Replace('Cert:\\', '').Replace('\\', '/')",
+      "      signingKeyAvailable = [bool]$_.HasPrivateKey",
+      "      notAfter = $_.NotAfter.ToUniversalTime().ToString('o')",
+      "    }",
+      "  }",
+      "}",
+      "$matches | ConvertTo-Json -Compress -Depth 3"
+    ].join("; ");
+    const output = execFileSync("powershell", ["-NoProfile", "-Command", script], {
+      encoding: "utf8",
+      windowsHide: true,
+      stdio: ["ignore", "pipe", "ignore"]
+    }).trim();
+    const rows = output ? JSON.parse(output) : [];
+    return normalizeCertificateStoreProbe(Array.isArray(rows) ? rows : [rows]);
+  } catch {
+    return {
+      checked: true,
+      usable: false,
+      found: false,
+      signingKeyAvailable: false,
+      notExpired: false,
+      matchCount: 0,
+      storeScopes: [],
+      reason: "probe-error"
+    };
+  }
+}
+
+function normalizeCertificateStoreProbe(value) {
+  const now = Date.now();
+  const rows = Array.isArray(value)
+    ? value
+    : Array.isArray(value?.matches)
+      ? value.matches
+      : [];
+  const matches = rows
+    .map(row => {
+      const store = stringValue(row.store);
+      const notAfter = stringValue(row.notAfter);
+      const notAfterMs = notAfter ? Date.parse(notAfter) : Number.NaN;
+      return {
+        store,
+        signingKeyAvailable: Boolean(row.signingKeyAvailable ?? row.keyAvailable),
+        notExpired: Number.isFinite(notAfterMs) ? notAfterMs > now : Boolean(row.notExpired)
+      };
+    })
+    .filter(row => row.store.length > 0);
+  const found = matches.length > 0;
+  const signingKeyAvailable = matches.some(row => row.signingKeyAvailable);
+  const notExpired = matches.some(row => row.notExpired);
+  const usable = found && signingKeyAvailable && notExpired;
+  return {
+    checked: value?.checked !== false,
+    usable,
+    found,
+    signingKeyAvailable,
+    notExpired,
+    matchCount: matches.length,
+    storeScopes: matches.map(row => row.store).slice(0, 4),
+    reason: usable ? "" : stringValue(value?.reason) || certificateStoreReason({ found, signingKeyAvailable, notExpired })
+  };
+}
+
+function certificateStoreReason({ found, signingKeyAvailable, notExpired }) {
+  if (!found) {
+    return "not-found";
+  }
+  if (!signingKeyAvailable) {
+    return "signing-key-unavailable";
+  }
+  if (!notExpired) {
+    return "expired";
+  }
+  return "not-usable";
+}
+
+function storeReadinessBlocker(readiness) {
+  if (readiness.reason === "windows-only") {
+    return "certificate-store-windows";
+  }
+  if (!readiness.found) {
+    return "certificate-store-entry";
+  }
+  if (!readiness.signingKeyAvailable) {
+    return "certificate-key-access";
+  }
+  if (!readiness.notExpired) {
+    return "certificate-store-expired";
+  }
+  return "certificate-store-check";
 }
 
 function validateArtifact(artifact, artifactPath) {

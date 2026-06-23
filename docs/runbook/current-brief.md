@@ -48,7 +48,8 @@ Android 后置到用户明确切回。
    installer 工具已支持显式 local signing profile 输入，并有只读 release readiness
    report 汇总签名输入、低敏 `signtool` 候选提示、签名验证和 installer 阻塞；
    候选工具不会自动用于 readiness；timestamp URL 禁止携带账号密码、query 或
-   fragment；下一步仍是真实证书输入、
+   fragment；Windows cert-store thumbprint 会做只读本机证书 / signing key / 过期检查；
+   下一步仍是真实证书输入、
    valid signed artifact 和 MSI / NSIS installer 体验。
 4. 所有客户端能力只走 api-gateway BFF 和 push-gateway，不直连内部服务。
 5. 新功能先做简短架构分析再编码；新增服务 / 中间件 / provider 必须归属正确平台层并同步 owner docs。

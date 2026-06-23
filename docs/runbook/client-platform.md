@@ -512,7 +512,10 @@ First slice:
   thumbprint plus a timestamp URL and PFX password environment variable name; it
   must not contain certificate passwords, private key material or provider
   credentials. The timestamp URL must be plain `http` / `https` without
-  embedded credentials, query string or fragment. It defaults to
+  embedded credentials, query string or fragment. When a Windows
+  certificate-store thumbprint is used, the plan performs a read-only local
+  certificate-store check and remains not ready unless the certificate exists,
+  has a usable signing key and is not expired. It defaults to
   `desktop-executable`; `desktop-installer` must be requested
   explicitly. It is plan-only: it does not sign, download tools, install
   packages, launch the desktop app or print local absolute paths. Missing kind

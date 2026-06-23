@@ -162,6 +162,52 @@ try {
   assert(invalidSHA1.readyToSign === false, "invalid SHA1 should not be ready");
   assert(invalidSHA1.missing.includes("certificate-sha1"), "invalid SHA1 should be reported");
 
+  const readyStoreSHA1 = "AABBCCDDEEFF00112233445566778899AABBCCDD";
+  const storeReady = buildDesktopSigningPlan({
+    manifest: manifestPath,
+    signToolPath: fakeSignTool,
+    certSHA1: readyStoreSHA1,
+    timestampURL: "https://timestamp.example.test",
+    certificateStoreProbe: () => [
+      {
+        store: "CurrentUser/My",
+        signingKeyAvailable: true,
+        notAfter: "2035-01-01T00:00:00.000Z"
+      }
+    ]
+  });
+  assert(storeReady.readyToSign === true, "usable cert-store thumbprint should be ready");
+  assert(storeReady.signing.mode === "cert-store-sha1", "cert store signing mode expected");
+  assert(storeReady.signing.certificate.storeReadiness.usable === true, "cert store readiness should be usable");
+  assert(storeReady.signing.certificate.storeReadiness.storeScopes.includes("CurrentUser/My"), "cert store scope should be reported");
+  assert(!JSON.stringify(storeReady).includes(readyStoreSHA1), "full cert-store thumbprint must not be echoed");
+
+  const storeMissing = buildDesktopSigningPlan({
+    manifest: manifestPath,
+    signToolPath: fakeSignTool,
+    certSHA1: readyStoreSHA1,
+    timestampURL: "https://timestamp.example.test",
+    certificateStoreProbe: () => []
+  });
+  assert(storeMissing.readyToSign === false, "missing cert-store entry should not be ready");
+  assert(storeMissing.missing.includes("certificate-store-entry"), "missing cert-store entry should be reported");
+
+  const storeNoKey = buildDesktopSigningPlan({
+    manifest: manifestPath,
+    signToolPath: fakeSignTool,
+    certSHA1: readyStoreSHA1,
+    timestampURL: "https://timestamp.example.test",
+    certificateStoreProbe: () => [
+      {
+        store: "CurrentUser/My",
+        signingKeyAvailable: false,
+        notAfter: "2035-01-01T00:00:00.000Z"
+      }
+    ]
+  });
+  assert(storeNoKey.readyToSign === false, "cert-store entry without signing key should not be ready");
+  assert(storeNoKey.missing.includes("certificate-key-access"), "missing cert-store signing key should be reported");
+
   const invalidTimestamp = buildDesktopSigningPlan({
     manifest: manifestPath,
     signToolPath: fakeSignTool,

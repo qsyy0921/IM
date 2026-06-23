@@ -138,6 +138,29 @@ try {
   assert(cliPlan.executionPolicy.executesSignCommand === false, "CLI dry-run should not execute signing");
   assert(!JSON.stringify(cliPlan).includes(tempRoot), "CLI signing dry-run leaked absolute temp path");
 
+  const cliEnvExpectedSignerPlan = runSigner([
+    "--manifest",
+    manifestPath,
+    "--signtool",
+    fakeSignTool,
+    "--cert-file",
+    fakePfx,
+    "--timestamp-url",
+    "https://timestamp.example.test"
+  ], {
+    ...pfxFixture.env,
+    NEXUSIM_DESKTOP_SIGN_EXPECTED_SUBJECT: "NexusIM"
+  });
+  assert(cliEnvExpectedSignerPlan.readyToSign === true, "env expected signer dry-run should be signing-ready");
+  assert(
+    cliEnvExpectedSignerPlan.executionPolicy.expectedSignerSubjectPolicyConfigured === true,
+    "env expected signer policy should be declared"
+  );
+  assert(
+    cliEnvExpectedSignerPlan.executionPolicy.requiresExpectedSignerSubjectAfterSigning === false,
+    "env expected signer policy should only be enforced with --require-valid"
+  );
+
   const cliProfilePlan = runSigner([
     "--manifest",
     manifestPath,
@@ -170,6 +193,25 @@ try {
   assert(cliRequireValidPlan.readyToSign === true, "require-valid CLI dry-run should still be ready to sign");
   assert(cliRequireValidPlan.executionPolicy.requiresValidSignatureAfterSigning === true, "require-valid dry-run should declare valid-signature requirement");
   assert(cliRequireValidPlan.executionPolicy.verifiesSignatureAfterSigning === false, "require-valid dry-run must not verify before execute");
+
+  const cliEnvExpectedSignerRequireValidPlan = runSigner([
+    "--require-valid",
+    "--manifest",
+    manifestPath,
+    "--signtool",
+    fakeSignTool,
+    "--cert-file",
+    fakePfx,
+    "--timestamp-url",
+    "https://timestamp.example.test"
+  ], {
+    ...pfxFixture.env,
+    NEXUSIM_DESKTOP_SIGN_EXPECTED_SUBJECT: "NexusIM"
+  });
+  assert(
+    cliEnvExpectedSignerRequireValidPlan.executionPolicy.requiresExpectedSignerSubjectAfterSigning === true,
+    "require-valid env expected signer dry-run should enforce signer policy after signing"
+  );
 
   const cliProfileRequireValidPlan = runSigner([
     "--require-valid",

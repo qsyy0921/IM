@@ -570,7 +570,8 @@ First slice:
   then the wrapper reruns read-only Authenticode verification after signing and
   fails closed if the artifact is still not valid. Its low-sensitive
   `executionPolicy` declares when a signing profile is read and when
-  `--require-valid` also enforces the profile's public signer subject policy.
+  `--require-valid` also enforces a public signer subject policy from CLI, env
+  or profile.
   `verify:desktop-signature` is the read-only post-signing verification wrapper.
   It validates the selected artifact hash and reads Windows Authenticode public
   status without signing, installing, launching, starting services or downloading

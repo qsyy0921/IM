@@ -25,7 +25,9 @@ import {
   type ListContactsInput,
   type InviteConversationMemberRequest,
   type LeaveConversationRequest,
+  type MuteConversationRequest,
   type RemoveConversationMemberRequest,
+  type PinConversationRequest,
   type RespondContactRequestInput,
   type SendContactRequestInput,
   type TransferConversationOwnerRequest,
@@ -191,6 +193,10 @@ interface BFFConversationSummary {
 interface BFFListConversationsResponse {
   items?: BFFConversationSummary[];
   next_page_cursor?: string;
+}
+
+interface BFFConversationSummaryResponse {
+  conversation?: BFFConversationSummary;
 }
 
 interface BFFInboxItem {
@@ -380,6 +386,26 @@ export class BFFClient implements AuthAPI, ConversationAPI, MessagingAPI, Delive
       idempotentReplay: response.idempotent_replay === true,
       ...optionalDirectPeerUserID(response)
     };
+  }
+
+  async pinConversation(request: PinConversationRequest, session: AuthSession): Promise<ConversationSummary> {
+    const response = await this.#request<BFFConversationSummaryResponse>(
+      "POST",
+      CLIENT_API_ENDPOINTS.pinConversation(request.conversationID),
+      { pinned: request.pinned },
+      session
+    );
+    return conversationSummaryFromBFF(requiredObject(response.conversation, "conversation"), session);
+  }
+
+  async muteConversation(request: MuteConversationRequest, session: AuthSession): Promise<ConversationSummary> {
+    const response = await this.#request<BFFConversationSummaryResponse>(
+      "POST",
+      CLIENT_API_ENDPOINTS.muteConversation(request.conversationID),
+      { muted: request.muted },
+      session
+    );
+    return conversationSummaryFromBFF(requiredObject(response.conversation, "conversation"), session);
   }
 
   async listConversationMembers(

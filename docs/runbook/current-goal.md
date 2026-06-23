@@ -27,7 +27,7 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
 - Web / PC shell 已接账号密码登录、注册、好友工作台、好友私聊、群聊列表、建群、
   群成员添加 / 退群、从好友列表邀请入群、成员列表、移除成员、角色变更、owner
   transfer、成员搜索 / 角色过滤 / 分页、群资料卡、权限感知群设置入口、邀请来源提示、
-  群公告、消息列表、发送、PullInbox 和 ACK。
+  群公告、会话置顶 / 免打扰、消息列表、发送、PullInbox 和 ACK。
 - 群设置 UI 已按资料、成员、操作分区；资料和成员事实仍只来自 conversation-service
   经 api-gateway BFF 暴露的公开接口，不维护本地假成员列表。
 - 群标题 / 头像 URI / 群公告已接 first-stage read/update：`conversation-service` 拥有事实，

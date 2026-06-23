@@ -20,9 +20,12 @@ import type {
   ListConversationMembersResponse,
   ConversationMemberChangeResponse,
   ConversationProfile,
+  ConversationSummary,
   InviteConversationMemberRequest,
   LeaveConversationRequest,
+  MuteConversationRequest,
   RemoveConversationMemberRequest,
+  PinConversationRequest,
   TransferConversationOwnerRequest,
   TransferConversationOwnerResponse,
   UpdateConversationProfileRequest,
@@ -49,6 +52,8 @@ export interface ConversationAPI {
     request: OpenDirectConversationRequest,
     session: AuthSession
   ): Promise<CreateConversationResponse>;
+  pinConversation(request: PinConversationRequest, session: AuthSession): Promise<ConversationSummary>;
+  muteConversation(request: MuteConversationRequest, session: AuthSession): Promise<ConversationSummary>;
   listConversationMembers(
     request: ListConversationMembersRequest,
     session: AuthSession

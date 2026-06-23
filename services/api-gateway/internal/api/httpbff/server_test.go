@@ -248,6 +248,81 @@ func TestOpenDirectConversationRequiresActiveContact(t *testing.T) {
 	}
 }
 
+func TestPinConversationEndpointForwardsReceiptRequest(t *testing.T) {
+	authenticator := &fakeAuthenticator{auth: gatewayauth.AuthContext{TenantID: "tenant-1", UserID: "user-a"}}
+	gateway := &fakeGateway{
+		pinConversation: func(ctx context.Context, request *receiptv1.PinConversationRequest) (*receiptv1.PinConversationResponse, error) {
+			md, ok := metadata.FromIncomingContext(ctx)
+			if !ok || firstMetadata(md, "authorization") != "Bearer token-1" {
+				t.Fatalf("expected forwarded auth metadata, got %+v", md)
+			}
+			if request.GetConversationId() != "conv/group" || !request.GetPinned() {
+				t.Fatalf("unexpected pin request: %+v", request)
+			}
+			return &receiptv1.PinConversationResponse{
+				Conversation: &receiptv1.ConversationSummary{
+					ConversationId:  "conv/group",
+					LastVisibleSeq:  9,
+					UnreadCount:     2,
+					UpdatedAtUnixMs: 11,
+					Pinned:          true,
+				},
+			}, nil
+		},
+	}
+	handler := NewServer(Config{Gateway: gateway, Authenticator: authenticator})
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/conversations/conv%2Fgroup/pin", strings.NewReader(`{"pinned":true}`))
+	request.Header.Set("Authorization", "Bearer token-1")
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+	if !strings.Contains(response.Body.String(), `"conversation_id":"conv/group"`) ||
+		!strings.Contains(response.Body.String(), `"pinned":true`) {
+		t.Fatalf("expected pinned conversation response, got %s", response.Body.String())
+	}
+}
+
+func TestMuteConversationEndpointForwardsReceiptRequest(t *testing.T) {
+	authenticator := &fakeAuthenticator{auth: gatewayauth.AuthContext{TenantID: "tenant-1", UserID: "user-a"}}
+	gateway := &fakeGateway{
+		muteConversation: func(ctx context.Context, request *receiptv1.MuteConversationRequest) (*receiptv1.MuteConversationResponse, error) {
+			md, ok := metadata.FromIncomingContext(ctx)
+			if !ok || firstMetadata(md, "authorization") != "Bearer token-1" {
+				t.Fatalf("expected forwarded auth metadata, got %+v", md)
+			}
+			if request.GetConversationId() != "conv/group" || request.GetMuted() {
+				t.Fatalf("unexpected mute request: %+v", request)
+			}
+			return &receiptv1.MuteConversationResponse{
+				Conversation: &receiptv1.ConversationSummary{
+					ConversationId:  "conv/group",
+					LastVisibleSeq:  9,
+					UnreadCount:     2,
+					UpdatedAtUnixMs: 12,
+					Muted:           false,
+				},
+			}, nil
+		},
+	}
+	handler := NewServer(Config{Gateway: gateway, Authenticator: authenticator})
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/conversations/conv%2Fgroup/mute", strings.NewReader(`{"muted":false}`))
+	request.Header.Set("Authorization", "Bearer token-1")
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+	if !strings.Contains(response.Body.String(), `"conversation_id":"conv/group"`) {
+		t.Fatalf("expected muted conversation response, got %s", response.Body.String())
+	}
+}
+
 func TestOpenDirectConversationRejectsInactiveContact(t *testing.T) {
 	authenticator := &fakeAuthenticator{auth: gatewayauth.AuthContext{
 		TenantID:  "tenant-1",
@@ -1382,6 +1457,8 @@ type fakeGateway struct {
 	pullInbox                 func(context.Context, *deliveryv1.PullInboxRequest) (*deliveryv1.PullInboxResponse, error)
 	ackDelivery               func(context.Context, *deliveryv1.AckDeliveryRequest) (*deliveryv1.AckDeliveryResponse, error)
 	listConversations         func(context.Context, *receiptv1.ListConversationsRequest) (*receiptv1.ListConversationsResponse, error)
+	pinConversation           func(context.Context, *receiptv1.PinConversationRequest) (*receiptv1.PinConversationResponse, error)
+	muteConversation          func(context.Context, *receiptv1.MuteConversationRequest) (*receiptv1.MuteConversationResponse, error)
 	listReceiptStates         func(context.Context, *receiptv1.ListReceiptStatesRequest) (*receiptv1.ListReceiptStatesResponse, error)
 	sendContactRequest        func(context.Context, *contactsv1.SendContactRequestRequest) (*contactsv1.SendContactRequestResponse, error)
 	respondContactRequest     func(context.Context, *contactsv1.RespondContactRequestRequest) (*contactsv1.RespondContactRequestResponse, error)
@@ -1499,6 +1576,20 @@ func (gateway *fakeGateway) ListConversations(ctx context.Context, request *rece
 		return nil, status.Error(codes.Unimplemented, "list conversations not implemented")
 	}
 	return gateway.listConversations(ctx, request)
+}
+
+func (gateway *fakeGateway) PinConversation(ctx context.Context, request *receiptv1.PinConversationRequest) (*receiptv1.PinConversationResponse, error) {
+	if gateway.pinConversation == nil {
+		return nil, status.Error(codes.Unimplemented, "pin conversation not implemented")
+	}
+	return gateway.pinConversation(ctx, request)
+}
+
+func (gateway *fakeGateway) MuteConversation(ctx context.Context, request *receiptv1.MuteConversationRequest) (*receiptv1.MuteConversationResponse, error) {
+	if gateway.muteConversation == nil {
+		return nil, status.Error(codes.Unimplemented, "mute conversation not implemented")
+	}
+	return gateway.muteConversation(ctx, request)
 }
 
 func (gateway *fakeGateway) ListReceiptStates(ctx context.Context, request *receiptv1.ListReceiptStatesRequest) (*receiptv1.ListReceiptStatesResponse, error) {

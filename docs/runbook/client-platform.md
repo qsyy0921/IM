@@ -157,7 +157,10 @@ First slice:
   OWNER / ADMIN management actions; unknown role state remains read-only. The
   group settings area now separates profile, member browsing / role management
   and explicit group actions into permission-aware sections instead of mixing
-  all controls in one block. The explicit actions section can now invite
+  all controls in one block. Conversation pin / mute now uses receipt-service
+  conversation-summary facts through api-gateway BFF and client-core; Web / PC
+  shell updates the conversation list from the returned server summary rather
+  than marking local-only success. The explicit actions section can now invite
   ACTIVE contacts from a searchable friend picker while excluding members
   already active in the current group; the actual mutation still goes through
   the existing api-gateway BFF conversation member-change endpoint.

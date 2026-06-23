@@ -1242,7 +1242,35 @@ export function App() {
   }
 
   function upsertConversationSummary(summary: ConversationSummary): void {
-    setConversations(current => [summary, ...current.filter(item => item.conversationID !== summary.conversationID)]);
+    setConversations(current => sortConversationSummaries([summary, ...current.filter(item => item.conversationID !== summary.conversationID)]));
+  }
+
+  async function setConversationPinned(conversation: ConversationSummary, pinned: boolean): Promise<void> {
+    await run(pinned ? "pin conversation" : "unpin conversation", async () => {
+      const currentSession = requireSession();
+      const updated = await runtime.bff.pinConversation(
+        {
+          conversationID: conversation.conversationID,
+          pinned
+        },
+        currentSession
+      );
+      upsertConversationSummary(mergeConversationSummary(conversation, updated));
+    });
+  }
+
+  async function setConversationMuted(conversation: ConversationSummary, muted: boolean): Promise<void> {
+    await run(muted ? "mute conversation" : "unmute conversation", async () => {
+      const currentSession = requireSession();
+      const updated = await runtime.bff.muteConversation(
+        {
+          conversationID: conversation.conversationID,
+          muted
+        },
+        currentSession
+      );
+      upsertConversationSummary(mergeConversationSummary(conversation, updated));
+    });
   }
 
   function updateConversationLastSeq(conversationID: string, seq: number): void {
@@ -1563,30 +1591,53 @@ export function App() {
                   <div className="conversation-empty">暂无会话</div>
                 ) : null}
                 {conversations.map(conversation => (
-                  <button
-                    data-testid="conversation-item"
-                    data-conversation-id={conversation.conversationID}
-                    data-conversation-type={conversation.type}
-                    className={`conversation-item ${conversation.conversationID === activeConversationID ? "active" : ""}`}
+                  <article
+                    className={`conversation-row ${conversation.conversationID === activeConversationID ? "active" : ""}`}
                     key={conversation.conversationID}
-                    onClick={() => void run("select conversation", () => selectConversation(conversation.conversationID))}
                   >
-                    <span className="conversation-avatar">
-                      {displayConversationAvatarURL(conversation) ? (
-                        <img
-                          alt=""
-                          src={displayConversationAvatarURL(conversation)}
-                          data-testid="conversation-avatar-image"
-                        />
-                      ) : (
-                        displayConversationAvatarText(conversation)
-                      )}
-                    </span>
-                    <span className="conversation-copy">
-                      <strong>{displayConversationTitle(conversation)}</strong>
-                      <small>{conversationSubtitle(conversation)}</small>
-                    </span>
-                  </button>
+                    <button
+                      data-testid="conversation-item"
+                      data-conversation-id={conversation.conversationID}
+                      data-conversation-type={conversation.type}
+                      className="conversation-item"
+                      type="button"
+                      onClick={() => void run("select conversation", () => selectConversation(conversation.conversationID))}
+                    >
+                      <span className="conversation-avatar">
+                        {displayConversationAvatarURL(conversation) ? (
+                          <img
+                            alt=""
+                            src={displayConversationAvatarURL(conversation)}
+                            data-testid="conversation-avatar-image"
+                          />
+                        ) : (
+                          displayConversationAvatarText(conversation)
+                        )}
+                      </span>
+                      <span className="conversation-copy">
+                        <strong>{displayConversationTitle(conversation)}</strong>
+                        <small>{conversationSubtitle(conversation)}</small>
+                      </span>
+                    </button>
+                    <div className="conversation-inline-actions" aria-label="会话操作">
+                      <button
+                        data-testid="conversation-pin-toggle"
+                        type="button"
+                        onClick={() => void setConversationPinned(conversation, !conversation.pinned)}
+                        disabled={!session}
+                      >
+                        {conversation.pinned ? "取消置顶" : "置顶"}
+                      </button>
+                      <button
+                        data-testid="conversation-mute-toggle"
+                        type="button"
+                        onClick={() => void setConversationMuted(conversation, !conversation.muted)}
+                        disabled={!session}
+                      >
+                        {conversation.muted ? "取消免扰" : "免扰"}
+                      </button>
+                    </div>
+                  </article>
                 ))}
               </div>
             </section>
@@ -2114,6 +2165,24 @@ export function App() {
                     <span>邀请、退群和危险操作都需要明确点击，不做隐藏兜底。</span>
                   </div>
                 </div>
+                <div className="conversation-management-actions" data-testid="group-conversation-actions">
+                  <button
+                    data-testid="group-pin-toggle"
+                    type="button"
+                    onClick={() => void setConversationPinned(activeGroupConversation, !activeGroupConversation.pinned)}
+                    disabled={!session}
+                  >
+                    {activeGroupConversation.pinned ? "取消置顶" : "置顶会话"}
+                  </button>
+                  <button
+                    data-testid="group-mute-toggle"
+                    type="button"
+                    onClick={() => void setConversationMuted(activeGroupConversation, !activeGroupConversation.muted)}
+                    disabled={!session}
+                  >
+                    {activeGroupConversation.muted ? "取消免打扰" : "设为免打扰"}
+                  </button>
+                </div>
                 <form
                   className="group-member-form"
                   onSubmit={event => {
@@ -2396,7 +2465,7 @@ function mergeConversationSummaries(
   incoming: ConversationSummary[]
 ): ConversationSummary[] {
   const currentByID = new Map(current.map(item => [item.conversationID, item]));
-  return incoming.map(item => mergeConversationSummary(currentByID.get(item.conversationID), item));
+  return sortConversationSummaries(incoming.map(item => mergeConversationSummary(currentByID.get(item.conversationID), item)));
 }
 
 function mergeConversationSummary(
@@ -2412,6 +2481,18 @@ function mergeConversationSummary(
       ? existing.title
       : incoming.title;
   return { ...incoming, type, title };
+}
+
+function sortConversationSummaries(items: ConversationSummary[]): ConversationSummary[] {
+  return [...items].sort((left, right) => {
+    if (left.pinned !== right.pinned) {
+      return left.pinned ? -1 : 1;
+    }
+    if (left.updatedAtMs !== right.updatedAtMs) {
+      return right.updatedAtMs - left.updatedAtMs;
+    }
+    return left.conversationID.localeCompare(right.conversationID);
+  });
 }
 
 function conversationDisplayTitle(conversation: ConversationSummary): string {

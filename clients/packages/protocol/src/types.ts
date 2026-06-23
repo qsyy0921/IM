@@ -78,6 +78,16 @@ export interface OpenDirectConversationRequest {
   idempotencyKey?: string;
 }
 
+export interface PinConversationRequest {
+  conversationID: ConversationID;
+  pinned: boolean;
+}
+
+export interface MuteConversationRequest {
+  conversationID: ConversationID;
+  muted: boolean;
+}
+
 export type MemberChangeType = "JOIN" | "LEAVE" | "REMOVE" | "ROLE_CHANGED" | "OWNER_TRANSFER" | string;
 export type MemberRole = "OWNER" | "ADMIN" | "MEMBER" | "UNSPECIFIED" | string;
 export type MemberStatus = "ACTIVE" | "LEFT" | "BANNED" | "UNSPECIFIED" | string;

@@ -54,6 +54,8 @@ type Gateway interface {
 	PullInbox(ctx context.Context, request *deliveryv1.PullInboxRequest) (*deliveryv1.PullInboxResponse, error)
 	AckDelivery(ctx context.Context, request *deliveryv1.AckDeliveryRequest) (*deliveryv1.AckDeliveryResponse, error)
 	ListConversations(ctx context.Context, request *receiptv1.ListConversationsRequest) (*receiptv1.ListConversationsResponse, error)
+	PinConversation(ctx context.Context, request *receiptv1.PinConversationRequest) (*receiptv1.PinConversationResponse, error)
+	MuteConversation(ctx context.Context, request *receiptv1.MuteConversationRequest) (*receiptv1.MuteConversationResponse, error)
 	ListReceiptStates(ctx context.Context, request *receiptv1.ListReceiptStatesRequest) (*receiptv1.ListReceiptStatesResponse, error)
 	SendContactRequest(ctx context.Context, request *contactsv1.SendContactRequestRequest) (*contactsv1.SendContactRequestResponse, error)
 	RespondContactRequest(ctx context.Context, request *contactsv1.RespondContactRequestRequest) (*contactsv1.RespondContactRequestResponse, error)
@@ -274,6 +276,10 @@ func (server *Server) serveHTTP(response http.ResponseWriter, request *http.Requ
 		server.handleCreateConversation(response, request)
 	case request.Method == http.MethodPost && path == "/api/conversations/direct":
 		server.handleOpenDirectConversation(response, request)
+	case request.Method == http.MethodPost && isConversationMemberActionPath(request.URL.EscapedPath(), "/pin"):
+		server.handlePinConversation(response, request)
+	case request.Method == http.MethodPost && isConversationMemberActionPath(request.URL.EscapedPath(), "/mute"):
+		server.handleMuteConversation(response, request)
 	case request.Method == http.MethodGet && isConversationMemberActionPath(request.URL.EscapedPath(), "/members"):
 		server.handleListConversationMembers(response, request)
 	case request.Method == http.MethodPost && isConversationMemberActionPath(request.URL.EscapedPath(), "/members/invite"):
@@ -494,6 +500,56 @@ func (server *Server) handleOpenDirectConversation(response http.ResponseWriter,
 		ConversationType: conversationv1.ConversationType_CONVERSATION_TYPE_DIRECT,
 		IdempotencyKey:   idempotencyKey,
 		DirectPeerUserId: peerUserID,
+	})
+	server.writeProtoOrError(response, output, err)
+}
+
+type conversationPinRequest struct {
+	Pinned bool `json:"pinned"`
+}
+
+type conversationMuteRequest struct {
+	Muted bool `json:"muted"`
+}
+
+func (server *Server) handlePinConversation(response http.ResponseWriter, request *http.Request) {
+	if _, err := server.authenticateRequest(request); err != nil {
+		writeError(response, err)
+		return
+	}
+	conversationID, err := conversationIDFromMemberActionPath(request.URL.EscapedPath(), "/pin")
+	if err != nil {
+		writeError(response, err)
+		return
+	}
+	var input conversationPinRequest
+	if !server.decodeJSON(response, request, &input) {
+		return
+	}
+	output, err := server.requireGateway().PinConversation(contextFromRequest(request), &receiptv1.PinConversationRequest{
+		ConversationId: conversationID,
+		Pinned:         input.Pinned,
+	})
+	server.writeProtoOrError(response, output, err)
+}
+
+func (server *Server) handleMuteConversation(response http.ResponseWriter, request *http.Request) {
+	if _, err := server.authenticateRequest(request); err != nil {
+		writeError(response, err)
+		return
+	}
+	conversationID, err := conversationIDFromMemberActionPath(request.URL.EscapedPath(), "/mute")
+	if err != nil {
+		writeError(response, err)
+		return
+	}
+	var input conversationMuteRequest
+	if !server.decodeJSON(response, request, &input) {
+		return
+	}
+	output, err := server.requireGateway().MuteConversation(contextFromRequest(request), &receiptv1.MuteConversationRequest{
+		ConversationId: conversationID,
+		Muted:          input.Muted,
 	})
 	server.writeProtoOrError(response, output, err)
 }
@@ -1202,6 +1258,12 @@ func (missingGateway) AckDelivery(context.Context, *deliveryv1.AckDeliveryReques
 	return nil, status.Error(codes.Internal, "gateway is not configured")
 }
 func (missingGateway) ListConversations(context.Context, *receiptv1.ListConversationsRequest) (*receiptv1.ListConversationsResponse, error) {
+	return nil, status.Error(codes.Internal, "gateway is not configured")
+}
+func (missingGateway) PinConversation(context.Context, *receiptv1.PinConversationRequest) (*receiptv1.PinConversationResponse, error) {
+	return nil, status.Error(codes.Internal, "gateway is not configured")
+}
+func (missingGateway) MuteConversation(context.Context, *receiptv1.MuteConversationRequest) (*receiptv1.MuteConversationResponse, error) {
 	return nil, status.Error(codes.Internal, "gateway is not configured")
 }
 func (missingGateway) ListReceiptStates(context.Context, *receiptv1.ListReceiptStatesRequest) (*receiptv1.ListReceiptStatesResponse, error) {

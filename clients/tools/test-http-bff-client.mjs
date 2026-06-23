@@ -84,10 +84,9 @@ async function main() {
     if (url.endsWith("/api/conversations/direct")) {
       assert.equal(init?.method, "POST");
       assert.equal(init?.headers?.Authorization, "Bearer gateway-token");
-      assert.deepEqual(JSON.parse(String(init?.body)), {
-        peer_user_id: "user-b",
-        idempotency_key: "idem-direct"
-      });
+      const body = JSON.parse(String(init?.body));
+      assert.equal(body.peer_user_id, "user-b");
+      assert.match(body.idempotency_key, /^direct-user-b-[a-z0-9-]+$/);
       return new Response(
         JSON.stringify({
           tenant_id: "tenant-client-local",
@@ -363,8 +362,7 @@ async function main() {
     assert.equal(created.boundarySeq, 1);
     const direct = await client.openDirectConversation(
       {
-        peerUserID: "user-b",
-        idempotencyKey: "idem-direct"
+        peerUserID: "user-b"
       },
       session()
     );

@@ -335,7 +335,7 @@ export class BFFClient implements AuthAPI, ConversationAPI, MessagingAPI, Delive
       CLIENT_API_ENDPOINTS.directConversation,
       {
         peer_user_id: request.peerUserID,
-        idempotency_key: request.idempotencyKey
+        idempotency_key: request.idempotencyKey ?? newClientID(`direct-${request.peerUserID}`)
       },
       session
     );

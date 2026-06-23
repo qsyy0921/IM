@@ -17,12 +17,14 @@
 ## 当前阶段
 
 ```text
-client platform MVP foundation
+client demo MVP closeout -> AI / Agent / RAG transition
 ```
 
 NexusIM 已有本地 / 双机可运行的最小分布式 IM 后端，并已扩展到 AI foundation
-和 product-active 服务 first paths。当前短线优先浏览器端和 Windows PC 端；
-Android 后置到用户明确切回。
+和 product-active 服务 first paths。当前短线只把浏览器端和 Windows PC 端收敛到
+可演示 IM MVP；Android、release signing、MSI / NSIS installer、完整移动端发布、
+复杂 UI 和深水区群管理全部后置。客户端演示达标后，主线切回后端架构完善和
+AI / Agent / RAG。
 
 ## 已有服务层级
 
@@ -39,10 +41,9 @@ Android 后置到用户明确切回。
 
 ## 当前短线
 
-1. Web / Windows PC 客户端继续收口：登录、注册、好友申请、好友私聊、群聊、
-   群成员管理、从好友列表邀请入群、权限感知群设置、群资料、群头像上传 / 展示
-   first path、群公告、会话置顶 / 免打扰、归档、标签、草稿、会话筛选、消息列表、
-   发送、PullInbox 和 ACK。
+1. Web / Windows PC 客户端只按演示 MVP 收口：登录、注册、好友 / 群聊列表、
+   点击好友发起私聊、点击群聊进入会话、中文消息双向不乱码、消息列表、发送、
+   PullInbox、ACK、push 状态和清晰失败提示。
 2. 已有 clean smoke 覆盖双用户好友直聊、群聊 first path、群资料 BFF
    read/update、群公告和群成员动作；当前群头像上传 / 展示已接 BFF -> media-service ->
    profile update / download URL 的本地 first path，头像更新会保留当前公告；详细证据见 `client-platform.md` 与
@@ -85,12 +86,27 @@ Android 后置到用户明确切回。
    manifest 写入；installer plan 的 signing summary 也会携带低敏 `signaturePolicy`；
    `smoke:desktop-local-signing` 已补显式本地开发签名 smoke，签名临时 artifact
    副本、临时信任 CurrentUser code-signing certificate、验证 Authenticode `Valid` 并清理；
-   2026-06-23 本机运行已通过，原 collected artifact 未变。下一步仍是真实 release
-   证书输入、真实 collected artifact 签名和 MSI / NSIS signed installer 体验。
+   2026-06-23 本机运行已通过，原 collected artifact 未变。这些能力保留为后置
+   release backlog，不作为当前主线。
 5. 所有客户端能力只走 api-gateway BFF 和 push-gateway，不直连内部服务。
 6. 新功能先做简短架构分析再编码；新增服务 / 中间件 / provider 必须归属正确平台层并同步 owner docs。
 7. 不引入隐藏 fallback；开发相关路径时清理旧 fallback-like 分支，无法本轮清理的写入
    `remaining-goals.md`。
+
+## 切回 AI / Agent 条件
+
+客户端满足登录 / 注册、好友和群聊展示、私聊 / 群聊发起、中文消息、消息列表、
+PullInbox / ACK / push 状态和 Windows PC 可打开演示后，立即把 active slice 切到：
+
+```text
+backend architecture + AI / Agent / RAG demo path
+```
+
+目标演示链路是：
+
+```text
+IM 消息 -> search / memory projection -> EvidencePack -> RAG / Agent answer -> approval / audit
+```
 
 ## 不变量
 

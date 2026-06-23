@@ -13,6 +13,10 @@ First slice:
 - LAN-friendly config for `api-gateway` and `push-gateway`.
 - Minimal MVP path: login, open conversation, send text, receive notify,
   PullInbox, AckDelivery, reconnect recovery.
+- Current stop line: Web / Windows PC only need a demonstrable IM MVP. Do not
+  keep expanding toward complete product UI, release signing, MSI / NSIS
+  installer, full Android release, deep media UX or deep group management unless
+  the user explicitly switches back to that track.
 
 ## Boundaries
 

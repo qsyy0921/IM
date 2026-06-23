@@ -10,18 +10,20 @@
 ## Active Slice
 
 ```text
-client platform MVP foundation
+client demo MVP closeout -> AI / Agent / RAG transition
 ```
 
 目标：
 
 ```text
-Browser + PC + Android client architecture + client BFF contract + reusable client packages
+Web + Windows PC demonstrable IM MVP, then switch active slice to backend architecture + AI / Agent / RAG
 ```
 
 ## 当前事实
 
 - 短线优先浏览器端和 Windows PC 端；Android 后置到用户明确切回。
+- 客户端当前只追“可演示 MVP”，不继续追完整产品级 UI、release signing、
+  MSI / NSIS installer、完整移动端、媒体体验或群管理深水区。
 - Web / PC / Android 共用 `clients/packages/protocol` 和
   `clients/packages/client-core`；客户端只连 `api-gateway` BFF 和 `push-gateway`。
 - Web / PC shell 已接账号密码登录、注册、好友工作台、好友私聊、群聊列表、建群、
@@ -91,14 +93,25 @@ Browser + PC + Android client architecture + client BFF contract + reusable clie
   installer 签名完成。
 - Android 已有 WebView shell / bridge / APK 历史产物和 metadata smoke；后续切回时重新加载 toolchain env 或 Docker builder。
 
+## 客户端演示 MVP 收口标准
+
+客户端达到以下程度即视为当前阶段完成，不再继续追完整产品级客户端：
+
+1. Web / Windows PC 能登录、注册和恢复会话。
+2. 能展示好友列表、群聊列表和消息列表。
+3. 能发起私聊、进入群聊、发送中文消息，Web / PC 双向不乱码。
+4. 能看到 PullInbox、ACK、push 连接状态和失败提示。
+5. Windows PC 端能打开并用于局域网演示。
+
 ## 下一步优先级
 
-1. Windows PC 端继续真实 release certificate profile、`sign:desktop-artifact` 签真实 collected artifact、
-   `verify:desktop-signature --require-valid` 和 MSI / NSIS signed installer 体验。
-2. 客户端产品能力继续补入群审批 / 禁言等更深群设置，以及
-   media-service 真实 S3-compatible / thumbnail / scanner / CDN provider 后续链路。
-3. Android 后续只在用户切回时继续 login-level WebView smoke、APK baseline 报告和真机 UI polish。
-4. 客户端切片阶段性收口后，回到 workflow compensation adapter、instruction approval UI 和 ops 管理。
+1. 只修阻塞上述演示 MVP 的 Web / Windows PC 缺口。
+2. 客户端演示 MVP 达标后，立即更新本文件、`current-brief.md`、`remaining-goals.md`
+   和 README，把 active slice 切到后端架构完善与 AI / Agent / RAG。
+3. 后端 / AI 演示主线优先做：
+   `IM 消息 -> search / memory projection -> EvidencePack -> RAG / Agent answer -> approval / audit`。
+4. Windows release signing / MSI / NSIS installer、完整 Android、完整移动端发布、
+   复杂 UI、群管理深水区和真实 media provider 链路全部后置到 backlog。
 5. 新发现待办写入 `docs/runbook/remaining-goals.md`，不要把长待办复制回本文件。
 
 ## Focused Checks

@@ -16,26 +16,23 @@
 
 ## 当前优先顺序
 
-1. Client platform MVP foundation：继续 Web / Windows PC，Android 后置到用户切回。
-2. 客户端阶段收口后回到 AI / Agent：group memory、EvidencePack、真实业务动作、
-   Python AI Worker 候选算法。
+1. Client demo MVP closeout：只修 Web / Windows PC 演示阻塞，Android / installer / release signing 后置。
+2. 客户端演示 MVP 达标后切回 AI / Agent：group memory、EvidencePack、真实业务动作、
+   Python AI Worker 候选算法和 eval gate。
 3. Product-active 服务按需推进：workflow、audit、admin、notification、media、
    vector、model、knowledge、presence、control-plane。
 4. 数据平台和中间件 profile 按完整架构逐步补，不抢占客户端切片。
 5. 9 个既有 IM 服务只回补阻塞 client / AI / product platform 的 P0/P1 或用户点名项。
 
-## Client Platform MVP
+## Client Demo MVP
 
-- Windows PC：继续真实 signing input、valid signed artifact、MSI / NSIS installer、
-  signed installer experience；当前 `signtool` 可定位，但仍缺代码签名证书和 valid
-  Authenticode signature。
-- Web / PC shell：继续入群审批 / 禁言等更深群设置、上传状态 UX 和错误提示；
-  群公告、群头像上传 / 展示 first path 已接 conversation / media BFF，从好友列表邀请入群已接
-  conversation BFF 成员变更，不得直接写 conversation-service 私表。
-- Desktop runtime：继续真实 UI lifecycle 和 installer / signing 流水线；portable zip
-  与 install plan 已有 first-stage 本地路径。
+- Web / PC shell：只补演示阻塞项：登录 / 注册、好友列表、群聊列表、点击好友发起私聊、
+  点击群聊进入会话、中文消息双向不乱码、消息列表、发送、PullInbox、ACK、push 状态和清晰失败提示。
+- Windows PC：只要求本地 PC shell 能打开并演示；release signing、MSI / NSIS installer、
+  signed installer experience 不作为当前主线。
 - Android：后续切回时重新加载 F 盘 toolchain env 或显式 Docker builder，再跑 APK /
   WebView login smoke；不要在当前状态宣称 Android build readiness。
+- Web / PC shell 的入群审批 / 禁言、复杂群管理、完整媒体 UX 和移动端体验后置。
 - Local store：后续 native packaging/runtime ready 后把 desktop / Android store 替换为
   SQLite bridge。
 - Web hardening：生产 Web 鉴权后续切 httpOnly cookie / provider-grade session 策略。

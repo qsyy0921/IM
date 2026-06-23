@@ -362,7 +362,8 @@ First slice:
   readiness also requires read-only Authenticode verification to report a valid
   signed installer; unsigned or unverifiable installer artifacts fail closed.
   It also declares expected signer subject checks in its execution policy when
-  a public signer policy is provided. It now reports install-side readiness such as Android `adb` availability
+  a public signer policy is provided by CLI or
+  `NEXUSIM_DESKTOP_SIGN_EXPECTED_SUBJECT`. It now reports install-side readiness such as Android `adb` availability
   and Windows local artifact launch support, while still not launching
   artifacts, contacting devices, installing packages or printing local absolute
   paths.

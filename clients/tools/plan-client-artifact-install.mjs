@@ -14,7 +14,7 @@ const desktopArtifactKinds = new Set(["desktop-executable", "desktop-installer"]
 const defaultDesktopArtifactKind = "desktop-executable";
 
 function main(argv) {
-  const options = parseArgs(argv);
+  const options = parseArgs(argv, process.env);
   const plan = buildClientArtifactInstallPlan(options);
   process.stdout.write(`${JSON.stringify(plan, null, 2)}\n`);
 }
@@ -554,11 +554,11 @@ function sha256Text(value) {
   return createHash("sha256").update(value).digest("hex");
 }
 
-function parseArgs(argv) {
+function parseArgs(argv, env = {}) {
   const options = {
     manifest: "",
     artifactKind: "",
-    expectedSignerSubjectContains: ""
+    expectedSignerSubjectContains: env.NEXUSIM_DESKTOP_SIGN_EXPECTED_SUBJECT ?? ""
   };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];

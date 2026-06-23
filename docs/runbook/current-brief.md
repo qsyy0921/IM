@@ -58,7 +58,8 @@ Android 后置到用户明确切回。
    低敏 execution policy 会声明 profile 读取和 `--require-valid` 下的 signer subject enforcement；
    release readiness report 的 top-level 和 nested signing execution policy 也会声明
    profile 读取 / signer subject policy 检查，并会对已收集的 `desktop-installer` artifact 做独立 post-build 签名验证；
-   install plan 会在传入公开 expected signer subject policy 时声明该检查；
+   install plan 会在通过 CLI 或 `NEXUSIM_DESKTOP_SIGN_EXPECTED_SUBJECT`
+   传入公开 expected signer subject policy 时声明该检查；
    `build:desktop-installer` 执行后的收集步骤只读取选中 `bundle/<target>` 目录并要求
    `desktop-installer` artifact kind；installer plan / builder 的低敏 execution policy
    也会声明 signing profile 读取、显式 expected signer subject policy 检查、artifact collection 和

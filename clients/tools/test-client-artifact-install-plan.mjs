@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { execFileSync } from "node:child_process";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { buildClientArtifactInstallPlan } from "./plan-client-artifact-install.mjs";
@@ -12,6 +13,17 @@ function assert(condition, message) {
 
 function sha256(value) {
   return createHash("sha256").update(value).digest("hex");
+}
+
+function runInstallPlan(args, env = {}) {
+  const output = execFileSync(process.execPath, [join(workspaceRoot, "tools", "plan-client-artifact-install.mjs"), ...args], {
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      ...env
+    }
+  });
+  return JSON.parse(output);
 }
 
 const runDir = join(workspaceRoot, "artifacts", "install-plan-test");
@@ -218,6 +230,16 @@ try {
   assert(signedInstallerPlan.executionPolicy.checksExpectedSignerSubject === true, "explicit signer policy should be declared by install plan");
   assert(signedInstallerPlan.targets["windows-desktop"].missing.length === 0, "valid signed desktop installer should have no missing inputs");
   assert(signedInstallerPlan.targets["windows-desktop"].installerSignatureVerification.status === "Valid", "signed desktop installer status should be preserved");
+
+  const cliEnvSignerPlan = runInstallPlan([
+    "--manifest",
+    join(runDir, "manifest.json"),
+    "--artifact-kind",
+    "desktop-installer"
+  ], {
+    NEXUSIM_DESKTOP_SIGN_EXPECTED_SUBJECT: "NexusIM"
+  });
+  assert(cliEnvSignerPlan.executionPolicy.checksExpectedSignerSubject === true, "CLI install plan should read expected signer policy from env");
 
   writeFileSync(join(runDir, "manifest.json"), `${JSON.stringify({
     schemaVersion: "nexusim.client-artifacts.v1",

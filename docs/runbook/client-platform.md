@@ -144,7 +144,10 @@ First slice:
   group profile summary, invite source hints and first-stage group title /
   avatar URI read-update. Group settings now use the caller's current
   conversation-member role from the public BFF member-list contract to enable
-  OWNER / ADMIN management actions; unknown role state remains read-only.
+  OWNER / ADMIN management actions; unknown role state remains read-only. The
+  group settings area now separates profile, member browsing / role management
+  and explicit group actions into permission-aware sections instead of mixing
+  all controls in one block.
   Conversation profile facts are owned by
   `conversation-service`; Web / PC shell only uses the api-gateway BFF. Remaining
   group product work is richer group settings, media-service-backed avatar upload

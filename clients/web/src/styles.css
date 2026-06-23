@@ -677,6 +677,47 @@ button {
   padding: 10px 12px;
 }
 
+.group-settings-tabs {
+  display: flex;
+  grid-column: 1 / -1;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #d8e0e4;
+  border-radius: 8px;
+  background: #f8fafb;
+  padding: 8px;
+}
+
+.group-settings-tabs button {
+  border: 1px solid #cbd6dc;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #31515e;
+  padding: 7px 12px;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.group-settings-tabs button.active {
+  border-color: #19b37c;
+  background: #dff8ee;
+  color: #08724f;
+}
+
+.group-settings-permission {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  color: #52636d;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.group-settings-permission span:first-child {
+  color: #172126;
+}
+
 .group-profile-avatar {
   display: inline-flex;
   align-items: center;
@@ -743,6 +784,41 @@ button {
   border-radius: 8px;
   background: #f8fafb;
   padding: 10px;
+}
+
+.group-settings-section {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: 10px;
+  min-width: 0;
+  border: 1px solid #d8e0e4;
+  border-radius: 8px;
+  background: #f8fafb;
+  padding: 10px;
+}
+
+.group-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.group-section-header div {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.group-section-header strong {
+  color: #172126;
+  font-size: 13px;
+}
+
+.group-section-header span {
+  color: #64757d;
+  font-size: 12px;
 }
 
 .group-profile-edit label {
@@ -945,12 +1021,27 @@ button {
     justify-content: flex-start;
   }
 
+  .group-settings-tabs {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .group-settings-permission {
+    margin-left: 0;
+    width: 100%;
+  }
+
   .group-member-toolbar {
     grid-template-columns: minmax(0, 1fr) minmax(96px, 1fr);
   }
 
   .group-profile-edit {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .group-section-header {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .group-member-pagination {

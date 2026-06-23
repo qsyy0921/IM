@@ -36,6 +36,7 @@ const shellConfig = readClientShellConfig();
 const androidNativeMetadata = readAndroidNativeBridgeMetadata();
 type ActiveView = "conversations" | "contacts" | "settings";
 type GroupMemberRoleFilter = "ALL" | "OWNER" | "ADMIN" | "MEMBER";
+type GroupSettingsTab = "profile" | "members" | "actions";
 
 const GROUP_MEMBER_PAGE_SIZE = 8;
 
@@ -93,6 +94,7 @@ export function App() {
   const [groupProfileError, setGroupProfileError] = useState("");
   const [status, setStatus] = useState("ready");
   const [activeView, setActiveView] = useState<ActiveView>("conversations");
+  const [groupSettingsTab, setGroupSettingsTab] = useState<GroupSettingsTab>("profile");
   const [contacts, setContacts] = useState<ContactItem[]>([]);
   const [incomingRequests, setIncomingRequests] = useState<ContactRequestItem[]>([]);
   const [outgoingRequests, setOutgoingRequests] = useState<ContactRequestItem[]>([]);
@@ -427,6 +429,7 @@ export function App() {
     await showCachedMessages(conversationID);
     await syncConversation(conversationID, currentSession);
     if (selectedConversation?.type === "GROUP") {
+      setGroupSettingsTab("profile");
       await loadGroupProfile(conversationID, currentSession);
       await loadGroupSelfMember(conversationID, currentSession);
       await loadGroupMembers(conversationID, currentSession, {
@@ -1096,6 +1099,7 @@ export function App() {
     setMessages([]);
     clearGroupMemberState();
     clearGroupProfileState();
+    setGroupSettingsTab("profile");
     setLastAck(null);
     setPushStatus("disconnected");
   }
@@ -1652,209 +1656,270 @@ export function App() {
                 ) : null}
               </div>
             </div>
-            <form
-              className="group-profile-edit"
-              onSubmit={event => {
-                event.preventDefault();
-                void saveGroupProfile();
-              }}
-            >
-              <div className="group-permission-note" data-testid="group-permission-status">
-                <span data-testid="group-self-role">{groupPermissionText}</span>
-                {!canManageActiveGroup ? <span>群资料和成员管理只对群主或管理员开放。</span> : null}
-              </div>
-              <label>
-                群名称
-                <input
-                  data-testid="group-profile-title-input"
-                  maxLength={128}
-                  placeholder="群名称"
-                  value={groupProfileTitleDraft}
-                  onChange={event => setGroupProfileTitleDraft(event.target.value)}
-                  disabled={!session || !activeGroupProfile || !canManageActiveGroup}
-                />
-              </label>
-              <label>
-                头像 URI
-                <input
-                  data-testid="group-profile-avatar-input"
-                  maxLength={512}
-                  placeholder="https://... 或 media://..."
-                  value={groupProfileAvatarDraft}
-                  onChange={event => setGroupProfileAvatarDraft(event.target.value)}
-                  disabled={!session || !activeGroupProfile || !canManageActiveGroup}
-                />
-              </label>
+            <div className="group-settings-tabs" data-testid="group-settings-tabs" role="tablist" aria-label="群设置分区">
               <button
-                data-testid="group-profile-save"
-                type="submit"
-                disabled={!session || !activeGroupProfile || !canManageActiveGroup || groupProfileTitleDraft.trim() === ""}
-              >
-                保存资料
-              </button>
-              {groupProfileError ? (
-                <div data-testid="group-profile-error" className="group-profile-error">
-                  {groupProfileError}
-                </div>
-              ) : null}
-            </form>
-            <button
-              data-testid="group-members-refresh"
-              className="ghost-button"
-              type="button"
-              onClick={() => void applyGroupMemberFilters()}
-              disabled={!session}
-            >
-              刷新成员
-            </button>
-            <form
-              className="group-member-toolbar"
-              onSubmit={event => {
-                event.preventDefault();
-                void applyGroupMemberFilters();
-              }}
-            >
-              <input
-                data-testid="group-member-search"
-                placeholder="按用户 ID 前缀搜索"
-                value={groupMemberQuery}
-                onChange={event => setGroupMemberQuery(event.target.value)}
-                disabled={!session}
-              />
-              <select
-                data-testid="group-member-role-filter"
-                value={groupMemberRoleFilter}
-                onChange={event => setGroupMemberRoleFilter(event.target.value as GroupMemberRoleFilter)}
-                disabled={!session}
-              >
-                <option value="ALL">全部角色</option>
-                <option value="OWNER">群主</option>
-                <option value="ADMIN">管理员</option>
-                <option value="MEMBER">成员</option>
-              </select>
-              <button data-testid="group-member-filter-submit" type="submit" disabled={!session}>
-                筛选
-              </button>
-              <button
-                data-testid="group-member-filter-reset"
+                data-testid="group-settings-profile-tab"
+                className={groupSettingsTab === "profile" ? "active" : ""}
                 type="button"
-                onClick={() => void resetGroupMemberFilters()}
-                disabled={!session}
+                role="tab"
+                aria-selected={groupSettingsTab === "profile"}
+                onClick={() => setGroupSettingsTab("profile")}
               >
-                清空
+                资料
               </button>
-            </form>
-            <form
-              className="group-member-form"
-              onSubmit={event => {
-                event.preventDefault();
-                void inviteGroupMember();
-              }}
-            >
-              <input
-                data-testid="group-invite-user"
-                placeholder="添加成员用户 ID"
-                value={groupInviteUserID}
-                onChange={event => setGroupInviteUserID(event.target.value)}
-                disabled={!session || !canManageActiveGroup}
-              />
               <button
-                data-testid="group-invite-submit"
-                type="submit"
-                disabled={!session || !canManageActiveGroup || groupInviteUserID.trim() === ""}
+                data-testid="group-settings-members-tab"
+                className={groupSettingsTab === "members" ? "active" : ""}
+                type="button"
+                role="tab"
+                aria-selected={groupSettingsTab === "members"}
+                onClick={() => setGroupSettingsTab("members")}
               >
-                添加成员
+                成员
               </button>
-              <span data-testid="group-invite-source" className="group-invite-source">
-                邀请来源：当前群 {compactConversationID(activeGroupConversation.conversationID)}
+              <button
+                data-testid="group-settings-actions-tab"
+                className={groupSettingsTab === "actions" ? "active" : ""}
+                type="button"
+                role="tab"
+                aria-selected={groupSettingsTab === "actions"}
+                onClick={() => setGroupSettingsTab("actions")}
+              >
+                操作
+              </button>
+              <span className="group-settings-permission" data-testid="group-permission-status">
+                <span data-testid="group-self-role">{groupPermissionText}</span>
+                {!canManageActiveGroup ? <span>只读</span> : <span>可管理</span>}
               </span>
-            </form>
-            <button
-              data-testid="group-leave-submit"
-              className="danger-inline-button"
-              type="button"
-              onClick={() => void leaveGroupConversation()}
-              disabled={!session}
-            >
-              退群
-            </button>
-            {groupMembersError ? <div className="group-members-error">{groupMembersError}</div> : null}
-            <div className="group-member-pagination" aria-label="群成员分页">
-              <span data-testid="group-member-page-status">
-                第 {groupMemberPageIndex + 1} 页 · 本页 {groupMembersForActive.length} 人
-                {groupMemberNextPageToken ? " · 还有更多" : ""}
-              </span>
-              <div>
-                <button
-                  data-testid="group-member-prev-page"
-                  type="button"
-                  onClick={() => void loadPreviousGroupMemberPage()}
-                  disabled={!session || groupMemberPageIndex <= 0}
-                >
-                  上一页
-                </button>
-                <button
-                  data-testid="group-member-next-page"
-                  type="button"
-                  onClick={() => void loadNextGroupMemberPage()}
-                  disabled={!session || !groupMemberNextPageToken}
-                >
-                  下一页
-                </button>
-              </div>
             </div>
-            <div className="group-member-list" aria-label="群成员列表">
-              {groupMembersForActive.length === 0 && !groupMembersError ? (
-                <div className="mini-empty">当前筛选下暂无成员数据</div>
-              ) : null}
-              {groupMembersForActive.map(member => (
-                <article className="group-member-item" key={member.userID} data-testid="group-member-item">
-                  <div className="group-member-copy">
-                    <strong>{member.userID}</strong>
-                    <span>
-                      {memberRoleLabel(member.role)} · {memberStatusLabel(member.status)}
-                    </span>
+
+            {groupSettingsTab === "profile" ? (
+              <form
+                className="group-profile-edit"
+                onSubmit={event => {
+                  event.preventDefault();
+                  void saveGroupProfile();
+                }}
+              >
+                <div className="group-permission-note">
+                  <span>群资料由 conversation-service 持有，客户端只通过 BFF 更新。</span>
+                  {!canManageActiveGroup ? <span>群资料只对群主或管理员开放编辑。</span> : null}
+                </div>
+                <label>
+                  群名称
+                  <input
+                    data-testid="group-profile-title-input"
+                    maxLength={128}
+                    placeholder="群名称"
+                    value={groupProfileTitleDraft}
+                    onChange={event => setGroupProfileTitleDraft(event.target.value)}
+                    disabled={!session || !activeGroupProfile || !canManageActiveGroup}
+                  />
+                </label>
+                <label>
+                  头像 URI
+                  <input
+                    data-testid="group-profile-avatar-input"
+                    maxLength={512}
+                    placeholder="https://... 或 media://..."
+                    value={groupProfileAvatarDraft}
+                    onChange={event => setGroupProfileAvatarDraft(event.target.value)}
+                    disabled={!session || !activeGroupProfile || !canManageActiveGroup}
+                  />
+                </label>
+                <button
+                  data-testid="group-profile-save"
+                  type="submit"
+                  disabled={!session || !activeGroupProfile || !canManageActiveGroup || groupProfileTitleDraft.trim() === ""}
+                >
+                  保存资料
+                </button>
+                {groupProfileError ? (
+                  <div data-testid="group-profile-error" className="group-profile-error">
+                    {groupProfileError}
                   </div>
-                  <div className="group-member-actions">
-                    {member.role !== "ADMIN" ? (
-                      <button
-                        type="button"
-                        onClick={() => void updateGroupMemberRole(member, "ADMIN")}
-                        disabled={!session || !canManageActiveGroup || member.status !== "ACTIVE" || member.role === "OWNER"}
-                      >
-                        设管理员
-                      </button>
-                    ) : null}
-                    {member.role !== "MEMBER" ? (
-                      <button
-                        type="button"
-                        onClick={() => void updateGroupMemberRole(member, "MEMBER")}
-                        disabled={!session || !canManageActiveGroup || member.status !== "ACTIVE" || member.role === "OWNER"}
-                      >
-                        设成员
-                      </button>
-                    ) : null}
-                    {member.role !== "OWNER" ? (
-                      <button
-                        type="button"
-                        onClick={() => void transferGroupOwner(member)}
-                        disabled={!session || !canTransferActiveGroupOwner || member.status !== "ACTIVE"}
-                      >
-                        转让群主
-                      </button>
-                    ) : null}
+                ) : null}
+              </form>
+            ) : null}
+
+            {groupSettingsTab === "members" ? (
+              <div className="group-settings-section" data-testid="group-settings-members-panel">
+                <div className="group-section-header">
+                  <div>
+                    <strong>成员管理</strong>
+                    <span>筛选和角色变更都通过公开 BFF 成员接口执行。</span>
+                  </div>
+                  <button
+                    data-testid="group-members-refresh"
+                    className="ghost-button"
+                    type="button"
+                    onClick={() => void applyGroupMemberFilters()}
+                    disabled={!session}
+                  >
+                    刷新成员
+                  </button>
+                </div>
+                <form
+                  className="group-member-toolbar"
+                  onSubmit={event => {
+                    event.preventDefault();
+                    void applyGroupMemberFilters();
+                  }}
+                >
+                  <input
+                    data-testid="group-member-search"
+                    placeholder="按用户 ID 前缀搜索"
+                    value={groupMemberQuery}
+                    onChange={event => setGroupMemberQuery(event.target.value)}
+                    disabled={!session}
+                  />
+                  <select
+                    data-testid="group-member-role-filter"
+                    value={groupMemberRoleFilter}
+                    onChange={event => setGroupMemberRoleFilter(event.target.value as GroupMemberRoleFilter)}
+                    disabled={!session}
+                  >
+                    <option value="ALL">全部角色</option>
+                    <option value="OWNER">群主</option>
+                    <option value="ADMIN">管理员</option>
+                    <option value="MEMBER">成员</option>
+                  </select>
+                  <button data-testid="group-member-filter-submit" type="submit" disabled={!session}>
+                    筛选
+                  </button>
+                  <button
+                    data-testid="group-member-filter-reset"
+                    type="button"
+                    onClick={() => void resetGroupMemberFilters()}
+                    disabled={!session}
+                  >
+                    清空
+                  </button>
+                </form>
+                {groupMembersError ? <div className="group-members-error">{groupMembersError}</div> : null}
+                <div className="group-member-pagination" aria-label="群成员分页">
+                  <span data-testid="group-member-page-status">
+                    第 {groupMemberPageIndex + 1} 页 · 本页 {groupMembersForActive.length} 人
+                    {groupMemberNextPageToken ? " · 还有更多" : ""}
+                  </span>
+                  <div>
                     <button
-                      className="danger-inline-button"
+                      data-testid="group-member-prev-page"
                       type="button"
-                      onClick={() => void removeGroupMember(member)}
-                      disabled={!session || !canManageActiveGroup || member.status !== "ACTIVE" || member.userID === session?.userID}
+                      onClick={() => void loadPreviousGroupMemberPage()}
+                      disabled={!session || groupMemberPageIndex <= 0}
                     >
-                      移除
+                      上一页
+                    </button>
+                    <button
+                      data-testid="group-member-next-page"
+                      type="button"
+                      onClick={() => void loadNextGroupMemberPage()}
+                      disabled={!session || !groupMemberNextPageToken}
+                    >
+                      下一页
                     </button>
                   </div>
-                </article>
-              ))}
-            </div>
+                </div>
+                <div className="group-member-list" aria-label="群成员列表">
+                  {groupMembersForActive.length === 0 && !groupMembersError ? (
+                    <div className="mini-empty">当前筛选下暂无成员数据</div>
+                  ) : null}
+                  {groupMembersForActive.map(member => (
+                    <article className="group-member-item" key={member.userID} data-testid="group-member-item">
+                      <div className="group-member-copy">
+                        <strong>{member.userID}</strong>
+                        <span>
+                          {memberRoleLabel(member.role)} · {memberStatusLabel(member.status)}
+                        </span>
+                      </div>
+                      <div className="group-member-actions">
+                        {member.role !== "ADMIN" ? (
+                          <button
+                            type="button"
+                            onClick={() => void updateGroupMemberRole(member, "ADMIN")}
+                            disabled={!session || !canManageActiveGroup || member.status !== "ACTIVE" || member.role === "OWNER"}
+                          >
+                            设管理员
+                          </button>
+                        ) : null}
+                        {member.role !== "MEMBER" ? (
+                          <button
+                            type="button"
+                            onClick={() => void updateGroupMemberRole(member, "MEMBER")}
+                            disabled={!session || !canManageActiveGroup || member.status !== "ACTIVE" || member.role === "OWNER"}
+                          >
+                            设成员
+                          </button>
+                        ) : null}
+                        {member.role !== "OWNER" ? (
+                          <button
+                            type="button"
+                            onClick={() => void transferGroupOwner(member)}
+                            disabled={!session || !canTransferActiveGroupOwner || member.status !== "ACTIVE"}
+                          >
+                            转让群主
+                          </button>
+                        ) : null}
+                        <button
+                          className="danger-inline-button"
+                          type="button"
+                          onClick={() => void removeGroupMember(member)}
+                          disabled={!session || !canManageActiveGroup || member.status !== "ACTIVE" || member.userID === session?.userID}
+                        >
+                          移除
+                        </button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            {groupSettingsTab === "actions" ? (
+              <div className="group-settings-section" data-testid="group-settings-actions-panel">
+                <div className="group-section-header">
+                  <div>
+                    <strong>群操作</strong>
+                    <span>邀请、退群和危险操作都需要明确点击，不做隐藏兜底。</span>
+                  </div>
+                </div>
+                <form
+                  className="group-member-form"
+                  onSubmit={event => {
+                    event.preventDefault();
+                    void inviteGroupMember();
+                  }}
+                >
+                  <input
+                    data-testid="group-invite-user"
+                    placeholder="添加成员用户 ID"
+                    value={groupInviteUserID}
+                    onChange={event => setGroupInviteUserID(event.target.value)}
+                    disabled={!session || !canManageActiveGroup}
+                  />
+                  <button
+                    data-testid="group-invite-submit"
+                    type="submit"
+                    disabled={!session || !canManageActiveGroup || groupInviteUserID.trim() === ""}
+                  >
+                    添加成员
+                  </button>
+                  <span data-testid="group-invite-source" className="group-invite-source">
+                    邀请来源：当前群 {compactConversationID(activeGroupConversation.conversationID)}
+                  </span>
+                </form>
+                <button
+                  data-testid="group-leave-submit"
+                  className="danger-inline-button"
+                  type="button"
+                  onClick={() => void leaveGroupConversation()}
+                  disabled={!session}
+                >
+                  退群
+                </button>
+              </div>
+            ) : null}
           </section>
         ) : null}
 

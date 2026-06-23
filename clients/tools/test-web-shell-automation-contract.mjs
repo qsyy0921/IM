@@ -28,6 +28,10 @@ const requiredTestIDs = [
   "group-profile-avatar",
   "group-profile-title",
   "group-profile-subtitle",
+  "group-settings-tabs",
+  "group-settings-profile-tab",
+  "group-settings-members-tab",
+  "group-settings-actions-tab",
   "group-profile-id",
   "group-profile-member-count",
   "group-profile-title-input",
@@ -44,6 +48,8 @@ const requiredTestIDs = [
   "group-member-page-status",
   "group-member-prev-page",
   "group-member-next-page",
+  "group-settings-members-panel",
+  "group-settings-actions-panel",
   "group-member-item",
   "runtime-status",
   "push-status",
@@ -80,6 +86,10 @@ assertIncludes(appSource, "removeGroupMember", "web shell must expose group memb
 assertIncludes(appSource, "updateGroupMemberRole", "web shell must expose group member role action");
 assertIncludes(appSource, "transferGroupOwner", "web shell must expose owner transfer action");
 assertIncludes(appSource, "requireActiveGroupConversation", "web shell must gate group actions to group conversations");
+assertIncludes(appSource, "GroupSettingsTab", "web shell must keep group settings sections explicit");
+assertIncludes(appSource, "setGroupSettingsTab(\"profile\")", "web shell must reset group settings to profile when selecting a group");
+assertIncludes(appSource, "groupSettingsTab === \"members\"", "web shell must separate group member management from profile editing");
+assertIncludes(appSource, "groupSettingsTab === \"actions\"", "web shell must separate explicit group actions from member browsing");
 assertIncludes(appSource, "chooseActiveConversationID", "web shell must preserve selected conversation during refresh");
 assertIncludes(appSource, "clearExpiredSession", "web shell must clear UI state when gateway token expires");
 assertIncludes(appSource, "nativeMetadata?.capabilities?.localStore", "web shell must display native local-store readiness when available");

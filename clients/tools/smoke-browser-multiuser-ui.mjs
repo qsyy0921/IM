@@ -418,7 +418,7 @@ async function openKnownConversation(cdp, conversationID, timeoutMs) {
 async function sendText(cdp, text, timeoutMs) {
   await setInput(cdp, "message-composer", text);
   await click(cdp, "send-message");
-  await waitForText(cdp, "runtime-status", value => value === "send ok", "send ok", timeoutMs);
+  await waitForText(cdp, "runtime-status", value => value === "send message ok", "send message ok", timeoutMs);
   return waitForMessageSeq(cdp, text, timeoutMs);
 }
 

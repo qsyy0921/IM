@@ -9,6 +9,8 @@
 - Planner Python candidate guard：Python 只产候选，Go 拥有 proposal / approval 状态。
 - EvidencePack memory graph edges、profile aggregate evidence 和 RAG-Agent demo path。
 - Approval outbox relay 与 low-sensitive report / eval adapter。
+- EvidencePack-backed business proposal -> approval -> action-executor demo path，
+  已覆盖 conversation note / profile mutation 通过公开 conversation-service API 执行。
 
 ## 边界
 
@@ -19,5 +21,4 @@
 
 ## 下一步
 
-- 扩展真实业务 proposal 场景、proposal risk policy、instruction approval UI 和
-  Agent action eval cases。
+- 扩展 proposal risk policy、instruction approval UI 和更多真实业务 proposal 场景。

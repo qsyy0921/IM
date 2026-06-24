@@ -15,8 +15,8 @@
 
 ## 当前优先顺序
 
-1. AI / Agent demo path：group memory、EvidencePack、真实业务动作、Python AI Worker
-   候选算法和 eval gate。
+1. AI / Agent operations：action-executor provider failure metrics、batch redrive
+   operator handoff、provider replay approval / audit。
 2. Product-active 服务按需推进：workflow、audit、admin、notification、media、vector、
    model、knowledge、presence、control-plane。
 3. 数据平台和中间件 profile 按完整架构逐步补，不抢占 AI / Agent 演示主线。
@@ -39,11 +39,12 @@
 - `retrieval-gateway`：真实 OpenSearch、pgvector、Milvus provider smoke 和 coverage 深化。
 - `rag-service` / `summary-service`：继续扩展 multi-hop / temporal / profile eval、
   provider-specific regression 和更完整 unsafe output cases。
-- `agent-service`：真实业务 proposal 场景、proposal risk policy、approval 前置和
-  action execution demo path。
+- `agent-service`：proposal risk policy、instruction approval UI、更多真实业务
+  proposal 场景。
 - `skill-registry` / `mcp-gateway`：tool contract、risk level、tenant allowlist、adapter、
   rate limit。
-- `action-executor`：batch redrive、provider replay、operator UI、provider failure metrics。
+- `action-executor`：provider failure metrics、batch redrive operator handoff、
+  provider replay、operator UI。
 - `ai-eval-service`：扩展 group memory、retrieval miss、provider readiness、Agent action
   boundary 和 redrive / repair cases。
 - Python AI Worker：继续保持 candidate-only；更多 memory extraction、planner、rerank 和

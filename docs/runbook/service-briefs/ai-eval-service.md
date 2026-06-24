@@ -10,6 +10,8 @@
   action-executor preflight safety。
 - Optional service-stack adapters：collaborative memory、profile aggregation、
   public candidate review / temporal update、profile repair approval、RAG-Agent demo。
+- RAG-Agent business proposal cases：source-chain audit boundary 和 approved
+  conversation note / profile mutation execution。
 - Provider readiness / source coverage / vector lane checks 已进入相关 smoke 输出。
 
 ## 边界

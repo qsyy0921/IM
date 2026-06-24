@@ -23,4 +23,5 @@
 
 ## 下一步
 
-- Provider-grade batch redrive、provider replay、operator UI、provider failure metrics。
+- Provider failure metrics、batch redrive operator handoff、provider replay、
+  operator UI。

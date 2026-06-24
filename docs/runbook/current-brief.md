@@ -7,16 +7,21 @@ loadtest report 或 archive。
 
 - 客户端 Web / PC 已达到演示 MVP；除阻塞演示的问题外，不继续追完整产品级客户端。
 - 后端主线已切到 AI / Agent / RAG 演示路径和必要平台能力。
-- 当前 active module：Agent proposal / approval / action execution demo path。
+- 当前 active module：action-executor provider failure metrics / batch redrive
+  operator handoff。
 
 ## 当前模块事实
 
 - 上一模块已收口：RAG / Summary 的生成用 text evidence 必须带 `source_ref`；
   search / memory evidence 必须带 `visibility_version`；memory / profile evidence
   必须满足 active / approved；citation verifier 不再用 item 顶层字段兜底。
-- 当前模块把 Agent demo path 接到同一 EvidencePack 边界：proposal 只能引用可见、
-  可审计 evidence；approval 是写动作前置；action-executor 只执行已批准且 policy
-  允许的 tool / skill / resource。
+- Agent demo path 已进入可演示闭环：EvidencePack -> RAG -> Agent proposal ->
+  approval -> action-executor -> conversation-service public API，已覆盖
+  `conversation.note.create` 和 `conversation.profile.update` 两类业务 mutation；
+  eval catalog 已补 source-chain audit boundary 和 approved business mutation cases。
+- 当前模块继续补 action-executor 的 provider failure 可观测与 batch redrive
+  operator handoff：只输出低敏状态 / hash / reason class，不自动 replay 旧 input /
+  provider output，真正 redrive 仍需 fresh proposal / approval / prepared audit。
 - group memory / multi-party collaboration 必须继续保留 source refs、conversation scope、
   member visibility、time/version boundary、citations 和 no-citation refusal。
 
@@ -42,5 +47,5 @@ loadtest report 或 archive。
 
 ## 下一个方向
 
-- 完成当前 Agent proposal / approval / action execution demo path 后，再补
-  provider-grade redrive / operator UI / eval 平台能力。
+- 完成当前 action-executor provider failure metrics / batch redrive handoff 后，再补
+  provider replay 的 operator UI / 审批 / 审计闭环。

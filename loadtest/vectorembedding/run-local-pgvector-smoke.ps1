@@ -10,6 +10,7 @@ param(
     [string]$RequestTimeout = "5s",
     [switch]$StartPgVector,
     [switch]$AllowPull,
+    [int]$DockerTimeoutSeconds = 30,
     [switch]$SkipBuild
 )
 
@@ -17,6 +18,7 @@ $ErrorActionPreference = "Stop"
 
 $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\.."))
 . (Join-Path $repoRoot "tools\output-root-safety.ps1")
+. (Join-Path $repoRoot "tools\docker-runtime.ps1")
 Assert-ExternalOutputRoot -Value $ResultRoot -RepositoryRoot $repoRoot -Name "ResultRoot"
 
 if (-not $RunName) {
@@ -49,26 +51,19 @@ function Wait-Tcp {
 
 if ($StartPgVector) {
     $image = "pgvector/pgvector:pg16"
-    $imageId = docker image ls $image -q
-    if (-not $imageId) {
-        if (-not $AllowPull) {
-            throw "Missing Docker image $image. Pull manually or rerun with -AllowPull; this script does not pull by default."
-        }
-        docker pull $image
-        if ($LASTEXITCODE -ne 0) {
-            throw "failed to pull $image"
-        }
-    }
-    $baseCompose = Join-Path $repoRoot "deploy\local\docker-compose.yml"
-    $pgVectorCompose = Join-Path $repoRoot "deploy\local\docker-compose.pgvector.yml"
-    docker compose `
-        -f $baseCompose `
-        -f $pgVectorCompose `
-        --profile pgvector `
-        up -d pgvector
-    if ($LASTEXITCODE -ne 0) {
-        throw "failed to start pgvector compose profile"
-    }
+    Assert-NexusIMDockerEngine -TimeoutSeconds $DockerTimeoutSeconds
+    Ensure-NexusIMDockerImage `
+        -Image $image `
+        -TimeoutSeconds $DockerTimeoutSeconds `
+        -AllowPull:$AllowPull
+    Invoke-NexusIMDockerComposeUp `
+        -ComposeFiles @(
+            (Join-Path $repoRoot "deploy\local\docker-compose.yml"),
+            (Join-Path $repoRoot "deploy\local\docker-compose.pgvector.yml")
+        ) `
+        -Profiles @("pgvector") `
+        -Services @("pgvector") `
+        -TimeoutSeconds $DockerTimeoutSeconds
     Wait-Tcp -HostName "127.0.0.1" -Port 15432
 }
 
@@ -81,13 +76,15 @@ if (-not $SkipBuild) {
 }
 
 $runner = Join-Path $repoRoot "bin\vector-embedding-smoke.exe"
-& $runner `
-    --phase preflight-pgvector `
-    --pgvector-dsn $PgVectorDsn `
-    --pgvector-table $PgVectorTable `
-    --request-timeout $RequestTimeout `
-    --result-root $ResultRoot `
-    --run-name $RunName
+$runnerArgs = @(
+    "--phase", "preflight-pgvector",
+    "--pgvector-dsn", $PgVectorDsn,
+    "--pgvector-table", $PgVectorTable,
+    "--request-timeout", $RequestTimeout,
+    "--result-root", $ResultRoot,
+    "--run-name", $RunName
+)
+& $runner @runnerArgs
 if ($LASTEXITCODE -ne 0) {
     throw "vector pgvector preflight failed with exit code $LASTEXITCODE"
 }

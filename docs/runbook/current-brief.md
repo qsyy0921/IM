@@ -271,7 +271,10 @@ fail-closed，不写 execution audit、不写 tool result projection、不调用
   contract；Milvus provider 已补 REST v2 preflight gate，会验证 endpoint / collection /
   vector field type / dimension contract；provider readiness matrix 可一次性输出
   pgvector / OpenSearch vector / Milvus 的低敏状态；所有 provider preflight / readiness
-  均接入显式 `request-timeout` 单 provider 硬超时并输出低敏 timeout 值。当前
+  均接入显式 `request-timeout` 单 provider 硬超时并输出低敏 timeout 值。search-rag
+  provider runtime readiness bootstrap 已能显式启动本地 pgvector / OpenSearch
+  compose profile 并准备 OpenSearch vector index，Docker 调用有硬超时且默认不拉镜像。
+  当前
   `localhost:15432` 不可用，只完成 pgvector fail-closed 负向验证。后续继续做真实 OpenSearch 进程 smoke、真实
   pgvector / Milvus / OpenSearch vector provider smoke，
   以及跨 provider EvidencePack coverage。

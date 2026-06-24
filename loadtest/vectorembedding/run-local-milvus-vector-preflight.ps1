@@ -30,17 +30,21 @@ if (-not $SkipBuild) {
 }
 
 $runner = Join-Path $repoRoot "bin\vector-embedding-smoke.exe"
-& $runner `
-    --phase preflight-milvus-vector `
-    --milvus-endpoint $MilvusEndpoint `
-    --milvus-token $MilvusToken `
-    --milvus-database $MilvusDatabase `
-    --milvus-collection $MilvusCollection `
-    --milvus-vector-field $MilvusVectorField `
-    --milvus-vector-dimension $MilvusVectorDimension `
-    --request-timeout $RequestTimeout `
-    --result-root $ResultRoot `
-    --run-name $RunName
+$runnerArgs = @(
+    "--phase", "preflight-milvus-vector",
+    "--milvus-endpoint", $MilvusEndpoint,
+    "--milvus-database", $MilvusDatabase,
+    "--milvus-collection", $MilvusCollection,
+    "--milvus-vector-field", $MilvusVectorField,
+    "--milvus-vector-dimension", $MilvusVectorDimension,
+    "--request-timeout", $RequestTimeout,
+    "--result-root", $ResultRoot,
+    "--run-name", $RunName
+)
+if ($MilvusToken) {
+    $runnerArgs += @("--milvus-token", $MilvusToken)
+}
+& $runner @runnerArgs
 if ($LASTEXITCODE -ne 0) {
     throw "Milvus vector preflight failed with exit code $LASTEXITCODE"
 }

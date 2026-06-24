@@ -46,6 +46,12 @@ Stage-switch：`docs/runbook/stage-switch/vector-index-service.md`。
 - 同日 provider preflight / readiness 已统一接入显式 `request-timeout`：pgvector、
   OpenSearch vector 和 Milvus 探测都会在单 provider 短超时内 fail-closed，并在 summary
   输出 `provider_request_timeout_ms`；不可用 runtime 不再拖到全局 verify timeout。
+- 同日已补 search-rag provider runtime readiness bootstrap：
+  `loadtest/vectorembedding/run-local-search-rag-runtime-readiness.ps1` 可显式启动
+  本地 pgvector / OpenSearch compose profile、按需准备 OpenSearch `knn_vector`
+  临时 index，再调用 provider readiness matrix。Docker 调用使用硬超时；脚本默认不拉镜像，
+  只有显式 `-AllowPull` 才会拉取。该脚本只证明本地 runtime / mapping readiness，
+  不代表 provider 数据写入 / 搜索 smoke 已完成。
 - 2026-06-25 `loadtest/vectorembedding` 已补 `preflight-milvus-vector` phase 和
   `run-local-milvus-vector-preflight.ps1`：使用 Milvus REST v2 验证 endpoint、
   collection、vector field type 和 dimension contract；endpoint 禁止携带 credentials /

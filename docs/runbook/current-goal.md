@@ -278,6 +278,11 @@ IM messages -> search / memory projection -> EvidencePack -> RAG / Agent answer 
   vector 和 Milvus 的探测都使用 `request-timeout` 作为单 provider 硬超时，并在
   summary 输出 `provider_request_timeout_ms`；runtime 不可用时快速 fail-closed，
   不等待全局 verify timeout，也不切换到其它 provider。
+- 同日 search-rag provider runtime readiness bootstrap 已补：
+  `loadtest/vectorembedding/run-local-search-rag-runtime-readiness.ps1` 可显式启动
+  本地 pgvector / OpenSearch compose profile，按需准备 OpenSearch `knn_vector`
+  临时 index，再调用 provider readiness matrix；Docker 命令有硬超时，默认不拉镜像，
+  只有显式 `-AllowPull` 才会拉取。该入口不宣称 provider 数据写入 / 搜索 smoke 完成。
 - 同日 retrieval provider coverage contract 已补：
   `loadtest/retrieval --provider-readiness-summary <path>` 可读取上述
   `preflight-provider-readiness` summary，并把 pgvector / OpenSearch vector / Milvus

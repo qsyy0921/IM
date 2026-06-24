@@ -37,24 +37,28 @@ if (-not $SkipBuild) {
 }
 
 $runner = Join-Path $repoRoot "bin\vector-embedding-smoke.exe"
-& $runner `
-    --phase preflight-provider-readiness `
-    --provider-readiness $ProviderReadiness `
-    --pgvector-dsn $PgVectorDsn `
-    --pgvector-table $PgVectorTable `
-    --opensearch-vector-endpoint $OpenSearchEndpoint `
-    --opensearch-vector-index $OpenSearchIndex `
-    --opensearch-vector-field $OpenSearchVectorField `
-    --opensearch-vector-dimension $OpenSearchVectorDimension `
-    --milvus-endpoint $MilvusEndpoint `
-    --milvus-token $MilvusToken `
-    --milvus-database $MilvusDatabase `
-    --milvus-collection $MilvusCollection `
-    --milvus-vector-field $MilvusVectorField `
-    --milvus-vector-dimension $MilvusVectorDimension `
-    --request-timeout $RequestTimeout `
-    --result-root $ResultRoot `
-    --run-name $RunName
+$runnerArgs = @(
+    "--phase", "preflight-provider-readiness",
+    "--provider-readiness", $ProviderReadiness,
+    "--pgvector-dsn", $PgVectorDsn,
+    "--pgvector-table", $PgVectorTable,
+    "--opensearch-vector-endpoint", $OpenSearchEndpoint,
+    "--opensearch-vector-index", $OpenSearchIndex,
+    "--opensearch-vector-field", $OpenSearchVectorField,
+    "--opensearch-vector-dimension", $OpenSearchVectorDimension,
+    "--milvus-endpoint", $MilvusEndpoint,
+    "--milvus-database", $MilvusDatabase,
+    "--milvus-collection", $MilvusCollection,
+    "--milvus-vector-field", $MilvusVectorField,
+    "--milvus-vector-dimension", $MilvusVectorDimension,
+    "--request-timeout", $RequestTimeout,
+    "--result-root", $ResultRoot,
+    "--run-name", $RunName
+)
+if ($MilvusToken) {
+    $runnerArgs += @("--milvus-token", $MilvusToken)
+}
+& $runner @runnerArgs
 if ($LASTEXITCODE -ne 0) {
     throw "vector provider readiness failed with exit code $LASTEXITCODE"
 }

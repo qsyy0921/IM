@@ -92,6 +92,11 @@ Replacement / migration notes:
   `deploy/local/docker-compose.opensearch.yml` for search / RAG smoke work. It is
   not part of the default `core` profile and must not be treated as a business
   fact source.
+- `loadtest/vectorembedding/run-local-search-rag-runtime-readiness.ps1` is the
+  local search-rag provider readiness bootstrap. It can explicitly start
+  pgvector / OpenSearch compose profiles, prepare a local OpenSearch vector
+  index, and then run the provider readiness matrix. Docker calls are bounded by
+  a hard timeout and images are not pulled unless `-AllowPull` is passed.
 - Add search / vector / object storage / workflow / security middleware only
   when its service slice becomes active.
 - Treat data-platform middleware as analytical infrastructure. It cannot become

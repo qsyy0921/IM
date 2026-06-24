@@ -537,6 +537,13 @@ pgvector PostgreSQL 连接、`vector` extension 可用性和 table identifier �
 `deploy/local/docker-compose.pgvector.yml`，会在 `localhost:15432` 暴露独立
 `nexusim-pgvector`，不替换默认 `nexusim-postgres`。
 
+`loadtest/vectorembedding/run-local-search-rag-runtime-readiness.ps1` 是 search-rag
+provider runtime readiness bootstrap：它可显式启动本地 pgvector / OpenSearch
+compose profile、按需创建本地 OpenSearch `knn_vector` 临时 index，再调用 provider
+readiness matrix。Docker 命令有硬超时；默认不拉镜像，只有显式 `-AllowPull`
+才拉取。该入口只证明 runtime / mapping readiness，不代表 provider 数据写入 /
+搜索 smoke 已完成。
+
 Optional Milvus provider preflight 配置：
 
 ```text

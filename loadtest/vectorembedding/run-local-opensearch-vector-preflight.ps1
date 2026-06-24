@@ -28,15 +28,17 @@ if (-not $SkipBuild) {
 }
 
 $runner = Join-Path $repoRoot "bin\vector-embedding-smoke.exe"
-& $runner `
-    --phase preflight-opensearch-vector `
-    --opensearch-vector-endpoint $OpenSearchEndpoint `
-    --opensearch-vector-index $OpenSearchIndex `
-    --opensearch-vector-field $OpenSearchVectorField `
-    --opensearch-vector-dimension $OpenSearchVectorDimension `
-    --request-timeout $RequestTimeout `
-    --result-root $ResultRoot `
-    --run-name $RunName
+$runnerArgs = @(
+    "--phase", "preflight-opensearch-vector",
+    "--opensearch-vector-endpoint", $OpenSearchEndpoint,
+    "--opensearch-vector-index", $OpenSearchIndex,
+    "--opensearch-vector-field", $OpenSearchVectorField,
+    "--opensearch-vector-dimension", $OpenSearchVectorDimension,
+    "--request-timeout", $RequestTimeout,
+    "--result-root", $ResultRoot,
+    "--run-name", $RunName
+)
+& $runner @runnerArgs
 if ($LASTEXITCODE -ne 0) {
     throw "vector OpenSearch preflight failed with exit code $LASTEXITCODE"
 }

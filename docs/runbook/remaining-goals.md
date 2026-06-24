@@ -89,9 +89,10 @@
   不再使用 substring fallback；显式 OpenSearch / BM25 candidate backend first path 已落，
   不会绕过 PostgreSQL visibility / tombstone hydration；OpenSearch opt-in backend
   smoke 入口、service-owned rebuild operator first path 和 mapping drift hardening
-  已补齐但本机尚未归档真实 OpenSearch 进程通过报告；下一步继续补真实 OpenSearch
+  已补齐但本机尚未归档真实 OpenSearch 进程通过报告；retrieval positive smoke /
+  adapter 已把 `source_coverage` 矩阵纳入门禁；下一步继续补真实 OpenSearch
   进程 smoke、pgvector / Milvus / OpenSearch vector provider smoke
-  与 EvidencePack coverage。
+  与跨 provider EvidencePack coverage。
   真实 mutation 场景必须等显式业务 adapter 和
   operator policy 就绪。
 - `rag-service` / `summary-service`：拒答、引用校验、source-ref regression、unsafe

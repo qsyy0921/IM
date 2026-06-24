@@ -55,6 +55,50 @@ function Get-ExpectedSourceCount {
     }
 }
 
+function Get-SourceCoverage {
+    param(
+        $Summary,
+        [string]$SourceType
+    )
+
+    foreach ($entry in @($Summary.source_coverage)) {
+        if ((Get-JsonPropertyString -Object $entry -Name "source_type") -eq $SourceType) {
+            return $entry
+        }
+    }
+    return $null
+}
+
+function Test-ReturnedCoverage {
+    param(
+        $Summary,
+        [string]$SourceType,
+        [int]$ExpectedReturned
+    )
+
+    $coverage = Get-SourceCoverage -Summary $Summary -SourceType $SourceType
+    return `
+        ($null -ne $coverage) `
+        -and [bool]$coverage.requested `
+        -and ((Get-JsonPropertyString -Object $coverage -Name "status") -eq "RETURNED") `
+        -and ([int]$coverage.returned_count -eq $ExpectedReturned) `
+        -and ([int]$coverage.candidate_count -ge [int]$coverage.returned_count)
+}
+
+function Test-NotRequestedCoverage {
+    param(
+        $Summary,
+        [string]$SourceType
+    )
+
+    $coverage = Get-SourceCoverage -Summary $Summary -SourceType $SourceType
+    return `
+        ($null -ne $coverage) `
+        -and (-not [bool]$coverage.requested) `
+        -and ((Get-JsonPropertyString -Object $coverage -Name "status") -eq "NOT_REQUESTED") `
+        -and ([int]$coverage.returned_count -eq 0)
+}
+
 function Test-RetrievalAssertion {
     param(
         $Summary,
@@ -81,7 +125,11 @@ function Test-RetrievalAssertion {
                 -and [int]$Summary.memory_item_count -eq $memoryCount `
                 -and [int]$Summary.profile_item_count -eq $profileCount `
                 -and $searchCount -gt 0 `
-                -and $memoryCount -gt 0
+                -and $memoryCount -gt 0 `
+                -and (Test-ReturnedCoverage -Summary $Summary -SourceType "SEARCH_MESSAGE" -ExpectedReturned $searchCount) `
+                -and (Test-ReturnedCoverage -Summary $Summary -SourceType "MEMORY_EVENT" -ExpectedReturned $memoryCount) `
+                -and (Test-ReturnedCoverage -Summary $Summary -SourceType "PROFILE_AGGREGATE" -ExpectedReturned $profileCount) `
+                -and (Test-NotRequestedCoverage -Summary $Summary -SourceType "VECTOR_ITEM")
         }
         "must_exclude_expired_superseded_memory_items" {
             return `

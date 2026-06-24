@@ -86,42 +86,43 @@ type seededData struct {
 }
 
 type evidenceSummary struct {
-	RunName                               string       `json:"run_name"`
-	ResultDir                             string       `json:"result_dir"`
-	RetrievalTarget                       string       `json:"retrieval_target"`
-	VectorTarget                          string       `json:"vector_target,omitempty"`
-	IncludeVectorBackend                  bool         `json:"include_vector_backend"`
-	Query                                 string       `json:"query"`
-	Seed                                  seededData   `json:"seed"`
-	PackID                                string       `json:"pack_id"`
-	ItemCount                             int          `json:"item_count"`
-	SearchItemCount                       int          `json:"search_item_count"`
-	MemoryItemCount                       int          `json:"memory_item_count"`
-	ProfileItemCount                      int          `json:"profile_item_count"`
-	VectorItemCount                       int          `json:"vector_item_count"`
-	SourceCounts                          sourceCounts `json:"source_counts"`
-	SourceChainRerankPreserved            bool         `json:"source_chain_rerank_preserved"`
-	SearchRerankScore                     float64      `json:"search_rerank_score"`
-	MemoryRerankScore                     float64      `json:"memory_rerank_score"`
-	VectorRerankScore                     float64      `json:"vector_rerank_score,omitempty"`
-	SearchProjectionVersion               int64        `json:"search_projection_version"`
-	MemoryProjectionVersion               int64        `json:"memory_projection_version"`
-	RetrievalVersion                      string       `json:"retrieval_version"`
-	CurrentMemoryAtSeq                    int64        `json:"current_memory_at_seq"`
-	CrossGroupSourceRefsPreserved         bool         `json:"cross_group_source_refs_preserved"`
-	CrossGroupSpeakerAttributionPreserved bool         `json:"cross_group_speaker_attribution_preserved"`
-	MemoryGraphEdgesPreserved             bool         `json:"memory_graph_edges_preserved"`
-	ProfileAggregatePreserved             bool         `json:"profile_aggregate_preserved"`
-	VectorEvidencePreserved               bool         `json:"vector_evidence_preserved"`
-	VectorSourceRefHashPreserved          bool         `json:"vector_source_ref_hash_preserved"`
-	VectorNoRawText                       bool         `json:"vector_no_raw_text"`
-	TemporalVersionSelectedByQuerySeq     bool         `json:"temporal_version_selected_by_query_seq"`
-	ExpiredMemoryExcluded                 bool         `json:"expired_memory_excluded"`
-	SupersededMemoryExcluded              bool         `json:"superseded_memory_excluded"`
-	FutureMemoryExcluded                  bool         `json:"future_memory_excluded"`
-	Verified                              []string     `json:"verified"`
-	StartedAt                             time.Time    `json:"started_at"`
-	FinishedAt                            time.Time    `json:"finished_at"`
+	RunName                               string                  `json:"run_name"`
+	ResultDir                             string                  `json:"result_dir"`
+	RetrievalTarget                       string                  `json:"retrieval_target"`
+	VectorTarget                          string                  `json:"vector_target,omitempty"`
+	IncludeVectorBackend                  bool                    `json:"include_vector_backend"`
+	Query                                 string                  `json:"query"`
+	Seed                                  seededData              `json:"seed"`
+	PackID                                string                  `json:"pack_id"`
+	ItemCount                             int                     `json:"item_count"`
+	SearchItemCount                       int                     `json:"search_item_count"`
+	MemoryItemCount                       int                     `json:"memory_item_count"`
+	ProfileItemCount                      int                     `json:"profile_item_count"`
+	VectorItemCount                       int                     `json:"vector_item_count"`
+	SourceCounts                          sourceCounts            `json:"source_counts"`
+	SourceCoverage                        []sourceCoverageSummary `json:"source_coverage"`
+	SourceChainRerankPreserved            bool                    `json:"source_chain_rerank_preserved"`
+	SearchRerankScore                     float64                 `json:"search_rerank_score"`
+	MemoryRerankScore                     float64                 `json:"memory_rerank_score"`
+	VectorRerankScore                     float64                 `json:"vector_rerank_score,omitempty"`
+	SearchProjectionVersion               int64                   `json:"search_projection_version"`
+	MemoryProjectionVersion               int64                   `json:"memory_projection_version"`
+	RetrievalVersion                      string                  `json:"retrieval_version"`
+	CurrentMemoryAtSeq                    int64                   `json:"current_memory_at_seq"`
+	CrossGroupSourceRefsPreserved         bool                    `json:"cross_group_source_refs_preserved"`
+	CrossGroupSpeakerAttributionPreserved bool                    `json:"cross_group_speaker_attribution_preserved"`
+	MemoryGraphEdgesPreserved             bool                    `json:"memory_graph_edges_preserved"`
+	ProfileAggregatePreserved             bool                    `json:"profile_aggregate_preserved"`
+	VectorEvidencePreserved               bool                    `json:"vector_evidence_preserved"`
+	VectorSourceRefHashPreserved          bool                    `json:"vector_source_ref_hash_preserved"`
+	VectorNoRawText                       bool                    `json:"vector_no_raw_text"`
+	TemporalVersionSelectedByQuerySeq     bool                    `json:"temporal_version_selected_by_query_seq"`
+	ExpiredMemoryExcluded                 bool                    `json:"expired_memory_excluded"`
+	SupersededMemoryExcluded              bool                    `json:"superseded_memory_excluded"`
+	FutureMemoryExcluded                  bool                    `json:"future_memory_excluded"`
+	Verified                              []string                `json:"verified"`
+	StartedAt                             time.Time               `json:"started_at"`
+	FinishedAt                            time.Time               `json:"finished_at"`
 }
 
 type sourceCounts struct {
@@ -129,6 +130,15 @@ type sourceCounts struct {
 	MemoryEvent      int32 `json:"memory_event"`
 	ProfileAggregate int32 `json:"profile_aggregate"`
 	VectorItem       int32 `json:"vector_item,omitempty"`
+}
+
+type sourceCoverageSummary struct {
+	SourceType     string `json:"source_type"`
+	Requested      bool   `json:"requested"`
+	CandidateCount int32  `json:"candidate_count"`
+	ReturnedCount  int32  `json:"returned_count"`
+	DedupedCount   int32  `json:"deduped_count"`
+	Status         string `json:"status"`
 }
 
 func main() {
@@ -746,6 +756,11 @@ func verifyEvidence(
 	if !cfg.includeVectorBackend && counts.VectorItem != 0 {
 		return evidenceSummary{}, fmt.Errorf("unexpected vector source count without vector backend: %+v", counts)
 	}
+	sourceCoverage, err := verifySourceCoverage(pack.GetSourceCoverage(), counts, cfg.includeVectorBackend)
+	if err != nil {
+		return evidenceSummary{}, err
+	}
+	verified = append(verified, "source coverage matrix preserves requested, candidate, returned and status semantics")
 	if pack.GetSearchProjectionVersion() != seed.VisibilityVersion {
 		return evidenceSummary{}, fmt.Errorf("unexpected search projection version %d", pack.GetSearchProjectionVersion())
 	}
@@ -772,6 +787,7 @@ func verifyEvidence(
 		ProfileItemCount:                      int(counts.ProfileAggregate),
 		VectorItemCount:                       int(counts.VectorItem),
 		SourceCounts:                          counts,
+		SourceCoverage:                        sourceCoverage,
 		SourceChainRerankPreserved:            true,
 		SearchRerankScore:                     searchItem.GetRerankScore(),
 		MemoryRerankScore:                     memoryItem.GetRerankScore(),
@@ -795,6 +811,100 @@ func verifyEvidence(
 		StartedAt:                             startedAt,
 		FinishedAt:                            time.Now().UTC(),
 	}, nil
+}
+
+func verifySourceCoverage(
+	coverageItems []*retrievalv1.EvidenceSourceCoverage,
+	counts sourceCounts,
+	includeVector bool,
+) ([]sourceCoverageSummary, error) {
+	coverage := make(map[string]sourceCoverageSummary, len(coverageItems))
+	ordered := make([]sourceCoverageSummary, 0, len(coverageItems))
+	for _, item := range coverageItems {
+		sourceType := evidenceSourceTypeName(item.GetSourceType())
+		if sourceType == "" {
+			return nil, fmt.Errorf("unexpected source coverage type: %v", item.GetSourceType())
+		}
+		summary := sourceCoverageSummary{
+			SourceType:     sourceType,
+			Requested:      item.GetRequested(),
+			CandidateCount: item.GetCandidateCount(),
+			ReturnedCount:  item.GetReturnedCount(),
+			DedupedCount:   item.GetDedupedCount(),
+			Status:         evidenceCoverageStatusName(item.GetStatus()),
+		}
+		if summary.Status == "" {
+			return nil, fmt.Errorf("unexpected source coverage status: %v", item.GetStatus())
+		}
+		coverage[sourceType] = summary
+		ordered = append(ordered, summary)
+	}
+	required := map[string]int32{
+		"SEARCH_MESSAGE":    counts.SearchMessage,
+		"MEMORY_EVENT":      counts.MemoryEvent,
+		"PROFILE_AGGREGATE": counts.ProfileAggregate,
+	}
+	if includeVector {
+		required["VECTOR_ITEM"] = counts.VectorItem
+	}
+	for sourceType, returned := range required {
+		item, ok := coverage[sourceType]
+		if !ok {
+			return nil, fmt.Errorf("missing source coverage for %s", sourceType)
+		}
+		if !item.Requested {
+			return nil, fmt.Errorf("source coverage for %s was not requested", sourceType)
+		}
+		if item.Status != "RETURNED" {
+			return nil, fmt.Errorf("source coverage for %s status=%s want RETURNED", sourceType, item.Status)
+		}
+		if item.ReturnedCount != returned || item.ReturnedCount <= 0 {
+			return nil, fmt.Errorf("source coverage for %s returned=%d want %d", sourceType, item.ReturnedCount, returned)
+		}
+		if item.CandidateCount < item.ReturnedCount {
+			return nil, fmt.Errorf("source coverage for %s candidate=%d returned=%d", sourceType, item.CandidateCount, item.ReturnedCount)
+		}
+	}
+	if !includeVector {
+		vector, ok := coverage["VECTOR_ITEM"]
+		if !ok {
+			return nil, errors.New("missing source coverage for VECTOR_ITEM")
+		}
+		if vector.Requested || vector.Status != "NOT_REQUESTED" || vector.ReturnedCount != 0 {
+			return nil, fmt.Errorf("unexpected vector source coverage without vector backend: %+v", vector)
+		}
+	}
+	return ordered, nil
+}
+
+func evidenceSourceTypeName(sourceType retrievalv1.EvidenceSourceType) string {
+	switch sourceType {
+	case retrievalv1.EvidenceSourceType_EVIDENCE_SOURCE_TYPE_SEARCH_MESSAGE:
+		return "SEARCH_MESSAGE"
+	case retrievalv1.EvidenceSourceType_EVIDENCE_SOURCE_TYPE_MEMORY_EVENT:
+		return "MEMORY_EVENT"
+	case retrievalv1.EvidenceSourceType_EVIDENCE_SOURCE_TYPE_PROFILE_AGGREGATE:
+		return "PROFILE_AGGREGATE"
+	case retrievalv1.EvidenceSourceType_EVIDENCE_SOURCE_TYPE_VECTOR_ITEM:
+		return "VECTOR_ITEM"
+	default:
+		return ""
+	}
+}
+
+func evidenceCoverageStatusName(status retrievalv1.EvidenceSourceCoverageStatus) string {
+	switch status {
+	case retrievalv1.EvidenceSourceCoverageStatus_EVIDENCE_SOURCE_COVERAGE_STATUS_NOT_REQUESTED:
+		return "NOT_REQUESTED"
+	case retrievalv1.EvidenceSourceCoverageStatus_EVIDENCE_SOURCE_COVERAGE_STATUS_EMPTY:
+		return "EMPTY"
+	case retrievalv1.EvidenceSourceCoverageStatus_EVIDENCE_SOURCE_COVERAGE_STATUS_RETURNED:
+		return "RETURNED"
+	case retrievalv1.EvidenceSourceCoverageStatus_EVIDENCE_SOURCE_COVERAGE_STATUS_FILTERED:
+		return "FILTERED"
+	default:
+		return ""
+	}
 }
 
 func verifyVectorItem(item *retrievalv1.EvidenceItem, seed seededData) error {

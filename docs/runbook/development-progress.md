@@ -527,6 +527,8 @@ memory-service / retrieval-gateway optional live adapter first pass 已接入，
 live adapters 已同步 multi-hop actor/source-chain completeness 断言；2026-06-24 已运行完整 live service-stack gate，
 先得到 8 adapters / 51 cases / 47 passed / 0 failed / 4 skipped，随后补齐 retrieval-gateway
 negative / miss adapter，最新结果为 9 adapters / 51 cases / 51 passed / 0 failed / 0 skipped。
+2026-06-25 retrieval positive smoke / adapter 已把 `source_coverage` 矩阵纳入低敏门禁，
+覆盖 search / memory / profile returned 和 vector not-requested 语义。
 短期生产级测试、完整 HA、长压和 sizing 不再作为当前转进阻塞，但仍留在 hardening backlog。
 ```
 

@@ -3,6 +3,8 @@ package main
 import (
 	"path/filepath"
 	"testing"
+
+	retrievalv1 "github.com/qsyy0921/IM/api/proto/nexusim/retrieval/v1"
 )
 
 func TestParseConfigDefaults(t *testing.T) {
@@ -67,5 +69,51 @@ func TestPathInside(t *testing.T) {
 	}
 	if pathInside(outside, root) {
 		t.Fatalf("did not expect %q inside %q", outside, root)
+	}
+}
+
+func TestVerifySourceCoverageRequiresReturnedCoreSources(t *testing.T) {
+	coverage, err := verifySourceCoverage([]*retrievalv1.EvidenceSourceCoverage{
+		coverageItem(retrievalv1.EvidenceSourceType_EVIDENCE_SOURCE_TYPE_SEARCH_MESSAGE, true, 2, 1, retrievalv1.EvidenceSourceCoverageStatus_EVIDENCE_SOURCE_COVERAGE_STATUS_RETURNED),
+		coverageItem(retrievalv1.EvidenceSourceType_EVIDENCE_SOURCE_TYPE_MEMORY_EVENT, true, 1, 1, retrievalv1.EvidenceSourceCoverageStatus_EVIDENCE_SOURCE_COVERAGE_STATUS_RETURNED),
+		coverageItem(retrievalv1.EvidenceSourceType_EVIDENCE_SOURCE_TYPE_PROFILE_AGGREGATE, true, 1, 1, retrievalv1.EvidenceSourceCoverageStatus_EVIDENCE_SOURCE_COVERAGE_STATUS_RETURNED),
+		coverageItem(retrievalv1.EvidenceSourceType_EVIDENCE_SOURCE_TYPE_VECTOR_ITEM, false, 0, 0, retrievalv1.EvidenceSourceCoverageStatus_EVIDENCE_SOURCE_COVERAGE_STATUS_NOT_REQUESTED),
+	}, sourceCounts{SearchMessage: 1, MemoryEvent: 1, ProfileAggregate: 1}, false)
+	if err != nil {
+		t.Fatalf("verifySourceCoverage returned error: %v", err)
+	}
+	if len(coverage) != 4 {
+		t.Fatalf("coverage len=%d want 4", len(coverage))
+	}
+	if coverage[0].SourceType != "SEARCH_MESSAGE" || coverage[0].Status != "RETURNED" {
+		t.Fatalf("unexpected first coverage entry: %+v", coverage[0])
+	}
+}
+
+func TestVerifySourceCoverageRejectsMissingReturnedSource(t *testing.T) {
+	_, err := verifySourceCoverage([]*retrievalv1.EvidenceSourceCoverage{
+		coverageItem(retrievalv1.EvidenceSourceType_EVIDENCE_SOURCE_TYPE_SEARCH_MESSAGE, true, 1, 1, retrievalv1.EvidenceSourceCoverageStatus_EVIDENCE_SOURCE_COVERAGE_STATUS_RETURNED),
+		coverageItem(retrievalv1.EvidenceSourceType_EVIDENCE_SOURCE_TYPE_MEMORY_EVENT, true, 0, 0, retrievalv1.EvidenceSourceCoverageStatus_EVIDENCE_SOURCE_COVERAGE_STATUS_EMPTY),
+		coverageItem(retrievalv1.EvidenceSourceType_EVIDENCE_SOURCE_TYPE_PROFILE_AGGREGATE, true, 1, 1, retrievalv1.EvidenceSourceCoverageStatus_EVIDENCE_SOURCE_COVERAGE_STATUS_RETURNED),
+		coverageItem(retrievalv1.EvidenceSourceType_EVIDENCE_SOURCE_TYPE_VECTOR_ITEM, false, 0, 0, retrievalv1.EvidenceSourceCoverageStatus_EVIDENCE_SOURCE_COVERAGE_STATUS_NOT_REQUESTED),
+	}, sourceCounts{SearchMessage: 1, MemoryEvent: 1, ProfileAggregate: 1}, false)
+	if err == nil {
+		t.Fatalf("expected missing memory returned coverage to fail")
+	}
+}
+
+func coverageItem(
+	sourceType retrievalv1.EvidenceSourceType,
+	requested bool,
+	candidateCount int32,
+	returnedCount int32,
+	status retrievalv1.EvidenceSourceCoverageStatus,
+) *retrievalv1.EvidenceSourceCoverage {
+	return &retrievalv1.EvidenceSourceCoverage{
+		SourceType:     sourceType,
+		Requested:      requested,
+		CandidateCount: candidateCount,
+		ReturnedCount:  returnedCount,
+		Status:         status,
 	}
 }

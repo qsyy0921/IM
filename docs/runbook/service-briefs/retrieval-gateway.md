@@ -21,6 +21,10 @@
   expired / superseded / future memory query-seq exclusion。
 - EvidencePack 字段 hardening first pass：`rerank_score`、`dedupe_reason`、
   `source_coverage` 已落地，app / gRPC tests 覆盖排序、去重和覆盖统计。
+- 2026-06-25 retrieval positive smoke / adapter 已把 `source_coverage` 矩阵纳入
+  低敏门禁：search / memory / profile 必须是 `RETURNED`，未启用 vector 时
+  `VECTOR_ITEM` 必须是 `NOT_REQUESTED`；summary 只输出 source type、requested、
+  candidate / returned / deduped count 和 status。
 - EvidencePack -> memory-service current-only query 已落：默认 memory status 收敛为
   ACTIVE，显式 `at_conversation_seq` 透传给 memory-service；未传时使用 search hit
   最大 conversation seq 作为 first-stage recovery。

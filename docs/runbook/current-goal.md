@@ -244,6 +244,10 @@ IM messages -> search / memory projection -> EvidencePack -> RAG / Agent answer 
   `_meta` owner / source projection；已有 index 会读取 `_mapping` 校验 mapping version、
   `dynamic=strict` 和必需字段类型，drift 时 fail-closed 为 `SEARCH_UNAVAILABLE`，
   不继续 bulk 写入。
+- 2026-06-25 retrieval positive smoke / adapter 已把 EvidencePack `source_coverage`
+  矩阵纳入低敏门禁：search / memory / profile 必须 `RETURNED`，未启用 vector 时
+  `VECTOR_ITEM` 必须 `NOT_REQUESTED`；summary 只输出 source type、requested、
+  candidate / returned / deduped count 和 status。
 - 已有 clean smoke 覆盖真实双用户好友直聊、群聊 first path、群资料 BFF
   read/update 和群成员动作链路；证据见 `docs/runbook/client-platform.md`。
 - Windows desktop 已有 artifact / signing / installer plan first paths；签名 / installer
@@ -335,9 +339,10 @@ IM messages -> search / memory projection -> EvidencePack -> RAG / Agent answer 
    vector backend opt-in live smoke 已通过；search-service PostgreSQL FTS lexical
    backend 和显式 OpenSearch / BM25 candidate backend first paths 已补齐；OpenSearch
    opt-in smoke 入口、service-owned rebuild operator first path 和 mapping drift
-   hardening 已补齐，但尚未在真实 OpenSearch 进程上归档通过报告；后续真实 OpenSearch
+   hardening 已补齐；retrieval `source_coverage` 矩阵已进入 positive smoke /
+   adapter 门禁，但尚未在真实 OpenSearch 进程上归档通过报告；后续真实 OpenSearch
    进程 smoke、pgvector /
-   Milvus / OpenSearch vector provider smoke 和更细 EvidencePack coverage 仍保持在
+   Milvus / OpenSearch vector provider smoke 和跨 provider EvidencePack coverage 仍保持在
    retrieval-gateway 边界内。
 5. 客户端只作为演示入口；除非阻塞上述演示，不继续扩 UI 产品化。
 6. Windows release signing / MSI / NSIS installer、完整 Android、完整移动端发布、

@@ -266,7 +266,8 @@ fail-closed，不写 execution audit、不写 tool result projection、不调用
   vector-index-service pgvector provider smoke 已补 preflight gate，会先验证
   pgvector 连接、extension 可用性和 table identifier；OpenSearch vector provider
   也已补 preflight gate，会验证 endpoint / index / `knn_vector` mapping / dimension
-  contract。当前 `localhost:15432` 不可用，只完成 pgvector fail-closed 负向验证。
+  contract；provider readiness matrix 可一次性输出 pgvector / OpenSearch vector
+  的低敏状态。当前 `localhost:15432` 不可用，只完成 pgvector fail-closed 负向验证。
   后续继续做真实 OpenSearch 进程 smoke、真实 pgvector / Milvus / OpenSearch vector provider smoke，
   以及跨 provider EvidencePack coverage。
 - 真实 mutation 必须等显式业务 adapter、approval、executor、audit 全部就绪后再扩展。

@@ -273,8 +273,10 @@ backend sink；未配置时行为保持 metadata-only。`rebuild-worker` 可显�
 model-gateway，再写入当前配置的 provider backend；它不读取上游私表，也不从 metadata 表伪造
 缺失的 vector array。OpenSearch vector provider 已有 opt-in preflight gate：在真实 provider
 smoke 前先验证 endpoint / index / `knn_vector` mapping / dimension contract，mapping drift
-或 runtime 不可用时 fail-closed，不写入 OpenSearch。Milvus / OpenSearch adapter、真实
-pgvector smoke 和 provider backend repair 仍是后续项。
+或 runtime 不可用时 fail-closed，不写入 OpenSearch。`loadtest/vectorembedding` 还提供
+provider readiness matrix，可一次性输出 pgvector / OpenSearch vector 的低敏状态；该矩阵
+只是前置门禁，不代表 provider 数据写入 / 搜索链路完成。Milvus / OpenSearch adapter、
+真实 pgvector smoke 和 provider backend repair 仍是后续项。
 
 ## 9. 核心流程
 

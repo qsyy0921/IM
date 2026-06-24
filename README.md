@@ -201,7 +201,7 @@ profile 和最小 smoke。
 | 事件传播 | Kafka + protobuf schema + transactional outbox relay | Schema Registry、AsyncAPI / CloudEvents 元数据、Pulsar 候选 | Kafka 是传播面，不是权威事实源。 |
 | 临时状态 / 路由 / 缓存 | Redis single / Sentinel / Cluster；push route、resume、quota / presence 场景 | Redis Cluster 深化、托管 Redis、局部内存 cache | Redis 不保存 durable business facts。 |
 | 搜索 | search-service projection；PostgreSQL FTS lexical first path；显式 OpenSearch / BM25 candidate backend first path；OpenSearch opt-in smoke 入口、service-owned rebuild operator first path 和 mapping drift hardening | OpenSearch 真实进程 smoke 归档、Elasticsearch、Meilisearch、provider-grade BM25 运维 | 只有 search-service 写搜索索引；外部索引只召回候选，最终 visibility / tombstone 仍由 PostgreSQL projection 过滤。 |
-| 向量索引 | vector-index-service；PostgreSQL metadata、pgvector optional adapter、embedding queue；pgvector / OpenSearch vector provider preflight gates | Milvus、Qdrant、Weaviate、真实 OpenSearch vector provider smoke | 向量是可重建 projection，不是消息事实源；preflight 只证明 runtime / mapping readiness，不代表真实 provider 已完成。 |
+| 向量索引 | vector-index-service；PostgreSQL metadata、pgvector optional adapter、embedding queue；pgvector / OpenSearch vector provider preflight gates 和 provider readiness matrix | Milvus、Qdrant、Weaviate、真实 OpenSearch vector provider smoke | 向量是可重建 projection，不是消息事实源；preflight / readiness 只证明 runtime / mapping contract，不代表真实 provider 已完成。 |
 | 对象存储 / 媒体 | media-service fake object-store port；Web / PC 群头像上传 / 展示 first path；MinIO / S3-compatible 预留 | S3、MinIO、Ceph、病毒扫描、缩略图、转码 provider | 二进制不放 message-service。 |
 | 工作流 / 审批 | workflow-service 内部状态机、compensation instruction registry | Temporal、Cadence、Argo Workflows | 审批和补偿审计归 workflow / audit 所有。 |
 | 身份 / 联邦 | identity-service、JWKS、OIDC discovery first path | Keycloak、OIDC providers、多 issuer、WebAuthn/passkeys | api-gateway 仍负责 trusted metadata 边界。 |
@@ -295,7 +295,7 @@ message / conversation / policy events -> search-service + memory-service projec
 | `model-gateway` | text generation / embedding invocation metadata、mock provider、低敏 invocation outbox，不持久化 raw prompt 或 embedding vector。 |
 | `knowledge-ingestion-service` | knowledge source、ingestion job、chunk manifest、knowledge outbox relay、vector handoff first path。 |
 | `workflow-service` | workflow creation / decision、approval状态机、compensation request / instruction registry / rollback adapter first path。 |
-| `vector-index-service` | vector metadata、tombstone、search、rebuild request / checkpoint、embedding queue / worker、knowledge chunk consumer first path；pgvector provider smoke 已有 preflight gate，先验证 pgvector 连接、extension 和 table 配置；OpenSearch vector provider 也已有 preflight gate，先验证 endpoint / index / `knn_vector` mapping / dimension，不可用或 drift 时 fail-closed 并写低敏 summary。 |
+| `vector-index-service` | vector metadata、tombstone、search、rebuild request / checkpoint、embedding queue / worker、knowledge chunk consumer first path；pgvector provider smoke 已有 preflight gate，先验证 pgvector 连接、extension 和 table 配置；OpenSearch vector provider 也已有 preflight gate，先验证 endpoint / index / `knn_vector` mapping / dimension；provider readiness matrix 可一次性输出 pgvector / OpenSearch vector 的低敏状态，不可用或 drift 时 fail-closed 并写 summary。 |
 
 已启动的客户端平台：
 

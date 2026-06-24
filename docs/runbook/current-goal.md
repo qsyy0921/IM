@@ -258,6 +258,11 @@ IM messages -> search / memory projection -> EvidencePack -> RAG / Agent answer 
   endpoint、index 存在、mapping 中指定字段为 `knn_vector` 且 dimension 匹配；
   endpoint 不允许 credentials / query / fragment；不可用、index 缺失或 mapping drift
   都 fail-closed 并写低敏 summary，不写 OpenSearch，也不伪造真实 provider smoke。
+- 同日 vector-index-service provider readiness matrix 已补：
+  `loadtest/vectorembedding --phase preflight-provider-readiness` 可一次性检查
+  pgvector / OpenSearch vector 的 readiness，并输出 `provider_readiness[]` 低敏矩阵；
+  任一 requested provider 不满足 contract 时整体 fail-closed，但保留每个 provider
+  的低敏状态用于排障；该矩阵仍不是 provider 数据写入 / 搜索 smoke。
 - 已有 clean smoke 覆盖真实双用户好友直聊、群聊 first path、群资料 BFF
   read/update 和群成员动作链路；证据见 `docs/runbook/client-platform.md`。
 - Windows desktop 已有 artifact / signing / installer plan first paths；签名 / installer
@@ -350,7 +355,8 @@ IM messages -> search / memory projection -> EvidencePack -> RAG / Agent answer 
    backend 和显式 OpenSearch / BM25 candidate backend first paths 已补齐；OpenSearch
    opt-in smoke 入口、service-owned rebuild operator first path 和 mapping drift
    hardening 已补齐；retrieval `source_coverage` 矩阵已进入 positive smoke /
-   adapter 门禁；pgvector 和 OpenSearch vector provider preflight gate 已补齐，但尚未
+   adapter 门禁；pgvector 和 OpenSearch vector provider preflight gate 及 readiness
+   matrix 已补齐，但尚未
    在真实 OpenSearch / pgvector 进程上归档通过 provider smoke 报告；后续真实
    OpenSearch 进程 smoke、真实 pgvector /
    Milvus / OpenSearch vector provider smoke 和跨 provider EvidencePack coverage 仍保持在

@@ -39,6 +39,10 @@ Stage-switch：`docs/runbook/stage-switch/vector-index-service.md`。
   是否存在，以及 mapping 中指定字段是否为 `knn_vector` 且 dimension 匹配；endpoint
   禁止携带 credentials / query / fragment；不可用或 mapping drift 时 fail-closed
   并写低敏 summary，不写入 OpenSearch，也不伪造真实 provider smoke。
+- 2026-06-25 `loadtest/vectorembedding` 已补 `preflight-provider-readiness` phase 和
+  `run-local-provider-readiness.ps1`：一次性输出 pgvector / OpenSearch vector 的
+  provider readiness matrix；任一 requested provider 不满足 contract 时整体 fail-closed，
+  但 summary 会保留每个 provider 的低敏状态，便于真实 provider smoke 前排障。
 
 证据入口：`docs/runbook/loadtest/vector-index-service/` 和 `loadtest/vectorembedding`。
 

@@ -532,6 +532,7 @@ negative / miss adapter，最新结果为 9 adapters / 51 cases / 51 passed / 0 
 同日 vector-index-service provider readiness 已补 pgvector 和 OpenSearch vector
 preflight gates：pgvector 会验证 PostgreSQL 连接、`vector` extension 和 table identifier；
 OpenSearch vector 会验证 endpoint、index、`knn_vector` mapping 和 dimension contract；
+provider readiness matrix 可一次性输出 pgvector / OpenSearch vector 的低敏 readiness 状态；
 本机 `localhost:15432` 不可用时已确认 pgvector 快速 fail-closed 并写低敏 summary。
 真实 pgvector / OpenSearch vector provider smoke 仍待 runtime 恢复后归档。
 短期生产级测试、完整 HA、长压和 sizing 不再作为当前转进阻塞，但仍留在 hardening backlog。

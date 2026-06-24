@@ -212,6 +212,36 @@ NEXUSIM_VECTOR_PGVECTOR_ENSURE_SCHEMA=true
 - index 缺失、endpoint 不可达、mapping drift 或 dimension 不匹配都必须 fail-closed；
   runner 只输出低敏 summary。
 
+## Provider Readiness Matrix
+
+用途：
+
+- 在真实 provider smoke 前一次性检查多个 vector provider runtime 是否满足最小 contract。
+- 当前支持 `pgvector` 和 `opensearch-vector`。
+- 输出 `provider_readiness[]` 低敏矩阵：provider、requested、configured、available、
+  status、public error；不输出 DSN、账号密码、provider body、raw vector 或 raw text。
+
+运行：
+
+```powershell
+.\loadtest\vectorembedding\run-local-provider-readiness.ps1 `
+  -ProviderReadiness "pgvector,opensearch-vector" `
+  -PgVectorDsn "postgres://nexusim:nexusim@localhost:15432/nexusim?sslmode=disable" `
+  -OpenSearchEndpoint "http://127.0.0.1:9200" `
+  -OpenSearchIndex "nexusim-vector-items" `
+  -OpenSearchVectorField "embedding_vector" `
+  -OpenSearchVectorDimension 8 `
+  -ResultRoot "H:\NexusIM\loadtest-results"
+```
+
+边界：
+
+- readiness matrix 是 provider 前置门禁，不会自动启动 Docker、不拉镜像、不写 provider。
+- 任一 requested provider 不满足 contract 时整体 fail-closed，并保留每个 provider
+  的低敏状态，便于 operator 判断是 pgvector、OpenSearch vector 还是配置问题。
+- readiness 通过后仍需单独跑真实 provider smoke；不得把 readiness 当作 provider
+  数据写入 / 搜索链路已经完成。
+
 ## Optional Rebuild Provider Backfill
 
 第一版 `rebuild-worker` 默认只推进 rebuild checkpoint / outbox。需要验证 provider

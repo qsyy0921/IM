@@ -17,6 +17,9 @@
 - Docker / Prometheus / Grafana wiring、聚焦测试、PG integration、Agent execution eval adapter、external HTTP adapter eval / failure smoke、preflight safety eval。
 - Action rate-limit / repair-DLQ safety：rate-limited action 在 tool execution 前 `BLOCKED`；limiter unavailable fail closed 为 `FAILED`；repair / DLQ action 需 operator workflow，不进通用 adapter。
 - Provider failure lifecycle：timeout / unavailable / rate-limit -> `RETRY_PENDING`；permission denied / unsafe / generic failure -> `DLQ`；worker 只做 bounded retry bookkeeping / DLQ，不重放 tool。
+- 2026-06-24 `loadtest/ragagent` 已提供 RAG-Agent demo first path：通过既有
+  Agent approval 后调用 action-executor，并把 execution / result 状态纳入低敏总报告；
+  该 runner 不保存 raw tool input / output。
 
 ## 边界
 
@@ -27,4 +30,5 @@
 
 ## 下一步
 
-- 后续 redrive API / metrics / operator UI；默认主线转回 memory / retrieval 深化。
+- 后续 redrive API / metrics / operator UI；下一步可运行 `loadtest/ragagent`
+  真实 service-stack smoke，再默认转回 memory / retrieval 深化。

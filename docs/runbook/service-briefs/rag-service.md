@@ -11,8 +11,8 @@
 - `rag_service.proto`、SDD、六层 skeleton、`grpc` runtime、metrics、Docker / observability wiring
 - app usecase 调用 retrieval port 和 `AnswerProvider` port；默认本地
   extractive provider 基于 EvidencePack 生成 deterministic answer
-- 已补 guarded external HTTP LLM boundary：只由 EvidencePack 构造 prompt，
-  provider failure 回退 extractive，unsafe / malformed output fail closed
+- 已补 guarded external HTTP LLM boundary：只由 EvidencePack 构造 prompt；
+  provider failure 返回稳定 unavailable，unsafe / malformed output fail closed
 - 已补可选 `python-worker` provider mode：Go 先生成 grounded answer，Python
   worker 只返回 candidate hash / citations；Go 校验 id、hash 和 citation
 - response 保留 citations、EvidencePack、`generated_by_llm=false`；provider 输出后统一运行 citation verifier
@@ -33,9 +33,14 @@
   `PROFILE_AGGREGATE` evidence 的 profile subject、aggregate type/key、
   supporting memory ids 和时间字段；`loadtest/rag` 会断言 profile aggregate
   evidence 被保留。RAG 仍只消费 retrieval-gateway 返回的 EvidencePack。
+- 2026-06-24 `loadtest/ragagent` 已提供 RAG-Agent demo first path：复用
+  `loadtest/rag` 的 grounded answer 校验，并与 Agent proposal / approval /
+  action-executor audit 组合成同一 tenant / conversation 的低敏总报告；RAG 仍不直接读
+  Agent、action-executor 或任何私表。
 
 下一步：
 
 - 真实服务栈启动后与 memory-service / retrieval-gateway adapter 一起跑完整
-  optional gate；之后扩展 temporal update / profile recompute 和更完整
-  group-memory answer 场景，provider 仍走 port、guard 和 citation verifier。
+  optional gate；之后运行 `loadtest/ragagent` 的真实 service-stack smoke，并扩展
+  temporal update / profile recompute 和更完整 group-memory answer 场景，provider
+  仍走 port、guard 和 citation verifier。

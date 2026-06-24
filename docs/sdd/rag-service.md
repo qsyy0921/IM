@@ -14,7 +14,7 @@ version 过滤的 `EvidencePack`，并向客户端返回带引用的回答。
   默认实现不调用外部 LLM provider。
 - 可选 `external-http` provider mode 只作为第一阶段外部 LLM boundary：它仍走
   `AnswerProvider` port，prompt 只能由 EvidencePack 构造，HTTP 明文 endpoint
-  只允许 loopback / private，provider failure 回退 extractive，unsafe /
+  只允许 loopback / private，provider failure 返回稳定 unavailable，unsafe /
   malformed output fail closed。
 - 可选 `python-worker` provider mode 只作为第一阶段服务级 Python candidate
   guard：Go 先生成 grounded answer，Python worker 只返回 candidate hash /

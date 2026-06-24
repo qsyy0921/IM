@@ -273,9 +273,9 @@ message / conversation / policy events -> search-service + memory-service projec
 | `search-service` | 搜索 projection、visibility / tombstone、`SearchMessages`、timeline consumer、projection smoke。 |
 | `memory-service` | group memory projection、rules-v0.2 extraction cue classifier、StructuredMemoryEvent、source refs、visibility window、revoke hidden、profile aggregate recompute / archive first path。 |
 | `retrieval-gateway` | EvidencePack 统一边界，聚合 search / memory / policy precheck，并通过 memory-service 公开 API 扩展 current memory graph edges 和当前用户 profile aggregate evidence；不直接调用 LLM。 |
-| `rag-service` | 只读问答 first path、EvidencePack citation verifier、guarded external HTTP LLM boundary，并保留 EvidencePack memory graph edges 和 profile aggregate evidence。 |
+| `rag-service` | 只读问答 first path、EvidencePack citation verifier、guarded external HTTP LLM boundary，并保留 EvidencePack memory graph edges 和 profile aggregate evidence；`loadtest/ragagent` 会把 RAG grounded answer 与 Agent approval / action audit 汇总成低敏演示报告。 |
 | `summary-service` | 只读摘要 first path、EvidencePack citation verifier、guarded external HTTP LLM boundary，并保留 EvidencePack memory graph edges 和 profile aggregate evidence。 |
-| `agent-service` | proposal-only path、mcp-gateway prepare、approval workflow、approval outbox relay、planner Python candidate guard，并保留 EvidencePack memory graph edges 和 profile aggregate evidence。 |
+| `agent-service` | proposal-only path、mcp-gateway prepare、approval workflow、approval outbox relay、planner Python candidate guard，并保留 EvidencePack memory graph edges 和 profile aggregate evidence；`loadtest/ragagent` 复用 Agent proposal / approval / action-executor audit 校验。 |
 | `skill-registry` | 技能目录、输入输出合约、风险等级、审批要求和审计元数据。 |
 | `mcp-gateway` | tool prepare 边界、skill catalog check、policy precheck、低敏 audit，不直接执行外部工具。 |
 | `action-executor` | approved execution audit、proposal / approval / prepare audit 校验、本地安全 adapter、guarded external HTTP provider adapter、eval smoke。 |
@@ -354,6 +354,11 @@ memory-service timeline worker 同步升级到 `rules-v0.2` group memory extract
 只抽取明确 `decision:` / `task:` / `status:` / `blocker:` / `file:` /
 `profile_signal:` 等 cue 或显式 memory metadata 的消息；普通聊天不会被泛化成
 memory fact，profile / preference / role signal 保持 PENDING + NEEDS_REVIEW。
+`loadtest/ragagent` 已新增 RAG-Agent demo first path：编排既有 `loadtest/rag`
+和 `loadtest/agent`，围绕同一 tenant / conversation 生成低敏总报告，断言
+RAG grounded answer、Agent proposal、approval、action-executor audit、
+EvidencePack graph edges 和 profile evidence 均成立；报告只保存 hash、计数和状态，
+不保存 raw answer / proposal text。真实服务栈运行和 ai-eval gate 接入是下一步。
 
 下一步默认看 [current-goal.md](docs/runbook/current-goal.md)。截至当前主线，客户端只修
 阻塞演示入口的问题；默认推进

@@ -29,6 +29,10 @@ proposal 前调用 `mcp-gateway.PrepareToolCall` 做 skill / policy / prepare au
   `PROFILE_AGGREGATE` evidence 的 profile subject、aggregate type/key、
   supporting memory ids 和时间字段；`loadtest/agent` 会断言 profile aggregate
   evidence 被保留。Agent 仍只提交 proposal，不直接读 memory-service 私表。
+- 2026-06-24 `loadtest/ragagent` 已提供 RAG-Agent demo first path：复用
+  `loadtest/agent` 的 proposal / approval / action-executor audit 校验，并与
+  RAG grounded answer 校验组合成同一 tenant / conversation 的低敏总报告；Agent
+  仍不直接执行工具或业务 mutation。
 
 ## 边界
 
@@ -38,5 +42,6 @@ proposal 前调用 `mcp-gateway.PrepareToolCall` 做 skill / policy / prepare au
 ## 下一步
 
 - 真实服务栈启动后与 memory-service / retrieval-gateway adapter 一起跑完整
-  optional gate；之后扩展 temporal update / profile recompute 和更完整
-  group-memory Agent proposal 场景；仍只提交 proposal。
+  optional gate；之后运行 `loadtest/ragagent` 的真实 service-stack smoke，并扩展
+  temporal update / profile recompute 和更完整 group-memory Agent proposal 场景；
+  仍只提交 proposal。

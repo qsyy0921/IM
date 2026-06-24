@@ -147,6 +147,11 @@ memory-service timeline worker 已升级 `rules-v0.2` group memory extraction：
 memory cue 或显式 memory metadata 的群消息会投影成 PENDING StructuredMemoryEvent；
 普通聊天不生成 memory fact；profile / preference / role signal 保持 NEEDS_REVIEW，
 避免单条群聊事实直接升级成个人画像。
+`loadtest/ragagent` 已提供 RAG-Agent demo first path：复用 `loadtest/rag` 和
+`loadtest/agent`，围绕同一 tenant / conversation 生成低敏总报告，断言 RAG grounded
+answer、Agent proposal、approval、action-executor audit、EvidencePack graph edges
+和 profile aggregate evidence 均成立；不保存 raw answer / proposal text。真实服务栈
+运行和 ai-eval gate 接入仍是下一步。
 
 ## 不变量
 

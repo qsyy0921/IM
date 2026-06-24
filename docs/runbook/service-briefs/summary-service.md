@@ -11,8 +11,8 @@
 - `summary_service.proto`、SDD、六层 skeleton、`grpc` runtime、metrics、Docker / observability wiring
 - app usecase 调用 retrieval port 和 `SummaryProvider` port；默认本地
   extractive provider 基于 EvidencePack 生成 deterministic summary
-- 已补 guarded external HTTP LLM boundary：只由 EvidencePack 构造 prompt，
-  provider failure 回退 extractive，unsafe / malformed output fail closed
+- 已补 guarded external HTTP LLM boundary：只由 EvidencePack 构造 prompt；
+  provider failure 返回稳定 unavailable，unsafe / malformed output fail closed
 - 已补可选 `python-worker` provider mode：Go 先生成 grounded summary，Python
   worker 只返回 candidate hash / citations；Go 校验 id、hash 和 citation
 - response 保留 citations、EvidencePack、`generated_by_llm=false`；provider 输出后统一运行 citation verifier

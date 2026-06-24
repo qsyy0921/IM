@@ -46,12 +46,14 @@
   reasoning failure、memory lifecycle failure、action boundary failure。
 - `ai-eval-service`：retrieval negative / miss adapter 已补齐；继续扩展
   profile repair batch、Python memory extraction candidate、EvidencePack
-  source-chain、RAG / Agent demo module 的真实 service-stack cases。
+  source-chain、RAG-Agent demo runner 的真实 service-stack smoke 和 gate 接入。
 - `memory-service` / `retrieval-gateway`：memory graph edge、profile aggregate
   evidence、公开 profile recompute first path 和 first-stage profile repair operator
   以及 rules-v0.2 group memory extraction 已进入主链路；继续做 profile repair
   batch / approval、Python memory extraction candidate、结构过滤、BM25 / vector、
   rerank 和 EvidencePack coverage 深化。
+- `loadtest/ragagent`：first-stage RAG-Agent demo runner 已提供低敏总报告；
+  下一步启动真实服务栈运行该 runner，并把结果接入 ai-eval gate / 面试演示路径。
 - `rag-service` / `summary-service`：拒答、引用校验、source-ref regression、unsafe
   output fail-closed cases。
 - `agent-service`：真实业务动作继续走 policy、skill contract、proposal、approval、

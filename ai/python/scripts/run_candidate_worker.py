@@ -5,7 +5,11 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from nexusim_ai_common.worker import build_failed_candidate, run_worker_request
+PYTHON_ROOT = Path(__file__).resolve().parents[1]
+if str(PYTHON_ROOT) not in sys.path:
+    sys.path.insert(0, str(PYTHON_ROOT))
+
+from nexusim_ai_common.worker import build_failed_candidate, run_worker_request  # noqa: E402
 
 
 def main() -> int:

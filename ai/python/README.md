@@ -30,10 +30,13 @@ ai/python/
   nexusim_ai_common/
     contracts.py
     safety.py
+  nexusim_ai_memory/
+    extractor.py
   contracts/
     worker-candidate.schema.json
   scripts/
     run_candidate_worker.py
+    run_memory_extraction_candidate.py
     validate_contracts.py
   tests/
 ```
@@ -48,8 +51,9 @@ conda activate IM
 python -m pytest ai/python/tests -q
 python ai/python/scripts/validate_contracts.py
 python ai/python/scripts/run_candidate_worker.py <low-sensitive-request.json>
+python ai/python/scripts/run_memory_extraction_candidate.py <low-sensitive-message-batch.json>
 python -m ruff check ai/python
-python -m mypy ai/python/nexusim_ai_common ai/python/scripts
+python -m mypy ai/python/nexusim_ai_common ai/python/nexusim_ai_memory ai/python/scripts
 ```
 
 If the environment already exists, update it instead:
@@ -68,6 +72,7 @@ Run this repo-level guard when changing Python worker foundations:
 ```powershell
 .\tools\check-python-ai-worker-boundary.ps1
 .\tools\run-python-ai-worker-smoke.ps1 -Python C:\Users\10495\anaconda3\envs\IM\python.exe
+.\tools\run-python-memory-extraction-smoke.ps1 -Python C:\Users\10495\anaconda3\envs\IM\python.exe
 .\tools\run-ai-eval-python-worker-adapter.ps1 -Python C:\Users\10495\anaconda3\envs\IM\python.exe
 go run ./tools/python-worker-go-adapter-smoke -python C:\Users\10495\anaconda3\envs\IM\python.exe
 go run ./services/rag-service/cmd/rag-python-worker-provider-smoke -python C:\Users\10495\anaconda3\envs\IM\python.exe
@@ -89,3 +94,25 @@ sensitive citation metadata and malformed output hashes.
 The RAG, summary and Agent provider smokes prove services can wrap Go-owned
 providers with a Python worker candidate guard while final state, citations,
 approval, audit and failure handling stay in Go.
+
+## Memory Extraction Candidate
+
+`nexusim_ai_memory.extractor` is the first concrete memory extraction candidate
+module. It accepts an explicit low-sensitive message batch and only extracts
+messages with clear memory cues:
+
+```text
+decision:
+task:
+status:
+blocker:
+file:
+profile_signal:
+```
+
+Ordinary chat produces zero candidates. `profile_signal` candidates are marked
+`NEEDS_REVIEW` and `GROUP_SCOPE_PROFILE_SIGNAL`; they must not become active
+profile facts without Go-side validation and review. The CLI output is
+hash-only: it includes candidate hashes, source refs, citation refs, speaker and
+message hashes, event type metadata and low-sensitive counts, but it does not
+return raw message text or persist memory facts.

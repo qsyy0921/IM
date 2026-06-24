@@ -45,25 +45,28 @@
   memory-service / retrieval / RAG / Agent live stack adapter，并继续区分 retrieval failure、
   reasoning failure、memory lifecycle failure、action boundary failure。
 - `ai-eval-service`：retrieval negative / miss adapter 已补齐；继续扩展
-  Python memory extraction candidate、EvidencePack
+  Python memory extraction candidate 的 eval / Go-side adapter、EvidencePack
   source-chain 和 RAG-Agent demo runner 后续回归 cases。
 - `memory-service` / `retrieval-gateway`：memory graph edge、profile aggregate
   evidence、公开 profile recompute first path 和 first-stage profile repair operator
   以及 profile repair batch approval path、rules-v0.2 group memory extraction
-  已进入主链路；继续做 Python memory extraction candidate、结构过滤、BM25 / vector、
+  已进入主链路；Python memory extraction candidate first path 已输出 hash-only
+  candidates；继续做 Go-side adapter / eval 接入、结构过滤、BM25 / vector、
   rerank 和 EvidencePack coverage 深化。
 - `loadtest/ragagent`：first-stage RAG-Agent demo runner 已提供低敏总报告；
   `rag-agent-demo` 已接入 ai-eval optional service-stack adapter / gate policy /
   service-stack preflight，且真实服务栈 gate 已通过并归档；下一步围绕 profile
-  repair approval 回归、Python memory extraction candidate 和更多 Agent action boundary
-  cases 扩展该演示路径。
+  repair approval 回归、Python memory extraction candidate eval 接入和更多
+  Agent action boundary cases 扩展该演示路径。
 - `rag-service` / `summary-service`：拒答、引用校验、source-ref regression、unsafe
   output fail-closed cases。
 - `agent-service`：真实业务动作继续走 policy、skill contract、proposal、approval、
   executor、audit；Agent 不直接写业务库。
 - `skill-registry` / `mcp-gateway` / `action-executor`：补 tool contract、risk level、
   tenant allowlist、adapter、rate limit、DLQ / redrive、repair guard。
-- Python AI Worker：只输出候选、hash、citation metadata 和低敏 diagnostics。
+- Python AI Worker：只输出候选、hash、citation metadata 和低敏 diagnostics；
+  memory extraction candidate first path 已落，后续接 Go-side adapter / eval gate，
+  不直接持久化最终 memory。
 
 ## Product-Active Services
 

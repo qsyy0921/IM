@@ -158,6 +158,12 @@ answer、Agent proposal、approval、action-executor audit、EvidencePack graph 
 `ai-eval-rag-agent-demo-live-20260624-current-image-fixed` 已通过真实 service-stack
 gate：4 adapters、27 cases、27 passed、0 failed、0 skipped；`rag-agent-demo`
 已接入 ai-eval optional service-stack adapter、gate policy 和 service-stack 路由。
+同日 Python AI Worker 已补 memory extraction candidate first path：
+`ai/python/nexusim_ai_memory` 只从显式 low-sensitive message batch 的
+`decision:` / `task:` / `status:` / `blocker:` / `file:` / `profile_signal:`
+cue 生成 hash-only candidates；普通聊天不抽取；profile signal 必须 review。
+该能力不写 memory fact、不返回 raw text，后续由 Go-side adapter / eval gate
+接入 memory-service 控制面。
 
 ## 不变量
 
@@ -165,3 +171,8 @@ gate：4 adapters、27 cases、27 passed、0 failed、0 skipped；`rag-agent-dem
 - RAG / summary / Agent 只能消费权限过滤后的 EvidencePack。
 - 真实写动作必须走 policy、proposal / approval、executor 和 audit。
 - Python AI Worker 只做候选算法和 eval；Go 拥有控制面、状态和审计。
+
+## 下一步
+
+- 优先做 Agent action boundary cases。
+- 再补 Python memory extraction candidate 的 Go-side adapter / ai-eval 接入。

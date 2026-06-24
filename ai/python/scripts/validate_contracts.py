@@ -4,11 +4,12 @@ import json
 import pathlib
 import sys
 
-from nexusim_ai_common.contracts import validate_worker_candidate
-
-
 ROOT = pathlib.Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 CONTRACT_PATH = ROOT / "contracts" / "worker-candidate.schema.json"
+
+from nexusim_ai_common.contracts import validate_worker_candidate  # noqa: E402
 
 
 def main() -> int:

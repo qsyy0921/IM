@@ -57,7 +57,13 @@
   `profile_signal:` 等 cue 或显式 memory metadata 的消息；普通聊天只推进 checkpoint，
   不被泛化成 StructuredMemoryEvent；profile / preference / role signal 保持
   PENDING + NEEDS_REVIEW，不直接升级个人画像。
+- 2026-06-24 Python AI Worker 已补 `memory-extraction-candidate` first path：
+  `ai/python/nexusim_ai_memory` 从显式低敏 message batch 中识别同一组 memory cue，
+  输出 hash-only `MEMORY_EVENT_CANDIDATE`、source refs、citation refs、event type、
+  speaker / message hash 和低敏 report；普通聊天输出 0 个候选；`profile_signal`
+  强制 `NEEDS_REVIEW` / `GROUP_SCOPE_PROFILE_SIGNAL`。该路径不写 memory-service
+  数据库、不返回 raw text、不绕过 Go-side validation / approval / audit。
 
 下一步：真实服务栈启动后运行 memory-service optional adapter / loadtest 并归档报告；
-后续继续做 Python memory extraction candidate 和 RAG-Agent demo module 集成，而不是把
-单条群消息直接升级为 ACTIVE profile fact。
+后续继续做 Python memory extraction candidate 的 Go-side adapter / ai-eval 接入和
+RAG-Agent demo module 集成，而不是把单条群消息直接升级为 ACTIVE profile fact。

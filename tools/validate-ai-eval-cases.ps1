@@ -193,6 +193,8 @@ $knownAssertionTypes = @(
     "must_emit_refusal_for_unapproved_action",
     "must_classify_output_safety_failure",
     "must_reject_text_evidence_without_anchor",
+    "must_reject_evidence_without_visibility_version",
+    "must_reject_inactive_or_unapproved_memory_evidence",
     "must_not_call_provider_on_bad_grounding",
     "must_preserve_ref_only_evidence_for_audit",
     "must_abstain_when_no_groundable_text"

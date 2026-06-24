@@ -25,24 +25,11 @@ func verifySummaryCitations(pack types.EvidencePack, summary types.SummaryGenera
 		if !ok || item.SourceType != citation.SourceType {
 			return types.ErrCitationVerification
 		}
-		if len(item.SourceRefs) == 0 {
-			if !citationMatchesItem(citation, item) {
-				return types.ErrCitationVerification
-			}
-			continue
-		}
 		if !citationMatchesAnyRef(citation, item.SourceRefs) {
 			return types.ErrCitationVerification
 		}
 	}
 	return nil
-}
-
-func citationMatchesItem(citation types.Citation, item types.EvidenceItem) bool {
-	return citation.SourceID == item.SourceID &&
-		citation.SourceEventID == "" &&
-		citation.ConversationID == item.ConversationID &&
-		citation.ConversationSeq == item.ConversationSeq
 }
 
 func citationMatchesAnyRef(citation types.Citation, refs []types.EvidenceSourceRef) bool {

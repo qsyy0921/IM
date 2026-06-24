@@ -38,18 +38,6 @@ func citationMatchesEvidence(items []types.EvidenceItem, citation types.Citation
 		if citation.EvidenceID != item.EvidenceID || citation.SourceType != item.SourceType {
 			continue
 		}
-		if len(item.SourceRefs) == 0 {
-			if citation.SourceID != item.SourceID {
-				continue
-			}
-			if citation.ConversationID != item.ConversationID || citation.ConversationSeq != item.ConversationSeq {
-				continue
-			}
-			if citation.SourceEventID != "" {
-				continue
-			}
-			return true
-		}
 		for _, ref := range item.SourceRefs {
 			if citation.SourceID == ref.SourceID &&
 				citation.SourceEventID == ref.SourceEventID &&

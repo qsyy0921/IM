@@ -155,23 +155,19 @@ func citationsFromEvidence(items []types.EvidenceItem) []types.Citation {
 	citations := make([]types.Citation, 0, limit)
 	for i := 0; i < limit; i++ {
 		item := items[i]
-		citation := types.Citation{
+		if len(item.SourceRefs) == 0 {
+			continue
+		}
+		ref := item.SourceRefs[0]
+		citations = append(citations, types.Citation{
 			EvidenceID:      item.EvidenceID,
 			SourceType:      item.SourceType,
-			SourceID:        item.SourceID,
-			ConversationID:  item.ConversationID,
-			ConversationSeq: item.ConversationSeq,
-			OccurredAt:      item.OccurredAt,
-		}
-		if len(item.SourceRefs) > 0 {
-			ref := item.SourceRefs[0]
-			citation.SourceID = ref.SourceID
-			citation.SourceEventID = ref.SourceEventID
-			citation.ConversationID = ref.ConversationID
-			citation.ConversationSeq = ref.ConversationSeq
-			citation.OccurredAt = ref.OccurredAt
-		}
-		citations = append(citations, citation)
+			SourceID:        ref.SourceID,
+			SourceEventID:   ref.SourceEventID,
+			ConversationID:  ref.ConversationID,
+			ConversationSeq: ref.ConversationSeq,
+			OccurredAt:      ref.OccurredAt,
+		})
 	}
 	return citations
 }

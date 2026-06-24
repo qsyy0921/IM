@@ -37,9 +37,10 @@
 - `search-service`：真实 OpenSearch 进程 smoke、容量曲线、provider-grade 运维。
 - `memory-service`：结构过滤、BM25 / vector、rerank、repair audit、更多 group-memory eval。
 - `retrieval-gateway`：真实 OpenSearch、pgvector、Milvus provider smoke 和 coverage 深化。
-- `rag-service` / `summary-service`：拒答、引用校验、source-ref regression、unsafe output
-  fail-closed cases。
-- `agent-service`：真实业务 proposal 场景、proposal risk policy、instruction approval UI。
+- `rag-service` / `summary-service`：继续扩展 multi-hop / temporal / profile eval、
+  provider-specific regression 和更完整 unsafe output cases。
+- `agent-service`：真实业务 proposal 场景、proposal risk policy、approval 前置和
+  action execution demo path。
 - `skill-registry` / `mcp-gateway`：tool contract、risk level、tenant allowlist、adapter、
   rate limit。
 - `action-executor`：batch redrive、provider replay、operator UI、provider failure metrics。

@@ -409,6 +409,42 @@
       ]
     },
     {
+      "id": "rag-grounding-rejects-missing-visibility-version",
+      "family": "permission_leak",
+      "stage": "rag-summary-grounding-safety",
+      "status": "active",
+      "query": "reject RAG answer evidence without visibility version",
+      "risk": "RAG must not generate from search or memory EvidencePack items when the retrieval boundary cannot prove the member visibility projection version",
+      "required_assertions": [
+        {
+          "type": "must_reject_evidence_without_visibility_version",
+          "consumer": "rag"
+        },
+        {
+          "type": "must_not_call_provider_on_bad_grounding",
+          "consumer": "rag"
+        }
+      ]
+    },
+    {
+      "id": "rag-grounding-rejects-inactive-memory-evidence",
+      "family": "temporal_version",
+      "stage": "rag-summary-grounding-safety",
+      "status": "active",
+      "query": "reject RAG answer evidence from inactive or unapproved memory",
+      "risk": "RAG must not generate from superseded, expired, pending or unreviewed group memory even if the text is otherwise relevant",
+      "required_assertions": [
+        {
+          "type": "must_reject_inactive_or_unapproved_memory_evidence",
+          "consumer": "rag"
+        },
+        {
+          "type": "must_not_call_provider_on_bad_grounding",
+          "consumer": "rag"
+        }
+      ]
+    },
+    {
       "id": "summary-grounding-rejects-unanchored-text-evidence",
       "family": "attribution",
       "stage": "rag-summary-grounding-safety",
@@ -418,6 +454,42 @@
       "required_assertions": [
         {
           "type": "must_reject_text_evidence_without_anchor",
+          "consumer": "summary"
+        },
+        {
+          "type": "must_not_call_provider_on_bad_grounding",
+          "consumer": "summary"
+        }
+      ]
+    },
+    {
+      "id": "summary-grounding-rejects-missing-visibility-version",
+      "family": "permission_leak",
+      "stage": "rag-summary-grounding-safety",
+      "status": "active",
+      "query": "reject Summary evidence without visibility version",
+      "risk": "Summary must not generate from search or memory EvidencePack items when the retrieval boundary cannot prove the member visibility projection version",
+      "required_assertions": [
+        {
+          "type": "must_reject_evidence_without_visibility_version",
+          "consumer": "summary"
+        },
+        {
+          "type": "must_not_call_provider_on_bad_grounding",
+          "consumer": "summary"
+        }
+      ]
+    },
+    {
+      "id": "summary-grounding-rejects-inactive-memory-evidence",
+      "family": "temporal_version",
+      "stage": "rag-summary-grounding-safety",
+      "status": "active",
+      "query": "reject Summary evidence from inactive or unapproved memory",
+      "risk": "Summary must not generate from superseded, expired, pending or unreviewed group memory even if the text is otherwise relevant",
+      "required_assertions": [
+        {
+          "type": "must_reject_inactive_or_unapproved_memory_evidence",
           "consumer": "summary"
         },
         {

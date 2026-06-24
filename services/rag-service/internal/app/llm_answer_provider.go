@@ -100,27 +100,27 @@ func citationsByEvidenceID(items []types.EvidenceItem, evidenceIDs []string) ([]
 		if !ok {
 			return nil, fmt.Errorf("unknown evidence id %q", evidenceID)
 		}
-		citations = append(citations, citationFromEvidenceItem(item))
+		citation, err := citationFromEvidenceItem(item)
+		if err != nil {
+			return nil, err
+		}
+		citations = append(citations, citation)
 	}
 	return citations, nil
 }
 
-func citationFromEvidenceItem(item types.EvidenceItem) types.Citation {
-	citation := types.Citation{
+func citationFromEvidenceItem(item types.EvidenceItem) (types.Citation, error) {
+	if len(item.SourceRefs) == 0 {
+		return types.Citation{}, fmt.Errorf("evidence %q has no source_ref", item.EvidenceID)
+	}
+	ref := item.SourceRefs[0]
+	return types.Citation{
 		EvidenceID:      item.EvidenceID,
 		SourceType:      item.SourceType,
-		SourceID:        item.SourceID,
-		ConversationID:  item.ConversationID,
-		ConversationSeq: item.ConversationSeq,
-		OccurredAt:      item.OccurredAt,
-	}
-	if len(item.SourceRefs) > 0 {
-		ref := item.SourceRefs[0]
-		citation.SourceID = ref.SourceID
-		citation.SourceEventID = ref.SourceEventID
-		citation.ConversationID = ref.ConversationID
-		citation.ConversationSeq = ref.ConversationSeq
-		citation.OccurredAt = ref.OccurredAt
-	}
-	return citation
+		SourceID:        ref.SourceID,
+		SourceEventID:   ref.SourceEventID,
+		ConversationID:  ref.ConversationID,
+		ConversationSeq: ref.ConversationSeq,
+		OccurredAt:      ref.OccurredAt,
+	}, nil
 }

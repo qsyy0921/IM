@@ -40,17 +40,14 @@ func validateGroundingEvidenceItem(item types.EvidenceItem) error {
 	if strings.TrimSpace(item.SourceID) == "" {
 		return fmt.Errorf("%w: source_id is required", types.ErrCitationVerification)
 	}
+	if err := validateEvidenceState(item); err != nil {
+		return err
+	}
 	if len(item.SourceRefs) == 0 {
-		if item.ConversationSeq > 0 && strings.TrimSpace(string(item.ConversationID)) == "" {
-			return fmt.Errorf("%w: conversation_id is required for sequenced evidence", types.ErrCitationVerification)
-		}
-		if strings.TrimSpace(string(item.ConversationID)) != "" && item.ConversationSeq <= 0 {
-			return fmt.Errorf("%w: conversation_seq is required for conversation evidence", types.ErrCitationVerification)
-		}
-		return nil
+		return fmt.Errorf("%w: source_ref anchor is required", types.ErrCitationVerification)
 	}
 	for _, ref := range item.SourceRefs {
-		if isValidGroundingSourceRef(ref) {
+		if isValidGroundingSourceRef(item, ref) {
 			return nil
 		}
 	}
@@ -68,11 +65,41 @@ func isGroundableSourceType(sourceType string) bool {
 	}
 }
 
-func isValidGroundingSourceRef(ref types.EvidenceSourceRef) bool {
+func validateEvidenceState(item types.EvidenceItem) error {
+	switch item.SourceType {
+	case types.EvidenceSourceSearchMessage:
+		if item.VisibilityVersion <= 0 {
+			return fmt.Errorf("%w: search evidence visibility_version is required", types.ErrCitationVerification)
+		}
+	case types.EvidenceSourceMemoryEvent:
+		if item.VisibilityVersion <= 0 {
+			return fmt.Errorf("%w: memory evidence visibility_version is required", types.ErrCitationVerification)
+		}
+		if item.TemporalStatus != "" && item.TemporalStatus != types.MemoryStatusActive {
+			return fmt.Errorf("%w: memory evidence must be active", types.ErrCitationVerification)
+		}
+		if item.ReviewState != "" && item.ReviewState != "APPROVED" {
+			return fmt.Errorf("%w: memory evidence must be approved", types.ErrCitationVerification)
+		}
+	case types.EvidenceSourceProfileAggregate:
+		if item.TemporalStatus != "" && item.TemporalStatus != types.MemoryStatusActive {
+			return fmt.Errorf("%w: profile evidence must be active", types.ErrCitationVerification)
+		}
+		if item.ReviewState != "" && item.ReviewState != "APPROVED" {
+			return fmt.Errorf("%w: profile evidence must be approved", types.ErrCitationVerification)
+		}
+	}
+	return nil
+}
+
+func isValidGroundingSourceRef(item types.EvidenceItem, ref types.EvidenceSourceRef) bool {
 	if strings.TrimSpace(ref.SourceType) == "" || strings.TrimSpace(ref.SourceID) == "" {
 		return false
 	}
 	conversationID := strings.TrimSpace(string(ref.ConversationID))
+	if item.SourceType == types.EvidenceSourceSearchMessage || item.SourceType == types.EvidenceSourceMemoryEvent {
+		return conversationID != "" && ref.ConversationSeq > 0
+	}
 	if conversationID == "" {
 		return ref.ConversationSeq == 0
 	}

@@ -19,14 +19,17 @@ func TestAnswerQuestionBuildsGroundedExtractiveAnswer(t *testing.T) {
 			Query:          "what changed?",
 			ConversationID: "conv-1",
 			Items: []types.EvidenceItem{{
-				EvidenceID:      "memory:m1",
-				SourceType:      types.EvidenceSourceMemoryEvent,
-				SourceID:        "m1",
-				ConversationID:  "conv-1",
-				ConversationSeq: 7,
-				Text:            "The active deployment plan is blue-green.",
-				Score:           0.9,
-				RerankScore:     0.9,
+				EvidenceID:        "memory:m1",
+				SourceType:        types.EvidenceSourceMemoryEvent,
+				SourceID:          "m1",
+				ConversationID:    "conv-1",
+				ConversationSeq:   7,
+				Text:              "The active deployment plan is blue-green.",
+				Score:             0.9,
+				RerankScore:       0.9,
+				VisibilityVersion: 4,
+				TemporalStatus:    types.MemoryStatusActive,
+				ReviewState:       "APPROVED",
 				SourceRefs: []types.EvidenceSourceRef{{
 					SourceType:      "MESSAGE",
 					SourceID:        "msg-1",
@@ -73,12 +76,13 @@ func TestAnswerQuestionUsesProviderBoundary(t *testing.T) {
 	retrieval := &fakeRetrievalPort{result: types.RetrieveEvidenceResult{
 		Pack: types.EvidencePack{
 			Items: []types.EvidenceItem{{
-				EvidenceID:      "search:msg-1",
-				SourceType:      types.EvidenceSourceSearchMessage,
-				SourceID:        "msg-1",
-				ConversationID:  "conv-1",
-				ConversationSeq: 3,
-				Text:            "source text",
+				EvidenceID:        "search:msg-1",
+				SourceType:        types.EvidenceSourceSearchMessage,
+				SourceID:          "msg-1",
+				ConversationID:    "conv-1",
+				ConversationSeq:   3,
+				Text:              "source text",
+				VisibilityVersion: 2,
 				SourceRefs: []types.EvidenceSourceRef{{
 					SourceType:      "MESSAGE",
 					SourceID:        "msg-1",
@@ -123,12 +127,20 @@ func TestAnswerQuestionRejectsUngroundedCitation(t *testing.T) {
 	retrieval := &fakeRetrievalPort{result: types.RetrieveEvidenceResult{
 		Pack: types.EvidencePack{
 			Items: []types.EvidenceItem{{
-				EvidenceID:      "search:msg-1",
-				SourceType:      types.EvidenceSourceSearchMessage,
-				SourceID:        "msg-1",
-				ConversationID:  "conv-1",
-				ConversationSeq: 3,
-				Text:            "source text",
+				EvidenceID:        "search:msg-1",
+				SourceType:        types.EvidenceSourceSearchMessage,
+				SourceID:          "msg-1",
+				ConversationID:    "conv-1",
+				ConversationSeq:   3,
+				Text:              "source text",
+				VisibilityVersion: 2,
+				SourceRefs: []types.EvidenceSourceRef{{
+					SourceType:      "MESSAGE",
+					SourceID:        "msg-1",
+					SourceEventID:   "evt-1",
+					ConversationID:  "conv-1",
+					ConversationSeq: 3,
+				}},
 			}},
 		},
 	}}
@@ -154,12 +166,13 @@ func TestAnswerQuestionRejectsGroundingEvidenceWithoutAnchor(t *testing.T) {
 	retrieval := &fakeRetrievalPort{result: types.RetrieveEvidenceResult{
 		Pack: types.EvidencePack{
 			Items: []types.EvidenceItem{{
-				EvidenceID:      "",
-				SourceType:      types.EvidenceSourceSearchMessage,
-				SourceID:        "msg-1",
-				ConversationID:  "conv-1",
-				ConversationSeq: 3,
-				Text:            "this text has no traceable evidence id",
+				EvidenceID:        "search:msg-1",
+				SourceType:        types.EvidenceSourceSearchMessage,
+				SourceID:          "msg-1",
+				ConversationID:    "conv-1",
+				ConversationSeq:   3,
+				Text:              "this text has no traceable evidence id",
+				VisibilityVersion: 2,
 			}},
 		},
 	}}
@@ -177,6 +190,67 @@ func TestAnswerQuestionRejectsGroundingEvidenceWithoutAnchor(t *testing.T) {
 	}
 }
 
+func TestAnswerQuestionRejectsGroundingEvidenceWithoutVisibilityVersion(t *testing.T) {
+	retrieval := &fakeRetrievalPort{result: types.RetrieveEvidenceResult{
+		Pack: types.EvidencePack{
+			Items: []types.EvidenceItem{{
+				EvidenceID:      "search:msg-1",
+				SourceType:      types.EvidenceSourceSearchMessage,
+				SourceID:        "msg-1",
+				ConversationID:  "conv-1",
+				ConversationSeq: 3,
+				Text:            "source text without visibility proof",
+				SourceRefs: []types.EvidenceSourceRef{{
+					SourceType:      "MESSAGE",
+					SourceID:        "msg-1",
+					ConversationID:  "conv-1",
+					ConversationSeq: 3,
+				}},
+			}},
+		},
+	}}
+	provider := &fakeAnswerProvider{}
+	_, err := NewAnswerQuestionUseCaseWithProvider(retrieval, provider).Execute(context.Background(), validCommand())
+	if !errors.Is(err, types.ErrCitationVerification) {
+		t.Fatalf("expected citation verification error, got %v", err)
+	}
+	if provider.called {
+		t.Fatal("provider must not receive evidence without visibility version")
+	}
+}
+
+func TestAnswerQuestionRejectsSupersededMemoryEvidence(t *testing.T) {
+	retrieval := &fakeRetrievalPort{result: types.RetrieveEvidenceResult{
+		Pack: types.EvidencePack{
+			Items: []types.EvidenceItem{{
+				EvidenceID:        "memory:m-old",
+				SourceType:        types.EvidenceSourceMemoryEvent,
+				SourceID:          "m-old",
+				ConversationID:    "conv-1",
+				ConversationSeq:   3,
+				Text:              "old deployment plan",
+				VisibilityVersion: 2,
+				TemporalStatus:    types.MemoryStatusSuperseded,
+				ReviewState:       "APPROVED",
+				SourceRefs: []types.EvidenceSourceRef{{
+					SourceType:      "MESSAGE",
+					SourceID:        "msg-old",
+					ConversationID:  "conv-1",
+					ConversationSeq: 3,
+				}},
+			}},
+		},
+	}}
+	provider := &fakeAnswerProvider{}
+	_, err := NewAnswerQuestionUseCaseWithProvider(retrieval, provider).Execute(context.Background(), validCommand())
+	if !errors.Is(err, types.ErrCitationVerification) {
+		t.Fatalf("expected citation verification error, got %v", err)
+	}
+	if provider.called {
+		t.Fatal("provider must not receive superseded memory evidence")
+	}
+}
+
 func TestAnswerQuestionOnlyPassesGroundableEvidenceToProvider(t *testing.T) {
 	retrieval := &fakeRetrievalPort{result: types.RetrieveEvidenceResult{
 		Pack: types.EvidencePack{
@@ -191,12 +265,19 @@ func TestAnswerQuestionOnlyPassesGroundableEvidenceToProvider(t *testing.T) {
 					ConversationSeq: 0,
 				},
 				{
-					EvidenceID:      "search:msg-1",
-					SourceType:      types.EvidenceSourceSearchMessage,
-					SourceID:        "msg-1",
-					ConversationID:  "conv-1",
-					ConversationSeq: 3,
-					Text:            "source text",
+					EvidenceID:        "search:msg-1",
+					SourceType:        types.EvidenceSourceSearchMessage,
+					SourceID:          "msg-1",
+					ConversationID:    "conv-1",
+					ConversationSeq:   3,
+					Text:              "source text",
+					VisibilityVersion: 2,
+					SourceRefs: []types.EvidenceSourceRef{{
+						SourceType:      "MESSAGE",
+						SourceID:        "msg-1",
+						ConversationID:  "conv-1",
+						ConversationSeq: 3,
+					}},
 				},
 			},
 		},

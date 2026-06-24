@@ -27,6 +27,15 @@
 - 无可见证据时返回 `INSUFFICIENT_EVIDENCE`，不能编造摘要。
 - provider 输出必须经过 citation verifier；引用无法匹配 EvidencePack 时
   fail closed，不返回 ungrounded summary。
+- 生成用的 text evidence 必须携带至少一个可验证 `source_ref`。`citation`
+  verifier 只接受命中 `source_ref` 的引用，不再用 evidence item 顶层
+  `conversation_id / seq` 做兜底匹配。
+- `SEARCH_MESSAGE` 和 `MEMORY_EVENT` evidence 必须携带正数
+  `visibility_version`，否则视为 retrieval boundary 无法证明成员可见性，
+  fail closed。
+- `MEMORY_EVENT` evidence 必须是 `ACTIVE` 且已 review/approve；`SUPERSEDED`、
+  `EXPIRED`、`PENDING` 或未审批 memory 不能进入摘要生成。`PROFILE_AGGREGATE`
+  若携带 temporal/review metadata，也必须满足 active/approved。
 
 ## 非职责
 
@@ -58,8 +67,8 @@ citation verifier。
 - `GenerateConversationSummary` 不返回没有 EvidencePack 支撑的事实。
 - 显式 `at_conversation_seq` 不能为负；传入后必须贯穿到 retrieval-gateway，
   防止摘要读取过期或 superseded memory。
-- citations 必须可追踪到 evidence item 或 source ref；provider 输出后统一
-  由 citation verifier 检查。
+- citations 必须可追踪到 EvidencePack `source_ref`；provider 输出后统一
+  由 citation verifier 检查，不能靠 item 顶层字段补齐缺失引用。
 - 高风险写动作属于后续 Agent / action-executor，不属于本服务。
 
 ## 后续

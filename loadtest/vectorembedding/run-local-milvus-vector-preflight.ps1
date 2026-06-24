@@ -1,11 +1,4 @@
 param(
-    [string]$ProviderReadiness = "pgvector,opensearch-vector",
-    [string]$PgVectorDsn = "postgres://nexusim:nexusim@localhost:15432/nexusim?sslmode=disable",
-    [string]$PgVectorTable = "vector_embedding_items",
-    [string]$OpenSearchEndpoint = "http://127.0.0.1:9200",
-    [string]$OpenSearchIndex = "nexusim-vector-items",
-    [string]$OpenSearchVectorField = "embedding_vector",
-    [int]$OpenSearchVectorDimension = 8,
     [string]$MilvusEndpoint = "http://127.0.0.1:19530",
     [string]$MilvusToken = "",
     [string]$MilvusDatabase = "_default",
@@ -24,7 +17,7 @@ $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\.."))
 Assert-ExternalOutputRoot -Value $ResultRoot -RepositoryRoot $repoRoot -Name "ResultRoot"
 
 if (-not $RunName) {
-    $RunName = "vector-provider-readiness-" + (Get-Date -Format "yyyyMMdd-HHmmss")
+    $RunName = "milvus-vector-preflight-" + (Get-Date -Format "yyyyMMdd-HHmmss")
 }
 
 . (Join-Path $repoRoot "tools\go-env.ps1")
@@ -37,14 +30,7 @@ if (-not $SkipBuild) {
 
 $runner = Join-Path $repoRoot "bin\vector-embedding-smoke.exe"
 & $runner `
-    --phase preflight-provider-readiness `
-    --provider-readiness $ProviderReadiness `
-    --pgvector-dsn $PgVectorDsn `
-    --pgvector-table $PgVectorTable `
-    --opensearch-vector-endpoint $OpenSearchEndpoint `
-    --opensearch-vector-index $OpenSearchIndex `
-    --opensearch-vector-field $OpenSearchVectorField `
-    --opensearch-vector-dimension $OpenSearchVectorDimension `
+    --phase preflight-milvus-vector `
     --milvus-endpoint $MilvusEndpoint `
     --milvus-token $MilvusToken `
     --milvus-database $MilvusDatabase `
@@ -54,5 +40,5 @@ $runner = Join-Path $repoRoot "bin\vector-embedding-smoke.exe"
     --result-root $ResultRoot `
     --run-name $RunName
 if ($LASTEXITCODE -ne 0) {
-    throw "vector provider readiness failed with exit code $LASTEXITCODE"
+    throw "Milvus vector preflight failed with exit code $LASTEXITCODE"
 }

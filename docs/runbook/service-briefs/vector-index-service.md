@@ -40,11 +40,16 @@ Stage-switch：`docs/runbook/stage-switch/vector-index-service.md`。
   禁止携带 credentials / query / fragment；不可用或 mapping drift 时 fail-closed
   并写低敏 summary，不写入 OpenSearch，也不伪造真实 provider smoke。
 - 2026-06-25 `loadtest/vectorembedding` 已补 `preflight-provider-readiness` phase 和
-  `run-local-provider-readiness.ps1`：一次性输出 pgvector / OpenSearch vector 的
+  `run-local-provider-readiness.ps1`：一次性输出 pgvector / OpenSearch vector / Milvus 的
   provider readiness matrix；任一 requested provider 不满足 contract 时整体 fail-closed，
   但 summary 会保留每个 provider 的低敏状态，便于真实 provider smoke 前排障。
+- 2026-06-25 `loadtest/vectorembedding` 已补 `preflight-milvus-vector` phase 和
+  `run-local-milvus-vector-preflight.ps1`：使用 Milvus REST v2 验证 endpoint、
+  collection、vector field type 和 dimension contract；endpoint 禁止携带 credentials /
+  query / fragment，token 只走 header，不写入 summary；不可达或 schema drift 时
+  fail-closed，不写 Milvus。
 
 证据入口：`docs/runbook/loadtest/vector-index-service/` 和 `loadtest/vectorembedding`。
 
 后续：memory / search chunk consumer、真实 pgvector smoke、真实 OpenSearch vector
-backend smoke、Milvus backend、provider repair、真 provider backfill smoke。
+backend smoke、真实 Milvus provider smoke、provider repair、真 provider backfill smoke。

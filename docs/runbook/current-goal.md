@@ -258,14 +258,20 @@ IM messages -> search / memory projection -> EvidencePack -> RAG / Agent answer 
   endpoint、index 存在、mapping 中指定字段为 `knn_vector` 且 dimension 匹配；
   endpoint 不允许 credentials / query / fragment；不可用、index 缺失或 mapping drift
   都 fail-closed 并写低敏 summary，不写 OpenSearch，也不伪造真实 provider smoke。
+- 同日 vector-index-service Milvus provider smoke 已补 preflight gate：
+  `loadtest/vectorembedding --phase preflight-milvus-vector` 会通过 Milvus REST v2
+  验证 endpoint、collection 存在、vector field dense type 和 dimension contract；
+  endpoint 不允许 credentials / query / fragment，token 只走 Authorization header；
+  不可用、collection 缺失或 schema drift 都 fail-closed 并写低敏 summary，不写
+  Milvus，也不伪造真实 provider smoke。
 - 同日 vector-index-service provider readiness matrix 已补：
   `loadtest/vectorembedding --phase preflight-provider-readiness` 可一次性检查
-  pgvector / OpenSearch vector 的 readiness，并输出 `provider_readiness[]` 低敏矩阵；
+  pgvector / OpenSearch vector / Milvus 的 readiness，并输出 `provider_readiness[]` 低敏矩阵；
   任一 requested provider 不满足 contract 时整体 fail-closed，但保留每个 provider
   的低敏状态用于排障；该矩阵仍不是 provider 数据写入 / 搜索 smoke。
 - 同日 retrieval provider coverage contract 已补：
   `loadtest/retrieval --provider-readiness-summary <path>` 可读取上述
-  `preflight-provider-readiness` summary，并把 pgvector / OpenSearch vector
+  `preflight-provider-readiness` summary，并把 pgvector / OpenSearch vector / Milvus
   readiness 作为低敏 `provider_coverage[]` 挂到 EvidencePack smoke summary；
   只输出 provider、configured / available / status、error class 和 VECTOR_ITEM lane
   状态。启用 `--include-vector-backend` 时，任一 requested provider readiness 不是
@@ -362,8 +368,8 @@ IM messages -> search / memory projection -> EvidencePack -> RAG / Agent answer 
    backend 和显式 OpenSearch / BM25 candidate backend first paths 已补齐；OpenSearch
    opt-in smoke 入口、service-owned rebuild operator first path 和 mapping drift
    hardening 已补齐；retrieval `source_coverage` 和 provider `provider_coverage`
-   矩阵已进入 positive smoke / adapter 侧契约；pgvector 和 OpenSearch vector
-   provider preflight gate 及 readiness matrix 已补齐，但尚未
+   矩阵已进入 positive smoke / adapter 侧契约；pgvector、OpenSearch vector 和
+   Milvus provider preflight gate 及 readiness matrix 已补齐，但尚未
    在真实 OpenSearch / pgvector 进程上归档通过 provider smoke 报告；后续真实
    OpenSearch 进程 smoke、真实 pgvector /
    Milvus / OpenSearch vector provider smoke 仍保持在

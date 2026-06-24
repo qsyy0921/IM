@@ -10,6 +10,7 @@ import (
 const (
 	providerReadinessPGVector         = "pgvector"
 	providerReadinessOpenSearchVector = "opensearch-vector"
+	providerReadinessMilvus           = "milvus"
 
 	providerReadinessReady  = "READY"
 	providerReadinessFailed = "FAILED"
@@ -47,6 +48,10 @@ func preflightProviderReadiness(ctx context.Context, cfg config, result *summary
 			entry.Configured = strings.TrimSpace(cfg.openSearchVectorEndpoint) != ""
 			err = preflightOpenSearchVector(ctx, cfg, result)
 			entry.Available = result.OpenSearchVectorAvailable && result.OpenSearchVectorIndexExists && result.OpenSearchVectorMappingVerified
+		case providerReadinessMilvus:
+			entry.Configured = strings.TrimSpace(cfg.milvusEndpoint) != ""
+			err = preflightMilvusVector(ctx, cfg, result)
+			entry.Available = result.MilvusAvailable && result.MilvusCollectionExists && result.MilvusSchemaVerified
 		default:
 			err = fmt.Errorf("unsupported provider %q", provider)
 		}
@@ -76,7 +81,7 @@ func parseProviderReadiness(value string) ([]string, error) {
 			continue
 		}
 		switch provider {
-		case providerReadinessPGVector, providerReadinessOpenSearchVector:
+		case providerReadinessPGVector, providerReadinessOpenSearchVector, providerReadinessMilvus:
 		default:
 			return nil, fmt.Errorf("unsupported provider-readiness provider %q", provider)
 		}

@@ -273,8 +273,11 @@ backend sink；未配置时行为保持 metadata-only。`rebuild-worker` 可显�
 model-gateway，再写入当前配置的 provider backend；它不读取上游私表，也不从 metadata 表伪造
 缺失的 vector array。OpenSearch vector provider 已有 opt-in preflight gate：在真实 provider
 smoke 前先验证 endpoint / index / `knn_vector` mapping / dimension contract，mapping drift
-或 runtime 不可用时 fail-closed，不写入 OpenSearch。`loadtest/vectorembedding` 还提供
-provider readiness matrix，可一次性输出 pgvector / OpenSearch vector 的低敏状态；该矩阵
+或 runtime 不可用时 fail-closed，不写入 OpenSearch。Milvus provider 也已有 opt-in
+REST v2 preflight gate：先验证 endpoint、collection 是否存在、vector field 类型和
+dimension contract；endpoint 不允许携带 credentials / query / fragment，token 只能通过
+header / secret 参数传入且不写 summary。`loadtest/vectorembedding` 还提供 provider
+readiness matrix，可一次性输出 pgvector / OpenSearch vector / Milvus 的低敏状态；该矩阵
 只是前置门禁，不代表 provider 数据写入 / 搜索链路完成。Milvus / OpenSearch adapter、
 真实 pgvector smoke 和 provider backend repair 仍是后续项。
 
@@ -533,6 +536,25 @@ pgvector PostgreSQL 连接、`vector` extension 可用性和 table identifier �
 所以普通开发 / CI 不应默认开启该 profile。可选本地 overlay 为
 `deploy/local/docker-compose.pgvector.yml`，会在 `localhost:15432` 暴露独立
 `nexusim-pgvector`，不替换默认 `nexusim-postgres`。
+
+Optional Milvus provider preflight 配置：
+
+```text
+NEXUSIM_VECTOR_MILVUS_ENDPOINT=http://127.0.0.1:19530
+NEXUSIM_VECTOR_MILVUS_TOKEN=...           # optional; never put credentials in endpoint URL
+NEXUSIM_VECTOR_MILVUS_DATABASE=_default
+NEXUSIM_VECTOR_MILVUS_COLLECTION=nexusim_vector_items
+NEXUSIM_VECTOR_MILVUS_VECTOR_FIELD=embedding_vector
+# dimension is supplied by --milvus-vector-dimension in the loadtest runner.
+```
+
+`loadtest/vectorembedding` 提供 `preflight-milvus-vector` phase 和
+`run-local-milvus-vector-preflight.ps1`。该 gate 使用 Milvus REST v2
+`/v2/vectordb/collections/has` 与 `/v2/vectordb/collections/describe` 验证 collection
+存在、vector field 类型为 dense vector、dimension 与本次配置匹配；不可达、collection
+缺失、schema drift、dimension mismatch 或 endpoint 携带 credentials / query / fragment
+时都 fail-closed。该 gate 不创建 collection、不写 Milvus、不验证 provider 数据写入 /
+搜索链路。
 
 Optional rebuild provider backfill 配置：
 

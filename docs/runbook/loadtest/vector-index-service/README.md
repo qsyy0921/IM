@@ -212,12 +212,51 @@ NEXUSIM_VECTOR_PGVECTOR_ENSURE_SCHEMA=true
 - index 缺失、endpoint 不可达、mapping drift 或 dimension 不匹配都必须 fail-closed；
   runner 只输出低敏 summary。
 
+## Optional Milvus Vector Preflight
+
+用途：
+
+- 为后续 `embedding-worker -> Milvus backend sink` focused smoke 提供 fail-closed
+  readiness gate。
+- 使用 Milvus REST v2 只读检查 collection contract，不启动 Docker、不拉镜像、不写 Milvus。
+- 先验证 endpoint 可访问、collection 存在、指定 vector field 是 dense vector type，且
+  dimension 与本次 smoke 配置一致。
+
+运行：
+
+```powershell
+.\loadtest\vectorembedding\run-local-milvus-vector-preflight.ps1 `
+  -MilvusEndpoint "http://127.0.0.1:19530" `
+  -MilvusDatabase "_default" `
+  -MilvusCollection "nexusim_vector_items" `
+  -MilvusVectorField "embedding_vector" `
+  -MilvusVectorDimension 8 `
+  -ResultRoot "H:\NexusIM\loadtest-results"
+```
+
+带认证的本地 Milvus 必须用独立参数 / 环境变量传 token：
+
+```powershell
+.\loadtest\vectorembedding\run-local-milvus-vector-preflight.ps1 `
+  -MilvusEndpoint "http://127.0.0.1:19530" `
+  -MilvusToken "root:Milvus"
+```
+
+边界：
+
+- endpoint 只允许 `http` / `https`，且不能携带 username / password、query 或 fragment；
+  token 只通过 `Authorization: Bearer` header 传给 Milvus，不写 summary。
+- preflight 成功只证明 Milvus runtime 和 collection schema contract 可用于后续 provider
+  smoke；不代表 `vector-index-service` 已完成 Milvus provider backend。
+- collection 缺失、endpoint 不可达、schema drift 或 dimension 不匹配都必须
+  fail-closed；runner 只输出低敏 summary。
+
 ## Provider Readiness Matrix
 
 用途：
 
 - 在真实 provider smoke 前一次性检查多个 vector provider runtime 是否满足最小 contract。
-- 当前支持 `pgvector` 和 `opensearch-vector`。
+- 当前支持 `pgvector`、`opensearch-vector` 和 `milvus`。
 - 输出 `provider_readiness[]` 低敏矩阵：provider、requested、configured、available、
   status、public error；不输出 DSN、账号密码、provider body、raw vector 或 raw text。
 
@@ -225,12 +264,16 @@ NEXUSIM_VECTOR_PGVECTOR_ENSURE_SCHEMA=true
 
 ```powershell
 .\loadtest\vectorembedding\run-local-provider-readiness.ps1 `
-  -ProviderReadiness "pgvector,opensearch-vector" `
+  -ProviderReadiness "pgvector,opensearch-vector,milvus" `
   -PgVectorDsn "postgres://nexusim:nexusim@localhost:15432/nexusim?sslmode=disable" `
   -OpenSearchEndpoint "http://127.0.0.1:9200" `
   -OpenSearchIndex "nexusim-vector-items" `
   -OpenSearchVectorField "embedding_vector" `
   -OpenSearchVectorDimension 8 `
+  -MilvusEndpoint "http://127.0.0.1:19530" `
+  -MilvusCollection "nexusim_vector_items" `
+  -MilvusVectorField "embedding_vector" `
+  -MilvusVectorDimension 8 `
   -ResultRoot "H:\NexusIM\loadtest-results"
 ```
 
@@ -238,7 +281,7 @@ NEXUSIM_VECTOR_PGVECTOR_ENSURE_SCHEMA=true
 
 - readiness matrix 是 provider 前置门禁，不会自动启动 Docker、不拉镜像、不写 provider。
 - 任一 requested provider 不满足 contract 时整体 fail-closed，并保留每个 provider
-  的低敏状态，便于 operator 判断是 pgvector、OpenSearch vector 还是配置问题。
+  的低敏状态，便于 operator 判断是 pgvector、OpenSearch vector、Milvus 还是配置问题。
 - readiness 通过后仍需单独跑真实 provider smoke；不得把 readiness 当作 provider
   数据写入 / 搜索链路已经完成。
 

@@ -9,14 +9,17 @@ import (
 )
 
 func TestParseProviderReadiness(t *testing.T) {
-	providers, err := parseProviderReadiness(" pgvector,opensearch-vector,pgvector ")
+	providers, err := parseProviderReadiness(" pgvector,opensearch-vector,milvus,pgvector ")
 	if err != nil {
 		t.Fatalf("parseProviderReadiness returned error: %v", err)
 	}
-	if len(providers) != 2 || providers[0] != providerReadinessPGVector || providers[1] != providerReadinessOpenSearchVector {
+	if len(providers) != 3 ||
+		providers[0] != providerReadinessPGVector ||
+		providers[1] != providerReadinessOpenSearchVector ||
+		providers[2] != providerReadinessMilvus {
 		t.Fatalf("unexpected providers: %+v", providers)
 	}
-	if _, err := parseProviderReadiness("milvus"); err == nil || !strings.Contains(err.Error(), "unsupported") {
+	if _, err := parseProviderReadiness("unknown-vector"); err == nil || !strings.Contains(err.Error(), "unsupported") {
 		t.Fatalf("expected unsupported provider error, got %v", err)
 	}
 }
@@ -38,6 +41,17 @@ func TestValidateConfigProviderReadinessRequiresSelectedProviderConfig(t *testin
 	cfg.pgVectorDSN = ""
 	if err := validateConfig(cfg); err == nil || !strings.Contains(err.Error(), "pgvector-dsn") {
 		t.Fatalf("expected pgvector dsn error, got %v", err)
+	}
+
+	cfg.providerReadiness = "milvus"
+	cfg.pgVectorDSN = ""
+	cfg.milvusEndpoint = ""
+	cfg.milvusDatabase = "_default"
+	cfg.milvusCollection = "nexusim_vector_items"
+	cfg.milvusVectorField = "embedding_vector"
+	cfg.milvusVectorDimension = 8
+	if err := validateConfig(cfg); err == nil || !strings.Contains(err.Error(), "milvus-endpoint") {
+		t.Fatalf("expected milvus endpoint error, got %v", err)
 	}
 }
 
@@ -110,5 +124,35 @@ func TestPreflightProviderReadinessOpenSearchFailureStillWritesEntry(t *testing.
 	entry := result.ProviderReadiness[0]
 	if entry.Status != providerReadinessFailed || entry.Error == "" || entry.Available {
 		t.Fatalf("unexpected failed readiness entry: %+v", entry)
+	}
+}
+
+func TestPreflightProviderReadinessMilvusSuccess(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assertMilvusRequest(t, r)
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/v2/vectordb/collections/has":
+			writeJSON(t, w, map[string]any{"code": 0, "data": map[string]any{"has": true}})
+		case r.Method == http.MethodPost && r.URL.Path == "/v2/vectordb/collections/describe":
+			writeJSON(t, w, milvusDescribePayload("FloatVector", "8"))
+		default:
+			t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	cfg := validMilvusPreflightConfig(server.URL)
+	cfg.phase = "preflight-provider-readiness"
+	cfg.providerReadiness = "milvus"
+	var result summary
+	if err := preflightProviderReadiness(context.Background(), cfg, &result); err != nil {
+		t.Fatalf("preflightProviderReadiness returned error: %v", err)
+	}
+	if len(result.ProviderReadiness) != 1 {
+		t.Fatalf("expected one provider readiness entry: %+v", result.ProviderReadiness)
+	}
+	entry := result.ProviderReadiness[0]
+	if entry.Provider != providerReadinessMilvus || entry.Status != providerReadinessReady || !entry.Available || !entry.Configured {
+		t.Fatalf("unexpected readiness entry: %+v", entry)
 	}
 }

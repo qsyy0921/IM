@@ -26,7 +26,7 @@
   `VECTOR_ITEM` 必须是 `NOT_REQUESTED`；summary 只输出 source type、requested、
   candidate / returned / deduped count 和 status。
 - 2026-06-25 `loadtest/retrieval` 已支持读取 `loadtest/vectorembedding`
-  `preflight-provider-readiness` summary，并把 pgvector / OpenSearch vector
+  `preflight-provider-readiness` summary，并把 pgvector / OpenSearch vector / Milvus
   readiness 以低敏 `provider_coverage` 矩阵挂到 retrieval EvidencePack smoke
   summary：只输出 provider、configured / available / status、error class 和
   VECTOR_ITEM lane 状态；启用 `--include-vector-backend` 时，任一 requested provider

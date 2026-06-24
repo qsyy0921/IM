@@ -34,6 +34,12 @@ type config struct {
 	openSearchVectorIndex     string
 	openSearchVectorField     string
 	openSearchVectorDimension int
+	milvusEndpoint            string
+	milvusToken               string
+	milvusDatabase            string
+	milvusCollection          string
+	milvusVectorField         string
+	milvusVectorDimension     int
 	providerReadiness         string
 	resultDir                 string
 	requestTimeout            time.Duration
@@ -95,6 +101,17 @@ type summary struct {
 	OpenSearchVectorFieldType         string                     `json:"opensearch_vector_field_type,omitempty"`
 	OpenSearchVectorDimension         int                        `json:"opensearch_vector_dimension"`
 	OpenSearchVectorExpectedDimension int                        `json:"opensearch_vector_expected_dimension"`
+	MilvusConfigured                  bool                       `json:"milvus_configured"`
+	MilvusEndpoint                    string                     `json:"milvus_endpoint,omitempty"`
+	MilvusDatabase                    string                     `json:"milvus_database,omitempty"`
+	MilvusCollection                  string                     `json:"milvus_collection,omitempty"`
+	MilvusVectorField                 string                     `json:"milvus_vector_field,omitempty"`
+	MilvusAvailable                   bool                       `json:"milvus_available"`
+	MilvusCollectionExists            bool                       `json:"milvus_collection_exists"`
+	MilvusSchemaVerified              bool                       `json:"milvus_schema_verified"`
+	MilvusVectorFieldType             string                     `json:"milvus_vector_field_type,omitempty"`
+	MilvusVectorDimension             int                        `json:"milvus_vector_dimension"`
+	MilvusVectorExpectedDimension     int                        `json:"milvus_vector_expected_dimension"`
 	ProviderReadiness                 []providerReadinessSummary `json:"provider_readiness,omitempty"`
 	EmbeddingTaskCount                int                        `json:"embedding_task_count"`
 	EmbeddingTaskPending              int                        `json:"embedding_task_pending"`
@@ -122,7 +139,7 @@ func parseConfig() config {
 	var cfg config
 	var resultRoot string
 	var runName string
-	flag.StringVar(&cfg.phase, "phase", "prepare", "phase: prepare or verify")
+	flag.StringVar(&cfg.phase, "phase", "prepare", "phase: prepare, verify, preflight-pgvector, preflight-opensearch-vector, preflight-milvus-vector, preflight-provider-readiness, verify-queue, request-rebuild")
 	flag.StringVar(&cfg.knowledgeTarget, "knowledge-target", envOr("NEXUSIM_KNOWLEDGE_INGESTION_GRPC_ADDR", "127.0.0.1:10740"), "knowledge-ingestion-service gRPC target")
 	flag.StringVar(&cfg.vectorTarget, "vector-target", envOr("NEXUSIM_VECTOR_INDEX_GRPC_ADDR", "127.0.0.1:10760"), "vector-index-service gRPC target")
 	flag.StringVar(&cfg.pgDSN, "pg-dsn", envOr("NEXUSIM_PG_DSN", "postgres://nexusim:nexusim@localhost:5432/nexusim?sslmode=disable"), "PostgreSQL DSN")
@@ -132,6 +149,12 @@ func parseConfig() config {
 	flag.StringVar(&cfg.openSearchVectorIndex, "opensearch-vector-index", envOr("NEXUSIM_VECTOR_OPENSEARCH_INDEX", "nexusim-vector-items"), "optional OpenSearch vector index for preflight-opensearch-vector")
 	flag.StringVar(&cfg.openSearchVectorField, "opensearch-vector-field", envOr("NEXUSIM_VECTOR_OPENSEARCH_VECTOR_FIELD", "embedding_vector"), "optional OpenSearch knn_vector field for preflight-opensearch-vector")
 	flag.IntVar(&cfg.openSearchVectorDimension, "opensearch-vector-dimension", 0, "expected OpenSearch knn_vector dimension; defaults to embedding-dimension")
+	flag.StringVar(&cfg.milvusEndpoint, "milvus-endpoint", envOr("NEXUSIM_VECTOR_MILVUS_ENDPOINT", ""), "optional Milvus REST v2 endpoint for preflight-milvus-vector")
+	flag.StringVar(&cfg.milvusToken, "milvus-token", envOr("NEXUSIM_VECTOR_MILVUS_TOKEN", ""), "optional Milvus bearer token; never put credentials in milvus-endpoint")
+	flag.StringVar(&cfg.milvusDatabase, "milvus-database", envOr("NEXUSIM_VECTOR_MILVUS_DATABASE", "_default"), "optional Milvus database for preflight-milvus-vector")
+	flag.StringVar(&cfg.milvusCollection, "milvus-collection", envOr("NEXUSIM_VECTOR_MILVUS_COLLECTION", "nexusim_vector_items"), "Milvus collection for preflight-milvus-vector")
+	flag.StringVar(&cfg.milvusVectorField, "milvus-vector-field", envOr("NEXUSIM_VECTOR_MILVUS_VECTOR_FIELD", "embedding_vector"), "Milvus vector field for preflight-milvus-vector")
+	flag.IntVar(&cfg.milvusVectorDimension, "milvus-vector-dimension", 0, "expected Milvus vector dimension; defaults to embedding-dimension")
 	flag.StringVar(&cfg.providerReadiness, "provider-readiness", envOr("NEXUSIM_VECTOR_PROVIDER_READINESS", "pgvector,opensearch-vector"), "comma-separated providers for preflight-provider-readiness")
 	flag.StringVar(&resultRoot, "result-root", defaultResultRoot, "external result root for raw smoke output")
 	flag.StringVar(&runName, "run-name", "", "run name under result-root")
@@ -180,6 +203,9 @@ func parseConfig() config {
 	if cfg.openSearchVectorDimension <= 0 {
 		cfg.openSearchVectorDimension = cfg.embeddingDim
 	}
+	if cfg.milvusVectorDimension <= 0 {
+		cfg.milvusVectorDimension = cfg.embeddingDim
+	}
 	return cfg
 }
 
@@ -215,6 +241,12 @@ func run(cfg config) error {
 		OpenSearchVectorIndex:             strings.TrimSpace(cfg.openSearchVectorIndex),
 		OpenSearchVectorField:             strings.TrimSpace(cfg.openSearchVectorField),
 		OpenSearchVectorExpectedDimension: cfg.openSearchVectorDimension,
+		MilvusConfigured:                  strings.TrimSpace(cfg.milvusEndpoint) != "",
+		MilvusEndpoint:                    safeMilvusEndpointForSummary(cfg.milvusEndpoint),
+		MilvusDatabase:                    strings.TrimSpace(cfg.milvusDatabase),
+		MilvusCollection:                  strings.TrimSpace(cfg.milvusCollection),
+		MilvusVectorField:                 strings.TrimSpace(cfg.milvusVectorField),
+		MilvusVectorExpectedDimension:     cfg.milvusVectorDimension,
 	}
 	result.GitDirty = strings.TrimSpace(result.GitStatusShort) != ""
 	defer func() {
@@ -243,6 +275,11 @@ func run(cfg config) error {
 		}
 	case "preflight-opensearch-vector":
 		if err := preflightOpenSearchVector(ctx, cfg, &result); err != nil {
+			result.Error = err.Error()
+			return err
+		}
+	case "preflight-milvus-vector":
+		if err := preflightMilvusVector(ctx, cfg, &result); err != nil {
 			result.Error = err.Error()
 			return err
 		}
@@ -912,6 +949,10 @@ func validateConfig(cfg config) error {
 		if cfg.openSearchVectorDimension <= 0 {
 			return errors.New("opensearch-vector-dimension must be positive")
 		}
+	case "preflight-milvus-vector":
+		if err := validateMilvusConfig(cfg, "preflight-milvus-vector"); err != nil {
+			return err
+		}
 	case "preflight-provider-readiness":
 		providers, err := parseProviderReadiness(cfg.providerReadiness)
 		if err != nil {
@@ -938,6 +979,10 @@ func validateConfig(cfg config) error {
 				}
 				if cfg.openSearchVectorDimension <= 0 {
 					return errors.New("opensearch-vector-dimension must be positive")
+				}
+			case providerReadinessMilvus:
+				if err := validateMilvusConfig(cfg, "provider-readiness includes milvus"); err != nil {
+					return err
 				}
 			}
 		}

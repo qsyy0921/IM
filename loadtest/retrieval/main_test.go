@@ -185,6 +185,36 @@ func TestVerifyProviderCoverageAcceptsReadyProviderWithVectorBackend(t *testing.
 	}
 }
 
+func TestVerifyProviderCoverageReportsMilvusReadiness(t *testing.T) {
+	path := writeProviderReadinessSummary(t, `{
+  "phase": "preflight-provider-readiness",
+  "provider_readiness": [
+    {
+      "provider": "milvus",
+      "requested": true,
+      "configured": true,
+      "available": false,
+      "status": "FAILED",
+      "error": "milvus collection nexusim_vector_items does not exist"
+    }
+  ]
+}`)
+	cfg := config{providerReadinessFile: path}
+	coverage, err := verifyProviderCoverage(cfg, []sourceCoverageSummary{
+		{SourceType: "VECTOR_ITEM", Requested: false, ReturnedCount: 0, Status: "NOT_REQUESTED"},
+	})
+	if err != nil {
+		t.Fatalf("verifyProviderCoverage returned error: %v", err)
+	}
+	if len(coverage) != 1 {
+		t.Fatalf("coverage len=%d want 1", len(coverage))
+	}
+	entry := coverage[0]
+	if entry.Provider != "milvus" || entry.ReadinessStatus != "FAILED" || entry.ErrorClass != "INDEX_MISSING" {
+		t.Fatalf("unexpected provider coverage entry: %+v", entry)
+	}
+}
+
 func TestLoadProviderReadinessFileRejectsWrongPhase(t *testing.T) {
 	path := writeProviderReadinessSummary(t, `{
   "phase": "verify",

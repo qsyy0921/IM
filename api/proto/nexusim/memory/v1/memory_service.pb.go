@@ -314,6 +314,55 @@ func (MemorySourceType) EnumDescriptor() ([]byte, []int) {
 	return file_nexusim_memory_v1_memory_service_proto_rawDescGZIP(), []int{4}
 }
 
+type MemoryReviewDecision int32
+
+const (
+	MemoryReviewDecision_MEMORY_REVIEW_DECISION_UNSPECIFIED MemoryReviewDecision = 0
+	MemoryReviewDecision_MEMORY_REVIEW_DECISION_APPROVE     MemoryReviewDecision = 1
+	MemoryReviewDecision_MEMORY_REVIEW_DECISION_REJECT      MemoryReviewDecision = 2
+)
+
+// Enum value maps for MemoryReviewDecision.
+var (
+	MemoryReviewDecision_name = map[int32]string{
+		0: "MEMORY_REVIEW_DECISION_UNSPECIFIED",
+		1: "MEMORY_REVIEW_DECISION_APPROVE",
+		2: "MEMORY_REVIEW_DECISION_REJECT",
+	}
+	MemoryReviewDecision_value = map[string]int32{
+		"MEMORY_REVIEW_DECISION_UNSPECIFIED": 0,
+		"MEMORY_REVIEW_DECISION_APPROVE":     1,
+		"MEMORY_REVIEW_DECISION_REJECT":      2,
+	}
+)
+
+func (x MemoryReviewDecision) Enum() *MemoryReviewDecision {
+	p := new(MemoryReviewDecision)
+	*p = x
+	return p
+}
+
+func (x MemoryReviewDecision) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (MemoryReviewDecision) Descriptor() protoreflect.EnumDescriptor {
+	return file_nexusim_memory_v1_memory_service_proto_enumTypes[5].Descriptor()
+}
+
+func (MemoryReviewDecision) Type() protoreflect.EnumType {
+	return &file_nexusim_memory_v1_memory_service_proto_enumTypes[5]
+}
+
+func (x MemoryReviewDecision) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use MemoryReviewDecision.Descriptor instead.
+func (MemoryReviewDecision) EnumDescriptor() ([]byte, []int) {
+	return file_nexusim_memory_v1_memory_service_proto_rawDescGZIP(), []int{5}
+}
+
 type AuthContext struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	TenantId      string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
@@ -1462,6 +1511,342 @@ func (x *RecomputeProfileAggregateResponse) GetActive() bool {
 	return false
 }
 
+type SubmitMemoryCandidateRequest struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	AuthContext         *AuthContext           `protobuf:"bytes,1,opt,name=auth_context,json=authContext,proto3" json:"auth_context,omitempty"`
+	CandidateId         string                 `protobuf:"bytes,2,opt,name=candidate_id,json=candidateId,proto3" json:"candidate_id,omitempty"`
+	Scope               MemoryScope            `protobuf:"varint,3,opt,name=scope,proto3,enum=nexusim.memory.v1.MemoryScope" json:"scope,omitempty"`
+	ScopeId             string                 `protobuf:"bytes,4,opt,name=scope_id,json=scopeId,proto3" json:"scope_id,omitempty"`
+	ConversationId      string                 `protobuf:"bytes,5,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
+	Topic               string                 `protobuf:"bytes,6,opt,name=topic,proto3" json:"topic,omitempty"`
+	EventType           MemoryEventType        `protobuf:"varint,7,opt,name=event_type,json=eventType,proto3,enum=nexusim.memory.v1.MemoryEventType" json:"event_type,omitempty"`
+	FactText            string                 `protobuf:"bytes,8,opt,name=fact_text,json=factText,proto3" json:"fact_text,omitempty"`
+	FactSha256          string                 `protobuf:"bytes,9,opt,name=fact_sha256,json=factSha256,proto3" json:"fact_sha256,omitempty"`
+	ActorUserIds        []string               `protobuf:"bytes,10,rep,name=actor_user_ids,json=actorUserIds,proto3" json:"actor_user_ids,omitempty"`
+	AudienceUserIds     []string               `protobuf:"bytes,11,rep,name=audience_user_ids,json=audienceUserIds,proto3" json:"audience_user_ids,omitempty"`
+	SourceRefs          []*SourceRef           `protobuf:"bytes,12,rep,name=source_refs,json=sourceRefs,proto3" json:"source_refs,omitempty"`
+	ValidFromSeq        int64                  `protobuf:"varint,13,opt,name=valid_from_seq,json=validFromSeq,proto3" json:"valid_from_seq,omitempty"`
+	ValidToSeq          int64                  `protobuf:"varint,14,opt,name=valid_to_seq,json=validToSeq,proto3" json:"valid_to_seq,omitempty"`
+	SupersedesEventIds  []string               `protobuf:"bytes,15,rep,name=supersedes_event_ids,json=supersedesEventIds,proto3" json:"supersedes_event_ids,omitempty"`
+	ContradictsEventIds []string               `protobuf:"bytes,16,rep,name=contradicts_event_ids,json=contradictsEventIds,proto3" json:"contradicts_event_ids,omitempty"`
+	Confidence          float64                `protobuf:"fixed64,17,opt,name=confidence,proto3" json:"confidence,omitempty"`
+	VisibilityVersion   int64                  `protobuf:"varint,18,opt,name=visibility_version,json=visibilityVersion,proto3" json:"visibility_version,omitempty"`
+	ExtractionVersion   string                 `protobuf:"bytes,19,opt,name=extraction_version,json=extractionVersion,proto3" json:"extraction_version,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+func (x *SubmitMemoryCandidateRequest) Reset() {
+	*x = SubmitMemoryCandidateRequest{}
+	mi := &file_nexusim_memory_v1_memory_service_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SubmitMemoryCandidateRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SubmitMemoryCandidateRequest) ProtoMessage() {}
+
+func (x *SubmitMemoryCandidateRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_nexusim_memory_v1_memory_service_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SubmitMemoryCandidateRequest.ProtoReflect.Descriptor instead.
+func (*SubmitMemoryCandidateRequest) Descriptor() ([]byte, []int) {
+	return file_nexusim_memory_v1_memory_service_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *SubmitMemoryCandidateRequest) GetAuthContext() *AuthContext {
+	if x != nil {
+		return x.AuthContext
+	}
+	return nil
+}
+
+func (x *SubmitMemoryCandidateRequest) GetCandidateId() string {
+	if x != nil {
+		return x.CandidateId
+	}
+	return ""
+}
+
+func (x *SubmitMemoryCandidateRequest) GetScope() MemoryScope {
+	if x != nil {
+		return x.Scope
+	}
+	return MemoryScope_MEMORY_SCOPE_UNSPECIFIED
+}
+
+func (x *SubmitMemoryCandidateRequest) GetScopeId() string {
+	if x != nil {
+		return x.ScopeId
+	}
+	return ""
+}
+
+func (x *SubmitMemoryCandidateRequest) GetConversationId() string {
+	if x != nil {
+		return x.ConversationId
+	}
+	return ""
+}
+
+func (x *SubmitMemoryCandidateRequest) GetTopic() string {
+	if x != nil {
+		return x.Topic
+	}
+	return ""
+}
+
+func (x *SubmitMemoryCandidateRequest) GetEventType() MemoryEventType {
+	if x != nil {
+		return x.EventType
+	}
+	return MemoryEventType_MEMORY_EVENT_TYPE_UNSPECIFIED
+}
+
+func (x *SubmitMemoryCandidateRequest) GetFactText() string {
+	if x != nil {
+		return x.FactText
+	}
+	return ""
+}
+
+func (x *SubmitMemoryCandidateRequest) GetFactSha256() string {
+	if x != nil {
+		return x.FactSha256
+	}
+	return ""
+}
+
+func (x *SubmitMemoryCandidateRequest) GetActorUserIds() []string {
+	if x != nil {
+		return x.ActorUserIds
+	}
+	return nil
+}
+
+func (x *SubmitMemoryCandidateRequest) GetAudienceUserIds() []string {
+	if x != nil {
+		return x.AudienceUserIds
+	}
+	return nil
+}
+
+func (x *SubmitMemoryCandidateRequest) GetSourceRefs() []*SourceRef {
+	if x != nil {
+		return x.SourceRefs
+	}
+	return nil
+}
+
+func (x *SubmitMemoryCandidateRequest) GetValidFromSeq() int64 {
+	if x != nil {
+		return x.ValidFromSeq
+	}
+	return 0
+}
+
+func (x *SubmitMemoryCandidateRequest) GetValidToSeq() int64 {
+	if x != nil {
+		return x.ValidToSeq
+	}
+	return 0
+}
+
+func (x *SubmitMemoryCandidateRequest) GetSupersedesEventIds() []string {
+	if x != nil {
+		return x.SupersedesEventIds
+	}
+	return nil
+}
+
+func (x *SubmitMemoryCandidateRequest) GetContradictsEventIds() []string {
+	if x != nil {
+		return x.ContradictsEventIds
+	}
+	return nil
+}
+
+func (x *SubmitMemoryCandidateRequest) GetConfidence() float64 {
+	if x != nil {
+		return x.Confidence
+	}
+	return 0
+}
+
+func (x *SubmitMemoryCandidateRequest) GetVisibilityVersion() int64 {
+	if x != nil {
+		return x.VisibilityVersion
+	}
+	return 0
+}
+
+func (x *SubmitMemoryCandidateRequest) GetExtractionVersion() string {
+	if x != nil {
+		return x.ExtractionVersion
+	}
+	return ""
+}
+
+type SubmitMemoryCandidateResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Item          *StructuredMemoryEvent `protobuf:"bytes,1,opt,name=item,proto3" json:"item,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SubmitMemoryCandidateResponse) Reset() {
+	*x = SubmitMemoryCandidateResponse{}
+	mi := &file_nexusim_memory_v1_memory_service_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SubmitMemoryCandidateResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SubmitMemoryCandidateResponse) ProtoMessage() {}
+
+func (x *SubmitMemoryCandidateResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_nexusim_memory_v1_memory_service_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SubmitMemoryCandidateResponse.ProtoReflect.Descriptor instead.
+func (*SubmitMemoryCandidateResponse) Descriptor() ([]byte, []int) {
+	return file_nexusim_memory_v1_memory_service_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *SubmitMemoryCandidateResponse) GetItem() *StructuredMemoryEvent {
+	if x != nil {
+		return x.Item
+	}
+	return nil
+}
+
+type ReviewMemoryCandidateRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AuthContext   *AuthContext           `protobuf:"bytes,1,opt,name=auth_context,json=authContext,proto3" json:"auth_context,omitempty"`
+	MemoryEventId string                 `protobuf:"bytes,2,opt,name=memory_event_id,json=memoryEventId,proto3" json:"memory_event_id,omitempty"`
+	Decision      MemoryReviewDecision   `protobuf:"varint,3,opt,name=decision,proto3,enum=nexusim.memory.v1.MemoryReviewDecision" json:"decision,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReviewMemoryCandidateRequest) Reset() {
+	*x = ReviewMemoryCandidateRequest{}
+	mi := &file_nexusim_memory_v1_memory_service_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReviewMemoryCandidateRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReviewMemoryCandidateRequest) ProtoMessage() {}
+
+func (x *ReviewMemoryCandidateRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_nexusim_memory_v1_memory_service_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReviewMemoryCandidateRequest.ProtoReflect.Descriptor instead.
+func (*ReviewMemoryCandidateRequest) Descriptor() ([]byte, []int) {
+	return file_nexusim_memory_v1_memory_service_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *ReviewMemoryCandidateRequest) GetAuthContext() *AuthContext {
+	if x != nil {
+		return x.AuthContext
+	}
+	return nil
+}
+
+func (x *ReviewMemoryCandidateRequest) GetMemoryEventId() string {
+	if x != nil {
+		return x.MemoryEventId
+	}
+	return ""
+}
+
+func (x *ReviewMemoryCandidateRequest) GetDecision() MemoryReviewDecision {
+	if x != nil {
+		return x.Decision
+	}
+	return MemoryReviewDecision_MEMORY_REVIEW_DECISION_UNSPECIFIED
+}
+
+type ReviewMemoryCandidateResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Item          *StructuredMemoryEvent `protobuf:"bytes,1,opt,name=item,proto3" json:"item,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReviewMemoryCandidateResponse) Reset() {
+	*x = ReviewMemoryCandidateResponse{}
+	mi := &file_nexusim_memory_v1_memory_service_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReviewMemoryCandidateResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReviewMemoryCandidateResponse) ProtoMessage() {}
+
+func (x *ReviewMemoryCandidateResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_nexusim_memory_v1_memory_service_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReviewMemoryCandidateResponse.ProtoReflect.Descriptor instead.
+func (*ReviewMemoryCandidateResponse) Descriptor() ([]byte, []int) {
+	return file_nexusim_memory_v1_memory_service_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *ReviewMemoryCandidateResponse) GetItem() *StructuredMemoryEvent {
+	if x != nil {
+		return x.Item
+	}
+	return nil
+}
+
 var File_nexusim_memory_v1_memory_service_proto protoreflect.FileDescriptor
 
 const file_nexusim_memory_v1_memory_service_proto_rawDesc = "" +
@@ -1584,7 +1969,42 @@ const file_nexusim_memory_v1_memory_service_proto_rawDesc = "" +
 	"!RecomputeProfileAggregateResponse\x127\n" +
 	"\x04item\x18\x01 \x01(\v2#.nexusim.memory.v1.ProfileAggregateR\x04item\x12#\n" +
 	"\rsupport_count\x18\x02 \x01(\x05R\fsupportCount\x12\x16\n" +
-	"\x06active\x18\x03 \x01(\bR\x06active*\x98\x01\n" +
+	"\x06active\x18\x03 \x01(\bR\x06active\"\xd2\x06\n" +
+	"\x1cSubmitMemoryCandidateRequest\x12A\n" +
+	"\fauth_context\x18\x01 \x01(\v2\x1e.nexusim.memory.v1.AuthContextR\vauthContext\x12!\n" +
+	"\fcandidate_id\x18\x02 \x01(\tR\vcandidateId\x124\n" +
+	"\x05scope\x18\x03 \x01(\x0e2\x1e.nexusim.memory.v1.MemoryScopeR\x05scope\x12\x19\n" +
+	"\bscope_id\x18\x04 \x01(\tR\ascopeId\x12'\n" +
+	"\x0fconversation_id\x18\x05 \x01(\tR\x0econversationId\x12\x14\n" +
+	"\x05topic\x18\x06 \x01(\tR\x05topic\x12A\n" +
+	"\n" +
+	"event_type\x18\a \x01(\x0e2\".nexusim.memory.v1.MemoryEventTypeR\teventType\x12\x1b\n" +
+	"\tfact_text\x18\b \x01(\tR\bfactText\x12\x1f\n" +
+	"\vfact_sha256\x18\t \x01(\tR\n" +
+	"factSha256\x12$\n" +
+	"\x0eactor_user_ids\x18\n" +
+	" \x03(\tR\factorUserIds\x12*\n" +
+	"\x11audience_user_ids\x18\v \x03(\tR\x0faudienceUserIds\x12=\n" +
+	"\vsource_refs\x18\f \x03(\v2\x1c.nexusim.memory.v1.SourceRefR\n" +
+	"sourceRefs\x12$\n" +
+	"\x0evalid_from_seq\x18\r \x01(\x03R\fvalidFromSeq\x12 \n" +
+	"\fvalid_to_seq\x18\x0e \x01(\x03R\n" +
+	"validToSeq\x120\n" +
+	"\x14supersedes_event_ids\x18\x0f \x03(\tR\x12supersedesEventIds\x122\n" +
+	"\x15contradicts_event_ids\x18\x10 \x03(\tR\x13contradictsEventIds\x12\x1e\n" +
+	"\n" +
+	"confidence\x18\x11 \x01(\x01R\n" +
+	"confidence\x12-\n" +
+	"\x12visibility_version\x18\x12 \x01(\x03R\x11visibilityVersion\x12-\n" +
+	"\x12extraction_version\x18\x13 \x01(\tR\x11extractionVersion\"]\n" +
+	"\x1dSubmitMemoryCandidateResponse\x12<\n" +
+	"\x04item\x18\x01 \x01(\v2(.nexusim.memory.v1.StructuredMemoryEventR\x04item\"\xce\x01\n" +
+	"\x1cReviewMemoryCandidateRequest\x12A\n" +
+	"\fauth_context\x18\x01 \x01(\v2\x1e.nexusim.memory.v1.AuthContextR\vauthContext\x12&\n" +
+	"\x0fmemory_event_id\x18\x02 \x01(\tR\rmemoryEventId\x12C\n" +
+	"\bdecision\x18\x03 \x01(\x0e2'.nexusim.memory.v1.MemoryReviewDecisionR\bdecision\"]\n" +
+	"\x1dReviewMemoryCandidateResponse\x12<\n" +
+	"\x04item\x18\x01 \x01(\v2(.nexusim.memory.v1.StructuredMemoryEventR\x04item*\x98\x01\n" +
 	"\vMemoryScope\x12\x1c\n" +
 	"\x18MEMORY_SCOPE_UNSPECIFIED\x10\x00\x12\x1d\n" +
 	"\x19MEMORY_SCOPE_CONVERSATION\x10\x01\x12\x18\n" +
@@ -1620,12 +2040,18 @@ const file_nexusim_memory_v1_memory_service_proto_rawDesc = "" +
 	"\x1aMEMORY_SOURCE_TYPE_MESSAGE\x10\x01\x12%\n" +
 	"!MEMORY_SOURCE_TYPE_TIMELINE_EVENT\x10\x02\x12(\n" +
 	"$MEMORY_SOURCE_TYPE_PROFILE_AGGREGATE\x10\x03\x12\x1d\n" +
-	"\x19MEMORY_SOURCE_TYPE_SYSTEM\x10\x042\xeb\x03\n" +
+	"\x19MEMORY_SOURCE_TYPE_SYSTEM\x10\x04*\x85\x01\n" +
+	"\x14MemoryReviewDecision\x12&\n" +
+	"\"MEMORY_REVIEW_DECISION_UNSPECIFIED\x10\x00\x12\"\n" +
+	"\x1eMEMORY_REVIEW_DECISION_APPROVE\x10\x01\x12!\n" +
+	"\x1dMEMORY_REVIEW_DECISION_REJECT\x10\x022\xe3\x05\n" +
 	"\rMemoryService\x12n\n" +
 	"\x11QueryMemoryEvents\x12+.nexusim.memory.v1.QueryMemoryEventsRequest\x1a,.nexusim.memory.v1.QueryMemoryEventsResponse\x12e\n" +
 	"\x0eGetMemoryEvent\x12(.nexusim.memory.v1.GetMemoryEventRequest\x1a).nexusim.memory.v1.GetMemoryEventResponse\x12z\n" +
 	"\x15ListProfileAggregates\x12/.nexusim.memory.v1.ListProfileAggregatesRequest\x1a0.nexusim.memory.v1.ListProfileAggregatesResponse\x12\x86\x01\n" +
-	"\x19RecomputeProfileAggregate\x123.nexusim.memory.v1.RecomputeProfileAggregateRequest\x1a4.nexusim.memory.v1.RecomputeProfileAggregateResponseB=Z;github.com/qsyy0921/IM/api/proto/nexusim/memory/v1;memoryv1b\x06proto3"
+	"\x19RecomputeProfileAggregate\x123.nexusim.memory.v1.RecomputeProfileAggregateRequest\x1a4.nexusim.memory.v1.RecomputeProfileAggregateResponse\x12z\n" +
+	"\x15SubmitMemoryCandidate\x12/.nexusim.memory.v1.SubmitMemoryCandidateRequest\x1a0.nexusim.memory.v1.SubmitMemoryCandidateResponse\x12z\n" +
+	"\x15ReviewMemoryCandidate\x12/.nexusim.memory.v1.ReviewMemoryCandidateRequest\x1a0.nexusim.memory.v1.ReviewMemoryCandidateResponseB=Z;github.com/qsyy0921/IM/api/proto/nexusim/memory/v1;memoryv1b\x06proto3"
 
 var (
 	file_nexusim_memory_v1_memory_service_proto_rawDescOnce sync.Once
@@ -1639,27 +2065,32 @@ func file_nexusim_memory_v1_memory_service_proto_rawDescGZIP() []byte {
 	return file_nexusim_memory_v1_memory_service_proto_rawDescData
 }
 
-var file_nexusim_memory_v1_memory_service_proto_enumTypes = make([]protoimpl.EnumInfo, 5)
-var file_nexusim_memory_v1_memory_service_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
+var file_nexusim_memory_v1_memory_service_proto_enumTypes = make([]protoimpl.EnumInfo, 6)
+var file_nexusim_memory_v1_memory_service_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
 var file_nexusim_memory_v1_memory_service_proto_goTypes = []any{
 	(MemoryScope)(0),                          // 0: nexusim.memory.v1.MemoryScope
 	(MemoryEventType)(0),                      // 1: nexusim.memory.v1.MemoryEventType
 	(MemoryEventStatus)(0),                    // 2: nexusim.memory.v1.MemoryEventStatus
 	(MemoryReviewState)(0),                    // 3: nexusim.memory.v1.MemoryReviewState
 	(MemorySourceType)(0),                     // 4: nexusim.memory.v1.MemorySourceType
-	(*AuthContext)(nil),                       // 5: nexusim.memory.v1.AuthContext
-	(*SourceRef)(nil),                         // 6: nexusim.memory.v1.SourceRef
-	(*StructuredMemoryEvent)(nil),             // 7: nexusim.memory.v1.StructuredMemoryEvent
-	(*MemoryGraphEdge)(nil),                   // 8: nexusim.memory.v1.MemoryGraphEdge
-	(*ProfileAggregate)(nil),                  // 9: nexusim.memory.v1.ProfileAggregate
-	(*QueryMemoryEventsRequest)(nil),          // 10: nexusim.memory.v1.QueryMemoryEventsRequest
-	(*QueryMemoryEventsResponse)(nil),         // 11: nexusim.memory.v1.QueryMemoryEventsResponse
-	(*GetMemoryEventRequest)(nil),             // 12: nexusim.memory.v1.GetMemoryEventRequest
-	(*GetMemoryEventResponse)(nil),            // 13: nexusim.memory.v1.GetMemoryEventResponse
-	(*ListProfileAggregatesRequest)(nil),      // 14: nexusim.memory.v1.ListProfileAggregatesRequest
-	(*ListProfileAggregatesResponse)(nil),     // 15: nexusim.memory.v1.ListProfileAggregatesResponse
-	(*RecomputeProfileAggregateRequest)(nil),  // 16: nexusim.memory.v1.RecomputeProfileAggregateRequest
-	(*RecomputeProfileAggregateResponse)(nil), // 17: nexusim.memory.v1.RecomputeProfileAggregateResponse
+	(MemoryReviewDecision)(0),                 // 5: nexusim.memory.v1.MemoryReviewDecision
+	(*AuthContext)(nil),                       // 6: nexusim.memory.v1.AuthContext
+	(*SourceRef)(nil),                         // 7: nexusim.memory.v1.SourceRef
+	(*StructuredMemoryEvent)(nil),             // 8: nexusim.memory.v1.StructuredMemoryEvent
+	(*MemoryGraphEdge)(nil),                   // 9: nexusim.memory.v1.MemoryGraphEdge
+	(*ProfileAggregate)(nil),                  // 10: nexusim.memory.v1.ProfileAggregate
+	(*QueryMemoryEventsRequest)(nil),          // 11: nexusim.memory.v1.QueryMemoryEventsRequest
+	(*QueryMemoryEventsResponse)(nil),         // 12: nexusim.memory.v1.QueryMemoryEventsResponse
+	(*GetMemoryEventRequest)(nil),             // 13: nexusim.memory.v1.GetMemoryEventRequest
+	(*GetMemoryEventResponse)(nil),            // 14: nexusim.memory.v1.GetMemoryEventResponse
+	(*ListProfileAggregatesRequest)(nil),      // 15: nexusim.memory.v1.ListProfileAggregatesRequest
+	(*ListProfileAggregatesResponse)(nil),     // 16: nexusim.memory.v1.ListProfileAggregatesResponse
+	(*RecomputeProfileAggregateRequest)(nil),  // 17: nexusim.memory.v1.RecomputeProfileAggregateRequest
+	(*RecomputeProfileAggregateResponse)(nil), // 18: nexusim.memory.v1.RecomputeProfileAggregateResponse
+	(*SubmitMemoryCandidateRequest)(nil),      // 19: nexusim.memory.v1.SubmitMemoryCandidateRequest
+	(*SubmitMemoryCandidateResponse)(nil),     // 20: nexusim.memory.v1.SubmitMemoryCandidateResponse
+	(*ReviewMemoryCandidateRequest)(nil),      // 21: nexusim.memory.v1.ReviewMemoryCandidateRequest
+	(*ReviewMemoryCandidateResponse)(nil),     // 22: nexusim.memory.v1.ReviewMemoryCandidateResponse
 }
 var file_nexusim_memory_v1_memory_service_proto_depIdxs = []int32{
 	4,  // 0: nexusim.memory.v1.SourceRef.source_type:type_name -> nexusim.memory.v1.MemorySourceType
@@ -1667,35 +2098,47 @@ var file_nexusim_memory_v1_memory_service_proto_depIdxs = []int32{
 	1,  // 2: nexusim.memory.v1.StructuredMemoryEvent.event_type:type_name -> nexusim.memory.v1.MemoryEventType
 	2,  // 3: nexusim.memory.v1.StructuredMemoryEvent.status:type_name -> nexusim.memory.v1.MemoryEventStatus
 	3,  // 4: nexusim.memory.v1.StructuredMemoryEvent.review_state:type_name -> nexusim.memory.v1.MemoryReviewState
-	6,  // 5: nexusim.memory.v1.StructuredMemoryEvent.source_refs:type_name -> nexusim.memory.v1.SourceRef
-	6,  // 6: nexusim.memory.v1.MemoryGraphEdge.source_refs:type_name -> nexusim.memory.v1.SourceRef
+	7,  // 5: nexusim.memory.v1.StructuredMemoryEvent.source_refs:type_name -> nexusim.memory.v1.SourceRef
+	7,  // 6: nexusim.memory.v1.MemoryGraphEdge.source_refs:type_name -> nexusim.memory.v1.SourceRef
 	2,  // 7: nexusim.memory.v1.ProfileAggregate.status:type_name -> nexusim.memory.v1.MemoryEventStatus
 	3,  // 8: nexusim.memory.v1.ProfileAggregate.review_state:type_name -> nexusim.memory.v1.MemoryReviewState
-	5,  // 9: nexusim.memory.v1.QueryMemoryEventsRequest.auth_context:type_name -> nexusim.memory.v1.AuthContext
+	6,  // 9: nexusim.memory.v1.QueryMemoryEventsRequest.auth_context:type_name -> nexusim.memory.v1.AuthContext
 	0,  // 10: nexusim.memory.v1.QueryMemoryEventsRequest.scope:type_name -> nexusim.memory.v1.MemoryScope
 	2,  // 11: nexusim.memory.v1.QueryMemoryEventsRequest.statuses:type_name -> nexusim.memory.v1.MemoryEventStatus
-	7,  // 12: nexusim.memory.v1.QueryMemoryEventsResponse.items:type_name -> nexusim.memory.v1.StructuredMemoryEvent
-	5,  // 13: nexusim.memory.v1.GetMemoryEventRequest.auth_context:type_name -> nexusim.memory.v1.AuthContext
-	7,  // 14: nexusim.memory.v1.GetMemoryEventResponse.item:type_name -> nexusim.memory.v1.StructuredMemoryEvent
-	8,  // 15: nexusim.memory.v1.GetMemoryEventResponse.graph_edges:type_name -> nexusim.memory.v1.MemoryGraphEdge
-	5,  // 16: nexusim.memory.v1.ListProfileAggregatesRequest.auth_context:type_name -> nexusim.memory.v1.AuthContext
+	8,  // 12: nexusim.memory.v1.QueryMemoryEventsResponse.items:type_name -> nexusim.memory.v1.StructuredMemoryEvent
+	6,  // 13: nexusim.memory.v1.GetMemoryEventRequest.auth_context:type_name -> nexusim.memory.v1.AuthContext
+	8,  // 14: nexusim.memory.v1.GetMemoryEventResponse.item:type_name -> nexusim.memory.v1.StructuredMemoryEvent
+	9,  // 15: nexusim.memory.v1.GetMemoryEventResponse.graph_edges:type_name -> nexusim.memory.v1.MemoryGraphEdge
+	6,  // 16: nexusim.memory.v1.ListProfileAggregatesRequest.auth_context:type_name -> nexusim.memory.v1.AuthContext
 	2,  // 17: nexusim.memory.v1.ListProfileAggregatesRequest.statuses:type_name -> nexusim.memory.v1.MemoryEventStatus
-	9,  // 18: nexusim.memory.v1.ListProfileAggregatesResponse.items:type_name -> nexusim.memory.v1.ProfileAggregate
-	5,  // 19: nexusim.memory.v1.RecomputeProfileAggregateRequest.auth_context:type_name -> nexusim.memory.v1.AuthContext
-	9,  // 20: nexusim.memory.v1.RecomputeProfileAggregateResponse.item:type_name -> nexusim.memory.v1.ProfileAggregate
-	10, // 21: nexusim.memory.v1.MemoryService.QueryMemoryEvents:input_type -> nexusim.memory.v1.QueryMemoryEventsRequest
-	12, // 22: nexusim.memory.v1.MemoryService.GetMemoryEvent:input_type -> nexusim.memory.v1.GetMemoryEventRequest
-	14, // 23: nexusim.memory.v1.MemoryService.ListProfileAggregates:input_type -> nexusim.memory.v1.ListProfileAggregatesRequest
-	16, // 24: nexusim.memory.v1.MemoryService.RecomputeProfileAggregate:input_type -> nexusim.memory.v1.RecomputeProfileAggregateRequest
-	11, // 25: nexusim.memory.v1.MemoryService.QueryMemoryEvents:output_type -> nexusim.memory.v1.QueryMemoryEventsResponse
-	13, // 26: nexusim.memory.v1.MemoryService.GetMemoryEvent:output_type -> nexusim.memory.v1.GetMemoryEventResponse
-	15, // 27: nexusim.memory.v1.MemoryService.ListProfileAggregates:output_type -> nexusim.memory.v1.ListProfileAggregatesResponse
-	17, // 28: nexusim.memory.v1.MemoryService.RecomputeProfileAggregate:output_type -> nexusim.memory.v1.RecomputeProfileAggregateResponse
-	25, // [25:29] is the sub-list for method output_type
-	21, // [21:25] is the sub-list for method input_type
-	21, // [21:21] is the sub-list for extension type_name
-	21, // [21:21] is the sub-list for extension extendee
-	0,  // [0:21] is the sub-list for field type_name
+	10, // 18: nexusim.memory.v1.ListProfileAggregatesResponse.items:type_name -> nexusim.memory.v1.ProfileAggregate
+	6,  // 19: nexusim.memory.v1.RecomputeProfileAggregateRequest.auth_context:type_name -> nexusim.memory.v1.AuthContext
+	10, // 20: nexusim.memory.v1.RecomputeProfileAggregateResponse.item:type_name -> nexusim.memory.v1.ProfileAggregate
+	6,  // 21: nexusim.memory.v1.SubmitMemoryCandidateRequest.auth_context:type_name -> nexusim.memory.v1.AuthContext
+	0,  // 22: nexusim.memory.v1.SubmitMemoryCandidateRequest.scope:type_name -> nexusim.memory.v1.MemoryScope
+	1,  // 23: nexusim.memory.v1.SubmitMemoryCandidateRequest.event_type:type_name -> nexusim.memory.v1.MemoryEventType
+	7,  // 24: nexusim.memory.v1.SubmitMemoryCandidateRequest.source_refs:type_name -> nexusim.memory.v1.SourceRef
+	8,  // 25: nexusim.memory.v1.SubmitMemoryCandidateResponse.item:type_name -> nexusim.memory.v1.StructuredMemoryEvent
+	6,  // 26: nexusim.memory.v1.ReviewMemoryCandidateRequest.auth_context:type_name -> nexusim.memory.v1.AuthContext
+	5,  // 27: nexusim.memory.v1.ReviewMemoryCandidateRequest.decision:type_name -> nexusim.memory.v1.MemoryReviewDecision
+	8,  // 28: nexusim.memory.v1.ReviewMemoryCandidateResponse.item:type_name -> nexusim.memory.v1.StructuredMemoryEvent
+	11, // 29: nexusim.memory.v1.MemoryService.QueryMemoryEvents:input_type -> nexusim.memory.v1.QueryMemoryEventsRequest
+	13, // 30: nexusim.memory.v1.MemoryService.GetMemoryEvent:input_type -> nexusim.memory.v1.GetMemoryEventRequest
+	15, // 31: nexusim.memory.v1.MemoryService.ListProfileAggregates:input_type -> nexusim.memory.v1.ListProfileAggregatesRequest
+	17, // 32: nexusim.memory.v1.MemoryService.RecomputeProfileAggregate:input_type -> nexusim.memory.v1.RecomputeProfileAggregateRequest
+	19, // 33: nexusim.memory.v1.MemoryService.SubmitMemoryCandidate:input_type -> nexusim.memory.v1.SubmitMemoryCandidateRequest
+	21, // 34: nexusim.memory.v1.MemoryService.ReviewMemoryCandidate:input_type -> nexusim.memory.v1.ReviewMemoryCandidateRequest
+	12, // 35: nexusim.memory.v1.MemoryService.QueryMemoryEvents:output_type -> nexusim.memory.v1.QueryMemoryEventsResponse
+	14, // 36: nexusim.memory.v1.MemoryService.GetMemoryEvent:output_type -> nexusim.memory.v1.GetMemoryEventResponse
+	16, // 37: nexusim.memory.v1.MemoryService.ListProfileAggregates:output_type -> nexusim.memory.v1.ListProfileAggregatesResponse
+	18, // 38: nexusim.memory.v1.MemoryService.RecomputeProfileAggregate:output_type -> nexusim.memory.v1.RecomputeProfileAggregateResponse
+	20, // 39: nexusim.memory.v1.MemoryService.SubmitMemoryCandidate:output_type -> nexusim.memory.v1.SubmitMemoryCandidateResponse
+	22, // 40: nexusim.memory.v1.MemoryService.ReviewMemoryCandidate:output_type -> nexusim.memory.v1.ReviewMemoryCandidateResponse
+	35, // [35:41] is the sub-list for method output_type
+	29, // [29:35] is the sub-list for method input_type
+	29, // [29:29] is the sub-list for extension type_name
+	29, // [29:29] is the sub-list for extension extendee
+	0,  // [0:29] is the sub-list for field type_name
 }
 
 func init() { file_nexusim_memory_v1_memory_service_proto_init() }
@@ -1708,8 +2151,8 @@ func file_nexusim_memory_v1_memory_service_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_nexusim_memory_v1_memory_service_proto_rawDesc), len(file_nexusim_memory_v1_memory_service_proto_rawDesc)),
-			NumEnums:      5,
-			NumMessages:   13,
+			NumEnums:      6,
+			NumMessages:   17,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

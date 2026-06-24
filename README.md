@@ -271,7 +271,7 @@ message / conversation / policy events -> search-service + memory-service projec
 | 服务 / 模块 | 当前状态 |
 | --- | --- |
 | `search-service` | 搜索 projection、visibility / tombstone、`SearchMessages`、timeline consumer、projection smoke。 |
-| `memory-service` | group memory projection、rules-v0.2 extraction cue classifier、StructuredMemoryEvent、source refs、visibility window、revoke hidden、profile aggregate recompute / archive first path。 |
+| `memory-service` | group memory projection、rules-v0.2 extraction cue classifier、StructuredMemoryEvent、source refs、visibility window、revoke hidden、profile aggregate recompute / archive first path，以及公开 candidate submit / review / approve / reject 持久化路径。 |
 | `retrieval-gateway` | EvidencePack 统一边界，聚合 search / memory / policy precheck，并通过 memory-service 公开 API 扩展 current memory graph edges 和当前用户 profile aggregate evidence；不直接调用 LLM。 |
 | `rag-service` | 只读问答 first path、EvidencePack citation verifier、guarded external HTTP LLM boundary，并保留 EvidencePack memory graph edges 和 profile aggregate evidence；`loadtest/ragagent` 会把 RAG grounded answer 与 Agent approval / action audit 汇总成低敏演示报告。 |
 | `summary-service` | 只读摘要 first path、EvidencePack citation verifier、guarded external HTTP LLM boundary，并保留 EvidencePack memory graph edges 和 profile aggregate evidence。 |
@@ -279,7 +279,7 @@ message / conversation / policy events -> search-service + memory-service projec
 | `skill-registry` | 技能目录、输入输出合约、风险等级、审批要求和审计元数据。 |
 | `mcp-gateway` | tool prepare 边界、skill catalog check、policy precheck、低敏 audit，不直接执行外部工具。 |
 | `action-executor` | approved execution audit、proposal / approval / prepare audit 校验、本地安全 adapter、guarded external HTTP provider adapter、eval smoke。 |
-| `ai-eval-service` | 低敏 eval catalog / recorder / gate；case catalog 73，profile-Agent safety fixture 20，memory-service / retrieval-gateway / RAG / Summary / Agent live adapters 已完成第一轮 service-stack gate，覆盖 collaborative memory、profile aggregation、EvidencePack、Agent output 和 action safety；`rag-agent-demo` 已通过 optional service-stack live gate，确认 RAG grounded answer、Agent approval 和 action-executor audit 主线。 |
+| `ai-eval-service` | 低敏 eval catalog / recorder / gate；case catalog 81，profile-Agent safety fixture 20，memory-service / retrieval-gateway / RAG / Summary / Agent live adapters 已完成第一轮 service-stack gate，覆盖 collaborative memory、profile aggregation、public candidate review、EvidencePack、Agent output 和 action safety；`rag-agent-demo` 已通过 optional service-stack live gate，确认 RAG grounded answer、Agent approval 和 action-executor audit 主线。 |
 | `ai/python` | Python AI Worker 候选层：contract guard、低敏 safety guard、candidate-only worker CLI、memory extraction hash-only candidate first path、`IM` conda toolchain。 |
 
 已进入 product-active first-stage 的平台 / 产品服务：
@@ -354,6 +354,11 @@ memory-service timeline worker 同步升级到 `rules-v0.2` group memory extract
 只抽取明确 `decision:` / `task:` / `status:` / `blocker:` / `file:` /
 `profile_signal:` 等 cue 或显式 memory metadata 的消息；普通聊天不会被泛化成
 memory fact，profile / preference / role signal 保持 PENDING + NEEDS_REVIEW。
+Python memory extraction candidate first path 和 Go-side adapter 已接入
+memory-service 的公开 candidate review path：`SubmitMemoryCandidate` 校验
+source refs 可见性与 `fact_sha256`，只写入 `PENDING + NEEDS_REVIEW`；
+`ReviewMemoryCandidate` 才能显式 approve / reject。`loadtest/memory` 和
+memory-service ai-eval adapter 已把该路径纳入 public API 检查。
 `loadtest/ragagent` 已新增 RAG-Agent demo first path：编排既有 `loadtest/rag`
 和 `loadtest/agent`，围绕同一 tenant / conversation 生成低敏总报告，断言
 RAG grounded answer、Agent proposal、approval、action-executor audit、

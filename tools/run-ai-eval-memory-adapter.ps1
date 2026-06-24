@@ -78,6 +78,9 @@ function Test-MemoryAssertion {
         "must_expire_profile_when_supporting_memory_deleted" {
             return [bool]$Summary.checks.deleted_support_profile_excluded
         }
+        "must_submit_and_review_memory_candidate_via_public_api" {
+            return [bool]$Summary.checks.candidate_review_public_api
+        }
         default {
             throw "unsupported memory-service eval assertion type: $type"
         }

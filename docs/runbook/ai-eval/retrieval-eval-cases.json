@@ -1269,6 +1269,19 @@
       ]
     },
     {
+      "id": "memory-service-live-public-candidate-review",
+      "family": "collaborative_memory",
+      "stage": "memory-service",
+      "status": "active",
+      "query": "submit a memory candidate and approve it through public memory-service APIs",
+      "risk": "Memory extraction candidates must enter memory-service as source-backed pending records and become active only after explicit public review",
+      "required_assertions": [
+        {
+          "type": "must_submit_and_review_memory_candidate_via_public_api"
+        }
+      ]
+    },
+    {
       "id": "memory-source-ref-required-before-active",
       "family": "collaborative_memory",
       "stage": "memory-profile-safety",

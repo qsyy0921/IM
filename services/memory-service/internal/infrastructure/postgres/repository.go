@@ -20,6 +20,10 @@ type Repository struct {
 	pool *pgxpool.Pool
 }
 
+type memoryQuerier interface {
+	Query(context.Context, string, ...any) (pgx.Rows, error)
+}
+
 func NewRepository(pool *pgxpool.Pool) *Repository {
 	return &Repository{pool: pool}
 }
@@ -351,6 +355,283 @@ func (repository *Repository) RecomputeProfileAggregate(
 		return types.ProfileAggregate{}, 0, false, types.NewDBWriteFailed(err.Error())
 	}
 	return item, len(supports), true, nil
+}
+
+func (repository *Repository) SubmitMemoryCandidate(
+	ctx context.Context,
+	command types.SubmitMemoryCandidateCommand,
+) (types.StructuredMemoryEvent, error) {
+	if repository.pool == nil {
+		return types.StructuredMemoryEvent{}, types.NewDBWriteFailed("memory repository is not configured")
+	}
+	tx, err := repository.pool.Begin(ctx)
+	if err != nil {
+		return types.StructuredMemoryEvent{}, types.NewDBWriteFailed(err.Error())
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+	if err := ensureCandidateSourceRefsVisible(ctx, tx, command.AuthContext, command.SourceRefs); err != nil {
+		return types.StructuredMemoryEvent{}, err
+	}
+	if err := insertMemoryCandidate(ctx, tx, command); err != nil {
+		return types.StructuredMemoryEvent{}, err
+	}
+	item, err := loadMemoryEventByID(ctx, tx, command.AuthContext.TenantID, command.CandidateID)
+	if err != nil {
+		return types.StructuredMemoryEvent{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return types.StructuredMemoryEvent{}, types.NewDBWriteFailed(err.Error())
+	}
+	return item, nil
+}
+
+func (repository *Repository) ReviewMemoryCandidate(
+	ctx context.Context,
+	command types.ReviewMemoryCandidateCommand,
+) (types.StructuredMemoryEvent, error) {
+	if repository.pool == nil {
+		return types.StructuredMemoryEvent{}, types.NewDBWriteFailed("memory repository is not configured")
+	}
+	tx, err := repository.pool.Begin(ctx)
+	if err != nil {
+		return types.StructuredMemoryEvent{}, types.NewDBWriteFailed(err.Error())
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+	var statusValue string
+	var reviewState string
+	if err := tx.QueryRow(ctx, `
+SELECT status, review_state
+FROM memory_structured_events
+WHERE tenant_id = $1
+  AND memory_event_id = $2
+FOR UPDATE
+`, command.AuthContext.TenantID, command.MemoryEventID).Scan(&statusValue, &reviewState); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return types.StructuredMemoryEvent{}, types.ErrMemoryNotFound
+		}
+		return types.StructuredMemoryEvent{}, types.NewDBReadFailed(err.Error())
+	}
+	if statusValue != types.MemoryStatusPending ||
+		(reviewState != types.MemoryReviewNeedsReview && reviewState != types.MemoryReviewUnreviewed) {
+		return types.StructuredMemoryEvent{}, types.ErrInvalidArgument
+	}
+	visible, err := isMemoryEventVisibleForUser(ctx, tx, command.AuthContext.TenantID, command.AuthContext.UserID, command.MemoryEventID)
+	if err != nil {
+		return types.StructuredMemoryEvent{}, err
+	}
+	if !visible {
+		return types.StructuredMemoryEvent{}, types.ErrPermissionDenied
+	}
+	nextStatus := types.MemoryStatusRejected
+	nextReview := types.MemoryReviewRejected
+	if command.Decision == types.MemoryReviewDecisionApprove {
+		nextStatus = types.MemoryStatusActive
+		nextReview = types.MemoryReviewApproved
+	}
+	if _, err := tx.Exec(ctx, `
+UPDATE memory_structured_events
+SET status = $3,
+    review_state = $4,
+    updated_at = now()
+WHERE tenant_id = $1
+  AND memory_event_id = $2
+`, command.AuthContext.TenantID, command.MemoryEventID, nextStatus, nextReview); err != nil {
+		return types.StructuredMemoryEvent{}, types.NewDBWriteFailed(err.Error())
+	}
+	item, err := loadMemoryEventByID(ctx, tx, command.AuthContext.TenantID, command.MemoryEventID)
+	if err != nil {
+		return types.StructuredMemoryEvent{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return types.StructuredMemoryEvent{}, types.NewDBWriteFailed(err.Error())
+	}
+	return item, nil
+}
+
+func ensureCandidateSourceRefsVisible(ctx context.Context, tx pgx.Tx, auth types.AuthContext, refs []types.SourceRef) error {
+	for _, ref := range refs {
+		var visible bool
+		if err := tx.QueryRow(ctx, `
+SELECT EXISTS (
+	SELECT 1
+	FROM memory_membership_projection
+	WHERE tenant_id = $1
+	  AND conversation_id = $2
+	  AND user_id = $3
+	  AND status <> 'BANNED'
+	  AND join_seq <= $4
+	  AND (leave_seq IS NULL OR leave_seq >= $4)
+)
+`, auth.TenantID, ref.ConversationID, auth.UserID, ref.ConversationSeq).Scan(&visible); err != nil {
+			return types.NewDBReadFailed(err.Error())
+		}
+		if !visible {
+			return types.ErrPermissionDenied
+		}
+	}
+	return nil
+}
+
+func insertMemoryCandidate(ctx context.Context, tx pgx.Tx, command types.SubmitMemoryCandidateCommand) error {
+	actorJSON, _ := json.Marshal(command.ActorUserIDs)
+	audienceJSON, _ := json.Marshal(command.AudienceUserIDs)
+	supersedesJSON, _ := json.Marshal(command.SupersedesEventIDs)
+	contradictsJSON, _ := json.Marshal(command.ContradictsEventIDs)
+	_, err := tx.Exec(ctx, `
+INSERT INTO memory_structured_events (
+	tenant_id,
+	memory_event_id,
+	scope_type,
+	scope_id,
+	conversation_id,
+	topic,
+	event_type,
+	status,
+	review_state,
+	fact_text,
+	actor_user_ids,
+	audience_user_ids,
+	valid_from_seq,
+	valid_to_seq,
+	supersedes_event_ids,
+	contradicts_event_ids,
+	confidence,
+	visibility_version,
+	extraction_version,
+	source_projection_version,
+	updated_at
+) VALUES ($1, $2, $3, $4, $5, $6, $7, 'PENDING', 'NEEDS_REVIEW', $8, $9::jsonb, $10::jsonb, $11, $12, $13::jsonb, $14::jsonb, $15, $16, $17, $18, now())
+`, command.AuthContext.TenantID, command.CandidateID, command.Scope, command.ScopeID, command.ConversationID, command.Topic, command.EventType, command.FactText, string(actorJSON), string(audienceJSON), command.ValidFromSeq, nullableInt64(command.ValidToSeq), string(supersedesJSON), string(contradictsJSON), command.Confidence, command.VisibilityVersion, command.ExtractionVersion, maxSourceProjectionVersion(command.SourceRefs))
+	if err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	for _, ref := range command.SourceRefs {
+		if err := insertCandidateSourceRef(ctx, tx, command.AuthContext.TenantID, command.CandidateID, ref); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func insertCandidateSourceRef(ctx context.Context, tx pgx.Tx, tenantID types.TenantID, memoryEventID string, ref types.SourceRef) error {
+	sourceRefID := strings.Join([]string{
+		ref.SourceType,
+		ref.SourceID,
+		ref.SourceEventID,
+		string(ref.ConversationID),
+		fmt.Sprintf("%d", ref.ConversationSeq),
+	}, ":")
+	_, err := tx.Exec(ctx, `
+INSERT INTO memory_event_source_refs (
+	tenant_id,
+	memory_event_id,
+	source_ref_id,
+	source_type,
+	source_id,
+	source_event_id,
+	conversation_id,
+	conversation_seq,
+	occurred_at
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+`, tenantID, memoryEventID, sourceRefID, ref.SourceType, ref.SourceID, ref.SourceEventID, ref.ConversationID, ref.ConversationSeq, nullableTime(ref.OccurredAt))
+	if err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	return nil
+}
+
+func loadMemoryEventByID(ctx context.Context, querier memoryQuerier, tenantID types.TenantID, memoryEventID string) (types.StructuredMemoryEvent, error) {
+	rows, err := querier.Query(ctx, `
+SELECT
+	e.memory_event_id,
+	e.scope_type,
+	e.scope_id,
+	e.conversation_id,
+	e.topic,
+	e.event_type,
+	e.status,
+	e.review_state,
+	e.fact_text,
+	e.actor_user_ids::text,
+	e.audience_user_ids::text,
+	COALESCE(e.valid_from_seq, 0),
+	COALESCE(e.valid_to_seq, 0),
+	e.valid_from_at,
+	e.valid_to_at,
+	e.supersedes_event_ids::text,
+	e.contradicts_event_ids::text,
+	e.confidence::float8,
+	e.visibility_version,
+	e.extraction_version,
+	e.updated_at,
+	COALESCE(e.source_projection_version, 0)
+FROM memory_structured_events e
+WHERE e.tenant_id = $1
+  AND e.memory_event_id = $2
+`, tenantID, memoryEventID)
+	if err != nil {
+		return types.StructuredMemoryEvent{}, types.NewDBReadFailed(err.Error())
+	}
+	defer rows.Close()
+	items, _, err := scanMemoryEvents(rows)
+	if err != nil {
+		return types.StructuredMemoryEvent{}, err
+	}
+	if len(items) == 0 {
+		return types.StructuredMemoryEvent{}, types.ErrMemoryNotFound
+	}
+	if err := attachSourceRefsWithQuerier(ctx, querier, tenantID, items); err != nil {
+		return types.StructuredMemoryEvent{}, err
+	}
+	return items[0], nil
+}
+
+func isMemoryEventVisibleForUser(ctx context.Context, tx pgx.Tx, tenantID types.TenantID, userID types.UserID, memoryEventID string) (bool, error) {
+	var visible bool
+	if err := tx.QueryRow(ctx, `
+SELECT EXISTS (
+	SELECT 1
+	FROM memory_event_source_refs s
+	LEFT JOIN memory_membership_projection m
+	  ON m.tenant_id = s.tenant_id
+	 AND m.conversation_id = s.conversation_id
+	 AND m.user_id = $3
+	WHERE s.tenant_id = $1
+	  AND s.memory_event_id = $2
+	  AND (
+		s.conversation_id = ''
+		OR (
+			m.status <> 'BANNED'
+			AND m.join_seq <= s.conversation_seq
+			AND (m.leave_seq IS NULL OR m.leave_seq >= s.conversation_seq)
+		)
+	  )
+)
+`, tenantID, memoryEventID, userID).Scan(&visible); err != nil {
+		return false, types.NewDBReadFailed(err.Error())
+	}
+	return visible, nil
+}
+
+func nullableInt64(value int64) any {
+	if value <= 0 {
+		return nil
+	}
+	return value
+}
+
+func maxSourceProjectionVersion(refs []types.SourceRef) int64 {
+	var maxValue int64
+	for _, ref := range refs {
+		if ref.ConversationSeq > maxValue {
+			maxValue = ref.ConversationSeq
+		}
+	}
+	return maxValue
 }
 
 type profileSupport struct {
@@ -877,6 +1158,10 @@ func scanMemoryEvents(rows pgx.Rows) ([]types.StructuredMemoryEvent, int64, erro
 }
 
 func (repository *Repository) attachSourceRefs(ctx context.Context, tenantID types.TenantID, items []types.StructuredMemoryEvent) error {
+	return attachSourceRefsWithQuerier(ctx, repository.pool, tenantID, items)
+}
+
+func attachSourceRefsWithQuerier(ctx context.Context, querier memoryQuerier, tenantID types.TenantID, items []types.StructuredMemoryEvent) error {
 	if len(items) == 0 {
 		return nil
 	}
@@ -886,7 +1171,7 @@ func (repository *Repository) attachSourceRefs(ctx context.Context, tenantID typ
 		ids = append(ids, items[i].MemoryEventID)
 		index[items[i].MemoryEventID] = i
 	}
-	rows, err := repository.pool.Query(ctx, `
+	rows, err := querier.Query(ctx, `
 SELECT memory_event_id, source_type, source_id, source_event_id, conversation_id, COALESCE(conversation_seq, 0), occurred_at
 FROM memory_event_source_refs
 WHERE tenant_id = $1

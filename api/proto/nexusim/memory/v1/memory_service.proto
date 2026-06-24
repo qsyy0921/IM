@@ -9,6 +9,8 @@ service MemoryService {
   rpc GetMemoryEvent(GetMemoryEventRequest) returns (GetMemoryEventResponse);
   rpc ListProfileAggregates(ListProfileAggregatesRequest) returns (ListProfileAggregatesResponse);
   rpc RecomputeProfileAggregate(RecomputeProfileAggregateRequest) returns (RecomputeProfileAggregateResponse);
+  rpc SubmitMemoryCandidate(SubmitMemoryCandidateRequest) returns (SubmitMemoryCandidateResponse);
+  rpc ReviewMemoryCandidate(ReviewMemoryCandidateRequest) returns (ReviewMemoryCandidateResponse);
 }
 
 message AuthContext {
@@ -64,6 +66,12 @@ enum MemorySourceType {
   MEMORY_SOURCE_TYPE_TIMELINE_EVENT = 2;
   MEMORY_SOURCE_TYPE_PROFILE_AGGREGATE = 3;
   MEMORY_SOURCE_TYPE_SYSTEM = 4;
+}
+
+enum MemoryReviewDecision {
+  MEMORY_REVIEW_DECISION_UNSPECIFIED = 0;
+  MEMORY_REVIEW_DECISION_APPROVE = 1;
+  MEMORY_REVIEW_DECISION_REJECT = 2;
 }
 
 message SourceRef {
@@ -179,4 +187,40 @@ message RecomputeProfileAggregateResponse {
   ProfileAggregate item = 1;
   int32 support_count = 2;
   bool active = 3;
+}
+
+message SubmitMemoryCandidateRequest {
+  AuthContext auth_context = 1;
+  string candidate_id = 2;
+  MemoryScope scope = 3;
+  string scope_id = 4;
+  string conversation_id = 5;
+  string topic = 6;
+  MemoryEventType event_type = 7;
+  string fact_text = 8;
+  string fact_sha256 = 9;
+  repeated string actor_user_ids = 10;
+  repeated string audience_user_ids = 11;
+  repeated SourceRef source_refs = 12;
+  int64 valid_from_seq = 13;
+  int64 valid_to_seq = 14;
+  repeated string supersedes_event_ids = 15;
+  repeated string contradicts_event_ids = 16;
+  double confidence = 17;
+  int64 visibility_version = 18;
+  string extraction_version = 19;
+}
+
+message SubmitMemoryCandidateResponse {
+  StructuredMemoryEvent item = 1;
+}
+
+message ReviewMemoryCandidateRequest {
+  AuthContext auth_context = 1;
+  string memory_event_id = 2;
+  MemoryReviewDecision decision = 3;
+}
+
+message ReviewMemoryCandidateResponse {
+  StructuredMemoryEvent item = 1;
 }

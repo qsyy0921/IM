@@ -177,6 +177,7 @@ $knownAssertionTypes = @(
     "must_recompute_profile_via_public_api",
     "must_preserve_profile_supporting_evidence",
     "must_expire_profile_when_supporting_memory_deleted",
+    "must_submit_and_review_memory_candidate_via_public_api",
     "must_propagate_current_memory_query_seq",
     "must_not_cite_expired_memory",
     "must_not_cite_superseded_memory",

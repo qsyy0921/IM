@@ -3,6 +3,7 @@ package grpc
 import (
 	"context"
 	"errors"
+	"time"
 
 	memoryv1 "github.com/qsyy0921/IM/api/proto/nexusim/memory/v1"
 	"github.com/qsyy0921/IM/services/memory-service/internal/types"
@@ -27,20 +28,32 @@ type RecomputeProfileAggregateExecutor interface {
 	Execute(context.Context, types.RecomputeProfileAggregateCommand) (types.RecomputeProfileAggregateResult, error)
 }
 
+type SubmitMemoryCandidateExecutor interface {
+	Execute(context.Context, types.SubmitMemoryCandidateCommand) (types.SubmitMemoryCandidateResult, error)
+}
+
+type ReviewMemoryCandidateExecutor interface {
+	Execute(context.Context, types.ReviewMemoryCandidateCommand) (types.ReviewMemoryCandidateResult, error)
+}
+
 type Server struct {
 	memoryv1.UnimplementedMemoryServiceServer
 	queryMemoryEvents         QueryMemoryEventsExecutor
 	getMemoryEvent            GetMemoryEventExecutor
 	listProfileAggregates     ListProfileAggregatesExecutor
 	recomputeProfileAggregate RecomputeProfileAggregateExecutor
+	submitMemoryCandidate     SubmitMemoryCandidateExecutor
+	reviewMemoryCandidate     ReviewMemoryCandidateExecutor
 }
 
-func NewServer(query QueryMemoryEventsExecutor, get GetMemoryEventExecutor, list ListProfileAggregatesExecutor, recompute RecomputeProfileAggregateExecutor) *Server {
+func NewServer(query QueryMemoryEventsExecutor, get GetMemoryEventExecutor, list ListProfileAggregatesExecutor, recompute RecomputeProfileAggregateExecutor, submit SubmitMemoryCandidateExecutor, review ReviewMemoryCandidateExecutor) *Server {
 	return &Server{
 		queryMemoryEvents:         query,
 		getMemoryEvent:            get,
 		listProfileAggregates:     list,
 		recomputeProfileAggregate: recompute,
+		submitMemoryCandidate:     submit,
+		reviewMemoryCandidate:     review,
 	}
 }
 
@@ -150,6 +163,60 @@ func (server *Server) RecomputeProfileAggregate(ctx context.Context, request *me
 	}, nil
 }
 
+func (server *Server) SubmitMemoryCandidate(ctx context.Context, request *memoryv1.SubmitMemoryCandidateRequest) (*memoryv1.SubmitMemoryCandidateResponse, error) {
+	if server == nil || server.submitMemoryCandidate == nil {
+		return nil, publicError(types.ErrMemoryUnavailable)
+	}
+	sourceRefs := make([]types.SourceRef, 0, len(request.GetSourceRefs()))
+	for _, ref := range request.GetSourceRefs() {
+		sourceRefs = append(sourceRefs, sourceRefFromProto(ref))
+	}
+	result, err := server.submitMemoryCandidate.Execute(ctx, types.SubmitMemoryCandidateCommand{
+		AuthContext:         authContext(ctx, request.GetAuthContext()),
+		CandidateID:         request.GetCandidateId(),
+		Scope:               scopeFromProto(request.GetScope()),
+		ScopeID:             request.GetScopeId(),
+		ConversationID:      types.ConversationID(request.GetConversationId()),
+		Topic:               request.GetTopic(),
+		EventType:           eventTypeFromProto(request.GetEventType()),
+		FactText:            request.GetFactText(),
+		FactSHA256:          request.GetFactSha256(),
+		ActorUserIDs:        request.GetActorUserIds(),
+		AudienceUserIDs:     request.GetAudienceUserIds(),
+		SourceRefs:          sourceRefs,
+		ValidFromSeq:        request.GetValidFromSeq(),
+		ValidToSeq:          request.GetValidToSeq(),
+		SupersedesEventIDs:  request.GetSupersedesEventIds(),
+		ContradictsEventIDs: request.GetContradictsEventIds(),
+		Confidence:          request.GetConfidence(),
+		VisibilityVersion:   request.GetVisibilityVersion(),
+		ExtractionVersion:   request.GetExtractionVersion(),
+	})
+	if err != nil {
+		return nil, publicError(err)
+	}
+	return &memoryv1.SubmitMemoryCandidateResponse{
+		Item: structuredMemoryEventToProto(result.Item),
+	}, nil
+}
+
+func (server *Server) ReviewMemoryCandidate(ctx context.Context, request *memoryv1.ReviewMemoryCandidateRequest) (*memoryv1.ReviewMemoryCandidateResponse, error) {
+	if server == nil || server.reviewMemoryCandidate == nil {
+		return nil, publicError(types.ErrMemoryUnavailable)
+	}
+	result, err := server.reviewMemoryCandidate.Execute(ctx, types.ReviewMemoryCandidateCommand{
+		AuthContext:   authContext(ctx, request.GetAuthContext()),
+		MemoryEventID: request.GetMemoryEventId(),
+		Decision:      reviewDecisionFromProto(request.GetDecision()),
+	})
+	if err != nil {
+		return nil, publicError(err)
+	}
+	return &memoryv1.ReviewMemoryCandidateResponse{
+		Item: structuredMemoryEventToProto(result.Item),
+	}, nil
+}
+
 func authContext(ctx context.Context, auth *memoryv1.AuthContext) types.AuthContext {
 	if verified, ok := verifiedAuthFromContext(ctx); ok {
 		return verified
@@ -223,6 +290,24 @@ func sourceRefToProto(ref types.SourceRef) *memoryv1.SourceRef {
 		ConversationId:   string(ref.ConversationID),
 		ConversationSeq:  ref.ConversationSeq,
 		OccurredAtUnixMs: unixMillis(ref.OccurredAt),
+	}
+}
+
+func sourceRefFromProto(ref *memoryv1.SourceRef) types.SourceRef {
+	if ref == nil {
+		return types.SourceRef{}
+	}
+	var occurredAt time.Time
+	if ref.GetOccurredAtUnixMs() > 0 {
+		occurredAt = time.UnixMilli(ref.GetOccurredAtUnixMs()).UTC()
+	}
+	return types.SourceRef{
+		SourceType:      sourceTypeFromProto(ref.GetSourceType()),
+		SourceID:        ref.GetSourceId(),
+		SourceEventID:   ref.GetSourceEventId(),
+		ConversationID:  types.ConversationID(ref.GetConversationId()),
+		ConversationSeq: ref.GetConversationSeq(),
+		OccurredAt:      occurredAt,
 	}
 }
 
@@ -369,6 +454,29 @@ func eventTypeToProto(eventType string) memoryv1.MemoryEventType {
 	}
 }
 
+func eventTypeFromProto(eventType memoryv1.MemoryEventType) string {
+	switch eventType {
+	case memoryv1.MemoryEventType_MEMORY_EVENT_TYPE_TASK:
+		return types.MemoryEventTypeTask
+	case memoryv1.MemoryEventType_MEMORY_EVENT_TYPE_DECISION:
+		return types.MemoryEventTypeDecision
+	case memoryv1.MemoryEventType_MEMORY_EVENT_TYPE_STATUS:
+		return types.MemoryEventTypeStatus
+	case memoryv1.MemoryEventType_MEMORY_EVENT_TYPE_BLOCKER:
+		return types.MemoryEventTypeBlocker
+	case memoryv1.MemoryEventType_MEMORY_EVENT_TYPE_FILE:
+		return types.MemoryEventTypeFile
+	case memoryv1.MemoryEventType_MEMORY_EVENT_TYPE_PREFERENCE_SIGNAL:
+		return types.MemoryEventTypePreferenceSignal
+	case memoryv1.MemoryEventType_MEMORY_EVENT_TYPE_ROLE_SIGNAL:
+		return types.MemoryEventTypeRoleSignal
+	case memoryv1.MemoryEventType_MEMORY_EVENT_TYPE_PROFILE_SIGNAL:
+		return types.MemoryEventTypeProfileSignal
+	default:
+		return ""
+	}
+}
+
 func reviewStateToProto(state string) memoryv1.MemoryReviewState {
 	switch state {
 	case types.MemoryReviewUnreviewed:
@@ -396,5 +504,31 @@ func sourceTypeToProto(sourceType string) memoryv1.MemorySourceType {
 		return memoryv1.MemorySourceType_MEMORY_SOURCE_TYPE_SYSTEM
 	default:
 		return memoryv1.MemorySourceType_MEMORY_SOURCE_TYPE_UNSPECIFIED
+	}
+}
+
+func sourceTypeFromProto(sourceType memoryv1.MemorySourceType) string {
+	switch sourceType {
+	case memoryv1.MemorySourceType_MEMORY_SOURCE_TYPE_MESSAGE:
+		return types.MemorySourceTypeMessage
+	case memoryv1.MemorySourceType_MEMORY_SOURCE_TYPE_TIMELINE_EVENT:
+		return types.MemorySourceTypeTimelineEvent
+	case memoryv1.MemorySourceType_MEMORY_SOURCE_TYPE_PROFILE_AGGREGATE:
+		return types.MemorySourceTypeProfileAggregate
+	case memoryv1.MemorySourceType_MEMORY_SOURCE_TYPE_SYSTEM:
+		return types.MemorySourceTypeSystem
+	default:
+		return ""
+	}
+}
+
+func reviewDecisionFromProto(decision memoryv1.MemoryReviewDecision) string {
+	switch decision {
+	case memoryv1.MemoryReviewDecision_MEMORY_REVIEW_DECISION_APPROVE:
+		return types.MemoryReviewDecisionApprove
+	case memoryv1.MemoryReviewDecision_MEMORY_REVIEW_DECISION_REJECT:
+		return types.MemoryReviewDecisionReject
+	default:
+		return ""
 	}
 }

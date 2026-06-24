@@ -83,6 +83,17 @@ operator path. If the number of visible supporting signals is lower than
 PENDING profile aggregate for that key instead of leaving stale profile evidence
 visible.
 
+`SubmitMemoryCandidate` and `ReviewMemoryCandidate` form the first public
+candidate review path. `SubmitMemoryCandidate` accepts only conversation-scoped
+candidates with visible message / timeline source refs. The caller must supply
+the final `fact_text` and a `fact_sha256` that matches the normalized fact text;
+this binds hash-only Python candidates to Go-owned validation without letting
+the Python worker persist final memory facts. Submitted candidates are always
+stored as `PENDING + NEEDS_REVIEW`. `ReviewMemoryCandidate` can then explicitly
+approve the candidate into `ACTIVE + APPROVED` or reject it into `REJECTED`; it
+also applies the same source-ref visibility check and fails closed when the
+candidate is not visible or no longer pending review.
+
 ## 3. Core Model
 
 `StructuredMemoryEvent` is not the raw message. It is a source-backed memory
@@ -115,6 +126,12 @@ Required fields:
 First-slice invariants:
 
 - A memory event must have at least one source ref before it can become ACTIVE.
+- Candidate submission must not create ACTIVE memory. Public candidate submit
+  writes only `PENDING + NEEDS_REVIEW`; review is the only first-stage public
+  path that can approve it.
+- Candidate `fact_sha256` must match normalized `fact_text`; Python AI Worker
+  may produce hash-only candidates, but cannot bypass Go-side validation,
+  review, approval and memory-service persistence.
 - Profile-like signals must not become ACTIVE profile facts without aggregation
   and review.
 - Recomputed profile aggregates must keep all supporting memory ids, and must

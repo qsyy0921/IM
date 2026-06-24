@@ -23,6 +23,8 @@ const (
 	MemoryService_GetMemoryEvent_FullMethodName            = "/nexusim.memory.v1.MemoryService/GetMemoryEvent"
 	MemoryService_ListProfileAggregates_FullMethodName     = "/nexusim.memory.v1.MemoryService/ListProfileAggregates"
 	MemoryService_RecomputeProfileAggregate_FullMethodName = "/nexusim.memory.v1.MemoryService/RecomputeProfileAggregate"
+	MemoryService_SubmitMemoryCandidate_FullMethodName     = "/nexusim.memory.v1.MemoryService/SubmitMemoryCandidate"
+	MemoryService_ReviewMemoryCandidate_FullMethodName     = "/nexusim.memory.v1.MemoryService/ReviewMemoryCandidate"
 )
 
 // MemoryServiceClient is the client API for MemoryService service.
@@ -33,6 +35,8 @@ type MemoryServiceClient interface {
 	GetMemoryEvent(ctx context.Context, in *GetMemoryEventRequest, opts ...grpc.CallOption) (*GetMemoryEventResponse, error)
 	ListProfileAggregates(ctx context.Context, in *ListProfileAggregatesRequest, opts ...grpc.CallOption) (*ListProfileAggregatesResponse, error)
 	RecomputeProfileAggregate(ctx context.Context, in *RecomputeProfileAggregateRequest, opts ...grpc.CallOption) (*RecomputeProfileAggregateResponse, error)
+	SubmitMemoryCandidate(ctx context.Context, in *SubmitMemoryCandidateRequest, opts ...grpc.CallOption) (*SubmitMemoryCandidateResponse, error)
+	ReviewMemoryCandidate(ctx context.Context, in *ReviewMemoryCandidateRequest, opts ...grpc.CallOption) (*ReviewMemoryCandidateResponse, error)
 }
 
 type memoryServiceClient struct {
@@ -83,6 +87,26 @@ func (c *memoryServiceClient) RecomputeProfileAggregate(ctx context.Context, in 
 	return out, nil
 }
 
+func (c *memoryServiceClient) SubmitMemoryCandidate(ctx context.Context, in *SubmitMemoryCandidateRequest, opts ...grpc.CallOption) (*SubmitMemoryCandidateResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SubmitMemoryCandidateResponse)
+	err := c.cc.Invoke(ctx, MemoryService_SubmitMemoryCandidate_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *memoryServiceClient) ReviewMemoryCandidate(ctx context.Context, in *ReviewMemoryCandidateRequest, opts ...grpc.CallOption) (*ReviewMemoryCandidateResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ReviewMemoryCandidateResponse)
+	err := c.cc.Invoke(ctx, MemoryService_ReviewMemoryCandidate_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // MemoryServiceServer is the server API for MemoryService service.
 // All implementations must embed UnimplementedMemoryServiceServer
 // for forward compatibility.
@@ -91,6 +115,8 @@ type MemoryServiceServer interface {
 	GetMemoryEvent(context.Context, *GetMemoryEventRequest) (*GetMemoryEventResponse, error)
 	ListProfileAggregates(context.Context, *ListProfileAggregatesRequest) (*ListProfileAggregatesResponse, error)
 	RecomputeProfileAggregate(context.Context, *RecomputeProfileAggregateRequest) (*RecomputeProfileAggregateResponse, error)
+	SubmitMemoryCandidate(context.Context, *SubmitMemoryCandidateRequest) (*SubmitMemoryCandidateResponse, error)
+	ReviewMemoryCandidate(context.Context, *ReviewMemoryCandidateRequest) (*ReviewMemoryCandidateResponse, error)
 	mustEmbedUnimplementedMemoryServiceServer()
 }
 
@@ -112,6 +138,12 @@ func (UnimplementedMemoryServiceServer) ListProfileAggregates(context.Context, *
 }
 func (UnimplementedMemoryServiceServer) RecomputeProfileAggregate(context.Context, *RecomputeProfileAggregateRequest) (*RecomputeProfileAggregateResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RecomputeProfileAggregate not implemented")
+}
+func (UnimplementedMemoryServiceServer) SubmitMemoryCandidate(context.Context, *SubmitMemoryCandidateRequest) (*SubmitMemoryCandidateResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SubmitMemoryCandidate not implemented")
+}
+func (UnimplementedMemoryServiceServer) ReviewMemoryCandidate(context.Context, *ReviewMemoryCandidateRequest) (*ReviewMemoryCandidateResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ReviewMemoryCandidate not implemented")
 }
 func (UnimplementedMemoryServiceServer) mustEmbedUnimplementedMemoryServiceServer() {}
 func (UnimplementedMemoryServiceServer) testEmbeddedByValue()                       {}
@@ -206,6 +238,42 @@ func _MemoryService_RecomputeProfileAggregate_Handler(srv interface{}, ctx conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _MemoryService_SubmitMemoryCandidate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SubmitMemoryCandidateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MemoryServiceServer).SubmitMemoryCandidate(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MemoryService_SubmitMemoryCandidate_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MemoryServiceServer).SubmitMemoryCandidate(ctx, req.(*SubmitMemoryCandidateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MemoryService_ReviewMemoryCandidate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ReviewMemoryCandidateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MemoryServiceServer).ReviewMemoryCandidate(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MemoryService_ReviewMemoryCandidate_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MemoryServiceServer).ReviewMemoryCandidate(ctx, req.(*ReviewMemoryCandidateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // MemoryService_ServiceDesc is the grpc.ServiceDesc for MemoryService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -228,6 +296,14 @@ var MemoryService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RecomputeProfileAggregate",
 			Handler:    _MemoryService_RecomputeProfileAggregate_Handler,
+		},
+		{
+			MethodName: "SubmitMemoryCandidate",
+			Handler:    _MemoryService_SubmitMemoryCandidate_Handler,
+		},
+		{
+			MethodName: "ReviewMemoryCandidate",
+			Handler:    _MemoryService_ReviewMemoryCandidate_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

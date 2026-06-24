@@ -11,6 +11,8 @@ type MemoryQueryRepository interface {
 	GetMemoryEvent(context.Context, types.GetMemoryEventCommand) (types.StructuredMemoryEvent, []types.MemoryGraphEdge, error)
 	ListProfileAggregates(context.Context, types.ListProfileAggregatesCommand, int) ([]types.ProfileAggregate, error)
 	RecomputeProfileAggregate(context.Context, types.RecomputeProfileAggregateCommand) (types.ProfileAggregate, int, bool, error)
+	SubmitMemoryCandidate(context.Context, types.SubmitMemoryCandidateCommand) (types.StructuredMemoryEvent, error)
+	ReviewMemoryCandidate(context.Context, types.ReviewMemoryCandidateCommand) (types.StructuredMemoryEvent, error)
 }
 
 type TimelineProjectionRepository interface {

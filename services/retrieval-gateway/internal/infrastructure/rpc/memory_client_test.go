@@ -173,3 +173,27 @@ func (client *fakeMemoryServiceClient) ListProfileAggregates(
 	client.listProfilesRequest = request
 	return client.listProfilesResponse, nil
 }
+
+func (client *fakeMemoryServiceClient) RecomputeProfileAggregate(
+	context.Context,
+	*memoryv1.RecomputeProfileAggregateRequest,
+	...grpc.CallOption,
+) (*memoryv1.RecomputeProfileAggregateResponse, error) {
+	return nil, nil
+}
+
+func (client *fakeMemoryServiceClient) SubmitMemoryCandidate(
+	context.Context,
+	*memoryv1.SubmitMemoryCandidateRequest,
+	...grpc.CallOption,
+) (*memoryv1.SubmitMemoryCandidateResponse, error) {
+	return nil, nil
+}
+
+func (client *fakeMemoryServiceClient) ReviewMemoryCandidate(
+	context.Context,
+	*memoryv1.ReviewMemoryCandidateRequest,
+	...grpc.CallOption,
+) (*memoryv1.ReviewMemoryCandidateResponse, error) {
+	return nil, nil
+}

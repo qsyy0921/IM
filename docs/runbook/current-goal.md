@@ -129,6 +129,14 @@ IM messages -> search / memory projection -> EvidencePack -> RAG / Agent answer 
   `run-ai-eval-memory-extraction-candidate-adapter.ps1` 覆盖 explicit cue hash-only、
   ordinary-chat zero candidates、profile review required 和 unsafe input fail-closed。
   ai-eval catalog 增至 80 个 cases，新增 adapter 为 optional local adapter，不启动服务栈。
+- 同日 memory-service 已补公开 candidate review / approval / persistence path：
+  `SubmitMemoryCandidate` 校验 conversation-scoped source refs 对 reviewer 可见，
+  并要求 Go 侧提交的 `fact_text` 与 Python candidate `fact_sha256` 一致；通过后只写入
+  `PENDING + NEEDS_REVIEW`。`ReviewMemoryCandidate` 才能将候选显式推进为
+  `ACTIVE + APPROVED` 或 `REJECTED + REJECTED`。PG integration tests 覆盖
+  submit -> approve、reject、不可见 source fail-closed；`loadtest/memory` 和
+  memory-service ai-eval adapter 已新增 public candidate review 检查；ai-eval catalog
+  增至 81 个 cases。
 - 同日 Agent action boundary cases 已补齐一轮 action-executor preflight safety：
   `action-preflight-safety` smoke / eval catalog 从 11 个扩到 14 个 case，新增
   approval id、prepared audit id、resource id 与已批准 proposal 绑定不一致时的
@@ -210,8 +218,9 @@ IM messages -> search / memory projection -> EvidencePack -> RAG / Agent answer 
    profile recompute first path、first-stage operator 和 `rules-v0.2` group memory
    extraction 已补齐；RAG-Agent demo runner first path 和真实服务栈 smoke 报告已补齐；
    profile repair batch approval path、Agent action boundary cases、Python memory
-   extraction candidate first path 及其 Go-side adapter / ai-eval 接入已补齐；下一步进入
-   memory-service 公开 candidate review / approval / persistence path。
+   extraction candidate first path、Go-side adapter / ai-eval 接入以及 memory-service
+   公开 candidate review / approval / persistence path 已补齐；下一步运行并归档真实
+   service-stack gate，把 public candidate review 纳入 RAG-Agent 演示证据链。
 5. 客户端只作为演示入口；除非阻塞上述演示，不继续扩 UI 产品化。
 6. Windows release signing / MSI / NSIS installer、完整 Android、完整移动端发布、
    复杂 UI、群管理深水区和真实 media provider 链路全部后置到 backlog。

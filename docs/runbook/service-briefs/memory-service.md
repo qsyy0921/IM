@@ -69,7 +69,14 @@
   `profile_signal` 保持 review required；`tools/memory-extraction-go-adapter-smoke`
   和 `run-ai-eval-memory-extraction-candidate-adapter.ps1` 覆盖 explicit cue hash-only、
   ordinary chat zero candidates、profile review 和 unsafe input fail-closed。
+- 2026-06-24 memory-service 已补公开 candidate review / approval / persistence path：
+  `SubmitMemoryCandidate` 要求 candidate id、conversation scope、source refs、fact text
+  与 Python candidate `fact_sha256` 匹配，并先写入 `PENDING + NEEDS_REVIEW`；
+  `ReviewMemoryCandidate` 只允许可见 source refs 的 reviewer 将 pending candidate
+  显式推进为 `ACTIVE + APPROVED` 或 `REJECTED + REJECTED`。PG integration tests
+  覆盖 submit -> approve、reject、不可见 source fail-closed；`loadtest/memory`
+  和 memory-service ai-eval adapter 已新增 public candidate review 检查。
 
-下一步：把 Go-side memory extraction candidates 接入 memory-service 的公开
-candidate review / approval / persistence path，并继续真实服务栈 optional adapter /
-loadtest 归档；仍不得把单条群消息直接升级为 ACTIVE profile fact。
+下一步：运行并归档真实 service-stack optional adapter，把 public candidate review
+纳入 RAG-Agent 演示证据链；继续做结构过滤、BM25 / vector、rerank 和 EvidencePack
+coverage 深化。仍不得把单条群消息直接升级为 ACTIVE profile fact。

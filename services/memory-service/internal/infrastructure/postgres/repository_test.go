@@ -2,8 +2,11 @@ package postgres
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -94,6 +97,102 @@ func TestRepositoryProjectAndQueryMemoryEventsIntegration(t *testing.T) {
 	}
 	if len(strangerItems) != 0 {
 		t.Fatalf("stranger should not see memory events: %+v", strangerItems)
+	}
+}
+
+func TestRepositorySubmitAndReviewMemoryCandidateIntegration(t *testing.T) {
+	ctx := context.Background()
+	pool := openMemoryTestPool(t)
+	resetMemoryTables(t, ctx, pool)
+	repository := NewRepository(pool)
+
+	projectMemberJoined(t, ctx, repository, "tenant-1", "conv-candidate", "reviewer-1", 1)
+	command := memoryCandidateCommand("tenant-1", "reviewer-1", "conv-candidate", "candidate-decision-1", "msg-candidate-1", 2)
+	item, err := repository.SubmitMemoryCandidate(ctx, command)
+	if err != nil {
+		t.Fatalf("submit memory candidate: %v", err)
+	}
+	if item.MemoryEventID != command.CandidateID || item.Status != types.MemoryStatusPending || item.ReviewState != types.MemoryReviewNeedsReview {
+		t.Fatalf("unexpected submitted item: %+v", item)
+	}
+	if len(item.SourceRefs) != 1 || item.SourceRefs[0].SourceID != "msg-candidate-1" {
+		t.Fatalf("expected source ref to be preserved: %+v", item.SourceRefs)
+	}
+
+	approved, err := repository.ReviewMemoryCandidate(ctx, types.ReviewMemoryCandidateCommand{
+		AuthContext:   types.AuthContext{TenantID: "tenant-1", UserID: "reviewer-1"},
+		MemoryEventID: "candidate-decision-1",
+		Decision:      types.MemoryReviewDecisionApprove,
+	})
+	if err != nil {
+		t.Fatalf("approve memory candidate: %v", err)
+	}
+	if approved.Status != types.MemoryStatusActive || approved.ReviewState != types.MemoryReviewApproved {
+		t.Fatalf("unexpected approved item: %+v", approved)
+	}
+
+	items, _, err := repository.QueryMemoryEvents(ctx, types.QueryMemoryEventsCommand{
+		AuthContext: types.AuthContext{TenantID: "tenant-1", UserID: "reviewer-1"},
+		Query:       "evidence pack",
+		Statuses:    []string{types.MemoryStatusActive},
+		Limit:       10,
+	}, 10)
+	if err != nil {
+		t.Fatalf("query approved candidate: %v", err)
+	}
+	if len(items) != 1 || items[0].MemoryEventID != "candidate-decision-1" {
+		t.Fatalf("expected approved candidate to become active: %+v", items)
+	}
+}
+
+func TestRepositorySubmitMemoryCandidateRequiresVisibleSourceIntegration(t *testing.T) {
+	ctx := context.Background()
+	pool := openMemoryTestPool(t)
+	resetMemoryTables(t, ctx, pool)
+	repository := NewRepository(pool)
+
+	projectMemberJoined(t, ctx, repository, "tenant-1", "conv-candidate", "member-1", 1)
+	command := memoryCandidateCommand("tenant-1", "stranger-1", "conv-candidate", "candidate-hidden-1", "msg-hidden-1", 2)
+	if _, err := repository.SubmitMemoryCandidate(ctx, command); err != types.ErrPermissionDenied {
+		t.Fatalf("submit hidden candidate error = %v, want permission denied", err)
+	}
+}
+
+func TestRepositoryReviewMemoryCandidateCanRejectIntegration(t *testing.T) {
+	ctx := context.Background()
+	pool := openMemoryTestPool(t)
+	resetMemoryTables(t, ctx, pool)
+	repository := NewRepository(pool)
+
+	projectMemberJoined(t, ctx, repository, "tenant-1", "conv-candidate", "reviewer-1", 1)
+	command := memoryCandidateCommand("tenant-1", "reviewer-1", "conv-candidate", "candidate-reject-1", "msg-reject-1", 2)
+	if _, err := repository.SubmitMemoryCandidate(ctx, command); err != nil {
+		t.Fatalf("submit memory candidate: %v", err)
+	}
+
+	rejected, err := repository.ReviewMemoryCandidate(ctx, types.ReviewMemoryCandidateCommand{
+		AuthContext:   types.AuthContext{TenantID: "tenant-1", UserID: "reviewer-1"},
+		MemoryEventID: "candidate-reject-1",
+		Decision:      types.MemoryReviewDecisionReject,
+	})
+	if err != nil {
+		t.Fatalf("reject memory candidate: %v", err)
+	}
+	if rejected.Status != types.MemoryStatusRejected || rejected.ReviewState != types.MemoryReviewRejected {
+		t.Fatalf("unexpected rejected item: %+v", rejected)
+	}
+
+	items, _, err := repository.QueryMemoryEvents(ctx, types.QueryMemoryEventsCommand{
+		AuthContext: types.AuthContext{TenantID: "tenant-1", UserID: "reviewer-1"},
+		Query:       "evidence pack",
+		Statuses:    []string{types.MemoryStatusRejected},
+		Limit:       10,
+	}, 10)
+	if err != nil {
+		t.Fatalf("query rejected candidate: %v", err)
+	}
+	if len(items) != 0 {
+		t.Fatalf("rejected candidate should stay hidden from query: %+v", items)
 	}
 }
 
@@ -557,6 +656,66 @@ func memoryEventsByID(items []types.StructuredMemoryEvent) map[string]types.Stru
 		byID[item.MemoryEventID] = item
 	}
 	return byID
+}
+
+func memoryCandidateCommand(tenantID string, reviewerID string, conversationID string, candidateID string, messageID string, conversationSeq int64) types.SubmitMemoryCandidateCommand {
+	factText := "decision: keep evidence pack source-backed"
+	return types.SubmitMemoryCandidateCommand{
+		AuthContext: types.AuthContext{
+			TenantID: types.TenantID(tenantID),
+			UserID:   types.UserID(reviewerID),
+			DeviceID: "device-reviewer",
+		},
+		CandidateID:    candidateID,
+		Scope:          types.MemoryScopeConversation,
+		ScopeID:        conversationID,
+		ConversationID: types.ConversationID(conversationID),
+		Topic:          "architecture",
+		EventType:      types.MemoryEventTypeDecision,
+		FactText:       factText,
+		FactSHA256:     normalizedTestFactSHA256(factText),
+		ActorUserIDs:   []string{"speaker-1"},
+		SourceRefs: []types.SourceRef{
+			{
+				SourceType:      types.MemorySourceTypeMessage,
+				SourceID:        messageID,
+				SourceEventID:   "timeline-" + messageID,
+				ConversationID:  types.ConversationID(conversationID),
+				ConversationSeq: conversationSeq,
+				OccurredAt:      time.Unix(1000+conversationSeq, 0).UTC(),
+			},
+		},
+		ValidFromSeq:      conversationSeq,
+		Confidence:        0.79,
+		VisibilityVersion: 3,
+		ExtractionVersion: "memory-extraction-candidate-v1",
+	}
+}
+
+func normalizedTestFactSHA256(value string) string {
+	normalized := strings.Join(strings.Fields(strings.TrimSpace(value)), " ")
+	sum := sha256.Sum256([]byte(normalized))
+	return hex.EncodeToString(sum[:])
+}
+
+func projectMemberJoined(t *testing.T, ctx context.Context, repository *Repository, tenantID string, conversationID string, userID string, seq int64) {
+	t.Helper()
+	projectMemory(t, ctx, repository, types.ProjectTimelineEventCommand{
+		TenantID:          types.TenantID(tenantID),
+		EventID:           "event-member-join-" + userID,
+		EventType:         types.TimelineEventConversationMemberJoined,
+		ConversationID:    types.ConversationID(conversationID),
+		ConversationSeq:   seq,
+		ConsumerGroup:     "memory-test",
+		Topic:             "conversation.timeline.events",
+		PartitionID:       0,
+		OffsetValue:       seq + 1,
+		TargetUserID:      types.UserID(userID),
+		MemberRole:        types.MemoryMemberRoleMember,
+		MemberStatus:      types.MemoryMemberStatusActive,
+		MemberVersion:     seq,
+		PermissionVersion: seq,
+	})
 }
 
 func projectMemory(t *testing.T, ctx context.Context, repository *Repository, command types.ProjectTimelineEventCommand) {

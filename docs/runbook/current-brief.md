@@ -167,6 +167,11 @@ candidate adapter / ai-eval 接入已补齐：`internal/ai/memorycandidate` 负�
 Python batch CLI 并校验低敏 request / result，`tools/memory-extraction-go-adapter-smoke`
 和 `run-ai-eval-memory-extraction-candidate-adapter.ps1` 覆盖 explicit cue hash-only、
 ordinary-chat zero candidates、profile review required 和 unsafe input fail-closed。
+同日 memory-service 公开 candidate review / approval / persistence path 已补齐：
+`SubmitMemoryCandidate` 会校验 source refs 可见、fact text 与 `fact_sha256` 匹配，
+并只写入 `PENDING + NEEDS_REVIEW`；`ReviewMemoryCandidate` 才能把 candidate
+显式推进为 `ACTIVE + APPROVED` 或 `REJECTED`。`loadtest/memory` 和 memory-service
+ai-eval adapter 已新增 public candidate review 检查。
 同日 action-executor 的 Agent action boundary cases 已补一轮 preflight safety
 覆盖：`action-preflight-safety` smoke / eval catalog 从 11 个扩到 14 个 case，
 新增 approval id、prepared audit id、resource id 与已批准 proposal 绑定不一致时的
@@ -182,6 +187,6 @@ fail-closed，不写 execution audit、不写 tool result projection、不调用
 
 ## 下一步
 
-- 优先把 Go-side memory extraction candidates 接入 memory-service 的公开
-  candidate review / approval / persistence path。
+- 优先运行并归档 memory-service / RAG-Agent 真实 service-stack gate，把 public
+  candidate review 纳入可演示证据链。
 - 再继续深化 RAG-Agent demo 的 EvidencePack / approval / audit 展示。

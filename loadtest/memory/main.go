@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -111,6 +112,7 @@ type checkRecord struct {
 	ProfileRecomputed     bool `json:"profile_recomputed_via_public_api"`
 	ProfileSupportKept    bool `json:"profile_supporting_evidence_preserved"`
 	DeletedSupportHidden  bool `json:"deleted_support_profile_excluded"`
+	CandidateReviewPublic bool `json:"candidate_review_public_api"`
 }
 
 type membershipRecord struct {
@@ -377,12 +379,58 @@ func publishAndVerify(
 		return err
 	}
 	result.Checks.RevokedMemoryHidden = true
+	if err := verifyPublicCandidateReview(ctx, cfg, client, runID, result); err != nil {
+		return err
+	}
 	if err := seedRuntimeMemoryWindow(ctx, pool, cfg, runID); err != nil {
 		return err
 	}
 	if err := verifyRuntimeMemoryWindow(ctx, cfg, client, runID, result); err != nil {
 		return err
 	}
+	return nil
+}
+
+func verifyPublicCandidateReview(ctx context.Context, cfg config, client memoryv1.MemoryServiceClient, runID string, result *summary) error {
+	candidateID := "public-candidate-" + runID
+	factText := "decision: public candidate review preserves evidence pack"
+	submitted, err := submitMemoryCandidate(ctx, cfg, client, cfg.viewerUserID, candidateID, "msg-public-candidate-"+runID, factText, 4)
+	if err != nil {
+		return fmt.Errorf("submit public memory candidate: %w", err)
+	}
+	if submitted.GetItem().GetStatus() != memoryv1.MemoryEventStatus_MEMORY_EVENT_STATUS_PENDING ||
+		submitted.GetItem().GetReviewState() != memoryv1.MemoryReviewState_MEMORY_REVIEW_STATE_NEEDS_REVIEW {
+		return fmt.Errorf("submitted candidate should require review: %+v", submitted.GetItem())
+	}
+	pending, err := queryMemoryWithOptions(ctx, cfg, client, cfg.viewerUserID, queryMemoryOptions{
+		query:    "public candidate review",
+		statuses: []memoryv1.MemoryEventStatus{memoryv1.MemoryEventStatus_MEMORY_EVENT_STATUS_PENDING},
+	})
+	if err != nil {
+		return err
+	}
+	if _, ok := memoryItemsByID(pending.GetItems())[candidateID]; !ok {
+		return fmt.Errorf("pending public candidate should be queryable before review: %+v", pending.GetItems())
+	}
+	approved, err := reviewMemoryCandidate(ctx, cfg, client, cfg.viewerUserID, candidateID, memoryv1.MemoryReviewDecision_MEMORY_REVIEW_DECISION_APPROVE)
+	if err != nil {
+		return fmt.Errorf("approve public memory candidate: %w", err)
+	}
+	if approved.GetItem().GetStatus() != memoryv1.MemoryEventStatus_MEMORY_EVENT_STATUS_ACTIVE ||
+		approved.GetItem().GetReviewState() != memoryv1.MemoryReviewState_MEMORY_REVIEW_STATE_APPROVED {
+		return fmt.Errorf("approved candidate should be active: %+v", approved.GetItem())
+	}
+	active, err := queryMemoryWithOptions(ctx, cfg, client, cfg.viewerUserID, queryMemoryOptions{
+		query:    "public candidate review",
+		statuses: []memoryv1.MemoryEventStatus{memoryv1.MemoryEventStatus_MEMORY_EVENT_STATUS_ACTIVE},
+	})
+	if err != nil {
+		return err
+	}
+	if _, ok := memoryItemsByID(active.GetItems())[candidateID]; !ok {
+		return fmt.Errorf("approved public candidate should be active and queryable: %+v", active.GetItems())
+	}
+	result.Checks.CandidateReviewPublic = true
 	return nil
 }
 
@@ -671,6 +719,12 @@ func hasString(values []string, want string) bool {
 	return false
 }
 
+func normalizedFactSHA256(value string) string {
+	normalized := strings.Join(strings.Fields(strings.TrimSpace(value)), " ")
+	sum := sha256.Sum256([]byte(normalized))
+	return hex.EncodeToString(sum[:])
+}
+
 func publishEvent(ctx context.Context, cfg config, writer *kafkago.Writer, event *conversationtimelinev1.ConversationTimelineEvent) error {
 	encoded, err := proto.Marshal(event)
 	if err != nil {
@@ -845,6 +899,63 @@ func getMemoryEvent(ctx context.Context, cfg config, client memoryv1.MemoryServi
 	return client.GetMemoryEvent(requestCtx, &memoryv1.GetMemoryEventRequest{
 		AuthContext:   auth(cfg, userID),
 		MemoryEventId: memoryEventID,
+	})
+}
+
+func submitMemoryCandidate(
+	ctx context.Context,
+	cfg config,
+	client memoryv1.MemoryServiceClient,
+	userID string,
+	candidateID string,
+	messageID string,
+	factText string,
+	conversationSeq int64,
+) (*memoryv1.SubmitMemoryCandidateResponse, error) {
+	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
+	defer cancel()
+	return client.SubmitMemoryCandidate(requestCtx, &memoryv1.SubmitMemoryCandidateRequest{
+		AuthContext:    auth(cfg, userID),
+		CandidateId:    candidateID,
+		Scope:          memoryv1.MemoryScope_MEMORY_SCOPE_CONVERSATION,
+		ScopeId:        cfg.conversationID,
+		ConversationId: cfg.conversationID,
+		Topic:          "public-candidate-review",
+		EventType:      memoryv1.MemoryEventType_MEMORY_EVENT_TYPE_DECISION,
+		FactText:       factText,
+		FactSha256:     normalizedFactSHA256(factText),
+		ActorUserIds:   []string{cfg.senderUserID},
+		SourceRefs: []*memoryv1.SourceRef{
+			{
+				SourceType:       memoryv1.MemorySourceType_MEMORY_SOURCE_TYPE_MESSAGE,
+				SourceId:         messageID,
+				SourceEventId:    "event-" + messageID,
+				ConversationId:   cfg.conversationID,
+				ConversationSeq:  conversationSeq,
+				OccurredAtUnixMs: time.Now().UTC().UnixMilli(),
+			},
+		},
+		ValidFromSeq:      conversationSeq,
+		Confidence:        0.81,
+		VisibilityVersion: 1,
+		ExtractionVersion: "memory-extraction-candidate-v1",
+	})
+}
+
+func reviewMemoryCandidate(
+	ctx context.Context,
+	cfg config,
+	client memoryv1.MemoryServiceClient,
+	userID string,
+	memoryEventID string,
+	decision memoryv1.MemoryReviewDecision,
+) (*memoryv1.ReviewMemoryCandidateResponse, error) {
+	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
+	defer cancel()
+	return client.ReviewMemoryCandidate(requestCtx, &memoryv1.ReviewMemoryCandidateRequest{
+		AuthContext:   auth(cfg, userID),
+		MemoryEventId: memoryEventID,
+		Decision:      decision,
 	})
 }
 

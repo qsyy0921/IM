@@ -460,6 +460,12 @@ The 2026-06-24 RAG-Agent group-memory answer / proposal gate run
 three reviewed group-memory events (`DECISION`, `BLOCKER`, `FILE`) enter both RAG
 and Agent EvidencePacks with 6 source refs and 3 cross-group source refs
 preserved.
+The 2026-06-24 RAG-Agent business proposal source-chain gate run
+`ai-eval-rag-agent-demo-live-20260624-business-proposal-source-chain-gate-v1`
+ran 4 adapters / 27 cases with 27 passed, 0 failed and 0 skipped. It verifies
+that reviewed `DECISION`, `TASK` and `STATUS` memory events drive an approved
+`conversation.note.create` proposal and action-executor audit record while the
+unconfigured business mutation remains unexecuted.
 The 2026-06-20 RAG / Summary citation regression added source-ref integrity
 cases and low-sensitive `citation_refs` fields to the RAG / Summary smoke
 summaries. This proves adapter-level citation anchoring only; it is not a live

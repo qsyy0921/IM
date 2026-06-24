@@ -176,6 +176,24 @@ Add-Assertion -Assertions $assertions -Type "group_memory_answer_and_proposal_mu
     $null -ne $summary.group_memory_fact_sha256 -and
     @($summary.group_memory_fact_sha256 | Where-Object { ([string]$_).Trim().Length -eq 64 }).Count -ge 3
 )
+Add-Assertion -Assertions $assertions -Type "business_proposal_must_preserve_source_chain_and_audit_boundary" -Passed (
+    (Get-JsonPropertyBool -Object $summary -Name "business_proposal_verified") -and
+    (Get-JsonPropertyBool -Object $summary -Name "business_proposal_approval_recorded") -and
+    (Get-JsonPropertyBool -Object $summary -Name "business_action_audit_recorded") -and
+    -not (Get-JsonPropertyBool -Object $summary -Name "business_action_executed") -and
+    (Get-JsonPropertyString -Object $summary -Name "business_execution_status") -eq "RECORDED" -and
+    [int]$summary.business_proposal_memory_event_count -ge 3 -and
+    [int]$summary.business_proposal_evidence_memory_count -ge [int]$summary.business_proposal_memory_event_count -and
+    [int]$summary.business_proposal_source_ref_count -ge ([int]$summary.business_proposal_memory_event_count * 2) -and
+    [int]$summary.business_proposal_cross_group_source_ref_count -ge [int]$summary.business_proposal_memory_event_count -and
+    (Get-JsonPropertyString -Object $summary -Name "business_proposal_text_sha256").Length -eq 64 -and
+    (Get-JsonPropertyString -Object $summary -Name "business_action_input_sha256").Length -eq 64 -and
+    (Get-JsonPropertyString -Object $summary -Name "business_tool_name").Length -gt 0 -and
+    (Get-JsonPropertyString -Object $summary -Name "business_skill_id").Length -gt 0 -and
+    (Get-JsonPropertyBool -Object $summary -Name "business_requires_approval") -and
+    (Get-JsonPropertyBool -Object $summary -Name "business_policy_allowed") -and
+    (Get-JsonPropertyBool -Object $summary -Name "business_policy_requires_approval")
+)
 Add-Assertion -Assertions $assertions -Type "profile_repair_must_require_workflow_approval_and_enter_evidence_chain" -Passed (
     (Get-JsonPropertyBool -Object $summary -Name "profile_repair_approval_requested") -and
     (Get-JsonPropertyBool -Object $summary -Name "profile_repair_workflow_approved") -and

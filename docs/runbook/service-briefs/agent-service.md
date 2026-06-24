@@ -65,6 +65,11 @@ proposal 前调用 `mcp-gateway.PrepareToolCall` 做 skill / policy / prepare au
   `FILE` 三类 group memory 保留 3 条 memory evidence、6 个 source refs 和 3 个
   cross-group source refs；proposal 仍走 approval / action-executor audit，不直接执行
   业务 mutation。
+- 同日 `ai-eval-rag-agent-demo-live-20260624-business-proposal-source-chain-gate-v1`
+  已通过真实 service-stack gate：Agent 基于 `DECISION` / `TASK` / `STATUS` 三类
+  reviewed memory 生成 `conversation.note.create` 业务 proposal，approval 后由
+  action-executor 记录 audit；由于没有配置真实 mutation adapter，本场景要求
+  `business_action_executed=false`，证明 source-chain、approval 和 audit 边界，而不是业务写入。
 
 ## 边界
 
@@ -73,5 +78,5 @@ proposal 前调用 `mcp-gateway.PrepareToolCall` 做 skill / policy / prepare au
 
 ## 下一步
 
-- 继续扩展 EvidencePack source-chain coverage 和更真实的业务 proposal 场景；真实写动作
-  仍只走 proposal / approval / executor / audit。
+- 继续扩展 EvidencePack source-chain / rerank coverage；真实写动作仍只走
+  proposal / approval / executor / audit，且必须等显式业务 adapter 就绪。

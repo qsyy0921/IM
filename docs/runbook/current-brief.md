@@ -193,6 +193,13 @@ aggregate 放入 RAG / Agent EvidencePack。
 candidate review path 构造 `DECISION` / `BLOCKER` / `FILE` 三类 group memory，
 并要求 RAG answer 和 Agent proposal 均保留 3 条 memory evidence、6 个 source refs
 和 3 个 cross-group source refs。
+同日 `ai-eval-rag-agent-demo-live-20260624-business-proposal-source-chain-gate-v1`
+已通过真实 service-stack gate：4 adapters、27 cases、27 passed、0 failed、
+0 skipped；该 run 确认 `loadtest/ragagent` 会基于 `DECISION` / `TASK` /
+`STATUS` 三类 reviewed group memory 生成 `conversation.note.create` 业务 proposal，
+经 approval 后由 action-executor 记录执行审计。由于该业务 tool 未配置真实 mutation
+adapter，本场景必须 `business_action_executed=false`，只证明 source-chain evidence、
+approval 和 audit 边界成立。
 同日 Python AI Worker 已补 memory extraction candidate first path：
 `ai/python/nexusim_ai_memory` 只从显式 low-sensitive message batch 的
 `decision:` / `task:` / `status:` / `blocker:` / `file:` / `profile_signal:`
@@ -222,7 +229,8 @@ fail-closed，不写 execution audit、不写 tool result projection、不调用
 
 ## 下一步
 
-- public candidate review、temporal update 和 profile repair approval 已进入
+- public candidate review、temporal update、profile repair approval / negative、
+  group-memory answer / proposal 和 business proposal source-chain 已进入
   RAG-Agent 真实 service-stack gate 归档。
-- 下一步继续深化 RAG-Agent demo 的 EvidencePack / approval / audit 展示：
-  EvidencePack source-chain coverage 和真实业务 proposal 场景。
+- 下一步继续深化 RAG-Agent demo 的 EvidencePack source-chain / rerank coverage；
+  真实 mutation 必须等显式业务 adapter、approval、executor、audit 全部就绪后再扩展。

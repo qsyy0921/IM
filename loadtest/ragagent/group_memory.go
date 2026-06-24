@@ -160,6 +160,26 @@ func submitAndApproveGroupMemoryCandidate(
 	seed seedSummary,
 	candidate groupMemoryCandidate,
 ) error {
+	return submitAndApproveReviewedMemoryCandidate(
+		ctx,
+		cfg,
+		client,
+		seed,
+		candidate,
+		"rag-agent-group-memory-chain",
+		"rag-agent-group-memory-v1",
+	)
+}
+
+func submitAndApproveReviewedMemoryCandidate(
+	ctx context.Context,
+	cfg config,
+	client memoryv1.MemoryServiceClient,
+	seed seedSummary,
+	candidate groupMemoryCandidate,
+	topic string,
+	extractionVersion string,
+) error {
 	now := time.Now().UTC().UnixMilli()
 	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
 	submitted, err := client.SubmitMemoryCandidate(requestCtx, &memoryv1.SubmitMemoryCandidateRequest{
@@ -168,7 +188,7 @@ func submitAndApproveGroupMemoryCandidate(
 		Scope:           memoryv1.MemoryScope_MEMORY_SCOPE_CONVERSATION,
 		ScopeId:         seed.ConversationID,
 		ConversationId:  seed.ConversationID,
-		Topic:           "rag-agent-group-memory-chain",
+		Topic:           topic,
 		EventType:       candidate.EventType,
 		FactText:        candidate.FactText,
 		FactSha256:      candidate.FactSHA256,
@@ -195,7 +215,7 @@ func submitAndApproveGroupMemoryCandidate(
 		ValidFromSeq:      candidate.ValidFromSeq,
 		Confidence:        0.97,
 		VisibilityVersion: 1,
-		ExtractionVersion: "rag-agent-group-memory-v1",
+		ExtractionVersion: extractionVersion,
 	})
 	cancel()
 	if err != nil {

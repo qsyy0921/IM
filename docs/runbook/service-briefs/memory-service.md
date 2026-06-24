@@ -99,6 +99,10 @@
   已通过真实 service-stack gate：通过公开 candidate review path 构造的
   `DECISION` / `BLOCKER` / `FILE` group memory 会同时进入 RAG answer 和 Agent
   proposal EvidencePack，并保留跨群 source refs。
+- 同日 `ai-eval-rag-agent-demo-live-20260624-business-proposal-source-chain-gate-v1`
+  已通过真实 service-stack gate：`DECISION` / `TASK` / `STATUS` 三类 reviewed memory
+  驱动 `conversation.note.create` 业务 proposal，并经 approval / action-executor audit
+  记录；未配置真实 mutation adapter 时不执行业务写动作。
 
 下一步：`loadtest/ragagent` / `rag-agent-demo` adapter 已把 public candidate
 review、temporal update 和 profile repair approval 纳入 RAG / Agent EvidencePack 断言链路，并已通过
@@ -108,6 +112,7 @@ review、temporal update 和 profile repair approval 纳入 RAG / Agent Evidence
 `ai-eval-rag-agent-demo-live-20260624-profile-repair-negative-v1` 真实 gate 归档。
 group-memory answer / proposal gate 也已通过
 `ai-eval-rag-agent-demo-live-20260624-group-memory-answer-proposal-gate-v1` 真实 gate
-归档。之后继续做结构过滤、BM25 / vector、rerank、source-chain coverage 和真实业务
-proposal 场景。仍不得把
+归档。business proposal source-chain gate 也已通过
+`ai-eval-rag-agent-demo-live-20260624-business-proposal-source-chain-gate-v1` 真实 gate
+归档。之后继续做结构过滤、BM25 / vector、rerank 和更细 source-chain coverage。仍不得把
 单条群消息直接升级为 ACTIVE profile fact。

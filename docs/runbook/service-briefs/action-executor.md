@@ -24,6 +24,11 @@
   14 个 case：approval id、prepared audit id、resource id 与 approved proposal
   绑定不一致时均返回 `PROPOSAL_MISMATCH`，并证明不会写 execution audit、不会写
   tool result projection、不会调用 tool executor。
+- 2026-06-24 `ai-eval-rag-agent-demo-live-20260624-business-proposal-source-chain-gate-v1`
+  已验证 RAG-Agent 业务 proposal audit path：`conversation.note.create` proposal 经
+  approval 后调用 `ExecuteApprovedAction`，action-executor 记录 `RECORDED` audit；
+  因该业务 tool 未配置真实 mutation adapter，必须 `executed=false`，不保存 raw tool
+  input / output。
 
 ## 边界
 
@@ -34,5 +39,5 @@
 
 ## 下一步
 
-- 后续 redrive API / metrics / operator UI；默认转回 Python memory extraction
-  Go-side adapter / eval，以及 memory / retrieval 深化。
+- 后续 redrive API / metrics / operator UI；真实业务 mutation 需要显式 adapter 和
+  operator policy，不允许用未配置工具静默执行。

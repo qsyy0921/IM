@@ -58,8 +58,11 @@
   已验证 group-memory answer 场景：RAG answer 对 `DECISION` / `BLOCKER` /
   `FILE` 三类 group memory 返回 `GROUNDED`，并保留 3 条 memory evidence、6 个
   source refs 和 3 个 cross-group source refs。
+- 2026-06-24 `ai-eval-rag-agent-demo-live-20260624-business-proposal-source-chain-gate-v1`
+  已验证业务 proposal source-chain 场景中的 RAG / Agent 同源证据链：RAG 仍只消费
+  retrieval-gateway EvidencePack，业务 proposal 后续 approval / action audit 不回写 RAG。
 
 下一步：
 
-- 继续扩展 EvidencePack source-chain coverage 和更真实的业务 proposal 场景，
-  provider 仍走 port、guard 和 citation verifier。
+- 继续扩展 EvidencePack source-chain / rerank coverage，provider 仍走 port、guard 和
+  citation verifier。

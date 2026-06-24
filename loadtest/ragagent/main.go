@@ -209,6 +209,29 @@ type combinedSummary struct {
 	GroupMemoryFactSHA256                  []string                           `json:"group_memory_fact_sha256,omitempty"`
 	GroupMemorySourceRefCount              int                                `json:"group_memory_source_ref_count"`
 	GroupMemoryCrossGroupSourceRefCount    int                                `json:"group_memory_cross_group_source_ref_count"`
+	BusinessProposalVerified               bool                               `json:"business_proposal_verified"`
+	BusinessProposalApprovalRecorded       bool                               `json:"business_proposal_approval_recorded"`
+	BusinessActionAuditRecorded            bool                               `json:"business_action_audit_recorded"`
+	BusinessActionExecuted                 bool                               `json:"business_action_executed"`
+	BusinessProposalID                     string                             `json:"business_proposal_id,omitempty"`
+	BusinessApprovalID                     string                             `json:"business_approval_id,omitempty"`
+	BusinessExecutionID                    string                             `json:"business_execution_id,omitempty"`
+	BusinessExecutionStatus                string                             `json:"business_execution_status,omitempty"`
+	BusinessProposalTextSHA256             string                             `json:"business_proposal_text_sha256,omitempty"`
+	BusinessActionInputSHA256              string                             `json:"business_action_input_sha256,omitempty"`
+	BusinessProposalMemoryEventCount       int                                `json:"business_proposal_memory_event_count"`
+	BusinessProposalEvidenceMemoryCount    int                                `json:"business_proposal_evidence_memory_count"`
+	BusinessProposalSourceRefCount         int                                `json:"business_proposal_source_ref_count"`
+	BusinessProposalCrossGroupSourceRefs   int                                `json:"business_proposal_cross_group_source_ref_count"`
+	BusinessProposalEventTypes             []string                           `json:"business_proposal_event_types,omitempty"`
+	BusinessProposalFactSHA256             []string                           `json:"business_proposal_fact_sha256,omitempty"`
+	BusinessProposalResourceType           string                             `json:"business_resource_type,omitempty"`
+	BusinessProposalResourceID             string                             `json:"business_resource_id,omitempty"`
+	BusinessProposalToolName               string                             `json:"business_tool_name,omitempty"`
+	BusinessProposalSkillID                string                             `json:"business_skill_id,omitempty"`
+	BusinessProposalRequiresApproval       bool                               `json:"business_requires_approval"`
+	BusinessProposalPolicyAllowed          bool                               `json:"business_policy_allowed"`
+	BusinessProposalPolicyRequiresApproval bool                               `json:"business_policy_requires_approval"`
 	RAGVersion                             string                             `json:"rag_version"`
 	AgentVersion                           string                             `json:"agent_version"`
 	RetrievalVersions                      []string                           `json:"retrieval_versions"`
@@ -276,11 +299,15 @@ func run(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
+	businessProposal, err := verifyBusinessProposalScenario(ctx, cfg, agentSummary.Seed)
+	if err != nil {
+		return err
+	}
 	profileRepair, err := verifyProfileRepairApproval(ctx, cfg, agentSummary.Seed, resultDir)
 	if err != nil {
 		return err
 	}
-	combined, err := verifyCombined(cfg, resultDir, ragSummaryPath, agentSummaryPath, ragSummary, agentSummary, publicCandidate, groupMemory, profileRepair, startedAt)
+	combined, err := verifyCombined(cfg, resultDir, ragSummaryPath, agentSummaryPath, ragSummary, agentSummary, publicCandidate, groupMemory, businessProposal, profileRepair, startedAt)
 	if err != nil {
 		return err
 	}
@@ -839,6 +866,7 @@ func verifyCombined(
 	agent agentPartialSummary,
 	publicCandidate publicCandidateReviewSummary,
 	groupMemory groupMemoryScenarioSummary,
+	businessProposal businessProposalScenarioSummary,
 	profileRepair profileRepairApprovalSummary,
 	startedAt time.Time,
 ) (combinedSummary, error) {
@@ -898,6 +926,22 @@ func verifyCombined(
 		return combinedSummary{}, errors.New("group-memory answer/proposal scenario did not preserve all multi-event cross-group evidence")
 	}
 	verified = append(verified, "Group-memory answer and proposal preserved decision, blocker and file evidence with cross-group source refs")
+	if !businessProposal.ProposalVerified ||
+		!businessProposal.ApprovalRecorded ||
+		!businessProposal.ActionAuditRecorded ||
+		businessProposal.ActionExecuted ||
+		businessProposal.MemoryEventCount < 3 ||
+		businessProposal.EvidenceMemoryCount < businessProposal.MemoryEventCount ||
+		businessProposal.SourceRefCount < businessProposal.MemoryEventCount*2 ||
+		businessProposal.CrossGroupSourceRefs < businessProposal.MemoryEventCount ||
+		!businessProposal.RequiresApproval ||
+		!businessProposal.PolicyAllowed ||
+		!businessProposal.PolicyRequiresApproval ||
+		strings.TrimSpace(businessProposal.ProposalTextSHA256) == "" ||
+		strings.TrimSpace(businessProposal.ActionInputSHA256) == "" {
+		return combinedSummary{}, errors.New("business proposal scenario did not preserve source-chain evidence and approval/audit boundary")
+	}
+	verified = append(verified, "Business proposal preserved multi-event source-chain evidence and recorded approval/action audit without executing an unconfigured mutation")
 	if !profileRepair.ApprovalRequested ||
 		!profileRepair.WorkflowApproved ||
 		!profileRepair.ApprovalVerified ||
@@ -977,6 +1021,29 @@ func verifyCombined(
 		GroupMemoryFactSHA256:                  append([]string(nil), groupMemory.FactSHA256...),
 		GroupMemorySourceRefCount:              groupMemory.SourceRefCount,
 		GroupMemoryCrossGroupSourceRefCount:    groupMemory.CrossGroupSourceRefs,
+		BusinessProposalVerified:               businessProposal.ProposalVerified,
+		BusinessProposalApprovalRecorded:       businessProposal.ApprovalRecorded,
+		BusinessActionAuditRecorded:            businessProposal.ActionAuditRecorded,
+		BusinessActionExecuted:                 businessProposal.ActionExecuted,
+		BusinessProposalID:                     businessProposal.ProposalID,
+		BusinessApprovalID:                     businessProposal.ApprovalID,
+		BusinessExecutionID:                    businessProposal.ExecutionID,
+		BusinessExecutionStatus:                businessProposal.ExecutionStatus,
+		BusinessProposalTextSHA256:             businessProposal.ProposalTextSHA256,
+		BusinessActionInputSHA256:              businessProposal.ActionInputSHA256,
+		BusinessProposalMemoryEventCount:       businessProposal.MemoryEventCount,
+		BusinessProposalEvidenceMemoryCount:    businessProposal.EvidenceMemoryCount,
+		BusinessProposalSourceRefCount:         businessProposal.SourceRefCount,
+		BusinessProposalCrossGroupSourceRefs:   businessProposal.CrossGroupSourceRefs,
+		BusinessProposalEventTypes:             append([]string(nil), businessProposal.EventTypes...),
+		BusinessProposalFactSHA256:             append([]string(nil), businessProposal.FactSHA256...),
+		BusinessProposalResourceType:           businessProposal.ResourceType,
+		BusinessProposalResourceID:             businessProposal.ResourceID,
+		BusinessProposalToolName:               businessProposal.ToolName,
+		BusinessProposalSkillID:                businessProposal.SkillID,
+		BusinessProposalRequiresApproval:       businessProposal.RequiresApproval,
+		BusinessProposalPolicyAllowed:          businessProposal.PolicyAllowed,
+		BusinessProposalPolicyRequiresApproval: businessProposal.PolicyRequiresApproval,
 		RAGVersion:                             rag.RAGVersion,
 		AgentVersion:                           agent.AgentVersion,
 		RetrievalVersions:                      uniqueNonEmpty(rag.RetrievalVersion, agent.RetrievalVersion),

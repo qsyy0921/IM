@@ -74,8 +74,13 @@
   归档。group-memory answer / proposal 场景已通过
   `ai-eval-rag-agent-demo-live-20260624-group-memory-answer-proposal-gate-v1` 真实 gate
   归档：`DECISION` / `BLOCKER` / `FILE` 三类 group memory 同时进入 RAG / Agent
-  EvidencePack。下一步继续扩展 EvidencePack source-chain coverage 和真实业务
-  proposal 场景。
+  EvidencePack。真实业务 proposal source-chain 场景已通过
+  `ai-eval-rag-agent-demo-live-20260624-business-proposal-source-chain-gate-v1` 真实 gate
+  归档：`DECISION` / `TASK` / `STATUS` 三类 reviewed memory 驱动
+  `conversation.note.create` proposal，并经 approval / action-executor audit 记录，
+  未配置真实 mutation adapter 时不执行业务写动作。下一步继续扩展 EvidencePack
+  source-chain / rerank coverage；真实 mutation 场景必须等显式业务 adapter 和
+  operator policy 就绪。
 - `rag-service` / `summary-service`：拒答、引用校验、source-ref regression、unsafe
   output fail-closed cases。
 - `agent-service`：真实业务动作继续走 policy、skill contract、proposal、approval、

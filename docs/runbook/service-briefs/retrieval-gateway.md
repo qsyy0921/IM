@@ -49,6 +49,10 @@
   已通过真实 service-stack gate：RAG answer 和 Agent proposal 同时验证
   `DECISION` / `BLOCKER` / `FILE` 三类 group memory、6 个 source refs 和 3 个
   cross-group source refs 经 EvidencePack 保留。
+- 2026-06-24 `ai-eval-rag-agent-demo-live-20260624-business-proposal-source-chain-gate-v1`
+  已通过真实 service-stack gate：Agent 业务 proposal 对 `DECISION` / `TASK` /
+  `STATUS` 三类 reviewed memory 保留 3 条 memory evidence、6 个 source refs 和
+  3 个 cross-group source refs，且后续 approval / action audit 不绕过 EvidencePack。
 
-下一步：继续把后续 rerank、source-chain coverage 和真实业务 proposal 场景通过
-EvidencePack 暴露给 RAG / summary / Agent，仍不绕过 retrieval-gateway。
+下一步：继续把后续 rerank 和更细 source-chain coverage 通过 EvidencePack 暴露给
+RAG / summary / Agent，仍不绕过 retrieval-gateway。

@@ -143,56 +143,60 @@ type seedSummary struct {
 }
 
 type combinedSummary struct {
-	RunName                               string    `json:"run_name"`
-	ResultDir                             string    `json:"result_dir"`
-	RAGSummaryPath                        string    `json:"rag_summary_path"`
-	AgentSummaryPath                      string    `json:"agent_summary_path"`
-	MemoryTarget                          string    `json:"memory_target"`
-	TenantID                              string    `json:"tenant_id"`
-	ConversationID                        string    `json:"conversation_id"`
-	ViewerUserID                          string    `json:"viewer_user_id"`
-	RAGAnswered                           bool      `json:"rag_answered"`
-	RAGAnswerID                           string    `json:"rag_answer_id"`
-	RAGAnswerStatus                       string    `json:"rag_answer_status"`
-	RAGAnswerTextSHA256                   string    `json:"rag_answer_text_sha256"`
-	RAGCitationCount                      int       `json:"rag_citation_count"`
-	RAGEvidenceItemCount                  int       `json:"rag_evidence_item_count"`
-	AgentProposalCreated                  bool      `json:"agent_proposal_created"`
-	AgentProposalID                       string    `json:"agent_proposal_id"`
-	AgentProposalStatus                   string    `json:"agent_proposal_status"`
-	AgentProposalTextSHA256               string    `json:"agent_proposal_text_sha256"`
-	AgentRequiresApproval                 bool      `json:"agent_requires_approval"`
-	AgentApprovalRecorded                 bool      `json:"agent_approval_recorded"`
-	AgentApprovalID                       string    `json:"agent_approval_id"`
-	ActionExecutionRecorded               bool      `json:"action_execution_recorded"`
-	ActionExecutionID                     string    `json:"action_execution_id"`
-	ActionExecutionStatus                 string    `json:"action_execution_status"`
-	ActionExecuted                        bool      `json:"action_executed"`
-	ActionResultRecorded                  bool      `json:"action_result_recorded"`
-	SharedTenantAndConversation           bool      `json:"shared_tenant_and_conversation"`
-	CrossGroupSourceRefsPreserved         bool      `json:"cross_group_source_refs_preserved"`
-	CrossGroupSpeakerAttributionPreserved bool      `json:"cross_group_speaker_attribution_preserved"`
-	MemoryGraphEdgesPreserved             bool      `json:"memory_graph_edges_preserved"`
-	ProfileAggregatePreserved             bool      `json:"profile_aggregate_preserved"`
-	PublicCandidateReviewApproved         bool      `json:"public_candidate_review_approved"`
-	PublicCandidateMemoryEventID          string    `json:"public_candidate_memory_event_id,omitempty"`
-	PublicCandidateFactSHA256             string    `json:"public_candidate_fact_sha256,omitempty"`
-	PublicCandidateEvidenceInRAG          bool      `json:"public_candidate_evidence_in_rag"`
-	PublicCandidateEvidenceInAgent        bool      `json:"public_candidate_evidence_in_agent"`
-	RAGVersion                            string    `json:"rag_version"`
-	AgentVersion                          string    `json:"agent_version"`
-	RetrievalVersions                     []string  `json:"retrieval_versions"`
-	Verified                              []string  `json:"verified"`
-	StartedAt                             time.Time `json:"started_at"`
-	FinishedAt                            time.Time `json:"finished_at"`
+	RunName                                string    `json:"run_name"`
+	ResultDir                              string    `json:"result_dir"`
+	RAGSummaryPath                         string    `json:"rag_summary_path"`
+	AgentSummaryPath                       string    `json:"agent_summary_path"`
+	MemoryTarget                           string    `json:"memory_target"`
+	TenantID                               string    `json:"tenant_id"`
+	ConversationID                         string    `json:"conversation_id"`
+	ViewerUserID                           string    `json:"viewer_user_id"`
+	RAGAnswered                            bool      `json:"rag_answered"`
+	RAGAnswerID                            string    `json:"rag_answer_id"`
+	RAGAnswerStatus                        string    `json:"rag_answer_status"`
+	RAGAnswerTextSHA256                    string    `json:"rag_answer_text_sha256"`
+	RAGCitationCount                       int       `json:"rag_citation_count"`
+	RAGEvidenceItemCount                   int       `json:"rag_evidence_item_count"`
+	AgentProposalCreated                   bool      `json:"agent_proposal_created"`
+	AgentProposalID                        string    `json:"agent_proposal_id"`
+	AgentProposalStatus                    string    `json:"agent_proposal_status"`
+	AgentProposalTextSHA256                string    `json:"agent_proposal_text_sha256"`
+	AgentRequiresApproval                  bool      `json:"agent_requires_approval"`
+	AgentApprovalRecorded                  bool      `json:"agent_approval_recorded"`
+	AgentApprovalID                        string    `json:"agent_approval_id"`
+	ActionExecutionRecorded                bool      `json:"action_execution_recorded"`
+	ActionExecutionID                      string    `json:"action_execution_id"`
+	ActionExecutionStatus                  string    `json:"action_execution_status"`
+	ActionExecuted                         bool      `json:"action_executed"`
+	ActionResultRecorded                   bool      `json:"action_result_recorded"`
+	SharedTenantAndConversation            bool      `json:"shared_tenant_and_conversation"`
+	CrossGroupSourceRefsPreserved          bool      `json:"cross_group_source_refs_preserved"`
+	CrossGroupSpeakerAttributionPreserved  bool      `json:"cross_group_speaker_attribution_preserved"`
+	MemoryGraphEdgesPreserved              bool      `json:"memory_graph_edges_preserved"`
+	ProfileAggregatePreserved              bool      `json:"profile_aggregate_preserved"`
+	PublicCandidateReviewApproved          bool      `json:"public_candidate_review_approved"`
+	PublicCandidateMemoryEventID           string    `json:"public_candidate_memory_event_id,omitempty"`
+	PublicCandidateSupersededMemoryEventID string    `json:"public_candidate_superseded_memory_event_id,omitempty"`
+	PublicCandidateFactSHA256              string    `json:"public_candidate_fact_sha256,omitempty"`
+	PublicCandidateEvidenceInRAG           bool      `json:"public_candidate_evidence_in_rag"`
+	PublicCandidateEvidenceInAgent         bool      `json:"public_candidate_evidence_in_agent"`
+	PublicCandidateTemporalUpdatePreserved bool      `json:"public_candidate_temporal_update_preserved"`
+	RAGVersion                             string    `json:"rag_version"`
+	AgentVersion                           string    `json:"agent_version"`
+	RetrievalVersions                      []string  `json:"retrieval_versions"`
+	Verified                               []string  `json:"verified"`
+	StartedAt                              time.Time `json:"started_at"`
+	FinishedAt                             time.Time `json:"finished_at"`
 }
 
 type publicCandidateReviewSummary struct {
-	Approved      bool
-	MemoryEventID string
-	FactSHA256    string
-	RAGEvidence   bool
-	AgentEvidence bool
+	Approved                bool
+	MemoryEventID           string
+	SupersededMemoryEventID string
+	FactSHA256              string
+	RAGEvidence             bool
+	AgentEvidence           bool
+	TemporalUpdatePreserved bool
 }
 
 func main() {
@@ -439,8 +443,14 @@ func verifyPublicCandidateReviewEvidence(
 	candidateID := "ragagent-public-candidate-" + suffix
 	sourceID := "msg-" + candidateID
 	sourceEventID := "evt-" + candidateID
-	factText := "decision: public candidate review for phoenix launch decision is approved through public memory-service APIs"
+	factText := "decision: public candidate review for phoenix launch decision uses the initial public memory-service APIs"
 	factHash := normalizedFactSHA256(factText)
+	replacementID := candidateID + "-replacement"
+	replacementSourceID := "msg-" + replacementID
+	replacementSourceEventID := "evt-" + replacementID
+	replacementSeq := conversationSeq + 1
+	replacementFactText := "decision: public candidate review for phoenix launch decision uses the updated temporal memory-service APIs"
+	replacementFactHash := normalizedFactSHA256(replacementFactText)
 
 	memoryConn, err := grpc.NewClient("passthrough:///"+cfg.memoryTarget, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
@@ -498,27 +508,95 @@ func verifyPublicCandidateReviewEvidence(
 		return publicCandidateReviewSummary{}, fmt.Errorf("approved public candidate should be active: %+v", approved.GetItem())
 	}
 
-	ragResponse, err := answerPublicCandidateQuestion(ctx, cfg, seed, candidateID, conversationSeq)
+	requestCtx, cancel = context.WithTimeout(ctx, cfg.requestTimeout)
+	submittedReplacement, err := memoryClient.SubmitMemoryCandidate(requestCtx, &memoryv1.SubmitMemoryCandidateRequest{
+		AuthContext:    memoryAuth(cfg, seed.ViewerUserID),
+		CandidateId:    replacementID,
+		Scope:          memoryv1.MemoryScope_MEMORY_SCOPE_CONVERSATION,
+		ScopeId:        seed.ConversationID,
+		ConversationId: seed.ConversationID,
+		Topic:          "rag-agent-public-candidate-review",
+		EventType:      memoryv1.MemoryEventType_MEMORY_EVENT_TYPE_DECISION,
+		FactText:       replacementFactText,
+		FactSha256:     replacementFactHash,
+		ActorUserIds:   []string{seed.SenderUserID},
+		SourceRefs: []*memoryv1.SourceRef{{
+			SourceType:       memoryv1.MemorySourceType_MEMORY_SOURCE_TYPE_MESSAGE,
+			SourceId:         replacementSourceID,
+			SourceEventId:    replacementSourceEventID,
+			ConversationId:   seed.ConversationID,
+			ConversationSeq:  replacementSeq,
+			OccurredAtUnixMs: time.Now().UTC().UnixMilli(),
+		}},
+		ValidFromSeq:       replacementSeq,
+		SupersedesEventIds: []string{candidateID},
+		Confidence:         0.99,
+		VisibilityVersion:  1,
+		ExtractionVersion:  "memory-extraction-candidate-v1",
+	})
+	cancel()
+	if err != nil {
+		return publicCandidateReviewSummary{}, fmt.Errorf("submit public replacement memory candidate: %w", err)
+	}
+	if submittedReplacement.GetItem().GetStatus() != memoryv1.MemoryEventStatus_MEMORY_EVENT_STATUS_PENDING ||
+		submittedReplacement.GetItem().GetReviewState() != memoryv1.MemoryReviewState_MEMORY_REVIEW_STATE_NEEDS_REVIEW {
+		return publicCandidateReviewSummary{}, fmt.Errorf("submitted public replacement should require review: %+v", submittedReplacement.GetItem())
+	}
+
+	requestCtx, cancel = context.WithTimeout(ctx, cfg.requestTimeout)
+	approvedReplacement, err := memoryClient.ReviewMemoryCandidate(requestCtx, &memoryv1.ReviewMemoryCandidateRequest{
+		AuthContext:   memoryAuth(cfg, seed.ViewerUserID),
+		MemoryEventId: replacementID,
+		Decision:      memoryv1.MemoryReviewDecision_MEMORY_REVIEW_DECISION_APPROVE,
+	})
+	cancel()
+	if err != nil {
+		return publicCandidateReviewSummary{}, fmt.Errorf("approve public replacement memory candidate: %w", err)
+	}
+	if approvedReplacement.GetItem().GetStatus() != memoryv1.MemoryEventStatus_MEMORY_EVENT_STATUS_ACTIVE ||
+		approvedReplacement.GetItem().GetReviewState() != memoryv1.MemoryReviewState_MEMORY_REVIEW_STATE_APPROVED ||
+		len(approvedReplacement.GetItem().GetSupersedesEventIds()) != 1 ||
+		approvedReplacement.GetItem().GetSupersedesEventIds()[0] != candidateID {
+		return publicCandidateReviewSummary{}, fmt.Errorf("approved replacement should be active and supersede original: %+v", approvedReplacement.GetItem())
+	}
+
+	requestCtx, cancel = context.WithTimeout(ctx, cfg.requestTimeout)
+	supersededOriginal, err := memoryClient.GetMemoryEvent(requestCtx, &memoryv1.GetMemoryEventRequest{
+		AuthContext:   memoryAuth(cfg, seed.ViewerUserID),
+		MemoryEventId: candidateID,
+	})
+	cancel()
+	if err != nil {
+		return publicCandidateReviewSummary{}, fmt.Errorf("load superseded original memory candidate: %w", err)
+	}
+	if supersededOriginal.GetItem().GetStatus() != memoryv1.MemoryEventStatus_MEMORY_EVENT_STATUS_SUPERSEDED ||
+		supersededOriginal.GetItem().GetValidToSeq() != replacementSeq-1 {
+		return publicCandidateReviewSummary{}, fmt.Errorf("original candidate should be superseded until replacement seq: %+v", supersededOriginal.GetItem())
+	}
+
+	ragResponse, err := answerPublicCandidateQuestion(ctx, cfg, seed, replacementID, replacementSeq)
 	if err != nil {
 		return publicCandidateReviewSummary{}, err
 	}
-	if err := verifyPublicCandidateEvidencePack(ragResponse.GetEvidencePack(), candidateID, sourceID, sourceEventID, seed.ConversationID, conversationSeq); err != nil {
+	if err := verifyPublicCandidateEvidencePack(ragResponse.GetEvidencePack(), replacementID, replacementSourceID, replacementSourceEventID, seed.ConversationID, replacementSeq, candidateID); err != nil {
 		return publicCandidateReviewSummary{}, fmt.Errorf("rag public candidate evidence: %w", err)
 	}
-	agentResponse, err := createPublicCandidateProposal(ctx, cfg, seed, candidateID, conversationSeq)
+	agentResponse, err := createPublicCandidateProposal(ctx, cfg, seed, replacementID, replacementSeq)
 	if err != nil {
 		return publicCandidateReviewSummary{}, err
 	}
-	if err := verifyPublicCandidateEvidencePack(agentResponse.GetEvidencePack(), candidateID, sourceID, sourceEventID, seed.ConversationID, conversationSeq); err != nil {
+	if err := verifyPublicCandidateEvidencePack(agentResponse.GetEvidencePack(), replacementID, replacementSourceID, replacementSourceEventID, seed.ConversationID, replacementSeq, candidateID); err != nil {
 		return publicCandidateReviewSummary{}, fmt.Errorf("agent public candidate evidence: %w", err)
 	}
 
 	return publicCandidateReviewSummary{
-		Approved:      true,
-		MemoryEventID: candidateID,
-		FactSHA256:    factHash,
-		RAGEvidence:   true,
-		AgentEvidence: true,
+		Approved:                true,
+		MemoryEventID:           replacementID,
+		SupersededMemoryEventID: candidateID,
+		FactSHA256:              replacementFactHash,
+		RAGEvidence:             true,
+		AgentEvidence:           true,
+		TemporalUpdatePreserved: true,
 	}, nil
 }
 
@@ -613,11 +691,17 @@ func verifyPublicCandidateEvidencePack(
 	sourceEventID string,
 	conversationID string,
 	conversationSeq int64,
+	absentMemoryEventID string,
 ) error {
 	if pack == nil {
 		return errors.New("missing EvidencePack")
 	}
+	found := false
 	for _, item := range pack.GetItems() {
+		if absentMemoryEventID != "" && item.GetSourceType() == retrievalv1.EvidenceSourceType_EVIDENCE_SOURCE_TYPE_MEMORY_EVENT &&
+			item.GetMemoryEventId() == absentMemoryEventID {
+			return fmt.Errorf("superseded public candidate memory event %q must not appear in current EvidencePack", absentMemoryEventID)
+		}
 		if item.GetSourceType() != retrievalv1.EvidenceSourceType_EVIDENCE_SOURCE_TYPE_MEMORY_EVENT ||
 			item.GetMemoryEventId() != candidateID {
 			continue
@@ -633,10 +717,16 @@ func verifyPublicCandidateEvidencePack(
 				ref.GetSourceEventId() == sourceEventID &&
 				ref.GetConversationId() == conversationID &&
 				ref.GetConversationSeq() == conversationSeq {
-				return nil
+				found = true
+				break
 			}
 		}
-		return fmt.Errorf("public candidate source ref missing from EvidencePack item: %+v", item.GetSourceRefs())
+		if !found {
+			return fmt.Errorf("public candidate source ref missing from EvidencePack item: %+v", item.GetSourceRefs())
+		}
+	}
+	if found {
+		return nil
 	}
 	return fmt.Errorf("public candidate memory event %q missing from EvidencePack", candidateID)
 }
@@ -724,54 +814,56 @@ func verifyCombined(
 		return combinedSummary{}, errors.New("RAG and Agent did not both preserve cross-group refs, speaker attribution, graph edges and profile evidence")
 	}
 	verified = append(verified, "EvidencePack cross-group refs, speaker attribution, graph edges and profile evidence were preserved in both paths")
-	if !publicCandidate.Approved || !publicCandidate.RAGEvidence || !publicCandidate.AgentEvidence {
-		return combinedSummary{}, errors.New("public candidate review was not approved and preserved in both RAG and Agent EvidencePacks")
+	if !publicCandidate.Approved || !publicCandidate.RAGEvidence || !publicCandidate.AgentEvidence || !publicCandidate.TemporalUpdatePreserved {
+		return combinedSummary{}, errors.New("public candidate review temporal update was not approved and preserved in both RAG and Agent EvidencePacks")
 	}
-	verified = append(verified, "Public memory candidate review produced approved memory evidence in both RAG and Agent paths")
+	verified = append(verified, "Public memory candidate temporal update superseded old evidence and preserved active replacement evidence in both RAG and Agent paths")
 
 	return combinedSummary{
-		RunName:                               cfg.runName,
-		ResultDir:                             resultDir,
-		RAGSummaryPath:                        ragSummaryPath,
-		AgentSummaryPath:                      agentSummaryPath,
-		MemoryTarget:                          cfg.memoryTarget,
-		TenantID:                              rag.Seed.TenantID,
-		ConversationID:                        rag.Seed.ConversationID,
-		ViewerUserID:                          rag.Seed.ViewerUserID,
-		RAGAnswered:                           true,
-		RAGAnswerID:                           rag.AnswerID,
-		RAGAnswerStatus:                       rag.AnswerStatus,
-		RAGAnswerTextSHA256:                   sha256Hex(rag.AnswerText),
-		RAGCitationCount:                      rag.CitationCount,
-		RAGEvidenceItemCount:                  rag.EvidenceItemCount,
-		AgentProposalCreated:                  true,
-		AgentProposalID:                       agent.ProposalID,
-		AgentProposalStatus:                   agent.ProposalStatus,
-		AgentProposalTextSHA256:               sha256Hex(agent.ProposalText),
-		AgentRequiresApproval:                 agent.RequiresApproval,
-		AgentApprovalRecorded:                 true,
-		AgentApprovalID:                       agent.ApprovalID,
-		ActionExecutionRecorded:               true,
-		ActionExecutionID:                     agent.ExecutionID,
-		ActionExecutionStatus:                 agent.ExecutionStatus,
-		ActionExecuted:                        agent.ExecutionExecuted,
-		ActionResultRecorded:                  strings.TrimSpace(agent.ExecutionResultID) != "",
-		SharedTenantAndConversation:           shared,
-		CrossGroupSourceRefsPreserved:         crossGroupRefs,
-		CrossGroupSpeakerAttributionPreserved: speaker,
-		MemoryGraphEdgesPreserved:             graph,
-		ProfileAggregatePreserved:             profile,
-		PublicCandidateReviewApproved:         publicCandidate.Approved,
-		PublicCandidateMemoryEventID:          publicCandidate.MemoryEventID,
-		PublicCandidateFactSHA256:             publicCandidate.FactSHA256,
-		PublicCandidateEvidenceInRAG:          publicCandidate.RAGEvidence,
-		PublicCandidateEvidenceInAgent:        publicCandidate.AgentEvidence,
-		RAGVersion:                            rag.RAGVersion,
-		AgentVersion:                          agent.AgentVersion,
-		RetrievalVersions:                     uniqueNonEmpty(rag.RetrievalVersion, agent.RetrievalVersion),
-		Verified:                              verified,
-		StartedAt:                             startedAt,
-		FinishedAt:                            time.Now().UTC(),
+		RunName:                                cfg.runName,
+		ResultDir:                              resultDir,
+		RAGSummaryPath:                         ragSummaryPath,
+		AgentSummaryPath:                       agentSummaryPath,
+		MemoryTarget:                           cfg.memoryTarget,
+		TenantID:                               rag.Seed.TenantID,
+		ConversationID:                         rag.Seed.ConversationID,
+		ViewerUserID:                           rag.Seed.ViewerUserID,
+		RAGAnswered:                            true,
+		RAGAnswerID:                            rag.AnswerID,
+		RAGAnswerStatus:                        rag.AnswerStatus,
+		RAGAnswerTextSHA256:                    sha256Hex(rag.AnswerText),
+		RAGCitationCount:                       rag.CitationCount,
+		RAGEvidenceItemCount:                   rag.EvidenceItemCount,
+		AgentProposalCreated:                   true,
+		AgentProposalID:                        agent.ProposalID,
+		AgentProposalStatus:                    agent.ProposalStatus,
+		AgentProposalTextSHA256:                sha256Hex(agent.ProposalText),
+		AgentRequiresApproval:                  agent.RequiresApproval,
+		AgentApprovalRecorded:                  true,
+		AgentApprovalID:                        agent.ApprovalID,
+		ActionExecutionRecorded:                true,
+		ActionExecutionID:                      agent.ExecutionID,
+		ActionExecutionStatus:                  agent.ExecutionStatus,
+		ActionExecuted:                         agent.ExecutionExecuted,
+		ActionResultRecorded:                   strings.TrimSpace(agent.ExecutionResultID) != "",
+		SharedTenantAndConversation:            shared,
+		CrossGroupSourceRefsPreserved:          crossGroupRefs,
+		CrossGroupSpeakerAttributionPreserved:  speaker,
+		MemoryGraphEdgesPreserved:              graph,
+		ProfileAggregatePreserved:              profile,
+		PublicCandidateReviewApproved:          publicCandidate.Approved,
+		PublicCandidateMemoryEventID:           publicCandidate.MemoryEventID,
+		PublicCandidateSupersededMemoryEventID: publicCandidate.SupersededMemoryEventID,
+		PublicCandidateFactSHA256:              publicCandidate.FactSHA256,
+		PublicCandidateEvidenceInRAG:           publicCandidate.RAGEvidence,
+		PublicCandidateEvidenceInAgent:         publicCandidate.AgentEvidence,
+		PublicCandidateTemporalUpdatePreserved: publicCandidate.TemporalUpdatePreserved,
+		RAGVersion:                             rag.RAGVersion,
+		AgentVersion:                           agent.AgentVersion,
+		RetrievalVersions:                      uniqueNonEmpty(rag.RetrievalVersion, agent.RetrievalVersion),
+		Verified:                               verified,
+		StartedAt:                              startedAt,
+		FinishedAt:                             time.Now().UTC(),
 	}, nil
 }
 

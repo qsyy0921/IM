@@ -110,8 +110,12 @@ func TestVerifyCombinedSummary(t *testing.T) {
 	if summary.RAGAnswerTextSHA256 == "" || summary.AgentProposalTextSHA256 == "" {
 		t.Fatalf("expected hashed text fields: %+v", summary)
 	}
-	if !summary.PublicCandidateReviewApproved || !summary.PublicCandidateEvidenceInRAG || !summary.PublicCandidateEvidenceInAgent {
-		t.Fatalf("expected public candidate review evidence flags: %+v", summary)
+	if !summary.PublicCandidateReviewApproved ||
+		!summary.PublicCandidateEvidenceInRAG ||
+		!summary.PublicCandidateEvidenceInAgent ||
+		!summary.PublicCandidateTemporalUpdatePreserved ||
+		summary.PublicCandidateSupersededMemoryEventID == "" {
+		t.Fatalf("expected public candidate temporal update evidence flags: %+v", summary)
 	}
 	if strings.Contains(summary.RAGAnswerTextSHA256, rag.AnswerText) ||
 		strings.Contains(summary.AgentProposalTextSHA256, agent.ProposalText) {
@@ -204,10 +208,12 @@ func validAgentPartial() agentPartialSummary {
 
 func validPublicCandidateReviewSummary() publicCandidateReviewSummary {
 	return publicCandidateReviewSummary{
-		Approved:      true,
-		MemoryEventID: "candidate-1",
-		FactSHA256:    strings.Repeat("a", 64),
-		RAGEvidence:   true,
-		AgentEvidence: true,
+		Approved:                true,
+		MemoryEventID:           "candidate-1-replacement",
+		SupersededMemoryEventID: "candidate-1",
+		FactSHA256:              strings.Repeat("a", 64),
+		RAGEvidence:             true,
+		AgentEvidence:           true,
+		TemporalUpdatePreserved: true,
 	}
 }

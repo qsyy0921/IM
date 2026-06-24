@@ -8,6 +8,7 @@ Raw eval summaries and generated smoke JSON stay under
 Current reports:
 
 - `loadtest-report-20260624-rag-agent-demo-public-candidate-review-gate.md`
+- `loadtest-report-20260624-rag-agent-demo-temporal-update-gate.md`
 - `loadtest-report-20260624-rag-agent-demo-service-stack-gate.md`
 - `loadtest-report-20260624-retrieval-negative-service-stack-gate.md`
 - `loadtest-report-20260624-collab-memory-service-stack-gate.md`

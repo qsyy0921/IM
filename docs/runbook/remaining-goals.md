@@ -60,6 +60,9 @@
   review 现在也会通过 memory-service 公开 submit / review API 写入
   `ACTIVE + APPROVED` memory，并被 RAG / Agent EvidencePack 断言消费；该断言已通过
   `ai-eval-rag-agent-demo-live-20260624-public-candidate-review-v3` 真实 gate 归档。
+  public candidate replacement temporal update 也已通过
+  `ai-eval-rag-agent-demo-live-20260624-temporal-update-v2` 真实 gate 归档：replacement
+  审批后 supersede 旧 memory，当前 RAG / Agent EvidencePack 只保留 active replacement。
   下一步围绕 profile repair approval 回归、更多 RAG-Agent EvidencePack / approval /
   audit 展示扩展该演示路径。
 - `rag-service` / `summary-service`：拒答、引用校验、source-ref regression、unsafe

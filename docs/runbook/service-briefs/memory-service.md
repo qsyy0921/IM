@@ -76,9 +76,15 @@
   显式推进为 `ACTIVE + APPROVED` 或 `REJECTED + REJECTED`。PG integration tests
   覆盖 submit -> approve、reject、不可见 source fail-closed；`loadtest/memory`
   和 memory-service ai-eval adapter 已新增 public candidate review 检查。
+- 2026-06-24 public candidate temporal update 已补齐：当 replacement candidate 带
+  `supersedes_event_ids` 并被公开 `ReviewMemoryCandidate(APPROVE)` 审批通过时，
+  memory-service 会在同一 PostgreSQL 事务内校验被 supersede memory 可见、同 scope、
+  已 `ACTIVE + APPROVED` 且时间顺序正确，然后把旧 memory 标为 `SUPERSEDED` 并把
+  `valid_to_seq` 截断到 replacement 前一 seq；失败时整次审批 fail-closed。
 
 下一步：`loadtest/ragagent` / `rag-agent-demo` adapter 已把 public candidate
-review 纳入 RAG / Agent EvidencePack 断言链路，并已通过
-`ai-eval-rag-agent-demo-live-20260624-public-candidate-review-v3` 真实 gate 归档。
-之后继续做结构过滤、BM25 / vector、rerank 和 EvidencePack coverage 深化。仍不得把
+review 和 temporal update 纳入 RAG / Agent EvidencePack 断言链路，并已通过
+`ai-eval-rag-agent-demo-live-20260624-public-candidate-review-v3` 和
+`ai-eval-rag-agent-demo-live-20260624-temporal-update-v2` 真实 gate 归档。之后继续做
+结构过滤、BM25 / vector、rerank 和 EvidencePack coverage 深化。仍不得把
 单条群消息直接升级为 ACTIVE profile fact。

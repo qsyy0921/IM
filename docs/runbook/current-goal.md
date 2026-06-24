@@ -157,6 +157,13 @@ IM messages -> search / memory projection -> EvidencePack -> RAG / Agent answer 
   0 skipped。该链路进一步确认 memory-service 公开
   `SubmitMemoryCandidate -> ReviewMemoryCandidate(APPROVE)` 产生的
   `ACTIVE + APPROVED` memory 会进入 RAG / Agent EvidencePack，并保留 source refs。
+- 2026-06-24 `ai-eval-rag-agent-demo-live-20260624-temporal-update-v2` 已通过真实
+  service-stack gate：4 adapters、27 cases、27 passed、0 failed、0 skipped。
+  该链路把 public candidate replacement 接入 RAG-Agent demo：replacement 经公开
+  `SubmitMemoryCandidate -> ReviewMemoryCandidate(APPROVE)` 审批后 supersede 旧
+  memory，旧 memory 变为 `SUPERSEDED` 且 `valid_to_seq` 截断到 replacement 前一 seq；
+  RAG / Agent EvidencePack 只保留当前 `ACTIVE + APPROVED` replacement，不包含旧
+  memory。
 - 已有 clean smoke 覆盖真实双用户好友直聊、群聊 first path、群资料 BFF
   read/update 和群成员动作链路；证据见 `docs/runbook/client-platform.md`。
 - Windows desktop 已有 artifact / signing / installer plan first paths；签名 / installer
@@ -225,9 +232,9 @@ IM messages -> search / memory projection -> EvidencePack -> RAG / Agent answer 
    profile repair batch approval path、Agent action boundary cases、Python memory
    extraction candidate first path、Go-side adapter / ai-eval 接入以及 memory-service
    公开 candidate review / approval / persistence path 已补齐；`loadtest/ragagent`
-   与 `rag-agent-demo` adapter 已把 public candidate review 纳入 RAG / Agent
-   EvidencePack 断言链路，并已通过真实 service-stack gate 归档。下一步继续深化
-   temporal update、profile repair approval 和更多 group-memory answer / proposal 场景。
+   与 `rag-agent-demo` adapter 已把 public candidate review 和 temporal update
+   纳入 RAG / Agent EvidencePack 断言链路，并已通过真实 service-stack gate 归档。
+   下一步继续深化 profile repair approval 和更多 group-memory answer / proposal 场景。
 5. 客户端只作为演示入口；除非阻塞上述演示，不继续扩 UI 产品化。
 6. Windows release signing / MSI / NSIS installer、完整 Android、完整移动端发布、
    复杂 UI、群管理深水区和真实 media provider 链路全部后置到 backlog。

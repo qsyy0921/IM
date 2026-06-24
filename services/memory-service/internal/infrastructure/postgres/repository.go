@@ -403,13 +403,32 @@ func (repository *Repository) ReviewMemoryCandidate(
 	}()
 	var statusValue string
 	var reviewState string
+	var conversationID string
+	var scopeType string
+	var scopeID string
+	var supersedesJSON string
+	var validFromSeq int64
 	if err := tx.QueryRow(ctx, `
-SELECT status, review_state
+SELECT status,
+       review_state,
+       conversation_id,
+       scope_type,
+       scope_id,
+       supersedes_event_ids::text,
+       COALESCE(valid_from_seq, 0)
 FROM memory_structured_events
 WHERE tenant_id = $1
   AND memory_event_id = $2
 FOR UPDATE
-`, command.AuthContext.TenantID, command.MemoryEventID).Scan(&statusValue, &reviewState); err != nil {
+`, command.AuthContext.TenantID, command.MemoryEventID).Scan(
+		&statusValue,
+		&reviewState,
+		&conversationID,
+		&scopeType,
+		&scopeID,
+		&supersedesJSON,
+		&validFromSeq,
+	); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return types.StructuredMemoryEvent{}, types.ErrMemoryNotFound
 		}
@@ -431,6 +450,9 @@ FOR UPDATE
 	if command.Decision == types.MemoryReviewDecisionApprove {
 		nextStatus = types.MemoryStatusActive
 		nextReview = types.MemoryReviewApproved
+		if err := applyApprovedMemorySupersedes(ctx, tx, command.AuthContext, command.MemoryEventID, decodeStringSlice(supersedesJSON), validFromSeq, conversationID, scopeType, scopeID); err != nil {
+			return types.StructuredMemoryEvent{}, err
+		}
 	}
 	if _, err := tx.Exec(ctx, `
 UPDATE memory_structured_events
@@ -450,6 +472,84 @@ WHERE tenant_id = $1
 		return types.StructuredMemoryEvent{}, types.NewDBWriteFailed(err.Error())
 	}
 	return item, nil
+}
+
+func applyApprovedMemorySupersedes(
+	ctx context.Context,
+	tx pgx.Tx,
+	auth types.AuthContext,
+	candidateID string,
+	supersedesEventIDs []string,
+	candidateValidFromSeq int64,
+	candidateConversationID string,
+	candidateScopeType string,
+	candidateScopeID string,
+) error {
+	seen := make(map[string]struct{}, len(supersedesEventIDs))
+	for _, supersededID := range supersedesEventIDs {
+		supersededID = strings.TrimSpace(supersededID)
+		if supersededID == "" {
+			return types.NewInvalidArgument("supersedes_event_ids must not contain blank ids")
+		}
+		if supersededID == candidateID {
+			return types.NewInvalidArgument("memory candidate cannot supersede itself")
+		}
+		if _, ok := seen[supersededID]; ok {
+			continue
+		}
+		seen[supersededID] = struct{}{}
+
+		var statusValue string
+		var reviewState string
+		var conversationID string
+		var scopeType string
+		var scopeID string
+		var validFromSeq int64
+		if err := tx.QueryRow(ctx, `
+SELECT status,
+       review_state,
+       conversation_id,
+       scope_type,
+       scope_id,
+       COALESCE(valid_from_seq, 0)
+FROM memory_structured_events
+WHERE tenant_id = $1
+  AND memory_event_id = $2
+FOR UPDATE
+`, auth.TenantID, supersededID).Scan(&statusValue, &reviewState, &conversationID, &scopeType, &scopeID, &validFromSeq); err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return types.ErrMemoryNotFound
+			}
+			return types.NewDBReadFailed(err.Error())
+		}
+		if statusValue != types.MemoryStatusActive || reviewState != types.MemoryReviewApproved {
+			return types.NewInvalidArgument("superseded memory must be active and approved")
+		}
+		if conversationID != candidateConversationID || scopeType != candidateScopeType || scopeID != candidateScopeID {
+			return types.NewInvalidArgument("superseded memory scope must match candidate scope")
+		}
+		if candidateValidFromSeq <= 1 || validFromSeq >= candidateValidFromSeq {
+			return types.NewInvalidArgument("superseded memory must start before candidate")
+		}
+		visible, err := isMemoryEventVisibleForUser(ctx, tx, auth.TenantID, auth.UserID, supersededID)
+		if err != nil {
+			return err
+		}
+		if !visible {
+			return types.ErrPermissionDenied
+		}
+		if _, err := tx.Exec(ctx, `
+UPDATE memory_structured_events
+SET status = $3,
+    valid_to_seq = $4,
+    updated_at = now()
+WHERE tenant_id = $1
+  AND memory_event_id = $2
+`, auth.TenantID, supersededID, types.MemoryStatusSuperseded, candidateValidFromSeq-1); err != nil {
+			return types.NewDBWriteFailed(err.Error())
+		}
+	}
+	return nil
 }
 
 func ensureCandidateSourceRefsVisible(ctx context.Context, tx pgx.Tx, auth types.AuthContext, refs []types.SourceRef) error {

@@ -145,6 +145,75 @@ func TestRepositorySubmitAndReviewMemoryCandidateIntegration(t *testing.T) {
 	}
 }
 
+func TestRepositoryReviewMemoryCandidateSupersedesActiveMemoryIntegration(t *testing.T) {
+	ctx := context.Background()
+	pool := openMemoryTestPool(t)
+	resetMemoryTables(t, ctx, pool)
+	repository := NewRepository(pool)
+
+	projectMemberJoined(t, ctx, repository, "tenant-1", "conv-candidate", "reviewer-1", 1)
+	original := memoryCandidateCommand("tenant-1", "reviewer-1", "conv-candidate", "candidate-original", "msg-original", 2)
+	original.FactText = "decision: phoenix launch will use the old evidence window"
+	original.FactSHA256 = normalizedTestFactSHA256(original.FactText)
+	if _, err := repository.SubmitMemoryCandidate(ctx, original); err != nil {
+		t.Fatalf("submit original candidate: %v", err)
+	}
+	if _, err := repository.ReviewMemoryCandidate(ctx, types.ReviewMemoryCandidateCommand{
+		AuthContext:   types.AuthContext{TenantID: "tenant-1", UserID: "reviewer-1", DeviceID: "device-reviewer"},
+		MemoryEventID: original.CandidateID,
+		Decision:      types.MemoryReviewDecisionApprove,
+	}); err != nil {
+		t.Fatalf("approve original candidate: %v", err)
+	}
+
+	replacement := memoryCandidateCommand("tenant-1", "reviewer-1", "conv-candidate", "candidate-replacement", "msg-replacement", 5)
+	replacement.FactText = "decision: phoenix launch now uses the updated evidence window"
+	replacement.FactSHA256 = normalizedTestFactSHA256(replacement.FactText)
+	replacement.SupersedesEventIDs = []string{original.CandidateID}
+	if _, err := repository.SubmitMemoryCandidate(ctx, replacement); err != nil {
+		t.Fatalf("submit replacement candidate: %v", err)
+	}
+	approved, err := repository.ReviewMemoryCandidate(ctx, types.ReviewMemoryCandidateCommand{
+		AuthContext:   types.AuthContext{TenantID: "tenant-1", UserID: "reviewer-1", DeviceID: "device-reviewer"},
+		MemoryEventID: replacement.CandidateID,
+		Decision:      types.MemoryReviewDecisionApprove,
+	})
+	if err != nil {
+		t.Fatalf("approve replacement candidate: %v", err)
+	}
+	if approved.Status != types.MemoryStatusActive || len(approved.SupersedesEventIDs) != 1 || approved.SupersedesEventIDs[0] != original.CandidateID {
+		t.Fatalf("unexpected replacement approval: %+v", approved)
+	}
+
+	active, _, err := repository.QueryMemoryEvents(ctx, types.QueryMemoryEventsCommand{
+		AuthContext:    types.AuthContext{TenantID: "tenant-1", UserID: "reviewer-1", DeviceID: "device-reviewer"},
+		ConversationID: "conv-candidate",
+		Query:          "phoenix launch",
+		Statuses:       []string{types.MemoryStatusActive},
+		Limit:          10,
+	}, 10)
+	if err != nil {
+		t.Fatalf("query active memories: %v", err)
+	}
+	if len(active) != 1 || active[0].MemoryEventID != replacement.CandidateID {
+		t.Fatalf("expected only replacement to remain active: %+v", active)
+	}
+
+	superseded, _, err := repository.QueryMemoryEvents(ctx, types.QueryMemoryEventsCommand{
+		AuthContext:    types.AuthContext{TenantID: "tenant-1", UserID: "reviewer-1", DeviceID: "device-reviewer"},
+		ConversationID: "conv-candidate",
+		Query:          "phoenix launch",
+		Statuses:       []string{types.MemoryStatusSuperseded},
+		Limit:          10,
+	}, 10)
+	if err != nil {
+		t.Fatalf("query superseded memories: %v", err)
+	}
+	if len(superseded) != 1 || superseded[0].MemoryEventID != original.CandidateID || superseded[0].ValidToSeq != replacement.ValidFromSeq-1 {
+		t.Fatalf("expected original to be superseded until replacement seq: %+v", superseded)
+	}
+}
+
 func TestRepositorySubmitMemoryCandidateRequiresVisibleSourceIntegration(t *testing.T) {
 	ctx := context.Background()
 	pool := openMemoryTestPool(t)

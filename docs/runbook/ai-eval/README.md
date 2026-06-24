@@ -436,6 +436,12 @@ The 2026-06-24 RAG-Agent public candidate review run
 memory-service `SubmitMemoryCandidate -> ReviewMemoryCandidate(APPROVE)` output
 enters both RAG and Agent EvidencePacks as `ACTIVE + APPROVED` memory with source
 refs preserved.
+The 2026-06-24 RAG-Agent temporal update run
+`ai-eval-rag-agent-demo-live-20260624-temporal-update-v2` ran 4 adapters / 27 cases
+with 27 passed, 0 failed and 0 skipped. It extends the same live assertion to a
+public candidate replacement: approving the replacement supersedes the original
+memory, and the current RAG / Agent EvidencePacks only contain the active
+replacement memory.
 The 2026-06-20 RAG / Summary citation regression added source-ref integrity
 cases and low-sensitive `citation_refs` fields to the RAG / Summary smoke
 summaries. This proves adapter-level citation anchoring only; it is not a live

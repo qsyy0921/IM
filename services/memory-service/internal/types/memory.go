@@ -342,6 +342,12 @@ func (command SubmitMemoryCandidateCommand) Validate() error {
 			return err
 		}
 	}
+	if err := validateMemoryEventIDReferences(command.CandidateID, command.SupersedesEventIDs, "supersedes_event_ids"); err != nil {
+		return err
+	}
+	if err := validateMemoryEventIDReferences(command.CandidateID, command.ContradictsEventIDs, "contradicts_event_ids"); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -381,6 +387,24 @@ func validateCandidateSourceRef(ref SourceRef) error {
 	}
 	if strings.TrimSpace(string(ref.ConversationID)) == "" || ref.ConversationSeq <= 0 {
 		return NewInvalidArgument("candidate source conversation is required")
+	}
+	return nil
+}
+
+func validateMemoryEventIDReferences(candidateID string, ids []string, field string) error {
+	seen := make(map[string]struct{}, len(ids))
+	for _, id := range ids {
+		id = strings.TrimSpace(id)
+		if id == "" {
+			return NewInvalidArgument(field + " must not contain blank ids")
+		}
+		if id == candidateID {
+			return NewInvalidArgument(field + " must not reference candidate_id")
+		}
+		if _, ok := seen[id]; ok {
+			return NewInvalidArgument(field + " must not contain duplicate ids")
+		}
+		seen[id] = struct{}{}
 	}
 	return nil
 }

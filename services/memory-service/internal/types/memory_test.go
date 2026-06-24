@@ -34,6 +34,41 @@ func TestSubmitMemoryCandidateCommandAcceptsProfileSignalAsNeedsReviewCandidate(
 	}
 }
 
+func TestSubmitMemoryCandidateCommandRejectsInvalidMemoryReferences(t *testing.T) {
+	cases := []struct {
+		name   string
+		mutate func(*SubmitMemoryCandidateCommand)
+	}{
+		{
+			name: "blank supersedes id",
+			mutate: func(command *SubmitMemoryCandidateCommand) {
+				command.SupersedesEventIDs = []string{" "}
+			},
+		},
+		{
+			name: "self supersedes id",
+			mutate: func(command *SubmitMemoryCandidateCommand) {
+				command.SupersedesEventIDs = []string{command.CandidateID}
+			},
+		},
+		{
+			name: "duplicate contradicts id",
+			mutate: func(command *SubmitMemoryCandidateCommand) {
+				command.ContradictsEventIDs = []string{"mem-1", "mem-1"}
+			},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			command := validSubmitMemoryCandidateCommand()
+			tc.mutate(&command)
+			if err := command.Validate(); err != ErrInvalidArgument {
+				t.Fatalf("Validate() error = %v, want invalid argument", err)
+			}
+		})
+	}
+}
+
 func validSubmitMemoryCandidateCommand() SubmitMemoryCandidateCommand {
 	factText := "profile_signal: user prefers source backed memory"
 	return SubmitMemoryCandidateCommand{

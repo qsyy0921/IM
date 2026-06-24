@@ -42,8 +42,12 @@
   `SubmitMemoryCandidate` -> `ReviewMemoryCandidate(APPROVE)` 成为
   `ACTIVE + APPROVED` memory 后才可被 RAG 作为 evidence 消费；该断言已在
   `ai-eval-rag-agent-demo-live-20260624-public-candidate-review-v3` 真实 gate 中通过。
+- 2026-06-24 `ai-eval-rag-agent-demo-live-20260624-temporal-update-v2` 已进一步验证
+  public candidate replacement temporal update：旧 memory 被 memory-service 标为
+  `SUPERSEDED` 后，RAG EvidencePack 只包含当前 `ACTIVE + APPROVED` replacement，
+  不把旧事实作为当前 evidence。
 
 下一步：
 
-- 继续扩展 temporal update / profile recompute 和更完整 group-memory answer 场景，
+- 继续扩展 profile repair approval 回归和更完整 group-memory answer 场景，
   provider 仍走 port、guard 和 citation verifier。

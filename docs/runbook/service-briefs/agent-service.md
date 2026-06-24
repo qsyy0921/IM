@@ -39,6 +39,10 @@ proposal 前调用 `mcp-gateway.PrepareToolCall` 做 skill / policy / prepare au
   `ACTIVE + APPROVED` memory 后才可进入 proposal evidence；Agent 仍不直接读
   memory-service 私表。该断言已在
   `ai-eval-rag-agent-demo-live-20260624-public-candidate-review-v3` 真实 gate 中通过。
+- 2026-06-24 `ai-eval-rag-agent-demo-live-20260624-temporal-update-v2` 已进一步验证
+  public candidate replacement temporal update：旧 memory 被 memory-service 标为
+  `SUPERSEDED` 后，Agent proposal EvidencePack 只包含当前 `ACTIVE + APPROVED`
+  replacement，不把旧事实作为当前 proposal evidence。
 - 2026-06-24 Agent action boundary cases 已扩展到 action-executor preflight
   safety eval：approval id、prepared audit id、resource id 与 approved proposal
   绑定不一致会在 verify-approved-proposal 阶段 fail-closed，且不生成 execution
@@ -51,5 +55,5 @@ proposal 前调用 `mcp-gateway.PrepareToolCall` 做 skill / policy / prepare au
 
 ## 下一步
 
-- 继续扩展 temporal update / profile recompute 和更完整 group-memory Agent proposal
+- 继续扩展 profile repair approval 回归和更完整 group-memory Agent proposal
   场景；真实写动作仍只走 proposal / approval / executor / audit。

@@ -156,7 +156,9 @@ Add-Assertion -Assertions $assertions -Type "public_candidate_review_must_enter_
     (Get-JsonPropertyBool -Object $summary -Name "public_candidate_review_approved") -and
     (Get-JsonPropertyBool -Object $summary -Name "public_candidate_evidence_in_rag") -and
     (Get-JsonPropertyBool -Object $summary -Name "public_candidate_evidence_in_agent") -and
+    (Get-JsonPropertyBool -Object $summary -Name "public_candidate_temporal_update_preserved") -and
     (Get-JsonPropertyString -Object $summary -Name "public_candidate_memory_event_id").Length -gt 0 -and
+    (Get-JsonPropertyString -Object $summary -Name "public_candidate_superseded_memory_event_id").Length -gt 0 -and
     (Get-JsonPropertyString -Object $summary -Name "public_candidate_fact_sha256").Length -gt 0
 )
 Add-Assertion -Assertions $assertions -Type "summary_must_be_low_sensitive" -Passed (

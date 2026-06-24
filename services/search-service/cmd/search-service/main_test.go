@@ -15,7 +15,7 @@ func TestSearchServiceModeFromEnvDefaultsToNoop(t *testing.T) {
 }
 
 func TestValidateSearchServiceModeAcceptsSupportedModes(t *testing.T) {
-	for _, mode := range []string{"noop", "grpc", "timeline-consumer"} {
+	for _, mode := range []string{"noop", "grpc", "timeline-consumer", "opensearch-rebuild"} {
 		if err := validateSearchServiceMode(mode); err != nil {
 			t.Fatalf("expected %s mode to be accepted: %v", mode, err)
 		}
@@ -33,6 +33,46 @@ func TestSearchBackendFromEnvDefaultsToPostgres(t *testing.T) {
 
 	if backend := searchBackendFromEnv(); backend != "postgres" {
 		t.Fatalf("expected default postgres backend, got %q", backend)
+	}
+}
+
+func TestRebuildSearchIndexCommandFromEnvDefaultsToDryRun(t *testing.T) {
+	t.Setenv("NEXUSIM_SEARCH_REBUILD_TENANT_ID", "tenant-1")
+	t.Setenv("NEXUSIM_SEARCH_REBUILD_CONVERSATION_ID", "conv-1")
+	t.Setenv("NEXUSIM_SEARCH_REBUILD_BATCH_SIZE", "17")
+	t.Setenv("NEXUSIM_SEARCH_REBUILD_MAX_DOCUMENTS", "23")
+	t.Setenv("NEXUSIM_SEARCH_REBUILD_EXECUTE", "")
+
+	command, err := rebuildSearchIndexCommandFromEnv()
+	if err != nil {
+		t.Fatalf("rebuildSearchIndexCommandFromEnv returned error: %v", err)
+	}
+	if command.Execute {
+		t.Fatalf("expected dry-run by default")
+	}
+	if command.TenantID != "tenant-1" || command.ConversationID != "conv-1" || command.BatchSize != 17 || command.MaxDocuments != 23 {
+		t.Fatalf("unexpected command: %+v", command)
+	}
+}
+
+func TestRebuildSearchIndexCommandFromEnvRequiresTenant(t *testing.T) {
+	t.Setenv("NEXUSIM_SEARCH_REBUILD_TENANT_ID", "")
+
+	if _, err := rebuildSearchIndexCommandFromEnv(); err == nil {
+		t.Fatalf("expected missing tenant to fail")
+	}
+}
+
+func TestRebuildSearchIndexCommandFromEnvAllowsExplicitUnlimitedMaxDocuments(t *testing.T) {
+	t.Setenv("NEXUSIM_SEARCH_REBUILD_TENANT_ID", "tenant-1")
+	t.Setenv("NEXUSIM_SEARCH_REBUILD_MAX_DOCUMENTS", "0")
+
+	command, err := rebuildSearchIndexCommandFromEnv()
+	if err != nil {
+		t.Fatalf("rebuildSearchIndexCommandFromEnv returned error: %v", err)
+	}
+	if command.MaxDocuments != 0 {
+		t.Fatalf("max_documents=%d want unlimited 0", command.MaxDocuments)
 	}
 }
 

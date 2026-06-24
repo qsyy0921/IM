@@ -206,6 +206,65 @@ LIMIT $6
 	return items, projectionVersion, nil
 }
 
+func (repository *Repository) ListSearchIndexDocuments(
+	ctx context.Context,
+	command types.RebuildSearchIndexCommand,
+	after types.SearchIndexCursor,
+	limit int,
+) ([]types.SearchIndexDocument, error) {
+	if repository.pool == nil {
+		return nil, types.NewDBReadFailed("search repository is not configured")
+	}
+	if limit <= 0 {
+		return nil, nil
+	}
+	args := []any{
+		command.TenantID,
+		string(after.ConversationID),
+		after.MessageID,
+		limit,
+	}
+	conversationFilter := ""
+	if command.ConversationID != "" {
+		args = append(args, string(command.ConversationID))
+		conversationFilter = "AND conversation_id = $5"
+	}
+	rows, err := repository.pool.Query(ctx, `
+SELECT tenant_id, conversation_id, message_id, conversation_seq, searchable_text
+FROM search_message_documents
+WHERE tenant_id = $1
+  AND tombstone_status = 'NONE'
+  AND searchable_text <> ''
+  AND (($2 = '' AND $3 = '') OR (conversation_id, message_id) > ($2, $3))
+`+conversationFilter+`
+ORDER BY conversation_id ASC, message_id ASC
+LIMIT $4
+`, args...)
+	if err != nil {
+		return nil, types.NewDBReadFailed(err.Error())
+	}
+	defer rows.Close()
+
+	documents := make([]types.SearchIndexDocument, 0, limit)
+	for rows.Next() {
+		var document types.SearchIndexDocument
+		if err := rows.Scan(
+			&document.TenantID,
+			&document.ConversationID,
+			&document.MessageID,
+			&document.ConversationSeq,
+			&document.SearchableText,
+		); err != nil {
+			return nil, types.NewDBReadFailed(err.Error())
+		}
+		documents = append(documents, document)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, types.NewDBReadFailed(err.Error())
+	}
+	return documents, nil
+}
+
 func (repository *Repository) ProjectTimelineEvent(
 	ctx context.Context,
 	command types.ProjectTimelineEventCommand,

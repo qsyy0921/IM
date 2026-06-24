@@ -13,3 +13,18 @@ type SearchMessagesRepository interface {
 type TimelineProjectionRepository interface {
 	ProjectTimelineEvent(ctx context.Context, command types.ProjectTimelineEventCommand) (types.ProjectTimelineEventResult, error)
 }
+
+type SearchIndexDocumentSource interface {
+	ListSearchIndexDocuments(
+		ctx context.Context,
+		command types.RebuildSearchIndexCommand,
+		after types.SearchIndexCursor,
+		limit int,
+	) ([]types.SearchIndexDocument, error)
+}
+
+type SearchIndexWriter interface {
+	EnsureSearchIndex(ctx context.Context) error
+	IndexSearchDocuments(ctx context.Context, documents []types.SearchIndexDocument) error
+	RefreshSearchIndex(ctx context.Context) error
+}

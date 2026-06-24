@@ -232,6 +232,13 @@ IM messages -> search / memory projection -> EvidencePack -> RAG / Agent answer 
   visibility / tombstone hydration。当前机器 Docker API 和本地 OpenSearch 端口不可用，
   因此本轮只验证 focused tests / build / script 入口；真实 OpenSearch 进程 smoke
   尚未归档通过报告。
+- 2026-06-25 search-service 已补 OpenSearch rebuild operator first path：
+  `NEXUSIM_SEARCH_SERVICE_MODE=opensearch-rebuild` 会从 search-service 自有
+  PostgreSQL projection 按 tenant 批量读取非 tombstone / 非空 searchable_text
+  document；默认 dry-run，只有 `NEXUSIM_SEARCH_REBUILD_EXECUTE=true` 才写 OpenSearch。
+  写入使用 create-index / NDJSON bulk / refresh，并且错误 fail-closed；该 operator
+  不跨服务读私表，不把 OpenSearch 变成权限事实源。真实 OpenSearch 进程验证仍待
+  Docker / OpenSearch runtime 恢复。
 - 已有 clean smoke 覆盖真实双用户好友直聊、群聊 first path、群资料 BFF
   read/update 和群成员动作链路；证据见 `docs/runbook/client-platform.md`。
 - Windows desktop 已有 artifact / signing / installer plan first paths；签名 / installer
@@ -322,8 +329,9 @@ IM messages -> search / memory projection -> EvidencePack -> RAG / Agent answer 
    vector-index-service 公开 `SearchVectors` 返回 `VECTOR_ITEM` source。retrieval
    vector backend opt-in live smoke 已通过；search-service PostgreSQL FTS lexical
    backend 和显式 OpenSearch / BM25 candidate backend first paths 已补齐；OpenSearch
-   opt-in smoke 入口已补齐但尚未在真实 OpenSearch 进程上归档通过报告；后续真实
-   OpenSearch 进程 smoke、pgvector / Milvus / OpenSearch vector provider smoke 和更细 EvidencePack coverage 仍保持在
+   opt-in smoke 入口和 service-owned rebuild operator first path 已补齐，但尚未在
+   真实 OpenSearch 进程上归档通过报告；后续真实 OpenSearch 进程 smoke、pgvector /
+   Milvus / OpenSearch vector provider smoke 和更细 EvidencePack coverage 仍保持在
    retrieval-gateway 边界内。
 5. 客户端只作为演示入口；除非阻塞上述演示，不继续扩 UI 产品化。
 6. Windows release signing / MSI / NSIS installer、完整 Android、完整移动端发布、

@@ -263,6 +263,97 @@ func TestRepositorySearchMessagesByCandidatesFiltersVisibilityIntegration(t *tes
 	}
 }
 
+func TestRepositoryListSearchIndexDocumentsIntegration(t *testing.T) {
+	ctx := context.Background()
+	pool := openSearchTestPool(t)
+	resetSearchTables(t, ctx, pool)
+	repository := NewRepository(pool)
+
+	project(t, ctx, repository, types.ProjectTimelineEventCommand{
+		TenantID:        "tenant-1",
+		EventID:         "event-document-1",
+		EventType:       types.TimelineEventMessagePersisted,
+		ConversationID:  "conv-1",
+		ConversationSeq: 2,
+		ConsumerGroup:   "search-test",
+		Topic:           "conversation.timeline.events",
+		PartitionID:     0,
+		OffsetValue:     3,
+		MessageID:       "msg-1",
+		SenderID:        "user-2",
+		MessageType:     "TEXT",
+		SearchableText:  "project first document",
+	})
+	project(t, ctx, repository, types.ProjectTimelineEventCommand{
+		TenantID:        "tenant-1",
+		EventID:         "event-document-2",
+		EventType:       types.TimelineEventMessagePersisted,
+		ConversationID:  "conv-1",
+		ConversationSeq: 3,
+		ConsumerGroup:   "search-test",
+		Topic:           "conversation.timeline.events",
+		PartitionID:     0,
+		OffsetValue:     4,
+		MessageID:       "msg-2",
+		SenderID:        "user-2",
+		MessageType:     "TEXT",
+		SearchableText:  "project second document",
+	})
+	project(t, ctx, repository, types.ProjectTimelineEventCommand{
+		TenantID:        "tenant-1",
+		EventID:         "event-document-delete",
+		EventType:       types.TimelineEventMessageDeleted,
+		ConversationID:  "conv-1",
+		ConversationSeq: 4,
+		ConsumerGroup:   "search-test",
+		Topic:           "conversation.timeline.events",
+		PartitionID:     0,
+		OffsetValue:     5,
+		MessageID:       "msg-2",
+		TombstoneStatus: types.SearchTombstoneDeleted,
+	})
+	project(t, ctx, repository, types.ProjectTimelineEventCommand{
+		TenantID:        "tenant-2",
+		EventID:         "event-other-tenant",
+		EventType:       types.TimelineEventMessagePersisted,
+		ConversationID:  "conv-1",
+		ConversationSeq: 2,
+		ConsumerGroup:   "search-test",
+		Topic:           "conversation.timeline.events",
+		PartitionID:     0,
+		OffsetValue:     6,
+		MessageID:       "msg-other",
+		SenderID:        "user-2",
+		MessageType:     "TEXT",
+		SearchableText:  "project other tenant document",
+	})
+
+	documents, err := repository.ListSearchIndexDocuments(ctx, types.RebuildSearchIndexCommand{
+		TenantID:  "tenant-1",
+		BatchSize: 1,
+	}, types.SearchIndexCursor{}, 1)
+	if err != nil {
+		t.Fatalf("list documents: %v", err)
+	}
+	if len(documents) != 1 || documents[0].MessageID != "msg-1" {
+		t.Fatalf("expected first non-tombstoned tenant document, got %+v", documents)
+	}
+
+	next, err := repository.ListSearchIndexDocuments(ctx, types.RebuildSearchIndexCommand{
+		TenantID:  "tenant-1",
+		BatchSize: 1,
+	}, types.SearchIndexCursor{
+		ConversationID: documents[0].ConversationID,
+		MessageID:      documents[0].MessageID,
+	}, 1)
+	if err != nil {
+		t.Fatalf("list next documents: %v", err)
+	}
+	if len(next) != 0 {
+		t.Fatalf("tombstoned or other-tenant documents must not be listed: %+v", next)
+	}
+}
+
 func TestRepositoryProjectionEditLeaveAndTombstoneIntegration(t *testing.T) {
 	ctx := context.Background()
 	pool := openSearchTestPool(t)

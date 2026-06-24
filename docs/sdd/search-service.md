@@ -227,9 +227,17 @@ search，不保留 `ILIKE` substring fallback。
   `tenant_id / conversation_id / message_id / conversation_seq / searchable_text`
   同步到临时 OpenSearch index，随后仍只通过 search-service gRPC 查询。
   该 fixture 只用于本地 smoke，不是生产索引写入链路。
-- 当前只宣称 adapter first path、opt-in smoke 入口和 focused tests；真实
-  OpenSearch 进程 smoke、mapping / rebuild operator、容量曲线和 provider-grade
-  运维仍是后续项。
+- `NEXUSIM_SEARCH_SERVICE_MODE=opensearch-rebuild` 是 search-service 自有
+  OpenSearch rebuild operator first path。它只读取 search-service PostgreSQL
+  projection 中当前 tenant 的 `tombstone_status='NONE'`、非空 `searchable_text`
+  文档，并通过 OpenSearch Create Index API、Bulk API 和 Refresh API 写入外部
+  index。默认 dry-run；只有显式设置 `NEXUSIM_SEARCH_REBUILD_EXECUTE=true`
+  才会写 OpenSearch。该 operator 适合 fresh index / local smoke / controlled
+  rebuild，不是跨服务数据修复通道，也不绕过 PostgreSQL projection 的最终
+  visibility / tombstone hydration。
+- 当前只宣称 adapter first path、opt-in smoke 入口、rebuild operator first path
+  和 focused tests；真实 OpenSearch 进程 smoke、mapping hardening、容量曲线和
+  provider-grade 运维仍是后续项。
 
 ## 8. 第一版验收
 
@@ -248,6 +256,10 @@ search，不保留 `ILIKE` substring fallback。
 - OpenSearch opt-in smoke 入口覆盖 search-service `opensearch` backend 启动参数、
   临时 index 创建、低敏 fixture document 写入和 search-service gRPC 查询路径；
   真实 OpenSearch 进程通过报告归档前，不宣称 OpenSearch runtime smoke 已完成。
+- OpenSearch rebuild operator app 单测覆盖 dry-run 不写外部 index、execute 批量
+  写入和 refresh、缺 writer fail-closed；OpenSearch indexer 单测覆盖 create-index、
+  NDJSON bulk、refresh 和 bulk item error fail-closed；PostgreSQL source 集成测试
+  覆盖只输出当前 tenant 的非 tombstone projection document。
 
 最小 smoke：
 
@@ -262,5 +274,5 @@ member joined
 -> later message is not visible to that user
 ```
 
-本轮不是容量压测，不宣称 OpenSearch 集群、Milvus / RAG 或 provider-grade BM25
-运维已完成。
+本轮不是容量压测，不宣称 OpenSearch 集群、Milvus / RAG、provider-grade BM25
+运维或真实 OpenSearch 进程 smoke 已完成。

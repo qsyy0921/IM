@@ -22,6 +22,7 @@ import (
 	opensearchinfra "github.com/qsyy0921/IM/services/search-service/internal/infrastructure/opensearch"
 	postgresinfra "github.com/qsyy0921/IM/services/search-service/internal/infrastructure/postgres"
 	"github.com/qsyy0921/IM/services/search-service/internal/trigger/timeline"
+	"github.com/qsyy0921/IM/services/search-service/internal/types"
 	"google.golang.org/grpc"
 )
 
@@ -46,6 +47,8 @@ func run(ctx context.Context) error {
 		return runGRPC(ctx)
 	case "timeline-consumer":
 		return runTimelineConsumer(ctx)
+	case "opensearch-rebuild":
+		return runOpenSearchRebuild(ctx)
 	default:
 		return fmt.Errorf("unsupported NEXUSIM_SEARCH_SERVICE_MODE %q", mode)
 	}
@@ -77,7 +80,7 @@ func searchServiceModeFromEnv() string {
 
 func validateSearchServiceMode(mode string) error {
 	switch mode {
-	case "noop", "grpc", "timeline-consumer":
+	case "noop", "grpc", "timeline-consumer", "opensearch-rebuild":
 		return nil
 	default:
 		return fmt.Errorf("unsupported NEXUSIM_SEARCH_SERVICE_MODE %q", mode)
@@ -178,6 +181,68 @@ func runTimelineConsumer(ctx context.Context) error {
 	)
 	log.Printf("search-service timeline consumer started topic=%s group=%s", topic, groupID)
 	return worker.Run(ctx)
+}
+
+func runOpenSearchRebuild(ctx context.Context) error {
+	pool, err := openPGPool(ctx)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	repository := postgresinfra.NewRepository(pool)
+	command, err := rebuildSearchIndexCommandFromEnv()
+	if err != nil {
+		return err
+	}
+	var writer app.SearchIndexWriter
+	if command.Execute {
+		config, err := opensearchConfigFromEnv()
+		if err != nil {
+			return err
+		}
+		writer, err = opensearchinfra.NewIndexer(config)
+		if err != nil {
+			return err
+		}
+	}
+	result, err := app.NewRebuildSearchIndexUseCase(repository, writer).Execute(ctx, command)
+	if err != nil {
+		return err
+	}
+	log.Printf(
+		"search-service opensearch rebuild complete tenant=%s conversation=%s dry_run=%t scanned=%d indexed=%d batches=%d",
+		result.TenantID,
+		result.ConversationID,
+		result.DryRun,
+		result.Scanned,
+		result.Indexed,
+		result.Batches,
+	)
+	return nil
+}
+
+func rebuildSearchIndexCommandFromEnv() (types.RebuildSearchIndexCommand, error) {
+	batchSize, err := envInt("NEXUSIM_SEARCH_REBUILD_BATCH_SIZE", types.DefaultSearchRebuildBatchSize)
+	if err != nil {
+		return types.RebuildSearchIndexCommand{}, err
+	}
+	maxDocuments, err := envNonNegativeInt("NEXUSIM_SEARCH_REBUILD_MAX_DOCUMENTS", 0)
+	if err != nil {
+		return types.RebuildSearchIndexCommand{}, err
+	}
+	execute, _, err := envOptionalBool("NEXUSIM_SEARCH_REBUILD_EXECUTE")
+	if err != nil {
+		return types.RebuildSearchIndexCommand{}, err
+	}
+	command := types.RebuildSearchIndexCommand{
+		TenantID:       types.TenantID(strings.TrimSpace(os.Getenv("NEXUSIM_SEARCH_REBUILD_TENANT_ID"))),
+		ConversationID: types.ConversationID(strings.TrimSpace(os.Getenv("NEXUSIM_SEARCH_REBUILD_CONVERSATION_ID"))),
+		BatchSize:      batchSize,
+		MaxDocuments:   maxDocuments,
+		Execute:        execute,
+	}
+	return command, command.Validate()
 }
 
 func newSearchMessagesRepositoryFromEnv(postgresRepository *postgresinfra.Repository) (app.SearchMessagesRepository, error) {
@@ -321,6 +386,21 @@ func envInt(name string, defaultValue int) (int, error) {
 	}
 	if value <= 0 {
 		return 0, fmt.Errorf("%s must be positive", name)
+	}
+	return value, nil
+}
+
+func envNonNegativeInt(name string, defaultValue int) (int, error) {
+	raw := strings.TrimSpace(os.Getenv(name))
+	if raw == "" {
+		return defaultValue, nil
+	}
+	value, err := strconv.Atoi(raw)
+	if err != nil {
+		return 0, err
+	}
+	if value < 0 {
+		return 0, fmt.Errorf("%s must be non-negative", name)
 	}
 	return value, nil
 }

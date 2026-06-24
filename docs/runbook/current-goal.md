@@ -253,6 +253,11 @@ IM messages -> search / memory projection -> EvidencePack -> RAG / Agent answer 
   连接、`vector` extension 可用性和 table identifier 配置；不可用时快速 fail-closed
   并写低敏 summary，不进入长链路或伪造真实 provider smoke。当前本机 `localhost:15432`
   不可用，因此只完成 preflight 负向验证，真实 pgvector smoke 仍待 runtime 恢复。
+- 同日 vector-index-service OpenSearch vector provider smoke 已补 preflight gate：
+  `loadtest/vectorembedding --phase preflight-opensearch-vector` 会验证 OpenSearch
+  endpoint、index 存在、mapping 中指定字段为 `knn_vector` 且 dimension 匹配；
+  endpoint 不允许 credentials / query / fragment；不可用、index 缺失或 mapping drift
+  都 fail-closed 并写低敏 summary，不写 OpenSearch，也不伪造真实 provider smoke。
 - 已有 clean smoke 覆盖真实双用户好友直聊、群聊 first path、群资料 BFF
   read/update 和群成员动作链路；证据见 `docs/runbook/client-platform.md`。
 - Windows desktop 已有 artifact / signing / installer plan first paths；签名 / installer
@@ -345,8 +350,9 @@ IM messages -> search / memory projection -> EvidencePack -> RAG / Agent answer 
    backend 和显式 OpenSearch / BM25 candidate backend first paths 已补齐；OpenSearch
    opt-in smoke 入口、service-owned rebuild operator first path 和 mapping drift
    hardening 已补齐；retrieval `source_coverage` 矩阵已进入 positive smoke /
-   adapter 门禁，但尚未在真实 OpenSearch 进程上归档通过报告；后续真实 OpenSearch
-   进程 smoke、真实 pgvector /
+   adapter 门禁；pgvector 和 OpenSearch vector provider preflight gate 已补齐，但尚未
+   在真实 OpenSearch / pgvector 进程上归档通过 provider smoke 报告；后续真实
+   OpenSearch 进程 smoke、真实 pgvector /
    Milvus / OpenSearch vector provider smoke 和跨 provider EvidencePack coverage 仍保持在
    retrieval-gateway 边界内。
 5. 客户端只作为演示入口；除非阻塞上述演示，不继续扩 UI 产品化。

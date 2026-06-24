@@ -271,8 +271,10 @@ dimension，不保存 raw vector array，用于本地 embedding / rebuild backfi
 backend sink；未配置时行为保持 metadata-only。`rebuild-worker` 可显式启用 first-stage provider backend backfill：从本服务
 自有 `vector_embedding_tasks` 中读取已完成的 redacted-preview task，重新调用
 model-gateway，再写入当前配置的 provider backend；它不读取上游私表，也不从 metadata 表伪造
-缺失的 vector array。Milvus / OpenSearch adapter、真实 pgvector smoke 和 provider backend
-repair 仍是后续项。
+缺失的 vector array。OpenSearch vector provider 已有 opt-in preflight gate：在真实 provider
+smoke 前先验证 endpoint / index / `knn_vector` mapping / dimension contract，mapping drift
+或 runtime 不可用时 fail-closed，不写入 OpenSearch。Milvus / OpenSearch adapter、真实
+pgvector smoke 和 provider backend repair 仍是后续项。
 
 ## 9. 核心流程
 

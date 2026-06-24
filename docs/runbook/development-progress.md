@@ -529,9 +529,11 @@ live adapters 已同步 multi-hop actor/source-chain completeness 断言；2026-
 negative / miss adapter，最新结果为 9 adapters / 51 cases / 51 passed / 0 failed / 0 skipped。
 2026-06-25 retrieval positive smoke / adapter 已把 `source_coverage` 矩阵纳入低敏门禁，
 覆盖 search / memory / profile returned 和 vector not-requested 语义。
-同日 vector-index-service pgvector provider smoke 已补 preflight gate，可在完整链路前
-验证 pgvector PostgreSQL 连接、`vector` extension 和 table identifier；本机
-`localhost:15432` 不可用时已确认快速 fail-closed 并写低敏 summary。
+同日 vector-index-service provider readiness 已补 pgvector 和 OpenSearch vector
+preflight gates：pgvector 会验证 PostgreSQL 连接、`vector` extension 和 table identifier；
+OpenSearch vector 会验证 endpoint、index、`knn_vector` mapping 和 dimension contract；
+本机 `localhost:15432` 不可用时已确认 pgvector 快速 fail-closed 并写低敏 summary。
+真实 pgvector / OpenSearch vector provider smoke 仍待 runtime 恢复后归档。
 短期生产级测试、完整 HA、长压和 sizing 不再作为当前转进阻塞，但仍留在 hardening backlog。
 ```
 

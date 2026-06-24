@@ -182,6 +182,36 @@ NEXUSIM_VECTOR_PGVECTOR_ENSURE_SCHEMA=true
   vector array。
 - 当前 README 只记录 profile 和 wiring；真实 pgvector focused smoke 报告后续单独归档。
 
+## Optional OpenSearch Vector Preflight
+
+用途：
+
+- 为后续 `embedding-worker -> OpenSearch vector backend sink` focused smoke 提供
+  fail-closed readiness gate。
+- 不启动 Docker、不拉镜像、不写 OpenSearch，只验证 endpoint / index / mapping contract。
+- mapping 必须包含指定 vector 字段，字段类型为 `knn_vector`，dimension 与本次 smoke
+  配置一致。
+
+运行：
+
+```powershell
+.\loadtest\vectorembedding\run-local-opensearch-vector-preflight.ps1 `
+  -OpenSearchEndpoint "http://127.0.0.1:9200" `
+  -OpenSearchIndex "nexusim-vector-items" `
+  -OpenSearchVectorField "embedding_vector" `
+  -OpenSearchVectorDimension 8 `
+  -ResultRoot "H:\NexusIM\loadtest-results"
+```
+
+边界：
+
+- endpoint 只允许 `http` / `https`，且不能携带 username / password、query 或 fragment；
+  认证后续用独立 secret / profile 接入，不写入 summary。
+- preflight 成功只证明 OpenSearch vector runtime 和 mapping contract 可用于后续
+  provider smoke；不代表 `vector-index-service` 已完成 OpenSearch provider backend。
+- index 缺失、endpoint 不可达、mapping drift 或 dimension 不匹配都必须 fail-closed；
+  runner 只输出低敏 summary。
+
 ## Optional Rebuild Provider Backfill
 
 第一版 `rebuild-worker` 默认只推进 rebuild checkpoint / outbox。需要验证 provider

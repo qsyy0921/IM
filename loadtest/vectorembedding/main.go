@@ -24,74 +24,88 @@ import (
 const defaultResultRoot = `H:\NexusIM\loadtest-results`
 
 type config struct {
-	phase           string
-	knowledgeTarget string
-	vectorTarget    string
-	pgDSN           string
-	pgVectorDSN     string
-	pgVectorTable   string
-	resultDir       string
-	requestTimeout  time.Duration
-	waitTimeout     time.Duration
-	pollInterval    time.Duration
-	tenantID        string
-	userID          string
-	idempotencyKey  string
-	cleanup         bool
-	applyMigration  bool
-	traceID         string
-	sourceID        string
-	documentID      string
-	visibilityScope string
-	policyVersion   string
-	expectedCount   int
-	embeddingModel  string
-	embeddingDim    int
+	phase                     string
+	knowledgeTarget           string
+	vectorTarget              string
+	pgDSN                     string
+	pgVectorDSN               string
+	pgVectorTable             string
+	openSearchVectorEndpoint  string
+	openSearchVectorIndex     string
+	openSearchVectorField     string
+	openSearchVectorDimension int
+	resultDir                 string
+	requestTimeout            time.Duration
+	waitTimeout               time.Duration
+	pollInterval              time.Duration
+	tenantID                  string
+	userID                    string
+	idempotencyKey            string
+	cleanup                   bool
+	applyMigration            bool
+	traceID                   string
+	sourceID                  string
+	documentID                string
+	visibilityScope           string
+	policyVersion             string
+	expectedCount             int
+	embeddingModel            string
+	embeddingDim              int
 }
 
 type summary struct {
-	Phase                    string    `json:"phase"`
-	Commit                   string    `json:"commit"`
-	CommitFull               string    `json:"commit_full"`
-	GitDirty                 bool      `json:"git_dirty"`
-	GitStatusShort           string    `json:"git_status_short,omitempty"`
-	ResultDir                string    `json:"result_dir"`
-	KnowledgeTarget          string    `json:"knowledge_target,omitempty"`
-	VectorTarget             string    `json:"vector_target,omitempty"`
-	TenantID                 string    `json:"tenant_id"`
-	UserID                   string    `json:"user_id"`
-	StartedAt                time.Time `json:"started_at"`
-	FinishedAt               time.Time `json:"finished_at"`
-	Success                  bool      `json:"success"`
-	Error                    string    `json:"error,omitempty"`
-	KnowledgeSourceID        string    `json:"knowledge_source_id,omitempty"`
-	KnowledgeJobID           string    `json:"knowledge_job_id,omitempty"`
-	DocumentID               string    `json:"document_id,omitempty"`
-	ChunkCount               int       `json:"chunk_count"`
-	ExpectedCount            int       `json:"expected_count"`
-	VectorSearchCount        int       `json:"vector_search_count"`
-	PGVectorConfigured       bool      `json:"pgvector_configured"`
-	PGVectorTable            string    `json:"pgvector_table,omitempty"`
-	PGVectorAvailable        bool      `json:"pgvector_available"`
-	PGVectorInstalled        bool      `json:"pgvector_installed"`
-	PGVectorDefaultVersion   string    `json:"pgvector_default_version,omitempty"`
-	PGVectorInstalledVersion string    `json:"pgvector_installed_version,omitempty"`
-	PGVectorItemCount        int       `json:"pgvector_item_count"`
-	PGVectorActiveCount      int       `json:"pgvector_active_count"`
-	PGVectorMinDimension     int       `json:"pgvector_min_dimension"`
-	PGVectorMaxDimension     int       `json:"pgvector_max_dimension"`
-	EmbeddingTaskCount       int       `json:"embedding_task_count"`
-	EmbeddingTaskPending     int       `json:"embedding_task_pending"`
-	EmbeddingTaskRunning     int       `json:"embedding_task_running"`
-	EmbeddingTaskCompleted   int       `json:"embedding_task_completed"`
-	RebuildJobID             string    `json:"rebuild_job_id,omitempty"`
-	RebuildJobStatus         string    `json:"rebuild_job_status,omitempty"`
-	RebuildCheckpoint        string    `json:"rebuild_checkpoint_status,omitempty"`
-	RebuildCursorValue       string    `json:"rebuild_cursor_value,omitempty"`
-	VisibilityScope          string    `json:"visibility_scope,omitempty"`
-	PolicyVersion            string    `json:"policy_version,omitempty"`
-	EmbeddingModelRef        string    `json:"embedding_model_ref"`
-	EmbeddingDimension       int       `json:"embedding_dimension"`
+	Phase                             string    `json:"phase"`
+	Commit                            string    `json:"commit"`
+	CommitFull                        string    `json:"commit_full"`
+	GitDirty                          bool      `json:"git_dirty"`
+	GitStatusShort                    string    `json:"git_status_short,omitempty"`
+	ResultDir                         string    `json:"result_dir"`
+	KnowledgeTarget                   string    `json:"knowledge_target,omitempty"`
+	VectorTarget                      string    `json:"vector_target,omitempty"`
+	TenantID                          string    `json:"tenant_id"`
+	UserID                            string    `json:"user_id"`
+	StartedAt                         time.Time `json:"started_at"`
+	FinishedAt                        time.Time `json:"finished_at"`
+	Success                           bool      `json:"success"`
+	Error                             string    `json:"error,omitempty"`
+	KnowledgeSourceID                 string    `json:"knowledge_source_id,omitempty"`
+	KnowledgeJobID                    string    `json:"knowledge_job_id,omitempty"`
+	DocumentID                        string    `json:"document_id,omitempty"`
+	ChunkCount                        int       `json:"chunk_count"`
+	ExpectedCount                     int       `json:"expected_count"`
+	VectorSearchCount                 int       `json:"vector_search_count"`
+	PGVectorConfigured                bool      `json:"pgvector_configured"`
+	PGVectorTable                     string    `json:"pgvector_table,omitempty"`
+	PGVectorAvailable                 bool      `json:"pgvector_available"`
+	PGVectorInstalled                 bool      `json:"pgvector_installed"`
+	PGVectorDefaultVersion            string    `json:"pgvector_default_version,omitempty"`
+	PGVectorInstalledVersion          string    `json:"pgvector_installed_version,omitempty"`
+	PGVectorItemCount                 int       `json:"pgvector_item_count"`
+	PGVectorActiveCount               int       `json:"pgvector_active_count"`
+	PGVectorMinDimension              int       `json:"pgvector_min_dimension"`
+	PGVectorMaxDimension              int       `json:"pgvector_max_dimension"`
+	OpenSearchVectorConfigured        bool      `json:"opensearch_vector_configured"`
+	OpenSearchVectorEndpoint          string    `json:"opensearch_vector_endpoint,omitempty"`
+	OpenSearchVectorIndex             string    `json:"opensearch_vector_index,omitempty"`
+	OpenSearchVectorField             string    `json:"opensearch_vector_field,omitempty"`
+	OpenSearchVectorAvailable         bool      `json:"opensearch_vector_available"`
+	OpenSearchVectorIndexExists       bool      `json:"opensearch_vector_index_exists"`
+	OpenSearchVectorMappingVerified   bool      `json:"opensearch_vector_mapping_verified"`
+	OpenSearchVectorFieldType         string    `json:"opensearch_vector_field_type,omitempty"`
+	OpenSearchVectorDimension         int       `json:"opensearch_vector_dimension"`
+	OpenSearchVectorExpectedDimension int       `json:"opensearch_vector_expected_dimension"`
+	EmbeddingTaskCount                int       `json:"embedding_task_count"`
+	EmbeddingTaskPending              int       `json:"embedding_task_pending"`
+	EmbeddingTaskRunning              int       `json:"embedding_task_running"`
+	EmbeddingTaskCompleted            int       `json:"embedding_task_completed"`
+	RebuildJobID                      string    `json:"rebuild_job_id,omitempty"`
+	RebuildJobStatus                  string    `json:"rebuild_job_status,omitempty"`
+	RebuildCheckpoint                 string    `json:"rebuild_checkpoint_status,omitempty"`
+	RebuildCursorValue                string    `json:"rebuild_cursor_value,omitempty"`
+	VisibilityScope                   string    `json:"visibility_scope,omitempty"`
+	PolicyVersion                     string    `json:"policy_version,omitempty"`
+	EmbeddingModelRef                 string    `json:"embedding_model_ref"`
+	EmbeddingDimension                int       `json:"embedding_dimension"`
 }
 
 func main() {
@@ -112,6 +126,10 @@ func parseConfig() config {
 	flag.StringVar(&cfg.pgDSN, "pg-dsn", envOr("NEXUSIM_PG_DSN", "postgres://nexusim:nexusim@localhost:5432/nexusim?sslmode=disable"), "PostgreSQL DSN")
 	flag.StringVar(&cfg.pgVectorDSN, "pgvector-dsn", envOr("NEXUSIM_VECTOR_PGVECTOR_DSN", ""), "optional pgvector backend DSN for verify phase")
 	flag.StringVar(&cfg.pgVectorTable, "pgvector-table", envOr("NEXUSIM_VECTOR_PGVECTOR_TABLE", "vector_embedding_items"), "optional pgvector backend table for verify phase")
+	flag.StringVar(&cfg.openSearchVectorEndpoint, "opensearch-vector-endpoint", envOr("NEXUSIM_VECTOR_OPENSEARCH_ENDPOINT", ""), "optional OpenSearch vector endpoint for preflight-opensearch-vector")
+	flag.StringVar(&cfg.openSearchVectorIndex, "opensearch-vector-index", envOr("NEXUSIM_VECTOR_OPENSEARCH_INDEX", "nexusim-vector-items"), "optional OpenSearch vector index for preflight-opensearch-vector")
+	flag.StringVar(&cfg.openSearchVectorField, "opensearch-vector-field", envOr("NEXUSIM_VECTOR_OPENSEARCH_VECTOR_FIELD", "embedding_vector"), "optional OpenSearch knn_vector field for preflight-opensearch-vector")
+	flag.IntVar(&cfg.openSearchVectorDimension, "opensearch-vector-dimension", 0, "expected OpenSearch knn_vector dimension; defaults to embedding-dimension")
 	flag.StringVar(&resultRoot, "result-root", defaultResultRoot, "external result root for raw smoke output")
 	flag.StringVar(&runName, "run-name", "", "run name under result-root")
 	flag.DurationVar(&cfg.requestTimeout, "request-timeout", 5*time.Second, "per request timeout")
@@ -156,6 +174,9 @@ func parseConfig() config {
 	if cfg.embeddingDim <= 0 {
 		cfg.embeddingDim = 8
 	}
+	if cfg.openSearchVectorDimension <= 0 {
+		cfg.openSearchVectorDimension = cfg.embeddingDim
+	}
 	return cfg
 }
 
@@ -171,21 +192,26 @@ func run(cfg config) error {
 	}
 
 	result := summary{
-		Phase:              cfg.phase,
-		Commit:             gitOutput("rev-parse", "--short", "HEAD"),
-		CommitFull:         gitOutput("rev-parse", "HEAD"),
-		GitStatusShort:     gitOutput("status", "--short", "--untracked-files=all"),
-		ResultDir:          cfg.resultDir,
-		KnowledgeTarget:    cfg.knowledgeTarget,
-		VectorTarget:       cfg.vectorTarget,
-		TenantID:           cfg.tenantID,
-		UserID:             cfg.userID,
-		StartedAt:          time.Now().UTC(),
-		ExpectedCount:      cfg.expectedCount,
-		EmbeddingModelRef:  cfg.embeddingModel,
-		EmbeddingDimension: cfg.embeddingDim,
-		PGVectorConfigured: strings.TrimSpace(cfg.pgVectorDSN) != "",
-		PGVectorTable:      strings.TrimSpace(cfg.pgVectorTable),
+		Phase:                             cfg.phase,
+		Commit:                            gitOutput("rev-parse", "--short", "HEAD"),
+		CommitFull:                        gitOutput("rev-parse", "HEAD"),
+		GitStatusShort:                    gitOutput("status", "--short", "--untracked-files=all"),
+		ResultDir:                         cfg.resultDir,
+		KnowledgeTarget:                   cfg.knowledgeTarget,
+		VectorTarget:                      cfg.vectorTarget,
+		TenantID:                          cfg.tenantID,
+		UserID:                            cfg.userID,
+		StartedAt:                         time.Now().UTC(),
+		ExpectedCount:                     cfg.expectedCount,
+		EmbeddingModelRef:                 cfg.embeddingModel,
+		EmbeddingDimension:                cfg.embeddingDim,
+		PGVectorConfigured:                strings.TrimSpace(cfg.pgVectorDSN) != "",
+		PGVectorTable:                     strings.TrimSpace(cfg.pgVectorTable),
+		OpenSearchVectorConfigured:        strings.TrimSpace(cfg.openSearchVectorEndpoint) != "",
+		OpenSearchVectorEndpoint:          safeOpenSearchEndpointForSummary(cfg.openSearchVectorEndpoint),
+		OpenSearchVectorIndex:             strings.TrimSpace(cfg.openSearchVectorIndex),
+		OpenSearchVectorField:             strings.TrimSpace(cfg.openSearchVectorField),
+		OpenSearchVectorExpectedDimension: cfg.openSearchVectorDimension,
 	}
 	result.GitDirty = strings.TrimSpace(result.GitStatusShort) != ""
 	defer func() {
@@ -209,6 +235,11 @@ func run(cfg config) error {
 		}
 	case "preflight-pgvector":
 		if err := preflightPGVector(ctx, cfg, &result); err != nil {
+			result.Error = err.Error()
+			return err
+		}
+	case "preflight-opensearch-vector":
+		if err := preflightOpenSearchVector(ctx, cfg, &result); err != nil {
 			result.Error = err.Error()
 			return err
 		}
@@ -856,6 +887,22 @@ func validateConfig(cfg config) error {
 	case "preflight-pgvector":
 		if strings.TrimSpace(cfg.pgVectorDSN) == "" {
 			return errors.New("pgvector-dsn is required for preflight-pgvector")
+		}
+	case "preflight-opensearch-vector":
+		if strings.TrimSpace(cfg.openSearchVectorEndpoint) == "" {
+			return errors.New("opensearch-vector-endpoint is required for preflight-opensearch-vector")
+		}
+		if err := validateOpenSearchEndpoint(cfg.openSearchVectorEndpoint); err != nil {
+			return err
+		}
+		if !isSafeOpenSearchIndexName(cfg.openSearchVectorIndex) {
+			return fmt.Errorf("unsafe opensearch vector index %q", cfg.openSearchVectorIndex)
+		}
+		if !isSafeOpenSearchFieldPath(cfg.openSearchVectorField) {
+			return fmt.Errorf("unsafe opensearch vector field %q", cfg.openSearchVectorField)
+		}
+		if cfg.openSearchVectorDimension <= 0 {
+			return errors.New("opensearch-vector-dimension must be positive")
 		}
 	case "verify-queue":
 		if strings.TrimSpace(cfg.pgDSN) == "" {

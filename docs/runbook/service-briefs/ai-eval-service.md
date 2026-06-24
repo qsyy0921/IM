@@ -53,6 +53,6 @@ adapter、状态、计数、summary/report 引用和低敏 metadata。
 
 边界：不保存 raw EvidencePack、prompt、model output、用户正文、secret 或 tool input；不授权业务动作。
 
-下一步：继续 profile repair batch / approval、Python memory extraction candidate
-evaluation 和 EvidencePack coverage 深化，并保持 retrieval failure、memory lifecycle
-failure、reasoning failure 和 action boundary failure 的独立诊断。
+下一步：继续 Python memory extraction candidate evaluation、profile repair approval
+回归和 EvidencePack coverage 深化，并保持 retrieval failure、memory lifecycle failure、
+reasoning failure 和 action boundary failure 的独立诊断。

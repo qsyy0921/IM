@@ -143,6 +143,10 @@ ai-eval memory-service live adapter 已把该行为登记为
 `must_recompute_profile_via_public_api` 断言。
 `loadtest/memoryprofile` 已提供 first-stage profile repair operator：默认 plan-only，
 显式 `--execute` 才调用公开 recompute RPC，输出低敏 hash / count 报告。
+同日该 operator 已补 profile repair batch approval path：batch manifest 默认只生成
+低敏 plan；批量执行必须通过 workflow-service 公开 `GetWorkflow` 校验
+`REPAIR_APPROVAL/APPROVED`，并要求 workflow target / payload hash 与本次 batch plan
+匹配；显式 `--request-approval` 只创建低敏 repair approval workflow，不执行 repair。
 memory-service timeline worker 已升级 `rules-v0.2` group memory extraction：只有明确
 memory cue 或显式 memory metadata 的群消息会投影成 PENDING StructuredMemoryEvent；
 普通聊天不生成 memory fact；profile / preference / role signal 保持 NEEDS_REVIEW，

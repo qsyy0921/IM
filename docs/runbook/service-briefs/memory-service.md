@@ -46,6 +46,12 @@
   默认 plan-only，只有显式 `--execute` 才调用 memory-service 公开
   `RecomputeProfileAggregate`；输出低敏报告，只保留 aggregate key / supporting memory
   ids / summary text 的 hash 和计数，不写 raw profile summary 或 memory text。
+- 2026-06-24 `loadtest/memoryprofile` 已补 profile repair batch approval path：
+  batch manifest 默认仍只生成低敏 plan；批量执行必须提供已批准的 workflow-service
+  `REPAIR_APPROVAL` workflow id，并校验 workflow status、target service / operation、
+  payload schema、payload hash 和 target hash 全部匹配后才逐项调用公开
+  `RecomputeProfileAggregate`。也可显式 `--request-approval` 创建低敏 repair
+  approval workflow；该路径不执行 repair、不读 memory-service 私表。
 - 2026-06-24 timeline worker 已升级 `rules-v0.2` group memory extraction：
   只抽取带明确 `decision:` / `task:` / `status:` / `blocker:` / `file:` /
   `profile_signal:` 等 cue 或显式 memory metadata 的消息；普通聊天只推进 checkpoint，
@@ -53,5 +59,5 @@
   PENDING + NEEDS_REVIEW，不直接升级个人画像。
 
 下一步：真实服务栈启动后运行 memory-service optional adapter / loadtest 并归档报告；
-后续继续做 profile repair batch / approval path、Python memory extraction candidate
-和 RAG-Agent demo module 集成，而不是把单条群消息直接升级为 ACTIVE profile fact。
+后续继续做 Python memory extraction candidate 和 RAG-Agent demo module 集成，而不是把
+单条群消息直接升级为 ACTIVE profile fact。

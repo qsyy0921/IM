@@ -654,6 +654,82 @@ INSERT INTO memory_event_source_refs (
 	}
 }
 
+func TestRepositoryRecomputeProfileAggregateUpdatesExistingSubjectKeyIntegration(t *testing.T) {
+	ctx := context.Background()
+	pool := openMemoryTestPool(t)
+	resetMemoryTables(t, ctx, pool)
+	repository := NewRepository(pool)
+	seedProfileSignalMemories(t, ctx, pool, "tenant-1", "conv-1", "user-1")
+	if _, err := pool.Exec(ctx, `
+INSERT INTO memory_profile_aggregates (
+	tenant_id,
+	profile_id,
+	subject_user_id,
+	aggregate_type,
+	aggregate_key,
+	status,
+	review_state,
+	summary_text,
+	supporting_memory_event_ids,
+	confidence,
+	updated_by_memory_event_id
+) VALUES (
+	$1,
+	'profile-legacy-seeded',
+	'user-1',
+	'SKILL',
+	'phoenix-launch',
+	'ACTIVE',
+	'APPROVED',
+	'legacy seeded profile summary',
+	'["legacy-support"]'::jsonb,
+	0.5000,
+	'legacy-support'
+)
+`, "tenant-1"); err != nil {
+		t.Fatalf("seed legacy profile aggregate: %v", err)
+	}
+
+	item, supportCount, active, err := repository.RecomputeProfileAggregate(ctx, types.RecomputeProfileAggregateCommand{
+		AuthContext: types.AuthContext{
+			TenantID: "tenant-1",
+			UserID:   "user-1",
+			DeviceID: "device-1",
+		},
+		SubjectUserID:   "user-1",
+		AggregateType:   types.ProfileAggregateTypeSkill,
+		AggregateKey:    "phoenix-launch",
+		MinSupportCount: 2,
+	})
+	if err != nil {
+		t.Fatalf("recompute existing subject-key profile aggregate: %v", err)
+	}
+	if !active || supportCount != 2 {
+		t.Fatalf("expected active profile with two supports, active=%v support_count=%d item=%+v", active, supportCount, item)
+	}
+	if item.ProfileID != "profile-legacy-seeded" {
+		t.Fatalf("expected recompute to update existing profile id, got %+v", item)
+	}
+	if len(item.SupportingMemoryEventIDs) != 2 {
+		t.Fatalf("expected recompute to replace supporting memory ids: %+v", item.SupportingMemoryEventIDs)
+	}
+
+	var count int
+	if err := pool.QueryRow(ctx, `
+SELECT count(*)
+FROM memory_profile_aggregates
+WHERE tenant_id = $1
+  AND subject_user_id = 'user-1'
+  AND aggregate_type = 'SKILL'
+  AND aggregate_key = 'phoenix-launch'
+`, "tenant-1").Scan(&count); err != nil {
+		t.Fatalf("count recomputed profile aggregates: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("expected one profile aggregate for subject key, got %d", count)
+	}
+}
+
 func seedProfileSignalMemories(t *testing.T, ctx context.Context, pool *pgxpool.Pool, tenantID string, conversationID string, userID string) {
 	t.Helper()
 	if _, err := pool.Exec(ctx, `

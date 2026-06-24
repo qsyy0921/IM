@@ -856,6 +856,43 @@ func upsertProfileAggregate(ctx context.Context, tx pgx.Tx, command types.Recomp
 	supportJSON, _ := json.Marshal(supportIDs)
 	confidence := confidenceTotal / float64(len(supports))
 	summary := profileAggregateSummary(command, facts, len(supports))
+	existing := tx.QueryRow(ctx, `
+UPDATE memory_profile_aggregates
+SET status = 'ACTIVE',
+    review_state = 'APPROVED',
+    summary_text = $5,
+    supporting_memory_event_ids = $6::jsonb,
+    confidence = $7,
+    valid_from_at = $8,
+    valid_to_at = NULL,
+    updated_by_memory_event_id = $9,
+    updated_at = now()
+WHERE tenant_id = $1
+  AND subject_user_id = $2
+  AND aggregate_type = $3
+  AND aggregate_key = $4
+  AND status IN ('PENDING', 'ACTIVE')
+RETURNING
+	profile_id,
+	subject_user_id,
+	aggregate_type,
+	aggregate_key,
+	status,
+	review_state,
+	summary_text,
+	supporting_memory_event_ids::text,
+	confidence::float8,
+	valid_from_at,
+	valid_to_at,
+	updated_at
+`, command.AuthContext.TenantID, string(command.SubjectUserID), command.AggregateType, command.AggregateKey, summary, string(supportJSON), confidence, nullableTime(validFromAt), updatedBy)
+	item, err := scanProfileAggregateRow(existing)
+	if err == nil {
+		return item, nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return types.ProfileAggregate{}, err
+	}
 	row := tx.QueryRow(ctx, `
 INSERT INTO memory_profile_aggregates (
 	tenant_id,

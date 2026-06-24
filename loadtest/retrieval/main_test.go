@@ -1,7 +1,9 @@
 package main
 
 import (
+	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	retrievalv1 "github.com/qsyy0921/IM/api/proto/nexusim/retrieval/v1"
@@ -102,6 +104,99 @@ func TestVerifySourceCoverageRejectsMissingReturnedSource(t *testing.T) {
 	}
 }
 
+func TestVerifyProviderCoverageReportsReadinessWithoutVectorBackend(t *testing.T) {
+	path := writeProviderReadinessSummary(t, `{
+  "phase": "preflight-provider-readiness",
+  "provider_readiness": [
+    {
+      "provider": "opensearch-vector",
+      "requested": true,
+      "configured": true,
+      "available": false,
+      "status": "FAILED",
+      "error": "opensearch vector index does not exist"
+    }
+  ]
+}`)
+	cfg := config{providerReadinessFile: path}
+	coverage, err := verifyProviderCoverage(cfg, []sourceCoverageSummary{
+		{SourceType: "VECTOR_ITEM", Requested: false, ReturnedCount: 0, Status: "NOT_REQUESTED"},
+	})
+	if err != nil {
+		t.Fatalf("verifyProviderCoverage returned error: %v", err)
+	}
+	if len(coverage) != 1 {
+		t.Fatalf("coverage len=%d want 1", len(coverage))
+	}
+	entry := coverage[0]
+	if entry.Provider != "opensearch-vector" || entry.ReadinessStatus != "FAILED" || entry.ErrorClass != "INDEX_MISSING" {
+		t.Fatalf("unexpected provider coverage entry: %+v", entry)
+	}
+	if entry.VectorLaneRequested || entry.VectorLaneStatus != "NOT_REQUESTED" || entry.VectorReturnedCount != 0 {
+		t.Fatalf("unexpected vector lane linkage: %+v", entry)
+	}
+}
+
+func TestVerifyProviderCoverageRejectsFailedRequestedProviderWithVectorBackend(t *testing.T) {
+	path := writeProviderReadinessSummary(t, `{
+  "phase": "preflight-provider-readiness",
+  "provider_readiness": [
+    {
+      "provider": "pgvector",
+      "requested": true,
+      "configured": true,
+      "available": false,
+      "status": "FAILED",
+      "error": "pgvector extension is unavailable"
+    }
+  ]
+}`)
+	cfg := config{includeVectorBackend: true, providerReadinessFile: path}
+	_, err := verifyProviderCoverage(cfg, []sourceCoverageSummary{
+		{SourceType: "VECTOR_ITEM", Requested: true, ReturnedCount: 1, Status: "RETURNED"},
+	})
+	if err == nil || !strings.Contains(err.Error(), "pgvector") {
+		t.Fatalf("expected failed requested provider to reject vector backend, got %v", err)
+	}
+}
+
+func TestVerifyProviderCoverageAcceptsReadyProviderWithVectorBackend(t *testing.T) {
+	path := writeProviderReadinessSummary(t, `{
+  "phase": "preflight-provider-readiness",
+  "provider_readiness": [
+    {
+      "provider": "pgvector",
+      "requested": true,
+      "configured": true,
+      "available": true,
+      "status": "READY"
+    }
+  ]
+}`)
+	cfg := config{includeVectorBackend: true, providerReadinessFile: path}
+	coverage, err := verifyProviderCoverage(cfg, []sourceCoverageSummary{
+		{SourceType: "VECTOR_ITEM", Requested: true, ReturnedCount: 1, Status: "RETURNED"},
+	})
+	if err != nil {
+		t.Fatalf("verifyProviderCoverage returned error: %v", err)
+	}
+	if len(coverage) != 1 || coverage[0].ReadinessStatus != "READY" || coverage[0].VectorLaneStatus != "RETURNED" {
+		t.Fatalf("unexpected provider coverage: %+v", coverage)
+	}
+}
+
+func TestLoadProviderReadinessFileRejectsWrongPhase(t *testing.T) {
+	path := writeProviderReadinessSummary(t, `{
+  "phase": "verify",
+  "provider_readiness": [
+    {"provider": "pgvector", "requested": true, "configured": true, "available": true, "status": "READY"}
+  ]
+}`)
+	if _, err := loadProviderReadinessFile(path); err == nil || !strings.Contains(err.Error(), "preflight-provider-readiness") {
+		t.Fatalf("expected wrong phase to fail, got %v", err)
+	}
+}
+
 func coverageItem(
 	sourceType retrievalv1.EvidenceSourceType,
 	requested bool,
@@ -116,4 +211,13 @@ func coverageItem(
 		ReturnedCount:  returnedCount,
 		Status:         status,
 	}
+}
+
+func writeProviderReadinessSummary(t *testing.T, body string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "vector-embedding-producer-summary.json")
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatalf("write provider readiness summary: %v", err)
+	}
+	return path
 }

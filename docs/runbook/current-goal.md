@@ -263,6 +263,13 @@ IM messages -> search / memory projection -> EvidencePack -> RAG / Agent answer 
   pgvector / OpenSearch vector 的 readiness，并输出 `provider_readiness[]` 低敏矩阵；
   任一 requested provider 不满足 contract 时整体 fail-closed，但保留每个 provider
   的低敏状态用于排障；该矩阵仍不是 provider 数据写入 / 搜索 smoke。
+- 同日 retrieval provider coverage contract 已补：
+  `loadtest/retrieval --provider-readiness-summary <path>` 可读取上述
+  `preflight-provider-readiness` summary，并把 pgvector / OpenSearch vector
+  readiness 作为低敏 `provider_coverage[]` 挂到 EvidencePack smoke summary；
+  只输出 provider、configured / available / status、error class 和 VECTOR_ITEM lane
+  状态。启用 `--include-vector-backend` 时，任一 requested provider readiness 不是
+  `READY` 会 fail-closed，不把 vector evidence 当成 provider-backed 证据。
 - 已有 clean smoke 覆盖真实双用户好友直聊、群聊 first path、群资料 BFF
   read/update 和群成员动作链路；证据见 `docs/runbook/client-platform.md`。
 - Windows desktop 已有 artifact / signing / installer plan first paths；签名 / installer
@@ -354,12 +361,12 @@ IM messages -> search / memory projection -> EvidencePack -> RAG / Agent answer 
    vector backend opt-in live smoke 已通过；search-service PostgreSQL FTS lexical
    backend 和显式 OpenSearch / BM25 candidate backend first paths 已补齐；OpenSearch
    opt-in smoke 入口、service-owned rebuild operator first path 和 mapping drift
-   hardening 已补齐；retrieval `source_coverage` 矩阵已进入 positive smoke /
-   adapter 门禁；pgvector 和 OpenSearch vector provider preflight gate 及 readiness
-   matrix 已补齐，但尚未
+   hardening 已补齐；retrieval `source_coverage` 和 provider `provider_coverage`
+   矩阵已进入 positive smoke / adapter 侧契约；pgvector 和 OpenSearch vector
+   provider preflight gate 及 readiness matrix 已补齐，但尚未
    在真实 OpenSearch / pgvector 进程上归档通过 provider smoke 报告；后续真实
    OpenSearch 进程 smoke、真实 pgvector /
-   Milvus / OpenSearch vector provider smoke 和跨 provider EvidencePack coverage 仍保持在
+   Milvus / OpenSearch vector provider smoke 仍保持在
    retrieval-gateway 边界内。
 5. 客户端只作为演示入口；除非阻塞上述演示，不继续扩 UI 产品化。
 6. Windows release signing / MSI / NSIS installer、完整 Android、完整移动端发布、

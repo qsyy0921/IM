@@ -48,6 +48,7 @@ type config struct {
 	vectorVisibilityScope string
 	vectorPolicyVersion   string
 	queryEmbeddingRef     string
+	providerReadinessFile string
 	requestTimeout        time.Duration
 	tls                   grpctls.Config
 }
@@ -86,43 +87,44 @@ type seededData struct {
 }
 
 type evidenceSummary struct {
-	RunName                               string                  `json:"run_name"`
-	ResultDir                             string                  `json:"result_dir"`
-	RetrievalTarget                       string                  `json:"retrieval_target"`
-	VectorTarget                          string                  `json:"vector_target,omitempty"`
-	IncludeVectorBackend                  bool                    `json:"include_vector_backend"`
-	Query                                 string                  `json:"query"`
-	Seed                                  seededData              `json:"seed"`
-	PackID                                string                  `json:"pack_id"`
-	ItemCount                             int                     `json:"item_count"`
-	SearchItemCount                       int                     `json:"search_item_count"`
-	MemoryItemCount                       int                     `json:"memory_item_count"`
-	ProfileItemCount                      int                     `json:"profile_item_count"`
-	VectorItemCount                       int                     `json:"vector_item_count"`
-	SourceCounts                          sourceCounts            `json:"source_counts"`
-	SourceCoverage                        []sourceCoverageSummary `json:"source_coverage"`
-	SourceChainRerankPreserved            bool                    `json:"source_chain_rerank_preserved"`
-	SearchRerankScore                     float64                 `json:"search_rerank_score"`
-	MemoryRerankScore                     float64                 `json:"memory_rerank_score"`
-	VectorRerankScore                     float64                 `json:"vector_rerank_score,omitempty"`
-	SearchProjectionVersion               int64                   `json:"search_projection_version"`
-	MemoryProjectionVersion               int64                   `json:"memory_projection_version"`
-	RetrievalVersion                      string                  `json:"retrieval_version"`
-	CurrentMemoryAtSeq                    int64                   `json:"current_memory_at_seq"`
-	CrossGroupSourceRefsPreserved         bool                    `json:"cross_group_source_refs_preserved"`
-	CrossGroupSpeakerAttributionPreserved bool                    `json:"cross_group_speaker_attribution_preserved"`
-	MemoryGraphEdgesPreserved             bool                    `json:"memory_graph_edges_preserved"`
-	ProfileAggregatePreserved             bool                    `json:"profile_aggregate_preserved"`
-	VectorEvidencePreserved               bool                    `json:"vector_evidence_preserved"`
-	VectorSourceRefHashPreserved          bool                    `json:"vector_source_ref_hash_preserved"`
-	VectorNoRawText                       bool                    `json:"vector_no_raw_text"`
-	TemporalVersionSelectedByQuerySeq     bool                    `json:"temporal_version_selected_by_query_seq"`
-	ExpiredMemoryExcluded                 bool                    `json:"expired_memory_excluded"`
-	SupersededMemoryExcluded              bool                    `json:"superseded_memory_excluded"`
-	FutureMemoryExcluded                  bool                    `json:"future_memory_excluded"`
-	Verified                              []string                `json:"verified"`
-	StartedAt                             time.Time               `json:"started_at"`
-	FinishedAt                            time.Time               `json:"finished_at"`
+	RunName                               string                    `json:"run_name"`
+	ResultDir                             string                    `json:"result_dir"`
+	RetrievalTarget                       string                    `json:"retrieval_target"`
+	VectorTarget                          string                    `json:"vector_target,omitempty"`
+	IncludeVectorBackend                  bool                      `json:"include_vector_backend"`
+	Query                                 string                    `json:"query"`
+	Seed                                  seededData                `json:"seed"`
+	PackID                                string                    `json:"pack_id"`
+	ItemCount                             int                       `json:"item_count"`
+	SearchItemCount                       int                       `json:"search_item_count"`
+	MemoryItemCount                       int                       `json:"memory_item_count"`
+	ProfileItemCount                      int                       `json:"profile_item_count"`
+	VectorItemCount                       int                       `json:"vector_item_count"`
+	SourceCounts                          sourceCounts              `json:"source_counts"`
+	SourceCoverage                        []sourceCoverageSummary   `json:"source_coverage"`
+	ProviderCoverage                      []providerCoverageSummary `json:"provider_coverage,omitempty"`
+	SourceChainRerankPreserved            bool                      `json:"source_chain_rerank_preserved"`
+	SearchRerankScore                     float64                   `json:"search_rerank_score"`
+	MemoryRerankScore                     float64                   `json:"memory_rerank_score"`
+	VectorRerankScore                     float64                   `json:"vector_rerank_score,omitempty"`
+	SearchProjectionVersion               int64                     `json:"search_projection_version"`
+	MemoryProjectionVersion               int64                     `json:"memory_projection_version"`
+	RetrievalVersion                      string                    `json:"retrieval_version"`
+	CurrentMemoryAtSeq                    int64                     `json:"current_memory_at_seq"`
+	CrossGroupSourceRefsPreserved         bool                      `json:"cross_group_source_refs_preserved"`
+	CrossGroupSpeakerAttributionPreserved bool                      `json:"cross_group_speaker_attribution_preserved"`
+	MemoryGraphEdgesPreserved             bool                      `json:"memory_graph_edges_preserved"`
+	ProfileAggregatePreserved             bool                      `json:"profile_aggregate_preserved"`
+	VectorEvidencePreserved               bool                      `json:"vector_evidence_preserved"`
+	VectorSourceRefHashPreserved          bool                      `json:"vector_source_ref_hash_preserved"`
+	VectorNoRawText                       bool                      `json:"vector_no_raw_text"`
+	TemporalVersionSelectedByQuerySeq     bool                      `json:"temporal_version_selected_by_query_seq"`
+	ExpiredMemoryExcluded                 bool                      `json:"expired_memory_excluded"`
+	SupersededMemoryExcluded              bool                      `json:"superseded_memory_excluded"`
+	FutureMemoryExcluded                  bool                      `json:"future_memory_excluded"`
+	Verified                              []string                  `json:"verified"`
+	StartedAt                             time.Time                 `json:"started_at"`
+	FinishedAt                            time.Time                 `json:"finished_at"`
 }
 
 type sourceCounts struct {
@@ -139,6 +141,32 @@ type sourceCoverageSummary struct {
 	ReturnedCount  int32  `json:"returned_count"`
 	DedupedCount   int32  `json:"deduped_count"`
 	Status         string `json:"status"`
+}
+
+type providerCoverageSummary struct {
+	Provider            string `json:"provider"`
+	Requested           bool   `json:"requested"`
+	Configured          bool   `json:"configured"`
+	Available           bool   `json:"available"`
+	ReadinessStatus     string `json:"readiness_status"`
+	ErrorClass          string `json:"error_class,omitempty"`
+	VectorLaneRequested bool   `json:"vector_lane_requested"`
+	VectorLaneStatus    string `json:"vector_lane_status"`
+	VectorReturnedCount int32  `json:"vector_returned_count"`
+}
+
+type providerReadinessFile struct {
+	Phase             string                   `json:"phase"`
+	ProviderReadiness []providerReadinessEntry `json:"provider_readiness"`
+}
+
+type providerReadinessEntry struct {
+	Provider   string `json:"provider"`
+	Requested  bool   `json:"requested"`
+	Configured bool   `json:"configured"`
+	Available  bool   `json:"available"`
+	Status     string `json:"status"`
+	Error      string `json:"error,omitempty"`
 }
 
 func main() {
@@ -215,6 +243,7 @@ func parseConfig(args []string) (config, error) {
 	flagSet.StringVar(&cfg.vectorVisibilityScope, "vector-visibility-scope", "", "explicit vector visibility scope")
 	flagSet.StringVar(&cfg.vectorPolicyVersion, "vector-policy-version", "policy-retrieval-vector-v1", "explicit vector policy version")
 	flagSet.StringVar(&cfg.queryEmbeddingRef, "query-embedding-ref", "", "low-sensitive query embedding ref used for vector retrieval")
+	flagSet.StringVar(&cfg.providerReadinessFile, "provider-readiness-summary", "", "optional vector provider readiness summary generated by loadtest/vectorembedding")
 	flagSet.DurationVar(&cfg.requestTimeout, "request-timeout", 10*time.Second, "gRPC request timeout")
 	flagSet.StringVar(&cfg.tls.CAFile, "retrieval-tls-ca-file", "", "retrieval gRPC TLS CA file")
 	flagSet.StringVar(&cfg.tls.ServerName, "retrieval-tls-server-name", "", "retrieval gRPC TLS server name")
@@ -231,6 +260,7 @@ func parseConfig(args []string) (config, error) {
 	cfg.vectorVisibilityScope = strings.TrimSpace(cfg.vectorVisibilityScope)
 	cfg.vectorPolicyVersion = strings.TrimSpace(cfg.vectorPolicyVersion)
 	cfg.queryEmbeddingRef = strings.TrimSpace(cfg.queryEmbeddingRef)
+	cfg.providerReadinessFile = strings.TrimSpace(cfg.providerReadinessFile)
 	if cfg.retrievalTarget == "" {
 		return config{}, errors.New("--retrieval-target is required")
 	}
@@ -761,6 +791,13 @@ func verifyEvidence(
 		return evidenceSummary{}, err
 	}
 	verified = append(verified, "source coverage matrix preserves requested, candidate, returned and status semantics")
+	providerCoverage, err := verifyProviderCoverage(cfg, sourceCoverage)
+	if err != nil {
+		return evidenceSummary{}, err
+	}
+	if len(providerCoverage) > 0 {
+		verified = append(verified, "provider readiness matrix is linked to EvidencePack vector lane without raw provider errors")
+	}
 	if pack.GetSearchProjectionVersion() != seed.VisibilityVersion {
 		return evidenceSummary{}, fmt.Errorf("unexpected search projection version %d", pack.GetSearchProjectionVersion())
 	}
@@ -788,6 +825,7 @@ func verifyEvidence(
 		VectorItemCount:                       int(counts.VectorItem),
 		SourceCounts:                          counts,
 		SourceCoverage:                        sourceCoverage,
+		ProviderCoverage:                      providerCoverage,
 		SourceChainRerankPreserved:            true,
 		SearchRerankScore:                     searchItem.GetRerankScore(),
 		MemoryRerankScore:                     memoryItem.GetRerankScore(),
@@ -875,6 +913,105 @@ func verifySourceCoverage(
 		}
 	}
 	return ordered, nil
+}
+
+func verifyProviderCoverage(cfg config, sourceCoverage []sourceCoverageSummary) ([]providerCoverageSummary, error) {
+	if cfg.providerReadinessFile == "" {
+		return nil, nil
+	}
+	readiness, err := loadProviderReadinessFile(cfg.providerReadinessFile)
+	if err != nil {
+		return nil, err
+	}
+	vectorCoverage, ok := findSourceCoverage(sourceCoverage, "VECTOR_ITEM")
+	if !ok {
+		return nil, errors.New("missing VECTOR_ITEM source coverage for provider coverage")
+	}
+	coverage := make([]providerCoverageSummary, 0, len(readiness.ProviderReadiness))
+	for _, entry := range readiness.ProviderReadiness {
+		provider := strings.TrimSpace(entry.Provider)
+		if provider == "" {
+			return nil, errors.New("provider readiness entry missing provider")
+		}
+		status := strings.ToUpper(strings.TrimSpace(entry.Status))
+		if status != "READY" && status != "FAILED" {
+			return nil, fmt.Errorf("provider readiness for %s has unsupported status %q", provider, entry.Status)
+		}
+		summary := providerCoverageSummary{
+			Provider:            provider,
+			Requested:           entry.Requested,
+			Configured:          entry.Configured,
+			Available:           entry.Available,
+			ReadinessStatus:     status,
+			ErrorClass:          classifyProviderReadinessError(entry.Error),
+			VectorLaneRequested: vectorCoverage.Requested,
+			VectorLaneStatus:    vectorCoverage.Status,
+			VectorReturnedCount: vectorCoverage.ReturnedCount,
+		}
+		if cfg.includeVectorBackend && entry.Requested && status != "READY" {
+			return nil, fmt.Errorf("provider readiness for %s is %s while vector backend evidence was requested", provider, status)
+		}
+		coverage = append(coverage, summary)
+	}
+	return coverage, nil
+}
+
+func loadProviderReadinessFile(path string) (providerReadinessFile, error) {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return providerReadinessFile{}, errors.New("provider readiness summary path is required")
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return providerReadinessFile{}, fmt.Errorf("read provider readiness summary: %w", err)
+	}
+	var result providerReadinessFile
+	if err := json.Unmarshal(data, &result); err != nil {
+		return providerReadinessFile{}, fmt.Errorf("decode provider readiness summary: %w", err)
+	}
+	if result.Phase != "preflight-provider-readiness" {
+		return providerReadinessFile{}, fmt.Errorf("provider readiness summary phase=%q want preflight-provider-readiness", result.Phase)
+	}
+	if len(result.ProviderReadiness) == 0 {
+		return providerReadinessFile{}, errors.New("provider readiness summary has no provider_readiness entries")
+	}
+	return result, nil
+}
+
+func findSourceCoverage(items []sourceCoverageSummary, sourceType string) (sourceCoverageSummary, bool) {
+	for _, item := range items {
+		if item.SourceType == sourceType {
+			return item, true
+		}
+	}
+	return sourceCoverageSummary{}, false
+}
+
+func classifyProviderReadinessError(value string) string {
+	value = strings.ToLower(strings.TrimSpace(value))
+	if value == "" {
+		return ""
+	}
+	switch {
+	case strings.Contains(value, "connection refused"),
+		strings.Contains(value, "connect"),
+		strings.Contains(value, "timeout"),
+		strings.Contains(value, "deadline exceeded"):
+		return "CONNECTIVITY"
+	case strings.Contains(value, "extension"),
+		strings.Contains(value, "pgvector"):
+		return "EXTENSION_UNAVAILABLE"
+	case strings.Contains(value, "does not exist"),
+		strings.Contains(value, "not found"),
+		strings.Contains(value, "404"):
+		return "INDEX_MISSING"
+	case strings.Contains(value, "mapping"),
+		strings.Contains(value, "knn_vector"),
+		strings.Contains(value, "dimension"):
+		return "MAPPING_CONTRACT"
+	default:
+		return "PROVIDER_PRECONDITION"
+	}
 }
 
 func evidenceSourceTypeName(sourceType retrievalv1.EvidenceSourceType) string {

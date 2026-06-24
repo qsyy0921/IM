@@ -25,6 +25,12 @@
   低敏门禁：search / memory / profile 必须是 `RETURNED`，未启用 vector 时
   `VECTOR_ITEM` 必须是 `NOT_REQUESTED`；summary 只输出 source type、requested、
   candidate / returned / deduped count 和 status。
+- 2026-06-25 `loadtest/retrieval` 已支持读取 `loadtest/vectorembedding`
+  `preflight-provider-readiness` summary，并把 pgvector / OpenSearch vector
+  readiness 以低敏 `provider_coverage` 矩阵挂到 retrieval EvidencePack smoke
+  summary：只输出 provider、configured / available / status、error class 和
+  VECTOR_ITEM lane 状态；启用 `--include-vector-backend` 时，任一 requested provider
+  readiness 不是 `READY` 会 fail-closed，不把 vector evidence 当成可用 provider 证据。
 - EvidencePack -> memory-service current-only query 已落：默认 memory status 收敛为
   ACTIVE，显式 `at_conversation_seq` 透传给 memory-service；未传时使用 search hit
   最大 conversation seq 作为 first-stage recovery。
@@ -104,6 +110,6 @@
   EvidencePack source counts 为 search / memory / profile / vector 各 1 条，vector
   evidence 不携带 raw text 或 embedding vector。
 
-下一步：继续把真实 BM25 backend、pgvector / Milvus / OpenSearch vector provider
-smoke 和更细 source-chain / vector coverage 通过
-EvidencePack 暴露给 RAG / summary / Agent，仍不绕过 retrieval-gateway。
+下一步：继续把真实 OpenSearch 进程 smoke、pgvector / Milvus / OpenSearch vector
+provider smoke 通过 EvidencePack 归档给 RAG / summary / Agent，仍不绕过
+retrieval-gateway。

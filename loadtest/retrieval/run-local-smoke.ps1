@@ -6,6 +6,7 @@ param(
     [string]$MemoryGrpcAddr = "127.0.0.1:10580",
     [string]$RetrievalGrpcAddr = "127.0.0.1:10590",
     [string]$VectorGrpcAddr = "127.0.0.1:10760",
+    [string]$ProviderReadinessSummary = "",
     [switch]$IncludeVectorBackend,
     [switch]$SkipBuild
 )
@@ -131,6 +132,11 @@ try {
         $runnerArgs += @(
             "--include-vector-backend",
             "--vector-target", $VectorGrpcAddr
+        )
+    }
+    if ($ProviderReadinessSummary) {
+        $runnerArgs += @(
+            "--provider-readiness-summary", $ProviderReadinessSummary
         )
     }
     & $runner @runnerArgs

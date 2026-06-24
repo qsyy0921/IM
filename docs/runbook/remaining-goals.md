@@ -91,9 +91,10 @@
   smoke 入口、service-owned rebuild operator first path 和 mapping drift hardening
   已补齐但本机尚未归档真实 OpenSearch 进程通过报告；retrieval positive smoke /
   adapter 已把 `source_coverage` 矩阵纳入门禁；pgvector 和 OpenSearch vector
-  provider preflight gate 以及 provider readiness matrix 已补齐；下一步继续补真实 OpenSearch 进程 smoke、真实
-  pgvector / Milvus / OpenSearch vector provider smoke
-  与跨 provider EvidencePack coverage。
+  provider preflight gate 以及 provider readiness matrix 已补齐；retrieval smoke
+  已可读取 provider readiness summary 并输出低敏 `provider_coverage[]`，把 provider
+  readiness 与 VECTOR_ITEM lane 状态关联起来。下一步继续补真实 OpenSearch 进程 smoke、真实
+  pgvector / Milvus / OpenSearch vector provider smoke。
   真实 mutation 场景必须等显式业务 adapter 和
   operator policy 就绪。
 - `rag-service` / `summary-service`：拒答、引用校验、source-ref regression、unsafe
@@ -125,8 +126,8 @@
   outbox relay、Redis hot-state、privacy / contacts policy。
 - `model-gateway`、`knowledge-ingestion-service`、`workflow-service`、
   `vector-index-service`：补真实 provider / worker / repair / backfill smoke；
-  pgvector / OpenSearch vector provider 已有 preflight gate 和 readiness matrix，仍需可用 provider runtime
-  后归档真实 smoke。
+  pgvector / OpenSearch vector provider 已有 preflight gate、readiness matrix 和
+  retrieval provider coverage summary contract，仍需可用 provider runtime 后归档真实 smoke。
 
 ## 9 个现有 IM 服务必要回补
 

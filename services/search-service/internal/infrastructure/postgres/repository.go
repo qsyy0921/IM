@@ -112,6 +112,100 @@ LIMIT $5
 	return items, projectionVersion, nil
 }
 
+func (repository *Repository) SearchMessagesByCandidates(
+	ctx context.Context,
+	command types.SearchMessagesCommand,
+	candidates []types.SearchMessageCandidate,
+	fetchLimit int,
+) ([]types.SearchMessageHit, int64, error) {
+	if repository.pool == nil {
+		return nil, 0, types.NewDBReadFailed("search repository is not configured")
+	}
+	if fetchLimit <= 0 || len(candidates) == 0 {
+		return nil, 0, nil
+	}
+
+	conversationIDs := make([]string, 0, len(candidates))
+	messageIDs := make([]string, 0, len(candidates))
+	for _, candidate := range candidates {
+		conversationIDs = append(conversationIDs, string(candidate.ConversationID))
+		messageIDs = append(messageIDs, candidate.MessageID)
+	}
+
+	rows, err := repository.pool.Query(ctx, `
+WITH candidates AS (
+	SELECT *
+	FROM unnest($3::text[], $4::text[]) WITH ORDINALITY AS candidate(conversation_id, message_id, rank)
+)
+SELECT
+	d.conversation_id,
+	d.message_id,
+	d.conversation_seq,
+	d.source_event_id,
+	d.sender_id,
+	d.message_type,
+	d.searchable_text,
+	d.occurred_at,
+	d.visibility_version,
+	COALESCE(MAX(d.visibility_version) OVER (), 0) AS projection_version
+FROM candidates c
+JOIN search_message_documents d
+  ON d.tenant_id = $1
+ AND d.conversation_id = c.conversation_id
+ AND d.message_id = c.message_id
+JOIN search_membership_projection m
+  ON m.tenant_id = d.tenant_id
+ AND m.conversation_id = d.conversation_id
+ AND m.user_id = $2
+WHERE m.status <> 'BANNED'
+  AND d.tombstone_status = 'NONE'
+  AND m.join_seq <= d.conversation_seq
+  AND (m.leave_seq IS NULL OR m.leave_seq >= d.conversation_seq)
+  AND d.conversation_seq > $5
+  AND ($7 = '' OR d.conversation_id = $7)
+ORDER BY c.rank ASC
+LIMIT $6
+`, command.AuthContext.TenantID,
+		command.AuthContext.UserID,
+		conversationIDs,
+		messageIDs,
+		command.AfterSeq,
+		fetchLimit,
+		string(command.ConversationID),
+	)
+	if err != nil {
+		return nil, 0, types.NewDBReadFailed(err.Error())
+	}
+	defer rows.Close()
+
+	items := make([]types.SearchMessageHit, 0, min(fetchLimit, len(candidates)))
+	var projectionVersion int64
+	for rows.Next() {
+		var hit types.SearchMessageHit
+		var text string
+		if err := rows.Scan(
+			&hit.ConversationID,
+			&hit.MessageID,
+			&hit.ConversationSeq,
+			&hit.SourceEventID,
+			&hit.SenderID,
+			&hit.MessageType,
+			&text,
+			&hit.OccurredAt,
+			&hit.VisibilityVersion,
+			&projectionVersion,
+		); err != nil {
+			return nil, 0, types.NewDBReadFailed(err.Error())
+		}
+		hit.Snippet, hit.HighlightRanges = buildSnippet(text, command.NormalizedQuery(), 160)
+		items = append(items, hit)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, types.NewDBReadFailed(err.Error())
+	}
+	return items, projectionVersion, nil
+}
+
 func (repository *Repository) ProjectTimelineEvent(
 	ctx context.Context,
 	command types.ProjectTimelineEventCommand,

@@ -7,6 +7,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"strconv"
@@ -18,6 +19,7 @@ import (
 	searchgrpc "github.com/qsyy0921/IM/services/search-service/internal/api/grpc"
 	"github.com/qsyy0921/IM/services/search-service/internal/app"
 	kafkainfra "github.com/qsyy0921/IM/services/search-service/internal/infrastructure/kafka"
+	opensearchinfra "github.com/qsyy0921/IM/services/search-service/internal/infrastructure/opensearch"
 	postgresinfra "github.com/qsyy0921/IM/services/search-service/internal/infrastructure/postgres"
 	"github.com/qsyy0921/IM/services/search-service/internal/trigger/timeline"
 	"google.golang.org/grpc"
@@ -104,7 +106,11 @@ func runGRPC(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	repository := postgresinfra.NewRepository(pool)
+	postgresRepository := postgresinfra.NewRepository(pool)
+	repository, err := newSearchMessagesRepositoryFromEnv(postgresRepository)
+	if err != nil {
+		return err
+	}
 	server := grpc.NewServer()
 	searchgrpc.Register(server, searchgrpc.NewServer(app.NewSearchMessagesUseCase(repository)))
 
@@ -174,6 +180,87 @@ func runTimelineConsumer(ctx context.Context) error {
 	return worker.Run(ctx)
 }
 
+func newSearchMessagesRepositoryFromEnv(postgresRepository *postgresinfra.Repository) (app.SearchMessagesRepository, error) {
+	backend := searchBackendFromEnv()
+	switch backend {
+	case "postgres":
+		return postgresRepository, nil
+	case "opensearch":
+		config, err := opensearchConfigFromEnv()
+		if err != nil {
+			return nil, err
+		}
+		return opensearchinfra.NewRepository(config, postgresRepository)
+	default:
+		return nil, fmt.Errorf("unsupported NEXUSIM_SEARCH_BACKEND %q", backend)
+	}
+}
+
+func searchBackendFromEnv() string {
+	return strings.ToLower(envString("NEXUSIM_SEARCH_BACKEND", "postgres"))
+}
+
+func opensearchConfigFromEnv() (opensearchinfra.Config, error) {
+	endpoint := strings.TrimSpace(os.Getenv("NEXUSIM_SEARCH_OPENSEARCH_ENDPOINT"))
+	allowInsecureHTTP, _, err := envOptionalBool("NEXUSIM_SEARCH_OPENSEARCH_ALLOW_INSECURE_HTTP")
+	if err != nil {
+		return opensearchinfra.Config{}, err
+	}
+	if err := validateOpenSearchEndpointSecurity(endpoint, allowInsecureHTTP); err != nil {
+		return opensearchinfra.Config{}, err
+	}
+	candidateOverfetchFactor, err := envInt("NEXUSIM_SEARCH_OPENSEARCH_CANDIDATE_OVERFETCH_FACTOR", 5)
+	if err != nil {
+		return opensearchinfra.Config{}, err
+	}
+	maxCandidateFetch, err := envInt("NEXUSIM_SEARCH_OPENSEARCH_MAX_CANDIDATE_FETCH", 500)
+	if err != nil {
+		return opensearchinfra.Config{}, err
+	}
+	return opensearchinfra.Config{
+		Endpoint:                 endpoint,
+		Index:                    os.Getenv("NEXUSIM_SEARCH_OPENSEARCH_INDEX"),
+		Username:                 os.Getenv("NEXUSIM_SEARCH_OPENSEARCH_USERNAME"),
+		Password:                 os.Getenv("NEXUSIM_SEARCH_OPENSEARCH_PASSWORD"),
+		APIKey:                   os.Getenv("NEXUSIM_SEARCH_OPENSEARCH_API_KEY"),
+		Timeout:                  envDuration("NEXUSIM_SEARCH_OPENSEARCH_TIMEOUT", 2*time.Second),
+		CandidateOverfetchFactor: candidateOverfetchFactor,
+		MaxCandidateFetch:        maxCandidateFetch,
+	}, nil
+}
+
+func validateOpenSearchEndpointSecurity(raw string, allowInsecureHTTP bool) error {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return errors.New("NEXUSIM_SEARCH_OPENSEARCH_ENDPOINT is required")
+	}
+	parsed, err := url.Parse(raw)
+	if err != nil {
+		return err
+	}
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return errors.New("NEXUSIM_SEARCH_OPENSEARCH_ENDPOINT must use http or https")
+	}
+	if parsed.Host == "" {
+		return errors.New("NEXUSIM_SEARCH_OPENSEARCH_ENDPOINT host is required")
+	}
+	if parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" {
+		return errors.New("NEXUSIM_SEARCH_OPENSEARCH_ENDPOINT must not include credentials, query, or fragment")
+	}
+	if parsed.Scheme != "http" || allowInsecureHTTP {
+		return nil
+	}
+	host := parsed.Hostname()
+	if host == "localhost" {
+		return nil
+	}
+	ip := net.ParseIP(host)
+	if ip != nil && (ip.IsLoopback() || ip.IsPrivate()) {
+		return nil
+	}
+	return errors.New("NEXUSIM_SEARCH_OPENSEARCH_ENDPOINT uses non-private http; set NEXUSIM_SEARCH_OPENSEARCH_ALLOW_INSECURE_HTTP=true to allow")
+}
+
 func searchDebugAddr() string {
 	if addr := strings.TrimSpace(os.Getenv("NEXUSIM_SEARCH_DEBUG_ADDR")); addr != "" {
 		return addr
@@ -221,6 +308,21 @@ func envOptionalBool(name string) (bool, bool, error) {
 		return false, true, err
 	}
 	return value, true, nil
+}
+
+func envInt(name string, defaultValue int) (int, error) {
+	raw := strings.TrimSpace(os.Getenv(name))
+	if raw == "" {
+		return defaultValue, nil
+	}
+	value, err := strconv.Atoi(raw)
+	if err != nil {
+		return 0, err
+	}
+	if value <= 0 {
+		return 0, fmt.Errorf("%s must be positive", name)
+	}
+	return value, nil
 }
 
 func envString(name string, defaultValue string) string {

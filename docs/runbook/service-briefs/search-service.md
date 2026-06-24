@@ -9,12 +9,20 @@
   `plainto_tsquery('simple') + to_tsvector('simple', searchable_text)` 和既有 GIN index，
   不再使用 `ILIKE` substring fallback；新增真实 PG token-search 集成测试用于覆盖
   `launch` 不会命中 `launchable` 这类子串。
-- 当前 active slice 已转入 `memory-service v0.1` 设计 / 契约；search-service 后续保留 EvidencePack 前置字段深化和搜索 hardening。
+- 2026-06-24 已补显式 OpenSearch / BM25 candidate backend first path：
+  `NEXUSIM_SEARCH_BACKEND=opensearch` 时 `SearchMessages` 会通过 OpenSearch
+  `POST /<index>/_search` + `match(searchable_text, operator=and)` 召回
+  `conversation_id/message_id` 候选，再回到 PostgreSQL projection 做 membership
+  visibility、tombstone、after_seq 和 conversation filter hydration；OpenSearch
+  配置错误、请求失败或返回 malformed hit 时返回 `SEARCH_UNAVAILABLE`，不静默回退 PG。
+- 当前 active slice 已转入 backend architecture + AI / Agent / RAG demo path；search-service 后续保留 EvidencePack 前置字段深化和搜索 hardening。
 - 短期不以生产级完整系统测试或生产级 HA 作为 v0.1 阻塞；v0.1 验证重点是切片级本地检查、projection / visibility / tombstone smoke 和 EvidencePack 前置字段。
 - 定位是搜索索引、成员可见窗口过滤、tombstone 和 EvidencePack 前置服务。
 - 不绑定具体搜索中间件；索引后端必须通过 port，可本地/PG 起步，后续按 ADR 替换。
 - 第一版目标：消费 `conversation.timeline.events`，维护消息索引、可见性窗口和 tombstone。
-- 第一版查询：提供 `SearchMessages`，使用 PostgreSQL FTS 词法匹配，并按 tenant / conversation / join_seq / leave_seq / deleted/revoked 状态过滤。
+- 第一版查询：提供 `SearchMessages`，默认使用 PostgreSQL FTS 词法匹配；显式
+  OpenSearch backend 只做候选召回，仍按 tenant / conversation / join_seq /
+  leave_seq / deleted/revoked 状态在 PostgreSQL 投影层过滤。
 - 第一版不调用 LLM，不做 RAG 回答，不直接读 message-service / conversation-service 私有表。
 - 后续 memory / retrieval-gateway / RAG / summary / Agent / skill-registry / MCP gateway / action-executor 都必须复用它的 visibility / tombstone 语义。
 - 搜索索引不直接承载每个 viewer 的成员窗口膨胀字段；v0.1 需要保留 message `conversation_seq`、source event、status、permission / visibility version，并配合 membership visibility projection 做查询过滤。
@@ -25,6 +33,8 @@
 
 - projection smoke：真实 timeline event -> PG projection -> `SearchMessages` 已通过。
 - search smoke：发消息可搜，编辑更新，撤回/删除不可见，退群后不可见，stranger 不可见已通过。
-- PostgreSQL FTS first path：`SearchMessages` 已从 substring match 改为 token-based lexical search；OpenSearch / BM25 provider 仍是后续可替换后端，不在当前切片宣称完成。
+- PostgreSQL FTS first path：`SearchMessages` 已从 substring match 改为 token-based lexical search。
+- OpenSearch / BM25 candidate backend first path：显式 `NEXUSIM_SEARCH_BACKEND=opensearch`
+  已接入；后续仍需真实 OpenSearch 进程 smoke、mapping / rebuild operator、容量曲线和 provider-grade 运维。
 - EvidencePack 前置 smoke：搜索结果必须带 source message id、conversation seq、source event id 和 visibility version。
 - 后续链路：memory / group memory -> retrieval-gateway / EvidencePack -> RAG / summary -> Agent -> skill-registry -> mcp-gateway/tool-gateway -> action-executor。

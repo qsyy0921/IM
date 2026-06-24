@@ -28,6 +28,46 @@ func TestValidateSearchServiceModeRejectsUnknownMode(t *testing.T) {
 	}
 }
 
+func TestSearchBackendFromEnvDefaultsToPostgres(t *testing.T) {
+	t.Setenv("NEXUSIM_SEARCH_BACKEND", "")
+
+	if backend := searchBackendFromEnv(); backend != "postgres" {
+		t.Fatalf("expected default postgres backend, got %q", backend)
+	}
+}
+
+func TestOpenSearchEndpointSecurityAllowsPrivateHTTPAndHTTPS(t *testing.T) {
+	for _, endpoint := range []string{
+		"http://127.0.0.1:9200",
+		"http://localhost:9200/search",
+		"http://172.31.50.10:9200",
+		"https://search.example.com",
+	} {
+		if err := validateOpenSearchEndpointSecurity(endpoint, false); err != nil {
+			t.Fatalf("expected endpoint %q to be allowed: %v", endpoint, err)
+		}
+	}
+}
+
+func TestOpenSearchEndpointSecurityRejectsUnsafeEndpoint(t *testing.T) {
+	for _, endpoint := range []string{
+		"http://search.example.com",
+		"https://user:pass@search.example.com",
+		"https://search.example.com?token=secret",
+		"ftp://search.example.com",
+	} {
+		if err := validateOpenSearchEndpointSecurity(endpoint, false); err == nil {
+			t.Fatalf("expected endpoint %q to fail", endpoint)
+		}
+	}
+}
+
+func TestOpenSearchEndpointSecurityAllowsExplicitPublicHTTPOptIn(t *testing.T) {
+	if err := validateOpenSearchEndpointSecurity("http://search.example.com", true); err != nil {
+		t.Fatalf("expected explicit public http opt-in to be allowed: %v", err)
+	}
+}
+
 func TestSearchDebugAddrPrefersServiceSpecificEnv(t *testing.T) {
 	t.Setenv("NEXUSIM_DEBUG_ADDR", "127.0.0.1:19100")
 	t.Setenv("NEXUSIM_SEARCH_DEBUG_ADDR", "127.0.0.1:19101")

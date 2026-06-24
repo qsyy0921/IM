@@ -2,7 +2,7 @@
 
 状态：Draft
 
-本文定义 `search-service` 的第一条可编码切片：消费 `conversation.timeline.events`，构建搜索 projection，并提供 `SearchMessages`。它是搜索索引服务，不绑定具体搜索中间件；当前 PostgreSQL first path 使用 FTS 词法检索，OpenSearch、外部 BM25、内存测试索引或其它后端都必须通过 `SearchIndexPort` 接入。
+本文定义 `search-service` 的第一条可编码切片：消费 `conversation.timeline.events`，构建搜索 projection，并提供 `SearchMessages`。它是搜索索引服务，不绑定具体搜索中间件；当前默认 PostgreSQL first path 使用 FTS 词法检索，显式 OpenSearch / BM25 candidate backend first path 已通过 adapter 接入。外部索引只做候选召回，最终可见性、tombstone 和成员窗口过滤仍由 PostgreSQL projection 执行。
 
 ## 1. 服务定位
 
@@ -11,7 +11,7 @@
 - `search_message_documents`：消息搜索文档投影，保存可检索文本、状态和来源事件。
 - `search_membership_projection`：成员可见窗口投影，用于查询过滤，不是成员事实源。
 - `search_projection_checkpoints`：consumer group + topic + partition 的 next offset checkpoint。
-- `search_index_port`：后端索引端口，第一版可用 PostgreSQL / in-memory adapter，后续按 ADR 替换。
+- `search_index_port`：后端索引端口，第一版支持 PostgreSQL FTS 和显式 OpenSearch candidate adapter，后续按 ADR 替换。
 
 职责：
 
@@ -39,7 +39,7 @@
 | 同步入口 | `api-gateway` | 调用 `SearchMessages` |
 | 同步依赖 | PostgreSQL | 写 projection、checkpoint、可选第一版索引表 |
 | 可选同步依赖 | `policy-service` | projection stale 或 strict mode 时做最终授权；后续 Agent/tool action 做 tool policy precheck |
-| 后端端口 | `SearchIndexPort` | 写入 / 删除 / 查询索引，不绑定具体中间件 |
+| 后端端口 | `SearchIndexPort` | 写入 / 删除 / 查询索引，不绑定具体中间件；外部搜索只返回候选 refs |
 
 ## 3. 六层 DDD 包结构
 
@@ -207,8 +207,23 @@ search_projection_checkpoints(
 当前 PostgreSQL first path 使用 `plainto_tsquery('simple')` 匹配
 `to_tsvector('simple', searchable_text)`，并复用
 `search_message_documents` 上的 GIN expression index。该路径是 token-based lexical
-search，不保留 `ILIKE` substring fallback；完整 OpenSearch / BM25 provider 仍需后续
-ADR 和独立 smoke。
+search，不保留 `ILIKE` substring fallback。
+
+显式 OpenSearch / BM25 candidate backend first path：
+
+- `NEXUSIM_SEARCH_BACKEND=postgres|opensearch`，默认 `postgres`。
+- `opensearch` backend 需要 `NEXUSIM_SEARCH_OPENSEARCH_ENDPOINT` 和
+  `NEXUSIM_SEARCH_OPENSEARCH_INDEX`；可选 basic auth / API key / timeout / overfetch
+  配置只用于该 backend。
+- OpenSearch query 使用官方 `_search` API 和 `match` query，对
+  `searchable_text` 做 `operator=and` 的候选召回，并只读取 `_source` 中的
+  `conversation_id` / `message_id`。
+- PostgreSQL `SearchMessagesByCandidates` 会按候选 rank hydration，并重新执行
+  tenant、user membership window、tombstone、after_seq 和 conversation filter。
+- OpenSearch 配置错误、非 2xx、malformed hit、dependency error 都返回
+  `SEARCH_UNAVAILABLE`，不静默回退 PostgreSQL FTS。
+- 当前只宣称 adapter first path 和 focused tests；真实 OpenSearch 进程 smoke、
+  mapping / rebuild operator、容量曲线和 provider-grade 运维仍是后续项。
 
 ## 8. 第一版验收
 
@@ -220,6 +235,10 @@ ADR 和独立 smoke。
 - timeline consumer 支持 message persisted / edited / revoked / deleted 和 member joined / left / removed。
 - repository PG 集成测试覆盖可见窗口、tombstone、checkpoint、replay 幂等。
 - repository PG 集成测试覆盖 PostgreSQL FTS token search：查询 token 不应命中仅包含该 token 子串的文档。
+- OpenSearch adapter 单元测试覆盖请求 DSL、candidate hydration、非 2xx fail-closed
+  和 malformed hit fail-closed。
+- PostgreSQL candidate hydration 集成测试覆盖外部候选仍受 visibility / tombstone
+  过滤，不允许外部索引绕过搜索投影边界。
 
 最小 smoke：
 
@@ -234,4 +253,5 @@ member joined
 -> later message is not visible to that user
 ```
 
-本轮不是容量压测，不宣称 OpenSearch / Milvus / RAG 或完整 BM25 provider 已完成。
+本轮不是容量压测，不宣称 OpenSearch 集群、Milvus / RAG 或 provider-grade BM25
+运维已完成。

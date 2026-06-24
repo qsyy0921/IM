@@ -179,6 +179,90 @@ func TestRepositorySearchMessagesUsesPostgresFullTextTokensIntegration(t *testin
 	}
 }
 
+func TestRepositorySearchMessagesByCandidatesFiltersVisibilityIntegration(t *testing.T) {
+	ctx := context.Background()
+	pool := openSearchTestPool(t)
+	resetSearchTables(t, ctx, pool)
+	repository := NewRepository(pool)
+
+	project(t, ctx, repository, types.ProjectTimelineEventCommand{
+		TenantID:        "tenant-1",
+		EventID:         "event-member-join",
+		EventType:       types.TimelineEventConversationMemberJoined,
+		ConversationID:  "conv-visible",
+		ConversationSeq: 1,
+		ConsumerGroup:   "search-test",
+		Topic:           "conversation.timeline.events",
+		PartitionID:     0,
+		OffsetValue:     2,
+		TargetUserID:    "user-1",
+		MemberRole:      "MEMBER",
+	})
+	project(t, ctx, repository, types.ProjectTimelineEventCommand{
+		TenantID:        "tenant-1",
+		EventID:         "event-visible",
+		EventType:       types.TimelineEventMessagePersisted,
+		ConversationID:  "conv-visible",
+		ConversationSeq: 2,
+		ConsumerGroup:   "search-test",
+		Topic:           "conversation.timeline.events",
+		PartitionID:     0,
+		OffsetValue:     3,
+		MessageID:       "msg-visible",
+		SenderID:        "user-2",
+		MessageType:     "TEXT",
+		SearchableText:  "project visible candidate",
+	})
+	project(t, ctx, repository, types.ProjectTimelineEventCommand{
+		TenantID:        "tenant-1",
+		EventID:         "event-tombstone",
+		EventType:       types.TimelineEventMessagePersisted,
+		ConversationID:  "conv-visible",
+		ConversationSeq: 3,
+		ConsumerGroup:   "search-test",
+		Topic:           "conversation.timeline.events",
+		PartitionID:     0,
+		OffsetValue:     4,
+		MessageID:       "msg-tombstone",
+		SenderID:        "user-2",
+		MessageType:     "TEXT",
+		SearchableText:  "project tombstone candidate",
+	})
+	project(t, ctx, repository, types.ProjectTimelineEventCommand{
+		TenantID:        "tenant-1",
+		EventID:         "event-tombstone-delete",
+		EventType:       types.TimelineEventMessageDeleted,
+		ConversationID:  "conv-visible",
+		ConversationSeq: 4,
+		ConsumerGroup:   "search-test",
+		Topic:           "conversation.timeline.events",
+		PartitionID:     0,
+		OffsetValue:     5,
+		MessageID:       "msg-tombstone",
+		TombstoneStatus: types.SearchTombstoneDeleted,
+	})
+
+	items, _, err := repository.SearchMessagesByCandidates(ctx, types.SearchMessagesCommand{
+		AuthContext: types.AuthContext{
+			TenantID: "tenant-1",
+			UserID:   "user-1",
+			DeviceID: "device-1",
+		},
+		Query: "project",
+		Limit: 10,
+	}, []types.SearchMessageCandidate{
+		{ConversationID: "conv-missing-membership", MessageID: "msg-hidden"},
+		{ConversationID: "conv-visible", MessageID: "msg-visible"},
+		{ConversationID: "conv-visible", MessageID: "msg-tombstone"},
+	}, 10)
+	if err != nil {
+		t.Fatalf("search by candidates: %v", err)
+	}
+	if len(items) != 1 || items[0].MessageID != "msg-visible" {
+		t.Fatalf("expected only visible non-tombstoned candidate, got %+v", items)
+	}
+}
+
 func TestRepositoryProjectionEditLeaveAndTombstoneIntegration(t *testing.T) {
 	ctx := context.Background()
 	pool := openSearchTestPool(t)

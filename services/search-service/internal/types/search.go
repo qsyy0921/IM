@@ -70,6 +70,11 @@ type SearchMessageHit struct {
 	VisibilityVersion int64
 }
 
+type SearchMessageCandidate struct {
+	ConversationID ConversationID
+	MessageID      string
+}
+
 type SearchMessagesResult struct {
 	Items             []SearchMessageHit
 	NextCursor        string

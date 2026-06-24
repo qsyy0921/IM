@@ -256,6 +256,8 @@ fail-closed，不写 execution audit、不写 tool result projection、不调用
   `VECTOR_ITEM` 送入 EvidencePack，且不携带 raw text 或 embedding vector；
   search-service 已补 PostgreSQL FTS lexical backend first path，`SearchMessages`
   使用 token-based `plainto_tsquery + to_tsvector` 并移除 `ILIKE` substring fallback；
-  后续继续接外部 OpenSearch / BM25 backend、pgvector / Milvus / OpenSearch vector provider smoke，
+  显式 OpenSearch / BM25 candidate backend first path 已接入，外部索引只召回候选并由
+  PostgreSQL projection 做 visibility / tombstone hydration；后续继续做真实 OpenSearch
+  进程 smoke、pgvector / Milvus / OpenSearch vector provider smoke，
   以及更细 EvidencePack coverage。
 - 真实 mutation 必须等显式业务 adapter、approval、executor、audit 全部就绪后再扩展。

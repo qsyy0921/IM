@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	RetrievalVersion = "retrieval-gateway.v1.hybrid-source-chain-rrf-graph-depth1"
+	RetrievalVersion = "retrieval-gateway.v1.hybrid-source-vector-rrf-graph-depth1"
 
 	DefaultEvidenceLimit = 20
 	MaxEvidenceLimit     = 50
@@ -18,6 +18,7 @@ const (
 	EvidenceSourceSearchMessage    = "SEARCH_MESSAGE"
 	EvidenceSourceMemoryEvent      = "MEMORY_EVENT"
 	EvidenceSourceProfileAggregate = "PROFILE_AGGREGATE"
+	EvidenceSourceVectorItem       = "VECTOR_ITEM"
 
 	EvidenceCoverageNotRequested = "NOT_REQUESTED"
 	EvidenceCoverageEmpty        = "EMPTY"
@@ -37,18 +38,30 @@ const (
 	MemoryStatusActive     = "ACTIVE"
 	MemoryStatusSuperseded = "SUPERSEDED"
 	MemoryStatusArchived   = "ARCHIVED"
+
+	VectorCollectionKnowledgeChunk   = "KNOWLEDGE_CHUNK"
+	VectorCollectionMemoryEvent      = "MEMORY_EVENT"
+	VectorCollectionSearchDocument   = "SEARCH_DOCUMENT"
+	VectorCollectionProfileAggregate = "PROFILE_AGGREGATE"
+	VectorCollectionEvalFixture      = "EVAL_FIXTURE"
 )
 
 type RetrieveEvidenceCommand struct {
-	AuthContext       AuthContext
-	Query             string
-	ConversationID    ConversationID
-	AfterSeq          int64
-	Limit             int
-	IncludeSearch     bool
-	IncludeMemory     bool
-	MemoryStatuses    []string
-	AtConversationSeq int64
+	AuthContext           AuthContext
+	Query                 string
+	ConversationID        ConversationID
+	AfterSeq              int64
+	Limit                 int
+	IncludeSearch         bool
+	IncludeMemory         bool
+	IncludeVector         bool
+	MemoryStatuses        []string
+	AtConversationSeq     int64
+	QueryEmbeddingRef     string
+	VectorCollections     []string
+	VectorVisibilityScope string
+	VectorPolicyVersion   string
+	VectorMinScore        float64
 }
 
 func (command RetrieveEvidenceCommand) Validate() error {
@@ -75,6 +88,31 @@ func (command RetrieveEvidenceCommand) Validate() error {
 			return NewInvalidArgument("invalid memory status")
 		}
 	}
+	if command.ShouldIncludeVector() {
+		if strings.TrimSpace(command.QueryEmbeddingRef) == "" {
+			return NewInvalidArgument("query_embedding_ref is required for vector retrieval")
+		}
+		if containsSensitiveValue(command.QueryEmbeddingRef) {
+			return NewInvalidArgument("query_embedding_ref must be a low-sensitive reference")
+		}
+		if len(command.EffectiveVectorCollections()) == 0 {
+			return NewInvalidArgument("vector_collection_types are required")
+		}
+		if strings.TrimSpace(command.VectorVisibilityScope) == "" || strings.TrimSpace(command.VectorPolicyVersion) == "" {
+			return NewInvalidArgument("vector visibility_scope and policy_version are required")
+		}
+		if containsSensitiveValue(command.VectorVisibilityScope, command.VectorPolicyVersion) {
+			return NewInvalidArgument("vector visibility metadata must be low-sensitive")
+		}
+		if command.VectorMinScore < 0 || command.VectorMinScore > 1 {
+			return NewInvalidArgument("vector_min_score must be between 0 and 1")
+		}
+		for _, collection := range command.EffectiveVectorCollections() {
+			if !isValidVectorCollection(collection) {
+				return NewInvalidArgument("invalid vector collection type")
+			}
+		}
+	}
 	return nil
 }
 
@@ -90,11 +128,15 @@ func (command RetrieveEvidenceCommand) EffectiveLimit() int {
 }
 
 func (command RetrieveEvidenceCommand) ShouldIncludeSearch() bool {
-	return command.IncludeSearch || !command.IncludeMemory
+	return command.IncludeSearch || (!command.IncludeMemory && !command.IncludeVector)
 }
 
 func (command RetrieveEvidenceCommand) ShouldIncludeMemory() bool {
-	return command.IncludeMemory || !command.IncludeSearch
+	return command.IncludeMemory || (!command.IncludeSearch && !command.IncludeVector)
+}
+
+func (command RetrieveEvidenceCommand) ShouldIncludeVector() bool {
+	return command.IncludeVector
 }
 
 func (command RetrieveEvidenceCommand) EffectiveMemoryStatuses() []string {
@@ -104,8 +146,25 @@ func (command RetrieveEvidenceCommand) EffectiveMemoryStatuses() []string {
 	return []string{MemoryStatusActive}
 }
 
+func (command RetrieveEvidenceCommand) EffectiveVectorCollections() []string {
+	seen := map[string]struct{}{}
+	out := make([]string, 0, len(command.VectorCollections))
+	for _, collection := range command.VectorCollections {
+		normalized := strings.ToUpper(strings.TrimSpace(collection))
+		if normalized == "" {
+			continue
+		}
+		if _, ok := seen[normalized]; ok {
+			continue
+		}
+		seen[normalized] = struct{}{}
+		out = append(out, normalized)
+	}
+	return out
+}
+
 func (command RetrieveEvidenceCommand) PackID() string {
-	sum := sha256.Sum256([]byte(fmt.Sprintf("%s|%s|%s|%d|%d|%d|%t|%t",
+	sum := sha256.Sum256([]byte(fmt.Sprintf("%s|%s|%s|%d|%d|%d|%t|%t|%t|%s|%s|%s|%s|%.6f",
 		command.AuthContext.TenantID,
 		command.AuthContext.UserID,
 		command.NormalizedQuery(),
@@ -114,6 +173,12 @@ func (command RetrieveEvidenceCommand) PackID() string {
 		command.EffectiveLimit(),
 		command.ShouldIncludeSearch(),
 		command.ShouldIncludeMemory(),
+		command.ShouldIncludeVector(),
+		command.QueryEmbeddingRef,
+		strings.Join(command.EffectiveVectorCollections(), ","),
+		command.VectorVisibilityScope,
+		command.VectorPolicyVersion,
+		command.VectorMinScore,
 	)))
 	return "ep_" + hex.EncodeToString(sum[:8])
 }
@@ -129,6 +194,33 @@ type SearchQuery struct {
 type SearchResult struct {
 	Items             []SearchMessageEvidence
 	ProjectionVersion int64
+}
+
+type VectorQuery struct {
+	AuthContext        AuthContext
+	RequesterRef       string
+	RetrievalRequestID string
+	CollectionTypes    []string
+	QueryEmbeddingRef  string
+	TopK               int
+	MinScore           float64
+	VisibilityScope    string
+	PolicyVersion      string
+	At                 time.Time
+}
+
+type VectorResult struct {
+	Items []VectorItemEvidence
+}
+
+type VectorItemEvidence struct {
+	VectorItemRef     string
+	SourceRefHash     string
+	SourceService     string
+	CollectionType    string
+	Score             float64
+	VisibilityVersion int64
+	TombstoneStatus   string
 }
 
 type SearchMessageEvidence struct {
@@ -278,6 +370,11 @@ type EvidenceItem struct {
 	ProfileValidFromAt       time.Time
 	ProfileValidToAt         time.Time
 	ProfileUpdatedAt         time.Time
+	VectorItemRef            string
+	VectorSourceRefHash      string
+	VectorSourceService      string
+	VectorCollectionType     string
+	VectorTombstoneStatus    string
 }
 
 type EvidenceSourceCount struct {
@@ -318,4 +415,29 @@ func isValidMemoryStatus(status string) bool {
 	default:
 		return false
 	}
+}
+
+func isValidVectorCollection(collection string) bool {
+	switch strings.ToUpper(strings.TrimSpace(collection)) {
+	case VectorCollectionKnowledgeChunk, VectorCollectionMemoryEvent, VectorCollectionSearchDocument,
+		VectorCollectionProfileAggregate, VectorCollectionEvalFixture:
+		return true
+	default:
+		return false
+	}
+}
+
+func containsSensitiveValue(values ...string) bool {
+	for _, value := range values {
+		normalized := strings.ToLower(strings.TrimSpace(value))
+		if normalized == "" {
+			continue
+		}
+		for _, marker := range []string{"secret", "token", "api_key", "apikey", "password", "private://", "raw:", "dsn=", "postgres://", "http://", "https://", "s3://"} {
+			if strings.Contains(normalized, marker) {
+				return true
+			}
+		}
+	}
+	return false
 }

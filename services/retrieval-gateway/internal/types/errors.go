@@ -11,6 +11,7 @@ var (
 	ErrRetrievalUnavailable = errors.New("retrieval unavailable")
 	ErrSearchUnavailable    = errors.New("search unavailable")
 	ErrMemoryUnavailable    = errors.New("memory unavailable")
+	ErrVectorUnavailable    = errors.New("vector unavailable")
 )
 
 func NewInvalidArgument(reason string) error {

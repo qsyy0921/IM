@@ -2,6 +2,8 @@ package app
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 
 	"github.com/qsyy0921/IM/services/retrieval-gateway/internal/types"
@@ -10,6 +12,7 @@ import (
 type RetrieveEvidenceUseCase struct {
 	search SearchPort
 	memory MemoryPort
+	vector VectorPort
 	policy PolicyPort
 }
 
@@ -18,6 +21,12 @@ type RetrieveEvidenceOption func(*RetrieveEvidenceUseCase)
 func WithPolicyPort(policy PolicyPort) RetrieveEvidenceOption {
 	return func(usecase *RetrieveEvidenceUseCase) {
 		usecase.policy = policy
+	}
+}
+
+func WithVectorPort(vector VectorPort) RetrieveEvidenceOption {
+	return func(usecase *RetrieveEvidenceUseCase) {
+		usecase.vector = vector
 	}
 }
 
@@ -43,7 +52,7 @@ func (usecase RetrieveEvidenceUseCase) Execute(
 	}
 
 	limit := command.EffectiveLimit()
-	candidates := make([]types.EvidenceItem, 0, limit*3)
+	candidates := make([]types.EvidenceItem, 0, limit*4)
 	coverage := newSourceCoverage(command)
 	seen := map[string]int{}
 	var searchProjectionVersion int64
@@ -71,6 +80,34 @@ func (usecase RetrieveEvidenceUseCase) Execute(
 				searchMaxConversationSeq = hit.ConversationSeq
 			}
 			item := searchHitToEvidence(hit)
+			appendEvidenceCandidate(&candidates, seen, coverage, item)
+		}
+	}
+
+	if command.ShouldIncludeVector() {
+		if usecase.vector == nil {
+			return types.RetrieveEvidenceResult{}, types.ErrVectorUnavailable
+		}
+		result, err := usecase.vector.SearchVectors(ctx, types.VectorQuery{
+			AuthContext:        command.AuthContext,
+			RequesterRef:       vectorRequesterRef(command.AuthContext),
+			RetrievalRequestID: command.PackID(),
+			CollectionTypes:    command.EffectiveVectorCollections(),
+			QueryEmbeddingRef:  command.QueryEmbeddingRef,
+			TopK:               limit,
+			MinScore:           command.VectorMinScore,
+			VisibilityScope:    command.VectorVisibilityScope,
+			PolicyVersion:      command.VectorPolicyVersion,
+		})
+		if err != nil {
+			return types.RetrieveEvidenceResult{}, err
+		}
+		coverage[types.EvidenceSourceVectorItem].CandidateCount = len(result.Items)
+		for _, hit := range result.Items {
+			item, err := vectorItemToEvidence(hit)
+			if err != nil {
+				return types.RetrieveEvidenceResult{}, err
+			}
 			appendEvidenceCandidate(&candidates, seen, coverage, item)
 		}
 	}
@@ -186,6 +223,7 @@ type sourceCoverageState struct {
 func newSourceCoverage(command types.RetrieveEvidenceCommand) map[string]*sourceCoverageState {
 	return map[string]*sourceCoverageState{
 		types.EvidenceSourceSearchMessage:    &sourceCoverageState{Requested: command.ShouldIncludeSearch()},
+		types.EvidenceSourceVectorItem:       &sourceCoverageState{Requested: command.ShouldIncludeVector()},
 		types.EvidenceSourceMemoryEvent:      &sourceCoverageState{Requested: command.ShouldIncludeMemory()},
 		types.EvidenceSourceProfileAggregate: &sourceCoverageState{Requested: command.ShouldIncludeMemory()},
 	}
@@ -307,13 +345,36 @@ func profileAggregateToEvidence(profile types.ProfileAggregateEvidence) types.Ev
 	}
 }
 
+func vectorItemToEvidence(hit types.VectorItemEvidence) (types.EvidenceItem, error) {
+	if hit.VectorItemRef == "" || hit.SourceRefHash == "" || hit.SourceService == "" || hit.CollectionType == "" {
+		return types.EvidenceItem{}, types.ErrRetrievalUnavailable
+	}
+	return types.EvidenceItem{
+		EvidenceID:            "vector:" + hit.VectorItemRef,
+		SourceType:            types.EvidenceSourceVectorItem,
+		SourceID:              hit.VectorItemRef,
+		Score:                 hit.Score,
+		VisibilityVersion:     hit.VisibilityVersion,
+		VectorItemRef:         hit.VectorItemRef,
+		VectorSourceRefHash:   hit.SourceRefHash,
+		VectorSourceService:   hit.SourceService,
+		VectorCollectionType:  hit.CollectionType,
+		VectorTombstoneStatus: hit.TombstoneStatus,
+		SourceRefs: []types.EvidenceSourceRef{{
+			SourceType: "VECTOR_SOURCE_REF_HASH",
+			SourceID:   hit.SourceRefHash,
+		}},
+	}, nil
+}
+
+func vectorRequesterRef(auth types.AuthContext) string {
+	sum := sha256.Sum256([]byte(fmt.Sprintf("%s|%s|%s", auth.TenantID, auth.UserID, auth.DeviceID)))
+	return "retrieval-requester:" + hex.EncodeToString(sum[:8])
+}
+
 func orderedSourceCounts(counts map[string]int) []types.EvidenceSourceCount {
-	out := make([]types.EvidenceSourceCount, 0, 3)
-	for _, sourceType := range []string{
-		types.EvidenceSourceSearchMessage,
-		types.EvidenceSourceMemoryEvent,
-		types.EvidenceSourceProfileAggregate,
-	} {
+	out := make([]types.EvidenceSourceCount, 0, len(evidenceSourceOrder()))
+	for _, sourceType := range evidenceSourceOrder() {
 		if count := counts[sourceType]; count > 0 {
 			out = append(out, types.EvidenceSourceCount{SourceType: sourceType, Count: count})
 		}
@@ -321,13 +382,23 @@ func orderedSourceCounts(counts map[string]int) []types.EvidenceSourceCount {
 	return out
 }
 
+func evidenceSourceOrder() []string {
+	return []string{
+		types.EvidenceSourceSearchMessage,
+		types.EvidenceSourceVectorItem,
+		types.EvidenceSourceMemoryEvent,
+		types.EvidenceSourceProfileAggregate,
+	}
+}
+
 func orderedSourceCoverage(
 	coverage map[string]*sourceCoverageState,
 	sourceCounts map[string]int,
 ) []types.EvidenceSourceCoverage {
-	out := make([]types.EvidenceSourceCoverage, 0, 3)
+	out := make([]types.EvidenceSourceCoverage, 0, len(evidenceSourceOrder()))
 	for _, sourceType := range []string{
 		types.EvidenceSourceSearchMessage,
+		types.EvidenceSourceVectorItem,
 		types.EvidenceSourceMemoryEvent,
 		types.EvidenceSourceProfileAggregate,
 	} {

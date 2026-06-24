@@ -7,6 +7,8 @@ import (
 
 	retrievalv1 "github.com/qsyy0921/IM/api/proto/nexusim/retrieval/v1"
 	"github.com/qsyy0921/IM/services/retrieval-gateway/internal/types"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func TestRetrieveEvidenceMapsResult(t *testing.T) {
@@ -40,6 +42,21 @@ func TestRetrieveEvidenceMapsResult(t *testing.T) {
 						ConversationSeq: 2,
 					}},
 				}},
+			}, {
+				EvidenceID:            "vector:vitem-1",
+				SourceType:            types.EvidenceSourceVectorItem,
+				SourceID:              "vitem-1",
+				VectorItemRef:         "vitem-1",
+				VectorSourceRefHash:   "sha256:source",
+				VectorSourceService:   "memory-service",
+				VectorCollectionType:  types.VectorCollectionMemoryEvent,
+				VectorTombstoneStatus: "NONE",
+				Score:                 0.88,
+				VisibilityVersion:     7,
+				SourceRefs: []types.EvidenceSourceRef{{
+					SourceType: "VECTOR_SOURCE_REF_HASH",
+					SourceID:   "sha256:source",
+				}},
 			}},
 			SourceCoverage: []types.EvidenceSourceCoverage{{
 				SourceType:     types.EvidenceSourceSearchMessage,
@@ -60,6 +77,15 @@ func TestRetrieveEvidenceMapsResult(t *testing.T) {
 	}
 	if got := response.GetPack().GetItems()[0].GetSourceType(); got != retrievalv1.EvidenceSourceType_EVIDENCE_SOURCE_TYPE_SEARCH_MESSAGE {
 		t.Fatalf("unexpected source type %v", got)
+	}
+	vectorItem := response.GetPack().GetItems()[1]
+	if vectorItem.GetSourceType() != retrievalv1.EvidenceSourceType_EVIDENCE_SOURCE_TYPE_VECTOR_ITEM ||
+		vectorItem.GetVectorItemRef() != "vitem-1" ||
+		vectorItem.GetVectorSourceRefHash() != "sha256:source" ||
+		vectorItem.GetVectorSourceService() != "memory-service" ||
+		vectorItem.GetVectorCollectionType() != types.VectorCollectionMemoryEvent ||
+		vectorItem.GetVectorTombstoneStatus() != "NONE" {
+		t.Fatalf("vector evidence item not mapped: %+v", vectorItem)
 	}
 	if got := response.GetPack().GetItems()[0].GetRerankScore(); got != 0.9 {
 		t.Fatalf("unexpected rerank score %v", got)
@@ -97,6 +123,16 @@ func TestRetrieveEvidenceMapsUnavailable(t *testing.T) {
 	}
 }
 
+func TestRetrieveEvidenceMapsVectorUnavailable(t *testing.T) {
+	_, err := NewServer(fakeRetrieveExecutor{err: types.ErrVectorUnavailable}).RetrieveEvidence(context.Background(), validRequest())
+	if status.Code(err) != codes.Unavailable {
+		t.Fatalf("expected unavailable, got %v", err)
+	}
+	if status.Convert(err).Message() != "vector unavailable" {
+		t.Fatalf("unexpected public error %q", status.Convert(err).Message())
+	}
+}
+
 func TestRetrieveEvidenceMapsAtConversationSeq(t *testing.T) {
 	executor := &recordingRetrieveExecutor{result: types.RetrieveEvidenceResult{
 		Pack: types.EvidencePack{PackID: "ep_1", RetrievalVersion: types.RetrievalVersion},
@@ -109,6 +145,33 @@ func TestRetrieveEvidenceMapsAtConversationSeq(t *testing.T) {
 	}
 	if got := executor.command.AtConversationSeq; got != 42 {
 		t.Fatalf("expected at_conversation_seq 42, got %d", got)
+	}
+}
+
+func TestRetrieveEvidenceMapsVectorRequestFields(t *testing.T) {
+	executor := &recordingRetrieveExecutor{result: types.RetrieveEvidenceResult{
+		Pack: types.EvidencePack{PackID: "ep_1", RetrievalVersion: types.RetrievalVersion},
+	}}
+	request := validRequest()
+	request.IncludeVector = true
+	request.QueryEmbeddingRef = "embedding-ref-1"
+	request.VectorCollectionTypes = []string{types.VectorCollectionMemoryEvent}
+	request.VectorVisibilityScope = "tenant:tenant-1:user:user-1"
+	request.VectorPolicyVersion = "policy-v1"
+	request.VectorMinScore = 0.35
+	_, err := NewServer(executor).RetrieveEvidence(context.Background(), request)
+	if err != nil {
+		t.Fatalf("RetrieveEvidence returned error: %v", err)
+	}
+	command := executor.command
+	if !command.IncludeVector ||
+		command.QueryEmbeddingRef != "embedding-ref-1" ||
+		len(command.VectorCollections) != 1 ||
+		command.VectorCollections[0] != types.VectorCollectionMemoryEvent ||
+		command.VectorVisibilityScope != "tenant:tenant-1:user:user-1" ||
+		command.VectorPolicyVersion != "policy-v1" ||
+		command.VectorMinScore != 0.35 {
+		t.Fatalf("vector request fields not mapped: %+v", command)
 	}
 }
 

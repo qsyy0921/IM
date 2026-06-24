@@ -52,6 +52,7 @@ func buildRankFusionLanes(items []types.EvidenceItem) [][]int {
 	ordered := make([][]int, 0, len(lanesByName))
 	for _, name := range []string{
 		"lexical_search",
+		"vector_item",
 		"memory_event",
 		"profile_aggregate",
 		"source_chain",
@@ -71,6 +72,8 @@ func evidenceRankLanes(item types.EvidenceItem) []string {
 	switch item.SourceType {
 	case types.EvidenceSourceSearchMessage:
 		lanes = append(lanes, "lexical_search")
+	case types.EvidenceSourceVectorItem:
+		lanes = append(lanes, "vector_item")
 	case types.EvidenceSourceMemoryEvent:
 		lanes = append(lanes, "memory_event")
 		if len(item.SourceRefs) > 1 || hasCrossConversationSourceRef(item.ConversationID, item.SourceRefs) {

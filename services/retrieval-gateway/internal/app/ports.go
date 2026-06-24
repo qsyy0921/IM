@@ -16,6 +16,10 @@ type MemoryPort interface {
 	ListProfileAggregates(context.Context, types.ProfileAggregateQuery) (types.ProfileAggregateResult, error)
 }
 
+type VectorPort interface {
+	SearchVectors(context.Context, types.VectorQuery) (types.VectorResult, error)
+}
+
 type PolicyPort interface {
 	CheckRetrieveEvidence(context.Context, types.RetrievalPolicyCheck) (types.RetrievalPolicyDecision, error)
 }

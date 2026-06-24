@@ -1,6 +1,6 @@
 # retrieval-gateway
 
-状态：foundation-active / EvidencePack graph depth=1 + profile evidence expansion first pass passed。
+状态：foundation-active / EvidencePack vector source adapter + graph depth=1 passed。
 
 定位：统一 search + memory 的检索入口，向 RAG / summary / Agent 提供
 `EvidencePack`。它不直接读业务库，不调用 LLM，不执行 Agent 动作。
@@ -10,8 +10,8 @@
 - `docs/sdd/retrieval-gateway.md`
 - `api/proto/nexusim/retrieval/v1/retrieval_gateway.proto`
 - `services/retrieval-gateway` 六层 skeleton、`grpc` runtime mode、debug `/metrics`
-- app usecase：调用 search / memory ports，归一成 EvidencePack
-- infrastructure RPC clients：只依赖 search / memory 公开 proto
+- app usecase：调用 search / memory / vector ports，归一成 EvidencePack
+- infrastructure RPC clients：只依赖 search / memory / vector 公开 proto
 - 可选 policy-service retrieval precheck：配置 `NEXUSIM_POLICY_GRPC_ADDR` 后，
   app 层在 search / memory 前通过 `CheckToolAction` fail-closed 检查
 - registry / Docker runtime / local compose / Prometheus / Grafana foundation-active wiring
@@ -78,6 +78,17 @@
   相邻 memory 必须满足当前请求 memory status，lookup 失败、不可见或 edge 不引用
   source memory 时 fail-closed。focused app tests 覆盖正常一跳扩展、相邻 lookup
   fail-closed、superseded 邻接 memory 默认过滤和 malformed graph edge fail-closed。
+- 2026-06-24 EvidencePack vector source adapter first path 已落：
+  strategy version 推进为 `retrieval-gateway.v1.hybrid-source-vector-rrf-graph-depth1`。
+  `RetrieveEvidence` 支持显式 `include_vector`，并要求调用方提供低敏
+  `query_embedding_ref`、明确的 `vector_collection_types`、`vector_visibility_scope`
+  和 `vector_policy_version`；
+  retrieval-gateway 通过 vector-index-service 公开 `SearchVectors` 获取
+  `VECTOR_ITEM` evidence，只返回 vector item ref、source ref hash、source service、
+  collection type、visibility version 和 tombstone status，不传 raw text 或 embedding
+  vector。vector lane 独立参与 RRF 风格融合，不与 BM25 / vector 原始分数直接比较；
+  未配置 vector port、vector 依赖错误或 malformed vector result 均 fail-closed。
 
-下一步：继续把真实 BM25 / vector provider adapter、更深或可配置 graph expansion 和
-更细 source-chain coverage 通过 EvidencePack 暴露给 RAG / summary / Agent，仍不绕过 retrieval-gateway。
+下一步：继续把真实 BM25 backend、vector backend live smoke、更深或可配置 graph
+expansion 和更细 source-chain / vector coverage 通过 EvidencePack 暴露给 RAG /
+summary / Agent，仍不绕过 retrieval-gateway。

@@ -68,3 +68,23 @@ func mapPolicyError(err error) error {
 		return types.ErrRetrievalUnavailable
 	}
 }
+
+func mapVectorError(err error) error {
+	if errors.Is(err, context.DeadlineExceeded) {
+		return types.ErrVectorUnavailable
+	}
+	st, ok := status.FromError(err)
+	if !ok {
+		return types.ErrVectorUnavailable
+	}
+	switch st.Code() {
+	case codes.InvalidArgument:
+		return types.ErrInvalidArgument
+	case codes.PermissionDenied:
+		return types.ErrPermissionDenied
+	case codes.Unavailable, codes.DeadlineExceeded:
+		return types.ErrVectorUnavailable
+	default:
+		return types.ErrVectorUnavailable
+	}
+}

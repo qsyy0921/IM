@@ -20,6 +20,9 @@ Stage-switch：`docs/runbook/stage-switch/vector-index-service.md`。
 - `knowledge.chunk.ready.v1 -> chunk-consumer -> vector_embedding_tasks` handoff。
 - PostgreSQL embedding task queue、embedding-producer、embedding-worker。
 - `postgres-test` provider sink 和 rebuild backfill focused smoke。
+- retrieval-gateway 已通过公开 `SearchVectors` adapter first path 消费 vector item
+  ref / source ref hash / visibility metadata，并以 `VECTOR_ITEM` EvidencePack source
+  暴露给 RAG / summary / Agent；vector-index-service 仍不直接服务 RAG 请求。
 - optional pgvector adapter 包和 compose overlay；默认不启用，不进入普通 migration。
 
 证据入口：`docs/runbook/loadtest/vector-index-service/` 和 `loadtest/vectorembedding`。

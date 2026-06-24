@@ -201,6 +201,14 @@ IM messages -> search / memory projection -> EvidencePack -> RAG / Agent answer 
   只证明 approval / action audit 边界、source-chain evidence 和低敏 input hash 成立。
   真实 `ai-eval-rag-agent-demo-live-20260624-business-proposal-source-chain-gate-v1`
   service-stack gate 已通过：4 adapters、27 cases、27 passed、0 failed、0 skipped。
+- 2026-06-24 retrieval-gateway 已补 vector-index-service `SearchVectors` adapter
+  first path：`RetrieveEvidence` 支持显式 `include_vector`，调用方必须提供低敏
+  `query_embedding_ref`、明确的 `vector_collection_types`、`vector_visibility_scope`
+  和 `vector_policy_version`；
+  retrieval-gateway 只把 vector item ref、source ref hash、source service、
+  collection type、visibility version 和 tombstone status 放入 `VECTOR_ITEM`
+  EvidencePack，不传 raw text 或 embedding vector。vector lane 独立参与 RRF 风格融合；
+  未配置 vector port、vector dependency error 或 malformed vector result 均 fail-closed。
 - 已有 clean smoke 覆盖真实双用户好友直聊、群聊 first path、群资料 BFF
   read/update 和群成员动作链路；证据见 `docs/runbook/client-platform.md`。
 - Windows desktop 已有 artifact / signing / installer plan first paths；签名 / installer
@@ -281,13 +289,15 @@ IM messages -> search / memory projection -> EvidencePack -> RAG / Agent answer 
    归档：4 adapters / 27 cases / 27 passed / 0 failed / 0 skipped，
    `memory_rerank_score=1.29` 高于 single search baseline。显式业务
    mutation 场景必须等业务 adapter 准备好后再扩展。retrieval strategy version
-   已推进为 `retrieval-gateway.v1.hybrid-source-chain-rrf-graph-depth1`：rerank 在截断 limit
+   已推进为 `retrieval-gateway.v1.hybrid-source-vector-rrf-graph-depth1`：rerank 在截断 limit
    前按 lexical search、memory event、profile aggregate、source chain、
-   memory graph、actor attribution 和 profile support lane 做 RRF 风格融合，
+   vector item、memory graph、actor attribution 和 profile support lane 做 RRF 风格融合，
    并沿 memory graph edge 做 first-stage depth=1 相邻 memory expansion；相邻 memory
    继续通过 memory-service 公开 `GetMemoryEvent` 和当前 memory status 过滤，lookup /
-   visibility / malformed edge 失败时 fail-closed。后续真实 BM25 / vector provider
-   adapter 和更深或可配置 graph expansion 仍保持在 retrieval-gateway 边界内。
+   visibility / malformed edge 失败时 fail-closed；显式 vector retrieval 会通过
+   vector-index-service 公开 `SearchVectors` 返回 `VECTOR_ITEM` source。后续真实 BM25
+   backend、vector backend live smoke 和更深或可配置 graph expansion 仍保持在
+   retrieval-gateway 边界内。
 5. 客户端只作为演示入口；除非阻塞上述演示，不继续扩 UI 产品化。
 6. Windows release signing / MSI / NSIS installer、完整 Android、完整移动端发布、
    复杂 UI、群管理深水区和真实 media provider 链路全部后置到 backlog。

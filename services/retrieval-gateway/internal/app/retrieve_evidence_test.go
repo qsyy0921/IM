@@ -120,19 +120,22 @@ func TestRetrieveEvidenceMergesSearchAndMemory(t *testing.T) {
 	if got := memory.query.Statuses; len(got) != 1 || got[0] != types.MemoryStatusActive {
 		t.Fatalf("expected active memory status by default, got %+v", got)
 	}
-	if got := result.Pack.SourceCoverage; len(got) != 3 ||
+	if got := result.Pack.SourceCoverage; len(got) != 4 ||
 		got[0].SourceType != types.EvidenceSourceSearchMessage ||
 		got[0].CandidateCount != 1 ||
 		got[0].ReturnedCount != 1 ||
 		got[0].Status != types.EvidenceCoverageReturned ||
-		got[1].SourceType != types.EvidenceSourceMemoryEvent ||
-		got[1].CandidateCount != 2 ||
-		got[1].ReturnedCount != 2 ||
-		got[1].Status != types.EvidenceCoverageReturned ||
-		got[2].SourceType != types.EvidenceSourceProfileAggregate ||
-		got[2].CandidateCount != 0 ||
-		got[2].ReturnedCount != 0 ||
-		got[2].Status != types.EvidenceCoverageEmpty {
+		got[1].SourceType != types.EvidenceSourceVectorItem ||
+		got[1].Requested ||
+		got[1].Status != types.EvidenceCoverageNotRequested ||
+		got[2].SourceType != types.EvidenceSourceMemoryEvent ||
+		got[2].CandidateCount != 2 ||
+		got[2].ReturnedCount != 2 ||
+		got[2].Status != types.EvidenceCoverageReturned ||
+		got[3].SourceType != types.EvidenceSourceProfileAggregate ||
+		got[3].CandidateCount != 0 ||
+		got[3].ReturnedCount != 0 ||
+		got[3].Status != types.EvidenceCoverageEmpty {
 		t.Fatalf("unexpected source coverage: %+v", got)
 	}
 }
@@ -240,6 +243,111 @@ func TestRetrieveEvidenceHonorsSourceFlags(t *testing.T) {
 	}
 }
 
+func TestRetrieveEvidenceIncludesExplicitVectorSource(t *testing.T) {
+	command := validVectorCommand()
+	vector := fakeVectorPort{result: types.VectorResult{
+		Items: []types.VectorItemEvidence{{
+			VectorItemRef:     "vitem_1",
+			SourceRefHash:     "sha256:source-ref",
+			SourceService:     "memory-service",
+			CollectionType:    types.VectorCollectionMemoryEvent,
+			Score:             0.72,
+			VisibilityVersion: 11,
+			TombstoneStatus:   "NONE",
+		}},
+	}}
+	search := fakeSearchPort{}
+	memory := fakeMemoryPort{}
+	result, err := NewRetrieveEvidenceUseCase(&search, &memory, WithVectorPort(&vector)).Execute(context.Background(), command)
+	if err != nil {
+		t.Fatalf("Execute returned error: %v", err)
+	}
+	if search.called || memory.called || !vector.called {
+		t.Fatalf("expected only vector to be called: search=%t memory=%t vector=%t", search.called, memory.called, vector.called)
+	}
+	if vector.query.QueryEmbeddingRef != "sha256:query-embedding" ||
+		vector.query.VisibilityScope != "tenant:tenant-1:user:user-1" ||
+		vector.query.PolicyVersion != "policy-v1" ||
+		vector.query.TopK != command.EffectiveLimit() ||
+		vector.query.RetrievalRequestID != command.PackID() ||
+		len(vector.query.CollectionTypes) != 1 ||
+		vector.query.CollectionTypes[0] != types.VectorCollectionMemoryEvent {
+		t.Fatalf("unexpected vector query: %+v", vector.query)
+	}
+	if got := len(result.Pack.Items); got != 1 {
+		t.Fatalf("expected one vector item, got %d", got)
+	}
+	item := result.Pack.Items[0]
+	if item.SourceType != types.EvidenceSourceVectorItem ||
+		item.VectorItemRef != "vitem_1" ||
+		item.VectorSourceRefHash != "sha256:source-ref" ||
+		item.VectorSourceService != "memory-service" ||
+		item.VectorCollectionType != types.VectorCollectionMemoryEvent ||
+		item.VectorTombstoneStatus != "NONE" ||
+		item.RerankScore <= item.Score ||
+		len(item.SourceRefs) != 1 ||
+		item.SourceRefs[0].SourceID != "sha256:source-ref" {
+		t.Fatalf("unexpected vector evidence item: %+v", item)
+	}
+	if got := result.Pack.SourceCoverage; len(got) != 4 ||
+		got[0].SourceType != types.EvidenceSourceSearchMessage ||
+		got[0].Status != types.EvidenceCoverageNotRequested ||
+		got[1].SourceType != types.EvidenceSourceVectorItem ||
+		!got[1].Requested ||
+		got[1].CandidateCount != 1 ||
+		got[1].ReturnedCount != 1 ||
+		got[1].Status != types.EvidenceCoverageReturned ||
+		got[2].SourceType != types.EvidenceSourceMemoryEvent ||
+		got[2].Status != types.EvidenceCoverageNotRequested ||
+		got[3].SourceType != types.EvidenceSourceProfileAggregate ||
+		got[3].Status != types.EvidenceCoverageNotRequested {
+		t.Fatalf("unexpected vector source coverage: %+v", got)
+	}
+}
+
+func TestRetrieveEvidenceFailsClosedWhenVectorPortMissing(t *testing.T) {
+	_, err := NewRetrieveEvidenceUseCase(&fakeSearchPort{}, &fakeMemoryPort{}).Execute(context.Background(), validVectorCommand())
+	if !errors.Is(err, types.ErrVectorUnavailable) {
+		t.Fatalf("expected vector unavailable, got %v", err)
+	}
+}
+
+func TestRetrieveEvidenceFailsClosedWhenVectorSearchFails(t *testing.T) {
+	vector := fakeVectorPort{err: types.ErrVectorUnavailable}
+	_, err := NewRetrieveEvidenceUseCase(&fakeSearchPort{}, &fakeMemoryPort{}, WithVectorPort(&vector)).Execute(context.Background(), validVectorCommand())
+	if !errors.Is(err, types.ErrVectorUnavailable) {
+		t.Fatalf("expected vector unavailable, got %v", err)
+	}
+}
+
+func TestRetrieveEvidenceRejectsVectorWithoutEmbeddingRef(t *testing.T) {
+	command := validVectorCommand()
+	command.QueryEmbeddingRef = ""
+	_, err := NewRetrieveEvidenceUseCase(&fakeSearchPort{}, &fakeMemoryPort{}, WithVectorPort(&fakeVectorPort{})).Execute(context.Background(), command)
+	if !errors.Is(err, types.ErrInvalidArgument) {
+		t.Fatalf("expected invalid argument, got %v", err)
+	}
+}
+
+func TestRetrieveEvidenceRejectsVectorWithoutCollectionTypes(t *testing.T) {
+	command := validVectorCommand()
+	command.VectorCollections = nil
+	_, err := NewRetrieveEvidenceUseCase(&fakeSearchPort{}, &fakeMemoryPort{}, WithVectorPort(&fakeVectorPort{})).Execute(context.Background(), command)
+	if !errors.Is(err, types.ErrInvalidArgument) {
+		t.Fatalf("expected invalid argument, got %v", err)
+	}
+}
+
+func TestRetrieveEvidenceFailsClosedOnMalformedVectorResult(t *testing.T) {
+	vector := fakeVectorPort{result: types.VectorResult{
+		Items: []types.VectorItemEvidence{{VectorItemRef: "vitem_1"}},
+	}}
+	_, err := NewRetrieveEvidenceUseCase(&fakeSearchPort{}, &fakeMemoryPort{}, WithVectorPort(&vector)).Execute(context.Background(), validVectorCommand())
+	if !errors.Is(err, types.ErrRetrievalUnavailable) {
+		t.Fatalf("expected retrieval unavailable, got %v", err)
+	}
+}
+
 func TestRetrieveEvidenceDedupeAndCoverage(t *testing.T) {
 	command := validCommand()
 	command.IncludeSearch = false
@@ -260,19 +368,22 @@ func TestRetrieveEvidenceDedupeAndCoverage(t *testing.T) {
 	if item := result.Pack.Items[0]; item.Text != "first" || item.DedupeReason != types.EvidenceDedupeKeptFirstDuplicateSource {
 		t.Fatalf("unexpected deduped item: %+v", item)
 	}
-	if got := result.Pack.SourceCoverage; len(got) != 3 ||
+	if got := result.Pack.SourceCoverage; len(got) != 4 ||
 		got[0].SourceType != types.EvidenceSourceSearchMessage ||
 		got[0].Requested ||
 		got[0].Status != types.EvidenceCoverageNotRequested ||
-		got[1].SourceType != types.EvidenceSourceMemoryEvent ||
-		!got[1].Requested ||
-		got[1].CandidateCount != 2 ||
-		got[1].ReturnedCount != 1 ||
-		got[1].DedupedCount != 1 ||
-		got[1].Status != types.EvidenceCoverageReturned ||
-		got[2].SourceType != types.EvidenceSourceProfileAggregate ||
+		got[1].SourceType != types.EvidenceSourceVectorItem ||
+		got[1].Requested ||
+		got[1].Status != types.EvidenceCoverageNotRequested ||
+		got[2].SourceType != types.EvidenceSourceMemoryEvent ||
 		!got[2].Requested ||
-		got[2].Status != types.EvidenceCoverageEmpty {
+		got[2].CandidateCount != 2 ||
+		got[2].ReturnedCount != 1 ||
+		got[2].DedupedCount != 1 ||
+		got[2].Status != types.EvidenceCoverageReturned ||
+		got[3].SourceType != types.EvidenceSourceProfileAggregate ||
+		!got[3].Requested ||
+		got[3].Status != types.EvidenceCoverageEmpty {
 		t.Fatalf("unexpected source coverage: %+v", got)
 	}
 }
@@ -323,11 +434,11 @@ func TestRetrieveEvidenceCarriesProfileAggregateEvidence(t *testing.T) {
 		item.Text == "" {
 		t.Fatalf("profile evidence was not preserved: %+v", item)
 	}
-	if got := result.Pack.SourceCoverage; len(got) != 3 ||
-		got[2].SourceType != types.EvidenceSourceProfileAggregate ||
-		got[2].CandidateCount != 1 ||
-		got[2].ReturnedCount != 1 ||
-		got[2].Status != types.EvidenceCoverageReturned {
+	if got := result.Pack.SourceCoverage; len(got) != 4 ||
+		got[3].SourceType != types.EvidenceSourceProfileAggregate ||
+		got[3].CandidateCount != 1 ||
+		got[3].ReturnedCount != 1 ||
+		got[3].Status != types.EvidenceCoverageReturned {
 		t.Fatalf("unexpected profile source coverage: %+v", got)
 	}
 }
@@ -419,7 +530,7 @@ func TestRetrieveEvidenceFiltersGraphExpansionByMemoryStatus(t *testing.T) {
 	if result.Pack.Items[0].MemoryEventID != "mem-current" {
 		t.Fatalf("unexpected retained memory item: %+v", result.Pack.Items[0])
 	}
-	if coverage := result.Pack.SourceCoverage[1]; coverage.CandidateCount != 2 || coverage.ReturnedCount != 1 {
+	if coverage := result.Pack.SourceCoverage[2]; coverage.CandidateCount != 2 || coverage.ReturnedCount != 1 {
 		t.Fatalf("expected filtered adjacent memory to be counted but not returned, got %+v", coverage)
 	}
 }
@@ -468,7 +579,7 @@ func TestRetrieveEvidenceReranksBeforeTruncating(t *testing.T) {
 	if got := result.Pack.Items[0].MemoryEventID; got != "mem-high" {
 		t.Fatalf("expected highest rerank item, got %q", got)
 	}
-	if coverage := result.Pack.SourceCoverage[1]; coverage.CandidateCount != 2 || coverage.ReturnedCount != 1 || coverage.Status != types.EvidenceCoverageReturned {
+	if coverage := result.Pack.SourceCoverage[2]; coverage.CandidateCount != 2 || coverage.ReturnedCount != 1 || coverage.Status != types.EvidenceCoverageReturned {
 		t.Fatalf("unexpected memory coverage: %+v", coverage)
 	}
 }
@@ -515,7 +626,7 @@ func TestRetrieveEvidenceRerankRewardsSourceChainBeforeTruncating(t *testing.T) 
 		t.Fatalf("expected source-chain rerank score above single search baseline, got %+v", item)
 	}
 	if coverage := result.Pack.SourceCoverage; coverage[0].Status != types.EvidenceCoverageFiltered ||
-		coverage[1].Status != types.EvidenceCoverageReturned {
+		coverage[2].Status != types.EvidenceCoverageReturned {
 		t.Fatalf("unexpected coverage after source-chain rerank truncation: %+v", coverage)
 	}
 }
@@ -527,6 +638,11 @@ func TestRankFusionRewardsMultiLaneEvidence(t *testing.T) {
 			SourceID:       "msg-search",
 			ConversationID: "conv-1",
 			Score:          1,
+		},
+		{
+			SourceType: types.EvidenceSourceVectorItem,
+			SourceID:   "vitem-1",
+			Score:      0.88,
 		},
 		{
 			SourceType:      types.EvidenceSourceMemoryEvent,
@@ -559,10 +675,14 @@ func TestRankFusionRewardsMultiLaneEvidence(t *testing.T) {
 
 	scores := rankFusionScores(items)
 	searchScore := scores[evidenceCandidateKey(items[0])]
-	memoryScore := scores[evidenceCandidateKey(items[1])]
-	profileScore := scores[evidenceCandidateKey(items[2])]
+	vectorScore := scores[evidenceCandidateKey(items[1])]
+	memoryScore := scores[evidenceCandidateKey(items[2])]
+	profileScore := scores[evidenceCandidateKey(items[3])]
 	if searchScore <= 0 {
 		t.Fatalf("expected lexical search lane score, got %f", searchScore)
+	}
+	if vectorScore <= 0 {
+		t.Fatalf("expected vector lane score, got %f", vectorScore)
 	}
 	if memoryScore <= searchScore {
 		t.Fatalf("expected memory evidence with source-chain, graph, and actor lanes to outrank single-lane search fusion: search=%f memory=%f", searchScore, memoryScore)
@@ -602,6 +722,19 @@ func validCommand() types.RetrieveEvidenceCommand {
 	}
 }
 
+func validVectorCommand() types.RetrieveEvidenceCommand {
+	command := validCommand()
+	command.IncludeSearch = false
+	command.IncludeMemory = false
+	command.IncludeVector = true
+	command.QueryEmbeddingRef = "sha256:query-embedding"
+	command.VectorCollections = []string{types.VectorCollectionMemoryEvent}
+	command.VectorVisibilityScope = "tenant:tenant-1:user:user-1"
+	command.VectorPolicyVersion = "policy-v1"
+	command.VectorMinScore = 0.2
+	return command
+}
+
 type fakeSearchPort struct {
 	result types.SearchResult
 	err    error
@@ -625,6 +758,19 @@ type fakeMemoryPort struct {
 	query         types.MemoryQuery
 	profileQuery  types.ProfileAggregateQuery
 	details       map[string]types.MemoryEventLookupResult
+}
+
+type fakeVectorPort struct {
+	result types.VectorResult
+	err    error
+	called bool
+	query  types.VectorQuery
+}
+
+func (port *fakeVectorPort) SearchVectors(_ context.Context, query types.VectorQuery) (types.VectorResult, error) {
+	port.called = true
+	port.query = query
+	return port.result, port.err
 }
 
 func (port *fakeMemoryPort) QueryMemoryEvents(_ context.Context, query types.MemoryQuery) (types.MemoryResult, error) {

@@ -43,15 +43,21 @@ func (server *Server) RetrieveEvidence(
 		return nil, status.Error(codes.InvalidArgument, "auth_context is required")
 	}
 	result, err := server.retrieveEvidence.Execute(ctx, types.RetrieveEvidenceCommand{
-		AuthContext:       auth,
-		Query:             request.GetQuery(),
-		ConversationID:    types.ConversationID(request.GetConversationId()),
-		AfterSeq:          request.GetAfterSeq(),
-		Limit:             int(request.GetLimit()),
-		IncludeSearch:     request.GetIncludeSearch(),
-		IncludeMemory:     request.GetIncludeMemory(),
-		MemoryStatuses:    memoryStatusesFromProto(request.GetMemoryStatuses()),
-		AtConversationSeq: request.GetAtConversationSeq(),
+		AuthContext:           auth,
+		Query:                 request.GetQuery(),
+		ConversationID:        types.ConversationID(request.GetConversationId()),
+		AfterSeq:              request.GetAfterSeq(),
+		Limit:                 int(request.GetLimit()),
+		IncludeSearch:         request.GetIncludeSearch(),
+		IncludeMemory:         request.GetIncludeMemory(),
+		IncludeVector:         request.GetIncludeVector(),
+		MemoryStatuses:        memoryStatusesFromProto(request.GetMemoryStatuses()),
+		AtConversationSeq:     request.GetAtConversationSeq(),
+		QueryEmbeddingRef:     request.GetQueryEmbeddingRef(),
+		VectorCollections:     request.GetVectorCollectionTypes(),
+		VectorVisibilityScope: request.GetVectorVisibilityScope(),
+		VectorPolicyVersion:   request.GetVectorPolicyVersion(),
+		VectorMinScore:        request.GetVectorMinScore(),
 	})
 	if err != nil {
 		return nil, publicError(err)
@@ -96,6 +102,8 @@ func publicError(err error) error {
 		return status.Error(codes.Unavailable, "search unavailable")
 	case errors.Is(err, types.ErrMemoryUnavailable):
 		return status.Error(codes.Unavailable, "memory unavailable")
+	case errors.Is(err, types.ErrVectorUnavailable):
+		return status.Error(codes.Unavailable, "vector unavailable")
 	case errors.Is(err, types.ErrRetrievalUnavailable):
 		return status.Error(codes.Unavailable, "retrieval unavailable")
 	default:
@@ -188,6 +196,11 @@ func evidenceItemToProto(item types.EvidenceItem) *retrievalv1.EvidenceItem {
 		ProfileValidFromUnixMs:   unixMillis(item.ProfileValidFromAt),
 		ProfileValidToUnixMs:     unixMillis(item.ProfileValidToAt),
 		ProfileUpdatedAtUnixMs:   unixMillis(item.ProfileUpdatedAt),
+		VectorItemRef:            item.VectorItemRef,
+		VectorSourceRefHash:      item.VectorSourceRefHash,
+		VectorSourceService:      item.VectorSourceService,
+		VectorCollectionType:     item.VectorCollectionType,
+		VectorTombstoneStatus:    item.VectorTombstoneStatus,
 	}
 }
 
@@ -231,6 +244,8 @@ func sourceTypeToProto(sourceType string) retrievalv1.EvidenceSourceType {
 		return retrievalv1.EvidenceSourceType_EVIDENCE_SOURCE_TYPE_MEMORY_EVENT
 	case types.EvidenceSourceProfileAggregate:
 		return retrievalv1.EvidenceSourceType_EVIDENCE_SOURCE_TYPE_PROFILE_AGGREGATE
+	case types.EvidenceSourceVectorItem:
+		return retrievalv1.EvidenceSourceType_EVIDENCE_SOURCE_TYPE_VECTOR_ITEM
 	default:
 		return retrievalv1.EvidenceSourceType_EVIDENCE_SOURCE_TYPE_UNSPECIFIED
 	}

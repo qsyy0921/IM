@@ -28,6 +28,7 @@ const (
 	EvidenceSourceType_EVIDENCE_SOURCE_TYPE_SEARCH_MESSAGE    EvidenceSourceType = 1
 	EvidenceSourceType_EVIDENCE_SOURCE_TYPE_MEMORY_EVENT      EvidenceSourceType = 2
 	EvidenceSourceType_EVIDENCE_SOURCE_TYPE_PROFILE_AGGREGATE EvidenceSourceType = 3
+	EvidenceSourceType_EVIDENCE_SOURCE_TYPE_VECTOR_ITEM       EvidenceSourceType = 4
 )
 
 // Enum value maps for EvidenceSourceType.
@@ -37,12 +38,14 @@ var (
 		1: "EVIDENCE_SOURCE_TYPE_SEARCH_MESSAGE",
 		2: "EVIDENCE_SOURCE_TYPE_MEMORY_EVENT",
 		3: "EVIDENCE_SOURCE_TYPE_PROFILE_AGGREGATE",
+		4: "EVIDENCE_SOURCE_TYPE_VECTOR_ITEM",
 	}
 	EvidenceSourceType_value = map[string]int32{
 		"EVIDENCE_SOURCE_TYPE_UNSPECIFIED":       0,
 		"EVIDENCE_SOURCE_TYPE_SEARCH_MESSAGE":    1,
 		"EVIDENCE_SOURCE_TYPE_MEMORY_EVENT":      2,
 		"EVIDENCE_SOURCE_TYPE_PROFILE_AGGREGATE": 3,
+		"EVIDENCE_SOURCE_TYPE_VECTOR_ITEM":       4,
 	}
 )
 
@@ -268,18 +271,24 @@ func (x *AuthContext) GetRequestId() string {
 }
 
 type RetrieveEvidenceRequest struct {
-	state             protoimpl.MessageState `protogen:"open.v1"`
-	AuthContext       *AuthContext           `protobuf:"bytes,1,opt,name=auth_context,json=authContext,proto3" json:"auth_context,omitempty"`
-	Query             string                 `protobuf:"bytes,2,opt,name=query,proto3" json:"query,omitempty"`
-	ConversationId    string                 `protobuf:"bytes,3,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
-	AfterSeq          int64                  `protobuf:"varint,4,opt,name=after_seq,json=afterSeq,proto3" json:"after_seq,omitempty"`
-	Limit             int32                  `protobuf:"varint,5,opt,name=limit,proto3" json:"limit,omitempty"`
-	IncludeSearch     bool                   `protobuf:"varint,6,opt,name=include_search,json=includeSearch,proto3" json:"include_search,omitempty"`
-	IncludeMemory     bool                   `protobuf:"varint,7,opt,name=include_memory,json=includeMemory,proto3" json:"include_memory,omitempty"`
-	MemoryStatuses    []EvidenceMemoryStatus `protobuf:"varint,8,rep,packed,name=memory_statuses,json=memoryStatuses,proto3,enum=nexusim.retrieval.v1.EvidenceMemoryStatus" json:"memory_statuses,omitempty"`
-	AtConversationSeq int64                  `protobuf:"varint,9,opt,name=at_conversation_seq,json=atConversationSeq,proto3" json:"at_conversation_seq,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	state                 protoimpl.MessageState `protogen:"open.v1"`
+	AuthContext           *AuthContext           `protobuf:"bytes,1,opt,name=auth_context,json=authContext,proto3" json:"auth_context,omitempty"`
+	Query                 string                 `protobuf:"bytes,2,opt,name=query,proto3" json:"query,omitempty"`
+	ConversationId        string                 `protobuf:"bytes,3,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
+	AfterSeq              int64                  `protobuf:"varint,4,opt,name=after_seq,json=afterSeq,proto3" json:"after_seq,omitempty"`
+	Limit                 int32                  `protobuf:"varint,5,opt,name=limit,proto3" json:"limit,omitempty"`
+	IncludeSearch         bool                   `protobuf:"varint,6,opt,name=include_search,json=includeSearch,proto3" json:"include_search,omitempty"`
+	IncludeMemory         bool                   `protobuf:"varint,7,opt,name=include_memory,json=includeMemory,proto3" json:"include_memory,omitempty"`
+	MemoryStatuses        []EvidenceMemoryStatus `protobuf:"varint,8,rep,packed,name=memory_statuses,json=memoryStatuses,proto3,enum=nexusim.retrieval.v1.EvidenceMemoryStatus" json:"memory_statuses,omitempty"`
+	AtConversationSeq     int64                  `protobuf:"varint,9,opt,name=at_conversation_seq,json=atConversationSeq,proto3" json:"at_conversation_seq,omitempty"`
+	IncludeVector         bool                   `protobuf:"varint,10,opt,name=include_vector,json=includeVector,proto3" json:"include_vector,omitempty"`
+	QueryEmbeddingRef     string                 `protobuf:"bytes,11,opt,name=query_embedding_ref,json=queryEmbeddingRef,proto3" json:"query_embedding_ref,omitempty"`
+	VectorCollectionTypes []string               `protobuf:"bytes,12,rep,name=vector_collection_types,json=vectorCollectionTypes,proto3" json:"vector_collection_types,omitempty"`
+	VectorVisibilityScope string                 `protobuf:"bytes,13,opt,name=vector_visibility_scope,json=vectorVisibilityScope,proto3" json:"vector_visibility_scope,omitempty"`
+	VectorPolicyVersion   string                 `protobuf:"bytes,14,opt,name=vector_policy_version,json=vectorPolicyVersion,proto3" json:"vector_policy_version,omitempty"`
+	VectorMinScore        float64                `protobuf:"fixed64,15,opt,name=vector_min_score,json=vectorMinScore,proto3" json:"vector_min_score,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
 }
 
 func (x *RetrieveEvidenceRequest) Reset() {
@@ -371,6 +380,48 @@ func (x *RetrieveEvidenceRequest) GetMemoryStatuses() []EvidenceMemoryStatus {
 func (x *RetrieveEvidenceRequest) GetAtConversationSeq() int64 {
 	if x != nil {
 		return x.AtConversationSeq
+	}
+	return 0
+}
+
+func (x *RetrieveEvidenceRequest) GetIncludeVector() bool {
+	if x != nil {
+		return x.IncludeVector
+	}
+	return false
+}
+
+func (x *RetrieveEvidenceRequest) GetQueryEmbeddingRef() string {
+	if x != nil {
+		return x.QueryEmbeddingRef
+	}
+	return ""
+}
+
+func (x *RetrieveEvidenceRequest) GetVectorCollectionTypes() []string {
+	if x != nil {
+		return x.VectorCollectionTypes
+	}
+	return nil
+}
+
+func (x *RetrieveEvidenceRequest) GetVectorVisibilityScope() string {
+	if x != nil {
+		return x.VectorVisibilityScope
+	}
+	return ""
+}
+
+func (x *RetrieveEvidenceRequest) GetVectorPolicyVersion() string {
+	if x != nil {
+		return x.VectorPolicyVersion
+	}
+	return ""
+}
+
+func (x *RetrieveEvidenceRequest) GetVectorMinScore() float64 {
+	if x != nil {
+		return x.VectorMinScore
 	}
 	return 0
 }
@@ -576,6 +627,11 @@ type EvidenceItem struct {
 	ProfileValidFromUnixMs   int64                      `protobuf:"varint,29,opt,name=profile_valid_from_unix_ms,json=profileValidFromUnixMs,proto3" json:"profile_valid_from_unix_ms,omitempty"`
 	ProfileValidToUnixMs     int64                      `protobuf:"varint,30,opt,name=profile_valid_to_unix_ms,json=profileValidToUnixMs,proto3" json:"profile_valid_to_unix_ms,omitempty"`
 	ProfileUpdatedAtUnixMs   int64                      `protobuf:"varint,31,opt,name=profile_updated_at_unix_ms,json=profileUpdatedAtUnixMs,proto3" json:"profile_updated_at_unix_ms,omitempty"`
+	VectorItemRef            string                     `protobuf:"bytes,32,opt,name=vector_item_ref,json=vectorItemRef,proto3" json:"vector_item_ref,omitempty"`
+	VectorSourceRefHash      string                     `protobuf:"bytes,33,opt,name=vector_source_ref_hash,json=vectorSourceRefHash,proto3" json:"vector_source_ref_hash,omitempty"`
+	VectorSourceService      string                     `protobuf:"bytes,34,opt,name=vector_source_service,json=vectorSourceService,proto3" json:"vector_source_service,omitempty"`
+	VectorCollectionType     string                     `protobuf:"bytes,35,opt,name=vector_collection_type,json=vectorCollectionType,proto3" json:"vector_collection_type,omitempty"`
+	VectorTombstoneStatus    string                     `protobuf:"bytes,36,opt,name=vector_tombstone_status,json=vectorTombstoneStatus,proto3" json:"vector_tombstone_status,omitempty"`
 	unknownFields            protoimpl.UnknownFields
 	sizeCache                protoimpl.SizeCache
 }
@@ -825,6 +881,41 @@ func (x *EvidenceItem) GetProfileUpdatedAtUnixMs() int64 {
 		return x.ProfileUpdatedAtUnixMs
 	}
 	return 0
+}
+
+func (x *EvidenceItem) GetVectorItemRef() string {
+	if x != nil {
+		return x.VectorItemRef
+	}
+	return ""
+}
+
+func (x *EvidenceItem) GetVectorSourceRefHash() string {
+	if x != nil {
+		return x.VectorSourceRefHash
+	}
+	return ""
+}
+
+func (x *EvidenceItem) GetVectorSourceService() string {
+	if x != nil {
+		return x.VectorSourceService
+	}
+	return ""
+}
+
+func (x *EvidenceItem) GetVectorCollectionType() string {
+	if x != nil {
+		return x.VectorCollectionType
+	}
+	return ""
+}
+
+func (x *EvidenceItem) GetVectorTombstoneStatus() string {
+	if x != nil {
+		return x.VectorTombstoneStatus
+	}
+	return ""
 }
 
 type EvidenceSourceCount struct {
@@ -1136,7 +1227,7 @@ const file_nexusim_retrieval_v1_retrieval_gateway_proto_rawDesc = "" +
 	"session_id\x18\x04 \x01(\tR\tsessionId\x12\x19\n" +
 	"\btrace_id\x18\x05 \x01(\tR\atraceId\x12\x1d\n" +
 	"\n" +
-	"request_id\x18\x06 \x01(\tR\trequestId\"\xa4\x03\n" +
+	"request_id\x18\x06 \x01(\tR\trequestId\"\xc9\x05\n" +
 	"\x17RetrieveEvidenceRequest\x12D\n" +
 	"\fauth_context\x18\x01 \x01(\v2!.nexusim.retrieval.v1.AuthContextR\vauthContext\x12\x14\n" +
 	"\x05query\x18\x02 \x01(\tR\x05query\x12'\n" +
@@ -1146,7 +1237,14 @@ const file_nexusim_retrieval_v1_retrieval_gateway_proto_rawDesc = "" +
 	"\x0einclude_search\x18\x06 \x01(\bR\rincludeSearch\x12%\n" +
 	"\x0einclude_memory\x18\a \x01(\bR\rincludeMemory\x12S\n" +
 	"\x0fmemory_statuses\x18\b \x03(\x0e2*.nexusim.retrieval.v1.EvidenceMemoryStatusR\x0ememoryStatuses\x12.\n" +
-	"\x13at_conversation_seq\x18\t \x01(\x03R\x11atConversationSeq\"\xfc\x01\n" +
+	"\x13at_conversation_seq\x18\t \x01(\x03R\x11atConversationSeq\x12%\n" +
+	"\x0einclude_vector\x18\n" +
+	" \x01(\bR\rincludeVector\x12.\n" +
+	"\x13query_embedding_ref\x18\v \x01(\tR\x11queryEmbeddingRef\x126\n" +
+	"\x17vector_collection_types\x18\f \x03(\tR\x15vectorCollectionTypes\x126\n" +
+	"\x17vector_visibility_scope\x18\r \x01(\tR\x15vectorVisibilityScope\x122\n" +
+	"\x15vector_policy_version\x18\x0e \x01(\tR\x13vectorPolicyVersion\x12(\n" +
+	"\x10vector_min_score\x18\x0f \x01(\x01R\x0evectorMinScore\"\xfc\x01\n" +
 	"\x11EvidenceSourceRef\x12\x1f\n" +
 	"\vsource_type\x18\x01 \x01(\tR\n" +
 	"sourceType\x12\x1b\n" +
@@ -1164,7 +1262,7 @@ const file_nexusim_retrieval_v1_retrieval_gateway_proto_rawDesc = "" +
 	"confidence\x18\x05 \x01(\x01R\n" +
 	"confidence\x12H\n" +
 	"\vsource_refs\x18\x06 \x03(\v2'.nexusim.retrieval.v1.EvidenceSourceRefR\n" +
-	"sourceRefs\"\x95\v\n" +
+	"sourceRefs\"\x94\r\n" +
 	"\fEvidenceItem\x12\x1f\n" +
 	"\vevidence_id\x18\x01 \x01(\tR\n" +
 	"evidenceId\x12I\n" +
@@ -1203,7 +1301,12 @@ const file_nexusim_retrieval_v1_retrieval_gateway_proto_rawDesc = "" +
 	"\x1bsupporting_memory_event_ids\x18\x1c \x03(\tR\x18supportingMemoryEventIds\x12:\n" +
 	"\x1aprofile_valid_from_unix_ms\x18\x1d \x01(\x03R\x16profileValidFromUnixMs\x126\n" +
 	"\x18profile_valid_to_unix_ms\x18\x1e \x01(\x03R\x14profileValidToUnixMs\x12:\n" +
-	"\x1aprofile_updated_at_unix_ms\x18\x1f \x01(\x03R\x16profileUpdatedAtUnixMs\"v\n" +
+	"\x1aprofile_updated_at_unix_ms\x18\x1f \x01(\x03R\x16profileUpdatedAtUnixMs\x12&\n" +
+	"\x0fvector_item_ref\x18  \x01(\tR\rvectorItemRef\x123\n" +
+	"\x16vector_source_ref_hash\x18! \x01(\tR\x13vectorSourceRefHash\x122\n" +
+	"\x15vector_source_service\x18\" \x01(\tR\x13vectorSourceService\x124\n" +
+	"\x16vector_collection_type\x18# \x01(\tR\x14vectorCollectionType\x126\n" +
+	"\x17vector_tombstone_status\x18$ \x01(\tR\x15vectorTombstoneStatus\"v\n" +
 	"\x13EvidenceSourceCount\x12I\n" +
 	"\vsource_type\x18\x01 \x01(\x0e2(.nexusim.retrieval.v1.EvidenceSourceTypeR\n" +
 	"sourceType\x12\x14\n" +
@@ -1229,12 +1332,13 @@ const file_nexusim_retrieval_v1_retrieval_gateway_proto_rawDesc = "" +
 	"\x0fsource_coverage\x18\n" +
 	" \x03(\v2,.nexusim.retrieval.v1.EvidenceSourceCoverageR\x0esourceCoverage\"R\n" +
 	"\x18RetrieveEvidenceResponse\x126\n" +
-	"\x04pack\x18\x01 \x01(\v2\".nexusim.retrieval.v1.EvidencePackR\x04pack*\xb6\x01\n" +
+	"\x04pack\x18\x01 \x01(\v2\".nexusim.retrieval.v1.EvidencePackR\x04pack*\xdc\x01\n" +
 	"\x12EvidenceSourceType\x12$\n" +
 	" EVIDENCE_SOURCE_TYPE_UNSPECIFIED\x10\x00\x12'\n" +
 	"#EVIDENCE_SOURCE_TYPE_SEARCH_MESSAGE\x10\x01\x12%\n" +
 	"!EVIDENCE_SOURCE_TYPE_MEMORY_EVENT\x10\x02\x12*\n" +
-	"&EVIDENCE_SOURCE_TYPE_PROFILE_AGGREGATE\x10\x03*\xd1\x01\n" +
+	"&EVIDENCE_SOURCE_TYPE_PROFILE_AGGREGATE\x10\x03\x12$\n" +
+	" EVIDENCE_SOURCE_TYPE_VECTOR_ITEM\x10\x04*\xd1\x01\n" +
 	"\x14EvidenceMemoryStatus\x12&\n" +
 	"\"EVIDENCE_MEMORY_STATUS_UNSPECIFIED\x10\x00\x12\"\n" +
 	"\x1eEVIDENCE_MEMORY_STATUS_PENDING\x10\x01\x12!\n" +

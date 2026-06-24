@@ -3,13 +3,14 @@
 ## 定位
 
 `retrieval-gateway` 是 AI 大模型应用底座中的统一检索边界。它位于
-`search-service` / `memory-service` 之后，`rag-service` / `summary-service` /
-`agent-service` 之前。
+`search-service` / `memory-service` / `vector-index-service` 之后，`rag-service` /
+`summary-service` / `agent-service` 之前。
 
 第一版目标：
 
 - 对外提供 `RetrieveEvidence`。
-- 聚合 `search-service.SearchMessages` 和 `memory-service.QueryMemoryEvents`。
+- 聚合 `search-service.SearchMessages`、`memory-service.QueryMemoryEvents` 和
+  `vector-index-service.SearchVectors`。
 - 返回统一 `EvidencePack`，保留 source refs、conversation seq、visibility
   version、memory temporal status、review state 和 projection version。
 - 不直接读 message / conversation / delivery / memory / search 的私有表。
@@ -23,12 +24,13 @@
 conversation.timeline.events
 -> search-service projection
 -> memory-service projection
+-> vector-index-service projection
 -> retrieval-gateway EvidencePack
 -> RAG / summary / Agent
 ```
 
 RAG / summary / Agent 必须消费 `EvidencePack`，不能绕过 retrieval-gateway
-直接调用 search / memory 或业务库。
+直接调用 search / memory / vector 或业务库。
 
 ## EvidencePack v0.1
 
@@ -42,15 +44,24 @@ RAG / summary / Agent 必须消费 `EvidencePack`，不能绕过 retrieval-gatew
 - `items`：
   - `SEARCH_MESSAGE`：来自 search-service 的 message hit。
   - `MEMORY_EVENT`：来自 memory-service 的 StructuredMemoryEvent。
+  - `PROFILE_AGGREGATE`：来自 memory-service 的当前用户 profile aggregate。
+  - `VECTOR_ITEM`：来自 vector-index-service 的低敏 vector item 引用。
+- `VECTOR_ITEM` 只包含 `vector_item_ref`、`vector_source_ref_hash`、
+  `vector_source_service`、`vector_collection_type`、`vector_tombstone_status`、
+  `visibility_version` 和 score；不包含 raw message / raw document / raw embedding。
+- vector retrieval 必须显式请求 `include_vector=true`，并提供低敏
+  `query_embedding_ref`、明确的 `vector_collection_types`、`vector_visibility_scope`、
+  `vector_policy_version`。未配置 vector port、vector 依赖不可用或返回 malformed
+  result 时 fail-closed，不静默降级或宽搜默认 collection。
 - `source_refs`：message id、source event id、conversation id、seq、occurred time。
 - `valid_from_seq` / `valid_to_seq`：memory temporal window。
 - `temporal_status` / `review_state` / `extraction_version`。
 - `rerank_score`：retrieval-gateway 本地统一排序分。当前策略版本为
-  `retrieval-gateway.v1.hybrid-source-chain-rrf-graph-depth1`：先保留各 source 的本地分数
+  `retrieval-gateway.v1.hybrid-source-vector-rrf-graph-depth1`：先保留各 source 的本地分数
   clamp 到 `[0, 1]`，再叠加 source-chain 信号和 RRF 风格 lane fusion。
-  lane 包括 lexical search、memory event、profile aggregate、source chain、
-  memory graph、actor attribution、profile support。该策略不直接比较 BM25、
-  vector、graph provider 的原始分数；新增 provider 必须以独立 lane / rank
+  lane 包括 lexical search、vector item、memory event、profile aggregate、
+  source chain、memory graph、actor attribution、profile support。该策略不直接比较
+  BM25、vector、graph provider 的原始分数；新增 provider 必须以独立 lane / rank
   进入融合。
 - `MEMORY_EVENT` graph expansion：第一阶段只做 depth=1。retrieval-gateway 对
   `QueryMemoryEvents` 命中的 memory event 调用 memory-service 公开
@@ -72,12 +83,14 @@ RAG / summary / Agent 必须消费 `EvidencePack`，不能绕过 retrieval-gatew
 
 - search-service 负责消息可见性和 tombstone 过滤。
 - memory-service 负责 memory event 可见性和 revoked / deleted 隐藏。
+- vector-index-service 负责 vector item tombstone、source hash 和 visibility metadata；
+  retrieval-gateway 仍只把 vector 作为可重建 projection evidence lane，不把它当事实源。
 - retrieval-gateway 默认只请求 ACTIVE memory；PENDING / SUPERSEDED 只能由
   调试、review 或指定调用方显式请求。
 - retrieval-gateway 调 memory-service 时传递 `at_conversation_seq`，确保
   `valid_from_seq / valid_to_seq` current-only 过滤生效。
 - retrieval-gateway 透传 verified auth metadata 和 request body auth context。
-- 如果配置 `NEXUSIM_POLICY_GRPC_ADDR`，retrieval-gateway 会在调用 search / memory
+- 如果配置 `NEXUSIM_POLICY_GRPC_ADDR`，retrieval-gateway 会在调用 search / memory / vector
   前通过 policy-service `CheckToolAction` 执行显式 retrieval precheck：
   `tool_name=retrieval.evidence`、`action=CALL`、`risk_level=LOW`。
   policy deny、requires approval 或 policy 依赖不可用时 fail-closed，不继续查询
@@ -101,6 +114,7 @@ visibility projection 跑本地 smoke。
 - `NEXUSIM_RETRIEVAL_DEBUG_ADDR`
 - `NEXUSIM_SEARCH_GRPC_ADDR`
 - `NEXUSIM_MEMORY_GRPC_ADDR`
+- `NEXUSIM_VECTOR_GRPC_ADDR`（可选；配置后允许显式 vector evidence retrieval）
 - `NEXUSIM_POLICY_GRPC_ADDR`（可选；配置后启用 retrieval policy precheck）
 - `NEXUSIM_RETRIEVAL_DEPENDENCY_TIMEOUT`
 

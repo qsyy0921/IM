@@ -83,6 +83,14 @@ func runGRPC(ctx context.Context) error {
 	}
 	defer closeMemory()
 	options := []app.RetrieveEvidenceOption{}
+	if vectorAddr := envString("NEXUSIM_VECTOR_GRPC_ADDR", ""); vectorAddr != "" {
+		vectorClient, closeVector, err := rpcinfra.DialVectorClient(ctx, vectorAddr, timeout)
+		if err != nil {
+			return err
+		}
+		defer closeVector()
+		options = append(options, app.WithVectorPort(vectorClient))
+	}
 	if policyAddr := envString("NEXUSIM_POLICY_GRPC_ADDR", ""); policyAddr != "" {
 		policyClient, closePolicy, err := rpcinfra.DialPolicyClient(ctx, policyAddr, timeout)
 		if err != nil {

@@ -81,9 +81,10 @@
   未配置真实 mutation adapter 时不执行业务写动作。EvidencePack source-chain-aware
   rerank first pass 已进入 retrieval-gateway，并已通过
   `ai-eval-service-stack-live-20260624-retrieval-source-chain-rerank-v2`
-  真实 service-stack gate；`retrieval-gateway.v1.hybrid-source-chain-rrf-graph-depth1` 已补
-  lane-aware RRF 风格融合边界和 first-stage graph expansion depth=1，下一步继续补
-  真实 BM25 / vector provider adapter、更深或可配置 graph expansion 与 EvidencePack coverage。
+  真实 service-stack gate；`retrieval-gateway.v1.hybrid-source-vector-rrf-graph-depth1` 已补
+  lane-aware RRF 风格融合边界、first-stage graph expansion depth=1 和
+  vector-index-service `SearchVectors` adapter first path，下一步继续补真实 BM25 backend、
+  vector backend live smoke、更深或可配置 graph expansion 与 EvidencePack coverage。
   真实 mutation 场景必须等显式业务 adapter 和
   operator policy 就绪。
 - `rag-service` / `summary-service`：拒答、引用校验、source-ref regression、unsafe

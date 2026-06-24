@@ -22,6 +22,7 @@ enum EvidenceSourceType {
   EVIDENCE_SOURCE_TYPE_SEARCH_MESSAGE = 1;
   EVIDENCE_SOURCE_TYPE_MEMORY_EVENT = 2;
   EVIDENCE_SOURCE_TYPE_PROFILE_AGGREGATE = 3;
+  EVIDENCE_SOURCE_TYPE_VECTOR_ITEM = 4;
 }
 
 enum EvidenceMemoryStatus {
@@ -50,6 +51,12 @@ message RetrieveEvidenceRequest {
   bool include_memory = 7;
   repeated EvidenceMemoryStatus memory_statuses = 8;
   int64 at_conversation_seq = 9;
+  bool include_vector = 10;
+  string query_embedding_ref = 11;
+  repeated string vector_collection_types = 12;
+  string vector_visibility_scope = 13;
+  string vector_policy_version = 14;
+  double vector_min_score = 15;
 }
 
 message EvidenceSourceRef {
@@ -102,6 +109,11 @@ message EvidenceItem {
   int64 profile_valid_from_unix_ms = 29;
   int64 profile_valid_to_unix_ms = 30;
   int64 profile_updated_at_unix_ms = 31;
+  string vector_item_ref = 32;
+  string vector_source_ref_hash = 33;
+  string vector_source_service = 34;
+  string vector_collection_type = 35;
+  string vector_tombstone_status = 36;
 }
 
 message EvidenceSourceCount {

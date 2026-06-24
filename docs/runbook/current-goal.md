@@ -196,9 +196,11 @@ IM messages -> search / memory projection -> EvidencePack -> RAG / Agent answer 
 - 同日 `loadtest/ragagent` 已补真实业务 proposal source-chain 场景：
   通过公开 memory candidate review 构造 `DECISION`、`TASK`、`STATUS` 三类业务证据，
   Agent 基于 EvidencePack 生成 `conversation.note.create` proposal，经
-  `ApproveAgentProposal` 审批后调用 action-executor 记录执行审计。由于该业务 tool
-  没有配置真实 mutation adapter，本场景要求 `business_action_executed=false`，
-  只证明 approval / action audit 边界、source-chain evidence 和低敏 input hash 成立。
+  `ApproveAgentProposal` 审批后调用 action-executor 记录执行审计。2026-06-25
+  已新增显式 opt-in business adapter：配置
+  `NEXUSIM_ACTION_EXECUTOR_CONVERSATION_GRPC_ADDR` 后，`conversation.note.create`
+  会通过 conversation-service 公开 `CreateConversationNote` 写入真实 note fact；未配置时
+  仍要求 `business_action_executed=false`，不伪造业务成功。
   真实 `ai-eval-rag-agent-demo-live-20260624-business-proposal-source-chain-gate-v1`
   service-stack gate 已通过：4 adapters、27 cases、27 passed、0 failed、0 skipped。
 - 2026-06-24 retrieval-gateway 已补 vector-index-service `SearchVectors` adapter
@@ -368,8 +370,9 @@ IM messages -> search / memory projection -> EvidencePack -> RAG / Agent answer 
    focused app / loadtest checks 和真实 service-stack gate
    `ai-eval-service-stack-live-20260624-retrieval-source-chain-rerank-v2`
    归档：4 adapters / 27 cases / 27 passed / 0 failed / 0 skipped，
-   `memory_rerank_score=1.29` 高于 single search baseline。显式业务
-   mutation 场景必须等业务 adapter 准备好后再扩展。retrieval strategy version
+   `memory_rerank_score=1.29` 高于 single search baseline。显式
+   `conversation.note.create` business adapter 已补齐；下一步是把 RAG-Agent demo
+   从 audit-only gate 扩展到 opt-in business mutation smoke。retrieval strategy version
    已推进为 `retrieval-gateway.v1.hybrid-source-vector-rrf-graph-depth<N>`：rerank 在截断 limit
    前按 lexical search、memory event、profile aggregate、source chain、
    vector item、memory graph、actor attribution 和 profile support lane 做 RRF 风格融合，

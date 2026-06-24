@@ -102,7 +102,8 @@
 - 同日 `ai-eval-rag-agent-demo-live-20260624-business-proposal-source-chain-gate-v1`
   已通过真实 service-stack gate：`DECISION` / `TASK` / `STATUS` 三类 reviewed memory
   驱动 `conversation.note.create` 业务 proposal，并经 approval / action-executor audit
-  记录；未配置真实 mutation adapter 时不执行业务写动作。
+  记录。2026-06-25 已补显式 opt-in conversation note business adapter；配置
+  conversation-service gRPC 地址后可写真实 note fact，未配置时仍不执行业务写动作。
 
 下一步：`loadtest/ragagent` / `rag-agent-demo` adapter 已把 public candidate
 review、temporal update 和 profile repair approval 纳入 RAG / Agent EvidencePack 断言链路，并已通过

@@ -38,6 +38,10 @@ type UpdateConversationProfileRepository interface {
 	UpdateConversationProfile(ctx context.Context, command types.UpdateConversationProfileCommand) (types.ConversationProfileResult, error)
 }
 
+type CreateConversationNoteRepository interface {
+	CreateConversationNote(ctx context.Context, command types.CreateConversationNoteCommand) (types.ConversationNoteResult, error)
+}
+
 type MemberChangeProgressRepository interface {
 	MarkPublishedMemberChanges(ctx context.Context, limit int) (types.MemberChangePublishProgressStats, error)
 }

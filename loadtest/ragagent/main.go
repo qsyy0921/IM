@@ -38,7 +38,7 @@ const (
 
 	defaultAgentToolName     = "conversation.note.create"
 	defaultAgentSkillID      = "conversation.note.create"
-	defaultAgentResourceType = "conversation_note"
+	defaultAgentResourceType = "conversation"
 )
 
 type config struct {

@@ -4,7 +4,7 @@
 
 `action-executor` 是 NexusIM AI 应用底座中的受控动作执行边界。它承接 Agent proposal、approval 和 `mcp-gateway` prepare 之后的动作执行请求，把真实写动作纳入 policy precheck、审批关联和低敏 audit。
 
-当前第一阶段记录 approved execution boundary，并在同一事务内写低敏 tool result projection。已支持本地安全 `nexusim.local.echo` adapter first path，用于验证真实低敏 output hash / result projection；已支持外部 MCP failure 稳定失败分类、tool output safety first path，以及显式开启的外部 HTTP provider adapter guarded first path。默认不连接外部 MCP / provider；外部 HTTP adapter 只允许 allowlist 内的 `LOW` risk tool，只发送 tool metadata / `input_sha256`，不发送 raw `input_json`，provider output 仍必须经过安全门禁后才写 hash / projection。工具 provider 失败和 unsafe output 已有 first-stage `provider_failures` 状态投影和 bounded retry bookkeeping worker，可区分 `RETRY_PENDING` 与 `DLQ`，但尚未实现 redrive API、operator UI 或真实 provider replay。
+当前第一阶段记录 approved execution boundary，并在同一事务内写低敏 tool result projection。已支持本地安全 `nexusim.local.echo` adapter first path，用于验证真实低敏 output hash / result projection；已支持外部 MCP failure 稳定失败分类、tool output safety first path，以及显式开启的外部 HTTP provider adapter guarded first path。`conversation.note.create` 已有显式 opt-in 业务 adapter：配置 `NEXUSIM_ACTION_EXECUTOR_CONVERSATION_GRPC_ADDR` 后，通过 conversation-service 公开 `CreateConversationNote` 写入真实 note fact；未配置时仍保持 unsupported / `executed=false`，不伪造业务成功。默认不连接外部 MCP / provider；外部 HTTP adapter 只允许 allowlist 内的 `LOW` risk tool，只发送 tool metadata / `input_sha256`，不发送 raw `input_json`，provider output 仍必须经过安全门禁后才写 hash / projection。工具 provider 失败和 unsafe output 已有 first-stage `provider_failures` 状态投影和 bounded retry bookkeeping worker，可区分 `RETRY_PENDING` 与 `DLQ`，但尚未实现 redrive API、operator UI 或真实 provider replay。
 
 ## 职责
 
@@ -44,6 +44,13 @@
     `input_sha256`
   - 不发送 raw `input_json`、provider secret、用户 PII 或业务私表内容
   - provider 返回 body 必须是安全 JSON object，才会生成 `output_sha256`
+- 对显式配置的 `conversation.note.create` 业务 adapter：
+  - 只接受 `LOW` risk、`resource_type=conversation`、`EXECUTE` skill contract
+  - raw `input_json` 只进入一方业务 adapter，用于解析 `body`；外部 provider 仍只拿
+    `input_sha256`
+  - 只调用 conversation-service 公开 gRPC `CreateConversationNote`，不读写
+    conversation-service 私表
+  - tool output 只返回 note id / ref / input hash / idempotent flag，不回显 note body
 - 对显式启用的外部 MCP failure，只返回 timeout / unavailable / rate-limit /
   permission-denied / failed 等稳定分类，不保存 provider 原始错误。
 - 对工具 provider 失败 / unsafe output，同一事务写入低敏
@@ -79,7 +86,7 @@
 
 ## 链路
 
-第一版默认业务 tool：
+未配置业务 tool 默认路径：
 
 ```text
 approved caller
@@ -88,6 +95,17 @@ approved caller
 -> skill-registry.GetSkill
 -> policy-service.CheckToolAction(action=EXECUTE)
 -> action_executor_execution_audits
+```
+
+Conversation note 业务 adapter 路径：
+
+```text
+approved caller
+-> action-executor.ExecuteApprovedAction(tool=conversation.note.create)
+-> proposal / skill / policy checks
+-> conversation-service.CreateConversationNote
+-> action_executor_execution_audits(output_sha256 only)
+-> action_executor_tool_results(status=SUCCEEDED)
 ```
 
 本地安全 output 验证路径：
@@ -131,7 +149,9 @@ agent-service proposal
 - `AuthContext` 必须包含 tenant / user / device。
 - `proposal_id`、`approval_id`、`prepared_audit_id` 必填。
 - proposal / approval 校验失败时不写 execution audit。
-- 业务 tool 第一版只返回 `RECORDED` / `BLOCKED`，且 `executed=false`。
+- 未配置显式 adapter 的业务 tool 只返回 `RECORDED` / `BLOCKED`，且 `executed=false`。
+- `conversation.note.create` 只有配置 conversation-service gRPC adapter 后才能写真实 note；
+  未配置时不执行、不伪造成功。
 - `nexusim.local.echo` 可返回 `executed=true`，但 output 只包含低敏 metadata
   和 `input_sha256`，不回显 raw input。
 - 外部 HTTP adapter 必须通过
@@ -174,8 +194,9 @@ agent-service proposal
 - 外键：`tenant_id + execution_id -> action_executor_execution_audits`
 - 状态：`NOT_EXECUTED` / `BLOCKED` / `SUCCEEDED` / `FAILED`
 - 当前 first path 对未配置 adapter 的业务 tool 只生成 `NOT_EXECUTED` 或
-  `BLOCKED` 低敏投影；对 `nexusim.local.echo` 和显式 allowlist 的外部 HTTP
-  provider tool 可生成 `SUCCEEDED` + `output_sha256`，不保存 raw provider output
+  `BLOCKED` 低敏投影；对 `conversation.note.create`、`nexusim.local.echo`
+  和显式 allowlist 的外部 HTTP provider tool 可生成 `SUCCEEDED` +
+  `output_sha256`，不保存 raw provider output / raw business input
 
 `migrations/postgres/action-executor/000003_action_executor_provider_failures.sql` 新增 `action_executor_provider_failures`：
 

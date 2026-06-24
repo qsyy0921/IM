@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/qsyy0921/IM/services/action-executor/internal/types"
 )
@@ -44,10 +45,11 @@ func TestValidateActionExecutorDebugListenerConfigAllowsExplicitPublicOptIn(t *t
 
 func TestNewToolExecutorFromEnvDefaultsToUnsupportedExternalTool(t *testing.T) {
 	t.Setenv("NEXUSIM_ACTION_EXECUTOR_EXTERNAL_MCP_FAILURE_MODE", "")
-	executor, err := newToolExecutorFromEnv()
+	executor, closeExecutor, err := newToolExecutorFromEnv(500 * time.Millisecond)
 	if err != nil {
 		t.Fatalf("new executor: %v", err)
 	}
+	defer closeExecutor()
 	_, err = executor.ExecuteTool(context.Background(), types.ToolExecutionCommand{ToolName: "external.tool"})
 	if !errors.Is(err, types.ErrToolExecutionUnsupported) {
 		t.Fatalf("expected external tool to remain unsupported by default, got %v", err)
@@ -56,10 +58,11 @@ func TestNewToolExecutorFromEnvDefaultsToUnsupportedExternalTool(t *testing.T) {
 
 func TestNewToolExecutorFromEnvCanEnableExternalMCPFailureMode(t *testing.T) {
 	t.Setenv("NEXUSIM_ACTION_EXECUTOR_EXTERNAL_MCP_FAILURE_MODE", "timeout")
-	executor, err := newToolExecutorFromEnv()
+	executor, closeExecutor, err := newToolExecutorFromEnv(500 * time.Millisecond)
 	if err != nil {
 		t.Fatalf("new executor: %v", err)
 	}
+	defer closeExecutor()
 	_, err = executor.ExecuteTool(context.Background(), types.ToolExecutionCommand{ToolName: "external.tool"})
 	if !errors.Is(err, types.ErrToolExecutionTimeout) {
 		t.Fatalf("expected timeout failure, got %v", err)
@@ -86,10 +89,11 @@ func TestNewToolExecutorFromEnvCanEnableExternalHTTPAdapter(t *testing.T) {
 	t.Setenv("NEXUSIM_ACTION_EXECUTOR_EXTERNAL_MCP_HTTP_ENDPOINT", server.URL)
 	t.Setenv("NEXUSIM_ACTION_EXECUTOR_EXTERNAL_MCP_ALLOWED_TOOLS", "provider.safe.echo")
 
-	executor, err := newToolExecutorFromEnv()
+	executor, closeExecutor, err := newToolExecutorFromEnv(500 * time.Millisecond)
 	if err != nil {
 		t.Fatalf("new executor: %v", err)
 	}
+	defer closeExecutor()
 	result, err := executor.ExecuteTool(context.Background(), types.ToolExecutionCommand{
 		ToolName:    "provider.safe.echo",
 		RiskLevel:   "LOW",
@@ -109,21 +113,21 @@ func TestNewToolExecutorFromEnvRequiresExternalHTTPAllowlist(t *testing.T) {
 	t.Setenv("NEXUSIM_ACTION_EXECUTOR_EXTERNAL_MCP_ADAPTER_MODE", "http")
 	t.Setenv("NEXUSIM_ACTION_EXECUTOR_EXTERNAL_MCP_HTTP_ENDPOINT", server.URL)
 
-	if _, err := newToolExecutorFromEnv(); err == nil {
+	if _, _, err := newToolExecutorFromEnv(500 * time.Millisecond); err == nil {
 		t.Fatal("expected missing external HTTP allowlist to fail closed")
 	}
 }
 
 func TestNewToolExecutorFromEnvRejectsUnknownExternalMCPAdapterMode(t *testing.T) {
 	t.Setenv("NEXUSIM_ACTION_EXECUTOR_EXTERNAL_MCP_ADAPTER_MODE", "live")
-	if _, err := newToolExecutorFromEnv(); err == nil {
+	if _, _, err := newToolExecutorFromEnv(500 * time.Millisecond); err == nil {
 		t.Fatal("expected unknown external adapter mode to fail closed")
 	}
 }
 
 func TestNewToolExecutorFromEnvRejectsUnknownExternalMCPFailureMode(t *testing.T) {
 	t.Setenv("NEXUSIM_ACTION_EXECUTOR_EXTERNAL_MCP_FAILURE_MODE", "live")
-	if _, err := newToolExecutorFromEnv(); err == nil {
+	if _, _, err := newToolExecutorFromEnv(500 * time.Millisecond); err == nil {
 		t.Fatal("expected unknown failure mode to fail closed")
 	}
 }

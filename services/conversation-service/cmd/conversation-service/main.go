@@ -124,6 +124,7 @@ func runGRPCServer() error {
 			grpcapi.WithListConversationMembers(app.NewListConversationMembersUseCase(repository)),
 			grpcapi.WithGetConversationProfile(app.NewGetConversationProfileUseCase(repository)),
 			grpcapi.WithUpdateConversationProfile(app.NewUpdateConversationProfileUseCase(repository)),
+			grpcapi.WithCreateConversationNote(app.NewCreateConversationNoteUseCase(repository)),
 		),
 	)
 

@@ -32,7 +32,7 @@ const (
 	defaultObjective    = "phoenix launch decision"
 	defaultToolName     = "conversation.note.create"
 	defaultSkillID      = "conversation.note.create"
-	defaultResource     = "conversation_note"
+	defaultResource     = "conversation"
 
 	scenarioApproved     = "approved"
 	scenarioPolicyDenied = "policy-denied"
@@ -819,6 +819,7 @@ func executeApprovedAction(
 	defer conn.Close()
 
 	inputJSON, err := json.Marshal(map[string]string{
+		"body":            "Phoenix launch follow-up note from approved Agent proposal.",
 		"conversation_id": cfg.conversationID,
 		"objective":       cfg.objective,
 		"source":          "loadtest/agent",

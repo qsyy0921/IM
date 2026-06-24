@@ -6,6 +6,9 @@
 - conversation profile 是群标题 / 头像 URI / 群公告的事实源；`GetConversationProfile`
   要求当前 ACTIVE 成员可读，`UpdateConversationProfile` 只允许 ACTIVE OWNER /
   ADMIN 更新 GROUP conversation，并用 `expected_profile_version` fail-closed。
+- conversation note 是 Agent / workflow 可审批写入的低风险会话注记事实源；
+  `CreateConversationNote` 要求当前 ACTIVE 成员，通过公开 gRPC API 写入
+  `conversation_notes`，按 `tenant + conversation + author + idempotency_key` 幂等。
 - 成员变更走 shared timeline/outbox，保持 `conversation_seq` 顺序。
 - 成员列表支持当前 ACTIVE roster 分页、legacy 单 role、多 role OR、`USER_ID_ASC` /
   `ROLE_USER_ID_ASC`、`user_id_prefix`。
@@ -15,6 +18,8 @@
 - `MarkPublishedMemberChanges` 只接受同 tenant / conversation、正确 producer 和
   `conversation.member.*` event type 的已发布 outbox 行推进 saga。
 - owner transfer、成员列表、群公告 profile 读写、成员变更 / 发布推进已有真实 PostgreSQL 回归。
+- conversation note 写入、幂等 replay、非 ACTIVE 成员拒绝和 DELETED conversation
+  拒绝已有真实 PostgreSQL 回归。
 - JOIN / rejoin 会刷新 `join_seq` 并清旧 `leave_seq`。
 - 已有只读 `member-change-audit`、`member-window-audit` 和保守
   `member-window-repair` / repair audit operator。

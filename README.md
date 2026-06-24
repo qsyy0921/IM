@@ -388,7 +388,9 @@ Agent proposal EvidencePack，并保留 source refs / cross-group source refs。
 `ai-eval-rag-agent-demo-live-20260624-business-proposal-source-chain-gate-v1` 进一步确认：
 `DECISION` / `TASK` / `STATUS` 三类 reviewed memory 可驱动
 `conversation.note.create` 业务 proposal，经 approval 后由 action-executor 记录 audit；
-未配置真实 mutation adapter 时必须不执行业务写动作。
+2026-06-25 已补显式 opt-in conversation note business adapter：配置
+`NEXUSIM_ACTION_EXECUTOR_CONVERSATION_GRPC_ADDR` 后，action-executor 会通过
+conversation-service 公开 `CreateConversationNote` 写真实 note fact；未配置时仍必须不执行业务写动作。
 
 下一步默认看 [current-goal.md](docs/runbook/current-goal.md)。截至当前主线，客户端只修
 阻塞演示入口的问题；默认推进

@@ -13,6 +13,7 @@ service ConversationService {
   rpc TransferConversationOwner(TransferConversationOwnerRequest) returns (TransferConversationOwnerResponse);
   rpc GetConversationProfile(GetConversationProfileRequest) returns (GetConversationProfileResponse);
   rpc UpdateConversationProfile(UpdateConversationProfileRequest) returns (UpdateConversationProfileResponse);
+  rpc CreateConversationNote(CreateConversationNoteRequest) returns (CreateConversationNoteResponse);
 }
 
 message GetSendContextRequest {
@@ -263,4 +264,33 @@ message UpdateConversationProfileRequest {
 
 message UpdateConversationProfileResponse {
   ConversationProfile profile = 1;
+}
+
+message ConversationNote {
+  string tenant_id = 1;
+  string conversation_id = 2;
+  string note_id = 3;
+  string author_user_id = 4;
+  string body = 5;
+  string source_tool_name = 6;
+  string source_proposal_id = 7;
+  string source_approval_id = 8;
+  string source_execution_id = 9;
+  int64 created_at_unix_ms = 10;
+}
+
+message CreateConversationNoteRequest {
+  AuthContext auth_context = 1;
+  string conversation_id = 2;
+  string body = 3;
+  string idempotency_key = 4;
+  string source_tool_name = 5;
+  string source_proposal_id = 6;
+  string source_approval_id = 7;
+  string source_execution_id = 8;
+}
+
+message CreateConversationNoteResponse {
+  ConversationNote note = 1;
+  bool idempotent_replay = 2;
 }

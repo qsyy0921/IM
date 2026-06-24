@@ -27,6 +27,7 @@ const (
 	ConversationService_TransferConversationOwner_FullMethodName = "/nexusim.conversation.v1.ConversationService/TransferConversationOwner"
 	ConversationService_GetConversationProfile_FullMethodName    = "/nexusim.conversation.v1.ConversationService/GetConversationProfile"
 	ConversationService_UpdateConversationProfile_FullMethodName = "/nexusim.conversation.v1.ConversationService/UpdateConversationProfile"
+	ConversationService_CreateConversationNote_FullMethodName    = "/nexusim.conversation.v1.ConversationService/CreateConversationNote"
 )
 
 // ConversationServiceClient is the client API for ConversationService service.
@@ -41,6 +42,7 @@ type ConversationServiceClient interface {
 	TransferConversationOwner(ctx context.Context, in *TransferConversationOwnerRequest, opts ...grpc.CallOption) (*TransferConversationOwnerResponse, error)
 	GetConversationProfile(ctx context.Context, in *GetConversationProfileRequest, opts ...grpc.CallOption) (*GetConversationProfileResponse, error)
 	UpdateConversationProfile(ctx context.Context, in *UpdateConversationProfileRequest, opts ...grpc.CallOption) (*UpdateConversationProfileResponse, error)
+	CreateConversationNote(ctx context.Context, in *CreateConversationNoteRequest, opts ...grpc.CallOption) (*CreateConversationNoteResponse, error)
 }
 
 type conversationServiceClient struct {
@@ -131,6 +133,16 @@ func (c *conversationServiceClient) UpdateConversationProfile(ctx context.Contex
 	return out, nil
 }
 
+func (c *conversationServiceClient) CreateConversationNote(ctx context.Context, in *CreateConversationNoteRequest, opts ...grpc.CallOption) (*CreateConversationNoteResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateConversationNoteResponse)
+	err := c.cc.Invoke(ctx, ConversationService_CreateConversationNote_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ConversationServiceServer is the server API for ConversationService service.
 // All implementations must embed UnimplementedConversationServiceServer
 // for forward compatibility.
@@ -143,6 +155,7 @@ type ConversationServiceServer interface {
 	TransferConversationOwner(context.Context, *TransferConversationOwnerRequest) (*TransferConversationOwnerResponse, error)
 	GetConversationProfile(context.Context, *GetConversationProfileRequest) (*GetConversationProfileResponse, error)
 	UpdateConversationProfile(context.Context, *UpdateConversationProfileRequest) (*UpdateConversationProfileResponse, error)
+	CreateConversationNote(context.Context, *CreateConversationNoteRequest) (*CreateConversationNoteResponse, error)
 	mustEmbedUnimplementedConversationServiceServer()
 }
 
@@ -176,6 +189,9 @@ func (UnimplementedConversationServiceServer) GetConversationProfile(context.Con
 }
 func (UnimplementedConversationServiceServer) UpdateConversationProfile(context.Context, *UpdateConversationProfileRequest) (*UpdateConversationProfileResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdateConversationProfile not implemented")
+}
+func (UnimplementedConversationServiceServer) CreateConversationNote(context.Context, *CreateConversationNoteRequest) (*CreateConversationNoteResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateConversationNote not implemented")
 }
 func (UnimplementedConversationServiceServer) mustEmbedUnimplementedConversationServiceServer() {}
 func (UnimplementedConversationServiceServer) testEmbeddedByValue()                             {}
@@ -342,6 +358,24 @@ func _ConversationService_UpdateConversationProfile_Handler(srv interface{}, ctx
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ConversationService_CreateConversationNote_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateConversationNoteRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ConversationServiceServer).CreateConversationNote(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ConversationService_CreateConversationNote_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ConversationServiceServer).CreateConversationNote(ctx, req.(*CreateConversationNoteRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ConversationService_ServiceDesc is the grpc.ServiceDesc for ConversationService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -380,6 +414,10 @@ var ConversationService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdateConversationProfile",
 			Handler:    _ConversationService_UpdateConversationProfile_Handler,
+		},
+		{
+			MethodName: "CreateConversationNote",
+			Handler:    _ConversationService_CreateConversationNote_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

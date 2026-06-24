@@ -328,7 +328,8 @@ func businessActionInput(candidates []groupMemoryCandidate) (string, string, err
 		eventHashes = append(eventHashes, sha256Hex(candidate.EventID))
 	}
 	encoded, err := json.Marshal(map[string]any{
-		"action":                "conversation_note_audit",
+		"action":                "conversation_note_create",
+		"body":                  "Phoenix launch follow-up note: security review and release owner follow-up are approved from reviewed group memory.",
 		"source":                "loadtest/ragagent",
 		"evidence_event_count":  len(candidates),
 		"evidence_event_hashes": eventHashes,

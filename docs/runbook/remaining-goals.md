@@ -78,7 +78,9 @@
   `ai-eval-rag-agent-demo-live-20260624-business-proposal-source-chain-gate-v1` 真实 gate
   归档：`DECISION` / `TASK` / `STATUS` 三类 reviewed memory 驱动
   `conversation.note.create` proposal，并经 approval / action-executor audit 记录，
-  未配置真实 mutation adapter 时不执行业务写动作。EvidencePack source-chain-aware
+  未配置真实 mutation adapter 时不执行业务写动作。2026-06-25 已补显式 opt-in
+  conversation note business adapter，配置 conversation-service gRPC 地址后可写真实
+  note fact；下一步补 RAG-Agent opt-in business mutation smoke。EvidencePack source-chain-aware
   rerank first pass 已进入 retrieval-gateway，并已通过
   `ai-eval-service-stack-live-20260624-retrieval-source-chain-rerank-v2`
   真实 service-stack gate；`retrieval-gateway.v1.hybrid-source-vector-rrf-graph-depth<N>` 已补
@@ -101,8 +103,8 @@
   OpenSearch vector index，Docker 调用有硬超时且默认不拉镜像。下一步继续在 Docker
   runtime 恢复后归档真实 OpenSearch 进程 smoke、真实 pgvector / Milvus / OpenSearch
   vector provider smoke。
-  真实 mutation 场景必须等显式业务 adapter 和
-  operator policy 就绪。
+  `conversation.note.create` 显式业务 adapter 已就绪；继续扩展其它真实 mutation
+  场景时仍必须先补公开业务 API、显式 adapter 和 operator policy。
 - `rag-service` / `summary-service`：拒答、引用校验、source-ref regression、unsafe
   output fail-closed cases。
 - `agent-service`：真实业务动作继续走 policy、skill contract、proposal、approval、

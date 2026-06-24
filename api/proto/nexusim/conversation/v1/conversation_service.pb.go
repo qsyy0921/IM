@@ -2193,6 +2193,274 @@ func (x *UpdateConversationProfileResponse) GetProfile() *ConversationProfile {
 	return nil
 }
 
+type ConversationNote struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	TenantId          string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	ConversationId    string                 `protobuf:"bytes,2,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
+	NoteId            string                 `protobuf:"bytes,3,opt,name=note_id,json=noteId,proto3" json:"note_id,omitempty"`
+	AuthorUserId      string                 `protobuf:"bytes,4,opt,name=author_user_id,json=authorUserId,proto3" json:"author_user_id,omitempty"`
+	Body              string                 `protobuf:"bytes,5,opt,name=body,proto3" json:"body,omitempty"`
+	SourceToolName    string                 `protobuf:"bytes,6,opt,name=source_tool_name,json=sourceToolName,proto3" json:"source_tool_name,omitempty"`
+	SourceProposalId  string                 `protobuf:"bytes,7,opt,name=source_proposal_id,json=sourceProposalId,proto3" json:"source_proposal_id,omitempty"`
+	SourceApprovalId  string                 `protobuf:"bytes,8,opt,name=source_approval_id,json=sourceApprovalId,proto3" json:"source_approval_id,omitempty"`
+	SourceExecutionId string                 `protobuf:"bytes,9,opt,name=source_execution_id,json=sourceExecutionId,proto3" json:"source_execution_id,omitempty"`
+	CreatedAtUnixMs   int64                  `protobuf:"varint,10,opt,name=created_at_unix_ms,json=createdAtUnixMs,proto3" json:"created_at_unix_ms,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *ConversationNote) Reset() {
+	*x = ConversationNote{}
+	mi := &file_nexusim_conversation_v1_conversation_service_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ConversationNote) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ConversationNote) ProtoMessage() {}
+
+func (x *ConversationNote) ProtoReflect() protoreflect.Message {
+	mi := &file_nexusim_conversation_v1_conversation_service_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ConversationNote.ProtoReflect.Descriptor instead.
+func (*ConversationNote) Descriptor() ([]byte, []int) {
+	return file_nexusim_conversation_v1_conversation_service_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *ConversationNote) GetTenantId() string {
+	if x != nil {
+		return x.TenantId
+	}
+	return ""
+}
+
+func (x *ConversationNote) GetConversationId() string {
+	if x != nil {
+		return x.ConversationId
+	}
+	return ""
+}
+
+func (x *ConversationNote) GetNoteId() string {
+	if x != nil {
+		return x.NoteId
+	}
+	return ""
+}
+
+func (x *ConversationNote) GetAuthorUserId() string {
+	if x != nil {
+		return x.AuthorUserId
+	}
+	return ""
+}
+
+func (x *ConversationNote) GetBody() string {
+	if x != nil {
+		return x.Body
+	}
+	return ""
+}
+
+func (x *ConversationNote) GetSourceToolName() string {
+	if x != nil {
+		return x.SourceToolName
+	}
+	return ""
+}
+
+func (x *ConversationNote) GetSourceProposalId() string {
+	if x != nil {
+		return x.SourceProposalId
+	}
+	return ""
+}
+
+func (x *ConversationNote) GetSourceApprovalId() string {
+	if x != nil {
+		return x.SourceApprovalId
+	}
+	return ""
+}
+
+func (x *ConversationNote) GetSourceExecutionId() string {
+	if x != nil {
+		return x.SourceExecutionId
+	}
+	return ""
+}
+
+func (x *ConversationNote) GetCreatedAtUnixMs() int64 {
+	if x != nil {
+		return x.CreatedAtUnixMs
+	}
+	return 0
+}
+
+type CreateConversationNoteRequest struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	AuthContext       *AuthContext           `protobuf:"bytes,1,opt,name=auth_context,json=authContext,proto3" json:"auth_context,omitempty"`
+	ConversationId    string                 `protobuf:"bytes,2,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
+	Body              string                 `protobuf:"bytes,3,opt,name=body,proto3" json:"body,omitempty"`
+	IdempotencyKey    string                 `protobuf:"bytes,4,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
+	SourceToolName    string                 `protobuf:"bytes,5,opt,name=source_tool_name,json=sourceToolName,proto3" json:"source_tool_name,omitempty"`
+	SourceProposalId  string                 `protobuf:"bytes,6,opt,name=source_proposal_id,json=sourceProposalId,proto3" json:"source_proposal_id,omitempty"`
+	SourceApprovalId  string                 `protobuf:"bytes,7,opt,name=source_approval_id,json=sourceApprovalId,proto3" json:"source_approval_id,omitempty"`
+	SourceExecutionId string                 `protobuf:"bytes,8,opt,name=source_execution_id,json=sourceExecutionId,proto3" json:"source_execution_id,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *CreateConversationNoteRequest) Reset() {
+	*x = CreateConversationNoteRequest{}
+	mi := &file_nexusim_conversation_v1_conversation_service_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateConversationNoteRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateConversationNoteRequest) ProtoMessage() {}
+
+func (x *CreateConversationNoteRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_nexusim_conversation_v1_conversation_service_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateConversationNoteRequest.ProtoReflect.Descriptor instead.
+func (*CreateConversationNoteRequest) Descriptor() ([]byte, []int) {
+	return file_nexusim_conversation_v1_conversation_service_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *CreateConversationNoteRequest) GetAuthContext() *AuthContext {
+	if x != nil {
+		return x.AuthContext
+	}
+	return nil
+}
+
+func (x *CreateConversationNoteRequest) GetConversationId() string {
+	if x != nil {
+		return x.ConversationId
+	}
+	return ""
+}
+
+func (x *CreateConversationNoteRequest) GetBody() string {
+	if x != nil {
+		return x.Body
+	}
+	return ""
+}
+
+func (x *CreateConversationNoteRequest) GetIdempotencyKey() string {
+	if x != nil {
+		return x.IdempotencyKey
+	}
+	return ""
+}
+
+func (x *CreateConversationNoteRequest) GetSourceToolName() string {
+	if x != nil {
+		return x.SourceToolName
+	}
+	return ""
+}
+
+func (x *CreateConversationNoteRequest) GetSourceProposalId() string {
+	if x != nil {
+		return x.SourceProposalId
+	}
+	return ""
+}
+
+func (x *CreateConversationNoteRequest) GetSourceApprovalId() string {
+	if x != nil {
+		return x.SourceApprovalId
+	}
+	return ""
+}
+
+func (x *CreateConversationNoteRequest) GetSourceExecutionId() string {
+	if x != nil {
+		return x.SourceExecutionId
+	}
+	return ""
+}
+
+type CreateConversationNoteResponse struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	Note             *ConversationNote      `protobuf:"bytes,1,opt,name=note,proto3" json:"note,omitempty"`
+	IdempotentReplay bool                   `protobuf:"varint,2,opt,name=idempotent_replay,json=idempotentReplay,proto3" json:"idempotent_replay,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *CreateConversationNoteResponse) Reset() {
+	*x = CreateConversationNoteResponse{}
+	mi := &file_nexusim_conversation_v1_conversation_service_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateConversationNoteResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateConversationNoteResponse) ProtoMessage() {}
+
+func (x *CreateConversationNoteResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_nexusim_conversation_v1_conversation_service_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateConversationNoteResponse.ProtoReflect.Descriptor instead.
+func (*CreateConversationNoteResponse) Descriptor() ([]byte, []int) {
+	return file_nexusim_conversation_v1_conversation_service_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *CreateConversationNoteResponse) GetNote() *ConversationNote {
+	if x != nil {
+		return x.Note
+	}
+	return nil
+}
+
+func (x *CreateConversationNoteResponse) GetIdempotentReplay() bool {
+	if x != nil {
+		return x.IdempotentReplay
+	}
+	return false
+}
+
 var File_nexusim_conversation_v1_conversation_service_proto protoreflect.FileDescriptor
 
 const file_nexusim_conversation_v1_conversation_service_proto_rawDesc = "" +
@@ -2358,7 +2626,31 @@ const file_nexusim_conversation_v1_conversation_service_proto_rawDesc = "" +
 	"\x18expected_profile_version\x18\x05 \x01(\x03R\x16expectedProfileVersion\x12\"\n" +
 	"\fannouncement\x18\x06 \x01(\tR\fannouncement\"k\n" +
 	"!UpdateConversationProfileResponse\x12F\n" +
-	"\aprofile\x18\x01 \x01(\v2,.nexusim.conversation.v1.ConversationProfileR\aprofile*\x82\x01\n" +
+	"\aprofile\x18\x01 \x01(\v2,.nexusim.conversation.v1.ConversationProfileR\aprofile\"\x8e\x03\n" +
+	"\x10ConversationNote\x12\x1b\n" +
+	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12'\n" +
+	"\x0fconversation_id\x18\x02 \x01(\tR\x0econversationId\x12\x17\n" +
+	"\anote_id\x18\x03 \x01(\tR\x06noteId\x12$\n" +
+	"\x0eauthor_user_id\x18\x04 \x01(\tR\fauthorUserId\x12\x12\n" +
+	"\x04body\x18\x05 \x01(\tR\x04body\x12(\n" +
+	"\x10source_tool_name\x18\x06 \x01(\tR\x0esourceToolName\x12,\n" +
+	"\x12source_proposal_id\x18\a \x01(\tR\x10sourceProposalId\x12,\n" +
+	"\x12source_approval_id\x18\b \x01(\tR\x10sourceApprovalId\x12.\n" +
+	"\x13source_execution_id\x18\t \x01(\tR\x11sourceExecutionId\x12+\n" +
+	"\x12created_at_unix_ms\x18\n" +
+	" \x01(\x03R\x0fcreatedAtUnixMs\"\x84\x03\n" +
+	"\x1dCreateConversationNoteRequest\x12G\n" +
+	"\fauth_context\x18\x01 \x01(\v2$.nexusim.conversation.v1.AuthContextR\vauthContext\x12'\n" +
+	"\x0fconversation_id\x18\x02 \x01(\tR\x0econversationId\x12\x12\n" +
+	"\x04body\x18\x03 \x01(\tR\x04body\x12'\n" +
+	"\x0fidempotency_key\x18\x04 \x01(\tR\x0eidempotencyKey\x12(\n" +
+	"\x10source_tool_name\x18\x05 \x01(\tR\x0esourceToolName\x12,\n" +
+	"\x12source_proposal_id\x18\x06 \x01(\tR\x10sourceProposalId\x12,\n" +
+	"\x12source_approval_id\x18\a \x01(\tR\x10sourceApprovalId\x12.\n" +
+	"\x13source_execution_id\x18\b \x01(\tR\x11sourceExecutionId\"\x8c\x01\n" +
+	"\x1eCreateConversationNoteResponse\x12=\n" +
+	"\x04note\x18\x01 \x01(\v2).nexusim.conversation.v1.ConversationNoteR\x04note\x12+\n" +
+	"\x11idempotent_replay\x18\x02 \x01(\bR\x10idempotentReplay*\x82\x01\n" +
 	"\x10ConversationMode\x12!\n" +
 	"\x1dCONVERSATION_MODE_UNSPECIFIED\x10\x00\x12$\n" +
 	" CONVERSATION_MODE_LOCAL_ROW_LOCK\x10\x01\x12%\n" +
@@ -2409,7 +2701,7 @@ const file_nexusim_conversation_v1_conversation_service_proto_rawDesc = "" +
 	"\x1aConversationMemberListSort\x12-\n" +
 	")CONVERSATION_MEMBER_LIST_SORT_UNSPECIFIED\x10\x00\x12-\n" +
 	")CONVERSATION_MEMBER_LIST_SORT_USER_ID_ASC\x10\x01\x122\n" +
-	".CONVERSATION_MEMBER_LIST_SORT_ROLE_USER_ID_ASC\x10\x022\xc1\b\n" +
+	".CONVERSATION_MEMBER_LIST_SORT_ROLE_USER_ID_ASC\x10\x022\xcd\t\n" +
 	"\x13ConversationService\x12q\n" +
 	"\x0eGetSendContext\x12..nexusim.conversation.v1.GetSendContextRequest\x1a/.nexusim.conversation.v1.GetSendContextResponse\x12}\n" +
 	"\x12CreateConversation\x122.nexusim.conversation.v1.CreateConversationRequest\x1a3.nexusim.conversation.v1.CreateConversationResponse\x12}\n" +
@@ -2418,7 +2710,8 @@ const file_nexusim_conversation_v1_conversation_service_proto_rawDesc = "" +
 	"\x17ListConversationMembers\x127.nexusim.conversation.v1.ListConversationMembersRequest\x1a8.nexusim.conversation.v1.ListConversationMembersResponse\x12\x92\x01\n" +
 	"\x19TransferConversationOwner\x129.nexusim.conversation.v1.TransferConversationOwnerRequest\x1a:.nexusim.conversation.v1.TransferConversationOwnerResponse\x12\x89\x01\n" +
 	"\x16GetConversationProfile\x126.nexusim.conversation.v1.GetConversationProfileRequest\x1a7.nexusim.conversation.v1.GetConversationProfileResponse\x12\x92\x01\n" +
-	"\x19UpdateConversationProfile\x129.nexusim.conversation.v1.UpdateConversationProfileRequest\x1a:.nexusim.conversation.v1.UpdateConversationProfileResponseBIZGgithub.com/qsyy0921/IM/api/proto/nexusim/conversation/v1;conversationv1b\x06proto3"
+	"\x19UpdateConversationProfile\x129.nexusim.conversation.v1.UpdateConversationProfileRequest\x1a:.nexusim.conversation.v1.UpdateConversationProfileResponse\x12\x89\x01\n" +
+	"\x16CreateConversationNote\x126.nexusim.conversation.v1.CreateConversationNoteRequest\x1a7.nexusim.conversation.v1.CreateConversationNoteResponseBIZGgithub.com/qsyy0921/IM/api/proto/nexusim/conversation/v1;conversationv1b\x06proto3"
 
 var (
 	file_nexusim_conversation_v1_conversation_service_proto_rawDescOnce sync.Once
@@ -2433,7 +2726,7 @@ func file_nexusim_conversation_v1_conversation_service_proto_rawDescGZIP() []byt
 }
 
 var file_nexusim_conversation_v1_conversation_service_proto_enumTypes = make([]protoimpl.EnumInfo, 9)
-var file_nexusim_conversation_v1_conversation_service_proto_msgTypes = make([]protoimpl.MessageInfo, 19)
+var file_nexusim_conversation_v1_conversation_service_proto_msgTypes = make([]protoimpl.MessageInfo, 22)
 var file_nexusim_conversation_v1_conversation_service_proto_goTypes = []any{
 	(ConversationMode)(0),                     // 0: nexusim.conversation.v1.ConversationMode
 	(FanoutMode)(0),                           // 1: nexusim.conversation.v1.FanoutMode
@@ -2463,6 +2756,9 @@ var file_nexusim_conversation_v1_conversation_service_proto_goTypes = []any{
 	(*GetConversationProfileResponse)(nil),    // 25: nexusim.conversation.v1.GetConversationProfileResponse
 	(*UpdateConversationProfileRequest)(nil),  // 26: nexusim.conversation.v1.UpdateConversationProfileRequest
 	(*UpdateConversationProfileResponse)(nil), // 27: nexusim.conversation.v1.UpdateConversationProfileResponse
+	(*ConversationNote)(nil),                  // 28: nexusim.conversation.v1.ConversationNote
+	(*CreateConversationNoteRequest)(nil),     // 29: nexusim.conversation.v1.CreateConversationNoteRequest
+	(*CreateConversationNoteResponse)(nil),    // 30: nexusim.conversation.v1.CreateConversationNoteResponse
 }
 var file_nexusim_conversation_v1_conversation_service_proto_depIdxs = []int32{
 	0,  // 0: nexusim.conversation.v1.GetSendContextResponse.conversation_mode:type_name -> nexusim.conversation.v1.ConversationMode
@@ -2495,27 +2791,31 @@ var file_nexusim_conversation_v1_conversation_service_proto_depIdxs = []int32{
 	24, // 27: nexusim.conversation.v1.GetConversationProfileResponse.profile:type_name -> nexusim.conversation.v1.ConversationProfile
 	11, // 28: nexusim.conversation.v1.UpdateConversationProfileRequest.auth_context:type_name -> nexusim.conversation.v1.AuthContext
 	24, // 29: nexusim.conversation.v1.UpdateConversationProfileResponse.profile:type_name -> nexusim.conversation.v1.ConversationProfile
-	9,  // 30: nexusim.conversation.v1.ConversationService.GetSendContext:input_type -> nexusim.conversation.v1.GetSendContextRequest
-	12, // 31: nexusim.conversation.v1.ConversationService.CreateConversation:input_type -> nexusim.conversation.v1.CreateConversationRequest
-	14, // 32: nexusim.conversation.v1.ConversationService.CreateMemberChange:input_type -> nexusim.conversation.v1.CreateMemberChangeRequest
-	16, // 33: nexusim.conversation.v1.ConversationService.GetMemberChange:input_type -> nexusim.conversation.v1.GetMemberChangeRequest
-	18, // 34: nexusim.conversation.v1.ConversationService.ListConversationMembers:input_type -> nexusim.conversation.v1.ListConversationMembersRequest
-	21, // 35: nexusim.conversation.v1.ConversationService.TransferConversationOwner:input_type -> nexusim.conversation.v1.TransferConversationOwnerRequest
-	23, // 36: nexusim.conversation.v1.ConversationService.GetConversationProfile:input_type -> nexusim.conversation.v1.GetConversationProfileRequest
-	26, // 37: nexusim.conversation.v1.ConversationService.UpdateConversationProfile:input_type -> nexusim.conversation.v1.UpdateConversationProfileRequest
-	10, // 38: nexusim.conversation.v1.ConversationService.GetSendContext:output_type -> nexusim.conversation.v1.GetSendContextResponse
-	13, // 39: nexusim.conversation.v1.ConversationService.CreateConversation:output_type -> nexusim.conversation.v1.CreateConversationResponse
-	15, // 40: nexusim.conversation.v1.ConversationService.CreateMemberChange:output_type -> nexusim.conversation.v1.CreateMemberChangeResponse
-	17, // 41: nexusim.conversation.v1.ConversationService.GetMemberChange:output_type -> nexusim.conversation.v1.GetMemberChangeResponse
-	20, // 42: nexusim.conversation.v1.ConversationService.ListConversationMembers:output_type -> nexusim.conversation.v1.ListConversationMembersResponse
-	22, // 43: nexusim.conversation.v1.ConversationService.TransferConversationOwner:output_type -> nexusim.conversation.v1.TransferConversationOwnerResponse
-	25, // 44: nexusim.conversation.v1.ConversationService.GetConversationProfile:output_type -> nexusim.conversation.v1.GetConversationProfileResponse
-	27, // 45: nexusim.conversation.v1.ConversationService.UpdateConversationProfile:output_type -> nexusim.conversation.v1.UpdateConversationProfileResponse
-	38, // [38:46] is the sub-list for method output_type
-	30, // [30:38] is the sub-list for method input_type
-	30, // [30:30] is the sub-list for extension type_name
-	30, // [30:30] is the sub-list for extension extendee
-	0,  // [0:30] is the sub-list for field type_name
+	11, // 30: nexusim.conversation.v1.CreateConversationNoteRequest.auth_context:type_name -> nexusim.conversation.v1.AuthContext
+	28, // 31: nexusim.conversation.v1.CreateConversationNoteResponse.note:type_name -> nexusim.conversation.v1.ConversationNote
+	9,  // 32: nexusim.conversation.v1.ConversationService.GetSendContext:input_type -> nexusim.conversation.v1.GetSendContextRequest
+	12, // 33: nexusim.conversation.v1.ConversationService.CreateConversation:input_type -> nexusim.conversation.v1.CreateConversationRequest
+	14, // 34: nexusim.conversation.v1.ConversationService.CreateMemberChange:input_type -> nexusim.conversation.v1.CreateMemberChangeRequest
+	16, // 35: nexusim.conversation.v1.ConversationService.GetMemberChange:input_type -> nexusim.conversation.v1.GetMemberChangeRequest
+	18, // 36: nexusim.conversation.v1.ConversationService.ListConversationMembers:input_type -> nexusim.conversation.v1.ListConversationMembersRequest
+	21, // 37: nexusim.conversation.v1.ConversationService.TransferConversationOwner:input_type -> nexusim.conversation.v1.TransferConversationOwnerRequest
+	23, // 38: nexusim.conversation.v1.ConversationService.GetConversationProfile:input_type -> nexusim.conversation.v1.GetConversationProfileRequest
+	26, // 39: nexusim.conversation.v1.ConversationService.UpdateConversationProfile:input_type -> nexusim.conversation.v1.UpdateConversationProfileRequest
+	29, // 40: nexusim.conversation.v1.ConversationService.CreateConversationNote:input_type -> nexusim.conversation.v1.CreateConversationNoteRequest
+	10, // 41: nexusim.conversation.v1.ConversationService.GetSendContext:output_type -> nexusim.conversation.v1.GetSendContextResponse
+	13, // 42: nexusim.conversation.v1.ConversationService.CreateConversation:output_type -> nexusim.conversation.v1.CreateConversationResponse
+	15, // 43: nexusim.conversation.v1.ConversationService.CreateMemberChange:output_type -> nexusim.conversation.v1.CreateMemberChangeResponse
+	17, // 44: nexusim.conversation.v1.ConversationService.GetMemberChange:output_type -> nexusim.conversation.v1.GetMemberChangeResponse
+	20, // 45: nexusim.conversation.v1.ConversationService.ListConversationMembers:output_type -> nexusim.conversation.v1.ListConversationMembersResponse
+	22, // 46: nexusim.conversation.v1.ConversationService.TransferConversationOwner:output_type -> nexusim.conversation.v1.TransferConversationOwnerResponse
+	25, // 47: nexusim.conversation.v1.ConversationService.GetConversationProfile:output_type -> nexusim.conversation.v1.GetConversationProfileResponse
+	27, // 48: nexusim.conversation.v1.ConversationService.UpdateConversationProfile:output_type -> nexusim.conversation.v1.UpdateConversationProfileResponse
+	30, // 49: nexusim.conversation.v1.ConversationService.CreateConversationNote:output_type -> nexusim.conversation.v1.CreateConversationNoteResponse
+	41, // [41:50] is the sub-list for method output_type
+	32, // [32:41] is the sub-list for method input_type
+	32, // [32:32] is the sub-list for extension type_name
+	32, // [32:32] is the sub-list for extension extendee
+	0,  // [0:32] is the sub-list for field type_name
 }
 
 func init() { file_nexusim_conversation_v1_conversation_service_proto_init() }
@@ -2529,7 +2829,7 @@ func file_nexusim_conversation_v1_conversation_service_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_nexusim_conversation_v1_conversation_service_proto_rawDesc), len(file_nexusim_conversation_v1_conversation_service_proto_rawDesc)),
 			NumEnums:      9,
-			NumMessages:   19,
+			NumMessages:   22,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

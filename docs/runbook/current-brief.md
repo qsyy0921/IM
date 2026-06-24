@@ -197,9 +197,11 @@ candidate review path 构造 `DECISION` / `BLOCKER` / `FILE` 三类 group memory
 已通过真实 service-stack gate：4 adapters、27 cases、27 passed、0 failed、
 0 skipped；该 run 确认 `loadtest/ragagent` 会基于 `DECISION` / `TASK` /
 `STATUS` 三类 reviewed group memory 生成 `conversation.note.create` 业务 proposal，
-经 approval 后由 action-executor 记录执行审计。由于该业务 tool 未配置真实 mutation
-adapter，本场景必须 `business_action_executed=false`，只证明 source-chain evidence、
-approval 和 audit 边界成立。
+经 approval 后由 action-executor 记录执行审计。2026-06-25 已补显式 opt-in
+conversation note business adapter：配置
+`NEXUSIM_ACTION_EXECUTOR_CONVERSATION_GRPC_ADDR` 后，action-executor 会通过
+conversation-service 公开 `CreateConversationNote` 写入真实 note fact；未配置时仍必须
+`business_action_executed=false`，不伪造业务成功。
 同日 Python AI Worker 已补 memory extraction candidate first path：
 `ai/python/nexusim_ai_memory` 只从显式 low-sensitive message batch 的
 `decision:` / `task:` / `status:` / `blocker:` / `file:` / `profile_signal:`
@@ -278,4 +280,5 @@ fail-closed，不写 execution audit、不写 tool result projection、不调用
   `localhost:15432` 不可用，只完成 pgvector fail-closed 负向验证。后续继续做真实 OpenSearch 进程 smoke、真实
   pgvector / Milvus / OpenSearch vector provider smoke，
   以及跨 provider EvidencePack coverage。
-- 真实 mutation 必须等显式业务 adapter、approval、executor、audit 全部就绪后再扩展。
+- `conversation.note.create` 的显式业务 adapter 已就绪；下一步把 RAG-Agent demo
+  从 audit-only gate 扩展到 opt-in business mutation smoke。

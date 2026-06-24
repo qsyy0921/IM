@@ -43,6 +43,10 @@ type UpdateConversationProfileExecutor interface {
 	Execute(context.Context, types.UpdateConversationProfileCommand) (types.ConversationProfileResult, error)
 }
 
+type CreateConversationNoteExecutor interface {
+	Execute(context.Context, types.CreateConversationNoteCommand) (types.ConversationNoteResult, error)
+}
+
 type Option func(*Server)
 
 type Server struct {
@@ -55,6 +59,7 @@ type Server struct {
 	listConversationMember ListConversationMembersExecutor
 	getConversationProfile GetConversationProfileExecutor
 	updateProfile          UpdateConversationProfileExecutor
+	createNote             CreateConversationNoteExecutor
 }
 
 func NewServer(getSendContext GetSendContextExecutor, opts ...Option) *Server {
@@ -104,6 +109,12 @@ func WithGetConversationProfile(executor GetConversationProfileExecutor) Option 
 func WithUpdateConversationProfile(executor UpdateConversationProfileExecutor) Option {
 	return func(server *Server) {
 		server.updateProfile = executor
+	}
+}
+
+func WithCreateConversationNote(executor CreateConversationNoteExecutor) Option {
+	return func(server *Server) {
+		server.createNote = executor
 	}
 }
 
@@ -403,6 +414,39 @@ func (s *Server) UpdateConversationProfile(
 	}, nil
 }
 
+func (s *Server) CreateConversationNote(
+	ctx context.Context,
+	request *conversationv1.CreateConversationNoteRequest,
+) (*conversationv1.CreateConversationNoteResponse, error) {
+	if request == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+	if s.createNote == nil {
+		return nil, status.Error(codes.Unimplemented, "create conversation note is not configured")
+	}
+	auth, ok := authFromProto(ctx, request.GetAuthContext())
+	if !ok {
+		return nil, status.Error(codes.InvalidArgument, "auth_context is required")
+	}
+	result, err := s.createNote.Execute(ctx, types.CreateConversationNoteCommand{
+		AuthContext:       auth,
+		ConversationID:    types.ConversationID(request.GetConversationId()),
+		Body:              request.GetBody(),
+		IdempotencyKey:    request.GetIdempotencyKey(),
+		SourceToolName:    request.GetSourceToolName(),
+		SourceProposalID:  request.GetSourceProposalId(),
+		SourceApprovalID:  request.GetSourceApprovalId(),
+		SourceExecutionID: request.GetSourceExecutionId(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	return &conversationv1.CreateConversationNoteResponse{
+		Note:             toProtoConversationNote(result),
+		IdempotentReplay: result.IdempotentReplay,
+	}, nil
+}
+
 func authFromProto(ctx context.Context, auth *conversationv1.AuthContext) (types.AuthContext, bool) {
 	if verified, ok := verifiedAuthFromContext(ctx); ok {
 		if auth != nil {
@@ -469,6 +513,21 @@ func toProtoConversationProfile(result types.ConversationProfileResult) *convers
 		MemberVersion:     result.MemberVersion,
 		PermissionVersion: result.PermissionVersion,
 		UpdatedAtUnixMs:   result.UpdatedAt.UnixMilli(),
+	}
+}
+
+func toProtoConversationNote(result types.ConversationNoteResult) *conversationv1.ConversationNote {
+	return &conversationv1.ConversationNote{
+		TenantId:          string(result.TenantID),
+		ConversationId:    string(result.ConversationID),
+		NoteId:            string(result.NoteID),
+		AuthorUserId:      string(result.AuthorUserID),
+		Body:              result.Body,
+		SourceToolName:    result.SourceToolName,
+		SourceProposalId:  result.SourceProposalID,
+		SourceApprovalId:  result.SourceApprovalID,
+		SourceExecutionId: result.SourceExecutionID,
+		CreatedAtUnixMs:   result.CreatedAt.UnixMilli(),
 	}
 }
 

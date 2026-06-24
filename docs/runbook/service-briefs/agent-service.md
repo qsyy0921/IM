@@ -68,8 +68,10 @@ proposal 前调用 `mcp-gateway.PrepareToolCall` 做 skill / policy / prepare au
 - 同日 `ai-eval-rag-agent-demo-live-20260624-business-proposal-source-chain-gate-v1`
   已通过真实 service-stack gate：Agent 基于 `DECISION` / `TASK` / `STATUS` 三类
   reviewed memory 生成 `conversation.note.create` 业务 proposal，approval 后由
-  action-executor 记录 audit；由于没有配置真实 mutation adapter，本场景要求
-  `business_action_executed=false`，证明 source-chain、approval 和 audit 边界，而不是业务写入。
+  action-executor 记录 audit。2026-06-25 已补显式 opt-in
+  `conversation.note.create` business adapter；配置 conversation-service gRPC 地址后，
+  action-executor 可写真实 note fact。未配置时仍要求
+  `business_action_executed=false`，证明 source-chain、approval 和 audit 边界，而不是伪造业务写入。
 - 2026-06-24 retrieval-gateway source-chain-aware rerank first pass 已落后，Agent
   仍只消费 EvidencePack，不自己实现排序或重查 source；proposal path 后续通过
   EvidencePack `rerank_score`、source refs、graph edges 和 profile evidence 继续扩展
@@ -77,10 +79,11 @@ proposal 前调用 `mcp-gateway.PrepareToolCall` 做 skill / policy / prepare au
 
 ## 边界
 
-- 不执行真实工具或业务 mutation；不直接读 message / conversation / search / memory / policy 私表。
+- 不直接执行真实工具或业务 mutation；真实写动作必须交给 action-executor 和显式业务 adapter。
+- 不直接读 message / conversation / search / memory / policy 私表。
 - 外部 LLM / Python worker / MCP provider 后续必须走 port、verifier、proposal / approval / executor / audit。
 
 ## 下一步
 
-- 继续消费并校验 EvidencePack source-chain / rerank coverage；真实写动作仍只走
-  proposal / approval / executor / audit，且必须等显式业务 adapter 就绪。
+- 继续消费并校验 EvidencePack source-chain / rerank coverage；下一步补
+  `conversation.note.create` opt-in business mutation smoke。

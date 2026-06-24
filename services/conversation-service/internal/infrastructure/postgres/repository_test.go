@@ -290,6 +290,7 @@ func resetConversationTables(t *testing.T, ctx context.Context, pool *pgxpool.Po
 	t.Helper()
 	if _, err := pool.Exec(ctx, `
 TRUNCATE TABLE
+    conversation_notes,
     member_change_saga,
     conversation_members,
     conversations

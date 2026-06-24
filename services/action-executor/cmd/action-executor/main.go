@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	conversationv1 "github.com/qsyy0921/IM/api/proto/nexusim/conversation/v1"
 	actiongrpc "github.com/qsyy0921/IM/services/action-executor/internal/api/grpc"
 	"github.com/qsyy0921/IM/services/action-executor/internal/app"
 	postgresinfra "github.com/qsyy0921/IM/services/action-executor/internal/infrastructure/postgres"
@@ -22,6 +23,7 @@ import (
 	toolinfra "github.com/qsyy0921/IM/services/action-executor/internal/infrastructure/tool"
 	"github.com/qsyy0921/IM/services/action-executor/internal/trigger/providerfailure"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 func main() {
@@ -155,10 +157,11 @@ func runGRPC(ctx context.Context) error {
 		return err
 	}
 	repository := postgresinfra.NewRepository(pool)
-	toolExecutor, err := newToolExecutorFromEnv()
+	toolExecutor, closeTools, err := newToolExecutorFromEnv(timeout)
 	if err != nil {
 		return err
 	}
+	defer closeTools()
 	server := grpc.NewServer()
 	actiongrpc.Register(server, actiongrpc.NewServer(app.NewExecuteApprovedActionUseCaseWithToolExecutor(
 		skillClient,
@@ -190,12 +193,28 @@ func runGRPC(ctx context.Context) error {
 	}
 }
 
-func newToolExecutorFromEnv() (app.ToolExecutorPort, error) {
+func newToolExecutorFromEnv(timeout time.Duration) (app.ToolExecutorPort, func() error, error) {
 	localExecutor := toolinfra.NewLocalSafeExecutor()
 	executors := []toolinfra.Executor{localExecutor}
+	closers := make([]func() error, 0, 1)
+	if conversationAddr := envString("NEXUSIM_ACTION_EXECUTOR_CONVERSATION_GRPC_ADDR", ""); conversationAddr != "" {
+		conn, err := grpc.NewClient(
+			"passthrough:///"+conversationAddr,
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+		)
+		if err != nil {
+			return nil, nil, err
+		}
+		closers = append(closers, conn.Close)
+		executors = append(executors, toolinfra.NewConversationNoteExecutor(
+			conversationv1.NewConversationServiceClient(conn),
+			timeout,
+		))
+	}
 	externalExecutor, err := externalMCPAdapterFromEnv()
 	if err != nil {
-		return nil, err
+		closeAll(closers)
+		return nil, nil, err
 	}
 	if externalExecutor != nil {
 		executors = append(executors, externalExecutor)
@@ -204,10 +223,26 @@ func newToolExecutorFromEnv() (app.ToolExecutorPort, error) {
 		envString("NEXUSIM_ACTION_EXECUTOR_EXTERNAL_MCP_FAILURE_MODE", toolinfra.ExternalMCPFailureDisabled),
 	)
 	if err != nil {
-		return nil, err
+		closeAll(closers)
+		return nil, nil, err
 	}
 	executors = append(executors, externalFailure)
-	return toolinfra.NewExecutorChain(executors...), nil
+	return toolinfra.NewExecutorChain(executors...), func() error {
+		return closeAll(closers)
+	}, nil
+}
+
+func closeAll(closers []func() error) error {
+	var closeErr error
+	for _, closer := range closers {
+		if closer == nil {
+			continue
+		}
+		if err := closer(); err != nil && closeErr == nil {
+			closeErr = err
+		}
+	}
+	return closeErr
 }
 
 func externalMCPAdapterFromEnv() (toolinfra.Executor, error) {

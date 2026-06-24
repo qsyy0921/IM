@@ -17,7 +17,8 @@ const (
 	SkillStatusActive   = "ACTIVE"
 	SkillStatusDisabled = "DISABLED"
 
-	LocalSafeEchoToolName = "nexusim.local.echo"
+	LocalSafeEchoToolName          = "nexusim.local.echo"
+	ConversationNoteCreateToolName = "conversation.note.create"
 
 	ExecutionStatusRecorded = "RECORDED"
 	ExecutionStatusBlocked  = "BLOCKED"
@@ -296,15 +297,21 @@ type ExecuteApprovedActionResult struct {
 }
 
 type ToolExecutionCommand struct {
-	AuthContext  AuthContext
-	Skill        SkillDefinition
-	ToolName     string
-	Action       string
-	ResourceType string
-	ResourceID   string
-	RiskLevel    string
-	Intent       string
-	InputSHA256  string
+	AuthContext     AuthContext
+	Skill           SkillDefinition
+	ProposalID      string
+	ApprovalID      string
+	PreparedAuditID string
+	ToolName        string
+	Action          string
+	ResourceType    string
+	ResourceID      string
+	RiskLevel       string
+	Intent          string
+	IdempotencyKey  string
+	// InputJSON is only available to first-party business adapters. External providers must receive InputSHA256 only.
+	InputJSON   string
+	InputSHA256 string
 }
 
 type ToolExecutionResult struct {

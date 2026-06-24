@@ -187,15 +187,20 @@ func (usecase ExecuteApprovedActionUseCase) executeToolAndInsertAudit(
 	var providerFailure *types.ProviderFailureProjection
 	if usecase.executor != nil {
 		execution, err := usecase.executor.ExecuteTool(ctx, types.ToolExecutionCommand{
-			AuthContext:  command.AuthContext,
-			Skill:        skill,
-			ToolName:     command.ToolName,
-			Action:       types.ToolActionExecute,
-			ResourceType: command.ResourceType,
-			ResourceID:   command.ResourceID,
-			RiskLevel:    result.RiskLevel,
-			Intent:       command.Intent,
-			InputSHA256:  command.InputSHA256(),
+			AuthContext:     command.AuthContext,
+			Skill:           skill,
+			ProposalID:      command.ProposalID,
+			ApprovalID:      command.ApprovalID,
+			PreparedAuditID: command.PreparedAuditID,
+			ToolName:        command.ToolName,
+			Action:          types.ToolActionExecute,
+			ResourceType:    command.ResourceType,
+			ResourceID:      command.ResourceID,
+			RiskLevel:       result.RiskLevel,
+			Intent:          command.Intent,
+			IdempotencyKey:  command.IdempotencyKey,
+			InputJSON:       command.InputJSON,
+			InputSHA256:     command.InputSHA256(),
 		})
 		switch {
 		case err == nil:

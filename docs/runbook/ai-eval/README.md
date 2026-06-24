@@ -420,8 +420,12 @@ The 2026-06-24 retrieval source-chain rerank first pass adds
 multi-source / cross-group / actor-attributed / graph-edge evidence must raise
 `rerank_score` and survive limit truncation ahead of a single search hit. This
 is currently covered by focused retrieval-gateway app tests and
-`loadtest/retrieval` summary fields; a fresh service-stack gate should be
-archived after the updated retrieval-gateway runtime is restarted.
+`loadtest/retrieval` summary fields. The 2026-06-24 live gate
+`ai-eval-service-stack-live-20260624-retrieval-source-chain-rerank-v2`
+rebuilt and recreated the local retrieval-gateway container, then passed
+4 adapters / 27 cases / 27 passed / 0 failed / 0 skipped. The retrieval adapter
+verified `source_chain_rerank_preserved=true` with `memory_rerank_score=1.29`
+above the single search baseline.
 The 2026-06-20 negative RAG / Agent service-stack run increased the live suite
 to 19 cases and added RAG no-evidence abstain plus Agent policy-denied blocked
 proposal checks.

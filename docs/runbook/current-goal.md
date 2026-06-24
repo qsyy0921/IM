@@ -276,7 +276,10 @@ IM messages -> search / memory projection -> EvidencePack -> RAG / Agent answer 
    EvidencePack source-chain-aware rerank first pass 已落到 retrieval-gateway：
    多来源 / 跨群 / actor attribution / graph-edge / profile-supporting evidence 会
    增加 `rerank_score`，并纳入 retrieval positive adapter 断言；当前已通过
-   focused app / loadtest checks，后续再归档真实 service-stack gate。显式业务
+   focused app / loadtest checks 和真实 service-stack gate
+   `ai-eval-service-stack-live-20260624-retrieval-source-chain-rerank-v2`
+   归档：4 adapters / 27 cases / 27 passed / 0 failed / 0 skipped，
+   `memory_rerank_score=1.29` 高于 single search baseline。显式业务
    mutation 场景必须等业务 adapter 准备好后再扩展。
 5. 客户端只作为演示入口；除非阻塞上述演示，不继续扩 UI 产品化。
 6. Windows release signing / MSI / NSIS installer、完整 Android、完整移动端发布、

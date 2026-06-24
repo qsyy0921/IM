@@ -235,5 +235,9 @@ fail-closed，不写 execution audit、不写 tool result projection、不调用
 - EvidencePack source-chain-aware rerank first pass 已落到 retrieval-gateway：
   多来源 / 跨群 / actor attribution / graph-edge / profile-supporting evidence 会增加
   `rerank_score`，retrieval positive adapter 已新增 `must_preserve_source_chain_rerank`
-  断言；当前是 focused check 证明，后续再归档真实 service-stack gate。
+  断言；2026-06-24
+  `ai-eval-service-stack-live-20260624-retrieval-source-chain-rerank-v2`
+  已通过真实 service-stack gate：4 adapters、27 cases、27 passed、0 failed、
+  0 skipped，且 retrieval adapter 断言 `memory_rerank_score=1.29` 高于 single
+  search baseline。
 - 真实 mutation 必须等显式业务 adapter、approval、executor、audit 全部就绪后再扩展。

@@ -70,11 +70,16 @@ function Test-RetrievalAssertion {
         "must_preserve_evidencepack_source_coverage" {
             $searchCount = [int]$Summary.source_counts.search_message
             $memoryCount = [int]$Summary.source_counts.memory_event
+            $profileCount = 0
+            if ($null -ne $Summary.source_counts.PSObject.Properties["profile_aggregate"]) {
+                $profileCount = [int]$Summary.source_counts.profile_aggregate
+            }
             return `
                 (Get-JsonPropertyString -Object $Summary -Name "pack_id").Length -gt 0 `
-                -and [int]$Summary.item_count -eq ($searchCount + $memoryCount) `
+                -and [int]$Summary.item_count -eq ($searchCount + $memoryCount + $profileCount) `
                 -and [int]$Summary.search_item_count -eq $searchCount `
                 -and [int]$Summary.memory_item_count -eq $memoryCount `
+                -and [int]$Summary.profile_item_count -eq $profileCount `
                 -and $searchCount -gt 0 `
                 -and $memoryCount -gt 0
         }

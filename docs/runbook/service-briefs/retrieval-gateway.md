@@ -59,7 +59,11 @@
   ids 会提高 rerank score。focused app test 覆盖 limit 截断前多来源 memory chain
   优先于单条 search hit；`loadtest/retrieval` 低敏 summary 和 retrieval positive
   adapter 已新增 `source_chain_rerank_preserved` / `must_preserve_source_chain_rerank`
-  断言。真实 service-stack gate 待后续归档。
+  断言。2026-06-24
+  `ai-eval-service-stack-live-20260624-retrieval-source-chain-rerank-v2`
+  已通过真实 service-stack gate：4 adapters / 27 cases / 27 passed / 0 failed /
+  0 skipped，retrieval case 的 9 个断言全通过，`memory_rerank_score=1.29`
+  高于 single search baseline。
 
-下一步：归档真实 service-stack gate，并继续把 BM25 / vector / graph expansion 与
+下一步：继续把 BM25 / vector / graph expansion 与
 更细 source-chain coverage 通过 EvidencePack 暴露给 RAG / summary / Agent，仍不绕过 retrieval-gateway。

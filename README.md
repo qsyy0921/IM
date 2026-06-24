@@ -279,7 +279,7 @@ message / conversation / policy events -> search-service + memory-service projec
 | `skill-registry` | 技能目录、输入输出合约、风险等级、审批要求和审计元数据。 |
 | `mcp-gateway` | tool prepare 边界、skill catalog check、policy precheck、低敏 audit，不直接执行外部工具。 |
 | `action-executor` | approved execution audit、proposal / approval / prepare audit 校验、本地安全 adapter、guarded external HTTP provider adapter、eval smoke。 |
-| `ai-eval-service` | 低敏 eval catalog / recorder / gate；case catalog 73，profile-Agent safety fixture 20，memory-service / retrieval-gateway / RAG / Summary / Agent live adapters 已完成第一轮 service-stack gate，覆盖 collaborative memory、profile aggregation、EvidencePack、Agent output 和 action safety。 |
+| `ai-eval-service` | 低敏 eval catalog / recorder / gate；case catalog 73，profile-Agent safety fixture 20，memory-service / retrieval-gateway / RAG / Summary / Agent live adapters 已完成第一轮 service-stack gate，覆盖 collaborative memory、profile aggregation、EvidencePack、Agent output 和 action safety；`rag-agent-demo` 已接入 optional service-stack adapter / policy / preflight，真实 live 运行待归档。 |
 | `ai/python` | Python AI Worker 候选层：contract guard、低敏 safety guard、candidate-only worker CLI、`IM` conda toolchain。 |
 
 已进入 product-active first-stage 的平台 / 产品服务：
@@ -358,7 +358,9 @@ memory fact，profile / preference / role signal 保持 PENDING + NEEDS_REVIEW�
 和 `loadtest/agent`，围绕同一 tenant / conversation 生成低敏总报告，断言
 RAG grounded answer、Agent proposal、approval、action-executor audit、
 EvidencePack graph edges 和 profile evidence 均成立；报告只保存 hash、计数和状态，
-不保存 raw answer / proposal text。真实服务栈运行和 ai-eval gate 接入是下一步。
+不保存 raw answer / proposal text。`rag-agent-demo` 已接入 ai-eval optional
+service-stack adapter、gate policy 和 service-stack preflight 路由；真实服务栈运行和
+报告归档是下一步。
 
 下一步默认看 [current-goal.md](docs/runbook/current-goal.md)。截至当前主线，客户端只修
 阻塞演示入口的问题；默认推进

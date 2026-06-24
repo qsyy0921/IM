@@ -179,9 +179,10 @@ IM messages -> search / memory projection -> EvidencePack -> RAG / Agent answer 
    `IM 消息 -> search / memory projection -> EvidencePack -> RAG / Agent answer -> approval / audit`。
    retrieval negative / miss adapter、EvidencePack memory graph edge 和 profile evidence 已补齐；
    profile recompute first path、first-stage operator 和 `rules-v0.2` group memory
-   extraction 已补齐；RAG-Agent demo runner first path 已补齐；下一步进入
-   profile repair batch approval / RAG-Agent demo runner 的真实服务栈 smoke 和
-   ai-eval gate 接入。
+   extraction 已补齐；RAG-Agent demo runner first path 已补齐；`rag-agent-demo`
+   已接入 ai-eval optional service-stack adapter、gate policy 和 service-stack
+   preflight 路由；下一步进入 profile repair batch approval / RAG-Agent demo
+   runner 的真实服务栈 smoke 报告归档。
 5. 客户端只作为演示入口；除非阻塞上述演示，不继续扩 UI 产品化。
 6. Windows release signing / MSI / NSIS installer、完整 Android、完整移动端发布、
    复杂 UI、群管理深水区和真实 media provider 链路全部后置到 backlog。

@@ -1,5 +1,5 @@
 param(
-    [string[]]$OptionalAdapter = @("memory-service", "retrieval-gateway", "rag-service", "agent-action-executor"),
+    [string[]]$OptionalAdapter = @("memory-service", "retrieval-gateway", "rag-service", "agent-action-executor", "rag-agent-demo"),
     [switch]$IncludePythonWorker,
     [switch]$PreflightOnly,
     [switch]$AllowMissing,
@@ -199,6 +199,17 @@ if ($adapters -contains "agent-action-executor") {
     Add-EndpointCheck -Checks $checks -Seen $seenChecks -Name "agent-service" -Endpoint $AgentTarget -DefaultPort 10630
     Add-EndpointCheck -Checks $checks -Seen $seenChecks -Name "action-executor" -Endpoint $ActionExecutorTarget -DefaultPort 10660
     Add-EndpointCheck -Checks $checks -Seen $seenChecks -Name "retrieval-gateway" -Endpoint $RetrievalTarget -DefaultPort 10590
+    Add-EndpointCheck -Checks $checks -Seen $seenChecks -Name "mcp-gateway" -Endpoint $MCPGatewayTarget -DefaultPort 10650
+    Add-EndpointCheck -Checks $checks -Seen $seenChecks -Name "skill-registry" -Endpoint $SkillRegistryTarget -DefaultPort 10640
+    Add-EndpointCheck -Checks $checks -Seen $seenChecks -Name "policy-service" -Endpoint $PolicyTarget -DefaultPort 10800
+}
+if ($adapters -contains "rag-agent-demo") {
+    Add-EndpointCheck -Checks $checks -Seen $seenChecks -Name "rag-service" -Endpoint $RAGTarget -DefaultPort 10610
+    Add-EndpointCheck -Checks $checks -Seen $seenChecks -Name "agent-service" -Endpoint $AgentTarget -DefaultPort 10630
+    Add-EndpointCheck -Checks $checks -Seen $seenChecks -Name "action-executor" -Endpoint $ActionExecutorTarget -DefaultPort 10660
+    Add-EndpointCheck -Checks $checks -Seen $seenChecks -Name "retrieval-gateway" -Endpoint $RetrievalTarget -DefaultPort 10590
+    Add-EndpointCheck -Checks $checks -Seen $seenChecks -Name "search-service" -Endpoint $SearchTarget -DefaultPort 10570
+    Add-EndpointCheck -Checks $checks -Seen $seenChecks -Name "memory-service" -Endpoint $MemoryTarget -DefaultPort 10580
     Add-EndpointCheck -Checks $checks -Seen $seenChecks -Name "mcp-gateway" -Endpoint $MCPGatewayTarget -DefaultPort 10650
     Add-EndpointCheck -Checks $checks -Seen $seenChecks -Name "skill-registry" -Endpoint $SkillRegistryTarget -DefaultPort 10640
     Add-EndpointCheck -Checks $checks -Seen $seenChecks -Name "policy-service" -Endpoint $PolicyTarget -DefaultPort 10800

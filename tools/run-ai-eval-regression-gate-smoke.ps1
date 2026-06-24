@@ -174,6 +174,18 @@ function Invoke-GateAdapter {
                 -OutputPath $SummaryPath `
                 -RequestTimeout $RequestTimeout
         }
+        "rag-agent-demo" {
+            & $ScriptPath `
+                -CasePath $resolvedCasePath `
+                -PGDSN $PGDSN `
+                -RAGTarget $RAGTarget `
+                -AgentTarget $AgentTarget `
+                -ActionExecutorTarget $ActionExecutorTarget `
+                -ResultRoot $ResultRoot `
+                -RunName $AdapterRunName `
+                -OutputPath $SummaryPath `
+                -RequestTimeout $RequestTimeout
+        }
         "python-ai-worker" {
             & $ScriptPath `
                 -Python $Python `

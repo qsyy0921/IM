@@ -40,9 +40,15 @@ adapter、状态、计数、summary/report 引用和低敏 metadata。
 - 2026-06-24 `ai-eval-service-stack-live-20260624-retrieval-negative` 已补齐
   retrieval-gateway negative / miss adapter，并通过真实 service-stack gate：
   9 adapters、51 cases、51 passed、0 failed、0 skipped。
+- 2026-06-24 `rag-agent-demo` 已接入 optional service-stack adapter：
+  `run-ai-eval-ragagent-adapter.ps1` 会运行 `loadtest/ragagent`，断言同一
+  tenant / conversation 上的 RAG grounded answer、Agent proposal / approval、
+  action-executor audit、EvidencePack graph edge 和 profile aggregate evidence，
+  并只持久化 hash、计数、状态和 summary ref。`run-ai-eval-service-stack-gate-smoke.ps1`
+  已能对该 adapter 做 endpoint preflight；真实 live service-stack run 仍需单独归档。
 
 边界：不保存 raw EvidencePack、prompt、model output、用户正文、secret 或 tool input；不授权业务动作。
 
-下一步：继续扩展 group memory extraction / EvidencePack / RAG-Agent demo module，
-并保持 retrieval failure、memory lifecycle failure、reasoning failure 和 action
-boundary failure 的独立诊断。
+下一步：运行并归档 RAG-Agent demo live service-stack gate，继续扩展 group memory
+extraction / EvidencePack，并保持 retrieval failure、memory lifecycle failure、
+reasoning failure 和 action boundary failure 的独立诊断。

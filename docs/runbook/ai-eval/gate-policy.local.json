@@ -123,6 +123,25 @@
       ]
     },
     {
+      "name": "rag-agent-demo",
+      "script": "run-ai-eval-ragagent-adapter.ps1",
+      "run_suffix": "rag-agent-demo",
+      "summary_file": "rag-agent-demo-eval-summary.json",
+      "requires_service_stack": true,
+      "requires": [
+        "rag-service",
+        "agent-service",
+        "action-executor",
+        "retrieval-gateway",
+        "search-service",
+        "memory-service",
+        "mcp-gateway",
+        "skill-registry",
+        "policy-service",
+        "postgres"
+      ]
+    },
+    {
       "name": "python-ai-worker",
       "script": "run-ai-eval-python-worker-adapter.ps1",
       "run_suffix": "python-ai-worker",

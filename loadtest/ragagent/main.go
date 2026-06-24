@@ -484,11 +484,21 @@ func runChild(ctx context.Context, name string, args []string) error {
 	cmd.Dir = repo
 	if output, err := cmd.CombinedOutput(); err != nil {
 		if len(output) != 0 {
-			return fmt.Errorf("%s child run failed: %w; rerun child directly for details", name, err)
+			return fmt.Errorf("%s child run failed: %w; output: %s", name, err, compactChildOutput(output))
 		}
 		return fmt.Errorf("%s child run failed: %w", name, err)
 	}
 	return nil
+}
+
+func compactChildOutput(output []byte) string {
+	const maxOutputBytes = 4096
+	text := strings.TrimSpace(string(output))
+	text = strings.ReplaceAll(text, "\r\n", "\n")
+	if len(text) <= maxOutputBytes {
+		return text
+	}
+	return text[:maxOutputBytes] + "...<truncated>"
 }
 
 func runMemoryProfileExpectFailure(ctx context.Context, name string, args []string, expected string) error {

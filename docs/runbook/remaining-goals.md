@@ -109,6 +109,14 @@
   vector provider smoke。
   `conversation.note.create` 显式业务 adapter 已就绪；继续扩展其它真实 mutation
   场景时仍必须先补公开业务 API、显式 adapter 和 operator policy。
+  当前待办：归档 `conversation.note.create` opt-in business mutation 完整
+  service-stack smoke。2026-06-25 运行结果显示 wrapper / preflight 已就绪，
+  但 live run 被 ai-eval recorder / PostgreSQL deadline 和 RAG child
+  `migrations/postgres/search/000001_search_core.sql` setup timeout 阻塞；同时
+  Docker Desktop API 返回 500，虽然服务端口仍在监听。先恢复 Docker /
+  PostgreSQL runtime，再重跑
+  `run-ai-eval-service-stack-gate-smoke.ps1 -OptionalAdapter rag-agent-demo
+  -ExpectBusinessActionExecuted -NoApplyMigration` 并归档通过报告。
 - `rag-service` / `summary-service`：拒答、引用校验、source-ref regression、unsafe
   output fail-closed cases。
 - `agent-service`：真实业务动作继续走 policy、skill contract、proposal、approval、

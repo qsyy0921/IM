@@ -207,7 +207,12 @@ execute-mode gate：`--expect-business-action-executed` / `-ExpectBusinessAction
 会要求 action-executor `executed=true`、result `SUCCEEDED`、tool output 不回显 note body，
 并用 loadtest verification 读取 `conversation_notes` 确认 note fact 与 approval / proposal
 绑定一致；默认仍是 audit-only gate。focused Go checks 已通过，真实完整 service-stack
-opt-in smoke 报告仍待下一次启动完整本地服务栈后归档。
+opt-in smoke 报告仍待下一次启动完整本地服务栈后归档。完整 service-stack gate wrapper
+也已支持 `-ExpectBusinessActionExecuted`，并在 preflight 中把 conversation-service
+endpoint 纳入 execute-mode 的必需检查。2026-06-25 live run 已确认 preflight 全部
+通过，但正式执行当前被 ai-eval recorder / PostgreSQL timeout 和 search migration
+setup timeout 阻塞；runner 已补 setup timeout 与 child output diagnostics，待 Docker /
+PostgreSQL runtime 恢复后重跑归档。
 同日 Python AI Worker 已补 memory extraction candidate first path：
 `ai/python/nexusim_ai_memory` 只从显式 low-sensitive message batch 的
 `decision:` / `task:` / `status:` / `blocker:` / `file:` / `profile_signal:`
@@ -286,5 +291,6 @@ fail-closed，不写 execution audit、不写 tool result projection、不调用
   `localhost:15432` 不可用，只完成 pgvector fail-closed 负向验证。后续继续做真实 OpenSearch 进程 smoke、真实
   pgvector / Milvus / OpenSearch vector provider smoke，
   以及跨 provider EvidencePack coverage。
-- `conversation.note.create` 的显式业务 adapter 已就绪；下一步把 RAG-Agent demo
-  从 audit-only gate 扩展到 opt-in business mutation smoke。
+- `conversation.note.create` 的显式业务 adapter 和完整 service-stack execute-mode
+  wrapper 已就绪；下一步把 RAG-Agent demo 从 audit-only gate 扩展到完整本地服务栈
+  opt-in business mutation smoke 归档。

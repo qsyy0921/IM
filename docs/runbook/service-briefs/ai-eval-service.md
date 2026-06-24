@@ -78,7 +78,12 @@ adapter、状态、计数、summary/report 引用和低敏 metadata。
   `business_action_executed=false`。同日 `rag-agent-demo` adapter 支持
   `-ExpectBusinessActionExecuted`：显式开启时断言 action-executor executed / SUCCEEDED、
   `business_note_persisted=true`、note ref / id 存在且 body 只输出 hash；默认仍校验
-  audit-only 边界。完整 service-stack opt-in mutation 报告待归档。
+  audit-only 边界。完整 service-stack wrapper 也支持 `-ExpectBusinessActionExecuted`，
+  并在 preflight 中把 conversation-service endpoint 纳入 execute-mode 必需检查；
+  完整 service-stack opt-in mutation 报告待归档。2026-06-25 live run 已确认
+  preflight 全部通过，但正式执行当前被 ai-eval recorder / PostgreSQL timeout 和
+  search migration setup timeout 阻塞；runner 已补 setup timeout 与 child output
+  diagnostics，待 Docker / PostgreSQL runtime 恢复后重跑归档。
 - 2026-06-24 `action-preflight-safety` adapter 已扩到 14 个 smoke cases，并在
   catalog 中新增 approval id、prepared audit id、resource id 绑定错配的
   `PROPOSAL_MISMATCH` 断言；这些 case 区分 action boundary failure 与

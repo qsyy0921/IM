@@ -196,6 +196,24 @@ EvidencePacks to include the resulting `ACTIVE + APPROVED` memory event with
 source refs. It does not read service private tables and does not persist raw
 answer, proposal or memory text in the adapter summary.
 
+To verify the explicit `conversation.note.create` business mutation path, start
+action-executor with `NEXUSIM_ACTION_EXECUTOR_CONVERSATION_GRPC_ADDR` pointing
+at the public conversation-service gRPC endpoint, then run:
+
+```powershell
+.\tools\run-ai-eval-ragagent-adapter.ps1 `
+  -MemoryTarget 127.0.0.1:10580 `
+  -RAGTarget 127.0.0.1:10610 `
+  -AgentTarget 127.0.0.1:10630 `
+  -ActionExecutorTarget 127.0.0.1:10660 `
+  -ExpectBusinessActionExecuted
+```
+
+This mode must observe action-executor `executed=true`, result `SUCCEEDED`,
+low-sensitive output only, and a real conversation note row bound to the
+approved proposal / approval. Without the explicit action-executor env var the
+same demo must stay audit-only and report `business_action_executed=false`.
+
 First-stage profile overgeneralization / Agent output safety adapter:
 
 ```powershell
@@ -374,6 +392,10 @@ RAG / Agent service-stack gate wrapper:
 The preflight writes endpoint readiness only. It does not prove live memory /
 retrieval / RAG / Summary / Agent adapter behavior. Remove `-PreflightOnly` and
 `-AllowMissing` only after the selected service stack is running.
+For the explicit `conversation.note.create` mutation smoke, pass
+`-ExpectBusinessActionExecuted`; preflight will additionally require
+conversation-service, and the selected RAG-Agent adapter will require real note
+persistence verification.
 The first local live run passed with `profile-agent-safety`,
 `action-external-http-provider`, `rag-service` and `agent-action-executor`
 selected; see `docs/runbook/loadtest/ai-eval-service/`.

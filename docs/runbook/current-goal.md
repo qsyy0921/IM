@@ -207,6 +207,14 @@ IM messages -> search / memory projection -> EvidencePack -> RAG / Agent answer 
   result `SUCCEEDED`、低敏 tool output 不回显 note body，并由 loadtest verification
   确认 `conversation_notes` 中真实 note fact 与 proposal / approval 绑定一致；默认路径仍是
   audit-only gate。
+  同日完整 service-stack gate wrapper 已支持 `-ExpectBusinessActionExecuted`，
+  并会在 preflight 中把 conversation-service endpoint 纳入必需检查；真实完整
+  service-stack opt-in mutation 报告仍待本地服务栈重新启动后归档。2026-06-25
+  live run 已确认 preflight 全部通过，但正式执行在 ai-eval recorder / PostgreSQL
+  路径超时；direct RAG-Agent run 的 RAG child 进一步定位到
+  `migrations/postgres/search/000001_search_core.sql` setup timeout。runner 已补
+  setup timeout 和 child output diagnostics，下一步先恢复 Docker / PostgreSQL
+  runtime，再重跑 execute-mode service-stack gate。
   真实 `ai-eval-rag-agent-demo-live-20260624-business-proposal-source-chain-gate-v1`
   service-stack gate 已通过：4 adapters、27 cases、27 passed、0 failed、0 skipped。
 - 2026-06-24 retrieval-gateway 已补 vector-index-service `SearchVectors` adapter
@@ -370,8 +378,8 @@ IM messages -> search / memory projection -> EvidencePack -> RAG / Agent answer 
    纳入 RAG / Agent EvidencePack 断言链路，并已通过真实 service-stack gate 归档；
    profile repair approval、negative gate、group-memory answer / proposal gate 和
    business proposal source-chain gate 均已通过真实 service-stack gate 归档；
-   opt-in business mutation execute-mode gate 已具备代码和 focused checks，真实完整
-   service-stack 报告待本地服务栈重新启动后归档。
+   opt-in business mutation execute-mode gate 已具备 adapter / wrapper 入口和 focused checks，
+   真实完整 service-stack 报告待本地服务栈重新启动后归档。
    EvidencePack source-chain-aware rerank first pass 已落到 retrieval-gateway：
    多来源 / 跨群 / actor attribution / graph-edge / profile-supporting evidence 会
    增加 `rerank_score`，并纳入 retrieval positive adapter 断言；当前已通过
@@ -379,8 +387,9 @@ IM messages -> search / memory projection -> EvidencePack -> RAG / Agent answer 
    `ai-eval-service-stack-live-20260624-retrieval-source-chain-rerank-v2`
    归档：4 adapters / 27 cases / 27 passed / 0 failed / 0 skipped，
    `memory_rerank_score=1.29` 高于 single search baseline。显式
-   `conversation.note.create` business adapter 和 RAG-Agent opt-in execute-mode gate 已补齐；
-   下一步是在完整本地服务栈上归档 `conversation.note.create` opt-in mutation smoke。
+   `conversation.note.create` business adapter、RAG-Agent opt-in execute-mode gate
+   和完整 service-stack wrapper execute-mode 入口已补齐；下一步是在完整本地服务栈上
+   归档 `conversation.note.create` opt-in mutation smoke。
    retrieval strategy version
    已推进为 `retrieval-gateway.v1.hybrid-source-vector-rrf-graph-depth<N>`：rerank 在截断 limit
    前按 lexical search、memory event、profile aggregate、source chain、

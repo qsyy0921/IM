@@ -14,6 +14,7 @@ param(
     [string]$MemoryTarget = "127.0.0.1:10580",
     [string]$AgentTarget = "127.0.0.1:10630",
     [string]$ActionExecutorTarget = "127.0.0.1:10660",
+    [string]$ConversationTarget = "127.0.0.1:10496",
     [string]$MCPGatewayTarget = "127.0.0.1:10650",
     [string]$SkillRegistryTarget = "127.0.0.1:10640",
     [string]$PolicyTarget = "127.0.0.1:10800",
@@ -22,6 +23,7 @@ param(
     [string]$ResultRoot = "H:\NexusIM\loadtest-results",
     [string]$RunName = "",
     [string]$RequestTimeout = "30s",
+    [switch]$ExpectBusinessActionExecuted,
     [switch]$NoApplyMigration
 )
 
@@ -216,6 +218,9 @@ if ($adapters -contains "rag-agent-demo") {
     Add-EndpointCheck -Checks $checks -Seen $seenChecks -Name "skill-registry" -Endpoint $SkillRegistryTarget -DefaultPort 10640
     Add-EndpointCheck -Checks $checks -Seen $seenChecks -Name "policy-service" -Endpoint $PolicyTarget -DefaultPort 10800
     Add-EndpointCheck -Checks $checks -Seen $seenChecks -Name "workflow-service" -Endpoint $WorkflowTarget -DefaultPort 10750
+    if ($ExpectBusinessActionExecuted) {
+        Add-EndpointCheck -Checks $checks -Seen $seenChecks -Name "conversation-service" -Endpoint $ConversationTarget -DefaultPort 10496
+    }
 }
 if ($checks.Count -gt 0) {
     $pgEndpoint = Get-PostgresEndpoint -DSN $PGDSN
@@ -287,6 +292,7 @@ if ($NoApplyMigration) {
         -DeviceID "ai-eval-service-stack-smoke-device" `
         -RequestTimeout $RequestTimeout `
         -OptionalAdapter $optionalAdapterValue `
+        -ExpectBusinessActionExecuted:$ExpectBusinessActionExecuted `
         -NoApplyMigration
 } else {
     & $gateScript `
@@ -309,7 +315,8 @@ if ($NoApplyMigration) {
         -UserID "ai-eval-service-stack-smoke" `
         -DeviceID "ai-eval-service-stack-smoke-device" `
         -RequestTimeout $RequestTimeout `
-        -OptionalAdapter $optionalAdapterValue
+        -OptionalAdapter $optionalAdapterValue `
+        -ExpectBusinessActionExecuted:$ExpectBusinessActionExecuted
 }
 if ($LASTEXITCODE -ne 0) {
     throw "AI eval service-stack gate smoke failed with exit code $LASTEXITCODE"

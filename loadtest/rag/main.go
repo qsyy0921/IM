@@ -43,6 +43,7 @@ type config struct {
 	deviceID       string
 	question       string
 	scenario       string
+	setupTimeout   time.Duration
 	requestTimeout time.Duration
 	tls            grpctls.Config
 }
@@ -153,13 +154,15 @@ func run(ctx context.Context, args []string) error {
 	defer pool.Close()
 
 	startedAt := time.Now().UTC()
-	if err := applyProjectionMigrations(ctx, pool); err != nil {
+	setupCtx, setupCancel := context.WithTimeout(ctx, cfg.setupTimeout)
+	defer setupCancel()
+	if err := applyProjectionMigrations(setupCtx, pool); err != nil {
 		return err
 	}
-	if err := cleanupTenant(ctx, pool, cfg.tenantID); err != nil {
+	if err := cleanupTenant(setupCtx, pool, cfg.tenantID); err != nil {
 		return err
 	}
-	seed, err := seedProjectionRows(ctx, pool, cfg)
+	seed, err := seedProjectionRows(setupCtx, pool, cfg)
 	if err != nil {
 		return err
 	}
@@ -189,6 +192,7 @@ func parseConfig(args []string) (config, error) {
 	flagSet.StringVar(&cfg.deviceID, "device-id", "rag-device", "viewer device id")
 	flagSet.StringVar(&cfg.question, "question", defaultQuestion, "question sent to rag-service")
 	flagSet.StringVar(&cfg.scenario, "scenario", scenarioGrounded, "smoke scenario: grounded or no-evidence")
+	flagSet.DurationVar(&cfg.setupTimeout, "setup-timeout", 30*time.Second, "PostgreSQL migration / seed setup timeout")
 	flagSet.DurationVar(&cfg.requestTimeout, "request-timeout", 10*time.Second, "gRPC request timeout")
 	flagSet.StringVar(&cfg.tls.CAFile, "rag-tls-ca-file", "", "rag gRPC TLS CA file")
 	flagSet.StringVar(&cfg.tls.ServerName, "rag-tls-server-name", "", "rag gRPC TLS server name")
@@ -215,6 +219,9 @@ func parseConfig(args []string) (config, error) {
 	}
 	if cfg.scenario != scenarioGrounded && cfg.scenario != scenarioNoEvidence {
 		return config{}, fmt.Errorf("unsupported --scenario %q", cfg.scenario)
+	}
+	if cfg.setupTimeout <= 0 {
+		return config{}, errors.New("--setup-timeout must be greater than 0")
 	}
 	if cfg.runName == "" {
 		cfg.runName = "rag-service-answer-smoke-" + time.Now().UTC().Format("20060102-150405")

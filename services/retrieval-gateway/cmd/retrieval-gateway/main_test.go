@@ -4,6 +4,8 @@ import (
 	"io"
 	"net/http"
 	"testing"
+
+	retrievaltypes "github.com/qsyy0921/IM/services/retrieval-gateway/internal/types"
 )
 
 func TestValidateRetrievalGatewayMode(t *testing.T) {
@@ -14,6 +16,52 @@ func TestValidateRetrievalGatewayMode(t *testing.T) {
 	}
 	if err := validateRetrievalGatewayMode("bad"); err == nil {
 		t.Fatal("expected invalid mode error")
+	}
+}
+
+func TestRetrievalGraphExpansionDepthFromEnv(t *testing.T) {
+	t.Setenv("NEXUSIM_RETRIEVAL_GRAPH_EXPANSION_DEPTH", "")
+	depth, err := retrievalGraphExpansionDepthFromEnv()
+	if err != nil {
+		t.Fatalf("default depth should be accepted: %v", err)
+	}
+	if depth != retrievaltypes.DefaultGraphExpansionDepth {
+		t.Fatalf("expected default depth %d, got %d", retrievaltypes.DefaultGraphExpansionDepth, depth)
+	}
+
+	t.Setenv("NEXUSIM_RETRIEVAL_GRAPH_EXPANSION_DEPTH", "0")
+	depth, err = retrievalGraphExpansionDepthFromEnv()
+	if err != nil {
+		t.Fatalf("depth zero should be accepted: %v", err)
+	}
+	if depth != 0 {
+		t.Fatalf("expected depth zero, got %d", depth)
+	}
+
+	t.Setenv("NEXUSIM_RETRIEVAL_GRAPH_EXPANSION_DEPTH", "2")
+	depth, err = retrievalGraphExpansionDepthFromEnv()
+	if err != nil {
+		t.Fatalf("depth two should be accepted: %v", err)
+	}
+	if depth != 2 {
+		t.Fatalf("expected depth two, got %d", depth)
+	}
+}
+
+func TestRetrievalGraphExpansionDepthFromEnvRejectsInvalidValues(t *testing.T) {
+	t.Setenv("NEXUSIM_RETRIEVAL_GRAPH_EXPANSION_DEPTH", "not-a-number")
+	if _, err := retrievalGraphExpansionDepthFromEnv(); err == nil {
+		t.Fatal("expected non-numeric graph expansion depth to be rejected")
+	}
+
+	t.Setenv("NEXUSIM_RETRIEVAL_GRAPH_EXPANSION_DEPTH", "-1")
+	if _, err := retrievalGraphExpansionDepthFromEnv(); err == nil {
+		t.Fatal("expected negative graph expansion depth to be rejected")
+	}
+
+	t.Setenv("NEXUSIM_RETRIEVAL_GRAPH_EXPANSION_DEPTH", "4")
+	if _, err := retrievalGraphExpansionDepthFromEnv(); err == nil {
+		t.Fatal("expected graph expansion depth above maximum to be rejected")
 	}
 }
 

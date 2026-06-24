@@ -6,7 +6,12 @@ import (
 	"github.com/qsyy0921/IM/services/retrieval-gateway/internal/types"
 )
 
-func (usecase RetrieveEvidenceUseCase) expandMemoryGraphDepthOne(
+type graphExpansionNode struct {
+	event types.MemoryEventEvidence
+	depth int
+}
+
+func (usecase RetrieveEvidenceUseCase) expandMemoryGraph(
 	ctx context.Context,
 	command types.RetrieveEvidenceCommand,
 	source types.MemoryEventEvidence,
@@ -15,56 +20,71 @@ func (usecase RetrieveEvidenceUseCase) expandMemoryGraphDepthOne(
 	seen map[string]int,
 	coverage map[string]*sourceCoverageState,
 ) error {
-	if len(source.GraphEdges) == 0 {
+	if usecase.graphExpansionDepth <= 0 || len(source.GraphEdges) == 0 {
 		return nil
 	}
 	allowedStatuses := memoryStatusSet(command.EffectiveMemoryStatuses())
-	for _, edge := range source.GraphEdges {
-		adjacentID, err := adjacentMemoryEventID(source.MemoryEventID, edge)
-		if err != nil {
-			return err
-		}
-		if _, ok := queryMemoryIDs[adjacentID]; ok {
+	expanded := map[string]struct{}{
+		source.MemoryEventID: {},
+	}
+	queue := []graphExpansionNode{{event: source, depth: 0}}
+	for len(queue) > 0 {
+		node := queue[0]
+		queue = queue[1:]
+		if node.depth >= usecase.graphExpansionDepth {
 			continue
 		}
+		for _, edge := range node.event.GraphEdges {
+			adjacentID, err := adjacentMemoryEventID(node.event.MemoryEventID, edge)
+			if err != nil {
+				return err
+			}
+			if _, ok := queryMemoryIDs[adjacentID]; ok {
+				continue
+			}
 
-		key := evidenceCandidateKey(types.EvidenceItem{
-			SourceType: types.EvidenceSourceMemoryEvent,
-			SourceID:   adjacentID,
-		})
-		if _, ok := seen[key]; ok {
+			key := evidenceCandidateKey(types.EvidenceItem{
+				SourceType: types.EvidenceSourceMemoryEvent,
+				SourceID:   adjacentID,
+			})
+			if _, ok := seen[key]; ok {
+				if state := coverage[types.EvidenceSourceMemoryEvent]; state != nil {
+					state.CandidateCount++
+					state.DedupedCount++
+				}
+				(*candidates)[seen[key]].DedupeReason = types.EvidenceDedupeKeptFirstDuplicateSource
+				continue
+			}
+
+			result, err := usecase.memory.GetMemoryEvent(ctx, types.MemoryEventLookup{
+				AuthContext:   command.AuthContext,
+				MemoryEventID: adjacentID,
+			})
+			if err != nil {
+				return err
+			}
+			if result.Item.MemoryEventID == "" {
+				return types.NewRetrievalUnavailable("memory graph adjacent event missing")
+			}
+			if result.Item.MemoryEventID != adjacentID {
+				return types.NewRetrievalUnavailable("memory graph adjacent event mismatch")
+			}
+
 			if state := coverage[types.EvidenceSourceMemoryEvent]; state != nil {
 				state.CandidateCount++
-				state.DedupedCount++
 			}
-			(*candidates)[seen[key]].DedupeReason = types.EvidenceDedupeKeptFirstDuplicateSource
-			continue
-		}
+			if !allowedStatuses[result.Item.Status] {
+				continue
+			}
 
-		result, err := usecase.memory.GetMemoryEvent(ctx, types.MemoryEventLookup{
-			AuthContext:   command.AuthContext,
-			MemoryEventID: adjacentID,
-		})
-		if err != nil {
-			return err
+			adjacent := result.Item
+			adjacent.GraphEdges = result.GraphEdges
+			appendEvidenceCandidate(candidates, seen, coverage, memoryEventToEvidence(adjacent))
+			if _, ok := expanded[adjacentID]; !ok {
+				expanded[adjacentID] = struct{}{}
+				queue = append(queue, graphExpansionNode{event: adjacent, depth: node.depth + 1})
+			}
 		}
-		if result.Item.MemoryEventID == "" {
-			return types.NewRetrievalUnavailable("memory graph adjacent event missing")
-		}
-		if result.Item.MemoryEventID != adjacentID {
-			return types.NewRetrievalUnavailable("memory graph adjacent event mismatch")
-		}
-
-		if state := coverage[types.EvidenceSourceMemoryEvent]; state != nil {
-			state.CandidateCount++
-		}
-		if !allowedStatuses[result.Item.Status] {
-			continue
-		}
-
-		adjacent := result.Item
-		adjacent.GraphEdges = result.GraphEdges
-		appendEvidenceCandidate(candidates, seen, coverage, memoryEventToEvidence(adjacent))
 	}
 	return nil
 }

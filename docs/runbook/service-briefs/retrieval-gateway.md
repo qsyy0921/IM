@@ -1,6 +1,6 @@
 # retrieval-gateway
 
-状态：foundation-active / EvidencePack vector source live smoke + graph depth=1 passed。
+状态：foundation-active / EvidencePack vector source live smoke + configurable graph depth passed。
 
 定位：统一 search + memory 的检索入口，向 RAG / summary / Agent 提供
 `EvidencePack`。它不直接读业务库，不调用 LLM，不执行 Agent 动作。
@@ -71,15 +71,19 @@
   风格融合，最后叠加 source-chain bonus 后截断 limit。该实现为后续 BM25 /
   vector / graph provider 接入提供边界，不引入新中间件，也不把原始 provider
   score 直接跨 lane 比较。
-- 2026-06-24 EvidencePack graph expansion depth=1 已落：
-  strategy version 推进为 `retrieval-gateway.v1.hybrid-source-chain-rrf-graph-depth1`。
-  retrieval-gateway 会沿当前 memory hit 的 graph edge 通过 memory-service 公开
-  `GetMemoryEvent` 拉取相邻 memory event，并在 rerank / limit 截断前纳入候选；
+- 2026-06-24 EvidencePack graph expansion 已从固定 depth=1 升级为可配置 depth：
+  `NEXUSIM_RETRIEVAL_GRAPH_EXPANSION_DEPTH` 默认 1，允许 0..3，非法配置启动失败；
+  strategy version 使用实际 depth，例如
+  `retrieval-gateway.v1.hybrid-source-vector-rrf-graph-depth2`。retrieval-gateway
+  会沿当前 memory hit 的 graph edge 通过 memory-service 公开 `GetMemoryEvent`
+  按 bounded BFS 拉取相邻 memory event，并在 rerank / limit 截断前纳入候选；
   相邻 memory 必须满足当前请求 memory status，lookup 失败、不可见或 edge 不引用
-  source memory 时 fail-closed。focused app tests 覆盖正常一跳扩展、相邻 lookup
-  fail-closed、superseded 邻接 memory 默认过滤和 malformed graph edge fail-closed。
+  source memory 时 fail-closed。focused app tests 覆盖 depth=0 禁用、depth=2 二跳扩展、
+  相邻 lookup fail-closed、superseded 邻接 memory 默认过滤和 malformed graph edge
+  fail-closed。
 - 2026-06-24 EvidencePack vector source adapter first path 已落：
-  strategy version 推进为 `retrieval-gateway.v1.hybrid-source-vector-rrf-graph-depth1`。
+  默认 strategy version 为 `retrieval-gateway.v1.hybrid-source-vector-rrf-graph-depth1`，
+  配置 graph expansion depth 后会记录实际 depth。
   `RetrieveEvidence` 支持显式 `include_vector`，并要求调用方提供低敏
   `query_embedding_ref`、明确的 `vector_collection_types`、`vector_visibility_scope`
   和 `vector_policy_version`；
@@ -97,5 +101,5 @@
   evidence 不携带 raw text 或 embedding vector。
 
 下一步：继续把真实 BM25 backend、pgvector / Milvus / OpenSearch vector provider
-smoke、更深或可配置 graph expansion 和更细 source-chain / vector coverage 通过
+smoke 和更细 source-chain / vector coverage 通过
 EvidencePack 暴露给 RAG / summary / Agent，仍不绕过 retrieval-gateway。

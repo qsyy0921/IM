@@ -57,18 +57,22 @@ RAG / summary / Agent 必须消费 `EvidencePack`，不能绕过 retrieval-gatew
 - `valid_from_seq` / `valid_to_seq`：memory temporal window。
 - `temporal_status` / `review_state` / `extraction_version`。
 - `rerank_score`：retrieval-gateway 本地统一排序分。当前策略版本为
-  `retrieval-gateway.v1.hybrid-source-vector-rrf-graph-depth1`：先保留各 source 的本地分数
-  clamp 到 `[0, 1]`，再叠加 source-chain 信号和 RRF 风格 lane fusion。
+  `retrieval-gateway.v1.hybrid-source-vector-rrf-graph-depth<N>`：先保留各 source 的本地分数
+  clamp 到 `[0, 1]`，再叠加 source-chain 信号和 RRF 风格 lane fusion；`<N>`
+  是本次运行实际 graph expansion depth。
   lane 包括 lexical search、vector item、memory event、profile aggregate、
   source chain、memory graph、actor attribution、profile support。该策略不直接比较
   BM25、vector、graph provider 的原始分数；新增 provider 必须以独立 lane / rank
   进入融合。
-- `MEMORY_EVENT` graph expansion：第一阶段只做 depth=1。retrieval-gateway 对
+- `MEMORY_EVENT` graph expansion：第一阶段允许配置 depth 0..3，默认 depth=1。
+  retrieval-gateway 对
   `QueryMemoryEvents` 命中的 memory event 调用 memory-service 公开
-  `GetMemoryEvent` 读取 graph edges，并沿每条 edge 再读取相邻 memory event；
+  `GetMemoryEvent` 读取 graph edges，并按 bounded BFS 沿 graph edge 读取相邻
+  memory event；
   相邻 event 必须继续满足当前请求的 memory status 过滤。相邻 event 查不到、
   不可见、权限不满足或 graph edge 与 source event 不一致时 fail-closed，不返回
-  缺失依赖的 EvidencePack。该路径不直接读取 memory-service 私表。
+  缺失依赖的 EvidencePack。depth=0 表示不做相邻 event expansion，但仍保留当前
+  memory hit 的 graph edges。该路径不直接读取 memory-service 私表。
 - `dedupe_reason`：证据去重语义，第一版按 `source_type + source_id` 去重，保留
   first duplicate source。
 - `source_coverage`：按 source type 返回 requested、candidate_count、
@@ -117,6 +121,7 @@ visibility projection 跑本地 smoke。
 - `NEXUSIM_VECTOR_GRPC_ADDR`（可选；配置后允许显式 vector evidence retrieval）
 - `NEXUSIM_POLICY_GRPC_ADDR`（可选；配置后启用 retrieval policy precheck）
 - `NEXUSIM_RETRIEVAL_DEPENDENCY_TIMEOUT`
+- `NEXUSIM_RETRIEVAL_GRAPH_EXPANSION_DEPTH`（默认 1，允许 0..3；非法值启动失败）
 
 ## 后续
 

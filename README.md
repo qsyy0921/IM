@@ -272,7 +272,7 @@ message / conversation / policy events -> search-service + memory-service projec
 | --- | --- |
 | `search-service` | 搜索 projection、visibility / tombstone、PostgreSQL FTS lexical `SearchMessages`、timeline consumer、projection smoke；OpenSearch / BM25 provider 后续通过 adapter 引入。 |
 | `memory-service` | group memory projection、rules-v0.2 extraction cue classifier、StructuredMemoryEvent、source refs、visibility window、revoke hidden、profile aggregate recompute / archive first path，以及公开 candidate submit / review / approve / reject / supersede temporal update 持久化路径。 |
-| `retrieval-gateway` | EvidencePack 统一边界，聚合 search / memory / vector / policy precheck，并通过 memory-service 公开 API 扩展 current memory graph edges、depth=1 相邻 memory 和当前用户 profile aggregate evidence；当前策略版本 `retrieval-gateway.v1.hybrid-source-vector-rrf-graph-depth1` 会按 lexical search、vector item、memory event、profile aggregate、source chain、memory graph、actor attribution 和 profile support lane 做 RRF 风格融合，再叠加 source-chain 信号；vector source 只消费 vector-index-service 公开 `SearchVectors` 返回的低敏引用 / hash / visibility metadata，不传 raw text 或 embedding vector；已通过 opt-in vector backend live smoke，search-service 已具备 PostgreSQL FTS lexical first path，下一步做外部 OpenSearch / BM25 backend、pgvector / Milvus / OpenSearch provider smoke 和更深 graph expansion；不直接调用 LLM。 |
+| `retrieval-gateway` | EvidencePack 统一边界，聚合 search / memory / vector / policy precheck，并通过 memory-service 公开 API 扩展 current memory graph edges、可配置 depth 0..3 的相邻 memory 和当前用户 profile aggregate evidence；当前策略版本 `retrieval-gateway.v1.hybrid-source-vector-rrf-graph-depth<N>` 会按 lexical search、vector item、memory event、profile aggregate、source chain、memory graph、actor attribution 和 profile support lane 做 RRF 风格融合，再叠加 source-chain 信号，`<N>` 记录本次运行实际 graph expansion depth；vector source 只消费 vector-index-service 公开 `SearchVectors` 返回的低敏引用 / hash / visibility metadata，不传 raw text 或 embedding vector；已通过 opt-in vector backend live smoke，search-service 已具备 PostgreSQL FTS lexical first path，下一步做外部 OpenSearch / BM25 backend、pgvector / Milvus / OpenSearch provider smoke 和更细 EvidencePack coverage；不直接调用 LLM。 |
 | `rag-service` | 只读问答 first path、EvidencePack citation verifier、guarded external HTTP LLM boundary，并保留 EvidencePack memory graph edges 和 profile aggregate evidence；`loadtest/ragagent` 会把 RAG grounded answer 与 Agent approval / action audit 汇总成低敏演示报告。 |
 | `summary-service` | 只读摘要 first path、EvidencePack citation verifier、guarded external HTTP LLM boundary，并保留 EvidencePack memory graph edges 和 profile aggregate evidence。 |
 | `agent-service` | proposal-only path、mcp-gateway prepare、approval workflow、approval outbox relay、planner Python candidate guard，并保留 EvidencePack memory graph edges 和 profile aggregate evidence；`loadtest/ragagent` 复用 Agent proposal / approval / action-executor audit 校验。 |
@@ -339,9 +339,10 @@ isolation。2026-06-24 追加 EvidencePack memory graph edge 扩展：
 retrieval-gateway 通过 memory-service 公开 `GetMemoryEvent` 读取 current memory
 graph edges，并把 `EvidenceMemoryGraphEdge` 透传给 RAG / Agent；retrieval /
 RAG / Agent loadtest 都会断言跨群 source refs 与 `SUPPORTS` graph edge 被保留。
-同日追加 graph expansion depth=1：retrieval-gateway 会沿当前 memory hit 的 graph
+同日追加 graph expansion 可配置 depth：retrieval-gateway 会沿当前 memory hit 的 graph
 edge 通过 memory-service 公开 API 拉取相邻 memory event，在 rerank / limit 截断前
-纳入 EvidencePack 候选；相邻 memory 必须满足当前 memory status 过滤，lookup /
+纳入 EvidencePack 候选；`NEXUSIM_RETRIEVAL_GRAPH_EXPANSION_DEPTH` 默认 1，允许
+0..3，非法配置启动失败；相邻 memory 必须满足当前 memory status 过滤，lookup /
 visibility / malformed edge 失败时 fail-closed。
 同日追加 EvidencePack profile aggregate evidence：retrieval-gateway 通过
 memory-service 公开 `ListProfileAggregates` 查询当前用户 ACTIVE profile aggregate，

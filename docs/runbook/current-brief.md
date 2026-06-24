@@ -241,12 +241,13 @@ fail-closed，不写 execution audit、不写 tool result projection、不调用
   0 skipped，且 retrieval adapter 断言 `memory_rerank_score=1.29` 高于 single
   search baseline。
 - retrieval strategy version 已推进为
-  `retrieval-gateway.v1.hybrid-source-vector-rrf-graph-depth1`：rerank 在截断 limit 前先按
+  `retrieval-gateway.v1.hybrid-source-vector-rrf-graph-depth<N>`：rerank 在截断 limit 前先按
   lexical search、vector item、memory event、profile aggregate、source chain、memory graph、
   actor attribution 和 profile support lane 做 RRF 风格融合，再叠加 source-chain
-  信号；retrieval-gateway 还会沿 memory graph edge 做 first-stage depth=1
-  相邻 memory expansion，所有相邻 event 仍通过 memory-service 公开 `GetMemoryEvent`
-  和当前 memory status 过滤，lookup / visibility / malformed edge 失败时 fail-closed。
+  信号；retrieval-gateway 还会沿 memory graph edge 做可配置 depth 0..3
+  相邻 memory expansion，默认 depth=1，strategy version 记录实际 depth。所有相邻
+  event 仍通过 memory-service 公开 `GetMemoryEvent` 和当前 memory status 过滤，
+  lookup / visibility / malformed edge 失败时 fail-closed，非法 depth 配置启动失败。
   显式 vector retrieval 已通过 vector-index-service 公开 `SearchVectors` 接入
   `VECTOR_ITEM` EvidencePack source，并要求低敏 embedding ref / 明确 collection /
   visibility / policy metadata；2026-06-24
@@ -256,5 +257,5 @@ fail-closed，不写 execution audit、不写 tool result projection、不调用
   search-service 已补 PostgreSQL FTS lexical backend first path，`SearchMessages`
   使用 token-based `plainto_tsquery + to_tsvector` 并移除 `ILIKE` substring fallback；
   后续继续接外部 OpenSearch / BM25 backend、pgvector / Milvus / OpenSearch vector provider smoke，
-  以及更深或可配置 graph expansion。
+  以及更细 EvidencePack coverage。
 - 真实 mutation 必须等显式业务 adapter、approval、executor、audit 全部就绪后再扩展。

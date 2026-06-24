@@ -140,6 +140,121 @@ func TestRetrieveEvidenceMergesSearchAndMemory(t *testing.T) {
 	}
 }
 
+func TestRetrieveEvidenceGraphExpansionDepthZeroDisablesAdjacentMemory(t *testing.T) {
+	command := validCommand()
+	command.IncludeSearch = false
+	command.IncludeMemory = true
+	memory := fakeMemoryPort{
+		result: types.MemoryResult{
+			Items: []types.MemoryEventEvidence{{MemoryEventID: "mem-1", ConversationID: "conv-1", FactText: "root", Status: types.MemoryStatusActive, Confidence: 0.8}},
+		},
+		details: map[string]types.MemoryEventLookupResult{
+			"mem-1": {
+				Item: types.MemoryEventEvidence{MemoryEventID: "mem-1", ConversationID: "conv-1", FactText: "root", Status: types.MemoryStatusActive, Confidence: 0.8},
+				GraphEdges: []types.MemoryGraphEdge{{
+					EdgeID:            "edge-1",
+					FromMemoryEventID: "mem-1",
+					ToMemoryEventID:   "mem-2",
+					RelationType:      "SUPPORTS",
+				}},
+			},
+			"mem-2": {
+				Item: types.MemoryEventEvidence{MemoryEventID: "mem-2", ConversationID: "conv-1", FactText: "adjacent", Status: types.MemoryStatusActive, Confidence: 0.7},
+			},
+		},
+	}
+
+	result, err := NewRetrieveEvidenceUseCase(
+		&fakeSearchPort{},
+		&memory,
+		WithGraphExpansionDepth(0),
+	).Execute(context.Background(), command)
+	if err != nil {
+		t.Fatalf("Execute returned error: %v", err)
+	}
+	if got := len(result.Pack.Items); got != 1 {
+		t.Fatalf("expected only root memory when graph depth is zero, got %d items: %+v", got, result.Pack.Items)
+	}
+	if got := result.Pack.Items[0].MemoryEventID; got != "mem-1" {
+		t.Fatalf("expected root memory, got %q", got)
+	}
+	if result.Pack.RetrievalVersion != types.RetrievalVersionForGraphDepth(0) {
+		t.Fatalf("unexpected retrieval version %q", result.Pack.RetrievalVersion)
+	}
+	if coverage := result.Pack.SourceCoverage[2]; coverage.CandidateCount != 1 || coverage.ReturnedCount != 1 {
+		t.Fatalf("unexpected memory coverage with graph depth zero: %+v", coverage)
+	}
+}
+
+func TestRetrieveEvidenceGraphExpansionDepthTwoIncludesSecondHop(t *testing.T) {
+	command := validCommand()
+	command.IncludeSearch = false
+	command.IncludeMemory = true
+	memory := fakeMemoryPort{
+		result: types.MemoryResult{
+			Items: []types.MemoryEventEvidence{{MemoryEventID: "mem-1", ConversationID: "conv-1", FactText: "root", Status: types.MemoryStatusActive, Confidence: 0.8}},
+		},
+		details: map[string]types.MemoryEventLookupResult{
+			"mem-1": {
+				Item: types.MemoryEventEvidence{MemoryEventID: "mem-1", ConversationID: "conv-1", FactText: "root", Status: types.MemoryStatusActive, Confidence: 0.8},
+				GraphEdges: []types.MemoryGraphEdge{{
+					EdgeID:            "edge-1",
+					FromMemoryEventID: "mem-1",
+					ToMemoryEventID:   "mem-2",
+					RelationType:      "SUPPORTS",
+				}},
+			},
+			"mem-2": {
+				Item: types.MemoryEventEvidence{MemoryEventID: "mem-2", ConversationID: "conv-1", FactText: "first hop", Status: types.MemoryStatusActive, Confidence: 0.7},
+				GraphEdges: []types.MemoryGraphEdge{{
+					EdgeID:            "edge-2",
+					FromMemoryEventID: "mem-2",
+					ToMemoryEventID:   "mem-3",
+					RelationType:      "SUPPORTS",
+				}},
+			},
+			"mem-3": {
+				Item: types.MemoryEventEvidence{MemoryEventID: "mem-3", ConversationID: "conv-1", FactText: "second hop", Status: types.MemoryStatusActive, Confidence: 0.6},
+			},
+		},
+	}
+
+	result, err := NewRetrieveEvidenceUseCase(
+		&fakeSearchPort{},
+		&memory,
+		WithGraphExpansionDepth(2),
+	).Execute(context.Background(), command)
+	if err != nil {
+		t.Fatalf("Execute returned error: %v", err)
+	}
+	if result.Pack.RetrievalVersion != types.RetrievalVersionForGraphDepth(2) {
+		t.Fatalf("unexpected retrieval version %q", result.Pack.RetrievalVersion)
+	}
+	ids := map[string]bool{}
+	for _, item := range result.Pack.Items {
+		ids[item.MemoryEventID] = true
+	}
+	for _, id := range []string{"mem-1", "mem-2", "mem-3"} {
+		if !ids[id] {
+			t.Fatalf("expected graph-expanded memory %s in EvidencePack, got %+v", id, result.Pack.Items)
+		}
+	}
+	if coverage := result.Pack.SourceCoverage[2]; coverage.CandidateCount != 3 || coverage.ReturnedCount != 3 {
+		t.Fatalf("unexpected depth-two memory coverage: %+v", coverage)
+	}
+}
+
+func TestRetrieveEvidenceInvalidGraphExpansionDepthFailsClosed(t *testing.T) {
+	_, err := NewRetrieveEvidenceUseCase(
+		&fakeSearchPort{},
+		&fakeMemoryPort{},
+		WithGraphExpansionDepth(types.MaxGraphExpansionDepth+1),
+	).Execute(context.Background(), validCommand())
+	if !errors.Is(err, types.ErrRetrievalUnavailable) {
+		t.Fatalf("expected retrieval unavailable from invalid graph expansion depth, got %v", err)
+	}
+}
+
 func TestRetrieveEvidenceUsesExplicitMemoryAtConversationSeq(t *testing.T) {
 	command := validCommand()
 	command.IncludeSearch = false

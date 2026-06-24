@@ -10,10 +10,11 @@ import (
 )
 
 type RetrieveEvidenceUseCase struct {
-	search SearchPort
-	memory MemoryPort
-	vector VectorPort
-	policy PolicyPort
+	search              SearchPort
+	memory              MemoryPort
+	vector              VectorPort
+	policy              PolicyPort
+	graphExpansionDepth int
 }
 
 type RetrieveEvidenceOption func(*RetrieveEvidenceUseCase)
@@ -30,8 +31,18 @@ func WithVectorPort(vector VectorPort) RetrieveEvidenceOption {
 	}
 }
 
+func WithGraphExpansionDepth(depth int) RetrieveEvidenceOption {
+	return func(usecase *RetrieveEvidenceUseCase) {
+		usecase.graphExpansionDepth = depth
+	}
+}
+
 func NewRetrieveEvidenceUseCase(search SearchPort, memory MemoryPort, options ...RetrieveEvidenceOption) RetrieveEvidenceUseCase {
-	usecase := RetrieveEvidenceUseCase{search: search, memory: memory}
+	usecase := RetrieveEvidenceUseCase{
+		search:              search,
+		memory:              memory,
+		graphExpansionDepth: types.DefaultGraphExpansionDepth,
+	}
 	for _, option := range options {
 		if option != nil {
 			option(&usecase)
@@ -46,6 +57,9 @@ func (usecase RetrieveEvidenceUseCase) Execute(
 ) (types.RetrieveEvidenceResult, error) {
 	if err := command.Validate(); err != nil {
 		return types.RetrieveEvidenceResult{}, err
+	}
+	if !types.IsValidGraphExpansionDepth(usecase.graphExpansionDepth) {
+		return types.RetrieveEvidenceResult{}, types.NewRetrievalUnavailable("invalid graph expansion depth")
 	}
 	if err := usecase.checkPolicy(ctx, command); err != nil {
 		return types.RetrieveEvidenceResult{}, err
@@ -150,7 +164,7 @@ func (usecase RetrieveEvidenceUseCase) Execute(
 			event.GraphEdges = enriched.GraphEdges
 			item := memoryEventToEvidence(event)
 			appendEvidenceCandidate(&candidates, seen, coverage, item)
-			if err := usecase.expandMemoryGraphDepthOne(
+			if err := usecase.expandMemoryGraph(
 				ctx,
 				command,
 				event,
@@ -191,7 +205,7 @@ func (usecase RetrieveEvidenceUseCase) Execute(
 			SourceCounts:            orderedSourceCounts(sourceCounts),
 			SearchProjectionVersion: searchProjectionVersion,
 			MemoryProjectionVersion: memoryProjectionVersion,
-			RetrievalVersion:        types.RetrievalVersion,
+			RetrievalVersion:        types.RetrievalVersionForGraphDepth(usecase.graphExpansionDepth),
 			SourceCoverage:          sourceCoverage,
 		},
 	}, nil

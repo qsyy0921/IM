@@ -9,11 +9,14 @@ import (
 )
 
 const (
-	RetrievalVersion = "retrieval-gateway.v1.hybrid-source-vector-rrf-graph-depth1"
+	RetrievalVersionPrefix = "retrieval-gateway.v1.hybrid-source-vector-rrf-graph-depth"
+	RetrievalVersion       = RetrievalVersionPrefix + "1"
 
-	DefaultEvidenceLimit = 20
-	MaxEvidenceLimit     = 50
-	MaxRetrievalQueryLen = 512
+	DefaultEvidenceLimit       = 20
+	MaxEvidenceLimit           = 50
+	MaxRetrievalQueryLen       = 512
+	DefaultGraphExpansionDepth = 1
+	MaxGraphExpansionDepth     = 3
 
 	EvidenceSourceSearchMessage    = "SEARCH_MESSAGE"
 	EvidenceSourceMemoryEvent      = "MEMORY_EVENT"
@@ -45,6 +48,14 @@ const (
 	VectorCollectionProfileAggregate = "PROFILE_AGGREGATE"
 	VectorCollectionEvalFixture      = "EVAL_FIXTURE"
 )
+
+func RetrievalVersionForGraphDepth(depth int) string {
+	return fmt.Sprintf("%s%d", RetrievalVersionPrefix, depth)
+}
+
+func IsValidGraphExpansionDepth(depth int) bool {
+	return depth >= 0 && depth <= MaxGraphExpansionDepth
+}
 
 type RetrieveEvidenceCommand struct {
 	AuthContext           AuthContext

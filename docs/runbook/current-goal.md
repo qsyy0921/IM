@@ -300,16 +300,17 @@ IM messages -> search / memory projection -> EvidencePack -> RAG / Agent answer 
    归档：4 adapters / 27 cases / 27 passed / 0 failed / 0 skipped，
    `memory_rerank_score=1.29` 高于 single search baseline。显式业务
    mutation 场景必须等业务 adapter 准备好后再扩展。retrieval strategy version
-   已推进为 `retrieval-gateway.v1.hybrid-source-vector-rrf-graph-depth1`：rerank 在截断 limit
+   已推进为 `retrieval-gateway.v1.hybrid-source-vector-rrf-graph-depth<N>`：rerank 在截断 limit
    前按 lexical search、memory event、profile aggregate、source chain、
    vector item、memory graph、actor attribution 和 profile support lane 做 RRF 风格融合，
-   并沿 memory graph edge 做 first-stage depth=1 相邻 memory expansion；相邻 memory
-   继续通过 memory-service 公开 `GetMemoryEvent` 和当前 memory status 过滤，lookup /
-   visibility / malformed edge 失败时 fail-closed；显式 vector retrieval 会通过
+   并沿 memory graph edge 做可配置 depth 0..3 相邻 memory expansion，默认 depth=1，
+   strategy version 记录实际 depth；相邻 memory 继续通过 memory-service 公开
+   `GetMemoryEvent` 和当前 memory status 过滤，lookup / visibility / malformed edge
+   失败时 fail-closed，非法 depth 配置启动失败；显式 vector retrieval 会通过
    vector-index-service 公开 `SearchVectors` 返回 `VECTOR_ITEM` source。retrieval
    vector backend opt-in live smoke 已通过；search-service PostgreSQL FTS lexical
    backend first path 已补齐；后续外部 OpenSearch / BM25 backend、pgvector / Milvus /
-   OpenSearch vector provider smoke 和更深或可配置 graph expansion 仍保持在
+   OpenSearch vector provider smoke 和更细 EvidencePack coverage 仍保持在
    retrieval-gateway 边界内。
 5. 客户端只作为演示入口；除非阻塞上述演示，不继续扩 UI 产品化。
 6. Windows release signing / MSI / NSIS installer、完整 Android、完整移动端发布、

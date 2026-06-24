@@ -17,6 +17,7 @@ import (
 	retrievalgrpc "github.com/qsyy0921/IM/services/retrieval-gateway/internal/api/grpc"
 	"github.com/qsyy0921/IM/services/retrieval-gateway/internal/app"
 	rpcinfra "github.com/qsyy0921/IM/services/retrieval-gateway/internal/infrastructure/rpc"
+	retrievaltypes "github.com/qsyy0921/IM/services/retrieval-gateway/internal/types"
 	"google.golang.org/grpc"
 )
 
@@ -82,7 +83,11 @@ func runGRPC(ctx context.Context) error {
 		return err
 	}
 	defer closeMemory()
-	options := []app.RetrieveEvidenceOption{}
+	graphDepth, err := retrievalGraphExpansionDepthFromEnv()
+	if err != nil {
+		return err
+	}
+	options := []app.RetrieveEvidenceOption{app.WithGraphExpansionDepth(graphDepth)}
 	if vectorAddr := envString("NEXUSIM_VECTOR_GRPC_ADDR", ""); vectorAddr != "" {
 		vectorClient, closeVector, err := rpcinfra.DialVectorClient(ctx, vectorAddr, timeout)
 		if err != nil {
@@ -136,6 +141,21 @@ func retrievalGatewayModeFromEnv() string {
 		mode = "noop"
 	}
 	return mode
+}
+
+func retrievalGraphExpansionDepthFromEnv() (int, error) {
+	raw := strings.TrimSpace(os.Getenv("NEXUSIM_RETRIEVAL_GRAPH_EXPANSION_DEPTH"))
+	if raw == "" {
+		return retrievaltypes.DefaultGraphExpansionDepth, nil
+	}
+	depth, err := strconv.Atoi(raw)
+	if err != nil {
+		return 0, fmt.Errorf("invalid NEXUSIM_RETRIEVAL_GRAPH_EXPANSION_DEPTH %q: %w", raw, err)
+	}
+	if !retrievaltypes.IsValidGraphExpansionDepth(depth) {
+		return 0, fmt.Errorf("NEXUSIM_RETRIEVAL_GRAPH_EXPANSION_DEPTH must be between 0 and %d", retrievaltypes.MaxGraphExpansionDepth)
+	}
+	return depth, nil
 }
 
 func validateRetrievalGatewayMode(mode string) error {

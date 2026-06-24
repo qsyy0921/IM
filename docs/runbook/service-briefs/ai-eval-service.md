@@ -17,7 +17,10 @@ adapter、状态、计数、summary/report 引用和低敏 metadata。
   和 RAG / Summary / Agent service-stack live gate 已登记到 catalog。
 - `check-ai-eval-regression-gate.ps1` 已接入 `check-local`，只跑 CI-safe
   required adapters，不启动 Docker / PostgreSQL / live RAG-Agent stack。
-- Case catalog 76；current-memory service-stack live gate 38/38 passed；cross-group / temporal memory fixture eval、retrieval smoke、RAG / Summary / Agent stack smokes 和 40/40 optional stack gate 已落。
+- Case catalog 87；current-memory service-stack live gate 38/38 passed；cross-group /
+  temporal memory fixture eval、retrieval smoke、RAG / Summary / Agent stack smokes
+  和 40/40 optional stack gate 已落；RAG / Summary grounding safety 与 guarded LLM
+  boundary safety 已作为 required local adapters 纳入 CI-safe gate。
 - 2026-06-23 低敏 collaborative-memory eval 扩到 20 个 profile / Agent safety fixture cases，
   新增 multi-hop actor-chain completeness、workstream / decision dependency edge、
   reviewed multi-source profile activation、supporting-memory delete 后 profile recompute
@@ -102,6 +105,11 @@ adapter、状态、计数、summary/report 引用和低敏 metadata。
   ordinary chat zero candidates、profile signal review required 和 unsafe input
   fail-closed；`run-ai-eval-memory-extraction-candidate-adapter.ps1` 会运行
   Go-side batch adapter smoke，不调用数据库、服务栈或外部 provider。
+- 2026-06-25 RAG / Summary grounding safety 和 guarded LLM boundary safety 已接入
+  required local adapters：前者验证 text evidence anchor 与 ref-only audit evidence
+  行为，后者验证敏感 EvidencePack prompt 不发送给 provider、unsafe output /
+  malformed citation fail-closed；两个 adapter 都只跑本地 focused app tests，不调用真实模型、
+  数据库或 service stack。
 
 边界：不保存 raw EvidencePack、prompt、model output、用户正文、secret 或 tool input；不授权业务动作。
 

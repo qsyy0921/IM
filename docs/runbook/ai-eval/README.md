@@ -15,6 +15,8 @@ summary, Agent and tool/action boundaries.
 - Summary execution adapter: `tools/run-ai-eval-summary-adapter.ps1`
 - RAG / Summary grounding safety adapter:
   `tools/run-ai-eval-rag-summary-grounding-safety.ps1`
+- RAG / Summary LLM boundary safety adapter:
+  `tools/run-ai-eval-rag-summary-llm-boundary-safety.ps1`
 - Agent execution adapter: `tools/run-ai-eval-agent-adapter.ps1`
 - RAG-Agent demo execution adapter: `tools/run-ai-eval-ragagent-adapter.ps1`
 - Profile / Agent output safety adapter:
@@ -169,6 +171,19 @@ grounded evidence anchor gate. It verifies that text evidence without
 execution, and that ref-only evidence remains in the returned EvidencePack for
 audit but cannot by itself generate an answer or summary. It does not call a
 model, connect to PostgreSQL, start Docker or require a live service stack.
+
+First-stage RAG / Summary LLM boundary safety adapter:
+
+```powershell
+.\tools\run-ai-eval-rag-summary-llm-boundary-safety.ps1
+```
+
+This required local adapter runs focused guarded-provider tests for RAG and
+Summary. It verifies that sensitive EvidencePack text is rejected before an
+external LLM client is called, unsafe provider output is rejected, and malformed
+or fabricated citation IDs fail closed. It uses fake in-process provider clients
+only; it does not call a real model, connect to PostgreSQL, start Docker or
+require a live service stack.
 
 First-stage Agent execution adapter:
 
@@ -362,8 +377,8 @@ failure count, `GetEvalRun` / `ListEvalRuns` readback requirements, forbidden
 persisted fields, and optional service-stack adapters for later RAG / Agent /
 Python worker coverage. The smoke runs the required profile / Agent output
 safety, action-executor external HTTP adapter and action-executor external MCP
-failure evals, plus the local RAG / Summary grounding safety adapter, records
-those summaries into `ai-eval-service`, then writes a
+failure evals, plus the local RAG / Summary grounding and LLM boundary safety
+adapters, records those summaries into `ai-eval-service`, then writes a
 low-sensitive suite-level gate summary. It
 is a local regression gate skeleton, not a production CI gate and not a
 model-quality benchmark.
@@ -375,9 +390,9 @@ CI-safe local gate:
 ```
 
 This check validates the case schema and gate policy, runs only the required
-CI-safe adapters, including the RAG / Summary grounding safety adapter, and is
-now included by `check-local`. It does not connect to PostgreSQL, start Docker
-or run live RAG / Agent service-stack adapters.
+CI-safe adapters, including the RAG / Summary grounding and LLM boundary safety
+adapters, and is now included by `check-local`. It does not connect to
+PostgreSQL, start Docker or run live RAG / Agent service-stack adapters.
 
 Optional adapters are opt-in so normal local gates do not require a full service
 stack:
@@ -526,6 +541,10 @@ The 2026-06-25 RAG / Summary grounding safety adapter added 4 required local
 cases for text evidence anchor validation and ref-only audit evidence behavior.
 It is part of the CI-safe ai-eval regression gate and does not call models,
 databases or live service stacks.
+The 2026-06-25 RAG / Summary LLM boundary safety adapter added 4 required local
+cases for sensitive prompt rejection, unsafe output rejection and malformed
+citation rejection. It uses fake in-process provider clients only and is also
+part of the CI-safe ai-eval regression gate.
 The 2026-06-20 action-executor external MCP failure eval added 4 CI-safe cases
 for unavailable, timeout, rate-limit and permission-denied classifications with
 no execution, no output hash and no raw provider output persistence.

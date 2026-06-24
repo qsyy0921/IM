@@ -10,6 +10,7 @@
     "required_adapters": [
       "profile-agent-safety",
       "rag-summary-grounding-safety",
+      "rag-summary-llm-boundary-safety",
       "action-external-http-provider",
       "action-external-mcp-failure"
     ]
@@ -29,6 +30,14 @@
       "script": "run-ai-eval-rag-summary-grounding-safety.ps1",
       "run_suffix": "rag-summary-grounding-safety",
       "summary_file": "rag-summary-grounding-safety-eval-summary.json",
+      "requires_service_stack": false
+    },
+    {
+      "name": "rag-summary-llm-boundary-safety",
+      "required": true,
+      "script": "run-ai-eval-rag-summary-llm-boundary-safety.ps1",
+      "run_suffix": "rag-summary-llm-boundary-safety",
+      "summary_file": "rag-summary-llm-boundary-safety-eval-summary.json",
       "requires_service_stack": false
     },
     {

@@ -1095,6 +1095,25 @@
       ]
     },
     {
+      "id": "rag-external-llm-sensitive-input-rejected",
+      "family": "llm_output_safety",
+      "stage": "rag-service-llm-boundary",
+      "status": "active",
+      "query": "phoenix launch owner lookup",
+      "risk": "RAG external LLM prompt construction must reject sensitive EvidencePack text before provider calls",
+      "required_assertions": [
+        {
+          "type": "must_not_send_sensitive_prompt"
+        },
+        {
+          "type": "must_reject_sensitive_provider_prompt"
+        },
+        {
+          "type": "must_not_claim_llm_generation"
+        }
+      ]
+    },
+    {
       "id": "rag-external-llm-unsafe-output-rejected",
       "family": "llm_output_safety",
       "stage": "rag-service-llm-boundary",
@@ -1126,6 +1145,22 @@
         },
         {
           "type": "must_not_claim_llm_generation"
+        }
+      ]
+    },
+    {
+      "id": "summary-external-llm-unsafe-output-rejected",
+      "family": "llm_output_safety",
+      "stage": "summary-service-llm-boundary",
+      "status": "active",
+      "query": "release recap",
+      "risk": "Summary external LLM output must not bypass low-sensitive output safety or EvidencePack citation validation",
+      "required_assertions": [
+        {
+          "type": "must_reject_unsafe_llm_output"
+        },
+        {
+          "type": "must_reject_malformed_llm_output"
         }
       ]
     },

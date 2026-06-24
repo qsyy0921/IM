@@ -237,6 +237,10 @@ answer / summary；有文本但 anchor 不完整的 evidence 会在 provider 调
 2026-06-25 该 gate 已纳入 ai-eval 必跑本地 adapter：
 `run-ai-eval-rag-summary-grounding-safety.ps1` 覆盖 4 个低敏 cases，只跑 focused
 app tests，不调用模型、数据库或 live service stack。
+同日 RAG / Summary guarded LLM boundary 也已纳入 ai-eval 必跑本地 adapter：
+`run-ai-eval-rag-summary-llm-boundary-safety.ps1` 覆盖 4 个低敏 cases，验证敏感
+EvidencePack prompt 不会发送给 provider、unsafe output / malformed citation 均
+fail-closed；该 adapter 只用进程内 fake provider，不调用真实模型。
 同日 Python AI Worker 已补 memory extraction candidate first path：
 `ai/python/nexusim_ai_memory` 只从显式 low-sensitive message batch 的
 `decision:` / `task:` / `status:` / `blocker:` / `file:` / `profile_signal:`

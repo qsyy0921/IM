@@ -238,6 +238,10 @@ IM messages -> search / memory projection -> EvidencePack -> RAG / Agent answer 
 - 2026-06-25 该 gate 已纳入 ai-eval 必跑本地 adapter：
   `run-ai-eval-rag-summary-grounding-safety.ps1` 覆盖 4 个低敏 cases，只跑 focused
   app tests，不调用模型、数据库或 live service stack。
+- 同日 RAG / Summary guarded LLM boundary 也已纳入 ai-eval 必跑本地 adapter：
+  `run-ai-eval-rag-summary-llm-boundary-safety.ps1` 覆盖 4 个低敏 cases，验证敏感
+  EvidencePack prompt 不会发送给 provider、unsafe output / malformed citation 均
+  fail-closed；该 adapter 只用进程内 fake provider，不调用真实模型。
 - 2026-06-24 retrieval-gateway 已补 vector-index-service `SearchVectors` adapter
   first path：`RetrieveEvidence` 支持显式 `include_vector`，调用方必须提供低敏
   `query_embedding_ref`、明确的 `vector_collection_types`、`vector_visibility_scope`

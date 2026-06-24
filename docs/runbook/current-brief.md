@@ -253,6 +253,8 @@ fail-closed，不写 execution audit、不写 tool result projection、不调用
   `retrieval-vector-backend-smoke-20260624-223543` 已通过真实 opt-in smoke，确认
   vector-index-service 公开 `UpsertVectorItem -> SearchVectors` 能把 refs-only
   `VECTOR_ITEM` 送入 EvidencePack，且不携带 raw text 或 embedding vector；
-  后续继续接真实 BM25 backend、pgvector / Milvus / OpenSearch vector provider smoke，
+  search-service 已补 PostgreSQL FTS lexical backend first path，`SearchMessages`
+  使用 token-based `plainto_tsquery + to_tsvector` 并移除 `ILIKE` substring fallback；
+  后续继续接外部 OpenSearch / BM25 backend、pgvector / Milvus / OpenSearch vector provider smoke，
   以及更深或可配置 graph expansion。
 - 真实 mutation 必须等显式业务 adapter、approval、executor、audit 全部就绪后再扩展。

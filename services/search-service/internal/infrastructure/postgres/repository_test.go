@@ -106,6 +106,79 @@ WHERE consumer_group = 'search-test'
 	}
 }
 
+func TestRepositorySearchMessagesUsesPostgresFullTextTokensIntegration(t *testing.T) {
+	ctx := context.Background()
+	pool := openSearchTestPool(t)
+	resetSearchTables(t, ctx, pool)
+	repository := NewRepository(pool)
+
+	project(t, ctx, repository, types.ProjectTimelineEventCommand{
+		TenantID:          "tenant-1",
+		EventID:           "event-member-join",
+		EventType:         types.TimelineEventConversationMemberJoined,
+		ConversationID:    "conv-1",
+		ConversationSeq:   1,
+		ConsumerGroup:     "search-test",
+		Topic:             "conversation.timeline.events",
+		PartitionID:       0,
+		OffsetValue:       2,
+		TargetUserID:      "user-1",
+		MemberRole:        "MEMBER",
+		MemberStatus:      types.SearchMemberStatusActive,
+		MemberVersion:     1,
+		PermissionVersion: 1,
+	})
+	project(t, ctx, repository, types.ProjectTimelineEventCommand{
+		TenantID:        "tenant-1",
+		EventID:         "event-message-substring",
+		EventType:       types.TimelineEventMessagePersisted,
+		ConversationID:  "conv-1",
+		ConversationSeq: 2,
+		ConsumerGroup:   "search-test",
+		Topic:           "conversation.timeline.events",
+		PartitionID:     0,
+		OffsetValue:     3,
+		MessageID:       "msg-substring",
+		SenderID:        "user-2",
+		MessageType:     "TEXT",
+		SearchableText:  "launchable codename phoenix",
+	})
+	project(t, ctx, repository, types.ProjectTimelineEventCommand{
+		TenantID:        "tenant-1",
+		EventID:         "event-message-token",
+		EventType:       types.TimelineEventMessagePersisted,
+		ConversationID:  "conv-1",
+		ConversationSeq: 3,
+		ConsumerGroup:   "search-test",
+		Topic:           "conversation.timeline.events",
+		PartitionID:     0,
+		OffsetValue:     4,
+		MessageID:       "msg-token",
+		SenderID:        "user-2",
+		MessageType:     "TEXT",
+		SearchableText:  "launch codename phoenix",
+	})
+
+	items, _, err := repository.SearchMessages(ctx, types.SearchMessagesCommand{
+		AuthContext: types.AuthContext{
+			TenantID: "tenant-1",
+			UserID:   "user-1",
+			DeviceID: "device-1",
+		},
+		Query: "launch",
+		Limit: 10,
+	}, 10)
+	if err != nil {
+		t.Fatalf("search messages: %v", err)
+	}
+	if len(items) != 1 {
+		t.Fatalf("expected one token hit, got %d: %+v", len(items), items)
+	}
+	if items[0].MessageID != "msg-token" {
+		t.Fatalf("expected token hit, got %+v", items[0])
+	}
+}
+
 func TestRepositoryProjectionEditLeaveAndTombstoneIntegration(t *testing.T) {
 	ctx := context.Background()
 	pool := openSearchTestPool(t)

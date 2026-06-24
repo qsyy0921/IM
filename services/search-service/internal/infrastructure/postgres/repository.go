@@ -32,11 +32,11 @@ func (repository *Repository) SearchMessages(
 		return nil, 0, nil
 	}
 
-	queryPattern := "%" + escapeLike(command.NormalizedQuery()) + "%"
+	normalizedQuery := command.NormalizedQuery()
 	args := []any{
 		command.AuthContext.TenantID,
 		command.AuthContext.UserID,
-		queryPattern,
+		normalizedQuery,
 		command.AfterSeq,
 		fetchLimit,
 	}
@@ -47,6 +47,9 @@ func (repository *Repository) SearchMessages(
 	}
 
 	rows, err := repository.pool.Query(ctx, `
+WITH search_query AS (
+	SELECT plainto_tsquery('simple', $3) AS ts_query
+)
 SELECT
 	d.conversation_id,
 	d.message_id,
@@ -63,12 +66,14 @@ JOIN search_membership_projection m
   ON m.tenant_id = d.tenant_id
  AND m.conversation_id = d.conversation_id
  AND m.user_id = $2
+CROSS JOIN search_query q
 WHERE d.tenant_id = $1
   AND m.status <> 'BANNED'
   AND d.tombstone_status = 'NONE'
   AND m.join_seq <= d.conversation_seq
   AND (m.leave_seq IS NULL OR m.leave_seq >= d.conversation_seq)
-  AND d.searchable_text ILIKE $3 ESCAPE '\'
+  AND numnode(q.ts_query) > 0
+  AND to_tsvector('simple', d.searchable_text) @@ q.ts_query
   AND d.conversation_seq > $4
 `+conversationFilter+`
 ORDER BY d.conversation_seq ASC, d.message_id ASC
@@ -98,7 +103,7 @@ LIMIT $5
 		); err != nil {
 			return nil, 0, types.NewDBReadFailed(err.Error())
 		}
-		hit.Snippet, hit.HighlightRanges = buildSnippet(text, command.NormalizedQuery(), 160)
+		hit.Snippet, hit.HighlightRanges = buildSnippet(text, normalizedQuery, 160)
 		items = append(items, hit)
 	}
 	if err := rows.Err(); err != nil {
@@ -369,13 +374,6 @@ ON CONFLICT (consumer_group, topic, partition_id) DO UPDATE SET
 		return types.NewDBWriteFailed(err.Error())
 	}
 	return nil
-}
-
-func escapeLike(value string) string {
-	value = strings.ReplaceAll(value, `\`, `\\`)
-	value = strings.ReplaceAll(value, `%`, `\%`)
-	value = strings.ReplaceAll(value, `_`, `\_`)
-	return value
 }
 
 func buildSnippet(text string, query string, maxRunes int) (string, []types.HighlightRange) {

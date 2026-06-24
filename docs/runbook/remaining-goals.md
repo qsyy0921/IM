@@ -85,7 +85,8 @@
   lane-aware RRF 风格融合边界、first-stage graph expansion depth=1 和
   vector-index-service `SearchVectors` adapter first path；retrieval vector backend opt-in
   live smoke 已通过，证明 refs-only `VECTOR_ITEM` 能经真实 vector-index-service gRPC
-  进入 EvidencePack。下一步继续补真实 BM25 backend、pgvector / Milvus / OpenSearch
+  进入 EvidencePack。search-service PostgreSQL FTS lexical backend first path 已落，
+  不再使用 substring fallback；下一步继续补外部 OpenSearch / BM25 backend、pgvector / Milvus / OpenSearch
   vector provider smoke、更深或可配置 graph expansion 与 EvidencePack coverage。
   真实 mutation 场景必须等显式业务 adapter 和
   operator policy 就绪。

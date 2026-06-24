@@ -2,7 +2,7 @@
 
 状态：Draft
 
-本文定义 `search-service` 的第一条可编码切片：消费 `conversation.timeline.events`，构建搜索 projection，并提供 `SearchMessages`。它是搜索索引服务，不绑定具体搜索中间件；OpenSearch、PostgreSQL FTS、内存测试索引或其它后端都必须通过 `SearchIndexPort` 接入。
+本文定义 `search-service` 的第一条可编码切片：消费 `conversation.timeline.events`，构建搜索 projection，并提供 `SearchMessages`。它是搜索索引服务，不绑定具体搜索中间件；当前 PostgreSQL first path 使用 FTS 词法检索，OpenSearch、外部 BM25、内存测试索引或其它后端都必须通过 `SearchIndexPort` 接入。
 
 ## 1. 服务定位
 
@@ -204,6 +204,12 @@ search_projection_checkpoints(
 
 后续如果接入外部搜索后端，PostgreSQL 表仍保留 projection / audit / rebuild 所需的最小状态；外部索引可以重建，不作为事实源。
 
+当前 PostgreSQL first path 使用 `plainto_tsquery('simple')` 匹配
+`to_tsvector('simple', searchable_text)`，并复用
+`search_message_documents` 上的 GIN expression index。该路径是 token-based lexical
+search，不保留 `ILIKE` substring fallback；完整 OpenSearch / BM25 provider 仍需后续
+ADR 和独立 smoke。
+
 ## 8. 第一版验收
 
 编码门禁：
@@ -213,6 +219,7 @@ search_projection_checkpoints(
 - `SearchIndexPort` 存在，app/domain 不依赖具体搜索后端。
 - timeline consumer 支持 message persisted / edited / revoked / deleted 和 member joined / left / removed。
 - repository PG 集成测试覆盖可见窗口、tombstone、checkpoint、replay 幂等。
+- repository PG 集成测试覆盖 PostgreSQL FTS token search：查询 token 不应命中仅包含该 token 子串的文档。
 
 最小 smoke：
 
@@ -227,4 +234,4 @@ member joined
 -> later message is not visible to that user
 ```
 
-本轮不是容量压测，不宣称 OpenSearch / Milvus / RAG 已完成。
+本轮不是容量压测，不宣称 OpenSearch / Milvus / RAG 或完整 BM25 provider 已完成。

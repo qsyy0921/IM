@@ -141,6 +141,8 @@ aggregate 由多个当前用户可见的 ACTIVE / APPROVED `PROFILE_SIGNAL` memo
 手工写 active profile，而是通过该 RPC 验证 multi-source profile evidence。
 ai-eval memory-service live adapter 已把该行为登记为
 `must_recompute_profile_via_public_api` 断言。
+`loadtest/memoryprofile` 已提供 first-stage profile repair operator：默认 plan-only，
+显式 `--execute` 才调用公开 recompute RPC，输出低敏 hash / count 报告。
 
 ## 不变量
 

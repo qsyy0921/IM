@@ -48,9 +48,9 @@
   memory extraction、profile evidence、EvidencePack source-chain、RAG / Agent
   demo module 的真实 service-stack cases。
 - `memory-service` / `retrieval-gateway`：memory graph edge、profile aggregate
-  evidence 和公开 profile recompute first path 已进入主链路；继续做 profile
-  repair / operator path、结构过滤、BM25 / vector、rerank 和 EvidencePack coverage
-  深化。
+  evidence、公开 profile recompute first path 和 first-stage profile repair operator
+  已进入主链路；继续做 profile repair batch / approval、结构过滤、BM25 / vector、
+  rerank 和 EvidencePack coverage 深化。
 - `rag-service` / `summary-service`：拒答、引用校验、source-ref regression、unsafe
   output fail-closed cases。
 - `agent-service`：真实业务动作继续走 policy、skill contract、proposal、approval、

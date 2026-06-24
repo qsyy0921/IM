@@ -347,7 +347,9 @@ memory ids 和 source coverage 被保留。随后 memory-service 公开
 `RecomputeProfileAggregate` first path：profile evidence 由多个可见 ACTIVE /
 APPROVED `PROFILE_SIGNAL` memory events 重算，支持数量不足时归档旧 profile，
 避免 deleted / rejected support 继续进入 EvidencePack；memory-service live adapter
-已把该行为登记为 `must_recompute_profile_via_public_api` 断言。
+已把该行为登记为 `must_recompute_profile_via_public_api` 断言。`loadtest/memoryprofile`
+提供 first-stage profile repair operator，默认 plan-only，显式 `--execute` 才调用公开
+recompute RPC，报告只输出低敏 hash / count。
 
 下一步默认看 [current-goal.md](docs/runbook/current-goal.md)。截至当前主线，客户端只修
 阻塞演示入口的问题；默认推进

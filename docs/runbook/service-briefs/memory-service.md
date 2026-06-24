@@ -42,7 +42,11 @@
   ACTIVE / PENDING profile aggregate，避免 deleted / rejected supporting memory
   继续暴露为 profile evidence。PG integration test 和 `loadtest/memory` 已改为
   通过该 API 验证 reviewed multi-source profile，而不是手工写入 active profile。
+- 2026-06-24 `loadtest/memoryprofile` 已提供 first-stage profile repair operator：
+  默认 plan-only，只有显式 `--execute` 才调用 memory-service 公开
+  `RecomputeProfileAggregate`；输出低敏报告，只保留 aggregate key / supporting memory
+  ids / summary text 的 hash 和计数，不写 raw profile summary 或 memory text。
 
 下一步：真实服务栈启动后运行 memory-service optional adapter / loadtest 并归档报告；
-后续继续做 profile repair / operator path 和 extraction worker 集成，而不是把单条群消息
-直接升级为 ACTIVE profile fact。
+后续继续做 profile repair batch / approval path 和 extraction worker 集成，而不是把单条
+群消息直接升级为 ACTIVE profile fact。

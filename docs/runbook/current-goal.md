@@ -219,8 +219,10 @@ IM messages -> search / memory projection -> EvidencePack -> RAG / Agent answer 
    extraction 已补齐；RAG-Agent demo runner first path 和真实服务栈 smoke 报告已补齐；
    profile repair batch approval path、Agent action boundary cases、Python memory
    extraction candidate first path、Go-side adapter / ai-eval 接入以及 memory-service
-   公开 candidate review / approval / persistence path 已补齐；下一步运行并归档真实
-   service-stack gate，把 public candidate review 纳入 RAG-Agent 演示证据链。
+   公开 candidate review / approval / persistence path 已补齐；`loadtest/ragagent`
+   与 `rag-agent-demo` adapter 已把 public candidate review 纳入 RAG / Agent
+   EvidencePack 断言链路。当前本机 service-stack preflight 显示相关服务未启动，
+   下一步是在启动服务栈后运行并归档真实 service-stack gate。
 5. 客户端只作为演示入口；除非阻塞上述演示，不继续扩 UI 产品化。
 6. Windows release signing / MSI / NSIS installer、完整 Android、完整移动端发布、
    复杂 UI、群管理深水区和真实 media provider 链路全部后置到 backlog。

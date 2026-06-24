@@ -14,6 +14,7 @@ summary, Agent and tool/action boundaries.
 - RAG execution adapter: `tools/run-ai-eval-rag-adapter.ps1`
 - Summary execution adapter: `tools/run-ai-eval-summary-adapter.ps1`
 - Agent execution adapter: `tools/run-ai-eval-agent-adapter.ps1`
+- RAG-Agent demo execution adapter: `tools/run-ai-eval-ragagent-adapter.ps1`
 - Profile / Agent output safety adapter:
   `tools/run-ai-eval-profile-agent-safety.ps1`
 - action-executor external HTTP adapter eval:
@@ -175,6 +176,25 @@ result-projection boundary and local safe tool output path only. It still does
 not execute external MCP/provider tools. Cases that require policy-denied
 assertions run a separate `-scenario policy-denied` path and verify `BLOCKED`
 proposal status, no approval / execution state and blocked MCP prepare audit.
+
+First-stage RAG-Agent demo execution adapter:
+
+```powershell
+.\tools\run-ai-eval-ragagent-adapter.ps1 `
+  -MemoryTarget 127.0.0.1:10580 `
+  -RAGTarget 127.0.0.1:10610 `
+  -AgentTarget 127.0.0.1:10630 `
+  -ActionExecutorTarget 127.0.0.1:10660
+```
+
+This adapter runs `loadtest/ragagent`, which composes the RAG grounded-answer
+smoke and Agent proposal / approval / action-executor smoke for one tenant and
+conversation. It now also submits a low-sensitive public memory candidate
+through memory-service `SubmitMemoryCandidate`, approves it through
+`ReviewMemoryCandidate(APPROVE)`, then requires both RAG and Agent
+EvidencePacks to include the resulting `ACTIVE + APPROVED` memory event with
+source refs. It does not read service private tables and does not persist raw
+answer, proposal or memory text in the adapter summary.
 
 First-stage profile overgeneralization / Agent output safety adapter:
 

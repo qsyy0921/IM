@@ -14,20 +14,35 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	agentv1 "github.com/qsyy0921/IM/api/proto/nexusim/agent/v1"
+	memoryv1 "github.com/qsyy0921/IM/api/proto/nexusim/memory/v1"
+	policyv1 "github.com/qsyy0921/IM/api/proto/nexusim/policy/v1"
+	ragv1 "github.com/qsyy0921/IM/api/proto/nexusim/rag/v1"
+	retrievalv1 "github.com/qsyy0921/IM/api/proto/nexusim/retrieval/v1"
+	"github.com/qsyy0921/IM/loadtest/internal/grpctls"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 const (
 	defaultPGDSN        = "postgres://nexusim:nexusim@localhost:5432/nexusim?sslmode=disable"
+	defaultMemoryTarget = "127.0.0.1:10580"
 	defaultRAGTarget    = "127.0.0.1:10610"
 	defaultAgentTarget  = "127.0.0.1:10630"
 	defaultActionTarget = "127.0.0.1:10660"
 	defaultResultRoot   = `H:\NexusIM\loadtest-results`
 	defaultQuestion     = "phoenix launch decision"
 	defaultObjective    = "phoenix launch decision"
+
+	defaultAgentToolName     = "conversation.note.create"
+	defaultAgentSkillID      = "conversation.note.create"
+	defaultAgentResourceType = "conversation_note"
 )
 
 type config struct {
 	pgDSN          string
+	memoryTarget   string
 	ragTarget      string
 	agentTarget    string
 	actionTarget   string
@@ -132,6 +147,7 @@ type combinedSummary struct {
 	ResultDir                             string    `json:"result_dir"`
 	RAGSummaryPath                        string    `json:"rag_summary_path"`
 	AgentSummaryPath                      string    `json:"agent_summary_path"`
+	MemoryTarget                          string    `json:"memory_target"`
 	TenantID                              string    `json:"tenant_id"`
 	ConversationID                        string    `json:"conversation_id"`
 	ViewerUserID                          string    `json:"viewer_user_id"`
@@ -158,12 +174,25 @@ type combinedSummary struct {
 	CrossGroupSpeakerAttributionPreserved bool      `json:"cross_group_speaker_attribution_preserved"`
 	MemoryGraphEdgesPreserved             bool      `json:"memory_graph_edges_preserved"`
 	ProfileAggregatePreserved             bool      `json:"profile_aggregate_preserved"`
+	PublicCandidateReviewApproved         bool      `json:"public_candidate_review_approved"`
+	PublicCandidateMemoryEventID          string    `json:"public_candidate_memory_event_id,omitempty"`
+	PublicCandidateFactSHA256             string    `json:"public_candidate_fact_sha256,omitempty"`
+	PublicCandidateEvidenceInRAG          bool      `json:"public_candidate_evidence_in_rag"`
+	PublicCandidateEvidenceInAgent        bool      `json:"public_candidate_evidence_in_agent"`
 	RAGVersion                            string    `json:"rag_version"`
 	AgentVersion                          string    `json:"agent_version"`
 	RetrievalVersions                     []string  `json:"retrieval_versions"`
 	Verified                              []string  `json:"verified"`
 	StartedAt                             time.Time `json:"started_at"`
 	FinishedAt                            time.Time `json:"finished_at"`
+}
+
+type publicCandidateReviewSummary struct {
+	Approved      bool
+	MemoryEventID string
+	FactSHA256    string
+	RAGEvidence   bool
+	AgentEvidence bool
 }
 
 func main() {
@@ -207,7 +236,11 @@ func run(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
-	combined, err := verifyCombined(cfg, resultDir, ragSummaryPath, agentSummaryPath, ragSummary, agentSummary, startedAt)
+	publicCandidate, err := verifyPublicCandidateReviewEvidence(ctx, cfg, agentSummary.Seed)
+	if err != nil {
+		return err
+	}
+	combined, err := verifyCombined(cfg, resultDir, ragSummaryPath, agentSummaryPath, ragSummary, agentSummary, publicCandidate, startedAt)
 	if err != nil {
 		return err
 	}
@@ -218,6 +251,7 @@ func parseConfig(args []string) (config, error) {
 	cfg := config{}
 	flagSet := flag.NewFlagSet("ragagent-demo", flag.ContinueOnError)
 	flagSet.StringVar(&cfg.pgDSN, "pg-dsn", defaultPGDSN, "PostgreSQL DSN")
+	flagSet.StringVar(&cfg.memoryTarget, "memory-target", defaultMemoryTarget, "memory-service gRPC address")
 	flagSet.StringVar(&cfg.ragTarget, "rag-target", defaultRAGTarget, "rag-service gRPC address")
 	flagSet.StringVar(&cfg.agentTarget, "agent-target", defaultAgentTarget, "agent-service gRPC address")
 	flagSet.StringVar(&cfg.actionTarget, "action-executor-target", defaultActionTarget, "action-executor gRPC address")
@@ -244,6 +278,7 @@ func parseConfig(args []string) (config, error) {
 		return config{}, err
 	}
 	cfg.pgDSN = strings.TrimSpace(cfg.pgDSN)
+	cfg.memoryTarget = strings.TrimSpace(cfg.memoryTarget)
 	cfg.ragTarget = strings.TrimSpace(cfg.ragTarget)
 	cfg.agentTarget = strings.TrimSpace(cfg.agentTarget)
 	cfg.actionTarget = strings.TrimSpace(cfg.actionTarget)
@@ -252,6 +287,9 @@ func parseConfig(args []string) (config, error) {
 	cfg.objective = strings.TrimSpace(cfg.objective)
 	if cfg.pgDSN == "" {
 		return config{}, errors.New("--pg-dsn is required")
+	}
+	if cfg.memoryTarget == "" {
+		return config{}, errors.New("--memory-target is required")
 	}
 	if cfg.ragTarget == "" {
 		return config{}, errors.New("--rag-target is required")
@@ -382,6 +420,250 @@ func readJSON[T any](path string) (T, error) {
 	return value, nil
 }
 
+func verifyPublicCandidateReviewEvidence(
+	ctx context.Context,
+	cfg config,
+	seed seedSummary,
+) (publicCandidateReviewSummary, error) {
+	conversationSeq := seed.CurrentMemoryAtSeq
+	if conversationSeq <= 0 {
+		conversationSeq = seed.ConversationSeq
+	}
+	if conversationSeq <= 0 {
+		return publicCandidateReviewSummary{}, errors.New("public candidate review requires a positive conversation seq")
+	}
+	suffix, err := randomSuffix()
+	if err != nil {
+		return publicCandidateReviewSummary{}, err
+	}
+	candidateID := "ragagent-public-candidate-" + suffix
+	sourceID := "msg-" + candidateID
+	sourceEventID := "evt-" + candidateID
+	factText := "decision: public candidate review for phoenix launch decision is approved through public memory-service APIs"
+	factHash := normalizedFactSHA256(factText)
+
+	memoryConn, err := grpc.NewClient("passthrough:///"+cfg.memoryTarget, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		return publicCandidateReviewSummary{}, err
+	}
+	defer memoryConn.Close()
+	memoryClient := memoryv1.NewMemoryServiceClient(memoryConn)
+
+	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
+	submitted, err := memoryClient.SubmitMemoryCandidate(requestCtx, &memoryv1.SubmitMemoryCandidateRequest{
+		AuthContext:    memoryAuth(cfg, seed.ViewerUserID),
+		CandidateId:    candidateID,
+		Scope:          memoryv1.MemoryScope_MEMORY_SCOPE_CONVERSATION,
+		ScopeId:        seed.ConversationID,
+		ConversationId: seed.ConversationID,
+		Topic:          "rag-agent-public-candidate-review",
+		EventType:      memoryv1.MemoryEventType_MEMORY_EVENT_TYPE_DECISION,
+		FactText:       factText,
+		FactSha256:     factHash,
+		ActorUserIds:   []string{seed.SenderUserID},
+		SourceRefs: []*memoryv1.SourceRef{{
+			SourceType:       memoryv1.MemorySourceType_MEMORY_SOURCE_TYPE_MESSAGE,
+			SourceId:         sourceID,
+			SourceEventId:    sourceEventID,
+			ConversationId:   seed.ConversationID,
+			ConversationSeq:  conversationSeq,
+			OccurredAtUnixMs: time.Now().UTC().UnixMilli(),
+		}},
+		ValidFromSeq:      conversationSeq,
+		Confidence:        0.99,
+		VisibilityVersion: 1,
+		ExtractionVersion: "memory-extraction-candidate-v1",
+	})
+	cancel()
+	if err != nil {
+		return publicCandidateReviewSummary{}, fmt.Errorf("submit public memory candidate: %w", err)
+	}
+	if submitted.GetItem().GetStatus() != memoryv1.MemoryEventStatus_MEMORY_EVENT_STATUS_PENDING ||
+		submitted.GetItem().GetReviewState() != memoryv1.MemoryReviewState_MEMORY_REVIEW_STATE_NEEDS_REVIEW {
+		return publicCandidateReviewSummary{}, fmt.Errorf("submitted public candidate should require review: %+v", submitted.GetItem())
+	}
+
+	requestCtx, cancel = context.WithTimeout(ctx, cfg.requestTimeout)
+	approved, err := memoryClient.ReviewMemoryCandidate(requestCtx, &memoryv1.ReviewMemoryCandidateRequest{
+		AuthContext:   memoryAuth(cfg, seed.ViewerUserID),
+		MemoryEventId: candidateID,
+		Decision:      memoryv1.MemoryReviewDecision_MEMORY_REVIEW_DECISION_APPROVE,
+	})
+	cancel()
+	if err != nil {
+		return publicCandidateReviewSummary{}, fmt.Errorf("approve public memory candidate: %w", err)
+	}
+	if approved.GetItem().GetStatus() != memoryv1.MemoryEventStatus_MEMORY_EVENT_STATUS_ACTIVE ||
+		approved.GetItem().GetReviewState() != memoryv1.MemoryReviewState_MEMORY_REVIEW_STATE_APPROVED {
+		return publicCandidateReviewSummary{}, fmt.Errorf("approved public candidate should be active: %+v", approved.GetItem())
+	}
+
+	ragResponse, err := answerPublicCandidateQuestion(ctx, cfg, seed, candidateID, conversationSeq)
+	if err != nil {
+		return publicCandidateReviewSummary{}, err
+	}
+	if err := verifyPublicCandidateEvidencePack(ragResponse.GetEvidencePack(), candidateID, sourceID, sourceEventID, seed.ConversationID, conversationSeq); err != nil {
+		return publicCandidateReviewSummary{}, fmt.Errorf("rag public candidate evidence: %w", err)
+	}
+	agentResponse, err := createPublicCandidateProposal(ctx, cfg, seed, candidateID, conversationSeq)
+	if err != nil {
+		return publicCandidateReviewSummary{}, err
+	}
+	if err := verifyPublicCandidateEvidencePack(agentResponse.GetEvidencePack(), candidateID, sourceID, sourceEventID, seed.ConversationID, conversationSeq); err != nil {
+		return publicCandidateReviewSummary{}, fmt.Errorf("agent public candidate evidence: %w", err)
+	}
+
+	return publicCandidateReviewSummary{
+		Approved:      true,
+		MemoryEventID: candidateID,
+		FactSHA256:    factHash,
+		RAGEvidence:   true,
+		AgentEvidence: true,
+	}, nil
+}
+
+func answerPublicCandidateQuestion(
+	ctx context.Context,
+	cfg config,
+	seed seedSummary,
+	candidateID string,
+	conversationSeq int64,
+) (*ragv1.AnswerQuestionResponse, error) {
+	dialOption, err := dialOptionFromTLSFlags(cfg.ragTLS, "rag-tls")
+	if err != nil {
+		return nil, err
+	}
+	conn, err := grpc.NewClient("passthrough:///"+cfg.ragTarget, dialOption)
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close()
+	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
+	defer cancel()
+	response, err := ragv1.NewRagServiceClient(conn).AnswerQuestion(requestCtx, &ragv1.AnswerQuestionRequest{
+		AuthContext:       retrievalAuth(cfg, seed.ViewerUserID),
+		Question:          "public candidate review",
+		ConversationId:    seed.ConversationID,
+		Limit:             10,
+		IncludeSearch:     false,
+		IncludeMemory:     true,
+		MemoryStatuses:    []retrievalv1.EvidenceMemoryStatus{retrievalv1.EvidenceMemoryStatus_EVIDENCE_MEMORY_STATUS_ACTIVE},
+		AtConversationSeq: conversationSeq,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("answer public candidate question %s: %w", candidateID, err)
+	}
+	if response.GetStatus() != ragv1.AnswerStatus_ANSWER_STATUS_GROUNDED {
+		return nil, fmt.Errorf("public candidate RAG answer status %v, want GROUNDED", response.GetStatus())
+	}
+	return response, nil
+}
+
+func createPublicCandidateProposal(
+	ctx context.Context,
+	cfg config,
+	seed seedSummary,
+	candidateID string,
+	conversationSeq int64,
+) (*agentv1.CreateAgentProposalResponse, error) {
+	dialOption, err := dialOptionFromTLSFlags(cfg.agentTLS, "agent-tls")
+	if err != nil {
+		return nil, err
+	}
+	conn, err := grpc.NewClient("passthrough:///"+cfg.agentTarget, dialOption)
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close()
+	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
+	defer cancel()
+	response, err := agentv1.NewAgentServiceClient(conn).CreateAgentProposal(requestCtx, &agentv1.CreateAgentProposalRequest{
+		AuthContext:       retrievalAuth(cfg, seed.ViewerUserID),
+		ConversationId:    seed.ConversationID,
+		Objective:         "public candidate review",
+		ToolName:          defaultAgentToolName,
+		ToolAction:        policyv1.ToolAction_TOOL_ACTION_CALL,
+		ResourceType:      defaultAgentResourceType,
+		ResourceId:        seed.ConversationID,
+		RiskLevel:         "LOW",
+		Intent:            "public candidate review",
+		Limit:             10,
+		IncludeSearch:     false,
+		IncludeMemory:     true,
+		MemoryStatuses:    []retrievalv1.EvidenceMemoryStatus{retrievalv1.EvidenceMemoryStatus_EVIDENCE_MEMORY_STATUS_ACTIVE},
+		SkillId:           defaultAgentSkillID,
+		AtConversationSeq: conversationSeq,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("create public candidate proposal %s: %w", candidateID, err)
+	}
+	if response.GetStatus() != agentv1.AgentProposalStatus_AGENT_PROPOSAL_STATUS_PROPOSED {
+		return nil, fmt.Errorf("public candidate agent proposal status %v, want PROPOSED", response.GetStatus())
+	}
+	if !response.GetRequiresApproval() {
+		return nil, errors.New("public candidate agent proposal should require approval")
+	}
+	return response, nil
+}
+
+func verifyPublicCandidateEvidencePack(
+	pack *retrievalv1.EvidencePack,
+	candidateID string,
+	sourceID string,
+	sourceEventID string,
+	conversationID string,
+	conversationSeq int64,
+) error {
+	if pack == nil {
+		return errors.New("missing EvidencePack")
+	}
+	for _, item := range pack.GetItems() {
+		if item.GetSourceType() != retrievalv1.EvidenceSourceType_EVIDENCE_SOURCE_TYPE_MEMORY_EVENT ||
+			item.GetMemoryEventId() != candidateID {
+			continue
+		}
+		if item.GetTemporalStatus() != "ACTIVE" || item.GetReviewState() != "APPROVED" {
+			return fmt.Errorf("public candidate should be active and approved: %+v", item)
+		}
+		if item.GetValidFromSeq() != conversationSeq {
+			return fmt.Errorf("public candidate valid_from_seq %d, want %d", item.GetValidFromSeq(), conversationSeq)
+		}
+		for _, ref := range item.GetSourceRefs() {
+			if ref.GetSourceId() == sourceID &&
+				ref.GetSourceEventId() == sourceEventID &&
+				ref.GetConversationId() == conversationID &&
+				ref.GetConversationSeq() == conversationSeq {
+				return nil
+			}
+		}
+		return fmt.Errorf("public candidate source ref missing from EvidencePack item: %+v", item.GetSourceRefs())
+	}
+	return fmt.Errorf("public candidate memory event %q missing from EvidencePack", candidateID)
+}
+
+func memoryAuth(cfg config, userID string) *memoryv1.AuthContext {
+	return &memoryv1.AuthContext{
+		TenantId: cfg.tenantID,
+		UserId:   userID,
+	}
+}
+
+func retrievalAuth(cfg config, userID string) *retrievalv1.AuthContext {
+	return &retrievalv1.AuthContext{
+		TenantId: cfg.tenantID,
+		UserId:   userID,
+	}
+}
+
+func dialOptionFromTLSFlags(flags tlsFlags, prefix string) (grpc.DialOption, error) {
+	return grpctls.DialOption(grpctls.Config{
+		CAFile:         flags.caFile,
+		ServerName:     flags.serverName,
+		ClientCertFile: flags.clientCertFile,
+		ClientKeyFile:  flags.clientKeyFile,
+	}, prefix)
+}
+
 func verifyCombined(
 	cfg config,
 	resultDir string,
@@ -389,6 +671,7 @@ func verifyCombined(
 	agentSummaryPath string,
 	rag ragPartialSummary,
 	agent agentPartialSummary,
+	publicCandidate publicCandidateReviewSummary,
 	startedAt time.Time,
 ) (combinedSummary, error) {
 	verified := make([]string, 0, 10)
@@ -433,12 +716,17 @@ func verifyCombined(
 		return combinedSummary{}, errors.New("RAG and Agent did not both preserve cross-group refs, speaker attribution, graph edges and profile evidence")
 	}
 	verified = append(verified, "EvidencePack cross-group refs, speaker attribution, graph edges and profile evidence were preserved in both paths")
+	if !publicCandidate.Approved || !publicCandidate.RAGEvidence || !publicCandidate.AgentEvidence {
+		return combinedSummary{}, errors.New("public candidate review was not approved and preserved in both RAG and Agent EvidencePacks")
+	}
+	verified = append(verified, "Public memory candidate review produced approved memory evidence in both RAG and Agent paths")
 
 	return combinedSummary{
 		RunName:                               cfg.runName,
 		ResultDir:                             resultDir,
 		RAGSummaryPath:                        ragSummaryPath,
 		AgentSummaryPath:                      agentSummaryPath,
+		MemoryTarget:                          cfg.memoryTarget,
 		TenantID:                              rag.Seed.TenantID,
 		ConversationID:                        rag.Seed.ConversationID,
 		ViewerUserID:                          rag.Seed.ViewerUserID,
@@ -465,6 +753,11 @@ func verifyCombined(
 		CrossGroupSpeakerAttributionPreserved: speaker,
 		MemoryGraphEdgesPreserved:             graph,
 		ProfileAggregatePreserved:             profile,
+		PublicCandidateReviewApproved:         publicCandidate.Approved,
+		PublicCandidateMemoryEventID:          publicCandidate.MemoryEventID,
+		PublicCandidateFactSHA256:             publicCandidate.FactSHA256,
+		PublicCandidateEvidenceInRAG:          publicCandidate.RAGEvidence,
+		PublicCandidateEvidenceInAgent:        publicCandidate.AgentEvidence,
 		RAGVersion:                            rag.RAGVersion,
 		AgentVersion:                          agent.AgentVersion,
 		RetrievalVersions:                     uniqueNonEmpty(rag.RetrievalVersion, agent.RetrievalVersion),
@@ -568,6 +861,11 @@ func gitOutput(args ...string) string {
 func sha256Hex(value string) string {
 	sum := sha256.Sum256([]byte(value))
 	return hex.EncodeToString(sum[:])
+}
+
+func normalizedFactSHA256(value string) string {
+	normalized := strings.Join(strings.Fields(value), " ")
+	return sha256Hex(normalized)
 }
 
 func uniqueNonEmpty(values ...string) []string {

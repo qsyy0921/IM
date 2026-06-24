@@ -1,6 +1,7 @@
 param(
     [string]$CasePath = "docs/runbook/ai-eval/retrieval-eval-cases.json",
     [string]$PGDSN = "postgres://nexusim:nexusim@localhost:5432/nexusim?sslmode=disable",
+    [string]$MemoryTarget = "127.0.0.1:10580",
     [string]$RAGTarget = "127.0.0.1:10610",
     [string]$AgentTarget = "127.0.0.1:10630",
     [string]$ActionExecutorTarget = "127.0.0.1:10660",
@@ -95,6 +96,7 @@ if ([string]::IsNullOrWhiteSpace($RunName)) {
 $runArgs = @(
     "run", "./loadtest/ragagent",
     "-pg-dsn", $PGDSN,
+    "-memory-target", $MemoryTarget,
     "-rag-target", $RAGTarget,
     "-agent-target", $AgentTarget,
     "-action-executor-target", $ActionExecutorTarget,
@@ -149,6 +151,13 @@ Add-Assertion -Assertions $assertions -Type "evidencepack_must_preserve_collabor
     (Get-JsonPropertyBool -Object $summary -Name "cross_group_speaker_attribution_preserved") -and
     (Get-JsonPropertyBool -Object $summary -Name "memory_graph_edges_preserved") -and
     (Get-JsonPropertyBool -Object $summary -Name "profile_aggregate_preserved")
+)
+Add-Assertion -Assertions $assertions -Type "public_candidate_review_must_enter_rag_agent_evidence_chain" -Passed (
+    (Get-JsonPropertyBool -Object $summary -Name "public_candidate_review_approved") -and
+    (Get-JsonPropertyBool -Object $summary -Name "public_candidate_evidence_in_rag") -and
+    (Get-JsonPropertyBool -Object $summary -Name "public_candidate_evidence_in_agent") -and
+    (Get-JsonPropertyString -Object $summary -Name "public_candidate_memory_event_id").Length -gt 0 -and
+    (Get-JsonPropertyString -Object $summary -Name "public_candidate_fact_sha256").Length -gt 0
 )
 Add-Assertion -Assertions $assertions -Type "summary_must_be_low_sensitive" -Passed (
     (Get-JsonPropertyString -Object $summary -Name "rag_answer_text_sha256").Length -gt 0 -and

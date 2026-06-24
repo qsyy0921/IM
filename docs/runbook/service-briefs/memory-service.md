@@ -77,6 +77,7 @@
   覆盖 submit -> approve、reject、不可见 source fail-closed；`loadtest/memory`
   和 memory-service ai-eval adapter 已新增 public candidate review 检查。
 
-下一步：运行并归档真实 service-stack optional adapter，把 public candidate review
-纳入 RAG-Agent 演示证据链；继续做结构过滤、BM25 / vector、rerank 和 EvidencePack
+下一步：`loadtest/ragagent` / `rag-agent-demo` adapter 已把 public candidate
+review 纳入 RAG / Agent EvidencePack 断言链路；待服务栈启动后运行并归档真实
+service-stack gate。之后继续做结构过滤、BM25 / vector、rerank 和 EvidencePack
 coverage 深化。仍不得把单条群消息直接升级为 ACTIVE profile fact。

@@ -56,9 +56,11 @@
   rerank 和 EvidencePack coverage 深化。
 - `loadtest/ragagent`：first-stage RAG-Agent demo runner 已提供低敏总报告；
   `rag-agent-demo` 已接入 ai-eval optional service-stack adapter / gate policy /
-  service-stack preflight，且真实服务栈 gate 已通过并归档；下一步围绕 profile
-  repair approval 回归、Python memory extraction candidate eval 接入和更多
-  RAG-Agent EvidencePack / approval / audit 展示扩展该演示路径。
+  service-stack preflight，且真实服务栈 gate 已通过并归档；public candidate
+  review 现在也会通过 memory-service 公开 submit / review API 写入
+  `ACTIVE + APPROVED` memory，并被 RAG / Agent EvidencePack 断言消费。下一步
+  是在服务栈启动后重新运行并归档包含该断言的真实 gate，再围绕 profile repair
+  approval 回归、更多 RAG-Agent EvidencePack / approval / audit 展示扩展该演示路径。
 - `rag-service` / `summary-service`：拒答、引用校验、source-ref regression、unsafe
   output fail-closed cases。
 - `agent-service`：真实业务动作继续走 policy、skill contract、proposal、approval、

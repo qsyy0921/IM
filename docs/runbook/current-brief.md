@@ -187,6 +187,8 @@ fail-closed，不写 execution audit、不写 tool result projection、不调用
 
 ## 下一步
 
-- 优先运行并归档 memory-service / RAG-Agent 真实 service-stack gate，把 public
-  candidate review 纳入可演示证据链。
+- `loadtest/ragagent` / `rag-agent-demo` 已把 public candidate review 纳入 RAG /
+  Agent EvidencePack 断言链路；当前本机 preflight 显示服务栈未启动。
+- 下一步在启动 search / memory / retrieval / RAG / Agent / action-executor /
+  MCP / skill / policy / PostgreSQL 后运行并归档真实 service-stack gate。
 - 再继续深化 RAG-Agent demo 的 EvidencePack / approval / audit 展示。

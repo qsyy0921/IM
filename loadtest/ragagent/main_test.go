@@ -15,6 +15,9 @@ func TestParseConfigDefaults(t *testing.T) {
 	if cfg.pgDSN != defaultPGDSN {
 		t.Fatalf("unexpected pg dsn %q", cfg.pgDSN)
 	}
+	if cfg.memoryTarget != defaultMemoryTarget {
+		t.Fatalf("unexpected memory target %q", cfg.memoryTarget)
+	}
 	if cfg.ragTarget != defaultRAGTarget {
 		t.Fatalf("unexpected rag target %q", cfg.ragTarget)
 	}
@@ -37,6 +40,7 @@ func TestParseConfigDefaults(t *testing.T) {
 
 func TestParseConfigRejectsMissingTargets(t *testing.T) {
 	cases := [][]string{
+		{"--memory-target", " "},
 		{"--rag-target", " "},
 		{"--agent-target", " "},
 		{"--action-executor-target", " "},
@@ -93,7 +97,7 @@ func TestVerifyCombinedSummary(t *testing.T) {
 	cfg := config{runName: "demo", expectExecuted: true}
 	rag := validRAGPartial()
 	agent := validAgentPartial()
-	summary, err := verifyCombined(cfg, `H:\NexusIM\loadtest-results\demo`, "rag.json", "agent.json", rag, agent, startedAt)
+	summary, err := verifyCombined(cfg, `H:\NexusIM\loadtest-results\demo`, "rag.json", "agent.json", rag, agent, validPublicCandidateReviewSummary(), startedAt)
 	if err != nil {
 		t.Fatalf("verifyCombined returned error: %v", err)
 	}
@@ -105,6 +109,9 @@ func TestVerifyCombinedSummary(t *testing.T) {
 	}
 	if summary.RAGAnswerTextSHA256 == "" || summary.AgentProposalTextSHA256 == "" {
 		t.Fatalf("expected hashed text fields: %+v", summary)
+	}
+	if !summary.PublicCandidateReviewApproved || !summary.PublicCandidateEvidenceInRAG || !summary.PublicCandidateEvidenceInAgent {
+		t.Fatalf("expected public candidate review evidence flags: %+v", summary)
 	}
 	if strings.Contains(summary.RAGAnswerTextSHA256, rag.AnswerText) ||
 		strings.Contains(summary.AgentProposalTextSHA256, agent.ProposalText) {
@@ -120,7 +127,7 @@ func TestVerifyCombinedRejectsDifferentConversation(t *testing.T) {
 	rag := validRAGPartial()
 	agent := validAgentPartial()
 	agent.Seed.ConversationID = "other-conv"
-	if _, err := verifyCombined(cfg, "out", "rag.json", "agent.json", rag, agent, time.Now().UTC()); err == nil {
+	if _, err := verifyCombined(cfg, "out", "rag.json", "agent.json", rag, agent, validPublicCandidateReviewSummary(), time.Now().UTC()); err == nil {
 		t.Fatalf("expected conversation mismatch to fail")
 	}
 }
@@ -130,8 +137,19 @@ func TestVerifyCombinedRejectsMissingEvidenceBoundary(t *testing.T) {
 	rag := validRAGPartial()
 	agent := validAgentPartial()
 	agent.MemoryGraphEdgesPreserved = false
-	if _, err := verifyCombined(cfg, "out", "rag.json", "agent.json", rag, agent, time.Now().UTC()); err == nil {
+	if _, err := verifyCombined(cfg, "out", "rag.json", "agent.json", rag, agent, validPublicCandidateReviewSummary(), time.Now().UTC()); err == nil {
 		t.Fatalf("expected missing graph edge preservation to fail")
+	}
+}
+
+func TestVerifyCombinedRejectsMissingPublicCandidateReview(t *testing.T) {
+	cfg := config{runName: "demo"}
+	rag := validRAGPartial()
+	agent := validAgentPartial()
+	candidate := validPublicCandidateReviewSummary()
+	candidate.AgentEvidence = false
+	if _, err := verifyCombined(cfg, "out", "rag.json", "agent.json", rag, agent, candidate, time.Now().UTC()); err == nil {
+		t.Fatalf("expected missing public candidate evidence to fail")
 	}
 }
 
@@ -181,5 +199,15 @@ func validAgentPartial() agentPartialSummary {
 		ProfileAggregatePreserved:             true,
 		AgentVersion:                          "agent-v",
 		RetrievalVersion:                      "retrieval-v",
+	}
+}
+
+func validPublicCandidateReviewSummary() publicCandidateReviewSummary {
+	return publicCandidateReviewSummary{
+		Approved:      true,
+		MemoryEventID: "candidate-1",
+		FactSHA256:    strings.Repeat("a", 64),
+		RAGEvidence:   true,
+		AgentEvidence: true,
 	}
 }

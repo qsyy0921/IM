@@ -31,3 +31,18 @@ type ProviderFailureAuditRow struct {
 	FailureRef        string
 	CreatedAt         time.Time
 }
+
+type ProviderFailureMetricCount struct {
+	Status         string
+	Classification string
+	Count          int64
+}
+
+type ProviderFailureMetricsSnapshot struct {
+	Total        int64
+	RetryPending int64
+	DLQ          int64
+	Retryable    int64
+	DueRetry     int64
+	ByClass      []ProviderFailureMetricCount
+}

@@ -9,6 +9,11 @@
 - Conversation note / profile opt-in business adapters：只走 conversation-service public API，低敏 output，不读写私表。
 - Provider failure lifecycle：retryable -> `RETRY_PENDING`，non-retryable / unsafe -> `DLQ`；worker 只做 bounded retry bookkeeping，不重放 tool。
 - Provider failure audit / redrive-plan operator handoff：只输出低敏 artifact，不修改 failure row。
+- Provider failure metrics：`/metrics` / `/debug/metrics` 输出 status、retryable、
+  due retry 和 classification 聚合，不输出 raw provider error、tool input / output、
+  secret 或 PII。
+- Batch redrive operator handoff：redrive plan 输出 batch id、candidate count、
+  fresh proposal / approval / prepared audit requirements，不自动 replay。
 - `RedriveProviderFailure`：只针对 `DLQ` source，要求 fresh proposal / approval /
   prepared audit、匹配 skill / tool / resource、新 input 和 reason hash，复用正常执行链；
   execution audit 记录 source failure id 和 reason hash。
@@ -23,5 +28,4 @@
 
 ## 下一步
 
-- Provider failure metrics、batch redrive operator handoff、provider replay、
-  operator UI。
+- Provider replay approval / audit first path、operator UI。

@@ -23,8 +23,10 @@ type providerFailureOperatorOutput struct {
 	SchemaVersion            int                                `json:"schema_version"`
 	GeneratedAt              string                             `json:"generated_at"`
 	Kind                     string                             `json:"kind"`
+	BatchID                  string                             `json:"batch_id,omitempty"`
 	Filters                  map[string]string                  `json:"filters,omitempty"`
 	Counts                   providerFailureOperatorCounts      `json:"counts"`
+	CandidateCount           int                                `json:"candidate_count"`
 	Rows                     []providerFailureOperatorOutputRow `json:"rows"`
 	ExecutesTool             bool                               `json:"executes_tool"`
 	MutatesProviderFailure   bool                               `json:"mutates_provider_failure"`
@@ -32,6 +34,7 @@ type providerFailureOperatorOutput struct {
 	DryRun                   bool                               `json:"dry_run"`
 	ReasonPresent            bool                               `json:"reason_present,omitempty"`
 	ReasonSHA256             string                             `json:"reason_sha256,omitempty"`
+	RedriveRequirements      []string                           `json:"redrive_requirements,omitempty"`
 	OperatorNextStep         string                             `json:"operator_next_step,omitempty"`
 	Note                     string                             `json:"note"`
 }
@@ -203,6 +206,7 @@ func newProviderFailureOperatorOutput(
 		Kind:                     kind,
 		Filters:                  compactProviderFailureFilters(options),
 		Rows:                     make([]providerFailureOperatorOutputRow, 0, len(rows)),
+		CandidateCount:           len(rows),
 		ExecutesTool:             false,
 		MutatesProviderFailure:   false,
 		RequiresOperatorApproval: redrivePlan,
@@ -210,6 +214,17 @@ func newProviderFailureOperatorOutput(
 		ReasonPresent:            redrivePlan,
 		ReasonSHA256:             reasonSHA256,
 		Note:                     "Low-sensitive operator artifact. It does not include raw tool input, provider output, reason text, or business payloads.",
+	}
+	if redrivePlan {
+		output.BatchID = providerFailureBatchID(kind, rows, reasonSHA256)
+		output.RedriveRequirements = []string{
+			"fresh_agent_proposal",
+			"fresh_approval",
+			"fresh_prepared_audit",
+			"matching_skill_tool_resource",
+			"new_input_json",
+			"reason_sha256",
+		}
 	}
 	for _, row := range rows {
 		switch row.Status {
@@ -243,6 +258,16 @@ func newProviderFailureOperatorOutput(
 		})
 	}
 	return output
+}
+
+func providerFailureBatchID(kind string, rows []types.ProviderFailureAuditRow, reasonSHA256 string) string {
+	parts := make([]string, 0, len(rows)+2)
+	parts = append(parts, strings.TrimSpace(kind), strings.TrimSpace(reasonSHA256))
+	for _, row := range rows {
+		parts = append(parts, row.TenantID+":"+row.ProviderFailureID)
+	}
+	sum := sha256.Sum256([]byte(strings.Join(parts, "|")))
+	return "provider-failure-batch-" + hex.EncodeToString(sum[:])[:16]
 }
 
 func compactProviderFailureFilters(options types.ProviderFailureAuditOptions) map[string]string {

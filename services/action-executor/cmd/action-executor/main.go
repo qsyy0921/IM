@@ -22,6 +22,7 @@ import (
 	rpcinfra "github.com/qsyy0921/IM/services/action-executor/internal/infrastructure/rpc"
 	toolinfra "github.com/qsyy0921/IM/services/action-executor/internal/infrastructure/tool"
 	"github.com/qsyy0921/IM/services/action-executor/internal/trigger/providerfailure"
+	"github.com/qsyy0921/IM/services/action-executor/internal/types"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -61,19 +62,19 @@ func runProviderFailureWorker(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	stopDebug, err := startDebugServer(ctx, debugAddr)
-	if err != nil {
-		return err
-	}
-	defer stopDebug()
-
 	pool, err := openPGPool(ctx)
 	if err != nil {
 		return err
 	}
 	defer pool.Close()
+	repository := postgresinfra.NewRepository(pool)
+	stopDebug, err := startDebugServer(ctx, debugAddr, repository)
+	if err != nil {
+		return err
+	}
+	defer stopDebug()
 
-	worker := providerfailure.NewWorker(postgresinfra.NewRepository(pool), providerfailure.Config{
+	worker := providerfailure.NewWorker(repository, providerfailure.Config{
 		BatchSize:      envInt("NEXUSIM_ACTION_EXECUTOR_PROVIDER_FAILURE_BATCH_SIZE", 100),
 		MaxAttempts:    envInt("NEXUSIM_ACTION_EXECUTOR_PROVIDER_FAILURE_MAX_ATTEMPTS", 3),
 		RetryBaseDelay: envDuration("NEXUSIM_ACTION_EXECUTOR_PROVIDER_FAILURE_RETRY_BASE_DELAY", 30*time.Second),
@@ -98,7 +99,7 @@ func runNoop(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	stopDebug, err := startDebugServer(ctx, debugAddr)
+	stopDebug, err := startDebugServer(ctx, debugAddr, nil)
 	if err != nil {
 		return err
 	}
@@ -114,17 +115,17 @@ func runGRPC(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	stopDebug, err := startDebugServer(ctx, debugAddr)
-	if err != nil {
-		return err
-	}
-	defer stopDebug()
-
 	pool, err := openPGPool(ctx)
 	if err != nil {
 		return err
 	}
 	defer pool.Close()
+	repository := postgresinfra.NewRepository(pool)
+	stopDebug, err := startDebugServer(ctx, debugAddr, repository)
+	if err != nil {
+		return err
+	}
+	defer stopDebug()
 
 	timeout := envDuration("NEXUSIM_ACTION_EXECUTOR_DEPENDENCY_TIMEOUT", 500*time.Millisecond)
 	skillClient, closeSkill, err := rpcinfra.DialSkillRegistryClient(
@@ -160,7 +161,6 @@ func runGRPC(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	repository := postgresinfra.NewRepository(pool)
 	toolExecutor, closeTools, err := newToolExecutorFromEnv(timeout)
 	if err != nil {
 		return err
@@ -407,7 +407,11 @@ func openPGPool(ctx context.Context) (*pgxpool.Pool, error) {
 	return pgxpool.NewWithConfig(connectCtx, config)
 }
 
-func startDebugServer(ctx context.Context, addr string) (func(), error) {
+type providerFailureMetricsStore interface {
+	ProviderFailureMetrics(context.Context) (types.ProviderFailureMetricsSnapshot, error)
+}
+
+func startDebugServer(ctx context.Context, addr string, metricsStore providerFailureMetricsStore) (func(), error) {
 	if strings.TrimSpace(addr) == "" {
 		return func() {}, nil
 	}
@@ -416,7 +420,7 @@ func startDebugServer(ctx context.Context, addr string) (func(), error) {
 		return nil, err
 	}
 	server := &http.Server{
-		Handler:           newDebugHandler(),
+		Handler:           newDebugHandler(metricsStore),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 	go func() {
@@ -437,7 +441,7 @@ func startDebugServer(ctx context.Context, addr string) (func(), error) {
 	}, nil
 }
 
-func newDebugHandler() http.Handler {
+func newDebugHandler(metricsStore providerFailureMetricsStore) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", func(writer http.ResponseWriter, _ *http.Request) {
 		_, _ = writer.Write([]byte("ok\n"))
@@ -445,11 +449,63 @@ func newDebugHandler() http.Handler {
 	mux.HandleFunc("/readyz", func(writer http.ResponseWriter, _ *http.Request) {
 		_, _ = writer.Write([]byte("ok\n"))
 	})
-	metricsHandler := func(writer http.ResponseWriter, _ *http.Request) {
+	metricsHandler := func(writer http.ResponseWriter, request *http.Request) {
 		writer.Header().Set("Content-Type", "text/plain; version=0.0.4")
-		_, _ = writer.Write([]byte("nexusim_action_executor_service_info 1\n"))
+		body, status := renderActionExecutorMetrics(request.Context(), metricsStore)
+		if status != http.StatusOK {
+			writer.WriteHeader(status)
+		}
+		_, _ = writer.Write([]byte(body))
 	}
 	mux.HandleFunc("/debug/metrics", metricsHandler)
 	mux.HandleFunc("/metrics", metricsHandler)
 	return mux
+}
+
+func renderActionExecutorMetrics(
+	ctx context.Context,
+	metricsStore providerFailureMetricsStore,
+) (string, int) {
+	var builder strings.Builder
+	builder.WriteString("nexusim_action_executor_service_info 1\n")
+	if metricsStore == nil {
+		return builder.String(), http.StatusOK
+	}
+	snapshot, err := metricsStore.ProviderFailureMetrics(ctx)
+	if err != nil {
+		builder.WriteString("nexusim_action_executor_provider_failure_metrics_error 1\n")
+		builder.WriteString("# provider failure metrics unavailable\n")
+		return builder.String(), http.StatusServiceUnavailable
+	}
+	builder.WriteString("nexusim_action_executor_provider_failure_metrics_error 0\n")
+	writePrometheusGauge(&builder, `nexusim_action_executor_provider_failures_total{status="ALL"}`, snapshot.Total)
+	writePrometheusGauge(&builder, `nexusim_action_executor_provider_failures_total{status="RETRY_PENDING"}`, snapshot.RetryPending)
+	writePrometheusGauge(&builder, `nexusim_action_executor_provider_failures_total{status="DLQ"}`, snapshot.DLQ)
+	writePrometheusGauge(&builder, "nexusim_action_executor_provider_failures_retryable_total", snapshot.Retryable)
+	writePrometheusGauge(&builder, "nexusim_action_executor_provider_failures_retry_due_total", snapshot.DueRetry)
+	for _, item := range snapshot.ByClass {
+		label := fmt.Sprintf(
+			`nexusim_action_executor_provider_failures_by_classification_total{status="%s",classification="%s"}`,
+			prometheusLabelValue(item.Status),
+			prometheusLabelValue(item.Classification),
+		)
+		writePrometheusGauge(&builder, label, item.Count)
+	}
+	return builder.String(), http.StatusOK
+}
+
+func writePrometheusGauge(builder *strings.Builder, name string, value int64) {
+	builder.WriteString(name)
+	builder.WriteByte(' ')
+	builder.WriteString(strconv.FormatInt(value, 10))
+	builder.WriteByte('\n')
+}
+
+func prometheusLabelValue(value string) string {
+	value = strings.TrimSpace(value)
+	value = strings.ReplaceAll(value, `\`, `\\`)
+	value = strings.ReplaceAll(value, `"`, `\"`)
+	value = strings.ReplaceAll(value, "\n", "")
+	value = strings.ReplaceAll(value, "\r", "")
+	return value
 }

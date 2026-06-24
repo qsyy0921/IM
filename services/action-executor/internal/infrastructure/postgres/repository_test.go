@@ -344,6 +344,20 @@ func TestRepositoryAuditProviderFailuresIntegration(t *testing.T) {
 	if len(allRows) != 2 {
 		t.Fatalf("expected both provider failure rows, got %d", len(allRows))
 	}
+	metrics, err := repository.ProviderFailureMetrics(ctx)
+	if err != nil {
+		t.Fatalf("provider failure metrics: %v", err)
+	}
+	if metrics.Total != 2 ||
+		metrics.RetryPending != 1 ||
+		metrics.DLQ != 1 ||
+		metrics.Retryable != 1 ||
+		metrics.DueRetry != 0 {
+		t.Fatalf("unexpected provider failure metrics: %+v", metrics)
+	}
+	if len(metrics.ByClass) != 2 {
+		t.Fatalf("expected metrics by status/classification, got %+v", metrics.ByClass)
+	}
 }
 
 func TestRepositoryRedriveProviderFailureMetadataIntegration(t *testing.T) {

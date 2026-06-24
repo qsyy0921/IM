@@ -4,7 +4,7 @@
 
 `action-executor` 是 NexusIM AI 应用底座中的受控动作执行边界。它承接 Agent proposal、approval 和 `mcp-gateway` prepare 之后的动作执行请求，把真实写动作纳入 policy precheck、审批关联和低敏 audit。
 
-当前第一阶段记录 approved execution boundary，并在同一事务内写低敏 tool result projection。已支持本地安全 `nexusim.local.echo` adapter first path，用于验证真实低敏 output hash / result projection；已支持外部 MCP failure 稳定失败分类、tool output safety first path，以及显式开启的外部 HTTP provider adapter guarded first path。`conversation.note.create` 已有显式 opt-in 业务 adapter：配置 `NEXUSIM_ACTION_EXECUTOR_CONVERSATION_GRPC_ADDR` 后，通过 conversation-service 公开 `CreateConversationNote` 写入真实 note fact；未配置时仍保持 unsupported / `executed=false`，不伪造业务成功。默认不连接外部 MCP / provider；外部 HTTP adapter 只允许 allowlist 内的 `LOW` risk tool，只发送 tool metadata / `input_sha256`，不发送 raw `input_json`，provider output 仍必须经过安全门禁后才写 hash / projection。工具 provider 失败和 unsafe output 已有 first-stage `provider_failures` 状态投影和 bounded retry bookkeeping worker，可区分 `RETRY_PENDING` 与 `DLQ`；同时提供 provider failure audit / redrive-plan operator handoff，redrive plan 只生成低敏审批 artifact，不重放 provider、不执行 tool、不修改失败状态。`RedriveProviderFailure` 已提供受控 redrive API first path：只能针对已有 `DLQ` provider failure，要求 fresh proposal / approval / prepared audit、匹配的 skill / tool / resource、新 `input_json` 和 `reason_sha256`，并复用正常 `ExecuteApprovedAction` 链路执行，同时把 source provider failure id 与 reason hash 写入 execution audit。operator UI、批量 redrive 或自动 provider replay 尚未实现。
+当前第一阶段记录 approved execution boundary，并在同一事务内写低敏 tool result projection。已支持本地安全 `nexusim.local.echo` adapter first path，用于验证真实低敏 output hash / result projection；已支持外部 MCP failure 稳定失败分类、tool output safety first path，以及显式开启的外部 HTTP provider adapter guarded first path。`conversation.note.create` 已有显式 opt-in 业务 adapter：配置 `NEXUSIM_ACTION_EXECUTOR_CONVERSATION_GRPC_ADDR` 后，通过 conversation-service 公开 `CreateConversationNote` 写入真实 note fact；未配置时仍保持 unsupported / `executed=false`，不伪造业务成功。默认不连接外部 MCP / provider；外部 HTTP adapter 只允许 allowlist 内的 `LOW` risk tool，只发送 tool metadata / `input_sha256`，不发送 raw `input_json`，provider output 仍必须经过安全门禁后才写 hash / projection。工具 provider 失败和 unsafe output 已有 first-stage `provider_failures` 状态投影和 bounded retry bookkeeping worker，可区分 `RETRY_PENDING` 与 `DLQ`；同时提供 provider failure metrics、provider failure audit 和 batch redrive-plan operator handoff，redrive plan 只生成低敏审批 artifact，不重放 provider、不执行 tool、不修改失败状态。`RedriveProviderFailure` 已提供受控 redrive API first path：只能针对已有 `DLQ` provider failure，要求 fresh proposal / approval / prepared audit、匹配的 skill / tool / resource、新 `input_json` 和 `reason_sha256`，并复用正常 `ExecuteApprovedAction` 链路执行，同时把 source provider failure id 与 reason hash 写入 execution audit。operator UI 或自动 provider replay 尚未实现。
 
 ## 职责
 
@@ -68,8 +68,14 @@
 - `provider-failure-audit` / `provider-failure-redrive-plan`：
   - 只读取 action-executor 自有 `action_executor_provider_failures` 投影
   - 输出低敏 JSON artifact；user / resource / failure_ref 只输出 hash
+  - redrive-plan 输出 batch id、candidate count 和 fresh proposal / approval /
+    prepared-audit requirements
   - redrive plan 必须显式 dry-run 和 reason file，挂入 repair operator approval chain
   - 不修改 provider failure row，不调用 tool executor，不重放 provider output
+- `/metrics` / `/debug/metrics`：
+  - 输出 provider failure status、retryable、due retry 和 classification 聚合计数
+  - 不输出 tenant / user / resource / provider raw error / tool input / output
+  - 查询失败时返回稳定 unavailable 语义，不泄漏数据库或 provider 错误
 - `RedriveProviderFailure`：
   - 只接受 source status 为 `DLQ` 的 provider failure
   - source skill / tool / resource 必须与本次 redrive command 完全匹配
@@ -203,8 +209,9 @@ agent-service proposal
 - tool result projection 不是 provider 输出存储；当前只记录
   `NOT_EXECUTED` / `BLOCKED` / `SUCCEEDED` 等低敏状态引用和 output hash。
 - 当前外部 HTTP adapter 只证明 guarded first path；provider failure worker 只证明
-  bounded retry bookkeeping，不代表任意 MCP server、高风险业务写动作、
-  自动 provider replay、批量 redrive、operator UI 或生产级 tool gateway 完成。
+  bounded retry bookkeeping，batch redrive plan 只证明低敏 operator handoff，不代表
+  任意 MCP server、高风险业务写动作、自动 provider replay、operator UI 或生产级 tool
+  gateway 完成。
 
 ## Migration
 
@@ -239,8 +246,9 @@ agent-service proposal
 - retry state check：
   - `RETRY_PENDING` 必须 `retryable=true` 且有 `next_retry_at`
   - `DLQ` 必须 `retryable=false` 且有 `dead_lettered_at`
-- 当前只做低敏状态投影、bounded retry bookkeeping、provider failure audit 和
-  redrive-plan operator handoff；不保存 raw provider output / raw input。
+- 当前只做低敏状态投影、bounded retry bookkeeping、provider failure metrics、
+  provider failure audit 和 redrive-plan operator handoff；不保存 raw provider output /
+  raw input。
 
 `migrations/postgres/action-executor/000004_action_executor_redrive_metadata.sql` 给 `action_executor_execution_audits` 增加受控 redrive lineage：
 
@@ -252,6 +260,5 @@ agent-service proposal
 ## 后续
 
 - 接入更完整的真实外部 MCP adapter / tool provider。
-- provider-grade batch redrive、真实 provider replay、operator UI。
-- provider failure metrics / operator UI。
+- 真实 provider replay、operator UI。
 - 外部 audit sink。

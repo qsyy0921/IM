@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -130,4 +131,74 @@ func TestNewToolExecutorFromEnvRejectsUnknownExternalMCPFailureMode(t *testing.T
 	if _, _, err := newToolExecutorFromEnv(500 * time.Millisecond); err == nil {
 		t.Fatal("expected unknown failure mode to fail closed")
 	}
+}
+
+func TestDebugMetricsIncludesProviderFailureSnapshotLowSensitive(t *testing.T) {
+	handler := newDebugHandler(fakeProviderFailureMetricsStore{
+		snapshot: types.ProviderFailureMetricsSnapshot{
+			Total:        3,
+			RetryPending: 2,
+			DLQ:          1,
+			Retryable:    2,
+			DueRetry:     1,
+			ByClass: []types.ProviderFailureMetricCount{
+				{Status: types.ProviderFailureStatusDLQ, Classification: "TOOL_OUTPUT_UNSAFE", Count: 1},
+				{Status: types.ProviderFailureStatusRetryPending, Classification: "TOOL_PROVIDER_UNAVAILABLE", Count: 2},
+			},
+		},
+	})
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/metrics", nil))
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("unexpected status: %d body=%s", recorder.Code, recorder.Body.String())
+	}
+	body := recorder.Body.String()
+	for _, want := range []string{
+		`nexusim_action_executor_provider_failure_metrics_error 0`,
+		`nexusim_action_executor_provider_failures_total{status="ALL"} 3`,
+		`nexusim_action_executor_provider_failures_total{status="RETRY_PENDING"} 2`,
+		`nexusim_action_executor_provider_failures_total{status="DLQ"} 1`,
+		`nexusim_action_executor_provider_failures_retry_due_total 1`,
+		`classification="TOOL_OUTPUT_UNSAFE"`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("metrics body missing %q: %s", want, body)
+		}
+	}
+	for _, forbidden := range []string{"user-", "provider raw", "secret"} {
+		if strings.Contains(body, forbidden) {
+			t.Fatalf("metrics leaked %q: %s", forbidden, body)
+		}
+	}
+}
+
+func TestDebugMetricsFailClosedWhenProviderFailureMetricsUnavailable(t *testing.T) {
+	handler := newDebugHandler(fakeProviderFailureMetricsStore{
+		err: errors.New("postgres password=secret unavailable"),
+	})
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/debug/metrics", nil))
+	if recorder.Code != http.StatusServiceUnavailable {
+		t.Fatalf("unexpected status: %d body=%s", recorder.Code, recorder.Body.String())
+	}
+	body := recorder.Body.String()
+	if !strings.Contains(body, "nexusim_action_executor_provider_failure_metrics_error 1") ||
+		!strings.Contains(body, "provider failure metrics unavailable") {
+		t.Fatalf("unexpected failure metrics body: %s", body)
+	}
+	if strings.Contains(body, "password=secret") {
+		t.Fatalf("metrics failure leaked internal error: %s", body)
+	}
+}
+
+type fakeProviderFailureMetricsStore struct {
+	snapshot types.ProviderFailureMetricsSnapshot
+	err      error
+}
+
+func (store fakeProviderFailureMetricsStore) ProviderFailureMetrics(context.Context) (types.ProviderFailureMetricsSnapshot, error) {
+	if store.err != nil {
+		return types.ProviderFailureMetricsSnapshot{}, store.err
+	}
+	return store.snapshot, nil
 }

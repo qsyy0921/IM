@@ -72,6 +72,9 @@ func TestProviderFailureRedrivePlanOutputIsLowSensitiveAndNonMutating(t *testing
 	if parsed.ExecutesTool || parsed.MutatesProviderFailure || !parsed.RequiresOperatorApproval || !parsed.DryRun {
 		t.Fatalf("unexpected redrive safety flags: %+v", parsed)
 	}
+	if parsed.BatchID == "" || parsed.CandidateCount != 1 || len(parsed.RedriveRequirements) == 0 {
+		t.Fatalf("unexpected redrive batch handoff fields: %+v", parsed)
+	}
 	if parsed.Counts.Total != 1 || parsed.Counts.DLQ != 1 || parsed.Rows[0].UserIDHash == "" || parsed.Rows[0].ResourceIDHash == "" || parsed.Rows[0].FailureRefHash == "" {
 		t.Fatalf("unexpected redrive plan content: %+v", parsed)
 	}

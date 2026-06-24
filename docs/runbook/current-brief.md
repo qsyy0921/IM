@@ -7,8 +7,8 @@ loadtest report 或 archive。
 
 - 客户端 Web / PC 已达到演示 MVP；除阻塞演示的问题外，不继续追完整产品级客户端。
 - 后端主线已切到 AI / Agent / RAG 演示路径和必要平台能力。
-- 当前 active module：action-executor provider failure metrics / batch redrive
-  operator handoff。
+- 当前 active module：action-executor provider replay approval / audit operator UI
+  first path。
 
 ## 当前模块事实
 
@@ -19,9 +19,12 @@ loadtest report 或 archive。
   approval -> action-executor -> conversation-service public API，已覆盖
   `conversation.note.create` 和 `conversation.profile.update` 两类业务 mutation；
   eval catalog 已补 source-chain audit boundary 和 approved business mutation cases。
-- 当前模块继续补 action-executor 的 provider failure 可观测与 batch redrive
-  operator handoff：只输出低敏状态 / hash / reason class，不自动 replay 旧 input /
-  provider output，真正 redrive 仍需 fresh proposal / approval / prepared audit。
+- action-executor provider failure metrics / batch redrive handoff 已收口：`/metrics`
+  输出 provider failure status / retry / due / classification 聚合；redrive plan 输出
+  batch id、candidate count 和 fresh proposal / approval / prepared-audit requirements。
+- 当前模块开始推进 provider replay approval / audit operator UI first path：仍不能自动
+  replay 旧 raw input / provider output，必须复用 fresh proposal / approval / prepared
+  audit 和低敏 operator workflow。
 - group memory / multi-party collaboration 必须继续保留 source refs、conversation scope、
   member visibility、time/version boundary、citations 和 no-citation refusal。
 
@@ -47,5 +50,5 @@ loadtest report 或 archive。
 
 ## 下一个方向
 
-- 完成当前 action-executor provider failure metrics / batch redrive handoff 后，再补
-  provider replay 的 operator UI / 审批 / 审计闭环。
+- 完成 provider replay approval / audit operator UI first path 后，再深化 group memory /
+  retrieval / eval 的多跳、时间版本和 profile cases。

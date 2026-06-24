@@ -479,6 +479,57 @@ LIMIT $%d`, len(args))
 	return result, nil
 }
 
+func (repository Repository) ProviderFailureMetrics(
+	ctx context.Context,
+) (types.ProviderFailureMetricsSnapshot, error) {
+	if repository.pool == nil {
+		return types.ProviderFailureMetricsSnapshot{}, errors.Join(types.ErrExecutionAuditFailed, errors.New("nil pg pool"))
+	}
+	var snapshot types.ProviderFailureMetricsSnapshot
+	if err := repository.pool.QueryRow(ctx, `
+SELECT COUNT(*),
+       COUNT(*) FILTER (WHERE status = 'RETRY_PENDING'),
+       COUNT(*) FILTER (WHERE status = 'DLQ'),
+       COUNT(*) FILTER (WHERE retryable = TRUE),
+       COUNT(*) FILTER (
+           WHERE status = 'RETRY_PENDING'
+             AND retryable = TRUE
+             AND next_retry_at IS NOT NULL
+             AND next_retry_at <= now()
+       )
+FROM action_executor_provider_failures`,
+	).Scan(
+		&snapshot.Total,
+		&snapshot.RetryPending,
+		&snapshot.DLQ,
+		&snapshot.Retryable,
+		&snapshot.DueRetry,
+	); err != nil {
+		return types.ProviderFailureMetricsSnapshot{}, fmt.Errorf("%w: %v", types.ErrExecutionAuditFailed, err)
+	}
+
+	rows, err := repository.pool.Query(ctx, `
+SELECT status, classification, COUNT(*)
+FROM action_executor_provider_failures
+GROUP BY status, classification
+ORDER BY status, classification`)
+	if err != nil {
+		return types.ProviderFailureMetricsSnapshot{}, fmt.Errorf("%w: %v", types.ErrExecutionAuditFailed, err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var item types.ProviderFailureMetricCount
+		if err := rows.Scan(&item.Status, &item.Classification, &item.Count); err != nil {
+			return types.ProviderFailureMetricsSnapshot{}, fmt.Errorf("%w: %v", types.ErrExecutionAuditFailed, err)
+		}
+		snapshot.ByClass = append(snapshot.ByClass, item)
+	}
+	if err := rows.Err(); err != nil {
+		return types.ProviderFailureMetricsSnapshot{}, fmt.Errorf("%w: %v", types.ErrExecutionAuditFailed, err)
+	}
+	return snapshot, nil
+}
+
 func truncateLowSensitive(value string, max int) string {
 	value = strings.TrimSpace(value)
 	if max <= 0 {

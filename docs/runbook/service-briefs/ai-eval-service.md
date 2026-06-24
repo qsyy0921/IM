@@ -17,7 +17,7 @@ adapter、状态、计数、summary/report 引用和低敏 metadata。
   和 RAG / Summary / Agent service-stack live gate 已登记到 catalog。
 - `check-ai-eval-regression-gate.ps1` 已接入 `check-local`，只跑 CI-safe
   required adapters，不启动 Docker / PostgreSQL / live RAG-Agent stack。
-- Case catalog 73；current-memory service-stack live gate 38/38 passed；cross-group / temporal memory fixture eval、retrieval smoke、RAG / Summary / Agent stack smokes 和 40/40 optional stack gate 已落。
+- Case catalog 76；current-memory service-stack live gate 38/38 passed；cross-group / temporal memory fixture eval、retrieval smoke、RAG / Summary / Agent stack smokes 和 40/40 optional stack gate 已落。
 - 2026-06-23 低敏 collaborative-memory eval 扩到 20 个 profile / Agent safety fixture cases，
   新增 multi-hop actor-chain completeness、workstream / decision dependency edge、
   reviewed multi-source profile activation、supporting-memory delete 后 profile recompute
@@ -50,6 +50,10 @@ adapter、状态、计数、summary/report 引用和低敏 metadata。
   service-stack gate：4 adapters、27 cases、27 passed、0 failed、0 skipped；
   RAG grounded answer、Agent approval、action-executor audit、cross-group source refs、
   memory graph edge 和 profile aggregate evidence 均被保留。
+- 2026-06-24 `action-preflight-safety` adapter 已扩到 14 个 smoke cases，并在
+  catalog 中新增 approval id、prepared audit id、resource id 绑定错配的
+  `PROPOSAL_MISMATCH` 断言；这些 case 区分 action boundary failure 与
+  tool execution / result projection failure。
 
 边界：不保存 raw EvidencePack、prompt、model output、用户正文、secret 或 tool input；不授权业务动作。
 

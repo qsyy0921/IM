@@ -89,7 +89,7 @@ func parseConfig(args []string) (smokeConfig, error) {
 }
 
 func runSmoke(ctx context.Context) (smokeSummary, error) {
-	cases := make([]smokeCase, 0, 11)
+	cases := make([]smokeCase, 0, 14)
 
 	policyDenied, err := runCase(ctx, caseConfig{
 		id:       "action-preflight-policy-denied",
@@ -200,6 +200,77 @@ func runSmoke(ctx context.Context) (smokeSummary, error) {
 		return smokeSummary{}, fmt.Errorf("unexpected unapproved proposal case: %+v", unapproved)
 	}
 	cases = append(cases, unapproved)
+
+	baseApprovalCommand := localEchoCommand("LOW")
+	boundApproval := boundApprovedProposalFrom(baseApprovalCommand)
+	approvalMismatchCommand := baseApprovalCommand
+	approvalMismatchCommand.ApprovalID = "approval-action-preflight-stale"
+	approvalMismatch, err := runCase(ctx, caseConfig{
+		id:       "action-preflight-approval-binding-mismatch-no-audit",
+		skill:    activeSkill(types.LocalSafeEchoToolName, "LOW"),
+		policy:   allowingPolicy(),
+		approval: boundApproval,
+		executor: &recordingToolExecutor{
+			result: types.ToolExecutionResult{
+				Executed:   true,
+				OutputJSON: `{"status":"should-not-run"}`,
+			},
+		},
+		command: approvalMismatchCommand,
+	})
+	if err != nil {
+		return smokeSummary{}, err
+	}
+	if !isPreApprovalError(approvalMismatch, "PROPOSAL_MISMATCH") {
+		return smokeSummary{}, fmt.Errorf("unexpected approval mismatch case: %+v", approvalMismatch)
+	}
+	cases = append(cases, approvalMismatch)
+
+	preparedAuditMismatchCommand := baseApprovalCommand
+	preparedAuditMismatchCommand.PreparedAuditID = "mcp-audit-action-preflight-stale"
+	preparedAuditMismatch, err := runCase(ctx, caseConfig{
+		id:       "action-preflight-prepared-audit-mismatch-no-audit",
+		skill:    activeSkill(types.LocalSafeEchoToolName, "LOW"),
+		policy:   allowingPolicy(),
+		approval: boundApproval,
+		executor: &recordingToolExecutor{
+			result: types.ToolExecutionResult{
+				Executed:   true,
+				OutputJSON: `{"status":"should-not-run"}`,
+			},
+		},
+		command: preparedAuditMismatchCommand,
+	})
+	if err != nil {
+		return smokeSummary{}, err
+	}
+	if !isPreApprovalError(preparedAuditMismatch, "PROPOSAL_MISMATCH") {
+		return smokeSummary{}, fmt.Errorf("unexpected prepared audit mismatch case: %+v", preparedAuditMismatch)
+	}
+	cases = append(cases, preparedAuditMismatch)
+
+	resourceMismatchCommand := baseApprovalCommand
+	resourceMismatchCommand.ResourceID = "diagnostic-action-preflight-other"
+	resourceMismatch, err := runCase(ctx, caseConfig{
+		id:       "action-preflight-resource-binding-mismatch-no-audit",
+		skill:    activeSkill(types.LocalSafeEchoToolName, "LOW"),
+		policy:   allowingPolicy(),
+		approval: boundApproval,
+		executor: &recordingToolExecutor{
+			result: types.ToolExecutionResult{
+				Executed:   true,
+				OutputJSON: `{"status":"should-not-run"}`,
+			},
+		},
+		command: resourceMismatchCommand,
+	})
+	if err != nil {
+		return smokeSummary{}, err
+	}
+	if !isPreApprovalError(resourceMismatch, "PROPOSAL_MISMATCH") {
+		return smokeSummary{}, fmt.Errorf("unexpected resource mismatch case: %+v", resourceMismatch)
+	}
+	cases = append(cases, resourceMismatch)
 
 	rateLimited, err := runCase(ctx, caseConfig{
 		id:       "action-preflight-rate-limited-blocked",
@@ -360,6 +431,7 @@ func runSmoke(ctx context.Context) (smokeSummary, error) {
 			"disabled skills and tool mismatches are blocked before policy/provider execution",
 			"elevated risk local-safe tools remain not executed and hashless",
 			"unapproved proposals fail before audit/result rows are recorded",
+			"approval, prepared-audit and resource binding mismatches fail before audit/result rows are recorded",
 			"rate-limited actions are blocked or fail closed before tool execution",
 			"DLQ/repair actions require operator workflow and cannot bypass policy or approval",
 		},
@@ -427,6 +499,15 @@ func isBlocked(result smokeCase, classification string) bool {
 		!result.Executed &&
 		result.AuditRecorded &&
 		result.ProjectionRecorded &&
+		!result.OutputSHA256Present
+}
+
+func isPreApprovalError(result smokeCase, errorClass string) bool {
+	return result.ErrorClass == errorClass &&
+		!result.AuditRecorded &&
+		!result.ProjectionRecorded &&
+		!result.ExecutorCalled &&
+		!result.Executed &&
 		!result.OutputSHA256Present
 }
 
@@ -571,6 +652,56 @@ func (approval approvedProposal) VerifyApprovedProposal(
 	_ context.Context,
 	command types.VerifyApprovedProposalCommand,
 ) (types.ApprovedProposal, error) {
+	return types.ApprovedProposal{
+		ProposalID:      command.ProposalID,
+		ApprovalID:      command.ApprovalID,
+		Status:          "APPROVED",
+		UserID:          command.AuthContext.UserID,
+		SkillID:         command.SkillID,
+		PreparedAuditID: command.PreparedAuditID,
+		ToolName:        command.ToolName,
+		ResourceType:    command.ResourceType,
+		ResourceID:      command.ResourceID,
+		RiskLevel:       "LOW",
+		ApprovedAt:      time.Now().UTC(),
+	}, nil
+}
+
+type boundApprovedProposal struct {
+	proposalID      string
+	approvalID      string
+	preparedAuditID string
+	skillID         string
+	toolName        string
+	resourceType    string
+	resourceID      string
+}
+
+func boundApprovedProposalFrom(command types.ExecuteApprovedActionCommand) boundApprovedProposal {
+	return boundApprovedProposal{
+		proposalID:      command.ProposalID,
+		approvalID:      command.ApprovalID,
+		preparedAuditID: command.PreparedAuditID,
+		skillID:         command.SkillID,
+		toolName:        command.ToolName,
+		resourceType:    command.ResourceType,
+		resourceID:      command.ResourceID,
+	}
+}
+
+func (approval boundApprovedProposal) VerifyApprovedProposal(
+	_ context.Context,
+	command types.VerifyApprovedProposalCommand,
+) (types.ApprovedProposal, error) {
+	if command.ProposalID != approval.proposalID ||
+		command.ApprovalID != approval.approvalID ||
+		command.PreparedAuditID != approval.preparedAuditID ||
+		command.SkillID != approval.skillID ||
+		command.ToolName != approval.toolName ||
+		command.ResourceType != approval.resourceType ||
+		command.ResourceID != approval.resourceID {
+		return types.ApprovedProposal{}, types.ErrProposalMismatch
+	}
 	return types.ApprovedProposal{
 		ProposalID:      command.ProposalID,
 		ApprovalID:      command.ApprovalID,

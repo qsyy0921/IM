@@ -164,6 +164,11 @@ gate：4 adapters、27 cases、27 passed、0 failed、0 skipped；`rag-agent-dem
 cue 生成 hash-only candidates；普通聊天不抽取；profile signal 必须 review。
 该能力不写 memory fact、不返回 raw text，后续由 Go-side adapter / eval gate
 接入 memory-service 控制面。
+同日 action-executor 的 Agent action boundary cases 已补一轮 preflight safety
+覆盖：`action-preflight-safety` smoke / eval catalog 从 11 个扩到 14 个 case，
+新增 approval id、prepared audit id、resource id 与已批准 proposal 绑定不一致时的
+`PROPOSAL_MISMATCH`；这些 case 都要求在 approved-proposal verification 阶段
+fail-closed，不写 execution audit、不写 tool result projection、不调用 tool executor。
 
 ## 不变量
 
@@ -174,5 +179,5 @@ cue 生成 hash-only candidates；普通聊天不抽取；profile signal 必须 
 
 ## 下一步
 
-- 优先做 Agent action boundary cases。
-- 再补 Python memory extraction candidate 的 Go-side adapter / ai-eval 接入。
+- 优先补 Python memory extraction candidate 的 Go-side adapter / ai-eval 接入。
+- 再继续深化 RAG-Agent demo 的 EvidencePack / approval / audit 展示。

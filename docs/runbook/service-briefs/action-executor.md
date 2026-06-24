@@ -20,6 +20,10 @@
 - 2026-06-24 `loadtest/ragagent` 已提供 RAG-Agent demo first path：通过既有
   Agent approval 后调用 action-executor，并把 execution / result 状态纳入低敏总报告；
   该 runner 不保存 raw tool input / output。
+- 2026-06-24 `action-preflight-safety` smoke / eval catalog 已从 11 个扩到
+  14 个 case：approval id、prepared audit id、resource id 与 approved proposal
+  绑定不一致时均返回 `PROPOSAL_MISMATCH`，并证明不会写 execution audit、不会写
+  tool result projection、不会调用 tool executor。
 
 ## 边界
 
@@ -30,5 +34,5 @@
 
 ## 下一步
 
-- 后续 redrive API / metrics / operator UI；下一步可运行 `loadtest/ragagent`
-  真实 service-stack smoke，再默认转回 memory / retrieval 深化。
+- 后续 redrive API / metrics / operator UI；默认转回 Python memory extraction
+  Go-side adapter / eval，以及 memory / retrieval 深化。

@@ -57,13 +57,14 @@
   `rag-agent-demo` 已接入 ai-eval optional service-stack adapter / gate policy /
   service-stack preflight，且真实服务栈 gate 已通过并归档；下一步围绕 profile
   repair approval 回归、Python memory extraction candidate eval 接入和更多
-  Agent action boundary cases 扩展该演示路径。
+  RAG-Agent EvidencePack / approval / audit 展示扩展该演示路径。
 - `rag-service` / `summary-service`：拒答、引用校验、source-ref regression、unsafe
   output fail-closed cases。
 - `agent-service`：真实业务动作继续走 policy、skill contract、proposal、approval、
   executor、audit；Agent 不直接写业务库。
 - `skill-registry` / `mcp-gateway` / `action-executor`：补 tool contract、risk level、
-  tenant allowlist、adapter、rate limit、DLQ / redrive、repair guard。
+  tenant allowlist、adapter、rate limit、DLQ / redrive、repair guard；Agent action
+  approval / prepared-audit / resource binding mismatch 已进入 preflight safety eval。
 - Python AI Worker：只输出候选、hash、citation metadata 和低敏 diagnostics；
   memory extraction candidate first path 已落，后续接 Go-side adapter / eval gate，
   不直接持久化最终 memory。

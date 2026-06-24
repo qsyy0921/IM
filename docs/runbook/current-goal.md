@@ -122,6 +122,11 @@ IM messages -> search / memory projection -> EvidencePack -> RAG / Agent answer 
   speaker / message hash、event type 和低敏计数，不返回 raw text、不写 memory fact。
   `profile_signal` 会强制标记 `NEEDS_REVIEW` / `GROUP_SCOPE_PROFILE_SIGNAL`，
   最终入库仍必须由 Go 侧验证、审批、审计和 memory-service 持久化。
+- 同日 Agent action boundary cases 已补齐一轮 action-executor preflight safety：
+  `action-preflight-safety` smoke / eval catalog 从 11 个扩到 14 个 case，新增
+  approval id、prepared audit id、resource id 与已批准 proposal 绑定不一致时的
+  `PROPOSAL_MISMATCH` 断言；这些 case 都要求在 approved-proposal verification
+  阶段 fail-closed，不写 execution audit、不写 tool result projection、不调用 tool executor。
 - 同日 `loadtest/ragagent` 已提供 RAG-Agent demo first path：编排既有
   `loadtest/rag` 与 `loadtest/agent`，让 RAG answer、Agent proposal、approval
   和 action-executor audit 围绕同一 tenant / conversation 生成一份低敏总报告。
@@ -197,9 +202,9 @@ IM messages -> search / memory projection -> EvidencePack -> RAG / Agent answer 
    retrieval negative / miss adapter、EvidencePack memory graph edge 和 profile evidence 已补齐；
    profile recompute first path、first-stage operator 和 `rules-v0.2` group memory
    extraction 已补齐；RAG-Agent demo runner first path 和真实服务栈 smoke 报告已补齐；
-   profile repair batch approval path 和 Python memory extraction candidate first path 已补齐；
-   下一步进入 Agent action boundary cases，以及 Python memory extraction candidate
-   的 ai-eval / Go-side adapter 接入。
+   profile repair batch approval path、Agent action boundary cases 和 Python memory
+   extraction candidate first path 已补齐；下一步进入 Python memory extraction
+   candidate 的 ai-eval / Go-side adapter 接入。
 5. 客户端只作为演示入口；除非阻塞上述演示，不继续扩 UI 产品化。
 6. Windows release signing / MSI / NSIS installer、完整 Android、完整移动端发布、
    复杂 UI、群管理深水区和真实 media provider 链路全部后置到 backlog。

@@ -445,6 +445,27 @@ func TestExecuteApprovedActionRejectsUnapprovedProposalBeforeAudit(t *testing.T)
 	}
 }
 
+func TestExecuteApprovedActionRejectsProposalMismatchBeforeAudit(t *testing.T) {
+	audit := &fakeAuditRepository{}
+	usecase := NewExecuteApprovedActionUseCaseWithToolExecutor(
+		fakeSkillCatalog{skill: activeSkill()},
+		allowingPolicy(),
+		fakeApproval{err: types.ErrProposalMismatch},
+		audit,
+		&fakeToolExecutor{result: types.ToolExecutionResult{
+			Executed:   true,
+			OutputJSON: `{"status":"should-not-run"}`,
+		}},
+	)
+	_, err := usecase.Execute(context.Background(), validCommand())
+	if !errors.Is(err, types.ErrProposalMismatch) {
+		t.Fatalf("expected proposal mismatch: %v", err)
+	}
+	if len(audit.rows) != 0 || len(audit.results) != 0 {
+		t.Fatalf("expected no audit/projection rows for proposal mismatch, rows=%+v projections=%+v", audit.rows, audit.results)
+	}
+}
+
 func TestExecuteApprovedActionRequiresProposalApprovalPort(t *testing.T) {
 	usecase := NewExecuteApprovedActionUseCase(fakeSkillCatalog{}, fakeToolPolicy{}, nil, &fakeAuditRepository{})
 	_, err := usecase.Execute(context.Background(), validCommand())

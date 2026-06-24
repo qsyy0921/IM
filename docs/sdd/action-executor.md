@@ -4,7 +4,7 @@
 
 `action-executor` 是 NexusIM AI 应用底座中的受控动作执行边界。它承接 Agent proposal、approval 和 `mcp-gateway` prepare 之后的动作执行请求，把真实写动作纳入 policy precheck、审批关联和低敏 audit。
 
-当前第一阶段记录 approved execution boundary，并在同一事务内写低敏 tool result projection。已支持本地安全 `nexusim.local.echo` adapter first path，用于验证真实低敏 output hash / result projection；已支持外部 MCP failure 稳定失败分类、tool output safety first path，以及显式开启的外部 HTTP provider adapter guarded first path。`conversation.note.create` 已有显式 opt-in 业务 adapter：配置 `NEXUSIM_ACTION_EXECUTOR_CONVERSATION_GRPC_ADDR` 后，通过 conversation-service 公开 `CreateConversationNote` 写入真实 note fact；未配置时仍保持 unsupported / `executed=false`，不伪造业务成功。默认不连接外部 MCP / provider；外部 HTTP adapter 只允许 allowlist 内的 `LOW` risk tool，只发送 tool metadata / `input_sha256`，不发送 raw `input_json`，provider output 仍必须经过安全门禁后才写 hash / projection。工具 provider 失败和 unsafe output 已有 first-stage `provider_failures` 状态投影和 bounded retry bookkeeping worker，可区分 `RETRY_PENDING` 与 `DLQ`；同时提供 provider failure audit / redrive-plan operator handoff，redrive plan 只生成低敏审批 artifact，不重放 provider、不执行 tool、不修改失败状态。真实 redrive API、operator UI 或 provider replay 尚未实现。
+当前第一阶段记录 approved execution boundary，并在同一事务内写低敏 tool result projection。已支持本地安全 `nexusim.local.echo` adapter first path，用于验证真实低敏 output hash / result projection；已支持外部 MCP failure 稳定失败分类、tool output safety first path，以及显式开启的外部 HTTP provider adapter guarded first path。`conversation.note.create` 已有显式 opt-in 业务 adapter：配置 `NEXUSIM_ACTION_EXECUTOR_CONVERSATION_GRPC_ADDR` 后，通过 conversation-service 公开 `CreateConversationNote` 写入真实 note fact；未配置时仍保持 unsupported / `executed=false`，不伪造业务成功。默认不连接外部 MCP / provider；外部 HTTP adapter 只允许 allowlist 内的 `LOW` risk tool，只发送 tool metadata / `input_sha256`，不发送 raw `input_json`，provider output 仍必须经过安全门禁后才写 hash / projection。工具 provider 失败和 unsafe output 已有 first-stage `provider_failures` 状态投影和 bounded retry bookkeeping worker，可区分 `RETRY_PENDING` 与 `DLQ`；同时提供 provider failure audit / redrive-plan operator handoff，redrive plan 只生成低敏审批 artifact，不重放 provider、不执行 tool、不修改失败状态。`RedriveProviderFailure` 已提供受控 redrive API first path：只能针对已有 `DLQ` provider failure，要求 fresh proposal / approval / prepared audit、匹配的 skill / tool / resource、新 `input_json` 和 `reason_sha256`，并复用正常 `ExecuteApprovedAction` 链路执行，同时把 source provider failure id 与 reason hash 写入 execution audit。operator UI、批量 redrive 或自动 provider replay 尚未实现。
 
 ## 职责
 
@@ -70,6 +70,13 @@
   - 输出低敏 JSON artifact；user / resource / failure_ref 只输出 hash
   - redrive plan 必须显式 dry-run 和 reason file，挂入 repair operator approval chain
   - 不修改 provider failure row，不调用 tool executor，不重放 provider output
+- `RedriveProviderFailure`：
+  - 只接受 source status 为 `DLQ` 的 provider failure
+  - source skill / tool / resource 必须与本次 redrive command 完全匹配
+  - proposal / approval / prepared audit 必须是新的，不能复用 source failure 的旧引用
+  - 调用方必须提交新的 `input_json` 和 64 位小写 hex `reason_sha256`
+  - 执行路径复用 `ExecuteApprovedAction` 的 proposal / skill / policy / adapter / audit
+    校验，不从旧失败行恢复 raw input，也不自动重放旧 provider output
 - 所有 adapter output 进入响应 / hash 前必须经过安全门禁：
   valid JSON object、大小限制、无 secret-like / PII-like key 或 value。
 - 明显的 repair / redrive / DLQ / dead-letter 类 tool / resource 元数据会被
@@ -138,6 +145,18 @@ approved caller
 -> action_executor_provider_failures(RETRY_PENDING or DLQ when provider fails)
 ```
 
+Provider failure redrive first path：
+
+```text
+operator / approved caller
+-> action-executor.RedriveProviderFailure(provider_failure_id, reason_sha256, fresh proposal refs, new input_json)
+-> load action_executor_provider_failures(status=DLQ)
+-> source skill / tool / resource match check
+-> ExecuteApprovedAction normal chain
+-> action_executor_execution_audits(redrive_provider_failure_id, redrive_reason_sha256)
+-> action_executor_tool_results / provider_failures according to execution outcome
+```
+
 目标态：
 
 ```text
@@ -177,11 +196,15 @@ agent-service proposal
   adapter、不写 output hash。
 - provider failure redrive 只能先生成低敏 `provider-failure-redrive-plan` operator
   artifact，并通过通用 repair approval chain 审批；该 plan 不代表 replay 已执行。
+- `RedriveProviderFailure` 是专用 redrive RPC，不属于通用 tool adapter。它要求
+  DLQ source、fresh proposal / approval / prepared audit、匹配 skill / tool / resource、
+  新 `input_json` 和 `reason_sha256`，并保留 source lineage；它不保存或恢复旧 raw
+  input / provider output。
 - tool result projection 不是 provider 输出存储；当前只记录
   `NOT_EXECUTED` / `BLOCKED` / `SUCCEEDED` 等低敏状态引用和 output hash。
 - 当前外部 HTTP adapter 只证明 guarded first path；provider failure worker 只证明
   bounded retry bookkeeping，不代表任意 MCP server、高风险业务写动作、
-  provider replay、redrive API 或生产级 tool gateway 完成。
+  自动 provider replay、批量 redrive、operator UI 或生产级 tool gateway 完成。
 
 ## Migration
 
@@ -219,9 +242,16 @@ agent-service proposal
 - 当前只做低敏状态投影、bounded retry bookkeeping、provider failure audit 和
   redrive-plan operator handoff；不保存 raw provider output / raw input。
 
+`migrations/postgres/action-executor/000004_action_executor_redrive_metadata.sql` 给 `action_executor_execution_audits` 增加受控 redrive lineage：
+
+- `redrive_provider_failure_id`：可空，引用同租户 `action_executor_provider_failures`
+- `redrive_reason_sha256`：无 redrive 时为空；有 redrive 时必须是 64 位小写 hex
+- 索引：`tenant_id + redrive_provider_failure_id + created_at`
+- 只保存 source id 和 reason hash，不保存旧 raw input、provider raw error 或 provider output。
+
 ## 后续
 
 - 接入更完整的真实外部 MCP adapter / tool provider。
-- redrive API / 真实 provider replay / operator UI。
+- provider-grade batch redrive、真实 provider replay、operator UI。
 - provider failure metrics / operator UI。
 - 外部 audit sink。

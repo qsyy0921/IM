@@ -22,4 +22,6 @@ var (
 	ErrToolProviderRateLimited      = errors.New("tool provider rate limited")
 	ErrToolProviderPermissionDenied = errors.New("tool provider permission denied")
 	ErrToolOutputUnsafe             = errors.New("tool output unsafe")
+	ErrProviderFailureNotFound      = errors.New("provider failure not found")
+	ErrProviderFailureNotRedrivable = errors.New("provider failure not redrivable")
 )

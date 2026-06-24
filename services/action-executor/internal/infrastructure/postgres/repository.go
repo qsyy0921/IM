@@ -89,12 +89,14 @@ INSERT INTO action_executor_execution_audits (
     decision_source,
     status,
     executed,
-    output_sha256
+    output_sha256,
+    redrive_provider_failure_id,
+    redrive_reason_sha256
 ) VALUES (
     $1, $2, $3, $4, $5, $6, $7,
     $8, $9, $10, $11, $12, $13, $14,
     $15, $16, $17, $18, $19, $20, $21,
-    $22, $23, $24, $25, $26, $27, $28
+    $22, $23, $24, $25, $26, $27, $28, $29, $30
 )`,
 		string(audit.TenantID),
 		audit.ExecutionID,
@@ -124,11 +126,78 @@ INSERT INTO action_executor_execution_audits (
 		audit.Status,
 		audit.Executed,
 		audit.OutputSHA256,
+		nullableString(audit.RedriveProviderFailureID),
+		strings.ToLower(strings.TrimSpace(audit.RedriveReasonSHA256)),
 	)
 	if err != nil {
 		return fmt.Errorf("%w: %v", types.ErrExecutionAuditFailed, err)
 	}
 	return nil
+}
+
+func (repository Repository) GetProviderFailureForRedrive(
+	ctx context.Context,
+	tenantID types.TenantID,
+	providerFailureID string,
+) (types.ProviderFailureAuditRow, error) {
+	if repository.pool == nil {
+		return types.ProviderFailureAuditRow{}, errors.Join(types.ErrExecutionAuditFailed, errors.New("nil pg pool"))
+	}
+	var row types.ProviderFailureAuditRow
+	err := repository.pool.QueryRow(ctx, `
+SELECT tenant_id,
+       provider_failure_id,
+       execution_id,
+       result_id,
+       proposal_id,
+       approval_id,
+       prepared_audit_id,
+       user_id,
+       skill_id,
+       tool_name,
+       resource_type,
+       resource_id,
+       classification,
+       status,
+       retryable,
+       retry_count,
+       next_retry_at,
+       dead_lettered_at,
+       failure_ref,
+       created_at
+FROM action_executor_provider_failures
+WHERE tenant_id = $1 AND provider_failure_id = $2`,
+		string(tenantID),
+		strings.TrimSpace(providerFailureID),
+	).Scan(
+		&row.TenantID,
+		&row.ProviderFailureID,
+		&row.ExecutionID,
+		&row.ResultID,
+		&row.ProposalID,
+		&row.ApprovalID,
+		&row.PreparedAuditID,
+		&row.UserID,
+		&row.SkillID,
+		&row.ToolName,
+		&row.ResourceType,
+		&row.ResourceID,
+		&row.Classification,
+		&row.Status,
+		&row.Retryable,
+		&row.RetryCount,
+		&row.NextRetryAt,
+		&row.DeadLetteredAt,
+		&row.FailureRef,
+		&row.CreatedAt,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return types.ProviderFailureAuditRow{}, types.ErrProviderFailureNotFound
+	}
+	if err != nil {
+		return types.ProviderFailureAuditRow{}, fmt.Errorf("%w: %v", types.ErrExecutionAuditFailed, err)
+	}
+	return row, nil
 }
 
 func insertToolResultProjection(ctx context.Context, tx pgx.Tx, projection types.ToolResultProjection) error {
@@ -424,6 +493,14 @@ func truncateLowSensitive(value string, max int) string {
 
 func nullableTime(value time.Time) any {
 	if value.IsZero() {
+		return nil
+	}
+	return value
+}
+
+func nullableString(value string) any {
+	value = strings.TrimSpace(value)
+	if value == "" {
 		return nil
 	}
 	return value

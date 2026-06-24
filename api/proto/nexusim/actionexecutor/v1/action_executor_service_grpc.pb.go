@@ -19,7 +19,8 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	ActionExecutorService_ExecuteApprovedAction_FullMethodName = "/nexusim.actionexecutor.v1.ActionExecutorService/ExecuteApprovedAction"
+	ActionExecutorService_ExecuteApprovedAction_FullMethodName  = "/nexusim.actionexecutor.v1.ActionExecutorService/ExecuteApprovedAction"
+	ActionExecutorService_RedriveProviderFailure_FullMethodName = "/nexusim.actionexecutor.v1.ActionExecutorService/RedriveProviderFailure"
 )
 
 // ActionExecutorServiceClient is the client API for ActionExecutorService service.
@@ -27,6 +28,7 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type ActionExecutorServiceClient interface {
 	ExecuteApprovedAction(ctx context.Context, in *ExecuteApprovedActionRequest, opts ...grpc.CallOption) (*ExecuteApprovedActionResponse, error)
+	RedriveProviderFailure(ctx context.Context, in *RedriveProviderFailureRequest, opts ...grpc.CallOption) (*RedriveProviderFailureResponse, error)
 }
 
 type actionExecutorServiceClient struct {
@@ -47,11 +49,22 @@ func (c *actionExecutorServiceClient) ExecuteApprovedAction(ctx context.Context,
 	return out, nil
 }
 
+func (c *actionExecutorServiceClient) RedriveProviderFailure(ctx context.Context, in *RedriveProviderFailureRequest, opts ...grpc.CallOption) (*RedriveProviderFailureResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RedriveProviderFailureResponse)
+	err := c.cc.Invoke(ctx, ActionExecutorService_RedriveProviderFailure_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ActionExecutorServiceServer is the server API for ActionExecutorService service.
 // All implementations must embed UnimplementedActionExecutorServiceServer
 // for forward compatibility.
 type ActionExecutorServiceServer interface {
 	ExecuteApprovedAction(context.Context, *ExecuteApprovedActionRequest) (*ExecuteApprovedActionResponse, error)
+	RedriveProviderFailure(context.Context, *RedriveProviderFailureRequest) (*RedriveProviderFailureResponse, error)
 	mustEmbedUnimplementedActionExecutorServiceServer()
 }
 
@@ -64,6 +77,9 @@ type UnimplementedActionExecutorServiceServer struct{}
 
 func (UnimplementedActionExecutorServiceServer) ExecuteApprovedAction(context.Context, *ExecuteApprovedActionRequest) (*ExecuteApprovedActionResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ExecuteApprovedAction not implemented")
+}
+func (UnimplementedActionExecutorServiceServer) RedriveProviderFailure(context.Context, *RedriveProviderFailureRequest) (*RedriveProviderFailureResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RedriveProviderFailure not implemented")
 }
 func (UnimplementedActionExecutorServiceServer) mustEmbedUnimplementedActionExecutorServiceServer() {}
 func (UnimplementedActionExecutorServiceServer) testEmbeddedByValue()                               {}
@@ -104,6 +120,24 @@ func _ActionExecutorService_ExecuteApprovedAction_Handler(srv interface{}, ctx c
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ActionExecutorService_RedriveProviderFailure_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RedriveProviderFailureRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ActionExecutorServiceServer).RedriveProviderFailure(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ActionExecutorService_RedriveProviderFailure_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ActionExecutorServiceServer).RedriveProviderFailure(ctx, req.(*RedriveProviderFailureRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ActionExecutorService_ServiceDesc is the grpc.ServiceDesc for ActionExecutorService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -114,6 +148,10 @@ var ActionExecutorService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ExecuteApprovedAction",
 			Handler:    _ActionExecutorService_ExecuteApprovedAction_Handler,
+		},
+		{
+			MethodName: "RedriveProviderFailure",
+			Handler:    _ActionExecutorService_RedriveProviderFailure_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

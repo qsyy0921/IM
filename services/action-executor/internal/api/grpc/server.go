@@ -16,13 +16,24 @@ type ExecuteApprovedActionExecutor interface {
 	Execute(context.Context, types.ExecuteApprovedActionCommand) (types.ExecuteApprovedActionResult, error)
 }
 
-type Server struct {
-	actionexecutorv1.UnimplementedActionExecutorServiceServer
-	executeApprovedAction ExecuteApprovedActionExecutor
+type RedriveProviderFailureExecutor interface {
+	Execute(context.Context, types.RedriveProviderFailureCommand) (types.RedriveProviderFailureResult, error)
 }
 
-func NewServer(executeApprovedAction ExecuteApprovedActionExecutor) *Server {
-	return &Server{executeApprovedAction: executeApprovedAction}
+type Server struct {
+	actionexecutorv1.UnimplementedActionExecutorServiceServer
+	executeApprovedAction  ExecuteApprovedActionExecutor
+	redriveProviderFailure RedriveProviderFailureExecutor
+}
+
+func NewServer(
+	executeApprovedAction ExecuteApprovedActionExecutor,
+	redriveProviderFailure RedriveProviderFailureExecutor,
+) *Server {
+	return &Server{
+		executeApprovedAction:  executeApprovedAction,
+		redriveProviderFailure: redriveProviderFailure,
+	}
 }
 
 func Register(registrar grpcgo.ServiceRegistrar, server *Server) {
@@ -59,6 +70,43 @@ func (server *Server) ExecuteApprovedAction(
 		return nil, grpcError(err)
 	}
 	return resultToProto(result), nil
+}
+
+func (server *Server) RedriveProviderFailure(
+	ctx context.Context,
+	request *actionexecutorv1.RedriveProviderFailureRequest,
+) (*actionexecutorv1.RedriveProviderFailureResponse, error) {
+	if request == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+	if server.redriveProviderFailure == nil {
+		return nil, status.Error(codes.Unimplemented, "provider failure redrive is not configured")
+	}
+	auth, ok := authFromProto(ctx, request.GetAuthContext())
+	if !ok {
+		return nil, status.Error(codes.InvalidArgument, "auth_context is required")
+	}
+	result, err := server.redriveProviderFailure.Execute(ctx, types.RedriveProviderFailureCommand{
+		AuthContext:       auth,
+		ProviderFailureID: request.GetProviderFailureId(),
+		ReasonSHA256:      request.GetReasonSha256(),
+		ProposalID:        request.GetProposalId(),
+		ApprovalID:        request.GetApprovalId(),
+		PreparedAuditID:   request.GetPreparedAuditId(),
+		SkillID:           request.GetSkillId(),
+		ToolName:          request.GetToolName(),
+		Action:            toolActionFromProto(request.GetAction()),
+		ResourceType:      request.GetResourceType(),
+		ResourceID:        request.GetResourceId(),
+		RiskLevel:         request.GetRiskLevel(),
+		Intent:            request.GetIntent(),
+		InputJSON:         request.GetInputJson(),
+		IdempotencyKey:    request.GetIdempotencyKey(),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	return redriveResultToProto(result), nil
 }
 
 func authFromProto(ctx context.Context, auth *actionexecutorv1.AuthContext) (types.AuthContext, bool) {
@@ -112,6 +160,32 @@ func resultToProto(result types.ExecuteApprovedActionResult) *actionexecutorv1.E
 		ResultId:          result.ResultID,
 		ResultStatus:      result.ResultStatus,
 		ResultRef:         result.ResultRef,
+	}
+}
+
+func redriveResultToProto(result types.RedriveProviderFailureResult) *actionexecutorv1.RedriveProviderFailureResponse {
+	redrive := result.RedriveResult
+	return &actionexecutorv1.RedriveProviderFailureResponse{
+		TenantId:           string(result.TenantID),
+		UserId:             string(result.UserID),
+		ProviderFailureId:  result.ProviderFailureID,
+		SourceExecutionId:  result.SourceExecutionID,
+		SourceResultId:     result.SourceResultID,
+		RedriveExecutionId: redrive.ExecutionID,
+		RedriveResultId:    redrive.ResultID,
+		ProposalId:         redrive.ProposalID,
+		ApprovalId:         redrive.ApprovalID,
+		PreparedAuditId:    redrive.PreparedAuditID,
+		SkillId:            redrive.SkillID,
+		ToolName:           redrive.ToolName,
+		ResourceType:       redrive.ResourceType,
+		ResourceId:         redrive.ResourceID,
+		Status:             executionStatusToProto(redrive.Status),
+		ResultStatus:       redrive.ResultStatus,
+		Executed:           redrive.Executed,
+		Classification:     redrive.Classification,
+		Reason:             redrive.Reason,
+		ResultRef:          redrive.ResultRef,
 	}
 }
 
@@ -180,6 +254,10 @@ func grpcError(err error) error {
 		return status.Error(codes.FailedPrecondition, "proposal mismatch")
 	case errors.Is(err, types.ErrExecutionAuditFailed):
 		return status.Error(codes.Unavailable, "action execution audit unavailable")
+	case errors.Is(err, types.ErrProviderFailureNotFound):
+		return status.Error(codes.NotFound, "provider failure not found")
+	case errors.Is(err, types.ErrProviderFailureNotRedrivable):
+		return status.Error(codes.FailedPrecondition, "provider failure not redrivable")
 	default:
 		return status.Error(codes.Internal, "action executor internal error")
 	}

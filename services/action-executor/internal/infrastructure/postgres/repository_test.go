@@ -346,12 +346,110 @@ func TestRepositoryAuditProviderFailuresIntegration(t *testing.T) {
 	}
 }
 
+func TestRepositoryRedriveProviderFailureMetadataIntegration(t *testing.T) {
+	dsn := os.Getenv("NEXUSIM_PG_DSN")
+	if dsn == "" {
+		t.Skip("NEXUSIM_PG_DSN is not set")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	pool, err := pgxpool.New(ctx, dsn)
+	if err != nil {
+		t.Fatalf("connect pg: %v", err)
+	}
+	defer pool.Close()
+	applyMigration(t, ctx, pool)
+	if _, err := pool.Exec(ctx, `TRUNCATE action_executor_provider_failures, action_executor_tool_results, action_executor_execution_audits`); err != nil {
+		t.Fatalf("reset action executor tables: %v", err)
+	}
+
+	repository := NewRepository(pool)
+	now := time.Date(2026, 6, 25, 14, 0, 0, 0, time.UTC)
+	recordProviderFailureFixture(t, ctx, repository, "redrive-source", 2, now.Add(-time.Minute))
+	if _, err := repository.ProcessDueProviderFailures(ctx, 10, 3, time.Second, now); err != nil {
+		t.Fatalf("move source failure to dlq: %v", err)
+	}
+	source, err := repository.GetProviderFailureForRedrive(ctx, "tenant-1", "provider-failure-redrive-source")
+	if err != nil {
+		t.Fatalf("get provider failure for redrive: %v", err)
+	}
+	if source.Status != types.ProviderFailureStatusDLQ ||
+		source.ExecutionID != "exec-redrive-source" ||
+		source.ResultID != "result-redrive-source" {
+		t.Fatalf("unexpected redrive source: %+v", source)
+	}
+
+	audit := types.ExecutionAudit{
+		TenantID:                 "tenant-1",
+		ExecutionID:              "exec-redrive-new",
+		ProposalID:               "proposal-redrive-new",
+		ApprovalID:               "approval-redrive-new",
+		PreparedAuditID:          "mcp-audit-redrive-new",
+		UserID:                   "user-1",
+		DeviceID:                 "device-1",
+		SkillID:                  "skill-1",
+		ToolName:                 "conversation.reply.send",
+		Action:                   types.ToolActionExecute,
+		ResourceType:             "conversation",
+		ResourceID:               "conv-1",
+		RiskLevel:                "LOW",
+		Intent:                   "operator approved provider redrive",
+		IdempotencyKey:           "idem-redrive-new",
+		InputSHA256:              "redrive-input-hash",
+		Allowed:                  true,
+		RequiresApproval:         true,
+		PermissionVersion:        8,
+		Classification:           "TOOL_ALLOWED",
+		Reason:                   "approved",
+		DecisionSource:           "TOOL_RULE",
+		Status:                   types.ExecutionStatusRecorded,
+		Executed:                 true,
+		OutputSHA256:             "redrive-output-hash",
+		RedriveProviderFailureID: "provider-failure-redrive-source",
+		RedriveReasonSHA256:      redriveReasonHashForRepositoryTest(),
+	}
+	projection := types.ToolResultProjection{
+		TenantID:        "tenant-1",
+		ResultID:        "result-redrive-new",
+		ExecutionID:     "exec-redrive-new",
+		ProposalID:      "proposal-redrive-new",
+		ApprovalID:      "approval-redrive-new",
+		PreparedAuditID: "mcp-audit-redrive-new",
+		UserID:          "user-1",
+		SkillID:         "skill-1",
+		ToolName:        "conversation.reply.send",
+		ResourceType:    "conversation",
+		ResourceID:      "conv-1",
+		Status:          types.ResultStatusSucceeded,
+		Executed:        true,
+		ResultRef:       "action-executor://executions/exec-redrive-new/results/result-redrive-new",
+		OutputSHA256:    "redrive-output-hash",
+	}
+	if err := repository.RecordExecution(ctx, audit, projection, nil); err != nil {
+		t.Fatalf("record redrive execution: %v", err)
+	}
+
+	var sourceFailureID string
+	var reasonHash string
+	err = pool.QueryRow(ctx, `
+SELECT redrive_provider_failure_id, redrive_reason_sha256
+FROM action_executor_execution_audits
+WHERE tenant_id = $1 AND execution_id = $2`, "tenant-1", "exec-redrive-new").Scan(&sourceFailureID, &reasonHash)
+	if err != nil {
+		t.Fatalf("query redrive metadata: %v", err)
+	}
+	if sourceFailureID != "provider-failure-redrive-source" || reasonHash != redriveReasonHashForRepositoryTest() {
+		t.Fatalf("unexpected redrive metadata: source=%s reason=%s", sourceFailureID, reasonHash)
+	}
+}
+
 func applyMigration(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
 	t.Helper()
 	for _, name := range []string{
 		"000001_action_executor_core.sql",
 		"000002_action_executor_tool_results.sql",
 		"000003_action_executor_provider_failures.sql",
+		"000004_action_executor_redrive_metadata.sql",
 	} {
 		path := filepath.Join("..", "..", "..", "..", "..", "migrations", "postgres", "action-executor", name)
 		sqlBytes, err := os.ReadFile(path)
@@ -362,6 +460,10 @@ func applyMigration(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
 			t.Fatalf("apply migration %s: %v", name, err)
 		}
 	}
+}
+
+func redriveReasonHashForRepositoryTest() string {
+	return "abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd"
 }
 
 type providerFailureState struct {

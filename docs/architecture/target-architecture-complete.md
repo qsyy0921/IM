@@ -202,7 +202,7 @@ AI 与 Agent 平台
 | `skill-registry` | 工具 / skill 能力目录、风险等级、调用 metadata。 |
 | `mcp-gateway` | MCP tool / resource / prompt 边界和 consent enforcement。 |
 | `model-gateway` | LLM、embedding、rerank provider 路由、预算、recovery 和审计。 |
-| `action-executor` | 只通过公开 API 执行已审批的业务动作。 |
+| `action-executor` | 只通过公开 API 执行已审批的业务动作，并保留受控 redrive lineage。 |
 | `ai-eval-service` | 数据集、回归运行、RAG / memory / Agent 评测、安全门禁。 |
 
 AI 服务消费投影和 EvidencePack，不能成为另一套业务事实源。

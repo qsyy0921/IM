@@ -526,6 +526,358 @@ func (x *ExecuteApprovedActionResponse) GetResultRef() string {
 	return ""
 }
 
+type RedriveProviderFailureRequest struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	AuthContext       *AuthContext           `protobuf:"bytes,1,opt,name=auth_context,json=authContext,proto3" json:"auth_context,omitempty"`
+	ProviderFailureId string                 `protobuf:"bytes,2,opt,name=provider_failure_id,json=providerFailureId,proto3" json:"provider_failure_id,omitempty"`
+	ReasonSha256      string                 `protobuf:"bytes,3,opt,name=reason_sha256,json=reasonSha256,proto3" json:"reason_sha256,omitempty"`
+	ProposalId        string                 `protobuf:"bytes,4,opt,name=proposal_id,json=proposalId,proto3" json:"proposal_id,omitempty"`
+	ApprovalId        string                 `protobuf:"bytes,5,opt,name=approval_id,json=approvalId,proto3" json:"approval_id,omitempty"`
+	PreparedAuditId   string                 `protobuf:"bytes,6,opt,name=prepared_audit_id,json=preparedAuditId,proto3" json:"prepared_audit_id,omitempty"`
+	SkillId           string                 `protobuf:"bytes,7,opt,name=skill_id,json=skillId,proto3" json:"skill_id,omitempty"`
+	ToolName          string                 `protobuf:"bytes,8,opt,name=tool_name,json=toolName,proto3" json:"tool_name,omitempty"`
+	Action            v1.ToolAction          `protobuf:"varint,9,opt,name=action,proto3,enum=nexusim.policy.v1.ToolAction" json:"action,omitempty"`
+	ResourceType      string                 `protobuf:"bytes,10,opt,name=resource_type,json=resourceType,proto3" json:"resource_type,omitempty"`
+	ResourceId        string                 `protobuf:"bytes,11,opt,name=resource_id,json=resourceId,proto3" json:"resource_id,omitempty"`
+	RiskLevel         string                 `protobuf:"bytes,12,opt,name=risk_level,json=riskLevel,proto3" json:"risk_level,omitempty"`
+	Intent            string                 `protobuf:"bytes,13,opt,name=intent,proto3" json:"intent,omitempty"`
+	InputJson         string                 `protobuf:"bytes,14,opt,name=input_json,json=inputJson,proto3" json:"input_json,omitempty"`
+	IdempotencyKey    string                 `protobuf:"bytes,15,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *RedriveProviderFailureRequest) Reset() {
+	*x = RedriveProviderFailureRequest{}
+	mi := &file_nexusim_actionexecutor_v1_action_executor_service_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RedriveProviderFailureRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RedriveProviderFailureRequest) ProtoMessage() {}
+
+func (x *RedriveProviderFailureRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_nexusim_actionexecutor_v1_action_executor_service_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RedriveProviderFailureRequest.ProtoReflect.Descriptor instead.
+func (*RedriveProviderFailureRequest) Descriptor() ([]byte, []int) {
+	return file_nexusim_actionexecutor_v1_action_executor_service_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *RedriveProviderFailureRequest) GetAuthContext() *AuthContext {
+	if x != nil {
+		return x.AuthContext
+	}
+	return nil
+}
+
+func (x *RedriveProviderFailureRequest) GetProviderFailureId() string {
+	if x != nil {
+		return x.ProviderFailureId
+	}
+	return ""
+}
+
+func (x *RedriveProviderFailureRequest) GetReasonSha256() string {
+	if x != nil {
+		return x.ReasonSha256
+	}
+	return ""
+}
+
+func (x *RedriveProviderFailureRequest) GetProposalId() string {
+	if x != nil {
+		return x.ProposalId
+	}
+	return ""
+}
+
+func (x *RedriveProviderFailureRequest) GetApprovalId() string {
+	if x != nil {
+		return x.ApprovalId
+	}
+	return ""
+}
+
+func (x *RedriveProviderFailureRequest) GetPreparedAuditId() string {
+	if x != nil {
+		return x.PreparedAuditId
+	}
+	return ""
+}
+
+func (x *RedriveProviderFailureRequest) GetSkillId() string {
+	if x != nil {
+		return x.SkillId
+	}
+	return ""
+}
+
+func (x *RedriveProviderFailureRequest) GetToolName() string {
+	if x != nil {
+		return x.ToolName
+	}
+	return ""
+}
+
+func (x *RedriveProviderFailureRequest) GetAction() v1.ToolAction {
+	if x != nil {
+		return x.Action
+	}
+	return v1.ToolAction(0)
+}
+
+func (x *RedriveProviderFailureRequest) GetResourceType() string {
+	if x != nil {
+		return x.ResourceType
+	}
+	return ""
+}
+
+func (x *RedriveProviderFailureRequest) GetResourceId() string {
+	if x != nil {
+		return x.ResourceId
+	}
+	return ""
+}
+
+func (x *RedriveProviderFailureRequest) GetRiskLevel() string {
+	if x != nil {
+		return x.RiskLevel
+	}
+	return ""
+}
+
+func (x *RedriveProviderFailureRequest) GetIntent() string {
+	if x != nil {
+		return x.Intent
+	}
+	return ""
+}
+
+func (x *RedriveProviderFailureRequest) GetInputJson() string {
+	if x != nil {
+		return x.InputJson
+	}
+	return ""
+}
+
+func (x *RedriveProviderFailureRequest) GetIdempotencyKey() string {
+	if x != nil {
+		return x.IdempotencyKey
+	}
+	return ""
+}
+
+type RedriveProviderFailureResponse struct {
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	TenantId           string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	UserId             string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	ProviderFailureId  string                 `protobuf:"bytes,3,opt,name=provider_failure_id,json=providerFailureId,proto3" json:"provider_failure_id,omitempty"`
+	SourceExecutionId  string                 `protobuf:"bytes,4,opt,name=source_execution_id,json=sourceExecutionId,proto3" json:"source_execution_id,omitempty"`
+	SourceResultId     string                 `protobuf:"bytes,5,opt,name=source_result_id,json=sourceResultId,proto3" json:"source_result_id,omitempty"`
+	RedriveExecutionId string                 `protobuf:"bytes,6,opt,name=redrive_execution_id,json=redriveExecutionId,proto3" json:"redrive_execution_id,omitempty"`
+	RedriveResultId    string                 `protobuf:"bytes,7,opt,name=redrive_result_id,json=redriveResultId,proto3" json:"redrive_result_id,omitempty"`
+	ProposalId         string                 `protobuf:"bytes,8,opt,name=proposal_id,json=proposalId,proto3" json:"proposal_id,omitempty"`
+	ApprovalId         string                 `protobuf:"bytes,9,opt,name=approval_id,json=approvalId,proto3" json:"approval_id,omitempty"`
+	PreparedAuditId    string                 `protobuf:"bytes,10,opt,name=prepared_audit_id,json=preparedAuditId,proto3" json:"prepared_audit_id,omitempty"`
+	SkillId            string                 `protobuf:"bytes,11,opt,name=skill_id,json=skillId,proto3" json:"skill_id,omitempty"`
+	ToolName           string                 `protobuf:"bytes,12,opt,name=tool_name,json=toolName,proto3" json:"tool_name,omitempty"`
+	ResourceType       string                 `protobuf:"bytes,13,opt,name=resource_type,json=resourceType,proto3" json:"resource_type,omitempty"`
+	ResourceId         string                 `protobuf:"bytes,14,opt,name=resource_id,json=resourceId,proto3" json:"resource_id,omitempty"`
+	Status             ActionExecutionStatus  `protobuf:"varint,15,opt,name=status,proto3,enum=nexusim.actionexecutor.v1.ActionExecutionStatus" json:"status,omitempty"`
+	ResultStatus       string                 `protobuf:"bytes,16,opt,name=result_status,json=resultStatus,proto3" json:"result_status,omitempty"`
+	Executed           bool                   `protobuf:"varint,17,opt,name=executed,proto3" json:"executed,omitempty"`
+	Classification     string                 `protobuf:"bytes,18,opt,name=classification,proto3" json:"classification,omitempty"`
+	Reason             string                 `protobuf:"bytes,19,opt,name=reason,proto3" json:"reason,omitempty"`
+	ResultRef          string                 `protobuf:"bytes,20,opt,name=result_ref,json=resultRef,proto3" json:"result_ref,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
+func (x *RedriveProviderFailureResponse) Reset() {
+	*x = RedriveProviderFailureResponse{}
+	mi := &file_nexusim_actionexecutor_v1_action_executor_service_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RedriveProviderFailureResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RedriveProviderFailureResponse) ProtoMessage() {}
+
+func (x *RedriveProviderFailureResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_nexusim_actionexecutor_v1_action_executor_service_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RedriveProviderFailureResponse.ProtoReflect.Descriptor instead.
+func (*RedriveProviderFailureResponse) Descriptor() ([]byte, []int) {
+	return file_nexusim_actionexecutor_v1_action_executor_service_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *RedriveProviderFailureResponse) GetTenantId() string {
+	if x != nil {
+		return x.TenantId
+	}
+	return ""
+}
+
+func (x *RedriveProviderFailureResponse) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *RedriveProviderFailureResponse) GetProviderFailureId() string {
+	if x != nil {
+		return x.ProviderFailureId
+	}
+	return ""
+}
+
+func (x *RedriveProviderFailureResponse) GetSourceExecutionId() string {
+	if x != nil {
+		return x.SourceExecutionId
+	}
+	return ""
+}
+
+func (x *RedriveProviderFailureResponse) GetSourceResultId() string {
+	if x != nil {
+		return x.SourceResultId
+	}
+	return ""
+}
+
+func (x *RedriveProviderFailureResponse) GetRedriveExecutionId() string {
+	if x != nil {
+		return x.RedriveExecutionId
+	}
+	return ""
+}
+
+func (x *RedriveProviderFailureResponse) GetRedriveResultId() string {
+	if x != nil {
+		return x.RedriveResultId
+	}
+	return ""
+}
+
+func (x *RedriveProviderFailureResponse) GetProposalId() string {
+	if x != nil {
+		return x.ProposalId
+	}
+	return ""
+}
+
+func (x *RedriveProviderFailureResponse) GetApprovalId() string {
+	if x != nil {
+		return x.ApprovalId
+	}
+	return ""
+}
+
+func (x *RedriveProviderFailureResponse) GetPreparedAuditId() string {
+	if x != nil {
+		return x.PreparedAuditId
+	}
+	return ""
+}
+
+func (x *RedriveProviderFailureResponse) GetSkillId() string {
+	if x != nil {
+		return x.SkillId
+	}
+	return ""
+}
+
+func (x *RedriveProviderFailureResponse) GetToolName() string {
+	if x != nil {
+		return x.ToolName
+	}
+	return ""
+}
+
+func (x *RedriveProviderFailureResponse) GetResourceType() string {
+	if x != nil {
+		return x.ResourceType
+	}
+	return ""
+}
+
+func (x *RedriveProviderFailureResponse) GetResourceId() string {
+	if x != nil {
+		return x.ResourceId
+	}
+	return ""
+}
+
+func (x *RedriveProviderFailureResponse) GetStatus() ActionExecutionStatus {
+	if x != nil {
+		return x.Status
+	}
+	return ActionExecutionStatus_ACTION_EXECUTION_STATUS_UNSPECIFIED
+}
+
+func (x *RedriveProviderFailureResponse) GetResultStatus() string {
+	if x != nil {
+		return x.ResultStatus
+	}
+	return ""
+}
+
+func (x *RedriveProviderFailureResponse) GetExecuted() bool {
+	if x != nil {
+		return x.Executed
+	}
+	return false
+}
+
+func (x *RedriveProviderFailureResponse) GetClassification() string {
+	if x != nil {
+		return x.Classification
+	}
+	return ""
+}
+
+func (x *RedriveProviderFailureResponse) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+func (x *RedriveProviderFailureResponse) GetResultRef() string {
+	if x != nil {
+		return x.ResultRef
+	}
+	return ""
+}
+
 var File_nexusim_actionexecutor_v1_action_executor_service_proto protoreflect.FileDescriptor
 
 const file_nexusim_actionexecutor_v1_action_executor_service_proto_rawDesc = "" +
@@ -591,14 +943,63 @@ const file_nexusim_actionexecutor_v1_action_executor_service_proto_rawDesc = "" 
 	"\tresult_id\x18\x16 \x01(\tR\bresultId\x12#\n" +
 	"\rresult_status\x18\x17 \x01(\tR\fresultStatus\x12\x1d\n" +
 	"\n" +
-	"result_ref\x18\x18 \x01(\tR\tresultRef*\xaf\x01\n" +
+	"result_ref\x18\x18 \x01(\tR\tresultRef\"\xe1\x04\n" +
+	"\x1dRedriveProviderFailureRequest\x12I\n" +
+	"\fauth_context\x18\x01 \x01(\v2&.nexusim.actionexecutor.v1.AuthContextR\vauthContext\x12.\n" +
+	"\x13provider_failure_id\x18\x02 \x01(\tR\x11providerFailureId\x12#\n" +
+	"\rreason_sha256\x18\x03 \x01(\tR\freasonSha256\x12\x1f\n" +
+	"\vproposal_id\x18\x04 \x01(\tR\n" +
+	"proposalId\x12\x1f\n" +
+	"\vapproval_id\x18\x05 \x01(\tR\n" +
+	"approvalId\x12*\n" +
+	"\x11prepared_audit_id\x18\x06 \x01(\tR\x0fpreparedAuditId\x12\x19\n" +
+	"\bskill_id\x18\a \x01(\tR\askillId\x12\x1b\n" +
+	"\ttool_name\x18\b \x01(\tR\btoolName\x125\n" +
+	"\x06action\x18\t \x01(\x0e2\x1d.nexusim.policy.v1.ToolActionR\x06action\x12#\n" +
+	"\rresource_type\x18\n" +
+	" \x01(\tR\fresourceType\x12\x1f\n" +
+	"\vresource_id\x18\v \x01(\tR\n" +
+	"resourceId\x12\x1d\n" +
+	"\n" +
+	"risk_level\x18\f \x01(\tR\triskLevel\x12\x16\n" +
+	"\x06intent\x18\r \x01(\tR\x06intent\x12\x1d\n" +
+	"\n" +
+	"input_json\x18\x0e \x01(\tR\tinputJson\x12'\n" +
+	"\x0fidempotency_key\x18\x0f \x01(\tR\x0eidempotencyKey\"\x94\x06\n" +
+	"\x1eRedriveProviderFailureResponse\x12\x1b\n" +
+	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x17\n" +
+	"\auser_id\x18\x02 \x01(\tR\x06userId\x12.\n" +
+	"\x13provider_failure_id\x18\x03 \x01(\tR\x11providerFailureId\x12.\n" +
+	"\x13source_execution_id\x18\x04 \x01(\tR\x11sourceExecutionId\x12(\n" +
+	"\x10source_result_id\x18\x05 \x01(\tR\x0esourceResultId\x120\n" +
+	"\x14redrive_execution_id\x18\x06 \x01(\tR\x12redriveExecutionId\x12*\n" +
+	"\x11redrive_result_id\x18\a \x01(\tR\x0fredriveResultId\x12\x1f\n" +
+	"\vproposal_id\x18\b \x01(\tR\n" +
+	"proposalId\x12\x1f\n" +
+	"\vapproval_id\x18\t \x01(\tR\n" +
+	"approvalId\x12*\n" +
+	"\x11prepared_audit_id\x18\n" +
+	" \x01(\tR\x0fpreparedAuditId\x12\x19\n" +
+	"\bskill_id\x18\v \x01(\tR\askillId\x12\x1b\n" +
+	"\ttool_name\x18\f \x01(\tR\btoolName\x12#\n" +
+	"\rresource_type\x18\r \x01(\tR\fresourceType\x12\x1f\n" +
+	"\vresource_id\x18\x0e \x01(\tR\n" +
+	"resourceId\x12H\n" +
+	"\x06status\x18\x0f \x01(\x0e20.nexusim.actionexecutor.v1.ActionExecutionStatusR\x06status\x12#\n" +
+	"\rresult_status\x18\x10 \x01(\tR\fresultStatus\x12\x1a\n" +
+	"\bexecuted\x18\x11 \x01(\bR\bexecuted\x12&\n" +
+	"\x0eclassification\x18\x12 \x01(\tR\x0eclassification\x12\x16\n" +
+	"\x06reason\x18\x13 \x01(\tR\x06reason\x12\x1d\n" +
+	"\n" +
+	"result_ref\x18\x14 \x01(\tR\tresultRef*\xaf\x01\n" +
 	"\x15ActionExecutionStatus\x12'\n" +
 	"#ACTION_EXECUTION_STATUS_UNSPECIFIED\x10\x00\x12$\n" +
 	" ACTION_EXECUTION_STATUS_RECORDED\x10\x01\x12#\n" +
 	"\x1fACTION_EXECUTION_STATUS_BLOCKED\x10\x02\x12\"\n" +
-	"\x1eACTION_EXECUTION_STATUS_FAILED\x10\x032\xa4\x01\n" +
+	"\x1eACTION_EXECUTION_STATUS_FAILED\x10\x032\xb4\x02\n" +
 	"\x15ActionExecutorService\x12\x8a\x01\n" +
-	"\x15ExecuteApprovedAction\x127.nexusim.actionexecutor.v1.ExecuteApprovedActionRequest\x1a8.nexusim.actionexecutor.v1.ExecuteApprovedActionResponseBMZKgithub.com/qsyy0921/IM/api/proto/nexusim/actionexecutor/v1;actionexecutorv1b\x06proto3"
+	"\x15ExecuteApprovedAction\x127.nexusim.actionexecutor.v1.ExecuteApprovedActionRequest\x1a8.nexusim.actionexecutor.v1.ExecuteApprovedActionResponse\x12\x8d\x01\n" +
+	"\x16RedriveProviderFailure\x128.nexusim.actionexecutor.v1.RedriveProviderFailureRequest\x1a9.nexusim.actionexecutor.v1.RedriveProviderFailureResponseBMZKgithub.com/qsyy0921/IM/api/proto/nexusim/actionexecutor/v1;actionexecutorv1b\x06proto3"
 
 var (
 	file_nexusim_actionexecutor_v1_action_executor_service_proto_rawDescOnce sync.Once
@@ -613,26 +1014,33 @@ func file_nexusim_actionexecutor_v1_action_executor_service_proto_rawDescGZIP() 
 }
 
 var file_nexusim_actionexecutor_v1_action_executor_service_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_nexusim_actionexecutor_v1_action_executor_service_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
+var file_nexusim_actionexecutor_v1_action_executor_service_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
 var file_nexusim_actionexecutor_v1_action_executor_service_proto_goTypes = []any{
-	(ActionExecutionStatus)(0),            // 0: nexusim.actionexecutor.v1.ActionExecutionStatus
-	(*AuthContext)(nil),                   // 1: nexusim.actionexecutor.v1.AuthContext
-	(*ExecuteApprovedActionRequest)(nil),  // 2: nexusim.actionexecutor.v1.ExecuteApprovedActionRequest
-	(*ExecuteApprovedActionResponse)(nil), // 3: nexusim.actionexecutor.v1.ExecuteApprovedActionResponse
-	(v1.ToolAction)(0),                    // 4: nexusim.policy.v1.ToolAction
+	(ActionExecutionStatus)(0),             // 0: nexusim.actionexecutor.v1.ActionExecutionStatus
+	(*AuthContext)(nil),                    // 1: nexusim.actionexecutor.v1.AuthContext
+	(*ExecuteApprovedActionRequest)(nil),   // 2: nexusim.actionexecutor.v1.ExecuteApprovedActionRequest
+	(*ExecuteApprovedActionResponse)(nil),  // 3: nexusim.actionexecutor.v1.ExecuteApprovedActionResponse
+	(*RedriveProviderFailureRequest)(nil),  // 4: nexusim.actionexecutor.v1.RedriveProviderFailureRequest
+	(*RedriveProviderFailureResponse)(nil), // 5: nexusim.actionexecutor.v1.RedriveProviderFailureResponse
+	(v1.ToolAction)(0),                     // 6: nexusim.policy.v1.ToolAction
 }
 var file_nexusim_actionexecutor_v1_action_executor_service_proto_depIdxs = []int32{
 	1, // 0: nexusim.actionexecutor.v1.ExecuteApprovedActionRequest.auth_context:type_name -> nexusim.actionexecutor.v1.AuthContext
-	4, // 1: nexusim.actionexecutor.v1.ExecuteApprovedActionRequest.action:type_name -> nexusim.policy.v1.ToolAction
-	4, // 2: nexusim.actionexecutor.v1.ExecuteApprovedActionResponse.action:type_name -> nexusim.policy.v1.ToolAction
+	6, // 1: nexusim.actionexecutor.v1.ExecuteApprovedActionRequest.action:type_name -> nexusim.policy.v1.ToolAction
+	6, // 2: nexusim.actionexecutor.v1.ExecuteApprovedActionResponse.action:type_name -> nexusim.policy.v1.ToolAction
 	0, // 3: nexusim.actionexecutor.v1.ExecuteApprovedActionResponse.status:type_name -> nexusim.actionexecutor.v1.ActionExecutionStatus
-	2, // 4: nexusim.actionexecutor.v1.ActionExecutorService.ExecuteApprovedAction:input_type -> nexusim.actionexecutor.v1.ExecuteApprovedActionRequest
-	3, // 5: nexusim.actionexecutor.v1.ActionExecutorService.ExecuteApprovedAction:output_type -> nexusim.actionexecutor.v1.ExecuteApprovedActionResponse
-	5, // [5:6] is the sub-list for method output_type
-	4, // [4:5] is the sub-list for method input_type
-	4, // [4:4] is the sub-list for extension type_name
-	4, // [4:4] is the sub-list for extension extendee
-	0, // [0:4] is the sub-list for field type_name
+	1, // 4: nexusim.actionexecutor.v1.RedriveProviderFailureRequest.auth_context:type_name -> nexusim.actionexecutor.v1.AuthContext
+	6, // 5: nexusim.actionexecutor.v1.RedriveProviderFailureRequest.action:type_name -> nexusim.policy.v1.ToolAction
+	0, // 6: nexusim.actionexecutor.v1.RedriveProviderFailureResponse.status:type_name -> nexusim.actionexecutor.v1.ActionExecutionStatus
+	2, // 7: nexusim.actionexecutor.v1.ActionExecutorService.ExecuteApprovedAction:input_type -> nexusim.actionexecutor.v1.ExecuteApprovedActionRequest
+	4, // 8: nexusim.actionexecutor.v1.ActionExecutorService.RedriveProviderFailure:input_type -> nexusim.actionexecutor.v1.RedriveProviderFailureRequest
+	3, // 9: nexusim.actionexecutor.v1.ActionExecutorService.ExecuteApprovedAction:output_type -> nexusim.actionexecutor.v1.ExecuteApprovedActionResponse
+	5, // 10: nexusim.actionexecutor.v1.ActionExecutorService.RedriveProviderFailure:output_type -> nexusim.actionexecutor.v1.RedriveProviderFailureResponse
+	9, // [9:11] is the sub-list for method output_type
+	7, // [7:9] is the sub-list for method input_type
+	7, // [7:7] is the sub-list for extension type_name
+	7, // [7:7] is the sub-list for extension extendee
+	0, // [0:7] is the sub-list for field type_name
 }
 
 func init() { file_nexusim_actionexecutor_v1_action_executor_service_proto_init() }
@@ -646,7 +1054,7 @@ func file_nexusim_actionexecutor_v1_action_executor_service_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_nexusim_actionexecutor_v1_action_executor_service_proto_rawDesc), len(file_nexusim_actionexecutor_v1_action_executor_service_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   3,
+			NumMessages:   5,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

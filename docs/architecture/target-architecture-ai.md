@@ -565,6 +565,7 @@ audit 约束：
 - audit 必须能追溯到 EvidencePack、policy decision、approval 和业务 API request id。
 - policy 拒绝、approval 拒绝、tool schema 校验失败也必须写 audit。
 - action-executor 失败后重试必须复用 idempotency key，并在 audit 中形成同一 action lineage。
+- provider failure redrive 必须通过专用 API 和 fresh approval / input 重新进入正常执行链；不能从失败投影中恢复旧 raw input 或自动重放旧 provider output。
 
 ## 7. AI 评测门禁
 

@@ -8,6 +8,7 @@ option go_package = "github.com/qsyy0921/IM/api/proto/nexusim/actionexecutor/v1;
 
 service ActionExecutorService {
   rpc ExecuteApprovedAction(ExecuteApprovedActionRequest) returns (ExecuteApprovedActionResponse);
+  rpc RedriveProviderFailure(RedriveProviderFailureRequest) returns (RedriveProviderFailureResponse);
 }
 
 enum ActionExecutionStatus {
@@ -67,4 +68,45 @@ message ExecuteApprovedActionResponse {
   string result_id = 22;
   string result_status = 23;
   string result_ref = 24;
+}
+
+message RedriveProviderFailureRequest {
+  AuthContext auth_context = 1;
+  string provider_failure_id = 2;
+  string reason_sha256 = 3;
+  string proposal_id = 4;
+  string approval_id = 5;
+  string prepared_audit_id = 6;
+  string skill_id = 7;
+  string tool_name = 8;
+  nexusim.policy.v1.ToolAction action = 9;
+  string resource_type = 10;
+  string resource_id = 11;
+  string risk_level = 12;
+  string intent = 13;
+  string input_json = 14;
+  string idempotency_key = 15;
+}
+
+message RedriveProviderFailureResponse {
+  string tenant_id = 1;
+  string user_id = 2;
+  string provider_failure_id = 3;
+  string source_execution_id = 4;
+  string source_result_id = 5;
+  string redrive_execution_id = 6;
+  string redrive_result_id = 7;
+  string proposal_id = 8;
+  string approval_id = 9;
+  string prepared_audit_id = 10;
+  string skill_id = 11;
+  string tool_name = 12;
+  string resource_type = 13;
+  string resource_id = 14;
+  ActionExecutionStatus status = 15;
+  string result_status = 16;
+  bool executed = 17;
+  string classification = 18;
+  string reason = 19;
+  string result_ref = 20;
 }

@@ -282,6 +282,8 @@ manifest；preflight summary 只记录 manifest hash / path hash / instruction c
 
 `policy-service` 还提供 `rebac-relation-audit` / `rebac-relation-set`，用于审计和设置 first-stage ReBAC relation gate 规则。规则按 tenant / action / relation_type / conversation_scope 要求 `DIRECT_CONTACT_ACTIVE` 或 `CONVERSATION_MEMBER_ACTIVE` 关系，在 exact / tenant allow 规则前 fail-closed deny；`rebac-relation-audit` 可选 `NEXUSIM_POLICY_REBAC_RELATION_AUDIT_OUTPUT` 写低敏 JSON，`rebac-relation-set` 可选 `NEXUSIM_POLICY_REBAC_RELATION_SET_OUTPUT` 写低敏 JSON。`rebac-relation-set` 支持 `NEXUSIM_POLICY_REBAC_RELATION_SET_REASON_FILE` 读取 operator reason 原文，避免把 reason 写进 operator plan / shell env；输出只包含规则元数据和 reason-present，不输出 operator reason 原文。该能力不是 provider-grade ReBAC graph / policy DSL。
 
+`action-executor` 提供 `provider-failure-audit` / `provider-failure-redrive-plan`，用于只读审计 provider failure 投影和生成低敏 redrive plan。环境变量为 `NEXUSIM_ACTION_EXECUTOR_MODE`；`provider-failure-audit` 可选 `NEXUSIM_ACTION_EXECUTOR_PROVIDER_FAILURE_AUDIT_OUTPUT` 写低敏 JSON；`provider-failure-redrive-plan` 必须使用 `NEXUSIM_ACTION_EXECUTOR_PROVIDER_FAILURE_REDRIVE_DRY_RUN=true` 和 `NEXUSIM_ACTION_EXECUTOR_PROVIDER_FAILURE_REDRIVE_REASON_FILE`，可选 `NEXUSIM_ACTION_EXECUTOR_PROVIDER_FAILURE_REDRIVE_PLAN_OUTPUT` 写低敏 plan。该 plan 不修改 provider failure row、不调用 tool executor、不重放 provider output。
+
 ## Delivery Projection
 
 `delivery-service` 额外拥有 projection 排障入口：

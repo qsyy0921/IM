@@ -62,6 +62,10 @@ type ExecuteApprovedActionCommand struct {
 	Intent          string
 	InputJSON       string
 	IdempotencyKey  string
+	// RedriveProviderFailureID and RedriveReasonSHA256 are set only by the
+	// RedriveProviderFailure use case after validating the source failure row.
+	RedriveProviderFailureID string
+	RedriveReasonSHA256      string
 }
 
 func (command ExecuteApprovedActionCommand) Validate() error {
@@ -92,6 +96,14 @@ func (command ExecuteApprovedActionCommand) Validate() error {
 	if strings.TrimSpace(command.InputJSON) != "" && !json.Valid([]byte(command.InputJSON)) {
 		return fmt.Errorf("%w: input_json must be valid JSON", ErrInvalidArgument)
 	}
+	if strings.TrimSpace(command.RedriveProviderFailureID) != "" {
+		if strings.TrimSpace(command.RedriveReasonSHA256) == "" {
+			return fmt.Errorf("%w: redrive_reason_sha256 is required", ErrInvalidArgument)
+		}
+		if !IsSHA256Hex(command.RedriveReasonSHA256) {
+			return fmt.Errorf("%w: redrive_reason_sha256 must be sha256 hex", ErrInvalidArgument)
+		}
+	}
 	return nil
 }
 
@@ -108,6 +120,8 @@ func (command ExecuteApprovedActionCommand) Normalized() ExecuteApprovedActionCo
 	command.Intent = strings.TrimSpace(command.Intent)
 	command.IdempotencyKey = strings.TrimSpace(command.IdempotencyKey)
 	command.InputJSON = strings.TrimSpace(command.InputJSON)
+	command.RedriveProviderFailureID = strings.TrimSpace(command.RedriveProviderFailureID)
+	command.RedriveReasonSHA256 = strings.ToLower(strings.TrimSpace(command.RedriveReasonSHA256))
 	return command
 }
 
@@ -191,35 +205,37 @@ type ApprovedProposal struct {
 }
 
 type ExecutionAudit struct {
-	TenantID          TenantID
-	ExecutionID       string
-	ProposalID        string
-	ApprovalID        string
-	PreparedAuditID   string
-	UserID            UserID
-	DeviceID          string
-	SessionID         string
-	TraceID           string
-	RequestID         string
-	SkillID           string
-	ToolName          string
-	Action            string
-	ResourceType      string
-	ResourceID        string
-	RiskLevel         string
-	Intent            string
-	IdempotencyKey    string
-	InputSHA256       string
-	Allowed           bool
-	RequiresApproval  bool
-	PermissionVersion int64
-	Classification    string
-	Reason            string
-	DecisionSource    string
-	Status            string
-	Executed          bool
-	OutputSHA256      string
-	CreatedAt         time.Time
+	TenantID                 TenantID
+	ExecutionID              string
+	ProposalID               string
+	ApprovalID               string
+	PreparedAuditID          string
+	UserID                   UserID
+	DeviceID                 string
+	SessionID                string
+	TraceID                  string
+	RequestID                string
+	SkillID                  string
+	ToolName                 string
+	Action                   string
+	ResourceType             string
+	ResourceID               string
+	RiskLevel                string
+	Intent                   string
+	IdempotencyKey           string
+	InputSHA256              string
+	Allowed                  bool
+	RequiresApproval         bool
+	PermissionVersion        int64
+	Classification           string
+	Reason                   string
+	DecisionSource           string
+	Status                   string
+	Executed                 bool
+	OutputSHA256             string
+	RedriveProviderFailureID string
+	RedriveReasonSHA256      string
+	CreatedAt                time.Time
 }
 
 type ToolResultProjection struct {
@@ -297,6 +313,85 @@ type ExecuteApprovedActionResult struct {
 	ResultRef         string
 }
 
+type RedriveProviderFailureCommand struct {
+	AuthContext       AuthContext
+	ProviderFailureID string
+	ReasonSHA256      string
+	ProposalID        string
+	ApprovalID        string
+	PreparedAuditID   string
+	SkillID           string
+	ToolName          string
+	Action            string
+	ResourceType      string
+	ResourceID        string
+	RiskLevel         string
+	Intent            string
+	InputJSON         string
+	IdempotencyKey    string
+}
+
+func (command RedriveProviderFailureCommand) Validate() error {
+	if !command.AuthContext.IsValid() {
+		return fmt.Errorf("%w: auth_context is required", ErrInvalidArgument)
+	}
+	if strings.TrimSpace(command.ProviderFailureID) == "" {
+		return fmt.Errorf("%w: provider_failure_id is required", ErrInvalidArgument)
+	}
+	if !IsSHA256Hex(command.ReasonSHA256) {
+		return fmt.Errorf("%w: reason_sha256 must be sha256 hex", ErrInvalidArgument)
+	}
+	execute := command.ExecuteCommand()
+	return execute.Validate()
+}
+
+func (command RedriveProviderFailureCommand) Normalized() RedriveProviderFailureCommand {
+	command.ProviderFailureID = strings.TrimSpace(command.ProviderFailureID)
+	command.ReasonSHA256 = strings.ToLower(strings.TrimSpace(command.ReasonSHA256))
+	execute := command.ExecuteCommand().Normalized()
+	command.AuthContext = execute.AuthContext
+	command.ProposalID = execute.ProposalID
+	command.ApprovalID = execute.ApprovalID
+	command.PreparedAuditID = execute.PreparedAuditID
+	command.SkillID = execute.SkillID
+	command.ToolName = execute.ToolName
+	command.Action = execute.Action
+	command.ResourceType = execute.ResourceType
+	command.ResourceID = execute.ResourceID
+	command.RiskLevel = execute.RiskLevel
+	command.Intent = execute.Intent
+	command.InputJSON = execute.InputJSON
+	command.IdempotencyKey = execute.IdempotencyKey
+	return command
+}
+
+func (command RedriveProviderFailureCommand) ExecuteCommand() ExecuteApprovedActionCommand {
+	return ExecuteApprovedActionCommand{
+		AuthContext:     command.AuthContext,
+		ProposalID:      command.ProposalID,
+		ApprovalID:      command.ApprovalID,
+		PreparedAuditID: command.PreparedAuditID,
+		SkillID:         command.SkillID,
+		ToolName:        command.ToolName,
+		Action:          command.Action,
+		ResourceType:    command.ResourceType,
+		ResourceID:      command.ResourceID,
+		RiskLevel:       command.RiskLevel,
+		Intent:          command.Intent,
+		InputJSON:       command.InputJSON,
+		IdempotencyKey:  command.IdempotencyKey,
+	}
+}
+
+type RedriveProviderFailureResult struct {
+	TenantID          TenantID
+	UserID            UserID
+	ProviderFailureID string
+	SourceExecutionID string
+	SourceResultID    string
+	RedriveResult     ExecuteApprovedActionResult
+}
+
 type ToolExecutionCommand struct {
 	AuthContext     AuthContext
 	Skill           SkillDefinition
@@ -341,4 +436,21 @@ func ToolActionAllowed(allowed []string, requested string) bool {
 		}
 	}
 	return false
+}
+
+func IsSHA256Hex(value string) bool {
+	value = strings.TrimSpace(value)
+	if len(value) != 64 {
+		return false
+	}
+	for _, r := range value {
+		switch {
+		case r >= '0' && r <= '9':
+		case r >= 'a' && r <= 'f':
+		case r >= 'A' && r <= 'F':
+		default:
+			return false
+		}
+	}
+	return true
 }

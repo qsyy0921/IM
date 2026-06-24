@@ -34,3 +34,11 @@ type ExecutionAuditRepository interface {
 		*types.ProviderFailureProjection,
 	) error
 }
+
+type ProviderFailureRedriveRepository interface {
+	GetProviderFailureForRedrive(
+		context.Context,
+		types.TenantID,
+		string,
+	) (types.ProviderFailureAuditRow, error)
+}

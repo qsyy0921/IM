@@ -166,14 +166,16 @@ func runGRPC(ctx context.Context) error {
 		return err
 	}
 	defer closeTools()
-	server := grpc.NewServer()
-	actiongrpc.Register(server, actiongrpc.NewServer(app.NewExecuteApprovedActionUseCaseWithToolExecutor(
+	executeUseCase := app.NewExecuteApprovedActionUseCaseWithToolExecutor(
 		skillClient,
 		policyClient,
 		agentClient,
 		repository,
 		toolExecutor,
-	)))
+	)
+	redriveUseCase := app.NewRedriveProviderFailureUseCase(repository, executeUseCase)
+	server := grpc.NewServer()
+	actiongrpc.Register(server, actiongrpc.NewServer(executeUseCase, redriveUseCase))
 
 	serveErr := make(chan error, 1)
 	go func() {

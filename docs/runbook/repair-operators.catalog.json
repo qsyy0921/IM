@@ -286,6 +286,24 @@
       "reason_file_envs": [
         "NEXUSIM_AGENT_PROPOSAL_APPROVAL_REASON_FILE"
       ]
+    },
+    {
+      "service": "action-executor",
+      "mode_env": "NEXUSIM_ACTION_EXECUTOR_MODE",
+      "modes": [
+        "provider-failure-audit",
+        "provider-failure-redrive-plan"
+      ],
+      "output_envs": [
+        "NEXUSIM_ACTION_EXECUTOR_PROVIDER_FAILURE_AUDIT_OUTPUT",
+        "NEXUSIM_ACTION_EXECUTOR_PROVIDER_FAILURE_REDRIVE_PLAN_OUTPUT"
+      ],
+      "dry_run_envs": [
+        "NEXUSIM_ACTION_EXECUTOR_PROVIDER_FAILURE_REDRIVE_DRY_RUN"
+      ],
+      "reason_file_envs": [
+        "NEXUSIM_ACTION_EXECUTOR_PROVIDER_FAILURE_REDRIVE_REASON_FILE"
+      ]
     }
   ]
 }

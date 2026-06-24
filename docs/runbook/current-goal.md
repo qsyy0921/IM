@@ -249,6 +249,12 @@ IM messages -> search / memory projection -> EvidencePack -> RAG / Agent answer 
   policy denied、disabled skill、tool mismatch、rate-limit、proposal mismatch 和
   DLQ / repair operator guard 都在执行前 fail-closed；该 adapter 只使用 in-memory ports
   和 local safe executor，不调用真实业务工具。
+- 2026-06-25 action-executor 已补 provider failure audit / redrive-plan operator
+  handoff：`provider-failure-audit` 只读自有失败投影；`provider-failure-redrive-plan`
+  必须显式 dry-run 和 reason file，输出低敏审批 artifact，并挂入通用
+  `repair-operators.catalog.json`。该 plan 不修改 provider failure row、不调用
+  tool executor、不重放 provider output；真实 provider replay / redrive API / operator UI
+  仍后置。
 - 2026-06-24 retrieval-gateway 已补 vector-index-service `SearchVectors` adapter
   first path：`RetrieveEvidence` 支持显式 `include_vector`，调用方必须提供低敏
   `query_embedding_ref`、明确的 `vector_collection_types`、`vector_visibility_scope`

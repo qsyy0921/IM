@@ -4,7 +4,7 @@
 
 `action-executor` 是 NexusIM AI 应用底座中的受控动作执行边界。它承接 Agent proposal、approval 和 `mcp-gateway` prepare 之后的动作执行请求，把真实写动作纳入 policy precheck、审批关联和低敏 audit。
 
-当前第一阶段记录 approved execution boundary，并在同一事务内写低敏 tool result projection。已支持本地安全 `nexusim.local.echo` adapter first path，用于验证真实低敏 output hash / result projection；已支持外部 MCP failure 稳定失败分类、tool output safety first path，以及显式开启的外部 HTTP provider adapter guarded first path。`conversation.note.create` 已有显式 opt-in 业务 adapter：配置 `NEXUSIM_ACTION_EXECUTOR_CONVERSATION_GRPC_ADDR` 后，通过 conversation-service 公开 `CreateConversationNote` 写入真实 note fact；未配置时仍保持 unsupported / `executed=false`，不伪造业务成功。默认不连接外部 MCP / provider；外部 HTTP adapter 只允许 allowlist 内的 `LOW` risk tool，只发送 tool metadata / `input_sha256`，不发送 raw `input_json`，provider output 仍必须经过安全门禁后才写 hash / projection。工具 provider 失败和 unsafe output 已有 first-stage `provider_failures` 状态投影和 bounded retry bookkeeping worker，可区分 `RETRY_PENDING` 与 `DLQ`，但尚未实现 redrive API、operator UI 或真实 provider replay。
+当前第一阶段记录 approved execution boundary，并在同一事务内写低敏 tool result projection。已支持本地安全 `nexusim.local.echo` adapter first path，用于验证真实低敏 output hash / result projection；已支持外部 MCP failure 稳定失败分类、tool output safety first path，以及显式开启的外部 HTTP provider adapter guarded first path。`conversation.note.create` 已有显式 opt-in 业务 adapter：配置 `NEXUSIM_ACTION_EXECUTOR_CONVERSATION_GRPC_ADDR` 后，通过 conversation-service 公开 `CreateConversationNote` 写入真实 note fact；未配置时仍保持 unsupported / `executed=false`，不伪造业务成功。默认不连接外部 MCP / provider；外部 HTTP adapter 只允许 allowlist 内的 `LOW` risk tool，只发送 tool metadata / `input_sha256`，不发送 raw `input_json`，provider output 仍必须经过安全门禁后才写 hash / projection。工具 provider 失败和 unsafe output 已有 first-stage `provider_failures` 状态投影和 bounded retry bookkeeping worker，可区分 `RETRY_PENDING` 与 `DLQ`；同时提供 provider failure audit / redrive-plan operator handoff，redrive plan 只生成低敏审批 artifact，不重放 provider、不执行 tool、不修改失败状态。真实 redrive API、operator UI 或 provider replay 尚未实现。
 
 ## 职责
 
@@ -65,6 +65,11 @@
   - 未超过 max attempts 时增加 `retry_count` 并推进 `next_retry_at`
   - 达到 max attempts 时转 `DLQ`
   - 不调用 tool executor，不重放 provider，不需要 raw input
+- `provider-failure-audit` / `provider-failure-redrive-plan`：
+  - 只读取 action-executor 自有 `action_executor_provider_failures` 投影
+  - 输出低敏 JSON artifact；user / resource / failure_ref 只输出 hash
+  - redrive plan 必须显式 dry-run 和 reason file，挂入 repair operator approval chain
+  - 不修改 provider failure row，不调用 tool executor，不重放 provider output
 - 所有 adapter output 进入响应 / hash 前必须经过安全门禁：
   valid JSON object、大小限制、无 secret-like / PII-like key 或 value。
 - 明显的 repair / redrive / DLQ / dead-letter 类 tool / resource 元数据会被
@@ -170,6 +175,8 @@ agent-service proposal
 - repair / redrive / DLQ / dead-letter 类动作即使 proposal 和 policy 允许，
   第一阶段也必须停在 `ACTION_REPAIR_REQUIRES_OPERATOR`，不调用通用 tool
   adapter、不写 output hash。
+- provider failure redrive 只能先生成低敏 `provider-failure-redrive-plan` operator
+  artifact，并通过通用 repair approval chain 审批；该 plan 不代表 replay 已执行。
 - tool result projection 不是 provider 输出存储；当前只记录
   `NOT_EXECUTED` / `BLOCKED` / `SUCCEEDED` 等低敏状态引用和 output hash。
 - 当前外部 HTTP adapter 只证明 guarded first path；provider failure worker 只证明
@@ -209,11 +216,12 @@ agent-service proposal
 - retry state check：
   - `RETRY_PENDING` 必须 `retryable=true` 且有 `next_retry_at`
   - `DLQ` 必须 `retryable=false` 且有 `dead_lettered_at`
-- 当前只做低敏状态投影、bounded retry bookkeeping 和后续 operator workflow 的输入面。
+- 当前只做低敏状态投影、bounded retry bookkeeping、provider failure audit 和
+  redrive-plan operator handoff；不保存 raw provider output / raw input。
 
 ## 后续
 
 - 接入更完整的真实外部 MCP adapter / tool provider。
-- redrive API / 正式 repair operator handoff。
+- redrive API / 真实 provider replay / operator UI。
 - provider failure metrics / operator UI。
 - 外部 audit sink。

@@ -125,9 +125,11 @@
   output fail-closed cases。
 - `agent-service`：真实业务动作继续走 policy、skill contract、proposal、approval、
   executor、audit；Agent 不直接写业务库。
-- `skill-registry` / `mcp-gateway` / `action-executor`：补 tool contract、risk level、
-  tenant allowlist、adapter、rate limit、DLQ / redrive、repair guard；Agent action
-  approval / prepared-audit / resource binding mismatch 已进入 preflight safety eval。
+- `skill-registry` / `mcp-gateway` / `action-executor`：继续补 tool contract、risk level、
+  tenant allowlist、adapter 和 rate limit。action-executor 已有 DLQ / repair guard
+  与 provider-failure audit / redrive-plan operator handoff；后续仍需真实 redrive API、
+  provider replay、operator UI 和 provider failure metrics。Agent action approval /
+  prepared-audit / resource binding mismatch 已进入 preflight safety eval。
 - Python AI Worker：只输出候选、hash、citation metadata 和低敏 diagnostics；
   memory extraction candidate first path 和 Go-side adapter / eval gate 已落；
   后续只通过 Go-owned review / approval / memory-service 持久化路径进入最终 memory，

@@ -13,7 +13,7 @@ import (
 )
 
 func TestValidateActionExecutorMode(t *testing.T) {
-	for _, mode := range []string{"noop", "grpc", "provider-failure-worker"} {
+	for _, mode := range []string{"noop", "grpc", "provider-failure-worker", "provider-failure-audit", "provider-failure-redrive-plan"} {
 		if err := validateActionExecutorMode(mode); err != nil {
 			t.Fatalf("mode %s should be valid: %v", mode, err)
 		}

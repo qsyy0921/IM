@@ -110,6 +110,27 @@ try {
         throw "workflow-service compensation-instruction-import repair operator plan has unexpected environment."
     }
 
+    $actionPlanJson = & powershell -NoProfile -ExecutionPolicy Bypass -File $plannerPath `
+        -Service "action-executor" `
+        -Mode "provider-failure-redrive-plan" `
+        -OutputEnv "NEXUSIM_ACTION_EXECUTOR_PROVIDER_FAILURE_REDRIVE_PLAN_OUTPUT" `
+        -OutputPath "H:\NexusIM\operator-plans\action-provider-redrive-plan.json" `
+        -DryRun `
+        -ReasonFilePath "H:\NexusIM\operator-plans\action-provider-redrive-reason.txt" `
+        -Env "NEXUSIM_ACTION_EXECUTOR_PROVIDER_FAILURE_REDRIVE_TENANT_ID=tenant_1","NEXUSIM_ACTION_EXECUTOR_PROVIDER_FAILURE_REDRIVE_STATUS=DLQ"
+    if ($LASTEXITCODE -ne 0) {
+        throw "write-repair-operator-plan.ps1 failed for action-executor provider-failure-redrive-plan"
+    }
+    $actionPlan = $actionPlanJson | ConvertFrom-Json
+    if ($actionPlan.environment.NEXUSIM_ACTION_EXECUTOR_MODE -ne "provider-failure-redrive-plan" -or
+        $actionPlan.environment.NEXUSIM_ACTION_EXECUTOR_PROVIDER_FAILURE_REDRIVE_PLAN_OUTPUT -ne "H:\NexusIM\operator-plans\action-provider-redrive-plan.json" -or
+        $actionPlan.environment.NEXUSIM_ACTION_EXECUTOR_PROVIDER_FAILURE_REDRIVE_DRY_RUN -ne "true" -or
+        $actionPlan.environment.NEXUSIM_ACTION_EXECUTOR_PROVIDER_FAILURE_REDRIVE_REASON_FILE -ne "H:\NexusIM\operator-plans\action-provider-redrive-reason.txt" -or
+        $actionPlan.environment.NEXUSIM_ACTION_EXECUTOR_PROVIDER_FAILURE_REDRIVE_TENANT_ID -ne "tenant_1" -or
+        $actionPlan.environment.NEXUSIM_ACTION_EXECUTOR_PROVIDER_FAILURE_REDRIVE_STATUS -ne "DLQ") {
+        throw "action-executor provider-failure-redrive-plan has unexpected environment."
+    }
+
     $previousErrorActionPreference = $ErrorActionPreference
     $ErrorActionPreference = "Continue"
     try {

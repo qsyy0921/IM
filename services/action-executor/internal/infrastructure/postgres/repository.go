@@ -320,6 +320,96 @@ WHERE tenant_id = $1 AND provider_failure_id = $2`,
 	return stats, nil
 }
 
+func (repository Repository) AuditProviderFailures(
+	ctx context.Context,
+	options types.ProviderFailureAuditOptions,
+) ([]types.ProviderFailureAuditRow, error) {
+	if repository.pool == nil {
+		return nil, errors.Join(types.ErrExecutionAuditFailed, errors.New("nil pg pool"))
+	}
+	limit := normalizeProviderFailureAuditLimit(options.Limit)
+	query := `
+SELECT tenant_id,
+       provider_failure_id,
+       execution_id,
+       result_id,
+       proposal_id,
+       approval_id,
+       prepared_audit_id,
+       user_id,
+       skill_id,
+       tool_name,
+       resource_type,
+       resource_id,
+       classification,
+       status,
+       retryable,
+       retry_count,
+       next_retry_at,
+       dead_lettered_at,
+       failure_ref,
+       created_at
+FROM action_executor_provider_failures
+WHERE 1 = 1`
+	args := make([]any, 0, 4)
+	addFilter := func(clause string, value any) {
+		args = append(args, value)
+		query += fmt.Sprintf(" AND %s = $%d", clause, len(args))
+	}
+	if tenantID := strings.TrimSpace(options.TenantID); tenantID != "" {
+		addFilter("tenant_id", tenantID)
+	}
+	if status := normalizeProviderFailureStatus(options.Status); status != "" {
+		addFilter("status", status)
+	}
+	if toolName := strings.TrimSpace(options.ToolName); toolName != "" {
+		addFilter("tool_name", toolName)
+	}
+	args = append(args, limit)
+	query += fmt.Sprintf(`
+ORDER BY created_at DESC, provider_failure_id DESC
+LIMIT $%d`, len(args))
+
+	rows, err := repository.pool.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %v", types.ErrExecutionAuditFailed, err)
+	}
+	defer rows.Close()
+	result := make([]types.ProviderFailureAuditRow, 0, limit)
+	for rows.Next() {
+		var row types.ProviderFailureAuditRow
+		if err := rows.Scan(
+			&row.TenantID,
+			&row.ProviderFailureID,
+			&row.ExecutionID,
+			&row.ResultID,
+			&row.ProposalID,
+			&row.ApprovalID,
+			&row.PreparedAuditID,
+			&row.UserID,
+			&row.SkillID,
+			&row.ToolName,
+			&row.ResourceType,
+			&row.ResourceID,
+			&row.Classification,
+			&row.Status,
+			&row.Retryable,
+			&row.RetryCount,
+			&row.NextRetryAt,
+			&row.DeadLetteredAt,
+			&row.FailureRef,
+			&row.CreatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("%w: %v", types.ErrExecutionAuditFailed, err)
+		}
+		result = append(result, row)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("%w: %v", types.ErrExecutionAuditFailed, err)
+	}
+	return result, nil
+}
+
 func truncateLowSensitive(value string, max int) string {
 	value = strings.TrimSpace(value)
 	if max <= 0 {
@@ -369,4 +459,24 @@ func providerFailureRetryDelay(base time.Duration, nextRetryCount int) time.Dura
 		shift = 6
 	}
 	return base * time.Duration(1<<shift)
+}
+
+func normalizeProviderFailureAuditLimit(limit int) int {
+	if limit <= 0 {
+		return 50
+	}
+	if limit > 500 {
+		return 500
+	}
+	return limit
+}
+
+func normalizeProviderFailureStatus(status string) string {
+	status = strings.ToUpper(strings.TrimSpace(status))
+	switch status {
+	case types.ProviderFailureStatusRetryPending, types.ProviderFailureStatusDLQ:
+		return status
+	default:
+		return ""
+	}
 }

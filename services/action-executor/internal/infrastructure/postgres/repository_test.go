@@ -286,6 +286,66 @@ func TestRepositoryProcessDueProviderFailuresIntegration(t *testing.T) {
 	}
 }
 
+func TestRepositoryAuditProviderFailuresIntegration(t *testing.T) {
+	dsn := os.Getenv("NEXUSIM_PG_DSN")
+	if dsn == "" {
+		t.Skip("NEXUSIM_PG_DSN is not set")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	pool, err := pgxpool.New(ctx, dsn)
+	if err != nil {
+		t.Fatalf("connect pg: %v", err)
+	}
+	defer pool.Close()
+	applyMigration(t, ctx, pool)
+	if _, err := pool.Exec(ctx, `TRUNCATE action_executor_provider_failures, action_executor_tool_results, action_executor_execution_audits`); err != nil {
+		t.Fatalf("reset action executor tables: %v", err)
+	}
+
+	repository := NewRepository(pool)
+	now := time.Date(2026, 6, 25, 12, 0, 0, 0, time.UTC)
+	recordProviderFailureFixture(t, ctx, repository, "audit-retry", 0, now.Add(time.Hour))
+	recordProviderFailureFixture(t, ctx, repository, "audit-dlq", 2, now.Add(-time.Minute))
+	if _, err := repository.ProcessDueProviderFailures(ctx, 10, 3, time.Second, now); err != nil {
+		t.Fatalf("process provider failure to dlq: %v", err)
+	}
+
+	rows, err := repository.AuditProviderFailures(ctx, types.ProviderFailureAuditOptions{
+		TenantID: "tenant-1",
+		Status:   types.ProviderFailureStatusDLQ,
+		ToolName: "conversation.reply.send",
+		Limit:    10,
+	})
+	if err != nil {
+		t.Fatalf("audit provider failures: %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("expected one DLQ provider failure row, got %d: %+v", len(rows), rows)
+	}
+	got := rows[0]
+	if got.ProviderFailureID != "provider-failure-audit-dlq" ||
+		got.Status != types.ProviderFailureStatusDLQ ||
+		got.Retryable ||
+		got.RetryCount != 3 ||
+		got.DeadLetteredAt == nil ||
+		got.NextRetryAt != nil ||
+		got.ExecutionID != "exec-audit-dlq" ||
+		got.ResultID != "result-audit-dlq" ||
+		got.UserID != "user-1" ||
+		got.FailureRef == "" {
+		t.Fatalf("unexpected provider failure audit row: %+v", got)
+	}
+
+	allRows, err := repository.AuditProviderFailures(ctx, types.ProviderFailureAuditOptions{TenantID: "tenant-1", Limit: 10})
+	if err != nil {
+		t.Fatalf("audit all provider failures: %v", err)
+	}
+	if len(allRows) != 2 {
+		t.Fatalf("expected both provider failure rows, got %d", len(allRows))
+	}
+}
+
 func applyMigration(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
 	t.Helper()
 	for _, name := range []string{

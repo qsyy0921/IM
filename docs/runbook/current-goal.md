@@ -6,40 +6,40 @@
 
 ## Active Module
 
-`action-executor` provider failure redrive first path 收口。
+AI / Agent demo path：EvidencePack-driven RAG / Summary safety first path。
 
 ## 目标
 
-- 提供 `RedriveProviderFailure` gRPC first path。
-- 只允许 redrive 已进入 `DLQ` 的 provider failure。
-- 要求 fresh proposal / approval / prepared audit，禁止复用 source failure 的旧
-  proposal / approval / prepared audit。
-- 要求 redrive command 的 skill / tool / resource 与 source failure 完全匹配。
-- 要求调用方提交新的 `input_json` 和 64 位小写 hex `reason_sha256`。
-- Redrive 必须复用 `ExecuteApprovedAction` 正常校验和执行链路。
-- execution audit 必须记录 source provider failure id 和 reason hash。
-- 不保存或恢复旧 raw input，不重放旧 provider output，不引入隐藏 fallback。
+- 以 `EvidencePack` 作为 RAG / Summary / Agent 读取业务事实的唯一输入契约。
+- 明确 group memory 场景下的 source refs、conversation scope、member visibility、
+  time/version boundary 和 citation requirements。
+- 收紧 `retrieval-gateway`、`rag-service`、`summary-service`、`ai-eval-service` 之间的
+  contract：不能绕过 EvidencePack 直接读 message / memory / search 私有表。
+- 补 focused tests / eval cases，覆盖 missing evidence、visibility mismatch、stale /
+  superseded evidence、unsafe no-citation answer 等 fail-closed cases。
+- 保持 Python AI Worker 只做 candidate algorithm / eval，不拥有业务状态、权限或审计。
+- 不引入隐藏 fallback；证据不足时拒答或返回稳定错误，不用假答案 / stale cache / 默认成功。
 
 ## 本轮完成条件
 
-- Proto / gRPC / app / postgres / cmd wiring 完成。
-- App、gRPC、真实 PostgreSQL integration 覆盖 redrive happy path 和 fail-closed cases。
-- SDD、service brief、remaining goals、README 和架构文档同步公开能力变化。
-- 相关 focused checks 通过；若涉及 proto / migration / 安全边界，提交前跑完整门禁或明确记录阻塞原因。
-- 提交并推送到 GitHub。
+- 先读取并对齐 `retrieval-gateway`、`rag-service`、`summary-service`、`memory-service`、
+  `search-service`、`ai-eval-service` 的 service brief / SDD。
+- 做 compact architecture analysis：owner、contract、permission、audit、eval gate、
+  Python / Go boundary 和是否需要新中间件。
+- 实现一个可演示的 EvidencePack -> RAG / Summary safety path 或补齐其阻塞缺口。
+- Focused checks 通过；若跨 proto / migration / 安全边界再跑完整门禁。
+- 必要文档同步后提交并推送到 GitHub。
 
 ## 非目标
 
-- 不做 operator UI。
-- 不做 provider-grade batch redrive。
-- 不自动 provider replay。
-- 不把 redrive 做成普通 tool action。
-- 不扩大客户端、Docker、双机或 HA 测试范围。
+- 不继续扩完整产品级客户端。
+- 不做长压、生产 HA、Docker / 双机基础设施整理。
+- 不把 AI Worker 变成业务事实源。
+- 不新增服务或中间件，除非架构分析证明当前模块必须新增。
+- 不一次性展开完整 Agent workflow / operator UI / provider-grade eval 平台。
 
 ## 后续优先级
 
-1. AI / Agent demo path：EvidencePack、RAG / Summary safety、Agent proposal /
-   approval / action execution、eval gate。
-2. action-executor 后续 hardening：batch redrive、provider replay、operator UI、
-   provider failure metrics。
+1. 本模块完成后，进入 Agent proposal / approval / action execution demo path。
+2. 再补 action-executor provider-grade batch redrive、provider replay、operator UI 和 metrics。
 3. Product-active 服务按需推进，不抢占 AI / Agent 演示主线。

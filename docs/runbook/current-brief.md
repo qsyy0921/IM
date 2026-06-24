@@ -7,18 +7,17 @@ loadtest report 或 archive。
 
 - 客户端 Web / PC 已达到演示 MVP；除阻塞演示的问题外，不继续追完整产品级客户端。
 - 后端主线已切到 AI / Agent / RAG 演示路径和必要平台能力。
-- 当前 active module：`action-executor` provider failure redrive first path 收口。
+- 当前 active module：EvidencePack-driven RAG / Summary safety first path。
 
 ## 当前模块事实
 
-- `action-executor` 已有 approved execution audit、tool result projection、本地安全
-  adapter、guarded external HTTP provider adapter、conversation note / profile opt-in
-  business adapters、provider failure projection 和 bounded retry bookkeeping。
-- 本轮新增目标是 `RedriveProviderFailure`：只能 redrive 已有 `DLQ` provider failure；
-  必须使用 fresh proposal / approval / prepared audit、匹配 skill / tool / resource、
-  新 `input_json` 和 `reason_sha256`。
-- Redrive 复用 `ExecuteApprovedAction` 正常链路；execution audit 只保存 source
-  provider failure id 和 reason hash，不恢复旧 raw input，不重放旧 provider output。
+- 上一模块已收口并推送：`action-executor` 支持 controlled `RedriveProviderFailure`
+  first path，要求 DLQ source、fresh proposal / approval / prepared audit、匹配
+  skill / tool / resource、新 input 和 reason hash，并记录 redrive lineage。
+- 当前模块要把 AI / Agent 读取事实的边界收紧到 EvidencePack：RAG、Summary 和后续
+  Agent 只能基于可见、可引用、可审计的 evidence 工作。
+- group memory / multi-party collaboration 必须保留 source refs、conversation scope、
+  member visibility、time/version boundary 和 no-citation refusal。
 
 ## 已成型底座
 
@@ -42,5 +41,5 @@ loadtest report 或 archive。
 
 ## 下一个方向
 
-- 完成当前 redrive module 后，继续 AI / Agent demo path：EvidencePack、RAG /
-  Summary safety、Agent proposal / approval / action execution、eval gate。
+- 完成当前 EvidencePack / RAG / Summary safety module 后，进入 Agent proposal /
+  approval / action execution demo path，再补 provider-grade redrive / eval 平台能力。

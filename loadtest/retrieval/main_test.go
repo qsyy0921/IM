@@ -30,6 +30,34 @@ func TestParseConfigRejectsMissingRetrievalTarget(t *testing.T) {
 	}
 }
 
+func TestParseConfigVectorBackendDefaults(t *testing.T) {
+	cfg, err := parseConfig([]string{"--include-vector-backend"})
+	if err != nil {
+		t.Fatalf("parseConfig returned error: %v", err)
+	}
+	if !cfg.includeVectorBackend {
+		t.Fatalf("expected vector backend enabled")
+	}
+	if cfg.vectorTarget != defaultVectorTarget {
+		t.Fatalf("unexpected vector target %q", cfg.vectorTarget)
+	}
+	if cfg.vectorCollectionType != "MEMORY_EVENT" {
+		t.Fatalf("unexpected vector collection type %q", cfg.vectorCollectionType)
+	}
+	if cfg.vectorVisibilityScope == "" || cfg.vectorPolicyVersion == "" {
+		t.Fatalf("expected vector visibility and policy fields")
+	}
+	if cfg.queryEmbeddingRef == "" || cfg.queryEmbeddingRef[:7] != "sha256:" {
+		t.Fatalf("expected low-sensitive query embedding ref, got %q", cfg.queryEmbeddingRef)
+	}
+}
+
+func TestParseConfigRejectsMissingVectorTargetWhenEnabled(t *testing.T) {
+	if _, err := parseConfig([]string{"--include-vector-backend", "--vector-target", " "}); err == nil {
+		t.Fatalf("expected missing vector target to fail")
+	}
+}
+
 func TestPathInside(t *testing.T) {
 	root := filepath.Join("E:", "development", "IM")
 	inside := filepath.Join(root, "loadtest", "retrieval")

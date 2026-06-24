@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -16,30 +17,39 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	retrievalv1 "github.com/qsyy0921/IM/api/proto/nexusim/retrieval/v1"
+	vectorv1 "github.com/qsyy0921/IM/api/proto/nexusim/vector/v1"
 	"github.com/qsyy0921/IM/loadtest/internal/grpctls"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 const (
 	defaultPGDSN           = "postgres://nexusim:nexusim@localhost:5432/nexusim?sslmode=disable"
 	defaultRetrievalTarget = "127.0.0.1:10590"
+	defaultVectorTarget    = "127.0.0.1:10760"
 	defaultResultRoot      = `H:\NexusIM\loadtest-results`
 	defaultQuery           = "phoenix launch decision"
 )
 
 type config struct {
-	pgDSN           string
-	retrievalTarget string
-	resultRoot      string
-	runName         string
-	tenantID        string
-	conversationID  string
-	viewerUserID    string
-	senderUserID    string
-	deviceID        string
-	query           string
-	requestTimeout  time.Duration
-	tls             grpctls.Config
+	pgDSN                 string
+	retrievalTarget       string
+	vectorTarget          string
+	resultRoot            string
+	runName               string
+	tenantID              string
+	conversationID        string
+	viewerUserID          string
+	senderUserID          string
+	deviceID              string
+	query                 string
+	includeVectorBackend  bool
+	vectorCollectionType  string
+	vectorVisibilityScope string
+	vectorPolicyVersion   string
+	queryEmbeddingRef     string
+	requestTimeout        time.Duration
+	tls                   grpctls.Config
 }
 
 type seededData struct {
@@ -66,12 +76,21 @@ type seededData struct {
 	MemoryValidFromSeq       int64  `json:"memory_valid_from_seq"`
 	MemoryValidToSeq         int64  `json:"memory_valid_to_seq"`
 	MemoryProjectionVer      int64  `json:"memory_projection_version"`
+	VectorItemID             string `json:"vector_item_id,omitempty"`
+	VectorSourceRefHash      string `json:"vector_source_ref_hash,omitempty"`
+	VectorSourceService      string `json:"vector_source_service,omitempty"`
+	VectorCollectionType     string `json:"vector_collection_type,omitempty"`
+	VectorVisibilityScope    string `json:"vector_visibility_scope,omitempty"`
+	VectorPolicyVersion      string `json:"vector_policy_version,omitempty"`
+	QueryEmbeddingRef        string `json:"query_embedding_ref,omitempty"`
 }
 
 type evidenceSummary struct {
 	RunName                               string       `json:"run_name"`
 	ResultDir                             string       `json:"result_dir"`
 	RetrievalTarget                       string       `json:"retrieval_target"`
+	VectorTarget                          string       `json:"vector_target,omitempty"`
+	IncludeVectorBackend                  bool         `json:"include_vector_backend"`
 	Query                                 string       `json:"query"`
 	Seed                                  seededData   `json:"seed"`
 	PackID                                string       `json:"pack_id"`
@@ -79,10 +98,12 @@ type evidenceSummary struct {
 	SearchItemCount                       int          `json:"search_item_count"`
 	MemoryItemCount                       int          `json:"memory_item_count"`
 	ProfileItemCount                      int          `json:"profile_item_count"`
+	VectorItemCount                       int          `json:"vector_item_count"`
 	SourceCounts                          sourceCounts `json:"source_counts"`
 	SourceChainRerankPreserved            bool         `json:"source_chain_rerank_preserved"`
 	SearchRerankScore                     float64      `json:"search_rerank_score"`
 	MemoryRerankScore                     float64      `json:"memory_rerank_score"`
+	VectorRerankScore                     float64      `json:"vector_rerank_score,omitempty"`
 	SearchProjectionVersion               int64        `json:"search_projection_version"`
 	MemoryProjectionVersion               int64        `json:"memory_projection_version"`
 	RetrievalVersion                      string       `json:"retrieval_version"`
@@ -91,6 +112,9 @@ type evidenceSummary struct {
 	CrossGroupSpeakerAttributionPreserved bool         `json:"cross_group_speaker_attribution_preserved"`
 	MemoryGraphEdgesPreserved             bool         `json:"memory_graph_edges_preserved"`
 	ProfileAggregatePreserved             bool         `json:"profile_aggregate_preserved"`
+	VectorEvidencePreserved               bool         `json:"vector_evidence_preserved"`
+	VectorSourceRefHashPreserved          bool         `json:"vector_source_ref_hash_preserved"`
+	VectorNoRawText                       bool         `json:"vector_no_raw_text"`
 	TemporalVersionSelectedByQuerySeq     bool         `json:"temporal_version_selected_by_query_seq"`
 	ExpiredMemoryExcluded                 bool         `json:"expired_memory_excluded"`
 	SupersededMemoryExcluded              bool         `json:"superseded_memory_excluded"`
@@ -104,6 +128,7 @@ type sourceCounts struct {
 	SearchMessage    int32 `json:"search_message"`
 	MemoryEvent      int32 `json:"memory_event"`
 	ProfileAggregate int32 `json:"profile_aggregate"`
+	VectorItem       int32 `json:"vector_item,omitempty"`
 }
 
 func main() {
@@ -133,15 +158,21 @@ func run(ctx context.Context, args []string) error {
 	defer pool.Close()
 
 	startedAt := time.Now().UTC()
-	if err := applyProjectionMigrations(ctx, pool); err != nil {
+	if err := applyProjectionMigrations(ctx, pool, cfg.includeVectorBackend); err != nil {
 		return err
 	}
-	if err := cleanupTenant(ctx, pool, cfg.tenantID); err != nil {
+	if err := cleanupTenant(ctx, pool, cfg.tenantID, cfg.includeVectorBackend); err != nil {
 		return err
 	}
 	seed, err := seedProjectionRows(ctx, pool, cfg)
 	if err != nil {
 		return err
+	}
+	if cfg.includeVectorBackend {
+		seed, err = seedVectorEvidence(ctx, cfg, seed)
+		if err != nil {
+			return err
+		}
 	}
 
 	response, err := retrieveEvidence(ctx, cfg, seed)
@@ -160,6 +191,7 @@ func parseConfig(args []string) (config, error) {
 	flagSet := flag.NewFlagSet("retrieval-smoke", flag.ContinueOnError)
 	flagSet.StringVar(&cfg.pgDSN, "pg-dsn", defaultPGDSN, "PostgreSQL DSN")
 	flagSet.StringVar(&cfg.retrievalTarget, "retrieval-target", defaultRetrievalTarget, "retrieval-gateway gRPC address")
+	flagSet.StringVar(&cfg.vectorTarget, "vector-target", defaultVectorTarget, "vector-index-service gRPC address")
 	flagSet.StringVar(&cfg.resultRoot, "result-root", defaultResultRoot, "external result root for raw smoke output")
 	flagSet.StringVar(&cfg.runName, "run-name", "", "run name under result root")
 	flagSet.StringVar(&cfg.tenantID, "tenant-id", "", "tenant id for seeded projection rows")
@@ -168,6 +200,11 @@ func parseConfig(args []string) (config, error) {
 	flagSet.StringVar(&cfg.senderUserID, "sender-user-id", "retrieval-sender", "sender user id")
 	flagSet.StringVar(&cfg.deviceID, "device-id", "retrieval-device", "viewer device id")
 	flagSet.StringVar(&cfg.query, "query", defaultQuery, "query used for search and memory")
+	flagSet.BoolVar(&cfg.includeVectorBackend, "include-vector-backend", false, "seed vector-index-service and request VECTOR_ITEM evidence")
+	flagSet.StringVar(&cfg.vectorCollectionType, "vector-collection-type", "MEMORY_EVENT", "vector collection type requested from vector-index-service")
+	flagSet.StringVar(&cfg.vectorVisibilityScope, "vector-visibility-scope", "", "explicit vector visibility scope")
+	flagSet.StringVar(&cfg.vectorPolicyVersion, "vector-policy-version", "policy-retrieval-vector-v1", "explicit vector policy version")
+	flagSet.StringVar(&cfg.queryEmbeddingRef, "query-embedding-ref", "", "low-sensitive query embedding ref used for vector retrieval")
 	flagSet.DurationVar(&cfg.requestTimeout, "request-timeout", 10*time.Second, "gRPC request timeout")
 	flagSet.StringVar(&cfg.tls.CAFile, "retrieval-tls-ca-file", "", "retrieval gRPC TLS CA file")
 	flagSet.StringVar(&cfg.tls.ServerName, "retrieval-tls-server-name", "", "retrieval gRPC TLS server name")
@@ -178,9 +215,17 @@ func parseConfig(args []string) (config, error) {
 	}
 	cfg.resultRoot = strings.TrimSpace(cfg.resultRoot)
 	cfg.retrievalTarget = strings.TrimSpace(cfg.retrievalTarget)
+	cfg.vectorTarget = strings.TrimSpace(cfg.vectorTarget)
 	cfg.query = strings.TrimSpace(cfg.query)
+	cfg.vectorCollectionType = strings.ToUpper(strings.TrimSpace(cfg.vectorCollectionType))
+	cfg.vectorVisibilityScope = strings.TrimSpace(cfg.vectorVisibilityScope)
+	cfg.vectorPolicyVersion = strings.TrimSpace(cfg.vectorPolicyVersion)
+	cfg.queryEmbeddingRef = strings.TrimSpace(cfg.queryEmbeddingRef)
 	if cfg.retrievalTarget == "" {
 		return config{}, errors.New("--retrieval-target is required")
+	}
+	if cfg.includeVectorBackend && cfg.vectorTarget == "" {
+		return config{}, errors.New("--vector-target is required when --include-vector-backend is set")
 	}
 	if cfg.resultRoot == "" {
 		return config{}, errors.New("--result-root is required")
@@ -198,6 +243,20 @@ func parseConfig(args []string) (config, error) {
 	if strings.TrimSpace(cfg.conversationID) == "" {
 		cfg.conversationID = "conv-retrieval-smoke-" + suffix
 	}
+	if cfg.includeVectorBackend {
+		if cfg.vectorCollectionType == "" {
+			return config{}, errors.New("--vector-collection-type is required when --include-vector-backend is set")
+		}
+		if cfg.vectorVisibilityScope == "" {
+			cfg.vectorVisibilityScope = "tenant:" + cfg.tenantID + ":user:" + cfg.viewerUserID
+		}
+		if cfg.vectorPolicyVersion == "" {
+			return config{}, errors.New("--vector-policy-version is required when --include-vector-backend is set")
+		}
+		if cfg.queryEmbeddingRef == "" {
+			cfg.queryEmbeddingRef = hashRef(cfg.tenantID + "|retrieval-query|" + cfg.runName)
+		}
+	}
 	return cfg, nil
 }
 
@@ -211,11 +270,20 @@ func openPGPool(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
 	return pgxpool.NewWithConfig(connectCtx, config)
 }
 
-func applyProjectionMigrations(ctx context.Context, pool *pgxpool.Pool) error {
-	for _, path := range []string{
+func applyProjectionMigrations(ctx context.Context, pool *pgxpool.Pool, includeVector bool) error {
+	paths := []string{
 		filepath.Join("migrations", "postgres", "search", "000001_search_core.sql"),
 		filepath.Join("migrations", "postgres", "memory", "000001_memory_core.sql"),
-	} {
+	}
+	if includeVector {
+		paths = append(paths,
+			filepath.Join("migrations", "postgres", "vector-index", "000001_vector_index_core.sql"),
+			filepath.Join("migrations", "postgres", "vector-index", "000002_vector_outbox_last_error.sql"),
+			filepath.Join("migrations", "postgres", "vector-index", "000003_vector_embedding_tasks.sql"),
+			filepath.Join("migrations", "postgres", "vector-index", "000004_vector_backend_items.sql"),
+		)
+	}
+	for _, path := range paths {
 		data, err := os.ReadFile(path)
 		if err != nil {
 			return err
@@ -227,8 +295,8 @@ func applyProjectionMigrations(ctx context.Context, pool *pgxpool.Pool) error {
 	return nil
 }
 
-func cleanupTenant(ctx context.Context, pool *pgxpool.Pool, tenantID string) error {
-	for _, statement := range []string{
+func cleanupTenant(ctx context.Context, pool *pgxpool.Pool, tenantID string, includeVector bool) error {
+	statements := []string{
 		`DELETE FROM memory_graph_edges WHERE tenant_id = $1`,
 		`DELETE FROM memory_profile_aggregates WHERE tenant_id = $1`,
 		`DELETE FROM memory_event_source_refs WHERE tenant_id = $1`,
@@ -236,7 +304,20 @@ func cleanupTenant(ctx context.Context, pool *pgxpool.Pool, tenantID string) err
 		`DELETE FROM memory_membership_projection WHERE tenant_id = $1`,
 		`DELETE FROM search_message_documents WHERE tenant_id = $1`,
 		`DELETE FROM search_membership_projection WHERE tenant_id = $1`,
-	} {
+	}
+	if includeVector {
+		statements = append([]string{
+			`DELETE FROM vector_embedding_tasks WHERE tenant_id = $1`,
+			`DELETE FROM vector_outbox WHERE tenant_id = $1`,
+			`DELETE FROM vector_rebuild_checkpoints WHERE tenant_id = $1`,
+			`DELETE FROM vector_tombstones WHERE tenant_id = $1`,
+			`DELETE FROM vector_index_jobs WHERE tenant_id = $1`,
+			`DELETE FROM vector_backend_items WHERE tenant_id = $1`,
+			`DELETE FROM vector_items WHERE tenant_id = $1`,
+			`DELETE FROM vector_collections WHERE tenant_id = $1`,
+		}, statements...)
+	}
+	for _, statement := range statements {
 		if _, err := pool.Exec(ctx, statement, tenantID); err != nil {
 			return err
 		}
@@ -451,6 +532,64 @@ INSERT INTO memory_event_source_refs (
 	}, nil
 }
 
+func seedVectorEvidence(ctx context.Context, cfg config, seed seededData) (seededData, error) {
+	conn, err := grpc.NewClient(
+		"passthrough:///"+cfg.vectorTarget,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	)
+	if err != nil {
+		return seededData{}, err
+	}
+	defer conn.Close()
+
+	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
+	defer cancel()
+	sourceRefHash := hashRef(seed.MemoryEventID + "|vector-source-ref")
+	response, err := vectorv1.NewVectorIndexServiceClient(conn).UpsertVectorItem(requestCtx, &vectorv1.UpsertVectorItemRequest{
+		AuthContext: &vectorv1.AuthContext{
+			TenantId:    cfg.tenantID,
+			UserId:      cfg.viewerUserID,
+			ServiceName: "memory-service",
+			InstanceRef: "retrieval-smoke",
+			TraceId:     "retrieval-smoke-trace",
+			RequestId:   "retrieval-smoke-vector-upsert",
+		},
+		SourceService:       "memory-service",
+		CollectionType:      cfg.vectorCollectionType,
+		SourceRefHash:       sourceRefHash,
+		SourceId:            seed.MemoryEventID,
+		SourceVersion:       seed.MemoryProjectionVer,
+		SourceHash:          hashRef(seed.MemoryEventID + "|source"),
+		ChunkHash:           hashRef(seed.MemoryEventID + "|chunk"),
+		EmbeddingModelRef:   "embed-ref-retrieval-v1",
+		EmbeddingVectorHash: hashRef(seed.MemoryEventID + "|embedding"),
+		Dimension:           3,
+		VisibilityScope:     cfg.vectorVisibilityScope,
+		VisibilityVersion:   seed.VisibilityVersion,
+		PolicyVersion:       cfg.vectorPolicyVersion,
+		DataClass:           "INTERNAL",
+		RetentionPolicyRef:  "retention-retrieval-vector-v1",
+		IdempotencyKey:      "retrieval-vector-upsert-" + sanitizeRunName(cfg.runName),
+		CorrelationId:       "retrieval-vector-" + sanitizeRunName(cfg.runName),
+		CausationId:         seed.MemoryEventID,
+		TraceId:             "retrieval-smoke-trace",
+	})
+	if err != nil {
+		return seededData{}, fmt.Errorf("upsert vector evidence: %w", err)
+	}
+	if response.GetItem().GetVectorItemId() == "" {
+		return seededData{}, errors.New("vector upsert returned empty vector_item_id")
+	}
+	seed.VectorItemID = response.GetItem().GetVectorItemId()
+	seed.VectorSourceRefHash = sourceRefHash
+	seed.VectorSourceService = response.GetItem().GetSourceService()
+	seed.VectorCollectionType = response.GetItem().GetCollectionType()
+	seed.VectorVisibilityScope = cfg.vectorVisibilityScope
+	seed.VectorPolicyVersion = cfg.vectorPolicyVersion
+	seed.QueryEmbeddingRef = cfg.queryEmbeddingRef
+	return seed, nil
+}
+
 func retrieveEvidence(ctx context.Context, cfg config, seed seededData) (*retrievalv1.RetrieveEvidenceResponse, error) {
 	dialOption, err := grpctls.DialOption(cfg.tls, "retrieval-tls")
 	if err != nil {
@@ -464,7 +603,7 @@ func retrieveEvidence(ctx context.Context, cfg config, seed seededData) (*retrie
 
 	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
 	defer cancel()
-	return retrievalv1.NewRetrievalGatewayClient(conn).RetrieveEvidence(requestCtx, &retrievalv1.RetrieveEvidenceRequest{
+	request := &retrievalv1.RetrieveEvidenceRequest{
 		AuthContext: &retrievalv1.AuthContext{
 			TenantId:  cfg.tenantID,
 			UserId:    cfg.viewerUserID,
@@ -477,7 +616,18 @@ func retrieveEvidence(ctx context.Context, cfg config, seed seededData) (*retrie
 		ConversationId:    cfg.conversationID,
 		AtConversationSeq: seed.ConversationSeq + 5,
 		Limit:             10,
-	})
+	}
+	if cfg.includeVectorBackend {
+		request.IncludeSearch = true
+		request.IncludeMemory = true
+		request.IncludeVector = true
+		request.QueryEmbeddingRef = cfg.queryEmbeddingRef
+		request.VectorCollectionTypes = []string{cfg.vectorCollectionType}
+		request.VectorVisibilityScope = cfg.vectorVisibilityScope
+		request.VectorPolicyVersion = cfg.vectorPolicyVersion
+		request.VectorMinScore = 0
+	}
+	return retrievalv1.NewRetrievalGatewayClient(conn).RetrieveEvidence(requestCtx, request)
 }
 
 func verifyEvidence(
@@ -504,6 +654,7 @@ func verifyEvidence(
 	var searchItem *retrievalv1.EvidenceItem
 	var memoryItem *retrievalv1.EvidenceItem
 	var profileItem *retrievalv1.EvidenceItem
+	var vectorItem *retrievalv1.EvidenceItem
 	staleMemoryExcluded := map[string]bool{
 		seed.ExpiredMemoryEventID:    true,
 		seed.SupersededMemoryEventID: true,
@@ -523,6 +674,9 @@ func verifyEvidence(
 		case retrievalv1.EvidenceSourceType_EVIDENCE_SOURCE_TYPE_PROFILE_AGGREGATE:
 			candidate := item
 			profileItem = candidate
+		case retrievalv1.EvidenceSourceType_EVIDENCE_SOURCE_TYPE_VECTOR_ITEM:
+			candidate := item
+			vectorItem = candidate
 		}
 	}
 	if searchItem == nil {
@@ -533,6 +687,12 @@ func verifyEvidence(
 	}
 	if profileItem == nil {
 		return evidenceSummary{}, errors.New("missing PROFILE_AGGREGATE evidence item")
+	}
+	if cfg.includeVectorBackend && vectorItem == nil {
+		return evidenceSummary{}, errors.New("missing VECTOR_ITEM evidence item")
+	}
+	if !cfg.includeVectorBackend && vectorItem != nil {
+		return evidenceSummary{}, errors.New("unexpected VECTOR_ITEM evidence item without --include-vector-backend")
 	}
 
 	verified := []string{}
@@ -552,6 +712,14 @@ func verifyEvidence(
 		return evidenceSummary{}, err
 	}
 	verified = append(verified, "source-chain rerank prioritizes multi-source memory evidence over a single search hit")
+	vectorRerankScore := 0.0
+	if cfg.includeVectorBackend {
+		if err := verifyVectorItem(vectorItem, seed); err != nil {
+			return evidenceSummary{}, err
+		}
+		vectorRerankScore = vectorItem.GetRerankScore()
+		verified = append(verified, "vector item evidence is returned from vector-index-service as refs-only EvidencePack source")
+	}
 	verified = append(verified, "cross-group memory source refs and speaker attribution are preserved")
 	verified = append(verified, "memory graph edge is preserved in EvidencePack")
 	verified = append(verified, "expired, superseded and future memory decoys are excluded by query seq")
@@ -565,10 +733,18 @@ func verifyEvidence(
 			counts.MemoryEvent = count.GetCount()
 		case retrievalv1.EvidenceSourceType_EVIDENCE_SOURCE_TYPE_PROFILE_AGGREGATE:
 			counts.ProfileAggregate = count.GetCount()
+		case retrievalv1.EvidenceSourceType_EVIDENCE_SOURCE_TYPE_VECTOR_ITEM:
+			counts.VectorItem = count.GetCount()
 		}
 	}
 	if counts.SearchMessage != 1 || counts.MemoryEvent != 1 || counts.ProfileAggregate != 1 {
 		return evidenceSummary{}, fmt.Errorf("unexpected source counts: %+v", counts)
+	}
+	if cfg.includeVectorBackend && counts.VectorItem != 1 {
+		return evidenceSummary{}, fmt.Errorf("unexpected vector source count: %+v", counts)
+	}
+	if !cfg.includeVectorBackend && counts.VectorItem != 0 {
+		return evidenceSummary{}, fmt.Errorf("unexpected vector source count without vector backend: %+v", counts)
 	}
 	if pack.GetSearchProjectionVersion() != seed.VisibilityVersion {
 		return evidenceSummary{}, fmt.Errorf("unexpected search projection version %d", pack.GetSearchProjectionVersion())
@@ -585,6 +761,8 @@ func verifyEvidence(
 		RunName:                               cfg.runName,
 		ResultDir:                             resultDir,
 		RetrievalTarget:                       cfg.retrievalTarget,
+		VectorTarget:                          cfg.vectorTarget,
+		IncludeVectorBackend:                  cfg.includeVectorBackend,
 		Query:                                 cfg.query,
 		Seed:                                  seed,
 		PackID:                                pack.GetPackId(),
@@ -592,10 +770,12 @@ func verifyEvidence(
 		SearchItemCount:                       int(counts.SearchMessage),
 		MemoryItemCount:                       int(counts.MemoryEvent),
 		ProfileItemCount:                      int(counts.ProfileAggregate),
+		VectorItemCount:                       int(counts.VectorItem),
 		SourceCounts:                          counts,
 		SourceChainRerankPreserved:            true,
 		SearchRerankScore:                     searchItem.GetRerankScore(),
 		MemoryRerankScore:                     memoryItem.GetRerankScore(),
+		VectorRerankScore:                     vectorRerankScore,
 		SearchProjectionVersion:               pack.GetSearchProjectionVersion(),
 		MemoryProjectionVersion:               pack.GetMemoryProjectionVersion(),
 		RetrievalVersion:                      pack.GetRetrievalVersion(),
@@ -604,6 +784,9 @@ func verifyEvidence(
 		CrossGroupSpeakerAttributionPreserved: true,
 		MemoryGraphEdgesPreserved:             true,
 		ProfileAggregatePreserved:             true,
+		VectorEvidencePreserved:               cfg.includeVectorBackend,
+		VectorSourceRefHashPreserved:          cfg.includeVectorBackend,
+		VectorNoRawText:                       cfg.includeVectorBackend,
 		TemporalVersionSelectedByQuerySeq:     true,
 		ExpiredMemoryExcluded:                 true,
 		SupersededMemoryExcluded:              true,
@@ -612,6 +795,39 @@ func verifyEvidence(
 		StartedAt:                             startedAt,
 		FinishedAt:                            time.Now().UTC(),
 	}, nil
+}
+
+func verifyVectorItem(item *retrievalv1.EvidenceItem, seed seededData) error {
+	if item.GetVectorItemRef() != seed.VectorItemID {
+		return fmt.Errorf("unexpected vector_item_ref %q", item.GetVectorItemRef())
+	}
+	if item.GetSourceId() != seed.VectorItemID {
+		return fmt.Errorf("unexpected vector source_id %q", item.GetSourceId())
+	}
+	if item.GetVectorSourceRefHash() != seed.VectorSourceRefHash {
+		return fmt.Errorf("unexpected vector source_ref_hash %q", item.GetVectorSourceRefHash())
+	}
+	if item.GetVectorSourceService() != seed.VectorSourceService {
+		return fmt.Errorf("unexpected vector source_service %q", item.GetVectorSourceService())
+	}
+	if item.GetVectorCollectionType() != seed.VectorCollectionType {
+		return fmt.Errorf("unexpected vector collection_type %q", item.GetVectorCollectionType())
+	}
+	if item.GetVectorTombstoneStatus() != "NONE" {
+		return fmt.Errorf("unexpected vector tombstone status %q", item.GetVectorTombstoneStatus())
+	}
+	if item.GetVisibilityVersion() != seed.VisibilityVersion {
+		return fmt.Errorf("unexpected vector visibility_version %d", item.GetVisibilityVersion())
+	}
+	if strings.TrimSpace(item.GetText()) != "" {
+		return errors.New("vector evidence must not carry raw text")
+	}
+	if len(item.GetSourceRefs()) != 1 ||
+		item.GetSourceRefs()[0].GetSourceType() != "VECTOR_SOURCE_REF_HASH" ||
+		item.GetSourceRefs()[0].GetSourceId() != seed.VectorSourceRefHash {
+		return fmt.Errorf("unexpected vector source refs: %+v", item.GetSourceRefs())
+	}
+	return nil
 }
 
 func verifySearchItem(item *retrievalv1.EvidenceItem, seed seededData) error {
@@ -841,6 +1057,11 @@ func randomSuffix() string {
 		return fmt.Sprintf("%d", time.Now().UnixNano())
 	}
 	return hex.EncodeToString(data[:])
+}
+
+func hashRef(value string) string {
+	sum := sha256.Sum256([]byte(strings.TrimSpace(value)))
+	return "sha256:" + hex.EncodeToString(sum[:])
 }
 
 func gitOutput(args ...string) string {

@@ -249,6 +249,10 @@ fail-closed，不写 execution audit、不写 tool result projection、不调用
   和当前 memory status 过滤，lookup / visibility / malformed edge 失败时 fail-closed。
   显式 vector retrieval 已通过 vector-index-service 公开 `SearchVectors` 接入
   `VECTOR_ITEM` EvidencePack source，并要求低敏 embedding ref / 明确 collection /
-  visibility / policy metadata；
-  后续继续接真实 BM25 backend、vector backend live smoke，以及更深或可配置 graph expansion。
+  visibility / policy metadata；2026-06-24
+  `retrieval-vector-backend-smoke-20260624-223543` 已通过真实 opt-in smoke，确认
+  vector-index-service 公开 `UpsertVectorItem -> SearchVectors` 能把 refs-only
+  `VECTOR_ITEM` 送入 EvidencePack，且不携带 raw text 或 embedding vector；
+  后续继续接真实 BM25 backend、pgvector / Milvus / OpenSearch vector provider smoke，
+  以及更深或可配置 graph expansion。
 - 真实 mutation 必须等显式业务 adapter、approval、executor、audit 全部就绪后再扩展。

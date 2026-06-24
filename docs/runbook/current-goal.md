@@ -209,6 +209,13 @@ IM messages -> search / memory projection -> EvidencePack -> RAG / Agent answer 
   collection type、visibility version 和 tombstone status 放入 `VECTOR_ITEM`
   EvidencePack，不传 raw text 或 embedding vector。vector lane 独立参与 RRF 风格融合；
   未配置 vector port、vector dependency error 或 malformed vector result 均 fail-closed。
+- 同日 `retrieval-vector-backend-smoke-20260624-223543` 已通过真实 opt-in smoke：
+  `loadtest/retrieval/run-local-smoke.ps1 -IncludeVectorBackend` 启动 search-service、
+  memory-service、vector-index-service 和 retrieval-gateway；runner 通过
+  vector-index-service 公开 `UpsertVectorItem` seed 低敏 vector metadata，再要求
+  retrieval-gateway 通过公开 `SearchVectors` 返回 refs-only `VECTOR_ITEM`。EvidencePack
+  source counts 为 search / memory / profile / vector 各 1 条，vector evidence 不携带
+  raw text 或 embedding vector。
 - 已有 clean smoke 覆盖真实双用户好友直聊、群聊 first path、群资料 BFF
   read/update 和群成员动作链路；证据见 `docs/runbook/client-platform.md`。
 - Windows desktop 已有 artifact / signing / installer plan first paths；签名 / installer
@@ -295,8 +302,9 @@ IM messages -> search / memory projection -> EvidencePack -> RAG / Agent answer 
    并沿 memory graph edge 做 first-stage depth=1 相邻 memory expansion；相邻 memory
    继续通过 memory-service 公开 `GetMemoryEvent` 和当前 memory status 过滤，lookup /
    visibility / malformed edge 失败时 fail-closed；显式 vector retrieval 会通过
-   vector-index-service 公开 `SearchVectors` 返回 `VECTOR_ITEM` source。后续真实 BM25
-   backend、vector backend live smoke 和更深或可配置 graph expansion 仍保持在
+   vector-index-service 公开 `SearchVectors` 返回 `VECTOR_ITEM` source。retrieval
+   vector backend opt-in live smoke 已通过；后续真实 BM25 backend、pgvector / Milvus /
+   OpenSearch vector provider smoke 和更深或可配置 graph expansion 仍保持在
    retrieval-gateway 边界内。
 5. 客户端只作为演示入口；除非阻塞上述演示，不继续扩 UI 产品化。
 6. Windows release signing / MSI / NSIS installer、完整 Android、完整移动端发布、

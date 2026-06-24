@@ -5,6 +5,8 @@ param(
     [string]$SearchGrpcAddr = "127.0.0.1:10570",
     [string]$MemoryGrpcAddr = "127.0.0.1:10580",
     [string]$RetrievalGrpcAddr = "127.0.0.1:10590",
+    [string]$VectorGrpcAddr = "127.0.0.1:10760",
+    [switch]$IncludeVectorBackend,
     [switch]$SkipBuild
 )
 
@@ -27,6 +29,9 @@ New-Item -ItemType Directory -Force $logDir | Out-Null
 if (-not $SkipBuild) {
     go build -o (Join-Path $repoRoot "bin\search-service.exe") ./services/search-service/cmd/search-service
     go build -o (Join-Path $repoRoot "bin\memory-service.exe") ./services/memory-service/cmd/memory-service
+    if ($IncludeVectorBackend) {
+        go build -o (Join-Path $repoRoot "bin\vector-index-service.exe") ./services/vector-index-service/cmd/vector-index-service
+    }
     go build -o (Join-Path $repoRoot "bin\retrieval-gateway.exe") ./services/retrieval-gateway/cmd/retrieval-gateway
     go build -o (Join-Path $repoRoot "bin\retrieval-smoke.exe") ./loadtest/retrieval
 }
@@ -91,9 +96,17 @@ try {
         NEXUSIM_PG_DSN = $PgDsn
         NEXUSIM_MEMORY_DEBUG_ADDR = ""
     }
+    if ($IncludeVectorBackend) {
+        $processes += Start-ProcessRole -Name "vector-index-grpc" -Exe (Join-Path $repoRoot "bin\vector-index-service.exe") -Env @{
+            NEXUSIM_VECTOR_INDEX_SERVICE_MODE = "grpc"
+            NEXUSIM_VECTOR_GRPC_ADDR = $VectorGrpcAddr
+            NEXUSIM_PG_DSN = $PgDsn
+            NEXUSIM_VECTOR_INDEX_DEBUG_ADDR = ""
+        }
+    }
     Start-Sleep -Milliseconds 700
 
-    $processes += Start-ProcessRole -Name "retrieval-grpc" -Exe (Join-Path $repoRoot "bin\retrieval-gateway.exe") -Env @{
+    $retrievalEnv = @{
         NEXUSIM_RETRIEVAL_GATEWAY_MODE = "grpc"
         NEXUSIM_RETRIEVAL_GRPC_ADDR = $RetrievalGrpcAddr
         NEXUSIM_SEARCH_GRPC_ADDR = $SearchGrpcAddr
@@ -101,14 +114,26 @@ try {
         NEXUSIM_RETRIEVAL_DEPENDENCY_TIMEOUT = "3s"
         NEXUSIM_RETRIEVAL_DEBUG_ADDR = ""
     }
+    if ($IncludeVectorBackend) {
+        $retrievalEnv["NEXUSIM_VECTOR_GRPC_ADDR"] = $VectorGrpcAddr
+    }
+    $processes += Start-ProcessRole -Name "retrieval-grpc" -Exe (Join-Path $repoRoot "bin\retrieval-gateway.exe") -Env $retrievalEnv
     Start-Sleep -Seconds 1
 
     $runner = Join-Path $repoRoot "bin\retrieval-smoke.exe"
-    & $runner `
-        --pg-dsn $PgDsn `
-        --retrieval-target $RetrievalGrpcAddr `
-        --result-root $ResultRoot `
-        --run-name $RunName
+    $runnerArgs = @(
+        "--pg-dsn", $PgDsn,
+        "--retrieval-target", $RetrievalGrpcAddr,
+        "--result-root", $ResultRoot,
+        "--run-name", $RunName
+    )
+    if ($IncludeVectorBackend) {
+        $runnerArgs += @(
+            "--include-vector-backend",
+            "--vector-target", $VectorGrpcAddr
+        )
+    }
+    & $runner @runnerArgs
     if ($LASTEXITCODE -ne 0) {
         throw "retrieval smoke failed with exit code $LASTEXITCODE"
     }

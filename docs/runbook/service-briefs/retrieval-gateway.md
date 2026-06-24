@@ -1,6 +1,6 @@
 # retrieval-gateway
 
-状态：foundation-active / EvidencePack vector source adapter + graph depth=1 passed。
+状态：foundation-active / EvidencePack vector source live smoke + graph depth=1 passed。
 
 定位：统一 search + memory 的检索入口，向 RAG / summary / Agent 提供
 `EvidencePack`。它不直接读业务库，不调用 LLM，不执行 Agent 动作。
@@ -88,7 +88,14 @@
   collection type、visibility version 和 tombstone status，不传 raw text 或 embedding
   vector。vector lane 独立参与 RRF 风格融合，不与 BM25 / vector 原始分数直接比较；
   未配置 vector port、vector 依赖错误或 malformed vector result 均 fail-closed。
+- 2026-06-24 `retrieval-vector-backend-smoke-20260624-223543` 已通过真实本地
+  opt-in smoke：`run-local-smoke.ps1 -IncludeVectorBackend` 启动 search-service、
+  memory-service、vector-index-service 和 retrieval-gateway，runner 通过
+  vector-index-service 公开 `UpsertVectorItem` seed 低敏 vector metadata，并要求
+  retrieval-gateway 通过公开 `SearchVectors` 返回 refs-only `VECTOR_ITEM`。
+  EvidencePack source counts 为 search / memory / profile / vector 各 1 条，vector
+  evidence 不携带 raw text 或 embedding vector。
 
-下一步：继续把真实 BM25 backend、vector backend live smoke、更深或可配置 graph
-expansion 和更细 source-chain / vector coverage 通过 EvidencePack 暴露给 RAG /
-summary / Agent，仍不绕过 retrieval-gateway。
+下一步：继续把真实 BM25 backend、pgvector / Milvus / OpenSearch vector provider
+smoke、更深或可配置 graph expansion 和更细 source-chain / vector coverage 通过
+EvidencePack 暴露给 RAG / summary / Agent，仍不绕过 retrieval-gateway。

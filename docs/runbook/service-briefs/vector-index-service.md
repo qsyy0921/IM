@@ -23,6 +23,12 @@ Stage-switch：`docs/runbook/stage-switch/vector-index-service.md`。
 - retrieval-gateway 已通过公开 `SearchVectors` adapter first path 消费 vector item
   ref / source ref hash / visibility metadata，并以 `VECTOR_ITEM` EvidencePack source
   暴露给 RAG / summary / Agent；vector-index-service 仍不直接服务 RAG 请求。
+- 2026-06-24 retrieval vector backend opt-in smoke 已通过：
+  `loadtest/retrieval/run-local-smoke.ps1 -IncludeVectorBackend` 启动真实
+  vector-index-service gRPC，runner 通过公开 `UpsertVectorItem` 写入低敏
+  `MEMORY_EVENT` vector metadata，retrieval-gateway 再通过公开 `SearchVectors`
+  获取 refs-only `VECTOR_ITEM`。该 smoke 使用 PostgreSQL metadata / `postgres-test`
+  backend state，不代表 pgvector / Milvus / OpenSearch provider 已完成。
 - optional pgvector adapter 包和 compose overlay；默认不启用，不进入普通 migration。
 
 证据入口：`docs/runbook/loadtest/vector-index-service/` 和 `loadtest/vectorembedding`。

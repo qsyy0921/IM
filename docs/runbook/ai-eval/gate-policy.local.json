@@ -119,6 +119,7 @@
         "mcp-gateway",
         "skill-registry",
         "policy-service",
+        "workflow-service",
         "postgres"
       ]
     },

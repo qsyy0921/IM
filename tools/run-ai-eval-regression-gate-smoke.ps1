@@ -11,6 +11,7 @@ param(
     [string]$SummaryTarget = "127.0.0.1:10620",
     [string]$AgentTarget = "127.0.0.1:10630",
     [string]$ActionExecutorTarget = "127.0.0.1:10660",
+    [string]$WorkflowTarget = "127.0.0.1:10750",
     [string]$Python = "python",
     [string]$ResultRoot = "H:\NexusIM\loadtest-results",
     [string]$RunName = "",
@@ -181,6 +182,7 @@ function Invoke-GateAdapter {
                 -RAGTarget $RAGTarget `
                 -AgentTarget $AgentTarget `
                 -ActionExecutorTarget $ActionExecutorTarget `
+                -WorkflowTarget $WorkflowTarget `
                 -ResultRoot $ResultRoot `
                 -RunName $AdapterRunName `
                 -OutputPath $SummaryPath `

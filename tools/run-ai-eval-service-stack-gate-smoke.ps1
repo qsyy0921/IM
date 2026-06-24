@@ -17,6 +17,7 @@ param(
     [string]$MCPGatewayTarget = "127.0.0.1:10650",
     [string]$SkillRegistryTarget = "127.0.0.1:10640",
     [string]$PolicyTarget = "127.0.0.1:10800",
+    [string]$WorkflowTarget = "127.0.0.1:10750",
     [string]$Python = "python",
     [string]$ResultRoot = "H:\NexusIM\loadtest-results",
     [string]$RunName = "",
@@ -202,6 +203,7 @@ if ($adapters -contains "agent-action-executor") {
     Add-EndpointCheck -Checks $checks -Seen $seenChecks -Name "mcp-gateway" -Endpoint $MCPGatewayTarget -DefaultPort 10650
     Add-EndpointCheck -Checks $checks -Seen $seenChecks -Name "skill-registry" -Endpoint $SkillRegistryTarget -DefaultPort 10640
     Add-EndpointCheck -Checks $checks -Seen $seenChecks -Name "policy-service" -Endpoint $PolicyTarget -DefaultPort 10800
+    Add-EndpointCheck -Checks $checks -Seen $seenChecks -Name "workflow-service" -Endpoint $WorkflowTarget -DefaultPort 10750
 }
 if ($adapters -contains "rag-agent-demo") {
     Add-EndpointCheck -Checks $checks -Seen $seenChecks -Name "rag-service" -Endpoint $RAGTarget -DefaultPort 10610
@@ -213,6 +215,7 @@ if ($adapters -contains "rag-agent-demo") {
     Add-EndpointCheck -Checks $checks -Seen $seenChecks -Name "mcp-gateway" -Endpoint $MCPGatewayTarget -DefaultPort 10650
     Add-EndpointCheck -Checks $checks -Seen $seenChecks -Name "skill-registry" -Endpoint $SkillRegistryTarget -DefaultPort 10640
     Add-EndpointCheck -Checks $checks -Seen $seenChecks -Name "policy-service" -Endpoint $PolicyTarget -DefaultPort 10800
+    Add-EndpointCheck -Checks $checks -Seen $seenChecks -Name "workflow-service" -Endpoint $WorkflowTarget -DefaultPort 10750
 }
 if ($checks.Count -gt 0) {
     $pgEndpoint = Get-PostgresEndpoint -DSN $PGDSN
@@ -274,6 +277,7 @@ if ($NoApplyMigration) {
         -SummaryTarget $SummaryTarget `
         -AgentTarget $AgentTarget `
         -ActionExecutorTarget $ActionExecutorTarget `
+        -WorkflowTarget $WorkflowTarget `
         -Python $Python `
         -ResultRoot $ResultRoot `
         -RunName $RunName `
@@ -296,6 +300,7 @@ if ($NoApplyMigration) {
         -SummaryTarget $SummaryTarget `
         -AgentTarget $AgentTarget `
         -ActionExecutorTarget $ActionExecutorTarget `
+        -WorkflowTarget $WorkflowTarget `
         -Python $Python `
         -ResultRoot $ResultRoot `
         -RunName $RunName `

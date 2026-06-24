@@ -5,6 +5,7 @@ param(
     [string]$RAGTarget = "127.0.0.1:10610",
     [string]$AgentTarget = "127.0.0.1:10630",
     [string]$ActionExecutorTarget = "127.0.0.1:10660",
+    [string]$WorkflowTarget = "127.0.0.1:10750",
     [string]$ResultRoot = "H:\NexusIM\loadtest-results",
     [string]$RunName = "",
     [string]$OutputPath = "",
@@ -100,6 +101,7 @@ $runArgs = @(
     "-rag-target", $RAGTarget,
     "-agent-target", $AgentTarget,
     "-action-executor-target", $ActionExecutorTarget,
+    "-workflow-target", $WorkflowTarget,
     "-result-root", $ResultRoot,
     "-run-name", $RunName,
     "-question", "phoenix launch decision",
@@ -160,6 +162,20 @@ Add-Assertion -Assertions $assertions -Type "public_candidate_review_must_enter_
     (Get-JsonPropertyString -Object $summary -Name "public_candidate_memory_event_id").Length -gt 0 -and
     (Get-JsonPropertyString -Object $summary -Name "public_candidate_superseded_memory_event_id").Length -gt 0 -and
     (Get-JsonPropertyString -Object $summary -Name "public_candidate_fact_sha256").Length -gt 0
+)
+Add-Assertion -Assertions $assertions -Type "profile_repair_must_require_workflow_approval_and_enter_evidence_chain" -Passed (
+    (Get-JsonPropertyBool -Object $summary -Name "profile_repair_approval_requested") -and
+    (Get-JsonPropertyBool -Object $summary -Name "profile_repair_workflow_approved") -and
+    (Get-JsonPropertyBool -Object $summary -Name "profile_repair_approval_verified") -and
+    (Get-JsonPropertyBool -Object $summary -Name "profile_repair_executed") -and
+    (Get-JsonPropertyBool -Object $summary -Name "profile_repair_profile_active") -and
+    [int]$summary.profile_repair_support_count -ge 2 -and
+    [int]$summary.profile_repair_supporting_memory_count -ge 2 -and
+    (Get-JsonPropertyBool -Object $summary -Name "profile_repair_evidence_in_rag") -and
+    (Get-JsonPropertyBool -Object $summary -Name "profile_repair_evidence_in_agent") -and
+    (Get-JsonPropertyString -Object $summary -Name "profile_repair_workflow_id").Length -gt 0 -and
+    (Get-JsonPropertyString -Object $summary -Name "profile_repair_payload_ref_hash").Length -gt 0 -and
+    (Get-JsonPropertyString -Object $summary -Name "profile_repair_target_ref_hash").Length -gt 0
 )
 Add-Assertion -Assertions $assertions -Type "summary_must_be_low_sensitive" -Passed (
     (Get-JsonPropertyString -Object $summary -Name "rag_answer_text_sha256").Length -gt 0 -and

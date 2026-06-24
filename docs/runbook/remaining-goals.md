@@ -88,9 +88,9 @@
   进入 EvidencePack。search-service PostgreSQL FTS lexical backend first path 已落，
   不再使用 substring fallback；显式 OpenSearch / BM25 candidate backend first path 已落，
   不会绕过 PostgreSQL visibility / tombstone hydration；OpenSearch opt-in backend
-  smoke 入口和 service-owned rebuild operator first path 已补齐但本机尚未归档真实
-  OpenSearch 进程通过报告；下一步继续补真实 OpenSearch 进程 smoke、mapping hardening、
-  pgvector / Milvus / OpenSearch vector provider smoke
+  smoke 入口、service-owned rebuild operator first path 和 mapping drift hardening
+  已补齐但本机尚未归档真实 OpenSearch 进程通过报告；下一步继续补真实 OpenSearch
+  进程 smoke、pgvector / Milvus / OpenSearch vector provider smoke
   与 EvidencePack coverage。
   真实 mutation 场景必须等显式业务 adapter 和
   operator policy 就绪。

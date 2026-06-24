@@ -81,11 +81,13 @@ type SearchIndexCursor struct {
 }
 
 type SearchIndexDocument struct {
-	TenantID        TenantID
-	ConversationID  ConversationID
-	MessageID       string
-	ConversationSeq int64
-	SearchableText  string
+	TenantID          TenantID
+	ConversationID    ConversationID
+	MessageID         string
+	ConversationSeq   int64
+	SourceEventID     string
+	SearchableText    string
+	VisibilityVersion int64
 }
 
 type SearchMessagesResult struct {

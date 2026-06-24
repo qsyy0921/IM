@@ -258,8 +258,8 @@ fail-closed，不写 execution audit、不写 tool result projection、不调用
   使用 token-based `plainto_tsquery + to_tsvector` 并移除 `ILIKE` substring fallback；
   显式 OpenSearch / BM25 candidate backend first path 已接入，外部索引只召回候选并由
   PostgreSQL projection 做 visibility / tombstone hydration；OpenSearch opt-in
-  backend smoke 入口和 service-owned rebuild operator first path 已补齐，但当前机器
-  Docker / OpenSearch 不可用，尚未归档真实 OpenSearch 进程通过报告；后续继续做真实
-  OpenSearch 进程 smoke、pgvector / Milvus / OpenSearch vector provider smoke，
-  以及更细 EvidencePack coverage。
+  backend smoke 入口、service-owned rebuild operator first path 和 index mapping
+  drift hardening 已补齐，但当前机器 Docker / OpenSearch 不可用，尚未归档真实
+  OpenSearch 进程通过报告；后续继续做真实 OpenSearch 进程 smoke、pgvector /
+  Milvus / OpenSearch vector provider smoke，以及更细 EvidencePack coverage。
 - 真实 mutation 必须等显式业务 adapter、approval、executor、audit 全部就绪后再扩展。

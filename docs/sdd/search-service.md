@@ -235,8 +235,14 @@ search，不保留 `ILIKE` substring fallback。
   才会写 OpenSearch。该 operator 适合 fresh index / local smoke / controlled
   rebuild，不是跨服务数据修复通道，也不绕过 PostgreSQL projection 的最终
   visibility / tombstone hydration。
-- 当前只宣称 adapter first path、opt-in smoke 入口、rebuild operator first path
-  和 focused tests；真实 OpenSearch 进程 smoke、mapping hardening、容量曲线和
+- OpenSearch index contract 使用 versioned strict mapping：
+  `nexusim.search.messages.v1`。Create Index request 会写入 `_meta.owner=search-service`、
+  `_meta.source_projection=search_message_documents` 和 mapping version；已有 index
+  命中 `resource_already_exists_exception` 时，rebuild operator 会读取
+  `/<index>/_mapping` 并校验 `dynamic=strict`、mapping version 和必需字段类型。
+  mapping drift 返回 `SEARCH_UNAVAILABLE`，不继续 bulk 写入。
+- 当前只宣称 adapter first path、opt-in smoke 入口、rebuild operator first path、
+  mapping drift focused tests；真实 OpenSearch 进程 smoke、容量曲线和
   provider-grade 运维仍是后续项。
 
 ## 8. 第一版验收

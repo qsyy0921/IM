@@ -22,6 +22,18 @@ type Indexer struct {
 	httpClient *http.Client
 }
 
+const searchIndexMappingVersion = "nexusim.search.messages.v1"
+
+var requiredSearchIndexFieldTypes = map[string]string{
+	"tenant_id":          "keyword",
+	"conversation_id":    "keyword",
+	"message_id":         "keyword",
+	"conversation_seq":   "long",
+	"source_event_id":    "keyword",
+	"searchable_text":    "text",
+	"visibility_version": "long",
+}
+
 func NewIndexer(config Config) (*Indexer, error) {
 	endpoint, err := parseEndpoint(config.Endpoint)
 	if err != nil {
@@ -49,24 +61,7 @@ func NewIndexer(config Config) (*Indexer, error) {
 }
 
 func (indexer *Indexer) EnsureSearchIndex(ctx context.Context) error {
-	body := map[string]any{
-		"settings": map[string]any{
-			"index": map[string]any{
-				"number_of_shards":   1,
-				"number_of_replicas": 0,
-			},
-		},
-		"mappings": map[string]any{
-			"properties": map[string]any{
-				"tenant_id":        map[string]any{"type": "keyword"},
-				"conversation_id":  map[string]any{"type": "keyword"},
-				"message_id":       map[string]any{"type": "keyword"},
-				"conversation_seq": map[string]any{"type": "long"},
-				"searchable_text":  map[string]any{"type": "text"},
-			},
-		},
-	}
-	status, responseBody, err := indexer.doJSON(ctx, http.MethodPut, "/"+url.PathEscape(indexer.index), body)
+	status, responseBody, err := indexer.doJSON(ctx, http.MethodPut, "/"+url.PathEscape(indexer.index), searchIndexDefinition())
 	if err != nil {
 		return err
 	}
@@ -74,9 +69,77 @@ func (indexer *Indexer) EnsureSearchIndex(ctx context.Context) error {
 		return nil
 	}
 	if status == http.StatusBadRequest && strings.Contains(responseBody, "resource_already_exists_exception") {
-		return nil
+		return indexer.VerifySearchIndex(ctx)
 	}
 	return types.NewSearchUnavailable(fmt.Sprintf("opensearch create index returned status %d", status))
+}
+
+func (indexer *Indexer) VerifySearchIndex(ctx context.Context) error {
+	status, responseBody, err := indexer.do(ctx, http.MethodGet, "/"+url.PathEscape(indexer.index)+"/_mapping", "", nil)
+	if err != nil {
+		return err
+	}
+	if status != http.StatusOK {
+		return types.NewSearchUnavailable(fmt.Sprintf("opensearch get mapping returned status %d", status))
+	}
+	var decoded map[string]struct {
+		Mappings struct {
+			Dynamic    string         `json:"dynamic"`
+			Meta       map[string]any `json:"_meta"`
+			Properties map[string]struct {
+				Type string `json:"type"`
+			} `json:"properties"`
+		} `json:"mappings"`
+	}
+	if err := json.Unmarshal([]byte(responseBody), &decoded); err != nil {
+		return types.NewSearchUnavailable("decode opensearch mapping response failed")
+	}
+	mapping, ok := decoded[indexer.index]
+	if !ok {
+		if len(decoded) != 1 {
+			return types.NewSearchUnavailable("opensearch mapping response missing index")
+		}
+		for _, candidate := range decoded {
+			mapping = candidate
+		}
+	}
+	if mapping.Mappings.Dynamic != "strict" {
+		return types.NewSearchUnavailable("opensearch index dynamic mapping mismatch")
+	}
+	if fmt.Sprint(mapping.Mappings.Meta["nexusim_mapping_version"]) != searchIndexMappingVersion {
+		return types.NewSearchUnavailable("opensearch index mapping version mismatch")
+	}
+	for field, expectedType := range requiredSearchIndexFieldTypes {
+		property, ok := mapping.Mappings.Properties[field]
+		if !ok || property.Type != expectedType {
+			return types.NewSearchUnavailable("opensearch index field mapping mismatch")
+		}
+	}
+	return nil
+}
+
+func searchIndexDefinition() map[string]any {
+	properties := make(map[string]any, len(requiredSearchIndexFieldTypes))
+	for field, fieldType := range requiredSearchIndexFieldTypes {
+		properties[field] = map[string]any{"type": fieldType}
+	}
+	return map[string]any{
+		"settings": map[string]any{
+			"index": map[string]any{
+				"number_of_shards":   1,
+				"number_of_replicas": 0,
+			},
+		},
+		"mappings": map[string]any{
+			"dynamic": "strict",
+			"_meta": map[string]any{
+				"nexusim_mapping_version": searchIndexMappingVersion,
+				"owner":                   "search-service",
+				"source_projection":       "search_message_documents",
+			},
+			"properties": properties,
+		},
+	}
 }
 
 func (indexer *Indexer) IndexSearchDocuments(ctx context.Context, documents []types.SearchIndexDocument) error {
@@ -97,11 +160,13 @@ func (indexer *Indexer) IndexSearchDocuments(ctx context.Context, documents []ty
 			return types.NewSearchUnavailable("encode opensearch bulk action failed")
 		}
 		payload := map[string]any{
-			"tenant_id":        document.TenantID,
-			"conversation_id":  document.ConversationID,
-			"message_id":       document.MessageID,
-			"conversation_seq": document.ConversationSeq,
-			"searchable_text":  document.SearchableText,
+			"tenant_id":          document.TenantID,
+			"conversation_id":    document.ConversationID,
+			"message_id":         document.MessageID,
+			"conversation_seq":   document.ConversationSeq,
+			"source_event_id":    document.SourceEventID,
+			"searchable_text":    document.SearchableText,
+			"visibility_version": document.VisibilityVersion,
 		}
 		if err := encoder.Encode(payload); err != nil {
 			return types.NewSearchUnavailable("encode opensearch bulk document failed")

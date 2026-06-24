@@ -29,6 +29,10 @@
   默认 dry-run，只有 `NEXUSIM_SEARCH_REBUILD_EXECUTE=true` 才通过 OpenSearch
   create-index / NDJSON bulk / refresh 写外部 index。该 operator 不跨服务读私表，
   不把 OpenSearch 当事实源，真实 OpenSearch 进程验证仍待运行环境恢复。
+- 2026-06-25 已补 OpenSearch index contract hardening：rebuild operator 创建 index 时写入
+  `nexusim.search.messages.v1` strict mapping 和 `_meta` owner / source projection；
+  已存在 index 会先读取 `_mapping` 校验 mapping version、`dynamic=strict` 和必需字段类型，
+  drift 时返回 `SEARCH_UNAVAILABLE`，不继续 bulk 写入。
 - 当前 active slice 已转入 backend architecture + AI / Agent / RAG demo path；search-service 后续保留 EvidencePack 前置字段深化和搜索 hardening。
 - 短期不以生产级完整系统测试或生产级 HA 作为 v0.1 阻塞；v0.1 验证重点是切片级本地检查、projection / visibility / tombstone smoke 和 EvidencePack 前置字段。
 - 定位是搜索索引、成员可见窗口过滤、tombstone 和 EvidencePack 前置服务。
@@ -50,7 +54,7 @@
 - PostgreSQL FTS first path：`SearchMessages` 已从 substring match 改为 token-based lexical search。
 - OpenSearch / BM25 candidate backend first path：显式 `NEXUSIM_SEARCH_BACKEND=opensearch`
   已接入；opt-in OpenSearch smoke 入口和 service-owned rebuild operator first path
-  已补齐；后续仍需在可用 OpenSearch 进程上归档真实 smoke，再做 mapping hardening、
-  容量曲线和 provider-grade 运维。
+  已补齐；mapping drift focused hardening 已补齐；后续仍需在可用 OpenSearch 进程上
+  归档真实 smoke，再做容量曲线和 provider-grade 运维。
 - EvidencePack 前置 smoke：搜索结果必须带 source message id、conversation seq、source event id 和 visibility version。
 - 后续链路：memory / group memory -> retrieval-gateway / EvidencePack -> RAG / summary -> Agent -> skill-registry -> mcp-gateway/tool-gateway -> action-executor。

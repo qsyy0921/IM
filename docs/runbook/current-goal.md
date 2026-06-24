@@ -239,6 +239,11 @@ IM messages -> search / memory projection -> EvidencePack -> RAG / Agent answer 
   写入使用 create-index / NDJSON bulk / refresh，并且错误 fail-closed；该 operator
   不跨服务读私表，不把 OpenSearch 变成权限事实源。真实 OpenSearch 进程验证仍待
   Docker / OpenSearch runtime 恢复。
+- 同日 search-service 已补 OpenSearch index contract hardening：
+  rebuild operator 创建 index 时写入 `nexusim.search.messages.v1` strict mapping 和
+  `_meta` owner / source projection；已有 index 会读取 `_mapping` 校验 mapping version、
+  `dynamic=strict` 和必需字段类型，drift 时 fail-closed 为 `SEARCH_UNAVAILABLE`，
+  不继续 bulk 写入。
 - 已有 clean smoke 覆盖真实双用户好友直聊、群聊 first path、群资料 BFF
   read/update 和群成员动作链路；证据见 `docs/runbook/client-platform.md`。
 - Windows desktop 已有 artifact / signing / installer plan first paths；签名 / installer
@@ -329,8 +334,9 @@ IM messages -> search / memory projection -> EvidencePack -> RAG / Agent answer 
    vector-index-service 公开 `SearchVectors` 返回 `VECTOR_ITEM` source。retrieval
    vector backend opt-in live smoke 已通过；search-service PostgreSQL FTS lexical
    backend 和显式 OpenSearch / BM25 candidate backend first paths 已补齐；OpenSearch
-   opt-in smoke 入口和 service-owned rebuild operator first path 已补齐，但尚未在
-   真实 OpenSearch 进程上归档通过报告；后续真实 OpenSearch 进程 smoke、pgvector /
+   opt-in smoke 入口、service-owned rebuild operator first path 和 mapping drift
+   hardening 已补齐，但尚未在真实 OpenSearch 进程上归档通过报告；后续真实 OpenSearch
+   进程 smoke、pgvector /
    Milvus / OpenSearch vector provider smoke 和更细 EvidencePack coverage 仍保持在
    retrieval-gateway 边界内。
 5. 客户端只作为演示入口；除非阻塞上述演示，不继续扩 UI 产品化。

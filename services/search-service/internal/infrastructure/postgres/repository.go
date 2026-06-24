@@ -230,7 +230,14 @@ func (repository *Repository) ListSearchIndexDocuments(
 		conversationFilter = "AND conversation_id = $5"
 	}
 	rows, err := repository.pool.Query(ctx, `
-SELECT tenant_id, conversation_id, message_id, conversation_seq, searchable_text
+SELECT
+	tenant_id,
+	conversation_id,
+	message_id,
+	conversation_seq,
+	source_event_id,
+	searchable_text,
+	visibility_version
 FROM search_message_documents
 WHERE tenant_id = $1
   AND tombstone_status = 'NONE'
@@ -253,7 +260,9 @@ LIMIT $4
 			&document.ConversationID,
 			&document.MessageID,
 			&document.ConversationSeq,
+			&document.SourceEventID,
 			&document.SearchableText,
+			&document.VisibilityVersion,
 		); err != nil {
 			return nil, types.NewDBReadFailed(err.Error())
 		}

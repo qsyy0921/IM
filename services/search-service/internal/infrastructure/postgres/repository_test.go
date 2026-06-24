@@ -338,6 +338,9 @@ func TestRepositoryListSearchIndexDocumentsIntegration(t *testing.T) {
 	if len(documents) != 1 || documents[0].MessageID != "msg-1" {
 		t.Fatalf("expected first non-tombstoned tenant document, got %+v", documents)
 	}
+	if documents[0].SourceEventID != "event-document-1" {
+		t.Fatalf("source event id=%q want event-document-1", documents[0].SourceEventID)
+	}
 
 	next, err := repository.ListSearchIndexDocuments(ctx, types.RebuildSearchIndexCommand{
 		TenantID:  "tenant-1",

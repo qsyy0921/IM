@@ -23,18 +23,24 @@ type ListProfileAggregatesExecutor interface {
 	Execute(context.Context, types.ListProfileAggregatesCommand) (types.ListProfileAggregatesResult, error)
 }
 
-type Server struct {
-	memoryv1.UnimplementedMemoryServiceServer
-	queryMemoryEvents     QueryMemoryEventsExecutor
-	getMemoryEvent        GetMemoryEventExecutor
-	listProfileAggregates ListProfileAggregatesExecutor
+type RecomputeProfileAggregateExecutor interface {
+	Execute(context.Context, types.RecomputeProfileAggregateCommand) (types.RecomputeProfileAggregateResult, error)
 }
 
-func NewServer(query QueryMemoryEventsExecutor, get GetMemoryEventExecutor, list ListProfileAggregatesExecutor) *Server {
+type Server struct {
+	memoryv1.UnimplementedMemoryServiceServer
+	queryMemoryEvents         QueryMemoryEventsExecutor
+	getMemoryEvent            GetMemoryEventExecutor
+	listProfileAggregates     ListProfileAggregatesExecutor
+	recomputeProfileAggregate RecomputeProfileAggregateExecutor
+}
+
+func NewServer(query QueryMemoryEventsExecutor, get GetMemoryEventExecutor, list ListProfileAggregatesExecutor, recompute RecomputeProfileAggregateExecutor) *Server {
 	return &Server{
-		queryMemoryEvents:     query,
-		getMemoryEvent:        get,
-		listProfileAggregates: list,
+		queryMemoryEvents:         query,
+		getMemoryEvent:            get,
+		listProfileAggregates:     list,
+		recomputeProfileAggregate: recompute,
 	}
 }
 
@@ -116,6 +122,31 @@ func (server *Server) ListProfileAggregates(ctx context.Context, request *memory
 	return &memoryv1.ListProfileAggregatesResponse{
 		Items:      items,
 		NextCursor: result.NextCursor,
+	}, nil
+}
+
+func (server *Server) RecomputeProfileAggregate(ctx context.Context, request *memoryv1.RecomputeProfileAggregateRequest) (*memoryv1.RecomputeProfileAggregateResponse, error) {
+	if server == nil || server.recomputeProfileAggregate == nil {
+		return nil, publicError(types.ErrMemoryUnavailable)
+	}
+	result, err := server.recomputeProfileAggregate.Execute(ctx, types.RecomputeProfileAggregateCommand{
+		AuthContext:     authContext(ctx, request.GetAuthContext()),
+		SubjectUserID:   types.UserID(request.GetSubjectUserId()),
+		AggregateType:   request.GetAggregateType(),
+		AggregateKey:    request.GetAggregateKey(),
+		MinSupportCount: int(request.GetMinSupportCount()),
+	})
+	if err != nil {
+		return nil, publicError(err)
+	}
+	var item *memoryv1.ProfileAggregate
+	if result.Item.ProfileID != "" {
+		item = profileAggregateToProto(result.Item)
+	}
+	return &memoryv1.RecomputeProfileAggregateResponse{
+		Item:         item,
+		SupportCount: int32(result.SupportCount),
+		Active:       result.Active,
 	}, nil
 }
 

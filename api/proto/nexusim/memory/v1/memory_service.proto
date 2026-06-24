@@ -8,6 +8,7 @@ service MemoryService {
   rpc QueryMemoryEvents(QueryMemoryEventsRequest) returns (QueryMemoryEventsResponse);
   rpc GetMemoryEvent(GetMemoryEventRequest) returns (GetMemoryEventResponse);
   rpc ListProfileAggregates(ListProfileAggregatesRequest) returns (ListProfileAggregatesResponse);
+  rpc RecomputeProfileAggregate(RecomputeProfileAggregateRequest) returns (RecomputeProfileAggregateResponse);
 }
 
 message AuthContext {
@@ -164,4 +165,18 @@ message ListProfileAggregatesRequest {
 message ListProfileAggregatesResponse {
   repeated ProfileAggregate items = 1;
   string next_cursor = 2;
+}
+
+message RecomputeProfileAggregateRequest {
+  AuthContext auth_context = 1;
+  string subject_user_id = 2;
+  string aggregate_type = 3;
+  string aggregate_key = 4;
+  int32 min_support_count = 5;
+}
+
+message RecomputeProfileAggregateResponse {
+  ProfileAggregate item = 1;
+  int32 support_count = 2;
+  bool active = 3;
 }

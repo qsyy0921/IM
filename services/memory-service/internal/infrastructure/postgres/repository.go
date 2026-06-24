@@ -2,7 +2,9 @@ package postgres
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -308,6 +310,281 @@ LIMIT $4
 		return nil, types.NewDBReadFailed(err.Error())
 	}
 	return items, nil
+}
+
+func (repository *Repository) RecomputeProfileAggregate(
+	ctx context.Context,
+	command types.RecomputeProfileAggregateCommand,
+) (types.ProfileAggregate, int, bool, error) {
+	if repository.pool == nil {
+		return types.ProfileAggregate{}, 0, false, types.NewDBWriteFailed("memory repository is not configured")
+	}
+	tx, err := repository.pool.Begin(ctx)
+	if err != nil {
+		return types.ProfileAggregate{}, 0, false, types.NewDBWriteFailed(err.Error())
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	supports, err := loadProfileSupports(ctx, tx, command)
+	if err != nil {
+		return types.ProfileAggregate{}, 0, false, err
+	}
+	minSupportCount := command.EffectiveMinSupportCount()
+	if len(supports) < minSupportCount {
+		item, err := archiveProfileAggregate(ctx, tx, command, len(supports))
+		if err != nil {
+			return types.ProfileAggregate{}, 0, false, err
+		}
+		if err := tx.Commit(ctx); err != nil {
+			return types.ProfileAggregate{}, 0, false, types.NewDBWriteFailed(err.Error())
+		}
+		return item, len(supports), false, nil
+	}
+
+	item, err := upsertProfileAggregate(ctx, tx, command, supports)
+	if err != nil {
+		return types.ProfileAggregate{}, 0, false, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return types.ProfileAggregate{}, 0, false, types.NewDBWriteFailed(err.Error())
+	}
+	return item, len(supports), true, nil
+}
+
+type profileSupport struct {
+	MemoryEventID string
+	FactText      string
+	Confidence    float64
+	ValidFromAt   time.Time
+	UpdatedAt     time.Time
+}
+
+func loadProfileSupports(ctx context.Context, tx pgx.Tx, command types.RecomputeProfileAggregateCommand) ([]profileSupport, error) {
+	rows, err := tx.Query(ctx, `
+SELECT
+	e.memory_event_id,
+	e.fact_text,
+	e.confidence::float8,
+	e.valid_from_at,
+	e.updated_at
+FROM memory_structured_events e
+WHERE e.tenant_id = $1
+  AND e.event_type = 'PROFILE_SIGNAL'
+  AND e.status = 'ACTIVE'
+  AND e.review_state = 'APPROVED'
+  AND e.actor_user_ids ? $2
+  AND e.topic = $3
+  AND EXISTS (
+	SELECT 1
+	FROM memory_event_source_refs s
+	LEFT JOIN memory_membership_projection m
+	  ON m.tenant_id = s.tenant_id
+	 AND m.conversation_id = s.conversation_id
+	 AND m.user_id = $4
+	WHERE s.tenant_id = e.tenant_id
+	  AND s.memory_event_id = e.memory_event_id
+	  AND (
+		s.conversation_id = ''
+		OR (
+			m.status <> 'BANNED'
+			AND m.join_seq <= s.conversation_seq
+			AND (m.leave_seq IS NULL OR m.leave_seq >= s.conversation_seq)
+		)
+	  )
+  )
+ORDER BY COALESCE(e.valid_from_seq, 0), e.memory_event_id
+FOR UPDATE OF e
+`, command.AuthContext.TenantID, string(command.SubjectUserID), command.AggregateKey, string(command.AuthContext.UserID))
+	if err != nil {
+		return nil, types.NewDBReadFailed(err.Error())
+	}
+	defer rows.Close()
+
+	var supports []profileSupport
+	for rows.Next() {
+		var support profileSupport
+		var validFromAt sql.NullTime
+		if err := rows.Scan(&support.MemoryEventID, &support.FactText, &support.Confidence, &validFromAt, &support.UpdatedAt); err != nil {
+			return nil, types.NewDBReadFailed(err.Error())
+		}
+		support.ValidFromAt = nullTimeValue(validFromAt)
+		supports = append(supports, support)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, types.NewDBReadFailed(err.Error())
+	}
+	return supports, nil
+}
+
+func archiveProfileAggregate(ctx context.Context, tx pgx.Tx, command types.RecomputeProfileAggregateCommand, supportCount int) (types.ProfileAggregate, error) {
+	row := tx.QueryRow(ctx, `
+UPDATE memory_profile_aggregates
+SET status = 'ARCHIVED',
+    review_state = 'NEEDS_REVIEW',
+    summary_text = $5,
+    confidence = 0,
+    updated_at = now()
+WHERE tenant_id = $1
+  AND subject_user_id = $2
+  AND aggregate_type = $3
+  AND aggregate_key = $4
+  AND status IN ('PENDING', 'ACTIVE')
+RETURNING
+	profile_id,
+	subject_user_id,
+	aggregate_type,
+	aggregate_key,
+	status,
+	review_state,
+	summary_text,
+	supporting_memory_event_ids::text,
+	confidence::float8,
+	valid_from_at,
+	valid_to_at,
+	updated_at
+`, command.AuthContext.TenantID, string(command.SubjectUserID), command.AggregateType, command.AggregateKey, fmt.Sprintf("profile aggregate archived: only %d approved supporting memory events", supportCount))
+	item, err := scanProfileAggregateRow(row)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return types.ProfileAggregate{}, nil
+	}
+	if err != nil {
+		return types.ProfileAggregate{}, err
+	}
+	return item, nil
+}
+
+func upsertProfileAggregate(ctx context.Context, tx pgx.Tx, command types.RecomputeProfileAggregateCommand, supports []profileSupport) (types.ProfileAggregate, error) {
+	supportIDs := make([]string, 0, len(supports))
+	facts := make([]string, 0, len(supports))
+	var confidenceTotal float64
+	var validFromAt time.Time
+	var updatedBy string
+	for _, support := range supports {
+		supportIDs = append(supportIDs, support.MemoryEventID)
+		if fact := strings.TrimSpace(support.FactText); fact != "" {
+			facts = append(facts, fact)
+		}
+		confidenceTotal += support.Confidence
+		if !support.ValidFromAt.IsZero() && (validFromAt.IsZero() || support.ValidFromAt.Before(validFromAt)) {
+			validFromAt = support.ValidFromAt
+		}
+		updatedBy = support.MemoryEventID
+	}
+	supportJSON, _ := json.Marshal(supportIDs)
+	confidence := confidenceTotal / float64(len(supports))
+	summary := profileAggregateSummary(command, facts, len(supports))
+	row := tx.QueryRow(ctx, `
+INSERT INTO memory_profile_aggregates (
+	tenant_id,
+	profile_id,
+	subject_user_id,
+	aggregate_type,
+	aggregate_key,
+	status,
+	review_state,
+	summary_text,
+	supporting_memory_event_ids,
+	confidence,
+	valid_from_at,
+	updated_by_memory_event_id,
+	created_at,
+	updated_at
+) VALUES (
+	$1, $2, $3, $4, $5,
+	'ACTIVE', 'APPROVED', $6, $7::jsonb, $8, $9, $10, now(), now()
+)
+ON CONFLICT (tenant_id, profile_id) DO UPDATE SET
+	subject_user_id = EXCLUDED.subject_user_id,
+	aggregate_type = EXCLUDED.aggregate_type,
+	aggregate_key = EXCLUDED.aggregate_key,
+	status = EXCLUDED.status,
+	review_state = EXCLUDED.review_state,
+	summary_text = EXCLUDED.summary_text,
+	supporting_memory_event_ids = EXCLUDED.supporting_memory_event_ids,
+	confidence = EXCLUDED.confidence,
+	valid_from_at = EXCLUDED.valid_from_at,
+	valid_to_at = NULL,
+	updated_by_memory_event_id = EXCLUDED.updated_by_memory_event_id,
+	updated_at = now()
+RETURNING
+	profile_id,
+	subject_user_id,
+	aggregate_type,
+	aggregate_key,
+	status,
+	review_state,
+	summary_text,
+	supporting_memory_event_ids::text,
+	confidence::float8,
+	valid_from_at,
+	valid_to_at,
+	updated_at
+`, command.AuthContext.TenantID, profileAggregateID(command), string(command.SubjectUserID), command.AggregateType, command.AggregateKey, summary, string(supportJSON), confidence, nullableTime(validFromAt), updatedBy)
+	return scanProfileAggregateRow(row)
+}
+
+type profileAggregateScanner interface {
+	Scan(dest ...any) error
+}
+
+func scanProfileAggregateRow(row profileAggregateScanner) (types.ProfileAggregate, error) {
+	var item types.ProfileAggregate
+	var supporting string
+	var validFromAt, validToAt sql.NullTime
+	if err := row.Scan(
+		&item.ProfileID,
+		&item.SubjectUserID,
+		&item.AggregateType,
+		&item.AggregateKey,
+		&item.Status,
+		&item.ReviewState,
+		&item.SummaryText,
+		&supporting,
+		&item.Confidence,
+		&validFromAt,
+		&validToAt,
+		&item.UpdatedAt,
+	); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return types.ProfileAggregate{}, err
+		}
+		return types.ProfileAggregate{}, types.NewDBReadFailed(err.Error())
+	}
+	item.SupportingMemoryEventIDs = decodeStringSlice(supporting)
+	item.ValidFromAt = nullTimeValue(validFromAt)
+	item.ValidToAt = nullTimeValue(validToAt)
+	return item, nil
+}
+
+func profileAggregateID(command types.RecomputeProfileAggregateCommand) string {
+	hash := sha256.Sum256([]byte(strings.Join([]string{
+		string(command.AuthContext.TenantID),
+		string(command.SubjectUserID),
+		command.AggregateType,
+		command.AggregateKey,
+	}, "\x00")))
+	return "profile-" + hex.EncodeToString(hash[:8])
+}
+
+func profileAggregateSummary(command types.RecomputeProfileAggregateCommand, facts []string, supportCount int) string {
+	prefix := fmt.Sprintf("%s/%s profile supported by %d approved memory events", command.AggregateType, command.AggregateKey, supportCount)
+	if len(facts) == 0 {
+		return prefix
+	}
+	summary := prefix + ": " + strings.Join(facts, " | ")
+	if len(summary) > 512 {
+		return summary[:512]
+	}
+	return summary
+}
+
+func nullableTime(value time.Time) any {
+	if value.IsZero() {
+		return nil
+	}
+	return value
 }
 
 func (repository *Repository) ProjectTimelineEvent(ctx context.Context, command types.ProjectTimelineEventCommand) (types.ProjectTimelineEventResult, error) {

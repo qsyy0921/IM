@@ -1,11 +1,11 @@
 # NexusIM memory-service SDD v0.1
 
-Status: Draft.
+Status: Foundation-active.
 
-This document freezes the first codable contract for `memory-service`. The first
-slice is a projection and query service for structured collaborative memory. It
-does not run LLM extraction in-process yet and does not replace search,
-retrieval, RAG, summary, policy, or business facts.
+This document records the first codable contract for `memory-service`. The
+service is a projection, query, and reviewed profile-aggregate service for
+structured collaborative memory. It does not run LLM extraction in-process yet
+and does not replace search, retrieval, RAG, summary, policy, or business facts.
 
 ## 1. Service Position
 
@@ -32,6 +32,8 @@ Responsibilities:
   historical membership.
 - Provide memory query and profile aggregate query contracts for the future
   `retrieval-gateway`.
+- Recompute reviewed profile aggregates from multiple ACTIVE / APPROVED
+  `PROFILE_SIGNAL` memories through an explicit service API.
 
 Non-responsibilities:
 
@@ -60,6 +62,7 @@ RPCs:
 - `QueryMemoryEvents`
 - `GetMemoryEvent`
 - `ListProfileAggregates`
+- `RecomputeProfileAggregate`
 
 These APIs return only structured, source-backed memory records. They do not
 return model answers.
@@ -69,6 +72,16 @@ for conversation-scoped retrieval. When set, the service returns only memory
 whose `valid_from_seq` is not after that seq and whose `valid_to_seq` is unset
 or still covers that seq. The default status set remains `ACTIVE`; callers may
 explicitly request `PENDING` for review/smoke flows.
+
+`RecomputeProfileAggregate` is an explicit profile maintenance API. It derives
+one profile aggregate for `subject_user_id + aggregate_type + aggregate_key`
+from visible ACTIVE / APPROVED `PROFILE_SIGNAL` memory events. The first version
+is self-service only: the caller can recompute its own profile aggregate, and
+must not recompute another user's profile without a future policy-controlled
+operator path. If the number of visible supporting signals is lower than
+`min_support_count` (default 2), the service archives any existing ACTIVE /
+PENDING profile aggregate for that key instead of leaving stale profile evidence
+visible.
 
 ## 3. Core Model
 
@@ -104,6 +117,9 @@ First-slice invariants:
 - A memory event must have at least one source ref before it can become ACTIVE.
 - Profile-like signals must not become ACTIVE profile facts without aggregation
   and review.
+- Recomputed profile aggregates must keep all supporting memory ids, and must
+  archive stale aggregates when supporting memory is deleted, rejected, or no
+  longer visible.
 - Supersession must be explicit; old and new facts must not sit side by side as
   equally active when a newer event overrides the older one.
 - Message revoke / delete / retention cleanup must be able to tombstone or
@@ -181,19 +197,22 @@ must not become the source of truth.
 Public errors must not expose SQL, provider body, model prompt, raw source text
 from non-visible evidence, or internal repair details.
 
-## 8. Acceptance for v0.1 Contracts
+## 8. Acceptance for Current First Paths
 
-This contract slice is complete when:
+Current first paths are accepted when:
 
-- `memory_service.proto` defines query contracts and structured memory DTOs.
+- `memory_service.proto` exposes query contracts, structured memory DTOs, graph
+  edge DTOs, profile aggregate DTOs, and `RecomputeProfileAggregate`.
 - `000001_memory_core.sql` defines the projection schema and invariants.
-- `docs/sdd/README.md`, `current-brief.md`, `remaining-goals.md`, and the
-  memory service brief point to the new boundary.
-- `tools/gen-proto.ps1` generates the memory API code.
-- No `services/memory-service` runtime directory exists until the next
-  implementation slice explicitly switches registry stage.
+- `services/memory-service` provides six-layer `grpc` and `timeline-consumer`
+  runtime modes.
+- PostgreSQL integration tests cover projection visibility, source refs,
+  current-window queries, graph edges, profile aggregate visibility, and
+  recompute / archive behavior.
+- `loadtest/memory` proves that the runtime path can query current memory,
+  preserve graph edges, call `RecomputeProfileAggregate`, and exclude stale
+  profile aggregates whose support was deleted.
 
-The next implementation slice should add the six-layer service skeleton,
-domain/types/app validation, PostgreSQL repository tests, and a timeline
-projection use case. It should still avoid LLM extraction until visibility,
-source refs, and review semantics are tested.
+Next hardening should add repair / operator flows and richer extraction worker
+integration; it must still avoid turning a single group message into an ACTIVE
+personal profile fact.

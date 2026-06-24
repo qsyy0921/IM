@@ -413,8 +413,10 @@ INSERT INTO memory_structured_events (
 ($1, $3 || '-expired', 'CONVERSATION', $2, $2, 'runtime-memory', 'DECISION', 'ACTIVE', 'APPROVED', 'expired runtime memory decision', '["memory-sender-1"]'::jsonb, '[]'::jsonb, 2, 5, '[]'::jsonb, '[]'::jsonb, 0.9000, 1, 'smoke-v1', 5),
 ($1, $3 || '-current', 'CONVERSATION', $2, $2, 'runtime-memory', 'DECISION', 'ACTIVE', 'APPROVED', 'current runtime memory decision', '["memory-sender-1"]'::jsonb, '[]'::jsonb, 10, 20, '[]'::jsonb, '[]'::jsonb, 0.9100, 1, 'smoke-v1', 20),
 ($1, $3 || '-superseded', 'CONVERSATION', $2, $2, 'runtime-memory', 'DECISION', 'SUPERSEDED', 'APPROVED', 'old runtime memory decision', '["memory-sender-1"]'::jsonb, '[]'::jsonb, 6, 12, '[]'::jsonb, '[]'::jsonb, 0.8000, 1, 'smoke-v1', 12),
-($1, $3 || '-replacement', 'CONVERSATION', $2, $2, 'runtime-memory', 'DECISION', 'ACTIVE', 'APPROVED', 'replacement runtime memory decision', '["memory-sender-1"]'::jsonb, '[]'::jsonb, 13, NULL, jsonb_build_array($3 || '-superseded'), '[]'::jsonb, 0.9500, 1, 'smoke-v1', 30)
-`, cfg.tenantID, cfg.conversationID, eventPrefix); err != nil {
+($1, $3 || '-replacement', 'CONVERSATION', $2, $2, 'runtime-memory', 'DECISION', 'ACTIVE', 'APPROVED', 'replacement runtime memory decision', '["memory-sender-1"]'::jsonb, '[]'::jsonb, 13, NULL, jsonb_build_array($3 || '-superseded'), '[]'::jsonb, 0.9500, 1, 'smoke-v1', 30),
+($1, $3 || '-profile-signal-1', 'CONVERSATION', $2, $2, 'phoenix-launch', 'PROFILE_SIGNAL', 'ACTIVE', 'APPROVED', 'viewer coordinates phoenix launch rollout plans', jsonb_build_array($4::text), '[]'::jsonb, 30, NULL, '[]'::jsonb, '[]'::jsonb, 0.8700, 1, 'smoke-v1', 31),
+($1, $3 || '-profile-signal-2', 'CONVERSATION', $2, $2, 'phoenix-launch', 'PROFILE_SIGNAL', 'ACTIVE', 'APPROVED', 'viewer resolves phoenix launch blockers across groups', jsonb_build_array($4::text), '[]'::jsonb, 31, NULL, '[]'::jsonb, '[]'::jsonb, 0.9300, 1, 'smoke-v1', 32)
+`, cfg.tenantID, cfg.conversationID, eventPrefix, cfg.viewerUserID); err != nil {
 		return fmt.Errorf("seed runtime memory events: %w", err)
 	}
 	if _, err := pool.Exec(ctx, `
@@ -432,7 +434,9 @@ INSERT INTO memory_event_source_refs (
 ($1, $3 || '-expired', 'source-expired', 'MESSAGE', 'msg-expired', 'event-expired', $2, 2, now()),
 ($1, $3 || '-current', 'source-current', 'MESSAGE', 'msg-current', 'event-current', $2, 10, now()),
 ($1, $3 || '-superseded', 'source-superseded', 'MESSAGE', 'msg-superseded', 'event-superseded', $2, 6, now()),
-($1, $3 || '-replacement', 'source-replacement', 'MESSAGE', 'msg-replacement', 'event-replacement', $2, 13, now())
+($1, $3 || '-replacement', 'source-replacement', 'MESSAGE', 'msg-replacement', 'event-replacement', $2, 13, now()),
+($1, $3 || '-profile-signal-1', 'source-profile-1', 'MESSAGE', 'msg-profile-1', 'event-profile-1', $2, 30, now()),
+($1, $3 || '-profile-signal-2', 'source-profile-2', 'MESSAGE', 'msg-profile-2', 'event-profile-2', $2, 31, now())
 `, cfg.tenantID, cfg.conversationID, eventPrefix); err != nil {
 		return fmt.Errorf("seed runtime memory source refs: %w", err)
 	}
@@ -524,10 +528,9 @@ INSERT INTO memory_profile_aggregates (
 	confidence,
 	updated_by_memory_event_id
 ) VALUES
-($1, $2 || '-profile-active', $3, 'SKILL', 'phoenix-launch', 'ACTIVE', 'APPROVED', 'reviewed multi-source profile with active supporting evidence', jsonb_build_array($2 || '-current', $2 || '-replacement'), 0.9100, $2 || '-replacement'),
 ($1, $2 || '-profile-deleted-support', $3, 'SKILL', 'deleted-support', 'ACTIVE', 'APPROVED', 'profile with deleted support must not be returned as active', jsonb_build_array($2 || '-deleted-support'), 0.9200, $2 || '-deleted-support')
 `, cfg.tenantID, eventPrefix, cfg.viewerUserID); err != nil {
-		return fmt.Errorf("seed runtime profile aggregates: %w", err)
+		return fmt.Errorf("seed stale runtime profile aggregate: %w", err)
 	}
 	return nil
 }
@@ -601,6 +604,21 @@ func verifyRuntimeMemoryWindow(ctx context.Context, cfg config, client memoryv1.
 	if _, ok := items[currentID]; ok {
 		return fmt.Errorf("current runtime memory should expire after valid_to_seq: %+v", response.GetItems())
 	}
+	recomputed, err := recomputeProfileAggregate(ctx, cfg, client, cfg.viewerUserID, "SKILL", "phoenix-launch", 2)
+	if err != nil {
+		return err
+	}
+	if !recomputed.GetActive() || recomputed.GetSupportCount() != 2 {
+		return fmt.Errorf("expected recomputed active profile with two supports: %+v", recomputed)
+	}
+	recomputedProfile := recomputed.GetItem()
+	if recomputedProfile.GetReviewState() != memoryv1.MemoryReviewState_MEMORY_REVIEW_STATE_APPROVED ||
+		recomputedProfile.GetAggregateType() != "SKILL" ||
+		recomputedProfile.GetAggregateKey() != "phoenix-launch" ||
+		!hasString(recomputedProfile.GetSupportingMemoryEventIds(), eventPrefix+"-profile-signal-1") ||
+		!hasString(recomputedProfile.GetSupportingMemoryEventIds(), eventPrefix+"-profile-signal-2") {
+		return fmt.Errorf("unexpected recomputed profile: %+v", recomputedProfile)
+	}
 	profiles, err := listProfileAggregatesWithStatuses(ctx, cfg, client, cfg.viewerUserID, []memoryv1.MemoryEventStatus{memoryv1.MemoryEventStatus_MEMORY_EVENT_STATUS_ACTIVE})
 	if err != nil {
 		return err
@@ -609,7 +627,7 @@ func verifyRuntimeMemoryWindow(ctx context.Context, cfg config, client memoryv1.
 		return fmt.Errorf("expected one active reviewed profile with valid support, got %d: %+v", len(profiles.GetItems()), profiles.GetItems())
 	}
 	profile := profiles.GetItems()[0]
-	if profile.GetProfileId() != eventPrefix+"-profile-active" ||
+	if profile.GetProfileId() != recomputedProfile.GetProfileId() ||
 		profile.GetReviewState() != memoryv1.MemoryReviewState_MEMORY_REVIEW_STATE_APPROVED ||
 		len(profile.GetSupportingMemoryEventIds()) != 2 {
 		return fmt.Errorf("unexpected active reviewed profile: %+v", profile)
@@ -640,6 +658,15 @@ func memoryItemsByID(items []*memoryv1.StructuredMemoryEvent) map[string]*memory
 		byID[item.GetMemoryEventId()] = item
 	}
 	return byID
+}
+
+func hasString(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }
 
 func publishEvent(ctx context.Context, cfg config, writer *kafkago.Writer, event *conversationtimelinev1.ConversationTimelineEvent) error {
@@ -831,6 +858,26 @@ func listProfileAggregatesWithStatuses(ctx context.Context, cfg config, client m
 		SubjectUserId: userID,
 		Statuses:      statuses,
 		Limit:         20,
+	})
+}
+
+func recomputeProfileAggregate(
+	ctx context.Context,
+	cfg config,
+	client memoryv1.MemoryServiceClient,
+	userID string,
+	aggregateType string,
+	aggregateKey string,
+	minSupportCount int32,
+) (*memoryv1.RecomputeProfileAggregateResponse, error) {
+	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
+	defer cancel()
+	return client.RecomputeProfileAggregate(requestCtx, &memoryv1.RecomputeProfileAggregateRequest{
+		AuthContext:     auth(cfg, userID),
+		SubjectUserId:   userID,
+		AggregateType:   aggregateType,
+		AggregateKey:    aggregateKey,
+		MinSupportCount: minSupportCount,
 	})
 }
 

@@ -47,9 +47,10 @@
 - `ai-eval-service`：retrieval negative / miss adapter 已补齐；继续扩展 group
   memory extraction、profile evidence、EvidencePack source-chain、RAG / Agent
   demo module 的真实 service-stack cases。
-- `retrieval-gateway`：memory graph edge 和 profile aggregate evidence 已进入
-  EvidencePack；继续做结构过滤、BM25 / vector、profile recompute / repair
-  联动、rerank 和 EvidencePack coverage 深化。
+- `memory-service` / `retrieval-gateway`：memory graph edge、profile aggregate
+  evidence 和公开 profile recompute first path 已进入主链路；继续做 profile
+  repair / operator path、结构过滤、BM25 / vector、rerank 和 EvidencePack coverage
+  深化。
 - `rag-service` / `summary-service`：拒答、引用校验、source-ref regression、unsafe
   output fail-closed cases。
 - `agent-service`：真实业务动作继续走 policy、skill contract、proposal、approval、

@@ -110,6 +110,7 @@ func runGRPC(ctx context.Context) error {
 		app.NewQueryMemoryEventsUseCase(repository),
 		app.NewGetMemoryEventUseCase(repository),
 		app.NewListProfileAggregatesUseCase(repository),
+		app.NewRecomputeProfileAggregateUseCase(repository),
 	))
 
 	serveErr := make(chan error, 1)

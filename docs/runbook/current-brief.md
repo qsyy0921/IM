@@ -135,6 +135,10 @@ aggregate，并以 `PROFILE_AGGREGATE` evidence 暴露给 RAG / Summary / Agent�
 downstream 只消费 EvidencePack，不直连 memory 私表。`loadtest/retrieval`、
 `loadtest/rag`、`loadtest/agent` 会断言 profile subject、aggregate type/key、
 supporting memory ids 和 source coverage 被保留，profile lookup 失败 fail-closed。
+同日 memory-service 补了公开 `RecomputeProfileAggregate` first path：profile
+aggregate 由多个当前用户可见的 ACTIVE / APPROVED `PROFILE_SIGNAL` memory events
+重算，支持数量不足时归档既有 active / pending profile；`loadtest/memory` 不再
+手工写 active profile，而是通过该 RPC 验证 multi-source profile evidence。
 
 ## 不变量
 

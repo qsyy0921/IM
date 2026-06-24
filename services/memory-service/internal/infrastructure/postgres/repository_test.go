@@ -261,6 +261,106 @@ INSERT INTO memory_profile_aggregates (
 	}
 }
 
+func TestRepositoryRecomputeProfileAggregateIntegration(t *testing.T) {
+	ctx := context.Background()
+	pool := openMemoryTestPool(t)
+	resetMemoryTables(t, ctx, pool)
+	repository := NewRepository(pool)
+	seedProfileSignalMemories(t, ctx, pool, "tenant-1", "conv-1", "user-1")
+
+	item, supportCount, active, err := repository.RecomputeProfileAggregate(ctx, types.RecomputeProfileAggregateCommand{
+		AuthContext: types.AuthContext{
+			TenantID: "tenant-1",
+			UserID:   "user-1",
+			DeviceID: "device-1",
+		},
+		SubjectUserID:   "user-1",
+		AggregateType:   types.ProfileAggregateTypeSkill,
+		AggregateKey:    "phoenix-launch",
+		MinSupportCount: 2,
+	})
+	if err != nil {
+		t.Fatalf("recompute profile aggregate: %v", err)
+	}
+	if !active || supportCount != 2 {
+		t.Fatalf("expected active profile with two supports, active=%v support_count=%d item=%+v", active, supportCount, item)
+	}
+	if item.Status != types.MemoryStatusActive || item.ReviewState != types.MemoryReviewApproved {
+		t.Fatalf("unexpected recomputed profile state: %+v", item)
+	}
+	if item.AggregateType != types.ProfileAggregateTypeSkill || item.AggregateKey != "phoenix-launch" {
+		t.Fatalf("unexpected aggregate identity: %+v", item)
+	}
+	if len(item.SupportingMemoryEventIDs) != 2 {
+		t.Fatalf("expected two supporting memory ids: %+v", item.SupportingMemoryEventIDs)
+	}
+
+	items, err := repository.ListProfileAggregates(ctx, types.ListProfileAggregatesCommand{
+		AuthContext: types.AuthContext{
+			TenantID: "tenant-1",
+			UserID:   "user-1",
+			DeviceID: "device-1",
+		},
+		SubjectUserID: "user-1",
+		AggregateType: types.ProfileAggregateTypeSkill,
+		Statuses:      []string{types.MemoryStatusActive},
+		Limit:         10,
+	}, 10)
+	if err != nil {
+		t.Fatalf("list recomputed profile: %v", err)
+	}
+	if len(items) != 1 || items[0].ProfileID != item.ProfileID {
+		t.Fatalf("expected recomputed profile to be visible: %+v", items)
+	}
+
+	if _, err := pool.Exec(ctx, `
+UPDATE memory_structured_events
+SET status = 'DELETED', review_state = 'REJECTED', updated_at = now()
+WHERE tenant_id = $1
+  AND memory_event_id = 'profile-signal-2'
+`, "tenant-1"); err != nil {
+		t.Fatalf("delete profile support: %v", err)
+	}
+	archived, supportCount, active, err := repository.RecomputeProfileAggregate(ctx, types.RecomputeProfileAggregateCommand{
+		AuthContext: types.AuthContext{
+			TenantID: "tenant-1",
+			UserID:   "user-1",
+			DeviceID: "device-1",
+		},
+		SubjectUserID:   "user-1",
+		AggregateType:   types.ProfileAggregateTypeSkill,
+		AggregateKey:    "phoenix-launch",
+		MinSupportCount: 2,
+	})
+	if err != nil {
+		t.Fatalf("recompute after support delete: %v", err)
+	}
+	if active || supportCount != 1 {
+		t.Fatalf("expected inactive profile after support delete, active=%v support_count=%d item=%+v", active, supportCount, archived)
+	}
+	if archived.ProfileID != item.ProfileID || archived.Status != types.MemoryStatusArchived {
+		t.Fatalf("expected existing profile to be archived: %+v", archived)
+	}
+
+	items, err = repository.ListProfileAggregates(ctx, types.ListProfileAggregatesCommand{
+		AuthContext: types.AuthContext{
+			TenantID: "tenant-1",
+			UserID:   "user-1",
+			DeviceID: "device-1",
+		},
+		SubjectUserID: "user-1",
+		AggregateType: types.ProfileAggregateTypeSkill,
+		Statuses:      []string{types.MemoryStatusActive},
+		Limit:         10,
+	}, 10)
+	if err != nil {
+		t.Fatalf("list archived profile: %v", err)
+	}
+	if len(items) != 0 {
+		t.Fatalf("archived profile should not be returned as active: %+v", items)
+	}
+}
+
 func TestRepositoryTombstonesMemoryByMessageIntegration(t *testing.T) {
 	ctx := context.Background()
 	pool := openMemoryTestPool(t)
@@ -375,6 +475,71 @@ INSERT INTO memory_event_source_refs (
 ($1, 'mem-replacement', 'source-replacement', 'MESSAGE', 'msg-replacement', 'event-replacement', $2, 13, now())
 `, tenantID, conversationID); err != nil {
 		t.Fatalf("seed runtime memory source refs: %v", err)
+	}
+}
+
+func seedProfileSignalMemories(t *testing.T, ctx context.Context, pool *pgxpool.Pool, tenantID string, conversationID string, userID string) {
+	t.Helper()
+	if _, err := pool.Exec(ctx, `
+INSERT INTO memory_membership_projection (
+	tenant_id,
+	conversation_id,
+	user_id,
+	role,
+	status,
+	join_seq,
+	leave_seq,
+	member_version,
+	permission_version,
+	updated_by_event_id
+) VALUES ($1, $2, $3, 'MEMBER', 'ACTIVE', 1, NULL, 1, 1, 'member-seed')
+`, tenantID, conversationID, userID); err != nil {
+		t.Fatalf("seed membership: %v", err)
+	}
+	if _, err := pool.Exec(ctx, `
+INSERT INTO memory_structured_events (
+	tenant_id,
+	memory_event_id,
+	scope_type,
+	scope_id,
+	conversation_id,
+	topic,
+	event_type,
+	status,
+	review_state,
+	fact_text,
+	actor_user_ids,
+	audience_user_ids,
+	valid_from_seq,
+	valid_to_seq,
+	supersedes_event_ids,
+	contradicts_event_ids,
+	confidence,
+	visibility_version,
+	extraction_version,
+	source_projection_version
+) VALUES
+($1, 'profile-signal-1', 'CONVERSATION', $2, $2, 'phoenix-launch', 'PROFILE_SIGNAL', 'ACTIVE', 'APPROVED', 'user coordinates phoenix launch rollout plans', jsonb_build_array($3::text), '[]'::jsonb, 2, NULL, '[]'::jsonb, '[]'::jsonb, 0.8700, 1, 'profile-test-v1', 2),
+($1, 'profile-signal-2', 'CONVERSATION', $2, $2, 'phoenix-launch', 'PROFILE_SIGNAL', 'ACTIVE', 'APPROVED', 'user resolves phoenix launch blockers across groups', jsonb_build_array($3::text), '[]'::jsonb, 3, NULL, '[]'::jsonb, '[]'::jsonb, 0.9300, 1, 'profile-test-v1', 3)
+`, tenantID, conversationID, userID); err != nil {
+		t.Fatalf("seed profile signals: %v", err)
+	}
+	if _, err := pool.Exec(ctx, `
+INSERT INTO memory_event_source_refs (
+	tenant_id,
+	memory_event_id,
+	source_ref_id,
+	source_type,
+	source_id,
+	source_event_id,
+	conversation_id,
+	conversation_seq,
+	occurred_at
+) VALUES
+($1, 'profile-signal-1', 'source-profile-1', 'MESSAGE', 'msg-profile-1', 'event-profile-1', $2, 2, now()),
+($1, 'profile-signal-2', 'source-profile-2', 'MESSAGE', 'msg-profile-2', 'event-profile-2', $2, 3, now())
+`, tenantID, conversationID); err != nil {
+		t.Fatalf("seed profile signal refs: %v", err)
 	}
 }
 

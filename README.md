@@ -271,7 +271,7 @@ message / conversation / policy events -> search-service + memory-service projec
 | 服务 / 模块 | 当前状态 |
 | --- | --- |
 | `search-service` | 搜索 projection、visibility / tombstone、`SearchMessages`、timeline consumer、projection smoke。 |
-| `memory-service` | group memory projection、StructuredMemoryEvent、source refs、visibility window、revoke hidden。 |
+| `memory-service` | group memory projection、StructuredMemoryEvent、source refs、visibility window、revoke hidden、profile aggregate recompute / archive first path。 |
 | `retrieval-gateway` | EvidencePack 统一边界，聚合 search / memory / policy precheck，并通过 memory-service 公开 API 扩展 current memory graph edges 和当前用户 profile aggregate evidence；不直接调用 LLM。 |
 | `rag-service` | 只读问答 first path、EvidencePack citation verifier、guarded external HTTP LLM boundary，并保留 EvidencePack memory graph edges 和 profile aggregate evidence。 |
 | `summary-service` | 只读摘要 first path、EvidencePack citation verifier、guarded external HTTP LLM boundary，并保留 EvidencePack memory graph edges 和 profile aggregate evidence。 |
@@ -343,7 +343,10 @@ RAG / Agent loadtest 都会断言跨群 source refs 与 `SUPPORTS` graph edge �
 memory-service 公开 `ListProfileAggregates` 查询当前用户 ACTIVE profile aggregate，
 并作为 `PROFILE_AGGREGATE` evidence 透传给 RAG / Summary / Agent；retrieval /
 RAG / Agent loadtest 都会断言 profile subject、aggregate type/key、supporting
-memory ids 和 source coverage 被保留。
+memory ids 和 source coverage 被保留。随后 memory-service 公开
+`RecomputeProfileAggregate` first path：profile evidence 由多个可见 ACTIVE /
+APPROVED `PROFILE_SIGNAL` memory events 重算，支持数量不足时归档旧 profile，
+避免 deleted / rejected support 继续进入 EvidencePack。
 
 下一步默认看 [current-goal.md](docs/runbook/current-goal.md)。截至当前主线，客户端只修
 阻塞演示入口的问题；默认推进

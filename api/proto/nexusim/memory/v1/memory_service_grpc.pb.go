@@ -19,9 +19,10 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	MemoryService_QueryMemoryEvents_FullMethodName     = "/nexusim.memory.v1.MemoryService/QueryMemoryEvents"
-	MemoryService_GetMemoryEvent_FullMethodName        = "/nexusim.memory.v1.MemoryService/GetMemoryEvent"
-	MemoryService_ListProfileAggregates_FullMethodName = "/nexusim.memory.v1.MemoryService/ListProfileAggregates"
+	MemoryService_QueryMemoryEvents_FullMethodName         = "/nexusim.memory.v1.MemoryService/QueryMemoryEvents"
+	MemoryService_GetMemoryEvent_FullMethodName            = "/nexusim.memory.v1.MemoryService/GetMemoryEvent"
+	MemoryService_ListProfileAggregates_FullMethodName     = "/nexusim.memory.v1.MemoryService/ListProfileAggregates"
+	MemoryService_RecomputeProfileAggregate_FullMethodName = "/nexusim.memory.v1.MemoryService/RecomputeProfileAggregate"
 )
 
 // MemoryServiceClient is the client API for MemoryService service.
@@ -31,6 +32,7 @@ type MemoryServiceClient interface {
 	QueryMemoryEvents(ctx context.Context, in *QueryMemoryEventsRequest, opts ...grpc.CallOption) (*QueryMemoryEventsResponse, error)
 	GetMemoryEvent(ctx context.Context, in *GetMemoryEventRequest, opts ...grpc.CallOption) (*GetMemoryEventResponse, error)
 	ListProfileAggregates(ctx context.Context, in *ListProfileAggregatesRequest, opts ...grpc.CallOption) (*ListProfileAggregatesResponse, error)
+	RecomputeProfileAggregate(ctx context.Context, in *RecomputeProfileAggregateRequest, opts ...grpc.CallOption) (*RecomputeProfileAggregateResponse, error)
 }
 
 type memoryServiceClient struct {
@@ -71,6 +73,16 @@ func (c *memoryServiceClient) ListProfileAggregates(ctx context.Context, in *Lis
 	return out, nil
 }
 
+func (c *memoryServiceClient) RecomputeProfileAggregate(ctx context.Context, in *RecomputeProfileAggregateRequest, opts ...grpc.CallOption) (*RecomputeProfileAggregateResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RecomputeProfileAggregateResponse)
+	err := c.cc.Invoke(ctx, MemoryService_RecomputeProfileAggregate_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // MemoryServiceServer is the server API for MemoryService service.
 // All implementations must embed UnimplementedMemoryServiceServer
 // for forward compatibility.
@@ -78,6 +90,7 @@ type MemoryServiceServer interface {
 	QueryMemoryEvents(context.Context, *QueryMemoryEventsRequest) (*QueryMemoryEventsResponse, error)
 	GetMemoryEvent(context.Context, *GetMemoryEventRequest) (*GetMemoryEventResponse, error)
 	ListProfileAggregates(context.Context, *ListProfileAggregatesRequest) (*ListProfileAggregatesResponse, error)
+	RecomputeProfileAggregate(context.Context, *RecomputeProfileAggregateRequest) (*RecomputeProfileAggregateResponse, error)
 	mustEmbedUnimplementedMemoryServiceServer()
 }
 
@@ -96,6 +109,9 @@ func (UnimplementedMemoryServiceServer) GetMemoryEvent(context.Context, *GetMemo
 }
 func (UnimplementedMemoryServiceServer) ListProfileAggregates(context.Context, *ListProfileAggregatesRequest) (*ListProfileAggregatesResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListProfileAggregates not implemented")
+}
+func (UnimplementedMemoryServiceServer) RecomputeProfileAggregate(context.Context, *RecomputeProfileAggregateRequest) (*RecomputeProfileAggregateResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RecomputeProfileAggregate not implemented")
 }
 func (UnimplementedMemoryServiceServer) mustEmbedUnimplementedMemoryServiceServer() {}
 func (UnimplementedMemoryServiceServer) testEmbeddedByValue()                       {}
@@ -172,6 +188,24 @@ func _MemoryService_ListProfileAggregates_Handler(srv interface{}, ctx context.C
 	return interceptor(ctx, in, info, handler)
 }
 
+func _MemoryService_RecomputeProfileAggregate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RecomputeProfileAggregateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MemoryServiceServer).RecomputeProfileAggregate(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MemoryService_RecomputeProfileAggregate_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MemoryServiceServer).RecomputeProfileAggregate(ctx, req.(*RecomputeProfileAggregateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // MemoryService_ServiceDesc is the grpc.ServiceDesc for MemoryService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -190,6 +224,10 @@ var MemoryService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListProfileAggregates",
 			Handler:    _MemoryService_ListProfileAggregates_Handler,
+		},
+		{
+			MethodName: "RecomputeProfileAggregate",
+			Handler:    _MemoryService_RecomputeProfileAggregate_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

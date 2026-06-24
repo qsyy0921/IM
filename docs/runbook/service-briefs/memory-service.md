@@ -36,6 +36,13 @@
 - 2026-06-24 retrieval-gateway 已通过 memory-service 公开 `ListProfileAggregates`
   把当前用户 ACTIVE profile aggregate 放入 EvidencePack；RAG / Summary / Agent
   只通过 EvidencePack 消费 profile evidence，不直接读 memory-service 私表。
+- 2026-06-24 memory-service 已新增公开 `RecomputeProfileAggregate` first path：
+  它从当前用户可见的多个 ACTIVE / APPROVED `PROFILE_SIGNAL` memory events 重算
+  `ProfileAggregate`，保留 supporting memory ids；支持数量不足时会归档既有
+  ACTIVE / PENDING profile aggregate，避免 deleted / rejected supporting memory
+  继续暴露为 profile evidence。PG integration test 和 `loadtest/memory` 已改为
+  通过该 API 验证 reviewed multi-source profile，而不是手工写入 active profile。
 
-下一步：真实服务栈启动后运行 memory-service optional adapter 并归档报告；后续
-继续做 profile recompute / repair，而不是把单条群消息直接升级为 ACTIVE profile fact。
+下一步：真实服务栈启动后运行 memory-service optional adapter / loadtest 并归档报告；
+后续继续做 profile repair / operator path 和 extraction worker 集成，而不是把单条群消息
+直接升级为 ACTIVE profile fact。

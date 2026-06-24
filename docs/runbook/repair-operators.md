@@ -283,15 +283,25 @@ manifest；preflight summary 只记录 manifest hash / path hash / instruction c
 `policy-service` 还提供 `rebac-relation-audit` / `rebac-relation-set`，用于审计和设置 first-stage ReBAC relation gate 规则。规则按 tenant / action / relation_type / conversation_scope 要求 `DIRECT_CONTACT_ACTIVE` 或 `CONVERSATION_MEMBER_ACTIVE` 关系，在 exact / tenant allow 规则前 fail-closed deny；`rebac-relation-audit` 可选 `NEXUSIM_POLICY_REBAC_RELATION_AUDIT_OUTPUT` 写低敏 JSON，`rebac-relation-set` 可选 `NEXUSIM_POLICY_REBAC_RELATION_SET_OUTPUT` 写低敏 JSON。`rebac-relation-set` 支持 `NEXUSIM_POLICY_REBAC_RELATION_SET_REASON_FILE` 读取 operator reason 原文，避免把 reason 写进 operator plan / shell env；输出只包含规则元数据和 reason-present，不输出 operator reason 原文。该能力不是 provider-grade ReBAC graph / policy DSL。
 
 `action-executor` 提供 `provider-failure-audit` / `provider-failure-redrive-plan` /
-`provider-replay-operator-ui`，用于只读审计 provider failure 投影、生成低敏 redrive
-plan 和生成 provider replay 人工审批视图。环境变量为 `NEXUSIM_ACTION_EXECUTOR_MODE`；
+`provider-replay-operator-ui` / `provider-replay-handoff`，用于只读审计 provider failure
+投影、生成低敏 redrive plan、生成 provider replay 人工审批视图，以及生成 admin /
+workflow handoff request。环境变量为 `NEXUSIM_ACTION_EXECUTOR_MODE`；
 `provider-failure-audit` 可选 `NEXUSIM_ACTION_EXECUTOR_PROVIDER_FAILURE_AUDIT_OUTPUT`
 写低敏 JSON；`provider-failure-redrive-plan` 必须使用
 `NEXUSIM_ACTION_EXECUTOR_PROVIDER_FAILURE_REDRIVE_DRY_RUN=true` 和
 `NEXUSIM_ACTION_EXECUTOR_PROVIDER_FAILURE_REDRIVE_REASON_FILE`，可选
 `NEXUSIM_ACTION_EXECUTOR_PROVIDER_FAILURE_REDRIVE_PLAN_OUTPUT` 写低敏 plan；
 `provider-replay-operator-ui` 只读取 `DLQ` candidates，并通过
-`NEXUSIM_ACTION_EXECUTOR_PROVIDER_REPLAY_UI_OUTPUT` 写低敏 UI artifact。上述模式都不修改
+`NEXUSIM_ACTION_EXECUTOR_PROVIDER_REPLAY_UI_OUTPUT` 写低敏 UI artifact。
+`provider-replay-handoff` 只读取 `DLQ` candidates，并通过
+`NEXUSIM_ACTION_EXECUTOR_PROVIDER_REPLAY_HANDOFF_OUTPUT` 写低敏 handoff artifact；它要求
+`NEXUSIM_ACTION_EXECUTOR_PROVIDER_REPLAY_HANDOFF_OPERATOR_REF`、
+`NEXUSIM_ACTION_EXECUTOR_PROVIDER_REPLAY_HANDOFF_REASON_REF` 和
+`NEXUSIM_ACTION_EXECUTOR_PROVIDER_REPLAY_HANDOFF_EVIDENCE_REFS`，可选
+`NEXUSIM_ACTION_EXECUTOR_PROVIDER_REPLAY_HANDOFF_OPERATOR_ROLE` /
+`CORRELATION_ID` / `TRACE_ID`。输出包含 `PROVIDER_REPLAY_REQUEST` admin operation request
+和 `REPAIR_APPROVAL` workflow handoff request，只带 hash/ref、candidate id 和 required gates；
+不包含 raw provider input / output / provider error / operator reason。上述模式都不修改
 provider failure row、不调用 tool executor、不重放 provider output。
 
 ## Delivery Projection

@@ -7,7 +7,7 @@ loadtest report 或 archive。
 
 - 客户端 Web / PC 已达到演示 MVP；除阻塞演示的问题外，不继续追完整产品级客户端。
 - 后端主线已切到 AI / Agent / RAG 演示路径和必要平台能力。
-- 当前 active module：action-executor / workflow provider replay admin / workflow handoff。
+- 当前 active module：Agent action boundary / repair cases。
 
 ## 当前模块事实
 
@@ -30,8 +30,10 @@ loadtest report 或 archive。
   active cases 扩到 24 个，新增 asker-bound term ambiguity、visible-chain incomplete
   abstention、missing visibility projection fail-closed、audience-language profile
   overgeneralization cases，并覆盖 no unsupported memory fallback / no raw prompt persistence。
-- 当前模块转向 provider replay admin / workflow handoff：把只读 operator UI 推进到更正式的
-  admin / workflow 运维请求和审批流，但最终执行仍只能走 action-executor 的受控 redrive。
+- provider replay admin / workflow handoff 已收口：`provider-replay-handoff` 只读 `DLQ`
+  provider failure，输出低敏 admin operation request 和 workflow handoff request；admin-service
+  已支持 `PROVIDER_REPLAY_REQUEST` 并强制路由 workflow-service `REPAIR_APPROVAL`，
+  workflow target 为 action-executor，最终执行仍只能走 `RedriveProviderFailure`。
 - group memory / multi-party collaboration 必须继续保留 source refs、conversation scope、
   member visibility、time/version boundary、citations 和 no-citation refusal。
 
@@ -57,5 +59,5 @@ loadtest report 或 archive。
 
 ## 下一个方向
 
-- 做 provider replay admin / workflow handoff 功能包；正式生产级运维 UI 和 provider-grade
-  长周期平台仍后置。
+- 继续补 Agent action boundary / repair cases；正式生产级运维 UI、provider-grade 长周期平台
+  和 provider replay 批量审批 UI 仍后置。

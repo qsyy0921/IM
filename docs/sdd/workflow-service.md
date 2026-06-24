@@ -132,6 +132,23 @@ correlation_id, causation_id, trace_id
 
 `payload_ref_hash` 只能是低敏 request summary 的 hash/ref，不能是业务 payload 原文。
 
+Provider replay handoff 使用既有 `REPAIR_APPROVAL` workflow type：
+
+```text
+admin-service PROVIDER_REPLAY_REQUEST
+-> workflow-service CreateWorkflow(
+     workflow_type=REPAIR_APPROVAL,
+     target_service=action-executor,
+     target_operation=PROVIDER_REPLAY_REQUEST,
+     approval_policy_ref=admin.workflow.provider_replay.v1,
+     payload_ref_hash=<admin operation payload hash>
+   )
+```
+
+workflow-service 只记录审批状态和低敏 refs；它不执行 provider replay，也不调用
+`RedriveProviderFailure`。workflow decision 完成后，后续仍需要 fresh Agent proposal /
+approval / prepared audit / new input / reason hash，再由 action-executor 执行。
+
 `RecordWorkflowDecision` 请求字段：
 
 ```text

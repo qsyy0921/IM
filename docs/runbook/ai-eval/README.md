@@ -316,6 +316,14 @@ requires fresh proposal, approval, prepared audit, new input and reason hash
 before `RedriveProviderFailure`. It does not prove automatic replay or a
 production admin UI.
 
+Provider replay admin / workflow handoff is represented by
+`action-provider-replay-admin-workflow-handoff`. It verifies that provider replay
+repair can be handed off as a low-sensitive `PROVIDER_REPLAY_REQUEST` admin
+operation, routed through workflow-service `REPAIR_APPROVAL`, and kept bound to
+action-executor as the only final `RedriveProviderFailure` execution owner. It
+does not execute replay, restore raw provider input/output, mutate the DLQ row,
+or reuse old approval.
+
 First-stage Python worker output-safety adapter:
 
 ```powershell

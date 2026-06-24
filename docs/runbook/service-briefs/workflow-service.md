@@ -24,6 +24,10 @@ admin operation approval、补偿请求和人工审批状态。
 - `loadtest/workflow` operator CLI：公开 gRPC get workflow、record decision、查询低敏 instruction metadata。
 - manifest / review-page scripts：生成和校验仓库外低敏 decision、instruction 和 HTML review page。
 - 已被 admin-service 用于 repair / critical / compensation handoff。
+- 已被 admin-service 用于 provider replay handoff：`PROVIDER_REPLAY_REQUEST` 创建
+  `REPAIR_APPROVAL` workflow，target service 为 `action-executor`；workflow-service 只记录
+  低敏审批状态，不执行 provider replay。
 
 后续：timer worker、更多 compensation adapter、instruction approval UI、
-external approval binding、external callback wait、outbox relay、repair operators。
+external approval binding、external callback wait、outbox relay、provider replay workflow 队列视图、
+repair operators。

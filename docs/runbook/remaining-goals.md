@@ -15,7 +15,8 @@
 
 ## 当前优先顺序
 
-1. action-executor / workflow：provider replay admin / workflow handoff。
+1. Agent action boundary / repair cases：在 provider replay admin / workflow handoff 已落
+   的基础上，继续扩更多需要 proposal / approval / workflow / audit 的 action 与 repair 场景。
 2. Product-active 服务按需推进：workflow、audit、admin、notification、media、vector、
    model、knowledge、presence、control-plane。
 3. 数据平台和中间件 profile 按完整架构逐步补，不抢占 AI / Agent 演示主线。
@@ -42,8 +43,8 @@
   proposal 场景。
 - `skill-registry` / `mcp-gateway`：tool contract、risk level、tenant allowlist、adapter、
   rate limit。
-- `action-executor`：provider replay admin / workflow handoff 是当前优先项；后续再做
-  external audit integration；当前 operator UI first path 和 group-memory eval 扩展已落。
+- `action-executor`：provider replay admin / workflow handoff 已落；后续再做更多
+  action boundary / repair cases、external audit integration 和 provider-grade replay UI。
 - `ai-eval-service`：group-memory asker-bound term ambiguity、visible-chain incomplete
   abstention、missing visibility projection fail-closed、audience-language profile negative
   cases 已进入本地低敏 gate；后续继续扩 provider readiness、Agent action boundary 和
@@ -59,8 +60,8 @@
   provider redrive / audit、tenant template policy。
 - `audit-service`：更多 Kafka ingestion source、checkpoint / rewind、export worker、
   SIEM forwarding、retention cleanup、segment sealing。
-- `admin-service`：admin UI、更多下游公开 API adapter、compensation adapter、
-  instruction approval UI。
+- `admin-service`：admin UI、provider replay request 列表 / 审批 UX、更多下游公开 API
+  adapter、compensation adapter、instruction approval UI。
 - `control-plane-service`：outbox relay、drift monitor、expiry / cleanup worker、
   api-gateway quota consumer、provider-grade rollout。
 - `presence-service`：push-gateway session consumer、`SubscribePresence`、stale scanner、
@@ -68,7 +69,8 @@
 - `model-gateway`：provider routing、budget、fallback policy as explicit config、audit。
 - `knowledge-ingestion-service`：file/web imports、chunking pipeline、PII scan、rebuild jobs。
 - `vector-index-service`：real pgvector / OpenSearch vector / Milvus smoke、provider repair。
-- `workflow-service`：compensation adapter、approval timeout、operator queues。
+- `workflow-service`：provider replay workflow 队列视图、compensation adapter、approval
+  timeout、operator queues。
 
 ## 9 个核心 IM 服务 P2
 

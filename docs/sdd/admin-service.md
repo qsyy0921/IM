@@ -85,6 +85,7 @@ TENANT_QUOTA_CHANGE
 CONFIG_PUBLISH
 CONFIG_ROLLBACK
 REPAIR_REQUEST
+PROVIDER_REPLAY_REQUEST
 AUDIT_EXPORT_REQUEST
 NOTIFICATION_SUPPRESSION_CHANGE
 ```
@@ -124,7 +125,9 @@ correlation_id, causation_id, trace_id
 
 ```text
 target_user_ref, device_ref, session_ref, config_bundle_key, config_version,
-quota_rps, quota_burst, policy_rule_ref, repair_mode, audit_export_filter_hash
+quota_rps, quota_burst, policy_rule_ref, repair_mode, audit_export_filter_hash,
+provider_failure_ref_hash, source_execution_ref_hash, source_result_ref_hash,
+redrive_entrypoint, source_dlq_immutable, direct_execution_allowed
 ```
 
 禁止字段：
@@ -158,6 +161,7 @@ operator reason raw text
 | `REBAC_RELATION_CHANGE` | 调 policy-service operator port |
 | `TENANT_QUOTA_CHANGE` / `CONFIG_PUBLISH` / `CONFIG_ROLLBACK` | 调 control-plane-service |
 | `REPAIR_REQUEST` | 创建 workflow request 或生成服务专用 operator command |
+| `PROVIDER_REPLAY_REQUEST` | 创建 workflow repair approval；最终执行仍由 action-executor `RedriveProviderFailure` 完成 |
 | `AUDIT_EXPORT_REQUEST` | 调 audit-service export API |
 | `NOTIFICATION_SUPPRESSION_CHANGE` | 调 notification-service suppression API |
 
@@ -165,6 +169,7 @@ operator reason raw text
 
 ```text
 REPAIR_REQUEST -> workflow-service CreateWorkflow(REPAIR_APPROVAL)
+PROVIDER_REPLAY_REQUEST -> workflow-service CreateWorkflow(REPAIR_APPROVAL)
 CRITICAL non-repair operation -> workflow-service CreateWorkflow(ADMIN_OPERATION)
 ```
 
@@ -178,7 +183,8 @@ service：`CONFIG_PUBLISH` / `CONFIG_ROLLBACK` / `TENANT_QUOTA_CHANGE` /
 `POLICY_RULE_CHANGE` 指向 `control-plane-service`，完整 policy mutation / ReBAC
 操作指向 `policy-service`，
 `AUDIT_EXPORT_REQUEST` 指向 `audit-service`，`NOTIFICATION_SUPPRESSION_CHANGE`
-指向 `notification-service`。未映射的 `CRITICAL` operation 仍使用
+指向 `notification-service`，`PROVIDER_REPLAY_REQUEST` 指向 `action-executor` 并使用
+`admin.workflow.provider_replay.v1`。未映射的 `CRITICAL` operation 仍使用
 `admin.workflow.operation.v1` 和 `admin-service` target，等待后续专用 adapter。
 
 第一版真实下游 adapter 已覆盖四类非 `CRITICAL` 的 control-plane operation：

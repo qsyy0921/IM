@@ -1158,6 +1158,31 @@
       ]
     },
     {
+      "id": "action-provider-replay-admin-workflow-handoff",
+      "family": "action_execution_safety",
+      "stage": "action-executor-provider-replay",
+      "status": "active",
+      "query": "handoff provider replay request through admin and workflow approval",
+      "risk": "Provider replay admin/workflow handoff must create only low-sensitive request artifacts, require workflow approval, preserve source DLQ immutability and keep RedriveProviderFailure as the only execution entrypoint",
+      "required_assertions": [
+        {
+          "type": "must_create_provider_replay_admin_handoff"
+        },
+        {
+          "type": "must_require_workflow_repair_approval"
+        },
+        {
+          "type": "must_keep_redrive_entrypoint_action_executor"
+        },
+        {
+          "type": "must_preserve_replay_audit_boundary"
+        },
+        {
+          "type": "must_not_auto_replay_provider_failure"
+        }
+      ]
+    },
+    {
       "id": "external-mcp-provider-unavailable",
       "family": "action_execution_safety",
       "stage": "action-executor-mcp-failure",

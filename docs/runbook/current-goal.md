@@ -6,7 +6,8 @@
 
 ## Active Module
 
-action-executor / workflow：provider replay admin / workflow handoff。
+Agent action boundary / repair cases：在 provider replay admin / workflow handoff
+已落的基础上，继续补更完整的 Agent action approval / repair / redrive 边界。
 
 ## 当前已收口
 
@@ -20,27 +21,29 @@ action-executor / workflow：provider replay admin / workflow handoff。
   active cases 增加到 24 个，新增 asker-bound term ambiguity、visible-chain incomplete
   abstention、missing visibility projection fail-closed、audience-language profile
   overgeneralization cases；覆盖 no unsupported memory fallback 和 no raw prompt persistence。
+- provider replay admin / workflow handoff 已落：`provider-replay-handoff` 只读
+  `DLQ` provider failure，输出低敏 admin operation request 和 workflow handoff request；
+  admin-service 已接受 `PROVIDER_REPLAY_REQUEST` 并强制路由 workflow-service
+  `REPAIR_APPROVAL`，approval policy 指向 `admin.workflow.provider_replay.v1`，target
+  service 为 `action-executor`。
 
 ## 目标
 
-- 把 provider failure replay 从本地 operator UI first path 推进到更接近正式运维的
-  admin / workflow handoff：operator 可以创建低敏 replay request / workflow，审批后仍走
-  `RedriveProviderFailure` 的 fresh proposal / approval / prepared audit / new input /
-  reason hash 链。
-- 不允许 admin / workflow 直接执行 provider replay，不允许复用旧 approval，不允许恢复 raw
-  provider input / output，不允许修改 DLQ failure row 来伪造完成。
+- 在现有 Agent / RAG demo path 上继续补 action boundary / repair cases：更多需要
+  proposal、approval、prepared audit、workflow handoff 和 action-executor final execution 的
+  场景。
+- 保持不变量：admin / workflow 不能直接执行工具或 provider replay；不能复用旧 approval；
+  不能恢复 raw provider input / output；不能修改 DLQ failure row 来伪造完成。
 - action-executor 继续拥有最终执行边界；workflow / admin 只做请求、审批、状态和运维视图。
 
 ## 本轮完成条件
 
-- 读取并对齐 `action-executor`、`workflow-service`、`admin-service`、`audit-service` 和
-  `ai-eval-service` brief / SDD。
+- 从 `remaining-goals.md` 选择下一个完整可感知功能模块，优先 action boundary / repair /
+  redrive 相关；不要把单个字段或单条文档作为 goal。
 - 做 compact architecture analysis：owner、state machine、approval boundary、audit contract、
   event / API contract、是否需要新中间件。
-- 补一个可感知的 provider replay admin / workflow handoff 功能包，而不是只加单条 case。
-- Focused tests / eval cases 覆盖 request creation、fresh approval requirement、prepared audit、
-  no direct execution、no raw provider payload、DLQ row immutable、redrive still goes through
-  action-executor。
+- Focused tests / eval cases 覆盖 no direct execution、fresh approval、prepared audit、
+  no raw payload、fact source immutable、final execution owner。
 - Focused checks 通过；若跨 proto / migration / 安全边界再跑完整门禁。
 - 必要文档同步后提交并推送到 GitHub。
 
@@ -54,6 +57,5 @@ action-executor / workflow：provider replay admin / workflow handoff。
 
 ## 后续优先级
 
-1. provider replay admin / workflow handoff 完成后，再按需推进更多 Agent action boundary /
-   repair cases。
+1. 按需推进更多 Agent action boundary / repair cases。
 2. Product-active 服务按需推进，不抢占 AI / Agent 演示主线。

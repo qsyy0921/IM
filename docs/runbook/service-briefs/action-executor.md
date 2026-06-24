@@ -20,6 +20,10 @@
 - Provider replay operator UI first path：`provider-replay-operator-ui` 只读 DLQ
   provider failure，输出低敏 candidate / batch / workflow state / permission gate /
   audit contract，不执行 tool、不修改 failure row、不复用旧 approval。
+- Provider replay admin / workflow handoff：`provider-replay-handoff` 只读 DLQ
+  provider failure，输出低敏 `PROVIDER_REPLAY_REQUEST` admin operation request 和
+  `REPAIR_APPROVAL` workflow handoff request；不执行 tool、不修改 failure row、不带 raw
+  input / output。
 - Docker / Prometheus / Grafana wiring、focused tests、PG integration、ai-eval action preflight safety adapter。
 
 ## 边界
@@ -28,9 +32,11 @@
 - 未配置 adapter 的业务 tool 必须 `executed=false`，不得伪造成功。
 - Redrive 是专用 API，不是普通 repair / DLQ tool action；不恢复旧 raw input，不自动 replay 旧 provider output。
 - Provider replay operator UI artifact 只是人工审批视图，不是 replay 已执行证明。
+- Provider replay handoff artifact 只是请求 / 审批交接，不是 replay 已执行证明；最终执行
+  仍只能走 `RedriveProviderFailure`。
 - 真实业务 mutation 必须新增显式 adapter、公开业务 API、operator / policy 边界。
 
 ## 下一步
 
-- 深化 provider replay approval / audit 的正式 admin/workflow handoff，以及更多
-  group memory / retrieval / eval redrive / repair cases。
+- 更多 Agent action boundary / repair cases、external audit integration 和 provider-grade
+  replay UI；group memory / retrieval / eval redrive / repair cases 继续扩展。

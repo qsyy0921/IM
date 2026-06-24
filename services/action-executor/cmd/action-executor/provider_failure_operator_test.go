@@ -148,6 +148,106 @@ func TestProviderFailureReplayOperatorUIOutputRequiresFreshApprovalAndAudit(t *t
 	}
 }
 
+func TestProviderFailureReplayHandoffOutputCreatesAdminWorkflowRequests(t *testing.T) {
+	now := time.Date(2026, 6, 25, 12, 30, 0, 0, time.UTC)
+	row := types.ProviderFailureAuditRow{
+		TenantID:          "tenant-1",
+		ProviderFailureID: "provider-failure-3",
+		ExecutionID:       "execution-3",
+		ResultID:          "result-3",
+		ProposalID:        "proposal-old-3",
+		ApprovalID:        "approval-old-3",
+		PreparedAuditID:   "mcp-audit-old-3",
+		UserID:            "user-sensitive-3",
+		SkillID:           "skill-3",
+		ToolName:          "conversation.profile.update",
+		ResourceType:      "conversation",
+		ResourceID:        "conversation-sensitive-3",
+		Classification:    "TOOL_PROVIDER_UNAVAILABLE",
+		Status:            types.ProviderFailureStatusDLQ,
+		Retryable:         false,
+		RetryCount:        3,
+		DeadLetteredAt:    &now,
+		FailureRef:        "action-executor://executions/execution-3/provider-failures/provider-failure-3",
+		CreatedAt:         now,
+	}
+	output := newProviderFailureReplayHandoffOutput(
+		types.ProviderFailureAuditOptions{TenantID: "tenant-1", Status: types.ProviderFailureStatusDLQ, Limit: 50},
+		[]types.ProviderFailureAuditRow{row},
+		providerFailureReplayHandoffConfig{
+			OperatorRef:   "operator:alice",
+			OperatorRole:  "OPERATOR",
+			ReasonRef:     "reason:provider-replay-ticket-3",
+			EvidenceRefs:  []string{"evidence:provider-failure-3"},
+			CorrelationID: "corr-3",
+			TraceID:       "trace-3",
+		},
+	)
+	encoded, err := json.Marshal(output)
+	if err != nil {
+		t.Fatalf("encode output: %v", err)
+	}
+	rawString := string(encoded)
+	for _, forbidden := range []string{"user-sensitive-3", "conversation-sensitive-3", row.FailureRef, "provider raw"} {
+		if strings.Contains(rawString, forbidden) {
+			t.Fatalf("handoff leaked %q: %s", forbidden, rawString)
+		}
+	}
+	if output.Kind != "action-executor.provider-failure.replay-admin-workflow-handoff" ||
+		output.ExecutesTool ||
+		output.MutatesProviderFailure ||
+		!output.RequiresOperatorApproval ||
+		!output.RequiresFreshApproval ||
+		!output.RequiresPreparedAudit ||
+		!output.RequiresNewInput ||
+		!output.RequiresReasonSHA256 ||
+		!output.DryRun {
+		t.Fatalf("unexpected handoff safety flags: %+v", output)
+	}
+	if output.HandoffContract == nil ||
+		output.HandoffContract.AdminOperationType != "PROVIDER_REPLAY_REQUEST" ||
+		output.HandoffContract.WorkflowType != "REPAIR_APPROVAL" ||
+		output.HandoffContract.TargetService != "action-executor" ||
+		output.HandoffContract.TargetOperation != "PROVIDER_REPLAY_REQUEST" ||
+		output.HandoffContract.RedriveEntrypoint != "RedriveProviderFailure" ||
+		output.HandoffContract.DirectExecutionAllowed ||
+		!output.HandoffContract.SourceDLQImmutable {
+		t.Fatalf("unexpected handoff contract: %+v", output.HandoffContract)
+	}
+	if len(output.AdminOperationRequests) != 1 || len(output.WorkflowHandoffRequests) != 1 {
+		t.Fatalf("expected one admin/workflow request: %+v", output)
+	}
+	adminRequest := output.AdminOperationRequests[0]
+	if adminRequest.OperationType != "PROVIDER_REPLAY_REQUEST" ||
+		adminRequest.RiskLevel != "HIGH" ||
+		adminRequest.PayloadSchemaVersion != "admin.provider_replay_request.v1" ||
+		adminRequest.TargetRefHash == "" ||
+		adminRequest.OperationPayloadHash == "" ||
+		adminRequest.ExpectedWorkflowPolicy != "admin.workflow.provider_replay.v1" ||
+		adminRequest.OperationPayload["redrive_entrypoint"] != "RedriveProviderFailure" ||
+		adminRequest.OperationPayload["direct_execution_allowed"] != false ||
+		adminRequest.OperationPayload["source_dlq_immutable"] != true {
+		t.Fatalf("unexpected admin request: %+v", adminRequest)
+	}
+	workflowRequest := output.WorkflowHandoffRequests[0]
+	if workflowRequest.WorkflowType != "REPAIR_APPROVAL" ||
+		workflowRequest.TargetService != "action-executor" ||
+		workflowRequest.TargetOperation != "PROVIDER_REPLAY_REQUEST" ||
+		workflowRequest.PayloadRefHash != adminRequest.OperationPayloadHash ||
+		workflowRequest.ApprovalPolicyRef != "admin.workflow.provider_replay.v1" ||
+		workflowRequest.IdempotencyKey != "admin-workflow:${operation_id}" {
+		t.Fatalf("unexpected workflow request: %+v", workflowRequest)
+	}
+	if len(output.Rows) != 1 ||
+		output.Rows[0].ReplayCandidateID == "" ||
+		output.Rows[0].ReplayState != "AWAITING_ADMIN_WORKFLOW" ||
+		output.Rows[0].UserIDHash == "" ||
+		output.Rows[0].ResourceIDHash == "" ||
+		output.Rows[0].FailureRefHash == "" {
+		t.Fatalf("unexpected handoff row: %+v", output.Rows)
+	}
+}
+
 func TestProviderFailureOperatorRejectsInvalidStatusAndReasonFile(t *testing.T) {
 	if err := validateProviderFailureAuditStatus("FAILED"); err == nil {
 		t.Fatal("expected invalid status to fail closed")
@@ -159,6 +259,26 @@ func TestProviderFailureOperatorRejectsInvalidStatusAndReasonFile(t *testing.T) 
 	t.Setenv("NEXUSIM_ACTION_EXECUTOR_PROVIDER_FAILURE_REDRIVE_REASON_FILE", filepath.Join(t.TempDir(), "missing.txt"))
 	if _, err := actionProviderFailureReasonSHA256FromEnv("NEXUSIM_ACTION_EXECUTOR_PROVIDER_FAILURE_REDRIVE_REASON_FILE"); err == nil {
 		t.Fatal("expected missing reason file to fail closed")
+	}
+}
+
+func TestProviderFailureReplayHandoffConfigRequiresLowSensitiveRefs(t *testing.T) {
+	t.Setenv("NEXUSIM_ACTION_EXECUTOR_PROVIDER_REPLAY_HANDOFF_OPERATOR_REF", "operator:alice")
+	t.Setenv("NEXUSIM_ACTION_EXECUTOR_PROVIDER_REPLAY_HANDOFF_REASON_REF", "reason:provider-replay")
+	if _, err := providerFailureReplayHandoffConfigFromEnv(); err == nil {
+		t.Fatal("expected missing evidence refs to fail closed")
+	}
+	t.Setenv("NEXUSIM_ACTION_EXECUTOR_PROVIDER_REPLAY_HANDOFF_EVIDENCE_REFS", "evidence:provider-replay")
+	config, err := providerFailureReplayHandoffConfigFromEnv()
+	if err != nil {
+		t.Fatalf("expected valid handoff config: %v", err)
+	}
+	if config.OperatorRole != "OPERATOR" || len(config.EvidenceRefs) != 1 {
+		t.Fatalf("unexpected config: %+v", config)
+	}
+	t.Setenv("NEXUSIM_ACTION_EXECUTOR_PROVIDER_REPLAY_HANDOFF_REASON_REF", "raw:operator reason")
+	if _, err := providerFailureReplayHandoffConfigFromEnv(); err == nil {
+		t.Fatal("expected sensitive reason ref to fail closed")
 	}
 }
 

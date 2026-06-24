@@ -8,6 +8,7 @@ import (
 
 const (
 	OperationTypeRepairRequest                 = "REPAIR_REQUEST"
+	OperationTypeProviderReplayRequest         = "PROVIDER_REPLAY_REQUEST"
 	OperationTypeConfigPublish                 = "CONFIG_PUBLISH"
 	OperationTypeConfigRollback                = "CONFIG_ROLLBACK"
 	OperationTypeTenantQuotaChange             = "TENANT_QUOTA_CHANGE"
@@ -69,5 +70,7 @@ func (executor OperationTypeRoutingExecutor) Execute(ctx context.Context, operat
 }
 
 func requiresWorkflow(operation types.AdminOperation) bool {
-	return operation.OperationType == OperationTypeRepairRequest || operation.RiskLevel == types.RiskLevelCritical
+	return operation.OperationType == OperationTypeRepairRequest ||
+		operation.OperationType == OperationTypeProviderReplayRequest ||
+		operation.RiskLevel == types.RiskLevelCritical
 }

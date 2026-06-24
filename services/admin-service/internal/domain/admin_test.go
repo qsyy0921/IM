@@ -126,6 +126,50 @@ func TestPrepareCreateAcceptsTenantQuotaPayload(t *testing.T) {
 	}
 }
 
+func TestPrepareCreateAcceptsProviderReplayRequestPayload(t *testing.T) {
+	command := validCreateCommand(`{
+		"provider_failure_ref_hash":"sha256:provider-failure",
+		"source_execution_ref_hash":"sha256:execution",
+		"source_result_ref_hash":"sha256:result",
+		"replay_candidate_id":"provider-replay-candidate-1234",
+		"redrive_entrypoint":"RedriveProviderFailure",
+		"requires_fresh_proposal":true,
+		"requires_fresh_approval":true,
+		"requires_prepared_audit":true,
+		"requires_new_input":true,
+		"requires_reason_sha256":true,
+		"source_dlq_immutable":true,
+		"direct_execution_allowed":false
+	}`)
+	command.OperationType = "PROVIDER_REPLAY_REQUEST"
+	command.PayloadSchemaVersion = "admin.provider_replay_request.v1"
+	command.RiskLevel = types.RiskLevelHigh
+
+	prepared, err := PrepareCreate(command, "op_provider_replay", time.Now())
+	if err != nil {
+		t.Fatalf("prepare create: %v", err)
+	}
+	if !strings.Contains(prepared.PayloadJSON, "RedriveProviderFailure") ||
+		!strings.Contains(prepared.PayloadJSON, "provider_failure_ref_hash") {
+		t.Fatalf("unexpected payload: %s", prepared.PayloadJSON)
+	}
+}
+
+func TestPrepareCreateRejectsSensitiveProviderReplayPayload(t *testing.T) {
+	command := validCreateCommand(`{
+		"provider_failure_ref_hash":"sha256:provider-failure",
+		"redrive_entrypoint":"RedriveProviderFailure",
+		"message_body":"raw provider input"
+	}`)
+	command.OperationType = "PROVIDER_REPLAY_REQUEST"
+	command.PayloadSchemaVersion = "admin.provider_replay_request.v1"
+	command.RiskLevel = types.RiskLevelHigh
+
+	if _, err := PrepareCreate(command, "op_provider_replay", time.Now()); !errors.Is(err, types.ErrInvalidArgument) {
+		t.Fatalf("expected invalid argument, got %v", err)
+	}
+}
+
 func validCreateCommand(payload string) types.CreateAdminOperationCommand {
 	return types.CreateAdminOperationCommand{
 		AuthContext:          types.AuthContext{TenantID: "tenant-admin-test", ServiceName: "admin-ui"},

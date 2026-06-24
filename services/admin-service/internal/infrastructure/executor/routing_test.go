@@ -62,6 +62,33 @@ func TestRiskRoutingExecutorRoutesRepairRequestToWorkflow(t *testing.T) {
 	}
 }
 
+func TestRiskRoutingExecutorRoutesProviderReplayRequestToWorkflow(t *testing.T) {
+	local := &fakeExecutor{}
+	workflow := &fakeExecutor{
+		result: types.OperationExecutionResult{
+			DownstreamService:    "workflow-service",
+			DownstreamRequestRef: "workflow:wf_provider_replay",
+			Status:               types.OperationStatusSucceeded,
+		},
+	}
+	router := NewRiskRoutingExecutor(local, workflow)
+
+	result, err := router.Execute(context.Background(), types.AdminOperation{
+		OperationID:   "admop_provider_replay",
+		OperationType: OperationTypeProviderReplayRequest,
+		RiskLevel:     types.RiskLevelHigh,
+	})
+	if err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if result.DownstreamService != "workflow-service" {
+		t.Fatalf("unexpected downstream: %+v", result)
+	}
+	if local.calls != 0 || workflow.calls != 1 {
+		t.Fatalf("unexpected call counts local=%d workflow=%d", local.calls, workflow.calls)
+	}
+}
+
 func TestRiskRoutingExecutorRejectsCriticalWhenWorkflowMissing(t *testing.T) {
 	router := NewRiskRoutingExecutor(NewNoopExecutor("local"), nil)
 
@@ -130,6 +157,7 @@ func TestNoopExecutorRejectsWorkflowRequiredOperations(t *testing.T) {
 	noop := NewNoopExecutor("local")
 	for _, operation := range []types.AdminOperation{
 		{OperationID: "admop_repair", OperationType: OperationTypeRepairRequest, RiskLevel: types.RiskLevelHigh},
+		{OperationID: "admop_provider_replay", OperationType: OperationTypeProviderReplayRequest, RiskLevel: types.RiskLevelHigh},
 		{OperationID: "admop_critical", OperationType: "CONFIG_PUBLISH", RiskLevel: types.RiskLevelCritical},
 	} {
 		if _, err := noop.Execute(context.Background(), operation); !errors.Is(err, types.ErrFailedPrecondition) {

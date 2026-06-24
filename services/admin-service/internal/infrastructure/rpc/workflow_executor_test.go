@@ -63,6 +63,50 @@ func TestWorkflowExecutorCreatesRepairApprovalWorkflow(t *testing.T) {
 	}
 }
 
+func TestWorkflowExecutorCreatesProviderReplayApprovalWorkflow(t *testing.T) {
+	client := &fakeWorkflowClient{
+		response: &workflowv1.CreateWorkflowResponse{
+			Workflow: &workflowv1.Workflow{WorkflowId: "wf_provider_replay_1"},
+		},
+	}
+	workflowExecutor := NewWorkflowExecutor(client, time.Second)
+
+	result, err := workflowExecutor.Execute(context.Background(), types.AdminOperation{
+		TenantID:             "tenant-admin-rpc-test",
+		OperationID:          "admop_provider_replay_1",
+		OperationType:        executor.OperationTypeProviderReplayRequest,
+		TargetRefHash:        "sha256:provider-failure",
+		RiskLevel:            types.RiskLevelHigh,
+		PayloadSchemaVersion: "admin.provider_replay_request.v1",
+		PayloadHash:          "sha256:payload",
+		ReasonRef:            "reason:provider-replay",
+		EvidenceRefs:         []string{"evidence:provider-failure"},
+		RequestedBy:          "operator:alice",
+		CorrelationID:        "corr-provider-replay",
+		TraceID:              "trace-provider-replay",
+	})
+	if err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if result.DownstreamService != "workflow-service" ||
+		result.DownstreamRequestRef != "workflow:wf_provider_replay_1" ||
+		result.Status != types.OperationStatusSucceeded {
+		t.Fatalf("unexpected result: %+v", result)
+	}
+	request := client.request
+	if request.GetWorkflowType() != "REPAIR_APPROVAL" ||
+		request.GetTargetService() != "action-executor" ||
+		request.GetTargetOperation() != executor.OperationTypeProviderReplayRequest ||
+		request.GetApprovalPolicyRef() != "admin.workflow.provider_replay.v1" {
+		t.Fatalf("unexpected workflow request: %+v", request)
+	}
+	if request.GetPayloadRefHash() != "sha256:payload" ||
+		request.GetReasonRef() != "reason:provider-replay" ||
+		request.GetIdempotencyKey() != "admin-workflow:admop_provider_replay_1" {
+		t.Fatalf("request should only carry refs and stable idempotency: %+v", request)
+	}
+}
+
 func TestWorkflowExecutorCreatesAdminOperationWorkflowForCriticalOperation(t *testing.T) {
 	client := &fakeWorkflowClient{
 		response: &workflowv1.CreateWorkflowResponse{

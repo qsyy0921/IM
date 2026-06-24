@@ -42,6 +42,9 @@ type providerFailureOperatorOutput struct {
 	AuditContract            string                             `json:"audit_contract,omitempty"`
 	EvalGate                 string                             `json:"eval_gate,omitempty"`
 	RedriveRequirements      []string                           `json:"redrive_requirements,omitempty"`
+	HandoffContract          *providerFailureHandoffContract    `json:"handoff_contract,omitempty"`
+	AdminOperationRequests   []providerFailureAdminRequest      `json:"admin_operation_requests,omitempty"`
+	WorkflowHandoffRequests  []providerFailureWorkflowRequest   `json:"workflow_handoff_requests,omitempty"`
 	OperatorNextStep         string                             `json:"operator_next_step,omitempty"`
 	Note                     string                             `json:"note"`
 }
@@ -50,6 +53,65 @@ type providerFailureOperatorCounts struct {
 	Total        int `json:"total"`
 	RetryPending int `json:"retry_pending"`
 	DLQ          int `json:"dlq"`
+}
+
+type providerFailureHandoffContract struct {
+	AdminOperationType     string   `json:"admin_operation_type"`
+	WorkflowType           string   `json:"workflow_type"`
+	TargetService          string   `json:"target_service"`
+	TargetOperation        string   `json:"target_operation"`
+	RedriveEntrypoint      string   `json:"redrive_entrypoint"`
+	ApprovalPolicyRef      string   `json:"approval_policy_ref"`
+	PayloadSchemaVersion   string   `json:"payload_schema_version"`
+	DirectExecutionAllowed bool     `json:"direct_execution_allowed"`
+	SourceDLQImmutable     bool     `json:"source_dlq_immutable"`
+	Requires               []string `json:"requires"`
+}
+
+type providerFailureAdminRequest struct {
+	AuthTenantID           string         `json:"auth_tenant_id"`
+	OperatorRef            string         `json:"operator_ref"`
+	OperatorRole           string         `json:"operator_role"`
+	OperationType          string         `json:"operation_type"`
+	TargetRefHash          string         `json:"target_ref_hash"`
+	RiskLevel              string         `json:"risk_level"`
+	PayloadSchemaVersion   string         `json:"payload_schema_version"`
+	OperationPayload       map[string]any `json:"operation_payload"`
+	OperationPayloadHash   string         `json:"operation_payload_hash"`
+	ReasonRef              string         `json:"reason_ref"`
+	EvidenceRefs           []string       `json:"evidence_refs"`
+	IdempotencyKey         string         `json:"idempotency_key"`
+	CorrelationID          string         `json:"correlation_id,omitempty"`
+	CausationID            string         `json:"causation_id,omitempty"`
+	TraceID                string         `json:"trace_id,omitempty"`
+	ExpectedWorkflowPolicy string         `json:"expected_workflow_policy"`
+}
+
+type providerFailureWorkflowRequest struct {
+	WorkflowType         string   `json:"workflow_type"`
+	RequesterService     string   `json:"requester_service"`
+	TargetService        string   `json:"target_service"`
+	TargetOperation      string   `json:"target_operation"`
+	RiskLevel            string   `json:"risk_level"`
+	TargetRefHash        string   `json:"target_ref_hash"`
+	PayloadSchemaVersion string   `json:"payload_schema_version"`
+	PayloadRefHash       string   `json:"payload_ref_hash"`
+	ApprovalPolicyRef    string   `json:"approval_policy_ref"`
+	ReasonRef            string   `json:"reason_ref"`
+	EvidenceRefs         []string `json:"evidence_refs"`
+	IdempotencyKey       string   `json:"idempotency_key"`
+	CorrelationID        string   `json:"correlation_id,omitempty"`
+	CausationID          string   `json:"causation_id,omitempty"`
+	TraceID              string   `json:"trace_id,omitempty"`
+}
+
+type providerFailureReplayHandoffConfig struct {
+	OperatorRef   string
+	OperatorRole  string
+	ReasonRef     string
+	EvidenceRefs  []string
+	CorrelationID string
+	TraceID       string
 }
 
 type providerFailureOperatorOutputRow struct {
@@ -157,6 +219,33 @@ func runProviderFailureReplayOperatorUI(ctx context.Context) error {
 	return writeProviderFailureOperatorOutput(outputPath, output)
 }
 
+func runProviderFailureReplayHandoff(ctx context.Context) error {
+	options, err := providerFailureAuditOptionsFromEnv("NEXUSIM_ACTION_EXECUTOR_PROVIDER_REPLAY_HANDOFF")
+	if err != nil {
+		return err
+	}
+	if strings.TrimSpace(options.Status) == "" {
+		options.Status = types.ProviderFailureStatusDLQ
+	}
+	if strings.ToUpper(strings.TrimSpace(options.Status)) != types.ProviderFailureStatusDLQ {
+		return errors.New("NEXUSIM_ACTION_EXECUTOR_PROVIDER_REPLAY_HANDOFF_STATUS must be DLQ; replay handoff only creates requests for redrivable DLQ candidates")
+	}
+	config, err := providerFailureReplayHandoffConfigFromEnv()
+	if err != nil {
+		return err
+	}
+	rows, options, err := loadProviderFailureRowsWithOptions(ctx, options)
+	if err != nil {
+		return err
+	}
+	outputPath := strings.TrimSpace(os.Getenv("NEXUSIM_ACTION_EXECUTOR_PROVIDER_REPLAY_HANDOFF_OUTPUT"))
+	if outputPath == "" {
+		return errors.New("NEXUSIM_ACTION_EXECUTOR_PROVIDER_REPLAY_HANDOFF_OUTPUT is required")
+	}
+	output := newProviderFailureReplayHandoffOutput(options, rows, config)
+	return writeProviderFailureOperatorOutput(outputPath, output)
+}
+
 func loadProviderFailureRows(ctx context.Context, prefix string) ([]types.ProviderFailureAuditRow, types.ProviderFailureAuditOptions, error) {
 	options, err := providerFailureAuditOptionsFromEnv(prefix)
 	if err != nil {
@@ -195,6 +284,41 @@ func providerFailureAuditOptionsFromEnv(prefix string) (types.ProviderFailureAud
 		ToolName: strings.TrimSpace(os.Getenv(prefix + "_TOOL_NAME")),
 		Limit:    limit,
 	}, nil
+}
+
+func providerFailureReplayHandoffConfigFromEnv() (providerFailureReplayHandoffConfig, error) {
+	config := providerFailureReplayHandoffConfig{
+		OperatorRef:   strings.TrimSpace(os.Getenv("NEXUSIM_ACTION_EXECUTOR_PROVIDER_REPLAY_HANDOFF_OPERATOR_REF")),
+		OperatorRole:  strings.ToUpper(strings.TrimSpace(os.Getenv("NEXUSIM_ACTION_EXECUTOR_PROVIDER_REPLAY_HANDOFF_OPERATOR_ROLE"))),
+		ReasonRef:     strings.TrimSpace(os.Getenv("NEXUSIM_ACTION_EXECUTOR_PROVIDER_REPLAY_HANDOFF_REASON_REF")),
+		EvidenceRefs:  splitCSV(os.Getenv("NEXUSIM_ACTION_EXECUTOR_PROVIDER_REPLAY_HANDOFF_EVIDENCE_REFS")),
+		CorrelationID: strings.TrimSpace(os.Getenv("NEXUSIM_ACTION_EXECUTOR_PROVIDER_REPLAY_HANDOFF_CORRELATION_ID")),
+		TraceID:       strings.TrimSpace(os.Getenv("NEXUSIM_ACTION_EXECUTOR_PROVIDER_REPLAY_HANDOFF_TRACE_ID")),
+	}
+	if config.OperatorRef == "" {
+		return config, errors.New("NEXUSIM_ACTION_EXECUTOR_PROVIDER_REPLAY_HANDOFF_OPERATOR_REF is required")
+	}
+	if config.OperatorRole == "" {
+		config.OperatorRole = "OPERATOR"
+	}
+	if config.ReasonRef == "" {
+		return config, errors.New("NEXUSIM_ACTION_EXECUTOR_PROVIDER_REPLAY_HANDOFF_REASON_REF is required")
+	}
+	if len(config.EvidenceRefs) == 0 {
+		return config, errors.New("NEXUSIM_ACTION_EXECUTOR_PROVIDER_REPLAY_HANDOFF_EVIDENCE_REFS is required")
+	}
+	if !providerFailureLowSensitiveRef(config.OperatorRef) ||
+		!providerFailureLowSensitiveRef(config.ReasonRef) ||
+		!providerFailureLowSensitiveRef(config.CorrelationID) ||
+		!providerFailureLowSensitiveRef(config.TraceID) {
+		return config, errors.New("provider replay handoff refs must be low-sensitive")
+	}
+	for _, ref := range config.EvidenceRefs {
+		if !providerFailureLowSensitiveRef(ref) {
+			return config, errors.New("provider replay handoff evidence refs must be low-sensitive")
+		}
+	}
+	return config, nil
 }
 
 func validateProviderFailureAuditStatus(status string) error {
@@ -331,6 +455,132 @@ func newProviderFailureReplayOperatorUIOutput(
 	return output
 }
 
+func newProviderFailureReplayHandoffOutput(
+	options types.ProviderFailureAuditOptions,
+	rows []types.ProviderFailureAuditRow,
+	config providerFailureReplayHandoffConfig,
+) providerFailureOperatorOutput {
+	output := newProviderFailureOperatorOutput(
+		"action-executor.provider-failure.replay-admin-workflow-handoff",
+		options,
+		rows,
+		false,
+		"",
+	)
+	output.BatchID = providerFailureBatchID(output.Kind, rows, config.ReasonRef)
+	output.RequiresOperatorApproval = true
+	output.RequiresFreshApproval = true
+	output.RequiresPreparedAudit = true
+	output.RequiresNewInput = true
+	output.RequiresReasonSHA256 = true
+	output.DryRun = true
+	output.PermissionGate = "admin-service creates PROVIDER_REPLAY_REQUEST; workflow-service records REPAIR_APPROVAL; action-executor RedriveProviderFailure remains the only execution entrypoint"
+	output.AuditContract = "admin operation, workflow approval, fresh agent approval, prepared audit and action-executor redrive lineage are all required"
+	output.EvalGate = "action-provider-replay-admin-workflow-handoff"
+	output.RedriveRequirements = providerReplayRequiredGates()
+	output.HandoffContract = &providerFailureHandoffContract{
+		AdminOperationType:     "PROVIDER_REPLAY_REQUEST",
+		WorkflowType:           "REPAIR_APPROVAL",
+		TargetService:          "action-executor",
+		TargetOperation:        "PROVIDER_REPLAY_REQUEST",
+		RedriveEntrypoint:      "RedriveProviderFailure",
+		ApprovalPolicyRef:      "admin.workflow.provider_replay.v1",
+		PayloadSchemaVersion:   "admin.provider_replay_request.v1",
+		DirectExecutionAllowed: false,
+		SourceDLQImmutable:     true,
+		Requires:               providerReplayRequiredGates(),
+	}
+	output.OperatorNextStep = "Submit each admin_operation_request to admin-service; after workflow approval, create fresh Agent proposal / approval / prepared audit and call action-executor.RedriveProviderFailure with new input_json and reason_sha256."
+	output.AdminOperationRequests = make([]providerFailureAdminRequest, 0, len(output.Rows))
+	output.WorkflowHandoffRequests = make([]providerFailureWorkflowRequest, 0, len(output.Rows))
+	for index := range output.Rows {
+		row := &output.Rows[index]
+		row.ReplayCandidateID = providerFailureReplayCandidateID(row.TenantID, row.ProviderFailureID)
+		row.ReplayState = "AWAITING_ADMIN_WORKFLOW"
+		adminRequest := providerFailureAdminHandoffRequest(*row, config)
+		output.AdminOperationRequests = append(output.AdminOperationRequests, adminRequest)
+		output.WorkflowHandoffRequests = append(output.WorkflowHandoffRequests, providerFailureWorkflowHandoffRequest(adminRequest))
+	}
+	return output
+}
+
+func providerFailureAdminHandoffRequest(
+	row providerFailureOperatorOutputRow,
+	config providerFailureReplayHandoffConfig,
+) providerFailureAdminRequest {
+	payload := map[string]any{
+		"provider_failure_ref_hash": row.ProviderFailureRefHash(),
+		"source_execution_ref_hash": "sha256:" + providerFailureSHA256(row.ExecutionID),
+		"source_result_ref_hash":    "sha256:" + providerFailureSHA256(row.ResultID),
+		"replay_candidate_id":       row.ReplayCandidateID,
+		"redrive_entrypoint":        "RedriveProviderFailure",
+		"requires_fresh_proposal":   true,
+		"requires_fresh_approval":   true,
+		"requires_prepared_audit":   true,
+		"requires_new_input":        true,
+		"requires_reason_sha256":    true,
+		"source_dlq_immutable":      true,
+		"direct_execution_allowed":  false,
+	}
+	payloadHash := providerFailurePayloadHash(payload)
+	return providerFailureAdminRequest{
+		AuthTenantID:           row.TenantID,
+		OperatorRef:            strings.TrimSpace(config.OperatorRef),
+		OperatorRole:           providerFailureFirstNonEmpty(strings.ToUpper(strings.TrimSpace(config.OperatorRole)), "OPERATOR"),
+		OperationType:          "PROVIDER_REPLAY_REQUEST",
+		TargetRefHash:          row.ProviderFailureRefHash(),
+		RiskLevel:              "HIGH",
+		PayloadSchemaVersion:   "admin.provider_replay_request.v1",
+		OperationPayload:       payload,
+		OperationPayloadHash:   payloadHash,
+		ReasonRef:              strings.TrimSpace(config.ReasonRef),
+		EvidenceRefs:           append([]string(nil), config.EvidenceRefs...),
+		IdempotencyKey:         "provider-replay-admin:" + row.ReplayCandidateID,
+		CorrelationID:          strings.TrimSpace(config.CorrelationID),
+		CausationID:            row.ProviderFailureID,
+		TraceID:                strings.TrimSpace(config.TraceID),
+		ExpectedWorkflowPolicy: "admin.workflow.provider_replay.v1",
+	}
+}
+
+func providerFailureWorkflowHandoffRequest(adminRequest providerFailureAdminRequest) providerFailureWorkflowRequest {
+	return providerFailureWorkflowRequest{
+		WorkflowType:         "REPAIR_APPROVAL",
+		RequesterService:     "admin-service",
+		TargetService:        "action-executor",
+		TargetOperation:      "PROVIDER_REPLAY_REQUEST",
+		RiskLevel:            adminRequest.RiskLevel,
+		TargetRefHash:        adminRequest.TargetRefHash,
+		PayloadSchemaVersion: adminRequest.PayloadSchemaVersion,
+		PayloadRefHash:       adminRequest.OperationPayloadHash,
+		ApprovalPolicyRef:    adminRequest.ExpectedWorkflowPolicy,
+		ReasonRef:            adminRequest.ReasonRef,
+		EvidenceRefs:         append([]string(nil), adminRequest.EvidenceRefs...),
+		IdempotencyKey:       "admin-workflow:${operation_id}",
+		CorrelationID:        adminRequest.CorrelationID,
+		CausationID:          "${operation_id}",
+		TraceID:              adminRequest.TraceID,
+	}
+}
+
+func providerReplayRequiredGates() []string {
+	return []string{
+		"admin_operation_request",
+		"workflow_repair_approval",
+		"fresh_agent_proposal",
+		"fresh_agent_approval",
+		"fresh_prepared_audit",
+		"matching_skill_tool_resource",
+		"new_input_json",
+		"reason_sha256",
+		"action_executor_redrive_entrypoint",
+	}
+}
+
+func (row providerFailureOperatorOutputRow) ProviderFailureRefHash() string {
+	return "sha256:" + providerFailureSHA256(row.TenantID+":"+row.ProviderFailureID)
+}
+
 func providerFailureReplayCandidateID(tenantID string, providerFailureID string) string {
 	sum := sha256.Sum256([]byte(strings.TrimSpace(tenantID) + ":" + strings.TrimSpace(providerFailureID)))
 	return "provider-replay-candidate-" + hex.EncodeToString(sum[:])[:16]
@@ -394,6 +644,33 @@ func providerFailureSHA256(value string) string {
 	}
 	sum := sha256.Sum256([]byte(value))
 	return hex.EncodeToString(sum[:])
+}
+
+func providerFailurePayloadHash(payload map[string]any) string {
+	encoded, _ := json.Marshal(payload)
+	return "sha256:" + providerFailureSHA256(string(encoded))
+}
+
+func providerFailureFirstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return strings.TrimSpace(value)
+		}
+	}
+	return ""
+}
+
+func providerFailureLowSensitiveRef(value string) bool {
+	value = strings.ToLower(strings.TrimSpace(value))
+	if value == "" {
+		return true
+	}
+	for _, marker := range []string{"password", "token", "secret", "api_key", "apikey", "private://", "raw:", "dsn=", "postgres://", "http://", "https://", "message_body", "provider_body", "prompt"} {
+		if strings.Contains(value, marker) {
+			return false
+		}
+	}
+	return len(value) <= 256
 }
 
 func actionProviderFailureReasonSHA256FromEnv(reasonFileEnv string) (string, error) {

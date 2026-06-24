@@ -27,6 +27,7 @@ const (
 )
 
 var adminWorkflowPolicies = map[string]string{
+	executor.OperationTypeProviderReplayRequest:         "admin.workflow.provider_replay.v1",
 	executor.OperationTypeConfigPublish:                 "admin.workflow.config_publish.v1",
 	executor.OperationTypeConfigRollback:                "admin.workflow.config_rollback.v1",
 	executor.OperationTypeTenantQuotaChange:             "admin.workflow.tenant_quota_change.v1",
@@ -37,6 +38,7 @@ var adminWorkflowPolicies = map[string]string{
 }
 
 var adminWorkflowTargetServices = map[string]string{
+	executor.OperationTypeProviderReplayRequest:         "action-executor",
 	executor.OperationTypeConfigPublish:                 "control-plane-service",
 	executor.OperationTypeConfigRollback:                "control-plane-service",
 	executor.OperationTypeTenantQuotaChange:             "control-plane-service",
@@ -177,7 +179,8 @@ func (executor WorkflowExecutor) CreateCompensationWorkflow(
 }
 
 func workflowTypeForAdminOperation(operation types.AdminOperation) (string, error) {
-	if operation.OperationType == executor.OperationTypeRepairRequest {
+	if operation.OperationType == executor.OperationTypeRepairRequest ||
+		operation.OperationType == executor.OperationTypeProviderReplayRequest {
 		return workflowTypeRepairApproval, nil
 	}
 	if operation.RiskLevel == types.RiskLevelCritical {
@@ -187,11 +190,11 @@ func workflowTypeForAdminOperation(operation types.AdminOperation) (string, erro
 }
 
 func workflowApprovalPolicy(operation types.AdminOperation, workflowType string) string {
-	if workflowType == workflowTypeRepairApproval {
-		return defaultWorkflowApprovalPolicy
-	}
 	if policy, ok := adminWorkflowPolicies[operation.OperationType]; ok {
 		return policy
+	}
+	if workflowType == workflowTypeRepairApproval {
+		return defaultWorkflowApprovalPolicy
 	}
 	if operation.RiskLevel == types.RiskLevelCritical {
 		return defaultAdminWorkflowPolicy

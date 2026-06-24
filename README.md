@@ -397,7 +397,12 @@ gate：开启后要求 action-executor `SUCCEEDED`、低敏 output 不回显 not
 `ai-eval-rag-agent-demo-live-20260625-business-mutation-execute-v7` 已通过真实完整
 service-stack opt-in mutation smoke：4 adapters、27 cases、27 passed、0 failed、
 0 skipped；RAG-Agent demo 已从 audit-only gate 推进到经 approval 执行真实
-conversation note mutation。
+conversation note mutation。同日 `conversation.profile.update` 已作为第二个
+conversation business adapter 接入 action-executor 和 `loadtest/ragagent` /
+`run-ai-eval-ragagent-adapter.ps1`：显式 execute-mode gate 现在要求 note + profile
+双 mutation，profile 路径通过 conversation-service public `UpdateConversationProfile`
+执行，并只在 summary 中保留 profile version 与 title / avatar / announcement hash；
+完整 live service-stack profile mutation 报告待重建 action-executor runtime 后归档。
 
 下一步默认看 [current-goal.md](docs/runbook/current-goal.md)。截至当前主线，客户端只修
 阻塞演示入口的问题；默认推进

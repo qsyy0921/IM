@@ -24,21 +24,40 @@ func seedBusinessToolingRows(ctx context.Context, cfg config) error {
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
-	if _, err := tx.Exec(ctx, `
+	for _, skill := range []struct {
+		skillID     string
+		toolName    string
+		description string
+		auditType   string
+	}{
+		{
+			skillID:     defaultAgentSkillID,
+			toolName:    defaultAgentToolName,
+			description: "RAG agent business mutation skill for conversation note creation.",
+			auditType:   "conversation.note.proposed.v1",
+		},
+		{
+			skillID:     defaultAgentProfileSkillID,
+			toolName:    defaultAgentProfileToolName,
+			description: "RAG agent business mutation skill for conversation profile update.",
+			auditType:   "conversation.profile.proposed.v1",
+		},
+	} {
+		if _, err := tx.Exec(ctx, `
 INSERT INTO skill_registry_definitions (
 	tenant_id, skill_id, display_name, description, version, status, tool_name,
 	allowed_actions_json, input_schema_json, output_schema_json, permission_scope,
 	risk_level, requires_approval, audit_event_type, owner_service, tags_json,
 	metadata_json, created_at, updated_at
 ) VALUES (
-	$1, $2, $2, 'RAG agent business mutation skill for conversation note creation.',
-	'v1', 'ACTIVE', $3, '[1,3]'::jsonb,
+	$1, $2, $2, $3,
+	'v1', 'ACTIVE', $4, '[1,3]'::jsonb,
 	'{"type":"object","additionalProperties":true}'::jsonb,
 	'{"type":"object","additionalProperties":true}'::jsonb,
-	$4, 'LOW', true, 'conversation.note.proposed.v1', 'agent-service',
+	$5, 'LOW', true, $6, 'agent-service',
 	'["rag-agent-demo","business-mutation"]'::jsonb,
 	'{"source":"loadtest/ragagent","purpose":"business_mutation_execute"}'::jsonb,
-	$5, $5
+	$7, $7
 )
 ON CONFLICT (tenant_id, skill_id) DO UPDATE SET
 	display_name = EXCLUDED.display_name,
@@ -57,12 +76,14 @@ ON CONFLICT (tenant_id, skill_id) DO UPDATE SET
 	tags_json = EXCLUDED.tags_json,
 	metadata_json = EXCLUDED.metadata_json,
 	updated_at = EXCLUDED.updated_at
-`, cfg.tenantID, defaultAgentSkillID, defaultAgentToolName, defaultAgentResourceType, now); err != nil {
-		return fmt.Errorf("seed business skill registry definition: %w", err)
+`, cfg.tenantID, skill.skillID, skill.description, skill.toolName, defaultAgentResourceType, skill.auditType, now); err != nil {
+			return fmt.Errorf("seed business skill registry definition %s: %w", skill.skillID, err)
+		}
 	}
 
-	for _, action := range []string{"CALL", "EXECUTE"} {
-		if _, err := tx.Exec(ctx, `
+	for _, toolName := range []string{defaultAgentToolName, defaultAgentProfileToolName} {
+		for _, action := range []string{"CALL", "EXECUTE"} {
+			if _, err := tx.Exec(ctx, `
 INSERT INTO policy_tool_action_rules (
 	tenant_id, tool_name, action, resource_type, risk_level, allowed,
 	requires_approval, permission_version, classification, reason, priority,
@@ -82,8 +103,9 @@ ON CONFLICT (tenant_id, tool_name, action, resource_type, risk_level) DO UPDATE 
 	enabled = EXCLUDED.enabled,
 	source = EXCLUDED.source,
 	updated_at = EXCLUDED.updated_at
-`, cfg.tenantID, defaultAgentToolName, action, defaultAgentResourceType, now); err != nil {
-			return fmt.Errorf("seed business policy tool action rule %s: %w", action, err)
+`, cfg.tenantID, toolName, action, defaultAgentResourceType, now); err != nil {
+				return fmt.Errorf("seed business policy tool action rule %s/%s: %w", toolName, action, err)
+			}
 		}
 	}
 

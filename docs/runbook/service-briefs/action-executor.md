@@ -51,6 +51,11 @@
   approved Agent action 可经 action-executor 调用 conversation-service public API 更新会话资料；
   adapter 要求 LOW risk、conversation resource、EXECUTE skill 和 expected profile version，
   并保持低敏 output，不把 title / avatar / announcement 原文写入 tool result。
+- 同日 `loadtest/ragagent` / `run-ai-eval-ragagent-adapter.ps1` 已把
+  `-ExpectBusinessActionExecuted` 升级为 note + profile 双 mutation gate；execute-mode
+  必须同时验证 conversation note fact 和 public `GetConversationProfile` 读回的 profile
+  update，默认 audit-only 模式仍要求两类 mutation 都不执行。完整 live service-stack
+  profile mutation 报告仍待重建 action-executor runtime 后归档。
 
 ## 边界
 

@@ -75,7 +75,9 @@ proposal 前调用 `mcp-gateway.PrepareToolCall` 做 skill / policy / prepare au
   同日 `loadtest/ragagent` 已补 execute-mode gate：显式开启
   `--expect-business-action-executed` 时必须确认 action-executor 执行成功、输出低敏且不回显
   note body，并验证 `conversation_notes` 中 note fact 与 proposal / approval 绑定一致；
-  默认仍保持 audit-only gate。2026-06-25
+  同日该 gate 已升级为 note + profile 双 mutation：还必须通过 conversation-service
+  public `GetConversationProfile` 读回 approved `conversation.profile.update` 结果，且 summary
+  只保存 profile version / hash metadata；默认仍保持 audit-only gate。2026-06-25
   `ai-eval-rag-agent-demo-live-20260625-business-mutation-execute-v7` 已通过真实完整
   service-stack opt-in mutation smoke，确认 approved Agent proposal 能经 action-executor
   写入真实 conversation note fact。

@@ -198,21 +198,31 @@ $businessBasePassed = (
     (Get-JsonPropertyBool -Object $summary -Name "business_policy_requires_approval")
 )
 if ($ExpectBusinessActionExecuted) {
-    Add-Assertion -Assertions $assertions -Type "business_proposal_must_execute_approved_conversation_note" -Passed (
+    Add-Assertion -Assertions $assertions -Type "business_proposal_must_execute_approved_conversation_note_and_profile" -Passed (
         $businessBasePassed -and
         (Get-JsonPropertyString -Object $summary -Name "business_action_mode") -eq "execute" -and
         (Get-JsonPropertyBool -Object $summary -Name "business_action_executed") -and
         (Get-JsonPropertyBool -Object $summary -Name "business_note_persisted") -and
         (Get-JsonPropertyString -Object $summary -Name "business_note_id").Length -gt 0 -and
         (Get-JsonPropertyString -Object $summary -Name "business_note_ref").Length -gt 0 -and
-        (Get-JsonPropertyString -Object $summary -Name "business_note_body_sha256").Length -eq 64
+        (Get-JsonPropertyString -Object $summary -Name "business_note_body_sha256").Length -eq 64 -and
+        (Get-JsonPropertyBool -Object $summary -Name "business_profile_updated") -and
+        [int64]$summary.business_profile_version -gt 0 -and
+        (Get-JsonPropertyString -Object $summary -Name "business_profile_title_sha256").Length -eq 64 -and
+        (Get-JsonPropertyString -Object $summary -Name "business_profile_avatar_uri_sha256").Length -eq 64 -and
+        (Get-JsonPropertyString -Object $summary -Name "business_profile_announcement_sha256").Length -eq 64 -and
+        (Get-JsonPropertyString -Object $summary -Name "business_profile_action_input_sha256").Length -eq 64 -and
+        (Get-JsonPropertyString -Object $summary -Name "business_profile_proposal_id").Length -gt 0 -and
+        (Get-JsonPropertyString -Object $summary -Name "business_profile_approval_id").Length -gt 0 -and
+        (Get-JsonPropertyString -Object $summary -Name "business_profile_execution_id").Length -gt 0
     )
 } else {
     Add-Assertion -Assertions $assertions -Type "business_proposal_must_preserve_source_chain_and_audit_boundary" -Passed (
         $businessBasePassed -and
         (Get-JsonPropertyString -Object $summary -Name "business_action_mode") -eq "audit-only" -and
         -not (Get-JsonPropertyBool -Object $summary -Name "business_action_executed") -and
-        -not (Get-JsonPropertyBool -Object $summary -Name "business_note_persisted")
+        -not (Get-JsonPropertyBool -Object $summary -Name "business_note_persisted") -and
+        -not (Get-JsonPropertyBool -Object $summary -Name "business_profile_updated")
     )
 }
 Add-Assertion -Assertions $assertions -Type "profile_repair_must_require_workflow_approval_and_enter_evidence_chain" -Passed (

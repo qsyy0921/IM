@@ -196,9 +196,9 @@ EvidencePacks to include the resulting `ACTIVE + APPROVED` memory event with
 source refs. It does not read service private tables and does not persist raw
 answer, proposal or memory text in the adapter summary.
 
-To verify the explicit `conversation.note.create` business mutation path, start
-action-executor with `NEXUSIM_ACTION_EXECUTOR_CONVERSATION_GRPC_ADDR` pointing
-at the public conversation-service gRPC endpoint, then run:
+To verify the explicit conversation business mutation path, start action-executor
+with `NEXUSIM_ACTION_EXECUTOR_CONVERSATION_GRPC_ADDR` pointing at the public
+conversation-service gRPC endpoint, then run:
 
 ```powershell
 .\tools\run-ai-eval-ragagent-adapter.ps1 `
@@ -210,9 +210,11 @@ at the public conversation-service gRPC endpoint, then run:
 ```
 
 This mode must observe action-executor `executed=true`, result `SUCCEEDED`,
-low-sensitive output only, and a real conversation note row bound to the
-approved proposal / approval. Without the explicit action-executor env var the
-same demo must stay audit-only and report `business_action_executed=false`.
+low-sensitive output only, a real conversation note row bound to the approved
+proposal / approval, and an approved `conversation.profile.update` mutation whose
+summary only carries profile version and title / avatar / announcement hashes.
+Without the explicit action-executor env var the same demo must stay audit-only
+and report `business_action_executed=false`.
 
 First-stage profile overgeneralization / Agent output safety adapter:
 

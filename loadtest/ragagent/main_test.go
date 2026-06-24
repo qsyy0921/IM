@@ -228,6 +228,26 @@ func TestVerifyCombinedRejectsMissingBusinessProposalScenario(t *testing.T) {
 	}
 }
 
+func TestVerifyCombinedRequiresProfileMutationInBusinessExecuteMode(t *testing.T) {
+	cfg := config{runName: "demo", expectBusinessActionExecuted: true}
+	rag := validRAGPartial()
+	agent := validAgentPartial()
+	businessProposal := validBusinessProposalScenarioSummary()
+	businessProposal.ActionExecuted = true
+	businessProposal.NotePersisted = true
+	businessProposal.NoteID = "note-1"
+	businessProposal.ProfileUpdated = false
+	if _, err := verifyCombined(cfg, "out", "rag.json", "agent.json", rag, agent, validPublicCandidateReviewSummary(), validGroupMemoryScenarioSummary(), businessProposal, validProfileRepairApprovalSummary(), time.Now().UTC()); err == nil {
+		t.Fatalf("expected missing profile mutation to fail")
+	}
+	businessProposal.ProfileUpdated = true
+	businessProposal.ProfileVersion = 2
+	businessProposal.ProfileActionInputSHA256 = strings.Repeat("3", 64)
+	if _, err := verifyCombined(cfg, "out", "rag.json", "agent.json", rag, agent, validPublicCandidateReviewSummary(), validGroupMemoryScenarioSummary(), businessProposal, validProfileRepairApprovalSummary(), time.Now().UTC()); err != nil {
+		t.Fatalf("expected note and profile mutation summary to pass: %v", err)
+	}
+}
+
 func TestVerifyCombinedRejectsMissingProfileRepairApproval(t *testing.T) {
 	cfg := config{runName: "demo"}
 	rag := validRAGPartial()

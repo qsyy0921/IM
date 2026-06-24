@@ -77,9 +77,12 @@ adapter、状态、计数、summary/report 引用和低敏 metadata。
   已补显式 opt-in conversation note business adapter；未配置真实 adapter 时仍必须
   `business_action_executed=false`。同日 `rag-agent-demo` adapter 支持
   `-ExpectBusinessActionExecuted`：显式开启时断言 action-executor executed / SUCCEEDED、
-  `business_note_persisted=true`、note ref / id 存在且 body 只输出 hash；默认仍校验
-  audit-only 边界。完整 service-stack wrapper 也支持 `-ExpectBusinessActionExecuted`，
-  并在 preflight 中把 conversation-service endpoint 纳入 execute-mode 必需检查。
+  `business_note_persisted=true`、note ref / id 存在且 body 只输出 hash；2026-06-25
+  该 execute-mode gate 已升级为 note + profile 双 mutation：还必须看到
+  `business_profile_updated=true`、profile version 前进、profile action input hash 和
+  title / avatar / announcement hash，且不保存 raw profile 字段。默认仍校验 audit-only
+  边界。完整 service-stack wrapper 也支持 `-ExpectBusinessActionExecuted`，并在
+  preflight 中把 conversation-service endpoint 纳入 execute-mode 必需检查。
   2026-06-25 Docker / PostgreSQL runtime 恢复后，
   `ai-eval-rag-agent-demo-live-20260625-business-mutation-execute-v7` 已通过真实完整
   service-stack opt-in mutation smoke：4 adapters、27 cases、27 passed、0 failed、

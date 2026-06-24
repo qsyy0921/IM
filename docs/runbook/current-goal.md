@@ -221,8 +221,12 @@ IM messages -> search / memory projection -> EvidencePack -> RAG / Agent answer 
   `UpdateConversationProfile` 更新会话资料。adapter 要求 LOW risk、conversation
   resource、`EXECUTE` skill 和 `expected_profile_version > 0`，tool output 只返回
   conversation ref、profile version 和 title / avatar / announcement hash，不回显
-  raw profile 字段。当前已完成 adapter focused tests；完整 service-stack profile
-  mutation smoke 仍待后续按需归档。
+  raw profile 字段。`loadtest/ragagent` / `run-ai-eval-ragagent-adapter.ps1`
+  已把 `-ExpectBusinessActionExecuted` 升级为 note + profile 双 mutation gate：
+  execute-mode 必须同时验证 conversation note fact 和 public `GetConversationProfile`
+  读回的 profile update；默认 audit-only 模式仍要求两类 mutation 都不执行。
+  当前已完成 adapter / runner focused tests；完整 service-stack profile mutation
+  报告仍待重建 action-executor runtime 后归档。
 - 2026-06-24 retrieval-gateway 已补 vector-index-service `SearchVectors` adapter
   first path：`RetrieveEvidence` 支持显式 `include_vector`，调用方必须提供低敏
   `query_embedding_ref`、明确的 `vector_collection_types`、`vector_visibility_scope`
@@ -387,7 +391,9 @@ IM messages -> search / memory projection -> EvidencePack -> RAG / Agent answer 
    opt-in business mutation execute-mode gate 已通过
    `ai-eval-rag-agent-demo-live-20260625-business-mutation-execute-v7`
    真实完整 service-stack 归档，确认 approved Agent proposal 能经 action-executor
-   写入真实 conversation note fact。
+   写入真实 conversation note fact。`conversation.profile.update` 的 approved
+   mutation adapter 和 RAG-Agent runner / ai-eval gate contract 已补齐，后续重建
+   action-executor runtime 后归档 note + profile 双 mutation service-stack smoke。
    EvidencePack source-chain-aware rerank first pass 已落到 retrieval-gateway：
    多来源 / 跨群 / actor attribution / graph-edge / profile-supporting evidence 会
    增加 `rerank_score`，并纳入 retrieval positive adapter 断言；当前已通过

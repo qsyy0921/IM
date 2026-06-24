@@ -21,6 +21,7 @@ import (
 )
 
 const businessProposalObjective = "phoenix launch business proposal source chain"
+const businessProfileObjective = "phoenix launch conversation profile update"
 
 const (
 	businessActionModeAuditOnly = "audit-only"
@@ -28,34 +29,43 @@ const (
 )
 
 type businessProposalScenarioSummary struct {
-	ProposalVerified       bool     `json:"business_proposal_verified"`
-	ApprovalRecorded       bool     `json:"business_proposal_approval_recorded"`
-	ActionAuditRecorded    bool     `json:"business_action_audit_recorded"`
-	ActionExecuted         bool     `json:"business_action_executed"`
-	ActionMode             string   `json:"business_action_mode"`
-	NotePersisted          bool     `json:"business_note_persisted"`
-	NoteID                 string   `json:"business_note_id,omitempty"`
-	NoteRef                string   `json:"business_note_ref,omitempty"`
-	NoteBodySHA256         string   `json:"business_note_body_sha256,omitempty"`
-	ProposalID             string   `json:"business_proposal_id,omitempty"`
-	ApprovalID             string   `json:"business_approval_id,omitempty"`
-	ExecutionID            string   `json:"business_execution_id,omitempty"`
-	ExecutionStatus        string   `json:"business_execution_status,omitempty"`
-	ProposalTextSHA256     string   `json:"business_proposal_text_sha256,omitempty"`
-	ActionInputSHA256      string   `json:"business_action_input_sha256,omitempty"`
-	MemoryEventCount       int      `json:"business_proposal_memory_event_count"`
-	EvidenceMemoryCount    int      `json:"business_proposal_evidence_memory_count"`
-	SourceRefCount         int      `json:"business_proposal_source_ref_count"`
-	CrossGroupSourceRefs   int      `json:"business_proposal_cross_group_source_ref_count"`
-	EventTypes             []string `json:"business_proposal_event_types,omitempty"`
-	FactSHA256             []string `json:"business_proposal_fact_sha256,omitempty"`
-	ResourceType           string   `json:"business_resource_type,omitempty"`
-	ResourceID             string   `json:"business_resource_id,omitempty"`
-	ToolName               string   `json:"business_tool_name,omitempty"`
-	SkillID                string   `json:"business_skill_id,omitempty"`
-	RequiresApproval       bool     `json:"business_requires_approval"`
-	PolicyAllowed          bool     `json:"business_policy_allowed"`
-	PolicyRequiresApproval bool     `json:"business_policy_requires_approval"`
+	ProposalVerified          bool     `json:"business_proposal_verified"`
+	ApprovalRecorded          bool     `json:"business_proposal_approval_recorded"`
+	ActionAuditRecorded       bool     `json:"business_action_audit_recorded"`
+	ActionExecuted            bool     `json:"business_action_executed"`
+	ActionMode                string   `json:"business_action_mode"`
+	NotePersisted             bool     `json:"business_note_persisted"`
+	NoteID                    string   `json:"business_note_id,omitempty"`
+	NoteRef                   string   `json:"business_note_ref,omitempty"`
+	NoteBodySHA256            string   `json:"business_note_body_sha256,omitempty"`
+	ProfileUpdated            bool     `json:"business_profile_updated"`
+	ProfileVersion            int64    `json:"business_profile_version,omitempty"`
+	ProfileTitleSHA256        string   `json:"business_profile_title_sha256,omitempty"`
+	ProfileAvatarURISHA256    string   `json:"business_profile_avatar_uri_sha256,omitempty"`
+	ProfileAnnouncementSHA256 string   `json:"business_profile_announcement_sha256,omitempty"`
+	ProfileActionInputSHA256  string   `json:"business_profile_action_input_sha256,omitempty"`
+	ProfileProposalID         string   `json:"business_profile_proposal_id,omitempty"`
+	ProfileApprovalID         string   `json:"business_profile_approval_id,omitempty"`
+	ProfileExecutionID        string   `json:"business_profile_execution_id,omitempty"`
+	ProposalID                string   `json:"business_proposal_id,omitempty"`
+	ApprovalID                string   `json:"business_approval_id,omitempty"`
+	ExecutionID               string   `json:"business_execution_id,omitempty"`
+	ExecutionStatus           string   `json:"business_execution_status,omitempty"`
+	ProposalTextSHA256        string   `json:"business_proposal_text_sha256,omitempty"`
+	ActionInputSHA256         string   `json:"business_action_input_sha256,omitempty"`
+	MemoryEventCount          int      `json:"business_proposal_memory_event_count"`
+	EvidenceMemoryCount       int      `json:"business_proposal_evidence_memory_count"`
+	SourceRefCount            int      `json:"business_proposal_source_ref_count"`
+	CrossGroupSourceRefs      int      `json:"business_proposal_cross_group_source_ref_count"`
+	EventTypes                []string `json:"business_proposal_event_types,omitempty"`
+	FactSHA256                []string `json:"business_proposal_fact_sha256,omitempty"`
+	ResourceType              string   `json:"business_resource_type,omitempty"`
+	ResourceID                string   `json:"business_resource_id,omitempty"`
+	ToolName                  string   `json:"business_tool_name,omitempty"`
+	SkillID                   string   `json:"business_skill_id,omitempty"`
+	RequiresApproval          bool     `json:"business_requires_approval"`
+	PolicyAllowed             bool     `json:"business_policy_allowed"`
+	PolicyRequiresApproval    bool     `json:"business_policy_requires_approval"`
 }
 
 func verifyBusinessProposalScenario(
@@ -142,12 +152,17 @@ func verifyBusinessProposalScenario(
 	}
 	actionMode := businessActionModeAuditOnly
 	var note businessNoteVerification
+	var profile businessProfileVerification
 	if cfg.expectBusinessActionExecuted {
 		actionMode = businessActionModeExecute
 		if !execution.GetExecuted() || execution.GetResultStatus() != "SUCCEEDED" {
 			return businessProposalScenarioSummary{}, fmt.Errorf("business action should execute in execute mode: executed=%v result_status=%q", execution.GetExecuted(), execution.GetResultStatus())
 		}
 		note, err = verifyBusinessNoteExecution(ctx, cfg, seed, proposal, approval, execution, noteBody, noteBodyHash, inputHash)
+		if err != nil {
+			return businessProposalScenarioSummary{}, err
+		}
+		profile, err = verifyBusinessProfileMutation(ctx, cfg, seed, querySeq, candidates)
 		if err != nil {
 			return businessProposalScenarioSummary{}, err
 		}
@@ -158,34 +173,43 @@ func verifyBusinessProposalScenario(
 	}
 
 	return businessProposalScenarioSummary{
-		ProposalVerified:       true,
-		ApprovalRecorded:       true,
-		ActionAuditRecorded:    true,
-		ActionExecuted:         execution.GetExecuted(),
-		ActionMode:             actionMode,
-		NotePersisted:          note.Persisted,
-		NoteID:                 note.NoteID,
-		NoteRef:                note.NoteRef,
-		NoteBodySHA256:         note.BodySHA256,
-		ProposalID:             proposal.GetProposalId(),
-		ApprovalID:             approval.GetApprovalId(),
-		ExecutionID:            execution.GetExecutionId(),
-		ExecutionStatus:        "RECORDED",
-		ProposalTextSHA256:     sha256Hex(proposal.GetProposalText()),
-		ActionInputSHA256:      inputHash,
-		MemoryEventCount:       len(candidates),
-		EvidenceMemoryCount:    memoryCount,
-		SourceRefCount:         sourceRefCount,
-		CrossGroupSourceRefs:   crossRefCount,
-		EventTypes:             groupMemoryEventTypes(candidates),
-		FactSHA256:             groupMemoryFactHashes(candidates),
-		ResourceType:           defaultAgentResourceType,
-		ResourceID:             seed.ConversationID,
-		ToolName:               defaultAgentToolName,
-		SkillID:                defaultAgentSkillID,
-		RequiresApproval:       proposal.GetRequiresApproval(),
-		PolicyAllowed:          proposal.GetToolPolicyDecision().GetAllowed(),
-		PolicyRequiresApproval: proposal.GetToolPolicyDecision().GetRequiresApproval(),
+		ProposalVerified:          true,
+		ApprovalRecorded:          true,
+		ActionAuditRecorded:       true,
+		ActionExecuted:            execution.GetExecuted(),
+		ActionMode:                actionMode,
+		NotePersisted:             note.Persisted,
+		NoteID:                    note.NoteID,
+		NoteRef:                   note.NoteRef,
+		NoteBodySHA256:            note.BodySHA256,
+		ProfileUpdated:            profile.Updated,
+		ProfileVersion:            profile.ProfileVersion,
+		ProfileTitleSHA256:        profile.TitleSHA256,
+		ProfileAvatarURISHA256:    profile.AvatarURISHA256,
+		ProfileAnnouncementSHA256: profile.AnnouncementSHA256,
+		ProfileActionInputSHA256:  profile.InputSHA256,
+		ProfileProposalID:         profile.ProposalID,
+		ProfileApprovalID:         profile.ApprovalID,
+		ProfileExecutionID:        profile.ExecutionID,
+		ProposalID:                proposal.GetProposalId(),
+		ApprovalID:                approval.GetApprovalId(),
+		ExecutionID:               execution.GetExecutionId(),
+		ExecutionStatus:           "RECORDED",
+		ProposalTextSHA256:        sha256Hex(proposal.GetProposalText()),
+		ActionInputSHA256:         inputHash,
+		MemoryEventCount:          len(candidates),
+		EvidenceMemoryCount:       memoryCount,
+		SourceRefCount:            sourceRefCount,
+		CrossGroupSourceRefs:      crossRefCount,
+		EventTypes:                groupMemoryEventTypes(candidates),
+		FactSHA256:                groupMemoryFactHashes(candidates),
+		ResourceType:              defaultAgentResourceType,
+		ResourceID:                seed.ConversationID,
+		ToolName:                  defaultAgentToolName,
+		SkillID:                   defaultAgentSkillID,
+		RequiresApproval:          proposal.GetRequiresApproval(),
+		PolicyAllowed:             proposal.GetToolPolicyDecision().GetAllowed(),
+		PolicyRequiresApproval:    proposal.GetToolPolicyDecision().GetRequiresApproval(),
 	}, nil
 }
 
@@ -519,4 +543,278 @@ WHERE tenant_id = $1
 		NoteRef:    output.NoteRef,
 		BodySHA256: noteBodySHA256,
 	}, nil
+}
+
+type businessProfileVerification struct {
+	Updated            bool
+	ProfileVersion     int64
+	TitleSHA256        string
+	AvatarURISHA256    string
+	AnnouncementSHA256 string
+	InputSHA256        string
+	ProposalID         string
+	ApprovalID         string
+	ExecutionID        string
+}
+
+type businessProfileExecutionOutput struct {
+	SchemaVersion      int    `json:"schema_version"`
+	Adapter            string `json:"adapter"`
+	ToolName           string `json:"tool_name"`
+	ResourceType       string `json:"resource_type"`
+	ResourceID         string `json:"resource_id"`
+	InputSHA256        string `json:"input_sha256"`
+	Status             string `json:"status"`
+	ConversationID     string `json:"conversation_id"`
+	ProfileVersion     int64  `json:"profile_version"`
+	TitleSHA256        string `json:"title_sha256"`
+	AvatarURISHA256    string `json:"avatar_uri_sha256"`
+	AnnouncementSHA256 string `json:"announcement_sha256"`
+}
+
+func verifyBusinessProfileMutation(
+	ctx context.Context,
+	cfg config,
+	seed seedSummary,
+	conversationSeq int64,
+	candidates []groupMemoryCandidate,
+) (businessProfileVerification, error) {
+	current, err := getConversationProfile(ctx, cfg, seed)
+	if err != nil {
+		return businessProfileVerification{}, err
+	}
+	title := "Phoenix Launch Approved Profile"
+	avatarURI := "media://nexusim/ragagent/phoenix-launch-approved"
+	announcement := "Security review and release owner follow-up are approved from reviewed group memory."
+	inputJSON, inputSHA256, err := businessProfileActionInput(candidates, title, avatarURI, announcement, current.GetProfileVersion())
+	if err != nil {
+		return businessProfileVerification{}, err
+	}
+	proposal, err := createBusinessProfileProposal(ctx, cfg, seed, conversationSeq)
+	if err != nil {
+		return businessProfileVerification{}, err
+	}
+	if _, _, _, err := verifyGroupMemoryEvidencePack(proposal.GetEvidencePack(), seed, candidates); err != nil {
+		return businessProfileVerification{}, fmt.Errorf("business profile proposal EvidencePack: %w", err)
+	}
+	approval, err := approveBusinessProposal(ctx, cfg, proposal.GetProposalId())
+	if err != nil {
+		return businessProfileVerification{}, err
+	}
+	execution, err := executeBusinessProfileAction(ctx, cfg, seed, proposal, approval, inputJSON)
+	if err != nil {
+		return businessProfileVerification{}, err
+	}
+	if execution.GetStatus() != actionexecutorv1.ActionExecutionStatus_ACTION_EXECUTION_STATUS_RECORDED ||
+		!execution.GetExecuted() ||
+		execution.GetResultStatus() != "SUCCEEDED" {
+		return businessProfileVerification{}, fmt.Errorf("business profile execution mismatch: status=%v executed=%v result=%q", execution.GetStatus(), execution.GetExecuted(), execution.GetResultStatus())
+	}
+	outputJSON := strings.TrimSpace(execution.GetOutputJson())
+	for _, sensitive := range []string{title, avatarURI, announcement} {
+		if strings.Contains(outputJSON, sensitive) {
+			return businessProfileVerification{}, errors.New("business profile output must not echo raw profile field")
+		}
+	}
+	var output businessProfileExecutionOutput
+	if err := json.Unmarshal([]byte(outputJSON), &output); err != nil {
+		return businessProfileVerification{}, fmt.Errorf("decode business profile output: %w", err)
+	}
+	if output.Adapter != "conversation-profile" ||
+		output.Status != "updated" ||
+		output.ToolName != defaultAgentProfileToolName ||
+		output.ResourceType != defaultAgentResourceType ||
+		output.ResourceID != seed.ConversationID ||
+		output.ConversationID != seed.ConversationID ||
+		output.InputSHA256 != inputSHA256 ||
+		output.ProfileVersion <= current.GetProfileVersion() ||
+		output.TitleSHA256 != sha256Hex(title) ||
+		output.AvatarURISHA256 != sha256Hex(avatarURI) ||
+		output.AnnouncementSHA256 != sha256Hex(announcement) {
+		return businessProfileVerification{}, fmt.Errorf("business profile output mismatch: %+v", output)
+	}
+	updated, err := getConversationProfile(ctx, cfg, seed)
+	if err != nil {
+		return businessProfileVerification{}, err
+	}
+	if updated.GetTitle() != title ||
+		updated.GetAvatarUri() != avatarURI ||
+		updated.GetAnnouncement() != announcement ||
+		updated.GetProfileVersion() != output.ProfileVersion {
+		return businessProfileVerification{}, fmt.Errorf("updated conversation profile mismatch: %+v", updated)
+	}
+	return businessProfileVerification{
+		Updated:            true,
+		ProfileVersion:     updated.GetProfileVersion(),
+		TitleSHA256:        sha256Hex(title),
+		AvatarURISHA256:    sha256Hex(avatarURI),
+		AnnouncementSHA256: sha256Hex(announcement),
+		InputSHA256:        inputSHA256,
+		ProposalID:         proposal.GetProposalId(),
+		ApprovalID:         approval.GetApprovalId(),
+		ExecutionID:        execution.GetExecutionId(),
+	}, nil
+}
+
+func createBusinessProfileProposal(
+	ctx context.Context,
+	cfg config,
+	seed seedSummary,
+	conversationSeq int64,
+) (*agentv1.CreateAgentProposalResponse, error) {
+	dialOption, err := dialOptionFromTLSFlags(cfg.agentTLS, "agent-tls")
+	if err != nil {
+		return nil, err
+	}
+	conn, err := grpc.NewClient("passthrough:///"+cfg.agentTarget, dialOption)
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close()
+	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
+	defer cancel()
+	response, err := agentv1.NewAgentServiceClient(conn).CreateAgentProposal(requestCtx, &agentv1.CreateAgentProposalRequest{
+		AuthContext:       retrievalAuth(cfg, seed.ViewerUserID),
+		ConversationId:    seed.ConversationID,
+		Objective:         businessProfileObjective,
+		ToolName:          defaultAgentProfileToolName,
+		ToolAction:        policyv1.ToolAction_TOOL_ACTION_CALL,
+		ResourceType:      defaultAgentResourceType,
+		ResourceId:        seed.ConversationID,
+		RiskLevel:         "LOW",
+		Intent:            businessProfileObjective,
+		Limit:             10,
+		IncludeSearch:     false,
+		IncludeMemory:     true,
+		MemoryStatuses:    []retrievalv1.EvidenceMemoryStatus{retrievalv1.EvidenceMemoryStatus_EVIDENCE_MEMORY_STATUS_ACTIVE},
+		SkillId:           defaultAgentProfileSkillID,
+		AtConversationSeq: conversationSeq,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("create business profile proposal: %w", err)
+	}
+	if response.GetStatus() != agentv1.AgentProposalStatus_AGENT_PROPOSAL_STATUS_PROPOSED {
+		return nil, fmt.Errorf("business profile proposal status %v, want PROPOSED", response.GetStatus())
+	}
+	if !response.GetRequiresApproval() || response.GetToolPolicyDecision() == nil ||
+		!response.GetToolPolicyDecision().GetAllowed() ||
+		!response.GetToolPolicyDecision().GetRequiresApproval() {
+		return nil, fmt.Errorf("business profile proposal should be allowed and require approval: %+v", response.GetToolPolicyDecision())
+	}
+	return response, nil
+}
+
+func executeBusinessProfileAction(
+	ctx context.Context,
+	cfg config,
+	seed seedSummary,
+	proposal *agentv1.CreateAgentProposalResponse,
+	approval *agentv1.ApproveAgentProposalResponse,
+	inputJSON string,
+) (*actionexecutorv1.ExecuteApprovedActionResponse, error) {
+	conn, err := grpc.NewClient(
+		"passthrough:///"+cfg.actionTarget,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close()
+	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
+	defer cancel()
+	response, err := actionexecutorv1.NewActionExecutorServiceClient(conn).ExecuteApprovedAction(
+		requestCtx,
+		&actionexecutorv1.ExecuteApprovedActionRequest{
+			AuthContext: &actionexecutorv1.AuthContext{
+				TenantId:  cfg.tenantID,
+				UserId:    seed.ViewerUserID,
+				DeviceId:  cfg.deviceID,
+				SessionId: "rag-agent-demo-profile-action-session",
+				TraceId:   "rag-agent-demo-profile-action-trace",
+				RequestId: "rag-agent-demo-profile-action-request",
+			},
+			ProposalId:      proposal.GetProposalId(),
+			ApprovalId:      approval.GetApprovalId(),
+			PreparedAuditId: proposal.GetPreparedAuditId(),
+			SkillId:         defaultAgentProfileSkillID,
+			ToolName:        defaultAgentProfileToolName,
+			Action:          policyv1.ToolAction_TOOL_ACTION_EXECUTE,
+			ResourceType:    defaultAgentResourceType,
+			ResourceId:      seed.ConversationID,
+			RiskLevel:       "LOW",
+			Intent:          businessProfileObjective,
+			InputJson:       inputJSON,
+			IdempotencyKey:  proposal.GetProposalId() + "-profile-execute",
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("execute business profile action: %w", err)
+	}
+	return response, nil
+}
+
+func businessProfileActionInput(
+	candidates []groupMemoryCandidate,
+	title string,
+	avatarURI string,
+	announcement string,
+	expectedProfileVersion int64,
+) (string, string, error) {
+	eventHashes := make([]string, 0, len(candidates))
+	for _, candidate := range candidates {
+		eventHashes = append(eventHashes, sha256Hex(candidate.EventID))
+	}
+	encoded, err := json.Marshal(map[string]any{
+		"action":                   "conversation_profile_update",
+		"title":                    title,
+		"avatar_uri":               avatarURI,
+		"announcement":             announcement,
+		"expected_profile_version": expectedProfileVersion,
+		"source":                   "loadtest/ragagent",
+		"evidence_event_count":     len(candidates),
+		"evidence_event_hashes":    eventHashes,
+	})
+	if err != nil {
+		return "", "", err
+	}
+	sum := sha256.Sum256(encoded)
+	return string(encoded), hex.EncodeToString(sum[:]), nil
+}
+
+func getConversationProfile(
+	ctx context.Context,
+	cfg config,
+	seed seedSummary,
+) (*conversationv1.ConversationProfile, error) {
+	conn, err := grpc.NewClient(
+		"passthrough:///"+cfg.conversationTarget,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close()
+	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
+	defer cancel()
+	response, err := conversationv1.NewConversationServiceClient(conn).GetConversationProfile(
+		requestCtx,
+		&conversationv1.GetConversationProfileRequest{
+			AuthContext: &conversationv1.AuthContext{
+				TenantId:  cfg.tenantID,
+				UserId:    seed.ViewerUserID,
+				DeviceId:  cfg.deviceID,
+				SessionId: "rag-agent-demo-profile-read-session",
+				TraceId:   "rag-agent-demo-profile-read-trace",
+				RequestId: "rag-agent-demo-profile-read-request",
+			},
+			ConversationId: seed.ConversationID,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("get conversation profile: %w", err)
+	}
+	if response.GetProfile() == nil {
+		return nil, errors.New("conversation profile response missing profile")
+	}
+	return response.GetProfile(), nil
 }

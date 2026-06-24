@@ -111,10 +111,12 @@
   `ai-eval-rag-agent-demo-live-20260625-business-mutation-execute-v7` 真实完整
   service-stack opt-in mutation smoke 归档：approved Agent proposal 经 action-executor
   执行后写入真实 conversation note fact，且 note fact 与 proposal / approval 绑定一致。
-  `conversation.profile.update` 显式业务 adapter 已落到 action-executor focused tests：
-  通过 conversation-service public `UpdateConversationProfile` 更新会话资料，并只输出
-  profile version / hash metadata。后续如要把 profile mutation 纳入演示，需要追加完整
-  service-stack opt-in mutation smoke。
+  `conversation.profile.update` 显式业务 adapter 已落到 action-executor focused tests，
+  并已接入 `loadtest/ragagent` / `run-ai-eval-ragagent-adapter.ps1` 的
+  `-ExpectBusinessActionExecuted` note + profile 双 mutation gate：通过
+  conversation-service public `UpdateConversationProfile` 更新会话资料，并只输出
+  profile version / hash metadata。后续需要在重建 action-executor runtime 后追加完整
+  service-stack opt-in mutation smoke 报告。
   继续扩展其它真实 mutation 场景时仍必须先补公开业务 API、显式 adapter、
   operator policy、低敏输出和 repair / redrive 边界。
 - `rag-service` / `summary-service`：拒答、引用校验、source-ref regression、unsafe

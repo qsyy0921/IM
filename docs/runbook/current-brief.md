@@ -220,8 +220,12 @@ proposal / approval 绑定一致。
 `UpdateConversationProfile` 更新会话资料；adapter 要求 LOW risk、conversation
 resource、EXECUTE skill 和 `expected_profile_version > 0`，tool output 只返回
 conversation ref、profile version 和 profile 字段 hash，不回显 title / avatar /
-announcement 原文。当前已完成 adapter focused tests；完整 service-stack profile
-mutation smoke 仍待后续按需归档。
+announcement 原文。`loadtest/ragagent` 和 `run-ai-eval-ragagent-adapter.ps1`
+已把 `-ExpectBusinessActionExecuted` 升级为 note + profile 双 mutation gate：
+execute-mode 必须同时验证真实 note fact 和 public `GetConversationProfile` 读回的
+profile update，默认 audit-only 模式仍要求两类 mutation 都不执行。当前已完成
+adapter / runner focused tests；完整 service-stack profile mutation 报告仍待重建
+action-executor runtime 后归档。
 同日 Python AI Worker 已补 memory extraction candidate first path：
 `ai/python/nexusim_ai_memory` 只从显式 low-sensitive message batch 的
 `decision:` / `task:` / `status:` / `blocker:` / `file:` / `profile_signal:`

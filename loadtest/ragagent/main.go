@@ -37,9 +37,11 @@ const (
 	defaultQuestion           = "phoenix launch decision"
 	defaultObjective          = "phoenix launch decision"
 
-	defaultAgentToolName     = "conversation.note.create"
-	defaultAgentSkillID      = "conversation.note.create"
-	defaultAgentResourceType = "conversation"
+	defaultAgentToolName        = "conversation.note.create"
+	defaultAgentSkillID         = "conversation.note.create"
+	defaultAgentProfileToolName = "conversation.profile.update"
+	defaultAgentProfileSkillID  = "conversation.profile.update"
+	defaultAgentResourceType    = "conversation"
 )
 
 type config struct {
@@ -221,6 +223,15 @@ type combinedSummary struct {
 	BusinessNoteID                         string                             `json:"business_note_id,omitempty"`
 	BusinessNoteRef                        string                             `json:"business_note_ref,omitempty"`
 	BusinessNoteBodySHA256                 string                             `json:"business_note_body_sha256,omitempty"`
+	BusinessProfileUpdated                 bool                               `json:"business_profile_updated"`
+	BusinessProfileVersion                 int64                              `json:"business_profile_version,omitempty"`
+	BusinessProfileTitleSHA256             string                             `json:"business_profile_title_sha256,omitempty"`
+	BusinessProfileAvatarURISHA256         string                             `json:"business_profile_avatar_uri_sha256,omitempty"`
+	BusinessProfileAnnouncementSHA256      string                             `json:"business_profile_announcement_sha256,omitempty"`
+	BusinessProfileActionInputSHA256       string                             `json:"business_profile_action_input_sha256,omitempty"`
+	BusinessProfileProposalID              string                             `json:"business_profile_proposal_id,omitempty"`
+	BusinessProfileApprovalID              string                             `json:"business_profile_approval_id,omitempty"`
+	BusinessProfileExecutionID             string                             `json:"business_profile_execution_id,omitempty"`
 	BusinessProposalID                     string                             `json:"business_proposal_id,omitempty"`
 	BusinessApprovalID                     string                             `json:"business_approval_id,omitempty"`
 	BusinessExecutionID                    string                             `json:"business_execution_id,omitempty"`
@@ -345,7 +356,7 @@ func parseConfig(args []string) (config, error) {
 	flagSet.StringVar(&cfg.question, "question", defaultQuestion, "question sent to rag-service")
 	flagSet.StringVar(&cfg.objective, "objective", defaultObjective, "objective sent to agent-service")
 	flagSet.BoolVar(&cfg.expectExecuted, "expect-executed", false, "expect action-executor to run the safe local tool in the Agent child run")
-	flagSet.BoolVar(&cfg.expectBusinessActionExecuted, "expect-business-action-executed", false, "expect business proposal action to create a real conversation note via action-executor")
+	flagSet.BoolVar(&cfg.expectBusinessActionExecuted, "expect-business-action-executed", false, "expect business proposal action to create a real conversation note and update conversation profile via action-executor")
 	flagSet.DurationVar(&cfg.requestTimeout, "request-timeout", 10*time.Second, "child gRPC request timeout")
 	flagSet.StringVar(&cfg.ragTLS.caFile, "rag-tls-ca-file", "", "rag gRPC TLS CA file")
 	flagSet.StringVar(&cfg.ragTLS.serverName, "rag-tls-server-name", "", "rag gRPC TLS server name")
@@ -968,12 +979,17 @@ func verifyCombined(
 		return combinedSummary{}, errors.New("business proposal scenario did not preserve source-chain evidence and approval/audit boundary")
 	}
 	if cfg.expectBusinessActionExecuted {
-		if !businessProposal.ActionExecuted || !businessProposal.NotePersisted || strings.TrimSpace(businessProposal.NoteID) == "" {
-			return combinedSummary{}, errors.New("business proposal execute mode did not persist a verified conversation note")
+		if !businessProposal.ActionExecuted ||
+			!businessProposal.NotePersisted ||
+			strings.TrimSpace(businessProposal.NoteID) == "" ||
+			!businessProposal.ProfileUpdated ||
+			businessProposal.ProfileVersion <= 0 ||
+			strings.TrimSpace(businessProposal.ProfileActionInputSHA256) == "" {
+			return combinedSummary{}, errors.New("business proposal execute mode did not persist verified conversation note and profile mutations")
 		}
-		verified = append(verified, "Business proposal preserved source-chain evidence, approval/audit and executed a verified conversation note mutation")
+		verified = append(verified, "Business proposal preserved source-chain evidence, approval/audit and executed verified conversation note and profile mutations")
 	} else {
-		if businessProposal.ActionExecuted || businessProposal.NotePersisted {
+		if businessProposal.ActionExecuted || businessProposal.NotePersisted || businessProposal.ProfileUpdated {
 			return combinedSummary{}, errors.New("business proposal audit-only mode unexpectedly executed a business mutation")
 		}
 		verified = append(verified, "Business proposal preserved multi-event source-chain evidence and recorded approval/action audit without executing an unconfigured mutation")
@@ -1066,6 +1082,15 @@ func verifyCombined(
 		BusinessNoteID:                         businessProposal.NoteID,
 		BusinessNoteRef:                        businessProposal.NoteRef,
 		BusinessNoteBodySHA256:                 businessProposal.NoteBodySHA256,
+		BusinessProfileUpdated:                 businessProposal.ProfileUpdated,
+		BusinessProfileVersion:                 businessProposal.ProfileVersion,
+		BusinessProfileTitleSHA256:             businessProposal.ProfileTitleSHA256,
+		BusinessProfileAvatarURISHA256:         businessProposal.ProfileAvatarURISHA256,
+		BusinessProfileAnnouncementSHA256:      businessProposal.ProfileAnnouncementSHA256,
+		BusinessProfileActionInputSHA256:       businessProposal.ProfileActionInputSHA256,
+		BusinessProfileProposalID:              businessProposal.ProfileProposalID,
+		BusinessProfileApprovalID:              businessProposal.ProfileApprovalID,
+		BusinessProfileExecutionID:             businessProposal.ProfileExecutionID,
 		BusinessProposalID:                     businessProposal.ProposalID,
 		BusinessApprovalID:                     businessProposal.ApprovalID,
 		BusinessExecutionID:                    businessProposal.ExecutionID,

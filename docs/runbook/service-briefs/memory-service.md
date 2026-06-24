@@ -104,6 +104,8 @@
   驱动 `conversation.note.create` 业务 proposal，并经 approval / action-executor audit
   记录。2026-06-25 已补显式 opt-in conversation note business adapter；配置
   conversation-service gRPC 地址后可写真实 note fact，未配置时仍不执行业务写动作。
+  同日 `conversation.profile.update` 已接入同一 RAG-Agent execute-mode gate，作为第二个
+  approved conversation business mutation；summary 只保留 profile version / hash metadata。
 
 下一步：`loadtest/ragagent` / `rag-agent-demo` adapter 已把 public candidate
 review、temporal update 和 profile repair approval 纳入 RAG / Agent EvidencePack 断言链路，并已通过

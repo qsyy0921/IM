@@ -79,10 +79,11 @@ First-stage memory-service execution adapter:
 ```
 
 This adapter runs `loadtest/memory`, which seeds low-sensitive structured
-memory events, source refs, graph edges and profile aggregates, then validates
-active `memory-service` cases against runtime checks. It covers source refs,
-validity window, supersession, graph SUPPORTS edge preservation, reviewed
-multi-source profile activation and deleted-support profile exclusion.
+memory events, source refs and graph edges, then validates active
+`memory-service` cases against runtime checks. It covers source refs, validity
+window, supersession, graph SUPPORTS edge preservation, reviewed multi-source
+profile activation through the public `RecomputeProfileAggregate` API, and
+deleted-support profile exclusion.
 
 First-stage retrieval-gateway positive execution adapter:
 

@@ -139,6 +139,8 @@ supporting memory ids 和 source coverage 被保留，profile lookup 失败 fail
 aggregate 由多个当前用户可见的 ACTIVE / APPROVED `PROFILE_SIGNAL` memory events
 重算，支持数量不足时归档既有 active / pending profile；`loadtest/memory` 不再
 手工写 active profile，而是通过该 RPC 验证 multi-source profile evidence。
+ai-eval memory-service live adapter 已把该行为登记为
+`must_recompute_profile_via_public_api` 断言。
 
 ## 不变量
 

@@ -346,7 +346,8 @@ RAG / Agent loadtest 都会断言 profile subject、aggregate type/key、support
 memory ids 和 source coverage 被保留。随后 memory-service 公开
 `RecomputeProfileAggregate` first path：profile evidence 由多个可见 ACTIVE /
 APPROVED `PROFILE_SIGNAL` memory events 重算，支持数量不足时归档旧 profile，
-避免 deleted / rejected support 继续进入 EvidencePack。
+避免 deleted / rejected support 继续进入 EvidencePack；memory-service live adapter
+已把该行为登记为 `must_recompute_profile_via_public_api` 断言。
 
 下一步默认看 [current-goal.md](docs/runbook/current-goal.md)。截至当前主线，客户端只修
 阻塞演示入口的问题；默认推进

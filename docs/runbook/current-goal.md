@@ -101,6 +101,9 @@ IM messages -> search / memory projection -> EvidencePack -> RAG / Agent answer 
   ACTIVE / PENDING aggregate，避免 stale / deleted support 继续进入 EvidencePack。
   `loadtest/memory` 已改为调用该 RPC 验证 reviewed multi-source profile，而不是
   直接手工写入 active profile。
+- 同日 ai-eval memory-service live adapter 已新增
+  `must_recompute_profile_via_public_api` 断言，把该 RPC 行为纳入 service-stack
+  gate contract。
 - 已有 clean smoke 覆盖真实双用户好友直聊、群聊 first path、群资料 BFF
   read/update 和群成员动作链路；证据见 `docs/runbook/client-platform.md`。
 - Windows desktop 已有 artifact / signing / installer plan first paths；签名 / installer

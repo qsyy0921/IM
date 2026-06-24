@@ -69,6 +69,9 @@ function Test-MemoryAssertion {
         "must_allow_reviewed_multi_source_profile" {
             return [bool]$Summary.checks.reviewed_multi_source_profile_active
         }
+        "must_recompute_profile_via_public_api" {
+            return [bool]$Summary.checks.profile_recomputed_via_public_api
+        }
         "must_preserve_profile_supporting_evidence" {
             return [bool]$Summary.checks.profile_supporting_evidence_preserved
         }

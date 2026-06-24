@@ -27,6 +27,10 @@ adapter、状态、计数、summary/report 引用和低敏 metadata。
   gate policy 和 service-stack wrapper 可选择 memory-service、retrieval-gateway、
   RAG、Summary、Agent adapter。RAG / Summary / Agent live adapters 同步断言
   multi-hop actor/source-chain completeness。
+- 2026-06-24 memory-service live adapter 已增加
+  `must_recompute_profile_via_public_api` 断言：`loadtest/memory` 必须通过
+  memory-service 公开 `RecomputeProfileAggregate` RPC 生成 reviewed multi-source
+  profile，而不是手工写 active profile row。
 - 2026-06-24 `ai-eval-service-stack-live-20260624-collab-memory-v4` 已通过
   真实 service-stack gate：8 adapters、51 cases、47 passed、0 failed、4 skipped。
   通过范围包括 profile / action required adapters、memory-service、retrieval-gateway、

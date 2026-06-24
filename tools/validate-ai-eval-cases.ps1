@@ -169,6 +169,7 @@ $knownAssertionTypes = @(
     "must_select_memory_version_by_query_seq",
     "must_not_return_future_memory_as_current",
     "must_allow_reviewed_multi_source_profile",
+    "must_recompute_profile_via_public_api",
     "must_preserve_profile_supporting_evidence",
     "must_expire_profile_when_supporting_memory_deleted",
     "must_propagate_current_memory_query_seq",

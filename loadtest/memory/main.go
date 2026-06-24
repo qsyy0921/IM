@@ -108,6 +108,7 @@ type checkRecord struct {
 	SupersessionLink      bool `json:"supersession_link"`
 	GraphEdgePreserved    bool `json:"graph_edge_preserved"`
 	ReviewedProfileActive bool `json:"reviewed_multi_source_profile_active"`
+	ProfileRecomputed     bool `json:"profile_recomputed_via_public_api"`
 	ProfileSupportKept    bool `json:"profile_supporting_evidence_preserved"`
 	DeletedSupportHidden  bool `json:"deleted_support_profile_excluded"`
 }
@@ -634,6 +635,7 @@ func verifyRuntimeMemoryWindow(ctx context.Context, cfg config, client memoryv1.
 	}
 	result.Checks.ValidityWindowCurrent = true
 	result.Checks.ReviewedProfileActive = true
+	result.Checks.ProfileRecomputed = true
 	result.Checks.ProfileSupportKept = true
 	result.Checks.DeletedSupportHidden = true
 	return nil

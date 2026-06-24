@@ -1116,6 +1116,9 @@
           "type": "must_allow_reviewed_multi_source_profile"
         },
         {
+          "type": "must_recompute_profile_via_public_api"
+        },
+        {
           "type": "must_preserve_profile_supporting_evidence"
         },
         {

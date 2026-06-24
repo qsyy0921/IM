@@ -30,3 +30,35 @@ func TestPathInside(t *testing.T) {
 		t.Fatalf("H drive output must not be treated as repo-local")
 	}
 }
+
+func TestValidateConfigRequiresOpenSearchEndpointAndIndex(t *testing.T) {
+	cfg := config{
+		searchTarget:   "127.0.0.1:10570",
+		kafkaBrokers:   []string{"localhost:9092"},
+		topic:          "conversation.timeline.events",
+		consumerGroup:  "nexusim-search-test",
+		pgDSN:          "postgres://nexusim:nexusim@localhost:5432/nexusim?sslmode=disable",
+		searchBackend:  "opensearch",
+		requestTimeout: 3,
+	}
+	if err := validateConfig(cfg); err == nil {
+		t.Fatalf("expected missing opensearch endpoint/index to fail")
+	}
+	cfg.openSearchEndpoint = "http://127.0.0.1:9200"
+	cfg.openSearchIndex = "nexusim-search-test"
+	if err := validateConfig(cfg); err != nil {
+		t.Fatalf("expected opensearch config to pass: %v", err)
+	}
+}
+
+func TestOpenSearchURL(t *testing.T) {
+	cfg := config{
+		openSearchEndpoint: "http://127.0.0.1:9200/root",
+		openSearchIndex:    "nexusim-search-test",
+	}
+	got := openSearchURL(cfg, "/"+cfg.openSearchIndex+"/_refresh")
+	want := "http://127.0.0.1:9200/root/nexusim-search-test/_refresh"
+	if got != want {
+		t.Fatalf("url=%q want %q", got, want)
+	}
+}

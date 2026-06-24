@@ -8,6 +8,9 @@ param(
     [string]$ConsumerGroup = "",
     [string]$SearchGrpcAddr = "127.0.0.1:10570",
     [int]$TopicReplicationFactor = 1,
+    [switch]$UseOpenSearchBackend,
+    [string]$OpenSearchEndpoint = "http://127.0.0.1:9200",
+    [string]$OpenSearchIndex = "",
     [switch]$SkipBuild
 )
 
@@ -26,6 +29,9 @@ if (-not $Topic) {
 }
 if (-not $ConsumerGroup) {
     $ConsumerGroup = "nexusim-search-smoke-" + (Get-Date -Format "yyyyMMddHHmmss")
+}
+if ($UseOpenSearchBackend -and -not $OpenSearchIndex) {
+    $OpenSearchIndex = ("nexusim-search-smoke-" + $safeRunName).ToLowerInvariant()
 }
 
 $resultDir = Join-Path $ResultRoot $RunName
@@ -107,6 +113,9 @@ try {
         NEXUSIM_SEARCH_GRPC_ADDR = $SearchGrpcAddr
         NEXUSIM_PG_DSN = $PgDsn
         NEXUSIM_SEARCH_DEBUG_ADDR = ""
+        NEXUSIM_SEARCH_BACKEND = $(if ($UseOpenSearchBackend) { "opensearch" } else { "postgres" })
+        NEXUSIM_SEARCH_OPENSEARCH_ENDPOINT = $(if ($UseOpenSearchBackend) { $OpenSearchEndpoint } else { "" })
+        NEXUSIM_SEARCH_OPENSEARCH_INDEX = $(if ($UseOpenSearchBackend) { $OpenSearchIndex } else { "" })
     }
     Start-Sleep -Milliseconds 500
 
@@ -121,6 +130,7 @@ try {
     Start-Sleep -Seconds 2
 
     $runner = Join-Path $repoRoot "bin\search-smoke.exe"
+    $searchBackend = if ($UseOpenSearchBackend) { "opensearch" } else { "postgres" }
     & $runner `
         --pg-dsn $PgDsn `
         --kafka-brokers $KafkaBrokers `
@@ -129,6 +139,9 @@ try {
         --search-target $SearchGrpcAddr `
         --result-root $ResultRoot `
         --run-name $RunName `
+        --search-backend $searchBackend `
+        --opensearch-endpoint $OpenSearchEndpoint `
+        --opensearch-index $OpenSearchIndex `
         --ensure-topic=false
     if ($LASTEXITCODE -ne 0) {
         throw "search smoke failed with exit code $LASTEXITCODE"
@@ -137,6 +150,11 @@ try {
     Write-Host "run_name=$RunName"
     Write-Host "topic=$Topic"
     Write-Host "consumer_group=$ConsumerGroup"
+    if ($UseOpenSearchBackend) {
+        Write-Host "search_backend=opensearch"
+        Write-Host "opensearch_endpoint=$OpenSearchEndpoint"
+        Write-Host "opensearch_index=$OpenSearchIndex"
+    }
     Write-Host "result_dir=$resultDir"
 }
 finally {

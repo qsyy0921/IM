@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
@@ -8,6 +9,9 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
+	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -60,6 +64,14 @@ type config struct {
 	autoTopic       bool
 	replication     int
 	topicPartitions int
+
+	searchBackend        string
+	openSearchEndpoint   string
+	openSearchIndex      string
+	openSearchUsername   string
+	openSearchPassword   string
+	openSearchAPIKey     string
+	openSearchHTTPClient *http.Client
 }
 
 type summary struct {
@@ -70,6 +82,9 @@ type summary struct {
 	ResultDir           string          `json:"result_dir"`
 	SearchTarget        string          `json:"search_target"`
 	SearchTLSEnabled    bool            `json:"search_tls_enabled"`
+	SearchBackend       string          `json:"search_backend"`
+	OpenSearchEndpoint  string          `json:"opensearch_endpoint,omitempty"`
+	OpenSearchIndex     string          `json:"opensearch_index,omitempty"`
 	TenantID            string          `json:"tenant_id"`
 	ConversationID      string          `json:"conversation_id"`
 	ViewerUserID        string          `json:"viewer_user_id"`
@@ -89,6 +104,7 @@ type summary struct {
 	MembershipJoinSeq   int64           `json:"membership_join_seq"`
 	MembershipLeaveSeq  *int64          `json:"membership_leave_seq,omitempty"`
 	ProjectionVersion   int64           `json:"projection_version"`
+	OpenSearchDocuments int             `json:"opensearch_fixture_document_count,omitempty"`
 	ProjectionSmokeNote string          `json:"projection_smoke_note"`
 }
 
@@ -113,6 +129,14 @@ type membershipSnapshot struct {
 	Status   string
 	JoinSeq  int64
 	LeaveSeq *int64
+}
+
+type searchDocumentSnapshot struct {
+	TenantID        string `json:"tenant_id"`
+	ConversationID  string `json:"conversation_id"`
+	MessageID       string `json:"message_id"`
+	ConversationSeq int64  `json:"conversation_seq"`
+	SearchableText  string `json:"searchable_text"`
 }
 
 func main() {
@@ -149,6 +173,12 @@ func parseConfig() config {
 	flag.BoolVar(&cfg.autoTopic, "allow-auto-topic-creation", false, "allow kafka-go writer auto topic creation")
 	flag.IntVar(&cfg.replication, "topic-replication-factor", 1, "Kafka topic replication factor when ensuring topic")
 	flag.IntVar(&cfg.topicPartitions, "topic-partitions", 1, "Kafka topic partitions when ensuring topic")
+	flag.StringVar(&cfg.searchBackend, "search-backend", envOr("NEXUSIM_SEARCH_BACKEND", "postgres"), "search backend expected from search-service: postgres or opensearch")
+	flag.StringVar(&cfg.openSearchEndpoint, "opensearch-endpoint", envOr("NEXUSIM_SEARCH_OPENSEARCH_ENDPOINT", ""), "OpenSearch endpoint used only when search-backend=opensearch")
+	flag.StringVar(&cfg.openSearchIndex, "opensearch-index", envOr("NEXUSIM_SEARCH_OPENSEARCH_INDEX", ""), "OpenSearch index used only when search-backend=opensearch")
+	flag.StringVar(&cfg.openSearchUsername, "opensearch-username", os.Getenv("NEXUSIM_SEARCH_OPENSEARCH_USERNAME"), "OpenSearch basic auth username; not written to summary")
+	flag.StringVar(&cfg.openSearchPassword, "opensearch-password", os.Getenv("NEXUSIM_SEARCH_OPENSEARCH_PASSWORD"), "OpenSearch basic auth password; not written to summary")
+	flag.StringVar(&cfg.openSearchAPIKey, "opensearch-api-key", os.Getenv("NEXUSIM_SEARCH_OPENSEARCH_API_KEY"), "OpenSearch API key; not written to summary")
 	flag.Parse()
 
 	cfg.kafkaBrokers = splitCSV(brokers)
@@ -177,6 +207,12 @@ func parseConfig() config {
 	if cfg.topicPartitions <= 0 {
 		cfg.topicPartitions = 1
 	}
+	cfg.searchBackend = strings.ToLower(strings.TrimSpace(cfg.searchBackend))
+	cfg.openSearchEndpoint = strings.TrimRight(strings.TrimSpace(cfg.openSearchEndpoint), "/")
+	cfg.openSearchIndex = strings.TrimSpace(cfg.openSearchIndex)
+	cfg.openSearchUsername = strings.TrimSpace(cfg.openSearchUsername)
+	cfg.openSearchAPIKey = strings.TrimSpace(cfg.openSearchAPIKey)
+	cfg.openSearchHTTPClient = &http.Client{Timeout: cfg.requestTimeout}
 	return cfg
 }
 
@@ -205,6 +241,9 @@ func run(cfg config) error {
 		ResultDir:           cfg.resultDir,
 		SearchTarget:        cfg.searchTarget,
 		SearchTLSEnabled:    cfg.searchTLS.Enabled(),
+		SearchBackend:       cfg.searchBackend,
+		OpenSearchEndpoint:  cfg.openSearchEndpoint,
+		OpenSearchIndex:     cfg.openSearchIndex,
 		TenantID:            cfg.tenantID,
 		ConversationID:      cfg.conversationID,
 		ViewerUserID:        cfg.viewerUserID,
@@ -303,6 +342,21 @@ func validateConfig(cfg config) error {
 	if strings.TrimSpace(cfg.searchTarget) == "" {
 		return errors.New("search-target is required")
 	}
+	switch cfg.searchBackend {
+	case "postgres":
+	case "opensearch":
+		if cfg.openSearchEndpoint == "" {
+			return errors.New("opensearch-endpoint is required when search-backend=opensearch")
+		}
+		if cfg.openSearchIndex == "" {
+			return errors.New("opensearch-index is required when search-backend=opensearch")
+		}
+		if strings.TrimSpace(cfg.openSearchUsername) != "" && cfg.openSearchPassword == "" {
+			return errors.New("opensearch-password is required when opensearch-username is set")
+		}
+	default:
+		return fmt.Errorf("unsupported search-backend %q", cfg.searchBackend)
+	}
 	return nil
 }
 
@@ -328,12 +382,18 @@ func publishAndVerify(
 	if err := waitMembership(ctx, pool, cfg, cfg.viewerUserID, "ACTIVE", nil); err != nil {
 		return err
 	}
+	if err := ensureOpenSearchIndex(ctx, cfg); err != nil {
+		return err
+	}
 
 	persisted := messagePersistedEvent("evt-search-persisted-"+runID, cfg, 2, messageID, "search smoke original phrase")
 	if err := publishEvent(ctx, cfg, writer, persisted); err != nil {
 		return fmt.Errorf("publish persisted: %w", err)
 	}
 	result.Events = append(result.Events, snapshot(persisted, messageID))
+	if err := waitDocumentAndSyncOpenSearch(ctx, cfg, pool, messageID, "original phrase", result); err != nil {
+		return err
+	}
 	if _, err := waitSearchHits(ctx, cfg, client, cfg.viewerUserID, "original phrase", messageID, 1); err != nil {
 		return err
 	}
@@ -344,6 +404,9 @@ func publishAndVerify(
 		return fmt.Errorf("publish edited: %w", err)
 	}
 	result.Events = append(result.Events, snapshot(edited, messageID))
+	if err := waitDocumentAndSyncOpenSearch(ctx, cfg, pool, messageID, "edited phrase", result); err != nil {
+		return err
+	}
 	editedResponse, err := waitSearchHits(ctx, cfg, client, cfg.viewerUserID, "edited phrase", messageID, 1)
 	if err != nil {
 		return err
@@ -365,6 +428,9 @@ func publishAndVerify(
 		return fmt.Errorf("publish revoked persisted: %w", err)
 	}
 	result.Events = append(result.Events, snapshot(revokedPersisted, revokedMessageID))
+	if err := waitDocumentAndSyncOpenSearch(ctx, cfg, pool, revokedMessageID, "revoked phrase", result); err != nil {
+		return err
+	}
 	if _, err := waitSearchHits(ctx, cfg, client, cfg.viewerUserID, "revoked phrase", revokedMessageID, 1); err != nil {
 		return err
 	}
@@ -383,6 +449,9 @@ func publishAndVerify(
 		return fmt.Errorf("publish deleted persisted: %w", err)
 	}
 	result.Events = append(result.Events, snapshot(deletedPersisted, deletedMessageID))
+	if err := waitDocumentAndSyncOpenSearch(ctx, cfg, pool, deletedMessageID, "deleted phrase", result); err != nil {
+		return err
+	}
 	if _, err := waitSearchHits(ctx, cfg, client, cfg.viewerUserID, "deleted phrase", deletedMessageID, 1); err != nil {
 		return err
 	}
@@ -411,7 +480,7 @@ func publishAndVerify(
 		return fmt.Errorf("publish after-leave message: %w", err)
 	}
 	result.Events = append(result.Events, snapshot(afterLeave, afterLeaveMessageID))
-	if err := waitDocument(ctx, pool, cfg, afterLeaveMessageID); err != nil {
+	if err := waitDocumentAndSyncOpenSearch(ctx, cfg, pool, afterLeaveMessageID, "after boundary phrase", result); err != nil {
 		return err
 	}
 	if err := waitSearchHitsCount(ctx, cfg, client, cfg.viewerUserID, "after boundary phrase", 0); err != nil {
@@ -631,6 +700,139 @@ func searchMessages(ctx context.Context, cfg config, client searchv1.SearchServi
 	})
 }
 
+func waitDocumentAndSyncOpenSearch(ctx context.Context, cfg config, pool *pgxpool.Pool, messageID string, textContains string, result *summary) error {
+	var document searchDocumentSnapshot
+	err := waitUntil(ctx, cfg, func() (bool, error) {
+		read, err := readSearchDocument(ctx, pool, cfg, messageID)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return false, nil
+		}
+		if err != nil {
+			return false, err
+		}
+		if textContains != "" && !strings.Contains(read.SearchableText, textContains) {
+			return false, nil
+		}
+		document = read
+		return true, nil
+	})
+	if err != nil {
+		return fmt.Errorf("wait document %s text=%q: %w", messageID, textContains, err)
+	}
+	if cfg.searchBackend != "opensearch" {
+		return nil
+	}
+	if err := indexOpenSearchDocument(ctx, cfg, document); err != nil {
+		return err
+	}
+	result.OpenSearchDocuments++
+	return nil
+}
+
+func ensureOpenSearchIndex(ctx context.Context, cfg config) error {
+	if cfg.searchBackend != "opensearch" {
+		return nil
+	}
+	body := map[string]any{
+		"settings": map[string]any{
+			"index": map[string]any{
+				"number_of_shards":   1,
+				"number_of_replicas": 0,
+			},
+		},
+		"mappings": map[string]any{
+			"properties": map[string]any{
+				"tenant_id":        map[string]any{"type": "keyword"},
+				"conversation_id":  map[string]any{"type": "keyword"},
+				"message_id":       map[string]any{"type": "keyword"},
+				"conversation_seq": map[string]any{"type": "long"},
+				"searchable_text":  map[string]any{"type": "text"},
+			},
+		},
+	}
+	status, responseBody, err := openSearchRequest(ctx, cfg, http.MethodPut, "/"+url.PathEscape(cfg.openSearchIndex), body)
+	if err != nil {
+		return err
+	}
+	if status == http.StatusOK || status == http.StatusCreated {
+		return nil
+	}
+	if status == http.StatusBadRequest && strings.Contains(responseBody, "resource_already_exists_exception") {
+		return nil
+	}
+	return fmt.Errorf("create opensearch index returned status %d", status)
+}
+
+func indexOpenSearchDocument(ctx context.Context, cfg config, document searchDocumentSnapshot) error {
+	body := map[string]any{
+		"tenant_id":        document.TenantID,
+		"conversation_id":  document.ConversationID,
+		"message_id":       document.MessageID,
+		"conversation_seq": document.ConversationSeq,
+		"searchable_text":  document.SearchableText,
+	}
+	documentID := url.PathEscape(document.TenantID + ":" + document.ConversationID + ":" + document.MessageID)
+	path := "/" + url.PathEscape(cfg.openSearchIndex) + "/_doc/" + documentID
+	status, _, err := openSearchRequest(ctx, cfg, http.MethodPut, path, body)
+	if err != nil {
+		return err
+	}
+	if status != http.StatusOK && status != http.StatusCreated {
+		return fmt.Errorf("index opensearch document returned status %d", status)
+	}
+	status, _, err = openSearchRequest(ctx, cfg, http.MethodPost, "/"+url.PathEscape(cfg.openSearchIndex)+"/_refresh", nil)
+	if err != nil {
+		return err
+	}
+	if status != http.StatusOK {
+		return fmt.Errorf("refresh opensearch index returned status %d", status)
+	}
+	return nil
+}
+
+func openSearchRequest(ctx context.Context, cfg config, method string, path string, body any) (int, string, error) {
+	var reader io.Reader
+	if body != nil {
+		encoded, err := json.Marshal(body)
+		if err != nil {
+			return 0, "", fmt.Errorf("encode opensearch request: %w", err)
+		}
+		reader = bytes.NewReader(encoded)
+	}
+	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
+	defer cancel()
+	request, err := http.NewRequestWithContext(requestCtx, method, openSearchURL(cfg, path), reader)
+	if err != nil {
+		return 0, "", fmt.Errorf("build opensearch request: %w", err)
+	}
+	if body != nil {
+		request.Header.Set("Content-Type", "application/json")
+	}
+	if cfg.openSearchAPIKey != "" {
+		request.Header.Set("Authorization", "ApiKey "+cfg.openSearchAPIKey)
+	} else if cfg.openSearchUsername != "" {
+		request.SetBasicAuth(cfg.openSearchUsername, cfg.openSearchPassword)
+	}
+	response, err := cfg.openSearchHTTPClient.Do(request)
+	if err != nil {
+		return 0, "", fmt.Errorf("opensearch request failed: %w", err)
+	}
+	defer response.Body.Close()
+	bodyBytes, err := io.ReadAll(io.LimitReader(response.Body, 64*1024))
+	if err != nil {
+		return response.StatusCode, "", fmt.Errorf("read opensearch response: %w", err)
+	}
+	return response.StatusCode, string(bodyBytes), nil
+}
+
+func openSearchURL(cfg config, path string) string {
+	base := strings.TrimRight(cfg.openSearchEndpoint, "/")
+	if strings.HasPrefix(path, "/") {
+		return base + path
+	}
+	return base + "/" + path
+}
+
 func waitMembership(ctx context.Context, pool *pgxpool.Pool, cfg config, userID string, wantStatus string, wantLeaveSeq *int64) error {
 	return waitUntil(ctx, cfg, func() (bool, error) {
 		membership, err := readMembership(ctx, pool, cfg, userID)
@@ -650,21 +852,22 @@ func waitMembership(ctx context.Context, pool *pgxpool.Pool, cfg config, userID 
 	})
 }
 
-func waitDocument(ctx context.Context, pool *pgxpool.Pool, cfg config, messageID string) error {
-	return waitUntil(ctx, cfg, func() (bool, error) {
-		var count int
-		err := pool.QueryRow(ctx, `
-SELECT COUNT(*)
+func readSearchDocument(ctx context.Context, pool *pgxpool.Pool, cfg config, messageID string) (searchDocumentSnapshot, error) {
+	var document searchDocumentSnapshot
+	err := pool.QueryRow(ctx, `
+SELECT tenant_id, conversation_id, message_id, conversation_seq, searchable_text
 FROM search_message_documents
 WHERE tenant_id = $1
   AND conversation_id = $2
   AND message_id = $3
-`, cfg.tenantID, cfg.conversationID, messageID).Scan(&count)
-		if err != nil {
-			return false, err
-		}
-		return count > 0, nil
-	})
+`, cfg.tenantID, cfg.conversationID, messageID).Scan(
+		&document.TenantID,
+		&document.ConversationID,
+		&document.MessageID,
+		&document.ConversationSeq,
+		&document.SearchableText,
+	)
+	return document, err
 }
 
 func waitUntil(ctx context.Context, cfg config, probe func() (bool, error)) error {

@@ -1,0 +1,27 @@
+name: nexusim-opensearch
+
+services:
+  opensearch:
+    image: opensearchproject/opensearch:3.3.2
+    container_name: nexusim-opensearch
+    profiles:
+      - opensearch
+      - search-rag
+    environment:
+      discovery.type: single-node
+      plugins.security.disabled: "true"
+      OPENSEARCH_INITIAL_ADMIN_PASSWORD: NexusIM-Local-Only-Admin-2026!
+      OPENSEARCH_JAVA_OPTS: "-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+      - "9600:9600"
+    volumes:
+      - opensearch_data:/usr/share/opensearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9200/_cluster/health >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+volumes:
+  opensearch_data:

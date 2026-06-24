@@ -225,6 +225,13 @@ IM messages -> search / memory projection -> EvidencePack -> RAG / Agent answer 
   召回 `conversation_id/message_id` 候选，再回到 PostgreSQL projection 做
   membership visibility、tombstone、after_seq 和 conversation filter hydration；
   OpenSearch 配置 / 请求 / malformed result 均 fail-closed，不静默回退 PostgreSQL FTS。
+- 同日 search-service 已补 opt-in OpenSearch backend smoke 入口：
+  `loadtest/search/run-local-smoke.ps1 -UseOpenSearchBackend` 会启动 search-service
+  `opensearch` backend，并由 runner 将已投影的低敏 search document 写入临时
+  OpenSearch index 后，再通过 search-service gRPC 验证候选召回和 PostgreSQL
+  visibility / tombstone hydration。当前机器 Docker API 和本地 OpenSearch 端口不可用，
+  因此本轮只验证 focused tests / build / script 入口；真实 OpenSearch 进程 smoke
+  尚未归档通过报告。
 - 已有 clean smoke 覆盖真实双用户好友直聊、群聊 first path、群资料 BFF
   read/update 和群成员动作链路；证据见 `docs/runbook/client-platform.md`。
 - Windows desktop 已有 artifact / signing / installer plan first paths；签名 / installer
@@ -314,7 +321,8 @@ IM messages -> search / memory projection -> EvidencePack -> RAG / Agent answer 
    失败时 fail-closed，非法 depth 配置启动失败；显式 vector retrieval 会通过
    vector-index-service 公开 `SearchVectors` 返回 `VECTOR_ITEM` source。retrieval
    vector backend opt-in live smoke 已通过；search-service PostgreSQL FTS lexical
-   backend 和显式 OpenSearch / BM25 candidate backend first paths 已补齐；后续真实
+   backend 和显式 OpenSearch / BM25 candidate backend first paths 已补齐；OpenSearch
+   opt-in smoke 入口已补齐但尚未在真实 OpenSearch 进程上归档通过报告；后续真实
    OpenSearch 进程 smoke、pgvector / Milvus / OpenSearch vector provider smoke 和更细 EvidencePack coverage 仍保持在
    retrieval-gateway 边界内。
 5. 客户端只作为演示入口；除非阻塞上述演示，不继续扩 UI 产品化。

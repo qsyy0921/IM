@@ -88,6 +88,10 @@ Replacement / migration notes:
 
 - Keep the current IM path on PostgreSQL + Kafka + Redis unless a feature
   clearly needs another middleware.
+- OpenSearch has a local opt-in compose profile in
+  `deploy/local/docker-compose.opensearch.yml` for search / RAG smoke work. It is
+  not part of the default `core` profile and must not be treated as a business
+  fact source.
 - Add search / vector / object storage / workflow / security middleware only
   when its service slice becomes active.
 - Treat data-platform middleware as analytical infrastructure. It cannot become

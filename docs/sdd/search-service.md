@@ -222,8 +222,14 @@ search，不保留 `ILIKE` substring fallback。
   tenant、user membership window、tombstone、after_seq 和 conversation filter。
 - OpenSearch 配置错误、非 2xx、malformed hit、dependency error 都返回
   `SEARCH_UNAVAILABLE`，不静默回退 PostgreSQL FTS。
-- 当前只宣称 adapter first path 和 focused tests；真实 OpenSearch 进程 smoke、
-  mapping / rebuild operator、容量曲线和 provider-grade 运维仍是后续项。
+- `loadtest/search/run-local-smoke.ps1 -UseOpenSearchBackend` 是显式 opt-in
+  OpenSearch backend smoke：runner 先等待 PostgreSQL projection 写入，再把低敏
+  `tenant_id / conversation_id / message_id / conversation_seq / searchable_text`
+  同步到临时 OpenSearch index，随后仍只通过 search-service gRPC 查询。
+  该 fixture 只用于本地 smoke，不是生产索引写入链路。
+- 当前只宣称 adapter first path、opt-in smoke 入口和 focused tests；真实
+  OpenSearch 进程 smoke、mapping / rebuild operator、容量曲线和 provider-grade
+  运维仍是后续项。
 
 ## 8. 第一版验收
 
@@ -239,6 +245,9 @@ search，不保留 `ILIKE` substring fallback。
   和 malformed hit fail-closed。
 - PostgreSQL candidate hydration 集成测试覆盖外部候选仍受 visibility / tombstone
   过滤，不允许外部索引绕过搜索投影边界。
+- OpenSearch opt-in smoke 入口覆盖 search-service `opensearch` backend 启动参数、
+  临时 index 创建、低敏 fixture document 写入和 search-service gRPC 查询路径；
+  真实 OpenSearch 进程通过报告归档前，不宣称 OpenSearch runtime smoke 已完成。
 
 最小 smoke：
 

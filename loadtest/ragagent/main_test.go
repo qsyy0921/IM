@@ -27,6 +27,9 @@ func TestParseConfigDefaults(t *testing.T) {
 	if cfg.actionTarget != defaultActionTarget {
 		t.Fatalf("unexpected action target %q", cfg.actionTarget)
 	}
+	if cfg.workflowTarget != defaultWorkflowTarget {
+		t.Fatalf("unexpected workflow target %q", cfg.workflowTarget)
+	}
 	if cfg.resultRoot != defaultResultRoot {
 		t.Fatalf("unexpected result root %q", cfg.resultRoot)
 	}
@@ -44,6 +47,7 @@ func TestParseConfigRejectsMissingTargets(t *testing.T) {
 		{"--rag-target", " "},
 		{"--agent-target", " "},
 		{"--action-executor-target", " "},
+		{"--workflow-target", " "},
 		{"--result-root", " "},
 	}
 	for _, args := range cases {
@@ -97,7 +101,7 @@ func TestVerifyCombinedSummary(t *testing.T) {
 	cfg := config{runName: "demo", expectExecuted: true}
 	rag := validRAGPartial()
 	agent := validAgentPartial()
-	summary, err := verifyCombined(cfg, `H:\NexusIM\loadtest-results\demo`, "rag.json", "agent.json", rag, agent, validPublicCandidateReviewSummary(), startedAt)
+	summary, err := verifyCombined(cfg, `H:\NexusIM\loadtest-results\demo`, "rag.json", "agent.json", rag, agent, validPublicCandidateReviewSummary(), validProfileRepairApprovalSummary(), startedAt)
 	if err != nil {
 		t.Fatalf("verifyCombined returned error: %v", err)
 	}
@@ -117,6 +121,18 @@ func TestVerifyCombinedSummary(t *testing.T) {
 		summary.PublicCandidateSupersededMemoryEventID == "" {
 		t.Fatalf("expected public candidate temporal update evidence flags: %+v", summary)
 	}
+	if !summary.ProfileRepairApprovalRequested ||
+		!summary.ProfileRepairWorkflowApproved ||
+		!summary.ProfileRepairApprovalVerified ||
+		!summary.ProfileRepairExecuted ||
+		!summary.ProfileRepairProfileActive ||
+		summary.ProfileRepairSupportCount < 2 ||
+		summary.ProfileRepairSupportingMemoryCount < 2 ||
+		!summary.ProfileRepairRAGEvidence ||
+		!summary.ProfileRepairAgentEvidence ||
+		summary.ProfileRepairWorkflowID == "" {
+		t.Fatalf("expected profile repair approval and evidence flags: %+v", summary)
+	}
 	if strings.Contains(summary.RAGAnswerTextSHA256, rag.AnswerText) ||
 		strings.Contains(summary.AgentProposalTextSHA256, agent.ProposalText) {
 		t.Fatalf("summary hash fields must not include raw answer or proposal")
@@ -131,7 +147,7 @@ func TestVerifyCombinedRejectsDifferentConversation(t *testing.T) {
 	rag := validRAGPartial()
 	agent := validAgentPartial()
 	agent.Seed.ConversationID = "other-conv"
-	if _, err := verifyCombined(cfg, "out", "rag.json", "agent.json", rag, agent, validPublicCandidateReviewSummary(), time.Now().UTC()); err == nil {
+	if _, err := verifyCombined(cfg, "out", "rag.json", "agent.json", rag, agent, validPublicCandidateReviewSummary(), validProfileRepairApprovalSummary(), time.Now().UTC()); err == nil {
 		t.Fatalf("expected conversation mismatch to fail")
 	}
 }
@@ -141,7 +157,7 @@ func TestVerifyCombinedRejectsMissingEvidenceBoundary(t *testing.T) {
 	rag := validRAGPartial()
 	agent := validAgentPartial()
 	agent.MemoryGraphEdgesPreserved = false
-	if _, err := verifyCombined(cfg, "out", "rag.json", "agent.json", rag, agent, validPublicCandidateReviewSummary(), time.Now().UTC()); err == nil {
+	if _, err := verifyCombined(cfg, "out", "rag.json", "agent.json", rag, agent, validPublicCandidateReviewSummary(), validProfileRepairApprovalSummary(), time.Now().UTC()); err == nil {
 		t.Fatalf("expected missing graph edge preservation to fail")
 	}
 }
@@ -152,8 +168,19 @@ func TestVerifyCombinedRejectsMissingPublicCandidateReview(t *testing.T) {
 	agent := validAgentPartial()
 	candidate := validPublicCandidateReviewSummary()
 	candidate.AgentEvidence = false
-	if _, err := verifyCombined(cfg, "out", "rag.json", "agent.json", rag, agent, candidate, time.Now().UTC()); err == nil {
+	if _, err := verifyCombined(cfg, "out", "rag.json", "agent.json", rag, agent, candidate, validProfileRepairApprovalSummary(), time.Now().UTC()); err == nil {
 		t.Fatalf("expected missing public candidate evidence to fail")
+	}
+}
+
+func TestVerifyCombinedRejectsMissingProfileRepairApproval(t *testing.T) {
+	cfg := config{runName: "demo"}
+	rag := validRAGPartial()
+	agent := validAgentPartial()
+	profileRepair := validProfileRepairApprovalSummary()
+	profileRepair.ApprovalVerified = false
+	if _, err := verifyCombined(cfg, "out", "rag.json", "agent.json", rag, agent, validPublicCandidateReviewSummary(), profileRepair, time.Now().UTC()); err == nil {
+		t.Fatalf("expected missing profile repair approval verification to fail")
 	}
 }
 
@@ -215,5 +242,24 @@ func validPublicCandidateReviewSummary() publicCandidateReviewSummary {
 		RAGEvidence:             true,
 		AgentEvidence:           true,
 		TemporalUpdatePreserved: true,
+	}
+}
+
+func validProfileRepairApprovalSummary() profileRepairApprovalSummary {
+	return profileRepairApprovalSummary{
+		ApprovalRequested:     true,
+		WorkflowApproved:      true,
+		ApprovalVerified:      true,
+		Executed:              true,
+		ProfileActive:         true,
+		SupportCount:          2,
+		SupportingMemoryCount: 2,
+		WorkflowID:            "wf-profile-repair",
+		PayloadRefHash:        "sha256:" + strings.Repeat("b", 64),
+		TargetRefHash:         "sha256:" + strings.Repeat("c", 64),
+		SupportingMemoryIDs:   []string{"profile-signal-1", "profile-signal-2"},
+		RAGEvidence:           true,
+		AgentEvidence:         true,
+		SummaryTextSHA256:     strings.Repeat("d", 64),
 	}
 }

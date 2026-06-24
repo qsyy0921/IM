@@ -167,6 +167,11 @@ service-stack gate：4 adapters、27 cases、27 passed、0 failed、0 skipped；
 该 run 证明 public candidate replacement 经公开审批后会 supersede 旧 memory，
 旧 memory 进入 `SUPERSEDED` 并被当前 EvidencePack 排除，RAG / Agent 只消费当前
 `ACTIVE + APPROVED` replacement。
+同日 `loadtest/ragagent` 已补 profile repair approval 组合断言：先用公开
+candidate review path 写入 `PROFILE_SIGNAL`，再通过 `loadtest/memoryprofile`
+请求 `REPAIR_APPROVAL` workflow，workflow-service 审批后才执行 batch recompute；
+组合报告会断言修复后的 profile aggregate 同时被 RAG / Agent EvidencePack 消费。
+该切片目前只跑 focused test，真实 service-stack gate 仍需后续归档。
 同日 Python AI Worker 已补 memory extraction candidate first path：
 `ai/python/nexusim_ai_memory` 只从显式 low-sensitive message batch 的
 `decision:` / `task:` / `status:` / `blocker:` / `file:` / `profile_signal:`
@@ -197,5 +202,6 @@ fail-closed，不写 execution audit、不写 tool result projection、不调用
 ## 下一步
 
 - public candidate review 和 temporal update 已进入 RAG-Agent 真实 service-stack gate 归档。
+- profile repair approval 已进入 `loadtest/ragagent` 组合断言；下一步补真实 service-stack gate 归档。
 - 下一步继续深化 RAG-Agent demo 的 EvidencePack / approval / audit 展示：
-  profile repair approval 回归和更多 group-memory answer / proposal 场景。
+  更多 group-memory answer / proposal 场景。

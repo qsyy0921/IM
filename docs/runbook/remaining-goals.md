@@ -63,8 +63,11 @@
   public candidate replacement temporal update 也已通过
   `ai-eval-rag-agent-demo-live-20260624-temporal-update-v2` 真实 gate 归档：replacement
   审批后 supersede 旧 memory，当前 RAG / Agent EvidencePack 只保留 active replacement。
-  下一步围绕 profile repair approval 回归、更多 RAG-Agent EvidencePack / approval /
-  audit 展示扩展该演示路径。
+  profile repair approval 已进入 `loadtest/ragagent` 组合断言：公开 candidate review
+  写入 `PROFILE_SIGNAL` 后，必须经 workflow-service `REPAIR_APPROVAL` 审批才执行
+  `memoryprofile` batch recompute，并要求修复后的 profile aggregate 同时进入 RAG /
+  Agent EvidencePack。下一步补该链路真实 service-stack gate 归档，并继续扩展更多
+  group-memory answer / proposal 场景。
 - `rag-service` / `summary-service`：拒答、引用校验、source-ref regression、unsafe
   output fail-closed cases。
 - `agent-service`：真实业务动作继续走 policy、skill contract、proposal、approval、

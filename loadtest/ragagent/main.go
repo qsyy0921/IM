@@ -26,14 +26,15 @@ import (
 )
 
 const (
-	defaultPGDSN        = "postgres://nexusim:nexusim@localhost:5432/nexusim?sslmode=disable"
-	defaultMemoryTarget = "127.0.0.1:10580"
-	defaultRAGTarget    = "127.0.0.1:10610"
-	defaultAgentTarget  = "127.0.0.1:10630"
-	defaultActionTarget = "127.0.0.1:10660"
-	defaultResultRoot   = `H:\NexusIM\loadtest-results`
-	defaultQuestion     = "phoenix launch decision"
-	defaultObjective    = "phoenix launch decision"
+	defaultPGDSN          = "postgres://nexusim:nexusim@localhost:5432/nexusim?sslmode=disable"
+	defaultMemoryTarget   = "127.0.0.1:10580"
+	defaultRAGTarget      = "127.0.0.1:10610"
+	defaultAgentTarget    = "127.0.0.1:10630"
+	defaultActionTarget   = "127.0.0.1:10660"
+	defaultWorkflowTarget = "127.0.0.1:10750"
+	defaultResultRoot     = `H:\NexusIM\loadtest-results`
+	defaultQuestion       = "phoenix launch decision"
+	defaultObjective      = "phoenix launch decision"
 
 	defaultAgentToolName     = "conversation.note.create"
 	defaultAgentSkillID      = "conversation.note.create"
@@ -46,6 +47,7 @@ type config struct {
 	ragTarget      string
 	agentTarget    string
 	actionTarget   string
+	workflowTarget string
 	resultRoot     string
 	runName        string
 	tenantID       string
@@ -59,6 +61,7 @@ type config struct {
 	requestTimeout time.Duration
 	ragTLS         tlsFlags
 	agentTLS       tlsFlags
+	workflowTLS    tlsFlags
 }
 
 type tlsFlags struct {
@@ -181,6 +184,18 @@ type combinedSummary struct {
 	PublicCandidateEvidenceInRAG           bool      `json:"public_candidate_evidence_in_rag"`
 	PublicCandidateEvidenceInAgent         bool      `json:"public_candidate_evidence_in_agent"`
 	PublicCandidateTemporalUpdatePreserved bool      `json:"public_candidate_temporal_update_preserved"`
+	ProfileRepairApprovalRequested         bool      `json:"profile_repair_approval_requested"`
+	ProfileRepairWorkflowApproved          bool      `json:"profile_repair_workflow_approved"`
+	ProfileRepairApprovalVerified          bool      `json:"profile_repair_approval_verified"`
+	ProfileRepairExecuted                  bool      `json:"profile_repair_executed"`
+	ProfileRepairProfileActive             bool      `json:"profile_repair_profile_active"`
+	ProfileRepairSupportCount              int32     `json:"profile_repair_support_count"`
+	ProfileRepairSupportingMemoryCount     int       `json:"profile_repair_supporting_memory_count"`
+	ProfileRepairWorkflowID                string    `json:"profile_repair_workflow_id,omitempty"`
+	ProfileRepairPayloadRefHash            string    `json:"profile_repair_payload_ref_hash,omitempty"`
+	ProfileRepairTargetRefHash             string    `json:"profile_repair_target_ref_hash,omitempty"`
+	ProfileRepairRAGEvidence               bool      `json:"profile_repair_evidence_in_rag"`
+	ProfileRepairAgentEvidence             bool      `json:"profile_repair_evidence_in_agent"`
 	RAGVersion                             string    `json:"rag_version"`
 	AgentVersion                           string    `json:"agent_version"`
 	RetrievalVersions                      []string  `json:"retrieval_versions"`
@@ -244,7 +259,11 @@ func run(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
-	combined, err := verifyCombined(cfg, resultDir, ragSummaryPath, agentSummaryPath, ragSummary, agentSummary, publicCandidate, startedAt)
+	profileRepair, err := verifyProfileRepairApproval(ctx, cfg, agentSummary.Seed, resultDir)
+	if err != nil {
+		return err
+	}
+	combined, err := verifyCombined(cfg, resultDir, ragSummaryPath, agentSummaryPath, ragSummary, agentSummary, publicCandidate, profileRepair, startedAt)
 	if err != nil {
 		return err
 	}
@@ -259,6 +278,7 @@ func parseConfig(args []string) (config, error) {
 	flagSet.StringVar(&cfg.ragTarget, "rag-target", defaultRAGTarget, "rag-service gRPC address")
 	flagSet.StringVar(&cfg.agentTarget, "agent-target", defaultAgentTarget, "agent-service gRPC address")
 	flagSet.StringVar(&cfg.actionTarget, "action-executor-target", defaultActionTarget, "action-executor gRPC address")
+	flagSet.StringVar(&cfg.workflowTarget, "workflow-target", defaultWorkflowTarget, "workflow-service gRPC address for profile repair approval")
 	flagSet.StringVar(&cfg.resultRoot, "result-root", defaultResultRoot, "external result root for raw demo output")
 	flagSet.StringVar(&cfg.runName, "run-name", "", "run name under result root")
 	flagSet.StringVar(&cfg.tenantID, "tenant-id", "", "tenant id shared by RAG and Agent child runs")
@@ -278,6 +298,10 @@ func parseConfig(args []string) (config, error) {
 	flagSet.StringVar(&cfg.agentTLS.serverName, "agent-tls-server-name", "", "agent gRPC TLS server name")
 	flagSet.StringVar(&cfg.agentTLS.clientCertFile, "agent-tls-client-cert-file", "", "agent gRPC client certificate")
 	flagSet.StringVar(&cfg.agentTLS.clientKeyFile, "agent-tls-client-key-file", "", "agent gRPC client key")
+	flagSet.StringVar(&cfg.workflowTLS.caFile, "workflow-tls-ca-file", "", "workflow gRPC TLS CA file")
+	flagSet.StringVar(&cfg.workflowTLS.serverName, "workflow-tls-server-name", "", "workflow gRPC TLS server name")
+	flagSet.StringVar(&cfg.workflowTLS.clientCertFile, "workflow-tls-client-cert-file", "", "workflow gRPC client certificate")
+	flagSet.StringVar(&cfg.workflowTLS.clientKeyFile, "workflow-tls-client-key-file", "", "workflow gRPC client key")
 	if err := flagSet.Parse(args); err != nil {
 		return config{}, err
 	}
@@ -286,6 +310,7 @@ func parseConfig(args []string) (config, error) {
 	cfg.ragTarget = strings.TrimSpace(cfg.ragTarget)
 	cfg.agentTarget = strings.TrimSpace(cfg.agentTarget)
 	cfg.actionTarget = strings.TrimSpace(cfg.actionTarget)
+	cfg.workflowTarget = strings.TrimSpace(cfg.workflowTarget)
 	cfg.resultRoot = strings.TrimSpace(cfg.resultRoot)
 	cfg.question = strings.TrimSpace(cfg.question)
 	cfg.objective = strings.TrimSpace(cfg.objective)
@@ -303,6 +328,9 @@ func parseConfig(args []string) (config, error) {
 	}
 	if cfg.actionTarget == "" {
 		return config{}, errors.New("--action-executor-target is required")
+	}
+	if cfg.workflowTarget == "" {
+		return config{}, errors.New("--workflow-target is required")
 	}
 	if cfg.resultRoot == "" {
 		return config{}, errors.New("--result-root is required")
@@ -770,6 +798,7 @@ func verifyCombined(
 	rag ragPartialSummary,
 	agent agentPartialSummary,
 	publicCandidate publicCandidateReviewSummary,
+	profileRepair profileRepairApprovalSummary,
 	startedAt time.Time,
 ) (combinedSummary, error) {
 	verified := make([]string, 0, 10)
@@ -818,6 +847,18 @@ func verifyCombined(
 		return combinedSummary{}, errors.New("public candidate review temporal update was not approved and preserved in both RAG and Agent EvidencePacks")
 	}
 	verified = append(verified, "Public memory candidate temporal update superseded old evidence and preserved active replacement evidence in both RAG and Agent paths")
+	if !profileRepair.ApprovalRequested ||
+		!profileRepair.WorkflowApproved ||
+		!profileRepair.ApprovalVerified ||
+		!profileRepair.Executed ||
+		!profileRepair.ProfileActive ||
+		profileRepair.SupportCount < 2 ||
+		profileRepair.SupportingMemoryCount < 2 ||
+		!profileRepair.RAGEvidence ||
+		!profileRepair.AgentEvidence {
+		return combinedSummary{}, errors.New("profile repair approval did not execute and preserve repaired profile evidence in both RAG and Agent paths")
+	}
+	verified = append(verified, "Profile repair required workflow approval, executed through memory-service public API, and preserved repaired profile evidence in both RAG and Agent paths")
 
 	return combinedSummary{
 		RunName:                                cfg.runName,
@@ -858,6 +899,18 @@ func verifyCombined(
 		PublicCandidateEvidenceInRAG:           publicCandidate.RAGEvidence,
 		PublicCandidateEvidenceInAgent:         publicCandidate.AgentEvidence,
 		PublicCandidateTemporalUpdatePreserved: publicCandidate.TemporalUpdatePreserved,
+		ProfileRepairApprovalRequested:         profileRepair.ApprovalRequested,
+		ProfileRepairWorkflowApproved:          profileRepair.WorkflowApproved,
+		ProfileRepairApprovalVerified:          profileRepair.ApprovalVerified,
+		ProfileRepairExecuted:                  profileRepair.Executed,
+		ProfileRepairProfileActive:             profileRepair.ProfileActive,
+		ProfileRepairSupportCount:              profileRepair.SupportCount,
+		ProfileRepairSupportingMemoryCount:     profileRepair.SupportingMemoryCount,
+		ProfileRepairWorkflowID:                profileRepair.WorkflowID,
+		ProfileRepairPayloadRefHash:            profileRepair.PayloadRefHash,
+		ProfileRepairTargetRefHash:             profileRepair.TargetRefHash,
+		ProfileRepairRAGEvidence:               profileRepair.RAGEvidence,
+		ProfileRepairAgentEvidence:             profileRepair.AgentEvidence,
 		RAGVersion:                             rag.RAGVersion,
 		AgentVersion:                           agent.AgentVersion,
 		RetrievalVersions:                      uniqueNonEmpty(rag.RetrievalVersion, agent.RetrievalVersion),

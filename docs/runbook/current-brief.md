@@ -158,6 +158,10 @@ answer、Agent proposal、approval、action-executor audit、EvidencePack graph 
 `ai-eval-rag-agent-demo-live-20260624-current-image-fixed` 已通过真实 service-stack
 gate：4 adapters、27 cases、27 passed、0 failed、0 skipped；`rag-agent-demo`
 已接入 ai-eval optional service-stack adapter、gate policy 和 service-stack 路由。
+2026-06-24 `ai-eval-rag-agent-demo-live-20260624-public-candidate-review-v3`
+进一步通过真实 service-stack gate：4 adapters、27 cases、27 passed、0 failed、
+0 skipped；该 run 证明 memory-service 公开 candidate review / approval path 产生的
+`ACTIVE + APPROVED` memory 会进入 RAG / Agent EvidencePack。
 同日 Python AI Worker 已补 memory extraction candidate first path：
 `ai/python/nexusim_ai_memory` 只从显式 low-sensitive message batch 的
 `decision:` / `task:` / `status:` / `blocker:` / `file:` / `profile_signal:`
@@ -187,8 +191,6 @@ fail-closed，不写 execution audit、不写 tool result projection、不调用
 
 ## 下一步
 
-- `loadtest/ragagent` / `rag-agent-demo` 已把 public candidate review 纳入 RAG /
-  Agent EvidencePack 断言链路；当前本机 preflight 显示服务栈未启动。
-- 下一步在启动 search / memory / retrieval / RAG / Agent / action-executor /
-  MCP / skill / policy / PostgreSQL 后运行并归档真实 service-stack gate。
-- 再继续深化 RAG-Agent demo 的 EvidencePack / approval / audit 展示。
+- public candidate review 已进入 RAG-Agent 真实 service-stack gate 归档。
+- 下一步继续深化 RAG-Agent demo 的 EvidencePack / approval / audit 展示：
+  temporal update、profile repair approval 回归和更多 group-memory answer / proposal 场景。

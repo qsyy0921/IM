@@ -78,6 +78,7 @@
   和 memory-service ai-eval adapter 已新增 public candidate review 检查。
 
 下一步：`loadtest/ragagent` / `rag-agent-demo` adapter 已把 public candidate
-review 纳入 RAG / Agent EvidencePack 断言链路；待服务栈启动后运行并归档真实
-service-stack gate。之后继续做结构过滤、BM25 / vector、rerank 和 EvidencePack
-coverage 深化。仍不得把单条群消息直接升级为 ACTIVE profile fact。
+review 纳入 RAG / Agent EvidencePack 断言链路，并已通过
+`ai-eval-rag-agent-demo-live-20260624-public-candidate-review-v3` 真实 gate 归档。
+之后继续做结构过滤、BM25 / vector、rerank 和 EvidencePack coverage 深化。仍不得把
+单条群消息直接升级为 ACTIVE profile fact。

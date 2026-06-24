@@ -366,6 +366,9 @@ EvidencePack graph edges 和 profile evidence 均成立；报告只保存 hash�
 不保存 raw answer / proposal text。`rag-agent-demo` 已接入 ai-eval optional
 service-stack adapter、gate policy 和 service-stack 路由；2026-06-24
 `ai-eval-rag-agent-demo-live-20260624-current-image-fixed` 已通过真实服务栈运行并归档报告。
+随后 `ai-eval-rag-agent-demo-live-20260624-public-candidate-review-v3` 进一步确认
+memory-service 公开 candidate review / approval path 产生的 `ACTIVE + APPROVED`
+memory 会进入 RAG / Agent EvidencePack。
 
 下一步默认看 [current-goal.md](docs/runbook/current-goal.md)。截至当前主线，客户端只修
 阻塞演示入口的问题；默认推进

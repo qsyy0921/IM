@@ -37,7 +37,8 @@ proposal 前调用 `mcp-gateway.PrepareToolCall` 做 skill / policy / prepare au
   公开 candidate review 纳入 Agent EvidencePack 断言链路：候选必须经
   `SubmitMemoryCandidate` -> `ReviewMemoryCandidate(APPROVE)` 成为
   `ACTIVE + APPROVED` memory 后才可进入 proposal evidence；Agent 仍不直接读
-  memory-service 私表。
+  memory-service 私表。该断言已在
+  `ai-eval-rag-agent-demo-live-20260624-public-candidate-review-v3` 真实 gate 中通过。
 - 2026-06-24 Agent action boundary cases 已扩展到 action-executor preflight
   safety eval：approval id、prepared audit id、resource id 与 approved proposal
   绑定不一致会在 verify-approved-proposal 阶段 fail-closed，且不生成 execution
@@ -50,6 +51,5 @@ proposal 前调用 `mcp-gateway.PrepareToolCall` 做 skill / policy / prepare au
 
 ## 下一步
 
-- 服务栈启动后运行并归档包含 public candidate review 断言的 RAG-Agent optional
-  gate；继续扩展 temporal update / profile recompute 和更完整 group-memory Agent proposal
+- 继续扩展 temporal update / profile recompute 和更完整 group-memory Agent proposal
   场景；真实写动作仍只走 proposal / approval / executor / audit。

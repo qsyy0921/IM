@@ -430,6 +430,12 @@ The 2026-06-24 Python memory extraction candidate run added 4 cases covering
 explicit cue hash-only extraction, ordinary-chat zero candidates,
 profile-signal review, and unsafe-input fail-closed behavior through the
 Go-side batch adapter.
+The 2026-06-24 RAG-Agent public candidate review run
+`ai-eval-rag-agent-demo-live-20260624-public-candidate-review-v3` ran 4 adapters /
+27 cases with 27 passed, 0 failed and 0 skipped. It added a live assertion that
+memory-service `SubmitMemoryCandidate -> ReviewMemoryCandidate(APPROVE)` output
+enters both RAG and Agent EvidencePacks as `ACTIVE + APPROVED` memory with source
+refs preserved.
 The 2026-06-20 RAG / Summary citation regression added source-ref integrity
 cases and low-sensitive `citation_refs` fields to the RAG / Summary smoke
 summaries. This proves adapter-level citation anchoring only; it is not a live

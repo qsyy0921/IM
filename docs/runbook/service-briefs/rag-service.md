@@ -40,11 +40,10 @@
 - 2026-06-24 `loadtest/ragagent` / `rag-agent-demo` adapter 已把 memory-service
   公开 candidate review 纳入 RAG EvidencePack 断言链路：候选必须经
   `SubmitMemoryCandidate` -> `ReviewMemoryCandidate(APPROVE)` 成为
-  `ACTIVE + APPROVED` memory 后才可被 RAG 作为 evidence 消费。
+  `ACTIVE + APPROVED` memory 后才可被 RAG 作为 evidence 消费；该断言已在
+  `ai-eval-rag-agent-demo-live-20260624-public-candidate-review-v3` 真实 gate 中通过。
 
 下一步：
 
-- 真实服务栈启动后运行并归档包含 public candidate review 断言的完整 optional
-  gate；之后继续扩展
-  temporal update / profile recompute 和更完整 group-memory answer 场景，provider
-  仍走 port、guard 和 citation verifier。
+- 继续扩展 temporal update / profile recompute 和更完整 group-memory answer 场景，
+  provider 仍走 port、guard 和 citation verifier。

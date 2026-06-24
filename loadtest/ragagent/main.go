@@ -643,15 +643,23 @@ func verifyPublicCandidateEvidencePack(
 
 func memoryAuth(cfg config, userID string) *memoryv1.AuthContext {
 	return &memoryv1.AuthContext{
-		TenantId: cfg.tenantID,
-		UserId:   userID,
+		TenantId:  cfg.tenantID,
+		UserId:    userID,
+		DeviceId:  cfg.deviceID,
+		SessionId: "rag-agent-demo-memory-session",
+		TraceId:   "rag-agent-demo-memory-trace",
+		RequestId: "rag-agent-demo-memory-request",
 	}
 }
 
 func retrievalAuth(cfg config, userID string) *retrievalv1.AuthContext {
 	return &retrievalv1.AuthContext{
-		TenantId: cfg.tenantID,
-		UserId:   userID,
+		TenantId:  cfg.tenantID,
+		UserId:    userID,
+		DeviceId:  cfg.deviceID,
+		SessionId: "rag-agent-demo-session",
+		TraceId:   "rag-agent-demo-trace",
+		RequestId: "rag-agent-demo-request",
 	}
 }
 

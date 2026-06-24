@@ -80,6 +80,9 @@ type evidenceSummary struct {
 	MemoryItemCount                       int          `json:"memory_item_count"`
 	ProfileItemCount                      int          `json:"profile_item_count"`
 	SourceCounts                          sourceCounts `json:"source_counts"`
+	SourceChainRerankPreserved            bool         `json:"source_chain_rerank_preserved"`
+	SearchRerankScore                     float64      `json:"search_rerank_score"`
+	MemoryRerankScore                     float64      `json:"memory_rerank_score"`
 	SearchProjectionVersion               int64        `json:"search_projection_version"`
 	MemoryProjectionVersion               int64        `json:"memory_projection_version"`
 	RetrievalVersion                      string       `json:"retrieval_version"`
@@ -545,6 +548,10 @@ func verifyEvidence(
 		return evidenceSummary{}, err
 	}
 	verified = append(verified, "profile aggregate evidence preserves subject, aggregate key and supporting memory ids")
+	if err := verifySourceChainRerank(searchItem, memoryItem); err != nil {
+		return evidenceSummary{}, err
+	}
+	verified = append(verified, "source-chain rerank prioritizes multi-source memory evidence over a single search hit")
 	verified = append(verified, "cross-group memory source refs and speaker attribution are preserved")
 	verified = append(verified, "memory graph edge is preserved in EvidencePack")
 	verified = append(verified, "expired, superseded and future memory decoys are excluded by query seq")
@@ -586,6 +593,9 @@ func verifyEvidence(
 		MemoryItemCount:                       int(counts.MemoryEvent),
 		ProfileItemCount:                      int(counts.ProfileAggregate),
 		SourceCounts:                          counts,
+		SourceChainRerankPreserved:            true,
+		SearchRerankScore:                     searchItem.GetRerankScore(),
+		MemoryRerankScore:                     memoryItem.GetRerankScore(),
 		SearchProjectionVersion:               pack.GetSearchProjectionVersion(),
 		MemoryProjectionVersion:               pack.GetMemoryProjectionVersion(),
 		RetrievalVersion:                      pack.GetRetrievalVersion(),
@@ -708,6 +718,19 @@ func verifyProfileItem(item *retrievalv1.EvidenceItem, seed seededData) error {
 	}
 	if item.GetProfileUpdatedAtUnixMs() == 0 {
 		return errors.New("profile aggregate evidence missing updated_at")
+	}
+	return nil
+}
+
+func verifySourceChainRerank(searchItem *retrievalv1.EvidenceItem, memoryItem *retrievalv1.EvidenceItem) error {
+	if searchItem.GetRerankScore() <= 0 {
+		return fmt.Errorf("search item missing rerank score: %+v", searchItem)
+	}
+	if memoryItem.GetRerankScore() <= memoryItem.GetScore() {
+		return fmt.Errorf("memory source-chain should increase rerank score above base score: %+v", memoryItem)
+	}
+	if memoryItem.GetRerankScore() <= searchItem.GetRerankScore() {
+		return fmt.Errorf("multi-source memory evidence should outrank single search hit: search=%f memory=%f", searchItem.GetRerankScore(), memoryItem.GetRerankScore())
 	}
 	return nil
 }

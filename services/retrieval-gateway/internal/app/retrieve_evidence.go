@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/qsyy0921/IM/services/retrieval-gateway/internal/types"
 )
@@ -213,16 +214,72 @@ func rerankEvidence(items []types.EvidenceItem, limit int) []types.EvidenceItem 
 }
 
 func evidenceRerankScore(item types.EvidenceItem) float64 {
+	return clampScore(item.Score) + sourceChainRerankBonus(item)
+}
+
+func sourceChainRerankBonus(item types.EvidenceItem) float64 {
 	switch item.SourceType {
-	case types.EvidenceSourceSearchMessage:
-		return clampScore(item.Score)
 	case types.EvidenceSourceMemoryEvent:
-		return clampScore(item.Score)
+		return memorySourceChainRerankBonus(item)
 	case types.EvidenceSourceProfileAggregate:
-		return clampScore(item.Score)
+		return profileSourceChainRerankBonus(item)
 	default:
 		return 0
 	}
+}
+
+func memorySourceChainRerankBonus(item types.EvidenceItem) float64 {
+	var bonus float64
+	if len(item.SourceRefs) > 0 {
+		bonus += 0.02
+	}
+	if len(item.SourceRefs) > 1 {
+		bonus += 0.08
+	}
+	if hasCrossConversationSourceRef(item.ConversationID, item.SourceRefs) {
+		bonus += 0.08
+	}
+	if len(item.ActorUserIDs) > 1 {
+		bonus += 0.06
+	}
+	if len(item.AudienceUserIDs) > 0 {
+		bonus += 0.04
+	}
+	if len(item.MemoryGraphEdges) > 0 {
+		bonus += 0.10
+	}
+	if memoryGraphSourceRefCount(item.MemoryGraphEdges) > 1 {
+		bonus += 0.04
+	}
+	return bonus
+}
+
+func profileSourceChainRerankBonus(item types.EvidenceItem) float64 {
+	var bonus float64
+	if len(item.SupportingMemoryEventIDs) > 1 {
+		bonus += 0.08
+	}
+	if item.ProfileSubjectUserID != "" {
+		bonus += 0.02
+	}
+	return bonus
+}
+
+func hasCrossConversationSourceRef(conversationID types.ConversationID, refs []types.EvidenceSourceRef) bool {
+	for _, ref := range refs {
+		if ref.ConversationID != "" && !strings.EqualFold(string(ref.ConversationID), string(conversationID)) {
+			return true
+		}
+	}
+	return false
+}
+
+func memoryGraphSourceRefCount(edges []types.MemoryGraphEdge) int {
+	count := 0
+	for _, edge := range edges {
+		count += len(edge.SourceRefs)
+	}
+	return count
 }
 
 func clampScore(score float64) float64 {

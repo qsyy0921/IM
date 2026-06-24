@@ -61,8 +61,11 @@
 - 2026-06-24 `ai-eval-rag-agent-demo-live-20260624-business-proposal-source-chain-gate-v1`
   已验证业务 proposal source-chain 场景中的 RAG / Agent 同源证据链：RAG 仍只消费
   retrieval-gateway EvidencePack，业务 proposal 后续 approval / action audit 不回写 RAG。
+- 2026-06-24 retrieval-gateway source-chain-aware rerank first pass 已落后，RAG 侧
+  不新增直接检索逻辑；后续只消费 EvidencePack 中的 `rerank_score`、source refs、
+  graph edges 和 profile evidence。真实 service-stack gate 待 retrieval 模块后续归档。
 
 下一步：
 
-- 继续扩展 EvidencePack source-chain / rerank coverage，provider 仍走 port、guard 和
-  citation verifier。
+- 继续消费并校验 EvidencePack source-chain / rerank coverage，provider 仍走 port、guard
+  和 citation verifier。

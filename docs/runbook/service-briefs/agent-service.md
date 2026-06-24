@@ -70,6 +70,10 @@ proposal 前调用 `mcp-gateway.PrepareToolCall` 做 skill / policy / prepare au
   reviewed memory 生成 `conversation.note.create` 业务 proposal，approval 后由
   action-executor 记录 audit；由于没有配置真实 mutation adapter，本场景要求
   `business_action_executed=false`，证明 source-chain、approval 和 audit 边界，而不是业务写入。
+- 2026-06-24 retrieval-gateway source-chain-aware rerank first pass 已落后，Agent
+  仍只消费 EvidencePack，不自己实现排序或重查 source；proposal path 后续通过
+  EvidencePack `rerank_score`、source refs、graph edges 和 profile evidence 继续扩展
+  source-chain coverage。真实 service-stack gate 待 retrieval 模块后续归档。
 
 ## 边界
 
@@ -78,5 +82,5 @@ proposal 前调用 `mcp-gateway.PrepareToolCall` 做 skill / policy / prepare au
 
 ## 下一步
 
-- 继续扩展 EvidencePack source-chain / rerank coverage；真实写动作仍只走
+- 继续消费并校验 EvidencePack source-chain / rerank coverage；真实写动作仍只走
   proposal / approval / executor / audit，且必须等显式业务 adapter 就绪。

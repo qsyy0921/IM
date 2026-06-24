@@ -53,6 +53,13 @@
   已通过真实 service-stack gate：Agent 业务 proposal 对 `DECISION` / `TASK` /
   `STATUS` 三类 reviewed memory 保留 3 条 memory evidence、6 个 source refs 和
   3 个 cross-group source refs，且后续 approval / action audit 不绕过 EvidencePack。
+- 2026-06-24 EvidencePack source-chain-aware rerank first pass 已落：
+  `rerank_score` 不再只等同单条 source score；多来源 source refs、跨群 source refs、
+  多 actor attribution、audience、memory graph edges 和 profile supporting memory
+  ids 会提高 rerank score。focused app test 覆盖 limit 截断前多来源 memory chain
+  优先于单条 search hit；`loadtest/retrieval` 低敏 summary 和 retrieval positive
+  adapter 已新增 `source_chain_rerank_preserved` / `must_preserve_source_chain_rerank`
+  断言。真实 service-stack gate 待后续归档。
 
-下一步：继续把后续 rerank 和更细 source-chain coverage 通过 EvidencePack 暴露给
-RAG / summary / Agent，仍不绕过 retrieval-gateway。
+下一步：归档真实 service-stack gate，并继续把 BM25 / vector / graph expansion 与
+更细 source-chain coverage 通过 EvidencePack 暴露给 RAG / summary / Agent，仍不绕过 retrieval-gateway。

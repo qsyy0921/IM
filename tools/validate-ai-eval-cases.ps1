@@ -169,6 +169,7 @@ $knownAssertionTypes = @(
     "must_preserve_speaker_attribution",
     "must_preserve_multi_hop_actor_chain",
     "must_require_complete_chain_before_answer",
+    "must_preserve_source_chain_rerank",
     "must_preserve_task_decision_dependency_edges",
     "must_preserve_temporal_update_order",
     "must_select_memory_version_by_query_seq",

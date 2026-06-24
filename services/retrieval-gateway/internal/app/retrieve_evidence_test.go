@@ -87,7 +87,9 @@ func TestRetrieveEvidenceMergesSearchAndMemory(t *testing.T) {
 	if result.Pack.Items[0].RerankScore != 1 || result.Pack.Items[0].DedupeReason != types.EvidenceDedupeUniqueSource {
 		t.Fatalf("unexpected search item rank metadata: %+v", result.Pack.Items[0])
 	}
-	if result.Pack.Items[1].RerankScore != 0.8 || result.Pack.Items[1].DedupeReason != types.EvidenceDedupeUniqueSource {
+	if result.Pack.Items[1].RerankScore <= result.Pack.Items[1].Score ||
+		result.Pack.Items[1].RerankScore < 0.9 ||
+		result.Pack.Items[1].DedupeReason != types.EvidenceDedupeUniqueSource {
 		t.Fatalf("unexpected memory item rank metadata: %+v", result.Pack.Items[1])
 	}
 	if got := result.Pack.Items[1].MemoryGraphEdges; len(got) != 1 || got[0].RelationType != "SUPPORTS" || len(got[0].SourceRefs) != 1 {
@@ -358,6 +360,53 @@ func TestRetrieveEvidenceReranksBeforeTruncating(t *testing.T) {
 	}
 	if coverage := result.Pack.SourceCoverage[1]; coverage.CandidateCount != 2 || coverage.ReturnedCount != 1 || coverage.Status != types.EvidenceCoverageReturned {
 		t.Fatalf("unexpected memory coverage: %+v", coverage)
+	}
+}
+
+func TestRetrieveEvidenceRerankRewardsSourceChainBeforeTruncating(t *testing.T) {
+	command := validCommand()
+	command.Limit = 1
+	search := fakeSearchPort{result: types.SearchResult{
+		Items: []types.SearchMessageEvidence{{
+			ConversationID:  "conv-1",
+			MessageID:       "msg-search",
+			ConversationSeq: 10,
+			SourceEventID:   "evt-search",
+			SenderID:        "user-a",
+			Snippet:         "single search hit",
+		}},
+	}}
+	memory := fakeMemoryPort{
+		result: types.MemoryResult{Items: []types.MemoryEventEvidence{{
+			MemoryEventID:   "mem-chain",
+			ConversationID:  "conv-1",
+			FactText:        "multi-source memory chain",
+			ActorUserIDs:    []string{"user-a", "user-b"},
+			AudienceUserIDs: []string{"user-1"},
+			SourceRefs: []types.EvidenceSourceRef{
+				{SourceType: "MESSAGE", SourceID: "msg-a", SourceEventID: "evt-a", ConversationID: "conv-1", ConversationSeq: 11},
+				{SourceType: "MESSAGE", SourceID: "msg-b", SourceEventID: "evt-b", ConversationID: "conv-cross", ConversationSeq: 12},
+			},
+			Confidence: 0.74,
+		}}},
+	}
+	result, err := NewRetrieveEvidenceUseCase(&search, &memory).Execute(context.Background(), command)
+	if err != nil {
+		t.Fatalf("Execute returned error: %v", err)
+	}
+	if got := len(result.Pack.Items); got != 1 {
+		t.Fatalf("expected one item after truncation, got %d", got)
+	}
+	item := result.Pack.Items[0]
+	if item.SourceType != types.EvidenceSourceMemoryEvent || item.MemoryEventID != "mem-chain" {
+		t.Fatalf("expected multi-source memory chain to outrank single search hit, got %+v", item)
+	}
+	if item.RerankScore <= 1 {
+		t.Fatalf("expected source-chain rerank score above single search baseline, got %+v", item)
+	}
+	if coverage := result.Pack.SourceCoverage; coverage[0].Status != types.EvidenceCoverageFiltered ||
+		coverage[1].Status != types.EvidenceCoverageReturned {
+		t.Fatalf("unexpected coverage after source-chain rerank truncation: %+v", coverage)
 	}
 }
 

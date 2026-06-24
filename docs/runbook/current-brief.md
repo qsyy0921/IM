@@ -232,5 +232,8 @@ fail-closed，不写 execution audit、不写 tool result projection、不调用
 - public candidate review、temporal update、profile repair approval / negative、
   group-memory answer / proposal 和 business proposal source-chain 已进入
   RAG-Agent 真实 service-stack gate 归档。
-- 下一步继续深化 RAG-Agent demo 的 EvidencePack source-chain / rerank coverage；
-  真实 mutation 必须等显式业务 adapter、approval、executor、audit 全部就绪后再扩展。
+- EvidencePack source-chain-aware rerank first pass 已落到 retrieval-gateway：
+  多来源 / 跨群 / actor attribution / graph-edge / profile-supporting evidence 会增加
+  `rerank_score`，retrieval positive adapter 已新增 `must_preserve_source_chain_rerank`
+  断言；当前是 focused check 证明，后续再归档真实 service-stack gate。
+- 真实 mutation 必须等显式业务 adapter、approval、executor、audit 全部就绪后再扩展。

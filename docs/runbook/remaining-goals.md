@@ -78,8 +78,10 @@
   `ai-eval-rag-agent-demo-live-20260624-business-proposal-source-chain-gate-v1` 真实 gate
   归档：`DECISION` / `TASK` / `STATUS` 三类 reviewed memory 驱动
   `conversation.note.create` proposal，并经 approval / action-executor audit 记录，
-  未配置真实 mutation adapter 时不执行业务写动作。下一步继续扩展 EvidencePack
-  source-chain / rerank coverage；真实 mutation 场景必须等显式业务 adapter 和
+  未配置真实 mutation adapter 时不执行业务写动作。EvidencePack source-chain-aware
+  rerank first pass 已进入 retrieval-gateway 和 retrieval positive adapter focused
+  check；下一步归档真实 service-stack gate，并继续深化 BM25 / vector / graph
+  expansion 与 rerank provider 边界。真实 mutation 场景必须等显式业务 adapter 和
   operator policy 就绪。
 - `rag-service` / `summary-service`：拒答、引用校验、source-ref regression、unsafe
   output fail-closed cases。

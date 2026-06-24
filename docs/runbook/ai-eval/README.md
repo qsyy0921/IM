@@ -415,6 +415,13 @@ fixture. The follow-up run
 `ai-eval-service-stack-live-20260624-retrieval-negative` added
 `retrieval-gateway-negative` and reached 9 adapters / 51 cases with 51 passed,
 0 failed and 0 skipped.
+The 2026-06-24 retrieval source-chain rerank first pass adds
+`must_preserve_source_chain_rerank` to the positive retrieval adapter contract:
+multi-source / cross-group / actor-attributed / graph-edge evidence must raise
+`rerank_score` and survive limit truncation ahead of a single search hit. This
+is currently covered by focused retrieval-gateway app tests and
+`loadtest/retrieval` summary fields; a fresh service-stack gate should be
+archived after the updated retrieval-gateway runtime is restarted.
 The 2026-06-20 negative RAG / Agent service-stack run increased the live suite
 to 19 cases and added RAG no-evidence abstain plus Agent policy-denied blocked
 proposal checks.

@@ -188,6 +188,9 @@
           "type": "must_require_complete_chain_before_answer"
         },
         {
+          "type": "must_preserve_source_chain_rerank"
+        },
+        {
           "type": "must_preserve_projection_versions"
         }
       ]

@@ -87,5 +87,7 @@ adapter、状态、计数、summary/report 引用和低敏 metadata。
 
 边界：不保存 raw EvidencePack、prompt、model output、用户正文、secret 或 tool input；不授权业务动作。
 
-下一步：继续深化 EvidencePack source-chain / rerank coverage，并保持 retrieval
-failure、memory lifecycle failure、reasoning failure 和 action boundary failure 的独立诊断。
+下一步：retrieval positive adapter 已新增 `must_preserve_source_chain_rerank`
+断言；先归档真实 service-stack gate，再继续深化 BM25 / vector / graph expansion /
+rerank provider 覆盖，并保持 retrieval failure、memory lifecycle failure、
+reasoning failure 和 action boundary failure 的独立诊断。

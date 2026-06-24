@@ -126,6 +126,12 @@ function Test-RetrievalAssertion {
                 -and [int64]$Summary.search_projection_version -eq [int64]$Summary.seed.visibility_version `
                 -and [int64]$Summary.memory_projection_version -eq [int64]$Summary.seed.memory_projection_version
         }
+        "must_preserve_source_chain_rerank" {
+            return `
+                [bool]$Summary.source_chain_rerank_preserved `
+                -and [double]$Summary.memory_rerank_score -gt [double]$Summary.search_rerank_score `
+                -and [double]$Summary.memory_rerank_score -gt 1.0
+        }
         default {
             throw "unsupported retrieval eval assertion type: $type"
         }

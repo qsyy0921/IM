@@ -242,6 +242,7 @@ services:
       NEXUSIM_AGENT_SERVICE_MODE: grpc
       NEXUSIM_AGENT_GRPC_ADDR: 172.30.80.25:10630
       NEXUSIM_AGENT_DEBUG_ADDR: 172.30.80.25:11922
+      NEXUSIM_AGENT_DEPENDENCY_TIMEOUT: 5s
       NEXUSIM_RETRIEVAL_GRPC_ADDR: retrieval-gateway-grpc:10590
       NEXUSIM_MCP_GATEWAY_GRPC_ADDR: mcp-gateway-grpc:10650
       NEXUSIM_PG_DSN: postgres://nexusim:nexusim@host.docker.internal:5432/nexusim?sslmode=disable
@@ -296,6 +297,8 @@ services:
     image: nexusim/action-executor:local
     container_name: nexusim-action-executor-grpc
     depends_on:
+      conversation-service-grpc:
+        condition: service_started
       skill-registry-grpc:
         condition: service_started
       policy-service-grpc:
@@ -309,6 +312,7 @@ services:
       NEXUSIM_SKILL_REGISTRY_GRPC_ADDR: skill-registry-grpc:10640
       NEXUSIM_POLICY_GRPC_ADDR: policy-service-grpc:10800
       NEXUSIM_AGENT_GRPC_ADDR: agent-service-grpc:10630
+      NEXUSIM_ACTION_EXECUTOR_CONVERSATION_GRPC_ADDR: conversation-service-grpc:10496
       NEXUSIM_PG_DSN: postgres://nexusim:nexusim@host.docker.internal:5432/nexusim?sslmode=disable
     ports:
       - "10660:10660"

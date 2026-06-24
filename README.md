@@ -279,7 +279,7 @@ message / conversation / policy events -> search-service + memory-service projec
 | `skill-registry` | 技能目录、输入输出合约、风险等级、审批要求和审计元数据。 |
 | `mcp-gateway` | tool prepare 边界、skill catalog check、policy precheck、低敏 audit，不直接执行外部工具。 |
 | `action-executor` | approved execution audit、proposal / approval / prepare audit 校验、本地安全 adapter、guarded external HTTP provider adapter、eval smoke。 |
-| `ai-eval-service` | 低敏 eval catalog / recorder / gate；case catalog 81，profile-Agent safety fixture 20，memory-service / retrieval-gateway / RAG / Summary / Agent live adapters 已完成第一轮 service-stack gate，覆盖 collaborative memory、profile aggregation、public candidate review / temporal update、profile repair approval、EvidencePack、Agent output 和 action safety；retrieval positive adapter 已通过 source-chain rerank live gate，确认 multi-source memory evidence rerank 优先级；retrieval opt-in vector backend smoke 已证明 refs-only `VECTOR_ITEM` 能经真实 vector-index-service gRPC 进入 EvidencePack；`rag-agent-demo` 已通过 optional service-stack live gate，确认 RAG grounded answer、Agent approval、profile repair workflow approval、group-memory answer / proposal、business proposal source-chain 和 action-executor audit 主线。 |
+| `ai-eval-service` | 低敏 eval catalog / recorder / gate；case catalog 81，profile-Agent safety fixture 20，memory-service / retrieval-gateway / RAG / Summary / Agent live adapters 已完成第一轮 service-stack gate，覆盖 collaborative memory、profile aggregation、public candidate review / temporal update、profile repair approval、EvidencePack、Agent output 和 action safety；retrieval positive adapter 已通过 source-chain rerank live gate，确认 multi-source memory evidence rerank 优先级；retrieval opt-in vector backend smoke 已证明 refs-only `VECTOR_ITEM` 能经真实 vector-index-service gRPC 进入 EvidencePack；`rag-agent-demo` 已通过 optional service-stack live gate，确认 RAG grounded answer、Agent approval、profile repair workflow approval、group-memory answer / proposal、business proposal source-chain、action-executor audit 和 opt-in `conversation.note.create` 真实业务 mutation。 |
 | `ai/python` | Python AI Worker 候选层：contract guard、低敏 safety guard、candidate-only worker CLI、memory extraction hash-only candidate first path、`IM` conda toolchain。 |
 
 已进入 product-active first-stage 的平台 / 产品服务：
@@ -393,8 +393,11 @@ Agent proposal EvidencePack，并保留 source refs / cross-group source refs。
 conversation-service 公开 `CreateConversationNote` 写真实 note fact；未配置时仍必须不执行业务写动作。
 同日 `loadtest/ragagent` 和 `run-ai-eval-ragagent-adapter.ps1` 已补显式 execute-mode
 gate：开启后要求 action-executor `SUCCEEDED`、低敏 output 不回显 note body，并确认
-`conversation_notes` 中 note fact 与 proposal / approval 绑定一致；完整 service-stack
-opt-in mutation 报告仍待本地服务栈重新启动后归档。
+`conversation_notes` 中 note fact 与 proposal / approval 绑定一致。2026-06-25
+`ai-eval-rag-agent-demo-live-20260625-business-mutation-execute-v7` 已通过真实完整
+service-stack opt-in mutation smoke：4 adapters、27 cases、27 passed、0 failed、
+0 skipped；RAG-Agent demo 已从 audit-only gate 推进到经 approval 执行真实
+conversation note mutation。
 
 下一步默认看 [current-goal.md](docs/runbook/current-goal.md)。截至当前主线，客户端只修
 阻塞演示入口的问题；默认推进

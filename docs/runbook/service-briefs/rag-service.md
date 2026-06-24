@@ -63,7 +63,9 @@
   retrieval-gateway EvidencePack，业务 proposal 后续 approval / action audit 不回写 RAG。
 - 2026-06-24 retrieval-gateway source-chain-aware rerank first pass 已落后，RAG 侧
   不新增直接检索逻辑；后续只消费 EvidencePack 中的 `rerank_score`、source refs、
-  graph edges 和 profile evidence。真实 service-stack gate 待 retrieval 模块后续归档。
+  graph edges 和 profile evidence。该 coverage 已通过
+  `ai-eval-service-stack-live-20260624-retrieval-source-chain-rerank-v2` 和后续
+  RAG-Agent service-stack gates 归档。
 
 下一步：
 

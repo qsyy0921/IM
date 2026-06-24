@@ -206,13 +206,14 @@ conversation-service 公开 `CreateConversationNote` 写入真实 note fact；�
 execute-mode gate：`--expect-business-action-executed` / `-ExpectBusinessActionExecuted`
 会要求 action-executor `executed=true`、result `SUCCEEDED`、tool output 不回显 note body，
 并用 loadtest verification 读取 `conversation_notes` 确认 note fact 与 approval / proposal
-绑定一致；默认仍是 audit-only gate。focused Go checks 已通过，真实完整 service-stack
-opt-in smoke 报告仍待下一次启动完整本地服务栈后归档。完整 service-stack gate wrapper
-也已支持 `-ExpectBusinessActionExecuted`，并在 preflight 中把 conversation-service
-endpoint 纳入 execute-mode 的必需检查。2026-06-25 live run 已确认 preflight 全部
-通过，但正式执行当前被 ai-eval recorder / PostgreSQL timeout 和 search migration
-setup timeout 阻塞；runner 已补 setup timeout 与 child output diagnostics，待 Docker /
-PostgreSQL runtime 恢复后重跑归档。
+绑定一致；默认仍是 audit-only gate。完整 service-stack gate wrapper 也已支持
+`-ExpectBusinessActionExecuted`，并在 preflight 中把 conversation-service endpoint 纳入
+execute-mode 的必需检查。2026-06-25 Docker / PostgreSQL runtime 恢复后，
+`ai-eval-rag-agent-demo-live-20260625-business-mutation-execute-v7` 已通过真实完整
+service-stack opt-in mutation smoke：4 adapters、27 cases、27 passed、0 failed、
+0 skipped；`rag-agent-demo` 确认 `business_action_executed=true`、
+`business_note_persisted=true`、execution status `RECORDED`，且 note fact 与
+proposal / approval 绑定一致。
 同日 Python AI Worker 已补 memory extraction candidate first path：
 `ai/python/nexusim_ai_memory` 只从显式 low-sensitive message batch 的
 `decision:` / `task:` / `status:` / `blocker:` / `file:` / `profile_signal:`
@@ -292,5 +293,5 @@ fail-closed，不写 execution audit、不写 tool result projection、不调用
   pgvector / Milvus / OpenSearch vector provider smoke，
   以及跨 provider EvidencePack coverage。
 - `conversation.note.create` 的显式业务 adapter 和完整 service-stack execute-mode
-  wrapper 已就绪；下一步把 RAG-Agent demo 从 audit-only gate 扩展到完整本地服务栈
-  opt-in business mutation smoke 归档。
+  wrapper 已通过 `ai-eval-rag-agent-demo-live-20260625-business-mutation-execute-v7`
+  归档；RAG-Agent demo 已从 audit-only gate 推进到 opt-in 真实业务 mutation smoke。

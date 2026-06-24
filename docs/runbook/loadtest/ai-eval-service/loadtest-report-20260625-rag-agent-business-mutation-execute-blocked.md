@@ -2,6 +2,10 @@
 
 ## 结论
 
+Superseded by
+`loadtest-report-20260625-rag-agent-business-mutation-execute-gate.md`:
+Docker / PostgreSQL runtime 恢复后，v7 已通过完整 service-stack opt-in mutation smoke。
+
 本轮没有归档为通过的 full smoke。`conversation.note.create` 显式业务 adapter、
 RAG-Agent execute-mode gate 和 service-stack wrapper 已具备执行入口，但本机 live
 运行在进入完整 RAG-Agent optional adapter 前被本地 Docker / PostgreSQL runtime

@@ -75,11 +75,16 @@ proposal 前调用 `mcp-gateway.PrepareToolCall` 做 skill / policy / prepare au
   同日 `loadtest/ragagent` 已补 execute-mode gate：显式开启
   `--expect-business-action-executed` 时必须确认 action-executor 执行成功、输出低敏且不回显
   note body，并验证 `conversation_notes` 中 note fact 与 proposal / approval 绑定一致；
-  默认仍保持 audit-only gate。
+  默认仍保持 audit-only gate。2026-06-25
+  `ai-eval-rag-agent-demo-live-20260625-business-mutation-execute-v7` 已通过真实完整
+  service-stack opt-in mutation smoke，确认 approved Agent proposal 能经 action-executor
+  写入真实 conversation note fact。
 - 2026-06-24 retrieval-gateway source-chain-aware rerank first pass 已落后，Agent
   仍只消费 EvidencePack，不自己实现排序或重查 source；proposal path 后续通过
   EvidencePack `rerank_score`、source refs、graph edges 和 profile evidence 继续扩展
-  source-chain coverage。真实 service-stack gate 待 retrieval 模块后续归档。
+  source-chain coverage。该 coverage 已通过
+  `ai-eval-service-stack-live-20260624-retrieval-source-chain-rerank-v2` 和后续
+  RAG-Agent service-stack gates 归档。
 
 ## 边界
 
@@ -89,5 +94,6 @@ proposal 前调用 `mcp-gateway.PrepareToolCall` 做 skill / policy / prepare au
 
 ## 下一步
 
-- 继续消费并校验 EvidencePack source-chain / rerank coverage；下一步在完整本地服务栈上归档
-  `conversation.note.create` opt-in business mutation smoke。
+- 继续消费并校验 EvidencePack source-chain / rerank coverage；下一步扩展其它真实
+  mutation 前必须先补公开业务 API、显式 tool adapter、operator policy、低敏输出和
+  repair / redrive 边界。

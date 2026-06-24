@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	actionexecutorv1 "github.com/qsyy0921/IM/api/proto/nexusim/actionexecutor/v1"
 	agentv1 "github.com/qsyy0921/IM/api/proto/nexusim/agent/v1"
+	conversationv1 "github.com/qsyy0921/IM/api/proto/nexusim/conversation/v1"
 	memoryv1 "github.com/qsyy0921/IM/api/proto/nexusim/memory/v1"
 	policyv1 "github.com/qsyy0921/IM/api/proto/nexusim/policy/v1"
 	retrievalv1 "github.com/qsyy0921/IM/api/proto/nexusim/retrieval/v1"
@@ -94,6 +95,11 @@ func verifyBusinessProposalScenario(
 			"rag-agent-business-proposal-source-chain",
 			"rag-agent-business-proposal-v1",
 		); err != nil {
+			return businessProposalScenarioSummary{}, err
+		}
+	}
+	if cfg.expectBusinessActionExecuted {
+		if err := ensureBusinessActionConversation(ctx, cfg, seed); err != nil {
 			return businessProposalScenarioSummary{}, err
 		}
 	}
@@ -370,6 +376,44 @@ func businessActionInput(candidates []groupMemoryCandidate) (string, string, str
 	}
 	sum := sha256.Sum256(encoded)
 	return string(encoded), hex.EncodeToString(sum[:]), body, sha256Hex(body), nil
+}
+
+func ensureBusinessActionConversation(
+	ctx context.Context,
+	cfg config,
+	seed seedSummary,
+) error {
+	conn, err := grpc.NewClient(
+		"passthrough:///"+cfg.conversationTarget,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+
+	requestCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
+	defer cancel()
+	_, err = conversationv1.NewConversationServiceClient(conn).CreateConversation(
+		requestCtx,
+		&conversationv1.CreateConversationRequest{
+			AuthContext: &conversationv1.AuthContext{
+				TenantId:  cfg.tenantID,
+				UserId:    seed.ViewerUserID,
+				DeviceId:  cfg.deviceID,
+				SessionId: "rag-agent-demo-business-conversation-session",
+				TraceId:   "rag-agent-demo-business-conversation-trace",
+				RequestId: "rag-agent-demo-business-conversation-request",
+			},
+			ConversationId:   seed.ConversationID,
+			ConversationType: conversationv1.ConversationType_CONVERSATION_TYPE_GROUP,
+			IdempotencyKey:   "rag-agent-demo-business-conversation:" + seed.ConversationID,
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("create business action conversation: %w", err)
+	}
+	return nil
 }
 
 type businessNoteVerification struct {

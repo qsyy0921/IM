@@ -38,6 +38,9 @@
   低敏 output 不回显 note body，并由 loadtest verification 确认 `conversation_notes`
   中 note fact 与 proposal / approval 绑定一致；默认 audit-only gate 仍要求
   `executed=false`。
+- 同日 `ai-eval-rag-agent-demo-live-20260625-business-mutation-execute-v7` 已通过真实完整
+  service-stack opt-in mutation smoke：approved Agent proposal 经 action-executor 执行后
+  写入真实 conversation note fact，且 execution status `RECORDED`、tool output 低敏。
 
 ## 边界
 

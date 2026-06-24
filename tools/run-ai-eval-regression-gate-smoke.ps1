@@ -177,20 +177,20 @@ function Invoke-GateAdapter {
                 -RequestTimeout $RequestTimeout
         }
         "rag-agent-demo" {
-            $adapterArgs = @(
-                "-CasePath", $resolvedCasePath,
-                "-PGDSN", $PGDSN,
-                "-RAGTarget", $RAGTarget,
-                "-AgentTarget", $AgentTarget,
-                "-ActionExecutorTarget", $ActionExecutorTarget,
-                "-WorkflowTarget", $WorkflowTarget,
-                "-ResultRoot", $ResultRoot,
-                "-RunName", $AdapterRunName,
-                "-OutputPath", $SummaryPath,
-                "-RequestTimeout", $RequestTimeout
-            )
+            $adapterArgs = @{
+                CasePath = $resolvedCasePath
+                PGDSN = $PGDSN
+                RAGTarget = $RAGTarget
+                AgentTarget = $AgentTarget
+                ActionExecutorTarget = $ActionExecutorTarget
+                WorkflowTarget = $WorkflowTarget
+                ResultRoot = $ResultRoot
+                RunName = $AdapterRunName
+                OutputPath = $SummaryPath
+                RequestTimeout = $RequestTimeout
+            }
             if ($ExpectBusinessActionExecuted) {
-                $adapterArgs += "-ExpectBusinessActionExecuted"
+                $adapterArgs["ExpectBusinessActionExecuted"] = $true
             }
             & $ScriptPath @adapterArgs
         }

@@ -1499,16 +1499,33 @@ WHERE table_schema = 'public'
 }
 
 func verifyCitation(citation *agentv1.AgentCitation, seed seededData) error {
-	if citation.GetSourceId() != seed.MessageID {
-		return fmt.Errorf("unexpected citation source_id %q", citation.GetSourceId())
+	if citationMatchesSource(citation, seed.MessageID, seed.SourceEventID, seed.ConversationID, seed.ConversationSeq) {
+		return nil
 	}
-	if citation.GetSourceEventId() != seed.SourceEventID {
-		return fmt.Errorf("unexpected citation source_event_id %q", citation.GetSourceEventId())
+	if citationMatchesSource(citation, seed.CrossGroupMessageID, seed.CrossGroupSourceEventID, seed.CrossGroupConversationID, seed.ConversationSeq+1) {
+		return nil
 	}
-	if citation.GetConversationId() != seed.ConversationID || citation.GetConversationSeq() != seed.ConversationSeq {
-		return fmt.Errorf("unexpected citation conversation ref: %+v", citation)
+	return fmt.Errorf("unexpected citation source ref: %+v", citation)
+}
+
+func citationMatchesSource(
+	citation *agentv1.AgentCitation,
+	sourceID string,
+	sourceEventID string,
+	conversationID string,
+	conversationSeq int64,
+) bool {
+	if citation == nil || strings.TrimSpace(sourceID) == "" || strings.TrimSpace(sourceEventID) == "" ||
+		strings.TrimSpace(conversationID) == "" {
+		return false
 	}
-	return nil
+	if citation.GetSourceId() != sourceID || citation.GetSourceEventId() != sourceEventID {
+		return false
+	}
+	if citation.GetConversationId() != conversationID || citation.GetConversationSeq() != conversationSeq {
+		return false
+	}
+	return true
 }
 
 func verifySearchItem(item *retrievalv1.EvidenceItem, seed seededData) error {

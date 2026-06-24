@@ -6,14 +6,19 @@ function Test-PathInsideDirectory {
         [string]$Directory
     )
 
-    $fullPath = [System.IO.Path]::GetFullPath($Path).TrimEnd(
-        [System.IO.Path]::DirectorySeparatorChar,
-        [System.IO.Path]::AltDirectorySeparatorChar
-    )
-    $fullDirectory = [System.IO.Path]::GetFullPath($Directory).TrimEnd(
-        [System.IO.Path]::DirectorySeparatorChar,
-        [System.IO.Path]::AltDirectorySeparatorChar
-    )
+    try {
+        $fullPath = [System.IO.Path]::GetFullPath($Path).TrimEnd(
+            [System.IO.Path]::DirectorySeparatorChar,
+            [System.IO.Path]::AltDirectorySeparatorChar
+        )
+        $fullDirectory = [System.IO.Path]::GetFullPath($Directory).TrimEnd(
+            [System.IO.Path]::DirectorySeparatorChar,
+            [System.IO.Path]::AltDirectorySeparatorChar
+        )
+    }
+    catch {
+        throw "Invalid path while checking output root. Path=`"$Path`"; Directory=`"$Directory`"; error=$($_.Exception.Message)"
+    }
 
     if ($fullPath.Equals($fullDirectory, [System.StringComparison]::OrdinalIgnoreCase)) {
         return $true

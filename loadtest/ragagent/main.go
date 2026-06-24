@@ -26,15 +26,16 @@ import (
 )
 
 const (
-	defaultPGDSN          = "postgres://nexusim:nexusim@localhost:5432/nexusim?sslmode=disable"
-	defaultMemoryTarget   = "127.0.0.1:10580"
-	defaultRAGTarget      = "127.0.0.1:10610"
-	defaultAgentTarget    = "127.0.0.1:10630"
-	defaultActionTarget   = "127.0.0.1:10660"
-	defaultWorkflowTarget = "127.0.0.1:10750"
-	defaultResultRoot     = `H:\NexusIM\loadtest-results`
-	defaultQuestion       = "phoenix launch decision"
-	defaultObjective      = "phoenix launch decision"
+	defaultPGDSN              = "postgres://nexusim:nexusim@localhost:5432/nexusim?sslmode=disable"
+	defaultMemoryTarget       = "127.0.0.1:10580"
+	defaultConversationTarget = "127.0.0.1:10496"
+	defaultRAGTarget          = "127.0.0.1:10610"
+	defaultAgentTarget        = "127.0.0.1:10630"
+	defaultActionTarget       = "127.0.0.1:10660"
+	defaultWorkflowTarget     = "127.0.0.1:10750"
+	defaultResultRoot         = `H:\NexusIM\loadtest-results`
+	defaultQuestion           = "phoenix launch decision"
+	defaultObjective          = "phoenix launch decision"
 
 	defaultAgentToolName     = "conversation.note.create"
 	defaultAgentSkillID      = "conversation.note.create"
@@ -44,6 +45,7 @@ const (
 type config struct {
 	pgDSN                        string
 	memoryTarget                 string
+	conversationTarget           string
 	ragTarget                    string
 	agentTarget                  string
 	actionTarget                 string
@@ -297,6 +299,9 @@ func run(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
+	if err := seedBusinessToolingRows(ctx, cfg); err != nil {
+		return err
+	}
 	publicCandidate, err := verifyPublicCandidateReviewEvidence(ctx, cfg, agentSummary.Seed)
 	if err != nil {
 		return err
@@ -325,6 +330,7 @@ func parseConfig(args []string) (config, error) {
 	flagSet := flag.NewFlagSet("ragagent-demo", flag.ContinueOnError)
 	flagSet.StringVar(&cfg.pgDSN, "pg-dsn", defaultPGDSN, "PostgreSQL DSN")
 	flagSet.StringVar(&cfg.memoryTarget, "memory-target", defaultMemoryTarget, "memory-service gRPC address")
+	flagSet.StringVar(&cfg.conversationTarget, "conversation-target", defaultConversationTarget, "conversation-service gRPC address for approved business action setup")
 	flagSet.StringVar(&cfg.ragTarget, "rag-target", defaultRAGTarget, "rag-service gRPC address")
 	flagSet.StringVar(&cfg.agentTarget, "agent-target", defaultAgentTarget, "agent-service gRPC address")
 	flagSet.StringVar(&cfg.actionTarget, "action-executor-target", defaultActionTarget, "action-executor gRPC address")
@@ -358,6 +364,7 @@ func parseConfig(args []string) (config, error) {
 	}
 	cfg.pgDSN = strings.TrimSpace(cfg.pgDSN)
 	cfg.memoryTarget = strings.TrimSpace(cfg.memoryTarget)
+	cfg.conversationTarget = strings.TrimSpace(cfg.conversationTarget)
 	cfg.ragTarget = strings.TrimSpace(cfg.ragTarget)
 	cfg.agentTarget = strings.TrimSpace(cfg.agentTarget)
 	cfg.actionTarget = strings.TrimSpace(cfg.actionTarget)
@@ -370,6 +377,9 @@ func parseConfig(args []string) (config, error) {
 	}
 	if cfg.memoryTarget == "" {
 		return config{}, errors.New("--memory-target is required")
+	}
+	if cfg.conversationTarget == "" {
+		return config{}, errors.New("--conversation-target is required")
 	}
 	if cfg.ragTarget == "" {
 		return config{}, errors.New("--rag-target is required")
@@ -442,7 +452,7 @@ func agentArgs(cfg config, runName string) []string {
 		"--objective", cfg.objective,
 		"--request-timeout", cfg.requestTimeout.String(),
 	}
-	if cfg.expectExecuted {
+	if cfg.expectExecuted || cfg.expectBusinessActionExecuted {
 		args = append(args,
 			"--expect-executed",
 			"--tool-name", "nexusim.local.echo",
@@ -908,7 +918,7 @@ func verifyCombined(
 	if strings.TrimSpace(agent.ExecutionID) == "" || agent.ExecutionStatus != "RECORDED" {
 		return combinedSummary{}, fmt.Errorf("action execution status %q, want RECORDED with execution id", agent.ExecutionStatus)
 	}
-	if cfg.expectExecuted && !agent.ExecutionExecuted {
+	if (cfg.expectExecuted || cfg.expectBusinessActionExecuted) && !agent.ExecutionExecuted {
 		return combinedSummary{}, errors.New("expected safe local action execution but child report says execution did not run")
 	}
 	verified = append(verified, "Agent proposal, approval and action-executor audit were recorded")

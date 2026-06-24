@@ -107,16 +107,12 @@
   OpenSearch vector index，Docker 调用有硬超时且默认不拉镜像。下一步继续在 Docker
   runtime 恢复后归档真实 OpenSearch 进程 smoke、真实 pgvector / Milvus / OpenSearch
   vector provider smoke。
-  `conversation.note.create` 显式业务 adapter 已就绪；继续扩展其它真实 mutation
-  场景时仍必须先补公开业务 API、显式 adapter 和 operator policy。
-  当前待办：归档 `conversation.note.create` opt-in business mutation 完整
-  service-stack smoke。2026-06-25 运行结果显示 wrapper / preflight 已就绪，
-  但 live run 被 ai-eval recorder / PostgreSQL deadline 和 RAG child
-  `migrations/postgres/search/000001_search_core.sql` setup timeout 阻塞；同时
-  Docker Desktop API 返回 500，虽然服务端口仍在监听。先恢复 Docker /
-  PostgreSQL runtime，再重跑
-  `run-ai-eval-service-stack-gate-smoke.ps1 -OptionalAdapter rag-agent-demo
-  -ExpectBusinessActionExecuted -NoApplyMigration` 并归档通过报告。
+  `conversation.note.create` 显式业务 adapter 已通过
+  `ai-eval-rag-agent-demo-live-20260625-business-mutation-execute-v7` 真实完整
+  service-stack opt-in mutation smoke 归档：approved Agent proposal 经 action-executor
+  执行后写入真实 conversation note fact，且 note fact 与 proposal / approval 绑定一致。
+  继续扩展其它真实 mutation 场景时仍必须先补公开业务 API、显式 adapter、
+  operator policy、低敏输出和 repair / redrive 边界。
 - `rag-service` / `summary-service`：拒答、引用校验、source-ref regression、unsafe
   output fail-closed cases。
 - `agent-service`：真实业务动作继续走 policy、skill contract、proposal、approval、

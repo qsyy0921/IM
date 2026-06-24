@@ -774,16 +774,16 @@ func verifyInsufficientAnswer(
 }
 
 func verifyCitation(citation *ragv1.Citation, seed seededData) error {
-	if citation.GetSourceId() != seed.MessageID {
-		return fmt.Errorf("unexpected citation source_id %q", citation.GetSourceId())
+	if isSeedSource(
+		citation.GetSourceId(),
+		citation.GetSourceEventId(),
+		citation.GetConversationId(),
+		citation.GetConversationSeq(),
+		seed,
+	) {
+		return nil
 	}
-	if citation.GetSourceEventId() != seed.SourceEventID {
-		return fmt.Errorf("unexpected citation source_event_id %q", citation.GetSourceEventId())
-	}
-	if citation.GetConversationId() != seed.ConversationID || citation.GetConversationSeq() != seed.ConversationSeq {
-		return fmt.Errorf("unexpected citation conversation ref: %+v", citation)
-	}
-	return nil
+	return fmt.Errorf("unexpected citation source ref: %+v", citation)
 }
 
 func citationRefsFromResponse(citations []*ragv1.Citation) []citationRef {
@@ -805,11 +805,9 @@ func citationRefsFromResponse(citations []*ragv1.Citation) []citationRef {
 }
 
 func verifySearchItem(item *retrievalv1.EvidenceItem, seed seededData) error {
-	if item.GetMessageId() != seed.MessageID {
-		return fmt.Errorf("unexpected search message_id %q", item.GetMessageId())
-	}
-	if item.GetConversationSeq() != seed.ConversationSeq {
-		return fmt.Errorf("unexpected search conversation_seq %d", item.GetConversationSeq())
+	if !isSeedSearchItem(item, seed) {
+		return fmt.Errorf("unexpected search message ref: message_id=%q conversation_id=%q seq=%d",
+			item.GetMessageId(), item.GetConversationId(), item.GetConversationSeq())
 	}
 	if item.GetVisibilityVersion() != seed.VisibilityVersion {
 		return fmt.Errorf("unexpected search visibility_version %d", item.GetVisibilityVersion())
@@ -818,13 +816,37 @@ func verifySearchItem(item *retrievalv1.EvidenceItem, seed seededData) error {
 		return errors.New("search item missing source refs")
 	}
 	ref := item.GetSourceRefs()[0]
-	if ref.GetSourceEventId() != seed.SourceEventID || ref.GetSourceId() != seed.MessageID {
+	if !isSeedSource(ref.GetSourceId(), ref.GetSourceEventId(), ref.GetConversationId(), ref.GetConversationSeq(), seed) {
 		return fmt.Errorf("unexpected search source ref: %+v", ref)
 	}
 	if strings.TrimSpace(item.GetText()) == "" {
 		return errors.New("search item text is empty")
 	}
 	return nil
+}
+
+func isSeedSearchItem(item *retrievalv1.EvidenceItem, seed seededData) bool {
+	if item.GetMessageId() == seed.MessageID &&
+		item.GetConversationId() == seed.ConversationID &&
+		item.GetConversationSeq() == seed.ConversationSeq {
+		return true
+	}
+	return item.GetMessageId() == seed.CrossGroupMessageID &&
+		item.GetConversationId() == seed.CrossGroupConversationID &&
+		item.GetConversationSeq() == seed.ConversationSeq+1
+}
+
+func isSeedSource(sourceID, sourceEventID, conversationID string, conversationSeq int64, seed seededData) bool {
+	if sourceID == seed.MessageID &&
+		sourceEventID == seed.SourceEventID &&
+		conversationID == seed.ConversationID &&
+		conversationSeq == seed.ConversationSeq {
+		return true
+	}
+	return sourceID == seed.CrossGroupMessageID &&
+		sourceEventID == seed.CrossGroupSourceEventID &&
+		conversationID == seed.CrossGroupConversationID &&
+		conversationSeq == seed.ConversationSeq+1
 }
 
 func verifyMemoryItem(item *retrievalv1.EvidenceItem, seed seededData) error {

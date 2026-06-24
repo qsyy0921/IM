@@ -59,7 +59,10 @@ adapter、状态、计数、summary/report 引用和低敏 metadata。
 - 2026-06-24 `run-ai-eval-ragagent-adapter.ps1` 已把 profile repair negative gate
   纳入必检断言：`loadtest/ragagent` summary 必须证明未审批 workflow 和 approval
   payload hash mismatch 都 fail-closed。`rag-agent-demo` optional adapter 的 runtime
-  dependency 已显式包含 workflow-service；真实 service-stack gate 待下一轮重新归档。
+  dependency 已显式包含 workflow-service。
+- 同日 `ai-eval-rag-agent-demo-live-20260624-profile-repair-negative-v1` 已通过真实
+  service-stack gate：4 adapters、27 cases、27 passed、0 failed、0 skipped；该 run
+  归档了 profile repair negative gate。
 - 2026-06-24 `action-preflight-safety` adapter 已扩到 14 个 smoke cases，并在
   catalog 中新增 approval id、prepared audit id、resource id 绑定错配的
   `PROPOSAL_MISMATCH` 断言；这些 case 区分 action boundary failure 与
@@ -72,6 +75,6 @@ adapter、状态、计数、summary/report 引用和低敏 metadata。
 
 边界：不保存 raw EvidencePack、prompt、model output、用户正文、secret 或 tool input；不授权业务动作。
 
-下一步：重新跑真实 service-stack gate 归档 profile repair negative gate，继续深化
-更多 group-memory answer / proposal 场景和 EvidencePack coverage，并保持 retrieval
-failure、memory lifecycle failure、reasoning failure 和 action boundary failure 的独立诊断。
+下一步：继续深化更多 group-memory answer / proposal 场景和 EvidencePack coverage，
+并保持 retrieval failure、memory lifecycle failure、reasoning failure 和 action
+boundary failure 的独立诊断。

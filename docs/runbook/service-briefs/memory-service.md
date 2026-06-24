@@ -92,12 +92,15 @@
   未审批 workflow 不能执行 batch recompute，已审批 workflow 的 payload hash 与
   当前 batch manifest 不匹配时必须 fail-closed；ai-eval rag-agent adapter 已把
   该负向门禁纳入必检断言。
+- 同日 `ai-eval-rag-agent-demo-live-20260624-profile-repair-negative-v1` 已通过真实
+  service-stack gate：4 adapters、27 cases、27 passed、0 failed、0 skipped；该 run
+  归档了上述负向门禁，并确认匹配审批后才执行 memory-service public recompute。
 
 下一步：`loadtest/ragagent` / `rag-agent-demo` adapter 已把 public candidate
 review、temporal update 和 profile repair approval 纳入 RAG / Agent EvidencePack 断言链路，并已通过
 `ai-eval-rag-agent-demo-live-20260624-public-candidate-review-v3` 和
 `ai-eval-rag-agent-demo-live-20260624-temporal-update-v2`、`ai-eval-rag-agent-demo-live-20260624-profile-repair-approval-v3`
-真实 gate 归档；profile repair negative gate 已进入 runner / adapter contract，
-待下一轮真实 gate 归档。之后继续做结构过滤、BM25 / vector、rerank 和
-EvidencePack coverage 深化。仍不得把
+真实 gate 归档；profile repair negative gate 也已通过
+`ai-eval-rag-agent-demo-live-20260624-profile-repair-negative-v1` 真实 gate 归档。
+之后继续做结构过滤、BM25 / vector、rerank 和 EvidencePack coverage 深化。仍不得把
 单条群消息直接升级为 ACTIVE profile fact。

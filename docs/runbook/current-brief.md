@@ -181,7 +181,12 @@ profile aggregate 上重算时可能触发唯一约束的问题，并以真实 P
 同日 `loadtest/ragagent` 已接入 profile repair 负向门禁：未审批 workflow 不能执行
 batch recompute，已审批 workflow 的 payload hash 与当前 batch manifest 不匹配时
 必须 fail-closed；`run-ai-eval-ragagent-adapter.ps1` 已把该负向门禁纳入 summary
-必检断言，真实 service-stack gate 待下一轮重新归档。
+必检断言。
+同日 `ai-eval-rag-agent-demo-live-20260624-profile-repair-negative-v1` 已通过真实
+service-stack gate：4 adapters、27 cases、27 passed、0 failed、0 skipped；该 run
+确认未审批 workflow 和 approval payload hash mismatch 均 fail-closed，之后匹配的
+已审批 workflow 才会执行 memory-service public recompute，并把修复后的 profile
+aggregate 放入 RAG / Agent EvidencePack。
 同日 Python AI Worker 已补 memory extraction candidate first path：
 `ai/python/nexusim_ai_memory` 只从显式 low-sensitive message batch 的
 `decision:` / `task:` / `status:` / `blocker:` / `file:` / `profile_signal:`
@@ -214,5 +219,4 @@ fail-closed，不写 execution audit、不写 tool result projection、不调用
 - public candidate review、temporal update 和 profile repair approval 已进入
   RAG-Agent 真实 service-stack gate 归档。
 - 下一步继续深化 RAG-Agent demo 的 EvidencePack / approval / audit 展示：
-  更多 group-memory answer / proposal 场景，并重新跑真实 service-stack gate
-  归档 profile repair negative gate。
+  更多 group-memory answer / proposal 场景和 EvidencePack source-chain coverage。

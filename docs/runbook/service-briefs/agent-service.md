@@ -56,6 +56,10 @@ proposal 前调用 `mcp-gateway.PrepareToolCall` 做 skill / policy / prepare au
   组合 demo 会在正确执行前验证未审批 workflow 不能触发 repair，且审批 payload
   hash 与 batch manifest 不匹配时必须 fail-closed；ai-eval rag-agent adapter 已把
   该 gate 纳入 summary 断言。
+- 同日 `ai-eval-rag-agent-demo-live-20260624-profile-repair-negative-v1` 已通过真实
+  service-stack gate：4 adapters、27 cases、27 passed、0 failed、0 skipped；该 run
+  归档了 profile repair negative gate，并确认修复后的 profile evidence 仍进入 Agent
+  proposal EvidencePack。
 
 ## 边界
 
@@ -64,6 +68,5 @@ proposal 前调用 `mcp-gateway.PrepareToolCall` 做 skill / policy / prepare au
 
 ## 下一步
 
-- 重新跑真实 service-stack gate 归档 profile repair negative gate，并继续扩展
-  更完整 group-memory Agent proposal 场景；真实写动作仍只走 proposal / approval /
-  executor / audit。
+- 继续扩展更完整 group-memory Agent proposal 场景；真实写动作仍只走 proposal /
+  approval / executor / audit。

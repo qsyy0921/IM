@@ -51,8 +51,11 @@
   `REPAIR_APPROVAL` 审批后，才通过 memory-service 公开
   `RecomputeProfileAggregate` 更新 profile aggregate；修复后的 profile evidence 会进入
   RAG EvidencePack。
+- 2026-06-24 `ai-eval-rag-agent-demo-live-20260624-profile-repair-negative-v1`
+  已验证 profile repair negative gate：未审批 workflow 和 approval payload hash mismatch
+  均 fail closed；同时修复后的 profile evidence 仍进入 RAG EvidencePack。
 
 下一步：
 
-- 继续扩展 profile repair negative cases 和更完整 group-memory answer 场景，
+- 继续扩展更完整 group-memory answer / proposal 场景，
   provider 仍走 port、guard 和 citation verifier。

@@ -180,8 +180,13 @@ IM messages -> search / memory projection -> EvidencePack -> RAG / Agent answer 
   在正确审批执行前，demo 会先验证未审批 `REPAIR_APPROVAL` workflow 不能执行
   batch recompute，并验证已审批 workflow 的 payload hash 与当前 batch manifest
   不匹配时必须 fail-closed。`run-ai-eval-ragagent-adapter.ps1` 已把
-  `profile_repair_negative_cases_verified` 和 case count 纳入必检断言；下一轮
-  真实 service-stack gate 需重新归档该负向门禁结果。
+  `profile_repair_negative_cases_verified` 和 case count 纳入必检断言。
+- 同日 `ai-eval-rag-agent-demo-live-20260624-profile-repair-negative-v1` 已通过真实
+  service-stack gate：4 adapters、27 cases、27 passed、0 failed、0 skipped。
+  该 run 确认 profile repair negative gate 已归档：未审批 workflow 和 approval
+  payload hash mismatch 均 fail-closed，之后匹配的已审批 workflow 才会执行
+  memory-service public recompute，并把修复后的 profile aggregate 放入 RAG / Agent
+  EvidencePack。
 - 已有 clean smoke 覆盖真实双用户好友直聊、群聊 first path、群资料 BFF
   read/update 和群成员动作链路；证据见 `docs/runbook/client-platform.md`。
 - Windows desktop 已有 artifact / signing / installer plan first paths；签名 / installer
@@ -252,10 +257,8 @@ IM messages -> search / memory projection -> EvidencePack -> RAG / Agent answer 
    公开 candidate review / approval / persistence path 已补齐；`loadtest/ragagent`
    与 `rag-agent-demo` adapter 已把 public candidate review 和 temporal update
    纳入 RAG / Agent EvidencePack 断言链路，并已通过真实 service-stack gate 归档；
-   profile repair approval 也已通过真实 service-stack gate 归档；profile repair
-   negative gate 已接入 `loadtest/ragagent` / ai-eval adapter contract。下一步
-   继续补更多 group-memory answer / proposal 场景，并重新跑真实 service-stack
-   gate 归档负向门禁结果。
+   profile repair approval 和 negative gate 均已通过真实 service-stack gate 归档。
+   下一步继续补更多 group-memory answer / proposal 场景。
 5. 客户端只作为演示入口；除非阻塞上述演示，不继续扩 UI 产品化。
 6. Windows release signing / MSI / NSIS installer、完整 Android、完整移动端发布、
    复杂 UI、群管理深水区和真实 media provider 链路全部后置到 backlog。

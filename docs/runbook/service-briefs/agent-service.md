@@ -25,6 +25,10 @@ proposal 前调用 `mcp-gateway.PrepareToolCall` 做 skill / policy / prepare au
   `EvidenceMemoryGraphEdge`，gRPC response 会继续向 action / UI 调用方返回该字段；
   `loadtest/agent` 会断言跨群 source refs 与 `SUPPORTS` memory graph edge 被保留，
   proposal 仍只基于 EvidencePack 和 citation verifier。
+- 2026-06-24 Agent EvidencePack profile evidence 透传已落：retrieval client 会保留
+  `PROFILE_AGGREGATE` evidence 的 profile subject、aggregate type/key、
+  supporting memory ids 和时间字段；`loadtest/agent` 会断言 profile aggregate
+  evidence 被保留。Agent 仍只提交 proposal，不直接读 memory-service 私表。
 
 ## 边界
 
@@ -34,5 +38,5 @@ proposal 前调用 `mcp-gateway.PrepareToolCall` 做 skill / policy / prepare au
 ## 下一步
 
 - 真实服务栈启动后与 memory-service / retrieval-gateway adapter 一起跑完整
-  optional gate；之后扩展 temporal update / profile aggregation 和更完整
+  optional gate；之后扩展 temporal update / profile recompute 和更完整
   group-memory Agent proposal 场景；仍只提交 proposal。

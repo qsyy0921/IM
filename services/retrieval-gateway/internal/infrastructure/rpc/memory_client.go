@@ -104,6 +104,34 @@ func (client MemoryClient) GetMemoryEvent(ctx context.Context, lookup types.Memo
 	}, nil
 }
 
+func (client MemoryClient) ListProfileAggregates(ctx context.Context, query types.ProfileAggregateQuery) (types.ProfileAggregateResult, error) {
+	callCtx, cancel := context.WithTimeout(ctx, client.timeout)
+	defer cancel()
+	callCtx = outgoingMetadataContext(callCtx, query.AuthContext)
+	response, err := client.client.ListProfileAggregates(callCtx, &memoryv1.ListProfileAggregatesRequest{
+		AuthContext: &memoryv1.AuthContext{
+			TenantId:  string(query.AuthContext.TenantID),
+			UserId:    string(query.AuthContext.UserID),
+			DeviceId:  query.AuthContext.DeviceID,
+			SessionId: query.AuthContext.SessionID,
+			TraceId:   query.AuthContext.TraceID,
+			RequestId: query.AuthContext.RequestID,
+		},
+		SubjectUserId: string(query.SubjectUserID),
+		AggregateType: query.AggregateType,
+		Statuses:      memoryStatusesToProto(query.Statuses),
+		Limit:         int32(query.Limit),
+	})
+	if err != nil {
+		return types.ProfileAggregateResult{}, mapMemoryError(err)
+	}
+	items := make([]types.ProfileAggregateEvidence, 0, len(response.GetItems()))
+	for _, item := range response.GetItems() {
+		items = append(items, profileAggregateFromProto(item))
+	}
+	return types.ProfileAggregateResult{Items: items}, nil
+}
+
 func memoryEventFromProto(item *memoryv1.StructuredMemoryEvent) types.MemoryEventEvidence {
 	if item == nil {
 		return types.MemoryEventEvidence{}
@@ -135,6 +163,26 @@ func memoryEventFromProto(item *memoryv1.StructuredMemoryEvent) types.MemoryEven
 		Confidence:        item.GetConfidence(),
 		VisibilityVersion: item.GetVisibilityVersion(),
 		ExtractionVersion: item.GetExtractionVersion(),
+	}
+}
+
+func profileAggregateFromProto(item *memoryv1.ProfileAggregate) types.ProfileAggregateEvidence {
+	if item == nil {
+		return types.ProfileAggregateEvidence{}
+	}
+	return types.ProfileAggregateEvidence{
+		ProfileID:                item.GetProfileId(),
+		SubjectUserID:            types.UserID(item.GetSubjectUserId()),
+		AggregateType:            item.GetAggregateType(),
+		AggregateKey:             item.GetAggregateKey(),
+		Status:                   memoryStatusFromProto(item.GetStatus()),
+		ReviewState:              reviewStateFromProto(item.GetReviewState()),
+		SummaryText:              item.GetSummaryText(),
+		SupportingMemoryEventIDs: item.GetSupportingMemoryEventIds(),
+		Confidence:               item.GetConfidence(),
+		ValidFromAt:              unixMillisToTime(item.GetValidFromUnixMs()),
+		ValidToAt:                unixMillisToTime(item.GetValidToUnixMs()),
+		UpdatedAt:                unixMillisToTime(item.GetUpdatedAtUnixMs()),
 	}
 }
 

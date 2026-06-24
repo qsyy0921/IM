@@ -15,8 +15,9 @@ const (
 	MaxEvidenceLimit     = 50
 	MaxRetrievalQueryLen = 512
 
-	EvidenceSourceSearchMessage = "SEARCH_MESSAGE"
-	EvidenceSourceMemoryEvent   = "MEMORY_EVENT"
+	EvidenceSourceSearchMessage    = "SEARCH_MESSAGE"
+	EvidenceSourceMemoryEvent      = "MEMORY_EVENT"
+	EvidenceSourceProfileAggregate = "PROFILE_AGGREGATE"
 
 	EvidenceCoverageNotRequested = "NOT_REQUESTED"
 	EvidenceCoverageEmpty        = "EMPTY"
@@ -167,6 +168,18 @@ type MemoryEventLookupResult struct {
 	GraphEdges []MemoryGraphEdge
 }
 
+type ProfileAggregateQuery struct {
+	AuthContext   AuthContext
+	SubjectUserID UserID
+	AggregateType string
+	Statuses      []string
+	Limit         int
+}
+
+type ProfileAggregateResult struct {
+	Items []ProfileAggregateEvidence
+}
+
 type RetrievalPolicyCheck struct {
 	AuthContext    AuthContext
 	ConversationID ConversationID
@@ -218,30 +231,53 @@ type MemoryGraphEdge struct {
 	SourceRefs        []EvidenceSourceRef
 }
 
+type ProfileAggregateEvidence struct {
+	ProfileID                string
+	SubjectUserID            UserID
+	AggregateType            string
+	AggregateKey             string
+	Status                   string
+	ReviewState              string
+	SummaryText              string
+	SupportingMemoryEventIDs []string
+	Confidence               float64
+	ValidFromAt              time.Time
+	ValidToAt                time.Time
+	UpdatedAt                time.Time
+}
+
 type EvidenceItem struct {
-	EvidenceID        string
-	SourceType        string
-	SourceID          string
-	ConversationID    ConversationID
-	ConversationSeq   int64
-	Text              string
-	Score             float64
-	SpeakerUserID     UserID
-	MessageID         string
-	MemoryEventID     string
-	OccurredAt        time.Time
-	ValidFromSeq      int64
-	ValidToSeq        int64
-	VisibilityVersion int64
-	SourceRefs        []EvidenceSourceRef
-	ActorUserIDs      []string
-	AudienceUserIDs   []string
-	TemporalStatus    string
-	ReviewState       string
-	ExtractionVersion string
-	RerankScore       float64
-	DedupeReason      string
-	MemoryGraphEdges  []MemoryGraphEdge
+	EvidenceID               string
+	SourceType               string
+	SourceID                 string
+	ConversationID           ConversationID
+	ConversationSeq          int64
+	Text                     string
+	Score                    float64
+	SpeakerUserID            UserID
+	MessageID                string
+	MemoryEventID            string
+	OccurredAt               time.Time
+	ValidFromSeq             int64
+	ValidToSeq               int64
+	VisibilityVersion        int64
+	SourceRefs               []EvidenceSourceRef
+	ActorUserIDs             []string
+	AudienceUserIDs          []string
+	TemporalStatus           string
+	ReviewState              string
+	ExtractionVersion        string
+	RerankScore              float64
+	DedupeReason             string
+	MemoryGraphEdges         []MemoryGraphEdge
+	ProfileID                string
+	ProfileSubjectUserID     UserID
+	ProfileAggregateType     string
+	ProfileAggregateKey      string
+	SupportingMemoryEventIDs []string
+	ProfileValidFromAt       time.Time
+	ProfileValidToAt         time.Time
+	ProfileUpdatedAt         time.Time
 }
 
 type EvidenceSourceCount struct {

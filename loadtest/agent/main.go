@@ -74,6 +74,7 @@ type seededData struct {
 	SourceEventID            string `json:"source_event_id"`
 	CrossGroupSourceEventID  string `json:"cross_group_source_event_id,omitempty"`
 	MemoryEventID            string `json:"memory_event_id"`
+	ProfileID                string `json:"profile_id,omitempty"`
 	MemorySourceRefID        string `json:"memory_source_ref_id"`
 	CrossGroupSourceRefID    string `json:"cross_group_source_ref_id,omitempty"`
 	MemoryGraphEdgeID        string `json:"memory_graph_edge_id,omitempty"`
@@ -131,6 +132,7 @@ type agentSmokeSummary struct {
 	EvidenceItemCount                     int          `json:"evidence_item_count"`
 	SearchItemCount                       int          `json:"search_item_count"`
 	MemoryItemCount                       int          `json:"memory_item_count"`
+	ProfileItemCount                      int          `json:"profile_item_count"`
 	CurrentMemoryAtSeq                    int64        `json:"current_memory_at_seq"`
 	ExpiredMemoryExcluded                 bool         `json:"expired_memory_excluded"`
 	SupersededMemoryExcluded              bool         `json:"superseded_memory_excluded"`
@@ -138,6 +140,7 @@ type agentSmokeSummary struct {
 	CrossGroupSourceRefsPreserved         bool         `json:"cross_group_source_refs_preserved"`
 	CrossGroupSpeakerAttributionPreserved bool         `json:"cross_group_speaker_attribution_preserved"`
 	MemoryGraphEdgesPreserved             bool         `json:"memory_graph_edges_preserved"`
+	ProfileAggregatePreserved             bool         `json:"profile_aggregate_preserved"`
 	SourceCounts                          sourceCounts `json:"source_counts"`
 	SearchProjectionVersion               int64        `json:"search_projection_version"`
 	MemoryProjectionVersion               int64        `json:"memory_projection_version"`
@@ -189,8 +192,9 @@ type actionAudit struct {
 }
 
 type sourceCounts struct {
-	SearchMessage int32 `json:"search_message"`
-	MemoryEvent   int32 `json:"memory_event"`
+	SearchMessage    int32 `json:"search_message"`
+	MemoryEvent      int32 `json:"memory_event"`
+	ProfileAggregate int32 `json:"profile_aggregate"`
 }
 
 func main() {
@@ -502,6 +506,7 @@ func seedProjectionRows(ctx context.Context, pool *pgxpool.Pool, cfg config) (se
 	sourceEventID := "evt-agent-" + randomSuffix()
 	crossGroupSourceEventID := "evt-agent-cross-" + randomSuffix()
 	memoryEventID := "mem-agent-" + randomSuffix()
+	profileID := "profile-agent-" + randomSuffix()
 	sourceRefID := "ref-agent-" + randomSuffix()
 	crossGroupSourceRefID := "ref-agent-cross-" + randomSuffix()
 	memoryGraphEdgeID := "edge-agent-supports-" + randomSuffix()
@@ -616,6 +621,20 @@ INSERT INTO memory_graph_edges (
 		return seededData{}, err
 	}
 
+	if _, err := tx.Exec(ctx, `
+INSERT INTO memory_profile_aggregates (
+	tenant_id, profile_id, subject_user_id, aggregate_type, aggregate_key,
+	status, review_state, summary_text, supporting_memory_event_ids,
+	confidence, valid_from_at, updated_by_memory_event_id, created_at, updated_at
+) VALUES (
+	$1, $2, $3, 'SKILL', 'phoenix-launch',
+	'ACTIVE', 'APPROVED', 'viewer coordinates phoenix launch decisions across groups',
+	jsonb_build_array($4::text), 0.9200, $5, $4, $5, $5
+)
+`, cfg.tenantID, profileID, cfg.viewerUserID, memoryEventID, now); err != nil {
+		return seededData{}, err
+	}
+
 	staleMemories := []struct {
 		eventID    string
 		sourceRef  string
@@ -696,6 +715,7 @@ INSERT INTO memory_event_source_refs (
 		SourceEventID:            sourceEventID,
 		CrossGroupSourceEventID:  crossGroupSourceEventID,
 		MemoryEventID:            memoryEventID,
+		ProfileID:                profileID,
 		MemorySourceRefID:        sourceRefID,
 		CrossGroupSourceRefID:    crossGroupSourceRefID,
 		MemoryGraphEdgeID:        memoryGraphEdgeID,
@@ -954,12 +974,15 @@ func verifyWorkflow(
 
 	var searchItem *retrievalv1.EvidenceItem
 	var memoryItem *retrievalv1.EvidenceItem
+	var profileItem *retrievalv1.EvidenceItem
 	for _, item := range pack.GetItems() {
 		switch item.GetSourceType() {
 		case retrievalv1.EvidenceSourceType_EVIDENCE_SOURCE_TYPE_SEARCH_MESSAGE:
 			searchItem = item
 		case retrievalv1.EvidenceSourceType_EVIDENCE_SOURCE_TYPE_MEMORY_EVENT:
 			memoryItem = item
+		case retrievalv1.EvidenceSourceType_EVIDENCE_SOURCE_TYPE_PROFILE_AGGREGATE:
+			profileItem = item
 		}
 	}
 	if searchItem == nil {
@@ -967,6 +990,9 @@ func verifyWorkflow(
 	}
 	if memoryItem == nil {
 		return agentSmokeSummary{}, errors.New("missing MEMORY_EVENT evidence item")
+	}
+	if profileItem == nil {
+		return agentSmokeSummary{}, errors.New("missing PROFILE_AGGREGATE evidence item")
 	}
 
 	verified := []string{}
@@ -982,6 +1008,10 @@ func verifyWorkflow(
 		return agentSmokeSummary{}, err
 	}
 	verified = append(verified, "memory evidence preserved with active temporal status and source ref")
+	if err := verifyProfileItem(profileItem, seed); err != nil {
+		return agentSmokeSummary{}, err
+	}
+	verified = append(verified, "profile aggregate evidence preserved with supporting memory ids")
 	verified = append(verified, "cross-group memory source refs and speaker attribution preserved in EvidencePack")
 	verified = append(verified, "memory graph edge preserved in EvidencePack")
 	currentCheck, err := verifyCurrentMemoryOnly(pack, seed)
@@ -1056,6 +1086,7 @@ func verifyWorkflow(
 		EvidenceItemCount:                     len(pack.GetItems()),
 		SearchItemCount:                       int(counts.SearchMessage),
 		MemoryItemCount:                       int(counts.MemoryEvent),
+		ProfileItemCount:                      int(counts.ProfileAggregate),
 		CurrentMemoryAtSeq:                    currentCheck.AtConversationSeq,
 		ExpiredMemoryExcluded:                 currentCheck.ExpiredMemoryExcluded,
 		SupersededMemoryExcluded:              currentCheck.SupersededMemoryExcluded,
@@ -1063,6 +1094,7 @@ func verifyWorkflow(
 		CrossGroupSourceRefsPreserved:         true,
 		CrossGroupSpeakerAttributionPreserved: true,
 		MemoryGraphEdgesPreserved:             true,
+		ProfileAggregatePreserved:             true,
 		SourceCounts:                          counts,
 		SearchProjectionVersion:               pack.GetSearchProjectionVersion(),
 		MemoryProjectionVersion:               pack.GetMemoryProjectionVersion(),
@@ -1555,6 +1587,28 @@ func verifyMemoryItem(item *retrievalv1.EvidenceItem, seed seededData) error {
 	return nil
 }
 
+func verifyProfileItem(item *retrievalv1.EvidenceItem, seed seededData) error {
+	if item.GetProfileId() != seed.ProfileID {
+		return fmt.Errorf("unexpected profile_id %q", item.GetProfileId())
+	}
+	if item.GetProfileSubjectUserId() != seed.ViewerUserID {
+		return fmt.Errorf("unexpected profile subject_user_id %q", item.GetProfileSubjectUserId())
+	}
+	if item.GetProfileAggregateType() != "SKILL" || item.GetProfileAggregateKey() != "phoenix-launch" {
+		return fmt.Errorf("unexpected profile aggregate fields: %+v", item)
+	}
+	if strings.TrimSpace(item.GetText()) == "" {
+		return errors.New("profile aggregate evidence text is empty")
+	}
+	if ids := item.GetSupportingMemoryEventIds(); len(ids) != 1 || ids[0] != seed.MemoryEventID {
+		return fmt.Errorf("unexpected profile supporting memory ids: %+v", ids)
+	}
+	if item.GetProfileUpdatedAtUnixMs() == 0 {
+		return errors.New("profile aggregate evidence missing updated_at")
+	}
+	return nil
+}
+
 type currentMemoryCheck struct {
 	AtConversationSeq        int64
 	ExpiredMemoryExcluded    bool
@@ -1633,9 +1687,11 @@ func verifySourceCoverage(pack *retrievalv1.EvidencePack, seed seededData) (sour
 			counts.SearchMessage = count.GetCount()
 		case retrievalv1.EvidenceSourceType_EVIDENCE_SOURCE_TYPE_MEMORY_EVENT:
 			counts.MemoryEvent = count.GetCount()
+		case retrievalv1.EvidenceSourceType_EVIDENCE_SOURCE_TYPE_PROFILE_AGGREGATE:
+			counts.ProfileAggregate = count.GetCount()
 		}
 	}
-	if counts.SearchMessage < 1 || counts.MemoryEvent < 1 {
+	if counts.SearchMessage < 1 || counts.MemoryEvent < 1 || counts.ProfileAggregate < 1 {
 		return counts, fmt.Errorf("unexpected source counts: %+v", counts)
 	}
 	if pack.GetSearchProjectionVersion() != seed.VisibilityVersion {
@@ -1651,6 +1707,7 @@ func verifySourceCoverage(pack *retrievalv1.EvidencePack, seed seededData) (sour
 	for _, sourceType := range []retrievalv1.EvidenceSourceType{
 		retrievalv1.EvidenceSourceType_EVIDENCE_SOURCE_TYPE_SEARCH_MESSAGE,
 		retrievalv1.EvidenceSourceType_EVIDENCE_SOURCE_TYPE_MEMORY_EVENT,
+		retrievalv1.EvidenceSourceType_EVIDENCE_SOURCE_TYPE_PROFILE_AGGREGATE,
 	} {
 		coverage := coverageByType[sourceType]
 		if coverage == nil {

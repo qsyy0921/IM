@@ -54,6 +54,7 @@ type seededData struct {
 	SourceEventID            string `json:"source_event_id"`
 	CrossGroupSourceEventID  string `json:"cross_group_source_event_id"`
 	MemoryEventID            string `json:"memory_event_id"`
+	ProfileID                string `json:"profile_id"`
 	ExpiredMemoryEventID     string `json:"expired_memory_event_id"`
 	SupersededMemoryEventID  string `json:"superseded_memory_event_id"`
 	FutureMemoryEventID      string `json:"future_memory_event_id"`
@@ -77,6 +78,7 @@ type evidenceSummary struct {
 	ItemCount                             int          `json:"item_count"`
 	SearchItemCount                       int          `json:"search_item_count"`
 	MemoryItemCount                       int          `json:"memory_item_count"`
+	ProfileItemCount                      int          `json:"profile_item_count"`
 	SourceCounts                          sourceCounts `json:"source_counts"`
 	SearchProjectionVersion               int64        `json:"search_projection_version"`
 	MemoryProjectionVersion               int64        `json:"memory_projection_version"`
@@ -85,6 +87,7 @@ type evidenceSummary struct {
 	CrossGroupSourceRefsPreserved         bool         `json:"cross_group_source_refs_preserved"`
 	CrossGroupSpeakerAttributionPreserved bool         `json:"cross_group_speaker_attribution_preserved"`
 	MemoryGraphEdgesPreserved             bool         `json:"memory_graph_edges_preserved"`
+	ProfileAggregatePreserved             bool         `json:"profile_aggregate_preserved"`
 	TemporalVersionSelectedByQuerySeq     bool         `json:"temporal_version_selected_by_query_seq"`
 	ExpiredMemoryExcluded                 bool         `json:"expired_memory_excluded"`
 	SupersededMemoryExcluded              bool         `json:"superseded_memory_excluded"`
@@ -95,8 +98,9 @@ type evidenceSummary struct {
 }
 
 type sourceCounts struct {
-	SearchMessage int32 `json:"search_message"`
-	MemoryEvent   int32 `json:"memory_event"`
+	SearchMessage    int32 `json:"search_message"`
+	MemoryEvent      int32 `json:"memory_event"`
+	ProfileAggregate int32 `json:"profile_aggregate"`
 }
 
 func main() {
@@ -246,6 +250,7 @@ func seedProjectionRows(ctx context.Context, pool *pgxpool.Pool, cfg config) (se
 	sourceEventID := "evt-retrieval-" + randomSuffix()
 	crossGroupSourceEventID := "evt-retrieval-cross-" + randomSuffix()
 	memoryEventID := "mem-retrieval-" + randomSuffix()
+	profileID := "profile-retrieval-" + randomSuffix()
 	memoryGraphEdgeID := "edge-retrieval-supports-" + randomSuffix()
 	expiredMemoryEventID := "mem-retrieval-expired-" + randomSuffix()
 	supersededMemoryEventID := "mem-retrieval-superseded-" + randomSuffix()
@@ -388,6 +393,20 @@ INSERT INTO memory_graph_edges (
 	}
 
 	if _, err := tx.Exec(ctx, `
+INSERT INTO memory_profile_aggregates (
+	tenant_id, profile_id, subject_user_id, aggregate_type, aggregate_key,
+	status, review_state, summary_text, supporting_memory_event_ids,
+	confidence, valid_from_at, updated_by_memory_event_id, created_at, updated_at
+) VALUES (
+	$1, $2, $3, 'SKILL', 'phoenix-launch',
+	'ACTIVE', 'APPROVED', 'viewer coordinates phoenix launch decisions across groups',
+	jsonb_build_array($4::text), 0.9200, $5, $4, $5, $5
+)
+`, cfg.tenantID, profileID, cfg.viewerUserID, memoryEventID, now); err != nil {
+		return seededData{}, err
+	}
+
+	if _, err := tx.Exec(ctx, `
 INSERT INTO memory_event_source_refs (
 	tenant_id, memory_event_id, source_ref_id, source_type, source_id,
 	source_event_id, conversation_id, conversation_seq, occurred_at, created_at
@@ -414,6 +433,7 @@ INSERT INTO memory_event_source_refs (
 		SourceEventID:            sourceEventID,
 		CrossGroupSourceEventID:  crossGroupSourceEventID,
 		MemoryEventID:            memoryEventID,
+		ProfileID:                profileID,
 		MemoryGraphEdgeID:        memoryGraphEdgeID,
 		ExpiredMemoryEventID:     expiredMemoryEventID,
 		SupersededMemoryEventID:  supersededMemoryEventID,
@@ -480,6 +500,7 @@ func verifyEvidence(
 
 	var searchItem *retrievalv1.EvidenceItem
 	var memoryItem *retrievalv1.EvidenceItem
+	var profileItem *retrievalv1.EvidenceItem
 	staleMemoryExcluded := map[string]bool{
 		seed.ExpiredMemoryEventID:    true,
 		seed.SupersededMemoryEventID: true,
@@ -496,6 +517,9 @@ func verifyEvidence(
 			}
 			candidate := item
 			memoryItem = candidate
+		case retrievalv1.EvidenceSourceType_EVIDENCE_SOURCE_TYPE_PROFILE_AGGREGATE:
+			candidate := item
+			profileItem = candidate
 		}
 	}
 	if searchItem == nil {
@@ -503,6 +527,9 @@ func verifyEvidence(
 	}
 	if memoryItem == nil {
 		return evidenceSummary{}, errors.New("missing MEMORY_EVENT evidence item")
+	}
+	if profileItem == nil {
+		return evidenceSummary{}, errors.New("missing PROFILE_AGGREGATE evidence item")
 	}
 
 	verified := []string{}
@@ -514,6 +541,10 @@ func verifyEvidence(
 		return evidenceSummary{}, err
 	}
 	verified = append(verified, "memory item is active current-only evidence with source refs, review state and extraction version")
+	if err := verifyProfileItem(profileItem, seed); err != nil {
+		return evidenceSummary{}, err
+	}
+	verified = append(verified, "profile aggregate evidence preserves subject, aggregate key and supporting memory ids")
 	verified = append(verified, "cross-group memory source refs and speaker attribution are preserved")
 	verified = append(verified, "memory graph edge is preserved in EvidencePack")
 	verified = append(verified, "expired, superseded and future memory decoys are excluded by query seq")
@@ -525,9 +556,11 @@ func verifyEvidence(
 			counts.SearchMessage = count.GetCount()
 		case retrievalv1.EvidenceSourceType_EVIDENCE_SOURCE_TYPE_MEMORY_EVENT:
 			counts.MemoryEvent = count.GetCount()
+		case retrievalv1.EvidenceSourceType_EVIDENCE_SOURCE_TYPE_PROFILE_AGGREGATE:
+			counts.ProfileAggregate = count.GetCount()
 		}
 	}
-	if counts.SearchMessage != 1 || counts.MemoryEvent != 1 {
+	if counts.SearchMessage != 1 || counts.MemoryEvent != 1 || counts.ProfileAggregate != 1 {
 		return evidenceSummary{}, fmt.Errorf("unexpected source counts: %+v", counts)
 	}
 	if pack.GetSearchProjectionVersion() != seed.VisibilityVersion {
@@ -551,6 +584,7 @@ func verifyEvidence(
 		ItemCount:                             len(pack.GetItems()),
 		SearchItemCount:                       int(counts.SearchMessage),
 		MemoryItemCount:                       int(counts.MemoryEvent),
+		ProfileItemCount:                      int(counts.ProfileAggregate),
 		SourceCounts:                          counts,
 		SearchProjectionVersion:               pack.GetSearchProjectionVersion(),
 		MemoryProjectionVersion:               pack.GetMemoryProjectionVersion(),
@@ -559,6 +593,7 @@ func verifyEvidence(
 		CrossGroupSourceRefsPreserved:         true,
 		CrossGroupSpeakerAttributionPreserved: true,
 		MemoryGraphEdgesPreserved:             true,
+		ProfileAggregatePreserved:             true,
 		TemporalVersionSelectedByQuerySeq:     true,
 		ExpiredMemoryExcluded:                 true,
 		SupersededMemoryExcluded:              true,
@@ -651,6 +686,28 @@ func verifyMemoryItem(item *retrievalv1.EvidenceItem, seed seededData) error {
 		edge.GetRelationType() != "SUPPORTS" ||
 		len(edge.GetSourceRefs()) != 2 {
 		return fmt.Errorf("unexpected memory graph edge: %+v", edge)
+	}
+	return nil
+}
+
+func verifyProfileItem(item *retrievalv1.EvidenceItem, seed seededData) error {
+	if item.GetProfileId() != seed.ProfileID {
+		return fmt.Errorf("unexpected profile_id %q", item.GetProfileId())
+	}
+	if item.GetProfileSubjectUserId() != seed.ViewerUserID {
+		return fmt.Errorf("unexpected profile subject_user_id %q", item.GetProfileSubjectUserId())
+	}
+	if item.GetProfileAggregateType() != "SKILL" || item.GetProfileAggregateKey() != "phoenix-launch" {
+		return fmt.Errorf("unexpected profile aggregate fields: %+v", item)
+	}
+	if strings.TrimSpace(item.GetText()) == "" {
+		return errors.New("profile aggregate evidence text is empty")
+	}
+	if ids := item.GetSupportingMemoryEventIds(); len(ids) != 1 || ids[0] != seed.MemoryEventID {
+		return fmt.Errorf("unexpected profile supporting memory ids: %+v", ids)
+	}
+	if item.GetProfileUpdatedAtUnixMs() == 0 {
+		return errors.New("profile aggregate evidence missing updated_at")
 	}
 	return nil
 }

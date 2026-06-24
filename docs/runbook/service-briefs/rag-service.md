@@ -29,9 +29,13 @@
 - 2026-06-24 RAG EvidencePack graph edge 透传已落：retrieval client 会保留
   `EvidenceMemoryGraphEdge`，gRPC response 会继续向调用方返回该字段；
   `loadtest/rag` 会断言跨群 source refs 与 `SUPPORTS` memory graph edge 被保留。
+- 2026-06-24 RAG EvidencePack profile evidence 透传已落：retrieval client 会保留
+  `PROFILE_AGGREGATE` evidence 的 profile subject、aggregate type/key、
+  supporting memory ids 和时间字段；`loadtest/rag` 会断言 profile aggregate
+  evidence 被保留。RAG 仍只消费 retrieval-gateway 返回的 EvidencePack。
 
 下一步：
 
 - 真实服务栈启动后与 memory-service / retrieval-gateway adapter 一起跑完整
-  optional gate；之后扩展 temporal update / profile aggregation 和更完整
+  optional gate；之后扩展 temporal update / profile recompute 和更完整
   group-memory answer 场景，provider 仍走 port、guard 和 citation verifier。

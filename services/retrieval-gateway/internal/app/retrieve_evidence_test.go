@@ -99,7 +99,7 @@ func TestRetrieveEvidenceMergesSearchAndMemory(t *testing.T) {
 	if got := memory.query.Statuses; len(got) != 1 || got[0] != types.MemoryStatusActive {
 		t.Fatalf("expected active memory status by default, got %+v", got)
 	}
-	if got := result.Pack.SourceCoverage; len(got) != 2 ||
+	if got := result.Pack.SourceCoverage; len(got) != 3 ||
 		got[0].SourceType != types.EvidenceSourceSearchMessage ||
 		got[0].CandidateCount != 1 ||
 		got[0].ReturnedCount != 1 ||
@@ -107,7 +107,11 @@ func TestRetrieveEvidenceMergesSearchAndMemory(t *testing.T) {
 		got[1].SourceType != types.EvidenceSourceMemoryEvent ||
 		got[1].CandidateCount != 1 ||
 		got[1].ReturnedCount != 1 ||
-		got[1].Status != types.EvidenceCoverageReturned {
+		got[1].Status != types.EvidenceCoverageReturned ||
+		got[2].SourceType != types.EvidenceSourceProfileAggregate ||
+		got[2].CandidateCount != 0 ||
+		got[2].ReturnedCount != 0 ||
+		got[2].Status != types.EvidenceCoverageEmpty {
 		t.Fatalf("unexpected source coverage: %+v", got)
 	}
 }
@@ -235,7 +239,7 @@ func TestRetrieveEvidenceDedupeAndCoverage(t *testing.T) {
 	if item := result.Pack.Items[0]; item.Text != "first" || item.DedupeReason != types.EvidenceDedupeKeptFirstDuplicateSource {
 		t.Fatalf("unexpected deduped item: %+v", item)
 	}
-	if got := result.Pack.SourceCoverage; len(got) != 2 ||
+	if got := result.Pack.SourceCoverage; len(got) != 3 ||
 		got[0].SourceType != types.EvidenceSourceSearchMessage ||
 		got[0].Requested ||
 		got[0].Status != types.EvidenceCoverageNotRequested ||
@@ -244,8 +248,77 @@ func TestRetrieveEvidenceDedupeAndCoverage(t *testing.T) {
 		got[1].CandidateCount != 2 ||
 		got[1].ReturnedCount != 1 ||
 		got[1].DedupedCount != 1 ||
-		got[1].Status != types.EvidenceCoverageReturned {
+		got[1].Status != types.EvidenceCoverageReturned ||
+		got[2].SourceType != types.EvidenceSourceProfileAggregate ||
+		!got[2].Requested ||
+		got[2].Status != types.EvidenceCoverageEmpty {
 		t.Fatalf("unexpected source coverage: %+v", got)
+	}
+}
+
+func TestRetrieveEvidenceCarriesProfileAggregateEvidence(t *testing.T) {
+	command := validCommand()
+	command.IncludeSearch = false
+	command.IncludeMemory = true
+	now := time.Unix(20, 0)
+	memory := fakeMemoryPort{
+		profileResult: types.ProfileAggregateResult{
+			Items: []types.ProfileAggregateEvidence{{
+				ProfileID:                "profile-1",
+				SubjectUserID:            "user-1",
+				AggregateType:            "SKILL",
+				AggregateKey:             "phoenix-launch",
+				Status:                   types.MemoryStatusActive,
+				ReviewState:              "APPROVED",
+				SummaryText:              "user-1 is reliable for phoenix launch coordination",
+				SupportingMemoryEventIDs: []string{"mem-1", "mem-2"},
+				Confidence:               0.91,
+				ValidFromAt:              now.Add(-time.Hour),
+				UpdatedAt:                now,
+			}},
+		},
+	}
+
+	result, err := NewRetrieveEvidenceUseCase(&fakeSearchPort{}, &memory).Execute(context.Background(), command)
+	if err != nil {
+		t.Fatalf("Execute returned error: %v", err)
+	}
+	if !memory.profileCalled {
+		t.Fatal("expected profile aggregate query")
+	}
+	if memory.profileQuery.SubjectUserID != command.AuthContext.UserID {
+		t.Fatalf("expected profile subject to be current user, got %+v", memory.profileQuery)
+	}
+	if got := len(result.Pack.Items); got != 1 {
+		t.Fatalf("expected one profile item, got %d", got)
+	}
+	item := result.Pack.Items[0]
+	if item.SourceType != types.EvidenceSourceProfileAggregate ||
+		item.ProfileID != "profile-1" ||
+		item.ProfileSubjectUserID != "user-1" ||
+		item.ProfileAggregateType != "SKILL" ||
+		item.ProfileAggregateKey != "phoenix-launch" ||
+		len(item.SupportingMemoryEventIDs) != 2 ||
+		item.Text == "" {
+		t.Fatalf("profile evidence was not preserved: %+v", item)
+	}
+	if got := result.Pack.SourceCoverage; len(got) != 3 ||
+		got[2].SourceType != types.EvidenceSourceProfileAggregate ||
+		got[2].CandidateCount != 1 ||
+		got[2].ReturnedCount != 1 ||
+		got[2].Status != types.EvidenceCoverageReturned {
+		t.Fatalf("unexpected profile source coverage: %+v", got)
+	}
+}
+
+func TestRetrieveEvidenceFailsClosedWhenProfileLookupFails(t *testing.T) {
+	command := validCommand()
+	command.IncludeSearch = false
+	command.IncludeMemory = true
+	memory := fakeMemoryPort{profileErr: types.ErrMemoryUnavailable}
+	_, err := NewRetrieveEvidenceUseCase(&fakeSearchPort{}, &memory).Execute(context.Background(), command)
+	if !errors.Is(err, types.ErrMemoryUnavailable) {
+		t.Fatalf("expected memory unavailable from profile lookup, got %v", err)
 	}
 }
 
@@ -330,12 +403,16 @@ func (port *fakeSearchPort) SearchMessages(context.Context, types.SearchQuery) (
 }
 
 type fakeMemoryPort struct {
-	result  types.MemoryResult
-	err     error
-	getErr  error
-	called  bool
-	query   types.MemoryQuery
-	details map[string]types.MemoryEventLookupResult
+	result        types.MemoryResult
+	err           error
+	getErr        error
+	profileResult types.ProfileAggregateResult
+	profileErr    error
+	called        bool
+	profileCalled bool
+	query         types.MemoryQuery
+	profileQuery  types.ProfileAggregateQuery
+	details       map[string]types.MemoryEventLookupResult
 }
 
 func (port *fakeMemoryPort) QueryMemoryEvents(_ context.Context, query types.MemoryQuery) (types.MemoryResult, error) {
@@ -359,6 +436,12 @@ func (port *fakeMemoryPort) GetMemoryEvent(_ context.Context, lookup types.Memor
 		}
 	}
 	return types.MemoryEventLookupResult{Item: types.MemoryEventEvidence{MemoryEventID: lookup.MemoryEventID}}, nil
+}
+
+func (port *fakeMemoryPort) ListProfileAggregates(_ context.Context, query types.ProfileAggregateQuery) (types.ProfileAggregateResult, error) {
+	port.profileCalled = true
+	port.profileQuery = query
+	return port.profileResult, port.profileErr
 }
 
 type fakePolicyPort struct {

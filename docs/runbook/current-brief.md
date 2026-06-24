@@ -129,6 +129,12 @@ graph edge 扩展已落地：retrieval-gateway 通过 memory-service 公开
 `EvidenceMemoryGraphEdge` 透传给 RAG / Agent；`loadtest/retrieval`、
 `loadtest/rag`、`loadtest/agent` 会断言跨群 source refs 与 `SUPPORTS`
 graph edge 被保留，lookup 失败 fail-closed。
+2026-06-24 profile aggregate evidence 也已进入 EvidencePack：retrieval-gateway
+通过 memory-service 公开 `ListProfileAggregates` 查询当前用户 ACTIVE profile
+aggregate，并以 `PROFILE_AGGREGATE` evidence 暴露给 RAG / Summary / Agent；
+downstream 只消费 EvidencePack，不直连 memory 私表。`loadtest/retrieval`、
+`loadtest/rag`、`loadtest/agent` 会断言 profile subject、aggregate type/key、
+supporting memory ids 和 source coverage 被保留，profile lookup 失败 fail-closed。
 
 ## 不变量
 

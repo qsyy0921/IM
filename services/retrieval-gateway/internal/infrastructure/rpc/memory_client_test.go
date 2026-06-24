@@ -95,11 +95,56 @@ func TestMemoryClientGetsGraphEdges(t *testing.T) {
 	}
 }
 
+func TestMemoryClientListsProfileAggregates(t *testing.T) {
+	fake := &fakeMemoryServiceClient{
+		listProfilesResponse: &memoryv1.ListProfileAggregatesResponse{
+			Items: []*memoryv1.ProfileAggregate{{
+				ProfileId:                "profile-1",
+				SubjectUserId:            "user-1",
+				AggregateType:            "SKILL",
+				AggregateKey:             "phoenix-launch",
+				Status:                   memoryv1.MemoryEventStatus_MEMORY_EVENT_STATUS_ACTIVE,
+				ReviewState:              memoryv1.MemoryReviewState_MEMORY_REVIEW_STATE_APPROVED,
+				SummaryText:              "reviewed cross-group skill profile",
+				SupportingMemoryEventIds: []string{"mem-1", "mem-2"},
+				Confidence:               0.91,
+				UpdatedAtUnixMs:          2000,
+			}},
+		},
+	}
+	result, err := NewMemoryClient(fake, time.Second).ListProfileAggregates(context.Background(), types.ProfileAggregateQuery{
+		AuthContext:   types.AuthContext{TenantID: "tenant-1", UserID: "user-1", DeviceID: "device-1"},
+		SubjectUserID: "user-1",
+		Statuses:      []string{types.MemoryStatusActive},
+		Limit:         5,
+	})
+	if err != nil {
+		t.Fatalf("ListProfileAggregates returned error: %v", err)
+	}
+	if fake.listProfilesRequest.GetSubjectUserId() != "user-1" {
+		t.Fatalf("unexpected list profiles request: %+v", fake.listProfilesRequest)
+	}
+	if len(result.Items) != 1 {
+		t.Fatalf("unexpected profile result: %+v", result)
+	}
+	item := result.Items[0]
+	if item.ProfileID != "profile-1" ||
+		item.SubjectUserID != "user-1" ||
+		item.AggregateType != "SKILL" ||
+		len(item.SupportingMemoryEventIDs) != 2 ||
+		item.ReviewState != "APPROVED" ||
+		item.UpdatedAt.IsZero() {
+		t.Fatalf("profile aggregate not mapped: %+v", item)
+	}
+}
+
 type fakeMemoryServiceClient struct {
-	request     *memoryv1.QueryMemoryEventsRequest
-	response    *memoryv1.QueryMemoryEventsResponse
-	getRequest  *memoryv1.GetMemoryEventRequest
-	getResponse *memoryv1.GetMemoryEventResponse
+	request              *memoryv1.QueryMemoryEventsRequest
+	response             *memoryv1.QueryMemoryEventsResponse
+	getRequest           *memoryv1.GetMemoryEventRequest
+	getResponse          *memoryv1.GetMemoryEventResponse
+	listProfilesRequest  *memoryv1.ListProfileAggregatesRequest
+	listProfilesResponse *memoryv1.ListProfileAggregatesResponse
 }
 
 func (client *fakeMemoryServiceClient) QueryMemoryEvents(
@@ -121,9 +166,10 @@ func (client *fakeMemoryServiceClient) GetMemoryEvent(
 }
 
 func (client *fakeMemoryServiceClient) ListProfileAggregates(
-	context.Context,
-	*memoryv1.ListProfileAggregatesRequest,
-	...grpc.CallOption,
+	_ context.Context,
+	request *memoryv1.ListProfileAggregatesRequest,
+	_ ...grpc.CallOption,
 ) (*memoryv1.ListProfileAggregatesResponse, error) {
-	return nil, nil
+	client.listProfilesRequest = request
+	return client.listProfilesResponse, nil
 }

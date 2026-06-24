@@ -88,6 +88,13 @@ IM messages -> search / memory projection -> EvidencePack -> RAG / Agent answer 
   Agent RPC mapping、`loadtest/retrieval`、`loadtest/rag`、`loadtest/agent`
   都会断言跨群 source refs 与 `SUPPORTS` graph edge 被保留；memory lookup
   失败时 retrieval-gateway fail-closed，不静默降级为无 graph edge。
+- 2026-06-24 retrieval-gateway EvidencePack 已补 profile aggregate evidence：
+  retrieval-gateway 会通过 memory-service 公开 `ListProfileAggregates` 查询当前
+  `auth.user_id` 的 ACTIVE profile aggregate，并作为 `PROFILE_AGGREGATE`
+  evidence 放入 EvidencePack；RAG / Summary / Agent 只透传 / 消费 EvidencePack，
+  不直接读 memory-service 私表。`loadtest/retrieval`、`loadtest/rag`、
+  `loadtest/agent` 会断言 profile subject、aggregate type/key、supporting memory
+  ids 和 source coverage 被保留；profile lookup 失败时 fail-closed。
 - 已有 clean smoke 覆盖真实双用户好友直聊、群聊 first path、群资料 BFF
   read/update 和群成员动作链路；证据见 `docs/runbook/client-platform.md`。
 - Windows desktop 已有 artifact / signing / installer plan first paths；签名 / installer
@@ -150,8 +157,8 @@ IM messages -> search / memory projection -> EvidencePack -> RAG / Agent answer 
    且完整 live service-stack gate 已归档低敏报告。
 4. 后端 / AI 演示主线优先做：
    `IM 消息 -> search / memory projection -> EvidencePack -> RAG / Agent answer -> approval / audit`。
-   retrieval negative / miss adapter 和 EvidencePack memory graph edge 已补齐；
-   下一步进入更完整的 group memory extraction / profile evidence /
+   retrieval negative / miss adapter、EvidencePack memory graph edge 和 profile evidence 已补齐；
+   下一步进入更完整的 group memory extraction / profile recompute /
    RAG-Agent demo module。
 5. 客户端只作为演示入口；除非阻塞上述演示，不继续扩 UI 产品化。
 6. Windows release signing / MSI / NSIS installer、完整 Android、完整移动端发布、

@@ -272,10 +272,10 @@ message / conversation / policy events -> search-service + memory-service projec
 | --- | --- |
 | `search-service` | 搜索 projection、visibility / tombstone、`SearchMessages`、timeline consumer、projection smoke。 |
 | `memory-service` | group memory projection、StructuredMemoryEvent、source refs、visibility window、revoke hidden。 |
-| `retrieval-gateway` | EvidencePack 统一边界，聚合 search / memory / policy precheck，并通过 memory-service 公开 API 扩展 current memory graph edges；不直接调用 LLM。 |
-| `rag-service` | 只读问答 first path、EvidencePack citation verifier、guarded external HTTP LLM boundary，并保留 EvidencePack memory graph edges。 |
-| `summary-service` | 只读摘要 first path、EvidencePack citation verifier、guarded external HTTP LLM boundary，并保留 EvidencePack memory graph edges。 |
-| `agent-service` | proposal-only path、mcp-gateway prepare、approval workflow、approval outbox relay、planner Python candidate guard，并保留 EvidencePack memory graph edges。 |
+| `retrieval-gateway` | EvidencePack 统一边界，聚合 search / memory / policy precheck，并通过 memory-service 公开 API 扩展 current memory graph edges 和当前用户 profile aggregate evidence；不直接调用 LLM。 |
+| `rag-service` | 只读问答 first path、EvidencePack citation verifier、guarded external HTTP LLM boundary，并保留 EvidencePack memory graph edges 和 profile aggregate evidence。 |
+| `summary-service` | 只读摘要 first path、EvidencePack citation verifier、guarded external HTTP LLM boundary，并保留 EvidencePack memory graph edges 和 profile aggregate evidence。 |
+| `agent-service` | proposal-only path、mcp-gateway prepare、approval workflow、approval outbox relay、planner Python candidate guard，并保留 EvidencePack memory graph edges 和 profile aggregate evidence。 |
 | `skill-registry` | 技能目录、输入输出合约、风险等级、审批要求和审计元数据。 |
 | `mcp-gateway` | tool prepare 边界、skill catalog check、policy precheck、低敏 audit，不直接执行外部工具。 |
 | `action-executor` | approved execution audit、proposal / approval / prepare audit 校验、本地安全 adapter、guarded external HTTP provider adapter、eval smoke。 |
@@ -339,6 +339,11 @@ isolation。2026-06-24 追加 EvidencePack memory graph edge 扩展：
 retrieval-gateway 通过 memory-service 公开 `GetMemoryEvent` 读取 current memory
 graph edges，并把 `EvidenceMemoryGraphEdge` 透传给 RAG / Agent；retrieval /
 RAG / Agent loadtest 都会断言跨群 source refs 与 `SUPPORTS` graph edge 被保留。
+同日追加 EvidencePack profile aggregate evidence：retrieval-gateway 通过
+memory-service 公开 `ListProfileAggregates` 查询当前用户 ACTIVE profile aggregate，
+并作为 `PROFILE_AGGREGATE` evidence 透传给 RAG / Summary / Agent；retrieval /
+RAG / Agent loadtest 都会断言 profile subject、aggregate type/key、supporting
+memory ids 和 source coverage 被保留。
 
 下一步默认看 [current-goal.md](docs/runbook/current-goal.md)。截至当前主线，客户端只修
 阻塞演示入口的问题；默认推进

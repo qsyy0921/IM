@@ -36,6 +36,18 @@ func TestRetrievalClientForwardsAtConversationSeq(t *testing.T) {
 							ConversationSeq: 4,
 						}},
 					}},
+				}, {
+					EvidenceId:               "profile:profile-1",
+					SourceType:               retrievalv1.EvidenceSourceType_EVIDENCE_SOURCE_TYPE_PROFILE_AGGREGATE,
+					SourceId:                 "profile-1",
+					Text:                     "user-1 coordinates phoenix launch",
+					Score:                    0.91,
+					ProfileId:                "profile-1",
+					ProfileSubjectUserId:     "user-1",
+					ProfileAggregateType:     "SKILL",
+					ProfileAggregateKey:      "phoenix-launch",
+					SupportingMemoryEventIds: []string{"mem-1", "mem-2"},
+					ProfileUpdatedAtUnixMs:   2000,
 				}},
 			},
 		},
@@ -61,6 +73,15 @@ func TestRetrievalClientForwardsAtConversationSeq(t *testing.T) {
 	}
 	if got := result.Pack.Items[0].MemoryGraphEdges; len(got) != 1 || got[0].RelationType != "SUPPORTS" || len(got[0].SourceRefs) != 1 {
 		t.Fatalf("memory graph edge not mapped: %+v", got)
+	}
+	profile := result.Pack.Items[1]
+	if profile.SourceType != types.EvidenceSourceProfileAggregate ||
+		profile.ProfileID != "profile-1" ||
+		profile.ProfileSubjectUserID != "user-1" ||
+		profile.ProfileAggregateType != "SKILL" ||
+		len(profile.SupportingMemoryEventIDs) != 2 ||
+		profile.ProfileUpdatedAt.IsZero() {
+		t.Fatalf("profile evidence not mapped: %+v", profile)
 	}
 	if fake.request.GetAtConversationSeq() != 21 {
 		t.Fatalf("at_conversation_seq not forwarded: %+v", fake.request)

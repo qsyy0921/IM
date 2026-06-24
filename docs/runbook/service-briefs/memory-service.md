@@ -33,6 +33,9 @@
   的 ACTIVE profile aggregate；`loadtest/memory` 增加 GetMemoryEvent graph edge、
   reviewed multi-source profile、supporting evidence 保留和 deleted support profile
   排除检查；`run-ai-eval-memory-adapter.ps1` 可把这些结果映射到 ai-eval cases。
+- 2026-06-24 retrieval-gateway 已通过 memory-service 公开 `ListProfileAggregates`
+  把当前用户 ACTIVE profile aggregate 放入 EvidencePack；RAG / Summary / Agent
+  只通过 EvidencePack 消费 profile evidence，不直接读 memory-service 私表。
 
 下一步：真实服务栈启动后运行 memory-service optional adapter 并归档报告；后续
 继续做 profile recompute / repair，而不是把单条群消息直接升级为 ACTIVE profile fact。

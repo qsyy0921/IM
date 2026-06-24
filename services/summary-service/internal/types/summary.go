@@ -19,8 +19,9 @@ const (
 	SummaryStatusGrounded             = "GROUNDED"
 	SummaryStatusInsufficientEvidence = "INSUFFICIENT_EVIDENCE"
 
-	EvidenceSourceSearchMessage = "SEARCH_MESSAGE"
-	EvidenceSourceMemoryEvent   = "MEMORY_EVENT"
+	EvidenceSourceSearchMessage    = "SEARCH_MESSAGE"
+	EvidenceSourceMemoryEvent      = "MEMORY_EVENT"
+	EvidenceSourceProfileAggregate = "PROFILE_AGGREGATE"
 
 	MemoryStatusPending    = "PENDING"
 	MemoryStatusActive     = "ACTIVE"
@@ -144,29 +145,37 @@ type MemoryGraphEdge struct {
 }
 
 type EvidenceItem struct {
-	EvidenceID        string
-	SourceType        string
-	SourceID          string
-	ConversationID    ConversationID
-	ConversationSeq   int64
-	Text              string
-	Score             float64
-	SpeakerUserID     UserID
-	MessageID         string
-	MemoryEventID     string
-	OccurredAt        time.Time
-	ValidFromSeq      int64
-	ValidToSeq        int64
-	VisibilityVersion int64
-	SourceRefs        []EvidenceSourceRef
-	ActorUserIDs      []string
-	AudienceUserIDs   []string
-	TemporalStatus    string
-	ReviewState       string
-	ExtractionVersion string
-	RerankScore       float64
-	DedupeReason      string
-	MemoryGraphEdges  []MemoryGraphEdge
+	EvidenceID               string
+	SourceType               string
+	SourceID                 string
+	ConversationID           ConversationID
+	ConversationSeq          int64
+	Text                     string
+	Score                    float64
+	SpeakerUserID            UserID
+	MessageID                string
+	MemoryEventID            string
+	OccurredAt               time.Time
+	ValidFromSeq             int64
+	ValidToSeq               int64
+	VisibilityVersion        int64
+	SourceRefs               []EvidenceSourceRef
+	ActorUserIDs             []string
+	AudienceUserIDs          []string
+	TemporalStatus           string
+	ReviewState              string
+	ExtractionVersion        string
+	RerankScore              float64
+	DedupeReason             string
+	MemoryGraphEdges         []MemoryGraphEdge
+	ProfileID                string
+	ProfileSubjectUserID     UserID
+	ProfileAggregateType     string
+	ProfileAggregateKey      string
+	SupportingMemoryEventIDs []string
+	ProfileValidFromAt       time.Time
+	ProfileValidToAt         time.Time
+	ProfileUpdatedAt         time.Time
 }
 
 type EvidenceSourceCount struct {

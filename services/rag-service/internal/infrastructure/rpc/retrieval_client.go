@@ -130,29 +130,37 @@ func evidenceItemFromProto(item *retrievalv1.EvidenceItem) types.EvidenceItem {
 		graphEdges = append(graphEdges, memoryGraphEdgeFromProto(edge))
 	}
 	return types.EvidenceItem{
-		EvidenceID:        item.GetEvidenceId(),
-		SourceType:        sourceTypeFromProto(item.GetSourceType()),
-		SourceID:          item.GetSourceId(),
-		ConversationID:    types.ConversationID(item.GetConversationId()),
-		ConversationSeq:   item.GetConversationSeq(),
-		Text:              item.GetText(),
-		Score:             item.GetScore(),
-		SpeakerUserID:     types.UserID(item.GetSpeakerUserId()),
-		MessageID:         item.GetMessageId(),
-		MemoryEventID:     item.GetMemoryEventId(),
-		OccurredAt:        unixMillisToTime(item.GetOccurredAtUnixMs()),
-		ValidFromSeq:      item.GetValidFromSeq(),
-		ValidToSeq:        item.GetValidToSeq(),
-		VisibilityVersion: item.GetVisibilityVersion(),
-		SourceRefs:        sourceRefs,
-		ActorUserIDs:      item.GetActorUserIds(),
-		AudienceUserIDs:   item.GetAudienceUserIds(),
-		TemporalStatus:    item.GetTemporalStatus(),
-		ReviewState:       item.GetReviewState(),
-		ExtractionVersion: item.GetExtractionVersion(),
-		RerankScore:       item.GetRerankScore(),
-		DedupeReason:      item.GetDedupeReason(),
-		MemoryGraphEdges:  graphEdges,
+		EvidenceID:               item.GetEvidenceId(),
+		SourceType:               sourceTypeFromProto(item.GetSourceType()),
+		SourceID:                 item.GetSourceId(),
+		ConversationID:           types.ConversationID(item.GetConversationId()),
+		ConversationSeq:          item.GetConversationSeq(),
+		Text:                     item.GetText(),
+		Score:                    item.GetScore(),
+		SpeakerUserID:            types.UserID(item.GetSpeakerUserId()),
+		MessageID:                item.GetMessageId(),
+		MemoryEventID:            item.GetMemoryEventId(),
+		OccurredAt:               unixMillisToTime(item.GetOccurredAtUnixMs()),
+		ValidFromSeq:             item.GetValidFromSeq(),
+		ValidToSeq:               item.GetValidToSeq(),
+		VisibilityVersion:        item.GetVisibilityVersion(),
+		SourceRefs:               sourceRefs,
+		ActorUserIDs:             item.GetActorUserIds(),
+		AudienceUserIDs:          item.GetAudienceUserIds(),
+		TemporalStatus:           item.GetTemporalStatus(),
+		ReviewState:              item.GetReviewState(),
+		ExtractionVersion:        item.GetExtractionVersion(),
+		RerankScore:              item.GetRerankScore(),
+		DedupeReason:             item.GetDedupeReason(),
+		MemoryGraphEdges:         graphEdges,
+		ProfileID:                item.GetProfileId(),
+		ProfileSubjectUserID:     types.UserID(item.GetProfileSubjectUserId()),
+		ProfileAggregateType:     item.GetProfileAggregateType(),
+		ProfileAggregateKey:      item.GetProfileAggregateKey(),
+		SupportingMemoryEventIDs: item.GetSupportingMemoryEventIds(),
+		ProfileValidFromAt:       unixMillisToTime(item.GetProfileValidFromUnixMs()),
+		ProfileValidToAt:         unixMillisToTime(item.GetProfileValidToUnixMs()),
+		ProfileUpdatedAt:         unixMillisToTime(item.GetProfileUpdatedAtUnixMs()),
 	}
 }
 
@@ -204,6 +212,8 @@ func sourceTypeFromProto(sourceType retrievalv1.EvidenceSourceType) string {
 		return types.EvidenceSourceSearchMessage
 	case retrievalv1.EvidenceSourceType_EVIDENCE_SOURCE_TYPE_MEMORY_EVENT:
 		return types.EvidenceSourceMemoryEvent
+	case retrievalv1.EvidenceSourceType_EVIDENCE_SOURCE_TYPE_PROFILE_AGGREGATE:
+		return types.EvidenceSourceProfileAggregate
 	default:
 		return ""
 	}

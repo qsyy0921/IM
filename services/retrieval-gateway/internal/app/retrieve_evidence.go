@@ -44,7 +44,7 @@ func (usecase RetrieveEvidenceUseCase) Execute(
 	}
 
 	limit := command.EffectiveLimit()
-	candidates := make([]types.EvidenceItem, 0, limit*2)
+	candidates := make([]types.EvidenceItem, 0, limit*3)
 	coverage := newSourceCoverage(command)
 	seen := map[string]int{}
 	var searchProjectionVersion int64
@@ -109,6 +109,20 @@ func (usecase RetrieveEvidenceUseCase) Execute(
 			item := memoryEventToEvidence(event)
 			appendEvidenceCandidate(&candidates, seen, coverage, item)
 		}
+		profiles, err := usecase.memory.ListProfileAggregates(ctx, types.ProfileAggregateQuery{
+			AuthContext:   command.AuthContext,
+			SubjectUserID: command.AuthContext.UserID,
+			Statuses:      command.EffectiveMemoryStatuses(),
+			Limit:         limit,
+		})
+		if err != nil {
+			return types.RetrieveEvidenceResult{}, err
+		}
+		coverage[types.EvidenceSourceProfileAggregate].CandidateCount = len(profiles.Items)
+		for _, profile := range profiles.Items {
+			item := profileAggregateToEvidence(profile)
+			appendEvidenceCandidate(&candidates, seen, coverage, item)
+		}
 	}
 	items := rerankEvidence(candidates, limit)
 	sourceCounts := countEvidenceSources(items)
@@ -155,8 +169,9 @@ type sourceCoverageState struct {
 
 func newSourceCoverage(command types.RetrieveEvidenceCommand) map[string]*sourceCoverageState {
 	return map[string]*sourceCoverageState{
-		types.EvidenceSourceSearchMessage: &sourceCoverageState{Requested: command.ShouldIncludeSearch()},
-		types.EvidenceSourceMemoryEvent:   &sourceCoverageState{Requested: command.ShouldIncludeMemory()},
+		types.EvidenceSourceSearchMessage:    &sourceCoverageState{Requested: command.ShouldIncludeSearch()},
+		types.EvidenceSourceMemoryEvent:      &sourceCoverageState{Requested: command.ShouldIncludeMemory()},
+		types.EvidenceSourceProfileAggregate: &sourceCoverageState{Requested: command.ShouldIncludeMemory()},
 	}
 }
 
@@ -202,6 +217,8 @@ func evidenceRerankScore(item types.EvidenceItem) float64 {
 	case types.EvidenceSourceSearchMessage:
 		return clampScore(item.Score)
 	case types.EvidenceSourceMemoryEvent:
+		return clampScore(item.Score)
+	case types.EvidenceSourceProfileAggregate:
 		return clampScore(item.Score)
 	default:
 		return 0
@@ -282,9 +299,39 @@ func memoryEventToEvidence(event types.MemoryEventEvidence) types.EvidenceItem {
 	}
 }
 
+func profileAggregateToEvidence(profile types.ProfileAggregateEvidence) types.EvidenceItem {
+	return types.EvidenceItem{
+		EvidenceID:               "profile:" + profile.ProfileID,
+		SourceType:               types.EvidenceSourceProfileAggregate,
+		SourceID:                 profile.ProfileID,
+		Text:                     profile.SummaryText,
+		Score:                    profile.Confidence,
+		OccurredAt:               profile.UpdatedAt,
+		TemporalStatus:           profile.Status,
+		ReviewState:              profile.ReviewState,
+		ProfileID:                profile.ProfileID,
+		ProfileSubjectUserID:     profile.SubjectUserID,
+		ProfileAggregateType:     profile.AggregateType,
+		ProfileAggregateKey:      profile.AggregateKey,
+		SupportingMemoryEventIDs: profile.SupportingMemoryEventIDs,
+		ProfileValidFromAt:       profile.ValidFromAt,
+		ProfileValidToAt:         profile.ValidToAt,
+		ProfileUpdatedAt:         profile.UpdatedAt,
+		SourceRefs: []types.EvidenceSourceRef{{
+			SourceType: "PROFILE_AGGREGATE",
+			SourceID:   profile.ProfileID,
+			OccurredAt: profile.UpdatedAt,
+		}},
+	}
+}
+
 func orderedSourceCounts(counts map[string]int) []types.EvidenceSourceCount {
-	out := make([]types.EvidenceSourceCount, 0, 2)
-	for _, sourceType := range []string{types.EvidenceSourceSearchMessage, types.EvidenceSourceMemoryEvent} {
+	out := make([]types.EvidenceSourceCount, 0, 3)
+	for _, sourceType := range []string{
+		types.EvidenceSourceSearchMessage,
+		types.EvidenceSourceMemoryEvent,
+		types.EvidenceSourceProfileAggregate,
+	} {
 		if count := counts[sourceType]; count > 0 {
 			out = append(out, types.EvidenceSourceCount{SourceType: sourceType, Count: count})
 		}
@@ -296,8 +343,12 @@ func orderedSourceCoverage(
 	coverage map[string]*sourceCoverageState,
 	sourceCounts map[string]int,
 ) []types.EvidenceSourceCoverage {
-	out := make([]types.EvidenceSourceCoverage, 0, 2)
-	for _, sourceType := range []string{types.EvidenceSourceSearchMessage, types.EvidenceSourceMemoryEvent} {
+	out := make([]types.EvidenceSourceCoverage, 0, 3)
+	for _, sourceType := range []string{
+		types.EvidenceSourceSearchMessage,
+		types.EvidenceSourceMemoryEvent,
+		types.EvidenceSourceProfileAggregate,
+	} {
 		state := coverage[sourceType]
 		if state == nil {
 			continue

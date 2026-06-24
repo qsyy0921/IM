@@ -21,6 +21,7 @@ enum EvidenceSourceType {
   EVIDENCE_SOURCE_TYPE_UNSPECIFIED = 0;
   EVIDENCE_SOURCE_TYPE_SEARCH_MESSAGE = 1;
   EVIDENCE_SOURCE_TYPE_MEMORY_EVENT = 2;
+  EVIDENCE_SOURCE_TYPE_PROFILE_AGGREGATE = 3;
 }
 
 enum EvidenceMemoryStatus {
@@ -93,6 +94,14 @@ message EvidenceItem {
   double rerank_score = 21;
   string dedupe_reason = 22;
   repeated EvidenceMemoryGraphEdge memory_graph_edges = 23;
+  string profile_id = 24;
+  string profile_subject_user_id = 25;
+  string profile_aggregate_type = 26;
+  string profile_aggregate_key = 27;
+  repeated string supporting_memory_event_ids = 28;
+  int64 profile_valid_from_unix_ms = 29;
+  int64 profile_valid_to_unix_ms = 30;
+  int64 profile_updated_at_unix_ms = 31;
 }
 
 message EvidenceSourceCount {

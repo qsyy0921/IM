@@ -24,9 +24,10 @@ const (
 type EvidenceSourceType int32
 
 const (
-	EvidenceSourceType_EVIDENCE_SOURCE_TYPE_UNSPECIFIED    EvidenceSourceType = 0
-	EvidenceSourceType_EVIDENCE_SOURCE_TYPE_SEARCH_MESSAGE EvidenceSourceType = 1
-	EvidenceSourceType_EVIDENCE_SOURCE_TYPE_MEMORY_EVENT   EvidenceSourceType = 2
+	EvidenceSourceType_EVIDENCE_SOURCE_TYPE_UNSPECIFIED       EvidenceSourceType = 0
+	EvidenceSourceType_EVIDENCE_SOURCE_TYPE_SEARCH_MESSAGE    EvidenceSourceType = 1
+	EvidenceSourceType_EVIDENCE_SOURCE_TYPE_MEMORY_EVENT      EvidenceSourceType = 2
+	EvidenceSourceType_EVIDENCE_SOURCE_TYPE_PROFILE_AGGREGATE EvidenceSourceType = 3
 )
 
 // Enum value maps for EvidenceSourceType.
@@ -35,11 +36,13 @@ var (
 		0: "EVIDENCE_SOURCE_TYPE_UNSPECIFIED",
 		1: "EVIDENCE_SOURCE_TYPE_SEARCH_MESSAGE",
 		2: "EVIDENCE_SOURCE_TYPE_MEMORY_EVENT",
+		3: "EVIDENCE_SOURCE_TYPE_PROFILE_AGGREGATE",
 	}
 	EvidenceSourceType_value = map[string]int32{
-		"EVIDENCE_SOURCE_TYPE_UNSPECIFIED":    0,
-		"EVIDENCE_SOURCE_TYPE_SEARCH_MESSAGE": 1,
-		"EVIDENCE_SOURCE_TYPE_MEMORY_EVENT":   2,
+		"EVIDENCE_SOURCE_TYPE_UNSPECIFIED":       0,
+		"EVIDENCE_SOURCE_TYPE_SEARCH_MESSAGE":    1,
+		"EVIDENCE_SOURCE_TYPE_MEMORY_EVENT":      2,
+		"EVIDENCE_SOURCE_TYPE_PROFILE_AGGREGATE": 3,
 	}
 )
 
@@ -541,32 +544,40 @@ func (x *EvidenceMemoryGraphEdge) GetSourceRefs() []*EvidenceSourceRef {
 }
 
 type EvidenceItem struct {
-	state             protoimpl.MessageState     `protogen:"open.v1"`
-	EvidenceId        string                     `protobuf:"bytes,1,opt,name=evidence_id,json=evidenceId,proto3" json:"evidence_id,omitempty"`
-	SourceType        EvidenceSourceType         `protobuf:"varint,2,opt,name=source_type,json=sourceType,proto3,enum=nexusim.retrieval.v1.EvidenceSourceType" json:"source_type,omitempty"`
-	SourceId          string                     `protobuf:"bytes,3,opt,name=source_id,json=sourceId,proto3" json:"source_id,omitempty"`
-	ConversationId    string                     `protobuf:"bytes,4,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
-	ConversationSeq   int64                      `protobuf:"varint,5,opt,name=conversation_seq,json=conversationSeq,proto3" json:"conversation_seq,omitempty"`
-	Text              string                     `protobuf:"bytes,6,opt,name=text,proto3" json:"text,omitempty"`
-	Score             float64                    `protobuf:"fixed64,7,opt,name=score,proto3" json:"score,omitempty"`
-	SpeakerUserId     string                     `protobuf:"bytes,8,opt,name=speaker_user_id,json=speakerUserId,proto3" json:"speaker_user_id,omitempty"`
-	MessageId         string                     `protobuf:"bytes,9,opt,name=message_id,json=messageId,proto3" json:"message_id,omitempty"`
-	MemoryEventId     string                     `protobuf:"bytes,10,opt,name=memory_event_id,json=memoryEventId,proto3" json:"memory_event_id,omitempty"`
-	OccurredAtUnixMs  int64                      `protobuf:"varint,11,opt,name=occurred_at_unix_ms,json=occurredAtUnixMs,proto3" json:"occurred_at_unix_ms,omitempty"`
-	ValidFromSeq      int64                      `protobuf:"varint,12,opt,name=valid_from_seq,json=validFromSeq,proto3" json:"valid_from_seq,omitempty"`
-	ValidToSeq        int64                      `protobuf:"varint,13,opt,name=valid_to_seq,json=validToSeq,proto3" json:"valid_to_seq,omitempty"`
-	VisibilityVersion int64                      `protobuf:"varint,14,opt,name=visibility_version,json=visibilityVersion,proto3" json:"visibility_version,omitempty"`
-	SourceRefs        []*EvidenceSourceRef       `protobuf:"bytes,15,rep,name=source_refs,json=sourceRefs,proto3" json:"source_refs,omitempty"`
-	ActorUserIds      []string                   `protobuf:"bytes,16,rep,name=actor_user_ids,json=actorUserIds,proto3" json:"actor_user_ids,omitempty"`
-	AudienceUserIds   []string                   `protobuf:"bytes,17,rep,name=audience_user_ids,json=audienceUserIds,proto3" json:"audience_user_ids,omitempty"`
-	TemporalStatus    string                     `protobuf:"bytes,18,opt,name=temporal_status,json=temporalStatus,proto3" json:"temporal_status,omitempty"`
-	ReviewState       string                     `protobuf:"bytes,19,opt,name=review_state,json=reviewState,proto3" json:"review_state,omitempty"`
-	ExtractionVersion string                     `protobuf:"bytes,20,opt,name=extraction_version,json=extractionVersion,proto3" json:"extraction_version,omitempty"`
-	RerankScore       float64                    `protobuf:"fixed64,21,opt,name=rerank_score,json=rerankScore,proto3" json:"rerank_score,omitempty"`
-	DedupeReason      string                     `protobuf:"bytes,22,opt,name=dedupe_reason,json=dedupeReason,proto3" json:"dedupe_reason,omitempty"`
-	MemoryGraphEdges  []*EvidenceMemoryGraphEdge `protobuf:"bytes,23,rep,name=memory_graph_edges,json=memoryGraphEdges,proto3" json:"memory_graph_edges,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	state                    protoimpl.MessageState     `protogen:"open.v1"`
+	EvidenceId               string                     `protobuf:"bytes,1,opt,name=evidence_id,json=evidenceId,proto3" json:"evidence_id,omitempty"`
+	SourceType               EvidenceSourceType         `protobuf:"varint,2,opt,name=source_type,json=sourceType,proto3,enum=nexusim.retrieval.v1.EvidenceSourceType" json:"source_type,omitempty"`
+	SourceId                 string                     `protobuf:"bytes,3,opt,name=source_id,json=sourceId,proto3" json:"source_id,omitempty"`
+	ConversationId           string                     `protobuf:"bytes,4,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
+	ConversationSeq          int64                      `protobuf:"varint,5,opt,name=conversation_seq,json=conversationSeq,proto3" json:"conversation_seq,omitempty"`
+	Text                     string                     `protobuf:"bytes,6,opt,name=text,proto3" json:"text,omitempty"`
+	Score                    float64                    `protobuf:"fixed64,7,opt,name=score,proto3" json:"score,omitempty"`
+	SpeakerUserId            string                     `protobuf:"bytes,8,opt,name=speaker_user_id,json=speakerUserId,proto3" json:"speaker_user_id,omitempty"`
+	MessageId                string                     `protobuf:"bytes,9,opt,name=message_id,json=messageId,proto3" json:"message_id,omitempty"`
+	MemoryEventId            string                     `protobuf:"bytes,10,opt,name=memory_event_id,json=memoryEventId,proto3" json:"memory_event_id,omitempty"`
+	OccurredAtUnixMs         int64                      `protobuf:"varint,11,opt,name=occurred_at_unix_ms,json=occurredAtUnixMs,proto3" json:"occurred_at_unix_ms,omitempty"`
+	ValidFromSeq             int64                      `protobuf:"varint,12,opt,name=valid_from_seq,json=validFromSeq,proto3" json:"valid_from_seq,omitempty"`
+	ValidToSeq               int64                      `protobuf:"varint,13,opt,name=valid_to_seq,json=validToSeq,proto3" json:"valid_to_seq,omitempty"`
+	VisibilityVersion        int64                      `protobuf:"varint,14,opt,name=visibility_version,json=visibilityVersion,proto3" json:"visibility_version,omitempty"`
+	SourceRefs               []*EvidenceSourceRef       `protobuf:"bytes,15,rep,name=source_refs,json=sourceRefs,proto3" json:"source_refs,omitempty"`
+	ActorUserIds             []string                   `protobuf:"bytes,16,rep,name=actor_user_ids,json=actorUserIds,proto3" json:"actor_user_ids,omitempty"`
+	AudienceUserIds          []string                   `protobuf:"bytes,17,rep,name=audience_user_ids,json=audienceUserIds,proto3" json:"audience_user_ids,omitempty"`
+	TemporalStatus           string                     `protobuf:"bytes,18,opt,name=temporal_status,json=temporalStatus,proto3" json:"temporal_status,omitempty"`
+	ReviewState              string                     `protobuf:"bytes,19,opt,name=review_state,json=reviewState,proto3" json:"review_state,omitempty"`
+	ExtractionVersion        string                     `protobuf:"bytes,20,opt,name=extraction_version,json=extractionVersion,proto3" json:"extraction_version,omitempty"`
+	RerankScore              float64                    `protobuf:"fixed64,21,opt,name=rerank_score,json=rerankScore,proto3" json:"rerank_score,omitempty"`
+	DedupeReason             string                     `protobuf:"bytes,22,opt,name=dedupe_reason,json=dedupeReason,proto3" json:"dedupe_reason,omitempty"`
+	MemoryGraphEdges         []*EvidenceMemoryGraphEdge `protobuf:"bytes,23,rep,name=memory_graph_edges,json=memoryGraphEdges,proto3" json:"memory_graph_edges,omitempty"`
+	ProfileId                string                     `protobuf:"bytes,24,opt,name=profile_id,json=profileId,proto3" json:"profile_id,omitempty"`
+	ProfileSubjectUserId     string                     `protobuf:"bytes,25,opt,name=profile_subject_user_id,json=profileSubjectUserId,proto3" json:"profile_subject_user_id,omitempty"`
+	ProfileAggregateType     string                     `protobuf:"bytes,26,opt,name=profile_aggregate_type,json=profileAggregateType,proto3" json:"profile_aggregate_type,omitempty"`
+	ProfileAggregateKey      string                     `protobuf:"bytes,27,opt,name=profile_aggregate_key,json=profileAggregateKey,proto3" json:"profile_aggregate_key,omitempty"`
+	SupportingMemoryEventIds []string                   `protobuf:"bytes,28,rep,name=supporting_memory_event_ids,json=supportingMemoryEventIds,proto3" json:"supporting_memory_event_ids,omitempty"`
+	ProfileValidFromUnixMs   int64                      `protobuf:"varint,29,opt,name=profile_valid_from_unix_ms,json=profileValidFromUnixMs,proto3" json:"profile_valid_from_unix_ms,omitempty"`
+	ProfileValidToUnixMs     int64                      `protobuf:"varint,30,opt,name=profile_valid_to_unix_ms,json=profileValidToUnixMs,proto3" json:"profile_valid_to_unix_ms,omitempty"`
+	ProfileUpdatedAtUnixMs   int64                      `protobuf:"varint,31,opt,name=profile_updated_at_unix_ms,json=profileUpdatedAtUnixMs,proto3" json:"profile_updated_at_unix_ms,omitempty"`
+	unknownFields            protoimpl.UnknownFields
+	sizeCache                protoimpl.SizeCache
 }
 
 func (x *EvidenceItem) Reset() {
@@ -758,6 +769,62 @@ func (x *EvidenceItem) GetMemoryGraphEdges() []*EvidenceMemoryGraphEdge {
 		return x.MemoryGraphEdges
 	}
 	return nil
+}
+
+func (x *EvidenceItem) GetProfileId() string {
+	if x != nil {
+		return x.ProfileId
+	}
+	return ""
+}
+
+func (x *EvidenceItem) GetProfileSubjectUserId() string {
+	if x != nil {
+		return x.ProfileSubjectUserId
+	}
+	return ""
+}
+
+func (x *EvidenceItem) GetProfileAggregateType() string {
+	if x != nil {
+		return x.ProfileAggregateType
+	}
+	return ""
+}
+
+func (x *EvidenceItem) GetProfileAggregateKey() string {
+	if x != nil {
+		return x.ProfileAggregateKey
+	}
+	return ""
+}
+
+func (x *EvidenceItem) GetSupportingMemoryEventIds() []string {
+	if x != nil {
+		return x.SupportingMemoryEventIds
+	}
+	return nil
+}
+
+func (x *EvidenceItem) GetProfileValidFromUnixMs() int64 {
+	if x != nil {
+		return x.ProfileValidFromUnixMs
+	}
+	return 0
+}
+
+func (x *EvidenceItem) GetProfileValidToUnixMs() int64 {
+	if x != nil {
+		return x.ProfileValidToUnixMs
+	}
+	return 0
+}
+
+func (x *EvidenceItem) GetProfileUpdatedAtUnixMs() int64 {
+	if x != nil {
+		return x.ProfileUpdatedAtUnixMs
+	}
+	return 0
 }
 
 type EvidenceSourceCount struct {
@@ -1097,7 +1164,7 @@ const file_nexusim_retrieval_v1_retrieval_gateway_proto_rawDesc = "" +
 	"confidence\x18\x05 \x01(\x01R\n" +
 	"confidence\x12H\n" +
 	"\vsource_refs\x18\x06 \x03(\v2'.nexusim.retrieval.v1.EvidenceSourceRefR\n" +
-	"sourceRefs\"\xe6\a\n" +
+	"sourceRefs\"\x95\v\n" +
 	"\fEvidenceItem\x12\x1f\n" +
 	"\vevidence_id\x18\x01 \x01(\tR\n" +
 	"evidenceId\x12I\n" +
@@ -1127,7 +1194,16 @@ const file_nexusim_retrieval_v1_retrieval_gateway_proto_rawDesc = "" +
 	"\x12extraction_version\x18\x14 \x01(\tR\x11extractionVersion\x12!\n" +
 	"\frerank_score\x18\x15 \x01(\x01R\vrerankScore\x12#\n" +
 	"\rdedupe_reason\x18\x16 \x01(\tR\fdedupeReason\x12[\n" +
-	"\x12memory_graph_edges\x18\x17 \x03(\v2-.nexusim.retrieval.v1.EvidenceMemoryGraphEdgeR\x10memoryGraphEdges\"v\n" +
+	"\x12memory_graph_edges\x18\x17 \x03(\v2-.nexusim.retrieval.v1.EvidenceMemoryGraphEdgeR\x10memoryGraphEdges\x12\x1d\n" +
+	"\n" +
+	"profile_id\x18\x18 \x01(\tR\tprofileId\x125\n" +
+	"\x17profile_subject_user_id\x18\x19 \x01(\tR\x14profileSubjectUserId\x124\n" +
+	"\x16profile_aggregate_type\x18\x1a \x01(\tR\x14profileAggregateType\x122\n" +
+	"\x15profile_aggregate_key\x18\x1b \x01(\tR\x13profileAggregateKey\x12=\n" +
+	"\x1bsupporting_memory_event_ids\x18\x1c \x03(\tR\x18supportingMemoryEventIds\x12:\n" +
+	"\x1aprofile_valid_from_unix_ms\x18\x1d \x01(\x03R\x16profileValidFromUnixMs\x126\n" +
+	"\x18profile_valid_to_unix_ms\x18\x1e \x01(\x03R\x14profileValidToUnixMs\x12:\n" +
+	"\x1aprofile_updated_at_unix_ms\x18\x1f \x01(\x03R\x16profileUpdatedAtUnixMs\"v\n" +
 	"\x13EvidenceSourceCount\x12I\n" +
 	"\vsource_type\x18\x01 \x01(\x0e2(.nexusim.retrieval.v1.EvidenceSourceTypeR\n" +
 	"sourceType\x12\x14\n" +
@@ -1153,11 +1229,12 @@ const file_nexusim_retrieval_v1_retrieval_gateway_proto_rawDesc = "" +
 	"\x0fsource_coverage\x18\n" +
 	" \x03(\v2,.nexusim.retrieval.v1.EvidenceSourceCoverageR\x0esourceCoverage\"R\n" +
 	"\x18RetrieveEvidenceResponse\x126\n" +
-	"\x04pack\x18\x01 \x01(\v2\".nexusim.retrieval.v1.EvidencePackR\x04pack*\x8a\x01\n" +
+	"\x04pack\x18\x01 \x01(\v2\".nexusim.retrieval.v1.EvidencePackR\x04pack*\xb6\x01\n" +
 	"\x12EvidenceSourceType\x12$\n" +
 	" EVIDENCE_SOURCE_TYPE_UNSPECIFIED\x10\x00\x12'\n" +
 	"#EVIDENCE_SOURCE_TYPE_SEARCH_MESSAGE\x10\x01\x12%\n" +
-	"!EVIDENCE_SOURCE_TYPE_MEMORY_EVENT\x10\x02*\xd1\x01\n" +
+	"!EVIDENCE_SOURCE_TYPE_MEMORY_EVENT\x10\x02\x12*\n" +
+	"&EVIDENCE_SOURCE_TYPE_PROFILE_AGGREGATE\x10\x03*\xd1\x01\n" +
 	"\x14EvidenceMemoryStatus\x12&\n" +
 	"\"EVIDENCE_MEMORY_STATUS_UNSPECIFIED\x10\x00\x12\"\n" +
 	"\x1eEVIDENCE_MEMORY_STATUS_PENDING\x10\x01\x12!\n" +

@@ -1,6 +1,6 @@
 # retrieval-gateway
 
-状态：foundation-active / EvidencePack graph edge expansion first pass passed。
+状态：foundation-active / EvidencePack graph edge + profile evidence expansion first pass passed。
 
 定位：统一 search + memory 的检索入口，向 RAG / summary / Agent 提供
 `EvidencePack`。它不直接读业务库，不调用 LLM，不执行 Agent 动作。
@@ -39,6 +39,12 @@
   EvidencePack。memory lookup 失败会 fail-closed，不静默返回缺少 graph edge
   的证据包。app / gRPC / RPC focused tests 和 `loadtest/retrieval` 已覆盖
   `SUPPORTS` graph edge、跨群 source refs 和 actor attribution。
+- 2026-06-24 EvidencePack profile aggregate evidence 已落：
+  `RetrieveEvidence` 会调用 memory-service 公开 `ListProfileAggregates` 查询当前
+  `auth.user_id` 的 ACTIVE profile aggregate，并作为 `PROFILE_AGGREGATE`
+  evidence 放入 EvidencePack。profile lookup 失败会 fail-closed；app / RPC
+  focused tests 和 `loadtest/retrieval` 已覆盖 profile subject、aggregate type/key、
+  supporting memory ids 和 source coverage。
 
-下一步：继续把 group memory extraction、profile 证据和后续 rerank / coverage
-增强通过 EvidencePack 暴露给 RAG / summary / Agent，仍不绕过 retrieval-gateway。
+下一步：继续把 group memory extraction、profile recompute / repair 和后续 rerank /
+coverage 增强通过 EvidencePack 暴露给 RAG / summary / Agent，仍不绕过 retrieval-gateway。

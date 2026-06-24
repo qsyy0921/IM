@@ -521,7 +521,11 @@ NEXUSIM_VECTOR_PGVECTOR_ENSURE_SCHEMA=true
 ```
 
 该模式要求目标 PostgreSQL 已安装 `vector` extension，或者允许 `EnsureSchema` 执行
-`CREATE EXTENSION IF NOT EXISTS vector`。默认本地 `postgres:16-alpine` 不带 pgvector，
+`CREATE EXTENSION IF NOT EXISTS vector`。`loadtest/vectorembedding` 提供
+`preflight-pgvector` phase，`run-local-pgvector-smoke.ps1` 会在完整链路启动前先验证
+pgvector PostgreSQL 连接、`vector` extension 可用性和 table identifier 配置；
+不可用时快速 fail-closed 并写低敏 summary，不继续伪造 provider smoke。默认本地
+`postgres:16-alpine` 不带 pgvector，
 所以普通开发 / CI 不应默认开启该 profile。可选本地 overlay 为
 `deploy/local/docker-compose.pgvector.yml`，会在 `localhost:15432` 暴露独立
 `nexusim-pgvector`，不替换默认 `nexusim-postgres`。

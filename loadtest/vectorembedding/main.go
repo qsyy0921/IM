@@ -50,44 +50,48 @@ type config struct {
 }
 
 type summary struct {
-	Phase                  string    `json:"phase"`
-	Commit                 string    `json:"commit"`
-	CommitFull             string    `json:"commit_full"`
-	GitDirty               bool      `json:"git_dirty"`
-	GitStatusShort         string    `json:"git_status_short,omitempty"`
-	ResultDir              string    `json:"result_dir"`
-	KnowledgeTarget        string    `json:"knowledge_target,omitempty"`
-	VectorTarget           string    `json:"vector_target,omitempty"`
-	TenantID               string    `json:"tenant_id"`
-	UserID                 string    `json:"user_id"`
-	StartedAt              time.Time `json:"started_at"`
-	FinishedAt             time.Time `json:"finished_at"`
-	Success                bool      `json:"success"`
-	Error                  string    `json:"error,omitempty"`
-	KnowledgeSourceID      string    `json:"knowledge_source_id,omitempty"`
-	KnowledgeJobID         string    `json:"knowledge_job_id,omitempty"`
-	DocumentID             string    `json:"document_id,omitempty"`
-	ChunkCount             int       `json:"chunk_count"`
-	ExpectedCount          int       `json:"expected_count"`
-	VectorSearchCount      int       `json:"vector_search_count"`
-	PGVectorConfigured     bool      `json:"pgvector_configured"`
-	PGVectorTable          string    `json:"pgvector_table,omitempty"`
-	PGVectorItemCount      int       `json:"pgvector_item_count"`
-	PGVectorActiveCount    int       `json:"pgvector_active_count"`
-	PGVectorMinDimension   int       `json:"pgvector_min_dimension"`
-	PGVectorMaxDimension   int       `json:"pgvector_max_dimension"`
-	EmbeddingTaskCount     int       `json:"embedding_task_count"`
-	EmbeddingTaskPending   int       `json:"embedding_task_pending"`
-	EmbeddingTaskRunning   int       `json:"embedding_task_running"`
-	EmbeddingTaskCompleted int       `json:"embedding_task_completed"`
-	RebuildJobID           string    `json:"rebuild_job_id,omitempty"`
-	RebuildJobStatus       string    `json:"rebuild_job_status,omitempty"`
-	RebuildCheckpoint      string    `json:"rebuild_checkpoint_status,omitempty"`
-	RebuildCursorValue     string    `json:"rebuild_cursor_value,omitempty"`
-	VisibilityScope        string    `json:"visibility_scope,omitempty"`
-	PolicyVersion          string    `json:"policy_version,omitempty"`
-	EmbeddingModelRef      string    `json:"embedding_model_ref"`
-	EmbeddingDimension     int       `json:"embedding_dimension"`
+	Phase                    string    `json:"phase"`
+	Commit                   string    `json:"commit"`
+	CommitFull               string    `json:"commit_full"`
+	GitDirty                 bool      `json:"git_dirty"`
+	GitStatusShort           string    `json:"git_status_short,omitempty"`
+	ResultDir                string    `json:"result_dir"`
+	KnowledgeTarget          string    `json:"knowledge_target,omitempty"`
+	VectorTarget             string    `json:"vector_target,omitempty"`
+	TenantID                 string    `json:"tenant_id"`
+	UserID                   string    `json:"user_id"`
+	StartedAt                time.Time `json:"started_at"`
+	FinishedAt               time.Time `json:"finished_at"`
+	Success                  bool      `json:"success"`
+	Error                    string    `json:"error,omitempty"`
+	KnowledgeSourceID        string    `json:"knowledge_source_id,omitempty"`
+	KnowledgeJobID           string    `json:"knowledge_job_id,omitempty"`
+	DocumentID               string    `json:"document_id,omitempty"`
+	ChunkCount               int       `json:"chunk_count"`
+	ExpectedCount            int       `json:"expected_count"`
+	VectorSearchCount        int       `json:"vector_search_count"`
+	PGVectorConfigured       bool      `json:"pgvector_configured"`
+	PGVectorTable            string    `json:"pgvector_table,omitempty"`
+	PGVectorAvailable        bool      `json:"pgvector_available"`
+	PGVectorInstalled        bool      `json:"pgvector_installed"`
+	PGVectorDefaultVersion   string    `json:"pgvector_default_version,omitempty"`
+	PGVectorInstalledVersion string    `json:"pgvector_installed_version,omitempty"`
+	PGVectorItemCount        int       `json:"pgvector_item_count"`
+	PGVectorActiveCount      int       `json:"pgvector_active_count"`
+	PGVectorMinDimension     int       `json:"pgvector_min_dimension"`
+	PGVectorMaxDimension     int       `json:"pgvector_max_dimension"`
+	EmbeddingTaskCount       int       `json:"embedding_task_count"`
+	EmbeddingTaskPending     int       `json:"embedding_task_pending"`
+	EmbeddingTaskRunning     int       `json:"embedding_task_running"`
+	EmbeddingTaskCompleted   int       `json:"embedding_task_completed"`
+	RebuildJobID             string    `json:"rebuild_job_id,omitempty"`
+	RebuildJobStatus         string    `json:"rebuild_job_status,omitempty"`
+	RebuildCheckpoint        string    `json:"rebuild_checkpoint_status,omitempty"`
+	RebuildCursorValue       string    `json:"rebuild_cursor_value,omitempty"`
+	VisibilityScope          string    `json:"visibility_scope,omitempty"`
+	PolicyVersion            string    `json:"policy_version,omitempty"`
+	EmbeddingModelRef        string    `json:"embedding_model_ref"`
+	EmbeddingDimension       int       `json:"embedding_dimension"`
 }
 
 func main() {
@@ -203,6 +207,11 @@ func run(cfg config) error {
 			result.Error = err.Error()
 			return err
 		}
+	case "preflight-pgvector":
+		if err := preflightPGVector(ctx, cfg, &result); err != nil {
+			result.Error = err.Error()
+			return err
+		}
 	case "verify-queue":
 		if err := verifyQueue(ctx, cfg, &result); err != nil {
 			result.Error = err.Error()
@@ -304,6 +313,51 @@ GROUP BY status
 		return embeddingTaskCounts{}, fmt.Errorf("read vector embedding task rows: %w", err)
 	}
 	return counts, nil
+}
+
+func preflightPGVector(ctx context.Context, cfg config, result *summary) error {
+	pool, err := pgxpool.New(ctx, cfg.pgVectorDSN)
+	if err != nil {
+		return fmt.Errorf("open pgvector postgres: %w", err)
+	}
+	defer pool.Close()
+	if err := pool.Ping(ctx); err != nil {
+		return fmt.Errorf("connect pgvector postgres: %w", err)
+	}
+	var available bool
+	var defaultVersion string
+	var installedVersion string
+	err = pool.QueryRow(ctx, `
+SELECT EXISTS (
+           SELECT 1
+           FROM pg_available_extensions
+           WHERE name = 'vector'
+       ),
+       COALESCE((
+           SELECT default_version
+           FROM pg_available_extensions
+           WHERE name = 'vector'
+       ), ''),
+       COALESCE((
+           SELECT installed_version
+           FROM pg_available_extensions
+           WHERE name = 'vector'
+       ), '')
+`).Scan(&available, &defaultVersion, &installedVersion)
+	if err != nil {
+		return fmt.Errorf("inspect pgvector extension: %w", err)
+	}
+	result.PGVectorAvailable = available
+	result.PGVectorInstalled = strings.TrimSpace(installedVersion) != ""
+	result.PGVectorDefaultVersion = strings.TrimSpace(defaultVersion)
+	result.PGVectorInstalledVersion = strings.TrimSpace(installedVersion)
+	if !available {
+		return errors.New("pgvector extension is not available on the configured PostgreSQL instance")
+	}
+	if _, err := quoteSQLIdentifier(cfg.pgVectorTable); err != nil {
+		return err
+	}
+	return nil
 }
 
 func prepare(ctx context.Context, cfg config, result *summary) error {
@@ -798,6 +852,10 @@ func validateConfig(cfg config) error {
 		}
 		if cfg.expectedCount <= 0 {
 			return errors.New("expected-count must be positive")
+		}
+	case "preflight-pgvector":
+		if strings.TrimSpace(cfg.pgVectorDSN) == "" {
+			return errors.New("pgvector-dsn is required for preflight-pgvector")
 		}
 	case "verify-queue":
 		if strings.TrimSpace(cfg.pgDSN) == "" {

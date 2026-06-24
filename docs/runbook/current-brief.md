@@ -262,7 +262,10 @@ fail-closed，不写 execution audit、不写 tool result projection、不调用
   drift hardening 已补齐；2026-06-25 retrieval positive smoke / adapter 已把
   `source_coverage` 矩阵纳入低敏门禁，要求 search / memory / profile 为
   `RETURNED`，未启用 vector 时 `VECTOR_ITEM` 为 `NOT_REQUESTED`。当前机器
-  Docker / OpenSearch 不可用，尚未归档真实 OpenSearch 进程通过报告；后续继续做
-  真实 OpenSearch 进程 smoke、pgvector / Milvus / OpenSearch vector provider smoke，
+  Docker / OpenSearch 不可用，尚未归档真实 OpenSearch 进程通过报告。2026-06-25
+  vector-index-service pgvector provider smoke 已补 preflight gate，会先验证
+  pgvector 连接、extension 可用性和 table identifier；当前 `localhost:15432`
+  不可用，只完成 fail-closed 负向验证。后续继续做真实 OpenSearch 进程 smoke、
+  真实 pgvector / Milvus / OpenSearch vector provider smoke，
   以及跨 provider EvidencePack coverage。
 - 真实 mutation 必须等显式业务 adapter、approval、executor、audit 全部就绪后再扩展。

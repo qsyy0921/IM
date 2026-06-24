@@ -18,6 +18,10 @@ $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\.."))
 . (Join-Path $repoRoot "tools\output-root-safety.ps1")
 Assert-ExternalOutputRoot -Value $ResultRoot -RepositoryRoot $repoRoot -Name "ResultRoot"
 
+if (-not $RunName) {
+    $RunName = "vector-pgvector-provider-smoke-" + (Get-Date -Format "yyyyMMdd-HHmmss")
+}
+
 function Wait-Tcp {
     param(
         [string]$HostName,
@@ -65,6 +69,25 @@ if ($StartPgVector) {
         throw "failed to start pgvector compose profile"
     }
     Wait-Tcp -HostName "127.0.0.1" -Port 15432
+}
+
+. (Join-Path $repoRoot "tools\go-env.ps1")
+if (-not $SkipBuild) {
+    go build -o (Join-Path $repoRoot "bin\vector-embedding-smoke.exe") ./loadtest/vectorembedding
+    if ($LASTEXITCODE -ne 0) {
+        throw "failed to build vector embedding smoke runner"
+    }
+}
+
+$runner = Join-Path $repoRoot "bin\vector-embedding-smoke.exe"
+& $runner `
+    --phase preflight-pgvector `
+    --pgvector-dsn $PgVectorDsn `
+    --pgvector-table $PgVectorTable `
+    --result-root $ResultRoot `
+    --run-name $RunName
+if ($LASTEXITCODE -ne 0) {
+    throw "vector pgvector preflight failed with exit code $LASTEXITCODE"
 }
 
 $args = @(

@@ -295,7 +295,7 @@ message / conversation / policy events -> search-service + memory-service projec
 | `model-gateway` | text generation / embedding invocation metadata、mock provider、低敏 invocation outbox，不持久化 raw prompt 或 embedding vector。 |
 | `knowledge-ingestion-service` | knowledge source、ingestion job、chunk manifest、knowledge outbox relay、vector handoff first path。 |
 | `workflow-service` | workflow creation / decision、approval状态机、compensation request / instruction registry / rollback adapter first path。 |
-| `vector-index-service` | vector metadata、tombstone、search、rebuild request / checkpoint、embedding queue / worker、knowledge chunk consumer first path。 |
+| `vector-index-service` | vector metadata、tombstone、search、rebuild request / checkpoint、embedding queue / worker、knowledge chunk consumer first path；pgvector provider smoke 已有 preflight gate，先验证 pgvector 连接、extension 和 table 配置，不可用时 fail-closed 并写低敏 summary。 |
 
 已启动的客户端平台：
 

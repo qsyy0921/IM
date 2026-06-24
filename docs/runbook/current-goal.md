@@ -248,6 +248,11 @@ IM messages -> search / memory projection -> EvidencePack -> RAG / Agent answer 
   矩阵纳入低敏门禁：search / memory / profile 必须 `RETURNED`，未启用 vector 时
   `VECTOR_ITEM` 必须 `NOT_REQUESTED`；summary 只输出 source type、requested、
   candidate / returned / deduped count 和 status。
+- 同日 vector-index-service pgvector provider smoke 已补 preflight gate：
+  `loadtest/vectorembedding --phase preflight-pgvector` 会验证 pgvector PostgreSQL
+  连接、`vector` extension 可用性和 table identifier 配置；不可用时快速 fail-closed
+  并写低敏 summary，不进入长链路或伪造真实 provider smoke。当前本机 `localhost:15432`
+  不可用，因此只完成 preflight 负向验证，真实 pgvector smoke 仍待 runtime 恢复。
 - 已有 clean smoke 覆盖真实双用户好友直聊、群聊 first path、群资料 BFF
   read/update 和群成员动作链路；证据见 `docs/runbook/client-platform.md`。
 - Windows desktop 已有 artifact / signing / installer plan first paths；签名 / installer
@@ -341,7 +346,7 @@ IM messages -> search / memory projection -> EvidencePack -> RAG / Agent answer 
    opt-in smoke 入口、service-owned rebuild operator first path 和 mapping drift
    hardening 已补齐；retrieval `source_coverage` 矩阵已进入 positive smoke /
    adapter 门禁，但尚未在真实 OpenSearch 进程上归档通过报告；后续真实 OpenSearch
-   进程 smoke、pgvector /
+   进程 smoke、真实 pgvector /
    Milvus / OpenSearch vector provider smoke 和跨 provider EvidencePack coverage 仍保持在
    retrieval-gateway 边界内。
 5. 客户端只作为演示入口；除非阻塞上述演示，不继续扩 UI 产品化。

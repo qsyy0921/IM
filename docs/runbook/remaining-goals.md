@@ -91,7 +91,7 @@
   smoke 入口、service-owned rebuild operator first path 和 mapping drift hardening
   已补齐但本机尚未归档真实 OpenSearch 进程通过报告；retrieval positive smoke /
   adapter 已把 `source_coverage` 矩阵纳入门禁；下一步继续补真实 OpenSearch
-  进程 smoke、pgvector / Milvus / OpenSearch vector provider smoke
+  进程 smoke、真实 pgvector / Milvus / OpenSearch vector provider smoke
   与跨 provider EvidencePack coverage。
   真实 mutation 场景必须等显式业务 adapter 和
   operator policy 就绪。
@@ -123,7 +123,8 @@
 - `presence-service`：push-gateway session consumer、`SubscribePresence`、stale scanner、
   outbox relay、Redis hot-state、privacy / contacts policy。
 - `model-gateway`、`knowledge-ingestion-service`、`workflow-service`、
-  `vector-index-service`：补真实 provider / worker / repair / backfill smoke。
+  `vector-index-service`：补真实 provider / worker / repair / backfill smoke；
+  pgvector provider 已有 preflight gate，仍需可用 pgvector runtime 后归档真实 smoke。
 
 ## 9 个现有 IM 服务必要回补
 

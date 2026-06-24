@@ -30,8 +30,12 @@ Stage-switch：`docs/runbook/stage-switch/vector-index-service.md`。
   获取 refs-only `VECTOR_ITEM`。该 smoke 使用 PostgreSQL metadata / `postgres-test`
   backend state，不代表 pgvector / Milvus / OpenSearch provider 已完成。
 - optional pgvector adapter 包和 compose overlay；默认不启用，不进入普通 migration。
+- 2026-06-25 `loadtest/vectorembedding` 已补 `preflight-pgvector` phase，
+  `run-local-pgvector-smoke.ps1` 会在启动完整链路前先验证 pgvector PostgreSQL
+  连接、`vector` extension 可用性和 table identifier 配置；不可用时快速
+  fail-closed 并写低敏 summary，不伪造 provider smoke 通过。
 
 证据入口：`docs/runbook/loadtest/vector-index-service/` 和 `loadtest/vectorembedding`。
 
-后续：memory / search chunk consumer、pgvector smoke、Milvus / OpenSearch backend、
+后续：memory / search chunk consumer、真实 pgvector smoke、Milvus / OpenSearch backend、
 provider repair、真 provider backfill smoke。

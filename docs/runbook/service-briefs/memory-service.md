@@ -88,11 +88,16 @@
   EvidencePack。repository 同步修复了既有 non-deterministic `profile_id` 但
   subject/type/key 相同的 profile aggregate 重算唯一约束问题，并新增真实 PG
   集成测试。
+- 2026-06-24 `loadtest/ragagent` 已把 profile repair 负向门禁接入 demo summary：
+  未审批 workflow 不能执行 batch recompute，已审批 workflow 的 payload hash 与
+  当前 batch manifest 不匹配时必须 fail-closed；ai-eval rag-agent adapter 已把
+  该负向门禁纳入必检断言。
 
 下一步：`loadtest/ragagent` / `rag-agent-demo` adapter 已把 public candidate
 review、temporal update 和 profile repair approval 纳入 RAG / Agent EvidencePack 断言链路，并已通过
 `ai-eval-rag-agent-demo-live-20260624-public-candidate-review-v3` 和
 `ai-eval-rag-agent-demo-live-20260624-temporal-update-v2`、`ai-eval-rag-agent-demo-live-20260624-profile-repair-approval-v3`
-真实 gate 归档。之后继续做
-结构过滤、BM25 / vector、rerank 和 EvidencePack coverage 深化。仍不得把
+真实 gate 归档；profile repair negative gate 已进入 runner / adapter contract，
+待下一轮真实 gate 归档。之后继续做结构过滤、BM25 / vector、rerank 和
+EvidencePack coverage 深化。仍不得把
 单条群消息直接升级为 ACTIVE profile fact。

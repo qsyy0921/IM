@@ -125,6 +125,9 @@ func TestVerifyCombinedSummary(t *testing.T) {
 		!summary.ProfileRepairWorkflowApproved ||
 		!summary.ProfileRepairApprovalVerified ||
 		!summary.ProfileRepairExecuted ||
+		!summary.ProfileRepairNegativeCasesVerified ||
+		summary.ProfileRepairNegativeCaseCount < 2 ||
+		len(summary.ProfileRepairNegativeCases) < 2 ||
 		!summary.ProfileRepairProfileActive ||
 		summary.ProfileRepairSupportCount < 2 ||
 		summary.ProfileRepairSupportingMemoryCount < 2 ||
@@ -139,6 +142,17 @@ func TestVerifyCombinedSummary(t *testing.T) {
 	}
 	if len(summary.Verified) < 4 {
 		t.Fatalf("expected verification details: %+v", summary.Verified)
+	}
+}
+
+func TestVerifyCombinedRejectsFailedProfileRepairNegativeCase(t *testing.T) {
+	cfg := config{runName: "demo"}
+	rag := validRAGPartial()
+	agent := validAgentPartial()
+	profileRepair := validProfileRepairApprovalSummary()
+	profileRepair.NegativeCases[0].Passed = false
+	if _, err := verifyCombined(cfg, "out", "rag.json", "agent.json", rag, agent, validPublicCandidateReviewSummary(), profileRepair, time.Now().UTC()); err == nil {
+		t.Fatalf("expected failed profile repair negative case to fail")
 	}
 }
 
@@ -181,6 +195,18 @@ func TestVerifyCombinedRejectsMissingProfileRepairApproval(t *testing.T) {
 	profileRepair.ApprovalVerified = false
 	if _, err := verifyCombined(cfg, "out", "rag.json", "agent.json", rag, agent, validPublicCandidateReviewSummary(), profileRepair, time.Now().UTC()); err == nil {
 		t.Fatalf("expected missing profile repair approval verification to fail")
+	}
+}
+
+func TestVerifyCombinedRejectsMissingProfileRepairNegativeCases(t *testing.T) {
+	cfg := config{runName: "demo"}
+	rag := validRAGPartial()
+	agent := validAgentPartial()
+	profileRepair := validProfileRepairApprovalSummary()
+	profileRepair.NegativeCasesVerified = false
+	profileRepair.NegativeCases = nil
+	if _, err := verifyCombined(cfg, "out", "rag.json", "agent.json", rag, agent, validPublicCandidateReviewSummary(), profileRepair, time.Now().UTC()); err == nil {
+		t.Fatalf("expected missing profile repair negative gate to fail")
 	}
 }
 
@@ -251,6 +277,16 @@ func validProfileRepairApprovalSummary() profileRepairApprovalSummary {
 		WorkflowApproved:      true,
 		ApprovalVerified:      true,
 		Executed:              true,
+		NegativeCasesVerified: true,
+		NegativeCases: []profileRepairNegativeCaseSummary{{
+			Name:         "unapproved_workflow_execute",
+			ExpectedFail: "approval workflow must be APPROVED",
+			Passed:       true,
+		}, {
+			Name:         "approval_payload_hash_mismatch",
+			ExpectedFail: "approval workflow payload hash mismatch",
+			Passed:       true,
+		}},
 		ProfileActive:         true,
 		SupportCount:          2,
 		SupportingMemoryCount: 2,

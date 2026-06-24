@@ -33,6 +33,8 @@ type profileRepairApprovalSummary struct {
 	WorkflowApproved      bool
 	ApprovalVerified      bool
 	Executed              bool
+	NegativeCasesVerified bool
+	NegativeCases         []profileRepairNegativeCaseSummary
 	ProfileActive         bool
 	SupportCount          int32
 	SupportingMemoryCount int
@@ -47,6 +49,12 @@ type profileRepairApprovalSummary struct {
 	RequestSummaryPath    string
 	ExecuteSummaryPath    string
 	DecisionID            string
+}
+
+type profileRepairNegativeCaseSummary struct {
+	Name         string `json:"name"`
+	ExpectedFail string `json:"expected_fail"`
+	Passed       bool   `json:"passed"`
 }
 
 type memoryProfileOperatorSummary struct {
@@ -141,10 +149,52 @@ func verifyProfileRepairApproval(
 		return profileRepairApprovalSummary{}, err
 	}
 
+	negativeCases := make([]profileRepairNegativeCaseSummary, 0, 2)
+	unapprovedRunName := cfg.runName + "-profile-repair-negative-unapproved"
+	if err := runMemoryProfileExpectFailure(
+		ctx,
+		"memory-profile-negative-unapproved",
+		memoryProfileArgs(cfg, seed, unapprovedRunName, batchPath, requestSummary.ApprovalWorkflowID, false),
+		"approval workflow must be APPROVED",
+	); err != nil {
+		return profileRepairApprovalSummary{}, err
+	}
+	negativeCases = append(negativeCases, profileRepairNegativeCaseSummary{
+		Name:         "unapproved_workflow_execute",
+		ExpectedFail: "approval workflow must be APPROVED",
+		Passed:       true,
+	})
+
 	decisionID, err := approveProfileRepairWorkflow(ctx, cfg, seed.ViewerUserID, requestSummary.ApprovalWorkflowID)
 	if err != nil {
 		return profileRepairApprovalSummary{}, err
 	}
+
+	tamperedBatchPath, err := writeProfileRepairBatchManifestForTarget(
+		resultDir,
+		"profile-repair-batch-tampered.json",
+		seed.ViewerUserID,
+		profileRepairAggregateType,
+		profileRepairAggregateKey+"-tampered",
+		2,
+	)
+	if err != nil {
+		return profileRepairApprovalSummary{}, err
+	}
+	tamperedRunName := cfg.runName + "-profile-repair-negative-hash-mismatch"
+	if err := runMemoryProfileExpectFailure(
+		ctx,
+		"memory-profile-negative-hash-mismatch",
+		memoryProfileArgs(cfg, seed, tamperedRunName, tamperedBatchPath, requestSummary.ApprovalWorkflowID, false),
+		"approval workflow payload hash mismatch",
+	); err != nil {
+		return profileRepairApprovalSummary{}, err
+	}
+	negativeCases = append(negativeCases, profileRepairNegativeCaseSummary{
+		Name:         "approval_payload_hash_mismatch",
+		ExpectedFail: "approval workflow payload hash mismatch",
+		Passed:       true,
+	})
 
 	executeRunName := cfg.runName + "-profile-repair-execute"
 	if err := runChild(ctx, "memory-profile-execute", memoryProfileArgs(cfg, seed, executeRunName, batchPath, requestSummary.ApprovalWorkflowID, false)); err != nil {
@@ -180,6 +230,8 @@ func verifyProfileRepairApproval(
 		WorkflowApproved:      true,
 		ApprovalVerified:      executeSummary.ApprovalVerified,
 		Executed:              executeSummary.Executed,
+		NegativeCasesVerified: true,
+		NegativeCases:         negativeCases,
 		ProfileActive:         executeSummary.Targets[0].Active,
 		SupportCount:          executeSummary.Targets[0].SupportCount,
 		SupportingMemoryCount: executeSummary.Targets[0].SupportingMemoryCount,
@@ -260,7 +312,25 @@ func submitAndApproveProfileSignal(
 }
 
 func writeProfileRepairBatchManifest(resultDir string, subjectUserID string) (string, error) {
-	path := filepath.Join(resultDir, "profile-repair-batch.json")
+	return writeProfileRepairBatchManifestForTarget(
+		resultDir,
+		"profile-repair-batch.json",
+		subjectUserID,
+		profileRepairAggregateType,
+		profileRepairAggregateKey,
+		2,
+	)
+}
+
+func writeProfileRepairBatchManifestForTarget(
+	resultDir string,
+	fileName string,
+	subjectUserID string,
+	aggregateType string,
+	aggregateKey string,
+	minSupportCount int,
+) (string, error) {
+	path := filepath.Join(resultDir, fileName)
 	manifest := struct {
 		SchemaVersion string `json:"schema_version"`
 		Targets       []struct {
@@ -278,9 +348,9 @@ func writeProfileRepairBatchManifest(resultDir string, subjectUserID string) (st
 			MinSupportCount int    `json:"min_support_count"`
 		}{{
 			SubjectUserID:   subjectUserID,
-			AggregateType:   profileRepairAggregateType,
-			AggregateKey:    profileRepairAggregateKey,
-			MinSupportCount: 2,
+			AggregateType:   aggregateType,
+			AggregateKey:    aggregateKey,
+			MinSupportCount: minSupportCount,
 		}},
 	}
 	encoded, err := json.MarshalIndent(manifest, "", "  ")

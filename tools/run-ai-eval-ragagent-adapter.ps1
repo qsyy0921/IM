@@ -177,6 +177,12 @@ Add-Assertion -Assertions $assertions -Type "profile_repair_must_require_workflo
     (Get-JsonPropertyString -Object $summary -Name "profile_repair_payload_ref_hash").Length -gt 0 -and
     (Get-JsonPropertyString -Object $summary -Name "profile_repair_target_ref_hash").Length -gt 0
 )
+Add-Assertion -Assertions $assertions -Type "profile_repair_negative_gate_must_fail_closed" -Passed (
+    (Get-JsonPropertyBool -Object $summary -Name "profile_repair_negative_cases_verified") -and
+    [int]$summary.profile_repair_negative_case_count -ge 2 -and
+    $null -ne $summary.profile_repair_negative_cases -and
+    @($summary.profile_repair_negative_cases | Where-Object { -not [bool]$_.passed }).Count -eq 0
+)
 Add-Assertion -Assertions $assertions -Type "summary_must_be_low_sensitive" -Passed (
     (Get-JsonPropertyString -Object $summary -Name "rag_answer_text_sha256").Length -gt 0 -and
     (Get-JsonPropertyString -Object $summary -Name "agent_proposal_text_sha256").Length -gt 0 -and

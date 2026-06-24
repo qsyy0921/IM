@@ -178,6 +178,10 @@ candidate review path 写入 `PROFILE_SIGNAL`，再通过 `loadtest/memoryprofil
 修复后的 profile aggregate 同时进入 RAG / Agent EvidencePack。期间修复了
 memory-service 在既有 non-deterministic `profile_id` 但 subject/type/key 相同的
 profile aggregate 上重算时可能触发唯一约束的问题，并以真实 PostgreSQL 集成测试覆盖。
+同日 `loadtest/ragagent` 已接入 profile repair 负向门禁：未审批 workflow 不能执行
+batch recompute，已审批 workflow 的 payload hash 与当前 batch manifest 不匹配时
+必须 fail-closed；`run-ai-eval-ragagent-adapter.ps1` 已把该负向门禁纳入 summary
+必检断言，真实 service-stack gate 待下一轮重新归档。
 同日 Python AI Worker 已补 memory extraction candidate first path：
 `ai/python/nexusim_ai_memory` 只从显式 low-sensitive message batch 的
 `decision:` / `task:` / `status:` / `blocker:` / `file:` / `profile_signal:`
@@ -210,4 +214,5 @@ fail-closed，不写 execution audit、不写 tool result projection、不调用
 - public candidate review、temporal update 和 profile repair approval 已进入
   RAG-Agent 真实 service-stack gate 归档。
 - 下一步继续深化 RAG-Agent demo 的 EvidencePack / approval / audit 展示：
-  更多 group-memory answer / proposal 场景和 profile repair negative cases。
+  更多 group-memory answer / proposal 场景，并重新跑真实 service-stack gate
+  归档 profile repair negative gate。

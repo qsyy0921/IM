@@ -136,6 +136,7 @@
         "retrieval-gateway",
         "search-service",
         "memory-service",
+        "workflow-service",
         "mcp-gateway",
         "skill-registry",
         "policy-service",

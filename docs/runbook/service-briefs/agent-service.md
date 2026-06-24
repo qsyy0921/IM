@@ -52,6 +52,10 @@ proposal 前调用 `mcp-gateway.PrepareToolCall` 做 skill / policy / prepare au
   `REPAIR_APPROVAL` 审批后，才通过 memory-service 公开
   `RecomputeProfileAggregate` 更新 profile aggregate；修复后的 profile evidence 会进入
   Agent proposal EvidencePack。Agent 仍不直接读 memory-service 私表。
+- 2026-06-24 `loadtest/ragagent` 已补 profile repair negative gate：Agent / RAG
+  组合 demo 会在正确执行前验证未审批 workflow 不能触发 repair，且审批 payload
+  hash 与 batch manifest 不匹配时必须 fail-closed；ai-eval rag-agent adapter 已把
+  该 gate 纳入 summary 断言。
 
 ## 边界
 
@@ -60,5 +64,6 @@ proposal 前调用 `mcp-gateway.PrepareToolCall` 做 skill / policy / prepare au
 
 ## 下一步
 
-- 继续扩展 profile repair negative cases 和更完整 group-memory Agent proposal
-  场景；真实写动作仍只走 proposal / approval / executor / audit。
+- 重新跑真实 service-stack gate 归档 profile repair negative gate，并继续扩展
+  更完整 group-memory Agent proposal 场景；真实写动作仍只走 proposal / approval /
+  executor / audit。

@@ -68,8 +68,10 @@
   公开 candidate review
   写入 `PROFILE_SIGNAL` 后，必须经 workflow-service `REPAIR_APPROVAL` 审批才执行
   `memoryprofile` batch recompute，并要求修复后的 profile aggregate 同时进入 RAG /
-  Agent EvidencePack。下一步继续扩展更多 group-memory answer / proposal 场景和
-  profile repair negative cases。
+  Agent EvidencePack。profile repair negative gate 已接入 runner / adapter contract：
+  未审批 workflow 和 approval payload hash mismatch 均必须 fail-closed；下一步重新
+  跑真实 service-stack gate 归档该负向门禁，并继续扩展更多 group-memory answer /
+  proposal 场景。
 - `rag-service` / `summary-service`：拒答、引用校验、source-ref regression、unsafe
   output fail-closed cases。
 - `agent-service`：真实业务动作继续走 policy、skill contract、proposal、approval、

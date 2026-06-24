@@ -146,62 +146,65 @@ type seedSummary struct {
 }
 
 type combinedSummary struct {
-	RunName                                string    `json:"run_name"`
-	ResultDir                              string    `json:"result_dir"`
-	RAGSummaryPath                         string    `json:"rag_summary_path"`
-	AgentSummaryPath                       string    `json:"agent_summary_path"`
-	MemoryTarget                           string    `json:"memory_target"`
-	TenantID                               string    `json:"tenant_id"`
-	ConversationID                         string    `json:"conversation_id"`
-	ViewerUserID                           string    `json:"viewer_user_id"`
-	RAGAnswered                            bool      `json:"rag_answered"`
-	RAGAnswerID                            string    `json:"rag_answer_id"`
-	RAGAnswerStatus                        string    `json:"rag_answer_status"`
-	RAGAnswerTextSHA256                    string    `json:"rag_answer_text_sha256"`
-	RAGCitationCount                       int       `json:"rag_citation_count"`
-	RAGEvidenceItemCount                   int       `json:"rag_evidence_item_count"`
-	AgentProposalCreated                   bool      `json:"agent_proposal_created"`
-	AgentProposalID                        string    `json:"agent_proposal_id"`
-	AgentProposalStatus                    string    `json:"agent_proposal_status"`
-	AgentProposalTextSHA256                string    `json:"agent_proposal_text_sha256"`
-	AgentRequiresApproval                  bool      `json:"agent_requires_approval"`
-	AgentApprovalRecorded                  bool      `json:"agent_approval_recorded"`
-	AgentApprovalID                        string    `json:"agent_approval_id"`
-	ActionExecutionRecorded                bool      `json:"action_execution_recorded"`
-	ActionExecutionID                      string    `json:"action_execution_id"`
-	ActionExecutionStatus                  string    `json:"action_execution_status"`
-	ActionExecuted                         bool      `json:"action_executed"`
-	ActionResultRecorded                   bool      `json:"action_result_recorded"`
-	SharedTenantAndConversation            bool      `json:"shared_tenant_and_conversation"`
-	CrossGroupSourceRefsPreserved          bool      `json:"cross_group_source_refs_preserved"`
-	CrossGroupSpeakerAttributionPreserved  bool      `json:"cross_group_speaker_attribution_preserved"`
-	MemoryGraphEdgesPreserved              bool      `json:"memory_graph_edges_preserved"`
-	ProfileAggregatePreserved              bool      `json:"profile_aggregate_preserved"`
-	PublicCandidateReviewApproved          bool      `json:"public_candidate_review_approved"`
-	PublicCandidateMemoryEventID           string    `json:"public_candidate_memory_event_id,omitempty"`
-	PublicCandidateSupersededMemoryEventID string    `json:"public_candidate_superseded_memory_event_id,omitempty"`
-	PublicCandidateFactSHA256              string    `json:"public_candidate_fact_sha256,omitempty"`
-	PublicCandidateEvidenceInRAG           bool      `json:"public_candidate_evidence_in_rag"`
-	PublicCandidateEvidenceInAgent         bool      `json:"public_candidate_evidence_in_agent"`
-	PublicCandidateTemporalUpdatePreserved bool      `json:"public_candidate_temporal_update_preserved"`
-	ProfileRepairApprovalRequested         bool      `json:"profile_repair_approval_requested"`
-	ProfileRepairWorkflowApproved          bool      `json:"profile_repair_workflow_approved"`
-	ProfileRepairApprovalVerified          bool      `json:"profile_repair_approval_verified"`
-	ProfileRepairExecuted                  bool      `json:"profile_repair_executed"`
-	ProfileRepairProfileActive             bool      `json:"profile_repair_profile_active"`
-	ProfileRepairSupportCount              int32     `json:"profile_repair_support_count"`
-	ProfileRepairSupportingMemoryCount     int       `json:"profile_repair_supporting_memory_count"`
-	ProfileRepairWorkflowID                string    `json:"profile_repair_workflow_id,omitempty"`
-	ProfileRepairPayloadRefHash            string    `json:"profile_repair_payload_ref_hash,omitempty"`
-	ProfileRepairTargetRefHash             string    `json:"profile_repair_target_ref_hash,omitempty"`
-	ProfileRepairRAGEvidence               bool      `json:"profile_repair_evidence_in_rag"`
-	ProfileRepairAgentEvidence             bool      `json:"profile_repair_evidence_in_agent"`
-	RAGVersion                             string    `json:"rag_version"`
-	AgentVersion                           string    `json:"agent_version"`
-	RetrievalVersions                      []string  `json:"retrieval_versions"`
-	Verified                               []string  `json:"verified"`
-	StartedAt                              time.Time `json:"started_at"`
-	FinishedAt                             time.Time `json:"finished_at"`
+	RunName                                string                             `json:"run_name"`
+	ResultDir                              string                             `json:"result_dir"`
+	RAGSummaryPath                         string                             `json:"rag_summary_path"`
+	AgentSummaryPath                       string                             `json:"agent_summary_path"`
+	MemoryTarget                           string                             `json:"memory_target"`
+	TenantID                               string                             `json:"tenant_id"`
+	ConversationID                         string                             `json:"conversation_id"`
+	ViewerUserID                           string                             `json:"viewer_user_id"`
+	RAGAnswered                            bool                               `json:"rag_answered"`
+	RAGAnswerID                            string                             `json:"rag_answer_id"`
+	RAGAnswerStatus                        string                             `json:"rag_answer_status"`
+	RAGAnswerTextSHA256                    string                             `json:"rag_answer_text_sha256"`
+	RAGCitationCount                       int                                `json:"rag_citation_count"`
+	RAGEvidenceItemCount                   int                                `json:"rag_evidence_item_count"`
+	AgentProposalCreated                   bool                               `json:"agent_proposal_created"`
+	AgentProposalID                        string                             `json:"agent_proposal_id"`
+	AgentProposalStatus                    string                             `json:"agent_proposal_status"`
+	AgentProposalTextSHA256                string                             `json:"agent_proposal_text_sha256"`
+	AgentRequiresApproval                  bool                               `json:"agent_requires_approval"`
+	AgentApprovalRecorded                  bool                               `json:"agent_approval_recorded"`
+	AgentApprovalID                        string                             `json:"agent_approval_id"`
+	ActionExecutionRecorded                bool                               `json:"action_execution_recorded"`
+	ActionExecutionID                      string                             `json:"action_execution_id"`
+	ActionExecutionStatus                  string                             `json:"action_execution_status"`
+	ActionExecuted                         bool                               `json:"action_executed"`
+	ActionResultRecorded                   bool                               `json:"action_result_recorded"`
+	SharedTenantAndConversation            bool                               `json:"shared_tenant_and_conversation"`
+	CrossGroupSourceRefsPreserved          bool                               `json:"cross_group_source_refs_preserved"`
+	CrossGroupSpeakerAttributionPreserved  bool                               `json:"cross_group_speaker_attribution_preserved"`
+	MemoryGraphEdgesPreserved              bool                               `json:"memory_graph_edges_preserved"`
+	ProfileAggregatePreserved              bool                               `json:"profile_aggregate_preserved"`
+	PublicCandidateReviewApproved          bool                               `json:"public_candidate_review_approved"`
+	PublicCandidateMemoryEventID           string                             `json:"public_candidate_memory_event_id,omitempty"`
+	PublicCandidateSupersededMemoryEventID string                             `json:"public_candidate_superseded_memory_event_id,omitempty"`
+	PublicCandidateFactSHA256              string                             `json:"public_candidate_fact_sha256,omitempty"`
+	PublicCandidateEvidenceInRAG           bool                               `json:"public_candidate_evidence_in_rag"`
+	PublicCandidateEvidenceInAgent         bool                               `json:"public_candidate_evidence_in_agent"`
+	PublicCandidateTemporalUpdatePreserved bool                               `json:"public_candidate_temporal_update_preserved"`
+	ProfileRepairApprovalRequested         bool                               `json:"profile_repair_approval_requested"`
+	ProfileRepairWorkflowApproved          bool                               `json:"profile_repair_workflow_approved"`
+	ProfileRepairApprovalVerified          bool                               `json:"profile_repair_approval_verified"`
+	ProfileRepairExecuted                  bool                               `json:"profile_repair_executed"`
+	ProfileRepairNegativeCasesVerified     bool                               `json:"profile_repair_negative_cases_verified"`
+	ProfileRepairNegativeCaseCount         int                                `json:"profile_repair_negative_case_count"`
+	ProfileRepairNegativeCases             []profileRepairNegativeCaseSummary `json:"profile_repair_negative_cases,omitempty"`
+	ProfileRepairProfileActive             bool                               `json:"profile_repair_profile_active"`
+	ProfileRepairSupportCount              int32                              `json:"profile_repair_support_count"`
+	ProfileRepairSupportingMemoryCount     int                                `json:"profile_repair_supporting_memory_count"`
+	ProfileRepairWorkflowID                string                             `json:"profile_repair_workflow_id,omitempty"`
+	ProfileRepairPayloadRefHash            string                             `json:"profile_repair_payload_ref_hash,omitempty"`
+	ProfileRepairTargetRefHash             string                             `json:"profile_repair_target_ref_hash,omitempty"`
+	ProfileRepairRAGEvidence               bool                               `json:"profile_repair_evidence_in_rag"`
+	ProfileRepairAgentEvidence             bool                               `json:"profile_repair_evidence_in_agent"`
+	RAGVersion                             string                             `json:"rag_version"`
+	AgentVersion                           string                             `json:"agent_version"`
+	RetrievalVersions                      []string                           `json:"retrieval_versions"`
+	Verified                               []string                           `json:"verified"`
+	StartedAt                              time.Time                          `json:"started_at"`
+	FinishedAt                             time.Time                          `json:"finished_at"`
 }
 
 type publicCandidateReviewSummary struct {
@@ -436,6 +439,29 @@ func runChild(ctx context.Context, name string, args []string) error {
 			return fmt.Errorf("%s child run failed: %w; rerun child directly for details", name, err)
 		}
 		return fmt.Errorf("%s child run failed: %w", name, err)
+	}
+	return nil
+}
+
+func runMemoryProfileExpectFailure(ctx context.Context, name string, args []string, expected string) error {
+	repo := gitOutput("rev-parse", "--show-toplevel")
+	if repo == "" {
+		cwd, err := os.Getwd()
+		if err != nil {
+			return err
+		}
+		repo = cwd
+	}
+	childCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	cmd := exec.CommandContext(childCtx, "go", args...)
+	cmd.Dir = repo
+	output, err := cmd.CombinedOutput()
+	if err == nil {
+		return fmt.Errorf("%s child run unexpectedly succeeded", name)
+	}
+	if !strings.Contains(string(output), expected) {
+		return fmt.Errorf("%s child run failed without expected reason %q", name, expected)
 	}
 	return nil
 }
@@ -851,6 +877,8 @@ func verifyCombined(
 		!profileRepair.WorkflowApproved ||
 		!profileRepair.ApprovalVerified ||
 		!profileRepair.Executed ||
+		!profileRepair.NegativeCasesVerified ||
+		!profileRepairNegativeCasesPassed(profileRepair.NegativeCases) ||
 		!profileRepair.ProfileActive ||
 		profileRepair.SupportCount < 2 ||
 		profileRepair.SupportingMemoryCount < 2 ||
@@ -858,6 +886,7 @@ func verifyCombined(
 		!profileRepair.AgentEvidence {
 		return combinedSummary{}, errors.New("profile repair approval did not execute and preserve repaired profile evidence in both RAG and Agent paths")
 	}
+	verified = append(verified, "Profile repair negative gate rejected unapproved and hash-mismatched execution before the approved public repair path")
 	verified = append(verified, "Profile repair required workflow approval, executed through memory-service public API, and preserved repaired profile evidence in both RAG and Agent paths")
 
 	return combinedSummary{
@@ -903,6 +932,9 @@ func verifyCombined(
 		ProfileRepairWorkflowApproved:          profileRepair.WorkflowApproved,
 		ProfileRepairApprovalVerified:          profileRepair.ApprovalVerified,
 		ProfileRepairExecuted:                  profileRepair.Executed,
+		ProfileRepairNegativeCasesVerified:     profileRepair.NegativeCasesVerified,
+		ProfileRepairNegativeCaseCount:         len(profileRepair.NegativeCases),
+		ProfileRepairNegativeCases:             append([]profileRepairNegativeCaseSummary(nil), profileRepair.NegativeCases...),
 		ProfileRepairProfileActive:             profileRepair.ProfileActive,
 		ProfileRepairSupportCount:              profileRepair.SupportCount,
 		ProfileRepairSupportingMemoryCount:     profileRepair.SupportingMemoryCount,
@@ -918,6 +950,18 @@ func verifyCombined(
 		StartedAt:                              startedAt,
 		FinishedAt:                             time.Now().UTC(),
 	}, nil
+}
+
+func profileRepairNegativeCasesPassed(cases []profileRepairNegativeCaseSummary) bool {
+	if len(cases) < 2 {
+		return false
+	}
+	for _, item := range cases {
+		if strings.TrimSpace(item.Name) == "" || strings.TrimSpace(item.ExpectedFail) == "" || !item.Passed {
+			return false
+		}
+	}
+	return true
 }
 
 func writeSummary(resultDir string, result combinedSummary) error {

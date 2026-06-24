@@ -74,7 +74,9 @@ Run this repo-level guard when changing Python worker foundations:
 .\tools\run-python-ai-worker-smoke.ps1 -Python C:\Users\10495\anaconda3\envs\IM\python.exe
 .\tools\run-python-memory-extraction-smoke.ps1 -Python C:\Users\10495\anaconda3\envs\IM\python.exe
 .\tools\run-ai-eval-python-worker-adapter.ps1 -Python C:\Users\10495\anaconda3\envs\IM\python.exe
+.\tools\run-ai-eval-memory-extraction-candidate-adapter.ps1 -Python C:\Users\10495\anaconda3\envs\IM\python.exe
 go run ./tools/python-worker-go-adapter-smoke -python C:\Users\10495\anaconda3\envs\IM\python.exe
+go run ./tools/memory-extraction-go-adapter-smoke -python C:\Users\10495\anaconda3\envs\IM\python.exe
 go run ./services/rag-service/cmd/rag-python-worker-provider-smoke -python C:\Users\10495\anaconda3\envs\IM\python.exe
 go run ./services/summary-service/cmd/summary-python-worker-provider-smoke -python C:\Users\10495\anaconda3\envs\IM\python.exe
 go run ./services/agent-service/cmd/agent-python-worker-provider-smoke -python C:\Users\10495\anaconda3\envs\IM\python.exe
@@ -90,6 +92,13 @@ candidates return hashes and source refs rather than raw output text, and Go
 consumes candidate metadata rather than delegating control to Python. The
 Python eval adapter also covers Go-side rejection of forbidden `raw_output`,
 sensitive citation metadata and malformed output hashes.
+
+The memory extraction candidate Go adapter smoke proves Go can invoke the
+batch memory extraction CLI, reject unsafe input before worker execution, accept
+only hash-only `MEMORY_EVENT_CANDIDATE` metadata, keep ordinary chat at zero
+candidates and require review for group-scoped profile signals. The matching
+ai-eval adapter records those four low-sensitive cases without databases,
+providers or business writes.
 
 The RAG, summary and Agent provider smokes prove services can wrap Go-owned
 providers with a Python worker candidate guard while final state, citations,

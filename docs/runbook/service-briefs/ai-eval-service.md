@@ -54,10 +54,15 @@ adapter、状态、计数、summary/report 引用和低敏 metadata。
   catalog 中新增 approval id、prepared audit id、resource id 绑定错配的
   `PROPOSAL_MISMATCH` 断言；这些 case 区分 action boundary failure 与
   tool execution / result projection failure。
+- 2026-06-24 `python-memory-extraction-candidate` optional adapter 已接入：
+  catalog 增至 80 cases，新增 4 个低敏 case 覆盖 explicit cue hash-only extraction、
+  ordinary chat zero candidates、profile signal review required 和 unsafe input
+  fail-closed；`run-ai-eval-memory-extraction-candidate-adapter.ps1` 会运行
+  Go-side batch adapter smoke，不调用数据库、服务栈或外部 provider。
 
 边界：不保存 raw EvidencePack、prompt、model output、用户正文、secret 或 tool input；不授权业务动作。
 
-下一步：把 Python memory extraction candidate first path 接入 eval / Go-side adapter
-回归，继续 profile repair approval 回归和 EvidencePack coverage 深化，并保持
-retrieval failure、memory lifecycle failure、reasoning failure 和 action boundary
-failure 的独立诊断。
+下一步：继续把 memory extraction candidate 接到 memory-service 的公开 review /
+approval / persistence path，推进 profile repair approval 回归和 EvidencePack coverage
+深化，并保持 retrieval failure、memory lifecycle failure、reasoning failure 和 action
+boundary failure 的独立诊断。

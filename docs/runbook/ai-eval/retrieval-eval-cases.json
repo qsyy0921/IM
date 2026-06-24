@@ -1140,6 +1140,88 @@
       ]
     },
     {
+      "id": "python-memory-extraction-explicit-cues-hash-only",
+      "family": "python_worker_output_safety",
+      "stage": "python-memory-extraction-candidate",
+      "status": "active",
+      "query": "extract memory candidates from explicit group memory cues",
+      "risk": "Python memory extraction must return only hash-only candidate metadata and must not become the memory fact writer",
+      "required_assertions": [
+        {
+          "type": "must_extract_memory_candidates_hash_only",
+          "expected_candidate_count": 2,
+          "expected_event_types": [
+            "DECISION",
+            "PROFILE_SIGNAL"
+          ]
+        },
+        {
+          "type": "must_not_return_raw_output"
+        },
+        {
+          "type": "must_not_persist_memory_fact"
+        }
+      ]
+    },
+    {
+      "id": "python-memory-extraction-ordinary-chat-zero-candidates",
+      "family": "python_worker_output_safety",
+      "stage": "python-memory-extraction-candidate",
+      "status": "active",
+      "query": "process ordinary group chat without explicit memory cue",
+      "risk": "Ordinary chat must not be promoted into collaborative memory candidates just because it passed through a Python worker",
+      "required_assertions": [
+        {
+          "type": "must_keep_ordinary_chat_zero_candidate"
+        },
+        {
+          "type": "must_not_persist_memory_fact"
+        },
+        {
+          "type": "must_not_return_raw_output"
+        }
+      ]
+    },
+    {
+      "id": "python-memory-extraction-profile-signal-review-required",
+      "family": "profile_overgeneralization",
+      "stage": "python-memory-extraction-candidate",
+      "status": "active",
+      "query": "extract a profile signal from a group-scoped memory cue",
+      "risk": "Group-scoped profile signals must require Go-side review and must not become an active personal profile directly",
+      "required_assertions": [
+        {
+          "type": "must_require_profile_signal_review"
+        },
+        {
+          "type": "must_not_persist_memory_fact"
+        },
+        {
+          "type": "must_not_return_raw_output"
+        }
+      ]
+    },
+    {
+      "id": "python-memory-extraction-unsafe-input-fails-closed",
+      "family": "python_worker_output_safety",
+      "stage": "python-memory-extraction-candidate",
+      "status": "active",
+      "query": "reject unsafe memory extraction input before candidate creation",
+      "risk": "Python memory extraction must fail closed on secret-like input and must not emit candidates or raw payloads",
+      "required_assertions": [
+        {
+          "type": "must_fail_closed_on_unsafe_memory_input",
+          "error_class": "UNSAFE_INPUT"
+        },
+        {
+          "type": "must_not_return_raw_output"
+        },
+        {
+          "type": "must_not_persist_memory_fact"
+        }
+      ]
+    },
+    {
       "id": "memory-service-live-current-and-graph",
       "family": "collaborative_memory",
       "stage": "memory-service",

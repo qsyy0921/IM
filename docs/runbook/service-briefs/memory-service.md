@@ -63,7 +63,13 @@
   speaker / message hash 和低敏 report；普通聊天输出 0 个候选；`profile_signal`
   强制 `NEEDS_REVIEW` / `GROUP_SCOPE_PROFILE_SIGNAL`。该路径不写 memory-service
   数据库、不返回 raw text、不绕过 Go-side validation / approval / audit。
+- 2026-06-24 Go-side memory extraction candidate adapter 已接入：
+  `internal/ai/memorycandidate` 负责调用 Python batch CLI、校验低敏 request /
+  batch result、拒绝 raw text / plaintext id 字段 / final persistence claim，并强制
+  `profile_signal` 保持 review required；`tools/memory-extraction-go-adapter-smoke`
+  和 `run-ai-eval-memory-extraction-candidate-adapter.ps1` 覆盖 explicit cue hash-only、
+  ordinary chat zero candidates、profile review 和 unsafe input fail-closed。
 
-下一步：真实服务栈启动后运行 memory-service optional adapter / loadtest 并归档报告；
-后续继续做 Python memory extraction candidate 的 Go-side adapter / ai-eval 接入和
-RAG-Agent demo module 集成，而不是把单条群消息直接升级为 ACTIVE profile fact。
+下一步：把 Go-side memory extraction candidates 接入 memory-service 的公开
+candidate review / approval / persistence path，并继续真实服务栈 optional adapter /
+loadtest 归档；仍不得把单条群消息直接升级为 ACTIVE profile fact。

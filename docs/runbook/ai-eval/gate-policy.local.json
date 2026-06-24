@@ -152,6 +152,16 @@
       ]
     },
     {
+      "name": "python-memory-extraction-candidate",
+      "script": "run-ai-eval-memory-extraction-candidate-adapter.ps1",
+      "run_suffix": "python-memory-extraction-candidate",
+      "summary_file": "memory-extraction-candidate-eval-summary.json",
+      "requires_service_stack": false,
+      "requires": [
+        "conda-env:IM"
+      ]
+    },
+    {
       "name": "agent-python-worker-provider",
       "script": "run-ai-eval-agent-output-regression.ps1",
       "run_suffix": "agent-python-worker-provider",

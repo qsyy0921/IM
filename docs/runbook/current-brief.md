@@ -162,8 +162,11 @@ gate：4 adapters、27 cases、27 passed、0 failed、0 skipped；`rag-agent-dem
 `ai/python/nexusim_ai_memory` 只从显式 low-sensitive message batch 的
 `decision:` / `task:` / `status:` / `blocker:` / `file:` / `profile_signal:`
 cue 生成 hash-only candidates；普通聊天不抽取；profile signal 必须 review。
-该能力不写 memory fact、不返回 raw text，后续由 Go-side adapter / eval gate
-接入 memory-service 控制面。
+该能力不写 memory fact、不返回 raw text。2026-06-24 Go-side memory extraction
+candidate adapter / ai-eval 接入已补齐：`internal/ai/memorycandidate` 负责调用
+Python batch CLI 并校验低敏 request / result，`tools/memory-extraction-go-adapter-smoke`
+和 `run-ai-eval-memory-extraction-candidate-adapter.ps1` 覆盖 explicit cue hash-only、
+ordinary-chat zero candidates、profile review required 和 unsafe input fail-closed。
 同日 action-executor 的 Agent action boundary cases 已补一轮 preflight safety
 覆盖：`action-preflight-safety` smoke / eval catalog 从 11 个扩到 14 个 case，
 新增 approval id、prepared audit id、resource id 与已批准 proposal 绑定不一致时的
@@ -179,5 +182,6 @@ fail-closed，不写 execution audit、不写 tool result projection、不调用
 
 ## 下一步
 
-- 优先补 Python memory extraction candidate 的 Go-side adapter / ai-eval 接入。
+- 优先把 Go-side memory extraction candidates 接入 memory-service 的公开
+  candidate review / approval / persistence path。
 - 再继续深化 RAG-Agent demo 的 EvidencePack / approval / audit 展示。

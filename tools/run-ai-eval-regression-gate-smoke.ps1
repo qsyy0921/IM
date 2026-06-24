@@ -193,6 +193,13 @@ function Invoke-GateAdapter {
                 -RunName $AdapterRunName `
                 -OutputPath $SummaryPath
         }
+        "python-memory-extraction-candidate" {
+            & $ScriptPath `
+                -Python $Python `
+                -ResultRoot $ResultRoot `
+                -RunName $AdapterRunName `
+                -OutputPath $SummaryPath
+        }
         "agent-python-worker-provider" {
             & $ScriptPath `
                 -CasePath $resolvedCasePath `

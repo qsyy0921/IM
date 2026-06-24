@@ -25,6 +25,8 @@ summary, Agent and tool/action boundaries.
 - Agent output regression adapter:
   `tools/run-ai-eval-agent-output-regression.ps1`
 - Python worker output-safety adapter: `tools/run-ai-eval-python-worker-adapter.ps1`
+- Python memory extraction candidate adapter:
+  `tools/run-ai-eval-memory-extraction-candidate-adapter.ps1`
 - ai-eval-service recorder smoke: `tools/run-ai-eval-record-run-smoke.ps1`
 - ai-eval-service gate policy manifest:
   `docs/runbook/ai-eval/gate-policy.local.json`
@@ -35,6 +37,8 @@ summary, Agent and tool/action boundaries.
 - CI-safe ai-eval regression gate:
   `tools/check-ai-eval-regression-gate.ps1`
 - Go-side Python worker adapter smoke: `tools/python-worker-go-adapter-smoke`
+- Go-side memory extraction adapter smoke:
+  `tools/memory-extraction-go-adapter-smoke`
 - rag-service service-level Python worker provider smoke:
   `services/rag-service/cmd/rag-python-worker-provider-smoke`
 - summary-service service-level Python worker provider smoke:
@@ -244,6 +248,20 @@ runs Go-side Python runner regressions that reject candidate outputs containing
 forbidden `raw_output`, sensitive citation metadata or malformed output hashes.
 It does not call external providers, databases or business services.
 
+First-stage Python memory extraction candidate adapter:
+
+```powershell
+.\tools\run-ai-eval-memory-extraction-candidate-adapter.ps1 `
+  -Python C:\Users\10495\anaconda3\envs\IM\python.exe
+```
+
+This adapter runs the Go-side memory extraction adapter smoke against the local
+Python batch memory extraction CLI. It validates explicit memory cues produce
+hash-only candidates, ordinary chat produces zero candidates, group-scoped
+`profile_signal` candidates require review, unsafe input fails closed before
+candidate creation, raw text is not returned and no final memory fact is
+persisted. It does not call external providers, databases or business services.
+
 First-stage Agent output regression adapter:
 
 ```powershell
@@ -315,6 +333,8 @@ stack:
 
 `agent-python-worker-provider` can be selected the same way to record the
 command-level Agent output regression through `ai-eval-service`.
+`python-memory-extraction-candidate` can be selected the same way to record the
+Go-side batch memory extraction candidate boundary through `ai-eval-service`.
 `action-preflight-safety` can also be selected to record the in-memory
 action-executor preflight safety regression.
 
@@ -386,6 +406,10 @@ cases and made RAG / Summary / Agent service-stack cases assert future-memory
 exclusion, cross-group source refs and speaker attribution.
 The 2026-06-20 Python model-output negative run expanded `python-ai-worker` to
 5 cases covering bad inputs plus Go-side bad candidate output rejection.
+The 2026-06-24 Python memory extraction candidate run added 4 cases covering
+explicit cue hash-only extraction, ordinary-chat zero candidates,
+profile-signal review, and unsafe-input fail-closed behavior through the
+Go-side batch adapter.
 The 2026-06-20 RAG / Summary citation regression added source-ref integrity
 cases and low-sensitive `citation_refs` fields to the RAG / Summary smoke
 summaries. This proves adapter-level citation anchoring only; it is not a live
@@ -411,6 +435,18 @@ go run ./tools/python-worker-go-adapter-smoke `
 This adapter proves Go can invoke the Python candidate CLI and consume only the
 validated candidate metadata / output hash. It still does not call external
 providers, databases or business services.
+
+First-stage Go-side memory extraction adapter smoke:
+
+```powershell
+go run ./tools/memory-extraction-go-adapter-smoke `
+  -python C:\Users\10495\anaconda3\envs\IM\python.exe
+```
+
+This smoke proves Go can invoke the Python memory extraction CLI and enforce
+batch-result safety: hash-only candidate metadata, no raw text, no final memory
+persistence, ordinary-chat zero candidates, profile-signal review and unsafe
+input fail-closed behavior.
 
 First-stage `rag-service` service-level Python provider smoke:
 

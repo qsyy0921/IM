@@ -224,8 +224,12 @@ announcement 原文。`loadtest/ragagent` 和 `run-ai-eval-ragagent-adapter.ps1`
 已把 `-ExpectBusinessActionExecuted` 升级为 note + profile 双 mutation gate：
 execute-mode 必须同时验证真实 note fact 和 public `GetConversationProfile` 读回的
 profile update，默认 audit-only 模式仍要求两类 mutation 都不执行。当前已完成
-adapter / runner focused tests；完整 service-stack profile mutation 报告仍待重建
-action-executor runtime 后归档。
+adapter / runner focused tests；同日重建 action-executor / workflow-service runtime 后，
+`ai-eval-service-stack-live-20260625-rag-agent-note-profile-mutation` 已通过真实
+service-stack gate：4 adapters、27 cases、27 passed、0 failed、0 skipped。
+该 gate 确认 approved Agent action 能同时写真实 conversation note fact，并通过
+conversation-service public API 更新 conversation profile；summary 只保留 profile
+version 和字段 hash。
 同日 Python AI Worker 已补 memory extraction candidate first path：
 `ai/python/nexusim_ai_memory` 只从显式 low-sensitive message batch 的
 `decision:` / `task:` / `status:` / `blocker:` / `file:` / `profile_signal:`
@@ -307,3 +311,7 @@ fail-closed，不写 execution audit、不写 tool result projection、不调用
 - `conversation.note.create` 的显式业务 adapter 和完整 service-stack execute-mode
   wrapper 已通过 `ai-eval-rag-agent-demo-live-20260625-business-mutation-execute-v7`
   归档；RAG-Agent demo 已从 audit-only gate 推进到 opt-in 真实业务 mutation smoke。
+  `conversation.profile.update` 已通过
+  `ai-eval-service-stack-live-20260625-rag-agent-note-profile-mutation` 归档为第二个
+  approved conversation mutation；当前 RAG-Agent demo execute-mode 要求 note + profile
+  双 mutation 都通过公开 conversation-service API 验证。

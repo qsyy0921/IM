@@ -115,8 +115,10 @@
   并已接入 `loadtest/ragagent` / `run-ai-eval-ragagent-adapter.ps1` 的
   `-ExpectBusinessActionExecuted` note + profile 双 mutation gate：通过
   conversation-service public `UpdateConversationProfile` 更新会话资料，并只输出
-  profile version / hash metadata。后续需要在重建 action-executor runtime 后追加完整
-  service-stack opt-in mutation smoke 报告。
+  profile version / hash metadata。2026-06-25 重建 action-executor / workflow-service
+  runtime 后，`ai-eval-service-stack-live-20260625-rag-agent-note-profile-mutation`
+  已通过真实 service-stack gate：4 adapters、27 cases、27 passed、0 failed、
+  0 skipped；note + profile 双 mutation 报告已归档。
   继续扩展其它真实 mutation 场景时仍必须先补公开业务 API、显式 adapter、
   operator policy、低敏输出和 repair / redrive 边界。
 - `rag-service` / `summary-service`：拒答、引用校验、source-ref regression、unsafe

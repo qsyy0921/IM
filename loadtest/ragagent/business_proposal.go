@@ -20,8 +20,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-const businessProposalObjective = "phoenix launch business proposal source chain"
-const businessProfileObjective = "phoenix launch conversation profile update"
+const businessProposalObjectiveBase = "phoenix launch business proposal source chain"
 
 const (
 	businessActionModeAuditOnly = "audit-only"
@@ -87,6 +86,8 @@ func verifyBusinessProposalScenario(
 	if err != nil {
 		return businessProposalScenarioSummary{}, err
 	}
+	proposalObjective := businessProposalObjectiveBase + " " + suffix
+	profileObjective := proposalObjective
 	candidates := buildBusinessProposalCandidates(suffix, conversationSeq)
 
 	memoryConn, err := grpc.NewClient("passthrough:///"+cfg.memoryTarget, grpc.WithTransportCredentials(insecure.NewCredentials()))
@@ -115,7 +116,7 @@ func verifyBusinessProposalScenario(
 	}
 
 	querySeq := candidates[len(candidates)-1].ValidFromSeq + 1
-	proposal, err := createBusinessProposal(ctx, cfg, seed, querySeq)
+	proposal, err := createBusinessProposal(ctx, cfg, seed, querySeq, proposalObjective)
 	if err != nil {
 		return businessProposalScenarioSummary{}, err
 	}
@@ -131,7 +132,7 @@ func verifyBusinessProposalScenario(
 	if err != nil {
 		return businessProposalScenarioSummary{}, err
 	}
-	execution, err := executeBusinessProposalAction(ctx, cfg, seed, proposal, approval, inputJSON)
+	execution, err := executeBusinessProposalAction(ctx, cfg, seed, proposal, approval, inputJSON, proposalObjective)
 	if err != nil {
 		return businessProposalScenarioSummary{}, err
 	}
@@ -162,7 +163,7 @@ func verifyBusinessProposalScenario(
 		if err != nil {
 			return businessProposalScenarioSummary{}, err
 		}
-		profile, err = verifyBusinessProfileMutation(ctx, cfg, seed, querySeq, candidates)
+		profile, err = verifyBusinessProfileMutation(ctx, cfg, seed, querySeq, candidates, profileObjective)
 		if err != nil {
 			return businessProposalScenarioSummary{}, err
 		}
@@ -222,17 +223,17 @@ func buildBusinessProposalCandidates(suffix string, conversationSeq int64) []gro
 		{
 			eventType:     memoryv1.MemoryEventType_MEMORY_EVENT_TYPE_DECISION,
 			eventTypeName: "DECISION",
-			factText:      "decision: phoenix launch business proposal source chain requires an owner-facing rollout note",
+			factText:      fmt.Sprintf("decision: phoenix launch business proposal source chain %s requires an owner-facing rollout note", suffix),
 		},
 		{
 			eventType:     memoryv1.MemoryEventType_MEMORY_EVENT_TYPE_TASK,
 			eventTypeName: "TASK",
-			factText:      "task: phoenix launch business proposal source chain must assign security review and release owner follow-up",
+			factText:      fmt.Sprintf("task: phoenix launch business proposal source chain %s must assign security review and release owner follow-up", suffix),
 		},
 		{
 			eventType:     memoryv1.MemoryEventType_MEMORY_EVENT_TYPE_STATUS,
 			eventTypeName: "STATUS",
-			factText:      "status: phoenix launch business proposal source chain is ready for approved conversation-note audit only",
+			factText:      fmt.Sprintf("status: phoenix launch business proposal source chain %s is ready for approved conversation-note audit only", suffix),
 		},
 	}
 	candidates := make([]groupMemoryCandidate, 0, len(facts))
@@ -259,6 +260,7 @@ func createBusinessProposal(
 	cfg config,
 	seed seedSummary,
 	conversationSeq int64,
+	objective string,
 ) (*agentv1.CreateAgentProposalResponse, error) {
 	dialOption, err := dialOptionFromTLSFlags(cfg.agentTLS, "agent-tls")
 	if err != nil {
@@ -274,13 +276,13 @@ func createBusinessProposal(
 	response, err := agentv1.NewAgentServiceClient(conn).CreateAgentProposal(requestCtx, &agentv1.CreateAgentProposalRequest{
 		AuthContext:       retrievalAuth(cfg, seed.ViewerUserID),
 		ConversationId:    seed.ConversationID,
-		Objective:         businessProposalObjective,
+		Objective:         objective,
 		ToolName:          defaultAgentToolName,
 		ToolAction:        policyv1.ToolAction_TOOL_ACTION_CALL,
 		ResourceType:      defaultAgentResourceType,
 		ResourceId:        seed.ConversationID,
 		RiskLevel:         "LOW",
-		Intent:            businessProposalObjective,
+		Intent:            objective,
 		Limit:             10,
 		IncludeSearch:     false,
 		IncludeMemory:     true,
@@ -340,6 +342,7 @@ func executeBusinessProposalAction(
 	proposal *agentv1.CreateAgentProposalResponse,
 	approval *agentv1.ApproveAgentProposalResponse,
 	inputJSON string,
+	intent string,
 ) (*actionexecutorv1.ExecuteApprovedActionResponse, error) {
 	conn, err := grpc.NewClient(
 		"passthrough:///"+cfg.actionTarget,
@@ -371,7 +374,7 @@ func executeBusinessProposalAction(
 			ResourceType:    defaultAgentResourceType,
 			ResourceId:      seed.ConversationID,
 			RiskLevel:       "LOW",
-			Intent:          businessProposalObjective,
+			Intent:          intent,
 			InputJson:       inputJSON,
 			IdempotencyKey:  proposal.GetProposalId() + "-business-execute",
 		},
@@ -578,6 +581,7 @@ func verifyBusinessProfileMutation(
 	seed seedSummary,
 	conversationSeq int64,
 	candidates []groupMemoryCandidate,
+	objective string,
 ) (businessProfileVerification, error) {
 	current, err := getConversationProfile(ctx, cfg, seed)
 	if err != nil {
@@ -590,7 +594,7 @@ func verifyBusinessProfileMutation(
 	if err != nil {
 		return businessProfileVerification{}, err
 	}
-	proposal, err := createBusinessProfileProposal(ctx, cfg, seed, conversationSeq)
+	proposal, err := createBusinessProfileProposal(ctx, cfg, seed, conversationSeq, objective)
 	if err != nil {
 		return businessProfileVerification{}, err
 	}
@@ -601,7 +605,7 @@ func verifyBusinessProfileMutation(
 	if err != nil {
 		return businessProfileVerification{}, err
 	}
-	execution, err := executeBusinessProfileAction(ctx, cfg, seed, proposal, approval, inputJSON)
+	execution, err := executeBusinessProfileAction(ctx, cfg, seed, proposal, approval, inputJSON, objective)
 	if err != nil {
 		return businessProfileVerification{}, err
 	}
@@ -661,6 +665,7 @@ func createBusinessProfileProposal(
 	cfg config,
 	seed seedSummary,
 	conversationSeq int64,
+	objective string,
 ) (*agentv1.CreateAgentProposalResponse, error) {
 	dialOption, err := dialOptionFromTLSFlags(cfg.agentTLS, "agent-tls")
 	if err != nil {
@@ -676,13 +681,13 @@ func createBusinessProfileProposal(
 	response, err := agentv1.NewAgentServiceClient(conn).CreateAgentProposal(requestCtx, &agentv1.CreateAgentProposalRequest{
 		AuthContext:       retrievalAuth(cfg, seed.ViewerUserID),
 		ConversationId:    seed.ConversationID,
-		Objective:         businessProfileObjective,
+		Objective:         objective,
 		ToolName:          defaultAgentProfileToolName,
 		ToolAction:        policyv1.ToolAction_TOOL_ACTION_CALL,
 		ResourceType:      defaultAgentResourceType,
 		ResourceId:        seed.ConversationID,
 		RiskLevel:         "LOW",
-		Intent:            businessProfileObjective,
+		Intent:            objective,
 		Limit:             10,
 		IncludeSearch:     false,
 		IncludeMemory:     true,
@@ -711,6 +716,7 @@ func executeBusinessProfileAction(
 	proposal *agentv1.CreateAgentProposalResponse,
 	approval *agentv1.ApproveAgentProposalResponse,
 	inputJSON string,
+	intent string,
 ) (*actionexecutorv1.ExecuteApprovedActionResponse, error) {
 	conn, err := grpc.NewClient(
 		"passthrough:///"+cfg.actionTarget,
@@ -742,7 +748,7 @@ func executeBusinessProfileAction(
 			ResourceType:    defaultAgentResourceType,
 			ResourceId:      seed.ConversationID,
 			RiskLevel:       "LOW",
-			Intent:          businessProfileObjective,
+			Intent:          intent,
 			InputJson:       inputJSON,
 			IdempotencyKey:  proposal.GetProposalId() + "-profile-execute",
 		},

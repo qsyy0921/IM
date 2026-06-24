@@ -225,8 +225,12 @@ IM messages -> search / memory projection -> EvidencePack -> RAG / Agent answer 
   已把 `-ExpectBusinessActionExecuted` 升级为 note + profile 双 mutation gate：
   execute-mode 必须同时验证 conversation note fact 和 public `GetConversationProfile`
   读回的 profile update；默认 audit-only 模式仍要求两类 mutation 都不执行。
-  当前已完成 adapter / runner focused tests；完整 service-stack profile mutation
-  报告仍待重建 action-executor runtime 后归档。
+  同日重建 action-executor / workflow-service runtime 后，
+  `ai-eval-service-stack-live-20260625-rag-agent-note-profile-mutation`
+  已通过真实 service-stack gate：4 adapters、27 cases、27 passed、0 failed、
+  0 skipped；`rag-agent-demo` 断言 `business_note_persisted=true`、
+  `business_profile_updated=true`、profile version 前进，且 profile output 只保留
+  title / avatar / announcement hash。
 - 2026-06-24 retrieval-gateway 已补 vector-index-service `SearchVectors` adapter
   first path：`RetrieveEvidence` 支持显式 `include_vector`，调用方必须提供低敏
   `query_embedding_ref`、明确的 `vector_collection_types`、`vector_visibility_scope`
@@ -392,8 +396,10 @@ IM messages -> search / memory projection -> EvidencePack -> RAG / Agent answer 
    `ai-eval-rag-agent-demo-live-20260625-business-mutation-execute-v7`
    真实完整 service-stack 归档，确认 approved Agent proposal 能经 action-executor
    写入真实 conversation note fact。`conversation.profile.update` 的 approved
-   mutation adapter 和 RAG-Agent runner / ai-eval gate contract 已补齐，后续重建
-   action-executor runtime 后归档 note + profile 双 mutation service-stack smoke。
+   mutation adapter 和 RAG-Agent runner / ai-eval gate contract 已补齐，并已通过
+   `ai-eval-service-stack-live-20260625-rag-agent-note-profile-mutation`
+   归档 note + profile 双 mutation service-stack smoke：approved Agent action 能同时写入
+   conversation note fact 并更新 conversation profile。
    EvidencePack source-chain-aware rerank first pass 已落到 retrieval-gateway：
    多来源 / 跨群 / actor attribution / graph-edge / profile-supporting evidence 会
    增加 `rerank_score`，并纳入 retrieval positive adapter 断言；当前已通过

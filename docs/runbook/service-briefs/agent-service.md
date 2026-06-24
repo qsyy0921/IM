@@ -80,7 +80,11 @@ proposal 前调用 `mcp-gateway.PrepareToolCall` 做 skill / policy / prepare au
   只保存 profile version / hash metadata；默认仍保持 audit-only gate。2026-06-25
   `ai-eval-rag-agent-demo-live-20260625-business-mutation-execute-v7` 已通过真实完整
   service-stack opt-in mutation smoke，确认 approved Agent proposal 能经 action-executor
-  写入真实 conversation note fact。
+  写入真实 conversation note fact。同日重建 action-executor / workflow-service runtime 后，
+  `ai-eval-service-stack-live-20260625-rag-agent-note-profile-mutation` 已通过真实
+  service-stack gate：4 adapters、27 cases、27 passed、0 failed、0 skipped；
+  该 gate 确认 approved Agent action 能同时写入真实 conversation note fact，并更新
+  conversation profile。
 - 2026-06-24 retrieval-gateway source-chain-aware rerank first pass 已落后，Agent
   仍只消费 EvidencePack，不自己实现排序或重查 source；proposal path 后续通过
   EvidencePack `rerank_score`、source refs、graph edges 和 profile evidence 继续扩展

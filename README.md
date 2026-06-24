@@ -402,7 +402,9 @@ conversation business adapter 接入 action-executor 和 `loadtest/ragagent` /
 `run-ai-eval-ragagent-adapter.ps1`：显式 execute-mode gate 现在要求 note + profile
 双 mutation，profile 路径通过 conversation-service public `UpdateConversationProfile`
 执行，并只在 summary 中保留 profile version 与 title / avatar / announcement hash；
-完整 live service-stack profile mutation 报告待重建 action-executor runtime 后归档。
+`ai-eval-service-stack-live-20260625-rag-agent-note-profile-mutation` 已归档：
+4 adapters、27 cases、27 passed、0 failed、0 skipped，确认 approved Agent action
+可同时写真实 conversation note fact 并更新真实 conversation profile。
 
 下一步默认看 [current-goal.md](docs/runbook/current-goal.md)。截至当前主线，客户端只修
 阻塞演示入口的问题；默认推进

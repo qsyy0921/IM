@@ -88,7 +88,11 @@ adapter、状态、计数、summary/report 引用和低敏 metadata。
   service-stack opt-in mutation smoke：4 adapters、27 cases、27 passed、0 failed、
   0 skipped；`rag-agent-demo` 确认 `business_action_executed=true`、
   `business_note_persisted=true`、execution status `RECORDED`，且真实 note fact
-  与 proposal / approval 绑定一致。
+  与 proposal / approval 绑定一致。同日重建 action-executor / workflow-service runtime 后，
+  `ai-eval-service-stack-live-20260625-rag-agent-note-profile-mutation` 已通过真实
+  service-stack gate：4 adapters、27 cases、27 passed、0 failed、0 skipped；
+  `rag-agent-demo` 进一步确认 `business_profile_updated=true`、profile version 前进，
+  且 profile output 只保留字段 hash。
 - 2026-06-24 `action-preflight-safety` adapter 已扩到 14 个 smoke cases，并在
   catalog 中新增 approval id、prepared audit id、resource id 绑定错配的
   `PROPOSAL_MISMATCH` 断言；这些 case 区分 action boundary failure 与

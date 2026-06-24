@@ -54,8 +54,13 @@
 - 同日 `loadtest/ragagent` / `run-ai-eval-ragagent-adapter.ps1` 已把
   `-ExpectBusinessActionExecuted` 升级为 note + profile 双 mutation gate；execute-mode
   必须同时验证 conversation note fact 和 public `GetConversationProfile` 读回的 profile
-  update，默认 audit-only 模式仍要求两类 mutation 都不执行。完整 live service-stack
-  profile mutation 报告仍待重建 action-executor runtime 后归档。
+  update，默认 audit-only 模式仍要求两类 mutation 都不执行。
+- 2026-06-25 重建 action-executor / workflow-service runtime 后，
+  `ai-eval-service-stack-live-20260625-rag-agent-note-profile-mutation` 已通过真实
+  service-stack gate：4 adapters、27 cases、27 passed、0 failed、0 skipped。
+  该报告确认 approved Agent action 能经 action-executor 同时写入真实 conversation
+  note fact，并通过 conversation-service public API 更新 conversation profile；tool
+  output 仍只保留 version / hash 元数据。
 
 ## 边界
 

@@ -3,8 +3,6 @@ package app
 import (
 	"context"
 	"fmt"
-	"sort"
-	"strings"
 
 	"github.com/qsyy0921/IM/services/retrieval-gateway/internal/types"
 )
@@ -189,7 +187,7 @@ func appendEvidenceCandidate(
 	coverage map[string]*sourceCoverageState,
 	item types.EvidenceItem,
 ) {
-	key := item.SourceType + ":" + item.SourceID
+	key := evidenceCandidateKey(item)
 	if index, ok := seen[key]; ok {
 		if state := coverage[item.SourceType]; state != nil {
 			state.DedupedCount++
@@ -197,99 +195,9 @@ func appendEvidenceCandidate(
 		(*items)[index].DedupeReason = types.EvidenceDedupeKeptFirstDuplicateSource
 		return
 	}
-	item.RerankScore = evidenceRerankScore(item)
 	item.DedupeReason = types.EvidenceDedupeUniqueSource
 	seen[key] = len(*items)
 	*items = append(*items, item)
-}
-
-func rerankEvidence(items []types.EvidenceItem, limit int) []types.EvidenceItem {
-	sort.SliceStable(items, func(i, j int) bool {
-		return items[i].RerankScore > items[j].RerankScore
-	})
-	if len(items) > limit {
-		items = items[:limit]
-	}
-	return items
-}
-
-func evidenceRerankScore(item types.EvidenceItem) float64 {
-	return clampScore(item.Score) + sourceChainRerankBonus(item)
-}
-
-func sourceChainRerankBonus(item types.EvidenceItem) float64 {
-	switch item.SourceType {
-	case types.EvidenceSourceMemoryEvent:
-		return memorySourceChainRerankBonus(item)
-	case types.EvidenceSourceProfileAggregate:
-		return profileSourceChainRerankBonus(item)
-	default:
-		return 0
-	}
-}
-
-func memorySourceChainRerankBonus(item types.EvidenceItem) float64 {
-	var bonus float64
-	if len(item.SourceRefs) > 0 {
-		bonus += 0.02
-	}
-	if len(item.SourceRefs) > 1 {
-		bonus += 0.08
-	}
-	if hasCrossConversationSourceRef(item.ConversationID, item.SourceRefs) {
-		bonus += 0.08
-	}
-	if len(item.ActorUserIDs) > 1 {
-		bonus += 0.06
-	}
-	if len(item.AudienceUserIDs) > 0 {
-		bonus += 0.04
-	}
-	if len(item.MemoryGraphEdges) > 0 {
-		bonus += 0.10
-	}
-	if memoryGraphSourceRefCount(item.MemoryGraphEdges) > 1 {
-		bonus += 0.04
-	}
-	return bonus
-}
-
-func profileSourceChainRerankBonus(item types.EvidenceItem) float64 {
-	var bonus float64
-	if len(item.SupportingMemoryEventIDs) > 1 {
-		bonus += 0.08
-	}
-	if item.ProfileSubjectUserID != "" {
-		bonus += 0.02
-	}
-	return bonus
-}
-
-func hasCrossConversationSourceRef(conversationID types.ConversationID, refs []types.EvidenceSourceRef) bool {
-	for _, ref := range refs {
-		if ref.ConversationID != "" && !strings.EqualFold(string(ref.ConversationID), string(conversationID)) {
-			return true
-		}
-	}
-	return false
-}
-
-func memoryGraphSourceRefCount(edges []types.MemoryGraphEdge) int {
-	count := 0
-	for _, edge := range edges {
-		count += len(edge.SourceRefs)
-	}
-	return count
-}
-
-func clampScore(score float64) float64 {
-	if score < 0 {
-		return 0
-	}
-	if score > 1 {
-		return 1
-	}
-	return score
 }
 
 func countEvidenceSources(items []types.EvidenceItem) map[string]int {

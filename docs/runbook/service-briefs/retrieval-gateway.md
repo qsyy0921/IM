@@ -64,6 +64,13 @@
   已通过真实 service-stack gate：4 adapters / 27 cases / 27 passed / 0 failed /
   0 skipped，retrieval case 的 9 个断言全通过，`memory_rerank_score=1.29`
   高于 single search baseline。
+- 2026-06-24 retrieval strategy version 已推进为
+  `retrieval-gateway.v1.hybrid-source-chain-rrf`：rerank 现在先收齐 search /
+  memory / profile candidates，再按 lexical search、memory event、profile aggregate、
+  source chain、memory graph、actor attribution、profile support 等 lane 做 RRF
+  风格融合，最后叠加 source-chain bonus 后截断 limit。该实现为后续 BM25 /
+  vector / graph provider 接入提供边界，不引入新中间件，也不把原始 provider
+  score 直接跨 lane 比较。
 
-下一步：继续把 BM25 / vector / graph expansion 与
+下一步：继续把真实 BM25 / vector provider adapter、graph expansion depth 和
 更细 source-chain coverage 通过 EvidencePack 暴露给 RAG / summary / Agent，仍不绕过 retrieval-gateway。

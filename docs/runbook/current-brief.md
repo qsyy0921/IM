@@ -240,4 +240,9 @@ fail-closed，不写 execution audit、不写 tool result projection、不调用
   已通过真实 service-stack gate：4 adapters、27 cases、27 passed、0 failed、
   0 skipped，且 retrieval adapter 断言 `memory_rerank_score=1.29` 高于 single
   search baseline。
+- retrieval strategy version 已推进为
+  `retrieval-gateway.v1.hybrid-source-chain-rrf`：rerank 在截断 limit 前先按
+  lexical search、memory event、profile aggregate、source chain、memory graph、
+  actor attribution 和 profile support lane 做 RRF 风格融合，再叠加 source-chain
+  信号；后续继续接真实 BM25 / vector provider adapter 和 graph expansion depth。
 - 真实 mutation 必须等显式业务 adapter、approval、executor、audit 全部就绪后再扩展。

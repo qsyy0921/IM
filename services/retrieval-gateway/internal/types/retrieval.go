@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	RetrievalVersion = "retrieval-gateway.v1"
+	RetrievalVersion = "retrieval-gateway.v1.hybrid-source-chain-rrf"
 
 	DefaultEvidenceLimit = 20
 	MaxEvidenceLimit     = 50

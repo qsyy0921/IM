@@ -45,8 +45,13 @@ RAG / summary / Agent 必须消费 `EvidencePack`，不能绕过 retrieval-gatew
 - `source_refs`：message id、source event id、conversation id、seq、occurred time。
 - `valid_from_seq` / `valid_to_seq`：memory temporal window。
 - `temporal_status` / `review_state` / `extraction_version`。
-- `rerank_score`：retrieval-gateway 本地统一排序分，第一版使用 search score /
-  memory confidence clamp 到 `[0, 1]`。
+- `rerank_score`：retrieval-gateway 本地统一排序分。当前策略版本为
+  `retrieval-gateway.v1.hybrid-source-chain-rrf`：先保留各 source 的本地分数
+  clamp 到 `[0, 1]`，再叠加 source-chain 信号和 RRF 风格 lane fusion。
+  lane 包括 lexical search、memory event、profile aggregate、source chain、
+  memory graph、actor attribution、profile support。该策略不直接比较 BM25、
+  vector、graph provider 的原始分数；新增 provider 必须以独立 lane / rank
+  进入融合。
 - `dedupe_reason`：证据去重语义，第一版按 `source_type + source_id` 去重，保留
   first duplicate source。
 - `source_coverage`：按 source type 返回 requested、candidate_count、

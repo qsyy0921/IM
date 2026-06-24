@@ -84,7 +84,7 @@ func TestRetrieveEvidenceMergesSearchAndMemory(t *testing.T) {
 	if result.Pack.RetrievalVersion != types.RetrievalVersion {
 		t.Fatalf("unexpected retrieval version %q", result.Pack.RetrievalVersion)
 	}
-	if result.Pack.Items[0].RerankScore != 1 || result.Pack.Items[0].DedupeReason != types.EvidenceDedupeUniqueSource {
+	if result.Pack.Items[0].RerankScore <= 1 || result.Pack.Items[0].DedupeReason != types.EvidenceDedupeUniqueSource {
 		t.Fatalf("unexpected search item rank metadata: %+v", result.Pack.Items[0])
 	}
 	if result.Pack.Items[1].RerankScore <= result.Pack.Items[1].Score ||
@@ -407,6 +407,58 @@ func TestRetrieveEvidenceRerankRewardsSourceChainBeforeTruncating(t *testing.T) 
 	if coverage := result.Pack.SourceCoverage; coverage[0].Status != types.EvidenceCoverageFiltered ||
 		coverage[1].Status != types.EvidenceCoverageReturned {
 		t.Fatalf("unexpected coverage after source-chain rerank truncation: %+v", coverage)
+	}
+}
+
+func TestRankFusionRewardsMultiLaneEvidence(t *testing.T) {
+	items := []types.EvidenceItem{
+		{
+			SourceType:     types.EvidenceSourceSearchMessage,
+			SourceID:       "msg-search",
+			ConversationID: "conv-1",
+			Score:          1,
+		},
+		{
+			SourceType:      types.EvidenceSourceMemoryEvent,
+			SourceID:        "mem-chain",
+			ConversationID:  "conv-1",
+			Score:           0.74,
+			ActorUserIDs:    []string{"user-a", "user-b"},
+			AudienceUserIDs: []string{"user-1"},
+			SourceRefs: []types.EvidenceSourceRef{
+				{SourceType: "MESSAGE", SourceID: "msg-a", ConversationID: "conv-1", ConversationSeq: 11},
+				{SourceType: "MESSAGE", SourceID: "msg-b", ConversationID: "conv-cross", ConversationSeq: 12},
+			},
+			MemoryGraphEdges: []types.MemoryGraphEdge{{
+				EdgeID:       "edge-1",
+				RelationType: "SUPPORTS",
+				SourceRefs: []types.EvidenceSourceRef{
+					{SourceType: "MESSAGE", SourceID: "msg-a", ConversationID: "conv-1", ConversationSeq: 11},
+					{SourceType: "MESSAGE", SourceID: "msg-b", ConversationID: "conv-cross", ConversationSeq: 12},
+				},
+			}},
+		},
+		{
+			SourceType:               types.EvidenceSourceProfileAggregate,
+			SourceID:                 "profile-1",
+			Score:                    0.82,
+			ProfileSubjectUserID:     "user-1",
+			SupportingMemoryEventIDs: []string{"mem-a", "mem-b"},
+		},
+	}
+
+	scores := rankFusionScores(items)
+	searchScore := scores[evidenceCandidateKey(items[0])]
+	memoryScore := scores[evidenceCandidateKey(items[1])]
+	profileScore := scores[evidenceCandidateKey(items[2])]
+	if searchScore <= 0 {
+		t.Fatalf("expected lexical search lane score, got %f", searchScore)
+	}
+	if memoryScore <= searchScore {
+		t.Fatalf("expected memory evidence with source-chain, graph, and actor lanes to outrank single-lane search fusion: search=%f memory=%f", searchScore, memoryScore)
+	}
+	if profileScore <= searchScore {
+		t.Fatalf("expected profile evidence with support lanes to outrank single-lane search fusion: search=%f profile=%f", searchScore, profileScore)
 	}
 }
 

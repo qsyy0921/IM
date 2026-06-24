@@ -280,7 +280,12 @@ IM messages -> search / memory projection -> EvidencePack -> RAG / Agent answer 
    `ai-eval-service-stack-live-20260624-retrieval-source-chain-rerank-v2`
    归档：4 adapters / 27 cases / 27 passed / 0 failed / 0 skipped，
    `memory_rerank_score=1.29` 高于 single search baseline。显式业务
-   mutation 场景必须等业务 adapter 准备好后再扩展。
+   mutation 场景必须等业务 adapter 准备好后再扩展。retrieval strategy version
+   已推进为 `retrieval-gateway.v1.hybrid-source-chain-rrf`：rerank 在截断 limit
+   前按 lexical search、memory event、profile aggregate、source chain、
+   memory graph、actor attribution 和 profile support lane 做 RRF 风格融合，
+   为后续真实 BM25 / vector provider adapter 和 graph expansion depth 接入留下
+   明确边界。
 5. 客户端只作为演示入口；除非阻塞上述演示，不继续扩 UI 产品化。
 6. Windows release signing / MSI / NSIS installer、完整 Android、完整移动端发布、
    复杂 UI、群管理深水区和真实 media provider 链路全部后置到 backlog。

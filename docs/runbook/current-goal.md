@@ -201,6 +201,12 @@ IM messages -> search / memory projection -> EvidencePack -> RAG / Agent answer 
   `NEXUSIM_ACTION_EXECUTOR_CONVERSATION_GRPC_ADDR` 后，`conversation.note.create`
   会通过 conversation-service 公开 `CreateConversationNote` 写入真实 note fact；未配置时
   仍要求 `business_action_executed=false`，不伪造业务成功。
+  同日 `loadtest/ragagent` 与 `run-ai-eval-ragagent-adapter.ps1` 已支持显式
+  execute-mode gate：开启 `--expect-business-action-executed` /
+  `-ExpectBusinessActionExecuted` 时必须看到 action-executor `executed=true`、
+  result `SUCCEEDED`、低敏 tool output 不回显 note body，并由 loadtest verification
+  确认 `conversation_notes` 中真实 note fact 与 proposal / approval 绑定一致；默认路径仍是
+  audit-only gate。
   真实 `ai-eval-rag-agent-demo-live-20260624-business-proposal-source-chain-gate-v1`
   service-stack gate 已通过：4 adapters、27 cases、27 passed、0 failed、0 skipped。
 - 2026-06-24 retrieval-gateway 已补 vector-index-service `SearchVectors` adapter
@@ -363,7 +369,9 @@ IM messages -> search / memory projection -> EvidencePack -> RAG / Agent answer 
    与 `rag-agent-demo` adapter 已把 public candidate review 和 temporal update
    纳入 RAG / Agent EvidencePack 断言链路，并已通过真实 service-stack gate 归档；
    profile repair approval、negative gate、group-memory answer / proposal gate 和
-   business proposal source-chain gate 均已通过真实 service-stack gate 归档。
+   business proposal source-chain gate 均已通过真实 service-stack gate 归档；
+   opt-in business mutation execute-mode gate 已具备代码和 focused checks，真实完整
+   service-stack 报告待本地服务栈重新启动后归档。
    EvidencePack source-chain-aware rerank first pass 已落到 retrieval-gateway：
    多来源 / 跨群 / actor attribution / graph-edge / profile-supporting evidence 会
    增加 `rerank_score`，并纳入 retrieval positive adapter 断言；当前已通过
@@ -371,8 +379,9 @@ IM messages -> search / memory projection -> EvidencePack -> RAG / Agent answer 
    `ai-eval-service-stack-live-20260624-retrieval-source-chain-rerank-v2`
    归档：4 adapters / 27 cases / 27 passed / 0 failed / 0 skipped，
    `memory_rerank_score=1.29` 高于 single search baseline。显式
-   `conversation.note.create` business adapter 已补齐；下一步是把 RAG-Agent demo
-   从 audit-only gate 扩展到 opt-in business mutation smoke。retrieval strategy version
+   `conversation.note.create` business adapter 和 RAG-Agent opt-in execute-mode gate 已补齐；
+   下一步是在完整本地服务栈上归档 `conversation.note.create` opt-in mutation smoke。
+   retrieval strategy version
    已推进为 `retrieval-gateway.v1.hybrid-source-vector-rrf-graph-depth<N>`：rerank 在截断 limit
    前按 lexical search、memory event、profile aggregate、source chain、
    vector item、memory graph、actor attribution 和 profile support lane 做 RRF 风格融合，

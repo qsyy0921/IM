@@ -42,26 +42,27 @@ const (
 )
 
 type config struct {
-	pgDSN          string
-	memoryTarget   string
-	ragTarget      string
-	agentTarget    string
-	actionTarget   string
-	workflowTarget string
-	resultRoot     string
-	runName        string
-	tenantID       string
-	conversationID string
-	viewerUserID   string
-	senderUserID   string
-	deviceID       string
-	question       string
-	objective      string
-	expectExecuted bool
-	requestTimeout time.Duration
-	ragTLS         tlsFlags
-	agentTLS       tlsFlags
-	workflowTLS    tlsFlags
+	pgDSN                        string
+	memoryTarget                 string
+	ragTarget                    string
+	agentTarget                  string
+	actionTarget                 string
+	workflowTarget               string
+	resultRoot                   string
+	runName                      string
+	tenantID                     string
+	conversationID               string
+	viewerUserID                 string
+	senderUserID                 string
+	deviceID                     string
+	question                     string
+	objective                    string
+	expectExecuted               bool
+	expectBusinessActionExecuted bool
+	requestTimeout               time.Duration
+	ragTLS                       tlsFlags
+	agentTLS                     tlsFlags
+	workflowTLS                  tlsFlags
 }
 
 type tlsFlags struct {
@@ -213,6 +214,11 @@ type combinedSummary struct {
 	BusinessProposalApprovalRecorded       bool                               `json:"business_proposal_approval_recorded"`
 	BusinessActionAuditRecorded            bool                               `json:"business_action_audit_recorded"`
 	BusinessActionExecuted                 bool                               `json:"business_action_executed"`
+	BusinessActionMode                     string                             `json:"business_action_mode"`
+	BusinessNotePersisted                  bool                               `json:"business_note_persisted"`
+	BusinessNoteID                         string                             `json:"business_note_id,omitempty"`
+	BusinessNoteRef                        string                             `json:"business_note_ref,omitempty"`
+	BusinessNoteBodySHA256                 string                             `json:"business_note_body_sha256,omitempty"`
 	BusinessProposalID                     string                             `json:"business_proposal_id,omitempty"`
 	BusinessApprovalID                     string                             `json:"business_approval_id,omitempty"`
 	BusinessExecutionID                    string                             `json:"business_execution_id,omitempty"`
@@ -333,6 +339,7 @@ func parseConfig(args []string) (config, error) {
 	flagSet.StringVar(&cfg.question, "question", defaultQuestion, "question sent to rag-service")
 	flagSet.StringVar(&cfg.objective, "objective", defaultObjective, "objective sent to agent-service")
 	flagSet.BoolVar(&cfg.expectExecuted, "expect-executed", false, "expect action-executor to run the safe local tool in the Agent child run")
+	flagSet.BoolVar(&cfg.expectBusinessActionExecuted, "expect-business-action-executed", false, "expect business proposal action to create a real conversation note via action-executor")
 	flagSet.DurationVar(&cfg.requestTimeout, "request-timeout", 10*time.Second, "child gRPC request timeout")
 	flagSet.StringVar(&cfg.ragTLS.caFile, "rag-tls-ca-file", "", "rag gRPC TLS CA file")
 	flagSet.StringVar(&cfg.ragTLS.serverName, "rag-tls-server-name", "", "rag gRPC TLS server name")
@@ -929,7 +936,6 @@ func verifyCombined(
 	if !businessProposal.ProposalVerified ||
 		!businessProposal.ApprovalRecorded ||
 		!businessProposal.ActionAuditRecorded ||
-		businessProposal.ActionExecuted ||
 		businessProposal.MemoryEventCount < 3 ||
 		businessProposal.EvidenceMemoryCount < businessProposal.MemoryEventCount ||
 		businessProposal.SourceRefCount < businessProposal.MemoryEventCount*2 ||
@@ -941,7 +947,17 @@ func verifyCombined(
 		strings.TrimSpace(businessProposal.ActionInputSHA256) == "" {
 		return combinedSummary{}, errors.New("business proposal scenario did not preserve source-chain evidence and approval/audit boundary")
 	}
-	verified = append(verified, "Business proposal preserved multi-event source-chain evidence and recorded approval/action audit without executing an unconfigured mutation")
+	if cfg.expectBusinessActionExecuted {
+		if !businessProposal.ActionExecuted || !businessProposal.NotePersisted || strings.TrimSpace(businessProposal.NoteID) == "" {
+			return combinedSummary{}, errors.New("business proposal execute mode did not persist a verified conversation note")
+		}
+		verified = append(verified, "Business proposal preserved source-chain evidence, approval/audit and executed a verified conversation note mutation")
+	} else {
+		if businessProposal.ActionExecuted || businessProposal.NotePersisted {
+			return combinedSummary{}, errors.New("business proposal audit-only mode unexpectedly executed a business mutation")
+		}
+		verified = append(verified, "Business proposal preserved multi-event source-chain evidence and recorded approval/action audit without executing an unconfigured mutation")
+	}
 	if !profileRepair.ApprovalRequested ||
 		!profileRepair.WorkflowApproved ||
 		!profileRepair.ApprovalVerified ||
@@ -1025,6 +1041,11 @@ func verifyCombined(
 		BusinessProposalApprovalRecorded:       businessProposal.ApprovalRecorded,
 		BusinessActionAuditRecorded:            businessProposal.ActionAuditRecorded,
 		BusinessActionExecuted:                 businessProposal.ActionExecuted,
+		BusinessActionMode:                     businessProposal.ActionMode,
+		BusinessNotePersisted:                  businessProposal.NotePersisted,
+		BusinessNoteID:                         businessProposal.NoteID,
+		BusinessNoteRef:                        businessProposal.NoteRef,
+		BusinessNoteBodySHA256:                 businessProposal.NoteBodySHA256,
 		BusinessProposalID:                     businessProposal.ProposalID,
 		BusinessApprovalID:                     businessProposal.ApprovalID,
 		BusinessExecutionID:                    businessProposal.ExecutionID,

@@ -80,7 +80,11 @@
   `conversation.note.create` proposal，并经 approval / action-executor audit 记录，
   未配置真实 mutation adapter 时不执行业务写动作。2026-06-25 已补显式 opt-in
   conversation note business adapter，配置 conversation-service gRPC 地址后可写真实
-  note fact；下一步补 RAG-Agent opt-in business mutation smoke。EvidencePack source-chain-aware
+  note fact；同日 `loadtest/ragagent` / `run-ai-eval-ragagent-adapter.ps1` 已补
+  execute-mode gate，开启显式 flag 后要求 action-executor 执行成功、tool output
+  低敏且不回显 note body，并验证 `conversation_notes` 中真实 note fact 与
+  proposal / approval 绑定一致；下一步是在完整本地服务栈上归档 RAG-Agent opt-in
+  business mutation smoke 报告。EvidencePack source-chain-aware
   rerank first pass 已进入 retrieval-gateway，并已通过
   `ai-eval-service-stack-live-20260624-retrieval-source-chain-rerank-v2`
   真实 service-stack gate；`retrieval-gateway.v1.hybrid-source-vector-rrf-graph-depth<N>` 已补

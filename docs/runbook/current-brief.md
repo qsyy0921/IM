@@ -202,6 +202,12 @@ conversation note business adapter：配置
 `NEXUSIM_ACTION_EXECUTOR_CONVERSATION_GRPC_ADDR` 后，action-executor 会通过
 conversation-service 公开 `CreateConversationNote` 写入真实 note fact；未配置时仍必须
 `business_action_executed=false`，不伪造业务成功。
+2026-06-25 `loadtest/ragagent` 和 `run-ai-eval-ragagent-adapter.ps1` 已补显式
+execute-mode gate：`--expect-business-action-executed` / `-ExpectBusinessActionExecuted`
+会要求 action-executor `executed=true`、result `SUCCEEDED`、tool output 不回显 note body，
+并用 loadtest verification 读取 `conversation_notes` 确认 note fact 与 approval / proposal
+绑定一致；默认仍是 audit-only gate。focused Go checks 已通过，真实完整 service-stack
+opt-in smoke 报告仍待下一次启动完整本地服务栈后归档。
 同日 Python AI Worker 已补 memory extraction candidate first path：
 `ai/python/nexusim_ai_memory` 只从显式 low-sensitive message batch 的
 `decision:` / `task:` / `status:` / `blocker:` / `file:` / `profile_signal:`

@@ -7,7 +7,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	actionexecutorv1 "github.com/qsyy0921/IM/api/proto/nexusim/actionexecutor/v1"
 	agentv1 "github.com/qsyy0921/IM/api/proto/nexusim/agent/v1"
 	memoryv1 "github.com/qsyy0921/IM/api/proto/nexusim/memory/v1"
@@ -19,11 +21,21 @@ import (
 
 const businessProposalObjective = "phoenix launch business proposal source chain"
 
+const (
+	businessActionModeAuditOnly = "audit-only"
+	businessActionModeExecute   = "execute"
+)
+
 type businessProposalScenarioSummary struct {
 	ProposalVerified       bool     `json:"business_proposal_verified"`
 	ApprovalRecorded       bool     `json:"business_proposal_approval_recorded"`
 	ActionAuditRecorded    bool     `json:"business_action_audit_recorded"`
 	ActionExecuted         bool     `json:"business_action_executed"`
+	ActionMode             string   `json:"business_action_mode"`
+	NotePersisted          bool     `json:"business_note_persisted"`
+	NoteID                 string   `json:"business_note_id,omitempty"`
+	NoteRef                string   `json:"business_note_ref,omitempty"`
+	NoteBodySHA256         string   `json:"business_note_body_sha256,omitempty"`
 	ProposalID             string   `json:"business_proposal_id,omitempty"`
 	ApprovalID             string   `json:"business_approval_id,omitempty"`
 	ExecutionID            string   `json:"business_execution_id,omitempty"`
@@ -99,7 +111,7 @@ func verifyBusinessProposalScenario(
 	if err != nil {
 		return businessProposalScenarioSummary{}, err
 	}
-	inputJSON, inputHash, err := businessActionInput(candidates)
+	inputJSON, inputHash, noteBody, noteBodyHash, err := businessActionInput(candidates)
 	if err != nil {
 		return businessProposalScenarioSummary{}, err
 	}
@@ -122,8 +134,21 @@ func verifyBusinessProposalScenario(
 		execution.GetResourceId() != seed.ConversationID {
 		return businessProposalScenarioSummary{}, fmt.Errorf("business action binding mismatch: %+v", execution)
 	}
-	if execution.GetExecuted() {
-		return businessProposalScenarioSummary{}, errors.New("business proposal scenario must record audit without executing an unconfigured business mutation")
+	actionMode := businessActionModeAuditOnly
+	var note businessNoteVerification
+	if cfg.expectBusinessActionExecuted {
+		actionMode = businessActionModeExecute
+		if !execution.GetExecuted() || execution.GetResultStatus() != "SUCCEEDED" {
+			return businessProposalScenarioSummary{}, fmt.Errorf("business action should execute in execute mode: executed=%v result_status=%q", execution.GetExecuted(), execution.GetResultStatus())
+		}
+		note, err = verifyBusinessNoteExecution(ctx, cfg, seed, proposal, approval, execution, noteBody, noteBodyHash, inputHash)
+		if err != nil {
+			return businessProposalScenarioSummary{}, err
+		}
+	} else {
+		if execution.GetExecuted() || execution.GetResultStatus() != "NOT_EXECUTED" {
+			return businessProposalScenarioSummary{}, fmt.Errorf("business proposal audit-only mode should not execute mutation: executed=%v result_status=%q", execution.GetExecuted(), execution.GetResultStatus())
+		}
 	}
 
 	return businessProposalScenarioSummary{
@@ -131,6 +156,11 @@ func verifyBusinessProposalScenario(
 		ApprovalRecorded:       true,
 		ActionAuditRecorded:    true,
 		ActionExecuted:         execution.GetExecuted(),
+		ActionMode:             actionMode,
+		NotePersisted:          note.Persisted,
+		NoteID:                 note.NoteID,
+		NoteRef:                note.NoteRef,
+		NoteBodySHA256:         note.BodySHA256,
 		ProposalID:             proposal.GetProposalId(),
 		ApprovalID:             approval.GetApprovalId(),
 		ExecutionID:            execution.GetExecutionId(),
@@ -322,21 +352,127 @@ func executeBusinessProposalAction(
 	return response, nil
 }
 
-func businessActionInput(candidates []groupMemoryCandidate) (string, string, error) {
+func businessActionInput(candidates []groupMemoryCandidate) (string, string, string, string, error) {
 	eventHashes := make([]string, 0, len(candidates))
 	for _, candidate := range candidates {
 		eventHashes = append(eventHashes, sha256Hex(candidate.EventID))
 	}
+	body := "Phoenix launch follow-up note: security review and release owner follow-up are approved from reviewed group memory."
 	encoded, err := json.Marshal(map[string]any{
 		"action":                "conversation_note_create",
-		"body":                  "Phoenix launch follow-up note: security review and release owner follow-up are approved from reviewed group memory.",
+		"body":                  body,
 		"source":                "loadtest/ragagent",
 		"evidence_event_count":  len(candidates),
 		"evidence_event_hashes": eventHashes,
 	})
 	if err != nil {
-		return "", "", err
+		return "", "", "", "", err
 	}
 	sum := sha256.Sum256(encoded)
-	return string(encoded), hex.EncodeToString(sum[:]), nil
+	return string(encoded), hex.EncodeToString(sum[:]), body, sha256Hex(body), nil
+}
+
+type businessNoteVerification struct {
+	Persisted  bool
+	NoteID     string
+	NoteRef    string
+	BodySHA256 string
+}
+
+type businessNoteExecutionOutput struct {
+	SchemaVersion    int    `json:"schema_version"`
+	Adapter          string `json:"adapter"`
+	ToolName         string `json:"tool_name"`
+	ResourceType     string `json:"resource_type"`
+	ResourceID       string `json:"resource_id"`
+	InputSHA256      string `json:"input_sha256"`
+	Status           string `json:"status"`
+	ConversationID   string `json:"conversation_id"`
+	NoteID           string `json:"note_id"`
+	NoteRef          string `json:"note_ref"`
+	IdempotentReplay bool   `json:"idempotent_replay"`
+}
+
+func verifyBusinessNoteExecution(
+	ctx context.Context,
+	cfg config,
+	seed seedSummary,
+	proposal *agentv1.CreateAgentProposalResponse,
+	approval *agentv1.ApproveAgentProposalResponse,
+	execution *actionexecutorv1.ExecuteApprovedActionResponse,
+	noteBody string,
+	noteBodySHA256 string,
+	inputSHA256 string,
+) (businessNoteVerification, error) {
+	outputJSON := strings.TrimSpace(execution.GetOutputJson())
+	if outputJSON == "" || outputJSON == "{}" {
+		return businessNoteVerification{}, errors.New("business action execute mode returned empty output")
+	}
+	if strings.Contains(outputJSON, noteBody) {
+		return businessNoteVerification{}, errors.New("business action output must not echo conversation note body")
+	}
+	var output businessNoteExecutionOutput
+	if err := json.Unmarshal([]byte(outputJSON), &output); err != nil {
+		return businessNoteVerification{}, fmt.Errorf("decode business action output: %w", err)
+	}
+	if output.Adapter != "conversation-note" ||
+		output.Status != "created" ||
+		output.ToolName != defaultAgentToolName ||
+		output.ResourceType != defaultAgentResourceType ||
+		output.ResourceID != seed.ConversationID ||
+		output.ConversationID != seed.ConversationID ||
+		output.NoteID == "" ||
+		output.NoteRef == "" ||
+		output.InputSHA256 != inputSHA256 {
+		return businessNoteVerification{}, fmt.Errorf("business action output mismatch: %+v", output)
+	}
+
+	connectCtx, cancel := context.WithTimeout(ctx, cfg.requestTimeout)
+	defer cancel()
+	pool, err := pgxpool.New(connectCtx, cfg.pgDSN)
+	if err != nil {
+		return businessNoteVerification{}, fmt.Errorf("connect postgres for conversation note verification: %w", err)
+	}
+	defer pool.Close()
+
+	queryCtx, queryCancel := context.WithTimeout(ctx, cfg.requestTimeout)
+	defer queryCancel()
+	var body string
+	var authorUserID string
+	var sourceToolName string
+	var sourceProposalID string
+	var sourceApprovalID string
+	if err := pool.QueryRow(queryCtx, `
+SELECT
+    body,
+    author_user_id,
+    source_tool_name,
+    source_proposal_id,
+    source_approval_id
+FROM conversation_notes
+WHERE tenant_id = $1
+  AND conversation_id = $2
+  AND note_id = $3
+`, cfg.tenantID, seed.ConversationID, output.NoteID).Scan(
+		&body,
+		&authorUserID,
+		&sourceToolName,
+		&sourceProposalID,
+		&sourceApprovalID,
+	); err != nil {
+		return businessNoteVerification{}, fmt.Errorf("query persisted conversation note: %w", err)
+	}
+	if body != noteBody ||
+		authorUserID != seed.ViewerUserID ||
+		sourceToolName != defaultAgentToolName ||
+		sourceProposalID != proposal.GetProposalId() ||
+		sourceApprovalID != approval.GetApprovalId() {
+		return businessNoteVerification{}, errors.New("persisted conversation note does not match approved business action")
+	}
+	return businessNoteVerification{
+		Persisted:  true,
+		NoteID:     output.NoteID,
+		NoteRef:    output.NoteRef,
+		BodySHA256: noteBodySHA256,
+	}, nil
 }

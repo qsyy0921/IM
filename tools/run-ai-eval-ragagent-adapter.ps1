@@ -9,7 +9,8 @@ param(
     [string]$ResultRoot = "H:\NexusIM\loadtest-results",
     [string]$RunName = "",
     [string]$OutputPath = "",
-    [string]$RequestTimeout = "10s"
+    [string]$RequestTimeout = "10s",
+    [switch]$ExpectBusinessActionExecuted
 )
 
 $ErrorActionPreference = "Stop"
@@ -108,6 +109,9 @@ $runArgs = @(
     "-objective", "phoenix launch decision",
     "-request-timeout", $RequestTimeout
 )
+if ($ExpectBusinessActionExecuted) {
+    $runArgs += "-expect-business-action-executed"
+}
 
 Push-Location $repoRoot
 try {
@@ -176,11 +180,10 @@ Add-Assertion -Assertions $assertions -Type "group_memory_answer_and_proposal_mu
     $null -ne $summary.group_memory_fact_sha256 -and
     @($summary.group_memory_fact_sha256 | Where-Object { ([string]$_).Trim().Length -eq 64 }).Count -ge 3
 )
-Add-Assertion -Assertions $assertions -Type "business_proposal_must_preserve_source_chain_and_audit_boundary" -Passed (
+$businessBasePassed = (
     (Get-JsonPropertyBool -Object $summary -Name "business_proposal_verified") -and
     (Get-JsonPropertyBool -Object $summary -Name "business_proposal_approval_recorded") -and
     (Get-JsonPropertyBool -Object $summary -Name "business_action_audit_recorded") -and
-    -not (Get-JsonPropertyBool -Object $summary -Name "business_action_executed") -and
     (Get-JsonPropertyString -Object $summary -Name "business_execution_status") -eq "RECORDED" -and
     [int]$summary.business_proposal_memory_event_count -ge 3 -and
     [int]$summary.business_proposal_evidence_memory_count -ge [int]$summary.business_proposal_memory_event_count -and
@@ -194,6 +197,24 @@ Add-Assertion -Assertions $assertions -Type "business_proposal_must_preserve_sou
     (Get-JsonPropertyBool -Object $summary -Name "business_policy_allowed") -and
     (Get-JsonPropertyBool -Object $summary -Name "business_policy_requires_approval")
 )
+if ($ExpectBusinessActionExecuted) {
+    Add-Assertion -Assertions $assertions -Type "business_proposal_must_execute_approved_conversation_note" -Passed (
+        $businessBasePassed -and
+        (Get-JsonPropertyString -Object $summary -Name "business_action_mode") -eq "execute" -and
+        (Get-JsonPropertyBool -Object $summary -Name "business_action_executed") -and
+        (Get-JsonPropertyBool -Object $summary -Name "business_note_persisted") -and
+        (Get-JsonPropertyString -Object $summary -Name "business_note_id").Length -gt 0 -and
+        (Get-JsonPropertyString -Object $summary -Name "business_note_ref").Length -gt 0 -and
+        (Get-JsonPropertyString -Object $summary -Name "business_note_body_sha256").Length -eq 64
+    )
+} else {
+    Add-Assertion -Assertions $assertions -Type "business_proposal_must_preserve_source_chain_and_audit_boundary" -Passed (
+        $businessBasePassed -and
+        (Get-JsonPropertyString -Object $summary -Name "business_action_mode") -eq "audit-only" -and
+        -not (Get-JsonPropertyBool -Object $summary -Name "business_action_executed") -and
+        -not (Get-JsonPropertyBool -Object $summary -Name "business_note_persisted")
+    )
+}
 Add-Assertion -Assertions $assertions -Type "profile_repair_must_require_workflow_approval_and_enter_evidence_chain" -Passed (
     (Get-JsonPropertyBool -Object $summary -Name "profile_repair_approval_requested") -and
     (Get-JsonPropertyBool -Object $summary -Name "profile_repair_workflow_approved") -and

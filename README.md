@@ -391,6 +391,10 @@ Agent proposal EvidencePack，并保留 source refs / cross-group source refs。
 2026-06-25 已补显式 opt-in conversation note business adapter：配置
 `NEXUSIM_ACTION_EXECUTOR_CONVERSATION_GRPC_ADDR` 后，action-executor 会通过
 conversation-service 公开 `CreateConversationNote` 写真实 note fact；未配置时仍必须不执行业务写动作。
+同日 `loadtest/ragagent` 和 `run-ai-eval-ragagent-adapter.ps1` 已补显式 execute-mode
+gate：开启后要求 action-executor `SUCCEEDED`、低敏 output 不回显 note body，并确认
+`conversation_notes` 中 note fact 与 proposal / approval 绑定一致；完整 service-stack
+opt-in mutation 报告仍待本地服务栈重新启动后归档。
 
 下一步默认看 [current-goal.md](docs/runbook/current-goal.md)。截至当前主线，客户端只修
 阻塞演示入口的问题；默认推进

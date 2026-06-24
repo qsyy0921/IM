@@ -72,6 +72,10 @@ proposal 前调用 `mcp-gateway.PrepareToolCall` 做 skill / policy / prepare au
   `conversation.note.create` business adapter；配置 conversation-service gRPC 地址后，
   action-executor 可写真实 note fact。未配置时仍要求
   `business_action_executed=false`，证明 source-chain、approval 和 audit 边界，而不是伪造业务写入。
+  同日 `loadtest/ragagent` 已补 execute-mode gate：显式开启
+  `--expect-business-action-executed` 时必须确认 action-executor 执行成功、输出低敏且不回显
+  note body，并验证 `conversation_notes` 中 note fact 与 proposal / approval 绑定一致；
+  默认仍保持 audit-only gate。
 - 2026-06-24 retrieval-gateway source-chain-aware rerank first pass 已落后，Agent
   仍只消费 EvidencePack，不自己实现排序或重查 source；proposal path 后续通过
   EvidencePack `rerank_score`、source refs、graph edges 和 profile evidence 继续扩展
@@ -85,5 +89,5 @@ proposal 前调用 `mcp-gateway.PrepareToolCall` 做 skill / policy / prepare au
 
 ## 下一步
 
-- 继续消费并校验 EvidencePack source-chain / rerank coverage；下一步补
+- 继续消费并校验 EvidencePack source-chain / rerank coverage；下一步在完整本地服务栈上归档
   `conversation.note.create` opt-in business mutation smoke。

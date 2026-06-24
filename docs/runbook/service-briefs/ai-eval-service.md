@@ -75,7 +75,10 @@ adapter、状态、计数、summary/report 引用和低敏 metadata。
   `DECISION` / `TASK` / `STATUS` 三类 reviewed memory 驱动
   `conversation.note.create` proposal、approval 和 action-executor audit。2026-06-25
   已补显式 opt-in conversation note business adapter；未配置真实 adapter 时仍必须
-  `business_action_executed=false`，后续新增 opt-in business mutation smoke。
+  `business_action_executed=false`。同日 `rag-agent-demo` adapter 支持
+  `-ExpectBusinessActionExecuted`：显式开启时断言 action-executor executed / SUCCEEDED、
+  `business_note_persisted=true`、note ref / id 存在且 body 只输出 hash；默认仍校验
+  audit-only 边界。完整 service-stack opt-in mutation 报告待归档。
 - 2026-06-24 `action-preflight-safety` adapter 已扩到 14 个 smoke cases，并在
   catalog 中新增 approval id、prepared audit id、resource id 绑定错配的
   `PROPOSAL_MISMATCH` 断言；这些 case 区分 action boundary failure 与

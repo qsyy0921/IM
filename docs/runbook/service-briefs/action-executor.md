@@ -33,6 +33,11 @@
   business adapter：配置 conversation-service gRPC 地址后，approval 后的 action-executor
   会调用 conversation-service 公开 API 写入 note；未配置时仍明确 `executed=false`，
   不伪造成功。
+- 同日 `loadtest/ragagent` / `run-ai-eval-ragagent-adapter.ps1` 已补显式 execute-mode
+  verification：开启 `expect-business-action-executed` 后，必须看到 execution `SUCCEEDED`、
+  低敏 output 不回显 note body，并由 loadtest verification 确认 `conversation_notes`
+  中 note fact 与 proposal / approval 绑定一致；默认 audit-only gate 仍要求
+  `executed=false`。
 
 ## 边界
 

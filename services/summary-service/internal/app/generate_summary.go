@@ -50,9 +50,13 @@ func (usecase GenerateConversationSummaryUseCase) Execute(
 	if err != nil {
 		return types.GenerateConversationSummaryResult{}, err
 	}
+	generationPack, err := groundableEvidencePack(evidence.Pack)
+	if err != nil {
+		return types.GenerateConversationSummaryResult{}, err
+	}
 	generation, err := usecase.provider.GenerateSummary(ctx, types.SummaryGenerationRequest{
 		Focus:        command.NormalizedFocus(),
-		EvidencePack: evidence.Pack,
+		EvidencePack: generationPack,
 	})
 	if err != nil {
 		return types.GenerateConversationSummaryResult{}, err
@@ -78,7 +82,11 @@ func (provider ExtractiveSummaryProvider) GenerateSummary(
 	_ context.Context,
 	request types.SummaryGenerationRequest,
 ) (types.SummaryGenerationResult, error) {
-	if len(request.EvidencePack.Items) == 0 {
+	pack, err := groundableEvidencePack(request.EvidencePack)
+	if err != nil {
+		return types.SummaryGenerationResult{}, err
+	}
+	if len(pack.Items) == 0 {
 		return types.SummaryGenerationResult{
 			Status:         types.SummaryStatusInsufficientEvidence,
 			SummaryText:    "I do not have enough visible evidence to summarize this conversation.",
@@ -88,9 +96,9 @@ func (provider ExtractiveSummaryProvider) GenerateSummary(
 	}
 	return types.SummaryGenerationResult{
 		Status:         types.SummaryStatusGrounded,
-		SummaryText:    buildExtractiveSummary(request.EvidencePack.Items),
-		Confidence:     summaryConfidence(request.EvidencePack.Items),
-		Citations:      citationsFromEvidence(request.EvidencePack.Items),
+		SummaryText:    buildExtractiveSummary(pack.Items),
+		Confidence:     summaryConfidence(pack.Items),
+		Citations:      citationsFromEvidence(pack.Items),
 		GeneratedByLLM: false,
 	}, nil
 }

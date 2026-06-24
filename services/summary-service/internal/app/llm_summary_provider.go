@@ -34,10 +34,14 @@ func (provider GuardedLLMSummaryProvider) GenerateSummary(
 	if provider.client == nil {
 		return types.SummaryGenerationResult{}, types.ErrSummaryUnavailable
 	}
+	pack, err := groundableEvidencePack(request.EvidencePack)
+	if err != nil {
+		return types.SummaryGenerationResult{}, fmt.Errorf("%w: %v", types.ErrSummaryUnavailable, err)
+	}
 	prompt, err := llmboundary.BuildPrompt(
 		"Summarize the conversation using only the provided EvidencePack. Return citations by evidence_id.",
 		request.Focus,
-		summaryBoundaryEvidence(request.EvidencePack.Items),
+		summaryBoundaryEvidence(pack.Items),
 		provider.options,
 	)
 	if err != nil {
@@ -47,11 +51,11 @@ func (provider GuardedLLMSummaryProvider) GenerateSummary(
 	if err != nil {
 		return types.SummaryGenerationResult{}, fmt.Errorf("%w: model provider failed", types.ErrSummaryUnavailable)
 	}
-	allowedIDs := summaryEvidenceIDSet(request.EvidencePack.Items)
+	allowedIDs := summaryEvidenceIDSet(pack.Items)
 	if err := llmboundary.ValidateCandidate(candidate, allowedIDs); err != nil {
 		return types.SummaryGenerationResult{}, fmt.Errorf("%w: %v", types.ErrSummaryUnavailable, err)
 	}
-	citations, err := summaryCitationsByEvidenceID(request.EvidencePack.Items, candidate.CitationEvidenceIDs)
+	citations, err := summaryCitationsByEvidenceID(pack.Items, candidate.CitationEvidenceIDs)
 	if err != nil {
 		return types.SummaryGenerationResult{}, fmt.Errorf("%w: %v", types.ErrSummaryUnavailable, err)
 	}

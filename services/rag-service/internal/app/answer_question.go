@@ -48,9 +48,13 @@ func (usecase AnswerQuestionUseCase) Execute(
 	if err != nil {
 		return types.AnswerQuestionResult{}, err
 	}
+	generationPack, err := groundableEvidencePack(evidence.Pack)
+	if err != nil {
+		return types.AnswerQuestionResult{}, err
+	}
 	generation, err := usecase.provider.GenerateAnswer(ctx, types.AnswerGenerationRequest{
 		Question:     command.NormalizedQuestion(),
-		EvidencePack: evidence.Pack,
+		EvidencePack: generationPack,
 	})
 	if err != nil {
 		return types.AnswerQuestionResult{}, err
@@ -76,7 +80,11 @@ func (provider ExtractiveAnswerProvider) GenerateAnswer(
 	_ context.Context,
 	request types.AnswerGenerationRequest,
 ) (types.AnswerGenerationResult, error) {
-	if len(request.EvidencePack.Items) == 0 {
+	pack, err := groundableEvidencePack(request.EvidencePack)
+	if err != nil {
+		return types.AnswerGenerationResult{}, err
+	}
+	if len(pack.Items) == 0 {
 		return types.AnswerGenerationResult{
 			Status:         types.AnswerStatusInsufficientEvidence,
 			AnswerText:     "I do not have enough visible evidence to answer this question.",
@@ -86,9 +94,9 @@ func (provider ExtractiveAnswerProvider) GenerateAnswer(
 	}
 	return types.AnswerGenerationResult{
 		Status:         types.AnswerStatusGrounded,
-		AnswerText:     buildExtractiveAnswer(request.EvidencePack.Items),
-		Confidence:     answerConfidence(request.EvidencePack.Items),
-		Citations:      citationsFromEvidence(request.EvidencePack.Items),
+		AnswerText:     buildExtractiveAnswer(pack.Items),
+		Confidence:     answerConfidence(pack.Items),
+		Citations:      citationsFromEvidence(pack.Items),
 		GeneratedByLLM: false,
 	}, nil
 }

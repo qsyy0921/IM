@@ -74,6 +74,7 @@ func TestGenerateConversationSummaryUsesProviderBoundary(t *testing.T) {
 				ConversationSeq: 9,
 				Text:            "memory text",
 				SourceRefs: []types.EvidenceSourceRef{{
+					SourceType:      "MESSAGE",
 					SourceID:        "msg-9",
 					SourceEventID:   "evt-9",
 					ConversationID:  "conv-1",
@@ -140,6 +141,110 @@ func TestGenerateConversationSummaryRejectsUngroundedCitation(t *testing.T) {
 	_, err := NewGenerateConversationSummaryUseCaseWithProvider(retrieval, &provider).Execute(context.Background(), validCommand())
 	if !errors.Is(err, types.ErrCitationVerification) {
 		t.Fatalf("expected citation verification error, got %v", err)
+	}
+}
+
+func TestGenerateConversationSummaryRejectsGroundingEvidenceWithoutAnchor(t *testing.T) {
+	retrieval := &fakeRetrievalPort{result: types.RetrieveEvidenceResult{
+		Pack: types.EvidencePack{
+			Items: []types.EvidenceItem{{
+				EvidenceID:      "",
+				SourceType:      types.EvidenceSourceSearchMessage,
+				SourceID:        "msg-1",
+				ConversationID:  "conv-1",
+				ConversationSeq: 3,
+				Text:            "this text has no traceable evidence id",
+			}},
+		},
+	}}
+	provider := &fakeSummaryProvider{result: types.SummaryGenerationResult{
+		Status:      types.SummaryStatusGrounded,
+		SummaryText: "provider summary",
+		Confidence:  0.8,
+	}}
+	_, err := NewGenerateConversationSummaryUseCaseWithProvider(retrieval, provider).Execute(context.Background(), validCommand())
+	if !errors.Is(err, types.ErrCitationVerification) {
+		t.Fatalf("expected citation verification error, got %v", err)
+	}
+	if provider.called {
+		t.Fatal("provider must not receive ungroundable evidence")
+	}
+}
+
+func TestGenerateConversationSummaryOnlyPassesGroundableEvidenceToProvider(t *testing.T) {
+	retrieval := &fakeRetrievalPort{result: types.RetrieveEvidenceResult{
+		Pack: types.EvidencePack{
+			Items: []types.EvidenceItem{
+				{
+					EvidenceID: "profile:p1",
+					SourceType: types.EvidenceSourceProfileAggregate,
+					SourceID:   "p1",
+					SourceRefs: []types.EvidenceSourceRef{{
+						SourceType: "PROFILE_AGGREGATE",
+						SourceID:   "p1",
+					}},
+				},
+				{
+					EvidenceID:      "search:msg-1",
+					SourceType:      types.EvidenceSourceSearchMessage,
+					SourceID:        "msg-1",
+					ConversationID:  "conv-1",
+					ConversationSeq: 3,
+					Text:            "source text",
+				},
+			},
+		},
+	}}
+	provider := &fakeSummaryProvider{result: types.SummaryGenerationResult{
+		Status:      types.SummaryStatusGrounded,
+		SummaryText: "provider summary",
+		Confidence:  0.8,
+		Citations: []types.Citation{{
+			EvidenceID:      "search:msg-1",
+			SourceType:      types.EvidenceSourceSearchMessage,
+			SourceID:        "msg-1",
+			ConversationID:  "conv-1",
+			ConversationSeq: 3,
+		}},
+	}}
+	result, err := NewGenerateConversationSummaryUseCaseWithProvider(retrieval, provider).Execute(context.Background(), validCommand())
+	if err != nil {
+		t.Fatalf("Execute returned error: %v", err)
+	}
+	if got := len(provider.request.EvidencePack.Items); got != 1 {
+		t.Fatalf("expected provider to receive 1 groundable item, got %d", got)
+	}
+	if got := len(result.EvidencePack.Items); got != 2 {
+		t.Fatalf("expected response to preserve original EvidencePack for audit, got %d", got)
+	}
+}
+
+func TestGenerateConversationSummaryAbstainsWhenEvidenceHasNoGroundingText(t *testing.T) {
+	retrieval := &fakeRetrievalPort{result: types.RetrieveEvidenceResult{
+		Pack: types.EvidencePack{
+			Items: []types.EvidenceItem{{
+				EvidenceID: "profile:p1",
+				SourceType: types.EvidenceSourceProfileAggregate,
+				SourceID:   "p1",
+				SourceRefs: []types.EvidenceSourceRef{{
+					SourceType: "PROFILE_AGGREGATE",
+					SourceID:   "p1",
+				}},
+			}},
+		},
+	}}
+	result, err := NewGenerateConversationSummaryUseCase(retrieval).Execute(context.Background(), validCommand())
+	if err != nil {
+		t.Fatalf("Execute returned error: %v", err)
+	}
+	if result.Status != types.SummaryStatusInsufficientEvidence {
+		t.Fatalf("unexpected status %s", result.Status)
+	}
+	if len(result.Citations) != 0 {
+		t.Fatalf("expected no citations, got %d", len(result.Citations))
+	}
+	if got := len(result.EvidencePack.Items); got != 1 {
+		t.Fatalf("expected response to preserve original EvidencePack for audit, got %d", got)
 	}
 }
 

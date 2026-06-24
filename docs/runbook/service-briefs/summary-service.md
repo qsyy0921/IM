@@ -16,6 +16,10 @@
 - 已补可选 `python-worker` provider mode：Go 先生成 grounded summary，Python
   worker 只返回 candidate hash / citations；Go 校验 id、hash 和 citation
 - response 保留 citations、EvidencePack、`generated_by_llm=false`；provider 输出后统一运行 citation verifier
+- 2026-06-25 已补 grounded-summary anchor gate：Summary 只把有文本且具备
+  `evidence_id / source_type / source_id / source anchor` 的 evidence 交给 provider；
+  ref-only evidence 仍保留在返回的 EvidencePack 供审计，但不能单独生成摘要；有文本但
+  anchor 不完整的 evidence 会在 provider 调用前 fail closed。
 - retrieval-gateway 公开 proto RPC client、app / gRPC / cmd focused tests
 - `loadtest/summary`、`tools/run-summary-adapter-smoke.ps1` 和真实本地
   `retrieval-gateway -> summary-service` adapter smoke 已通过
@@ -38,4 +42,5 @@
 
 - 真实服务栈启动后与 memory-service / retrieval-gateway adapter 一起跑完整
   optional gate；之后扩展 temporal update / profile recompute 和更完整
-  group-memory 摘要场景，provider 仍走 port、guard、hash / citation 校验和 verifier。
+  group-memory 摘要场景，provider 仍走 port、guard、hash / citation 校验、
+  grounded-summary anchor gate 和 verifier。

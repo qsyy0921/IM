@@ -34,10 +34,14 @@ func (provider GuardedLLMAnswerProvider) GenerateAnswer(
 	if provider.client == nil {
 		return types.AnswerGenerationResult{}, types.ErrRAGUnavailable
 	}
+	pack, err := groundableEvidencePack(request.EvidencePack)
+	if err != nil {
+		return types.AnswerGenerationResult{}, fmt.Errorf("%w: %v", types.ErrRAGUnavailable, err)
+	}
 	prompt, err := llmboundary.BuildPrompt(
 		"Answer the question using only the provided EvidencePack. Return citations by evidence_id.",
 		request.Question,
-		answerBoundaryEvidence(request.EvidencePack.Items),
+		answerBoundaryEvidence(pack.Items),
 		provider.options,
 	)
 	if err != nil {
@@ -47,11 +51,11 @@ func (provider GuardedLLMAnswerProvider) GenerateAnswer(
 	if err != nil {
 		return types.AnswerGenerationResult{}, fmt.Errorf("%w: model provider failed", types.ErrRAGUnavailable)
 	}
-	allowedIDs := evidenceIDSet(request.EvidencePack.Items)
+	allowedIDs := evidenceIDSet(pack.Items)
 	if err := llmboundary.ValidateCandidate(candidate, allowedIDs); err != nil {
 		return types.AnswerGenerationResult{}, fmt.Errorf("%w: %v", types.ErrRAGUnavailable, err)
 	}
-	citations, err := citationsByEvidenceID(request.EvidencePack.Items, candidate.CitationEvidenceIDs)
+	citations, err := citationsByEvidenceID(pack.Items, candidate.CitationEvidenceIDs)
 	if err != nil {
 		return types.AnswerGenerationResult{}, fmt.Errorf("%w: %v", types.ErrRAGUnavailable, err)
 	}

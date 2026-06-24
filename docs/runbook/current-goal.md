@@ -231,6 +231,10 @@ IM messages -> search / memory projection -> EvidencePack -> RAG / Agent answer 
   0 skipped；`rag-agent-demo` 断言 `business_note_persisted=true`、
   `business_profile_updated=true`、profile version 前进，且 profile output 只保留
   title / avatar / announcement hash。
+- 同日 RAG / Summary 已补 grounded evidence anchor gate：只有有文本且具备
+  `evidence_id / source_type / source_id / source anchor` 的 evidence 会进入 provider；
+  ref-only evidence 仍保留在返回的 EvidencePack 供审计，但不会单独生成
+  answer / summary；有文本但 anchor 不完整的 evidence 会在 provider 调用前 fail-closed。
 - 2026-06-24 retrieval-gateway 已补 vector-index-service `SearchVectors` adapter
   first path：`RetrieveEvidence` 支持显式 `include_vector`，调用方必须提供低敏
   `query_embedding_ref`、明确的 `vector_collection_types`、`vector_visibility_scope`

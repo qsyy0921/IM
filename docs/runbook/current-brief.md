@@ -230,6 +230,10 @@ service-stack gate：4 adapters、27 cases、27 passed、0 failed、0 skipped。
 该 gate 确认 approved Agent action 能同时写真实 conversation note fact，并通过
 conversation-service public API 更新 conversation profile；summary 只保留 profile
 version 和字段 hash。
+同日 RAG / Summary 已补 grounded evidence anchor gate：只有有文本且具备
+`evidence_id / source_type / source_id / source anchor` 的 evidence 会进入
+provider；ref-only evidence 仍保留在返回的 EvidencePack 供审计，但不会单独生成
+answer / summary；有文本但 anchor 不完整的 evidence 会在 provider 调用前 fail-closed。
 同日 Python AI Worker 已补 memory extraction candidate first path：
 `ai/python/nexusim_ai_memory` 只从显式 low-sensitive message batch 的
 `decision:` / `task:` / `status:` / `blocker:` / `file:` / `profile_signal:`

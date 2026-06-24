@@ -113,6 +113,7 @@ type summary struct {
 	MilvusVectorDimension             int                        `json:"milvus_vector_dimension"`
 	MilvusVectorExpectedDimension     int                        `json:"milvus_vector_expected_dimension"`
 	ProviderReadiness                 []providerReadinessSummary `json:"provider_readiness,omitempty"`
+	ProviderRequestTimeoutMs          int64                      `json:"provider_request_timeout_ms"`
 	EmbeddingTaskCount                int                        `json:"embedding_task_count"`
 	EmbeddingTaskPending              int                        `json:"embedding_task_pending"`
 	EmbeddingTaskRunning              int                        `json:"embedding_task_running"`
@@ -247,6 +248,7 @@ func run(cfg config) error {
 		MilvusCollection:                  strings.TrimSpace(cfg.milvusCollection),
 		MilvusVectorField:                 strings.TrimSpace(cfg.milvusVectorField),
 		MilvusVectorExpectedDimension:     cfg.milvusVectorDimension,
+		ProviderRequestTimeoutMs:          cfg.requestTimeout.Milliseconds(),
 	}
 	result.GitDirty = strings.TrimSpace(result.GitStatusShort) != ""
 	defer func() {
@@ -269,17 +271,23 @@ func run(cfg config) error {
 			return err
 		}
 	case "preflight-pgvector":
-		if err := preflightPGVector(ctx, cfg, &result); err != nil {
+		preflightCtx, cancel := preflightTimeoutContext(ctx, cfg)
+		defer cancel()
+		if err := preflightPGVector(preflightCtx, cfg, &result); err != nil {
 			result.Error = err.Error()
 			return err
 		}
 	case "preflight-opensearch-vector":
-		if err := preflightOpenSearchVector(ctx, cfg, &result); err != nil {
+		preflightCtx, cancel := preflightTimeoutContext(ctx, cfg)
+		defer cancel()
+		if err := preflightOpenSearchVector(preflightCtx, cfg, &result); err != nil {
 			result.Error = err.Error()
 			return err
 		}
 	case "preflight-milvus-vector":
-		if err := preflightMilvusVector(ctx, cfg, &result); err != nil {
+		preflightCtx, cancel := preflightTimeoutContext(ctx, cfg)
+		defer cancel()
+		if err := preflightMilvusVector(preflightCtx, cfg, &result); err != nil {
 			result.Error = err.Error()
 			return err
 		}
@@ -304,6 +312,14 @@ func run(cfg config) error {
 	}
 	result.Success = true
 	return nil
+}
+
+func preflightTimeoutContext(parent context.Context, cfg config) (context.Context, context.CancelFunc) {
+	timeout := cfg.requestTimeout
+	if timeout <= 0 {
+		timeout = 5 * time.Second
+	}
+	return context.WithTimeout(parent, timeout)
 }
 
 func verifyQueue(ctx context.Context, cfg config, result *summary) error {

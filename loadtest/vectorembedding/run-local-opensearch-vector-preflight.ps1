@@ -3,6 +3,7 @@ param(
     [string]$OpenSearchIndex = "nexusim-vector-items",
     [string]$OpenSearchVectorField = "embedding_vector",
     [int]$OpenSearchVectorDimension = 8,
+    [string]$RequestTimeout = "5s",
     [string]$ResultRoot = "H:\NexusIM\loadtest-results",
     [string]$RunName = "",
     [switch]$SkipBuild
@@ -33,6 +34,7 @@ $runner = Join-Path $repoRoot "bin\vector-embedding-smoke.exe"
     --opensearch-vector-index $OpenSearchIndex `
     --opensearch-vector-field $OpenSearchVectorField `
     --opensearch-vector-dimension $OpenSearchVectorDimension `
+    --request-timeout $RequestTimeout `
     --result-root $ResultRoot `
     --run-name $RunName
 if ($LASTEXITCODE -ne 0) {

@@ -1,8 +1,10 @@
 package main
 
 import (
+	"context"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestValidateConfigRequiresPGVectorDSNForPreflight(t *testing.T) {
@@ -45,6 +47,28 @@ func TestQuoteSQLIdentifierRejectsUnsafePGVectorTable(t *testing.T) {
 
 	if _, err := quoteSQLIdentifier("vector_embedding_items;drop table vector_items"); err == nil {
 		t.Fatal("expected unsafe identifier to fail")
+	}
+}
+
+func TestPreflightTimeoutContextUsesRequestTimeout(t *testing.T) {
+	cfg := validTestConfig()
+	cfg.requestTimeout = 15 * time.Millisecond
+	ctx, cancel := preflightTimeoutContext(context.Background(), cfg)
+	defer cancel()
+
+	deadline, ok := ctx.Deadline()
+	if !ok {
+		t.Fatal("expected preflight context deadline")
+	}
+	remaining := time.Until(deadline)
+	if remaining <= 0 || remaining > 250*time.Millisecond {
+		t.Fatalf("unexpected preflight timeout: %s", remaining)
+	}
+
+	select {
+	case <-ctx.Done():
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("expected preflight context to expire")
 	}
 }
 

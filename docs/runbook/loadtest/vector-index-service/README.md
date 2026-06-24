@@ -154,6 +154,7 @@ Focused smoke：
   -StartPgVector `
   -PgDsn "postgres://nexusim:nexusim@localhost:5432/nexusim?sslmode=disable" `
   -PgVectorDsn "postgres://nexusim:nexusim@localhost:15432/nexusim?sslmode=disable" `
+  -RequestTimeout "5s" `
   -ResultRoot "H:\NexusIM\loadtest-results"
 ```
 
@@ -162,6 +163,8 @@ Focused smoke：
 - 使用 `-StartPgVector` 时，脚本会先检查本机是否已有 `pgvector/pgvector:pg16` 镜像。
 - `-StartPgVector` 且没有镜像时默认失败退出，不自动拉取，避免误耗外网流量。
 - 如确实允许拉取，可显式加 `-AllowPull`。
+- `-RequestTimeout` 是 provider preflight 的单次探测硬超时；summary 会输出
+  `provider_request_timeout_ms`，避免 provider 不可用时长时间卡住或误认为 smoke 已通过。
 
 embedding worker 相关环境变量：
 
@@ -200,6 +203,7 @@ NEXUSIM_VECTOR_PGVECTOR_ENSURE_SCHEMA=true
   -OpenSearchIndex "nexusim-vector-items" `
   -OpenSearchVectorField "embedding_vector" `
   -OpenSearchVectorDimension 8 `
+  -RequestTimeout "5s" `
   -ResultRoot "H:\NexusIM\loadtest-results"
 ```
 
@@ -211,6 +215,8 @@ NEXUSIM_VECTOR_PGVECTOR_ENSURE_SCHEMA=true
   provider smoke；不代表 `vector-index-service` 已完成 OpenSearch provider backend。
 - index 缺失、endpoint 不可达、mapping drift 或 dimension 不匹配都必须 fail-closed；
   runner 只输出低敏 summary。
+- `-RequestTimeout` 只控制本次 OpenSearch contract probe 的单请求硬超时，不会启动
+  OpenSearch，也不会切换到其它 backend。
 
 ## Optional Milvus Vector Preflight
 
@@ -231,6 +237,7 @@ NEXUSIM_VECTOR_PGVECTOR_ENSURE_SCHEMA=true
   -MilvusCollection "nexusim_vector_items" `
   -MilvusVectorField "embedding_vector" `
   -MilvusVectorDimension 8 `
+  -RequestTimeout "5s" `
   -ResultRoot "H:\NexusIM\loadtest-results"
 ```
 
@@ -250,6 +257,8 @@ NEXUSIM_VECTOR_PGVECTOR_ENSURE_SCHEMA=true
   smoke；不代表 `vector-index-service` 已完成 Milvus provider backend。
 - collection 缺失、endpoint 不可达、schema drift 或 dimension 不匹配都必须
   fail-closed；runner 只输出低敏 summary。
+- `-RequestTimeout` 只控制本次 Milvus REST probe 的单请求硬超时；token 仍只走
+  Authorization header，不写 summary。
 
 ## Provider Readiness Matrix
 
@@ -274,6 +283,7 @@ NEXUSIM_VECTOR_PGVECTOR_ENSURE_SCHEMA=true
   -MilvusCollection "nexusim_vector_items" `
   -MilvusVectorField "embedding_vector" `
   -MilvusVectorDimension 8 `
+  -RequestTimeout "5s" `
   -ResultRoot "H:\NexusIM\loadtest-results"
 ```
 
@@ -282,6 +292,8 @@ NEXUSIM_VECTOR_PGVECTOR_ENSURE_SCHEMA=true
 - readiness matrix 是 provider 前置门禁，不会自动启动 Docker、不拉镜像、不写 provider。
 - 任一 requested provider 不满足 contract 时整体 fail-closed，并保留每个 provider
   的低敏状态，便于 operator 判断是 pgvector、OpenSearch vector、Milvus 还是配置问题。
+- 每个 requested provider 都使用 `-RequestTimeout` 作为独立探测硬超时；某个 provider
+  卡住不会让矩阵等待全局 verify timeout。
 - readiness 通过后仍需单独跑真实 provider smoke；不得把 readiness 当作 provider
   数据写入 / 搜索链路已经完成。
 

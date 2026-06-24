@@ -7,6 +7,7 @@ param(
     [string]$ModelGatewayGrpcAddr = "",
     [string]$VectorGrpcAddr = "",
     [string]$PgVectorTable = "vector_embedding_items",
+    [string]$RequestTimeout = "5s",
     [switch]$StartPgVector,
     [switch]$AllowPull,
     [switch]$SkipBuild
@@ -84,6 +85,7 @@ $runner = Join-Path $repoRoot "bin\vector-embedding-smoke.exe"
     --phase preflight-pgvector `
     --pgvector-dsn $PgVectorDsn `
     --pgvector-table $PgVectorTable `
+    --request-timeout $RequestTimeout `
     --result-root $ResultRoot `
     --run-name $RunName
 if ($LASTEXITCODE -ne 0) {

@@ -39,22 +39,24 @@ func preflightProviderReadiness(ctx context.Context, cfg config, result *summary
 			Status:    providerReadinessReady,
 		}
 		var err error
+		providerCtx, cancel := preflightTimeoutContext(ctx, cfg)
 		switch provider {
 		case providerReadinessPGVector:
 			entry.Configured = strings.TrimSpace(cfg.pgVectorDSN) != ""
-			err = preflightPGVector(ctx, cfg, result)
+			err = preflightPGVector(providerCtx, cfg, result)
 			entry.Available = result.PGVectorAvailable
 		case providerReadinessOpenSearchVector:
 			entry.Configured = strings.TrimSpace(cfg.openSearchVectorEndpoint) != ""
-			err = preflightOpenSearchVector(ctx, cfg, result)
+			err = preflightOpenSearchVector(providerCtx, cfg, result)
 			entry.Available = result.OpenSearchVectorAvailable && result.OpenSearchVectorIndexExists && result.OpenSearchVectorMappingVerified
 		case providerReadinessMilvus:
 			entry.Configured = strings.TrimSpace(cfg.milvusEndpoint) != ""
-			err = preflightMilvusVector(ctx, cfg, result)
+			err = preflightMilvusVector(providerCtx, cfg, result)
 			entry.Available = result.MilvusAvailable && result.MilvusCollectionExists && result.MilvusSchemaVerified
 		default:
 			err = fmt.Errorf("unsupported provider %q", provider)
 		}
+		cancel()
 		if err != nil {
 			entry.Status = providerReadinessFailed
 			entry.Error = err.Error()

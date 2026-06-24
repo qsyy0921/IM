@@ -5,6 +5,7 @@ param(
     [string]$MilvusCollection = "nexusim_vector_items",
     [string]$MilvusVectorField = "embedding_vector",
     [int]$MilvusVectorDimension = 8,
+    [string]$RequestTimeout = "5s",
     [string]$ResultRoot = "H:\NexusIM\loadtest-results",
     [string]$RunName = "",
     [switch]$SkipBuild
@@ -37,6 +38,7 @@ $runner = Join-Path $repoRoot "bin\vector-embedding-smoke.exe"
     --milvus-collection $MilvusCollection `
     --milvus-vector-field $MilvusVectorField `
     --milvus-vector-dimension $MilvusVectorDimension `
+    --request-timeout $RequestTimeout `
     --result-root $ResultRoot `
     --run-name $RunName
 if ($LASTEXITCODE -ne 0) {

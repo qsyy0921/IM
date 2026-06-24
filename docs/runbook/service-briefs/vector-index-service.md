@@ -43,6 +43,9 @@ Stage-switch：`docs/runbook/stage-switch/vector-index-service.md`。
   `run-local-provider-readiness.ps1`：一次性输出 pgvector / OpenSearch vector / Milvus 的
   provider readiness matrix；任一 requested provider 不满足 contract 时整体 fail-closed，
   但 summary 会保留每个 provider 的低敏状态，便于真实 provider smoke 前排障。
+- 同日 provider preflight / readiness 已统一接入显式 `request-timeout`：pgvector、
+  OpenSearch vector 和 Milvus 探测都会在单 provider 短超时内 fail-closed，并在 summary
+  输出 `provider_request_timeout_ms`；不可用 runtime 不再拖到全局 verify timeout。
 - 2026-06-25 `loadtest/vectorembedding` 已补 `preflight-milvus-vector` phase 和
   `run-local-milvus-vector-preflight.ps1`：使用 Milvus REST v2 验证 endpoint、
   collection、vector field type 和 dimension contract；endpoint 禁止携带 credentials /

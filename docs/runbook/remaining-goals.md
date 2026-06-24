@@ -93,7 +93,8 @@
   adapter 已把 `source_coverage` 矩阵纳入门禁；pgvector、OpenSearch vector 和
   Milvus provider preflight gate 以及 provider readiness matrix 已补齐；retrieval smoke
   已可读取 provider readiness summary 并输出低敏 `provider_coverage[]`，把 provider
-  readiness 与 VECTOR_ITEM lane 状态关联起来。下一步继续补真实 OpenSearch 进程 smoke、真实
+  readiness 与 VECTOR_ITEM lane 状态关联起来；preflight / readiness 已接显式
+  `request-timeout`，runtime 缺失时快速 fail-closed。下一步继续补真实 OpenSearch 进程 smoke、真实
   pgvector / Milvus / OpenSearch vector provider smoke。
   真实 mutation 场景必须等显式业务 adapter 和
   operator policy 就绪。

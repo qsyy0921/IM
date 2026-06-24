@@ -258,8 +258,10 @@ fail-closed，不写 execution audit、不写 tool result projection、不调用
   使用 token-based `plainto_tsquery + to_tsvector` 并移除 `ILIKE` substring fallback；
   显式 OpenSearch / BM25 candidate backend first path 已接入，外部索引只召回候选并由
   PostgreSQL projection 做 visibility / tombstone hydration；OpenSearch opt-in
-  backend smoke 入口、service-owned rebuild operator first path 和 index mapping
-  drift hardening 已补齐；2026-06-25 retrieval positive smoke / adapter 已把
+  backend smoke 入口、preflight-opensearch gate、service-owned rebuild operator first path
+  和 index mapping drift hardening 已补齐；OpenSearch backend smoke 会先用显式
+  request-timeout 校验 endpoint / index，再启动 service / Kafka 链路；2026-06-25
+  retrieval positive smoke / adapter 已把
   `source_coverage` 矩阵纳入低敏门禁，要求 search / memory / profile 为
   `RETURNED`，未启用 vector 时 `VECTOR_ITEM` 为 `NOT_REQUESTED`。当前机器
   Docker / OpenSearch 不可用，尚未归档真实 OpenSearch 进程通过报告。2026-06-25

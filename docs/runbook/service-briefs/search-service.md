@@ -21,6 +21,11 @@
   同步进临时 OpenSearch index，再通过 search-service gRPC 验证候选召回 +
   PostgreSQL visibility / tombstone hydration。该路径不改变默认 PostgreSQL FTS
   smoke，不把 OpenSearch 当权限事实源。
+- 2026-06-25 已补 OpenSearch opt-in smoke 预检门：
+  `run-local-smoke.ps1 -UseOpenSearchBackend` 会先执行
+  `loadtest/search --phase preflight-opensearch`，用显式 `RequestTimeout` 校验
+  OpenSearch endpoint 可达、URL 不携带 secret、临时 index 可创建；预检失败时不启动
+  search-service / timeline-consumer / Kafka 链路，并写入低敏 summary。
 - 当前机器 Docker API 和 `127.0.0.1:9200` OpenSearch 均不可用，因此本轮只验证到
   runner / 脚本 / adapter focused tests；真实 OpenSearch 进程 smoke 尚未归档通过报告。
 - 2026-06-25 已补 search-service 自有 OpenSearch rebuild operator first path：
@@ -54,7 +59,7 @@
 - PostgreSQL FTS first path：`SearchMessages` 已从 substring match 改为 token-based lexical search。
 - OpenSearch / BM25 candidate backend first path：显式 `NEXUSIM_SEARCH_BACKEND=opensearch`
   已接入；opt-in OpenSearch smoke 入口和 service-owned rebuild operator first path
-  已补齐；mapping drift focused hardening 已补齐；后续仍需在可用 OpenSearch 进程上
-  归档真实 smoke，再做容量曲线和 provider-grade 运维。
+  已补齐；OpenSearch opt-in smoke 预检门和 mapping drift focused hardening 已补齐；
+  后续仍需在可用 OpenSearch 进程上归档真实 smoke，再做容量曲线和 provider-grade 运维。
 - EvidencePack 前置 smoke：搜索结果必须带 source message id、conversation seq、source event id 和 visibility version。
 - 后续链路：memory / group memory -> retrieval-gateway / EvidencePack -> RAG / summary -> Agent -> skill-registry -> mcp-gateway/tool-gateway -> action-executor。

@@ -227,6 +227,11 @@ search，不保留 `ILIKE` substring fallback。
   `tenant_id / conversation_id / message_id / conversation_seq / searchable_text`
   同步到临时 OpenSearch index，随后仍只通过 search-service gRPC 查询。
   该 fixture 只用于本地 smoke，不是生产索引写入链路。
+- `run-local-smoke.ps1 -UseOpenSearchBackend` 必须先跑
+  `loadtest/search --phase preflight-opensearch`：验证 endpoint 可达、endpoint URL
+  不携带账号 / token / query / fragment、临时 index 可创建，并受显式
+  `request-timeout` 限制。预检失败时不得启动 search-service / timeline-consumer /
+  Kafka 链路。
 - `NEXUSIM_SEARCH_SERVICE_MODE=opensearch-rebuild` 是 search-service 自有
   OpenSearch rebuild operator first path。它只读取 search-service PostgreSQL
   projection 中当前 tenant 的 `tombstone_status='NONE'`、非空 `searchable_text`
@@ -260,7 +265,7 @@ search，不保留 `ILIKE` substring fallback。
 - PostgreSQL candidate hydration 集成测试覆盖外部候选仍受 visibility / tombstone
   过滤，不允许外部索引绕过搜索投影边界。
 - OpenSearch opt-in smoke 入口覆盖 search-service `opensearch` backend 启动参数、
-  临时 index 创建、低敏 fixture document 写入和 search-service gRPC 查询路径；
+  预检门、临时 index 创建、低敏 fixture document 写入和 search-service gRPC 查询路径；
   真实 OpenSearch 进程通过报告归档前，不宣称 OpenSearch runtime smoke 已完成。
 - OpenSearch rebuild operator app 单测覆盖 dry-run 不写外部 index、execute 批量
   写入和 refresh、缺 writer fail-closed；OpenSearch indexer 单测覆盖 create-index、

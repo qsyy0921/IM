@@ -11,6 +11,7 @@ param(
     [switch]$UseOpenSearchBackend,
     [string]$OpenSearchEndpoint = "http://127.0.0.1:9200",
     [string]$OpenSearchIndex = "",
+    [string]$RequestTimeout = "3s",
     [switch]$SkipBuild
 )
 
@@ -104,6 +105,22 @@ function Start-SearchProcess {
 
 $processes = @()
 try {
+    $runner = Join-Path $repoRoot "bin\search-smoke.exe"
+    if ($UseOpenSearchBackend) {
+        $preflightRunName = "$RunName-opensearch-preflight"
+        & $runner `
+            --phase preflight-opensearch `
+            --search-backend opensearch `
+            --opensearch-endpoint $OpenSearchEndpoint `
+            --opensearch-index $OpenSearchIndex `
+            --request-timeout $RequestTimeout `
+            --result-root $ResultRoot `
+            --run-name $preflightRunName
+        if ($LASTEXITCODE -ne 0) {
+            throw "search OpenSearch preflight failed with exit code $LASTEXITCODE"
+        }
+    }
+
     # Create the topic before starting the consumer; kafka-go readers may miss
     # a topic created after group startup in local smoke runs.
     Ensure-KafkaTopic -Name $Topic
@@ -129,7 +146,6 @@ try {
     }
     Start-Sleep -Seconds 2
 
-    $runner = Join-Path $repoRoot "bin\search-smoke.exe"
     $searchBackend = if ($UseOpenSearchBackend) { "opensearch" } else { "postgres" }
     & $runner `
         --pg-dsn $PgDsn `
@@ -142,6 +158,7 @@ try {
         --search-backend $searchBackend `
         --opensearch-endpoint $OpenSearchEndpoint `
         --opensearch-index $OpenSearchIndex `
+        --request-timeout $RequestTimeout `
         --ensure-topic=false
     if ($LASTEXITCODE -ne 0) {
         throw "search smoke failed with exit code $LASTEXITCODE"

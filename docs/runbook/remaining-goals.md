@@ -88,8 +88,10 @@
   进入 EvidencePack。search-service PostgreSQL FTS lexical backend first path 已落，
   不再使用 substring fallback；显式 OpenSearch / BM25 candidate backend first path 已落，
   不会绕过 PostgreSQL visibility / tombstone hydration；OpenSearch opt-in backend
-  smoke 入口、service-owned rebuild operator first path 和 mapping drift hardening
-  已补齐但本机尚未归档真实 OpenSearch 进程通过报告；retrieval positive smoke /
+  smoke 入口、preflight-opensearch gate、service-owned rebuild operator first path
+  和 mapping drift hardening 已补齐；OpenSearch backend smoke 会先用显式
+  request-timeout 校验 endpoint / index 再启动 service / Kafka 链路，但本机尚未归档真实
+  OpenSearch 进程通过报告；retrieval positive smoke /
   adapter 已把 `source_coverage` 矩阵纳入门禁；pgvector、OpenSearch vector 和
   Milvus provider preflight gate 以及 provider readiness matrix 已补齐；retrieval smoke
   已可读取 provider readiness summary 并输出低敏 `provider_coverage[]`，把 provider

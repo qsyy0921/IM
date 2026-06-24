@@ -44,6 +44,7 @@ const (
 )
 
 type config struct {
+	phase           string
 	searchTarget    string
 	searchTLS       grpctls.Config
 	kafkaBrokers    []string
@@ -75,6 +76,7 @@ type config struct {
 }
 
 type summary struct {
+	Phase               string          `json:"phase"`
 	Commit              string          `json:"commit"`
 	CommitFull          string          `json:"commit_full"`
 	GitDirty            bool            `json:"git_dirty"`
@@ -85,6 +87,8 @@ type summary struct {
 	SearchBackend       string          `json:"search_backend"`
 	OpenSearchEndpoint  string          `json:"opensearch_endpoint,omitempty"`
 	OpenSearchIndex     string          `json:"opensearch_index,omitempty"`
+	OpenSearchReady     bool            `json:"opensearch_ready,omitempty"`
+	RequestTimeoutMs    int64           `json:"request_timeout_ms"`
 	TenantID            string          `json:"tenant_id"`
 	ConversationID      string          `json:"conversation_id"`
 	ViewerUserID        string          `json:"viewer_user_id"`
@@ -152,6 +156,7 @@ func parseConfig() config {
 	var brokers string
 	var resultRoot string
 	var runName string
+	flag.StringVar(&cfg.phase, "phase", envOr("NEXUSIM_SEARCH_SMOKE_PHASE", "smoke"), "phase: smoke or preflight-opensearch")
 	flag.StringVar(&cfg.searchTarget, "search-target", envOr("NEXUSIM_SEARCH_GRPC_ADDR", "127.0.0.1:10570"), "search-service gRPC target")
 	registerTLSFlags("search-tls", "NEXUSIM_SEARCH_TLS", "search-service", &cfg.searchTLS)
 	flag.StringVar(&brokers, "kafka-brokers", envOr("NEXUSIM_KAFKA_BROKERS", "localhost:9092"), "comma-separated Kafka brokers")
@@ -181,6 +186,7 @@ func parseConfig() config {
 	flag.StringVar(&cfg.openSearchAPIKey, "opensearch-api-key", os.Getenv("NEXUSIM_SEARCH_OPENSEARCH_API_KEY"), "OpenSearch API key; not written to summary")
 	flag.Parse()
 
+	cfg.phase = strings.ToLower(strings.TrimSpace(cfg.phase))
 	cfg.kafkaBrokers = splitCSV(brokers)
 	if runName == "" {
 		runName = "search-service-projection-smoke-" + time.Now().Format("20060102-150405")
@@ -235,6 +241,7 @@ func run(cfg config) error {
 	}
 
 	result := summary{
+		Phase:               cfg.phase,
 		Commit:              gitOutput("rev-parse", "--short", "HEAD"),
 		CommitFull:          gitOutput("rev-parse", "HEAD"),
 		GitStatusShort:      gitOutput("status", "--short"),
@@ -244,6 +251,7 @@ func run(cfg config) error {
 		SearchBackend:       cfg.searchBackend,
 		OpenSearchEndpoint:  cfg.openSearchEndpoint,
 		OpenSearchIndex:     cfg.openSearchIndex,
+		RequestTimeoutMs:    cfg.requestTimeout.Milliseconds(),
 		TenantID:            cfg.tenantID,
 		ConversationID:      cfg.conversationID,
 		ViewerUserID:        cfg.viewerUserID,
@@ -262,6 +270,15 @@ func run(cfg config) error {
 
 	ctx, cancel := context.WithTimeout(context.Background(), cfg.waitTimeout+30*time.Second)
 	defer cancel()
+
+	if cfg.phase == "preflight-opensearch" {
+		if err := preflightOpenSearch(ctx, cfg, &result); err != nil {
+			result.Error = err.Error()
+			return err
+		}
+		result.Success = true
+		return nil
+	}
 
 	pool, err := pgxpool.New(ctx, cfg.pgDSN)
 	if err != nil {
@@ -327,6 +344,16 @@ func run(cfg config) error {
 }
 
 func validateConfig(cfg config) error {
+	switch cfg.phase {
+	case "smoke":
+	case "preflight-opensearch":
+		if cfg.searchBackend != "opensearch" {
+			return errors.New("search-backend must be opensearch for preflight-opensearch")
+		}
+		return validateOpenSearchConfig(cfg)
+	default:
+		return fmt.Errorf("unsupported phase %q", cfg.phase)
+	}
 	if len(cfg.kafkaBrokers) == 0 {
 		return errors.New("kafka-brokers is required")
 	}
@@ -345,17 +372,32 @@ func validateConfig(cfg config) error {
 	switch cfg.searchBackend {
 	case "postgres":
 	case "opensearch":
-		if cfg.openSearchEndpoint == "" {
-			return errors.New("opensearch-endpoint is required when search-backend=opensearch")
-		}
-		if cfg.openSearchIndex == "" {
-			return errors.New("opensearch-index is required when search-backend=opensearch")
-		}
-		if strings.TrimSpace(cfg.openSearchUsername) != "" && cfg.openSearchPassword == "" {
-			return errors.New("opensearch-password is required when opensearch-username is set")
-		}
+		return validateOpenSearchConfig(cfg)
 	default:
 		return fmt.Errorf("unsupported search-backend %q", cfg.searchBackend)
+	}
+	return nil
+}
+
+func validateOpenSearchConfig(cfg config) error {
+	if cfg.openSearchEndpoint == "" {
+		return errors.New("opensearch-endpoint is required when search-backend=opensearch")
+	}
+	parsedEndpoint, err := url.Parse(cfg.openSearchEndpoint)
+	if err != nil || parsedEndpoint.Scheme == "" || parsedEndpoint.Host == "" {
+		return errors.New("opensearch-endpoint must be an absolute http or https URL")
+	}
+	if parsedEndpoint.Scheme != "http" && parsedEndpoint.Scheme != "https" {
+		return errors.New("opensearch-endpoint must use http or https")
+	}
+	if parsedEndpoint.User != nil || parsedEndpoint.RawQuery != "" || parsedEndpoint.Fragment != "" {
+		return errors.New("opensearch-endpoint must not include credentials, query, or fragment")
+	}
+	if cfg.openSearchIndex == "" {
+		return errors.New("opensearch-index is required when search-backend=opensearch")
+	}
+	if strings.TrimSpace(cfg.openSearchUsername) != "" && cfg.openSearchPassword == "" {
+		return errors.New("opensearch-password is required when opensearch-username is set")
 	}
 	return nil
 }
@@ -726,6 +768,21 @@ func waitDocumentAndSyncOpenSearch(ctx context.Context, cfg config, pool *pgxpoo
 		return err
 	}
 	result.OpenSearchDocuments++
+	return nil
+}
+
+func preflightOpenSearch(ctx context.Context, cfg config, result *summary) error {
+	status, _, err := openSearchRequest(ctx, cfg, http.MethodGet, "/", nil)
+	if err != nil {
+		return fmt.Errorf("connect opensearch endpoint: %w", err)
+	}
+	if status < http.StatusOK || status >= http.StatusMultipleChoices {
+		return fmt.Errorf("opensearch endpoint returned status %d", status)
+	}
+	if err := ensureOpenSearchIndex(ctx, cfg); err != nil {
+		return err
+	}
+	result.OpenSearchReady = true
 	return nil
 }
 

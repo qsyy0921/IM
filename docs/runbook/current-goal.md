@@ -232,6 +232,11 @@ IM messages -> search / memory projection -> EvidencePack -> RAG / Agent answer 
   visibility / tombstone hydration。当前机器 Docker API 和本地 OpenSearch 端口不可用，
   因此本轮只验证 focused tests / build / script 入口；真实 OpenSearch 进程 smoke
   尚未归档通过报告。
+- 2026-06-25 search-service 已补 OpenSearch opt-in smoke 预检门：
+  `loadtest/search --phase preflight-opensearch` 会在 `run-local-smoke.ps1 -UseOpenSearchBackend`
+  启动 search-service / timeline-consumer / Kafka 链路之前，先用显式
+  `request-timeout` 验证 OpenSearch endpoint 可达、URL 不携带 secret、临时 index 可创建；
+  预检失败会 fail-closed 并写低敏 summary，不把缺失 runtime 误报成完整 smoke。
 - 2026-06-25 search-service 已补 OpenSearch rebuild operator first path：
   `NEXUSIM_SEARCH_SERVICE_MODE=opensearch-rebuild` 会从 search-service 自有
   PostgreSQL projection 按 tenant 批量读取非 tombstone / 非空 searchable_text

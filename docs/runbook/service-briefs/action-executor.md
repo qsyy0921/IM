@@ -35,6 +35,9 @@
   14 个 case：approval id、prepared audit id、resource id 与 approved proposal
   绑定不一致时均返回 `PROPOSAL_MISMATCH`，并证明不会写 execution audit、不会写
   tool result projection、不会调用 tool executor。
+- 2026-06-25 该 adapter 已纳入 ai-eval required local gate，随 CI-safe
+  `check-ai-eval-regression-gate` 默认运行；仍只使用 in-memory ports 和 local safe
+  executor，不调用真实业务工具、数据库、Docker 或 live service stack。
 - 2026-06-25 `conversation.note.create` 已从 audit-only 边界推进为显式 opt-in
   business adapter：配置 conversation-service gRPC 地址后，approval 后的 action-executor
   会调用 conversation-service 公开 API 写入 note；未配置时仍明确 `executed=false`，

@@ -142,6 +142,8 @@ IM messages -> search / memory projection -> EvidencePack -> RAG / Agent answer 
   approval id、prepared audit id、resource id 与已批准 proposal 绑定不一致时的
   `PROPOSAL_MISMATCH` 断言；这些 case 都要求在 approved-proposal verification
   阶段 fail-closed，不写 execution audit、不写 tool result projection、不调用 tool executor。
+  2026-06-25 该 adapter 已从 optional 记录项提升为 ai-eval required local gate，
+  会随 CI-safe `check-ai-eval-regression-gate` 默认运行，不需要数据库、Docker 或 live service stack。
 - 同日 `loadtest/ragagent` 已提供 RAG-Agent demo first path：编排既有
   `loadtest/rag` 与 `loadtest/agent`，让 RAG answer、Agent proposal、approval
   和 action-executor audit 围绕同一 tenant / conversation 生成一份低敏总报告。
@@ -242,6 +244,11 @@ IM messages -> search / memory projection -> EvidencePack -> RAG / Agent answer 
   `run-ai-eval-rag-summary-llm-boundary-safety.ps1` 覆盖 4 个低敏 cases，验证敏感
   EvidencePack prompt 不会发送给 provider、unsafe output / malformed citation 均
   fail-closed；该 adapter 只用进程内 fake provider，不调用真实模型。
+- 同日 action-executor preflight safety 也已纳入 ai-eval 必跑本地 adapter：
+  `run-ai-eval-action-preflight-safety-adapter.ps1` 覆盖 14 个低敏 cases，验证
+  policy denied、disabled skill、tool mismatch、rate-limit、proposal mismatch 和
+  DLQ / repair operator guard 都在执行前 fail-closed；该 adapter 只使用 in-memory ports
+  和 local safe executor，不调用真实业务工具。
 - 2026-06-24 retrieval-gateway 已补 vector-index-service `SearchVectors` adapter
   first path：`RetrieveEvidence` 支持显式 `include_vector`，调用方必须提供低敏
   `query_embedding_ref`、明确的 `vector_collection_types`、`vector_visibility_scope`

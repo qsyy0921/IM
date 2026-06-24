@@ -326,3 +326,7 @@ fail-closed，不写 execution audit、不写 tool result projection、不调用
   `ai-eval-service-stack-live-20260625-rag-agent-note-profile-mutation` 归档为第二个
   approved conversation mutation；当前 RAG-Agent demo execute-mode 要求 note + profile
   双 mutation 都通过公开 conversation-service API 验证。
+- `action-preflight-safety` 已从 optional adapter 提升为 required local ai-eval gate：
+  14 个低敏 case 默认随 CI-safe gate 运行，覆盖 policy denied、disabled skill、
+  tool mismatch、rate-limit、proposal / approval / prepared-audit / resource mismatch
+  和 DLQ / repair operator guard；该 gate 不调用数据库、Docker、live service stack 或真实工具。

@@ -19,8 +19,9 @@ adapter、状态、计数、summary/report 引用和低敏 metadata。
   required adapters，不启动 Docker / PostgreSQL / live RAG-Agent stack。
 - Case catalog 87；current-memory service-stack live gate 38/38 passed；cross-group /
   temporal memory fixture eval、retrieval smoke、RAG / Summary / Agent stack smokes
-  和 40/40 optional stack gate 已落；RAG / Summary grounding safety 与 guarded LLM
-  boundary safety 已作为 required local adapters 纳入 CI-safe gate。
+  和 40/40 optional stack gate 已落；RAG / Summary grounding safety、guarded LLM
+  boundary safety 与 action-executor preflight safety 已作为 required local adapters
+  纳入 CI-safe gate。
 - 2026-06-23 低敏 collaborative-memory eval 扩到 20 个 profile / Agent safety fixture cases，
   新增 multi-hop actor-chain completeness、workstream / decision dependency edge、
   reviewed multi-source profile activation、supporting-memory delete 后 profile recompute
@@ -110,6 +111,10 @@ adapter、状态、计数、summary/report 引用和低敏 metadata。
   行为，后者验证敏感 EvidencePack prompt 不发送给 provider、unsafe output /
   malformed citation fail-closed；两个 adapter 都只跑本地 focused app tests，不调用真实模型、
   数据库或 service stack。
+- 2026-06-25 `action-preflight-safety` 已从 optional adapter 提升为 required local
+  adapter：14 个低敏 cases 默认随 CI-safe gate 运行，验证 policy denied、disabled
+  skill、tool mismatch、rate-limit、proposal mismatch 和 DLQ / repair operator guard
+  都在执行前 fail-closed；该 adapter 只使用 in-memory ports 和 local safe executor。
 
 边界：不保存 raw EvidencePack、prompt、model output、用户正文、secret 或 tool input；不授权业务动作。
 

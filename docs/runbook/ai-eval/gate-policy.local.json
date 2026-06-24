@@ -11,6 +11,7 @@
       "profile-agent-safety",
       "rag-summary-grounding-safety",
       "rag-summary-llm-boundary-safety",
+      "action-preflight-safety",
       "action-external-http-provider",
       "action-external-mcp-failure"
     ]
@@ -38,6 +39,14 @@
       "script": "run-ai-eval-rag-summary-llm-boundary-safety.ps1",
       "run_suffix": "rag-summary-llm-boundary-safety",
       "summary_file": "rag-summary-llm-boundary-safety-eval-summary.json",
+      "requires_service_stack": false
+    },
+    {
+      "name": "action-preflight-safety",
+      "required": true,
+      "script": "run-ai-eval-action-preflight-safety-adapter.ps1",
+      "run_suffix": "action-preflight-safety",
+      "summary_file": "action-preflight-safety-eval-summary.json",
       "requires_service_stack": false
     },
     {
@@ -190,13 +199,6 @@
       "requires": [
         "conda-env:IM"
       ]
-    },
-    {
-      "name": "action-preflight-safety",
-      "script": "run-ai-eval-action-preflight-safety-adapter.ps1",
-      "run_suffix": "action-preflight-safety",
-      "summary_file": "action-preflight-safety-eval-summary.json",
-      "requires_service_stack": false
     }
   ],
   "forbidden_persisted_fields": [

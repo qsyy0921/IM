@@ -296,12 +296,12 @@ First-stage action-executor preflight safety eval:
 .\tools\run-ai-eval-action-preflight-safety-adapter.ps1
 ```
 
-This adapter runs the real action-executor app usecase against in-memory ports
-and the local safe executor. It verifies policy denial, disabled skill, tool
-mismatch, elevated-risk local tool no-execute, unapproved proposal no-audit
-paths, rate-limited blocked and rate-limiter-unavailable fail-closed paths, and
-DLQ / repair actions that require the operator workflow instead of generic tool
-execution.
+This required local adapter runs the real action-executor app usecase against
+in-memory ports and the local safe executor. It verifies policy denial, disabled
+skill, tool mismatch, elevated-risk local tool no-execute, unapproved proposal
+no-audit paths, rate-limited blocked and rate-limiter-unavailable fail-closed
+paths, approval / prepared-audit / resource binding mismatches, and DLQ / repair
+actions that require the operator workflow instead of generic tool execution.
 It does not call real MCP servers, external networks, databases or production
 tools.
 
@@ -376,10 +376,10 @@ The gate policy manifest declares required adapters, minimum case count, maximum
 failure count, `GetEvalRun` / `ListEvalRuns` readback requirements, forbidden
 persisted fields, and optional service-stack adapters for later RAG / Agent /
 Python worker coverage. The smoke runs the required profile / Agent output
-safety, action-executor external HTTP adapter and action-executor external MCP
-failure evals, plus the local RAG / Summary grounding and LLM boundary safety
-adapters, records those summaries into `ai-eval-service`, then writes a
-low-sensitive suite-level gate summary. It
+safety, action-executor preflight safety, action-executor external HTTP adapter
+and action-executor external MCP failure evals, plus the local RAG / Summary
+grounding and LLM boundary safety adapters, records those summaries into
+`ai-eval-service`, then writes a low-sensitive suite-level gate summary. It
 is a local regression gate skeleton, not a production CI gate and not a
 model-quality benchmark.
 
@@ -390,8 +390,9 @@ CI-safe local gate:
 ```
 
 This check validates the case schema and gate policy, runs only the required
-CI-safe adapters, including the RAG / Summary grounding and LLM boundary safety
-adapters, and is now included by `check-local`. It does not connect to
+CI-safe adapters, including action-executor preflight safety plus the RAG /
+Summary grounding and LLM boundary safety adapters, and is now included by
+`check-local`. It does not connect to
 PostgreSQL, start Docker or run live RAG / Agent service-stack adapters.
 
 Optional adapters are opt-in so normal local gates do not require a full service
@@ -407,8 +408,6 @@ stack:
 command-level Agent output regression through `ai-eval-service`.
 `python-memory-extraction-candidate` can be selected the same way to record the
 Go-side batch memory extraction candidate boundary through `ai-eval-service`.
-`action-preflight-safety` can also be selected to record the in-memory
-action-executor preflight safety regression.
 
 `memory-service`, `retrieval-gateway`, `rag-service`, `summary-service` and
 `agent-action-executor` can also be selected through `-OptionalAdapter`, but
@@ -551,10 +550,14 @@ no execution, no output hash and no raw provider output persistence.
 The 2026-06-20 Agent output regression added 4 optional Python-worker provider
 cases for grounded candidate success, hash mismatch, citation mismatch and
 worker failure.
-The 2026-06-20 action preflight safety eval added 10 optional action-executor
-cases for policy denial, disabled skill, tool mismatch, elevated local risk,
-unapproved proposal no-audit behavior, rate-limit fail-closed behavior and
-DLQ / repair operator-guard behavior.
+The 2026-06-20 action preflight safety eval added 10 action-executor cases for
+policy denial, disabled skill, tool mismatch, elevated local risk, unapproved
+proposal no-audit behavior, rate-limit fail-closed behavior and DLQ / repair
+operator-guard behavior. The 2026-06-25 promotion made
+`action-preflight-safety` a required CI-safe local adapter with 14 cases,
+including approval id, prepared audit id and resource id binding mismatch
+checks that must fail closed before execution audit, result projection or tool
+executor calls.
 
 First-stage Go-side Python worker adapter smoke:
 

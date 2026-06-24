@@ -34,6 +34,9 @@ loadtest report 或 archive。
   provider failure，输出低敏 admin operation request 和 workflow handoff request；admin-service
   已支持 `PROVIDER_REPLAY_REQUEST` 并强制路由 workflow-service `REPAIR_APPROVAL`，
   workflow target 为 action-executor，最终执行仍只能走 `RedriveProviderFailure`。
+- provider replay admin operator bridge 已收口：`loadtest/admin provider-replay-submit`
+  读取低敏 handoff artifact 并创建 `PROVIDER_REPLAY_REQUEST`；`provider-replay-list` /
+  `provider-replay-approve` / `provider-replay-reject` 提供第一版列表和审批 UX，不执行 redrive。
 - group memory / multi-party collaboration 必须继续保留 source refs、conversation scope、
   member visibility、time/version boundary、citations 和 no-citation refusal。
 

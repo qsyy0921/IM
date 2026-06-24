@@ -22,6 +22,9 @@ operator CLI 和 first-stage downstream adapters 已落。
   target service 为 `action-executor`，approval policy 为
   `admin.workflow.provider_replay.v1`；admin-service 只创建 / 审批 / 路由请求，不执行
   `RedriveProviderFailure`。
+- provider replay operator bridge：`loadtest/admin provider-replay-submit` 可读取
+  action-executor handoff artifact 并创建低敏 `PROVIDER_REPLAY_REQUEST`；`provider-replay-list`
+  / `provider-replay-approve` / `provider-replay-reject` 提供第一版 operator UX，不执行 redrive。
 - control-plane adapters：`CONFIG_PUBLISH`、`CONFIG_ROLLBACK`、
   `TENANT_QUOTA_CHANGE`、`POLICY_RULE_CHANGE`。
 - audit adapter：`AUDIT_EXPORT_REQUEST -> audit-service.CreateAuditExport`；
@@ -30,5 +33,5 @@ operator CLI 和 first-stage downstream adapters 已落。
 
 证据入口：`docs/runbook/loadtest/admin-service/`。
 
-后续：admin-event ingestion、admin UI、provider replay request 列表 / 审批 UX、更多明确下游公开
+后续：admin-event ingestion、admin UI、provider-grade provider replay request UI、更多明确下游公开
 API adapter、更多补偿 adapter、provider-grade compensation instruction 审批 / UI 和运维。

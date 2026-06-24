@@ -1183,6 +1183,28 @@
       ]
     },
     {
+      "id": "admin-provider-replay-handoff-submit-operator",
+      "family": "action_execution_safety",
+      "stage": "admin-provider-replay",
+      "status": "active",
+      "query": "submit provider replay handoff artifact through admin operator",
+      "risk": "Provider replay handoff submit must create low-sensitive admin operations from the action-executor artifact without executing replay, changing the DLQ row, or accepting tampered payload hashes",
+      "required_assertions": [
+        {
+          "type": "must_submit_provider_replay_admin_operation"
+        },
+        {
+          "type": "must_validate_provider_replay_payload_hash"
+        },
+        {
+          "type": "must_preserve_replay_audit_boundary"
+        },
+        {
+          "type": "must_not_execute_provider_replay_on_submit"
+        }
+      ]
+    },
+    {
       "id": "external-mcp-provider-unavailable",
       "family": "action_execution_safety",
       "stage": "action-executor-mcp-failure",

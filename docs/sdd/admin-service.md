@@ -187,6 +187,14 @@ service：`CONFIG_PUBLISH` / `CONFIG_ROLLBACK` / `TENANT_QUOTA_CHANGE` /
 `admin.workflow.provider_replay.v1`。未映射的 `CRITICAL` operation 仍使用
 `admin.workflow.operation.v1` 和 `admin-service` target，等待后续专用 adapter。
 
+第一版 provider replay operator bridge 位于 `loadtest/admin`：`provider-replay-submit`
+读取 action-executor `provider-replay-handoff` 低敏 artifact，校验 handoff contract、
+payload hash、低敏 refs、`direct_execution_allowed=false` 和
+`source_dlq_immutable=true` 后调用 `CreateAdminOperation`；`provider-replay-list` /
+`provider-replay-approve` / `provider-replay-reject` 分别提供 provider replay request
+列表和审批入口。该 bridge 不调用 `RedriveProviderFailure`，也不直接创建 workflow；
+workflow 创建仍由 admin-service operation-worker 负责。
+
 第一版真实下游 adapter 已覆盖四类非 `CRITICAL` 的 control-plane operation：
 
 ```text

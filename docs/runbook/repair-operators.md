@@ -304,6 +304,16 @@ workflow handoff request。环境变量为 `NEXUSIM_ACTION_EXECUTOR_MODE`；
 不包含 raw provider input / output / provider error / operator reason。上述模式都不修改
 provider failure row、不调用 tool executor、不重放 provider output。
 
+`loadtest/admin` 提供 provider replay handoff operator bridge：`provider-replay-submit`
+读取上面的 handoff artifact，校验 `PROVIDER_REPLAY_REQUEST` contract、payload hash、
+低敏 refs、`direct_execution_allowed=false` 和 `source_dlq_immutable=true` 后，调用
+admin-service `CreateAdminOperation` 创建管理操作；`provider-replay-list` 只列
+`PROVIDER_REPLAY_REQUEST`；`provider-replay-approve` / `provider-replay-reject` 使用
+`admin.workflow.provider_replay.v1` 审批 policy。该 bridge 不调用 workflow-service、
+不调用 action-executor `RedriveProviderFailure`、不修改 DLQ row；后续仍由
+admin-service operation-worker 路由 workflow，并由 fresh proposal / approval /
+prepared audit / new input / reason hash 触发最终 redrive。
+
 ## Delivery Projection
 
 `delivery-service` 额外拥有 projection 排障入口：

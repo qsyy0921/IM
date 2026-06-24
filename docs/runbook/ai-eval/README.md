@@ -324,6 +324,12 @@ action-executor as the only final `RedriveProviderFailure` execution owner. It
 does not execute replay, restore raw provider input/output, mutate the DLQ row,
 or reuse old approval.
 
+Provider replay submit operator bridge is represented by
+`admin-provider-replay-handoff-submit-operator`. It verifies that the admin
+operator can submit low-sensitive `PROVIDER_REPLAY_REQUEST` operations from an
+action-executor handoff artifact, validates the operation payload hash, and does
+not execute provider replay during submit.
+
 First-stage Python worker output-safety adapter:
 
 ```powershell

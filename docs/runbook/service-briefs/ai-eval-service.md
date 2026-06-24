@@ -18,6 +18,8 @@
   `PROVIDER_REPLAY_REQUEST` admin operation、workflow-service `REPAIR_APPROVAL`
   handoff、action-executor final execution owner，以及 no auto replay / no raw
   payload / immutable DLQ row。
+- Provider replay submit operator case：验证 admin operator 从 action-executor handoff
+  artifact 创建 `PROVIDER_REPLAY_REQUEST`，校验 payload hash，且 submit 阶段不执行 replay。
 - Provider readiness / source coverage / vector lane checks 已进入相关 smoke 输出。
 - Group-memory ambiguity safety expansion：asker-bound term ambiguity、visible-chain
   incomplete abstention、missing visibility projection fail-closed、audience-language

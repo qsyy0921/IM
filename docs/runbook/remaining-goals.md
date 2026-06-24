@@ -60,7 +60,7 @@
   provider redrive / audit、tenant template policy。
 - `audit-service`：更多 Kafka ingestion source、checkpoint / rewind、export worker、
   SIEM forwarding、retention cleanup、segment sealing。
-- `admin-service`：admin UI、provider replay request 列表 / 审批 UX、更多下游公开 API
+- `admin-service`：admin UI、provider-grade provider replay request UI、更多下游公开 API
   adapter、compensation adapter、instruction approval UI。
 - `control-plane-service`：outbox relay、drift monitor、expiry / cleanup worker、
   api-gateway quota consumer、provider-grade rollout。

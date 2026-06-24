@@ -16,42 +16,43 @@ import (
 )
 
 type config struct {
-	mode               string
-	target             string
-	requestTimeout     time.Duration
-	tls                grpctls.Config
-	tenantID           string
-	userID             string
-	instanceRef        string
-	traceID            string
-	requestID          string
-	operationID        string
-	operatorRef        string
-	operatorRole       string
-	targetRefHash      string
-	riskLevel          string
-	payloadSchema      string
-	operationPayload   string
-	payloadFile        string
-	payloadLoadError   error
-	approverRef        string
-	approverRole       string
-	decision           string
-	approvalPolicyRef  string
-	reasonRef          string
-	evidenceRefs       []string
-	idempotencyKey     string
-	status             string
-	operationType      string
-	pageSize           int32
-	controlPlaneTarget string
-	pgDSN              string
-	resultRoot         string
-	runName            string
-	applyMigration     bool
-	cleanup            bool
-	pollTimeout        time.Duration
-	pollInterval       time.Duration
+	mode                      string
+	target                    string
+	requestTimeout            time.Duration
+	tls                       grpctls.Config
+	tenantID                  string
+	userID                    string
+	instanceRef               string
+	traceID                   string
+	requestID                 string
+	operationID               string
+	operatorRef               string
+	operatorRole              string
+	targetRefHash             string
+	riskLevel                 string
+	payloadSchema             string
+	operationPayload          string
+	payloadFile               string
+	payloadLoadError          error
+	approverRef               string
+	approverRole              string
+	decision                  string
+	approvalPolicyRef         string
+	reasonRef                 string
+	evidenceRefs              []string
+	idempotencyKey            string
+	status                    string
+	operationType             string
+	pageSize                  int32
+	controlPlaneTarget        string
+	pgDSN                     string
+	resultRoot                string
+	runName                   string
+	applyMigration            bool
+	cleanup                   bool
+	pollTimeout               time.Duration
+	pollInterval              time.Duration
+	providerReplayHandoffFile string
 }
 
 type commandResult struct {
@@ -107,7 +108,7 @@ func main() {
 func parseFlags(args []string) config {
 	cfg := config{}
 	flags := flag.NewFlagSet("admin-operator", flag.ExitOnError)
-	flags.StringVar(&cfg.mode, "mode", "approve", "mode: create, approve, reject, get, list, config-publish-smoke, config-rollback-smoke, tenant-quota-smoke, or policy-ruleset-smoke")
+	flags.StringVar(&cfg.mode, "mode", "approve", "mode: create, approve, reject, get, list, provider-replay-submit, provider-replay-list, provider-replay-approve, provider-replay-reject, config-publish-smoke, config-rollback-smoke, tenant-quota-smoke, or policy-ruleset-smoke")
 	flags.StringVar(&cfg.target, "target", envOr("NEXUSIM_ADMIN_GRPC_ADDR", "127.0.0.1:10770"), "admin-service gRPC target")
 	flags.DurationVar(&cfg.requestTimeout, "request-timeout", 5*time.Second, "request timeout")
 	flags.StringVar(&cfg.tls.CAFile, "admin-tls-ca-file", os.Getenv("NEXUSIM_ADMIN_TLS_CA_FILE"), "CA PEM for admin-service gRPC TLS")
@@ -147,6 +148,7 @@ func parseFlags(args []string) config {
 	flags.BoolVar(&cfg.cleanup, "cleanup", true, "cleanup smoke tenant before control-plane admin smoke")
 	flags.DurationVar(&cfg.pollTimeout, "poll-timeout", 15*time.Second, "operation polling timeout for control-plane admin smoke")
 	flags.DurationVar(&cfg.pollInterval, "poll-interval", 300*time.Millisecond, "operation polling interval for control-plane admin smoke")
+	flags.StringVar(&cfg.providerReplayHandoffFile, "provider-replay-handoff-file", os.Getenv("NEXUSIM_ADMIN_PROVIDER_REPLAY_HANDOFF_FILE"), "action-executor provider-replay-handoff JSON artifact")
 	_ = flags.Parse(args)
 	cfg.pageSize = int32(pageSize)
 	cfg.mode = strings.ToLower(strings.TrimSpace(cfg.mode))
@@ -170,8 +172,14 @@ func parseFlags(args []string) config {
 	if cfg.idempotencyKey == "" && cfg.mode == "create" {
 		cfg.idempotencyKey = "create:" + cfg.operationType + ":" + cfg.targetRefHash + ":" + cfg.operatorRef
 	}
-	if cfg.idempotencyKey == "" && (cfg.mode == "approve" || cfg.mode == "reject") {
+	if cfg.idempotencyKey == "" && (cfg.mode == "approve" || cfg.mode == "reject" || cfg.mode == "provider-replay-approve" || cfg.mode == "provider-replay-reject") {
 		cfg.idempotencyKey = cfg.mode + ":" + cfg.operationID + ":" + cfg.approverRef
+	}
+	if cfg.mode == "provider-replay-list" && cfg.operationType == "" {
+		cfg.operationType = providerReplayOperationType
+	}
+	if (cfg.mode == "provider-replay-approve" || cfg.mode == "provider-replay-reject") && cfg.approvalPolicyRef == "admin.operator.cli.v1" {
+		cfg.approvalPolicyRef = providerReplayApprovalPolicy
 	}
 	if cfg.runName == "" && isControlPlaneAdminSmokeMode(cfg.mode) {
 		cfg.runName = "admin-" + cfg.mode + "-" + time.Now().UTC().Format("20060102-150405")
@@ -215,6 +223,12 @@ func execute(ctx context.Context, cfg config, client adminv1.AdminServiceClient)
 		CheckedAt: time.Now().UTC(),
 	}
 	switch cfg.mode {
+	case "provider-replay-submit":
+		operations, err := submitProviderReplayHandoff(ctx, cfg, client)
+		if err != nil {
+			return commandResult{}, err
+		}
+		result.Operations = operations
 	case "create":
 		response, err := client.CreateAdminOperation(ctx, &adminv1.CreateAdminOperationRequest{
 			AuthContext:          authContext(cfg),
@@ -237,9 +251,9 @@ func execute(ctx context.Context, cfg config, client adminv1.AdminServiceClient)
 		}
 		result.Operation = summarizeOperation(response.GetOperation())
 		result.Replayed = response.GetReplayed()
-	case "approve", "reject":
+	case "approve", "reject", "provider-replay-approve", "provider-replay-reject":
 		decision := cfg.decision
-		if cfg.mode == "reject" {
+		if cfg.mode == "reject" || cfg.mode == "provider-replay-reject" {
 			decision = "REJECT"
 		}
 		response, err := client.ApproveAdminOperation(ctx, &adminv1.ApproveAdminOperationRequest{
@@ -274,7 +288,7 @@ func execute(ctx context.Context, cfg config, client adminv1.AdminServiceClient)
 		if approvals := response.GetApprovals(); len(approvals) > 0 {
 			result.Approval = summarizeApproval(approvals[len(approvals)-1])
 		}
-	case "list":
+	case "list", "provider-replay-list":
 		response, err := client.ListAdminOperations(ctx, &adminv1.ListAdminOperationsRequest{
 			AuthContext:   authContext(cfg),
 			Status:        cfg.status,
@@ -306,6 +320,10 @@ func (cfg config) validate() error {
 		return errors.New("--request-timeout must be positive")
 	}
 	switch cfg.mode {
+	case "provider-replay-submit":
+		if strings.TrimSpace(cfg.providerReplayHandoffFile) == "" {
+			return errors.New("--provider-replay-handoff-file is required")
+		}
 	case "create":
 		if cfg.payloadLoadError != nil {
 			return fmt.Errorf("read --operation-payload-file: %w", cfg.payloadLoadError)
@@ -337,7 +355,7 @@ func (cfg config) validate() error {
 		if strings.TrimSpace(cfg.idempotencyKey) == "" {
 			return errors.New("--idempotency-key is required")
 		}
-	case "approve", "reject":
+	case "approve", "reject", "provider-replay-approve", "provider-replay-reject":
 		if strings.TrimSpace(cfg.operationID) == "" {
 			return errors.New("--operation-id is required")
 		}
@@ -351,7 +369,7 @@ func (cfg config) validate() error {
 		if strings.TrimSpace(cfg.operationID) == "" {
 			return errors.New("--operation-id is required")
 		}
-	case "list":
+	case "list", "provider-replay-list":
 		if cfg.pageSize <= 0 {
 			return errors.New("--page-size must be positive")
 		}
@@ -375,7 +393,7 @@ func (cfg config) validate() error {
 			return errors.New("--poll-interval must be positive")
 		}
 	default:
-		return fmt.Errorf("--mode must be create, approve, reject, get, list, config-publish-smoke, config-rollback-smoke, tenant-quota-smoke, or policy-ruleset-smoke")
+		return fmt.Errorf("--mode must be create, approve, reject, get, list, provider-replay-submit, provider-replay-list, provider-replay-approve, provider-replay-reject, config-publish-smoke, config-rollback-smoke, tenant-quota-smoke, or policy-ruleset-smoke")
 	}
 	return nil
 }

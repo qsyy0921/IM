@@ -272,7 +272,7 @@ message / conversation / policy events -> search-service + memory-service projec
 | --- | --- |
 | `search-service` | 搜索 projection、visibility / tombstone、`SearchMessages`、timeline consumer、projection smoke。 |
 | `memory-service` | group memory projection、rules-v0.2 extraction cue classifier、StructuredMemoryEvent、source refs、visibility window、revoke hidden、profile aggregate recompute / archive first path，以及公开 candidate submit / review / approve / reject / supersede temporal update 持久化路径。 |
-| `retrieval-gateway` | EvidencePack 统一边界，聚合 search / memory / policy precheck，并通过 memory-service 公开 API 扩展 current memory graph edges 和当前用户 profile aggregate evidence；当前策略版本 `retrieval-gateway.v1.hybrid-source-chain-rrf` 会按 lexical search、memory event、profile aggregate、source chain、memory graph、actor attribution 和 profile support lane 做 RRF 风格融合，再叠加 source-chain 信号；已通过 2026-06-24 retrieval source-chain rerank service-stack gate；不直接调用 LLM。 |
+| `retrieval-gateway` | EvidencePack 统一边界，聚合 search / memory / policy precheck，并通过 memory-service 公开 API 扩展 current memory graph edges、depth=1 相邻 memory 和当前用户 profile aggregate evidence；当前策略版本 `retrieval-gateway.v1.hybrid-source-chain-rrf-graph-depth1` 会按 lexical search、memory event、profile aggregate、source chain、memory graph、actor attribution 和 profile support lane 做 RRF 风格融合，再叠加 source-chain 信号；已通过 2026-06-24 retrieval source-chain rerank service-stack gate；不直接调用 LLM。 |
 | `rag-service` | 只读问答 first path、EvidencePack citation verifier、guarded external HTTP LLM boundary，并保留 EvidencePack memory graph edges 和 profile aggregate evidence；`loadtest/ragagent` 会把 RAG grounded answer 与 Agent approval / action audit 汇总成低敏演示报告。 |
 | `summary-service` | 只读摘要 first path、EvidencePack citation verifier、guarded external HTTP LLM boundary，并保留 EvidencePack memory graph edges 和 profile aggregate evidence。 |
 | `agent-service` | proposal-only path、mcp-gateway prepare、approval workflow、approval outbox relay、planner Python candidate guard，并保留 EvidencePack memory graph edges 和 profile aggregate evidence；`loadtest/ragagent` 复用 Agent proposal / approval / action-executor audit 校验。 |
@@ -339,6 +339,10 @@ isolation。2026-06-24 追加 EvidencePack memory graph edge 扩展：
 retrieval-gateway 通过 memory-service 公开 `GetMemoryEvent` 读取 current memory
 graph edges，并把 `EvidenceMemoryGraphEdge` 透传给 RAG / Agent；retrieval /
 RAG / Agent loadtest 都会断言跨群 source refs 与 `SUPPORTS` graph edge 被保留。
+同日追加 graph expansion depth=1：retrieval-gateway 会沿当前 memory hit 的 graph
+edge 通过 memory-service 公开 API 拉取相邻 memory event，在 rerank / limit 截断前
+纳入 EvidencePack 候选；相邻 memory 必须满足当前 memory status 过滤，lookup /
+visibility / malformed edge 失败时 fail-closed。
 同日追加 EvidencePack profile aggregate evidence：retrieval-gateway 通过
 memory-service 公开 `ListProfileAggregates` 查询当前用户 ACTIVE profile aggregate，
 并作为 `PROFILE_AGGREGATE` evidence 透传给 RAG / Summary / Agent；retrieval /

@@ -63,14 +63,28 @@ func TestRetrieveEvidenceMergesSearchAndMemory(t *testing.T) {
 				SourceRefs:        []types.EvidenceSourceRef{{SourceType: "MESSAGE", SourceID: "msg-1", ConversationSeq: 10}},
 			}},
 		},
+		"mem-2": {
+			Item: types.MemoryEventEvidence{
+				MemoryEventID:     "mem-2",
+				ConversationID:    "conv-1",
+				Status:            types.MemoryStatusActive,
+				ReviewState:       "APPROVED",
+				FactText:          "linked memory fact",
+				SourceRefs:        []types.EvidenceSourceRef{{SourceType: "MESSAGE", SourceID: "msg-2", ConversationSeq: 11}},
+				ValidFromSeq:      11,
+				Confidence:        0.66,
+				VisibilityVersion: 4,
+				ExtractionVersion: "memory.v1",
+			},
+		},
 	}}
 
 	result, err := NewRetrieveEvidenceUseCase(&search, &memory).Execute(context.Background(), validCommand())
 	if err != nil {
 		t.Fatalf("Execute returned error: %v", err)
 	}
-	if got := len(result.Pack.Items); got != 2 {
-		t.Fatalf("expected 2 items, got %d", got)
+	if got := len(result.Pack.Items); got != 3 {
+		t.Fatalf("expected 3 items, got %d", got)
 	}
 	if result.Pack.SearchProjectionVersion != 7 || result.Pack.MemoryProjectionVersion != 9 {
 		t.Fatalf("unexpected projection versions: %+v", result.Pack)
@@ -95,6 +109,11 @@ func TestRetrieveEvidenceMergesSearchAndMemory(t *testing.T) {
 	if got := result.Pack.Items[1].MemoryGraphEdges; len(got) != 1 || got[0].RelationType != "SUPPORTS" || len(got[0].SourceRefs) != 1 {
 		t.Fatalf("expected memory graph edge to be carried in evidence item: %+v", got)
 	}
+	if result.Pack.Items[2].SourceType != types.EvidenceSourceMemoryEvent ||
+		result.Pack.Items[2].MemoryEventID != "mem-2" ||
+		result.Pack.Items[2].Text != "linked memory fact" {
+		t.Fatalf("expected one-hop graph adjacent memory evidence, got %+v", result.Pack.Items[2])
+	}
 	if got := memory.query.AtConversationSeq; got != 10 {
 		t.Fatalf("expected memory current query at search seq 10, got %d", got)
 	}
@@ -107,8 +126,8 @@ func TestRetrieveEvidenceMergesSearchAndMemory(t *testing.T) {
 		got[0].ReturnedCount != 1 ||
 		got[0].Status != types.EvidenceCoverageReturned ||
 		got[1].SourceType != types.EvidenceSourceMemoryEvent ||
-		got[1].CandidateCount != 1 ||
-		got[1].ReturnedCount != 1 ||
+		got[1].CandidateCount != 2 ||
+		got[1].ReturnedCount != 2 ||
 		got[1].Status != types.EvidenceCoverageReturned ||
 		got[2].SourceType != types.EvidenceSourceProfileAggregate ||
 		got[2].CandidateCount != 0 ||
@@ -340,6 +359,97 @@ func TestRetrieveEvidenceFailsClosedWhenMemoryGraphLookupFails(t *testing.T) {
 	}
 }
 
+func TestRetrieveEvidenceFailsClosedWhenMemoryGraphExpansionLookupFails(t *testing.T) {
+	command := validCommand()
+	command.IncludeSearch = false
+	command.IncludeMemory = true
+	memory := fakeMemoryPort{
+		result: types.MemoryResult{
+			Items: []types.MemoryEventEvidence{{MemoryEventID: "mem-1", ConversationID: "conv-1", FactText: "memory", Status: types.MemoryStatusActive, Confidence: 0.7}},
+		},
+		details: map[string]types.MemoryEventLookupResult{
+			"mem-1": {
+				Item: types.MemoryEventEvidence{MemoryEventID: "mem-1", ConversationID: "conv-1", FactText: "memory", Status: types.MemoryStatusActive, Confidence: 0.7},
+				GraphEdges: []types.MemoryGraphEdge{{
+					EdgeID:            "edge-1",
+					FromMemoryEventID: "mem-1",
+					ToMemoryEventID:   "mem-2",
+					RelationType:      "SUPPORTS",
+				}},
+			},
+		},
+		getErrors: map[string]error{"mem-2": types.ErrMemoryUnavailable},
+	}
+	_, err := NewRetrieveEvidenceUseCase(&fakeSearchPort{}, &memory).Execute(context.Background(), command)
+	if !errors.Is(err, types.ErrMemoryUnavailable) {
+		t.Fatalf("expected memory unavailable from adjacent graph lookup, got %v", err)
+	}
+}
+
+func TestRetrieveEvidenceFiltersGraphExpansionByMemoryStatus(t *testing.T) {
+	command := validCommand()
+	command.IncludeSearch = false
+	command.IncludeMemory = true
+	memory := fakeMemoryPort{
+		result: types.MemoryResult{
+			Items: []types.MemoryEventEvidence{{MemoryEventID: "mem-current", ConversationID: "conv-1", FactText: "current", Status: types.MemoryStatusActive, Confidence: 0.8}},
+		},
+		details: map[string]types.MemoryEventLookupResult{
+			"mem-current": {
+				Item: types.MemoryEventEvidence{MemoryEventID: "mem-current", ConversationID: "conv-1", FactText: "current", Status: types.MemoryStatusActive, Confidence: 0.8},
+				GraphEdges: []types.MemoryGraphEdge{{
+					EdgeID:            "edge-1",
+					FromMemoryEventID: "mem-current",
+					ToMemoryEventID:   "mem-old",
+					RelationType:      "SUPERSEDES",
+				}},
+			},
+			"mem-old": {
+				Item: types.MemoryEventEvidence{MemoryEventID: "mem-old", ConversationID: "conv-1", FactText: "old", Status: types.MemoryStatusSuperseded, Confidence: 0.9},
+			},
+		},
+	}
+	result, err := NewRetrieveEvidenceUseCase(&fakeSearchPort{}, &memory).Execute(context.Background(), command)
+	if err != nil {
+		t.Fatalf("Execute returned error: %v", err)
+	}
+	if got := len(result.Pack.Items); got != 1 {
+		t.Fatalf("expected superseded adjacent memory to be filtered from default active retrieval, got %d items: %+v", got, result.Pack.Items)
+	}
+	if result.Pack.Items[0].MemoryEventID != "mem-current" {
+		t.Fatalf("unexpected retained memory item: %+v", result.Pack.Items[0])
+	}
+	if coverage := result.Pack.SourceCoverage[1]; coverage.CandidateCount != 2 || coverage.ReturnedCount != 1 {
+		t.Fatalf("expected filtered adjacent memory to be counted but not returned, got %+v", coverage)
+	}
+}
+
+func TestRetrieveEvidenceFailsClosedWhenGraphEdgeDoesNotReferenceSource(t *testing.T) {
+	command := validCommand()
+	command.IncludeSearch = false
+	command.IncludeMemory = true
+	memory := fakeMemoryPort{
+		result: types.MemoryResult{
+			Items: []types.MemoryEventEvidence{{MemoryEventID: "mem-1", ConversationID: "conv-1", FactText: "memory", Status: types.MemoryStatusActive, Confidence: 0.7}},
+		},
+		details: map[string]types.MemoryEventLookupResult{
+			"mem-1": {
+				Item: types.MemoryEventEvidence{MemoryEventID: "mem-1", ConversationID: "conv-1", FactText: "memory", Status: types.MemoryStatusActive, Confidence: 0.7},
+				GraphEdges: []types.MemoryGraphEdge{{
+					EdgeID:            "edge-bad",
+					FromMemoryEventID: "mem-x",
+					ToMemoryEventID:   "mem-y",
+					RelationType:      "SUPPORTS",
+				}},
+			},
+		},
+	}
+	_, err := NewRetrieveEvidenceUseCase(&fakeSearchPort{}, &memory).Execute(context.Background(), command)
+	if !errors.Is(err, types.ErrRetrievalUnavailable) {
+		t.Fatalf("expected retrieval unavailable from malformed graph edge, got %v", err)
+	}
+}
+
 func TestRetrieveEvidenceReranksBeforeTruncating(t *testing.T) {
 	command := validCommand()
 	command.IncludeSearch = false
@@ -507,6 +617,7 @@ type fakeMemoryPort struct {
 	result        types.MemoryResult
 	err           error
 	getErr        error
+	getErrors     map[string]error
 	profileResult types.ProfileAggregateResult
 	profileErr    error
 	called        bool
@@ -523,6 +634,11 @@ func (port *fakeMemoryPort) QueryMemoryEvents(_ context.Context, query types.Mem
 }
 
 func (port *fakeMemoryPort) GetMemoryEvent(_ context.Context, lookup types.MemoryEventLookup) (types.MemoryEventLookupResult, error) {
+	if port.getErrors != nil {
+		if err, ok := port.getErrors[lookup.MemoryEventID]; ok {
+			return types.MemoryEventLookupResult{}, err
+		}
+	}
 	if port.getErr != nil {
 		return types.MemoryEventLookupResult{}, port.getErr
 	}

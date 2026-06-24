@@ -93,6 +93,12 @@ func (usecase RetrieveEvidenceUseCase) Execute(
 		}
 		memoryProjectionVersion = result.ProjectionVersion
 		coverage[types.EvidenceSourceMemoryEvent].CandidateCount = len(result.Items)
+		queryMemoryIDs := make(map[string]struct{}, len(result.Items))
+		for _, event := range result.Items {
+			if event.MemoryEventID != "" {
+				queryMemoryIDs[event.MemoryEventID] = struct{}{}
+			}
+		}
 		for _, event := range result.Items {
 			enriched, err := usecase.memory.GetMemoryEvent(ctx, types.MemoryEventLookup{
 				AuthContext:   command.AuthContext,
@@ -107,6 +113,17 @@ func (usecase RetrieveEvidenceUseCase) Execute(
 			event.GraphEdges = enriched.GraphEdges
 			item := memoryEventToEvidence(event)
 			appendEvidenceCandidate(&candidates, seen, coverage, item)
+			if err := usecase.expandMemoryGraphDepthOne(
+				ctx,
+				command,
+				event,
+				queryMemoryIDs,
+				&candidates,
+				seen,
+				coverage,
+			); err != nil {
+				return types.RetrieveEvidenceResult{}, err
+			}
 		}
 		profiles, err := usecase.memory.ListProfileAggregates(ctx, types.ProfileAggregateQuery{
 			AuthContext:   command.AuthContext,

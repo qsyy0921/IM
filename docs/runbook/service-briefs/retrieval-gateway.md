@@ -1,6 +1,6 @@
 # retrieval-gateway
 
-状态：foundation-active / EvidencePack graph edge + profile evidence expansion first pass passed。
+状态：foundation-active / EvidencePack graph depth=1 + profile evidence expansion first pass passed。
 
 定位：统一 search + memory 的检索入口，向 RAG / summary / Agent 提供
 `EvidencePack`。它不直接读业务库，不调用 LLM，不执行 Agent 动作。
@@ -64,13 +64,20 @@
   已通过真实 service-stack gate：4 adapters / 27 cases / 27 passed / 0 failed /
   0 skipped，retrieval case 的 9 个断言全通过，`memory_rerank_score=1.29`
   高于 single search baseline。
-- 2026-06-24 retrieval strategy version 已推进为
-  `retrieval-gateway.v1.hybrid-source-chain-rrf`：rerank 现在先收齐 search /
+- 2026-06-24 retrieval source-chain rerank first pass 已落：
+  `retrieval-gateway.v1.hybrid-source-chain-rrf` 先收齐 search /
   memory / profile candidates，再按 lexical search、memory event、profile aggregate、
   source chain、memory graph、actor attribution、profile support 等 lane 做 RRF
   风格融合，最后叠加 source-chain bonus 后截断 limit。该实现为后续 BM25 /
   vector / graph provider 接入提供边界，不引入新中间件，也不把原始 provider
   score 直接跨 lane 比较。
+- 2026-06-24 EvidencePack graph expansion depth=1 已落：
+  strategy version 推进为 `retrieval-gateway.v1.hybrid-source-chain-rrf-graph-depth1`。
+  retrieval-gateway 会沿当前 memory hit 的 graph edge 通过 memory-service 公开
+  `GetMemoryEvent` 拉取相邻 memory event，并在 rerank / limit 截断前纳入候选；
+  相邻 memory 必须满足当前请求 memory status，lookup 失败、不可见或 edge 不引用
+  source memory 时 fail-closed。focused app tests 覆盖正常一跳扩展、相邻 lookup
+  fail-closed、superseded 邻接 memory 默认过滤和 malformed graph edge fail-closed。
 
-下一步：继续把真实 BM25 / vector provider adapter、graph expansion depth 和
+下一步：继续把真实 BM25 / vector provider adapter、更深或可配置 graph expansion 和
 更细 source-chain coverage 通过 EvidencePack 暴露给 RAG / summary / Agent，仍不绕过 retrieval-gateway。

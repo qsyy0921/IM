@@ -373,6 +373,78 @@
       ]
     },
     {
+      "id": "rag-grounding-rejects-unanchored-text-evidence",
+      "family": "attribution",
+      "stage": "rag-summary-grounding-safety",
+      "status": "active",
+      "query": "reject RAG answer evidence that has text but no traceable source anchor",
+      "risk": "RAG must fail closed before provider generation when a text-bearing EvidencePack item has no evidence id or source anchor",
+      "required_assertions": [
+        {
+          "type": "must_reject_text_evidence_without_anchor",
+          "consumer": "rag"
+        },
+        {
+          "type": "must_not_call_provider_on_bad_grounding",
+          "consumer": "rag"
+        }
+      ]
+    },
+    {
+      "id": "rag-grounding-ref-only-evidence-is-audit-only",
+      "family": "attribution",
+      "stage": "rag-summary-grounding-safety",
+      "status": "active",
+      "query": "keep RAG ref-only EvidencePack items for audit but do not generate an answer from them",
+      "risk": "RAG must preserve ref-only evidence in returned EvidencePack while abstaining when no groundable text exists",
+      "required_assertions": [
+        {
+          "type": "must_preserve_ref_only_evidence_for_audit",
+          "consumer": "rag"
+        },
+        {
+          "type": "must_abstain_when_no_groundable_text",
+          "consumer": "rag"
+        }
+      ]
+    },
+    {
+      "id": "summary-grounding-rejects-unanchored-text-evidence",
+      "family": "attribution",
+      "stage": "rag-summary-grounding-safety",
+      "status": "active",
+      "query": "reject Summary evidence that has text but no traceable source anchor",
+      "risk": "Summary must fail closed before provider generation when a text-bearing EvidencePack item has no evidence id or source anchor",
+      "required_assertions": [
+        {
+          "type": "must_reject_text_evidence_without_anchor",
+          "consumer": "summary"
+        },
+        {
+          "type": "must_not_call_provider_on_bad_grounding",
+          "consumer": "summary"
+        }
+      ]
+    },
+    {
+      "id": "summary-grounding-ref-only-evidence-is-audit-only",
+      "family": "attribution",
+      "stage": "rag-summary-grounding-safety",
+      "status": "active",
+      "query": "keep Summary ref-only EvidencePack items for audit but do not generate a summary from them",
+      "risk": "Summary must preserve ref-only evidence in returned EvidencePack while abstaining when no groundable text exists",
+      "required_assertions": [
+        {
+          "type": "must_preserve_ref_only_evidence_for_audit",
+          "consumer": "summary"
+        },
+        {
+          "type": "must_abstain_when_no_groundable_text",
+          "consumer": "summary"
+        }
+      ]
+    },
+    {
       "id": "agent-sensitive-action-approval-required",
       "family": "tool_policy_violation",
       "stage": "agent-service",

@@ -235,6 +235,9 @@ IM messages -> search / memory projection -> EvidencePack -> RAG / Agent answer 
   `evidence_id / source_type / source_id / source anchor` 的 evidence 会进入 provider；
   ref-only evidence 仍保留在返回的 EvidencePack 供审计，但不会单独生成
   answer / summary；有文本但 anchor 不完整的 evidence 会在 provider 调用前 fail-closed。
+- 2026-06-25 该 gate 已纳入 ai-eval 必跑本地 adapter：
+  `run-ai-eval-rag-summary-grounding-safety.ps1` 覆盖 4 个低敏 cases，只跑 focused
+  app tests，不调用模型、数据库或 live service stack。
 - 2026-06-24 retrieval-gateway 已补 vector-index-service `SearchVectors` adapter
   first path：`RetrieveEvidence` 支持显式 `include_vector`，调用方必须提供低敏
   `query_embedding_ref`、明确的 `vector_collection_types`、`vector_visibility_scope`

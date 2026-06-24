@@ -191,7 +191,11 @@ $knownAssertionTypes = @(
     "must_preserve_citation_refs_only",
     "must_not_emit_tool_call_payload",
     "must_emit_refusal_for_unapproved_action",
-    "must_classify_output_safety_failure"
+    "must_classify_output_safety_failure",
+    "must_reject_text_evidence_without_anchor",
+    "must_not_call_provider_on_bad_grounding",
+    "must_preserve_ref_only_evidence_for_audit",
+    "must_abstain_when_no_groundable_text"
 )
 
 $seenCaseIDs = @{}

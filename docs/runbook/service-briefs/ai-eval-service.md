@@ -15,6 +15,10 @@
 - Action-executor provider failure ops cases：low-sensitive metrics 和 batch redrive
   operator handoff。
 - Provider readiness / source coverage / vector lane checks 已进入相关 smoke 输出。
+- Group-memory ambiguity safety expansion：asker-bound term ambiguity、visible-chain
+  incomplete abstention、missing visibility projection fail-closed、audience-language
+  profile overgeneralization、no unsupported memory fallback 和 no raw prompt persistence
+  已进入 `profile-agent-output-safety` 本地低敏 adapter。
 
 ## 边界
 
@@ -24,5 +28,5 @@
 
 ## 下一步
 
-- 扩展 group memory、retrieval miss、provider runtime readiness、Agent action boundary
-  和 redrive / repair cases。
+- 扩展 provider runtime readiness、Agent action boundary、redrive / repair cases 和后续
+  service-stack live adapters。

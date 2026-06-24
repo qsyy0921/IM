@@ -7,6 +7,7 @@ Raw eval summaries and generated smoke JSON stay under
 
 Current reports:
 
+- `loadtest-report-20260625-group-memory-ambiguity-safety.md`
 - `loadtest-report-20260625-rag-agent-business-mutation-execute-gate.md`
 - `loadtest-report-20260624-retrieval-source-chain-rerank-gate.md`
 - `loadtest-report-20260624-rag-agent-demo-profile-repair-approval-gate.md`

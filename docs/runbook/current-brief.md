@@ -7,7 +7,7 @@ loadtest report 或 archive。
 
 - 客户端 Web / PC 已达到演示 MVP；除阻塞演示的问题外，不继续追完整产品级客户端。
 - 后端主线已切到 AI / Agent / RAG 演示路径和必要平台能力。
-- 当前 active module：group memory / retrieval / eval multi-hop temporal profile cases。
+- 当前 active module：action-executor / workflow provider replay admin / workflow handoff。
 
 ## 当前模块事实
 
@@ -26,8 +26,12 @@ loadtest report 或 archive。
   permission gate / audit contract，不执行 tool、不修改 failure row、不复用旧 approval；
   真正执行仍只能走 `RedriveProviderFailure` 的 fresh proposal / approval / prepared audit /
   new input / reason hash 链。
-- 当前模块转向 group memory / retrieval / eval：重点补多人、多群、跨时间版本和
-  profile 边界的可感知功能包，而不是继续加单条字段或单条 case。
+- group memory / retrieval / eval 功能包已收口：profile-agent safety adapter 从 20 个
+  active cases 扩到 24 个，新增 asker-bound term ambiguity、visible-chain incomplete
+  abstention、missing visibility projection fail-closed、audience-language profile
+  overgeneralization cases，并覆盖 no unsupported memory fallback / no raw prompt persistence。
+- 当前模块转向 provider replay admin / workflow handoff：把只读 operator UI 推进到更正式的
+  admin / workflow 运维请求和审批流，但最终执行仍只能走 action-executor 的受控 redrive。
 - group memory / multi-party collaboration 必须继续保留 source refs、conversation scope、
   member visibility、time/version boundary、citations 和 no-citation refusal。
 
@@ -53,5 +57,5 @@ loadtest report 或 archive。
 
 ## 下一个方向
 
-- 深化 group memory / retrieval / eval 的多跳、时间版本和 profile cases；正式
-  provider replay admin / workflow handoff 后置。
+- 做 provider replay admin / workflow handoff 功能包；正式生产级运维 UI 和 provider-grade
+  长周期平台仍后置。

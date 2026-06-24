@@ -261,7 +261,11 @@ preserves source refs, validity windows and supersession current-only behavior,
 that RAG / Summary / Agent current-memory consumers propagate
 `at_conversation_seq` and avoid expired or superseded memory citations, and
 that weak-signal / contradictory memory extraction candidates remain pending
-review instead of becoming ACTIVE evidence, and
+review instead of becoming ACTIVE evidence, that ambiguous group terms are bound
+to the asker's visible context, that incomplete visible chains abstain instead
+of using hidden or unsupported evidence, that missing visibility projections
+fail closed without raw prompt persistence, that audience-adapted group wording
+does not become a global user style profile, and
 that Agent output rejects raw EvidencePack text, secret-like content, tool-call
 payloads and unapproved business actions. It does not call models, databases or
 business services.
@@ -464,6 +468,11 @@ decision dependency edges, reviewed multi-source profile activation and
 supporting-memory delete / profile recompute checks. This is still a
 low-sensitive local eval gate; it does not call models, databases or business
 services.
+The 2026-06-25 group-memory ambiguity safety expansion increased the same
+fixture adapter to 24 cases and added asker-bound term ambiguity, incomplete
+visible-chain abstention, missing visibility projection fail-closed and
+audience-language profile negative checks. It also gates unsupported memory
+fallback and raw prompt persistence in the local fixture.
 The 2026-06-23 live-adapter first pass increased the catalog to 73 cases and
 added optional `memory-service` / `retrieval-gateway` adapters. It also made
 RAG / Summary / Agent live adapters assert multi-hop actor/source-chain

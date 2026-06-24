@@ -114,7 +114,12 @@ IM messages -> search / memory projection -> EvidencePack -> RAG / Agent answer 
   `loadtest/rag` 与 `loadtest/agent`，让 RAG answer、Agent proposal、approval
   和 action-executor audit 围绕同一 tenant / conversation 生成一份低敏总报告。
   该 runner 不读取私表、不保存 raw answer / proposal text，只记录 hash、计数和
-  EvidencePack / approval / execution 状态；真实服务栈 smoke 仍需后续显式运行。
+  EvidencePack / approval / execution 状态。
+- 2026-06-24 `ai-eval-rag-agent-demo-live-20260624-current-image-fixed` 已通过
+  RAG-Agent demo 真实 service-stack gate：4 adapters、27 cases、27 passed、0 failed、
+  0 skipped。该链路确认 RAG grounded answer、Agent proposal / approval、
+  action-executor audit、同一 tenant / conversation、cross-group source refs、
+  speaker attribution、memory graph edge 和 profile aggregate evidence 均成立。
 - 已有 clean smoke 覆盖真实双用户好友直聊、群聊 first path、群资料 BFF
   read/update 和群成员动作链路；证据见 `docs/runbook/client-platform.md`。
 - Windows desktop 已有 artifact / signing / installer plan first paths；签名 / installer
@@ -179,10 +184,9 @@ IM messages -> search / memory projection -> EvidencePack -> RAG / Agent answer 
    `IM 消息 -> search / memory projection -> EvidencePack -> RAG / Agent answer -> approval / audit`。
    retrieval negative / miss adapter、EvidencePack memory graph edge 和 profile evidence 已补齐；
    profile recompute first path、first-stage operator 和 `rules-v0.2` group memory
-   extraction 已补齐；RAG-Agent demo runner first path 已补齐；`rag-agent-demo`
-   已接入 ai-eval optional service-stack adapter、gate policy 和 service-stack
-   preflight 路由；下一步进入 profile repair batch approval / RAG-Agent demo
-   runner 的真实服务栈 smoke 报告归档。
+   extraction 已补齐；RAG-Agent demo runner first path 和真实服务栈 smoke 报告已补齐；
+   下一步进入 profile repair batch approval、Python memory extraction candidate 和
+   Agent action boundary cases。
 5. 客户端只作为演示入口；除非阻塞上述演示，不继续扩 UI 产品化。
 6. Windows release signing / MSI / NSIS installer、完整 Android、完整移动端发布、
    复杂 UI、群管理深水区和真实 media provider 链路全部后置到 backlog。

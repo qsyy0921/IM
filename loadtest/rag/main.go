@@ -371,9 +371,9 @@ INSERT INTO memory_structured_events (
 ) VALUES (
 	$1, $2, 'CONVERSATION', $3, $3, 'phoenix-launch',
 	'DECISION', 'ACTIVE', 'APPROVED', $4, $5::jsonb, $6::jsonb,
-	$7, $8, $9, NULL, '[]'::jsonb,
-	'[]'::jsonb, 0.9100, $10, 'rag-smoke-v1',
-	$11, $9, $9
+	$7::bigint, $8::bigint, $9, NULL, '[]'::jsonb,
+	'[]'::jsonb, 0.9100, $10::bigint, 'rag-smoke-v1',
+	$11::bigint, $9, $9
 )
 `, cfg.tenantID, memoryEventID, cfg.conversationID, factText, actorJSON, audienceJSON, seq, seq+10, now, visibilityVersion, memoryProjectionVersion); err != nil {
 		return seededData{}, err
@@ -387,34 +387,6 @@ INSERT INTO memory_event_source_refs (
 	($1, $2, $3, 'MESSAGE', $4, $5, $6, $7, $10, $10),
 	($1, $2, $8, 'MESSAGE', $11, $12, $9, $13, $10, $10)
 `, cfg.tenantID, memoryEventID, sourceRefID, messageID, sourceEventID, cfg.conversationID, seq, crossGroupSourceRefID, crossGroupConversationID, now, crossGroupMessageID, crossGroupSourceEventID, seq+1); err != nil {
-		return seededData{}, err
-	}
-
-	if _, err := tx.Exec(ctx, `
-INSERT INTO memory_graph_edges (
-	tenant_id, edge_id, from_memory_event_id, to_memory_event_id,
-	relation_type, confidence, source_refs, created_at
-) VALUES (
-	$1, $2, $3, $4, 'SUPPORTS', 0.9100,
-	jsonb_build_array(
-		jsonb_build_object(
-			'source_type', 'MESSAGE',
-			'source_id', $5::text,
-			'source_event_id', $6::text,
-			'conversation_id', $7::text,
-			'conversation_seq', $8
-		),
-		jsonb_build_object(
-			'source_type', 'MESSAGE',
-			'source_id', $9::text,
-			'source_event_id', $10::text,
-			'conversation_id', $11::text,
-			'conversation_seq', $12
-		)
-	),
-	$13
-)
-`, cfg.tenantID, memoryGraphEdgeID, memoryEventID, supersededMemoryEventID, messageID, sourceEventID, cfg.conversationID, seq, crossGroupMessageID, crossGroupSourceEventID, crossGroupConversationID, seq+1, now); err != nil {
 		return seededData{}, err
 	}
 
@@ -480,9 +452,9 @@ INSERT INTO memory_structured_events (
 ) VALUES (
 	$1, $2, 'CONVERSATION', $3, $3, 'phoenix-launch',
 	'DECISION', $4, 'APPROVED', $5, $6::jsonb, $7::jsonb,
-	$8, $9, $10, NULL, '[]'::jsonb,
-	'[]'::jsonb, $11, $12, 'rag-smoke-v1',
-	$13, $10, $10
+	$8::bigint, $9::bigint, $10, NULL, '[]'::jsonb,
+	'[]'::jsonb, $11, $12::bigint, 'rag-smoke-v1',
+	$13::bigint, $10, $10
 )
 `, cfg.tenantID, stale.eventID, cfg.conversationID, stale.status, stale.factText, actorJSON, audienceJSON, stale.validFrom, stale.validTo, now, stale.confidence, visibilityVersion, memoryProjectionVersion); err != nil {
 			return seededData{}, err
@@ -495,6 +467,34 @@ INSERT INTO memory_event_source_refs (
 `, cfg.tenantID, stale.eventID, stale.sourceRef, messageID, sourceEventID, cfg.conversationID, seq, now); err != nil {
 			return seededData{}, err
 		}
+	}
+
+	if _, err := tx.Exec(ctx, `
+INSERT INTO memory_graph_edges (
+	tenant_id, edge_id, from_memory_event_id, to_memory_event_id,
+	relation_type, confidence, source_refs, created_at
+) VALUES (
+	$1, $2, $3, $4, 'SUPPORTS', 0.9100,
+	jsonb_build_array(
+		jsonb_build_object(
+			'source_type', 'MESSAGE',
+			'source_id', $5::text,
+			'source_event_id', $6::text,
+			'conversation_id', $7::text,
+			'conversation_seq', $8::bigint
+		),
+		jsonb_build_object(
+			'source_type', 'MESSAGE',
+			'source_id', $9::text,
+			'source_event_id', $10::text,
+			'conversation_id', $11::text,
+			'conversation_seq', $12::bigint
+		)
+	),
+	$13
+)
+`, cfg.tenantID, memoryGraphEdgeID, memoryEventID, supersededMemoryEventID, messageID, sourceEventID, cfg.conversationID, seq, crossGroupMessageID, crossGroupSourceEventID, crossGroupConversationID, seq+1, now); err != nil {
+		return seededData{}, err
 	}
 
 	if err := tx.Commit(ctx); err != nil {

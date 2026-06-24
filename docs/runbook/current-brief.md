@@ -150,9 +150,10 @@ memory cue 或显式 memory metadata 的群消息会投影成 PENDING Structured
 `loadtest/ragagent` 已提供 RAG-Agent demo first path：复用 `loadtest/rag` 和
 `loadtest/agent`，围绕同一 tenant / conversation 生成低敏总报告，断言 RAG grounded
 answer、Agent proposal、approval、action-executor audit、EvidencePack graph edges
-和 profile aggregate evidence 均成立；不保存 raw answer / proposal text。真实服务栈
-运行仍是下一步；`rag-agent-demo` 已接入 ai-eval optional service-stack adapter、
-gate policy 和 service-stack preflight 路由。
+和 profile aggregate evidence 均成立；不保存 raw answer / proposal text。2026-06-24
+`ai-eval-rag-agent-demo-live-20260624-current-image-fixed` 已通过真实 service-stack
+gate：4 adapters、27 cases、27 passed、0 failed、0 skipped；`rag-agent-demo`
+已接入 ai-eval optional service-stack adapter、gate policy 和 service-stack 路由。
 
 ## 不变量
 

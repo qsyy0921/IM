@@ -318,9 +318,9 @@ INSERT INTO memory_structured_events (
 ) VALUES (
 	$1, $2, 'CONVERSATION', $3, $3, 'phoenix-launch',
 	'DECISION', 'ACTIVE', 'APPROVED', $4, $5::jsonb, $6::jsonb,
-	$7, $8, $9, NULL, '[]'::jsonb,
-	'[]'::jsonb, 0.8700, $10, 'retrieval-smoke-v1',
-	$11, $9, $9
+	$7::bigint, $8::bigint, $9, NULL, '[]'::jsonb,
+	'[]'::jsonb, 0.8700, $10::bigint, 'retrieval-smoke-v1',
+	$11::bigint, $9, $9
 )
 `, cfg.tenantID, memoryEventID, cfg.conversationID, factText, actorJSON, audienceJSON, seq, seq+10, now, visibilityVersion, memoryProjectionVersion); err != nil {
 		return seededData{}, err
@@ -336,19 +336,19 @@ INSERT INTO memory_structured_events (
 ) VALUES
 	($1, $2, 'CONVERSATION', $4, $4, 'phoenix-launch',
 	 'DECISION', 'ACTIVE', 'APPROVED', $5, $6::jsonb, $7::jsonb,
-	 1, $8, $9, NULL, '[]'::jsonb,
-	 '[]'::jsonb, 0.9900, $10, 'retrieval-smoke-v1',
-	 $11, $9, $9),
+	 1, $8::bigint, $9, NULL, '[]'::jsonb,
+	 '[]'::jsonb, 0.9900, $10::bigint, 'retrieval-smoke-v1',
+	 $11::bigint, $9, $9),
 	($1, $3, 'CONVERSATION', $4, $4, 'phoenix-launch',
 	 'DECISION', 'SUPERSEDED', 'APPROVED', $5, $6::jsonb, $7::jsonb,
-	 $8, $12, $9, NULL, '[]'::jsonb,
-	 '[]'::jsonb, 0.9800, $10, 'retrieval-smoke-v1',
-	 $11, $9, $9),
+	 $8::bigint, $12::bigint, $9, NULL, '[]'::jsonb,
+	 '[]'::jsonb, 0.9800, $10::bigint, 'retrieval-smoke-v1',
+	 $11::bigint, $9, $9),
 	($1, $13, 'CONVERSATION', $4, $4, 'phoenix-launch',
 	 'DECISION', 'ACTIVE', 'APPROVED', $5, $6::jsonb, $7::jsonb,
-	 $14, NULL, $9, NULL, '[]'::jsonb,
-	 '[]'::jsonb, 0.9700, $10, 'retrieval-smoke-v1',
-	 $11, $9, $9)
+	 $14::bigint, NULL, $9, NULL, '[]'::jsonb,
+	 '[]'::jsonb, 0.9700, $10::bigint, 'retrieval-smoke-v1',
+	 $11::bigint, $9, $9)
 `, cfg.tenantID, expiredMemoryEventID, supersededMemoryEventID, cfg.conversationID, factText, actorJSON, audienceJSON, seq-1, now, visibilityVersion, memoryProjectionVersion, seq+10, futureMemoryEventID, seq+20); err != nil {
 		return seededData{}, err
 	}
@@ -376,14 +376,14 @@ INSERT INTO memory_graph_edges (
 			'source_id', $5::text,
 			'source_event_id', $6::text,
 			'conversation_id', $7::text,
-			'conversation_seq', $8
+			'conversation_seq', $8::bigint
 		),
 		jsonb_build_object(
 			'source_type', 'MESSAGE',
 			'source_id', $9::text,
 			'source_event_id', $10::text,
 			'conversation_id', $11::text,
-			'conversation_seq', $12
+			'conversation_seq', $12::bigint
 		)
 	),
 	$13

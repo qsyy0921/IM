@@ -45,10 +45,14 @@ adapter、状态、计数、summary/report 引用和低敏 metadata。
   tenant / conversation 上的 RAG grounded answer、Agent proposal / approval、
   action-executor audit、EvidencePack graph edge 和 profile aggregate evidence，
   并只持久化 hash、计数、状态和 summary ref。`run-ai-eval-service-stack-gate-smoke.ps1`
-  已能对该 adapter 做 endpoint preflight；真实 live service-stack run 仍需单独归档。
+  已能对该 adapter 做 endpoint preflight。2026-06-24
+  `ai-eval-rag-agent-demo-live-20260624-current-image-fixed` 已通过真实
+  service-stack gate：4 adapters、27 cases、27 passed、0 failed、0 skipped；
+  RAG grounded answer、Agent approval、action-executor audit、cross-group source refs、
+  memory graph edge 和 profile aggregate evidence 均被保留。
 
 边界：不保存 raw EvidencePack、prompt、model output、用户正文、secret 或 tool input；不授权业务动作。
 
-下一步：运行并归档 RAG-Agent demo live service-stack gate，继续扩展 group memory
-extraction / EvidencePack，并保持 retrieval failure、memory lifecycle failure、
-reasoning failure 和 action boundary failure 的独立诊断。
+下一步：继续 profile repair batch / approval、Python memory extraction candidate
+evaluation 和 EvidencePack coverage 深化，并保持 retrieval failure、memory lifecycle
+failure、reasoning failure 和 action boundary failure 的独立诊断。

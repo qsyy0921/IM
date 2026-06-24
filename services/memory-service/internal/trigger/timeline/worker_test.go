@@ -44,8 +44,92 @@ func TestWorkerRunOnceProjectsAndCommitsMessagePersisted(t *testing.T) {
 	if projector.command.EventID != "event-1" || projector.command.MessageID != "msg-1" || projector.command.OffsetValue != 42 {
 		t.Fatalf("unexpected command: %+v", projector.command)
 	}
-	if projector.command.FactText != "decision: keep source references" {
-		t.Fatalf("unexpected fact text %q", projector.command.FactText)
+	if !projector.command.ProjectMemory ||
+		projector.command.MemoryEventType != types.MemoryEventTypeDecision ||
+		projector.command.MemoryReviewState != types.MemoryReviewUnreviewed ||
+		projector.command.ExtractionVersion != "rules-v0.2" {
+		t.Fatalf("unexpected memory extraction metadata: %+v", projector.command)
+	}
+	if projector.command.FactText != "keep source references" {
+		t.Fatalf("unexpected stripped fact text %q", projector.command.FactText)
+	}
+}
+
+func TestWorkerRunOnceDoesNotProjectOrdinaryChatAsMemory(t *testing.T) {
+	payload, err := structpb.NewStruct(map[string]any{"text": "hello, this is just an ordinary chat"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	value, err := proto.Marshal(&conversationtimelinev1.ConversationTimelineEvent{
+		EventId:          "event-chat",
+		EventType:        types.TimelineEventMessagePersisted,
+		TenantId:         "tenant-1",
+		AggregateId:      "conv-1",
+		AggregateVersion: 3,
+		Payload: &conversationtimelinev1.ConversationTimelineEvent_MessagePersisted{
+			MessagePersisted: &conversationtimelinev1.MessagePersistedV1{
+				MessageId: "msg-chat",
+				SenderId:  "user-1",
+				Payload:   payload,
+			},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	consumer := &fakeConsumer{message: types.TimelineMessage{Topic: TopicConversationTimelineEvents, Partition: 1, Offset: 42, Value: value}}
+	projector := &fakeProjector{}
+	worker := NewWorker(consumer, projector, "memory-test")
+	if err := worker.RunOnce(context.Background()); err != nil {
+		t.Fatalf("run once: %v", err)
+	}
+	if !consumer.committed {
+		t.Fatal("ordinary chat event should still commit after checkpoint projection")
+	}
+	if !projector.called {
+		t.Fatal("ordinary chat should still reach projector for checkpoint handling")
+	}
+	if projector.command.ProjectMemory || projector.command.FactText != "" {
+		t.Fatalf("ordinary chat must not be projected as memory: %+v", projector.command)
+	}
+}
+
+func TestWorkerRunOnceProfileSignalNeedsReview(t *testing.T) {
+	payload, err := structpb.NewStruct(map[string]any{
+		"profile_signal": "coordinates incident handoffs",
+		"memory_topic":   "incident-response",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	value, err := proto.Marshal(&conversationtimelinev1.ConversationTimelineEvent{
+		EventId:          "event-profile",
+		EventType:        types.TimelineEventMessagePersisted,
+		TenantId:         "tenant-1",
+		AggregateId:      "conv-1",
+		AggregateVersion: 4,
+		Payload: &conversationtimelinev1.ConversationTimelineEvent_MessagePersisted{
+			MessagePersisted: &conversationtimelinev1.MessagePersistedV1{
+				MessageId: "msg-profile",
+				SenderId:  "user-1",
+				Payload:   payload,
+			},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	consumer := &fakeConsumer{message: types.TimelineMessage{Topic: TopicConversationTimelineEvents, Partition: 1, Offset: 43, Value: value}}
+	projector := &fakeProjector{}
+	worker := NewWorker(consumer, projector, "memory-test")
+	if err := worker.RunOnce(context.Background()); err != nil {
+		t.Fatalf("run once: %v", err)
+	}
+	if !projector.command.ProjectMemory ||
+		projector.command.MemoryEventType != types.MemoryEventTypeProfileSignal ||
+		projector.command.MemoryReviewState != types.MemoryReviewNeedsReview ||
+		projector.command.TopicText != "incident-response" {
+		t.Fatalf("unexpected profile signal extraction: %+v", projector.command)
 	}
 }
 

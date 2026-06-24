@@ -282,6 +282,25 @@ func isValidMemoryStatus(status string) bool {
 	}
 }
 
+func isValidMemoryEventType(eventType string) bool {
+	switch eventType {
+	case MemoryEventTypeTask, MemoryEventTypeDecision, MemoryEventTypeStatus, MemoryEventTypeBlocker, MemoryEventTypeFile,
+		MemoryEventTypePreferenceSignal, MemoryEventTypeRoleSignal, MemoryEventTypeProfileSignal:
+		return true
+	default:
+		return false
+	}
+}
+
+func isValidMemoryReviewState(state string) bool {
+	switch state {
+	case MemoryReviewUnreviewed, MemoryReviewNeedsReview, MemoryReviewApproved, MemoryReviewRejected:
+		return true
+	default:
+		return false
+	}
+}
+
 func isValidProfileAggregateType(value string) bool {
 	switch value {
 	case ProfileAggregateTypeStyle, ProfileAggregateTypeSkill, ProfileAggregateTypeRole, ProfileAggregateTypePreference, ProfileAggregateTypeInterest:

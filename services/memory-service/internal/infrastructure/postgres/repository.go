@@ -606,7 +606,7 @@ func (repository *Repository) ProjectTimelineEvent(ctx context.Context, command 
 	}
 	switch command.EventType {
 	case types.TimelineEventMessagePersisted, types.TimelineEventMessageEdited:
-		if strings.TrimSpace(command.FactText) != "" {
+		if command.ProjectMemory {
 			if err := upsertMemoryCandidate(ctx, tx, command); err != nil {
 				return types.ProjectTimelineEventResult{}, err
 			}
@@ -696,20 +696,23 @@ INSERT INTO memory_structured_events (
 	extraction_version,
 	source_projection_version,
 	updated_at
-) VALUES ($1, $2, 'CONVERSATION', $3, $3, $4, 'STATUS', 'PENDING', 'UNREVIEWED', $5, $6::jsonb, $7::jsonb, $8, $7::jsonb, $7::jsonb, 0.4500, $9, $10, $8, now())
+) VALUES ($1, $2, 'CONVERSATION', $3, $3, $4, $5, 'PENDING', $6, $7, $8::jsonb, $9::jsonb, $10, $9::jsonb, $9::jsonb, $11, $12, $13, $10, now())
 ON CONFLICT (tenant_id, memory_event_id) DO UPDATE SET
 	scope_type = EXCLUDED.scope_type,
 	scope_id = EXCLUDED.scope_id,
 	conversation_id = EXCLUDED.conversation_id,
 	topic = EXCLUDED.topic,
+	event_type = EXCLUDED.event_type,
+	review_state = EXCLUDED.review_state,
 	fact_text = EXCLUDED.fact_text,
 	actor_user_ids = EXCLUDED.actor_user_ids,
 	valid_from_seq = EXCLUDED.valid_from_seq,
+	confidence = EXCLUDED.confidence,
 	visibility_version = EXCLUDED.visibility_version,
 	extraction_version = EXCLUDED.extraction_version,
 	source_projection_version = EXCLUDED.source_projection_version,
 	updated_at = now()
-`, command.TenantID, memoryEventID, command.ConversationID, command.TopicText, command.FactText, string(actorJSON), string(emptyJSON), command.ConversationSeq, command.PermissionVersion, extractionVersion)
+`, command.TenantID, memoryEventID, command.ConversationID, command.TopicText, command.MemoryEventType, command.MemoryReviewState, command.FactText, string(actorJSON), string(emptyJSON), command.ConversationSeq, command.MemoryConfidence, command.PermissionVersion, extractionVersion)
 	if err != nil {
 		return types.NewDBWriteFailed(err.Error())
 	}

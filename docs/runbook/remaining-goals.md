@@ -44,12 +44,13 @@
   profile aggregation 正 / 负路径和 profile delete propagation；下一步把这些要求接到
   memory-service / retrieval / RAG / Agent live stack adapter，并继续区分 retrieval failure、
   reasoning failure、memory lifecycle failure、action boundary failure。
-- `ai-eval-service`：retrieval negative / miss adapter 已补齐；继续扩展 group
-  memory extraction、profile evidence、EvidencePack source-chain、RAG / Agent
-  demo module 的真实 service-stack cases。
+- `ai-eval-service`：retrieval negative / miss adapter 已补齐；继续扩展
+  profile repair batch、Python memory extraction candidate、EvidencePack
+  source-chain、RAG / Agent demo module 的真实 service-stack cases。
 - `memory-service` / `retrieval-gateway`：memory graph edge、profile aggregate
   evidence、公开 profile recompute first path 和 first-stage profile repair operator
-  已进入主链路；继续做 profile repair batch / approval、结构过滤、BM25 / vector、
+  以及 rules-v0.2 group memory extraction 已进入主链路；继续做 profile repair
+  batch / approval、Python memory extraction candidate、结构过滤、BM25 / vector、
   rerank 和 EvidencePack coverage 深化。
 - `rag-service` / `summary-service`：拒答、引用校验、source-ref regression、unsafe
   output fail-closed cases。

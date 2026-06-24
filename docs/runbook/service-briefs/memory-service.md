@@ -46,7 +46,12 @@
   默认 plan-only，只有显式 `--execute` 才调用 memory-service 公开
   `RecomputeProfileAggregate`；输出低敏报告，只保留 aggregate key / supporting memory
   ids / summary text 的 hash 和计数，不写 raw profile summary 或 memory text。
+- 2026-06-24 timeline worker 已升级 `rules-v0.2` group memory extraction：
+  只抽取带明确 `decision:` / `task:` / `status:` / `blocker:` / `file:` /
+  `profile_signal:` 等 cue 或显式 memory metadata 的消息；普通聊天只推进 checkpoint，
+  不被泛化成 StructuredMemoryEvent；profile / preference / role signal 保持
+  PENDING + NEEDS_REVIEW，不直接升级个人画像。
 
 下一步：真实服务栈启动后运行 memory-service optional adapter / loadtest 并归档报告；
-后续继续做 profile repair batch / approval path 和 extraction worker 集成，而不是把单条
-群消息直接升级为 ACTIVE profile fact。
+后续继续做 profile repair batch / approval path、Python memory extraction candidate
+和 RAG-Agent demo module 集成，而不是把单条群消息直接升级为 ACTIVE profile fact。

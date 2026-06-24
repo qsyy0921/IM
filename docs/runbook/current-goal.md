@@ -107,6 +107,9 @@ IM messages -> search / memory projection -> EvidencePack -> RAG / Agent answer 
 - 同日 `loadtest/memoryprofile` 已补 first-stage profile repair operator：
   默认 plan-only，显式 `--execute` 才调用公开 `RecomputeProfileAggregate`；
   输出低敏 hash / count 报告，不写 raw profile summary 或 memory text。
+- 同日 memory-service timeline worker 已升级 `rules-v0.2` group memory extraction：
+  只抽取带明确 memory cue 或显式 memory metadata 的群消息；普通聊天不生成
+  memory fact；profile / preference / role signal 保持 PENDING + NEEDS_REVIEW。
 - 已有 clean smoke 覆盖真实双用户好友直聊、群聊 first path、群资料 BFF
   read/update 和群成员动作链路；证据见 `docs/runbook/client-platform.md`。
 - Windows desktop 已有 artifact / signing / installer plan first paths；签名 / installer
@@ -170,8 +173,8 @@ IM messages -> search / memory projection -> EvidencePack -> RAG / Agent answer 
 4. 后端 / AI 演示主线优先做：
    `IM 消息 -> search / memory projection -> EvidencePack -> RAG / Agent answer -> approval / audit`。
    retrieval negative / miss adapter、EvidencePack memory graph edge 和 profile evidence 已补齐；
-   profile recompute first path 和 first-stage operator 已补齐；下一步进入
-   group memory extraction worker / profile repair batch approval /
+   profile recompute first path、first-stage operator 和 `rules-v0.2` group memory
+   extraction 已补齐；下一步进入 profile repair batch approval /
    RAG-Agent demo module 的真实服务栈联动。
 5. 客户端只作为演示入口；除非阻塞上述演示，不继续扩 UI 产品化。
 6. Windows release signing / MSI / NSIS installer、完整 Android、完整移动端发布、

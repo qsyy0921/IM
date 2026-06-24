@@ -42,6 +42,10 @@ type ProjectTimelineEventCommand struct {
 
 	MessageID         string
 	SenderID          UserID
+	ProjectMemory     bool
+	MemoryEventType   string
+	MemoryReviewState string
+	MemoryConfidence  float64
 	FactText          string
 	TopicText         string
 	MemoryEventID     string
@@ -91,6 +95,20 @@ func (command ProjectTimelineEventCommand) Validate() error {
 	case TimelineEventMessagePersisted, TimelineEventMessageEdited:
 		if strings.TrimSpace(command.MessageID) == "" {
 			return NewInvalidArgument("message_id is required")
+		}
+		if command.ProjectMemory {
+			if strings.TrimSpace(command.FactText) == "" {
+				return NewInvalidArgument("fact_text is required")
+			}
+			if !isValidMemoryEventType(command.MemoryEventType) {
+				return NewInvalidArgument("invalid memory event type")
+			}
+			if !isValidMemoryReviewState(command.MemoryReviewState) {
+				return NewInvalidArgument("invalid memory review state")
+			}
+			if command.MemoryConfidence < 0 || command.MemoryConfidence > 1 {
+				return NewInvalidArgument("memory confidence must be between 0 and 1")
+			}
 		}
 	case TimelineEventMessageRevoked, TimelineEventMessageDeleted:
 		if strings.TrimSpace(command.MessageID) == "" {

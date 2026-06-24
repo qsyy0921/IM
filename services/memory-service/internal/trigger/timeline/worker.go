@@ -3,7 +3,6 @@ package timeline
 import (
 	"context"
 	"errors"
-	"sort"
 	"strings"
 	"time"
 
@@ -107,7 +106,7 @@ func buildCommand(consumerGroup string, message types.TimelineMessage) (types.Pr
 		ConversationID:    types.ConversationID(event.GetAggregateId()),
 		ConversationSeq:   event.GetAggregateVersion(),
 		MemoryEventID:     event.GetEventId(),
-		ExtractionVersion: "rules-v0.1",
+		ExtractionVersion: "rules-v0.2",
 		ConsumerGroup:     consumerGroup,
 		Topic:             message.Topic,
 		PartitionID:       int32(message.Partition),
@@ -121,9 +120,13 @@ func buildCommand(consumerGroup string, message types.TimelineMessage) (types.Pr
 	}
 	switch payload := event.GetPayload().(type) {
 	case *conversationtimelinev1.ConversationTimelineEvent_MessagePersisted:
-		fillMessagePersisted(&command, payload.MessagePersisted)
+		if err := fillMessagePersisted(&command, payload.MessagePersisted); err != nil {
+			return types.ProjectTimelineEventCommand{}, err
+		}
 	case *conversationtimelinev1.ConversationTimelineEvent_MessageEdited:
-		fillMessageEdited(&command, payload.MessageEdited)
+		if err := fillMessageEdited(&command, payload.MessageEdited); err != nil {
+			return types.ProjectTimelineEventCommand{}, err
+		}
 	case *conversationtimelinev1.ConversationTimelineEvent_MessageRevoked:
 		fillMessageRevoked(&command, payload.MessageRevoked)
 	case *conversationtimelinev1.ConversationTimelineEvent_MessageDeleted:
@@ -149,22 +152,22 @@ func buildCommand(consumerGroup string, message types.TimelineMessage) (types.Pr
 	return command, nil
 }
 
-func fillMessagePersisted(command *types.ProjectTimelineEventCommand, payload *conversationtimelinev1.MessagePersistedV1) {
+func fillMessagePersisted(command *types.ProjectTimelineEventCommand, payload *conversationtimelinev1.MessagePersistedV1) error {
 	if payload == nil {
-		return
+		return nil
 	}
 	command.MessageID = payload.GetMessageId()
 	command.SenderID = types.UserID(payload.GetSenderId())
-	command.FactText = durableFactTextFromStruct(payload.GetPayload())
+	return fillMemoryCandidate(command, payload.GetPayload())
 }
 
-func fillMessageEdited(command *types.ProjectTimelineEventCommand, payload *conversationtimelinev1.MessageEditedV1) {
+func fillMessageEdited(command *types.ProjectTimelineEventCommand, payload *conversationtimelinev1.MessageEditedV1) error {
 	if payload == nil {
-		return
+		return nil
 	}
 	command.MessageID = payload.GetMessageId()
 	command.SenderID = types.UserID(payload.GetEditedBy())
-	command.FactText = durableFactTextFromStruct(payload.GetAfterPayload())
+	return fillMemoryCandidate(command, payload.GetAfterPayload())
 }
 
 func fillMessageRevoked(command *types.ProjectTimelineEventCommand, payload *conversationtimelinev1.MessageRevokedV1) {
@@ -231,38 +234,159 @@ func memberStatus(status conversationtimelinev1.ConversationMemberStatus) string
 	}
 }
 
-func durableFactTextFromStruct(payload *structpb.Struct) string {
+type memoryCandidate struct {
+	project     bool
+	factText    string
+	topicText   string
+	eventType   string
+	reviewState string
+	confidence  float64
+}
+
+func fillMemoryCandidate(command *types.ProjectTimelineEventCommand, payload *structpb.Struct) error {
+	candidate, err := extractMemoryCandidate(payload)
+	if err != nil {
+		return err
+	}
+	if !candidate.project {
+		return nil
+	}
+	command.ProjectMemory = true
+	command.MemoryEventType = candidate.eventType
+	command.MemoryReviewState = candidate.reviewState
+	command.MemoryConfidence = candidate.confidence
+	command.FactText = candidate.factText
+	command.TopicText = candidate.topicText
+	return nil
+}
+
+func extractMemoryCandidate(payload *structpb.Struct) (memoryCandidate, error) {
+	if payload == nil {
+		return memoryCandidate{}, nil
+	}
+
+	explicitTypeValue := firstStructString(payload, "memory_event_type", "memory_type")
+	explicitType := ""
+	if explicitTypeValue != "" {
+		normalized, ok := normalizeMemoryEventType(explicitTypeValue)
+		if !ok {
+			return memoryCandidate{}, types.NewInvalidArgument("invalid memory event type")
+		}
+		explicitType = normalized
+	}
+
+	topicText := firstStructString(payload, "memory_topic", "topic", "project", "workstream")
+	for _, entry := range []struct {
+		key       string
+		eventType string
+	}{
+		{"decision", types.MemoryEventTypeDecision},
+		{"task", types.MemoryEventTypeTask},
+		{"status", types.MemoryEventTypeStatus},
+		{"blocker", types.MemoryEventTypeBlocker},
+		{"file", types.MemoryEventTypeFile},
+		{"profile_signal", types.MemoryEventTypeProfileSignal},
+		{"preference", types.MemoryEventTypePreferenceSignal},
+		{"role_signal", types.MemoryEventTypeRoleSignal},
+	} {
+		if fact := firstStructString(payload, entry.key); fact != "" {
+			eventType := entry.eventType
+			if explicitType != "" {
+				eventType = explicitType
+			}
+			return buildMemoryCandidate(fact, topicText, eventType, true), nil
+		}
+	}
+
+	factText := firstStructString(payload, "memory_fact", "text", "content", "body", "title")
+	if factText == "" {
+		if explicitType != "" {
+			return memoryCandidate{}, types.NewInvalidArgument("memory fact is required")
+		}
+		return memoryCandidate{}, nil
+	}
+	if explicitType != "" {
+		return buildMemoryCandidate(factText, topicText, explicitType, true), nil
+	}
+	eventType, strippedFact, ok := classifyMemoryFactByPrefix(factText)
+	if !ok {
+		return memoryCandidate{}, nil
+	}
+	return buildMemoryCandidate(strippedFact, topicText, eventType, false), nil
+}
+
+func firstStructString(payload *structpb.Struct, keys ...string) string {
 	if payload == nil {
 		return ""
 	}
-	for _, key := range []string{"memory_fact", "decision", "task", "status", "text", "content", "body", "title"} {
+	for _, key := range keys {
 		if value := strings.TrimSpace(payload.GetFields()[key].GetStringValue()); value != "" {
 			return value
 		}
 	}
-	var values []string
-	collectStructStrings(&values, payload.AsMap())
-	return strings.TrimSpace(strings.Join(values, "\n"))
+	return ""
 }
 
-func collectStructStrings(values *[]string, value any) {
-	switch typed := value.(type) {
-	case string:
-		if text := strings.TrimSpace(typed); text != "" {
-			*values = append(*values, text)
+func buildMemoryCandidate(factText string, topicText string, eventType string, explicit bool) memoryCandidate {
+	reviewState := types.MemoryReviewUnreviewed
+	confidence := 0.55
+	if explicit {
+		confidence = 0.65
+	}
+	switch eventType {
+	case types.MemoryEventTypeProfileSignal, types.MemoryEventTypePreferenceSignal, types.MemoryEventTypeRoleSignal:
+		reviewState = types.MemoryReviewNeedsReview
+		confidence = 0.35
+	}
+	return memoryCandidate{
+		project:     true,
+		factText:    strings.TrimSpace(factText),
+		topicText:   strings.TrimSpace(topicText),
+		eventType:   eventType,
+		reviewState: reviewState,
+		confidence:  confidence,
+	}
+}
+
+func classifyMemoryFactByPrefix(value string) (string, string, bool) {
+	trimmed := strings.TrimSpace(value)
+	lower := strings.ToLower(trimmed)
+	for _, entry := range []struct {
+		prefix    string
+		eventType string
+	}{
+		{"decision:", types.MemoryEventTypeDecision},
+		{"task:", types.MemoryEventTypeTask},
+		{"status:", types.MemoryEventTypeStatus},
+		{"blocker:", types.MemoryEventTypeBlocker},
+		{"file:", types.MemoryEventTypeFile},
+		{"profile_signal:", types.MemoryEventTypeProfileSignal},
+		{"profile:", types.MemoryEventTypeProfileSignal},
+		{"preference:", types.MemoryEventTypePreferenceSignal},
+		{"role_signal:", types.MemoryEventTypeRoleSignal},
+		{"role:", types.MemoryEventTypeRoleSignal},
+	} {
+		if strings.HasPrefix(lower, entry.prefix) {
+			return entry.eventType, strings.TrimSpace(trimmed[len(entry.prefix):]), true
 		}
-	case []any:
-		for _, item := range typed {
-			collectStructStrings(values, item)
-		}
-	case map[string]any:
-		keys := make([]string, 0, len(typed))
-		for key := range typed {
-			keys = append(keys, key)
-		}
-		sort.Strings(keys)
-		for _, key := range keys {
-			collectStructStrings(values, typed[key])
-		}
+	}
+	return "", "", false
+}
+
+func normalizeMemoryEventType(value string) (string, bool) {
+	normalized := strings.ToUpper(strings.TrimSpace(value))
+	normalized = strings.TrimPrefix(normalized, "MEMORY_EVENT_TYPE_")
+	switch normalized {
+	case types.MemoryEventTypeTask,
+		types.MemoryEventTypeDecision,
+		types.MemoryEventTypeStatus,
+		types.MemoryEventTypeBlocker,
+		types.MemoryEventTypeFile,
+		types.MemoryEventTypePreferenceSignal,
+		types.MemoryEventTypeRoleSignal,
+		types.MemoryEventTypeProfileSignal:
+		return normalized, true
+	default:
+		return "", false
 	}
 }

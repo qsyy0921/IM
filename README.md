@@ -271,7 +271,7 @@ message / conversation / policy events -> search-service + memory-service projec
 | 服务 / 模块 | 当前状态 |
 | --- | --- |
 | `search-service` | 搜索 projection、visibility / tombstone、`SearchMessages`、timeline consumer、projection smoke。 |
-| `memory-service` | group memory projection、StructuredMemoryEvent、source refs、visibility window、revoke hidden、profile aggregate recompute / archive first path。 |
+| `memory-service` | group memory projection、rules-v0.2 extraction cue classifier、StructuredMemoryEvent、source refs、visibility window、revoke hidden、profile aggregate recompute / archive first path。 |
 | `retrieval-gateway` | EvidencePack 统一边界，聚合 search / memory / policy precheck，并通过 memory-service 公开 API 扩展 current memory graph edges 和当前用户 profile aggregate evidence；不直接调用 LLM。 |
 | `rag-service` | 只读问答 first path、EvidencePack citation verifier、guarded external HTTP LLM boundary，并保留 EvidencePack memory graph edges 和 profile aggregate evidence。 |
 | `summary-service` | 只读摘要 first path、EvidencePack citation verifier、guarded external HTTP LLM boundary，并保留 EvidencePack memory graph edges 和 profile aggregate evidence。 |
@@ -350,6 +350,10 @@ APPROVED `PROFILE_SIGNAL` memory events 重算，支持数量不足时归档旧 
 已把该行为登记为 `must_recompute_profile_via_public_api` 断言。`loadtest/memoryprofile`
 提供 first-stage profile repair operator，默认 plan-only，显式 `--execute` 才调用公开
 recompute RPC，报告只输出低敏 hash / count。
+memory-service timeline worker 同步升级到 `rules-v0.2` group memory extraction：
+只抽取明确 `decision:` / `task:` / `status:` / `blocker:` / `file:` /
+`profile_signal:` 等 cue 或显式 memory metadata 的消息；普通聊天不会被泛化成
+memory fact，profile / preference / role signal 保持 PENDING + NEEDS_REVIEW。
 
 下一步默认看 [current-goal.md](docs/runbook/current-goal.md)。截至当前主线，客户端只修
 阻塞演示入口的问题；默认推进

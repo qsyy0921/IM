@@ -143,6 +143,10 @@ ai-eval memory-service live adapter 已把该行为登记为
 `must_recompute_profile_via_public_api` 断言。
 `loadtest/memoryprofile` 已提供 first-stage profile repair operator：默认 plan-only，
 显式 `--execute` 才调用公开 recompute RPC，输出低敏 hash / count 报告。
+memory-service timeline worker 已升级 `rules-v0.2` group memory extraction：只有明确
+memory cue 或显式 memory metadata 的群消息会投影成 PENDING StructuredMemoryEvent；
+普通聊天不生成 memory fact；profile / preference / role signal 保持 NEEDS_REVIEW，
+避免单条群聊事实直接升级成个人画像。
 
 ## 不变量
 

@@ -52,6 +52,8 @@ func run(ctx context.Context) error {
 		return runProviderFailureAudit(ctx)
 	case "provider-failure-redrive-plan":
 		return runProviderFailureRedrivePlan(ctx)
+	case "provider-replay-operator-ui":
+		return runProviderFailureReplayOperatorUI(ctx)
 	default:
 		return fmt.Errorf("unsupported NEXUSIM_ACTION_EXECUTOR_MODE %q", mode)
 	}
@@ -281,7 +283,7 @@ func actionExecutorModeFromEnv() string {
 
 func validateActionExecutorMode(mode string) error {
 	switch mode {
-	case "noop", "grpc", "provider-failure-worker", "provider-failure-audit", "provider-failure-redrive-plan":
+	case "noop", "grpc", "provider-failure-worker", "provider-failure-audit", "provider-failure-redrive-plan", "provider-replay-operator-ui":
 		return nil
 	default:
 		return fmt.Errorf("unsupported NEXUSIM_ACTION_EXECUTOR_MODE %q", mode)

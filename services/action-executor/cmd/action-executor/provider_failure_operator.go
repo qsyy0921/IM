@@ -31,9 +31,16 @@ type providerFailureOperatorOutput struct {
 	ExecutesTool             bool                               `json:"executes_tool"`
 	MutatesProviderFailure   bool                               `json:"mutates_provider_failure"`
 	RequiresOperatorApproval bool                               `json:"requires_operator_approval"`
+	RequiresFreshApproval    bool                               `json:"requires_fresh_approval,omitempty"`
+	RequiresPreparedAudit    bool                               `json:"requires_prepared_audit,omitempty"`
+	RequiresNewInput         bool                               `json:"requires_new_input,omitempty"`
+	RequiresReasonSHA256     bool                               `json:"requires_reason_sha256,omitempty"`
 	DryRun                   bool                               `json:"dry_run"`
 	ReasonPresent            bool                               `json:"reason_present,omitempty"`
 	ReasonSHA256             string                             `json:"reason_sha256,omitempty"`
+	PermissionGate           string                             `json:"permission_gate,omitempty"`
+	AuditContract            string                             `json:"audit_contract,omitempty"`
+	EvalGate                 string                             `json:"eval_gate,omitempty"`
 	RedriveRequirements      []string                           `json:"redrive_requirements,omitempty"`
 	OperatorNextStep         string                             `json:"operator_next_step,omitempty"`
 	Note                     string                             `json:"note"`
@@ -46,6 +53,8 @@ type providerFailureOperatorCounts struct {
 }
 
 type providerFailureOperatorOutputRow struct {
+	ReplayCandidateID string `json:"replay_candidate_id,omitempty"`
+	ReplayState       string `json:"replay_state,omitempty"`
 	TenantID          string `json:"tenant_id"`
 	ProviderFailureID string `json:"provider_failure_id"`
 	ExecutionID       string `json:"execution_id"`
@@ -122,6 +131,29 @@ func runProviderFailureRedrivePlan(ctx context.Context) error {
 		reasonSHA256,
 	)
 	output.OperatorNextStep = "Create or verify a fresh approved Agent proposal for each candidate, then rerun ExecuteApprovedAction through normal policy, preflight safety and audit; this plan does not replay provider output."
+	return writeProviderFailureOperatorOutput(outputPath, output)
+}
+
+func runProviderFailureReplayOperatorUI(ctx context.Context) error {
+	options, err := providerFailureAuditOptionsFromEnv("NEXUSIM_ACTION_EXECUTOR_PROVIDER_REPLAY_UI")
+	if err != nil {
+		return err
+	}
+	if strings.TrimSpace(options.Status) == "" {
+		options.Status = types.ProviderFailureStatusDLQ
+	}
+	if strings.ToUpper(strings.TrimSpace(options.Status)) != types.ProviderFailureStatusDLQ {
+		return errors.New("NEXUSIM_ACTION_EXECUTOR_PROVIDER_REPLAY_UI_STATUS must be DLQ; replay operator UI only reviews redrivable DLQ candidates")
+	}
+	rows, options, err := loadProviderFailureRowsWithOptions(ctx, options)
+	if err != nil {
+		return err
+	}
+	outputPath := strings.TrimSpace(os.Getenv("NEXUSIM_ACTION_EXECUTOR_PROVIDER_REPLAY_UI_OUTPUT"))
+	if outputPath == "" {
+		return errors.New("NEXUSIM_ACTION_EXECUTOR_PROVIDER_REPLAY_UI_OUTPUT is required")
+	}
+	output := newProviderFailureReplayOperatorUIOutput(options, rows)
 	return writeProviderFailureOperatorOutput(outputPath, output)
 }
 
@@ -258,6 +290,50 @@ func newProviderFailureOperatorOutput(
 		})
 	}
 	return output
+}
+
+func newProviderFailureReplayOperatorUIOutput(
+	options types.ProviderFailureAuditOptions,
+	rows []types.ProviderFailureAuditRow,
+) providerFailureOperatorOutput {
+	output := newProviderFailureOperatorOutput(
+		"action-executor.provider-failure.replay-operator-ui",
+		options,
+		rows,
+		false,
+		"",
+	)
+	output.BatchID = providerFailureBatchID(output.Kind, rows, "")
+	output.RequiresOperatorApproval = true
+	output.RequiresFreshApproval = true
+	output.RequiresPreparedAudit = true
+	output.RequiresNewInput = true
+	output.RequiresReasonSHA256 = true
+	output.DryRun = true
+	output.PermissionGate = "policy-service CheckToolAction and fresh agent-service approval are required before RedriveProviderFailure"
+	output.AuditContract = "new prepared audit and action_executor_execution_audits redrive lineage are required"
+	output.EvalGate = "action-provider-replay-operator-ui-first-path"
+	output.RedriveRequirements = []string{
+		"operator_review",
+		"fresh_agent_proposal",
+		"fresh_approval",
+		"fresh_prepared_audit",
+		"matching_skill_tool_resource",
+		"new_input_json",
+		"reason_sha256",
+	}
+	output.OperatorNextStep = "Use this low-sensitive view to create a fresh proposal and approval package; execute RedriveProviderFailure only after policy, approval and prepared audit are verified."
+	for index := range output.Rows {
+		row := &output.Rows[index]
+		row.ReplayCandidateID = providerFailureReplayCandidateID(row.TenantID, row.ProviderFailureID)
+		row.ReplayState = "AWAITING_FRESH_APPROVAL"
+	}
+	return output
+}
+
+func providerFailureReplayCandidateID(tenantID string, providerFailureID string) string {
+	sum := sha256.Sum256([]byte(strings.TrimSpace(tenantID) + ":" + strings.TrimSpace(providerFailureID)))
+	return "provider-replay-candidate-" + hex.EncodeToString(sum[:])[:16]
 }
 
 func providerFailureBatchID(kind string, rows []types.ProviderFailureAuditRow, reasonSHA256 string) string {

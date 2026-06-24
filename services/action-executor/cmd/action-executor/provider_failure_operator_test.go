@@ -83,6 +83,71 @@ func TestProviderFailureRedrivePlanOutputIsLowSensitiveAndNonMutating(t *testing
 	}
 }
 
+func TestProviderFailureReplayOperatorUIOutputRequiresFreshApprovalAndAudit(t *testing.T) {
+	now := time.Date(2026, 6, 25, 11, 30, 0, 0, time.UTC)
+	row := types.ProviderFailureAuditRow{
+		TenantID:          "tenant-1",
+		ProviderFailureID: "provider-failure-2",
+		ExecutionID:       "execution-2",
+		ResultID:          "result-2",
+		ProposalID:        "proposal-old-2",
+		ApprovalID:        "approval-old-2",
+		PreparedAuditID:   "mcp-audit-old-2",
+		UserID:            "user-sensitive-2",
+		SkillID:           "skill-2",
+		ToolName:          "conversation.profile.update",
+		ResourceType:      "conversation",
+		ResourceID:        "conversation-sensitive-2",
+		Classification:    "TOOL_PROVIDER_UNAVAILABLE",
+		Status:            types.ProviderFailureStatusDLQ,
+		Retryable:         false,
+		RetryCount:        3,
+		DeadLetteredAt:    &now,
+		FailureRef:        "action-executor://executions/execution-2/provider-failures/provider-failure-2",
+		CreatedAt:         now,
+	}
+	output := newProviderFailureReplayOperatorUIOutput(
+		types.ProviderFailureAuditOptions{TenantID: "tenant-1", Status: types.ProviderFailureStatusDLQ, Limit: 50},
+		[]types.ProviderFailureAuditRow{row},
+	)
+	encoded, err := json.Marshal(output)
+	if err != nil {
+		t.Fatalf("encode output: %v", err)
+	}
+	rawString := string(encoded)
+	for _, forbidden := range []string{"user-sensitive-2", "conversation-sensitive-2", row.FailureRef} {
+		if strings.Contains(rawString, forbidden) {
+			t.Fatalf("operator UI leaked %q: %s", forbidden, rawString)
+		}
+	}
+	if output.Kind != "action-executor.provider-failure.replay-operator-ui" ||
+		output.ExecutesTool ||
+		output.MutatesProviderFailure ||
+		!output.RequiresOperatorApproval ||
+		!output.RequiresFreshApproval ||
+		!output.RequiresPreparedAudit ||
+		!output.RequiresNewInput ||
+		!output.RequiresReasonSHA256 ||
+		!output.DryRun {
+		t.Fatalf("unexpected operator UI safety flags: %+v", output)
+	}
+	if output.BatchID == "" ||
+		output.PermissionGate == "" ||
+		output.AuditContract == "" ||
+		output.EvalGate != "action-provider-replay-operator-ui-first-path" ||
+		len(output.RedriveRequirements) == 0 {
+		t.Fatalf("operator UI missing workflow fields: %+v", output)
+	}
+	if len(output.Rows) != 1 ||
+		output.Rows[0].ReplayCandidateID == "" ||
+		output.Rows[0].ReplayState != "AWAITING_FRESH_APPROVAL" ||
+		output.Rows[0].UserIDHash == "" ||
+		output.Rows[0].ResourceIDHash == "" ||
+		output.Rows[0].FailureRefHash == "" {
+		t.Fatalf("unexpected operator UI row: %+v", output.Rows)
+	}
+}
+
 func TestProviderFailureOperatorRejectsInvalidStatusAndReasonFile(t *testing.T) {
 	if err := validateProviderFailureAuditStatus("FAILED"); err == nil {
 		t.Fatal("expected invalid status to fail closed")

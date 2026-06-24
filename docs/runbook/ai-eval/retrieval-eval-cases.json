@@ -1136,6 +1136,28 @@
       ]
     },
     {
+      "id": "action-provider-replay-operator-ui-first-path",
+      "family": "action_execution_safety",
+      "stage": "action-executor-provider-replay",
+      "status": "active",
+      "query": "review provider replay candidates through an operator approval UI",
+      "risk": "Provider replay operator UI must expose only low-sensitive candidate state and must require fresh proposal, approval, prepared audit, new input and reason hash before redrive",
+      "required_assertions": [
+        {
+          "type": "must_create_provider_replay_operator_ui"
+        },
+        {
+          "type": "must_require_fresh_replay_approval"
+        },
+        {
+          "type": "must_preserve_replay_audit_boundary"
+        },
+        {
+          "type": "must_not_auto_replay_provider_failure"
+        }
+      ]
+    },
+    {
       "id": "external-mcp-provider-unavailable",
       "family": "action_execution_safety",
       "stage": "action-executor-mcp-failure",

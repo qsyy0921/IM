@@ -292,11 +292,13 @@
       "mode_env": "NEXUSIM_ACTION_EXECUTOR_MODE",
       "modes": [
         "provider-failure-audit",
-        "provider-failure-redrive-plan"
+        "provider-failure-redrive-plan",
+        "provider-replay-operator-ui"
       ],
       "output_envs": [
         "NEXUSIM_ACTION_EXECUTOR_PROVIDER_FAILURE_AUDIT_OUTPUT",
-        "NEXUSIM_ACTION_EXECUTOR_PROVIDER_FAILURE_REDRIVE_PLAN_OUTPUT"
+        "NEXUSIM_ACTION_EXECUTOR_PROVIDER_FAILURE_REDRIVE_PLAN_OUTPUT",
+        "NEXUSIM_ACTION_EXECUTOR_PROVIDER_REPLAY_UI_OUTPUT"
       ],
       "dry_run_envs": [
         "NEXUSIM_ACTION_EXECUTOR_PROVIDER_FAILURE_REDRIVE_DRY_RUN"

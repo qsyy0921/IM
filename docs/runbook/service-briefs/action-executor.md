@@ -1,6 +1,6 @@
 # action-executor Brief
 
-状态：foundation-active / approved execution + guarded adapters + redrive first path。
+状态：foundation-active / approved execution + guarded adapters + redrive operator path。
 
 ## 已落
 
@@ -17,6 +17,9 @@
 - `RedriveProviderFailure`：只针对 `DLQ` source，要求 fresh proposal / approval /
   prepared audit、匹配 skill / tool / resource、新 input 和 reason hash，复用正常执行链；
   execution audit 记录 source failure id 和 reason hash。
+- Provider replay operator UI first path：`provider-replay-operator-ui` 只读 DLQ
+  provider failure，输出低敏 candidate / batch / workflow state / permission gate /
+  audit contract，不执行 tool、不修改 failure row、不复用旧 approval。
 - Docker / Prometheus / Grafana wiring、focused tests、PG integration、ai-eval action preflight safety adapter。
 
 ## 边界
@@ -24,8 +27,10 @@
 - 不保存 raw `input_json`、provider raw error、provider output、secret 或 PII。
 - 未配置 adapter 的业务 tool 必须 `executed=false`，不得伪造成功。
 - Redrive 是专用 API，不是普通 repair / DLQ tool action；不恢复旧 raw input，不自动 replay 旧 provider output。
+- Provider replay operator UI artifact 只是人工审批视图，不是 replay 已执行证明。
 - 真实业务 mutation 必须新增显式 adapter、公开业务 API、operator / policy 边界。
 
 ## 下一步
 
-- Provider replay approval / audit first path、operator UI。
+- 深化 provider replay approval / audit 的正式 admin/workflow handoff，以及更多
+  group memory / retrieval / eval redrive / repair cases。

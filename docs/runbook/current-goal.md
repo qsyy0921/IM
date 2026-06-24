@@ -6,33 +6,37 @@
 
 ## Active Module
 
-AI / Agent operations：action-executor provider replay approval / audit operator UI
-first path。
+AI / Agent eval：group memory / retrieval / eval multi-hop temporal profile cases。
+
+## 当前已收口
+
+- action-executor provider replay operator UI first path 已落：`provider-replay-operator-ui`
+  只读 `DLQ` provider failure，输出低敏 batch / candidate / workflow state /
+  permission gate / audit contract，不执行 tool、不修改 failure row、不复用旧 approval。
+- `RedriveProviderFailure` 仍是唯一执行入口，必须使用 fresh proposal / approval /
+  prepared audit、新 input 和 reason hash，并复用正常 action execution 链。
+- eval catalog 已新增 provider replay operator UI first-path case。
 
 ## 目标
 
-- 在已有 provider failure metrics / batch redrive handoff 基础上，补 provider replay
-  的审批、审计和 operator UI first path。
-- provider replay 不能自动重放旧 raw input、旧 provider output 或旧审批；必须复用
-  fresh proposal / approval / prepared audit 和新的 input / reason hash。
-- operator UI / API 只能展示低敏状态、hash、reason class、batch id、candidate id 和
-  workflow 状态，不暴露 raw provider error、raw tool input / output、secret 或 PII。
-- replay / approval / audit 任一状态不确定时 fail-closed；不引入隐藏 fallback，
-  不用默认成功、静默降级或本地缓存冒充 replay 成功。
-- Python AI Worker 仍只做 candidate algorithm / planner / eval，不拥有业务状态、
-  权限、审批或持久化。
+- 深化 group memory / retrieval / eval 的多跳、时间版本和 profile cases，让 AI / Agent
+  演示链路能解释多人、多群、跨时间版本的协作记忆，而不是只做单条事实检索。
+- Memory / retrieval / RAG / Agent 必须保留 source refs、conversation scope、
+  speaker attribution、member visibility、validity window、supersession、profile
+  review 和 citation boundary。
+- Python AI Worker 仍只做 candidate extraction / planner / rerank / eval 候选；
+  Go 服务继续拥有权限、状态、审批、审计和持久化。
 
 ## 本轮完成条件
 
-- 先读取并对齐 `action-executor`、`agent-service`、`workflow-service`、
-  `admin-service`、`audit-service`、`skill-registry`、`mcp-gateway`、`policy-service`、
-  `ai-eval-service` 的 service brief / SDD。
-- 做 compact architecture analysis：owner、replay state、operator workflow、
-  approval / audit contract、permission、eval gate 和是否需要新中间件。
-- 实现一个可演示的 provider replay approval / audit operator UI first path，或补齐其
-  阻塞缺口。
-- 补 focused tests / eval cases，覆盖 unapproved replay、stale approval、policy denied
-  replay、source mismatch、no raw payload boundary 和 audit / result projection。
+- 先读取并对齐 `memory-service`、`search-service`、`retrieval-gateway`、`rag-service`、
+  `summary-service`、`agent-service`、`ai-eval-service` 和 Python AI Worker brief / SDD。
+- 做 compact architecture analysis：case owner、source chain、temporal version、
+  profile boundary、visibility gate、eval adapter 和是否需要新中间件。
+- 补一个可感知的 group-memory / retrieval / eval 功能包，而不是只加单条 case。
+- Focused tests / eval cases 覆盖 multi-hop actor chain、temporal update、profile
+  overgeneralization negative gate、retrieval miss / insufficient evidence 和 no raw prompt /
+  no unsupported fallback。
 - Focused checks 通过；若跨 proto / migration / 安全边界再跑完整门禁。
 - 必要文档同步后提交并推送到 GitHub。
 
@@ -42,9 +46,10 @@ first path。
 - 不做长压、生产 HA、Docker / 双机基础设施整理。
 - 不把 AI Worker 变成业务事实源。
 - 不新增服务或中间件，除非架构分析证明当前模块必须新增。
-- 不一次性展开完整 provider-grade eval 平台、生产 UI 或自动 replay。
+- 不一次性展开完整 provider-grade eval 平台、生产 UI 或真实模型长评测。
 
 ## 后续优先级
 
-1. 本模块完成后，深化 group memory / retrieval / eval 的多跳、时间版本、profile cases。
+1. group memory / retrieval / eval 功能包完成后，再按需推进正式 provider replay admin /
+   workflow handoff。
 2. Product-active 服务按需推进，不抢占 AI / Agent 演示主线。

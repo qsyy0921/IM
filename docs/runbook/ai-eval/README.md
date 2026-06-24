@@ -305,6 +305,13 @@ actions that require the operator workflow instead of generic tool execution.
 It does not call real MCP servers, external networks, databases or production
 tools.
 
+Provider replay operator UI first path is represented in the case catalog by
+`action-provider-replay-operator-ui-first-path`. It verifies that provider replay
+review exposes only low-sensitive candidate / batch / workflow metadata and
+requires fresh proposal, approval, prepared audit, new input and reason hash
+before `RedriveProviderFailure`. It does not prove automatic replay or a
+production admin UI.
+
 First-stage Python worker output-safety adapter:
 
 ```powershell

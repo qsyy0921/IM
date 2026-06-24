@@ -7,8 +7,7 @@ loadtest report 或 archive。
 
 - 客户端 Web / PC 已达到演示 MVP；除阻塞演示的问题外，不继续追完整产品级客户端。
 - 后端主线已切到 AI / Agent / RAG 演示路径和必要平台能力。
-- 当前 active module：action-executor provider replay approval / audit operator UI
-  first path。
+- 当前 active module：group memory / retrieval / eval multi-hop temporal profile cases。
 
 ## 当前模块事实
 
@@ -22,9 +21,13 @@ loadtest report 或 archive。
 - action-executor provider failure metrics / batch redrive handoff 已收口：`/metrics`
   输出 provider failure status / retry / due / classification 聚合；redrive plan 输出
   batch id、candidate count 和 fresh proposal / approval / prepared-audit requirements。
-- 当前模块开始推进 provider replay approval / audit operator UI first path：仍不能自动
-  replay 旧 raw input / provider output，必须复用 fresh proposal / approval / prepared
-  audit 和低敏 operator workflow。
+- action-executor provider replay operator UI first path 已收口：`provider-replay-operator-ui`
+  只读 `DLQ` provider failure，输出低敏 batch / candidate / workflow state /
+  permission gate / audit contract，不执行 tool、不修改 failure row、不复用旧 approval；
+  真正执行仍只能走 `RedriveProviderFailure` 的 fresh proposal / approval / prepared audit /
+  new input / reason hash 链。
+- 当前模块转向 group memory / retrieval / eval：重点补多人、多群、跨时间版本和
+  profile 边界的可感知功能包，而不是继续加单条字段或单条 case。
 - group memory / multi-party collaboration 必须继续保留 source refs、conversation scope、
   member visibility、time/version boundary、citations 和 no-citation refusal。
 
@@ -50,5 +53,5 @@ loadtest report 或 archive。
 
 ## 下一个方向
 
-- 完成 provider replay approval / audit operator UI first path 后，再深化 group memory /
-  retrieval / eval 的多跳、时间版本和 profile cases。
+- 深化 group memory / retrieval / eval 的多跳、时间版本和 profile cases；正式
+  provider replay admin / workflow handoff 后置。

@@ -213,10 +213,16 @@ IM messages -> search / memory projection -> EvidencePack -> RAG / Agent answer 
   `ai-eval-rag-agent-demo-live-20260625-business-mutation-execute-v7`
   真实完整 service-stack opt-in mutation smoke：4 adapters、27 cases、
   27 passed、0 failed、0 skipped；`rag-agent-demo` 断言
-  `business_action_executed=true`、`business_note_persisted=true`、
-  execution status `RECORDED`，且 note fact 与 proposal / approval 绑定一致。
-  真实 `ai-eval-rag-agent-demo-live-20260624-business-proposal-source-chain-gate-v1`
-  service-stack gate 已通过：4 adapters、27 cases、27 passed、0 failed、0 skipped。
+  `business_action_executed=true`、`business_note_persisted=true`，且 note fact
+  与 proposal / approval 绑定一致。
+- 同日 action-executor 已补第二个显式 conversation business adapter：
+  `conversation.profile.update` 复用
+  `NEXUSIM_ACTION_EXECUTOR_CONVERSATION_GRPC_ADDR`，通过 conversation-service 公开
+  `UpdateConversationProfile` 更新会话资料。adapter 要求 LOW risk、conversation
+  resource、`EXECUTE` skill 和 `expected_profile_version > 0`，tool output 只返回
+  conversation ref、profile version 和 title / avatar / announcement hash，不回显
+  raw profile 字段。当前已完成 adapter focused tests；完整 service-stack profile
+  mutation smoke 仍待后续按需归档。
 - 2026-06-24 retrieval-gateway 已补 vector-index-service `SearchVectors` adapter
   first path：`RetrieveEvidence` 支持显式 `include_vector`，调用方必须提供低敏
   `query_embedding_ref`、明确的 `vector_collection_types`、`vector_visibility_scope`

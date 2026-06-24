@@ -206,10 +206,11 @@ func newToolExecutorFromEnv(timeout time.Duration) (app.ToolExecutorPort, func()
 			return nil, nil, err
 		}
 		closers = append(closers, conn.Close)
-		executors = append(executors, toolinfra.NewConversationNoteExecutor(
-			conversationv1.NewConversationServiceClient(conn),
-			timeout,
-		))
+		conversationClient := conversationv1.NewConversationServiceClient(conn)
+		executors = append(executors,
+			toolinfra.NewConversationNoteExecutor(conversationClient, timeout),
+			toolinfra.NewConversationProfileExecutor(conversationClient, timeout),
+		)
 	}
 	externalExecutor, err := externalMCPAdapterFromEnv()
 	if err != nil {

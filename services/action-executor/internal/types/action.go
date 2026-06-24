@@ -17,8 +17,9 @@ const (
 	SkillStatusActive   = "ACTIVE"
 	SkillStatusDisabled = "DISABLED"
 
-	LocalSafeEchoToolName          = "nexusim.local.echo"
-	ConversationNoteCreateToolName = "conversation.note.create"
+	LocalSafeEchoToolName             = "nexusim.local.echo"
+	ConversationNoteCreateToolName    = "conversation.note.create"
+	ConversationProfileUpdateToolName = "conversation.profile.update"
 
 	ExecutionStatusRecorded = "RECORDED"
 	ExecutionStatusBlocked  = "BLOCKED"

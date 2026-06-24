@@ -31,9 +31,9 @@ backend service briefs.
 
 ## 当前推进规则
 
-- 当前 active slice 是 client platform MVP foundation；client 细节看
-  `../client-platform.md` 和 `../../sdd/client-platform.md`。
-- 现有 9 个服务只做阻塞当前 client / AI 链路的必要收口。
+- 当前 active slice 是 backend architecture + AI / Agent / RAG demo path；client
+  仅作为演示入口，细节看 `../client-platform.md` 和 `../../sdd/client-platform.md`。
+- 现有 9 个服务只做阻塞当前 AI / Agent / RAG 链路的必要收口。
 - client platform 只能通过 `api-gateway` / `push-gateway` 使用后端能力。
 - memory 必须保留 source refs、speaker / audience、validity、supersedes、confidence、review state。
 - Agent 写动作必须走 policy precheck 和 `Proposal -> Approval -> Executor -> Audit`。

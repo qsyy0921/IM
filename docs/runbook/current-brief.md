@@ -214,6 +214,14 @@ service-stack opt-in mutation smoke：4 adapters、27 cases、27 passed、0 fail
 0 skipped；`rag-agent-demo` 确认 `business_action_executed=true`、
 `business_note_persisted=true`、execution status `RECORDED`，且 note fact 与
 proposal / approval 绑定一致。
+同日 action-executor 已补第二个显式 conversation business adapter：
+`conversation.profile.update` 复用
+`NEXUSIM_ACTION_EXECUTOR_CONVERSATION_GRPC_ADDR`，通过 conversation-service 公开
+`UpdateConversationProfile` 更新会话资料；adapter 要求 LOW risk、conversation
+resource、EXECUTE skill 和 `expected_profile_version > 0`，tool output 只返回
+conversation ref、profile version 和 profile 字段 hash，不回显 title / avatar /
+announcement 原文。当前已完成 adapter focused tests；完整 service-stack profile
+mutation smoke 仍待后续按需归档。
 同日 Python AI Worker 已补 memory extraction candidate first path：
 `ai/python/nexusim_ai_memory` 只从显式 low-sensitive message batch 的
 `decision:` / `task:` / `status:` / `blocker:` / `file:` / `profile_signal:`

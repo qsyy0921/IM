@@ -41,6 +41,7 @@ func TestLocalSafeExecutorRejectsUnsupportedOrHigherRiskTool(t *testing.T) {
 	executor := NewLocalSafeExecutor()
 	for _, command := range []types.ToolExecutionCommand{
 		{ToolName: "conversation.note.create", RiskLevel: "LOW", Skill: types.SkillDefinition{AllowedActions: []string{types.ToolActionExecute}}},
+		{ToolName: types.ConversationProfileUpdateToolName, RiskLevel: "LOW", Skill: types.SkillDefinition{AllowedActions: []string{types.ToolActionExecute}}},
 		{ToolName: types.LocalSafeEchoToolName, RiskLevel: "HIGH", Skill: types.SkillDefinition{AllowedActions: []string{types.ToolActionExecute}}},
 		{ToolName: types.LocalSafeEchoToolName, RiskLevel: "LOW", Skill: types.SkillDefinition{AllowedActions: []string{types.ToolActionCall}}},
 	} {

@@ -1,6 +1,6 @@
 # action-executor Brief
 
-状态：foundation-active / approved execution audit + guarded adapters + conversation note business adapter.
+状态：foundation-active / approved execution audit + guarded adapters + conversation business adapters.
 
 ## 已落
 
@@ -18,6 +18,12 @@
   会通过 conversation-service 公开 gRPC `CreateConversationNote` 写入真实会话 note
   fact；只接受 `LOW` risk、`resource_type=conversation`、`EXECUTE` skill contract，
   output 只返回 note ref / id / hash metadata，不回显 note body。
+- Conversation profile business adapter：默认关闭；复用
+  `NEXUSIM_ACTION_EXECUTOR_CONVERSATION_GRPC_ADDR` 后，`conversation.profile.update`
+  会通过 conversation-service 公开 gRPC `UpdateConversationProfile` 更新会话资料；
+  只接受 `LOW` risk、`resource_type=conversation`、`EXECUTE` skill contract，并要求
+  `expected_profile_version > 0`。output 只返回 conversation ref、profile version 和
+  title / avatar / announcement hash，不回显 raw profile 字段。
 - Tool output safety：malformed / oversize / secret-like / PII-like output fail closed，不入 hash。
 - Docker / Prometheus / Grafana wiring、聚焦测试、PG integration、Agent execution eval adapter、external HTTP adapter eval / failure smoke、preflight safety eval。
 - Action rate-limit / repair-DLQ safety：rate-limited action 在 tool execution 前 `BLOCKED`；limiter unavailable fail closed 为 `FAILED`；repair / DLQ action 需 operator workflow，不进通用 adapter。
@@ -41,13 +47,17 @@
 - 同日 `ai-eval-rag-agent-demo-live-20260625-business-mutation-execute-v7` 已通过真实完整
   service-stack opt-in mutation smoke：approved Agent proposal 经 action-executor 执行后
   写入真实 conversation note fact，且 execution status `RECORDED`、tool output 低敏。
+- 同日 `conversation.profile.update` 已补为第二个显式 conversation business adapter：
+  approved Agent action 可经 action-executor 调用 conversation-service public API 更新会话资料；
+  adapter 要求 LOW risk、conversation resource、EXECUTE skill 和 expected profile version，
+  并保持低敏 output，不把 title / avatar / announcement 原文写入 tool result。
 
 ## 边界
 
 - 不执行任意外部 MCP / provider tool；当前只允许显式开启的 LOW-risk HTTP adapter first path。
 - 不自动执行高风险 / 真实业务写动作；执行前仍必须经过 proposal / approval / prepare / policy。
 - 不保存 raw `input_json`、provider secret、provider output 或 provider 原始错误。
-- 未配置 adapter 的业务 tool 默认 `executed=false`；conversation note、echo /
+- 未配置 adapter 的业务 tool 默认 `executed=false`；conversation note / profile、echo /
   allowlisted HTTP provider tool 均必须显式满足各自 adapter contract 才能 `SUCCEEDED`。
 
 ## 下一步

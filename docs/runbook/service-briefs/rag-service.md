@@ -54,8 +54,12 @@
 - 2026-06-24 `ai-eval-rag-agent-demo-live-20260624-profile-repair-negative-v1`
   已验证 profile repair negative gate：未审批 workflow 和 approval payload hash mismatch
   均 fail closed；同时修复后的 profile evidence 仍进入 RAG EvidencePack。
+- 2026-06-24 `ai-eval-rag-agent-demo-live-20260624-group-memory-answer-proposal-gate-v1`
+  已验证 group-memory answer 场景：RAG answer 对 `DECISION` / `BLOCKER` /
+  `FILE` 三类 group memory 返回 `GROUNDED`，并保留 3 条 memory evidence、6 个
+  source refs 和 3 个 cross-group source refs。
 
 下一步：
 
-- 继续扩展更完整 group-memory answer / proposal 场景，
+- 继续扩展 EvidencePack source-chain coverage 和更真实的业务 proposal 场景，
   provider 仍走 port、guard 和 citation verifier。

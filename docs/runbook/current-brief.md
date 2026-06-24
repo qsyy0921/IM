@@ -187,6 +187,12 @@ service-stack gate：4 adapters、27 cases、27 passed、0 failed、0 skipped；
 确认未审批 workflow 和 approval payload hash mismatch 均 fail-closed，之后匹配的
 已审批 workflow 才会执行 memory-service public recompute，并把修复后的 profile
 aggregate 放入 RAG / Agent EvidencePack。
+同日 `ai-eval-rag-agent-demo-live-20260624-group-memory-answer-proposal-gate-v1`
+已通过真实 service-stack gate：4 adapters、27 cases、27 passed、0 failed、
+0 skipped；该 run 确认 `loadtest/ragagent` 会通过 memory-service 公开
+candidate review path 构造 `DECISION` / `BLOCKER` / `FILE` 三类 group memory，
+并要求 RAG answer 和 Agent proposal 均保留 3 条 memory evidence、6 个 source refs
+和 3 个 cross-group source refs。
 同日 Python AI Worker 已补 memory extraction candidate first path：
 `ai/python/nexusim_ai_memory` 只从显式 low-sensitive message batch 的
 `decision:` / `task:` / `status:` / `blocker:` / `file:` / `profile_signal:`
@@ -219,4 +225,4 @@ fail-closed，不写 execution audit、不写 tool result projection、不调用
 - public candidate review、temporal update 和 profile repair approval 已进入
   RAG-Agent 真实 service-stack gate 归档。
 - 下一步继续深化 RAG-Agent demo 的 EvidencePack / approval / audit 展示：
-  更多 group-memory answer / proposal 场景和 EvidencePack source-chain coverage。
+  EvidencePack source-chain coverage 和真实业务 proposal 场景。

@@ -163,6 +163,19 @@ Add-Assertion -Assertions $assertions -Type "public_candidate_review_must_enter_
     (Get-JsonPropertyString -Object $summary -Name "public_candidate_superseded_memory_event_id").Length -gt 0 -and
     (Get-JsonPropertyString -Object $summary -Name "public_candidate_fact_sha256").Length -gt 0
 )
+Add-Assertion -Assertions $assertions -Type "group_memory_answer_and_proposal_must_preserve_multievent_evidence" -Passed (
+    (Get-JsonPropertyBool -Object $summary -Name "group_memory_answer_verified") -and
+    (Get-JsonPropertyBool -Object $summary -Name "group_memory_proposal_verified") -and
+    [int]$summary.group_memory_event_count -ge 3 -and
+    [int]$summary.group_memory_rag_evidence_count -ge [int]$summary.group_memory_event_count -and
+    [int]$summary.group_memory_agent_evidence_count -ge [int]$summary.group_memory_event_count -and
+    [int]$summary.group_memory_source_ref_count -ge ([int]$summary.group_memory_event_count * 2) -and
+    [int]$summary.group_memory_cross_group_source_ref_count -ge [int]$summary.group_memory_event_count -and
+    $null -ne $summary.group_memory_event_types -and
+    @($summary.group_memory_event_types).Count -ge 3 -and
+    $null -ne $summary.group_memory_fact_sha256 -and
+    @($summary.group_memory_fact_sha256 | Where-Object { ([string]$_).Trim().Length -eq 64 }).Count -ge 3
+)
 Add-Assertion -Assertions $assertions -Type "profile_repair_must_require_workflow_approval_and_enter_evidence_chain" -Passed (
     (Get-JsonPropertyBool -Object $summary -Name "profile_repair_approval_requested") -and
     (Get-JsonPropertyBool -Object $summary -Name "profile_repair_workflow_approved") -and

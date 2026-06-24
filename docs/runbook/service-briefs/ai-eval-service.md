@@ -63,6 +63,11 @@ adapter、状态、计数、summary/report 引用和低敏 metadata。
 - 同日 `ai-eval-rag-agent-demo-live-20260624-profile-repair-negative-v1` 已通过真实
   service-stack gate：4 adapters、27 cases、27 passed、0 failed、0 skipped；该 run
   归档了 profile repair negative gate。
+- 同日 `ai-eval-rag-agent-demo-live-20260624-group-memory-answer-proposal-gate-v1`
+  已通过真实 service-stack gate：4 adapters、27 cases、27 passed、0 failed、
+  0 skipped；`rag-agent-demo` adapter 新增
+  `group_memory_answer_and_proposal_must_preserve_multievent_evidence` 断言，覆盖
+  `DECISION` / `BLOCKER` / `FILE` 三类 group memory 同时进入 RAG / Agent EvidencePack。
 - 2026-06-24 `action-preflight-safety` adapter 已扩到 14 个 smoke cases，并在
   catalog 中新增 approval id、prepared audit id、resource id 绑定错配的
   `PROPOSAL_MISMATCH` 断言；这些 case 区分 action boundary failure 与
@@ -75,6 +80,6 @@ adapter、状态、计数、summary/report 引用和低敏 metadata。
 
 边界：不保存 raw EvidencePack、prompt、model output、用户正文、secret 或 tool input；不授权业务动作。
 
-下一步：继续深化更多 group-memory answer / proposal 场景和 EvidencePack coverage，
+下一步：继续深化 EvidencePack source-chain coverage 和真实业务 proposal 场景，
 并保持 retrieval failure、memory lifecycle failure、reasoning failure 和 action
 boundary failure 的独立诊断。

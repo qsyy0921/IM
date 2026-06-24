@@ -101,7 +101,7 @@ func TestVerifyCombinedSummary(t *testing.T) {
 	cfg := config{runName: "demo", expectExecuted: true}
 	rag := validRAGPartial()
 	agent := validAgentPartial()
-	summary, err := verifyCombined(cfg, `H:\NexusIM\loadtest-results\demo`, "rag.json", "agent.json", rag, agent, validPublicCandidateReviewSummary(), validProfileRepairApprovalSummary(), startedAt)
+	summary, err := verifyCombined(cfg, `H:\NexusIM\loadtest-results\demo`, "rag.json", "agent.json", rag, agent, validPublicCandidateReviewSummary(), validGroupMemoryScenarioSummary(), validProfileRepairApprovalSummary(), startedAt)
 	if err != nil {
 		t.Fatalf("verifyCombined returned error: %v", err)
 	}
@@ -120,6 +120,14 @@ func TestVerifyCombinedSummary(t *testing.T) {
 		!summary.PublicCandidateTemporalUpdatePreserved ||
 		summary.PublicCandidateSupersededMemoryEventID == "" {
 		t.Fatalf("expected public candidate temporal update evidence flags: %+v", summary)
+	}
+	if !summary.GroupMemoryAnswerVerified ||
+		!summary.GroupMemoryProposalVerified ||
+		summary.GroupMemoryEventCount < 3 ||
+		summary.GroupMemoryRAGEvidenceCount < 3 ||
+		summary.GroupMemoryAgentEvidenceCount < 3 ||
+		summary.GroupMemoryCrossGroupSourceRefCount < 3 {
+		t.Fatalf("expected group-memory answer/proposal evidence flags: %+v", summary)
 	}
 	if !summary.ProfileRepairApprovalRequested ||
 		!summary.ProfileRepairWorkflowApproved ||
@@ -151,7 +159,7 @@ func TestVerifyCombinedRejectsFailedProfileRepairNegativeCase(t *testing.T) {
 	agent := validAgentPartial()
 	profileRepair := validProfileRepairApprovalSummary()
 	profileRepair.NegativeCases[0].Passed = false
-	if _, err := verifyCombined(cfg, "out", "rag.json", "agent.json", rag, agent, validPublicCandidateReviewSummary(), profileRepair, time.Now().UTC()); err == nil {
+	if _, err := verifyCombined(cfg, "out", "rag.json", "agent.json", rag, agent, validPublicCandidateReviewSummary(), validGroupMemoryScenarioSummary(), profileRepair, time.Now().UTC()); err == nil {
 		t.Fatalf("expected failed profile repair negative case to fail")
 	}
 }
@@ -161,7 +169,7 @@ func TestVerifyCombinedRejectsDifferentConversation(t *testing.T) {
 	rag := validRAGPartial()
 	agent := validAgentPartial()
 	agent.Seed.ConversationID = "other-conv"
-	if _, err := verifyCombined(cfg, "out", "rag.json", "agent.json", rag, agent, validPublicCandidateReviewSummary(), validProfileRepairApprovalSummary(), time.Now().UTC()); err == nil {
+	if _, err := verifyCombined(cfg, "out", "rag.json", "agent.json", rag, agent, validPublicCandidateReviewSummary(), validGroupMemoryScenarioSummary(), validProfileRepairApprovalSummary(), time.Now().UTC()); err == nil {
 		t.Fatalf("expected conversation mismatch to fail")
 	}
 }
@@ -171,7 +179,7 @@ func TestVerifyCombinedRejectsMissingEvidenceBoundary(t *testing.T) {
 	rag := validRAGPartial()
 	agent := validAgentPartial()
 	agent.MemoryGraphEdgesPreserved = false
-	if _, err := verifyCombined(cfg, "out", "rag.json", "agent.json", rag, agent, validPublicCandidateReviewSummary(), validProfileRepairApprovalSummary(), time.Now().UTC()); err == nil {
+	if _, err := verifyCombined(cfg, "out", "rag.json", "agent.json", rag, agent, validPublicCandidateReviewSummary(), validGroupMemoryScenarioSummary(), validProfileRepairApprovalSummary(), time.Now().UTC()); err == nil {
 		t.Fatalf("expected missing graph edge preservation to fail")
 	}
 }
@@ -182,8 +190,19 @@ func TestVerifyCombinedRejectsMissingPublicCandidateReview(t *testing.T) {
 	agent := validAgentPartial()
 	candidate := validPublicCandidateReviewSummary()
 	candidate.AgentEvidence = false
-	if _, err := verifyCombined(cfg, "out", "rag.json", "agent.json", rag, agent, candidate, validProfileRepairApprovalSummary(), time.Now().UTC()); err == nil {
+	if _, err := verifyCombined(cfg, "out", "rag.json", "agent.json", rag, agent, candidate, validGroupMemoryScenarioSummary(), validProfileRepairApprovalSummary(), time.Now().UTC()); err == nil {
 		t.Fatalf("expected missing public candidate evidence to fail")
+	}
+}
+
+func TestVerifyCombinedRejectsMissingGroupMemoryScenario(t *testing.T) {
+	cfg := config{runName: "demo"}
+	rag := validRAGPartial()
+	agent := validAgentPartial()
+	groupMemory := validGroupMemoryScenarioSummary()
+	groupMemory.AgentMemoryEventCount = 2
+	if _, err := verifyCombined(cfg, "out", "rag.json", "agent.json", rag, agent, validPublicCandidateReviewSummary(), groupMemory, validProfileRepairApprovalSummary(), time.Now().UTC()); err == nil {
+		t.Fatalf("expected missing group-memory evidence to fail")
 	}
 }
 
@@ -193,7 +212,7 @@ func TestVerifyCombinedRejectsMissingProfileRepairApproval(t *testing.T) {
 	agent := validAgentPartial()
 	profileRepair := validProfileRepairApprovalSummary()
 	profileRepair.ApprovalVerified = false
-	if _, err := verifyCombined(cfg, "out", "rag.json", "agent.json", rag, agent, validPublicCandidateReviewSummary(), profileRepair, time.Now().UTC()); err == nil {
+	if _, err := verifyCombined(cfg, "out", "rag.json", "agent.json", rag, agent, validPublicCandidateReviewSummary(), validGroupMemoryScenarioSummary(), profileRepair, time.Now().UTC()); err == nil {
 		t.Fatalf("expected missing profile repair approval verification to fail")
 	}
 }
@@ -205,7 +224,7 @@ func TestVerifyCombinedRejectsMissingProfileRepairNegativeCases(t *testing.T) {
 	profileRepair := validProfileRepairApprovalSummary()
 	profileRepair.NegativeCasesVerified = false
 	profileRepair.NegativeCases = nil
-	if _, err := verifyCombined(cfg, "out", "rag.json", "agent.json", rag, agent, validPublicCandidateReviewSummary(), profileRepair, time.Now().UTC()); err == nil {
+	if _, err := verifyCombined(cfg, "out", "rag.json", "agent.json", rag, agent, validPublicCandidateReviewSummary(), validGroupMemoryScenarioSummary(), profileRepair, time.Now().UTC()); err == nil {
 		t.Fatalf("expected missing profile repair negative gate to fail")
 	}
 }
@@ -268,6 +287,20 @@ func validPublicCandidateReviewSummary() publicCandidateReviewSummary {
 		RAGEvidence:             true,
 		AgentEvidence:           true,
 		TemporalUpdatePreserved: true,
+	}
+}
+
+func validGroupMemoryScenarioSummary() groupMemoryScenarioSummary {
+	return groupMemoryScenarioSummary{
+		AnswerVerified:        true,
+		ProposalVerified:      true,
+		MemoryEventCount:      3,
+		RAGMemoryEventCount:   3,
+		AgentMemoryEventCount: 3,
+		EventTypes:            []string{"DECISION", "BLOCKER", "FILE"},
+		FactSHA256:            []string{strings.Repeat("a", 64), strings.Repeat("b", 64), strings.Repeat("c", 64)},
+		SourceRefCount:        6,
+		CrossGroupSourceRefs:  3,
 	}
 }
 

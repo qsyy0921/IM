@@ -71,7 +71,11 @@
   Agent EvidencePack。profile repair negative gate 已接入 runner / adapter contract：
   未审批 workflow 和 approval payload hash mismatch 均必须 fail-closed；该负向门禁
   已通过 `ai-eval-rag-agent-demo-live-20260624-profile-repair-negative-v1` 真实 gate
-  归档。下一步继续扩展更多 group-memory answer / proposal 场景。
+  归档。group-memory answer / proposal 场景已通过
+  `ai-eval-rag-agent-demo-live-20260624-group-memory-answer-proposal-gate-v1` 真实 gate
+  归档：`DECISION` / `BLOCKER` / `FILE` 三类 group memory 同时进入 RAG / Agent
+  EvidencePack。下一步继续扩展 EvidencePack source-chain coverage 和真实业务
+  proposal 场景。
 - `rag-service` / `summary-service`：拒答、引用校验、source-ref regression、unsafe
   output fail-closed cases。
 - `agent-service`：真实业务动作继续走 policy、skill contract、proposal、approval、

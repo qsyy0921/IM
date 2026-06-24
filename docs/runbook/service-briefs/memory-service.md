@@ -95,6 +95,10 @@
 - 同日 `ai-eval-rag-agent-demo-live-20260624-profile-repair-negative-v1` 已通过真实
   service-stack gate：4 adapters、27 cases、27 passed、0 failed、0 skipped；该 run
   归档了上述负向门禁，并确认匹配审批后才执行 memory-service public recompute。
+- 同日 `ai-eval-rag-agent-demo-live-20260624-group-memory-answer-proposal-gate-v1`
+  已通过真实 service-stack gate：通过公开 candidate review path 构造的
+  `DECISION` / `BLOCKER` / `FILE` group memory 会同时进入 RAG answer 和 Agent
+  proposal EvidencePack，并保留跨群 source refs。
 
 下一步：`loadtest/ragagent` / `rag-agent-demo` adapter 已把 public candidate
 review、temporal update 和 profile repair approval 纳入 RAG / Agent EvidencePack 断言链路，并已通过
@@ -102,5 +106,8 @@ review、temporal update 和 profile repair approval 纳入 RAG / Agent Evidence
 `ai-eval-rag-agent-demo-live-20260624-temporal-update-v2`、`ai-eval-rag-agent-demo-live-20260624-profile-repair-approval-v3`
 真实 gate 归档；profile repair negative gate 也已通过
 `ai-eval-rag-agent-demo-live-20260624-profile-repair-negative-v1` 真实 gate 归档。
-之后继续做结构过滤、BM25 / vector、rerank 和 EvidencePack coverage 深化。仍不得把
+group-memory answer / proposal gate 也已通过
+`ai-eval-rag-agent-demo-live-20260624-group-memory-answer-proposal-gate-v1` 真实 gate
+归档。之后继续做结构过滤、BM25 / vector、rerank、source-chain coverage 和真实业务
+proposal 场景。仍不得把
 单条群消息直接升级为 ACTIVE profile fact。

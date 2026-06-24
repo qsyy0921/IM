@@ -45,6 +45,10 @@
   evidence 放入 EvidencePack。profile lookup 失败会 fail-closed；app / RPC
   focused tests 和 `loadtest/retrieval` 已覆盖 profile subject、aggregate type/key、
   supporting memory ids 和 source coverage。
+- 2026-06-24 `ai-eval-rag-agent-demo-live-20260624-group-memory-answer-proposal-gate-v1`
+  已通过真实 service-stack gate：RAG answer 和 Agent proposal 同时验证
+  `DECISION` / `BLOCKER` / `FILE` 三类 group memory、6 个 source refs 和 3 个
+  cross-group source refs 经 EvidencePack 保留。
 
-下一步：继续把 group memory extraction、profile recompute / repair 和后续 rerank /
-coverage 增强通过 EvidencePack 暴露给 RAG / summary / Agent，仍不绕过 retrieval-gateway。
+下一步：继续把后续 rerank、source-chain coverage 和真实业务 proposal 场景通过
+EvidencePack 暴露给 RAG / summary / Agent，仍不绕过 retrieval-gateway。

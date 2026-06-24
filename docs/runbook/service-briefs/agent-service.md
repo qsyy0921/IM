@@ -60,6 +60,11 @@ proposal 前调用 `mcp-gateway.PrepareToolCall` 做 skill / policy / prepare au
   service-stack gate：4 adapters、27 cases、27 passed、0 failed、0 skipped；该 run
   归档了 profile repair negative gate，并确认修复后的 profile evidence 仍进入 Agent
   proposal EvidencePack。
+- 同日 `ai-eval-rag-agent-demo-live-20260624-group-memory-answer-proposal-gate-v1`
+  已通过真实 service-stack gate：Agent proposal 对 `DECISION` / `BLOCKER` /
+  `FILE` 三类 group memory 保留 3 条 memory evidence、6 个 source refs 和 3 个
+  cross-group source refs；proposal 仍走 approval / action-executor audit，不直接执行
+  业务 mutation。
 
 ## 边界
 
@@ -68,5 +73,5 @@ proposal 前调用 `mcp-gateway.PrepareToolCall` 做 skill / policy / prepare au
 
 ## 下一步
 
-- 继续扩展更完整 group-memory Agent proposal 场景；真实写动作仍只走 proposal /
-  approval / executor / audit。
+- 继续扩展 EvidencePack source-chain coverage 和更真实的业务 proposal 场景；真实写动作
+  仍只走 proposal / approval / executor / audit。

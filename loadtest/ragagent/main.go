@@ -138,6 +138,7 @@ type seedSummary struct {
 	CrossGroupConversationID string `json:"cross_group_conversation_id,omitempty"`
 	ViewerUserID             string `json:"viewer_user_id"`
 	SenderUserID             string `json:"sender_user_id"`
+	CrossGroupActorUserID    string `json:"cross_group_actor_user_id,omitempty"`
 	MemoryEventID            string `json:"memory_event_id"`
 	ProfileID                string `json:"profile_id,omitempty"`
 	MemoryGraphEdgeID        string `json:"memory_graph_edge_id,omitempty"`
@@ -199,6 +200,15 @@ type combinedSummary struct {
 	ProfileRepairTargetRefHash             string                             `json:"profile_repair_target_ref_hash,omitempty"`
 	ProfileRepairRAGEvidence               bool                               `json:"profile_repair_evidence_in_rag"`
 	ProfileRepairAgentEvidence             bool                               `json:"profile_repair_evidence_in_agent"`
+	GroupMemoryAnswerVerified              bool                               `json:"group_memory_answer_verified"`
+	GroupMemoryProposalVerified            bool                               `json:"group_memory_proposal_verified"`
+	GroupMemoryEventCount                  int                                `json:"group_memory_event_count"`
+	GroupMemoryRAGEvidenceCount            int                                `json:"group_memory_rag_evidence_count"`
+	GroupMemoryAgentEvidenceCount          int                                `json:"group_memory_agent_evidence_count"`
+	GroupMemoryEventTypes                  []string                           `json:"group_memory_event_types,omitempty"`
+	GroupMemoryFactSHA256                  []string                           `json:"group_memory_fact_sha256,omitempty"`
+	GroupMemorySourceRefCount              int                                `json:"group_memory_source_ref_count"`
+	GroupMemoryCrossGroupSourceRefCount    int                                `json:"group_memory_cross_group_source_ref_count"`
 	RAGVersion                             string                             `json:"rag_version"`
 	AgentVersion                           string                             `json:"agent_version"`
 	RetrievalVersions                      []string                           `json:"retrieval_versions"`
@@ -262,11 +272,15 @@ func run(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
+	groupMemory, err := verifyGroupMemoryAnswerProposalScenario(ctx, cfg, agentSummary.Seed)
+	if err != nil {
+		return err
+	}
 	profileRepair, err := verifyProfileRepairApproval(ctx, cfg, agentSummary.Seed, resultDir)
 	if err != nil {
 		return err
 	}
-	combined, err := verifyCombined(cfg, resultDir, ragSummaryPath, agentSummaryPath, ragSummary, agentSummary, publicCandidate, profileRepair, startedAt)
+	combined, err := verifyCombined(cfg, resultDir, ragSummaryPath, agentSummaryPath, ragSummary, agentSummary, publicCandidate, groupMemory, profileRepair, startedAt)
 	if err != nil {
 		return err
 	}
@@ -824,6 +838,7 @@ func verifyCombined(
 	rag ragPartialSummary,
 	agent agentPartialSummary,
 	publicCandidate publicCandidateReviewSummary,
+	groupMemory groupMemoryScenarioSummary,
 	profileRepair profileRepairApprovalSummary,
 	startedAt time.Time,
 ) (combinedSummary, error) {
@@ -873,6 +888,16 @@ func verifyCombined(
 		return combinedSummary{}, errors.New("public candidate review temporal update was not approved and preserved in both RAG and Agent EvidencePacks")
 	}
 	verified = append(verified, "Public memory candidate temporal update superseded old evidence and preserved active replacement evidence in both RAG and Agent paths")
+	if !groupMemory.AnswerVerified ||
+		!groupMemory.ProposalVerified ||
+		groupMemory.MemoryEventCount < 3 ||
+		groupMemory.RAGMemoryEventCount < groupMemory.MemoryEventCount ||
+		groupMemory.AgentMemoryEventCount < groupMemory.MemoryEventCount ||
+		groupMemory.SourceRefCount < groupMemory.MemoryEventCount*2 ||
+		groupMemory.CrossGroupSourceRefs < groupMemory.MemoryEventCount {
+		return combinedSummary{}, errors.New("group-memory answer/proposal scenario did not preserve all multi-event cross-group evidence")
+	}
+	verified = append(verified, "Group-memory answer and proposal preserved decision, blocker and file evidence with cross-group source refs")
 	if !profileRepair.ApprovalRequested ||
 		!profileRepair.WorkflowApproved ||
 		!profileRepair.ApprovalVerified ||
@@ -943,6 +968,15 @@ func verifyCombined(
 		ProfileRepairTargetRefHash:             profileRepair.TargetRefHash,
 		ProfileRepairRAGEvidence:               profileRepair.RAGEvidence,
 		ProfileRepairAgentEvidence:             profileRepair.AgentEvidence,
+		GroupMemoryAnswerVerified:              groupMemory.AnswerVerified,
+		GroupMemoryProposalVerified:            groupMemory.ProposalVerified,
+		GroupMemoryEventCount:                  groupMemory.MemoryEventCount,
+		GroupMemoryRAGEvidenceCount:            groupMemory.RAGMemoryEventCount,
+		GroupMemoryAgentEvidenceCount:          groupMemory.AgentMemoryEventCount,
+		GroupMemoryEventTypes:                  append([]string(nil), groupMemory.EventTypes...),
+		GroupMemoryFactSHA256:                  append([]string(nil), groupMemory.FactSHA256...),
+		GroupMemorySourceRefCount:              groupMemory.SourceRefCount,
+		GroupMemoryCrossGroupSourceRefCount:    groupMemory.CrossGroupSourceRefs,
 		RAGVersion:                             rag.RAGVersion,
 		AgentVersion:                           agent.AgentVersion,
 		RetrievalVersions:                      uniqueNonEmpty(rag.RetrievalVersion, agent.RetrievalVersion),

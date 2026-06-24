@@ -187,6 +187,12 @@ IM messages -> search / memory projection -> EvidencePack -> RAG / Agent answer 
   payload hash mismatch 均 fail-closed，之后匹配的已审批 workflow 才会执行
   memory-service public recompute，并把修复后的 profile aggregate 放入 RAG / Agent
   EvidencePack。
+- 同日 `loadtest/ragagent` 已补 group-memory answer / proposal 场景：
+  通过 memory-service 公开 `SubmitMemoryCandidate -> ReviewMemoryCandidate(APPROVE)`
+  构造 `DECISION`、`BLOCKER`、`FILE` 三类协作记忆，再要求 RAG answer 和 Agent
+  proposal 同时保留这些 evidence、source refs 和跨群 source refs。真实
+  `ai-eval-rag-agent-demo-live-20260624-group-memory-answer-proposal-gate-v1`
+  service-stack gate 已通过：4 adapters、27 cases、27 passed、0 failed、0 skipped。
 - 已有 clean smoke 覆盖真实双用户好友直聊、群聊 first path、群资料 BFF
   read/update 和群成员动作链路；证据见 `docs/runbook/client-platform.md`。
 - Windows desktop 已有 artifact / signing / installer plan first paths；签名 / installer
@@ -257,8 +263,9 @@ IM messages -> search / memory projection -> EvidencePack -> RAG / Agent answer 
    公开 candidate review / approval / persistence path 已补齐；`loadtest/ragagent`
    与 `rag-agent-demo` adapter 已把 public candidate review 和 temporal update
    纳入 RAG / Agent EvidencePack 断言链路，并已通过真实 service-stack gate 归档；
-   profile repair approval 和 negative gate 均已通过真实 service-stack gate 归档。
-   下一步继续补更多 group-memory answer / proposal 场景。
+   profile repair approval、negative gate 和 group-memory answer / proposal gate
+   均已通过真实 service-stack gate 归档。下一步继续深化 EvidencePack
+   source-chain coverage 和真实业务 proposal 场景。
 5. 客户端只作为演示入口；除非阻塞上述演示，不继续扩 UI 产品化。
 6. Windows release signing / MSI / NSIS installer、完整 Android、完整移动端发布、
    复杂 UI、群管理深水区和真实 media provider 链路全部后置到 backlog。

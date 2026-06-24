@@ -47,6 +47,11 @@ proposal 前调用 `mcp-gateway.PrepareToolCall` 做 skill / policy / prepare au
   safety eval：approval id、prepared audit id、resource id 与 approved proposal
   绑定不一致会在 verify-approved-proposal 阶段 fail-closed，且不生成 execution
   audit / tool result projection / tool execution。
+- 2026-06-24 `ai-eval-rag-agent-demo-live-20260624-profile-repair-approval-v3`
+  已验证 profile repair approval：profile repair 必须经 workflow-service
+  `REPAIR_APPROVAL` 审批后，才通过 memory-service 公开
+  `RecomputeProfileAggregate` 更新 profile aggregate；修复后的 profile evidence 会进入
+  Agent proposal EvidencePack。Agent 仍不直接读 memory-service 私表。
 
 ## 边界
 
@@ -55,5 +60,5 @@ proposal 前调用 `mcp-gateway.PrepareToolCall` 做 skill / policy / prepare au
 
 ## 下一步
 
-- 继续扩展 profile repair approval 回归和更完整 group-memory Agent proposal
+- 继续扩展 profile repair negative cases 和更完整 group-memory Agent proposal
   场景；真实写动作仍只走 proposal / approval / executor / audit。

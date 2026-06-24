@@ -171,7 +171,13 @@ service-stack gate：4 adapters、27 cases、27 passed、0 failed、0 skipped；
 candidate review path 写入 `PROFILE_SIGNAL`，再通过 `loadtest/memoryprofile`
 请求 `REPAIR_APPROVAL` workflow，workflow-service 审批后才执行 batch recompute；
 组合报告会断言修复后的 profile aggregate 同时被 RAG / Agent EvidencePack 消费。
-该切片目前只跑 focused test，真实 service-stack gate 仍需后续归档。
+2026-06-24 `ai-eval-rag-agent-demo-live-20260624-profile-repair-approval-v3`
+已通过真实 service-stack gate：4 adapters、27 cases、27 passed、0 failed、
+0 skipped；该 run 确认 profile repair 先经 workflow-service `REPAIR_APPROVAL`
+审批，再通过 memory-service 公开 `RecomputeProfileAggregate` 执行 batch recompute，
+修复后的 profile aggregate 同时进入 RAG / Agent EvidencePack。期间修复了
+memory-service 在既有 non-deterministic `profile_id` 但 subject/type/key 相同的
+profile aggregate 上重算时可能触发唯一约束的问题，并以真实 PostgreSQL 集成测试覆盖。
 同日 Python AI Worker 已补 memory extraction candidate first path：
 `ai/python/nexusim_ai_memory` 只从显式 low-sensitive message batch 的
 `decision:` / `task:` / `status:` / `blocker:` / `file:` / `profile_signal:`
@@ -201,7 +207,7 @@ fail-closed，不写 execution audit、不写 tool result projection、不调用
 
 ## 下一步
 
-- public candidate review 和 temporal update 已进入 RAG-Agent 真实 service-stack gate 归档。
-- profile repair approval 已进入 `loadtest/ragagent` 组合断言；下一步补真实 service-stack gate 归档。
+- public candidate review、temporal update 和 profile repair approval 已进入
+  RAG-Agent 真实 service-stack gate 归档。
 - 下一步继续深化 RAG-Agent demo 的 EvidencePack / approval / audit 展示：
-  更多 group-memory answer / proposal 场景。
+  更多 group-memory answer / proposal 场景和 profile repair negative cases。

@@ -279,7 +279,7 @@ message / conversation / policy events -> search-service + memory-service projec
 | `skill-registry` | 技能目录、输入输出合约、风险等级、审批要求和审计元数据。 |
 | `mcp-gateway` | tool prepare 边界、skill catalog check、policy precheck、低敏 audit，不直接执行外部工具。 |
 | `action-executor` | approved execution audit、proposal / approval / prepare audit 校验、本地安全 adapter、guarded external HTTP provider adapter、eval smoke。 |
-| `ai-eval-service` | 低敏 eval catalog / recorder / gate；case catalog 81，profile-Agent safety fixture 20，memory-service / retrieval-gateway / RAG / Summary / Agent live adapters 已完成第一轮 service-stack gate，覆盖 collaborative memory、profile aggregation、public candidate review / temporal update、EvidencePack、Agent output 和 action safety；`rag-agent-demo` 已通过 optional service-stack live gate，确认 RAG grounded answer、Agent approval 和 action-executor audit 主线。 |
+| `ai-eval-service` | 低敏 eval catalog / recorder / gate；case catalog 81，profile-Agent safety fixture 20，memory-service / retrieval-gateway / RAG / Summary / Agent live adapters 已完成第一轮 service-stack gate，覆盖 collaborative memory、profile aggregation、public candidate review / temporal update、profile repair approval、EvidencePack、Agent output 和 action safety；`rag-agent-demo` 已通过 optional service-stack live gate，确认 RAG grounded answer、Agent approval、profile repair workflow approval 和 action-executor audit 主线。 |
 | `ai/python` | Python AI Worker 候选层：contract guard、低敏 safety guard、candidate-only worker CLI、memory extraction hash-only candidate first path、`IM` conda toolchain。 |
 
 已进入 product-active first-stage 的平台 / 产品服务：
@@ -371,7 +371,12 @@ memory-service 公开 candidate review / approval path 产生的 `ACTIVE + APPRO
 memory 会进入 RAG / Agent EvidencePack。`ai-eval-rag-agent-demo-live-20260624-temporal-update-v2`
 继续把 public candidate replacement 接入同一链路：新 candidate 经公开审批后
 supersede 旧 memory，旧 memory 变为 `SUPERSEDED`，RAG / Agent EvidencePack 只保留
-当前 `ACTIVE + APPROVED` replacement。
+当前 `ACTIVE + APPROVED` replacement。`ai-eval-rag-agent-demo-live-20260624-profile-repair-approval-v3`
+已把 profile repair approval 接入真实 service-stack gate：profile signal candidate
+经公开 submit / review 后，必须创建并审批 workflow-service `REPAIR_APPROVAL`，再通过
+memory-service 公开 `RecomputeProfileAggregate` 执行 batch recompute；修复后的 profile
+aggregate 同时进入 RAG / Agent EvidencePack。该轮还修复了 memory-service 对既有
+non-deterministic `profile_id` 但 subject/type/key 相同的 profile aggregate 重算唯一约束问题。
 
 下一步默认看 [current-goal.md](docs/runbook/current-goal.md)。截至当前主线，客户端只修
 阻塞演示入口的问题；默认推进

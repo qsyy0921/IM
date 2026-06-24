@@ -50,6 +50,12 @@ adapter、状态、计数、summary/report 引用和低敏 metadata。
   service-stack gate：4 adapters、27 cases、27 passed、0 failed、0 skipped；
   RAG grounded answer、Agent approval、action-executor audit、cross-group source refs、
   memory graph edge 和 profile aggregate evidence 均被保留。
+- 2026-06-24 `ai-eval-rag-agent-demo-live-20260624-public-candidate-review-v3`、
+  `ai-eval-rag-agent-demo-live-20260624-temporal-update-v2` 和
+  `ai-eval-rag-agent-demo-live-20260624-profile-repair-approval-v3` 已把 public
+  candidate review、temporal replacement 和 profile repair workflow approval 纳入
+  RAG-Agent demo 真实 service-stack gate；每轮均为 4 adapters、27 cases、27 passed、
+  0 failed、0 skipped。
 - 2026-06-24 `action-preflight-safety` adapter 已扩到 14 个 smoke cases，并在
   catalog 中新增 approval id、prepared audit id、resource id 绑定错配的
   `PROPOSAL_MISMATCH` 断言；这些 case 区分 action boundary failure 与
@@ -62,7 +68,6 @@ adapter、状态、计数、summary/report 引用和低敏 metadata。
 
 边界：不保存 raw EvidencePack、prompt、model output、用户正文、secret 或 tool input；不授权业务动作。
 
-下一步：继续把 memory extraction candidate 接到 memory-service 的公开 review /
-approval / persistence path，推进 profile repair approval 回归和 EvidencePack coverage
-深化，并保持 retrieval failure、memory lifecycle failure、reasoning failure 和 action
-boundary failure 的独立诊断。
+下一步：继续深化 profile repair negative cases、更多 group-memory answer /
+proposal 场景和 EvidencePack coverage，并保持 retrieval failure、memory lifecycle
+failure、reasoning failure 和 action boundary failure 的独立诊断。

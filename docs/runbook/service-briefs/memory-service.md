@@ -81,10 +81,18 @@
   memory-service 会在同一 PostgreSQL 事务内校验被 supersede memory 可见、同 scope、
   已 `ACTIVE + APPROVED` 且时间顺序正确，然后把旧 memory 标为 `SUPERSEDED` 并把
   `valid_to_seq` 截断到 replacement 前一 seq；失败时整次审批 fail-closed。
+- 2026-06-24 profile repair approval 已通过真实 RAG-Agent service-stack gate：
+  `loadtest/ragagent` 会通过公开 candidate review path 写入 `PROFILE_SIGNAL`，
+  再经 workflow-service `REPAIR_APPROVAL` 审批后调用公开
+  `RecomputeProfileAggregate`。修复后的 profile aggregate 同时进入 RAG / Agent
+  EvidencePack。repository 同步修复了既有 non-deterministic `profile_id` 但
+  subject/type/key 相同的 profile aggregate 重算唯一约束问题，并新增真实 PG
+  集成测试。
 
 下一步：`loadtest/ragagent` / `rag-agent-demo` adapter 已把 public candidate
-review 和 temporal update 纳入 RAG / Agent EvidencePack 断言链路，并已通过
+review、temporal update 和 profile repair approval 纳入 RAG / Agent EvidencePack 断言链路，并已通过
 `ai-eval-rag-agent-demo-live-20260624-public-candidate-review-v3` 和
-`ai-eval-rag-agent-demo-live-20260624-temporal-update-v2` 真实 gate 归档。之后继续做
+`ai-eval-rag-agent-demo-live-20260624-temporal-update-v2`、`ai-eval-rag-agent-demo-live-20260624-profile-repair-approval-v3`
+真实 gate 归档。之后继续做
 结构过滤、BM25 / vector、rerank 和 EvidencePack coverage 深化。仍不得把
 单条群消息直接升级为 ACTIVE profile fact。

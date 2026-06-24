@@ -46,8 +46,13 @@
   public candidate replacement temporal update：旧 memory 被 memory-service 标为
   `SUPERSEDED` 后，RAG EvidencePack 只包含当前 `ACTIVE + APPROVED` replacement，
   不把旧事实作为当前 evidence。
+- 2026-06-24 `ai-eval-rag-agent-demo-live-20260624-profile-repair-approval-v3`
+  已验证 profile repair approval：profile repair 必须经 workflow-service
+  `REPAIR_APPROVAL` 审批后，才通过 memory-service 公开
+  `RecomputeProfileAggregate` 更新 profile aggregate；修复后的 profile evidence 会进入
+  RAG EvidencePack。
 
 下一步：
 
-- 继续扩展 profile repair approval 回归和更完整 group-memory answer 场景，
+- 继续扩展 profile repair negative cases 和更完整 group-memory answer 场景，
   provider 仍走 port、guard 和 citation verifier。

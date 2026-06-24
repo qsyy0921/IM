@@ -442,6 +442,12 @@ with 27 passed, 0 failed and 0 skipped. It extends the same live assertion to a
 public candidate replacement: approving the replacement supersedes the original
 memory, and the current RAG / Agent EvidencePacks only contain the active
 replacement memory.
+The 2026-06-24 RAG-Agent profile repair approval run
+`ai-eval-rag-agent-demo-live-20260624-profile-repair-approval-v3` ran 4 adapters /
+27 cases with 27 passed, 0 failed and 0 skipped. It verifies that profile repair
+requires workflow-service `REPAIR_APPROVAL`, executes via memory-service public
+`RecomputeProfileAggregate`, and the repaired profile aggregate enters both RAG
+and Agent EvidencePacks.
 The 2026-06-20 RAG / Summary citation regression added source-ref integrity
 cases and low-sensitive `citation_refs` fields to the RAG / Summary smoke
 summaries. This proves adapter-level citation anchoring only; it is not a live

@@ -159,11 +159,13 @@ Assert-True ($expectedStatus -eq "WAITING_DECISION") "workflow_binding.expected_
 
 $attemptNumber = [int]$status.attempt_number
 $maxAttempts = [int]$status.max_attempts
+$sourceDeliveryPlanSha256 = Get-JsonString -Object $status -Name "source_delivery_plan_sha256"
 $deliveryAttemptRef = Get-JsonString -Object $status -Name "delivery_attempt_ref"
 $failureClassRef = Get-JsonString -Object $status -Name "failure_class_ref"
 $redrivePolicyRef = Get-JsonString -Object $status -Name "redrive_policy_ref"
 
 foreach ($entry in @(
+        @{ name = "source_delivery_plan_sha256"; value = $sourceDeliveryPlanSha256 },
         @{ name = "delivery_attempt_ref"; value = $deliveryAttemptRef },
         @{ name = "failure_class_ref"; value = $failureClassRef },
         @{ name = "redrive_policy_ref"; value = $redrivePolicyRef }
@@ -185,6 +187,7 @@ $plan = [ordered]@{
     prepared_by = $PreparedBy
     source_delivery_status_sha256 = Get-CallbackRedriveFileSha256Ref -Path $DeliveryStatusPath
     source_delivery_status_path_sha256 = Get-CallbackRedriveStringSha256Ref -Value $resolvedStatusPath
+    source_delivery_plan_sha256 = $sourceDeliveryPlanSha256
     workflow_binding = [ordered]@{
         workflow_id = $workflowID
         step_id = $stepID
@@ -202,6 +205,7 @@ $plan = [ordered]@{
         delivery_status = $deliveryStatus
         attempt_number = $attemptNumber
         max_attempts = $maxAttempts
+        source_delivery_plan_sha256 = $sourceDeliveryPlanSha256
         delivery_attempt_ref = $deliveryAttemptRef
         failure_class_ref = $failureClassRef
         redrive_policy_ref = $redrivePolicyRef

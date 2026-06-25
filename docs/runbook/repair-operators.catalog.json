@@ -263,7 +263,8 @@
       "service": "workflow-service",
       "mode_env": "NEXUSIM_WORKFLOW_SERVICE_MODE",
       "modes": [
-        "compensation-instruction-import"
+        "compensation-instruction-import",
+        "external-callback-delivery-redrive"
       ],
       "output_envs": [],
       "dry_run_envs": [],

@@ -53,6 +53,7 @@ const (
 	WorkflowEventTimedOut                  = "workflow.timed_out.v1"
 	WorkflowEventExternalCallbackDelivered = "workflow.external_callback.delivered.v1"
 	WorkflowEventExternalCallbackDLQ       = "workflow.external_callback.dlq.v1"
+	WorkflowEventExternalCallbackRedriven  = "workflow.external_callback.redriven.v1"
 
 	DecisionTypeApprove        = "APPROVE"
 	DecisionTypeReject         = "REJECT"
@@ -269,6 +270,10 @@ type WorkflowExternalCallbackDelivery struct {
 	DeliveredAt                  time.Time
 	LastFailureClass             string
 	LastDeliveryResultRef        string
+	RedriveCount                 int
+	LastRedrivePlanSha256        string
+	LastRedriveReasonRef         string
+	LastRedrivenAt               time.Time
 	CreatedAt                    time.Time
 	UpdatedAt                    time.Time
 }
@@ -276,6 +281,34 @@ type WorkflowExternalCallbackDelivery struct {
 type WorkflowExternalCallbackDeliveryResult struct {
 	DeliveryResultRef string
 	FailureClass      string
+}
+
+type WorkflowExternalCallbackRedrivePlan struct {
+	TenantID                   TenantID
+	RedrivePlanID              string
+	RedrivePlanSha256          string
+	SourceDeliveryStatusSha256 string
+	SourceDeliveryPlanSha256   string
+	WorkflowID                 string
+	StepID                     string
+	WorkflowType               string
+	TargetService              string
+	TargetOperation            string
+	TargetRefHash              string
+	PayloadSchemaVersion       string
+	PayloadRefHash             string
+	ApprovalPolicyRef          string
+	DecisionPolicyRef          string
+	DeliveryStatus             string
+	AttemptNumber              int
+	MaxAttempts                int
+	DeliveryAttemptRef         string
+	FailureClassRef            string
+	RedrivePolicyRef           string
+	RedriveQueueRef            string
+	RedriveReasonRef           string
+	OperatorReviewRef          string
+	AvailableAt                time.Time
 }
 
 func (command CreateWorkflowCommand) Normalized() CreateWorkflowCommand {
@@ -545,6 +578,8 @@ func (delivery WorkflowExternalCallbackDelivery) Normalized() WorkflowExternalCa
 	}
 	delivery.LastFailureClass = strings.TrimSpace(delivery.LastFailureClass)
 	delivery.LastDeliveryResultRef = strings.TrimSpace(delivery.LastDeliveryResultRef)
+	delivery.LastRedrivePlanSha256 = strings.TrimSpace(delivery.LastRedrivePlanSha256)
+	delivery.LastRedriveReasonRef = strings.TrimSpace(delivery.LastRedriveReasonRef)
 	return delivery
 }
 
@@ -599,6 +634,92 @@ func (delivery WorkflowExternalCallbackDelivery) Validate() error {
 		"callback_payload_ref_hash":       delivery.CallbackPayloadRefHash,
 		"last_failure_class":              delivery.LastFailureClass,
 		"last_delivery_result_ref":        delivery.LastDeliveryResultRef,
+		"last_redrive_plan_sha256":        delivery.LastRedrivePlanSha256,
+		"last_redrive_reason_ref":         delivery.LastRedriveReasonRef,
+	} {
+		if looksSensitive(value) {
+			return NewInvalidArgument(name + " must be a low-sensitive ref")
+		}
+	}
+	return nil
+}
+
+func (plan WorkflowExternalCallbackRedrivePlan) Normalized() WorkflowExternalCallbackRedrivePlan {
+	plan.TenantID = TenantID(strings.TrimSpace(string(plan.TenantID)))
+	plan.RedrivePlanID = strings.TrimSpace(plan.RedrivePlanID)
+	plan.RedrivePlanSha256 = strings.TrimSpace(plan.RedrivePlanSha256)
+	plan.SourceDeliveryStatusSha256 = strings.TrimSpace(plan.SourceDeliveryStatusSha256)
+	plan.SourceDeliveryPlanSha256 = strings.TrimSpace(plan.SourceDeliveryPlanSha256)
+	plan.WorkflowID = strings.TrimSpace(plan.WorkflowID)
+	plan.StepID = strings.TrimSpace(plan.StepID)
+	plan.WorkflowType = strings.ToUpper(strings.TrimSpace(plan.WorkflowType))
+	plan.TargetService = strings.TrimSpace(plan.TargetService)
+	plan.TargetOperation = strings.TrimSpace(plan.TargetOperation)
+	plan.TargetRefHash = strings.TrimSpace(plan.TargetRefHash)
+	plan.PayloadSchemaVersion = strings.TrimSpace(plan.PayloadSchemaVersion)
+	plan.PayloadRefHash = strings.TrimSpace(plan.PayloadRefHash)
+	plan.ApprovalPolicyRef = strings.TrimSpace(plan.ApprovalPolicyRef)
+	plan.DecisionPolicyRef = strings.TrimSpace(plan.DecisionPolicyRef)
+	plan.DeliveryStatus = strings.ToUpper(strings.TrimSpace(plan.DeliveryStatus))
+	plan.DeliveryAttemptRef = strings.TrimSpace(plan.DeliveryAttemptRef)
+	plan.FailureClassRef = strings.TrimSpace(plan.FailureClassRef)
+	plan.RedrivePolicyRef = strings.TrimSpace(plan.RedrivePolicyRef)
+	plan.RedriveQueueRef = strings.TrimSpace(plan.RedriveQueueRef)
+	plan.RedriveReasonRef = strings.TrimSpace(plan.RedriveReasonRef)
+	plan.OperatorReviewRef = strings.TrimSpace(plan.OperatorReviewRef)
+	return plan
+}
+
+func (plan WorkflowExternalCallbackRedrivePlan) Validate() error {
+	plan = plan.Normalized()
+	if plan.TenantID == "" ||
+		plan.RedrivePlanID == "" ||
+		plan.RedrivePlanSha256 == "" ||
+		plan.SourceDeliveryStatusSha256 == "" ||
+		plan.SourceDeliveryPlanSha256 == "" ||
+		plan.WorkflowID == "" ||
+		plan.StepID == "" ||
+		plan.WorkflowType == "" ||
+		plan.TargetService == "" ||
+		plan.TargetOperation == "" ||
+		plan.TargetRefHash == "" ||
+		plan.PayloadSchemaVersion == "" ||
+		plan.PayloadRefHash == "" ||
+		plan.ApprovalPolicyRef == "" ||
+		plan.DecisionPolicyRef == "" ||
+		plan.DeliveryStatus == "" ||
+		plan.DeliveryAttemptRef == "" ||
+		plan.FailureClassRef == "" ||
+		plan.RedrivePolicyRef == "" ||
+		plan.RedriveQueueRef == "" ||
+		plan.RedriveReasonRef == "" {
+		return NewInvalidArgument("workflow external callback redrive plan is incomplete")
+	}
+	if !isAllowedWorkflowType(plan.WorkflowType) {
+		return NewInvalidArgument("workflow external callback redrive workflow type is unsupported")
+	}
+	if plan.DeliveryStatus != WorkflowExternalCallbackDeliveryStatusRetryPending &&
+		plan.DeliveryStatus != WorkflowExternalCallbackDeliveryStatusDLQ {
+		return NewInvalidArgument("workflow external callback redrive source status is unsupported")
+	}
+	if plan.AttemptNumber < 1 || plan.MaxAttempts < 1 || plan.AttemptNumber > plan.MaxAttempts || plan.MaxAttempts > 10 {
+		return NewInvalidArgument("workflow external callback redrive attempts are invalid")
+	}
+	for name, value := range map[string]string{
+		"redrive_plan_id":               plan.RedrivePlanID,
+		"redrive_plan_sha256":           plan.RedrivePlanSha256,
+		"source_delivery_status_sha256": plan.SourceDeliveryStatusSha256,
+		"source_delivery_plan_sha256":   plan.SourceDeliveryPlanSha256,
+		"target_ref_hash":               plan.TargetRefHash,
+		"payload_ref_hash":              plan.PayloadRefHash,
+		"approval_policy_ref":           plan.ApprovalPolicyRef,
+		"decision_policy_ref":           plan.DecisionPolicyRef,
+		"delivery_attempt_ref":          plan.DeliveryAttemptRef,
+		"failure_class_ref":             plan.FailureClassRef,
+		"redrive_policy_ref":            plan.RedrivePolicyRef,
+		"redrive_queue_ref":             plan.RedriveQueueRef,
+		"redrive_reason_ref":            plan.RedriveReasonRef,
+		"operator_review_ref":           plan.OperatorReviewRef,
 	} {
 		if looksSensitive(value) {
 			return NewInvalidArgument(name + " must be a low-sensitive ref")

@@ -231,13 +231,17 @@ callback provider / endpoint / queue / retry refs；
 `RETRY_PENDING` / `DLQ` attempt status；
 `write-workflow-external-callback-redrive-plan.ps1` 只从 retry / DLQ status 生成 redrive
 handoff。当前 first path 已新增 `workflow_external_callback_deliveries` 持久 job 和
-`external-callback-delivery-import` / `external-callback-delivery-worker` 运行模式：
+`external-callback-delivery-import` / `external-callback-delivery-worker` /
+`external-callback-delivery-redrive` 运行模式：
 import 锁定 workflow-service 自有 workflow fact，校验仍为 `WAITING_DECISION` 且
 workflow type / step / target / payload hash / approval policy 绑定一致；worker 只按
 runtime endpoint ref 调用 provider，并推进
-`PENDING -> IN_FLIGHT -> DELIVERED / RETRY_PENDING / DLQ`。上述入口不记录
+`PENDING -> IN_FLIGHT -> DELIVERED / RETRY_PENDING / DLQ`；redrive 读取低敏
+`nexusim.workflow.external_callback_redrive_plan.v1`，重新锁定 workflow / delivery，
+只允许 `RETRY_PENDING` 或 `DLQ` 重新入队为 `PENDING` 并写 low-sensitive redriven
+outbox。上述入口不记录
 decision、不执行 target action、不保存 raw callback URL / provider body。更多下游
-adapter、provider-grade instruction UI、callback redrive worker / operator UI 和运维后置。
+adapter、provider-grade instruction / approval UI 和正式运维后置。
 
 后续扩展：
 
@@ -258,6 +262,7 @@ adapter、provider-grade instruction UI、callback redrive worker / operator UI 
 | `workflow.completed.v1` | `im.workflow.events` | `tenant_id:workflow_id` | workflow 成功 |
 | `workflow.failed.v1` | `im.workflow.events` | `tenant_id:workflow_id` | workflow 失败 |
 | `workflow.timed_out.v1` | `im.workflow.events` | `tenant_id:workflow_id` | workflow / step 超时 |
+| `workflow.external_callback.redriven.v1` | `im.workflow.events` | `tenant_id:workflow_id` | external callback delivery 被 operator 显式重新入队 |
 | `workflow.compensation.requested.v1` | `im.workflow.events` | `tenant_id:workflow_id` | 需要补偿 |
 
 事件 payload 只包含 workflow id、type、status、risk、target ref hash、step id、decision id、
@@ -464,6 +469,7 @@ NEXUSIM_WORKFLOW_SERVICE_MODE=compensation-worker
 NEXUSIM_WORKFLOW_SERVICE_MODE=compensation-executor
 NEXUSIM_WORKFLOW_SERVICE_MODE=compensation-instruction-import
 NEXUSIM_WORKFLOW_SERVICE_MODE=external-callback-delivery-import
+NEXUSIM_WORKFLOW_SERVICE_MODE=external-callback-delivery-redrive
 NEXUSIM_WORKFLOW_SERVICE_MODE=external-callback-delivery-worker
 ```
 
@@ -502,11 +508,16 @@ external callback delivery worker 运行依赖：
 ```text
 NEXUSIM_WORKFLOW_EXTERNAL_CALLBACK_DELIVERY_TENANT_ID
 NEXUSIM_WORKFLOW_EXTERNAL_CALLBACK_DELIVERY_PLAN_FILE
+NEXUSIM_WORKFLOW_EXTERNAL_CALLBACK_REDRIVE_PLAN_FILE
 NEXUSIM_WORKFLOW_EXTERNAL_CALLBACK_ENDPOINTS_FILE
 ```
 
 `NEXUSIM_WORKFLOW_EXTERNAL_CALLBACK_ENDPOINTS_FILE` 只存在运行时，用 endpoint ref
 映射 URL；URL 不进入 PostgreSQL、outbox、报告或 delivery plan。
+`external-callback-delivery-redrive` 不需要 endpoint map，只读取
+`NEXUSIM_WORKFLOW_EXTERNAL_CALLBACK_REDRIVE_PLAN_FILE` 指向的低敏 redrive plan，
+重新校验 workflow / delivery fact 后把 delivery 重新入队；它不调用 provider、不记录
+decision、不执行 target action。
 
 该 CLI 只通过 workflow-service 公开 gRPC get workflow、list workflows、record decision
 和查询低敏 instruction refs / version / status，不读 PostgreSQL 私表，不输出 workflow

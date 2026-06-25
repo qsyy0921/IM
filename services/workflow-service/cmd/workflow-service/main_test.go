@@ -11,6 +11,7 @@ func TestValidateWorkflowMode(t *testing.T) {
 		"compensation-executor",
 		"compensation-instruction-import",
 		"external-callback-delivery-import",
+		"external-callback-delivery-redrive",
 		"external-callback-delivery-worker",
 	} {
 		if err := validateWorkflowMode(mode); err != nil {

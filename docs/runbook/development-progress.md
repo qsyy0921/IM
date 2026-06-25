@@ -239,7 +239,11 @@
   import 会锁定并校验 `WAITING_DECISION` workflow 绑定，worker 只按 runtime endpoint ref
   调用 provider 并推进 `PENDING` / `IN_FLIGHT` / `DELIVERED` / `RETRY_PENDING` /
   `DLQ`，只写低敏 delivered / DLQ outbox，不记录 decision、不执行 target action、不保存
-  raw callback URL / provider body；
+  raw callback URL / provider body；external callback delivery redrive operator path
+  已新增 `external-callback-delivery-redrive` 运行模式，读取低敏 redrive plan 后重新锁定
+  workflow / delivery fact，只允许仍处于 `WAITING_DECISION` 的 `RETRY_PENDING` / `DLQ`
+  delivery 重新入队为 `PENDING` 并写 redriven outbox，不调用 provider、不记录 decision、
+  不执行 target；
   本地 repair approval review page writer 已能把 plan / request / decision /
   invocation / audit bundle 渲染成只含 hash / path hash / env key / preflight 摘要的
   低敏 HTML 审批页，不复制 reason、payload、manifest path 或 evidence 原文；
@@ -250,7 +254,7 @@
   control-plane-service 或其它下游服务；
   workflow 第一路径已通过完整 `check-local`，本 worker / executor / registry / timer /
   callback delivery 切片按风险分层用 focused checks 收口；不宣称多 adapter compensation
-  platform、provider-grade instruction UI、callback delivery redrive worker / operator UI
+  platform、provider-grade instruction UI、callback delivery provider-grade UI
   或 workflow outbox relay。
 - `vector-index-service` product-active：SDD v0.1 和 stage-switch review 已通过，
   第一版 proto / migration / 六层 skeleton / `grpc` runtime / Docker /

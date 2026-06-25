@@ -107,6 +107,94 @@ func TestRepositoryExternalCallbackDeliveryRetryAndDLQIntegration(t *testing.T) 
 	assertExternalCallbackOutbox(t, ctx, pool, delivery.DeliveryID, types.WorkflowEventExternalCallbackDLQ)
 }
 
+func TestRepositoryExternalCallbackDeliveryRedriveIntegration(t *testing.T) {
+	ctx := context.Background()
+	pool := openWorkflowTestPool(t)
+	resetWorkflowTables(t, ctx, pool)
+	repository := NewRepository(pool)
+
+	workflow := createExternalCallbackWorkflow(t, ctx, repository, "wf_external_callback_redrive", "wfs_external_callback_redrive")
+	delivery := externalCallbackDeliveryForWorkflow(workflow, "wfecd_redrive_1")
+	delivery.MaxAttempts = 1
+	if _, _, err := repository.RegisterExternalCallbackDelivery(ctx, delivery); err != nil {
+		t.Fatalf("register external callback delivery: %v", err)
+	}
+
+	now := time.Date(2026, 6, 25, 12, 0, 0, 0, time.UTC)
+	claimed, err := repository.ClaimReadyExternalCallbackDeliveries(ctx, now, 10, time.Minute)
+	if err != nil {
+		t.Fatalf("claim delivery: %v", err)
+	}
+	dlq, err := repository.MarkExternalCallbackDeliveryFailed(ctx, claimed[0], types.WorkflowExternalCallbackDeliveryResult{
+		FailureClass: "provider_unavailable",
+	}, now.Add(time.Minute))
+	if err != nil {
+		t.Fatalf("mark dlq: %v", err)
+	}
+	if dlq.Status != types.WorkflowExternalCallbackDeliveryStatusDLQ || dlq.AttemptCount != 1 {
+		t.Fatalf("expected DLQ source, got %+v", dlq)
+	}
+
+	plan := externalCallbackRedrivePlanForDelivery(workflow, dlq, "wfecdr_redrive_1")
+	redriven, err := repository.RedriveExternalCallbackDelivery(ctx, plan)
+	if err != nil {
+		t.Fatalf("redrive external callback delivery: %v", err)
+	}
+	if redriven.Status != types.WorkflowExternalCallbackDeliveryStatusPending ||
+		redriven.AttemptCount != 0 ||
+		redriven.RedriveCount != 1 ||
+		redriven.LastRedrivePlanSha256 != plan.RedrivePlanSha256 ||
+		redriven.LastRedriveReasonRef != plan.RedriveReasonRef ||
+		redriven.LastRedrivenAt.IsZero() {
+		t.Fatalf("unexpected redriven state: %+v", redriven)
+	}
+	assertExternalCallbackOutbox(t, ctx, pool, delivery.DeliveryID, types.WorkflowEventExternalCallbackRedriven)
+
+	reclaimed, err := repository.ClaimReadyExternalCallbackDeliveries(ctx, now.Add(time.Second), 10, time.Minute)
+	if err != nil {
+		t.Fatalf("claim redriven delivery: %v", err)
+	}
+	if len(reclaimed) != 1 ||
+		reclaimed[0].DeliveryID != delivery.DeliveryID ||
+		reclaimed[0].Status != types.WorkflowExternalCallbackDeliveryStatusInFlight ||
+		reclaimed[0].AttemptCount != 1 ||
+		reclaimed[0].RedriveCount != 1 {
+		t.Fatalf("unexpected redriven claim: %+v", reclaimed)
+	}
+}
+
+func TestRepositoryExternalCallbackDeliveryRedriveRejectsClosedWorkflowIntegration(t *testing.T) {
+	ctx := context.Background()
+	pool := openWorkflowTestPool(t)
+	resetWorkflowTables(t, ctx, pool)
+	repository := NewRepository(pool)
+
+	workflow := createExternalCallbackWorkflow(t, ctx, repository, "wf_external_callback_redrive_closed", "wfs_external_callback_redrive_closed")
+	delivery := externalCallbackDeliveryForWorkflow(workflow, "wfecd_redrive_closed_1")
+	delivery.MaxAttempts = 1
+	if _, _, err := repository.RegisterExternalCallbackDelivery(ctx, delivery); err != nil {
+		t.Fatalf("register external callback delivery: %v", err)
+	}
+	claimed, err := repository.ClaimReadyExternalCallbackDeliveries(ctx, time.Now().UTC(), 10, time.Minute)
+	if err != nil {
+		t.Fatalf("claim delivery: %v", err)
+	}
+	dlq, err := repository.MarkExternalCallbackDeliveryFailed(ctx, claimed[0], types.WorkflowExternalCallbackDeliveryResult{
+		FailureClass: "provider_unavailable",
+	}, time.Now().UTC())
+	if err != nil {
+		t.Fatalf("mark dlq: %v", err)
+	}
+	decision := prepareDecision(t, workflow.WorkflowID, workflow.CurrentStepID, "wfd_external_callback_redrive_closed", "operator:approver", "decision-external-callback-redrive-closed")
+	if _, _, _, err := repository.RecordWorkflowDecision(ctx, decision); err != nil {
+		t.Fatalf("approve workflow: %v", err)
+	}
+	plan := externalCallbackRedrivePlanForDelivery(workflow, dlq, "wfecdr_redrive_closed_1")
+	if _, err := repository.RedriveExternalCallbackDelivery(ctx, plan); !errors.Is(err, types.ErrFailedPrecondition) {
+		t.Fatalf("expected closed workflow redrive to fail, got %v", err)
+	}
+}
+
 func TestRepositoryExternalCallbackDeliveryRejectsClosedWorkflowIntegration(t *testing.T) {
 	ctx := context.Background()
 	pool := openWorkflowTestPool(t)
@@ -181,6 +269,39 @@ func externalCallbackDeliveryForWorkflow(
 		CallbackPayloadRefHash:       "sha256:callback-payload-" + deliveryID,
 		Status:                       types.WorkflowExternalCallbackDeliveryStatusPending,
 		MaxAttempts:                  3,
+	}
+}
+
+func externalCallbackRedrivePlanForDelivery(
+	workflow types.Workflow,
+	delivery types.WorkflowExternalCallbackDelivery,
+	redrivePlanID string,
+) types.WorkflowExternalCallbackRedrivePlan {
+	return types.WorkflowExternalCallbackRedrivePlan{
+		TenantID:                   workflow.TenantID,
+		RedrivePlanID:              redrivePlanID,
+		RedrivePlanSha256:          "sha256:redrive-plan-" + redrivePlanID,
+		SourceDeliveryStatusSha256: "sha256:delivery-status-" + redrivePlanID,
+		SourceDeliveryPlanSha256:   delivery.DeliveryPlanSha256,
+		WorkflowID:                 workflow.WorkflowID,
+		StepID:                     workflow.CurrentStepID,
+		WorkflowType:               workflow.WorkflowType,
+		TargetService:              workflow.TargetService,
+		TargetOperation:            workflow.TargetOperation,
+		TargetRefHash:              workflow.TargetRefHash,
+		PayloadSchemaVersion:       workflow.PayloadSchemaVersion,
+		PayloadRefHash:             workflow.PayloadRefHash,
+		ApprovalPolicyRef:          workflow.ApprovalPolicyRef,
+		DecisionPolicyRef:          delivery.DecisionPolicyRef,
+		DeliveryStatus:             delivery.Status,
+		AttemptNumber:              delivery.AttemptCount,
+		MaxAttempts:                delivery.MaxAttempts,
+		DeliveryAttemptRef:         "attempt:callback-redrive",
+		FailureClassRef:            "failure:" + delivery.LastFailureClass,
+		RedrivePolicyRef:           "workflow.external-callback-redrive.v1",
+		RedriveQueueRef:            "queue:workflow-callback-redrive",
+		RedriveReasonRef:           "reason-sha256:callback-redrive",
+		OperatorReviewRef:          "review:callback-redrive",
 	}
 }
 

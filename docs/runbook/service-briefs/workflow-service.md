@@ -44,6 +44,10 @@ admin operation approval、补偿请求和人工审批状态。
   endpoint ref 调用 provider，推进 `PENDING` / `IN_FLIGHT` / `DELIVERED` /
   `RETRY_PENDING` / `DLQ`；只写低敏 delivered / DLQ outbox，不记录 decision、
   不执行 target action、不修改业务 fact。
+- `external-callback-delivery-redrive`：读取低敏
+  `nexusim.workflow.external_callback_redrive_plan.v1`，重新锁定 workflow / delivery fact，
+  只允许仍绑定 `WAITING_DECISION` 的 `RETRY_PENDING` / `DLQ` delivery 重新入队为
+  `PENDING`，并写低敏 redriven outbox；不调用 provider、不记录 decision、不执行 target。
 - `loadtest/workflow operator-queues`：按固定 operator 队列展示 action approval、
   repair approval、provider replay、admin operation、compensation request 和
   compensation pending 的低敏 workflow refs / counts；不记录 decision、不执行 replay。
@@ -70,4 +74,4 @@ admin operation approval、补偿请求和人工审批状态。
   低敏审批状态，不执行 provider replay。
 
 后续：更多 compensation adapter、provider-grade instruction approval UI、outbox relay、
-provider-grade approval UI、callback delivery redrive worker / operator UI、repair operators。
+provider-grade approval UI、callback delivery provider-grade UI、repair operators。

@@ -207,6 +207,8 @@ try {
     $redrive = $redriveRaw | ConvertFrom-Json
     if ($redrive.schema_version -ne "nexusim.workflow.external_callback_redrive_plan.v1" -or
         $redrive.redrive_source.delivery_status -ne "DLQ" -or
+        $redrive.source_delivery_plan_sha256 -ne $dlq.source_delivery_plan_sha256 -or
+        $redrive.redrive_source.source_delivery_plan_sha256 -ne $dlq.source_delivery_plan_sha256 -or
         $redrive.workflow_binding.workflow_id -ne "wf_callback_status_1" -or
         $redrive.redrive_contract.redrive_queue_ref -ne "queue:workflow-callback-redrive" -or
         $redrive.redrive_contract.redrive_plan_calls_provider -ne $false -or

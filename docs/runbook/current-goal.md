@@ -94,6 +94,10 @@ Agent action boundary / repair cases：在 provider replay admin / workflow hand
   调用 runtime provider，更新 `PENDING` / `IN_FLIGHT` / `DELIVERED` /
   `RETRY_PENDING` / `DLQ`，并只写低敏 delivered / DLQ outbox；不记录 decision、
   不执行 target action、不保存 raw callback URL / provider body。
+- workflow external callback delivery redrive operator path 已落：
+  `external-callback-delivery-redrive` 读取低敏 redrive plan，重新锁定 workflow / delivery fact，
+  只允许仍处于 `WAITING_DECISION` 的 `RETRY_PENDING` / `DLQ` delivery 重新入队为
+  `PENDING` 并写 redriven outbox；不调用 provider、不记录 decision、不执行 target。
 - workflow compensation review bundle 已落：`loadtest/workflow compensation-review-bundle`
   只读 `COMPENSATION_PENDING` workflow 和 `ACTIVE` instruction refs，校验 workflow id /
   payload hash / target 绑定后输出低敏审查包；不记录 decision、不创建 approval、

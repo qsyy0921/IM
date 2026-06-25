@@ -20,7 +20,8 @@ brief、loadtest report、development-progress 或 archive。
 - workflow-service 已覆盖 provider replay queue、approval timeout、external
   approval binding、operator queues、external callback wait、external callback
   delivery plan、delivery status / redrive plan、external callback delivery
-  persistent worker first path、compensation review bundle / page 和 execution
+  persistent worker first path、external callback delivery redrive operator path、
+  compensation review bundle / page 和 execution
   readiness。
 - group memory / retrieval / eval 持续保留 source refs、conversation scope、
   member visibility、time/version boundary、citations 和 no-citation refusal。

@@ -66,6 +66,48 @@ type externalCallbackDeliveryPlan struct {
 	DoesNotExecuteTarget bool `json:"does_not_execute_target"`
 }
 
+type externalCallbackRedrivePlan struct {
+	SchemaVersion              string `json:"schema_version"`
+	RedrivePlanID              string `json:"redrive_plan_id"`
+	SourceDeliveryStatusSha256 string `json:"source_delivery_status_sha256"`
+	SourceDeliveryPlanSha256   string `json:"source_delivery_plan_sha256"`
+	WorkflowBinding            struct {
+		WorkflowID                   string `json:"workflow_id"`
+		StepID                       string `json:"step_id"`
+		ExpectedWorkflowType         string `json:"expected_workflow_type"`
+		ExpectedStatus               string `json:"expected_status"`
+		ExpectedTargetService        string `json:"expected_target_service"`
+		ExpectedTargetOperation      string `json:"expected_target_operation"`
+		ExpectedTargetRefHash        string `json:"expected_target_ref_hash"`
+		ExpectedPayloadSchemaVersion string `json:"expected_payload_schema_version"`
+		ExpectedPayloadRefHash       string `json:"expected_payload_ref_hash"`
+		ExpectedApprovalPolicyRef    string `json:"expected_approval_policy_ref"`
+		DecisionPolicyRef            string `json:"decision_policy_ref"`
+	} `json:"workflow_binding"`
+	RedriveSource struct {
+		DeliveryStatus           string `json:"delivery_status"`
+		AttemptNumber            int    `json:"attempt_number"`
+		MaxAttempts              int    `json:"max_attempts"`
+		SourceDeliveryPlanSha256 string `json:"source_delivery_plan_sha256"`
+		DeliveryAttemptRef       string `json:"delivery_attempt_ref"`
+		FailureClassRef          string `json:"failure_class_ref"`
+		RedrivePolicyRef         string `json:"redrive_policy_ref"`
+	} `json:"redrive_source"`
+	RedriveContract struct {
+		Owner                      string `json:"owner"`
+		RedriveQueueRef            string `json:"redrive_queue_ref"`
+		RedriveReasonRef           string `json:"redrive_reason_ref"`
+		OperatorReviewRef          string `json:"operator_review_ref"`
+		RedrivePlanCallsProvider   bool   `json:"redrive_plan_calls_provider"`
+		RedrivePlanRecordsDecision bool   `json:"redrive_plan_records_decision"`
+		RedrivePlanExecutesTarget  bool   `json:"redrive_plan_executes_target"`
+	} `json:"redrive_contract"`
+	NoDirectExecution    bool `json:"no_direct_execution"`
+	NoDecisionRecorded   bool `json:"no_decision_recorded"`
+	DoesNotCallProvider  bool `json:"does_not_call_provider"`
+	DoesNotExecuteTarget bool `json:"does_not_execute_target"`
+}
+
 func LoadExternalCallbackDeliveryPlan(path string, tenantID types.TenantID) (types.WorkflowExternalCallbackDelivery, error) {
 	path = strings.TrimSpace(path)
 	if path == "" {
@@ -120,6 +162,79 @@ func LoadExternalCallbackDeliveryPlan(path string, tenantID types.TenantID) (typ
 		return types.WorkflowExternalCallbackDelivery{}, err
 	}
 	return delivery, nil
+}
+
+func LoadExternalCallbackRedrivePlan(path string, tenantID types.TenantID) (types.WorkflowExternalCallbackRedrivePlan, error) {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return types.WorkflowExternalCallbackRedrivePlan{}, errors.New("workflow external callback redrive plan file is required")
+	}
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return types.WorkflowExternalCallbackRedrivePlan{}, err
+	}
+	var plan externalCallbackRedrivePlan
+	if err := json.Unmarshal(content, &plan); err != nil {
+		return types.WorkflowExternalCallbackRedrivePlan{}, err
+	}
+	if strings.TrimSpace(plan.SchemaVersion) != "nexusim.workflow.external_callback_redrive_plan.v1" {
+		return types.WorkflowExternalCallbackRedrivePlan{}, types.NewInvalidArgument("workflow external callback redrive plan schema is unsupported")
+	}
+	if !plan.NoDirectExecution || !plan.NoDecisionRecorded || !plan.DoesNotCallProvider || !plan.DoesNotExecuteTarget {
+		return types.WorkflowExternalCallbackRedrivePlan{}, types.NewInvalidArgument("workflow external callback redrive plan boundary flags are invalid")
+	}
+	if plan.RedriveContract.RedrivePlanCallsProvider ||
+		plan.RedriveContract.RedrivePlanRecordsDecision ||
+		plan.RedriveContract.RedrivePlanExecutesTarget {
+		return types.WorkflowExternalCallbackRedrivePlan{}, types.NewInvalidArgument("workflow external callback redrive contract is unsafe")
+	}
+	if strings.TrimSpace(plan.RedriveContract.Owner) != "workflow-service.external-callback-delivery" {
+		return types.WorkflowExternalCallbackRedrivePlan{}, types.NewInvalidArgument("workflow external callback redrive owner is unsupported")
+	}
+	if strings.ToUpper(strings.TrimSpace(plan.WorkflowBinding.ExpectedStatus)) != types.WorkflowStatusWaitingDecision {
+		return types.WorkflowExternalCallbackRedrivePlan{}, types.NewInvalidArgument("workflow external callback redrive plan must bind WAITING_DECISION")
+	}
+	sourceDeliveryPlanSha256 := strings.TrimSpace(plan.SourceDeliveryPlanSha256)
+	if sourceDeliveryPlanSha256 == "" {
+		sourceDeliveryPlanSha256 = strings.TrimSpace(plan.RedriveSource.SourceDeliveryPlanSha256)
+	}
+	if sourceDeliveryPlanSha256 == "" ||
+		(strings.TrimSpace(plan.RedriveSource.SourceDeliveryPlanSha256) != "" &&
+			strings.TrimSpace(plan.RedriveSource.SourceDeliveryPlanSha256) != sourceDeliveryPlanSha256) {
+		return types.WorkflowExternalCallbackRedrivePlan{}, types.NewInvalidArgument("workflow external callback redrive source delivery plan hash mismatch")
+	}
+	sum := sha256.Sum256(content)
+	redrive := types.WorkflowExternalCallbackRedrivePlan{
+		TenantID:                   tenantID,
+		RedrivePlanID:              plan.RedrivePlanID,
+		RedrivePlanSha256:          "sha256:" + fmt.Sprintf("%x", sum[:]),
+		SourceDeliveryStatusSha256: plan.SourceDeliveryStatusSha256,
+		SourceDeliveryPlanSha256:   sourceDeliveryPlanSha256,
+		WorkflowID:                 plan.WorkflowBinding.WorkflowID,
+		StepID:                     plan.WorkflowBinding.StepID,
+		WorkflowType:               plan.WorkflowBinding.ExpectedWorkflowType,
+		TargetService:              plan.WorkflowBinding.ExpectedTargetService,
+		TargetOperation:            plan.WorkflowBinding.ExpectedTargetOperation,
+		TargetRefHash:              plan.WorkflowBinding.ExpectedTargetRefHash,
+		PayloadSchemaVersion:       plan.WorkflowBinding.ExpectedPayloadSchemaVersion,
+		PayloadRefHash:             plan.WorkflowBinding.ExpectedPayloadRefHash,
+		ApprovalPolicyRef:          plan.WorkflowBinding.ExpectedApprovalPolicyRef,
+		DecisionPolicyRef:          plan.WorkflowBinding.DecisionPolicyRef,
+		DeliveryStatus:             plan.RedriveSource.DeliveryStatus,
+		AttemptNumber:              plan.RedriveSource.AttemptNumber,
+		MaxAttempts:                plan.RedriveSource.MaxAttempts,
+		DeliveryAttemptRef:         plan.RedriveSource.DeliveryAttemptRef,
+		FailureClassRef:            plan.RedriveSource.FailureClassRef,
+		RedrivePolicyRef:           plan.RedriveSource.RedrivePolicyRef,
+		RedriveQueueRef:            plan.RedriveContract.RedriveQueueRef,
+		RedriveReasonRef:           plan.RedriveContract.RedriveReasonRef,
+		OperatorReviewRef:          plan.RedriveContract.OperatorReviewRef,
+	}
+	redrive = redrive.Normalized()
+	if err := redrive.Validate(); err != nil {
+		return types.WorkflowExternalCallbackRedrivePlan{}, err
+	}
+	return redrive, nil
 }
 
 func LoadExternalCallbackEndpoints(path string) (map[string]string, error) {

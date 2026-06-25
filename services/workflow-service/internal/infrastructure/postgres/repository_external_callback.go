@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"errors"
+	"strconv"
 	"strings"
 	"time"
 
@@ -269,6 +270,56 @@ func (repository *Repository) MarkExternalCallbackDeliveryFailed(
 	return updated, nil
 }
 
+func (repository *Repository) RedriveExternalCallbackDelivery(
+	ctx context.Context,
+	plan types.WorkflowExternalCallbackRedrivePlan,
+) (types.WorkflowExternalCallbackDelivery, error) {
+	if repository.pool == nil {
+		return types.WorkflowExternalCallbackDelivery{}, types.NewDBWriteFailed("workflow repository is not configured")
+	}
+	plan = plan.Normalized()
+	if err := plan.Validate(); err != nil {
+		return types.WorkflowExternalCallbackDelivery{}, err
+	}
+	now := time.Now().UTC()
+	availableAt := plan.AvailableAt.UTC()
+	if availableAt.IsZero() {
+		availableAt = now
+	}
+
+	tx, err := repository.pool.Begin(ctx)
+	if err != nil {
+		return types.WorkflowExternalCallbackDelivery{}, types.NewDBWriteFailed(err.Error())
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	workflow, err := getWorkflowForUpdate(ctx, tx, plan.TenantID, plan.WorkflowID)
+	if err != nil {
+		return types.WorkflowExternalCallbackDelivery{}, err
+	}
+	if err := verifyExternalCallbackRedriveWorkflowBinding(workflow, plan); err != nil {
+		return types.WorkflowExternalCallbackDelivery{}, err
+	}
+	locked, err := getExternalCallbackDeliveryForPlanForUpdate(ctx, tx, plan)
+	if err != nil {
+		return types.WorkflowExternalCallbackDelivery{}, err
+	}
+	if err := verifyExternalCallbackRedriveDeliveryBinding(locked, plan); err != nil {
+		return types.WorkflowExternalCallbackDelivery{}, err
+	}
+	updated, err := updateExternalCallbackDeliveryRedriven(ctx, tx, locked, plan, availableAt, now)
+	if err != nil {
+		return types.WorkflowExternalCallbackDelivery{}, err
+	}
+	if err := insertExternalCallbackDeliveryOutbox(ctx, tx, workflow, updated, types.WorkflowEventExternalCallbackRedriven); err != nil {
+		return types.WorkflowExternalCallbackDelivery{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return types.WorkflowExternalCallbackDelivery{}, types.NewDBWriteFailed(err.Error())
+	}
+	return updated, nil
+}
+
 func verifyExternalCallbackWorkflowBinding(workflow types.Workflow, delivery types.WorkflowExternalCallbackDelivery) error {
 	if workflow.Status != types.WorkflowStatusWaitingDecision {
 		return types.NewFailedPrecondition("workflow is not waiting for decision")
@@ -282,6 +333,48 @@ func verifyExternalCallbackWorkflowBinding(workflow types.Workflow, delivery typ
 		workflow.PayloadRefHash != delivery.PayloadRefHash ||
 		workflow.ApprovalPolicyRef != delivery.ApprovalPolicyRef {
 		return types.NewFailedPrecondition("workflow external callback delivery binding mismatch")
+	}
+	return nil
+}
+
+func verifyExternalCallbackRedriveWorkflowBinding(workflow types.Workflow, plan types.WorkflowExternalCallbackRedrivePlan) error {
+	if workflow.Status != types.WorkflowStatusWaitingDecision {
+		return types.NewFailedPrecondition("workflow is not waiting for decision")
+	}
+	if workflow.WorkflowType != plan.WorkflowType ||
+		workflow.CurrentStepID != plan.StepID ||
+		workflow.TargetService != plan.TargetService ||
+		workflow.TargetOperation != plan.TargetOperation ||
+		workflow.TargetRefHash != plan.TargetRefHash ||
+		workflow.PayloadSchemaVersion != plan.PayloadSchemaVersion ||
+		workflow.PayloadRefHash != plan.PayloadRefHash ||
+		workflow.ApprovalPolicyRef != plan.ApprovalPolicyRef {
+		return types.NewFailedPrecondition("workflow external callback redrive binding mismatch")
+	}
+	return nil
+}
+
+func verifyExternalCallbackRedriveDeliveryBinding(delivery types.WorkflowExternalCallbackDelivery, plan types.WorkflowExternalCallbackRedrivePlan) error {
+	if delivery.Status != plan.DeliveryStatus {
+		return types.NewFailedPrecondition("workflow external callback redrive source status mismatch")
+	}
+	if delivery.Status != types.WorkflowExternalCallbackDeliveryStatusRetryPending &&
+		delivery.Status != types.WorkflowExternalCallbackDeliveryStatusDLQ {
+		return types.NewFailedPrecondition("workflow external callback delivery is not redrivable")
+	}
+	if delivery.AttemptCount != plan.AttemptNumber || delivery.MaxAttempts != plan.MaxAttempts {
+		return types.NewFailedPrecondition("workflow external callback redrive attempt mismatch")
+	}
+	if delivery.StepID != plan.StepID ||
+		delivery.WorkflowType != plan.WorkflowType ||
+		delivery.TargetService != plan.TargetService ||
+		delivery.TargetOperation != plan.TargetOperation ||
+		delivery.TargetRefHash != plan.TargetRefHash ||
+		delivery.PayloadSchemaVersion != plan.PayloadSchemaVersion ||
+		delivery.PayloadRefHash != plan.PayloadRefHash ||
+		delivery.ApprovalPolicyRef != plan.ApprovalPolicyRef ||
+		delivery.DecisionPolicyRef != plan.DecisionPolicyRef {
+		return types.NewFailedPrecondition("workflow external callback redrive delivery binding mismatch")
 	}
 	return nil
 }
@@ -350,6 +443,29 @@ FOR UPDATE
 	return delivery, nil
 }
 
+func getExternalCallbackDeliveryForPlanForUpdate(
+	ctx context.Context,
+	tx pgx.Tx,
+	plan types.WorkflowExternalCallbackRedrivePlan,
+) (types.WorkflowExternalCallbackDelivery, error) {
+	row := tx.QueryRow(ctx, `
+SELECT `+selectExternalCallbackDeliveryColumns("")+`
+FROM workflow_external_callback_deliveries
+WHERE tenant_id = $1
+  AND workflow_id = $2
+  AND delivery_plan_sha256 = $3
+FOR UPDATE
+`, string(plan.TenantID), plan.WorkflowID, plan.SourceDeliveryPlanSha256)
+	delivery, err := scanExternalCallbackDelivery(row)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return types.WorkflowExternalCallbackDelivery{}, types.NewNotFound("workflow external callback delivery not found")
+		}
+		return types.WorkflowExternalCallbackDelivery{}, types.NewDBReadFailed(err.Error())
+	}
+	return delivery, nil
+}
+
 func updateExternalCallbackDeliveryDelivered(
 	ctx context.Context,
 	tx pgx.Tx,
@@ -401,6 +517,39 @@ RETURNING `+selectExternalCallbackDeliveryColumns("workflow_external_callback_de
 	return updated, nil
 }
 
+func updateExternalCallbackDeliveryRedriven(
+	ctx context.Context,
+	tx pgx.Tx,
+	delivery types.WorkflowExternalCallbackDelivery,
+	plan types.WorkflowExternalCallbackRedrivePlan,
+	availableAt time.Time,
+	now time.Time,
+) (types.WorkflowExternalCallbackDelivery, error) {
+	row := tx.QueryRow(ctx, `
+UPDATE workflow_external_callback_deliveries
+SET status = $3,
+    attempt_count = 0,
+    leased_until = NULL,
+    last_attempt_at = NULL,
+    delivered_at = NULL,
+    available_at = $4,
+    redrive_count = redrive_count + 1,
+    last_redrive_plan_sha256 = $5,
+    last_redrive_reason_ref = $6,
+    last_redriven_at = $7,
+    updated_at = $7
+WHERE tenant_id = $1 AND delivery_id = $2
+RETURNING `+selectExternalCallbackDeliveryColumns("workflow_external_callback_deliveries"),
+		string(delivery.TenantID), delivery.DeliveryID,
+		types.WorkflowExternalCallbackDeliveryStatusPending,
+		availableAt, plan.RedrivePlanSha256, plan.RedriveReasonRef, now)
+	updated, err := scanExternalCallbackDelivery(row)
+	if err != nil {
+		return types.WorkflowExternalCallbackDelivery{}, types.NewDBWriteFailed(err.Error())
+	}
+	return updated, nil
+}
+
 func insertExternalCallbackDeliveryOutbox(
 	ctx context.Context,
 	tx pgx.Tx,
@@ -419,7 +568,14 @@ func insertExternalCallbackDeliveryOutbox(
 	payload["max_attempts"] = delivery.MaxAttempts
 	payload["last_failure_class"] = delivery.LastFailureClass
 	payload["last_delivery_result_ref"] = delivery.LastDeliveryResultRef
-	return insertOutbox(ctx, tx, "evt_"+delivery.DeliveryID+"_"+delivery.Status, workflow, eventType, payload)
+	payload["redrive_count"] = delivery.RedriveCount
+	payload["last_redrive_plan_sha256"] = delivery.LastRedrivePlanSha256
+	payload["last_redrive_reason_ref"] = delivery.LastRedriveReasonRef
+	eventID := "evt_" + delivery.DeliveryID + "_" + delivery.Status
+	if eventType == types.WorkflowEventExternalCallbackRedriven {
+		eventID = "evt_" + delivery.DeliveryID + "_redrive_" + strconv.Itoa(delivery.RedriveCount)
+	}
+	return insertOutbox(ctx, tx, eventID, workflow, eventType, payload)
 }
 
 func sameExternalCallbackDeliveryPlan(
@@ -466,7 +622,9 @@ func selectExternalCallbackDeliveryColumns(alias string) string {
        ` + prefix + `status, ` + prefix + `attempt_count, ` + prefix + `max_attempts,
        ` + prefix + `available_at, ` + prefix + `leased_until, ` + prefix + `last_attempt_at,
        ` + prefix + `delivered_at, ` + prefix + `last_failure_class,
-       ` + prefix + `last_delivery_result_ref, ` + prefix + `created_at, ` + prefix + `updated_at`
+       ` + prefix + `last_delivery_result_ref, ` + prefix + `redrive_count,
+       ` + prefix + `last_redrive_plan_sha256, ` + prefix + `last_redrive_reason_ref,
+       ` + prefix + `last_redriven_at, ` + prefix + `created_at, ` + prefix + `updated_at`
 }
 
 func scanExternalCallbackDelivery(row scanner) (types.WorkflowExternalCallbackDelivery, error) {
@@ -474,6 +632,7 @@ func scanExternalCallbackDelivery(row scanner) (types.WorkflowExternalCallbackDe
 	var leasedUntil *time.Time
 	var lastAttemptAt *time.Time
 	var deliveredAt *time.Time
+	var lastRedrivenAt *time.Time
 	err := row.Scan(
 		&delivery.TenantID, &delivery.WorkflowID, &delivery.DeliveryID,
 		&delivery.DeliveryPlanSha256, &delivery.SourceDecisionManifestSha256,
@@ -488,7 +647,9 @@ func scanExternalCallbackDelivery(row scanner) (types.WorkflowExternalCallbackDe
 		&delivery.Status, &delivery.AttemptCount, &delivery.MaxAttempts,
 		&delivery.AvailableAt, &leasedUntil, &lastAttemptAt,
 		&deliveredAt, &delivery.LastFailureClass,
-		&delivery.LastDeliveryResultRef, &delivery.CreatedAt, &delivery.UpdatedAt,
+		&delivery.LastDeliveryResultRef, &delivery.RedriveCount,
+		&delivery.LastRedrivePlanSha256, &delivery.LastRedriveReasonRef,
+		&lastRedrivenAt, &delivery.CreatedAt, &delivery.UpdatedAt,
 	)
 	if err != nil {
 		return types.WorkflowExternalCallbackDelivery{}, err
@@ -501,6 +662,9 @@ func scanExternalCallbackDelivery(row scanner) (types.WorkflowExternalCallbackDe
 	}
 	if deliveredAt != nil {
 		delivery.DeliveredAt = *deliveredAt
+	}
+	if lastRedrivenAt != nil {
+		delivery.LastRedrivenAt = *lastRedrivenAt
 	}
 	return delivery, nil
 }

@@ -55,6 +55,8 @@ func run(ctx context.Context) error {
 		return runCompensationInstructionImport(ctx)
 	case "external-callback-delivery-import":
 		return runExternalCallbackDeliveryImport(ctx)
+	case "external-callback-delivery-redrive":
+		return runExternalCallbackDeliveryRedrive(ctx)
 	case "external-callback-delivery-worker":
 		return runExternalCallbackDeliveryWorker(ctx)
 	default:
@@ -289,6 +291,38 @@ func runExternalCallbackDeliveryImport(ctx context.Context) error {
 	return nil
 }
 
+func runExternalCallbackDeliveryRedrive(ctx context.Context) error {
+	pool, err := openPGPool(ctx)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	tenantID := strings.TrimSpace(os.Getenv("NEXUSIM_WORKFLOW_EXTERNAL_CALLBACK_DELIVERY_TENANT_ID"))
+	if tenantID == "" {
+		return errors.New("NEXUSIM_WORKFLOW_EXTERNAL_CALLBACK_DELIVERY_TENANT_ID is required")
+	}
+	plan, err := rpcinfra.LoadExternalCallbackRedrivePlan(
+		os.Getenv("NEXUSIM_WORKFLOW_EXTERNAL_CALLBACK_REDRIVE_PLAN_FILE"),
+		types.TenantID(tenantID),
+	)
+	if err != nil {
+		return err
+	}
+	redriven, err := postgresinfra.NewRepository(pool).RedriveExternalCallbackDelivery(ctx, plan)
+	if err != nil {
+		return err
+	}
+	log.Printf(
+		"workflow-service redriven external callback delivery delivery_id=%s workflow_id=%s status=%s redrive_count=%d",
+		redriven.DeliveryID,
+		redriven.WorkflowID,
+		redriven.Status,
+		redriven.RedriveCount,
+	)
+	return nil
+}
+
 func runExternalCallbackDeliveryWorker(ctx context.Context) error {
 	debugAddr, err := workflowDebugAddrFromEnv()
 	if err != nil {
@@ -378,7 +412,7 @@ func workflowModeFromEnv() string {
 func validateWorkflowMode(mode string) error {
 	switch mode {
 	case "noop", "grpc", "timer-worker", "compensation-worker", "compensation-executor", "compensation-instruction-import",
-		"external-callback-delivery-import", "external-callback-delivery-worker":
+		"external-callback-delivery-import", "external-callback-delivery-redrive", "external-callback-delivery-worker":
 		return nil
 	default:
 		return fmt.Errorf("unsupported NEXUSIM_WORKFLOW_SERVICE_MODE %q", mode)

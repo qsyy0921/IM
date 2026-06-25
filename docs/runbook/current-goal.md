@@ -111,6 +111,12 @@ Agent action boundary / repair cases：在 provider replay admin / workflow hand
   `ACTIVE` instruction refs、payload hash、target 和 executor mode 后输出低敏
   readiness manifest；它只绑定 workflow-service `compensation-executor` 执行契约，
   不记录 decision、不创建 approval、不执行 compensation、不调用 control-plane 或其它下游服务。
+- workflow compensation execution invocation manifest 已落：
+  `write-workflow-compensation-execution-invocation.ps1` 只接受低敏 readiness manifest，
+  重新校验 workflow / instruction / executor contract 后输出
+  `nexusim.workflow.compensation_execution_invocation.v1`；它只给 operator 明确
+  `workflow-service` `compensation-executor` runtime env / owner / preflight checks，
+  不执行 compensation、不调用 control-plane、不记录 decision、不修改 workflow 或 compensation rows。
 
 ## 目标
 

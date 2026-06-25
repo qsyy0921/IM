@@ -251,7 +251,10 @@
   bundle 绑定到 workflow-service `compensation-executor` 的显式执行契约，校验
   `COMPENSATION_PENDING` workflow、`ACTIVE` instruction refs、payload hash、target 和
   executor mode；manifest 不记录 decision、不创建 approval、不执行 compensation、不调用
-  control-plane-service 或其它下游服务；
+  control-plane-service 或其它下游服务；workflow compensation execution invocation manifest
+  已能把该 readiness 进一步绑定为启动 `workflow-service` `compensation-executor` 前的低敏
+  runtime contract，输出 env 名称、owner、hash 和 required checks，不执行 compensation、
+  不调用 control-plane、不修改 workflow / compensation rows；
   workflow 第一路径已通过完整 `check-local`，本 worker / executor / registry / timer /
   callback delivery 切片按风险分层用 focused checks 收口；不宣称多 adapter compensation
   platform、provider-grade instruction UI、callback delivery provider-grade UI

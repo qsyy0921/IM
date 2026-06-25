@@ -119,6 +119,9 @@ try {
     Write-Host "== workflow compensation execution readiness =="
     Invoke-LocalCheck "check-workflow-compensation-execution-readiness.ps1"
 
+    Write-Host "== workflow compensation execution invocation =="
+    Invoke-LocalCheck "check-workflow-compensation-execution-invocation.ps1"
+
     Write-Host "== ddd boundaries =="
     Invoke-LocalCheck "check-ddd-boundaries.ps1"
 

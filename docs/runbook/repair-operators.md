@@ -442,6 +442,28 @@ audit-service 公开 gRPC `AppendAuditRecord` 追加审计；operator 不直接�
 私表，不打印 manifest 本机路径、raw provider input / output、provider body、raw
 attributes JSON 或 credential-like 内容。
 
+## Workflow Compensation Execution
+
+补偿执行前的 operator 流程分为三段：review bundle、execution readiness、execution invocation。
+review / readiness 都不执行 compensation；invocation 也只是启动 `workflow-service`
+`compensation-executor` 前的低敏运行契约，不是执行结果。
+
+readiness 审查通过后，生成 invocation manifest：
+
+```powershell
+.\tools\write-workflow-compensation-execution-invocation.ps1 -ReadinessPath H:\NexusIM\operator-plans\workflow-compensation-execution-readiness.json -GeneratedBy operator-a -OutputPath H:\NexusIM\operator-plans\workflow-compensation-execution-invocation.json
+```
+
+该 manifest 只接受 `nexusim.workflow.compensation_execution_readiness.v1`，重新校验
+`COMPENSATION_PENDING` workflow、`ACTIVE` instruction refs、control-plane
+`CONFIG_ROLLBACK` target 和 workflow-service `compensation-executor` owner / mode。输出只包含
+runtime env 名称、owner、hash、instruction refs 和 required checks。它不记录 decision、不创建
+approval、不执行 compensation、不调用 control-plane-service、不修改 workflow /
+compensation rows，也不嵌入 raw payload、operator reason、provider artifact、EvidencePack、
+本机路径或 credential-like 内容。operator 真正执行时必须显式启动
+`NEXUSIM_WORKFLOW_SERVICE_MODE=compensation-executor` 的 workflow-service runtime，并在启动前
+再次确认 workflow / instruction 仍与 invocation manifest 中的低敏 refs 对齐。
+
 ## Delivery Projection
 
 `delivery-service` 额外拥有 projection 排障入口：

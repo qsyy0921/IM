@@ -582,6 +582,16 @@ workflow-service `compensation-executor` 的最终执行契约，不记录 decis
 approval、不执行 compensation、不调用 control-plane-service / action-executor，也不嵌入原始
 payload、operator reason、provider body、EvidencePack、本机路径或 credential-like 字段。
 
+`write-workflow-compensation-execution-invocation.ps1` 提供 readiness 之后、真正启动
+`workflow-service` `compensation-executor` 之前的低敏 invocation manifest：它只接受
+`nexusim.workflow.compensation_execution_readiness.v1`，重新校验 workflow 仍是
+`COMPENSATION_PENDING`、instruction refs 仍为 `ACTIVE`、target 为
+control-plane `CONFIG_ROLLBACK`，且 executor owner / mode / final execution owner 都绑定到
+workflow-service。输出 `nexusim.workflow.compensation_execution_invocation.v1` 只包含
+runtime env 名称、owner、hash 和 required checks；该 manifest 不记录 decision、不执行
+compensation、不调用 control-plane-service、不修改 workflow / compensation rows，也不包含原始
+payload、operator reason、provider artifact、EvidencePack、本机路径或凭证。
+
 `write-workflow-compensation-instruction-manifest.ps1` /
 `validate-workflow-compensation-instruction-manifest.ps1` 是第一版 compensation
 instruction handoff：它复用 runtime 的 `instructions` JSON 形状，生成 / 校验

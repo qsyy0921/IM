@@ -508,6 +508,7 @@ go run ./loadtest/workflow -mode list-workflows -workflow-type REPAIR_APPROVAL -
 go run ./loadtest/workflow -mode record-decision -workflow-id wf_123 -step-id wfs_1 -decision APPROVE -decider-ref operator:a
 go run ./loadtest/workflow -mode record-decision -decision-manifest H:\NexusIM\operator-plans\workflow-decision.json
 go run ./loadtest/workflow -mode operator-queues
+.\tools\write-workflow-approval-queue-review-page.ps1 -QueueSummaryPath H:\NexusIM\operator-plans\workflow-operator-queues.json -GeneratedBy operator-a -OutputPath H:\NexusIM\operator-plans\workflow-approval-queue-review.html
 go run ./loadtest/workflow -mode list-compensation-instructions -workflow-id wf_123 -status ACTIVE
 go run ./loadtest/workflow -mode list-compensations -workflow-id wf_123 -status SUCCEEDED
 go run ./loadtest/workflow -mode compensation-review-bundle -workflow-id wf_123
@@ -552,6 +553,15 @@ body。writer / validator 只处理仓库外低敏 JSON artifact，不读取数�
 compensation request 和 compensation pending workflow refs / hash / counts。它不记录
 decision、不修改 workflow 状态、不调用 action-executor，也不执行 provider replay；队列
 结果只作为人工审批和 repair triage 入口。
+
+`write-workflow-approval-queue-review-page.ps1` 提供第一版本地 approval queue review
+HTML：它只接受 `loadtest/workflow -mode operator-queues` 或
+`-mode provider-replay-queue` 的低敏 summary，重新校验 queue / workflow 绑定、
+`WAITING_DECISION` 状态、approval policy、target service / operation、workflow count 和
+no-decision contract，再渲染 workflow refs / hashes / step id / reason ref。页面不创建
+approval、不记录 decision、不调用 action-executor、不执行 compensation、不 redrive provider
+work，也不输出 raw payload、provider body、本机路径或 credential-like 字段。真正审批仍必须
+通过 `workflow-service.RecordWorkflowDecision` 和 decision manifest 绑定校验完成。
 
 `external-callback-wait` 是第一版外部回调等待入口：它通过 workflow-service
 `CreateWorkflow` 创建一个显式 `WAITING_DECISION` workflow，并输出

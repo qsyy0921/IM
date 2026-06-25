@@ -122,6 +122,9 @@ try {
     Write-Host "== workflow external callback delivery review page =="
     Invoke-LocalCheck "check-workflow-external-callback-delivery-review-page.ps1"
 
+    Write-Host "== workflow approval queue review page =="
+    Invoke-LocalCheck "check-workflow-approval-queue-review-page.ps1"
+
     Write-Host "== workflow compensation instruction manifest =="
     Invoke-LocalCheck "check-workflow-compensation-instruction-manifest.ps1"
 

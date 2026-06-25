@@ -258,6 +258,10 @@ agent-service proposal
 - `provider-replay-operator-ui` / `provider-replay-handoff` 只能生成低敏人工审批视图或
   admin / workflow request artifact；它们不代表 replay 已执行，不复用旧 approval，
   不恢复旧 raw input / provider output，也不修改 DLQ failure row。
+- `write-provider-replay-redrive-invocation.ps1` 只能生成仓库外低敏 invocation manifest：
+  它绑定 approved admin operation、workflow approval manifest、fresh Agent proof 和 source
+  handoff，并输出 `RedriveProviderFailure` command contract；它不调用 RPC、不修改 DLQ row、
+  不保存 raw resource id / input / reason / provider artifact。
 - `RedriveProviderFailure` 是专用 redrive RPC，不属于通用 tool adapter。它要求
   DLQ source、fresh proposal / approval / prepared audit、匹配 skill / tool / resource、
   新 `input_json` 和 `reason_sha256`，并保留 source lineage；它不保存或恢复旧 raw

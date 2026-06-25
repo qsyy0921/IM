@@ -44,8 +44,9 @@
 - `skill-registry` / `mcp-gateway`：tool contract、risk level、tenant allowlist、adapter、
   rate limit。
 - `action-executor`：provider replay admin / workflow handoff / handoff review page /
-  execution readiness page 已落；后续再做更多 action boundary / repair cases、
-  external audit integration 和 provider-grade replay UI。
+  execution readiness page / redrive invocation manifest 已落；后续再做受控 redrive
+  execution operator path、更多 action boundary / repair cases、external audit integration
+  和 provider-grade replay UI。
 - `ai-eval-service`：group-memory asker-bound term ambiguity、visible-chain incomplete
   abstention、missing visibility projection fail-closed、audience-language profile negative
   cases 已进入本地低敏 gate；后续继续扩 provider readiness、Agent action boundary 和

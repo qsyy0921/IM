@@ -355,6 +355,19 @@ skill / tool / resource hash、new input sha256 和 reason sha256。readiness pa
 `RedriveProviderFailure`，只证明最终执行前的 admin approval、workflow approval 和 fresh
 Agent proof 已绑定；raw new input、operator reason、provider artifacts 和本机路径都不得进入页面。
 
+readiness 审查通过后，可生成最终执行前的低敏 redrive invocation manifest：
+
+```powershell
+.\tools\write-provider-replay-redrive-invocation.ps1 -HandoffPath H:\NexusIM\operator-plans\provider-replay-handoff.json -AdminOperationPath H:\NexusIM\operator-plans\provider-replay-admin-approved.json -WorkflowDecisionManifestPath H:\NexusIM\operator-plans\workflow-decision.json -FreshProofPath H:\NexusIM\operator-plans\provider-replay-fresh-proof.json -GeneratedBy operator-a -OutputPath H:\NexusIM\operator-plans\provider-replay-redrive-invocation.json
+```
+
+该 manifest 只输出 `RedriveProviderFailure` 的低敏 command contract：source failure id、
+admin / workflow / fresh proposal / approval / prepared audit refs、resource id hash、
+new input sha256 和 reason sha256。它不调用 action-executor、不修改 DLQ row、不包含
+raw `resource_id`、raw `input_json`、operator reason、provider artifact 或 EvidencePack；
+operator 真正执行 redrive 前必须在仓库外提供 raw resource id / new input，并重新计算 hash
+与 manifest 中的 refs 对齐。
+
 `loadtest/admin` 提供 provider replay handoff operator bridge：`provider-replay-submit`
 读取上面的 handoff artifact，校验 `PROVIDER_REPLAY_REQUEST` contract、payload hash、
 低敏 refs、`direct_execution_allowed=false` 和 `source_dlq_immutable=true` 后，调用

@@ -1230,6 +1230,34 @@
       ]
     },
     {
+      "id": "action-provider-replay-redrive-invocation-manifest",
+      "family": "action_execution_safety",
+      "stage": "action-executor-provider-replay",
+      "status": "active",
+      "query": "create a low-sensitive provider replay redrive invocation manifest after readiness review",
+      "risk": "Provider replay redrive invocation manifest must bind approved admin operation, workflow APPROVE manifest, fresh Agent proof and source handoff into a command contract without executing RedriveProviderFailure or embedding raw new input, resource id, reason, or provider artifacts",
+      "required_assertions": [
+        {
+          "type": "must_create_provider_replay_redrive_invocation_manifest"
+        },
+        {
+          "type": "must_bind_redrive_invocation_to_fresh_proof"
+        },
+        {
+          "type": "must_require_fresh_replay_approval"
+        },
+        {
+          "type": "must_not_execute_provider_replay_from_invocation_manifest"
+        },
+        {
+          "type": "must_keep_redrive_entrypoint_action_executor"
+        },
+        {
+          "type": "must_not_leak_raw_provider_replay_artifacts"
+        }
+      ]
+    },
+    {
       "id": "admin-provider-replay-handoff-submit-operator",
       "family": "action_execution_safety",
       "stage": "admin-provider-replay",

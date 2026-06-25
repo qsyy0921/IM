@@ -42,6 +42,11 @@ loadtest report 或 archive。
   绑定原 handoff、approved admin operation、workflow APPROVE manifest 和 fresh Agent proof，
   生成最终 redrive 前低敏审查页；页面不调用 redrive、不修改 DLQ、不泄漏 raw new input /
   reason / provider artifacts。
+- provider replay redrive invocation manifest 已收口：
+  `write-provider-replay-redrive-invocation.ps1` 绑定原 handoff、approved admin operation、
+  workflow APPROVE manifest 和 fresh Agent proof，输出低敏 `RedriveProviderFailure`
+  command contract；manifest 不执行 redrive、不修改 DLQ、不包含 raw resource id / input /
+  reason / provider artifacts。
 - provider replay admin operator bridge 已收口：`loadtest/admin provider-replay-submit`
   读取低敏 handoff artifact 并创建 `PROVIDER_REPLAY_REQUEST`；`provider-replay-list` /
   `provider-replay-approve` / `provider-replay-reject` 提供第一版列表和审批 UX，不执行 redrive。

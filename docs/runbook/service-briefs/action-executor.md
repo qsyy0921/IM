@@ -31,6 +31,11 @@
 - Provider replay execution readiness page：`write-provider-replay-readiness-page.ps1`
   绑定原 handoff、approved admin operation、workflow APPROVE manifest 和 fresh Agent
   proof；页面只输出 refs / hashes，不调用 redrive、不修改 DLQ、不泄漏 raw provider artifact。
+- Provider replay redrive invocation manifest：`write-provider-replay-redrive-invocation.ps1`
+  把原 handoff、approved admin operation、workflow APPROVE manifest 和 fresh Agent proof
+  绑定成低敏 `RedriveProviderFailure` command contract；manifest 不执行 redrive、不修改
+  DLQ、不包含 raw resource id / input / reason / provider artifact，operator 必须在仓库外
+  提供 raw 值并重新核验 hash。
 - Docker / Prometheus / Grafana wiring、focused tests、PG integration、ai-eval action preflight safety adapter。
 
 ## 边界
@@ -44,6 +49,8 @@
 - Provider replay handoff review page 只是 operator 提交前的只读检查页，不是 admin submit、
   workflow decision、approval 或 redrive 证明。
 - Provider replay readiness page 只是最终 redrive 前的低敏绑定检查，不是 redrive 已执行证明。
+- Provider replay redrive invocation manifest 只是最终 operator 调用契约，不是 redrive 已执行证明；
+  raw `resource_id` / `input_json` / reason text 必须留在仓库外并以 hash 对齐。
 - 真实业务 mutation 必须新增显式 adapter、公开业务 API、operator / policy 边界。
 
 ## 下一步

@@ -324,6 +324,19 @@ action-executor as the only final `RedriveProviderFailure` execution owner. It
 does not execute replay, restore raw provider input/output, mutate the DLQ row,
 or reuse old approval.
 
+Provider replay execution readiness is represented by
+`action-provider-replay-execution-readiness-page`. It verifies that approved
+admin operation evidence, workflow APPROVE manifest, fresh Agent proof and the
+source handoff are bound before final redrive review. It does not execute
+provider replay or expose raw provider artifacts.
+
+Provider replay redrive invocation is represented by
+`action-provider-replay-redrive-invocation-manifest`. It verifies that the
+readiness evidence can be converted into a low-sensitive
+`RedriveProviderFailure` command contract with refs and hashes only. It does not
+call action-executor, mutate the DLQ row, or embed raw resource id, input,
+reason or provider artifacts.
+
 Provider replay submit operator bridge is represented by
 `admin-provider-replay-handoff-submit-operator`. It verifies that the admin
 operator can submit low-sensitive `PROVIDER_REPLAY_REQUEST` operations from an

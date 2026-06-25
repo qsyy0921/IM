@@ -32,6 +32,9 @@ operator CLI 和 first-stage downstream adapters 已落。
 - provider replay readiness page：approved admin operation 和 workflow APPROVE manifest
   准备后，可和 fresh Agent proof / 原 handoff 绑定成低敏 execution readiness page；页面不执行
   `RedriveProviderFailure`。
+- provider replay redrive invocation manifest：readiness 后可生成低敏
+  `RedriveProviderFailure` command contract；admin-service 只提供 approved operation 证据，
+  不执行 redrive，也不持有 raw resource id / input / reason。
 - control-plane adapters：`CONFIG_PUBLISH`、`CONFIG_ROLLBACK`、
   `TENANT_QUOTA_CHANGE`、`POLICY_RULE_CHANGE`。
 - audit adapter：`AUDIT_EXPORT_REQUEST -> audit-service.CreateAuditExport`；

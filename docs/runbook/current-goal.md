@@ -35,6 +35,11 @@ Agent action boundary / repair cases：在 provider replay admin / workflow hand
   将原 handoff、approved admin operation、workflow APPROVE manifest 和 fresh Agent proof
   绑定成最终 redrive 前的低敏 HTML；它只展示 refs / hashes，不执行 redrive、不修改 DLQ row、
   不包含 raw new input / reason / provider artifacts。
+- provider replay redrive invocation manifest 已落：
+  `write-provider-replay-redrive-invocation.ps1` 将原 handoff、approved admin operation、
+  workflow APPROVE manifest 和 fresh Agent proof 绑定成低敏 `RedriveProviderFailure`
+  command contract；它不执行 redrive、不修改 DLQ row、不包含 raw resource id / input /
+  reason / provider artifacts，operator 必须在仓库外提供 raw 值并核验 hash。
 - provider replay admin operator bridge 已落：`loadtest/admin provider-replay-submit`
   校验 handoff contract / payload hash / 低敏 refs 后创建 `PROVIDER_REPLAY_REQUEST`；
   `provider-replay-list` / `provider-replay-approve` / `provider-replay-reject` 只做

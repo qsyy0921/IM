@@ -24,6 +24,9 @@
 - Provider replay execution readiness page case：验证 approved admin operation、workflow
   APPROVE manifest、fresh Agent proof 和原 handoff 绑定后才进入最终 redrive 前审查；页面不执行
   redrive、不泄漏 raw provider artifacts。
+- Provider replay redrive invocation manifest case：验证 readiness 后的低敏 invocation
+  manifest 只输出 `RedriveProviderFailure` command contract 和 refs / hashes，必须绑定 fresh
+  proof，不执行 redrive、不包含 raw resource id / input / reason / provider artifacts。
 - Provider replay submit operator case：验证 admin operator 从 action-executor handoff
   artifact 创建 `PROVIDER_REPLAY_REQUEST`，校验 payload hash，且 submit 阶段不执行 replay。
 - Workflow provider replay queue view case：验证 workflow-service 只列低敏

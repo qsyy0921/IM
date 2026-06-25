@@ -184,6 +184,13 @@
       "note": "Provider replay readiness pages must bind approved admin operation, workflow approval manifest, fresh Agent proof, and source handoff before final redrive; they must not execute RedriveProviderFailure or leak raw provider artifacts."
     },
     {
+      "name": "provider replay redrive invocation manifest",
+      "category": "operator-safety",
+      "script": "tools/check-provider-replay-redrive-invocation.ps1",
+      "check_local_label": "provider replay redrive invocation",
+      "note": "Provider replay redrive invocation manifests must bind approved admin operation, workflow approval manifest, and fresh Agent proof into a low-sensitive operator command contract without executing RedriveProviderFailure or embedding raw new input, resource id, reason, or provider artifacts."
+    },
+    {
       "name": "approved repair invocation",
       "category": "operator-safety",
       "script": "tools/check-approved-repair-invocation.ps1",

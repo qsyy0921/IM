@@ -201,6 +201,10 @@ workflow 创建仍由 admin-service operation-worker 负责。
 APPROVE manifest 准备好后，把 approved admin operation、workflow manifest、fresh Agent
 proof 和原 handoff 绑定成最终执行前的低敏 readiness page；该页面仍不调用
 `RedriveProviderFailure`，只证明 admin / workflow / fresh proof 边界满足。
+`write-provider-replay-redrive-invocation.ps1` 可继续生成低敏 redrive invocation manifest，
+把 approved operation、workflow APPROVE manifest 和 fresh Agent proof 转成
+`RedriveProviderFailure` command contract；admin-service 仍只提供 approved operation
+证据，不执行 redrive，不持有 raw resource id / input / reason。
 
 第一版真实下游 adapter 已覆盖四类非 `CRITICAL` 的 control-plane operation：
 

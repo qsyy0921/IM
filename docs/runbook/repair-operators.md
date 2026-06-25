@@ -476,6 +476,17 @@ audit-service 公开 gRPC `AppendAuditRecord` 追加审计；operator 不直接�
 私表，不打印 manifest 本机路径、raw provider input / output、provider body、raw
 attributes JSON 或 credential-like 内容。
 
+显式 append 完成后，保存 `loadtest/actionexecutor -mode external-audit-append -execute`
+的 JSON summary，并生成低敏 result manifest：
+
+```powershell
+.\tools\write-provider-replay-redrive-audit-append-result-manifest.ps1 -AuditManifestPath H:\NexusIM\operator-plans\provider-replay-redrive-audit-append.json -AuditAppendResultPath H:\NexusIM\operator-plans\provider-replay-redrive-audit-append-execution.json -GeneratedBy operator-a -OutputPath H:\NexusIM\operator-plans\provider-replay-redrive-audit-append-result-manifest.json
+```
+
+该 result manifest 重新绑定 audit append manifest、request summary、audit id、
+record hash 和 idempotency key；它不调用 audit-service、不执行 redrive、不修改 DLQ row、
+不输出 raw attributes JSON、本机路径或 provider artifact。
+
 ## Workflow Compensation Execution
 
 补偿执行前的 operator 流程分为三段：review bundle、execution readiness、execution invocation。

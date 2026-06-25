@@ -62,6 +62,11 @@ Agent action boundary / repair cases：在 provider replay admin / workflow hand
   artifact 禁入；显式 `-execute` 才调用 audit-service 公开 `AppendAuditRecord`
   gRPC；输出不打印 manifest path、raw attributes JSON、raw provider artifact 或
   credential-like 内容。
+- provider replay audit append result manifest 已落：
+  `write-provider-replay-redrive-audit-append-result-manifest.ps1` 读取低敏 audit append
+  manifest 和 `external-audit-append -execute` 的低敏 summary，重新绑定 audit record
+  id / record hash / idempotency key；它不调用 audit-service、不执行 redrive、不修改
+  DLQ row、不包含 raw attributes JSON、raw provider artifact 或本机路径。
 - provider replay admin operator bridge 已落：`loadtest/admin provider-replay-submit`
   校验 handoff contract / payload hash / 低敏 refs 后创建 `PROVIDER_REPLAY_REQUEST`；
   `provider-replay-list` / `provider-replay-approve` / `provider-replay-reject` 只做

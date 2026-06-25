@@ -95,6 +95,9 @@ try {
     Write-Host "== action-executor external audit append =="
     Invoke-LocalCheck "check-action-executor-external-audit-append.ps1"
 
+    Write-Host "== provider replay audit append result manifest =="
+    Invoke-LocalCheck "check-provider-replay-redrive-audit-append-result-manifest.ps1"
+
     Write-Host "== approved repair invocation =="
     Invoke-LocalCheck "check-approved-repair-invocation.ps1"
 

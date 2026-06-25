@@ -17,7 +17,8 @@ brief、loadtest report、development-progress 或 archive。
 - action-executor 已覆盖 provider failure metrics、batch handoff、provider replay
   operator UI、admin / workflow handoff、review / readiness / invocation manifest、
   controlled redrive execution、redrive result manifest、redrive audit append
-  manifest handoff 和 external audit append operator path。
+  manifest handoff、external audit append operator path 和 audit append result
+  manifest。
 - workflow-service 已覆盖 provider replay queue、approval timeout、external
   approval binding、operator queues、external callback wait、external callback
   delivery plan、delivery status / redrive plan、external callback delivery

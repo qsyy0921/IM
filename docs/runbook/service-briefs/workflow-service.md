@@ -38,6 +38,10 @@ admin operation approval、补偿请求和人工审批状态。
 - `write-workflow-compensation-review-page.ps1`：把 compensation review bundle 渲染成
   仓库外低敏 HTML 审查页；不记录 decision、不创建 approval、不执行 compensation、
   不暴露 raw payload / reason / path / provider body / EvidencePack。
+- `write-workflow-compensation-execution-readiness.ps1`：把 compensation review bundle
+  绑定到 workflow-service `compensation-executor` 的显式执行契约，输出仓库外低敏
+  readiness manifest；不记录 decision、不创建 approval、不执行 compensation、不调用
+  control-plane 或其它下游服务。
 - `loadtest/workflow provider-replay-queue`：默认列出等待
   `admin.workflow.provider_replay.v1` 审批的 action-executor
   `PROVIDER_REPLAY_REQUEST` workflow；不执行 redrive、不修改 DLQ、不暴露 raw payload。

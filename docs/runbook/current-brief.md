@@ -84,6 +84,12 @@ loadtest report 或 archive。
   把低敏审查包渲染成仓库外 HTML，并再次校验 workflow / instruction 绑定；页面不记录
   decision、不创建 approval、不执行 compensation、不泄漏 raw payload / reason / path /
   provider body / EvidencePack。
+- workflow compensation execution readiness 已收口：
+  `write-workflow-compensation-execution-readiness.ps1` 把低敏审查包绑定到
+  workflow-service `compensation-executor` 的显式执行契约，校验 workflow status、
+  ACTIVE instruction refs、payload hash、target 和 executor mode 后输出 readiness
+  manifest；manifest 不记录 decision、不创建 approval、不执行 compensation、不调用
+  control-plane 或其它下游服务。
 - group memory / multi-party collaboration 必须继续保留 source refs、conversation scope、
   member visibility、time/version boundary、citations 和 no-citation refusal。
 

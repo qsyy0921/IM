@@ -29,6 +29,8 @@ summary, Agent and tool/action boundaries.
   `tools/run-ai-eval-action-preflight-safety-adapter.ps1`
 - action-executor external audit append focused check:
   `tools/check-action-executor-external-audit-append.ps1`
+- workflow compensation execution readiness focused check:
+  `tools/check-workflow-compensation-execution-readiness.ps1`
 - Agent output regression adapter:
   `tools/run-ai-eval-agent-output-regression.ps1`
 - Python worker output-safety adapter: `tools/run-ai-eval-python-worker-adapter.ps1`
@@ -159,7 +161,10 @@ fabricated citations or LLM-generation claim.
 
 Future Agent slices should add execution adapters that evaluate tool policy,
 proposal / approval and action safety against real EvidencePack outputs before
-making model-quality or agent-safety claims.
+making model-quality or agent-safety claims. Workflow compensation readiness is
+currently a low-sensitive operator manifest gate only: it binds a reviewed
+compensation bundle to the explicit compensation-executor contract and must not
+execute compensation or embed raw payload / reason / provider artifacts.
 
 First-stage RAG / Summary grounding safety adapter:
 

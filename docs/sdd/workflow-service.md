@@ -526,6 +526,15 @@ policy / status / boundary。页面不记录 decision、不创建 approval、不
 不调用下游服务，也不嵌入原始 payload、operator reason、provider body、EvidencePack、
 本机路径或 credential-like 字段。
 
+`write-workflow-compensation-execution-readiness.ps1` 提供第一版本地 compensation
+execution readiness manifest：它只接受低敏 compensation review bundle，校验
+`COMPENSATION_PENDING` workflow、`ACTIVE` instruction refs、payload hash、target、
+control-plane rollback instruction type 和显式 executor mode，然后输出
+`nexusim.workflow.compensation_execution_readiness.v1`。该 manifest 只绑定
+workflow-service `compensation-executor` 的最终执行契约，不记录 decision、不创建或复用
+approval、不执行 compensation、不调用 control-plane-service / action-executor，也不嵌入原始
+payload、operator reason、provider body、EvidencePack、本机路径或 credential-like 字段。
+
 `write-workflow-compensation-instruction-manifest.ps1` /
 `validate-workflow-compensation-instruction-manifest.ps1` 是第一版 compensation
 instruction handoff：它复用 runtime 的 `instructions` JSON 形状，生成 / 校验

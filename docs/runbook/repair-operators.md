@@ -312,6 +312,12 @@ workflow-service、control-plane-service 或数据库。
 页面只展示 workflow / instruction refs、hash、policy、status 和审查边界；它不会记录
 decision、不会创建 approval、不会执行 compensation、不会调用 control-plane-service /
 action-executor，也不会输出原始 payload、reason、provider body、EvidencePack 或本机路径。
+`write-workflow-compensation-execution-readiness.ps1` 可把同一个低敏审查包绑定为
+仓库外 `nexusim.workflow.compensation_execution_readiness.v1` readiness manifest。
+该 manifest 只声明 workflow-service `compensation-executor` 的显式执行契约和
+instruction refs / hash / executor mode；它不是执行命令，不记录 decision、不创建
+approval、不调用 control-plane-service / action-executor，也不输出原始 payload、reason、
+provider body、EvidencePack 或本机路径。
 
 `workflow-service` 的 `compensation-instruction-import` 已纳入
 `repair-operators.catalog.json`，可被本地 repair approval request / decision /

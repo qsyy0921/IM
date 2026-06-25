@@ -84,6 +84,11 @@ Agent action boundary / repair cases：在 provider replay admin / workflow hand
   只接受低敏 compensation review bundle，重新校验 workflow / instruction 绑定后渲染
   仓库外 HTML；不记录 decision、不创建 approval、不执行 compensation、不暴露 raw
   payload / reason / path / provider body / EvidencePack。
+- workflow compensation execution readiness 已落：`write-workflow-compensation-execution-readiness.ps1`
+  只接受低敏 compensation review bundle，校验 `COMPENSATION_PENDING` workflow、
+  `ACTIVE` instruction refs、payload hash、target 和 executor mode 后输出低敏
+  readiness manifest；它只绑定 workflow-service `compensation-executor` 执行契约，
+  不记录 decision、不创建 approval、不执行 compensation、不调用 control-plane 或其它下游服务。
 
 ## 目标
 

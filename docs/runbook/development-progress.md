@@ -230,6 +230,11 @@
   本地 repair approval review page writer 已能把 plan / request / decision /
   invocation / audit bundle 渲染成只含 hash / path hash / env key / preflight 摘要的
   低敏 HTML 审批页，不复制 reason、payload、manifest path 或 evidence 原文；
+  workflow compensation execution readiness manifest 已能把低敏 compensation review
+  bundle 绑定到 workflow-service `compensation-executor` 的显式执行契约，校验
+  `COMPENSATION_PENDING` workflow、`ACTIVE` instruction refs、payload hash、target 和
+  executor mode；manifest 不记录 decision、不创建 approval、不执行 compensation、不调用
+  control-plane-service 或其它下游服务；
   workflow 第一路径已通过完整 `check-local`，本 worker / executor / registry / timer
   切片按风险分层用 focused checks 收口；不宣称多 adapter compensation
   platform、provider-grade instruction UI、external callback delivery / retry hardening 或 outbox relay。

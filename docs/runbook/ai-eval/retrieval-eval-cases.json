@@ -1205,6 +1205,31 @@
       ]
     },
     {
+      "id": "action-provider-replay-execution-readiness-page",
+      "family": "action_execution_safety",
+      "stage": "action-executor-provider-replay",
+      "status": "active",
+      "query": "render a low-sensitive provider replay execution readiness page after admin and workflow approval",
+      "risk": "Provider replay readiness review must bind approved admin operation, workflow APPROVE manifest, fresh Agent proof, and original handoff before final RedriveProviderFailure, without executing replay or leaking raw provider artifacts",
+      "required_assertions": [
+        {
+          "type": "must_render_provider_replay_execution_readiness_page"
+        },
+        {
+          "type": "must_bind_provider_replay_admin_workflow_and_fresh_proof"
+        },
+        {
+          "type": "must_require_fresh_replay_approval"
+        },
+        {
+          "type": "must_not_execute_provider_replay_from_readiness_page"
+        },
+        {
+          "type": "must_not_leak_raw_provider_replay_artifacts"
+        }
+      ]
+    },
+    {
       "id": "admin-provider-replay-handoff-submit-operator",
       "family": "action_execution_safety",
       "stage": "admin-provider-replay",

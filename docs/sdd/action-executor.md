@@ -94,6 +94,13 @@
     不调用 `RedriveProviderFailure`、不修改 DLQ row
   - 不嵌入 raw provider input / output、provider error、new input、operator reason、
     EvidencePack、本机路径或 credential-like 字段
+- `write-provider-replay-readiness-page.ps1`：
+  - 在 admin operation 已 `APPROVED`、workflow decision manifest 为 `APPROVE` 后使用
+  - 重新绑定原 handoff candidate、approved admin operation、workflow manifest 和 fresh Agent proof
+  - fresh proof 只允许 proposal / approval / prepared audit refs、skill / tool / resource hash、
+    new input sha256 和 reason sha256；不得包含 raw new input、raw reason 或 raw provider artifact
+  - 输出低敏 HTML readiness page，不调用 `RedriveProviderFailure`、不修改 DLQ row、
+    不提交 admin operation、不记录 workflow decision
 - `/metrics` / `/debug/metrics`：
   - 输出 provider failure status、retryable、due retry 和 classification 聚合计数
   - 不输出 tenant / user / resource / provider raw error / tool input / output

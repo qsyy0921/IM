@@ -28,6 +28,9 @@
   只接受低敏 handoff artifact，重新校验 contract / payload hash / workflow request /
   final execution owner 后渲染仓库外 HTML；不提交 admin operation、不创建 workflow、
   不记录 approval、不调用 `RedriveProviderFailure`、不修改 DLQ row。
+- Provider replay execution readiness page：`write-provider-replay-readiness-page.ps1`
+  绑定原 handoff、approved admin operation、workflow APPROVE manifest 和 fresh Agent
+  proof；页面只输出 refs / hashes，不调用 redrive、不修改 DLQ、不泄漏 raw provider artifact。
 - Docker / Prometheus / Grafana wiring、focused tests、PG integration、ai-eval action preflight safety adapter。
 
 ## 边界
@@ -40,6 +43,7 @@
   仍只能走 `RedriveProviderFailure`。
 - Provider replay handoff review page 只是 operator 提交前的只读检查页，不是 admin submit、
   workflow decision、approval 或 redrive 证明。
+- Provider replay readiness page 只是最终 redrive 前的低敏绑定检查，不是 redrive 已执行证明。
 - 真实业务 mutation 必须新增显式 adapter、公开业务 API、operator / policy 边界。
 
 ## 下一步

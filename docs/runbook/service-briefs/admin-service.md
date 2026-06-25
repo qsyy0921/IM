@@ -29,6 +29,9 @@ operator CLI 和 first-stage downstream adapters 已落。
   `write-provider-replay-handoff-review-page.ps1` 渲染低敏 handoff contract / payload hash /
   workflow request / candidate refs；页面不创建 admin operation、不创建 workflow、不记录
   approval、不执行 redrive。
+- provider replay readiness page：approved admin operation 和 workflow APPROVE manifest
+  准备后，可和 fresh Agent proof / 原 handoff 绑定成低敏 execution readiness page；页面不执行
+  `RedriveProviderFailure`。
 - control-plane adapters：`CONFIG_PUBLISH`、`CONFIG_ROLLBACK`、
   `TENANT_QUOTA_CHANGE`、`POLICY_RULE_CHANGE`。
 - audit adapter：`AUDIT_EXPORT_REQUEST -> audit-service.CreateAuditExport`；

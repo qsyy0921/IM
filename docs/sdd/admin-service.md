@@ -197,6 +197,10 @@ workflow 创建仍由 admin-service operation-worker 负责。
 `write-provider-replay-handoff-review-page.ps1` 可在 submit 前把 handoff artifact 渲染成
 低敏 HTML 审查页；该页面不提交 admin operation、不创建 workflow、不记录 approval、
 不调用 action-executor redrive，也不泄漏 raw provider artifact。
+`write-provider-replay-readiness-page.ps1` 可在 admin operation approved 和 workflow
+APPROVE manifest 准备好后，把 approved admin operation、workflow manifest、fresh Agent
+proof 和原 handoff 绑定成最终执行前的低敏 readiness page；该页面仍不调用
+`RedriveProviderFailure`，只证明 admin / workflow / fresh proof 边界满足。
 
 第一版真实下游 adapter 已覆盖四类非 `CRITICAL` 的 control-plane operation：
 

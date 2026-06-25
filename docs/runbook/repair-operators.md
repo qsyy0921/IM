@@ -340,6 +340,21 @@ required gates；不提交 admin operation、不创建 workflow、不记录 appr
 `RedriveProviderFailure`、不修改 DLQ row，也不输出 raw provider input / output、provider
 error、new input、operator reason、EvidencePack 或本机路径。
 
+admin operation 和 workflow decision 都完成后，可用以下命令把 approved admin operation、
+workflow APPROVE manifest、fresh Agent proof 和原 handoff 绑定成最终 redrive 前的低敏
+readiness 审查页：
+
+```powershell
+.\tools\write-provider-replay-readiness-page.ps1 -HandoffPath H:\NexusIM\operator-plans\provider-replay-handoff.json -AdminOperationPath H:\NexusIM\operator-plans\provider-replay-admin-approved.json -WorkflowDecisionManifestPath H:\NexusIM\operator-plans\workflow-decision.json -FreshProofPath H:\NexusIM\operator-plans\provider-replay-fresh-proof.json -GeneratedBy operator-a -OutputPath H:\NexusIM\operator-plans\provider-replay-readiness.html
+```
+
+`provider-replay-fresh-proof.json` 只允许低敏 refs / hashes：schema version、
+replay candidate id、provider failure ref hash、admin operation id / payload hash、
+workflow decision manifest sha256、fresh proposal / approval / prepared audit id、
+skill / tool / resource hash、new input sha256 和 reason sha256。readiness page 不调用
+`RedriveProviderFailure`，只证明最终执行前的 admin approval、workflow approval 和 fresh
+Agent proof 已绑定；raw new input、operator reason、provider artifacts 和本机路径都不得进入页面。
+
 `loadtest/admin` 提供 provider replay handoff operator bridge：`provider-replay-submit`
 读取上面的 handoff artifact，校验 `PROVIDER_REPLAY_REQUEST` contract、payload hash、
 低敏 refs、`direct_execution_allowed=false` 和 `source_dlq_immutable=true` 后，调用

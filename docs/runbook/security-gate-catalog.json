@@ -177,6 +177,13 @@
       "note": "Provider replay handoff review pages must render only low-sensitive admin/workflow refs and hashes, never submit operations, call RedriveProviderFailure, mutate DLQ rows, or leak raw provider artifacts."
     },
     {
+      "name": "provider replay execution readiness page",
+      "category": "operator-safety",
+      "script": "tools/check-provider-replay-readiness-page.ps1",
+      "check_local_label": "provider replay execution readiness page",
+      "note": "Provider replay readiness pages must bind approved admin operation, workflow approval manifest, fresh Agent proof, and source handoff before final redrive; they must not execute RedriveProviderFailure or leak raw provider artifacts."
+    },
+    {
       "name": "approved repair invocation",
       "category": "operator-safety",
       "script": "tools/check-approved-repair-invocation.ps1",

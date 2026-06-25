@@ -21,6 +21,9 @@
 - Provider replay handoff review page case：验证 handoff artifact 渲染 HTML 时只输出
   admin / workflow refs、payload hash、candidate refs 和 required gates，不提交 admin
   operation、不执行 `RedriveProviderFailure`、不泄漏 raw provider artifacts。
+- Provider replay execution readiness page case：验证 approved admin operation、workflow
+  APPROVE manifest、fresh Agent proof 和原 handoff 绑定后才进入最终 redrive 前审查；页面不执行
+  redrive、不泄漏 raw provider artifacts。
 - Provider replay submit operator case：验证 admin operator 从 action-executor handoff
   artifact 创建 `PROVIDER_REPLAY_REQUEST`，校验 payload hash，且 submit 阶段不执行 replay。
 - Workflow provider replay queue view case：验证 workflow-service 只列低敏

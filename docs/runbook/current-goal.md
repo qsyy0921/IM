@@ -31,6 +31,10 @@ Agent action boundary / repair cases：在 provider replay admin / workflow hand
   workflow request、final execution owner、`direct_execution_allowed=false` 和
   `source_dlq_immutable=true`；页面不提交 admin operation、不创建 workflow、不记录 approval、
   不调用 `RedriveProviderFailure`、不暴露 raw provider artifacts。
+- provider replay execution readiness page 已落：`write-provider-replay-readiness-page.ps1`
+  将原 handoff、approved admin operation、workflow APPROVE manifest 和 fresh Agent proof
+  绑定成最终 redrive 前的低敏 HTML；它只展示 refs / hashes，不执行 redrive、不修改 DLQ row、
+  不包含 raw new input / reason / provider artifacts。
 - provider replay admin operator bridge 已落：`loadtest/admin provider-replay-submit`
   校验 handoff contract / payload hash / 低敏 refs 后创建 `PROVIDER_REPLAY_REQUEST`；
   `provider-replay-list` / `provider-replay-approve` / `provider-replay-reject` 只做

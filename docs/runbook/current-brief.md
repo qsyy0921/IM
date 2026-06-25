@@ -38,6 +38,10 @@ loadtest report 或 archive。
   将低敏 handoff artifact 渲染为仓库外 HTML，并校验 contract / payload hash / workflow
   request / final execution owner；页面不提交 admin operation、不创建 workflow、不记录
   approval、不调用 redrive、不泄漏 raw provider artifacts。
+- provider replay execution readiness page 已收口：`write-provider-replay-readiness-page.ps1`
+  绑定原 handoff、approved admin operation、workflow APPROVE manifest 和 fresh Agent proof，
+  生成最终 redrive 前低敏审查页；页面不调用 redrive、不修改 DLQ、不泄漏 raw new input /
+  reason / provider artifacts。
 - provider replay admin operator bridge 已收口：`loadtest/admin provider-replay-submit`
   读取低敏 handoff artifact 并创建 `PROVIDER_REPLAY_REQUEST`；`provider-replay-list` /
   `provider-replay-approve` / `provider-replay-reject` 提供第一版列表和审批 UX，不执行 redrive。

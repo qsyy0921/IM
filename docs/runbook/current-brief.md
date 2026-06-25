@@ -23,7 +23,8 @@ brief、loadtest report、development-progress 或 archive。
   approval binding、operator queues、external callback wait、external callback
   delivery plan、delivery status / redrive plan、external callback delivery
   persistent worker first path、external callback delivery redrive operator path、
-  external callback delivery review page / dashboard、approval queue review page、
+  external callback delivery review page / dashboard / batch redrive invocation
+  manifest、approval queue review page、
   compensation review bundle / page、instruction approval page、execution readiness /
   invocation manifest、execution result visibility、audit append manifest handoff 和
   audit append result manifest。

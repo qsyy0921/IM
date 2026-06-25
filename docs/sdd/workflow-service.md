@@ -246,7 +246,16 @@ delivery triage dashboard：它读取仓库外一组 `external_callback_delivery
 仍为 `WAITING_DECISION`、redrive plan 只对应 retry / DLQ status，并输出状态计数、
 redrive candidate 和低敏 refs / hashes。dashboard 不调用 provider、不记录 decision、
 不执行 redrive、不执行 target action，也不输出本机路径、provider material、payload
-material、model input 或 auth material。当前 first path 已新增
+material、model input 或 auth material。
+`write-workflow-external-callback-batch-redrive-invocation.ps1` 提供第一版本地批量
+redrive invocation manifest：它读取仓库外一组
+`nexusim.workflow.external_callback_redrive_plan.v1` artifact，重新校验每个 redrive
+plan 的 workflow binding、retry / DLQ source status、no-execution contract、
+dedupe key 和 low-sensitive refs，并可绑定 dashboard hash 作为人工 review evidence。
+manifest 只枚举 `external-callback-delivery-redrive` runtime contract 和每个 plan 的
+hash / ref，不调用 workflow-service、不重新入队、不调用 provider、不记录 decision、
+不执行 target action，也不输出本机路径、provider material、payload material、model
+input 或 auth material。当前 first path 已新增
 `workflow_external_callback_deliveries` 持久 job 和
 `external-callback-delivery-import` / `external-callback-delivery-worker` /
 `external-callback-delivery-redrive` 运行模式：
@@ -517,6 +526,7 @@ go run ./loadtest/workflow -mode record-decision -decision-manifest H:\NexusIM\o
 go run ./loadtest/workflow -mode operator-queues
 .\tools\write-workflow-approval-queue-review-page.ps1 -QueueSummaryPath H:\NexusIM\operator-plans\workflow-operator-queues.json -GeneratedBy operator-a -OutputPath H:\NexusIM\operator-plans\workflow-approval-queue-review.html
 .\tools\write-workflow-external-callback-delivery-dashboard.ps1 -DeliveryStatusRootPath H:\NexusIM\operator-plans\workflow-callback-statuses -RedrivePlanRootPath H:\NexusIM\operator-plans\workflow-callback-redrives -GeneratedBy operator-a -OutputPath H:\NexusIM\operator-plans\workflow-callback-delivery-dashboard.html
+.\tools\write-workflow-external-callback-batch-redrive-invocation.ps1 -RedrivePlanRootPath H:\NexusIM\operator-plans\workflow-callback-redrives -DashboardPath H:\NexusIM\operator-plans\workflow-callback-delivery-dashboard.html -PreparedBy operator-a -OutputPath H:\NexusIM\operator-plans\workflow-callback-batch-redrive-invocation.json
 go run ./loadtest/workflow -mode list-compensation-instructions -workflow-id wf_123 -status ACTIVE
 go run ./loadtest/workflow -mode list-compensations -workflow-id wf_123 -status SUCCEEDED
 go run ./loadtest/workflow -mode compensation-review-bundle -workflow-id wf_123

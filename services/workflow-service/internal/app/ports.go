@@ -11,6 +11,7 @@ type WorkflowRepository interface {
 	CreateWorkflow(context.Context, domain.PreparedWorkflow) (types.Workflow, bool, error)
 	RecordWorkflowDecision(context.Context, domain.PreparedDecision) (types.Workflow, types.WorkflowDecision, bool, error)
 	GetWorkflow(context.Context, types.GetWorkflowCommand) (types.Workflow, []types.WorkflowDecision, error)
+	ListWorkflows(context.Context, types.ListWorkflowsCommand) ([]types.Workflow, error)
 	ListWorkflowCompensationInstructions(context.Context, types.ListWorkflowCompensationInstructionsCommand) ([]types.WorkflowCompensationInstruction, error)
 }
 

@@ -125,6 +125,63 @@ func TestRepositoryCreateCompensationRequestWorkflowIntegration(t *testing.T) {
 	}
 }
 
+func TestRepositoryListWorkflowsProviderReplayQueueIntegration(t *testing.T) {
+	ctx := context.Background()
+	pool := openWorkflowTestPool(t)
+	resetWorkflowTables(t, ctx, pool)
+	repository := NewRepository(pool)
+
+	providerReplay := prepareWorkflow(t, "wf-provider-replay-idem-1", "wf_provider_replay_1", "wfs_provider_replay_1")
+	providerReplay.Command.WorkflowType = types.WorkflowTypeRepairApproval
+	providerReplay.Command.RiskLevel = types.RiskLevelHigh
+	providerReplay.Command.RequesterService = "admin-service"
+	providerReplay.Command.TargetService = "action-executor"
+	providerReplay.Command.TargetOperation = "PROVIDER_REPLAY_REQUEST"
+	providerReplay.Command.TargetRefHash = "sha256:provider-failure"
+	providerReplay.Command.ApprovalPolicyRef = "admin.workflow.provider_replay.v1"
+	providerReplay.Command.PayloadSchemaVersion = "admin.provider_replay_request.v1"
+	providerReplay.Command.PayloadRefHash = "sha256:provider-replay-payload"
+	providerReplay.CommandHash = domain.HashRef("provider-replay-workflow")
+	if _, _, err := repository.CreateWorkflow(ctx, providerReplay); err != nil {
+		t.Fatalf("create provider replay workflow: %v", err)
+	}
+
+	compensation := prepareWorkflow(t, "wf-compensation-list-idem-1", "wf_compensation_list_1", "wfs_compensation_list_1")
+	compensation.Command.WorkflowType = types.WorkflowTypeCompensationRequest
+	compensation.Command.RiskLevel = types.RiskLevelHigh
+	compensation.Command.RequesterService = "admin-service"
+	compensation.Command.TargetService = "control-plane-service"
+	compensation.Command.TargetOperation = "CONFIG_ROLLBACK"
+	compensation.Command.ApprovalPolicyRef = "admin.workflow.compensation.v1"
+	compensation.Command.PayloadSchemaVersion = "admin.config_rollback.v1"
+	compensation.CommandHash = domain.HashRef("compensation-list-workflow")
+	if _, _, err := repository.CreateWorkflow(ctx, compensation); err != nil {
+		t.Fatalf("create compensation workflow: %v", err)
+	}
+
+	listed, err := repository.ListWorkflows(ctx, types.ListWorkflowsCommand{
+		AuthContext:       types.AuthContext{TenantID: "tenant-workflow-test", ServiceName: "admin-service"},
+		WorkflowType:      types.WorkflowTypeRepairApproval,
+		Status:            types.WorkflowStatusWaitingDecision,
+		TargetService:     "action-executor",
+		TargetOperation:   "PROVIDER_REPLAY_REQUEST",
+		ApprovalPolicyRef: "admin.workflow.provider_replay.v1",
+		PageSize:          10,
+	})
+	if err != nil {
+		t.Fatalf("list provider replay workflows: %v", err)
+	}
+	if len(listed) != 1 {
+		t.Fatalf("expected one provider replay workflow, got %d: %+v", len(listed), listed)
+	}
+	if listed[0].WorkflowID != "wf_provider_replay_1" ||
+		listed[0].TargetService != "action-executor" ||
+		listed[0].TargetOperation != "PROVIDER_REPLAY_REQUEST" ||
+		listed[0].PayloadRefHash != "sha256:provider-replay-payload" {
+		t.Fatalf("unexpected provider replay workflow: %+v", listed[0])
+	}
+}
+
 func TestRepositoryRequestApprovedCompensationsIntegration(t *testing.T) {
 	ctx := context.Background()
 	pool := openWorkflowTestPool(t)

@@ -98,6 +98,7 @@ func runGRPC(ctx context.Context) error {
 		app.NewCreateWorkflowUseCase(repository, ids),
 		app.NewRecordWorkflowDecisionUseCase(repository, ids),
 		app.NewGetWorkflowUseCase(repository),
+		app.NewListWorkflowsUseCase(repository),
 		app.NewListWorkflowCompensationInstructionsUseCase(repository),
 	))
 

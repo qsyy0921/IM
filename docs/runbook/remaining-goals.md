@@ -69,8 +69,8 @@
 - `model-gateway`：provider routing、budget、fallback policy as explicit config、audit。
 - `knowledge-ingestion-service`：file/web imports、chunking pipeline、PII scan、rebuild jobs。
 - `vector-index-service`：real pgvector / OpenSearch vector / Milvus smoke、provider repair。
-- `workflow-service`：provider replay workflow 队列视图、compensation adapter、approval
-  timeout、operator queues。
+- `workflow-service`：更多 compensation adapter、approval timeout、operator queues、
+  provider-grade approval UI / external approval binding。
 
 ## 9 个核心 IM 服务 P2
 

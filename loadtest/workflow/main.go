@@ -30,6 +30,7 @@ type config struct {
 	correlationID        string
 	causationID          string
 	workflowID           string
+	workflowType         string
 	stepID               string
 	decisionManifestPath string
 	deciderRef           string
@@ -39,21 +40,29 @@ type config struct {
 	evidenceRefs         []string
 	idempotencyKey       string
 	status               string
+	targetService        string
+	targetOperation      string
+	approvalPolicyRef    string
 	pageSize             int32
 }
 
 type commandResult struct {
-	Mode         string                       `json:"mode"`
-	Target       string                       `json:"target"`
-	TenantID     string                       `json:"tenant_id"`
-	WorkflowID   string                       `json:"workflow_id"`
-	Status       string                       `json:"status,omitempty"`
-	Workflow     *workflowRef                 `json:"workflow,omitempty"`
-	Decision     *decisionRef                 `json:"decision,omitempty"`
-	Decisions    []decisionRef                `json:"decisions,omitempty"`
-	Instructions []compensationInstructionRef `json:"instructions,omitempty"`
-	Replayed     bool                         `json:"replayed,omitempty"`
-	CheckedAt    time.Time                    `json:"checked_at"`
+	Mode              string                       `json:"mode"`
+	Target            string                       `json:"target"`
+	TenantID          string                       `json:"tenant_id"`
+	WorkflowID        string                       `json:"workflow_id"`
+	WorkflowType      string                       `json:"workflow_type,omitempty"`
+	Status            string                       `json:"status,omitempty"`
+	TargetService     string                       `json:"target_service,omitempty"`
+	TargetOperation   string                       `json:"target_operation,omitempty"`
+	ApprovalPolicyRef string                       `json:"approval_policy_ref,omitempty"`
+	Workflow          *workflowRef                 `json:"workflow,omitempty"`
+	Workflows         []workflowRef                `json:"workflows,omitempty"`
+	Decision          *decisionRef                 `json:"decision,omitempty"`
+	Decisions         []decisionRef                `json:"decisions,omitempty"`
+	Instructions      []compensationInstructionRef `json:"instructions,omitempty"`
+	Replayed          bool                         `json:"replayed,omitempty"`
+	CheckedAt         time.Time                    `json:"checked_at"`
 }
 
 type workflowRef struct {
@@ -143,7 +152,7 @@ func main() {
 func parseFlags(args []string) config {
 	cfg := config{}
 	flags := flag.NewFlagSet("workflow-operator", flag.ExitOnError)
-	flags.StringVar(&cfg.mode, "mode", "get", "mode: get, record-decision, list-compensation-instructions")
+	flags.StringVar(&cfg.mode, "mode", "get", "mode: get, record-decision, list-workflows, provider-replay-queue, list-compensation-instructions")
 	flags.StringVar(&cfg.target, "target", envOr("NEXUSIM_WORKFLOW_GRPC_ADDR", "127.0.0.1:10750"), "workflow-service gRPC target")
 	flags.DurationVar(&cfg.requestTimeout, "request-timeout", 5*time.Second, "request timeout")
 	flags.StringVar(&cfg.tls.CAFile, "workflow-tls-ca-file", os.Getenv("NEXUSIM_WORKFLOW_TLS_CA_FILE"), "CA PEM for workflow-service gRPC TLS")
@@ -158,6 +167,7 @@ func parseFlags(args []string) config {
 	flags.StringVar(&cfg.correlationID, "correlation-id", "", "optional correlation id for record-decision")
 	flags.StringVar(&cfg.causationID, "causation-id", "", "optional causation id for record-decision")
 	flags.StringVar(&cfg.workflowID, "workflow-id", "", "workflow id")
+	flags.StringVar(&cfg.workflowType, "workflow-type", "", "workflow type filter for list-workflows")
 	flags.StringVar(&cfg.stepID, "step-id", "", "workflow step id for record-decision")
 	flags.StringVar(&cfg.decisionManifestPath, "decision-manifest", "", "optional low-sensitive decision manifest JSON for record-decision")
 	flags.StringVar(&cfg.deciderRef, "decider-ref", "operator:workflow-cli", "low-sensitive decider ref for record-decision")
@@ -167,7 +177,10 @@ func parseFlags(args []string) config {
 	var evidenceRefs string
 	flags.StringVar(&evidenceRefs, "evidence-refs", "evidence:workflow-cli", "comma-separated low-sensitive evidence refs")
 	flags.StringVar(&cfg.idempotencyKey, "idempotency-key", "", "idempotency key for record-decision")
-	flags.StringVar(&cfg.status, "status", "", "optional instruction status filter")
+	flags.StringVar(&cfg.status, "status", "", "optional workflow or instruction status filter")
+	flags.StringVar(&cfg.targetService, "target-service", "", "target service filter for list-workflows")
+	flags.StringVar(&cfg.targetOperation, "target-operation", "", "target operation filter for list-workflows")
+	flags.StringVar(&cfg.approvalPolicyRef, "approval-policy-ref", "", "approval policy ref filter for list-workflows")
 	var pageSize int
 	flags.IntVar(&pageSize, "page-size", 50, "list page size")
 	_ = flags.Parse(args)
@@ -179,6 +192,7 @@ func parseFlags(args []string) config {
 	cfg.causationID = strings.TrimSpace(cfg.causationID)
 	cfg.decisionManifestPath = strings.TrimSpace(cfg.decisionManifestPath)
 	cfg.workflowID = strings.TrimSpace(cfg.workflowID)
+	cfg.workflowType = strings.ToUpper(strings.TrimSpace(cfg.workflowType))
 	cfg.stepID = strings.TrimSpace(cfg.stepID)
 	cfg.deciderRef = strings.TrimSpace(cfg.deciderRef)
 	cfg.decision = strings.ToUpper(strings.TrimSpace(cfg.decision))
@@ -186,6 +200,9 @@ func parseFlags(args []string) config {
 	cfg.reasonRef = strings.TrimSpace(cfg.reasonRef)
 	cfg.evidenceRefs = splitCSV(evidenceRefs)
 	cfg.idempotencyKey = strings.TrimSpace(cfg.idempotencyKey)
+	cfg.targetService = strings.TrimSpace(cfg.targetService)
+	cfg.targetOperation = strings.TrimSpace(cfg.targetOperation)
+	cfg.approvalPolicyRef = strings.TrimSpace(cfg.approvalPolicyRef)
 	cfg.pageSize = int32(pageSize)
 	return fillDerivedDefaults(cfg)
 }
@@ -205,6 +222,23 @@ func fillDerivedDefaults(cfg config) config {
 	}
 	if cfg.idempotencyKey == "" && cfg.mode == "record-decision" {
 		cfg.idempotencyKey = "decision:" + cfg.workflowID + ":" + cfg.stepID + ":" + cfg.decision + ":" + cfg.deciderRef
+	}
+	if cfg.mode == "provider-replay-queue" {
+		if cfg.workflowType == "" {
+			cfg.workflowType = "REPAIR_APPROVAL"
+		}
+		if cfg.status == "" {
+			cfg.status = "WAITING_DECISION"
+		}
+		if cfg.targetService == "" {
+			cfg.targetService = "action-executor"
+		}
+		if cfg.targetOperation == "" {
+			cfg.targetOperation = "PROVIDER_REPLAY_REQUEST"
+		}
+		if cfg.approvalPolicyRef == "" {
+			cfg.approvalPolicyRef = "admin.workflow.provider_replay.v1"
+		}
 	}
 	return cfg
 }
@@ -300,12 +334,16 @@ func readDecisionManifest(path string) (decisionManifest, error) {
 
 func execute(ctx context.Context, cfg config, client workflowv1.WorkflowServiceClient) (commandResult, error) {
 	result := commandResult{
-		Mode:       cfg.mode,
-		Target:     cfg.target,
-		TenantID:   cfg.tenantID,
-		WorkflowID: cfg.workflowID,
-		Status:     cfg.status,
-		CheckedAt:  time.Now().UTC(),
+		Mode:              cfg.mode,
+		Target:            cfg.target,
+		TenantID:          cfg.tenantID,
+		WorkflowID:        cfg.workflowID,
+		WorkflowType:      cfg.workflowType,
+		Status:            cfg.status,
+		TargetService:     cfg.targetService,
+		TargetOperation:   cfg.targetOperation,
+		ApprovalPolicyRef: cfg.approvalPolicyRef,
+		CheckedAt:         time.Now().UTC(),
 	}
 	switch cfg.mode {
 	case "get":
@@ -319,6 +357,24 @@ func execute(ctx context.Context, cfg config, client workflowv1.WorkflowServiceC
 		result.Workflow = summarizeWorkflow(response.GetWorkflow())
 		for _, decision := range response.GetDecisions() {
 			result.Decisions = append(result.Decisions, summarizeDecision(decision))
+		}
+	case "list-workflows", "provider-replay-queue":
+		response, err := client.ListWorkflows(ctx, &workflowv1.ListWorkflowsRequest{
+			AuthContext:       authContext(cfg),
+			WorkflowType:      cfg.workflowType,
+			Status:            cfg.status,
+			TargetService:     cfg.targetService,
+			TargetOperation:   cfg.targetOperation,
+			ApprovalPolicyRef: cfg.approvalPolicyRef,
+			PageSize:          cfg.pageSize,
+		})
+		if err != nil {
+			return commandResult{}, fmt.Errorf("list workflows: %w", err)
+		}
+		for _, workflow := range response.GetWorkflows() {
+			if summarized := summarizeWorkflow(workflow); summarized != nil {
+				result.Workflows = append(result.Workflows, *summarized)
+			}
 		}
 	case "record-decision":
 		response, err := client.RecordWorkflowDecision(ctx, &workflowv1.RecordWorkflowDecisionRequest{
@@ -371,11 +427,11 @@ func (cfg config) validate() error {
 	if strings.TrimSpace(cfg.userID) == "" {
 		return errors.New("user-id is required")
 	}
-	if strings.TrimSpace(cfg.workflowID) == "" {
-		return errors.New("workflow-id is required")
-	}
 	if !isAllowedMode(cfg.mode) {
 		return fmt.Errorf("unsupported mode %q", cfg.mode)
+	}
+	if requiresWorkflowID(cfg.mode) && strings.TrimSpace(cfg.workflowID) == "" {
+		return errors.New("workflow-id is required")
 	}
 	if cfg.mode == "record-decision" {
 		if strings.TrimSpace(cfg.stepID) == "" {
@@ -403,8 +459,19 @@ func (cfg config) validate() error {
 			return errors.New("idempotency-key is required for record-decision")
 		}
 	}
-	if cfg.mode == "list-compensation-instructions" && cfg.pageSize <= 0 {
+	if isListMode(cfg.mode) && cfg.pageSize <= 0 {
 		return errors.New("page-size must be greater than zero")
+	}
+	if cfg.mode == "list-workflows" || cfg.mode == "provider-replay-queue" {
+		if err := validateLowSensitiveRef("target-service", cfg.targetService); err != nil {
+			return err
+		}
+		if err := validateLowSensitiveRef("target-operation", cfg.targetOperation); err != nil {
+			return err
+		}
+		if err := validateLowSensitiveRef("approval-policy-ref", cfg.approvalPolicyRef); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -523,6 +590,20 @@ func summarizeInstruction(instruction *workflowv1.WorkflowCompensationInstructio
 func isAllowedMode(value string) bool {
 	return value == "get" ||
 		value == "record-decision" ||
+		value == "list-workflows" ||
+		value == "provider-replay-queue" ||
+		value == "list-compensation-instructions"
+}
+
+func requiresWorkflowID(value string) bool {
+	return value == "get" ||
+		value == "record-decision" ||
+		value == "list-compensation-instructions"
+}
+
+func isListMode(value string) bool {
+	return value == "list-workflows" ||
+		value == "provider-replay-queue" ||
 		value == "list-compensation-instructions"
 }
 

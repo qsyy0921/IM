@@ -8,6 +8,7 @@ service WorkflowService {
   rpc CreateWorkflow(CreateWorkflowRequest) returns (CreateWorkflowResponse);
   rpc RecordWorkflowDecision(RecordWorkflowDecisionRequest) returns (RecordWorkflowDecisionResponse);
   rpc GetWorkflow(GetWorkflowRequest) returns (GetWorkflowResponse);
+  rpc ListWorkflows(ListWorkflowsRequest) returns (ListWorkflowsResponse);
   rpc ListWorkflowCompensationInstructions(ListWorkflowCompensationInstructionsRequest) returns (ListWorkflowCompensationInstructionsResponse);
 }
 
@@ -135,6 +136,20 @@ message GetWorkflowRequest {
 message GetWorkflowResponse {
   Workflow workflow = 1;
   repeated WorkflowDecision decisions = 2;
+}
+
+message ListWorkflowsRequest {
+  AuthContext auth_context = 1;
+  string workflow_type = 2;
+  string status = 3;
+  string target_service = 4;
+  string target_operation = 5;
+  string approval_policy_ref = 6;
+  int32 page_size = 7;
+}
+
+message ListWorkflowsResponse {
+  repeated Workflow workflows = 1;
 }
 
 message ListWorkflowCompensationInstructionsRequest {

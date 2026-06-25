@@ -239,14 +239,21 @@ workflow-service PostgreSQL 私表：
 .\tools\write-workflow-compensation-instruction-manifest.ps1 -OutputPath H:\NexusIM\operator-plans\workflow-compensation-instruction.json -WorkflowID wf_123 -PayloadRefFile H:\NexusIM\operator-plans\rollback-payload-ref.txt -Environment local -ConfigKind API_GATEWAY_TENANT_QUOTA -BundleKey tenant-a -TargetVersion quota-v1 -OperatorRef operator:rollback -ReasonFile H:\NexusIM\operator-plans\rollback-reason.txt
 .\tools\validate-workflow-compensation-instruction-manifest.ps1 -ManifestPath H:\NexusIM\operator-plans\workflow-compensation-instruction.json -ExpectedWorkflowID wf_123 -ExpectedTargetVersion quota-v1
 go run ./loadtest/workflow -mode get -workflow-id wf_123
+go run ./loadtest/workflow -mode provider-replay-queue
+go run ./loadtest/workflow -mode list-workflows -workflow-type REPAIR_APPROVAL -status WAITING_DECISION -target-service action-executor -target-operation PROVIDER_REPLAY_REQUEST -approval-policy-ref admin.workflow.provider_replay.v1
 go run ./loadtest/workflow -mode record-decision -workflow-id wf_123 -step-id wfs_1 -decision APPROVE -decider-ref operator:a
 go run ./loadtest/workflow -mode record-decision -decision-manifest H:\NexusIM\operator-plans\workflow-decision.json
 go run ./loadtest/workflow -mode list-compensation-instructions -workflow-id wf_123 -status ACTIVE
 ```
 
 可用 `-target` 或 `NEXUSIM_WORKFLOW_GRPC_ADDR` 指向 workflow-service gRPC，
-并支持 `NEXUSIM_WORKFLOW_TLS_*` / `-workflow-tls-*` 配置 TLS / mTLS。输出只包含
-workflow metadata、decision refs、instruction id、payload ref hash、target service /
+并支持 `NEXUSIM_WORKFLOW_TLS_*` / `-workflow-tls-*` 配置 TLS / mTLS。
+`provider-replay-queue` 是 `list-workflows` 的显式 provider replay 队列视图，默认只列
+`REPAIR_APPROVAL`、`WAITING_DECISION`、`target_service=action-executor`、
+`target_operation=PROVIDER_REPLAY_REQUEST`、`approval_policy_ref=admin.workflow.provider_replay.v1`
+的 workflow；它只辅助 operator 找到待审批工作流，不执行 redrive、不调用
+action-executor、不修改 provider failure / DLQ row。输出只包含 workflow metadata、
+decision refs、instruction id、payload ref hash、target service /
 operation、version 和状态等低敏字段，不输出 workflow payload、instruction payload、
 operator reason 原文或 downstream response body。它是 first-stage ops visibility，
 不是正式审批 UI 或执行器。`record-decision` 还会在本地拒绝看起来像 secret /

@@ -30,7 +30,7 @@ func TestListWorkflowCompensationInstructions(t *testing.T) {
 		CreatedAt:       time.Unix(10, 0).UTC(),
 		UpdatedAt:       time.Unix(20, 0).UTC(),
 	}}}
-	server := NewServer(nil, nil, nil, executor)
+	server := NewServer(nil, nil, nil, nil, executor)
 	response, err := server.ListWorkflowCompensationInstructions(context.Background(), &workflowv1.ListWorkflowCompensationInstructionsRequest{
 		AuthContext: &workflowv1.AuthContext{TenantId: "tenant-workflow-test", ServiceName: "admin-service"},
 		WorkflowId:  "wf_1",
@@ -56,7 +56,7 @@ func TestListWorkflowCompensationInstructions(t *testing.T) {
 }
 
 func TestListWorkflowCompensationInstructionsPermissionDenied(t *testing.T) {
-	server := NewServer(nil, nil, nil, &fakeListInstructionsExecutor{err: types.ErrPermissionDenied})
+	server := NewServer(nil, nil, nil, nil, &fakeListInstructionsExecutor{err: types.ErrPermissionDenied})
 	_, err := server.ListWorkflowCompensationInstructions(context.Background(), &workflowv1.ListWorkflowCompensationInstructionsRequest{
 		AuthContext: &workflowv1.AuthContext{TenantId: "tenant-workflow-test", ServiceName: "admin-service"},
 		WorkflowId:  "wf_1",
@@ -81,3 +81,82 @@ func (executor *fakeListInstructionsExecutor) Execute(_ context.Context, command
 }
 
 var _ ListWorkflowCompensationInstructionsExecutor = (*fakeListInstructionsExecutor)(nil)
+
+func TestListWorkflows(t *testing.T) {
+	executor := &fakeListWorkflowsExecutor{workflows: []types.Workflow{{
+		TenantID:             "tenant-workflow-test",
+		WorkflowID:           "wf_provider_replay_1",
+		WorkflowType:         types.WorkflowTypeRepairApproval,
+		RiskLevel:            types.RiskLevelHigh,
+		RequesterRef:         "admin-operation:provider-replay",
+		RequesterService:     "admin-service",
+		TargetService:        "action-executor",
+		TargetOperation:      "PROVIDER_REPLAY_REQUEST",
+		TargetRefHash:        "sha256:provider-failure",
+		PayloadSchemaVersion: "admin.provider_replay_request.v1",
+		PayloadRefHash:       "sha256:provider-replay-payload",
+		ApprovalPolicyRef:    "admin.workflow.provider_replay.v1",
+		ReasonRef:            "reason-sha256:provider-replay",
+		Status:               types.WorkflowStatusWaitingDecision,
+		CurrentStepID:        "wfs_provider_replay_1",
+		CreatedAt:            time.Unix(10, 0).UTC(),
+		UpdatedAt:            time.Unix(20, 0).UTC(),
+	}}}
+	server := NewServer(nil, nil, nil, executor, nil)
+	response, err := server.ListWorkflows(context.Background(), &workflowv1.ListWorkflowsRequest{
+		AuthContext:       &workflowv1.AuthContext{TenantId: "tenant-workflow-test", ServiceName: "admin-service"},
+		WorkflowType:      "REPAIR_APPROVAL",
+		Status:            "WAITING_DECISION",
+		TargetService:     "action-executor",
+		TargetOperation:   "PROVIDER_REPLAY_REQUEST",
+		ApprovalPolicyRef: "admin.workflow.provider_replay.v1",
+		PageSize:          5,
+	})
+	if err != nil {
+		t.Fatalf("list workflows: %v", err)
+	}
+	if executor.command.WorkflowType != "REPAIR_APPROVAL" ||
+		executor.command.TargetService != "action-executor" ||
+		executor.command.TargetOperation != "PROVIDER_REPLAY_REQUEST" ||
+		executor.command.ApprovalPolicyRef != "admin.workflow.provider_replay.v1" ||
+		executor.command.PageSize != 5 {
+		t.Fatalf("unexpected command: %+v", executor.command)
+	}
+	if len(response.GetWorkflows()) != 1 {
+		t.Fatalf("expected one workflow, got %d", len(response.GetWorkflows()))
+	}
+	workflow := response.GetWorkflows()[0]
+	if workflow.GetWorkflowId() != "wf_provider_replay_1" ||
+		workflow.GetTargetService() != "action-executor" ||
+		workflow.GetPayloadRefHash() != "sha256:provider-replay-payload" ||
+		workflow.GetCreatedAtUnixMs() == 0 {
+		t.Fatalf("unexpected workflow response: %+v", workflow)
+	}
+}
+
+func TestListWorkflowsPermissionDenied(t *testing.T) {
+	server := NewServer(nil, nil, nil, &fakeListWorkflowsExecutor{err: types.ErrPermissionDenied}, nil)
+	_, err := server.ListWorkflows(context.Background(), &workflowv1.ListWorkflowsRequest{
+		AuthContext: &workflowv1.AuthContext{TenantId: "tenant-workflow-test", ServiceName: "admin-service"},
+		PageSize:    5,
+	})
+	if status.Code(err) != codes.PermissionDenied {
+		t.Fatalf("expected permission denied, got %v", err)
+	}
+}
+
+type fakeListWorkflowsExecutor struct {
+	command   types.ListWorkflowsCommand
+	workflows []types.Workflow
+	err       error
+}
+
+func (executor *fakeListWorkflowsExecutor) Execute(_ context.Context, command types.ListWorkflowsCommand) ([]types.Workflow, error) {
+	executor.command = command
+	if executor.err != nil {
+		return nil, executor.err
+	}
+	return executor.workflows, nil
+}
+
+var _ ListWorkflowsExecutor = (*fakeListWorkflowsExecutor)(nil)

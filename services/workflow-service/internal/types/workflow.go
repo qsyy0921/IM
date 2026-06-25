@@ -87,6 +87,16 @@ type GetWorkflowCommand struct {
 	WorkflowID  string
 }
 
+type ListWorkflowsCommand struct {
+	AuthContext       AuthContext
+	WorkflowType      string
+	Status            string
+	TargetService     string
+	TargetOperation   string
+	ApprovalPolicyRef string
+	PageSize          int
+}
+
 type ListWorkflowCompensationInstructionsCommand struct {
 	AuthContext AuthContext
 	WorkflowID  string
@@ -318,6 +328,41 @@ func (command GetWorkflowCommand) Validate() error {
 	return nil
 }
 
+func (command ListWorkflowsCommand) Normalized() ListWorkflowsCommand {
+	command.AuthContext = command.AuthContext.Normalized()
+	command.WorkflowType = strings.ToUpper(strings.TrimSpace(command.WorkflowType))
+	command.Status = strings.ToUpper(strings.TrimSpace(command.Status))
+	command.TargetService = strings.TrimSpace(command.TargetService)
+	command.TargetOperation = strings.TrimSpace(command.TargetOperation)
+	command.ApprovalPolicyRef = strings.TrimSpace(command.ApprovalPolicyRef)
+	if command.PageSize <= 0 {
+		command.PageSize = 50
+	}
+	if command.PageSize > 200 {
+		command.PageSize = 200
+	}
+	return command
+}
+
+func (command ListWorkflowsCommand) Validate() error {
+	command = command.Normalized()
+	if err := command.AuthContext.Validate(); err != nil {
+		return err
+	}
+	if command.WorkflowType != "" && !isAllowedWorkflowType(command.WorkflowType) {
+		return NewInvalidArgument("workflow_type is unsupported")
+	}
+	if command.Status != "" && !isAllowedWorkflowStatus(command.Status) {
+		return NewInvalidArgument("workflow status is unsupported")
+	}
+	if looksSensitive(command.TargetService) ||
+		looksSensitive(command.TargetOperation) ||
+		looksSensitive(command.ApprovalPolicyRef) {
+		return NewInvalidArgument("workflow list filters must be low-sensitive refs")
+	}
+	return nil
+}
+
 func (command ListWorkflowCompensationInstructionsCommand) Normalized() ListWorkflowCompensationInstructionsCommand {
 	command.AuthContext = command.AuthContext.Normalized()
 	command.WorkflowID = strings.TrimSpace(command.WorkflowID)
@@ -413,6 +458,20 @@ func isAllowedWorkflowType(value string) bool {
 func isAllowedRiskLevel(value string) bool {
 	switch value {
 	case RiskLevelLow, RiskLevelMedium, RiskLevelHigh, RiskLevelCritical:
+		return true
+	default:
+		return false
+	}
+}
+
+func isAllowedWorkflowStatus(value string) bool {
+	switch value {
+	case WorkflowStatusWaitingDecision,
+		WorkflowStatusApproved,
+		WorkflowStatusRejected,
+		WorkflowStatusCanceled,
+		WorkflowStatusCompensationPending,
+		WorkflowStatusCompensated:
 		return true
 	default:
 		return false

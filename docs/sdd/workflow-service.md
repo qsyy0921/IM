@@ -149,6 +149,22 @@ workflow-service 只记录审批状态和低敏 refs；它不执行 provider rep
 `RedriveProviderFailure`。workflow decision 完成后，后续仍需要 fresh Agent proposal /
 approval / prepared audit / new input / reason hash，再由 action-executor 执行。
 
+第一版 operator queue view 使用 `ListWorkflows` 暴露低敏 workflow metadata，可按
+`workflow_type`、`status`、`target_service`、`target_operation` 和
+`approval_policy_ref` 过滤。`loadtest/workflow -mode provider-replay-queue` 默认查询：
+
+```text
+workflow_type=REPAIR_APPROVAL
+status=WAITING_DECISION
+target_service=action-executor
+target_operation=PROVIDER_REPLAY_REQUEST
+approval_policy_ref=admin.workflow.provider_replay.v1
+```
+
+该视图只展示 workflow id、目标、policy、payload/ref hash、status、step 和时间戳等
+低敏字段，不读取 action-executor provider failure raw payload，不修改 DLQ row，也不执行
+`RedriveProviderFailure`。
+
 `RecordWorkflowDecision` 请求字段：
 
 ```text
@@ -452,13 +468,15 @@ workflow-outbox-repair
 .\tools\write-workflow-compensation-instruction-manifest.ps1 -OutputPath H:\NexusIM\operator-plans\workflow-compensation-instruction.json -WorkflowID wf_123 -PayloadRefFile H:\NexusIM\operator-plans\rollback-payload-ref.txt -Environment local -ConfigKind API_GATEWAY_TENANT_QUOTA -BundleKey tenant-a -TargetVersion quota-v1 -OperatorRef operator:rollback -ReasonFile H:\NexusIM\operator-plans\rollback-reason.txt
 .\tools\validate-workflow-compensation-instruction-manifest.ps1 -ManifestPath H:\NexusIM\operator-plans\workflow-compensation-instruction.json -ExpectedWorkflowID wf_123 -ExpectedTargetVersion quota-v1
 go run ./loadtest/workflow -mode get -workflow-id wf_123
+go run ./loadtest/workflow -mode provider-replay-queue
+go run ./loadtest/workflow -mode list-workflows -workflow-type REPAIR_APPROVAL -status WAITING_DECISION -target-service action-executor -target-operation PROVIDER_REPLAY_REQUEST -approval-policy-ref admin.workflow.provider_replay.v1
 go run ./loadtest/workflow -mode record-decision -workflow-id wf_123 -step-id wfs_1 -decision APPROVE -decider-ref operator:a
 go run ./loadtest/workflow -mode record-decision -decision-manifest H:\NexusIM\operator-plans\workflow-decision.json
 go run ./loadtest/workflow -mode list-compensation-instructions -workflow-id wf_123 -status ACTIVE
 ```
 
-该 CLI 只通过 workflow-service 公开 gRPC get workflow、record decision 和查询
-低敏 instruction refs / version / status，不读 PostgreSQL 私表，不输出 workflow
+该 CLI 只通过 workflow-service 公开 gRPC get workflow、list workflows、record decision
+和查询低敏 instruction refs / version / status，不读 PostgreSQL 私表，不输出 workflow
 payload、instruction payload、reason 原文或 downstream response body。`record-decision`
 模式会在本机拒绝看起来像 secret / token / password / raw body / DSN 的
 `decider-ref`、`decision-policy-ref`、`reason-ref` 或 `evidence-refs`，避免

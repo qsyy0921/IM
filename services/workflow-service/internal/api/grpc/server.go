@@ -25,6 +25,10 @@ type GetWorkflowExecutor interface {
 	Execute(context.Context, types.GetWorkflowCommand) (types.Workflow, []types.WorkflowDecision, error)
 }
 
+type ListWorkflowsExecutor interface {
+	Execute(context.Context, types.ListWorkflowsCommand) ([]types.Workflow, error)
+}
+
 type ListWorkflowCompensationInstructionsExecutor interface {
 	Execute(context.Context, types.ListWorkflowCompensationInstructionsCommand) ([]types.WorkflowCompensationInstruction, error)
 }
@@ -34,6 +38,7 @@ type Server struct {
 	createWorkflow   CreateWorkflowExecutor
 	recordDecision   RecordWorkflowDecisionExecutor
 	getWorkflow      GetWorkflowExecutor
+	listWorkflows    ListWorkflowsExecutor
 	listInstructions ListWorkflowCompensationInstructionsExecutor
 }
 
@@ -41,12 +46,14 @@ func NewServer(
 	createWorkflow CreateWorkflowExecutor,
 	recordDecision RecordWorkflowDecisionExecutor,
 	getWorkflow GetWorkflowExecutor,
+	listWorkflows ListWorkflowsExecutor,
 	listInstructions ListWorkflowCompensationInstructionsExecutor,
 ) *Server {
 	return &Server{
 		createWorkflow:   createWorkflow,
 		recordDecision:   recordDecision,
 		getWorkflow:      getWorkflow,
+		listWorkflows:    listWorkflows,
 		listInstructions: listInstructions,
 	}
 }
@@ -152,6 +159,36 @@ func (server *Server) GetWorkflow(
 	response := &workflowv1.GetWorkflowResponse{Workflow: workflowToProto(workflow)}
 	for _, decision := range decisions {
 		response.Decisions = append(response.Decisions, decisionToProto(decision))
+	}
+	return response, nil
+}
+
+func (server *Server) ListWorkflows(
+	ctx context.Context,
+	request *workflowv1.ListWorkflowsRequest,
+) (*workflowv1.ListWorkflowsResponse, error) {
+	if request == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+	auth, ok := authFromProto(ctx, request.GetAuthContext())
+	if !ok {
+		return nil, status.Error(codes.InvalidArgument, "auth_context is required")
+	}
+	workflows, err := server.listWorkflows.Execute(ctx, types.ListWorkflowsCommand{
+		AuthContext:       auth,
+		WorkflowType:      request.GetWorkflowType(),
+		Status:            request.GetStatus(),
+		TargetService:     request.GetTargetService(),
+		TargetOperation:   request.GetTargetOperation(),
+		ApprovalPolicyRef: request.GetApprovalPolicyRef(),
+		PageSize:          int(request.GetPageSize()),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	response := &workflowv1.ListWorkflowsResponse{}
+	for _, workflow := range workflows {
+		response.Workflows = append(response.Workflows, workflowToProto(workflow))
 	}
 	return response, nil
 }

@@ -37,6 +37,10 @@ loadtest report 或 archive。
 - provider replay admin operator bridge 已收口：`loadtest/admin provider-replay-submit`
   读取低敏 handoff artifact 并创建 `PROVIDER_REPLAY_REQUEST`；`provider-replay-list` /
   `provider-replay-approve` / `provider-replay-reject` 提供第一版列表和审批 UX，不执行 redrive。
+- workflow provider replay 队列视图已收口：workflow-service 公开 `ListWorkflows`
+  低敏查询，`loadtest/workflow provider-replay-queue` 默认列出等待
+  `admin.workflow.provider_replay.v1` 审批的 `REPAIR_APPROVAL` / action-executor
+  `PROVIDER_REPLAY_REQUEST` workflow；它只展示 refs / hash / 状态，不执行 redrive。
 - group memory / multi-party collaboration 必须继续保留 source refs、conversation scope、
   member visibility、time/version boundary、citations 和 no-citation refusal。
 

@@ -264,6 +264,10 @@ func (client *fakeWorkflowClient) GetWorkflow(context.Context, *workflowv1.GetWo
 	return nil, status.Error(codes.Unimplemented, "not implemented")
 }
 
+func (client *fakeWorkflowClient) ListWorkflows(context.Context, *workflowv1.ListWorkflowsRequest, ...grpc.CallOption) (*workflowv1.ListWorkflowsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not implemented")
+}
+
 func (client *fakeWorkflowClient) ListWorkflowCompensationInstructions(context.Context, *workflowv1.ListWorkflowCompensationInstructionsRequest, ...grpc.CallOption) (*workflowv1.ListWorkflowCompensationInstructionsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "not implemented")
 }

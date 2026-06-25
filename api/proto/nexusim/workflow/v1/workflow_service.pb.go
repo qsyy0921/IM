@@ -1149,6 +1149,142 @@ func (x *GetWorkflowResponse) GetDecisions() []*WorkflowDecision {
 	return nil
 }
 
+type ListWorkflowsRequest struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	AuthContext       *AuthContext           `protobuf:"bytes,1,opt,name=auth_context,json=authContext,proto3" json:"auth_context,omitempty"`
+	WorkflowType      string                 `protobuf:"bytes,2,opt,name=workflow_type,json=workflowType,proto3" json:"workflow_type,omitempty"`
+	Status            string                 `protobuf:"bytes,3,opt,name=status,proto3" json:"status,omitempty"`
+	TargetService     string                 `protobuf:"bytes,4,opt,name=target_service,json=targetService,proto3" json:"target_service,omitempty"`
+	TargetOperation   string                 `protobuf:"bytes,5,opt,name=target_operation,json=targetOperation,proto3" json:"target_operation,omitempty"`
+	ApprovalPolicyRef string                 `protobuf:"bytes,6,opt,name=approval_policy_ref,json=approvalPolicyRef,proto3" json:"approval_policy_ref,omitempty"`
+	PageSize          int32                  `protobuf:"varint,7,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *ListWorkflowsRequest) Reset() {
+	*x = ListWorkflowsRequest{}
+	mi := &file_nexusim_workflow_v1_workflow_service_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListWorkflowsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListWorkflowsRequest) ProtoMessage() {}
+
+func (x *ListWorkflowsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_nexusim_workflow_v1_workflow_service_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListWorkflowsRequest.ProtoReflect.Descriptor instead.
+func (*ListWorkflowsRequest) Descriptor() ([]byte, []int) {
+	return file_nexusim_workflow_v1_workflow_service_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *ListWorkflowsRequest) GetAuthContext() *AuthContext {
+	if x != nil {
+		return x.AuthContext
+	}
+	return nil
+}
+
+func (x *ListWorkflowsRequest) GetWorkflowType() string {
+	if x != nil {
+		return x.WorkflowType
+	}
+	return ""
+}
+
+func (x *ListWorkflowsRequest) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *ListWorkflowsRequest) GetTargetService() string {
+	if x != nil {
+		return x.TargetService
+	}
+	return ""
+}
+
+func (x *ListWorkflowsRequest) GetTargetOperation() string {
+	if x != nil {
+		return x.TargetOperation
+	}
+	return ""
+}
+
+func (x *ListWorkflowsRequest) GetApprovalPolicyRef() string {
+	if x != nil {
+		return x.ApprovalPolicyRef
+	}
+	return ""
+}
+
+func (x *ListWorkflowsRequest) GetPageSize() int32 {
+	if x != nil {
+		return x.PageSize
+	}
+	return 0
+}
+
+type ListWorkflowsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Workflows     []*Workflow            `protobuf:"bytes,1,rep,name=workflows,proto3" json:"workflows,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListWorkflowsResponse) Reset() {
+	*x = ListWorkflowsResponse{}
+	mi := &file_nexusim_workflow_v1_workflow_service_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListWorkflowsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListWorkflowsResponse) ProtoMessage() {}
+
+func (x *ListWorkflowsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_nexusim_workflow_v1_workflow_service_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListWorkflowsResponse.ProtoReflect.Descriptor instead.
+func (*ListWorkflowsResponse) Descriptor() ([]byte, []int) {
+	return file_nexusim_workflow_v1_workflow_service_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *ListWorkflowsResponse) GetWorkflows() []*Workflow {
+	if x != nil {
+		return x.Workflows
+	}
+	return nil
+}
+
 type ListWorkflowCompensationInstructionsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	AuthContext   *AuthContext           `protobuf:"bytes,1,opt,name=auth_context,json=authContext,proto3" json:"auth_context,omitempty"`
@@ -1161,7 +1297,7 @@ type ListWorkflowCompensationInstructionsRequest struct {
 
 func (x *ListWorkflowCompensationInstructionsRequest) Reset() {
 	*x = ListWorkflowCompensationInstructionsRequest{}
-	mi := &file_nexusim_workflow_v1_workflow_service_proto_msgTypes[10]
+	mi := &file_nexusim_workflow_v1_workflow_service_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1173,7 +1309,7 @@ func (x *ListWorkflowCompensationInstructionsRequest) String() string {
 func (*ListWorkflowCompensationInstructionsRequest) ProtoMessage() {}
 
 func (x *ListWorkflowCompensationInstructionsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_nexusim_workflow_v1_workflow_service_proto_msgTypes[10]
+	mi := &file_nexusim_workflow_v1_workflow_service_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1186,7 +1322,7 @@ func (x *ListWorkflowCompensationInstructionsRequest) ProtoReflect() protoreflec
 
 // Deprecated: Use ListWorkflowCompensationInstructionsRequest.ProtoReflect.Descriptor instead.
 func (*ListWorkflowCompensationInstructionsRequest) Descriptor() ([]byte, []int) {
-	return file_nexusim_workflow_v1_workflow_service_proto_rawDescGZIP(), []int{10}
+	return file_nexusim_workflow_v1_workflow_service_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *ListWorkflowCompensationInstructionsRequest) GetAuthContext() *AuthContext {
@@ -1226,7 +1362,7 @@ type ListWorkflowCompensationInstructionsResponse struct {
 
 func (x *ListWorkflowCompensationInstructionsResponse) Reset() {
 	*x = ListWorkflowCompensationInstructionsResponse{}
-	mi := &file_nexusim_workflow_v1_workflow_service_proto_msgTypes[11]
+	mi := &file_nexusim_workflow_v1_workflow_service_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1238,7 +1374,7 @@ func (x *ListWorkflowCompensationInstructionsResponse) String() string {
 func (*ListWorkflowCompensationInstructionsResponse) ProtoMessage() {}
 
 func (x *ListWorkflowCompensationInstructionsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_nexusim_workflow_v1_workflow_service_proto_msgTypes[11]
+	mi := &file_nexusim_workflow_v1_workflow_service_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1251,7 +1387,7 @@ func (x *ListWorkflowCompensationInstructionsResponse) ProtoReflect() protorefle
 
 // Deprecated: Use ListWorkflowCompensationInstructionsResponse.ProtoReflect.Descriptor instead.
 func (*ListWorkflowCompensationInstructionsResponse) Descriptor() ([]byte, []int) {
-	return file_nexusim_workflow_v1_workflow_service_proto_rawDescGZIP(), []int{11}
+	return file_nexusim_workflow_v1_workflow_service_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *ListWorkflowCompensationInstructionsResponse) GetInstructions() []*WorkflowCompensationInstruction {
@@ -1394,7 +1530,17 @@ const file_nexusim_workflow_v1_workflow_service_proto_rawDesc = "" +
 	"workflowId\"\x95\x01\n" +
 	"\x13GetWorkflowResponse\x129\n" +
 	"\bworkflow\x18\x01 \x01(\v2\x1d.nexusim.workflow.v1.WorkflowR\bworkflow\x12C\n" +
-	"\tdecisions\x18\x02 \x03(\v2%.nexusim.workflow.v1.WorkflowDecisionR\tdecisions\"\xc8\x01\n" +
+	"\tdecisions\x18\x02 \x03(\v2%.nexusim.workflow.v1.WorkflowDecisionR\tdecisions\"\xb7\x02\n" +
+	"\x14ListWorkflowsRequest\x12C\n" +
+	"\fauth_context\x18\x01 \x01(\v2 .nexusim.workflow.v1.AuthContextR\vauthContext\x12#\n" +
+	"\rworkflow_type\x18\x02 \x01(\tR\fworkflowType\x12\x16\n" +
+	"\x06status\x18\x03 \x01(\tR\x06status\x12%\n" +
+	"\x0etarget_service\x18\x04 \x01(\tR\rtargetService\x12)\n" +
+	"\x10target_operation\x18\x05 \x01(\tR\x0ftargetOperation\x12.\n" +
+	"\x13approval_policy_ref\x18\x06 \x01(\tR\x11approvalPolicyRef\x12\x1b\n" +
+	"\tpage_size\x18\a \x01(\x05R\bpageSize\"T\n" +
+	"\x15ListWorkflowsResponse\x12;\n" +
+	"\tworkflows\x18\x01 \x03(\v2\x1d.nexusim.workflow.v1.WorkflowR\tworkflows\"\xc8\x01\n" +
 	"+ListWorkflowCompensationInstructionsRequest\x12C\n" +
 	"\fauth_context\x18\x01 \x01(\v2 .nexusim.workflow.v1.AuthContextR\vauthContext\x12\x1f\n" +
 	"\vworkflow_id\x18\x02 \x01(\tR\n" +
@@ -1402,11 +1548,12 @@ const file_nexusim_workflow_v1_workflow_service_proto_rawDesc = "" +
 	"\x06status\x18\x03 \x01(\tR\x06status\x12\x1b\n" +
 	"\tpage_size\x18\x04 \x01(\x05R\bpageSize\"\x88\x01\n" +
 	",ListWorkflowCompensationInstructionsResponse\x12X\n" +
-	"\finstructions\x18\x01 \x03(\v24.nexusim.workflow.v1.WorkflowCompensationInstructionR\finstructions2\x90\x04\n" +
+	"\finstructions\x18\x01 \x03(\v24.nexusim.workflow.v1.WorkflowCompensationInstructionR\finstructions2\xf8\x04\n" +
 	"\x0fWorkflowService\x12i\n" +
 	"\x0eCreateWorkflow\x12*.nexusim.workflow.v1.CreateWorkflowRequest\x1a+.nexusim.workflow.v1.CreateWorkflowResponse\x12\x81\x01\n" +
 	"\x16RecordWorkflowDecision\x122.nexusim.workflow.v1.RecordWorkflowDecisionRequest\x1a3.nexusim.workflow.v1.RecordWorkflowDecisionResponse\x12`\n" +
-	"\vGetWorkflow\x12'.nexusim.workflow.v1.GetWorkflowRequest\x1a(.nexusim.workflow.v1.GetWorkflowResponse\x12\xab\x01\n" +
+	"\vGetWorkflow\x12'.nexusim.workflow.v1.GetWorkflowRequest\x1a(.nexusim.workflow.v1.GetWorkflowResponse\x12f\n" +
+	"\rListWorkflows\x12).nexusim.workflow.v1.ListWorkflowsRequest\x1a*.nexusim.workflow.v1.ListWorkflowsResponse\x12\xab\x01\n" +
 	"$ListWorkflowCompensationInstructions\x12@.nexusim.workflow.v1.ListWorkflowCompensationInstructionsRequest\x1aA.nexusim.workflow.v1.ListWorkflowCompensationInstructionsResponseBAZ?github.com/qsyy0921/IM/api/proto/nexusim/workflow/v1;workflowv1b\x06proto3"
 
 var (
@@ -1421,7 +1568,7 @@ func file_nexusim_workflow_v1_workflow_service_proto_rawDescGZIP() []byte {
 	return file_nexusim_workflow_v1_workflow_service_proto_rawDescData
 }
 
-var file_nexusim_workflow_v1_workflow_service_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
+var file_nexusim_workflow_v1_workflow_service_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
 var file_nexusim_workflow_v1_workflow_service_proto_goTypes = []any{
 	(*AuthContext)(nil),                                  // 0: nexusim.workflow.v1.AuthContext
 	(*Workflow)(nil),                                     // 1: nexusim.workflow.v1.Workflow
@@ -1433,8 +1580,10 @@ var file_nexusim_workflow_v1_workflow_service_proto_goTypes = []any{
 	(*RecordWorkflowDecisionResponse)(nil),               // 7: nexusim.workflow.v1.RecordWorkflowDecisionResponse
 	(*GetWorkflowRequest)(nil),                           // 8: nexusim.workflow.v1.GetWorkflowRequest
 	(*GetWorkflowResponse)(nil),                          // 9: nexusim.workflow.v1.GetWorkflowResponse
-	(*ListWorkflowCompensationInstructionsRequest)(nil),  // 10: nexusim.workflow.v1.ListWorkflowCompensationInstructionsRequest
-	(*ListWorkflowCompensationInstructionsResponse)(nil), // 11: nexusim.workflow.v1.ListWorkflowCompensationInstructionsResponse
+	(*ListWorkflowsRequest)(nil),                         // 10: nexusim.workflow.v1.ListWorkflowsRequest
+	(*ListWorkflowsResponse)(nil),                        // 11: nexusim.workflow.v1.ListWorkflowsResponse
+	(*ListWorkflowCompensationInstructionsRequest)(nil),  // 12: nexusim.workflow.v1.ListWorkflowCompensationInstructionsRequest
+	(*ListWorkflowCompensationInstructionsResponse)(nil), // 13: nexusim.workflow.v1.ListWorkflowCompensationInstructionsResponse
 }
 var file_nexusim_workflow_v1_workflow_service_proto_depIdxs = []int32{
 	0,  // 0: nexusim.workflow.v1.CreateWorkflowRequest.auth_context:type_name -> nexusim.workflow.v1.AuthContext
@@ -1445,21 +1594,25 @@ var file_nexusim_workflow_v1_workflow_service_proto_depIdxs = []int32{
 	0,  // 5: nexusim.workflow.v1.GetWorkflowRequest.auth_context:type_name -> nexusim.workflow.v1.AuthContext
 	1,  // 6: nexusim.workflow.v1.GetWorkflowResponse.workflow:type_name -> nexusim.workflow.v1.Workflow
 	2,  // 7: nexusim.workflow.v1.GetWorkflowResponse.decisions:type_name -> nexusim.workflow.v1.WorkflowDecision
-	0,  // 8: nexusim.workflow.v1.ListWorkflowCompensationInstructionsRequest.auth_context:type_name -> nexusim.workflow.v1.AuthContext
-	3,  // 9: nexusim.workflow.v1.ListWorkflowCompensationInstructionsResponse.instructions:type_name -> nexusim.workflow.v1.WorkflowCompensationInstruction
-	4,  // 10: nexusim.workflow.v1.WorkflowService.CreateWorkflow:input_type -> nexusim.workflow.v1.CreateWorkflowRequest
-	6,  // 11: nexusim.workflow.v1.WorkflowService.RecordWorkflowDecision:input_type -> nexusim.workflow.v1.RecordWorkflowDecisionRequest
-	8,  // 12: nexusim.workflow.v1.WorkflowService.GetWorkflow:input_type -> nexusim.workflow.v1.GetWorkflowRequest
-	10, // 13: nexusim.workflow.v1.WorkflowService.ListWorkflowCompensationInstructions:input_type -> nexusim.workflow.v1.ListWorkflowCompensationInstructionsRequest
-	5,  // 14: nexusim.workflow.v1.WorkflowService.CreateWorkflow:output_type -> nexusim.workflow.v1.CreateWorkflowResponse
-	7,  // 15: nexusim.workflow.v1.WorkflowService.RecordWorkflowDecision:output_type -> nexusim.workflow.v1.RecordWorkflowDecisionResponse
-	9,  // 16: nexusim.workflow.v1.WorkflowService.GetWorkflow:output_type -> nexusim.workflow.v1.GetWorkflowResponse
-	11, // 17: nexusim.workflow.v1.WorkflowService.ListWorkflowCompensationInstructions:output_type -> nexusim.workflow.v1.ListWorkflowCompensationInstructionsResponse
-	14, // [14:18] is the sub-list for method output_type
-	10, // [10:14] is the sub-list for method input_type
-	10, // [10:10] is the sub-list for extension type_name
-	10, // [10:10] is the sub-list for extension extendee
-	0,  // [0:10] is the sub-list for field type_name
+	0,  // 8: nexusim.workflow.v1.ListWorkflowsRequest.auth_context:type_name -> nexusim.workflow.v1.AuthContext
+	1,  // 9: nexusim.workflow.v1.ListWorkflowsResponse.workflows:type_name -> nexusim.workflow.v1.Workflow
+	0,  // 10: nexusim.workflow.v1.ListWorkflowCompensationInstructionsRequest.auth_context:type_name -> nexusim.workflow.v1.AuthContext
+	3,  // 11: nexusim.workflow.v1.ListWorkflowCompensationInstructionsResponse.instructions:type_name -> nexusim.workflow.v1.WorkflowCompensationInstruction
+	4,  // 12: nexusim.workflow.v1.WorkflowService.CreateWorkflow:input_type -> nexusim.workflow.v1.CreateWorkflowRequest
+	6,  // 13: nexusim.workflow.v1.WorkflowService.RecordWorkflowDecision:input_type -> nexusim.workflow.v1.RecordWorkflowDecisionRequest
+	8,  // 14: nexusim.workflow.v1.WorkflowService.GetWorkflow:input_type -> nexusim.workflow.v1.GetWorkflowRequest
+	10, // 15: nexusim.workflow.v1.WorkflowService.ListWorkflows:input_type -> nexusim.workflow.v1.ListWorkflowsRequest
+	12, // 16: nexusim.workflow.v1.WorkflowService.ListWorkflowCompensationInstructions:input_type -> nexusim.workflow.v1.ListWorkflowCompensationInstructionsRequest
+	5,  // 17: nexusim.workflow.v1.WorkflowService.CreateWorkflow:output_type -> nexusim.workflow.v1.CreateWorkflowResponse
+	7,  // 18: nexusim.workflow.v1.WorkflowService.RecordWorkflowDecision:output_type -> nexusim.workflow.v1.RecordWorkflowDecisionResponse
+	9,  // 19: nexusim.workflow.v1.WorkflowService.GetWorkflow:output_type -> nexusim.workflow.v1.GetWorkflowResponse
+	11, // 20: nexusim.workflow.v1.WorkflowService.ListWorkflows:output_type -> nexusim.workflow.v1.ListWorkflowsResponse
+	13, // 21: nexusim.workflow.v1.WorkflowService.ListWorkflowCompensationInstructions:output_type -> nexusim.workflow.v1.ListWorkflowCompensationInstructionsResponse
+	17, // [17:22] is the sub-list for method output_type
+	12, // [12:17] is the sub-list for method input_type
+	12, // [12:12] is the sub-list for extension type_name
+	12, // [12:12] is the sub-list for extension extendee
+	0,  // [0:12] is the sub-list for field type_name
 }
 
 func init() { file_nexusim_workflow_v1_workflow_service_proto_init() }
@@ -1473,7 +1626,7 @@ func file_nexusim_workflow_v1_workflow_service_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_nexusim_workflow_v1_workflow_service_proto_rawDesc), len(file_nexusim_workflow_v1_workflow_service_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   12,
+			NumMessages:   14,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

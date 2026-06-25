@@ -330,6 +330,13 @@ operator can submit low-sensitive `PROVIDER_REPLAY_REQUEST` operations from an
 action-executor handoff artifact, validates the operation payload hash, and does
 not execute provider replay during submit.
 
+Workflow provider replay queue view is represented by
+`workflow-provider-replay-queue-view`. It verifies that workflow-service can list
+low-sensitive `REPAIR_APPROVAL` workflows for action-executor
+`PROVIDER_REPLAY_REQUEST` operations without executing replay, mutating the DLQ
+row, restoring raw provider input/output, or bypassing action-executor as the
+final execution owner.
+
 First-stage Python worker output-safety adapter:
 
 ```powershell

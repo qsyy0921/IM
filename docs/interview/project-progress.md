@@ -233,7 +233,7 @@ AI 能力按依赖逐步进入。`search-service` / group memory / retrieval 是
 | `control-plane-service` | 多租户配置、功能开关、限流策略、灰度、配额、动态策略发布和 applied-version ACK |
 | `presence-service` | 在线状态、输入中、最后在线时间；当前 push-gateway session registry 还不是完整 presence 服务 |
 | `model-gateway` | 统一模型 provider、embedding、rerank、成本、recovery、prompt policy 和低敏审计 |
-| `workflow-service` | Agent / repair / retention 的长事务、审批等待、补偿和 operator workflow；当前已支撑 action / repair / admin operation approval first path |
+| `workflow-service` | Agent / repair / retention 的长事务、审批等待、补偿和 operator workflow；当前已支撑 action / repair / admin operation approval first path，并补了 provider replay queue 低敏队列视图 |
 | `knowledge-ingestion-service` | 文件解析、网页导入、企业知识库导入、chunking、embedding pipeline 和导入审计 |
 | `vector-index-service` | 向量索引写入、重建、backfill；满足独立伸缩 / 重建边界后再拆 |
 

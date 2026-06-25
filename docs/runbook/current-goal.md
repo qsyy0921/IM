@@ -30,6 +30,11 @@ Agent action boundary / repair cases：在 provider replay admin / workflow hand
   校验 handoff contract / payload hash / 低敏 refs 后创建 `PROVIDER_REPLAY_REQUEST`；
   `provider-replay-list` / `provider-replay-approve` / `provider-replay-reject` 只做
   admin operation 列表和审批，不执行 redrive。
+- workflow provider replay 队列视图已落：workflow-service `ListWorkflows` 可按
+  workflow type / status / target service / target operation / approval policy 查询低敏
+  workflow metadata；`loadtest/workflow provider-replay-queue` 默认列出等待
+  `admin.workflow.provider_replay.v1` 审批的 action-executor
+  `PROVIDER_REPLAY_REQUEST`，不执行 redrive、不修改 DLQ row、不暴露 raw payload。
 
 ## 目标
 

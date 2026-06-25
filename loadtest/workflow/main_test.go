@@ -35,6 +35,29 @@ func TestParseFlagsBuildsListInstructionDefaults(t *testing.T) {
 	}
 }
 
+func TestParseFlagsBuildsProviderReplayQueueDefaults(t *testing.T) {
+	cfg := parseFlags([]string{
+		"-mode", "provider-replay-queue",
+		"-tenant-id", "tenant-wf",
+	})
+	if cfg.mode != "provider-replay-queue" {
+		t.Fatalf("mode = %q", cfg.mode)
+	}
+	if cfg.workflowType != "REPAIR_APPROVAL" ||
+		cfg.status != "WAITING_DECISION" ||
+		cfg.targetService != "action-executor" ||
+		cfg.targetOperation != "PROVIDER_REPLAY_REQUEST" ||
+		cfg.approvalPolicyRef != "admin.workflow.provider_replay.v1" {
+		t.Fatalf("unexpected provider replay queue defaults: %+v", cfg)
+	}
+	if cfg.requestID != "workflow-operator-provider-replay-queue" || cfg.traceID != cfg.requestID {
+		t.Fatalf("unexpected request/trace ids: %+v", cfg)
+	}
+	if err := cfg.validate(); err != nil {
+		t.Fatalf("validate: %v", err)
+	}
+}
+
 func TestParseFlagsBuildsRecordDecisionDefaults(t *testing.T) {
 	cfg := parseFlags([]string{
 		"-mode", "record-decision",
@@ -213,6 +236,47 @@ func TestExecuteGetWorkflow(t *testing.T) {
 	}
 }
 
+func TestExecuteProviderReplayQueue(t *testing.T) {
+	cfg := parseFlags([]string{
+		"-mode", "provider-replay-queue",
+		"-tenant-id", "tenant-wf",
+		"-page-size", "5",
+	})
+	client := &fakeWorkflowClient{listWorkflowsResponse: &workflowv1.ListWorkflowsResponse{
+		Workflows: []*workflowv1.Workflow{{
+			WorkflowId:           "wf_provider_replay_1",
+			WorkflowType:         "REPAIR_APPROVAL",
+			RiskLevel:            "HIGH",
+			TargetService:        "action-executor",
+			TargetOperation:      "PROVIDER_REPLAY_REQUEST",
+			TargetRefHash:        "sha256:provider-failure",
+			PayloadSchemaVersion: "admin.provider_replay_request.v1",
+			PayloadRefHash:       "sha256:provider-replay-payload",
+			ApprovalPolicyRef:    "admin.workflow.provider_replay.v1",
+			Status:               "WAITING_DECISION",
+			CurrentStepId:        "wfs_provider_replay_1",
+		}},
+	}}
+	result, err := execute(context.Background(), cfg, client)
+	if err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if client.listWorkflowsRequest.GetAuthContext().GetTenantId() != "tenant-wf" ||
+		client.listWorkflowsRequest.GetWorkflowType() != "REPAIR_APPROVAL" ||
+		client.listWorkflowsRequest.GetStatus() != "WAITING_DECISION" ||
+		client.listWorkflowsRequest.GetTargetService() != "action-executor" ||
+		client.listWorkflowsRequest.GetTargetOperation() != "PROVIDER_REPLAY_REQUEST" ||
+		client.listWorkflowsRequest.GetApprovalPolicyRef() != "admin.workflow.provider_replay.v1" ||
+		client.listWorkflowsRequest.GetPageSize() != 5 {
+		t.Fatalf("unexpected request: %+v", client.listWorkflowsRequest)
+	}
+	if len(result.Workflows) != 1 ||
+		result.Workflows[0].WorkflowID != "wf_provider_replay_1" ||
+		result.Workflows[0].PayloadRefHash != "sha256:provider-replay-payload" {
+		t.Fatalf("unexpected result: %+v", result)
+	}
+}
+
 func TestExecuteRecordDecision(t *testing.T) {
 	cfg := parseFlags([]string{
 		"-mode", "record-decision",
@@ -313,6 +377,12 @@ func TestRunOutputDoesNotExposePayloadOrReasonBody(t *testing.T) {
 			PayloadRefHash: "sha256:payload",
 			ReasonRef:      "reason-sha256:abc",
 		},
+		Workflows: []workflowRef{{
+			WorkflowID:        "wf_provider_replay_1",
+			TargetRefHash:     "sha256:provider-failure",
+			PayloadRefHash:    "sha256:provider-replay-payload",
+			ApprovalPolicyRef: "admin.workflow.provider_replay.v1",
+		}},
 		Instructions: []compensationInstructionRef{{
 			InstructionID:  "wfi_1",
 			PayloadRefHash: "sha256:payload",
@@ -333,12 +403,14 @@ func TestRunOutputDoesNotExposePayloadOrReasonBody(t *testing.T) {
 
 type fakeWorkflowClient struct {
 	workflowv1.WorkflowServiceClient
-	getRequest       *workflowv1.GetWorkflowRequest
-	getResponse      *workflowv1.GetWorkflowResponse
-	decisionRequest  *workflowv1.RecordWorkflowDecisionRequest
-	decisionResponse *workflowv1.RecordWorkflowDecisionResponse
-	request          *workflowv1.ListWorkflowCompensationInstructionsRequest
-	response         *workflowv1.ListWorkflowCompensationInstructionsResponse
+	getRequest            *workflowv1.GetWorkflowRequest
+	getResponse           *workflowv1.GetWorkflowResponse
+	decisionRequest       *workflowv1.RecordWorkflowDecisionRequest
+	decisionResponse      *workflowv1.RecordWorkflowDecisionResponse
+	listWorkflowsRequest  *workflowv1.ListWorkflowsRequest
+	listWorkflowsResponse *workflowv1.ListWorkflowsResponse
+	request               *workflowv1.ListWorkflowCompensationInstructionsRequest
+	response              *workflowv1.ListWorkflowCompensationInstructionsResponse
 }
 
 func (client *fakeWorkflowClient) GetWorkflow(
@@ -357,6 +429,15 @@ func (client *fakeWorkflowClient) RecordWorkflowDecision(
 ) (*workflowv1.RecordWorkflowDecisionResponse, error) {
 	client.decisionRequest = request
 	return client.decisionResponse, nil
+}
+
+func (client *fakeWorkflowClient) ListWorkflows(
+	_ context.Context,
+	request *workflowv1.ListWorkflowsRequest,
+	_ ...grpc.CallOption,
+) (*workflowv1.ListWorkflowsResponse, error) {
+	client.listWorkflowsRequest = request
+	return client.listWorkflowsResponse, nil
 }
 
 func (client *fakeWorkflowClient) ListWorkflowCompensationInstructions(

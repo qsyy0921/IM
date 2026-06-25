@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -152,6 +154,54 @@ WHERE tenant_id = $1 AND workflow_id = $2
 		return types.Workflow{}, nil, err
 	}
 	return workflow, decisions, nil
+}
+
+func (repository *Repository) ListWorkflows(
+	ctx context.Context,
+	command types.ListWorkflowsCommand,
+) ([]types.Workflow, error) {
+	if repository.pool == nil {
+		return nil, types.NewDBReadFailed("workflow repository is not configured")
+	}
+	command = command.Normalized()
+	conditions := []string{"tenant_id = $1"}
+	args := []any{string(command.AuthContext.TenantID)}
+	addCondition := func(column string, value string) {
+		if value == "" {
+			return
+		}
+		args = append(args, value)
+		conditions = append(conditions, fmt.Sprintf("%s = $%d", column, len(args)))
+	}
+	addCondition("workflow_type", command.WorkflowType)
+	addCondition("status", command.Status)
+	addCondition("target_service", command.TargetService)
+	addCondition("target_operation", command.TargetOperation)
+	addCondition("approval_policy_ref", command.ApprovalPolicyRef)
+	args = append(args, command.PageSize)
+	query := selectWorkflowSQL() + `
+WHERE ` + strings.Join(conditions, " AND ") + `
+ORDER BY created_at DESC, workflow_id DESC
+LIMIT $` + fmt.Sprint(len(args)) + `
+`
+	rows, err := repository.pool.Query(ctx, query, args...)
+	if err != nil {
+		return nil, types.NewDBReadFailed(err.Error())
+	}
+	defer rows.Close()
+
+	workflows := []types.Workflow{}
+	for rows.Next() {
+		workflow, err := scanWorkflow(rows)
+		if err != nil {
+			return nil, types.NewDBReadFailed(err.Error())
+		}
+		workflows = append(workflows, workflow)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, types.NewDBReadFailed(err.Error())
+	}
+	return workflows, nil
 }
 
 func findWorkflowByIdempotency(ctx context.Context, tx pgx.Tx, tenantID types.TenantID, requesterService string, key string) (types.Workflow, bool, error) {

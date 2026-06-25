@@ -235,7 +235,12 @@ callback provider / endpoint / queue / retry refs；
 `write-workflow-external-callback-delivery-status.ps1` 记录 `DELIVERED` /
 `RETRY_PENDING` / `DLQ` attempt status；
 `write-workflow-external-callback-redrive-plan.ps1` 只从 retry / DLQ status 生成 redrive
-handoff。当前 first path 已新增 `workflow_external_callback_deliveries` 持久 job 和
+handoff。`write-workflow-external-callback-delivery-review-page.ps1` 生成静态低敏
+operator review page，重新校验 delivery plan、delivery status 和 redrive plan 的
+hash / workflow binding / no-execution contract；页面只展示 refs、hashes、attempt、
+failure class、redrive queue 和 owner，不调用 provider、不重新入队、不记录 decision、
+不执行 target action，也不输出 raw callback URL、provider body、本地路径或 payload
+正文。当前 first path 已新增 `workflow_external_callback_deliveries` 持久 job 和
 `external-callback-delivery-import` / `external-callback-delivery-worker` /
 `external-callback-delivery-redrive` 运行模式：
 import 锁定 workflow-service 自有 workflow fact，校验仍为 `WAITING_DECISION` 且

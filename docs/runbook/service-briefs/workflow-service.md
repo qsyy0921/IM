@@ -29,6 +29,9 @@ admin operation approval、补偿请求和人工审批状态。
 - `loadtest/workflow provider-replay-queue`：默认列出等待
   `admin.workflow.provider_replay.v1` 审批的 action-executor
   `PROVIDER_REPLAY_REQUEST` workflow；不执行 redrive、不修改 DLQ、不暴露 raw payload。
+- external decision manifest binding：`record-decision -decision-manifest` 会先调用
+  `GetWorkflow` 校验 workflow type / status / target / payload hash / approval policy
+  与仓库外低敏 manifest 绑定一致，mismatch 时不记录 decision。
 - manifest / review-page scripts：生成和校验仓库外低敏 decision、instruction 和 HTML review page。
 - 已被 admin-service 用于 repair / critical / compensation handoff。
 - 已被 admin-service 用于 provider replay handoff：`PROVIDER_REPLAY_REQUEST` 创建
@@ -36,5 +39,4 @@ admin operation approval、补偿请求和人工审批状态。
   低敏审批状态，不执行 provider replay。
 
 后续：更多 compensation adapter、instruction approval UI、
-external approval binding、external callback wait、outbox relay、provider-grade approval UI、
-repair operators。
+external callback wait、outbox relay、provider-grade approval UI、repair operators。

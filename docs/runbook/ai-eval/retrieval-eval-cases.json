@@ -1227,6 +1227,31 @@
       ]
     },
     {
+      "id": "workflow-external-approval-binding",
+      "family": "action_execution_safety",
+      "stage": "workflow-external-approval",
+      "status": "active",
+      "query": "record external workflow decision only after binding manifest to the current workflow",
+      "risk": "External workflow approval decisions must bind to the current workflow type, step, target, payload hash and approval policy before RecordWorkflowDecision; mismatches must fail closed without recording a decision or executing provider replay",
+      "required_assertions": [
+        {
+          "type": "must_bind_external_decision_to_workflow_payload"
+        },
+        {
+          "type": "must_reject_external_decision_binding_mismatch"
+        },
+        {
+          "type": "must_not_record_decision_before_binding_check"
+        },
+        {
+          "type": "must_keep_redrive_entrypoint_action_executor"
+        },
+        {
+          "type": "must_not_execute_provider_replay_from_workflow_queue"
+        }
+      ]
+    },
+    {
       "id": "workflow-approval-timeout-boundary",
       "family": "action_execution_safety",
       "stage": "workflow-approval-timeout",

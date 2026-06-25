@@ -18,32 +18,40 @@ import (
 )
 
 type config struct {
-	mode                 string
-	target               string
-	requestTimeout       time.Duration
-	tls                  grpctls.Config
-	tenantID             string
-	userID               string
-	instanceRef          string
-	traceID              string
-	requestID            string
-	correlationID        string
-	causationID          string
-	workflowID           string
-	workflowType         string
-	stepID               string
-	decisionManifestPath string
-	deciderRef           string
-	decision             string
-	decisionPolicy       string
-	reasonRef            string
-	evidenceRefs         []string
-	idempotencyKey       string
-	status               string
-	targetService        string
-	targetOperation      string
-	approvalPolicyRef    string
-	pageSize             int32
+	mode                         string
+	target                       string
+	requestTimeout               time.Duration
+	tls                          grpctls.Config
+	tenantID                     string
+	userID                       string
+	instanceRef                  string
+	traceID                      string
+	requestID                    string
+	correlationID                string
+	causationID                  string
+	workflowID                   string
+	workflowType                 string
+	expectedWorkflowType         string
+	expectedStatus               string
+	stepID                       string
+	decisionManifestPath         string
+	deciderRef                   string
+	decision                     string
+	decisionPolicy               string
+	reasonRef                    string
+	evidenceRefs                 []string
+	idempotencyKey               string
+	status                       string
+	targetService                string
+	expectedTargetService        string
+	targetOperation              string
+	expectedTargetOperation      string
+	expectedTargetRefHash        string
+	expectedPayloadSchemaVersion string
+	expectedPayloadRefHash       string
+	approvalPolicyRef            string
+	expectedApprovalPolicyRef    string
+	pageSize                     int32
 }
 
 type commandResult struct {
@@ -122,22 +130,30 @@ type compensationInstructionRef struct {
 }
 
 type decisionManifest struct {
-	SchemaVersion     string   `json:"schema_version"`
-	WorkflowID        string   `json:"workflow_id"`
-	StepID            string   `json:"step_id"`
-	Decision          string   `json:"decision"`
-	DeciderRef        string   `json:"decider_ref"`
-	DecisionPolicyRef string   `json:"decision_policy_ref"`
-	ReasonRef         string   `json:"reason_ref"`
-	EvidenceRefs      []string `json:"evidence_refs"`
-	IdempotencyKey    string   `json:"idempotency_key"`
-	CorrelationID     string   `json:"correlation_id"`
-	CausationID       string   `json:"causation_id"`
-	TraceID           string   `json:"trace_id"`
+	SchemaVersion                string   `json:"schema_version"`
+	WorkflowID                   string   `json:"workflow_id"`
+	StepID                       string   `json:"step_id"`
+	ExpectedWorkflowType         string   `json:"expected_workflow_type"`
+	ExpectedStatus               string   `json:"expected_status"`
+	ExpectedTargetService        string   `json:"expected_target_service"`
+	ExpectedTargetOperation      string   `json:"expected_target_operation"`
+	ExpectedTargetRefHash        string   `json:"expected_target_ref_hash"`
+	ExpectedPayloadSchemaVersion string   `json:"expected_payload_schema_version"`
+	ExpectedPayloadRefHash       string   `json:"expected_payload_ref_hash"`
+	ExpectedApprovalPolicyRef    string   `json:"expected_approval_policy_ref"`
+	Decision                     string   `json:"decision"`
+	DeciderRef                   string   `json:"decider_ref"`
+	DecisionPolicyRef            string   `json:"decision_policy_ref"`
+	ReasonRef                    string   `json:"reason_ref"`
+	EvidenceRefs                 []string `json:"evidence_refs"`
+	IdempotencyKey               string   `json:"idempotency_key"`
+	CorrelationID                string   `json:"correlation_id"`
+	CausationID                  string   `json:"causation_id"`
+	TraceID                      string   `json:"trace_id"`
 }
 
 const (
-	decisionManifestSchemaVersion = "nexusim.workflow.decision_manifest.v1"
+	decisionManifestSchemaVersion = "nexusim.workflow.external_decision_manifest.v1"
 	maxDecisionManifestBytes      = 64 * 1024
 )
 
@@ -286,6 +302,14 @@ func prepareConfig(cfg config) (config, error) {
 	}
 	cfg.workflowID = strings.TrimSpace(manifest.WorkflowID)
 	cfg.stepID = strings.TrimSpace(manifest.StepID)
+	cfg.expectedWorkflowType = strings.ToUpper(strings.TrimSpace(manifest.ExpectedWorkflowType))
+	cfg.expectedStatus = strings.ToUpper(strings.TrimSpace(manifest.ExpectedStatus))
+	cfg.expectedTargetService = strings.TrimSpace(manifest.ExpectedTargetService)
+	cfg.expectedTargetOperation = strings.TrimSpace(manifest.ExpectedTargetOperation)
+	cfg.expectedTargetRefHash = strings.TrimSpace(manifest.ExpectedTargetRefHash)
+	cfg.expectedPayloadSchemaVersion = strings.TrimSpace(manifest.ExpectedPayloadSchemaVersion)
+	cfg.expectedPayloadRefHash = strings.TrimSpace(manifest.ExpectedPayloadRefHash)
+	cfg.expectedApprovalPolicyRef = strings.TrimSpace(manifest.ExpectedApprovalPolicyRef)
 	cfg.deciderRef = strings.TrimSpace(manifest.DeciderRef)
 	cfg.decision = strings.ToUpper(strings.TrimSpace(manifest.Decision))
 	cfg.decisionPolicy = strings.TrimSpace(manifest.DecisionPolicyRef)
@@ -377,6 +401,18 @@ func execute(ctx context.Context, cfg config, client workflowv1.WorkflowServiceC
 			}
 		}
 	case "record-decision":
+		if cfg.decisionManifestPath != "" {
+			response, err := client.GetWorkflow(ctx, &workflowv1.GetWorkflowRequest{
+				AuthContext: authContext(cfg),
+				WorkflowId:  cfg.workflowID,
+			})
+			if err != nil {
+				return commandResult{}, fmt.Errorf("get workflow for external decision binding: %w", err)
+			}
+			if err := verifyExternalDecisionBinding(cfg, response.GetWorkflow()); err != nil {
+				return commandResult{}, err
+			}
+		}
 		response, err := client.RecordWorkflowDecision(ctx, &workflowv1.RecordWorkflowDecisionRequest{
 			AuthContext:       authContext(cfg),
 			WorkflowId:        cfg.workflowID,
@@ -437,6 +473,11 @@ func (cfg config) validate() error {
 		if strings.TrimSpace(cfg.stepID) == "" {
 			return errors.New("step-id is required for record-decision")
 		}
+		if cfg.decisionManifestPath != "" {
+			if err := validateExternalDecisionBindingConfig(cfg); err != nil {
+				return err
+			}
+		}
 		if strings.TrimSpace(cfg.deciderRef) == "" {
 			return errors.New("decider-ref is required for record-decision")
 		}
@@ -471,6 +512,62 @@ func (cfg config) validate() error {
 		}
 		if err := validateLowSensitiveRef("approval-policy-ref", cfg.approvalPolicyRef); err != nil {
 			return err
+		}
+	}
+	return nil
+}
+
+func validateExternalDecisionBindingConfig(cfg config) error {
+	required := []struct {
+		name  string
+		value string
+	}{
+		{"expected_workflow_type", cfg.expectedWorkflowType},
+		{"expected_status", cfg.expectedStatus},
+		{"expected_target_service", cfg.expectedTargetService},
+		{"expected_target_operation", cfg.expectedTargetOperation},
+		{"expected_target_ref_hash", cfg.expectedTargetRefHash},
+		{"expected_payload_schema_version", cfg.expectedPayloadSchemaVersion},
+		{"expected_payload_ref_hash", cfg.expectedPayloadRefHash},
+		{"expected_approval_policy_ref", cfg.expectedApprovalPolicyRef},
+	}
+	for _, item := range required {
+		if strings.TrimSpace(item.value) == "" {
+			return fmt.Errorf("%s is required in external decision manifest", item.name)
+		}
+		if err := validateLowSensitiveRef(item.name, item.value); err != nil {
+			return err
+		}
+	}
+	if cfg.expectedStatus != "WAITING_DECISION" {
+		return errors.New("expected_status must be WAITING_DECISION for external decision manifest")
+	}
+	return nil
+}
+
+func verifyExternalDecisionBinding(cfg config, workflow *workflowv1.Workflow) error {
+	if workflow == nil {
+		return errors.New("external decision binding workflow not found")
+	}
+	checks := []struct {
+		name string
+		got  string
+		want string
+	}{
+		{"workflow_id", workflow.GetWorkflowId(), cfg.workflowID},
+		{"step_id", workflow.GetCurrentStepId(), cfg.stepID},
+		{"workflow_type", workflow.GetWorkflowType(), cfg.expectedWorkflowType},
+		{"status", workflow.GetStatus(), cfg.expectedStatus},
+		{"target_service", workflow.GetTargetService(), cfg.expectedTargetService},
+		{"target_operation", workflow.GetTargetOperation(), cfg.expectedTargetOperation},
+		{"target_ref_hash", workflow.GetTargetRefHash(), cfg.expectedTargetRefHash},
+		{"payload_schema_version", workflow.GetPayloadSchemaVersion(), cfg.expectedPayloadSchemaVersion},
+		{"payload_ref_hash", workflow.GetPayloadRefHash(), cfg.expectedPayloadRefHash},
+		{"approval_policy_ref", workflow.GetApprovalPolicyRef(), cfg.expectedApprovalPolicyRef},
+	}
+	for _, check := range checks {
+		if strings.TrimSpace(check.got) != strings.TrimSpace(check.want) {
+			return fmt.Errorf("external decision manifest %s binding mismatch", check.name)
 		}
 	}
 	return nil

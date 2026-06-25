@@ -220,8 +220,9 @@ target fail closed。DB registry instruction 必须绑定具体 `COMPENSATION_RE
 workflow，导入时校验 workflow 已批准或待补偿、target / payload refs 一致；resolve
 时只匹配同一 workflow。`ListWorkflowCompensationInstructions` 提供按 workflow 的
 低敏 instruction refs / version / status 查询面，供后续 operator UI 使用；它不暴露
-payload 原文、reason 原文或 downstream body。更多下游 adapter、provider-grade
-instruction UI / external approval binding 和运维后置。
+payload 原文、reason 原文或 downstream body。第一版外部审批 manifest binding 已由
+operator CLI 负责当前 workflow 绑定校验；更多下游 adapter、provider-grade
+instruction UI / external callback wait 和运维后置。
 
 后续扩展：
 
@@ -482,10 +483,14 @@ payload、instruction payload、reason 原文或 downstream response body。`rec
 模式会在本机拒绝看起来像 secret / token / password / raw body / DSN 的
 `decider-ref`、`decision-policy-ref`、`reason-ref` 或 `evidence-refs`，避免
 operator 把敏感原文送入 gRPC 请求。`-decision-manifest` 是第一版 external
-approval binding：manifest 只允许 `nexusim.workflow.decision_manifest.v1` 中的
-workflow id、step id、decision、低敏 reason/evidence refs、idempotency key 和
-correlation refs，不保存审批 comment 或 payload 原文。writer / validator 只处理
-仓库外低敏 JSON artifact，不调用服务、不读取数据库。
+approval binding：manifest 只允许
+`nexusim.workflow.external_decision_manifest.v1`，除 workflow id、step id、
+decision、低敏 reason/evidence refs、idempotency key 和 correlation refs 外，还必须
+绑定 expected workflow type、status、target service / operation、target ref hash、
+payload schema version、payload ref hash 和 approval policy ref。record decision 前 CLI
+必须先调用 workflow-service `GetWorkflow` 校验这些字段，任何 mismatch 都 fail-closed，
+且不调用 `RecordWorkflowDecision`。manifest 不保存审批 comment、payload 原文或 provider
+body。writer / validator 只处理仓库外低敏 JSON artifact，不读取数据库。
 
 `write-workflow-compensation-instruction-manifest.ps1` /
 `validate-workflow-compensation-instruction-manifest.ps1` 是第一版 compensation

@@ -337,6 +337,13 @@ low-sensitive `REPAIR_APPROVAL` workflows for action-executor
 row, restoring raw provider input/output, or bypassing action-executor as the
 final execution owner.
 
+Workflow external approval binding is represented by
+`workflow-external-approval-binding`. It verifies that an external approval
+manifest must bind to the current workflow type, step, target service /
+operation, target ref hash, payload schema version, payload ref hash and
+approval policy before `RecordWorkflowDecision`. Binding mismatches fail closed
+before recording a decision and do not execute provider replay.
+
 Workflow approval timeout boundary is represented by
 `workflow-approval-timeout-boundary`. It verifies that stale approval workflows
 move to `TIMED_OUT` through workflow-service timer handling, emit only a

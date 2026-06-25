@@ -260,12 +260,15 @@ operator reason 原文或 downstream response body。它是 first-stage ops visi
 token / password / raw body / DSN 的 decider、policy、reason 或 evidence ref；
 真实原因和证据原文应留在独立 artifact / audit 系统中，只把低敏 ref 或 hash 传给
 workflow-service。`-decision-manifest` 可作为第一版外部审批系统交接文件，schema
-version 必须是 `nexusim.workflow.decision_manifest.v1`；manifest 只保存 workflow /
+version 必须是 `nexusim.workflow.external_decision_manifest.v1`；manifest 除 workflow /
 step / decision / decider / policy / reason ref / evidence refs / idempotency /
-correlation refs，不保存审批 comment、EvidencePack、payload 或 provider body。
+correlation refs 外，还必须包含 expected workflow type、status、target service /
+operation、target ref hash、payload schema version、payload ref hash 和 approval policy
+ref。CLI 在记录 decision 前会调用 workflow-service `GetWorkflow` 绑定校验；任何
+mismatch 都 fail-closed，不会调用 `RecordWorkflowDecision`，也不会执行 provider
+replay。manifest 不保存审批 comment、EvidencePack、payload 或 provider body。
 `write-workflow-decision-manifest.ps1` 可从 reason 文件生成 `reason-sha256:<hash>`，
-`validate-workflow-decision-manifest.ps1` 只做 schema / 低敏字段校验，不调用
-workflow-service，也不读取数据库。
+`validate-workflow-decision-manifest.ps1` 只做 schema / 低敏字段校验，不读取数据库。
 `write-workflow-compensation-instruction-manifest.ps1` /
 `validate-workflow-compensation-instruction-manifest.ps1` 可生成和校验 workflow
 compensation executor 使用的 control-plane rollback instruction JSON。该 manifest

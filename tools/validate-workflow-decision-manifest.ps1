@@ -83,6 +83,14 @@ Assert-OnlyKnownFields -Object $manifest -Prefix "Workflow decision manifest" -A
     "schema_version",
     "workflow_id",
     "step_id",
+    "expected_workflow_type",
+    "expected_status",
+    "expected_target_service",
+    "expected_target_operation",
+    "expected_target_ref_hash",
+    "expected_payload_schema_version",
+    "expected_payload_ref_hash",
+    "expected_approval_policy_ref",
     "decision",
     "decider_ref",
     "decision_policy_ref",
@@ -94,10 +102,18 @@ Assert-OnlyKnownFields -Object $manifest -Prefix "Workflow decision manifest" -A
     "trace_id"
 )
 
-Assert-Condition ((Get-RequiredString $manifest "schema_version") -eq "nexusim.workflow.decision_manifest.v1") "Unsupported workflow decision manifest schema_version."
+Assert-Condition ((Get-RequiredString $manifest "schema_version") -eq "nexusim.workflow.external_decision_manifest.v1") "Unsupported workflow decision manifest schema_version."
 
 $workflowID = Get-RequiredString $manifest "workflow_id"
 $stepID = Get-RequiredString $manifest "step_id"
+$expectedWorkflowType = (Get-RequiredString $manifest "expected_workflow_type").ToUpperInvariant()
+$expectedStatus = (Get-RequiredString $manifest "expected_status").ToUpperInvariant()
+$expectedTargetService = Get-RequiredString $manifest "expected_target_service"
+$expectedTargetOperation = Get-RequiredString $manifest "expected_target_operation"
+$expectedTargetRefHash = Get-RequiredString $manifest "expected_target_ref_hash"
+$expectedPayloadSchemaVersion = Get-RequiredString $manifest "expected_payload_schema_version"
+$expectedPayloadRefHash = Get-RequiredString $manifest "expected_payload_ref_hash"
+$expectedApprovalPolicyRef = Get-RequiredString $manifest "expected_approval_policy_ref"
 $decision = (Get-RequiredString $manifest "decision").ToUpperInvariant()
 $deciderRef = Get-RequiredString $manifest "decider_ref"
 $decisionPolicyRef = Get-RequiredString $manifest "decision_policy_ref"
@@ -105,9 +121,21 @@ $idempotencyKey = Get-RequiredString $manifest "idempotency_key"
 
 Assert-LowSensitiveWorkflowRef -Value $workflowID -FieldName "workflow_id"
 Assert-LowSensitiveWorkflowRef -Value $stepID -FieldName "step_id"
+Assert-LowSensitiveWorkflowRef -Value $expectedWorkflowType -FieldName "expected_workflow_type"
+Assert-LowSensitiveWorkflowRef -Value $expectedStatus -FieldName "expected_status"
+Assert-LowSensitiveWorkflowRef -Value $expectedTargetService -FieldName "expected_target_service"
+Assert-LowSensitiveWorkflowRef -Value $expectedTargetOperation -FieldName "expected_target_operation"
+Assert-LowSensitiveWorkflowRef -Value $expectedTargetRefHash -FieldName "expected_target_ref_hash"
+Assert-LowSensitiveWorkflowRef -Value $expectedPayloadSchemaVersion -FieldName "expected_payload_schema_version"
+Assert-LowSensitiveWorkflowRef -Value $expectedPayloadRefHash -FieldName "expected_payload_ref_hash"
+Assert-LowSensitiveWorkflowRef -Value $expectedApprovalPolicyRef -FieldName "expected_approval_policy_ref"
 Assert-LowSensitiveRepairActor -Value $deciderRef -FieldName "decider_ref"
 Assert-LowSensitiveWorkflowRef -Value $decisionPolicyRef -FieldName "decision_policy_ref"
 Assert-LowSensitiveWorkflowRef -Value $idempotencyKey -FieldName "idempotency_key"
+
+if ($expectedStatus -ne "WAITING_DECISION") {
+    throw "Workflow decision manifest expected_status must be WAITING_DECISION."
+}
 
 if (@("APPROVE", "REJECT", "REQUEST_CHANGES", "CANCEL") -notcontains $decision) {
     throw "Workflow decision manifest decision must be APPROVE, REJECT, REQUEST_CHANGES, or CANCEL."
@@ -141,13 +169,19 @@ if ($ExpectedDecision.Trim().Length -gt 0) {
 
 $summary = [ordered]@{
     manifest_path = $ManifestPath
-    schema_version = "nexusim.workflow.decision_manifest.v1"
+    schema_version = "nexusim.workflow.external_decision_manifest.v1"
     workflow_id = $workflowID
     step_id = $stepID
+    expected_workflow_type = $expectedWorkflowType
+    expected_status = $expectedStatus
+    expected_target_service = $expectedTargetService
+    expected_target_operation = $expectedTargetOperation
+    expected_payload_ref_hash = $expectedPayloadRefHash
+    expected_approval_policy_ref = $expectedApprovalPolicyRef
     decision = $decision
     decider_ref = $deciderRef
     manifest_sha256 = Get-RepairSha256Hex -Bytes ([System.Text.Encoding]::UTF8.GetBytes($raw))
-    note = "Workflow decision manifest validation only. It does not call workflow-service or copy reason text, payload, EvidencePack, or provider body."
+    note = "Workflow external decision manifest validation only. It does not call workflow-service or copy reason text, payload, EvidencePack, or provider body."
 }
 
 $summary | ConvertTo-Json -Depth 4

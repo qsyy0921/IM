@@ -9,6 +9,29 @@ param(
     [string]$StepID,
 
     [Parameter(Mandatory = $true)]
+    [string]$ExpectedWorkflowType,
+
+    [Parameter(Mandatory = $true)]
+    [string]$ExpectedTargetService,
+
+    [Parameter(Mandatory = $true)]
+    [string]$ExpectedTargetOperation,
+
+    [Parameter(Mandatory = $true)]
+    [string]$ExpectedTargetRefHash,
+
+    [Parameter(Mandatory = $true)]
+    [string]$ExpectedPayloadSchemaVersion,
+
+    [Parameter(Mandatory = $true)]
+    [string]$ExpectedPayloadRefHash,
+
+    [Parameter(Mandatory = $true)]
+    [string]$ExpectedApprovalPolicyRef,
+
+    [string]$ExpectedStatus = "WAITING_DECISION",
+
+    [Parameter(Mandatory = $true)]
     [ValidateSet("APPROVE", "REJECT", "REQUEST_CHANGES", "CANCEL")]
     [string]$Decision,
 
@@ -33,8 +56,19 @@ $ErrorActionPreference = "Stop"
 Assert-ExternalRepairOutputPath -Value $OutputPath -FieldName "OutputPath"
 Assert-LowSensitiveRepairIdentifier -Value $WorkflowID -FieldName "WorkflowID"
 Assert-LowSensitiveRepairIdentifier -Value $StepID -FieldName "StepID"
+Assert-LowSensitiveRepairIdentifier -Value $ExpectedWorkflowType -FieldName "ExpectedWorkflowType"
+Assert-LowSensitiveRepairIdentifier -Value $ExpectedStatus -FieldName "ExpectedStatus"
+Assert-LowSensitiveRepairIdentifier -Value $ExpectedTargetService -FieldName "ExpectedTargetService"
+Assert-LowSensitiveRepairIdentifier -Value $ExpectedTargetOperation -FieldName "ExpectedTargetOperation"
+Assert-LowSensitiveRepairIdentifier -Value $ExpectedTargetRefHash -FieldName "ExpectedTargetRefHash"
+Assert-LowSensitiveRepairIdentifier -Value $ExpectedPayloadSchemaVersion -FieldName "ExpectedPayloadSchemaVersion"
+Assert-LowSensitiveRepairIdentifier -Value $ExpectedPayloadRefHash -FieldName "ExpectedPayloadRefHash"
+Assert-LowSensitiveRepairIdentifier -Value $ExpectedApprovalPolicyRef -FieldName "ExpectedApprovalPolicyRef"
 Assert-LowSensitiveRepairActor -Value $DeciderRef -FieldName "DeciderRef"
 Assert-LowSensitiveRepairIdentifier -Value $DecisionPolicyRef -FieldName "DecisionPolicyRef"
+if ($ExpectedStatus.Trim().ToUpperInvariant() -ne "WAITING_DECISION") {
+    throw "ExpectedStatus must be WAITING_DECISION."
+}
 
 if ((Test-Path -LiteralPath $OutputPath -PathType Leaf) -and -not $Force) {
     throw "OutputPath already exists. Use -Force to overwrite: $OutputPath"
@@ -93,9 +127,17 @@ foreach ($pair in @(
 }
 
 $manifest = [ordered]@{
-    schema_version = "nexusim.workflow.decision_manifest.v1"
+    schema_version = "nexusim.workflow.external_decision_manifest.v1"
     workflow_id = $WorkflowID.Trim()
     step_id = $StepID.Trim()
+    expected_workflow_type = $ExpectedWorkflowType.Trim().ToUpperInvariant()
+    expected_status = $ExpectedStatus.Trim().ToUpperInvariant()
+    expected_target_service = $ExpectedTargetService.Trim()
+    expected_target_operation = $ExpectedTargetOperation.Trim()
+    expected_target_ref_hash = $ExpectedTargetRefHash.Trim()
+    expected_payload_schema_version = $ExpectedPayloadSchemaVersion.Trim()
+    expected_payload_ref_hash = $ExpectedPayloadRefHash.Trim()
+    expected_approval_policy_ref = $ExpectedApprovalPolicyRef.Trim()
     decision = $decisionValue
     decider_ref = $DeciderRef.Trim()
     decision_policy_ref = $DecisionPolicyRef.Trim()

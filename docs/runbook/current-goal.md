@@ -20,7 +20,7 @@ Agent action boundary / repair cases：在 provider replay admin / workflow hand
 - group-memory / retrieval / eval 功能包已扩展：profile-agent safety adapter 从 20 个
   active cases 增加到 24 个，新增 asker-bound term ambiguity、visible-chain incomplete
   abstention、missing visibility projection fail-closed、audience-language profile
-  overgeneralization cases；覆盖 no unsupported memory fallback 和 no raw prompt persistence。
+  overgeneralization cases；覆盖 no unsupported memory hidden path 和 no raw prompt persistence。
 - provider replay admin / workflow handoff 已落：`provider-replay-handoff` 只读
   `DLQ` provider failure，输出低敏 admin operation request 和 workflow handoff request；
   admin-service 已接受 `PROVIDER_REPLAY_REQUEST` 并强制路由 workflow-service
@@ -39,6 +39,11 @@ Agent action boundary / repair cases：在 provider replay admin / workflow hand
   `workflow_timers(APPROVAL_TIMEOUT)` 到期事实，将仍在 `WAITING_DECISION` 的 workflow
   推进到 `TIMED_OUT` 并写低敏 `workflow.timed_out.v1` outbox；审批已终结时取消 pending
   timer；不执行 action、不创建隐式 approval、不根据命名 `timeout_policy_ref` 猜默认 due_at。
+- workflow external approval binding 已落：`loadtest/workflow record-decision
+  -decision-manifest` 使用仓库外低敏
+  `nexusim.workflow.external_decision_manifest.v1` manifest，记录 decision 前先调用
+  `GetWorkflow` 校验 workflow type、step、target、payload hash 和 approval policy；
+  任何 mismatch 都 fail-closed，不调用 `RecordWorkflowDecision`，不执行 provider replay。
 
 ## 目标
 

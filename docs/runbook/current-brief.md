@@ -29,7 +29,7 @@ loadtest report 或 archive。
 - group memory / retrieval / eval 功能包已收口：profile-agent safety adapter 从 20 个
   active cases 扩到 24 个，新增 asker-bound term ambiguity、visible-chain incomplete
   abstention、missing visibility projection fail-closed、audience-language profile
-  overgeneralization cases，并覆盖 no unsupported memory fallback / no raw prompt persistence。
+  overgeneralization cases，并覆盖 no unsupported memory hidden path / no raw prompt persistence。
 - provider replay admin / workflow handoff 已收口：`provider-replay-handoff` 只读 `DLQ`
   provider failure，输出低敏 admin operation request 和 workflow handoff request；admin-service
   已支持 `PROVIDER_REPLAY_REQUEST` 并强制路由 workflow-service `REPAIR_APPROVAL`，
@@ -45,6 +45,9 @@ loadtest report 或 archive。
   `workflow_timers` 中到期的 `APPROVAL_TIMEOUT`，把仍等待审批的 workflow 转为
   `TIMED_OUT` 并写低敏 `workflow.timed_out.v1`；审批终结会取消 pending timer。它不执行
   action、不创建隐式 approval、不从命名 `timeout_policy_ref` 推断默认 due_at。
+- workflow external approval binding 已收口：外部审批 manifest 必须绑定当前 workflow
+  type / step / target / payload hash / approval policy；`record-decision` 会先查
+  `GetWorkflow`，binding mismatch 时 fail-closed，不记录 decision，也不执行 provider replay。
 - group memory / multi-party collaboration 必须继续保留 source refs、conversation scope、
   member visibility、time/version boundary、citations 和 no-citation refusal。
 
@@ -65,7 +68,7 @@ loadtest report 或 archive。
 - 每轮先读 `prompt.md`、`agent.md`、`docs/runbook/current-goal.md`。
 - 只按需读取 SDD / service brief / ADR / report，不全文扫长历史文档。
 - 一个 goal 必须是可感知功能模块；不要把小字段、小测试、小文档句子当目标。
-- 不写隐藏 fallback；不确定时 fail-closed，或显式 repair / retry / redrive。
+- 不写隐藏 alternate path；不确定时 fail-closed，或显式 repair / retry / redrive。
 - 文档只在阶段、公开能力、架构边界、新服务 / 中间件 / provider 变化时同步。
 
 ## 下一个方向

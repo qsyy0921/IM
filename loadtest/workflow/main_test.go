@@ -96,9 +96,17 @@ func TestParseFlagsBuildsRecordDecisionDefaults(t *testing.T) {
 func TestPrepareConfigLoadsDecisionManifest(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "decision.json")
 	manifest := `{
-		"schema_version": "nexusim.workflow.decision_manifest.v1",
+		"schema_version": "nexusim.workflow.external_decision_manifest.v1",
 		"workflow_id": "wf_manifest",
 		"step_id": "wfs_manifest",
+		"expected_workflow_type": "repair_approval",
+		"expected_status": "waiting_decision",
+		"expected_target_service": "action-executor",
+		"expected_target_operation": "PROVIDER_REPLAY_REQUEST",
+		"expected_target_ref_hash": "sha256:target-binding",
+		"expected_payload_schema_version": "admin.provider_replay_request.v1",
+		"expected_payload_ref_hash": "sha256:payload-binding",
+		"expected_approval_policy_ref": "admin.workflow.provider_replay.v1",
 		"decision": "approve",
 		"decider_ref": "operator:manifest",
 		"decision_policy_ref": "policy:external-approval",
@@ -125,6 +133,14 @@ func TestPrepareConfigLoadsDecisionManifest(t *testing.T) {
 	}
 	if prepared.workflowID != "wf_manifest" ||
 		prepared.stepID != "wfs_manifest" ||
+		prepared.expectedWorkflowType != "REPAIR_APPROVAL" ||
+		prepared.expectedStatus != "WAITING_DECISION" ||
+		prepared.expectedTargetService != "action-executor" ||
+		prepared.expectedTargetOperation != "PROVIDER_REPLAY_REQUEST" ||
+		prepared.expectedTargetRefHash != "sha256:target-binding" ||
+		prepared.expectedPayloadSchemaVersion != "admin.provider_replay_request.v1" ||
+		prepared.expectedPayloadRefHash != "sha256:payload-binding" ||
+		prepared.expectedApprovalPolicyRef != "admin.workflow.provider_replay.v1" ||
 		prepared.decision != "APPROVE" ||
 		prepared.deciderRef != "operator:manifest" ||
 		prepared.idempotencyKey != "external-approval:wf_manifest:wfs_manifest" ||
@@ -326,6 +342,44 @@ func TestExecuteRecordDecision(t *testing.T) {
 	}
 }
 
+func TestExecuteRecordDecisionWithExternalManifestVerifiesWorkflowBinding(t *testing.T) {
+	cfg := externalDecisionConfig()
+	client := &fakeWorkflowClient{
+		getResponse:      &workflowv1.GetWorkflowResponse{Workflow: matchingExternalDecisionWorkflow()},
+		decisionResponse: approvedDecisionResponse(),
+	}
+	result, err := execute(context.Background(), cfg, client)
+	if err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if client.getRequest == nil || client.getRequest.GetWorkflowId() != "wf_external" {
+		t.Fatalf("expected workflow lookup before decision, got %+v", client.getRequest)
+	}
+	if client.decisionRequest == nil || client.decisionRequest.GetWorkflowId() != "wf_external" {
+		t.Fatalf("expected decision request after binding check, got %+v", client.decisionRequest)
+	}
+	if result.Workflow == nil || result.Workflow.Status != "APPROVED" || result.Decision == nil {
+		t.Fatalf("unexpected result: %+v", result)
+	}
+}
+
+func TestExecuteRecordDecisionWithExternalManifestRejectsBindingMismatch(t *testing.T) {
+	cfg := externalDecisionConfig()
+	workflow := matchingExternalDecisionWorkflow()
+	workflow.PayloadRefHash = "sha256:different-payload"
+	client := &fakeWorkflowClient{
+		getResponse:      &workflowv1.GetWorkflowResponse{Workflow: workflow},
+		decisionResponse: approvedDecisionResponse(),
+	}
+	if _, err := execute(context.Background(), cfg, client); err == nil ||
+		!strings.Contains(err.Error(), "payload_ref_hash binding mismatch") {
+		t.Fatalf("expected binding mismatch, got %v", err)
+	}
+	if client.decisionRequest != nil {
+		t.Fatalf("decision should not be recorded after binding mismatch: %+v", client.decisionRequest)
+	}
+}
+
 func TestExecuteListCompensationInstructions(t *testing.T) {
 	cfg := parseFlags([]string{
 		"-mode", "list-compensation-instructions",
@@ -398,6 +452,65 @@ func TestRunOutputDoesNotExposePayloadOrReasonBody(t *testing.T) {
 		if strings.Contains(output, forbidden) {
 			t.Fatalf("output leaked forbidden marker %q: %s", forbidden, output)
 		}
+	}
+}
+
+func externalDecisionConfig() config {
+	cfg := parseFlags([]string{
+		"-mode", "record-decision",
+		"-tenant-id", "tenant-wf",
+		"-workflow-id", "wf_external",
+		"-step-id", "wfs_external",
+		"-decider-ref", "operator:external",
+		"-decision", "APPROVE",
+		"-decision-policy-ref", "workflow.external-approval.v1",
+		"-reason-ref", "reason-sha256:abc",
+		"-evidence-refs", "evidence:ticket",
+		"-idempotency-key", "external-approval:wf_external:wfs_external:approve:operator",
+	})
+	cfg.decisionManifestPath = "manifest.json"
+	cfg.expectedWorkflowType = "REPAIR_APPROVAL"
+	cfg.expectedStatus = "WAITING_DECISION"
+	cfg.expectedTargetService = "action-executor"
+	cfg.expectedTargetOperation = "PROVIDER_REPLAY_REQUEST"
+	cfg.expectedTargetRefHash = "sha256:target-binding"
+	cfg.expectedPayloadSchemaVersion = "admin.provider_replay_request.v1"
+	cfg.expectedPayloadRefHash = "sha256:payload-binding"
+	cfg.expectedApprovalPolicyRef = "admin.workflow.provider_replay.v1"
+	return cfg
+}
+
+func matchingExternalDecisionWorkflow() *workflowv1.Workflow {
+	return &workflowv1.Workflow{
+		WorkflowId:           "wf_external",
+		WorkflowType:         "REPAIR_APPROVAL",
+		TargetService:        "action-executor",
+		TargetOperation:      "PROVIDER_REPLAY_REQUEST",
+		TargetRefHash:        "sha256:target-binding",
+		PayloadSchemaVersion: "admin.provider_replay_request.v1",
+		PayloadRefHash:       "sha256:payload-binding",
+		ApprovalPolicyRef:    "admin.workflow.provider_replay.v1",
+		Status:               "WAITING_DECISION",
+		CurrentStepId:        "wfs_external",
+	}
+}
+
+func approvedDecisionResponse() *workflowv1.RecordWorkflowDecisionResponse {
+	return &workflowv1.RecordWorkflowDecisionResponse{
+		Workflow: &workflowv1.Workflow{
+			WorkflowId: "wf_external",
+			Status:     "APPROVED",
+		},
+		Decision: &workflowv1.WorkflowDecision{
+			DecisionId:        "wfd_external",
+			WorkflowId:        "wf_external",
+			StepId:            "wfs_external",
+			DeciderRef:        "operator:external",
+			DecisionType:      "APPROVE",
+			DecisionPolicyRef: "workflow.external-approval.v1",
+			ReasonRef:         "reason-sha256:abc",
+			EvidenceRefs:      []string{"evidence:ticket"},
+		},
 	}
 }
 

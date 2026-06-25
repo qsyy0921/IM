@@ -23,10 +23,13 @@
 - Workflow provider replay queue view case：验证 workflow-service 只列低敏
   `REPAIR_APPROVAL` / action-executor `PROVIDER_REPLAY_REQUEST` 工作流，不执行 replay、
   不读取 raw payload、不绕过 action-executor final execution owner。
+- Workflow external approval binding case：验证外部审批 manifest 必须绑定当前
+  workflow type / step / target / payload hash / approval policy，binding mismatch 不记录
+  decision、不执行 replay。
 - Provider readiness / source coverage / vector lane checks 已进入相关 smoke 输出。
 - Group-memory ambiguity safety expansion：asker-bound term ambiguity、visible-chain
   incomplete abstention、missing visibility projection fail-closed、audience-language
-  profile overgeneralization、no unsupported memory fallback 和 no raw prompt persistence
+  profile overgeneralization、no unsupported memory hidden path 和 no raw prompt persistence
   已进入 `profile-agent-output-safety` 本地低敏 adapter。
 
 ## 边界

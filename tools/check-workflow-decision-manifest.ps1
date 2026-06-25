@@ -19,6 +19,13 @@ try {
         -OutputPath $manifestPath `
         -WorkflowID "wf_manifest_1" `
         -StepID "wfs_manifest_1" `
+        -ExpectedWorkflowType "REPAIR_APPROVAL" `
+        -ExpectedTargetService "action-executor" `
+        -ExpectedTargetOperation "PROVIDER_REPLAY_REQUEST" `
+        -ExpectedTargetRefHash "sha256:target-binding" `
+        -ExpectedPayloadSchemaVersion "admin.provider_replay_request.v1" `
+        -ExpectedPayloadRefHash "sha256:payload-binding" `
+        -ExpectedApprovalPolicyRef "admin.workflow.provider_replay.v1" `
         -Decision "APPROVE" `
         -DeciderRef "operator-a" `
         -DecisionPolicyRef "workflow.external-approval.v1" `
@@ -41,13 +48,22 @@ try {
         throw "validate-workflow-decision-manifest.ps1 failed"
     }
     $summary = ($summaryRaw -join "`n") | ConvertFrom-Json
-    if ($summary.workflow_id -ne "wf_manifest_1" -or $summary.step_id -ne "wfs_manifest_1" -or $summary.decision -ne "APPROVE") {
+    if ($summary.workflow_id -ne "wf_manifest_1" -or
+        $summary.step_id -ne "wfs_manifest_1" -or
+        $summary.expected_workflow_type -ne "REPAIR_APPROVAL" -or
+        $summary.expected_target_service -ne "action-executor" -or
+        $summary.expected_target_operation -ne "PROVIDER_REPLAY_REQUEST" -or
+        $summary.expected_payload_ref_hash -ne "sha256:payload-binding" -or
+        $summary.expected_approval_policy_ref -ne "admin.workflow.provider_replay.v1" -or
+        $summary.decision -ne "APPROVE") {
         throw "Workflow decision manifest summary has unexpected identity fields."
     }
 
     $manifestRaw = Get-Content -LiteralPath $manifestPath -Raw
     $manifest = $manifestRaw | ConvertFrom-Json
-    if ($manifest.schema_version -ne "nexusim.workflow.decision_manifest.v1" -or
+    if ($manifest.schema_version -ne "nexusim.workflow.external_decision_manifest.v1" -or
+        $manifest.expected_status -ne "WAITING_DECISION" -or
+        $manifest.expected_target_ref_hash -ne "sha256:target-binding" -or
         $manifest.reason_ref -notmatch "^reason-sha256:[a-f0-9]{64}$" -or
         @($manifest.evidence_refs).Count -ne 2) {
         throw "Workflow decision manifest has unexpected normalized fields."
@@ -64,6 +80,13 @@ try {
             -OutputPath (Join-Path $tempRoot "bad.json") `
             -WorkflowID "wf_manifest_1" `
             -StepID "wfs_manifest_1" `
+            -ExpectedWorkflowType "REPAIR_APPROVAL" `
+            -ExpectedTargetService "action-executor" `
+            -ExpectedTargetOperation "PROVIDER_REPLAY_REQUEST" `
+            -ExpectedTargetRefHash "sha256:target-binding" `
+            -ExpectedPayloadSchemaVersion "admin.provider_replay_request.v1" `
+            -ExpectedPayloadRefHash "sha256:payload-binding" `
+            -ExpectedApprovalPolicyRef "admin.workflow.provider_replay.v1" `
             -Decision "APPROVE" `
             -DeciderRef "bearer-token" 2>&1
         $badExitCode = $LASTEXITCODE

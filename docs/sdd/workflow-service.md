@@ -479,6 +479,7 @@ go run ./loadtest/workflow -mode record-decision -decision-manifest H:\NexusIM\o
 go run ./loadtest/workflow -mode operator-queues
 go run ./loadtest/workflow -mode list-compensation-instructions -workflow-id wf_123 -status ACTIVE
 go run ./loadtest/workflow -mode compensation-review-bundle -workflow-id wf_123
+.\tools\write-workflow-compensation-review-page.ps1 -BundlePath H:\NexusIM\operator-plans\workflow-compensation-review-bundle.json -GeneratedBy operator-a -OutputPath H:\NexusIM\operator-plans\workflow-compensation-review.html
 ```
 
 该 CLI 只通过 workflow-service 公开 gRPC get workflow、list workflows、record decision
@@ -518,6 +519,12 @@ CLI 会校验 workflow id、payload ref hash、target service 和 target operati
 hash、version 和审查边界，不记录 decision、不创建 approval、不修改 instruction 状态、
 不调用 compensation-executor、control-plane-service 或 action-executor。正式 provider-grade
 instruction approval UI 仍是后续项。
+`write-workflow-compensation-review-page.ps1` 提供第一版本地 compensation review HTML：
+它只接受 `nexusim.workflow.compensation_review_bundle.v1`，重新校验 workflow type /
+status、payload hash、target 和 ACTIVE instruction 绑定，再渲染低敏 refs / hash /
+policy / status / boundary。页面不记录 decision、不创建 approval、不执行 compensation、
+不调用下游服务，也不嵌入原始 payload、operator reason、provider body、EvidencePack、
+本机路径或 credential-like 字段。
 
 `write-workflow-compensation-instruction-manifest.ps1` /
 `validate-workflow-compensation-instruction-manifest.ps1` 是第一版 compensation

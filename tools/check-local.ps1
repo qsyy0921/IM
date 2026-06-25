@@ -92,6 +92,9 @@ try {
     Write-Host "== workflow compensation instruction manifest =="
     Invoke-LocalCheck "check-workflow-compensation-instruction-manifest.ps1"
 
+    Write-Host "== workflow compensation review page =="
+    Invoke-LocalCheck "check-workflow-compensation-review-page.ps1"
+
     Write-Host "== ddd boundaries =="
     Invoke-LocalCheck "check-ddd-boundaries.ps1"
 

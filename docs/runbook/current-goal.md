@@ -55,6 +55,10 @@ Agent action boundary / repair cases：在 provider replay admin / workflow hand
   只读 `COMPENSATION_PENDING` workflow 和 `ACTIVE` instruction refs，校验 workflow id /
   payload hash / target 绑定后输出低敏审查包；不记录 decision、不创建 approval、
   不执行 compensation、不调用下游服务。
+- workflow compensation review page 已落：`write-workflow-compensation-review-page.ps1`
+  只接受低敏 compensation review bundle，重新校验 workflow / instruction 绑定后渲染
+  仓库外 HTML；不记录 decision、不创建 approval、不执行 compensation、不暴露 raw
+  payload / reason / path / provider body / EvidencePack。
 
 ## 目标
 

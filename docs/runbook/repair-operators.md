@@ -244,6 +244,8 @@ go run ./loadtest/workflow -mode list-workflows -workflow-type REPAIR_APPROVAL -
 go run ./loadtest/workflow -mode record-decision -workflow-id wf_123 -step-id wfs_1 -decision APPROVE -decider-ref operator:a
 go run ./loadtest/workflow -mode record-decision -decision-manifest H:\NexusIM\operator-plans\workflow-decision.json
 go run ./loadtest/workflow -mode list-compensation-instructions -workflow-id wf_123 -status ACTIVE
+go run ./loadtest/workflow -mode compensation-review-bundle -workflow-id wf_123 > H:\NexusIM\operator-plans\workflow-compensation-review-bundle.json
+.\tools\write-workflow-compensation-review-page.ps1 -BundlePath H:\NexusIM\operator-plans\workflow-compensation-review-bundle.json -GeneratedBy operator-a -OutputPath H:\NexusIM\operator-plans\workflow-compensation-review.html
 ```
 
 可用 `-target` 或 `NEXUSIM_WORKFLOW_GRPC_ADDR` 指向 workflow-service gRPC，
@@ -285,6 +287,11 @@ compensation executor 使用的 control-plane rollback instruction JSON。该 ma
 / reason 文件只用于计算 hash，不会被复制进 manifest，也不会保存本机路径。它是
 first-stage operator handoff，不是正式 instruction approval UI，也不调用
 workflow-service、control-plane-service 或数据库。
+`write-workflow-compensation-review-page.ps1` 可把
+`loadtest/workflow -mode compensation-review-bundle` 的低敏审查包渲染成仓库外 HTML。
+页面只展示 workflow / instruction refs、hash、policy、status 和审查边界；它不会记录
+decision、不会创建 approval、不会执行 compensation、不会调用 control-plane-service /
+action-executor，也不会输出原始 payload、reason、provider body、EvidencePack 或本机路径。
 
 `workflow-service` 的 `compensation-instruction-import` 已纳入
 `repair-operators.catalog.json`，可被本地 repair approval request / decision /

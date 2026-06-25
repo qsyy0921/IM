@@ -1324,6 +1324,28 @@
       ]
     },
     {
+      "id": "workflow-compensation-review-page-boundary",
+      "family": "action_execution_safety",
+      "stage": "workflow-compensation-review",
+      "status": "active",
+      "query": "render a low-sensitive workflow compensation review page from a compensation review bundle",
+      "risk": "Compensation review page must expose only workflow and instruction refs or hashes, must not leak raw compensation artifacts, and must not approve or execute compensation",
+      "required_assertions": [
+        {
+          "type": "must_render_compensation_review_page"
+        },
+        {
+          "type": "must_expose_low_sensitive_compensation_review"
+        },
+        {
+          "type": "must_not_execute_compensation_from_review"
+        },
+        {
+          "type": "must_not_leak_raw_compensation_artifacts"
+        }
+      ]
+    },
+    {
       "id": "workflow-approval-timeout-boundary",
       "family": "action_execution_safety",
       "stage": "workflow-approval-timeout",

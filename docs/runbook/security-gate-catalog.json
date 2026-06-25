@@ -226,6 +226,13 @@
       "note": "Workflow compensation rollback instruction manifests must stay low-sensitive, external to the repository, and free of raw payload or operator reason text."
     },
     {
+      "name": "workflow compensation review page",
+      "category": "operator-safety",
+      "script": "tools/check-workflow-compensation-review-page.ps1",
+      "check_local_label": "workflow compensation review page",
+      "note": "Workflow compensation review pages must render only low-sensitive bundle refs and hashes, never execute compensation or leak raw payload, reason, path, provider body, or EvidencePack content."
+    },
+    {
       "name": "capacity baseline evidence manifest",
       "category": "evidence-safety",
       "script": "tools/check-capacity-baseline-evidence.ps1",

@@ -35,6 +35,9 @@ admin operation approval、补偿请求和人工审批状态。
 - `loadtest/workflow compensation-review-bundle`：读取 `COMPENSATION_PENDING`
   workflow 和 `ACTIVE` instruction refs，校验 workflow id / payload hash / target
   绑定后输出低敏审查包；不记录 decision、不执行 compensation、不调用下游服务。
+- `write-workflow-compensation-review-page.ps1`：把 compensation review bundle 渲染成
+  仓库外低敏 HTML 审查页；不记录 decision、不创建 approval、不执行 compensation、
+  不暴露 raw payload / reason / path / provider body / EvidencePack。
 - `loadtest/workflow provider-replay-queue`：默认列出等待
   `admin.workflow.provider_replay.v1` 审批的 action-executor
   `PROVIDER_REPLAY_REQUEST` workflow；不执行 redrive、不修改 DLQ、不暴露 raw payload。

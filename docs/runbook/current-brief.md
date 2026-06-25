@@ -58,6 +58,10 @@ loadtest report 或 archive。
   `COMPENSATION_PENDING` workflow 和 `ACTIVE` instruction refs，校验 workflow id /
   payload hash / target 后输出低敏审查包；它不记录 decision、不创建 approval、不执行
   compensation、不调用下游服务。
+- workflow compensation review page 已收口：`write-workflow-compensation-review-page.ps1`
+  把低敏审查包渲染成仓库外 HTML，并再次校验 workflow / instruction 绑定；页面不记录
+  decision、不创建 approval、不执行 compensation、不泄漏 raw payload / reason / path /
+  provider body / EvidencePack。
 - group memory / multi-party collaboration 必须继续保留 source refs、conversation scope、
   member visibility、time/version boundary、citations 和 no-citation refusal。
 

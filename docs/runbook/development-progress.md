@@ -233,7 +233,13 @@
   external callback delivery status / redrive plan 已能把 `DELIVERED` /
   `RETRY_PENDING` / `DLQ` attempt metadata 绑定回 delivery plan 和 waiting workflow，并只从
   retry / DLQ 状态生成低敏 redrive handoff；status / redrive 均不调用 provider、不记录
-  decision、不执行 target action；
+  decision、不执行 target action；external callback delivery persistent worker first path
+  已新增 `workflow_external_callback_deliveries` 持久 job 状态机和
+  `external-callback-delivery-import` / `external-callback-delivery-worker` 运行模式；
+  import 会锁定并校验 `WAITING_DECISION` workflow 绑定，worker 只按 runtime endpoint ref
+  调用 provider 并推进 `PENDING` / `IN_FLIGHT` / `DELIVERED` / `RETRY_PENDING` /
+  `DLQ`，只写低敏 delivered / DLQ outbox，不记录 decision、不执行 target action、不保存
+  raw callback URL / provider body；
   本地 repair approval review page writer 已能把 plan / request / decision /
   invocation / audit bundle 渲染成只含 hash / path hash / env key / preflight 摘要的
   低敏 HTML 审批页，不复制 reason、payload、manifest path 或 evidence 原文；
@@ -242,10 +248,10 @@
   `COMPENSATION_PENDING` workflow、`ACTIVE` instruction refs、payload hash、target 和
   executor mode；manifest 不记录 decision、不创建 approval、不执行 compensation、不调用
   control-plane-service 或其它下游服务；
-  workflow 第一路径已通过完整 `check-local`，本 worker / executor / registry / timer
-  切片按风险分层用 focused checks 收口；不宣称多 adapter compensation
-  platform、provider-grade instruction UI、真实 external callback delivery worker、持久
-  retry state / redrive worker 或 outbox relay。
+  workflow 第一路径已通过完整 `check-local`，本 worker / executor / registry / timer /
+  callback delivery 切片按风险分层用 focused checks 收口；不宣称多 adapter compensation
+  platform、provider-grade instruction UI、callback delivery redrive worker / operator UI
+  或 workflow outbox relay。
 - `vector-index-service` product-active：SDD v0.1 和 stage-switch review 已通过，
   第一版 proto / migration / 六层 skeleton / `grpc` runtime / Docker /
   Prometheus / Grafana 覆盖已落；当前覆盖 `UpsertVectorItem`、

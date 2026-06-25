@@ -36,6 +36,14 @@ admin operation approval、补偿请求和人工审批状态。
   `write-workflow-external-callback-redrive-plan.ps1`：记录 `DELIVERED` /
   `RETRY_PENDING` / `DLQ` 低敏 attempt status，并只从 retry / DLQ 状态生成 redrive
   handoff；不调用 provider、不记录 decision、不执行 target。
+- `external-callback-delivery-import`：读取低敏 delivery plan，锁定 workflow-service 自有
+  workflow fact，确认仍为 `WAITING_DECISION` 且 workflow type / step / target /
+  payload hash / approval policy 全部匹配后，写入 `workflow_external_callback_deliveries`
+  持久 job；不接受 raw callback URL / provider body。
+- `external-callback-delivery-worker`：claim ready callback delivery job，按 runtime
+  endpoint ref 调用 provider，推进 `PENDING` / `IN_FLIGHT` / `DELIVERED` /
+  `RETRY_PENDING` / `DLQ`；只写低敏 delivered / DLQ outbox，不记录 decision、
+  不执行 target action、不修改业务 fact。
 - `loadtest/workflow operator-queues`：按固定 operator 队列展示 action approval、
   repair approval、provider replay、admin operation、compensation request 和
   compensation pending 的低敏 workflow refs / counts；不记录 decision、不执行 replay。
@@ -62,5 +70,4 @@ admin operation approval、补偿请求和人工审批状态。
   低敏审批状态，不执行 provider replay。
 
 后续：更多 compensation adapter、provider-grade instruction approval UI、outbox relay、
-provider-grade approval UI、真实 external callback delivery worker、持久 retry state /
-redrive worker、repair operators。
+provider-grade approval UI、callback delivery redrive worker / operator UI、repair operators。

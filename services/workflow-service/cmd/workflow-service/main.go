@@ -20,6 +20,7 @@ import (
 	postgresinfra "github.com/qsyy0921/IM/services/workflow-service/internal/infrastructure/postgres"
 	rpcinfra "github.com/qsyy0921/IM/services/workflow-service/internal/infrastructure/rpc"
 	"github.com/qsyy0921/IM/services/workflow-service/internal/trigger/compensation"
+	externalcallback "github.com/qsyy0921/IM/services/workflow-service/internal/trigger/externalcallback"
 	timertrigger "github.com/qsyy0921/IM/services/workflow-service/internal/trigger/timer"
 	"github.com/qsyy0921/IM/services/workflow-service/internal/types"
 	"google.golang.org/grpc"
@@ -52,6 +53,10 @@ func run(ctx context.Context) error {
 		return runCompensationExecutor(ctx)
 	case "compensation-instruction-import":
 		return runCompensationInstructionImport(ctx)
+	case "external-callback-delivery-import":
+		return runExternalCallbackDeliveryImport(ctx)
+	case "external-callback-delivery-worker":
+		return runExternalCallbackDeliveryWorker(ctx)
 	default:
 		return fmt.Errorf("unsupported NEXUSIM_WORKFLOW_SERVICE_MODE %q", mode)
 	}
@@ -252,6 +257,82 @@ func runCompensationInstructionImport(ctx context.Context) error {
 	return nil
 }
 
+func runExternalCallbackDeliveryImport(ctx context.Context) error {
+	pool, err := openPGPool(ctx)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	tenantID := strings.TrimSpace(os.Getenv("NEXUSIM_WORKFLOW_EXTERNAL_CALLBACK_DELIVERY_TENANT_ID"))
+	if tenantID == "" {
+		return errors.New("NEXUSIM_WORKFLOW_EXTERNAL_CALLBACK_DELIVERY_TENANT_ID is required")
+	}
+	delivery, err := rpcinfra.LoadExternalCallbackDeliveryPlan(
+		os.Getenv("NEXUSIM_WORKFLOW_EXTERNAL_CALLBACK_DELIVERY_PLAN_FILE"),
+		types.TenantID(tenantID),
+	)
+	if err != nil {
+		return err
+	}
+	registered, replayed, err := postgresinfra.NewRepository(pool).RegisterExternalCallbackDelivery(ctx, delivery)
+	if err != nil {
+		return err
+	}
+	log.Printf(
+		"workflow-service registered external callback delivery delivery_id=%s workflow_id=%s replayed=%v status=%s",
+		registered.DeliveryID,
+		registered.WorkflowID,
+		replayed,
+		registered.Status,
+	)
+	return nil
+}
+
+func runExternalCallbackDeliveryWorker(ctx context.Context) error {
+	debugAddr, err := workflowDebugAddrFromEnv()
+	if err != nil {
+		return err
+	}
+	stopDebug, err := startDebugServer(ctx, debugAddr)
+	if err != nil {
+		return err
+	}
+	defer stopDebug()
+
+	pool, err := openPGPool(ctx)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	endpoints, err := rpcinfra.LoadExternalCallbackEndpoints(os.Getenv("NEXUSIM_WORKFLOW_EXTERNAL_CALLBACK_ENDPOINTS_FILE"))
+	if err != nil {
+		return err
+	}
+	provider, err := rpcinfra.NewExternalCallbackHTTPProvider(
+		nil,
+		endpoints,
+		envDuration("NEXUSIM_WORKFLOW_EXTERNAL_CALLBACK_HTTP_TIMEOUT", time.Second),
+	)
+	if err != nil {
+		return err
+	}
+	worker := externalcallback.NewWorker(postgresinfra.NewRepository(pool), provider, externalcallback.Config{
+		BatchSize:      envInt("NEXUSIM_WORKFLOW_EXTERNAL_CALLBACK_BATCH_SIZE", 50),
+		PollInterval:   envDuration("NEXUSIM_WORKFLOW_EXTERNAL_CALLBACK_POLL_INTERVAL", time.Second),
+		ErrorBackoff:   envDuration("NEXUSIM_WORKFLOW_EXTERNAL_CALLBACK_ERROR_BACKOFF", time.Second),
+		LeaseDuration:  envDuration("NEXUSIM_WORKFLOW_EXTERNAL_CALLBACK_LEASE_DURATION", 30*time.Second),
+		RetryBaseDelay: envDuration("NEXUSIM_WORKFLOW_EXTERNAL_CALLBACK_RETRY_BASE_DELAY", time.Second),
+		Logf:           log.Printf,
+	})
+	log.Println("workflow-service external-callback-delivery-worker started")
+	if err := worker.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
+		return err
+	}
+	return nil
+}
+
 func workflowCompensationExecutorFromEnv(
 	ctx context.Context,
 	instructionResolver rpcinfra.ControlPlaneRollbackInstructionResolver,
@@ -296,7 +377,8 @@ func workflowModeFromEnv() string {
 
 func validateWorkflowMode(mode string) error {
 	switch mode {
-	case "noop", "grpc", "timer-worker", "compensation-worker", "compensation-executor", "compensation-instruction-import":
+	case "noop", "grpc", "timer-worker", "compensation-worker", "compensation-executor", "compensation-instruction-import",
+		"external-callback-delivery-import", "external-callback-delivery-worker":
 		return nil
 	default:
 		return fmt.Errorf("unsupported NEXUSIM_WORKFLOW_SERVICE_MODE %q", mode)

@@ -87,6 +87,13 @@ Agent action boundary / repair cases：在 provider replay admin / workflow hand
   `write-workflow-external-callback-redrive-plan.ps1` 只从 `RETRY_PENDING` 或 `DLQ`
   status 生成 redrive handoff；两者都绑定 delivery plan 和仍在 `WAITING_DECISION`
   的 workflow，不调用 provider、不记录 decision、不执行 target action。
+- workflow external callback delivery persistent worker first path 已落：
+  workflow-service 新增 `workflow_external_callback_deliveries` 持久 job 状态机和
+  `external-callback-delivery-import` / `external-callback-delivery-worker` 运行模式；
+  import 会锁定并校验仍处于 `WAITING_DECISION` 的 workflow 绑定，worker 只按 endpoint ref
+  调用 runtime provider，更新 `PENDING` / `IN_FLIGHT` / `DELIVERED` /
+  `RETRY_PENDING` / `DLQ`，并只写低敏 delivered / DLQ outbox；不记录 decision、
+  不执行 target action、不保存 raw callback URL / provider body。
 - workflow compensation review bundle 已落：`loadtest/workflow compensation-review-bundle`
   只读 `COMPENSATION_PENDING` workflow 和 `ACTIVE` instruction refs，校验 workflow id /
   payload hash / target 绑定后输出低敏审查包；不记录 decision、不创建 approval、

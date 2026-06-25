@@ -673,6 +673,7 @@ func clearWorkflowTablesIfPresent(ctx context.Context, pool *pgxpool.Pool) {
 	_, _ = pool.Exec(ctx, `
 DROP TABLE IF EXISTS
     workflow_outbox,
+    workflow_external_callback_deliveries,
     workflow_compensation_instructions,
     workflow_compensations,
     workflow_timers,
@@ -688,6 +689,7 @@ func resetWorkflowTables(t *testing.T, ctx context.Context, pool *pgxpool.Pool) 
 	_, err := pool.Exec(ctx, `
 TRUNCATE
     workflow_outbox,
+    workflow_external_callback_deliveries,
     workflow_compensation_instructions,
     workflow_compensations,
     workflow_timers,

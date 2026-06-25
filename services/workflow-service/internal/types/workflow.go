@@ -41,10 +41,18 @@ const (
 	WorkflowCompensationInstructionStatusActive             = "ACTIVE"
 	WorkflowCompensationInstructionStatusDisabled           = "DISABLED"
 
-	WorkflowEventCompensationRequested = "workflow.compensation.requested.v1"
-	WorkflowEventCompensationSucceeded = "workflow.compensation.succeeded.v1"
-	WorkflowEventCompensationFailed    = "workflow.compensation.failed.v1"
-	WorkflowEventTimedOut              = "workflow.timed_out.v1"
+	WorkflowExternalCallbackDeliveryStatusPending      = "PENDING"
+	WorkflowExternalCallbackDeliveryStatusInFlight     = "IN_FLIGHT"
+	WorkflowExternalCallbackDeliveryStatusDelivered    = "DELIVERED"
+	WorkflowExternalCallbackDeliveryStatusRetryPending = "RETRY_PENDING"
+	WorkflowExternalCallbackDeliveryStatusDLQ          = "DLQ"
+
+	WorkflowEventCompensationRequested     = "workflow.compensation.requested.v1"
+	WorkflowEventCompensationSucceeded     = "workflow.compensation.succeeded.v1"
+	WorkflowEventCompensationFailed        = "workflow.compensation.failed.v1"
+	WorkflowEventTimedOut                  = "workflow.timed_out.v1"
+	WorkflowEventExternalCallbackDelivered = "workflow.external_callback.delivered.v1"
+	WorkflowEventExternalCallbackDLQ       = "workflow.external_callback.dlq.v1"
 
 	DecisionTypeApprove        = "APPROVE"
 	DecisionTypeReject         = "REJECT"
@@ -227,6 +235,47 @@ type WorkflowCompensationInstruction struct {
 	Status          string
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
+}
+
+type WorkflowExternalCallbackDelivery struct {
+	TenantID                     TenantID
+	WorkflowID                   string
+	DeliveryID                   string
+	DeliveryPlanSha256           string
+	SourceDecisionManifestSha256 string
+	StepID                       string
+	WorkflowType                 string
+	TargetService                string
+	TargetOperation              string
+	TargetRefHash                string
+	PayloadSchemaVersion         string
+	PayloadRefHash               string
+	ApprovalPolicyRef            string
+	DecisionPolicyRef            string
+	CallbackProviderRef          string
+	CallbackEndpointRef          string
+	DeliveryQueueRef             string
+	RetryPolicyRef               string
+	BackoffPolicyRef             string
+	CallbackTimeoutPolicyRef     string
+	CallbackPayloadSchemaVersion string
+	CallbackPayloadRefHash       string
+	Status                       string
+	AttemptCount                 int
+	MaxAttempts                  int
+	AvailableAt                  time.Time
+	LeasedUntil                  time.Time
+	LastAttemptAt                time.Time
+	DeliveredAt                  time.Time
+	LastFailureClass             string
+	LastDeliveryResultRef        string
+	CreatedAt                    time.Time
+	UpdatedAt                    time.Time
+}
+
+type WorkflowExternalCallbackDeliveryResult struct {
+	DeliveryResultRef string
+	FailureClass      string
 }
 
 func (command CreateWorkflowCommand) Normalized() CreateWorkflowCommand {
@@ -467,6 +516,97 @@ func (instruction WorkflowCompensationInstruction) Validate() error {
 	return nil
 }
 
+func (delivery WorkflowExternalCallbackDelivery) Normalized() WorkflowExternalCallbackDelivery {
+	delivery.TenantID = TenantID(strings.TrimSpace(string(delivery.TenantID)))
+	delivery.WorkflowID = strings.TrimSpace(delivery.WorkflowID)
+	delivery.DeliveryID = strings.TrimSpace(delivery.DeliveryID)
+	delivery.DeliveryPlanSha256 = strings.TrimSpace(delivery.DeliveryPlanSha256)
+	delivery.SourceDecisionManifestSha256 = strings.TrimSpace(delivery.SourceDecisionManifestSha256)
+	delivery.StepID = strings.TrimSpace(delivery.StepID)
+	delivery.WorkflowType = strings.ToUpper(strings.TrimSpace(delivery.WorkflowType))
+	delivery.TargetService = strings.TrimSpace(delivery.TargetService)
+	delivery.TargetOperation = strings.TrimSpace(delivery.TargetOperation)
+	delivery.TargetRefHash = strings.TrimSpace(delivery.TargetRefHash)
+	delivery.PayloadSchemaVersion = strings.TrimSpace(delivery.PayloadSchemaVersion)
+	delivery.PayloadRefHash = strings.TrimSpace(delivery.PayloadRefHash)
+	delivery.ApprovalPolicyRef = strings.TrimSpace(delivery.ApprovalPolicyRef)
+	delivery.DecisionPolicyRef = strings.TrimSpace(delivery.DecisionPolicyRef)
+	delivery.CallbackProviderRef = strings.TrimSpace(delivery.CallbackProviderRef)
+	delivery.CallbackEndpointRef = strings.TrimSpace(delivery.CallbackEndpointRef)
+	delivery.DeliveryQueueRef = strings.TrimSpace(delivery.DeliveryQueueRef)
+	delivery.RetryPolicyRef = strings.TrimSpace(delivery.RetryPolicyRef)
+	delivery.BackoffPolicyRef = strings.TrimSpace(delivery.BackoffPolicyRef)
+	delivery.CallbackTimeoutPolicyRef = strings.TrimSpace(delivery.CallbackTimeoutPolicyRef)
+	delivery.CallbackPayloadSchemaVersion = strings.TrimSpace(delivery.CallbackPayloadSchemaVersion)
+	delivery.CallbackPayloadRefHash = strings.TrimSpace(delivery.CallbackPayloadRefHash)
+	delivery.Status = strings.ToUpper(strings.TrimSpace(delivery.Status))
+	if delivery.Status == "" {
+		delivery.Status = WorkflowExternalCallbackDeliveryStatusPending
+	}
+	delivery.LastFailureClass = strings.TrimSpace(delivery.LastFailureClass)
+	delivery.LastDeliveryResultRef = strings.TrimSpace(delivery.LastDeliveryResultRef)
+	return delivery
+}
+
+func (delivery WorkflowExternalCallbackDelivery) Validate() error {
+	delivery = delivery.Normalized()
+	if delivery.TenantID == "" ||
+		delivery.WorkflowID == "" ||
+		delivery.DeliveryID == "" ||
+		delivery.DeliveryPlanSha256 == "" ||
+		delivery.StepID == "" ||
+		delivery.WorkflowType == "" ||
+		delivery.TargetService == "" ||
+		delivery.TargetOperation == "" ||
+		delivery.TargetRefHash == "" ||
+		delivery.PayloadSchemaVersion == "" ||
+		delivery.PayloadRefHash == "" ||
+		delivery.ApprovalPolicyRef == "" ||
+		delivery.DecisionPolicyRef == "" ||
+		delivery.CallbackProviderRef == "" ||
+		delivery.CallbackEndpointRef == "" ||
+		delivery.DeliveryQueueRef == "" ||
+		delivery.RetryPolicyRef == "" ||
+		delivery.BackoffPolicyRef == "" ||
+		delivery.CallbackTimeoutPolicyRef == "" ||
+		delivery.CallbackPayloadSchemaVersion == "" ||
+		delivery.CallbackPayloadRefHash == "" {
+		return NewInvalidArgument("workflow external callback delivery is incomplete")
+	}
+	if !isAllowedWorkflowType(delivery.WorkflowType) {
+		return NewInvalidArgument("workflow external callback delivery workflow type is unsupported")
+	}
+	if !isAllowedExternalCallbackDeliveryStatus(delivery.Status) {
+		return NewInvalidArgument("workflow external callback delivery status is unsupported")
+	}
+	if delivery.MaxAttempts < 1 || delivery.MaxAttempts > 10 {
+		return NewInvalidArgument("workflow external callback max attempts must be between 1 and 10")
+	}
+	for name, value := range map[string]string{
+		"delivery_id":                     delivery.DeliveryID,
+		"delivery_plan_sha256":            delivery.DeliveryPlanSha256,
+		"source_decision_manifest_sha256": delivery.SourceDecisionManifestSha256,
+		"target_ref_hash":                 delivery.TargetRefHash,
+		"payload_ref_hash":                delivery.PayloadRefHash,
+		"approval_policy_ref":             delivery.ApprovalPolicyRef,
+		"decision_policy_ref":             delivery.DecisionPolicyRef,
+		"callback_provider_ref":           delivery.CallbackProviderRef,
+		"callback_endpoint_ref":           delivery.CallbackEndpointRef,
+		"delivery_queue_ref":              delivery.DeliveryQueueRef,
+		"retry_policy_ref":                delivery.RetryPolicyRef,
+		"backoff_policy_ref":              delivery.BackoffPolicyRef,
+		"callback_timeout_policy_ref":     delivery.CallbackTimeoutPolicyRef,
+		"callback_payload_ref_hash":       delivery.CallbackPayloadRefHash,
+		"last_failure_class":              delivery.LastFailureClass,
+		"last_delivery_result_ref":        delivery.LastDeliveryResultRef,
+	} {
+		if looksSensitive(value) {
+			return NewInvalidArgument(name + " must be a low-sensitive ref")
+		}
+	}
+	return nil
+}
+
 func isAllowedWorkflowType(value string) bool {
 	return value == WorkflowTypeActionApproval ||
 		value == WorkflowTypeRepairApproval ||
@@ -492,6 +632,19 @@ func isAllowedWorkflowStatus(value string) bool {
 		WorkflowStatusTimedOut,
 		WorkflowStatusCompensationPending,
 		WorkflowStatusCompensated:
+		return true
+	default:
+		return false
+	}
+}
+
+func isAllowedExternalCallbackDeliveryStatus(value string) bool {
+	switch value {
+	case WorkflowExternalCallbackDeliveryStatusPending,
+		WorkflowExternalCallbackDeliveryStatusInFlight,
+		WorkflowExternalCallbackDeliveryStatusDelivered,
+		WorkflowExternalCallbackDeliveryStatusRetryPending,
+		WorkflowExternalCallbackDeliveryStatusDLQ:
 		return true
 	default:
 		return false

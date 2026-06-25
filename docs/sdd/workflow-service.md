@@ -9,7 +9,8 @@ operator workflow。
 职责：
 
 - 拥有 `workflow_requests`、`workflow_steps`、`workflow_decisions`、
-  `workflow_timers`、`workflow_compensations` 和 `workflow_outbox`。
+  `workflow_timers`、`workflow_compensations`、`workflow_external_callback_deliveries`
+  和 `workflow_outbox`。
 - 提供 action approval、repair approval、config rollout approval、retention cleanup、
   external callback wait 和 compensation request 的统一状态机。
 - 为 admin-service、agent-service、action-executor、control-plane-service 提供长等待编排。
@@ -70,6 +71,7 @@ services/workflow-service/
 | `WorkflowDecision` | 人工或系统决策 | append-only；separation-of-duty 可验证 |
 | `WorkflowTimer` | 等待 / timeout / retry 计时器 | due_at 到期后 worker 推进 |
 | `WorkflowCompensation` | 补偿动作请求 | 只保存低敏 target ref 和 outcome |
+| `WorkflowExternalCallbackDelivery` | 外部审批 callback delivery job | 只保存低敏 refs / hashes / retry 状态，不保存 raw URL / provider body |
 | `WorkflowOutboxEvent` | 低敏 workflow 事件 | 只通过 outbox relay 发布 |
 
 Workflow 类型：
@@ -228,9 +230,14 @@ callback provider / endpoint / queue / retry refs；
 `write-workflow-external-callback-delivery-status.ps1` 记录 `DELIVERED` /
 `RETRY_PENDING` / `DLQ` attempt status；
 `write-workflow-external-callback-redrive-plan.ps1` 只从 retry / DLQ status 生成 redrive
-handoff。上述入口都不调用 provider、不记录 decision、不执行 target action。更多下游
-adapter、provider-grade instruction UI、真实 callback delivery worker、持久 retry state /
-redrive worker 和运维后置。
+handoff。当前 first path 已新增 `workflow_external_callback_deliveries` 持久 job 和
+`external-callback-delivery-import` / `external-callback-delivery-worker` 运行模式：
+import 锁定 workflow-service 自有 workflow fact，校验仍为 `WAITING_DECISION` 且
+workflow type / step / target / payload hash / approval policy 绑定一致；worker 只按
+runtime endpoint ref 调用 provider，并推进
+`PENDING -> IN_FLIGHT -> DELIVERED / RETRY_PENDING / DLQ`。上述入口不记录
+decision、不执行 target action、不保存 raw callback URL / provider body。更多下游
+adapter、provider-grade instruction UI、callback redrive worker / operator UI 和运维后置。
 
 后续扩展：
 
@@ -456,6 +463,8 @@ NEXUSIM_WORKFLOW_SERVICE_MODE=timer-worker
 NEXUSIM_WORKFLOW_SERVICE_MODE=compensation-worker
 NEXUSIM_WORKFLOW_SERVICE_MODE=compensation-executor
 NEXUSIM_WORKFLOW_SERVICE_MODE=compensation-instruction-import
+NEXUSIM_WORKFLOW_SERVICE_MODE=external-callback-delivery-import
+NEXUSIM_WORKFLOW_SERVICE_MODE=external-callback-delivery-worker
 ```
 
 operator：
@@ -487,6 +496,17 @@ go run ./loadtest/workflow -mode list-compensation-instructions -workflow-id wf_
 go run ./loadtest/workflow -mode compensation-review-bundle -workflow-id wf_123
 .\tools\write-workflow-compensation-review-page.ps1 -BundlePath H:\NexusIM\operator-plans\workflow-compensation-review-bundle.json -GeneratedBy operator-a -OutputPath H:\NexusIM\operator-plans\workflow-compensation-review.html
 ```
+
+external callback delivery worker 运行依赖：
+
+```text
+NEXUSIM_WORKFLOW_EXTERNAL_CALLBACK_DELIVERY_TENANT_ID
+NEXUSIM_WORKFLOW_EXTERNAL_CALLBACK_DELIVERY_PLAN_FILE
+NEXUSIM_WORKFLOW_EXTERNAL_CALLBACK_ENDPOINTS_FILE
+```
+
+`NEXUSIM_WORKFLOW_EXTERNAL_CALLBACK_ENDPOINTS_FILE` 只存在运行时，用 endpoint ref
+映射 URL；URL 不进入 PostgreSQL、outbox、报告或 delivery plan。
 
 该 CLI 只通过 workflow-service 公开 gRPC get workflow、list workflows、record decision
 和查询低敏 instruction refs / version / status，不读 PostgreSQL 私表，不输出 workflow

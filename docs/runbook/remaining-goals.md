@@ -76,7 +76,7 @@
 - `vector-index-service`：real pgvector / OpenSearch vector / Milvus smoke、provider repair。
 - `workflow-service`：external callback delivery plan、delivery status / redrive plan、
   persistent delivery worker first path、redrive operator path、callback delivery review page、
-  callback delivery dashboard、batch redrive invocation manifest、approval queue review page、
+  callback delivery dashboard、batch redrive invocation / result manifest、approval queue review page、
   compensation review bundle / review page /
   instruction approval page / execution readiness manifest / execution invocation manifest /
   execution result visibility / execution audit append manifest handoff /

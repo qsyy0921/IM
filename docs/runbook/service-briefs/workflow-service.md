@@ -13,7 +13,7 @@
 - `timer-worker`：显式 approval timeout -> `TIMED_OUT`，不执行 action。
 - compensation：request materialization、instruction import / list、control-plane rollback
   first path，unsupported target fail closed。
-- external callback：wait workflow、decision binding、delivery plan、persistent delivery worker、status / redrive path、delivery review page / dashboard、batch redrive invocation manifest。
+- external callback：wait workflow、decision binding、delivery plan、persistent delivery worker、status / redrive path、delivery review page / dashboard、batch redrive invocation / result manifest。
 - operator visibility：provider-replay queue、operator queues、compensation review bundle / page、
   approval queue review page、`ListWorkflowCompensations` execution result query。
 - compensation execution artifacts：instruction approval page、readiness、invocation、execution result、audit append handoff 和 append result；

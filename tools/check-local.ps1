@@ -128,6 +128,9 @@ try {
     Write-Host "== workflow external callback batch redrive invocation =="
     Invoke-LocalCheck "check-workflow-external-callback-batch-redrive-invocation.ps1"
 
+    Write-Host "== workflow external callback batch redrive result =="
+    Invoke-LocalCheck "check-workflow-external-callback-batch-redrive-result-manifest.ps1"
+
     Write-Host "== workflow approval queue review page =="
     Invoke-LocalCheck "check-workflow-approval-queue-review-page.ps1"
 

@@ -255,7 +255,16 @@ dedupe key 和 low-sensitive refs，并可绑定 dashboard hash 作为人工 rev
 manifest 只枚举 `external-callback-delivery-redrive` runtime contract 和每个 plan 的
 hash / ref，不调用 workflow-service、不重新入队、不调用 provider、不记录 decision、
 不执行 target action，也不输出本机路径、provider material、payload material、model
-input 或 auth material。当前 first path 已新增
+input 或 auth material。`external-callback-delivery-redrive` runtime 可通过
+`NEXUSIM_WORKFLOW_EXTERNAL_CALLBACK_REDRIVE_SUMMARY_FILE` 输出
+`nexusim.workflow.external_callback_redrive_execution_summary.v1` 低敏执行 summary；
+summary 只包含 redrive plan hash、workflow / delivery refs、delivery fact 回到 `PENDING`
+的状态、redrive count 和 redriven outbox event type，不包含 raw callback URL、provider
+body、payload 正文或本机路径。`write-workflow-external-callback-batch-redrive-result-manifest.ps1`
+读取 batch invocation 和一组 runtime summary，要求每个 plan exactly one summary、summary
+与 invocation 绑定完全一致、runtime 已报告 `executed_redrive=true`，然后输出低敏 batch
+result manifest。result manifest 不调用 workflow-service、不重新入队、不调用 provider、
+不记录 decision、不执行 target action，也不修改 delivery rows。当前 first path 已新增
 `workflow_external_callback_deliveries` 持久 job 和
 `external-callback-delivery-import` / `external-callback-delivery-worker` /
 `external-callback-delivery-redrive` 运行模式：
@@ -527,6 +536,7 @@ go run ./loadtest/workflow -mode operator-queues
 .\tools\write-workflow-approval-queue-review-page.ps1 -QueueSummaryPath H:\NexusIM\operator-plans\workflow-operator-queues.json -GeneratedBy operator-a -OutputPath H:\NexusIM\operator-plans\workflow-approval-queue-review.html
 .\tools\write-workflow-external-callback-delivery-dashboard.ps1 -DeliveryStatusRootPath H:\NexusIM\operator-plans\workflow-callback-statuses -RedrivePlanRootPath H:\NexusIM\operator-plans\workflow-callback-redrives -GeneratedBy operator-a -OutputPath H:\NexusIM\operator-plans\workflow-callback-delivery-dashboard.html
 .\tools\write-workflow-external-callback-batch-redrive-invocation.ps1 -RedrivePlanRootPath H:\NexusIM\operator-plans\workflow-callback-redrives -DashboardPath H:\NexusIM\operator-plans\workflow-callback-delivery-dashboard.html -PreparedBy operator-a -OutputPath H:\NexusIM\operator-plans\workflow-callback-batch-redrive-invocation.json
+.\tools\write-workflow-external-callback-batch-redrive-result-manifest.ps1 -BatchInvocationPath H:\NexusIM\operator-plans\workflow-callback-batch-redrive-invocation.json -ExecutionSummaryRootPath H:\NexusIM\operator-plans\workflow-callback-redrive-summaries -GeneratedBy operator-a -OutputPath H:\NexusIM\operator-plans\workflow-callback-batch-redrive-result.json
 go run ./loadtest/workflow -mode list-compensation-instructions -workflow-id wf_123 -status ACTIVE
 go run ./loadtest/workflow -mode list-compensations -workflow-id wf_123 -status SUCCEEDED
 go run ./loadtest/workflow -mode compensation-review-bundle -workflow-id wf_123
@@ -541,6 +551,7 @@ external callback delivery worker 运行依赖：
 NEXUSIM_WORKFLOW_EXTERNAL_CALLBACK_DELIVERY_TENANT_ID
 NEXUSIM_WORKFLOW_EXTERNAL_CALLBACK_DELIVERY_PLAN_FILE
 NEXUSIM_WORKFLOW_EXTERNAL_CALLBACK_REDRIVE_PLAN_FILE
+NEXUSIM_WORKFLOW_EXTERNAL_CALLBACK_REDRIVE_SUMMARY_FILE
 NEXUSIM_WORKFLOW_EXTERNAL_CALLBACK_ENDPOINTS_FILE
 ```
 
@@ -549,7 +560,10 @@ NEXUSIM_WORKFLOW_EXTERNAL_CALLBACK_ENDPOINTS_FILE
 `external-callback-delivery-redrive` 不需要 endpoint map，只读取
 `NEXUSIM_WORKFLOW_EXTERNAL_CALLBACK_REDRIVE_PLAN_FILE` 指向的低敏 redrive plan，
 重新校验 workflow / delivery fact 后把 delivery 重新入队；它不调用 provider、不记录
-decision、不执行 target action。
+decision、不执行 target action。设置
+`NEXUSIM_WORKFLOW_EXTERNAL_CALLBACK_REDRIVE_SUMMARY_FILE` 时，runtime 在成功提交 redrive
+后写低敏 execution summary，供 batch result manifest 绑定；该 summary 不是 decision、
+不是 provider delivery，也不是 target execution proof。
 
 该 CLI 只通过 workflow-service 公开 gRPC get workflow、list workflows、record decision
 和查询低敏 instruction refs / version / status，不读 PostgreSQL 私表，不输出 workflow

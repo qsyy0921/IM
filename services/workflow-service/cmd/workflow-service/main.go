@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -9,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
@@ -310,8 +312,15 @@ func runExternalCallbackDeliveryRedrive(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	summaryPath := strings.TrimSpace(os.Getenv("NEXUSIM_WORKFLOW_EXTERNAL_CALLBACK_REDRIVE_SUMMARY_FILE"))
+	if err := prepareExternalCallbackRedriveExecutionSummaryPath(summaryPath); err != nil {
+		return err
+	}
 	redriven, err := postgresinfra.NewRepository(pool).RedriveExternalCallbackDelivery(ctx, plan)
 	if err != nil {
+		return err
+	}
+	if err := writeExternalCallbackRedriveExecutionSummary(summaryPath, plan, redriven); err != nil {
 		return err
 	}
 	log.Printf(
@@ -321,6 +330,115 @@ func runExternalCallbackDeliveryRedrive(ctx context.Context) error {
 		redriven.Status,
 		redriven.RedriveCount,
 	)
+	return nil
+}
+
+type externalCallbackRedriveExecutionSummary struct {
+	SchemaVersion              string `json:"schema_version"`
+	Mode                       string `json:"mode"`
+	GeneratedAt                string `json:"generated_at"`
+	RedrivePlanID              string `json:"redrive_plan_id"`
+	RedrivePlanSha256          string `json:"redrive_plan_sha256"`
+	SourceDeliveryStatusSha256 string `json:"source_delivery_status_sha256"`
+	SourceDeliveryPlanSha256   string `json:"source_delivery_plan_sha256"`
+	TenantID                   string `json:"tenant_id"`
+	WorkflowID                 string `json:"workflow_id"`
+	StepID                     string `json:"step_id"`
+	DeliveryID                 string `json:"delivery_id"`
+	TargetService              string `json:"target_service"`
+	TargetOperation            string `json:"target_operation"`
+	TargetRefHash              string `json:"target_ref_hash"`
+	PayloadSchemaVersion       string `json:"payload_schema_version"`
+	PayloadRefHash             string `json:"payload_ref_hash"`
+	ApprovalPolicyRef          string `json:"approval_policy_ref"`
+	DecisionPolicyRef          string `json:"decision_policy_ref"`
+	DeliveryStatus             string `json:"delivery_status"`
+	RedriveCount               int    `json:"redrive_count"`
+	LastRedrivePlanSha256      string `json:"last_redrive_plan_sha256"`
+	LastRedriveReasonRef       string `json:"last_redrive_reason_ref"`
+	OutboxEventType            string `json:"outbox_event_type"`
+	ExecutedRedrive            bool   `json:"executed_redrive"`
+	RecordsDecision            bool   `json:"records_decision"`
+	CallsProvider              bool   `json:"calls_provider"`
+	ExecutesTarget             bool   `json:"executes_target"`
+	MutatesDeliveryFact        bool   `json:"mutates_delivery_fact"`
+}
+
+func writeExternalCallbackRedriveExecutionSummaryFromEnv(
+	plan types.WorkflowExternalCallbackRedrivePlan,
+	redriven types.WorkflowExternalCallbackDelivery,
+) error {
+	path := strings.TrimSpace(os.Getenv("NEXUSIM_WORKFLOW_EXTERNAL_CALLBACK_REDRIVE_SUMMARY_FILE"))
+	return writeExternalCallbackRedriveExecutionSummary(path, plan, redriven)
+}
+
+func prepareExternalCallbackRedriveExecutionSummaryPath(path string) error {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return nil
+	}
+	directory := strings.TrimSpace(filepath.Dir(path))
+	if directory != "" {
+		if err := os.MkdirAll(directory, 0o755); err != nil {
+			return fmt.Errorf("create workflow external callback redrive summary directory: %w", err)
+		}
+	}
+	probePath := filepath.Join(directory, ".nexusim-redrive-summary-write-probe-"+strconv.FormatInt(time.Now().UnixNano(), 10))
+	if err := os.WriteFile(probePath, []byte("probe\n"), 0o644); err != nil {
+		return fmt.Errorf("preflight workflow external callback redrive summary path: %w", err)
+	}
+	if err := os.Remove(probePath); err != nil {
+		return fmt.Errorf("cleanup workflow external callback redrive summary path probe: %w", err)
+	}
+	return nil
+}
+
+func writeExternalCallbackRedriveExecutionSummary(
+	path string,
+	plan types.WorkflowExternalCallbackRedrivePlan,
+	redriven types.WorkflowExternalCallbackDelivery,
+) error {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return nil
+	}
+	summary := externalCallbackRedriveExecutionSummary{
+		SchemaVersion:              "nexusim.workflow.external_callback_redrive_execution_summary.v1",
+		Mode:                       "external-callback-delivery-redrive",
+		GeneratedAt:                time.Now().UTC().Format(time.RFC3339Nano),
+		RedrivePlanID:              plan.RedrivePlanID,
+		RedrivePlanSha256:          plan.RedrivePlanSha256,
+		SourceDeliveryStatusSha256: plan.SourceDeliveryStatusSha256,
+		SourceDeliveryPlanSha256:   plan.SourceDeliveryPlanSha256,
+		TenantID:                   string(redriven.TenantID),
+		WorkflowID:                 redriven.WorkflowID,
+		StepID:                     redriven.StepID,
+		DeliveryID:                 redriven.DeliveryID,
+		TargetService:              redriven.TargetService,
+		TargetOperation:            redriven.TargetOperation,
+		TargetRefHash:              redriven.TargetRefHash,
+		PayloadSchemaVersion:       redriven.PayloadSchemaVersion,
+		PayloadRefHash:             redriven.PayloadRefHash,
+		ApprovalPolicyRef:          redriven.ApprovalPolicyRef,
+		DecisionPolicyRef:          redriven.DecisionPolicyRef,
+		DeliveryStatus:             redriven.Status,
+		RedriveCount:               redriven.RedriveCount,
+		LastRedrivePlanSha256:      redriven.LastRedrivePlanSha256,
+		LastRedriveReasonRef:       redriven.LastRedriveReasonRef,
+		OutboxEventType:            types.WorkflowEventExternalCallbackRedriven,
+		ExecutedRedrive:            true,
+		RecordsDecision:            false,
+		CallsProvider:              false,
+		ExecutesTarget:             false,
+		MutatesDeliveryFact:        true,
+	}
+	encoded, err := json.MarshalIndent(summary, "", "  ")
+	if err != nil {
+		return fmt.Errorf("encode workflow external callback redrive summary: %w", err)
+	}
+	if err := os.WriteFile(path, append(encoded, '\n'), 0o644); err != nil {
+		return fmt.Errorf("write workflow external callback redrive summary: %w", err)
+	}
 	return nil
 }
 

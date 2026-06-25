@@ -619,6 +619,15 @@ attributes hash；它不调用 audit-service、不执行 compensation、不记�
 不调用下游服务、不修改 workflow / compensation rows，也不保存 raw payload、operator
 reason、provider body、本机路径或凭证。
 
+`write-workflow-compensation-execution-audit-append-result-manifest.ps1` 读取低敏
+audit append manifest 和 `loadtest/actionexecutor -mode external-audit-append -execute`
+summary，重新绑定 audit-service 返回的 audit id、record hash、previous record hash 和
+idempotency key，输出 `nexusim.workflow.compensation_audit_append_result.v1`。该 manifest
+只证明外部 audit append execution summary 与 workflow compensation audit handoff
+一致；它不调用 audit-service、不执行 compensation、不记录 workflow decision、不调用下游服务、
+不修改 workflow / compensation rows，也不保存 raw payload、raw attributes JSON、provider
+body、本机路径或凭证。
+
 `write-workflow-compensation-instruction-manifest.ps1` /
 `validate-workflow-compensation-instruction-manifest.ps1` 是第一版 compensation
 instruction handoff：它复用 runtime 的 `instructions` JSON 形状，生成 / 校验

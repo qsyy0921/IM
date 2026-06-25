@@ -16,7 +16,7 @@
 - external callback：wait workflow、decision binding、delivery plan、persistent delivery worker、status / redrive path。
 - operator visibility：provider-replay queue、operator queues、compensation review bundle / page、
   `ListWorkflowCompensations` execution result query。
-- compensation execution artifacts：readiness、invocation、result manifest 和 audit append handoff；
+- compensation execution artifacts：readiness、invocation、execution result、audit append handoff 和 append result；
   只输出低敏 refs / hashes / runtime contract，不执行 compensation / decision / 下游调用。
 - 已被 admin-service 用于 repair / critical / compensation handoff 和 provider replay workflow handoff。
 

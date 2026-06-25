@@ -16,8 +16,8 @@
   admin / workflow handoff、handoff review page、readiness page、redrive invocation、
   controlled redrive execution、external audit append、admin submit / approve bridge。
 - Workflow action boundary cases：provider replay queue、external approval binding、
-  external callback wait、operator queues、compensation review bundle / page 和
-  compensation execution readiness。
+  external callback wait、external callback delivery plan、operator queues、
+  compensation review bundle / page 和 compensation execution readiness。
 - Provider readiness / source coverage / vector lane checks 已进入相关 smoke 输出。
 - Group-memory ambiguity safety expansion 已覆盖 asker-bound term ambiguity、
   visible-chain incomplete abstention、missing visibility projection fail-closed、

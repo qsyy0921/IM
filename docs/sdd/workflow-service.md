@@ -511,6 +511,16 @@ workflow id、step id、target / payload hash、approval policy 和 correlation 
 `record-decision -decision-manifest` 进行绑定校验。该模式不记录 decision、不调用
 action-executor、不执行 target operation，也不把外部回调当成最终执行证明。
 
+`write-workflow-external-callback-delivery-plan.ps1` 是第一版外部回调交付计划：
+它只接受仓库外低敏 `nexusim.workflow.external_decision_manifest.v1` template，
+要求 workflow 仍绑定 `WAITING_DECISION`，且 decision / decider 仍为空，然后输出
+`nexusim.workflow.external_callback_delivery_plan.v1`。plan 只保存 workflow / target /
+payload / approval policy 绑定、decision manifest hash、callback provider ref、endpoint
+ref、delivery queue ref 和显式 retry / backoff / timeout policy refs。它不接受 raw
+callback URL，不保存 provider body，不调用外部 provider，不记录 decision，不执行 target
+action。外部系统完成审批后仍必须产出 explicit decision manifest，并通过
+`record-decision -decision-manifest` 再次绑定校验。
+
 `compensation-review-bundle` 是第一版 compensation instruction 审查包入口：它先调用
 `GetWorkflow`，默认只接受 `COMPENSATION_REQUEST / COMPENSATION_PENDING` workflow，
 再调用 `ListWorkflowCompensationInstructions(status=ACTIVE)` 查询低敏 instruction refs。

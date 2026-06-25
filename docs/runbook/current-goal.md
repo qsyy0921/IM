@@ -76,6 +76,11 @@ Agent action boundary / repair cases：在 provider replay admin / workflow hand
 - workflow external callback wait 已落：`loadtest/workflow external-callback-wait` 创建显式
   `WAITING_DECISION` workflow，并输出低敏 external decision manifest template；外部系统仍需
   补全 explicit decision 后走 `record-decision -decision-manifest` 绑定校验，不执行 action。
+- workflow external callback delivery plan 已落：
+  `write-workflow-external-callback-delivery-plan.ps1` 将低敏 external decision manifest
+  template 绑定到 endpoint ref、delivery queue ref 和 retry policy refs，输出仓库外
+  `nexusim.workflow.external_callback_delivery_plan.v1`；它不调用外部 provider、不记录
+  decision、不执行 target action，也不接受 raw callback URL / provider body。
 - workflow compensation review bundle 已落：`loadtest/workflow compensation-review-bundle`
   只读 `COMPENSATION_PENDING` workflow 和 `ACTIVE` instruction refs，校验 workflow id /
   payload hash / target 绑定后输出低敏审查包；不记录 decision、不创建 approval、

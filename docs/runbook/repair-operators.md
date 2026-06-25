@@ -300,6 +300,13 @@ workflow queue summary；它只调用 `ListWorkflows`，不记录 decision、不
 step / target / payload / approval policy refs；外部系统必须补全 explicit decision /
 decider / reason / evidence 后再走 `record-decision -decision-manifest`。创建 wait workflow
 不会记录 decision、不会调用目标服务、不会执行 provider replay 或任何 action。
+`write-workflow-external-callback-delivery-plan.ps1` 可把该低敏 template 绑定成
+仓库外 `nexusim.workflow.external_callback_delivery_plan.v1`。plan 只包含 workflow
+binding、decision manifest hash、callback provider / endpoint / delivery queue refs 和
+显式 retry / backoff / timeout policy refs；它不是 provider call，不记录 decision、不调用
+target service、不执行 provider replay，也不接受 raw callback URL、provider body 或
+credential-like 字段。真正审批结果仍必须回到 external decision manifest，再走
+`record-decision -decision-manifest` 绑定校验。
 `write-workflow-compensation-instruction-manifest.ps1` /
 `validate-workflow-compensation-instruction-manifest.ps1` 可生成和校验 workflow
 compensation executor 使用的 control-plane rollback instruction JSON。该 manifest

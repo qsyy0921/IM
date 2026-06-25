@@ -378,6 +378,12 @@ create a low-sensitive workflow waiting for an external callback and emit a
 decision manifest template without recording a decision, executing the target
 action, or treating the callback handoff as final execution.
 
+Workflow external callback delivery planning is represented by
+`workflow-external-callback-delivery-plan-boundary`. It verifies that the
+low-sensitive decision manifest template can be bound to callback provider,
+endpoint, queue and retry refs without calling the provider, recording a
+decision, storing raw callback material or executing the target action.
+
 Workflow operator queue visibility is represented by
 `workflow-operator-queues-low-sensitive`. It verifies that workflow-service
 operator queues can expose low-sensitive counts and workflow refs for action

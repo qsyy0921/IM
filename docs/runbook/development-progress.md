@@ -227,6 +227,9 @@
   mismatch 时 fail closed 且不调用 `RecordWorkflowDecision`；
   `external-callback-wait` 已提供等待外部 callback decision 的低敏 workflow 创建路径，
   并输出 decision manifest template；创建 wait workflow 不记录 decision、不调用目标服务；
+  external callback delivery plan 已能把该低敏 template 绑定到 callback provider /
+  endpoint / queue / retry refs，输出 `nexusim.workflow.external_callback_delivery_plan.v1`；
+  plan 不调用 provider、不记录 decision、不执行 target action、不保存 raw callback URL；
   本地 repair approval review page writer 已能把 plan / request / decision /
   invocation / audit bundle 渲染成只含 hash / path hash / env key / preflight 摘要的
   低敏 HTML 审批页，不复制 reason、payload、manifest path 或 evidence 原文；
@@ -237,7 +240,8 @@
   control-plane-service 或其它下游服务；
   workflow 第一路径已通过完整 `check-local`，本 worker / executor / registry / timer
   切片按风险分层用 focused checks 收口；不宣称多 adapter compensation
-  platform、provider-grade instruction UI、external callback delivery / retry hardening 或 outbox relay。
+  platform、provider-grade instruction UI、真实 external callback delivery worker / retry
+  status / redrive 或 outbox relay。
 - `vector-index-service` product-active：SDD v0.1 和 stage-switch review 已通过，
   第一版 proto / migration / 六层 skeleton / `grpc` runtime / Docker /
   Prometheus / Grafana 覆盖已落；当前覆盖 `UpsertVectorItem`、

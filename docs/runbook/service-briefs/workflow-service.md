@@ -29,6 +29,9 @@ admin operation approval、补偿请求和人工审批状态。
 - `loadtest/workflow external-callback-wait`：创建等待外部 callback decision 的低敏
   `WAITING_DECISION` workflow，并输出 external decision manifest template；不记录
   decision、不调用目标服务、不执行 action。
+- `write-workflow-external-callback-delivery-plan.ps1`：把 external decision manifest
+  template 绑定为低敏 callback delivery / retry contract；只保存 endpoint / queue /
+  retry refs 和 manifest hash，不调用外部 provider、不记录 decision、不执行 target。
 - `loadtest/workflow operator-queues`：按固定 operator 队列展示 action approval、
   repair approval、provider replay、admin operation、compensation request 和
   compensation pending 的低敏 workflow refs / counts；不记录 decision、不执行 replay。
@@ -55,4 +58,5 @@ admin operation approval、补偿请求和人工审批状态。
   低敏审批状态，不执行 provider replay。
 
 后续：更多 compensation adapter、provider-grade instruction approval UI、outbox relay、
-provider-grade approval UI、repair operators。
+provider-grade approval UI、真实 external callback delivery worker / retry status /
+redrive、repair operators。

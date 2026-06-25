@@ -1283,6 +1283,28 @@
       ]
     },
     {
+      "id": "action-executor-external-audit-append-boundary",
+      "family": "action_execution_safety",
+      "stage": "action-executor-audit-append",
+      "status": "active",
+      "query": "append low-sensitive external audit after controlled provider replay",
+      "risk": "Action-executor external audit append must verify a low-sensitive manifest, default to preflight, reject raw provider artifacts, and append only through audit-service AppendAuditRecord when explicitly executed",
+      "required_assertions": [
+        {
+          "type": "must_preflight_action_execution_audit_append"
+        },
+        {
+          "type": "must_append_external_audit_only_via_audit_service"
+        },
+        {
+          "type": "must_keep_audit_append_manifest_low_sensitive"
+        },
+        {
+          "type": "must_not_leak_raw_provider_replay_artifacts"
+        }
+      ]
+    },
+    {
       "id": "admin-provider-replay-handoff-submit-operator",
       "family": "action_execution_safety",
       "stage": "admin-provider-replay",

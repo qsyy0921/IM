@@ -1,6 +1,6 @@
 ﻿{
   "schema_version": 1,
-  "updated_at": "2026-06-21",
+  "updated_at": "2026-06-25",
   "scope": "Local startup/security boundary gate catalog for NexusIM. These gates protect local development and CI-style checks; they are not a substitute for production identity, network policy, mTLS rollout, or external audit controls.",
   "entries": [
     {
@@ -196,6 +196,13 @@
       "script": "tools/check-provider-replay-redrive-execution.ps1",
       "check_local_label": "provider replay controlled redrive execution",
       "note": "Provider replay controlled redrive execution must preflight the low-sensitive invocation manifest, verify operator-supplied external raw resource id, new input and reason hashes, default to no RPC execution, and call only action-executor RedriveProviderFailure when explicitly executed."
+    },
+    {
+      "name": "action-executor external audit append",
+      "category": "operator-safety",
+      "script": "tools/check-action-executor-external-audit-append.ps1",
+      "check_local_label": "action-executor external audit append",
+      "note": "External action-executor audit append must default to low-sensitive preflight, reject raw provider artifacts, and call only audit-service AppendAuditRecord when explicitly executed."
     },
     {
       "name": "approved repair invocation",

@@ -86,6 +86,9 @@ try {
     Write-Host "== provider replay controlled redrive execution =="
     Invoke-LocalCheck "check-provider-replay-redrive-execution.ps1"
 
+    Write-Host "== action-executor external audit append =="
+    Invoke-LocalCheck "check-action-executor-external-audit-append.ps1"
+
     Write-Host "== approved repair invocation =="
     Invoke-LocalCheck "check-approved-repair-invocation.ps1"
 

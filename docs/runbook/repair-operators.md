@@ -398,6 +398,19 @@ admin-service `CreateAdminOperation` 创建管理操作；`provider-replay-list`
 admin-service operation-worker 路由 workflow，并由 fresh proposal / approval /
 prepared audit / new input / reason hash 触发最终 redrive。
 
+provider replay 最终执行后，如需把低敏外部审计事实追加到 `audit-service`，使用
+`loadtest/actionexecutor` 的 external audit append operator：
+
+```powershell
+go run ./loadtest/actionexecutor -mode external-audit-append -audit-manifest H:\NexusIM\operator-plans\action-executor-audit-append.json -operator-user-id operator-a -operator-device-id operator-device-a
+```
+
+默认只做 preflight：校验仓库外低敏 manifest、`attributes_json` hash、required checks、
+operator identity 和敏感字段禁入，不调用 audit-service。显式加 `-execute` 时才通过
+audit-service 公开 gRPC `AppendAuditRecord` 追加审计；operator 不直接写 audit-service
+私表，不打印 manifest 本机路径、raw provider input / output、provider body、raw
+attributes JSON 或 credential-like 内容。
+
 ## Delivery Projection
 
 `delivery-service` 额外拥有 projection 排障入口：

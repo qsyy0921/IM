@@ -20,6 +20,9 @@ metadata 和 proof 已落。
 - 低敏 `audit.record.appended.v1` outbox。
 - `admin-consumer`：消费公开 `im.admin.events`，映射为低敏 admin audit record；
   append 成功后才提交 Kafka offset。
+- action-executor external audit append operator 可在显式 `-execute` 时调用公开
+  `AppendAuditRecord` 追加低敏 action / repair 审计；operator 默认只 preflight，
+  不直接写 audit-service 私表。
 - 最小 gRPC smoke：`docs/runbook/loadtest/audit-service/`。
 
 后续：更多 Kafka ingestion source、持久 ingestion checkpoint / rewind operator、

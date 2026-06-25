@@ -51,6 +51,11 @@ loadtest report 或 archive。
   会先 preflight invocation manifest，并校验仓库外 raw resource id / new input / reason
   与 manifest hash 一致；默认不调用 RPC，只有显式 `-execute` 才调用 action-executor
   `RedriveProviderFailure`，输出保持低敏 refs / hashes / result metadata。
+- action-executor external audit append operator path 已收口：`loadtest/actionexecutor
+  -mode external-audit-append` 会先 preflight 仓库外低敏 audit append manifest，
+  校验 `attributes_json` hash、required checks、operator identity 和 raw provider
+  artifact 禁入；默认不调用 RPC，只有显式 `-execute` 才调用 audit-service 公开
+  `AppendAuditRecord`，输出不打印 manifest path、raw attributes JSON 或 provider artifacts。
 - provider replay admin operator bridge 已收口：`loadtest/admin provider-replay-submit`
   读取低敏 handoff artifact 并创建 `PROVIDER_REPLAY_REQUEST`；`provider-replay-list` /
   `provider-replay-approve` / `provider-replay-reject` 提供第一版列表和审批 UX，不执行 redrive。

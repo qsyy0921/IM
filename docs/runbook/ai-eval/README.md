@@ -27,6 +27,8 @@ summary, Agent and tool/action boundaries.
   `tools/run-ai-eval-action-mcp-failure-adapter.ps1`
 - action-executor preflight safety adapter eval:
   `tools/run-ai-eval-action-preflight-safety-adapter.ps1`
+- action-executor external audit append focused check:
+  `tools/check-action-executor-external-audit-append.ps1`
 - Agent output regression adapter:
   `tools/run-ai-eval-agent-output-regression.ps1`
 - Python worker output-safety adapter: `tools/run-ai-eval-python-worker-adapter.ps1`

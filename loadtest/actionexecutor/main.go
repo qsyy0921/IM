@@ -16,6 +16,7 @@ import (
 	"time"
 
 	actionexecutorv1 "github.com/qsyy0921/IM/api/proto/nexusim/actionexecutor/v1"
+	auditv1 "github.com/qsyy0921/IM/api/proto/nexusim/audit/v1"
 	policyv1 "github.com/qsyy0921/IM/api/proto/nexusim/policy/v1"
 	"github.com/qsyy0921/IM/loadtest/internal/grpctls"
 	"google.golang.org/grpc"
@@ -23,6 +24,7 @@ import (
 
 const (
 	defaultActionExecutorTarget = "127.0.0.1:10660"
+	defaultAuditTarget          = "127.0.0.1:10700"
 	maxInputJSONBytes           = 64 * 1024
 	maxReasonBytes              = 4096
 	maxResourceIDBytes          = 2048
@@ -31,9 +33,12 @@ const (
 type config struct {
 	mode            string
 	target          string
+	auditTarget     string
 	requestTimeout  time.Duration
 	tls             grpctls.Config
+	auditTLS        grpctls.Config
 	manifestPath    string
+	auditManifest   string
 	resourceIDPath  string
 	inputJSONPath   string
 	reasonPath      string
@@ -159,13 +164,22 @@ type actionExecutorClient interface {
 	RedriveProviderFailure(context.Context, *actionexecutorv1.RedriveProviderFailureRequest, ...grpc.CallOption) (*actionexecutorv1.RedriveProviderFailureResponse, error)
 }
 
+type auditClient interface {
+	AppendAuditRecord(context.Context, *auditv1.AppendAuditRecordRequest, ...grpc.CallOption) (*auditv1.AppendAuditRecordResponse, error)
+}
+
+type operatorClients struct {
+	actionExecutor actionExecutorClient
+	audit          auditClient
+}
+
 func main() {
 	cfg, err := parseFlags(os.Args[1:])
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
 	}
-	if err := run(context.Background(), cfg, os.Stdout, nil); err != nil {
+	if err := run(context.Background(), cfg, os.Stdout, operatorClients{}); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
@@ -175,14 +189,20 @@ func parseFlags(args []string) (config, error) {
 	cfg := config{}
 	flags := flag.NewFlagSet("actionexecutor-operator", flag.ContinueOnError)
 	flags.SetOutput(io.Discard)
-	flags.StringVar(&cfg.mode, "mode", "provider-replay-redrive", "mode: provider-replay-redrive")
+	flags.StringVar(&cfg.mode, "mode", "provider-replay-redrive", "mode: provider-replay-redrive, external-audit-append")
 	flags.StringVar(&cfg.target, "target", envOr("NEXUSIM_ACTION_EXECUTOR_GRPC_ADDR", defaultActionExecutorTarget), "action-executor gRPC target")
+	flags.StringVar(&cfg.auditTarget, "audit-target", envOr("NEXUSIM_AUDIT_GRPC_ADDR", defaultAuditTarget), "audit-service gRPC target")
 	flags.DurationVar(&cfg.requestTimeout, "request-timeout", 5*time.Second, "request timeout")
 	flags.StringVar(&cfg.tls.CAFile, "action-executor-tls-ca-file", os.Getenv("NEXUSIM_ACTION_EXECUTOR_TLS_CA_FILE"), "CA PEM for action-executor gRPC TLS")
 	flags.StringVar(&cfg.tls.ServerName, "action-executor-tls-server-name", os.Getenv("NEXUSIM_ACTION_EXECUTOR_TLS_SERVER_NAME"), "server name for action-executor gRPC TLS")
 	flags.StringVar(&cfg.tls.ClientCertFile, "action-executor-tls-client-cert-file", os.Getenv("NEXUSIM_ACTION_EXECUTOR_TLS_CLIENT_CERT_FILE"), "client certificate PEM for action-executor mTLS")
 	flags.StringVar(&cfg.tls.ClientKeyFile, "action-executor-tls-client-key-file", os.Getenv("NEXUSIM_ACTION_EXECUTOR_TLS_CLIENT_KEY_FILE"), "client private key PEM for action-executor mTLS")
+	flags.StringVar(&cfg.auditTLS.CAFile, "audit-tls-ca-file", os.Getenv("NEXUSIM_AUDIT_TLS_CA_FILE"), "CA PEM for audit-service gRPC TLS")
+	flags.StringVar(&cfg.auditTLS.ServerName, "audit-tls-server-name", os.Getenv("NEXUSIM_AUDIT_TLS_SERVER_NAME"), "server name for audit-service gRPC TLS")
+	flags.StringVar(&cfg.auditTLS.ClientCertFile, "audit-tls-client-cert-file", os.Getenv("NEXUSIM_AUDIT_TLS_CLIENT_CERT_FILE"), "client certificate PEM for audit-service mTLS")
+	flags.StringVar(&cfg.auditTLS.ClientKeyFile, "audit-tls-client-key-file", os.Getenv("NEXUSIM_AUDIT_TLS_CLIENT_KEY_FILE"), "client private key PEM for audit-service mTLS")
 	flags.StringVar(&cfg.manifestPath, "manifest", os.Getenv("NEXUSIM_ACTION_EXECUTOR_REDRIVE_MANIFEST"), "provider replay redrive invocation manifest")
+	flags.StringVar(&cfg.auditManifest, "audit-manifest", os.Getenv("NEXUSIM_ACTION_EXECUTOR_EXTERNAL_AUDIT_MANIFEST"), "action-executor external audit append manifest")
 	flags.StringVar(&cfg.resourceIDPath, "resource-id-file", os.Getenv("NEXUSIM_ACTION_EXECUTOR_REDRIVE_RESOURCE_ID_FILE"), "external raw resource id file")
 	flags.StringVar(&cfg.inputJSONPath, "input-json-file", os.Getenv("NEXUSIM_ACTION_EXECUTOR_REDRIVE_INPUT_JSON_FILE"), "external new input JSON file")
 	flags.StringVar(&cfg.reasonPath, "reason-file", os.Getenv("NEXUSIM_ACTION_EXECUTOR_REDRIVE_REASON_FILE"), "external redrive reason file")
@@ -197,7 +217,9 @@ func parseFlags(args []string) (config, error) {
 	}
 	cfg.mode = strings.ToLower(strings.TrimSpace(cfg.mode))
 	cfg.target = strings.TrimSpace(cfg.target)
+	cfg.auditTarget = strings.TrimSpace(cfg.auditTarget)
 	cfg.manifestPath = strings.TrimSpace(cfg.manifestPath)
+	cfg.auditManifest = strings.TrimSpace(cfg.auditManifest)
 	cfg.resourceIDPath = strings.TrimSpace(cfg.resourceIDPath)
 	cfg.inputJSONPath = strings.TrimSpace(cfg.inputJSONPath)
 	cfg.reasonPath = strings.TrimSpace(cfg.reasonPath)
@@ -215,10 +237,18 @@ func parseFlags(args []string) (config, error) {
 	return cfg, nil
 }
 
-func run(ctx context.Context, cfg config, out io.Writer, client actionExecutorClient) error {
-	if cfg.mode != "provider-replay-redrive" {
+func run(ctx context.Context, cfg config, out io.Writer, clients operatorClients) error {
+	switch cfg.mode {
+	case "provider-replay-redrive":
+		return runProviderReplayRedrive(ctx, cfg, out, clients.actionExecutor)
+	case "external-audit-append":
+		return runExternalAuditAppend(ctx, cfg, out, clients.audit)
+	default:
 		return fmt.Errorf("unsupported mode: %s", cfg.mode)
 	}
+}
+
+func runProviderReplayRedrive(ctx context.Context, cfg config, out io.Writer, client actionExecutorClient) error {
 	prepared, err := prepareRedrive(cfg)
 	if err != nil {
 		return err

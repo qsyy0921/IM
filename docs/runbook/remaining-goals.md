@@ -45,8 +45,8 @@
   rate limit。
 - `action-executor`：provider replay admin / workflow handoff / handoff review page /
   execution readiness page / redrive invocation manifest / 受控 redrive execution operator
-  path 已落；后续再做更多 action boundary / repair cases、external audit integration
-  和 provider-grade replay UI。
+  path / external audit append operator path 已落；后续再做更多 action boundary /
+  repair cases 和 provider-grade replay UI。
 - `ai-eval-service`：group-memory asker-bound term ambiguity、visible-chain incomplete
   abstention、missing visibility projection fail-closed、audience-language profile negative
   cases 已进入本地低敏 gate；后续继续扩 provider readiness、Agent action boundary 和
@@ -60,8 +60,10 @@
   CDN / download policy、retention / delete proof。
 - `notification-service`：SMTP / SMS / APNs / FCM adapter、bounce / suppression、
   provider redrive / audit、tenant template policy。
-- `audit-service`：更多 Kafka ingestion source、checkpoint / rewind、export worker、
-  SIEM forwarding、retention cleanup、segment sealing。
+- `audit-service`：action-executor external audit append operator 已通过公开
+  `AppendAuditRecord` 接入第一版低敏 operator 追加路径；后续补更多 Kafka ingestion
+  source、checkpoint / rewind、export worker、SIEM forwarding、retention cleanup、
+  segment sealing。
 - `admin-service`：admin UI、provider-grade provider replay request UI、更多下游公开 API
   adapter、compensation adapter、instruction approval UI。
 - `control-plane-service`：outbox relay、drift monitor、expiry / cleanup worker、

@@ -8,8 +8,10 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	actionexecutorv1 "github.com/qsyy0921/IM/api/proto/nexusim/actionexecutor/v1"
+	auditv1 "github.com/qsyy0921/IM/api/proto/nexusim/audit/v1"
 	"google.golang.org/grpc"
 )
 
@@ -19,7 +21,7 @@ func TestProviderReplayRedrivePreflightBuildsLowSensitiveRequest(t *testing.T) {
 	var out bytes.Buffer
 	client := &fakeActionExecutorClient{}
 
-	if err := run(context.Background(), cfg, &out, client); err != nil {
+	if err := run(context.Background(), cfg, &out, operatorClients{actionExecutor: client}); err != nil {
 		t.Fatalf("run preflight: %v", err)
 	}
 	if len(client.requests) != 0 {
@@ -78,7 +80,7 @@ func TestProviderReplayRedriveExecuteCallsActionExecutor(t *testing.T) {
 	}
 	var out bytes.Buffer
 
-	if err := run(context.Background(), cfg, &out, client); err != nil {
+	if err := run(context.Background(), cfg, &out, operatorClients{actionExecutor: client}); err != nil {
 		t.Fatalf("run execute: %v", err)
 	}
 	if len(client.requests) != 1 {
@@ -101,6 +103,124 @@ func TestProviderReplayRedriveExecuteCallsActionExecutor(t *testing.T) {
 	}
 	if strings.Contains(out.String(), fixture.resourceID) || strings.Contains(out.String(), fixture.inputJSON) {
 		t.Fatalf("execute result leaked raw resource id or input: %s", out.String())
+	}
+}
+
+func TestExternalAuditAppendPreflightBuildsLowSensitiveRequest(t *testing.T) {
+	fixture := newAuditAppendFixture(t)
+	cfg := fixture.config(false)
+	var out bytes.Buffer
+	client := &fakeAuditClient{}
+
+	if err := run(context.Background(), cfg, &out, operatorClients{audit: client}); err != nil {
+		t.Fatalf("run audit preflight: %v", err)
+	}
+	if len(client.requests) != 0 {
+		t.Fatalf("preflight must not call AppendAuditRecord")
+	}
+	var result auditAppendCommandResult
+	if err := json.Unmarshal(out.Bytes(), &result); err != nil {
+		t.Fatalf("decode result: %v\n%s", err, out.String())
+	}
+	if result.ExecutedAppend {
+		t.Fatalf("preflight must report executed_append=false")
+	}
+	if result.Request.SourceService != "action-executor" ||
+		result.Request.SourceEventID != "execution-redrive-1" ||
+		result.Request.AttributesSHA256 != fixture.attributesSHA ||
+		result.Request.UserID != "operator-user" {
+		t.Fatalf("unexpected audit request summary: %+v", result.Request)
+	}
+	raw := out.String()
+	for _, forbidden := range []string{
+		fixture.rawProviderInput,
+		fixture.manifestPath,
+		fixture.attributesJSON,
+	} {
+		if strings.Contains(raw, forbidden) {
+			t.Fatalf("audit result leaked forbidden content %q in %s", forbidden, raw)
+		}
+	}
+}
+
+func TestExternalAuditAppendExecuteCallsAuditService(t *testing.T) {
+	fixture := newAuditAppendFixture(t)
+	cfg := fixture.config(true)
+	client := &fakeAuditClient{
+		response: &auditv1.AppendAuditRecordResponse{
+			Record: &auditv1.AuditRecord{
+				AuditId:            "audit-action-redrive-1",
+				RecordHash:         "record-hash-1",
+				PreviousRecordHash: "previous-hash-1",
+				IdempotencyKey:     "action-executor:audit:execution-redrive-1",
+			},
+		},
+	}
+	var out bytes.Buffer
+
+	if err := run(context.Background(), cfg, &out, operatorClients{audit: client}); err != nil {
+		t.Fatalf("run audit execute: %v", err)
+	}
+	if len(client.requests) != 1 {
+		t.Fatalf("expected one append request, got %d", len(client.requests))
+	}
+	request := client.requests[0]
+	if request.GetSourceService() != "action-executor" ||
+		request.GetSourceEventId() != "execution-redrive-1" ||
+		request.GetAuthContext().GetTenantId() != "tenant-provider-replay" ||
+		request.GetAttributesJson() != fixture.attributesJSON {
+		t.Fatalf("unexpected append request: %+v", request)
+	}
+	var result auditAppendCommandResult
+	if err := json.Unmarshal(out.Bytes(), &result); err != nil {
+		t.Fatalf("decode result: %v", err)
+	}
+	if !result.ExecutedAppend || result.Response == nil || result.Response.AuditID != "audit-action-redrive-1" {
+		t.Fatalf("unexpected audit execute result: %+v", result)
+	}
+	if strings.Contains(out.String(), fixture.attributesJSON) {
+		t.Fatalf("execute result leaked attributes json: %s", out.String())
+	}
+}
+
+func TestExternalAuditAppendRejectsSensitiveManifest(t *testing.T) {
+	fixture := newAuditAppendFixture(t)
+	manifest := fixture.manifest
+	manifest.ForbiddenContents = append(manifest.ForbiddenContents, "raw_input")
+	manifest.ResourceRef = "resource-without-sensitive-content"
+	writeRawJSON(t, fixture.manifestPath, map[string]any{
+		"schema_version":              manifest.SchemaVersion,
+		"manifest_id":                 manifest.ManifestID,
+		"source_service":              manifest.SourceService,
+		"source_event_id":             manifest.SourceEventID,
+		"record_type":                 manifest.RecordType,
+		"resource_ref":                manifest.ResourceRef,
+		"action":                      manifest.Action,
+		"outcome":                     manifest.Outcome,
+		"occurred_at_unix_ms":         manifest.OccurredAtUnixMs,
+		"attributes_json":             json.RawMessage(manifest.AttributesJSON),
+		"attributes_sha256":           manifest.AttributesSHA256,
+		"idempotency_key":             manifest.IdempotencyKey,
+		"requires_operator_execution": true,
+		"auth_context_contract":       manifest.AuthContextContract,
+		"required_checks":             manifest.RequiredChecks,
+		"raw_provider_input":          fixture.rawProviderInput,
+	})
+	_, err := prepareExternalAuditAppend(fixture.config(false))
+	if err == nil || !strings.Contains(err.Error(), "sensitive-looking") {
+		t.Fatalf("expected sensitive manifest rejection, got %v", err)
+	}
+}
+
+func TestExternalAuditAppendRejectsDisallowedAttributes(t *testing.T) {
+	fixture := newAuditAppendFixture(t)
+	manifest := fixture.manifest
+	manifest.AttributesJSON = json.RawMessage(`{"raw_provider_body":"secret"}`)
+	manifest.AttributesSHA256 = sha256Ref([]byte(compactJSON(manifest.AttributesJSON)))
+	writeJSON(t, fixture.manifestPath, manifest)
+	_, err := prepareExternalAuditAppend(fixture.config(false))
+	if err == nil || !strings.Contains(err.Error(), "disallowed key") {
+		t.Fatalf("expected disallowed attribute rejection, got %v", err)
 	}
 }
 
@@ -288,9 +408,124 @@ func writeJSON(t *testing.T, path string, value any) {
 	}
 }
 
+func writeRawJSON(t *testing.T, path string, value any) {
+	t.Helper()
+	encoded, err := json.Marshal(value)
+	if err != nil {
+		t.Fatalf("encode json: %v", err)
+	}
+	if err := os.WriteFile(path, encoded, 0o600); err != nil {
+		t.Fatalf("write json: %v", err)
+	}
+}
+
 type fakeActionExecutorClient struct {
 	requests []*actionexecutorv1.RedriveProviderFailureRequest
 	response *actionexecutorv1.RedriveProviderFailureResponse
+}
+
+type auditAppendFixture struct {
+	dir              string
+	manifest         externalAuditAppendManifest
+	manifestPath     string
+	attributesJSON   string
+	attributesSHA    string
+	rawProviderInput string
+}
+
+func newAuditAppendFixture(t *testing.T) auditAppendFixture {
+	t.Helper()
+	dir := t.TempDir()
+	attributes := `{"proposal_id":"proposal-fresh-1","approval_id":"approval-fresh-1","prepared_audit_id":"audit-fresh-1","execution_id":"execution-redrive-1","result_id":"result-redrive-1","source_ref":"provider-failure-1","operator_mode":"provider-replay-redrive","status":"SUCCEEDED","target_ref_hash":"sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"}`
+	attributesJSON := compactJSON(json.RawMessage(attributes))
+	manifest := externalAuditAppendManifest{
+		SchemaVersion:     "nexusim.action_executor.external_audit_append.v1",
+		ManifestID:        "action-executor-audit-append-1",
+		SourceManifestID:  "provider-replay-redrive-invocation-1",
+		ExecutesAppend:    false,
+		MutatesAudit:      false,
+		DirectAppend:      false,
+		RequiresExecution: true,
+		AuditStream:       "security",
+		SourceService:     "action-executor",
+		SourceEventID:     "execution-redrive-1",
+		RecordType:        "ACTION_PROVIDER_REDRIVE",
+		ActorRef:          "service:action-executor",
+		SubjectRef:        "workflow:workflow-provider-replay-1",
+		ResourceRef:       "hash:sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+		Action:            "REDRIVE_PROVIDER_FAILURE",
+		Outcome:           "SUCCEEDED",
+		ReasonCode:        "PROVIDER_REPLAY_APPROVED",
+		RiskLevel:         "HIGH",
+		OccurredAtUnixMs:  time.Date(2026, 6, 25, 3, 0, 0, 0, time.UTC).UnixMilli(),
+		AttributesJSON:    json.RawMessage(attributesJSON),
+		AttributesSHA256:  sha256Ref([]byte(attributesJSON)),
+		IdempotencyKey:    "action-executor:audit:execution-redrive-1",
+		CorrelationID:     "corr-provider-replay",
+		CausationID:       "provider-replay-redrive-invocation-1",
+		TraceID:           "trace-provider-replay",
+		RequiredChecks: []string{
+			"source_execution_audit_low_sensitive",
+			"no_raw_provider_artifacts",
+			"audit_service_append_only",
+			"idempotency_key_present",
+		},
+		ForbiddenContents: []string{
+			"raw_provider_input",
+			"raw_provider_output",
+			"input_json",
+		},
+	}
+	manifest.AuthContextContract.TenantID = "tenant-provider-replay"
+	manifest.AuthContextContract.TraceID = "trace-provider-replay"
+	manifestPath := filepath.Join(dir, "action-executor-audit-append.json")
+	writeJSON(t, manifestPath, manifest)
+	return auditAppendFixture{
+		dir:              dir,
+		manifest:         manifest,
+		manifestPath:     manifestPath,
+		attributesJSON:   attributesJSON,
+		attributesSHA:    manifest.AttributesSHA256,
+		rawProviderInput: `{"token":"secret-provider-payload"}`,
+	}
+}
+
+func (fixture auditAppendFixture) config(execute bool) config {
+	return config{
+		mode:            "external-audit-append",
+		auditTarget:     "127.0.0.1:10700",
+		requestTimeout:  time.Second,
+		auditManifest:   fixture.manifestPath,
+		operatorUserID:  "operator-user",
+		operatorDevice:  "operator-device",
+		operatorSession: "operator-session",
+		traceID:         "trace-provider-replay",
+		requestID:       "request-audit-append",
+		execute:         execute,
+	}
+}
+
+type fakeAuditClient struct {
+	requests []*auditv1.AppendAuditRecordRequest
+	response *auditv1.AppendAuditRecordResponse
+}
+
+func (client *fakeAuditClient) AppendAuditRecord(
+	_ context.Context,
+	request *auditv1.AppendAuditRecordRequest,
+	_ ...grpc.CallOption,
+) (*auditv1.AppendAuditRecordResponse, error) {
+	client.requests = append(client.requests, request)
+	if client.response != nil {
+		return client.response, nil
+	}
+	return &auditv1.AppendAuditRecordResponse{
+		Record: &auditv1.AuditRecord{
+			AuditId:        "audit-action-executor-1",
+			RecordHash:     "record-hash-1",
+			IdempotencyKey: request.GetIdempotencyKey(),
+		},
+	}, nil
 }
 
 func (client *fakeActionExecutorClient) RedriveProviderFailure(

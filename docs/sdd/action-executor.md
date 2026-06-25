@@ -4,7 +4,7 @@
 
 `action-executor` 是 NexusIM AI 应用底座中的受控动作执行边界。它承接 Agent proposal、approval 和 `mcp-gateway` prepare 之后的动作执行请求，把真实写动作纳入 policy precheck、审批关联和低敏 audit。
 
-当前第一阶段记录 approved execution boundary，并在同一事务内写低敏 tool result projection。已支持本地安全 `nexusim.local.echo` adapter first path，用于验证真实低敏 output hash / result projection；已支持外部 MCP failure 稳定失败分类、tool output safety first path，以及显式开启的外部 HTTP provider adapter guarded first path。`conversation.note.create` 已有显式 opt-in 业务 adapter：配置 `NEXUSIM_ACTION_EXECUTOR_CONVERSATION_GRPC_ADDR` 后，通过 conversation-service 公开 `CreateConversationNote` 写入真实 note fact；未配置时仍保持 unsupported / `executed=false`，不伪造业务成功。默认不连接外部 MCP / provider；外部 HTTP adapter 只允许 allowlist 内的 `LOW` risk tool，只发送 tool metadata / `input_sha256`，不发送 raw `input_json`，provider output 仍必须经过安全门禁后才写 hash / projection。工具 provider 失败和 unsafe output 已有 first-stage `provider_failures` 状态投影和 bounded retry bookkeeping worker，可区分 `RETRY_PENDING` 与 `DLQ`；同时提供 provider failure metrics、provider failure audit、batch redrive-plan operator handoff、provider replay operator UI first path 和 provider replay admin / workflow handoff。redrive plan / operator UI / handoff 只生成低敏审批 artifact，不重放 provider、不执行 tool、不修改失败状态。`RedriveProviderFailure` 已提供受控 redrive API first path：只能针对已有 `DLQ` provider failure，要求 fresh proposal / approval / prepared audit、匹配的 skill / tool / resource、新 `input_json` 和 `reason_sha256`，并复用正常 `ExecuteApprovedAction` 链路执行，同时把 source provider failure id 与 reason hash 写入 execution audit。`loadtest/actionexecutor -mode provider-replay-redrive` 已提供第一版受控 operator path：默认 preflight，校验 invocation manifest 和仓库外 raw resource id / new input / reason hash；显式 `-execute` 时才调用 action-executor 公开 gRPC。自动 provider replay 尚未实现。
+当前第一阶段记录 approved execution boundary，并在同一事务内写低敏 tool result projection。已支持本地安全 `nexusim.local.echo` adapter first path，用于验证真实低敏 output hash / result projection；已支持外部 MCP failure 稳定失败分类、tool output safety first path，以及显式开启的外部 HTTP provider adapter guarded first path。`conversation.note.create` 已有显式 opt-in 业务 adapter：配置 `NEXUSIM_ACTION_EXECUTOR_CONVERSATION_GRPC_ADDR` 后，通过 conversation-service 公开 `CreateConversationNote` 写入真实 note fact；未配置时仍保持 unsupported / `executed=false`，不伪造业务成功。默认不连接外部 MCP / provider；外部 HTTP adapter 只允许 allowlist 内的 `LOW` risk tool，只发送 tool metadata / `input_sha256`，不发送 raw `input_json`，provider output 仍必须经过安全门禁后才写 hash / projection。工具 provider 失败和 unsafe output 已有 first-stage `provider_failures` 状态投影和 bounded retry bookkeeping worker，可区分 `RETRY_PENDING` 与 `DLQ`；同时提供 provider failure metrics、provider failure audit、batch redrive-plan operator handoff、provider replay operator UI first path 和 provider replay admin / workflow handoff。redrive plan / operator UI / handoff 只生成低敏审批 artifact，不重放 provider、不执行 tool、不修改失败状态。`RedriveProviderFailure` 已提供受控 redrive API first path：只能针对已有 `DLQ` provider failure，要求 fresh proposal / approval / prepared audit、匹配的 skill / tool / resource、新 `input_json` 和 `reason_sha256`，并复用正常 `ExecuteApprovedAction` 链路执行，同时把 source provider failure id 与 reason hash 写入 execution audit。`loadtest/actionexecutor -mode provider-replay-redrive` 已提供第一版受控 operator path：默认 preflight，校验 invocation manifest 和仓库外 raw resource id / new input / reason hash；显式 `-execute` 时才调用 action-executor 公开 gRPC。`loadtest/actionexecutor -mode external-audit-append` 已提供第一版受控外部审计追加 operator：默认 preflight，校验仓库外低敏 audit append manifest、`attributes_json` hash、required checks 和 raw provider artifact 禁入；显式 `-execute` 时才调用 audit-service 公开 `AppendAuditRecord`。自动 provider replay 尚未实现。
 
 ## 职责
 
@@ -109,6 +109,16 @@
   - 默认只输出低敏 preflight summary；显式 `-execute` 时才调用 action-executor
     `RedriveProviderFailure`
   - 输出不打印 raw resource id、raw input、reason text、本机文件路径或 provider artifact
+- `loadtest/actionexecutor -mode external-audit-append`：
+  - 读取仓库外低敏 audit append manifest
+  - 校验 `attributes_json` canonical hash、manifest required checks、operator identity
+    和 `source_service=action-executor`
+  - 拒绝 top-level raw input / raw output / provider body / provider artifact 字段，并
+    只允许白名单低敏 audit attributes
+  - 默认只输出低敏 preflight summary；显式 `-execute` 时才通过 audit-service 公开
+    `AppendAuditRecord` 追加审计
+  - 输出不打印 manifest 本机路径、raw attributes JSON、raw provider artifact 或
+    credential-like 内容
 - `/metrics` / `/debug/metrics`：
   - 输出 provider failure status、retryable、due retry 和 classification 聚合计数
   - 不输出 tenant / user / resource / provider raw error / tool input / output
@@ -209,6 +219,16 @@ operator
 -> low-sensitive operator UI artifact(batch_id, candidate_id, workflow state, hashes, required gates)
 -> fresh proposal / approval / prepared audit / new input / reason hash
 -> action-executor.RedriveProviderFailure
+```
+
+External audit append operator first path：
+
+```text
+operator
+-> loadtest/actionexecutor -mode external-audit-append
+-> low-sensitive audit append manifest preflight
+-> explicit -execute
+-> audit-service.AppendAuditRecord
 ```
 
 Provider replay admin / workflow handoff：

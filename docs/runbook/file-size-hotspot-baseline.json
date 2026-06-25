@@ -1,7 +1,7 @@
 ﻿{
-    "created_at":  "2026-06-25T10:39:00.3436167Z",
+    "created_at":  "2026-06-25T10:56:14.1000272Z",
     "scope":  "handwritten Go/Markdown/PowerShell/Bash file-size budget snapshot; not a code-quality score",
-    "file_count":  2132,
+    "file_count":  2134,
     "thresholds":  {
                        "production_warn_lines":  2500,
                        "production_max_lines":  3500,
@@ -83,6 +83,15 @@
                           "MaxRatio":  0.512
                       },
                       {
+                          "Path":  "docs\\sdd\\workflow-service.md",
+                          "Lines":  745,
+                          "Kind":  "docs",
+                          "Warn":  1200,
+                          "Max":  1500,
+                          "WarnRatio":  0.6208,
+                          "MaxRatio":  0.4967
+                      },
+                      {
                           "Path":  "docs\\sdd\\push-gateway.md",
                           "Lines":  743,
                           "Kind":  "docs",
@@ -99,15 +108,6 @@
                           "Max":  1500,
                           "WarnRatio":  0.734,
                           "MaxRatio":  0.4893
-                      },
-                      {
-                          "Path":  "docs\\sdd\\workflow-service.md",
-                          "Lines":  733,
-                          "Kind":  "docs",
-                          "Warn":  1200,
-                          "Max":  1500,
-                          "WarnRatio":  0.6108,
-                          "MaxRatio":  0.4887
                       }
                   ],
     "hotspots":  [

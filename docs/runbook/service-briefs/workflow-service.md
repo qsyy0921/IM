@@ -15,7 +15,7 @@
   first path，unsupported target fail closed。
 - external callback：wait workflow、decision binding、delivery plan、persistent delivery worker、status / redrive path、delivery review page / dashboard、batch redrive invocation / runner / result manifest。
 - operator visibility：provider-replay queue、operator queues、compensation review bundle / page、
-  approval queue review page、`ListWorkflowCompensations` execution result query。
+  approval queue review page / batch decision manifest、`ListWorkflowCompensations` execution result query。
 - compensation execution artifacts：instruction approval page、readiness、invocation、execution result、audit append handoff 和 append result；
   只输出低敏 refs / hashes / runtime contract，不执行 compensation / decision / 下游调用。
 - 已被 admin-service 用于 repair / critical / compensation handoff 和 provider replay workflow handoff。
@@ -27,4 +27,4 @@
 - Temporal 等工作流引擎只是候选，中间件不写死。
 
 ## 后续
-- 更多 compensation adapter、provider-grade batch approval / decision UI、callback delivery persisted dashboard、workflow outbox relay。
+- 更多 compensation adapter、provider-grade approval platform / decision execution runner、callback delivery persisted dashboard、workflow outbox relay。

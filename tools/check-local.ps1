@@ -112,6 +112,8 @@ try {
 
     Write-Host "== workflow decision manifest =="
     Invoke-LocalCheck "check-workflow-decision-manifest.ps1"
+    Write-Host "== workflow approval queue batch decision manifest =="
+    Invoke-LocalCheck "check-workflow-approval-queue-batch-decision-manifest.ps1"
 
     Write-Host "== workflow external callback delivery plan =="
     Invoke-LocalCheck "check-workflow-external-callback-delivery-plan.ps1"

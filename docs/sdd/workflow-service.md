@@ -474,6 +474,7 @@ go run ./loadtest/workflow -mode provider-replay-queue
 go run ./loadtest/workflow -mode list-workflows -workflow-type REPAIR_APPROVAL -status WAITING_DECISION -target-service action-executor -target-operation PROVIDER_REPLAY_REQUEST -approval-policy-ref admin.workflow.provider_replay.v1
 go run ./loadtest/workflow -mode record-decision -workflow-id wf_123 -step-id wfs_1 -decision APPROVE -decider-ref operator:a
 go run ./loadtest/workflow -mode record-decision -decision-manifest H:\NexusIM\operator-plans\workflow-decision.json
+go run ./loadtest/workflow -mode operator-queues
 go run ./loadtest/workflow -mode list-compensation-instructions -workflow-id wf_123 -status ACTIVE
 ```
 
@@ -491,6 +492,12 @@ payload schema version、payload ref hash 和 approval policy ref。record decis
 必须先调用 workflow-service `GetWorkflow` 校验这些字段，任何 mismatch 都 fail-closed，
 且不调用 `RecordWorkflowDecision`。manifest 不保存审批 comment、payload 原文或 provider
 body。writer / validator 只处理仓库外低敏 JSON artifact，不读取数据库。
+
+`operator-queues` 是第一版多队列 operator visibility：它复用 `ListWorkflows`，按固定
+低敏队列列出 action approval、repair approval、provider replay、admin operation、
+compensation request 和 compensation pending workflow refs / hash / counts。它不记录
+decision、不修改 workflow 状态、不调用 action-executor，也不执行 provider replay；队列
+结果只作为人工审批和 repair triage 入口。
 
 `write-workflow-compensation-instruction-manifest.ps1` /
 `validate-workflow-compensation-instruction-manifest.ps1` 是第一版 compensation

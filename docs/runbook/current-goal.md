@@ -44,6 +44,10 @@ Agent action boundary / repair cases：在 provider replay admin / workflow hand
   `nexusim.workflow.external_decision_manifest.v1` manifest，记录 decision 前先调用
   `GetWorkflow` 校验 workflow type、step、target、payload hash 和 approval policy；
   任何 mismatch 都 fail-closed，不调用 `RecordWorkflowDecision`，不执行 provider replay。
+- workflow operator queues 已落：`loadtest/workflow operator-queues` 通过公开
+  `ListWorkflows` 列出 action approval、repair approval、provider replay、admin operation、
+  compensation request 和 compensation pending 的低敏 refs / counts；不记录 decision、
+  不修改 workflow 状态、不执行 provider replay。
 
 ## 目标
 

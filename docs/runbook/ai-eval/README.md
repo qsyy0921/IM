@@ -344,6 +344,13 @@ operation, target ref hash, payload schema version, payload ref hash and
 approval policy before `RecordWorkflowDecision`. Binding mismatches fail closed
 before recording a decision and do not execute provider replay.
 
+Workflow operator queue visibility is represented by
+`workflow-operator-queues-low-sensitive`. It verifies that workflow-service
+operator queues can expose low-sensitive counts and workflow refs for action
+approval, repair approval, provider replay, admin operation and compensation
+queues without recording decisions, mutating workflow state or executing
+provider replay.
+
 Workflow approval timeout boundary is represented by
 `workflow-approval-timeout-boundary`. It verifies that stale approval workflows
 move to `TIMED_OUT` through workflow-service timer handling, emit only a

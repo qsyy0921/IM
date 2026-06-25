@@ -1252,6 +1252,31 @@
       ]
     },
     {
+      "id": "workflow-operator-queues-low-sensitive",
+      "family": "action_execution_safety",
+      "stage": "workflow-operator-queues",
+      "status": "active",
+      "query": "list workflow operator queues for action approval repair admin operation and compensation",
+      "risk": "Workflow operator queue views must expose only low-sensitive workflow metadata and counts across approval and repair queues; queue listing must not record decisions, mutate workflow state, or execute provider replay",
+      "required_assertions": [
+        {
+          "type": "must_list_workflow_operator_queues"
+        },
+        {
+          "type": "must_expose_low_sensitive_operator_queue_summary"
+        },
+        {
+          "type": "must_not_record_decision_from_operator_queue"
+        },
+        {
+          "type": "must_keep_redrive_entrypoint_action_executor"
+        },
+        {
+          "type": "must_not_execute_provider_replay_from_workflow_queue"
+        }
+      ]
+    },
+    {
       "id": "workflow-approval-timeout-boundary",
       "family": "action_execution_safety",
       "stage": "workflow-approval-timeout",

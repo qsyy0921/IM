@@ -26,6 +26,9 @@
 - Workflow external approval binding case：验证外部审批 manifest 必须绑定当前
   workflow type / step / target / payload hash / approval policy，binding mismatch 不记录
   decision、不执行 replay。
+- Workflow operator queue case：验证 action approval、repair approval、provider replay、
+  admin operation 和 compensation queue 只输出低敏 workflow summary，不记录 decision、
+  不执行 replay。
 - Provider readiness / source coverage / vector lane checks 已进入相关 smoke 输出。
 - Group-memory ambiguity safety expansion：asker-bound term ambiguity、visible-chain
   incomplete abstention、missing visibility projection fail-closed、audience-language

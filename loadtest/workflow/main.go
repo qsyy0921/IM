@@ -66,11 +66,23 @@ type commandResult struct {
 	ApprovalPolicyRef string                       `json:"approval_policy_ref,omitempty"`
 	Workflow          *workflowRef                 `json:"workflow,omitempty"`
 	Workflows         []workflowRef                `json:"workflows,omitempty"`
+	OperatorQueues    []operatorQueueRef           `json:"operator_queues,omitempty"`
 	Decision          *decisionRef                 `json:"decision,omitempty"`
 	Decisions         []decisionRef                `json:"decisions,omitempty"`
 	Instructions      []compensationInstructionRef `json:"instructions,omitempty"`
 	Replayed          bool                         `json:"replayed,omitempty"`
 	CheckedAt         time.Time                    `json:"checked_at"`
+}
+
+type operatorQueueRef struct {
+	QueueID           string        `json:"queue_id"`
+	WorkflowType      string        `json:"workflow_type"`
+	Status            string        `json:"status"`
+	TargetService     string        `json:"target_service,omitempty"`
+	TargetOperation   string        `json:"target_operation,omitempty"`
+	ApprovalPolicyRef string        `json:"approval_policy_ref,omitempty"`
+	WorkflowCount     int           `json:"workflow_count"`
+	Workflows         []workflowRef `json:"workflows,omitempty"`
 }
 
 type workflowRef struct {
@@ -168,7 +180,7 @@ func main() {
 func parseFlags(args []string) config {
 	cfg := config{}
 	flags := flag.NewFlagSet("workflow-operator", flag.ExitOnError)
-	flags.StringVar(&cfg.mode, "mode", "get", "mode: get, record-decision, list-workflows, provider-replay-queue, list-compensation-instructions")
+	flags.StringVar(&cfg.mode, "mode", "get", "mode: get, record-decision, list-workflows, provider-replay-queue, operator-queues, list-compensation-instructions")
 	flags.StringVar(&cfg.target, "target", envOr("NEXUSIM_WORKFLOW_GRPC_ADDR", "127.0.0.1:10750"), "workflow-service gRPC target")
 	flags.DurationVar(&cfg.requestTimeout, "request-timeout", 5*time.Second, "request timeout")
 	flags.StringVar(&cfg.tls.CAFile, "workflow-tls-ca-file", os.Getenv("NEXUSIM_WORKFLOW_TLS_CA_FILE"), "CA PEM for workflow-service gRPC TLS")
@@ -400,6 +412,29 @@ func execute(ctx context.Context, cfg config, client workflowv1.WorkflowServiceC
 				result.Workflows = append(result.Workflows, *summarized)
 			}
 		}
+	case "operator-queues":
+		for _, queue := range defaultOperatorQueues() {
+			response, err := client.ListWorkflows(ctx, &workflowv1.ListWorkflowsRequest{
+				AuthContext:       authContext(cfg),
+				WorkflowType:      queue.WorkflowType,
+				Status:            queue.Status,
+				TargetService:     queue.TargetService,
+				TargetOperation:   queue.TargetOperation,
+				ApprovalPolicyRef: queue.ApprovalPolicyRef,
+				PageSize:          cfg.pageSize,
+			})
+			if err != nil {
+				return commandResult{}, fmt.Errorf("list operator queue %s workflows: %w", queue.QueueID, err)
+			}
+			queue.Workflows = nil
+			for _, workflow := range response.GetWorkflows() {
+				if summarized := summarizeWorkflow(workflow); summarized != nil {
+					queue.Workflows = append(queue.Workflows, *summarized)
+				}
+			}
+			queue.WorkflowCount = len(queue.Workflows)
+			result.OperatorQueues = append(result.OperatorQueues, queue)
+		}
 	case "record-decision":
 		if cfg.decisionManifestPath != "" {
 			response, err := client.GetWorkflow(ctx, &workflowv1.GetWorkflowRequest{
@@ -515,6 +550,44 @@ func (cfg config) validate() error {
 		}
 	}
 	return nil
+}
+
+func defaultOperatorQueues() []operatorQueueRef {
+	return []operatorQueueRef{
+		{
+			QueueID:      "action-approval",
+			WorkflowType: "ACTION_APPROVAL",
+			Status:       "WAITING_DECISION",
+		},
+		{
+			QueueID:      "repair-approval",
+			WorkflowType: "REPAIR_APPROVAL",
+			Status:       "WAITING_DECISION",
+		},
+		{
+			QueueID:           "provider-replay",
+			WorkflowType:      "REPAIR_APPROVAL",
+			Status:            "WAITING_DECISION",
+			TargetService:     "action-executor",
+			TargetOperation:   "PROVIDER_REPLAY_REQUEST",
+			ApprovalPolicyRef: "admin.workflow.provider_replay.v1",
+		},
+		{
+			QueueID:      "admin-operation",
+			WorkflowType: "ADMIN_OPERATION",
+			Status:       "WAITING_DECISION",
+		},
+		{
+			QueueID:      "compensation-request",
+			WorkflowType: "COMPENSATION_REQUEST",
+			Status:       "WAITING_DECISION",
+		},
+		{
+			QueueID:      "compensation-pending",
+			WorkflowType: "COMPENSATION_REQUEST",
+			Status:       "COMPENSATION_PENDING",
+		},
+	}
 }
 
 func validateExternalDecisionBindingConfig(cfg config) error {
@@ -689,6 +762,7 @@ func isAllowedMode(value string) bool {
 		value == "record-decision" ||
 		value == "list-workflows" ||
 		value == "provider-replay-queue" ||
+		value == "operator-queues" ||
 		value == "list-compensation-instructions"
 }
 
@@ -701,6 +775,7 @@ func requiresWorkflowID(value string) bool {
 func isListMode(value string) bool {
 	return value == "list-workflows" ||
 		value == "provider-replay-queue" ||
+		value == "operator-queues" ||
 		value == "list-compensation-instructions"
 }
 

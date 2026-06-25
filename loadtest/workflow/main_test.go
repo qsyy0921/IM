@@ -58,6 +58,26 @@ func TestParseFlagsBuildsProviderReplayQueueDefaults(t *testing.T) {
 	}
 }
 
+func TestParseFlagsBuildsOperatorQueuesDefaults(t *testing.T) {
+	cfg := parseFlags([]string{
+		"-mode", "operator-queues",
+		"-tenant-id", "tenant-wf",
+		"-page-size", "3",
+	})
+	if cfg.mode != "operator-queues" {
+		t.Fatalf("mode = %q", cfg.mode)
+	}
+	if cfg.requestID != "workflow-operator-operator-queues" || cfg.traceID != cfg.requestID {
+		t.Fatalf("unexpected request/trace ids: %+v", cfg)
+	}
+	if cfg.pageSize != 3 {
+		t.Fatalf("page size = %d", cfg.pageSize)
+	}
+	if err := cfg.validate(); err != nil {
+		t.Fatalf("validate: %v", err)
+	}
+}
+
 func TestParseFlagsBuildsRecordDecisionDefaults(t *testing.T) {
 	cfg := parseFlags([]string{
 		"-mode", "record-decision",
@@ -293,6 +313,78 @@ func TestExecuteProviderReplayQueue(t *testing.T) {
 	}
 }
 
+func TestExecuteOperatorQueuesListsLowSensitiveWorkflowQueues(t *testing.T) {
+	cfg := parseFlags([]string{
+		"-mode", "operator-queues",
+		"-tenant-id", "tenant-wf",
+		"-page-size", "2",
+	})
+	client := &fakeWorkflowClient{listWorkflowsResponses: []*workflowv1.ListWorkflowsResponse{
+		{Workflows: []*workflowv1.Workflow{{
+			WorkflowId:    "wf_action_1",
+			WorkflowType:  "ACTION_APPROVAL",
+			RiskLevel:     "HIGH",
+			Status:        "WAITING_DECISION",
+			CurrentStepId: "wfs_action_1",
+		}}},
+		{Workflows: []*workflowv1.Workflow{{
+			WorkflowId:    "wf_repair_1",
+			WorkflowType:  "REPAIR_APPROVAL",
+			RiskLevel:     "HIGH",
+			Status:        "WAITING_DECISION",
+			CurrentStepId: "wfs_repair_1",
+		}}},
+		{Workflows: []*workflowv1.Workflow{{
+			WorkflowId:           "wf_provider_replay_1",
+			WorkflowType:         "REPAIR_APPROVAL",
+			RiskLevel:            "HIGH",
+			TargetService:        "action-executor",
+			TargetOperation:      "PROVIDER_REPLAY_REQUEST",
+			TargetRefHash:        "sha256:provider-failure",
+			PayloadSchemaVersion: "admin.provider_replay_request.v1",
+			PayloadRefHash:       "sha256:provider-replay-payload",
+			ApprovalPolicyRef:    "admin.workflow.provider_replay.v1",
+			Status:               "WAITING_DECISION",
+			CurrentStepId:        "wfs_provider_replay_1",
+		}}},
+		{Workflows: []*workflowv1.Workflow{}},
+		{Workflows: []*workflowv1.Workflow{}},
+		{Workflows: []*workflowv1.Workflow{}},
+	}}
+	result, err := execute(context.Background(), cfg, client)
+	if err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if len(client.listWorkflowsRequests) != len(defaultOperatorQueues()) {
+		t.Fatalf("list requests = %d", len(client.listWorkflowsRequests))
+	}
+	if client.listWorkflowsRequests[0].GetWorkflowType() != "ACTION_APPROVAL" ||
+		client.listWorkflowsRequests[0].GetStatus() != "WAITING_DECISION" ||
+		client.listWorkflowsRequests[0].GetPageSize() != 2 {
+		t.Fatalf("unexpected action queue request: %+v", client.listWorkflowsRequests[0])
+	}
+	providerRequest := client.listWorkflowsRequests[2]
+	if providerRequest.GetWorkflowType() != "REPAIR_APPROVAL" ||
+		providerRequest.GetTargetService() != "action-executor" ||
+		providerRequest.GetTargetOperation() != "PROVIDER_REPLAY_REQUEST" ||
+		providerRequest.GetApprovalPolicyRef() != "admin.workflow.provider_replay.v1" {
+		t.Fatalf("unexpected provider replay queue request: %+v", providerRequest)
+	}
+	if len(result.OperatorQueues) != len(defaultOperatorQueues()) {
+		t.Fatalf("operator queues = %+v", result.OperatorQueues)
+	}
+	if result.OperatorQueues[0].QueueID != "action-approval" ||
+		result.OperatorQueues[0].WorkflowCount != 1 ||
+		result.OperatorQueues[2].QueueID != "provider-replay" ||
+		result.OperatorQueues[2].WorkflowCount != 1 ||
+		result.OperatorQueues[2].Workflows[0].PayloadRefHash != "sha256:provider-replay-payload" {
+		t.Fatalf("unexpected operator queue summary: %+v", result.OperatorQueues)
+	}
+	if client.decisionRequest != nil {
+		t.Fatalf("operator queues must not record decisions: %+v", client.decisionRequest)
+	}
+}
+
 func TestExecuteRecordDecision(t *testing.T) {
 	cfg := parseFlags([]string{
 		"-mode", "record-decision",
@@ -437,6 +529,16 @@ func TestRunOutputDoesNotExposePayloadOrReasonBody(t *testing.T) {
 			PayloadRefHash:    "sha256:provider-replay-payload",
 			ApprovalPolicyRef: "admin.workflow.provider_replay.v1",
 		}},
+		OperatorQueues: []operatorQueueRef{{
+			QueueID:       "provider-replay",
+			WorkflowType:  "REPAIR_APPROVAL",
+			Status:        "WAITING_DECISION",
+			WorkflowCount: 1,
+			Workflows: []workflowRef{{
+				WorkflowID:     "wf_provider_replay_1",
+				PayloadRefHash: "sha256:provider-replay-payload",
+			}},
+		}},
 		Instructions: []compensationInstructionRef{{
 			InstructionID:  "wfi_1",
 			PayloadRefHash: "sha256:payload",
@@ -516,14 +618,16 @@ func approvedDecisionResponse() *workflowv1.RecordWorkflowDecisionResponse {
 
 type fakeWorkflowClient struct {
 	workflowv1.WorkflowServiceClient
-	getRequest            *workflowv1.GetWorkflowRequest
-	getResponse           *workflowv1.GetWorkflowResponse
-	decisionRequest       *workflowv1.RecordWorkflowDecisionRequest
-	decisionResponse      *workflowv1.RecordWorkflowDecisionResponse
-	listWorkflowsRequest  *workflowv1.ListWorkflowsRequest
-	listWorkflowsResponse *workflowv1.ListWorkflowsResponse
-	request               *workflowv1.ListWorkflowCompensationInstructionsRequest
-	response              *workflowv1.ListWorkflowCompensationInstructionsResponse
+	getRequest             *workflowv1.GetWorkflowRequest
+	getResponse            *workflowv1.GetWorkflowResponse
+	decisionRequest        *workflowv1.RecordWorkflowDecisionRequest
+	decisionResponse       *workflowv1.RecordWorkflowDecisionResponse
+	listWorkflowsRequest   *workflowv1.ListWorkflowsRequest
+	listWorkflowsRequests  []*workflowv1.ListWorkflowsRequest
+	listWorkflowsResponse  *workflowv1.ListWorkflowsResponse
+	listWorkflowsResponses []*workflowv1.ListWorkflowsResponse
+	request                *workflowv1.ListWorkflowCompensationInstructionsRequest
+	response               *workflowv1.ListWorkflowCompensationInstructionsResponse
 }
 
 func (client *fakeWorkflowClient) GetWorkflow(
@@ -550,6 +654,14 @@ func (client *fakeWorkflowClient) ListWorkflows(
 	_ ...grpc.CallOption,
 ) (*workflowv1.ListWorkflowsResponse, error) {
 	client.listWorkflowsRequest = request
+	client.listWorkflowsRequests = append(client.listWorkflowsRequests, request)
+	if len(client.listWorkflowsResponses) > 0 {
+		index := len(client.listWorkflowsRequests) - 1
+		if index < len(client.listWorkflowsResponses) {
+			return client.listWorkflowsResponses[index], nil
+		}
+		return &workflowv1.ListWorkflowsResponse{}, nil
+	}
 	return client.listWorkflowsResponse, nil
 }
 

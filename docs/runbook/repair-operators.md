@@ -269,6 +269,10 @@ mismatch 都 fail-closed，不会调用 `RecordWorkflowDecision`，也不会执�
 replay。manifest 不保存审批 comment、EvidencePack、payload 或 provider body。
 `write-workflow-decision-manifest.ps1` 可从 reason 文件生成 `reason-sha256:<hash>`，
 `validate-workflow-decision-manifest.ps1` 只做 schema / 低敏字段校验，不读取数据库。
+`loadtest/workflow -mode operator-queues` 可列出 action approval、repair approval、
+provider replay、admin operation、compensation request 和 compensation pending 的低敏
+workflow queue summary；它只调用 `ListWorkflows`，不记录 decision、不修改 workflow、
+不执行 provider replay。
 `write-workflow-compensation-instruction-manifest.ps1` /
 `validate-workflow-compensation-instruction-manifest.ps1` 可生成和校验 workflow
 compensation executor 使用的 control-plane rollback instruction JSON。该 manifest

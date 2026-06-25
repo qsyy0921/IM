@@ -26,6 +26,9 @@ admin operation approval、补偿请求和人工审批状态。
 - `ListWorkflowCompensationInstructions`：按 workflow 查询低敏 instruction metadata。
 - `loadtest/workflow` operator CLI：公开 gRPC get workflow、record decision、查询低敏 instruction metadata。
 - `ListWorkflows`：按 type / status / target / approval policy 查询低敏 workflow metadata。
+- `loadtest/workflow operator-queues`：按固定 operator 队列展示 action approval、
+  repair approval、provider replay、admin operation、compensation request 和
+  compensation pending 的低敏 workflow refs / counts；不记录 decision、不执行 replay。
 - `loadtest/workflow provider-replay-queue`：默认列出等待
   `admin.workflow.provider_replay.v1` 审批的 action-executor
   `PROVIDER_REPLAY_REQUEST` workflow；不执行 redrive、不修改 DLQ、不暴露 raw payload。

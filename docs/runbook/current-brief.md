@@ -48,6 +48,9 @@ loadtest report 或 archive。
 - workflow external approval binding 已收口：外部审批 manifest 必须绑定当前 workflow
   type / step / target / payload hash / approval policy；`record-decision` 会先查
   `GetWorkflow`，binding mismatch 时 fail-closed，不记录 decision，也不执行 provider replay。
+- workflow operator queues 已收口：`operator-queues` 统一展示 action approval、repair
+  approval、provider replay、admin operation、compensation request / pending 队列的低敏
+  workflow refs / counts；它只读 `ListWorkflows`，不记录 decision、不执行 replay。
 - group memory / multi-party collaboration 必须继续保留 source refs、conversation scope、
   member visibility、time/version boundary、citations 和 no-citation refusal。
 

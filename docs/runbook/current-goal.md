@@ -18,8 +18,8 @@ workflow handoff、operator redrive 和最终执行归属证明的 Agent action 
   bridge，只创建和审批低敏 admin operation，不执行 redrive。
 - workflow-service 已覆盖 provider replay queue、approval timeout、external approval
   binding、operator queues、external callback wait / delivery / redrive、compensation
-  review / readiness / invocation / result visibility / audit append handoff /
-  audit append result manifest。
+  review / instruction approval page / readiness / invocation / result visibility /
+  audit append handoff / audit append result manifest。
 - ai-eval 已覆盖 group-memory / retrieval / RAG / Agent safety 和 action boundary
   本地低敏 gates。
 - 详细能力和历史证据见 `docs/runbook/current-brief.md`、相关 service brief 和 SDD。

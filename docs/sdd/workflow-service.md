@@ -650,6 +650,13 @@ audit bundle 渲染低敏 HTML，只展示 service / mode / approval refs、arti
 path hash、env key、preflight hash 和 audit 摘要；不复制环境变量值、operator
 reason 原文、manifest 路径、payload ref 文件正文、业务数据或 evidence 原文，也不执行
 operator。该页面是 first-stage operator UI artifact，不是正式审批系统。
+`write-workflow-compensation-instruction-approval-page.ps1` 是 workflow compensation
+instruction import 的专用 approval page：它读取 instruction manifest、repair approval
+request / decision 和可选 invocation summary，重新校验 plan mode、manifest path binding、
+manifest hash 和 invocation preflight hash，只渲染 tenant / workflow / instruction refs、
+approval refs、reason hash 和 artifact hash。该页面不创建 approval、不记录 decision、
+不导入 instruction、不执行 compensation、不调用 workflow-service / control-plane-service，
+也不输出 raw payload、reason text、本机路径、provider body、credential 或 evidence body。
 
 ## 18. 验收标准
 

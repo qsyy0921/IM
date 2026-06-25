@@ -125,6 +125,9 @@ try {
     Write-Host "== workflow compensation review page =="
     Invoke-LocalCheck "check-workflow-compensation-review-page.ps1"
 
+    Write-Host "== workflow compensation instruction approval page =="
+    Invoke-LocalCheck "check-workflow-compensation-instruction-approval-page.ps1"
+
     Write-Host "== workflow compensation execution readiness =="
     Invoke-LocalCheck "check-workflow-compensation-execution-readiness.ps1"
 

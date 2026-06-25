@@ -19,7 +19,8 @@ workflow handoff、operator redrive 和最终执行归属证明的 Agent action 
 - workflow-service 已覆盖 provider replay queue、approval timeout、external approval
   binding、operator queues、external callback wait / delivery / redrive / review page /
   dashboard / batch redrive invocation / runner / result manifest、approval queue review page /
-  batch decision manifest / runner / result review page / audit append handoff、
+  batch decision manifest / runner / result review page / audit append handoff /
+  audit append result manifest、
   compensation review / instruction approval page / readiness / invocation /
   result visibility / audit append handoff /
   audit append result manifest。

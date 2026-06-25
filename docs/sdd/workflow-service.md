@@ -663,6 +663,24 @@ raw payload、provider body、本机路径或 credential-like 内容。示例：
   -OutputPath H:\NexusIM\operator-plans\workflow-batch-decision-audit-append.json
 ```
 
+`write-workflow-approval-queue-decision-audit-append-result-manifest.ps1` 读取低敏
+audit append manifest 和 `loadtest/actionexecutor -mode external-audit-append -execute`
+summary，重新绑定 audit-service 返回的 audit id、record hash、previous record hash 和
+idempotency key，输出
+`nexusim.workflow.approval_queue_decision_audit_append_result.v1`。该 manifest 只证明外部
+audit append execution summary 与 workflow approval decision audit handoff 一致；它不调用
+audit-service、不追加审计、不记录 workflow decision、不调用 action-executor、不执行 target
+action、不修改 workflow fact，也不保存 raw payload、raw attributes JSON、provider body、本机路径或
+credential-like 内容。示例：
+
+```powershell
+.\tools\write-workflow-approval-queue-decision-audit-append-result-manifest.ps1 `
+  -AuditManifestPath H:\NexusIM\operator-plans\workflow-batch-decision-audit-append.json `
+  -AuditAppendResultPath H:\NexusIM\operator-plans\workflow-batch-decision-audit-append-execution.json `
+  -GeneratedBy operator-a `
+  -OutputPath H:\NexusIM\operator-plans\workflow-batch-decision-audit-append-result.json
+```
+
 `external-callback-wait` 是第一版外部回调等待入口：它通过 workflow-service
 `CreateWorkflow` 创建一个显式 `WAITING_DECISION` workflow，并输出
 `nexusim.workflow.external_decision_manifest.v1` 低敏 template。template 只携带

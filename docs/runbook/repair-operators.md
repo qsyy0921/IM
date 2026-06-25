@@ -98,7 +98,20 @@ manifest：
 provider failure、fresh proposal / approval / prepared audit、skill / tool / resource hash、
 new input hash、reason hash、result refs 和 status 是否一致；它不执行 redrive、不追加
 audit、不修改 DLQ row、不创建 admin / workflow decision，也不输出 raw resource id、
-input JSON、reason 文本、provider artifact 或本机路径。后续若需要外部审计追加，再使用
+input JSON、reason 文本、provider artifact 或本机路径。
+
+如需把该执行结果追加到 `audit-service`，先从 result manifest 生成 external audit
+append manifest：
+
+```powershell
+.\tools\write-provider-replay-redrive-audit-append-manifest.ps1 -ResultManifestPath H:\NexusIM\operator-plans\provider-replay-redrive-result-manifest.json -GeneratedBy operator-a -OutputPath H:\NexusIM\operator-plans\provider-replay-redrive-audit-append.json
+```
+
+该 handoff 只生成 `loadtest/actionexecutor -mode external-audit-append` 可消费的低敏
+manifest，重新绑定 result manifest hash、provider failure ref、fresh proposal /
+approval / prepared audit、redrive execution / result refs 和 `attributes_json` hash；
+它不调用 audit-service、不执行 redrive、不修改 DLQ row、不输出 raw resource id /
+input JSON / reason 文本 / provider artifact / 本机路径。后续若需要外部审计追加，再使用
 external audit append operator 显式提交 audit-service。
 
 本地批量 repair manifest 生成入口：
@@ -445,10 +458,16 @@ admin-service operation-worker 路由 workflow，并由 fresh proposal / approva
 prepared audit / new input / reason hash 触发最终 redrive。
 
 provider replay 最终执行后，如需把低敏外部审计事实追加到 `audit-service`，使用
-`loadtest/actionexecutor` 的 external audit append operator：
+`write-provider-replay-redrive-audit-append-manifest.ps1` 从 result manifest 生成低敏
+audit append manifest，然后使用 `loadtest/actionexecutor` 的 external audit append
+operator：
 
 ```powershell
-go run ./loadtest/actionexecutor -mode external-audit-append -audit-manifest H:\NexusIM\operator-plans\action-executor-audit-append.json -operator-user-id operator-a -operator-device-id operator-device-a
+.\tools\write-provider-replay-redrive-audit-append-manifest.ps1 -ResultManifestPath H:\NexusIM\operator-plans\provider-replay-redrive-result-manifest.json -GeneratedBy operator-a -OutputPath H:\NexusIM\operator-plans\provider-replay-redrive-audit-append.json
+```
+
+```powershell
+go run ./loadtest/actionexecutor -mode external-audit-append -audit-manifest H:\NexusIM\operator-plans\provider-replay-redrive-audit-append.json -operator-user-id operator-a -operator-device-id operator-device-a
 ```
 
 默认只做 preflight：校验仓库外低敏 manifest、`attributes_json` hash、required checks、

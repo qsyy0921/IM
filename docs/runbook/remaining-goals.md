@@ -45,8 +45,9 @@
   rate limit。
 - `action-executor`：provider replay admin / workflow handoff / handoff review page /
   execution readiness page / redrive invocation manifest / 受控 redrive execution operator
-  path / redrive result manifest / external audit append operator path 已落；后续再做更多 action boundary /
-  repair cases 和 provider-grade replay UI。
+  path / redrive result manifest / redrive audit append manifest handoff /
+  external audit append operator path 已落；后续再做更多 action boundary / repair cases
+  和 provider-grade replay UI。
 - `ai-eval-service`：group-memory asker-bound term ambiguity、visible-chain incomplete
   abstention、missing visibility projection fail-closed、audience-language profile negative
   cases 已进入本地低敏 gate；后续继续扩 provider readiness、Agent action boundary 和

@@ -89,6 +89,9 @@ try {
     Write-Host "== provider replay redrive result manifest =="
     Invoke-LocalCheck "check-provider-replay-redrive-result-manifest.ps1"
 
+    Write-Host "== provider replay redrive audit append manifest =="
+    Invoke-LocalCheck "check-provider-replay-redrive-audit-append-manifest.ps1"
+
     Write-Host "== action-executor external audit append =="
     Invoke-LocalCheck "check-action-executor-external-audit-append.ps1"
 

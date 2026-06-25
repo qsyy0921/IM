@@ -51,6 +51,11 @@ Agent action boundary / repair cases：在 provider replay admin / workflow hand
   重新绑定 fresh proposal / approval / prepared audit、skill / tool / resource hash、
   result refs 和 status；它不执行 redrive、不追加 audit、不修改 DLQ row、不包含 raw
   resource id / input / reason / provider artifact。
+- provider replay redrive audit append manifest handoff 已落：
+  `write-provider-replay-redrive-audit-append-manifest.ps1` 读取低敏 redrive result
+  manifest，生成现有 external audit append operator 可消费的低敏 audit append
+  manifest；它不调用 audit-service、不执行 redrive、不修改 DLQ row、不包含 raw
+  resource id / input / reason / provider artifact 或本机路径。
 - action-executor external audit append operator path 已落：`loadtest/actionexecutor
   -mode external-audit-append` 默认只做 preflight，校验仓库外低敏 audit append
   manifest、`attributes_json` hash、required checks、operator identity 和 raw provider

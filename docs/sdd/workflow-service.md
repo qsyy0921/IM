@@ -647,6 +647,22 @@ workflow fact，也不输出 raw payload、provider body、本机路径或 crede
   -SummaryPath H:\NexusIM\operator-plans\workflow-batch-decision-result-review.json
 ```
 
+`write-workflow-approval-queue-decision-audit-append-manifest.ps1` 是 result review
+summary 之后的审计交接 artifact。它只接受
+`nexusim.workflow.approval_queue_decision_result_review.v1`，要求 source 已证明
+`workflow-service.RecordWorkflowDecision` 记录了 decision、review page 自身只读、未调用
+action-executor 且未执行 target。输出使用 `nexusim.audit.external_append.v1`，目标是后续由
+operator 显式调用 audit-service `AppendAuditRecord`；该脚本自身不追加审计、不记录 workflow
+decision、不调用 action-executor、不执行 compensation / provider redrive / target action，也不输出
+raw payload、provider body、本机路径或 credential-like 内容。示例：
+
+```powershell
+.\tools\write-workflow-approval-queue-decision-audit-append-manifest.ps1 `
+  -ReviewSummaryPath H:\NexusIM\operator-plans\workflow-batch-decision-result-review.json `
+  -GeneratedBy operator-a `
+  -OutputPath H:\NexusIM\operator-plans\workflow-batch-decision-audit-append.json
+```
+
 `external-callback-wait` 是第一版外部回调等待入口：它通过 workflow-service
 `CreateWorkflow` 创建一个显式 `WAITING_DECISION` workflow，并输出
 `nexusim.workflow.external_decision_manifest.v1` 低敏 template。template 只携带

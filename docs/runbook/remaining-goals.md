@@ -77,7 +77,7 @@
 - `workflow-service`：external callback delivery plan、delivery status / redrive plan、
   persistent delivery worker first path、redrive operator path、callback delivery review page、
   callback delivery dashboard、batch redrive invocation / runner / result manifest、approval queue review page、
-  approval queue batch decision manifest / runner / result review page、
+  approval queue batch decision manifest / runner / result review page / audit append handoff、
   compensation review bundle / review page /
   instruction approval page / execution readiness manifest / execution invocation manifest /
   execution result visibility / execution audit append manifest handoff /

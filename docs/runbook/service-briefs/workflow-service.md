@@ -15,7 +15,7 @@
   first path，unsupported target fail closed。
 - external callback：wait workflow、decision binding、delivery plan、persistent delivery worker、status / redrive path、delivery review page / dashboard、batch redrive invocation / runner / result manifest。
 - operator visibility：provider-replay queue、operator queues、compensation review bundle / page、
-  approval queue review page / batch decision manifest / runner / result review page、
+  approval queue review page / batch decision manifest / runner / result review page / audit append handoff、
   `ListWorkflowCompensations` execution result query。
 - compensation execution artifacts：instruction approval page、readiness、invocation、execution result、audit append handoff 和 append result；
   只输出低敏 refs / hashes / runtime contract，不执行 compensation / decision / 下游调用。

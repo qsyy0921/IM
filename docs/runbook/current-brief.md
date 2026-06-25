@@ -25,7 +25,7 @@ brief、loadtest report、development-progress 或 archive。
   persistent worker first path、external callback delivery redrive operator path、
   external callback delivery review page / dashboard / batch redrive invocation
   manifest / runner / result manifest、approval queue review page / batch decision manifest /
-  runner / result review page、
+  runner / result review page / audit append handoff、
   compensation review bundle / page、instruction approval page、execution readiness /
   invocation manifest、execution result visibility、audit append manifest handoff 和
   audit append result manifest。

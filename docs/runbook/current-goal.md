@@ -133,6 +133,13 @@ Agent action boundary / repair cases：在 provider replay admin / workflow hand
   `nexusim.workflow.compensation_execution_invocation.v1`；它只给 operator 明确
   `workflow-service` `compensation-executor` runtime env / owner / preflight checks，
   不执行 compensation、不调用 control-plane、不记录 decision、不修改 workflow 或 compensation rows。
+- workflow compensation execution result visibility 已落：workflow-service 新增
+  `ListWorkflowCompensations` 低敏公开查询，`loadtest/workflow -mode list-compensations`
+  可按 workflow / status 查看 compensation refs / terminal result；
+  `write-workflow-compensation-execution-result-manifest.ps1` 将低敏 invocation manifest
+  和公开查询 summary 绑定成 `nexusim.workflow.compensation_execution_result.v1`；
+  它不执行 compensation、不记录 decision、不调用下游服务、不修改 workflow /
+  compensation rows，也不包含 raw payload / reason / provider body / 本机路径。
 
 ## 目标
 

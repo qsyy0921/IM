@@ -385,6 +385,85 @@ func TestRepositoryExecuteWorkflowCompensationIntegration(t *testing.T) {
 	assertWorkflowCompensationResultOutbox(t, ctx, pool, workflow.WorkflowID, completed.CompensationID, types.WorkflowEventCompensationSucceeded)
 }
 
+func TestRepositoryListWorkflowCompensationsIntegration(t *testing.T) {
+	ctx := context.Background()
+	pool := openWorkflowTestPool(t)
+	resetWorkflowTables(t, ctx, pool)
+	repository := NewRepository(pool)
+
+	workflow := createApprovedCompensationWorkflow(t, ctx, repository)
+	if _, err := repository.RequestApprovedCompensations(ctx, 10); err != nil {
+		t.Fatalf("request approved compensation: %v", err)
+	}
+	claimed, err := repository.ClaimRequestedCompensations(ctx, 10, time.Minute)
+	if err != nil {
+		t.Fatalf("claim requested compensation: %v", err)
+	}
+	if len(claimed) != 1 {
+		t.Fatalf("expected one claimed compensation, got %d", len(claimed))
+	}
+	completed, err := repository.CompleteWorkflowCompensation(ctx, claimed[0], types.WorkflowCompensationExecutionResult{
+		DownstreamService:    "control-plane-service",
+		DownstreamRequestRef: "config-rollback:prod:API_GATEWAY_TENANT_QUOTA:tenant-a:v1",
+		Status:               types.WorkflowCompensationStatusSucceeded,
+	})
+	if err != nil {
+		t.Fatalf("complete workflow compensation: %v", err)
+	}
+
+	listed, err := repository.ListWorkflowCompensations(ctx, types.ListWorkflowCompensationsCommand{
+		AuthContext: types.AuthContext{TenantID: "tenant-workflow-test", ServiceName: "admin-service"},
+		WorkflowID:  workflow.WorkflowID,
+		PageSize:    10,
+	})
+	if err != nil {
+		t.Fatalf("list compensations: %v", err)
+	}
+	if len(listed) != 1 {
+		t.Fatalf("expected one compensation, got %d: %+v", len(listed), listed)
+	}
+	got := listed[0]
+	if got.CompensationID != completed.CompensationID ||
+		got.Status != types.WorkflowCompensationStatusSucceeded ||
+		got.DownstreamRequestRef != "config-rollback:prod:API_GATEWAY_TENANT_QUOTA:tenant-a:v1" ||
+		got.PayloadRefHash != "sha256:rollback-payload" ||
+		got.CompletedAt.IsZero() {
+		t.Fatalf("unexpected listed compensation: %+v", got)
+	}
+	for _, forbidden := range []string{"secret", "token", "raw:", "rollback plaintext"} {
+		if strings.Contains(got.PayloadRefHash, forbidden) ||
+			strings.Contains(got.ReasonRef, forbidden) ||
+			strings.Contains(got.DownstreamRequestRef, forbidden) {
+			t.Fatalf("compensation leaked forbidden value %q: %+v", forbidden, got)
+		}
+	}
+
+	succeeded, err := repository.ListWorkflowCompensations(ctx, types.ListWorkflowCompensationsCommand{
+		AuthContext: types.AuthContext{TenantID: "tenant-workflow-test", ServiceName: "admin-service"},
+		WorkflowID:  workflow.WorkflowID,
+		Status:      types.WorkflowCompensationStatusSucceeded,
+		PageSize:    10,
+	})
+	if err != nil {
+		t.Fatalf("list succeeded compensations: %v", err)
+	}
+	if len(succeeded) != 1 || succeeded[0].CompensationID != completed.CompensationID {
+		t.Fatalf("unexpected succeeded compensations: %+v", succeeded)
+	}
+	failed, err := repository.ListWorkflowCompensations(ctx, types.ListWorkflowCompensationsCommand{
+		AuthContext: types.AuthContext{TenantID: "tenant-workflow-test", ServiceName: "admin-service"},
+		WorkflowID:  workflow.WorkflowID,
+		Status:      types.WorkflowCompensationStatusFailed,
+		PageSize:    10,
+	})
+	if err != nil {
+		t.Fatalf("list failed compensations: %v", err)
+	}
+	if len(failed) != 0 {
+		t.Fatalf("failed filter should return no compensations: %+v", failed)
+	}
+}
+
 func TestRepositoryWorkflowCompensationInstructionRegistryIntegration(t *testing.T) {
 	ctx := context.Background()
 	pool := openWorkflowTestPool(t)

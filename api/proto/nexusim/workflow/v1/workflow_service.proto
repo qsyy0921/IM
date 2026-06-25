@@ -9,6 +9,7 @@ service WorkflowService {
   rpc RecordWorkflowDecision(RecordWorkflowDecisionRequest) returns (RecordWorkflowDecisionResponse);
   rpc GetWorkflow(GetWorkflowRequest) returns (GetWorkflowResponse);
   rpc ListWorkflows(ListWorkflowsRequest) returns (ListWorkflowsResponse);
+  rpc ListWorkflowCompensations(ListWorkflowCompensationsRequest) returns (ListWorkflowCompensationsResponse);
   rpc ListWorkflowCompensationInstructions(ListWorkflowCompensationInstructionsRequest) returns (ListWorkflowCompensationInstructionsResponse);
 }
 
@@ -78,6 +79,28 @@ message WorkflowCompensationInstruction {
   string status = 14;
   int64 created_at_unix_ms = 15;
   int64 updated_at_unix_ms = 16;
+}
+
+message WorkflowCompensation {
+  string tenant_id = 1;
+  string workflow_id = 2;
+  string compensation_id = 3;
+  string source_step_id = 4;
+  string target_service = 5;
+  string target_operation = 6;
+  string target_ref_hash = 7;
+  string payload_schema_version = 8;
+  string payload_ref_hash = 9;
+  string compensation_policy_ref = 10;
+  string reason_ref = 11;
+  string downstream_service = 12;
+  string downstream_request_ref = 13;
+  string status = 14;
+  string failure_class = 15;
+  string public_error = 16;
+  int64 created_at_unix_ms = 17;
+  int64 updated_at_unix_ms = 18;
+  int64 completed_at_unix_ms = 19;
 }
 
 message CreateWorkflowRequest {
@@ -150,6 +173,17 @@ message ListWorkflowsRequest {
 
 message ListWorkflowsResponse {
   repeated Workflow workflows = 1;
+}
+
+message ListWorkflowCompensationsRequest {
+  AuthContext auth_context = 1;
+  string workflow_id = 2;
+  string status = 3;
+  int32 page_size = 4;
+}
+
+message ListWorkflowCompensationsResponse {
+  repeated WorkflowCompensation compensations = 1;
 }
 
 message ListWorkflowCompensationInstructionsRequest {

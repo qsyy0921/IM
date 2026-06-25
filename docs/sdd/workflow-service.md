@@ -117,6 +117,7 @@ rpc AdvanceWorkflow(AdvanceWorkflowRequest) returns (AdvanceWorkflowResponse)
 rpc CancelWorkflow(CancelWorkflowRequest) returns (CancelWorkflowResponse)
 rpc GetWorkflow(GetWorkflowRequest) returns (GetWorkflowResponse)
 rpc ListWorkflows(ListWorkflowsRequest) returns (ListWorkflowsResponse)
+rpc ListWorkflowCompensations(ListWorkflowCompensationsRequest) returns (ListWorkflowCompensationsResponse)
 ```
 
 `CreateWorkflow` 请求字段：
@@ -222,7 +223,11 @@ target fail closed。DB registry instruction 必须绑定具体 `COMPENSATION_RE
 workflow，导入时校验 workflow 已批准或待补偿、target / payload refs 一致；resolve
 时只匹配同一 workflow。`ListWorkflowCompensationInstructions` 提供按 workflow 的
 低敏 instruction refs / version / status 查询面，供后续 operator UI 使用；它不暴露
-payload 原文、reason 原文或 downstream body。第一版外部审批 manifest binding 已由
+payload 原文、reason 原文或 downstream body。`ListWorkflowCompensations` 提供按
+workflow / status 查询 execution result 的低敏公开查询面，只返回 compensation id、
+target refs、payload hash、downstream service / request ref、terminal status、failure
+class 和 stable public error；它不读取下游服务私表，不暴露 payload / reason 原文，
+也不调用下游服务。第一版外部审批 manifest binding 已由
 operator CLI 负责当前 workflow 绑定校验；第一版 external callback wait 已由
 `loadtest/workflow external-callback-wait` 创建低敏等待 workflow 和 decision manifest
 template；`write-workflow-external-callback-delivery-plan.ps1` 把 template 绑定为低敏
@@ -499,8 +504,10 @@ go run ./loadtest/workflow -mode record-decision -workflow-id wf_123 -step-id wf
 go run ./loadtest/workflow -mode record-decision -decision-manifest H:\NexusIM\operator-plans\workflow-decision.json
 go run ./loadtest/workflow -mode operator-queues
 go run ./loadtest/workflow -mode list-compensation-instructions -workflow-id wf_123 -status ACTIVE
+go run ./loadtest/workflow -mode list-compensations -workflow-id wf_123 -status SUCCEEDED
 go run ./loadtest/workflow -mode compensation-review-bundle -workflow-id wf_123
 .\tools\write-workflow-compensation-review-page.ps1 -BundlePath H:\NexusIM\operator-plans\workflow-compensation-review-bundle.json -GeneratedBy operator-a -OutputPath H:\NexusIM\operator-plans\workflow-compensation-review.html
+.\tools\write-workflow-compensation-execution-result-manifest.ps1 -InvocationPath H:\NexusIM\operator-plans\workflow-compensation-execution-invocation.json -CompensationSummaryPath H:\NexusIM\operator-plans\workflow-compensation-summary.json -GeneratedBy operator-a -OutputPath H:\NexusIM\operator-plans\workflow-compensation-execution-result.json
 ```
 
 external callback delivery worker 运行依赖：
@@ -591,6 +598,17 @@ workflow-service。输出 `nexusim.workflow.compensation_execution_invocation.v1
 runtime env 名称、owner、hash 和 required checks；该 manifest 不记录 decision、不执行
 compensation、不调用 control-plane-service、不修改 workflow / compensation rows，也不包含原始
 payload、operator reason、provider artifact、EvidencePack、本机路径或凭证。
+
+`loadtest/workflow -mode list-compensations` 是第一版 compensation execution result
+visibility：它只调用 workflow-service 公开 `ListWorkflowCompensations`，按 workflow id
+和可选 status 输出低敏 compensation refs / terminal result，不记录 decision、不执行
+compensation、不调用下游服务、不读取 PostgreSQL 私表。
+`write-workflow-compensation-execution-result-manifest.ps1` 将低敏 invocation manifest
+与 `list-compensations` summary 绑定为
+`nexusim.workflow.compensation_execution_result.v1`，要求 compensation row 与 invocation
+的 workflow / payload / target refs 一致，且 status 为 `SUCCEEDED` 或 `FAILED`。该
+manifest 只用于 operator 结果归档和后续 audit / repair handoff，不修改 workflow /
+compensation rows，也不保存 raw payload、operator reason、provider body、本机路径或凭证。
 
 `write-workflow-compensation-instruction-manifest.ps1` /
 `validate-workflow-compensation-instruction-manifest.ps1` 是第一版 compensation

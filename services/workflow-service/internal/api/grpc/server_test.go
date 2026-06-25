@@ -30,7 +30,7 @@ func TestListWorkflowCompensationInstructions(t *testing.T) {
 		CreatedAt:       time.Unix(10, 0).UTC(),
 		UpdatedAt:       time.Unix(20, 0).UTC(),
 	}}}
-	server := NewServer(nil, nil, nil, nil, executor)
+	server := NewServer(nil, nil, nil, nil, nil, executor)
 	response, err := server.ListWorkflowCompensationInstructions(context.Background(), &workflowv1.ListWorkflowCompensationInstructionsRequest{
 		AuthContext: &workflowv1.AuthContext{TenantId: "tenant-workflow-test", ServiceName: "admin-service"},
 		WorkflowId:  "wf_1",
@@ -56,7 +56,7 @@ func TestListWorkflowCompensationInstructions(t *testing.T) {
 }
 
 func TestListWorkflowCompensationInstructionsPermissionDenied(t *testing.T) {
-	server := NewServer(nil, nil, nil, nil, &fakeListInstructionsExecutor{err: types.ErrPermissionDenied})
+	server := NewServer(nil, nil, nil, nil, nil, &fakeListInstructionsExecutor{err: types.ErrPermissionDenied})
 	_, err := server.ListWorkflowCompensationInstructions(context.Background(), &workflowv1.ListWorkflowCompensationInstructionsRequest{
 		AuthContext: &workflowv1.AuthContext{TenantId: "tenant-workflow-test", ServiceName: "admin-service"},
 		WorkflowId:  "wf_1",
@@ -82,6 +82,79 @@ func (executor *fakeListInstructionsExecutor) Execute(_ context.Context, command
 
 var _ ListWorkflowCompensationInstructionsExecutor = (*fakeListInstructionsExecutor)(nil)
 
+func TestListWorkflowCompensations(t *testing.T) {
+	executor := &fakeListCompensationsExecutor{compensations: []types.WorkflowCompensation{{
+		TenantID:              "tenant-workflow-test",
+		WorkflowID:            "wf_1",
+		CompensationID:        "wfc_1",
+		SourceStepID:          "wfs_1",
+		TargetService:         "control-plane-service",
+		TargetOperation:       "CONFIG_ROLLBACK",
+		TargetRefHash:         "sha256:target",
+		PayloadSchemaVersion:  "admin.config_rollback.v1",
+		PayloadRefHash:        "sha256:payload",
+		CompensationPolicyRef: "admin.compensation.control_plane.v1",
+		ReasonRef:             "reason-sha256:rollback",
+		DownstreamService:     "control-plane-service",
+		DownstreamRequestRef:  "config-rollback:prod:API_GATEWAY_TENANT_QUOTA:tenant-a:v1",
+		Status:                types.WorkflowCompensationStatusSucceeded,
+		CreatedAt:             time.Unix(10, 0).UTC(),
+		UpdatedAt:             time.Unix(20, 0).UTC(),
+		CompletedAt:           time.Unix(30, 0).UTC(),
+	}}}
+	server := NewServer(nil, nil, nil, nil, executor, nil)
+	response, err := server.ListWorkflowCompensations(context.Background(), &workflowv1.ListWorkflowCompensationsRequest{
+		AuthContext: &workflowv1.AuthContext{TenantId: "tenant-workflow-test", ServiceName: "admin-service"},
+		WorkflowId:  "wf_1",
+		Status:      "SUCCEEDED",
+		PageSize:    10,
+	})
+	if err != nil {
+		t.Fatalf("list compensations: %v", err)
+	}
+	if executor.command.WorkflowID != "wf_1" || executor.command.Status != "SUCCEEDED" || executor.command.PageSize != 10 {
+		t.Fatalf("unexpected command: %+v", executor.command)
+	}
+	if len(response.GetCompensations()) != 1 {
+		t.Fatalf("expected one compensation, got %d", len(response.GetCompensations()))
+	}
+	compensation := response.GetCompensations()[0]
+	if compensation.GetCompensationId() != "wfc_1" ||
+		compensation.GetPayloadRefHash() != "sha256:payload" ||
+		compensation.GetDownstreamRequestRef() != "config-rollback:prod:API_GATEWAY_TENANT_QUOTA:tenant-a:v1" ||
+		compensation.GetStatus() != "SUCCEEDED" ||
+		compensation.GetCompletedAtUnixMs() == 0 {
+		t.Fatalf("unexpected compensation response: %+v", compensation)
+	}
+}
+
+func TestListWorkflowCompensationsPermissionDenied(t *testing.T) {
+	server := NewServer(nil, nil, nil, nil, &fakeListCompensationsExecutor{err: types.ErrPermissionDenied}, nil)
+	_, err := server.ListWorkflowCompensations(context.Background(), &workflowv1.ListWorkflowCompensationsRequest{
+		AuthContext: &workflowv1.AuthContext{TenantId: "tenant-workflow-test", ServiceName: "admin-service"},
+		WorkflowId:  "wf_1",
+	})
+	if status.Code(err) != codes.PermissionDenied {
+		t.Fatalf("expected permission denied, got %v", err)
+	}
+}
+
+type fakeListCompensationsExecutor struct {
+	command       types.ListWorkflowCompensationsCommand
+	compensations []types.WorkflowCompensation
+	err           error
+}
+
+func (executor *fakeListCompensationsExecutor) Execute(_ context.Context, command types.ListWorkflowCompensationsCommand) ([]types.WorkflowCompensation, error) {
+	executor.command = command
+	if executor.err != nil {
+		return nil, executor.err
+	}
+	return executor.compensations, nil
+}
+
+var _ ListWorkflowCompensationsExecutor = (*fakeListCompensationsExecutor)(nil)
+
 func TestListWorkflows(t *testing.T) {
 	executor := &fakeListWorkflowsExecutor{workflows: []types.Workflow{{
 		TenantID:             "tenant-workflow-test",
@@ -102,7 +175,7 @@ func TestListWorkflows(t *testing.T) {
 		CreatedAt:            time.Unix(10, 0).UTC(),
 		UpdatedAt:            time.Unix(20, 0).UTC(),
 	}}}
-	server := NewServer(nil, nil, nil, executor, nil)
+	server := NewServer(nil, nil, nil, executor, nil, nil)
 	response, err := server.ListWorkflows(context.Background(), &workflowv1.ListWorkflowsRequest{
 		AuthContext:       &workflowv1.AuthContext{TenantId: "tenant-workflow-test", ServiceName: "admin-service"},
 		WorkflowType:      "REPAIR_APPROVAL",
@@ -135,7 +208,7 @@ func TestListWorkflows(t *testing.T) {
 }
 
 func TestListWorkflowsPermissionDenied(t *testing.T) {
-	server := NewServer(nil, nil, nil, &fakeListWorkflowsExecutor{err: types.ErrPermissionDenied}, nil)
+	server := NewServer(nil, nil, nil, &fakeListWorkflowsExecutor{err: types.ErrPermissionDenied}, nil, nil)
 	_, err := server.ListWorkflows(context.Background(), &workflowv1.ListWorkflowsRequest{
 		AuthContext: &workflowv1.AuthContext{TenantId: "tenant-workflow-test", ServiceName: "admin-service"},
 		PageSize:    5,

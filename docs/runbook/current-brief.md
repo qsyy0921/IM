@@ -23,8 +23,8 @@ brief、loadtest report、development-progress 或 archive。
   approval binding、operator queues、external callback wait、external callback
   delivery plan、delivery status / redrive plan、external callback delivery
   persistent worker first path、external callback delivery redrive operator path、
-  compensation review bundle / page 和 execution
-  readiness / invocation manifest。
+  compensation review bundle / page、execution readiness / invocation manifest
+  和 execution result visibility。
 - group memory / retrieval / eval 持续保留 source refs、conversation scope、
   member visibility、time/version boundary、citations 和 no-citation refusal。
 

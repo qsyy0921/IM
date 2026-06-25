@@ -662,6 +662,50 @@ func TestExecuteListCompensationInstructions(t *testing.T) {
 	}
 }
 
+func TestExecuteListCompensations(t *testing.T) {
+	cfg := parseFlags([]string{
+		"-mode", "list-compensations",
+		"-tenant-id", "tenant-wf",
+		"-workflow-id", "wf_1",
+		"-status", "SUCCEEDED",
+		"-page-size", "5",
+	})
+	client := &fakeWorkflowClient{compensationsResponse: &workflowv1.ListWorkflowCompensationsResponse{
+		Compensations: []*workflowv1.WorkflowCompensation{{
+			CompensationId:        "wfc_1",
+			WorkflowId:            "wf_1",
+			SourceStepId:          "wfs_1",
+			TargetService:         "control-plane-service",
+			TargetOperation:       "CONFIG_ROLLBACK",
+			TargetRefHash:         "sha256:target",
+			PayloadSchemaVersion:  "admin.config_rollback.v1",
+			PayloadRefHash:        "sha256:payload",
+			CompensationPolicyRef: "admin.compensation.control_plane.v1",
+			ReasonRef:             "reason-sha256:rollback",
+			DownstreamService:     "control-plane-service",
+			DownstreamRequestRef:  "config-rollback:prod:API_GATEWAY_TENANT_QUOTA:tenant-a:v1",
+			Status:                "SUCCEEDED",
+			CompletedAtUnixMs:     30000,
+		}},
+	}}
+	result, err := execute(context.Background(), cfg, client)
+	if err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if client.compensationsRequest.GetAuthContext().GetTenantId() != "tenant-wf" ||
+		client.compensationsRequest.GetWorkflowId() != "wf_1" ||
+		client.compensationsRequest.GetStatus() != "SUCCEEDED" ||
+		client.compensationsRequest.GetPageSize() != 5 {
+		t.Fatalf("unexpected request: %+v", client.compensationsRequest)
+	}
+	if len(result.Compensations) != 1 ||
+		result.Compensations[0].CompensationID != "wfc_1" ||
+		result.Compensations[0].DownstreamRequestRef != "config-rollback:prod:API_GATEWAY_TENANT_QUOTA:tenant-a:v1" ||
+		result.Compensations[0].Status != "SUCCEEDED" {
+		t.Fatalf("unexpected result: %+v", result)
+	}
+}
+
 func TestExecuteCompensationReviewBundleBuildsReadOnlyBundle(t *testing.T) {
 	cfg := parseFlags([]string{
 		"-mode", "compensation-review-bundle",
@@ -933,6 +977,8 @@ type fakeWorkflowClient struct {
 	listWorkflowsResponses []*workflowv1.ListWorkflowsResponse
 	request                *workflowv1.ListWorkflowCompensationInstructionsRequest
 	response               *workflowv1.ListWorkflowCompensationInstructionsResponse
+	compensationsRequest   *workflowv1.ListWorkflowCompensationsRequest
+	compensationsResponse  *workflowv1.ListWorkflowCompensationsResponse
 }
 
 func (client *fakeWorkflowClient) CreateWorkflow(
@@ -986,4 +1032,13 @@ func (client *fakeWorkflowClient) ListWorkflowCompensationInstructions(
 ) (*workflowv1.ListWorkflowCompensationInstructionsResponse, error) {
 	client.request = request
 	return client.response, nil
+}
+
+func (client *fakeWorkflowClient) ListWorkflowCompensations(
+	_ context.Context,
+	request *workflowv1.ListWorkflowCompensationsRequest,
+	_ ...grpc.CallOption,
+) (*workflowv1.ListWorkflowCompensationsResponse, error) {
+	client.compensationsRequest = request
+	return client.compensationsResponse, nil
 }

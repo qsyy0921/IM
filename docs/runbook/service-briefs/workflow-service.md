@@ -21,9 +21,13 @@ admin operation approval、补偿请求、外部 callback 等低敏工作流状�
   `compensation-executor` control-plane rollback first path，unsupported target fail closed。
 - external callback：wait workflow、decision manifest binding、delivery plan、persistent delivery worker、
   delivery status / redrive plan、redrive operator path；不记录 decision、不执行 target。
-- operator visibility：provider-replay queue、operator queues、compensation review bundle / review page。
+- operator visibility：provider-replay queue、operator queues、compensation review bundle / review page、
+  `ListWorkflowCompensations` execution result query。
 - compensation execution operator artifacts：execution readiness manifest 和 execution invocation manifest；
   只输出低敏 refs / hashes / runtime contract，不记录 decision、不执行 compensation、不调用 control-plane。
+- compensation execution result manifest：绑定 execution invocation 和 workflow-service 公开
+  compensation result summary；只输出 terminal status / downstream refs / public error，不执行
+  compensation、不记录 decision、不调用下游服务。
 - 已被 admin-service 用于 repair / critical / compensation handoff 和 provider replay workflow handoff。
 
 后续：更多 compensation adapter、provider-grade instruction / approval UI、callback delivery provider-grade UI、

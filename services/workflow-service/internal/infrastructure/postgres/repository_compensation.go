@@ -192,6 +192,45 @@ func (repository *Repository) CompleteWorkflowCompensation(
 	return completed, nil
 }
 
+func (repository *Repository) ListWorkflowCompensations(
+	ctx context.Context,
+	command types.ListWorkflowCompensationsCommand,
+) ([]types.WorkflowCompensation, error) {
+	if repository.pool == nil {
+		return nil, types.NewDBReadFailed("workflow repository is not configured")
+	}
+	normalized := command.Normalized()
+	if err := normalized.Validate(); err != nil {
+		return nil, err
+	}
+	rows, err := repository.pool.Query(ctx, `
+SELECT `+selectCompensationColumns("")+`
+FROM workflow_compensations
+WHERE tenant_id = $1
+  AND workflow_id = $2
+  AND ($3 = '' OR status = $3)
+ORDER BY updated_at DESC, compensation_id DESC
+LIMIT $4
+`, string(normalized.AuthContext.TenantID), normalized.WorkflowID, normalized.Status, normalized.PageSize)
+	if err != nil {
+		return nil, types.NewDBReadFailed(err.Error())
+	}
+	defer rows.Close()
+
+	compensations := make([]types.WorkflowCompensation, 0, normalized.PageSize)
+	for rows.Next() {
+		compensation, err := scanWorkflowCompensation(rows)
+		if err != nil {
+			return nil, types.NewDBReadFailed(err.Error())
+		}
+		compensations = append(compensations, compensation)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, types.NewDBReadFailed(err.Error())
+	}
+	return compensations, nil
+}
+
 func listApprovedCompensationWorkflowsForUpdate(ctx context.Context, tx pgx.Tx, limit int) ([]types.Workflow, error) {
 	rows, err := tx.Query(ctx, selectWorkflowSQL()+`
 WHERE workflow_type = $1 AND status = $2

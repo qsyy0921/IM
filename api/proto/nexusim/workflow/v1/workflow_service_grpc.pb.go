@@ -23,6 +23,7 @@ const (
 	WorkflowService_RecordWorkflowDecision_FullMethodName               = "/nexusim.workflow.v1.WorkflowService/RecordWorkflowDecision"
 	WorkflowService_GetWorkflow_FullMethodName                          = "/nexusim.workflow.v1.WorkflowService/GetWorkflow"
 	WorkflowService_ListWorkflows_FullMethodName                        = "/nexusim.workflow.v1.WorkflowService/ListWorkflows"
+	WorkflowService_ListWorkflowCompensations_FullMethodName            = "/nexusim.workflow.v1.WorkflowService/ListWorkflowCompensations"
 	WorkflowService_ListWorkflowCompensationInstructions_FullMethodName = "/nexusim.workflow.v1.WorkflowService/ListWorkflowCompensationInstructions"
 )
 
@@ -34,6 +35,7 @@ type WorkflowServiceClient interface {
 	RecordWorkflowDecision(ctx context.Context, in *RecordWorkflowDecisionRequest, opts ...grpc.CallOption) (*RecordWorkflowDecisionResponse, error)
 	GetWorkflow(ctx context.Context, in *GetWorkflowRequest, opts ...grpc.CallOption) (*GetWorkflowResponse, error)
 	ListWorkflows(ctx context.Context, in *ListWorkflowsRequest, opts ...grpc.CallOption) (*ListWorkflowsResponse, error)
+	ListWorkflowCompensations(ctx context.Context, in *ListWorkflowCompensationsRequest, opts ...grpc.CallOption) (*ListWorkflowCompensationsResponse, error)
 	ListWorkflowCompensationInstructions(ctx context.Context, in *ListWorkflowCompensationInstructionsRequest, opts ...grpc.CallOption) (*ListWorkflowCompensationInstructionsResponse, error)
 }
 
@@ -85,6 +87,16 @@ func (c *workflowServiceClient) ListWorkflows(ctx context.Context, in *ListWorkf
 	return out, nil
 }
 
+func (c *workflowServiceClient) ListWorkflowCompensations(ctx context.Context, in *ListWorkflowCompensationsRequest, opts ...grpc.CallOption) (*ListWorkflowCompensationsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListWorkflowCompensationsResponse)
+	err := c.cc.Invoke(ctx, WorkflowService_ListWorkflowCompensations_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *workflowServiceClient) ListWorkflowCompensationInstructions(ctx context.Context, in *ListWorkflowCompensationInstructionsRequest, opts ...grpc.CallOption) (*ListWorkflowCompensationInstructionsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ListWorkflowCompensationInstructionsResponse)
@@ -103,6 +115,7 @@ type WorkflowServiceServer interface {
 	RecordWorkflowDecision(context.Context, *RecordWorkflowDecisionRequest) (*RecordWorkflowDecisionResponse, error)
 	GetWorkflow(context.Context, *GetWorkflowRequest) (*GetWorkflowResponse, error)
 	ListWorkflows(context.Context, *ListWorkflowsRequest) (*ListWorkflowsResponse, error)
+	ListWorkflowCompensations(context.Context, *ListWorkflowCompensationsRequest) (*ListWorkflowCompensationsResponse, error)
 	ListWorkflowCompensationInstructions(context.Context, *ListWorkflowCompensationInstructionsRequest) (*ListWorkflowCompensationInstructionsResponse, error)
 	mustEmbedUnimplementedWorkflowServiceServer()
 }
@@ -125,6 +138,9 @@ func (UnimplementedWorkflowServiceServer) GetWorkflow(context.Context, *GetWorkf
 }
 func (UnimplementedWorkflowServiceServer) ListWorkflows(context.Context, *ListWorkflowsRequest) (*ListWorkflowsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListWorkflows not implemented")
+}
+func (UnimplementedWorkflowServiceServer) ListWorkflowCompensations(context.Context, *ListWorkflowCompensationsRequest) (*ListWorkflowCompensationsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListWorkflowCompensations not implemented")
 }
 func (UnimplementedWorkflowServiceServer) ListWorkflowCompensationInstructions(context.Context, *ListWorkflowCompensationInstructionsRequest) (*ListWorkflowCompensationInstructionsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListWorkflowCompensationInstructions not implemented")
@@ -222,6 +238,24 @@ func _WorkflowService_ListWorkflows_Handler(srv interface{}, ctx context.Context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _WorkflowService_ListWorkflowCompensations_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListWorkflowCompensationsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(WorkflowServiceServer).ListWorkflowCompensations(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: WorkflowService_ListWorkflowCompensations_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(WorkflowServiceServer).ListWorkflowCompensations(ctx, req.(*ListWorkflowCompensationsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _WorkflowService_ListWorkflowCompensationInstructions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ListWorkflowCompensationInstructionsRequest)
 	if err := dec(in); err != nil {
@@ -262,6 +296,10 @@ var WorkflowService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListWorkflows",
 			Handler:    _WorkflowService_ListWorkflows_Handler,
+		},
+		{
+			MethodName: "ListWorkflowCompensations",
+			Handler:    _WorkflowService_ListWorkflowCompensations_Handler,
 		},
 		{
 			MethodName: "ListWorkflowCompensationInstructions",

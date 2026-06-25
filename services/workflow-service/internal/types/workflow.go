@@ -32,10 +32,12 @@ const (
 	WorkflowTimerStatusFired         = "FIRED"
 	WorkflowTimerStatusCanceled      = "CANCELED"
 
+	WorkflowCompensationStatusPending   = "PENDING"
 	WorkflowCompensationStatusRequested = "REQUESTED"
 	WorkflowCompensationStatusExecuting = "EXECUTING"
 	WorkflowCompensationStatusSucceeded = "SUCCEEDED"
 	WorkflowCompensationStatusFailed    = "FAILED"
+	WorkflowCompensationStatusCanceled  = "CANCELED"
 
 	WorkflowCompensationInstructionTypeControlPlaneRollback = "CONTROL_PLANE_ROLLBACK"
 	WorkflowCompensationInstructionStatusActive             = "ACTIVE"
@@ -114,6 +116,13 @@ type ListWorkflowsCommand struct {
 }
 
 type ListWorkflowCompensationInstructionsCommand struct {
+	AuthContext AuthContext
+	WorkflowID  string
+	Status      string
+	PageSize    int
+}
+
+type ListWorkflowCompensationsCommand struct {
 	AuthContext AuthContext
 	WorkflowID  string
 	Status      string
@@ -493,6 +502,33 @@ func (command ListWorkflowCompensationInstructionsCommand) Validate() error {
 	return nil
 }
 
+func (command ListWorkflowCompensationsCommand) Normalized() ListWorkflowCompensationsCommand {
+	command.AuthContext = command.AuthContext.Normalized()
+	command.WorkflowID = strings.TrimSpace(command.WorkflowID)
+	command.Status = strings.ToUpper(strings.TrimSpace(command.Status))
+	if command.PageSize <= 0 {
+		command.PageSize = 50
+	}
+	if command.PageSize > 200 {
+		command.PageSize = 200
+	}
+	return command
+}
+
+func (command ListWorkflowCompensationsCommand) Validate() error {
+	command = command.Normalized()
+	if err := command.AuthContext.Validate(); err != nil {
+		return err
+	}
+	if command.WorkflowID == "" {
+		return NewInvalidArgument("workflow_id is required")
+	}
+	if command.Status != "" && !isAllowedWorkflowCompensationStatus(command.Status) {
+		return NewInvalidArgument("workflow compensation status is unsupported")
+	}
+	return nil
+}
+
 func (instruction WorkflowCompensationInstruction) Normalized() WorkflowCompensationInstruction {
 	instruction.TenantID = TenantID(strings.TrimSpace(string(instruction.TenantID)))
 	instruction.InstructionID = strings.TrimSpace(instruction.InstructionID)
@@ -753,6 +789,20 @@ func isAllowedWorkflowStatus(value string) bool {
 		WorkflowStatusTimedOut,
 		WorkflowStatusCompensationPending,
 		WorkflowStatusCompensated:
+		return true
+	default:
+		return false
+	}
+}
+
+func isAllowedWorkflowCompensationStatus(value string) bool {
+	switch value {
+	case WorkflowCompensationStatusPending,
+		WorkflowCompensationStatusRequested,
+		WorkflowCompensationStatusExecuting,
+		WorkflowCompensationStatusSucceeded,
+		WorkflowCompensationStatusFailed,
+		WorkflowCompensationStatusCanceled:
 		return true
 	default:
 		return false

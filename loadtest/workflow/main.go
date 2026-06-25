@@ -79,6 +79,7 @@ type commandResult struct {
 	Decision           *decisionRef                 `json:"decision,omitempty"`
 	Decisions          []decisionRef                `json:"decisions,omitempty"`
 	Instructions       []compensationInstructionRef `json:"instructions,omitempty"`
+	Compensations      []compensationRef            `json:"compensations,omitempty"`
 	CompensationReview *compensationReviewBundle    `json:"compensation_review,omitempty"`
 	Replayed           bool                         `json:"replayed,omitempty"`
 	CheckedAt          time.Time                    `json:"checked_at"`
@@ -149,6 +150,27 @@ type compensationInstructionRef struct {
 	Status          string `json:"status"`
 	CreatedAtUnixMs int64  `json:"created_at_unix_ms,omitempty"`
 	UpdatedAtUnixMs int64  `json:"updated_at_unix_ms,omitempty"`
+}
+
+type compensationRef struct {
+	CompensationID        string `json:"compensation_id"`
+	WorkflowID            string `json:"workflow_id"`
+	SourceStepID          string `json:"source_step_id,omitempty"`
+	TargetService         string `json:"target_service"`
+	TargetOperation       string `json:"target_operation"`
+	TargetRefHash         string `json:"target_ref_hash,omitempty"`
+	PayloadSchemaVersion  string `json:"payload_schema_version,omitempty"`
+	PayloadRefHash        string `json:"payload_ref_hash,omitempty"`
+	CompensationPolicyRef string `json:"compensation_policy_ref,omitempty"`
+	ReasonRef             string `json:"reason_ref,omitempty"`
+	DownstreamService     string `json:"downstream_service,omitempty"`
+	DownstreamRequestRef  string `json:"downstream_request_ref,omitempty"`
+	Status                string `json:"status"`
+	FailureClass          string `json:"failure_class,omitempty"`
+	PublicError           string `json:"public_error,omitempty"`
+	CreatedAtUnixMs       int64  `json:"created_at_unix_ms,omitempty"`
+	UpdatedAtUnixMs       int64  `json:"updated_at_unix_ms,omitempty"`
+	CompletedAtUnixMs     int64  `json:"completed_at_unix_ms,omitempty"`
 }
 
 type compensationReviewBundle struct {
@@ -227,7 +249,7 @@ func main() {
 func parseFlags(args []string) config {
 	cfg := config{}
 	flags := flag.NewFlagSet("workflow-operator", flag.ExitOnError)
-	flags.StringVar(&cfg.mode, "mode", "get", "mode: compensation-review-bundle, external-callback-wait, get, record-decision, list-workflows, provider-replay-queue, operator-queues, list-compensation-instructions")
+	flags.StringVar(&cfg.mode, "mode", "get", "mode: compensation-review-bundle, external-callback-wait, get, record-decision, list-workflows, provider-replay-queue, operator-queues, list-compensations, list-compensation-instructions")
 	flags.StringVar(&cfg.target, "target", envOr("NEXUSIM_WORKFLOW_GRPC_ADDR", "127.0.0.1:10750"), "workflow-service gRPC target")
 	flags.DurationVar(&cfg.requestTimeout, "request-timeout", 5*time.Second, "request timeout")
 	flags.StringVar(&cfg.tls.CAFile, "workflow-tls-ca-file", os.Getenv("NEXUSIM_WORKFLOW_TLS_CA_FILE"), "CA PEM for workflow-service gRPC TLS")
@@ -598,6 +620,19 @@ func execute(ctx context.Context, cfg config, client workflowv1.WorkflowServiceC
 		}
 		for _, instruction := range response.GetInstructions() {
 			result.Instructions = append(result.Instructions, summarizeInstruction(instruction))
+		}
+	case "list-compensations":
+		response, err := client.ListWorkflowCompensations(ctx, &workflowv1.ListWorkflowCompensationsRequest{
+			AuthContext: authContext(cfg),
+			WorkflowId:  cfg.workflowID,
+			Status:      cfg.status,
+			PageSize:    cfg.pageSize,
+		})
+		if err != nil {
+			return commandResult{}, fmt.Errorf("list workflow compensations: %w", err)
+		}
+		for _, compensation := range response.GetCompensations() {
+			result.Compensations = append(result.Compensations, summarizeCompensation(compensation))
 		}
 	case "compensation-review-bundle":
 		workflowResponse, err := client.GetWorkflow(ctx, &workflowv1.GetWorkflowRequest{
@@ -1091,6 +1126,32 @@ func summarizeInstruction(instruction *workflowv1.WorkflowCompensationInstructio
 	}
 }
 
+func summarizeCompensation(compensation *workflowv1.WorkflowCompensation) compensationRef {
+	if compensation == nil {
+		return compensationRef{}
+	}
+	return compensationRef{
+		CompensationID:        compensation.GetCompensationId(),
+		WorkflowID:            compensation.GetWorkflowId(),
+		SourceStepID:          compensation.GetSourceStepId(),
+		TargetService:         compensation.GetTargetService(),
+		TargetOperation:       compensation.GetTargetOperation(),
+		TargetRefHash:         compensation.GetTargetRefHash(),
+		PayloadSchemaVersion:  compensation.GetPayloadSchemaVersion(),
+		PayloadRefHash:        compensation.GetPayloadRefHash(),
+		CompensationPolicyRef: compensation.GetCompensationPolicyRef(),
+		ReasonRef:             compensation.GetReasonRef(),
+		DownstreamService:     compensation.GetDownstreamService(),
+		DownstreamRequestRef:  compensation.GetDownstreamRequestRef(),
+		Status:                compensation.GetStatus(),
+		FailureClass:          compensation.GetFailureClass(),
+		PublicError:           compensation.GetPublicError(),
+		CreatedAtUnixMs:       compensation.GetCreatedAtUnixMs(),
+		UpdatedAtUnixMs:       compensation.GetUpdatedAtUnixMs(),
+		CompletedAtUnixMs:     compensation.GetCompletedAtUnixMs(),
+	}
+}
+
 func isAllowedMode(value string) bool {
 	return value == "external-callback-wait" ||
 		value == "compensation-review-bundle" ||
@@ -1099,6 +1160,7 @@ func isAllowedMode(value string) bool {
 		value == "list-workflows" ||
 		value == "provider-replay-queue" ||
 		value == "operator-queues" ||
+		value == "list-compensations" ||
 		value == "list-compensation-instructions"
 }
 
@@ -1106,6 +1168,7 @@ func requiresWorkflowID(value string) bool {
 	return value == "get" ||
 		value == "record-decision" ||
 		value == "compensation-review-bundle" ||
+		value == "list-compensations" ||
 		value == "list-compensation-instructions"
 }
 
@@ -1114,6 +1177,7 @@ func isListMode(value string) bool {
 		value == "provider-replay-queue" ||
 		value == "operator-queues" ||
 		value == "compensation-review-bundle" ||
+		value == "list-compensations" ||
 		value == "list-compensation-instructions"
 }
 

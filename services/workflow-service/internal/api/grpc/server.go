@@ -29,17 +29,22 @@ type ListWorkflowsExecutor interface {
 	Execute(context.Context, types.ListWorkflowsCommand) ([]types.Workflow, error)
 }
 
+type ListWorkflowCompensationsExecutor interface {
+	Execute(context.Context, types.ListWorkflowCompensationsCommand) ([]types.WorkflowCompensation, error)
+}
+
 type ListWorkflowCompensationInstructionsExecutor interface {
 	Execute(context.Context, types.ListWorkflowCompensationInstructionsCommand) ([]types.WorkflowCompensationInstruction, error)
 }
 
 type Server struct {
 	workflowv1.UnimplementedWorkflowServiceServer
-	createWorkflow   CreateWorkflowExecutor
-	recordDecision   RecordWorkflowDecisionExecutor
-	getWorkflow      GetWorkflowExecutor
-	listWorkflows    ListWorkflowsExecutor
-	listInstructions ListWorkflowCompensationInstructionsExecutor
+	createWorkflow    CreateWorkflowExecutor
+	recordDecision    RecordWorkflowDecisionExecutor
+	getWorkflow       GetWorkflowExecutor
+	listWorkflows     ListWorkflowsExecutor
+	listCompensations ListWorkflowCompensationsExecutor
+	listInstructions  ListWorkflowCompensationInstructionsExecutor
 }
 
 func NewServer(
@@ -47,14 +52,16 @@ func NewServer(
 	recordDecision RecordWorkflowDecisionExecutor,
 	getWorkflow GetWorkflowExecutor,
 	listWorkflows ListWorkflowsExecutor,
+	listCompensations ListWorkflowCompensationsExecutor,
 	listInstructions ListWorkflowCompensationInstructionsExecutor,
 ) *Server {
 	return &Server{
-		createWorkflow:   createWorkflow,
-		recordDecision:   recordDecision,
-		getWorkflow:      getWorkflow,
-		listWorkflows:    listWorkflows,
-		listInstructions: listInstructions,
+		createWorkflow:    createWorkflow,
+		recordDecision:    recordDecision,
+		getWorkflow:       getWorkflow,
+		listWorkflows:     listWorkflows,
+		listCompensations: listCompensations,
+		listInstructions:  listInstructions,
 	}
 }
 
@@ -220,6 +227,33 @@ func (server *Server) ListWorkflowCompensationInstructions(
 	return response, nil
 }
 
+func (server *Server) ListWorkflowCompensations(
+	ctx context.Context,
+	request *workflowv1.ListWorkflowCompensationsRequest,
+) (*workflowv1.ListWorkflowCompensationsResponse, error) {
+	if request == nil {
+		return nil, status.Error(codes.InvalidArgument, "request is required")
+	}
+	auth, ok := authFromProto(ctx, request.GetAuthContext())
+	if !ok {
+		return nil, status.Error(codes.InvalidArgument, "auth_context is required")
+	}
+	compensations, err := server.listCompensations.Execute(ctx, types.ListWorkflowCompensationsCommand{
+		AuthContext: auth,
+		WorkflowID:  request.GetWorkflowId(),
+		Status:      request.GetStatus(),
+		PageSize:    int(request.GetPageSize()),
+	})
+	if err != nil {
+		return nil, grpcError(err)
+	}
+	response := &workflowv1.ListWorkflowCompensationsResponse{}
+	for _, compensation := range compensations {
+		response.Compensations = append(response.Compensations, compensationToProto(compensation))
+	}
+	return response, nil
+}
+
 func authFromProto(ctx context.Context, auth *workflowv1.AuthContext) (types.AuthContext, bool) {
 	if verified, ok := verifiedAuthFromContext(ctx); ok {
 		return verified, true
@@ -255,6 +289,30 @@ func instructionToProto(instruction types.WorkflowCompensationInstruction) *work
 		Status:          instruction.Status,
 		CreatedAtUnixMs: timeToUnixMillis(instruction.CreatedAt),
 		UpdatedAtUnixMs: timeToUnixMillis(instruction.UpdatedAt),
+	}
+}
+
+func compensationToProto(compensation types.WorkflowCompensation) *workflowv1.WorkflowCompensation {
+	return &workflowv1.WorkflowCompensation{
+		TenantId:              string(compensation.TenantID),
+		WorkflowId:            compensation.WorkflowID,
+		CompensationId:        compensation.CompensationID,
+		SourceStepId:          compensation.SourceStepID,
+		TargetService:         compensation.TargetService,
+		TargetOperation:       compensation.TargetOperation,
+		TargetRefHash:         compensation.TargetRefHash,
+		PayloadSchemaVersion:  compensation.PayloadSchemaVersion,
+		PayloadRefHash:        compensation.PayloadRefHash,
+		CompensationPolicyRef: compensation.CompensationPolicyRef,
+		ReasonRef:             compensation.ReasonRef,
+		DownstreamService:     compensation.DownstreamService,
+		DownstreamRequestRef:  compensation.DownstreamRequestRef,
+		Status:                compensation.Status,
+		FailureClass:          compensation.FailureClass,
+		PublicError:           compensation.PublicError,
+		CreatedAtUnixMs:       timeToUnixMillis(compensation.CreatedAt),
+		UpdatedAtUnixMs:       timeToUnixMillis(compensation.UpdatedAt),
+		CompletedAtUnixMs:     timeToUnixMillis(compensation.CompletedAt),
 	}
 }
 

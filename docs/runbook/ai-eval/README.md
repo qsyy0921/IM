@@ -337,6 +337,14 @@ readiness evidence can be converted into a low-sensitive
 call action-executor, mutate the DLQ row, or embed raw resource id, input,
 reason or provider artifacts.
 
+Provider replay controlled redrive execution is represented by
+`action-provider-replay-controlled-redrive-execution`. It verifies that the
+operator path first preflights the low-sensitive invocation manifest, checks
+external raw resource id, new input and reason hashes, and only calls
+action-executor `RedriveProviderFailure` when explicitly executed. Operator
+output must stay low-sensitive and must not print raw resource id, input,
+reason or provider artifacts.
+
 Provider replay submit operator bridge is represented by
 `admin-provider-replay-handoff-submit-operator`. It verifies that the admin
 operator can submit low-sensitive `PROVIDER_REPLAY_REQUEST` operations from an

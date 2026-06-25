@@ -1,59 +1,25 @@
 # action-executor Brief
 
-状态：foundation-active / approved execution + guarded adapters + redrive operator path。
+状态：foundation-active / approved execution + guarded adapters + provider replay redrive operator path。
 
 ## 已落
 
-- `ExecuteApprovedAction` gRPC：强制 proposal / approval / prepared audit，校验 agent-service、skill-registry、policy-service 后写 execution audit 和 tool result。
-- 本地安全 `nexusim.local.echo`、guarded external HTTP provider adapter、外部 MCP failure 稳定分类、tool output safety gate。
-- Conversation note / profile opt-in business adapters：只走 conversation-service public API，低敏 output，不读写私表。
-- Provider failure lifecycle：retryable -> `RETRY_PENDING`，non-retryable / unsafe -> `DLQ`；worker 只做 bounded retry bookkeeping，不重放 tool。
-- Provider failure audit / redrive-plan operator handoff：只输出低敏 artifact，不修改 failure row。
-- Provider failure metrics：`/metrics` / `/debug/metrics` 输出 status、retryable、
-  due retry 和 classification 聚合，不输出 raw provider error、tool input / output、
-  secret 或 PII。
-- Batch redrive operator handoff：redrive plan 输出 batch id、candidate count、
-  fresh proposal / approval / prepared audit requirements，不自动 replay。
-- `RedriveProviderFailure`：只针对 `DLQ` source，要求 fresh proposal / approval /
-  prepared audit、匹配 skill / tool / resource、新 input 和 reason hash，复用正常执行链；
-  execution audit 记录 source failure id 和 reason hash。
-- Provider replay operator UI first path：`provider-replay-operator-ui` 只读 DLQ
-  provider failure，输出低敏 candidate / batch / workflow state / permission gate /
-  audit contract，不执行 tool、不修改 failure row、不复用旧 approval。
-- Provider replay admin / workflow handoff：`provider-replay-handoff` 只读 DLQ
-  provider failure，输出低敏 `PROVIDER_REPLAY_REQUEST` admin operation request 和
-  `REPAIR_APPROVAL` workflow handoff request；不执行 tool、不修改 failure row、不带 raw
-  input / output。
-- Provider replay handoff review page：`write-provider-replay-handoff-review-page.ps1`
-  只接受低敏 handoff artifact，重新校验 contract / payload hash / workflow request /
-  final execution owner 后渲染仓库外 HTML；不提交 admin operation、不创建 workflow、
-  不记录 approval、不调用 `RedriveProviderFailure`、不修改 DLQ row。
-- Provider replay execution readiness page：`write-provider-replay-readiness-page.ps1`
-  绑定原 handoff、approved admin operation、workflow APPROVE manifest 和 fresh Agent
-  proof；页面只输出 refs / hashes，不调用 redrive、不修改 DLQ、不泄漏 raw provider artifact。
-- Provider replay redrive invocation manifest：`write-provider-replay-redrive-invocation.ps1`
-  把原 handoff、approved admin operation、workflow APPROVE manifest 和 fresh Agent proof
-  绑定成低敏 `RedriveProviderFailure` command contract；manifest 不执行 redrive、不修改
-  DLQ、不包含 raw resource id / input / reason / provider artifact，operator 必须在仓库外
-  提供 raw 值并重新核验 hash。
-- Docker / Prometheus / Grafana wiring、focused tests、PG integration、ai-eval action preflight safety adapter。
+- `ExecuteApprovedAction` gRPC 强制 proposal / approval / prepared audit，校验 agent-service、skill-registry、policy-service 后写 execution audit 和 tool result。
+- 本地安全 echo、guarded external HTTP、外部 MCP failure 分类、tool output safety gate、Conversation note / profile opt-in adapter 已落；业务 adapter 只走公开 API。
+- Provider failure lifecycle / metrics / redrive-plan / batch handoff 已落；retryable 只进入 bounded retry bookkeeping，non-retryable / unsafe 进入 DLQ，不自动 replay。
+- `RedriveProviderFailure` 只针对 DLQ source，要求 fresh proposal / approval / prepared audit、匹配 skill / tool / resource、新 input 和 reason hash，复用正常执行链。
+- Provider replay UI、admin/workflow handoff、review page、readiness page、redrive invocation manifest 都是低敏只读或 contract 生成，不执行 tool、不修改 DLQ、不泄漏 raw provider artifact。
+- `loadtest/actionexecutor -mode provider-replay-redrive` 默认 preflight，校验低敏 invocation manifest 与仓库外 raw resource id / new input / reason hash；显式 `-execute` 才调用 `RedriveProviderFailure`。
+- Docker / Prometheus / Grafana wiring、focused tests、PG integration、ai-eval action safety cases 已落。
 
 ## 边界
 
-- 不保存 raw `input_json`、provider raw error、provider output、secret 或 PII。
+- 不保存 raw `input_json`、provider raw error / output、secret 或 PII。
 - 未配置 adapter 的业务 tool 必须 `executed=false`，不得伪造成功。
 - Redrive 是专用 API，不是普通 repair / DLQ tool action；不恢复旧 raw input，不自动 replay 旧 provider output。
-- Provider replay operator UI artifact 只是人工审批视图，不是 replay 已执行证明。
-- Provider replay handoff artifact 只是请求 / 审批交接，不是 replay 已执行证明；最终执行
-  仍只能走 `RedriveProviderFailure`。
-- Provider replay handoff review page 只是 operator 提交前的只读检查页，不是 admin submit、
-  workflow decision、approval 或 redrive 证明。
-- Provider replay readiness page 只是最终 redrive 前的低敏绑定检查，不是 redrive 已执行证明。
-- Provider replay redrive invocation manifest 只是最终 operator 调用契约，不是 redrive 已执行证明；
-  raw `resource_id` / `input_json` / reason text 必须留在仓库外并以 hash 对齐。
+- Provider replay UI / handoff / review / readiness / invocation 都不是 redrive 已执行证明；只有显式 `-execute` 且 action-executor `RedriveProviderFailure` 成功，才进入最终执行链。
 - 真实业务 mutation 必须新增显式 adapter、公开业务 API、operator / policy 边界。
 
 ## 下一步
 
-- 更多 Agent action boundary / repair cases、external audit integration 和 provider-grade
-  replay UI；group memory / retrieval / eval redrive / repair cases 继续扩展。
+- 更多 Agent action boundary / repair cases、external audit integration、provider-grade replay UI，以及 group memory / retrieval / eval redrive / repair cases。

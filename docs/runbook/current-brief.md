@@ -47,6 +47,10 @@ loadtest report 或 archive。
   workflow APPROVE manifest 和 fresh Agent proof，输出低敏 `RedriveProviderFailure`
   command contract；manifest 不执行 redrive、不修改 DLQ、不包含 raw resource id / input /
   reason / provider artifacts。
+- provider replay 受控 redrive execution operator path 已收口：`loadtest/actionexecutor`
+  会先 preflight invocation manifest，并校验仓库外 raw resource id / new input / reason
+  与 manifest hash 一致；默认不调用 RPC，只有显式 `-execute` 才调用 action-executor
+  `RedriveProviderFailure`，输出保持低敏 refs / hashes / result metadata。
 - provider replay admin operator bridge 已收口：`loadtest/admin provider-replay-submit`
   读取低敏 handoff artifact 并创建 `PROVIDER_REPLAY_REQUEST`；`provider-replay-list` /
   `provider-replay-approve` / `provider-replay-reject` 提供第一版列表和审批 UX，不执行 redrive。

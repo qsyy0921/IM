@@ -4,7 +4,7 @@
 
 `action-executor` 是 NexusIM AI 应用底座中的受控动作执行边界。它承接 Agent proposal、approval 和 `mcp-gateway` prepare 之后的动作执行请求，把真实写动作纳入 policy precheck、审批关联和低敏 audit。
 
-当前第一阶段记录 approved execution boundary，并在同一事务内写低敏 tool result projection。已支持本地安全 `nexusim.local.echo` adapter first path，用于验证真实低敏 output hash / result projection；已支持外部 MCP failure 稳定失败分类、tool output safety first path，以及显式开启的外部 HTTP provider adapter guarded first path。`conversation.note.create` 已有显式 opt-in 业务 adapter：配置 `NEXUSIM_ACTION_EXECUTOR_CONVERSATION_GRPC_ADDR` 后，通过 conversation-service 公开 `CreateConversationNote` 写入真实 note fact；未配置时仍保持 unsupported / `executed=false`，不伪造业务成功。默认不连接外部 MCP / provider；外部 HTTP adapter 只允许 allowlist 内的 `LOW` risk tool，只发送 tool metadata / `input_sha256`，不发送 raw `input_json`，provider output 仍必须经过安全门禁后才写 hash / projection。工具 provider 失败和 unsafe output 已有 first-stage `provider_failures` 状态投影和 bounded retry bookkeeping worker，可区分 `RETRY_PENDING` 与 `DLQ`；同时提供 provider failure metrics、provider failure audit、batch redrive-plan operator handoff、provider replay operator UI first path 和 provider replay admin / workflow handoff。redrive plan / operator UI / handoff 只生成低敏审批 artifact，不重放 provider、不执行 tool、不修改失败状态。`RedriveProviderFailure` 已提供受控 redrive API first path：只能针对已有 `DLQ` provider failure，要求 fresh proposal / approval / prepared audit、匹配的 skill / tool / resource、新 `input_json` 和 `reason_sha256`，并复用正常 `ExecuteApprovedAction` 链路执行，同时把 source provider failure id 与 reason hash 写入 execution audit。自动 provider replay 尚未实现。
+当前第一阶段记录 approved execution boundary，并在同一事务内写低敏 tool result projection。已支持本地安全 `nexusim.local.echo` adapter first path，用于验证真实低敏 output hash / result projection；已支持外部 MCP failure 稳定失败分类、tool output safety first path，以及显式开启的外部 HTTP provider adapter guarded first path。`conversation.note.create` 已有显式 opt-in 业务 adapter：配置 `NEXUSIM_ACTION_EXECUTOR_CONVERSATION_GRPC_ADDR` 后，通过 conversation-service 公开 `CreateConversationNote` 写入真实 note fact；未配置时仍保持 unsupported / `executed=false`，不伪造业务成功。默认不连接外部 MCP / provider；外部 HTTP adapter 只允许 allowlist 内的 `LOW` risk tool，只发送 tool metadata / `input_sha256`，不发送 raw `input_json`，provider output 仍必须经过安全门禁后才写 hash / projection。工具 provider 失败和 unsafe output 已有 first-stage `provider_failures` 状态投影和 bounded retry bookkeeping worker，可区分 `RETRY_PENDING` 与 `DLQ`；同时提供 provider failure metrics、provider failure audit、batch redrive-plan operator handoff、provider replay operator UI first path 和 provider replay admin / workflow handoff。redrive plan / operator UI / handoff 只生成低敏审批 artifact，不重放 provider、不执行 tool、不修改失败状态。`RedriveProviderFailure` 已提供受控 redrive API first path：只能针对已有 `DLQ` provider failure，要求 fresh proposal / approval / prepared audit、匹配的 skill / tool / resource、新 `input_json` 和 `reason_sha256`，并复用正常 `ExecuteApprovedAction` 链路执行，同时把 source provider failure id 与 reason hash 写入 execution audit。`loadtest/actionexecutor -mode provider-replay-redrive` 已提供第一版受控 operator path：默认 preflight，校验 invocation manifest 和仓库外 raw resource id / new input / reason hash；显式 `-execute` 时才调用 action-executor 公开 gRPC。自动 provider replay 尚未实现。
 
 ## 职责
 
@@ -101,6 +101,14 @@
     new input sha256 和 reason sha256；不得包含 raw new input、raw reason 或 raw provider artifact
   - 输出低敏 HTML readiness page，不调用 `RedriveProviderFailure`、不修改 DLQ row、
     不提交 admin operation、不记录 workflow decision
+- `loadtest/actionexecutor -mode provider-replay-redrive`：
+  - 读取仓库外低敏 redrive invocation manifest 和仓库外 raw resource id / new input /
+    reason 文件
+  - 校验 `resource_id_hash`、`new_input_sha256` 和 `reason_sha256` 后构造
+    `RedriveProviderFailure` request
+  - 默认只输出低敏 preflight summary；显式 `-execute` 时才调用 action-executor
+    `RedriveProviderFailure`
+  - 输出不打印 raw resource id、raw input、reason text、本机文件路径或 provider artifact
 - `/metrics` / `/debug/metrics`：
   - 输出 provider failure status、retryable、due retry 和 classification 聚合计数
   - 不输出 tenant / user / resource / provider raw error / tool input / output
@@ -262,6 +270,11 @@ agent-service proposal
   它绑定 approved admin operation、workflow approval manifest、fresh Agent proof 和 source
   handoff，并输出 `RedriveProviderFailure` command contract；它不调用 RPC、不修改 DLQ row、
   不保存 raw resource id / input / reason / provider artifact。
+- `loadtest/actionexecutor -mode provider-replay-redrive` 是第一版受控 operator 执行入口：
+  它默认只做 preflight，不调用 RPC；显式 `-execute` 时必须先校验低敏 invocation manifest、
+  仓库外 raw resource id / new input / reason hash，并且只能调用 action-executor
+  `RedriveProviderFailure` 公开 gRPC。它不读取其它服务私表，不绕过 admin / workflow /
+  fresh Agent proof，不打印 raw input、reason 或 provider artifact。
 - `RedriveProviderFailure` 是专用 redrive RPC，不属于通用 tool adapter。它要求
   DLQ source、fresh proposal / approval / prepared audit、匹配 skill / tool / resource、
   新 `input_json` 和 `reason_sha256`，并保留 source lineage；它不保存或恢复旧 raw

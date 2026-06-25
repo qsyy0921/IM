@@ -191,6 +191,13 @@
       "note": "Provider replay redrive invocation manifests must bind approved admin operation, workflow approval manifest, and fresh Agent proof into a low-sensitive operator command contract without executing RedriveProviderFailure or embedding raw new input, resource id, reason, or provider artifacts."
     },
     {
+      "name": "provider replay controlled redrive execution",
+      "category": "operator-safety",
+      "script": "tools/check-provider-replay-redrive-execution.ps1",
+      "check_local_label": "provider replay controlled redrive execution",
+      "note": "Provider replay controlled redrive execution must preflight the low-sensitive invocation manifest, verify operator-supplied external raw resource id, new input and reason hashes, default to no RPC execution, and call only action-executor RedriveProviderFailure when explicitly executed."
+    },
+    {
       "name": "approved repair invocation",
       "category": "operator-safety",
       "script": "tools/check-approved-repair-invocation.ps1",

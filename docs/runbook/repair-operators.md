@@ -66,6 +66,26 @@
 
 默认只做审批链校验并输出低敏执行摘要，不执行 operator。显式加 `-Execute` 才会按 plan 设置环境变量并运行服务 operator；如果 plan 没有 `*_DRY_RUN=true`，还必须额外加 `-AllowMutating`，避免误执行 mutate / cleanup。
 
+Provider replay 受控 redrive operator 入口：
+
+```powershell
+go run ./loadtest/actionexecutor -mode provider-replay-redrive `
+  -manifest H:\NexusIM\operator-plans\provider-replay-redrive-invocation.json `
+  -resource-id-file H:\NexusIM\operator-plans\provider-replay-resource-id.txt `
+  -input-json-file H:\NexusIM\operator-plans\provider-replay-new-input.json `
+  -reason-file H:\NexusIM\operator-plans\provider-replay-reason.txt `
+  -operator-user-id operator-a `
+  -operator-device-id operator-device-a
+```
+
+默认只做低敏 preflight，不调用 action-executor。显式加 `-execute` 才会调用
+action-executor 公开 `RedriveProviderFailure` gRPC。执行前必须校验低敏 redrive
+invocation manifest、仓库外 raw resource id、new input JSON 和 reason 文件 hash；
+输出只保留 refs / hashes / result metadata，不打印 raw resource id、input JSON、reason
+文本、本机文件路径或 provider artifact。该入口不属于 `repair-operators.catalog.json`
+的服务 mode，因为它不是通过 `NEXUSIM_ACTION_EXECUTOR_MODE` 启动的 service operator，
+而是最终 operator gRPC caller。
+
 本地批量 repair manifest 生成入口：
 
 ```powershell

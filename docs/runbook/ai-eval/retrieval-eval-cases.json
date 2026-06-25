@@ -1258,6 +1258,31 @@
       ]
     },
     {
+      "id": "action-provider-replay-controlled-redrive-execution",
+      "family": "action_execution_safety",
+      "stage": "action-executor-provider-replay",
+      "status": "active",
+      "query": "execute provider replay through a controlled operator path after invocation manifest approval",
+      "risk": "Provider replay controlled execution must verify the low-sensitive invocation manifest and operator-supplied external raw resource id, new input and reason hashes before calling only action-executor RedriveProviderFailure; preflight must not execute and output must stay low-sensitive",
+      "required_assertions": [
+        {
+          "type": "must_preflight_provider_replay_redrive_execution"
+        },
+        {
+          "type": "must_verify_operator_supplied_redrive_inputs"
+        },
+        {
+          "type": "must_execute_provider_replay_only_via_action_executor_redrive"
+        },
+        {
+          "type": "must_keep_redrive_output_low_sensitive"
+        },
+        {
+          "type": "must_not_leak_raw_provider_replay_artifacts"
+        }
+      ]
+    },
+    {
       "id": "admin-provider-replay-handoff-submit-operator",
       "family": "action_execution_safety",
       "stage": "admin-provider-replay",

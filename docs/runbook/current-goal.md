@@ -40,6 +40,11 @@ Agent action boundary / repair cases：在 provider replay admin / workflow hand
   workflow APPROVE manifest 和 fresh Agent proof 绑定成低敏 `RedriveProviderFailure`
   command contract；它不执行 redrive、不修改 DLQ row、不包含 raw resource id / input /
   reason / provider artifacts，operator 必须在仓库外提供 raw 值并核验 hash。
+- provider replay 受控 redrive execution operator path 已落：`loadtest/actionexecutor
+  -mode provider-replay-redrive` 默认只做 preflight，校验低敏 invocation manifest、
+  仓库外 raw resource id / new input / reason 的 hash，显式 `-execute` 才调用
+  action-executor 公开 `RedriveProviderFailure` gRPC；输出只保留 refs / hashes /
+  result metadata，不打印 raw resource id / input / reason。
 - provider replay admin operator bridge 已落：`loadtest/admin provider-replay-submit`
   校验 handoff contract / payload hash / 低敏 refs 后创建 `PROVIDER_REPLAY_REQUEST`；
   `provider-replay-list` / `provider-replay-approve` / `provider-replay-reject` 只做

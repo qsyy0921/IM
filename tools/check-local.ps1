@@ -83,6 +83,9 @@ try {
     Write-Host "== provider replay redrive invocation =="
     Invoke-LocalCheck "check-provider-replay-redrive-invocation.ps1"
 
+    Write-Host "== provider replay controlled redrive execution =="
+    Invoke-LocalCheck "check-provider-replay-redrive-execution.ps1"
+
     Write-Host "== approved repair invocation =="
     Invoke-LocalCheck "check-approved-repair-invocation.ps1"
 

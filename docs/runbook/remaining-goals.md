@@ -76,13 +76,13 @@
 - `vector-index-service`：real pgvector / OpenSearch vector / Milvus smoke、provider repair。
 - `workflow-service`：external callback delivery plan、delivery status / redrive plan、
   persistent delivery worker first path、redrive operator path、callback delivery review page、
-  callback delivery dashboard、batch redrive invocation / result manifest、approval queue review page、
+  callback delivery dashboard、batch redrive invocation / runner / result manifest、approval queue review page、
   compensation review bundle / review page /
   instruction approval page / execution readiness manifest / execution invocation manifest /
   execution result visibility / execution audit append manifest handoff /
   audit append result manifest 已落；
   后续继续补更多 compensation adapter、callback delivery provider-grade persisted dashboard /
-  provider-grade batch redrive runner 和 provider-grade batch approval / decision UI。
+  provider-grade batch approval / decision UI。
 
 ## 9 个核心 IM 服务 P2
 

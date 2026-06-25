@@ -29,6 +29,8 @@ type config struct {
 	requestID                    string
 	correlationID                string
 	causationID                  string
+	requesterRef                 string
+	requesterService             string
 	workflowID                   string
 	workflowType                 string
 	expectedWorkflowType         string
@@ -41,16 +43,22 @@ type config struct {
 	reasonRef                    string
 	evidenceRefs                 []string
 	idempotencyKey               string
+	riskLevel                    string
 	status                       string
 	targetService                string
 	expectedTargetService        string
 	targetOperation              string
 	expectedTargetOperation      string
 	expectedTargetRefHash        string
+	targetRefHash                string
 	expectedPayloadSchemaVersion string
 	expectedPayloadRefHash       string
+	payloadSchemaVersion         string
+	payloadRefHash               string
 	approvalPolicyRef            string
 	expectedApprovalPolicyRef    string
+	timeoutPolicyRef             string
+	compensationPolicyRef        string
 	pageSize                     int32
 }
 
@@ -67,6 +75,7 @@ type commandResult struct {
 	Workflow          *workflowRef                 `json:"workflow,omitempty"`
 	Workflows         []workflowRef                `json:"workflows,omitempty"`
 	OperatorQueues    []operatorQueueRef           `json:"operator_queues,omitempty"`
+	DecisionManifest  *decisionManifestTemplate    `json:"decision_manifest_template,omitempty"`
 	Decision          *decisionRef                 `json:"decision,omitempty"`
 	Decisions         []decisionRef                `json:"decisions,omitempty"`
 	Instructions      []compensationInstructionRef `json:"instructions,omitempty"`
@@ -164,6 +173,29 @@ type decisionManifest struct {
 	TraceID                      string   `json:"trace_id"`
 }
 
+type decisionManifestTemplate struct {
+	SchemaVersion                string   `json:"schema_version"`
+	WorkflowID                   string   `json:"workflow_id"`
+	StepID                       string   `json:"step_id"`
+	ExpectedWorkflowType         string   `json:"expected_workflow_type"`
+	ExpectedStatus               string   `json:"expected_status"`
+	ExpectedTargetService        string   `json:"expected_target_service"`
+	ExpectedTargetOperation      string   `json:"expected_target_operation"`
+	ExpectedTargetRefHash        string   `json:"expected_target_ref_hash"`
+	ExpectedPayloadSchemaVersion string   `json:"expected_payload_schema_version"`
+	ExpectedPayloadRefHash       string   `json:"expected_payload_ref_hash"`
+	ExpectedApprovalPolicyRef    string   `json:"expected_approval_policy_ref"`
+	Decision                     string   `json:"decision,omitempty"`
+	DeciderRef                   string   `json:"decider_ref,omitempty"`
+	DecisionPolicyRef            string   `json:"decision_policy_ref,omitempty"`
+	ReasonRef                    string   `json:"reason_ref,omitempty"`
+	EvidenceRefs                 []string `json:"evidence_refs,omitempty"`
+	IdempotencyKey               string   `json:"idempotency_key,omitempty"`
+	CorrelationID                string   `json:"correlation_id,omitempty"`
+	CausationID                  string   `json:"causation_id,omitempty"`
+	TraceID                      string   `json:"trace_id,omitempty"`
+}
+
 const (
 	decisionManifestSchemaVersion = "nexusim.workflow.external_decision_manifest.v1"
 	maxDecisionManifestBytes      = 64 * 1024
@@ -180,7 +212,7 @@ func main() {
 func parseFlags(args []string) config {
 	cfg := config{}
 	flags := flag.NewFlagSet("workflow-operator", flag.ExitOnError)
-	flags.StringVar(&cfg.mode, "mode", "get", "mode: get, record-decision, list-workflows, provider-replay-queue, operator-queues, list-compensation-instructions")
+	flags.StringVar(&cfg.mode, "mode", "get", "mode: external-callback-wait, get, record-decision, list-workflows, provider-replay-queue, operator-queues, list-compensation-instructions")
 	flags.StringVar(&cfg.target, "target", envOr("NEXUSIM_WORKFLOW_GRPC_ADDR", "127.0.0.1:10750"), "workflow-service gRPC target")
 	flags.DurationVar(&cfg.requestTimeout, "request-timeout", 5*time.Second, "request timeout")
 	flags.StringVar(&cfg.tls.CAFile, "workflow-tls-ca-file", os.Getenv("NEXUSIM_WORKFLOW_TLS_CA_FILE"), "CA PEM for workflow-service gRPC TLS")
@@ -194,6 +226,8 @@ func parseFlags(args []string) config {
 	flags.StringVar(&cfg.requestID, "request-id", "", "request id")
 	flags.StringVar(&cfg.correlationID, "correlation-id", "", "optional correlation id for record-decision")
 	flags.StringVar(&cfg.causationID, "causation-id", "", "optional causation id for record-decision")
+	flags.StringVar(&cfg.requesterRef, "requester-ref", "operator:workflow-cli", "low-sensitive requester ref for create workflow modes")
+	flags.StringVar(&cfg.requesterService, "requester-service", "workflow-operator", "low-sensitive requester service for create workflow modes")
 	flags.StringVar(&cfg.workflowID, "workflow-id", "", "workflow id")
 	flags.StringVar(&cfg.workflowType, "workflow-type", "", "workflow type filter for list-workflows")
 	flags.StringVar(&cfg.stepID, "step-id", "", "workflow step id for record-decision")
@@ -205,10 +239,16 @@ func parseFlags(args []string) config {
 	var evidenceRefs string
 	flags.StringVar(&evidenceRefs, "evidence-refs", "evidence:workflow-cli", "comma-separated low-sensitive evidence refs")
 	flags.StringVar(&cfg.idempotencyKey, "idempotency-key", "", "idempotency key for record-decision")
+	flags.StringVar(&cfg.riskLevel, "risk-level", "", "risk level for create workflow modes")
 	flags.StringVar(&cfg.status, "status", "", "optional workflow or instruction status filter")
 	flags.StringVar(&cfg.targetService, "target-service", "", "target service filter for list-workflows")
 	flags.StringVar(&cfg.targetOperation, "target-operation", "", "target operation filter for list-workflows")
+	flags.StringVar(&cfg.targetRefHash, "target-ref-hash", "", "low-sensitive target ref hash for create workflow modes")
+	flags.StringVar(&cfg.payloadSchemaVersion, "payload-schema-version", "", "payload schema version for create workflow modes")
+	flags.StringVar(&cfg.payloadRefHash, "payload-ref-hash", "", "low-sensitive payload ref hash for create workflow modes")
 	flags.StringVar(&cfg.approvalPolicyRef, "approval-policy-ref", "", "approval policy ref filter for list-workflows")
+	flags.StringVar(&cfg.timeoutPolicyRef, "timeout-policy-ref", "", "optional timeout policy ref for create workflow modes")
+	flags.StringVar(&cfg.compensationPolicyRef, "compensation-policy-ref", "", "optional compensation policy ref for create workflow modes")
 	var pageSize int
 	flags.IntVar(&pageSize, "page-size", 50, "list page size")
 	_ = flags.Parse(args)
@@ -218,6 +258,8 @@ func parseFlags(args []string) config {
 	cfg.traceID = strings.TrimSpace(cfg.traceID)
 	cfg.correlationID = strings.TrimSpace(cfg.correlationID)
 	cfg.causationID = strings.TrimSpace(cfg.causationID)
+	cfg.requesterRef = strings.TrimSpace(cfg.requesterRef)
+	cfg.requesterService = strings.TrimSpace(cfg.requesterService)
 	cfg.decisionManifestPath = strings.TrimSpace(cfg.decisionManifestPath)
 	cfg.workflowID = strings.TrimSpace(cfg.workflowID)
 	cfg.workflowType = strings.ToUpper(strings.TrimSpace(cfg.workflowType))
@@ -228,9 +270,15 @@ func parseFlags(args []string) config {
 	cfg.reasonRef = strings.TrimSpace(cfg.reasonRef)
 	cfg.evidenceRefs = splitCSV(evidenceRefs)
 	cfg.idempotencyKey = strings.TrimSpace(cfg.idempotencyKey)
+	cfg.riskLevel = strings.ToUpper(strings.TrimSpace(cfg.riskLevel))
 	cfg.targetService = strings.TrimSpace(cfg.targetService)
 	cfg.targetOperation = strings.TrimSpace(cfg.targetOperation)
+	cfg.targetRefHash = strings.TrimSpace(cfg.targetRefHash)
+	cfg.payloadSchemaVersion = strings.TrimSpace(cfg.payloadSchemaVersion)
+	cfg.payloadRefHash = strings.TrimSpace(cfg.payloadRefHash)
 	cfg.approvalPolicyRef = strings.TrimSpace(cfg.approvalPolicyRef)
+	cfg.timeoutPolicyRef = strings.TrimSpace(cfg.timeoutPolicyRef)
+	cfg.compensationPolicyRef = strings.TrimSpace(cfg.compensationPolicyRef)
 	cfg.pageSize = int32(pageSize)
 	return fillDerivedDefaults(cfg)
 }
@@ -250,6 +298,9 @@ func fillDerivedDefaults(cfg config) config {
 	}
 	if cfg.idempotencyKey == "" && cfg.mode == "record-decision" {
 		cfg.idempotencyKey = "decision:" + cfg.workflowID + ":" + cfg.stepID + ":" + cfg.decision + ":" + cfg.deciderRef
+	}
+	if cfg.mode == "external-callback-wait" && cfg.causationID == "" {
+		cfg.causationID = cfg.requestID
 	}
 	if cfg.mode == "provider-replay-queue" {
 		if cfg.workflowType == "" {
@@ -382,6 +433,42 @@ func execute(ctx context.Context, cfg config, client workflowv1.WorkflowServiceC
 		CheckedAt:         time.Now().UTC(),
 	}
 	switch cfg.mode {
+	case "external-callback-wait":
+		response, err := client.CreateWorkflow(ctx, &workflowv1.CreateWorkflowRequest{
+			AuthContext:           authContext(cfg),
+			RequesterRef:          cfg.requesterRef,
+			RequesterService:      cfg.requesterService,
+			WorkflowType:          cfg.workflowType,
+			RiskLevel:             cfg.riskLevel,
+			TargetRefHash:         cfg.targetRefHash,
+			TargetService:         cfg.targetService,
+			TargetOperation:       cfg.targetOperation,
+			ApprovalPolicyRef:     cfg.approvalPolicyRef,
+			TimeoutPolicyRef:      cfg.timeoutPolicyRef,
+			CompensationPolicyRef: cfg.compensationPolicyRef,
+			PayloadSchemaVersion:  cfg.payloadSchemaVersion,
+			PayloadRefHash:        cfg.payloadRefHash,
+			ReasonRef:             cfg.reasonRef,
+			EvidenceRefs:          append([]string(nil), cfg.evidenceRefs...),
+			IdempotencyKey:        cfg.idempotencyKey,
+			CorrelationId:         cfg.correlationID,
+			CausationId:           cfg.causationID,
+			TraceId:               cfg.traceID,
+		})
+		if err != nil {
+			return commandResult{}, fmt.Errorf("create external callback wait workflow: %w", err)
+		}
+		result.Workflow = summarizeWorkflow(response.GetWorkflow())
+		result.Replayed = response.GetReplayed()
+		if result.Workflow != nil {
+			result.WorkflowID = result.Workflow.WorkflowID
+			result.WorkflowType = result.Workflow.WorkflowType
+			result.Status = result.Workflow.Status
+			result.TargetService = result.Workflow.TargetService
+			result.TargetOperation = result.Workflow.TargetOperation
+			result.ApprovalPolicyRef = result.Workflow.ApprovalPolicyRef
+			result.DecisionManifest = buildDecisionManifestTemplate(*result.Workflow, cfg)
+		}
 	case "get":
 		response, err := client.GetWorkflow(ctx, &workflowv1.GetWorkflowRequest{
 			AuthContext: authContext(cfg),
@@ -535,6 +622,60 @@ func (cfg config) validate() error {
 			return errors.New("idempotency-key is required for record-decision")
 		}
 	}
+	if cfg.mode == "external-callback-wait" {
+		if strings.TrimSpace(cfg.workflowType) == "" {
+			return errors.New("workflow-type is required for external-callback-wait")
+		}
+		if strings.TrimSpace(cfg.riskLevel) == "" {
+			return errors.New("risk-level is required for external-callback-wait")
+		}
+		if strings.TrimSpace(cfg.requesterRef) == "" || strings.TrimSpace(cfg.requesterService) == "" {
+			return errors.New("requester-ref and requester-service are required for external-callback-wait")
+		}
+		if strings.TrimSpace(cfg.targetService) == "" ||
+			strings.TrimSpace(cfg.targetOperation) == "" ||
+			strings.TrimSpace(cfg.targetRefHash) == "" {
+			return errors.New("target-service, target-operation and target-ref-hash are required for external-callback-wait")
+		}
+		if strings.TrimSpace(cfg.payloadSchemaVersion) == "" || strings.TrimSpace(cfg.payloadRefHash) == "" {
+			return errors.New("payload-schema-version and payload-ref-hash are required for external-callback-wait")
+		}
+		if strings.TrimSpace(cfg.approvalPolicyRef) == "" {
+			return errors.New("approval-policy-ref is required for external-callback-wait")
+		}
+		if strings.TrimSpace(cfg.idempotencyKey) == "" {
+			return errors.New("idempotency-key is required for external-callback-wait")
+		}
+		for _, item := range []struct {
+			name  string
+			value string
+		}{
+			{"requester-ref", cfg.requesterRef},
+			{"requester-service", cfg.requesterService},
+			{"target-service", cfg.targetService},
+			{"target-operation", cfg.targetOperation},
+			{"target-ref-hash", cfg.targetRefHash},
+			{"payload-schema-version", cfg.payloadSchemaVersion},
+			{"payload-ref-hash", cfg.payloadRefHash},
+			{"approval-policy-ref", cfg.approvalPolicyRef},
+			{"timeout-policy-ref", cfg.timeoutPolicyRef},
+			{"compensation-policy-ref", cfg.compensationPolicyRef},
+			{"reason-ref", cfg.reasonRef},
+		} {
+			if err := validateLowSensitiveRef(item.name, item.value); err != nil {
+				return err
+			}
+		}
+		if err := validateLowSensitiveRefs("evidence-refs", cfg.evidenceRefs); err != nil {
+			return err
+		}
+		if !isAllowedWorkflowType(cfg.workflowType) {
+			return errors.New("workflow-type must be ACTION_APPROVAL, REPAIR_APPROVAL, ADMIN_OPERATION, or COMPENSATION_REQUEST")
+		}
+		if !isAllowedRiskLevel(cfg.riskLevel) {
+			return errors.New("risk-level must be LOW, MEDIUM, HIGH, or CRITICAL")
+		}
+	}
 	if isListMode(cfg.mode) && cfg.pageSize <= 0 {
 		return errors.New("page-size must be greater than zero")
 	}
@@ -550,6 +691,27 @@ func (cfg config) validate() error {
 		}
 	}
 	return nil
+}
+
+func buildDecisionManifestTemplate(workflow workflowRef, cfg config) *decisionManifestTemplate {
+	return &decisionManifestTemplate{
+		SchemaVersion:                decisionManifestSchemaVersion,
+		WorkflowID:                   workflow.WorkflowID,
+		StepID:                       workflow.CurrentStepID,
+		ExpectedWorkflowType:         workflow.WorkflowType,
+		ExpectedStatus:               workflow.Status,
+		ExpectedTargetService:        workflow.TargetService,
+		ExpectedTargetOperation:      workflow.TargetOperation,
+		ExpectedTargetRefHash:        workflow.TargetRefHash,
+		ExpectedPayloadSchemaVersion: workflow.PayloadSchemaVersion,
+		ExpectedPayloadRefHash:       workflow.PayloadRefHash,
+		ExpectedApprovalPolicyRef:    workflow.ApprovalPolicyRef,
+		DecisionPolicyRef:            cfg.decisionPolicy,
+		EvidenceRefs:                 append([]string(nil), cfg.evidenceRefs...),
+		CorrelationID:                workflow.CorrelationID,
+		CausationID:                  workflow.WorkflowID,
+		TraceID:                      workflow.TraceID,
+	}
 }
 
 func defaultOperatorQueues() []operatorQueueRef {
@@ -758,7 +920,8 @@ func summarizeInstruction(instruction *workflowv1.WorkflowCompensationInstructio
 }
 
 func isAllowedMode(value string) bool {
-	return value == "get" ||
+	return value == "external-callback-wait" ||
+		value == "get" ||
 		value == "record-decision" ||
 		value == "list-workflows" ||
 		value == "provider-replay-queue" ||
@@ -782,6 +945,24 @@ func isListMode(value string) bool {
 func isAllowedDecision(value string) bool {
 	switch value {
 	case "APPROVE", "REJECT", "REQUEST_CHANGES", "CANCEL":
+		return true
+	default:
+		return false
+	}
+}
+
+func isAllowedWorkflowType(value string) bool {
+	switch value {
+	case "ACTION_APPROVAL", "REPAIR_APPROVAL", "ADMIN_OPERATION", "COMPENSATION_REQUEST":
+		return true
+	default:
+		return false
+	}
+}
+
+func isAllowedRiskLevel(value string) bool {
+	switch value {
+	case "LOW", "MEDIUM", "HIGH", "CRITICAL":
 		return true
 	default:
 		return false

@@ -344,6 +344,12 @@ operation, target ref hash, payload schema version, payload ref hash and
 approval policy before `RecordWorkflowDecision`. Binding mismatches fail closed
 before recording a decision and do not execute provider replay.
 
+Workflow external callback wait is represented by
+`workflow-external-callback-wait-boundary`. It verifies that workflow-service can
+create a low-sensitive workflow waiting for an external callback and emit a
+decision manifest template without recording a decision, executing the target
+action, or treating the callback handoff as final execution.
+
 Workflow operator queue visibility is represented by
 `workflow-operator-queues-low-sensitive`. It verifies that workflow-service
 operator queues can expose low-sensitive counts and workflow refs for action

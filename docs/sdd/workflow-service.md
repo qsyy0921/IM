@@ -221,8 +221,10 @@ workflow，导入时校验 workflow 已批准或待补偿、target / payload ref
 时只匹配同一 workflow。`ListWorkflowCompensationInstructions` 提供按 workflow 的
 低敏 instruction refs / version / status 查询面，供后续 operator UI 使用；它不暴露
 payload 原文、reason 原文或 downstream body。第一版外部审批 manifest binding 已由
-operator CLI 负责当前 workflow 绑定校验；更多下游 adapter、provider-grade
-instruction UI / external callback wait 和运维后置。
+operator CLI 负责当前 workflow 绑定校验；第一版 external callback wait 已由
+`loadtest/workflow external-callback-wait` 创建低敏等待 workflow 和 decision manifest
+template；更多下游 adapter、provider-grade instruction UI、callback delivery / retry
+hardening 和运维后置。
 
 后续扩展：
 
@@ -498,6 +500,14 @@ body。writer / validator 只处理仓库外低敏 JSON artifact，不读取数�
 compensation request 和 compensation pending workflow refs / hash / counts。它不记录
 decision、不修改 workflow 状态、不调用 action-executor，也不执行 provider replay；队列
 结果只作为人工审批和 repair triage 入口。
+
+`external-callback-wait` 是第一版外部回调等待入口：它通过 workflow-service
+`CreateWorkflow` 创建一个显式 `WAITING_DECISION` workflow，并输出
+`nexusim.workflow.external_decision_manifest.v1` 低敏 template。template 只携带
+workflow id、step id、target / payload hash、approval policy 和 correlation refs；外部系统
+仍必须填入 explicit decision / decider / reason / evidence 后，再通过
+`record-decision -decision-manifest` 进行绑定校验。该模式不记录 decision、不调用
+action-executor、不执行 target operation，也不把外部回调当成最终执行证明。
 
 `write-workflow-compensation-instruction-manifest.ps1` /
 `validate-workflow-compensation-instruction-manifest.ps1` 是第一版 compensation

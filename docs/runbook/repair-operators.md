@@ -273,6 +273,11 @@ replay。manifest 不保存审批 comment、EvidencePack、payload 或 provider 
 provider replay、admin operation、compensation request 和 compensation pending 的低敏
 workflow queue summary；它只调用 `ListWorkflows`，不记录 decision、不修改 workflow、
 不执行 provider replay。
+`loadtest/workflow -mode external-callback-wait` 可创建一个等待外部 callback decision 的
+低敏 workflow，并输出 external decision manifest template。该 template 只绑定 workflow /
+step / target / payload / approval policy refs；外部系统必须补全 explicit decision /
+decider / reason / evidence 后再走 `record-decision -decision-manifest`。创建 wait workflow
+不会记录 decision、不会调用目标服务、不会执行 provider replay 或任何 action。
 `write-workflow-compensation-instruction-manifest.ps1` /
 `validate-workflow-compensation-instruction-manifest.ps1` 可生成和校验 workflow
 compensation executor 使用的 control-plane rollback instruction JSON。该 manifest

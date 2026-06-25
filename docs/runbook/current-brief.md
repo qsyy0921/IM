@@ -51,6 +51,9 @@ loadtest report 或 archive。
 - workflow operator queues 已收口：`operator-queues` 统一展示 action approval、repair
   approval、provider replay、admin operation、compensation request / pending 队列的低敏
   workflow refs / counts；它只读 `ListWorkflows`，不记录 decision、不执行 replay。
+- workflow external callback wait 已收口：`external-callback-wait` 通过 `CreateWorkflow`
+  创建显式等待外部 callback decision 的 workflow，并输出低敏 decision manifest template；
+  它不记录 decision、不调用目标服务、不执行 action。
 - group memory / multi-party collaboration 必须继续保留 source refs、conversation scope、
   member visibility、time/version boundary、citations 和 no-citation refusal。
 

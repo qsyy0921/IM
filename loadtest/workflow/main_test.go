@@ -78,6 +78,62 @@ func TestParseFlagsBuildsOperatorQueuesDefaults(t *testing.T) {
 	}
 }
 
+func TestParseFlagsBuildsExternalCallbackWait(t *testing.T) {
+	cfg := parseFlags([]string{
+		"-mode", "external-callback-wait",
+		"-tenant-id", "tenant-wf",
+		"-workflow-type", "action_approval",
+		"-risk-level", "high",
+		"-requester-ref", "agent:planner",
+		"-requester-service", "agent-service",
+		"-target-service", "external-crm",
+		"-target-operation", "SYNC_APPROVAL_CALLBACK",
+		"-target-ref-hash", "sha256:target",
+		"-payload-schema-version", "external.callback_request.v1",
+		"-payload-ref-hash", "sha256:payload",
+		"-approval-policy-ref", "workflow.external_callback.v1",
+		"-timeout-policy-ref", "workflow.external_callback.timeout.v1",
+		"-reason-ref", "reason-sha256:abc",
+		"-evidence-refs", "evidence:ticket",
+		"-idempotency-key", "external-callback:tenant-wf:target",
+	})
+	if cfg.mode != "external-callback-wait" {
+		t.Fatalf("mode = %q", cfg.mode)
+	}
+	if cfg.workflowType != "ACTION_APPROVAL" ||
+		cfg.riskLevel != "HIGH" ||
+		cfg.targetService != "external-crm" ||
+		cfg.targetOperation != "SYNC_APPROVAL_CALLBACK" ||
+		cfg.approvalPolicyRef != "workflow.external_callback.v1" {
+		t.Fatalf("unexpected callback wait config: %+v", cfg)
+	}
+	if cfg.causationID != cfg.requestID {
+		t.Fatalf("expected causation id to bind to request id, got %+v", cfg)
+	}
+	if err := cfg.validate(); err != nil {
+		t.Fatalf("validate: %v", err)
+	}
+}
+
+func TestValidateExternalCallbackWaitRequiresExplicitRefs(t *testing.T) {
+	cfg := parseFlags([]string{
+		"-mode", "external-callback-wait",
+		"-tenant-id", "tenant-wf",
+		"-workflow-type", "ACTION_APPROVAL",
+		"-risk-level", "HIGH",
+		"-target-service", "external-crm",
+		"-target-operation", "SYNC_APPROVAL_CALLBACK",
+		"-target-ref-hash", "sha256:target",
+		"-payload-schema-version", "external.callback_request.v1",
+		"-approval-policy-ref", "workflow.external_callback.v1",
+		"-idempotency-key", "external-callback:tenant-wf:target",
+	})
+	if err := cfg.validate(); err == nil ||
+		!strings.Contains(err.Error(), "payload-schema-version and payload-ref-hash are required") {
+		t.Fatalf("expected missing payload ref error, got %v", err)
+	}
+}
+
 func TestParseFlagsBuildsRecordDecisionDefaults(t *testing.T) {
 	cfg := parseFlags([]string{
 		"-mode", "record-decision",
@@ -225,6 +281,79 @@ func TestValidateRejectsSensitiveDecisionRefs(t *testing.T) {
 				t.Fatal("expected validation error")
 			}
 		})
+	}
+}
+
+func TestExecuteExternalCallbackWaitCreatesWorkflowAndManifestTemplate(t *testing.T) {
+	cfg := parseFlags([]string{
+		"-mode", "external-callback-wait",
+		"-tenant-id", "tenant-wf",
+		"-workflow-type", "ACTION_APPROVAL",
+		"-risk-level", "HIGH",
+		"-requester-ref", "agent:planner",
+		"-requester-service", "agent-service",
+		"-target-service", "external-crm",
+		"-target-operation", "SYNC_APPROVAL_CALLBACK",
+		"-target-ref-hash", "sha256:target",
+		"-payload-schema-version", "external.callback_request.v1",
+		"-payload-ref-hash", "sha256:payload",
+		"-approval-policy-ref", "workflow.external_callback.v1",
+		"-decision-policy-ref", "workflow.external_callback.decision.v1",
+		"-reason-ref", "reason-sha256:abc",
+		"-evidence-refs", "evidence:ticket",
+		"-idempotency-key", "external-callback:tenant-wf:target",
+	})
+	client := &fakeWorkflowClient{createResponse: &workflowv1.CreateWorkflowResponse{
+		Workflow: &workflowv1.Workflow{
+			WorkflowId:           "wf_callback_1",
+			WorkflowType:         "ACTION_APPROVAL",
+			RiskLevel:            "HIGH",
+			RequesterRef:         "agent:planner",
+			RequesterService:     "agent-service",
+			TargetService:        "external-crm",
+			TargetOperation:      "SYNC_APPROVAL_CALLBACK",
+			TargetRefHash:        "sha256:target",
+			PayloadSchemaVersion: "external.callback_request.v1",
+			PayloadRefHash:       "sha256:payload",
+			ApprovalPolicyRef:    "workflow.external_callback.v1",
+			Status:               "WAITING_DECISION",
+			CurrentStepId:        "wfs_callback_1",
+			CorrelationId:        "workflow-operator-external-callback-wait",
+			TraceId:              "workflow-operator-external-callback-wait",
+		},
+	}}
+	result, err := execute(context.Background(), cfg, client)
+	if err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if client.createRequest == nil {
+		t.Fatal("expected create workflow request")
+	}
+	if client.createRequest.GetWorkflowType() != "ACTION_APPROVAL" ||
+		client.createRequest.GetRiskLevel() != "HIGH" ||
+		client.createRequest.GetTargetService() != "external-crm" ||
+		client.createRequest.GetTargetOperation() != "SYNC_APPROVAL_CALLBACK" ||
+		client.createRequest.GetTargetRefHash() != "sha256:target" ||
+		client.createRequest.GetPayloadRefHash() != "sha256:payload" ||
+		client.createRequest.GetApprovalPolicyRef() != "workflow.external_callback.v1" {
+		t.Fatalf("unexpected create request: %+v", client.createRequest)
+	}
+	if result.Workflow == nil || result.Workflow.WorkflowID != "wf_callback_1" {
+		t.Fatalf("unexpected workflow result: %+v", result.Workflow)
+	}
+	if result.DecisionManifest == nil ||
+		result.DecisionManifest.SchemaVersion != decisionManifestSchemaVersion ||
+		result.DecisionManifest.WorkflowID != "wf_callback_1" ||
+		result.DecisionManifest.StepID != "wfs_callback_1" ||
+		result.DecisionManifest.ExpectedStatus != "WAITING_DECISION" ||
+		result.DecisionManifest.ExpectedPayloadRefHash != "sha256:payload" ||
+		result.DecisionManifest.Decision != "" ||
+		result.DecisionManifest.DeciderRef != "" ||
+		result.DecisionManifest.DecisionPolicyRef != "workflow.external_callback.decision.v1" {
+		t.Fatalf("unexpected decision manifest template: %+v", result.DecisionManifest)
+	}
+	if client.decisionRequest != nil {
+		t.Fatalf("external callback wait must not record decisions: %+v", client.decisionRequest)
 	}
 }
 
@@ -539,6 +668,19 @@ func TestRunOutputDoesNotExposePayloadOrReasonBody(t *testing.T) {
 				PayloadRefHash: "sha256:provider-replay-payload",
 			}},
 		}},
+		DecisionManifest: &decisionManifestTemplate{
+			SchemaVersion:                decisionManifestSchemaVersion,
+			WorkflowID:                   "wf_callback_1",
+			StepID:                       "wfs_callback_1",
+			ExpectedWorkflowType:         "ACTION_APPROVAL",
+			ExpectedStatus:               "WAITING_DECISION",
+			ExpectedTargetService:        "external-crm",
+			ExpectedTargetOperation:      "SYNC_APPROVAL_CALLBACK",
+			ExpectedTargetRefHash:        "sha256:target",
+			ExpectedPayloadSchemaVersion: "external.callback_request.v1",
+			ExpectedPayloadRefHash:       "sha256:payload",
+			ExpectedApprovalPolicyRef:    "workflow.external_callback.v1",
+		},
 		Instructions: []compensationInstructionRef{{
 			InstructionID:  "wfi_1",
 			PayloadRefHash: "sha256:payload",
@@ -618,6 +760,8 @@ func approvedDecisionResponse() *workflowv1.RecordWorkflowDecisionResponse {
 
 type fakeWorkflowClient struct {
 	workflowv1.WorkflowServiceClient
+	createRequest          *workflowv1.CreateWorkflowRequest
+	createResponse         *workflowv1.CreateWorkflowResponse
 	getRequest             *workflowv1.GetWorkflowRequest
 	getResponse            *workflowv1.GetWorkflowResponse
 	decisionRequest        *workflowv1.RecordWorkflowDecisionRequest
@@ -628,6 +772,15 @@ type fakeWorkflowClient struct {
 	listWorkflowsResponses []*workflowv1.ListWorkflowsResponse
 	request                *workflowv1.ListWorkflowCompensationInstructionsRequest
 	response               *workflowv1.ListWorkflowCompensationInstructionsResponse
+}
+
+func (client *fakeWorkflowClient) CreateWorkflow(
+	_ context.Context,
+	request *workflowv1.CreateWorkflowRequest,
+	_ ...grpc.CallOption,
+) (*workflowv1.CreateWorkflowResponse, error) {
+	client.createRequest = request
+	return client.createResponse, nil
 }
 
 func (client *fakeWorkflowClient) GetWorkflow(

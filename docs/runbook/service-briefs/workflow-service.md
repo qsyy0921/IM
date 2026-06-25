@@ -26,6 +26,9 @@ admin operation approval、补偿请求和人工审批状态。
 - `ListWorkflowCompensationInstructions`：按 workflow 查询低敏 instruction metadata。
 - `loadtest/workflow` operator CLI：公开 gRPC get workflow、record decision、查询低敏 instruction metadata。
 - `ListWorkflows`：按 type / status / target / approval policy 查询低敏 workflow metadata。
+- `loadtest/workflow external-callback-wait`：创建等待外部 callback decision 的低敏
+  `WAITING_DECISION` workflow，并输出 external decision manifest template；不记录
+  decision、不调用目标服务、不执行 action。
 - `loadtest/workflow operator-queues`：按固定 operator 队列展示 action approval、
   repair approval、provider replay、admin operation、compensation request 和
   compensation pending 的低敏 workflow refs / counts；不记录 decision、不执行 replay。
@@ -41,5 +44,5 @@ admin operation approval、补偿请求和人工审批状态。
   `REPAIR_APPROVAL` workflow，target service 为 `action-executor`；workflow-service 只记录
   低敏审批状态，不执行 provider replay。
 
-后续：更多 compensation adapter、instruction approval UI、
-external callback wait、outbox relay、provider-grade approval UI、repair operators。
+后续：更多 compensation adapter、instruction approval UI、outbox relay、
+provider-grade approval UI、repair operators。

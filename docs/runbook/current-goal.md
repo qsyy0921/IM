@@ -48,6 +48,9 @@ Agent action boundary / repair cases：在 provider replay admin / workflow hand
   `ListWorkflows` 列出 action approval、repair approval、provider replay、admin operation、
   compensation request 和 compensation pending 的低敏 refs / counts；不记录 decision、
   不修改 workflow 状态、不执行 provider replay。
+- workflow external callback wait 已落：`loadtest/workflow external-callback-wait` 创建显式
+  `WAITING_DECISION` workflow，并输出低敏 external decision manifest template；外部系统仍需
+  补全 explicit decision 后走 `record-decision -decision-manifest` 绑定校验，不执行 action。
 
 ## 目标
 

@@ -200,6 +200,10 @@
   approval 最小状态机和低敏 `workflow_outbox`；已作为 admin-service
   `REPAIR_REQUEST -> REPAIR_APPROVAL` 和 `CRITICAL -> ADMIN_OPERATION` 的长审批
   入口，并支撑 admin operation-specific approval policy / target-service routing；
+  first-stage `timer-worker` 已能消费显式 `workflow_timers(APPROVAL_TIMEOUT)`
+  到期事实，将仍等待审批的 workflow 推进到 `TIMED_OUT` 并写低敏
+  `workflow.timed_out.v1` outbox；审批终结会取消 pending timer，且不执行 action、
+  不创建隐式 approval、不从命名 `timeout_policy_ref` 推断默认 due_at；
   first-stage `compensation-worker` 已能把 approved `COMPENSATION_REQUEST` 物化为
   `workflow_compensations`、低敏 `workflow.compensation.requested.v1` outbox 和
   `COMPENSATION_PENDING` workflow 状态；first-stage `compensation-executor` 已支持
@@ -216,8 +220,8 @@
   本地 repair approval review page writer 已能把 plan / request / decision /
   invocation / audit bundle 渲染成只含 hash / path hash / env key / preflight 摘要的
   低敏 HTML 审批页，不复制 reason、payload、manifest path 或 evidence 原文；
-  workflow 第一路径已通过完整 `check-local`，本 worker / executor / registry 切片按
-  风险分层用 focused checks 收口；不宣称 timer worker、多 adapter compensation
+  workflow 第一路径已通过完整 `check-local`，本 worker / executor / registry / timer
+  切片按风险分层用 focused checks 收口；不宣称多 adapter compensation
   platform、provider-grade instruction UI / external approval binding、external
   callback wait 或 outbox relay。
 - `vector-index-service` product-active：SDD v0.1 和 stage-switch review 已通过，

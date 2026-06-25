@@ -334,9 +334,13 @@ Timer / timeout：
 ```text
 workflow_timers(due_at)
 -> timer worker locks due timers
--> transition step/workflow TIMED_OUT or RETRYING
+-> transition waiting workflow to TIMED_OUT
 -> write low-sensitive event
 ```
+
+当前实现只消费显式写入 `workflow_timers` 的 `APPROVAL_TIMEOUT` timer fact。
+`timeout_policy_ref` 是低敏策略引用，不会被 workflow-service 猜测成默认 due_at；
+命名策略要产生超时必须由对应创建方 / policy catalog 显式写入 timer。
 
 ## 10. 一致性和事务
 
@@ -430,7 +434,7 @@ target_ref、reason_ref、trace_id 或 request_id。
 | app unit | policy deny、separation-of-duty、idempotency、timeout、cancel |
 | PostgreSQL integration | request + steps + decision + timer + outbox 同事务 |
 | event builder | 不输出 reason / payload / proposal / downstream body |
-| worker test | timer due SKIP LOCKED、step advance retry、compensation request |
+| worker test | timer due SKIP LOCKED、workflow TIMED_OUT、compensation request |
 | smoke | CreateWorkflow -> Approve -> StepReady -> Complete fake target |
 
 ## 17. Runbook
@@ -439,13 +443,10 @@ target_ref、reason_ref、trace_id 或 request_id。
 
 ```text
 NEXUSIM_WORKFLOW_SERVICE_MODE=grpc
-NEXUSIM_WORKFLOW_SERVICE_MODE=workflow-worker
 NEXUSIM_WORKFLOW_SERVICE_MODE=timer-worker
 NEXUSIM_WORKFLOW_SERVICE_MODE=compensation-worker
 NEXUSIM_WORKFLOW_SERVICE_MODE=compensation-executor
 NEXUSIM_WORKFLOW_SERVICE_MODE=compensation-instruction-import
-NEXUSIM_WORKFLOW_SERVICE_MODE=outbox-relay
-NEXUSIM_WORKFLOW_SERVICE_MODE=cleanup
 ```
 
 operator：

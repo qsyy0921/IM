@@ -337,6 +337,12 @@ low-sensitive `REPAIR_APPROVAL` workflows for action-executor
 row, restoring raw provider input/output, or bypassing action-executor as the
 final execution owner.
 
+Workflow approval timeout boundary is represented by
+`workflow-approval-timeout-boundary`. It verifies that stale approval workflows
+move to `TIMED_OUT` through workflow-service timer handling, emit only a
+low-sensitive workflow timeout event, and do not create implicit approval or
+execute provider replay.
+
 First-stage Python worker output-safety adapter:
 
 ```powershell

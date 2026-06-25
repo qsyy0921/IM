@@ -294,7 +294,7 @@ message / conversation / policy events -> search-service + memory-service projec
 | `presence-service` | `UpdatePresence`、`GetPresence`、`UpdateTyping`、PostgreSQL presence projection、低敏 presence outbox。 |
 | `model-gateway` | text generation / embedding invocation metadata、mock provider、低敏 invocation outbox，不持久化 raw prompt 或 embedding vector。 |
 | `knowledge-ingestion-service` | knowledge source、ingestion job、chunk manifest、knowledge outbox relay、vector handoff first path。 |
-| `workflow-service` | workflow creation / decision、approval状态机、`ListWorkflows` 低敏队列视图、provider replay queue operator view、compensation request / instruction registry / rollback adapter first path。 |
+| `workflow-service` | workflow creation / decision、approval 状态机、`timer-worker` 显式 approval timeout -> `TIMED_OUT`、`ListWorkflows` 低敏队列视图、provider replay queue operator view、compensation request / instruction registry / rollback adapter first path。 |
 | `vector-index-service` | vector metadata、tombstone、search、rebuild request / checkpoint、embedding queue / worker、knowledge chunk consumer first path；pgvector provider smoke 已有 preflight gate，先验证 pgvector 连接、extension 和 table 配置；OpenSearch vector provider 已有 endpoint / index / `knn_vector` mapping / dimension preflight；Milvus provider 已有 REST v2 endpoint / collection / vector field / dimension preflight；provider readiness matrix 可一次性输出 pgvector / OpenSearch vector / Milvus 的低敏状态，且每个 provider 使用显式 request-timeout 快速 fail-closed；search-rag provider runtime readiness bootstrap 可显式启动本地 pgvector / OpenSearch profile 并准备 OpenSearch vector index，Docker 调用有硬超时且默认不拉镜像；retrieval smoke 可把 readiness 矩阵关联成 `provider_coverage[]`，不可用或 drift 时 fail-closed 并写 summary。 |
 
 已启动的客户端平台：

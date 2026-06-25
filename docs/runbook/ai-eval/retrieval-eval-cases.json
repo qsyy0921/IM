@@ -1227,6 +1227,31 @@
       ]
     },
     {
+      "id": "workflow-approval-timeout-boundary",
+      "family": "action_execution_safety",
+      "stage": "workflow-approval-timeout",
+      "status": "active",
+      "query": "expire stale approval workflows without executing provider replay",
+      "risk": "Workflow approval timeout must fail closed into TIMED_OUT with a low-sensitive event; it must not approve, execute replay, modify DLQ rows, or create an implicit approval path",
+      "required_assertions": [
+        {
+          "type": "must_transition_waiting_workflow_to_timed_out"
+        },
+        {
+          "type": "must_emit_low_sensitive_workflow_timeout_event"
+        },
+        {
+          "type": "must_not_create_implicit_approval_on_timeout"
+        },
+        {
+          "type": "must_keep_redrive_entrypoint_action_executor"
+        },
+        {
+          "type": "must_not_execute_provider_replay_from_workflow_queue"
+        }
+      ]
+    },
+    {
       "id": "external-mcp-provider-unavailable",
       "family": "action_execution_safety",
       "stage": "action-executor-mcp-failure",

@@ -201,6 +201,20 @@ services:
       - nexusim-services
       - nexusim-local
 
+  workflow-service-timer-worker:
+    image: nexusim/workflow-service:local
+    container_name: nexusim-workflow-service-timer-worker
+    environment:
+      NEXUSIM_WORKFLOW_SERVICE_MODE: timer-worker
+      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@host.docker.internal:5432/nexusim?sslmode=disable
+      NEXUSIM_WORKFLOW_TIMER_BATCH_SIZE: 50
+      NEXUSIM_WORKFLOW_TIMER_POLL_INTERVAL: 1s
+      NEXUSIM_WORKFLOW_TIMER_ERROR_BACKOFF: 1s
+    restart: unless-stopped
+    networks:
+      - nexusim-services
+      - nexusim-local
+
   search-service-timeline-consumer:
     image: nexusim/search-service:local
     container_name: nexusim-search-service-timeline-consumer

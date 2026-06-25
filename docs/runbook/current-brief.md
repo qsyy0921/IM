@@ -41,6 +41,10 @@ loadtest report 或 archive。
   低敏查询，`loadtest/workflow provider-replay-queue` 默认列出等待
   `admin.workflow.provider_replay.v1` 审批的 `REPAIR_APPROVAL` / action-executor
   `PROVIDER_REPLAY_REQUEST` workflow；它只展示 refs / hash / 状态，不执行 redrive。
+- workflow approval timeout handling 已收口：`timer-worker` 只消费显式
+  `workflow_timers` 中到期的 `APPROVAL_TIMEOUT`，把仍等待审批的 workflow 转为
+  `TIMED_OUT` 并写低敏 `workflow.timed_out.v1`；审批终结会取消 pending timer。它不执行
+  action、不创建隐式 approval、不从命名 `timeout_policy_ref` 推断默认 due_at。
 - group memory / multi-party collaboration 必须继续保留 source refs、conversation scope、
   member visibility、time/version boundary、citations 和 no-citation refusal。
 

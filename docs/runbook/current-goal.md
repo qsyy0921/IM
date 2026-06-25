@@ -35,6 +35,10 @@ Agent action boundary / repair cases：在 provider replay admin / workflow hand
   workflow metadata；`loadtest/workflow provider-replay-queue` 默认列出等待
   `admin.workflow.provider_replay.v1` 审批的 action-executor
   `PROVIDER_REPLAY_REQUEST`，不执行 redrive、不修改 DLQ row、不暴露 raw payload。
+- workflow approval timeout handling 已落：`timer-worker` 消费显式
+  `workflow_timers(APPROVAL_TIMEOUT)` 到期事实，将仍在 `WAITING_DECISION` 的 workflow
+  推进到 `TIMED_OUT` 并写低敏 `workflow.timed_out.v1` outbox；审批已终结时取消 pending
+  timer；不执行 action、不创建隐式 approval、不根据命名 `timeout_policy_ref` 猜默认 due_at。
 
 ## 目标
 

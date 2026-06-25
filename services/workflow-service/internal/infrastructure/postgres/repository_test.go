@@ -182,6 +182,86 @@ func TestRepositoryListWorkflowsProviderReplayQueueIntegration(t *testing.T) {
 	}
 }
 
+func TestRepositoryFireDueWorkflowTimersIntegration(t *testing.T) {
+	ctx := context.Background()
+	pool := openWorkflowTestPool(t)
+	resetWorkflowTables(t, ctx, pool)
+	repository := NewRepository(pool)
+
+	now := time.Date(2026, 6, 25, 10, 0, 0, 0, time.UTC)
+	dueWorkflow := createWorkflowForTimerTest(t, ctx, repository, "wf-timeout-idem-1", "wf_timeout_1", "wfs_timeout_1")
+	futureWorkflow := createWorkflowForTimerTest(t, ctx, repository, "wf-timeout-idem-2", "wf_timeout_future", "wfs_timeout_future")
+	wrongTypeWorkflow := createWorkflowForTimerTest(t, ctx, repository, "wf-timeout-idem-3", "wf_timeout_wrong_type", "wfs_timeout_wrong_type")
+	insertWorkflowTimer(t, ctx, pool, dueWorkflow, "wft_due_1", types.WorkflowTimerTypeApprovalTimeout, now.Add(-time.Minute))
+	insertWorkflowTimer(t, ctx, pool, futureWorkflow, "wft_future_1", types.WorkflowTimerTypeApprovalTimeout, now.Add(time.Hour))
+	insertWorkflowTimer(t, ctx, pool, wrongTypeWorkflow, "wft_wrong_type_1", "RETRY_BACKOFF", now.Add(-time.Minute))
+
+	expired, err := repository.FireDueWorkflowTimers(ctx, now, 10)
+	if err != nil {
+		t.Fatalf("fire due workflow timers: %v", err)
+	}
+	if len(expired) != 1 || expired[0].WorkflowID != dueWorkflow.WorkflowID ||
+		expired[0].Status != types.WorkflowStatusTimedOut || expired[0].CompletedAt.IsZero() {
+		t.Fatalf("unexpected expired workflows: %+v", expired)
+	}
+
+	loaded, _, err := repository.GetWorkflow(ctx, types.GetWorkflowCommand{
+		AuthContext: types.AuthContext{TenantID: "tenant-workflow-test", ServiceName: "admin-service"},
+		WorkflowID:  dueWorkflow.WorkflowID,
+	})
+	if err != nil {
+		t.Fatalf("get timed out workflow: %v", err)
+	}
+	if loaded.Status != types.WorkflowStatusTimedOut || loaded.CompletedAt.IsZero() {
+		t.Fatalf("workflow should be timed out: %+v", loaded)
+	}
+	assertWorkflowTimerStatus(t, ctx, pool, dueWorkflow.WorkflowID, "wft_due_1", types.WorkflowTimerStatusFired)
+	assertWorkflowTimerStatus(t, ctx, pool, futureWorkflow.WorkflowID, "wft_future_1", types.WorkflowTimerStatusPending)
+	assertWorkflowTimerStatus(t, ctx, pool, wrongTypeWorkflow.WorkflowID, "wft_wrong_type_1", types.WorkflowTimerStatusPending)
+	assertWorkflowTimedOutOutbox(t, ctx, pool, dueWorkflow.WorkflowID, "wft_due_1")
+
+	lateDecision := prepareDecision(t, dueWorkflow.WorkflowID, dueWorkflow.CurrentStepID, "wfd_timeout_late", "operator:approver", "decision-timeout-late")
+	if _, _, _, err := repository.RecordWorkflowDecision(ctx, lateDecision); !errors.Is(err, types.ErrFailedPrecondition) {
+		t.Fatalf("timed out workflow should reject late decisions, got %v", err)
+	}
+	replayed, err := repository.FireDueWorkflowTimers(ctx, now.Add(time.Minute), 10)
+	if err != nil {
+		t.Fatalf("replay due workflow timers: %v", err)
+	}
+	if len(replayed) != 0 {
+		t.Fatalf("expected no replayed timeouts, got %+v", replayed)
+	}
+}
+
+func TestRepositoryRecordDecisionCancelsPendingWorkflowTimersIntegration(t *testing.T) {
+	ctx := context.Background()
+	pool := openWorkflowTestPool(t)
+	resetWorkflowTables(t, ctx, pool)
+	repository := NewRepository(pool)
+
+	now := time.Date(2026, 6, 25, 10, 0, 0, 0, time.UTC)
+	workflow := createWorkflowForTimerTest(t, ctx, repository, "wf-timeout-cancel-idem-1", "wf_timeout_cancel_1", "wfs_timeout_cancel_1")
+	insertWorkflowTimer(t, ctx, pool, workflow, "wft_cancel_1", types.WorkflowTimerTypeApprovalTimeout, now.Add(-time.Minute))
+
+	decision := prepareDecision(t, workflow.WorkflowID, workflow.CurrentStepID, "wfd_timeout_cancel_1", "operator:approver", "decision-timeout-cancel")
+	approved, _, _, err := repository.RecordWorkflowDecision(ctx, decision)
+	if err != nil {
+		t.Fatalf("approve workflow with pending timer: %v", err)
+	}
+	if approved.Status != types.WorkflowStatusApproved {
+		t.Fatalf("expected approved workflow, got %+v", approved)
+	}
+	assertWorkflowTimerStatus(t, ctx, pool, workflow.WorkflowID, "wft_cancel_1", types.WorkflowTimerStatusCanceled)
+
+	expired, err := repository.FireDueWorkflowTimers(ctx, now, 10)
+	if err != nil {
+		t.Fatalf("fire due workflow timers after approval: %v", err)
+	}
+	if len(expired) != 0 {
+		t.Fatalf("approved workflow timer should not expire: %+v", expired)
+	}
+}
+
 func TestRepositoryRequestApprovedCompensationsIntegration(t *testing.T) {
 	ctx := context.Background()
 	pool := openWorkflowTestPool(t)
@@ -723,6 +803,95 @@ WHERE event_type = $1 AND workflow_id = $2
 	for _, forbidden := range []string{"secret", "token", "raw:", "rollback plaintext", "operator:approver"} {
 		if strings.Contains(payload, forbidden) {
 			t.Fatalf("compensation result outbox leaked forbidden value %q: %s", forbidden, payload)
+		}
+	}
+}
+
+func createWorkflowForTimerTest(
+	t *testing.T,
+	ctx context.Context,
+	repository *Repository,
+	idempotencyKey string,
+	workflowID string,
+	stepID string,
+) types.Workflow {
+	t.Helper()
+	prepared := prepareWorkflow(t, idempotencyKey, workflowID, stepID)
+	prepared.Command.TimeoutPolicyRef = "timer:test:" + workflowID
+	prepared.CommandHash = domain.HashRef("timer-workflow:" + workflowID)
+	workflow, replayed, err := repository.CreateWorkflow(ctx, prepared)
+	if err != nil {
+		t.Fatalf("create timer workflow: %v", err)
+	}
+	if replayed {
+		t.Fatal("timer workflow should not replay")
+	}
+	return workflow
+}
+
+func insertWorkflowTimer(
+	t *testing.T,
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	workflow types.Workflow,
+	timerID string,
+	timerType string,
+	dueAt time.Time,
+) {
+	t.Helper()
+	_, err := pool.Exec(ctx, `
+INSERT INTO workflow_timers (
+    tenant_id, workflow_id, timer_id, step_id, timer_type, due_at, status, created_at
+) VALUES (
+    $1, $2, $3, $4, $5, $6, $7, $8
+)
+`, string(workflow.TenantID), workflow.WorkflowID, timerID, workflow.CurrentStepID, timerType, dueAt.UTC(), types.WorkflowTimerStatusPending, dueAt.Add(-time.Hour).UTC())
+	if err != nil {
+		t.Fatalf("insert workflow timer: %v", err)
+	}
+}
+
+func assertWorkflowTimerStatus(t *testing.T, ctx context.Context, pool *pgxpool.Pool, workflowID string, timerID string, want string) {
+	t.Helper()
+	var status string
+	var firedAt *time.Time
+	if err := pool.QueryRow(ctx, `
+SELECT status, fired_at
+FROM workflow_timers
+WHERE tenant_id = 'tenant-workflow-test' AND workflow_id = $1 AND timer_id = $2
+`, workflowID, timerID).Scan(&status, &firedAt); err != nil {
+		t.Fatalf("query workflow timer: %v", err)
+	}
+	if status != want {
+		t.Fatalf("timer %s status=%s want=%s", timerID, status, want)
+	}
+	if (want == types.WorkflowTimerStatusFired || want == types.WorkflowTimerStatusCanceled) && firedAt == nil {
+		t.Fatalf("timer %s status=%s should record fired_at timestamp", timerID, want)
+	}
+}
+
+func assertWorkflowTimedOutOutbox(t *testing.T, ctx context.Context, pool *pgxpool.Pool, workflowID string, timerID string) {
+	t.Helper()
+	var outboxCount int
+	var payload string
+	if err := pool.QueryRow(ctx, `
+SELECT count(*), COALESCE(max(payload_json::text), '')
+FROM workflow_outbox
+WHERE event_type = $1 AND workflow_id = $2
+`, types.WorkflowEventTimedOut, workflowID).Scan(&outboxCount, &payload); err != nil {
+		t.Fatalf("query workflow timed out outbox: %v", err)
+	}
+	if outboxCount != 1 {
+		t.Fatalf("expected one workflow timed out outbox row, got %d", outboxCount)
+	}
+	for _, want := range []string{timerID, types.WorkflowTimerTypeApprovalTimeout, types.WorkflowStatusTimedOut, "sha256:"} {
+		if !strings.Contains(payload, want) {
+			t.Fatalf("timed out outbox payload missing %q: %s", want, payload)
+		}
+	}
+	for _, forbidden := range []string{"secret", "token", "raw:", "approval plaintext", "provider body"} {
+		if strings.Contains(payload, forbidden) {
+			t.Fatalf("timed out outbox leaked forbidden value %q: %s", forbidden, payload)
 		}
 	}
 }

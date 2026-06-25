@@ -360,6 +360,12 @@
       "service": "workflow-service",
       "env": "NEXUSIM_WORKFLOW_SERVICE_MODE",
       "value": "compensation-worker"
+    },
+    {
+      "name": "workflow-service-timer-worker",
+      "service": "workflow-service",
+      "env": "NEXUSIM_WORKFLOW_SERVICE_MODE",
+      "value": "timer-worker"
     }
   ]
 }

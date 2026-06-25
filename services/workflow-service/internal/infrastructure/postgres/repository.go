@@ -123,6 +123,11 @@ func (repository *Repository) RecordWorkflowDecision(
 	if err != nil {
 		return types.Workflow{}, types.WorkflowDecision{}, false, err
 	}
+	if terminal {
+		if err := cancelPendingWorkflowTimers(ctx, tx, workflow.TenantID, workflow.WorkflowID, prepared.CreatedAt); err != nil {
+			return types.Workflow{}, types.WorkflowDecision{}, false, err
+		}
+	}
 	if err := insertDecisionRecordedOutbox(ctx, tx, updated, decision); err != nil {
 		return types.Workflow{}, types.WorkflowDecision{}, false, err
 	}
@@ -202,6 +207,91 @@ LIMIT $` + fmt.Sprint(len(args)) + `
 		return nil, types.NewDBReadFailed(err.Error())
 	}
 	return workflows, nil
+}
+
+func (repository *Repository) FireDueWorkflowTimers(
+	ctx context.Context,
+	now time.Time,
+	limit int,
+) ([]types.Workflow, error) {
+	if repository.pool == nil {
+		return nil, types.NewDBWriteFailed("workflow repository is not configured")
+	}
+	if limit <= 0 {
+		limit = 50
+	}
+	if limit > 200 {
+		limit = 200
+	}
+	now = now.UTC()
+	tx, err := repository.pool.Begin(ctx)
+	if err != nil {
+		return nil, types.NewDBWriteFailed(err.Error())
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	rows, err := tx.Query(ctx, `
+SELECT t.tenant_id, t.workflow_id, t.timer_id, t.step_id, t.timer_type,
+       t.due_at, t.status, t.fired_at, t.created_at
+FROM workflow_timers t
+JOIN workflow_requests wr
+  ON wr.tenant_id = t.tenant_id AND wr.workflow_id = t.workflow_id
+WHERE t.status = $1
+  AND t.timer_type = $2
+  AND t.due_at <= $3
+  AND wr.status = $4
+ORDER BY t.due_at, t.created_at, t.timer_id
+LIMIT $5
+FOR UPDATE OF t, wr SKIP LOCKED
+`, types.WorkflowTimerStatusPending, types.WorkflowTimerTypeApprovalTimeout, now, types.WorkflowStatusWaitingDecision, limit)
+	if err != nil {
+		return nil, types.NewDBReadFailed(err.Error())
+	}
+
+	timers := []types.WorkflowTimer{}
+	for rows.Next() {
+		timer, err := scanWorkflowTimer(rows)
+		if err != nil {
+			rows.Close()
+			return nil, types.NewDBReadFailed(err.Error())
+		}
+		timers = append(timers, timer)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return nil, types.NewDBReadFailed(err.Error())
+	}
+	rows.Close()
+
+	expired := make([]types.Workflow, 0, len(timers))
+	for _, timer := range timers {
+		workflow, err := getWorkflowForUpdate(ctx, tx, timer.TenantID, timer.WorkflowID)
+		if err != nil {
+			return nil, err
+		}
+		if workflow.Status != types.WorkflowStatusWaitingDecision {
+			continue
+		}
+		if _, err := tx.Exec(ctx, `
+UPDATE workflow_timers
+SET status = $4, fired_at = $5
+WHERE tenant_id = $1 AND workflow_id = $2 AND timer_id = $3 AND status = $6
+`, string(timer.TenantID), timer.WorkflowID, timer.TimerID, types.WorkflowTimerStatusFired, now, types.WorkflowTimerStatusPending); err != nil {
+			return nil, types.NewDBWriteFailed(err.Error())
+		}
+		updated, err := updateWorkflowTimedOut(ctx, tx, workflow, now)
+		if err != nil {
+			return nil, err
+		}
+		if err := insertWorkflowTimedOutOutbox(ctx, tx, updated, timer); err != nil {
+			return nil, err
+		}
+		expired = append(expired, updated)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, types.NewDBWriteFailed(err.Error())
+	}
+	return expired, nil
 }
 
 func findWorkflowByIdempotency(ctx context.Context, tx pgx.Tx, tenantID types.TenantID, requesterService string, key string) (types.Workflow, bool, error) {
@@ -345,6 +435,36 @@ WHERE tenant_id = $1 AND workflow_id = $2
 	return workflow, nil
 }
 
+func updateWorkflowTimedOut(ctx context.Context, tx pgx.Tx, workflow types.Workflow, now time.Time) (types.Workflow, error) {
+	commandTag, err := tx.Exec(ctx, `
+UPDATE workflow_requests
+SET status = $3, updated_at = $4, completed_at = $4
+WHERE tenant_id = $1 AND workflow_id = $2 AND status = $5
+`, string(workflow.TenantID), workflow.WorkflowID, types.WorkflowStatusTimedOut, now, types.WorkflowStatusWaitingDecision)
+	if err != nil {
+		return types.Workflow{}, types.NewDBWriteFailed(err.Error())
+	}
+	if commandTag.RowsAffected() != 1 {
+		return types.Workflow{}, types.NewFailedPrecondition("workflow is not waiting for timeout")
+	}
+	workflow.Status = types.WorkflowStatusTimedOut
+	workflow.UpdatedAt = now
+	workflow.CompletedAt = now
+	return workflow, nil
+}
+
+func cancelPendingWorkflowTimers(ctx context.Context, tx pgx.Tx, tenantID types.TenantID, workflowID string, now time.Time) error {
+	_, err := tx.Exec(ctx, `
+UPDATE workflow_timers
+SET status = $4, fired_at = $5
+WHERE tenant_id = $1 AND workflow_id = $2 AND status = $3
+`, string(tenantID), workflowID, types.WorkflowTimerStatusPending, types.WorkflowTimerStatusCanceled, now)
+	if err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	return nil
+}
+
 func insertWorkflowSubmittedOutbox(ctx context.Context, tx pgx.Tx, workflow types.Workflow) error {
 	payload := workflowPayload(workflow)
 	return insertOutbox(ctx, tx, "evt_"+workflow.WorkflowID, workflow, "workflow.submitted.v1", payload)
@@ -356,6 +476,14 @@ func insertDecisionRecordedOutbox(ctx context.Context, tx pgx.Tx, workflow types
 	payload["decision_type"] = decision.DecisionType
 	payload["decider_ref_hash"] = domain.HashRef(decision.DeciderRef)
 	return insertOutbox(ctx, tx, "evt_"+decision.DecisionID, workflow, "workflow.decision.recorded.v1", payload)
+}
+
+func insertWorkflowTimedOutOutbox(ctx context.Context, tx pgx.Tx, workflow types.Workflow, timer types.WorkflowTimer) error {
+	payload := workflowPayload(workflow)
+	payload["timer_id"] = timer.TimerID
+	payload["timer_type"] = timer.TimerType
+	payload["timer_due_at_unix_ms"] = timer.DueAt.UTC().UnixMilli()
+	return insertOutbox(ctx, tx, "evt_"+timer.TimerID, workflow, types.WorkflowEventTimedOut, payload)
 }
 
 func insertOutbox(ctx context.Context, tx pgx.Tx, eventID string, workflow types.Workflow, eventType string, payload map[string]any) error {
@@ -490,4 +618,20 @@ func scanDecision(row scanner) (types.WorkflowDecision, error) {
 		return types.WorkflowDecision{}, err
 	}
 	return decision, nil
+}
+
+func scanWorkflowTimer(row scanner) (types.WorkflowTimer, error) {
+	var timer types.WorkflowTimer
+	var firedAt *time.Time
+	err := row.Scan(
+		&timer.TenantID, &timer.WorkflowID, &timer.TimerID, &timer.StepID,
+		&timer.TimerType, &timer.DueAt, &timer.Status, &firedAt, &timer.CreatedAt,
+	)
+	if err != nil {
+		return types.WorkflowTimer{}, err
+	}
+	if firedAt != nil {
+		timer.FiredAt = *firedAt
+	}
+	return timer, nil
 }

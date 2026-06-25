@@ -51,6 +51,8 @@ function Test-GroundingAssertion {
         "must_not_call_provider_on_bad_grounding" { return $true }
         "must_preserve_ref_only_evidence_for_audit" { return $true }
         "must_abstain_when_no_groundable_text" { return $true }
+        "must_reject_evidence_without_visibility_version" { return $true }
+        "must_reject_inactive_or_unapproved_memory_evidence" { return $true }
         default { throw "unsupported RAG/Summary grounding assertion type: $type" }
     }
 }

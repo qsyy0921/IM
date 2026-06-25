@@ -3,13 +3,13 @@ package main
 import "testing"
 
 func TestValidateWorkflowMode(t *testing.T) {
-	for _, mode := range []string{"noop", "grpc", "compensation-worker", "compensation-executor", "compensation-instruction-import"} {
+	for _, mode := range []string{"noop", "grpc", "timer-worker", "compensation-worker", "compensation-executor", "compensation-instruction-import"} {
 		if err := validateWorkflowMode(mode); err != nil {
 			t.Fatalf("mode %s: %v", mode, err)
 		}
 	}
-	if err := validateWorkflowMode("timer-worker"); err == nil {
-		t.Fatal("expected unsupported mode to fail until worker slice is implemented")
+	if err := validateWorkflowMode("bad-mode"); err == nil {
+		t.Fatal("expected unsupported mode to fail")
 	}
 }
 

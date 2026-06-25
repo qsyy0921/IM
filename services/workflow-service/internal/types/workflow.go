@@ -20,11 +20,17 @@ const (
 	WorkflowStatusApproved            = "APPROVED"
 	WorkflowStatusRejected            = "REJECTED"
 	WorkflowStatusCanceled            = "CANCELED"
+	WorkflowStatusTimedOut            = "TIMED_OUT"
 	WorkflowStatusCompensationPending = "COMPENSATION_PENDING"
 	WorkflowStatusCompensated         = "COMPENSATED"
 
 	WorkflowStepTypeApproval = "APPROVAL"
 	WorkflowStepStatusReady  = "READY"
+
+	WorkflowTimerTypeApprovalTimeout = "APPROVAL_TIMEOUT"
+	WorkflowTimerStatusPending       = "PENDING"
+	WorkflowTimerStatusFired         = "FIRED"
+	WorkflowTimerStatusCanceled      = "CANCELED"
 
 	WorkflowCompensationStatusRequested = "REQUESTED"
 	WorkflowCompensationStatusExecuting = "EXECUTING"
@@ -38,6 +44,7 @@ const (
 	WorkflowEventCompensationRequested = "workflow.compensation.requested.v1"
 	WorkflowEventCompensationSucceeded = "workflow.compensation.succeeded.v1"
 	WorkflowEventCompensationFailed    = "workflow.compensation.failed.v1"
+	WorkflowEventTimedOut              = "workflow.timed_out.v1"
 
 	DecisionTypeApprove        = "APPROVE"
 	DecisionTypeReject         = "REJECT"
@@ -144,6 +151,18 @@ type WorkflowStep struct {
 	Status          string
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
+}
+
+type WorkflowTimer struct {
+	TenantID   TenantID
+	WorkflowID string
+	TimerID    string
+	StepID     string
+	TimerType  string
+	DueAt      time.Time
+	Status     string
+	FiredAt    time.Time
+	CreatedAt  time.Time
 }
 
 type WorkflowDecision struct {
@@ -470,6 +489,7 @@ func isAllowedWorkflowStatus(value string) bool {
 		WorkflowStatusApproved,
 		WorkflowStatusRejected,
 		WorkflowStatusCanceled,
+		WorkflowStatusTimedOut,
 		WorkflowStatusCompensationPending,
 		WorkflowStatusCompensated:
 		return true

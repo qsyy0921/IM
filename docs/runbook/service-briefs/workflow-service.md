@@ -1,7 +1,7 @@
 # workflow-service
 
 状态：product-active / first path complete，已覆盖 approval workflow、
-compensation request materialization 和 instruction ops visibility。
+approval timeout、compensation request materialization 和 instruction ops visibility。
 
 定位：长事务和审批工作流服务，负责 Agent approval wait、repair approval、
 admin operation approval、补偿请求和人工审批状态。
@@ -15,6 +15,9 @@ admin operation approval、补偿请求和人工审批状态。
 
 - `CreateWorkflow` / `RecordWorkflowDecision` / `GetWorkflow`。
 - `ACTION_APPROVAL`、`REPAIR_APPROVAL`、`ADMIN_OPERATION`、`COMPENSATION_REQUEST`。
+- `timer-worker`：消费显式 `workflow_timers` 中到期的 `APPROVAL_TIMEOUT` timer，
+  将仍在 `WAITING_DECISION` 的 workflow 推进到 `TIMED_OUT` 并写低敏
+  `workflow.timed_out.v1` outbox；不执行 action、不创建隐式 approval、不推断默认 due_at。
 - `compensation-worker`：approved compensation request -> `workflow_compensations`
   -> low-sensitive outbox -> `COMPENSATION_PENDING`。
 - `compensation-executor`：显式 file / DB instruction 驱动 control-plane rollback，
@@ -32,6 +35,6 @@ admin operation approval、补偿请求和人工审批状态。
   `REPAIR_APPROVAL` workflow，target service 为 `action-executor`；workflow-service 只记录
   低敏审批状态，不执行 provider replay。
 
-后续：timer worker、更多 compensation adapter、instruction approval UI、
+后续：更多 compensation adapter、instruction approval UI、
 external approval binding、external callback wait、outbox relay、provider-grade approval UI、
 repair operators。

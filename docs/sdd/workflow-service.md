@@ -240,7 +240,14 @@ operator review page，重新校验 delivery plan、delivery status 和 redrive 
 hash / workflow binding / no-execution contract；页面只展示 refs、hashes、attempt、
 failure class、redrive queue 和 owner，不调用 provider、不重新入队、不记录 decision、
 不执行 target action，也不输出 raw callback URL、provider body、本地路径或 payload
-正文。当前 first path 已新增 `workflow_external_callback_deliveries` 持久 job 和
+正文。`write-workflow-external-callback-delivery-dashboard.ps1` 提供第一版本地批量
+delivery triage dashboard：它读取仓库外一组 `external_callback_delivery_status` 和可选
+`external_callback_redrive_plan` artifact，重新校验 status / redrive 绑定、workflow
+仍为 `WAITING_DECISION`、redrive plan 只对应 retry / DLQ status，并输出状态计数、
+redrive candidate 和低敏 refs / hashes。dashboard 不调用 provider、不记录 decision、
+不执行 redrive、不执行 target action，也不输出本机路径、provider material、payload
+material、model input 或 auth material。当前 first path 已新增
+`workflow_external_callback_deliveries` 持久 job 和
 `external-callback-delivery-import` / `external-callback-delivery-worker` /
 `external-callback-delivery-redrive` 运行模式：
 import 锁定 workflow-service 自有 workflow fact，校验仍为 `WAITING_DECISION` 且
@@ -509,6 +516,7 @@ go run ./loadtest/workflow -mode record-decision -workflow-id wf_123 -step-id wf
 go run ./loadtest/workflow -mode record-decision -decision-manifest H:\NexusIM\operator-plans\workflow-decision.json
 go run ./loadtest/workflow -mode operator-queues
 .\tools\write-workflow-approval-queue-review-page.ps1 -QueueSummaryPath H:\NexusIM\operator-plans\workflow-operator-queues.json -GeneratedBy operator-a -OutputPath H:\NexusIM\operator-plans\workflow-approval-queue-review.html
+.\tools\write-workflow-external-callback-delivery-dashboard.ps1 -DeliveryStatusRootPath H:\NexusIM\operator-plans\workflow-callback-statuses -RedrivePlanRootPath H:\NexusIM\operator-plans\workflow-callback-redrives -GeneratedBy operator-a -OutputPath H:\NexusIM\operator-plans\workflow-callback-delivery-dashboard.html
 go run ./loadtest/workflow -mode list-compensation-instructions -workflow-id wf_123 -status ACTIVE
 go run ./loadtest/workflow -mode list-compensations -workflow-id wf_123 -status SUCCEEDED
 go run ./loadtest/workflow -mode compensation-review-bundle -workflow-id wf_123

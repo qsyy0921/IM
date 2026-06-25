@@ -13,7 +13,7 @@
 - `timer-worker`：显式 approval timeout -> `TIMED_OUT`，不执行 action。
 - compensation：request materialization、instruction import / list、control-plane rollback
   first path，unsupported target fail closed。
-- external callback：wait workflow、decision binding、delivery plan、persistent delivery worker、status / redrive path、delivery review page。
+- external callback：wait workflow、decision binding、delivery plan、persistent delivery worker、status / redrive path、delivery review page / dashboard。
 - operator visibility：provider-replay queue、operator queues、compensation review bundle / page、
   approval queue review page、`ListWorkflowCompensations` execution result query。
 - compensation execution artifacts：instruction approval page、readiness、invocation、execution result、audit append handoff 和 append result；
@@ -27,4 +27,4 @@
 - Temporal 等工作流引擎只是候选，中间件不写死。
 
 ## 后续
-- 更多 compensation adapter、provider-grade batch approval / decision UI、callback delivery dashboard / batch operator workflow、workflow outbox relay。
+- 更多 compensation adapter、provider-grade batch approval / decision UI、callback delivery persisted dashboard / batch redrive execution workflow、workflow outbox relay。

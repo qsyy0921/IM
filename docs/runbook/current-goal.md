@@ -17,9 +17,9 @@ workflow handoff、operator redrive 和最终执行归属证明的 Agent action 
 - admin-service 已覆盖 provider replay request submit / list / approve / reject operator
   bridge，只创建和审批低敏 admin operation，不执行 redrive。
 - workflow-service 已覆盖 provider replay queue、approval timeout、external approval
-  binding、operator queues、external callback wait / delivery / redrive / review page、
-  approval queue review page、compensation review / instruction approval page /
-  readiness / invocation / result visibility / audit append handoff /
+  binding、operator queues、external callback wait / delivery / redrive / review page /
+  dashboard、approval queue review page、compensation review / instruction approval
+  page / readiness / invocation / result visibility / audit append handoff /
   audit append result manifest。
 - ai-eval 已覆盖 group-memory / retrieval / RAG / Agent safety 和 action boundary
   本地低敏 gates。

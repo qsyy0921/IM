@@ -45,6 +45,12 @@ Agent action boundary / repair cases：在 provider replay admin / workflow hand
   仓库外 raw resource id / new input / reason 的 hash，显式 `-execute` 才调用
   action-executor 公开 `RedriveProviderFailure` gRPC；输出只保留 refs / hashes /
   result metadata，不打印 raw resource id / input / reason。
+- provider replay redrive result manifest 已落：
+  `write-provider-replay-redrive-result-manifest.ps1` 读取低敏 invocation manifest 和
+  `loadtest/actionexecutor -mode provider-replay-redrive -execute` 的低敏执行 summary，
+  重新绑定 fresh proposal / approval / prepared audit、skill / tool / resource hash、
+  result refs 和 status；它不执行 redrive、不追加 audit、不修改 DLQ row、不包含 raw
+  resource id / input / reason / provider artifact。
 - action-executor external audit append operator path 已落：`loadtest/actionexecutor
   -mode external-audit-append` 默认只做 preflight，校验仓库外低敏 audit append
   manifest、`attributes_json` hash、required checks、operator identity 和 raw provider

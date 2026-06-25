@@ -86,6 +86,21 @@ invocation manifest、仓库外 raw resource id、new input JSON 和 reason 文�
 的服务 mode，因为它不是通过 `NEXUSIM_ACTION_EXECUTOR_MODE` 启动的 service operator，
 而是最终 operator gRPC caller。
 
+provider replay 显式执行完成后，先把 `loadtest/actionexecutor -mode
+provider-replay-redrive -execute` 的 JSON summary 保存到仓库外，再生成低敏 result
+manifest：
+
+```powershell
+.\tools\write-provider-replay-redrive-result-manifest.ps1 -InvocationPath H:\NexusIM\operator-plans\provider-replay-redrive-invocation.json -ExecutionResultPath H:\NexusIM\operator-plans\provider-replay-redrive-execution.json -GeneratedBy operator-a -OutputPath H:\NexusIM\operator-plans\provider-replay-redrive-result-manifest.json
+```
+
+该 manifest 会重新校验 invocation、execution request 和 execution response 中的
+provider failure、fresh proposal / approval / prepared audit、skill / tool / resource hash、
+new input hash、reason hash、result refs 和 status 是否一致；它不执行 redrive、不追加
+audit、不修改 DLQ row、不创建 admin / workflow decision，也不输出 raw resource id、
+input JSON、reason 文本、provider artifact 或本机路径。后续若需要外部审计追加，再使用
+external audit append operator 显式提交 audit-service。
+
 本地批量 repair manifest 生成入口：
 
 ```powershell

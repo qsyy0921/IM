@@ -194,6 +194,9 @@ payload hash、低敏 refs、`direct_execution_allowed=false` 和
 `provider-replay-approve` / `provider-replay-reject` 分别提供 provider replay request
 列表和审批入口。该 bridge 不调用 `RedriveProviderFailure`，也不直接创建 workflow；
 workflow 创建仍由 admin-service operation-worker 负责。
+`write-provider-replay-handoff-review-page.ps1` 可在 submit 前把 handoff artifact 渲染成
+低敏 HTML 审查页；该页面不提交 admin operation、不创建 workflow、不记录 approval、
+不调用 action-executor redrive，也不泄漏 raw provider artifact。
 
 第一版真实下游 adapter 已覆盖四类非 `CRITICAL` 的 control-plane operation：
 

@@ -25,6 +25,10 @@ operator CLI 和 first-stage downstream adapters 已落。
 - provider replay operator bridge：`loadtest/admin provider-replay-submit` 可读取
   action-executor handoff artifact 并创建低敏 `PROVIDER_REPLAY_REQUEST`；`provider-replay-list`
   / `provider-replay-approve` / `provider-replay-reject` 提供第一版 operator UX，不执行 redrive。
+- provider replay handoff review page：submit 前可用
+  `write-provider-replay-handoff-review-page.ps1` 渲染低敏 handoff contract / payload hash /
+  workflow request / candidate refs；页面不创建 admin operation、不创建 workflow、不记录
+  approval、不执行 redrive。
 - control-plane adapters：`CONFIG_PUBLISH`、`CONFIG_ROLLBACK`、
   `TENANT_QUOTA_CHANGE`、`POLICY_RULE_CHANGE`。
 - audit adapter：`AUDIT_EXPORT_REQUEST -> audit-service.CreateAuditExport`；

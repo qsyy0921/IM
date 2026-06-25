@@ -329,6 +329,16 @@ workflow handoff request。环境变量为 `NEXUSIM_ACTION_EXECUTOR_MODE`；
 和 `REPAIR_APPROVAL` workflow handoff request，只带 hash/ref、candidate id 和 required gates；
 不包含 raw provider input / output / provider error / operator reason。上述模式都不修改
 provider failure row、不调用 tool executor、不重放 provider output。
+可用以下命令把 handoff artifact 渲染成仓库外低敏 HTML 审查页：
+
+```powershell
+.\tools\write-provider-replay-handoff-review-page.ps1 -HandoffPath H:\NexusIM\operator-plans\provider-replay-handoff.json -GeneratedBy operator-a -OutputPath H:\NexusIM\operator-plans\provider-replay-handoff-review.html
+```
+
+该页面只展示 handoff contract、admin / workflow refs、payload hash、candidate refs 和
+required gates；不提交 admin operation、不创建 workflow、不记录 approval、不调用
+`RedriveProviderFailure`、不修改 DLQ row，也不输出 raw provider input / output、provider
+error、new input、operator reason、EvidencePack 或本机路径。
 
 `loadtest/admin` 提供 provider replay handoff operator bridge：`provider-replay-submit`
 读取上面的 handoff artifact，校验 `PROVIDER_REPLAY_REQUEST` contract、payload hash、

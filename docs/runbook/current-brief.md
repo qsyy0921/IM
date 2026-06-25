@@ -34,6 +34,10 @@ loadtest report 或 archive。
   provider failure，输出低敏 admin operation request 和 workflow handoff request；admin-service
   已支持 `PROVIDER_REPLAY_REQUEST` 并强制路由 workflow-service `REPAIR_APPROVAL`，
   workflow target 为 action-executor，最终执行仍只能走 `RedriveProviderFailure`。
+- provider replay handoff review page 已收口：`write-provider-replay-handoff-review-page.ps1`
+  将低敏 handoff artifact 渲染为仓库外 HTML，并校验 contract / payload hash / workflow
+  request / final execution owner；页面不提交 admin operation、不创建 workflow、不记录
+  approval、不调用 redrive、不泄漏 raw provider artifacts。
 - provider replay admin operator bridge 已收口：`loadtest/admin provider-replay-submit`
   读取低敏 handoff artifact 并创建 `PROVIDER_REPLAY_REQUEST`；`provider-replay-list` /
   `provider-replay-approve` / `provider-replay-reject` 提供第一版列表和审批 UX，不执行 redrive。

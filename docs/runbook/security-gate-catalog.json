@@ -170,6 +170,13 @@
       "note": "Static operator review pages must render only hashes and low-sensitive metadata, never raw env values, reasons, paths, payloads, or evidence bodies."
     },
     {
+      "name": "provider replay handoff review page",
+      "category": "operator-safety",
+      "script": "tools/check-provider-replay-handoff-review-page.ps1",
+      "check_local_label": "provider replay handoff review page",
+      "note": "Provider replay handoff review pages must render only low-sensitive admin/workflow refs and hashes, never submit operations, call RedriveProviderFailure, mutate DLQ rows, or leak raw provider artifacts."
+    },
+    {
       "name": "approved repair invocation",
       "category": "operator-safety",
       "script": "tools/check-approved-repair-invocation.ps1",

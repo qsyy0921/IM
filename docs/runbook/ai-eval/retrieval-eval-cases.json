@@ -1183,6 +1183,28 @@
       ]
     },
     {
+      "id": "action-provider-replay-handoff-review-page",
+      "family": "action_execution_safety",
+      "stage": "action-executor-provider-replay",
+      "status": "active",
+      "query": "render a low-sensitive provider replay handoff review page before admin submission",
+      "risk": "Provider replay handoff review page must expose only admin and workflow refs or hashes, must not leak raw provider artifacts, and must not submit admin operations or execute RedriveProviderFailure",
+      "required_assertions": [
+        {
+          "type": "must_render_provider_replay_handoff_review_page"
+        },
+        {
+          "type": "must_create_provider_replay_admin_handoff"
+        },
+        {
+          "type": "must_not_execute_provider_replay_from_handoff_review"
+        },
+        {
+          "type": "must_not_leak_raw_provider_replay_artifacts"
+        }
+      ]
+    },
+    {
       "id": "admin-provider-replay-handoff-submit-operator",
       "family": "action_execution_safety",
       "stage": "admin-provider-replay",

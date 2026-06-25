@@ -87,6 +87,13 @@
   - admin-service / workflow-service 只做请求、审批和状态；最终执行仍只能走
     action-executor `RedriveProviderFailure`
   - 它不执行 replay、不调用 tool、不修改 provider failure row
+- `write-provider-replay-handoff-review-page.ps1`：
+  - 只读取仓库外 handoff artifact，重新校验 handoff contract、admin request payload hash、
+    workflow request 和 `direct_execution_allowed=false` / `source_dlq_immutable=true`
+  - 输出低敏 HTML 审查页，不提交 admin operation、不创建 workflow、不记录 approval、
+    不调用 `RedriveProviderFailure`、不修改 DLQ row
+  - 不嵌入 raw provider input / output、provider error、new input、operator reason、
+    EvidencePack、本机路径或 credential-like 字段
 - `/metrics` / `/debug/metrics`：
   - 输出 provider failure status、retryable、due retry 和 classification 聚合计数
   - 不输出 tenant / user / resource / provider raw error / tool input / output

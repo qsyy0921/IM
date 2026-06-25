@@ -24,6 +24,10 @@
   provider failure，输出低敏 `PROVIDER_REPLAY_REQUEST` admin operation request 和
   `REPAIR_APPROVAL` workflow handoff request；不执行 tool、不修改 failure row、不带 raw
   input / output。
+- Provider replay handoff review page：`write-provider-replay-handoff-review-page.ps1`
+  只接受低敏 handoff artifact，重新校验 contract / payload hash / workflow request /
+  final execution owner 后渲染仓库外 HTML；不提交 admin operation、不创建 workflow、
+  不记录 approval、不调用 `RedriveProviderFailure`、不修改 DLQ row。
 - Docker / Prometheus / Grafana wiring、focused tests、PG integration、ai-eval action preflight safety adapter。
 
 ## 边界
@@ -34,6 +38,8 @@
 - Provider replay operator UI artifact 只是人工审批视图，不是 replay 已执行证明。
 - Provider replay handoff artifact 只是请求 / 审批交接，不是 replay 已执行证明；最终执行
   仍只能走 `RedriveProviderFailure`。
+- Provider replay handoff review page 只是 operator 提交前的只读检查页，不是 admin submit、
+  workflow decision、approval 或 redrive 证明。
 - 真实业务 mutation 必须新增显式 adapter、公开业务 API、operator / policy 边界。
 
 ## 下一步

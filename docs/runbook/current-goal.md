@@ -26,6 +26,11 @@ Agent action boundary / repair cases：在 provider replay admin / workflow hand
   admin-service 已接受 `PROVIDER_REPLAY_REQUEST` 并强制路由 workflow-service
   `REPAIR_APPROVAL`，approval policy 指向 `admin.workflow.provider_replay.v1`，target
   service 为 `action-executor`。
+- provider replay handoff review page 已落：`write-provider-replay-handoff-review-page.ps1`
+  把低敏 handoff artifact 渲染成仓库外 HTML，并重新校验 contract、payload hash、
+  workflow request、final execution owner、`direct_execution_allowed=false` 和
+  `source_dlq_immutable=true`；页面不提交 admin operation、不创建 workflow、不记录 approval、
+  不调用 `RedriveProviderFailure`、不暴露 raw provider artifacts。
 - provider replay admin operator bridge 已落：`loadtest/admin provider-replay-submit`
   校验 handoff contract / payload hash / 低敏 refs 后创建 `PROVIDER_REPLAY_REQUEST`；
   `provider-replay-list` / `provider-replay-approve` / `provider-replay-reject` 只做

@@ -269,7 +269,39 @@ workflow-service 自有 delivery fact，不调用 provider、不记录 decision�
 读取 batch invocation 和一组 runtime summary，要求每个 plan exactly one summary、summary
 与 invocation 绑定完全一致、runtime 已报告 `executed_redrive=true`，然后输出低敏 batch
 result manifest。result manifest 不调用 workflow-service、不重新入队、不调用 provider、
-不记录 decision、不执行 target action，也不修改 delivery rows。当前 first path 已新增
+不记录 decision、不执行 target action，也不修改 delivery rows。
+`write-workflow-external-callback-batch-redrive-audit-append-manifest.ps1` 从
+`nexusim.workflow.external_callback_batch_redrive_result.v1` 派生
+`nexusim.audit.external_append.v1`，作为 audit-service `AppendAuditRecord` 的 operator
+handoff：它重新校验 result manifest 的 no-execution contract、redrive result count、
+`PENDING` delivery status、`workflow.external_callback.redriven.v1` outbox event 和低敏
+attribute hash；manifest 本身不调用 audit-service、不重新 redrive、不记录 decision、
+不调用 provider、不执行 target action、不修改 delivery rows，也不输出 raw callback URL、
+provider body、payload material、auth material 或本机路径。
+`write-workflow-external-callback-batch-redrive-audit-append-result-manifest.ps1` 读取上述
+audit handoff 和外部 `loadtest/actionexecutor -mode external-audit-append -execute` summary，
+校验 audit request / response 与 manifest 完全绑定，并输出
+`nexusim.workflow.external_callback_batch_redrive_audit_append_result.v1`，记录 audit id、
+record hash、previous record hash、idempotency key 和 source result manifest hash；该 result
+manifest 仍只是证明 artifact，不调用 audit-service、不重新 redrive、不记录 decision、
+不调用 provider、不执行 target action、不修改 delivery rows。
+
+示例：
+
+```powershell
+.\tools\write-workflow-external-callback-batch-redrive-audit-append-manifest.ps1 `
+  -ResultManifestPath H:\NexusIM\loadtest-results\workflow\callback-redrive-result.json `
+  -TenantID tenant-demo
+
+.\loadtest\actionexecutor\actionexecutor.exe -mode external-audit-append -execute `
+  -manifest H:\NexusIM\loadtest-results\workflow\callback-redrive-audit-append.json
+
+.\tools\write-workflow-external-callback-batch-redrive-audit-append-result-manifest.ps1 `
+  -AuditManifestPath H:\NexusIM\loadtest-results\workflow\callback-redrive-audit-append.json `
+  -AuditAppendResultPath H:\NexusIM\loadtest-results\workflow\audit-append-summary.json
+```
+
+当前 first path 已新增
 `workflow_external_callback_deliveries` 持久 job 和
 `external-callback-delivery-import` / `external-callback-delivery-worker` /
 `external-callback-delivery-redrive` 运行模式：

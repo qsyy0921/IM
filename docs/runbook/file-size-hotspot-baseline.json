@@ -1,7 +1,7 @@
 ﻿{
-    "created_at":  "2026-06-25T12:24:11.3452389Z",
+    "created_at":  "2026-06-25T12:46:39.7230748Z",
     "scope":  "handwritten Go/Markdown/PowerShell/Bash file-size budget snapshot; not a code-quality score",
-    "file_count":  2142,
+    "file_count":  2146,
     "thresholds":  {
                        "production_warn_lines":  2500,
                        "production_max_lines":  3500,
@@ -66,12 +66,12 @@
                       },
                       {
                           "Path":  "docs\\sdd\\workflow-service.md",
-                          "Lines":  809,
+                          "Lines":  841,
                           "Kind":  "docs",
                           "Warn":  1200,
                           "Max":  1500,
-                          "WarnRatio":  0.6742,
-                          "MaxRatio":  0.5393
+                          "WarnRatio":  0.7008,
+                          "MaxRatio":  0.5607
                       },
                       {
                           "Path":  "docs\\architecture\\target-architecture-ai.md",

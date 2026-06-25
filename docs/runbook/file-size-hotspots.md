@@ -1,8 +1,8 @@
 ﻿# File Size Budget Hotspots
 
-- Created at: 2026-06-25T12:24:11.3452389Z
+- Created at: 2026-06-25T12:46:39.7230748Z
 - Scope: handwritten Go/Markdown/PowerShell/Bash file-size budget snapshot; not a code-quality score
-- Files checked: 2142
+- Files checked: 2146
 - Warnings: 0
 - Failures: 0
 - Hotspots at >= 80% of warning threshold: 1
@@ -14,7 +14,7 @@
 | services\api-gateway\internal\api\httpbff\server_test.go | test/runner | 1870 | 2500 | 3000 | 74.8 | 62.3 |
 | loadtest\agent\main.go | test/runner | 1865 | 2500 | 3000 | 74.6 | 62.2 |
 | docs\runbook\client-platform.md | docs | 929 | 1200 | 1500 | 77.4 | 61.9 |
-| docs\sdd\workflow-service.md | docs | 809 | 1200 | 1500 | 67.4 | 53.9 |
+| docs\sdd\workflow-service.md | docs | 841 | 1200 | 1500 | 70.1 | 56.1 |
 | docs\architecture\target-architecture-ai.md | docs | 777 | 1200 | 1500 | 64.8 | 51.8 |
 | docs\runbook\local-loadtest.md | docs | 768 | 1200 | 1500 | 64 | 51.2 |
 | docs\sdd\push-gateway.md | docs | 743 | 1200 | 1500 | 61.9 | 49.5 |

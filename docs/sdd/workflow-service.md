@@ -629,6 +629,24 @@ action-executor，不执行 compensation，不 redrive provider，不执行 targ
 operator 本机路径、raw payload、reason 原文、provider body、EvidencePack 或 credential-like
 内容。
 
+`write-workflow-approval-queue-decision-result-page.ps1` 是 runner 之后的只读
+operator review artifact。它只接受
+`nexusim.workflow.approval_queue_batch_decision_result.v1`，重新校验 result manifest
+证明 runtime 已调用 workflow-service、decision 已由
+`workflow-service.RecordWorkflowDecision` 记录，并且未调用 action-executor、未执行 target、
+未 redrive provider、未执行 compensation。页面和 summary 只显示低敏 workflow / step /
+decision refs 与 source hash；它自身不调用 workflow-service、不记录 decision、不修改
+workflow fact，也不输出 raw payload、provider body、本机路径或 credential-like 内容。
+示例：
+
+```powershell
+.\tools\write-workflow-approval-queue-decision-result-page.ps1 `
+  -ResultManifestPath H:\NexusIM\operator-plans\workflow-batch-decision-result.json `
+  -GeneratedBy operator-a `
+  -OutputPath H:\NexusIM\operator-plans\workflow-batch-decision-result-review.html `
+  -SummaryPath H:\NexusIM\operator-plans\workflow-batch-decision-result-review.json
+```
+
 `external-callback-wait` 是第一版外部回调等待入口：它通过 workflow-service
 `CreateWorkflow` 创建一个显式 `WAITING_DECISION` workflow，并输出
 `nexusim.workflow.external_decision_manifest.v1` 低敏 template。template 只携带

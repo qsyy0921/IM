@@ -117,6 +117,9 @@ try {
     Write-Host "== workflow approval queue batch decision runner =="
     Invoke-LocalCheck "check-workflow-approval-queue-batch-decision-runner.ps1"
 
+    Write-Host "== workflow approval queue decision result page =="
+    Invoke-LocalCheck "check-workflow-approval-queue-decision-result-page.ps1"
+
     Write-Host "== workflow external callback delivery plan =="
     Invoke-LocalCheck "check-workflow-external-callback-delivery-plan.ps1"
 

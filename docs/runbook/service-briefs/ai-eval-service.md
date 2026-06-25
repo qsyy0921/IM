@@ -31,6 +31,9 @@
 - Workflow operator queue case：验证 action approval、repair approval、provider replay、
   admin operation 和 compensation queue 只输出低敏 workflow summary，不记录 decision、
   不执行 replay。
+- Workflow compensation review bundle case：验证 `COMPENSATION_PENDING` workflow 和
+  `ACTIVE` instruction refs 必须按 workflow id / payload hash / target 绑定；审查包只输出
+  低敏 refs / hash，不记录 decision、不执行 compensation。
 - Provider readiness / source coverage / vector lane checks 已进入相关 smoke 输出。
 - Group-memory ambiguity safety expansion：asker-bound term ambiguity、visible-chain
   incomplete abstention、missing visibility projection fail-closed、audience-language

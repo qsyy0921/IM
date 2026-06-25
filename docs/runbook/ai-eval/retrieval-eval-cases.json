@@ -1302,6 +1302,28 @@
       ]
     },
     {
+      "id": "workflow-compensation-review-bundle-boundary",
+      "family": "action_execution_safety",
+      "stage": "workflow-compensation-review",
+      "status": "active",
+      "query": "build a low-sensitive compensation instruction review bundle before any compensation execution",
+      "risk": "Compensation review bundle must bind the COMPENSATION_PENDING workflow and ACTIVE instruction refs by workflow id target and payload hash; review must not record decisions execute compensation or call downstream providers",
+      "required_assertions": [
+        {
+          "type": "must_create_compensation_review_bundle"
+        },
+        {
+          "type": "must_bind_compensation_instruction_to_workflow"
+        },
+        {
+          "type": "must_expose_low_sensitive_compensation_review"
+        },
+        {
+          "type": "must_not_execute_compensation_from_review"
+        }
+      ]
+    },
+    {
       "id": "workflow-approval-timeout-boundary",
       "family": "action_execution_safety",
       "stage": "workflow-approval-timeout",

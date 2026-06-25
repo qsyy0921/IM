@@ -54,6 +54,10 @@ loadtest report 或 archive。
 - workflow external callback wait 已收口：`external-callback-wait` 通过 `CreateWorkflow`
   创建显式等待外部 callback decision 的 workflow，并输出低敏 decision manifest template；
   它不记录 decision、不调用目标服务、不执行 action。
+- workflow compensation review bundle 已收口：`compensation-review-bundle` 只读
+  `COMPENSATION_PENDING` workflow 和 `ACTIVE` instruction refs，校验 workflow id /
+  payload hash / target 后输出低敏审查包；它不记录 decision、不创建 approval、不执行
+  compensation、不调用下游服务。
 - group memory / multi-party collaboration 必须继续保留 source refs、conversation scope、
   member visibility、time/version boundary、citations 和 no-citation refusal。
 

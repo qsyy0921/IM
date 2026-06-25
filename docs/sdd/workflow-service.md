@@ -478,6 +478,7 @@ go run ./loadtest/workflow -mode record-decision -workflow-id wf_123 -step-id wf
 go run ./loadtest/workflow -mode record-decision -decision-manifest H:\NexusIM\operator-plans\workflow-decision.json
 go run ./loadtest/workflow -mode operator-queues
 go run ./loadtest/workflow -mode list-compensation-instructions -workflow-id wf_123 -status ACTIVE
+go run ./loadtest/workflow -mode compensation-review-bundle -workflow-id wf_123
 ```
 
 该 CLI 只通过 workflow-service 公开 gRPC get workflow、list workflows、record decision
@@ -508,6 +509,15 @@ workflow id、step id、target / payload hash、approval policy 和 correlation 
 仍必须填入 explicit decision / decider / reason / evidence 后，再通过
 `record-decision -decision-manifest` 进行绑定校验。该模式不记录 decision、不调用
 action-executor、不执行 target operation，也不把外部回调当成最终执行证明。
+
+`compensation-review-bundle` 是第一版 compensation instruction 审查包入口：它先调用
+`GetWorkflow`，默认只接受 `COMPENSATION_REQUEST / COMPENSATION_PENDING` workflow，
+再调用 `ListWorkflowCompensationInstructions(status=ACTIVE)` 查询低敏 instruction refs。
+CLI 会校验 workflow id、payload ref hash、target service 和 target operation 绑定一致；
+任何 mismatch 都 fail closed，不输出审查包。审查包只包含 workflow / instruction refs、
+hash、version 和审查边界，不记录 decision、不创建 approval、不修改 instruction 状态、
+不调用 compensation-executor、control-plane-service 或 action-executor。正式 provider-grade
+instruction approval UI 仍是后续项。
 
 `write-workflow-compensation-instruction-manifest.ps1` /
 `validate-workflow-compensation-instruction-manifest.ps1` 是第一版 compensation

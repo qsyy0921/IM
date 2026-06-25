@@ -63,24 +63,25 @@ type config struct {
 }
 
 type commandResult struct {
-	Mode              string                       `json:"mode"`
-	Target            string                       `json:"target"`
-	TenantID          string                       `json:"tenant_id"`
-	WorkflowID        string                       `json:"workflow_id"`
-	WorkflowType      string                       `json:"workflow_type,omitempty"`
-	Status            string                       `json:"status,omitempty"`
-	TargetService     string                       `json:"target_service,omitempty"`
-	TargetOperation   string                       `json:"target_operation,omitempty"`
-	ApprovalPolicyRef string                       `json:"approval_policy_ref,omitempty"`
-	Workflow          *workflowRef                 `json:"workflow,omitempty"`
-	Workflows         []workflowRef                `json:"workflows,omitempty"`
-	OperatorQueues    []operatorQueueRef           `json:"operator_queues,omitempty"`
-	DecisionManifest  *decisionManifestTemplate    `json:"decision_manifest_template,omitempty"`
-	Decision          *decisionRef                 `json:"decision,omitempty"`
-	Decisions         []decisionRef                `json:"decisions,omitempty"`
-	Instructions      []compensationInstructionRef `json:"instructions,omitempty"`
-	Replayed          bool                         `json:"replayed,omitempty"`
-	CheckedAt         time.Time                    `json:"checked_at"`
+	Mode               string                       `json:"mode"`
+	Target             string                       `json:"target"`
+	TenantID           string                       `json:"tenant_id"`
+	WorkflowID         string                       `json:"workflow_id"`
+	WorkflowType       string                       `json:"workflow_type,omitempty"`
+	Status             string                       `json:"status,omitempty"`
+	TargetService      string                       `json:"target_service,omitempty"`
+	TargetOperation    string                       `json:"target_operation,omitempty"`
+	ApprovalPolicyRef  string                       `json:"approval_policy_ref,omitempty"`
+	Workflow           *workflowRef                 `json:"workflow,omitempty"`
+	Workflows          []workflowRef                `json:"workflows,omitempty"`
+	OperatorQueues     []operatorQueueRef           `json:"operator_queues,omitempty"`
+	DecisionManifest   *decisionManifestTemplate    `json:"decision_manifest_template,omitempty"`
+	Decision           *decisionRef                 `json:"decision,omitempty"`
+	Decisions          []decisionRef                `json:"decisions,omitempty"`
+	Instructions       []compensationInstructionRef `json:"instructions,omitempty"`
+	CompensationReview *compensationReviewBundle    `json:"compensation_review,omitempty"`
+	Replayed           bool                         `json:"replayed,omitempty"`
+	CheckedAt          time.Time                    `json:"checked_at"`
 }
 
 type operatorQueueRef struct {
@@ -150,6 +151,19 @@ type compensationInstructionRef struct {
 	UpdatedAtUnixMs int64  `json:"updated_at_unix_ms,omitempty"`
 }
 
+type compensationReviewBundle struct {
+	SchemaVersion      string                       `json:"schema_version"`
+	Workflow           workflowRef                  `json:"workflow"`
+	InstructionStatus  string                       `json:"instruction_status"`
+	InstructionCount   int                          `json:"instruction_count"`
+	Instructions       []compensationInstructionRef `json:"instructions"`
+	ReviewChecks       []string                     `json:"review_checks"`
+	ApprovalBoundary   []string                     `json:"approval_boundary"`
+	ExecutionBoundary  []string                     `json:"execution_boundary"`
+	NoDirectExecution  bool                         `json:"no_direct_execution"`
+	NoDecisionRecorded bool                         `json:"no_decision_recorded"`
+}
+
 type decisionManifest struct {
 	SchemaVersion                string   `json:"schema_version"`
 	WorkflowID                   string   `json:"workflow_id"`
@@ -197,8 +211,9 @@ type decisionManifestTemplate struct {
 }
 
 const (
-	decisionManifestSchemaVersion = "nexusim.workflow.external_decision_manifest.v1"
-	maxDecisionManifestBytes      = 64 * 1024
+	decisionManifestSchemaVersion         = "nexusim.workflow.external_decision_manifest.v1"
+	compensationReviewBundleSchemaVersion = "nexusim.workflow.compensation_review_bundle.v1"
+	maxDecisionManifestBytes              = 64 * 1024
 )
 
 func main() {
@@ -212,7 +227,7 @@ func main() {
 func parseFlags(args []string) config {
 	cfg := config{}
 	flags := flag.NewFlagSet("workflow-operator", flag.ExitOnError)
-	flags.StringVar(&cfg.mode, "mode", "get", "mode: external-callback-wait, get, record-decision, list-workflows, provider-replay-queue, operator-queues, list-compensation-instructions")
+	flags.StringVar(&cfg.mode, "mode", "get", "mode: compensation-review-bundle, external-callback-wait, get, record-decision, list-workflows, provider-replay-queue, operator-queues, list-compensation-instructions")
 	flags.StringVar(&cfg.target, "target", envOr("NEXUSIM_WORKFLOW_GRPC_ADDR", "127.0.0.1:10750"), "workflow-service gRPC target")
 	flags.DurationVar(&cfg.requestTimeout, "request-timeout", 5*time.Second, "request timeout")
 	flags.StringVar(&cfg.tls.CAFile, "workflow-tls-ca-file", os.Getenv("NEXUSIM_WORKFLOW_TLS_CA_FILE"), "CA PEM for workflow-service gRPC TLS")
@@ -230,6 +245,8 @@ func parseFlags(args []string) config {
 	flags.StringVar(&cfg.requesterService, "requester-service", "workflow-operator", "low-sensitive requester service for create workflow modes")
 	flags.StringVar(&cfg.workflowID, "workflow-id", "", "workflow id")
 	flags.StringVar(&cfg.workflowType, "workflow-type", "", "workflow type filter for list-workflows")
+	flags.StringVar(&cfg.expectedWorkflowType, "expected-workflow-type", "", "expected workflow type for binding checks")
+	flags.StringVar(&cfg.expectedStatus, "expected-workflow-status", "", "expected workflow status for binding checks")
 	flags.StringVar(&cfg.stepID, "step-id", "", "workflow step id for record-decision")
 	flags.StringVar(&cfg.decisionManifestPath, "decision-manifest", "", "optional low-sensitive decision manifest JSON for record-decision")
 	flags.StringVar(&cfg.deciderRef, "decider-ref", "operator:workflow-cli", "low-sensitive decider ref for record-decision")
@@ -263,6 +280,8 @@ func parseFlags(args []string) config {
 	cfg.decisionManifestPath = strings.TrimSpace(cfg.decisionManifestPath)
 	cfg.workflowID = strings.TrimSpace(cfg.workflowID)
 	cfg.workflowType = strings.ToUpper(strings.TrimSpace(cfg.workflowType))
+	cfg.expectedWorkflowType = strings.ToUpper(strings.TrimSpace(cfg.expectedWorkflowType))
+	cfg.expectedStatus = strings.ToUpper(strings.TrimSpace(cfg.expectedStatus))
 	cfg.stepID = strings.TrimSpace(cfg.stepID)
 	cfg.deciderRef = strings.TrimSpace(cfg.deciderRef)
 	cfg.decision = strings.ToUpper(strings.TrimSpace(cfg.decision))
@@ -317,6 +336,17 @@ func fillDerivedDefaults(cfg config) config {
 		}
 		if cfg.approvalPolicyRef == "" {
 			cfg.approvalPolicyRef = "admin.workflow.provider_replay.v1"
+		}
+	}
+	if cfg.mode == "compensation-review-bundle" {
+		if cfg.status == "" {
+			cfg.status = "ACTIVE"
+		}
+		if cfg.expectedWorkflowType == "" {
+			cfg.expectedWorkflowType = "COMPENSATION_REQUEST"
+		}
+		if cfg.expectedStatus == "" {
+			cfg.expectedStatus = "COMPENSATION_PENDING"
 		}
 	}
 	return cfg
@@ -569,6 +599,48 @@ func execute(ctx context.Context, cfg config, client workflowv1.WorkflowServiceC
 		for _, instruction := range response.GetInstructions() {
 			result.Instructions = append(result.Instructions, summarizeInstruction(instruction))
 		}
+	case "compensation-review-bundle":
+		workflowResponse, err := client.GetWorkflow(ctx, &workflowv1.GetWorkflowRequest{
+			AuthContext: authContext(cfg),
+			WorkflowId:  cfg.workflowID,
+		})
+		if err != nil {
+			return commandResult{}, fmt.Errorf("get workflow for compensation review bundle: %w", err)
+		}
+		if err := verifyCompensationReviewWorkflowBinding(cfg, workflowResponse.GetWorkflow()); err != nil {
+			return commandResult{}, err
+		}
+		workflow := summarizeWorkflow(workflowResponse.GetWorkflow())
+		if workflow == nil {
+			return commandResult{}, errors.New("compensation review workflow not found")
+		}
+		instructionsResponse, err := client.ListWorkflowCompensationInstructions(ctx, &workflowv1.ListWorkflowCompensationInstructionsRequest{
+			AuthContext: authContext(cfg),
+			WorkflowId:  cfg.workflowID,
+			Status:      cfg.status,
+			PageSize:    cfg.pageSize,
+		})
+		if err != nil {
+			return commandResult{}, fmt.Errorf("list workflow compensation instructions for review bundle: %w", err)
+		}
+		for _, instruction := range instructionsResponse.GetInstructions() {
+			summarized := summarizeInstruction(instruction)
+			if err := verifyCompensationReviewInstructionBinding(*workflow, summarized); err != nil {
+				return commandResult{}, err
+			}
+			result.Instructions = append(result.Instructions, summarized)
+		}
+		if len(result.Instructions) == 0 {
+			return commandResult{}, errors.New("no matching compensation instructions found for review bundle")
+		}
+		result.Workflow = workflow
+		result.WorkflowID = workflow.WorkflowID
+		result.WorkflowType = workflow.WorkflowType
+		result.Status = workflow.Status
+		result.TargetService = workflow.TargetService
+		result.TargetOperation = workflow.TargetOperation
+		result.ApprovalPolicyRef = workflow.ApprovalPolicyRef
+		result.CompensationReview = buildCompensationReviewBundle(*workflow, cfg.status, result.Instructions)
 	default:
 		return commandResult{}, fmt.Errorf("unsupported mode %q", cfg.mode)
 	}
@@ -690,6 +762,17 @@ func (cfg config) validate() error {
 			return err
 		}
 	}
+	if cfg.mode == "compensation-review-bundle" {
+		if cfg.expectedWorkflowType != "COMPENSATION_REQUEST" {
+			return errors.New("expected-workflow-type must be COMPENSATION_REQUEST for compensation-review-bundle")
+		}
+		if cfg.expectedStatus != "COMPENSATION_PENDING" {
+			return errors.New("expected-workflow-status must be COMPENSATION_PENDING for compensation-review-bundle")
+		}
+		if cfg.status != "ACTIVE" {
+			return errors.New("status must be ACTIVE for compensation-review-bundle")
+		}
+	}
 	return nil
 }
 
@@ -808,6 +891,95 @@ func verifyExternalDecisionBinding(cfg config, workflow *workflowv1.Workflow) er
 	return nil
 }
 
+func verifyCompensationReviewWorkflowBinding(cfg config, workflow *workflowv1.Workflow) error {
+	if workflow == nil {
+		return errors.New("compensation review workflow not found")
+	}
+	checks := []struct {
+		name string
+		got  string
+		want string
+	}{
+		{"workflow_id", workflow.GetWorkflowId(), cfg.workflowID},
+		{"workflow_type", workflow.GetWorkflowType(), cfg.expectedWorkflowType},
+		{"status", workflow.GetStatus(), cfg.expectedStatus},
+	}
+	for _, check := range checks {
+		if strings.TrimSpace(check.got) != strings.TrimSpace(check.want) {
+			return fmt.Errorf("compensation review %s binding mismatch", check.name)
+		}
+	}
+	if strings.TrimSpace(workflow.GetPayloadRefHash()) == "" {
+		return errors.New("compensation review workflow payload_ref_hash is required")
+	}
+	return nil
+}
+
+func verifyCompensationReviewInstructionBinding(workflow workflowRef, instruction compensationInstructionRef) error {
+	checks := []struct {
+		name string
+		got  string
+		want string
+	}{
+		{"workflow_id", instruction.WorkflowID, workflow.WorkflowID},
+		{"payload_ref_hash", instruction.PayloadRefHash, workflow.PayloadRefHash},
+		{"target_service", instruction.TargetService, workflow.TargetService},
+		{"target_operation", instruction.TargetOperation, workflow.TargetOperation},
+		{"status", instruction.Status, "ACTIVE"},
+	}
+	for _, check := range checks {
+		if strings.TrimSpace(check.want) == "" {
+			continue
+		}
+		if strings.TrimSpace(check.got) != strings.TrimSpace(check.want) {
+			return fmt.Errorf("compensation review instruction %s binding mismatch", check.name)
+		}
+	}
+	if strings.TrimSpace(instruction.InstructionID) == "" {
+		return errors.New("compensation review instruction_id is required")
+	}
+	if strings.TrimSpace(instruction.InstructionType) == "" {
+		return errors.New("compensation review instruction_type is required")
+	}
+	return nil
+}
+
+func buildCompensationReviewBundle(
+	workflow workflowRef,
+	instructionStatus string,
+	instructions []compensationInstructionRef,
+) *compensationReviewBundle {
+	copiedInstructions := append([]compensationInstructionRef(nil), instructions...)
+	return &compensationReviewBundle{
+		SchemaVersion:     compensationReviewBundleSchemaVersion,
+		Workflow:          workflow,
+		InstructionStatus: instructionStatus,
+		InstructionCount:  len(copiedInstructions),
+		Instructions:      copiedInstructions,
+		ReviewChecks: []string{
+			"workflow_type_status_payload_binding_verified",
+			"active_instruction_refs_bound_to_same_workflow",
+			"instruction_payload_hash_matches_workflow_payload_hash",
+			"instruction_target_matches_workflow_target",
+			"operator_must_use_explicit_approval_or_repair_invocation",
+		},
+		ApprovalBoundary: []string{
+			"review_bundle_is_read_only",
+			"does_not_record_workflow_decision",
+			"does_not_create_or_reuse_approval",
+			"does_not_modify_compensation_instruction_status",
+		},
+		ExecutionBoundary: []string{
+			"does_not_execute_compensation",
+			"does_not_call_control_plane_or_action_executor",
+			"workflow_compensation_executor_remains_final_compensation_execution_owner",
+			"downstream_mutation_requires_public_service_api_and_audit",
+		},
+		NoDirectExecution:  true,
+		NoDecisionRecorded: true,
+	}
+}
+
 func validateLowSensitiveRefs(field string, values []string) error {
 	for _, value := range values {
 		if err := validateLowSensitiveRef(field, value); err != nil {
@@ -921,6 +1093,7 @@ func summarizeInstruction(instruction *workflowv1.WorkflowCompensationInstructio
 
 func isAllowedMode(value string) bool {
 	return value == "external-callback-wait" ||
+		value == "compensation-review-bundle" ||
 		value == "get" ||
 		value == "record-decision" ||
 		value == "list-workflows" ||
@@ -932,6 +1105,7 @@ func isAllowedMode(value string) bool {
 func requiresWorkflowID(value string) bool {
 	return value == "get" ||
 		value == "record-decision" ||
+		value == "compensation-review-bundle" ||
 		value == "list-compensation-instructions"
 }
 
@@ -939,6 +1113,7 @@ func isListMode(value string) bool {
 	return value == "list-workflows" ||
 		value == "provider-replay-queue" ||
 		value == "operator-queues" ||
+		value == "compensation-review-bundle" ||
 		value == "list-compensation-instructions"
 }
 

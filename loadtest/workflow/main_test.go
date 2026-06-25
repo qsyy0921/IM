@@ -35,6 +35,27 @@ func TestParseFlagsBuildsListInstructionDefaults(t *testing.T) {
 	}
 }
 
+func TestParseFlagsBuildsCompensationReviewBundleDefaults(t *testing.T) {
+	cfg := parseFlags([]string{
+		"-mode", "compensation-review-bundle",
+		"-workflow-id", "wf_1",
+	})
+	if cfg.mode != "compensation-review-bundle" {
+		t.Fatalf("mode = %q", cfg.mode)
+	}
+	if cfg.status != "ACTIVE" ||
+		cfg.expectedWorkflowType != "COMPENSATION_REQUEST" ||
+		cfg.expectedStatus != "COMPENSATION_PENDING" {
+		t.Fatalf("unexpected review defaults: %+v", cfg)
+	}
+	if cfg.requestID != "workflow-operator-compensation-review-bundle" || cfg.traceID != cfg.requestID {
+		t.Fatalf("unexpected request/trace ids: %+v", cfg)
+	}
+	if err := cfg.validate(); err != nil {
+		t.Fatalf("validate: %v", err)
+	}
+}
+
 func TestParseFlagsBuildsProviderReplayQueueDefaults(t *testing.T) {
 	cfg := parseFlags([]string{
 		"-mode", "provider-replay-queue",
@@ -641,6 +662,98 @@ func TestExecuteListCompensationInstructions(t *testing.T) {
 	}
 }
 
+func TestExecuteCompensationReviewBundleBuildsReadOnlyBundle(t *testing.T) {
+	cfg := parseFlags([]string{
+		"-mode", "compensation-review-bundle",
+		"-tenant-id", "tenant-wf",
+		"-workflow-id", "wf_comp_1",
+		"-page-size", "5",
+	})
+	client := &fakeWorkflowClient{
+		getResponse: &workflowv1.GetWorkflowResponse{Workflow: compensationReviewWorkflow()},
+		response: &workflowv1.ListWorkflowCompensationInstructionsResponse{
+			Instructions: []*workflowv1.WorkflowCompensationInstruction{compensationReviewInstruction()},
+		},
+	}
+	result, err := execute(context.Background(), cfg, client)
+	if err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if client.getRequest == nil || client.getRequest.GetWorkflowId() != "wf_comp_1" {
+		t.Fatalf("expected workflow lookup, got %+v", client.getRequest)
+	}
+	if client.request == nil ||
+		client.request.GetWorkflowId() != "wf_comp_1" ||
+		client.request.GetStatus() != "ACTIVE" ||
+		client.request.GetPageSize() != 5 {
+		t.Fatalf("unexpected instruction request: %+v", client.request)
+	}
+	if client.decisionRequest != nil {
+		t.Fatalf("review bundle must not record decisions: %+v", client.decisionRequest)
+	}
+	if result.CompensationReview == nil ||
+		result.CompensationReview.SchemaVersion != compensationReviewBundleSchemaVersion ||
+		result.CompensationReview.Workflow.WorkflowID != "wf_comp_1" ||
+		result.CompensationReview.InstructionCount != 1 ||
+		!result.CompensationReview.NoDirectExecution ||
+		!result.CompensationReview.NoDecisionRecorded {
+		t.Fatalf("unexpected review bundle: %+v", result.CompensationReview)
+	}
+	if len(result.CompensationReview.ExecutionBoundary) == 0 ||
+		len(result.CompensationReview.ApprovalBoundary) == 0 {
+		t.Fatalf("expected explicit boundaries: %+v", result.CompensationReview)
+	}
+}
+
+func TestExecuteCompensationReviewBundleRejectsWorkflowMismatchBeforeListingInstructions(t *testing.T) {
+	cfg := parseFlags([]string{
+		"-mode", "compensation-review-bundle",
+		"-tenant-id", "tenant-wf",
+		"-workflow-id", "wf_comp_1",
+	})
+	workflow := compensationReviewWorkflow()
+	workflow.Status = "APPROVED"
+	client := &fakeWorkflowClient{
+		getResponse: &workflowv1.GetWorkflowResponse{Workflow: workflow},
+		response: &workflowv1.ListWorkflowCompensationInstructionsResponse{
+			Instructions: []*workflowv1.WorkflowCompensationInstruction{compensationReviewInstruction()},
+		},
+	}
+	if _, err := execute(context.Background(), cfg, client); err == nil ||
+		!strings.Contains(err.Error(), "status binding mismatch") {
+		t.Fatalf("expected status binding mismatch, got %v", err)
+	}
+	if client.request != nil {
+		t.Fatalf("instructions must not be listed after workflow mismatch: %+v", client.request)
+	}
+	if client.decisionRequest != nil {
+		t.Fatalf("review bundle must not record decisions: %+v", client.decisionRequest)
+	}
+}
+
+func TestExecuteCompensationReviewBundleRejectsInstructionMismatch(t *testing.T) {
+	cfg := parseFlags([]string{
+		"-mode", "compensation-review-bundle",
+		"-tenant-id", "tenant-wf",
+		"-workflow-id", "wf_comp_1",
+	})
+	instruction := compensationReviewInstruction()
+	instruction.PayloadRefHash = "sha256:different-payload"
+	client := &fakeWorkflowClient{
+		getResponse: &workflowv1.GetWorkflowResponse{Workflow: compensationReviewWorkflow()},
+		response: &workflowv1.ListWorkflowCompensationInstructionsResponse{
+			Instructions: []*workflowv1.WorkflowCompensationInstruction{instruction},
+		},
+	}
+	if _, err := execute(context.Background(), cfg, client); err == nil ||
+		!strings.Contains(err.Error(), "payload_ref_hash binding mismatch") {
+		t.Fatalf("expected instruction payload binding mismatch, got %v", err)
+	}
+	if client.decisionRequest != nil {
+		t.Fatalf("review bundle must not record decisions: %+v", client.decisionRequest)
+	}
+}
+
 func TestRunOutputDoesNotExposePayloadOrReasonBody(t *testing.T) {
 	result := commandResult{
 		Mode:       "get",
@@ -686,6 +799,20 @@ func TestRunOutputDoesNotExposePayloadOrReasonBody(t *testing.T) {
 			PayloadRefHash: "sha256:payload",
 			ReasonRef:      "reason-sha256:abc",
 		}},
+		CompensationReview: &compensationReviewBundle{
+			SchemaVersion: compensationReviewBundleSchemaVersion,
+			Workflow: workflowRef{
+				WorkflowID:     "wf_comp_1",
+				PayloadRefHash: "sha256:payload",
+			},
+			Instructions: []compensationInstructionRef{{
+				InstructionID:  "wfi_1",
+				PayloadRefHash: "sha256:payload",
+				ReasonRef:      "reason-sha256:abc",
+			}},
+			NoDirectExecution:  true,
+			NoDecisionRecorded: true,
+		},
 	}
 	var builder strings.Builder
 	if err := json.NewEncoder(&builder).Encode(result); err != nil {
@@ -736,6 +863,40 @@ func matchingExternalDecisionWorkflow() *workflowv1.Workflow {
 		ApprovalPolicyRef:    "admin.workflow.provider_replay.v1",
 		Status:               "WAITING_DECISION",
 		CurrentStepId:        "wfs_external",
+	}
+}
+
+func compensationReviewWorkflow() *workflowv1.Workflow {
+	return &workflowv1.Workflow{
+		WorkflowId:           "wf_comp_1",
+		WorkflowType:         "COMPENSATION_REQUEST",
+		RiskLevel:            "HIGH",
+		TargetService:        "control-plane-service",
+		TargetOperation:      "CONFIG_ROLLBACK",
+		TargetRefHash:        "sha256:target",
+		PayloadSchemaVersion: "admin.config_rollback.v1",
+		PayloadRefHash:       "sha256:payload",
+		ApprovalPolicyRef:    "admin.workflow.compensation.v1",
+		Status:               "COMPENSATION_PENDING",
+		CurrentStepId:        "wfs_comp_1",
+	}
+}
+
+func compensationReviewInstruction() *workflowv1.WorkflowCompensationInstruction {
+	return &workflowv1.WorkflowCompensationInstruction{
+		InstructionId:   "wfi_1",
+		WorkflowId:      "wf_comp_1",
+		PayloadRefHash:  "sha256:payload",
+		TargetService:   "control-plane-service",
+		TargetOperation: "CONFIG_ROLLBACK",
+		InstructionType: "CONTROL_PLANE_ROLLBACK",
+		Environment:     "local",
+		ConfigKind:      "API_GATEWAY_TENANT_QUOTA",
+		BundleKey:       "tenant-a",
+		TargetVersion:   "quota-v1",
+		OperatorRef:     "operator:cli",
+		ReasonRef:       "reason-sha256:abc",
+		Status:          "ACTIVE",
 	}
 }
 

@@ -32,6 +32,9 @@ admin operation approval、补偿请求和人工审批状态。
 - `loadtest/workflow operator-queues`：按固定 operator 队列展示 action approval、
   repair approval、provider replay、admin operation、compensation request 和
   compensation pending 的低敏 workflow refs / counts；不记录 decision、不执行 replay。
+- `loadtest/workflow compensation-review-bundle`：读取 `COMPENSATION_PENDING`
+  workflow 和 `ACTIVE` instruction refs，校验 workflow id / payload hash / target
+  绑定后输出低敏审查包；不记录 decision、不执行 compensation、不调用下游服务。
 - `loadtest/workflow provider-replay-queue`：默认列出等待
   `admin.workflow.provider_replay.v1` 审批的 action-executor
   `PROVIDER_REPLAY_REQUEST` workflow；不执行 redrive、不修改 DLQ、不暴露 raw payload。
@@ -44,5 +47,5 @@ admin operation approval、补偿请求和人工审批状态。
   `REPAIR_APPROVAL` workflow，target service 为 `action-executor`；workflow-service 只记录
   低敏审批状态，不执行 provider replay。
 
-后续：更多 compensation adapter、instruction approval UI、outbox relay、
+后续：更多 compensation adapter、provider-grade instruction approval UI、outbox relay、
 provider-grade approval UI、repair operators。

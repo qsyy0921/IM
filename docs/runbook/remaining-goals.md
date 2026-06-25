@@ -77,13 +77,13 @@
 - `workflow-service`：external callback delivery plan、delivery status / redrive plan、
   persistent delivery worker first path、redrive operator path、callback delivery review page、
   callback delivery dashboard、batch redrive invocation / runner / result manifest、approval queue review page、
-  approval queue batch decision manifest、
+  approval queue batch decision manifest / runner、
   compensation review bundle / review page /
   instruction approval page / execution readiness manifest / execution invocation manifest /
   execution result visibility / execution audit append manifest handoff /
   audit append result manifest 已落；
   后续继续补更多 compensation adapter、callback delivery provider-grade persisted dashboard /
-  provider-grade approval platform / decision execution runner。
+  provider-grade approval platform。
 
 ## 9 个核心 IM 服务 P2
 

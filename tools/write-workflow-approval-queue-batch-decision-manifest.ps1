@@ -292,6 +292,9 @@ foreach ($workflow in $workflows) {
     }
     $seenWorkflowStep[$dedupe] = $true
 
+    $decisionIdentityHash = Get-RepairSha256Hex -Bytes ([System.Text.Encoding]::UTF8.GetBytes("${BatchDecisionID}:$($workflow.workflow_id):$($workflow.step_id):${decisionValue}:$($DeciderRef.Trim())"))
+    $batchIdentityHash = Get-RepairSha256Hex -Bytes ([System.Text.Encoding]::UTF8.GetBytes($BatchDecisionID))
+    $workflowIdentityHash = Get-RepairSha256Hex -Bytes ([System.Text.Encoding]::UTF8.GetBytes($workflow.workflow_id))
     $decisionPath = Join-Path ([System.IO.Path]::GetFullPath($OutputRootPath)) (Get-SafeDecisionFileName -WorkflowID $workflow.workflow_id -StepID $workflow.step_id)
     $writerArgs = @(
         "-NoProfile", "-ExecutionPolicy", "Bypass",
@@ -310,10 +313,10 @@ foreach ($workflow in $workflows) {
         "-Decision", $decisionValue,
         "-DeciderRef", $DeciderRef,
         "-DecisionPolicyRef", $DecisionPolicyRef,
-        "-IdempotencyKey", "workflow-batch-decision:${BatchDecisionID}:$($workflow.workflow_id):$($workflow.step_id):${decisionValue}:${DeciderRef}",
-        "-CorrelationID", "workflow-batch-decision:$BatchDecisionID",
-        "-CausationID", "workflow:$($workflow.workflow_id)",
-        "-TraceID", "workflow-batch-decision:$BatchDecisionID"
+        "-IdempotencyKey", "workflow-decision-$decisionIdentityHash",
+        "-CorrelationID", "workflow-batch-$batchIdentityHash",
+        "-CausationID", "workflow-$workflowIdentityHash",
+        "-TraceID", "workflow-batch-$batchIdentityHash"
     )
     if (-not [string]::IsNullOrWhiteSpace($ReasonRef)) {
         $writerArgs += @("-ReasonRef", $ReasonRef)

@@ -540,6 +540,7 @@ go run ./loadtest/workflow -mode record-decision -decision-manifest H:\NexusIM\o
 go run ./loadtest/workflow -mode operator-queues
 .\tools\write-workflow-approval-queue-review-page.ps1 -QueueSummaryPath H:\NexusIM\operator-plans\workflow-operator-queues.json -GeneratedBy operator-a -OutputPath H:\NexusIM\operator-plans\workflow-approval-queue-review.html
 .\tools\write-workflow-approval-queue-batch-decision-manifest.ps1 -QueueSummaryPath H:\NexusIM\operator-plans\workflow-operator-queues.json -OutputRootPath H:\NexusIM\operator-plans\workflow-batch-decisions -Decision APPROVE -DeciderRef operator-a -ReasonFile H:\NexusIM\operator-plans\workflow-decision-reason.txt -BatchManifestPath H:\NexusIM\operator-plans\workflow-batch-decision.json
+.\tools\invoke-workflow-approval-queue-batch-decision.ps1 -BatchDecisionPath H:\NexusIM\operator-plans\workflow-batch-decision.json -DecisionManifestRootPath H:\NexusIM\operator-plans\workflow-batch-decisions -WorkflowOperatorPath E:\development\IM\bin\workflow-operator.exe -ExecutionSummaryRootPath H:\NexusIM\operator-plans\workflow-batch-decision-results -GeneratedBy operator-a -ResultManifestPath H:\NexusIM\operator-plans\workflow-batch-decision-result.json -AllowMutating
 .\tools\write-workflow-external-callback-delivery-dashboard.ps1 -DeliveryStatusRootPath H:\NexusIM\operator-plans\workflow-callback-statuses -RedrivePlanRootPath H:\NexusIM\operator-plans\workflow-callback-redrives -GeneratedBy operator-a -OutputPath H:\NexusIM\operator-plans\workflow-callback-delivery-dashboard.html
 .\tools\write-workflow-external-callback-batch-redrive-invocation.ps1 -RedrivePlanRootPath H:\NexusIM\operator-plans\workflow-callback-redrives -DashboardPath H:\NexusIM\operator-plans\workflow-callback-delivery-dashboard.html -PreparedBy operator-a -OutputPath H:\NexusIM\operator-plans\workflow-callback-batch-redrive-invocation.json
 .\tools\invoke-workflow-external-callback-batch-redrive.ps1 -BatchInvocationPath H:\NexusIM\operator-plans\workflow-callback-batch-redrive-invocation.json -RedrivePlanRootPath H:\NexusIM\operator-plans\workflow-callback-redrives -WorkflowServicePath E:\development\IM\bin\workflow-service.exe -ExecutionSummaryRootPath H:\NexusIM\operator-plans\workflow-callback-redrive-summaries -GeneratedBy operator-a -TenantID tenant_123 -ResultManifestPath H:\NexusIM\operator-plans\workflow-callback-batch-redrive-result.json -AllowMutating
@@ -616,6 +617,17 @@ step / target / payload / approval policy binding、decision manifest hash 和 p
 provider body 或本机路径。后续真正状态变更仍必须逐条通过
 `record-decision -decision-manifest` 的 `GetWorkflow` binding check 和
 `RecordWorkflowDecision` 完成。
+
+`invoke-workflow-approval-queue-batch-decision.ps1` 是 batch decision manifest 之后的
+显式 mutating runner：必须传 `-AllowMutating`，读取 batch manifest 的每个 decision
+manifest hash，从仓库外 `DecisionManifestRootPath` 找到对应单条
+`nexusim.workflow.external_decision_manifest.v1`，并逐条调用既有
+`record-decision -decision-manifest` 入口。因此每条 decision 仍会先执行 `GetWorkflow`
+binding check，再由 `workflow-service.RecordWorkflowDecision` 写入 workflow decision。
+runner 只记录 workflow decision 和低敏 execution summary / result manifest；不调用
+action-executor，不执行 compensation，不 redrive provider，不执行 target action，也不输出
+operator 本机路径、raw payload、reason 原文、provider body、EvidencePack 或 credential-like
+内容。
 
 `external-callback-wait` 是第一版外部回调等待入口：它通过 workflow-service
 `CreateWorkflow` 创建一个显式 `WAITING_DECISION` workflow，并输出

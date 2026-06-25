@@ -256,9 +256,12 @@
   runtime contract，输出 env 名称、owner、hash 和 required checks，不执行 compensation、
   不调用 control-plane、不修改 workflow / compensation rows；
   workflow 第一路径已通过完整 `check-local`，本 worker / executor / registry / timer /
-  callback delivery 切片按风险分层用 focused checks 收口；不宣称多 adapter compensation
-  platform、provider-grade instruction UI、callback delivery provider-grade UI
-  或 workflow outbox relay。
+  callback delivery / outbox relay 切片按风险分层用 focused checks 收口；workflow
+  `outbox-relay` first path 已能把自有 `workflow_outbox` 发布为
+  `im.workflow.events` 低敏 JSON envelope，并用同 workflow 旧 `PENDING` / `DLQ`
+  row 阻塞后续事件；不宣称多 adapter compensation platform、
+  provider-grade instruction UI、callback delivery provider-grade UI
+  或 workflow outbox relay 真实 Kafka smoke 已完成。
 - `vector-index-service` product-active：SDD v0.1 和 stage-switch review 已通过，
   第一版 proto / migration / 六层 skeleton / `grpc` runtime / Docker /
   Prometheus / Grafana 覆盖已落；当前覆盖 `UpsertVectorItem`、
@@ -482,7 +485,7 @@ Web / PC / Android 已进入当前 client platform MVP foundation；面试叙述
 - runbook consistency 门禁，防止 `development-progress.md` / service brief 已标记完成的事项继续残留在 `remaining-goals.md`
 - 压测原始输出路径门禁，loadtest / smoke 默认结果不能写回仓库内 `loadtest/results`，原始数据默认落 `H:\NexusIM\loadtest-results`；9 服务 `capacity_summary` 合约、`tools/summarize-loadtest-capacity-baselines.ps1` 容量基线汇总器、`tools/run-loadtest-capacity-baseline-suite.ps1` dry-run / 顺序执行入口、`tools/write-capacity-longrun-campaign-plan.ps1` 30m+ 长压 campaign 计划入口、`tools/test-capacity-longrun-campaign-preflight.ps1` plan-driven 长压就绪预检入口、`tools/invoke-capacity-longrun-campaign.ps1` plan-driven 长压执行 / dry-run 入口、`tools/summarize-capacity-longrun-campaign.ps1` 长压完成结果汇总 / report 生成入口，以及 `docs/runbook/capacity-baseline-evidence.json` / `docs/runbook/capacity-longrun-campaign-evidence.json` 低敏证据索引、validator 和追加工具已有本地自测门禁，suite 会区分 direct runner、需要后台角色的 stack runner 与 seeded-only runner；`deploy/local/docker-compose.service-workers.yml` 已提供本地 relay / consumer worker overlay，`loadtest/capacityseed` 已提供 message / conversation / delivery seeded runner fixture，且本地 seeded 短基线已覆盖 message / conversation / delivery；contacts stack 短基线已覆盖 contacts outbox relay 和 Kafka readback，且 contacts runner 已支持 `--duration` / `--vus` 容量模式；identity stack 短基线已覆盖临时 webhook fixture 与 challenge-delivery-worker，且 identity runner 已支持 `--duration` / `--vus` Login/Refresh 热路径容量模式；receipt stack 短基线已覆盖 message / delivery / receipt relay-consumer 链路和 receipt Kafka readback；api-gateway stack 短基线已覆盖 secure mTLS + HMAC GatewayService facade、push WebSocket、delivery / receipt / policy Kafka readback；push-gateway stack 短基线已覆盖 full 场景在线 notify / PullInbox / ACK / delivery_outbox；policy-service 已有本地 direct 短基线和一条 clean commit direct 30m 长跑切片；delivery-service、message-service、conversation-service 已有本地 seeded 30m 长跑切片；identity-service、contacts-service 和 receipt-service 已有本地 stack 30m 长跑切片；9 个服务的短基线证据已覆盖，且 9 服务 30m+ planned long-run campaign 已登记到 `capacity-longrun-campaign-evidence.json`，后续仍需完整 9 服务长时间运行、资源曲线和生产 sizing
 - outbox / projection / challenge delivery 等 repair / audit / cleanup operator，并通过 `docs/runbook/repair-operators.md` 提供统一入口；本地门禁会校验文档中的 operator mode 与对应服务 cmd 入口一致
-- `check-local` 会显式检查子门禁脚本和原生命令 exit code，避免出现打印 `FAIL` 但总检查仍返回成功的假绿。
+- `check-local` 会显式检查子门禁脚本和原生命令 exit code，避免出现打印 `FAIL` 但总检查仍返回成功的假绿；同时会把当前运行 / 失败的子门禁记录到 `.git\nexusim-check-local-state.json`，下次默认从该失败点继续，必要时可用 `-NoResume` 强制完整重跑或 `-ResetResume` 清理旧状态。
 - worker / relay 非取消错误退避重试
 - identity-service 已补 opt-in production key guard，并已纳入 `check-local` 与 security gate catalog；生产样式启动会拒绝 legacy / HS256 gateway token 和 MFA / recovery / challenge token 的 local shared key；这只是本地启动安全门禁，不等同于 KMS/HSM。
 

@@ -52,6 +52,8 @@ const (
 	WorkflowEventCompensationRequested     = "workflow.compensation.requested.v1"
 	WorkflowEventCompensationSucceeded     = "workflow.compensation.succeeded.v1"
 	WorkflowEventCompensationFailed        = "workflow.compensation.failed.v1"
+	WorkflowEventSubmitted                 = "workflow.submitted.v1"
+	WorkflowEventDecisionRecorded          = "workflow.decision.recorded.v1"
 	WorkflowEventTimedOut                  = "workflow.timed_out.v1"
 	WorkflowEventExternalCallbackDelivered = "workflow.external_callback.delivered.v1"
 	WorkflowEventExternalCallbackDLQ       = "workflow.external_callback.dlq.v1"

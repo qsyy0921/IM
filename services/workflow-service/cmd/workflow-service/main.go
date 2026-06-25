@@ -19,10 +19,12 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	workflowgrpc "github.com/qsyy0921/IM/services/workflow-service/internal/api/grpc"
 	"github.com/qsyy0921/IM/services/workflow-service/internal/app"
+	kafkainfra "github.com/qsyy0921/IM/services/workflow-service/internal/infrastructure/kafka"
 	postgresinfra "github.com/qsyy0921/IM/services/workflow-service/internal/infrastructure/postgres"
 	rpcinfra "github.com/qsyy0921/IM/services/workflow-service/internal/infrastructure/rpc"
 	"github.com/qsyy0921/IM/services/workflow-service/internal/trigger/compensation"
 	externalcallback "github.com/qsyy0921/IM/services/workflow-service/internal/trigger/externalcallback"
+	"github.com/qsyy0921/IM/services/workflow-service/internal/trigger/outbox"
 	timertrigger "github.com/qsyy0921/IM/services/workflow-service/internal/trigger/timer"
 	"github.com/qsyy0921/IM/services/workflow-service/internal/types"
 	"google.golang.org/grpc"
@@ -47,6 +49,8 @@ func run(ctx context.Context) error {
 		return runNoop(ctx)
 	case "grpc":
 		return runGRPC(ctx)
+	case "outbox-relay":
+		return runOutboxRelay(ctx)
 	case "timer-worker":
 		return runTimerWorker(ctx)
 	case "compensation-worker":
@@ -91,6 +95,54 @@ func runTimerWorker(ctx context.Context) error {
 	})
 	log.Println("workflow-service timer-worker started")
 	if err := worker.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
+		return err
+	}
+	return nil
+}
+
+func runOutboxRelay(ctx context.Context) error {
+	debugAddr, err := workflowDebugAddrFromEnv()
+	if err != nil {
+		return err
+	}
+	stopDebug, err := startDebugServer(ctx, debugAddr)
+	if err != nil {
+		return err
+	}
+	defer stopDebug()
+
+	pool, err := openPGPool(ctx)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	brokers := splitCSV(os.Getenv("NEXUSIM_KAFKA_BROKERS"))
+	producer, err := kafkainfra.NewWriterProducer(brokers)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err := producer.Close(); err != nil {
+			log.Printf("workflow outbox relay kafka producer close failed: %v", err)
+		}
+	}()
+
+	relay := outbox.NewRelay(
+		postgresinfra.NewOutboxStore(pool),
+		producer,
+		outbox.Config{
+			Topic:          envString("NEXUSIM_WORKFLOW_EVENTS_TOPIC", outbox.TopicWorkflowEvents),
+			BatchSize:      envInt("NEXUSIM_WORKFLOW_OUTBOX_BATCH_SIZE", 500),
+			PollInterval:   envDuration("NEXUSIM_WORKFLOW_OUTBOX_POLL_INTERVAL", time.Second),
+			MaxAttempts:    envInt("NEXUSIM_WORKFLOW_OUTBOX_MAX_ATTEMPTS", 5),
+			RetryBaseDelay: envDuration("NEXUSIM_WORKFLOW_OUTBOX_RETRY_BASE_DELAY", time.Second),
+			ErrorBackoff:   envDuration("NEXUSIM_WORKFLOW_OUTBOX_ERROR_BACKOFF", time.Second),
+			Logf:           log.Printf,
+		},
+	)
+	log.Println("workflow-service outbox-relay started")
+	if err := relay.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
 		return err
 	}
 	return nil
@@ -530,7 +582,7 @@ func workflowModeFromEnv() string {
 
 func validateWorkflowMode(mode string) error {
 	switch mode {
-	case "noop", "grpc", "timer-worker", "compensation-worker", "compensation-executor", "compensation-instruction-import",
+	case "noop", "grpc", "outbox-relay", "timer-worker", "compensation-worker", "compensation-executor", "compensation-instruction-import",
 		"external-callback-delivery-import", "external-callback-delivery-redrive", "external-callback-delivery-worker":
 		return nil
 	default:
@@ -593,6 +645,18 @@ func envString(name string, defaultValue string) string {
 		return defaultValue
 	}
 	return value
+}
+
+func splitCSV(value string) []string {
+	parts := strings.Split(value, ",")
+	result := make([]string, 0, len(parts))
+	for _, part := range parts {
+		trimmed := strings.TrimSpace(part)
+		if trimmed != "" {
+			result = append(result, trimmed)
+		}
+	}
+	return result
 }
 
 func envInt(name string, defaultValue int) int {

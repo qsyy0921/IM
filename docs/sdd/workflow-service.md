@@ -341,6 +341,13 @@ adapter、provider-grade instruction / approval UI 和正式运维后置。
 failure class、timer refs、correlation refs。禁止包含 reason 原文、业务 payload 原文、
 EvidencePack、proposal 正文、provider body、secret、SQL error 或 operator shell 输出。
 
+第一版 `outbox-relay` 读取 workflow-service 自有 `workflow_outbox`，向
+`im.workflow.events` 发布 `nexusim.workflow.event_envelope.v1` JSON envelope。relay
+不执行 workflow、不记录 decision、不调用 provider / target service，也不读取其它服务私有表。
+同一 `tenant_id + workflow_id` 下旧的 `PENDING` / `DLQ` outbox row 会阻塞后续 row，
+repair / redrive 只能显式处理旧 row 后再继续推进。后续若引入 protobuf schema 或更多
+consumer，必须 expand-only，并保持 payload 只包含低敏 refs / hashes。
+
 ## 8. 数据库设计
 
 第一版表：
@@ -536,6 +543,7 @@ target_ref、reason_ref、trace_id 或 request_id。
 
 ```text
 NEXUSIM_WORKFLOW_SERVICE_MODE=grpc
+NEXUSIM_WORKFLOW_SERVICE_MODE=outbox-relay
 NEXUSIM_WORKFLOW_SERVICE_MODE=timer-worker
 NEXUSIM_WORKFLOW_SERVICE_MODE=compensation-worker
 NEXUSIM_WORKFLOW_SERVICE_MODE=compensation-executor

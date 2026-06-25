@@ -366,6 +366,12 @@
       "service": "workflow-service",
       "env": "NEXUSIM_WORKFLOW_SERVICE_MODE",
       "value": "timer-worker"
+    },
+    {
+      "name": "workflow-service-outbox-relay",
+      "service": "workflow-service",
+      "env": "NEXUSIM_WORKFLOW_SERVICE_MODE",
+      "value": "outbox-relay"
     }
   ]
 }

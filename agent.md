@@ -129,4 +129,8 @@ Use tiered gates:
 3. One-service changes: that service tests, build, and relevant smoke.
 4. Cross-service, generated code, migration, registry, Docker/compose, security
    boundary, or pre-push changes: `.\tools\check-local.ps1`.
+   `check-local` records the currently running / failed sub-gate in
+   `.git\nexusim-check-local-state.json` and the next run resumes from that
+   sub-gate by default. Use `-NoResume` for a fresh full run, `-ResetResume` to
+   clear stale state, or `-StartAt "<step name>"` for an explicit continuation.
 5. End with `git status --short --branch --untracked-files=all`.

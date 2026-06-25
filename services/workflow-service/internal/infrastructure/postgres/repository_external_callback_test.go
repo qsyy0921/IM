@@ -35,7 +35,7 @@ func TestRepositoryExternalCallbackDeliveryLifecycleIntegration(t *testing.T) {
 		t.Fatalf("unexpected replay replayed=%v %+v", replayed, replayedDelivery)
 	}
 
-	now := time.Date(2026, 6, 25, 12, 0, 0, 0, time.UTC)
+	now := time.Now().UTC().Add(time.Second)
 	claimed, err := repository.ClaimReadyExternalCallbackDeliveries(ctx, now, 10, time.Minute)
 	if err != nil {
 		t.Fatalf("claim external callback delivery: %v", err)
@@ -70,7 +70,7 @@ func TestRepositoryExternalCallbackDeliveryRetryAndDLQIntegration(t *testing.T) 
 		t.Fatalf("register external callback delivery: %v", err)
 	}
 
-	now := time.Date(2026, 6, 25, 12, 0, 0, 0, time.UTC)
+	now := time.Now().UTC().Add(time.Second)
 	claimed, err := repository.ClaimReadyExternalCallbackDeliveries(ctx, now, 10, time.Minute)
 	if err != nil {
 		t.Fatalf("claim first attempt: %v", err)
@@ -84,7 +84,7 @@ func TestRepositoryExternalCallbackDeliveryRetryAndDLQIntegration(t *testing.T) 
 	}
 	if retryPending.Status != types.WorkflowExternalCallbackDeliveryStatusRetryPending ||
 		retryPending.LastFailureClass != "provider_unavailable" ||
-		!retryPending.AvailableAt.Equal(retryAt) {
+		retryPending.AvailableAt.Sub(retryAt).Abs() > time.Millisecond {
 		t.Fatalf("unexpected retry pending state: %+v", retryPending)
 	}
 
@@ -120,7 +120,7 @@ func TestRepositoryExternalCallbackDeliveryRedriveIntegration(t *testing.T) {
 		t.Fatalf("register external callback delivery: %v", err)
 	}
 
-	now := time.Date(2026, 6, 25, 12, 0, 0, 0, time.UTC)
+	now := time.Now().UTC().Add(time.Second)
 	claimed, err := repository.ClaimReadyExternalCallbackDeliveries(ctx, now, 10, time.Minute)
 	if err != nil {
 		t.Fatalf("claim delivery: %v", err)

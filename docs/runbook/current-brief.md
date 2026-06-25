@@ -28,8 +28,8 @@ brief、loadtest report、development-progress 或 archive。
   approval queue review page / batch decision manifest /
   runner / result review page / audit append handoff / audit append result manifest、
   compensation review bundle / page、instruction approval page、execution readiness /
-  invocation manifest、execution result visibility、audit append manifest handoff 和
-  audit append result manifest。
+  invocation manifest、execution result visibility、audit append manifest handoff、
+  audit append result manifest，以及 workflow outbox relay first path。
 - group memory / retrieval / eval 持续保留 source refs、conversation scope、
   member visibility、time/version boundary、citations 和 no-citation refusal。
 

@@ -1,6 +1,10 @@
 param(
     [switch]$SkipPowerShellParser,
-    [switch]$SkipShellParser
+    [switch]$SkipShellParser,
+    [switch]$NoResume,
+    [switch]$ResetResume,
+    [string]$StartAt = "",
+    [string]$ResumeStatePath = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -8,15 +12,129 @@ $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent $PSScriptRoot
 Push-Location $repoRoot
 try {
-    function Invoke-LocalCheck {
+    if ([string]::IsNullOrWhiteSpace($ResumeStatePath)) {
+        $gitDir = Join-Path $repoRoot ".git"
+        if (Test-Path -LiteralPath $gitDir -PathType Container) {
+            $ResumeStatePath = Join-Path $gitDir "nexusim-check-local-state.json"
+        } else {
+            $ResumeStatePath = Join-Path ([System.IO.Path]::GetTempPath()) "nexusim-check-local-state.json"
+        }
+    }
+    $ResumeStatePath = [System.IO.Path]::GetFullPath($ResumeStatePath)
+
+    function Write-LocalCheckState {
         param(
-            [string]$ScriptName
+            [string]$Status,
+            [string]$StepName,
+            [string]$ScriptName = "",
+            [int]$ExitCode = 0,
+            [string]$Message = ""
         )
 
+        $state = [pscustomobject]@{
+            schema_version = 1
+            status = $Status
+            step_name = $StepName
+            script_name = $ScriptName
+            exit_code = $ExitCode
+            message = $Message
+            repo_root = $repoRoot
+            updated_at = (Get-Date).ToUniversalTime().ToString("o")
+            process_id = $PID
+        }
+        $stateDir = Split-Path -Parent $ResumeStatePath
+        if ($stateDir -and -not (Test-Path -LiteralPath $stateDir)) {
+            New-Item -ItemType Directory -Force -Path $stateDir | Out-Null
+        }
+        $state | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $ResumeStatePath -Encoding UTF8
+    }
+
+    function Clear-LocalCheckState {
+        if (Test-Path -LiteralPath $ResumeStatePath -PathType Leaf) {
+            Remove-Item -LiteralPath $ResumeStatePath -Force
+        }
+    }
+
+    if ($ResetResume) {
+        Clear-LocalCheckState
+    }
+
+    $resumeStepName = ""
+    if (-not [string]::IsNullOrWhiteSpace($StartAt)) {
+        $resumeStepName = $StartAt.Trim()
+    } elseif (-not $NoResume -and (Test-Path -LiteralPath $ResumeStatePath -PathType Leaf)) {
+        try {
+            $savedState = Get-Content -LiteralPath $ResumeStatePath -Raw | ConvertFrom-Json
+            if ($savedState.status -in @("failed", "running") -and -not [string]::IsNullOrWhiteSpace([string]$savedState.step_name)) {
+                $resumeStepName = ([string]$savedState.step_name).Trim()
+            }
+        } catch {
+            Write-Host "WARN check-local resume state is unreadable; ignoring $ResumeStatePath"
+        }
+    }
+
+    $script:resumeActive = [string]::IsNullOrWhiteSpace($resumeStepName)
+    $script:resumeTargetSeen = $script:resumeActive
+    if (-not $script:resumeActive) {
+        Write-Host "== resume mode =="
+        Write-Host "resuming check-local from: $resumeStepName"
+        Write-Host "resume state: $ResumeStatePath"
+        Write-Host "use -ResetResume or -NoResume to force a full run"
+    }
+
+    function Should-RunLocalCheckStep {
+        param(
+            [string]$StepName
+        )
+
+        if ($script:resumeActive) {
+            return $true
+        }
+        if ($StepName -eq $resumeStepName) {
+            $script:resumeActive = $true
+            $script:resumeTargetSeen = $true
+            Write-Host "== resume from failed step: $StepName =="
+            return $true
+        }
+        Write-Host "SKIP $StepName (resume target: $resumeStepName)"
+        return $false
+    }
+
+    function Invoke-LocalCheck {
+        param(
+            [string]$ScriptName,
+            [string]$StepName = $ScriptName
+        )
+
+        if (-not (Should-RunLocalCheckStep -StepName $StepName)) {
+            return
+        }
+
         $scriptPath = Join-Path $PSScriptRoot $ScriptName
+        Write-LocalCheckState -Status "running" -StepName $StepName -ScriptName $ScriptName
         & powershell -NoProfile -ExecutionPolicy Bypass -File $scriptPath
         if ($LASTEXITCODE -ne 0) {
+            Write-LocalCheckState -Status "failed" -StepName $StepName -ScriptName $ScriptName -ExitCode $LASTEXITCODE -Message "$ScriptName failed with exit code $LASTEXITCODE"
             throw "$ScriptName failed with exit code $LASTEXITCODE"
+        }
+    }
+
+    function Invoke-LocalNativeCheck {
+        param(
+            [string]$StepName,
+            [scriptblock]$ScriptBlock
+        )
+
+        if (-not (Should-RunLocalCheckStep -StepName $StepName)) {
+            return
+        }
+
+        Write-LocalCheckState -Status "running" -StepName $StepName -ScriptName "<native>"
+        try {
+            & $ScriptBlock
+        } catch {
+            Write-LocalCheckState -Status "failed" -StepName $StepName -ScriptName "<native>" -ExitCode 1 -Message $_.Exception.Message
+            throw
         }
     }
 
@@ -364,13 +482,15 @@ try {
     Invoke-LocalCheck "check-postgres-smoke-summary.ps1"
 
     Write-Host "== git whitespace =="
-    git diff --check
-    if ($LASTEXITCODE -ne 0) {
-        throw "git diff --check failed with exit code $LASTEXITCODE"
-    }
-    git diff --cached --check
-    if ($LASTEXITCODE -ne 0) {
-        throw "git diff --cached --check failed with exit code $LASTEXITCODE"
+    Invoke-LocalNativeCheck -StepName "git whitespace" -ScriptBlock {
+        git diff --check
+        if ($LASTEXITCODE -ne 0) {
+            throw "git diff --check failed with exit code $LASTEXITCODE"
+        }
+        git diff --cached --check
+        if ($LASTEXITCODE -ne 0) {
+            throw "git diff --cached --check failed with exit code $LASTEXITCODE"
+        }
     }
 
     if (-not $SkipPowerShellParser) {
@@ -382,6 +502,13 @@ try {
         Write-Host "== shell parser =="
         Invoke-LocalCheck "check-shell-scripts.ps1"
     }
+
+    if (-not $script:resumeTargetSeen) {
+        throw "Resume target was not found in check-local: $resumeStepName"
+    }
+
+    Clear-LocalCheckState
+    Write-Host "OK   check-local completed; resume state cleared"
 }
 finally {
     Pop-Location

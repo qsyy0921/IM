@@ -467,7 +467,7 @@ WHERE tenant_id = $1 AND workflow_id = $2 AND status = $3
 
 func insertWorkflowSubmittedOutbox(ctx context.Context, tx pgx.Tx, workflow types.Workflow) error {
 	payload := workflowPayload(workflow)
-	return insertOutbox(ctx, tx, "evt_"+workflow.WorkflowID, workflow, "workflow.submitted.v1", payload)
+	return insertOutbox(ctx, tx, "evt_"+workflow.WorkflowID, workflow, types.WorkflowEventSubmitted, payload)
 }
 
 func insertDecisionRecordedOutbox(ctx context.Context, tx pgx.Tx, workflow types.Workflow, decision types.WorkflowDecision) error {
@@ -475,7 +475,7 @@ func insertDecisionRecordedOutbox(ctx context.Context, tx pgx.Tx, workflow types
 	payload["decision_id"] = decision.DecisionID
 	payload["decision_type"] = decision.DecisionType
 	payload["decider_ref_hash"] = domain.HashRef(decision.DeciderRef)
-	return insertOutbox(ctx, tx, "evt_"+decision.DecisionID, workflow, "workflow.decision.recorded.v1", payload)
+	return insertOutbox(ctx, tx, "evt_"+decision.DecisionID, workflow, types.WorkflowEventDecisionRecorded, payload)
 }
 
 func insertWorkflowTimedOutOutbox(ctx context.Context, tx pgx.Tx, workflow types.Workflow, timer types.WorkflowTimer) error {

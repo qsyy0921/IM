@@ -14,6 +14,7 @@ func TestValidateWorkflowMode(t *testing.T) {
 	for _, mode := range []string{
 		"noop",
 		"grpc",
+		"outbox-relay",
 		"timer-worker",
 		"compensation-worker",
 		"compensation-executor",

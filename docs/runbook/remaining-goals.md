@@ -43,10 +43,8 @@
   proposal 场景。
 - `skill-registry` / `mcp-gateway`：tool contract、risk level、tenant allowlist、adapter、
   rate limit。
-- `action-executor`：provider replay admin / workflow handoff / handoff review page /
-  execution readiness page / redrive invocation manifest / 受控 redrive execution operator
-  path / redrive result manifest / redrive audit append manifest handoff /
-  external audit append operator path / audit append result manifest 已落；后续再做更多
+- `action-executor`：provider replay admin / workflow handoff、review/readiness/redrive
+  operator artifacts、external audit append 和 audit result manifest 已落；后续做更多
   action boundary / repair cases 和 provider-grade replay UI。
 - `ai-eval-service`：group-memory asker-bound term ambiguity、visible-chain incomplete
   abstention、missing visibility projection fail-closed、audience-language profile negative
@@ -74,18 +72,10 @@
 - `model-gateway`：provider routing、budget、fallback policy as explicit config、audit。
 - `knowledge-ingestion-service`：file/web imports、chunking pipeline、PII scan、rebuild jobs。
 - `vector-index-service`：real pgvector / OpenSearch vector / Milvus smoke、provider repair。
-- `workflow-service`：external callback delivery plan、delivery status / redrive plan、
-  persistent delivery worker first path、redrive operator path、callback delivery review page、
-  callback delivery dashboard、batch redrive invocation / runner / result manifest /
-  audit append handoff / audit append result manifest、approval queue review page、
-  approval queue batch decision manifest / runner / result review page / audit append handoff /
-  audit append result manifest、
-  compensation review bundle / review page /
-  instruction approval page / execution readiness manifest / execution invocation manifest /
-  execution result visibility / execution audit append manifest handoff /
-  audit append result manifest 已落；
-  后续继续补更多 compensation adapter、callback delivery provider-grade persisted dashboard /
-  provider-grade approval platform。
+- `workflow-service`：external callback delivery / redrive、approval queue review / batch
+  decision、compensation review / execution artifacts、audit append handoff 和 workflow outbox
+  relay first path 已落；后续继续补 workflow outbox relay smoke、更多 compensation adapter、
+  callback delivery provider-grade persisted dashboard / provider-grade approval platform。
 
 ## 9 个核心 IM 服务 P2
 

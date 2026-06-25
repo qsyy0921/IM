@@ -1,47 +1,28 @@
-# admin-service
+# admin-service Brief
 
-状态：product-active / operation、approval、outbox relay、operation-worker、
-operator CLI 和 first-stage downstream adapters 已落。
+状态：product-active / operation、approval、outbox relay、operator CLI 和 first-stage downstream adapters 已落。
 
-定位：管理后台 API 和 operator workflow 入口；负责租户 / 配置 / repair /
-高风险操作的申请、审批、执行视图和补偿入口。
+定位：管理后台 API 和 operator workflow 入口；负责租户 / 配置 / repair / 高风险操作的申请、
+审批、执行视图和补偿入口。
 
-边界：
-
-- 不直接写其他服务私有表；下游 mutation 只能走公开 API、事件或 operator command。
-- 高风险操作必须走 policy precheck、approval、audit 和幂等键。
-- 不承载普通用户 IM 流量，不替代 api-gateway。
-
-已覆盖：
+## 已落
 
 - `CreateAdminOperation` / `ApproveAdminOperation` / `GetAdminOperation` /
   `ListAdminOperations`、低敏 `admin_outbox -> im.admin.events`。
 - `operation-worker`：APPROVED operation -> risk / type route -> result projection。
-- workflow route：`REPAIR_REQUEST -> REPAIR_APPROVAL`、`CRITICAL -> ADMIN_OPERATION`。
-- provider replay route：`PROVIDER_REPLAY_REQUEST -> workflow-service REPAIR_APPROVAL`，
-  target service 为 `action-executor`，approval policy 为
-  `admin.workflow.provider_replay.v1`；admin-service 只创建 / 审批 / 路由请求，不执行
-  `RedriveProviderFailure`。
-- provider replay operator bridge：`loadtest/admin provider-replay-submit` 可读取
-  action-executor handoff artifact 并创建低敏 `PROVIDER_REPLAY_REQUEST`；`provider-replay-list`
-  / `provider-replay-approve` / `provider-replay-reject` 提供第一版 operator UX，不执行 redrive。
-- provider replay handoff review page：submit 前可用
-  `write-provider-replay-handoff-review-page.ps1` 渲染低敏 handoff contract / payload hash /
-  workflow request / candidate refs；页面不创建 admin operation、不创建 workflow、不记录
-  approval、不执行 redrive。
-- provider replay readiness page：approved admin operation 和 workflow APPROVE manifest
-  准备后，可和 fresh Agent proof / 原 handoff 绑定成低敏 execution readiness page；页面不执行
-  `RedriveProviderFailure`。
-- provider replay redrive invocation manifest：readiness 后可生成低敏
-  `RedriveProviderFailure` command contract；admin-service 只提供 approved operation 证据，
-  不执行 redrive，也不持有 raw resource id / input / reason。
+- workflow route：`REPAIR_REQUEST -> REPAIR_APPROVAL`、`CRITICAL -> ADMIN_OPERATION`、
+  `PROVIDER_REPLAY_REQUEST -> workflow-service REPAIR_APPROVAL`。
+- provider replay operator bridge：submit / list / approve / reject 只创建、查询和审批
+  low-sensitive admin operation，不调用 `RedriveProviderFailure`。
+- provider replay handoff review、readiness、redrive invocation manifest 已落；admin-service
+  只提供 approved operation 证据，不持有 raw resource id / input / reason。
 - control-plane adapters：`CONFIG_PUBLISH`、`CONFIG_ROLLBACK`、
   `TENANT_QUOTA_CHANGE`、`POLICY_RULE_CHANGE`。
-- audit adapter：`AUDIT_EXPORT_REQUEST -> audit-service.CreateAuditExport`；
-  只传低敏 filter hash / redaction profile / requester refs。
+- audit adapter：`AUDIT_EXPORT_REQUEST -> audit-service.CreateAuditExport`。
 - first-stage `compensation-request` operator 和 workflow handoff。
 
-证据入口：`docs/runbook/loadtest/admin-service/`。
+## 边界 / 后续
 
-后续：admin-event ingestion、admin UI、provider-grade provider replay request UI、更多明确下游公开
-API adapter、更多补偿 adapter、provider-grade compensation instruction 审批 / UI 和运维。
+- 不直接写其他服务私有表；下游 mutation 只能走公开 API、事件或 operator command。
+- 高风险操作必须走 policy precheck、approval、audit 和幂等键；不承载普通用户 IM 流量，不替代 api-gateway。
+- admin-event ingestion、provider-grade replay / compensation UI、更多明确下游公开 API adapter。

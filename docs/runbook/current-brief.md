@@ -24,7 +24,7 @@ brief、loadtest report、development-progress 或 archive。
   delivery plan、delivery status / redrive plan、external callback delivery
   persistent worker first path、external callback delivery redrive operator path、
   compensation review bundle / page、execution readiness / invocation manifest
-  和 execution result visibility。
+  execution result visibility 和 audit append manifest handoff。
 - group memory / retrieval / eval 持续保留 source refs、conversation scope、
   member visibility、time/version boundary、citations 和 no-citation refusal。
 

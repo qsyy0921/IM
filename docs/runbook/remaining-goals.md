@@ -77,7 +77,7 @@
 - `workflow-service`：external callback delivery plan、delivery status / redrive plan、
   persistent delivery worker first path、redrive operator path、compensation review bundle /
   review page / execution readiness manifest / execution invocation manifest /
-  execution result visibility 已落；
+  execution result visibility / execution audit append manifest handoff 已落；
   后续继续补更多 compensation adapter、provider-grade instruction / approval UI、
   callback delivery provider-grade UI 和 provider-grade approval UI。
 

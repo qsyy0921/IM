@@ -183,6 +183,60 @@ func TestExternalAuditAppendExecuteCallsAuditService(t *testing.T) {
 	}
 }
 
+func TestExternalAuditAppendAcceptsWorkflowCompensationManifest(t *testing.T) {
+	fixture := newAuditAppendFixture(t)
+	manifest := fixture.manifest
+	attributes := `{"operation_id":"wf-comp-1","operation_type":"CONFIG_ROLLBACK","source_ref":"wfc-comp-1","status":"SUCCEEDED","target_ref_hash":"sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","payload_hash":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","payload_schema_version":"admin.config_rollback.v1","downstream_service":"control-plane-service","downstream_request_ref":"config-rollback:prod:quota:v1"}`
+	attributesJSON := compactJSON(json.RawMessage(attributes))
+	manifest.SchemaVersion = "nexusim.audit.external_append.v1"
+	manifest.ManifestID = "workflow-compensation-audit-append-1"
+	manifest.SourceManifestID = "workflow-compensation-execution-result-1"
+	manifest.AuditStream = "security"
+	manifest.SourceService = "workflow-service"
+	manifest.SourceEventID = "wfc-comp-1"
+	manifest.RecordType = "WORKFLOW_COMPENSATION_EXECUTION"
+	manifest.ActorRef = "service:workflow-service"
+	manifest.SubjectRef = "workflow:wf-comp-1"
+	manifest.ResourceRef = "workflow:wf-comp-1:compensation:wfc-comp-1"
+	manifest.Action = "EXECUTE_COMPENSATION"
+	manifest.Outcome = "SUCCEEDED"
+	manifest.ReasonCode = "WORKFLOW_COMPENSATION_EXECUTED"
+	manifest.RiskLevel = "HIGH"
+	manifest.AttributesJSON = json.RawMessage(attributesJSON)
+	manifest.AttributesSHA256 = sha256Ref([]byte(attributesJSON))
+	manifest.IdempotencyKey = "workflow-service:audit:wfc-comp-1:SUCCEEDED"
+	manifest.CorrelationID = "wf-comp-1"
+	manifest.CausationID = "workflow-compensation-execution-result-1"
+	manifest.RequiredChecks = []string{
+		"source_compensation_result_manifest_verified",
+		"workflow_compensation_result_low_sensitive",
+		"no_raw_compensation_payload",
+		"audit_service_append_only",
+		"idempotency_key_present",
+	}
+	writeJSON(t, fixture.manifestPath, manifest)
+
+	cfg := fixture.config(true)
+	client := &fakeAuditClient{}
+	var out bytes.Buffer
+	if err := run(context.Background(), cfg, &out, operatorClients{audit: client}); err != nil {
+		t.Fatalf("run workflow compensation audit append: %v", err)
+	}
+	if len(client.requests) != 1 {
+		t.Fatalf("expected one append request, got %d", len(client.requests))
+	}
+	request := client.requests[0]
+	if request.GetSourceService() != "workflow-service" ||
+		request.GetRecordType() != "WORKFLOW_COMPENSATION_EXECUTION" ||
+		request.GetAction() != "EXECUTE_COMPENSATION" ||
+		request.GetAttributesJson() != attributesJSON {
+		t.Fatalf("unexpected workflow audit append request: %+v", request)
+	}
+	if strings.Contains(out.String(), attributesJSON) {
+		t.Fatalf("workflow audit append result leaked attributes json: %s", out.String())
+	}
+}
+
 func TestExternalAuditAppendRejectsSensitiveManifest(t *testing.T) {
 	fixture := newAuditAppendFixture(t)
 	manifest := fixture.manifest

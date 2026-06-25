@@ -278,11 +278,12 @@ func validateAuditAppendManifest(manifest externalAuditAppendManifest, raw strin
 			return fmt.Errorf("audit-manifest %s is required", field)
 		}
 	}
-	if manifest.SchemaVersion != "nexusim.action_executor.external_audit_append.v1" {
+	if manifest.SchemaVersion != "nexusim.action_executor.external_audit_append.v1" &&
+		manifest.SchemaVersion != "nexusim.audit.external_append.v1" {
 		return errors.New("unsupported audit-manifest schema_version")
 	}
-	if manifest.SourceService != "action-executor" {
-		return errors.New("audit-manifest source_service must be action-executor")
+	if manifest.SourceService != "action-executor" && manifest.SourceService != "workflow-service" {
+		return errors.New("audit-manifest source_service must be action-executor or workflow-service")
 	}
 	if manifest.ExecutesAppend || manifest.MutatesAudit || manifest.DirectAppend {
 		return errors.New("audit-manifest must not claim it already appends or mutates audit-service")
@@ -303,13 +304,32 @@ func validateAuditAppendManifest(manifest externalAuditAppendManifest, raw strin
 		return err
 	}
 	for _, check := range []string{
-		"source_execution_audit_low_sensitive",
-		"no_raw_provider_artifacts",
 		"audit_service_append_only",
 		"idempotency_key_present",
 	} {
 		if !contains(manifest.RequiredChecks, check) {
 			return fmt.Errorf("audit-manifest missing required check: %s", check)
+		}
+	}
+	switch manifest.SourceService {
+	case "action-executor":
+		for _, check := range []string{
+			"source_execution_audit_low_sensitive",
+			"no_raw_provider_artifacts",
+		} {
+			if !contains(manifest.RequiredChecks, check) {
+				return fmt.Errorf("audit-manifest missing required check: %s", check)
+			}
+		}
+	case "workflow-service":
+		for _, check := range []string{
+			"source_compensation_result_manifest_verified",
+			"workflow_compensation_result_low_sensitive",
+			"no_raw_compensation_payload",
+		} {
+			if !contains(manifest.RequiredChecks, check) {
+				return fmt.Errorf("audit-manifest missing required check: %s", check)
+			}
 		}
 	}
 	if containsSensitiveManifestText(raw) || auditManifestHasForbiddenTopLevelKey(raw) {

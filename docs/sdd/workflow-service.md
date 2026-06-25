@@ -508,6 +508,7 @@ go run ./loadtest/workflow -mode list-compensations -workflow-id wf_123 -status 
 go run ./loadtest/workflow -mode compensation-review-bundle -workflow-id wf_123
 .\tools\write-workflow-compensation-review-page.ps1 -BundlePath H:\NexusIM\operator-plans\workflow-compensation-review-bundle.json -GeneratedBy operator-a -OutputPath H:\NexusIM\operator-plans\workflow-compensation-review.html
 .\tools\write-workflow-compensation-execution-result-manifest.ps1 -InvocationPath H:\NexusIM\operator-plans\workflow-compensation-execution-invocation.json -CompensationSummaryPath H:\NexusIM\operator-plans\workflow-compensation-summary.json -GeneratedBy operator-a -OutputPath H:\NexusIM\operator-plans\workflow-compensation-execution-result.json
+.\tools\write-workflow-compensation-execution-audit-append-manifest.ps1 -ResultManifestPath H:\NexusIM\operator-plans\workflow-compensation-execution-result.json -GeneratedBy operator-a -TenantID tenant_123 -OutputPath H:\NexusIM\operator-plans\workflow-compensation-audit-append.json
 ```
 
 external callback delivery worker 运行依赖：
@@ -609,6 +610,14 @@ compensation、不调用下游服务、不读取 PostgreSQL 私表。
 的 workflow / payload / target refs 一致，且 status 为 `SUCCEEDED` 或 `FAILED`。该
 manifest 只用于 operator 结果归档和后续 audit / repair handoff，不修改 workflow /
 compensation rows，也不保存 raw payload、operator reason、provider body、本机路径或凭证。
+
+`write-workflow-compensation-execution-audit-append-manifest.ps1` 将低敏 execution result
+manifest 派生为 `nexusim.audit.external_append.v1`，供外部 audit append operator 通过
+audit-service 公开 `AppendAuditRecord` 追加审计。该脚本必须显式传入 tenant id，只输出
+workflow id、compensation id、payload/ref hash、downstream ref、terminal status 和
+attributes hash；它不调用 audit-service、不执行 compensation、不记录 workflow decision、
+不调用下游服务、不修改 workflow / compensation rows，也不保存 raw payload、operator
+reason、provider body、本机路径或凭证。
 
 `write-workflow-compensation-instruction-manifest.ps1` /
 `validate-workflow-compensation-instruction-manifest.ps1` 是第一版 compensation

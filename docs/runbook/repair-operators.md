@@ -307,6 +307,14 @@ binding、decision manifest hash、callback provider / endpoint / delivery queue
 target service、不执行 provider replay，也不接受 raw callback URL、provider body 或
 credential-like 字段。真正审批结果仍必须回到 external decision manifest，再走
 `record-decision -decision-manifest` 绑定校验。
+`write-workflow-external-callback-delivery-status.ps1` 可把 delivery plan 的一次
+callback attempt 写成仓库外
+`nexusim.workflow.external_callback_delivery_status.v1`，状态只能是 `DELIVERED` /
+`RETRY_PENDING` / `DLQ`，并重新绑定 workflow、attempt、retry policy 和 plan hash。
+`write-workflow-external-callback-redrive-plan.ps1` 只接受 `RETRY_PENDING` 或 `DLQ`
+status，输出低敏 redrive handoff。二者都不调用 callback provider、不记录 workflow
+decision、不执行 target action，也不保存 raw callback URL、provider body、decision body、
+payload body 或本机路径。
 `write-workflow-compensation-instruction-manifest.ps1` /
 `validate-workflow-compensation-instruction-manifest.ps1` 可生成和校验 workflow
 compensation executor 使用的 control-plane rollback instruction JSON。该 manifest

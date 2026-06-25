@@ -81,6 +81,12 @@ Agent action boundary / repair cases：在 provider replay admin / workflow hand
   template 绑定到 endpoint ref、delivery queue ref 和 retry policy refs，输出仓库外
   `nexusim.workflow.external_callback_delivery_plan.v1`；它不调用外部 provider、不记录
   decision、不执行 target action，也不接受 raw callback URL / provider body。
+- workflow external callback delivery status / redrive plan 已落：
+  `write-workflow-external-callback-delivery-status.ps1` 记录 `DELIVERED` /
+  `RETRY_PENDING` / `DLQ` 低敏 attempt status；
+  `write-workflow-external-callback-redrive-plan.ps1` 只从 `RETRY_PENDING` 或 `DLQ`
+  status 生成 redrive handoff；两者都绑定 delivery plan 和仍在 `WAITING_DECISION`
+  的 workflow，不调用 provider、不记录 decision、不执行 target action。
 - workflow compensation review bundle 已落：`loadtest/workflow compensation-review-bundle`
   只读 `COMPENSATION_PENDING` workflow 和 `ACTIVE` instruction refs，校验 workflow id /
   payload hash / target 绑定后输出低敏审查包；不记录 decision、不创建 approval、

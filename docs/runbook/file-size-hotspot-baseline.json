@@ -1,7 +1,7 @@
 ﻿{
-    "created_at":  "2026-06-25T03:57:52.0170927Z",
+    "created_at":  "2026-06-25T04:16:57.8652449Z",
     "scope":  "handwritten Go/Markdown/PowerShell/Bash file-size budget snapshot; not a code-quality score",
-    "file_count":  2095,
+    "file_count":  2098,
     "thresholds":  {
                        "production_warn_lines":  2500,
                        "production_max_lines":  3500,
@@ -101,13 +101,13 @@
                           "MaxRatio":  0.4893
                       },
                       {
-                          "Path":  "services\\api-gateway\\internal\\api\\httpbff\\server.go",
-                          "Lines":  1669,
-                          "Kind":  "production",
-                          "Warn":  2500,
-                          "Max":  3500,
-                          "WarnRatio":  0.6676,
-                          "MaxRatio":  0.4769
+                          "Path":  "docs\\runbook\\ai-eval\\README.md",
+                          "Lines":  719,
+                          "Kind":  "docs",
+                          "Warn":  1200,
+                          "Max":  1500,
+                          "WarnRatio":  0.5992,
+                          "MaxRatio":  0.4793
                       }
                   ],
     "hotspots":  [

@@ -32,6 +32,10 @@ admin operation approval、补偿请求和人工审批状态。
 - `write-workflow-external-callback-delivery-plan.ps1`：把 external decision manifest
   template 绑定为低敏 callback delivery / retry contract；只保存 endpoint / queue /
   retry refs 和 manifest hash，不调用外部 provider、不记录 decision、不执行 target。
+- `write-workflow-external-callback-delivery-status.ps1` /
+  `write-workflow-external-callback-redrive-plan.ps1`：记录 `DELIVERED` /
+  `RETRY_PENDING` / `DLQ` 低敏 attempt status，并只从 retry / DLQ 状态生成 redrive
+  handoff；不调用 provider、不记录 decision、不执行 target。
 - `loadtest/workflow operator-queues`：按固定 operator 队列展示 action approval、
   repair approval、provider replay、admin operation、compensation request 和
   compensation pending 的低敏 workflow refs / counts；不记录 decision、不执行 replay。
@@ -58,5 +62,5 @@ admin operation approval、补偿请求和人工审批状态。
   低敏审批状态，不执行 provider replay。
 
 后续：更多 compensation adapter、provider-grade instruction approval UI、outbox relay、
-provider-grade approval UI、真实 external callback delivery worker / retry status /
-redrive、repair operators。
+provider-grade approval UI、真实 external callback delivery worker、持久 retry state /
+redrive worker、repair operators。

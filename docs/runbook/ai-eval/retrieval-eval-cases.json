@@ -1427,6 +1427,37 @@
       ]
     },
     {
+      "id": "workflow-external-callback-status-redrive-boundary",
+      "family": "action_execution_safety",
+      "stage": "workflow-external-callback-status-redrive",
+      "status": "active",
+      "query": "create low-sensitive delivery status and redrive plan for an external callback decision workflow",
+      "risk": "External callback delivery status and redrive planning must bind to the delivery plan and waiting workflow without calling the provider, recording a decision, or executing the target action",
+      "required_assertions": [
+        {
+          "type": "must_create_external_callback_delivery_status"
+        },
+        {
+          "type": "must_bind_callback_status_to_delivery_plan"
+        },
+        {
+          "type": "must_keep_callback_status_low_sensitive"
+        },
+        {
+          "type": "must_create_external_callback_redrive_plan"
+        },
+        {
+          "type": "must_not_call_provider_from_callback_status_or_redrive"
+        },
+        {
+          "type": "must_not_record_decision_from_callback_status_or_redrive"
+        },
+        {
+          "type": "must_not_execute_target_from_callback_status_or_redrive"
+        }
+      ]
+    },
+    {
       "id": "workflow-operator-queues-low-sensitive",
       "family": "action_execution_safety",
       "stage": "workflow-operator-queues",

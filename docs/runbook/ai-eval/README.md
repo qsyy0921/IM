@@ -384,6 +384,12 @@ low-sensitive decision manifest template can be bound to callback provider,
 endpoint, queue and retry refs without calling the provider, recording a
 decision, storing raw callback material or executing the target action.
 
+Workflow external callback delivery status and redrive planning is represented by
+`workflow-external-callback-status-redrive-boundary`. It verifies that delivery
+attempt status and redrive handoff bind back to the delivery plan and still-waiting
+workflow without calling the provider, recording a decision or executing the
+target action.
+
 Workflow operator queue visibility is represented by
 `workflow-operator-queues-low-sensitive`. It verifies that workflow-service
 operator queues can expose low-sensitive counts and workflow refs for action

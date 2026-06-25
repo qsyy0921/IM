@@ -223,8 +223,14 @@ workflow，导入时校验 workflow 已批准或待补偿、target / payload ref
 payload 原文、reason 原文或 downstream body。第一版外部审批 manifest binding 已由
 operator CLI 负责当前 workflow 绑定校验；第一版 external callback wait 已由
 `loadtest/workflow external-callback-wait` 创建低敏等待 workflow 和 decision manifest
-template；更多下游 adapter、provider-grade instruction UI、callback delivery / retry
-hardening 和运维后置。
+template；`write-workflow-external-callback-delivery-plan.ps1` 把 template 绑定为低敏
+callback provider / endpoint / queue / retry refs；
+`write-workflow-external-callback-delivery-status.ps1` 记录 `DELIVERED` /
+`RETRY_PENDING` / `DLQ` attempt status；
+`write-workflow-external-callback-redrive-plan.ps1` 只从 retry / DLQ status 生成 redrive
+handoff。上述入口都不调用 provider、不记录 decision、不执行 target action。更多下游
+adapter、provider-grade instruction UI、真实 callback delivery worker、持久 retry state /
+redrive worker 和运维后置。
 
 后续扩展：
 

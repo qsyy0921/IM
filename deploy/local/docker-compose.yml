@@ -88,7 +88,7 @@ services:
       schema-registry:
         condition: service_healthy
     ports:
-      - "9090:8080"
+      - "19090:8080"
     environment:
       KAFKA_CLUSTERS_0_NAME: "nexusim-local"
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: "kafka:29092"
@@ -98,3 +98,11 @@ volumes:
   postgres_data:
   redis_data:
   kafka_data:
+
+networks:
+  default:
+    name: nexusim-services
+    ipam:
+      config:
+        - subnet: 172.30.80.0/24
+          ip_range: 172.30.80.128/25

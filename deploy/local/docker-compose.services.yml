@@ -9,7 +9,7 @@ services:
       NEXUSIM_CONVERSATION_AUTH_MODE: body
       NEXUSIM_CONVERSATION_GRPC_ADDR: 172.30.80.11:10496
       NEXUSIM_CONVERSATION_DEBUG_ADDR: 172.30.80.11:11911
-      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@host.docker.internal:5432/nexusim?sslmode=disable
+      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@postgres:5432/nexusim?sslmode=disable
     ports:
       - "10496:10496"
       - "11911:11911"
@@ -46,8 +46,8 @@ services:
       NEXUSIM_MESSAGE_AUTH_MODE: body
       NEXUSIM_GRPC_ADDR: 172.30.80.12:10495
       NEXUSIM_MESSAGE_DEBUG_ADDR: 172.30.80.12:11910
-      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@host.docker.internal:5432/nexusim?sslmode=disable
-      NEXUSIM_KAFKA_BROKERS: host.docker.internal:9092
+      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@postgres:5432/nexusim?sslmode=disable
+      NEXUSIM_KAFKA_BROKERS: kafka:29092
       NEXUSIM_CONVERSATION_SERVICE_ADDR: conversation-service-grpc:10496
       NEXUSIM_CONVERSATION_RPC_TIMEOUT: 500ms
       NEXUSIM_POLICY_SERVICE_ADDR: policy-service-grpc:10800
@@ -68,8 +68,8 @@ services:
       NEXUSIM_DELIVERY_AUTH_MODE: body
       NEXUSIM_DELIVERY_GRPC_ADDR: 172.30.80.13:10497
       NEXUSIM_DELIVERY_DEBUG_ADDR: 172.30.80.13:11912
-      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@host.docker.internal:5432/nexusim?sslmode=disable
-      NEXUSIM_KAFKA_BROKERS: host.docker.internal:9092
+      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@postgres:5432/nexusim?sslmode=disable
+      NEXUSIM_KAFKA_BROKERS: kafka:29092
     ports:
       - "10497:10497"
       - "11912:11912"
@@ -86,8 +86,8 @@ services:
       NEXUSIM_RECEIPT_AUTH_MODE: body
       NEXUSIM_RECEIPT_GRPC_ADDR: 172.30.80.14:10499
       NEXUSIM_RECEIPT_DEBUG_ADDR: 172.30.80.14:11914
-      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@host.docker.internal:5432/nexusim?sslmode=disable
-      NEXUSIM_KAFKA_BROKERS: host.docker.internal:9092
+      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@postgres:5432/nexusim?sslmode=disable
+      NEXUSIM_KAFKA_BROKERS: kafka:29092
     ports:
       - "10499:10499"
       - "11914:11914"
@@ -104,7 +104,7 @@ services:
       NEXUSIM_CONTACTS_AUTH_MODE: body
       NEXUSIM_CONTACTS_GRPC_ADDR: 172.30.80.15:10500
       NEXUSIM_CONTACTS_DEBUG_ADDR: 172.30.80.15:11915
-      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@host.docker.internal:5432/nexusim?sslmode=disable
+      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@postgres:5432/nexusim?sslmode=disable
     ports:
       - "10500:10500"
       - "11915:11915"
@@ -121,8 +121,8 @@ services:
       NEXUSIM_IDENTITY_ADMIN_AUTH_MODE: body
       NEXUSIM_IDENTITY_GRPC_ADDR: 172.30.80.16:10600
       NEXUSIM_IDENTITY_DEBUG_ADDR: 172.30.80.16:11905
-      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@host.docker.internal:5432/nexusim?sslmode=disable
-      NEXUSIM_KAFKA_BROKERS: host.docker.internal:9092
+      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@postgres:5432/nexusim?sslmode=disable
+      NEXUSIM_KAFKA_BROKERS: kafka:29092
       NEXUSIM_IDENTITY_GATEWAY_TOKEN_SECRET: local-dev-gateway-token-secret
       NEXUSIM_IDENTITY_MFA_SECRET_KEY: local-dev-mfa-secret-key
       NEXUSIM_IDENTITY_MFA_RECOVERY_CODE_SECRET: local-dev-mfa-recovery-secret
@@ -142,8 +142,8 @@ services:
       NEXUSIM_POLICY_SERVICE_MODE: grpc
       NEXUSIM_POLICY_GRPC_ADDR: 172.30.80.17:10800
       NEXUSIM_POLICY_DEBUG_ADDR: 172.30.80.17:11916
-      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@host.docker.internal:5432/nexusim?sslmode=disable
-      NEXUSIM_KAFKA_BROKERS: host.docker.internal:9092
+      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@postgres:5432/nexusim?sslmode=disable
+      NEXUSIM_KAFKA_BROKERS: kafka:29092
       NEXUSIM_POLICY_RULES_ENABLED: "true"
     ports:
       - "10800:10800"
@@ -160,7 +160,7 @@ services:
       NEXUSIM_SEARCH_SERVICE_MODE: grpc
       NEXUSIM_SEARCH_GRPC_ADDR: 172.30.80.20:10570
       NEXUSIM_SEARCH_DEBUG_ADDR: 172.30.80.20:11917
-      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@host.docker.internal:5432/nexusim?sslmode=disable
+      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@postgres:5432/nexusim?sslmode=disable
     ports:
       - "10570:10570"
       - "11917:11917"
@@ -176,7 +176,7 @@ services:
       NEXUSIM_MEMORY_SERVICE_MODE: grpc
       NEXUSIM_MEMORY_GRPC_ADDR: 172.30.80.21:10580
       NEXUSIM_MEMORY_DEBUG_ADDR: 172.30.80.21:11918
-      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@host.docker.internal:5432/nexusim?sslmode=disable
+      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@postgres:5432/nexusim?sslmode=disable
     ports:
       - "10580:10580"
       - "11918:11918"
@@ -260,7 +260,7 @@ services:
       NEXUSIM_AGENT_DEPENDENCY_TIMEOUT: 5s
       NEXUSIM_RETRIEVAL_GRPC_ADDR: retrieval-gateway-grpc:10590
       NEXUSIM_MCP_GATEWAY_GRPC_ADDR: mcp-gateway-grpc:10650
-      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@host.docker.internal:5432/nexusim?sslmode=disable
+      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@postgres:5432/nexusim?sslmode=disable
     ports:
       - "10630:10630"
       - "11922:11922"
@@ -276,7 +276,7 @@ services:
       NEXUSIM_SKILL_REGISTRY_SERVICE_MODE: grpc
       NEXUSIM_SKILL_REGISTRY_GRPC_ADDR: 172.30.80.26:10640
       NEXUSIM_SKILL_REGISTRY_DEBUG_ADDR: 172.30.80.26:11923
-      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@host.docker.internal:5432/nexusim?sslmode=disable
+      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@postgres:5432/nexusim?sslmode=disable
     ports:
       - "10640:10640"
       - "11923:11923"
@@ -299,7 +299,7 @@ services:
       NEXUSIM_MCP_GATEWAY_DEBUG_ADDR: 172.30.80.27:11924
       NEXUSIM_SKILL_REGISTRY_GRPC_ADDR: skill-registry-grpc:10640
       NEXUSIM_POLICY_GRPC_ADDR: policy-service-grpc:10800
-      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@host.docker.internal:5432/nexusim?sslmode=disable
+      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@postgres:5432/nexusim?sslmode=disable
     ports:
       - "10650:10650"
       - "11924:11924"
@@ -328,7 +328,7 @@ services:
       NEXUSIM_POLICY_GRPC_ADDR: policy-service-grpc:10800
       NEXUSIM_AGENT_GRPC_ADDR: agent-service-grpc:10630
       NEXUSIM_ACTION_EXECUTOR_CONVERSATION_GRPC_ADDR: conversation-service-grpc:10496
-      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@host.docker.internal:5432/nexusim?sslmode=disable
+      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@postgres:5432/nexusim?sslmode=disable
     ports:
       - "10660:10660"
       - "11925:11925"
@@ -344,7 +344,7 @@ services:
       NEXUSIM_AI_EVAL_SERVICE_MODE: grpc
       NEXUSIM_AI_EVAL_GRPC_ADDR: 172.30.80.29:10670
       NEXUSIM_AI_EVAL_DEBUG_ADDR: 172.30.80.29:11926
-      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@host.docker.internal:5432/nexusim?sslmode=disable
+      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@postgres:5432/nexusim?sslmode=disable
     ports:
       - "10670:10670"
       - "11926:11926"
@@ -361,7 +361,7 @@ services:
       NEXUSIM_MEDIA_GRPC_ADDR: 172.30.80.30:10680
       NEXUSIM_MEDIA_DEBUG_ADDR: 172.30.80.30:11927
       NEXUSIM_MEDIA_FAKE_OBJECT_BASE_URL: http://127.0.0.1:19080/media
-      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@host.docker.internal:5432/nexusim?sslmode=disable
+      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@postgres:5432/nexusim?sslmode=disable
     ports:
       - "10680:10680"
       - "11927:11927"
@@ -378,7 +378,7 @@ services:
       NEXUSIM_NOTIFICATION_GRPC_ADDR: 172.30.80.31:10690
       NEXUSIM_NOTIFICATION_DEBUG_ADDR: 172.30.80.31:11928
       NEXUSIM_NOTIFICATION_DESTINATION_HASH_KEY: local-notification-destination-hash-key
-      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@host.docker.internal:5432/nexusim?sslmode=disable
+      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@postgres:5432/nexusim?sslmode=disable
     ports:
       - "10690:10690"
       - "11928:11928"
@@ -394,7 +394,7 @@ services:
       NEXUSIM_AUDIT_SERVICE_MODE: grpc
       NEXUSIM_AUDIT_GRPC_ADDR: 172.30.80.32:10700
       NEXUSIM_AUDIT_DEBUG_ADDR: 172.30.80.32:11929
-      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@host.docker.internal:5432/nexusim?sslmode=disable
+      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@postgres:5432/nexusim?sslmode=disable
     ports:
       - "10700:10700"
       - "11929:11929"
@@ -410,7 +410,7 @@ services:
       NEXUSIM_ADMIN_SERVICE_MODE: grpc
       NEXUSIM_ADMIN_GRPC_ADDR: 172.30.80.39:10770
       NEXUSIM_ADMIN_DEBUG_ADDR: 172.30.80.39:11936
-      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@host.docker.internal:5432/nexusim?sslmode=disable
+      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@postgres:5432/nexusim?sslmode=disable
     ports:
       - "10770:10770"
       - "11936:11936"
@@ -426,7 +426,7 @@ services:
       NEXUSIM_CONTROL_PLANE_SERVICE_MODE: grpc
       NEXUSIM_CONTROL_PLANE_GRPC_ADDR: 172.30.80.33:10710
       NEXUSIM_CONTROL_PLANE_DEBUG_ADDR: 172.30.80.33:11930
-      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@host.docker.internal:5432/nexusim?sslmode=disable
+      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@postgres:5432/nexusim?sslmode=disable
     ports:
       - "10710:10710"
       - "11930:11930"
@@ -442,7 +442,7 @@ services:
       NEXUSIM_PRESENCE_SERVICE_MODE: grpc
       NEXUSIM_PRESENCE_GRPC_ADDR: 172.30.80.34:10720
       NEXUSIM_PRESENCE_DEBUG_ADDR: 172.30.80.34:11931
-      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@host.docker.internal:5432/nexusim?sslmode=disable
+      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@postgres:5432/nexusim?sslmode=disable
     ports:
       - "10720:10720"
       - "11931:11931"
@@ -458,7 +458,7 @@ services:
       NEXUSIM_MODEL_GATEWAY_MODE: grpc
       NEXUSIM_MODEL_GATEWAY_GRPC_ADDR: 172.30.80.35:10730
       NEXUSIM_MODEL_GATEWAY_DEBUG_ADDR: 172.30.80.35:11932
-      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@host.docker.internal:5432/nexusim?sslmode=disable
+      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@postgres:5432/nexusim?sslmode=disable
     ports:
       - "10730:10730"
       - "11932:11932"
@@ -474,7 +474,7 @@ services:
       NEXUSIM_KNOWLEDGE_INGESTION_SERVICE_MODE: grpc
       NEXUSIM_KNOWLEDGE_INGESTION_GRPC_ADDR: 172.30.80.36:10740
       NEXUSIM_KNOWLEDGE_INGESTION_DEBUG_ADDR: 172.30.80.36:11933
-      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@host.docker.internal:5432/nexusim?sslmode=disable
+      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@postgres:5432/nexusim?sslmode=disable
     ports:
       - "10740:10740"
       - "11933:11933"
@@ -490,7 +490,7 @@ services:
       NEXUSIM_WORKFLOW_SERVICE_MODE: grpc
       NEXUSIM_WORKFLOW_GRPC_ADDR: 172.30.80.37:10750
       NEXUSIM_WORKFLOW_DEBUG_ADDR: 172.30.80.37:11934
-      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@host.docker.internal:5432/nexusim?sslmode=disable
+      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@postgres:5432/nexusim?sslmode=disable
     ports:
       - "10750:10750"
       - "11934:11934"
@@ -506,7 +506,7 @@ services:
       NEXUSIM_VECTOR_INDEX_SERVICE_MODE: grpc
       NEXUSIM_VECTOR_INDEX_GRPC_ADDR: 172.30.80.38:10760
       NEXUSIM_VECTOR_INDEX_DEBUG_ADDR: 172.30.80.38:11935
-      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@host.docker.internal:5432/nexusim?sslmode=disable
+      NEXUSIM_PG_DSN: postgres://nexusim:nexusim@postgres:5432/nexusim?sslmode=disable
     ports:
       - "10760:10760"
       - "11935:11935"
@@ -528,9 +528,9 @@ services:
       NEXUSIM_PUSH_DEBUG_ADDR: 172.30.80.18:11913
       NEXUSIM_PUSH_ROUTE_BACKEND: redis
       NEXUSIM_PUSH_REDIS_MODE: single
-      NEXUSIM_PUSH_REDIS_ADDR: host.docker.internal:6379
+      NEXUSIM_PUSH_REDIS_ADDR: redis:6379
       NEXUSIM_DELIVERY_GRPC_ADDR: delivery-service-grpc:10497
-      NEXUSIM_KAFKA_BROKERS: host.docker.internal:9092
+      NEXUSIM_KAFKA_BROKERS: kafka:29092
     ports:
       - "10498:10498"
       - "11913:11913"
@@ -582,7 +582,5 @@ services:
 
 networks:
   nexusim-services:
+    external: true
     name: nexusim-services
-    ipam:
-      config:
-        - subnet: 172.30.80.0/24

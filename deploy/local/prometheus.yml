@@ -44,6 +44,14 @@ scrape_configs:
         labels:
           service: conversation-service
 
+  - job_name: nexusim-timeline-service
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - host.docker.internal:11937
+        labels:
+          service: timeline-service
+
   - job_name: nexusim-delivery-service
     metrics_path: /metrics
     static_configs:

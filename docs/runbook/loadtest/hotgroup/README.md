@@ -34,7 +34,7 @@ CreateConversation / member seed
 
 | 场景 | 目的 |
 | --- | --- |
-| medium group fanout | 100 / 1,000 成员，验证普通群 write fanout 和 end-to-end latency。 |
+| medium group fanout | 100 成员验证小群 `WRITE_FANOUT`；1,000 成员验证自动 promotion 到 `HYBRID_FANOUT` 和 end-to-end latency。 |
 | hot sender burst | 多 sender 高频发送，观察 conversation seq、Kafka lag 和 outbox pending。 |
 | online notify storm | 高在线比例 + 慢客户端，验证 push queue、slow eviction 和 PullInbox 兜底。 |
 | member churn during send | 发送期间 join / leave / remove / role change，验证历史可见窗口。 |
@@ -74,6 +74,63 @@ kafka_lag_max
 ```
 
 原始大文件继续写入 `H:\NexusIM\loadtest-results`；仓库只保留低敏 summary 和报告。
+
+## 可视化要求
+
+热点群聊压测必须配套趋势图。仓库已提供 first-stage Grafana dashboard：
+
+```text
+deploy/local/grafana/dashboards/hotgroup-observability.json
+```
+
+Grafana 通过 `deploy/local/docker-compose.grafana.yml` 自动加载该 dashboard，标题为
+`NexusIM Hot Group Loadtest`。正式压测报告至少要记录：
+
+当前三机本地压测约定端口：
+
+```text
+Kafka UI:    http://172.31.50.2:19090
+Prometheus:  http://172.31.50.2:19091
+Grafana:     http://172.31.50.2:13000
+OTel gRPC:   172.31.50.2:14317
+OTel HTTP:   http://172.31.50.2:14318
+OTel health: http://172.31.50.2:14333
+```
+
+`19090` 固定留给 Kafka UI；Prometheus 使用 `19091`，避免压测时把两个入口混淆。
+
+```text
+dashboard_name
+prometheus_time_range
+run_name
+commit
+group_size
+fanout_mode / expected_fanout_mode
+SendMessage p95 / p99 趋势
+message_outbox / delivery_outbox pending 趋势
+delivery projection failure / worker error 趋势
+user_inbox / membership projection 增长趋势
+PullInbox / AckDelivery gRPC 请求和延迟趋势
+push session / slow eviction 趋势
+PostgreSQL pool 趋势
+```
+
+当前 dashboard 只使用已有 `/metrics` 指标，不假装拥有尚未实现的 Kafka consumer lag
+exporter 或 fanout-mode distribution exporter。`fanout_mode / expected_fanout_mode`
+在 runner summary 和 PostgreSQL 统计中校验；后续再沉淀成 Prometheus exporter。
+缺口仍需后续补：
+
+```text
+conversation fanout mode distribution
+message timeline topic lag
+delivery timeline consumer lag by topic / partition / group
+delivery_timeline_items count / insert rate
+user_inbox rows per message
+PostgreSQL lock / WAL / dead tuple time-series exporter
+```
+
+没有 Grafana / Prometheus 趋势图的运行，只能作为功能 smoke、dry-run 或一次性
+diagnostics，不能写成热点群聊容量证明。
 
 ## 当前 v0.1 runner
 
@@ -119,6 +176,19 @@ go run .\loadtest\hotgroup `
 ```
 
 业务写入路径必须走公开 gRPC。PostgreSQL 只用于清理测试租户、等待异步投影和读取统计。
+
+conversation-service 会在成员变更事务内按 ACTIVE 成员数做单调 promotion：
+
+```text
+<=500      WRITE_FANOUT
+501-5000   HYBRID_FANOUT
+5001-50000 READ_FANOUT
+>50000     BROADCAST_SIGNAL / SEQUENCER_BLOCK contract-only, fail-closed
+```
+
+promotion 只向更高版本推进，不因为成员离开自动降级，避免压测中策略反复震荡。
+hotgroup runner 的结果必须记录实际 `fanout_mode`，否则不能解释不同规模下的
+写放大和延迟曲线。
 
 如果本轮要把 `delivery_outbox -> im.delivery.events` 也纳入通过条件，必须同时启动
 `delivery-service outbox-relay`，并显式打开：

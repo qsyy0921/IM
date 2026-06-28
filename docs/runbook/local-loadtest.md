@@ -2,8 +2,8 @@
 
 ## 快速入口：热点群聊业务压测规划
 
-热点群聊不要只用单接口 QPS 代替真实业务压测。后续 `loadtest/hotgroup` runner
-应覆盖：
+热点群聊不要只用单接口 QPS 代替真实业务压测。`loadtest/hotgroup` first-stage
+runner 应覆盖：
 
 ```text
 多 sender SendMessage
@@ -17,12 +17,12 @@
 -> member churn visibility
 ```
 
-场景、指标和面试口径见 `docs/runbook/loadtest/hotgroup/README.md`。该 runner
-未落地前，不要把现有 `sendmessage` 单服务压测解释为热点群聊能力证明。
+场景、指标和面试口径见 `docs/runbook/loadtest/hotgroup/README.md`。不要把现有
+`sendmessage` 单服务压测解释为热点群聊能力证明。
 
-## 快速入口：9 服务健康态资源快照
+## 快速入口：10 个运行链路服务健康态资源快照
 
-本地 9 服务 Docker 健康态检查可以同时写出一次性资源快照：
+本地 10 个运行链路服务 Docker 健康态检查可以同时写出一次性资源快照：
 
 ```powershell
 .\tools\run-local-service-health-smoke.ps1 -SkipImageBuild -RecordResourceSnapshot -RunName local-service-health-smoke-<name>
@@ -51,14 +51,14 @@
   -Name local-service-health-smoke-<name> `
   -SummaryPath H:\NexusIM\loadtest-results\local-service-health-smoke-<name>\resource-summary.json `
   -MarkdownPath H:\NexusIM\loadtest-results\local-service-health-smoke-<name>\resource-summary.md `
-  -Note "9-service Docker health-state resource snapshot"
+  -Note "10-runtime-service Docker health-state resource snapshot"
 ```
 
 同名条目默认拒绝覆盖；确认要更新时再显式加 `-Replace`。
 
 ## 快速入口：容量基线汇总
 
-9 个已实现服务的 loadtest runner 会在各自 summary JSON 中输出 `capacity_summary`。完成一轮或多轮压测后，可以从 H 盘原始结果目录生成统一容量基线索引：
+9 个已实现 IM 业务服务的 loadtest runner 会在各自 summary JSON 中输出 `capacity_summary`；`timeline-service` 当前只有 noop health / metrics runtime，尚无容量 runner。完成一轮或多轮压测后，可以从 H 盘原始结果目录生成统一容量基线索引：
 
 ```powershell
 .\tools\summarize-loadtest-capacity-baselines.ps1 `
@@ -67,9 +67,9 @@
   -MarkdownPath H:\NexusIM\loadtest-results\capacity-baseline-summary\capacity-baseline-summary.md
 ```
 
-如果要确认 9 个服务都已有至少一份 `capacity_summary`，追加 `-RequireAllServices`。该汇总只聚合既有压测结果，不能替代真实容量压测、SLO 或生产 sizing 结论。
+如果要确认 9 个 IM 业务服务都已有至少一份 `capacity_summary`，追加 `-RequireAllServices`。该汇总只聚合既有压测结果，不能替代 timeline sequencer 压测、真实容量压测、SLO 或生产 sizing 结论。
 
-已归档的 9 服务本地短容量基线证据索引见 `docs/runbook/capacity-baseline-evidence.json`。默认门禁只校验 schema 和报告边界；如需复核 H 盘原始 summary 是否仍存在，运行：
+已归档的 9 个 IM 业务服务本地短容量基线证据索引见 `docs/runbook/capacity-baseline-evidence.json`。默认门禁只校验 schema 和报告边界；如需复核 H 盘原始 summary 是否仍存在，运行：
 
 ```powershell
 .\tools\validate-capacity-baseline-evidence.ps1 `
@@ -90,9 +90,9 @@
   -Replace
 ```
 
-不带 `-Replace` 时，工具会拒绝覆盖已有服务证据，避免误改 9 服务索引。
+不带 `-Replace` 时，工具会拒绝覆盖已有服务证据，避免误改 9 个 IM 业务服务索引。
 
-如果本地 9 个服务已经按 `deploy/local/docker-compose.services.yml` 暴露默认端口，可以先 dry-run 生成计划，再执行一轮短基线：
+如果本地 10 个运行链路服务已经按 `deploy/local/docker-compose.services.yml` 暴露默认端口，可以先 dry-run 生成计划，再执行一轮短基线：
 
 ```powershell
 .\tools\run-loadtest-capacity-baseline-suite.ps1 -DryRun
@@ -111,7 +111,7 @@ suite runner 默认只执行主入口服务可直接支撑的 direct runner，�
 .\tools\run-loadtest-capacity-baseline-suite.ps1 -IncludeStackRunners
 ```
 
-本地 Docker 9 服务主进程由 `deploy/local/docker-compose.services.yml` 启动；后台 relay / consumer 角色不要默认常驻，可以按需叠加 worker overlay：
+本地 Docker 10 个运行链路服务主进程由 `deploy/local/docker-compose.services.yml` 启动；后台 relay / consumer 角色不要默认常驻，可以按需叠加 worker overlay：
 
 ```powershell
 docker compose `
@@ -326,6 +326,19 @@ MacBook 172.31.50.3: 轻量 arm64 验证节点，只保留少量 gateway 镜像�
 因此后续热点群聊或分布式 smoke 默认把服务目标指向 Ubuntu 的 `172.31.50.2`；
 Windows 和 MacBook 只作为客户端、receiver 或对照节点加入，不默认承载重型中间件。
 
+当前实验网观测入口：
+
+```text
+Kafka UI:    http://172.31.50.2:19090
+Prometheus:  http://172.31.50.2:19091
+Grafana:     http://172.31.50.2:13000
+OTel gRPC:   172.31.50.2:14317
+OTel HTTP:   http://172.31.50.2:14318
+OTel health: http://172.31.50.2:14333
+```
+
+`19090` 固定留给 Kafka UI，Prometheus 使用 `19091`，避免压测报告和排障时混淆入口。
+
 ## 2. 端口分配
 
 `8080` 不作为 NexusIM 本地压测端口。
@@ -429,6 +442,8 @@ TcpTestSucceeded : True
 - 压测脚本不能写死 IP、端口、并发和持续时间，必须通过参数或环境变量传入。
 - 每次压测记录目标 commit、机器、端口、并发、请求数、p95/p99、错误率。
 - 压测结果输出到 `loadtest/results/<date>/`。
+- 压测必须配套 Prometheus / Grafana 趋势图。没有 dashboard 时间窗口、关键面板截图或
+  导出链接的运行，只能称为 smoke / dry-run / diagnostics，不能称为容量结论。
 - 先跑短压测确认功能，再跑长压测观察资源和稳定性。
 - 本地多机结果只用于发现早期瓶颈和趋势，不作为生产容量承诺。
 - 如需记录 `conversation_seq_alloc_latency`、Kafka publish、outbox relay 分段指标，gRPC 进程与 outbox relay 进程必须分别设置 `NEXUSIM_DEBUG_ADDR`，并把对应地址传给压测脚本。`kafka_publish_latency` 只保留兼容旧报告；正式报告优先看 `kafka_publish_call_latency`、`kafka_publish_records_per_call` 和 `kafka_publish_record_latency_estimate`，避免 single path 和 batch path 口径混用。

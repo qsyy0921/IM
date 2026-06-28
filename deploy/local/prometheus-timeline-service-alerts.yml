@@ -1,0 +1,19 @@
+groups:
+  - name: nexusim-timeline-service
+    rules:
+      - alert: NexusIMTimelineServiceDown
+        expr: up{service="timeline-service"} == 0
+        for: 1m
+        labels:
+          severity: warning
+          service: timeline-service
+        annotations:
+          summary: timeline-service metrics endpoint is down
+      - alert: NexusIMTimelineServiceInfoMissing
+        expr: absent(nexusim_timeline_service_info)
+        for: 1m
+        labels:
+          severity: warning
+          service: timeline-service
+        annotations:
+          summary: timeline-service info metric is missing

@@ -20,7 +20,8 @@
 2. Product-active 服务按需推进：workflow、audit、admin、notification、media、vector、
    model、knowledge、presence、control-plane。
 3. 数据平台和中间件 profile 按完整架构逐步补，不抢占 AI / Agent 演示主线。
-4. 9 个既有 IM 服务只回补阻塞 AI / product platform 的 P0/P1 或用户点名项。
+4. 10 个运行链路服务（9 个既有 IM 服务 + `timeline-service` noop）只回补阻塞
+   AI / product platform、热点群压测或用户点名项的 P0/P1。
 5. 客户端只作为演示入口维护；除非阻塞演示，不继续扩完整产品级客户端。
 6. 热点群 / 分区主线已落 conversation-service scale policy、delivery hybrid/read fanout
    first-stage runtime 和 hotgroup runner；下一步实现 timeline-service sequencer、broadcast
@@ -80,21 +81,25 @@
   relay first path 已落；后续继续补 workflow outbox relay smoke、更多 compensation adapter、
   callback delivery provider-grade persisted dashboard / provider-grade approval platform。
 
-## 9 个核心 IM 服务 P2
+## 核心 IM 运行链路 P2
 
 - `api-gateway`：legacy observation evidence、provider-grade quota、gray rollout、OTel stack。
 - Cross-service loadtest：继续维护 `capacity_summary`，形成容量曲线和瓶颈说明；新增
   `loadtest/hotgroup` 业务压测 runner，覆盖热点群聊 fanout、Kafka lag、delivery
   projection、push notify storm、PullInbox / ACK 追平、成员变更和故障恢复，不用单接口
-  QPS 替代真实业务链路。
+  QPS 替代真实业务链路；正式压测必须配套 Prometheus / Grafana 趋势图。当前已新增
+  `NexusIM Hot Group Loadtest` first-stage dashboard，后续还需补 fanout-mode distribution、
+  Kafka consumer lag、delivery timeline item insert rate、inbox rows per message 和
+  PostgreSQL lock / WAL / dead tuple time-series exporter。
 - `identity-service`：WebAuthn/passkeys、OIDC、多 issuer、KMS/HSM、完整风控、生产级
   email/SMS provider。
 - `message-service`：删除 / 撤回 / 编辑深化、外部 proof workflow、发送链路生产观测。
 - `conversation-service`：群规模策略已进入 domain 层，medium / large 策略已转 active
   first-stage；后续在 timeline-service SDD 冻结后，把 hot group 的 contract-only 策略接入
   sequencer runtime，并继续补群管理深化、历史窗口 / targeted replay repair。
-- `timeline-service`：foundation-planned；下一步冻结 SDD，补 seq block allocator、
-  sequencer epoch fencing、gap marker、virtual partition mapping 和 repair operator。
+- `timeline-service`：已进入本地运行链路的 noop 服务，具备 Docker / Prometheus /
+  Grafana 观测；下一步冻结 SDD，补 seq block allocator、sequencer epoch fencing、
+  gap marker、virtual partition mapping 和 repair operator。
 - `delivery-service`：projection DLQ / repair 深化、更多 delivery event consumer；
   `WRITE_FANOUT`、`HYBRID_FANOUT` 和 `READ_FANOUT` 已有 first-stage runtime，后续补
   `BROADCAST_SIGNAL` delivery event / push consumer、timeline item repair、动态 read

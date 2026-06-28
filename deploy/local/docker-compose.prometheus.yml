@@ -10,35 +10,18 @@ services:
       - "--storage.tsdb.path=/prometheus"
       - "--storage.tsdb.retention.time=24h"
     ports:
-      - "19090:9090"
+      - "19091:9090"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./${NEXUSIM_PROMETHEUS_CONFIG:-prometheus-core.yml}:/etc/prometheus/prometheus.yml:ro
       - ./prometheus-api-gateway-alerts.yml:/etc/prometheus/rules/api-gateway.yml:ro
       - ./prometheus-identity-service-alerts.yml:/etc/prometheus/rules/identity-service.yml:ro
       - ./prometheus-message-service-alerts.yml:/etc/prometheus/rules/message-service.yml:ro
       - ./prometheus-conversation-service-alerts.yml:/etc/prometheus/rules/conversation-service.yml:ro
+      - ./prometheus-timeline-service-alerts.yml:/etc/prometheus/rules/timeline-service.yml:ro
       - ./prometheus-delivery-service-alerts.yml:/etc/prometheus/rules/delivery-service.yml:ro
       - ./prometheus-push-gateway-alerts.yml:/etc/prometheus/rules/push-gateway.yml:ro
       - ./prometheus-receipt-service-alerts.yml:/etc/prometheus/rules/receipt-service.yml:ro
       - ./prometheus-contacts-service-alerts.yml:/etc/prometheus/rules/contacts-service.yml:ro
       - ./prometheus-policy-service-alerts.yml:/etc/prometheus/rules/policy-service.yml:ro
-      - ./prometheus-search-service-alerts.yml:/etc/prometheus/rules/search-service.yml:ro
-      - ./prometheus-memory-service-alerts.yml:/etc/prometheus/rules/memory-service.yml:ro
-      - ./prometheus-retrieval-gateway-alerts.yml:/etc/prometheus/rules/retrieval-gateway.yml:ro
-      - ./prometheus-rag-service-alerts.yml:/etc/prometheus/rules/rag-service.yml:ro
-      - ./prometheus-summary-service-alerts.yml:/etc/prometheus/rules/summary-service.yml:ro
-      - ./prometheus-agent-service-alerts.yml:/etc/prometheus/rules/agent-service.yml:ro
-      - ./prometheus-skill-registry-alerts.yml:/etc/prometheus/rules/skill-registry.yml:ro
-      - ./prometheus-mcp-gateway-alerts.yml:/etc/prometheus/rules/mcp-gateway.yml:ro
-      - ./prometheus-action-executor-alerts.yml:/etc/prometheus/rules/action-executor.yml:ro
-      - ./prometheus-ai-eval-service-alerts.yml:/etc/prometheus/rules/ai-eval-service.yml:ro
-      - ./prometheus-media-service-alerts.yml:/etc/prometheus/rules/media-service.yml:ro
-      - ./prometheus-notification-service-alerts.yml:/etc/prometheus/rules/notification-service.yml:ro
-      - ./prometheus-audit-service-alerts.yml:/etc/prometheus/rules/audit-service.yml:ro
-      - ./prometheus-admin-service-alerts.yml:/etc/prometheus/rules/admin-service.yml:ro
-      - ./prometheus-control-plane-service-alerts.yml:/etc/prometheus/rules/control-plane-service.yml:ro
-      - ./prometheus-presence-service-alerts.yml:/etc/prometheus/rules/presence-service.yml:ro
-      - ./prometheus-model-gateway-alerts.yml:/etc/prometheus/rules/model-gateway.yml:ro
-      - ./prometheus-knowledge-ingestion-service-alerts.yml:/etc/prometheus/rules/knowledge-ingestion-service.yml:ro
-      - ./prometheus-workflow-service-alerts.yml:/etc/prometheus/rules/workflow-service.yml:ro
-      - ./prometheus-vector-index-service-alerts.yml:/etc/prometheus/rules/vector-index-service.yml:ro

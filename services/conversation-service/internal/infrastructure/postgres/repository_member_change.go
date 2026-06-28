@@ -154,6 +154,7 @@ func lockConversation(ctx context.Context, tx pgx.Tx, command types.CreateMember
 	row := tx.QueryRow(ctx, `
 SELECT
     status,
+    conversation_type,
     conversation_mode,
     fanout_mode,
     fanout_policy_version,
@@ -171,6 +172,7 @@ FOR UPDATE
 	}
 	if err := row.Scan(
 		&conversation.Status,
+		&conversation.ConversationType,
 		&conversation.ConversationMode,
 		&conversation.FanoutMode,
 		&conversation.FanoutPolicyVersion,
@@ -346,6 +348,83 @@ SET role = EXCLUDED.role,
 
 func updateConversationVersions(ctx context.Context, tx pgx.Tx, command types.CreateMemberChangeCommand, record domain.MemberChangeRecord) error {
 	return updateConversationVersionValues(ctx, tx, command.AuthContext.TenantID, command.ConversationID, record.Target.MemberVersion, record.Target.PermissionVersion)
+}
+
+func applyConversationScalePolicyAfterMemberChange(
+	ctx context.Context,
+	tx pgx.Tx,
+	conversation domain.Conversation,
+) (domain.ConversationScalePolicy, error) {
+	currentPolicy := domain.ConversationScalePolicy{
+		Runtime:             domain.ConversationScaleRuntimeActive,
+		ConversationMode:    conversation.ConversationMode,
+		FanoutMode:          conversation.FanoutMode,
+		FanoutPolicyVersion: conversation.FanoutPolicyVersion,
+		CurrentSeqShard:     conversation.CurrentSeqShard,
+	}
+	if conversation.ConversationType != types.ConversationTypeGroup {
+		return currentPolicy, nil
+	}
+	activeMemberCount, err := countActiveConversationMembers(ctx, tx, conversation.TenantID, conversation.ConversationID)
+	if err != nil {
+		return domain.ConversationScalePolicy{}, err
+	}
+	resolvedPolicy, err := domain.ResolveConversationScalePolicy(conversation.ConversationType, activeMemberCount)
+	if err != nil {
+		return domain.ConversationScalePolicy{}, err
+	}
+	if resolvedPolicy.Runtime != domain.ConversationScaleRuntimeActive {
+		return domain.ConversationScalePolicy{}, types.NewSequencerUnavailable("conversation scale policy is not active")
+	}
+	if resolvedPolicy.FanoutPolicyVersion <= conversation.FanoutPolicyVersion {
+		return currentPolicy, nil
+	}
+	if err := promoteConversationScalePolicy(ctx, tx, conversation, resolvedPolicy); err != nil {
+		return domain.ConversationScalePolicy{}, err
+	}
+	return resolvedPolicy, nil
+}
+
+func countActiveConversationMembers(
+	ctx context.Context,
+	tx pgx.Tx,
+	tenantID types.TenantID,
+	conversationID types.ConversationID,
+) (int64, error) {
+	var activeMemberCount int64
+	err := tx.QueryRow(ctx, `
+SELECT COUNT(*)
+FROM conversation_members
+WHERE tenant_id = $1
+  AND conversation_id = $2
+  AND status = 'ACTIVE'
+`, tenantID, conversationID).Scan(&activeMemberCount)
+	if err != nil {
+		return 0, types.NewDBReadFailed(err.Error())
+	}
+	return activeMemberCount, nil
+}
+
+func promoteConversationScalePolicy(
+	ctx context.Context,
+	tx pgx.Tx,
+	conversation domain.Conversation,
+	policy domain.ConversationScalePolicy,
+) error {
+	_, err := tx.Exec(ctx, `
+UPDATE conversations
+SET conversation_mode = $3,
+    fanout_mode = $4,
+    fanout_policy_version = $5,
+    current_seq_shard = $6,
+    updated_at = now()
+WHERE tenant_id = $1
+  AND conversation_id = $2
+`, conversation.TenantID, conversation.ConversationID, policy.ConversationMode, policy.FanoutMode, policy.FanoutPolicyVersion, policy.CurrentSeqShard)
+	if err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	return nil
 }
 
 func updateConversationVersionValues(

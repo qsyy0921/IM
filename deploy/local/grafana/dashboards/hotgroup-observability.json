@@ -1,0 +1,291 @@
+{
+  "uid": "nexusim-hotgroup",
+  "title": "NexusIM Hot Group Loadtest",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "time": {
+    "from": "now-30m",
+    "to": "now"
+  },
+  "tags": ["nexusim", "hotgroup", "loadtest", "first-stage"],
+  "templating": {
+    "list": []
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "SendMessage p95 / p99",
+      "gridPos": {"h": 6, "w": 6, "x": 0, "y": 0},
+      "targets": [
+        {"refId": "A", "expr": "max(nexusim_message_latency_p95_milliseconds{operation=\"send_message\"})", "legendFormat": "p95"},
+        {"refId": "B", "expr": "max(nexusim_message_latency_p99_milliseconds{operation=\"send_message\"})", "legendFormat": "p99"}
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "orange", "value": 250},
+              {"color": "red", "value": 1000}
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {"values": false, "calcs": ["lastNotNull"], "fields": ""},
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Delivery outbox backlog",
+      "gridPos": {"h": 6, "w": 6, "x": 6, "y": 0},
+      "targets": [
+        {"refId": "A", "expr": "max(nexusim_delivery_outbox{state=\"pending\"})", "legendFormat": "pending"},
+        {"refId": "B", "expr": "max(nexusim_delivery_outbox{state=\"dlq\"})", "legendFormat": "dlq"}
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "orange", "value": 1},
+              {"color": "red", "value": 100}
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {"values": false, "calcs": ["lastNotNull"], "fields": ""},
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Projection blockers",
+      "gridPos": {"h": 6, "w": 6, "x": 12, "y": 0},
+      "targets": [
+        {"refId": "A", "expr": "max(nexusim_delivery_projection_failures{state=\"unresolved_total\"})", "legendFormat": "unresolved"},
+        {"refId": "B", "expr": "max(nexusim_delivery_timeline_worker_consecutive_errors)", "legendFormat": "worker consecutive"}
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "red", "value": 1}
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {"values": false, "calcs": ["lastNotNull"], "fields": ""},
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Push sessions / slow evictions",
+      "gridPos": {"h": 6, "w": 6, "x": 18, "y": 0},
+      "targets": [
+        {"refId": "A", "expr": "max(nexusim_push_gateway_sessions{state=\"connected\"})", "legendFormat": "connected"},
+        {"refId": "B", "expr": "increase(nexusim_push_gateway_session_events_total{event=\"slow_evicted\"}[30m])", "legendFormat": "slow evicted"}
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "orange", "value": 1},
+              {"color": "red", "value": 10}
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {"values": false, "calcs": ["lastNotNull"], "fields": ""},
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Send path latency",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 6},
+      "targets": [
+        {"refId": "A", "expr": "nexusim_message_latency_p95_milliseconds{operation=~\"send_message|conversation_seq_alloc|repository_pool_acquire_recent|kafka_publish_call\"}", "legendFormat": "p95 {{operation}}"},
+        {"refId": "B", "expr": "nexusim_message_latency_p99_milliseconds{operation=~\"send_message|conversation_seq_alloc|repository_pool_acquire_recent|kafka_publish_call\"}", "legendFormat": "p99 {{operation}}"}
+      ],
+      "fieldConfig": {
+        "defaults": {"unit": "ms"},
+        "overrides": []
+      },
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
+        "tooltip": {"mode": "multi", "sort": "none"}
+      }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Message relay and Kafka publish shape",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 6},
+      "targets": [
+        {"refId": "A", "expr": "nexusim_message_value_avg{operation=\"outbox_fetched_per_call_recent\"}", "legendFormat": "outbox fetched / call"},
+        {"refId": "B", "expr": "nexusim_message_value_avg{operation=\"kafka_publish_records_per_call_recent\"}", "legendFormat": "kafka records / call"},
+        {"refId": "C", "expr": "nexusim_message_value_p95{operation=\"kafka_publish_records_per_call_recent\"}", "legendFormat": "kafka records / call p95"}
+      ],
+      "fieldConfig": {
+        "defaults": {"unit": "short"},
+        "overrides": []
+      },
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
+        "tooltip": {"mode": "multi", "sort": "none"}
+      }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Conversation traffic and membership",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 14},
+      "targets": [
+        {"refId": "A", "expr": "sum by (method) (rate(nexusim_conversation_grpc_method_requests_total[5m]))", "legendFormat": "grpc {{method}}"},
+        {"refId": "B", "expr": "max(nexusim_conversation_members{state=\"active\"})", "legendFormat": "active members"},
+        {"refId": "C", "expr": "max(nexusim_conversation_member_changes{state=\"failed_compensated\"})", "legendFormat": "failed member changes"}
+      ],
+      "fieldConfig": {
+        "defaults": {"unit": "short"},
+        "overrides": []
+      },
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
+        "tooltip": {"mode": "multi", "sort": "none"}
+      }
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Delivery read model growth",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 14},
+      "targets": [
+        {"refId": "A", "expr": "nexusim_delivery_read_model{state=~\"user_inbox_total|device_delivery_cursors|kafka_checkpoints\"}", "legendFormat": "{{state}}"},
+        {"refId": "B", "expr": "nexusim_delivery_membership_projection{state=~\"active|inactive|total\"}", "legendFormat": "membership {{state}}"}
+      ],
+      "fieldConfig": {
+        "defaults": {"unit": "short"},
+        "overrides": []
+      },
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
+        "tooltip": {"mode": "multi", "sort": "none"}
+      }
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Delivery gRPC traffic",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 22},
+      "targets": [
+        {"refId": "A", "expr": "sum by (method) (rate(nexusim_delivery_grpc_method_requests_total[5m]))", "legendFormat": "requests {{method}}"},
+        {"refId": "B", "expr": "sum by (method) (rate(nexusim_delivery_grpc_method_errors_total[5m]))", "legendFormat": "errors {{method}}"}
+      ],
+      "fieldConfig": {
+        "defaults": {"unit": "ops"},
+        "overrides": []
+      },
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
+        "tooltip": {"mode": "multi", "sort": "none"}
+      }
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Delivery gRPC latency",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 22},
+      "targets": [
+        {"refId": "A", "expr": "nexusim_delivery_grpc_latency_avg_milliseconds", "legendFormat": "avg {{method}}"},
+        {"refId": "B", "expr": "nexusim_delivery_grpc_latency_max_milliseconds", "legendFormat": "max {{method}}"}
+      ],
+      "fieldConfig": {
+        "defaults": {"unit": "ms"},
+        "overrides": []
+      },
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
+        "tooltip": {"mode": "multi", "sort": "none"}
+      }
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Push gateway activity",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 30},
+      "targets": [
+        {"refId": "A", "expr": "increase(nexusim_push_gateway_session_events_total[5m])", "legendFormat": "session {{event}}"},
+        {"refId": "B", "expr": "increase(nexusim_push_gateway_redis_route_events_total[5m])", "legendFormat": "redis route {{event}}"}
+      ],
+      "fieldConfig": {
+        "defaults": {"unit": "short"},
+        "overrides": []
+      },
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
+        "tooltip": {"mode": "multi", "sort": "none"}
+      }
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "PostgreSQL pools",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 30},
+      "targets": [
+        {"refId": "A", "expr": "nexusim_message_pg_pool_conns", "legendFormat": "message {{state}}"},
+        {"refId": "B", "expr": "nexusim_conversation_pg_pool_conns", "legendFormat": "conversation {{state}}"},
+        {"refId": "C", "expr": "nexusim_delivery_pg_pool_conns", "legendFormat": "delivery {{state}}"}
+      ],
+      "fieldConfig": {
+        "defaults": {"unit": "short"},
+        "overrides": []
+      },
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
+        "tooltip": {"mode": "multi", "sort": "none"}
+      }
+    }
+  ]
+}

@@ -127,14 +127,14 @@ try {
         throw "local-up-grafana.ps1 failed with exit code $LASTEXITCODE"
     }
 
-    Wait-HttpEndpoint -Name "Prometheus" -Url "http://127.0.0.1:19090/-/ready"
-    $rules = Invoke-Endpoint -Url "http://127.0.0.1:19090/api/v1/rules"
+    Wait-HttpEndpoint -Name "Prometheus" -Url "http://127.0.0.1:19091/-/ready"
+    $rules = Invoke-Endpoint -Url "http://127.0.0.1:19091/api/v1/rules"
     if ($rules.status -ne "success" -or -not $rules.data.groups -or $rules.data.groups.Count -lt 9) {
         throw "Prometheus did not load expected local rule groups."
     }
     $activeAlertmanagerUrls = @()
     if ($IncludeAlertmanager) {
-        $alertmanagers = Invoke-Endpoint -Url "http://127.0.0.1:19090/api/v1/alertmanagers"
+        $alertmanagers = Invoke-Endpoint -Url "http://127.0.0.1:19091/api/v1/alertmanagers"
         if ($alertmanagers.status -ne "success" -or -not $alertmanagers.data.activeAlertmanagers) {
             throw "Prometheus did not discover the local Alertmanager target."
         }

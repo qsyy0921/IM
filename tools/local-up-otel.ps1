@@ -7,7 +7,7 @@ $ready = $false
 do {
     Start-Sleep -Seconds 1
     try {
-        $response = Invoke-WebRequest -UseBasicParsing -Uri "http://127.0.0.1:13133/" -TimeoutSec 2
+        $response = Invoke-WebRequest -UseBasicParsing -Uri "http://127.0.0.1:14333/" -TimeoutSec 2
         $ready = ($response.StatusCode -ge 200 -and $response.StatusCode -lt 500)
     } catch {
         $ready = $false
@@ -19,6 +19,6 @@ if (-not $ready) {
     throw "OpenTelemetry collector did not become ready before timeout."
 }
 
-Write-Host "otel_collector_otlp_grpc=127.0.0.1:4317"
-Write-Host "otel_collector_otlp_http=http://127.0.0.1:4318"
-Write-Host "otel_collector_health=http://127.0.0.1:13133"
+Write-Host "otel_collector_otlp_grpc=127.0.0.1:14317"
+Write-Host "otel_collector_otlp_http=http://127.0.0.1:14318"
+Write-Host "otel_collector_health=http://127.0.0.1:14333"

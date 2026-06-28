@@ -40,18 +40,19 @@ brief、loadtest report、development-progress 或 archive。
 
 ## 已成型底座
 
-- 9 个核心 IM 服务：api-gateway、identity-service、message-service、
+- 10 个核心运行链路服务：api-gateway、identity-service、message-service、
   conversation-service、delivery-service、push-gateway、receipt-service、
-  contacts-service、policy-service。
+  contacts-service、policy-service，以及已进入本地 Docker / 观测链路的
+  timeline-service noop。
 - AI foundation：search-service、memory-service、retrieval-gateway、rag-service、
   summary-service、agent-service、skill-registry、mcp-gateway、action-executor、
   ai-eval-service、Python AI Worker。
 - Product-active first paths：admin-service、audit-service、control-plane-service、
   knowledge-ingestion-service、media-service、model-gateway、notification-service、
   presence-service、vector-index-service、workflow-service。
-- Distributed timeline planning：timeline-service 已建立 foundation-planned 六层边界和
-  noop runtime，用于后续热点会话 sequencer、seq block、gap marker 和分区映射；
-  当前不进入消息写入主路径。
+- Distributed timeline planning：timeline-service 已建立六层边界、noop runtime、
+  Docker runtime 和 Prometheus / Grafana 观测，用于后续热点会话 sequencer、seq block、
+  gap marker 和分区映射；当前不进入消息写入主路径。
 - Observability platform：当前 first-stage 指标和 trace 继续按 Prometheus / Grafana /
   OpenTelemetry 分工维护；它们只提供观测，不参与业务判定或隐藏降级。
 

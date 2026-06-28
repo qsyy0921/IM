@@ -21,7 +21,7 @@ $ready = $false
 do {
     Start-Sleep -Seconds 1
     try {
-        $response = Invoke-WebRequest -UseBasicParsing -Uri "http://127.0.0.1:19090/-/ready" -TimeoutSec 2
+        $response = Invoke-WebRequest -UseBasicParsing -Uri "http://127.0.0.1:19091/-/ready" -TimeoutSec 2
         $ready = ($response.StatusCode -ge 200 -and $response.StatusCode -lt 500)
     } catch {
         $ready = $false
@@ -33,7 +33,7 @@ if (-not $ready) {
     throw "Prometheus did not become ready before timeout."
 }
 
-Write-Host "prometheus_url=http://127.0.0.1:19090"
+Write-Host "prometheus_url=http://127.0.0.1:19091"
 Write-Host "api_gateway_scrape_target=host.docker.internal:11904"
 Write-Host "identity_service_scrape_target=host.docker.internal:11905"
 Write-Host "message_service_scrape_target=host.docker.internal:11910"

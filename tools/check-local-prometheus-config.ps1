@@ -5,9 +5,9 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 
 $servicesRoot = Join-Path $repoRoot "services"
 $composePath = Join-Path $repoRoot "deploy\local\docker-compose.prometheus.yml"
-$configPath = Join-Path $repoRoot "deploy\local\prometheus.yml"
+$configPath = Join-Path $repoRoot "deploy\local\prometheus-core.yml"
 
-$prometheusServices = @(Get-NexusIMRegistryServices -RepoRoot $repoRoot -Active |
+$prometheusServices = @(Get-NexusIMRegistryServices -RepoRoot $repoRoot -Stages @("core") |
     Where-Object { [string]$_.prometheus_rule_file -ne "" -and [int]$_.debug_port -gt 0 } |
     ForEach-Object {
         @{
@@ -17,12 +17,12 @@ $prometheusServices = @(Get-NexusIMRegistryServices -RepoRoot $repoRoot -Active 
         }
     })
 
-$implementedServices = Get-NexusIMRegistryServiceNames -RepoRoot $repoRoot -Active
+$implementedServices = Get-NexusIMRegistryServiceNames -RepoRoot $repoRoot -Stages @("core")
 $actualServiceDirs = @(Get-ChildItem -LiteralPath $servicesRoot -Directory | Sort-Object Name | Select-Object -ExpandProperty Name)
-$serviceDirDiff = Compare-Object -ReferenceObject $implementedServices -DifferenceObject $actualServiceDirs
-if ($serviceDirDiff) {
-    $diffText = ($serviceDirDiff | ForEach-Object { "$($_.SideIndicator) $($_.InputObject)" }) -join ", "
-    throw "Service registry active services mismatch with services directory: $diffText"
+$missingServiceDirs = @($implementedServices | Where-Object { $actualServiceDirs -notcontains $_ })
+if ($missingServiceDirs) {
+    $diffText = ($missingServiceDirs | ForEach-Object { "missing $_" }) -join ", "
+    throw "Service registry active services missing service directories: $diffText"
 }
 
 $configuredServices = @($prometheusServices | ForEach-Object { [string]$_.Name } | Sort-Object)
@@ -48,8 +48,8 @@ foreach ($service in $prometheusServices) {
     $rulesByService[[string]$service.Name] = Get-Content -LiteralPath (Join-Path $repoRoot "deploy\local\$([string]$service.RuleFile)") -Raw
 }
 
-if ($compose -notmatch "19090:9090") {
-    throw "Prometheus compose must expose host port 19090 to avoid existing local service ports."
+if ($compose -notmatch "19091:9090") {
+    throw "Prometheus compose must expose host port 19091 to avoid Kafka UI on 19090."
 }
 if ($config -notmatch "metrics_path:\s*/metrics") {
     throw "Prometheus config must scrape local /metrics endpoints."
@@ -244,113 +244,14 @@ foreach ($alert in $requiredPolicyAlerts) {
     }
 }
 
-$requiredSearchAlerts = @(
-    "NexusIMSearchServiceDown",
-    "NexusIMSearchServiceInfoMissing"
+$requiredTimelineAlerts = @(
+    "NexusIMTimelineServiceDown",
+    "NexusIMTimelineServiceInfoMissing"
 )
 
-foreach ($alert in $requiredSearchAlerts) {
-    if ($rulesByService["search-service"] -notmatch [regex]::Escape($alert)) {
-        throw "Prometheus search-service rules missing alert: $alert"
-    }
-}
-
-$requiredMemoryAlerts = @(
-    "NexusIMMemoryServiceDown",
-    "NexusIMMemoryServiceInfoMissing"
-)
-
-foreach ($alert in $requiredMemoryAlerts) {
-    if ($rulesByService["memory-service"] -notmatch [regex]::Escape($alert)) {
-        throw "Prometheus memory-service rules missing alert: $alert"
-    }
-}
-
-$requiredRAGAlerts = @(
-    "NexusIMRAGServiceDown",
-    "NexusIMRAGServiceInfoMissing"
-)
-
-foreach ($alert in $requiredRAGAlerts) {
-    if ($rulesByService["rag-service"] -notmatch [regex]::Escape($alert)) {
-        throw "Prometheus rag-service rules missing alert: $alert"
-    }
-}
-
-$requiredSummaryAlerts = @(
-    "NexusIMSummaryServiceDown",
-    "NexusIMSummaryServiceInfoMissing"
-)
-
-foreach ($alert in $requiredSummaryAlerts) {
-    if ($rulesByService["summary-service"] -notmatch [regex]::Escape($alert)) {
-        throw "Prometheus summary-service rules missing alert: $alert"
-    }
-}
-
-$requiredAgentAlerts = @(
-    "NexusIMAgentServiceDown",
-    "NexusIMAgentServiceInfoMissing"
-)
-
-foreach ($alert in $requiredAgentAlerts) {
-    if ($rulesByService["agent-service"] -notmatch [regex]::Escape($alert)) {
-        throw "Prometheus agent-service rules missing alert: $alert"
-    }
-}
-
-$requiredSkillRegistryAlerts = @(
-    "NexusIMSkillRegistryDown",
-    "NexusIMSkillRegistryInfoMissing"
-)
-
-foreach ($alert in $requiredSkillRegistryAlerts) {
-    if ($rulesByService["skill-registry"] -notmatch [regex]::Escape($alert)) {
-        throw "Prometheus skill-registry rules missing alert: $alert"
-    }
-}
-
-$requiredMCPGatewayAlerts = @(
-    "NexusIMMCPGatewayDown",
-    "NexusIMMCPGatewayInfoMissing"
-)
-
-foreach ($alert in $requiredMCPGatewayAlerts) {
-    if ($rulesByService["mcp-gateway"] -notmatch [regex]::Escape($alert)) {
-        throw "Prometheus mcp-gateway rules missing alert: $alert"
-    }
-}
-
-$requiredActionExecutorAlerts = @(
-    "NexusIMActionExecutorDown",
-    "NexusIMActionExecutorInfoMissing"
-)
-
-foreach ($alert in $requiredActionExecutorAlerts) {
-    if ($rulesByService["action-executor"] -notmatch [regex]::Escape($alert)) {
-        throw "Prometheus action-executor rules missing alert: $alert"
-    }
-}
-
-$requiredAIEvalServiceAlerts = @(
-    "NexusIMAIEvalServiceDown",
-    "NexusIMAIEvalServiceInfoMissing"
-)
-
-foreach ($alert in $requiredAIEvalServiceAlerts) {
-    if ($rulesByService["ai-eval-service"] -notmatch [regex]::Escape($alert)) {
-        throw "Prometheus ai-eval-service rules missing alert: $alert"
-    }
-}
-
-$requiredMediaServiceAlerts = @(
-    "NexusIMMediaServiceDown",
-    "NexusIMMediaServiceInfoMissing"
-)
-
-foreach ($alert in $requiredMediaServiceAlerts) {
-    if ($rulesByService["media-service"] -notmatch [regex]::Escape($alert)) {
-        throw "Prometheus media-service rules missing alert: $alert"
+foreach ($alert in $requiredTimelineAlerts) {
+    if ($rulesByService["timeline-service"] -notmatch [regex]::Escape($alert)) {
+        throw "Prometheus timeline-service rules missing alert: $alert"
     }
 }
 

@@ -19,6 +19,11 @@
 - 每个活跃服务至少维护一份 consolidated 总报告或 README，说明 smoke / 压测如何做、
   如何排查瓶颈、最终结论是什么。
 - 原始结果、趋势图和大文件继续放在 `H:\NexusIM\loadtest-results`，默认不提交；仓库只保存报告和必要摘要。
+- 以后凡是“压测 / 长跑 / 容量基线 / 热点群聊”类报告，必须同时记录可视化证据：
+  Grafana dashboard 名称、Prometheus 查询时间窗口、关键截图路径或导出的 dashboard link /
+  panel JSON。没有趋势图的结果只能称为 smoke 或 dry-run，不能称为容量结论。
+- 新增压测 runner 时要同步检查是否已有对应 dashboard；没有时先补
+  `deploy/local/grafana/dashboards/<scenario>-observability.json`，再跑正式压测。
 
 推荐命名：
 

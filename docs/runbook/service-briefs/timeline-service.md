@@ -1,11 +1,13 @@
 # timeline-service Brief
 
-状态：foundation-planned。六层目录和 `noop` runtime 已建立，用于承接热点会话
-sequencer、conversation timeline 分区、seq block、epoch fencing 和 gap marker 的后续实现。
+状态：core runtime / noop。六层目录、Docker runtime、Prometheus / Grafana 观测和
+`noop` runtime 已进入本地运行链路，用于承接热点会话 sequencer、conversation
+timeline 分区、seq block、epoch fencing 和 gap marker 的后续实现。
 
 ## 当前边界
 
-- 当前只提供 `NEXUSIM_TIMELINE_SERVICE_MODE=noop`，可启动 debug health / metrics。
+- 当前只提供 `NEXUSIM_TIMELINE_SERVICE_MODE=noop`，可启动 debug health / metrics，并作为
+  `timeline-service-noop` 纳入本地 Docker 运行链路。
 - 不分配 `conversation_seq`，不写 timeline，不发布 Kafka，不修改 message /
   conversation / delivery 事实源。
 - message-service 对 `SEQUENCER_BLOCK` 仍 fail-closed 返回 sequencer unavailable；

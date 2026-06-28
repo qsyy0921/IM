@@ -41,7 +41,7 @@
     },
     {
       "name": "timeline-service",
-      "stage": "foundation-planned",
+      "stage": "core",
       "local_process": "timeline-service-noop",
       "debug_port": 11937,
       "prometheus_rule_file": "prometheus-timeline-service-alerts.yml",

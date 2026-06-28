@@ -360,6 +360,193 @@ WHERE event_id = 'event-1'
 	}
 }
 
+func TestRepositoryCreateMemberChangePromotesFanoutPolicyIntegration(t *testing.T) {
+	dsn := os.Getenv("NEXUSIM_PG_DSN")
+	if dsn == "" {
+		t.Skip("NEXUSIM_PG_DSN is not set")
+	}
+	ctx := context.Background()
+	pool, err := pgxpool.New(ctx, dsn)
+	if err != nil {
+		t.Fatalf("open pg pool: %v", err)
+	}
+	defer pool.Close()
+
+	resetMemberChangeTables(t, ctx, pool)
+	_, err = pool.Exec(ctx, `
+INSERT INTO conversations (
+    tenant_id, conversation_id, conversation_type, status, conversation_mode,
+    fanout_mode, fanout_policy_version, member_version, permission_version, current_seq_shard
+) VALUES ('tenant-scale', 'conv-scale', 'GROUP', 'ACTIVE', 'LOCAL_ROW_LOCK', 'WRITE_FANOUT', 1, 500, 500, 'local');
+INSERT INTO conversation_members (
+    tenant_id, conversation_id, user_id, role, status, join_seq, member_version, permission_version
+)
+SELECT
+    'tenant-scale',
+    'conv-scale',
+    CASE WHEN seq = 1 THEN 'owner-scale' ELSE 'member-scale-' || seq::text END,
+    CASE WHEN seq = 1 THEN 'OWNER' ELSE 'MEMBER' END,
+    'ACTIVE',
+    seq,
+    500,
+    500
+FROM generate_series(1, 500) AS seq;
+`)
+	if err != nil {
+		t.Fatalf("seed scale promotion data: %v", err)
+	}
+
+	repository := NewRepository(
+		pool,
+		WithIDGenerators(
+			func() (types.ChangeID, error) { return "change-scale-501", nil },
+			func() (types.EventID, error) { return "event-scale-501", nil },
+		),
+	)
+	_, err = repository.CreateMemberChange(ctx, types.CreateMemberChangeCommand{
+		AuthContext: types.AuthContext{
+			TenantID: "tenant-scale",
+			UserID:   "owner-scale",
+		},
+		ConversationID:        "conv-scale",
+		TargetUserID:          "member-scale-501",
+		ChangeType:            types.MemberChangeTypeJoin,
+		TargetRole:            types.MemberRoleMember,
+		ExpectedMemberVersion: 500,
+		IdempotencyKey:        "idem-scale-501",
+		ConflictPolicy:        types.MemberChangeConflictPolicyReject,
+		Reason:                "promote to hybrid fanout",
+	})
+	if err != nil {
+		t.Fatalf("create member change: %v", err)
+	}
+
+	var conversationFanout types.FanoutMode
+	var conversationPolicyVersion int64
+	var conversationShard string
+	if err := pool.QueryRow(ctx, `
+SELECT fanout_mode, fanout_policy_version, current_seq_shard
+FROM conversations
+WHERE tenant_id = 'tenant-scale'
+  AND conversation_id = 'conv-scale'
+`).Scan(&conversationFanout, &conversationPolicyVersion, &conversationShard); err != nil {
+		t.Fatalf("query promoted conversation: %v", err)
+	}
+	if conversationFanout != types.FanoutModeHybridFanout ||
+		conversationPolicyVersion != 2 ||
+		conversationShard != "hybrid" {
+		t.Fatalf("unexpected promoted policy: fanout=%s version=%d shard=%s", conversationFanout, conversationPolicyVersion, conversationShard)
+	}
+
+	var timelineFanout types.FanoutMode
+	var timelinePolicyVersion int64
+	if err := pool.QueryRow(ctx, `
+SELECT fanout_mode, fanout_policy_version
+FROM conversation_timeline_events
+WHERE tenant_id = 'tenant-scale'
+  AND conversation_id = 'conv-scale'
+  AND event_id = 'event-scale-501'
+`).Scan(&timelineFanout, &timelinePolicyVersion); err != nil {
+		t.Fatalf("query promoted timeline event: %v", err)
+	}
+	if timelineFanout != types.FanoutModeHybridFanout || timelinePolicyVersion != 2 {
+		t.Fatalf("unexpected timeline policy: fanout=%s version=%d", timelineFanout, timelinePolicyVersion)
+	}
+}
+
+func TestRepositoryCreateMemberChangeDoesNotDowngradeFanoutPolicyIntegration(t *testing.T) {
+	dsn := os.Getenv("NEXUSIM_PG_DSN")
+	if dsn == "" {
+		t.Skip("NEXUSIM_PG_DSN is not set")
+	}
+	ctx := context.Background()
+	pool, err := pgxpool.New(ctx, dsn)
+	if err != nil {
+		t.Fatalf("open pg pool: %v", err)
+	}
+	defer pool.Close()
+
+	resetMemberChangeTables(t, ctx, pool)
+	_, err = pool.Exec(ctx, `
+INSERT INTO conversations (
+    tenant_id, conversation_id, conversation_type, status, conversation_mode,
+    fanout_mode, fanout_policy_version, member_version, permission_version, current_seq_shard
+) VALUES ('tenant-scale', 'conv-read', 'GROUP', 'ACTIVE', 'LOCAL_ROW_LOCK', 'READ_FANOUT', 3, 501, 501, 'read');
+INSERT INTO conversation_members (
+    tenant_id, conversation_id, user_id, role, status, join_seq, member_version, permission_version
+)
+SELECT
+    'tenant-scale',
+    'conv-read',
+    CASE WHEN seq = 1 THEN 'owner-read' ELSE 'member-read-' || seq::text END,
+    CASE WHEN seq = 1 THEN 'OWNER' ELSE 'MEMBER' END,
+    'ACTIVE',
+    seq,
+    501,
+    501
+FROM generate_series(1, 501) AS seq;
+`)
+	if err != nil {
+		t.Fatalf("seed no-downgrade data: %v", err)
+	}
+
+	repository := NewRepository(
+		pool,
+		WithIDGenerators(
+			func() (types.ChangeID, error) { return "change-read-remove", nil },
+			func() (types.EventID, error) { return "event-read-remove", nil },
+		),
+	)
+	_, err = repository.CreateMemberChange(ctx, types.CreateMemberChangeCommand{
+		AuthContext: types.AuthContext{
+			TenantID: "tenant-scale",
+			UserID:   "owner-read",
+		},
+		ConversationID:        "conv-read",
+		TargetUserID:          "member-read-501",
+		ChangeType:            types.MemberChangeTypeRemove,
+		ExpectedMemberVersion: 501,
+		IdempotencyKey:        "idem-read-remove",
+		ConflictPolicy:        types.MemberChangeConflictPolicyReject,
+		Reason:                "no fanout downgrade on shrink",
+	})
+	if err != nil {
+		t.Fatalf("create member change: %v", err)
+	}
+
+	var conversationFanout types.FanoutMode
+	var conversationPolicyVersion int64
+	var conversationShard string
+	if err := pool.QueryRow(ctx, `
+SELECT fanout_mode, fanout_policy_version, current_seq_shard
+FROM conversations
+WHERE tenant_id = 'tenant-scale'
+  AND conversation_id = 'conv-read'
+`).Scan(&conversationFanout, &conversationPolicyVersion, &conversationShard); err != nil {
+		t.Fatalf("query no-downgrade conversation: %v", err)
+	}
+	if conversationFanout != types.FanoutModeReadFanout ||
+		conversationPolicyVersion != 3 ||
+		conversationShard != "read" {
+		t.Fatalf("unexpected downgraded policy: fanout=%s version=%d shard=%s", conversationFanout, conversationPolicyVersion, conversationShard)
+	}
+
+	var timelineFanout types.FanoutMode
+	var timelinePolicyVersion int64
+	if err := pool.QueryRow(ctx, `
+SELECT fanout_mode, fanout_policy_version
+FROM conversation_timeline_events
+WHERE tenant_id = 'tenant-scale'
+  AND conversation_id = 'conv-read'
+  AND event_id = 'event-read-remove'
+`).Scan(&timelineFanout, &timelinePolicyVersion); err != nil {
+		t.Fatalf("query no-downgrade timeline event: %v", err)
+	}
+	if timelineFanout != types.FanoutModeReadFanout || timelinePolicyVersion != 3 {
+		t.Fatalf("unexpected timeline policy: fanout=%s version=%d", timelineFanout, timelinePolicyVersion)
+	}
+}
+
 func TestRepositoryMarkPublishedMemberChangesIntegration(t *testing.T) {
 	dsn := os.Getenv("NEXUSIM_PG_DSN")
 	if dsn == "" {

@@ -24,19 +24,19 @@ foreach ($path in @($composePath, $datasourcePath, $providerPath) + @($dashboard
 
 $implementedServices = Get-NexusIMRegistryServiceNames -RepoRoot $repoRoot -Active
 $actualServiceDirs = @(Get-ChildItem -LiteralPath $servicesRoot -Directory | Sort-Object Name | Select-Object -ExpandProperty Name)
-$serviceDirDiff = Compare-Object -ReferenceObject $implementedServices -DifferenceObject $actualServiceDirs
-if ($serviceDirDiff) {
-    $diffText = ($serviceDirDiff | ForEach-Object { "$($_.SideIndicator) $($_.InputObject)" }) -join ", "
-    throw "Service registry active services mismatch with services directory: $diffText"
+$missingServiceDirs = @($implementedServices | Where-Object { $actualServiceDirs -notcontains $_ })
+if ($missingServiceDirs) {
+    $diffText = ($missingServiceDirs | ForEach-Object { "missing $_" }) -join ", "
+    throw "Service registry active services missing service directories: $diffText"
 }
 
 $dashboardServices = @(Get-ChildItem -LiteralPath $dashboardRoot -Filter "*-observability.json" -File |
     ForEach-Object { $_.BaseName -replace "-observability$", "" } |
     Sort-Object)
-$serviceDiff = Compare-Object -ReferenceObject $implementedServices -DifferenceObject $dashboardServices
-if ($serviceDiff) {
-    $diffText = ($serviceDiff | ForEach-Object { "$($_.SideIndicator) $($_.InputObject)" }) -join ", "
-    throw "Grafana dashboard coverage mismatch with services directory: $diffText"
+$missingDashboards = @($implementedServices | Where-Object { $dashboardServices -notcontains $_ })
+if ($missingDashboards) {
+    $diffText = ($missingDashboards | ForEach-Object { "missing $_" }) -join ", "
+    throw "Grafana dashboard coverage missing active services: $diffText"
 }
 
 $compose = Get-Content -LiteralPath $composePath -Raw
@@ -46,8 +46,8 @@ $provider = Get-Content -LiteralPath $providerPath -Raw
 if ($compose -notmatch "13000:3000") {
     throw "Grafana compose must expose host port 13000 to avoid existing local service ports."
 }
-if ($datasource -notmatch "http://host\.docker\.internal:19090") {
-    throw "Grafana datasource must point at the local Prometheus host port through host.docker.internal:19090."
+if ($datasource -notmatch "http://host\.docker\.internal:19091") {
+    throw "Grafana datasource must point at the local Prometheus host port through host.docker.internal:19091."
 }
 if ($provider -notmatch "/var/lib/grafana/dashboards") {
     throw "Grafana dashboard provider must load dashboards from /var/lib/grafana/dashboards."
@@ -141,6 +141,10 @@ $conversationRequiredMetrics = @(
     "nexusim_conversation_member_change_worker_consecutive_errors",
     "nexusim_conversation_pg_pool_conns",
     "nexusim_conversation_otel_traces_enabled"
+)
+
+$timelineRequiredMetrics = @(
+    "nexusim_timeline_service_info"
 )
 
 $deliveryRequiredMetrics = @(
@@ -272,6 +276,7 @@ Test-Dashboard -Path $dashboardPathsByService["api-gateway"] -Name "api-gateway"
 Test-Dashboard -Path $dashboardPathsByService["identity-service"] -Name "identity-service" -ExpectedUid "nexusim-identity-service" -MinimumPanels 8 -RequiredMetrics $identityRequiredMetrics
 Test-Dashboard -Path $dashboardPathsByService["message-service"] -Name "message-service" -ExpectedUid "nexusim-message-service" -MinimumPanels 8 -RequiredMetrics $messageRequiredMetrics
 Test-Dashboard -Path $dashboardPathsByService["conversation-service"] -Name "conversation-service" -ExpectedUid "nexusim-conversation-service" -MinimumPanels 8 -RequiredMetrics $conversationRequiredMetrics
+Test-Dashboard -Path $dashboardPathsByService["timeline-service"] -Name "timeline-service" -ExpectedUid "nexusim-timeline-service" -MinimumPanels 1 -RequiredMetrics $timelineRequiredMetrics
 Test-Dashboard -Path $dashboardPathsByService["delivery-service"] -Name "delivery-service" -ExpectedUid "nexusim-delivery-service" -MinimumPanels 8 -RequiredMetrics $deliveryRequiredMetrics
 Test-Dashboard -Path $dashboardPathsByService["push-gateway"] -Name "push-gateway" -ExpectedUid "nexusim-push-gateway" -MinimumPanels 8 -RequiredMetrics $pushGatewayRequiredMetrics
 Test-Dashboard -Path $dashboardPathsByService["receipt-service"] -Name "receipt-service" -ExpectedUid "nexusim-receipt-service" -MinimumPanels 8 -RequiredMetrics $receiptRequiredMetrics

@@ -47,7 +47,7 @@ foreach ($name in @(
 try {
     Set-PolicyOTelEnv -Name "NEXUSIM_POLICY_OTEL_TRACES_ENABLED" -Value "true"
     Set-PolicyOTelEnv -Name "NEXUSIM_POLICY_OTEL_TRACES_EXPORTER" -Value "otlp-grpc"
-    Set-PolicyOTelEnv -Name "NEXUSIM_POLICY_OTEL_TRACES_OTLP_ENDPOINT" -Value "127.0.0.1:4317"
+    Set-PolicyOTelEnv -Name "NEXUSIM_POLICY_OTEL_TRACES_OTLP_ENDPOINT" -Value "127.0.0.1:14317"
     Set-PolicyOTelEnv -Name "NEXUSIM_POLICY_OTEL_TRACES_OTLP_INSECURE" -Value "true"
     Set-PolicyOTelEnv -Name "NEXUSIM_POLICY_OTEL_TRACES_SAMPLING_RATIO" -Value "1"
 
@@ -81,7 +81,7 @@ try {
         collector_logs = $collectorLogsPath
         expected_span = "/nexusim.policy.v1.PolicyService/CheckMessageAction"
         exporter = "otlp-grpc"
-        endpoint = "127.0.0.1:4317"
+        endpoint = "127.0.0.1:14317"
     } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $summaryPath -Encoding UTF8
 
     Write-Host "result_dir=$resultDir"

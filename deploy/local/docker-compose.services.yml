@@ -18,11 +18,26 @@ services:
       nexusim-services:
         ipv4_address: 172.30.80.11
 
+  timeline-service-noop:
+    image: nexusim/timeline-service:local
+    container_name: nexusim-timeline-service-noop
+    environment:
+      NEXUSIM_TIMELINE_SERVICE_MODE: noop
+      NEXUSIM_TIMELINE_DEBUG_ADDR: 172.30.80.40:11937
+    ports:
+      - "11937:11937"
+    restart: unless-stopped
+    networks:
+      nexusim-services:
+        ipv4_address: 172.30.80.40
+
   message-service-grpc:
     image: nexusim/message-service:local
     container_name: nexusim-message-service-grpc
     depends_on:
       conversation-service-grpc:
+        condition: service_started
+      timeline-service-noop:
         condition: service_started
       policy-service-grpc:
         condition: service_started

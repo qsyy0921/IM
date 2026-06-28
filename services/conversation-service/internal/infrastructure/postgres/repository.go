@@ -204,6 +204,12 @@ func (r *Repository) CreateMemberChange(
 	if err := upsertConversationMember(ctx, tx, command, record); err != nil {
 		return types.MemberChangeResult{}, err
 	}
+	scalePolicy, err := applyConversationScalePolicyAfterMemberChange(ctx, tx, conversation)
+	if err != nil {
+		return types.MemberChangeResult{}, err
+	}
+	record.Timeline.FanoutMode = scalePolicy.FanoutMode
+	record.Timeline.FanoutPolicyVersion = scalePolicy.FanoutPolicyVersion
 	if err := updateConversationVersions(ctx, tx, command, record); err != nil {
 		return types.MemberChangeResult{}, err
 	}

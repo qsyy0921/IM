@@ -35,4 +35,4 @@ if (-not $ready) {
 
 Write-Host "grafana_url=http://127.0.0.1:13000"
 Write-Host "grafana_login=admin / nexusim"
-Write-Host "prometheus_datasource=http://host.docker.internal:19090"
+Write-Host "prometheus_datasource=http://host.docker.internal:19091"

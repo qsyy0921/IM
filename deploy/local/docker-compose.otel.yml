@@ -6,8 +6,8 @@ services:
     container_name: nexusim-otel-collector
     command: ["--config=/etc/otelcol-contrib/config.yaml"]
     ports:
-      - "4317:4317"
-      - "4318:4318"
-      - "13133:13133"
+      - "14317:4317"
+      - "14318:4318"
+      - "14333:13133"
     volumes:
       - ./otel-collector.yml:/etc/otelcol-contrib/config.yaml:ro

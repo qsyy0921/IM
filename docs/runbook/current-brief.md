@@ -33,9 +33,10 @@ brief、loadtest report、development-progress 或 archive。
 - group memory / retrieval / eval 持续保留 source refs、conversation scope、
   member visibility、time/version boundary、citations 和 no-citation refusal。
 - Conversation scale policy 已在 conversation-service domain 层落地：direct / small group
-  使用 active `WRITE_FANOUT`；medium / large / hot group 分别建模为 `HYBRID_FANOUT`、
-  `READ_FANOUT`、`BROADCAST_SIGNAL + SEQUENCER_BLOCK`，在 timeline / delivery
-  runtime 完成前保持 contract-only / fail-closed。
+  使用 active `WRITE_FANOUT`；medium group 使用 active first-stage `HYBRID_FANOUT`；
+  large group 使用 active first-stage `READ_FANOUT`；hot group 的
+  `BROADCAST_SIGNAL + SEQUENCER_BLOCK` 仍在 timeline sequencer / push signal 完成前
+  contract-only / fail-closed。
 
 ## 已成型底座
 

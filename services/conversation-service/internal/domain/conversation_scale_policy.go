@@ -21,10 +21,10 @@ const (
 const (
 	// Direct and small groups use the current durable write-fanout path.
 	SmallGroupMaxActiveMembers int64 = 500
-	// Medium and larger groups are contract-only until timeline-service and
-	// delivery fanout planners implement the corresponding runtime paths.
+	// Medium groups use hybrid fanout; large groups use timeline pull.
 	MediumGroupMaxActiveMembers int64 = 5000
-	LargeGroupMaxActiveMembers  int64 = 50000
+	// Hot groups remain contract-only until timeline-service sequencer is active.
+	LargeGroupMaxActiveMembers int64 = 50000
 )
 
 type ConversationScalePolicy struct {
@@ -87,7 +87,7 @@ func resolveGroupScalePolicy(activeMemberCount int64) ConversationScalePolicy {
 			"local",
 		)
 	case activeMemberCount <= MediumGroupMaxActiveMembers:
-		return contractOnlyConversationPolicy(
+		return activeConversationPolicy(
 			ConversationScaleTierMedium,
 			types.ConversationModeLocalRowLock,
 			types.FanoutModeHybridFanout,
@@ -95,7 +95,7 @@ func resolveGroupScalePolicy(activeMemberCount int64) ConversationScalePolicy {
 			"hybrid",
 		)
 	case activeMemberCount <= LargeGroupMaxActiveMembers:
-		return contractOnlyConversationPolicy(
+		return activeConversationPolicy(
 			ConversationScaleTierLarge,
 			types.ConversationModeLocalRowLock,
 			types.FanoutModeReadFanout,

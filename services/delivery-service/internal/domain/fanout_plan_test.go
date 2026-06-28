@@ -1,7 +1,6 @@
 package domain
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/qsyy0921/IM/services/delivery-service/internal/types"
@@ -23,11 +22,12 @@ func TestBuildFanoutPlan(t *testing.T) {
 			materializesUserInbox: true,
 		},
 		{
-			name:                 "hybrid fanout",
-			mode:                 types.DeliveryFanoutModeHybridFanout,
-			strategy:             FanoutProjectionHybridSegments,
-			requiresTimelineRead: true,
-			requiresFanoutShard:  true,
+			name:                  "hybrid fanout",
+			mode:                  types.DeliveryFanoutModeHybridFanout,
+			strategy:              FanoutProjectionHybridSegments,
+			materializesUserInbox: true,
+			requiresTimelineRead:  true,
+			requiresFanoutShard:   true,
 		},
 		{
 			name:                 "read fanout",
@@ -75,9 +75,15 @@ func TestEnsureTimelineProjectionSupported(t *testing.T) {
 		t.Fatalf("write fanout should be supported: %v", err)
 	}
 
-	command.FanoutMode = types.DeliveryFanoutModeReadFanout
-	if err := EnsureTimelineProjectionSupported(command); !errors.Is(err, types.ErrUnsupportedFanoutMode) {
-		t.Fatalf("expected unsupported fanout mode, got %v", err)
+	for _, mode := range []string{
+		types.DeliveryFanoutModeHybridFanout,
+		types.DeliveryFanoutModeReadFanout,
+		types.DeliveryFanoutModeBroadcastSignal,
+	} {
+		command.FanoutMode = mode
+		if err := EnsureTimelineProjectionSupported(command); err != nil {
+			t.Fatalf("%s should be supported: %v", mode, err)
+		}
 	}
 
 	command.EventType = types.TimelineEventConversationMemberJoined

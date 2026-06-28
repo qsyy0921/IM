@@ -155,15 +155,16 @@ flowchart TB
 
 热点群聊不靠单一写路径硬扛。conversation-service 已把群规模策略抽到 domain 层，
 message / delivery 只消费明确的 send context 和 timeline fanout contract，不自行猜测群规模。
-当前运行态只启用 direct / small group 的写扩散路径；中 / 大 / 热点群目标策略已经建模，
-但在 timeline-service 和 delivery fanout planner 完成前保持 contract-only / fail-closed。
+当前运行态已支持 direct / small group 写扩散、medium group 混合扩散第一版、large group
+timeline pull 第一版；热点 / 超大群的在线广播 signal 和 sequencer 仍保持 contract-only /
+fail-closed。
 
 | 会话类型 | 成员规模 | 当前策略状态 | 目标写入 / 投递策略 |
 | --- | --- | --- | --- |
 | 单聊 | `<=2` | active | `LOCAL_ROW_LOCK + WRITE_FANOUT`，沿用 durable inbox。 |
 | 小群 | `<=500` | active | `LOCAL_ROW_LOCK + WRITE_FANOUT`，每个成员写 `user_inbox`。 |
-| 中群 | `501-5000` | contract-only | `HYBRID_FANOUT`，活跃用户写扩散，冷用户按 timeline pull / repair。 |
-| 大群 | `5001-50000` | contract-only | `READ_FANOUT`，按成员可见窗口和 timeline 分区拉取。 |
+| 中群 | `501-5000` | active first-stage | `HYBRID_FANOUT`，写 `user_inbox` 并保留 `delivery_timeline_items` 旁路。 |
+| 大群 | `5001-50000` | active first-stage | `READ_FANOUT`，不做全量 inbox 写放大，PullInbox 按成员窗口从 timeline read model 动态读取。 |
 | 热点群 / 超大群 | `>50000` 或高写入热点 | contract-only | `SEQUENCER_BLOCK + BROADCAST_SIGNAL`，timeline-service 分配 seq block，push 只发轻量 signal。 |
 
 观测层使用 Prometheus 采集指标、Grafana 展示面板、OpenTelemetry 串联 trace；

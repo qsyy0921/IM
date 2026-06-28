@@ -43,22 +43,22 @@ func TestResolveConversationScalePolicy(t *testing.T) {
 			wantShard:        "local",
 		},
 		{
-			name:             "medium group is hybrid contract",
+			name:             "medium group uses hybrid fanout",
 			conversationType: types.ConversationTypeGroup,
 			members:          SmallGroupMaxActiveMembers + 1,
 			wantTier:         ConversationScaleTierMedium,
-			wantRuntime:      ConversationScaleRuntimeContractOnly,
+			wantRuntime:      ConversationScaleRuntimeActive,
 			wantMode:         types.ConversationModeLocalRowLock,
 			wantFanout:       types.FanoutModeHybridFanout,
 			wantVersion:      2,
 			wantShard:        "hybrid",
 		},
 		{
-			name:             "large group is read fanout contract",
+			name:             "large group uses read fanout",
 			conversationType: types.ConversationTypeGroup,
 			members:          MediumGroupMaxActiveMembers + 1,
 			wantTier:         ConversationScaleTierLarge,
-			wantRuntime:      ConversationScaleRuntimeContractOnly,
+			wantRuntime:      ConversationScaleRuntimeActive,
 			wantMode:         types.ConversationModeLocalRowLock,
 			wantFanout:       types.FanoutModeReadFanout,
 			wantVersion:      3,
@@ -96,7 +96,7 @@ func TestResolveConversationScalePolicy(t *testing.T) {
 }
 
 func TestResolveConversationCreatePolicyRejectsContractOnlyPolicy(t *testing.T) {
-	_, err := ResolveConversationCreatePolicy(types.ConversationTypeGroup, SmallGroupMaxActiveMembers+1)
+	_, err := ResolveConversationCreatePolicy(types.ConversationTypeGroup, LargeGroupMaxActiveMembers+1)
 	if !errors.Is(err, types.ErrSequencerUnavailable) {
 		t.Fatalf("err=%v want ErrSequencerUnavailable", err)
 	}

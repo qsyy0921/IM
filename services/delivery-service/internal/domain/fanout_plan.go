@@ -1,10 +1,6 @@
 package domain
 
-import (
-	"fmt"
-
-	"github.com/qsyy0921/IM/services/delivery-service/internal/types"
-)
+import "github.com/qsyy0921/IM/services/delivery-service/internal/types"
 
 type FanoutProjectionStrategy string
 
@@ -33,10 +29,11 @@ func BuildFanoutPlan(mode string) (FanoutPlan, error) {
 		}, nil
 	case types.DeliveryFanoutModeHybridFanout:
 		return FanoutPlan{
-			Mode:                 mode,
-			Strategy:             FanoutProjectionHybridSegments,
-			RequiresTimelineRead: true,
-			RequiresFanoutShard:  true,
+			Mode:                  mode,
+			Strategy:              FanoutProjectionHybridSegments,
+			MaterializesUserInbox: true,
+			RequiresTimelineRead:  true,
+			RequiresFanoutShard:   true,
 		}, nil
 	case types.DeliveryFanoutModeReadFanout:
 		return FanoutPlan{
@@ -61,18 +58,6 @@ func EnsureTimelineProjectionSupported(command types.ProjectTimelineEventCommand
 	if !types.IsMessageTimelineEvent(command.EventType) {
 		return nil
 	}
-	plan, err := BuildFanoutPlan(command.FanoutMode)
-	if err != nil {
-		return err
-	}
-	if plan.MaterializesUserInbox {
-		return nil
-	}
-	return types.NewUnsupportedFanoutMode(
-		fmt.Sprintf("%s requires %s projection; delivery-service currently supports %s only",
-			plan.Mode,
-			plan.Strategy,
-			FanoutProjectionWriteInbox,
-		),
-	)
+	_, err := BuildFanoutPlan(command.FanoutMode)
+	return err
 }

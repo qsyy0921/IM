@@ -188,18 +188,18 @@ conversation-service 是群规模策略的 owner，负责把 `conversation_mode`
 | --- | --- | --- | --- |
 | 单聊 | `<=2` | active | `LOCAL_ROW_LOCK + WRITE_FANOUT`。 |
 | 小群 | `<=500` | active | 当前 durable inbox 写扩散路径。 |
-| 中群 | `501-5000` | contract-only | `HYBRID_FANOUT`，活跃成员优先写扩散，冷成员走 timeline pull / repair。 |
-| 大群 | `5001-50000` | contract-only | `READ_FANOUT`，以 timeline + 成员可见窗口作为读取事实。 |
+| 中群 | `501-5000` | active first-stage | `HYBRID_FANOUT`，物化 inbox + `delivery_timeline_items` 旁路，为后续冷热分层和 repair 做准备。 |
+| 大群 | `5001-50000` | active first-stage | `READ_FANOUT`，以 timeline + 成员可见窗口作为 PullInbox 读取事实，避免全量 inbox 写放大。 |
 | 热点 / 超大群 | `>50000` 或高写入热点 | contract-only | `SEQUENCER_BLOCK + BROADCAST_SIGNAL`，timeline-service 分配 seq block / gap marker，push 只做轻量唤醒。 |
 
 contract-only 的含义是：接口和领域枚举已经冻结，但 runtime 未完成前必须 fail-closed；
-禁止把未知 fanout mode 静默降级为 write-fanout。后续启用顺序是：
+禁止把未知 fanout mode 静默降级为 write-fanout。当前启用顺序是：
 
 ```text
-WRITE_FANOUT
--> HYBRID_FANOUT
--> READ_FANOUT
--> BROADCAST_SIGNAL + timeline-service sequencer
+WRITE_FANOUT [active]
+-> HYBRID_FANOUT [active first-stage]
+-> READ_FANOUT [active first-stage]
+-> BROADCAST_SIGNAL + timeline-service sequencer [contract-only]
 ```
 
 热点群压测需要观察 Kafka lag、timeline outbox、delivery projection backlog、user_inbox

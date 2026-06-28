@@ -97,6 +97,16 @@ func projectMessagePersisted(
 	tx pgx.Tx,
 	command types.ProjectTimelineEventCommand,
 ) (int, error) {
+	plan, err := domain.BuildFanoutPlan(command.FanoutMode)
+	if err != nil {
+		return 0, err
+	}
+	if err := insertTimelineItem(ctx, tx, command); err != nil {
+		return 0, err
+	}
+	if !plan.MaterializesUserInbox {
+		return countVisibleTimelineRecipients(ctx, tx, command)
+	}
 	rows, err := tx.Query(ctx, `
 SELECT user_id
 FROM delivery_membership_projection
@@ -144,6 +154,16 @@ func projectMessageChangedForOriginalRecipients(
 	command types.ProjectTimelineEventCommand,
 	missingMessage string,
 ) (int, error) {
+	plan, err := domain.BuildFanoutPlan(command.FanoutMode)
+	if err != nil {
+		return 0, err
+	}
+	if err := insertTimelineItem(ctx, tx, command); err != nil {
+		return 0, err
+	}
+	if !plan.MaterializesUserInbox {
+		return countVisibleTimelineRecipients(ctx, tx, command)
+	}
 	rows, err := tx.Query(ctx, `
 SELECT DISTINCT user_id
 FROM user_inbox
@@ -185,6 +205,58 @@ ORDER BY user_id
 		projected++
 	}
 	return projected, nil
+}
+
+func insertTimelineItem(
+	ctx context.Context,
+	tx pgx.Tx,
+	command types.ProjectTimelineEventCommand,
+) error {
+	payloadJSON := command.PayloadJSON
+	if len(payloadJSON) == 0 {
+		payloadJSON = json.RawMessage(`{}`)
+	}
+	_, err := tx.Exec(ctx, `
+INSERT INTO delivery_timeline_items (
+    tenant_id,
+    conversation_id,
+    conversation_seq,
+    event_id,
+    event_type,
+    message_id,
+    sender_id,
+    payload_json,
+    fanout_mode,
+    permission_version,
+    created_at
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, now())
+ON CONFLICT (tenant_id, conversation_id, conversation_seq) DO NOTHING
+`, command.TenantID, command.ConversationID, command.ConversationSeq, command.EventID, command.EventType, command.MessageID, command.SenderID, payloadJSON, command.FanoutMode, command.PermissionVersion)
+	if err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	return nil
+}
+
+func countVisibleTimelineRecipients(
+	ctx context.Context,
+	tx pgx.Tx,
+	command types.ProjectTimelineEventCommand,
+) (int, error) {
+	var count int
+	err := tx.QueryRow(ctx, `
+SELECT COUNT(*)
+FROM delivery_membership_projection
+WHERE tenant_id = $1
+  AND conversation_id = $2
+  AND status = 'ACTIVE'
+  AND join_seq <= $3
+  AND (leave_seq IS NULL OR leave_seq >= $3)
+`, command.TenantID, command.ConversationID, command.ConversationSeq).Scan(&count)
+	if err != nil {
+		return 0, types.NewDBReadFailed(err.Error())
+	}
+	return count, nil
 }
 
 func insertInboxItem(
@@ -421,6 +493,58 @@ func (repository *Repository) PullInbox(
 	fetchLimit int,
 ) ([]types.InboxItem, error) {
 	rows, err := repository.pool.Query(ctx, `
+WITH materialized AS (
+    SELECT
+        conversation_id,
+        conversation_seq,
+        event_id,
+        event_type,
+        message_id,
+        sender_id,
+        payload_json,
+        created_at
+    FROM user_inbox
+    WHERE tenant_id = $1
+      AND user_id = $2
+      AND conversation_id = $3
+      AND conversation_seq > $4
+      AND hidden_at IS NULL
+),
+timeline_visible AS (
+    SELECT
+        item.conversation_id,
+        item.conversation_seq,
+        item.event_id,
+        item.event_type,
+        item.message_id,
+        item.sender_id,
+        item.payload_json,
+        item.created_at
+    FROM delivery_timeline_items item
+    JOIN delivery_membership_projection member
+      ON member.tenant_id = item.tenant_id
+     AND member.conversation_id = item.conversation_id
+     AND member.user_id = $2
+     AND member.status = 'ACTIVE'
+     AND member.join_seq <= item.conversation_seq
+     AND (member.leave_seq IS NULL OR member.leave_seq >= item.conversation_seq)
+    LEFT JOIN user_inbox inbox
+      ON inbox.tenant_id = item.tenant_id
+     AND inbox.user_id = $2
+     AND inbox.conversation_id = item.conversation_id
+     AND inbox.conversation_seq = item.conversation_seq
+    LEFT JOIN delivery_user_hidden_timeline_items hidden
+      ON hidden.tenant_id = item.tenant_id
+     AND hidden.user_id = $2
+     AND hidden.conversation_id = item.conversation_id
+     AND hidden.conversation_seq = item.conversation_seq
+    WHERE item.tenant_id = $1
+      AND item.conversation_id = $3
+      AND item.conversation_seq > $4
+      AND item.fanout_mode IN ('READ_FANOUT', 'BROADCAST_SIGNAL')
+      AND inbox.tenant_id IS NULL
+      AND hidden.tenant_id IS NULL
+)
 SELECT
     conversation_id,
     conversation_seq,
@@ -430,12 +554,18 @@ SELECT
     sender_id,
     payload_json,
     created_at
-FROM user_inbox
-WHERE tenant_id = $1
-  AND user_id = $2
-  AND conversation_id = $3
-  AND conversation_seq > $4
-  AND hidden_at IS NULL
+FROM materialized
+UNION ALL
+SELECT
+    conversation_id,
+    conversation_seq,
+    event_id,
+    event_type,
+    message_id,
+    sender_id,
+    payload_json,
+    created_at
+FROM timeline_visible
 ORDER BY conversation_seq ASC
 LIMIT $5
 `, command.AuthContext.TenantID, command.AuthContext.UserID, command.ConversationID, command.AfterSeq, fetchLimit)
@@ -479,9 +609,41 @@ func (repository *Repository) HideInboxItem(
 		_ = tx.Rollback(ctx)
 	}()
 
+	alreadyHidden, messageID, found, err := hideMaterializedInboxItem(ctx, tx, command)
+	if err != nil {
+		return types.HideInboxItemResult{}, err
+	}
+	if !found {
+		alreadyHidden, messageID, err = hideTimelineItem(ctx, tx, command)
+		if err != nil {
+			return types.HideInboxItemResult{}, err
+		}
+	}
+	if !alreadyHidden {
+		if err := insertHideInboxOutbox(ctx, tx, command, messageID); err != nil {
+			return types.HideInboxItemResult{}, err
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return types.HideInboxItemResult{}, types.NewDBWriteFailed(err.Error())
+	}
+	return types.HideInboxItemResult{
+		TenantID:        command.AuthContext.TenantID,
+		UserID:          command.AuthContext.UserID,
+		ConversationID:  command.ConversationID,
+		ConversationSeq: command.ConversationSeq,
+		AlreadyHidden:   alreadyHidden,
+	}, nil
+}
+
+func hideMaterializedInboxItem(
+	ctx context.Context,
+	tx pgx.Tx,
+	command types.HideInboxItemCommand,
+) (bool, string, bool, error) {
 	var alreadyHidden bool
 	var messageID string
-	err = tx.QueryRow(ctx, `
+	err := tx.QueryRow(ctx, `
 WITH target AS (
     SELECT hidden_at, message_id
     FROM user_inbox
@@ -519,26 +681,58 @@ FROM updated AS result(already_hidden, message_id)
 		command.Reason,
 	).Scan(&alreadyHidden, &messageID)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return types.HideInboxItemResult{}, types.NewInboxItemNotFound("inbox item not found")
+		return false, "", false, nil
 	}
 	if err != nil {
-		return types.HideInboxItemResult{}, types.NewDBWriteFailed(err.Error())
+		return false, "", false, types.NewDBWriteFailed(err.Error())
 	}
-	if !alreadyHidden {
-		if err := insertHideInboxOutbox(ctx, tx, command, messageID); err != nil {
-			return types.HideInboxItemResult{}, err
-		}
+	return alreadyHidden, messageID, true, nil
+}
+
+func hideTimelineItem(
+	ctx context.Context,
+	tx pgx.Tx,
+	command types.HideInboxItemCommand,
+) (bool, string, error) {
+	var messageID string
+	err := tx.QueryRow(ctx, `
+SELECT item.message_id
+FROM delivery_timeline_items item
+JOIN delivery_membership_projection member
+  ON member.tenant_id = item.tenant_id
+ AND member.conversation_id = item.conversation_id
+ AND member.user_id = $2
+ AND member.status = 'ACTIVE'
+ AND member.join_seq <= item.conversation_seq
+ AND (member.leave_seq IS NULL OR member.leave_seq >= item.conversation_seq)
+WHERE item.tenant_id = $1
+  AND item.conversation_id = $3
+  AND item.conversation_seq = $4
+  AND item.fanout_mode IN ('READ_FANOUT', 'BROADCAST_SIGNAL')
+`, command.AuthContext.TenantID, command.AuthContext.UserID, command.ConversationID, command.ConversationSeq).Scan(&messageID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, "", types.NewInboxItemNotFound("inbox item not found")
 	}
-	if err := tx.Commit(ctx); err != nil {
-		return types.HideInboxItemResult{}, types.NewDBWriteFailed(err.Error())
+	if err != nil {
+		return false, "", types.NewDBReadFailed(err.Error())
 	}
-	return types.HideInboxItemResult{
-		TenantID:        command.AuthContext.TenantID,
-		UserID:          command.AuthContext.UserID,
-		ConversationID:  command.ConversationID,
-		ConversationSeq: command.ConversationSeq,
-		AlreadyHidden:   alreadyHidden,
-	}, nil
+	tag, err := tx.Exec(ctx, `
+INSERT INTO delivery_user_hidden_timeline_items (
+    tenant_id,
+    user_id,
+    device_id,
+    conversation_id,
+    conversation_seq,
+    message_id,
+    reason,
+    hidden_at
+) VALUES ($1, $2, $3, $4, $5, $6, $7, now())
+ON CONFLICT (tenant_id, user_id, conversation_id, conversation_seq) DO NOTHING
+`, command.AuthContext.TenantID, command.AuthContext.UserID, command.AuthContext.DeviceID, command.ConversationID, command.ConversationSeq, messageID, command.Reason)
+	if err != nil {
+		return false, "", types.NewDBWriteFailed(err.Error())
+	}
+	return tag.RowsAffected() == 0, messageID, nil
 }
 
 func insertHideInboxOutbox(
@@ -664,11 +858,35 @@ func maxVisibleInboxSeq(
 ) (int64, error) {
 	var maxSeq int64
 	err := tx.QueryRow(ctx, `
-SELECT COALESCE(MAX(conversation_seq), 0)
-FROM user_inbox
-WHERE tenant_id = $1
-  AND user_id = $2
-  AND conversation_id = $3
+SELECT GREATEST(
+    (
+        SELECT COALESCE(MAX(conversation_seq), 0)
+        FROM user_inbox
+        WHERE tenant_id = $1
+          AND user_id = $2
+          AND conversation_id = $3
+    ),
+    (
+        SELECT COALESCE(MAX(item.conversation_seq), 0)
+        FROM delivery_timeline_items item
+        JOIN delivery_membership_projection member
+          ON member.tenant_id = item.tenant_id
+         AND member.conversation_id = item.conversation_id
+         AND member.user_id = $2
+         AND member.status = 'ACTIVE'
+         AND member.join_seq <= item.conversation_seq
+         AND (member.leave_seq IS NULL OR member.leave_seq >= item.conversation_seq)
+        LEFT JOIN delivery_user_hidden_timeline_items hidden
+          ON hidden.tenant_id = item.tenant_id
+         AND hidden.user_id = $2
+         AND hidden.conversation_id = item.conversation_id
+         AND hidden.conversation_seq = item.conversation_seq
+        WHERE item.tenant_id = $1
+          AND item.conversation_id = $3
+          AND item.fanout_mode IN ('READ_FANOUT', 'BROADCAST_SIGNAL')
+          AND hidden.tenant_id IS NULL
+    )
+)
 `, command.AuthContext.TenantID, command.AuthContext.UserID, command.ConversationID).Scan(&maxSeq)
 	if err != nil {
 		return 0, types.NewDBReadFailed(err.Error())

@@ -48,10 +48,12 @@ func TestProjectTimelineEventUseCase(t *testing.T) {
 	}
 }
 
-func TestProjectTimelineEventUseCaseRejectsUnsupportedFanoutMode(t *testing.T) {
-	repository := &fakeTimelineProjectionRepository{}
+func TestProjectTimelineEventUseCasePassesHybridFanoutToRepository(t *testing.T) {
+	repository := &fakeTimelineProjectionRepository{
+		result: types.ProjectTimelineEventResult{ProjectedInboxCount: 3},
+	}
 	useCase := NewProjectTimelineEventUseCase(repository)
-	_, err := useCase.Execute(context.Background(), types.ProjectTimelineEventCommand{
+	result, err := useCase.Execute(context.Background(), types.ProjectTimelineEventCommand{
 		TenantID:        "tenant-1",
 		EventID:         "event-1",
 		EventType:       types.TimelineEventMessagePersisted,
@@ -60,11 +62,14 @@ func TestProjectTimelineEventUseCaseRejectsUnsupportedFanoutMode(t *testing.T) {
 		MessageID:       "msg-1",
 		FanoutMode:      types.DeliveryFanoutModeHybridFanout,
 	})
-	if !errors.Is(err, types.ErrUnsupportedFanoutMode) {
-		t.Fatalf("expected unsupported fanout mode, got %v", err)
+	if err != nil {
+		t.Fatalf("project timeline event: %v", err)
 	}
-	if repository.called {
-		t.Fatal("repository should not be called for unsupported projection fanout")
+	if !repository.called || repository.command.FanoutMode != types.DeliveryFanoutModeHybridFanout {
+		t.Fatalf("repository call not recorded: called=%t command=%+v", repository.called, repository.command)
+	}
+	if result.ProjectedInboxCount != 3 {
+		t.Fatalf("result=%+v", result)
 	}
 }
 

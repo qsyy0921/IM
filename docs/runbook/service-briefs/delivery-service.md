@@ -19,6 +19,12 @@
 - Kafka writer 已显式固定 `acks=all`、禁自动建 topic、bounded attempts/backoff，并由本地门禁和 package 单测防漂移；真正 idempotent / transactional producer 仍属后续客户端选型。
 - 已补 delivery outbox audit / repair audit 错误脱敏：`last_error`、`before_last_error`、`after_last_error` 对外只返回稳定低敏分类，不暴露 broker body、账号、token 或 provider 原文。
 - 已补 `delivery.inbox_item.hidden.v1`：`HideInboxItem` 首次隐藏时同事务写 delivery outbox，push-gateway 可向同 user 在线设备发送 `delivery.hide` 轻量提示；重复隐藏不重复写 outbox。
+- 已补 `delivery_timeline_items` read model：`WRITE_FANOUT` 继续物化 `user_inbox`；
+  `HYBRID_FANOUT` 同时物化 inbox 并保留 timeline 旁路；`READ_FANOUT` 不全量写
+  `user_inbox`，`PullInbox` 按成员可见窗口从 timeline read model 动态读取，`AckDelivery`
+  和 `HideInboxItem` 已能识别该动态可见范围。
+- `BROADCAST_SIGNAL` 当前只具备 timeline pull/read-model 基础；真正面向 push-gateway 的
+  广播 signal delivery event、consumer 和热点在线 fanout 仍是后续 runtime。
 - 已补 trusted metadata 启动门禁：当 `NEXUSIM_DELIVERY_AUTH_MODE=metadata|verified-metadata` 时，如果 gRPC 监听地址不是 loopback / RFC1918 私网，且服务端未启用 mTLS client cert 校验，则启动前直接失败；私网 / loopback 仍保留第一阶段 trusted metadata 直连。
 - cmd 启动编排已把 env / TLS / debug listener helper 拆到独立同 package 文件，`main.go` 保持运行模式编排，避免后续 operator 模式继续堆进单文件。
 - 已补 first-stage OpenTelemetry gRPC server span；gRPC access log 只记录低敏 `trace_id/request_id`，并对白名单外入口 metadata 直接丢弃。
@@ -27,4 +33,7 @@
 - `loadtest/capacityseed` 已能准备 `tenant-capacity-delivery` 下的 `user_inbox` fixture；`capacity-baseline-seeded-20260616` 本地 seeded 短基线中 `PullInbox + AckDelivery` 成功，`items_per_second=10.49`，报告见 `loadtest/distributed/loadtest-report-20260616-seeded-capacity-baseline.md`。
 
 ## 后续
-- 更多 delivery event 消费方、更完整容量曲线和生产 sizing；OTel collector / 生产级 alerting / SLO dashboard 仍属于后续统一观测治理。
+
+- `BROADCAST_SIGNAL` delivery event / push consumer、timeline item repair、动态 read fanout
+  容量曲线、更多 delivery event 消费方、更完整容量曲线和生产 sizing。
+- OTel collector / 生产级 alerting / SLO dashboard 仍属于后续统一观测治理。

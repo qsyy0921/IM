@@ -180,6 +180,124 @@ WHERE tenant_id = 'tenant-delivery'
 	}
 }
 
+func TestRepositoryReadFanoutPullAckAndHideIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetDeliveryTables(t, ctx, pool)
+	repository := NewRepository(pool)
+
+	_, err := repository.ProjectTimelineEvent(ctx, types.ProjectTimelineEventCommand{
+		TenantID:          "tenant-read-fanout",
+		EventID:           "read-member-joined-1",
+		EventType:         types.TimelineEventConversationMemberJoined,
+		ConversationID:    "conv-read-fanout",
+		ConversationSeq:   1,
+		MemberUserID:      "user-1",
+		MemberRole:        "MEMBER",
+		MemberStatus:      types.DeliveryMemberStatusActive,
+		MemberVersion:     1,
+		PermissionVersion: 1,
+	})
+	if err != nil {
+		t.Fatalf("project join: %v", err)
+	}
+	result, err := repository.ProjectTimelineEvent(ctx, types.ProjectTimelineEventCommand{
+		TenantID:          "tenant-read-fanout",
+		EventID:           "read-message-1",
+		EventType:         types.TimelineEventMessagePersisted,
+		ConversationID:    "conv-read-fanout",
+		ConversationSeq:   2,
+		FanoutMode:        types.DeliveryFanoutModeReadFanout,
+		PermissionVersion: 1,
+		MessageID:         "msg-read-1",
+		SenderID:          "sender-1",
+		PayloadJSON:       []byte(`{"text":"read fanout"}`),
+	})
+	if err != nil {
+		t.Fatalf("project read fanout message: %v", err)
+	}
+	if result.ProjectedInboxCount != 1 {
+		t.Fatalf("expected one visible recipient, got %d", result.ProjectedInboxCount)
+	}
+
+	var inboxRows int
+	if err := pool.QueryRow(ctx, `
+SELECT COUNT(*)
+FROM user_inbox
+WHERE tenant_id = 'tenant-read-fanout'
+`).Scan(&inboxRows); err != nil {
+		t.Fatalf("count user_inbox: %v", err)
+	}
+	if inboxRows != 0 {
+		t.Fatalf("read fanout should not materialize user_inbox rows, got %d", inboxRows)
+	}
+
+	items, err := repository.PullInbox(ctx, types.PullInboxCommand{
+		AuthContext: types.AuthContext{
+			TenantID: "tenant-read-fanout",
+			UserID:   "user-1",
+			DeviceID: "device-1",
+		},
+		ConversationID: "conv-read-fanout",
+		AfterSeq:       0,
+	}, 10)
+	if err != nil {
+		t.Fatalf("pull inbox: %v", err)
+	}
+	if len(items) != 1 || items[0].ConversationSeq != 2 || items[0].MessageID != "msg-read-1" {
+		t.Fatalf("unexpected pulled items: %+v", items)
+	}
+
+	ack, err := repository.AckDelivery(ctx, types.AckDeliveryCommand{
+		AuthContext: types.AuthContext{
+			TenantID: "tenant-read-fanout",
+			UserID:   "user-1",
+			DeviceID: "device-1",
+		},
+		ConversationID: "conv-read-fanout",
+		ReceivedSeq:    2,
+	})
+	if err != nil {
+		t.Fatalf("ack read fanout item: %v", err)
+	}
+	if ack.LastReceivedSeq != 2 {
+		t.Fatalf("ack=%+v", ack)
+	}
+
+	hide, err := repository.HideInboxItem(ctx, types.HideInboxItemCommand{
+		AuthContext: types.AuthContext{
+			TenantID:  "tenant-read-fanout",
+			UserID:    "user-1",
+			DeviceID:  "device-1",
+			RequestID: "hide-read-1",
+		},
+		ConversationID:  "conv-read-fanout",
+		ConversationSeq: 2,
+		Reason:          "hide read fanout item",
+	})
+	if err != nil {
+		t.Fatalf("hide read fanout item: %v", err)
+	}
+	if hide.AlreadyHidden {
+		t.Fatalf("first hide should not be already hidden: %+v", hide)
+	}
+	items, err = repository.PullInbox(ctx, types.PullInboxCommand{
+		AuthContext: types.AuthContext{
+			TenantID: "tenant-read-fanout",
+			UserID:   "user-1",
+			DeviceID: "device-1",
+		},
+		ConversationID: "conv-read-fanout",
+		AfterSeq:       0,
+	}, 10)
+	if err != nil {
+		t.Fatalf("pull after hide: %v", err)
+	}
+	if len(items) != 0 {
+		t.Fatalf("hidden read fanout item should not be visible: %+v", items)
+	}
+}
+
 func TestRepositoryProjectOwnerTransferredIntegration(t *testing.T) {
 	pool := openTestPool(t)
 	ctx := context.Background()
@@ -524,6 +642,8 @@ TRUNCATE
     delivery_projection_checkpoint_repair_audit,
     delivery_outbox_repair_audit,
     delivery_outbox,
+    delivery_user_hidden_timeline_items,
+    delivery_timeline_items,
     device_delivery_cursors,
     user_inbox,
     delivery_membership_projection,

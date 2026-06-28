@@ -73,6 +73,7 @@ NexusIM 的目标形态是：
 
 IM 核心平台
   identity / policy / contacts / conversation / message / delivery / receipt
+  + planned timeline sequencer boundary
 
 产品业务平台
   media / notification / presence / admin / audit / control-plane / workflow
@@ -168,11 +169,42 @@ AI 与 Agent 平台
 | `policy-service` | 授权策略、ReBAC 边、policy decision、risk / moderation policy。 |
 | `contacts-service` | 联系人关系、隐私设置、联系人分组。 |
 | `conversation-service` | 会话、群、成员、角色、成员边界、owner transfer。 |
+| `timeline-service` | foundation-planned：热点会话 sequencer、seq block、epoch fencing、gap marker、timeline 分区映射；当前不拥有消息事实，也不进入已运行写路径。 |
 | `message-service` | 消息日志、编辑、撤回、删除、附件引用、message outbox。 |
 | `delivery-service` | durable user inbox、device cursor、delivery event、projection checkpoint。 |
 | `receipt-service` | 已读 / 送达回执、未读基础、会话列表摘要。 |
 
-这些服务构成当前 IM 产品行为的核心底座。
+9 个已运行服务构成当前 IM 产品行为的核心底座。`timeline-service` 是为后续热点群、
+多分区和分布式 sequencer 预留的独立边界；在 SDD、迁移和 smoke 冻结前，任何
+`SEQUENCER_BLOCK` / 非写扩散策略都必须 fail-closed，不能被旧路径兜底成普通写入。
+
+### 6.2.1 群聊规模与 fanout 策略
+
+群聊策略按规模分层，而不是让 message-service 或 delivery-service 在局部代码里猜测。
+conversation-service 是群规模策略的 owner，负责把 `conversation_mode`、`fanout_mode`、
+`fanout_policy_version` 和 `current_seq_shard` 固化到 send context / timeline contract。
+
+| 类型 | 成员规模 | 当前状态 | 策略 |
+| --- | --- | --- | --- |
+| 单聊 | `<=2` | active | `LOCAL_ROW_LOCK + WRITE_FANOUT`。 |
+| 小群 | `<=500` | active | 当前 durable inbox 写扩散路径。 |
+| 中群 | `501-5000` | contract-only | `HYBRID_FANOUT`，活跃成员优先写扩散，冷成员走 timeline pull / repair。 |
+| 大群 | `5001-50000` | contract-only | `READ_FANOUT`，以 timeline + 成员可见窗口作为读取事实。 |
+| 热点 / 超大群 | `>50000` 或高写入热点 | contract-only | `SEQUENCER_BLOCK + BROADCAST_SIGNAL`，timeline-service 分配 seq block / gap marker，push 只做轻量唤醒。 |
+
+contract-only 的含义是：接口和领域枚举已经冻结，但 runtime 未完成前必须 fail-closed；
+禁止把未知 fanout mode 静默降级为 write-fanout。后续启用顺序是：
+
+```text
+WRITE_FANOUT
+-> HYBRID_FANOUT
+-> READ_FANOUT
+-> BROADCAST_SIGNAL + timeline-service sequencer
+```
+
+热点群压测需要观察 Kafka lag、timeline outbox、delivery projection backlog、user_inbox
+写入放大、push notify storm、PullInbox / ACK 追平时间。观测平台分工为：Prometheus 采集
+低敏指标，Grafana 展示 dashboard，OpenTelemetry / OTel Collector 串联跨服务 trace。
 
 ### 6.3 产品业务域
 

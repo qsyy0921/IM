@@ -22,6 +22,8 @@
 3. 数据平台和中间件 profile 按完整架构逐步补，不抢占 AI / Agent 演示主线。
 4. 9 个既有 IM 服务只回补阻塞 AI / product platform 的 P0/P1 或用户点名项。
 5. 客户端只作为演示入口维护；除非阻塞演示，不继续扩完整产品级客户端。
+6. 热点群 / 分区主线已落 conversation-service scale policy 和 delivery fanout contract；
+   下一步按 runtime 顺序实现 timeline-service、hybrid fanout、read fanout 和 broadcast signal。
 
 ## Client Demo Backlog
 
@@ -80,12 +82,22 @@
 ## 9 个核心 IM 服务 P2
 
 - `api-gateway`：legacy observation evidence、provider-grade quota、gray rollout、OTel stack。
-- Cross-service loadtest：继续维护 `capacity_summary`，形成容量曲线和瓶颈说明。
+- Cross-service loadtest：继续维护 `capacity_summary`，形成容量曲线和瓶颈说明；新增
+  `loadtest/hotgroup` 业务压测 runner，覆盖热点群聊 fanout、Kafka lag、delivery
+  projection、push notify storm、PullInbox / ACK 追平、成员变更和故障恢复，不用单接口
+  QPS 替代真实业务链路。
 - `identity-service`：WebAuthn/passkeys、OIDC、多 issuer、KMS/HSM、完整风控、生产级
   email/SMS provider。
 - `message-service`：删除 / 撤回 / 编辑深化、外部 proof workflow、发送链路生产观测。
-- `conversation-service`：群管理深化、历史窗口 / targeted replay repair。
-- `delivery-service`：projection DLQ / repair 深化、更多 delivery event consumer。
+- `conversation-service`：群规模策略已进入 domain 层；后续在 timeline-service SDD 冻结后，
+  把 medium / large / hot group 的 contract-only 策略接入真实 runtime，并继续补群管理深化、
+  历史窗口 / targeted replay repair。
+- `timeline-service`：foundation-planned；下一步冻结 SDD，补 seq block allocator、
+  sequencer epoch fencing、gap marker、virtual partition mapping 和 repair operator。
+- `delivery-service`：projection DLQ / repair 深化、更多 delivery event consumer；
+  后续按 `WRITE_FANOUT -> HYBRID_FANOUT -> READ_FANOUT -> BROADCAST_SIGNAL`
+  分阶段实现 fanout planner 当前已显式建模但未支持的投影策略，重点验证 Kafka lag、
+  projection backlog、PullInbox / ACK 追平时间和 push notify storm。
 - `push-gateway`：Redis 网络分区 smoke、跨实例 resume、容量测试。
 - `receipt-service`：会话列表产品能力、更多摘要策略和容量曲线。
 - `contacts-service`：组织级策略、租户默认值、来源策略、隐私例外。

@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 
+	"github.com/qsyy0921/IM/services/delivery-service/internal/domain"
 	"github.com/qsyy0921/IM/services/delivery-service/internal/types"
 )
 
@@ -19,6 +20,9 @@ func (useCase *ProjectTimelineEventUseCase) Execute(
 	command types.ProjectTimelineEventCommand,
 ) (types.ProjectTimelineEventResult, error) {
 	if err := command.Validate(); err != nil {
+		return types.ProjectTimelineEventResult{}, err
+	}
+	if err := domain.EnsureTimelineProjectionSupported(command); err != nil {
 		return types.ProjectTimelineEventResult{}, err
 	}
 	return useCase.repository.ProjectTimelineEvent(ctx, command)

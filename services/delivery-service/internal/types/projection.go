@@ -70,6 +70,9 @@ func (command ProjectTimelineEventCommand) Validate() error {
 		if command.MessageID == "" {
 			return NewInvalidArgument("message_id is required")
 		}
+		if err := validateDeliveryFanoutMode(command.FanoutMode); err != nil {
+			return err
+		}
 	case TimelineEventConversationMemberJoined,
 		TimelineEventConversationMemberLeft,
 		TimelineEventConversationMemberRemoved,

@@ -6,15 +6,16 @@ import (
 )
 
 var (
-	ErrInvalidArgument      = errors.New("invalid argument")
-	ErrPermissionDenied     = errors.New("permission denied")
-	ErrCursorRegression     = errors.New("cursor regression")
-	ErrAckOutOfVisibleRange = errors.New("ack out of visible range")
-	ErrInboxItemNotFound    = errors.New("inbox item not found")
-	ErrDBReadFailed         = errors.New("db read failed")
-	ErrDBWriteFailed        = errors.New("db write failed")
-	ErrServiceOverloaded    = errors.New("service overloaded")
-	ErrProjectionDependency = errors.New("projection dependency missing")
+	ErrInvalidArgument       = errors.New("invalid argument")
+	ErrPermissionDenied      = errors.New("permission denied")
+	ErrCursorRegression      = errors.New("cursor regression")
+	ErrAckOutOfVisibleRange  = errors.New("ack out of visible range")
+	ErrInboxItemNotFound     = errors.New("inbox item not found")
+	ErrDBReadFailed          = errors.New("db read failed")
+	ErrDBWriteFailed         = errors.New("db write failed")
+	ErrServiceOverloaded     = errors.New("service overloaded")
+	ErrProjectionDependency  = errors.New("projection dependency missing")
+	ErrUnsupportedFanoutMode = errors.New("unsupported fanout mode")
 )
 
 func NewInvalidArgument(reason string) error {
@@ -78,4 +79,11 @@ func NewProjectionDependencyMissing(reason string) error {
 		return ErrProjectionDependency
 	}
 	return fmt.Errorf("%w: %s", ErrProjectionDependency, reason)
+}
+
+func NewUnsupportedFanoutMode(reason string) error {
+	if reason == "" {
+		return ErrUnsupportedFanoutMode
+	}
+	return fmt.Errorf("%w: %s", ErrUnsupportedFanoutMode, reason)
 }

@@ -6,6 +6,7 @@
 | 分类 | 入口 |
 | --- | --- |
 | Core IM services | `message-service/`、`conversation-service/`、`delivery-service/`、`push-gateway/`、`receipt-service/`、`contacts-service/`、`identity-service/`、`policy-service/`、`api-gateway/` |
+| Cross-service scenarios | `hotgroup/` |
 | Client platform | `client-platform/` |
 | AI / Agent foundation | `search-service/`、`memory-service/`、`retrieval-gateway/`、`rag-service/`、`summary-service/`、`agent-service/`、`ai-eval-service/` |
 | Product / platform services | `media-service/`、`notification-service/`、`audit-service/`、`admin-service/`、`control-plane-service/`、`presence-service/`、`model-gateway/`、`vector-index-service/`、`knowledge-vector-handoff/` |

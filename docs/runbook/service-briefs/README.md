@@ -24,6 +24,12 @@
 [knowledge-ingestion](knowledge-ingestion-service.md) /
 [workflow](workflow-service.md) / [vector-index](vector-index-service.md)
 
+## Distributed timeline / hot conversation planning
+
+[timeline](timeline-service.md) is foundation-planned. It has a compileable noop
+runtime and six-layer boundary for future sequencer / partition work, but it is
+not yet part of the active message write path.
+
 ## Client platform
 
 Client platform is tracked in [client platform](../client-platform.md), not in

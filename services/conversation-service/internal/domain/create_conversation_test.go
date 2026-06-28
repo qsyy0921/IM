@@ -27,6 +27,11 @@ func TestNewConversationCreateRecordWritesBoundaryChangeID(t *testing.T) {
 	if len(record.Outbox) != 2 || len(record.Timeline) != 2 {
 		t.Fatalf("expected two member boundary events, got outbox=%d timeline=%d", len(record.Outbox), len(record.Timeline))
 	}
+	if record.Conversation.FanoutMode != types.FanoutModeWriteFanout ||
+		record.Conversation.FanoutPolicyVersion != 1 ||
+		record.Conversation.CurrentSeqShard != "local" {
+		t.Fatalf("conversation policy=%+v", record.Conversation)
+	}
 	for index, event := range record.Outbox {
 		var payload map[string]any
 		if err := json.Unmarshal(event.PayloadJSON, &payload); err != nil {
@@ -35,6 +40,10 @@ func TestNewConversationCreateRecordWritesBoundaryChangeID(t *testing.T) {
 		wantChangeID := string(event.EventID)
 		if got := payload["change_id"]; got != wantChangeID {
 			t.Fatalf("payload %d change_id=%v want %s", index, got, wantChangeID)
+		}
+		if record.Timeline[index].FanoutMode != record.Conversation.FanoutMode ||
+			record.Timeline[index].FanoutPolicyVersion != record.Conversation.FanoutPolicyVersion {
+			t.Fatalf("timeline %d policy fanout=%s version=%d", index, record.Timeline[index].FanoutMode, record.Timeline[index].FanoutPolicyVersion)
 		}
 	}
 }

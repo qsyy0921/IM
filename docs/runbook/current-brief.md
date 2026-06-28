@@ -32,6 +32,10 @@ brief、loadtest report、development-progress 或 archive。
   audit append result manifest，以及 workflow outbox relay first path。
 - group memory / retrieval / eval 持续保留 source refs、conversation scope、
   member visibility、time/version boundary、citations 和 no-citation refusal。
+- Conversation scale policy 已在 conversation-service domain 层落地：direct / small group
+  使用 active `WRITE_FANOUT`；medium / large / hot group 分别建模为 `HYBRID_FANOUT`、
+  `READ_FANOUT`、`BROADCAST_SIGNAL + SEQUENCER_BLOCK`，在 timeline / delivery
+  runtime 完成前保持 contract-only / fail-closed。
 
 ## 已成型底座
 
@@ -44,6 +48,11 @@ brief、loadtest report、development-progress 或 archive。
 - Product-active first paths：admin-service、audit-service、control-plane-service、
   knowledge-ingestion-service、media-service、model-gateway、notification-service、
   presence-service、vector-index-service、workflow-service。
+- Distributed timeline planning：timeline-service 已建立 foundation-planned 六层边界和
+  noop runtime，用于后续热点会话 sequencer、seq block、gap marker 和分区映射；
+  当前不进入消息写入主路径。
+- Observability platform：当前 first-stage 指标和 trace 继续按 Prometheus / Grafana /
+  OpenTelemetry 分工维护；它们只提供观测，不参与业务判定或隐藏降级。
 
 ## 工作规则
 

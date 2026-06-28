@@ -35,6 +35,10 @@ func NewConversationCreateRecord(
 	if len(eventIDs) != len(members) {
 		return ConversationCreateRecord{}, types.NewInvalidArgument("event_ids count must match members")
 	}
+	policy, err := ResolveConversationCreatePolicy(command.ConversationType, int64(len(members)))
+	if err != nil {
+		return ConversationCreateRecord{}, err
+	}
 	memberVersion := int64(len(members))
 	permissionVersion := memberVersion
 	occurredAt := now.UTC()
@@ -43,15 +47,15 @@ func NewConversationCreateRecord(
 		ConversationID:      command.ConversationID,
 		ConversationType:    command.ConversationType,
 		Status:              types.ConversationStatusActive,
-		ConversationMode:    types.ConversationModeLocalRowLock,
-		FanoutMode:          types.FanoutModeWriteFanout,
-		FanoutPolicyVersion: 1,
+		ConversationMode:    policy.ConversationMode,
+		FanoutMode:          policy.FanoutMode,
+		FanoutPolicyVersion: policy.FanoutPolicyVersion,
 		MemberVersion:       memberVersion,
 		PermissionVersion:   permissionVersion,
-		CurrentSeqShard:     "local",
+		CurrentSeqShard:     policy.CurrentSeqShard,
 		DirectPeerUserID:    command.DirectPeerUserID,
 	}
-	timeline, outbox, err := buildConversationCreateBoundaryEvents(command, members, eventIDs, occurredAt)
+	timeline, outbox, err := buildConversationCreateBoundaryEvents(command, members, eventIDs, policy, occurredAt)
 	if err != nil {
 		return ConversationCreateRecord{}, err
 	}
@@ -106,6 +110,7 @@ func buildConversationCreateBoundaryEvents(
 	command types.CreateConversationCommand,
 	members []MemberMutation,
 	eventIDs []types.EventID,
+	policy ConversationScalePolicy,
 	occurredAt time.Time,
 ) ([]TimelineEvent, []OutboxEvent, error) {
 	traceID := firstNonEmpty(command.AuthContext.TraceID, command.AuthContext.RequestID)
@@ -146,8 +151,8 @@ func buildConversationCreateBoundaryEvents(
 			ConversationID:      command.ConversationID,
 			ConversationSeq:     seq,
 			ActorID:             command.AuthContext.UserID,
-			FanoutMode:          types.FanoutModeWriteFanout,
-			FanoutPolicyVersion: 1,
+			FanoutMode:          policy.FanoutMode,
+			FanoutPolicyVersion: policy.FanoutPolicyVersion,
 			PermissionVersion:   member.PermissionVersion,
 			Classification:      "MEMBER_BOUNDARY",
 			MappingVersion:      string(eventType),

@@ -61,6 +61,7 @@ flowchart TB
     Policy["policy-service"]
     Contacts["contacts-service"]
     Conversation["conversation-service"]
+    Timeline["timeline-service / planned sequencer"]
     Message["message-service"]
     Delivery["delivery-service"]
     Receipt["receipt-service"]
@@ -106,6 +107,8 @@ flowchart TB
   BFF --> Policy
   BFF --> Contacts
   BFF --> Conversation
+  Conversation --> Timeline
+  Timeline --> Message
   BFF --> Message
   BFF --> Delivery
   BFF --> Receipt
@@ -141,12 +144,31 @@ flowchart TB
 | --- | --- |
 | 客户端层 | Web / Windows PC / Android 共用 TypeScript `protocol` 和 `client-core`；native shell 只做薄平台 bridge。 |
 | 接入层 | `api-gateway` 提供 client BFF、鉴权、quota、trusted metadata；`push-gateway` 只做在线唤醒，不拥有 durable inbox。 |
-| IM 核心层 | 9 个 IM 服务分别拥有身份、策略、联系人、会话、消息、投递、回执等事实和读模型。 |
-| 事件与投影层 | 每个服务拥有自己的 PostgreSQL schema；跨服务事实传播走 outbox -> Kafka -> projection / worker。 |
+| IM 核心层 | 9 个已运行 IM 服务分别拥有身份、策略、联系人、会话、消息、投递、回执等事实和读模型；`timeline-service` 已作为 foundation-planned 边界承接后续热点会话 sequencer / 分区 / gap marker，不伪装成当前已运行写路径。 |
+| 事件与投影层 | 每个服务拥有自己的 PostgreSQL schema；跨服务事实传播走 outbox -> Kafka -> projection / worker；conversation timeline 的 virtual partition / physical partition mapping 后续由 control-plane + timeline-service 协同管理。 |
 | 产品平台层 | media、notification、audit、admin、control-plane、presence、workflow 等按独立数据模型和故障边界逐步 promotion。 |
 | AI / Agent 层 | search / memory 产出可见投影，retrieval-gateway 构造 EvidencePack，RAG / summary / Agent 只能基于 EvidencePack 工作。 |
 | Python AI Worker | 只做模型、算法、embedding、rerank、memory extraction、planner 和 eval 候选；Go 继续拥有权限、状态、审批、审计和持久化。 |
-| 中间件平台 | PostgreSQL、Kafka、Redis、OpenSearch / vector store、对象存储、观测、安全组件、数据平台和 AI runtime 都按能力与 runtime profile 引入，不写死产品。 |
+| 中间件平台 | PostgreSQL、Kafka、Redis、OpenSearch / vector store、对象存储、Prometheus、Grafana、OpenTelemetry / OTel Collector、安全组件、数据平台和 AI runtime 都按能力与 runtime profile 引入，不写死产品。 |
+
+### 群聊规模策略
+
+热点群聊不靠单一写路径硬扛。conversation-service 已把群规模策略抽到 domain 层，
+message / delivery 只消费明确的 send context 和 timeline fanout contract，不自行猜测群规模。
+当前运行态只启用 direct / small group 的写扩散路径；中 / 大 / 热点群目标策略已经建模，
+但在 timeline-service 和 delivery fanout planner 完成前保持 contract-only / fail-closed。
+
+| 会话类型 | 成员规模 | 当前策略状态 | 目标写入 / 投递策略 |
+| --- | --- | --- | --- |
+| 单聊 | `<=2` | active | `LOCAL_ROW_LOCK + WRITE_FANOUT`，沿用 durable inbox。 |
+| 小群 | `<=500` | active | `LOCAL_ROW_LOCK + WRITE_FANOUT`，每个成员写 `user_inbox`。 |
+| 中群 | `501-5000` | contract-only | `HYBRID_FANOUT`，活跃用户写扩散，冷用户按 timeline pull / repair。 |
+| 大群 | `5001-50000` | contract-only | `READ_FANOUT`，按成员可见窗口和 timeline 分区拉取。 |
+| 热点群 / 超大群 | `>50000` 或高写入热点 | contract-only | `SEQUENCER_BLOCK + BROADCAST_SIGNAL`，timeline-service 分配 seq block，push 只发轻量 signal。 |
+
+观测层使用 Prometheus 采集指标、Grafana 展示面板、OpenTelemetry 串联 trace；
+这些工具用于定位 Kafka lag、delivery projection backlog、push notify storm、PullInbox / ACK
+追平时间等问题，不参与业务事实判定，也不作为隐藏降级路径。
 
 ### 当前客户端状态
 

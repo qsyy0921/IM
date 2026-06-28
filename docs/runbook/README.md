@@ -9,6 +9,8 @@
   中间件或部署形态。
 - AI / Agent 后续主线包括 group memory、EvidencePack、RAG、summary、Agent、MCP/tool、approval/audit 和 ai-eval。
 - 9 个既有 IM 服务作为基础；默认只处理阻塞当前主线的 P0/P1 或用户点名事项。
+- 热点群 / 分区 / distributed timeline 主线通过 foundation-planned `timeline-service`
+  承接；当前只提供 noop runtime，不进入已运行消息写路径。
 - 生产级压测、长故障演练和完整生产就绪测试后置。
 
 ## 默认入口
@@ -19,6 +21,7 @@
 - 每轮短入口：`current-brief.md`
 - 剩余工作：`remaining-goals.md`
 - 服务短状态索引：`service-briefs/README.md`
+- Docker 镜像归档和三机 SSD 加载策略：`docker-image-storage.md`
 
 ## 按需读取
 
@@ -28,7 +31,7 @@
 - 中间件目录：`../platform/middleware-catalog.md`
 - 服务设计：`../sdd/<service>.md`
 - smoke / 压测证据：`loadtest/<service>/`
-- 本地分布式 / Docker / 观测 / 压测：`distributed-local.md`、`mac-arm64-docker-images.md`、`observability-local.md`、`local-loadtest.md`
+- 本地分布式 / Docker / 观测 / 压测：`distributed-local.md`、`mac-arm64-docker-images.md`、`docker-image-storage.md`、`observability-local.md`、`local-loadtest.md`
 - AI eval / evidence manifests：`ai-eval/README.md`、`*-evidence.json`
 - 复杂度治理：`file-size-hotspots.md`、`file-size-hotspot-baseline.json`
 - repair / DLQ operator：`repair-operators.md`、`repair-operators.catalog.json`

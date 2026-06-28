@@ -11,6 +11,7 @@ import (
 type fakeTimelineProjectionRepository struct {
 	command types.ProjectTimelineEventCommand
 	result  types.ProjectTimelineEventResult
+	called  bool
 }
 
 func (repository *fakeTimelineProjectionRepository) ProjectTimelineEvent(
@@ -18,6 +19,7 @@ func (repository *fakeTimelineProjectionRepository) ProjectTimelineEvent(
 	command types.ProjectTimelineEventCommand,
 ) (types.ProjectTimelineEventResult, error) {
 	repository.command = command
+	repository.called = true
 	return repository.result, nil
 }
 
@@ -33,6 +35,7 @@ func TestProjectTimelineEventUseCase(t *testing.T) {
 		ConversationID:  "conv-1",
 		ConversationSeq: 10,
 		MessageID:       "msg-1",
+		FanoutMode:      types.DeliveryFanoutModeWriteFanout,
 	})
 	if err != nil {
 		t.Fatalf("project timeline event: %v", err)
@@ -42,6 +45,26 @@ func TestProjectTimelineEventUseCase(t *testing.T) {
 	}
 	if repository.command.EventID != "event-1" {
 		t.Fatalf("command was not passed to repository: %+v", repository.command)
+	}
+}
+
+func TestProjectTimelineEventUseCaseRejectsUnsupportedFanoutMode(t *testing.T) {
+	repository := &fakeTimelineProjectionRepository{}
+	useCase := NewProjectTimelineEventUseCase(repository)
+	_, err := useCase.Execute(context.Background(), types.ProjectTimelineEventCommand{
+		TenantID:        "tenant-1",
+		EventID:         "event-1",
+		EventType:       types.TimelineEventMessagePersisted,
+		ConversationID:  "conv-1",
+		ConversationSeq: 10,
+		MessageID:       "msg-1",
+		FanoutMode:      types.DeliveryFanoutModeHybridFanout,
+	})
+	if !errors.Is(err, types.ErrUnsupportedFanoutMode) {
+		t.Fatalf("expected unsupported fanout mode, got %v", err)
+	}
+	if repository.called {
+		t.Fatal("repository should not be called for unsupported projection fanout")
 	}
 }
 

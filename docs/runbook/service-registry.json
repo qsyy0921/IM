@@ -40,6 +40,14 @@
       "grafana_dashboard": "conversation-service-observability.json"
     },
     {
+      "name": "timeline-service",
+      "stage": "foundation-planned",
+      "local_process": "timeline-service-noop",
+      "debug_port": 11937,
+      "prometheus_rule_file": "prometheus-timeline-service-alerts.yml",
+      "grafana_dashboard": "timeline-service-observability.json"
+    },
+    {
       "name": "delivery-service",
       "stage": "core",
       "local_process": "delivery-service-grpc",

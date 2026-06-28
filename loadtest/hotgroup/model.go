@@ -1,0 +1,105 @@
+package main
+
+import "time"
+
+type userRole string
+
+const (
+	roleOwner    userRole = "owner"
+	roleSender   userRole = "sender"
+	roleReceiver userRole = "receiver"
+)
+
+type onlineMode string
+
+const (
+	onlineFast onlineMode = "online_fast"
+	onlineSlow onlineMode = "online_slow"
+	offline    onlineMode = "offline"
+)
+
+type loadUser struct {
+	UserID     string     `json:"user_id"`
+	DeviceID   string     `json:"device_id"`
+	SessionID  string     `json:"session_id"`
+	Role       userRole   `json:"role"`
+	OnlineMode onlineMode `json:"online_mode"`
+}
+
+type userPlan struct {
+	TenantID       string     `json:"tenant_id"`
+	ConversationID string     `json:"conversation_id"`
+	GroupSize      int        `json:"group_size"`
+	Owner          loadUser   `json:"owner"`
+	Senders        []loadUser `json:"senders"`
+	Receivers      []loadUser `json:"receivers"`
+	OnlineFast     int        `json:"online_fast"`
+	OnlineSlow     int        `json:"online_slow"`
+	Offline        int        `json:"offline"`
+}
+
+type sendStats struct {
+	SuccessCount int       `json:"success_count"`
+	ErrorCount   int       `json:"error_count"`
+	LatencyAvgMS float64   `json:"latency_avg_ms"`
+	LatencyP95MS float64   `json:"latency_p95_ms"`
+	LatencyP99MS float64   `json:"latency_p99_ms"`
+	MaxSeq       int64     `json:"max_seq"`
+	Errors       []string  `json:"errors,omitempty"`
+	StartedAt    time.Time `json:"started_at,omitempty"`
+	FinishedAt   time.Time `json:"finished_at,omitempty"`
+}
+
+type receiverStats struct {
+	SampledReceivers int      `json:"sampled_receivers"`
+	PullSuccessCount int      `json:"pull_success_count"`
+	PullErrorCount   int      `json:"pull_error_count"`
+	AckSuccessCount  int      `json:"ack_success_count"`
+	AckErrorCount    int      `json:"ack_error_count"`
+	MaxPulledSeq     int64    `json:"max_pulled_seq"`
+	PullLatencyAvgMS float64  `json:"pull_latency_avg_ms"`
+	PullLatencyP95MS float64  `json:"pull_latency_p95_ms"`
+	PullLatencyP99MS float64  `json:"pull_latency_p99_ms"`
+	Errors           []string `json:"errors,omitempty"`
+}
+
+type postgresStats struct {
+	ConversationMemberCount       int64 `json:"conversation_member_count"`
+	DeliveryMembershipActiveCount int64 `json:"delivery_membership_active_count"`
+	MessageLogCount               int64 `json:"message_log_count"`
+	UserInboxRows                 int64 `json:"user_inbox_rows"`
+	MessageOutboxPending          int64 `json:"message_outbox_pending"`
+	MessageOutboxDLQ              int64 `json:"message_outbox_dlq"`
+	DeliveryOutboxPending         int64 `json:"delivery_outbox_pending"`
+	DeliveryOutboxDLQ             int64 `json:"delivery_outbox_dlq"`
+}
+
+type summary struct {
+	SchemaVersion              int            `json:"schema_version"`
+	RunName                    string         `json:"run_name"`
+	Commit                     string         `json:"commit"`
+	GitDirty                   bool           `json:"git_dirty"`
+	GitStatusShort             string         `json:"git_status_short,omitempty"`
+	DryRun                     bool           `json:"dry_run"`
+	VerifiedAuthMetadata       bool           `json:"verified_auth_metadata"`
+	TenantID                   string         `json:"tenant_id"`
+	ConversationID             string         `json:"conversation_id"`
+	GroupSize                  int            `json:"group_size"`
+	SenderCount                int            `json:"sender_count"`
+	OnlineRatio                float64        `json:"online_ratio"`
+	SlowClientRatio            float64        `json:"slow_client_ratio"`
+	ACKRatio                   float64        `json:"ack_ratio"`
+	MessageRate                float64        `json:"message_rate"`
+	DurationSeconds            float64        `json:"duration_seconds"`
+	MessageCount               int            `json:"message_count"`
+	ExpectedInboxRows          int64          `json:"expected_inbox_rows"`
+	RequireDeliveryOutboxDrain bool           `json:"require_delivery_outbox_drain"`
+	UserPlan                   userPlan       `json:"user_plan"`
+	Send                       sendStats      `json:"send"`
+	Receiver                   receiverStats  `json:"receiver"`
+	Postgres                   *postgresStats `json:"postgres,omitempty"`
+	Success                    bool           `json:"success"`
+	Error                      string         `json:"error,omitempty"`
+	StartedAt                  time.Time      `json:"started_at"`
+	FinishedAt                 time.Time      `json:"finished_at"`
+}

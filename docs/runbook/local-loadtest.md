@@ -1,4 +1,24 @@
-# 本地双机压测 Runbook
+# 本地多机压测 Runbook
+
+## 快速入口：热点群聊业务压测规划
+
+热点群聊不要只用单接口 QPS 代替真实业务压测。后续 `loadtest/hotgroup` runner
+应覆盖：
+
+```text
+多 sender SendMessage
+-> Kafka timeline lag
+-> delivery membership projection
+-> user_inbox fanout
+-> push notify storm
+-> PullInbox visible latency
+-> AckDelivery latency
+-> slow session eviction
+-> member churn visibility
+```
+
+场景、指标和面试口径见 `docs/runbook/loadtest/hotgroup/README.md`。该 runner
+未落地前，不要把现有 `sendmessage` 单服务压测解释为热点群聊能力证明。
 
 ## 快速入口：9 服务健康态资源快照
 
@@ -181,24 +201,46 @@ seed 工具只写本地压测 fixture 租户：`tenant-capacity-message`、`tena
 
 ## 1. 机器与网络
 
-当前本地双机压测只用于开发阶段，不代表目标态生产拓扑。
+当前本地多机压测只用于开发阶段，不代表目标态生产拓扑。
+交换机网络和 Wi-Fi 网络必须分开使用：
 
-| 角色 | 地址 | 用途 |
-| --- | --- | --- |
-| Windows 本机 Wi-Fi | `192.168.0.141` | 上网、SSH recovery |
-| MacBook Wi-Fi | `192.168.0.182` | 上网、SSH recovery |
-| Windows 本机有线直连 | `172.31.50.1` | Win-Mac 压测服务端 / 客户端 |
-| MacBook 有线直连 | `172.31.50.2` | Win-Mac 压测客户端 / callback/mock receiver |
+```text
+Wi-Fi: 上网、代理、临时 SSH recovery。
+有线交换机: NexusIM Docker / 服务调用 / 压测流量。
+```
 
-Win-Mac 之间的压测流量统一走有线直连网段：
+有线交换机固定使用：
 
 ```text
 172.31.50.0/24
 ```
 
-两端有线网卡都不设置默认网关；Wi-Fi 继续负责上网和普通局域网访问。Windows 网络面板显示“无网络访问权限”是正常的，因为该有线网段只用于双机直连。
+三台机器的当前静态地址：
 
-当前静态地址配置：
+| 角色 | 地址 | 用途 |
+| --- | --- | --- |
+| Windows Wi-Fi | `192.168.0.141` | 上网、代理、本机开发。 |
+| Ubuntu Wi-Fi | `192.168.0.38` | 临时 SSH recovery、外网依赖。 |
+| MacBook Wi-Fi | `192.168.0.182` | 临时 SSH recovery、外网依赖。 |
+| Windows 有线 | `172.31.50.1/24` | 主开发机、压测客户端、客户端调试。 |
+| Ubuntu 有线 | `172.31.50.2/24` | 重型 Docker 节点，承载 PostgreSQL / Kafka / Redis / 后端服务。 |
+| MacBook 有线 | `172.31.50.3/24` | 轻量客户端、WebSocket receiver、arm64 兼容性验证。 |
+
+有线网卡都不设置默认网关；默认路由继续走 Wi-Fi。Windows 网络面板显示
+“无网络访问权限”是正常的，因为该有线网段只用于本地实验。
+
+当前物理拓扑：
+
+```text
+Windows Realtek 2.5GbE  -> TL-SG1008M 交换机
+Ubuntu enp6s0           -> TL-SG1008M 交换机
+MacBook en5 USB LAN     -> TL-SG1008M 交换机
+```
+
+注意：TL-SG1008M 是 1GbE 交换机，因此即使 Windows 网卡是 2.5GbE，
+当前三机有线链路也只能协商到 1Gbps。
+
+### 静态地址配置
 
 Windows 管理员 PowerShell：
 
@@ -207,20 +249,82 @@ Set-NetIPInterface -InterfaceAlias '以太网' -AddressFamily IPv4 -Dhcp Disable
 New-NetIPAddress -InterfaceAlias '以太网' -IPAddress 172.31.50.1 -PrefixLength 24
 ```
 
+Ubuntu：
+
+```bash
+sudo ip addr replace 172.31.50.2/24 dev enp6s0
+sudo ip link set enp6s0 up
+```
+
+如果使用 netplan / NetworkManager 持久化，仍保持 no gateway。
+
 MacBook：
 
 ```bash
-sudo networksetup -createnetworkservice 'NexusIM Direct Ethernet' en5
-sudo networksetup -setmanual 'NexusIM Direct Ethernet' 172.31.50.2 255.255.255.0 0.0.0.0
+sudo ifconfig en5 inet 172.31.50.3 netmask 255.255.255.0 up
+sudo networksetup -setmanual 'USB 10/100/1G/2.5G LAN' 172.31.50.3 255.255.255.0 0.0.0.0
 ```
 
-如果服务已经存在，只需要执行 `networksetup -setmanual`。不要给该服务配置真实 router / gateway。
+如果 MacBook 出现 `169.254.x.x/16`，说明有线物理链路已连接但没有手动地址或 DHCP；
+按上面的 `172.31.50.3/24` 配置即可。
 
-两端本地 Git/HTTP 代理统一使用：
+两端本地 Git/HTTP 代理统一使用本机 loopback：
 
 ```text
-127.0.0.1:7890
+Windows: 127.0.0.1:7890
+Ubuntu: 127.0.0.1:7890
+MacBook: 127.0.0.1:7890
 ```
+
+### 拓扑验证
+
+Windows:
+
+```powershell
+Test-NetConnection 172.31.50.2 -Port 22
+Test-NetConnection 172.31.50.3 -Port 22
+ping 172.31.50.2
+ping 172.31.50.3
+```
+
+预期结果：
+
+```powershell
+InterfaceAlias   : 以太网
+SourceAddress    : 172.31.50.1
+TcpTestSucceeded : True
+```
+
+Ubuntu:
+
+```bash
+ping -c 3 172.31.50.1
+ping -c 3 172.31.50.3
+ip route get 172.31.50.1
+ip route get 172.31.50.3
+```
+
+MacBook:
+
+```bash
+ping -c 3 172.31.50.1
+ping -c 3 172.31.50.2
+route -n get 172.31.50.1
+route -n get 172.31.50.2
+```
+
+### 当前 Docker 角色
+
+当前实验网的 Docker 内容按机器分工：
+
+```text
+Ubuntu 172.31.50.2: 主运行节点，跑 PostgreSQL / Redis / Kafka / NexusIM 后端容器。
+Windows 172.31.50.1: 主开发机、镜像构建入口、loadtest/hotgroup 压测客户端、GPU 小模型实验节点。
+MacBook 172.31.50.3: 轻量 arm64 验证节点，只保留少量 gateway 镜像。
+```
+
+因此后续热点群聊或分布式 smoke 默认把服务目标指向 Ubuntu 的 `172.31.50.2`；
+Windows 和 MacBook 只作为客户端、receiver 或对照节点加入，不默认承载重型中间件。
 
 ## 2. 端口分配
 
@@ -228,12 +332,12 @@ sudo networksetup -setmanual 'NexusIM Direct Ethernet' 172.31.50.2 255.255.255.0
 
 | 端口 | 方向 | 用途 |
 | ---: | --- | --- |
-| `10495` | MacBook -> Windows；Windows -> MacBook 可对称使用 | 主 HTTP/API 压测入口 |
-| `10496` | MacBook -> Windows | push-gateway WebSocket 压测入口 |
-| `10497` | MacBook -> Windows | message-service gRPC 进程 metrics/debug，只在压测窗口开放 |
-| `10498` | Windows -> MacBook | callback/mock receiver，用于双向新建连接场景 |
-| `10499` | MacBook <-> Windows | load coordinator / report endpoint |
-| `10500` | MacBook -> Windows | message-service outbox relay 进程 metrics/debug，只在压测窗口开放 |
+| `10495` | Windows / MacBook -> Ubuntu | 主 HTTP/API 压测入口，优先由 Ubuntu Docker 服务监听。 |
+| `10496` | Windows / MacBook -> Ubuntu | push-gateway WebSocket 压测入口。 |
+| `10497` | Windows / MacBook -> Ubuntu | message-service gRPC 进程 metrics/debug，只在压测窗口开放。 |
+| `10498` | Ubuntu / Windows -> MacBook | callback/mock receiver，用于双向新建连接或轻量客户端接收场景。 |
+| `10499` | 三机互通 | load coordinator / report endpoint。 |
+| `10500` | Windows / MacBook -> Ubuntu | message-service outbox relay 进程 metrics/debug，只在压测窗口开放。 |
 | `10501-10510` | 按需双向 | 预留给服务级 SDD、故障注入、临时对照实验 |
 
 两台机器可以使用相同端口号，因为监听地址不同，例如：
@@ -241,26 +345,27 @@ sudo networksetup -setmanual 'NexusIM Direct Ethernet' 172.31.50.2 255.255.255.0
 ```text
 172.31.50.1:10495
 172.31.50.2:10495
+172.31.50.3:10495
 ```
 
-这两个监听不冲突。
+这些监听不冲突。
 
 ## 3. 防火墙约束
 
 Windows 防火墙规则：
 
 ```text
-规则名: NexusIM LoadTest 10495-10510 from MacBook
+规则名: NexusIM LoadTest 10495-10510 from Wired Lab
 协议: TCP
 本地端口: 10495-10510
-远端地址: 172.31.50.2
+远端地址: 172.31.50.2,172.31.50.3
 动作: Allow
 ```
 
-如 MacBook 开启系统防火墙，只允许 Windows 访问同一端口段：
+Ubuntu / MacBook 如开启系统防火墙，只允许有线实验网访问同一端口段：
 
 ```text
-172.31.50.1 -> 10495-10510
+172.31.50.0/24 -> 10495-10510
 ```
 
 非压测窗口不启动这些端口上的服务。
@@ -283,23 +388,31 @@ Windows 防火墙规则：
 
 ## 5. 验证命令
 
-MacBook 验证 Windows 服务端口：
+Windows 验证 Ubuntu 服务端口：
+
+```powershell
+Test-NetConnection 172.31.50.2 -Port 10495
+curl.exe -I http://172.31.50.2:10495/healthz
+```
+
+MacBook 验证 Ubuntu 服务端口：
 
 ```bash
-nc -vz 172.31.50.1 10495
-curl -I http://172.31.50.1:10495/healthz
+nc -vz 172.31.50.2 10495
+curl -I http://172.31.50.2:10495/healthz
 ```
 
 Windows 验证 MacBook callback/mock receiver：
 
 ```powershell
-Test-NetConnection 172.31.50.2 -Port 10498
+Test-NetConnection 172.31.50.3 -Port 10498
 ```
 
-验证 Win-Mac SSH 直连路径：
+验证三机 SSH 有线路径：
 
 ```powershell
 Test-NetConnection 172.31.50.2 -Port 22
+Test-NetConnection 172.31.50.3 -Port 22
 ```
 
 预期结果：
@@ -317,7 +430,7 @@ TcpTestSucceeded : True
 - 每次压测记录目标 commit、机器、端口、并发、请求数、p95/p99、错误率。
 - 压测结果输出到 `loadtest/results/<date>/`。
 - 先跑短压测确认功能，再跑长压测观察资源和稳定性。
-- 本地双机结果只用于发现早期瓶颈和趋势，不作为生产容量承诺。
+- 本地多机结果只用于发现早期瓶颈和趋势，不作为生产容量承诺。
 - 如需记录 `conversation_seq_alloc_latency`、Kafka publish、outbox relay 分段指标，gRPC 进程与 outbox relay 进程必须分别设置 `NEXUSIM_DEBUG_ADDR`，并把对应地址传给压测脚本。`kafka_publish_latency` 只保留兼容旧报告；正式报告优先看 `kafka_publish_call_latency`、`kafka_publish_records_per_call` 和 `kafka_publish_record_latency_estimate`，避免 single path 和 batch path 口径混用。
 
 推荐参数形式：

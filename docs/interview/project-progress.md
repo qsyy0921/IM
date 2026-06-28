@@ -119,6 +119,103 @@ search-service v0.1 / group memory / retrieval / RAG / summary / Agent / skill /
 消息从客户端入口进入后，可以经过身份、权限、会话、消息、投递、在线通知、ACK 和回执链路闭环。
 ```
 
+## 热点群聊面试讲法
+
+面试官问“热点群聊怎么处理”时，不要只回答“加机器”或“上消息队列”。
+NexusIM 的回答应先把问题拆清楚：热点群聊真正的瓶颈通常不是单个
+`SendMessage` RPC，而是消息写入、Kafka timeline、delivery fanout、
+`user_inbox` 写放大、在线 push 风暴、慢连接、ACK 追平和成员可见窗口一起叠加。
+
+当前架构的第一原则是：
+
+```text
+消息事实只写一次；
+投递异步 fanout；
+在线通知只做轻量唤醒；
+可靠恢复依赖 durable inbox / PullInbox / AckDelivery；
+客户端展示顺序以 conversation_seq 为准。
+```
+
+### 当前系统如何承接热点群
+
+| 压力点 | 当前边界 |
+| --- | --- |
+| 消息写入 | `message-service` 只写 `message_log` 和 outbox，不同步写所有群成员 inbox。 |
+| 消息顺序 | 当前普通群由 message 写入链路维持 conversation scope 的 seq 语义；`timeline-service` 已作为 planned sequencer 边界，后续承接热点群 seq block / epoch fencing / gap marker。 |
+| 事件传播 | `message_outbox -> Kafka conversation.timeline.events`，业务事务不直接 publish Kafka。 |
+| 成员可见性 | `conversation-service` 是成员事实源；`delivery-service` 使用 membership projection，不实时回查当前成员来改写历史可见性。 |
+| 投递 fanout | `delivery-service` 异步生成 `user_inbox`，失败可 fail-closed、repair / redrive，不阻塞发送主路径。 |
+| 在线通知 | `push-gateway` 只发 `delivery.notify`，不保存消息事实，不拥有 durable inbox。 |
+| 慢连接 | slow session close / resume hint / PullInbox 兜底，不能让慢 WebSocket 卡住 Kafka commit。 |
+| 多实例在线路由 | Redis route 支撑 first-stage cross-instance notify；Redis 故障时在线唤醒可降级，消息不丢。 |
+| 幂等 | outbox event id、projection unique key、inbox unique constraint 和 ACK cursor 事务语义保证重复消费不重复生成事实。 |
+
+### 热点群的演进策略
+
+普通群可以继续使用 write fanout：
+
+```text
+SendMessage
+-> message_log + message_outbox
+-> Kafka timeline
+-> delivery-service fanout user_inbox
+-> push-gateway online notify
+-> client PullInbox / AckDelivery
+```
+
+当群规模和消息速率继续上升时，优先优化模型，而不是马上堆新中间件：
+
+1. `delivery-service` 按 `conversation_id + user_bucket` 做 fanout 分桶，避免一个 worker 串行处理所有成员。
+2. `user_inbox` 使用批量 insert / 分批事务 / 幂等 unique key，减少 PostgreSQL roundtrip 和锁竞争。
+3. 在线 push 只向在线 session 发轻量 notify，离线和慢客户端只依赖 PullInbox 补拉。
+4. 超大群可切 lazy inbox：不为全部离线冷用户即时物化 inbox，而是在 PullInbox 时结合 timeline、visibility window 和 cursor 计算可见消息。
+5. 对活跃用户、`@我`、置顶会话、在线设备优先 materialize；冷用户延迟或按需 materialize。
+6. Kafka 上保留 timeline 的顺序语义，但 delivery fanout 可以拆成 fanout shard topic / user bucket，不把展示顺序和投递并行度绑定死。
+7. 当单会话写入热点超过本地 row lock 能力时，引入 `timeline-service` 的 seq block allocator；未完成前 `SEQUENCER_BLOCK` 必须 fail-closed，不能悄悄回退成普通 row-lock。
+
+只有压测证明当前模型和拓扑已经成为硬瓶颈时，才考虑新增或升级中间件：
+
+| 触发条件 | 可能动作 |
+| --- | --- |
+| Redis route / online session 查询成为瓶颈 | 从 Redis single / Sentinel 升级 Redis Cluster，或为 presence/push 做更细分热状态缓存。 |
+| PostgreSQL `user_inbox` 写放大不可接受 | 先做 fanout bucket / lazy inbox；仍不足时评估 Citus、CockroachDB、ScyllaDB / Cassandra 类宽表存储。 |
+| Kafka 单 conversation partition 热点过高 | timeline 保序不变，delivery fanout 拆 bucket；必要时增加 fanout shard topic。 |
+| 历史搜索 / 大群检索压力上升 | 引入或强化 OpenSearch / vector backend，但搜索索引不替代消息事实源。 |
+| 大规模在线状态聚合 | presence-service + Redis Cluster / 专用热状态存储，而不是让 push-gateway 变成事实源。 |
+
+### 热点群压测应该证明什么
+
+热点群不能只用 `wrk` 或 `k6` 打单个 HTTP 接口。NexusIM 后续应补
+`loadtest/hotgroup` 业务 runner，至少覆盖：
+
+```text
+group_size
+online_ratio
+sender_count
+message_rate
+duration
+SendMessage p95 / p99
+conversation_seq 是否连续
+Kafka timeline lag
+delivery projection lag
+user_inbox inserted rows/s
+PullInbox visible latency p95 / p99
+AckDelivery p95 / p99
+push notify received / dropped / slow evicted
+outbox pending / DLQ count
+PostgreSQL pool / lock / WAL 指标
+```
+
+面试时可以这样收束：
+
+```text
+我不会把热点群聊简单理解成 SendMessage QPS。我的方案是先用 outbox、Kafka、
+delivery fanout、durable inbox 和 push wakeup 拆开写入事实、投递和在线通知；
+再通过热点群业务压测观察 fanout、Kafka lag、user_inbox 写放大、push 风暴和 ACK
+追平能力。只有压测证明瓶颈不能靠 fanout 分桶、批量写、lazy inbox 和 Redis/Kafka
+拓扑优化解决时，才引入新的中间件。
+```
+
 ## 已完成的分布式与可靠性能力
 
 当前已经做过的关键验证：

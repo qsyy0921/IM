@@ -144,7 +144,7 @@ flowchart TB
 | --- | --- |
 | 客户端层 | Web / Windows PC / Android 共用 TypeScript `protocol` 和 `client-core`；native shell 只做薄平台 bridge。 |
 | 接入层 | `api-gateway` 提供 client BFF、鉴权、quota、trusted metadata；`push-gateway` 只做在线唤醒，不拥有 durable inbox。 |
-| IM 核心层 | 10 个本地运行链路服务：9 个已运行 IM 服务分别拥有身份、策略、联系人、会话、消息、投递、回执等事实和读模型；`timeline-service` 已有 seq block allocator、lease status、gap marker、Docker / 观测链路和独立 PostgreSQL 状态；message-service 已把 `SEQUENCER_BLOCK` 接入 active 写路径，并支持本地 seq block cache、lease safety margin 和 lease metadata 校验。 |
+| IM 核心层 | 10 个本地运行链路服务：9 个已运行 IM 服务分别拥有身份、策略、联系人、会话、消息、投递、回执等事实和读模型；`timeline-service` 已有 seq block allocator、lease status、gap marker、Docker / 观测链路和独立 PostgreSQL 状态；message-service 已把 `SEQUENCER_BLOCK` 接入 active 写路径，并支持本地 seq block cache、lease safety margin 和 lease metadata 校验；conversation-service 热点成员边界也已接 timeline-service single-seq lease。 |
 | 事件与投影层 | 每个服务拥有自己的 PostgreSQL schema；跨服务事实传播走 outbox -> Kafka -> projection / worker；conversation timeline 的 virtual partition / physical partition mapping 后续由 control-plane + timeline-service 协同管理。 |
 | 产品平台层 | media、notification、audit、admin、control-plane、presence、workflow 等按独立数据模型和故障边界逐步 promotion。 |
 | AI / Agent 层 | search / memory 产出可见投影，retrieval-gateway 构造 EvidencePack，RAG / summary / Agent 只能基于 EvidencePack 工作。 |
@@ -182,13 +182,18 @@ message-service active `SEQUENCER_BLOCK` seq block cache 写路径，以及 deli
 同 consumer group 多 worker、按 Kafka partition 安全并行。
 2026-06-29 已用最新镜像跑通热点群 first-stage smoke：61 人群、20 条消息、
 `SEQUENCER_BLOCK + BROADCAST_SIGNAL`、3 个 WebSocket conversation subscriber 共收到
-60 条 `delivery.notify` conversation signal；`send_p95_ms=19.03`、
-`user_inbox_rows=0`、`delivery_timeline_rows=20`、`delivery_outbox_pending=0`，
-PullInbox / AckDelivery 抽样通过。原始结果在
-`H:\NexusIM\loadtest-results\hotgroup-broadcast-push-smoke-20260629-2135`。
-下一轮压测需要扩大规模并补 projection lag、online signal storm、单热点会话 fanout 和
-PullInbox / ACK 追平曲线。
-低敏报告见 `docs/runbook/loadtest/hotgroup/loadtest-report-20260628-hotgroup-relay-bottleneck.md`。
+60 条 `delivery.notify` conversation signal。2026-06-30 又补齐
+conversation-service 热点成员边界 seq 分配：`SEQUENCER_BLOCK` 下成员 JOIN / LEAVE /
+REMOVE / owner transfer 也通过 timeline-service `AllocateSeqBlock` 获取 single-seq lease，
+不回退本地 row lock。clean commit `d13bff6c` 重建 / redeploy 后完成三档复验：
+61 人 / 20 消息 / 3 subscriber、200 人 / 500 消息 / 20 subscriber、500 人 / 1000
+消息 / 50 subscriber。最大档产生 50000 条 conversation signal，`send_p95_ms=10.633`、
+`send_p99_ms=13.013`、`user_inbox_rows=0`、`delivery_outbox_pending=0`、Kafka lag=0。
+下一轮压测需要继续提高 message rate、online subscriber、慢连接比例，并补
+projection lag、online signal storm、单热点会话 fanout 和 PullInbox / ACK 追平曲线。
+低敏报告见
+`docs/runbook/loadtest/hotgroup/loadtest-report-20260628-hotgroup-relay-bottleneck.md` 和
+`docs/runbook/loadtest/hotgroup/loadtest-report-20260630-hotgroup-clean-redeploy.md`。
 
 ### 当前客户端状态
 

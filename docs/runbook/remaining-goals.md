@@ -18,8 +18,8 @@
 1. Hot group fanout / sequencer / projection hardening：小规模 Docker 热点群 smoke 已通过；
    message-service seq block cache、timeline-service lease status / gap marker / repair
    operator first path 已进入收口；conversation-service 热点成员边界 seq 分配已接
-   timeline-service；下一步用 clean commit 重建镜像、三机 redeploy，扩大压测规模并补趋势图
-   和瓶颈曲线归档。
+   timeline-service；clean commit `d13bff6c` 已完成 61 人 / 20 消息、200 人 / 500 消息、
+   500 人 / 1000 消息三档复验。下一步继续扩大压测规模并补趋势图和瓶颈曲线归档。
 2. Agent action boundary / repair cases：在 provider replay admin / workflow handoff 已落
    的基础上，继续扩更多需要 proposal / approval / workflow / audit 的 action 与 repair 场景。
 3. Product-active 服务按需推进：workflow、audit、admin、notification、media、vector、
@@ -34,8 +34,8 @@
    active `SEQUENCER_BLOCK` 写路径、seq block cache、gap marker / repair operator first path
    和 hotgroup runner；2026-06-29 已跑通 61 人 / 20 消息 / 3 WebSocket subscriber 小规模
    smoke；2026-06-30 已定位并修复 `SEQUENCER_BLOCK` 下成员 JOIN 仍未接 timeline
-   sequencer 的问题，下一步用 clean commit 扩大压测规模，并继续做 virtual partition
-   mapping、leader ownership audit 和 deeper repair。
+   sequencer 的问题，并完成 clean redeploy 三档复验；下一步继续扩大压测规模，并继续做
+   virtual partition mapping、leader ownership audit 和 deeper repair。
 
 ## Client Demo Backlog
 

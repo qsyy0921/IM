@@ -76,6 +76,12 @@ brief、loadtest report、development-progress 或 archive。
   `user_inbox_rows=0`、`delivery_timeline_rows=20`、`delivery_outbox_pending=0`、
   `message_outbox_dlq=0`、`delivery_outbox_dlq=0`。原始结果在
   `H:\NexusIM\loadtest-results\hotgroup-broadcast-push-smoke-20260629-2135`。
+- 2026-06-30 已用 clean commit `d13bff6c` 重建 / redeploy conversation-service，并完成
+  三档热点群复验：61 人 / 20 消息 / 3 subscriber、200 人 / 500 消息 / 20 subscriber、
+  500 人 / 1000 消息 / 50 subscriber。最大一档 `send_p95_ms=10.633`、
+  `send_p99_ms=13.013`、conversation signal=50000、`user_inbox_rows=0`、
+  `delivery_outbox_pending=0`、Kafka lag=0。报告见
+  `docs/runbook/loadtest/hotgroup/loadtest-report-20260630-hotgroup-clean-redeploy.md`。
 
 ## 已成型底座
 
@@ -105,8 +111,7 @@ brief、loadtest report、development-progress 或 archive。
 
 ## 下一个方向
 
-- 基于已通过的小规模 smoke 和本轮 sequencer repair readiness 改动，下一步重建最新
-  Docker 镜像、三机 redeploy，并做 clean commit 热点群小 / 中规模复验。
-- 后续再扩大三机热点群压测规模，并把 Prometheus / Grafana 趋势、projection lag、
+- 基于已通过的 clean commit 三档复验，下一步继续扩大三机热点群 step run，并把
+  Prometheus / Grafana 趋势、projection lag、
   push signal 和 PostgreSQL bottleneck 曲线归档到低敏报告；正式生产级运维 UI、
   provider-grade 长周期平台仍后置。

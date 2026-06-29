@@ -169,6 +169,7 @@ CreateConversation(GROUP)
 | 继续探测 | 100 人群 200 QPS 时发送 1000 / 1000 成功，后续 DB 证明 `user_inbox` 和 `delivery_outbox` 最终追平，但超过 runner 等待窗口 | 新瓶颈从 relay 转移到 delivery timeline projection / `user_inbox` fanout。 |
 | 策略切换 smoke | 61 人热点群、20 条消息、3 个 WebSocket conversation subscriber，`SEQUENCER_BLOCK + BROADCAST_SIGNAL` 通过 | `send_p95_ms=19.03`、`user_inbox_rows=0`、`delivery_timeline_rows=20`、3 个订阅者共收到 60 条 conversation signal，`delivery_outbox_pending=0`，证明热点群 first-stage 不再走小群全员写扩散路径。 |
 | 成员边界诊断 | 200 人 / 500 消息 dirty-run 暴露并修复 `SEQUENCER_BLOCK` 下成员 JOIN 未接 timeline sequencer 的问题 | 修复后成员边界通过 timeline-service 分配单 seq lease，中等规模诊断可完成 `BROADCAST_SIGNAL`、`delivery_outbox_pending=0`、Kafka lag=0；正式报告仍需 clean commit 重跑。 |
+| clean redeploy 复验 | clean commit `d13bff6c` 重建 / redeploy 后跑通 61 人 / 20 消息、200 人 / 500 消息、500 人 / 1000 消息三档 | 最大档 500 人 / 1000 消息 / 50 subscriber 产生 50000 条 conversation signal，`send_p95_ms=10.633`、`send_p99_ms=13.013`、`user_inbox_rows=0`、`delivery_outbox_pending=0`、Kafka lag=0。 |
 
 面试时可以把这个结果讲成一次真实性能定位过程：
 
@@ -215,6 +216,17 @@ delivery projection lag、push signal、PullInbox / ACK 和 PostgreSQL 指标曲
 timeline-service sequencer，成员边界事件也要走同一个 sequencer。否则群被提升到
 `SEQUENCER_BLOCK` 后，继续 JOIN 成员时会 fail-closed。当前修复后的正式结论仍要用
 clean commit 重跑后再写入容量报告。
+
+随后 clean commit `d13bff6c` 已重建镜像并 redeploy，通过三档复验。当前可以讲成：
+
+```text
+热点群 first-stage 已经从“普通群写扩散”推进到“timeline sequencer + conversation signal”。
+500 人 / 1000 消息 / 50 在线订阅者下，系统产生 5 万条 conversation signal，
+但不再写 50 万级 user_inbox 行；delivery_outbox、Kafka lag 和 PullInbox / ACK 抽样均追平。
+```
+
+这仍不是生产容量上限，下一步要继续提高 message rate、在线比例和慢连接比例，并把
+Grafana / Prometheus 趋势图和 PostgreSQL / Kafka / projection 指标一起归档。
 
 ### 当前系统如何承接热点群
 

@@ -6,10 +6,9 @@
 
 ## Active Module
 
-Hot group Docker redeploy and pressure validation：在已通过的
-`SEQUENCER_BLOCK + BROADCAST_SIGNAL` 小规模 smoke 和 sequencer repair readiness
-基础上，收口 conversation-service 热点成员边界 seq 分配，重建最新镜像，三机 redeploy，
-再跑 clean commit 小 / 中规模热点群复验。
+Hot group pressure step-up and bottleneck curve：在 clean commit Docker redeploy 和
+`SEQUENCER_BLOCK + BROADCAST_SIGNAL` 三档复验通过基础上，继续扩大热点群压测规模，
+补 Prometheus / Grafana 趋势和下一瓶颈曲线。
 
 ## 当前已收口摘要
 
@@ -38,26 +37,30 @@ Hot group Docker redeploy and pressure validation：在已通过的
   `send_p95_ms=19.03`、`user_inbox_rows=0`、`delivery_outbox_pending=0`、无 message /
   delivery DLQ。原始目录：
   `H:\NexusIM\loadtest-results\hotgroup-broadcast-push-smoke-20260629-2135`。
+- 2026-06-30 已用 clean commit `d13bff6c` 重建并 redeploy conversation-service 镜像，
+  归档到 `H:\NexusIM\docker-images\archives\nexusim-conversation-service-d13bff6c-20260630-002306.tar`。
+  三档复验均通过：
+  - 61 人 / 20 消息 / 3 subscriber；
+  - 200 人 / 500 消息 / 20 subscriber；
+  - 500 人 / 1000 消息 / 50 subscriber。
+  最大一档产生 50000 条 conversation signal，`send_p95_ms=10.633`、`send_p99_ms=13.013`、
+  `user_inbox_rows=0`、`delivery_outbox_pending=0`、Kafka lag=0。低敏报告见
+  `docs/runbook/loadtest/hotgroup/loadtest-report-20260630-hotgroup-clean-redeploy.md`。
 
 ## 目标
 
-- 将当前 conversation member-boundary sequencer 改动收口提交，确保 focused tests、
-  Docker / compose 相关检查通过。
-- 用 clean commit 重建最新 Docker 镜像并 redeploy Ubuntu Docker 核心链路。
-- 先跑小规模热点群复验，再跑中等规模诊断压测；记录 Kafka lag、delivery projection lag、
+- 继续做热点群 step run，逐步提高 message rate、subscriber count、online ratio 和慢连接比例，
+  找出下一瓶颈。
+- 对每轮正式压测记录 run name、commit、dashboard 时间窗口、Kafka lag、delivery projection lag、
   push signal、PullInbox / ACK 追平和 PostgreSQL 关键指标。
 - 本轮只写本地 / 三机实验结论，不写生产容量上限。
 
 ## 本轮完成条件
 
-- 当前 uncommitted conversation member-boundary sequencer 改动收口，focused tests 和
-  Docker / compose 相关检查通过。
-- 最新 Docker 镜像已备份到 `H:\NexusIM\docker-images\archives`，Ubuntu Docker 核心链路
-  已使用新镜像 redeploy。
-- clean commit 小 / 中规模热点群复验完成，并明确记录是否存在新瓶颈。
-- 文档同步当前公开能力：message-service 已接 timeline-service seq block cache；
-  conversation-service 热点成员边界已接 timeline-service；timeline-service 已有 lease
-  expire / gap marker repair operator first path。
+- clean commit step run 完成，并明确记录是否存在新瓶颈。
+- 至少补一轮 Prometheus / Grafana 时间窗口信息；若缺 exporter，必须写清楚缺口，不把
+  一次性 CLI 统计冒充趋势图。
+- 文档同步本轮公开能力或瓶颈变化。
 - 提交并推送到 GitHub。
 
 ## 非目标
@@ -70,8 +73,7 @@ Hot group Docker redeploy and pressure validation：在已通过的
 
 ## 后续优先级
 
-1. clean commit 中等规模热点群复验和报告归档。
-2. 扩大三机热点群压测规模，补趋势图 / 瓶颈曲线。
-3. delivery projection lag / inbox rows per message / push notify storm 指标深化。
-4. timeline virtual partition mapping、leader ownership audit 和更完整 repair workflow。
-5. 压测报告与面试叙事维护。
+1. 扩大三机热点群 step run，补趋势图 / 瓶颈曲线。
+2. delivery projection lag / inbox rows per message / push notify storm 指标深化。
+3. timeline virtual partition mapping、leader ownership audit 和更完整 repair workflow。
+4. 压测报告与面试叙事维护。

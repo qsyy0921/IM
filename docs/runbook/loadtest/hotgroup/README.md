@@ -20,6 +20,7 @@ route fault 仍是后续阶段。本文继续冻结场景、指标和面试口�
 | --- | --- |
 | `loadtest-report-20260628-hotgroup-relay-bottleneck.md` | 记录 delivery outbox relay 优化前后对比：旧 20 人群在 50/100/150 QPS 卡在 `delivery_outbox` drain；修正为 conversation-sharded relay 后，100 人群 50/100/150 QPS 均能在等待窗口内完成 `user_inbox` 和 `delivery_outbox` drain；200 QPS 暴露下一瓶颈已转移到 delivery timeline projection / `user_inbox` fanout。 |
 | 2026-06-30 pre-commit diagnostic | 200 人 / 500 消息 / 16 sender 中等规模诊断曾暴露 `SEQUENCER_BLOCK` 后成员 JOIN 未接 timeline-service 的缺口；修复后 dirty-run 可完成 `BROADCAST_SIGNAL`，`delivery_outbox_pending=0`、Kafka lag=0。正式报告必须用 clean commit 重跑。 |
+| `loadtest-report-20260630-hotgroup-clean-redeploy.md` | clean commit `d13bff6c` 重建 / redeploy 后，61 人 / 20 消息、200 人 / 500 消息、500 人 / 1000 消息三档均通过；最大档产生 50000 条 conversation signal，`user_inbox_rows=0`、`delivery_outbox_pending=0`、Kafka lag=0。 |
 
 ## 目标
 

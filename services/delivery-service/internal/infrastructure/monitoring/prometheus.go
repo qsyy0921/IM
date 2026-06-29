@@ -148,7 +148,14 @@ func writeTimelineWorkerPrometheus(builder *strings.Builder, snapshot *types.Pro
 
 func writeOutboxRelayPrometheus(builder *strings.Builder, snapshot *types.OutboxRelayWorkerSnapshot) {
 	writePrometheusHeader(builder, "nexusim_delivery_outbox_relay_errors_total", "Delivery outbox relay errors.", "counter")
+	writePrometheusHeader(builder, "nexusim_delivery_outbox_relay_fetched_total", "Delivery outbox relay fetched rows.", "counter")
+	writePrometheusHeader(builder, "nexusim_delivery_outbox_relay_published_total", "Delivery outbox relay published rows.", "counter")
+	writePrometheusHeader(builder, "nexusim_delivery_outbox_relay_retried_total", "Delivery outbox relay retried rows.", "counter")
+	writePrometheusHeader(builder, "nexusim_delivery_outbox_relay_dead_lettered_total", "Delivery outbox relay dead-lettered rows.", "counter")
 	writePrometheusHeader(builder, "nexusim_delivery_outbox_relay_consecutive_errors", "Delivery outbox relay consecutive errors.", "gauge")
+	writePrometheusHeader(builder, "nexusim_delivery_outbox_relay_workers", "Delivery outbox relay worker count.", "gauge")
+	writePrometheusHeader(builder, "nexusim_delivery_outbox_relay_last_run_duration_milliseconds", "Delivery outbox relay last run duration.", "gauge")
+	writePrometheusHeader(builder, "nexusim_delivery_outbox_relay_last_publish_duration_milliseconds", "Delivery outbox relay last Kafka publish duration.", "gauge")
 	writePrometheusHeader(builder, "nexusim_delivery_outbox_relay_last_error_unix_milliseconds", "Delivery outbox relay last error timestamp.", "gauge")
 	writePrometheusHeader(builder, "nexusim_delivery_outbox_relay_last_success_unix_milliseconds", "Delivery outbox relay last success timestamp.", "gauge")
 	writePrometheusHeader(builder, "nexusim_delivery_outbox_relay_last_published_unix_milliseconds", "Delivery outbox relay last publish timestamp.", "gauge")
@@ -157,7 +164,14 @@ func writeOutboxRelayPrometheus(builder *strings.Builder, snapshot *types.Outbox
 		return
 	}
 	writePrometheusSample(builder, "nexusim_delivery_outbox_relay_errors_total", nil, snapshot.TotalErrors)
+	writePrometheusSample(builder, "nexusim_delivery_outbox_relay_fetched_total", nil, snapshot.TotalFetched)
+	writePrometheusSample(builder, "nexusim_delivery_outbox_relay_published_total", nil, snapshot.TotalPublished)
+	writePrometheusSample(builder, "nexusim_delivery_outbox_relay_retried_total", nil, snapshot.TotalRetried)
+	writePrometheusSample(builder, "nexusim_delivery_outbox_relay_dead_lettered_total", nil, snapshot.TotalDeadLettered)
 	writePrometheusSample(builder, "nexusim_delivery_outbox_relay_consecutive_errors", nil, snapshot.ConsecutiveErrors)
+	writePrometheusSample(builder, "nexusim_delivery_outbox_relay_workers", nil, snapshot.WorkerCount)
+	writePrometheusSample(builder, "nexusim_delivery_outbox_relay_last_run_duration_milliseconds", nil, snapshot.LastRunDurationMS)
+	writePrometheusSample(builder, "nexusim_delivery_outbox_relay_last_publish_duration_milliseconds", nil, snapshot.LastPublishMS)
 	writePrometheusSample(builder, "nexusim_delivery_outbox_relay_last_error_unix_milliseconds", nil, snapshot.LastErrorAtMS)
 	writePrometheusSample(builder, "nexusim_delivery_outbox_relay_last_success_unix_milliseconds", nil, snapshot.LastSuccessAtMS)
 	writePrometheusSample(builder, "nexusim_delivery_outbox_relay_last_published_unix_milliseconds", nil, snapshot.LastPublishedAtMS)

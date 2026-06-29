@@ -97,6 +97,37 @@ func TestBuildDeliveryEventInboxItemHidden(t *testing.T) {
 	}
 }
 
+func TestBuildDeliveryEventConversationSignal(t *testing.T) {
+	message := testOutboxMessage(types.DeliveryEventConversationSignal, []byte(`{
+		"tenant_id":"tenant-1",
+		"conversation_id":"conversation-1",
+		"conversation_seq":12,
+		"source_event_id":"timeline-event-1",
+		"source_event_type":"message.persisted.v1",
+		"message_id":"message-1",
+		"sender_id":"sender-1",
+		"fanout_mode":"READ_FANOUT"
+	}`))
+	event, err := BuildDeliveryEvent(message)
+	if err != nil {
+		t.Fatalf("build delivery event: %v", err)
+	}
+	payload := event.GetConversationSignal()
+	if payload == nil {
+		t.Fatalf("expected conversation signal payload")
+	}
+	if event.EventType != types.DeliveryEventConversationSignal ||
+		payload.ConversationId != "conversation-1" ||
+		payload.ConversationSeq != 12 ||
+		payload.SourceEventId != "timeline-event-1" ||
+		payload.SourceEventType != "message.persisted.v1" ||
+		payload.MessageId != "message-1" ||
+		payload.SenderId != "sender-1" ||
+		payload.FanoutMode != "READ_FANOUT" {
+		t.Fatalf("unexpected signal event=%+v payload=%+v", event, payload)
+	}
+}
+
 func TestRelayRunOnceFailClosedForMalformedPayload(t *testing.T) {
 	store := &fakeStore{
 		messages: []types.OutboxMessage{
@@ -189,6 +220,26 @@ func TestRelayRetriesTransientRunOnceErrorAndExposesSnapshot(t *testing.T) {
 	}
 }
 
+func TestRelayRunUsesShardedStoreWhenWorkerCountIsGreaterThanOne(t *testing.T) {
+	store := &shardedFakeStore{}
+	relay := NewRelay(store, &recordingPublisher{}, Config{
+		BatchSize:    10,
+		WorkerCount:  3,
+		PollInterval: time.Hour,
+	})
+	err := relay.Run(context.Background())
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("run error = %v, want context canceled", err)
+	}
+	if store.calls.Load() == 0 {
+		t.Fatalf("expected sharded store to be called")
+	}
+	snapshot := relay.Snapshot()
+	if snapshot.WorkerCount != 3 {
+		t.Fatalf("worker count snapshot = %d, want 3", snapshot.WorkerCount)
+	}
+}
+
 type fakeStore struct {
 	messages []types.OutboxMessage
 }
@@ -210,6 +261,36 @@ func (store *fakeStore) ProcessReadyBatch(
 		}
 	}
 	return stats, nil
+}
+
+type shardedFakeStore struct {
+	calls atomic.Int32
+}
+
+func (store *shardedFakeStore) ProcessReadyBatch(
+	ctx context.Context,
+	limit int,
+	maxAttempts int,
+	retryBaseDelay time.Duration,
+	publish func(context.Context, []types.OutboxMessage) []error,
+) (types.OutboxRelayStats, error) {
+	return types.OutboxRelayStats{}, errors.New("unsharded batch must not be used when worker count is greater than one")
+}
+
+func (store *shardedFakeStore) ProcessReadyShardBatch(
+	ctx context.Context,
+	limit int,
+	maxAttempts int,
+	retryBaseDelay time.Duration,
+	shardCount int,
+	shardID int,
+	publish func(context.Context, []types.OutboxMessage) []error,
+) (types.OutboxRelayStats, error) {
+	if shardCount != 3 {
+		return types.OutboxRelayStats{}, errors.New("unexpected shard count")
+	}
+	store.calls.Add(1)
+	return types.OutboxRelayStats{}, context.Canceled
 }
 
 type recordingPublisher struct {

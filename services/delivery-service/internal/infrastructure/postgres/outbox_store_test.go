@@ -144,6 +144,59 @@ func TestOutboxStoreProcessReadyBatchDeadLettersAndBlocksLaterVersionIntegration
 	assertDeliveryOutboxStatus(t, ctx, pool, "event-2", types.OutboxStatusPending, 0)
 }
 
+func TestOutboxStoreProcessReadyShardBatchSplitsConversationsIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetDeliveryTables(t, ctx, pool)
+	for index := 1; index <= 4; index++ {
+		seedDeliveryOutbox(t, ctx, pool, fmt.Sprintf("event-%d", index), fmt.Sprintf("conversation-%d", index), 1, types.DeliveryEventInboxItemCreated)
+	}
+
+	store := NewOutboxStore(pool, WithOutboxClock(func() time.Time {
+		return time.Date(2026, 6, 28, 12, 0, 0, 0, time.UTC)
+	}))
+	published := map[string]bool{}
+	stats, err := store.ProcessReadyShardBatch(ctx, 10, 3, time.Millisecond, 2, 0, func(ctx context.Context, messages []types.OutboxMessage) []error {
+		errs := make([]error, len(messages))
+		for _, message := range messages {
+			if got := deliveryOutboxShardForConversation(t, ctx, pool, string(message.TenantID), string(message.ConversationID), 2); got != 0 {
+				t.Fatalf("shard 0 received conversation %s assigned to shard %d", message.ConversationID, got)
+			}
+			published[message.EventID] = true
+		}
+		return errs
+	})
+	if err != nil {
+		t.Fatalf("process shard batch: %v", err)
+	}
+	if stats.Fetched != stats.Published {
+		t.Fatalf("unexpected shard 0 stats: %+v", stats)
+	}
+
+	stats, err = store.ProcessReadyShardBatch(ctx, 10, 3, time.Millisecond, 2, 1, func(ctx context.Context, messages []types.OutboxMessage) []error {
+		errs := make([]error, len(messages))
+		for _, message := range messages {
+			if got := deliveryOutboxShardForConversation(t, ctx, pool, string(message.TenantID), string(message.ConversationID), 2); got != 1 {
+				t.Fatalf("shard 1 received conversation %s assigned to shard %d", message.ConversationID, got)
+			}
+			published[message.EventID] = true
+		}
+		return errs
+	})
+	if err != nil {
+		t.Fatalf("process shard 1 batch: %v", err)
+	}
+	if stats.Fetched != stats.Published {
+		t.Fatalf("unexpected shard 1 stats: %+v", stats)
+	}
+	if len(published) != 4 {
+		t.Fatalf("expected all conversations to be published across shards, got %v", published)
+	}
+	for index := 1; index <= 4; index++ {
+		assertDeliveryOutboxStatus(t, ctx, pool, fmt.Sprintf("event-%d", index), types.OutboxStatusPublished, 0)
+	}
+}
+
 func TestOutboxStoreRepairAuditsDLQIntegration(t *testing.T) {
 	pool := openTestPool(t)
 	ctx := context.Background()
@@ -793,6 +846,20 @@ WHERE event_id = $1
 		t.Fatalf("read delivery outbox id: %v", err)
 	}
 	return id
+}
+
+func deliveryOutboxShardForConversation(t *testing.T, ctx context.Context, pool *pgxpool.Pool, tenantID string, conversationID string, shardCount int) int {
+	t.Helper()
+	var shard int
+	if err := pool.QueryRow(ctx, `
+SELECT MOD(
+    MOD(hashtextextended($1 || ':' || $2, 0), $3::bigint) + $3::bigint,
+    $3::bigint
+)::int
+`, tenantID, conversationID, shardCount).Scan(&shard); err != nil {
+		t.Fatalf("compute delivery outbox shard: %v", err)
+	}
+	return shard
 }
 
 func assertDeliveryOutboxRepairAudit(t *testing.T, ctx context.Context, pool *pgxpool.Pool, outboxID int64, mode string, outcome string, skipReason string, beforeStatus string, beforeRetry int, beforeLastError string, afterStatus string, afterRetry int, afterLastError string, reason string, forbidden ...string) {

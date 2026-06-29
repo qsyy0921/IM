@@ -68,3 +68,24 @@ func TestNewWriterProducerConfig(t *testing.T) {
 		t.Fatalf("read timeout = %v, want 5s", writer.ReadTimeout)
 	}
 }
+
+func TestNewWriterProducerWithConfigOverridesBatching(t *testing.T) {
+	producer, err := NewWriterProducerWithConfig([]string{"127.0.0.1:9092"}, WriterProducerConfig{
+		BatchSize:    750,
+		BatchTimeout: 25 * time.Millisecond,
+	})
+	if err != nil {
+		t.Fatalf("create producer: %v", err)
+	}
+	defer func() {
+		if err := producer.Close(); err != nil {
+			t.Fatalf("close producer: %v", err)
+		}
+	}()
+	if producer.writer.BatchSize != 750 {
+		t.Fatalf("batch size = %d, want 750", producer.writer.BatchSize)
+	}
+	if producer.writer.BatchTimeout != 25*time.Millisecond {
+		t.Fatalf("batch timeout = %v, want 25ms", producer.writer.BatchTimeout)
+	}
+}

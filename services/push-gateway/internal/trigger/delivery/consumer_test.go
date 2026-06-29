@@ -159,6 +159,44 @@ func TestWorkerNotifiesAndCommitsInboxItemHidden(t *testing.T) {
 	}
 }
 
+func TestWorkerCommitsConversationSignalWithoutUserNotify(t *testing.T) {
+	event := &deliveryeventsv1.DeliveryEvent{
+		EventId:       "delivery-signal-1",
+		EventType:     EventConversationSignalV1,
+		EventVersion:  "1.0.0",
+		TenantId:      "tenant-1",
+		AggregateId:   "conversation-1",
+		PartitionKey:  "tenant-1:conversation-1",
+		CorrelationId: "corr-1",
+		Payload: &deliveryeventsv1.DeliveryEvent_ConversationSignal{
+			ConversationSignal: &deliveryeventsv1.DeliveryConversationSignalV1{
+				TenantId:        "tenant-1",
+				ConversationId:  "conversation-1",
+				ConversationSeq: 7,
+				SourceEventId:   "timeline-event-1",
+				SourceEventType: SourceEventMessagePersisted,
+				MessageId:       "message-1",
+				SenderId:        "sender-1",
+				FanoutMode:      "READ_FANOUT",
+			},
+		},
+	}
+	value, _ := proto.Marshal(event)
+	consumer := &fakeConsumer{messages: []types.DeliveryEventMessage{{Value: value}}}
+	notifier := &recordingNotifier{}
+	worker := NewWorker(consumer, notifier)
+
+	if err := worker.Run(context.Background()); !errors.Is(err, context.Canceled) {
+		t.Fatalf("run: %v", err)
+	}
+	if notifier.calls != 0 {
+		t.Fatalf("conversation signal must not fabricate user-level notify")
+	}
+	if consumer.commits != 1 {
+		t.Fatalf("expected commit, got %d", consumer.commits)
+	}
+}
+
 func TestWorkerFailClosedForUnsupportedEvent(t *testing.T) {
 	value, _ := proto.Marshal(&deliveryeventsv1.DeliveryEvent{
 		EventId:      "delivery-event-1",

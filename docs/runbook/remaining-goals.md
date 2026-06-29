@@ -23,9 +23,10 @@
 4. 10 个运行链路服务（9 个既有 IM 服务 + `timeline-service` noop）只回补阻塞
    AI / product platform、热点群压测或用户点名项的 P0/P1。
 5. 客户端只作为演示入口维护；除非阻塞演示，不继续扩完整产品级客户端。
-6. 热点群 / 分区主线已落 conversation-service scale policy、delivery hybrid/read fanout
-   first-stage runtime 和 hotgroup runner；下一步实现 timeline-service sequencer、broadcast
-   signal、真实热点群压测和 deeper repair。
+6. 热点群 / 分区主线已落 conversation-service scale policy、delivery hybrid/read fanout、
+   conversation-level delivery signal first-stage runtime 和 hotgroup runner；下一步实现
+   timeline-service sequencer、push-gateway conversation subscription broadcast、真实热点群
+   压测和 deeper repair。
 
 ## Client Demo Backlog
 
@@ -101,10 +102,14 @@
   Grafana 观测；下一步冻结 SDD，补 seq block allocator、sequencer epoch fencing、
   gap marker、virtual partition mapping 和 repair operator。
 - `delivery-service`：projection DLQ / repair 深化、更多 delivery event consumer；
-  `WRITE_FANOUT`、`HYBRID_FANOUT` 和 `READ_FANOUT` 已有 first-stage runtime，后续补
-  `BROADCAST_SIGNAL` delivery event / push consumer、timeline item repair、动态 read
+  `WRITE_FANOUT`、`HYBRID_FANOUT`、`READ_FANOUT` 和 conversation-level signal 已有
+  first-stage runtime，后续补 push-gateway conversation subscription broadcast、timeline item repair、动态 read
   fanout 容量曲线，重点验证 Kafka lag、projection backlog、PullInbox / ACK 追平时间
-  和 push notify storm。
+  和 push notify storm；delivery outbox relay SQL / worker / Kafka batch hardening 已落，
+  2026-06-28 hotgroup QPS step 已证明 `delivery_outbox -> Kafka im.delivery.events`
+  不再是 100 人群 150 QPS 内的首个瓶颈；下一步转向 delivery timeline projection /
+  `user_inbox` fanout 批量写、projection lag metrics、inbox rows per message metrics 和
+  WebSocket notify storm 覆盖。
 - `push-gateway`：Redis 网络分区 smoke、跨实例 resume、容量测试。
 - `receipt-service`：会话列表产品能力、更多摘要策略和容量曲线。
 - `contacts-service`：组织级策略、租户默认值、来源策略、隐私例外。

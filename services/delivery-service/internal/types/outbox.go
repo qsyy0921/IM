@@ -7,9 +7,10 @@ const (
 	OutboxStatusPublished = "PUBLISHED"
 	OutboxStatusDLQ       = "DLQ"
 
-	DeliveryEventInboxItemCreated = "delivery.inbox_item.created.v1"
-	DeliveryEventAckRecorded      = "delivery.ack.recorded.v1"
-	DeliveryEventInboxItemHidden  = "delivery.inbox_item.hidden.v1"
+	DeliveryEventInboxItemCreated   = "delivery.inbox_item.created.v1"
+	DeliveryEventAckRecorded        = "delivery.ack.recorded.v1"
+	DeliveryEventInboxItemHidden    = "delivery.inbox_item.hidden.v1"
+	DeliveryEventConversationSignal = "delivery.conversation.signal.v1"
 )
 
 type OutboxMessage struct {

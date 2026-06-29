@@ -126,6 +126,30 @@ func (store *OutboxStore) ProcessReadyBatch(
 	retryBaseDelay time.Duration,
 	publish func(context.Context, []types.OutboxMessage) []error,
 ) (types.OutboxRelayStats, error) {
+	return store.processReadyBatch(ctx, limit, maxAttempts, retryBaseDelay, 1, 0, publish)
+}
+
+func (store *OutboxStore) ProcessReadyShardBatch(
+	ctx context.Context,
+	limit int,
+	maxAttempts int,
+	retryBaseDelay time.Duration,
+	shardCount int,
+	shardID int,
+	publish func(context.Context, []types.OutboxMessage) []error,
+) (types.OutboxRelayStats, error) {
+	return store.processReadyBatch(ctx, limit, maxAttempts, retryBaseDelay, shardCount, shardID, publish)
+}
+
+func (store *OutboxStore) processReadyBatch(
+	ctx context.Context,
+	limit int,
+	maxAttempts int,
+	retryBaseDelay time.Duration,
+	shardCount int,
+	shardID int,
+	publish func(context.Context, []types.OutboxMessage) []error,
+) (types.OutboxRelayStats, error) {
 	if store == nil || store.pool == nil {
 		return types.OutboxRelayStats{}, errors.New("delivery outbox store is not configured")
 	}
@@ -141,6 +165,12 @@ func (store *OutboxStore) ProcessReadyBatch(
 	if retryBaseDelay <= 0 {
 		retryBaseDelay = time.Second
 	}
+	if shardCount <= 0 {
+		shardCount = 1
+	}
+	if shardID < 0 || shardID >= shardCount {
+		return types.OutboxRelayStats{}, types.NewInvalidArgument("delivery outbox relay shard is out of range")
+	}
 
 	tx, err := store.pool.Begin(ctx)
 	if err != nil {
@@ -150,7 +180,7 @@ func (store *OutboxStore) ProcessReadyBatch(
 		_ = tx.Rollback(ctx)
 	}()
 
-	messages, err := store.fetchReadyLocked(ctx, tx, limit)
+	messages, err := store.fetchReadyLocked(ctx, tx, limit, shardCount, shardID)
 	if err != nil {
 		return types.OutboxRelayStats{}, err
 	}
@@ -203,41 +233,54 @@ func (store *OutboxStore) ProcessReadyBatch(
 	return stats, nil
 }
 
-func (store *OutboxStore) fetchReadyLocked(ctx context.Context, tx pgx.Tx, limit int) ([]types.OutboxMessage, error) {
+func (store *OutboxStore) fetchReadyLocked(ctx context.Context, tx pgx.Tx, limit int, shardCount int, shardID int) ([]types.OutboxMessage, error) {
 	rows, err := tx.Query(ctx, `
 SELECT
-    id,
-    event_id,
-    tenant_id,
-    conversation_id,
-    aggregate_version,
-    event_type,
-    event_version,
-    partition_key,
-    mapping_version,
-    correlation_id,
-    causation_id,
-    producer,
-    payload_json,
-    trace_id,
-    retry_count,
-    created_at
+    current.id,
+    current.event_id,
+    current.tenant_id,
+    current.conversation_id,
+    current.aggregate_version,
+    current.event_type,
+    current.event_version,
+    current.partition_key,
+    current.mapping_version,
+    current.correlation_id,
+    current.causation_id,
+    current.producer,
+    current.payload_json,
+    current.trace_id,
+    current.retry_count,
+    current.created_at
 FROM delivery_outbox current
-WHERE status = 'PENDING'
-  AND published_at IS NULL
-  AND COALESCE(next_retry_at, available_at) <= now()
+WHERE current.status = 'PENDING'
+  AND current.published_at IS NULL
+  AND COALESCE(current.next_retry_at, current.available_at) <= now()
+  AND (
+      $2::bigint <= 1
+      OR MOD(
+          MOD(hashtextextended(current.tenant_id || ':' || current.conversation_id, 0), $2::bigint) + $2::bigint,
+          $2::bigint
+      ) = $3::bigint
+  )
   AND NOT EXISTS (
       SELECT 1
-      FROM delivery_outbox previous
-      WHERE previous.tenant_id = current.tenant_id
-        AND previous.conversation_id = current.conversation_id
-        AND previous.aggregate_version < current.aggregate_version
-        AND previous.status IN ('PENDING', 'DLQ')
+      FROM delivery_outbox blocker
+      WHERE blocker.tenant_id = current.tenant_id
+        AND blocker.conversation_id = current.conversation_id
+        AND blocker.aggregate_version < current.aggregate_version
+        AND (
+            blocker.status = 'DLQ'
+            OR (
+                blocker.status = 'PENDING'
+                AND COALESCE(blocker.next_retry_at, blocker.available_at) > now()
+            )
+        )
   )
-ORDER BY id
+ORDER BY current.tenant_id, current.conversation_id, current.aggregate_version, current.id
 LIMIT $1
 FOR UPDATE OF current SKIP LOCKED
-`, limit)
+`, limit, shardCount, shardID)
 	if err != nil {
 		return nil, types.NewDBWriteFailed(err.Error())
 	}

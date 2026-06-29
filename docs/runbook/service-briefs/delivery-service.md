@@ -16,6 +16,8 @@
 - 已补 `projection-failure-cleanup` operator：只删除超过保留期的 resolved failure 审计行，不会碰 unresolved blocker，并支持按 consumer/topic/partition/class 缩小范围；`NEXUSIM_DELIVERY_PROJECTION_FAILURE_CLEANUP_DRY_RUN=true` 只统计候选行不删除；可选 `NEXUSIM_DELIVERY_PROJECTION_FAILURE_CLEANUP_OUTPUT` 写低敏 cleanup summary。
 - `timeline-consumer` 现已对运行时 `Fetch` / `Commit` 错误做退避重试，并在 worker 模式通过 `/debug/metrics` 暴露低敏 retry 快照；malformed event、projection failure、failure recorder 异常仍保持持久审计 + fail-closed，不会自动越过 blocker。
 - `outbox-relay` 现已对非取消运行时错误做退避重试，并在 relay 模式通过 `/debug/metrics` 暴露低敏 retry 快照；publisher 错误写入稳定低敏 `last_error`，malformed payload / unsupported event 仍保持 fail-closed，交给 outbox retry / DLQ 语义处理。
+- 已补 delivery outbox ready 查询吞吐 hardening：新增 pending-ready expression index、blocking aggregate partial index 和 pending conversation/version index；ready SQL 按 `tenant_id + conversation_id` 顺序推进，relay 支持 `NEXUSIM_DELIVERY_OUTBOX_WORKERS` conversation-sharded workers，Kafka writer 支持 delivery 专用 batch size / timeout env，并输出 fetched / published / retry / DLQ 累计值和 last run / publish duration。
+- 2026-06-28 hotgroup QPS step 已验证该 hardening 的边界：旧链路在 20 人群 50 / 100 / 150 QPS 卡在 `delivery_outbox` drain；修正为 conversation-sharded relay 后，100 人群 50 / 100 / 150 QPS 均能在等待窗口内完成 `user_inbox` 和 `delivery_outbox` drain；200 QPS 探测发送 1000 / 1000 成功，后续 DB 证明 `user_inbox` 和 `delivery_outbox` 最终追平，但等待窗口内瓶颈转移到 delivery timeline projection / `user_inbox` fanout。
 - Kafka writer 已显式固定 `acks=all`、禁自动建 topic、bounded attempts/backoff，并由本地门禁和 package 单测防漂移；真正 idempotent / transactional producer 仍属后续客户端选型。
 - 已补 delivery outbox audit / repair audit 错误脱敏：`last_error`、`before_last_error`、`after_last_error` 对外只返回稳定低敏分类，不暴露 broker body、账号、token 或 provider 原文。
 - 已补 `delivery.inbox_item.hidden.v1`：`HideInboxItem` 首次隐藏时同事务写 delivery outbox，push-gateway 可向同 user 在线设备发送 `delivery.hide` 轻量提示；重复隐藏不重复写 outbox。
@@ -23,8 +25,10 @@
   `HYBRID_FANOUT` 同时物化 inbox 并保留 timeline 旁路；`READ_FANOUT` 不全量写
   `user_inbox`，`PullInbox` 按成员可见窗口从 timeline read model 动态读取，`AckDelivery`
   和 `HideInboxItem` 已能识别该动态可见范围。
-- `BROADCAST_SIGNAL` 当前只具备 timeline pull/read-model 基础；真正面向 push-gateway 的
-  广播 signal delivery event、consumer 和热点在线 fanout 仍是后续 runtime。
+- `READ_FANOUT` / `BROADCAST_SIGNAL` 已能写一条会话级
+  `delivery.conversation.signal.v1`，避免按成员数写 `delivery_outbox`；push-gateway 和
+  receipt-service 当前只校验并提交该事件 checkpoint，不把它伪造成 user-level notify。
+  真正面向在线 session 的热点广播仍需要 conversation subscription / presence runtime。
 - 已补 trusted metadata 启动门禁：当 `NEXUSIM_DELIVERY_AUTH_MODE=metadata|verified-metadata` 时，如果 gRPC 监听地址不是 loopback / RFC1918 私网，且服务端未启用 mTLS client cert 校验，则启动前直接失败；私网 / loopback 仍保留第一阶段 trusted metadata 直连。
 - cmd 启动编排已把 env / TLS / debug listener helper 拆到独立同 package 文件，`main.go` 保持运行模式编排，避免后续 operator 模式继续堆进单文件。
 - 已补 first-stage OpenTelemetry gRPC server span；gRPC access log 只记录低敏 `trace_id/request_id`，并对白名单外入口 metadata 直接丢弃。
@@ -34,6 +38,9 @@
 
 ## 后续
 
-- `BROADCAST_SIGNAL` delivery event / push consumer、timeline item repair、动态 read fanout
-  容量曲线、更多 delivery event 消费方、更完整容量曲线和生产 sizing。
+- conversation-level signal 到 push-gateway 在线 session 的订阅广播、timeline item repair、动态 read fanout
+  容量曲线、更多 delivery event 消费方、更完整容量曲线和生产 sizing；下一轮热点群
+  重点应优化 delivery timeline projection / `user_inbox` fanout 批量写、projection lag
+  metrics、inbox rows per message metrics 和 push notify storm，而不是继续盲目增加
+  delivery outbox relay worker。
 - OTel collector / 生产级 alerting / SLO dashboard 仍属于后续统一观测治理。

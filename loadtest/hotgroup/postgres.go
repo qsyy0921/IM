@@ -99,8 +99,28 @@ func waitForZero(
 	}
 }
 
+func readConversationFanoutMode(ctx context.Context, pool *pgxpool.Pool, cfg config) (string, error) {
+	var fanoutMode string
+	err := pool.QueryRow(ctx, `
+SELECT fanout_mode
+FROM conversations
+WHERE tenant_id = $1 AND conversation_id = $2
+`, cfg.TenantID, cfg.ConversationID).Scan(&fanoutMode)
+	if err != nil {
+		return "", fmt.Errorf("query conversation fanout mode: %w", err)
+	}
+	return fanoutMode, nil
+}
+
 func readPostgresStats(ctx context.Context, pool *pgxpool.Pool, cfg config) (postgresStats, error) {
 	stats := postgresStats{}
+	if err := pool.QueryRow(ctx, `
+SELECT conversation_mode, fanout_mode, fanout_policy_version
+FROM conversations
+WHERE tenant_id = $1 AND conversation_id = $2
+`, cfg.TenantID, cfg.ConversationID).Scan(&stats.ConversationMode, &stats.FanoutMode, &stats.FanoutPolicyVersion); err != nil {
+		return postgresStats{}, fmt.Errorf("query conversation policy: %w", err)
+	}
 	queries := []struct {
 		name   string
 		target *int64
@@ -109,7 +129,9 @@ func readPostgresStats(ctx context.Context, pool *pgxpool.Pool, cfg config) (pos
 		{"conversation members", &stats.ConversationMemberCount, `SELECT COUNT(*) FROM conversation_members WHERE tenant_id = $1 AND conversation_id = $2 AND status = 'ACTIVE'`},
 		{"delivery membership", &stats.DeliveryMembershipActiveCount, `SELECT COUNT(*) FROM delivery_membership_projection WHERE tenant_id = $1 AND conversation_id = $2 AND status = 'ACTIVE'`},
 		{"message log", &stats.MessageLogCount, `SELECT COUNT(*) FROM message_log WHERE tenant_id = $1 AND conversation_id = $2`},
+		{"delivery timeline", &stats.DeliveryTimelineRows, `SELECT COUNT(*) FROM delivery_timeline_items WHERE tenant_id = $1 AND conversation_id = $2`},
 		{"user inbox", &stats.UserInboxRows, `SELECT COUNT(*) FROM user_inbox WHERE tenant_id = $1 AND conversation_id = $2`},
+		{"delivery outbox", &stats.DeliveryOutboxRows, `SELECT COUNT(*) FROM delivery_outbox WHERE tenant_id = $1 AND conversation_id = $2`},
 		{"message outbox pending", &stats.MessageOutboxPending, `SELECT COUNT(*) FROM message_outbox WHERE tenant_id = $1 AND conversation_id = $2 AND status = 'PENDING'`},
 		{"message outbox dlq", &stats.MessageOutboxDLQ, `SELECT COUNT(*) FROM message_outbox WHERE tenant_id = $1 AND conversation_id = $2 AND status = 'DLQ'`},
 		{"delivery outbox pending", &stats.DeliveryOutboxPending, `SELECT COUNT(*) FROM delivery_outbox WHERE tenant_id = $1 AND conversation_id = $2 AND status = 'PENDING'`},

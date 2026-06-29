@@ -136,6 +136,48 @@ NexusIM 的回答应先把问题拆清楚：热点群聊真正的瓶颈通常不
 客户端展示顺序以 conversation_seq 为准。
 ```
 
+### 已有热点群压测证据
+
+当前已经做过第一轮热点群业务压测，并把原始结果保存在
+`H:\NexusIM\loadtest-results`，低敏报告见
+`docs/runbook/loadtest/hotgroup/loadtest-report-20260628-hotgroup-relay-bottleneck.md`。
+
+这轮压测不是单接口 `wrk`，而是走真实业务链路：
+
+```text
+CreateConversation(GROUP)
+-> CreateMemberChange(JOIN)
+-> SendMessage
+-> message_outbox
+-> Kafka conversation.timeline.events
+-> delivery timeline projection
+-> user_inbox fanout
+-> delivery_outbox
+-> delivery outbox relay
+-> Kafka im.delivery.events
+-> sampled PullInbox / AckDelivery
+```
+
+关键观察：
+
+| 阶段 | 结果 | 说明 |
+| --- | --- | --- |
+| 优化前 | 20 人群 10 QPS 通过；50 / 100 / 150 QPS 均卡在 `delivery_outbox` drain | `SendMessage` 和 `user_inbox` 已完成，瓶颈在 `delivery_outbox -> Kafka im.delivery.events`。 |
+| 第一版优化 | 多 worker 但按 outbox row id 分片，效果不好 | 这证明不能只“加 worker”；分片边界必须和业务顺序边界一致。 |
+| 修正后 | 100 人群 50 / 100 / 150 QPS 均能完成 `user_inbox` 和 `delivery_outbox` drain | relay 改成按 `tenant_id + conversation_id` 分片，单 conversation 顺序推进，跨 conversation 并行。 |
+| 继续探测 | 100 人群 200 QPS 时发送 1000 / 1000 成功，后续 DB 证明 `user_inbox` 和 `delivery_outbox` 最终追平，但超过 runner 等待窗口 | 新瓶颈从 relay 转移到 delivery timeline projection / `user_inbox` fanout。 |
+
+面试时可以把这个结果讲成一次真实性能定位过程：
+
+```text
+我先用业务压测证明瓶颈在 delivery_outbox relay，而不是 SendMessage。
+然后做 batch publish、ready index 和 worker sharding。第一次按 row id 分片失败，
+因为 outbox 的顺序边界是 conversation。修正为 conversation-sharded relay 后，
+100 人群 150 QPS 可以完整追平。再往上到 200 QPS，瓶颈转移到 timeline projection
+和 user_inbox fanout，这说明下一步不是继续盲目加 relay worker，而是优化 fanout
+批量写、projection 并行和热点群策略。
+```
+
 ### 当前系统如何承接热点群
 
 | 压力点 | 当前边界 |

@@ -171,6 +171,13 @@ fail-closed。
 这些工具用于定位 Kafka lag、delivery projection backlog、push notify storm、PullInbox / ACK
 追平时间等问题，不参与业务事实判定，也不作为隐藏降级路径。
 
+2026-06-28 已完成第一轮热点群业务压测与 delivery outbox relay before / after
+诊断。旧链路在 20 人群 50 / 100 / 150 QPS 卡在
+`delivery_outbox -> Kafka im.delivery.events`；修正为 conversation-sharded relay 后，
+100 人群 50 / 100 / 150 QPS 可完成 durable inbox 和 delivery outbox drain；
+200 QPS 探测显示下一瓶颈转移到 delivery timeline projection / `user_inbox` fanout。
+低敏报告见 `docs/runbook/loadtest/hotgroup/loadtest-report-20260628-hotgroup-relay-bottleneck.md`。
+
 ### 当前客户端状态
 
 客户端当前停在 Web / Windows PC 可演示 MVP，Android、release signing、MSI / NSIS

@@ -223,19 +223,27 @@ func runOutboxRelay() error {
 	defer pool.Close()
 
 	brokers := splitCSV(os.Getenv("NEXUSIM_KAFKA_BROKERS"))
-	producer, err := kafkainfra.NewWriterProducer(brokers)
+	kafkaBatchSize := envInt("NEXUSIM_DELIVERY_KAFKA_BATCH_SIZE", 500)
+	kafkaBatchTimeout := envDuration("NEXUSIM_DELIVERY_KAFKA_BATCH_TIMEOUT", 20*time.Millisecond)
+	producer, err := kafkainfra.NewWriterProducerWithConfig(brokers, kafkainfra.WriterProducerConfig{
+		BatchSize:    kafkaBatchSize,
+		BatchTimeout: kafkaBatchTimeout,
+	})
 	if err != nil {
 		return err
 	}
 	defer producer.Close()
 
+	outboxBatchSize := envInt("NEXUSIM_DELIVERY_OUTBOX_BATCH_SIZE", 500)
+	outboxWorkerCount := envInt("NEXUSIM_DELIVERY_OUTBOX_WORKERS", 1)
 	topic := envString("NEXUSIM_DELIVERY_EVENTS_TOPIC", outbox.TopicDeliveryEvents)
 	relay := outbox.NewRelay(
 		postgresinfra.NewOutboxStore(pool),
 		producer,
 		outbox.Config{
 			Topic:          topic,
-			BatchSize:      envInt("NEXUSIM_DELIVERY_OUTBOX_BATCH_SIZE", 500),
+			BatchSize:      outboxBatchSize,
+			WorkerCount:    outboxWorkerCount,
 			PollInterval:   envDuration("NEXUSIM_DELIVERY_OUTBOX_POLL_INTERVAL", time.Second),
 			MaxAttempts:    envInt("NEXUSIM_DELIVERY_OUTBOX_MAX_ATTEMPTS", 5),
 			RetryBaseDelay: envDuration("NEXUSIM_DELIVERY_OUTBOX_RETRY_BASE_DELAY", time.Second),
@@ -252,7 +260,7 @@ func runOutboxRelay() error {
 		return err
 	}
 	defer stopDebug()
-	log.Printf("delivery-service outbox relay started topic=%s", topic)
+	log.Printf("delivery-service outbox relay started topic=%s workers=%d batch_size=%d kafka_batch_size=%d kafka_batch_timeout=%s", topic, relay.Snapshot().WorkerCount, outboxBatchSize, kafkaBatchSize, kafkaBatchTimeout)
 	return relay.Run(ctx)
 }
 

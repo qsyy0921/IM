@@ -37,6 +37,17 @@ brief、loadtest report、development-progress 或 archive。
   large group 使用 active first-stage `READ_FANOUT`；hot group 的
   `BROADCAST_SIGNAL + SEQUENCER_BLOCK` 仍在 timeline sequencer / push signal 完成前
   contract-only / fail-closed。
+- delivery-service 已补 outbox relay 吞吐 hardening：ready SQL 避免积压下反复扫描历史
+  `PUBLISHED` 行，新增 pending-ready / blocking aggregate indexes，relay 支持
+  conversation-sharded workers 和 delivery 专用 Kafka batch 参数；2026-06-28
+  hotgroup QPS step 复测显示旧瓶颈 `delivery_outbox -> Kafka im.delivery.events`
+  已解除到 100 人群 150 QPS 可追平，200 QPS 的下一瓶颈转移到 delivery timeline
+  projection / `user_inbox` fanout。
+- delivery-service 已补 `delivery.conversation.signal.v1` first path：`READ_FANOUT` /
+  `BROADCAST_SIGNAL` 不再按成员数写 delivery outbox，而是写会话级 signal；push-gateway
+  / receipt-service 当前只校验并 checkpoint，不伪造 user-level 在线通知。hotgroup runner
+  已支持 `--expect-fanout-mode` 并按 WRITE / HYBRID / READ / BROADCAST 区分验证
+  `user_inbox` 或 `delivery_timeline_items`。
 
 ## 已成型底座
 

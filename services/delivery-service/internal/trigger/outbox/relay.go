@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -25,6 +26,18 @@ type Store interface {
 	) (types.OutboxRelayStats, error)
 }
 
+type ShardedStore interface {
+	ProcessReadyShardBatch(
+		ctx context.Context,
+		limit int,
+		maxAttempts int,
+		retryBaseDelay time.Duration,
+		shardCount int,
+		shardID int,
+		publish func(context.Context, []types.OutboxMessage) []error,
+	) (types.OutboxRelayStats, error)
+}
+
 type Publisher interface {
 	PublishBatch(ctx context.Context, topic string, records []types.KafkaPublishRecord) error
 }
@@ -39,6 +52,7 @@ type Relay struct {
 type Config struct {
 	Topic          string
 	BatchSize      int
+	WorkerCount    int
 	PollInterval   time.Duration
 	MaxAttempts    int
 	RetryBaseDelay time.Duration
@@ -49,6 +63,12 @@ type Config struct {
 type relayMetrics struct {
 	totalErrors        atomic.Uint64
 	consecutiveErrors  atomic.Uint64
+	totalFetched       atomic.Uint64
+	totalPublished     atomic.Uint64
+	totalRetried       atomic.Uint64
+	totalDeadLettered  atomic.Uint64
+	lastRunDurationMS  atomic.Int64
+	lastPublishMS      atomic.Int64
 	lastErrorAtMS      atomic.Int64
 	lastSuccessAtMS    atomic.Int64
 	lastPublishedAtMS  atomic.Int64
@@ -64,19 +84,45 @@ func NewRelay(store Store, publisher Publisher, config Config) *Relay {
 }
 
 func (relay *Relay) Run(ctx context.Context) error {
+	if relay.config.WorkerCount <= 1 {
+		return relay.runLoop(ctx, 0)
+	}
+
+	workerCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	errCh := make(chan error, relay.config.WorkerCount)
+	var wg sync.WaitGroup
+	for workerID := 0; workerID < relay.config.WorkerCount; workerID++ {
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+			errCh <- relay.runLoop(workerCtx, id)
+		}(workerID)
+	}
+
+	err := <-errCh
+	cancel()
+	wg.Wait()
+	if errors.Is(err, context.Canceled) && ctx.Err() != nil {
+		return ctx.Err()
+	}
+	return err
+}
+
+func (relay *Relay) runLoop(ctx context.Context, workerID int) error {
 	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		default:
 		}
-		stats, err := relay.RunOnce(ctx)
+		stats, err := relay.runOnceForWorker(ctx, workerID)
 		if err != nil {
 			if errors.Is(err, context.Canceled) {
 				return context.Canceled
 			}
 			if relay.config.Logf != nil {
-				relay.config.Logf("delivery-service outbox relay retrying after runtime error: %v", err)
+				relay.config.Logf("delivery-service outbox relay worker=%d retrying after runtime error: %v", workerID, err)
 			}
 			relay.recordError()
 			relay.metrics.lastErrorBackoffMS.Store(relay.config.ErrorBackoff.Milliseconds())
@@ -99,6 +145,13 @@ func (relay *Relay) Snapshot() types.OutboxRelayWorkerSnapshot {
 	return types.OutboxRelayWorkerSnapshot{
 		TotalErrors:        relay.metrics.totalErrors.Load(),
 		ConsecutiveErrors:  relay.metrics.consecutiveErrors.Load(),
+		TotalFetched:       relay.metrics.totalFetched.Load(),
+		TotalPublished:     relay.metrics.totalPublished.Load(),
+		TotalRetried:       relay.metrics.totalRetried.Load(),
+		TotalDeadLettered:  relay.metrics.totalDeadLettered.Load(),
+		WorkerCount:        relay.config.WorkerCount,
+		LastRunDurationMS:  relay.metrics.lastRunDurationMS.Load(),
+		LastPublishMS:      relay.metrics.lastPublishMS.Load(),
 		LastErrorAtMS:      relay.metrics.lastErrorAtMS.Load(),
 		LastSuccessAtMS:    relay.metrics.lastSuccessAtMS.Load(),
 		LastPublishedAtMS:  relay.metrics.lastPublishedAtMS.Load(),
@@ -107,19 +160,44 @@ func (relay *Relay) Snapshot() types.OutboxRelayWorkerSnapshot {
 }
 
 func (relay *Relay) RunOnce(ctx context.Context) (types.OutboxRelayStats, error) {
+	return relay.runOnceForWorker(ctx, 0)
+}
+
+func (relay *Relay) runOnceForWorker(ctx context.Context, workerID int) (types.OutboxRelayStats, error) {
 	if relay == nil || relay.store == nil {
 		return types.OutboxRelayStats{}, errors.New("delivery outbox relay store is not configured")
 	}
 	if relay.publisher == nil {
 		return types.OutboxRelayStats{}, errors.New("delivery outbox relay publisher is not configured")
 	}
-	return relay.store.ProcessReadyBatch(
-		ctx,
-		relay.config.BatchSize,
-		relay.config.MaxAttempts,
-		relay.config.RetryBaseDelay,
-		relay.publishMessages,
-	)
+	startedAt := time.Now()
+	var stats types.OutboxRelayStats
+	var err error
+	if relay.config.WorkerCount > 1 {
+		shardedStore, ok := relay.store.(ShardedStore)
+		if !ok {
+			return types.OutboxRelayStats{}, errors.New("delivery outbox relay store does not support sharded workers")
+		}
+		stats, err = shardedStore.ProcessReadyShardBatch(
+			ctx,
+			relay.config.BatchSize,
+			relay.config.MaxAttempts,
+			relay.config.RetryBaseDelay,
+			relay.config.WorkerCount,
+			workerID,
+			relay.publishMessages,
+		)
+	} else {
+		stats, err = relay.store.ProcessReadyBatch(
+			ctx,
+			relay.config.BatchSize,
+			relay.config.MaxAttempts,
+			relay.config.RetryBaseDelay,
+			relay.publishMessages,
+		)
+	}
+	relay.metrics.lastRunDurationMS.Store(time.Since(startedAt).Milliseconds())
+	return stats, err
 }
 
 func (relay *Relay) publishMessages(ctx context.Context, messages []types.OutboxMessage) []error {
@@ -141,11 +219,13 @@ func (relay *Relay) publishMessages(ctx context.Context, messages []types.Outbox
 	if len(records) == 0 {
 		return errs
 	}
+	startedAt := time.Now()
 	if err := relay.publisher.PublishBatch(ctx, relay.config.Topic, records); err != nil {
 		for _, index := range indexes {
 			errs[index] = err
 		}
 	}
+	relay.metrics.lastPublishMS.Store(time.Since(startedAt).Milliseconds())
 	return errs
 }
 
@@ -222,6 +302,24 @@ func BuildDeliveryEvent(message types.OutboxMessage) (*deliveryeventsv1.Delivery
 				ConversationId:  payload.ConversationID,
 				ConversationSeq: payload.ConversationSeq,
 				MessageId:       payload.MessageID,
+			},
+		}
+		return event, nil
+	case types.DeliveryEventConversationSignal:
+		payload, err := decodeConversationSignalPayload(message.PayloadJSON)
+		if err != nil {
+			return nil, err
+		}
+		event.Payload = &deliveryeventsv1.DeliveryEvent_ConversationSignal{
+			ConversationSignal: &deliveryeventsv1.DeliveryConversationSignalV1{
+				TenantId:        payload.TenantID,
+				ConversationId:  payload.ConversationID,
+				ConversationSeq: payload.ConversationSeq,
+				SourceEventId:   payload.SourceEventID,
+				SourceEventType: payload.SourceEventType,
+				MessageId:       payload.MessageID,
+				SenderId:        payload.SenderID,
+				FanoutMode:      payload.FanoutMode,
 			},
 		}
 		return event, nil
@@ -313,12 +411,44 @@ func decodeInboxItemHiddenPayload(payloadJSON []byte) (inboxItemHiddenPayload, e
 	return payload, nil
 }
 
+type conversationSignalPayload struct {
+	TenantID        string `json:"tenant_id"`
+	ConversationID  string `json:"conversation_id"`
+	ConversationSeq int64  `json:"conversation_seq"`
+	SourceEventID   string `json:"source_event_id"`
+	SourceEventType string `json:"source_event_type"`
+	MessageID       string `json:"message_id"`
+	SenderID        string `json:"sender_id"`
+	FanoutMode      string `json:"fanout_mode"`
+}
+
+func decodeConversationSignalPayload(payloadJSON []byte) (conversationSignalPayload, error) {
+	var payload conversationSignalPayload
+	if err := json.Unmarshal(payloadJSON, &payload); err != nil {
+		return conversationSignalPayload{}, err
+	}
+	if payload.TenantID == "" ||
+		payload.ConversationID == "" ||
+		payload.ConversationSeq <= 0 ||
+		payload.SourceEventID == "" ||
+		payload.SourceEventType == "" ||
+		payload.MessageID == "" ||
+		payload.SenderID == "" ||
+		payload.FanoutMode == "" {
+		return conversationSignalPayload{}, errors.New("delivery conversation signal payload is incomplete")
+	}
+	return payload, nil
+}
+
 func normalizeConfig(config Config) Config {
 	if config.Topic == "" {
 		config.Topic = TopicDeliveryEvents
 	}
 	if config.BatchSize <= 0 {
 		config.BatchSize = 500
+	}
+	if config.WorkerCount <= 0 {
+		config.WorkerCount = 1
 	}
 	if config.PollInterval <= 0 {
 		config.PollInterval = time.Second
@@ -343,6 +473,18 @@ func (relay *Relay) recordError() {
 
 func (relay *Relay) recordSuccess(stats types.OutboxRelayStats) {
 	relay.metrics.consecutiveErrors.Store(0)
+	if stats.Fetched > 0 {
+		relay.metrics.totalFetched.Add(uint64(stats.Fetched))
+	}
+	if stats.Published > 0 {
+		relay.metrics.totalPublished.Add(uint64(stats.Published))
+	}
+	if stats.Retried > 0 {
+		relay.metrics.totalRetried.Add(uint64(stats.Retried))
+	}
+	if stats.DeadLettered > 0 {
+		relay.metrics.totalDeadLettered.Add(uint64(stats.DeadLettered))
+	}
 	now := time.Now().UnixMilli()
 	relay.metrics.lastSuccessAtMS.Store(now)
 	if stats.Published > 0 {

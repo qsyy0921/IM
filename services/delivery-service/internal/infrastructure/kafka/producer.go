@@ -13,6 +13,11 @@ type WriterProducer struct {
 	writer *kafkago.Writer
 }
 
+type WriterProducerConfig struct {
+	BatchSize    int
+	BatchTimeout time.Duration
+}
+
 const (
 	kafkaProducerMaxAttempts     = 5
 	kafkaProducerWriteBackoffMin = 100 * time.Millisecond
@@ -20,8 +25,18 @@ const (
 )
 
 func NewWriterProducer(brokers []string) (*WriterProducer, error) {
+	return NewWriterProducerWithConfig(brokers, WriterProducerConfig{})
+}
+
+func NewWriterProducerWithConfig(brokers []string, config WriterProducerConfig) (*WriterProducer, error) {
 	if len(brokers) == 0 {
 		return nil, errors.New("kafka brokers are required")
+	}
+	if config.BatchSize <= 0 {
+		config.BatchSize = 100
+	}
+	if config.BatchTimeout <= 0 {
+		config.BatchTimeout = 10 * time.Millisecond
 	}
 	// kafka-go does not expose Kafka's enable.idempotence producer flag. This
 	// first-phase writer enforces acks=all, explicit bounded retry/backoff, and
@@ -33,8 +48,8 @@ func NewWriterProducer(brokers []string) (*WriterProducer, error) {
 			Balancer:               &kafkago.Hash{},
 			RequiredAcks:           kafkago.RequireAll,
 			AllowAutoTopicCreation: false,
-			BatchSize:              100,
-			BatchTimeout:           10 * time.Millisecond,
+			BatchSize:              config.BatchSize,
+			BatchTimeout:           config.BatchTimeout,
 			MaxAttempts:            kafkaProducerMaxAttempts,
 			WriteBackoffMin:        kafkaProducerWriteBackoffMin,
 			WriteBackoffMax:        kafkaProducerWriteBackoffMax,

@@ -46,6 +46,7 @@ type DeliveryEvent struct {
 	//	*DeliveryEvent_InboxItemCreated
 	//	*DeliveryEvent_AckRecorded
 	//	*DeliveryEvent_InboxItemHidden
+	//	*DeliveryEvent_ConversationSignal
 	Payload       isDeliveryEvent_Payload `protobuf_oneof:"payload"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -213,6 +214,15 @@ func (x *DeliveryEvent) GetInboxItemHidden() *DeliveryInboxItemHiddenV1 {
 	return nil
 }
 
+func (x *DeliveryEvent) GetConversationSignal() *DeliveryConversationSignalV1 {
+	if x != nil {
+		if x, ok := x.Payload.(*DeliveryEvent_ConversationSignal); ok {
+			return x.ConversationSignal
+		}
+	}
+	return nil
+}
+
 type isDeliveryEvent_Payload interface {
 	isDeliveryEvent_Payload()
 }
@@ -229,11 +239,17 @@ type DeliveryEvent_InboxItemHidden struct {
 	InboxItemHidden *DeliveryInboxItemHiddenV1 `protobuf:"bytes,22,opt,name=inbox_item_hidden,json=inboxItemHidden,proto3,oneof"`
 }
 
+type DeliveryEvent_ConversationSignal struct {
+	ConversationSignal *DeliveryConversationSignalV1 `protobuf:"bytes,23,opt,name=conversation_signal,json=conversationSignal,proto3,oneof"`
+}
+
 func (*DeliveryEvent_InboxItemCreated) isDeliveryEvent_Payload() {}
 
 func (*DeliveryEvent_AckRecorded) isDeliveryEvent_Payload() {}
 
 func (*DeliveryEvent_InboxItemHidden) isDeliveryEvent_Payload() {}
+
+func (*DeliveryEvent_ConversationSignal) isDeliveryEvent_Payload() {}
 
 type DeliveryInboxItemCreatedV1 struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
@@ -495,11 +511,111 @@ func (x *DeliveryInboxItemHiddenV1) GetMessageId() string {
 	return ""
 }
 
+type DeliveryConversationSignalV1 struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	TenantId        string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	ConversationId  string                 `protobuf:"bytes,2,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
+	ConversationSeq int64                  `protobuf:"varint,3,opt,name=conversation_seq,json=conversationSeq,proto3" json:"conversation_seq,omitempty"`
+	SourceEventId   string                 `protobuf:"bytes,4,opt,name=source_event_id,json=sourceEventId,proto3" json:"source_event_id,omitempty"`
+	SourceEventType string                 `protobuf:"bytes,5,opt,name=source_event_type,json=sourceEventType,proto3" json:"source_event_type,omitempty"`
+	MessageId       string                 `protobuf:"bytes,6,opt,name=message_id,json=messageId,proto3" json:"message_id,omitempty"`
+	SenderId        string                 `protobuf:"bytes,7,opt,name=sender_id,json=senderId,proto3" json:"sender_id,omitempty"`
+	FanoutMode      string                 `protobuf:"bytes,8,opt,name=fanout_mode,json=fanoutMode,proto3" json:"fanout_mode,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *DeliveryConversationSignalV1) Reset() {
+	*x = DeliveryConversationSignalV1{}
+	mi := &file_delivery_v1_im_delivery_events_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeliveryConversationSignalV1) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeliveryConversationSignalV1) ProtoMessage() {}
+
+func (x *DeliveryConversationSignalV1) ProtoReflect() protoreflect.Message {
+	mi := &file_delivery_v1_im_delivery_events_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeliveryConversationSignalV1.ProtoReflect.Descriptor instead.
+func (*DeliveryConversationSignalV1) Descriptor() ([]byte, []int) {
+	return file_delivery_v1_im_delivery_events_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *DeliveryConversationSignalV1) GetTenantId() string {
+	if x != nil {
+		return x.TenantId
+	}
+	return ""
+}
+
+func (x *DeliveryConversationSignalV1) GetConversationId() string {
+	if x != nil {
+		return x.ConversationId
+	}
+	return ""
+}
+
+func (x *DeliveryConversationSignalV1) GetConversationSeq() int64 {
+	if x != nil {
+		return x.ConversationSeq
+	}
+	return 0
+}
+
+func (x *DeliveryConversationSignalV1) GetSourceEventId() string {
+	if x != nil {
+		return x.SourceEventId
+	}
+	return ""
+}
+
+func (x *DeliveryConversationSignalV1) GetSourceEventType() string {
+	if x != nil {
+		return x.SourceEventType
+	}
+	return ""
+}
+
+func (x *DeliveryConversationSignalV1) GetMessageId() string {
+	if x != nil {
+		return x.MessageId
+	}
+	return ""
+}
+
+func (x *DeliveryConversationSignalV1) GetSenderId() string {
+	if x != nil {
+		return x.SenderId
+	}
+	return ""
+}
+
+func (x *DeliveryConversationSignalV1) GetFanoutMode() string {
+	if x != nil {
+		return x.FanoutMode
+	}
+	return ""
+}
+
 var File_delivery_v1_im_delivery_events_proto protoreflect.FileDescriptor
 
 const file_delivery_v1_im_delivery_events_proto_rawDesc = "" +
 	"\n" +
-	"$delivery/v1/im.delivery.events.proto\x12\x1anexusim.delivery.events.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xbe\x06\n" +
+	"$delivery/v1/im.delivery.events.proto\x12\x1anexusim.delivery.events.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xab\a\n" +
 	"\rDeliveryEvent\x12\x19\n" +
 	"\bevent_id\x18\x01 \x01(\tR\aeventId\x12\x1d\n" +
 	"\n" +
@@ -520,7 +636,8 @@ const file_delivery_v1_im_delivery_events_proto_rawDesc = "" +
 	"occurredAt\x12f\n" +
 	"\x12inbox_item_created\x18\x14 \x01(\v26.nexusim.delivery.events.v1.DeliveryInboxItemCreatedV1H\x00R\x10inboxItemCreated\x12V\n" +
 	"\fack_recorded\x18\x15 \x01(\v21.nexusim.delivery.events.v1.DeliveryAckRecordedV1H\x00R\vackRecorded\x12c\n" +
-	"\x11inbox_item_hidden\x18\x16 \x01(\v25.nexusim.delivery.events.v1.DeliveryInboxItemHiddenV1H\x00R\x0finboxItemHiddenB\t\n" +
+	"\x11inbox_item_hidden\x18\x16 \x01(\v25.nexusim.delivery.events.v1.DeliveryInboxItemHiddenV1H\x00R\x0finboxItemHidden\x12k\n" +
+	"\x13conversation_signal\x18\x17 \x01(\v28.nexusim.delivery.events.v1.DeliveryConversationSignalV1H\x00R\x12conversationSignalB\t\n" +
 	"\apayload\"\xb6\x02\n" +
 	"\x1aDeliveryInboxItemCreatedV1\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x17\n" +
@@ -545,7 +662,18 @@ const file_delivery_v1_im_delivery_events_proto_rawDesc = "" +
 	"\x0fconversation_id\x18\x04 \x01(\tR\x0econversationId\x12)\n" +
 	"\x10conversation_seq\x18\x05 \x01(\x03R\x0fconversationSeq\x12\x1d\n" +
 	"\n" +
-	"message_id\x18\x06 \x01(\tR\tmessageIdBCZAgithub.com/qsyy0921/IM/schemas/kafka/delivery/v1;deliveryeventsv1b\x06proto3"
+	"message_id\x18\x06 \x01(\tR\tmessageId\"\xc0\x02\n" +
+	"\x1cDeliveryConversationSignalV1\x12\x1b\n" +
+	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12'\n" +
+	"\x0fconversation_id\x18\x02 \x01(\tR\x0econversationId\x12)\n" +
+	"\x10conversation_seq\x18\x03 \x01(\x03R\x0fconversationSeq\x12&\n" +
+	"\x0fsource_event_id\x18\x04 \x01(\tR\rsourceEventId\x12*\n" +
+	"\x11source_event_type\x18\x05 \x01(\tR\x0fsourceEventType\x12\x1d\n" +
+	"\n" +
+	"message_id\x18\x06 \x01(\tR\tmessageId\x12\x1b\n" +
+	"\tsender_id\x18\a \x01(\tR\bsenderId\x12\x1f\n" +
+	"\vfanout_mode\x18\b \x01(\tR\n" +
+	"fanoutModeBCZAgithub.com/qsyy0921/IM/schemas/kafka/delivery/v1;deliveryeventsv1b\x06proto3"
 
 var (
 	file_delivery_v1_im_delivery_events_proto_rawDescOnce sync.Once
@@ -559,24 +687,26 @@ func file_delivery_v1_im_delivery_events_proto_rawDescGZIP() []byte {
 	return file_delivery_v1_im_delivery_events_proto_rawDescData
 }
 
-var file_delivery_v1_im_delivery_events_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_delivery_v1_im_delivery_events_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
 var file_delivery_v1_im_delivery_events_proto_goTypes = []any{
-	(*DeliveryEvent)(nil),              // 0: nexusim.delivery.events.v1.DeliveryEvent
-	(*DeliveryInboxItemCreatedV1)(nil), // 1: nexusim.delivery.events.v1.DeliveryInboxItemCreatedV1
-	(*DeliveryAckRecordedV1)(nil),      // 2: nexusim.delivery.events.v1.DeliveryAckRecordedV1
-	(*DeliveryInboxItemHiddenV1)(nil),  // 3: nexusim.delivery.events.v1.DeliveryInboxItemHiddenV1
-	(*timestamppb.Timestamp)(nil),      // 4: google.protobuf.Timestamp
+	(*DeliveryEvent)(nil),                // 0: nexusim.delivery.events.v1.DeliveryEvent
+	(*DeliveryInboxItemCreatedV1)(nil),   // 1: nexusim.delivery.events.v1.DeliveryInboxItemCreatedV1
+	(*DeliveryAckRecordedV1)(nil),        // 2: nexusim.delivery.events.v1.DeliveryAckRecordedV1
+	(*DeliveryInboxItemHiddenV1)(nil),    // 3: nexusim.delivery.events.v1.DeliveryInboxItemHiddenV1
+	(*DeliveryConversationSignalV1)(nil), // 4: nexusim.delivery.events.v1.DeliveryConversationSignalV1
+	(*timestamppb.Timestamp)(nil),        // 5: google.protobuf.Timestamp
 }
 var file_delivery_v1_im_delivery_events_proto_depIdxs = []int32{
-	4, // 0: nexusim.delivery.events.v1.DeliveryEvent.occurred_at:type_name -> google.protobuf.Timestamp
+	5, // 0: nexusim.delivery.events.v1.DeliveryEvent.occurred_at:type_name -> google.protobuf.Timestamp
 	1, // 1: nexusim.delivery.events.v1.DeliveryEvent.inbox_item_created:type_name -> nexusim.delivery.events.v1.DeliveryInboxItemCreatedV1
 	2, // 2: nexusim.delivery.events.v1.DeliveryEvent.ack_recorded:type_name -> nexusim.delivery.events.v1.DeliveryAckRecordedV1
 	3, // 3: nexusim.delivery.events.v1.DeliveryEvent.inbox_item_hidden:type_name -> nexusim.delivery.events.v1.DeliveryInboxItemHiddenV1
-	4, // [4:4] is the sub-list for method output_type
-	4, // [4:4] is the sub-list for method input_type
-	4, // [4:4] is the sub-list for extension type_name
-	4, // [4:4] is the sub-list for extension extendee
-	0, // [0:4] is the sub-list for field type_name
+	4, // 4: nexusim.delivery.events.v1.DeliveryEvent.conversation_signal:type_name -> nexusim.delivery.events.v1.DeliveryConversationSignalV1
+	5, // [5:5] is the sub-list for method output_type
+	5, // [5:5] is the sub-list for method input_type
+	5, // [5:5] is the sub-list for extension type_name
+	5, // [5:5] is the sub-list for extension extendee
+	0, // [0:5] is the sub-list for field type_name
 }
 
 func init() { file_delivery_v1_im_delivery_events_proto_init() }
@@ -588,6 +718,7 @@ func file_delivery_v1_im_delivery_events_proto_init() {
 		(*DeliveryEvent_InboxItemCreated)(nil),
 		(*DeliveryEvent_AckRecorded)(nil),
 		(*DeliveryEvent_InboxItemHidden)(nil),
+		(*DeliveryEvent_ConversationSignal)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -595,7 +726,7 @@ func file_delivery_v1_im_delivery_events_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_delivery_v1_im_delivery_events_proto_rawDesc), len(file_delivery_v1_im_delivery_events_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   4,
+			NumMessages:   5,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

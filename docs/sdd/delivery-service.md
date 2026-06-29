@@ -215,6 +215,7 @@ schemas/kafka/delivery/v1/im.delivery.events.proto
 | `delivery.inbox_item.created.v1` | `tenant_id + conversation_id` | push-gateway、audit |
 | `delivery.ack.recorded.v1` | `tenant_id + conversation_id` | receipt-service、audit |
 | `delivery.inbox_item.hidden.v1` | `tenant_id + conversation_id` | push-gateway、audit |
+| `delivery.conversation.signal.v1` | `tenant_id + conversation_id` | push-gateway checkpoint、receipt-service checkpoint、audit |
 
 `delivery_outbox` 是 delivery-service 的本地事务 outbox。业务事务只写 `delivery_outbox`，由 `NEXUSIM_DELIVERY_SERVICE_MODE=outbox-relay` 后台进程发布到 Kafka，不允许 `ProjectTimelineEvent` 或 `AckDelivery` 用例直接 publish Kafka。
 
@@ -242,16 +243,31 @@ Payload 映射：
 - `delivery.inbox_item.created.v1` -> `DeliveryInboxItemCreatedV1`，包含 `tenant_id/user_id/conversation_id/conversation_seq/source_event_id/source_event_type/message_id`。
 - `delivery.ack.recorded.v1` -> `DeliveryAckRecordedV1`，包含 `tenant_id/user_id/device_id/conversation_id/last_received_seq`。
 - `delivery.inbox_item.hidden.v1` -> `DeliveryInboxItemHiddenV1`，包含 `tenant_id/user_id/device_id/conversation_id/conversation_seq/message_id`；`message_id` 只是可选定位上下文，客户端仍必须按 `conversation_seq` 和 durable inbox 状态校准。
+- `delivery.conversation.signal.v1` -> `DeliveryConversationSignalV1`，包含 `tenant_id/conversation_id/conversation_seq/source_event_id/source_event_type/message_id/sender_id/fanout_mode`。该事件用于 `READ_FANOUT` / `BROADCAST_SIGNAL` 等不全量物化 `user_inbox` 的会话级唤醒和下游 checkpoint，不包含 user-level recipient，也不承载消息体。
 
 `delivery.inbox_item.created.v1` 和 `delivery.inbox_item.hidden.v1` 第一阶段定位为在线通知和补拉 / 本地视图更新唤醒信号，不承载完整消息体，也不代表 message-service 事实变更。push-gateway 收到后只能通知在线客户端回源或更新本地视图；客户端仍以 `PullInbox` 返回的 durable read model 为准。
+
+`delivery.conversation.signal.v1` 第一阶段由 push-gateway / receipt-service 校验并提交 checkpoint，但不直接转成 user-level WebSocket notify。真正的热点在线广播需要 push-gateway 拥有 conversation subscription / presence 视图后才能把 conversation-level signal 扩展到在线 session；在该能力完成前不能伪造用户通知或用本地 fallback 假装送达。
 
 Relay 语义：
 
 - 按 `tenant_id + conversation_id + aggregate_version` 保持 fail-closed 顺序保护；低版本 `PENDING` / `DLQ` 会阻塞同会话更高版本 delivery event。
+- ready 查询先定位每个会话当前最小未完成 `aggregate_version`，再锁定 ready `PENDING` rows；`idx_delivery_outbox_pending_ready_expr` 和 `idx_delivery_outbox_blocking_aggregate` 用于避免积压后对历史 `PUBLISHED` rows 和前置版本反复扫描。
+- `outbox-relay` 支持 `NEXUSIM_DELIVERY_OUTBOX_WORKERS` sharded workers；worker 按 outbox id 取模分片获取 ready rows，避免多 worker 竞争同一批 `SKIP LOCKED` rows。
 - publish 成功后批量标记 `PUBLISHED`；publish 失败按指数退避写回 `retry_count/next_retry_at` 和稳定低敏 `last_error`。
 - 超过最大次数进入 `DLQ`，不自动跳过；repair/replay 必须显式审计。
 - unsupported / malformed `payload_json` 不允许 publish，也不能误标记 `PUBLISHED`，必须进入 retry / DLQ。
 - Kafka publish 是 at-least-once；下游按 `event_id` 幂等去重。
+
+Outbox relay 关键配置：
+
+| 环境变量 | 默认值 | 说明 |
+| --- | --- | --- |
+| `NEXUSIM_DELIVERY_OUTBOX_BATCH_SIZE` | `500` | 每个 worker 单批 ready rows 上限 |
+| `NEXUSIM_DELIVERY_OUTBOX_WORKERS` | `1` | outbox relay sharded worker 数 |
+| `NEXUSIM_DELIVERY_KAFKA_BATCH_SIZE` | `500` | Kafka writer 批量发送大小 |
+| `NEXUSIM_DELIVERY_KAFKA_BATCH_TIMEOUT` | `20ms` | Kafka writer 批量等待时间 |
+| `NEXUSIM_DELIVERY_OUTBOX_MAX_ATTEMPTS` | `5` | 单行进入 DLQ 前最大尝试次数 |
 
 ## 7. 数据库设计
 
@@ -343,6 +359,18 @@ CREATE TABLE delivery_outbox (
     created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at          TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+```
+
+关键索引：
+
+```sql
+CREATE INDEX IF NOT EXISTS idx_delivery_outbox_pending_ready_expr
+    ON delivery_outbox ((COALESCE(next_retry_at, available_at)), id)
+    WHERE status = 'PENDING' AND published_at IS NULL;
+
+CREATE INDEX IF NOT EXISTS idx_delivery_outbox_blocking_aggregate
+    ON delivery_outbox (tenant_id, conversation_id, aggregate_version)
+    WHERE status IN ('PENDING', 'DLQ');
 ```
 
 `delivery_kafka_checkpoints.offset_value` 固定表示 next offset to commit。处理 Kafka record offset `N` 成功后，本表写入 `N + 1`；Kafka commit 也提交同一个 next offset 语义。
@@ -471,6 +499,10 @@ delivery_inbox_write_count
 delivery_projection_lag
 delivery_outbox_pending_count
 delivery_outbox_dlq_count
+delivery_outbox_relay_fetched_total
+delivery_outbox_relay_published_total
+delivery_outbox_relay_last_run_duration_ms
+delivery_outbox_relay_last_publish_duration_ms
 delivery_cursor_regression_count
 ```
 
@@ -485,7 +517,7 @@ GET /metrics
 Prometheus scrape target: host.docker.internal:11912/metrics
 ```
 
-`/debug/metrics` 返回低敏 JSON snapshot；`/metrics` 复用同一 snapshot 输出 Prometheus text。当前覆盖 gRPC request / error / latency、durable `user_inbox` read model、`delivery_membership_projection`、`delivery_outbox`、unresolved projection failure blocker、timeline worker retry、outbox relay retry、PG pool 和 OTel trace config。labels 限定为 `method/code/state/class/exporter` 等低基数字段，不输出 token、tenant/user/device/session id、request/trace id、conversation id、message id、event id、payload 或 raw broker / SQL error。
+`/debug/metrics` 返回低敏 JSON snapshot；`/metrics` 复用同一 snapshot 输出 Prometheus text。当前覆盖 gRPC request / error / latency、durable `user_inbox` read model、`delivery_membership_projection`、`delivery_outbox`、unresolved projection failure blocker、timeline worker retry、outbox relay retry / worker count / fetched-published counters / last run-publish duration、PG pool 和 OTel trace config。labels 限定为 `method/code/state/class/exporter` 等低基数字段，不输出 token、tenant/user/device/session id、request/trace id、conversation id、message id、event id、payload 或 raw broker / SQL error。
 
 本地 alert rules 覆盖 gRPC errors、metrics query error、delivery outbox DLQ / ready pending rows、projection failure blocker、timeline worker retry、outbox relay retry、PG pool canceled acquire 和 OTLP endpoint missing。该能力仅用于本地开发 / smoke / 面试演示，不等同于生产 Prometheus、Alertmanager、Grafana 权限治理、retention 或 SLO 阈值。
 

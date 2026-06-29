@@ -46,6 +46,8 @@ func run(args []string, getenv func(string) string) error {
 		DurationSeconds:            cfg.Duration.Seconds(),
 		MessageCount:               messageCount,
 		ExpectedInboxRows:          int64(messageCount * cfg.GroupSize),
+		ExpectedTimelineRows:       int64(messageCount),
+		ExpectedFanoutMode:         cfg.ExpectedFanoutMode,
 		RequireDeliveryOutboxDrain: cfg.RequireDeliveryOutboxDrain,
 		UserPlan:                   plan,
 		StartedAt:                  time.Now().UTC(),
@@ -93,6 +95,19 @@ WHERE tenant_id = $1 AND conversation_id = $2 AND status = 'ACTIVE'
 `, int64(cfg.GroupSize), cfg.TenantID, cfg.ConversationID); err != nil {
 		return fmt.Errorf("wait delivery membership projection: %w", err)
 	}
+	fanoutMode, err := readConversationFanoutMode(ctx, pool, cfg)
+	if err != nil {
+		return err
+	}
+	result.ActualFanoutMode = fanoutMode
+	result.ExpectedInboxRows = expectedInboxRowsForFanoutMode(result.MessageCount, cfg.GroupSize, fanoutMode)
+	if cfg.ExpectedFanoutMode != "" && fanoutMode != cfg.ExpectedFanoutMode {
+		stats, statsErr := readPostgresStats(ctx, pool, cfg)
+		if statsErr == nil {
+			result.Postgres = &stats
+		}
+		return fmt.Errorf("fanout mode = %s, want %s", fanoutMode, cfg.ExpectedFanoutMode)
+	}
 	result.Send = sendMessages(ctx, cfg, clients, plan, result.MessageCount)
 	if result.Send.ErrorCount > 0 {
 		stats, statsErr := readPostgresStats(ctx, pool, cfg)
@@ -102,15 +117,28 @@ WHERE tenant_id = $1 AND conversation_id = $2 AND status = 'ACTIVE'
 		result.Success = false
 		return fmt.Errorf("send errors: %d", result.Send.ErrorCount)
 	}
-	if _, err := waitForCount(ctx, pool, cfg.WaitTimeout, cfg.PollInterval, `
+	if result.ExpectedInboxRows > 0 {
+		if _, err := waitForCount(ctx, pool, cfg.WaitTimeout, cfg.PollInterval, `
 SELECT COUNT(*) FROM user_inbox
 WHERE tenant_id = $1 AND conversation_id = $2
 `, result.ExpectedInboxRows, cfg.TenantID, cfg.ConversationID); err != nil {
-		stats, statsErr := readPostgresStats(ctx, pool, cfg)
-		if statsErr == nil {
-			result.Postgres = &stats
+			stats, statsErr := readPostgresStats(ctx, pool, cfg)
+			if statsErr == nil {
+				result.Postgres = &stats
+			}
+			return fmt.Errorf("wait user inbox fanout: %w", err)
 		}
-		return fmt.Errorf("wait user inbox fanout: %w", err)
+	} else {
+		if _, err := waitForCount(ctx, pool, cfg.WaitTimeout, cfg.PollInterval, `
+SELECT COUNT(*) FROM delivery_timeline_items
+WHERE tenant_id = $1 AND conversation_id = $2
+`, result.ExpectedTimelineRows, cfg.TenantID, cfg.ConversationID); err != nil {
+			stats, statsErr := readPostgresStats(ctx, pool, cfg)
+			if statsErr == nil {
+				result.Postgres = &stats
+			}
+			return fmt.Errorf("wait delivery timeline read-fanout rows: %w", err)
+		}
 	}
 	result.Receiver = pullAndAckSample(ctx, cfg, clients, plan, result.Send.MaxSeq)
 	if cfg.RequireDeliveryOutboxDrain {
@@ -130,9 +158,11 @@ WHERE tenant_id = $1 AND conversation_id = $2 AND status = 'PENDING'
 		return err
 	}
 	result.Postgres = &stats
+	result.ActualFanoutMode = stats.FanoutMode
 	result.Success = result.Send.SuccessCount == result.MessageCount &&
 		result.Receiver.PullErrorCount == 0 &&
 		result.Postgres.UserInboxRows >= result.ExpectedInboxRows &&
+		result.Postgres.DeliveryTimelineRows >= result.ExpectedTimelineRows &&
 		result.Postgres.MessageOutboxDLQ == 0 &&
 		result.Postgres.DeliveryOutboxDLQ == 0 &&
 		(!cfg.RequireDeliveryOutboxDrain || result.Postgres.DeliveryOutboxPending == 0)
@@ -140,4 +170,13 @@ WHERE tenant_id = $1 AND conversation_id = $2 AND status = 'PENDING'
 		return fmt.Errorf("hotgroup validation failed")
 	}
 	return nil
+}
+
+func expectedInboxRowsForFanoutMode(messageCount int, groupSize int, fanoutMode string) int64 {
+	switch fanoutMode {
+	case "READ_FANOUT", "BROADCAST_SIGNAL":
+		return 0
+	default:
+		return int64(messageCount * groupSize)
+	}
 }

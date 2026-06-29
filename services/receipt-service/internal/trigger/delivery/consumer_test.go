@@ -80,6 +80,47 @@ func TestBuildCommandFromAckRecorded(t *testing.T) {
 	}
 }
 
+func TestBuildCommandFromConversationSignal(t *testing.T) {
+	value, err := proto.Marshal(&deliveryeventsv1.DeliveryEvent{
+		EventId:     "delivery-signal-1",
+		EventType:   types.DeliveryEventConversationSignal,
+		TenantId:    "tenant-1",
+		AggregateId: "conversation-1",
+		Payload: &deliveryeventsv1.DeliveryEvent_ConversationSignal{
+			ConversationSignal: &deliveryeventsv1.DeliveryConversationSignalV1{
+				TenantId:        "tenant-1",
+				ConversationId:  "conversation-1",
+				ConversationSeq: 12,
+				SourceEventId:   "timeline-event-1",
+				SourceEventType: types.SourceEventMessagePersisted,
+				MessageId:       "message-1",
+				SenderId:        "sender-1",
+				FanoutMode:      "READ_FANOUT",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("marshal event: %v", err)
+	}
+	command, err := buildCommand("receipt-test", types.DeliveryMessage{
+		Topic:     "im.delivery.events",
+		Partition: 3,
+		Offset:    9,
+		Value:     value,
+	})
+	if err != nil {
+		t.Fatalf("build command: %v", err)
+	}
+	if command.EventType != types.DeliveryEventConversationSignal ||
+		command.UserID != "" ||
+		command.ConversationSeq != 12 ||
+		command.SourceEventID != "timeline-event-1" ||
+		command.SourceEventType != types.SourceEventMessagePersisted ||
+		command.OffsetValue != 10 {
+		t.Fatalf("unexpected command: %+v", command)
+	}
+}
+
 func TestWorkerRunRetriesAfterProjectorError(t *testing.T) {
 	t.Parallel()
 

@@ -1,8 +1,9 @@
 package types
 
 const (
-	DeliveryEventInboxItemCreated = "delivery.inbox_item.created.v1"
-	DeliveryEventAckRecorded      = "delivery.ack.recorded.v1"
+	DeliveryEventInboxItemCreated   = "delivery.inbox_item.created.v1"
+	DeliveryEventAckRecorded        = "delivery.ack.recorded.v1"
+	DeliveryEventConversationSignal = "delivery.conversation.signal.v1"
 
 	SourceEventMessagePersisted = "message.persisted.v1"
 	SourceEventMessageEdited    = "message.edited.v1"
@@ -42,14 +43,14 @@ func (command ProjectDeliveryEventCommand) Validate() error {
 	if command.EventType == "" {
 		return NewInvalidArgument("event_type is required")
 	}
-	if command.UserID == "" {
-		return NewInvalidArgument("user_id is required")
-	}
 	if command.ConversationID == "" {
 		return NewInvalidArgument("conversation_id is required")
 	}
 	switch command.EventType {
 	case DeliveryEventInboxItemCreated:
+		if command.UserID == "" {
+			return NewInvalidArgument("user_id is required")
+		}
 		if command.ConversationSeq <= 0 {
 			return NewInvalidArgument("conversation_seq must be positive")
 		}
@@ -70,11 +71,28 @@ func (command ProjectDeliveryEventCommand) Validate() error {
 			return NewInvalidArgument("sender_id is required")
 		}
 	case DeliveryEventAckRecorded:
+		if command.UserID == "" {
+			return NewInvalidArgument("user_id is required")
+		}
 		if command.DeviceID == "" {
 			return NewInvalidArgument("device_id is required")
 		}
 		if command.LastReceivedSeq <= 0 {
 			return NewInvalidArgument("last_received_seq must be positive")
+		}
+	case DeliveryEventConversationSignal:
+		if command.ConversationSeq <= 0 {
+			return NewInvalidArgument("conversation_seq must be positive")
+		}
+		if command.SourceEventID == "" {
+			return NewInvalidArgument("source_event_id is required")
+		}
+		switch command.SourceEventType {
+		case SourceEventMessagePersisted, SourceEventMessageEdited, SourceEventMessageRevoked, SourceEventMessageDeleted:
+		case "":
+			return NewInvalidArgument("source_event_type is required")
+		default:
+			return NewInvalidArgument("unsupported source_event_type")
 		}
 	default:
 		return NewInvalidArgument("unsupported delivery event type")

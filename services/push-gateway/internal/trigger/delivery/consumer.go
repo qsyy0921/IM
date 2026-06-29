@@ -16,6 +16,7 @@ const (
 	EventInboxItemCreatedV1     = "delivery.inbox_item.created.v1"
 	EventDeliveryAckRecordedV1  = "delivery.ack.recorded.v1"
 	EventInboxItemHiddenV1      = "delivery.inbox_item.hidden.v1"
+	EventConversationSignalV1   = "delivery.conversation.signal.v1"
 	SourceEventMessagePersisted = "message.persisted.v1"
 )
 
@@ -244,6 +245,29 @@ func buildCommand(message types.DeliveryEventMessage) (types.NotifyDeliveryComma
 				CorrelationID:   event.GetCorrelationId(),
 			},
 		}, true, nil
+	case *deliveryeventsv1.DeliveryEvent_ConversationSignal:
+		if event.GetEventType() != EventConversationSignalV1 {
+			return types.NotifyDeliveryCommand{}, false, types.NewInvalidFrame("delivery event type mismatch")
+		}
+		signal := payload.ConversationSignal
+		if signal == nil {
+			return types.NotifyDeliveryCommand{}, false, types.NewInvalidFrame("empty conversation signal payload")
+		}
+		if signal.GetTenantId() == "" ||
+			signal.GetConversationId() == "" ||
+			signal.GetConversationSeq() <= 0 ||
+			signal.GetSourceEventId() == "" ||
+			signal.GetSourceEventType() == "" ||
+			signal.GetFanoutMode() == "" {
+			return types.NotifyDeliveryCommand{}, false, types.NewInvalidFrame("conversation signal payload is incomplete")
+		}
+		if event.GetTenantId() != signal.GetTenantId() || event.GetAggregateId() != signal.GetConversationId() {
+			return types.NotifyDeliveryCommand{}, false, types.NewInvalidFrame("delivery event envelope mismatch")
+		}
+		// Conversation-level online broadcast needs a conversation subscription registry.
+		// Until that owner exists, push-gateway commits the durable signal without
+		// fabricating user-level notification semantics.
+		return types.NotifyDeliveryCommand{}, false, nil
 	default:
 		return types.NotifyDeliveryCommand{}, false, types.ErrUnsupportedDeliveryEvent
 	}

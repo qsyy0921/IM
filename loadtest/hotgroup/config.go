@@ -39,6 +39,7 @@ type config struct {
 	MessageRate                float64
 	Duration                   time.Duration
 	MessageCount               int
+	ExpectedFanoutMode         string
 	RequireDeliveryOutboxDrain bool
 	PullLimit                  int32
 	ReceiverSampleCount        int
@@ -70,6 +71,7 @@ func parseConfig(args []string, getenv func(string) string) (config, error) {
 	flags.Float64Var(&cfg.MessageRate, "message-rate", envFloat(getenv, "NEXUSIM_HOTGROUP_MESSAGE_RATE", 10), "target message rate per second")
 	flags.DurationVar(&cfg.Duration, "duration", envDuration(getenv, "NEXUSIM_DURATION", 60*time.Second), "traffic duration")
 	flags.IntVar(&cfg.MessageCount, "message-count", envInt(getenv, "NEXUSIM_HOTGROUP_MESSAGE_COUNT", 0), "explicit total message count; zero derives from message-rate * duration")
+	flags.StringVar(&cfg.ExpectedFanoutMode, "expect-fanout-mode", envString(getenv, "NEXUSIM_HOTGROUP_EXPECT_FANOUT_MODE", ""), "optional required conversation fanout mode after member promotion")
 	flags.BoolVar(&cfg.RequireDeliveryOutboxDrain, "require-delivery-outbox-drain", envBool(getenv, "NEXUSIM_HOTGROUP_REQUIRE_DELIVERY_OUTBOX_DRAIN", false), "wait for delivery_outbox PENDING rows to drain before marking success")
 	pullLimit := envInt(getenv, "NEXUSIM_HOTGROUP_PULL_LIMIT", 100)
 	flags.IntVar(&pullLimit, "pull-limit", pullLimit, "PullInbox limit per sampled receiver")
@@ -136,6 +138,11 @@ func (cfg config) validate() error {
 	}
 	if cfg.MessageCount < 0 {
 		return errors.New("--message-count must be greater than or equal to zero")
+	}
+	switch cfg.ExpectedFanoutMode {
+	case "", "WRITE_FANOUT", "HYBRID_FANOUT", "READ_FANOUT", "BROADCAST_SIGNAL":
+	default:
+		return errors.New("--expect-fanout-mode must be WRITE_FANOUT, HYBRID_FANOUT, READ_FANOUT or BROADCAST_SIGNAL")
 	}
 	if cfg.PullLimit <= 0 {
 		return errors.New("--pull-limit must be positive")

@@ -64,14 +64,19 @@ type receiverStats struct {
 }
 
 type postgresStats struct {
-	ConversationMemberCount       int64 `json:"conversation_member_count"`
-	DeliveryMembershipActiveCount int64 `json:"delivery_membership_active_count"`
-	MessageLogCount               int64 `json:"message_log_count"`
-	UserInboxRows                 int64 `json:"user_inbox_rows"`
-	MessageOutboxPending          int64 `json:"message_outbox_pending"`
-	MessageOutboxDLQ              int64 `json:"message_outbox_dlq"`
-	DeliveryOutboxPending         int64 `json:"delivery_outbox_pending"`
-	DeliveryOutboxDLQ             int64 `json:"delivery_outbox_dlq"`
+	ConversationMemberCount       int64  `json:"conversation_member_count"`
+	DeliveryMembershipActiveCount int64  `json:"delivery_membership_active_count"`
+	ConversationMode              string `json:"conversation_mode"`
+	FanoutMode                    string `json:"fanout_mode"`
+	FanoutPolicyVersion           int64  `json:"fanout_policy_version"`
+	MessageLogCount               int64  `json:"message_log_count"`
+	DeliveryTimelineRows          int64  `json:"delivery_timeline_rows"`
+	UserInboxRows                 int64  `json:"user_inbox_rows"`
+	DeliveryOutboxRows            int64  `json:"delivery_outbox_rows"`
+	MessageOutboxPending          int64  `json:"message_outbox_pending"`
+	MessageOutboxDLQ              int64  `json:"message_outbox_dlq"`
+	DeliveryOutboxPending         int64  `json:"delivery_outbox_pending"`
+	DeliveryOutboxDLQ             int64  `json:"delivery_outbox_dlq"`
 }
 
 type summary struct {
@@ -93,6 +98,9 @@ type summary struct {
 	DurationSeconds            float64        `json:"duration_seconds"`
 	MessageCount               int            `json:"message_count"`
 	ExpectedInboxRows          int64          `json:"expected_inbox_rows"`
+	ExpectedTimelineRows       int64          `json:"expected_timeline_rows"`
+	ActualFanoutMode           string         `json:"actual_fanout_mode,omitempty"`
+	ExpectedFanoutMode         string         `json:"expected_fanout_mode,omitempty"`
 	RequireDeliveryOutboxDrain bool           `json:"require_delivery_outbox_drain"`
 	UserPlan                   userPlan       `json:"user_plan"`
 	Send                       sendStats      `json:"send"`

@@ -231,6 +231,7 @@ WHERE tenant_id = 'tenant-read-fanout'
 	if inboxRows != 0 {
 		t.Fatalf("read fanout should not materialize user_inbox rows, got %d", inboxRows)
 	}
+	assertDeliveryOutboxCountForTenant(t, ctx, pool, "tenant-read-fanout", types.DeliveryEventConversationSignal, 1)
 
 	items, err := repository.PullInbox(ctx, types.PullInboxCommand{
 		AuthContext: types.AuthContext{
@@ -582,6 +583,23 @@ FROM delivery_outbox
 WHERE tenant_id = 'tenant-delivery'
   AND event_type = $1
 `, eventType).Scan(&got)
+	if err != nil {
+		t.Fatalf("count outbox: %v", err)
+	}
+	if got != want {
+		t.Fatalf("expected %d outbox rows for %s, got %d", want, eventType, got)
+	}
+}
+
+func assertDeliveryOutboxCountForTenant(t *testing.T, ctx context.Context, pool *pgxpool.Pool, tenantID string, eventType string, want int) {
+	t.Helper()
+	var got int
+	err := pool.QueryRow(ctx, `
+SELECT COUNT(*)
+FROM delivery_outbox
+WHERE tenant_id = $1
+  AND event_type = $2
+`, tenantID, eventType).Scan(&got)
 	if err != nil {
 		t.Fatalf("count outbox: %v", err)
 	}

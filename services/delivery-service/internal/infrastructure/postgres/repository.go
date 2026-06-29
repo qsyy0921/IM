@@ -105,6 +105,9 @@ func projectMessagePersisted(
 		return 0, err
 	}
 	if !plan.MaterializesUserInbox {
+		if err := insertConversationSignalOutbox(ctx, tx, command); err != nil {
+			return 0, err
+		}
 		return countVisibleTimelineRecipients(ctx, tx, command)
 	}
 	rows, err := tx.Query(ctx, `
@@ -162,6 +165,9 @@ func projectMessageChangedForOriginalRecipients(
 		return 0, err
 	}
 	if !plan.MaterializesUserInbox {
+		if err := insertConversationSignalOutbox(ctx, tx, command); err != nil {
+			return 0, err
+		}
 		return countVisibleTimelineRecipients(ctx, tx, command)
 	}
 	rows, err := tx.Query(ctx, `
@@ -432,6 +438,54 @@ INSERT INTO delivery_outbox (
     created_at,
     updated_at
 ) VALUES ($1, $2, $3, $4, 'delivery.inbox_item.created.v1', '1.0.0', $5, 1, $6, $7, 'delivery-service', $8, $9, 'PENDING', now(), now(), now())
+ON CONFLICT (event_id) DO NOTHING
+`, eventID, command.TenantID, command.ConversationID, command.ConversationSeq, partitionKeyFor(command.TenantID, command.ConversationID), command.CorrelationID, command.EventID, command.TraceID, payloadBytes)
+	if err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	return nil
+}
+
+func insertConversationSignalOutbox(
+	ctx context.Context,
+	tx pgx.Tx,
+	command types.ProjectTimelineEventCommand,
+) error {
+	payload := map[string]any{
+		"tenant_id":         command.TenantID,
+		"conversation_id":   command.ConversationID,
+		"conversation_seq":  command.ConversationSeq,
+		"source_event_id":   command.EventID,
+		"source_event_type": command.EventType,
+		"message_id":        command.MessageID,
+		"sender_id":         command.SenderID,
+		"fanout_mode":       command.FanoutMode,
+	}
+	payloadBytes, err := json.Marshal(payload)
+	if err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	eventID := conversationSignalEventID(command)
+	_, err = tx.Exec(ctx, `
+INSERT INTO delivery_outbox (
+    event_id,
+    tenant_id,
+    conversation_id,
+    aggregate_version,
+    event_type,
+    event_version,
+    partition_key,
+    mapping_version,
+    correlation_id,
+    causation_id,
+    producer,
+    trace_id,
+    payload_json,
+    status,
+    available_at,
+    created_at,
+    updated_at
+) VALUES ($1, $2, $3, $4, 'delivery.conversation.signal.v1', '1.0.0', $5, 1, $6, $7, 'delivery-service', $8, $9, 'PENDING', now(), now(), now())
 ON CONFLICT (event_id) DO NOTHING
 `, eventID, command.TenantID, command.ConversationID, command.ConversationSeq, partitionKeyFor(command.TenantID, command.ConversationID), command.CorrelationID, command.EventID, command.TraceID, payloadBytes)
 	if err != nil {
@@ -1053,6 +1107,18 @@ func inboxEventID(command types.ProjectTimelineEventCommand, userID types.UserID
 	)
 	sum := sha256.Sum256([]byte(raw))
 	return "evt_delivery_inbox_" + hex.EncodeToString(sum[:16])
+}
+
+func conversationSignalEventID(command types.ProjectTimelineEventCommand) string {
+	raw := fmt.Sprintf(
+		"%s\x1f%s\x1f%d\x1f%s",
+		command.TenantID,
+		command.ConversationID,
+		command.ConversationSeq,
+		command.EventID,
+	)
+	sum := sha256.Sum256([]byte(raw))
+	return "evt_delivery_signal_" + hex.EncodeToString(sum[:16])
 }
 
 func ackEventID(command types.AckDeliveryCommand, receivedSeq int64) string {

@@ -55,6 +55,10 @@ func (repository *Repository) ProjectDeliveryEvent(
 			}
 		}
 		result.AdvancedReceived = true
+	case types.DeliveryEventConversationSignal:
+		// Conversation-level delivery signal is a push/PullInbox wakeup event.
+		// receipt-service has no per-user receipt projection for it, but must
+		// still checkpoint the Kafka offset so the shared topic can progress.
 	default:
 		return types.ProjectDeliveryEventResult{}, types.NewInvalidArgument("unsupported delivery event type")
 	}

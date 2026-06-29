@@ -171,6 +171,8 @@ func buildCommand(consumerGroup string, message types.DeliveryMessage) (types.Pr
 		fillInboxItemCreated(&command, payload.InboxItemCreated)
 	case *deliveryeventsv1.DeliveryEvent_AckRecorded:
 		fillAckRecorded(&command, payload.AckRecorded)
+	case *deliveryeventsv1.DeliveryEvent_ConversationSignal:
+		fillConversationSignal(&command, payload.ConversationSignal)
 	default:
 		return types.ProjectDeliveryEventCommand{}, types.NewInvalidArgument("unsupported delivery payload")
 	}
@@ -199,4 +201,15 @@ func fillAckRecorded(command *types.ProjectDeliveryEventCommand, payload *delive
 	command.UserID = types.UserID(payload.GetUserId())
 	command.DeviceID = payload.GetDeviceId()
 	command.LastReceivedSeq = payload.GetLastReceivedSeq()
+}
+
+func fillConversationSignal(command *types.ProjectDeliveryEventCommand, payload *deliveryeventsv1.DeliveryConversationSignalV1) {
+	if payload == nil {
+		return
+	}
+	command.ConversationSeq = payload.GetConversationSeq()
+	command.SourceEventID = payload.GetSourceEventId()
+	command.SourceEventType = payload.GetSourceEventType()
+	command.MessageID = payload.GetMessageId()
+	command.SenderID = types.UserID(payload.GetSenderId())
 }

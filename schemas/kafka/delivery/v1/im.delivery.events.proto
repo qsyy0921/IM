@@ -31,6 +31,7 @@ message DeliveryEvent {
     DeliveryInboxItemCreatedV1 inbox_item_created = 20;
     DeliveryAckRecordedV1 ack_recorded = 21;
     DeliveryInboxItemHiddenV1 inbox_item_hidden = 22;
+    DeliveryConversationSignalV1 conversation_signal = 23;
   }
 }
 
@@ -60,4 +61,15 @@ message DeliveryInboxItemHiddenV1 {
   string conversation_id = 4;
   int64 conversation_seq = 5;
   string message_id = 6;
+}
+
+message DeliveryConversationSignalV1 {
+  string tenant_id = 1;
+  string conversation_id = 2;
+  int64 conversation_seq = 3;
+  string source_event_id = 4;
+  string source_event_type = 5;
+  string message_id = 6;
+  string sender_id = 7;
+  string fanout_mode = 8;
 }

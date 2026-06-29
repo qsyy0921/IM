@@ -14,6 +14,12 @@ v0.1 暂不覆盖 WebSocket notify storm；push-gateway 在线通知压力、慢
 route fault 仍是后续阶段。本文继续冻结场景、指标和面试口径，避免只用单接口 QPS
 代替真实 IM 业务压测。
 
+## 最新压测记录
+
+| 报告 | 结论 |
+| --- | --- |
+| `loadtest-report-20260628-hotgroup-relay-bottleneck.md` | 记录 delivery outbox relay 优化前后对比：旧 20 人群在 50/100/150 QPS 卡在 `delivery_outbox` drain；修正为 conversation-sharded relay 后，100 人群 50/100/150 QPS 均能在等待窗口内完成 `user_inbox` 和 `delivery_outbox` drain；200 QPS 暴露下一瓶颈已转移到 delivery timeline projection / `user_inbox` fanout。 |
+
 ## 目标
 
 热点群聊压测要证明端到端链路，而不是单个服务的孤立吞吐：
@@ -172,6 +178,7 @@ go run .\loadtest\hotgroup `
   --message-rate 10 `
   --duration 60s `
   --receiver-sample-count 10 `
+  --expect-fanout-mode WRITE_FANOUT `
   --cleanup
 ```
 
@@ -189,6 +196,8 @@ conversation-service 会在成员变更事务内按 ACTIVE 成员数做单调 pr
 promotion 只向更高版本推进，不因为成员离开自动降级，避免压测中策略反复震荡。
 hotgroup runner 的结果必须记录实际 `fanout_mode`，否则不能解释不同规模下的
 写放大和延迟曲线。
+如果传入 `--expect-fanout-mode`，runner 会在发送前校验 conversation 当前策略；
+不匹配时 fail-closed，避免把小群 `WRITE_FANOUT` 结果误写成中大群 fanout 结论。
 
 如果本轮要把 `delivery_outbox -> im.delivery.events` 也纳入通过条件，必须同时启动
 `delivery-service outbox-relay`，并显式打开：

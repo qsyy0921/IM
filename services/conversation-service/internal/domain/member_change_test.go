@@ -62,10 +62,10 @@ func TestNewMemberChangeRecordRejectsInvalidState(t *testing.T) {
 			err: types.ErrMemberConflict,
 		},
 		{
-			name: "sequencer mode not implemented",
+			name: "unsupported conversation mode",
 			input: func() MemberChangeInput {
 				input := validMemberChangeInput()
-				input.Conversation.ConversationMode = types.ConversationModeSequencerBlock
+				input.Conversation.ConversationMode = "UNKNOWN"
 				return input
 			}(),
 			err: types.ErrSequencerUnavailable,
@@ -96,6 +96,23 @@ func TestNewMemberChangeRecordRejectsInvalidState(t *testing.T) {
 				t.Fatalf("expected %v, got %v", tc.err, err)
 			}
 		})
+	}
+}
+
+func TestNewMemberChangeRecordAllowsSequencerMode(t *testing.T) {
+	input := validMemberChangeInput()
+	input.Conversation.ConversationMode = types.ConversationModeSequencerBlock
+	input.Conversation.FanoutMode = types.FanoutModeBroadcastSignal
+	input.Conversation.CurrentSeqShard = "timeline"
+
+	record, err := NewMemberChangeRecord(input, "change-1", "event-1", 91, time.Now())
+	if err != nil {
+		t.Fatalf("new member change record: %v", err)
+	}
+	if record.Change.BoundarySeq != 91 ||
+		record.Timeline.FanoutMode != types.FanoutModeBroadcastSignal ||
+		record.Timeline.ConversationSeq != 91 {
+		t.Fatalf("unexpected sequencer record: %+v", record)
 	}
 }
 

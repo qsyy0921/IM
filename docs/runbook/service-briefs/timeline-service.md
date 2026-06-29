@@ -21,6 +21,10 @@ Docker runtime、Prometheus / Grafana 观测和 `seq-block-allocator` runtime �
   `AllocateSeqBlock` 获得 valid lease 后才写 message facts；未配置 timeline client、
   lease 过期或 epoch / lease_id 缺失时 fail-closed，不回退到本地 row lock。message-service
   已支持本地 seq block cache 和 lease safety margin。
+- conversation-service 已接入热点成员边界 first path：当 conversation 已提升到
+  `SEQUENCER_BLOCK` 时，成员 JOIN / LEAVE / REMOVE / owner transfer 使用
+  `AllocateSeqBlock` 获取单 seq lease，并以现有 conversation timeline 最大 seq 作为
+  floor；未配置 timeline client 或 lease 无效时 fail-closed，不回退到本地 row lock。
 
 ## 目标职责
 
@@ -39,7 +43,7 @@ Docker runtime、Prometheus / Grafana 观测和 `seq-block-allocator` runtime �
 
 ## 下一步
 
-- 重建镜像后跑 timeline repair operator 和热点群小规模复验。
+- 重建镜像后跑热点群 clean commit 小 / 中规模复验。
 - 补热点群压测中的 seq block allocation、lease replay / conflict、gap marker、
   projection lag 和 operator repair 指标。
 - 后续继续做 virtual partition mapping、leader ownership audit、operator UI 和更完整

@@ -556,6 +556,146 @@ WHERE tenant_id = 'tenant-scale-hot'
 	}
 }
 
+func TestRepositoryCreateMemberChangeUsesSequencerForHotGroupIntegration(t *testing.T) {
+	dsn := os.Getenv("NEXUSIM_PG_DSN")
+	if dsn == "" {
+		t.Skip("NEXUSIM_PG_DSN is not set")
+	}
+	ctx := context.Background()
+	pool, err := pgxpool.New(ctx, dsn)
+	if err != nil {
+		t.Fatalf("open pg pool: %v", err)
+	}
+	defer pool.Close()
+
+	resetMemberChangeTables(t, ctx, pool)
+	_, err = pool.Exec(ctx, `
+INSERT INTO conversations (
+    tenant_id, conversation_id, conversation_type, status, conversation_mode,
+    fanout_mode, fanout_policy_version, member_version, permission_version, current_seq_shard
+) VALUES ('tenant-seq-member', 'conv-seq-member', 'GROUP', 'ACTIVE', 'SEQUENCER_BLOCK', 'BROADCAST_SIGNAL', 4, 90, 90, 'timeline');
+INSERT INTO conversation_members (
+    tenant_id, conversation_id, user_id, role, status, join_seq, member_version, permission_version
+) VALUES ('tenant-seq-member', 'conv-seq-member', 'owner-seq', 'OWNER', 'ACTIVE', 1, 90, 90);
+INSERT INTO conversation_timeline_events (
+    tenant_id, conversation_id, seq, event_id, event_type, event_version, actor_id,
+    fanout_mode, fanout_policy_version, permission_version, classification, mapping_version,
+    trace_id, payload_json, created_at
+) VALUES (
+    'tenant-seq-member', 'conv-seq-member', 90, 'event-existing-90', 'message.persisted.v1', 'v1', 'owner-seq',
+    'BROADCAST_SIGNAL', 4, 90, 'MESSAGE', 'message.persisted.v1',
+    'trace-existing', '{}'::jsonb, now()
+);
+`)
+	if err != nil {
+		t.Fatalf("seed sequencer member data: %v", err)
+	}
+
+	allocator := &fakeMemberBoundarySeqAllocator{
+		block: types.SeqBlock{
+			StartSeq:  91,
+			EndSeq:    91,
+			Epoch:     7,
+			LeaseID:   "lease-member-91",
+			ExpiresAt: time.Now().Add(time.Minute),
+		},
+	}
+	repository := NewRepository(
+		pool,
+		WithMemberBoundarySeqAllocator(allocator),
+		WithIDGenerators(
+			func() (types.ChangeID, error) { return "change-seq-91", nil },
+			func() (types.EventID, error) { return "event-seq-91", nil },
+		),
+	)
+	command := types.CreateMemberChangeCommand{
+		AuthContext: types.AuthContext{
+			TenantID:  "tenant-seq-member",
+			UserID:    "owner-seq",
+			TraceID:   "trace-seq-member",
+			RequestID: "request-seq-member",
+		},
+		ConversationID:        "conv-seq-member",
+		TargetUserID:          "member-seq-91",
+		ChangeType:            types.MemberChangeTypeJoin,
+		TargetRole:            types.MemberRoleMember,
+		ExpectedMemberVersion: 90,
+		IdempotencyKey:        "idem-seq-member-91",
+		ConflictPolicy:        types.MemberChangeConflictPolicyReject,
+		Reason:                "sequencer member boundary",
+	}
+	result, err := repository.CreateMemberChange(ctx, command)
+	if err != nil {
+		t.Fatalf("create sequencer member change: %v", err)
+	}
+	if result.BoundarySeq != 91 || result.MemberVersion != 91 || result.PermissionVersion != 91 {
+		t.Fatalf("unexpected sequencer result: %+v", result)
+	}
+	if allocator.calls != 1 || allocator.minimumStartSeq != 91 {
+		t.Fatalf("unexpected allocator calls=%d floor=%d", allocator.calls, allocator.minimumStartSeq)
+	}
+
+	var timelineSeq int64
+	var timelineFanout types.FanoutMode
+	if err := pool.QueryRow(ctx, `
+SELECT seq, fanout_mode
+FROM conversation_timeline_events
+WHERE tenant_id = 'tenant-seq-member'
+  AND conversation_id = 'conv-seq-member'
+  AND event_id = 'event-seq-91'
+`).Scan(&timelineSeq, &timelineFanout); err != nil {
+		t.Fatalf("query sequencer timeline event: %v", err)
+	}
+	if timelineSeq != 91 || timelineFanout != types.FanoutModeBroadcastSignal {
+		t.Fatalf("unexpected sequencer timeline event seq=%d fanout=%s", timelineSeq, timelineFanout)
+	}
+}
+
+func TestRepositoryCreateMemberChangeSequencerModeRequiresAllocatorIntegration(t *testing.T) {
+	dsn := os.Getenv("NEXUSIM_PG_DSN")
+	if dsn == "" {
+		t.Skip("NEXUSIM_PG_DSN is not set")
+	}
+	ctx := context.Background()
+	pool, err := pgxpool.New(ctx, dsn)
+	if err != nil {
+		t.Fatalf("open pg pool: %v", err)
+	}
+	defer pool.Close()
+
+	resetMemberChangeTables(t, ctx, pool)
+	_, err = pool.Exec(ctx, `
+INSERT INTO conversations (
+    tenant_id, conversation_id, conversation_type, status, conversation_mode,
+    fanout_mode, fanout_policy_version, member_version, permission_version, current_seq_shard
+) VALUES ('tenant-seq-missing', 'conv-seq-missing', 'GROUP', 'ACTIVE', 'SEQUENCER_BLOCK', 'BROADCAST_SIGNAL', 4, 12, 12, 'timeline');
+INSERT INTO conversation_members (
+    tenant_id, conversation_id, user_id, role, status, join_seq, member_version, permission_version
+) VALUES ('tenant-seq-missing', 'conv-seq-missing', 'owner-seq', 'OWNER', 'ACTIVE', 1, 12, 12);
+`)
+	if err != nil {
+		t.Fatalf("seed missing allocator data: %v", err)
+	}
+
+	_, err = NewRepository(pool).CreateMemberChange(ctx, types.CreateMemberChangeCommand{
+		AuthContext: types.AuthContext{
+			TenantID: "tenant-seq-missing",
+			UserID:   "owner-seq",
+		},
+		ConversationID:        "conv-seq-missing",
+		TargetUserID:          "member-seq-missing",
+		ChangeType:            types.MemberChangeTypeJoin,
+		TargetRole:            types.MemberRoleMember,
+		ExpectedMemberVersion: 12,
+		IdempotencyKey:        "idem-seq-missing",
+		ConflictPolicy:        types.MemberChangeConflictPolicyReject,
+		Reason:                "missing allocator",
+	})
+	if !errors.Is(err, types.ErrSequencerUnavailable) {
+		t.Fatalf("expected sequencer unavailable, got %v", err)
+	}
+}
+
 func TestRepositoryCreateMemberChangeDoesNotDowngradeFanoutPolicyIntegration(t *testing.T) {
 	dsn := os.Getenv("NEXUSIM_PG_DSN")
 	if dsn == "" {
@@ -826,4 +966,26 @@ INSERT INTO message_outbox (
 	assertMemberChangeStatus(t, ctx, pool, "change-bad-type", types.MemberChangeStatusOutboxEnqueued, false)
 	assertMemberChangeStatus(t, ctx, pool, "change-bad-conversation", types.MemberChangeStatusOutboxEnqueued, false)
 	assertMemberChangeStatus(t, ctx, pool, "change-good", types.MemberChangeStatusDone, true)
+}
+
+type fakeMemberBoundarySeqAllocator struct {
+	calls           int
+	command         types.CreateMemberChangeCommand
+	minimumStartSeq int64
+	block           types.SeqBlock
+	err             error
+}
+
+func (f *fakeMemberBoundarySeqAllocator) AllocateMemberBoundarySeq(
+	_ context.Context,
+	command types.CreateMemberChangeCommand,
+	minimumStartSeq int64,
+) (types.SeqBlock, error) {
+	f.calls++
+	f.command = command
+	f.minimumStartSeq = minimumStartSeq
+	if f.err != nil {
+		return types.SeqBlock{}, f.err
+	}
+	return f.block, nil
 }

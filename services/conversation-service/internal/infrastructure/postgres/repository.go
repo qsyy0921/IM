@@ -17,9 +17,14 @@ type Repository struct {
 	changeID        func() (types.ChangeID, error)
 	eventID         func() (types.EventID, error)
 	scaleThresholds domain.ConversationScaleThresholds
+	seqAllocator    MemberBoundarySeqAllocator
 }
 
 type RepositoryOption func(*Repository)
+
+type MemberBoundarySeqAllocator interface {
+	AllocateMemberBoundarySeq(ctx context.Context, command types.CreateMemberChangeCommand, minimumStartSeq int64) (types.SeqBlock, error)
+}
 
 func NewRepository(pool *pgxpool.Pool, opts ...RepositoryOption) *Repository {
 	repo := &Repository{
@@ -50,6 +55,12 @@ func NewRepository(pool *pgxpool.Pool, opts ...RepositoryOption) *Repository {
 func WithScaleThresholds(thresholds domain.ConversationScaleThresholds) RepositoryOption {
 	return func(repo *Repository) {
 		repo.scaleThresholds = thresholds
+	}
+}
+
+func WithMemberBoundarySeqAllocator(allocator MemberBoundarySeqAllocator) RepositoryOption {
+	return func(repo *Repository) {
+		repo.seqAllocator = allocator
 	}
 }
 
@@ -181,10 +192,7 @@ func (r *Repository) CreateMemberChange(
 		}
 	}
 
-	if err := ensureConversationSeq(ctx, tx, command); err != nil {
-		return types.MemberChangeResult{}, err
-	}
-	boundarySeq, err := allocateConversationSeq(ctx, tx, command)
+	boundarySeq, err := r.allocateMemberBoundarySeq(ctx, tx, command, conversation)
 	if err != nil {
 		return types.MemberChangeResult{}, err
 	}
@@ -350,10 +358,7 @@ func (r *Repository) TransferConversationOwner(
 		return types.TransferConversationOwnerResult{}, err
 	}
 
-	if err := ensureConversationSeq(ctx, tx, memberCommand); err != nil {
-		return types.TransferConversationOwnerResult{}, err
-	}
-	boundarySeq, err := allocateConversationSeq(ctx, tx, memberCommand)
+	boundarySeq, err := r.allocateMemberBoundarySeq(ctx, tx, memberCommand, conversation)
 	if err != nil {
 		return types.TransferConversationOwnerResult{}, err
 	}

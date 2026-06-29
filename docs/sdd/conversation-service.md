@@ -25,6 +25,15 @@ message-service
 - fanout 策略：`fanout_mode / fanout_policy_version`。
 - 成员变更 Saga 表结构。
 
+热点会话边界：
+
+- 普通会话成员边界使用本地 `conversation_seq` row lock。
+- `SEQUENCER_BLOCK` 会话的成员 JOIN / LEAVE / REMOVE / owner transfer 必须通过
+  timeline-service `AllocateSeqBlock` 获取单 seq lease，并以当前 conversation timeline
+  最大 seq 作为 floor。
+- 未配置 timeline-service、lease 无效、epoch / lease_id 缺失或 lease 过期时 fail-closed；
+  禁止回退到本地 row lock 冒充热点路径。
+
 禁止事项：
 
 - 不写消息正文。

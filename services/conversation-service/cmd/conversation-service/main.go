@@ -22,6 +22,7 @@ import (
 	"github.com/qsyy0921/IM/services/conversation-service/internal/domain"
 	monitoringinfra "github.com/qsyy0921/IM/services/conversation-service/internal/infrastructure/monitoring"
 	postgresinfra "github.com/qsyy0921/IM/services/conversation-service/internal/infrastructure/postgres"
+	rpcinfra "github.com/qsyy0921/IM/services/conversation-service/internal/infrastructure/rpc"
 	"github.com/qsyy0921/IM/services/conversation-service/internal/trigger/memberchange"
 	"github.com/qsyy0921/IM/services/conversation-service/internal/types"
 	"google.golang.org/grpc"
@@ -117,7 +118,29 @@ func runGRPCServer() error {
 	if err != nil {
 		return err
 	}
-	repository := postgresinfra.NewRepository(pool, postgresinfra.WithScaleThresholds(scaleThresholds))
+	repositoryOptions := []postgresinfra.RepositoryOption{postgresinfra.WithScaleThresholds(scaleThresholds)}
+	if timelineAddr := envString("NEXUSIM_TIMELINE_SERVICE_ADDR", ""); timelineAddr != "" {
+		timelineTLS, err := timelineClientTLSConfigFromEnv()
+		if err != nil {
+			return err
+		}
+		client, closeClient, err := rpcinfra.DialTimelineClientWithConfig(ctx, rpcinfra.TimelineClientDialConfig{
+			Addr:    timelineAddr,
+			Timeout: envDuration("NEXUSIM_TIMELINE_RPC_TIMEOUT", 100*time.Millisecond),
+			TLS:     timelineTLS,
+		})
+		if err != nil {
+			return err
+		}
+		defer func() {
+			if err := closeClient(); err != nil {
+				log.Printf("close timeline-service client: %v", err)
+			}
+		}()
+		repositoryOptions = append(repositoryOptions, postgresinfra.WithMemberBoundarySeqAllocator(client))
+		log.Printf("conversation-service using timeline-service at %s for member boundary sequencer", timelineAddr)
+	}
+	repository := postgresinfra.NewRepository(pool, repositoryOptions...)
 	grpcapi.Register(
 		server,
 		grpcapi.NewServer(

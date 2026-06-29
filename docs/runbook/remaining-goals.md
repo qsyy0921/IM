@@ -17,7 +17,8 @@
 
 1. Hot group fanout / sequencer / projection hardening：小规模 Docker 热点群 smoke 已通过；
    message-service seq block cache、timeline-service lease status / gap marker / repair
-   operator first path 已进入收口；下一步重建镜像、三机 redeploy，扩大压测规模并补趋势图
+   operator first path 已进入收口；conversation-service 热点成员边界 seq 分配已接
+   timeline-service；下一步用 clean commit 重建镜像、三机 redeploy，扩大压测规模并补趋势图
    和瓶颈曲线归档。
 2. Agent action boundary / repair cases：在 provider replay admin / workflow handoff 已落
    的基础上，继续扩更多需要 proposal / approval / workflow / audit 的 action 与 repair 场景。
@@ -32,8 +33,9 @@
    subscription / signal broadcast、timeline-service seq-block allocator、message-service
    active `SEQUENCER_BLOCK` 写路径、seq block cache、gap marker / repair operator first path
    和 hotgroup runner；2026-06-29 已跑通 61 人 / 20 消息 / 3 WebSocket subscriber 小规模
-   smoke，下一步扩大压测规模，并继续做 virtual partition mapping、leader ownership audit
-   和 deeper repair。
+   smoke；2026-06-30 已定位并修复 `SEQUENCER_BLOCK` 下成员 JOIN 仍未接 timeline
+   sequencer 的问题，下一步用 clean commit 扩大压测规模，并继续做 virtual partition
+   mapping、leader ownership audit 和 deeper repair。
 
 ## Client Demo Backlog
 
@@ -108,8 +110,8 @@
   外部 proof workflow 后置。
 - `conversation-service`：群规模策略已进入 domain 层，medium / large 策略已转 active
   first-stage；hot group 策略已与 message-service `SEQUENCER_BLOCK` seq block cache
-  active 写路径和 timeline lease 绑定；后续继续补 control-plane rollout、群管理深化、
-  历史窗口 / targeted replay repair。
+  active 写路径、conversation-service 成员边界 seq 分配和 timeline lease 绑定；后续继续补
+  control-plane rollout、群管理深化、历史窗口 / targeted replay repair。
 - `timeline-service`：已进入本地运行链路的 seq-block allocator，具备 PostgreSQL
   sequence state / block lease / gap marker、`AllocateSeqBlock` gRPC API、Docker /
   Prometheus / Grafana 观测；message-service 已只在 valid block lease 下取号并支持本地

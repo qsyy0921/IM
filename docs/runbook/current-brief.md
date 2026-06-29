@@ -46,6 +46,10 @@ brief、loadtest report、development-progress 或 archive。
   `gap-marker-close` / `gap-marker-audit` operator first path。epoch fencing 当前以
   lease epoch / lease_id / expires_at 校验进入写路径，leader ownership audit 和 virtual
   partition mapping 仍后续深化。
+- conversation-service 已补热点成员边界 seq 分配：`SEQUENCER_BLOCK` 会话中的成员
+  JOIN / LEAVE / REMOVE / owner transfer 通过 timeline-service `AllocateSeqBlock`
+  获取单 seq lease，并以当前 conversation timeline 最大 seq 作为 floor。未配置 sequencer、
+  lease 无效或 lease 过期时 fail-closed，不回退到本地 row lock。
 - delivery-service 已补 outbox relay 吞吐 hardening：ready SQL 避免积压下反复扫描历史
   `PUBLISHED` 行，新增 pending-ready / blocking aggregate indexes，relay 支持
   conversation-sharded workers 和 delivery 专用 Kafka batch 参数；2026-06-28
@@ -102,7 +106,7 @@ brief、loadtest report、development-progress 或 archive。
 ## 下一个方向
 
 - 基于已通过的小规模 smoke 和本轮 sequencer repair readiness 改动，下一步重建最新
-  Docker 镜像、三机 redeploy，并做热点群小规模复验。
+  Docker 镜像、三机 redeploy，并做 clean commit 热点群小 / 中规模复验。
 - 后续再扩大三机热点群压测规模，并把 Prometheus / Grafana 趋势、projection lag、
   push signal 和 PostgreSQL bottleneck 曲线归档到低敏报告；正式生产级运维 UI、
   provider-grade 长周期平台仍后置。

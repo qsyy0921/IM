@@ -213,8 +213,10 @@ func validateMemberChange(input MemberChangeInput) error {
 	if input.Conversation.Status != types.ConversationStatusActive {
 		return types.NewConversationNotFound("conversation is not active")
 	}
-	if input.Conversation.ConversationMode != types.ConversationModeLocalRowLock {
-		return types.NewSequencerUnavailable("conversation mode is not implemented")
+	switch input.Conversation.ConversationMode {
+	case types.ConversationModeLocalRowLock, types.ConversationModeSequencerBlock:
+	default:
+		return types.NewSequencerUnavailable("conversation mode is not supported")
 	}
 	if input.Command.ExpectedMemberVersion > 0 &&
 		input.Command.ExpectedMemberVersion != input.Conversation.MemberVersion {

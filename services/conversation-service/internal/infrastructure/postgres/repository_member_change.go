@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/qsyy0921/IM/services/conversation-service/internal/domain"
@@ -244,6 +245,70 @@ RETURNING current_seq
 		return 0, types.NewDBWriteFailed(err.Error())
 	}
 	return seq, nil
+}
+
+func (r *Repository) allocateMemberBoundarySeq(
+	ctx context.Context,
+	tx pgx.Tx,
+	command types.CreateMemberChangeCommand,
+	conversation domain.Conversation,
+) (int64, error) {
+	switch conversation.ConversationMode {
+	case types.ConversationModeLocalRowLock:
+		if err := ensureConversationSeq(ctx, tx, command); err != nil {
+			return 0, err
+		}
+		return allocateConversationSeq(ctx, tx, command)
+	case types.ConversationModeSequencerBlock:
+		if r.seqAllocator == nil {
+			return 0, types.NewSequencerUnavailable("member boundary sequencer is not configured")
+		}
+		minimumStartSeq, err := nextConversationTimelineSeqFloor(ctx, tx, command.AuthContext.TenantID, command.ConversationID)
+		if err != nil {
+			return 0, err
+		}
+		block, err := r.seqAllocator.AllocateMemberBoundarySeq(ctx, command, minimumStartSeq)
+		if err != nil {
+			return 0, err
+		}
+		if err := validateMemberBoundarySeqBlock(block, r.now()); err != nil {
+			return 0, err
+		}
+		return block.StartSeq, nil
+	default:
+		return 0, types.NewSequencerUnavailable("conversation mode is not supported")
+	}
+}
+
+func nextConversationTimelineSeqFloor(
+	ctx context.Context,
+	tx pgx.Tx,
+	tenantID types.TenantID,
+	conversationID types.ConversationID,
+) (int64, error) {
+	var nextSeq int64
+	if err := tx.QueryRow(ctx, `
+SELECT COALESCE(MAX(seq) + 1, 1)
+FROM conversation_timeline_events
+WHERE tenant_id = $1
+  AND conversation_id = $2
+`, tenantID, conversationID).Scan(&nextSeq); err != nil {
+		return 0, types.NewDBReadFailed(err.Error())
+	}
+	return nextSeq, nil
+}
+
+func validateMemberBoundarySeqBlock(block types.SeqBlock, now time.Time) error {
+	if block.StartSeq <= 0 || block.EndSeq != block.StartSeq {
+		return types.NewSequencerUnavailable("sequencer returned invalid member boundary block")
+	}
+	if block.Epoch <= 0 || block.LeaseID == "" || block.ExpiresAt.IsZero() {
+		return types.NewSequencerUnavailable("sequencer returned incomplete member boundary lease")
+	}
+	if !now.Before(block.ExpiresAt) {
+		return types.NewSequencerUnavailable("member boundary sequencer lease expired")
+	}
+	return nil
 }
 
 func insertMemberChangeSaga(ctx context.Context, tx pgx.Tx, change domain.MemberChange) error {

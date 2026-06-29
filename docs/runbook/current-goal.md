@@ -6,15 +6,19 @@
 
 ## Active Module
 
-Hot group sequencer repair readiness：在已通过的 `SEQUENCER_BLOCK + BROADCAST_SIGNAL`
-小规模 smoke 基础上，补齐正式热点群压测前需要的 seq block cache、lease epoch
-fencing、gap marker 和 operator repair first path。
+Hot group Docker redeploy and pressure validation：在已通过的
+`SEQUENCER_BLOCK + BROADCAST_SIGNAL` 小规模 smoke 和 sequencer repair readiness
+基础上，收口 conversation-service 热点成员边界 seq 分配，重建最新镜像，三机 redeploy，
+再跑 clean commit 小 / 中规模热点群复验。
 
 ## 当前已收口摘要
 
 - conversation-service 已按群规模输出 fanout / conversation mode：direct / small group
   使用 `WRITE_FANOUT`，medium / large 使用 first-stage `HYBRID_FANOUT` /
   `READ_FANOUT`，hot group 使用 `BROADCAST_SIGNAL + SEQUENCER_BLOCK`。
+- conversation-service 在 `SEQUENCER_BLOCK` 会话中已不再把成员 JOIN / LEAVE /
+  REMOVE / owner transfer 当成本地 row-lock 边界处理；成员边界 seq 通过
+  timeline-service `AllocateSeqBlock` 分配，拿不到 valid lease 时 fail-closed，不回退。
 - timeline-service 已进入本地运行链路，提供 `seq-block-allocator` runtime、PostgreSQL
   sequence state / lease 表和 `AllocateSeqBlock` gRPC API。
 - message-service 已在 `SEQUENCER_BLOCK` active 写路径调用 timeline-service
@@ -37,20 +41,23 @@ fencing、gap marker 和 operator repair first path。
 
 ## 目标
 
-- 将当前 timeline / message sequencer repair readiness 改动收口提交，确保 focused
-  tests、Docker / compose / registry 相关检查通过。
-- 保留小规模 smoke 证据，并明确它证明 first-stage 链路可用，不代表容量上限。
-- 本轮不写正式容量结论；后续需要重建最新 Docker 镜像、三机重新部署，再扩大热点群压测，
-  记录 Kafka lag、delivery projection lag、push notify、PullInbox / ACK 追平和 PostgreSQL
-  关键指标。
+- 将当前 conversation member-boundary sequencer 改动收口提交，确保 focused tests、
+  Docker / compose 相关检查通过。
+- 用 clean commit 重建最新 Docker 镜像并 redeploy Ubuntu Docker 核心链路。
+- 先跑小规模热点群复验，再跑中等规模诊断压测；记录 Kafka lag、delivery projection lag、
+  push signal、PullInbox / ACK 追平和 PostgreSQL 关键指标。
+- 本轮只写本地 / 三机实验结论，不写生产容量上限。
 
 ## 本轮完成条件
 
-- 当前 uncommitted timeline / message sequencer repair readiness 改动收口，focused tests 和
-  Docker / compose / registry 相关检查通过。
-- 若本地 / 远端 Docker 未启动，必须明确标注真实压测未执行，不写成完成。
+- 当前 uncommitted conversation member-boundary sequencer 改动收口，focused tests 和
+  Docker / compose 相关检查通过。
+- 最新 Docker 镜像已备份到 `H:\NexusIM\docker-images\archives`，Ubuntu Docker 核心链路
+  已使用新镜像 redeploy。
+- clean commit 小 / 中规模热点群复验完成，并明确记录是否存在新瓶颈。
 - 文档同步当前公开能力：message-service 已接 timeline-service seq block cache；
-  timeline-service 已有 lease expire / gap marker repair operator first path；三机压测仍是后续。
+  conversation-service 热点成员边界已接 timeline-service；timeline-service 已有 lease
+  expire / gap marker repair operator first path。
 - 提交并推送到 GitHub。
 
 ## 非目标
@@ -63,7 +70,7 @@ fencing、gap marker 和 operator repair first path。
 
 ## 后续优先级
 
-1. 重建最新 Docker 镜像、三机 redeploy，跑热点群小规模复验。
+1. clean commit 中等规模热点群复验和报告归档。
 2. 扩大三机热点群压测规模，补趋势图 / 瓶颈曲线。
 3. delivery projection lag / inbox rows per message / push notify storm 指标深化。
 4. timeline virtual partition mapping、leader ownership audit 和更完整 repair workflow。

@@ -95,6 +95,23 @@ func TestNewOwnerTransferRecordRejectsInvalidRules(t *testing.T) {
 	}
 }
 
+func TestNewOwnerTransferRecordAllowsSequencerMode(t *testing.T) {
+	input := validOwnerTransferInput()
+	input.Conversation.ConversationMode = types.ConversationModeSequencerBlock
+	input.Conversation.FanoutMode = types.FanoutModeBroadcastSignal
+	input.Conversation.CurrentSeqShard = "timeline"
+
+	record, err := NewOwnerTransferRecord(input, "change-owner-1", "event-owner-1", 100, time.Now())
+	if err != nil {
+		t.Fatalf("new owner transfer record: %v", err)
+	}
+	if record.Change.BoundarySeq != 100 ||
+		record.Timeline.ConversationSeq != 100 ||
+		record.Timeline.FanoutMode != types.FanoutModeBroadcastSignal {
+		t.Fatalf("unexpected sequencer owner transfer record: %+v", record)
+	}
+}
+
 func validOwnerTransferInput() OwnerTransferInput {
 	return OwnerTransferInput{
 		Command: types.TransferConversationOwnerCommand{

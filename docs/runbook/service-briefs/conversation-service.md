@@ -17,8 +17,12 @@
 - Conversation scale policy 已进入 domain 层：direct / small group 继续走
   `LOCAL_ROW_LOCK + WRITE_FANOUT`；medium group 使用 active first-stage
   `HYBRID_FANOUT`；large group 使用 active first-stage `READ_FANOUT`；hot group 的
-  `BROADCAST_SIGNAL + SEQUENCER_BLOCK` 在 timeline-service sequencer 和 push signal 完成前
-  保持 contract-only / fail-closed。
+  `BROADCAST_SIGNAL + SEQUENCER_BLOCK` 已接入 timeline-service sequencer 和 push signal
+  first path。
+- `SEQUENCER_BLOCK` 会话的成员边界事件不再使用本地 row-lock 取号；`CreateMemberChange`
+  和 owner transfer 会通过 timeline-service `AllocateSeqBlock` 获取单 seq lease，并以
+  当前 conversation timeline 最大 seq 作为 floor。未配置 sequencer、lease 无效或 lease
+  过期时 fail-closed，不回退到本地 row lock。
 
 ## 边界
 
@@ -30,6 +34,6 @@
 
 ## 下一步
 
-- 冻结 timeline-service SDD 后，把 hot group 策略从 contract-only 推进到真实
-  sequencer / broadcast signal runtime。
+- clean commit Docker redeploy 后继续扩大热点群压测规模，观察成员边界、消息写入、
+  delivery projection、push signal 和 PullInbox / ACK 的追平曲线。
 - 群管理深化、owner transfer 策略、历史窗口 / targeted replay repair。

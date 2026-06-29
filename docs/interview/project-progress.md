@@ -168,6 +168,7 @@ CreateConversation(GROUP)
 | 修正后 | 100 人群 50 / 100 / 150 QPS 均能完成 `user_inbox` 和 `delivery_outbox` drain | relay 改成按 `tenant_id + conversation_id` 分片，单 conversation 顺序推进，跨 conversation 并行。 |
 | 继续探测 | 100 人群 200 QPS 时发送 1000 / 1000 成功，后续 DB 证明 `user_inbox` 和 `delivery_outbox` 最终追平，但超过 runner 等待窗口 | 新瓶颈从 relay 转移到 delivery timeline projection / `user_inbox` fanout。 |
 | 策略切换 smoke | 61 人热点群、20 条消息、3 个 WebSocket conversation subscriber，`SEQUENCER_BLOCK + BROADCAST_SIGNAL` 通过 | `send_p95_ms=19.03`、`user_inbox_rows=0`、`delivery_timeline_rows=20`、3 个订阅者共收到 60 条 conversation signal，`delivery_outbox_pending=0`，证明热点群 first-stage 不再走小群全员写扩散路径。 |
+| 成员边界诊断 | 200 人 / 500 消息 dirty-run 暴露并修复 `SEQUENCER_BLOCK` 下成员 JOIN 未接 timeline sequencer 的问题 | 修复后成员边界通过 timeline-service 分配单 seq lease，中等规模诊断可完成 `BROADCAST_SIGNAL`、`delivery_outbox_pending=0`、Kafka lag=0；正式报告仍需 clean commit 重跑。 |
 
 面试时可以把这个结果讲成一次真实性能定位过程：
 
@@ -209,6 +210,11 @@ delivery_outbox_dlq=0
 
 这仍然是小规模 smoke，不是容量上限。下一步要扩大三机压测规模，并记录 Kafka lag、
 delivery projection lag、push signal、PullInbox / ACK 和 PostgreSQL 指标曲线。
+
+2026-06-30 的中等规模诊断还暴露了一个关键边界：热点会话不仅消息写入要走
+timeline-service sequencer，成员边界事件也要走同一个 sequencer。否则群被提升到
+`SEQUENCER_BLOCK` 后，继续 JOIN 成员时会 fail-closed。当前修复后的正式结论仍要用
+clean commit 重跑后再写入容量报告。
 
 ### 当前系统如何承接热点群
 

@@ -63,6 +63,19 @@ type receiverStats struct {
 	Errors           []string `json:"errors,omitempty"`
 }
 
+type pushStats struct {
+	Enabled                 bool      `json:"enabled"`
+	PushURL                 string    `json:"push_url,omitempty"`
+	SubscriberCount         int       `json:"subscriber_count"`
+	SubscribeSuccessCount   int       `json:"subscribe_success_count"`
+	SubscribeErrorCount     int       `json:"subscribe_error_count"`
+	ConversationSignalCount int       `json:"conversation_signal_count"`
+	MaxConversationSeq      int64     `json:"max_conversation_seq"`
+	Errors                  []string  `json:"errors,omitempty"`
+	StartedAt               time.Time `json:"started_at,omitempty"`
+	FinishedAt              time.Time `json:"finished_at,omitempty"`
+}
+
 type postgresStats struct {
 	ConversationMemberCount       int64  `json:"conversation_member_count"`
 	DeliveryMembershipActiveCount int64  `json:"delivery_membership_active_count"`
@@ -104,6 +117,7 @@ type summary struct {
 	RequireDeliveryOutboxDrain bool           `json:"require_delivery_outbox_drain"`
 	UserPlan                   userPlan       `json:"user_plan"`
 	Send                       sendStats      `json:"send"`
+	Push                       pushStats      `json:"push"`
 	Receiver                   receiverStats  `json:"receiver"`
 	Postgres                   *postgresStats `json:"postgres,omitempty"`
 	Success                    bool           `json:"success"`

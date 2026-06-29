@@ -184,7 +184,11 @@ func runRuntime(enableWS bool, enableDeliveryConsumer bool, enableIdentityConsum
 		server := wsapi.NewServer(
 			app.NewConnectSessionUseCase(registry),
 			app.NewDisconnectSessionUseCase(registry),
-			app.NewHandleClientFrameUseCase(deliveryClient),
+			app.NewHandleClientFrameUseCaseWithSubscriptions(
+				deliveryClient,
+				app.NewSubscribeConversationUseCase(registry),
+				app.NewUnsubscribeConversationUseCase(registry),
+			),
 			wsapi.Config{
 				QueueSize:         envInt("NEXUSIM_PUSH_SESSION_QUEUE_SIZE", 256),
 				HeartbeatInterval: envDuration("NEXUSIM_PUSH_HEARTBEAT_INTERVAL", 30*time.Second),

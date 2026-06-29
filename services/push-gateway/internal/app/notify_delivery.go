@@ -22,5 +22,8 @@ func (usecase *NotifyDeliveryUseCase) Execute(
 	if err := notification.Validate(); err != nil {
 		return types.NotifyDeliveryResult{}, err
 	}
+	if notification.Kind == types.DeliveryNotificationKindConversationSignal {
+		return usecase.registry.EnqueueConversationSignal(ctx, notification)
+	}
 	return usecase.registry.EnqueueNotification(ctx, notification)
 }

@@ -11,7 +11,8 @@ CreateConversation(GROUP)
 -> batch CreateMemberChange(JOIN)
 -> SendMessage
 -> wait delivery membership projection
--> wait user_inbox fanout
+-> wait user_inbox fanout or delivery_timeline_items
+-> optional WebSocket conversation.subscribe / delivery.notify signal verification
 -> sampled PullInbox
 -> sampled AckDelivery
 -> summary/report/users.jsonl
@@ -20,7 +21,6 @@ CreateConversation(GROUP)
 暂不覆盖：
 
 ```text
-WebSocket notify storm
 slow client active close
 Redis route fault
 member churn during send
@@ -40,7 +40,28 @@ go run .\loadtest\hotgroup `
 ```
 
 真实执行前必须启动 conversation-service、message-service、delivery-service、
-message outbox relay、delivery timeline consumer、PostgreSQL 和 Kafka。
+push-gateway、message outbox relay、delivery timeline consumer、delivery outbox relay、
+PostgreSQL 和 Kafka。
+
+热点群 `BROADCAST_SIGNAL` 路径示例：
+
+```powershell
+. .\tools\go-env.ps1
+go run .\loadtest\hotgroup `
+  --run-name hotgroup-broadcast-push-smoke `
+  --conversation-target 172.31.50.2:10496 `
+  --message-target 172.31.50.2:10495 `
+  --delivery-target 172.31.50.2:10497 `
+  --push-url ws://172.31.50.2:10498/ws `
+  --pg-dsn "postgres://nexusim:nexusim@172.31.50.2:5432/nexusim?sslmode=disable" `
+  --group-size 61 `
+  --sender-count 4 `
+  --message-count 20 `
+  --expect-fanout-mode BROADCAST_SIGNAL `
+  --conversation-subscriber-count 3 `
+  --require-conversation-notify `
+  --require-delivery-outbox-drain
+```
 
 结果默认写入：
 

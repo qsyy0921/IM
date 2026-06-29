@@ -183,6 +183,29 @@ func runGRPCServer() error {
 		conversation = staticConversation
 	}
 
+	var sequencer app.SequencerPort = rpcinfra.NoopSequencer{}
+	if timelineAddr := envString("NEXUSIM_TIMELINE_SERVICE_ADDR", ""); timelineAddr != "" {
+		timelineTLS, err := timelineClientTLSConfigFromEnv()
+		if err != nil {
+			return err
+		}
+		client, closeClient, err := rpcinfra.DialTimelineClientWithConfig(ctx, rpcinfra.TimelineClientDialConfig{
+			Addr:    timelineAddr,
+			Timeout: envDuration("NEXUSIM_TIMELINE_RPC_TIMEOUT", 100*time.Millisecond),
+			TLS:     timelineTLS,
+		})
+		if err != nil {
+			return err
+		}
+		defer func() {
+			if err := closeClient(); err != nil {
+				log.Printf("close timeline-service client: %v", err)
+			}
+		}()
+		sequencer = client
+		log.Printf("message-service using timeline-service at %s", timelineAddr)
+	}
+
 	repositoryOptions := []postgresinfra.MessageRepositoryOption{postgresinfra.WithMetrics(metrics)}
 	if envBool("NEXUSIM_PG_BACKPRESSURE_ENABLED", false) {
 		repositoryOptions = append(repositoryOptions, postgresinfra.WithBackpressure(postgresinfra.BackpressureConfig{
@@ -233,7 +256,7 @@ func runGRPCServer() error {
 	sendUseCase := app.NewSendMessageUseCase(
 		policy,
 		conversation,
-		rpcinfra.NoopSequencer{},
+		sequencer,
 		messageRepository,
 		useCaseOptions...,
 	)

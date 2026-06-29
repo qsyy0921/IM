@@ -42,7 +42,7 @@ func TestSendMessageUseCasePermissionDenied(t *testing.T) {
 	useCase := NewSendMessageUseCase(
 		&fakePolicy{decision: types.PermissionDecision{Allowed: false, Reason: "blocked"}},
 		&fakeConversation{context: localConversation()},
-		fakeSequencer{},
+		&fakeSequencer{},
 		repo,
 	)
 
@@ -69,7 +69,7 @@ func TestSendMessageUseCasePassesConversationContextToPolicy(t *testing.T) {
 	useCase := NewSendMessageUseCase(
 		policy,
 		&fakeConversation{context: conversationContext},
-		fakeSequencer{},
+		&fakeSequencer{},
 		repo,
 	)
 
@@ -89,7 +89,7 @@ func TestSendMessageUseCaseAdmissionRejectsBeforeDependencyReads(t *testing.T) {
 	useCase := NewSendMessageUseCase(
 		policy,
 		conversation,
-		fakeSequencer{},
+		&fakeSequencer{},
 		repo,
 		WithAdmission(&fakeAdmission{err: types.NewServiceOverloaded("test overload")}),
 	)
@@ -109,7 +109,7 @@ func TestSendMessageUseCaseReleasesAdmissionPermitOnRepositoryError(t *testing.T
 	useCase := NewSendMessageUseCase(
 		&fakePolicy{decision: allowedDecision()},
 		&fakeConversation{context: localConversation()},
-		fakeSequencer{},
+		&fakeSequencer{},
 		repo,
 		WithAdmission(&fakeAdmission{permit: permit}),
 	)
@@ -123,14 +123,48 @@ func TestSendMessageUseCaseReleasesAdmissionPermitOnRepositoryError(t *testing.T
 	}
 }
 
-func TestSendMessageUseCaseRejectsSequencerModeInPhaseOne(t *testing.T) {
+func TestSendMessageUseCaseUsesSequencerBlockMode(t *testing.T) {
+	repo := &fakeMessageRepository{
+		nextConversationSeqFloor: 42,
+		result: domain.AppendMessageResult{
+			MessageID:       "msg-1",
+			ConversationSeq: 42,
+			AcceptedAt:      time.Unix(100, 0).UTC(),
+		},
+	}
+	conversation := localConversation()
+	conversation.ConversationMode = types.ConversationModeSequencerBlock
+	sequencer := &fakeSequencer{block: types.SeqBlock{StartSeq: 42, EndSeq: 42, Epoch: 1}}
+	useCase := NewSendMessageUseCase(
+		&fakePolicy{decision: allowedDecision()},
+		&fakeConversation{context: conversation},
+		sequencer,
+		repo,
+	)
+
+	result, err := useCase.Execute(context.Background(), testCommand())
+	if err != nil {
+		t.Fatalf("execute sequencer send message: %v", err)
+	}
+	if result.ConversationSeq != 42 || repo.input.AllocatedSeq != 42 {
+		t.Fatalf("expected sequencer seq to be used, result=%+v input=%+v", result, repo.input)
+	}
+	if sequencer.calls != 1 || sequencer.lastCommand.ClientMsgID != "client-1" {
+		t.Fatalf("expected sequencer to be called once, calls=%d command=%+v", sequencer.calls, sequencer.lastCommand)
+	}
+	if sequencer.lastMinimumStartSeq != 42 {
+		t.Fatalf("expected sequencer floor 42, got %d", sequencer.lastMinimumStartSeq)
+	}
+}
+
+func TestSendMessageUseCaseRejectsInvalidSequencerBlock(t *testing.T) {
 	repo := &fakeMessageRepository{}
 	conversation := localConversation()
 	conversation.ConversationMode = types.ConversationModeSequencerBlock
 	useCase := NewSendMessageUseCase(
 		&fakePolicy{decision: allowedDecision()},
 		&fakeConversation{context: conversation},
-		fakeSequencer{},
+		&fakeSequencer{block: types.SeqBlock{StartSeq: 10, EndSeq: 11}},
 		repo,
 	)
 
@@ -139,7 +173,7 @@ func TestSendMessageUseCaseRejectsSequencerModeInPhaseOne(t *testing.T) {
 		t.Fatalf("expected sequencer unavailable, got %v", err)
 	}
 	if repo.calls != 0 {
-		t.Fatalf("repository should not be called")
+		t.Fatalf("repository should not be called after invalid sequencer block")
 	}
 }
 
@@ -181,7 +215,7 @@ func TestSendMessageUseCaseRetriesPermissionVersionMismatchOnce(t *testing.T) {
 	secondDecision.PermissionVersion = 8
 	policy := &fakePolicy{decisions: []types.PermissionDecision{firstDecision, secondDecision}}
 	conversation := &fakeConversation{contexts: []types.ConversationSendContext{firstConversation, secondConversation}}
-	useCase := NewSendMessageUseCase(policy, conversation, fakeSequencer{}, repo)
+	useCase := NewSendMessageUseCase(policy, conversation, &fakeSequencer{}, repo)
 
 	_, err := useCase.Execute(context.Background(), testCommand())
 	if err != nil {
@@ -210,7 +244,7 @@ func TestSendMessageUseCaseRetriesConversationDependencyUnavailableOnce(t *testi
 		},
 		context: localConversation(),
 	}
-	useCase := NewSendMessageUseCase(&fakePolicy{decision: allowedDecision()}, conversation, fakeSequencer{}, repo)
+	useCase := NewSendMessageUseCase(&fakePolicy{decision: allowedDecision()}, conversation, &fakeSequencer{}, repo)
 
 	_, err := useCase.Execute(context.Background(), testCommand())
 	if err != nil {
@@ -227,7 +261,7 @@ func TestSendMessageUseCaseRetriesConversationDependencyUnavailableOnce(t *testi
 func TestSendMessageUseCaseDoesNotRetryConversationBusinessErrors(t *testing.T) {
 	repo := &fakeMessageRepository{}
 	conversation := &fakeConversation{err: types.NewConversationNotFound("missing")}
-	useCase := NewSendMessageUseCase(&fakePolicy{decision: allowedDecision()}, conversation, fakeSequencer{}, repo)
+	useCase := NewSendMessageUseCase(&fakePolicy{decision: allowedDecision()}, conversation, &fakeSequencer{}, repo)
 
 	_, err := useCase.Execute(context.Background(), testCommand())
 	if !errors.Is(err, types.ErrConversationNotFound) {
@@ -244,7 +278,7 @@ func TestSendMessageUseCaseDoesNotRetryConversationBusinessErrors(t *testing.T) 
 func TestSendMessageUseCaseStopsAfterConversationDependencyRetry(t *testing.T) {
 	repo := &fakeMessageRepository{}
 	conversation := &fakeConversation{err: types.NewDependencyUnavailable("conversation service unavailable")}
-	useCase := NewSendMessageUseCase(&fakePolicy{decision: allowedDecision()}, conversation, fakeSequencer{}, repo)
+	useCase := NewSendMessageUseCase(&fakePolicy{decision: allowedDecision()}, conversation, &fakeSequencer{}, repo)
 
 	_, err := useCase.Execute(context.Background(), testCommand())
 	if !errors.Is(err, types.ErrDependencyUnavailable) {
@@ -267,7 +301,7 @@ func TestSendMessageUseCaseRejectsPersistentPermissionVersionMismatch(t *testing
 	useCase := NewSendMessageUseCase(
 		&fakePolicy{decision: decision},
 		&fakeConversation{context: conversation},
-		fakeSequencer{},
+		&fakeSequencer{},
 		repo,
 	)
 
@@ -284,7 +318,7 @@ func newTestUseCase(repo MessageRepository) *SendMessageUseCase {
 	return NewSendMessageUseCase(
 		&fakePolicy{decision: allowedDecision()},
 		&fakeConversation{context: localConversation()},
-		fakeSequencer{},
+		&fakeSequencer{},
 		repo,
 	)
 }
@@ -433,17 +467,35 @@ func (f *fakeConversation) GetSendContext(context.Context, types.SendMessageComm
 	return f.context, f.err
 }
 
-type fakeSequencer struct{}
+type fakeSequencer struct {
+	block               types.SeqBlock
+	err                 error
+	calls               int
+	lastCommand         types.SendMessageCommand
+	lastMinimumStartSeq int64
+}
 
-func (fakeSequencer) AllocateSeqBlock(context.Context, types.SendMessageCommand) (types.SeqBlock, error) {
-	return types.SeqBlock{}, nil
+func (f *fakeSequencer) AllocateSeqBlock(_ context.Context, command types.SendMessageCommand, minimumStartSeq int64) (types.SeqBlock, error) {
+	f.calls++
+	f.lastCommand = command
+	f.lastMinimumStartSeq = minimumStartSeq
+	if f.err != nil {
+		return types.SeqBlock{}, f.err
+	}
+	if f.block.StartSeq == 0 && f.block.EndSeq == 0 {
+		return types.SeqBlock{StartSeq: 1, EndSeq: 1, Epoch: 1}, nil
+	}
+	return f.block, nil
 }
 
 type fakeMessageRepository struct {
-	result domain.AppendMessageResult
-	err    error
-	calls  int
-	input  domain.AppendMessageInput
+	result                   domain.AppendMessageResult
+	err                      error
+	calls                    int
+	input                    domain.AppendMessageInput
+	nextConversationSeqFloor int64
+	nextSeqFloorErr          error
+	nextSeqFloorCalls        int
 
 	messagePolicyContext types.MessagePolicyContext
 	messagePolicyErr     error
@@ -463,6 +515,17 @@ type fakeMessageRepository struct {
 	deleteErr    error
 	deleteCalls  int
 	deleteInput  domain.DeleteMessageInput
+}
+
+func (f *fakeMessageRepository) NextConversationSeqFloor(context.Context, types.TenantID, types.ConversationID) (int64, error) {
+	f.nextSeqFloorCalls++
+	if f.nextSeqFloorErr != nil {
+		return 0, f.nextSeqFloorErr
+	}
+	if f.nextConversationSeqFloor <= 0 {
+		return 1, nil
+	}
+	return f.nextConversationSeqFloor, nil
 }
 
 func (f *fakeMessageRepository) AppendMessage(_ context.Context, input domain.AppendMessageInput) (domain.AppendMessageResult, error) {

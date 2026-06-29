@@ -62,7 +62,7 @@ func writeUsers(path string, plan userPlan) error {
 func writeReport(path string, result *summary) error {
 	var builder strings.Builder
 	builder.WriteString("# Hot Group Loadtest Report\n\n")
-	builder.WriteString("本报告由 `loadtest/hotgroup` 生成。v0.1 只覆盖 GROUP 创建、批量成员 JOIN、SendMessage、PullInbox、AckDelivery 抽样和 PostgreSQL 统计；不包含 WebSocket notify storm。\n\n")
+	builder.WriteString("本报告由 `loadtest/hotgroup` 生成，覆盖 GROUP 创建、批量成员 JOIN、SendMessage、异步投影等待、可选 WebSocket conversation signal 订阅、PullInbox、AckDelivery 抽样和 PostgreSQL 统计。\n\n")
 	fmt.Fprintf(&builder, "- run_name: `%s`\n", result.RunName)
 	fmt.Fprintf(&builder, "- commit: `%s`\n", result.Commit)
 	fmt.Fprintf(&builder, "- dry_run: `%t`\n", result.DryRun)
@@ -95,6 +95,13 @@ func writeReport(path string, result *summary) error {
 	fmt.Fprintf(&builder, "- p95_ms: `%.2f`\n", result.Send.LatencyP95MS)
 	fmt.Fprintf(&builder, "- p99_ms: `%.2f`\n", result.Send.LatencyP99MS)
 	fmt.Fprintf(&builder, "- max_seq: `%d`\n\n", result.Send.MaxSeq)
+	builder.WriteString("## Push Conversation Signal\n\n")
+	fmt.Fprintf(&builder, "- enabled: `%t`\n", result.Push.Enabled)
+	fmt.Fprintf(&builder, "- subscriber_count: `%d`\n", result.Push.SubscriberCount)
+	fmt.Fprintf(&builder, "- subscribe_success: `%d`\n", result.Push.SubscribeSuccessCount)
+	fmt.Fprintf(&builder, "- subscribe_errors: `%d`\n", result.Push.SubscribeErrorCount)
+	fmt.Fprintf(&builder, "- conversation_signal_count: `%d`\n", result.Push.ConversationSignalCount)
+	fmt.Fprintf(&builder, "- max_conversation_seq: `%d`\n\n", result.Push.MaxConversationSeq)
 	builder.WriteString("## Receiver Sample\n\n")
 	fmt.Fprintf(&builder, "- sampled_receivers: `%d`\n", result.Receiver.SampledReceivers)
 	fmt.Fprintf(&builder, "- pull_success: `%d`\n", result.Receiver.PullSuccessCount)

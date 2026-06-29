@@ -87,10 +87,26 @@ foreach ($entry in $requiredWorkerEnvironment) {
 }
 
 if ($compose -notmatch "172\.30\.80\.0/24") {
-    throw "Local service compose must use the private 172.30.80.0/24 Docker network."
+    $staticServiceIPs = [regex]::Matches($compose, "ipv4_address:\s*([0-9.]+)") |
+        ForEach-Object { $_.Groups[1].Value }
+    if ($staticServiceIPs.Count -eq 0) {
+        throw "Local service compose must declare static private service IPs on the 172.30.80.0/24 Docker network."
+    }
+    foreach ($serviceIP in $staticServiceIPs) {
+        if ($serviceIP -notmatch "^172\.30\.80\.") {
+            throw "Local service compose uses non-private service IP: $serviceIP"
+        }
+    }
+    if ($compose -notmatch "nexusim-services:\s*\r?\n\s*external:\s*true\s*\r?\n\s*name:\s*nexusim-services") {
+        throw "Local service compose must attach to the external nexusim-services private Docker network."
+    }
 }
-if ($compose -notmatch "host\.docker\.internal:5432" -or $compose -notmatch "host\.docker\.internal:6379") {
-    throw "Local service compose must use host.docker.internal for local infrastructure access."
+$usesHostInfrastructure = $compose -match "host\.docker\.internal:5432" -and $compose -match "host\.docker\.internal:6379"
+$usesComposeInfrastructure = $compose -match "@postgres:5432" -and
+    $compose -match "redis:6379" -and
+    $compose -match "kafka:29092"
+if (-not $usesHostInfrastructure -and -not $usesComposeInfrastructure) {
+    throw "Local service compose must explicitly use either host.docker.internal infrastructure or local compose service DNS for PostgreSQL, Redis and Kafka."
 }
 if ($compose -match "depends_on:\s*\r?\n\s*(postgres|redis|kafka):") {
     throw "Local service compose must not depend on the base compose services or mutate the base compose network."
@@ -101,8 +117,8 @@ if ($compose -match "NEXUSIM_.*(TOKEN|SECRET|PASSWORD).*:.*(sk-|bearer|token=|pa
 if ($workerCompose -match "NEXUSIM_.*(TOKEN|SECRET|PASSWORD).*:.*(sk-|bearer|token=|password=)") {
     throw "Local service worker compose appears to contain a high-risk secret literal."
 }
-if ($workerCompose -notmatch "name:\s+nexusim-local_default") {
-    throw "Local service worker compose must attach workers to the base infrastructure network for Kafka internal listener access."
+if ($workerCompose -notmatch "nexusim-services:\s*\r?\n\s*external:\s*true\s*\r?\n\s*name:\s*nexusim-services") {
+    throw "Local service worker compose must attach workers to the external nexusim-services private network for Kafka internal listener access."
 }
 
 & docker compose -f $serviceComposePath config --quiet

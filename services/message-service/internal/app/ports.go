@@ -19,10 +19,11 @@ type ConversationQueryPort interface {
 }
 
 type SequencerPort interface {
-	AllocateSeqBlock(ctx context.Context, command types.SendMessageCommand) (types.SeqBlock, error)
+	AllocateSeqBlock(ctx context.Context, command types.SendMessageCommand, minimumStartSeq int64) (types.SeqBlock, error)
 }
 
 type MessageRepository interface {
+	NextConversationSeqFloor(ctx context.Context, tenantID types.TenantID, conversationID types.ConversationID) (int64, error)
 	AppendMessage(ctx context.Context, input domain.AppendMessageInput) (domain.AppendMessageResult, error)
 	GetMessagePolicyContext(ctx context.Context, tenantID types.TenantID, conversationID types.ConversationID, messageID types.MessageID) (types.MessagePolicyContext, error)
 	EditMessage(ctx context.Context, input domain.EditMessageInput) (domain.MessageChangeResult, error)

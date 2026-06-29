@@ -144,7 +144,15 @@ func (subscriber *Subscriber) handleNotification(ctx context.Context, payload []
 		return
 	}
 	subscriber.metrics.messageCount.Add(1)
-	result, err := subscriber.local.EnqueueNotification(ctx, notification)
+	var (
+		result types.NotifyDeliveryResult
+		err    error
+	)
+	if notification.Kind == types.DeliveryNotificationKindConversationSignal {
+		result, err = subscriber.local.EnqueueConversationSignal(ctx, notification)
+	} else {
+		result, err = subscriber.local.EnqueueNotification(ctx, notification)
+	}
 	if err != nil {
 		subscriber.metrics.errorCount.Add(1)
 		return

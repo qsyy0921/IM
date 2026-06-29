@@ -15,32 +15,37 @@ type Config struct {
 }
 
 type Registry struct {
-	mu       sync.RWMutex
-	sessions map[string]*session
-	byUser   map[string]map[string]struct{}
-	resumes  map[string]*resumeState
-	metrics  Metrics
-	config   Config
+	mu             sync.RWMutex
+	sessions       map[string]*session
+	byUser         map[string]map[string]struct{}
+	byConversation map[string]map[string]struct{}
+	resumes        map[string]*resumeState
+	metrics        Metrics
+	config         Config
 }
 
 type Metrics struct {
-	ConnectedSessions           int    `json:"connected_sessions"`
-	SessionQueueFullCount       uint64 `json:"session_queue_full_count"`
-	SlowSessionEvictedCount     uint64 `json:"slow_session_evicted_count"`
-	IdentitySessionEvictedCount uint64 `json:"identity_session_evicted_count"`
-	ResumeBufferReplayCount     uint64 `json:"resume_buffer_replay_count"`
-	ResumeBufferMissCount       uint64 `json:"resume_buffer_miss_count"`
-	ResumeBufferStoredFrames    int    `json:"resume_buffer_stored_frames"`
-	ResumeBufferTokenCount      int    `json:"resume_buffer_token_count"`
-	ResumeBufferExpiredCount    uint64 `json:"resume_buffer_expired_count"`
+	ConnectedSessions               int    `json:"connected_sessions"`
+	SessionQueueFullCount           uint64 `json:"session_queue_full_count"`
+	SlowSessionEvictedCount         uint64 `json:"slow_session_evicted_count"`
+	IdentitySessionEvictedCount     uint64 `json:"identity_session_evicted_count"`
+	ConversationSubscriptionCount   int    `json:"conversation_subscription_count"`
+	ConversationSignalMatchedCount  uint64 `json:"conversation_signal_matched_count"`
+	ConversationSignalEnqueuedCount uint64 `json:"conversation_signal_enqueued_count"`
+	ResumeBufferReplayCount         uint64 `json:"resume_buffer_replay_count"`
+	ResumeBufferMissCount           uint64 `json:"resume_buffer_miss_count"`
+	ResumeBufferStoredFrames        int    `json:"resume_buffer_stored_frames"`
+	ResumeBufferTokenCount          int    `json:"resume_buffer_token_count"`
+	ResumeBufferExpiredCount        uint64 `json:"resume_buffer_expired_count"`
 }
 
 type session struct {
-	auth        types.AuthContext
-	resumeToken string
-	outbound    chan<- types.ServerFrame
-	evicted     chan<- types.SessionEviction
-	seen        map[string]struct{}
+	auth          types.AuthContext
+	resumeToken   string
+	outbound      chan<- types.ServerFrame
+	evicted       chan<- types.SessionEviction
+	seen          map[string]struct{}
+	conversations map[string]struct{}
 }
 
 type resumeState struct {
@@ -61,10 +66,11 @@ func NewRegistryWithConfig(config Config) *Registry {
 		config.Now = time.Now
 	}
 	return &Registry{
-		sessions: make(map[string]*session),
-		byUser:   make(map[string]map[string]struct{}),
-		resumes:  make(map[string]*resumeState),
-		config:   config,
+		sessions:       make(map[string]*session),
+		byUser:         make(map[string]map[string]struct{}),
+		byConversation: make(map[string]map[string]struct{}),
+		resumes:        make(map[string]*resumeState),
+		config:         config,
 	}
 }
 
@@ -109,13 +115,15 @@ func (registry *Registry) Register(
 	}
 	if previous, ok := registry.sessions[registration.SessionID]; ok {
 		delete(registry.byUser[userKey(previous.auth)], registration.SessionID)
+		registry.removeConversationSubscriptionsLocked(registration.SessionID, previous)
 	}
 	registry.sessions[registration.SessionID] = &session{
-		auth:        registration.AuthContext,
-		resumeToken: effectiveResumeToken,
-		outbound:    registration.Outbound,
-		evicted:     registration.Evicted,
-		seen:        make(map[string]struct{}),
+		auth:          registration.AuthContext,
+		resumeToken:   effectiveResumeToken,
+		outbound:      registration.Outbound,
+		evicted:       registration.Evicted,
+		seen:          make(map[string]struct{}),
+		conversations: make(map[string]struct{}),
 	}
 	if state != nil {
 		if bufferMiss || registry.replayLocked(registration, state) {
@@ -144,6 +152,7 @@ func (registry *Registry) Unregister(sessionID string) {
 	if len(registry.byUser[key]) == 0 {
 		delete(registry.byUser, key)
 	}
+	registry.removeConversationSubscriptionsLocked(sessionID, existing)
 }
 
 func (registry *Registry) EnqueueNotification(
@@ -187,6 +196,115 @@ func (registry *Registry) EnqueueNotification(
 			result.Evicted++
 		}
 	}
+	return result, nil
+}
+
+func (registry *Registry) SubscribeConversation(
+	ctx context.Context,
+	command types.ConversationSubscriptionCommand,
+) (types.ConversationSubscriptionResult, error) {
+	if err := command.AuthContext.Validate(); err != nil {
+		return types.ConversationSubscriptionResult{}, err
+	}
+	if command.ConversationID == "" {
+		return types.ConversationSubscriptionResult{}, types.NewInvalidFrame("conversation_id is required")
+	}
+	registry.mu.Lock()
+	defer registry.mu.Unlock()
+	target := registry.sessions[command.AuthContext.SessionID]
+	if target == nil ||
+		target.auth.TenantID != command.AuthContext.TenantID ||
+		target.auth.UserID != command.AuthContext.UserID ||
+		target.auth.DeviceID != command.AuthContext.DeviceID {
+		return types.ConversationSubscriptionResult{}, types.ErrPermissionDenied
+	}
+	key := conversationKey(command.AuthContext.TenantID, command.ConversationID)
+	if target.conversations == nil {
+		target.conversations = make(map[string]struct{})
+	}
+	target.conversations[key] = struct{}{}
+	if registry.byConversation[key] == nil {
+		registry.byConversation[key] = make(map[string]struct{})
+	}
+	registry.byConversation[key][command.AuthContext.SessionID] = struct{}{}
+	return types.ConversationSubscriptionResult{ConversationID: command.ConversationID, Subscribed: true}, nil
+}
+
+func (registry *Registry) UnsubscribeConversation(
+	ctx context.Context,
+	command types.ConversationSubscriptionCommand,
+) (types.ConversationSubscriptionResult, error) {
+	if err := command.AuthContext.Validate(); err != nil {
+		return types.ConversationSubscriptionResult{}, err
+	}
+	if command.ConversationID == "" {
+		return types.ConversationSubscriptionResult{}, types.NewInvalidFrame("conversation_id is required")
+	}
+	registry.mu.Lock()
+	defer registry.mu.Unlock()
+	target := registry.sessions[command.AuthContext.SessionID]
+	if target == nil ||
+		target.auth.TenantID != command.AuthContext.TenantID ||
+		target.auth.UserID != command.AuthContext.UserID ||
+		target.auth.DeviceID != command.AuthContext.DeviceID {
+		return types.ConversationSubscriptionResult{}, types.ErrPermissionDenied
+	}
+	key := conversationKey(command.AuthContext.TenantID, command.ConversationID)
+	delete(target.conversations, key)
+	delete(registry.byConversation[key], command.AuthContext.SessionID)
+	if len(registry.byConversation[key]) == 0 {
+		delete(registry.byConversation, key)
+	}
+	return types.ConversationSubscriptionResult{ConversationID: command.ConversationID, Subscribed: false}, nil
+}
+
+func (registry *Registry) EnqueueConversationSignal(
+	ctx context.Context,
+	notification types.DeliveryNotification,
+) (types.NotifyDeliveryResult, error) {
+	notification.Kind = types.DeliveryNotificationKindConversationSignal
+	if err := notification.Validate(); err != nil {
+		return types.NotifyDeliveryResult{}, err
+	}
+	key := conversationKey(notification.TenantID, notification.ConversationID)
+	registry.mu.Lock()
+	defer registry.mu.Unlock()
+	registry.pruneExpiredResumesLocked(registry.config.Now())
+
+	sessionIDs := registry.byConversation[key]
+	result := types.NotifyDeliveryResult{MatchedSessions: len(sessionIDs)}
+	if len(sessionIDs) == 0 {
+		return result, nil
+	}
+	registry.metrics.ConversationSignalMatchedCount += uint64(len(sessionIDs))
+	frame := domain.DeliveryNotify(notification)
+	for sessionID := range sessionIDs {
+		target := registry.sessions[sessionID]
+		if target == nil {
+			continue
+		}
+		if _, ok := target.seen[notification.EventID]; ok {
+			continue
+		}
+		select {
+		case target.outbound <- frame:
+			target.seen[notification.EventID] = struct{}{}
+			registry.appendResumeLocked(target.resumeToken, frame)
+			result.Enqueued++
+		case <-ctx.Done():
+			return result, ctx.Err()
+		default:
+			registry.appendResumeLocked(target.resumeToken, frame)
+			registry.evictLocked(sessionID, target, types.SessionEviction{
+				Reason: "slow_session",
+			})
+			registry.metrics.SessionQueueFullCount++
+			registry.metrics.SlowSessionEvictedCount++
+			result.Dropped++
+			result.Evicted++
+		}
+	}
+	registry.metrics.ConversationSignalEnqueuedCount += uint64(result.Enqueued)
 	return result, nil
 }
 
@@ -241,6 +359,9 @@ func (registry *Registry) Metrics() Metrics {
 	registry.pruneExpiredResumesLocked(registry.config.Now())
 	snapshot := registry.metrics
 	snapshot.ConnectedSessions = len(registry.sessions)
+	for _, sessions := range registry.byConversation {
+		snapshot.ConversationSubscriptionCount += len(sessions)
+	}
 	for _, state := range registry.resumes {
 		snapshot.ResumeBufferStoredFrames += len(state.frames)
 	}
@@ -334,6 +455,7 @@ func (registry *Registry) evictLocked(sessionID string, target *session, evictio
 	if len(registry.byUser[key]) == 0 {
 		delete(registry.byUser, key)
 	}
+	registry.removeConversationSubscriptionsLocked(sessionID, target)
 	if target.evicted == nil {
 		return
 	}
@@ -345,6 +467,20 @@ func (registry *Registry) evictLocked(sessionID string, target *session, evictio
 
 func userKey(auth types.AuthContext) string {
 	return auth.TenantID + "\x1f" + auth.UserID
+}
+
+func conversationKey(tenantID string, conversationID string) string {
+	return tenantID + "\x1f" + conversationID
+}
+
+func (registry *Registry) removeConversationSubscriptionsLocked(sessionID string, target *session) {
+	for key := range target.conversations {
+		delete(registry.byConversation[key], sessionID)
+		if len(registry.byConversation[key]) == 0 {
+			delete(registry.byConversation, key)
+		}
+	}
+	target.conversations = nil
 }
 
 func sameDevice(left types.AuthContext, right types.AuthContext) bool {

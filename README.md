@@ -61,7 +61,7 @@ flowchart TB
     Policy["policy-service"]
     Contacts["contacts-service"]
     Conversation["conversation-service"]
-    Timeline["timeline-service / planned sequencer"]
+    Timeline["timeline-service / seq block allocator"]
     Message["message-service"]
     Delivery["delivery-service"]
     Receipt["receipt-service"]
@@ -144,7 +144,7 @@ flowchart TB
 | --- | --- |
 | 客户端层 | Web / Windows PC / Android 共用 TypeScript `protocol` 和 `client-core`；native shell 只做薄平台 bridge。 |
 | 接入层 | `api-gateway` 提供 client BFF、鉴权、quota、trusted metadata；`push-gateway` 只做在线唤醒，不拥有 durable inbox。 |
-| IM 核心层 | 10 个本地运行链路服务：9 个已运行 IM 服务分别拥有身份、策略、联系人、会话、消息、投递、回执等事实和读模型；`timeline-service` 作为 noop runtime 进入 Docker / 观测链路，承接后续热点会话 sequencer / 分区 / gap marker，但不伪装成当前已完成写路径。 |
+| IM 核心层 | 10 个本地运行链路服务：9 个已运行 IM 服务分别拥有身份、策略、联系人、会话、消息、投递、回执等事实和读模型；`timeline-service` 已有第一版 seq block allocator、Docker / 观测链路和独立 PostgreSQL 状态；message-service 已把 `SEQUENCER_BLOCK` 接入 active 写路径，当前按每条消息申请单条 seq block，后续继续做 block cache / gap marker / epoch fencing。 |
 | 事件与投影层 | 每个服务拥有自己的 PostgreSQL schema；跨服务事实传播走 outbox -> Kafka -> projection / worker；conversation timeline 的 virtual partition / physical partition mapping 后续由 control-plane + timeline-service 协同管理。 |
 | 产品平台层 | media、notification、audit、admin、control-plane、presence、workflow 等按独立数据模型和故障边界逐步 promotion。 |
 | AI / Agent 层 | search / memory 产出可见投影，retrieval-gateway 构造 EvidencePack，RAG / summary / Agent 只能基于 EvidencePack 工作。 |
@@ -156,8 +156,9 @@ flowchart TB
 热点群聊不靠单一写路径硬扛。conversation-service 已把群规模策略抽到 domain 层，
 message / delivery 只消费明确的 send context 和 timeline fanout contract，不自行猜测群规模。
 当前运行态已支持 direct / small group 写扩散、medium group 混合扩散第一版、large group
-timeline pull 第一版；热点 / 超大群的在线广播 signal 和 sequencer 仍保持 contract-only /
-fail-closed。
+timeline pull 第一版；热点 / 超大群已有 conversation-level delivery signal、push-gateway
+conversation subscription 广播服务端 first path、timeline-service seq block allocator 和
+message-service active `SEQUENCER_BLOCK` 单条 seq block 写路径。
 
 | 会话类型 | 成员规模 | 当前策略状态 | 目标写入 / 投递策略 |
 | --- | --- | --- | --- |
@@ -165,7 +166,7 @@ fail-closed。
 | 小群 | `<=500` | active | `LOCAL_ROW_LOCK + WRITE_FANOUT`，每个成员写 `user_inbox`。 |
 | 中群 | `501-5000` | active first-stage | `HYBRID_FANOUT`，写 `user_inbox` 并保留 `delivery_timeline_items` 旁路。 |
 | 大群 | `5001-50000` | active first-stage | `READ_FANOUT`，不做全量 inbox 写放大，PullInbox 按成员窗口从 timeline read model 动态读取。 |
-| 热点群 / 超大群 | `>50000` 或高写入热点 | contract-only | `SEQUENCER_BLOCK + BROADCAST_SIGNAL`，timeline-service 分配 seq block，push 只发轻量 signal。 |
+| 热点群 / 超大群 | `>50000` 或高写入热点 | allocator / signal / active sequencer first-stage | `SEQUENCER_BLOCK + BROADCAST_SIGNAL`，timeline-service 分配 seq block，message-service 获得 valid lease 后写 message facts，push 只向订阅会话的在线 session 发轻量 signal；block cache / gap marker / epoch fencing 仍是后续。 |
 
 观测层使用 Prometheus 采集指标、Grafana 展示面板、OpenTelemetry 串联 trace；
 这些工具用于定位 Kafka lag、delivery projection backlog、push notify storm、PullInbox / ACK
@@ -176,6 +177,17 @@ fail-closed。
 `delivery_outbox -> Kafka im.delivery.events`；修正为 conversation-sharded relay 后，
 100 人群 50 / 100 / 150 QPS 可完成 durable inbox 和 delivery outbox drain；
 200 QPS 探测显示下一瓶颈转移到 delivery timeline projection / `user_inbox` fanout。
+随后已补 materialized `user_inbox` 批量 insert、push-gateway conversation signal 广播服务端路径，
+message-service active `SEQUENCER_BLOCK` 单条 seq block 写路径，以及 delivery timeline consumer
+同 consumer group 多 worker、按 Kafka partition 安全并行。
+2026-06-29 已用最新镜像跑通热点群 first-stage smoke：61 人群、20 条消息、
+`SEQUENCER_BLOCK + BROADCAST_SIGNAL`、3 个 WebSocket conversation subscriber 共收到
+60 条 `delivery.notify` conversation signal；`send_p95_ms=19.03`、
+`user_inbox_rows=0`、`delivery_timeline_rows=20`、`delivery_outbox_pending=0`，
+PullInbox / AckDelivery 抽样通过。原始结果在
+`H:\NexusIM\loadtest-results\hotgroup-broadcast-push-smoke-20260629-2135`。
+下一轮压测需要扩大规模并补 projection lag、online signal storm、单热点会话 fanout 和
+PullInbox / ACK 追平曲线。
 低敏报告见 `docs/runbook/loadtest/hotgroup/loadtest-report-20260628-hotgroup-relay-bottleneck.md`。
 
 ### 当前客户端状态
@@ -290,7 +302,7 @@ message / conversation / policy events -> search-service + memory-service projec
 | `identity-service` | 登录、Refresh、MFA、recovery code、JWKS、challenge delivery。 |
 | `message-service` | 发消息、编辑 / 撤回 / 删除、timeline / outbox。 |
 | `conversation-service` | 会话、成员边界、owner transfer、发送上下文。 |
-| `timeline-service` | 当前为 noop runtime 和观测节点；后续承接热点群 sequencer、seq block、gap marker 和 timeline 分区。 |
+| `timeline-service` | 第一版 seq block allocator、lease / idempotency 记录、debug health / metrics；已被 message-service 热点 `SEQUENCER_BLOCK` 写路径调用，后续继续承接 block cache、epoch fencing、gap marker 和 timeline 分区。 |
 | `delivery-service` | durable inbox、`PullInbox`、`AckDelivery`、delivery outbox。 |
 | `push-gateway` | WebSocket 在线通知、Redis route、resume / PullInbox recovery。 |
 | `receipt-service` | 已读 / 送达回执、会话列表、未读 / 置顶 / 静音等读模型。 |
@@ -603,7 +615,7 @@ python -m mypy nexusim_ai_common scripts tests
 当前最准确表述：
 
 ```text
-NexusIM 已完成 9 个 IM 后端服务的主链路，并把 `timeline-service` 作为第 10 个 noop 运行节点纳入本地链路和观测；一批本地 / 双机分布式 smoke 已落地，
+NexusIM 已完成 9 个 IM 后端服务的主链路，并把 `timeline-service` 作为第 10 个 seq block allocator 运行节点纳入本地链路和观测；message-service 已接入第一阶段 `SEQUENCER_BLOCK` 单条 seq block 写路径；一批本地 / 双机分布式 smoke 已落地，
 已形成 AI / RAG / Agent first-stage 应用底座和 product-active 平台服务 first paths，
 Web / Windows PC 客户端已经满足当前演示入口标准。
 当前主线切回后端架构完善和 AI / Agent / RAG。

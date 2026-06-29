@@ -108,6 +108,20 @@ WHERE tenant_id = $1 AND conversation_id = $2 AND status = 'ACTIVE'
 		}
 		return fmt.Errorf("fanout mode = %s, want %s", fanoutMode, cfg.ExpectedFanoutMode)
 	}
+	subscribers, pushStats, err := openConversationSubscribers(ctx, cfg, plan)
+	result.Push = pushStats
+	if err != nil {
+		stats, statsErr := readPostgresStats(ctx, pool, cfg)
+		if statsErr == nil {
+			result.Postgres = &stats
+		}
+		return fmt.Errorf("open conversation subscribers: %w", err)
+	}
+	defer closeConversationSubscribers(subscribers)
+	pushCollector := startConversationSignalCollection(ctx, cfg, subscribers, result.MessageCount)
+	if pushCollector != nil {
+		defer pushCollector.cancel()
+	}
 	result.Send = sendMessages(ctx, cfg, clients, plan, result.MessageCount)
 	if result.Send.ErrorCount > 0 {
 		stats, statsErr := readPostgresStats(ctx, pool, cfg)
@@ -140,6 +154,17 @@ WHERE tenant_id = $1 AND conversation_id = $2
 			return fmt.Errorf("wait delivery timeline read-fanout rows: %w", err)
 		}
 	}
+	if pushCollector != nil {
+		pushStats, err := pushCollector.wait(cfg, result.Push)
+		result.Push = pushStats
+		if err != nil {
+			stats, statsErr := readPostgresStats(ctx, pool, cfg)
+			if statsErr == nil {
+				result.Postgres = &stats
+			}
+			return fmt.Errorf("wait conversation signals: %w", err)
+		}
+	}
 	result.Receiver = pullAndAckSample(ctx, cfg, clients, plan, result.Send.MaxSeq)
 	if cfg.RequireDeliveryOutboxDrain {
 		if _, err := waitForZero(ctx, pool, cfg.WaitTimeout, cfg.PollInterval, `
@@ -165,6 +190,8 @@ WHERE tenant_id = $1 AND conversation_id = $2 AND status = 'PENDING'
 		result.Postgres.DeliveryTimelineRows >= result.ExpectedTimelineRows &&
 		result.Postgres.MessageOutboxDLQ == 0 &&
 		result.Postgres.DeliveryOutboxDLQ == 0 &&
+		(!cfg.RequireConversationNotify ||
+			result.Push.ConversationSignalCount >= cfg.ConversationSubscriberCount*result.MessageCount) &&
 		(!cfg.RequireDeliveryOutboxDrain || result.Postgres.DeliveryOutboxPending == 0)
 	if !result.Success {
 		return fmt.Errorf("hotgroup validation failed")

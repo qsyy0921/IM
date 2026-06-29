@@ -354,6 +354,7 @@ func applyConversationScalePolicyAfterMemberChange(
 	ctx context.Context,
 	tx pgx.Tx,
 	conversation domain.Conversation,
+	thresholds domain.ConversationScaleThresholds,
 ) (domain.ConversationScalePolicy, error) {
 	currentPolicy := domain.ConversationScalePolicy{
 		Runtime:             domain.ConversationScaleRuntimeActive,
@@ -369,7 +370,7 @@ func applyConversationScalePolicyAfterMemberChange(
 	if err != nil {
 		return domain.ConversationScalePolicy{}, err
 	}
-	resolvedPolicy, err := domain.ResolveConversationScalePolicy(conversation.ConversationType, activeMemberCount)
+	resolvedPolicy, err := domain.ResolveConversationScalePolicyWithThresholds(conversation.ConversationType, activeMemberCount, thresholds)
 	if err != nil {
 		return domain.ConversationScalePolicy{}, err
 	}

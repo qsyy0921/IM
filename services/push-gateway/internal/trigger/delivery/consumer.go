@@ -264,10 +264,19 @@ func buildCommand(message types.DeliveryEventMessage) (types.NotifyDeliveryComma
 		if event.GetTenantId() != signal.GetTenantId() || event.GetAggregateId() != signal.GetConversationId() {
 			return types.NotifyDeliveryCommand{}, false, types.NewInvalidFrame("delivery event envelope mismatch")
 		}
-		// Conversation-level online broadcast needs a conversation subscription registry.
-		// Until that owner exists, push-gateway commits the durable signal without
-		// fabricating user-level notification semantics.
-		return types.NotifyDeliveryCommand{}, false, nil
+		return types.NotifyDeliveryCommand{
+			Notification: types.DeliveryNotification{
+				Kind:            types.DeliveryNotificationKindConversationSignal,
+				EventID:         event.GetEventId(),
+				TenantID:        signal.GetTenantId(),
+				ConversationID:  signal.GetConversationId(),
+				ConversationSeq: signal.GetConversationSeq(),
+				SourceEventID:   signal.GetSourceEventId(),
+				SourceEventType: signal.GetSourceEventType(),
+				MessageID:       signal.GetMessageId(),
+				CorrelationID:   event.GetCorrelationId(),
+			},
+		}, true, nil
 	default:
 		return types.NotifyDeliveryCommand{}, false, types.ErrUnsupportedDeliveryEvent
 	}

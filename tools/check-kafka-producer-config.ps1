@@ -33,8 +33,6 @@ $requiredSnippets = @(
     "MaxAttempts:            kafkaProducerMaxAttempts",
     "WriteBackoffMin:        kafkaProducerWriteBackoffMin",
     "WriteBackoffMax:        kafkaProducerWriteBackoffMax",
-    "BatchSize:              100",
-    "BatchTimeout:           10 * time.Millisecond",
     "kafka-go does not expose Kafka's enable.idempotence producer flag",
     "Production hardening must revisit the client"
 )
@@ -53,6 +51,16 @@ foreach ($relativePath in $expectedProducerFiles) {
         if (-not $content.Contains($snippet)) {
             $violations.Add("${relativePath}: missing required snippet [$snippet]")
         }
+    }
+    $hasLiteralBatchSize = $content.Contains("BatchSize:              100")
+    $hasConfiguredBatchSize = $content.Contains("config.BatchSize = 100") -and $content.Contains("BatchSize:              config.BatchSize")
+    if (-not ($hasLiteralBatchSize -or $hasConfiguredBatchSize)) {
+        $violations.Add("${relativePath}: missing batch size guardrail [100 default or explicit config default]")
+    }
+    $hasLiteralBatchTimeout = $content.Contains("BatchTimeout:           10 * time.Millisecond")
+    $hasConfiguredBatchTimeout = $content.Contains("config.BatchTimeout = 10 * time.Millisecond") -and $content.Contains("BatchTimeout:           config.BatchTimeout")
+    if (-not ($hasLiteralBatchTimeout -or $hasConfiguredBatchTimeout)) {
+        $violations.Add("${relativePath}: missing batch timeout guardrail [10ms default or explicit config default]")
     }
 
     if ($content.Length -gt 0) {

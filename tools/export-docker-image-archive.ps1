@@ -10,6 +10,10 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+$repoRoot = Split-Path -Parent $PSScriptRoot
+. (Join-Path $PSScriptRoot "output-root-safety.ps1")
+Assert-ExternalOutputRoot -Value $OutputRoot -RepositoryRoot $repoRoot -Name "OutputRoot" -SuggestedRoot "H:\NexusIM\docker-images"
+
 function Get-DockerImages {
     docker images --format "{{.Repository}}:{{.Tag}}" |
         Where-Object { $_ -and $_ -notmatch "<none>" } |

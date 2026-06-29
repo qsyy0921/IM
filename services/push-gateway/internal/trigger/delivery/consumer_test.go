@@ -159,7 +159,7 @@ func TestWorkerNotifiesAndCommitsInboxItemHidden(t *testing.T) {
 	}
 }
 
-func TestWorkerCommitsConversationSignalWithoutUserNotify(t *testing.T) {
+func TestWorkerNotifiesConversationSignal(t *testing.T) {
 	event := &deliveryeventsv1.DeliveryEvent{
 		EventId:       "delivery-signal-1",
 		EventType:     EventConversationSignalV1,
@@ -189,8 +189,13 @@ func TestWorkerCommitsConversationSignalWithoutUserNotify(t *testing.T) {
 	if err := worker.Run(context.Background()); !errors.Is(err, context.Canceled) {
 		t.Fatalf("run: %v", err)
 	}
-	if notifier.calls != 0 {
-		t.Fatalf("conversation signal must not fabricate user-level notify")
+	if notifier.calls != 1 ||
+		notifier.command.Notification.Kind != types.DeliveryNotificationKindConversationSignal ||
+		notifier.command.Notification.UserID != "" ||
+		notifier.command.Notification.ConversationID != "conversation-1" ||
+		notifier.command.Notification.ConversationSeq != 7 ||
+		notifier.command.Notification.SourceEventID != "timeline-event-1" {
+		t.Fatalf("unexpected conversation signal notify: %+v", notifier)
 	}
 	if consumer.commits != 1 {
 		t.Fatalf("expected commit, got %d", consumer.commits)

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/qsyy0921/IM/services/conversation-service/internal/domain"
 	"github.com/qsyy0921/IM/services/conversation-service/internal/types"
 )
 
@@ -451,6 +452,107 @@ WHERE tenant_id = 'tenant-scale'
 	}
 	if timelineFanout != types.FanoutModeHybridFanout || timelinePolicyVersion != 2 {
 		t.Fatalf("unexpected timeline policy: fanout=%s version=%d", timelineFanout, timelinePolicyVersion)
+	}
+}
+
+func TestRepositoryCreateMemberChangePromotesHotGroupPolicyWithThresholdsIntegration(t *testing.T) {
+	dsn := os.Getenv("NEXUSIM_PG_DSN")
+	if dsn == "" {
+		t.Skip("NEXUSIM_PG_DSN is not set")
+	}
+	ctx := context.Background()
+	pool, err := pgxpool.New(ctx, dsn)
+	if err != nil {
+		t.Fatalf("open pg pool: %v", err)
+	}
+	defer pool.Close()
+
+	resetMemberChangeTables(t, ctx, pool)
+	_, err = pool.Exec(ctx, `
+INSERT INTO conversations (
+    tenant_id, conversation_id, conversation_type, status, conversation_mode,
+    fanout_mode, fanout_policy_version, member_version, permission_version, current_seq_shard
+) VALUES ('tenant-scale-hot', 'conv-hot', 'GROUP', 'ACTIVE', 'LOCAL_ROW_LOCK', 'READ_FANOUT', 3, 12, 12, 'read');
+INSERT INTO conversation_members (
+    tenant_id, conversation_id, user_id, role, status, join_seq, member_version, permission_version
+)
+SELECT
+    'tenant-scale-hot',
+    'conv-hot',
+    CASE WHEN seq = 1 THEN 'owner-hot' ELSE 'member-hot-' || seq::text END,
+    CASE WHEN seq = 1 THEN 'OWNER' ELSE 'MEMBER' END,
+    'ACTIVE',
+    seq,
+    12,
+    12
+FROM generate_series(1, 12) AS seq;
+`)
+	if err != nil {
+		t.Fatalf("seed hot promotion data: %v", err)
+	}
+
+	repository := NewRepository(
+		pool,
+		WithScaleThresholds(domain.ConversationScaleThresholds{
+			SmallGroupMaxActiveMembers:  4,
+			MediumGroupMaxActiveMembers: 8,
+			LargeGroupMaxActiveMembers:  12,
+		}),
+		WithIDGenerators(
+			func() (types.ChangeID, error) { return "change-hot-13", nil },
+			func() (types.EventID, error) { return "event-hot-13", nil },
+		),
+	)
+	_, err = repository.CreateMemberChange(ctx, types.CreateMemberChangeCommand{
+		AuthContext: types.AuthContext{
+			TenantID: "tenant-scale-hot",
+			UserID:   "owner-hot",
+		},
+		ConversationID:        "conv-hot",
+		TargetUserID:          "member-hot-13",
+		ChangeType:            types.MemberChangeTypeJoin,
+		TargetRole:            types.MemberRoleMember,
+		ExpectedMemberVersion: 12,
+		IdempotencyKey:        "idem-hot-13",
+		ConflictPolicy:        types.MemberChangeConflictPolicyReject,
+		Reason:                "promote to broadcast signal",
+	})
+	if err != nil {
+		t.Fatalf("create member change: %v", err)
+	}
+
+	var conversationMode types.ConversationMode
+	var conversationFanout types.FanoutMode
+	var conversationPolicyVersion int64
+	var conversationShard string
+	if err := pool.QueryRow(ctx, `
+SELECT conversation_mode, fanout_mode, fanout_policy_version, current_seq_shard
+FROM conversations
+WHERE tenant_id = 'tenant-scale-hot'
+  AND conversation_id = 'conv-hot'
+`).Scan(&conversationMode, &conversationFanout, &conversationPolicyVersion, &conversationShard); err != nil {
+		t.Fatalf("query promoted hot conversation: %v", err)
+	}
+	if conversationMode != types.ConversationModeSequencerBlock ||
+		conversationFanout != types.FanoutModeBroadcastSignal ||
+		conversationPolicyVersion != 4 ||
+		conversationShard != "timeline" {
+		t.Fatalf("unexpected promoted hot policy: mode=%s fanout=%s version=%d shard=%s", conversationMode, conversationFanout, conversationPolicyVersion, conversationShard)
+	}
+
+	var timelineFanout types.FanoutMode
+	var timelinePolicyVersion int64
+	if err := pool.QueryRow(ctx, `
+SELECT fanout_mode, fanout_policy_version
+FROM conversation_timeline_events
+WHERE tenant_id = 'tenant-scale-hot'
+  AND conversation_id = 'conv-hot'
+  AND event_id = 'event-hot-13'
+`).Scan(&timelineFanout, &timelinePolicyVersion); err != nil {
+		t.Fatalf("query hot timeline event: %v", err)
+	}
+	if timelineFanout != types.FanoutModeBroadcastSignal || timelinePolicyVersion != 4 {
+		t.Fatalf("unexpected hot timeline policy: fanout=%s version=%d", timelineFanout, timelinePolicyVersion)
 	}
 }
 

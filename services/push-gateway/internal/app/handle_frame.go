@@ -11,11 +11,30 @@ import (
 
 type HandleClientFrameUseCase struct {
 	deliveryClient DeliveryClient
+	subscribe      *SubscribeConversationUseCase
+	unsubscribe    *UnsubscribeConversationUseCase
 	now            func() time.Time
 }
 
-func NewHandleClientFrameUseCase(deliveryClient DeliveryClient) *HandleClientFrameUseCase {
-	return &HandleClientFrameUseCase{deliveryClient: deliveryClient, now: time.Now}
+func NewHandleClientFrameUseCase(deliveryClient DeliveryClient, subscriptions ...*SubscribeConversationUseCase) *HandleClientFrameUseCase {
+	usecase := &HandleClientFrameUseCase{deliveryClient: deliveryClient, now: time.Now}
+	if len(subscriptions) > 0 {
+		usecase.subscribe = subscriptions[0]
+	}
+	return usecase
+}
+
+func NewHandleClientFrameUseCaseWithSubscriptions(
+	deliveryClient DeliveryClient,
+	subscribe *SubscribeConversationUseCase,
+	unsubscribe *UnsubscribeConversationUseCase,
+) *HandleClientFrameUseCase {
+	return &HandleClientFrameUseCase{
+		deliveryClient: deliveryClient,
+		subscribe:      subscribe,
+		unsubscribe:    unsubscribe,
+		now:            time.Now,
+	}
 }
 
 func (usecase *HandleClientFrameUseCase) Execute(
@@ -28,6 +47,36 @@ func (usecase *HandleClientFrameUseCase) Execute(
 		return domain.ServerPong(frame.RequestID, usecase.now()), nil
 	case types.OpClientHello:
 		return types.ServerFrame{}, nil
+	case types.OpConversationSubscribe:
+		if frame.ConversationID == "" {
+			return types.ServerFrame{}, types.NewInvalidFrame("conversation_id is required")
+		}
+		if usecase.subscribe == nil {
+			return types.ServerFrame{}, types.NewDeliveryUnavailable("conversation subscription is not configured")
+		}
+		result, err := usecase.subscribe.Execute(ctx, types.ConversationSubscriptionCommand{
+			AuthContext:    auth,
+			ConversationID: frame.ConversationID,
+		})
+		if err != nil {
+			return types.ServerFrame{}, err
+		}
+		return domain.ConversationSubscribeOK(frame.RequestID, result), nil
+	case types.OpConversationUnsubscribe:
+		if frame.ConversationID == "" {
+			return types.ServerFrame{}, types.NewInvalidFrame("conversation_id is required")
+		}
+		if usecase.unsubscribe == nil {
+			return types.ServerFrame{}, types.NewDeliveryUnavailable("conversation subscription is not configured")
+		}
+		result, err := usecase.unsubscribe.Execute(ctx, types.ConversationSubscriptionCommand{
+			AuthContext:    auth,
+			ConversationID: frame.ConversationID,
+		})
+		if err != nil {
+			return types.ServerFrame{}, err
+		}
+		return domain.ConversationUnsubscribeOK(frame.RequestID, result), nil
 	case types.OpDeliveryAck:
 		if frame.ConversationID == "" {
 			return types.ServerFrame{}, types.NewInvalidFrame("conversation_id is required")

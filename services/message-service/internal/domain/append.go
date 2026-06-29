@@ -17,6 +17,7 @@ type AppendMessageInput struct {
 	Command      types.SendMessageCommand
 	Permission   types.PermissionDecision
 	Conversation types.ConversationSendContext
+	AllocatedSeq int64
 }
 
 type AppendMessageResult struct {

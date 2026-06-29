@@ -65,14 +65,16 @@ func (u *SendMessageUseCase) Execute(ctx context.Context, command types.SendMess
 		return types.SendMessageResult{}, types.NewPermissionDenied(permission.Reason)
 	}
 
-	if conversation.ConversationMode != types.ConversationModeLocalRowLock {
-		return types.SendMessageResult{}, types.NewSequencerUnavailable("sequencer mode is contract-only in phase 1")
+	allocatedSeq, err := u.allocateConversationSeq(ctx, command, conversation)
+	if err != nil {
+		return types.SendMessageResult{}, err
 	}
 
 	result, err := u.messageRepo.AppendMessage(ctx, domain.AppendMessageInput{
 		Command:      command,
 		Permission:   permission,
 		Conversation: conversation,
+		AllocatedSeq: allocatedSeq,
 	})
 	if err != nil {
 		return types.SendMessageResult{}, err
@@ -129,4 +131,37 @@ func (u *SendMessageUseCase) readConversationSendContext(
 		lastErr = err
 	}
 	return types.ConversationSendContext{}, lastErr
+}
+
+func (u *SendMessageUseCase) allocateConversationSeq(
+	ctx context.Context,
+	command types.SendMessageCommand,
+	conversation types.ConversationSendContext,
+) (int64, error) {
+	switch conversation.ConversationMode {
+	case types.ConversationModeLocalRowLock:
+		return 0, nil
+	case types.ConversationModeSequencerBlock:
+		if u.sequencer == nil {
+			return 0, types.NewSequencerUnavailable("sequencer client is not configured")
+		}
+		minimumStartSeq, err := u.messageRepo.NextConversationSeqFloor(
+			ctx,
+			command.AuthContext.TenantID,
+			command.ConversationID,
+		)
+		if err != nil {
+			return 0, err
+		}
+		block, err := u.sequencer.AllocateSeqBlock(ctx, command, minimumStartSeq)
+		if err != nil {
+			return 0, err
+		}
+		if block.StartSeq <= 0 || block.EndSeq != block.StartSeq {
+			return 0, types.NewSequencerUnavailable("sequencer returned invalid single-message block")
+		}
+		return block.StartSeq, nil
+	default:
+		return 0, types.NewSequencerUnavailable("conversation mode is not supported")
+	}
 }

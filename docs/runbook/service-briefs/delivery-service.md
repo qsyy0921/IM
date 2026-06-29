@@ -18,6 +18,10 @@
 - `outbox-relay` 现已对非取消运行时错误做退避重试，并在 relay 模式通过 `/debug/metrics` 暴露低敏 retry 快照；publisher 错误写入稳定低敏 `last_error`，malformed payload / unsupported event 仍保持 fail-closed，交给 outbox retry / DLQ 语义处理。
 - 已补 delivery outbox ready 查询吞吐 hardening：新增 pending-ready expression index、blocking aggregate partial index 和 pending conversation/version index；ready SQL 按 `tenant_id + conversation_id` 顺序推进，relay 支持 `NEXUSIM_DELIVERY_OUTBOX_WORKERS` conversation-sharded workers，Kafka writer 支持 delivery 专用 batch size / timeout env，并输出 fetched / published / retry / DLQ 累计值和 last run / publish duration。
 - 2026-06-28 hotgroup QPS step 已验证该 hardening 的边界：旧链路在 20 人群 50 / 100 / 150 QPS 卡在 `delivery_outbox` drain；修正为 conversation-sharded relay 后，100 人群 50 / 100 / 150 QPS 均能在等待窗口内完成 `user_inbox` 和 `delivery_outbox` drain；200 QPS 探测发送 1000 / 1000 成功，后续 DB 证明 `user_inbox` 和 `delivery_outbox` 最终追平，但等待窗口内瓶颈转移到 delivery timeline projection / `user_inbox` fanout。
+- `timeline-consumer` 已支持 `NEXUSIM_DELIVERY_TIMELINE_CONSUMER_WORKERS` 多 worker runtime；
+  每个 worker 是同 consumer group 的独立 Kafka reader，由 Kafka 按 partition 分配任务。该能力
+  用于跨 conversation / partition projection 并行，不改变单 partition 顺序，也不把单热点会话
+  强行拆成无序并行。
 - Kafka writer 已显式固定 `acks=all`、禁自动建 topic、bounded attempts/backoff，并由本地门禁和 package 单测防漂移；真正 idempotent / transactional producer 仍属后续客户端选型。
 - 已补 delivery outbox audit / repair audit 错误脱敏：`last_error`、`before_last_error`、`after_last_error` 对外只返回稳定低敏分类，不暴露 broker body、账号、token 或 provider 原文。
 - 已补 `delivery.inbox_item.hidden.v1`：`HideInboxItem` 首次隐藏时同事务写 delivery outbox，push-gateway 可向同 user 在线设备发送 `delivery.hide` 轻量提示；重复隐藏不重复写 outbox。

@@ -107,6 +107,51 @@ func TestConversationTraceConfigRejectsInvalidValues(t *testing.T) {
 	}
 }
 
+func TestConversationScaleThresholdsFromEnvDefaults(t *testing.T) {
+	clearConversationScaleThresholds(t)
+	thresholds, err := conversationScaleThresholdsFromEnv()
+	if err != nil {
+		t.Fatalf("load conversation scale thresholds: %v", err)
+	}
+	if thresholds.SmallGroupMaxActiveMembers != 500 ||
+		thresholds.MediumGroupMaxActiveMembers != 5000 ||
+		thresholds.LargeGroupMaxActiveMembers != 50000 {
+		t.Fatalf("unexpected default thresholds: %+v", thresholds)
+	}
+}
+
+func TestConversationScaleThresholdsFromEnvLoadsStrictValues(t *testing.T) {
+	clearConversationScaleThresholds(t)
+	t.Setenv("NEXUSIM_CONVERSATION_SCALE_SMALL_MAX", "20")
+	t.Setenv("NEXUSIM_CONVERSATION_SCALE_MEDIUM_MAX", "40")
+	t.Setenv("NEXUSIM_CONVERSATION_SCALE_LARGE_MAX", "60")
+
+	thresholds, err := conversationScaleThresholdsFromEnv()
+	if err != nil {
+		t.Fatalf("load conversation scale thresholds: %v", err)
+	}
+	if thresholds.SmallGroupMaxActiveMembers != 20 ||
+		thresholds.MediumGroupMaxActiveMembers != 40 ||
+		thresholds.LargeGroupMaxActiveMembers != 60 {
+		t.Fatalf("unexpected thresholds: %+v", thresholds)
+	}
+}
+
+func TestConversationScaleThresholdsFromEnvRejectsInvalidValues(t *testing.T) {
+	clearConversationScaleThresholds(t)
+	t.Setenv("NEXUSIM_CONVERSATION_SCALE_SMALL_MAX", "zero")
+	if _, err := conversationScaleThresholdsFromEnv(); err == nil {
+		t.Fatalf("expected non-integer threshold to fail")
+	}
+
+	clearConversationScaleThresholds(t)
+	t.Setenv("NEXUSIM_CONVERSATION_SCALE_SMALL_MAX", "20")
+	t.Setenv("NEXUSIM_CONVERSATION_SCALE_MEDIUM_MAX", "10")
+	if _, err := conversationScaleThresholdsFromEnv(); err == nil {
+		t.Fatalf("expected unordered thresholds to fail")
+	}
+}
+
 func TestValidateTrustedMetadataListenerConfigAllowsPrivateAddressWithoutMTLS(t *testing.T) {
 	err := validateTrustedMetadataListenerConfig(
 		"172.31.50.10:10496",
@@ -345,6 +390,13 @@ func clearConversationTraceConfig(t *testing.T) {
 	t.Setenv("NEXUSIM_CONVERSATION_OTEL_TRACES_OTLP_ENDPOINT", "")
 	t.Setenv("NEXUSIM_CONVERSATION_OTEL_TRACES_OTLP_INSECURE", "")
 	t.Setenv("NEXUSIM_CONVERSATION_OTEL_TRACES_SAMPLING_RATIO", "")
+}
+
+func clearConversationScaleThresholds(t *testing.T) {
+	t.Helper()
+	t.Setenv("NEXUSIM_CONVERSATION_SCALE_SMALL_MAX", "")
+	t.Setenv("NEXUSIM_CONVERSATION_SCALE_MEDIUM_MAX", "")
+	t.Setenv("NEXUSIM_CONVERSATION_SCALE_LARGE_MAX", "")
 }
 
 func writeConversationTLSTestCert(t *testing.T, dir string, name string) (string, string) {

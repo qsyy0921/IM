@@ -18,6 +18,7 @@
 ## 服务 SDD
 
 - `message-service.md`
+- `timeline-service.md`
 - `client-platform.md`
 - `media-service.md`
 - `notification-service.md`

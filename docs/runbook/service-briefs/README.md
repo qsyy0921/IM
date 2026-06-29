@@ -27,22 +27,14 @@
 
 ## Distributed timeline / hot conversation planning
 
-[timeline](timeline-service.md) is now part of the local core runtime as a noop
-service. It is deployable and observable for hot-group loadtest topology, but it
-does not allocate sequence blocks or participate in the active message write path
-until the sequencer SDD and runtime land.
+[timeline](timeline-service.md) is now part of the local core runtime as a
+first-stage seq block allocator. It is deployable and observable for hot-group
+loadtest topology, can allocate sequence blocks through its own PostgreSQL
+state, and is now called by message-service when a conversation enters
+`SEQUENCER_BLOCK`. The current write path requests one seq per message; block
+cache, gap marker, epoch fencing and repair remain future hardening.
 
 ## Client platform
 
 Client platform is tracked in [client platform](../client-platform.md), not in
 backend service briefs.
-
-## 当前推进规则
-
-- 当前 active slice 是 backend architecture + AI / Agent / RAG demo path；client
-  仅作为演示入口，细节看 `../client-platform.md` 和 `../../sdd/client-platform.md`。
-- 现有 9 个 IM 业务服务和 timeline noop 运行节点只做阻塞当前 AI / Agent / RAG 链路、
-  热点群压测或用户点名事项的必要收口。
-- client platform 只能通过 `api-gateway` / `push-gateway` 使用后端能力。
-- memory 必须保留 source refs、speaker / audience、validity、supersedes、confidence、review state。
-- Agent 写动作必须走 policy precheck 和 `Proposal -> Approval -> Executor -> Audit`。

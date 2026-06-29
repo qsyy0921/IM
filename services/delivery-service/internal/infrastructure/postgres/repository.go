@@ -138,11 +138,11 @@ ORDER BY user_id
 		return 0, types.NewDBReadFailed(err.Error())
 	}
 
+	if err := insertInboxItems(ctx, tx, command, userIDs); err != nil {
+		return 0, err
+	}
 	projected := 0
 	for _, userID := range userIDs {
-		if err := insertInboxItem(ctx, tx, command, userID); err != nil {
-			return 0, err
-		}
 		if err := insertInboxOutbox(ctx, tx, command, userID); err != nil {
 			return 0, err
 		}
@@ -200,11 +200,11 @@ ORDER BY user_id
 		return 0, types.NewProjectionDependencyMissing(missingMessage)
 	}
 
+	if err := insertInboxItems(ctx, tx, command, userIDs); err != nil {
+		return 0, err
+	}
 	projected := 0
 	for _, userID := range userIDs {
-		if err := insertInboxItem(ctx, tx, command, userID); err != nil {
-			return 0, err
-		}
 		if err := insertInboxOutbox(ctx, tx, command, userID); err != nil {
 			return 0, err
 		}
@@ -265,16 +265,20 @@ WHERE tenant_id = $1
 	return count, nil
 }
 
-func insertInboxItem(
+func insertInboxItems(
 	ctx context.Context,
 	tx pgx.Tx,
 	command types.ProjectTimelineEventCommand,
-	userID types.UserID,
+	userIDs []types.UserID,
 ) error {
+	if len(userIDs) == 0 {
+		return nil
+	}
 	payloadJSON := command.PayloadJSON
 	if len(payloadJSON) == 0 {
 		payloadJSON = json.RawMessage(`{}`)
 	}
+	recipients := userIDsAsStrings(userIDs)
 	_, err := tx.Exec(ctx, `
 INSERT INTO user_inbox (
     tenant_id,
@@ -289,13 +293,36 @@ INSERT INTO user_inbox (
     fanout_mode,
     permission_version,
     created_at
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, now())
+)
+SELECT
+    $1,
+    recipient.user_id,
+    $3,
+    $4,
+    $5,
+    $6,
+    $7,
+    $8,
+    $9,
+    $10,
+    $11,
+    now()
+FROM unnest($2::text[]) AS recipient(user_id)
+ORDER BY recipient.user_id
 ON CONFLICT (tenant_id, user_id, event_id) DO NOTHING
-`, command.TenantID, userID, command.ConversationID, command.ConversationSeq, command.EventID, command.EventType, command.MessageID, command.SenderID, payloadJSON, command.FanoutMode, command.PermissionVersion)
+`, command.TenantID, recipients, command.ConversationID, command.ConversationSeq, command.EventID, command.EventType, command.MessageID, command.SenderID, payloadJSON, command.FanoutMode, command.PermissionVersion)
 	if err != nil {
 		return types.NewDBWriteFailed(err.Error())
 	}
 	return nil
+}
+
+func userIDsAsStrings(userIDs []types.UserID) []string {
+	recipients := make([]string, 0, len(userIDs))
+	for _, userID := range userIDs {
+		recipients = append(recipients, string(userID))
+	}
+	return recipients
 }
 
 func upsertMembershipProjection(

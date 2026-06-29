@@ -12,10 +12,11 @@ import (
 )
 
 type Repository struct {
-	pool     *pgxpool.Pool
-	now      func() time.Time
-	changeID func() (types.ChangeID, error)
-	eventID  func() (types.EventID, error)
+	pool            *pgxpool.Pool
+	now             func() time.Time
+	changeID        func() (types.ChangeID, error)
+	eventID         func() (types.EventID, error)
+	scaleThresholds domain.ConversationScaleThresholds
 }
 
 type RepositoryOption func(*Repository)
@@ -38,11 +39,18 @@ func NewRepository(pool *pgxpool.Pool, opts ...RepositoryOption) *Repository {
 			}
 			return types.EventID(id), nil
 		},
+		scaleThresholds: domain.DefaultConversationScaleThresholds(),
 	}
 	for _, opt := range opts {
 		opt(repo)
 	}
 	return repo
+}
+
+func WithScaleThresholds(thresholds domain.ConversationScaleThresholds) RepositoryOption {
+	return func(repo *Repository) {
+		repo.scaleThresholds = thresholds
+	}
 }
 
 func WithClock(clock func() time.Time) RepositoryOption {
@@ -204,7 +212,7 @@ func (r *Repository) CreateMemberChange(
 	if err := upsertConversationMember(ctx, tx, command, record); err != nil {
 		return types.MemberChangeResult{}, err
 	}
-	scalePolicy, err := applyConversationScalePolicyAfterMemberChange(ctx, tx, conversation)
+	scalePolicy, err := applyConversationScalePolicyAfterMemberChange(ctx, tx, conversation, r.scaleThresholds)
 	if err != nil {
 		return types.MemberChangeResult{}, err
 	}

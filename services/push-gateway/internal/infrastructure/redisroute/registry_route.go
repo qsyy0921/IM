@@ -121,6 +121,120 @@ func (registry *Registry) EnqueueNotification(
 	return result, nil
 }
 
+func (registry *Registry) SubscribeConversation(
+	ctx context.Context,
+	command types.ConversationSubscriptionCommand,
+) (types.ConversationSubscriptionResult, error) {
+	localResult, err := registry.local.SubscribeConversation(ctx, command)
+	if err != nil {
+		return localResult, err
+	}
+	registry.mu.Lock()
+	state, ok := registry.routes[command.AuthContext.SessionID]
+	if ok {
+		if registry.subscriptions[command.AuthContext.SessionID] == nil {
+			registry.subscriptions[command.AuthContext.SessionID] = make(map[string]struct{})
+		}
+		registry.subscriptions[command.AuthContext.SessionID][command.ConversationID] = struct{}{}
+	}
+	registry.mu.Unlock()
+	if !ok {
+		_, _ = registry.local.UnsubscribeConversation(ctx, command)
+		return types.ConversationSubscriptionResult{}, types.ErrPermissionDenied
+	}
+	if err := registry.writeConversationSubscription(ctx, state.entry, command.ConversationID); err != nil {
+		_, _ = registry.local.UnsubscribeConversation(ctx, command)
+		registry.mu.Lock()
+		delete(registry.subscriptions[command.AuthContext.SessionID], command.ConversationID)
+		registry.mu.Unlock()
+		registry.metrics.registerErrorCount.Add(1)
+		return types.ConversationSubscriptionResult{}, err
+	}
+	return localResult, nil
+}
+
+func (registry *Registry) UnsubscribeConversation(
+	ctx context.Context,
+	command types.ConversationSubscriptionCommand,
+) (types.ConversationSubscriptionResult, error) {
+	localResult, err := registry.local.UnsubscribeConversation(ctx, command)
+	if err != nil {
+		return localResult, err
+	}
+	registry.mu.Lock()
+	state, ok := registry.routes[command.AuthContext.SessionID]
+	if ok {
+		delete(registry.subscriptions[command.AuthContext.SessionID], command.ConversationID)
+	}
+	registry.mu.Unlock()
+	if !ok {
+		return localResult, nil
+	}
+	if err := registry.deleteConversationSubscription(ctx, state.entry, command.ConversationID); err != nil {
+		registry.metrics.cleanupErrorCount.Add(1)
+		return localResult, err
+	}
+	return localResult, nil
+}
+
+func (registry *Registry) EnqueueConversationSignal(
+	ctx context.Context,
+	notification types.DeliveryNotification,
+) (types.NotifyDeliveryResult, error) {
+	notification.Kind = types.DeliveryNotificationKindConversationSignal
+	localResult, err := registry.local.EnqueueConversationSignal(ctx, notification)
+	if err != nil {
+		return localResult, err
+	}
+	routes, err := registry.lookupConversationRoutes(ctx, notification.TenantID, notification.ConversationID)
+	if err != nil {
+		localResult.Dropped++
+		registry.metrics.lookupErrorCount.Add(1)
+		return localResult, nil
+	}
+	result := localResult
+	remoteSessionsByGateway := make(map[string]int)
+	for _, route := range routes {
+		if route.GatewayID == "" || route.SessionID == "" {
+			continue
+		}
+		if route.ResumeToken != "" {
+			if err := registry.appendRedisResume(ctx, route.ResumeToken, domain.DeliveryNotify(notification)); err != nil {
+				registry.metrics.resumeAppendErrorCount.Add(1)
+			}
+		}
+		if route.GatewayID == registry.config.GatewayID {
+			continue
+		}
+		remoteSessionsByGateway[route.GatewayID]++
+		result.MatchedSessions++
+	}
+	var remoteMatched int
+	for _, sessionCount := range remoteSessionsByGateway {
+		remoteMatched += sessionCount
+	}
+	if remoteMatched > 0 {
+		registry.metrics.remoteMatchedSessions.Add(uint64(remoteMatched))
+	}
+	for gatewayID, sessionCount := range remoteSessionsByGateway {
+		registry.metrics.remotePublishCallCount.Add(1)
+		subscriberCount, err := registry.publishRemote(ctx, gatewayID, notification)
+		if err != nil {
+			result.Dropped += sessionCount
+			registry.metrics.remotePublishErrorCount.Add(1)
+			continue
+		}
+		if subscriberCount == 0 {
+			result.Dropped += sessionCount
+			registry.metrics.remoteNoSubscriberCount.Add(uint64(sessionCount))
+			continue
+		}
+		result.Enqueued += sessionCount
+		registry.metrics.remoteEnqueuedSessions.Add(uint64(sessionCount))
+	}
+	return result, nil
+}
+
 func (registry *Registry) EvictDevice(ctx context.Context, tenantID string, userID string, deviceID string, reason string) (types.SessionEvictionResult, error) {
 	localResult, err := registry.local.EvictDevice(ctx, tenantID, userID, deviceID, reason)
 	if err != nil {
@@ -249,6 +363,10 @@ func (registry *Registry) renewRouteLoop(ctx context.Context, entry routeEntry) 
 				registry.metrics.renewErrorCount.Add(1)
 				tickFailed = true
 			}
+			if err := registry.renewConversationSubscriptions(refreshCtx, entry); err != nil {
+				registry.metrics.renewErrorCount.Add(1)
+				tickFailed = true
+			}
 			cancel()
 			if tickFailed {
 				consecutiveFailures++
@@ -284,6 +402,57 @@ func (registry *Registry) deleteRoute(ctx context.Context, entry routeEntry) err
 	return err
 }
 
+type conversationRouteRef struct {
+	TenantID  string `json:"tenant_id"`
+	UserID    string `json:"user_id"`
+	SessionID string `json:"session_id"`
+}
+
+func (registry *Registry) writeConversationSubscription(ctx context.Context, entry routeEntry, conversationID string) error {
+	payload, err := json.Marshal(conversationRouteRef{
+		TenantID:  entry.TenantID,
+		UserID:    entry.UserID,
+		SessionID: entry.SessionID,
+	})
+	if err != nil {
+		return err
+	}
+	pipe := registry.client.TxPipeline()
+	key := registry.conversationKey(entry.TenantID, conversationID)
+	pipe.SAdd(ctx, key, string(payload))
+	pipe.Expire(ctx, key, registry.config.RouteTTL)
+	_, err = pipe.Exec(ctx)
+	return err
+}
+
+func (registry *Registry) deleteConversationSubscription(ctx context.Context, entry routeEntry, conversationID string) error {
+	payload, err := json.Marshal(conversationRouteRef{
+		TenantID:  entry.TenantID,
+		UserID:    entry.UserID,
+		SessionID: entry.SessionID,
+	})
+	if err != nil {
+		return err
+	}
+	_, err = registry.client.SRem(ctx, registry.conversationKey(entry.TenantID, conversationID), string(payload)).Result()
+	return err
+}
+
+func (registry *Registry) renewConversationSubscriptions(ctx context.Context, entry routeEntry) error {
+	registry.mu.Lock()
+	conversations := make([]string, 0, len(registry.subscriptions[entry.SessionID]))
+	for conversationID := range registry.subscriptions[entry.SessionID] {
+		conversations = append(conversations, conversationID)
+	}
+	registry.mu.Unlock()
+	for _, conversationID := range conversations {
+		if err := registry.writeConversationSubscription(ctx, entry, conversationID); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (registry *Registry) cleanupUserRouteKey(ctx context.Context, userKey string) (int, error) {
 	sessionIDs, err := registry.client.SMembers(ctx, userKey).Result()
 	if err != nil {
@@ -316,6 +485,52 @@ func (registry *Registry) cleanupUserRouteKey(ctx context.Context, userKey strin
 		registry.metrics.staleRemovedCount.Add(uint64(removed))
 	}
 	return int(removed), err
+}
+
+func (registry *Registry) lookupConversationRoutes(ctx context.Context, tenantID string, conversationID string) ([]routeEntry, error) {
+	key := registry.conversationKey(tenantID, conversationID)
+	rawRefs, err := registry.client.SMembers(ctx, key).Result()
+	if err != nil {
+		return nil, err
+	}
+	routes := make([]routeEntry, 0, len(rawRefs))
+	stale := make([]interface{}, 0)
+	for _, rawRef := range rawRefs {
+		var ref conversationRouteRef
+		if err := json.Unmarshal([]byte(rawRef), &ref); err != nil {
+			stale = append(stale, rawRef)
+			continue
+		}
+		if ref.TenantID != tenantID || ref.UserID == "" || ref.SessionID == "" {
+			stale = append(stale, rawRef)
+			continue
+		}
+		raw, err := registry.client.Get(ctx, registry.sessionKey(ref.TenantID, ref.UserID, ref.SessionID)).Result()
+		if errors.Is(err, redis.Nil) {
+			stale = append(stale, rawRef)
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		var entry routeEntry
+		if err := json.Unmarshal([]byte(raw), &entry); err != nil {
+			stale = append(stale, rawRef)
+			continue
+		}
+		if entry.TenantID != ref.TenantID || entry.UserID != ref.UserID || entry.SessionID != ref.SessionID {
+			stale = append(stale, rawRef)
+			continue
+		}
+		routes = append(routes, entry)
+	}
+	if len(stale) > 0 {
+		removed, _ := registry.client.SRem(ctx, key, stale...).Result()
+		if removed > 0 {
+			registry.metrics.staleRemovedCount.Add(uint64(removed))
+		}
+	}
+	return routes, nil
 }
 
 func (registry *Registry) lookupRoutes(ctx context.Context, tenantID string, userID string) ([]routeEntry, error) {
@@ -394,8 +609,16 @@ func (registry *Registry) userKey(tenantID string, userID string) string {
 	return strings.Join([]string{registry.config.KeyPrefix, "route", registry.userRouteHashTag(tenantID, userID), "user"}, ":")
 }
 
+func (registry *Registry) conversationKey(tenantID string, conversationID string) string {
+	return strings.Join([]string{registry.config.KeyPrefix, "route", registry.conversationRouteHashTag(tenantID, conversationID), "conversation"}, ":")
+}
+
 func (registry *Registry) userRouteHashTag(tenantID string, userID string) string {
 	return "{user:" + redisKeyPart(tenantID) + ":" + redisKeyPart(userID) + "}"
+}
+
+func (registry *Registry) conversationRouteHashTag(tenantID string, conversationID string) string {
+	return "{conversation:" + redisKeyPart(tenantID) + ":" + redisKeyPart(conversationID) + "}"
 }
 
 func (registry *Registry) gatewayChannel(gatewayID string) string {

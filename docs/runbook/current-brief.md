@@ -6,8 +6,10 @@ brief、loadtest report、development-progress 或 archive。
 ## 当前主线
 
 - 客户端 Web / PC 已达到演示 MVP；除阻塞演示的问题外，不继续追完整产品级客户端。
-- 后端主线已切到 AI / Agent / RAG 演示路径和必要平台能力。
-- 当前 active module：Agent action boundary / repair cases。
+- 后端主线按用户指令临时切到热点群聊链路收口：conversation fanout policy、
+  timeline-service seq block、message-service sequencer active path、delivery projection
+  和 push conversation signal。
+- 当前 active module：hot group fanout / sequencer / projection hardening。
 
 ## 最近收口
 
@@ -35,8 +37,11 @@ brief、loadtest report、development-progress 或 archive。
 - Conversation scale policy 已在 conversation-service domain 层落地：direct / small group
   使用 active `WRITE_FANOUT`；medium group 使用 active first-stage `HYBRID_FANOUT`；
   large group 使用 active first-stage `READ_FANOUT`；hot group 的
-  `BROADCAST_SIGNAL + SEQUENCER_BLOCK` 仍在 timeline sequencer / push signal 完成前
-  contract-only / fail-closed。
+  `BROADCAST_SIGNAL + SEQUENCER_BLOCK` 已有 timeline seq-block allocator 和 push
+  conversation subscription / signal 广播服务端 first path；message-service 已接入
+  第一阶段 active `SEQUENCER_BLOCK` 写路径，发送时调用 timeline-service
+  `AllocateSeqBlock(block_size=1)`，获得 valid lease 后才写 message facts。当前仍未实现
+  本地 block cache、gap marker 和 epoch fencing 深化。
 - delivery-service 已补 outbox relay 吞吐 hardening：ready SQL 避免积压下反复扫描历史
   `PUBLISHED` 行，新增 pending-ready / blocking aggregate indexes，relay 支持
   conversation-sharded workers 和 delivery 专用 Kafka batch 参数；2026-06-28
@@ -45,25 +50,41 @@ brief、loadtest report、development-progress 或 archive。
   projection / `user_inbox` fanout。
 - delivery-service 已补 `delivery.conversation.signal.v1` first path：`READ_FANOUT` /
   `BROADCAST_SIGNAL` 不再按成员数写 delivery outbox，而是写会话级 signal；push-gateway
-  / receipt-service 当前只校验并 checkpoint，不伪造 user-level 在线通知。hotgroup runner
-  已支持 `--expect-fanout-mode` 并按 WRITE / HYBRID / READ / BROADCAST 区分验证
-  `user_inbox` 或 `delivery_timeline_items`。
+  已支持 `conversation.subscribe / unsubscribe` 和 conversation signal fanout，receipt-service
+  当前仍只校验并 checkpoint，不伪造 user-level 回执。hotgroup runner 已支持
+  `--expect-fanout-mode` 并按 WRITE / HYBRID / READ / BROADCAST 区分验证 `user_inbox`
+  或 `delivery_timeline_items`。
+- delivery-service materialized `user_inbox` projection 已将 per-recipient inbox insert
+  合并为批量 insert，保持 per-recipient delivery outbox 事件语义不变，减少小 / 中群写扩散
+  的 PostgreSQL roundtrip。
+- delivery-service `timeline-consumer` 已支持 `NEXUSIM_DELIVERY_TIMELINE_CONSUMER_WORKERS`
+  多 worker runtime：同一 consumer group 内启动多个 Kafka reader，由 Kafka 做 partition
+  assignment；这能并行多个 conversation / partition 的 projection，但仍保持单 partition 顺序，
+  不把单热点会话伪装成可无序并行。
+- 2026-06-29 已在 Ubuntu Docker 核心链路跑通热点群小规模 smoke：
+  `group_size=61`、`sender_count=4`、`message_count=20`、`fanout_mode=BROADCAST_SIGNAL`、
+  `conversation_mode=SEQUENCER_BLOCK`、3 个 WebSocket conversation subscriber 共收到
+  60 条 `delivery.notify` conversation signal；`send_p95_ms=19.03`、
+  `user_inbox_rows=0`、`delivery_timeline_rows=20`、`delivery_outbox_pending=0`、
+  `message_outbox_dlq=0`、`delivery_outbox_dlq=0`。原始结果在
+  `H:\NexusIM\loadtest-results\hotgroup-broadcast-push-smoke-20260629-2135`。
 
 ## 已成型底座
 
 - 10 个核心运行链路服务：api-gateway、identity-service、message-service、
   conversation-service、delivery-service、push-gateway、receipt-service、
   contacts-service、policy-service，以及已进入本地 Docker / 观测链路的
-  timeline-service noop。
+  timeline-service seq-block allocator。
 - AI foundation：search-service、memory-service、retrieval-gateway、rag-service、
   summary-service、agent-service、skill-registry、mcp-gateway、action-executor、
   ai-eval-service、Python AI Worker。
 - Product-active first paths：admin-service、audit-service、control-plane-service、
   knowledge-ingestion-service、media-service、model-gateway、notification-service、
   presence-service、vector-index-service、workflow-service。
-- Distributed timeline planning：timeline-service 已建立六层边界、noop runtime、
-  Docker runtime 和 Prometheus / Grafana 观测，用于后续热点会话 sequencer、seq block、
-  gap marker 和分区映射；当前不进入消息写入主路径。
+- Distributed timeline planning：timeline-service 已建立六层边界、PostgreSQL
+  seq block lease 表、`AllocateSeqBlock` gRPC API、Docker runtime 和 Prometheus /
+  Grafana 观测；message-service 已在 active `SEQUENCER_BLOCK` 写路径消费该 lease，
+  当前第一阶段按每条消息申请单条 block。
 - Observability platform：当前 first-stage 指标和 trace 继续按 Prometheus / Grafana /
   OpenTelemetry 分工维护；它们只提供观测，不参与业务判定或隐藏降级。
 
@@ -76,5 +97,8 @@ brief、loadtest report、development-progress 或 archive。
 
 ## 下一个方向
 
-- 继续补 Agent action boundary / repair cases；正式生产级运维 UI、provider-grade
-  长周期平台和 provider replay 批量审批 UI 仍后置。
+- 基于已通过的小规模 smoke，继续把 timeline-service 从单条 seq block 推进到
+  block cache、gap marker、epoch fencing 和 repair operator。
+- 后续再扩大三机热点群压测规模，并把 Prometheus / Grafana 趋势、projection lag、
+  push signal 和 PostgreSQL bottleneck 曲线归档到低敏报告；正式生产级运维 UI、
+  provider-grade 长周期平台仍后置。

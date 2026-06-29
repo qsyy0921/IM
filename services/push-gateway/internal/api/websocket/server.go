@@ -288,6 +288,10 @@ func DecodeClientFrame(raw json.RawMessage) (types.ClientFrame, string, error) {
 			return types.ClientFrame{}, frame.RequestID, types.NewInvalidFrame("device_id is required")
 		}
 	case types.OpClientPing:
+	case types.OpConversationSubscribe, types.OpConversationUnsubscribe:
+		if frame.ConversationID == "" {
+			return types.ClientFrame{}, frame.RequestID, types.NewInvalidFrame("conversation_id is required")
+		}
 	case types.OpDeliveryAck:
 		if frame.ConversationID == "" || frame.ReceivedSeq <= 0 {
 			return types.ClientFrame{}, frame.RequestID, types.NewInvalidFrame("delivery ack is incomplete")

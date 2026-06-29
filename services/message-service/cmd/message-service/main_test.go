@@ -110,6 +110,52 @@ func TestConversationClientTLSConfigFromEnvLoadsTLS(t *testing.T) {
 	}
 }
 
+func TestTimelineClientTLSConfigFromEnvDisabledByDefault(t *testing.T) {
+	clearTimelineClientTLSConfig(t)
+	config, err := timelineClientTLSConfigFromEnv()
+	if err != nil {
+		t.Fatalf("load timeline client tls config: %v", err)
+	}
+	if config.Enabled() {
+		t.Fatalf("expected timeline client tls to be disabled by default: %+v", config)
+	}
+}
+
+func TestTimelineClientTLSConfigFromEnvRequiresCAFile(t *testing.T) {
+	clearTimelineClientTLSConfig(t)
+	t.Setenv("NEXUSIM_TIMELINE_SERVICE_TLS_SERVER_NAME", "timeline-service.nexusim.local")
+	if _, err := timelineClientTLSConfigFromEnv(); err == nil {
+		t.Fatalf("expected timeline client tls without CA file to fail")
+	}
+}
+
+func TestTimelineClientTLSConfigFromEnvRequiresClientKeyPair(t *testing.T) {
+	clearTimelineClientTLSConfig(t)
+	t.Setenv("NEXUSIM_TIMELINE_SERVICE_TLS_CA_FILE", "ca.pem")
+	t.Setenv("NEXUSIM_TIMELINE_SERVICE_TLS_CLIENT_CERT_FILE", "client.crt")
+	if _, err := timelineClientTLSConfigFromEnv(); err == nil {
+		t.Fatalf("expected partial timeline client certificate config to fail")
+	}
+}
+
+func TestTimelineClientTLSConfigFromEnvLoadsTLS(t *testing.T) {
+	clearTimelineClientTLSConfig(t)
+	t.Setenv("NEXUSIM_TIMELINE_SERVICE_TLS_CA_FILE", "ca.pem")
+	t.Setenv("NEXUSIM_TIMELINE_SERVICE_TLS_SERVER_NAME", "timeline-service.nexusim.local")
+	t.Setenv("NEXUSIM_TIMELINE_SERVICE_TLS_CLIENT_CERT_FILE", "client.crt")
+	t.Setenv("NEXUSIM_TIMELINE_SERVICE_TLS_CLIENT_KEY_FILE", "client.key")
+	config, err := timelineClientTLSConfigFromEnv()
+	if err != nil {
+		t.Fatalf("load timeline client tls config: %v", err)
+	}
+	if config.CAFile != "ca.pem" ||
+		config.ServerName != "timeline-service.nexusim.local" ||
+		config.ClientCertFile != "client.crt" ||
+		config.ClientKeyFile != "client.key" {
+		t.Fatalf("unexpected timeline client tls config: %+v", config)
+	}
+}
+
 func TestNewGRPCServerAcceptsMetadataAuthMode(t *testing.T) {
 	clearMessageGRPCTLSConfig(t)
 	t.Setenv("NEXUSIM_MESSAGE_AUTH_MODE", "metadata")
@@ -497,6 +543,14 @@ func clearConversationClientTLSConfig(t *testing.T) {
 	t.Setenv("NEXUSIM_CONVERSATION_SERVICE_TLS_SERVER_NAME", "")
 	t.Setenv("NEXUSIM_CONVERSATION_SERVICE_TLS_CLIENT_CERT_FILE", "")
 	t.Setenv("NEXUSIM_CONVERSATION_SERVICE_TLS_CLIENT_KEY_FILE", "")
+}
+
+func clearTimelineClientTLSConfig(t *testing.T) {
+	t.Helper()
+	t.Setenv("NEXUSIM_TIMELINE_SERVICE_TLS_CA_FILE", "")
+	t.Setenv("NEXUSIM_TIMELINE_SERVICE_TLS_SERVER_NAME", "")
+	t.Setenv("NEXUSIM_TIMELINE_SERVICE_TLS_CLIENT_CERT_FILE", "")
+	t.Setenv("NEXUSIM_TIMELINE_SERVICE_TLS_CLIENT_KEY_FILE", "")
 }
 
 func clearMessageGRPCTLSConfig(t *testing.T) {

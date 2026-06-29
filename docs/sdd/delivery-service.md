@@ -247,7 +247,11 @@ Payload 映射：
 
 `delivery.inbox_item.created.v1` 和 `delivery.inbox_item.hidden.v1` 第一阶段定位为在线通知和补拉 / 本地视图更新唤醒信号，不承载完整消息体，也不代表 message-service 事实变更。push-gateway 收到后只能通知在线客户端回源或更新本地视图；客户端仍以 `PullInbox` 返回的 durable read model 为准。
 
-`delivery.conversation.signal.v1` 第一阶段由 push-gateway / receipt-service 校验并提交 checkpoint，但不直接转成 user-level WebSocket notify。真正的热点在线广播需要 push-gateway 拥有 conversation subscription / presence 视图后才能把 conversation-level signal 扩展到在线 session；在该能力完成前不能伪造用户通知或用本地 fallback 假装送达。
+`delivery.conversation.signal.v1` 第一阶段由 receipt-service 校验并提交 checkpoint；
+push-gateway 已拥有 `conversation.subscribe / unsubscribe` 服务端 first path，可将
+conversation-level signal 扩展为订阅该 conversation 的在线 session 轻量 notify。
+该 notify 仍不是 user-level durable delivery，不写 `user_inbox`，也不承载消息体；
+客户端必须回源 `PullInbox` / timeline read model 校准，离线用户不能被伪造成已通知。
 
 Relay 语义：
 
@@ -401,6 +405,18 @@ Kafka conversation.timeline.events
 -> commit
 -> commit Kafka offset
 ```
+
+`timeline-consumer` 支持按 Kafka partition 安全并行：
+
+| 环境变量 | 默认值 | 说明 |
+| --- | --- | --- |
+| `NEXUSIM_DELIVERY_TIMELINE_CONSUMER_WORKERS` | `1` | 同一 consumer group 内启动的独立 Kafka reader / projection worker 数；必须是正整数，非法值启动失败。 |
+| `NEXUSIM_DELIVERY_TIMELINE_CONSUMER_ERROR_BACKOFF` | `1s` | Fetch / Commit 等运行时错误的退避间隔。 |
+
+多 worker 只提升跨 partition / 多 conversation 的 projection 并行度。`tenant_id + conversation_id`
+仍应作为 timeline partition key 保持同一 conversation 顺序；单热点会话的写放大必须通过
+`HYBRID_FANOUT` / `READ_FANOUT` / `BROADCAST_SIGNAL`、fanout bucket 或 timeline service
+sequencer 策略解决，不能通过无序并发处理同一 partition 来换吞吐。
 
 ### 8.2 Pull Inbox
 

@@ -71,6 +71,64 @@ func TestRegistryEnqueueNotificationFailsClosedWhenQueueFull(t *testing.T) {
 	}
 }
 
+func TestRegistryConversationSignalRequiresSubscription(t *testing.T) {
+	registry := NewRegistry()
+	subscribedOutbound := make(chan types.ServerFrame, 2)
+	unsubscribedOutbound := make(chan types.ServerFrame, 2)
+	auth := types.AuthContext{TenantID: "tenant-1", UserID: "user-1", DeviceID: "device-1", SessionID: "session-1"}
+	if _, err := registry.Register(context.Background(), types.SessionRegistration{
+		AuthContext: auth,
+		SessionID:   "session-1",
+		Outbound:    subscribedOutbound,
+	}); err != nil {
+		t.Fatalf("register subscribed: %v", err)
+	}
+	if _, err := registry.Register(context.Background(), types.SessionRegistration{
+		AuthContext: types.AuthContext{TenantID: "tenant-1", UserID: "user-2", DeviceID: "device-2", SessionID: "session-2"},
+		SessionID:   "session-2",
+		Outbound:    unsubscribedOutbound,
+	}); err != nil {
+		t.Fatalf("register unsubscribed: %v", err)
+	}
+	if _, err := registry.SubscribeConversation(context.Background(), types.ConversationSubscriptionCommand{
+		AuthContext:    auth,
+		ConversationID: "conversation-1",
+	}); err != nil {
+		t.Fatalf("subscribe: %v", err)
+	}
+	notification := testNotification()
+	notification.Kind = types.DeliveryNotificationKindConversationSignal
+	notification.UserID = ""
+	result, err := registry.EnqueueConversationSignal(context.Background(), notification)
+	if err != nil {
+		t.Fatalf("conversation signal: %v", err)
+	}
+	if result.MatchedSessions != 1 || result.Enqueued != 1 || len(subscribedOutbound) != 1 || len(unsubscribedOutbound) != 0 {
+		t.Fatalf("unexpected signal result=%+v subscribed=%d unsubscribed=%d", result, len(subscribedOutbound), len(unsubscribedOutbound))
+	}
+	frame := <-subscribedOutbound
+	if frame.Op != types.OpDeliveryNotify ||
+		frame.ConversationID != "conversation-1" ||
+		frame.ConversationSeq != 7 ||
+		!frame.PullRequired {
+		t.Fatalf("unexpected signal frame: %+v", frame)
+	}
+	if _, err := registry.UnsubscribeConversation(context.Background(), types.ConversationSubscriptionCommand{
+		AuthContext:    auth,
+		ConversationID: "conversation-1",
+	}); err != nil {
+		t.Fatalf("unsubscribe: %v", err)
+	}
+	notification.EventID = "delivery-event-2"
+	result, err = registry.EnqueueConversationSignal(context.Background(), notification)
+	if err != nil {
+		t.Fatalf("conversation signal after unsubscribe: %v", err)
+	}
+	if result.MatchedSessions != 0 || result.Enqueued != 0 {
+		t.Fatalf("unexpected signal after unsubscribe: %+v", result)
+	}
+}
+
 func TestRegistryEvictDeviceClosesMatchingSessions(t *testing.T) {
 	registry := NewRegistry()
 	firstEvicted := make(chan types.SessionEviction, 1)

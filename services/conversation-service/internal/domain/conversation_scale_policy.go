@@ -23,9 +23,14 @@ const (
 	SmallGroupMaxActiveMembers int64 = 500
 	// Medium groups use hybrid fanout; large groups use timeline pull.
 	MediumGroupMaxActiveMembers int64 = 5000
-	// Hot groups remain contract-only until timeline-service sequencer is active.
 	LargeGroupMaxActiveMembers int64 = 50000
 )
+
+type ConversationScaleThresholds struct {
+	SmallGroupMaxActiveMembers  int64
+	MediumGroupMaxActiveMembers int64
+	LargeGroupMaxActiveMembers  int64
+}
 
 type ConversationScalePolicy struct {
 	Tier                ConversationScaleTier
@@ -40,8 +45,27 @@ func ResolveConversationScalePolicy(
 	conversationType types.ConversationType,
 	activeMemberCount int64,
 ) (ConversationScalePolicy, error) {
+	return ResolveConversationScalePolicyWithThresholds(conversationType, activeMemberCount, DefaultConversationScaleThresholds())
+}
+
+func DefaultConversationScaleThresholds() ConversationScaleThresholds {
+	return ConversationScaleThresholds{
+		SmallGroupMaxActiveMembers:  SmallGroupMaxActiveMembers,
+		MediumGroupMaxActiveMembers: MediumGroupMaxActiveMembers,
+		LargeGroupMaxActiveMembers:  LargeGroupMaxActiveMembers,
+	}
+}
+
+func ResolveConversationScalePolicyWithThresholds(
+	conversationType types.ConversationType,
+	activeMemberCount int64,
+	thresholds ConversationScaleThresholds,
+) (ConversationScalePolicy, error) {
 	if activeMemberCount <= 0 {
 		return ConversationScalePolicy{}, types.NewInvalidArgument("active member count is invalid")
+	}
+	if err := thresholds.Validate(); err != nil {
+		return ConversationScalePolicy{}, err
 	}
 	switch conversationType {
 	case types.ConversationTypeDirect:
@@ -56,10 +80,19 @@ func ResolveConversationScalePolicy(
 			"local",
 		), nil
 	case types.ConversationTypeGroup:
-		return resolveGroupScalePolicy(activeMemberCount), nil
+		return resolveGroupScalePolicy(activeMemberCount, thresholds), nil
 	default:
 		return ConversationScalePolicy{}, types.NewInvalidArgument("conversation_type is not supported")
 	}
+}
+
+func (thresholds ConversationScaleThresholds) Validate() error {
+	if thresholds.SmallGroupMaxActiveMembers <= 0 ||
+		thresholds.MediumGroupMaxActiveMembers <= thresholds.SmallGroupMaxActiveMembers ||
+		thresholds.LargeGroupMaxActiveMembers <= thresholds.MediumGroupMaxActiveMembers {
+		return types.NewInvalidArgument("conversation scale thresholds are invalid")
+	}
+	return nil
 }
 
 func ResolveConversationCreatePolicy(
@@ -76,9 +109,9 @@ func ResolveConversationCreatePolicy(
 	return policy, nil
 }
 
-func resolveGroupScalePolicy(activeMemberCount int64) ConversationScalePolicy {
+func resolveGroupScalePolicy(activeMemberCount int64, thresholds ConversationScaleThresholds) ConversationScalePolicy {
 	switch {
-	case activeMemberCount <= SmallGroupMaxActiveMembers:
+	case activeMemberCount <= thresholds.SmallGroupMaxActiveMembers:
 		return activeConversationPolicy(
 			ConversationScaleTierSmall,
 			types.ConversationModeLocalRowLock,
@@ -86,7 +119,7 @@ func resolveGroupScalePolicy(activeMemberCount int64) ConversationScalePolicy {
 			1,
 			"local",
 		)
-	case activeMemberCount <= MediumGroupMaxActiveMembers:
+	case activeMemberCount <= thresholds.MediumGroupMaxActiveMembers:
 		return activeConversationPolicy(
 			ConversationScaleTierMedium,
 			types.ConversationModeLocalRowLock,
@@ -94,7 +127,7 @@ func resolveGroupScalePolicy(activeMemberCount int64) ConversationScalePolicy {
 			2,
 			"hybrid",
 		)
-	case activeMemberCount <= LargeGroupMaxActiveMembers:
+	case activeMemberCount <= thresholds.LargeGroupMaxActiveMembers:
 		return activeConversationPolicy(
 			ConversationScaleTierLarge,
 			types.ConversationModeLocalRowLock,
@@ -103,7 +136,7 @@ func resolveGroupScalePolicy(activeMemberCount int64) ConversationScalePolicy {
 			"read",
 		)
 	default:
-		return contractOnlyConversationPolicy(
+		return activeConversationPolicy(
 			ConversationScaleTierHot,
 			types.ConversationModeSequencerBlock,
 			types.FanoutModeBroadcastSignal,
@@ -123,23 +156,6 @@ func activeConversationPolicy(
 	return ConversationScalePolicy{
 		Tier:                tier,
 		Runtime:             ConversationScaleRuntimeActive,
-		ConversationMode:    conversationMode,
-		FanoutMode:          fanoutMode,
-		FanoutPolicyVersion: fanoutPolicyVersion,
-		CurrentSeqShard:     currentSeqShard,
-	}
-}
-
-func contractOnlyConversationPolicy(
-	tier ConversationScaleTier,
-	conversationMode types.ConversationMode,
-	fanoutMode types.FanoutMode,
-	fanoutPolicyVersion int64,
-	currentSeqShard string,
-) ConversationScalePolicy {
-	return ConversationScalePolicy{
-		Tier:                tier,
-		Runtime:             ConversationScaleRuntimeContractOnly,
 		ConversationMode:    conversationMode,
 		FanoutMode:          fanoutMode,
 		FanoutPolicyVersion: fanoutPolicyVersion,

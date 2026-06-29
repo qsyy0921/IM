@@ -1,4 +1,4 @@
-{
+﻿{
   "schema_version": 1,
   "description": "Single source of truth for NexusIM service lifecycle and local guard coverage. Gate scripts should read this file instead of hard-coding service lists.",
   "active_stages": [
@@ -42,7 +42,7 @@
     {
       "name": "timeline-service",
       "stage": "core",
-      "local_process": "timeline-service-noop",
+      "local_process": "timeline-service-seq-block-allocator",
       "debug_port": 11937,
       "prometheus_rule_file": "prometheus-timeline-service-alerts.yml",
       "grafana_dashboard": "timeline-service-observability.json"

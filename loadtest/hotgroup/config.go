@@ -13,36 +13,39 @@ import (
 )
 
 type config struct {
-	RunName                    string
-	ResultRoot                 string
-	ResultDir                  string
-	DryRun                     bool
-	Cleanup                    bool
-	RequestTimeout             time.Duration
-	WaitTimeout                time.Duration
-	PollInterval               time.Duration
-	ConversationTarget         string
-	MessageTarget              string
-	DeliveryTarget             string
-	ConversationTLS            grpctls.Config
-	MessageTLS                 grpctls.Config
-	DeliveryTLS                grpctls.Config
-	VerifiedAuthMetadata       bool
-	PGDSN                      string
-	TenantID                   string
-	ConversationID             string
-	GroupSize                  int
-	SenderCount                int
-	OnlineRatio                float64
-	SlowClientRatio            float64
-	ACKRatio                   float64
-	MessageRate                float64
-	Duration                   time.Duration
-	MessageCount               int
-	ExpectedFanoutMode         string
-	RequireDeliveryOutboxDrain bool
-	PullLimit                  int32
-	ReceiverSampleCount        int
+	RunName                     string
+	ResultRoot                  string
+	ResultDir                   string
+	DryRun                      bool
+	Cleanup                     bool
+	RequestTimeout              time.Duration
+	WaitTimeout                 time.Duration
+	PollInterval                time.Duration
+	ConversationTarget          string
+	MessageTarget               string
+	DeliveryTarget              string
+	PushURL                     string
+	ConversationTLS             grpctls.Config
+	MessageTLS                  grpctls.Config
+	DeliveryTLS                 grpctls.Config
+	VerifiedAuthMetadata        bool
+	PGDSN                       string
+	TenantID                    string
+	ConversationID              string
+	GroupSize                   int
+	SenderCount                 int
+	OnlineRatio                 float64
+	SlowClientRatio             float64
+	ACKRatio                    float64
+	MessageRate                 float64
+	Duration                    time.Duration
+	MessageCount                int
+	ExpectedFanoutMode          string
+	RequireDeliveryOutboxDrain  bool
+	PullLimit                   int32
+	ReceiverSampleCount         int
+	ConversationSubscriberCount int
+	RequireConversationNotify   bool
 }
 
 func parseConfig(args []string, getenv func(string) string) (config, error) {
@@ -59,6 +62,7 @@ func parseConfig(args []string, getenv func(string) string) (config, error) {
 	flags.StringVar(&cfg.ConversationTarget, "conversation-target", envString(getenv, "NEXUSIM_CONVERSATION_TARGET", "127.0.0.1:13096"), "conversation-service gRPC target")
 	flags.StringVar(&cfg.MessageTarget, "message-target", envString(getenv, "NEXUSIM_MESSAGE_TARGET", "127.0.0.1:13095"), "message-service gRPC target")
 	flags.StringVar(&cfg.DeliveryTarget, "delivery-target", envString(getenv, "NEXUSIM_DELIVERY_TARGET", "127.0.0.1:13097"), "delivery-service gRPC target")
+	flags.StringVar(&cfg.PushURL, "push-url", envString(getenv, "NEXUSIM_PUSH_URL", ""), "optional push-gateway WebSocket URL used for conversation signal verification")
 	flags.BoolVar(&cfg.VerifiedAuthMetadata, "verified-auth-metadata", envBool(getenv, "NEXUSIM_HOTGROUP_VERIFIED_AUTH_METADATA", false), "send gateway verified identity through gRPC metadata")
 	flags.StringVar(&cfg.PGDSN, "pg-dsn", envString(getenv, "NEXUSIM_PG_DSN", ""), "PostgreSQL DSN for cleanup, async waits and stats")
 	flags.StringVar(&cfg.TenantID, "tenant-id", envString(getenv, "NEXUSIM_TENANT_ID", "tenant-hotgroup-"+now), "tenant id")
@@ -76,6 +80,8 @@ func parseConfig(args []string, getenv func(string) string) (config, error) {
 	pullLimit := envInt(getenv, "NEXUSIM_HOTGROUP_PULL_LIMIT", 100)
 	flags.IntVar(&pullLimit, "pull-limit", pullLimit, "PullInbox limit per sampled receiver")
 	flags.IntVar(&cfg.ReceiverSampleCount, "receiver-sample-count", envInt(getenv, "NEXUSIM_HOTGROUP_RECEIVER_SAMPLE_COUNT", 10), "number of receivers used for PullInbox/AckDelivery sampling")
+	flags.IntVar(&cfg.ConversationSubscriberCount, "conversation-subscriber-count", envInt(getenv, "NEXUSIM_HOTGROUP_CONVERSATION_SUBSCRIBER_COUNT", 0), "number of receivers that subscribe to conversation signals over WebSocket")
+	flags.BoolVar(&cfg.RequireConversationNotify, "require-conversation-notify", envBool(getenv, "NEXUSIM_HOTGROUP_REQUIRE_CONVERSATION_NOTIFY", false), "require each WebSocket subscriber to receive at least one conversation signal")
 	registerTLSFlags(flags, "conversation-tls", "NEXUSIM_CONVERSATION_TLS", "conversation-service", &cfg.ConversationTLS, getenv)
 	registerTLSFlags(flags, "message-tls", "NEXUSIM_MESSAGE_TLS", "message-service", &cfg.MessageTLS, getenv)
 	registerTLSFlags(flags, "delivery-tls", "NEXUSIM_DELIVERY_TLS", "delivery-service", &cfg.DeliveryTLS, getenv)
@@ -149,6 +155,15 @@ func (cfg config) validate() error {
 	}
 	if cfg.ReceiverSampleCount <= 0 {
 		return errors.New("--receiver-sample-count must be positive")
+	}
+	if cfg.ConversationSubscriberCount < 0 {
+		return errors.New("--conversation-subscriber-count must be greater than or equal to zero")
+	}
+	if cfg.ConversationSubscriberCount > 0 && strings.TrimSpace(cfg.PushURL) == "" {
+		return errors.New("--push-url is required when --conversation-subscriber-count is positive")
+	}
+	if cfg.RequireConversationNotify && cfg.ConversationSubscriberCount == 0 {
+		return errors.New("--require-conversation-notify requires --conversation-subscriber-count")
 	}
 	return nil
 }

@@ -63,7 +63,8 @@ Web-first 客户端平台 first slice。
 当前项目已经进入“完整架构同步后的产品化 + AI 应用底座”阶段：
 
 ```text
-9 个后端服务已经能跑通主链路，并作为 AI 主线的 Go 底座；
+9 个既有 IM 后端服务已经能跑通主链路；`timeline-service` 作为第 10 个运行链路服务
+已进入热点群 seq block allocator first path，并作为 AI 主线前的 Go 底座补强；
 短期不以生产级完整系统测试或生产级 HA 作为算法/eval 前置阻塞，验证重点放在低敏 cases、EvidencePack、权限过滤、source refs、时间版本和审计边界；
 search / memory / retrieval / RAG / summary / Agent / skill / MCP / executor / ai-eval first paths 已落，RAG / Summary / Agent stack 已通过 cross-group / temporal optional gate；
 future platform / product services 已进入 product-active first-stage implementation；
@@ -73,7 +74,7 @@ client platform MVP foundation 已启动：Web first path、api-gateway client B
 api-gateway 已补 first-stage tenant-scoped rate limit、静态 tenant plan override、tenant plan 文件热更新、版本化 quota URL source、DB-backed tenant plan snapshot source、本地 tenant quota audit / set operator、tenant quota approval manifest 强制校验、URL bearer token / HTTPS guard、URL source CA / client cert TLS 边界、可选 checksum-required gate、applied quota snapshot stale 观测和 quota snapshot gate；
 api-gateway 已补 legacy/facade traffic metrics，以及 legacy observation-window / removal-plan 低敏 evidence manifest，用于旧 descriptor 迁移观察和归档；
 legacy descriptor 已收敛为显式 opt-in 默认；
-当前 9 个服务已补 first-stage Prometheus text /metrics、本地 Prometheus alert rules 和本地 Grafana dashboard 原型；
+当前 9 个既有 IM 服务已补 first-stage Prometheus text /metrics、本地 Prometheus alert rules 和本地 Grafana dashboard 原型；timeline-service 已纳入本地 Docker / 观测链路；
 api-gateway 已补 first-stage OpenTelemetry 入口 server span 和下游 gRPC client span；当前 9 个服务均已纳入 first-stage trace runtime wiring，其中 8 个后端 gRPC 服务使用 server span，push-gateway 使用 WebSocket connection span，并由采样策略和本地 check-local 门禁约束；
 本地 OTel collector debug 入口和 policy OTLP smoke 脚本已补，可用于面试演示 OTLP trace 链路，但还不是生产告警平台；
 search-service v0.1 / group memory / retrieval / RAG / summary / Agent / skill / MCP / action-executor / ai-eval 已分别完成 first path、smoke 或 eval gate；当前 Go 底座已足够支撑算法切片，下一步进入 low-sensitive collaborative-memory 算法/eval；
@@ -83,7 +84,7 @@ search-service v0.1 / group memory / retrieval / RAG / summary / Agent / skill /
 
 ## 已完成的后端服务
 
-当前已有 9 个真实后端微服务：
+当前已有 9 个既有真实 IM 后端微服务，另有 `timeline-service` 作为第 10 个运行链路服务承接热点群 sequencer 能力：
 
 | 服务 | 已完成能力 | 面试可讲重点 |
 | --- | --- | --- |
@@ -166,6 +167,7 @@ CreateConversation(GROUP)
 | 第一版优化 | 多 worker 但按 outbox row id 分片，效果不好 | 这证明不能只“加 worker”；分片边界必须和业务顺序边界一致。 |
 | 修正后 | 100 人群 50 / 100 / 150 QPS 均能完成 `user_inbox` 和 `delivery_outbox` drain | relay 改成按 `tenant_id + conversation_id` 分片，单 conversation 顺序推进，跨 conversation 并行。 |
 | 继续探测 | 100 人群 200 QPS 时发送 1000 / 1000 成功，后续 DB 证明 `user_inbox` 和 `delivery_outbox` 最终追平，但超过 runner 等待窗口 | 新瓶颈从 relay 转移到 delivery timeline projection / `user_inbox` fanout。 |
+| 策略切换 smoke | 61 人热点群、20 条消息、3 个 WebSocket conversation subscriber，`SEQUENCER_BLOCK + BROADCAST_SIGNAL` 通过 | `send_p95_ms=19.03`、`user_inbox_rows=0`、`delivery_timeline_rows=20`、3 个订阅者共收到 60 条 conversation signal，`delivery_outbox_pending=0`，证明热点群 first-stage 不再走小群全员写扩散路径。 |
 
 面试时可以把这个结果讲成一次真实性能定位过程：
 
@@ -178,16 +180,46 @@ CreateConversation(GROUP)
 批量写、projection 并行和热点群策略。
 ```
 
+2026-06-29 的小规模 smoke 进一步证明了策略切换链路：
+
+```text
+conversation-service promoted fanout_mode=BROADCAST_SIGNAL
+-> message-service uses timeline-service AllocateSeqBlock(block_size=1)
+-> delivery-service writes delivery_timeline_items instead of per-user user_inbox
+-> delivery_outbox publishes conversation-level signal
+-> push-gateway sends delivery.notify to conversation subscribers
+-> sampled receivers still recover through PullInbox / AckDelivery
+```
+
+本轮数据：
+
+```text
+group_size=61
+message_count=20
+conversation_mode=SEQUENCER_BLOCK
+fanout_mode=BROADCAST_SIGNAL
+conversation_subscribers=3
+conversation_signal_count=60
+user_inbox_rows=0
+delivery_timeline_rows=20
+delivery_outbox_pending=0
+message_outbox_dlq=0
+delivery_outbox_dlq=0
+```
+
+这仍然是小规模 smoke，不是容量上限。下一步要扩大三机压测规模，并记录 Kafka lag、
+delivery projection lag、push signal、PullInbox / ACK 和 PostgreSQL 指标曲线。
+
 ### 当前系统如何承接热点群
 
 | 压力点 | 当前边界 |
 | --- | --- |
 | 消息写入 | `message-service` 只写 `message_log` 和 outbox，不同步写所有群成员 inbox。 |
-| 消息顺序 | 当前普通群由 message 写入链路维持 conversation scope 的 seq 语义；`timeline-service` 已作为 planned sequencer 边界，后续承接热点群 seq block / epoch fencing / gap marker。 |
+| 消息顺序 | 普通群由 message 写入链路维持 conversation scope 的 seq 语义；热点 `SEQUENCER_BLOCK` 会由 message-service 调用 timeline-service `AllocateSeqBlock(block_size=1)`，只在 valid block lease 下取号。 |
 | 事件传播 | `message_outbox -> Kafka conversation.timeline.events`，业务事务不直接 publish Kafka。 |
 | 成员可见性 | `conversation-service` 是成员事实源；`delivery-service` 使用 membership projection，不实时回查当前成员来改写历史可见性。 |
 | 投递 fanout | `delivery-service` 异步生成 `user_inbox`，失败可 fail-closed、repair / redrive，不阻塞发送主路径。 |
-| 在线通知 | `push-gateway` 只发 `delivery.notify`，不保存消息事实，不拥有 durable inbox。 |
+| 在线通知 | `push-gateway` 只发轻量 `delivery.notify` / conversation signal notify，不保存消息事实，不拥有 durable inbox。 |
 | 慢连接 | slow session close / resume hint / PullInbox 兜底，不能让慢 WebSocket 卡住 Kafka commit。 |
 | 多实例在线路由 | Redis route 支撑 first-stage cross-instance notify；Redis 故障时在线唤醒可降级，消息不丢。 |
 | 幂等 | outbox event id、projection unique key、inbox unique constraint 和 ACK cursor 事务语义保证重复消费不重复生成事实。 |
@@ -208,12 +240,13 @@ SendMessage
 当群规模和消息速率继续上升时，优先优化模型，而不是马上堆新中间件：
 
 1. `delivery-service` 按 `conversation_id + user_bucket` 做 fanout 分桶，避免一个 worker 串行处理所有成员。
-2. `user_inbox` 使用批量 insert / 分批事务 / 幂等 unique key，减少 PostgreSQL roundtrip 和锁竞争。
-3. 在线 push 只向在线 session 发轻量 notify，离线和慢客户端只依赖 PullInbox 补拉。
-4. 超大群可切 lazy inbox：不为全部离线冷用户即时物化 inbox，而是在 PullInbox 时结合 timeline、visibility window 和 cursor 计算可见消息。
-5. 对活跃用户、`@我`、置顶会话、在线设备优先 materialize；冷用户延迟或按需 materialize。
-6. Kafka 上保留 timeline 的顺序语义，但 delivery fanout 可以拆成 fanout shard topic / user bucket，不把展示顺序和投递并行度绑定死。
-7. 当单会话写入热点超过本地 row lock 能力时，引入 `timeline-service` 的 seq block allocator；未完成前 `SEQUENCER_BLOCK` 必须 fail-closed，不能悄悄回退成普通 row-lock。
+2. `user_inbox` 使用批量 insert / 分批事务 / 幂等 unique key，减少 PostgreSQL roundtrip 和锁竞争；当前 materialized inbox 已先把 per-recipient insert 合并成批量 SQL。
+3. delivery timeline consumer 使用同 consumer group 多 worker，由 Kafka 按 partition 分配任务；这提升跨 conversation / partition projection 并行度，但不破坏单 conversation 顺序。
+4. 在线 push 只向订阅 conversation 的在线 session 发轻量 notify，离线和慢客户端只依赖 PullInbox 补拉；push-gateway 已有 conversation subscribe / unsubscribe 和 conversation signal fanout 服务端 first path。
+5. 超大群可切 lazy inbox：不为全部离线冷用户即时物化 inbox，而是在 PullInbox 时结合 timeline、visibility window 和 cursor 计算可见消息。
+6. 对活跃用户、`@我`、置顶会话、在线设备优先 materialize；冷用户延迟或按需 materialize。
+7. Kafka 上保留 timeline 的顺序语义，但 delivery fanout 可以拆成 fanout shard topic / user bucket，不把展示顺序和投递并行度绑定死。
+8. 当单会话写入热点超过本地 row lock 能力时，引入 `timeline-service` 的 seq block allocator；allocator 已有第一版，message-service 已接 active `SEQUENCER_BLOCK` 单条 seq block 写路径，拿不到 valid lease 时仍必须 fail-closed，不能悄悄回退成普通 row-lock。
 
 只有压测证明当前模型和拓扑已经成为硬瓶颈时，才考虑新增或升级中间件：
 

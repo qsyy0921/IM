@@ -10,8 +10,9 @@ const (
 )
 
 const (
-	DeliveryNotificationKindInboxItemCreated = "inbox_item_created"
-	DeliveryNotificationKindInboxItemHidden  = "inbox_item_hidden"
+	DeliveryNotificationKindInboxItemCreated   = "inbox_item_created"
+	DeliveryNotificationKindInboxItemHidden    = "inbox_item_hidden"
+	DeliveryNotificationKindConversationSignal = "conversation_signal"
 )
 
 type SessionRegistration struct {
@@ -65,17 +66,21 @@ func (notification DeliveryNotification) Validate() error {
 	if kind == "" {
 		kind = DeliveryNotificationKindInboxItemCreated
 	}
-	if kind != DeliveryNotificationKindInboxItemCreated && kind != DeliveryNotificationKindInboxItemHidden {
+	if kind != DeliveryNotificationKindInboxItemCreated &&
+		kind != DeliveryNotificationKindInboxItemHidden &&
+		kind != DeliveryNotificationKindConversationSignal {
 		return NewInvalidFrame("delivery notification kind is unsupported")
 	}
 	if notification.TenantID == "" ||
-		notification.UserID == "" ||
 		notification.ConversationID == "" ||
 		notification.ConversationSeq <= 0 ||
 		notification.EventID == "" {
 		return NewInvalidFrame("delivery notification is incomplete")
 	}
-	if kind == DeliveryNotificationKindInboxItemCreated && notification.SourceEventType == "" {
+	if kind != DeliveryNotificationKindConversationSignal && notification.UserID == "" {
+		return NewInvalidFrame("delivery notification is incomplete")
+	}
+	if (kind == DeliveryNotificationKindInboxItemCreated || kind == DeliveryNotificationKindConversationSignal) && notification.SourceEventType == "" {
 		return NewInvalidFrame("delivery notification is incomplete")
 	}
 	return nil
@@ -90,6 +95,16 @@ type NotifyDeliveryResult struct {
 	Enqueued        int
 	Dropped         int
 	Evicted         int
+}
+
+type ConversationSubscriptionCommand struct {
+	AuthContext    AuthContext
+	ConversationID string
+}
+
+type ConversationSubscriptionResult struct {
+	ConversationID string
+	Subscribed     bool
 }
 
 type SessionEvictionResult struct {

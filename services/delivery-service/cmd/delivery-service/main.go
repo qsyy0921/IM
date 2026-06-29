@@ -174,19 +174,19 @@ func runTimelineConsumer() error {
 	brokers := splitCSV(os.Getenv("NEXUSIM_KAFKA_BROKERS"))
 	topic := envString("NEXUSIM_TIMELINE_TOPIC", "conversation.timeline.events")
 	groupID := envString("NEXUSIM_DELIVERY_CONSUMER_GROUP", "nexusim-delivery-service")
-	consumer, err := kafkainfra.NewReaderConsumer(kafkainfra.ReaderConfig{
-		Brokers: brokers,
-		Topic:   topic,
-		GroupID: groupID,
-	})
+	workerCount, err := deliveryTimelineConsumerWorkerCountFromEnv()
 	if err != nil {
 		return err
 	}
-	defer consumer.Close()
 
 	repository := postgresinfra.NewRepository(pool)
-	worker := timeline.NewWorker(
-		consumer,
+	runtime, consumers, err := newTimelineProjectionRuntime(
+		workerCount,
+		kafkainfra.ReaderConfig{
+			Brokers: brokers,
+			Topic:   topic,
+			GroupID: groupID,
+		},
 		app.NewProjectTimelineEventUseCase(repository),
 		groupID,
 		postgresinfra.NewProjectionFailureStore(pool),
@@ -195,17 +195,21 @@ func runTimelineConsumer() error {
 			Logf:         log.Printf,
 		},
 	)
+	if err != nil {
+		return err
+	}
+	defer closeTimelineConsumers(consumers)
 	debugAddr, err := deliveryDebugAddrFromEnv()
 	if err != nil {
 		return err
 	}
-	stopDebug, err := startDebugServer(ctx, debugAddr, monitoringinfra.NewHandler(pool).WithTimelineProjectionWorkerStats(worker.Snapshot))
+	stopDebug, err := startDebugServer(ctx, debugAddr, monitoringinfra.NewHandler(pool).WithTimelineProjectionWorkerStats(runtime.Snapshot))
 	if err != nil {
 		return err
 	}
 	defer stopDebug()
-	log.Printf("delivery-service timeline consumer started topic=%s group=%s", topic, groupID)
-	return worker.Run(ctx)
+	log.Printf("delivery-service timeline consumer started topic=%s group=%s workers=%d", topic, groupID, workerCount)
+	return runtime.Run(ctx)
 }
 
 func runOutboxRelay() error {

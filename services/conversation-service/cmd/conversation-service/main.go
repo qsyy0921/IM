@@ -19,6 +19,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	grpcapi "github.com/qsyy0921/IM/services/conversation-service/internal/api/grpc"
 	"github.com/qsyy0921/IM/services/conversation-service/internal/app"
+	"github.com/qsyy0921/IM/services/conversation-service/internal/domain"
 	monitoringinfra "github.com/qsyy0921/IM/services/conversation-service/internal/infrastructure/monitoring"
 	postgresinfra "github.com/qsyy0921/IM/services/conversation-service/internal/infrastructure/postgres"
 	"github.com/qsyy0921/IM/services/conversation-service/internal/trigger/memberchange"
@@ -78,6 +79,10 @@ func runGRPCServer() error {
 		return err
 	}
 	defer pool.Close()
+	scaleThresholds, err := conversationScaleThresholdsFromEnv()
+	if err != nil {
+		return err
+	}
 	grpcMetrics := monitoringinfra.NewGRPCMetrics()
 	traceConfig, err := conversationTraceConfigFromEnv()
 	if err != nil {
@@ -112,7 +117,7 @@ func runGRPCServer() error {
 	if err != nil {
 		return err
 	}
-	repository := postgresinfra.NewRepository(pool)
+	repository := postgresinfra.NewRepository(pool, postgresinfra.WithScaleThresholds(scaleThresholds))
 	grpcapi.Register(
 		server,
 		grpcapi.NewServer(
@@ -810,6 +815,48 @@ func envOptionalBool(name string) (bool, bool, error) {
 	default:
 		return false, true, errors.New(name + " must be a boolean")
 	}
+}
+
+func conversationScaleThresholdsFromEnv() (domain.ConversationScaleThresholds, error) {
+	thresholds := domain.DefaultConversationScaleThresholds()
+	var err error
+	thresholds.SmallGroupMaxActiveMembers, err = envOptionalPositiveInt64(
+		"NEXUSIM_CONVERSATION_SCALE_SMALL_MAX",
+		thresholds.SmallGroupMaxActiveMembers,
+	)
+	if err != nil {
+		return domain.ConversationScaleThresholds{}, err
+	}
+	thresholds.MediumGroupMaxActiveMembers, err = envOptionalPositiveInt64(
+		"NEXUSIM_CONVERSATION_SCALE_MEDIUM_MAX",
+		thresholds.MediumGroupMaxActiveMembers,
+	)
+	if err != nil {
+		return domain.ConversationScaleThresholds{}, err
+	}
+	thresholds.LargeGroupMaxActiveMembers, err = envOptionalPositiveInt64(
+		"NEXUSIM_CONVERSATION_SCALE_LARGE_MAX",
+		thresholds.LargeGroupMaxActiveMembers,
+	)
+	if err != nil {
+		return domain.ConversationScaleThresholds{}, err
+	}
+	if err := thresholds.Validate(); err != nil {
+		return domain.ConversationScaleThresholds{}, errors.New("conversation scale thresholds must satisfy small < medium < large")
+	}
+	return thresholds, nil
+}
+
+func envOptionalPositiveInt64(name string, defaultValue int64) (int64, error) {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		return defaultValue, nil
+	}
+	parsed, err := strconv.ParseInt(value, 10, 64)
+	if err != nil || parsed <= 0 {
+		return 0, errors.New(name + " must be a positive integer")
+	}
+	return parsed, nil
 }
 
 func envInt(name string, defaultValue int) int {

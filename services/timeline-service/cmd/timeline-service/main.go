@@ -13,6 +13,12 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+	grpcapi "github.com/qsyy0921/IM/services/timeline-service/internal/api/grpc"
+	"github.com/qsyy0921/IM/services/timeline-service/internal/app"
+	postgresinfra "github.com/qsyy0921/IM/services/timeline-service/internal/infrastructure/postgres"
+	"google.golang.org/grpc"
 )
 
 func main() {
@@ -32,8 +38,66 @@ func run(ctx context.Context) error {
 	switch mode {
 	case "noop":
 		return runNoop(ctx)
+	case "seq-block-allocator":
+		return runSeqBlockAllocator(ctx)
 	default:
 		return fmt.Errorf("unsupported NEXUSIM_TIMELINE_SERVICE_MODE %q", mode)
+	}
+}
+
+func runSeqBlockAllocator(ctx context.Context) error {
+	dsn := strings.TrimSpace(os.Getenv("NEXUSIM_PG_DSN"))
+	if dsn == "" {
+		return errors.New("NEXUSIM_PG_DSN is required")
+	}
+	pool, err := openPGPool(ctx, dsn)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	debugAddr, err := timelineDebugAddrFromEnv()
+	if err != nil {
+		return err
+	}
+	stopDebug, err := startDebugServer(ctx, debugAddr)
+	if err != nil {
+		return err
+	}
+	defer stopDebug()
+
+	grpcAddr := envString("NEXUSIM_TIMELINE_GRPC_ADDR", "0.0.0.0:10710")
+	listener, err := net.Listen("tcp", grpcAddr)
+	if err != nil {
+		return err
+	}
+	server := grpc.NewServer()
+	repository := postgresinfra.NewRepository(pool)
+	grpcapi.Register(server, grpcapi.NewServer(app.NewAllocateSeqBlockUseCase(
+		repository,
+		envInt("NEXUSIM_TIMELINE_SEQ_BLOCK_MAX_SIZE", 10000),
+		envDuration("NEXUSIM_TIMELINE_SEQ_BLOCK_LEASE_TTL", 30*time.Second),
+	)))
+
+	serveErr := make(chan error, 1)
+	go func() {
+		serveErr <- server.Serve(listener)
+	}()
+	log.Printf("timeline-service seq block allocator listening on %s", grpcAddr)
+
+	select {
+	case err := <-serveErr:
+		if errors.Is(err, grpc.ErrServerStopped) {
+			return context.Canceled
+		}
+		return err
+	case <-ctx.Done():
+		server.GracefulStop()
+		err := <-serveErr
+		if err != nil && !errors.Is(err, grpc.ErrServerStopped) {
+			return err
+		}
+		return context.Canceled
 	}
 }
 
@@ -63,11 +127,51 @@ func timelineModeFromEnv() string {
 
 func validateTimelineMode(mode string) error {
 	switch mode {
-	case "noop":
+	case "noop", "seq-block-allocator":
 		return nil
 	default:
 		return fmt.Errorf("unsupported NEXUSIM_TIMELINE_SERVICE_MODE %q", mode)
 	}
+}
+
+func openPGPool(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
+	config, err := pgxpool.ParseConfig(dsn)
+	if err != nil {
+		return nil, err
+	}
+	config.MaxConns = int32(envInt("NEXUSIM_TIMELINE_PG_MAX_CONNS", 16))
+	return pgxpool.NewWithConfig(ctx, config)
+}
+
+func envString(name, defaultValue string) string {
+	if value := strings.TrimSpace(os.Getenv(name)); value != "" {
+		return value
+	}
+	return defaultValue
+}
+
+func envInt(name string, defaultValue int) int {
+	raw := strings.TrimSpace(os.Getenv(name))
+	if raw == "" {
+		return defaultValue
+	}
+	value, err := strconv.Atoi(raw)
+	if err != nil {
+		return defaultValue
+	}
+	return value
+}
+
+func envDuration(name string, defaultValue time.Duration) time.Duration {
+	raw := strings.TrimSpace(os.Getenv(name))
+	if raw == "" {
+		return defaultValue
+	}
+	value, err := time.ParseDuration(raw)
+	if err != nil {
+		return defaultValue
+	}
+	return value
 }
 
 func timelineDebugAddr() string {

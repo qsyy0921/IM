@@ -1,16 +1,20 @@
 package types
 
 const (
-	OpClientHello    = "client.hello"
-	OpClientPing     = "client.ping"
-	OpDeliveryAck    = "delivery.ack"
-	OpServerHello    = "server.hello"
-	OpServerPong     = "server.pong"
-	OpDeliveryNotify = "delivery.notify"
-	OpDeliveryHide   = "delivery.hide"
-	OpDeliveryAckOK  = "delivery.ack.ok"
-	OpResumeHint     = "server.resume_hint"
-	OpError          = "error"
+	OpClientHello               = "client.hello"
+	OpClientPing                = "client.ping"
+	OpConversationSubscribe     = "conversation.subscribe"
+	OpConversationUnsubscribe   = "conversation.unsubscribe"
+	OpConversationSubscribeOK   = "conversation.subscribe.ok"
+	OpConversationUnsubscribeOK = "conversation.unsubscribe.ok"
+	OpDeliveryAck               = "delivery.ack"
+	OpServerHello               = "server.hello"
+	OpServerPong                = "server.pong"
+	OpDeliveryNotify            = "delivery.notify"
+	OpDeliveryHide              = "delivery.hide"
+	OpDeliveryAckOK             = "delivery.ack.ok"
+	OpResumeHint                = "server.resume_hint"
+	OpError                     = "error"
 )
 
 type ConversationCursor struct {

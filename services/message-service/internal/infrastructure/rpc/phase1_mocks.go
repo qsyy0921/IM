@@ -102,6 +102,6 @@ func (c StaticConversation) GetSendContext(context.Context, types.SendMessageCom
 
 type NoopSequencer struct{}
 
-func (NoopSequencer) AllocateSeqBlock(context.Context, types.SendMessageCommand) (types.SeqBlock, error) {
-	return types.SeqBlock{}, types.NewSequencerUnavailable("sequencer is disabled in phase 1 LOCAL_ROW_LOCK mode")
+func (NoopSequencer) AllocateSeqBlock(context.Context, types.SendMessageCommand, int64) (types.SeqBlock, error) {
+	return types.SeqBlock{}, types.NewSequencerUnavailable("sequencer is not configured for SEQUENCER_BLOCK mode")
 }

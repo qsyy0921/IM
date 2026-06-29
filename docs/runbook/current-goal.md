@@ -6,57 +6,59 @@
 
 ## Active Module
 
-Agent action boundary / repair cases：继续补需要 proposal、approval、prepared audit、
-workflow handoff、operator redrive 和最终执行归属证明的 Agent action / repair 场景。
+Hot group fanout / sequencer / projection hardening：把热点群聊从普通小群写扩散路径
+推进到可演示的 `SEQUENCER_BLOCK + BROADCAST_SIGNAL` 链路，并准备真实三机压测。
 
 ## 当前已收口摘要
 
-- action-executor 已覆盖 provider failure lifecycle、operator handoff / review /
-  readiness / invocation、受控 redrive execution、result manifest、audit append handoff
-  和 audit append result manifest；最终执行仍只在 action-executor。
-- admin-service 已覆盖 provider replay request submit / list / approve / reject operator
-  bridge，只创建和审批低敏 admin operation，不执行 redrive。
-- workflow-service 已覆盖 provider replay queue、approval timeout、external approval
-  binding、operator queues、external callback wait / delivery / redrive / review page /
-  dashboard / batch redrive invocation / runner / result manifest / audit append handoff /
-  audit append result manifest、approval queue review page /
-  batch decision manifest / runner / result review page / audit append handoff /
-  audit append result manifest、
-  compensation review / instruction approval page / readiness / invocation /
-  result visibility / audit append handoff /
-  audit append result manifest，以及 workflow outbox relay first path。
-- ai-eval 已覆盖 group-memory / retrieval / RAG / Agent safety 和 action boundary
-  本地低敏 gates。
-- 详细能力和历史证据见 `docs/runbook/current-brief.md`、相关 service brief 和 SDD。
+- conversation-service 已按群规模输出 fanout / conversation mode：direct / small group
+  使用 `WRITE_FANOUT`，medium / large 使用 first-stage `HYBRID_FANOUT` /
+  `READ_FANOUT`，hot group 使用 `BROADCAST_SIGNAL + SEQUENCER_BLOCK`。
+- timeline-service 已进入本地运行链路，提供 `seq-block-allocator` runtime、PostgreSQL
+  sequence state / lease 表和 `AllocateSeqBlock` gRPC API。
+- message-service 已在 `SEQUENCER_BLOCK` active 写路径调用 timeline-service
+  `AllocateSeqBlock(block_size=1)`；拿不到 valid lease 时 fail-closed，不回退到本地
+  row lock。
+- delivery-service 已支持 `WRITE_FANOUT` / `HYBRID_FANOUT` / `READ_FANOUT` /
+  conversation-level signal；materialized `user_inbox` 已改为批量 insert；
+  `timeline-consumer` 支持同 consumer group 多 worker 按 Kafka partition 安全并行。
+- push-gateway 已支持 `conversation.subscribe / unsubscribe` 和 conversation signal
+  fanout first path。
+- 2026-06-29 小规模热点群 smoke 已跑通：61 人群、20 条消息、`SEQUENCER_BLOCK +
+  BROADCAST_SIGNAL`，3 个 WebSocket conversation subscriber 收到 60 条 signal，
+  `send_p95_ms=19.03`、`user_inbox_rows=0`、`delivery_outbox_pending=0`、无 message /
+  delivery DLQ。原始目录：
+  `H:\NexusIM\loadtest-results\hotgroup-broadcast-push-smoke-20260629-2135`。
 
 ## 目标
 
-- 继续补更多 Agent action boundary / repair cases。
-- 保持 admin / workflow 只做请求、审批、状态和运维视图，不能直接执行工具、
-  provider replay、compensation 或业务 mutation。
-- 任何 repair / redrive 必须使用 fresh proposal / approval / prepared audit、新输入或低敏 refs，
-  并经 final execution owner 的公开 API 执行。
-- 不恢复 raw provider input / output，不修改 DLQ failure row 来伪造完成。
+- 将当前 hotgroup / sequencer / projection 改动收口提交，确保 focused checks、Docker /
+  compose / registry 相关检查通过。
+- 保留小规模 smoke 证据，并明确它证明 first-stage 链路可用，不代表容量上限。
+- 下一模块进入 timeline-service block cache、gap marker、epoch fencing 和 repair operator；
+  随后扩大三机热点群压测规模，记录 Kafka lag、delivery projection lag、push notify、
+  PullInbox / ACK 追平和 PostgreSQL 关键指标。
 
 ## 本轮完成条件
 
-- 从 `remaining-goals.md` 选择下一个完整可感知功能模块。
-- 先做 compact architecture analysis：owner、state machine、approval boundary、
-  audit contract、event / API contract、是否需要新中间件。
-- Focused tests / eval cases 覆盖 no direct execution、fresh approval、prepared audit、
-  no raw payload、fact source immutable、final execution owner。
-- Focused checks 通过；跨 proto / migration / 安全边界再跑完整门禁。
-- 必要文档同步后提交并推送到 GitHub。
+- 当前 uncommitted hotgroup / sequencer / projection 改动收口，focused tests 和
+  Docker / compose / registry 相关检查通过。
+- 若本地 / 远端 Docker 未启动，必须明确标注真实压测未执行，不写成完成。
+- 文档同步当前公开能力：message-service 已接 timeline-service 单条 seq block；
+  block cache / gap marker / epoch fencing / 三机压测仍是后续。
+- 提交并推送到 GitHub。
 
 ## 非目标
 
+- 不做长时间正式容量压测或生产 sizing。
+- 不把单条 seq block 接入说成完整 sequencer 分区系统。
+- 不新增隐藏 fallback，不用本地 row lock 冒充热点 sequencer。
 - 不继续扩完整产品级客户端。
-- 不做长压、生产 HA、Docker / 双机基础设施整理。
-- 不把 AI Worker 变成业务事实源。
-- 不新增服务或中间件，除非架构分析证明当前模块必须新增。
-- 不一次性展开 provider-grade 运维 UI、生产审批平台或真实模型长评测。
+- 不展开无关 Agent action boundary / repair cases。
 
 ## 后续优先级
 
-1. 按需推进更多 Agent action boundary / repair cases。
-2. Product-active 服务按需推进，不抢占 AI / Agent 演示主线。
+1. timeline-service block cache、gap marker、epoch fencing 和 repair operator。
+2. 扩大三机热点群压测规模，补趋势图 / 瓶颈曲线。
+3. delivery projection lag / inbox rows per message / push notify storm 指标深化。
+4. 压测报告与面试叙事维护。

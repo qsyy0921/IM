@@ -7,6 +7,12 @@
 - 已补 first-stage compliance external proof / delete approval：`message_compliance_external_proofs` 只保存低敏 proof ref、provider 和 proof hash，不保存 proof 正文，且 `REVOKED` proof ref 为 terminal 状态，不能被重新 register 复活；`message_compliance_delete_approvals` 引用已 VERIFIED 的 external proof ref；`CONSUMED` / `CANCELED` approval 为 terminal 状态，不能被同一 `approval_id` 重新 approve 复活；`compliance-proof-register` 支持默认手工低敏登记和 manifest verifier 模式，manifest 模式只从外部 proof manifest 校验 `VERIFIED` ref 并导入 provider / proof hash；`tools/validate-message-compliance-proof-manifest.ps1` 提供更严格的 operator 前低敏 manifest 校验，拒绝 proof 正文和未知字段；`compliance-approval-create` 支持 reason file 输入；`compliance-proof-audit` 和 `compliance-approval-audit` 支持 `updated_at` RFC3339 时间窗口过滤；`compliance-proof-audit/revoke` 和 `compliance-approval-audit/create/cancel` operator 可写低敏 JSON 结果。
 - 通过 outbox relay 发布 conversation timeline events，不在业务事务里直接 publish Kafka。
 - 已接 conversation-service / policy-service，可走 verified metadata、TLS / mTLS。
+- 已接 timeline-service 第一阶段 sequencer：当 conversation-service 返回
+  `SEQUENCER_BLOCK` 时，`SendMessage` 会通过 `NEXUSIM_TIMELINE_SERVICE_ADDR`
+  调用 timeline-service `AllocateSeqBlock(block_size=1)`，只在获得 valid seq block
+  lease 后写 `message_log` / timeline / outbox；未配置 sequencer 时对
+  `SEQUENCER_BLOCK` fail-closed，不回退到本地 row lock。当前仍是单条 seq block
+  接入，批量 block cache、gap marker 和 lease fencing 深化后置。
 - 已补 `/healthz`、`/readyz`、`/debug/metrics` 和 Prometheus text `/metrics`，可观察低敏 PG pool、send / repository / Kafka / outbox relay 聚合指标和固定 operation latency；debug HTTP 监听默认只允许 loopback / 私网，公网或未指定地址必须显式 `NEXUSIM_MESSAGE_DEBUG_ALLOW_PUBLIC=true`。
 - 本地 Prometheus scrape / alert rules 与 Grafana dashboard 原型已覆盖 SendMessage / PG pool / Kafka / outbox relay latency、relay runtime error 和 OTLP endpoint missing；这仍是本地开发 / 面试演示级观测，不是生产 Alertmanager / SLO。
 - 已补 first-stage OpenTelemetry gRPC server span，默认关闭；启用后可输出 stdout 或 OTLP gRPC trace，并从入口 metadata 提取 W3C `traceparent`。
@@ -26,5 +32,7 @@
 ## 后续
 
 - AI 底座转进前的必要收口：继续确保 `EditMessage` / `RevokeMessage` / `DeleteMessage`、timeline / outbox、tombstone 和 delete proof 对 search / memory / retrieval 可重建且低敏。
+- 热点群后续：把 timeline-service seq block 从单条调用推进到本地 block cache、
+  gap marker、epoch fencing 和真实三机热点压测曲线。
 - Provider-grade 外部 proof 工作流 / 审批系统集成、更完整容量曲线和生产观测后置为 hardening backlog；用户私有隐藏已由 delivery-service `HideInboxItem` 承担，图片 / 文件 / 语音二进制上传和处理属于后续 media 能力。
 - 生产级 OTel collector、告警路由、retention 和 SLO dashboard 仍属于后续统一观测治理。

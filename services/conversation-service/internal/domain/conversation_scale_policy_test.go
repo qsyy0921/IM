@@ -65,11 +65,11 @@ func TestResolveConversationScalePolicy(t *testing.T) {
 			wantShard:        "read",
 		},
 		{
-			name:             "hot group is broadcast signal contract",
+			name:             "hot group uses broadcast signal",
 			conversationType: types.ConversationTypeGroup,
 			members:          LargeGroupMaxActiveMembers + 1,
 			wantTier:         ConversationScaleTierHot,
-			wantRuntime:      ConversationScaleRuntimeContractOnly,
+			wantRuntime:      ConversationScaleRuntimeActive,
 			wantMode:         types.ConversationModeSequencerBlock,
 			wantFanout:       types.FanoutModeBroadcastSignal,
 			wantVersion:      4,
@@ -95,10 +95,33 @@ func TestResolveConversationScalePolicy(t *testing.T) {
 	}
 }
 
-func TestResolveConversationCreatePolicyRejectsContractOnlyPolicy(t *testing.T) {
-	_, err := ResolveConversationCreatePolicy(types.ConversationTypeGroup, LargeGroupMaxActiveMembers+1)
-	if !errors.Is(err, types.ErrSequencerUnavailable) {
-		t.Fatalf("err=%v want ErrSequencerUnavailable", err)
+func TestResolveConversationScalePolicyWithThresholds(t *testing.T) {
+	policy, err := ResolveConversationScalePolicyWithThresholds(types.ConversationTypeGroup, 13, ConversationScaleThresholds{
+		SmallGroupMaxActiveMembers:  3,
+		MediumGroupMaxActiveMembers: 7,
+		LargeGroupMaxActiveMembers:  12,
+	})
+	if err != nil {
+		t.Fatalf("resolve policy: %v", err)
+	}
+	if policy.Tier != ConversationScaleTierHot ||
+		policy.Runtime != ConversationScaleRuntimeActive ||
+		policy.ConversationMode != types.ConversationModeSequencerBlock ||
+		policy.FanoutMode != types.FanoutModeBroadcastSignal ||
+		policy.FanoutPolicyVersion != 4 ||
+		policy.CurrentSeqShard != "timeline" {
+		t.Fatalf("policy=%+v", policy)
+	}
+}
+
+func TestResolveConversationScalePolicyRejectsInvalidThresholds(t *testing.T) {
+	_, err := ResolveConversationScalePolicyWithThresholds(types.ConversationTypeGroup, 10, ConversationScaleThresholds{
+		SmallGroupMaxActiveMembers:  10,
+		MediumGroupMaxActiveMembers: 10,
+		LargeGroupMaxActiveMembers:  20,
+	})
+	if !errors.Is(err, types.ErrInvalidArgument) {
+		t.Fatalf("err=%v want ErrInvalidArgument", err)
 	}
 }
 

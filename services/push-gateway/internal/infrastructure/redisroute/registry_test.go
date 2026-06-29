@@ -136,6 +136,59 @@ func TestRegistryPublishesRemoteRouteAndEnqueuesLocal(t *testing.T) {
 	}
 }
 
+func TestRegistryPublishesRemoteConversationSignalToSubscribedGateway(t *testing.T) {
+	server := miniredis.RunT(t)
+	client := redis.NewClient(&redis.Options{Addr: server.Addr()})
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	gatewayA := NewRegistry(memory.NewRegistry(), client, Config{GatewayID: "gateway-a", RouteTTL: time.Minute})
+	localB := memory.NewRegistry()
+	gatewayB := NewRegistry(localB, client, Config{GatewayID: "gateway-b", RouteTTL: time.Minute})
+	outbound := make(chan types.ServerFrame, 2)
+	auth := types.AuthContext{TenantID: "tenant-1", UserID: "user-1", DeviceID: "device-1", SessionID: "session-b"}
+	if _, err := gatewayB.Register(ctx, types.SessionRegistration{
+		AuthContext: auth,
+		SessionID:   "session-b",
+		Outbound:    outbound,
+	}); err != nil {
+		t.Fatalf("register remote session: %v", err)
+	}
+	if _, err := gatewayB.SubscribeConversation(ctx, types.ConversationSubscriptionCommand{
+		AuthContext:    auth,
+		ConversationID: "conversation-1",
+	}); err != nil {
+		t.Fatalf("subscribe remote conversation: %v", err)
+	}
+	done := make(chan error, 1)
+	subscriber := NewSubscriber(localB, client, SubscriberConfig{GatewayID: "gateway-b"})
+	go func() {
+		done <- subscriber.Run(ctx)
+	}()
+	time.Sleep(50 * time.Millisecond)
+
+	notification := testNotification()
+	notification.Kind = types.DeliveryNotificationKindConversationSignal
+	notification.UserID = ""
+	result, err := gatewayA.EnqueueConversationSignal(ctx, notification)
+	if err != nil {
+		t.Fatalf("enqueue remote conversation signal: %v", err)
+	}
+	if result.MatchedSessions != 1 || result.Enqueued != 1 {
+		t.Fatalf("unexpected remote signal result: %+v", result)
+	}
+	select {
+	case frame := <-outbound:
+		if frame.Op != types.OpDeliveryNotify || frame.EventID != notification.EventID || !frame.PullRequired {
+			t.Fatalf("unexpected remote signal frame: %+v", frame)
+		}
+	case <-time.After(time.Second):
+		t.Fatalf("timed out waiting for remote conversation signal")
+	}
+	cancel()
+	<-done
+}
+
 func TestRegistryPublishesRemoteDeviceEvictionAndSubscriberEvicts(t *testing.T) {
 	server := miniredis.RunT(t)
 	client := redis.NewClient(&redis.Options{Addr: server.Addr()})

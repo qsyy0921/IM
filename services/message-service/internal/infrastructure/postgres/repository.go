@@ -145,10 +145,6 @@ func (r *MessageRepository) AppendMessage(ctx context.Context, input domain.Appe
 	}
 
 	seqAllocStarted := time.Now()
-	if err := r.ensureConversationSeq(ctx, tx, input); err != nil {
-		return domain.AppendMessageResult{}, err
-	}
-
 	seq, err := r.allocateConversationSeq(ctx, tx, input)
 	if err != nil {
 		return domain.AppendMessageResult{}, err
@@ -207,6 +203,26 @@ func (r *MessageRepository) checkBackpressure() error {
 		stats.MaxConns(),
 		r.backpressureMinAvailableConns,
 	))
+}
+
+func (r *MessageRepository) NextConversationSeqFloor(
+	ctx context.Context,
+	tenantID types.TenantID,
+	conversationID types.ConversationID,
+) (int64, error) {
+	if r.pool == nil {
+		return 0, ErrRepositoryNotConfigured
+	}
+	var nextSeq int64
+	if err := r.pool.QueryRow(ctx, `
+SELECT COALESCE(MAX(seq) + 1, 1)
+FROM conversation_timeline_events
+WHERE tenant_id = $1
+  AND conversation_id = $2
+`, tenantID, conversationID).Scan(&nextSeq); err != nil {
+		return 0, types.NewDBWriteFailed(err.Error())
+	}
+	return nextSeq, nil
 }
 
 type existingMessage struct {
@@ -309,6 +325,12 @@ ON CONFLICT (tenant_id, conversation_id) DO NOTHING
 }
 
 func (r *MessageRepository) allocateConversationSeq(ctx context.Context, tx pgx.Tx, input domain.AppendMessageInput) (int64, error) {
+	if input.AllocatedSeq > 0 {
+		return input.AllocatedSeq, nil
+	}
+	if err := r.ensureConversationSeq(ctx, tx, input); err != nil {
+		return 0, err
+	}
 	started := time.Now()
 	row := tx.QueryRow(ctx, `
 UPDATE conversation_seq

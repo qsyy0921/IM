@@ -76,6 +76,22 @@ func DeliveryAckOK(requestID string, result types.AckDeliveryResult) types.Serve
 	}
 }
 
+func ConversationSubscribeOK(requestID string, result types.ConversationSubscriptionResult) types.ServerFrame {
+	return types.ServerFrame{
+		Op:             types.OpConversationSubscribeOK,
+		RequestID:      requestID,
+		ConversationID: result.ConversationID,
+	}
+}
+
+func ConversationUnsubscribeOK(requestID string, result types.ConversationSubscriptionResult) types.ServerFrame {
+	return types.ServerFrame{
+		Op:             types.OpConversationUnsubscribeOK,
+		RequestID:      requestID,
+		ConversationID: result.ConversationID,
+	}
+}
+
 func ResumeHint(reason string, conversations []types.ConversationCursor) types.ServerFrame {
 	return types.ServerFrame{
 		Op:            types.OpResumeHint,

@@ -16,6 +16,9 @@ type LocalRegistry interface {
 	Register(context.Context, types.SessionRegistration) (types.SessionRegistrationResult, error)
 	Unregister(sessionID string)
 	EnqueueNotification(context.Context, types.DeliveryNotification) (types.NotifyDeliveryResult, error)
+	SubscribeConversation(context.Context, types.ConversationSubscriptionCommand) (types.ConversationSubscriptionResult, error)
+	UnsubscribeConversation(context.Context, types.ConversationSubscriptionCommand) (types.ConversationSubscriptionResult, error)
+	EnqueueConversationSignal(context.Context, types.DeliveryNotification) (types.NotifyDeliveryResult, error)
 	EvictDevice(ctx context.Context, tenantID string, userID string, deviceID string, reason string) (types.SessionEvictionResult, error)
 	EvictSession(ctx context.Context, tenantID string, userID string, deviceID string, sessionID string, reason string) (types.SessionEvictionResult, error)
 }
@@ -33,8 +36,9 @@ type Registry struct {
 	client redis.UniversalClient
 	config Config
 
-	mu     sync.Mutex
-	routes map[string]routeState
+	mu            sync.Mutex
+	routes        map[string]routeState
+	subscriptions map[string]map[string]struct{}
 
 	metrics registryMetrics
 }
@@ -129,10 +133,11 @@ func NewRegistry(local LocalRegistry, client redis.UniversalClient, config Confi
 		config.RenewFailureThreshold = 0
 	}
 	return &Registry{
-		local:  local,
-		client: client,
-		config: config,
-		routes: make(map[string]routeState),
+		local:         local,
+		client:        client,
+		config:        config,
+		routes:        make(map[string]routeState),
+		subscriptions: make(map[string]map[string]struct{}),
 	}
 }
 
@@ -187,6 +192,9 @@ func (registry *Registry) Register(
 	renewCtx, cancel := context.WithCancel(context.Background())
 	registry.mu.Lock()
 	registry.routes[registration.SessionID] = routeState{entry: entry, cancel: cancel}
+	if registry.subscriptions[registration.SessionID] == nil {
+		registry.subscriptions[registration.SessionID] = make(map[string]struct{})
+	}
 	registry.mu.Unlock()
 	go registry.renewRouteLoop(renewCtx, entry)
 	if replayFromRedis && registry.replayRedisResume(registration, redisResume.frames) {
@@ -204,6 +212,8 @@ func (registry *Registry) Unregister(sessionID string) {
 	if ok {
 		delete(registry.routes, sessionID)
 	}
+	conversations := registry.subscriptions[sessionID]
+	delete(registry.subscriptions, sessionID)
 	registry.mu.Unlock()
 	if !ok {
 		return
@@ -212,6 +222,9 @@ func (registry *Registry) Unregister(sessionID string) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 	_ = registry.deleteRoute(ctx, state.entry)
+	for conversationID := range conversations {
+		_ = registry.deleteConversationSubscription(ctx, state.entry, conversationID)
+	}
 }
 
 func (registry *Registry) Metrics() Metrics {

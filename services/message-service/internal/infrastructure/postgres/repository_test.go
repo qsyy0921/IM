@@ -92,6 +92,77 @@ func TestMessageRepositoryAppendAttachmentMessageIntegration(t *testing.T) {
 	assertPersistedFacts(t, ctx, pool, input, result)
 }
 
+func TestMessageRepositoryAppendMessageUsesAllocatedSeqIntegration(t *testing.T) {
+	ctx := context.Background()
+	pool := openIntegrationPool(t, ctx)
+	defer pool.Close()
+	applyMessageMigration(t, ctx, pool)
+
+	runID := time.Now().UnixNano()
+	repo := NewMessageRepository(pool)
+	tenantID := types.TenantID(fmt.Sprintf("tenant-it-allocated-seq-%d", runID))
+	input := testAppendInput(tenantID, "client-allocated-seq", []byte(`{"text":"sequenced"}`))
+	input.AllocatedSeq = 5000
+	input.Conversation.ConversationMode = types.ConversationModeSequencerBlock
+	input.Conversation.FanoutMode = types.FanoutModeBroadcastSignal
+
+	result, err := repo.AppendMessage(ctx, input)
+	if err != nil {
+		t.Fatalf("append sequencer-allocated message: %v", err)
+	}
+	if result.ConversationSeq != input.AllocatedSeq {
+		t.Fatalf("expected allocated seq to be used, got=%d want=%d", result.ConversationSeq, input.AllocatedSeq)
+	}
+	assertPersistedFacts(t, ctx, pool, input, result)
+	assertNoLocalConversationSeq(t, ctx, pool, tenantID, input.Command.ConversationID)
+}
+
+func TestMessageRepositoryNextConversationSeqFloorUsesTimelineEventsIntegration(t *testing.T) {
+	ctx := context.Background()
+	pool := openIntegrationPool(t, ctx)
+	defer pool.Close()
+	applyMessageMigration(t, ctx, pool)
+
+	runID := time.Now().UnixNano()
+	repo := NewMessageRepository(pool)
+	tenantID := types.TenantID(fmt.Sprintf("tenant-it-floor-%d", runID))
+	conversationID := types.ConversationID("conversation-it")
+	if _, err := pool.Exec(ctx, `
+INSERT INTO conversation_timeline_events (
+    tenant_id,
+    conversation_id,
+    seq,
+    event_id,
+    event_type,
+    event_version,
+    message_id,
+    actor_id,
+    fanout_mode,
+    fanout_policy_version,
+    permission_version,
+    classification,
+    mapping_version,
+    trace_id,
+    payload_json,
+    created_at
+) VALUES ($1, $2, 61, $3, 'conversation.member.joined.v1', 'v1', NULL, 'owner-it', 'BROADCAST_SIGNAL', 4, 1, 'INTERNAL', 'member-boundary.v1', 'trace-it', '{"member":"owner-it"}'::jsonb, now())
+`,
+		tenantID,
+		conversationID,
+		fmt.Sprintf("event-floor-%d", runID),
+	); err != nil {
+		t.Fatalf("seed member boundary timeline event: %v", err)
+	}
+
+	floor, err := repo.NextConversationSeqFloor(ctx, tenantID, conversationID)
+	if err != nil {
+		t.Fatalf("next conversation seq floor: %v", err)
+	}
+	if floor != 62 {
+		t.Fatalf("unexpected floor: got=%d want=62", floor)
+	}
+}
+
 func TestMessageRepositoryAppendRichMessageTypesIntegration(t *testing.T) {
 	ctx := context.Background()
 	pool := openIntegrationPool(t, ctx)
@@ -876,5 +947,27 @@ WHERE tenant_id = $1
 	}
 	if got != want {
 		t.Fatalf("unexpected current_seq: got %d want %d", got, want)
+	}
+}
+
+func assertNoLocalConversationSeq(
+	t *testing.T,
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	tenantID types.TenantID,
+	conversationID types.ConversationID,
+) {
+	t.Helper()
+	var count int
+	if err := pool.QueryRow(ctx, `
+SELECT COUNT(*)
+FROM conversation_seq
+WHERE tenant_id = $1
+  AND conversation_id = $2
+`, tenantID, conversationID).Scan(&count); err != nil {
+		t.Fatalf("count conversation seq: %v", err)
+	}
+	if count != 0 {
+		t.Fatalf("expected no local conversation seq row, got %d", count)
 	}
 }

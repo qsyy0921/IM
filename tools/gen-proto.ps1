@@ -35,6 +35,7 @@ protoc `
     "$ApiProtoDir/nexusim/search/v1/search_service.proto" `
     "$ApiProtoDir/nexusim/skillregistry/v1/skill_registry_service.proto" `
     "$ApiProtoDir/nexusim/summary/v1/summary_service.proto" `
+    "$ApiProtoDir/nexusim/timeline/v1/timeline_service.proto" `
     "$ApiProtoDir/nexusim/vector/v1/vector_index_service.proto" `
     "$ApiProtoDir/nexusim/workflow/v1/workflow_service.proto" `
     "$ApiProtoDir/nexusim/conversation/v1/conversation_service.proto" `

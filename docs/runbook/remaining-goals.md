@@ -15,18 +15,22 @@
 
 ## 当前优先顺序
 
-1. Agent action boundary / repair cases：在 provider replay admin / workflow handoff 已落
+1. Hot group fanout / sequencer / projection hardening：小规模 Docker 热点群 smoke 已通过；
+   下一步扩大三机压测规模，补趋势图和瓶颈曲线归档。
+2. Agent action boundary / repair cases：在 provider replay admin / workflow handoff 已落
    的基础上，继续扩更多需要 proposal / approval / workflow / audit 的 action 与 repair 场景。
-2. Product-active 服务按需推进：workflow、audit、admin、notification、media、vector、
+3. Product-active 服务按需推进：workflow、audit、admin、notification、media、vector、
    model、knowledge、presence、control-plane。
-3. 数据平台和中间件 profile 按完整架构逐步补，不抢占 AI / Agent 演示主线。
-4. 10 个运行链路服务（9 个既有 IM 服务 + `timeline-service` noop）只回补阻塞
+4. 数据平台和中间件 profile 按完整架构逐步补，不抢占 AI / Agent 演示主线。
+5. 10 个运行链路服务（9 个既有 IM 服务 + `timeline-service` seq-block allocator）只回补阻塞
    AI / product platform、热点群压测或用户点名项的 P0/P1。
-5. 客户端只作为演示入口维护；除非阻塞演示，不继续扩完整产品级客户端。
-6. 热点群 / 分区主线已落 conversation-service scale policy、delivery hybrid/read fanout、
-   conversation-level delivery signal first-stage runtime 和 hotgroup runner；下一步实现
-   timeline-service sequencer、push-gateway conversation subscription broadcast、真实热点群
-   压测和 deeper repair。
+6. 客户端只作为演示入口维护；除非阻塞演示，不继续扩完整产品级客户端。
+7. 热点群 / 分区主线已落 conversation-service scale policy、delivery hybrid/read fanout、
+   conversation-level delivery signal first-stage runtime、push-gateway conversation
+   subscription / signal broadcast、timeline-service seq-block allocator、message-service
+   active `SEQUENCER_BLOCK` 单条 seq block 写路径和 hotgroup runner；2026-06-29 已跑通
+   61 人 / 20 消息 / 3 WebSocket subscriber 小规模 smoke，下一步扩大压测规模，并继续做
+   block cache / gap marker / epoch fencing / deeper repair。
 
 ## Client Demo Backlog
 
@@ -95,22 +99,30 @@
 - `identity-service`：WebAuthn/passkeys、OIDC、多 issuer、KMS/HSM、完整风控、生产级
   email/SMS provider。
 - `message-service`：删除 / 撤回 / 编辑深化、外部 proof workflow、发送链路生产观测。
+- `message-service`：`SEQUENCER_BLOCK` 已接 timeline-service 单条 seq block active 写路径；
+  61 人热点群小规模 smoke 已通过；后续补本地 block cache、gap marker、epoch fencing
+  观测和发送链路生产观测；删除 / 撤回 / 编辑深化、外部 proof workflow 后置。
 - `conversation-service`：群规模策略已进入 domain 层，medium / large 策略已转 active
-  first-stage；后续在 timeline-service SDD 冻结后，把 hot group 的 contract-only 策略接入
-  sequencer runtime，并继续补群管理深化、历史窗口 / targeted replay repair。
-- `timeline-service`：已进入本地运行链路的 noop 服务，具备 Docker / Prometheus /
-  Grafana 观测；下一步冻结 SDD，补 seq block allocator、sequencer epoch fencing、
-  gap marker、virtual partition mapping 和 repair operator。
+  first-stage；hot group 策略已与 message-service `SEQUENCER_BLOCK` 单条 seq block
+  active 写路径和 timeline lease 绑定；后续继续补 control-plane rollout、群管理深化、
+  历史窗口 / targeted replay repair。
+- `timeline-service`：已进入本地运行链路的 seq-block allocator，具备 PostgreSQL
+  sequence state / block lease、`AllocateSeqBlock` gRPC API、Docker / Prometheus /
+  Grafana 观测；message-service 已只在 valid block lease 下取号；下一步补 block cache、
+  sequencer epoch fencing、gap marker、virtual partition mapping 和 repair operator。
 - `delivery-service`：projection DLQ / repair 深化、更多 delivery event consumer；
   `WRITE_FANOUT`、`HYBRID_FANOUT`、`READ_FANOUT` 和 conversation-level signal 已有
-  first-stage runtime，后续补 push-gateway conversation subscription broadcast、timeline item repair、动态 read
+  first-stage runtime，materialized `user_inbox` 已改成批量 insert，`timeline-consumer`
+  已支持按 Kafka partition 安全并行的 multi-worker runtime；后续补 timeline item repair、动态 read
   fanout 容量曲线，重点验证 Kafka lag、projection backlog、PullInbox / ACK 追平时间
   和 push notify storm；delivery outbox relay SQL / worker / Kafka batch hardening 已落，
   2026-06-28 hotgroup QPS step 已证明 `delivery_outbox -> Kafka im.delivery.events`
   不再是 100 人群 150 QPS 内的首个瓶颈；下一步转向 delivery timeline projection /
-  `user_inbox` fanout 批量写、projection lag metrics、inbox rows per message metrics 和
+  single hot conversation fanout 策略、projection lag metrics、inbox rows per message metrics 和
   WebSocket notify storm 覆盖。
-- `push-gateway`：Redis 网络分区 smoke、跨实例 resume、容量测试。
+- `push-gateway`：conversation subscribe / unsubscribe 与 conversation signal fanout
+  已进入服务端 first path；hotgroup runner 已验证 3 个 WebSocket subscriber 共收到
+  60 条 conversation signal；后续补 Redis 网络分区 smoke、跨实例 resume、容量测试。
 - `receipt-service`：会话列表产品能力、更多摘要策略和容量曲线。
 - `contacts-service`：组织级策略、租户默认值、来源策略、隐私例外。
 - `policy-service`：provider-grade ReBAC / DSL、moderation / risk scoring、tenant quota、

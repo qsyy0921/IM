@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+package nexusim.timeline.v1;
+
+option go_package = "github.com/qsyy0921/IM/api/proto/nexusim/timeline/v1;timelinev1";
+
+service TimelineService {
+  rpc AllocateSeqBlock(AllocateSeqBlockRequest) returns (AllocateSeqBlockResponse);
+}
+
+message AllocateSeqBlockRequest {
+  string tenant_id = 1;
+  string conversation_id = 2;
+  string requester_id = 3;
+  int32 block_size = 4;
+  string idempotency_key = 5;
+  int64 minimum_start_seq = 6;
+}
+
+message AllocateSeqBlockResponse {
+  string tenant_id = 1;
+  string conversation_id = 2;
+  int64 start_seq = 3;
+  int64 end_seq = 4;
+  int32 block_size = 5;
+  int64 sequencer_epoch = 6;
+  string lease_id = 7;
+  int64 expires_at_unix_ms = 8;
+  bool idempotent_replay = 9;
+}

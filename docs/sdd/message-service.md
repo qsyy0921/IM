@@ -53,10 +53,10 @@ message-service 是 NexusIM 消息事实源服务，负责普通会话消息写�
 | --- | --- | --- |
 | `PolicyCheckPort` | 返回 allow/deny、`permission_version`、拒绝原因 | 不在 message-service 内硬编码角色、群主、管理员或合规规则 |
 | `ConversationQueryPort` | 返回会话存在性、`member_version`、`permission_version`、`conversation_mode`、`fanout_mode`、`fanout_policy_version`、`current_seq_shard` | 不修改成员事实，不生成成员边界事件，不硬编码 fanout 策略 |
-| `SequencerPort` | 只为热点会话定义 `AllocateSeqBlock` mock | 不在第一阶段实现 sequencer 状态机、epoch fencing 或 Kubernetes Lease |
+| `SequencerPort` | 热点会话调用 timeline-service `AllocateSeqBlock`，message-service 本地消费 seq block cache | 不在 message-service 内实现 sequencer 状态机、leader ownership 或跨服务 repair |
 | `EventPublisherPort` | 由 outbox relay 发布 Kafka 事件 | 不允许业务事务绕过 outbox 直接发布 |
 
-第一阶段只实现普通会话 `LOCAL_ROW_LOCK`。`SEQUENCER_BLOCK` 只能保留 port、mock 和表契约，等 `timeline-service / sequencer SDD` 冻结后再实现。
+当前已实现普通会话 `LOCAL_ROW_LOCK` 和热点会话 first-stage `SEQUENCER_BLOCK` active 写路径。`SEQUENCER_BLOCK` 必须依赖 timeline-service valid lease；未配置 sequencer、lease 无效、epoch / lease id 缺失或 lease 过期时 fail-closed，不允许回退到本地 row lock。
 
 第一阶段 `ConversationQueryPort` strict mock 可以返回 `fanout_mode=WRITE_FANOUT`、`fanout_policy_version=1`，但这些值必须经由 port 返回，不能在 SendMessage use case 内硬编码。
 
@@ -603,26 +603,27 @@ CREATE TABLE seq_allocation_journal (
 ALLOCATED 超过 30s 未 COMMITTED:
   1. 查询 message_log 是否已有 tenant_id + conversation_id + seq
   2. 有则补 COMMITTED
-  3. 无则写 GAP_MARKED + timeline_gap_markers
+  3. 无则由 timeline-service 显式 operator 创建 timeline_seq_gap_markers
 ```
 
 `seq_allocation_journal` 是热点 seq 解释事实源；`message_log/timeline/outbox` 是消息事实源。
 
-### 6.8 timeline_gap_markers
+### 6.8 timeline_seq_gap_markers
 
-用于解释热点会话已分配但未形成消息事实的 seq，保证补拉、审计和修复任务看到的是显式 gap，而不是未知缺口。
+用于解释热点会话已分配但未形成消息事实的 seq，保证补拉、审计和修复任务看到的是显式 gap，而不是未知缺口。该表现在归 timeline-service，不归 message-service；message-service 只在 message persisted payload 中记录 lease metadata，不直接写 gap marker。
 
 ```sql
-CREATE TABLE timeline_gap_markers (
+CREATE TABLE timeline_seq_gap_markers (
     tenant_id        TEXT        NOT NULL,
     conversation_id  TEXT        NOT NULL,
-    seq              BIGINT      NOT NULL,
-    allocation_id    TEXT        NOT NULL,
+    start_seq        BIGINT      NOT NULL,
+    end_seq          BIGINT      NOT NULL,
+    lease_id         TEXT        NOT NULL,
     sequencer_epoch  BIGINT      NOT NULL,
     reason           TEXT        NOT NULL,
-    detected_by      TEXT        NOT NULL,
-    detected_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
-    PRIMARY KEY (tenant_id, conversation_id, seq)
+    status           TEXT        NOT NULL,
+    created_by       TEXT        NOT NULL,
+    created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 ```
 
@@ -662,7 +663,7 @@ outside transaction:
   query ConversationQueryPort
   call PolicyCheckPort
   if conversation_mode == SEQUENCER_BLOCK:
-    return SEQUENCER_UNAVAILABLE(reason=sequencer_not_implemented_in_phase_1)
+    get seq from timeline-service backed local seq block cache
   if checked_permission_version != current_permission_version:
     retry dependency read once or return retryable dependency error
   pre-check idempotency by client_msg_id and command_hash if possible
@@ -687,16 +688,15 @@ return message_id + seq
 
 ### 8.2 热点会话 SendMessage
 
-第一阶段不实现该流程。代码必须在识别 `conversation_mode=SEQUENCER_BLOCK` 时直接返回 `SEQUENCER_UNAVAILABLE`，不能写 `seq_allocation_journal`、`timeline_gap_markers`，也不能真实调用 `AllocateSeqBlock`。
-
-目标态流程：
+当前 first-stage active 流程：
 
 ```text
 pre-check idempotency by client_msg_id
 if hit:
   return old message_id + seq
-get seq from local seq block cache
-insert seq_allocation_journal(ALLOCATED)
+get seq from timeline-service backed local seq block cache
+if lease missing / expired / missing epoch / missing lease_id:
+  return SEQUENCER_UNAVAILABLE
 begin
   check idempotency by client_msg_id
   check permission_version
@@ -704,7 +704,6 @@ begin
   insert conversation_timeline_events(message.persisted)
   insert message_outbox(message.persisted)
 commit
-mark seq_allocation_journal(COMMITTED)
 ```
 
 并发幂等处理：
@@ -714,14 +713,13 @@ if two requests pass pre-check concurrently:
   one transaction commits successfully
   the other hits unique(tenant_id, sender_id, device_id, client_msg_id)
   failed request queries existing message_log and returns old message_id + seq
-  already allocated seq is marked GAP_MARKED
+  any unused allocated seq must be explained later by timeline-service gap marker operator
 ```
 
 事务失败：
 
 ```text
-mark seq_allocation_journal(GAP_MARKED)
-write timeline_gap_markers
+leave explicit gap repair to timeline-service gap marker operator
 return retryable error if client can retry same client_msg_id
 ```
 

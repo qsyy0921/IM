@@ -1,15 +1,15 @@
 ﻿# File Size Budget Hotspots
 
-- Created at: 2026-06-29T13:51:02.0899673Z
+- Created at: 2026-06-29T15:19:31.7976018Z
 - Scope: handwritten Go/Markdown/PowerShell/Bash file-size budget snapshot; not a code-quality score
-- Files checked: 2197
+- Files checked: 2199
 - Warnings: 0
 - Failures: 0
 - Hotspots at >= 80% of warning threshold: 1
 
 | File | Kind | Lines | Warn | Max | Warn % | Max % |
 | --- | --- | ---: | ---: | ---: | ---: | ---: |
-| docs\sdd\message-service.md | docs | 1048 | 1200 | 1500 | 87.3 | 69.9 |
+| docs\sdd\message-service.md | docs | 1046 | 1200 | 1500 | 87.2 | 69.7 |
 | docs\sdd\contacts-service.md | docs | 945 | 1200 | 1500 | 78.8 | 63 |
 | services\api-gateway\internal\api\httpbff\server_test.go | test/runner | 1870 | 2500 | 3000 | 74.8 | 62.3 |
 | loadtest\agent\main.go | test/runner | 1865 | 2500 | 3000 | 74.6 | 62.2 |

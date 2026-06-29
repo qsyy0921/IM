@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/qsyy0921/IM/services/timeline-service/internal/types"
 )
@@ -135,6 +136,212 @@ INSERT INTO timeline_seq_block_leases (
 	}, nil
 }
 
+func (repository *Repository) ExpireSeqBlockLeases(
+	ctx context.Context,
+	command types.ExpireLeasesCommand,
+) (types.ExpireLeasesResult, error) {
+	tx, err := repository.pool.Begin(ctx)
+	if err != nil {
+		return types.ExpireLeasesResult{}, types.NewDBWriteFailed(err.Error())
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	rows, err := tx.Query(ctx, `
+SELECT lease_id
+FROM timeline_seq_block_leases
+WHERE status = 'ACTIVE'
+  AND expires_at <= $1
+ORDER BY expires_at, tenant_id, conversation_id
+LIMIT $2
+FOR UPDATE SKIP LOCKED
+`, command.Before, command.Limit)
+	if err != nil {
+		return types.ExpireLeasesResult{}, types.NewDBReadFailed(err.Error())
+	}
+	leaseIDs := make([]string, 0, command.Limit)
+	for rows.Next() {
+		var leaseID string
+		if err := rows.Scan(&leaseID); err != nil {
+			rows.Close()
+			return types.ExpireLeasesResult{}, types.NewDBReadFailed(err.Error())
+		}
+		leaseIDs = append(leaseIDs, leaseID)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return types.ExpireLeasesResult{}, types.NewDBReadFailed(err.Error())
+	}
+	rows.Close()
+
+	if command.DryRun {
+		if err := tx.Commit(ctx); err != nil {
+			return types.ExpireLeasesResult{}, types.NewDBWriteFailed(err.Error())
+		}
+		return types.ExpireLeasesResult{Matched: len(leaseIDs), DryRun: true}, nil
+	}
+
+	expired := 0
+	for _, leaseID := range leaseIDs {
+		tag, err := tx.Exec(ctx, `
+UPDATE timeline_seq_block_leases
+SET status = 'EXPIRED',
+    expired_at = now(),
+    expired_by = $2,
+    expire_reason = $3
+WHERE lease_id = $1
+  AND status = 'ACTIVE'
+`, leaseID, command.OperatorID, command.Reason)
+		if err != nil {
+			return types.ExpireLeasesResult{}, types.NewDBWriteFailed(err.Error())
+		}
+		expired += int(tag.RowsAffected())
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return types.ExpireLeasesResult{}, types.NewDBWriteFailed(err.Error())
+	}
+	return types.ExpireLeasesResult{Matched: len(leaseIDs), Expired: expired}, nil
+}
+
+func (repository *Repository) CreateGapMarker(
+	ctx context.Context,
+	command types.GapMarkerCommand,
+) (types.GapMarker, error) {
+	markerID, err := newGapMarkerID()
+	if err != nil {
+		return types.GapMarker{}, types.NewDBWriteFailed(err.Error())
+	}
+	marker := types.GapMarker{
+		MarkerID:       markerID,
+		TenantID:       command.TenantID,
+		ConversationID: command.ConversationID,
+		StartSeq:       command.StartSeq,
+		EndSeq:         command.EndSeq,
+		SequencerEpoch: command.SequencerEpoch,
+		LeaseID:        command.LeaseID,
+		Reason:         command.Reason,
+		Status:         "OPEN",
+		CreatedBy:      command.OperatorID,
+		CreatedAt:      time.Now().UTC(),
+	}
+	if command.DryRun {
+		return marker, nil
+	}
+	inserted, err := scanGapMarker(repository.pool.QueryRow(ctx, `
+INSERT INTO timeline_seq_gap_markers (
+    marker_id,
+    tenant_id,
+    conversation_id,
+    start_seq,
+    end_seq,
+    sequencer_epoch,
+    lease_id,
+    reason,
+    status,
+    created_by,
+    created_at
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'OPEN', $9, now())
+RETURNING marker_id, tenant_id, conversation_id, start_seq, end_seq, sequencer_epoch, lease_id, reason, status, created_by, created_at, closed_by, closed_at, close_reason
+`,
+		marker.MarkerID,
+		command.TenantID,
+		command.ConversationID,
+		command.StartSeq,
+		command.EndSeq,
+		command.SequencerEpoch,
+		command.LeaseID,
+		command.Reason,
+		command.OperatorID,
+	))
+	if err != nil {
+		return types.GapMarker{}, types.NewDBWriteFailed(err.Error())
+	}
+	return inserted, nil
+}
+
+func (repository *Repository) CloseGapMarker(
+	ctx context.Context,
+	command types.CloseGapMarkerCommand,
+) (types.GapMarker, error) {
+	marker, err := repository.getGapMarker(ctx, command.MarkerID)
+	if err != nil {
+		return types.GapMarker{}, err
+	}
+	if command.DryRun {
+		return marker, nil
+	}
+	closed, err := scanGapMarker(repository.pool.QueryRow(ctx, `
+UPDATE timeline_seq_gap_markers
+SET status = 'CLOSED',
+    closed_by = $2,
+    closed_at = now(),
+    close_reason = $3
+WHERE marker_id = $1
+  AND status = 'OPEN'
+RETURNING marker_id, tenant_id, conversation_id, start_seq, end_seq, sequencer_epoch, lease_id, reason, status, created_by, created_at, closed_by, closed_at, close_reason
+`, command.MarkerID, command.OperatorID, command.CloseReason))
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return types.GapMarker{}, types.NewInvalidArgument("gap marker is not open")
+		}
+		return types.GapMarker{}, types.NewDBWriteFailed(err.Error())
+	}
+	return closed, nil
+}
+
+func (repository *Repository) AuditGapMarkers(
+	ctx context.Context,
+	tenantID string,
+	conversationID string,
+	status string,
+	limit int,
+) ([]types.GapMarker, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	rows, err := repository.pool.Query(ctx, `
+SELECT marker_id, tenant_id, conversation_id, start_seq, end_seq, sequencer_epoch, lease_id, reason, status, created_by, created_at, closed_by, closed_at, close_reason
+FROM timeline_seq_gap_markers
+WHERE ($1 = '' OR tenant_id = $1)
+  AND ($2 = '' OR conversation_id = $2)
+  AND ($3 = '' OR status = $3)
+ORDER BY created_at DESC
+LIMIT $4
+`, tenantID, conversationID, status, limit)
+	if err != nil {
+		return nil, types.NewDBReadFailed(err.Error())
+	}
+	defer rows.Close()
+	markers := make([]types.GapMarker, 0)
+	for rows.Next() {
+		marker, err := scanGapMarker(rows)
+		if err != nil {
+			return nil, types.NewDBReadFailed(err.Error())
+		}
+		markers = append(markers, marker)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, types.NewDBReadFailed(err.Error())
+	}
+	return markers, nil
+}
+
+func (repository *Repository) getGapMarker(ctx context.Context, markerID string) (types.GapMarker, error) {
+	marker, err := scanGapMarker(repository.pool.QueryRow(ctx, `
+SELECT marker_id, tenant_id, conversation_id, start_seq, end_seq, sequencer_epoch, lease_id, reason, status, created_by, created_at, closed_by, closed_at, close_reason
+FROM timeline_seq_gap_markers
+WHERE marker_id = $1
+`, markerID))
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return types.GapMarker{}, types.NewInvalidArgument("gap marker not found")
+		}
+		return types.GapMarker{}, types.NewDBReadFailed(err.Error())
+	}
+	return marker, nil
+}
+
 type storedSeqBlockLease struct {
 	lease       types.SeqBlockLease
 	commandHash string
@@ -208,4 +415,52 @@ func newLeaseID() (string, error) {
 		return "", err
 	}
 	return "seqblk_" + hex.EncodeToString(randomBytes[:]), nil
+}
+
+func newGapMarkerID() (string, error) {
+	var randomBytes [16]byte
+	if _, err := rand.Read(randomBytes[:]); err != nil {
+		return "", err
+	}
+	return "gap_" + hex.EncodeToString(randomBytes[:]), nil
+}
+
+type rowScanner interface {
+	Scan(dest ...any) error
+}
+
+func scanGapMarker(scanner rowScanner) (types.GapMarker, error) {
+	var marker types.GapMarker
+	var closedBy pgtype.Text
+	var closedAt pgtype.Timestamptz
+	var closeReason pgtype.Text
+	if err := scanner.Scan(
+		&marker.MarkerID,
+		&marker.TenantID,
+		&marker.ConversationID,
+		&marker.StartSeq,
+		&marker.EndSeq,
+		&marker.SequencerEpoch,
+		&marker.LeaseID,
+		&marker.Reason,
+		&marker.Status,
+		&marker.CreatedBy,
+		&marker.CreatedAt,
+		&closedBy,
+		&closedAt,
+		&closeReason,
+	); err != nil {
+		return types.GapMarker{}, err
+	}
+	if closedBy.Valid {
+		marker.ClosedBy = closedBy.String
+	}
+	if closedAt.Valid {
+		value := closedAt.Time
+		marker.ClosedAt = &value
+	}
+	if closeReason.Valid {
+		marker.CloseReason = closeReason.String
+	}
+	return marker, nil
 }

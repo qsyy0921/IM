@@ -190,9 +190,11 @@ func runGRPCServer() error {
 			return err
 		}
 		client, closeClient, err := rpcinfra.DialTimelineClientWithConfig(ctx, rpcinfra.TimelineClientDialConfig{
-			Addr:    timelineAddr,
-			Timeout: envDuration("NEXUSIM_TIMELINE_RPC_TIMEOUT", 100*time.Millisecond),
-			TLS:     timelineTLS,
+			Addr:              timelineAddr,
+			Timeout:           envDuration("NEXUSIM_TIMELINE_RPC_TIMEOUT", 100*time.Millisecond),
+			BlockSize:         envInt("NEXUSIM_TIMELINE_SEQ_BLOCK_CACHE_SIZE", 1),
+			LeaseSafetyMargin: envDuration("NEXUSIM_TIMELINE_SEQ_BLOCK_LEASE_SAFETY_MARGIN", 250*time.Millisecond),
+			TLS:               timelineTLS,
 		})
 		if err != nil {
 			return err

@@ -18,6 +18,9 @@ type AppendMessageInput struct {
 	Permission   types.PermissionDecision
 	Conversation types.ConversationSendContext
 	AllocatedSeq int64
+	SeqLeaseID   string
+	SeqEpoch     int64
+	SeqExpiresAt time.Time
 }
 
 type AppendMessageResult struct {
@@ -127,6 +130,8 @@ func buildMessagePersistedPayload(
 		"message_id":       messageID,
 		"conversation_id":  input.Command.ConversationID,
 		"conversation_seq": seq,
+		"seq_lease_id":     input.SeqLeaseID,
+		"sequencer_epoch":  input.SeqEpoch,
 		"sender_id":        input.Command.AuthContext.UserID,
 		"device_id":        input.Command.AuthContext.DeviceID,
 		"client_msg_id":    input.Command.ClientMsgID,

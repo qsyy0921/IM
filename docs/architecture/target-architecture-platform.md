@@ -517,7 +517,7 @@ LOCAL_ROW_LOCK
 SEQUENCER_BLOCK
 AllocateSeqBlock port
 seq_allocation_journal table contract
-timeline_gap_markers table contract
+timeline_seq_gap_markers table contract
 ```
 
 该切片只定义契约、不实现业务闭环：

@@ -65,7 +65,7 @@ func (u *SendMessageUseCase) Execute(ctx context.Context, command types.SendMess
 		return types.SendMessageResult{}, types.NewPermissionDenied(permission.Reason)
 	}
 
-	allocatedSeq, err := u.allocateConversationSeq(ctx, command, conversation)
+	allocatedSeq, lease, err := u.allocateConversationSeq(ctx, command, conversation)
 	if err != nil {
 		return types.SendMessageResult{}, err
 	}
@@ -75,6 +75,9 @@ func (u *SendMessageUseCase) Execute(ctx context.Context, command types.SendMess
 		Permission:   permission,
 		Conversation: conversation,
 		AllocatedSeq: allocatedSeq,
+		SeqLeaseID:   lease.LeaseID,
+		SeqEpoch:     lease.Epoch,
+		SeqExpiresAt: lease.ExpiresAt,
 	})
 	if err != nil {
 		return types.SendMessageResult{}, err
@@ -137,13 +140,13 @@ func (u *SendMessageUseCase) allocateConversationSeq(
 	ctx context.Context,
 	command types.SendMessageCommand,
 	conversation types.ConversationSendContext,
-) (int64, error) {
+) (int64, types.SeqBlock, error) {
 	switch conversation.ConversationMode {
 	case types.ConversationModeLocalRowLock:
-		return 0, nil
+		return 0, types.SeqBlock{}, nil
 	case types.ConversationModeSequencerBlock:
 		if u.sequencer == nil {
-			return 0, types.NewSequencerUnavailable("sequencer client is not configured")
+			return 0, types.SeqBlock{}, types.NewSequencerUnavailable("sequencer client is not configured")
 		}
 		minimumStartSeq, err := u.messageRepo.NextConversationSeqFloor(
 			ctx,
@@ -151,17 +154,20 @@ func (u *SendMessageUseCase) allocateConversationSeq(
 			command.ConversationID,
 		)
 		if err != nil {
-			return 0, err
+			return 0, types.SeqBlock{}, err
 		}
 		block, err := u.sequencer.AllocateSeqBlock(ctx, command, minimumStartSeq)
 		if err != nil {
-			return 0, err
+			return 0, types.SeqBlock{}, err
 		}
 		if block.StartSeq <= 0 || block.EndSeq != block.StartSeq {
-			return 0, types.NewSequencerUnavailable("sequencer returned invalid single-message block")
+			return 0, types.SeqBlock{}, types.NewSequencerUnavailable("sequencer returned invalid single-message block")
 		}
-		return block.StartSeq, nil
+		if block.Epoch <= 0 || block.LeaseID == "" || block.ExpiresAt.IsZero() {
+			return 0, types.SeqBlock{}, types.NewSequencerUnavailable("sequencer returned incomplete lease metadata")
+		}
+		return block.StartSeq, block, nil
 	default:
-		return 0, types.NewSequencerUnavailable("conversation mode is not supported")
+		return 0, types.SeqBlock{}, types.NewSequencerUnavailable("conversation mode is not supported")
 	}
 }

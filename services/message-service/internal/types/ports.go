@@ -1,5 +1,7 @@
 package types
 
+import "time"
+
 type PermissionDecision struct {
 	Allowed           bool
 	PermissionVersion int64
@@ -19,7 +21,9 @@ type ConversationSendContext struct {
 }
 
 type SeqBlock struct {
-	StartSeq int64
-	EndSeq   int64
-	Epoch    int64
+	StartSeq  int64
+	EndSeq    int64
+	Epoch     int64
+	LeaseID   string
+	ExpiresAt time.Time
 }

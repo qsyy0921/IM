@@ -103,6 +103,9 @@ func TestMessageRepositoryAppendMessageUsesAllocatedSeqIntegration(t *testing.T)
 	tenantID := types.TenantID(fmt.Sprintf("tenant-it-allocated-seq-%d", runID))
 	input := testAppendInput(tenantID, "client-allocated-seq", []byte(`{"text":"sequenced"}`))
 	input.AllocatedSeq = 5000
+	input.SeqLeaseID = "seqblk-integration"
+	input.SeqEpoch = 1
+	input.SeqExpiresAt = time.Now().Add(time.Minute)
 	input.Conversation.ConversationMode = types.ConversationModeSequencerBlock
 	input.Conversation.FanoutMode = types.FanoutModeBroadcastSignal
 
@@ -115,6 +118,28 @@ func TestMessageRepositoryAppendMessageUsesAllocatedSeqIntegration(t *testing.T)
 	}
 	assertPersistedFacts(t, ctx, pool, input, result)
 	assertNoLocalConversationSeq(t, ctx, pool, tenantID, input.Command.ConversationID)
+}
+
+func TestMessageRepositoryAppendMessageRejectsExpiredAllocatedSeqLeaseIntegration(t *testing.T) {
+	ctx := context.Background()
+	pool := openIntegrationPool(t, ctx)
+	defer pool.Close()
+	applyMessageMigration(t, ctx, pool)
+
+	runID := time.Now().UnixNano()
+	repo := NewMessageRepository(pool)
+	tenantID := types.TenantID(fmt.Sprintf("tenant-it-expired-seq-lease-%d", runID))
+	input := testAppendInput(tenantID, "client-expired-seq-lease", []byte(`{"text":"expired"}`))
+	input.AllocatedSeq = 6000
+	input.SeqLeaseID = "seqblk-expired"
+	input.SeqEpoch = 1
+	input.SeqExpiresAt = time.Now().Add(-time.Second)
+	input.Conversation.ConversationMode = types.ConversationModeSequencerBlock
+
+	_, err := repo.AppendMessage(ctx, input)
+	if !errors.Is(err, types.ErrSequencerUnavailable) {
+		t.Fatalf("expected sequencer unavailable for expired lease, got %v", err)
+	}
 }
 
 func TestMessageRepositoryNextConversationSeqFloorUsesTimelineEventsIntegration(t *testing.T) {

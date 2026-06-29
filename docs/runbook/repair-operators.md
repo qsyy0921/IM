@@ -541,6 +541,26 @@ compensation rows，也不嵌入 raw payload、operator reason、provider artifa
 
 完整历史窗口 / targeted replay repair 仍是后续工作；执行 mutate 前仍应先用 `member-window-audit` 缩小范围并留存证据，不能用手写 SQL 直接改成员事实。
 
+## Timeline Sequencer
+
+`timeline-service` 当前提供：
+
+环境变量：`NEXUSIM_TIMELINE_SERVICE_MODE`
+
+| 模式 | 作用 |
+| --- | --- |
+| `seq-lease-expire` | 按 `NEXUSIM_TIMELINE_LEASE_EXPIRE_BEFORE` 和 limit 查找过期 ACTIVE seq block lease；默认 `NEXUSIM_TIMELINE_REPAIR_DRY_RUN=true` 只统计，显式设为 false 才标记 `EXPIRED`。 |
+| `gap-marker-create` | 显式创建一个 OPEN gap marker，要求 tenant / conversation / seq range / epoch / lease id / operator / reason。默认 dry-run 只生成 preview，不写表。 |
+| `gap-marker-close` | 显式关闭一个 OPEN gap marker，要求 marker id、operator 和 reason。默认 dry-run 只返回当前 marker，不写表。 |
+| `gap-marker-audit` | 只读列出 gap marker，可按 tenant / conversation / status 缩小范围。 |
+
+这些 operator 只操作 timeline-service 自有 `timeline_seq_block_leases` /
+`timeline_seq_gap_markers`，不读取 message / conversation / delivery 私有表，也不自动推断
+业务 gap。`seq-lease-expire`、`gap-marker-create` 和 `gap-marker-close` 必须提供
+`NEXUSIM_TIMELINE_REPAIR_OPERATOR_ID` 和 `NEXUSIM_TIMELINE_REPAIR_REASON_FILE`；
+`NEXUSIM_TIMELINE_REPAIR_OUTPUT` 可写低敏 JSON 结果。reason 必须走文件输入，不能把自由
+文本 reason 写进 operator plan / shell env。
+
 ## Identity Challenge / Session
 
 `identity-service` 当前提供：

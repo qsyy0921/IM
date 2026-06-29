@@ -27,6 +27,37 @@ func (repository *fakeSeqBlockRepository) AllocateSeqBlock(
 	return repository.result, repository.err
 }
 
+func (repository *fakeSeqBlockRepository) ExpireSeqBlockLeases(
+	context.Context,
+	types.ExpireLeasesCommand,
+) (types.ExpireLeasesResult, error) {
+	return types.ExpireLeasesResult{}, nil
+}
+
+func (repository *fakeSeqBlockRepository) CreateGapMarker(
+	context.Context,
+	types.GapMarkerCommand,
+) (types.GapMarker, error) {
+	return types.GapMarker{}, nil
+}
+
+func (repository *fakeSeqBlockRepository) CloseGapMarker(
+	context.Context,
+	types.CloseGapMarkerCommand,
+) (types.GapMarker, error) {
+	return types.GapMarker{}, nil
+}
+
+func (repository *fakeSeqBlockRepository) AuditGapMarkers(
+	context.Context,
+	string,
+	string,
+	string,
+	int,
+) ([]types.GapMarker, error) {
+	return nil, nil
+}
+
 func TestAllocateSeqBlockUseCaseValidatesCommand(t *testing.T) {
 	repository := &fakeSeqBlockRepository{}
 	useCase := NewAllocateSeqBlockUseCase(repository, 10, time.Second)

@@ -9,10 +9,10 @@
 - 已接 conversation-service / policy-service，可走 verified metadata、TLS / mTLS。
 - 已接 timeline-service 第一阶段 sequencer：当 conversation-service 返回
   `SEQUENCER_BLOCK` 时，`SendMessage` 会通过 `NEXUSIM_TIMELINE_SERVICE_ADDR`
-  调用 timeline-service `AllocateSeqBlock(block_size=1)`，只在获得 valid seq block
-  lease 后写 `message_log` / timeline / outbox；未配置 sequencer 时对
-  `SEQUENCER_BLOCK` fail-closed，不回退到本地 row lock。当前仍是单条 seq block
-  接入，批量 block cache、gap marker 和 lease fencing 深化后置。
+  调用 timeline-service `AllocateSeqBlock`，只在获得 valid seq block lease 后写
+  `message_log` / timeline / outbox；未配置 sequencer、lease 过期或 epoch / lease_id
+  缺失时对 `SEQUENCER_BLOCK` fail-closed，不回退到本地 row lock。本轮已补本地
+  seq block cache、lease safety margin，以及 message persisted payload 中的 lease metadata。
 - 已补 `/healthz`、`/readyz`、`/debug/metrics` 和 Prometheus text `/metrics`，可观察低敏 PG pool、send / repository / Kafka / outbox relay 聚合指标和固定 operation latency；debug HTTP 监听默认只允许 loopback / 私网，公网或未指定地址必须显式 `NEXUSIM_MESSAGE_DEBUG_ALLOW_PUBLIC=true`。
 - 本地 Prometheus scrape / alert rules 与 Grafana dashboard 原型已覆盖 SendMessage / PG pool / Kafka / outbox relay latency、relay runtime error 和 OTLP endpoint missing；这仍是本地开发 / 面试演示级观测，不是生产 Alertmanager / SLO。
 - 已补 first-stage OpenTelemetry gRPC server span，默认关闭；启用后可输出 stdout 或 OTLP gRPC trace，并从入口 metadata 提取 W3C `traceparent`。
@@ -32,7 +32,7 @@
 ## 后续
 
 - AI 底座转进前的必要收口：继续确保 `EditMessage` / `RevokeMessage` / `DeleteMessage`、timeline / outbox、tombstone 和 delete proof 对 search / memory / retrieval 可重建且低敏。
-- 热点群后续：把 timeline-service seq block 从单条调用推进到本地 block cache、
-  gap marker、epoch fencing 和真实三机热点压测曲线。
+- 热点群后续：重建镜像并跑真实三机热点压测曲线；timeline-service virtual partition
+  mapping、leader ownership audit 和更完整 repair workflow 继续后置。
 - Provider-grade 外部 proof 工作流 / 审批系统集成、更完整容量曲线和生产观测后置为 hardening backlog；用户私有隐藏已由 delivery-service `HideInboxItem` 承担，图片 / 文件 / 语音二进制上传和处理属于后续 media 能力。
 - 生产级 OTel collector、告警路由、retention 和 SLO dashboard 仍属于后续统一观测治理。

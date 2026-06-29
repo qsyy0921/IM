@@ -270,7 +270,7 @@ delivery_consumer_lag
 | conversation_seq | `tenant_id + conversation_id` | 普通会话 seq |
 | conversation_sequencer_state | `tenant_id + conversation_id` | 热点会话 owner、epoch、seq block |
 | seq_allocation_journal | `tenant_id + conversation_id + seq` | 热点 seq 分配、提交、gap 标记流水 |
-| timeline_gap_markers | `tenant_id + conversation_id + gap_start` | seq gap 解释 |
+| timeline_seq_gap_markers | `tenant_id + conversation_id + gap_start` | timeline-service owned seq gap 解释 |
 | message_log | `tenant_id + conversation_id + conversation_seq` | 消息事实源 |
 | conversation_timeline_events | `tenant_id + conversation_id + seq` | 会话顺序轴 |
 | message_outbox | `event_id` | 待发布事件 |

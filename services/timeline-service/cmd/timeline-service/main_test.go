@@ -2,15 +2,24 @@ package main
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"testing"
 )
 
 func TestValidateTimelineMode(t *testing.T) {
-	if err := validateTimelineMode("noop"); err != nil {
-		t.Fatalf("noop mode should be valid: %v", err)
+	validModes := []string{
+		"noop",
+		"seq-block-allocator",
+		"seq-lease-expire",
+		"gap-marker-create",
+		"gap-marker-close",
+		"gap-marker-audit",
 	}
-	if err := validateTimelineMode("seq-block-allocator"); err != nil {
-		t.Fatalf("seq-block-allocator mode should be valid: %v", err)
+	for _, mode := range validModes {
+		if err := validateTimelineMode(mode); err != nil {
+			t.Fatalf("%s mode should be valid: %v", mode, err)
+		}
 	}
 }
 
@@ -31,6 +40,40 @@ func TestRunSeqBlockAllocatorRequiresDSN(t *testing.T) {
 	defer cancel()
 	if err := run(ctx); err == nil {
 		t.Fatal("seq-block-allocator should require NEXUSIM_PG_DSN")
+	}
+}
+
+func TestTimelineRepairOperatorIDRequiresExplicitEnv(t *testing.T) {
+	t.Setenv("NEXUSIM_TIMELINE_REPAIR_OPERATOR_ID", "")
+	if _, err := timelineRepairOperatorID(); err == nil {
+		t.Fatal("timeline repair operator id should be required")
+	}
+	t.Setenv("NEXUSIM_TIMELINE_REPAIR_OPERATOR_ID", "operator-a")
+	operatorID, err := timelineRepairOperatorID()
+	if err != nil {
+		t.Fatalf("timeline repair operator id: %v", err)
+	}
+	if operatorID != "operator-a" {
+		t.Fatalf("operator id = %q", operatorID)
+	}
+}
+
+func TestTimelineRepairReasonRequiresExplicitFile(t *testing.T) {
+	t.Setenv("NEXUSIM_TIMELINE_REPAIR_REASON_FILE", "")
+	if _, err := timelineRepairReason(); err == nil {
+		t.Fatal("timeline repair reason file should be required")
+	}
+	path := filepath.Join(t.TempDir(), "reason.txt")
+	if err := os.WriteFile(path, []byte("repair reason\n"), 0o644); err != nil {
+		t.Fatalf("write reason: %v", err)
+	}
+	t.Setenv("NEXUSIM_TIMELINE_REPAIR_REASON_FILE", path)
+	reason, err := timelineRepairReason()
+	if err != nil {
+		t.Fatalf("timeline repair reason: %v", err)
+	}
+	if reason != "repair reason" {
+		t.Fatalf("reason = %q", reason)
 	}
 }
 

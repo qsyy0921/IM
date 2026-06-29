@@ -184,7 +184,7 @@ CreateConversation(GROUP)
 
 ```text
 conversation-service promoted fanout_mode=BROADCAST_SIGNAL
--> message-service uses timeline-service AllocateSeqBlock(block_size=1)
+-> message-service uses timeline-service AllocateSeqBlock with local seq block cache
 -> delivery-service writes delivery_timeline_items instead of per-user user_inbox
 -> delivery_outbox publishes conversation-level signal
 -> push-gateway sends delivery.notify to conversation subscribers
@@ -215,7 +215,7 @@ delivery projection lag、push signal、PullInbox / ACK 和 PostgreSQL 指标曲
 | 压力点 | 当前边界 |
 | --- | --- |
 | 消息写入 | `message-service` 只写 `message_log` 和 outbox，不同步写所有群成员 inbox。 |
-| 消息顺序 | 普通群由 message 写入链路维持 conversation scope 的 seq 语义；热点 `SEQUENCER_BLOCK` 会由 message-service 调用 timeline-service `AllocateSeqBlock(block_size=1)`，只在 valid block lease 下取号。 |
+| 消息顺序 | 普通群由 message 写入链路维持 conversation scope 的 seq 语义；热点 `SEQUENCER_BLOCK` 会由 message-service 通过 timeline-service `AllocateSeqBlock` 和本地 seq block cache 取号，只在 valid block lease、epoch、lease_id 和未过期 lease 下写入。 |
 | 事件传播 | `message_outbox -> Kafka conversation.timeline.events`，业务事务不直接 publish Kafka。 |
 | 成员可见性 | `conversation-service` 是成员事实源；`delivery-service` 使用 membership projection，不实时回查当前成员来改写历史可见性。 |
 | 投递 fanout | `delivery-service` 异步生成 `user_inbox`，失败可 fail-closed、repair / redrive，不阻塞发送主路径。 |
@@ -246,7 +246,7 @@ SendMessage
 5. 超大群可切 lazy inbox：不为全部离线冷用户即时物化 inbox，而是在 PullInbox 时结合 timeline、visibility window 和 cursor 计算可见消息。
 6. 对活跃用户、`@我`、置顶会话、在线设备优先 materialize；冷用户延迟或按需 materialize。
 7. Kafka 上保留 timeline 的顺序语义，但 delivery fanout 可以拆成 fanout shard topic / user bucket，不把展示顺序和投递并行度绑定死。
-8. 当单会话写入热点超过本地 row lock 能力时，引入 `timeline-service` 的 seq block allocator；allocator 已有第一版，message-service 已接 active `SEQUENCER_BLOCK` 单条 seq block 写路径，拿不到 valid lease 时仍必须 fail-closed，不能悄悄回退成普通 row-lock。
+8. 当单会话写入热点超过本地 row lock 能力时，引入 `timeline-service` 的 seq block allocator；allocator 已有 lease status、gap marker 和 repair operator first path，message-service 已接 active `SEQUENCER_BLOCK` seq block cache 写路径，拿不到 valid lease 或 lease 过期时仍必须 fail-closed，不能悄悄回退成普通 row-lock。
 
 只有压测证明当前模型和拓扑已经成为硬瓶颈时，才考虑新增或升级中间件：
 

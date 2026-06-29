@@ -39,9 +39,13 @@ brief、loadtest report、development-progress 或 archive。
   large group 使用 active first-stage `READ_FANOUT`；hot group 的
   `BROADCAST_SIGNAL + SEQUENCER_BLOCK` 已有 timeline seq-block allocator 和 push
   conversation subscription / signal 广播服务端 first path；message-service 已接入
-  第一阶段 active `SEQUENCER_BLOCK` 写路径，发送时调用 timeline-service
-  `AllocateSeqBlock(block_size=1)`，获得 valid lease 后才写 message facts。当前仍未实现
-  本地 block cache、gap marker 和 epoch fencing 深化。
+  第一阶段 active `SEQUENCER_BLOCK` 写路径，发送时通过 timeline-service
+  `AllocateSeqBlock` 获取 valid lease 后才写 message facts。本轮已补 message-service
+  本地 seq block cache、lease safety margin、lease metadata 写入 / 校验；timeline-service
+  已补 lease status、显式 gap marker 表和 `seq-lease-expire` / `gap-marker-create` /
+  `gap-marker-close` / `gap-marker-audit` operator first path。epoch fencing 当前以
+  lease epoch / lease_id / expires_at 校验进入写路径，leader ownership audit 和 virtual
+  partition mapping 仍后续深化。
 - delivery-service 已补 outbox relay 吞吐 hardening：ready SQL 避免积压下反复扫描历史
   `PUBLISHED` 行，新增 pending-ready / blocking aggregate indexes，relay 支持
   conversation-sharded workers 和 delivery 专用 Kafka batch 参数；2026-06-28
@@ -82,9 +86,9 @@ brief、loadtest report、development-progress 或 archive。
   knowledge-ingestion-service、media-service、model-gateway、notification-service、
   presence-service、vector-index-service、workflow-service。
 - Distributed timeline planning：timeline-service 已建立六层边界、PostgreSQL
-  seq block lease 表、`AllocateSeqBlock` gRPC API、Docker runtime 和 Prometheus /
-  Grafana 观测；message-service 已在 active `SEQUENCER_BLOCK` 写路径消费该 lease，
-  当前第一阶段按每条消息申请单条 block。
+  seq state / block lease / gap marker 表、`AllocateSeqBlock` gRPC API、Docker runtime
+  和 Prometheus / Grafana 观测；message-service 已在 active `SEQUENCER_BLOCK` 写路径消费
+  lease，并支持本地 seq block cache。
 - Observability platform：当前 first-stage 指标和 trace 继续按 Prometheus / Grafana /
   OpenTelemetry 分工维护；它们只提供观测，不参与业务判定或隐藏降级。
 
@@ -97,8 +101,8 @@ brief、loadtest report、development-progress 或 archive。
 
 ## 下一个方向
 
-- 基于已通过的小规模 smoke，继续把 timeline-service 从单条 seq block 推进到
-  block cache、gap marker、epoch fencing 和 repair operator。
+- 基于已通过的小规模 smoke 和本轮 sequencer repair readiness 改动，下一步重建最新
+  Docker 镜像、三机 redeploy，并做热点群小规模复验。
 - 后续再扩大三机热点群压测规模，并把 Prometheus / Grafana 趋势、projection lag、
   push signal 和 PostgreSQL bottleneck 曲线归档到低敏报告；正式生产级运维 UI、
   provider-grade 长周期平台仍后置。

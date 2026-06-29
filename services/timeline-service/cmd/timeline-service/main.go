@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -9,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
@@ -18,6 +20,7 @@ import (
 	grpcapi "github.com/qsyy0921/IM/services/timeline-service/internal/api/grpc"
 	"github.com/qsyy0921/IM/services/timeline-service/internal/app"
 	postgresinfra "github.com/qsyy0921/IM/services/timeline-service/internal/infrastructure/postgres"
+	"github.com/qsyy0921/IM/services/timeline-service/internal/types"
 	"google.golang.org/grpc"
 )
 
@@ -40,6 +43,14 @@ func run(ctx context.Context) error {
 		return runNoop(ctx)
 	case "seq-block-allocator":
 		return runSeqBlockAllocator(ctx)
+	case "seq-lease-expire":
+		return runSeqLeaseExpire(ctx)
+	case "gap-marker-create":
+		return runGapMarkerCreate(ctx)
+	case "gap-marker-close":
+		return runGapMarkerClose(ctx)
+	case "gap-marker-audit":
+		return runGapMarkerAudit(ctx)
 	default:
 		return fmt.Errorf("unsupported NEXUSIM_TIMELINE_SERVICE_MODE %q", mode)
 	}
@@ -127,11 +138,140 @@ func timelineModeFromEnv() string {
 
 func validateTimelineMode(mode string) error {
 	switch mode {
-	case "noop", "seq-block-allocator":
+	case "noop", "seq-block-allocator", "seq-lease-expire", "gap-marker-create", "gap-marker-close", "gap-marker-audit":
 		return nil
 	default:
 		return fmt.Errorf("unsupported NEXUSIM_TIMELINE_SERVICE_MODE %q", mode)
 	}
+}
+
+func runSeqLeaseExpire(ctx context.Context) error {
+	repository, closePool, err := timelineRepositoryFromEnv(ctx)
+	if err != nil {
+		return err
+	}
+	defer closePool()
+	operatorID, err := timelineRepairOperatorID()
+	if err != nil {
+		return err
+	}
+	reason, err := timelineRepairReason()
+	if err != nil {
+		return err
+	}
+	before, err := envOptionalRFC3339Time("NEXUSIM_TIMELINE_LEASE_EXPIRE_BEFORE")
+	if err != nil {
+		return err
+	}
+	if before.IsZero() {
+		before = time.Now().UTC()
+	}
+	command := types.ExpireLeasesCommand{
+		Before:     before,
+		Limit:      envInt("NEXUSIM_TIMELINE_REPAIR_LIMIT", 100),
+		DryRun:     envBool("NEXUSIM_TIMELINE_REPAIR_DRY_RUN", true),
+		OperatorID: operatorID,
+		Reason:     reason,
+	}
+	result, err := app.NewExpireSeqBlockLeasesUseCase(repository).Execute(ctx, command)
+	if err != nil {
+		return err
+	}
+	log.Printf("timeline-service seq lease expire matched=%d expired=%d dry_run=%t", result.Matched, result.Expired, result.DryRun)
+	return writeTimelineRepairOutput(result)
+}
+
+func runGapMarkerCreate(ctx context.Context) error {
+	repository, closePool, err := timelineRepositoryFromEnv(ctx)
+	if err != nil {
+		return err
+	}
+	defer closePool()
+	operatorID, err := timelineRepairOperatorID()
+	if err != nil {
+		return err
+	}
+	reason, err := timelineRepairReason()
+	if err != nil {
+		return err
+	}
+	command := types.GapMarkerCommand{
+		TenantID:       envString("NEXUSIM_TIMELINE_GAP_TENANT_ID", ""),
+		ConversationID: envString("NEXUSIM_TIMELINE_GAP_CONVERSATION_ID", ""),
+		StartSeq:       envInt64("NEXUSIM_TIMELINE_GAP_START_SEQ", 0),
+		EndSeq:         envInt64("NEXUSIM_TIMELINE_GAP_END_SEQ", 0),
+		SequencerEpoch: envInt64("NEXUSIM_TIMELINE_GAP_EPOCH", 0),
+		LeaseID:        envString("NEXUSIM_TIMELINE_GAP_LEASE_ID", ""),
+		Reason:         reason,
+		OperatorID:     operatorID,
+		DryRun:         envBool("NEXUSIM_TIMELINE_REPAIR_DRY_RUN", true),
+	}
+	marker, err := app.NewCreateGapMarkerUseCase(repository).Execute(ctx, command)
+	if err != nil {
+		return err
+	}
+	log.Printf("timeline-service gap marker create marker_id=%s tenant_id=%s conversation_id=%s range=%d-%d dry_run=%t", marker.MarkerID, marker.TenantID, marker.ConversationID, marker.StartSeq, marker.EndSeq, command.DryRun)
+	return writeTimelineRepairOutput(marker)
+}
+
+func runGapMarkerClose(ctx context.Context) error {
+	repository, closePool, err := timelineRepositoryFromEnv(ctx)
+	if err != nil {
+		return err
+	}
+	defer closePool()
+	operatorID, err := timelineRepairOperatorID()
+	if err != nil {
+		return err
+	}
+	reason, err := timelineRepairReason()
+	if err != nil {
+		return err
+	}
+	command := types.CloseGapMarkerCommand{
+		MarkerID:    envString("NEXUSIM_TIMELINE_GAP_MARKER_ID", ""),
+		OperatorID:  operatorID,
+		CloseReason: reason,
+		DryRun:      envBool("NEXUSIM_TIMELINE_REPAIR_DRY_RUN", true),
+	}
+	marker, err := app.NewCloseGapMarkerUseCase(repository).Execute(ctx, command)
+	if err != nil {
+		return err
+	}
+	log.Printf("timeline-service gap marker close marker_id=%s status=%s dry_run=%t", marker.MarkerID, marker.Status, command.DryRun)
+	return writeTimelineRepairOutput(marker)
+}
+
+func runGapMarkerAudit(ctx context.Context) error {
+	repository, closePool, err := timelineRepositoryFromEnv(ctx)
+	if err != nil {
+		return err
+	}
+	defer closePool()
+	rows, err := repository.AuditGapMarkers(
+		ctx,
+		envString("NEXUSIM_TIMELINE_GAP_TENANT_ID", ""),
+		envString("NEXUSIM_TIMELINE_GAP_CONVERSATION_ID", ""),
+		envString("NEXUSIM_TIMELINE_GAP_STATUS", ""),
+		envInt("NEXUSIM_TIMELINE_REPAIR_LIMIT", 20),
+	)
+	if err != nil {
+		return err
+	}
+	log.Printf("timeline-service gap marker audit rows=%d", len(rows))
+	return writeTimelineRepairOutput(rows)
+}
+
+func timelineRepositoryFromEnv(ctx context.Context) (*postgresinfra.Repository, func(), error) {
+	dsn := strings.TrimSpace(os.Getenv("NEXUSIM_PG_DSN"))
+	if dsn == "" {
+		return nil, nil, errors.New("NEXUSIM_PG_DSN is required")
+	}
+	pool, err := openPGPool(ctx, dsn)
+	if err != nil {
+		return nil, nil, err
+	}
+	return postgresinfra.NewRepository(pool), pool.Close, nil
 }
 
 func openPGPool(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
@@ -150,12 +290,63 @@ func envString(name, defaultValue string) string {
 	return defaultValue
 }
 
+func timelineRepairOperatorID() (string, error) {
+	operatorID := strings.TrimSpace(os.Getenv("NEXUSIM_TIMELINE_REPAIR_OPERATOR_ID"))
+	if operatorID == "" {
+		return "", errors.New("NEXUSIM_TIMELINE_REPAIR_OPERATOR_ID is required")
+	}
+	return operatorID, nil
+}
+
+func timelineRepairReason() (string, error) {
+	path := strings.TrimSpace(os.Getenv("NEXUSIM_TIMELINE_REPAIR_REASON_FILE"))
+	if path == "" {
+		return "", errors.New("NEXUSIM_TIMELINE_REPAIR_REASON_FILE is required")
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", fmt.Errorf("read NEXUSIM_TIMELINE_REPAIR_REASON_FILE: %w", err)
+	}
+	if len(data) > 64*1024 {
+		return "", errors.New("NEXUSIM_TIMELINE_REPAIR_REASON_FILE must be at most 64 KiB")
+	}
+	reason := strings.TrimSpace(string(data))
+	if reason == "" {
+		return "", errors.New("NEXUSIM_TIMELINE_REPAIR_REASON_FILE must not be empty")
+	}
+	return reason, nil
+}
+
 func envInt(name string, defaultValue int) int {
 	raw := strings.TrimSpace(os.Getenv(name))
 	if raw == "" {
 		return defaultValue
 	}
 	value, err := strconv.Atoi(raw)
+	if err != nil {
+		return defaultValue
+	}
+	return value
+}
+
+func envInt64(name string, defaultValue int64) int64 {
+	raw := strings.TrimSpace(os.Getenv(name))
+	if raw == "" {
+		return defaultValue
+	}
+	value, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil {
+		return defaultValue
+	}
+	return value
+}
+
+func envBool(name string, defaultValue bool) bool {
+	raw := strings.TrimSpace(os.Getenv(name))
+	if raw == "" {
+		return defaultValue
+	}
+	value, err := strconv.ParseBool(raw)
 	if err != nil {
 		return defaultValue
 	}
@@ -172,6 +363,37 @@ func envDuration(name string, defaultValue time.Duration) time.Duration {
 		return defaultValue
 	}
 	return value
+}
+
+func envOptionalRFC3339Time(name string) (time.Time, error) {
+	raw := strings.TrimSpace(os.Getenv(name))
+	if raw == "" {
+		return time.Time{}, nil
+	}
+	value, err := time.Parse(time.RFC3339, raw)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("%s must be RFC3339: %w", name, err)
+	}
+	return value.UTC(), nil
+}
+
+func writeTimelineRepairOutput(payload any) error {
+	outputPath := strings.TrimSpace(os.Getenv("NEXUSIM_TIMELINE_REPAIR_OUTPUT"))
+	if outputPath == "" {
+		return nil
+	}
+	fullPath, err := filepath.Abs(outputPath)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(fullPath), 0o755); err != nil {
+		return err
+	}
+	data, err := json.MarshalIndent(payload, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(fullPath, append(data, '\n'), 0o644)
 }
 
 func timelineDebugAddr() string {

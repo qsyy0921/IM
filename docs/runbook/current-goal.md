@@ -6,8 +6,9 @@
 
 ## Active Module
 
-Hot group fanout / sequencer / projection hardening：把热点群聊从普通小群写扩散路径
-推进到可演示的 `SEQUENCER_BLOCK + BROADCAST_SIGNAL` 链路，并准备真实三机压测。
+Hot group sequencer repair readiness：在已通过的 `SEQUENCER_BLOCK + BROADCAST_SIGNAL`
+小规模 smoke 基础上，补齐正式热点群压测前需要的 seq block cache、lease epoch
+fencing、gap marker 和 operator repair first path。
 
 ## 当前已收口摘要
 
@@ -17,8 +18,12 @@ Hot group fanout / sequencer / projection hardening：把热点群聊从普通�
 - timeline-service 已进入本地运行链路，提供 `seq-block-allocator` runtime、PostgreSQL
   sequence state / lease 表和 `AllocateSeqBlock` gRPC API。
 - message-service 已在 `SEQUENCER_BLOCK` active 写路径调用 timeline-service
-  `AllocateSeqBlock(block_size=1)`；拿不到 valid lease 时 fail-closed，不回退到本地
-  row lock。
+  `AllocateSeqBlock`；本轮新增本地 seq block cache、lease safety margin 和 lease
+  metadata 写入 / 校验。拿不到 valid lease、lease 过期或 epoch / lease_id 缺失时
+  fail-closed，不回退到本地 row lock。
+- timeline-service 已新增 lease 状态、显式 gap marker 表和 repair operator modes：
+  `seq-lease-expire`、`gap-marker-create`、`gap-marker-close`、`gap-marker-audit`。
+  repair 只操作 timeline-service 自有表，不读 message / conversation 私有表。
 - delivery-service 已支持 `WRITE_FANOUT` / `HYBRID_FANOUT` / `READ_FANOUT` /
   conversation-level signal；materialized `user_inbox` 已改为批量 insert；
   `timeline-consumer` 支持同 consumer group 多 worker 按 Kafka partition 安全并行。
@@ -32,33 +37,34 @@ Hot group fanout / sequencer / projection hardening：把热点群聊从普通�
 
 ## 目标
 
-- 将当前 hotgroup / sequencer / projection 改动收口提交，确保 focused checks、Docker /
-  compose / registry 相关检查通过。
+- 将当前 timeline / message sequencer repair readiness 改动收口提交，确保 focused
+  tests、Docker / compose / registry 相关检查通过。
 - 保留小规模 smoke 证据，并明确它证明 first-stage 链路可用，不代表容量上限。
-- 下一模块进入 timeline-service block cache、gap marker、epoch fencing 和 repair operator；
-  随后扩大三机热点群压测规模，记录 Kafka lag、delivery projection lag、push notify、
-  PullInbox / ACK 追平和 PostgreSQL 关键指标。
+- 本轮不写正式容量结论；后续需要重建最新 Docker 镜像、三机重新部署，再扩大热点群压测，
+  记录 Kafka lag、delivery projection lag、push notify、PullInbox / ACK 追平和 PostgreSQL
+  关键指标。
 
 ## 本轮完成条件
 
-- 当前 uncommitted hotgroup / sequencer / projection 改动收口，focused tests 和
+- 当前 uncommitted timeline / message sequencer repair readiness 改动收口，focused tests 和
   Docker / compose / registry 相关检查通过。
 - 若本地 / 远端 Docker 未启动，必须明确标注真实压测未执行，不写成完成。
-- 文档同步当前公开能力：message-service 已接 timeline-service 单条 seq block；
-  block cache / gap marker / epoch fencing / 三机压测仍是后续。
+- 文档同步当前公开能力：message-service 已接 timeline-service seq block cache；
+  timeline-service 已有 lease expire / gap marker repair operator first path；三机压测仍是后续。
 - 提交并推送到 GitHub。
 
 ## 非目标
 
 - 不做长时间正式容量压测或生产 sizing。
-- 不把单条 seq block 接入说成完整 sequencer 分区系统。
+- 不把 first-stage block cache / repair operator 说成完整 sequencer 分区系统。
 - 不新增隐藏 fallback，不用本地 row lock 冒充热点 sequencer。
 - 不继续扩完整产品级客户端。
 - 不展开无关 Agent action boundary / repair cases。
 
 ## 后续优先级
 
-1. timeline-service block cache、gap marker、epoch fencing 和 repair operator。
+1. 重建最新 Docker 镜像、三机 redeploy，跑热点群小规模复验。
 2. 扩大三机热点群压测规模，补趋势图 / 瓶颈曲线。
 3. delivery projection lag / inbox rows per message / push notify storm 指标深化。
-4. 压测报告与面试叙事维护。
+4. timeline virtual partition mapping、leader ownership audit 和更完整 repair workflow。
+5. 压测报告与面试叙事维护。

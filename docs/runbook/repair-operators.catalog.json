@@ -200,6 +200,25 @@
       ]
     },
     {
+      "service": "timeline-service",
+      "mode_env": "NEXUSIM_TIMELINE_SERVICE_MODE",
+      "modes": [
+        "seq-lease-expire",
+        "gap-marker-create",
+        "gap-marker-close",
+        "gap-marker-audit"
+      ],
+      "output_envs": [
+        "NEXUSIM_TIMELINE_REPAIR_OUTPUT"
+      ],
+      "dry_run_envs": [
+        "NEXUSIM_TIMELINE_REPAIR_DRY_RUN"
+      ],
+      "reason_file_envs": [
+        "NEXUSIM_TIMELINE_REPAIR_REASON_FILE"
+      ]
+    },
+    {
       "service": "identity-service",
       "mode_env": "NEXUSIM_IDENTITY_SERVICE_MODE",
       "modes": [

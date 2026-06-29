@@ -18,6 +18,19 @@ CreateConversation(GROUP)
 -> summary/report/users.jsonl
 ```
 
+热点群准备状态：
+
+```text
+conversation-service fanout policy
+-> timeline-service seq block allocator / lease status / gap marker repair operator
+-> message-service SEQUENCER_BLOCK local seq block cache
+-> delivery-service READ_FANOUT / BROADCAST_SIGNAL projection
+-> push-gateway conversation signal notify
+```
+
+注意：本 runner 仍只记录压测事实，不负责自动修复 gap 或自动调整群规模策略。
+正式三机压测前需要先重建最新 Docker 镜像并重新部署服务容器。
+
 暂不覆盖：
 
 ```text

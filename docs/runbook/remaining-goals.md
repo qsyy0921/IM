@@ -16,7 +16,9 @@
 ## 当前优先顺序
 
 1. Hot group fanout / sequencer / projection hardening：小规模 Docker 热点群 smoke 已通过；
-   下一步扩大三机压测规模，补趋势图和瓶颈曲线归档。
+   message-service seq block cache、timeline-service lease status / gap marker / repair
+   operator first path 已进入收口；下一步重建镜像、三机 redeploy，扩大压测规模并补趋势图
+   和瓶颈曲线归档。
 2. Agent action boundary / repair cases：在 provider replay admin / workflow handoff 已落
    的基础上，继续扩更多需要 proposal / approval / workflow / audit 的 action 与 repair 场景。
 3. Product-active 服务按需推进：workflow、audit、admin、notification、media、vector、
@@ -28,9 +30,10 @@
 7. 热点群 / 分区主线已落 conversation-service scale policy、delivery hybrid/read fanout、
    conversation-level delivery signal first-stage runtime、push-gateway conversation
    subscription / signal broadcast、timeline-service seq-block allocator、message-service
-   active `SEQUENCER_BLOCK` 单条 seq block 写路径和 hotgroup runner；2026-06-29 已跑通
-   61 人 / 20 消息 / 3 WebSocket subscriber 小规模 smoke，下一步扩大压测规模，并继续做
-   block cache / gap marker / epoch fencing / deeper repair。
+   active `SEQUENCER_BLOCK` 写路径、seq block cache、gap marker / repair operator first path
+   和 hotgroup runner；2026-06-29 已跑通 61 人 / 20 消息 / 3 WebSocket subscriber 小规模
+   smoke，下一步扩大压测规模，并继续做 virtual partition mapping、leader ownership audit
+   和 deeper repair。
 
 ## Client Demo Backlog
 
@@ -99,17 +102,20 @@
 - `identity-service`：WebAuthn/passkeys、OIDC、多 issuer、KMS/HSM、完整风控、生产级
   email/SMS provider。
 - `message-service`：删除 / 撤回 / 编辑深化、外部 proof workflow、发送链路生产观测。
-- `message-service`：`SEQUENCER_BLOCK` 已接 timeline-service 单条 seq block active 写路径；
-  61 人热点群小规模 smoke 已通过；后续补本地 block cache、gap marker、epoch fencing
-  观测和发送链路生产观测；删除 / 撤回 / 编辑深化、外部 proof workflow 后置。
+- `message-service`：`SEQUENCER_BLOCK` 已接 timeline-service seq block active 写路径；
+  61 人热点群小规模 smoke 已通过；本轮已补本地 seq block cache、lease safety margin
+  和 lease metadata 校验；后续补更完整发送链路生产观测；删除 / 撤回 / 编辑深化、
+  外部 proof workflow 后置。
 - `conversation-service`：群规模策略已进入 domain 层，medium / large 策略已转 active
-  first-stage；hot group 策略已与 message-service `SEQUENCER_BLOCK` 单条 seq block
+  first-stage；hot group 策略已与 message-service `SEQUENCER_BLOCK` seq block cache
   active 写路径和 timeline lease 绑定；后续继续补 control-plane rollout、群管理深化、
   历史窗口 / targeted replay repair。
 - `timeline-service`：已进入本地运行链路的 seq-block allocator，具备 PostgreSQL
-  sequence state / block lease、`AllocateSeqBlock` gRPC API、Docker / Prometheus /
-  Grafana 观测；message-service 已只在 valid block lease 下取号；下一步补 block cache、
-  sequencer epoch fencing、gap marker、virtual partition mapping 和 repair operator。
+  sequence state / block lease / gap marker、`AllocateSeqBlock` gRPC API、Docker /
+  Prometheus / Grafana 观测；message-service 已只在 valid block lease 下取号并支持本地
+  block cache；已补 `seq-lease-expire`、`gap-marker-create`、`gap-marker-close`、
+  `gap-marker-audit` operator first path。后续补 virtual partition mapping、leader ownership
+  audit、operator workflow UI 和更完整 repair smoke。
 - `delivery-service`：projection DLQ / repair 深化、更多 delivery event consumer；
   `WRITE_FANOUT`、`HYBRID_FANOUT`、`READ_FANOUT` 和 conversation-level signal 已有
   first-stage runtime，materialized `user_inbox` 已改成批量 insert，`timeline-consumer`

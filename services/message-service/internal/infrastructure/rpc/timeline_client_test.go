@@ -41,6 +41,9 @@ func TestTimelineClientAllocateSeqBlock(t *testing.T) {
 	if result.StartSeq != 42 || result.EndSeq != 42 || result.Epoch != 3 {
 		t.Fatalf("unexpected seq block: %+v", result)
 	}
+	if result.LeaseID != "lease-1" || result.ExpiresAt.IsZero() {
+		t.Fatalf("expected lease metadata, got %+v", result)
+	}
 	if fake.request.GetTenantId() != "tenant-1" ||
 		fake.request.GetConversationId() != "conv-1" ||
 		fake.request.GetRequesterId() != timelineRequesterID ||
@@ -54,13 +57,14 @@ func TestTimelineClientAllocateSeqBlock(t *testing.T) {
 func TestTimelineClientPropagatesTraceAndRequestMetadata(t *testing.T) {
 	fake := &fakeTimelineServer{
 		response: &timelinev1.AllocateSeqBlockResponse{
-			TenantId:       "tenant-1",
-			ConversationId: "conv-1",
-			StartSeq:       1,
-			EndSeq:         1,
-			BlockSize:      1,
-			SequencerEpoch: 1,
-			LeaseId:        "lease-1",
+			TenantId:        "tenant-1",
+			ConversationId:  "conv-1",
+			StartSeq:        1,
+			EndSeq:          1,
+			BlockSize:       1,
+			SequencerEpoch:  1,
+			LeaseId:         "lease-1",
+			ExpiresAtUnixMs: time.Now().Add(time.Minute).UnixMilli(),
 		},
 	}
 	client, cleanup := newBufconnTimelineClient(t, fake)
@@ -99,36 +103,39 @@ func TestTimelineClientRejectsInvalidResponseContract(t *testing.T) {
 		{
 			name: "mismatched tenant",
 			response: &timelinev1.AllocateSeqBlockResponse{
-				TenantId:       "other-tenant",
-				ConversationId: "conv-1",
-				StartSeq:       1,
-				EndSeq:         1,
-				BlockSize:      1,
-				SequencerEpoch: 1,
-				LeaseId:        "lease-1",
+				TenantId:        "other-tenant",
+				ConversationId:  "conv-1",
+				StartSeq:        1,
+				EndSeq:          1,
+				BlockSize:       1,
+				SequencerEpoch:  1,
+				LeaseId:         "lease-1",
+				ExpiresAtUnixMs: time.Now().Add(time.Minute).UnixMilli(),
 			},
 		},
 		{
 			name: "range block not supported by first stage",
 			response: &timelinev1.AllocateSeqBlockResponse{
-				TenantId:       "tenant-1",
-				ConversationId: "conv-1",
-				StartSeq:       1,
-				EndSeq:         10,
-				BlockSize:      10,
-				SequencerEpoch: 1,
-				LeaseId:        "lease-1",
+				TenantId:        "tenant-1",
+				ConversationId:  "conv-1",
+				StartSeq:        1,
+				EndSeq:          10,
+				BlockSize:       10,
+				SequencerEpoch:  1,
+				LeaseId:         "lease-1",
+				ExpiresAtUnixMs: time.Now().Add(time.Minute).UnixMilli(),
 			},
 		},
 		{
 			name: "missing lease",
 			response: &timelinev1.AllocateSeqBlockResponse{
-				TenantId:       "tenant-1",
-				ConversationId: "conv-1",
-				StartSeq:       1,
-				EndSeq:         1,
-				BlockSize:      1,
-				SequencerEpoch: 1,
+				TenantId:        "tenant-1",
+				ConversationId:  "conv-1",
+				StartSeq:        1,
+				EndSeq:          1,
+				BlockSize:       1,
+				SequencerEpoch:  1,
+				ExpiresAtUnixMs: time.Now().Add(time.Minute).UnixMilli(),
 			},
 		},
 	}
@@ -146,7 +153,48 @@ func TestTimelineClientRejectsInvalidResponseContract(t *testing.T) {
 	}
 }
 
+func TestTimelineClientCachesSeqBlock(t *testing.T) {
+	fake := &fakeTimelineServer{
+		response: &timelinev1.AllocateSeqBlockResponse{
+			TenantId:         "tenant-1",
+			ConversationId:   "conv-1",
+			StartSeq:         100,
+			EndSeq:           102,
+			BlockSize:        3,
+			SequencerEpoch:   7,
+			LeaseId:          "lease-cached",
+			ExpiresAtUnixMs:  time.Now().Add(time.Minute).UnixMilli(),
+			IdempotentReplay: false,
+		},
+	}
+	client, cleanup := newBufconnTimelineClientWithConfig(t, fake, 3)
+	defer cleanup()
+
+	first, err := client.AllocateSeqBlock(context.Background(), timelineCommand(), 100)
+	if err != nil {
+		t.Fatalf("allocate first seq: %v", err)
+	}
+	second, err := client.AllocateSeqBlock(context.Background(), timelineCommand(), 100)
+	if err != nil {
+		t.Fatalf("allocate second seq: %v", err)
+	}
+	third, err := client.AllocateSeqBlock(context.Background(), timelineCommand(), 100)
+	if err != nil {
+		t.Fatalf("allocate third seq: %v", err)
+	}
+	if first.StartSeq != 100 || second.StartSeq != 101 || third.StartSeq != 102 {
+		t.Fatalf("unexpected cached seqs: first=%+v second=%+v third=%+v", first, second, third)
+	}
+	if fake.calls != 1 || fake.request.GetBlockSize() != 3 {
+		t.Fatalf("expected one remote block allocation, calls=%d request=%+v", fake.calls, fake.request)
+	}
+}
+
 func newBufconnTimelineClient(t *testing.T, server timelinev1.TimelineServiceServer) (TimelineClient, func()) {
+	return newBufconnTimelineClientWithConfig(t, server, 1)
+}
+
+func newBufconnTimelineClientWithConfig(t *testing.T, server timelinev1.TimelineServiceServer, blockSize int) (TimelineClient, func()) {
 	t.Helper()
 	listener := bufconn.Listen(1024 * 1024)
 	grpcServer := grpcgo.NewServer()
@@ -167,7 +215,7 @@ func newBufconnTimelineClient(t *testing.T, server timelinev1.TimelineServiceSer
 	if err != nil {
 		t.Fatalf("dial bufconn grpc: %v", err)
 	}
-	return NewTimelineClient(timelinev1.NewTimelineServiceClient(conn), time.Second), func() {
+	return NewTimelineClientWithConfig(timelinev1.NewTimelineServiceClient(conn), time.Second, blockSize, 0), func() {
 		_ = conn.Close()
 		grpcServer.Stop()
 	}
@@ -195,12 +243,14 @@ type fakeTimelineServer struct {
 	request          *timelinev1.AllocateSeqBlockRequest
 	response         *timelinev1.AllocateSeqBlockResponse
 	err              error
+	calls            int
 }
 
 func (f *fakeTimelineServer) AllocateSeqBlock(
 	ctx context.Context,
 	request *timelinev1.AllocateSeqBlockRequest,
 ) (*timelinev1.AllocateSeqBlockResponse, error) {
+	f.calls++
 	f.incomingMetadata, _ = metadata.FromIncomingContext(ctx)
 	f.request = request
 	if f.err != nil {

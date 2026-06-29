@@ -134,7 +134,7 @@ func TestSendMessageUseCaseUsesSequencerBlockMode(t *testing.T) {
 	}
 	conversation := localConversation()
 	conversation.ConversationMode = types.ConversationModeSequencerBlock
-	sequencer := &fakeSequencer{block: types.SeqBlock{StartSeq: 42, EndSeq: 42, Epoch: 1}}
+	sequencer := &fakeSequencer{block: testSeqBlock(42, 42)}
 	useCase := NewSendMessageUseCase(
 		&fakePolicy{decision: allowedDecision()},
 		&fakeConversation{context: conversation},
@@ -164,7 +164,7 @@ func TestSendMessageUseCaseRejectsInvalidSequencerBlock(t *testing.T) {
 	useCase := NewSendMessageUseCase(
 		&fakePolicy{decision: allowedDecision()},
 		&fakeConversation{context: conversation},
-		&fakeSequencer{block: types.SeqBlock{StartSeq: 10, EndSeq: 11}},
+		&fakeSequencer{block: testSeqBlock(10, 11)},
 		repo,
 	)
 
@@ -340,6 +340,16 @@ func testCommand() types.SendMessageCommand {
 	}
 }
 
+func testSeqBlock(startSeq int64, endSeq int64) types.SeqBlock {
+	return types.SeqBlock{
+		StartSeq:  startSeq,
+		EndSeq:    endSeq,
+		Epoch:     1,
+		LeaseID:   "seqblk-test",
+		ExpiresAt: time.Now().Add(time.Minute),
+	}
+}
+
 func allowedDecision() types.PermissionDecision {
 	return types.PermissionDecision{
 		Allowed:           true,
@@ -483,7 +493,7 @@ func (f *fakeSequencer) AllocateSeqBlock(_ context.Context, command types.SendMe
 		return types.SeqBlock{}, f.err
 	}
 	if f.block.StartSeq == 0 && f.block.EndSeq == 0 {
-		return types.SeqBlock{StartSeq: 1, EndSeq: 1, Epoch: 1}, nil
+		return testSeqBlock(1, 1), nil
 	}
 	return f.block, nil
 }

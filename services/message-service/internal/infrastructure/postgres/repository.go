@@ -326,7 +326,13 @@ ON CONFLICT (tenant_id, conversation_id) DO NOTHING
 
 func (r *MessageRepository) allocateConversationSeq(ctx context.Context, tx pgx.Tx, input domain.AppendMessageInput) (int64, error) {
 	if input.AllocatedSeq > 0 {
+		if err := r.validateAllocatedSeqLease(input); err != nil {
+			return 0, err
+		}
 		return input.AllocatedSeq, nil
+	}
+	if input.SeqLeaseID != "" || input.SeqEpoch != 0 || !input.SeqExpiresAt.IsZero() {
+		return 0, types.NewSequencerUnavailable("sequencer lease metadata requires allocated seq")
 	}
 	if err := r.ensureConversationSeq(ctx, tx, input); err != nil {
 		return 0, err
@@ -350,6 +356,25 @@ RETURNING current_seq
 	}
 	r.metrics.ObserveRepositoryAllocateSeq(time.Since(started))
 	return seq, nil
+}
+
+func (r *MessageRepository) validateAllocatedSeqLease(input domain.AppendMessageInput) error {
+	if input.Conversation.ConversationMode != types.ConversationModeSequencerBlock {
+		return types.NewSequencerUnavailable("allocated seq is only valid for sequencer mode")
+	}
+	if input.SeqLeaseID == "" {
+		return types.NewSequencerUnavailable("sequencer lease id is required")
+	}
+	if input.SeqEpoch <= 0 {
+		return types.NewSequencerUnavailable("sequencer epoch is required")
+	}
+	if input.SeqExpiresAt.IsZero() {
+		return types.NewSequencerUnavailable("sequencer lease expiry is required")
+	}
+	if !r.now().Before(input.SeqExpiresAt) {
+		return types.NewSequencerUnavailable("sequencer lease expired")
+	}
+	return nil
 }
 
 func (r *MessageRepository) insertMessage(ctx context.Context, tx pgx.Tx, record domain.AppendMessageRecord) error {

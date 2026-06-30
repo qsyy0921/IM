@@ -42,9 +42,11 @@
    后续 registry lock 缩短、payload 预编码和 WebSocket writer duration 复压均未突破
    约 2.85k-2.89k signals/s；clean commit `4f45519` 的 writer duration 复压显示
    `delivery_notify` write p95 / p99 低于 0.5ms，说明单 runner JSON decode、
-   registry mutex、重复 JSON marshal 和单次 `conn.Write` 长尾都不是主瓶颈。下一步优先做
-   Redis subscriber 本地 fanout / enqueue duration 观测或优化，不要只盲目增大
-   subscriber。已新增
+   registry mutex、重复 JSON marshal 和单次 `conn.Write` 长尾都不是主瓶颈。Redis
+   subscriber 本地 fanout / enqueue duration 观测已实现，下一步需要 clean commit
+   镜像重建 / redeploy 后复压同一 400 subscriber coordinator + shard 场景，把 Redis
+   enqueue duration、WebSocket writer duration 和 runner drain span 放在同一报告里对比。
+   已新增
    `tools/analyze-hotgroup-loadtest.ps1`、`tools/analyze-hotgroup-multirunner.ps1` 和
    `tools/record-hotgroup-metrics-window.ps1` 自动汇总压测结果、分类瓶颈、记录
    Prometheus 时间窗口和给出下一步策略；后续每次正式复压都要生成或更新对应低敏分析报告。

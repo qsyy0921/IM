@@ -182,6 +182,12 @@ func TestRegistryPublishesRemoteConversationSignalToSubscribedGateway(t *testing
 		if frame.Op != types.OpDeliveryNotify || frame.EventID != notification.EventID || !frame.PullRequired {
 			t.Fatalf("unexpected remote signal frame: %+v", frame)
 		}
+		waitForSubscriberMetrics(t, subscriber, func(metrics Metrics) bool {
+			return metrics.RedisRouteSubscriberMessageCount == 1 &&
+				metrics.RedisRouteSubscriberEnqueuedCount == 1 &&
+				metrics.RedisRouteSubscriberSignalFanoutDuration.Count == 1 &&
+				metrics.RedisRouteSubscriberNotifyFanoutDuration.Count == 0
+		})
 	case <-time.After(time.Second):
 		t.Fatalf("timed out waiting for remote conversation signal")
 	}
@@ -930,7 +936,9 @@ func TestSubscriberEnqueuesRemoteNotificationLocally(t *testing.T) {
 		waitForSubscriberMetrics(t, subscriber, func(metrics Metrics) bool {
 			return metrics.RedisRouteSubscriberMessageCount == 1 &&
 				metrics.RedisRouteSubscriberEnqueuedCount == 1 &&
-				metrics.RedisRouteSubscriberMalformedCount == 0
+				metrics.RedisRouteSubscriberMalformedCount == 0 &&
+				metrics.RedisRouteSubscriberNotifyFanoutDuration.Count == 1 &&
+				metrics.RedisRouteSubscriberSignalFanoutDuration.Count == 0
 		})
 	case <-time.After(time.Second):
 		t.Fatalf("timed out waiting for local enqueue")

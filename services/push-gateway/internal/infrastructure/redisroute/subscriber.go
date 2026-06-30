@@ -19,15 +19,17 @@ type Subscriber struct {
 }
 
 type subscriberMetrics struct {
-	messageCount       atomic.Uint64
-	malformedCount     atomic.Uint64
-	enqueuedCount      atomic.Uint64
-	evictedCount       atomic.Uint64
-	errorCount         atomic.Uint64
-	consecutiveErrors  atomic.Uint64
-	lastErrorAtMS      atomic.Int64
-	lastSuccessAtMS    atomic.Int64
-	lastErrorBackoffMS atomic.Int64
+	messageCount         atomic.Uint64
+	malformedCount       atomic.Uint64
+	enqueuedCount        atomic.Uint64
+	evictedCount         atomic.Uint64
+	errorCount           atomic.Uint64
+	consecutiveErrors    atomic.Uint64
+	lastErrorAtMS        atomic.Int64
+	lastSuccessAtMS      atomic.Int64
+	lastErrorBackoffMS   atomic.Int64
+	notifyFanoutDuration durationMetrics
+	signalFanoutDuration durationMetrics
 }
 
 type SubscriberConfig struct {
@@ -49,11 +51,13 @@ func NewSubscriber(local LocalRegistry, client redis.UniversalClient, config Sub
 
 func (subscriber *Subscriber) Metrics() Metrics {
 	return Metrics{
-		RedisRouteSubscriberMessageCount:   subscriber.metrics.messageCount.Load(),
-		RedisRouteSubscriberMalformedCount: subscriber.metrics.malformedCount.Load(),
-		RedisRouteSubscriberEnqueuedCount:  subscriber.metrics.enqueuedCount.Load(),
-		RedisRouteSubscriberEvictedCount:   subscriber.metrics.evictedCount.Load(),
-		RedisRouteSubscriberErrorCount:     subscriber.metrics.errorCount.Load(),
+		RedisRouteSubscriberMessageCount:         subscriber.metrics.messageCount.Load(),
+		RedisRouteSubscriberMalformedCount:       subscriber.metrics.malformedCount.Load(),
+		RedisRouteSubscriberEnqueuedCount:        subscriber.metrics.enqueuedCount.Load(),
+		RedisRouteSubscriberEvictedCount:         subscriber.metrics.evictedCount.Load(),
+		RedisRouteSubscriberErrorCount:           subscriber.metrics.errorCount.Load(),
+		RedisRouteSubscriberNotifyFanoutDuration: snapshotDuration(&subscriber.metrics.notifyFanoutDuration),
+		RedisRouteSubscriberSignalFanoutDuration: snapshotDuration(&subscriber.metrics.signalFanoutDuration),
 	}
 }
 
@@ -149,9 +153,13 @@ func (subscriber *Subscriber) handleNotification(ctx context.Context, payload []
 		err    error
 	)
 	if notification.Kind == types.DeliveryNotificationKindConversationSignal {
+		startedAt := time.Now()
 		result, err = subscriber.local.EnqueueConversationSignal(ctx, notification)
+		recordDuration(&subscriber.metrics.signalFanoutDuration, time.Since(startedAt))
 	} else {
+		startedAt := time.Now()
 		result, err = subscriber.local.EnqueueNotification(ctx, notification)
+		recordDuration(&subscriber.metrics.notifyFanoutDuration, time.Since(startedAt))
 	}
 	if err != nil {
 		subscriber.metrics.errorCount.Add(1)

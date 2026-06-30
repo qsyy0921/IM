@@ -48,6 +48,8 @@ func writeMemoryPrometheus(builder *strings.Builder, snapshot *memory.Metrics) {
 func writeRedisRoutePrometheus(builder *strings.Builder, registry *redisroute.Metrics, subscriber *redisroute.Metrics) {
 	writePrometheusHeader(builder, "nexusim_push_gateway_redis_route_events_total", "Push gateway Redis route counters.", "counter")
 	writePrometheusHeader(builder, "nexusim_push_gateway_redis_resume_events_total", "Push gateway Redis-backed resume counters.", "counter")
+	writePrometheusHeader(builder, "nexusim_push_gateway_redis_subscriber_fanout_duration_milliseconds", "Push gateway Redis subscriber local fanout duration histogram.", "histogram")
+	writePrometheusHeader(builder, "nexusim_push_gateway_redis_subscriber_fanout_duration_max_milliseconds", "Push gateway Redis subscriber max observed local fanout duration.", "gauge")
 	writeRedisRoutePrometheusSamples(builder, "registry", registry)
 	writeRedisRoutePrometheusSamples(builder, "subscriber", subscriber)
 }
@@ -80,6 +82,21 @@ func writeRedisRoutePrometheusSamples(builder *strings.Builder, role string, sna
 	writePrometheusSample(builder, "nexusim_push_gateway_redis_resume_events_total", labels("append"), snapshot.RedisResumeAppendCount)
 	writePrometheusSample(builder, "nexusim_push_gateway_redis_resume_events_total", labels("append_error"), snapshot.RedisResumeAppendErrorCount)
 	writePrometheusSample(builder, "nexusim_push_gateway_redis_resume_events_total", labels("permission_denied"), snapshot.RedisResumePermissionDeniedCount)
+	if role == "subscriber" {
+		writeRedisSubscriberFanoutDurationPrometheusSamples(builder, "delivery_notify", snapshot.RedisRouteSubscriberNotifyFanoutDuration)
+		writeRedisSubscriberFanoutDurationPrometheusSamples(builder, "conversation_signal", snapshot.RedisRouteSubscriberSignalFanoutDuration)
+	}
+}
+
+func writeRedisSubscriberFanoutDurationPrometheusSamples(builder *strings.Builder, operation string, snapshot redisroute.DurationSnapshot) {
+	labels := map[string]string{"operation": operation}
+	for _, bucket := range snapshot.Buckets {
+		bucketLabels := map[string]string{"operation": operation, "le": bucket.LE}
+		writePrometheusSample(builder, "nexusim_push_gateway_redis_subscriber_fanout_duration_milliseconds_bucket", bucketLabels, bucket.Count)
+	}
+	writePrometheusSample(builder, "nexusim_push_gateway_redis_subscriber_fanout_duration_milliseconds_sum", labels, snapshot.SumMS)
+	writePrometheusSample(builder, "nexusim_push_gateway_redis_subscriber_fanout_duration_milliseconds_count", labels, snapshot.Count)
+	writePrometheusSample(builder, "nexusim_push_gateway_redis_subscriber_fanout_duration_max_milliseconds", labels, snapshot.MaxMS)
 }
 
 func writeRedisSubscriberWorkerPrometheus(builder *strings.Builder, snapshot *types.RedisSubscriberWorkerSnapshot) {

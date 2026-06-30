@@ -196,6 +196,24 @@ func TestHandlerPrometheusMetrics(t *testing.T) {
 				RedisRouteSubscriberEnqueuedCount:  23,
 				RedisRouteSubscriberEvictedCount:   24,
 				RedisRouteSubscriberErrorCount:     25,
+				RedisRouteSubscriberNotifyFanoutDuration: redisroute.DurationSnapshot{
+					Count: 2,
+					SumMS: 6,
+					MaxMS: 4,
+					Buckets: []redisroute.DurationBucket{
+						{LE: "1", Count: 0},
+						{LE: "+Inf", Count: 2},
+					},
+				},
+				RedisRouteSubscriberSignalFanoutDuration: redisroute.DurationSnapshot{
+					Count: 3,
+					SumMS: 7.5,
+					MaxMS: 4.5,
+					Buckets: []redisroute.DurationBucket{
+						{LE: "1", Count: 1},
+						{LE: "+Inf", Count: 3},
+					},
+				},
 			}
 		}).
 		WithRedisSubscriberWorkerStats(func() types.RedisSubscriberWorkerSnapshot {
@@ -300,6 +318,10 @@ func TestHandlerPrometheusMetrics(t *testing.T) {
 	assertContains(t, body, `nexusim_push_gateway_redis_route_events_total{event="remote_publish_error",role="registry"} 7`)
 	assertContains(t, body, `nexusim_push_gateway_redis_route_events_total{event="subscriber_malformed",role="subscriber"} 22`)
 	assertContains(t, body, `nexusim_push_gateway_redis_resume_events_total{event="append_error",role="registry"} 15`)
+	assertContains(t, body, `nexusim_push_gateway_redis_subscriber_fanout_duration_milliseconds_bucket{le="+Inf",operation="conversation_signal"} 3`)
+	assertContains(t, body, `nexusim_push_gateway_redis_subscriber_fanout_duration_milliseconds_sum{operation="delivery_notify"} 6`)
+	assertContains(t, body, `nexusim_push_gateway_redis_subscriber_fanout_duration_milliseconds_count{operation="conversation_signal"} 3`)
+	assertContains(t, body, `nexusim_push_gateway_redis_subscriber_fanout_duration_max_milliseconds{operation="delivery_notify"} 4`)
 	assertContains(t, body, `nexusim_push_gateway_redis_subscriber_worker_consecutive_errors 1`)
 	assertContains(t, body, `nexusim_push_gateway_auth_jwks_cached_keys 2`)
 	assertContains(t, body, `nexusim_push_gateway_auth_jwks_refresh_failures_total 1`)

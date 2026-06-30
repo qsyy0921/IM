@@ -208,3 +208,31 @@ local fanout / enqueue duration and per-session writer scheduling. The key
 question is now where the time is spent between one Redis subscriber message
 and 400 session queues / writers draining it, not whether one `conn.Write` call
 has a large long tail.
+
+## Redis Subscriber Fanout Duration Instrumentation
+
+The next diagnostic change adds low-cardinality Redis subscriber local fanout
+duration metrics. It records the time spent inside the local enqueue call after
+the Redis subscriber has parsed a remote route message:
+
+```text
+delivery_notify      -> LocalRegistry.EnqueueNotification
+conversation_signal  -> LocalRegistry.EnqueueConversationSignal
+```
+
+The metrics are exported as:
+
+```text
+nexusim_push_gateway_redis_subscriber_fanout_duration_milliseconds
+nexusim_push_gateway_redis_subscriber_fanout_duration_max_milliseconds
+```
+
+Only the operation label is used; tenant, user, conversation, session and event
+identifiers are intentionally excluded. The hotgroup Prometheus window script
+now records conversation-signal fanout p95 / p99 / avg / max.
+
+This is observation only. It does not change Redis route semantics, WebSocket
+frame payloads, durable inbox, PullInbox, ACK, slow-session handling or resume
+behavior. The next comparable run should redeploy this commit and rerun the same
+400 subscriber coordinator + shard scenario, then compare Redis enqueue
+duration, WebSocket writer duration and runner signal drain span in one report.

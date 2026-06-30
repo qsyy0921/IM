@@ -37,11 +37,14 @@
    error 与 eviction 均为 0，整窗口 writer success 和 Redis subscriber enqueue 约 200 万级，
    当前需要继续区分 push writer flush 批量效率、runner 读取 / JSON decode / accounting
    和网络吞吐。`loadtest/hotgroup` 已新增 `subscriber-only` 多 runner shard 模式；
-   下一步先跑单 runner vs 多 runner 对照复压，再决定优化客户端读取侧还是 push writer。
-   不要只盲目增大 subscriber。已新增
-   `tools/analyze-hotgroup-loadtest.ps1` 和 `tools/record-hotgroup-metrics-window.ps1`
-   自动汇总压测结果、分类瓶颈、记录 Prometheus 时间窗口和给出下一步策略；后续每次
-   正式复压都要生成或更新对应低敏分析报告。
+   clean commit `9e7d4f9` 的 4 runner / 400 subscriber 对照已完成，drain rate 约
+   2852 signals/s，与单 runner 400 subscriber baseline 约 2840 signals/s 基本一致。
+   这说明单 runner JSON decode / accounting 不是唯一瓶颈。下一步优先做
+   push-gateway conversation signal 写出 / writer flush / per-connection scheduling
+   优化，不要只盲目增大 subscriber。已新增
+   `tools/analyze-hotgroup-loadtest.ps1`、`tools/analyze-hotgroup-multirunner.ps1` 和
+   `tools/record-hotgroup-metrics-window.ps1` 自动汇总压测结果、分类瓶颈、记录
+   Prometheus 时间窗口和给出下一步策略；后续每次正式复压都要生成或更新对应低敏分析报告。
 2. Agent action boundary / repair cases：在 provider replay admin / workflow handoff 已落
    的基础上，继续扩更多需要 proposal / approval / workflow / audit 的 action 与 repair 场景。
 3. Product-active 服务按需推进：workflow、audit、admin、notification、media、vector、
@@ -57,8 +60,9 @@
    和 hotgroup runner；2026-06-29 已跑通 61 人 / 20 消息 / 3 WebSocket subscriber 小规模
    smoke；2026-06-30 已定位并修复 `SEQUENCER_BLOCK` 下成员 JOIN 仍未接 timeline
    sequencer 的问题，完成 clean redeploy 三档复验，并完成 message outbox relay
-   conversation-sharded batch publish 复验。下一步继续做 push signal 写出 / runner 读取观测、
-   virtual partition mapping、leader ownership audit 和 deeper repair。
+   conversation-sharded batch publish 复验。多 runner 对照已证明单 runner 读取不是唯一瓶颈；
+   下一步继续做 push signal 写出 / writer flush 优化、virtual partition mapping、
+   leader ownership audit 和 deeper repair。
 
 ## Client Demo Backlog
 

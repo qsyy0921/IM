@@ -142,6 +142,13 @@ brief、loadtest report、development-progress 或 archive。
   WebSocket conversation subscribers 并通过 `subscriber-shard-count/index` 读取
   deterministic receiver 子集。下一轮可以把 400 subscriber 拆到多个进程 / 机器上，
   先判断 2.8k signals/s 是否由单 runner 读取 / JSON decode / accounting 限制。
+- 2026-07-01 已跑 4 runner shard 对照：
+  `hotgroup-multirunner-400sub-coordinator-20260701-013557` + 4 个
+  `subscriber-only` shard，clean commit `9e7d4f9`，6000 人、1000 消息、目标
+  8000 msg/s、400 subscriber。coordinator send / PullInbox / ACK 成功，message /
+  delivery outbox pending=0；4 个 shard 共读完 400000 条 signal。按首帧到末帧计算
+  drain rate 约 2852 signals/s，与单 runner 400 subscriber baseline 约 2840 signals/s
+  基本一致，说明当前瓶颈不只是单 runner JSON decode / accounting。
 - 2026-06-30 HYBRID 1000 人 / 1000 消息 / 400 msg/s 诊断 run 暴露 per-user outbox
   写扩散下的 delivery outbox ready query 退化：旧 anti-join blocker 查询在约 100 万
   pending row 下每批 500 行约 24s。delivery-service 已改为 per-conversation frontier
@@ -178,7 +185,7 @@ brief、loadtest report、development-progress 或 archive。
 ## 下一个方向
 
 - 下一步用分析器和 Prometheus 时间窗口持续记录复压对比；online signal drain 已排除
-  Redis route error、WebSocket write error 和 session eviction，下一步重点跑单 runner
-  vs 多 runner 对照，比较 runner JSON decode / accounting、push writer flush 批量效率
-  和网络吞吐。
+  Redis route error、WebSocket write error、session eviction 和单 runner 唯一瓶颈。
+  下一步重点进入 push-gateway conversation signal 写出路径、writer flush cadence、
+  Redis subscriber fanout、per-connection write scheduling 和网络吞吐的代码级优化。
   正式生产级运维 UI、provider-grade 长周期平台仍后置。

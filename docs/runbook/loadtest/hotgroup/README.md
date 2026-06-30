@@ -27,6 +27,7 @@ CreateConversation -> batch CreateMemberChange(JOIN)
 | `hotgroup-metrics-window-20260701-readfanout-200sub.md` | 200 subscriber run 的 Prometheus 低敏窗口：核心 4 个 scrape target 全部 up，`SendMessage p99` 约 21ms，`delivery_outbox_pending` 峰值 2233 后归零，push connected sessions 达到 200，slow eviction 为 0。 |
 | `hotgroup-metrics-window-20260701-readfanout-400sub.md` | clean commit `233d695` 的 400 subscriber run 继续通过：6000 人 / 5000 消息 / 8000 msg/s 产生 2000000 条 signal，最慢 drain 704.631s，drain rate 约 2.84k signals/s；Prometheus 窗口内核心 target up、`delivery_outbox_pending` 峰值 2284 后归零、push connected sessions 达到 400、slow eviction 为 0。 |
 | `hotgroup-metrics-window-20260701-readfanout-400sub.md` push attribution update | 同一窗口已补 WebSocket writer / Redis route per-event 归因：整窗口 `frame_write_success` 约 200.97 万、`delivery_notify_write_success` 约 200.89 万、`redis subscriber_enqueued` 约 200.89 万，writer / delivery notify / Redis subscriber error 与 eviction 均为 0；下一步瓶颈定位应聚焦写出 / 读取 drain 能力，而不是 Redis 路由失败或 WebSocket 写失败。 |
+| `hotgroup-multirunner-analysis-20260701-400sub.md` | clean commit `9e7d4f9` 的 4 runner shard 对照：coordinator 发送 6000 人 / 1000 消息 / 8000 msg/s，4 个 `subscriber-only` shard 共 400 subscriber 读取 400000 条 signal；按首帧到末帧计算总 drain rate 约 2852 signals/s，与单 runner 400 subscriber baseline 约 2840 signals/s 基本一致，说明瓶颈不只是单个 runner JSON decode / accounting。 |
 
 ## 目标
 
@@ -104,6 +105,19 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\analyze-hotgroup-loa
 它会输出 run matrix、clean / dirty 状态、SendMessage / PullInbox 延迟、outbox pending、
 conversation signal drain、瓶颈分类和下一步策略。
 
+多 runner 对照需要用专用分析器把一个 coordinator 和多个 subscriber shard 合成同一轮报告：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\analyze-hotgroup-multirunner.ps1 `
+  -CoordinatorRunName hotgroup-multirunner-400sub-coordinator-20260701-013557 `
+  -ShardRunNamePattern 'hotgroup-multirunner-400sub-shard*-20260701-013557' `
+  -BaselineRunName hotgroup-readfanout-6000-8000qps-400sub-233d6956-20260701-004948 `
+  -OutputPath docs\runbook\loadtest\hotgroup\hotgroup-multirunner-analysis-20260701-400sub.md
+```
+
+该报告会用首帧到末帧的 signal span 计算 drain rate，避免把 subscriber-only 提前等待
+coordinator 建群 / 加成员的时间误算为在线信号写出瓶颈。
+
 当前瓶颈分类规则保持保守：
 
 ```text
@@ -122,9 +136,13 @@ outbox 追平但 signal drain 长  -> online signal drain
 ## 多 Runner 读取验证
 
 400 subscriber 阶梯已证明 Redis route / WebSocket writer 没有错误或 eviction，但
-`online-signal-drain` 仍稳定在约 2.8k signals/s。下一轮不要继续只增大
-`--conversation-subscriber-count`；应先用多 runner 验证是否是单进程读取、JSON decode
-或 accounting 限制。
+`online-signal-drain` 仍稳定在约 2.8k signals/s。随后 4 个 `subscriber-only`
+runner shard 的对照 run 也没有把总 drain rate 提升到新的量级，因此当前不能继续把瓶颈
+简单归因到单个 runner 的 JSON decode / accounting。
+
+下一步不要继续只增大 `--conversation-subscriber-count`；应进入 push-gateway
+conversation signal 写出路径、WebSocket flush cadence、Redis subscriber fanout、
+per-connection write scheduling 和有线网络吞吐的代码级定位。
 
 `loadtest/hotgroup` 支持两个运行模式：
 

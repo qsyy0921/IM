@@ -137,6 +137,11 @@ brief、loadtest report、development-progress 或 archive。
   `redis subscriber_enqueued` 约 200.89 万，writer / delivery notify / Redis subscriber
   error 与 eviction 均为 0，说明下一步应定位写出 / 读取 drain 能力，而不是继续调
   message / delivery outbox 或 Kafka。
+- 2026-07-01 已为 `loadtest/hotgroup` 增加多 runner 读取验证：`full` coordinator
+  继续建群 / 加成员 / 发消息 / PullInbox / ACK；`subscriber-only` runner 只打开
+  WebSocket conversation subscribers 并通过 `subscriber-shard-count/index` 读取
+  deterministic receiver 子集。下一轮可以把 400 subscriber 拆到多个进程 / 机器上，
+  先判断 2.8k signals/s 是否由单 runner 读取 / JSON decode / accounting 限制。
 - 2026-06-30 HYBRID 1000 人 / 1000 消息 / 400 msg/s 诊断 run 暴露 per-user outbox
   写扩散下的 delivery outbox ready query 退化：旧 anti-join blocker 查询在约 100 万
   pending row 下每批 500 行约 24s。delivery-service 已改为 per-conversation frontier
@@ -173,6 +178,7 @@ brief、loadtest report、development-progress 或 archive。
 ## 下一个方向
 
 - 下一步用分析器和 Prometheus 时间窗口持续记录复压对比；online signal drain 已排除
-  Redis route error、WebSocket write error 和 session eviction，下一步重点比较多 runner
-  读取、runner JSON decode / accounting、push writer flush 批量效率和网络吞吐。
+  Redis route error、WebSocket write error 和 session eviction，下一步重点跑单 runner
+  vs 多 runner 对照，比较 runner JSON decode / accounting、push writer flush 批量效率
+  和网络吞吐。
   正式生产级运维 UI、provider-grade 长周期平台仍后置。

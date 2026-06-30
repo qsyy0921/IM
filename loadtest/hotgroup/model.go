@@ -66,6 +66,9 @@ type receiverStats struct {
 type pushStats struct {
 	Enabled                 bool                        `json:"enabled"`
 	PushURL                 string                      `json:"push_url,omitempty"`
+	SubscriberTotalCount    int                         `json:"subscriber_total_count"`
+	SubscriberShardCount    int                         `json:"subscriber_shard_count"`
+	SubscriberShardIndex    int                         `json:"subscriber_shard_index"`
 	SubscriberCount         int                         `json:"subscriber_count"`
 	SubscribeSuccessCount   int                         `json:"subscribe_success_count"`
 	SubscribeErrorCount     int                         `json:"subscribe_error_count"`
@@ -110,6 +113,7 @@ type summary struct {
 	Commit                     string         `json:"commit"`
 	GitDirty                   bool           `json:"git_dirty"`
 	GitStatusShort             string         `json:"git_status_short,omitempty"`
+	RunnerMode                 string         `json:"runner_mode"`
 	DryRun                     bool           `json:"dry_run"`
 	VerifiedAuthMetadata       bool           `json:"verified_auth_metadata"`
 	TenantID                   string         `json:"tenant_id"`

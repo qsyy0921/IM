@@ -12,10 +12,16 @@ import (
 	"github.com/qsyy0921/IM/loadtest/internal/grpctls"
 )
 
+const (
+	runnerModeFull           = "full"
+	runnerModeSubscriberOnly = "subscriber-only"
+)
+
 type config struct {
 	RunName                     string
 	ResultRoot                  string
 	ResultDir                   string
+	RunnerMode                  string
 	DryRun                      bool
 	Cleanup                     bool
 	RequestTimeout              time.Duration
@@ -45,6 +51,8 @@ type config struct {
 	PullLimit                   int32
 	ReceiverSampleCount         int
 	ConversationSubscriberCount int
+	SubscriberShardCount        int
+	SubscriberShardIndex        int
 	RequireConversationNotify   bool
 }
 
@@ -54,6 +62,7 @@ func parseConfig(args []string, getenv func(string) string) (config, error) {
 	flags := flag.NewFlagSet("hotgroup", flag.ContinueOnError)
 	flags.StringVar(&cfg.RunName, "run-name", envString(getenv, "NEXUSIM_HOTGROUP_RUN_NAME", "hotgroup-"+now), "run name")
 	flags.StringVar(&cfg.ResultRoot, "result-root", envString(getenv, "NEXUSIM_RESULT_ROOT", `H:\NexusIM\loadtest-results`), "result root directory")
+	flags.StringVar(&cfg.RunnerMode, "runner-mode", envString(getenv, "NEXUSIM_HOTGROUP_RUNNER_MODE", runnerModeFull), "runner mode: full or subscriber-only")
 	flags.BoolVar(&cfg.DryRun, "dry-run", envBool(getenv, "NEXUSIM_HOTGROUP_DRY_RUN", false), "write user model and summary without contacting services")
 	flags.BoolVar(&cfg.Cleanup, "cleanup", envBool(getenv, "NEXUSIM_HOTGROUP_CLEANUP", false), "delete rows for the configured tenant before running; requires --pg-dsn")
 	flags.DurationVar(&cfg.RequestTimeout, "request-timeout", envDuration(getenv, "NEXUSIM_REQUEST_TIMEOUT", 3*time.Second), "per-request timeout")
@@ -81,6 +90,8 @@ func parseConfig(args []string, getenv func(string) string) (config, error) {
 	flags.IntVar(&pullLimit, "pull-limit", pullLimit, "PullInbox limit per sampled receiver")
 	flags.IntVar(&cfg.ReceiverSampleCount, "receiver-sample-count", envInt(getenv, "NEXUSIM_HOTGROUP_RECEIVER_SAMPLE_COUNT", 10), "number of receivers used for PullInbox/AckDelivery sampling")
 	flags.IntVar(&cfg.ConversationSubscriberCount, "conversation-subscriber-count", envInt(getenv, "NEXUSIM_HOTGROUP_CONVERSATION_SUBSCRIBER_COUNT", 0), "number of receivers that subscribe to conversation signals over WebSocket")
+	flags.IntVar(&cfg.SubscriberShardCount, "subscriber-shard-count", envInt(getenv, "NEXUSIM_HOTGROUP_SUBSCRIBER_SHARD_COUNT", 1), "number of subscriber runner shards for conversation signal reading")
+	flags.IntVar(&cfg.SubscriberShardIndex, "subscriber-shard-index", envInt(getenv, "NEXUSIM_HOTGROUP_SUBSCRIBER_SHARD_INDEX", 0), "zero-based subscriber runner shard index")
 	flags.BoolVar(&cfg.RequireConversationNotify, "require-conversation-notify", envBool(getenv, "NEXUSIM_HOTGROUP_REQUIRE_CONVERSATION_NOTIFY", false), "require each WebSocket subscriber to receive at least one conversation signal")
 	registerTLSFlags(flags, "conversation-tls", "NEXUSIM_CONVERSATION_TLS", "conversation-service", &cfg.ConversationTLS, getenv)
 	registerTLSFlags(flags, "message-tls", "NEXUSIM_MESSAGE_TLS", "message-service", &cfg.MessageTLS, getenv)
@@ -109,8 +120,16 @@ func (cfg config) validate() error {
 	if cfg.PollInterval <= 0 {
 		return errors.New("--poll-interval must be positive")
 	}
-	if !cfg.DryRun && strings.TrimSpace(cfg.PGDSN) == "" {
+	switch cfg.RunnerMode {
+	case runnerModeFull, runnerModeSubscriberOnly:
+	default:
+		return errors.New("--runner-mode must be full or subscriber-only")
+	}
+	if !cfg.DryRun && cfg.RunnerMode != runnerModeSubscriberOnly && strings.TrimSpace(cfg.PGDSN) == "" {
 		return errors.New("--pg-dsn is required for non-dry-run hotgroup loadtest")
+	}
+	if cfg.RunnerMode == runnerModeSubscriberOnly && cfg.Cleanup {
+		return errors.New("--cleanup cannot be used with --runner-mode subscriber-only")
 	}
 	if strings.TrimSpace(cfg.TenantID) == "" {
 		return errors.New("--tenant-id is required")
@@ -159,11 +178,20 @@ func (cfg config) validate() error {
 	if cfg.ConversationSubscriberCount < 0 {
 		return errors.New("--conversation-subscriber-count must be greater than or equal to zero")
 	}
+	if cfg.SubscriberShardCount <= 0 {
+		return errors.New("--subscriber-shard-count must be positive")
+	}
+	if cfg.SubscriberShardIndex < 0 || cfg.SubscriberShardIndex >= cfg.SubscriberShardCount {
+		return errors.New("--subscriber-shard-index must be greater than or equal to zero and smaller than --subscriber-shard-count")
+	}
 	if cfg.ConversationSubscriberCount > 0 && strings.TrimSpace(cfg.PushURL) == "" {
 		return errors.New("--push-url is required when --conversation-subscriber-count is positive")
 	}
 	if cfg.RequireConversationNotify && cfg.ConversationSubscriberCount == 0 {
 		return errors.New("--require-conversation-notify requires --conversation-subscriber-count")
+	}
+	if cfg.RunnerMode == runnerModeSubscriberOnly && cfg.ConversationSubscriberCount == 0 {
+		return errors.New("--runner-mode subscriber-only requires --conversation-subscriber-count")
 	}
 	return nil
 }

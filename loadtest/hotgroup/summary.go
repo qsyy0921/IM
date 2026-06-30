@@ -65,6 +65,7 @@ func writeReport(path string, result *summary) error {
 	builder.WriteString("本报告由 `loadtest/hotgroup` 生成，覆盖 GROUP 创建、批量成员 JOIN、SendMessage、异步投影等待、可选 WebSocket conversation signal 订阅、PullInbox、AckDelivery 抽样和 PostgreSQL 统计。\n\n")
 	fmt.Fprintf(&builder, "- run_name: `%s`\n", result.RunName)
 	fmt.Fprintf(&builder, "- commit: `%s`\n", result.Commit)
+	fmt.Fprintf(&builder, "- runner_mode: `%s`\n", result.RunnerMode)
 	fmt.Fprintf(&builder, "- dry_run: `%t`\n", result.DryRun)
 	fmt.Fprintf(&builder, "- success: `%t`\n", result.Success)
 	if result.Error != "" {
@@ -97,6 +98,9 @@ func writeReport(path string, result *summary) error {
 	fmt.Fprintf(&builder, "- max_seq: `%d`\n\n", result.Send.MaxSeq)
 	builder.WriteString("## Push Conversation Signal\n\n")
 	fmt.Fprintf(&builder, "- enabled: `%t`\n", result.Push.Enabled)
+	fmt.Fprintf(&builder, "- subscriber_total_count: `%d`\n", result.Push.SubscriberTotalCount)
+	fmt.Fprintf(&builder, "- subscriber_shard_index: `%d`\n", result.Push.SubscriberShardIndex)
+	fmt.Fprintf(&builder, "- subscriber_shard_count: `%d`\n", result.Push.SubscriberShardCount)
 	fmt.Fprintf(&builder, "- subscriber_count: `%d`\n", result.Push.SubscriberCount)
 	fmt.Fprintf(&builder, "- subscribe_success: `%d`\n", result.Push.SubscribeSuccessCount)
 	fmt.Fprintf(&builder, "- subscribe_errors: `%d`\n", result.Push.SubscribeErrorCount)

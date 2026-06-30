@@ -121,6 +121,12 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
   writer error、delivery notify error、subscriber evicted / error 均为 0。该证据把
   当前瓶颈进一步收窄为 online signal 写出 / 客户端读取 drain 速度，而不是 Redis
   路由失败、WebSocket 写失败或 session eviction。
+- 2026-07-01 已为 `loadtest/hotgroup` 增加多 runner 读取验证能力：
+  `--runner-mode subscriber-only` 只负责打开 WebSocket conversation subscribers 并等待
+  signal；`--subscriber-shard-count/index` 将同一 deterministic receiver 列表拆给多个
+  runner 进程。后续可用一个 coordinator 负责建群 / 发消息，多个 subscriber-only
+  runner 分散在 Windows / Ubuntu / Mac 上读取同一 conversation signal，从而判断单
+  runner JSON decode / accounting 是否限制 drain rate。
 - HYBRID 诊断档位 1000 人 / 1000 消息 / 400 msg/s 暴露 `delivery_outbox` ready query
   在百万级 per-user outbox 下退化：旧 anti-join blocker 查询每批 500 行约 24s。当前
   delivery outbox relay 已改成 per-conversation frontier ready query，并把本地 worker
@@ -134,9 +140,9 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
 - push-focused step 的 READ_FANOUT clean commit 阶梯 run 已完成，并明确记录 signal
   写出 / 读取指标；自动分析报告和最高档 Prometheus 低敏时间窗口均已生成。
 - 下一轮围绕 online signal drain 做优化分析：Redis route 和 WebSocket writer
-  已证明无错误 / 无 eviction，下一步优先区分单 runner 读取能力、每连接 JSON
-  decode / accounting 成本、push writer flush 批量能力和网络吞吐；不要继续只盲目增大
-  subscriber。若要再加压，建议先做多 runner 读取或 push writer 优化后复压。
+  已证明无错误 / 无 eviction，`loadtest/hotgroup` 已支持多 runner subscriber shard。
+  下一步优先跑同参数的单 runner vs 多 runner 对比，区分单 runner 读取 / JSON decode /
+  accounting 成本、push writer flush 批量能力和网络吞吐；不要继续只盲目增大 subscriber。
 - 文档同步本轮公开能力或瓶颈变化。
 - 提交并推送到 GitHub。
 
@@ -153,8 +159,9 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
 1. 针对 online signal drain 做架构分析和代码级定位：当前 400 subscriber 指标已排除
    Redis route error、WebSocket write error 和 session eviction；下一步确认瓶颈在 push
    writer flush 批量效率、runner 单进程读取 / JSON decode、网络吞吐还是测试端 accounting。
-2. 选择一个明确优化模块：优先考虑多 runner 读取验证或 push-gateway conversation
-   signal fanout / writer flush 优化，优化后用 200 / 400 subscriber 对照复压。
+2. 选择一个明确优化模块：优先用多 runner 读取验证复压 200 / 400 subscriber；
+   如果 drain rate 随 runner 数提高，优化 loadtest / 客户端读取侧；如果不提高，再进入
+   push-gateway conversation signal fanout / writer flush 优化。
 3. 若 HYBRID 仍要支持千人级 per-user materialized outbox，优先评估显式 frontier /
    progress 表或把策略提前切到 READ_FANOUT；不要把 Kafka / Redis 当成替代 fanout 策略。
 4. delivery projection lag / inbox rows per message / push notify storm 指标深化。

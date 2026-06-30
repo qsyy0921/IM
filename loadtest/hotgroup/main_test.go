@@ -44,6 +44,67 @@ func TestParseConfigRejectsSenderCountAtLeastGroupSize(t *testing.T) {
 	}
 }
 
+func TestParseConfigSubscriberOnlyDoesNotRequirePostgres(t *testing.T) {
+	cfg, err := parseConfig([]string{
+		"--runner-mode", "subscriber-only",
+		"--conversation-subscriber-count", "8",
+		"--subscriber-shard-count", "2",
+		"--subscriber-shard-index", "1",
+		"--push-url", "ws://127.0.0.1:10498/ws",
+		"--message-count", "10",
+	}, func(string) string { return "" })
+	if err != nil {
+		t.Fatalf("parse subscriber-only config: %v", err)
+	}
+	if cfg.RunnerMode != runnerModeSubscriberOnly {
+		t.Fatalf("runner mode = %s", cfg.RunnerMode)
+	}
+	if cfg.PGDSN != "" {
+		t.Fatalf("pg dsn should not be required in subscriber-only mode: %s", cfg.PGDSN)
+	}
+}
+
+func TestParseConfigRejectsInvalidSubscriberShard(t *testing.T) {
+	_, err := parseConfig([]string{
+		"--runner-mode", "subscriber-only",
+		"--conversation-subscriber-count", "8",
+		"--subscriber-shard-count", "2",
+		"--subscriber-shard-index", "2",
+		"--push-url", "ws://127.0.0.1:10498/ws",
+	}, func(string) string { return "" })
+	if err == nil {
+		t.Fatal("expected validation error")
+	}
+}
+
+func TestShardReceiversIsDeterministic(t *testing.T) {
+	cfg := config{
+		TenantID:        "tenant-hot",
+		ConversationID:  "conv-hot",
+		GroupSize:       12,
+		SenderCount:     1,
+		OnlineRatio:     1,
+		SlowClientRatio: 0,
+	}
+	plan := buildUserPlan(cfg)
+	receivers := sampledReceivers(plan, 8)
+	shard0 := shardReceivers(receivers, 3, 0)
+	shard1 := shardReceivers(receivers, 3, 1)
+	shard2 := shardReceivers(receivers, 3, 2)
+	if got, want := len(shard0), 3; got != want {
+		t.Fatalf("shard0 len = %d, want %d", got, want)
+	}
+	if got, want := len(shard1), 3; got != want {
+		t.Fatalf("shard1 len = %d, want %d", got, want)
+	}
+	if got, want := len(shard2), 2; got != want {
+		t.Fatalf("shard2 len = %d, want %d", got, want)
+	}
+	if shard0[0].UserID != "hot-user-000001" || shard1[0].UserID != "hot-user-000002" || shard2[0].UserID != "hot-user-000003" {
+		t.Fatalf("unexpected shard starts: %s %s %s", shard0[0].UserID, shard1[0].UserID, shard2[0].UserID)
+	}
+}
+
 func TestRunDryRunWritesSummaryAndUsers(t *testing.T) {
 	dir := t.TempDir()
 	err := run([]string{
@@ -70,6 +131,12 @@ func TestRunDryRunWritesSummaryAndUsers(t *testing.T) {
 	}
 	if !result.Success || !result.DryRun {
 		t.Fatalf("unexpected dry-run result: success=%v dry_run=%v error=%s", result.Success, result.DryRun, result.Error)
+	}
+	if result.SchemaVersion != 2 {
+		t.Fatalf("schema version = %d", result.SchemaVersion)
+	}
+	if result.RunnerMode != runnerModeFull {
+		t.Fatalf("runner mode = %s", result.RunnerMode)
 	}
 	if result.ExpectedInboxRows != 48 {
 		t.Fatalf("expected inbox rows = %d", result.ExpectedInboxRows)

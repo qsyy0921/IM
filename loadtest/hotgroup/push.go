@@ -64,16 +64,23 @@ type pushSignalResult struct {
 
 func openConversationSubscribers(ctx context.Context, cfg config, plan userPlan) ([]pushSubscriber, pushStats, error) {
 	stats := pushStats{
-		Enabled:         cfg.ConversationSubscriberCount > 0,
-		PushURL:         cfg.PushURL,
-		SubscriberCount: cfg.ConversationSubscriberCount,
-		StartedAt:       time.Now().UTC(),
+		Enabled:              cfg.ConversationSubscriberCount > 0,
+		PushURL:              cfg.PushURL,
+		SubscriberTotalCount: cfg.ConversationSubscriberCount,
+		SubscriberShardCount: cfg.SubscriberShardCount,
+		SubscriberShardIndex: cfg.SubscriberShardIndex,
+		StartedAt:            time.Now().UTC(),
 	}
 	if cfg.ConversationSubscriberCount == 0 {
 		stats.FinishedAt = time.Now().UTC()
 		return nil, stats, nil
 	}
-	receivers := sampledReceivers(plan, cfg.ConversationSubscriberCount)
+	receivers := shardReceivers(sampledReceivers(plan, cfg.ConversationSubscriberCount), cfg.SubscriberShardCount, cfg.SubscriberShardIndex)
+	stats.SubscriberCount = len(receivers)
+	if len(receivers) == 0 {
+		stats.FinishedAt = time.Now().UTC()
+		return nil, stats, fmt.Errorf("subscriber shard selects no receivers: total=%d shard_index=%d shard_count=%d", cfg.ConversationSubscriberCount, cfg.SubscriberShardIndex, cfg.SubscriberShardCount)
+	}
 	subscribers := make([]pushSubscriber, 0, len(receivers))
 	for _, receiver := range receivers {
 		conn, err := connectConversationSubscriber(ctx, cfg, receiver)
@@ -91,6 +98,22 @@ func openConversationSubscribers(ctx context.Context, cfg config, plan userPlan)
 	}
 	stats.FinishedAt = time.Now().UTC()
 	return subscribers, stats, nil
+}
+
+func shardReceivers(receivers []loadUser, shardCount int, shardIndex int) []loadUser {
+	if shardCount <= 1 {
+		return append([]loadUser(nil), receivers...)
+	}
+	if shardIndex < 0 || shardIndex >= shardCount {
+		return nil
+	}
+	sharded := make([]loadUser, 0, (len(receivers)+shardCount-1)/shardCount)
+	for index, receiver := range receivers {
+		if index%shardCount == shardIndex {
+			sharded = append(sharded, receiver)
+		}
+	}
+	return sharded
 }
 
 func connectConversationSubscriber(ctx context.Context, cfg config, user loadUser) (*nhooyr.Conn, error) {

@@ -28,11 +28,12 @@ func run(args []string, getenv func(string) string) error {
 		messageCount = 1
 	}
 	result := &summary{
-		SchemaVersion:              1,
+		SchemaVersion:              2,
 		RunName:                    cfg.RunName,
 		Commit:                     shortCommit(),
 		GitDirty:                   gitDirty(),
 		GitStatusShort:             gitStatusShort(),
+		RunnerMode:                 cfg.RunnerMode,
 		DryRun:                     cfg.DryRun,
 		VerifiedAuthMetadata:       cfg.VerifiedAuthMetadata,
 		TenantID:                   cfg.TenantID,
@@ -52,6 +53,10 @@ func run(args []string, getenv func(string) string) error {
 		UserPlan:                   plan,
 		StartedAt:                  time.Now().UTC(),
 	}
+	if cfg.RunnerMode == runnerModeSubscriberOnly {
+		result.ExpectedInboxRows = 0
+		result.ExpectedTimelineRows = 0
+	}
 	runErr := execute(context.Background(), cfg, plan, result)
 	if finishErr := finish(cfg, result, runErr); finishErr != nil {
 		return finishErr
@@ -64,6 +69,9 @@ func execute(ctx context.Context, cfg config, plan userPlan, result *summary) er
 	if cfg.DryRun {
 		result.Success = true
 		return nil
+	}
+	if cfg.RunnerMode == runnerModeSubscriberOnly {
+		return executeSubscriberOnly(ctx, cfg, plan, result)
 	}
 	pool, err := openPool(ctx, cfg)
 	if err != nil {
@@ -191,10 +199,34 @@ WHERE tenant_id = $1 AND conversation_id = $2 AND status = 'PENDING'
 		result.Postgres.MessageOutboxDLQ == 0 &&
 		result.Postgres.DeliveryOutboxDLQ == 0 &&
 		(!cfg.RequireConversationNotify ||
-			result.Push.ConversationSignalCount >= cfg.ConversationSubscriberCount*result.MessageCount) &&
+			result.Push.ConversationSignalCount >= result.Push.SubscriberCount*result.MessageCount) &&
 		(!cfg.RequireDeliveryOutboxDrain || result.Postgres.DeliveryOutboxPending == 0)
 	if !result.Success {
 		return fmt.Errorf("hotgroup validation failed")
+	}
+	return nil
+}
+
+func executeSubscriberOnly(ctx context.Context, cfg config, plan userPlan, result *summary) error {
+	subscribers, pushStats, err := openConversationSubscribers(ctx, cfg, plan)
+	result.Push = pushStats
+	if err != nil {
+		return fmt.Errorf("open conversation subscribers: %w", err)
+	}
+	defer closeConversationSubscribers(subscribers)
+	pushCollector := startConversationSignalCollection(ctx, cfg, subscribers, result.MessageCount)
+	if pushCollector != nil {
+		defer pushCollector.cancel()
+	}
+	pushStats, err = pushCollector.wait(cfg, result.Push)
+	result.Push = pushStats
+	if err != nil {
+		return fmt.Errorf("wait conversation signals: %w", err)
+	}
+	result.Success = !cfg.RequireConversationNotify ||
+		result.Push.ConversationSignalCount >= result.Push.SubscriberCount*result.MessageCount
+	if !result.Success {
+		return fmt.Errorf("hotgroup subscriber-only validation failed")
 	}
 	return nil
 }

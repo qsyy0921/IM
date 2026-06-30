@@ -119,6 +119,71 @@ outbox 追平但 signal drain 长  -> online signal drain
 该报告只能作为本地 / 三机压测诊断材料，不能单独替代 Grafana / Prometheus 时间窗口，
 也不能写成生产 SLO。
 
+## 多 Runner 读取验证
+
+400 subscriber 阶梯已证明 Redis route / WebSocket writer 没有错误或 eviction，但
+`online-signal-drain` 仍稳定在约 2.8k signals/s。下一轮不要继续只增大
+`--conversation-subscriber-count`；应先用多 runner 验证是否是单进程读取、JSON decode
+或 accounting 限制。
+
+`loadtest/hotgroup` 支持两个运行模式：
+
+```text
+--runner-mode full             # 默认模式：建群、加成员、发消息、等待投影、可选订阅、Pull/Ack 抽样
+--runner-mode subscriber-only  # 只按 deterministic 用户模型打开 WebSocket subscriber 并等待 signal
+```
+
+多 runner 运行时，先启动多个 `subscriber-only` 进程，使用相同 tenant /
+conversation / group / sender / message_count，并通过 shard 参数拆分订阅者：
+
+```powershell
+# shard 0/4 示例；其它机器改 --subscriber-shard-index 为 1、2、3
+. .\tools\go-env.ps1
+go run .\loadtest\hotgroup `
+  --runner-mode subscriber-only `
+  --run-name hotgroup-readfanout-6000-8000qps-400sub-shard0 `
+  --tenant-id tenant-shared `
+  --conversation-id conv-shared `
+  --group-size 6000 `
+  --sender-count 256 `
+  --message-count 5000 `
+  --conversation-subscriber-count 400 `
+  --subscriber-shard-count 4 `
+  --subscriber-shard-index 0 `
+  --push-url ws://172.31.50.2:10498/ws `
+  --require-conversation-notify `
+  --wait-timeout 25m
+```
+
+所有 shard 都连上后，再启动一个 coordinator，不打开本地 subscriber，只负责建群和发消息：
+
+```powershell
+go run .\loadtest\hotgroup `
+  --runner-mode full `
+  --run-name hotgroup-readfanout-6000-8000qps-coordinator `
+  --conversation-target 172.31.50.2:10496 `
+  --message-target 172.31.50.2:10495 `
+  --delivery-target 172.31.50.2:10497 `
+  --pg-dsn "postgres://nexusim:nexusim@172.31.50.2:5432/nexusim?sslmode=disable" `
+  --tenant-id tenant-shared `
+  --conversation-id conv-shared `
+  --group-size 6000 `
+  --sender-count 256 `
+  --message-rate 8000 `
+  --message-count 5000 `
+  --conversation-subscriber-count 0 `
+  --receiver-sample-count 20 `
+  --expect-fanout-mode READ_FANOUT `
+  --require-delivery-outbox-drain `
+  --cleanup
+```
+
+多 runner 的每个 shard 都会输出自己的 `hotgroup-summary.json`，其中
+`push.subscriber_total_count` 是总订阅目标，`push.subscriber_count` 是本 shard
+实际连接数，`push.subscriber_shard_index/count` 记录分片身份。正式报告需要把所有 shard
+的 signal 总数、最慢 `last_signal_after_ms`、error / eviction 与 coordinator 的
+SendMessage / PullInbox / outbox 指标一起记录。
+
 每轮正式压测还必须记录至少一个 Prometheus / Grafana 或 debug metrics 时间窗口。
 如果使用 Prometheus，可用窗口记录工具从 H 盘原始目录生成低敏报告：
 

@@ -177,6 +177,7 @@ CreateConversation(GROUP)
 | 200 subscriber 阶梯 | clean commit `7bff4f3` 跑 6000 人 / 5000 消息 / 8000 msg/s / 256 sender / 200 subscriber | 产生 1000000 条 conversation signal，`send_p95_ms=18.315`、`send_p99_ms=21.808`、`PullInbox p95=26.326ms`、outbox / Kafka 追平；最慢 drain 349.903s，drain rate 约 2857.934 signals/s，和 100 subscriber 的约 2831.995 signals/s 接近，说明瓶颈沿 online signal drain 线性放大。 |
 | 400 subscriber 阶梯 | clean commit `233d695` 跑 6000 人 / 5000 消息 / 8000 msg/s / 256 sender / 400 subscriber | 产生 2000000 条 conversation signal，`send_p95_ms=19.724`、`send_p99_ms=25.668`、`PullInbox p95=25.341ms`、outbox / Kafka 追平；最慢 drain 704.631s，drain rate 约 2838.365 signals/s，和 100 / 200 subscriber 档保持同一量级。 |
 | push attribution 归因 | 400 subscriber Prometheus 窗口已补 writer / Redis route per-event 分解和整窗口计数 | 整窗口 `frame_write_success` 约 200.97 万、`delivery_notify_write_success` 约 200.89 万、`redis subscriber_enqueued` 约 200.89 万，writer / delivery notify / Redis subscriber error 与 eviction 均为 0；这说明问题不是 Redis 路由失败或 WebSocket 写失败，下一步应比较 push writer flush、runner 读取 / JSON decode / accounting 和网络吞吐。 |
+| 多 runner 读取验证 | `loadtest/hotgroup` 新增 `subscriber-only` 模式和 `subscriber-shard-count/index` | 后续可以一个 coordinator 建群 / 发消息，多个 runner 分别订阅 receiver 子集；这能验证 2.8k signals/s 是单 runner 读取 / JSON decode / accounting 限制，还是 push-gateway / 网络侧限制。 |
 
 面试时可以把这个结果讲成一次真实性能定位过程：
 
@@ -255,7 +256,9 @@ drain rate 稳定在约 2.83k-2.86k signals/s，因此下一步面试叙事应�
 route fanout、session queue 和压测 runner 读取能力。新的 attribution 窗口已经显示
 Redis subscriber enqueue 与 WebSocket writer success 都能到约 200 万级，并且没有
 write error / eviction，所以后续重点不应再讲“消息队列不够”，而应讲如何进一步验证
-客户端读取侧、JSON 编解码、writer flush 策略和网络吞吐。
+客户端读取侧、JSON 编解码、writer flush 策略和网络吞吐。为此 runner 已补
+subscriber-only shard 模式，可以把同一 conversation 的在线订阅者分散到多个进程或机器，
+用同参数复压判断瓶颈是否随 runner 数迁移。
 
 ### 当前系统如何承接热点群
 

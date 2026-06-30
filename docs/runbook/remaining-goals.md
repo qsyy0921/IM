@@ -36,7 +36,9 @@
    per-event 归因，400 subscriber 窗口显示 writer / delivery notify / Redis subscriber
    error 与 eviction 均为 0，整窗口 writer success 和 Redis subscriber enqueue 约 200 万级，
    当前需要继续区分 push writer flush 批量效率、runner 读取 / JSON decode / accounting
-   和网络吞吐。下一步不要只盲目增大 subscriber；先选一个模块优化并复压。已新增
+   和网络吞吐。`loadtest/hotgroup` 已新增 `subscriber-only` 多 runner shard 模式；
+   下一步先跑单 runner vs 多 runner 对照复压，再决定优化客户端读取侧还是 push writer。
+   不要只盲目增大 subscriber。已新增
    `tools/analyze-hotgroup-loadtest.ps1` 和 `tools/record-hotgroup-metrics-window.ps1`
    自动汇总压测结果、分类瓶颈、记录 Prometheus 时间窗口和给出下一步策略；后续每次
    正式复压都要生成或更新对应低敏分析报告。

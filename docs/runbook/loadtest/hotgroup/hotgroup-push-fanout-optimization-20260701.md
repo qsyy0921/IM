@@ -119,11 +119,44 @@ git diff --check; git diff --cached --check
 
 All checks passed before this section was written.
 
-## Required Next Retest
+## Second Retest Result
 
-After committing, rebuild and redeploy the latest push-gateway image, then rerun
-the same 400 subscriber coordinator + 4 shard scenario. If pre-encoding does not
-move drain rate materially above the current `2.85k-2.89k signals/s` band, the
-next module should shift to WebSocket writer flush cadence, per-connection write
-scheduling, nhooyr write behavior or network throughput rather than message /
-delivery outbox or Kafka.
+The second optimization was committed as `d8d78fd`, rebuilt, archived and
+redeployed to Ubuntu Docker. The same 400 subscriber coordinator + 4 shard
+scenario was then rerun:
+
+```text
+group_size=6000
+message_count=1000
+message_rate=8000
+sender_count=256
+subscriber_count=400
+fanout_mode=READ_FANOUT
+runner layout=coordinator + 4 subscriber-only shards
+```
+
+Artifacts:
+
+- coordinator:
+  `H:\NexusIM\loadtest-results\hotgroup-pushpreenc-clean-400sub-coordinator-20260701-024044`
+- shards:
+  `H:\NexusIM\loadtest-results\hotgroup-pushpreenc-clean-400sub-shard*-20260701-024044`
+- analysis:
+  `hotgroup-multirunner-analysis-20260701-pushpreenc-400sub.md`
+- metrics window:
+  `hotgroup-metrics-window-20260701-pushpreenc-clean-400sub.md`
+
+Result:
+
+- coordinator send, PullInbox and ACK succeeded;
+- `message_outbox_pending=0`, `delivery_outbox_pending=0`;
+- 4 shards read 400000 conversation signals with no subscriber error;
+- aggregate signal span rate was about `2863.092 signals/s`;
+- previous single-runner 400 subscriber baseline was about `2839.888 signals/s`;
+- the registry lock optimization retest was about `2891.8 signals/s`.
+
+Judgment: pre-encoding the WebSocket payload did not materially move the drain
+rate. Repeated JSON marshaling is not the dominant bottleneck. The next module
+should shift to WebSocket writer flush cadence, per-connection write scheduling,
+nhooyr write behavior, connection-side read backpressure or network throughput
+rather than message / delivery outbox or Kafka.

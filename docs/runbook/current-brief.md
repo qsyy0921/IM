@@ -155,11 +155,14 @@ brief、loadtest report、development-progress 或 archive。
   clean commit `4bc4a30` 镜像 redeploy 后，400 subscriber coordinator + 4 shard
   复压显示 drain rate 从单 runner baseline 约 2839.888 signals/s 到约
   2891.8 signals/s，仅约 1.8% 提升，瓶颈仍是 online signal drain。
-- 2026-07-01 已完成第二轮 push-gateway online signal drain 代码优化：delivery /
-  conversation notify 在 registry fanout 时预编码一次 JSON，WebSocket writer 优先写
-  cached payload，避免同一条热点 signal 在每个 connection 写出前重复 marshal。
-  focused tests / build / diff check 已通过；该改动仍需 clean commit 镜像 redeploy 和
-  400 subscriber coordinator + shard 复压确认。
+- 2026-07-01 已完成第二轮 push-gateway online signal drain 代码优化并复压：
+  clean commit `d8d78fd` 的 delivery / conversation notify 预编码 payload 版本已
+  重建 / redeploy。400 subscriber coordinator + 4 shard run
+  `hotgroup-pushpreenc-clean-400sub-coordinator-20260701-024044` 共读完
+  400000 条 signal，drain rate 约 `2863.092 signals/s`，相比单 runner baseline
+  `2839.888 signals/s` 仅约 `0.8%` 提升，也没有超过上一轮 registry lock 优化后的
+  `2891.8 signals/s`。结论：重复 JSON marshal 不是主瓶颈，online signal drain
+  仍需从 WebSocket 写调度 / flush / 连接读取背压 / 网络吞吐继续定位。
 - 2026-06-30 HYBRID 1000 人 / 1000 消息 / 400 msg/s 诊断 run 暴露 per-user outbox
   写扩散下的 delivery outbox ready query 退化：旧 anti-join blocker 查询在约 100 万
   pending row 下每批 500 行约 24s。delivery-service 已改为 per-conversation frontier
@@ -195,8 +198,7 @@ brief、loadtest report、development-progress 或 archive。
 
 ## 下一个方向
 
-- 下一步用 clean commit 镜像重建 / redeploy 后复跑 400 subscriber coordinator +
-  多 shard 对照；如果 WebSocket pre-encoded payload 优化没有把 drain rate 推离约
-  2.85k-2.89k signals/s，再转向 WebSocket writer flush cadence、per-connection
-  write scheduling 和网络吞吐。
+- 下一步直接转向 WebSocket writer flush cadence、per-connection write scheduling、
+  nhooyr WebSocket 写入策略、连接侧读取背压和网络吞吐定位；不要继续优先调
+  message / delivery outbox 或 Kafka。
   正式生产级运维 UI、provider-grade 长周期平台仍后置。

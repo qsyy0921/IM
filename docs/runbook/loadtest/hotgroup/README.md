@@ -31,6 +31,8 @@ CreateConversation -> batch CreateMemberChange(JOIN)
 | `hotgroup-push-fanout-optimization-20260701.md` | 第一轮 push-gateway online signal drain 代码级优化记录：memory registry fanout 改为锁内快照、锁外写出，queue full 时精确回锁驱逐仍注册 session；clean commit `4bc4a30` redeploy 后 400 subscriber + 4 shard 复压显示 drain rate 约 2891.8 signals/s，仅比单 runner baseline 约 2839.888 signals/s 高约 1.8%，瓶颈未迁移。 |
 | `hotgroup-multirunner-analysis-20260701-pushfanout-400sub.md` | clean commit `4bc4a30` 的 registry fanout 快照优化复压：6000 人 / 1000 消息 / 8000 msg/s / 400 subscriber，message / delivery outbox pending=0，400000 条 signal 全部读完，当前瓶颈仍是 `online-signal-drain`。 |
 | `hotgroup-metrics-window-20260701-pushfanout-clean-400sub.md` | registry fanout 快照优化复压的 Prometheus 窗口：核心 target up，`delivery_outbox_pending` 峰值 140 后归零，push connected sessions 达到 400，writer / Redis subscriber error 和 eviction 均为 0。 |
+| `hotgroup-multirunner-analysis-20260701-pushpreenc-400sub.md` | clean commit `d8d78fd` 的 WebSocket payload 预编码优化复压：6000 人 / 1000 消息 / 8000 msg/s / 400 subscriber，message / delivery outbox pending=0，400000 条 signal 全部读完，drain rate 约 2863.092 signals/s；相比单 runner baseline 约 2839.888 signals/s 仅约 0.8% 提升，也未超过上一轮 registry lock 优化，当前瓶颈仍是 `online-signal-drain`。 |
+| `hotgroup-metrics-window-20260701-pushpreenc-clean-400sub.md` | payload 预编码优化复压的 Prometheus 窗口：核心 target up，`delivery_outbox_pending` 持续为 0，push connected sessions 达到 400，writer / Redis subscriber error 和 eviction 均为 0。 |
 
 ## 目标
 
@@ -148,10 +150,11 @@ conversation signal 写出路径、WebSocket flush cadence、Redis subscriber fa
 per-connection write scheduling 和有线网络吞吐的代码级定位。
 第一轮代码优化已经处理本地 memory registry fanout 的锁持有范围；clean commit
 `4bc4a30` 复压后 drain rate 仍在约 2.89k signals/s，说明 registry global mutex
-不是主瓶颈。当前第二轮优化改为在 registry fanout 时预编码 delivery /
-conversation notify JSON，让 WebSocket writer 优先写 cached payload，避免同一条
-热点 signal 在每个 connection 写出前重复 marshal。该优化仍需 clean commit
-镜像 redeploy 后用 coordinator + subscriber shard 复压确认。
+不是主瓶颈。第二轮优化在 registry fanout 时预编码 delivery / conversation notify
+JSON，让 WebSocket writer 优先写 cached payload，避免同一条热点 signal 在每个
+connection 写出前重复 marshal；clean commit `d8d78fd` 复压后 drain rate 约
+2863 signals/s，仍未离开 2.85k-2.89k signals/s 区间。下一步应转向 WebSocket
+writer flush cadence、per-connection write scheduling、nhooyr 写入策略、连接侧读取背压和网络吞吐。
 
 `loadtest/hotgroup` 支持两个运行模式：
 

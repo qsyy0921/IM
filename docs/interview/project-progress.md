@@ -178,8 +178,8 @@ CreateConversation(GROUP)
 | 400 subscriber 阶梯 | clean commit `233d695` 跑 6000 人 / 5000 消息 / 8000 msg/s / 256 sender / 400 subscriber | 产生 2000000 条 conversation signal，`send_p95_ms=19.724`、`send_p99_ms=25.668`、`PullInbox p95=25.341ms`、outbox / Kafka 追平；最慢 drain 704.631s，drain rate 约 2838.365 signals/s，和 100 / 200 subscriber 档保持同一量级。 |
 | push attribution 归因 | 400 subscriber Prometheus 窗口已补 writer / Redis route per-event 分解和整窗口计数 | 整窗口 `frame_write_success` 约 200.97 万、`delivery_notify_write_success` 约 200.89 万、`redis subscriber_enqueued` 约 200.89 万，writer / delivery notify / Redis subscriber error 与 eviction 均为 0；这说明问题不是 Redis 路由失败或 WebSocket 写失败，下一步应比较 push writer flush、runner 读取 / JSON decode / accounting 和网络吞吐。 |
 | 多 runner 读取验证 | clean commit `9e7d4f9` 跑 1 个 coordinator + 4 个 `subscriber-only` shard | 6000 人 / 1000 消息 / 8000 msg/s / 400 subscriber 产生 400000 条 signal，4 个 shard 全部读完；按首帧到末帧计算 drain rate 约 2852 signals/s，和单 runner 400 subscriber baseline 约 2840 signals/s 基本一致，说明瓶颈不只是单 runner JSON decode / accounting。 |
-| push registry 锁优化复压 | clean commit `4bc4a30` 把 push-gateway memory registry fanout 改为锁内快照、锁外写出后，重建 / redeploy 并跑 1 coordinator + 4 shard 复压 | 6000 人 / 1000 消息 / 8000 msg/s / 400 subscriber 产生 400000 条 signal，drain rate 约 2891.8 signals/s；比单 runner 400 subscriber baseline 约 2839.888 signals/s 只高约 1.8%，说明 registry 全局锁持有不是主瓶颈。下一轮已转向 WebSocket payload 预编码，减少热点 signal 重复 JSON marshal。 |
-| push fanout 锁范围优化 | 2026-07-01 已把 push-gateway memory registry 的 user / conversation fanout 改为锁内快照、锁外写出 | 该改动减少热点 signal fanout 持有全局 registry mutex 的时间，queue full 时仍精确回锁驱逐同一 session；focused tests / build 已通过，但还需要 clean commit Docker redeploy 后复压确认 drain rate 是否迁移。 |
+| push registry 锁优化复压 | clean commit `4bc4a30` 把 push-gateway memory registry fanout 改为锁内快照、锁外写出后，重建 / redeploy 并跑 1 coordinator + 4 shard 复压 | 6000 人 / 1000 消息 / 8000 msg/s / 400 subscriber 产生 400000 条 signal，drain rate 约 2891.8 signals/s；比单 runner 400 subscriber baseline 约 2839.888 signals/s 只高约 1.8%，说明 registry 全局锁持有不是主瓶颈。 |
+| push WebSocket payload 预编码复压 | clean commit `d8d78fd` 在 registry fanout 时预编码 delivery / conversation notify JSON，WebSocket writer 写 cached payload | 同样的 6000 人 / 1000 消息 / 8000 msg/s / 400 subscriber + 4 shard 场景产生 400000 条 signal，drain rate 约 2863.092 signals/s；相比单 runner baseline 只高约 0.8%，也未超过上一轮 2891.8 signals/s，说明重复 JSON marshal 也不是主瓶颈。下一步应看 WebSocket flush / per-connection scheduling / nhooyr 写入 / 网络或客户端读取背压。 |
 
 面试时可以把这个结果讲成一次真实性能定位过程：
 
@@ -265,9 +265,12 @@ subscriber-only shard 模式，并完成 4 shard 对照：drain rate 没有明�
 baseline，因此下一步应进入 push-gateway conversation signal 写出路径、WebSocket flush
 cadence、Redis subscriber fanout、per-connection write scheduling 和有线网络吞吐优化。
 第一轮代码级优化先收缩 memory registry fanout 的锁持有范围，复压后 drain rate
-约 2891.8 signals/s，仅比旧 baseline 高约 1.8%，所以它不是主瓶颈。当前第二轮优化
-改为 WebSocket payload 预编码，后续仍要用相同 400 subscriber coordinator + shard
-对照复压，看 drain rate 是否离开约 2.85k-2.89k signals/s 的旧区间。
+约 2891.8 signals/s，仅比旧 baseline 高约 1.8%，所以它不是主瓶颈。第二轮优化
+改为 WebSocket payload 预编码，复压后 drain rate 约 2863.092 signals/s，也没有离开
+约 2.85k-2.89k signals/s 的旧区间。因此当前讲法应明确：瓶颈不在 SendMessage、
+message outbox、delivery projection、Kafka、Redis route、registry mutex 或重复 JSON
+marshal，而更接近 WebSocket writer flush / per-connection scheduling / nhooyr 写入 /
+网络吞吐 / 客户端读取背压。
 
 ### 当前系统如何承接热点群
 

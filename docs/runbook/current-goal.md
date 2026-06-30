@@ -157,12 +157,18 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
   `docs/runbook/loadtest/hotgroup/hotgroup-multirunner-analysis-20260701-pushfanout-400sub.md`
   和
   `docs/runbook/loadtest/hotgroup/hotgroup-metrics-window-20260701-pushfanout-clean-400sub.md`。
-- 2026-07-01 已实现第二轮 push-gateway online signal drain 优化：delivery /
-  conversation notify 在 registry fanout 时预编码一次 JSON，WebSocket writer 优先写
-  cached payload，避免同一条热点 signal 被 400 个 connection 各自重复 `json.Marshal`。
-  该改动不改变协议字段、不改变 durable inbox / PullInbox 边界；focused tests /
-  build / diff check 已通过。下一步需要 clean commit 镜像重建 / redeploy 后再次复跑
-  400 subscriber coordinator + shard 对照。
+- 2026-07-01 已用 clean commit `d8d78fd` 重建 / redeploy push-gateway，并完成
+  第二轮 online signal drain 优化复压：delivery / conversation notify 在 registry
+  fanout 时预编码一次 JSON，WebSocket writer 优先写 cached payload，避免同一条
+  热点 signal 被 400 个 connection 各自重复 `json.Marshal`。400 subscriber
+  coordinator + 4 shard 对照 run 为
+  `hotgroup-pushpreenc-clean-400sub-coordinator-20260701-024044`；coordinator
+  `send_p95_ms=18.769`、`send_p99_ms=20.644`、`PullInbox p95=113.882ms`，
+  message / delivery outbox pending=0；4 个 shard 共读完 400000 条 signal，
+  drain rate 约 `2863.092 signals/s`。与单 runner 400 subscriber baseline
+  `2839.888 signals/s` 相比仅约 `0.8%` 提升，也低于上一轮 registry lock
+  优化复压的 `2891.8 signals/s`。结论：重复 JSON marshal 也不是主瓶颈，瓶颈仍是
+  online signal drain。
 - HYBRID 诊断档位 1000 人 / 1000 消息 / 400 msg/s 暴露 `delivery_outbox` ready query
   在百万级 per-user outbox 下退化：旧 anti-join blocker 查询每批 500 行约 24s。当前
   delivery outbox relay 已改成 per-conversation frontier ready query，并把本地 worker
@@ -193,12 +199,11 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
 
 ## 后续优先级
 
-1. 重建 / redeploy 包含 push-gateway WebSocket pre-encoded payload 优化的 clean
-   commit 镜像，并复跑 400 subscriber coordinator + 多 shard 对照，确认 drain rate
-   是否从约 2.85k-2.89k signals/s 迁移。
-2. 如果 drain rate 仍没有明显变化，下一模块转向 WebSocket writer flush cadence、
-   per-connection write scheduling、网络吞吐或 nhooyr WebSocket 写入策略；不要回头
-   优先调 message / delivery outbox 或 Kafka。
+1. 下一模块转向 WebSocket writer flush cadence、per-connection write scheduling、
+   nhooyr WebSocket 写入策略、连接侧读取背压和网络吞吐定位；不要回头优先调
+   message / delivery outbox 或 Kafka。
+2. 继续为每轮优化保留 clean commit、Docker 镜像归档、三机部署版本和 Prometheus
+   时间窗口，保证压测曲线可复现。
 3. 若 HYBRID 仍要支持千人级 per-user materialized outbox，优先评估显式 frontier /
    progress 表或把策略提前切到 READ_FANOUT；不要把 Kafka / Redis 当成替代 fanout 策略。
 4. delivery projection lag / inbox rows per message / push notify storm 指标深化。

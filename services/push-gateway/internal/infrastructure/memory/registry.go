@@ -48,6 +48,12 @@ type session struct {
 	conversations map[string]struct{}
 }
 
+type outboundTarget struct {
+	sessionID string
+	session   *session
+	outbound  chan<- types.ServerFrame
+}
+
 type resumeState struct {
 	auth      types.AuthContext
 	frames    []types.ServerFrame
@@ -161,42 +167,18 @@ func (registry *Registry) EnqueueNotification(
 ) (types.NotifyDeliveryResult, error) {
 	key := notification.TenantID + "\x1f" + notification.UserID
 	registry.mu.Lock()
-	defer registry.mu.Unlock()
 	registry.pruneExpiredResumesLocked(registry.config.Now())
 
 	sessionIDs := registry.byUser[key]
 	result := types.NotifyDeliveryResult{MatchedSessions: len(sessionIDs)}
 	if len(sessionIDs) == 0 {
+		registry.mu.Unlock()
 		return result, nil
 	}
 	frame := domain.DeliveryNotify(notification)
-	for sessionID := range sessionIDs {
-		target := registry.sessions[sessionID]
-		if target == nil {
-			continue
-		}
-		if _, ok := target.seen[notification.EventID]; ok {
-			continue
-		}
-		select {
-		case target.outbound <- frame:
-			target.seen[notification.EventID] = struct{}{}
-			registry.appendResumeLocked(target.resumeToken, frame)
-			result.Enqueued++
-		case <-ctx.Done():
-			return result, ctx.Err()
-		default:
-			registry.appendResumeLocked(target.resumeToken, frame)
-			registry.evictLocked(sessionID, target, types.SessionEviction{
-				Reason: "slow_session",
-			})
-			registry.metrics.SessionQueueFullCount++
-			registry.metrics.SlowSessionEvictedCount++
-			result.Dropped++
-			result.Evicted++
-		}
-	}
-	return result, nil
+	targets := registry.collectOutboundTargetsLocked(sessionIDs, notification.EventID, frame)
+	registry.mu.Unlock()
+	return registry.enqueueOutboundTargets(ctx, frame, result, targets)
 }
 
 func (registry *Registry) SubscribeConversation(
@@ -268,44 +250,26 @@ func (registry *Registry) EnqueueConversationSignal(
 	}
 	key := conversationKey(notification.TenantID, notification.ConversationID)
 	registry.mu.Lock()
-	defer registry.mu.Unlock()
 	registry.pruneExpiredResumesLocked(registry.config.Now())
 
 	sessionIDs := registry.byConversation[key]
 	result := types.NotifyDeliveryResult{MatchedSessions: len(sessionIDs)}
 	if len(sessionIDs) == 0 {
+		registry.mu.Unlock()
 		return result, nil
 	}
 	registry.metrics.ConversationSignalMatchedCount += uint64(len(sessionIDs))
 	frame := domain.DeliveryNotify(notification)
-	for sessionID := range sessionIDs {
-		target := registry.sessions[sessionID]
-		if target == nil {
-			continue
-		}
-		if _, ok := target.seen[notification.EventID]; ok {
-			continue
-		}
-		select {
-		case target.outbound <- frame:
-			target.seen[notification.EventID] = struct{}{}
-			registry.appendResumeLocked(target.resumeToken, frame)
-			result.Enqueued++
-		case <-ctx.Done():
-			return result, ctx.Err()
-		default:
-			registry.appendResumeLocked(target.resumeToken, frame)
-			registry.evictLocked(sessionID, target, types.SessionEviction{
-				Reason: "slow_session",
-			})
-			registry.metrics.SessionQueueFullCount++
-			registry.metrics.SlowSessionEvictedCount++
-			result.Dropped++
-			result.Evicted++
-		}
+	targets := registry.collectOutboundTargetsLocked(sessionIDs, notification.EventID, frame)
+	registry.mu.Unlock()
+
+	result, err := registry.enqueueOutboundTargets(ctx, frame, result, targets)
+	if result.Enqueued > 0 {
+		registry.mu.Lock()
+		registry.metrics.ConversationSignalEnqueuedCount += uint64(result.Enqueued)
+		registry.mu.Unlock()
 	}
-	registry.metrics.ConversationSignalEnqueuedCount += uint64(result.Enqueued)
-	return result, nil
+	return result, err
 }
 
 func (registry *Registry) EvictDevice(ctx context.Context, tenantID string, userID string, deviceID string, reason string) (types.SessionEvictionResult, error) {
@@ -428,6 +392,53 @@ func (registry *Registry) enqueueResumeHintLocked(outbound chan<- types.ServerFr
 	}
 }
 
+func (registry *Registry) collectOutboundTargetsLocked(
+	sessionIDs map[string]struct{},
+	eventID string,
+	frame types.ServerFrame,
+) []outboundTarget {
+	targets := make([]outboundTarget, 0, len(sessionIDs))
+	for sessionID := range sessionIDs {
+		target := registry.sessions[sessionID]
+		if target == nil {
+			continue
+		}
+		if _, ok := target.seen[eventID]; ok {
+			continue
+		}
+		target.seen[eventID] = struct{}{}
+		registry.appendResumeLocked(target.resumeToken, frame)
+		targets = append(targets, outboundTarget{
+			sessionID: sessionID,
+			session:   target,
+			outbound:  target.outbound,
+		})
+	}
+	return targets
+}
+
+func (registry *Registry) enqueueOutboundTargets(
+	ctx context.Context,
+	frame types.ServerFrame,
+	result types.NotifyDeliveryResult,
+	targets []outboundTarget,
+) (types.NotifyDeliveryResult, error) {
+	for _, target := range targets {
+		select {
+		case target.outbound <- frame:
+			result.Enqueued++
+		case <-ctx.Done():
+			return result, ctx.Err()
+		default:
+			if registry.evictSlowTarget(target.sessionID, target.session) {
+				result.Dropped++
+				result.Evicted++
+			}
+		}
+	}
+	return result, nil
+}
+
 func (registry *Registry) appendResumeLocked(resumeToken string, frame types.ServerFrame) {
 	if resumeToken == "" || !isResumeFrame(frame) {
 		return
@@ -463,6 +474,20 @@ func (registry *Registry) evictLocked(sessionID string, target *session, evictio
 	case target.evicted <- eviction:
 	default:
 	}
+}
+
+func (registry *Registry) evictSlowTarget(sessionID string, target *session) bool {
+	registry.mu.Lock()
+	defer registry.mu.Unlock()
+	if registry.sessions[sessionID] != target {
+		return false
+	}
+	registry.evictLocked(sessionID, target, types.SessionEviction{
+		Reason: "slow_session",
+	})
+	registry.metrics.SessionQueueFullCount++
+	registry.metrics.SlowSessionEvictedCount++
+	return true
 }
 
 func userKey(auth types.AuthContext) string {

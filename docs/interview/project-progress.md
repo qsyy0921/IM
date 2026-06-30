@@ -178,6 +178,7 @@ CreateConversation(GROUP)
 | 400 subscriber 阶梯 | clean commit `233d695` 跑 6000 人 / 5000 消息 / 8000 msg/s / 256 sender / 400 subscriber | 产生 2000000 条 conversation signal，`send_p95_ms=19.724`、`send_p99_ms=25.668`、`PullInbox p95=25.341ms`、outbox / Kafka 追平；最慢 drain 704.631s，drain rate 约 2838.365 signals/s，和 100 / 200 subscriber 档保持同一量级。 |
 | push attribution 归因 | 400 subscriber Prometheus 窗口已补 writer / Redis route per-event 分解和整窗口计数 | 整窗口 `frame_write_success` 约 200.97 万、`delivery_notify_write_success` 约 200.89 万、`redis subscriber_enqueued` 约 200.89 万，writer / delivery notify / Redis subscriber error 与 eviction 均为 0；这说明问题不是 Redis 路由失败或 WebSocket 写失败，下一步应比较 push writer flush、runner 读取 / JSON decode / accounting 和网络吞吐。 |
 | 多 runner 读取验证 | clean commit `9e7d4f9` 跑 1 个 coordinator + 4 个 `subscriber-only` shard | 6000 人 / 1000 消息 / 8000 msg/s / 400 subscriber 产生 400000 条 signal，4 个 shard 全部读完；按首帧到末帧计算 drain rate 约 2852 signals/s，和单 runner 400 subscriber baseline 约 2840 signals/s 基本一致，说明瓶颈不只是单 runner JSON decode / accounting。 |
+| push fanout 锁范围优化 | 2026-07-01 已把 push-gateway memory registry 的 user / conversation fanout 改为锁内快照、锁外写出 | 该改动减少热点 signal fanout 持有全局 registry mutex 的时间，queue full 时仍精确回锁驱逐同一 session；focused tests / build 已通过，但还需要 clean commit Docker redeploy 后复压确认 drain rate 是否迁移。 |
 
 面试时可以把这个结果讲成一次真实性能定位过程：
 
@@ -262,6 +263,9 @@ write error / eviction，所以后续重点不应再讲“消息队列不够”�
 subscriber-only shard 模式，并完成 4 shard 对照：drain rate 没有明显超过单 runner
 baseline，因此下一步应进入 push-gateway conversation signal 写出路径、WebSocket flush
 cadence、Redis subscriber fanout、per-connection write scheduling 和有线网络吞吐优化。
+第一轮代码级优化已经先收缩 memory registry fanout 的锁持有范围；它还不是压测结论，
+后续必须用相同 400 subscriber coordinator + shard 对照复压，看 drain rate 是否离开
+约 2.85k signals/s 的旧区间。
 
 ### 当前系统如何承接热点群
 

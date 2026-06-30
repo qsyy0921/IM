@@ -71,6 +71,47 @@ func TestRegistryEnqueueNotificationFailsClosedWhenQueueFull(t *testing.T) {
 	}
 }
 
+func TestRegistryEvictSlowTargetDoesNotEvictReplacedSession(t *testing.T) {
+	registry := NewRegistry()
+	auth := types.AuthContext{TenantID: "tenant-1", UserID: "user-1", DeviceID: "device-1"}
+	if _, err := registry.Register(context.Background(), types.SessionRegistration{
+		AuthContext: auth,
+		SessionID:   "session-1",
+		Outbound:    make(chan types.ServerFrame, 1),
+	}); err != nil {
+		t.Fatalf("register old session: %v", err)
+	}
+
+	registry.mu.Lock()
+	oldSession := registry.sessions["session-1"]
+	registry.mu.Unlock()
+	if oldSession == nil {
+		t.Fatalf("expected old session")
+	}
+
+	newEvicted := make(chan types.SessionEviction, 1)
+	if _, err := registry.Register(context.Background(), types.SessionRegistration{
+		AuthContext: auth,
+		SessionID:   "session-1",
+		Outbound:    make(chan types.ServerFrame, 1),
+		Evicted:     newEvicted,
+	}); err != nil {
+		t.Fatalf("register replacement session: %v", err)
+	}
+
+	if registry.evictSlowTarget("session-1", oldSession) {
+		t.Fatalf("old snapshot must not evict replacement session")
+	}
+	if snapshot := registry.Metrics(); snapshot.ConnectedSessions != 1 || snapshot.SlowSessionEvictedCount != 0 {
+		t.Fatalf("unexpected metrics after stale eviction: %+v", snapshot)
+	}
+	select {
+	case eviction := <-newEvicted:
+		t.Fatalf("replacement session was evicted: %+v", eviction)
+	default:
+	}
+}
+
 func TestRegistryConversationSignalRequiresSubscription(t *testing.T) {
 	registry := NewRegistry()
 	subscribedOutbound := make(chan types.ServerFrame, 2)

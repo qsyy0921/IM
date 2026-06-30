@@ -28,6 +28,7 @@ CreateConversation -> batch CreateMemberChange(JOIN)
 | `hotgroup-metrics-window-20260701-readfanout-400sub.md` | clean commit `233d695` 的 400 subscriber run 继续通过：6000 人 / 5000 消息 / 8000 msg/s 产生 2000000 条 signal，最慢 drain 704.631s，drain rate 约 2.84k signals/s；Prometheus 窗口内核心 target up、`delivery_outbox_pending` 峰值 2284 后归零、push connected sessions 达到 400、slow eviction 为 0。 |
 | `hotgroup-metrics-window-20260701-readfanout-400sub.md` push attribution update | 同一窗口已补 WebSocket writer / Redis route per-event 归因：整窗口 `frame_write_success` 约 200.97 万、`delivery_notify_write_success` 约 200.89 万、`redis subscriber_enqueued` 约 200.89 万，writer / delivery notify / Redis subscriber error 与 eviction 均为 0；下一步瓶颈定位应聚焦写出 / 读取 drain 能力，而不是 Redis 路由失败或 WebSocket 写失败。 |
 | `hotgroup-multirunner-analysis-20260701-400sub.md` | clean commit `9e7d4f9` 的 4 runner shard 对照：coordinator 发送 6000 人 / 1000 消息 / 8000 msg/s，4 个 `subscriber-only` shard 共 400 subscriber 读取 400000 条 signal；按首帧到末帧计算总 drain rate 约 2852 signals/s，与单 runner 400 subscriber baseline 约 2840 signals/s 基本一致，说明瓶颈不只是单个 runner JSON decode / accounting。 |
+| `hotgroup-push-fanout-optimization-20260701.md` | 第一轮 push-gateway online signal drain 代码级优化记录：memory registry fanout 改为锁内快照、锁外写出，queue full 时精确回锁驱逐仍注册 session；focused checks 已通过，仍需 clean commit Docker redeploy 后复压确认 drain rate 是否迁移。 |
 
 ## 目标
 
@@ -143,6 +144,8 @@ runner shard 的对照 run 也没有把总 drain rate 提升到新的量级，�
 下一步不要继续只增大 `--conversation-subscriber-count`；应进入 push-gateway
 conversation signal 写出路径、WebSocket flush cadence、Redis subscriber fanout、
 per-connection write scheduling 和有线网络吞吐的代码级定位。
+当前第一轮代码优化已经先处理本地 memory registry fanout 的锁持有范围；正式结论
+必须等 clean commit 镜像 redeploy 后用 coordinator + subscriber shard 复压确认。
 
 `loadtest/hotgroup` 支持两个运行模式：
 

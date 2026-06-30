@@ -145,6 +145,45 @@ func TestOutboxStoreProcessReadyBatchMarksPublished(t *testing.T) {
 	assertOutboxStatusCounts(t, ctx, pool, tenantID, 2, 0, 0)
 }
 
+func TestOutboxStoreProcessReadyBatchPublishesContiguousConversationPrefix(t *testing.T) {
+	ctx := context.Background()
+	pool := openIntegrationPool(t, ctx)
+	defer pool.Close()
+	applyMessageMigration(t, ctx, pool)
+	resetMessageCoreTables(t, ctx, pool)
+
+	tenantID := types.TenantID(fmt.Sprintf("tenant-outbox-prefix-%d", time.Now().UnixNano()))
+	repo := NewMessageRepository(pool)
+	appendConversationMessages(t, ctx, repo, tenantID, "hot-conversation", 5)
+
+	store := NewOutboxStore(pool, WithOutboxClock(func() time.Time {
+		return time.Date(2026, 6, 8, 12, 1, 0, 0, time.UTC)
+	}))
+	var published []int64
+	stats, err := store.ProcessReadyBatch(ctx, 10, 3, time.Millisecond, func(_ context.Context, messages []types.OutboxMessage) []error {
+		errs := make([]error, len(messages))
+		for _, message := range messages {
+			if message.ConversationID != "hot-conversation" {
+				t.Fatalf("unexpected conversation in batch: %s", message.ConversationID)
+			}
+			published = append(published, message.AggregateVersion)
+		}
+		return errs
+	})
+	if err != nil {
+		t.Fatalf("process contiguous conversation prefix: %v", err)
+	}
+	if stats.Fetched != 5 || stats.Published != 5 || stats.Retried != 0 || stats.DeadLettered != 0 {
+		t.Fatalf("unexpected stats=%+v", stats)
+	}
+	for index, want := range []int64{1, 2, 3, 4, 5} {
+		if index >= len(published) || published[index] != want {
+			t.Fatalf("unexpected published versions: got %v want [1 2 3 4 5]", published)
+		}
+	}
+	assertOutboxStatusCounts(t, ctx, pool, tenantID, 5, 0, 0)
+}
+
 func TestOutboxStoreProcessReadyBatchMarksPublishedAndRetriesFailures(t *testing.T) {
 	ctx := context.Background()
 	pool := openIntegrationPool(t, ctx)
@@ -186,6 +225,45 @@ func TestOutboxStoreProcessReadyBatchMarksPublishedAndRetriesFailures(t *testing
 		t.Fatalf("expected conversation-b retried, got %+v", retried)
 	}
 	assertOutboxStatusCounts(t, ctx, pool, tenantID, 1, 1, 0)
+}
+
+func TestOutboxStoreProcessReadyKeepsLaterConversationRowsPendingAfterFailure(t *testing.T) {
+	ctx := context.Background()
+	pool := openIntegrationPool(t, ctx)
+	defer pool.Close()
+	applyMessageMigration(t, ctx, pool)
+	resetMessageCoreTables(t, ctx, pool)
+
+	tenantID := types.TenantID(fmt.Sprintf("tenant-outbox-prefix-fail-%d", time.Now().UnixNano()))
+	repo := NewMessageRepository(pool)
+	appendConversationMessages(t, ctx, repo, tenantID, "hot-conversation", 3)
+
+	store := NewOutboxStore(pool, WithOutboxClock(func() time.Time {
+		return time.Date(2026, 6, 8, 12, 1, 0, 0, time.UTC)
+	}))
+	var attempted []int64
+	stats, err := store.ProcessReady(ctx, 10, 1, time.Millisecond, func(_ context.Context, message types.OutboxMessage) error {
+		attempted = append(attempted, message.AggregateVersion)
+		return errors.New("kafka unavailable")
+	})
+	if err != nil {
+		t.Fatalf("process failed prefix: %v", err)
+	}
+	if stats.Fetched != 3 || stats.DeadLettered != 1 || stats.Published != 0 || stats.Retried != 0 {
+		t.Fatalf("unexpected stats=%+v", stats)
+	}
+	if len(attempted) != 1 || attempted[0] != 1 {
+		t.Fatalf("only the first conversation row should be attempted, got %v", attempted)
+	}
+	if status := readOutboxStatusByVersion(t, ctx, pool, tenantID, 1); status.Status != types.OutboxStatusDLQ {
+		t.Fatalf("first event should be DLQ: %+v", status)
+	}
+	if status := readOutboxStatusByVersion(t, ctx, pool, tenantID, 2); status.Status != types.OutboxStatusPending || status.RetryCount != 0 || status.Published {
+		t.Fatalf("second event should remain untouched pending: %+v", status)
+	}
+	if status := readOutboxStatusByVersion(t, ctx, pool, tenantID, 3); status.Status != types.OutboxStatusPending || status.RetryCount != 0 || status.Published {
+		t.Fatalf("third event should remain untouched pending: %+v", status)
+	}
 }
 
 func TestOutboxStoreProcessReadyBatchSkipsPublishWhenEmpty(t *testing.T) {
@@ -393,8 +471,10 @@ func TestOutboxStoreProcessReadyConcurrentWorkersKeepConversationOrder(t *testin
 
 	tenantID := types.TenantID(fmt.Sprintf("tenant-outbox-concurrent-%d", time.Now().UnixNano()))
 	repo := NewMessageRepository(pool)
-	appendConversationMessages(t, ctx, repo, tenantID, "conversation-a", 3)
-	appendConversationMessages(t, ctx, repo, tenantID, "conversation-b", 3)
+	shardCount := 4
+	conversationA, conversationB := distinctShardConversationIDs(t, ctx, pool, tenantID, shardCount)
+	appendConversationMessages(t, ctx, repo, tenantID, conversationA, 3)
+	appendConversationMessages(t, ctx, repo, tenantID, conversationB, 3)
 
 	store := NewOutboxStore(pool)
 	recorder := newOutboxPublishRecorder()
@@ -409,10 +489,10 @@ func TestOutboxStoreProcessReadyConcurrentWorkersKeepConversationOrder(t *testin
 
 	firstBatchErr := make(chan error, 1)
 	go func() {
-		firstBatchErr <- runConcurrentProcessReady(
+		firstBatchErr <- runConcurrentProcessReadySharded(
 			ctx,
 			store,
-			4,
+			shardCount,
 			func(ctx context.Context, message types.OutboxMessage) error {
 				recorder.record(message)
 				recorder.enter()
@@ -441,13 +521,13 @@ func TestOutboxStoreProcessReadyConcurrentWorkersKeepConversationOrder(t *testin
 		t.Fatalf("expected cross-conversation concurrency, max active=%d", recorder.maxActiveCount())
 	}
 
-	drainOutboxConcurrently(t, ctx, store, 4, func(_ context.Context, message types.OutboxMessage) error {
+	drainOutboxConcurrentlySharded(t, ctx, store, shardCount, func(_ context.Context, message types.OutboxMessage) error {
 		recorder.record(message)
 		return nil
 	})
 
-	recorder.assertConversationOrder(t, "conversation-a", []int64{1, 2, 3})
-	recorder.assertConversationOrder(t, "conversation-b", []int64{1, 2, 3})
+	recorder.assertConversationOrder(t, conversationA, []int64{1, 2, 3})
+	recorder.assertConversationOrder(t, conversationB, []int64{1, 2, 3})
 	assertOutboxStatusCounts(t, ctx, pool, tenantID, 6, 0, 0)
 }
 
@@ -528,20 +608,73 @@ func appendConversationMessages(
 	}
 }
 
-func runConcurrentProcessReady(
+func distinctShardConversationIDs(
+	t *testing.T,
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	tenantID types.TenantID,
+	shardCount int,
+) (types.ConversationID, types.ConversationID) {
+	t.Helper()
+	var firstID types.ConversationID
+	firstShard := -1
+	for i := 0; i < 100; i++ {
+		conversationID := types.ConversationID(fmt.Sprintf("conversation-shard-%d", i))
+		shardID := conversationShardID(t, ctx, pool, tenantID, conversationID, shardCount)
+		if firstShard < 0 {
+			firstID = conversationID
+			firstShard = shardID
+			continue
+		}
+		if shardID != firstShard {
+			return firstID, conversationID
+		}
+	}
+	t.Fatalf("could not find two conversation ids in distinct shards for tenant %s", tenantID)
+	return "", ""
+}
+
+func conversationShardID(
+	t *testing.T,
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	tenantID types.TenantID,
+	conversationID types.ConversationID,
+	shardCount int,
+) int {
+	t.Helper()
+	var shardID int64
+	if err := pool.QueryRow(ctx, `
+SELECT MOD(
+    MOD(hashtextextended($1::text || ':' || $2::text, 0), $3::bigint) + $3::bigint,
+    $3::bigint
+)::bigint
+`, string(tenantID), string(conversationID), int64(shardCount)).Scan(&shardID); err != nil {
+		t.Fatalf("compute conversation shard id: %v", err)
+	}
+	return int(shardID)
+}
+
+func runConcurrentProcessReadySharded(
 	ctx context.Context,
 	store *OutboxStore,
-	workers int,
+	shardCount int,
 	publish func(context.Context, types.OutboxMessage) error,
 ) error {
-	errCh := make(chan error, workers)
-	for i := 0; i < workers; i++ {
-		go func() {
-			_, err := store.ProcessReady(ctx, 1, 3, time.Millisecond, publish)
+	errCh := make(chan error, shardCount)
+	for shardID := 0; shardID < shardCount; shardID++ {
+		go func(shardID int) {
+			_, err := store.ProcessReadyShardBatch(ctx, 1, 3, time.Millisecond, shardCount, shardID, func(ctx context.Context, messages []types.OutboxMessage) []error {
+				errs := make([]error, len(messages))
+				for index, message := range messages {
+					errs[index] = publish(ctx, message)
+				}
+				return errs
+			})
 			errCh <- err
-		}()
+		}(shardID)
 	}
-	for i := 0; i < workers; i++ {
+	for i := 0; i < shardCount; i++ {
 		if err := <-errCh; err != nil {
 			return err
 		}
@@ -549,30 +682,39 @@ func runConcurrentProcessReady(
 	return nil
 }
 
-func drainOutboxConcurrently(
+func drainOutboxConcurrentlySharded(
 	t *testing.T,
 	ctx context.Context,
 	store *OutboxStore,
-	workers int,
+	shardCount int,
 	publish func(context.Context, types.OutboxMessage) error,
 ) {
 	t.Helper()
+	type result struct {
+		stats types.OutboxRelayStats
+		err   error
+	}
 	for round := 0; round < 20; round++ {
-		statsCh := make(chan types.OutboxRelayStats, workers)
-		errCh := make(chan error, workers)
-		for i := 0; i < workers; i++ {
-			go func() {
-				stats, err := store.ProcessReady(ctx, 1, 3, time.Millisecond, publish)
-				statsCh <- stats
-				errCh <- err
-			}()
+		resultCh := make(chan result, shardCount)
+		for shardID := 0; shardID < shardCount; shardID++ {
+			go func(shardID int) {
+				stats, err := store.ProcessReadyShardBatch(ctx, 1, 3, time.Millisecond, shardCount, shardID, func(ctx context.Context, messages []types.OutboxMessage) []error {
+					errs := make([]error, len(messages))
+					for index, message := range messages {
+						errs[index] = publish(ctx, message)
+					}
+					return errs
+				})
+				resultCh <- result{stats: stats, err: err}
+			}(shardID)
 		}
 		var fetched int
-		for i := 0; i < workers; i++ {
-			if err := <-errCh; err != nil {
-				t.Fatalf("drain outbox concurrently: %v", err)
+		for i := 0; i < shardCount; i++ {
+			result := <-resultCh
+			if result.err != nil {
+				t.Fatalf("drain outbox concurrently: %v", result.err)
 			}
-			fetched += (<-statsCh).Fetched
+			fetched += result.stats.Fetched
 		}
 		if fetched == 0 {
 			return

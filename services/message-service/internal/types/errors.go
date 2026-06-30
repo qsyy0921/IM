@@ -22,6 +22,7 @@ var (
 	ErrInvalidMessageState    = errors.New("invalid message state")
 	ErrDBWriteFailed          = errors.New("db write failed")
 	ErrOutboxWriteFailed      = errors.New("outbox write failed")
+	ErrOutboxPublishSkipped   = errors.New("outbox publish skipped")
 	ErrServiceOverloaded      = errors.New("service overloaded")
 	ErrDependencyVersion      = errors.New("dependency version mismatch")
 	ErrDependencyUnavailable  = errors.New("dependency unavailable")

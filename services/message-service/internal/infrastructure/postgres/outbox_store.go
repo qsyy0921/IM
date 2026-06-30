@@ -123,8 +123,17 @@ func (s *OutboxStore) ProcessReady(
 	}
 	return s.ProcessReadyBatch(ctx, limit, maxAttempts, retryBaseDelay, func(ctx context.Context, messages []types.OutboxMessage) []error {
 		errs := make([]error, len(messages))
+		blockedConversations := make(map[string]struct{})
 		for i, message := range messages {
+			conversationKey := string(message.TenantID) + ":" + string(message.ConversationID)
+			if _, blocked := blockedConversations[conversationKey]; blocked {
+				errs[i] = types.ErrOutboxPublishSkipped
+				continue
+			}
 			errs[i] = publish(ctx, message)
+			if errs[i] != nil {
+				blockedConversations[conversationKey] = struct{}{}
+			}
 		}
 		return errs
 	})
@@ -135,6 +144,30 @@ func (s *OutboxStore) ProcessReadyBatch(
 	limit int,
 	maxAttempts int,
 	retryBaseDelay time.Duration,
+	publish func(context.Context, []types.OutboxMessage) []error,
+) (types.OutboxRelayStats, error) {
+	return s.processReadyBatch(ctx, limit, maxAttempts, retryBaseDelay, 1, 0, publish)
+}
+
+func (s *OutboxStore) ProcessReadyShardBatch(
+	ctx context.Context,
+	limit int,
+	maxAttempts int,
+	retryBaseDelay time.Duration,
+	shardCount int,
+	shardID int,
+	publish func(context.Context, []types.OutboxMessage) []error,
+) (types.OutboxRelayStats, error) {
+	return s.processReadyBatch(ctx, limit, maxAttempts, retryBaseDelay, shardCount, shardID, publish)
+}
+
+func (s *OutboxStore) processReadyBatch(
+	ctx context.Context,
+	limit int,
+	maxAttempts int,
+	retryBaseDelay time.Duration,
+	shardCount int,
+	shardID int,
 	publish func(context.Context, []types.OutboxMessage) []error,
 ) (types.OutboxRelayStats, error) {
 	if s.pool == nil {
@@ -152,6 +185,12 @@ func (s *OutboxStore) ProcessReadyBatch(
 	if retryBaseDelay <= 0 {
 		retryBaseDelay = time.Second
 	}
+	if shardCount <= 0 {
+		shardCount = 1
+	}
+	if shardID < 0 || shardID >= shardCount {
+		return types.OutboxRelayStats{}, types.NewInvalidArgument("message outbox relay shard is out of range")
+	}
 
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
@@ -162,7 +201,7 @@ func (s *OutboxStore) ProcessReadyBatch(
 	}()
 
 	fetchStarted := time.Now()
-	messages, err := s.fetchReadyLocked(ctx, tx, limit)
+	messages, err := s.fetchReadyLocked(ctx, tx, limit, shardCount, shardID)
 	s.metrics.ObserveOutboxFetchReady(time.Since(fetchStarted))
 	if err != nil {
 		return types.OutboxRelayStats{}, err
@@ -184,9 +223,13 @@ func (s *OutboxStore) ProcessReadyBatch(
 	if len(publishErrors) != len(messages) {
 		return types.OutboxRelayStats{}, errors.New("outbox batch publish result count mismatch")
 	}
+	publishErrors = skipAfterConversationFailure(messages, publishErrors)
 
 	for index, message := range messages {
 		if err := publishErrors[index]; err != nil {
+			if errors.Is(err, types.ErrOutboxPublishSkipped) {
+				continue
+			}
 			attempt := message.RetryCount + 1
 			lastError := sanitizeOutboxPublishError(err)
 			if attempt >= maxAttempts {
@@ -221,6 +264,24 @@ func (s *OutboxStore) ProcessReadyBatch(
 	}
 	s.metrics.ObserveOutboxCommit(time.Since(commitStarted))
 	return stats, nil
+}
+
+func skipAfterConversationFailure(messages []types.OutboxMessage, publishErrors []error) []error {
+	if len(messages) == 0 {
+		return publishErrors
+	}
+	blockedConversations := make(map[string]struct{})
+	for index, message := range messages {
+		conversationKey := string(message.TenantID) + ":" + string(message.ConversationID)
+		if _, blocked := blockedConversations[conversationKey]; blocked {
+			publishErrors[index] = types.ErrOutboxPublishSkipped
+			continue
+		}
+		if publishErrors[index] != nil {
+			blockedConversations[conversationKey] = struct{}{}
+		}
+	}
+	return publishErrors
 }
 
 func (s *OutboxStore) AuditOutbox(ctx context.Context, options OutboxAuditOptions) ([]OutboxAuditRow, error) {
@@ -613,8 +674,83 @@ RETURNING 1
 	return stats, nil
 }
 
-func (s *OutboxStore) fetchReadyLocked(ctx context.Context, tx pgx.Tx, limit int) ([]types.OutboxMessage, error) {
+func (s *OutboxStore) fetchReadyLocked(ctx context.Context, tx pgx.Tx, limit int, shardCount int, shardID int) ([]types.OutboxMessage, error) {
+	headLimit := limit * 4
+	minHeadLimit := shardCount * 4
+	if headLimit < minHeadLimit {
+		headLimit = minHeadLimit
+	}
+	if headLimit > 2000 {
+		headLimit = 2000
+	}
 	rows, err := tx.Query(ctx, `
+WITH ready_heads AS (
+    SELECT
+        mo.tenant_id,
+        mo.conversation_id,
+        MIN(mo.id) AS first_id
+    FROM message_outbox mo
+    WHERE mo.status = 'PENDING'
+      AND mo.published_at IS NULL
+      AND COALESCE(mo.next_retry_at, mo.available_at) <= now()
+      AND (
+          $2::bigint <= 1
+          OR MOD(
+              MOD(hashtextextended(mo.tenant_id || ':' || mo.conversation_id, 0), $2::bigint) + $2::bigint,
+              $2::bigint
+          ) = $3::bigint
+      )
+      AND NOT EXISTS (
+          SELECT 1
+          FROM message_outbox blocker
+          WHERE blocker.tenant_id = mo.tenant_id
+            AND blocker.conversation_id = mo.conversation_id
+            AND blocker.aggregate_version < mo.aggregate_version
+            AND (
+                blocker.status = 'DLQ'
+                OR (
+                    blocker.status = 'PENDING'
+                    AND blocker.published_at IS NULL
+                    AND COALESCE(blocker.next_retry_at, blocker.available_at) > now()
+                )
+            )
+    )
+    GROUP BY mo.tenant_id, mo.conversation_id
+    ORDER BY MIN(mo.id)
+    LIMIT $4
+),
+locked_heads AS (
+    SELECT *
+    FROM ready_heads
+    WHERE pg_try_advisory_xact_lock(hashtextextended(tenant_id || ':' || conversation_id, 0))
+),
+ready_ids AS (
+    SELECT current.id, head.first_id, current.aggregate_version
+    FROM locked_heads head
+    JOIN message_outbox current
+      ON current.tenant_id = head.tenant_id
+     AND current.conversation_id = head.conversation_id
+    WHERE current.status = 'PENDING'
+      AND current.published_at IS NULL
+      AND COALESCE(current.next_retry_at, current.available_at) <= now()
+      AND NOT EXISTS (
+          SELECT 1
+          FROM message_outbox blocker
+          WHERE blocker.tenant_id = current.tenant_id
+            AND blocker.conversation_id = current.conversation_id
+            AND blocker.aggregate_version < current.aggregate_version
+            AND (
+                blocker.status = 'DLQ'
+                OR (
+                    blocker.status = 'PENDING'
+                    AND blocker.published_at IS NULL
+                    AND COALESCE(blocker.next_retry_at, blocker.available_at) > now()
+                )
+            )
+      )
+    ORDER BY head.first_id, current.aggregate_version, current.id
+    LIMIT $1
+)
 SELECT
     mo.id,
     mo.event_id,
@@ -637,26 +773,15 @@ SELECT
     COALESCE(te.classification, ''),
     te.created_at
 FROM message_outbox mo
+JOIN ready_ids ready ON ready.id = mo.id
 JOIN conversation_timeline_events te
   ON te.tenant_id = mo.tenant_id
  AND te.conversation_id = mo.conversation_id
  AND te.seq = mo.aggregate_version
  AND te.event_id = mo.event_id
-WHERE mo.status = 'PENDING'
-  AND mo.published_at IS NULL
-  AND COALESCE(mo.next_retry_at, mo.available_at) <= now()
-  AND NOT EXISTS (
-      SELECT 1
-      FROM message_outbox prev
-      WHERE prev.tenant_id = mo.tenant_id
-        AND prev.conversation_id = mo.conversation_id
-        AND prev.aggregate_version < mo.aggregate_version
-        AND prev.status IN ('PENDING', 'DLQ')
-  )
-ORDER BY mo.id
-LIMIT $1
+ORDER BY ready.first_id, mo.aggregate_version, mo.id
 FOR UPDATE OF mo SKIP LOCKED
-`, limit)
+`, limit, shardCount, shardID, headLimit)
 	if err != nil {
 		return nil, types.NewDBWriteFailed(err.Error())
 	}

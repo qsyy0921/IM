@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -175,6 +176,46 @@ func TestRelayRunOnceBatchPayloadErrorRetriesOnlyInvalidMessage(t *testing.T) {
 	}
 }
 
+func TestRelayRunOnceBatchPayloadErrorSkipsLaterSameConversationMessages(t *testing.T) {
+	first := testOutboxMessage()
+	invalid := testOutboxMessage()
+	invalid.ID = 2
+	invalid.EventID = "event-2"
+	invalid.AggregateVersion = 2
+	invalid.PayloadJSON = []byte(`{"message_id":"msg-2"}`)
+	third := testOutboxMessage()
+	third.ID = 3
+	third.EventID = "event-3"
+	third.AggregateVersion = 3
+	third.PayloadJSON = []byte(`{
+		"message_id":"msg-3",
+		"conversation_id":"conv-1",
+		"conversation_seq":3,
+		"sender_id":"user-1",
+		"device_id":"device-1",
+		"client_msg_id":"client-3",
+		"command_hash":"hash-3",
+		"message_type":"TEXT",
+		"payload":{"text":"hello-3"},
+		"attachment_ids":["att-3"],
+		"accepted_at":"2026-06-08T12:00:00Z"
+	}`)
+	store := &fakeBatchStore{messages: []types.OutboxMessage{first, invalid, third}}
+	publisher := &fakePublisher{}
+	relay := NewRelay(store, publisher, Config{Topic: "topic-it", BatchSize: 10})
+
+	stats, err := relay.RunOnce(context.Background())
+	if err != nil {
+		t.Fatalf("run relay once: %v", err)
+	}
+	if stats.Fetched != 3 || stats.Published != 1 || stats.Retried != 1 {
+		t.Fatalf("unexpected stats: %+v", stats)
+	}
+	if len(publisher.batches) != 1 || len(publisher.batches[0]) != 1 {
+		t.Fatalf("expected only the valid prefix to publish, got %+v", publisher.batches)
+	}
+}
+
 func TestRelayRunOnceRecordsPublishFailure(t *testing.T) {
 	store := &fakeStore{messages: []types.OutboxMessage{testOutboxMessage()}}
 	publisher := &fakePublisher{err: errors.New("kafka unavailable")}
@@ -277,7 +318,7 @@ func TestRelayRunContinuesImmediatelyWhenWorkWasPublished(t *testing.T) {
 
 func TestRelayRunStartsConfiguredWorkers(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	store := newBlockingStore(3)
+	store := newShardedBlockingStore(3)
 	relay := NewRelay(store, &fakePublisher{}, Config{
 		WorkerCount:  3,
 		PollInterval: time.Hour,
@@ -306,6 +347,9 @@ func TestRelayRunStartsConfiguredWorkers(t *testing.T) {
 	}
 	if store.maxActiveCount() < 3 {
 		t.Fatalf("expected 3 active workers, got %d", store.maxActiveCount())
+	}
+	if store.callCount() < 3 {
+		t.Fatalf("expected sharded workers to call store, got %d", store.callCount())
 	}
 }
 
@@ -487,6 +531,9 @@ func (s *fakeStore) ProcessReady(
 	stats := types.OutboxRelayStats{Fetched: len(s.messages)}
 	for _, message := range s.messages {
 		if err := publish(ctx, message); err != nil {
+			if errors.Is(err, types.ErrOutboxPublishSkipped) {
+				continue
+			}
 			if message.RetryCount+1 >= maxAttempts {
 				stats.DeadLettered++
 			} else {
@@ -513,6 +560,9 @@ func (s *fakeBatchStore) ProcessReady(
 	stats := types.OutboxRelayStats{Fetched: len(s.messages)}
 	for _, message := range s.messages {
 		if err := publish(ctx, message); err != nil {
+			if errors.Is(err, types.ErrOutboxPublishSkipped) {
+				continue
+			}
 			if message.RetryCount+1 >= maxAttempts {
 				stats.DeadLettered++
 			} else {
@@ -538,6 +588,9 @@ func (s *fakeBatchStore) ProcessReadyBatch(
 		return types.OutboxRelayStats{}, errors.New("unexpected result count")
 	}
 	for index, err := range errs {
+		if errors.Is(err, types.ErrOutboxPublishSkipped) {
+			continue
+		}
 		if err != nil {
 			if s.messages[index].RetryCount+1 >= maxAttempts {
 				stats.DeadLettered++
@@ -627,6 +680,38 @@ func (s *blockingStore) maxActiveCount() int {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.maxActive
+}
+
+type shardedBlockingStore struct {
+	*blockingStore
+	calls atomic.Int32
+}
+
+func newShardedBlockingStore(expected int) *shardedBlockingStore {
+	return &shardedBlockingStore{blockingStore: newBlockingStore(expected)}
+}
+
+func (s *shardedBlockingStore) ProcessReadyShardBatch(
+	ctx context.Context,
+	_ int,
+	_ int,
+	_ time.Duration,
+	shardCount int,
+	shardID int,
+	_ func(context.Context, []types.OutboxMessage) []error,
+) (types.OutboxRelayStats, error) {
+	if shardCount != s.expected {
+		return types.OutboxRelayStats{}, errors.New("unexpected shard count")
+	}
+	if shardID < 0 || shardID >= shardCount {
+		return types.OutboxRelayStats{}, errors.New("unexpected shard id")
+	}
+	s.calls.Add(1)
+	return s.blockingStore.ProcessReady(ctx, 0, 0, 0, nil)
+}
+
+func (s *shardedBlockingStore) callCount() int {
+	return int(s.calls.Load())
 }
 
 type backoffStore struct {

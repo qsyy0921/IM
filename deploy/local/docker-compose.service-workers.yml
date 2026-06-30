@@ -8,6 +8,11 @@ services:
       NEXUSIM_MESSAGE_SERVICE_MODE: outbox-relay
       NEXUSIM_PG_DSN: postgres://nexusim:nexusim@postgres:5432/nexusim?sslmode=disable
       NEXUSIM_KAFKA_BROKERS: kafka:29092
+      NEXUSIM_OUTBOX_WORKERS: 4
+      NEXUSIM_OUTBOX_BATCH_SIZE: 500
+      NEXUSIM_OUTBOX_PUBLISH_BATCH_ENABLED: "true"
+      NEXUSIM_OUTBOX_POLL_INTERVAL: 100ms
+      NEXUSIM_OUTBOX_FAILURE_BACKOFF: 100ms
     restart: unless-stopped
     networks:
       - nexusim-services

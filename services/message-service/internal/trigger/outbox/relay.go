@@ -32,6 +32,18 @@ type BatchStore interface {
 	) (types.OutboxRelayStats, error)
 }
 
+type ShardedBatchStore interface {
+	ProcessReadyShardBatch(
+		ctx context.Context,
+		limit int,
+		maxAttempts int,
+		retryBaseDelay time.Duration,
+		shardCount int,
+		shardID int,
+		publish func(context.Context, []types.OutboxMessage) []error,
+	) (types.OutboxRelayStats, error)
+}
+
 type Publisher interface {
 	Publish(ctx context.Context, topic string, key []byte, value []byte) error
 }
@@ -80,7 +92,7 @@ func NewRelay(store Store, publisher Publisher, config Config) *Relay {
 
 func (r *Relay) Run(ctx context.Context) error {
 	if r.config.WorkerCount <= 1 {
-		return r.runWorker(ctx)
+		return r.runWorker(ctx, 0)
 	}
 
 	workerCtx, cancel := context.WithCancel(ctx)
@@ -91,9 +103,9 @@ func (r *Relay) Run(ctx context.Context) error {
 	var firstErr error
 	for worker := 0; worker < r.config.WorkerCount; worker++ {
 		wg.Add(1)
-		go func() {
+		go func(workerID int) {
 			defer wg.Done()
-			if err := r.runWorker(workerCtx); err != nil && !errors.Is(err, context.Canceled) {
+			if err := r.runWorker(workerCtx, workerID); err != nil && !errors.Is(err, context.Canceled) {
 				mu.Lock()
 				if firstErr == nil {
 					firstErr = err
@@ -101,7 +113,7 @@ func (r *Relay) Run(ctx context.Context) error {
 				}
 				mu.Unlock()
 			}
-		}()
+		}(worker)
 	}
 	wg.Wait()
 	if firstErr != nil {
@@ -110,14 +122,14 @@ func (r *Relay) Run(ctx context.Context) error {
 	return ctx.Err()
 }
 
-func (r *Relay) runWorker(ctx context.Context) error {
+func (r *Relay) runWorker(ctx context.Context, workerID int) error {
 	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		default:
 		}
-		stats, err := r.RunOnce(ctx)
+		stats, err := r.runOnceForWorker(ctx, workerID)
 		if err != nil {
 			if errors.Is(err, context.Canceled) {
 				return context.Canceled
@@ -158,6 +170,10 @@ func (r *Relay) Snapshot() types.OutboxRelayWorkerSnapshot {
 }
 
 func (r *Relay) RunOnce(ctx context.Context) (types.OutboxRelayStats, error) {
+	return r.runOnceForWorker(ctx, 0)
+}
+
+func (r *Relay) runOnceForWorker(ctx context.Context, workerID int) (types.OutboxRelayStats, error) {
 	if r.store == nil {
 		return types.OutboxRelayStats{}, errors.New("outbox relay store is not configured")
 	}
@@ -169,7 +185,21 @@ func (r *Relay) RunOnce(ctx context.Context) (types.OutboxRelayStats, error) {
 	var err error
 	useSingle := r.config.DisablePublishBatch
 	if !useSingle {
-		if store, ok := r.store.(BatchStore); ok {
+		if r.config.WorkerCount > 1 {
+			store, ok := r.store.(ShardedBatchStore)
+			if !ok {
+				return types.OutboxRelayStats{}, errors.New("outbox relay store does not support sharded workers")
+			}
+			stats, err = store.ProcessReadyShardBatch(
+				ctx,
+				r.config.BatchSize,
+				r.config.MaxAttempts,
+				r.config.RetryBaseDelay,
+				r.config.WorkerCount,
+				workerID,
+				r.publishMessages,
+			)
+		} else if store, ok := r.store.(BatchStore); ok {
 			stats, err = store.ProcessReadyBatch(
 				ctx,
 				r.config.BatchSize,
@@ -212,10 +242,17 @@ func (r *Relay) publishMessages(ctx context.Context, messages []types.OutboxMess
 	}
 	records := make([]types.KafkaPublishRecord, 0, len(messages))
 	indexes := make([]int, 0, len(messages))
+	blockedConversations := make(map[string]struct{})
 	for index, message := range messages {
+		conversationKey := string(message.TenantID) + ":" + string(message.ConversationID)
+		if _, blocked := blockedConversations[conversationKey]; blocked {
+			errs[index] = types.ErrOutboxPublishSkipped
+			continue
+		}
 		value, err := BuildKafkaValue(message)
 		if err != nil {
 			errs[index] = err
+			blockedConversations[conversationKey] = struct{}{}
 			continue
 		}
 		records = append(records, types.KafkaPublishRecord{

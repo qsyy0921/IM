@@ -21,6 +21,7 @@ type Handler struct {
 	authJWKStatsFunc           func() *authinfra.JWKStats
 	deliveryWorkerStatsFunc    func() types.ConsumerWorkerSnapshot
 	identityWorkerStatsFunc    func() types.ConsumerWorkerSnapshot
+	webSocketWriterStatsFunc   func() types.WebSocketWriterSnapshot
 	traceStatsFunc             func() TraceSnapshot
 }
 
@@ -60,6 +61,11 @@ func (h *Handler) WithDeliveryConsumerStats(statsFunc func() types.ConsumerWorke
 
 func (h *Handler) WithIdentityConsumerStats(statsFunc func() types.ConsumerWorkerSnapshot) *Handler {
 	h.identityWorkerStatsFunc = statsFunc
+	return h
+}
+
+func (h *Handler) WithWebSocketWriterStats(statsFunc func() types.WebSocketWriterSnapshot) *Handler {
+	h.webSocketWriterStatsFunc = statsFunc
 	return h
 }
 
@@ -117,6 +123,10 @@ func (h *Handler) snapshot() Snapshot {
 		stats := h.identityWorkerStatsFunc()
 		snapshot.IdentityConsumer = &stats
 	}
+	if h.webSocketWriterStatsFunc != nil {
+		stats := h.webSocketWriterStatsFunc()
+		snapshot.WebSocketWriter = &stats
+	}
 	if h.traceStatsFunc != nil {
 		stats := h.traceStatsFunc()
 		snapshot.Trace = &stats
@@ -139,6 +149,7 @@ type Snapshot struct {
 	AuthJWKStats          *authinfra.JWKStats                  `json:"auth_jwks,omitempty"`
 	DeliveryConsumer      *types.ConsumerWorkerSnapshot        `json:"delivery_consumer,omitempty"`
 	IdentityConsumer      *types.ConsumerWorkerSnapshot        `json:"identity_consumer,omitempty"`
+	WebSocketWriter       *types.WebSocketWriterSnapshot       `json:"websocket_writer,omitempty"`
 	Trace                 *TraceSnapshot                       `json:"trace,omitempty"`
 }
 

@@ -90,6 +90,11 @@ brief、loadtest report、development-progress 或 archive。
   SendMessage、message outbox、delivery projection、delivery outbox 和 Kafka consumer 都能追平；
   新瓶颈迁移到 push-gateway conversation signal 写出 / runner 读取观测。报告见
   `docs/runbook/loadtest/hotgroup/loadtest-report-20260630-hotgroup-message-outbox-relay.md`。
+- push-gateway / hotgroup 已补下一轮定位所需指标：push-gateway WebSocket writer 现在暴露
+  outbound dequeued、frame write success/error、delivery.notify write success/error、
+  resume_hint write success/error 和 last event timestamp；`loadtest/hotgroup` 现在在
+  summary/report 中记录每个 conversation subscriber 的 signal 数、max seq、首帧/末帧耗时、
+  completed 和 read error。focused checks 已通过，下一步是最新镜像 redeploy 后复压。
 
 ## 已成型底座
 
@@ -119,6 +124,6 @@ brief、loadtest report、development-progress 或 archive。
 
 ## 下一个方向
 
-- 基于已通过的 message relay 复验，下一步优先拆 push-gateway conversation signal
-  写出 / runner 读取瓶颈，补 per-connection signal summary、writer flush / enqueue
-  指标和 Prometheus / Grafana 时间窗口；正式生产级运维 UI、provider-grade 长周期平台仍后置。
+- 基于已落地的 push writer metrics 和 per-connection signal summary，下一步优先重建镜像、
+  redeploy，然后跑 push-focused step 并记录 Prometheus / Grafana 时间窗口；正式生产级运维 UI、
+  provider-grade 长周期平台仍后置。

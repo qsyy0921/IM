@@ -27,6 +27,7 @@ import (
 	rpcinfra "github.com/qsyy0921/IM/services/push-gateway/internal/infrastructure/rpc"
 	"github.com/qsyy0921/IM/services/push-gateway/internal/trigger/delivery"
 	identitytrigger "github.com/qsyy0921/IM/services/push-gateway/internal/trigger/identity"
+	"github.com/qsyy0921/IM/services/push-gateway/internal/types"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -78,6 +79,7 @@ func runRuntime(enableWS bool, enableDeliveryConsumer bool, enableIdentityConsum
 	localRegistry := memory.NewRegistryWithConfig(memory.Config{
 		ResumeBufferTTL: envDuration("NEXUSIM_PUSH_RESUME_BUFFER_TTL", 10*time.Minute),
 	})
+	writerMetrics := &types.WebSocketWriterMetrics{}
 	registry := app.SessionRegistry(localRegistry)
 	var revocationStore revocationinfra.Store = revocationinfra.NewMemoryStore()
 	errs := make(chan error, 6)
@@ -137,6 +139,7 @@ func runRuntime(enableWS bool, enableDeliveryConsumer bool, enableIdentityConsum
 		WithAuthJWKStats(func() *authinfra.JWKStats {
 			return authenticatorJWKStats(authenticator)
 		}).
+		WithWebSocketWriterStats(writerMetrics.Snapshot).
 		WithTraceStats(traceRuntime.Snapshot)
 	if redisSubscriber != nil {
 		monitoringHandler.WithRedisSubscriberWorkerStats(redisSubscriber.Snapshot)
@@ -199,6 +202,7 @@ func runRuntime(enableWS bool, enableDeliveryConsumer bool, enableIdentityConsum
 				RouteBackend:      routeBackend,
 				GatewayID:         gatewayID,
 				TraceRecorder:     traceRuntime,
+				WriterMetrics:     writerMetrics,
 			},
 		)
 		mux := http.NewServeMux()

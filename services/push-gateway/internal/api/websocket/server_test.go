@@ -36,11 +36,12 @@ func TestDecodeClientFrameDeliveryAck(t *testing.T) {
 func TestWebSocketPingAndAck(t *testing.T) {
 	registry := memory.NewRegistry()
 	delivery := &fakeDeliveryClient{}
+	writerMetrics := &types.WebSocketWriterMetrics{}
 	server := NewServer(
 		app.NewConnectSessionUseCase(registry),
 		app.NewDisconnectSessionUseCase(registry),
 		app.NewHandleClientFrameUseCase(delivery),
-		Config{QueueSize: 8, HeartbeatInterval: time.Second},
+		Config{QueueSize: 8, HeartbeatInterval: time.Second, WriterMetrics: writerMetrics},
 	)
 	httpServer := httptest.NewServer(server)
 	defer httpServer.Close()
@@ -131,6 +132,13 @@ func TestWebSocketPingAndAck(t *testing.T) {
 		delivery.last.AuthContext.DeviceID != "device-1" ||
 		delivery.last.AuthContext.SessionID != hello.SessionID {
 		t.Fatalf("ack must use session auth context: %+v", delivery.last)
+	}
+	metrics := writerMetrics.Snapshot()
+	if metrics.FrameWriteSuccessCount < 4 ||
+		metrics.DeliveryNotifyWriteSuccessCount != 1 ||
+		metrics.OutboundFrameDequeuedCount < 3 ||
+		metrics.LastDeliveryNotifyWriteAtMS <= 0 {
+		t.Fatalf("unexpected writer metrics: %+v", metrics)
 	}
 }
 
@@ -670,6 +678,7 @@ func TestWebSocketUnknownResumeTokenIsReplaced(t *testing.T) {
 func TestWriteLoopSendsResumeHintAndClosesOnEviction(t *testing.T) {
 	outbound := make(chan types.ServerFrame)
 	evicted := make(chan types.SessionEviction, 1)
+	writerMetrics := &types.WebSocketWriterMetrics{}
 	httpServer := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		conn, err := nhooyr.Accept(writer, request, &nhooyr.AcceptOptions{InsecureSkipVerify: true})
 		if err != nil {
@@ -683,7 +692,7 @@ func TestWriteLoopSendsResumeHintAndClosesOnEviction(t *testing.T) {
 				Seq:            12,
 			}},
 		}
-		_ = writeLoop(request.Context(), conn, outbound, evicted, time.Second, 0)
+		_ = writeLoop(request.Context(), conn, outbound, evicted, time.Second, 0, writerMetrics)
 	}))
 	defer httpServer.Close()
 
@@ -714,5 +723,8 @@ func TestWriteLoopSendsResumeHintAndClosesOnEviction(t *testing.T) {
 	}
 	if nhooyr.CloseStatus(err) != nhooyr.StatusPolicyViolation {
 		t.Fatalf("expected policy violation close, got %v", err)
+	}
+	if snapshot := writerMetrics.Snapshot(); snapshot.ResumeHintWriteSuccessCount != 1 {
+		t.Fatalf("unexpected writer metrics: %+v", snapshot)
 	}
 }

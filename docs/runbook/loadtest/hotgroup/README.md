@@ -135,8 +135,27 @@ delivery timeline consumer lag by topic / partition / group
 delivery_timeline_items count / insert rate
 user_inbox rows per message
 PostgreSQL lock / WAL / dead tuple time-series exporter
-push signal writer flush / client observed gap
+push signal writer flush / client observed gap 的趋势化 dashboard
 ```
+
+2026-06-30 后续代码已补齐第一阶段 push signal 观测字段：
+
+```text
+push-gateway /metrics:
+  nexusim_push_gateway_ws_writer_events_total
+  nexusim_push_gateway_ws_writer_last_event_unix_milliseconds
+
+loadtest/hotgroup summary:
+  push.subscriber_signals[].signal_count
+  push.subscriber_signals[].max_conversation_seq
+  push.subscriber_signals[].first_signal_after_ms
+  push.subscriber_signals[].last_signal_after_ms
+  push.subscriber_signals[].completed
+  push.subscriber_signals[].error
+```
+
+下一轮三机压测必须使用包含这些字段的最新镜像 / runner；否则无法区分 WebSocket writer
+未写出、客户端读取慢、session queue 压力或 runner accounting 问题。
 
 没有 Grafana / Prometheus 趋势图的运行，只能作为功能 smoke、dry-run 或一次性
 diagnostics，不能写成热点群聊容量证明。

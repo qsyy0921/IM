@@ -150,10 +150,11 @@ H:\NexusIM\loadtest-results\hotgroup-message-relayopt-1000u-8000m-1200qps-202606
 
 ## 下一步
 
-1. 为 push-gateway conversation signal 写出增加更细的 low-sensitive metrics：
-   read from Kafka、route match、session enqueue、writer flush、client observed。
-2. 把 `loadtest/hotgroup` 的 signal reader 拆出 per-connection summary，记录首帧时间、
-   read loop error、close code、每连接收到数量。
-3. 再跑 800 -> 1000 -> 1200 msg/s 的 push-focused step，定位 WebSocket writer 还是 runner 侧。
+1. 已实现第一阶段 push-gateway writer flush 指标和 `loadtest/hotgroup` per-connection
+   signal summary；下一步重建最新镜像并 redeploy。
+2. 再跑 800 -> 1000 -> 1200 msg/s 的 push-focused step，定位 WebSocket writer、client
+   read loop、session queue 还是 Redis route / Kafka consumer。
+3. 将 `/metrics` 中 `nexusim_push_gateway_ws_writer_events_total` 和 runner
+   `push.subscriber_signals[]` 一起写入新报告。
 4. 必要时把 push conversation signal 改成按 conversation subscription bucket 批量广播，
    或引入更明确的 online signal backpressure / sampling 策略。

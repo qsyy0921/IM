@@ -78,6 +78,14 @@ func TestHandlerHealthReadyAndMetrics(t *testing.T) {
 				LastErrorBackoffMS: 500,
 			}
 		}).
+		WithWebSocketWriterStats(func() types.WebSocketWriterSnapshot {
+			return types.WebSocketWriterSnapshot{
+				OutboundFrameDequeuedCount:      11,
+				FrameWriteSuccessCount:          12,
+				DeliveryNotifyWriteSuccessCount: 10,
+				LastDeliveryNotifyWriteAtMS:     1200,
+			}
+		}).
 		WithTraceStats(func() TraceSnapshot {
 			return TraceSnapshot{
 				Enabled:       true,
@@ -125,6 +133,11 @@ func TestHandlerHealthReadyAndMetrics(t *testing.T) {
 	}
 	if snapshot.IdentityConsumer == nil || snapshot.IdentityConsumer.TotalErrors != 3 {
 		t.Fatalf("unexpected identity consumer stats: %+v", snapshot.IdentityConsumer)
+	}
+	if snapshot.WebSocketWriter == nil ||
+		snapshot.WebSocketWriter.OutboundFrameDequeuedCount != 11 ||
+		snapshot.WebSocketWriter.DeliveryNotifyWriteSuccessCount != 10 {
+		t.Fatalf("unexpected websocket writer stats: %+v", snapshot.WebSocketWriter)
 	}
 	if snapshot.Trace == nil ||
 		!snapshot.Trace.Enabled ||
@@ -217,6 +230,24 @@ func TestHandlerPrometheusMetrics(t *testing.T) {
 				LastErrorBackoffMS: 500,
 			}
 		}).
+		WithWebSocketWriterStats(func() types.WebSocketWriterSnapshot {
+			return types.WebSocketWriterSnapshot{
+				OutboundFrameDequeuedCount:       31,
+				FrameWriteAttemptCount:           32,
+				FrameWriteSuccessCount:           30,
+				FrameWriteErrorCount:             2,
+				DeliveryNotifyWriteAttemptCount:  24,
+				DeliveryNotifyWriteSuccessCount:  23,
+				DeliveryNotifyWriteErrorCount:    1,
+				ResumeHintWriteAttemptCount:      3,
+				ResumeHintWriteSuccessCount:      2,
+				ResumeHintWriteErrorCount:        1,
+				LastWriteSuccessAtMS:             3000,
+				LastWriteErrorAtMS:               3100,
+				LastDeliveryNotifyWriteAtMS:      3200,
+				LastDeliveryNotifyWriteErrorAtMS: 3300,
+			}
+		}).
 		WithTraceStats(func() TraceSnapshot {
 			return TraceSnapshot{
 				Enabled:         true,
@@ -250,6 +281,10 @@ func TestHandlerPrometheusMetrics(t *testing.T) {
 	assertContains(t, body, `nexusim_push_gateway_auth_jwks_refresh_failures_total 1`)
 	assertContains(t, body, `nexusim_push_gateway_consumer_worker_errors_total{consumer="delivery"} 2`)
 	assertContains(t, body, `nexusim_push_gateway_consumer_worker_errors_total{consumer="identity"} 3`)
+	assertContains(t, body, `nexusim_push_gateway_ws_writer_events_total{event="outbound_frame_dequeued"} 31`)
+	assertContains(t, body, `nexusim_push_gateway_ws_writer_events_total{event="delivery_notify_write_success"} 23`)
+	assertContains(t, body, `nexusim_push_gateway_ws_writer_events_total{event="resume_hint_write_error"} 1`)
+	assertContains(t, body, `nexusim_push_gateway_ws_writer_last_event_unix_milliseconds{event="delivery_notify_write_error"} 3300`)
 	assertContains(t, body, `nexusim_push_gateway_otel_traces_enabled{exporter="otlp-grpc"} 1`)
 	assertContains(t, body, `nexusim_push_gateway_otel_traces_sampling_ratio{exporter="otlp-grpc"} 0.5`)
 	for _, forbidden := range []string{

@@ -64,16 +64,28 @@ type receiverStats struct {
 }
 
 type pushStats struct {
-	Enabled                 bool      `json:"enabled"`
-	PushURL                 string    `json:"push_url,omitempty"`
-	SubscriberCount         int       `json:"subscriber_count"`
-	SubscribeSuccessCount   int       `json:"subscribe_success_count"`
-	SubscribeErrorCount     int       `json:"subscribe_error_count"`
-	ConversationSignalCount int       `json:"conversation_signal_count"`
-	MaxConversationSeq      int64     `json:"max_conversation_seq"`
-	Errors                  []string  `json:"errors,omitempty"`
-	StartedAt               time.Time `json:"started_at,omitempty"`
-	FinishedAt              time.Time `json:"finished_at,omitempty"`
+	Enabled                 bool                        `json:"enabled"`
+	PushURL                 string                      `json:"push_url,omitempty"`
+	SubscriberCount         int                         `json:"subscriber_count"`
+	SubscribeSuccessCount   int                         `json:"subscribe_success_count"`
+	SubscribeErrorCount     int                         `json:"subscribe_error_count"`
+	ConversationSignalCount int                         `json:"conversation_signal_count"`
+	MaxConversationSeq      int64                       `json:"max_conversation_seq"`
+	SubscriberSignals       []pushSignalSubscriberStats `json:"subscriber_signals,omitempty"`
+	Errors                  []string                    `json:"errors,omitempty"`
+	StartedAt               time.Time                   `json:"started_at,omitempty"`
+	FinishedAt              time.Time                   `json:"finished_at,omitempty"`
+}
+
+type pushSignalSubscriberStats struct {
+	UserID             string  `json:"user_id"`
+	DeviceID           string  `json:"device_id"`
+	SignalCount        int     `json:"signal_count"`
+	MaxConversationSeq int64   `json:"max_conversation_seq"`
+	FirstSignalAfterMS float64 `json:"first_signal_after_ms,omitempty"`
+	LastSignalAfterMS  float64 `json:"last_signal_after_ms,omitempty"`
+	Completed          bool    `json:"completed"`
+	Error              string  `json:"error,omitempty"`
 }
 
 type postgresStats struct {

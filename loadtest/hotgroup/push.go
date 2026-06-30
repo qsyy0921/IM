@@ -48,13 +48,18 @@ type conversationSignalCollector struct {
 	cancel          context.CancelFunc
 	subscriberCount int
 	messageCount    int
+	startedAt       time.Time
 }
 
 type pushSignalResult struct {
-	userID string
-	count  int
-	maxSeq int64
-	err    error
+	userID             string
+	deviceID           string
+	count              int
+	maxSeq             int64
+	firstSignalAfterMS float64
+	lastSignalAfterMS  float64
+	completed          bool
+	err                error
 }
 
 func openConversationSubscribers(ctx context.Context, cfg config, plan userPlan) ([]pushSubscriber, pushStats, error) {
@@ -144,14 +149,16 @@ func startConversationSignalCollection(ctx context.Context, cfg config, subscrib
 	}
 	collectorCtx, cancel := context.WithCancel(ctx)
 	done := make(chan pushSignalResult, len(subscribers))
+	startedAt := time.Now()
 	for _, subscriber := range subscribers {
-		go collectSubscriberSignals(collectorCtx, cfg, subscriber, messageCount, done)
+		go collectSubscriberSignals(collectorCtx, cfg, subscriber, messageCount, startedAt, done)
 	}
 	return &conversationSignalCollector{
 		done:            done,
 		cancel:          cancel,
 		subscriberCount: len(subscribers),
 		messageCount:    messageCount,
+		startedAt:       startedAt,
 	}
 }
 
@@ -160,9 +167,10 @@ func collectSubscriberSignals(
 	cfg config,
 	subscriber pushSubscriber,
 	messageCount int,
+	startedAt time.Time,
 	done chan<- pushSignalResult,
 ) {
-	result := pushSignalResult{userID: subscriber.user.UserID}
+	result := pushSignalResult{userID: subscriber.user.UserID, deviceID: subscriber.user.DeviceID}
 	for result.count < messageCount {
 		frame, err := readHotgroupFrame(ctx, subscriber.conn)
 		if err != nil {
@@ -176,8 +184,14 @@ func collectSubscriberSignals(
 		if frame.ConversationSeq > result.maxSeq {
 			result.maxSeq = frame.ConversationSeq
 		}
+		afterMS := float64(time.Since(startedAt).Microseconds()) / 1000
+		if result.count == 0 {
+			result.firstSignalAfterMS = afterMS
+		}
+		result.lastSignalAfterMS = afterMS
 		result.count++
 	}
+	result.completed = true
 	done <- result
 }
 
@@ -193,19 +207,15 @@ func (collector *conversationSignalCollector) wait(cfg config, stats pushStats) 
 	for received := 0; received < collector.subscriberCount; received++ {
 		select {
 		case result := <-collector.done:
-			stats.ConversationSignalCount += result.count
-			if result.maxSeq > stats.MaxConversationSeq {
-				stats.MaxConversationSeq = result.maxSeq
-			}
-			if result.err != nil {
+			stats = recordPushSignalResult(stats, result)
+			if result.err != nil && cfg.RequireConversationNotify {
 				message := fmt.Sprintf("%s: read conversation signal: %v", result.userID, result.err)
-				stats.Errors = appendError(stats.Errors, message)
-				if cfg.RequireConversationNotify {
-					stats.FinishedAt = time.Now().UTC()
-					return stats, fmt.Errorf("%s", message)
-				}
+				stats.FinishedAt = time.Now().UTC()
+				return stats, fmt.Errorf("%s", message)
 			}
 		case <-timer.C:
+			collector.cancel()
+			stats = collector.drainPartialResults(stats, received)
 			message := fmt.Sprintf(
 				"timed out waiting for conversation signals: got=%d expected=%d",
 				stats.ConversationSignalCount,
@@ -226,6 +236,44 @@ func (collector *conversationSignalCollector) wait(cfg config, stats pushStats) 
 		return stats, err
 	}
 	return stats, nil
+}
+
+func recordPushSignalResult(stats pushStats, result pushSignalResult) pushStats {
+	stats.ConversationSignalCount += result.count
+	if result.maxSeq > stats.MaxConversationSeq {
+		stats.MaxConversationSeq = result.maxSeq
+	}
+	subscriber := pushSignalSubscriberStats{
+		UserID:             result.userID,
+		DeviceID:           result.deviceID,
+		SignalCount:        result.count,
+		MaxConversationSeq: result.maxSeq,
+		FirstSignalAfterMS: result.firstSignalAfterMS,
+		LastSignalAfterMS:  result.lastSignalAfterMS,
+		Completed:          result.completed,
+	}
+	if result.err != nil {
+		message := fmt.Sprintf("%s: read conversation signal: %v", result.userID, result.err)
+		stats.Errors = appendError(stats.Errors, message)
+		subscriber.Error = result.err.Error()
+	}
+	stats.SubscriberSignals = append(stats.SubscriberSignals, subscriber)
+	return stats
+}
+
+func (collector *conversationSignalCollector) drainPartialResults(stats pushStats, alreadyReceived int) pushStats {
+	timeout := time.NewTimer(500 * time.Millisecond)
+	defer timeout.Stop()
+	for received := alreadyReceived; received < collector.subscriberCount; {
+		select {
+		case result := <-collector.done:
+			stats = recordPushSignalResult(stats, result)
+			received++
+		case <-timeout.C:
+			return stats
+		}
+	}
+	return stats
 }
 
 func websocketURLForUser(cfg config, user loadUser) (string, error) {

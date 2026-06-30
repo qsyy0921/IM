@@ -39,6 +39,7 @@ type Config struct {
 	RouteBackend      string
 	GatewayID         string
 	TraceRecorder     TraceRecorder
+	WriterMetrics     *types.WebSocketWriterMetrics
 }
 
 func NewServer(
@@ -140,7 +141,7 @@ func (server *Server) ServeHTTP(writer http.ResponseWriter, request *http.Reques
 	defer disconnect()
 
 	auth.SessionID = result.SessionID
-	if err := writeFrame(request.Context(), conn, domain.ServerHello(helloFrame.RequestID, result), server.config.WriteTimeout); err != nil {
+	if err := writeFrameWithMetrics(request.Context(), conn, domain.ServerHello(helloFrame.RequestID, result), server.config.WriteTimeout, server.config.WriterMetrics); err != nil {
 		traceErr = err
 		return
 	}
@@ -150,7 +151,7 @@ func (server *Server) ServeHTTP(writer http.ResponseWriter, request *http.Reques
 
 	writeDone := make(chan error, 1)
 	go func() {
-		err := writeLoop(sessionCtx, conn, outbound, evicted, server.config.WriteTimeout, server.config.WriteDelay)
+		err := writeLoop(sessionCtx, conn, outbound, evicted, server.config.WriteTimeout, server.config.WriteDelay, server.config.WriterMetrics)
 		cancelSession()
 		writeDone <- err
 	}()
@@ -218,6 +219,7 @@ func writeLoop(
 	evicted <-chan types.SessionEviction,
 	timeout time.Duration,
 	writeDelay time.Duration,
+	metrics *types.WebSocketWriterMetrics,
 ) error {
 	for {
 		select {
@@ -228,13 +230,16 @@ func writeLoop(
 				evicted = nil
 				continue
 			}
-			_ = writeFrame(ctx, conn, domain.ResumeHint(eviction.Reason, eviction.Conversations), timeout)
+			resumeHint := domain.ResumeHint(eviction.Reason, eviction.Conversations)
+			if err := writeFrameWithMetrics(ctx, conn, resumeHint, timeout, metrics); err != nil {
+			}
 			_ = conn.Close(nhooyr.StatusPolicyViolation, closeReason(eviction.Reason))
 			return types.ErrSessionEvicted
 		case frame, ok := <-outbound:
 			if !ok {
 				return nil
 			}
+			metrics.RecordOutboundFrameDequeued(frame)
 			if writeDelay > 0 {
 				timer := time.NewTimer(writeDelay)
 				select {
@@ -244,11 +249,27 @@ func writeLoop(
 				case <-timer.C:
 				}
 			}
-			if err := writeFrame(ctx, conn, frame, timeout); err != nil {
+			if err := writeFrameWithMetrics(ctx, conn, frame, timeout, metrics); err != nil {
 				return err
 			}
 		}
 	}
+}
+
+func writeFrameWithMetrics(
+	ctx context.Context,
+	conn *nhooyr.Conn,
+	frame types.ServerFrame,
+	timeout time.Duration,
+	metrics *types.WebSocketWriterMetrics,
+) error {
+	metrics.RecordFrameWriteAttempt(frame)
+	if err := writeFrame(ctx, conn, frame, timeout); err != nil {
+		metrics.RecordFrameWriteError(frame)
+		return err
+	}
+	metrics.RecordFrameWriteSuccess(frame)
+	return nil
 }
 
 func writeFrame(ctx context.Context, conn *nhooyr.Conn, frame types.ServerFrame, timeout time.Duration) error {

@@ -102,6 +102,27 @@ func writeReport(path string, result *summary) error {
 	fmt.Fprintf(&builder, "- subscribe_errors: `%d`\n", result.Push.SubscribeErrorCount)
 	fmt.Fprintf(&builder, "- conversation_signal_count: `%d`\n", result.Push.ConversationSignalCount)
 	fmt.Fprintf(&builder, "- max_conversation_seq: `%d`\n\n", result.Push.MaxConversationSeq)
+	if len(result.Push.SubscriberSignals) > 0 {
+		builder.WriteString("### Subscriber Signal Progress\n\n")
+		builder.WriteString("| user | signals | max_seq | first_ms | last_ms | completed | error |\n")
+		builder.WriteString("| --- | ---: | ---: | ---: | ---: | --- | --- |\n")
+		for _, subscriber := range summarizePushSubscribers(result.Push.SubscriberSignals, 20) {
+			errorText := strings.ReplaceAll(subscriber.Error, "|", "/")
+			fmt.Fprintf(&builder, "| `%s` | `%d` | `%d` | `%.2f` | `%.2f` | `%t` | `%s` |\n",
+				subscriber.UserID,
+				subscriber.SignalCount,
+				subscriber.MaxConversationSeq,
+				subscriber.FirstSignalAfterMS,
+				subscriber.LastSignalAfterMS,
+				subscriber.Completed,
+				errorText,
+			)
+		}
+		if len(result.Push.SubscriberSignals) > 20 {
+			fmt.Fprintf(&builder, "\nOnly the 20 slowest/least-complete subscribers are shown; full data is in `hotgroup-summary.json`.\n")
+		}
+		builder.WriteByte('\n')
+	}
 	builder.WriteString("## Receiver Sample\n\n")
 	fmt.Fprintf(&builder, "- sampled_receivers: `%d`\n", result.Receiver.SampledReceivers)
 	fmt.Fprintf(&builder, "- pull_success: `%d`\n", result.Receiver.PullSuccessCount)
@@ -126,6 +147,23 @@ func writeReport(path string, result *summary) error {
 		fmt.Fprintf(&builder, "- delivery_outbox_dlq: `%d`\n\n", result.Postgres.DeliveryOutboxDLQ)
 	}
 	return os.WriteFile(path, []byte(builder.String()), 0o644)
+}
+
+func summarizePushSubscribers(subscribers []pushSignalSubscriberStats, limit int) []pushSignalSubscriberStats {
+	copied := append([]pushSignalSubscriberStats(nil), subscribers...)
+	sort.Slice(copied, func(i, j int) bool {
+		if copied[i].Completed != copied[j].Completed {
+			return !copied[i].Completed
+		}
+		if copied[i].SignalCount != copied[j].SignalCount {
+			return copied[i].SignalCount < copied[j].SignalCount
+		}
+		return copied[i].LastSignalAfterMS > copied[j].LastSignalAfterMS
+	})
+	if len(copied) > limit {
+		return copied[:limit]
+	}
+	return copied
 }
 
 func gitOutput(args ...string) string {

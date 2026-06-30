@@ -21,6 +21,7 @@ func renderPrometheus(snapshot Snapshot) string {
 	writeRedisSubscriberWorkerPrometheus(&builder, snapshot.RedisSubscriberWorker)
 	writeAuthJWKPrometheus(&builder, snapshot.AuthJWKStats)
 	writeConsumerWorkersPrometheus(&builder, snapshot.DeliveryConsumer, snapshot.IdentityConsumer)
+	writeWebSocketWriterPrometheus(&builder, snapshot.WebSocketWriter)
 	writeTracePrometheus(&builder, snapshot.Trace)
 	return builder.String()
 }
@@ -135,6 +136,28 @@ func writeConsumerWorkerPrometheusSamples(builder *strings.Builder, kind string,
 	writePrometheusSample(builder, "nexusim_push_gateway_consumer_worker_last_success_unix_milliseconds", labels, snapshot.LastSuccessAtMS)
 	writePrometheusSample(builder, "nexusim_push_gateway_consumer_worker_last_commit_unix_milliseconds", labels, snapshot.LastCommitAtMS)
 	writePrometheusSample(builder, "nexusim_push_gateway_consumer_worker_last_error_backoff_milliseconds", labels, snapshot.LastErrorBackoffMS)
+}
+
+func writeWebSocketWriterPrometheus(builder *strings.Builder, snapshot *types.WebSocketWriterSnapshot) {
+	writePrometheusHeader(builder, "nexusim_push_gateway_ws_writer_events_total", "Push gateway WebSocket writer event counters.", "counter")
+	writePrometheusHeader(builder, "nexusim_push_gateway_ws_writer_last_event_unix_milliseconds", "Push gateway WebSocket writer last event timestamps.", "gauge")
+	if snapshot == nil {
+		return
+	}
+	writePrometheusSample(builder, "nexusim_push_gateway_ws_writer_events_total", map[string]string{"event": "outbound_frame_dequeued"}, snapshot.OutboundFrameDequeuedCount)
+	writePrometheusSample(builder, "nexusim_push_gateway_ws_writer_events_total", map[string]string{"event": "frame_write_attempt"}, snapshot.FrameWriteAttemptCount)
+	writePrometheusSample(builder, "nexusim_push_gateway_ws_writer_events_total", map[string]string{"event": "frame_write_success"}, snapshot.FrameWriteSuccessCount)
+	writePrometheusSample(builder, "nexusim_push_gateway_ws_writer_events_total", map[string]string{"event": "frame_write_error"}, snapshot.FrameWriteErrorCount)
+	writePrometheusSample(builder, "nexusim_push_gateway_ws_writer_events_total", map[string]string{"event": "delivery_notify_write_attempt"}, snapshot.DeliveryNotifyWriteAttemptCount)
+	writePrometheusSample(builder, "nexusim_push_gateway_ws_writer_events_total", map[string]string{"event": "delivery_notify_write_success"}, snapshot.DeliveryNotifyWriteSuccessCount)
+	writePrometheusSample(builder, "nexusim_push_gateway_ws_writer_events_total", map[string]string{"event": "delivery_notify_write_error"}, snapshot.DeliveryNotifyWriteErrorCount)
+	writePrometheusSample(builder, "nexusim_push_gateway_ws_writer_events_total", map[string]string{"event": "resume_hint_write_attempt"}, snapshot.ResumeHintWriteAttemptCount)
+	writePrometheusSample(builder, "nexusim_push_gateway_ws_writer_events_total", map[string]string{"event": "resume_hint_write_success"}, snapshot.ResumeHintWriteSuccessCount)
+	writePrometheusSample(builder, "nexusim_push_gateway_ws_writer_events_total", map[string]string{"event": "resume_hint_write_error"}, snapshot.ResumeHintWriteErrorCount)
+	writePrometheusSample(builder, "nexusim_push_gateway_ws_writer_last_event_unix_milliseconds", map[string]string{"event": "write_success"}, snapshot.LastWriteSuccessAtMS)
+	writePrometheusSample(builder, "nexusim_push_gateway_ws_writer_last_event_unix_milliseconds", map[string]string{"event": "write_error"}, snapshot.LastWriteErrorAtMS)
+	writePrometheusSample(builder, "nexusim_push_gateway_ws_writer_last_event_unix_milliseconds", map[string]string{"event": "delivery_notify_write_success"}, snapshot.LastDeliveryNotifyWriteAtMS)
+	writePrometheusSample(builder, "nexusim_push_gateway_ws_writer_last_event_unix_milliseconds", map[string]string{"event": "delivery_notify_write_error"}, snapshot.LastDeliveryNotifyWriteErrorAtMS)
 }
 
 func writeTracePrometheus(builder *strings.Builder, snapshot *TraceSnapshot) {

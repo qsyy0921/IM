@@ -174,6 +174,7 @@ CreateConversation(GROUP)
 | delivery outbox frontier 优化 | clean commit `01b2a70` 后，delivery-service outbox ready query 改为 per-conversation frontier，并用 8 worker relay 复压 | 6000 人 READ_FANOUT、100 subscriber 下，400 / 800 / 1200 / 2000 / 4000 / 8000 msg/s 目标档均通过；最高档 5000 条消息、500000 条 signal，`send_p95_ms=18.54`、`send_p99_ms=22.41`、`delivery_outbox_pending=0`、Kafka lag=0。 |
 | 压测自动分析 | `tools/analyze-hotgroup-loadtest.ps1` 离线读取 H 盘 `hotgroup-summary.json`，生成 run matrix、瓶颈分类和下一步策略 | clean commit `01b2a70` 的 6 档 READ_FANOUT 被分类为 `online-signal-drain`：outbox / Kafka 已追平，但 500000 条 signal 最慢读完约 176s；下一步应提高 subscriber / signal 总量并补 Grafana / Prometheus 时间窗口。 |
 | Prometheus 时间窗口 | `tools/record-hotgroup-metrics-window.ps1` 读取 H 盘压测目录并查询 Prometheus range API，输出低敏窗口报告 | 最高档 `hotgroup-readfanout-6000-8000qps-clean-01b2a70e-20260630-2336` 已补窗口：核心 4 个 scrape target 全部 up，`SendMessage p99` 约 21ms，`delivery_outbox_pending` 峰值 2258 后归零，push writer / Redis route 指标有数据，slow eviction 为 0。 |
+| 200 subscriber 阶梯 | clean commit `7bff4f3` 跑 6000 人 / 5000 消息 / 8000 msg/s / 256 sender / 200 subscriber | 产生 1000000 条 conversation signal，`send_p95_ms=18.315`、`send_p99_ms=21.808`、`PullInbox p95=26.326ms`、outbox / Kafka 追平；最慢 drain 349.903s，drain rate 约 2857.934 signals/s，和 100 subscriber 的约 2831.995 signals/s 接近，说明瓶颈沿 online signal drain 线性放大。 |
 
 面试时可以把这个结果讲成一次真实性能定位过程：
 
@@ -184,7 +185,8 @@ CreateConversation(GROUP)
 100 人群 150 QPS 可以完整追平。随后我把 message outbox relay 改成 conversation-sharded
 multi-worker batch publish，把 delivery outbox ready query 改成 per-conversation frontier。
 再用 READ_FANOUT 路径做 6000 人 / 100 subscriber 阶梯复压，最高目标 8000 msg/s、
-500000 条 online signal 也能追平。这个结果说明当前上限不在 SendMessage、outbox、
+500000 条 online signal 也能追平。随后把 subscriber 提到 200，signal 到 1000000，
+drain rate 仍约 2.85k signals/s。这个结果说明当前上限不在 SendMessage、outbox、
 delivery projection 或 Kafka，而更接近 online signal drain / 压测端读取能力。
 为了避免靠人工感觉判断，我补了一个 hotgroup 离线分析器，后续每轮压测都先从
 原始 summary 生成 run matrix、瓶颈分类、证据链和下一步策略，再决定优化哪个模块。

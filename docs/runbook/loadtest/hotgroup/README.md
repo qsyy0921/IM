@@ -23,6 +23,8 @@ CreateConversation -> batch CreateMemberChange(JOIN)
 | `loadtest-report-20260630-hotgroup-message-outbox-relay.md` | message-service outbox relay 已支持 conversation-sharded multi-worker batch publish；1000 人 / 4000 消息 / 800 msg/s 通过，message / delivery outbox 均无积压；随后 clean commit `01b2a70` 完成 READ_FANOUT 6000 人 / 100 subscriber 阶梯复压，最高目标 8000 msg/s、500000 条 conversation signal，outbox / Kafka 均无积压。 |
 | `hotgroup-analysis-20260630-readfanout-clean.md` | 由 `tools/analyze-hotgroup-loadtest.ps1` 自动汇总 clean commit `01b2a70` 的 6 档 READ_FANOUT 结果；当前分类为 `online-signal-drain`，证据是 outbox / Kafka 已追平但 500000 条 signal 最慢读完约 176s。 |
 | `hotgroup-metrics-window-20260630-readfanout-clean-8000qps.md` | 由 `tools/record-hotgroup-metrics-window.ps1` 采集最高档 Prometheus 时间窗口；核心 4 个 scrape target 全部 up，`SendMessage p99` 约 21ms，`delivery_outbox_pending` 峰值 2258 后归零，push writer / Redis route 指标有数据，slow eviction 为 0。 |
+| `hotgroup-analysis-20260701-readfanout-subscriber-step.md` | clean commit `7bff4f3` 的 200 subscriber 阶梯与上一轮 100 subscriber 对比：同为 6000 人 / 5000 消息 / 8000 msg/s，signal 从 500000 增至 1000000，最慢 drain 从 176.554s 增至 349.903s，drain rate 约 2.86k signals/s，继续分类为 `online-signal-drain`。 |
+| `hotgroup-metrics-window-20260701-readfanout-200sub.md` | 200 subscriber run 的 Prometheus 低敏窗口：核心 4 个 scrape target 全部 up，`SendMessage p99` 约 21ms，`delivery_outbox_pending` 峰值 2233 后归零，push connected sessions 达到 200，slow eviction 为 0。 |
 
 ## 目标
 

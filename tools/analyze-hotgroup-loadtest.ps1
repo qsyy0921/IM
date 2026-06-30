@@ -160,10 +160,15 @@ function Convert-HotGroupSummary {
         $signalDrainRate = [double]$signalCount / $signalDrainSeconds
     }
 
+    $metricsWindowPath = Join-Path $File.RunDirectory "hotgroup-prometheus-window.json"
+    $hasMetricsWindow = Test-Path -LiteralPath $metricsWindowPath -PathType Leaf
+
     return [pscustomobject]@{
         run_name = [string](Get-PropertyValue -Object $summary -Name "run_name")
         result_dir = $File.RunDirectory
         summary_path = $File.SummaryPath
+        metrics_window_path = $metricsWindowPath
+        has_metrics_window = $hasMetricsWindow
         last_write_time = $File.LastWriteTime
         commit = [string](Get-PropertyValue -Object $summary -Name "commit")
         git_dirty = [bool](Get-PropertyValue -Object $summary -Name "git_dirty")
@@ -340,13 +345,13 @@ function Write-AnalysisMarkdown {
 
     [void]$builder.AppendLine("## Run Matrix")
     [void]$builder.AppendLine("")
-    [void]$builder.AppendLine("| run | commit | clean | ok | fanout | group | msg/s | messages | senders | subs | send p95 | send p99 | pull p95 | signals | slowest drain s | drain signals/s | msg pending | delivery pending | bottleneck |")
-    [void]$builder.AppendLine("| --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |")
+    [void]$builder.AppendLine("| run | commit | clean | ok | fanout | group | msg/s | messages | senders | subs | send p95 | send p99 | pull p95 | signals | slowest drain s | drain signals/s | msg pending | delivery pending | metrics window | bottleneck |")
+    [void]$builder.AppendLine("| --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- |")
 
     foreach ($run in $Runs) {
         $classification = Get-BottleneckClassification -Run $run
         [void]$builder.AppendLine((
-            "| {0} | {1} | {2} | {3} | {4} | {5} | {6} | {7} | {8} | {9} | {10} | {11} | {12} | {13} | {14} | {15} | {16} | {17} | {18} |" -f
+            "| {0} | {1} | {2} | {3} | {4} | {5} | {6} | {7} | {8} | {9} | {10} | {11} | {12} | {13} | {14} | {15} | {16} | {17} | {18} | {19} |" -f
             (Escape-MarkdownCell $run.run_name),
             (Escape-MarkdownCell $run.commit),
             (-not $run.git_dirty),
@@ -365,6 +370,7 @@ function Write-AnalysisMarkdown {
             (Format-Number $run.signal_drain_rate),
             $run.message_outbox_pending,
             $run.delivery_outbox_pending,
+            $run.has_metrics_window,
             (Escape-MarkdownCell $classification.Class)
         ))
     }
@@ -384,6 +390,12 @@ function Write-AnalysisMarkdown {
             [void]$builder.AppendLine("- next_strategy: $item")
         }
         [void]$builder.AppendLine("- result_dir: $($run.result_dir)")
+        if ($run.has_metrics_window) {
+            [void]$builder.AppendLine("- metrics_window: $($run.metrics_window_path)")
+        }
+        else {
+            [void]$builder.AppendLine("- metrics_window: missing")
+        }
         [void]$builder.AppendLine("")
     }
 
@@ -397,7 +409,12 @@ function Write-AnalysisMarkdown {
     foreach ($item in $latestClassification.Next) {
         [void]$builder.AppendLine("- strategy: $item")
     }
-    [void]$builder.AppendLine("- required_before_next_claim: capture Prometheus / Grafana or debug metrics time window and bind it to the run name.")
+    if ($latestRun.has_metrics_window) {
+        [void]$builder.AppendLine("- required_before_next_claim: metrics window is captured for the latest run; keep capturing a window for each subsequent pressure step.")
+    }
+    else {
+        [void]$builder.AppendLine("- required_before_next_claim: capture Prometheus / Grafana or debug metrics time window and bind it to the run name.")
+    }
     [void]$builder.AppendLine("")
 
     $parent = Split-Path -Parent $Path

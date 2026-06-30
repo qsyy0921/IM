@@ -91,6 +91,18 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
   该窗口显示核心 4 个 scrape target 全部 up，`SendMessage p99` 约 21ms，
   `delivery_outbox_pending` 峰值 2258 后归零，push writer / Redis route 指标有数据，
   slow eviction 为 0。
+- 2026-07-01 已完成 200 subscriber 阶梯复压：
+  `hotgroup-readfanout-6000-8000qps-200sub-7bff4f38-20260701-002833`，
+  clean commit `7bff4f3`、6000 人、5000 条消息、目标 8000 msg/s、256 sender、
+  200 subscriber、READ_FANOUT。该 run 产生 1000000 条 conversation signal，
+  `send_p95_ms=18.315`、`send_p99_ms=21.808`、`PullInbox p95=26.326ms`、
+  `message_outbox_pending=0`、`delivery_outbox_pending=0`，所有 subscriber 读完。
+  Prometheus 窗口显示核心 4 个 scrape target 全部 up，`delivery_outbox_pending`
+  峰值 2233 后归零，push connected sessions 达到 200，slow eviction 为 0。
+  与上一轮 100 subscriber / 500000 signal / 176.554s drain 对比，200 subscriber /
+  1000000 signal 最慢 drain 为 349.903s，drain rate 约 2857.934 signals/s，
+  继续证明当前瓶颈是 `online-signal-drain` 线性放大，而不是 SendMessage、
+  outbox、delivery projection 或 Kafka。
 - HYBRID 诊断档位 1000 人 / 1000 消息 / 400 msg/s 暴露 `delivery_outbox` ready query
   在百万级 per-user outbox 下退化：旧 anti-join blocker 查询每批 500 行约 24s。当前
   delivery outbox relay 已改成 per-conversation frontier ready query，并把本地 worker
@@ -103,8 +115,9 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
 
 - push-focused step 的 READ_FANOUT clean commit 阶梯 run 已完成，并明确记录 signal
   写出 / 读取指标；自动分析报告和最高档 Prometheus 低敏时间窗口均已生成。
-- 下一轮继续扩大 subscriber 数、总 signal 数或并发 runner 读取能力，形成 online signal drain
-  瓶颈曲线；若缺 exporter，必须写清楚缺口，不把一次性 CLI 统计冒充完整趋势图。
+- 下一轮继续扩大到 400 subscriber / 2000000 signal 级别，或拆成多 runner 读取，
+  形成 online signal drain 曲线；若缺 exporter，必须写清楚缺口，不把一次性 CLI
+  统计冒充完整趋势图。
 - 文档同步本轮公开能力或瓶颈变化。
 - 提交并推送到 GitHub。
 
@@ -119,9 +132,10 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
 ## 后续优先级
 
 1. 用 writer metrics + per-subscriber signal summary + Prometheus 时间窗口继续判断瓶颈在
-   writer flush、客户端读取、
-   session queue、Redis route，还是压测端读取；当前不是 PostgreSQL / delivery outbox。
-2. 扩大 subscriber 数、总 signal 数或多 runner 读取能力，逼近 online signal drain 上限。
+   writer flush、客户端读取、session queue、Redis route，还是压测端读取；当前不是
+   PostgreSQL / delivery outbox。
+2. 扩大到 400 subscriber / 2000000 signal 或使用多 runner 读取能力，逼近 online
+   signal drain 上限。
 3. 若 HYBRID 仍要支持千人级 per-user materialized outbox，优先评估显式 frontier /
    progress 表或把策略提前切到 READ_FANOUT；不要把 Kafka / Redis 当成替代 fanout 策略。
 4. delivery projection lag / inbox rows per message / push notify storm 指标深化。

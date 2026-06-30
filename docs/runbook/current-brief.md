@@ -82,6 +82,14 @@ brief、loadtest report、development-progress 或 archive。
   `send_p99_ms=13.013`、conversation signal=50000、`user_inbox_rows=0`、
   `delivery_outbox_pending=0`、Kafka lag=0。报告见
   `docs/runbook/loadtest/hotgroup/loadtest-report-20260630-hotgroup-clean-redeploy.md`。
+- 2026-06-30 已用 clean commit `0a1395c` 收口 message-service outbox relay：
+  relay 现在支持 4 worker conversation-sharded batch publish、批量 mark published 和
+  message outbox ready query conversation/version indexes。1000 人 / 4000 消息 /
+  800 msg/s / 100 subscriber 档位通过，`message_outbox_pending=0`、
+  `delivery_outbox_pending=0`、Kafka lag=0。1200 / 1500 msg/s 更高档位已证明
+  SendMessage、message outbox、delivery projection、delivery outbox 和 Kafka consumer 都能追平；
+  新瓶颈迁移到 push-gateway conversation signal 写出 / runner 读取观测。报告见
+  `docs/runbook/loadtest/hotgroup/loadtest-report-20260630-hotgroup-message-outbox-relay.md`。
 
 ## 已成型底座
 
@@ -111,7 +119,6 @@ brief、loadtest report、development-progress 或 archive。
 
 ## 下一个方向
 
-- 基于已通过的 clean commit 三档复验，下一步继续扩大三机热点群 step run，并把
-  Prometheus / Grafana 趋势、projection lag、
-  push signal 和 PostgreSQL bottleneck 曲线归档到低敏报告；正式生产级运维 UI、
-  provider-grade 长周期平台仍后置。
+- 基于已通过的 message relay 复验，下一步优先拆 push-gateway conversation signal
+  写出 / runner 读取瓶颈，补 per-connection signal summary、writer flush / enqueue
+  指标和 Prometheus / Grafana 时间窗口；正式生产级运维 UI、provider-grade 长周期平台仍后置。

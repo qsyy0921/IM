@@ -46,20 +46,36 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
   最大一档产生 50000 条 conversation signal，`send_p95_ms=10.633`、`send_p99_ms=13.013`、
   `user_inbox_rows=0`、`delivery_outbox_pending=0`、Kafka lag=0。低敏报告见
   `docs/runbook/loadtest/hotgroup/loadtest-report-20260630-hotgroup-clean-redeploy.md`。
+- 2026-06-30 已用 clean commit `0a1395c` 优化 message-service outbox relay：
+  4 worker conversation-sharded batch publish、批量 mark `PUBLISHED`、同 conversation
+  失败后续 ready row 保持 pending、`message_outbox` conversation/version ready query indexes。
+  镜像已归档到
+  `H:\NexusIM\docker-images\archives\nexusim-message-service-0a1395c3-20260630-125317.tar`，
+  并已 redeploy 到 Ubuntu Docker。
+- message outbox relay 复验结果：
+  - 1000 人 / 2000 消息 / 400 msg/s / 100 subscriber：通过，conversation signal=200000，
+    message / delivery outbox pending=0；
+  - 1000 人 / 4000 消息 / 800 msg/s / 100 subscriber：通过，conversation signal=400000，
+    message / delivery outbox pending=0；
+  - 1000 人 / 8000 消息 / 1200 msg/s / 150 subscriber、2000 人 / 8000 消息 /
+    1500 msg/s / 200 subscriber：SendMessage / message outbox / delivery projection /
+    delivery outbox / Kafka consumer lag 均追平，但 runner 等待 conversation signal 超时。
+  报告见
+  `docs/runbook/loadtest/hotgroup/loadtest-report-20260630-hotgroup-message-outbox-relay.md`。
 
 ## 目标
 
-- 继续做热点群 step run，逐步提高 message rate、subscriber count、online ratio 和慢连接比例，
-  找出下一瓶颈。
+- 下一步聚焦 push-gateway conversation signal 写出 / runner 读取观测：拆清 Kafka consumer、
+  Redis route、session enqueue、writer flush、client observed signal 之间的差值。
 - 对每轮正式压测记录 run name、commit、dashboard 时间窗口、Kafka lag、delivery projection lag、
   push signal、PullInbox / ACK 追平和 PostgreSQL 关键指标。
 - 本轮只写本地 / 三机实验结论，不写生产容量上限。
 
 ## 本轮完成条件
 
-- clean commit step run 完成，并明确记录是否存在新瓶颈。
-- 至少补一轮 Prometheus / Grafana 时间窗口信息；若缺 exporter，必须写清楚缺口，不把
-  一次性 CLI 统计冒充趋势图。
+- push-focused step run 完成，并明确记录 signal 写出 / 读取瓶颈。
+- 至少补一轮 Prometheus / Grafana 或 debug metrics 时间窗口信息；若缺 exporter，必须写清楚缺口，不把
+  一次性 CLI 统计冒充完整趋势图。
 - 文档同步本轮公开能力或瓶颈变化。
 - 提交并推送到 GitHub。
 
@@ -73,7 +89,8 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
 
 ## 后续优先级
 
-1. 扩大三机热点群 step run，补趋势图 / 瓶颈曲线。
-2. delivery projection lag / inbox rows per message / push notify storm 指标深化。
-3. timeline virtual partition mapping、leader ownership audit 和更完整 repair workflow。
-4. 压测报告与面试叙事维护。
+1. push-gateway conversation signal writer throughput / runner signal accounting 指标深化。
+2. 扩大三机热点群 step run，补趋势图 / 瓶颈曲线。
+3. delivery projection lag / inbox rows per message / push notify storm 指标深化。
+4. timeline virtual partition mapping、leader ownership audit 和更完整 repair workflow。
+5. 压测报告与面试叙事维护。

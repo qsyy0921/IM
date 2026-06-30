@@ -18,6 +18,7 @@
 - 已补 first-stage OpenTelemetry gRPC server span，默认关闭；启用后可输出 stdout 或 OTLP gRPC trace，并从入口 metadata 提取 W3C `traceparent`。
 - gRPC access log 只记录低敏 `trace_id/request_id`，并对入口 metadata 做 trim、长度上限和字符白名单过滤，避免把 token / 邮箱 / 原始认证头写入结构化日志。
 - `outbox-relay` 对非取消运行时错误已改为退避重试，并在 relay 模式通过 `/debug/metrics` 暴露 low-sensitive outbox relay retry 快照；malformed event / payload 仍保持 fail-closed，交给 outbox retry / DLQ 语义处理；`message_outbox.last_error` 和 repair audit `previous_last_error` 只暴露稳定公开文案，不落 Kafka / publisher 原始错误正文。
+- `outbox-relay` 已支持 conversation-sharded multi-worker batch publish、批量 mark `PUBLISHED` 和 `message_outbox` ready query conversation/version partial indexes；同一 conversation 内保持 aggregate_version 顺序，publish / payload 失败时后续同 conversation ready row 继续保持 `PENDING`。`0a1395c` 三机复验中 1000 人 / 4000 消息 / 800 msg/s 档位 message outbox 可追平，`message_outbox_pending=0`。
 - Kafka writer 已显式固定 `acks=all`、禁自动建 topic、bounded attempts/backoff，并由本地门禁和 package 单测防漂移；真正 idempotent / transactional producer 仍属后续客户端选型。
 - 已补 `outbox-audit`、`outbox-repair`、只读 `outbox-repair-audit` 和 `outbox-repair-cleanup` 运维模式，可直接审计、redrive 和清理 `message_outbox` repair 历史；`outbox-repair` 支持 reason file 输入；`outbox-repair-cleanup` 支持 `NEXUSIM_MESSAGE_OUTBOX_REPAIR_CLEANUP_DRY_RUN=true` 只统计候选行不删除，JSON summary 会输出 `dry_run`；`outbox-audit` / `outbox-repair` / `outbox-repair-audit` / `outbox-repair-cleanup` 可通过 `NEXUSIM_MESSAGE_OUTBOX_AUDIT_OUTPUT` / `NEXUSIM_MESSAGE_OUTBOX_REPAIR_OUTPUT` / `NEXUSIM_MESSAGE_OUTBOX_REPAIR_AUDIT_OUTPUT` / `NEXUSIM_MESSAGE_OUTBOX_REPAIR_CLEANUP_OUTPUT` 写低敏 JSON 结果或 cleanup summary，便于 operator 留存证据；`outbox-audit` 支持按 `created_at` RFC3339 时间窗口过滤，并在 JSON 输出当前 compacted filters；`outbox-repair-audit` 支持按 event / tenant / conversation / `repaired_at` RFC3339 时间窗口过滤，并在 JSON 输出 compacted filters。
 - 已补只读 `change-history-audit`，可按 tenant / conversation / message / change type / changed_by 审计 `message_change_history` 中 `EDIT / REVOKE / DELETE` 变更证明；可通过 `NEXUSIM_MESSAGE_CHANGE_HISTORY_AUDIT_OUTPUT` 写低敏 JSON 结果，输出只包含状态转换和 payload / reason 存在性，不输出消息 payload 或 reason 原文。
@@ -32,7 +33,6 @@
 ## 后续
 
 - AI 底座转进前的必要收口：继续确保 `EditMessage` / `RevokeMessage` / `DeleteMessage`、timeline / outbox、tombstone 和 delete proof 对 search / memory / retrieval 可重建且低敏。
-- 热点群后续：重建镜像并跑真实三机热点压测曲线；timeline-service virtual partition
-  mapping、leader ownership audit 和更完整 repair workflow 继续后置。
+- 热点群后续：message outbox relay 当前 1000 人 / 4000 消息 / 800 msg/s 已不再是首个瓶颈，下一步瓶颈在 push-gateway conversation signal 写出 / runner 读取观测；timeline-service virtual partition mapping、leader ownership audit 和更完整 repair workflow 继续后置。
 - Provider-grade 外部 proof 工作流 / 审批系统集成、更完整容量曲线和生产观测后置为 hardening backlog；用户私有隐藏已由 delivery-service `HideInboxItem` 承担，图片 / 文件 / 语音二进制上传和处理属于后续 media 能力。
 - 生产级 OTel collector、告警路由、retention 和 SLO dashboard 仍属于后续统一观测治理。

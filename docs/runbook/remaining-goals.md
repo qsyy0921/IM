@@ -19,7 +19,9 @@
    message-service seq block cache、timeline-service lease status / gap marker / repair
    operator first path 已进入收口；conversation-service 热点成员边界 seq 分配已接
    timeline-service；clean commit `d13bff6c` 已完成 61 人 / 20 消息、200 人 / 500 消息、
-   500 人 / 1000 消息三档复验。下一步继续扩大压测规模并补趋势图和瓶颈曲线归档。
+   500 人 / 1000 消息三档复验；clean commit `0a1395c` 已解除 1000 人 / 4000 消息 /
+   800 msg/s 内的 message outbox relay 瓶颈。下一步优先拆 push-gateway conversation
+   signal 写出 / runner 读取瓶颈，并补趋势图和瓶颈曲线归档。
 2. Agent action boundary / repair cases：在 provider replay admin / workflow handoff 已落
    的基础上，继续扩更多需要 proposal / approval / workflow / audit 的 action 与 repair 场景。
 3. Product-active 服务按需推进：workflow、audit、admin、notification、media、vector、
@@ -34,7 +36,8 @@
    active `SEQUENCER_BLOCK` 写路径、seq block cache、gap marker / repair operator first path
    和 hotgroup runner；2026-06-29 已跑通 61 人 / 20 消息 / 3 WebSocket subscriber 小规模
    smoke；2026-06-30 已定位并修复 `SEQUENCER_BLOCK` 下成员 JOIN 仍未接 timeline
-   sequencer 的问题，并完成 clean redeploy 三档复验；下一步继续扩大压测规模，并继续做
+   sequencer 的问题，完成 clean redeploy 三档复验，并完成 message outbox relay
+   conversation-sharded batch publish 复验。下一步继续做 push signal 写出 / runner 读取观测、
    virtual partition mapping、leader ownership audit 和 deeper repair。
 
 ## Client Demo Backlog
@@ -106,8 +109,10 @@
 - `message-service`：删除 / 撤回 / 编辑深化、外部 proof workflow、发送链路生产观测。
 - `message-service`：`SEQUENCER_BLOCK` 已接 timeline-service seq block active 写路径；
   61 人热点群小规模 smoke 已通过；本轮已补本地 seq block cache、lease safety margin
-  和 lease metadata 校验；后续补更完整发送链路生产观测；删除 / 撤回 / 编辑深化、
-  外部 proof workflow 后置。
+  和 lease metadata 校验；message outbox relay 已支持 conversation-sharded multi-worker
+  batch publish、批量 mark published 和 ready query indexes；1000 人 / 4000 消息 /
+  800 msg/s 档位 message outbox 可追平。后续补更完整发送链路生产观测；删除 / 撤回 /
+  编辑深化、外部 proof workflow 后置。
 - `conversation-service`：群规模策略已进入 domain 层，medium / large 策略已转 active
   first-stage；hot group 策略已与 message-service `SEQUENCER_BLOCK` seq block cache
   active 写路径、conversation-service 成员边界 seq 分配和 timeline lease 绑定；后续继续补
@@ -130,7 +135,9 @@
   WebSocket notify storm 覆盖。
 - `push-gateway`：conversation subscribe / unsubscribe 与 conversation signal fanout
   已进入服务端 first path；hotgroup runner 已验证 3 个 WebSocket subscriber 共收到
-  60 条 conversation signal；后续补 Redis 网络分区 smoke、跨实例 resume、容量测试。
+  60 条 conversation signal；message relay 复验后高压失败点已迁移到 push conversation
+  signal 写出 / runner 读取观测。后续补 per-connection signal summary、writer flush /
+  enqueue metrics、Redis 网络分区 smoke、跨实例 resume、容量测试。
 - `receipt-service`：会话列表产品能力、更多摘要策略和容量曲线。
 - `contacts-service`：组织级策略、租户默认值、来源策略、隐私例外。
 - `policy-service`：provider-grade ReBAC / DSL、moderation / risk scoring、tenant quota、

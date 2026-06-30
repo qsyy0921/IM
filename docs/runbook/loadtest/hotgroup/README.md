@@ -1,18 +1,17 @@
 # Hot Group Loadtest Plan
 
-本目录用于规划热点群聊业务压测。当前已有 `loadtest/hotgroup` v0.1 初版
-runner，可生成用户模型 dry-run，并在完整本地服务栈可用时执行：
+本目录用于规划热点群聊业务压测。当前已有 `loadtest/hotgroup` runner，可生成
+用户模型 dry-run，并在完整本地服务栈可用时执行：
 
 ```text
 CreateConversation -> batch CreateMemberChange(JOIN)
 -> SendMessage
--> delivery membership projection / user_inbox fanout
+-> delivery membership projection / user_inbox fanout 或 conversation signal
+-> 可选 WebSocket conversation subscriber
 -> sampled PullInbox / AckDelivery
 ```
 
-v0.1 暂不覆盖 WebSocket notify storm；push-gateway 在线通知压力、慢连接和 Redis
-route fault 仍是后续阶段。本文继续冻结场景、指标和面试口径，避免只用单接口 QPS
-代替真实 IM 业务压测。
+本文继续冻结场景、指标和面试口径，避免只用单接口 QPS 代替真实 IM 业务压测。
 
 ## 最新压测记录
 
@@ -21,6 +20,7 @@ route fault 仍是后续阶段。本文继续冻结场景、指标和面试口�
 | `loadtest-report-20260628-hotgroup-relay-bottleneck.md` | 记录 delivery outbox relay 优化前后对比：旧 20 人群在 50/100/150 QPS 卡在 `delivery_outbox` drain；修正为 conversation-sharded relay 后，100 人群 50/100/150 QPS 均能在等待窗口内完成 `user_inbox` 和 `delivery_outbox` drain；200 QPS 暴露下一瓶颈已转移到 delivery timeline projection / `user_inbox` fanout。 |
 | 2026-06-30 pre-commit diagnostic | 200 人 / 500 消息 / 16 sender 中等规模诊断曾暴露 `SEQUENCER_BLOCK` 后成员 JOIN 未接 timeline-service 的缺口；修复后 dirty-run 可完成 `BROADCAST_SIGNAL`，`delivery_outbox_pending=0`、Kafka lag=0。正式报告必须用 clean commit 重跑。 |
 | `loadtest-report-20260630-hotgroup-clean-redeploy.md` | clean commit `d13bff6c` 重建 / redeploy 后，61 人 / 20 消息、200 人 / 500 消息、500 人 / 1000 消息三档均通过；最大档产生 50000 条 conversation signal，`user_inbox_rows=0`、`delivery_outbox_pending=0`、Kafka lag=0。 |
+| `loadtest-report-20260630-hotgroup-message-outbox-relay.md` | message-service outbox relay 已支持 conversation-sharded multi-worker batch publish；1000 人 / 4000 消息 / 800 msg/s 通过，message / delivery outbox 均无积压；1200 / 1500 msg/s 失败点迁移到 push conversation signal 写出 / runner 读取观测。 |
 
 ## 目标
 
@@ -135,6 +135,7 @@ delivery timeline consumer lag by topic / partition / group
 delivery_timeline_items count / insert rate
 user_inbox rows per message
 PostgreSQL lock / WAL / dead tuple time-series exporter
+push signal writer flush / client observed gap
 ```
 
 没有 Grafana / Prometheus 趋势图的运行，只能作为功能 smoke、dry-run 或一次性

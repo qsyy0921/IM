@@ -182,6 +182,13 @@ func (registry *Registry) EnqueueConversationSignal(
 	notification types.DeliveryNotification,
 ) (types.NotifyDeliveryResult, error) {
 	notification.Kind = types.DeliveryNotificationKindConversationSignal
+	if err := notification.Validate(); err != nil {
+		return types.NotifyDeliveryResult{}, err
+	}
+	if !registry.shouldEmitConversationSignal(notification) {
+		registry.metrics.conversationSignalSuppressedEventCount.Add(1)
+		return types.NotifyDeliveryResult{}, nil
+	}
 	localResult, err := registry.local.EnqueueConversationSignal(ctx, notification)
 	if err != nil {
 		return localResult, err
@@ -233,6 +240,14 @@ func (registry *Registry) EnqueueConversationSignal(
 		registry.metrics.remoteEnqueuedSessions.Add(uint64(sessionCount))
 	}
 	return result, nil
+}
+
+func (registry *Registry) shouldEmitConversationSignal(notification types.DeliveryNotification) bool {
+	sampleEvery := registry.config.ConversationSignalSampleEvery
+	if sampleEvery <= 1 {
+		return true
+	}
+	return notification.ConversationSeq%int64(sampleEvery) == 0
 }
 
 func (registry *Registry) EvictDevice(ctx context.Context, tenantID string, userID string, deviceID string, reason string) (types.SessionEvictionResult, error) {

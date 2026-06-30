@@ -27,6 +27,7 @@ func run(args []string, getenv func(string) string) error {
 	if messageCount <= 0 {
 		messageCount = 1
 	}
+	cfg.MessageCount = messageCount
 	result := &summary{
 		SchemaVersion:              2,
 		RunName:                    cfg.RunName,
@@ -126,7 +127,7 @@ WHERE tenant_id = $1 AND conversation_id = $2 AND status = 'ACTIVE'
 		return fmt.Errorf("open conversation subscribers: %w", err)
 	}
 	defer closeConversationSubscribers(subscribers)
-	pushCollector := startConversationSignalCollection(ctx, cfg, subscribers, result.MessageCount)
+	pushCollector := startConversationSignalCollection(ctx, cfg, subscribers, expectedConversationSignalsPerSubscriber(cfg, result.MessageCount))
 	if pushCollector != nil {
 		defer pushCollector.cancel()
 	}
@@ -199,7 +200,7 @@ WHERE tenant_id = $1 AND conversation_id = $2 AND status = 'PENDING'
 		result.Postgres.MessageOutboxDLQ == 0 &&
 		result.Postgres.DeliveryOutboxDLQ == 0 &&
 		(!cfg.RequireConversationNotify ||
-			result.Push.ConversationSignalCount >= result.Push.SubscriberCount*result.MessageCount) &&
+			result.Push.ConversationSignalCount >= expectedConversationSignalCount(cfg, result.MessageCount, result.Push.SubscriberCount)) &&
 		(!cfg.RequireDeliveryOutboxDrain || result.Postgres.DeliveryOutboxPending == 0)
 	if !result.Success {
 		return fmt.Errorf("hotgroup validation failed")
@@ -214,7 +215,7 @@ func executeSubscriberOnly(ctx context.Context, cfg config, plan userPlan, resul
 		return fmt.Errorf("open conversation subscribers: %w", err)
 	}
 	defer closeConversationSubscribers(subscribers)
-	pushCollector := startConversationSignalCollection(ctx, cfg, subscribers, result.MessageCount)
+	pushCollector := startConversationSignalCollection(ctx, cfg, subscribers, expectedConversationSignalsPerSubscriber(cfg, result.MessageCount))
 	if pushCollector != nil {
 		defer pushCollector.cancel()
 	}
@@ -224,7 +225,7 @@ func executeSubscriberOnly(ctx context.Context, cfg config, plan userPlan, resul
 		return fmt.Errorf("wait conversation signals: %w", err)
 	}
 	result.Success = !cfg.RequireConversationNotify ||
-		result.Push.ConversationSignalCount >= result.Push.SubscriberCount*result.MessageCount
+		result.Push.ConversationSignalCount >= expectedConversationSignalCount(cfg, result.MessageCount, result.Push.SubscriberCount)
 	if !result.Success {
 		return fmt.Errorf("hotgroup subscriber-only validation failed")
 	}

@@ -270,8 +270,10 @@ brief、loadtest report、development-progress 或 archive。
 
 ## 下一个方向
 
-- 下一步围绕 `a15e0ad` / `4be4b2d` 的复压结果做架构分析和下一模块选择：
-  不要继续在单次本地 fanout 调用里堆并发，也不要把多开 ws 容器当成已验证解法；
-  优先评估持久 bucket worker、超大房间 pull-first / sampled online signal 策略，
-  或先做小诊断拆分 server enqueue cost 与 client/network receive cadence。
+- 下一步围绕 pull-first sampled online signal 做 clean commit Docker redeploy 和对比复压：
+  push-gateway 已新增显式 `NEXUSIM_PUSH_CONVERSATION_SIGNAL_SAMPLE_EVERY`，hotgroup
+  runner 已新增 `--conversation-signal-sample-every` 并记录 expected signal 口径。
+  默认值 `1` 保持全量 signal；sampled 模式只用于超大群在线唤醒减量，durable 展示
+  和 ACK 仍必须通过 PullInbox 追平。下一轮用 400 subscriber coordinator + shard 场景
+  比较 full-signal 与 sample=10，确认瓶颈是否随 online frame 总量下降而迁移。
   正式生产级运维 UI、provider-grade 长周期平台仍后置。

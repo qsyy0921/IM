@@ -24,11 +24,12 @@ type LocalRegistry interface {
 }
 
 type Config struct {
-	GatewayID             string
-	KeyPrefix             string
-	RouteTTL              time.Duration
-	ResumeTTL             time.Duration
-	RenewFailureThreshold int
+	GatewayID                     string
+	KeyPrefix                     string
+	RouteTTL                      time.Duration
+	ResumeTTL                     time.Duration
+	RenewFailureThreshold         int
+	ConversationSignalSampleEvery int
 }
 
 type Registry struct {
@@ -55,6 +56,7 @@ type Metrics struct {
 	RedisRouteRemoteEnqueuedSessions                  uint64           `json:"redis_route_remote_enqueued_sessions"`
 	RedisRouteStaleRemovedCount                       uint64           `json:"redis_route_stale_removed_count"`
 	RedisRouteCleanupErrorCount                       uint64           `json:"redis_route_cleanup_error_count"`
+	RedisRouteConversationSignalSuppressedEventCount  uint64           `json:"redis_route_conversation_signal_suppressed_event_count"`
 	RedisRouteSubscriberMessageCount                  uint64           `json:"redis_route_subscriber_message_count,omitempty"`
 	RedisRouteSubscriberMalformedCount                uint64           `json:"redis_route_subscriber_malformed_count,omitempty"`
 	RedisRouteSubscriberEnqueuedCount                 uint64           `json:"redis_route_subscriber_enqueued_count,omitempty"`
@@ -75,22 +77,23 @@ type Metrics struct {
 }
 
 type registryMetrics struct {
-	registerErrorCount      atomic.Uint64
-	renewErrorCount         atomic.Uint64
-	renewSessionEvicted     atomic.Uint64
-	lookupErrorCount        atomic.Uint64
-	remoteMatchedSessions   atomic.Uint64
-	remotePublishCallCount  atomic.Uint64
-	remotePublishErrorCount atomic.Uint64
-	remoteNoSubscriberCount atomic.Uint64
-	remoteEnqueuedSessions  atomic.Uint64
-	staleRemovedCount       atomic.Uint64
-	cleanupErrorCount       atomic.Uint64
-	resumeReplayCount       atomic.Uint64
-	resumeMissCount         atomic.Uint64
-	resumeAppendCount       atomic.Uint64
-	resumeAppendErrorCount  atomic.Uint64
-	resumePermissionDenied  atomic.Uint64
+	registerErrorCount                     atomic.Uint64
+	renewErrorCount                        atomic.Uint64
+	renewSessionEvicted                    atomic.Uint64
+	lookupErrorCount                       atomic.Uint64
+	remoteMatchedSessions                  atomic.Uint64
+	remotePublishCallCount                 atomic.Uint64
+	remotePublishErrorCount                atomic.Uint64
+	remoteNoSubscriberCount                atomic.Uint64
+	remoteEnqueuedSessions                 atomic.Uint64
+	staleRemovedCount                      atomic.Uint64
+	cleanupErrorCount                      atomic.Uint64
+	conversationSignalSuppressedEventCount atomic.Uint64
+	resumeReplayCount                      atomic.Uint64
+	resumeMissCount                        atomic.Uint64
+	resumeAppendCount                      atomic.Uint64
+	resumeAppendErrorCount                 atomic.Uint64
+	resumePermissionDenied                 atomic.Uint64
 }
 
 type routeState struct {
@@ -138,6 +141,9 @@ func NewRegistry(local LocalRegistry, client redis.UniversalClient, config Confi
 	}
 	if config.RenewFailureThreshold < 0 {
 		config.RenewFailureThreshold = 0
+	}
+	if config.ConversationSignalSampleEvery <= 0 {
+		config.ConversationSignalSampleEvery = 1
 	}
 	return &Registry{
 		local:         local,
@@ -236,21 +242,22 @@ func (registry *Registry) Unregister(sessionID string) {
 
 func (registry *Registry) Metrics() Metrics {
 	return Metrics{
-		RedisRouteRegisterErrorCount:       registry.metrics.registerErrorCount.Load(),
-		RedisRouteRenewErrorCount:          registry.metrics.renewErrorCount.Load(),
-		RedisRouteRenewSessionEvictedCount: registry.metrics.renewSessionEvicted.Load(),
-		RedisRouteLookupErrorCount:         registry.metrics.lookupErrorCount.Load(),
-		RedisRouteRemoteMatchedSessions:    registry.metrics.remoteMatchedSessions.Load(),
-		RedisRouteRemotePublishCallCount:   registry.metrics.remotePublishCallCount.Load(),
-		RedisRouteRemotePublishErrorCount:  registry.metrics.remotePublishErrorCount.Load(),
-		RedisRouteRemoteNoSubscriberCount:  registry.metrics.remoteNoSubscriberCount.Load(),
-		RedisRouteRemoteEnqueuedSessions:   registry.metrics.remoteEnqueuedSessions.Load(),
-		RedisRouteStaleRemovedCount:        registry.metrics.staleRemovedCount.Load(),
-		RedisRouteCleanupErrorCount:        registry.metrics.cleanupErrorCount.Load(),
-		RedisResumeReplayCount:             registry.metrics.resumeReplayCount.Load(),
-		RedisResumeMissCount:               registry.metrics.resumeMissCount.Load(),
-		RedisResumeAppendCount:             registry.metrics.resumeAppendCount.Load(),
-		RedisResumeAppendErrorCount:        registry.metrics.resumeAppendErrorCount.Load(),
-		RedisResumePermissionDeniedCount:   registry.metrics.resumePermissionDenied.Load(),
+		RedisRouteRegisterErrorCount:                     registry.metrics.registerErrorCount.Load(),
+		RedisRouteRenewErrorCount:                        registry.metrics.renewErrorCount.Load(),
+		RedisRouteRenewSessionEvictedCount:               registry.metrics.renewSessionEvicted.Load(),
+		RedisRouteLookupErrorCount:                       registry.metrics.lookupErrorCount.Load(),
+		RedisRouteRemoteMatchedSessions:                  registry.metrics.remoteMatchedSessions.Load(),
+		RedisRouteRemotePublishCallCount:                 registry.metrics.remotePublishCallCount.Load(),
+		RedisRouteRemotePublishErrorCount:                registry.metrics.remotePublishErrorCount.Load(),
+		RedisRouteRemoteNoSubscriberCount:                registry.metrics.remoteNoSubscriberCount.Load(),
+		RedisRouteRemoteEnqueuedSessions:                 registry.metrics.remoteEnqueuedSessions.Load(),
+		RedisRouteStaleRemovedCount:                      registry.metrics.staleRemovedCount.Load(),
+		RedisRouteCleanupErrorCount:                      registry.metrics.cleanupErrorCount.Load(),
+		RedisRouteConversationSignalSuppressedEventCount: registry.metrics.conversationSignalSuppressedEventCount.Load(),
+		RedisResumeReplayCount:                           registry.metrics.resumeReplayCount.Load(),
+		RedisResumeMissCount:                             registry.metrics.resumeMissCount.Load(),
+		RedisResumeAppendCount:                           registry.metrics.resumeAppendCount.Load(),
+		RedisResumeAppendErrorCount:                      registry.metrics.resumeAppendErrorCount.Load(),
+		RedisResumePermissionDeniedCount:                 registry.metrics.resumePermissionDenied.Load(),
 	}
 }

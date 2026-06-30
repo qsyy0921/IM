@@ -43,6 +43,7 @@ CreateConversation -> batch CreateMemberChange(JOIN)
 | `hotgroup-metrics-window-20260701-fanoutbuckets-400sub.md` | fanout buckets 窗口显示 `delivery_notify` queue p95 / p99 约 4.616ms / 4.931ms，write p95 / p99 约 0.383ms / 0.574ms，Redis subscriber fanout p95 / p99 约 54.133ms / 90.827ms；下一步应评估持久 bucket worker、跨 push 实例分摊订阅或超大房间 pull-first 策略。 |
 | `hotgroup-multirunner-analysis-20260701-multiws-400sub.md` | clean commit `4be4b2d` 的 4 个 push-gateway ws 实例拓扑复压：400 subscriber 按 100 / 100 / 100 / 100 分散到 4 个 ws 端口，400000 条 signal 全部读完，drain rate 约 2822.479 signals/s，低于单 ws fanout-buckets baseline 约 2874.378 signals/s；说明简单多开 ws 进程不是当前瓶颈解。 |
 | `hotgroup-metrics-window-20260701-multiws-400sub.md` | multi-ws 窗口显示 4 个 push debug target 均 up，`delivery_notify` queue p95 / p99 约 3.703ms / 4.742ms，write p95 / p99 约 0.425ms / 0.769ms，Redis subscriber fanout p95 / p99 约 69.014ms / 93.803ms；writer / Redis error、queue-full 和 slow eviction 均为 0。 |
+| `hotgroup-push-fanout-optimization-20260701.md` pull-first sampled signal update | 已实现显式 `NEXUSIM_PUSH_CONVERSATION_SIGNAL_SAMPLE_EVERY` 和 runner `--conversation-signal-sample-every`。默认 `1` 保持全量 signal；大群可显式采样在线唤醒，并用 PullInbox 追平 durable timeline。该模块已通过 focused tests / build，尚待 clean Docker redeploy 和 sampled vs full 复压。 |
 
 ## 目标
 
@@ -145,6 +146,21 @@ writer duration p95 / p99 high -> WebSocket write / flush / network
 outbox 追平但 signal drain 长  -> online signal drain
 缺少信号或 lag 字段            -> insufficient observability
 ```
+
+大群 sampled online signal 场景必须同时配置服务端和 runner：
+
+```text
+push-gateway:
+  NEXUSIM_PUSH_CONVERSATION_SIGNAL_SAMPLE_EVERY=10
+
+loadtest/hotgroup:
+  --conversation-signal-sample-every 10
+```
+
+默认值 `1` 表示全量 signal，旧压测口径不变。采样场景的成功条件不再是
+`subscriber_count * message_count`，而是
+`subscriber_count * expected_signals_per_subscriber`。这不是可靠投递降级：
+WebSocket signal 只作为在线唤醒，最终展示和 ACK 仍必须通过 PullInbox 追平最新 seq。
 
 该报告只能作为本地 / 三机压测诊断材料，不能单独替代 Grafana / Prometheus 时间窗口，
 也不能写成生产 SLO。

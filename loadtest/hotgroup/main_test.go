@@ -64,6 +64,33 @@ func TestParseConfigSubscriberOnlyDoesNotRequirePostgres(t *testing.T) {
 	}
 }
 
+func TestConversationSignalSampleEveryAdjustsExpectedSignals(t *testing.T) {
+	cfg, err := parseConfig([]string{
+		"--runner-mode", "subscriber-only",
+		"--conversation-subscriber-count", "8",
+		"--subscriber-shard-count", "2",
+		"--subscriber-shard-index", "1",
+		"--push-url", "ws://127.0.0.1:10498/ws",
+		"--message-count", "1000",
+		"--conversation-signal-sample-every", "10",
+	}, func(string) string { return "" })
+	if err != nil {
+		t.Fatalf("parse sampled signal config: %v", err)
+	}
+	if cfg.ConversationSignalSampleEvery != 10 {
+		t.Fatalf("sample every = %d", cfg.ConversationSignalSampleEvery)
+	}
+	if got, want := expectedConversationSignalsPerSubscriber(cfg, 1000), 100; got != want {
+		t.Fatalf("expected per subscriber = %d, want %d", got, want)
+	}
+	if got, want := expectedConversationSignalCount(cfg, 1000, 4), 400; got != want {
+		t.Fatalf("expected total = %d, want %d", got, want)
+	}
+	if got, want := expectedConversationSignalsPerSubscriber(cfg, 9), 0; got != want {
+		t.Fatalf("expected small sampled run per subscriber = %d, want %d", got, want)
+	}
+}
+
 func TestParseConfigRejectsInvalidSubscriberShard(t *testing.T) {
 	_, err := parseConfig([]string{
 		"--runner-mode", "subscriber-only",

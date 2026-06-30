@@ -73,6 +73,11 @@
    约 2874.378 signals/s。后续不要把简单多开 ws 容器当成主要解法，应评估持久
    per-conversation / per-bucket worker、超大房间 pull-first / sampled online signal
    策略，或用小诊断拆分 server enqueue cost 与 client/network receive cadence。
+   当前已实现显式 `NEXUSIM_PUSH_CONVERSATION_SIGNAL_SAMPLE_EVERY` 和
+   `loadtest/hotgroup --conversation-signal-sample-every`，默认保持全量 signal；
+   下一步必须 clean commit 重建 / 归档 / redeploy push-gateway，并用 400 subscriber
+   coordinator + shard 对照 full-signal 与 sample=10，确认瓶颈是否随 online frame
+   总量下降而迁移。
 2. Agent action boundary / repair cases：在 provider replay admin / workflow handoff 已落
    的基础上，继续扩更多需要 proposal / approval / workflow / audit 的 action 与 repair 场景。
 3. Product-active 服务按需推进：workflow、audit、admin、notification、media、vector、

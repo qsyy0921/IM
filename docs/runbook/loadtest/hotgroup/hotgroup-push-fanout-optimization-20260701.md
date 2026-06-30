@@ -669,3 +669,77 @@ reducing signal volume: persistent per-conversation / per-bucket workers,
 pull-first or sampled online signals for very large rooms, and a smaller
 diagnostic to distinguish server-side enqueue cost from client/network receive
 cadence.
+
+## Pull-First Sampled Online Signal Module
+
+The next implementation step changes the very-large-room online wakeup model
+instead of adding more goroutines to the same fanout path.
+
+Motivation:
+
+- The previous code-level optimizations did not break the
+  `2.85k-2.89k signals/s` range.
+- Multi WebSocket instances did not improve the same conversation drain curve.
+- For READ_FANOUT / hot rooms, `delivery.notify` is a wakeup signal. The durable
+  truth remains `delivery_timeline_items` + `PullInbox`, not the count of online
+  WebSocket frames.
+
+Change:
+
+- `push-gateway` now supports explicit conversation signal sampling through:
+
+```text
+NEXUSIM_PUSH_CONVERSATION_SIGNAL_SAMPLE_EVERY=1
+```
+
+- The default value `1` preserves the old full-signal behavior.
+- A value such as `10` emits only conversation signals whose
+  `conversation_seq % 10 == 0`.
+- The skipped signals are counted as intentional sampled suppression, not as
+  delivery success and not as hidden fallback.
+- Redis route mode applies the same policy before local enqueue, Redis publish
+  and remote resume append, so remote gateways do not receive suppressed signal
+  events.
+- Memory mode applies the same policy when it is the active route backend.
+
+New low-cardinality metrics:
+
+```text
+nexusim_push_gateway_conversation_signal_events_total{event="suppressed_events"}
+nexusim_push_gateway_conversation_signal_events_total{event="suppressed_sessions"}
+nexusim_push_gateway_redis_route_events_total{event="conversation_signal_suppressed",role="registry"}
+```
+
+`loadtest/hotgroup` now supports matching validation:
+
+```text
+--conversation-signal-sample-every 10
+```
+
+The runner records:
+
+```text
+push.conversation_signal_sample_every
+push.expected_signals_per_subscriber
+push.expected_conversation_signals
+```
+
+Judgment before retest: this is not a capacity result yet. The next clean
+Docker redeploy should run a comparable 400 subscriber coordinator + 4 shard
+scenario with:
+
+```text
+NEXUSIM_PUSH_CONVERSATION_SIGNAL_SAMPLE_EVERY=10
+--conversation-signal-sample-every 10
+```
+
+Expected interpretation:
+
+- If SendMessage / outbox / Kafka remain clean and signal drain time drops
+  roughly with emitted signal count, the current limit is confirmed as online
+  frame volume.
+- PullInbox / ACK must still reach the latest message seq; sampled online signal
+  cannot be counted as durable delivery.
+- If drain rate stays flat even with 10x fewer emitted signals, the next
+  bottleneck is likely client / network scheduling rather than server fanout
+  volume.

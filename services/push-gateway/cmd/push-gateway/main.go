@@ -77,8 +77,9 @@ func runRuntime(enableWS bool, enableDeliveryConsumer bool, enableIdentityConsum
 	}()
 
 	localRegistry := memory.NewRegistryWithConfig(memory.Config{
-		ResumeBufferTTL:           envDuration("NEXUSIM_PUSH_RESUME_BUFFER_TTL", 10*time.Minute),
-		ConversationFanoutBuckets: envInt("NEXUSIM_PUSH_CONVERSATION_FANOUT_BUCKETS", 1),
+		ResumeBufferTTL:               envDuration("NEXUSIM_PUSH_RESUME_BUFFER_TTL", 10*time.Minute),
+		ConversationFanoutBuckets:     envInt("NEXUSIM_PUSH_CONVERSATION_FANOUT_BUCKETS", 1),
+		ConversationSignalSampleEvery: envInt("NEXUSIM_PUSH_CONVERSATION_SIGNAL_SAMPLE_EVERY", 1),
 	})
 	writerMetrics := &types.WebSocketWriterMetrics{}
 	registry := app.SessionRegistry(localRegistry)
@@ -102,11 +103,12 @@ func runRuntime(enableWS bool, enableDeliveryConsumer bool, enableIdentityConsum
 			return err
 		}
 		routeConfig := redisroute.Config{
-			GatewayID:             gatewayID,
-			KeyPrefix:             envString("NEXUSIM_PUSH_REDIS_KEY_PREFIX", "nexusim:push"),
-			RouteTTL:              envDuration("NEXUSIM_PUSH_ROUTE_TTL", 90*time.Second),
-			ResumeTTL:             envDuration("NEXUSIM_PUSH_RESUME_BUFFER_TTL", 10*time.Minute),
-			RenewFailureThreshold: envInt("NEXUSIM_PUSH_ROUTE_RENEW_FAILURES_BEFORE_EVICT", 3),
+			GatewayID:                     gatewayID,
+			KeyPrefix:                     envString("NEXUSIM_PUSH_REDIS_KEY_PREFIX", "nexusim:push"),
+			RouteTTL:                      envDuration("NEXUSIM_PUSH_ROUTE_TTL", 90*time.Second),
+			ResumeTTL:                     envDuration("NEXUSIM_PUSH_RESUME_BUFFER_TTL", 10*time.Minute),
+			RenewFailureThreshold:         envInt("NEXUSIM_PUSH_ROUTE_RENEW_FAILURES_BEFORE_EVICT", 3),
+			ConversationSignalSampleEvery: envInt("NEXUSIM_PUSH_CONVERSATION_SIGNAL_SAMPLE_EVERY", 1),
 		}
 		redisRegistry = redisroute.NewRegistry(localRegistry, redisClient, routeConfig)
 		revocationStore = revocationinfra.NewRedisStore(redisClient, routeConfig.KeyPrefix)

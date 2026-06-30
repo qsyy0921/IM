@@ -18,42 +18,43 @@ const (
 )
 
 type config struct {
-	RunName                     string
-	ResultRoot                  string
-	ResultDir                   string
-	RunnerMode                  string
-	DryRun                      bool
-	Cleanup                     bool
-	RequestTimeout              time.Duration
-	WaitTimeout                 time.Duration
-	PollInterval                time.Duration
-	ConversationTarget          string
-	MessageTarget               string
-	DeliveryTarget              string
-	PushURL                     string
-	ConversationTLS             grpctls.Config
-	MessageTLS                  grpctls.Config
-	DeliveryTLS                 grpctls.Config
-	VerifiedAuthMetadata        bool
-	PGDSN                       string
-	TenantID                    string
-	ConversationID              string
-	GroupSize                   int
-	SenderCount                 int
-	OnlineRatio                 float64
-	SlowClientRatio             float64
-	ACKRatio                    float64
-	MessageRate                 float64
-	Duration                    time.Duration
-	MessageCount                int
-	ExpectedFanoutMode          string
-	RequireDeliveryOutboxDrain  bool
-	PullLimit                   int32
-	ReceiverSampleCount         int
-	ConversationSubscriberCount int
-	SubscriberShardCount        int
-	SubscriberShardIndex        int
-	RequireConversationNotify   bool
+	RunName                       string
+	ResultRoot                    string
+	ResultDir                     string
+	RunnerMode                    string
+	DryRun                        bool
+	Cleanup                       bool
+	RequestTimeout                time.Duration
+	WaitTimeout                   time.Duration
+	PollInterval                  time.Duration
+	ConversationTarget            string
+	MessageTarget                 string
+	DeliveryTarget                string
+	PushURL                       string
+	ConversationTLS               grpctls.Config
+	MessageTLS                    grpctls.Config
+	DeliveryTLS                   grpctls.Config
+	VerifiedAuthMetadata          bool
+	PGDSN                         string
+	TenantID                      string
+	ConversationID                string
+	GroupSize                     int
+	SenderCount                   int
+	OnlineRatio                   float64
+	SlowClientRatio               float64
+	ACKRatio                      float64
+	MessageRate                   float64
+	Duration                      time.Duration
+	MessageCount                  int
+	ExpectedFanoutMode            string
+	RequireDeliveryOutboxDrain    bool
+	PullLimit                     int32
+	ReceiverSampleCount           int
+	ConversationSubscriberCount   int
+	SubscriberShardCount          int
+	SubscriberShardIndex          int
+	RequireConversationNotify     bool
+	ConversationSignalSampleEvery int
 }
 
 func parseConfig(args []string, getenv func(string) string) (config, error) {
@@ -93,6 +94,7 @@ func parseConfig(args []string, getenv func(string) string) (config, error) {
 	flags.IntVar(&cfg.SubscriberShardCount, "subscriber-shard-count", envInt(getenv, "NEXUSIM_HOTGROUP_SUBSCRIBER_SHARD_COUNT", 1), "number of subscriber runner shards for conversation signal reading")
 	flags.IntVar(&cfg.SubscriberShardIndex, "subscriber-shard-index", envInt(getenv, "NEXUSIM_HOTGROUP_SUBSCRIBER_SHARD_INDEX", 0), "zero-based subscriber runner shard index")
 	flags.BoolVar(&cfg.RequireConversationNotify, "require-conversation-notify", envBool(getenv, "NEXUSIM_HOTGROUP_REQUIRE_CONVERSATION_NOTIFY", false), "require each WebSocket subscriber to receive at least one conversation signal")
+	flags.IntVar(&cfg.ConversationSignalSampleEvery, "conversation-signal-sample-every", envInt(getenv, "NEXUSIM_HOTGROUP_CONVERSATION_SIGNAL_SAMPLE_EVERY", 1), "expected conversation signal sampling interval; 1 requires every message signal")
 	registerTLSFlags(flags, "conversation-tls", "NEXUSIM_CONVERSATION_TLS", "conversation-service", &cfg.ConversationTLS, getenv)
 	registerTLSFlags(flags, "message-tls", "NEXUSIM_MESSAGE_TLS", "message-service", &cfg.MessageTLS, getenv)
 	registerTLSFlags(flags, "delivery-tls", "NEXUSIM_DELIVERY_TLS", "delivery-service", &cfg.DeliveryTLS, getenv)
@@ -189,6 +191,9 @@ func (cfg config) validate() error {
 	}
 	if cfg.RequireConversationNotify && cfg.ConversationSubscriberCount == 0 {
 		return errors.New("--require-conversation-notify requires --conversation-subscriber-count")
+	}
+	if cfg.ConversationSignalSampleEvery <= 0 {
+		return errors.New("--conversation-signal-sample-every must be positive")
 	}
 	if cfg.RunnerMode == runnerModeSubscriberOnly && cfg.ConversationSubscriberCount == 0 {
 		return errors.New("--runner-mode subscriber-only requires --conversation-subscriber-count")

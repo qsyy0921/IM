@@ -265,6 +265,14 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
   结论：简单把同一会话订阅者分散到多个 push-gateway ws 进程没有突破在线 drain
   曲线，当前不应把“多开容器”当成热点群主要优化；下一步需要改变 fanout 模型或减少
   超大房间在线 signal 总量。
+- 当前工作区已实现显式 pull-first sampled online signal 模块：push-gateway 支持
+  `NEXUSIM_PUSH_CONVERSATION_SIGNAL_SAMPLE_EVERY`，默认 `1` 保持全量 signal；Redis
+  route 会在本地 enqueue、远端 publish 和 remote resume append 前应用相同采样策略；
+  memory route 也支持同一策略。`loadtest/hotgroup` 增加
+  `--conversation-signal-sample-every`，summary/report 会记录
+  `expected_signals_per_subscriber` 和 `expected_conversation_signals`。该模块已完成
+  focused tests / build，尚待 clean commit、Docker 镜像重建 / 归档 / redeploy 和
+  400 subscriber sampled vs full 对照复压。
 - HYBRID 诊断档位 1000 人 / 1000 消息 / 400 msg/s 暴露 `delivery_outbox` ready query
   在百万级 per-user outbox 下退化：旧 anti-join blocker 查询每批 500 行约 24s。当前
   delivery outbox relay 已改成 per-conversation frontier ready query，并把本地 worker
@@ -277,10 +285,11 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
 
 - push-focused step 的 READ_FANOUT clean commit 阶梯 run 已完成，并明确记录 signal
   写出 / 读取指标；自动分析报告和最高档 Prometheus 低敏时间窗口均已生成。
-- 下一轮围绕 push-gateway worker 本地 fanout / session writer 调度做架构分析和优化：
-  重点比较 per-conversation worker 数、per-session outbound queue drain、writer goroutine
-  调度、WebSocket flush 策略和 runner 读取背压；继续使用 400 subscriber coordinator +
-  shard 场景做可比复压。
+- 下一轮围绕 sampled online signal 做可比复压：先用 clean commit 重建 / 归档 /
+  redeploy push-gateway，再使用 400 subscriber coordinator + shard 场景对比全量 signal
+  与 `sample_every=10`；记录 emitted signal 数、suppressed signal metrics、PullInbox /
+  ACK 是否追平最新 seq、drain span 是否按 online frame 总量下降。若 sample=10 仍不迁移
+  瓶颈，再继续拆分 client/network receive cadence。
 - 文档同步本轮公开能力或瓶颈变化。
 - 提交并推送到 GitHub。
 
@@ -294,11 +303,10 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
 
 ## 后续优先级
 
-1. 基于 `a15e0ad` 和 `4be4b2d` 的复压结论，先做下一轮架构分析：在不破坏
-   PullInbox durable 恢复和 per-session 顺序的前提下，优先评估持久
-   per-conversation / per-bucket worker、超大房间 pull-first / sampled online signal
-   策略，或用更小诊断拆分 server enqueue cost 与 client/network receive cadence；
-   不要继续只在单次 fanout 调用里增加临时 goroutine，也不要把多开 ws 容器当成已验证解法。
+1. 基于 `a15e0ad` 和 `4be4b2d` 的复压结论，下一步先复验已实现的
+   pull-first sampled online signal 策略：`sample_every=10` 应显著减少超大群在线
+   wakeup 帧总量，同时 PullInbox / ACK 必须继续追平最新 seq。不要把采样写成隐藏
+   fallback，也不要把少发 WebSocket frame 等同于 durable delivery。
 2. 继续为每轮优化保留 clean commit、Docker 镜像归档、三机部署版本和 Prometheus
    时间窗口，保证压测曲线可复现。
 3. 若 HYBRID 仍要支持千人级 per-user materialized outbox，优先评估显式 frontier /

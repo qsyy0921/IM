@@ -12,9 +12,10 @@ import (
 )
 
 type Config struct {
-	ResumeBufferTTL           time.Duration
-	ConversationFanoutBuckets int
-	Now                       func() time.Time
+	ResumeBufferTTL               time.Duration
+	ConversationFanoutBuckets     int
+	ConversationSignalSampleEvery int
+	Now                           func() time.Time
 }
 
 type Registry struct {
@@ -28,18 +29,20 @@ type Registry struct {
 }
 
 type Metrics struct {
-	ConnectedSessions               int    `json:"connected_sessions"`
-	SessionQueueFullCount           uint64 `json:"session_queue_full_count"`
-	SlowSessionEvictedCount         uint64 `json:"slow_session_evicted_count"`
-	IdentitySessionEvictedCount     uint64 `json:"identity_session_evicted_count"`
-	ConversationSubscriptionCount   int    `json:"conversation_subscription_count"`
-	ConversationSignalMatchedCount  uint64 `json:"conversation_signal_matched_count"`
-	ConversationSignalEnqueuedCount uint64 `json:"conversation_signal_enqueued_count"`
-	ResumeBufferReplayCount         uint64 `json:"resume_buffer_replay_count"`
-	ResumeBufferMissCount           uint64 `json:"resume_buffer_miss_count"`
-	ResumeBufferStoredFrames        int    `json:"resume_buffer_stored_frames"`
-	ResumeBufferTokenCount          int    `json:"resume_buffer_token_count"`
-	ResumeBufferExpiredCount        uint64 `json:"resume_buffer_expired_count"`
+	ConnectedSessions                        int    `json:"connected_sessions"`
+	SessionQueueFullCount                    uint64 `json:"session_queue_full_count"`
+	SlowSessionEvictedCount                  uint64 `json:"slow_session_evicted_count"`
+	IdentitySessionEvictedCount              uint64 `json:"identity_session_evicted_count"`
+	ConversationSubscriptionCount            int    `json:"conversation_subscription_count"`
+	ConversationSignalMatchedCount           uint64 `json:"conversation_signal_matched_count"`
+	ConversationSignalEnqueuedCount          uint64 `json:"conversation_signal_enqueued_count"`
+	ConversationSignalSuppressedEventCount   uint64 `json:"conversation_signal_suppressed_event_count"`
+	ConversationSignalSuppressedSessionCount uint64 `json:"conversation_signal_suppressed_session_count"`
+	ResumeBufferReplayCount                  uint64 `json:"resume_buffer_replay_count"`
+	ResumeBufferMissCount                    uint64 `json:"resume_buffer_miss_count"`
+	ResumeBufferStoredFrames                 int    `json:"resume_buffer_stored_frames"`
+	ResumeBufferTokenCount                   int    `json:"resume_buffer_token_count"`
+	ResumeBufferExpiredCount                 uint64 `json:"resume_buffer_expired_count"`
 }
 
 type session struct {
@@ -73,6 +76,9 @@ func NewRegistryWithConfig(config Config) *Registry {
 	}
 	if config.ConversationFanoutBuckets <= 0 {
 		config.ConversationFanoutBuckets = 1
+	}
+	if config.ConversationSignalSampleEvery <= 0 {
+		config.ConversationSignalSampleEvery = 1
 	}
 	if config.Now == nil {
 		config.Now = time.Now
@@ -264,6 +270,12 @@ func (registry *Registry) EnqueueConversationSignal(
 
 	sessionIDs := registry.byConversation[key]
 	result := types.NotifyDeliveryResult{MatchedSessions: len(sessionIDs)}
+	if !registry.shouldEmitConversationSignal(notification) {
+		registry.metrics.ConversationSignalSuppressedEventCount++
+		registry.metrics.ConversationSignalSuppressedSessionCount += uint64(len(sessionIDs))
+		registry.mu.Unlock()
+		return result, nil
+	}
 	if len(sessionIDs) == 0 {
 		registry.mu.Unlock()
 		return result, nil
@@ -284,6 +296,14 @@ func (registry *Registry) EnqueueConversationSignal(
 		registry.mu.Unlock()
 	}
 	return result, err
+}
+
+func (registry *Registry) shouldEmitConversationSignal(notification types.DeliveryNotification) bool {
+	sampleEvery := registry.config.ConversationSignalSampleEvery
+	if sampleEvery <= 1 {
+		return true
+	}
+	return notification.ConversationSeq%int64(sampleEvery) == 0
 }
 
 func (registry *Registry) enqueueConversationOutboundTargets(

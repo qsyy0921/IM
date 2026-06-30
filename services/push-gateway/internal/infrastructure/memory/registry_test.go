@@ -174,6 +174,49 @@ func TestRegistryConversationSignalRequiresSubscription(t *testing.T) {
 	}
 }
 
+func TestRegistryConversationSignalSamplingSuppressesNonSampledSignals(t *testing.T) {
+	registry := NewRegistryWithConfig(Config{ConversationSignalSampleEvery: 2})
+	outbound := make(chan types.ServerFrame, 4)
+	auth := types.AuthContext{TenantID: "tenant-1", UserID: "user-1", DeviceID: "device-1", SessionID: "session-1"}
+	if _, err := registry.Register(context.Background(), types.SessionRegistration{
+		AuthContext: auth,
+		SessionID:   "session-1",
+		Outbound:    outbound,
+	}); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+	if _, err := registry.SubscribeConversation(context.Background(), types.ConversationSubscriptionCommand{
+		AuthContext:    auth,
+		ConversationID: "conversation-1",
+	}); err != nil {
+		t.Fatalf("subscribe: %v", err)
+	}
+	for seq := int64(1); seq <= 4; seq++ {
+		notification := testNotification()
+		notification.Kind = types.DeliveryNotificationKindConversationSignal
+		notification.UserID = ""
+		notification.EventID = "delivery-event-sampled-" + string(rune('0'+seq))
+		notification.ConversationSeq = seq
+		if _, err := registry.EnqueueConversationSignal(context.Background(), notification); err != nil {
+			t.Fatalf("signal seq=%d: %v", seq, err)
+		}
+	}
+	if len(outbound) != 2 {
+		t.Fatalf("sampled signal queue = %d, want 2", len(outbound))
+	}
+	first := <-outbound
+	second := <-outbound
+	if first.ConversationSeq != 2 || second.ConversationSeq != 4 {
+		t.Fatalf("unexpected sampled seqs: first=%d second=%d", first.ConversationSeq, second.ConversationSeq)
+	}
+	snapshot := registry.Metrics()
+	if snapshot.ConversationSignalSuppressedEventCount != 2 ||
+		snapshot.ConversationSignalSuppressedSessionCount != 2 ||
+		snapshot.ConversationSignalEnqueuedCount != 2 {
+		t.Fatalf("unexpected sampling metrics: %+v", snapshot)
+	}
+}
+
 func TestRegistryConversationSignalFanoutBucketsPreservePerSessionOrder(t *testing.T) {
 	registry := NewRegistryWithConfig(Config{ConversationFanoutBuckets: 4})
 	outbounds := make([]chan types.ServerFrame, 8)

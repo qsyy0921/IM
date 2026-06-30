@@ -195,6 +195,60 @@ func TestRegistryPublishesRemoteConversationSignalToSubscribedGateway(t *testing
 	<-done
 }
 
+func TestRegistryConversationSignalSamplingSkipsRemotePublish(t *testing.T) {
+	server := miniredis.RunT(t)
+	client := redis.NewClient(&redis.Options{Addr: server.Addr()})
+	ctx := context.Background()
+
+	gatewayA := NewRegistry(memory.NewRegistry(), client, Config{
+		GatewayID:                     "gateway-a",
+		RouteTTL:                      time.Minute,
+		ConversationSignalSampleEvery: 2,
+	})
+	localB := memory.NewRegistry()
+	gatewayB := NewRegistry(localB, client, Config{GatewayID: "gateway-b", RouteTTL: time.Minute})
+	outbound := make(chan types.ServerFrame, 2)
+	auth := types.AuthContext{TenantID: "tenant-1", UserID: "user-1", DeviceID: "device-1", SessionID: "session-b"}
+	if _, err := gatewayB.Register(ctx, types.SessionRegistration{
+		AuthContext: auth,
+		SessionID:   "session-b",
+		Outbound:    outbound,
+	}); err != nil {
+		t.Fatalf("register remote session: %v", err)
+	}
+	if _, err := gatewayB.SubscribeConversation(ctx, types.ConversationSubscriptionCommand{
+		AuthContext:    auth,
+		ConversationID: "conversation-1",
+	}); err != nil {
+		t.Fatalf("subscribe remote conversation: %v", err)
+	}
+	pubsub := client.Subscribe(ctx, GatewayChannel(defaultKeyPrefix, "gateway-b"))
+	defer pubsub.Close()
+	if _, err := pubsub.Receive(ctx); err != nil {
+		t.Fatalf("subscribe gateway channel: %v", err)
+	}
+
+	notification := testNotification()
+	notification.Kind = types.DeliveryNotificationKindConversationSignal
+	notification.UserID = ""
+	notification.ConversationSeq = 1
+	result, err := gatewayA.EnqueueConversationSignal(ctx, notification)
+	if err != nil {
+		t.Fatalf("enqueue sampled-out signal: %v", err)
+	}
+	if result.MatchedSessions != 0 || result.Enqueued != 0 {
+		t.Fatalf("sampled-out signal should not route: %+v", result)
+	}
+	if metrics := gatewayA.Metrics(); metrics.RedisRouteConversationSignalSuppressedEventCount != 1 {
+		t.Fatalf("unexpected sampling metrics: %+v", metrics)
+	}
+	select {
+	case message := <-pubsub.Channel():
+		t.Fatalf("sampled-out signal must not publish remotely: %+v", message)
+	case <-time.After(100 * time.Millisecond):
+	}
+}
+
 func TestRegistryPublishesRemoteDeviceEvictionAndSubscriberEvicts(t *testing.T) {
 	server := miniredis.RunT(t)
 	client := redis.NewClient(&redis.Options{Addr: server.Addr()})

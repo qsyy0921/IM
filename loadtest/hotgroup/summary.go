@@ -104,6 +104,9 @@ func writeReport(path string, result *summary) error {
 	fmt.Fprintf(&builder, "- subscriber_count: `%d`\n", result.Push.SubscriberCount)
 	fmt.Fprintf(&builder, "- subscribe_success: `%d`\n", result.Push.SubscribeSuccessCount)
 	fmt.Fprintf(&builder, "- subscribe_errors: `%d`\n", result.Push.SubscribeErrorCount)
+	fmt.Fprintf(&builder, "- conversation_signal_sample_every: `%d`\n", result.Push.ConversationSignalSampleEvery)
+	fmt.Fprintf(&builder, "- expected_signals_per_subscriber: `%d`\n", result.Push.ExpectedSignalsPerSubscriber)
+	fmt.Fprintf(&builder, "- expected_conversation_signals: `%d`\n", result.Push.ExpectedConversationSignals)
 	fmt.Fprintf(&builder, "- conversation_signal_count: `%d`\n", result.Push.ConversationSignalCount)
 	fmt.Fprintf(&builder, "- max_conversation_seq: `%d`\n\n", result.Push.MaxConversationSeq)
 	if len(result.Push.SubscriberSignals) > 0 {

@@ -64,12 +64,13 @@ type pushSignalResult struct {
 
 func openConversationSubscribers(ctx context.Context, cfg config, plan userPlan) ([]pushSubscriber, pushStats, error) {
 	stats := pushStats{
-		Enabled:              cfg.ConversationSubscriberCount > 0,
-		PushURL:              cfg.PushURL,
-		SubscriberTotalCount: cfg.ConversationSubscriberCount,
-		SubscriberShardCount: cfg.SubscriberShardCount,
-		SubscriberShardIndex: cfg.SubscriberShardIndex,
-		StartedAt:            time.Now().UTC(),
+		Enabled:                       cfg.ConversationSubscriberCount > 0,
+		PushURL:                       cfg.PushURL,
+		SubscriberTotalCount:          cfg.ConversationSubscriberCount,
+		SubscriberShardCount:          cfg.SubscriberShardCount,
+		SubscriberShardIndex:          cfg.SubscriberShardIndex,
+		ConversationSignalSampleEvery: cfg.ConversationSignalSampleEvery,
+		StartedAt:                     time.Now().UTC(),
 	}
 	if cfg.ConversationSubscriberCount == 0 {
 		stats.FinishedAt = time.Now().UTC()
@@ -77,6 +78,8 @@ func openConversationSubscribers(ctx context.Context, cfg config, plan userPlan)
 	}
 	receivers := shardReceivers(sampledReceivers(plan, cfg.ConversationSubscriberCount), cfg.SubscriberShardCount, cfg.SubscriberShardIndex)
 	stats.SubscriberCount = len(receivers)
+	stats.ExpectedSignalsPerSubscriber = expectedConversationSignalsPerSubscriber(cfg, cfg.MessageCount)
+	stats.ExpectedConversationSignals = stats.SubscriberCount * stats.ExpectedSignalsPerSubscriber
 	if len(receivers) == 0 {
 		stats.FinishedAt = time.Now().UTC()
 		return nil, stats, fmt.Errorf("subscriber shard selects no receivers: total=%d shard_index=%d shard_count=%d", cfg.ConversationSubscriberCount, cfg.SubscriberShardIndex, cfg.SubscriberShardCount)
@@ -166,7 +169,7 @@ func connectConversationSubscriber(ctx context.Context, cfg config, user loadUse
 	return conn, nil
 }
 
-func startConversationSignalCollection(ctx context.Context, cfg config, subscribers []pushSubscriber, messageCount int) *conversationSignalCollector {
+func startConversationSignalCollection(ctx context.Context, cfg config, subscribers []pushSubscriber, expectedPerSubscriber int) *conversationSignalCollector {
 	if len(subscribers) == 0 {
 		return nil
 	}
@@ -174,13 +177,13 @@ func startConversationSignalCollection(ctx context.Context, cfg config, subscrib
 	done := make(chan pushSignalResult, len(subscribers))
 	startedAt := time.Now()
 	for _, subscriber := range subscribers {
-		go collectSubscriberSignals(collectorCtx, cfg, subscriber, messageCount, startedAt, done)
+		go collectSubscriberSignals(collectorCtx, cfg, subscriber, expectedPerSubscriber, startedAt, done)
 	}
 	return &conversationSignalCollector{
 		done:            done,
 		cancel:          cancel,
 		subscriberCount: len(subscribers),
-		messageCount:    messageCount,
+		messageCount:    expectedPerSubscriber,
 		startedAt:       startedAt,
 	}
 }
@@ -189,12 +192,12 @@ func collectSubscriberSignals(
 	ctx context.Context,
 	cfg config,
 	subscriber pushSubscriber,
-	messageCount int,
+	expectedSignals int,
 	startedAt time.Time,
 	done chan<- pushSignalResult,
 ) {
 	result := pushSignalResult{userID: subscriber.user.UserID, deviceID: subscriber.user.DeviceID}
-	for result.count < messageCount {
+	for result.count < expectedSignals {
 		frame, err := readHotgroupFrame(ctx, subscriber.conn)
 		if err != nil {
 			result.err = err
@@ -216,6 +219,24 @@ func collectSubscriberSignals(
 	}
 	result.completed = true
 	done <- result
+}
+
+func expectedConversationSignalsPerSubscriber(cfg config, messageCount int) int {
+	if messageCount <= 0 {
+		return 0
+	}
+	sampleEvery := cfg.ConversationSignalSampleEvery
+	if sampleEvery <= 1 {
+		return messageCount
+	}
+	return messageCount / sampleEvery
+}
+
+func expectedConversationSignalCount(cfg config, messageCount int, subscriberCount int) int {
+	if subscriberCount <= 0 {
+		return 0
+	}
+	return subscriberCount * expectedConversationSignalsPerSubscriber(cfg, messageCount)
 }
 
 func (collector *conversationSignalCollector) wait(cfg config, stats pushStats) (pushStats, error) {

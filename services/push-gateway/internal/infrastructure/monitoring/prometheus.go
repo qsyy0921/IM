@@ -29,6 +29,7 @@ func renderPrometheus(snapshot Snapshot) string {
 func writeMemoryPrometheus(builder *strings.Builder, snapshot *memory.Metrics) {
 	writePrometheusHeader(builder, "nexusim_push_gateway_sessions", "Push gateway session counts by state.", "gauge")
 	writePrometheusHeader(builder, "nexusim_push_gateway_session_events_total", "Push gateway session event counters.", "counter")
+	writePrometheusHeader(builder, "nexusim_push_gateway_conversation_signal_events_total", "Push gateway conversation signal event counters.", "counter")
 	writePrometheusHeader(builder, "nexusim_push_gateway_resume_buffer", "Push gateway in-memory resume buffer gauges.", "gauge")
 	writePrometheusHeader(builder, "nexusim_push_gateway_resume_buffer_events_total", "Push gateway in-memory resume buffer event counters.", "counter")
 	if snapshot == nil {
@@ -38,6 +39,10 @@ func writeMemoryPrometheus(builder *strings.Builder, snapshot *memory.Metrics) {
 	writePrometheusSample(builder, "nexusim_push_gateway_session_events_total", map[string]string{"event": "queue_full"}, snapshot.SessionQueueFullCount)
 	writePrometheusSample(builder, "nexusim_push_gateway_session_events_total", map[string]string{"event": "slow_evicted"}, snapshot.SlowSessionEvictedCount)
 	writePrometheusSample(builder, "nexusim_push_gateway_session_events_total", map[string]string{"event": "identity_evicted"}, snapshot.IdentitySessionEvictedCount)
+	writePrometheusSample(builder, "nexusim_push_gateway_conversation_signal_events_total", map[string]string{"event": "matched_sessions"}, snapshot.ConversationSignalMatchedCount)
+	writePrometheusSample(builder, "nexusim_push_gateway_conversation_signal_events_total", map[string]string{"event": "enqueued_sessions"}, snapshot.ConversationSignalEnqueuedCount)
+	writePrometheusSample(builder, "nexusim_push_gateway_conversation_signal_events_total", map[string]string{"event": "suppressed_events"}, snapshot.ConversationSignalSuppressedEventCount)
+	writePrometheusSample(builder, "nexusim_push_gateway_conversation_signal_events_total", map[string]string{"event": "suppressed_sessions"}, snapshot.ConversationSignalSuppressedSessionCount)
 	writePrometheusSample(builder, "nexusim_push_gateway_resume_buffer", map[string]string{"state": "stored_frames"}, snapshot.ResumeBufferStoredFrames)
 	writePrometheusSample(builder, "nexusim_push_gateway_resume_buffer", map[string]string{"state": "tokens"}, snapshot.ResumeBufferTokenCount)
 	writePrometheusSample(builder, "nexusim_push_gateway_resume_buffer_events_total", map[string]string{"event": "replay"}, snapshot.ResumeBufferReplayCount)
@@ -75,6 +80,7 @@ func writeRedisRoutePrometheusSamples(builder *strings.Builder, role string, sna
 	writePrometheusSample(builder, "nexusim_push_gateway_redis_route_events_total", labels("remote_enqueued_sessions"), snapshot.RedisRouteRemoteEnqueuedSessions)
 	writePrometheusSample(builder, "nexusim_push_gateway_redis_route_events_total", labels("stale_removed"), snapshot.RedisRouteStaleRemovedCount)
 	writePrometheusSample(builder, "nexusim_push_gateway_redis_route_events_total", labels("cleanup_error"), snapshot.RedisRouteCleanupErrorCount)
+	writePrometheusSample(builder, "nexusim_push_gateway_redis_route_events_total", labels("conversation_signal_suppressed"), snapshot.RedisRouteConversationSignalSuppressedEventCount)
 	writePrometheusSample(builder, "nexusim_push_gateway_redis_route_events_total", labels("subscriber_message"), snapshot.RedisRouteSubscriberMessageCount)
 	writePrometheusSample(builder, "nexusim_push_gateway_redis_route_events_total", labels("subscriber_malformed"), snapshot.RedisRouteSubscriberMalformedCount)
 	writePrometheusSample(builder, "nexusim_push_gateway_redis_route_events_total", labels("subscriber_enqueued"), snapshot.RedisRouteSubscriberEnqueuedCount)

@@ -64,20 +64,23 @@ type receiverStats struct {
 }
 
 type pushStats struct {
-	Enabled                 bool                        `json:"enabled"`
-	PushURL                 string                      `json:"push_url,omitempty"`
-	SubscriberTotalCount    int                         `json:"subscriber_total_count"`
-	SubscriberShardCount    int                         `json:"subscriber_shard_count"`
-	SubscriberShardIndex    int                         `json:"subscriber_shard_index"`
-	SubscriberCount         int                         `json:"subscriber_count"`
-	SubscribeSuccessCount   int                         `json:"subscribe_success_count"`
-	SubscribeErrorCount     int                         `json:"subscribe_error_count"`
-	ConversationSignalCount int                         `json:"conversation_signal_count"`
-	MaxConversationSeq      int64                       `json:"max_conversation_seq"`
-	SubscriberSignals       []pushSignalSubscriberStats `json:"subscriber_signals,omitempty"`
-	Errors                  []string                    `json:"errors,omitempty"`
-	StartedAt               time.Time                   `json:"started_at,omitempty"`
-	FinishedAt              time.Time                   `json:"finished_at,omitempty"`
+	Enabled                       bool                        `json:"enabled"`
+	PushURL                       string                      `json:"push_url,omitempty"`
+	SubscriberTotalCount          int                         `json:"subscriber_total_count"`
+	SubscriberShardCount          int                         `json:"subscriber_shard_count"`
+	SubscriberShardIndex          int                         `json:"subscriber_shard_index"`
+	SubscriberCount               int                         `json:"subscriber_count"`
+	SubscribeSuccessCount         int                         `json:"subscribe_success_count"`
+	SubscribeErrorCount           int                         `json:"subscribe_error_count"`
+	ConversationSignalSampleEvery int                         `json:"conversation_signal_sample_every"`
+	ExpectedSignalsPerSubscriber  int                         `json:"expected_signals_per_subscriber"`
+	ExpectedConversationSignals   int                         `json:"expected_conversation_signals"`
+	ConversationSignalCount       int                         `json:"conversation_signal_count"`
+	MaxConversationSeq            int64                       `json:"max_conversation_seq"`
+	SubscriberSignals             []pushSignalSubscriberStats `json:"subscriber_signals,omitempty"`
+	Errors                        []string                    `json:"errors,omitempty"`
+	StartedAt                     time.Time                   `json:"started_at,omitempty"`
+	FinishedAt                    time.Time                   `json:"finished_at,omitempty"`
 }
 
 type pushSignalSubscriberStats struct {

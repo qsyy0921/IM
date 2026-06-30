@@ -534,6 +534,7 @@ services:
         condition: service_started
     environment:
       NEXUSIM_PUSH_GATEWAY_MODE: ws
+      NEXUSIM_PUSH_GATEWAY_ID: nexusim-push-gateway-ws-1
       NEXUSIM_PUSH_AUTH_MODE: mock
       NEXUSIM_PUSH_WS_ADDR: 172.30.80.18:10498
       NEXUSIM_PUSH_DEBUG_ADDR: 172.30.80.18:11913
@@ -550,6 +551,84 @@ services:
     networks:
       nexusim-services:
         ipv4_address: 172.30.80.18
+
+  push-gateway-ws-2:
+    image: nexusim/push-gateway:local
+    container_name: nexusim-push-gateway-ws-2
+    depends_on:
+      delivery-service-grpc:
+        condition: service_started
+    environment:
+      NEXUSIM_PUSH_GATEWAY_MODE: ws
+      NEXUSIM_PUSH_GATEWAY_ID: nexusim-push-gateway-ws-2
+      NEXUSIM_PUSH_AUTH_MODE: mock
+      NEXUSIM_PUSH_WS_ADDR: 172.30.80.41:10498
+      NEXUSIM_PUSH_DEBUG_ADDR: 172.30.80.41:11913
+      NEXUSIM_PUSH_ROUTE_BACKEND: redis
+      NEXUSIM_PUSH_REDIS_MODE: single
+      NEXUSIM_PUSH_REDIS_ADDR: redis:6379
+      NEXUSIM_PUSH_CONVERSATION_FANOUT_BUCKETS: 8
+      NEXUSIM_DELIVERY_GRPC_ADDR: delivery-service-grpc:10497
+      NEXUSIM_KAFKA_BROKERS: kafka:29092
+    ports:
+      - "11001:10498"
+      - "11941:11913"
+    restart: unless-stopped
+    networks:
+      nexusim-services:
+        ipv4_address: 172.30.80.41
+
+  push-gateway-ws-3:
+    image: nexusim/push-gateway:local
+    container_name: nexusim-push-gateway-ws-3
+    depends_on:
+      delivery-service-grpc:
+        condition: service_started
+    environment:
+      NEXUSIM_PUSH_GATEWAY_MODE: ws
+      NEXUSIM_PUSH_GATEWAY_ID: nexusim-push-gateway-ws-3
+      NEXUSIM_PUSH_AUTH_MODE: mock
+      NEXUSIM_PUSH_WS_ADDR: 172.30.80.42:10498
+      NEXUSIM_PUSH_DEBUG_ADDR: 172.30.80.42:11913
+      NEXUSIM_PUSH_ROUTE_BACKEND: redis
+      NEXUSIM_PUSH_REDIS_MODE: single
+      NEXUSIM_PUSH_REDIS_ADDR: redis:6379
+      NEXUSIM_PUSH_CONVERSATION_FANOUT_BUCKETS: 8
+      NEXUSIM_DELIVERY_GRPC_ADDR: delivery-service-grpc:10497
+      NEXUSIM_KAFKA_BROKERS: kafka:29092
+    ports:
+      - "11002:10498"
+      - "11942:11913"
+    restart: unless-stopped
+    networks:
+      nexusim-services:
+        ipv4_address: 172.30.80.42
+
+  push-gateway-ws-4:
+    image: nexusim/push-gateway:local
+    container_name: nexusim-push-gateway-ws-4
+    depends_on:
+      delivery-service-grpc:
+        condition: service_started
+    environment:
+      NEXUSIM_PUSH_GATEWAY_MODE: ws
+      NEXUSIM_PUSH_GATEWAY_ID: nexusim-push-gateway-ws-4
+      NEXUSIM_PUSH_AUTH_MODE: mock
+      NEXUSIM_PUSH_WS_ADDR: 172.30.80.43:10498
+      NEXUSIM_PUSH_DEBUG_ADDR: 172.30.80.43:11913
+      NEXUSIM_PUSH_ROUTE_BACKEND: redis
+      NEXUSIM_PUSH_REDIS_MODE: single
+      NEXUSIM_PUSH_REDIS_ADDR: redis:6379
+      NEXUSIM_PUSH_CONVERSATION_FANOUT_BUCKETS: 8
+      NEXUSIM_DELIVERY_GRPC_ADDR: delivery-service-grpc:10497
+      NEXUSIM_KAFKA_BROKERS: kafka:29092
+    ports:
+      - "11003:10498"
+      - "11943:11913"
+    restart: unless-stopped
+    networks:
+      nexusim-services:
+        ipv4_address: 172.30.80.43
 
   api-gateway-grpc:
     image: nexusim/api-gateway:local

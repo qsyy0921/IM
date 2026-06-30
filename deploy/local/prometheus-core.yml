@@ -65,6 +65,9 @@ scrape_configs:
     static_configs:
       - targets:
           - host.docker.internal:11913
+          - host.docker.internal:11941
+          - host.docker.internal:11942
+          - host.docker.internal:11943
         labels:
           service: push-gateway
 

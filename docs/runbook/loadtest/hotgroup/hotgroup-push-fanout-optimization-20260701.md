@@ -435,3 +435,60 @@ next 400 subscriber coordinator + shard run able to answer whether the
 remaining online signal drain curve is caused by outbound queue wait, writer
 scheduling / select overhead, worker-side local fanout, runner read backpressure
 or network throughput.
+
+## WebSocket Writer Queue Latency Retest
+
+The writer queue latency / batch drain commit `fedb5f43` was rebuilt, archived
+and redeployed to Ubuntu Docker. The image archive is:
+
+```text
+H:\NexusIM\docker-images\archives\nexusim-push-gateway-fedb5f43-20260701-044622.tar
+```
+
+Comparable scenario:
+
+```text
+group_size=6000
+message_count=1000
+message_rate=8000
+sender_count=256
+subscriber_count=400
+fanout_mode=READ_FANOUT
+runner layout=coordinator + 4 subscriber-only shards
+```
+
+Artifacts:
+
+- coordinator:
+  `H:\NexusIM\loadtest-results\hotgroup-writerqueue-clean-400sub-coordinator-20260701-045022`
+- shards:
+  `H:\NexusIM\loadtest-results\hotgroup-writerqueue-clean-400sub-shard*-20260701-045022`
+- analysis:
+  `hotgroup-multirunner-analysis-20260701-writerqueue-400sub.md`
+- metrics window:
+  `hotgroup-metrics-window-20260701-writerqueue-clean-400sub.md`
+
+Result:
+
+- coordinator send, PullInbox and ACK succeeded;
+- `message_outbox_pending=0`, `delivery_outbox_pending=0`;
+- 4 shards read 400000 conversation signals with no subscriber error;
+- aggregate signal span rate was about `2884.066 signals/s`;
+- previous signal queue run was about `2876.076 signals/s`, so the change is
+  not a material throughput improvement;
+- WebSocket `delivery_notify` queue p95 / p99 were about `4.665ms / 4.942ms`;
+- WebSocket `delivery_notify` write p95 / p99 were about `0.383ms / 0.587ms`;
+- Redis subscriber signal queue wait p95 / p99 stayed about
+  `0.095ms / 0.099ms`;
+- worker-side conversation signal fanout p95 / p99 remained about
+  `57.759ms / 92.241ms`;
+- writer / Redis subscriber error, queue full and eviction were 0.
+
+Judgment: per-session writer queue wait and single `conn.Write` duration are
+not the dominant bottleneck. The remaining bottleneck is still the local fanout
+work that maps one conversation signal to about 400 session enqueues. Because
+the current conversation signal worker preserves order by serializing a whole
+conversation through one worker, the next optimization should evaluate
+conversation-local fanout buckets: split the subscriber set into stable buckets
+and let each bucket drain in order for its sessions, while preserving per-session
+signal order and keeping durable PullInbox as the recovery path.

@@ -37,6 +37,8 @@ CreateConversation -> batch CreateMemberChange(JOIN)
 | `hotgroup-metrics-window-20260701-writerdur-clean-400sub.md` | writer duration 窗口显示 `delivery_notify` write p95 / p99 约 0.345ms / 0.499ms、avg 约 0.125ms、max 约 10.056ms，writer / Redis subscriber error 与 eviction 为 0；下一步应定位 Redis subscriber 本地 fanout / enqueue 调度、writer goroutine 节奏和 runner 读取背压。 |
 | `hotgroup-multirunner-analysis-20260701-redisfanout-400sub.md` | clean commit `6099ecd` 的 Redis subscriber fanout duration 复压：6000 人 / 1000 消息 / 8000 msg/s / 400 subscriber，message / delivery outbox pending=0，400000 条 signal 全部读完，drain rate 约 2883.976 signals/s，仍在旧区间。 |
 | `hotgroup-metrics-window-20260701-redisfanout-clean-400sub.md` | Redis subscriber fanout duration 窗口显示 WebSocket `delivery_notify` write p95 / p99 约 0.406ms / 0.63ms，但 Redis subscriber conversation signal fanout/enqueue 整窗口 p95 / p99 约 56.14ms / 91.228ms，5m last p95 / p99 约 60.263ms / 92.053ms；下一步应做 fanout worker / shard queue，而不是继续调单次 WebSocket write。 |
+| `hotgroup-multirunner-analysis-20260701-writerqueue-400sub.md` | clean commit `fedb5f43` 的 WebSocket writer queue latency / batch drain 复压：6000 人 / 1000 消息 / 8000 msg/s / 400 subscriber，400000 条 signal 全部读完，drain rate 约 2884.066 signals/s，仍未突破旧区间。 |
+| `hotgroup-metrics-window-20260701-writerqueue-clean-400sub.md` | writer queue 窗口显示 `delivery_notify` queue p95 / p99 约 4.665ms / 4.942ms，write p95 / p99 约 0.383ms / 0.587ms，但 worker fanout p95 / p99 仍约 57.759ms / 92.241ms；下一步应评估 conversation-local fanout buckets，而不是继续调 writer queue。 |
 
 ## 目标
 

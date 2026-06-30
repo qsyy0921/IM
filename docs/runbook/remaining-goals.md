@@ -57,9 +57,13 @@
    `tools/analyze-hotgroup-loadtest.ps1`、`tools/analyze-hotgroup-multirunner.ps1` 和
    `tools/record-hotgroup-metrics-window.ps1` 自动汇总压测结果、分类瓶颈、记录
    Prometheus 时间窗口和给出下一步策略；后续每次正式复压都要生成或更新对应低敏分析报告。
-   当前已补 push-gateway writer queue latency 指标和 writer batch drain 调度，下一步
-   需要 clean commit 镜像重建 / 归档 / redeploy 后复跑 400 subscriber coordinator +
-   shard 场景，比较 queue p95 / p99、write p95 / p99、worker fanout 和 signal drain rate。
+   clean commit `fedb5f43` 的 writer queue latency / batch drain 已完成镜像重建 /
+   归档 / redeploy 和 400 subscriber coordinator + shard 复压；queue p95 / p99 低、
+   write p95 / p99 低，但 worker fanout p95 / p99 仍约 57.759ms / 92.241ms，
+   signal drain rate 仍约 2884 signals/s。下一步需要设计 conversation-local fanout
+   buckets：把同一 conversation 的本地 subscriber 集合拆成稳定 bucket 并行 fanout，
+   同时保持每个 session 内信号顺序、queue full / slow eviction 和 durable PullInbox
+   恢复边界。
 2. Agent action boundary / repair cases：在 provider replay admin / workflow handoff 已落
    的基础上，继续扩更多需要 proposal / approval / workflow / audit 的 action 与 repair 场景。
 3. Product-active 服务按需推进：workflow、audit、admin、notification、media、vector、

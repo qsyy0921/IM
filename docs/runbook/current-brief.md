@@ -204,6 +204,13 @@ brief、loadtest report、development-progress 或 archive。
   小批量 drain 已排队 frame。该改动保持单连接顺序和现有 durable PullInbox 边界；
   focused push-gateway tests、hotgroup tests 和 build 已通过。下一步需要 clean commit
   镜像重建 / redeploy 后复压，确认 queue latency 是否解释 online signal drain 曲线。
+- 2026-07-01 已用 clean commit `fedb5f43` 重建 / 归档 / redeploy push-gateway，并完成
+  writer queue latency / batch drain 复压。400 subscriber coordinator + 4 shard 场景下，
+  400000 条 signal 全部读完，drain rate 约 `2884.066 signals/s`，仍未突破
+  2.85k-2.89k 旧区间；`delivery_notify` queue p95 / p99 约
+  `4.665ms / 4.942ms`，write p95 / p99 约 `0.383ms / 0.587ms`，但 worker fanout
+  p95 / p99 仍约 `57.759ms / 92.241ms`。结论：writer queue / 单次 write
+  不是主瓶颈，下一模块应设计 conversation-local fanout buckets。
 - 2026-06-30 HYBRID 1000 人 / 1000 消息 / 400 msg/s 诊断 run 暴露 per-user outbox
   写扩散下的 delivery outbox ready query 退化：旧 anti-join blocker 查询在约 100 万
   pending row 下每批 500 行约 24s。delivery-service 已改为 per-conversation frontier
@@ -240,8 +247,7 @@ brief、loadtest report、development-progress 或 archive。
 ## 下一个方向
 
 - 下一步围绕 push-gateway worker 本地 fanout / session writer 调度继续优化：
-  queue handoff 已不是瓶颈；当前已补 writer queue latency / batch drain，下一步
-  先用同一 400 subscriber coordinator + shard 场景复压，再决定是否继续调整
-  per-conversation worker 数、session outbound queue drain、writer goroutine 调度、
-  WebSocket flush 策略或 runner 读取背压。
+  queue handoff、writer queue 和单次 WebSocket write 都不是主瓶颈。下一步优先分析并实现
+  conversation-local fanout buckets，把同一 conversation 的本地 subscriber 集合拆成
+  稳定 bucket 并行 fanout，同时保持 per-session 顺序和 queue full / slow eviction 边界。
   正式生产级运维 UI、provider-grade 长周期平台仍后置。

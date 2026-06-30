@@ -184,6 +184,7 @@ CreateConversation(GROUP)
 | WebSocket writer duration 复压 | clean commit `4f45519` 重建 / redeploy 后，同一 400 subscriber coordinator + 4 shard 场景复压 | 400000 条 signal 全部读完，drain rate 约 2876.698 signals/s，仍未离开旧区间；Prometheus 窗口显示 `delivery_notify` write p95 / p99 约 0.345ms / 0.499ms、avg 约 0.125ms、max 约 10.056ms，说明单次 `conn.Write` 长尾不是主瓶颈，下一步应看 Redis subscriber 本地 fanout / enqueue 和 writer goroutine 调度。 |
 | Redis subscriber fanout duration 复压 | clean commit `6099ecd` 重建 / redeploy 后，同一 400 subscriber coordinator + 4 shard 场景复压 | 400000 条 signal 全部读完，drain rate 约 2883.976 signals/s，仍未离开旧区间；Prometheus 窗口显示 WebSocket `delivery_notify` write p95 / p99 约 0.406ms / 0.63ms，但 Redis subscriber conversation signal fanout/enqueue p95 / p99 约 56.14ms / 91.228ms，说明瓶颈已收窄到本地 fanout/enqueue 调度，下一步应做 conversation fanout worker / shard queue。 |
 | Redis subscriber signal queue 复压 | clean commit `93654117` 把 conversation signal 从 Redis subscriber receive path 切到 bounded worker / shard queue 后重建 / 归档 / redeploy | 400000 条 signal 全部读完，drain rate 约 2876.076 signals/s；queue full / worker error 为 0，queue wait p95 / p99 约 0.095ms / 0.099ms，说明快速 handoff 已成立；但 worker fanout p95 / p99 仍约 38.636ms / 87.5ms，总 drain 未突破旧曲线，下一步应看 worker 本地 fanout、session queue drain、writer 调度、flush / batching 和客户端读取背压。 |
+| WebSocket writer queue / batch drain 复压 | clean commit `fedb5f43` 增加 outbound queue latency 指标和默认 16 帧 batch drain 后重建 / 归档 / redeploy | 400000 条 signal 全部读完，drain rate 约 2884.066 signals/s，仍未突破旧区间；Prometheus 窗口显示 `delivery_notify` queue p95 / p99 约 4.665ms / 4.942ms、write p95 / p99 约 0.383ms / 0.587ms，但 worker fanout p95 / p99 仍约 57.759ms / 92.241ms。结论是 writer queue / 单次 write 不是主瓶颈，下一步应做 conversation-local fanout buckets。 |
 
 面试时可以把这个结果讲成一次真实性能定位过程：
 
@@ -283,11 +284,12 @@ Redis subscriber fanout duration 复压显示 conversation signal fanout/enqueue
 约 56ms / 91ms。再把 Redis subscriber receive path 改成 bounded worker / shard queue
 后，queue wait p99 约 0.099ms、queue full / worker error 为 0，但总 drain rate
 仍约 2.876k signals/s。因此当前讲法应进一步收窄：瓶颈已经不是 Redis Pub/Sub
-receive path，而是 worker 对本机 session 的 fanout/enqueue、session outbound queue
-drain、writer goroutine 调度、flush / batching 或客户端读取背压。最新代码已补
-WebSocket writer outbound queue latency 指标和默认 16 帧的小批量 drain 调度，下一轮
-400 subscriber coordinator + shard 复压会把 queue p95 / p99、write p95 / p99、
-worker fanout 和整体 signal drain rate 放在同一张证据链里比较。
+receive path。最新的 writer queue / batch drain 复压显示 queue p99 约 4.94ms、
+单次 write p99 约 0.59ms，但 worker fanout p99 仍约 92ms，整体 drain rate 仍约
+2.884k signals/s。因此瓶颈更接近“一个 conversation signal 串行 fanout 到本机
+400 个 session”的本地 fanout 模型。下一步可讲的优化方向是 conversation-local
+fanout buckets：把订阅者按稳定 bucket 拆分并行 fanout，但每个 session 内仍保持顺序，
+慢连接仍通过 queue full / eviction 和 PullInbox 恢复。
 
 ### 当前系统如何承接热点群
 

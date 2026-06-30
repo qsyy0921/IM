@@ -235,6 +235,12 @@ func (store *OutboxStore) processReadyBatch(
 
 func (store *OutboxStore) fetchReadyLocked(ctx context.Context, tx pgx.Tx, limit int, shardCount int, shardID int) ([]types.OutboxMessage, error) {
 	rows, err := tx.Query(ctx, `
+WITH frontier AS (
+    SELECT tenant_id, conversation_id, MIN(aggregate_version) AS aggregate_version
+    FROM delivery_outbox
+    WHERE status IN ('PENDING', 'DLQ')
+    GROUP BY tenant_id, conversation_id
+)
 SELECT
     current.id,
     current.event_id,
@@ -252,35 +258,18 @@ SELECT
     current.trace_id,
     current.retry_count,
     current.created_at
-FROM delivery_outbox current
+FROM frontier
+JOIN delivery_outbox current
+  ON current.tenant_id = frontier.tenant_id
+ AND current.conversation_id = frontier.conversation_id
+ AND current.aggregate_version = frontier.aggregate_version
 WHERE current.status = 'PENDING'
   AND current.published_at IS NULL
   AND COALESCE(current.next_retry_at, current.available_at) <= now()
-  AND (
-      $2::bigint <= 1
-      OR MOD(
-          MOD(hashtextextended(current.tenant_id || ':' || current.conversation_id, 0), $2::bigint) + $2::bigint,
-          $2::bigint
-      ) = $3::bigint
-  )
-  AND NOT EXISTS (
-      SELECT 1
-      FROM delivery_outbox blocker
-      WHERE blocker.tenant_id = current.tenant_id
-        AND blocker.conversation_id = current.conversation_id
-        AND blocker.aggregate_version < current.aggregate_version
-        AND (
-            blocker.status = 'DLQ'
-            OR (
-                blocker.status = 'PENDING'
-                AND COALESCE(blocker.next_retry_at, blocker.available_at) > now()
-            )
-        )
-  )
 ORDER BY current.tenant_id, current.conversation_id, current.aggregate_version, current.id
 LIMIT $1
 FOR UPDATE OF current SKIP LOCKED
-`, limit, shardCount, shardID)
+`, limit)
 	if err != nil {
 		return nil, types.NewDBWriteFailed(err.Error())
 	}

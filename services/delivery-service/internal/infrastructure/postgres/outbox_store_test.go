@@ -144,57 +144,72 @@ func TestOutboxStoreProcessReadyBatchDeadLettersAndBlocksLaterVersionIntegration
 	assertDeliveryOutboxStatus(t, ctx, pool, "event-2", types.OutboxStatusPending, 0)
 }
 
-func TestOutboxStoreProcessReadyShardBatchSplitsConversationsIntegration(t *testing.T) {
+func TestOutboxStoreProcessReadyShardBatchSharesHotConversationVersionIntegration(t *testing.T) {
 	pool := openTestPool(t)
 	ctx := context.Background()
 	resetDeliveryTables(t, ctx, pool)
-	for index := 1; index <= 4; index++ {
-		seedDeliveryOutbox(t, ctx, pool, fmt.Sprintf("event-%d", index), fmt.Sprintf("conversation-%d", index), 1, types.DeliveryEventInboxItemCreated)
-	}
+	seedDeliveryOutbox(t, ctx, pool, "event-v1-a", "conversation-hot", 1, types.DeliveryEventInboxItemCreated)
+	seedDeliveryOutbox(t, ctx, pool, "event-v1-b", "conversation-hot", 1, types.DeliveryEventInboxItemCreated)
+	seedDeliveryOutbox(t, ctx, pool, "event-v1-c", "conversation-hot", 1, types.DeliveryEventInboxItemCreated)
+	seedDeliveryOutbox(t, ctx, pool, "event-v2-a", "conversation-hot", 2, types.DeliveryEventInboxItemCreated)
 
 	store := NewOutboxStore(pool, WithOutboxClock(func() time.Time {
 		return time.Date(2026, 6, 28, 12, 0, 0, 0, time.UTC)
 	}))
-	published := map[string]bool{}
-	stats, err := store.ProcessReadyShardBatch(ctx, 10, 3, time.Millisecond, 2, 0, func(ctx context.Context, messages []types.OutboxMessage) []error {
+	firstBatch := make([]string, 0)
+	stats, err := store.ProcessReadyShardBatch(ctx, 2, 3, time.Millisecond, 4, 0, func(ctx context.Context, messages []types.OutboxMessage) []error {
 		errs := make([]error, len(messages))
 		for _, message := range messages {
-			if got := deliveryOutboxShardForConversation(t, ctx, pool, string(message.TenantID), string(message.ConversationID), 2); got != 0 {
-				t.Fatalf("shard 0 received conversation %s assigned to shard %d", message.ConversationID, got)
-			}
-			published[message.EventID] = true
+			firstBatch = append(firstBatch, message.EventID)
 		}
 		return errs
 	})
 	if err != nil {
 		t.Fatalf("process shard batch: %v", err)
 	}
-	if stats.Fetched != stats.Published {
-		t.Fatalf("unexpected shard 0 stats: %+v", stats)
+	if stats.Fetched != 2 || stats.Published != 2 {
+		t.Fatalf("first batch should publish two rows from the hot version: %+v", stats)
 	}
+	if len(firstBatch) != 2 || firstBatch[0] != "event-v1-a" || firstBatch[1] != "event-v1-b" {
+		t.Fatalf("first batch should only publish version 1 rows in order, got %v", firstBatch)
+	}
+	assertDeliveryOutboxStatus(t, ctx, pool, "event-v1-a", types.OutboxStatusPublished, 0)
+	assertDeliveryOutboxStatus(t, ctx, pool, "event-v1-b", types.OutboxStatusPublished, 0)
+	assertDeliveryOutboxStatus(t, ctx, pool, "event-v1-c", types.OutboxStatusPending, 0)
+	assertDeliveryOutboxStatus(t, ctx, pool, "event-v2-a", types.OutboxStatusPending, 0)
 
-	stats, err = store.ProcessReadyShardBatch(ctx, 10, 3, time.Millisecond, 2, 1, func(ctx context.Context, messages []types.OutboxMessage) []error {
+	secondBatch := make([]string, 0)
+	stats, err = store.ProcessReadyShardBatch(ctx, 10, 3, time.Millisecond, 4, 1, func(ctx context.Context, messages []types.OutboxMessage) []error {
 		errs := make([]error, len(messages))
 		for _, message := range messages {
-			if got := deliveryOutboxShardForConversation(t, ctx, pool, string(message.TenantID), string(message.ConversationID), 2); got != 1 {
-				t.Fatalf("shard 1 received conversation %s assigned to shard %d", message.ConversationID, got)
-			}
-			published[message.EventID] = true
+			secondBatch = append(secondBatch, message.EventID)
 		}
 		return errs
 	})
 	if err != nil {
-		t.Fatalf("process shard 1 batch: %v", err)
+		t.Fatalf("process second shard batch: %v", err)
 	}
-	if stats.Fetched != stats.Published {
-		t.Fatalf("unexpected shard 1 stats: %+v", stats)
+	if stats.Fetched != 1 || stats.Published != 1 {
+		t.Fatalf("second batch should only finish the lower aggregate version: %+v events=%v", stats, secondBatch)
 	}
-	if len(published) != 4 {
-		t.Fatalf("expected all conversations to be published across shards, got %v", published)
+	if len(secondBatch) != 1 || secondBatch[0] != "event-v1-c" {
+		t.Fatalf("higher aggregate version should remain blocked until version 1 is complete, got %v", secondBatch)
 	}
-	for index := 1; index <= 4; index++ {
-		assertDeliveryOutboxStatus(t, ctx, pool, fmt.Sprintf("event-%d", index), types.OutboxStatusPublished, 0)
+	assertDeliveryOutboxStatus(t, ctx, pool, "event-v2-a", types.OutboxStatusPending, 0)
+
+	stats, err = store.ProcessReadyShardBatch(ctx, 10, 3, time.Millisecond, 4, 2, func(ctx context.Context, messages []types.OutboxMessage) []error {
+		if len(messages) != 1 || messages[0].EventID != "event-v2-a" {
+			t.Fatalf("expected version 2 after version 1 completes, got %+v", messages)
+		}
+		return make([]error, len(messages))
+	})
+	if err != nil {
+		t.Fatalf("process version 2 batch: %v", err)
 	}
+	if stats.Fetched != 1 || stats.Published != 1 {
+		t.Fatalf("third batch should publish version 2: %+v", stats)
+	}
+	assertDeliveryOutboxStatus(t, ctx, pool, "event-v2-a", types.OutboxStatusPublished, 0)
 }
 
 func TestOutboxStoreRepairAuditsDLQIntegration(t *testing.T) {
@@ -846,20 +861,6 @@ WHERE event_id = $1
 		t.Fatalf("read delivery outbox id: %v", err)
 	}
 	return id
-}
-
-func deliveryOutboxShardForConversation(t *testing.T, ctx context.Context, pool *pgxpool.Pool, tenantID string, conversationID string, shardCount int) int {
-	t.Helper()
-	var shard int
-	if err := pool.QueryRow(ctx, `
-SELECT MOD(
-    MOD(hashtextextended($1 || ':' || $2, 0), $3::bigint) + $3::bigint,
-    $3::bigint
-)::int
-`, tenantID, conversationID, shardCount).Scan(&shard); err != nil {
-		t.Fatalf("compute delivery outbox shard: %v", err)
-	}
-	return shard
 }
 
 func assertDeliveryOutboxRepairAudit(t *testing.T, ctx context.Context, pool *pgxpool.Pool, outboxID int64, mode string, outcome string, skipReason string, beforeStatus string, beforeRetry int, beforeLastError string, afterStatus string, afterRetry int, afterLastError string, reason string, forbidden ...string) {

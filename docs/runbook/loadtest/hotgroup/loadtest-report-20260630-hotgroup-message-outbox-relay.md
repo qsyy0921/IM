@@ -124,6 +124,100 @@ per-session queue / resume buffer pressure metrics
 Prometheus dashboard 中 push signal egress 与 client observed signal 的差值
 ```
 
+## 2026-06-30 后续诊断补充
+
+### push signal writer 观测
+
+提交 `7ec899d8 feat: add push signal pressure metrics` 后，push-gateway WebSocket writer
+已暴露低敏写出指标，`loadtest/hotgroup` 也会记录每个 conversation subscriber 的
+signal 数、最大 seq、首帧 / 末帧耗时、完成状态和 read error。
+
+在 Ubuntu Docker redeploy push-gateway 后，诊断 run：
+
+```text
+run_name = hotgroup-readfanout-6000-400qps-100sub-20260630-2258
+commit = 7ec899d
+git_dirty = true
+group_size = 6000
+message_count = 1000
+message_rate = 400/s
+subscriber_count = 100
+fanout_mode = READ_FANOUT
+```
+
+结果：
+
+```text
+success = true
+conversation_signal_count = 100000
+subscriber completed = 100 / 100
+send_p95_ms = 17.75
+send_p99_ms = 22.66
+PullInbox p95_ms = 14.05
+user_inbox_rows = 0
+delivery_outbox_pending = 0
+Kafka lag = 0
+```
+
+该 run 证明 READ_FANOUT 路径在 6000 人 / 400 msg/s / 100 个在线订阅者下可以完成
+online signal、PullInbox 和 ACK 抽样。它的限制是：当时工作区包含 delivery outbox
+query 未提交改动，因此只能作为诊断证据；后续需要在 clean commit 镜像下复压，才能写入
+可复现实验基线。
+
+原始目录：
+
+```text
+H:\NexusIM\loadtest-results\hotgroup-readfanout-6000-400qps-100sub-20260630-2258
+```
+
+### delivery_outbox ready query 瓶颈
+
+HYBRID 诊断 run：
+
+```text
+run_name = hotgroup-hybrid-1000-400qps-pushmetrics-20260630-2232
+group_size = 1000
+message_count = 1000
+message_rate = 400/s
+fanout_mode = HYBRID_FANOUT
+```
+
+失败原因不是 SendMessage，也不是 message outbox。该 run 产生百万级 per-user
+`delivery_outbox` row 后，旧 ready query 对每个候选 row 都用 anti-join 检查低版本
+blocker。`EXPLAIN ANALYZE` 显示旧查询在约 100 万 pending row 下取 500 行约 24s，
+会让 relay 发布速度被 PostgreSQL ready query 吃掉。
+
+本轮将 ready query 改为 per-conversation frontier 形态：
+
+```text
+frontier = 每个 tenant + conversation 当前最低 PENDING / DLQ aggregate_version
+current = 只锁 frontier version 中已经到 available_at / next_retry_at 的 PENDING row
+```
+
+语义：
+
+- 同一个 conversation 的高 `aggregate_version` 仍会被低版本 PENDING / DLQ 阻塞；
+- 同一个 `aggregate_version` 内的多条 user-level delivery event 可以被多 worker 用
+  `FOR UPDATE SKIP LOCKED` 分批发布；
+- 如果最低版本尚未到 retry 时间，后续高版本不会被越过；
+- 这是 first-stage 查询优化，不是完整 outbox frontier/progress 表。
+
+本地 Docker 配置同时把 delivery outbox relay worker 提高到 8：
+
+```text
+NEXUSIM_DELIVERY_OUTBOX_WORKERS=8
+NEXUSIM_DELIVERY_OUTBOX_BATCH_SIZE=500
+NEXUSIM_DELIVERY_KAFKA_BATCH_SIZE=500
+```
+
+后续判断：
+
+- 如果目标是继续支撑千人级 HYBRID per-user materialized outbox，应继续评估显式
+  outbox frontier / progress 表，减少每批扫描成本；
+- 如果目标是热点群 / 大群吞吐，应优先让策略进入 READ_FANOUT / BROADCAST_SIGNAL，
+  避免把百万级 per-user outbox 当作主路径；
+- Kafka / Redis 只负责事件传播和在线 signal，不应替代业务 fanout 策略。
+
 ## 当前限制
 
 - 本报告没有嵌入 Grafana 截图；低敏原始 summary 和 push debug JSON 已写入 H 盘结果目录。
@@ -150,11 +244,12 @@ H:\NexusIM\loadtest-results\hotgroup-message-relayopt-1000u-8000m-1200qps-202606
 
 ## 下一步
 
-1. 已实现第一阶段 push-gateway writer flush 指标和 `loadtest/hotgroup` per-connection
-   signal summary；下一步重建最新镜像并 redeploy。
-2. 再跑 800 -> 1000 -> 1200 msg/s 的 push-focused step，定位 WebSocket writer、client
-   read loop、session queue 还是 Redis route / Kafka consumer。
-3. 将 `/metrics` 中 `nexusim_push_gateway_ws_writer_events_total` 和 runner
-   `push.subscriber_signals[]` 一起写入新报告。
+1. 提交 delivery outbox frontier ready query，重建 clean commit delivery-service 镜像并
+   redeploy。
+2. 复压 READ_FANOUT 6000 人档位，再跑 800 -> 1000 -> 1200 msg/s 的 push-focused step，
+   定位 WebSocket writer、client read loop、session queue、Redis route、Kafka consumer
+   或 PostgreSQL ready query。
+3. 将 `/metrics` 中 `nexusim_push_gateway_ws_writer_events_total`、delivery outbox relay
+   stats 和 runner `push.subscriber_signals[]` 一起写入新报告。
 4. 必要时把 push conversation signal 改成按 conversation subscription bucket 批量广播，
    或引入更明确的 online signal backpressure / sampling 策略。

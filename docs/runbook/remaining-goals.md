@@ -21,8 +21,11 @@
    timeline-service；clean commit `d13bff6c` 已完成 61 人 / 20 消息、200 人 / 500 消息、
    500 人 / 1000 消息三档复验；clean commit `0a1395c` 已解除 1000 人 / 4000 消息 /
    800 msg/s 内的 message outbox relay 瓶颈。push-gateway writer metrics 和 hotgroup
-   per-subscriber signal summary 已落地；下一步重建 / redeploy 最新镜像并跑
-   push-focused step，补趋势图和瓶颈曲线归档。
+   per-subscriber signal summary 已落地并 redeploy；READ_FANOUT 6000 人 / 1000 消息 /
+   400 msg/s / 100 subscriber 诊断 run 已通过。HYBRID 1000 人 / 1000 消息 /
+   400 msg/s 暴露 delivery outbox ready query 在百万级 per-user outbox 下退化，当前已
+   改成 per-conversation frontier query；下一步用 clean commit delivery-service 镜像
+   复压更高档位，补趋势图和瓶颈曲线归档。
 2. Agent action boundary / repair cases：在 provider replay admin / workflow handoff 已落
    的基础上，继续扩更多需要 proposal / approval / workflow / audit 的 action 与 repair 场景。
 3. Product-active 服务按需推进：workflow、audit、admin、notification、media、vector、
@@ -138,7 +141,9 @@
   已进入服务端 first path；hotgroup runner 已验证 3 个 WebSocket subscriber 共收到
   60 条 conversation signal；message relay 复验后高压失败点已迁移到 push conversation
   signal 写出 / runner 读取观测。已补 writer flush 指标和 per-connection signal summary；
-  后续跑最新镜像 push-focused step、Redis 网络分区 smoke、跨实例 resume、容量测试。
+  READ_FANOUT 6000 人 / 1000 消息 / 100 subscriber 诊断 run 已验证 100000 条 signal
+  可完整读出；后续跑 clean commit 更高 QPS step、Redis 网络分区 smoke、跨实例 resume、
+  容量测试。
 - `receipt-service`：会话列表产品能力、更多摘要策略和容量曲线。
 - `contacts-service`：组织级策略、租户默认值、来源策略、隐私例外。
 - `policy-service`：provider-grade ReBAC / DSL、moderation / risk scoring、tenant quota、

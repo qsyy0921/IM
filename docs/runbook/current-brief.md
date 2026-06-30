@@ -94,7 +94,15 @@ brief、loadtest report、development-progress 或 archive。
   outbound dequeued、frame write success/error、delivery.notify write success/error、
   resume_hint write success/error 和 last event timestamp；`loadtest/hotgroup` 现在在
   summary/report 中记录每个 conversation subscriber 的 signal 数、max seq、首帧/末帧耗时、
-  completed 和 read error。focused checks 已通过，下一步是最新镜像 redeploy 后复压。
+  completed 和 read error。push-gateway 镜像已按 clean commit redeploy，READ_FANOUT
+  6000 人 / 1000 消息 / 400 msg/s / 100 subscriber 诊断 run 已通过，100000 条
+  conversation signal 均被 subscriber 读到，`delivery_outbox_pending=0`、Kafka lag=0。
+- 2026-06-30 HYBRID 1000 人 / 1000 消息 / 400 msg/s 诊断 run 暴露 per-user outbox
+  写扩散下的 delivery outbox ready query 退化：旧 anti-join blocker 查询在约 100 万
+  pending row 下每批 500 行约 24s。delivery-service 已改为 per-conversation frontier
+  ready query，本地 relay worker 提高到 8；这是 first-stage 查询优化，后续仍需通过
+  clean commit 镜像复压并决定 HYBRID 策略是否提前切 READ_FANOUT 或引入显式
+  frontier / progress 表。
 
 ## 已成型底座
 
@@ -124,6 +132,7 @@ brief、loadtest report、development-progress 或 archive。
 
 ## 下一个方向
 
-- 基于已落地的 push writer metrics 和 per-connection signal summary，下一步优先重建镜像、
-  redeploy，然后跑 push-focused step 并记录 Prometheus / Grafana 时间窗口；正式生产级运维 UI、
-  provider-grade 长周期平台仍后置。
+- 下一步优先提交 delivery outbox frontier ready query，重建 clean commit delivery-service
+  镜像并 redeploy，然后继续跑 READ_FANOUT 800 -> 1000 -> 1200 msg/s step，记录
+  Prometheus / Grafana 或 debug metrics 时间窗口；正式生产级运维 UI、provider-grade
+  长周期平台仍后置。

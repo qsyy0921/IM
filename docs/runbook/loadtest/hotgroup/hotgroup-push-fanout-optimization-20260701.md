@@ -743,3 +743,91 @@ Expected interpretation:
 - If drain rate stays flat even with 10x fewer emitted signals, the next
   bottleneck is likely client / network scheduling rather than server fanout
   volume.
+
+## Pull-First Sampled Online Signal Retest
+
+The sampled signal module was committed and deployed as:
+
+```text
+562290b3 feat: add sampled hotgroup conversation signals
+873ea057 deploy: wire hotgroup signal sampling
+bac71c65 deploy: sample push delivery consumer signals
+```
+
+The clean `nexusim/push-gateway:local` image was rebuilt and archived at:
+
+```text
+H:\NexusIM\docker-images\archives\nexusim-push-gateway-bac71c65-20260701-063645.tar
+```
+
+The archive was loaded on Ubuntu and these containers were recreated with
+`NEXUSIM_PUSH_CONVERSATION_SIGNAL_SAMPLE_EVERY=10`:
+
+```text
+nexusim-push-gateway-delivery-consumer
+nexusim-push-gateway-ws
+nexusim-push-gateway-ws-2
+nexusim-push-gateway-ws-3
+nexusim-push-gateway-ws-4
+```
+
+The comparable 400 subscriber coordinator + 4 shard run used the same
+6000-member / 1000-message / 8000 msg/s / 256-sender READ_FANOUT shape as the
+full-signal multi-ws run.
+
+Artifacts:
+
+```text
+H:\NexusIM\loadtest-results\hotgroup-sample10-clean-400sub-coordinator-20260701-070655
+H:\NexusIM\loadtest-results\hotgroup-sample10-clean-400sub-shard*-20260701-070655
+docs/runbook/loadtest/hotgroup/hotgroup-multirunner-analysis-20260701-sample10-400sub.md
+docs/runbook/loadtest/hotgroup/hotgroup-metrics-window-20260701-sample10-400sub.md
+```
+
+Results:
+
+| metric | value |
+| --- | ---: |
+| success | true |
+| group_size | 6000 |
+| fanout_mode | READ_FANOUT |
+| message_count | 1000 |
+| target_message_rate | 8000 msg/s |
+| sender_count | 256 |
+| send_success / errors | 1000 / 0 |
+| send_p95 / p99 | 17.835 ms / 22.003 ms |
+| PullInbox p95 | 122.69 ms |
+| message_outbox_pending / delivery_outbox_pending | 0 / 0 |
+| subscriber_count | 400 |
+| emitted conversation signals read | 40000 |
+| signal_span_seconds | 25.243 s |
+| baseline full-signal span | 141.719 s |
+
+Prometheus window:
+
+| metric | value |
+| --- | ---: |
+| core_targets_up | 7 |
+| delivery_outbox_pending max | 267, then 0 |
+| push writer delivery notify success window | about 40720.899 |
+| Redis subscriber messages window | about 407.209 |
+| Redis subscriber enqueued window | about 40720.899 |
+| delivery notify write p95 / p99 window | 0.481 ms / 0.948 ms |
+| delivery notify queue p95 / p99 window | 4.045 ms / 4.82 ms |
+| Redis subscriber fanout p95 / p99 window | 4.767 ms / 10 ms |
+
+Interpretation:
+
+- The emitted online signal count dropped from 400000 to 40000, and the drain
+  span dropped from 141.719s to 25.243s. This confirms that online frame volume
+  is a material factor for large READ_FANOUT rooms.
+- SendMessage, message outbox, delivery projection, delivery outbox, PullInbox
+  and ACK remained valid; sampled online signal did not replace durable
+  PullInbox semantics.
+- The drain span did not drop by a full 10x. At this smaller emitted-frame
+  volume, fixed setup time, WebSocket scheduling and client/network receive
+  cadence become more visible. Do not report this as a production capacity
+  number.
+- For very large rooms, the next strategy is to keep `sample_every` explicit per
+  room policy and then test larger message counts / higher subscriber counts to
+  find the new sustainable QPS curve.

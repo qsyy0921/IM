@@ -44,6 +44,8 @@ CreateConversation -> batch CreateMemberChange(JOIN)
 | `hotgroup-multirunner-analysis-20260701-multiws-400sub.md` | clean commit `4be4b2d` 的 4 个 push-gateway ws 实例拓扑复压：400 subscriber 按 100 / 100 / 100 / 100 分散到 4 个 ws 端口，400000 条 signal 全部读完，drain rate 约 2822.479 signals/s，低于单 ws fanout-buckets baseline 约 2874.378 signals/s；说明简单多开 ws 进程不是当前瓶颈解。 |
 | `hotgroup-metrics-window-20260701-multiws-400sub.md` | multi-ws 窗口显示 4 个 push debug target 均 up，`delivery_notify` queue p95 / p99 约 3.703ms / 4.742ms，write p95 / p99 约 0.425ms / 0.769ms，Redis subscriber fanout p95 / p99 约 69.014ms / 93.803ms；writer / Redis error、queue-full 和 slow eviction 均为 0。 |
 | `hotgroup-push-fanout-optimization-20260701.md` pull-first sampled signal update | 已实现显式 `NEXUSIM_PUSH_CONVERSATION_SIGNAL_SAMPLE_EVERY` 和 runner `--conversation-signal-sample-every`。默认 `1` 保持全量 signal；大群可显式采样在线唤醒，并用 PullInbox 追平 durable timeline。该模块已通过 focused tests / build，尚待 clean Docker redeploy 和 sampled vs full 复压。 |
+| `hotgroup-multirunner-analysis-20260701-sample10-400sub.md` | clean commit `bac71c65` 的 pull-first sampled online signal 复压：delivery-consumer 和 4 个 ws 实例均配置 `NEXUSIM_PUSH_CONVERSATION_SIGNAL_SAMPLE_EVERY=10`；6000 人 / 1000 消息 / 8000 msg/s / 400 subscriber 只发出并读完 40000 条 signal，span 25.243s；SendMessage / PullInbox / ACK 成功，message / delivery outbox pending=0。 |
+| `hotgroup-metrics-window-20260701-sample10-400sub.md` | sample=10 窗口显示核心 target up，`delivery_outbox_pending` 峰值 267 后归零，Redis subscriber message/window 约 407、enqueued/window 约 40720，符合 100 sampled seq * 4 ws * 100 subscribers；`delivery_notify` write p95 / p99 低于 1ms，说明减少在线 frame 总量能显著缩短 drain span，但该结果不是生产容量上限。 |
 
 ## 目标
 

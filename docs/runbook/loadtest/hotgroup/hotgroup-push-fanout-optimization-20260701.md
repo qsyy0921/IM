@@ -236,3 +236,55 @@ frame payloads, durable inbox, PullInbox, ACK, slow-session handling or resume
 behavior. The next comparable run should redeploy this commit and rerun the same
 400 subscriber coordinator + shard scenario, then compare Redis enqueue
 duration, WebSocket writer duration and runner signal drain span in one report.
+
+## Redis Subscriber Fanout Duration Retest
+
+The Redis subscriber fanout duration instrumentation was committed as `6099ecd`,
+rebuilt, archived and redeployed to Ubuntu Docker. The same 400 subscriber
+coordinator + 4 shard scenario was rerun:
+
+```text
+group_size=6000
+message_count=1000
+message_rate=8000
+sender_count=256
+subscriber_count=400
+fanout_mode=READ_FANOUT
+runner layout=coordinator + 4 subscriber-only shards
+```
+
+Artifacts:
+
+- coordinator:
+  `H:\NexusIM\loadtest-results\hotgroup-redisfanout-clean-400sub-coordinator-20260701-033606`
+- shards:
+  `H:\NexusIM\loadtest-results\hotgroup-redisfanout-clean-400sub-shard*-20260701-033606`
+- analysis:
+  `hotgroup-multirunner-analysis-20260701-redisfanout-400sub.md`
+- metrics window:
+  `hotgroup-metrics-window-20260701-redisfanout-clean-400sub.md`
+
+Result:
+
+- coordinator send, PullInbox and ACK succeeded;
+- `message_outbox_pending=0`, `delivery_outbox_pending=0`;
+- 4 shards read 400000 conversation signals with no subscriber error;
+- aggregate signal span rate was about `2883.976 signals/s`;
+- previous single-runner 400 subscriber baseline was about `2839.888 signals/s`;
+- WebSocket `delivery_notify` write p95 / p99 were about `0.406ms / 0.63ms`;
+- Redis subscriber conversation signal fanout/enqueue whole-window p95 / p99
+  were about `56.14ms / 91.228ms`;
+- Redis subscriber conversation signal fanout/enqueue five-minute last p95 /
+  p99 were about `60.263ms / 92.053ms`;
+- Redis subscriber fanout/enqueue average was about `16.485ms`, max about
+  `84.305ms`;
+- writer error, Redis subscriber error and slow eviction stayed at 0.
+
+Judgment: the bottleneck is now narrowed to Redis subscriber local
+fanout/enqueue scheduling for conversation signals. The subscriber receives one
+conversation signal, then spends tens of milliseconds fanning it out to the 400
+local WebSocket sessions, while the individual WebSocket write remains
+sub-millisecond at p99. The next module should introduce a controlled
+conversation fanout worker / shard queue so Redis subscriber goroutines can
+handoff quickly and worker-side queue depth, drain latency and backpressure can
+be measured directly.

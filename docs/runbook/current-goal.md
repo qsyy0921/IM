@@ -189,15 +189,21 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
   结论：`conn.Write` 单次调用长尾不是当前主瓶颈，下一步应定位 Redis subscriber
   收到 conversation signal 后的本地 fanout / enqueue 调度、per-session writer
   调度节奏、runner 读取背压和链路吞吐。
-- 本轮已补 Redis subscriber 本地 fanout / enqueue 耗时观测：push-gateway
-  `/metrics` 现在会输出 `delivery_notify` 和 `conversation_signal` 两类
-  `nexusim_push_gateway_redis_subscriber_fanout_duration_milliseconds` histogram
-  以及 max gauge；`tools/record-hotgroup-metrics-window.ps1` 会把
-  conversation signal fanout/enqueue p95 / p99 / avg / max 写入窗口报告。
-  该改动只增加低基数观测，不改变 Redis route、WebSocket frame、durable inbox、
-  PullInbox 或 ACK 语义。下一步需要 clean commit 镜像重建 / redeploy，并用同一
-  400 subscriber coordinator + shard 场景复压，把 Redis enqueue duration、
-  WebSocket writer duration 和 runner drain span 放到同一报告里对比。
+- 2026-07-01 已用 clean commit `6099ecd` 重建 / redeploy push-gateway，并完成
+  Redis subscriber fanout duration 复压：
+  `hotgroup-redisfanout-clean-400sub-coordinator-20260701-033606`。该 run 为
+  6000 人、1000 消息、目标 8000 msg/s、256 sender、400 subscriber、
+  READ_FANOUT；coordinator `send_p95_ms=18.325`、`send_p99_ms=21.333`、
+  `PullInbox p95=20.016ms`，message / delivery outbox pending=0；4 个 shard
+  共读完 400000 条 signal，drain rate 约 `2883.976 signals/s`。Prometheus
+  窗口显示 WebSocket `delivery_notify` write p95 / p99 约 `0.406ms / 0.63ms`，
+  Redis subscriber conversation signal fanout/enqueue 整窗口 p95 / p99 约
+  `56.14ms / 91.228ms`，5m last p95 / p99 约 `60.263ms / 92.053ms`，
+  avg 约 `16.485ms`，max 约 `84.305ms`；writer / Redis subscriber error
+  和 eviction 均为 0。结论：瓶颈已进一步收窄到 Redis subscriber 收到
+  conversation signal 后对本机 400 个 session 的本地 fanout/enqueue 调度，而不是
+  SendMessage、outbox、Kafka、registry mutex、重复 JSON marshal 或单次 WebSocket
+  `conn.Write`。
 - HYBRID 诊断档位 1000 人 / 1000 消息 / 400 msg/s 暴露 `delivery_outbox` ready query
   在百万级 per-user outbox 下退化：旧 anti-join blocker 查询每批 500 行约 24s。当前
   delivery outbox relay 已改成 per-conversation frontier ready query，并把本地 worker
@@ -210,11 +216,11 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
 
 - push-focused step 的 READ_FANOUT clean commit 阶梯 run 已完成，并明确记录 signal
   写出 / 读取指标；自动分析报告和最高档 Prometheus 低敏时间窗口均已生成。
-- 下一轮围绕 online signal drain 做优化分析：Redis route 和 WebSocket writer
-  已证明无错误 / 无 eviction，多 runner 对照也没有突破约 2.85k signals/s。
-  下一步优先定位 push-gateway conversation signal 写出路径、WebSocket flush cadence、
-  Redis subscriber fanout、per-connection write scheduling 和有线网络吞吐；不要继续只
-  盲目增大 subscriber。
+- 下一轮围绕 Redis subscriber 本地 fanout/enqueue 做架构优化：Redis route、
+  WebSocket writer、runner 多进程读取、registry mutex 和 JSON marshal 均已被排除为
+  首要瓶颈。下一步优先设计 push-gateway conversation fanout worker / shard queue，
+  要求保留 conversation 内必要顺序、显式 backpressure 指标和 fail-closed 语义；不要继续
+  只盲目增大 subscriber。
 - 文档同步本轮公开能力或瓶颈变化。
 - 提交并推送到 GitHub。
 
@@ -228,10 +234,10 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
 
 ## 后续优先级
 
-1. 下一步用 clean commit 重建 / redeploy push-gateway，并用同一 400 subscriber
-   coordinator + shard 场景复压，把 Redis subscriber fanout/enqueue p95 /
-   p99 / max、writer duration、runner drain span 一起记录；如果 enqueue 长尾高，
-   再考虑 fanout worker pool / shard queue / connection scheduling。
+1. 设计并实现 push-gateway conversation fanout worker / shard queue：Redis subscriber
+   收到 conversation signal 后快速 handoff，worker 按 conversation 或本地 session bucket
+   执行受控 fanout，暴露 queue depth、enqueue latency、worker drain、drop / eviction
+   和 backpressure 指标；保持 durable PullInbox 兜底和 fail-closed，不引入隐藏 fallback。
 2. 继续为每轮优化保留 clean commit、Docker 镜像归档、三机部署版本和 Prometheus
    时间窗口，保证压测曲线可复现。
 3. 若 HYBRID 仍要支持千人级 per-user materialized outbox，优先评估显式 frontier /

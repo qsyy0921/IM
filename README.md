@@ -189,11 +189,14 @@ REMOVE / owner transfer 也通过 timeline-service `AllocateSeqBlock` 获取 sin
 61 人 / 20 消息 / 3 subscriber、200 人 / 500 消息 / 20 subscriber、500 人 / 1000
 消息 / 50 subscriber。最大档产生 50000 条 conversation signal，`send_p95_ms=10.633`、
 `send_p99_ms=13.013`、`user_inbox_rows=0`、`delivery_outbox_pending=0`、Kafka lag=0。
-下一轮压测需要继续提高 message rate、online subscriber、慢连接比例，并补
-projection lag、online signal storm、单热点会话 fanout 和 PullInbox / ACK 追平曲线。
-低敏报告见
-`docs/runbook/loadtest/hotgroup/loadtest-report-20260628-hotgroup-relay-bottleneck.md` 和
-`docs/runbook/loadtest/hotgroup/loadtest-report-20260630-hotgroup-clean-redeploy.md`。
+随后 READ_FANOUT 路径已放大到 6000 人、100 / 200 / 400 online subscriber 和最高
+8000 msg/s 目标档；SendMessage、message outbox、delivery projection、delivery outbox
+和 Kafka 都能追平。当前热点瓶颈已通过多 runner 对照、push attribution、WebSocket
+writer duration 和 Redis subscriber fanout duration 收窄到 push-gateway 本地
+conversation signal fanout/enqueue 调度：单次 WebSocket write p99 低于 1ms，但
+400 subscriber 下 Redis subscriber fanout/enqueue p99 约 91ms。下一步是
+push-gateway conversation fanout worker / shard queue，而不是继续盲目加机器或调
+Kafka / outbox。低敏报告见 `docs/runbook/loadtest/hotgroup/`。
 
 ### 当前客户端状态
 

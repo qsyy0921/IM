@@ -35,7 +35,8 @@ CreateConversation -> batch CreateMemberChange(JOIN)
 | `hotgroup-metrics-window-20260701-pushpreenc-clean-400sub.md` | payload 预编码优化复压的 Prometheus 窗口：核心 target up，`delivery_outbox_pending` 持续为 0，push connected sessions 达到 400，writer / Redis subscriber error 和 eviction 均为 0。 |
 | `hotgroup-multirunner-analysis-20260701-writerdur-400sub.md` | clean commit `4f45519` 的 WebSocket writer duration 复压：6000 人 / 1000 消息 / 8000 msg/s / 400 subscriber，message / delivery outbox pending=0，400000 条 signal 全部读完，drain rate 约 2876.698 signals/s，仍未离开旧区间。 |
 | `hotgroup-metrics-window-20260701-writerdur-clean-400sub.md` | writer duration 窗口显示 `delivery_notify` write p95 / p99 约 0.345ms / 0.499ms、avg 约 0.125ms、max 约 10.056ms，writer / Redis subscriber error 与 eviction 为 0；下一步应定位 Redis subscriber 本地 fanout / enqueue 调度、writer goroutine 节奏和 runner 读取背压。 |
-| pending redis subscriber fanout duration retest | push-gateway 已新增 Redis subscriber 本地 fanout/enqueue duration histogram，`record-hotgroup-metrics-window.ps1` 会输出 conversation signal fanout p95 / p99 / avg / max；下一轮需要 clean commit 镜像重建 / redeploy 后用同一 400 subscriber coordinator + shard 场景复压。 |
+| `hotgroup-multirunner-analysis-20260701-redisfanout-400sub.md` | clean commit `6099ecd` 的 Redis subscriber fanout duration 复压：6000 人 / 1000 消息 / 8000 msg/s / 400 subscriber，message / delivery outbox pending=0，400000 条 signal 全部读完，drain rate 约 2883.976 signals/s，仍在旧区间。 |
+| `hotgroup-metrics-window-20260701-redisfanout-clean-400sub.md` | Redis subscriber fanout duration 窗口显示 WebSocket `delivery_notify` write p95 / p99 约 0.406ms / 0.63ms，但 Redis subscriber conversation signal fanout/enqueue 整窗口 p95 / p99 约 56.14ms / 91.228ms，5m last p95 / p99 约 60.263ms / 92.053ms；下一步应做 fanout worker / shard queue，而不是继续调单次 WebSocket write。 |
 
 ## 目标
 
@@ -171,8 +172,11 @@ clean commit `4f45519` 复压后，`delivery_notify` write p95 / p99 低于 0.5m
 而整体 drain rate 仍约 2.88k signals/s，因此下一轮不要继续优先调单次
 `conn.Write`；应补 Redis subscriber 收到事件后本地 fanout / enqueue duration，
 并把 enqueue、writer duration 和 runner drain span 放在同一报告里对比。
-当前 Redis subscriber fanout/enqueue duration 指标已经实现；正式结论仍需
-clean commit 镜像重建 / redeploy 后复压。
+clean commit `6099ecd` 复压后，Redis subscriber conversation signal fanout/enqueue
+整窗口 p95 / p99 约 `56.14ms / 91.228ms`，而单次 WebSocket write p99 约
+`0.63ms`。因此下一轮不要继续优先调单次 `conn.Write`；应设计 push-gateway
+conversation fanout worker / shard queue，让 Redis subscriber 快速 handoff，并用
+queue depth、worker drain、enqueue latency、backpressure 和 eviction 指标验证。
 
 `loadtest/hotgroup` 支持两个运行模式：
 

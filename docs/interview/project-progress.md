@@ -182,6 +182,7 @@ CreateConversation(GROUP)
 | push WebSocket payload 预编码复压 | clean commit `d8d78fd` 在 registry fanout 时预编码 delivery / conversation notify JSON，WebSocket writer 写 cached payload | 同样的 6000 人 / 1000 消息 / 8000 msg/s / 400 subscriber + 4 shard 场景产生 400000 条 signal，drain rate 约 2863.092 signals/s；相比单 runner baseline 只高约 0.8%，也未超过上一轮 2891.8 signals/s，说明重复 JSON marshal 也不是主瓶颈。下一步应看 WebSocket flush / per-connection scheduling / nhooyr 写入 / 网络或客户端读取背压。 |
 | WebSocket writer duration 观测 | push-gateway 已新增 `frame_write` / `delivery_notify` 写耗时 histogram，hotgroup Prometheus 窗口会记录 p95 / p99 / avg / max | 这是下一轮复压的定位工具：如果 `conn.Write` 长尾高，优先优化 WebSocket flush / scheduling / 网络；如果写耗时低但 signal drain 仍慢，则继续查 subscriber read loop、runner decode / accounting 或链路吞吐。 |
 | WebSocket writer duration 复压 | clean commit `4f45519` 重建 / redeploy 后，同一 400 subscriber coordinator + 4 shard 场景复压 | 400000 条 signal 全部读完，drain rate 约 2876.698 signals/s，仍未离开旧区间；Prometheus 窗口显示 `delivery_notify` write p95 / p99 约 0.345ms / 0.499ms、avg 约 0.125ms、max 约 10.056ms，说明单次 `conn.Write` 长尾不是主瓶颈，下一步应看 Redis subscriber 本地 fanout / enqueue 和 writer goroutine 调度。 |
+| Redis subscriber fanout duration 复压 | clean commit `6099ecd` 重建 / redeploy 后，同一 400 subscriber coordinator + 4 shard 场景复压 | 400000 条 signal 全部读完，drain rate 约 2883.976 signals/s，仍未离开旧区间；Prometheus 窗口显示 WebSocket `delivery_notify` write p95 / p99 约 0.406ms / 0.63ms，但 Redis subscriber conversation signal fanout/enqueue p95 / p99 约 56.14ms / 91.228ms，说明瓶颈已收窄到本地 fanout/enqueue 调度，下一步应做 conversation fanout worker / shard queue。 |
 
 面试时可以把这个结果讲成一次真实性能定位过程：
 
@@ -196,8 +197,9 @@ multi-worker batch publish，把 delivery outbox ready query 改成 per-conversa
 1000000 和 2000000，drain rate 仍约 2.83k-2.86k signals/s。这个结果说明当前上限不在 SendMessage、outbox、
 delivery projection 或 Kafka，而更接近 online signal drain / 压测端读取能力。
 为了避免靠人工感觉判断，我补了一个 hotgroup 离线分析器，后续每轮压测都先从
-原始 summary 生成 run matrix、瓶颈分类、证据链和下一步策略，再决定优化哪个模块。
-随后又把 Prometheus 窗口工具加上 writer / Redis route 的 per-event 归因，避免只看到
+原始 summary 生成 run matrix、瓶颈分类、证据链和下一步策略，再决定优化哪个模块；
+每一轮改进策略和结果都写回 runbook / 面试文档。随后又把 Prometheus 窗口工具加上
+writer / Redis route 的 per-event 归因，避免只看到
 `push_writer_events_total` 这种总数而不知道是写成功、写失败、入队失败还是 subscriber
 读取慢。最后我把 subscriber 拆到 4 个 runner 进程复压，结果总 drain rate 仍约
 2.85k signals/s，所以后续优化重心从压测端单进程读取转到 push-gateway 写出 / flush /
@@ -275,10 +277,12 @@ marshal，而更接近 WebSocket writer flush / per-connection scheduling / nhoo
 网络吞吐 / 客户端读取背压。为此 push-gateway 已补 WebSocket writer duration
 histogram，下一轮 400 subscriber coordinator + shard 复压要把 `delivery_notify`
 write p95 / p99 / avg / max 也纳入报告，避免继续用 CPU 空闲这类间接现象判断瓶颈。
-复压结果显示写耗时 p95 / p99 低于 0.5ms，但总 drain rate 仍约 2.88k signals/s，
-所以后续讲法应进一步收窄：当前更像 Redis subscriber 本地 fanout / enqueue、
-writer goroutine 调度节奏、runner 读取背压或链路吞吐，而不是单次 WebSocket
-`conn.Write` 阻塞。
+复压结果显示写耗时 p99 低于 1ms，但总 drain rate 仍约 2.88k signals/s；随后
+Redis subscriber fanout duration 复压显示 conversation signal fanout/enqueue p95 / p99
+约 56ms / 91ms。所以后续讲法应进一步收窄：当前瓶颈不是单次 WebSocket `conn.Write`，
+而是 Redis subscriber 收到 conversation signal 后对本机 session 的 fanout/enqueue
+调度。下一步应把这一段改成 fanout worker / shard queue，并用 queue depth、
+worker drain、backpressure 和 eviction 指标验证。
 
 ### 当前系统如何承接热点群
 

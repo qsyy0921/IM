@@ -177,12 +177,15 @@ brief、loadtest report、development-progress 或 archive。
   writer / Redis subscriber error 与 eviction 为 0。结论：单次 WebSocket
   `conn.Write` 长尾不是当前主瓶颈，下一步应定位 Redis subscriber 本地 fanout /
   enqueue 调度、writer goroutine 节奏、runner 读取背压和网络吞吐。
-- 本轮已补 Redis subscriber 本地 fanout / enqueue duration histogram：
-  push-gateway `/metrics` 暴露 `delivery_notify` / `conversation_signal` 两类
-  Redis subscriber fanout 耗时，hotgroup Prometheus 时间窗口脚本会输出
-  conversation signal fanout p95 / p99 / avg / max。下一步用 clean commit 镜像
-  redeploy 后复压同一 400 subscriber coordinator + shard 场景，对比 Redis
-  enqueue、WebSocket writer duration 和 runner drain span。
+- 2026-07-01 已用 clean commit `6099ecd` 重建 / redeploy push-gateway，并完成
+  Redis subscriber fanout duration 复压：
+  `hotgroup-redisfanout-clean-400sub-coordinator-20260701-033606`。同一 400
+  subscriber coordinator + 4 shard 场景下，400000 条 signal 全部读完，drain rate
+  约 `2883.976 signals/s`；WebSocket `delivery_notify` write p95 / p99 约
+  `0.406ms / 0.63ms`，Redis subscriber conversation signal fanout/enqueue 整窗口
+  p95 / p99 约 `56.14ms / 91.228ms`，5m last p95 / p99 约
+  `60.263ms / 92.053ms`，avg 约 `16.485ms`。结论：瓶颈已进一步收窄到
+  Redis subscriber 收到 conversation signal 后的本地 fanout/enqueue 调度。
 - 2026-06-30 HYBRID 1000 人 / 1000 消息 / 400 msg/s 诊断 run 暴露 per-user outbox
   写扩散下的 delivery outbox ready query 退化：旧 anti-join blocker 查询在约 100 万
   pending row 下每批 500 行约 24s。delivery-service 已改为 per-conversation frontier
@@ -218,8 +221,7 @@ brief、loadtest report、development-progress 或 archive。
 
 ## 下一个方向
 
-- 下一步重建 / redeploy 包含 Redis subscriber fanout duration 指标的 push-gateway；
-  用同一 400 subscriber coordinator + shard 场景复压，比较 enqueue duration、
-  writer duration 和 runner drain span，判断是否需要 fanout worker pool /
-  shard queue / connection scheduling。
+- 下一步做 push-gateway conversation fanout worker / shard queue：Redis subscriber
+  快速 handoff，worker 负责受控 fanout，并记录 queue depth、worker drain、
+  enqueue latency、backpressure 和 eviction 指标。
   正式生产级运维 UI、provider-grade 长周期平台仍后置。

@@ -198,6 +198,12 @@ brief、loadtest report、development-progress 或 archive。
   `38.636ms / 87.5ms`，总 drain 没突破旧曲线。下一步不要继续调 Redis subscriber
   handoff，而要分析 worker 本地 fanout、per-session writer 调度、flush / batching
   和 runner 读取侧。
+- 2026-07-01 已补 push-gateway WebSocket writer queue latency 和 batch drain：
+  `ServerFrame.EnqueuedAtMS` 是 transport-only 元数据，writer 会记录 outbound queue
+  duration histogram / max，`NEXUSIM_PUSH_WS_WRITER_BATCH_SIZE` 默认 16 用于单连接内
+  小批量 drain 已排队 frame。该改动保持单连接顺序和现有 durable PullInbox 边界；
+  focused push-gateway tests、hotgroup tests 和 build 已通过。下一步需要 clean commit
+  镜像重建 / redeploy 后复压，确认 queue latency 是否解释 online signal drain 曲线。
 - 2026-06-30 HYBRID 1000 人 / 1000 消息 / 400 msg/s 诊断 run 暴露 per-user outbox
   写扩散下的 delivery outbox ready query 退化：旧 anti-join blocker 查询在约 100 万
   pending row 下每批 500 行约 24s。delivery-service 已改为 per-conversation frontier
@@ -234,6 +240,8 @@ brief、loadtest report、development-progress 或 archive。
 ## 下一个方向
 
 - 下一步围绕 push-gateway worker 本地 fanout / session writer 调度继续优化：
-  queue handoff 已不是瓶颈；需要对比 per-conversation worker 数、session outbound
-  queue drain、writer goroutine 调度、WebSocket flush 策略和 runner 读取背压。
+  queue handoff 已不是瓶颈；当前已补 writer queue latency / batch drain，下一步
+  先用同一 400 subscriber coordinator + shard 场景复压，再决定是否继续调整
+  per-conversation worker 数、session outbound queue drain、writer goroutine 调度、
+  WebSocket flush 策略或 runner 读取背压。
   正式生产级运维 UI、provider-grade 长周期平台仍后置。

@@ -56,4 +56,5 @@ type ServerFrame struct {
 	Retryable         bool                 `json:"retryable"`
 	RetryAfterMS      int64                `json:"retry_after_ms,omitempty"`
 	EncodedPayload    []byte               `json:"-"`
+	EnqueuedAtMS      int64                `json:"-"`
 }

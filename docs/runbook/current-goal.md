@@ -217,6 +217,14 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
   delivery notify write p95 / p99 约 `0.349ms / 0.495ms`。结论：Redis subscriber
   快速 handoff 已成立，但总 drain 曲线没有突破约 2.85k-2.89k signals/s；瓶颈仍在
   worker 对本机 400 session 的本地 fanout/enqueue、session writer 调度或客户端读取侧。
+- 2026-07-01 已补下一轮 session writer 调度诊断 / 优化代码：push-gateway
+  WebSocket writer 现在记录 outbound queue latency histogram / max，`delivery.notify`
+  queue latency 会进入 Prometheus 时间窗口；writer 每次唤醒后会按
+  `NEXUSIM_PUSH_WS_WRITER_BATCH_SIZE` 小批量 drain 已排队 frame，默认 16，保持
+  单连接内顺序，不改变协议、durable inbox、PullInbox / ACK、Redis route 或
+  slow-session fail-closed 语义。focused tests / build 已通过；下一步需要 clean
+  commit 镜像重建 / redeploy 后用同一 400 subscriber coordinator + shard 场景复压，
+  判断 queue latency / batch drain 是否解释约 2.85k-2.89k signals/s 曲线。
 - HYBRID 诊断档位 1000 人 / 1000 消息 / 400 msg/s 暴露 `delivery_outbox` ready query
   在百万级 per-user outbox 下退化：旧 anti-join blocker 查询每批 500 行约 24s。当前
   delivery outbox relay 已改成 per-conversation frontier ready query，并把本地 worker
@@ -246,10 +254,10 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
 
 ## 后续优先级
 
-1. 基于 clean commit `93654117` 的复压结果，继续定位 push-gateway worker 本地 fanout /
-   session writer 调度：queue handoff 已不是瓶颈，下一轮不要继续调 Redis subscriber
-   receive path；应分析 session queue、writer goroutine、flush / batching 和 runner
-   读取侧对约 2.85k-2.89k signals/s 曲线的影响。
+1. 基于本轮 writer queue latency / batch drain 代码，先提交 clean commit、重建 /
+   归档 / redeploy push-gateway，再复跑 400 subscriber coordinator + shard 场景；
+   重点看 `delivery_notify` queue p95 / p99 / max、write p95 / p99、worker fanout
+   p95 / p99 和整体 signal drain rate 是否迁移。
 2. 继续为每轮优化保留 clean commit、Docker 镜像归档、三机部署版本和 Prometheus
    时间窗口，保证压测曲线可复现。
 3. 若 HYBRID 仍要支持千人级 per-user materialized outbox，优先评估显式 frontier /

@@ -388,7 +388,7 @@ func (registry *Registry) replayLocked(registration types.SessionRegistration, s
 		return true
 	}
 	for _, frame := range pendingFrames {
-		registration.Outbound <- frame
+		registration.Outbound <- stampOutboundFrame(frame)
 		registry.metrics.ResumeBufferReplayCount++
 	}
 	return false
@@ -396,7 +396,7 @@ func (registry *Registry) replayLocked(registration types.SessionRegistration, s
 
 func (registry *Registry) enqueueResumeHintLocked(outbound chan<- types.ServerFrame) {
 	select {
-	case outbound <- domain.ResumeHint("buffer_miss", nil):
+	case outbound <- stampOutboundFrame(domain.ResumeHint("buffer_miss", nil)):
 	default:
 	}
 }
@@ -433,8 +433,9 @@ func (registry *Registry) enqueueOutboundTargets(
 	targets []outboundTarget,
 ) (types.NotifyDeliveryResult, error) {
 	for _, target := range targets {
+		stampedFrame := stampOutboundFrame(frame)
 		select {
-		case target.outbound <- frame:
+		case target.outbound <- stampedFrame:
 			result.Enqueued++
 		case <-ctx.Done():
 			return result, ctx.Err()
@@ -446,6 +447,13 @@ func (registry *Registry) enqueueOutboundTargets(
 		}
 	}
 	return result, nil
+}
+
+func stampOutboundFrame(frame types.ServerFrame) types.ServerFrame {
+	if frame.EnqueuedAtMS == 0 {
+		frame.EnqueuedAtMS = time.Now().UnixMilli()
+	}
+	return frame
 }
 
 func (registry *Registry) appendResumeLocked(resumeToken string, frame types.ServerFrame) {

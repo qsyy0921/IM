@@ -22,6 +22,8 @@ type WebSocketWriterSnapshot struct {
 	LastDeliveryNotifyWriteErrorAtMS int64                           `json:"last_delivery_notify_write_error_at_ms,omitempty"`
 	FrameWriteDuration               WebSocketWriterDurationSnapshot `json:"frame_write_duration"`
 	DeliveryNotifyWriteDuration      WebSocketWriterDurationSnapshot `json:"delivery_notify_write_duration"`
+	FrameQueueDuration               WebSocketWriterDurationSnapshot `json:"frame_queue_duration"`
+	DeliveryNotifyQueueDuration      WebSocketWriterDurationSnapshot `json:"delivery_notify_queue_duration"`
 }
 
 type WebSocketWriterDurationSnapshot struct {
@@ -95,6 +97,8 @@ type WebSocketWriterMetrics struct {
 	lastDeliveryNotifyWriteErrorAtMS atomic.Int64
 	frameWriteDuration               webSocketDurationMetrics
 	deliveryNotifyWriteDuration      webSocketDurationMetrics
+	frameQueueDuration               webSocketDurationMetrics
+	deliveryNotifyQueueDuration      webSocketDurationMetrics
 }
 
 func (metrics *WebSocketWriterMetrics) RecordOutboundFrameDequeued(frame ServerFrame) {
@@ -102,6 +106,15 @@ func (metrics *WebSocketWriterMetrics) RecordOutboundFrameDequeued(frame ServerF
 		return
 	}
 	metrics.outboundFrameDequeuedCount.Add(1)
+	if frame.EnqueuedAtMS <= 0 {
+		return
+	}
+	duration := time.Since(time.UnixMilli(frame.EnqueuedAtMS))
+	recordWebSocketDuration(&metrics.frameQueueDuration, duration)
+	switch frame.Op {
+	case OpDeliveryNotify, OpDeliveryHide:
+		recordWebSocketDuration(&metrics.deliveryNotifyQueueDuration, duration)
+	}
 }
 
 func (metrics *WebSocketWriterMetrics) RecordFrameWriteAttempt(frame ServerFrame) {
@@ -181,6 +194,8 @@ func (metrics *WebSocketWriterMetrics) Snapshot() WebSocketWriterSnapshot {
 		LastDeliveryNotifyWriteErrorAtMS: metrics.lastDeliveryNotifyWriteErrorAtMS.Load(),
 		FrameWriteDuration:               snapshotWebSocketDuration(&metrics.frameWriteDuration),
 		DeliveryNotifyWriteDuration:      snapshotWebSocketDuration(&metrics.deliveryNotifyWriteDuration),
+		FrameQueueDuration:               snapshotWebSocketDuration(&metrics.frameQueueDuration),
+		DeliveryNotifyQueueDuration:      snapshotWebSocketDuration(&metrics.deliveryNotifyQueueDuration),
 	}
 }
 

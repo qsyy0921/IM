@@ -5,6 +5,7 @@ import "time"
 const (
 	DefaultHeartbeatInterval = 30 * time.Second
 	DefaultSessionQueueSize  = 256
+	DefaultWriterBatchSize   = 16
 	DefaultResumeBufferSize  = 256
 	DefaultResumeBufferTTL   = 10 * time.Minute
 )

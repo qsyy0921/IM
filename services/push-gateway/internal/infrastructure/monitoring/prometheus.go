@@ -182,6 +182,8 @@ func writeWebSocketWriterPrometheus(builder *strings.Builder, snapshot *types.We
 	writePrometheusHeader(builder, "nexusim_push_gateway_ws_writer_last_event_unix_milliseconds", "Push gateway WebSocket writer last event timestamps.", "gauge")
 	writePrometheusHeader(builder, "nexusim_push_gateway_ws_writer_write_duration_milliseconds", "Push gateway WebSocket writer write duration histogram.", "histogram")
 	writePrometheusHeader(builder, "nexusim_push_gateway_ws_writer_write_duration_max_milliseconds", "Push gateway WebSocket writer max observed write duration.", "gauge")
+	writePrometheusHeader(builder, "nexusim_push_gateway_ws_writer_queue_duration_milliseconds", "Push gateway WebSocket writer outbound queue duration histogram.", "histogram")
+	writePrometheusHeader(builder, "nexusim_push_gateway_ws_writer_queue_duration_max_milliseconds", "Push gateway WebSocket writer max observed outbound queue duration.", "gauge")
 	if snapshot == nil {
 		return
 	}
@@ -201,6 +203,8 @@ func writeWebSocketWriterPrometheus(builder *strings.Builder, snapshot *types.We
 	writePrometheusSample(builder, "nexusim_push_gateway_ws_writer_last_event_unix_milliseconds", map[string]string{"event": "delivery_notify_write_error"}, snapshot.LastDeliveryNotifyWriteErrorAtMS)
 	writeWebSocketDurationPrometheusSamples(builder, "frame_write", snapshot.FrameWriteDuration)
 	writeWebSocketDurationPrometheusSamples(builder, "delivery_notify", snapshot.DeliveryNotifyWriteDuration)
+	writeWebSocketQueueDurationPrometheusSamples(builder, "frame", snapshot.FrameQueueDuration)
+	writeWebSocketQueueDurationPrometheusSamples(builder, "delivery_notify", snapshot.DeliveryNotifyQueueDuration)
 }
 
 func writeWebSocketDurationPrometheusSamples(builder *strings.Builder, operation string, snapshot types.WebSocketWriterDurationSnapshot) {
@@ -212,6 +216,17 @@ func writeWebSocketDurationPrometheusSamples(builder *strings.Builder, operation
 	writePrometheusSample(builder, "nexusim_push_gateway_ws_writer_write_duration_milliseconds_sum", labels, snapshot.SumMS)
 	writePrometheusSample(builder, "nexusim_push_gateway_ws_writer_write_duration_milliseconds_count", labels, snapshot.Count)
 	writePrometheusSample(builder, "nexusim_push_gateway_ws_writer_write_duration_max_milliseconds", labels, snapshot.MaxMS)
+}
+
+func writeWebSocketQueueDurationPrometheusSamples(builder *strings.Builder, operation string, snapshot types.WebSocketWriterDurationSnapshot) {
+	labels := map[string]string{"operation": operation}
+	for _, bucket := range snapshot.Buckets {
+		bucketLabels := map[string]string{"operation": operation, "le": bucket.LE}
+		writePrometheusSample(builder, "nexusim_push_gateway_ws_writer_queue_duration_milliseconds_bucket", bucketLabels, bucket.Count)
+	}
+	writePrometheusSample(builder, "nexusim_push_gateway_ws_writer_queue_duration_milliseconds_sum", labels, snapshot.SumMS)
+	writePrometheusSample(builder, "nexusim_push_gateway_ws_writer_queue_duration_milliseconds_count", labels, snapshot.Count)
+	writePrometheusSample(builder, "nexusim_push_gateway_ws_writer_queue_duration_max_milliseconds", labels, snapshot.MaxMS)
 }
 
 func writeTracePrometheus(builder *strings.Builder, snapshot *TraceSnapshot) {

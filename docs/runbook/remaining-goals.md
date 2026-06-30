@@ -57,6 +57,9 @@
    `tools/analyze-hotgroup-loadtest.ps1`、`tools/analyze-hotgroup-multirunner.ps1` 和
    `tools/record-hotgroup-metrics-window.ps1` 自动汇总压测结果、分类瓶颈、记录
    Prometheus 时间窗口和给出下一步策略；后续每次正式复压都要生成或更新对应低敏分析报告。
+   当前已补 push-gateway writer queue latency 指标和 writer batch drain 调度，下一步
+   需要 clean commit 镜像重建 / 归档 / redeploy 后复跑 400 subscriber coordinator +
+   shard 场景，比较 queue p95 / p99、write p95 / p99、worker fanout 和 signal drain rate。
 2. Agent action boundary / repair cases：在 provider replay admin / workflow handoff 已落
    的基础上，继续扩更多需要 proposal / approval / workflow / audit 的 action 与 repair 场景。
 3. Product-active 服务按需推进：workflow、audit、admin、notification、media、vector、

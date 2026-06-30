@@ -396,3 +396,42 @@ should stop optimizing the Pub/Sub receive path and instead inspect worker-side
 local fanout, per-session outbound queue drain, WebSocket writer goroutine
 scheduling, flush / batching behavior, runner-side read backpressure and
 network throughput.
+
+## WebSocket Writer Queue Latency and Batch Drain
+
+The next diagnostic / optimization module targets the gap between local fanout
+enqueue and per-connection writer drain.
+
+Changes:
+
+- `ServerFrame` now carries a transport-only `EnqueuedAtMS` field. It is excluded
+  from JSON and does not change the WebSocket protocol.
+- Memory registry and WebSocket app-response enqueue paths stamp outbound
+  frames when they enter a session queue.
+- WebSocket writer metrics now record queue duration histograms for all frames
+  and for `delivery.notify` / `delivery.hide` frames:
+
+```text
+nexusim_push_gateway_ws_writer_queue_duration_milliseconds
+nexusim_push_gateway_ws_writer_queue_duration_max_milliseconds
+```
+
+- The writer loop now drains up to `NEXUSIM_PUSH_WS_WRITER_BATCH_SIZE` already
+  queued frames per wakeup, defaulting to 16. This preserves per-connection
+  order and does not change ACK, PullInbox, durable inbox, Redis route or
+  slow-session behavior.
+- `tools/record-hotgroup-metrics-window.ps1` now records delivery notify queue
+  p95 / p99 / avg / max for both five-minute and whole-window views.
+
+Focused checks:
+
+```powershell
+. .\tools\go-env.ps1; go test ./services/push-gateway/internal/types ./services/push-gateway/internal/api/websocket ./services/push-gateway/internal/infrastructure/memory ./services/push-gateway/internal/infrastructure/monitoring ./services/push-gateway/cmd/push-gateway -count=1
+. .\tools\go-env.ps1; go test ./services/push-gateway/... ./loadtest/hotgroup -count=1; go build ./services/push-gateway/cmd/push-gateway ./loadtest/hotgroup
+```
+
+Judgment before retest: this module is not yet a capacity result. It makes the
+next 400 subscriber coordinator + shard run able to answer whether the
+remaining online signal drain curve is caused by outbound queue wait, writer
+scheduling / select overhead, worker-side local fanout, runner read backpressure
+or network throughput.

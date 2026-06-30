@@ -284,7 +284,10 @@ Redis subscriber fanout duration 复压显示 conversation signal fanout/enqueue
 后，queue wait p99 约 0.099ms、queue full / worker error 为 0，但总 drain rate
 仍约 2.876k signals/s。因此当前讲法应进一步收窄：瓶颈已经不是 Redis Pub/Sub
 receive path，而是 worker 对本机 session 的 fanout/enqueue、session outbound queue
-drain、writer goroutine 调度、flush / batching 或客户端读取背压。
+drain、writer goroutine 调度、flush / batching 或客户端读取背压。最新代码已补
+WebSocket writer outbound queue latency 指标和默认 16 帧的小批量 drain 调度，下一轮
+400 subscriber coordinator + shard 复压会把 queue p95 / p99、write p95 / p99、
+worker fanout 和整体 signal drain rate 放在同一张证据链里比较。
 
 ### 当前系统如何承接热点群
 

@@ -41,6 +41,34 @@ func TestWebSocketWriterMetricsRecordsWriteDurationBuckets(t *testing.T) {
 	}
 }
 
+func TestWebSocketWriterMetricsRecordsQueueDurationBuckets(t *testing.T) {
+	var metrics WebSocketWriterMetrics
+	now := time.Now()
+	metrics.RecordOutboundFrameDequeued(ServerFrame{Op: OpServerPong, EnqueuedAtMS: now.Add(-800 * time.Microsecond).UnixMilli()})
+	metrics.RecordOutboundFrameDequeued(ServerFrame{Op: OpDeliveryNotify, EnqueuedAtMS: now.Add(-3 * time.Millisecond).UnixMilli()})
+	metrics.RecordOutboundFrameDequeued(ServerFrame{Op: OpDeliveryNotify, EnqueuedAtMS: now.Add(-1200 * time.Millisecond).UnixMilli()})
+
+	snapshot := metrics.Snapshot()
+	if snapshot.FrameQueueDuration.Count != 3 {
+		t.Fatalf("frame queue count = %d", snapshot.FrameQueueDuration.Count)
+	}
+	if snapshot.DeliveryNotifyQueueDuration.Count != 2 {
+		t.Fatalf("delivery notify queue count = %d", snapshot.DeliveryNotifyQueueDuration.Count)
+	}
+	if snapshot.FrameQueueDuration.MaxMS < 1000 {
+		t.Fatalf("frame queue max = %v", snapshot.FrameQueueDuration.MaxMS)
+	}
+	if snapshot.DeliveryNotifyQueueDuration.MaxMS < 1000 {
+		t.Fatalf("delivery notify queue max = %v", snapshot.DeliveryNotifyQueueDuration.MaxMS)
+	}
+	if got := bucketCount(snapshot.FrameQueueDuration, "+Inf"); got != 3 {
+		t.Fatalf("frame queue +Inf bucket = %d", got)
+	}
+	if got := bucketCount(snapshot.DeliveryNotifyQueueDuration, "+Inf"); got != 2 {
+		t.Fatalf("delivery notify queue +Inf bucket = %d", got)
+	}
+}
+
 func bucketCount(snapshot WebSocketWriterDurationSnapshot, le string) uint64 {
 	for _, bucket := range snapshot.Buckets {
 		if bucket.LE == le {

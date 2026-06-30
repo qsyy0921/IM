@@ -31,6 +31,7 @@ type TraceRecorder interface {
 
 type Config struct {
 	QueueSize         int
+	WriterBatchSize   int
 	HeartbeatInterval time.Duration
 	WriteTimeout      time.Duration
 	WriteDelay        time.Duration
@@ -50,6 +51,9 @@ func NewServer(
 ) *Server {
 	if config.QueueSize <= 0 {
 		config.QueueSize = types.DefaultSessionQueueSize
+	}
+	if config.WriterBatchSize <= 0 {
+		config.WriterBatchSize = types.DefaultWriterBatchSize
 	}
 	if config.HeartbeatInterval <= 0 {
 		config.HeartbeatInterval = types.DefaultHeartbeatInterval
@@ -151,7 +155,7 @@ func (server *Server) ServeHTTP(writer http.ResponseWriter, request *http.Reques
 
 	writeDone := make(chan error, 1)
 	go func() {
-		err := writeLoop(sessionCtx, conn, outbound, evicted, server.config.WriteTimeout, server.config.WriteDelay, server.config.WriterMetrics)
+		err := writeLoop(sessionCtx, conn, outbound, evicted, server.config.WriteTimeout, server.config.WriteDelay, server.config.WriterBatchSize, server.config.WriterMetrics)
 		cancelSession()
 		writeDone <- err
 	}()
@@ -204,6 +208,7 @@ func (server *Server) readLoop(
 }
 
 func enqueueOutbound(ctx context.Context, outbound chan<- types.ServerFrame, frame types.ServerFrame) error {
+	frame = stampOutboundFrame(frame)
 	select {
 	case outbound <- frame:
 		return nil
@@ -219,8 +224,12 @@ func writeLoop(
 	evicted <-chan types.SessionEviction,
 	timeout time.Duration,
 	writeDelay time.Duration,
+	batchSize int,
 	metrics *types.WebSocketWriterMetrics,
 ) error {
+	if batchSize <= 0 {
+		batchSize = types.DefaultWriterBatchSize
+	}
 	for {
 		select {
 		case <-ctx.Done():
@@ -239,21 +248,58 @@ func writeLoop(
 			if !ok {
 				return nil
 			}
-			metrics.RecordOutboundFrameDequeued(frame)
-			if writeDelay > 0 {
-				timer := time.NewTimer(writeDelay)
+			if err := writeOutboundFrame(ctx, conn, frame, timeout, writeDelay, metrics); err != nil {
+				return err
+			}
+			for drained := 1; drained < batchSize; drained++ {
 				select {
 				case <-ctx.Done():
-					timer.Stop()
 					return ctx.Err()
-				case <-timer.C:
+				case eviction, ok := <-evicted:
+					if !ok {
+						evicted = nil
+						continue
+					}
+					resumeHint := domain.ResumeHint(eviction.Reason, eviction.Conversations)
+					if err := writeFrameWithMetrics(ctx, conn, resumeHint, timeout, metrics); err != nil {
+						return err
+					}
+					_ = conn.Close(nhooyr.StatusPolicyViolation, closeReason(eviction.Reason))
+					return types.ErrSessionEvicted
+				case frame, ok := <-outbound:
+					if !ok {
+						return nil
+					}
+					if err := writeOutboundFrame(ctx, conn, frame, timeout, writeDelay, metrics); err != nil {
+						return err
+					}
+				default:
+					drained = batchSize
 				}
-			}
-			if err := writeFrameWithMetrics(ctx, conn, frame, timeout, metrics); err != nil {
-				return err
 			}
 		}
 	}
+}
+
+func writeOutboundFrame(
+	ctx context.Context,
+	conn *nhooyr.Conn,
+	frame types.ServerFrame,
+	timeout time.Duration,
+	writeDelay time.Duration,
+	metrics *types.WebSocketWriterMetrics,
+) error {
+	metrics.RecordOutboundFrameDequeued(frame)
+	if writeDelay > 0 {
+		timer := time.NewTimer(writeDelay)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return ctx.Err()
+		case <-timer.C:
+		}
+	}
+	return writeFrameWithMetrics(ctx, conn, frame, timeout, metrics)
 }
 
 func writeFrameWithMetrics(
@@ -282,6 +328,13 @@ func writeFrame(ctx context.Context, conn *nhooyr.Conn, frame types.ServerFrame,
 		return conn.Write(writeCtx, nhooyr.MessageText, frame.EncodedPayload)
 	}
 	return wsjson.Write(writeCtx, conn, frame)
+}
+
+func stampOutboundFrame(frame types.ServerFrame) types.ServerFrame {
+	if frame.EnqueuedAtMS == 0 {
+		frame.EnqueuedAtMS = time.Now().UnixMilli()
+	}
+	return frame
 }
 
 func closeReason(reason string) string {

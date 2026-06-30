@@ -29,10 +29,11 @@
    per-user outbox 下退化，当前已改成 per-conversation frontier query；最高档
    READ_FANOUT 已补 Prometheus 低敏时间窗口，核心 target up、SendMessage p99 约
    21ms、delivery_outbox pending 峰值后归零、push writer / Redis route 有数据。
-   clean commit `7bff4f3` 的 200 subscriber / 1000000 signal 阶梯也已通过，
-   outbox / Kafka 追平，drain rate 约 2.86k signals/s，继续证明瓶颈是
-   online signal drain。下一步做 400 subscriber / 2000000 signal 或多 runner
-   读取能力的瓶颈曲线。已新增
+   clean commit `7bff4f3` 的 200 subscriber / 1000000 signal 阶梯和 clean commit
+   `233d695` 的 400 subscriber / 2000000 signal 阶梯也已通过，outbox / Kafka
+   追平，drain rate 稳定在约 2.83k-2.86k signals/s，继续证明瓶颈是
+   online signal drain。下一步不要只盲目增大 subscriber；先区分 push writer flush、
+   Redis route fanout、session queue 和 runner 读取能力，再选一个模块优化并复压。已新增
    `tools/analyze-hotgroup-loadtest.ps1` 和 `tools/record-hotgroup-metrics-window.ps1`
    自动汇总压测结果、分类瓶颈、记录 Prometheus 时间窗口和给出下一步策略；后续每次
    正式复压都要生成或更新对应低敏分析报告。

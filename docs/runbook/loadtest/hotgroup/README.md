@@ -25,6 +25,7 @@ CreateConversation -> batch CreateMemberChange(JOIN)
 | `hotgroup-metrics-window-20260630-readfanout-clean-8000qps.md` | 由 `tools/record-hotgroup-metrics-window.ps1` 采集最高档 Prometheus 时间窗口；核心 4 个 scrape target 全部 up，`SendMessage p99` 约 21ms，`delivery_outbox_pending` 峰值 2258 后归零，push writer / Redis route 指标有数据，slow eviction 为 0。 |
 | `hotgroup-analysis-20260701-readfanout-subscriber-step.md` | clean commit `7bff4f3` 的 200 subscriber 阶梯与上一轮 100 subscriber 对比：同为 6000 人 / 5000 消息 / 8000 msg/s，signal 从 500000 增至 1000000，最慢 drain 从 176.554s 增至 349.903s，drain rate 约 2.86k signals/s，继续分类为 `online-signal-drain`。 |
 | `hotgroup-metrics-window-20260701-readfanout-200sub.md` | 200 subscriber run 的 Prometheus 低敏窗口：核心 4 个 scrape target 全部 up，`SendMessage p99` 约 21ms，`delivery_outbox_pending` 峰值 2233 后归零，push connected sessions 达到 200，slow eviction 为 0。 |
+| `hotgroup-metrics-window-20260701-readfanout-400sub.md` | clean commit `233d695` 的 400 subscriber run 继续通过：6000 人 / 5000 消息 / 8000 msg/s 产生 2000000 条 signal，最慢 drain 704.631s，drain rate 约 2.84k signals/s；Prometheus 窗口内核心 target up、`delivery_outbox_pending` 峰值 2284 后归零、push connected sessions 达到 400、slow eviction 为 0。 |
 
 ## 目标
 

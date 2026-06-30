@@ -123,6 +123,13 @@ brief、loadtest report、development-progress 或 archive。
   `send_p99_ms=21.808`、`PullInbox p95=26.326ms`，outbox / Kafka 追平。
   与上一轮 100 subscriber / 500000 signal 对比，drain rate 仍约 2.85k signals/s，
   当前瓶颈继续指向 online signal drain / reader 侧。
+- 2026-07-01 已跑 400 subscriber 阶梯：
+  `hotgroup-readfanout-6000-8000qps-400sub-233d6956-20260701-004948`，
+  clean commit `233d695`、6000 人、5000 消息、目标 8000 msg/s、256 sender、
+  400 subscriber，产生 2000000 条 conversation signal；`send_p95_ms=19.724`、
+  `send_p99_ms=25.668`、`PullInbox p95=25.341ms`，outbox / Kafka 追平。
+  100 / 200 / 400 subscriber 三档 drain rate 分别约 2832 / 2858 / 2838 signals/s，
+  瓶颈继续线性落在 online signal drain。
 - 2026-06-30 HYBRID 1000 人 / 1000 消息 / 400 msg/s 诊断 run 暴露 per-user outbox
   写扩散下的 delivery outbox ready query 退化：旧 anti-join blocker 查询在约 100 万
   pending row 下每批 500 行约 24s。delivery-service 已改为 per-conversation frontier
@@ -158,6 +165,6 @@ brief、loadtest report、development-progress 或 archive。
 
 ## 下一个方向
 
-- 下一步用分析器和 Prometheus 时间窗口持续记录复压对比；继续扩大到 400 subscriber /
-  2000000 signal 或多 runner 读取能力，逼近 online signal drain 上限；
+- 下一步用分析器和 Prometheus 时间窗口持续记录复压对比；先做 online signal drain
+  优化分析，区分 push writer flush、Redis route、session queue 和 runner 读取能力；
   正式生产级运维 UI、provider-grade 长周期平台仍后置。

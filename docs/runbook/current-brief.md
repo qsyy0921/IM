@@ -130,6 +130,13 @@ brief、loadtest report、development-progress 或 archive。
   `send_p99_ms=25.668`、`PullInbox p95=25.341ms`，outbox / Kafka 追平。
   100 / 200 / 400 subscriber 三档 drain rate 分别约 2832 / 2858 / 2838 signals/s，
   瓶颈继续线性落在 online signal drain。
+- 2026-07-01 已把 hotgroup Prometheus 窗口工具升级为 push attribution 版本：
+  `hotgroup-metrics-window-20260701-readfanout-400sub.md` 现在同时记录 WebSocket
+  writer 与 Redis route 的 per-event 五分钟峰值和整窗口计数。400 subscriber 窗口内
+  `frame_write_success` 约 200.97 万、`delivery_notify_write_success` 约 200.89 万、
+  `redis subscriber_enqueued` 约 200.89 万，writer / delivery notify / Redis subscriber
+  error 与 eviction 均为 0，说明下一步应定位写出 / 读取 drain 能力，而不是继续调
+  message / delivery outbox 或 Kafka。
 - 2026-06-30 HYBRID 1000 人 / 1000 消息 / 400 msg/s 诊断 run 暴露 per-user outbox
   写扩散下的 delivery outbox ready query 退化：旧 anti-join blocker 查询在约 100 万
   pending row 下每批 500 行约 24s。delivery-service 已改为 per-conversation frontier
@@ -165,6 +172,7 @@ brief、loadtest report、development-progress 或 archive。
 
 ## 下一个方向
 
-- 下一步用分析器和 Prometheus 时间窗口持续记录复压对比；先做 online signal drain
-  优化分析，区分 push writer flush、Redis route、session queue 和 runner 读取能力；
+- 下一步用分析器和 Prometheus 时间窗口持续记录复压对比；online signal drain 已排除
+  Redis route error、WebSocket write error 和 session eviction，下一步重点比较多 runner
+  读取、runner JSON decode / accounting、push writer flush 批量效率和网络吞吐。
   正式生产级运维 UI、provider-grade 长周期平台仍后置。

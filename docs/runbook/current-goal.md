@@ -114,6 +114,13 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
   slow eviction 为 0。与 100 / 200 subscriber 档对比，drain rate 分别约
   2831.995 / 2857.934 / 2838.365 signals/s，说明继续呈线性 online signal drain，
   当前不应优先优化 message / delivery outbox 或 Kafka。
+- 2026-07-01 已增强 `tools/record-hotgroup-metrics-window.ps1` 的 push attribution：
+  同一 400 subscriber 窗口现在记录 WebSocket writer 和 Redis route 的 per-event
+  五分钟峰值与整窗口计数。最新报告显示整窗口 `frame_write_success` 约 2009692、
+  `delivery_notify_write_success` 约 2008889、`redis subscriber_enqueued` 约 2008889，
+  writer error、delivery notify error、subscriber evicted / error 均为 0。该证据把
+  当前瓶颈进一步收窄为 online signal 写出 / 客户端读取 drain 速度，而不是 Redis
+  路由失败、WebSocket 写失败或 session eviction。
 - HYBRID 诊断档位 1000 人 / 1000 消息 / 400 msg/s 暴露 `delivery_outbox` ready query
   在百万级 per-user outbox 下退化：旧 anti-join blocker 查询每批 500 行约 24s。当前
   delivery outbox relay 已改成 per-conversation frontier ready query，并把本地 worker
@@ -126,9 +133,10 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
 
 - push-focused step 的 READ_FANOUT clean commit 阶梯 run 已完成，并明确记录 signal
   写出 / 读取指标；自动分析报告和最高档 Prometheus 低敏时间窗口均已生成。
-- 下一轮围绕 online signal drain 做优化分析：区分 push-gateway writer flush、
-  Redis route fanout、session queue 和 runner 读取能力；不要继续只盲目增大 subscriber。
-  若要再加压，建议先做多 runner 读取或 push writer 优化后复压。
+- 下一轮围绕 online signal drain 做优化分析：Redis route 和 WebSocket writer
+  已证明无错误 / 无 eviction，下一步优先区分单 runner 读取能力、每连接 JSON
+  decode / accounting 成本、push writer flush 批量能力和网络吞吐；不要继续只盲目增大
+  subscriber。若要再加压，建议先做多 runner 读取或 push writer 优化后复压。
 - 文档同步本轮公开能力或瓶颈变化。
 - 提交并推送到 GitHub。
 
@@ -142,9 +150,9 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
 
 ## 后续优先级
 
-1. 针对 online signal drain 做架构分析和代码级定位：确认瓶颈在 push writer flush、
-   Redis route fanout、session queue，还是 runner 单进程读取；当前不是 PostgreSQL /
-   delivery outbox / Kafka。
+1. 针对 online signal drain 做架构分析和代码级定位：当前 400 subscriber 指标已排除
+   Redis route error、WebSocket write error 和 session eviction；下一步确认瓶颈在 push
+   writer flush 批量效率、runner 单进程读取 / JSON decode、网络吞吐还是测试端 accounting。
 2. 选择一个明确优化模块：优先考虑多 runner 读取验证或 push-gateway conversation
    signal fanout / writer flush 优化，优化后用 200 / 400 subscriber 对照复压。
 3. 若 HYBRID 仍要支持千人级 per-user materialized outbox，优先评估显式 frontier /

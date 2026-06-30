@@ -129,6 +129,12 @@ function Summarize-PrometheusResult {
 }
 
 function New-HotGroupMetricQueries {
+    param([int]$WindowSeconds)
+
+    if ($WindowSeconds -lt 1) {
+        $WindowSeconds = 1
+    }
+
     return @(
         [pscustomobject]@{ name = "core_targets_up"; query = 'sum(up{job=~"nexusim-message-service|nexusim-conversation-service|nexusim-delivery-service|nexusim-push-gateway"})' },
         [pscustomobject]@{ name = "message_send_p95_ms"; query = 'max(nexusim_message_latency_p95_milliseconds{operation="send_message"})' },
@@ -148,8 +154,32 @@ function New-HotGroupMetricQueries {
         [pscustomobject]@{ name = "push_connected_sessions"; query = 'max(nexusim_push_gateway_sessions{state="connected"})' },
         [pscustomobject]@{ name = "push_slow_evicted_5m"; query = 'sum(increase(nexusim_push_gateway_session_events_total{event="slow_evicted"}[5m]))' },
         [pscustomobject]@{ name = "push_writer_events_5m"; query = 'sum(increase(nexusim_push_gateway_ws_writer_events_total[5m]))' },
+        [pscustomobject]@{ name = "push_writer_outbound_dequeued_5m"; query = 'sum(increase(nexusim_push_gateway_ws_writer_events_total{event="outbound_frame_dequeued"}[5m]))' },
+        [pscustomobject]@{ name = "push_writer_frame_write_attempt_5m"; query = 'sum(increase(nexusim_push_gateway_ws_writer_events_total{event="frame_write_attempt"}[5m]))' },
+        [pscustomobject]@{ name = "push_writer_frame_write_success_5m"; query = 'sum(increase(nexusim_push_gateway_ws_writer_events_total{event="frame_write_success"}[5m]))' },
+        [pscustomobject]@{ name = "push_writer_frame_write_error_5m"; query = 'sum(increase(nexusim_push_gateway_ws_writer_events_total{event="frame_write_error"}[5m]))' },
+        [pscustomobject]@{ name = "push_writer_delivery_notify_attempt_5m"; query = 'sum(increase(nexusim_push_gateway_ws_writer_events_total{event="delivery_notify_write_attempt"}[5m]))' },
+        [pscustomobject]@{ name = "push_writer_delivery_notify_success_5m"; query = 'sum(increase(nexusim_push_gateway_ws_writer_events_total{event="delivery_notify_write_success"}[5m]))' },
+        [pscustomobject]@{ name = "push_writer_delivery_notify_error_5m"; query = 'sum(increase(nexusim_push_gateway_ws_writer_events_total{event="delivery_notify_write_error"}[5m]))' },
         [pscustomobject]@{ name = "push_consumer_worker_errors_5m"; query = 'sum(increase(nexusim_push_gateway_consumer_worker_errors_total[5m]))' },
         [pscustomobject]@{ name = "push_redis_route_events_5m"; query = 'sum(increase(nexusim_push_gateway_redis_route_events_total[5m]))' },
+        [pscustomobject]@{ name = "push_redis_registry_remote_matched_sessions_5m"; query = 'sum(increase(nexusim_push_gateway_redis_route_events_total{role="registry",event="remote_matched_sessions"}[5m]))' },
+        [pscustomobject]@{ name = "push_redis_registry_remote_publish_call_5m"; query = 'sum(increase(nexusim_push_gateway_redis_route_events_total{role="registry",event="remote_publish_call"}[5m]))' },
+        [pscustomobject]@{ name = "push_redis_registry_remote_publish_error_5m"; query = 'sum(increase(nexusim_push_gateway_redis_route_events_total{role="registry",event="remote_publish_error"}[5m]))' },
+        [pscustomobject]@{ name = "push_redis_registry_remote_no_subscriber_5m"; query = 'sum(increase(nexusim_push_gateway_redis_route_events_total{role="registry",event="remote_no_subscriber"}[5m]))' },
+        [pscustomobject]@{ name = "push_redis_registry_remote_enqueued_sessions_5m"; query = 'sum(increase(nexusim_push_gateway_redis_route_events_total{role="registry",event="remote_enqueued_sessions"}[5m]))' },
+        [pscustomobject]@{ name = "push_redis_subscriber_messages_5m"; query = 'sum(increase(nexusim_push_gateway_redis_route_events_total{role="subscriber",event="subscriber_message"}[5m]))' },
+        [pscustomobject]@{ name = "push_redis_subscriber_enqueued_5m"; query = 'sum(increase(nexusim_push_gateway_redis_route_events_total{role="subscriber",event="subscriber_enqueued"}[5m]))' },
+        [pscustomobject]@{ name = "push_redis_subscriber_evicted_5m"; query = 'sum(increase(nexusim_push_gateway_redis_route_events_total{role="subscriber",event="subscriber_evicted"}[5m]))' },
+        [pscustomobject]@{ name = "push_redis_subscriber_errors_5m"; query = 'sum(increase(nexusim_push_gateway_redis_route_events_total{role="subscriber",event="subscriber_error"}[5m]))' },
+        [pscustomobject]@{ name = "push_writer_frame_write_success_window"; query = "sum(increase(nexusim_push_gateway_ws_writer_events_total{event=`"frame_write_success`"}[$($WindowSeconds)s]))" },
+        [pscustomobject]@{ name = "push_writer_frame_write_error_window"; query = "sum(increase(nexusim_push_gateway_ws_writer_events_total{event=`"frame_write_error`"}[$($WindowSeconds)s]))" },
+        [pscustomobject]@{ name = "push_writer_delivery_notify_success_window"; query = "sum(increase(nexusim_push_gateway_ws_writer_events_total{event=`"delivery_notify_write_success`"}[$($WindowSeconds)s]))" },
+        [pscustomobject]@{ name = "push_writer_delivery_notify_error_window"; query = "sum(increase(nexusim_push_gateway_ws_writer_events_total{event=`"delivery_notify_write_error`"}[$($WindowSeconds)s]))" },
+        [pscustomobject]@{ name = "push_redis_subscriber_messages_window"; query = "sum(increase(nexusim_push_gateway_redis_route_events_total{role=`"subscriber`",event=`"subscriber_message`"}[$($WindowSeconds)s]))" },
+        [pscustomobject]@{ name = "push_redis_subscriber_enqueued_window"; query = "sum(increase(nexusim_push_gateway_redis_route_events_total{role=`"subscriber`",event=`"subscriber_enqueued`"}[$($WindowSeconds)s]))" },
+        [pscustomobject]@{ name = "push_redis_subscriber_evicted_window"; query = "sum(increase(nexusim_push_gateway_redis_route_events_total{role=`"subscriber`",event=`"subscriber_evicted`"}[$($WindowSeconds)s]))" },
+        [pscustomobject]@{ name = "push_redis_subscriber_errors_window"; query = "sum(increase(nexusim_push_gateway_redis_route_events_total{role=`"subscriber`",event=`"subscriber_error`"}[$($WindowSeconds)s]))" },
         [pscustomobject]@{ name = "message_pg_pool_conns"; query = 'max(nexusim_message_pg_pool_conns)' },
         [pscustomobject]@{ name = "conversation_pg_pool_conns"; query = 'max(nexusim_conversation_pg_pool_conns)' },
         [pscustomobject]@{ name = "delivery_pg_pool_conns"; query = 'max(nexusim_delivery_pg_pool_conns)' }
@@ -214,6 +244,7 @@ function Write-MetricsMarkdown {
     [void]$builder.AppendLine("## Interpretation")
     [void]$builder.AppendLine("")
     [void]$builder.AppendLine("- Use this report with the matching hotgroup summary and analysis report.")
+    [void]$builder.AppendLine("- Metrics ending in `_5m` show the moving five-minute pressure window; metrics ending in `_window` approximate the whole captured run window.")
     [void]$builder.AppendLine("- Metrics with no data mean the exporter or scrape target did not expose that series in this window.")
     [void]$builder.AppendLine("- Do not use this single window as production capacity evidence.")
 
@@ -253,8 +284,9 @@ if ($MarkdownPath.Trim().Length -eq 0) {
 
 $startUnix = $windowStart.ToUnixTimeSeconds()
 $endUnix = $windowEnd.ToUnixTimeSeconds()
+$windowSeconds = [Math]::Max(1, [int]($endUnix - $startUnix))
 $metrics = New-Object System.Collections.Generic.List[object]
-foreach ($definition in New-HotGroupMetricQueries) {
+foreach ($definition in New-HotGroupMetricQueries -WindowSeconds $windowSeconds) {
     try {
         $series = Invoke-PrometheusRangeQuery -BaseUrl $PrometheusBaseUrl -Query $definition.query -Start $startUnix -End $endUnix -Step $StepSeconds
         $metrics.Add((Summarize-PrometheusResult -Name $definition.name -Query $definition.query -Series @($series)))

@@ -32,8 +32,11 @@
    clean commit `7bff4f3` 的 200 subscriber / 1000000 signal 阶梯和 clean commit
    `233d695` 的 400 subscriber / 2000000 signal 阶梯也已通过，outbox / Kafka
    追平，drain rate 稳定在约 2.83k-2.86k signals/s，继续证明瓶颈是
-   online signal drain。下一步不要只盲目增大 subscriber；先区分 push writer flush、
-   Redis route fanout、session queue 和 runner 读取能力，再选一个模块优化并复压。已新增
+   online signal drain。Prometheus 窗口工具已补 WebSocket writer / Redis route
+   per-event 归因，400 subscriber 窗口显示 writer / delivery notify / Redis subscriber
+   error 与 eviction 均为 0，整窗口 writer success 和 Redis subscriber enqueue 约 200 万级，
+   当前需要继续区分 push writer flush 批量效率、runner 读取 / JSON decode / accounting
+   和网络吞吐。下一步不要只盲目增大 subscriber；先选一个模块优化并复压。已新增
    `tools/analyze-hotgroup-loadtest.ps1` 和 `tools/record-hotgroup-metrics-window.ps1`
    自动汇总压测结果、分类瓶颈、记录 Prometheus 时间窗口和给出下一步策略；后续每次
    正式复压都要生成或更新对应低敏分析报告。

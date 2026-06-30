@@ -176,6 +176,7 @@ CreateConversation(GROUP)
 | Prometheus 时间窗口 | `tools/record-hotgroup-metrics-window.ps1` 读取 H 盘压测目录并查询 Prometheus range API，输出低敏窗口报告 | 最高档 `hotgroup-readfanout-6000-8000qps-clean-01b2a70e-20260630-2336` 已补窗口：核心 4 个 scrape target 全部 up，`SendMessage p99` 约 21ms，`delivery_outbox_pending` 峰值 2258 后归零，push writer / Redis route 指标有数据，slow eviction 为 0。 |
 | 200 subscriber 阶梯 | clean commit `7bff4f3` 跑 6000 人 / 5000 消息 / 8000 msg/s / 256 sender / 200 subscriber | 产生 1000000 条 conversation signal，`send_p95_ms=18.315`、`send_p99_ms=21.808`、`PullInbox p95=26.326ms`、outbox / Kafka 追平；最慢 drain 349.903s，drain rate 约 2857.934 signals/s，和 100 subscriber 的约 2831.995 signals/s 接近，说明瓶颈沿 online signal drain 线性放大。 |
 | 400 subscriber 阶梯 | clean commit `233d695` 跑 6000 人 / 5000 消息 / 8000 msg/s / 256 sender / 400 subscriber | 产生 2000000 条 conversation signal，`send_p95_ms=19.724`、`send_p99_ms=25.668`、`PullInbox p95=25.341ms`、outbox / Kafka 追平；最慢 drain 704.631s，drain rate 约 2838.365 signals/s，和 100 / 200 subscriber 档保持同一量级。 |
+| push attribution 归因 | 400 subscriber Prometheus 窗口已补 writer / Redis route per-event 分解和整窗口计数 | 整窗口 `frame_write_success` 约 200.97 万、`delivery_notify_write_success` 约 200.89 万、`redis subscriber_enqueued` 约 200.89 万，writer / delivery notify / Redis subscriber error 与 eviction 均为 0；这说明问题不是 Redis 路由失败或 WebSocket 写失败，下一步应比较 push writer flush、runner 读取 / JSON decode / accounting 和网络吞吐。 |
 
 面试时可以把这个结果讲成一次真实性能定位过程：
 
@@ -191,6 +192,9 @@ multi-worker batch publish，把 delivery outbox ready query 改成 per-conversa
 delivery projection 或 Kafka，而更接近 online signal drain / 压测端读取能力。
 为了避免靠人工感觉判断，我补了一个 hotgroup 离线分析器，后续每轮压测都先从
 原始 summary 生成 run matrix、瓶颈分类、证据链和下一步策略，再决定优化哪个模块。
+随后又把 Prometheus 窗口工具加上 writer / Redis route 的 per-event 归因，避免只看到
+`push_writer_events_total` 这种总数而不知道是写成功、写失败、入队失败还是 subscriber
+读取慢。
 ```
 
 2026-06-29 的小规模 smoke 进一步证明了策略切换链路：
@@ -248,7 +252,10 @@ PostgreSQL / Kafka / projection 指标一起归档；最高档已补一轮低敏
 5000 消息、目标 8000 msg/s 和 256 sender，只改变在线订阅者数量。三档结果的
 drain rate 稳定在约 2.83k-2.86k signals/s，因此下一步面试叙事应从“继续加压”
 转为“如何定位并优化 online signal drain”：区分 push-gateway writer flush、Redis
-route fanout、session queue 和压测 runner 读取能力。
+route fanout、session queue 和压测 runner 读取能力。新的 attribution 窗口已经显示
+Redis subscriber enqueue 与 WebSocket writer success 都能到约 200 万级，并且没有
+write error / eviction，所以后续重点不应再讲“消息队列不够”，而应讲如何进一步验证
+客户端读取侧、JSON 编解码、writer flush 策略和网络吞吐。
 
 ### 当前系统如何承接热点群
 

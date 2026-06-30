@@ -26,6 +26,7 @@ CreateConversation -> batch CreateMemberChange(JOIN)
 | `hotgroup-analysis-20260701-readfanout-subscriber-step.md` | clean commit `7bff4f3` 的 200 subscriber 阶梯与上一轮 100 subscriber 对比：同为 6000 人 / 5000 消息 / 8000 msg/s，signal 从 500000 增至 1000000，最慢 drain 从 176.554s 增至 349.903s，drain rate 约 2.86k signals/s，继续分类为 `online-signal-drain`。 |
 | `hotgroup-metrics-window-20260701-readfanout-200sub.md` | 200 subscriber run 的 Prometheus 低敏窗口：核心 4 个 scrape target 全部 up，`SendMessage p99` 约 21ms，`delivery_outbox_pending` 峰值 2233 后归零，push connected sessions 达到 200，slow eviction 为 0。 |
 | `hotgroup-metrics-window-20260701-readfanout-400sub.md` | clean commit `233d695` 的 400 subscriber run 继续通过：6000 人 / 5000 消息 / 8000 msg/s 产生 2000000 条 signal，最慢 drain 704.631s，drain rate 约 2.84k signals/s；Prometheus 窗口内核心 target up、`delivery_outbox_pending` 峰值 2284 后归零、push connected sessions 达到 400、slow eviction 为 0。 |
+| `hotgroup-metrics-window-20260701-readfanout-400sub.md` push attribution update | 同一窗口已补 WebSocket writer / Redis route per-event 归因：整窗口 `frame_write_success` 约 200.97 万、`delivery_notify_write_success` 约 200.89 万、`redis subscriber_enqueued` 约 200.89 万，writer / delivery notify / Redis subscriber error 与 eviction 均为 0；下一步瓶颈定位应聚焦写出 / 读取 drain 能力，而不是 Redis 路由失败或 WebSocket 写失败。 |
 
 ## 目标
 
@@ -130,6 +131,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\record-hotgroup-metr
 工具会把原始 Prometheus JSON 写回对应 `H:\NexusIM\loadtest-results\<run>`，
 仓库只保存低敏 Markdown 摘要。窗口报告仍不是生产 SLO，只用于解释该轮压测
 是否有核心 target、outbox、projection、push writer、Redis route 和 PostgreSQL pool 指标。
+`_5m` 指标表示移动五分钟压力窗口，`_window` 指标表示整个捕获窗口内的近似累计值；
+后续定位 online signal drain 时必须同时记录 writer success/error、Redis subscriber enqueue/error、
+session eviction 和 runner 侧 subscriber 完成时间。
 
 ## 可视化要求
 

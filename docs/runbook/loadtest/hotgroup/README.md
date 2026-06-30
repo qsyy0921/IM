@@ -20,7 +20,7 @@ CreateConversation -> batch CreateMemberChange(JOIN)
 | `loadtest-report-20260628-hotgroup-relay-bottleneck.md` | 记录 delivery outbox relay 优化前后对比：旧 20 人群在 50/100/150 QPS 卡在 `delivery_outbox` drain；修正为 conversation-sharded relay 后，100 人群 50/100/150 QPS 均能在等待窗口内完成 `user_inbox` 和 `delivery_outbox` drain；200 QPS 暴露下一瓶颈已转移到 delivery timeline projection / `user_inbox` fanout。 |
 | 2026-06-30 pre-commit diagnostic | 200 人 / 500 消息 / 16 sender 中等规模诊断曾暴露 `SEQUENCER_BLOCK` 后成员 JOIN 未接 timeline-service 的缺口；修复后 dirty-run 可完成 `BROADCAST_SIGNAL`，`delivery_outbox_pending=0`、Kafka lag=0。正式报告必须用 clean commit 重跑。 |
 | `loadtest-report-20260630-hotgroup-clean-redeploy.md` | clean commit `d13bff6c` 重建 / redeploy 后，61 人 / 20 消息、200 人 / 500 消息、500 人 / 1000 消息三档均通过；最大档产生 50000 条 conversation signal，`user_inbox_rows=0`、`delivery_outbox_pending=0`、Kafka lag=0。 |
-| `loadtest-report-20260630-hotgroup-message-outbox-relay.md` | message-service outbox relay 已支持 conversation-sharded multi-worker batch publish；1000 人 / 4000 消息 / 800 msg/s 通过，message / delivery outbox 均无积压；1200 / 1500 msg/s 失败点迁移到 push conversation signal 写出 / runner 读取观测。 |
+| `loadtest-report-20260630-hotgroup-message-outbox-relay.md` | message-service outbox relay 已支持 conversation-sharded multi-worker batch publish；1000 人 / 4000 消息 / 800 msg/s 通过，message / delivery outbox 均无积压；随后 clean commit `01b2a70` 完成 READ_FANOUT 6000 人 / 100 subscriber 阶梯复压，最高目标 8000 msg/s、500000 条 conversation signal，outbox / Kafka 均无积压。 |
 
 ## 目标
 

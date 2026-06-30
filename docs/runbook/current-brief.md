@@ -97,6 +97,13 @@ brief、loadtest report、development-progress 或 archive。
   completed 和 read error。push-gateway 镜像已按 clean commit redeploy，READ_FANOUT
   6000 人 / 1000 消息 / 400 msg/s / 100 subscriber 诊断 run 已通过，100000 条
   conversation signal 均被 subscriber 读到，`delivery_outbox_pending=0`、Kafka lag=0。
+- 2026-06-30 已用 clean commit `01b2a70` 重建 / redeploy delivery-service 后完成
+  READ_FANOUT 阶梯复压：6000 人、100 subscriber 下目标 400 / 800 / 1200 /
+  2000 / 4000 / 8000 msg/s 全部通过；最高档发送 5000 条消息并产生 500000 条
+  conversation signal，所有 subscriber 读完，`send_p95_ms=18.54`、`send_p99_ms=22.41`、
+  `PullInbox p95=26.93ms`、`message_outbox_pending=0`、`delivery_outbox_pending=0`、
+  Kafka lag=0。当前瓶颈不在 SendMessage、message outbox、delivery projection、
+  delivery outbox 或 Kafka consumer；下一步看 online signal drain / reader 侧。
 - 2026-06-30 HYBRID 1000 人 / 1000 消息 / 400 msg/s 诊断 run 暴露 per-user outbox
   写扩散下的 delivery outbox ready query 退化：旧 anti-join blocker 查询在约 100 万
   pending row 下每批 500 行约 24s。delivery-service 已改为 per-conversation frontier
@@ -132,7 +139,6 @@ brief、loadtest report、development-progress 或 archive。
 
 ## 下一个方向
 
-- 下一步优先提交 delivery outbox frontier ready query，重建 clean commit delivery-service
-  镜像并 redeploy，然后继续跑 READ_FANOUT 800 -> 1000 -> 1200 msg/s step，记录
-  Prometheus / Grafana 或 debug metrics 时间窗口；正式生产级运维 UI、provider-grade
-  长周期平台仍后置。
+- 下一步优先补本轮 READ_FANOUT 阶梯复压的 Prometheus / Grafana 或 debug metrics
+  时间窗口，必要时继续扩大 subscriber 数或总 signal 数来逼近 online signal drain 上限；
+  正式生产级运维 UI、provider-grade 长周期平台仍后置。

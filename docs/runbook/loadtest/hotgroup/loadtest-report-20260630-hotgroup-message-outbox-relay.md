@@ -218,6 +218,62 @@ NEXUSIM_DELIVERY_KAFKA_BATCH_SIZE=500
   避免把百万级 per-user outbox 当作主路径；
 - Kafka / Redis 只负责事件传播和在线 signal，不应替代业务 fanout 策略。
 
+### clean commit READ_FANOUT 阶梯复压
+
+提交 `01b2a70e fix: speed delivery outbox frontier fetch` 已推送并重建
+`nexusim/delivery-service:local`，镜像归档：
+
+```text
+H:\NexusIM\docker-images\archives\nexusim-delivery-service-01b2a70e-frontier-20260630-231103.tar
+```
+
+Ubuntu Docker 已重新创建：
+
+```text
+nexusim-delivery-service-grpc
+nexusim-delivery-service-timeline-consumer
+nexusim-delivery-service-outbox-relay
+```
+
+relay 启动日志：
+
+```text
+delivery-service outbox relay started topic=im.delivery.events workers=8 batch_size=500 kafka_batch_size=500 kafka_batch_timeout=20ms
+```
+
+clean commit `01b2a70` 的 READ_FANOUT 阶梯复压结果：
+
+| run | target msg/s | messages | senders | subscribers | send p95 | send p99 | signals | slowest signal drain ms | completed subscribers | Pull p95 | message pending | delivery pending |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `hotgroup-readfanout-6000-400qps-clean-01b2a70e-20260630-2313` | 400 | 1000 | 32 | 100 | 17.73 | 20.04 | 100000 | 35541 | 100 | 22.56 | 0 | 0 |
+| `hotgroup-readfanout-6000-800qps-clean-01b2a70e-20260630-2316` | 800 | 2000 | 64 | 100 | 18.31 | 22.13 | 200000 | 70744 | 100 | 16.73 | 0 | 0 |
+| `hotgroup-readfanout-6000-1200qps-clean-01b2a70e-20260630-2320` | 1200 | 3000 | 96 | 100 | 18.25 | 21.91 | 300000 | 104999 | 100 | 37.90 | 0 | 0 |
+| `hotgroup-readfanout-6000-2000qps-clean-01b2a70e-20260630-2325` | 2000 | 5000 | 128 | 100 | 17.55 | 20.63 | 500000 | 173888 | 100 | 24.02 | 0 | 0 |
+| `hotgroup-readfanout-6000-4000qps-clean-01b2a70e-20260630-2330` | 4000 | 5000 | 192 | 100 | 19.17 | 23.35 | 500000 | 176197 | 100 | 24.92 | 0 | 0 |
+| `hotgroup-readfanout-6000-8000qps-clean-01b2a70e-20260630-2336` | 8000 | 5000 | 256 | 100 | 18.54 | 22.41 | 500000 | 176554 | 100 | 26.93 | 0 | 0 |
+
+当前判断：
+
+- 目标 8000 msg/s、5000 条消息的 READ_FANOUT burst 没有打穿 SendMessage、message outbox、
+  delivery projection、delivery outbox 或 Kafka consumer；
+- `delivery_outbox_pending=0`、Kafka `nexusim-delivery-service-local` lag=0、push writer
+  `delivery_notify_write_error_count=0`；
+- 500000 条 signal 在 100 个 WebSocket subscriber 上全部读完，但最慢 subscriber drain
+  约 176s，说明当前更像 online signal drain / 压测端读取容量问题，而不是事实写入容量问题；
+- 后续如果要继续找上限，应优先增加 subscriber 数或总 signal 数，并配套 Prometheus /
+  Grafana 时间窗口，而不是只继续提高 message-rate。
+
+原始目录：
+
+```text
+H:\NexusIM\loadtest-results\hotgroup-readfanout-6000-400qps-clean-01b2a70e-20260630-2313
+H:\NexusIM\loadtest-results\hotgroup-readfanout-6000-800qps-clean-01b2a70e-20260630-2316
+H:\NexusIM\loadtest-results\hotgroup-readfanout-6000-1200qps-clean-01b2a70e-20260630-2320
+H:\NexusIM\loadtest-results\hotgroup-readfanout-6000-2000qps-clean-01b2a70e-20260630-2325
+H:\NexusIM\loadtest-results\hotgroup-readfanout-6000-4000qps-clean-01b2a70e-20260630-2330
+H:\NexusIM\loadtest-results\hotgroup-readfanout-6000-8000qps-clean-01b2a70e-20260630-2336
+```
+
 ## 当前限制
 
 - 本报告没有嵌入 Grafana 截图；低敏原始 summary 和 push debug JSON 已写入 H 盘结果目录。
@@ -244,12 +300,7 @@ H:\NexusIM\loadtest-results\hotgroup-message-relayopt-1000u-8000m-1200qps-202606
 
 ## 下一步
 
-1. 提交 delivery outbox frontier ready query，重建 clean commit delivery-service 镜像并
-   redeploy。
-2. 复压 READ_FANOUT 6000 人档位，再跑 800 -> 1000 -> 1200 msg/s 的 push-focused step，
-   定位 WebSocket writer、client read loop、session queue、Redis route、Kafka consumer
-   或 PostgreSQL ready query。
-3. 将 `/metrics` 中 `nexusim_push_gateway_ws_writer_events_total`、delivery outbox relay
-   stats 和 runner `push.subscriber_signals[]` 一起写入新报告。
-4. 必要时把 push conversation signal 改成按 conversation subscription bucket 批量广播，
+1. 补本轮阶梯复压的 Prometheus / Grafana 或 debug metrics 时间窗口记录。
+2. 继续扩大 subscriber 数或总 signal 数，定位 online signal drain 的真实上限。
+3. 必要时把 push conversation signal 改成按 conversation subscription bucket 批量广播，
    或引入更明确的 online signal backpressure / sampling 策略。

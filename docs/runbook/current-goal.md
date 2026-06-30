@@ -69,12 +69,13 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
   push-gateway WebSocket writer 暴露 frame write / delivery.notify write /
   resume_hint write 低敏指标；`loadtest/hotgroup` 报告每个 conversation subscriber
   的首帧、末帧、signal 数、max seq 和 read error。
-- 2026-06-30 READ_FANOUT 诊断档位已跑通：6000 人 / 1000 消息 / 400 msg/s /
-  100 subscriber，conversation signal=100000，所有 subscriber 完整读到 1000 条 signal，
-  `send_p95_ms=17.75`、`send_p99_ms=22.66`、`PullInbox p95=14.05ms`、
-  `user_inbox_rows=0`、`delivery_outbox_pending=0`、Kafka lag=0。该 run 使用当时
-  未提交的 delivery outbox query 优化，作为诊断证据保留，后续 clean commit 复压再作为
-  可复现实验基线。
+- 2026-06-30 已用 clean commit `01b2a70` 重建 / redeploy delivery-service，并完成
+  READ_FANOUT 阶梯复压：6000 人、100 subscriber 下，目标 400 / 800 / 1200 /
+  2000 / 4000 / 8000 msg/s 档位均通过；最高档 5000 条消息、500000 条
+  conversation signal、`send_p95_ms=18.54`、`send_p99_ms=22.41`、PullInbox p95
+  `26.93ms`、`user_inbox_rows=0`、`delivery_outbox_pending=0`、Kafka lag=0。
+  这证明当前瓶颈不在 SendMessage、message outbox、delivery projection、delivery outbox
+  或 Kafka consumer；需要继续观察 online signal drain 和压测端读取能力。
 - HYBRID 诊断档位 1000 人 / 1000 消息 / 400 msg/s 暴露 `delivery_outbox` ready query
   在百万级 per-user outbox 下退化：旧 anti-join blocker 查询每批 500 行约 24s。当前
   delivery outbox relay 已改成 per-conversation frontier ready query，并把本地 worker
@@ -85,8 +86,8 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
 
 ## 本轮完成条件
 
-- push-focused step 的第一轮 READ_FANOUT 诊断 run 已完成，并明确记录 signal 写出 / 读取
-  指标；当前还需要用 clean commit delivery-service 镜像复压更高档位，形成可复现实验。
+- push-focused step 的 READ_FANOUT clean commit 阶梯 run 已完成，并明确记录 signal
+  写出 / 读取指标；当前还需要补 Grafana / Prometheus 时间窗口截图或低敏查询输出。
 - 至少补一轮 Prometheus / Grafana 或 debug metrics 时间窗口信息；若缺 exporter，必须写清楚缺口，不把
   一次性 CLI 统计冒充完整趋势图。
 - 文档同步本轮公开能力或瓶颈变化。
@@ -102,10 +103,10 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
 
 ## 后续优先级
 
-1. 提交 delivery outbox frontier ready query，重建 clean commit delivery-service 镜像并
-   redeploy，先复压 READ_FANOUT 6000 人 / 400 msg/s，再逐步跑 800 -> 1000 -> 1200 msg/s。
-2. 用 writer metrics + per-subscriber signal summary 判断瓶颈在 writer flush、客户端读取、
-   session queue、Redis route、Kafka consumer，还是 PostgreSQL / delivery outbox。
+1. 补本轮 READ_FANOUT 阶梯复压的 Grafana / Prometheus 或 debug metrics 时间窗口，
+   并提交文档。
+2. 用 writer metrics + per-subscriber signal summary 继续判断瓶颈在 writer flush、客户端读取、
+   session queue、Redis route，还是压测端读取；当前不是 PostgreSQL / delivery outbox。
 3. 若 HYBRID 仍要支持千人级 per-user materialized outbox，优先评估显式 frontier /
    progress 表或把策略提前切到 READ_FANOUT；不要把 Kafka / Redis 当成替代 fanout 策略。
 4. delivery projection lag / inbox rows per message / push notify storm 指标深化。

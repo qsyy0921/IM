@@ -170,6 +170,8 @@ CreateConversation(GROUP)
 | 策略切换 smoke | 61 人热点群、20 条消息、3 个 WebSocket conversation subscriber，`SEQUENCER_BLOCK + BROADCAST_SIGNAL` 通过 | `send_p95_ms=19.03`、`user_inbox_rows=0`、`delivery_timeline_rows=20`、3 个订阅者共收到 60 条 conversation signal，`delivery_outbox_pending=0`，证明热点群 first-stage 不再走小群全员写扩散路径。 |
 | 成员边界诊断 | 200 人 / 500 消息 dirty-run 暴露并修复 `SEQUENCER_BLOCK` 下成员 JOIN 未接 timeline sequencer 的问题 | 修复后成员边界通过 timeline-service 分配单 seq lease，中等规模诊断可完成 `BROADCAST_SIGNAL`、`delivery_outbox_pending=0`、Kafka lag=0；正式报告仍需 clean commit 重跑。 |
 | clean redeploy 复验 | clean commit `d13bff6c` 重建 / redeploy 后跑通 61 人 / 20 消息、200 人 / 500 消息、500 人 / 1000 消息三档 | 最大档 500 人 / 1000 消息 / 50 subscriber 产生 50000 条 conversation signal，`send_p95_ms=10.633`、`send_p99_ms=13.013`、`user_inbox_rows=0`、`delivery_outbox_pending=0`、Kafka lag=0。 |
+| message relay 优化 | clean commit `0a1395c` 后，message-service outbox relay 支持 conversation-sharded multi-worker batch publish | 1000 人 / 4000 消息 / 800 msg/s / 100 subscriber 通过，message / delivery outbox 均无积压；更高档位把瓶颈暴露到 push conversation signal 观测。 |
+| delivery outbox frontier 优化 | clean commit `01b2a70` 后，delivery-service outbox ready query 改为 per-conversation frontier，并用 8 worker relay 复压 | 6000 人 READ_FANOUT、100 subscriber 下，400 / 800 / 1200 / 2000 / 4000 / 8000 msg/s 目标档均通过；最高档 5000 条消息、500000 条 signal，`send_p95_ms=18.54`、`send_p99_ms=22.41`、`delivery_outbox_pending=0`、Kafka lag=0。 |
 
 面试时可以把这个结果讲成一次真实性能定位过程：
 
@@ -177,9 +179,11 @@ CreateConversation(GROUP)
 我先用业务压测证明瓶颈在 delivery_outbox relay，而不是 SendMessage。
 然后做 batch publish、ready index 和 worker sharding。第一次按 row id 分片失败，
 因为 outbox 的顺序边界是 conversation。修正为 conversation-sharded relay 后，
-100 人群 150 QPS 可以完整追平。再往上到 200 QPS，瓶颈转移到 timeline projection
-和 user_inbox fanout，这说明下一步不是继续盲目加 relay worker，而是优化 fanout
-批量写、projection 并行和热点群策略。
+100 人群 150 QPS 可以完整追平。随后我把 message outbox relay 改成 conversation-sharded
+multi-worker batch publish，把 delivery outbox ready query 改成 per-conversation frontier。
+再用 READ_FANOUT 路径做 6000 人 / 100 subscriber 阶梯复压，最高目标 8000 msg/s、
+500000 条 online signal 也能追平。这个结果说明当前上限不在 SendMessage、outbox、
+delivery projection 或 Kafka，而更接近 online signal drain / 压测端读取能力。
 ```
 
 2026-06-29 的小规模 smoke 进一步证明了策略切换链路：
@@ -225,8 +229,12 @@ clean commit 重跑后再写入容量报告。
 但不再写 50 万级 user_inbox 行；delivery_outbox、Kafka lag 和 PullInbox / ACK 抽样均追平。
 ```
 
-这仍不是生产容量上限，下一步要继续提高 message rate、在线比例和慢连接比例，并把
-Grafana / Prometheus 趋势图和 PostgreSQL / Kafka / projection 指标一起归档。
+后续 clean commit `01b2a70` 进一步把 READ_FANOUT 路径放大到 6000 人、100 个
+WebSocket subscriber，并跑 400 / 800 / 1200 / 2000 / 4000 / 8000 msg/s 目标档。
+最高档发送 5000 条消息、产生 500000 条 conversation signal，全部 subscriber 读完，
+`delivery_outbox_pending=0`、Kafka lag=0。这个结果仍不是生产容量上限；下一步要继续
+提高 subscriber 数、在线比例和总 signal 数，并把 Grafana / Prometheus 趋势图和
+PostgreSQL / Kafka / projection 指标一起归档。
 
 ### 当前系统如何承接热点群
 

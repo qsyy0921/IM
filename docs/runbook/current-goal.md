@@ -6,9 +6,9 @@
 
 ## Active Module
 
-Hot group pressure step-up and bottleneck curve：在 clean commit Docker redeploy 和
-`SEQUENCER_BLOCK + BROADCAST_SIGNAL` 三档复验通过基础上，继续扩大热点群压测规模，
-补 Prometheus / Grafana 趋势和下一瓶颈曲线。
+Hot group pressure step-up and bottleneck curve：在 clean commit Docker redeploy、
+`SEQUENCER_BLOCK + BROADCAST_SIGNAL` 三档复验和 READ_FANOUT 6000 人阶梯复压基础上，
+继续扩大 subscriber 数、总 signal 数和在线读取侧瓶颈曲线。
 
 ## 当前已收口摘要
 
@@ -82,6 +82,15 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
   `docs/runbook/loadtest/hotgroup/hotgroup-analysis-20260630-readfanout-clean.md`，
   分类为 `online-signal-drain`：outbox / Kafka 追平，但 500000 条 signal 最慢读完约
   176s。该报告是诊断材料，不替代 Grafana / Prometheus 时间窗口。
+- 已新增 `tools/record-hotgroup-metrics-window.ps1`，并对最高档
+  `hotgroup-readfanout-6000-8000qps-clean-01b2a70e-20260630-2336` 采集
+  Prometheus 时间窗口。原始 JSON 写入
+  `H:\NexusIM\loadtest-results\hotgroup-readfanout-6000-8000qps-clean-01b2a70e-20260630-2336\hotgroup-prometheus-window.json`，
+  仓库低敏报告见
+  `docs/runbook/loadtest/hotgroup/hotgroup-metrics-window-20260630-readfanout-clean-8000qps.md`。
+  该窗口显示核心 4 个 scrape target 全部 up，`SendMessage p99` 约 21ms，
+  `delivery_outbox_pending` 峰值 2258 后归零，push writer / Redis route 指标有数据，
+  slow eviction 为 0。
 - HYBRID 诊断档位 1000 人 / 1000 消息 / 400 msg/s 暴露 `delivery_outbox` ready query
   在百万级 per-user outbox 下退化：旧 anti-join blocker 查询每批 500 行约 24s。当前
   delivery outbox relay 已改成 per-conversation frontier ready query，并把本地 worker
@@ -93,10 +102,9 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
 ## 本轮完成条件
 
 - push-focused step 的 READ_FANOUT clean commit 阶梯 run 已完成，并明确记录 signal
-  写出 / 读取指标；自动分析报告已生成；当前还需要补 Grafana / Prometheus 时间窗口截图
-  或低敏查询输出。
-- 至少补一轮 Prometheus / Grafana 或 debug metrics 时间窗口信息；若缺 exporter，必须写清楚缺口，不把
-  一次性 CLI 统计冒充完整趋势图。
+  写出 / 读取指标；自动分析报告和最高档 Prometheus 低敏时间窗口均已生成。
+- 下一轮继续扩大 subscriber 数、总 signal 数或并发 runner 读取能力，形成 online signal drain
+  瓶颈曲线；若缺 exporter，必须写清楚缺口，不把一次性 CLI 统计冒充完整趋势图。
 - 文档同步本轮公开能力或瓶颈变化。
 - 提交并推送到 GitHub。
 
@@ -110,10 +118,10 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
 
 ## 后续优先级
 
-1. 补本轮 READ_FANOUT 阶梯复压的 Grafana / Prometheus 或 debug metrics 时间窗口，
-   并提交文档。
-2. 用 writer metrics + per-subscriber signal summary 继续判断瓶颈在 writer flush、客户端读取、
+1. 用 writer metrics + per-subscriber signal summary + Prometheus 时间窗口继续判断瓶颈在
+   writer flush、客户端读取、
    session queue、Redis route，还是压测端读取；当前不是 PostgreSQL / delivery outbox。
+2. 扩大 subscriber 数、总 signal 数或多 runner 读取能力，逼近 online signal drain 上限。
 3. 若 HYBRID 仍要支持千人级 per-user materialized outbox，优先评估显式 frontier /
    progress 表或把策略提前切到 READ_FANOUT；不要把 Kafka / Redis 当成替代 fanout 策略。
 4. delivery projection lag / inbox rows per message / push notify storm 指标深化。

@@ -109,6 +109,13 @@ brief、loadtest report、development-progress 或 archive。
   已生成 `docs/runbook/loadtest/hotgroup/hotgroup-analysis-20260630-readfanout-clean.md`：
   clean commit `01b2a70` 6 档 READ_FANOUT 结果被分类为 `online-signal-drain`，证据是
   outbox / Kafka 已追平，但 500000 条 conversation signal 最慢读完约 176s。
+- 2026-07-01 已新增 hotgroup Prometheus 时间窗口记录工具
+  `tools/record-hotgroup-metrics-window.ps1`，并为最高档
+  `hotgroup-readfanout-6000-8000qps-clean-01b2a70e-20260630-2336` 写出低敏窗口报告：
+  `docs/runbook/loadtest/hotgroup/hotgroup-metrics-window-20260630-readfanout-clean-8000qps.md`。
+  该窗口内核心 4 个 scrape target 全部 up，`SendMessage p99` 约 21ms，
+  `delivery_outbox_pending` 峰值 2258 后归零，push writer / Redis route 指标有数据，
+  slow eviction 为 0。
 - 2026-06-30 HYBRID 1000 人 / 1000 消息 / 400 msg/s 诊断 run 暴露 per-user outbox
   写扩散下的 delivery outbox ready query 退化：旧 anti-join blocker 查询在约 100 万
   pending row 下每批 500 行约 24s。delivery-service 已改为 per-conversation frontier
@@ -144,7 +151,6 @@ brief、loadtest report、development-progress 或 archive。
 
 ## 下一个方向
 
-- 下一步优先补本轮 READ_FANOUT 阶梯复压的 Prometheus / Grafana 或 debug metrics
-  时间窗口，并用分析器持续记录复压对比；必要时继续扩大 subscriber 数或总 signal 数
-  来逼近 online signal drain 上限；
+- 下一步用分析器和 Prometheus 时间窗口持续记录复压对比；继续扩大 subscriber 数、
+  总 signal 数或多 runner 读取能力，逼近 online signal drain 上限；
   正式生产级运维 UI、provider-grade 长周期平台仍后置。

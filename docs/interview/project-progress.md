@@ -173,6 +173,7 @@ CreateConversation(GROUP)
 | message relay 优化 | clean commit `0a1395c` 后，message-service outbox relay 支持 conversation-sharded multi-worker batch publish | 1000 人 / 4000 消息 / 800 msg/s / 100 subscriber 通过，message / delivery outbox 均无积压；更高档位把瓶颈暴露到 push conversation signal 观测。 |
 | delivery outbox frontier 优化 | clean commit `01b2a70` 后，delivery-service outbox ready query 改为 per-conversation frontier，并用 8 worker relay 复压 | 6000 人 READ_FANOUT、100 subscriber 下，400 / 800 / 1200 / 2000 / 4000 / 8000 msg/s 目标档均通过；最高档 5000 条消息、500000 条 signal，`send_p95_ms=18.54`、`send_p99_ms=22.41`、`delivery_outbox_pending=0`、Kafka lag=0。 |
 | 压测自动分析 | `tools/analyze-hotgroup-loadtest.ps1` 离线读取 H 盘 `hotgroup-summary.json`，生成 run matrix、瓶颈分类和下一步策略 | clean commit `01b2a70` 的 6 档 READ_FANOUT 被分类为 `online-signal-drain`：outbox / Kafka 已追平，但 500000 条 signal 最慢读完约 176s；下一步应提高 subscriber / signal 总量并补 Grafana / Prometheus 时间窗口。 |
+| Prometheus 时间窗口 | `tools/record-hotgroup-metrics-window.ps1` 读取 H 盘压测目录并查询 Prometheus range API，输出低敏窗口报告 | 最高档 `hotgroup-readfanout-6000-8000qps-clean-01b2a70e-20260630-2336` 已补窗口：核心 4 个 scrape target 全部 up，`SendMessage p99` 约 21ms，`delivery_outbox_pending` 峰值 2258 后归零，push writer / Redis route 指标有数据，slow eviction 为 0。 |
 
 面试时可以把这个结果讲成一次真实性能定位过程：
 
@@ -236,8 +237,9 @@ clean commit 重跑后再写入容量报告。
 WebSocket subscriber，并跑 400 / 800 / 1200 / 2000 / 4000 / 8000 msg/s 目标档。
 最高档发送 5000 条消息、产生 500000 条 conversation signal，全部 subscriber 读完，
 `delivery_outbox_pending=0`、Kafka lag=0。这个结果仍不是生产容量上限；下一步要继续
-提高 subscriber 数、在线比例和总 signal 数，并把 Grafana / Prometheus 趋势图、
-自动分析报告和 PostgreSQL / Kafka / projection 指标一起归档。
+提高 subscriber 数、在线比例和总 signal 数，并把 Prometheus 时间窗口、自动分析报告和
+PostgreSQL / Kafka / projection 指标一起归档；最高档已补一轮低敏 Prometheus 窗口，
+后续继续扩大曲线时必须同样记录窗口。
 
 ### 当前系统如何承接热点群
 

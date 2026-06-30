@@ -26,10 +26,13 @@
    6000 人 READ_FANOUT 阶梯复压，目标 400 / 800 / 1200 / 2000 / 4000 /
    8000 msg/s 均通过，最高档产生 500000 条 conversation signal 且 outbox / Kafka 无积压。
    HYBRID 1000 人 / 1000 消息 / 400 msg/s 暴露 delivery outbox ready query 在百万级
-   per-user outbox 下退化，当前已改成 per-conversation frontier query；下一步补
-   Prometheus / Grafana 时间窗口和更高 subscriber / signal 总量的瓶颈曲线。已新增
-   `tools/analyze-hotgroup-loadtest.ps1` 自动汇总压测结果、分类瓶颈和给出下一步策略；
-   后续每次正式复压都要生成或更新对应低敏分析报告。
+   per-user outbox 下退化，当前已改成 per-conversation frontier query；最高档
+   READ_FANOUT 已补 Prometheus 低敏时间窗口，核心 target up、SendMessage p99 约
+   21ms、delivery_outbox pending 峰值后归零、push writer / Redis route 有数据。
+   下一步做更高 subscriber / signal 总量和多 runner 读取能力的瓶颈曲线。已新增
+   `tools/analyze-hotgroup-loadtest.ps1` 和 `tools/record-hotgroup-metrics-window.ps1`
+   自动汇总压测结果、分类瓶颈、记录 Prometheus 时间窗口和给出下一步策略；后续每次
+   正式复压都要生成或更新对应低敏分析报告。
 2. Agent action boundary / repair cases：在 provider replay admin / workflow handoff 已落
    的基础上，继续扩更多需要 proposal / approval / workflow / audit 的 action 与 repair 场景。
 3. Product-active 服务按需推进：workflow、audit、admin、notification、media、vector、
@@ -109,8 +112,9 @@
   `loadtest/hotgroup` 业务压测 runner，覆盖热点群聊 fanout、Kafka lag、delivery
   projection、push notify storm、PullInbox / ACK 追平、成员变更和故障恢复，不用单接口
   QPS 替代真实业务链路；正式压测必须配套 Prometheus / Grafana 趋势图。当前已新增
-  `NexusIM Hot Group Loadtest` first-stage dashboard 和 hotgroup 离线分析器；后续还需补
-  fanout-mode distribution、Kafka consumer lag、delivery timeline item insert rate、
+  `NexusIM Hot Group Loadtest` first-stage dashboard、hotgroup 离线分析器和
+  Prometheus 时间窗口记录工具；后续还需补 fanout-mode distribution、Kafka consumer lag、
+  delivery timeline item insert rate、
   inbox rows per message 和 PostgreSQL lock / WAL / dead tuple time-series exporter。
 - `identity-service`：WebAuthn/passkeys、OIDC、多 issuer、KMS/HSM、完整风控、生产级
   email/SMS provider。

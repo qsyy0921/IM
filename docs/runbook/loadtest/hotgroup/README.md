@@ -22,6 +22,7 @@ CreateConversation -> batch CreateMemberChange(JOIN)
 | `loadtest-report-20260630-hotgroup-clean-redeploy.md` | clean commit `d13bff6c` 重建 / redeploy 后，61 人 / 20 消息、200 人 / 500 消息、500 人 / 1000 消息三档均通过；最大档产生 50000 条 conversation signal，`user_inbox_rows=0`、`delivery_outbox_pending=0`、Kafka lag=0。 |
 | `loadtest-report-20260630-hotgroup-message-outbox-relay.md` | message-service outbox relay 已支持 conversation-sharded multi-worker batch publish；1000 人 / 4000 消息 / 800 msg/s 通过，message / delivery outbox 均无积压；随后 clean commit `01b2a70` 完成 READ_FANOUT 6000 人 / 100 subscriber 阶梯复压，最高目标 8000 msg/s、500000 条 conversation signal，outbox / Kafka 均无积压。 |
 | `hotgroup-analysis-20260630-readfanout-clean.md` | 由 `tools/analyze-hotgroup-loadtest.ps1` 自动汇总 clean commit `01b2a70` 的 6 档 READ_FANOUT 结果；当前分类为 `online-signal-drain`，证据是 outbox / Kafka 已追平但 500000 条 signal 最慢读完约 176s。 |
+| `hotgroup-metrics-window-20260630-readfanout-clean-8000qps.md` | 由 `tools/record-hotgroup-metrics-window.ps1` 采集最高档 Prometheus 时间窗口；核心 4 个 scrape target 全部 up，`SendMessage p99` 约 21ms，`delivery_outbox_pending` 峰值 2258 后归零，push writer / Redis route 指标有数据，slow eviction 为 0。 |
 
 ## 目标
 
@@ -113,6 +114,19 @@ outbox 追平但 signal drain 长  -> online signal drain
 
 该报告只能作为本地 / 三机压测诊断材料，不能单独替代 Grafana / Prometheus 时间窗口，
 也不能写成生产 SLO。
+
+每轮正式压测还必须记录至少一个 Prometheus / Grafana 或 debug metrics 时间窗口。
+如果使用 Prometheus，可用窗口记录工具从 H 盘原始目录生成低敏报告：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\record-hotgroup-metrics-window.ps1 `
+  -ResultDir H:\NexusIM\loadtest-results\hotgroup-readfanout-6000-8000qps-clean-01b2a70e-20260630-2336 `
+  -MarkdownPath docs\runbook\loadtest\hotgroup\hotgroup-metrics-window-20260630-readfanout-clean-8000qps.md
+```
+
+工具会把原始 Prometheus JSON 写回对应 `H:\NexusIM\loadtest-results\<run>`，
+仓库只保存低敏 Markdown 摘要。窗口报告仍不是生产 SLO，只用于解释该轮压测
+是否有核心 target、outbox、projection、push writer、Redis route 和 PostgreSQL pool 指标。
 
 ## 可视化要求
 

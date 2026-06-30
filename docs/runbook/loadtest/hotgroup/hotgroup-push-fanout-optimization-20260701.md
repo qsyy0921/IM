@@ -831,3 +831,66 @@ Interpretation:
 - For very large rooms, the next strategy is to keep `sample_every` explicit per
   room policy and then test larger message counts / higher subscriber counts to
   find the new sustainable QPS curve.
+
+## Sampled Signal Larger Message Count Retest
+
+The next comparable run kept `sample_every=10`, 400 conversation subscribers,
+256 senders and a target 8000 msg/s, but increased `message_count` from 1000 to
+5000.
+
+Artifacts:
+
+```text
+H:\NexusIM\loadtest-results\hotgroup-sample10-400sub-5000msg-coordinator-20260701-072206
+H:\NexusIM\loadtest-results\hotgroup-sample10-400sub-5000msg-shard*-20260701-072206
+docs/runbook/loadtest/hotgroup/hotgroup-multirunner-analysis-20260701-sample10-400sub-5000msg.md
+docs/runbook/loadtest/hotgroup/hotgroup-metrics-window-20260701-sample10-400sub-5000msg.md
+```
+
+Results:
+
+| metric | value |
+| --- | ---: |
+| success | true |
+| group_size | 6000 |
+| fanout_mode | READ_FANOUT |
+| message_count | 5000 |
+| target_message_rate | 8000 msg/s |
+| sender_count | 256 |
+| send_success / errors | 5000 / 0 |
+| send_p95 / p99 | 18.103 ms / 20.914 ms |
+| PullInbox p95 | 23.874 ms |
+| message_outbox_pending / delivery_outbox_pending | 0 / 0 |
+| subscriber_count | 400 |
+| emitted conversation signals read | 200000 |
+| signal_span_seconds | 138.555 s |
+| signal_span_rate | 1443.474 signals/s |
+
+Prometheus window:
+
+| metric | value |
+| --- | ---: |
+| core_targets_up | 7 |
+| delivery_outbox_pending max | 1763, then 0 |
+| push writer delivery notify success window | about 203660 |
+| Redis subscriber messages window | about 2036 |
+| Redis subscriber enqueued window | about 203660 |
+| delivery notify write p95 / p99 window | about 0.458 ms / 0.87 ms |
+| delivery notify queue p95 / p99 window | about 3.991 ms / 4.799 ms |
+| Redis subscriber fanout p95 / p99 window | about 54.541 ms / 90.908 ms |
+| writer / Redis errors / queue-full / eviction | 0 |
+
+Interpretation:
+
+- Increasing sampled messages from 1000 to 5000 scaled emitted frames from 40000
+  to 200000 and kept the durable path healthy: SendMessage, PullInbox, ACK,
+  message outbox and delivery outbox all completed.
+- The signal span grew to 138.555s and the span rate dropped from about
+  1584.587 to 1443.474 signals/s. This keeps the bottleneck in
+  `online-signal-drain`.
+- Single WebSocket write latency remains low. The stronger evidence is again
+  Redis subscriber conversation fanout / enqueue duration around 54ms p95 and
+  91ms p99 when the sampled signal count grows.
+- The next module should not be another blind scale-up. Pick one concrete
+  design: room-level online signal policy / adaptive cadence, or a persistent
+  per-conversation / per-bucket fanout worker model inside push-gateway.

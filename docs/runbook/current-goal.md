@@ -276,6 +276,18 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
   message / delivery outbox pending=0；4 个 shard 共读完 40000 条 signal，
   signal span 25.243s。对比 full-signal multi-ws baseline 的 400000 条 signal /
   141.719s，在线帧总量显著下降，durable PullInbox / ACK 仍成立。
+- 2026-07-01 继续扩大 sample=10 的 message_count：run
+  `hotgroup-sample10-400sub-5000msg-coordinator-20260701-072206` 使用 clean commit
+  `f5bc0199`、服务镜像仍为 `bac71c65` sampled push-gateway，6000 人、5000 消息、
+  目标 8000 msg/s、256 sender、400 subscriber、READ_FANOUT。coordinator
+  `send_p95_ms=18.103`、`send_p99_ms=20.914`、`PullInbox p95=23.874ms`，
+  message / delivery outbox pending=0；4 个 shard 共读完 200000 条 signal，
+  span 138.555s，drain rate 约 `1443.474 signals/s`。Prometheus 窗口显示
+  `delivery_outbox_pending` 峰值 1763 后归零，writer / Redis error、queue-full 和
+  eviction 均为 0；`delivery_notify` write p95 / p99 约 `0.458ms / 0.87ms`，
+  Redis subscriber conversation fanout p95 / p99 约 `54.541ms / 90.908ms`。
+  结论：sample=10 能降低在线 frame 总量，但当消息数扩大到 5000 时仍呈
+  online-signal-drain，且本地 Redis subscriber fanout/enqueue 继续是主要证据点。
 - HYBRID 诊断档位 1000 人 / 1000 消息 / 400 msg/s 暴露 `delivery_outbox` ready query
   在百万级 per-user outbox 下退化：旧 anti-join blocker 查询每批 500 行约 24s。当前
   delivery outbox relay 已改成 per-conversation frontier ready query，并把本地 worker
@@ -288,11 +300,13 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
 
 - push-focused step 的 READ_FANOUT clean commit 阶梯 run 已完成，并明确记录 signal
   写出 / 读取指标；自动分析报告和最高档 Prometheus 低敏时间窗口均已生成。
-- `sample_every=10` 可比复压已完成：emitted signal 数从 400000 降至 40000，
-  span 从 141.719s 降至 25.243s；Prometheus 窗口显示 Redis subscriber message/window
-  约 407、enqueued/window 约 40720，符合 sampled seq 经 4 个 ws fanout 的预期。
-  下一步应扩大 sampled 场景的 message_count / subscriber_count，探索新的可持续 QPS
-  曲线，并继续记录 client/network receive cadence 是否成为新瓶颈。
+- `sample_every=10` 的 1000 消息和 5000 消息两档复压均已完成：1000 消息档将
+  emitted signal 从 400000 降至 40000，span 从 141.719s 降至 25.243s；5000
+  消息档产生 200000 条 sampled signal，span 138.555s。两档 SendMessage、
+  PullInbox、ACK 和 outbox drain 均成立，但 5000 消息档继续显示 online-signal-drain
+  和 Redis subscriber 本地 fanout/enqueue 长尾。下一步应选择一个明确模块继续优化：
+  要么进一步减少超大房间在线 signal 总量，要么重构 push-gateway 本地 conversation
+  signal fanout 的持久 worker / bucket 模型。
 - 文档同步本轮公开能力或瓶颈变化。
 - 提交并推送到 GitHub。
 
@@ -306,10 +320,11 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
 
 ## 后续优先级
 
-1. 基于 `bac71c65` 的 sample=10 复压结论，下一步扩大 sampled 场景的
-   message_count / subscriber_count，确认新瓶颈是否迁移到 client / network receive
-   cadence 或其它服务；不要把采样写成隐藏 fallback，也不要把少发 WebSocket frame
-   等同于 durable delivery。
+1. 基于 `bac71c65` / `f5bc0199` 的 sample=10 两档复压结论，下一步不要继续盲目加压；
+   优先做一个明确模块：要么把超大房间 online signal 策略从固定采样推进到可配置
+   room policy / adaptive cadence，要么重构 push-gateway 本地 conversation signal
+   fanout 为持久 per-conversation / per-bucket worker。仍需保持 PullInbox / ACK 作为
+   durable 事实追平路径，不能把 sampled WebSocket frame 当可靠投递。
 2. 继续为每轮优化保留 clean commit、Docker 镜像归档、三机部署版本和 Prometheus
    时间窗口，保证压测曲线可复现。
 3. 若 HYBRID 仍要支持千人级 per-user materialized outbox，优先评估显式 frontier /

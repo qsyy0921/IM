@@ -77,8 +77,12 @@
    `bac71c65` 镜像重建 / 归档 / redeploy，并用 400 subscriber coordinator + 4 shard
    对照 full-signal 与 sample=10：emitted signal 从 400000 降至 40000，signal span
    从 141.719s 降至 25.243s，SendMessage / PullInbox / ACK 和 message / delivery
-   outbox drain 均成立。下一步扩大 sampled 场景的 message_count / subscriber_count，
-   继续判断新瓶颈是否迁移到 client / network receive cadence、固定 setup 成本或其它服务。
+   outbox drain 均成立。随后用 clean commit `f5bc0199` 将 sample=10 场景扩大到
+   5000 消息：400 subscriber 共读完 200000 条 signal，span 138.555s，SendMessage
+   / PullInbox / ACK 和 outbox drain 仍成立，但 Redis subscriber conversation fanout
+   p95 / p99 约 54.541ms / 90.908ms，瓶颈仍是 online-signal-drain。下一步不要
+   只继续加压；优先在 room policy / adaptive cadence 或 push-gateway 本地
+   conversation fanout 持久 worker / bucket 模型中选择一个完整模块推进。
 2. Agent action boundary / repair cases：在 provider replay admin / workflow handoff 已落
    的基础上，继续扩更多需要 proposal / approval / workflow / audit 的 action 与 repair 场景。
 3. Product-active 服务按需推进：workflow、audit、admin、notification、media、vector、

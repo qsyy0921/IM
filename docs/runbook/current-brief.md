@@ -277,3 +277,11 @@ brief、loadtest report、development-progress 或 archive。
   subscriber_count，探索新的可持续 QPS 曲线，并判断新瓶颈是否转向 client /
   network receive cadence、固定 setup 成本或其它服务。正式生产级运维 UI、
   provider-grade 长周期平台仍后置。
+- 2026-07-01 已完成 sample=10 的 5000 消息扩大复压：400 subscriber / 5000 消息
+  产生并读完 200000 条 signal，span 138.555s，SendMessage p95 / p99 为
+  18.103ms / 20.914ms，PullInbox p95 为 23.874ms，message / delivery outbox
+  pending=0。Prometheus 窗口显示 `delivery_notify` write p95 / p99 仍低于 1ms，
+  但 Redis subscriber conversation fanout p95 / p99 约 54.541ms / 90.908ms。
+  下一步不再盲目堆 subscriber，应在“更少在线 signal 的 room policy / adaptive
+  cadence”和“push-gateway 本地 conversation fanout 持久 worker / bucket 模型”
+  两个方向中选一个完整模块继续。

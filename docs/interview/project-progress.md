@@ -188,6 +188,7 @@ CreateConversation(GROUP)
 | Conversation-local fanout buckets | clean commit `a15e0ad` 已把 registry 内部 stable `session_id` bucket fanout 部署到 Ubuntu Docker，`push-gateway-ws` 配置 8 bucket，并完成同一 400 subscriber coordinator + 4 shard 复压 | 400000 条 signal 全部读完，drain rate 约 2874.378 signals/s，未突破旧区间；`delivery_notify` queue p95 / p99 约 4.616ms / 4.931ms，write p95 / p99 约 0.383ms / 0.574ms，Redis subscriber fanout p95 / p99 约 54.133ms / 90.827ms。结论：per-event bucket goroutine 不是决定性优化，下一步应评估持久 bucket worker、跨 push 实例分摊订阅或超大房间 pull-first 策略。 |
 | 多 push-gateway ws 拓扑复压 | clean commit `4be4b2d` 增加 4 个 ws 实例，400 个 subscriber 按 100 / 100 / 100 / 100 分散到 10498 / 11001 / 11002 / 11003 四个 ws 端口 | 400000 条 signal 全部读完，drain rate 约 2822.479 signals/s，低于单 ws fanout-buckets baseline 约 2874.378 signals/s；4 个 Prometheus push target 均 up，writer / Redis error、queue-full 和 slow eviction 为 0。结论：简单多开 push-gateway ws 容器不是当前瓶颈解，不能把“加机器”当成热点群优化答案。 |
 | Pull-first 采样式在线唤醒 | clean commit `bac71c65` 将 delivery-consumer 和 4 个 ws 实例统一配置 `NEXUSIM_PUSH_CONVERSATION_SIGNAL_SAMPLE_EVERY=10`，并用同一 400 subscriber coordinator + 4 shard 场景复压 | 6000 人 / 1000 消息 / 8000 msg/s 下 emitted signal 从 full-signal baseline 的 400000 降至 40000，signal span 从 141.719s 降至 25.243s；SendMessage / PullInbox / ACK 成立，message / delivery outbox pending=0。结论：减少在线 frame 总量能显著改善 drain，但 durable 展示仍靠 PullInbox，不能把采样 signal 当可靠投递。 |
+| Sampled signal 扩大消息数复压 | clean commit `f5bc0199` 在 sample=10、400 subscriber、8000 msg/s 下把消息数扩大到 5000 | 产生并读完 200000 条 sampled signal，span 138.555s，SendMessage p95 / p99 为 18.103ms / 20.914ms，PullInbox p95 为 23.874ms，message / delivery outbox pending=0；Prometheus 显示 `delivery_notify` write p95 / p99 低于 1ms，但 Redis subscriber fanout p95 / p99 约 54.541ms / 90.908ms。结论：采样可以降压，但扩大消息数后仍是 online-signal-drain，下一步应做 room policy / adaptive cadence 或本地 fanout 持久 worker。 |
 
 面试时可以把这个结果讲成一次真实性能定位过程：
 
@@ -212,9 +213,12 @@ per-connection 调度和网络吞吐。进一步把 400 个 subscriber 分散到
 push-gateway ws 进程后，drain rate 仍没有提升，这说明热点群优化不能停留在
 “多开容器”。随后我把超大房间在线唤醒改成显式 pull-first sampled signal，
 sample=10 的复压把在线 signal 从 40 万降到 4 万，drain span 从 141.719s 降到
-25.243s，同时 PullInbox / ACK 仍追平 durable timeline。这个结果说明热点群不能把
-WebSocket signal 当可靠投递，真正可靠展示仍要靠 PullInbox；下一步要扩大 sampled
-场景的 message_count / subscriber_count，观察新瓶颈是否转向客户端 / 网络读取节奏。
+25.243s，同时 PullInbox / ACK 仍追平 durable timeline。继续把 sample=10 消息数扩大
+到 5000 后，系统读完 20 万条 sampled signal，SendMessage 和 outbox 仍追平，但
+Redis subscriber fanout p95 / p99 又回到约 54ms / 91ms。这个结果说明热点群不能把
+WebSocket signal 当可靠投递，真正可靠展示仍要靠 PullInbox；下一步不是继续盲目加
+subscriber，而是设计 room-level online signal policy / adaptive cadence，或重构
+push-gateway 本地 conversation fanout worker。
 ```
 
 2026-06-29 的小规模 smoke 进一步证明了策略切换链路：

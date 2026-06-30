@@ -176,6 +176,19 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
   PullInbox / ACK 语义；focused tests / build 已通过。下一步需要 clean commit 镜像
   重建 / redeploy，并用同一 400 subscriber coordinator + shard 场景复压，确认每帧
   `conn.Write` 长尾是否解释 `online-signal-drain`。
+- 2026-07-01 已用 clean commit `4f45519` 重建 / redeploy push-gateway，并完成
+  writer duration 复压：
+  `hotgroup-writerdur-clean-400sub-coordinator-20260701-031058`。该 run 为
+  6000 人、1000 消息、目标 8000 msg/s、256 sender、400 subscriber、
+  READ_FANOUT；coordinator `send_p95_ms=18.655`、`send_p99_ms=21.62`、
+  `PullInbox p95=119.884ms`，message / delivery outbox pending=0；4 个 shard
+  共读完 400000 条 signal，drain rate 约 `2876.698 signals/s`，相对旧
+  400 subscriber baseline 约 `2839.888 signals/s` 只高约 `1.3%`。Prometheus
+  窗口显示 `delivery_notify` write p95 / p99 约 `0.345ms / 0.499ms`，avg 约
+  `0.125ms`，max 约 `10.056ms`，writer / Redis subscriber error 和 eviction 均为 0。
+  结论：`conn.Write` 单次调用长尾不是当前主瓶颈，下一步应定位 Redis subscriber
+  收到 conversation signal 后的本地 fanout / enqueue 调度、per-session writer
+  调度节奏、runner 读取背压和链路吞吐。
 - HYBRID 诊断档位 1000 人 / 1000 消息 / 400 msg/s 暴露 `delivery_outbox` ready query
   在百万级 per-user outbox 下退化：旧 anti-join blocker 查询每批 500 行约 24s。当前
   delivery outbox relay 已改成 per-conversation frontier ready query，并把本地 worker
@@ -206,12 +219,13 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
 
 ## 后续优先级
 
-1. 下一模块转向 WebSocket writer flush cadence、per-connection write scheduling、
-   nhooyr WebSocket 写入策略、连接侧读取背压和网络吞吐定位；不要回头优先调
-   message / delivery outbox 或 Kafka。
-2. 先重建 / redeploy 包含 WebSocket writer duration histogram 的 push-gateway 镜像，
-   复跑 400 subscriber coordinator + shard 对照，用 p95 / p99 / max 写耗时判断下一步
-   是调 writer flush / scheduling，还是压测端读取 / 网络。
+1. 下一模块优先补 Redis subscriber / local conversation fanout enqueue duration
+   观测或优化：区分 Pub/Sub 收到事件、匹配 route、写入本地 session queue、
+   writer goroutine 实际写出和 runner 读取完成之间的时间；不要回头优先调
+   message / delivery outbox、Kafka 或单次 `conn.Write`。
+2. 用同一 400 subscriber coordinator + shard 场景复压，并把 fanout enqueue p95 /
+   p99 / max、writer duration、runner drain span 一起记录；如果 enqueue 长尾高，
+   再考虑 fanout worker pool / shard queue / connection scheduling。
 3. 继续为每轮优化保留 clean commit、Docker 镜像归档、三机部署版本和 Prometheus
    时间窗口，保证压测曲线可复现。
 4. 若 HYBRID 仍要支持千人级 per-user materialized outbox，优先评估显式 frontier /

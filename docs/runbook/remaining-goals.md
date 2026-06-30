@@ -39,9 +39,12 @@
    和网络吞吐。`loadtest/hotgroup` 已新增 `subscriber-only` 多 runner shard 模式；
    clean commit `9e7d4f9` 的 4 runner / 400 subscriber 对照已完成，drain rate 约
    2852 signals/s，与单 runner 400 subscriber baseline 约 2840 signals/s 基本一致。
-   这说明单 runner JSON decode / accounting 不是唯一瓶颈。下一步优先做
-   push-gateway conversation signal 写出 / writer flush / per-connection scheduling
-   优化，不要只盲目增大 subscriber。已新增
+   后续 registry lock 缩短、payload 预编码和 WebSocket writer duration 复压均未突破
+   约 2.85k-2.89k signals/s；clean commit `4f45519` 的 writer duration 复压显示
+   `delivery_notify` write p95 / p99 低于 0.5ms，说明单 runner JSON decode、
+   registry mutex、重复 JSON marshal 和单次 `conn.Write` 长尾都不是主瓶颈。下一步优先做
+   Redis subscriber 本地 fanout / enqueue duration 观测或优化，不要只盲目增大
+   subscriber。已新增
    `tools/analyze-hotgroup-loadtest.ps1`、`tools/analyze-hotgroup-multirunner.ps1` 和
    `tools/record-hotgroup-metrics-window.ps1` 自动汇总压测结果、分类瓶颈、记录
    Prometheus 时间窗口和给出下一步策略；后续每次正式复压都要生成或更新对应低敏分析报告。
@@ -61,7 +64,7 @@
    smoke；2026-06-30 已定位并修复 `SEQUENCER_BLOCK` 下成员 JOIN 仍未接 timeline
    sequencer 的问题，完成 clean redeploy 三档复验，并完成 message outbox relay
    conversation-sharded batch publish 复验。多 runner 对照已证明单 runner 读取不是唯一瓶颈；
-   下一步继续做 push signal 写出 / writer flush 优化、virtual partition mapping、
+   下一步继续做 push signal fanout / enqueue 调度优化、virtual partition mapping、
    leader ownership audit 和 deeper repair。
 
 ## Client Demo Backlog

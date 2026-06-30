@@ -160,3 +160,51 @@ rate. Repeated JSON marshaling is not the dominant bottleneck. The next module
 should shift to WebSocket writer flush cadence, per-connection write scheduling,
 nhooyr write behavior, connection-side read backpressure or network throughput
 rather than message / delivery outbox or Kafka.
+
+## Writer Duration Retest
+
+The next diagnostic change was committed as `4f45519`, rebuilt, archived and
+redeployed to Ubuntu Docker. It added low-cardinality WebSocket writer duration
+histograms for `frame_write` and `delivery_notify`, without changing protocol,
+fanout, durable inbox, PullInbox or ACK behavior.
+
+Comparable scenario:
+
+```text
+group_size=6000
+message_count=1000
+message_rate=8000
+sender_count=256
+subscriber_count=400
+fanout_mode=READ_FANOUT
+runner layout=coordinator + 4 subscriber-only shards
+```
+
+Artifacts:
+
+- coordinator:
+  `H:\NexusIM\loadtest-results\hotgroup-writerdur-clean-400sub-coordinator-20260701-031058`
+- shards:
+  `H:\NexusIM\loadtest-results\hotgroup-writerdur-clean-400sub-shard*-20260701-031058`
+- analysis:
+  `hotgroup-multirunner-analysis-20260701-writerdur-400sub.md`
+- metrics window:
+  `hotgroup-metrics-window-20260701-writerdur-clean-400sub.md`
+
+Result:
+
+- coordinator send, PullInbox and ACK succeeded;
+- `message_outbox_pending=0`, `delivery_outbox_pending=0`;
+- 4 shards read 400000 conversation signals with no subscriber error;
+- aggregate signal span rate was about `2876.698 signals/s`;
+- previous single-runner 400 subscriber baseline was about `2839.888 signals/s`;
+- `delivery_notify` write p95 / p99 were about `0.345ms / 0.499ms`;
+- `delivery_notify` write avg was about `0.125ms`, max about `10.056ms`;
+- writer error, Redis subscriber error and slow eviction stayed at 0.
+
+Judgment: single-call WebSocket `conn.Write` latency is not the dominant
+bottleneck. The next module should instrument or optimize Redis subscriber
+local fanout / enqueue duration and per-session writer scheduling. The key
+question is now where the time is spent between one Redis subscriber message
+and 400 session queues / writers draining it, not whether one `conn.Write` call
+has a large long tail.

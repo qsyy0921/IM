@@ -168,6 +168,15 @@ brief、loadtest report、development-progress 或 archive。
   时间窗口脚本会输出 delivery notify p95 / p99 / avg / max。该改动是下一轮定位
   `conn.Write` 长尾、flush / scheduling 或读端背压的前置证据，不改变消息协议或
   fanout 语义；focused push-gateway tests 和 hotgroup build 已通过。
+- 2026-07-01 已用 clean commit `4f45519` 重建 / redeploy push-gateway，并用同一
+  400 subscriber coordinator + 4 shard 场景复压。run
+  `hotgroup-writerdur-clean-400sub-coordinator-20260701-031058` 共读完
+  400000 条 signal，drain rate 约 `2876.698 signals/s`，相比旧 baseline
+  `2839.888 signals/s` 只高约 `1.3%`。Prometheus 窗口显示 `delivery_notify`
+  write p95 / p99 约 `0.345ms / 0.499ms`，avg 约 `0.125ms`，max 约 `10.056ms`，
+  writer / Redis subscriber error 与 eviction 为 0。结论：单次 WebSocket
+  `conn.Write` 长尾不是当前主瓶颈，下一步应定位 Redis subscriber 本地 fanout /
+  enqueue 调度、writer goroutine 节奏、runner 读取背压和网络吞吐。
 - 2026-06-30 HYBRID 1000 人 / 1000 消息 / 400 msg/s 诊断 run 暴露 per-user outbox
   写扩散下的 delivery outbox ready query 退化：旧 anti-join blocker 查询在约 100 万
   pending row 下每批 500 行约 24s。delivery-service 已改为 per-conversation frontier
@@ -203,8 +212,8 @@ brief、loadtest report、development-progress 或 archive。
 
 ## 下一个方向
 
-- 下一步重建 / redeploy 包含 writer duration histogram 的 push-gateway 镜像，并用同一
-  400 subscriber coordinator + shard 场景复压；如果写耗时 p95 / p99 很低，就继续
-  查压测端读取 / 网络吞吐，如果写耗时出现长尾，再进入 WebSocket writer flush cadence、
-  per-connection write scheduling 或 nhooyr 写入策略优化。
+- 下一步补 Redis subscriber / local conversation fanout enqueue duration 观测或优化；
+  用同一 400 subscriber coordinator + shard 场景复压，比较 enqueue duration、
+  writer duration 和 runner drain span，判断是否需要 fanout worker pool /
+  shard queue / connection scheduling。
   正式生产级运维 UI、provider-grade 长周期平台仍后置。

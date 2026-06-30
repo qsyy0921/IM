@@ -174,6 +174,116 @@ func TestRegistryConversationSignalRequiresSubscription(t *testing.T) {
 	}
 }
 
+func TestRegistryConversationSignalFanoutBucketsPreservePerSessionOrder(t *testing.T) {
+	registry := NewRegistryWithConfig(Config{ConversationFanoutBuckets: 4})
+	outbounds := make([]chan types.ServerFrame, 8)
+	for index := range outbounds {
+		sessionID := "session-" + string(rune('a'+index))
+		auth := types.AuthContext{
+			TenantID:  "tenant-1",
+			UserID:    "user-" + string(rune('a'+index)),
+			DeviceID:  "device-" + string(rune('a'+index)),
+			SessionID: sessionID,
+		}
+		outbounds[index] = make(chan types.ServerFrame, 4)
+		if _, err := registry.Register(context.Background(), types.SessionRegistration{
+			AuthContext: auth,
+			SessionID:   sessionID,
+			Outbound:    outbounds[index],
+		}); err != nil {
+			t.Fatalf("register %s: %v", sessionID, err)
+		}
+		if _, err := registry.SubscribeConversation(context.Background(), types.ConversationSubscriptionCommand{
+			AuthContext:    auth,
+			ConversationID: "conversation-1",
+		}); err != nil {
+			t.Fatalf("subscribe %s: %v", sessionID, err)
+		}
+	}
+
+	first := testNotification()
+	first.Kind = types.DeliveryNotificationKindConversationSignal
+	first.UserID = ""
+	first.EventID = "delivery-event-1"
+	first.ConversationSeq = 7
+	second := first
+	second.EventID = "delivery-event-2"
+	second.ConversationSeq = 8
+
+	firstResult, err := registry.EnqueueConversationSignal(context.Background(), first)
+	if err != nil {
+		t.Fatalf("first signal: %v", err)
+	}
+	secondResult, err := registry.EnqueueConversationSignal(context.Background(), second)
+	if err != nil {
+		t.Fatalf("second signal: %v", err)
+	}
+	if firstResult.MatchedSessions != len(outbounds) ||
+		firstResult.Enqueued != len(outbounds) ||
+		secondResult.MatchedSessions != len(outbounds) ||
+		secondResult.Enqueued != len(outbounds) {
+		t.Fatalf("unexpected results: first=%+v second=%+v", firstResult, secondResult)
+	}
+	for index, outbound := range outbounds {
+		firstFrame := <-outbound
+		secondFrame := <-outbound
+		if firstFrame.ConversationSeq != 7 || secondFrame.ConversationSeq != 8 {
+			t.Fatalf("session %d saw out-of-order frames: first=%+v second=%+v", index, firstFrame, secondFrame)
+		}
+	}
+}
+
+func TestRegistryConversationSignalFanoutBucketsEvictFullQueues(t *testing.T) {
+	registry := NewRegistryWithConfig(Config{ConversationFanoutBuckets: 4})
+	evicted := make([]chan types.SessionEviction, 2)
+	for index := range evicted {
+		sessionID := "session-full-" + string(rune('a'+index))
+		auth := types.AuthContext{
+			TenantID:  "tenant-1",
+			UserID:    "full-user-" + string(rune('a'+index)),
+			DeviceID:  "full-device-" + string(rune('a'+index)),
+			SessionID: sessionID,
+		}
+		evicted[index] = make(chan types.SessionEviction, 1)
+		if _, err := registry.Register(context.Background(), types.SessionRegistration{
+			AuthContext: auth,
+			SessionID:   sessionID,
+			Outbound:    make(chan types.ServerFrame),
+			Evicted:     evicted[index],
+		}); err != nil {
+			t.Fatalf("register %s: %v", sessionID, err)
+		}
+		if _, err := registry.SubscribeConversation(context.Background(), types.ConversationSubscriptionCommand{
+			AuthContext:    auth,
+			ConversationID: "conversation-1",
+		}); err != nil {
+			t.Fatalf("subscribe %s: %v", sessionID, err)
+		}
+	}
+
+	notification := testNotification()
+	notification.Kind = types.DeliveryNotificationKindConversationSignal
+	notification.UserID = ""
+	result, err := registry.EnqueueConversationSignal(context.Background(), notification)
+	if err != nil {
+		t.Fatalf("conversation signal: %v", err)
+	}
+	if result.MatchedSessions != len(evicted) ||
+		result.Enqueued != 0 ||
+		result.Dropped != len(evicted) ||
+		result.Evicted != len(evicted) {
+		t.Fatalf("unexpected bucket queue-full result: %+v", result)
+	}
+	for index := range evicted {
+		assertEvictionReason(t, evicted[index], "slow_session")
+	}
+	snapshot := registry.Metrics()
+	if snapshot.SessionQueueFullCount != uint64(len(evicted)) ||
+		snapshot.SlowSessionEvictedCount != uint64(len(evicted)) {
+		t.Fatalf("unexpected queue-full metrics: %+v", snapshot)
+	}
+}
+
 func TestRegistryEvictDeviceClosesMatchingSessions(t *testing.T) {
 	registry := NewRegistry()
 	firstEvicted := make(chan types.SessionEviction, 1)

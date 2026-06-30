@@ -492,3 +492,45 @@ conversation through one worker, the next optimization should evaluate
 conversation-local fanout buckets: split the subscriber set into stable buckets
 and let each bucket drain in order for its sessions, while preserving per-session
 signal order and keeping durable PullInbox as the recovery path.
+
+## Conversation-Local Fanout Buckets
+
+The next implementation step keeps Redis Pub/Sub, `delivery.notify` payloads,
+durable inbox, PullInbox and ACK semantics unchanged. It only changes how a
+single push-gateway process maps one conversation signal to local WebSocket
+session queues.
+
+Change:
+
+- `memory.Registry` now accepts `ConversationFanoutBuckets`.
+- `EnqueueConversationSignal` still snapshots eligible subscribers and marks
+  event ids under the registry lock.
+- After snapshot, local outbound enqueue is split by stable `session_id` bucket.
+- Buckets run in parallel for the same conversation signal.
+- The outer Redis subscriber worker still processes a conversation signal before
+  the next signal for that conversation, so each session sees ordered
+  `conversation_seq` frames.
+- Queue-full handling is unchanged: a full session queue causes explicit
+  slow-session eviction, not silent drop.
+
+Runtime knob:
+
+```text
+NEXUSIM_PUSH_CONVERSATION_FANOUT_BUCKETS=8
+```
+
+The local Docker profile enables 8 buckets on `push-gateway-ws` for the next
+hotgroup retest.
+
+Focused checks:
+
+```powershell
+. .\tools\go-env.ps1; go test ./services/push-gateway/... ./loadtest/hotgroup -count=1
+. .\tools\go-env.ps1; go build ./services/push-gateway/cmd/push-gateway ./loadtest/hotgroup
+```
+
+Judgment before retest: this is an implementation change, not a capacity result.
+The next step is a clean commit, rebuild / archive the push-gateway image,
+redeploy it, then rerun the same 400 subscriber coordinator + 4 shard scenario
+and compare worker fanout p95 / p99 and total signal drain rate against
+`fedb5f43`.

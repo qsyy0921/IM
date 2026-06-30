@@ -77,7 +77,8 @@ func runRuntime(enableWS bool, enableDeliveryConsumer bool, enableIdentityConsum
 	}()
 
 	localRegistry := memory.NewRegistryWithConfig(memory.Config{
-		ResumeBufferTTL: envDuration("NEXUSIM_PUSH_RESUME_BUFFER_TTL", 10*time.Minute),
+		ResumeBufferTTL:           envDuration("NEXUSIM_PUSH_RESUME_BUFFER_TTL", 10*time.Minute),
+		ConversationFanoutBuckets: envInt("NEXUSIM_PUSH_CONVERSATION_FANOUT_BUCKETS", 1),
 	})
 	writerMetrics := &types.WebSocketWriterMetrics{}
 	registry := app.SessionRegistry(localRegistry)

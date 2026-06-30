@@ -60,10 +60,12 @@
    clean commit `fedb5f43` 的 writer queue latency / batch drain 已完成镜像重建 /
    归档 / redeploy 和 400 subscriber coordinator + shard 复压；queue p95 / p99 低、
    write p95 / p99 低，但 worker fanout p95 / p99 仍约 57.759ms / 92.241ms，
-   signal drain rate 仍约 2884 signals/s。下一步需要设计 conversation-local fanout
-   buckets：把同一 conversation 的本地 subscriber 集合拆成稳定 bucket 并行 fanout，
-   同时保持每个 session 内信号顺序、queue full / slow eviction 和 durable PullInbox
-   恢复边界。
+   signal drain rate 仍约 2884 signals/s。conversation-local fanout buckets 已实现：
+   同一 conversation signal 的本地 subscriber 集合按 stable `session_id` bucket
+   并行 fanout，同时保持每个 session 内信号顺序、queue full / slow eviction 和
+   durable PullInbox 恢复边界；本地 Docker `push-gateway-ws` 已配置 8 bucket。下一步
+   需要 clean commit 镜像重建 / 归档 / redeploy，并复跑 400 subscriber coordinator +
+   4 shard 对照，确认 worker fanout p95 / p99 和 drain rate 是否改善。
 2. Agent action boundary / repair cases：在 provider replay admin / workflow handoff 已落
    的基础上，继续扩更多需要 proposal / approval / workflow / audit 的 action 与 repair 场景。
 3. Product-active 服务按需推进：workflow、audit、admin、notification、media、vector、

@@ -3,6 +3,7 @@ package memory
 import (
 	"context"
 	"encoding/json"
+	"hash/fnv"
 	"sync"
 	"time"
 
@@ -11,8 +12,9 @@ import (
 )
 
 type Config struct {
-	ResumeBufferTTL time.Duration
-	Now             func() time.Time
+	ResumeBufferTTL           time.Duration
+	ConversationFanoutBuckets int
+	Now                       func() time.Time
 }
 
 type Registry struct {
@@ -68,6 +70,9 @@ func NewRegistry() *Registry {
 func NewRegistryWithConfig(config Config) *Registry {
 	if config.ResumeBufferTTL <= 0 {
 		config.ResumeBufferTTL = types.DefaultResumeBufferTTL
+	}
+	if config.ConversationFanoutBuckets <= 0 {
+		config.ConversationFanoutBuckets = 1
 	}
 	if config.Now == nil {
 		config.Now = time.Now
@@ -272,13 +277,62 @@ func (registry *Registry) EnqueueConversationSignal(
 	targets := registry.collectOutboundTargetsLocked(sessionIDs, notification.EventID, frame)
 	registry.mu.Unlock()
 
-	result, err = registry.enqueueOutboundTargets(ctx, frame, result, targets)
+	result, err = registry.enqueueConversationOutboundTargets(ctx, frame, result, targets)
 	if result.Enqueued > 0 {
 		registry.mu.Lock()
 		registry.metrics.ConversationSignalEnqueuedCount += uint64(result.Enqueued)
 		registry.mu.Unlock()
 	}
 	return result, err
+}
+
+func (registry *Registry) enqueueConversationOutboundTargets(
+	ctx context.Context,
+	frame types.ServerFrame,
+	result types.NotifyDeliveryResult,
+	targets []outboundTarget,
+) (types.NotifyDeliveryResult, error) {
+	buckets := registry.config.ConversationFanoutBuckets
+	if buckets <= 1 || len(targets) <= 1 {
+		return registry.enqueueOutboundTargets(ctx, frame, result, targets)
+	}
+	if buckets > len(targets) {
+		buckets = len(targets)
+	}
+	targetBuckets := make([][]outboundTarget, buckets)
+	for _, target := range targets {
+		bucket := conversationFanoutBucket(target.sessionID, buckets)
+		targetBuckets[bucket] = append(targetBuckets[bucket], target)
+	}
+
+	type fanoutBucketResult struct {
+		result types.NotifyDeliveryResult
+		err    error
+	}
+	resultCh := make(chan fanoutBucketResult, buckets)
+	launched := 0
+	for _, bucketTargets := range targetBuckets {
+		if len(bucketTargets) == 0 {
+			continue
+		}
+		launched++
+		go func(targets []outboundTarget) {
+			bucketResult, err := registry.enqueueOutboundTargets(ctx, frame, types.NotifyDeliveryResult{}, targets)
+			resultCh <- fanoutBucketResult{result: bucketResult, err: err}
+		}(bucketTargets)
+	}
+
+	var firstErr error
+	for index := 0; index < launched; index++ {
+		bucket := <-resultCh
+		result.Enqueued += bucket.result.Enqueued
+		result.Dropped += bucket.result.Dropped
+		result.Evicted += bucket.result.Evicted
+		if firstErr == nil && bucket.err != nil {
+			firstErr = bucket.err
+		}
+	}
+	return result, firstErr
 }
 
 func (registry *Registry) EvictDevice(ctx context.Context, tenantID string, userID string, deviceID string, reason string) (types.SessionEvictionResult, error) {
@@ -513,6 +567,15 @@ func userKey(auth types.AuthContext) string {
 
 func conversationKey(tenantID string, conversationID string) string {
 	return tenantID + "\x1f" + conversationID
+}
+
+func conversationFanoutBucket(sessionID string, buckets int) int {
+	if buckets <= 1 {
+		return 0
+	}
+	hash := fnv.New32a()
+	_, _ = hash.Write([]byte(sessionID))
+	return int(hash.Sum32() % uint32(buckets))
 }
 
 func encodedDeliveryFrame(notification types.DeliveryNotification) (types.ServerFrame, error) {

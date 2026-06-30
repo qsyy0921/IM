@@ -211,6 +211,13 @@ brief、loadtest report、development-progress 或 archive。
   `4.665ms / 4.942ms`，write p95 / p99 约 `0.383ms / 0.587ms`，但 worker fanout
   p95 / p99 仍约 `57.759ms / 92.241ms`。结论：writer queue / 单次 write
   不是主瓶颈，下一模块应设计 conversation-local fanout buckets。
+- 2026-07-01 已实现 conversation-local fanout buckets：本地 registry 对同一个
+  conversation signal 仍先做锁内快照、dedupe 和 resume buffer 记录，然后按 stable
+  `session_id` bucket 并行写 session outbound queue。每个 session 只属于一个 bucket，
+  外层 conversation worker 仍逐条处理 signal，因此 per-session 顺序保持不变；queue
+  full 仍显式 slow-session eviction。本地 Docker `push-gateway-ws` 已配置
+  `NEXUSIM_PUSH_CONVERSATION_FANOUT_BUCKETS=8`；focused push-gateway / hotgroup tests
+  和 build 已通过。下一步是 clean commit 镜像重建 / 归档 / redeploy 后复压。
 - 2026-06-30 HYBRID 1000 人 / 1000 消息 / 400 msg/s 诊断 run 暴露 per-user outbox
   写扩散下的 delivery outbox ready query 退化：旧 anti-join blocker 查询在约 100 万
   pending row 下每批 500 行约 24s。delivery-service 已改为 per-conversation frontier
@@ -246,8 +253,7 @@ brief、loadtest report、development-progress 或 archive。
 
 ## 下一个方向
 
-- 下一步围绕 push-gateway worker 本地 fanout / session writer 调度继续优化：
-  queue handoff、writer queue 和单次 WebSocket write 都不是主瓶颈。下一步优先分析并实现
-  conversation-local fanout buckets，把同一 conversation 的本地 subscriber 集合拆成
-  稳定 bucket 并行 fanout，同时保持 per-session 顺序和 queue full / slow eviction 边界。
+- 下一步围绕当前 conversation-local fanout buckets 做 clean commit Docker redeploy
+  和同场景复压。重点比较 worker fanout p95 / p99、writer queue p95 / p99、total
+  signal drain rate 和 queue full / slow eviction 是否变化。
   正式生产级运维 UI、provider-grade 长周期平台仍后置。

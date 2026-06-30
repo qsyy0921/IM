@@ -218,6 +218,15 @@ brief、loadtest report、development-progress 或 archive。
   full 仍显式 slow-session eviction。本地 Docker `push-gateway-ws` 已配置
   `NEXUSIM_PUSH_CONVERSATION_FANOUT_BUCKETS=8`；focused push-gateway / hotgroup tests
   和 build 已通过。下一步是 clean commit 镜像重建 / 归档 / redeploy 后复压。
+- 2026-07-01 已用 clean commit `a15e0ad` 完成 conversation-local fanout buckets
+  镜像重建 / 归档 / redeploy 和 400 subscriber coordinator + 4 shard 复压。该 run
+  共读完 400000 条 signal，drain rate 约 `2874.378 signals/s`，仍在旧的
+  `2.85k-2.89k signals/s` 区间；`delivery_notify` queue p95 / p99 约
+  `4.616ms / 4.931ms`，write p95 / p99 约 `0.383ms / 0.574ms`，Redis subscriber
+  conversation-signal fanout p95 / p99 约 `54.133ms / 90.827ms`，queue full /
+  error / slow eviction 均为 0。结论是 per-event fanout bucket goroutine 没有突破瓶颈；
+  下一步要做更大设计判断：持久 per-conversation / per-bucket workers、跨 push 实例
+  分摊 subscriber，或对超大房间采用更强 pull-first 策略降低在线 signal 总量。
 - 2026-06-30 HYBRID 1000 人 / 1000 消息 / 400 msg/s 诊断 run 暴露 per-user outbox
   写扩散下的 delivery outbox ready query 退化：旧 anti-join blocker 查询在约 100 万
   pending row 下每批 500 行约 24s。delivery-service 已改为 per-conversation frontier
@@ -253,7 +262,7 @@ brief、loadtest report、development-progress 或 archive。
 
 ## 下一个方向
 
-- 下一步围绕当前 conversation-local fanout buckets 做 clean commit Docker redeploy
-  和同场景复压。重点比较 worker fanout p95 / p99、writer queue p95 / p99、total
-  signal drain rate 和 queue full / slow eviction 是否变化。
+- 下一步围绕 `a15e0ad` 的复压结果做架构分析和下一模块选择：不要继续在单次本地
+  fanout 调用里堆并发；优先评估持久 bucket worker、跨 push 实例分摊订阅，或超大房间
+  pull-first / sampled online signal 策略。
   正式生产级运维 UI、provider-grade 长周期平台仍后置。

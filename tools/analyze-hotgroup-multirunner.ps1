@@ -5,6 +5,7 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$ShardRunNamePattern,
     [string]$BaselineRunName = "",
+    [string]$BaselineShardRunNamePattern = "",
     [string]$OutputPath = ""
 )
 
@@ -285,6 +286,9 @@ function Write-MultirunnerReport {
     if ($BaselineRunName.Trim().Length -gt 0) {
         [void]$builder.AppendLine("- baseline_run: $BaselineRunName")
     }
+    if ($BaselineShardRunNamePattern.Trim().Length -gt 0) {
+        [void]$builder.AppendLine("- baseline_shard_pattern: $BaselineShardRunNamePattern")
+    }
     [void]$builder.AppendLine("")
     [void]$builder.AppendLine("## Coordinator")
     [void]$builder.AppendLine("")
@@ -384,7 +388,11 @@ $shards = Get-ShardSummaries -Pattern $ShardRunNamePattern
 $sendSummary = Get-SendSummary -Run $coordinator
 $signalSummary = Get-SignalSummary -Runs $shards
 $baselineSignalSummary = $null
-if ($BaselineRunName.Trim().Length -gt 0) {
+if ($BaselineShardRunNamePattern.Trim().Length -gt 0) {
+    $baselineShards = Get-ShardSummaries -Pattern $BaselineShardRunNamePattern
+    $baselineSignalSummary = Get-SignalSummary -Runs $baselineShards
+}
+elseif ($BaselineRunName.Trim().Length -gt 0) {
     $baseline = Read-HotGroupSummary -RunName $BaselineRunName
     $baselineSignalSummary = Get-SignalSummary -Runs @($baseline)
 }

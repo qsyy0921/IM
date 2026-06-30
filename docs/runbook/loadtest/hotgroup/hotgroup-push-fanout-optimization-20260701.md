@@ -534,3 +534,63 @@ The next step is a clean commit, rebuild / archive the push-gateway image,
 redeploy it, then rerun the same 400 subscriber coordinator + 4 shard scenario
 and compare worker fanout p95 / p99 and total signal drain rate against
 `fedb5f43`.
+
+## Conversation-Local Fanout Buckets Retest
+
+The conversation-local fanout bucket implementation was committed as `a15e0ad`,
+rebuilt, archived and redeployed to Ubuntu Docker. The image archive is:
+
+```text
+H:\NexusIM\docker-images\archives\nexusim-push-gateway-a15e0ad7-20260701-052941.tar
+```
+
+Comparable scenario:
+
+```text
+group_size=6000
+message_count=1000
+message_rate=8000
+sender_count=256
+subscriber_count=400
+fanout_mode=READ_FANOUT
+runner layout=coordinator + 4 subscriber-only shards
+```
+
+Artifacts:
+
+- coordinator:
+  `H:\NexusIM\loadtest-results\hotgroup-fanoutbuckets-clean-400sub-coordinator-20260701-053403`
+- shards:
+  `H:\NexusIM\loadtest-results\hotgroup-fanoutbuckets-clean-400sub-shard*-20260701-053403`
+- analysis:
+  `hotgroup-multirunner-analysis-20260701-fanoutbuckets-400sub.md`
+- metrics window:
+  `hotgroup-metrics-window-20260701-fanoutbuckets-400sub.md`
+
+Result:
+
+- coordinator send, PullInbox and ACK succeeded;
+- `message_outbox_pending=0`, `delivery_outbox_pending=0`;
+- 4 shards read 400000 conversation signals with no subscriber error;
+- aggregate signal span rate was about `2874.378 signals/s`;
+- previous writer-queue / batch-drain run was about `2884.066 signals/s`;
+- WebSocket `delivery_notify` queue p95 / p99 stayed about
+  `4.616ms / 4.931ms`;
+- WebSocket `delivery_notify` write p95 / p99 stayed about
+  `0.383ms / 0.574ms`;
+- Redis subscriber conversation signal fanout p95 / p99 were about
+  `54.133ms / 90.827ms` in the five-minute window and about
+  `48.684ms / 89.796ms` across the captured window;
+- Redis subscriber queue wait p95 / p99 stayed about `0.095ms / 0.099ms`;
+- writer error, Redis subscriber error, queue-full and slow eviction stayed at
+  0.
+
+Judgment: conversation-local fanout buckets did not materially improve total
+online signal drain. The metric did not move out of the existing
+`2.85k-2.89k signals/s` band. Worker-side local fanout remains the strongest
+measured bottleneck, but per-event goroutine buckets are not enough to break the
+curve. The next optimization should avoid adding more ad hoc concurrency in the
+same call path and instead evaluate a bigger design choice: persistent per
+conversation / per bucket workers, distributing subscribers across multiple
+push-gateway instances, or reducing total online signal volume through a more
+aggressive pull-first policy for very large rooms.

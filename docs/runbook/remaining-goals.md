@@ -63,9 +63,13 @@
    signal drain rate 仍约 2884 signals/s。conversation-local fanout buckets 已实现：
    同一 conversation signal 的本地 subscriber 集合按 stable `session_id` bucket
    并行 fanout，同时保持每个 session 内信号顺序、queue full / slow eviction 和
-   durable PullInbox 恢复边界；本地 Docker `push-gateway-ws` 已配置 8 bucket。下一步
-   需要 clean commit 镜像重建 / 归档 / redeploy，并复跑 400 subscriber coordinator +
-   4 shard 对照，确认 worker fanout p95 / p99 和 drain rate 是否改善。
+   durable PullInbox 恢复边界；clean commit `a15e0ad` 已完成镜像重建 / 归档 /
+   redeploy 和 400 subscriber coordinator + 4 shard 复压。结果显示 drain rate 约
+   2874.378 signals/s，仍在旧区间；fanout p95 / p99 约 54.133ms / 90.827ms，
+   queue full / error / slow eviction 为 0。下一步不要继续在单次 fanout 调用里加
+   临时 goroutine，应评估持久 per-conversation / per-bucket worker、跨 push-gateway
+   实例分摊同一 conversation subscriber，或超大房间 pull-first / sampled online signal
+   策略。
 2. Agent action boundary / repair cases：在 provider replay admin / workflow handoff 已落
    的基础上，继续扩更多需要 proposal / approval / workflow / audit 的 action 与 repair 场景。
 3. Product-active 服务按需推进：workflow、audit、admin、notification、media、vector、

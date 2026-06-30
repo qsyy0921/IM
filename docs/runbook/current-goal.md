@@ -234,9 +234,21 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
   stable `session_id` bucket 并行写 session outbound queue；外层 Redis subscriber
   仍保持同 conversation 顺序，queue full 仍显式 slow-session eviction。新增
   `NEXUSIM_PUSH_CONVERSATION_FANOUT_BUCKETS`，本地 Docker `push-gateway-ws` 设为 8。
-  focused push-gateway / hotgroup tests 和 build 已通过；下一步需要 clean commit
-  镜像重建 / 归档 / redeploy 后，用同一 400 subscriber coordinator + 4 shard 场景复压，
-  比较 worker fanout p95 / p99 和 total drain rate 是否突破 `fedb5f43`。
+  focused push-gateway / hotgroup tests 和 build 已通过；clean commit 复压结果见下一条。
+- 2026-07-01 已用 clean commit `a15e0ad` 重建 / 归档 / redeploy push-gateway，并完成
+  conversation-local fanout buckets 复压：
+  `hotgroup-fanoutbuckets-clean-400sub-coordinator-20260701-053403`。该 run 为
+  6000 人、1000 消息、目标 8000 msg/s、256 sender、400 subscriber、READ_FANOUT；
+  coordinator `send_p95_ms=19.288`、`send_p99_ms=22.026`、`PullInbox p95=128.099ms`，
+  message / delivery outbox pending=0；4 个 shard 共读完 400000 条 signal，
+  drain rate 约 `2874.378 signals/s`。Prometheus 窗口显示 `delivery_notify`
+  queue p95 / p99 约 `4.616ms / 4.931ms`，write p95 / p99 约
+  `0.383ms / 0.574ms`，Redis subscriber conversation-signal fanout p95 / p99
+  约 `54.133ms / 90.827ms`，queue wait p95 / p99 约 `0.095ms / 0.099ms`，
+  writer / Redis subscriber error、queue-full 和 slow eviction 均为 0。结论：
+  bucket 并行没有突破 `2.85k-2.89k signals/s` 区间；下一步不要继续在同一调用路径
+  堆并发，而应评估持久 per-conversation / per-bucket worker、跨 push 实例分摊订阅，
+  或对超大房间采用更激进的 pull-first 策略来减少在线 signal 总量。
 - HYBRID 诊断档位 1000 人 / 1000 消息 / 400 msg/s 暴露 `delivery_outbox` ready query
   在百万级 per-user outbox 下退化：旧 anti-join blocker 查询每批 500 行约 24s。当前
   delivery outbox relay 已改成 per-conversation frontier ready query，并把本地 worker
@@ -266,10 +278,11 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
 
 ## 后续优先级
 
-1. 基于当前 conversation-local fanout buckets 实现，先提交 clean commit，然后重建 /
-   归档 / redeploy push-gateway 镜像，并复跑 400 subscriber coordinator + 4 shard
-   对照；重点观察 worker fanout p95 / p99、writer queue p95 / p99、drain rate 和
-   queue full / eviction 是否变化。
+1. 基于 `a15e0ad` 的复压结论，先做下一轮架构分析：在不破坏 PullInbox durable
+   恢复和 per-session 顺序的前提下，选择是做持久 per-conversation / per-bucket
+   worker、跨 push-gateway 实例分摊同一 conversation subscriber，还是为超大房间改成
+   更强 pull-first / sampled online signal 策略；不要继续只在单次 fanout 调用里增加
+   临时 goroutine。
 2. 继续为每轮优化保留 clean commit、Docker 镜像归档、三机部署版本和 Prometheus
    时间窗口，保证压测曲线可复现。
 3. 若 HYBRID 仍要支持千人级 per-user materialized outbox，优先评估显式 frontier /

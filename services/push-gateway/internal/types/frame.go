@@ -55,4 +55,5 @@ type ServerFrame struct {
 	Message           string               `json:"message,omitempty"`
 	Retryable         bool                 `json:"retryable"`
 	RetryAfterMS      int64                `json:"retry_after_ms,omitempty"`
+	EncodedPayload    []byte               `json:"-"`
 }

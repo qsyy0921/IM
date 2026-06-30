@@ -275,6 +275,9 @@ func writeFrameWithMetrics(
 func writeFrame(ctx context.Context, conn *nhooyr.Conn, frame types.ServerFrame, timeout time.Duration) error {
 	writeCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
+	if len(frame.EncodedPayload) > 0 {
+		return conn.Write(writeCtx, nhooyr.MessageText, frame.EncodedPayload)
+	}
 	return wsjson.Write(writeCtx, conn, frame)
 }
 

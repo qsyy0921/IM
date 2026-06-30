@@ -2,6 +2,7 @@ package memory
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -153,6 +154,9 @@ func TestRegistryConversationSignalRequiresSubscription(t *testing.T) {
 		frame.ConversationSeq != 7 ||
 		!frame.PullRequired {
 		t.Fatalf("unexpected signal frame: %+v", frame)
+	}
+	if len(frame.EncodedPayload) == 0 || !json.Valid(frame.EncodedPayload) {
+		t.Fatalf("conversation signal should carry cached encoded payload: %q", string(frame.EncodedPayload))
 	}
 	if _, err := registry.UnsubscribeConversation(context.Background(), types.ConversationSubscriptionCommand{
 		AuthContext:    auth,

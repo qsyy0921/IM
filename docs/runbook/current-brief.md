@@ -152,8 +152,14 @@ brief、loadtest report、development-progress 或 archive。
 - 2026-07-01 已完成第一轮 push-gateway online signal drain 代码级优化：本地 memory
   registry 的 user / conversation fanout 改为锁内快照、锁外写出，queue full 时再
   精确回锁驱逐仍然注册的同一 session；focused tests / build / diff check 已通过。
-  该改动等待 clean commit Docker redeploy 和 400 subscriber coordinator + shard
-  复压，不提前宣称 QPS 已提升。
+  clean commit `4bc4a30` 镜像 redeploy 后，400 subscriber coordinator + 4 shard
+  复压显示 drain rate 从单 runner baseline 约 2839.888 signals/s 到约
+  2891.8 signals/s，仅约 1.8% 提升，瓶颈仍是 online signal drain。
+- 2026-07-01 已完成第二轮 push-gateway online signal drain 代码优化：delivery /
+  conversation notify 在 registry fanout 时预编码一次 JSON，WebSocket writer 优先写
+  cached payload，避免同一条热点 signal 在每个 connection 写出前重复 marshal。
+  focused tests / build / diff check 已通过；该改动仍需 clean commit 镜像 redeploy 和
+  400 subscriber coordinator + shard 复压确认。
 - 2026-06-30 HYBRID 1000 人 / 1000 消息 / 400 msg/s 诊断 run 暴露 per-user outbox
   写扩散下的 delivery outbox ready query 退化：旧 anti-join blocker 查询在约 100 万
   pending row 下每批 500 行约 24s。delivery-service 已改为 per-conversation frontier
@@ -190,6 +196,7 @@ brief、loadtest report、development-progress 或 archive。
 ## 下一个方向
 
 - 下一步用 clean commit 镜像重建 / redeploy 后复跑 400 subscriber coordinator +
-  多 shard 对照；如果 fanout 快照优化没有把 drain rate 推离约 2.85k signals/s，
-  再转向 WebSocket writer flush cadence、per-connection write scheduling 和网络吞吐。
+  多 shard 对照；如果 WebSocket pre-encoded payload 优化没有把 drain rate 推离约
+  2.85k-2.89k signals/s，再转向 WebSocket writer flush cadence、per-connection
+  write scheduling 和网络吞吐。
   正式生产级运维 UI、provider-grade 长周期平台仍后置。

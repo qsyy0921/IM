@@ -145,6 +145,24 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
   redeploy 后复跑 400 subscriber coordinator + shard 对照，确认 drain rate 是否突破
   约 2.85k signals/s。记录见
   `docs/runbook/loadtest/hotgroup/hotgroup-push-fanout-optimization-20260701.md`。
+- 2026-07-01 已用 clean commit `4bc4a30` 重建 / redeploy push-gateway，并完成
+  400 subscriber coordinator + 4 shard 复压：
+  `hotgroup-pushfanout-clean-400sub-coordinator-20260701-022043`。该 run 为
+  6000 人、1000 消息、目标 8000 msg/s、256 sender、400 subscriber、
+  READ_FANOUT；coordinator `send_p95_ms=17.929`、`send_p99_ms=19.618`、
+  `PullInbox p95=18.825ms`，message / delivery outbox pending=0；4 个 shard
+  共读完 400000 条 signal，drain rate 约 2891.8 signals/s。与单 runner
+  400 subscriber baseline 约 2839.888 signals/s 相比仅约 1.8% 提升，说明
+  registry lock hold time 不是主瓶颈。低敏报告见
+  `docs/runbook/loadtest/hotgroup/hotgroup-multirunner-analysis-20260701-pushfanout-400sub.md`
+  和
+  `docs/runbook/loadtest/hotgroup/hotgroup-metrics-window-20260701-pushfanout-clean-400sub.md`。
+- 2026-07-01 已实现第二轮 push-gateway online signal drain 优化：delivery /
+  conversation notify 在 registry fanout 时预编码一次 JSON，WebSocket writer 优先写
+  cached payload，避免同一条热点 signal 被 400 个 connection 各自重复 `json.Marshal`。
+  该改动不改变协议字段、不改变 durable inbox / PullInbox 边界；focused tests /
+  build / diff check 已通过。下一步需要 clean commit 镜像重建 / redeploy 后再次复跑
+  400 subscriber coordinator + shard 对照。
 - HYBRID 诊断档位 1000 人 / 1000 消息 / 400 msg/s 暴露 `delivery_outbox` ready query
   在百万级 per-user outbox 下退化：旧 anti-join blocker 查询每批 500 行约 24s。当前
   delivery outbox relay 已改成 per-conversation frontier ready query，并把本地 worker
@@ -175,10 +193,10 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
 
 ## 后续优先级
 
-1. 重建 / redeploy 包含 push-gateway memory registry fanout 快照优化的 clean commit
-   镜像，并复跑 400 subscriber coordinator + 多 shard 对照，确认 drain rate 是否从
-   约 2.85k signals/s 迁移。
-2. 如果 drain rate 没有明显变化，下一模块转向 WebSocket writer flush cadence、
+1. 重建 / redeploy 包含 push-gateway WebSocket pre-encoded payload 优化的 clean
+   commit 镜像，并复跑 400 subscriber coordinator + 多 shard 对照，确认 drain rate
+   是否从约 2.85k-2.89k signals/s 迁移。
+2. 如果 drain rate 仍没有明显变化，下一模块转向 WebSocket writer flush cadence、
    per-connection write scheduling、网络吞吐或 nhooyr WebSocket 写入策略；不要回头
    优先调 message / delivery outbox 或 Kafka。
 3. 若 HYBRID 仍要支持千人级 per-user materialized outbox，优先评估显式 frontier /

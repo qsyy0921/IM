@@ -2,6 +2,7 @@ package memory
 
 import (
 	"context"
+	"encoding/json"
 	"sync"
 	"time"
 
@@ -175,7 +176,11 @@ func (registry *Registry) EnqueueNotification(
 		registry.mu.Unlock()
 		return result, nil
 	}
-	frame := domain.DeliveryNotify(notification)
+	frame, err := encodedDeliveryFrame(notification)
+	if err != nil {
+		registry.mu.Unlock()
+		return result, err
+	}
 	targets := registry.collectOutboundTargetsLocked(sessionIDs, notification.EventID, frame)
 	registry.mu.Unlock()
 	return registry.enqueueOutboundTargets(ctx, frame, result, targets)
@@ -259,11 +264,15 @@ func (registry *Registry) EnqueueConversationSignal(
 		return result, nil
 	}
 	registry.metrics.ConversationSignalMatchedCount += uint64(len(sessionIDs))
-	frame := domain.DeliveryNotify(notification)
+	frame, err := encodedDeliveryFrame(notification)
+	if err != nil {
+		registry.mu.Unlock()
+		return result, err
+	}
 	targets := registry.collectOutboundTargetsLocked(sessionIDs, notification.EventID, frame)
 	registry.mu.Unlock()
 
-	result, err := registry.enqueueOutboundTargets(ctx, frame, result, targets)
+	result, err = registry.enqueueOutboundTargets(ctx, frame, result, targets)
 	if result.Enqueued > 0 {
 		registry.mu.Lock()
 		registry.metrics.ConversationSignalEnqueuedCount += uint64(result.Enqueued)
@@ -496,6 +505,16 @@ func userKey(auth types.AuthContext) string {
 
 func conversationKey(tenantID string, conversationID string) string {
 	return tenantID + "\x1f" + conversationID
+}
+
+func encodedDeliveryFrame(notification types.DeliveryNotification) (types.ServerFrame, error) {
+	frame := domain.DeliveryNotify(notification)
+	payload, err := json.Marshal(frame)
+	if err != nil {
+		return types.ServerFrame{}, err
+	}
+	frame.EncodedPayload = payload
+	return frame, nil
 }
 
 func (registry *Registry) removeConversationSubscriptionsLocked(sessionID string, target *session) {

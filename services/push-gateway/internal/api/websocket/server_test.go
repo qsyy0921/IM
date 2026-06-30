@@ -410,6 +410,37 @@ func TestEnqueueOutboundReturnsWhenContextCanceled(t *testing.T) {
 	}
 }
 
+func TestWriteFrameUsesEncodedPayload(t *testing.T) {
+	httpServer := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		conn, err := nhooyr.Accept(writer, request, &nhooyr.AcceptOptions{InsecureSkipVerify: true})
+		if err != nil {
+			return
+		}
+		defer conn.Close(nhooyr.StatusNormalClosure, "")
+		frame := types.ServerFrame{
+			Op:             types.OpServerPong,
+			EncodedPayload: []byte(`{"op":"preencoded.test","retryable":false}`),
+		}
+		_ = writeFrame(request.Context(), conn, frame, time.Second)
+	}))
+	defer httpServer.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	conn, _, err := nhooyr.Dial(ctx, "ws"+httpServer.URL[len("http"):], nil)
+	if err != nil {
+		t.Fatalf("dial: %v", err)
+	}
+	defer conn.Close(nhooyr.StatusNormalClosure, "")
+	_, payload, err := conn.Read(ctx)
+	if err != nil {
+		t.Fatalf("read encoded payload: %v", err)
+	}
+	if string(payload) != `{"op":"preencoded.test","retryable":false}` {
+		t.Fatalf("unexpected payload: %s", payload)
+	}
+}
+
 func TestCloseReasonUsesIdentityRevokedText(t *testing.T) {
 	if got := closeReason("identity_revoked"); got != "identity revoked" {
 		t.Fatalf("unexpected identity close reason: %q", got)

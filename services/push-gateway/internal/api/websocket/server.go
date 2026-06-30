@@ -264,10 +264,13 @@ func writeFrameWithMetrics(
 	metrics *types.WebSocketWriterMetrics,
 ) error {
 	metrics.RecordFrameWriteAttempt(frame)
+	startedAt := time.Now()
 	if err := writeFrame(ctx, conn, frame, timeout); err != nil {
+		metrics.RecordFrameWriteDuration(frame, time.Since(startedAt))
 		metrics.RecordFrameWriteError(frame)
 		return err
 	}
+	metrics.RecordFrameWriteDuration(frame, time.Since(startedAt))
 	metrics.RecordFrameWriteSuccess(frame)
 	return nil
 }

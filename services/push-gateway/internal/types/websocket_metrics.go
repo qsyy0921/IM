@@ -6,20 +6,76 @@ import (
 )
 
 type WebSocketWriterSnapshot struct {
-	OutboundFrameDequeuedCount       uint64 `json:"outbound_frame_dequeued_count"`
-	FrameWriteAttemptCount           uint64 `json:"frame_write_attempt_count"`
-	FrameWriteSuccessCount           uint64 `json:"frame_write_success_count"`
-	FrameWriteErrorCount             uint64 `json:"frame_write_error_count"`
-	DeliveryNotifyWriteAttemptCount  uint64 `json:"delivery_notify_write_attempt_count"`
-	DeliveryNotifyWriteSuccessCount  uint64 `json:"delivery_notify_write_success_count"`
-	DeliveryNotifyWriteErrorCount    uint64 `json:"delivery_notify_write_error_count"`
-	ResumeHintWriteAttemptCount      uint64 `json:"resume_hint_write_attempt_count"`
-	ResumeHintWriteSuccessCount      uint64 `json:"resume_hint_write_success_count"`
-	ResumeHintWriteErrorCount        uint64 `json:"resume_hint_write_error_count"`
-	LastWriteSuccessAtMS             int64  `json:"last_write_success_at_ms,omitempty"`
-	LastWriteErrorAtMS               int64  `json:"last_write_error_at_ms,omitempty"`
-	LastDeliveryNotifyWriteAtMS      int64  `json:"last_delivery_notify_write_at_ms,omitempty"`
-	LastDeliveryNotifyWriteErrorAtMS int64  `json:"last_delivery_notify_write_error_at_ms,omitempty"`
+	OutboundFrameDequeuedCount       uint64                          `json:"outbound_frame_dequeued_count"`
+	FrameWriteAttemptCount           uint64                          `json:"frame_write_attempt_count"`
+	FrameWriteSuccessCount           uint64                          `json:"frame_write_success_count"`
+	FrameWriteErrorCount             uint64                          `json:"frame_write_error_count"`
+	DeliveryNotifyWriteAttemptCount  uint64                          `json:"delivery_notify_write_attempt_count"`
+	DeliveryNotifyWriteSuccessCount  uint64                          `json:"delivery_notify_write_success_count"`
+	DeliveryNotifyWriteErrorCount    uint64                          `json:"delivery_notify_write_error_count"`
+	ResumeHintWriteAttemptCount      uint64                          `json:"resume_hint_write_attempt_count"`
+	ResumeHintWriteSuccessCount      uint64                          `json:"resume_hint_write_success_count"`
+	ResumeHintWriteErrorCount        uint64                          `json:"resume_hint_write_error_count"`
+	LastWriteSuccessAtMS             int64                           `json:"last_write_success_at_ms,omitempty"`
+	LastWriteErrorAtMS               int64                           `json:"last_write_error_at_ms,omitempty"`
+	LastDeliveryNotifyWriteAtMS      int64                           `json:"last_delivery_notify_write_at_ms,omitempty"`
+	LastDeliveryNotifyWriteErrorAtMS int64                           `json:"last_delivery_notify_write_error_at_ms,omitempty"`
+	FrameWriteDuration               WebSocketWriterDurationSnapshot `json:"frame_write_duration"`
+	DeliveryNotifyWriteDuration      WebSocketWriterDurationSnapshot `json:"delivery_notify_write_duration"`
+}
+
+type WebSocketWriterDurationSnapshot struct {
+	Count   uint64                          `json:"count"`
+	SumMS   float64                         `json:"sum_ms"`
+	MaxMS   float64                         `json:"max_ms"`
+	Buckets []WebSocketWriterDurationBucket `json:"buckets"`
+}
+
+type WebSocketWriterDurationBucket struct {
+	LE    string `json:"le"`
+	Count uint64 `json:"count"`
+}
+
+const webSocketWriteDurationBucketCount = 14
+
+var webSocketWriteDurationUpperBoundsMS = [...]float64{
+	0.1,
+	0.25,
+	0.5,
+	1,
+	2,
+	5,
+	10,
+	25,
+	50,
+	100,
+	250,
+	500,
+	1000,
+}
+
+var webSocketWriteDurationBucketLabels = [...]string{
+	"0.1",
+	"0.25",
+	"0.5",
+	"1",
+	"2",
+	"5",
+	"10",
+	"25",
+	"50",
+	"100",
+	"250",
+	"500",
+	"1000",
+	"+Inf",
+}
+
+type webSocketDurationMetrics struct {
+	count   atomic.Uint64
+	sumNS   atomic.Uint64
+	maxNS   atomic.Uint64
+	buckets [webSocketWriteDurationBucketCount]atomic.Uint64
 }
 
 type WebSocketWriterMetrics struct {
@@ -37,6 +93,8 @@ type WebSocketWriterMetrics struct {
 	lastWriteErrorAtMS               atomic.Int64
 	lastDeliveryNotifyWriteAtMS      atomic.Int64
 	lastDeliveryNotifyWriteErrorAtMS atomic.Int64
+	frameWriteDuration               webSocketDurationMetrics
+	deliveryNotifyWriteDuration      webSocketDurationMetrics
 }
 
 func (metrics *WebSocketWriterMetrics) RecordOutboundFrameDequeued(frame ServerFrame) {
@@ -91,6 +149,17 @@ func (metrics *WebSocketWriterMetrics) RecordFrameWriteError(frame ServerFrame) 
 	}
 }
 
+func (metrics *WebSocketWriterMetrics) RecordFrameWriteDuration(frame ServerFrame, duration time.Duration) {
+	if metrics == nil {
+		return
+	}
+	recordWebSocketDuration(&metrics.frameWriteDuration, duration)
+	switch frame.Op {
+	case OpDeliveryNotify, OpDeliveryHide:
+		recordWebSocketDuration(&metrics.deliveryNotifyWriteDuration, duration)
+	}
+}
+
 func (metrics *WebSocketWriterMetrics) Snapshot() WebSocketWriterSnapshot {
 	if metrics == nil {
 		return WebSocketWriterSnapshot{}
@@ -110,5 +179,53 @@ func (metrics *WebSocketWriterMetrics) Snapshot() WebSocketWriterSnapshot {
 		LastWriteErrorAtMS:               metrics.lastWriteErrorAtMS.Load(),
 		LastDeliveryNotifyWriteAtMS:      metrics.lastDeliveryNotifyWriteAtMS.Load(),
 		LastDeliveryNotifyWriteErrorAtMS: metrics.lastDeliveryNotifyWriteErrorAtMS.Load(),
+		FrameWriteDuration:               snapshotWebSocketDuration(&metrics.frameWriteDuration),
+		DeliveryNotifyWriteDuration:      snapshotWebSocketDuration(&metrics.deliveryNotifyWriteDuration),
+	}
+}
+
+func recordWebSocketDuration(metrics *webSocketDurationMetrics, duration time.Duration) {
+	if duration < 0 {
+		duration = 0
+	}
+	nanos := uint64(duration.Nanoseconds())
+	metrics.count.Add(1)
+	metrics.sumNS.Add(nanos)
+	for {
+		current := metrics.maxNS.Load()
+		if nanos <= current || metrics.maxNS.CompareAndSwap(current, nanos) {
+			break
+		}
+	}
+	bucketIndex := webSocketDurationBucketIndex(duration)
+	metrics.buckets[bucketIndex].Add(1)
+}
+
+func webSocketDurationBucketIndex(duration time.Duration) int {
+	ms := float64(duration.Nanoseconds()) / float64(time.Millisecond)
+	for index, upperBoundMS := range webSocketWriteDurationUpperBoundsMS {
+		if ms <= upperBoundMS {
+			return index
+		}
+	}
+	return webSocketWriteDurationBucketCount - 1
+}
+
+func snapshotWebSocketDuration(metrics *webSocketDurationMetrics) WebSocketWriterDurationSnapshot {
+	count := metrics.count.Load()
+	buckets := make([]WebSocketWriterDurationBucket, 0, webSocketWriteDurationBucketCount)
+	var cumulative uint64
+	for index := 0; index < webSocketWriteDurationBucketCount; index++ {
+		cumulative += metrics.buckets[index].Load()
+		buckets = append(buckets, WebSocketWriterDurationBucket{
+			LE:    webSocketWriteDurationBucketLabels[index],
+			Count: cumulative,
+		})
+	}
+	return WebSocketWriterDurationSnapshot{
+		Count:   count,
+		SumMS:   float64(metrics.sumNS.Load()) / float64(time.Millisecond),
+		MaxMS:   float64(metrics.maxNS.Load()) / float64(time.Millisecond),
+		Buckets: buckets,
 	}
 }

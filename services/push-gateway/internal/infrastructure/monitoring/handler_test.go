@@ -84,6 +84,11 @@ func TestHandlerHealthReadyAndMetrics(t *testing.T) {
 				FrameWriteSuccessCount:          12,
 				DeliveryNotifyWriteSuccessCount: 10,
 				LastDeliveryNotifyWriteAtMS:     1200,
+				FrameWriteDuration: types.WebSocketWriterDurationSnapshot{
+					Count: 2,
+					SumMS: 3.5,
+					MaxMS: 2.5,
+				},
 			}
 		}).
 		WithTraceStats(func() TraceSnapshot {
@@ -136,7 +141,8 @@ func TestHandlerHealthReadyAndMetrics(t *testing.T) {
 	}
 	if snapshot.WebSocketWriter == nil ||
 		snapshot.WebSocketWriter.OutboundFrameDequeuedCount != 11 ||
-		snapshot.WebSocketWriter.DeliveryNotifyWriteSuccessCount != 10 {
+		snapshot.WebSocketWriter.DeliveryNotifyWriteSuccessCount != 10 ||
+		snapshot.WebSocketWriter.FrameWriteDuration.Count != 2 {
 		t.Fatalf("unexpected websocket writer stats: %+v", snapshot.WebSocketWriter)
 	}
 	if snapshot.Trace == nil ||
@@ -246,6 +252,24 @@ func TestHandlerPrometheusMetrics(t *testing.T) {
 				LastWriteErrorAtMS:               3100,
 				LastDeliveryNotifyWriteAtMS:      3200,
 				LastDeliveryNotifyWriteErrorAtMS: 3300,
+				FrameWriteDuration: types.WebSocketWriterDurationSnapshot{
+					Count: 3,
+					SumMS: 7.5,
+					MaxMS: 4.5,
+					Buckets: []types.WebSocketWriterDurationBucket{
+						{LE: "1", Count: 1},
+						{LE: "+Inf", Count: 3},
+					},
+				},
+				DeliveryNotifyWriteDuration: types.WebSocketWriterDurationSnapshot{
+					Count: 2,
+					SumMS: 6,
+					MaxMS: 4,
+					Buckets: []types.WebSocketWriterDurationBucket{
+						{LE: "1", Count: 0},
+						{LE: "+Inf", Count: 2},
+					},
+				},
 			}
 		}).
 		WithTraceStats(func() TraceSnapshot {
@@ -285,6 +309,11 @@ func TestHandlerPrometheusMetrics(t *testing.T) {
 	assertContains(t, body, `nexusim_push_gateway_ws_writer_events_total{event="delivery_notify_write_success"} 23`)
 	assertContains(t, body, `nexusim_push_gateway_ws_writer_events_total{event="resume_hint_write_error"} 1`)
 	assertContains(t, body, `nexusim_push_gateway_ws_writer_last_event_unix_milliseconds{event="delivery_notify_write_error"} 3300`)
+	assertContains(t, body, `nexusim_push_gateway_ws_writer_write_duration_milliseconds_bucket{le="1",operation="frame_write"} 1`)
+	assertContains(t, body, `nexusim_push_gateway_ws_writer_write_duration_milliseconds_bucket{le="+Inf",operation="delivery_notify"} 2`)
+	assertContains(t, body, `nexusim_push_gateway_ws_writer_write_duration_milliseconds_sum{operation="frame_write"} 7.5`)
+	assertContains(t, body, `nexusim_push_gateway_ws_writer_write_duration_milliseconds_count{operation="delivery_notify"} 2`)
+	assertContains(t, body, `nexusim_push_gateway_ws_writer_write_duration_max_milliseconds{operation="delivery_notify"} 4`)
 	assertContains(t, body, `nexusim_push_gateway_otel_traces_enabled{exporter="otlp-grpc"} 1`)
 	assertContains(t, body, `nexusim_push_gateway_otel_traces_sampling_ratio{exporter="otlp-grpc"} 0.5`)
 	for _, forbidden := range []string{

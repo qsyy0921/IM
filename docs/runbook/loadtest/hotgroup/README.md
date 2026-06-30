@@ -33,6 +33,7 @@ CreateConversation -> batch CreateMemberChange(JOIN)
 | `hotgroup-metrics-window-20260701-pushfanout-clean-400sub.md` | registry fanout 快照优化复压的 Prometheus 窗口：核心 target up，`delivery_outbox_pending` 峰值 140 后归零，push connected sessions 达到 400，writer / Redis subscriber error 和 eviction 均为 0。 |
 | `hotgroup-multirunner-analysis-20260701-pushpreenc-400sub.md` | clean commit `d8d78fd` 的 WebSocket payload 预编码优化复压：6000 人 / 1000 消息 / 8000 msg/s / 400 subscriber，message / delivery outbox pending=0，400000 条 signal 全部读完，drain rate 约 2863.092 signals/s；相比单 runner baseline 约 2839.888 signals/s 仅约 0.8% 提升，也未超过上一轮 registry lock 优化，当前瓶颈仍是 `online-signal-drain`。 |
 | `hotgroup-metrics-window-20260701-pushpreenc-clean-400sub.md` | payload 预编码优化复压的 Prometheus 窗口：核心 target up，`delivery_outbox_pending` 持续为 0，push connected sessions 达到 400，writer / Redis subscriber error 和 eviction 均为 0。 |
+| pending writer-duration retest | push-gateway 已新增 WebSocket writer duration histogram；下一轮同一 400 subscriber coordinator + shard 场景必须记录 `delivery_notify` write p95 / p99 / avg / max，用来区分 `conn.Write` 长尾、flush / scheduling、网络吞吐和客户端读取背压。 |
 
 ## 目标
 
@@ -131,6 +132,7 @@ message_outbox pending / DLQ   -> message outbox relay
 delivery_outbox pending / DLQ  -> delivery outbox relay
 PullInbox / ACK error or slow  -> receiver read / ack
 subscriber incomplete / error  -> push subscribe / read path
+writer duration p95 / p99 high -> WebSocket write / flush / network
 outbox 追平但 signal drain 长  -> online signal drain
 缺少信号或 lag 字段            -> insufficient observability
 ```
@@ -155,6 +157,14 @@ JSON，让 WebSocket writer 优先写 cached payload，避免同一条热点 sig
 connection 写出前重复 marshal；clean commit `d8d78fd` 复压后 drain rate 约
 2863 signals/s，仍未离开 2.85k-2.89k signals/s 区间。下一步应转向 WebSocket
 writer flush cadence、per-connection write scheduling、nhooyr 写入策略、连接侧读取背压和网络吞吐。
+
+为避免继续靠 CPU 空闲或进程列表猜瓶颈，下一轮 push-gateway 镜像必须包含
+WebSocket writer duration histogram。`/metrics` 会输出 `frame_write` 和
+`delivery_notify` 的 write duration bucket / sum / count / max；
+`tools/record-hotgroup-metrics-window.ps1` 会在窗口报告中写出 delivery notify
+p95 / p99 / avg / max。若 write duration 长尾高，优先分析 nhooyr `conn.Write`、
+flush cadence、per-connection scheduling 和网络；若 write duration 低但 drain 仍慢，
+则继续转向 subscriber read loop、runner 端 decode / accounting 或链路吞吐。
 
 `loadtest/hotgroup` 支持两个运行模式：
 

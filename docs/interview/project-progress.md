@@ -180,6 +180,7 @@ CreateConversation(GROUP)
 | 多 runner 读取验证 | clean commit `9e7d4f9` 跑 1 个 coordinator + 4 个 `subscriber-only` shard | 6000 人 / 1000 消息 / 8000 msg/s / 400 subscriber 产生 400000 条 signal，4 个 shard 全部读完；按首帧到末帧计算 drain rate 约 2852 signals/s，和单 runner 400 subscriber baseline 约 2840 signals/s 基本一致，说明瓶颈不只是单 runner JSON decode / accounting。 |
 | push registry 锁优化复压 | clean commit `4bc4a30` 把 push-gateway memory registry fanout 改为锁内快照、锁外写出后，重建 / redeploy 并跑 1 coordinator + 4 shard 复压 | 6000 人 / 1000 消息 / 8000 msg/s / 400 subscriber 产生 400000 条 signal，drain rate 约 2891.8 signals/s；比单 runner 400 subscriber baseline 约 2839.888 signals/s 只高约 1.8%，说明 registry 全局锁持有不是主瓶颈。 |
 | push WebSocket payload 预编码复压 | clean commit `d8d78fd` 在 registry fanout 时预编码 delivery / conversation notify JSON，WebSocket writer 写 cached payload | 同样的 6000 人 / 1000 消息 / 8000 msg/s / 400 subscriber + 4 shard 场景产生 400000 条 signal，drain rate 约 2863.092 signals/s；相比单 runner baseline 只高约 0.8%，也未超过上一轮 2891.8 signals/s，说明重复 JSON marshal 也不是主瓶颈。下一步应看 WebSocket flush / per-connection scheduling / nhooyr 写入 / 网络或客户端读取背压。 |
+| WebSocket writer duration 观测 | push-gateway 已新增 `frame_write` / `delivery_notify` 写耗时 histogram，hotgroup Prometheus 窗口会记录 p95 / p99 / avg / max | 这是下一轮复压的定位工具：如果 `conn.Write` 长尾高，优先优化 WebSocket flush / scheduling / 网络；如果写耗时低但 signal drain 仍慢，则继续查 subscriber read loop、runner decode / accounting 或链路吞吐。 |
 
 面试时可以把这个结果讲成一次真实性能定位过程：
 
@@ -270,7 +271,9 @@ cadence、Redis subscriber fanout、per-connection write scheduling 和有线网
 约 2.85k-2.89k signals/s 的旧区间。因此当前讲法应明确：瓶颈不在 SendMessage、
 message outbox、delivery projection、Kafka、Redis route、registry mutex 或重复 JSON
 marshal，而更接近 WebSocket writer flush / per-connection scheduling / nhooyr 写入 /
-网络吞吐 / 客户端读取背压。
+网络吞吐 / 客户端读取背压。为此 push-gateway 已补 WebSocket writer duration
+histogram，下一轮 400 subscriber coordinator + shard 复压要把 `delivery_notify`
+write p95 / p99 / avg / max 也纳入报告，避免继续用 CPU 空闲这类间接现象判断瓶颈。
 
 ### 当前系统如何承接热点群
 

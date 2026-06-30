@@ -163,6 +163,11 @@ brief、loadtest report、development-progress 或 archive。
   `2839.888 signals/s` 仅约 `0.8%` 提升，也没有超过上一轮 registry lock 优化后的
   `2891.8 signals/s`。结论：重复 JSON marshal 不是主瓶颈，online signal drain
   仍需从 WebSocket 写调度 / flush / 连接读取背压 / 网络吞吐继续定位。
+- 2026-07-01 已补 push-gateway WebSocket writer 写耗时观测：`frame_write` 和
+  `delivery_notify` 现在暴露 histogram / sum / count / max，hotgroup Prometheus
+  时间窗口脚本会输出 delivery notify p95 / p99 / avg / max。该改动是下一轮定位
+  `conn.Write` 长尾、flush / scheduling 或读端背压的前置证据，不改变消息协议或
+  fanout 语义；focused push-gateway tests 和 hotgroup build 已通过。
 - 2026-06-30 HYBRID 1000 人 / 1000 消息 / 400 msg/s 诊断 run 暴露 per-user outbox
   写扩散下的 delivery outbox ready query 退化：旧 anti-join blocker 查询在约 100 万
   pending row 下每批 500 行约 24s。delivery-service 已改为 per-conversation frontier
@@ -198,7 +203,8 @@ brief、loadtest report、development-progress 或 archive。
 
 ## 下一个方向
 
-- 下一步直接转向 WebSocket writer flush cadence、per-connection write scheduling、
-  nhooyr WebSocket 写入策略、连接侧读取背压和网络吞吐定位；不要继续优先调
-  message / delivery outbox 或 Kafka。
+- 下一步重建 / redeploy 包含 writer duration histogram 的 push-gateway 镜像，并用同一
+  400 subscriber coordinator + shard 场景复压；如果写耗时 p95 / p99 很低，就继续
+  查压测端读取 / 网络吞吐，如果写耗时出现长尾，再进入 WebSocket writer flush cadence、
+  per-connection write scheduling 或 nhooyr 写入策略优化。
   正式生产级运维 UI、provider-grade 长周期平台仍后置。

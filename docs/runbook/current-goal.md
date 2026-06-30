@@ -169,6 +169,13 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
   `2839.888 signals/s` 相比仅约 `0.8%` 提升，也低于上一轮 registry lock
   优化复压的 `2891.8 signals/s`。结论：重复 JSON marshal 也不是主瓶颈，瓶颈仍是
   online signal drain。
+- 2026-07-01 已补下一轮 WebSocket 写出定位指标：push-gateway WebSocket writer
+  现在记录 `frame_write` 和 `delivery_notify` 写耗时 histogram / sum / count / max，
+  `tools/record-hotgroup-metrics-window.ps1` 会输出 delivery notify 写耗时 p95 / p99 /
+  avg / max。该改动只增加低基数观测，不改变协议、fanout、durable inbox 或
+  PullInbox / ACK 语义；focused tests / build 已通过。下一步需要 clean commit 镜像
+  重建 / redeploy，并用同一 400 subscriber coordinator + shard 场景复压，确认每帧
+  `conn.Write` 长尾是否解释 `online-signal-drain`。
 - HYBRID 诊断档位 1000 人 / 1000 消息 / 400 msg/s 暴露 `delivery_outbox` ready query
   在百万级 per-user outbox 下退化：旧 anti-join blocker 查询每批 500 行约 24s。当前
   delivery outbox relay 已改成 per-conversation frontier ready query，并把本地 worker
@@ -202,10 +209,13 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
 1. 下一模块转向 WebSocket writer flush cadence、per-connection write scheduling、
    nhooyr WebSocket 写入策略、连接侧读取背压和网络吞吐定位；不要回头优先调
    message / delivery outbox 或 Kafka。
-2. 继续为每轮优化保留 clean commit、Docker 镜像归档、三机部署版本和 Prometheus
+2. 先重建 / redeploy 包含 WebSocket writer duration histogram 的 push-gateway 镜像，
+   复跑 400 subscriber coordinator + shard 对照，用 p95 / p99 / max 写耗时判断下一步
+   是调 writer flush / scheduling，还是压测端读取 / 网络。
+3. 继续为每轮优化保留 clean commit、Docker 镜像归档、三机部署版本和 Prometheus
    时间窗口，保证压测曲线可复现。
-3. 若 HYBRID 仍要支持千人级 per-user materialized outbox，优先评估显式 frontier /
+4. 若 HYBRID 仍要支持千人级 per-user materialized outbox，优先评估显式 frontier /
    progress 表或把策略提前切到 READ_FANOUT；不要把 Kafka / Redis 当成替代 fanout 策略。
-4. delivery projection lag / inbox rows per message / push notify storm 指标深化。
-5. timeline virtual partition mapping、leader ownership audit 和更完整 repair workflow。
-6. 压测报告与面试叙事维护。
+5. delivery projection lag / inbox rows per message / push notify storm 指标深化。
+6. timeline virtual partition mapping、leader ownership audit 和更完整 repair workflow。
+7. 压测报告与面试叙事维护。

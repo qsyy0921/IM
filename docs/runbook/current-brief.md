@@ -186,6 +186,13 @@ brief、loadtest report、development-progress 或 archive。
   p95 / p99 约 `56.14ms / 91.228ms`，5m last p95 / p99 约
   `60.263ms / 92.053ms`，avg 约 `16.485ms`。结论：瓶颈已进一步收窄到
   Redis subscriber 收到 conversation signal 后的本地 fanout/enqueue 调度。
+- 2026-07-01 已实现 push-gateway Redis subscriber conversation signal worker /
+  shard queue：conversation signal 按 `tenant_id + conversation_id` 入 bounded queue
+  并由 worker fanout，delivery notify 路径不变；新增 worker / queue size env、
+  queued / queue_full / worker_error / queue_depth / queue_wait 指标，并同步
+  hotgroup Prometheus 时间窗口脚本。focused push-gateway tests 和 build 已通过，
+  下一步是 clean commit 镜像重建 / redeploy 后复跑 400 subscriber coordinator +
+  shard 场景。
 - 2026-06-30 HYBRID 1000 人 / 1000 消息 / 400 msg/s 诊断 run 暴露 per-user outbox
   写扩散下的 delivery outbox ready query 退化：旧 anti-join blocker 查询在约 100 万
   pending row 下每批 500 行约 24s。delivery-service 已改为 per-conversation frontier
@@ -221,7 +228,7 @@ brief、loadtest report、development-progress 或 archive。
 
 ## 下一个方向
 
-- 下一步做 push-gateway conversation fanout worker / shard queue：Redis subscriber
-  快速 handoff，worker 负责受控 fanout，并记录 queue depth、worker drain、
-  enqueue latency、backpressure 和 eviction 指标。
+- 下一步对已实现的 push-gateway conversation fanout worker / shard queue 做 clean
+  镜像复压：记录 queue depth、queue wait、worker fanout、queue full、writer duration
+  和总 drain rate，判断瓶颈是否迁移。
   正式生产级运维 UI、provider-grade 长周期平台仍后置。

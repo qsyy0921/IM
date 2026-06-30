@@ -46,9 +46,11 @@
    commit `6099ecd` 的 Redis subscriber fanout duration 复压显示 400 subscriber
    / 400000 signal drain rate 约 2883.976 signals/s，WebSocket write p99 约
    0.63ms，而 Redis subscriber conversation signal fanout/enqueue p95 / p99 约
-   56.14ms / 91.228ms。下一步需要实现 push-gateway conversation fanout worker /
-   shard queue，让 Redis subscriber 快速 handoff，并用 queue depth、worker drain、
-   enqueue latency、backpressure、eviction 指标验证是否突破 online signal drain。
+   56.14ms / 91.228ms。push-gateway conversation fanout worker / shard queue
+   已实现，Redis subscriber 现在可快速 handoff conversation signal，并暴露 queue depth、
+   queue wait、worker error、queue full 等指标。下一步需要 clean commit 镜像重建 /
+   redeploy，并用同一 400 subscriber coordinator + shard 场景验证是否突破
+   online signal drain。
    已新增
    `tools/analyze-hotgroup-loadtest.ps1`、`tools/analyze-hotgroup-multirunner.ps1` 和
    `tools/record-hotgroup-metrics-window.ps1` 自动汇总压测结果、分类瓶颈、记录

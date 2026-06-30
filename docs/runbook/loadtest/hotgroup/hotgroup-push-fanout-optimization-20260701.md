@@ -288,3 +288,58 @@ sub-millisecond at p99. The next module should introduce a controlled
 conversation fanout worker / shard queue so Redis subscriber goroutines can
 handoff quickly and worker-side queue depth, drain latency and backpressure can
 be measured directly.
+
+## Redis Subscriber Conversation Signal Worker Queue
+
+The next implementation step adds a dedicated worker / shard queue for Redis
+subscriber conversation signals:
+
+- `delivery_notify` continues to run synchronously through the existing local
+  registry path.
+- `conversation_signal` is enqueued into a bounded dispatcher queue.
+- Jobs are sharded by `tenant_id + conversation_id`, so signals for the same
+  conversation stay on the same worker and preserve local order.
+- Redis subscriber handling now returns after enqueue instead of spending the
+  fanout time in the Pub/Sub receive path.
+- Queue-full is explicit backpressure: it increments queue-full / error metrics
+  and does not pretend the signal was delivered. Durable recovery remains
+  `PullInbox`; there is no hidden fallback.
+
+New runtime knobs:
+
+```text
+NEXUSIM_PUSH_REDIS_SUBSCRIBER_SIGNAL_WORKERS=4
+NEXUSIM_PUSH_REDIS_SUBSCRIBER_SIGNAL_QUEUE_SIZE=4096
+```
+
+New metrics:
+
+```text
+nexusim_push_gateway_redis_route_events_total{event="subscriber_signal_fanout_queued",role="subscriber"}
+nexusim_push_gateway_redis_route_events_total{event="subscriber_signal_fanout_queue_full",role="subscriber"}
+nexusim_push_gateway_redis_route_events_total{event="subscriber_signal_fanout_worker_error",role="subscriber"}
+nexusim_push_gateway_redis_subscriber_signal_fanout_queue_depth
+nexusim_push_gateway_redis_subscriber_signal_fanout_queue_wait_duration_milliseconds
+nexusim_push_gateway_redis_subscriber_signal_fanout_queue_wait_duration_max_milliseconds
+```
+
+The Prometheus window recorder now captures queued / queue-full / worker-error,
+queue depth and queue-wait p95 / p99 / avg / max. The next comparable retest
+should rebuild a clean push-gateway image and rerun the same 400 subscriber
+coordinator + 4 shard scenario. The expected interpretation is:
+
+- if queue wait stays low and drain rate improves, Redis subscriber handoff was
+  the bottleneck;
+- if queue depth / wait grows, worker drain is still the bottleneck and needs
+  worker count or per-session scheduling analysis;
+- if queue full appears, the system is applying explicit online-notify
+  backpressure and the run must be treated as lossy online wakeup, not as a
+  successful notify-drain capacity result.
+
+Focused checks run before this note:
+
+```powershell
+. .\tools\go-env.ps1; go test ./services/push-gateway/internal/infrastructure/redisroute ./services/push-gateway/internal/infrastructure/monitoring ./services/push-gateway/cmd/push-gateway -count=1
+. .\tools\go-env.ps1; go test ./services/push-gateway/... -count=1
+. .\tools\go-env.ps1; go build ./services/push-gateway/cmd/push-gateway ./loadtest/hotgroup
+```

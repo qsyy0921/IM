@@ -204,6 +204,15 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
   conversation signal 后对本机 400 个 session 的本地 fanout/enqueue 调度，而不是
   SendMessage、outbox、Kafka、registry mutex、重复 JSON marshal 或单次 WebSocket
   `conn.Write`。
+- 2026-07-01 已实现 push-gateway Redis subscriber conversation signal worker /
+  shard queue：`conversation_signal` 入 bounded queue，按 `tenant_id + conversation_id`
+  分片给 worker 执行本地 fanout；`delivery_notify` 仍走原同步路径。同会话信号保持
+  本地顺序，queue full 显式记录 backpressure / error，不伪造成成功。新增
+  `NEXUSIM_PUSH_REDIS_SUBSCRIBER_SIGNAL_WORKERS`、
+  `NEXUSIM_PUSH_REDIS_SUBSCRIBER_SIGNAL_QUEUE_SIZE`，并暴露 queued、queue_full、
+  worker_error、queue_depth、queue_wait duration 指标；Prometheus 时间窗口脚本也已补
+  对应查询。该改动 focused tests / build 已通过，尚未 clean commit / Docker redeploy /
+  复压。
 - HYBRID 诊断档位 1000 人 / 1000 消息 / 400 msg/s 暴露 `delivery_outbox` ready query
   在百万级 per-user outbox 下退化：旧 anti-join blocker 查询每批 500 行约 24s。当前
   delivery outbox relay 已改成 per-conversation frontier ready query，并把本地 worker
@@ -216,11 +225,10 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
 
 - push-focused step 的 READ_FANOUT clean commit 阶梯 run 已完成，并明确记录 signal
   写出 / 读取指标；自动分析报告和最高档 Prometheus 低敏时间窗口均已生成。
-- 下一轮围绕 Redis subscriber 本地 fanout/enqueue 做架构优化：Redis route、
-  WebSocket writer、runner 多进程读取、registry mutex 和 JSON marshal 均已被排除为
-  首要瓶颈。下一步优先设计 push-gateway conversation fanout worker / shard queue，
-  要求保留 conversation 内必要顺序、显式 backpressure 指标和 fail-closed 语义；不要继续
-  只盲目增大 subscriber。
+- 下一轮围绕已实现的 push-gateway conversation fanout worker / shard queue 做
+  clean commit 镜像重建 / redeploy 和 400 subscriber coordinator + shard 复压，
+  对比 queue wait、queue depth、queue full、worker fanout duration、writer duration
+  和总 drain rate，判断瓶颈是否从 Redis subscriber fanout 调度迁移。
 - 文档同步本轮公开能力或瓶颈变化。
 - 提交并推送到 GitHub。
 
@@ -234,10 +242,10 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
 
 ## 后续优先级
 
-1. 设计并实现 push-gateway conversation fanout worker / shard queue：Redis subscriber
-   收到 conversation signal 后快速 handoff，worker 按 conversation 或本地 session bucket
-   执行受控 fanout，暴露 queue depth、enqueue latency、worker drain、drop / eviction
-   和 backpressure 指标；保持 durable PullInbox 兜底和 fail-closed，不引入隐藏 fallback。
+1. 为已实现的 push-gateway conversation fanout worker / shard queue 做 clean commit
+   镜像重建、归档、Ubuntu redeploy，并复跑 400 subscriber coordinator + 4 shard
+   场景；用新 queue 指标确认 Redis subscriber handoff 是否突破约 2.85k signals/s
+   的 online drain 曲线。
 2. 继续为每轮优化保留 clean commit、Docker 镜像归档、三机部署版本和 Prometheus
    时间窗口，保证压测曲线可复现。
 3. 若 HYBRID 仍要支持千人级 per-user materialized outbox，优先评估显式 frontier /

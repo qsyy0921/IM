@@ -44,29 +44,34 @@ type Registry struct {
 }
 
 type Metrics struct {
-	RedisRouteRegisterErrorCount             uint64           `json:"redis_route_register_error_count"`
-	RedisRouteRenewErrorCount                uint64           `json:"redis_route_renew_error_count"`
-	RedisRouteRenewSessionEvictedCount       uint64           `json:"redis_route_renew_session_evicted_count"`
-	RedisRouteLookupErrorCount               uint64           `json:"redis_route_lookup_error_count"`
-	RedisRouteRemoteMatchedSessions          uint64           `json:"redis_route_remote_matched_sessions"`
-	RedisRouteRemotePublishCallCount         uint64           `json:"redis_route_remote_publish_call_count"`
-	RedisRouteRemotePublishErrorCount        uint64           `json:"redis_route_remote_publish_error_count"`
-	RedisRouteRemoteNoSubscriberCount        uint64           `json:"redis_route_remote_no_subscriber_count"`
-	RedisRouteRemoteEnqueuedSessions         uint64           `json:"redis_route_remote_enqueued_sessions"`
-	RedisRouteStaleRemovedCount              uint64           `json:"redis_route_stale_removed_count"`
-	RedisRouteCleanupErrorCount              uint64           `json:"redis_route_cleanup_error_count"`
-	RedisRouteSubscriberMessageCount         uint64           `json:"redis_route_subscriber_message_count,omitempty"`
-	RedisRouteSubscriberMalformedCount       uint64           `json:"redis_route_subscriber_malformed_count,omitempty"`
-	RedisRouteSubscriberEnqueuedCount        uint64           `json:"redis_route_subscriber_enqueued_count,omitempty"`
-	RedisRouteSubscriberEvictedCount         uint64           `json:"redis_route_subscriber_evicted_count,omitempty"`
-	RedisRouteSubscriberErrorCount           uint64           `json:"redis_route_subscriber_error_count,omitempty"`
-	RedisRouteSubscriberNotifyFanoutDuration DurationSnapshot `json:"redis_route_subscriber_notify_fanout_duration,omitempty"`
-	RedisRouteSubscriberSignalFanoutDuration DurationSnapshot `json:"redis_route_subscriber_signal_fanout_duration,omitempty"`
-	RedisResumeReplayCount                   uint64           `json:"redis_resume_replay_count"`
-	RedisResumeMissCount                     uint64           `json:"redis_resume_miss_count"`
-	RedisResumeAppendCount                   uint64           `json:"redis_resume_append_count"`
-	RedisResumeAppendErrorCount              uint64           `json:"redis_resume_append_error_count"`
-	RedisResumePermissionDeniedCount         uint64           `json:"redis_resume_permission_denied_count"`
+	RedisRouteRegisterErrorCount                      uint64           `json:"redis_route_register_error_count"`
+	RedisRouteRenewErrorCount                         uint64           `json:"redis_route_renew_error_count"`
+	RedisRouteRenewSessionEvictedCount                uint64           `json:"redis_route_renew_session_evicted_count"`
+	RedisRouteLookupErrorCount                        uint64           `json:"redis_route_lookup_error_count"`
+	RedisRouteRemoteMatchedSessions                   uint64           `json:"redis_route_remote_matched_sessions"`
+	RedisRouteRemotePublishCallCount                  uint64           `json:"redis_route_remote_publish_call_count"`
+	RedisRouteRemotePublishErrorCount                 uint64           `json:"redis_route_remote_publish_error_count"`
+	RedisRouteRemoteNoSubscriberCount                 uint64           `json:"redis_route_remote_no_subscriber_count"`
+	RedisRouteRemoteEnqueuedSessions                  uint64           `json:"redis_route_remote_enqueued_sessions"`
+	RedisRouteStaleRemovedCount                       uint64           `json:"redis_route_stale_removed_count"`
+	RedisRouteCleanupErrorCount                       uint64           `json:"redis_route_cleanup_error_count"`
+	RedisRouteSubscriberMessageCount                  uint64           `json:"redis_route_subscriber_message_count,omitempty"`
+	RedisRouteSubscriberMalformedCount                uint64           `json:"redis_route_subscriber_malformed_count,omitempty"`
+	RedisRouteSubscriberEnqueuedCount                 uint64           `json:"redis_route_subscriber_enqueued_count,omitempty"`
+	RedisRouteSubscriberEvictedCount                  uint64           `json:"redis_route_subscriber_evicted_count,omitempty"`
+	RedisRouteSubscriberErrorCount                    uint64           `json:"redis_route_subscriber_error_count,omitempty"`
+	RedisRouteSubscriberNotifyFanoutDuration          DurationSnapshot `json:"redis_route_subscriber_notify_fanout_duration,omitempty"`
+	RedisRouteSubscriberSignalFanoutDuration          DurationSnapshot `json:"redis_route_subscriber_signal_fanout_duration,omitempty"`
+	RedisRouteSubscriberSignalFanoutQueuedCount       uint64           `json:"redis_route_subscriber_signal_fanout_queued_count,omitempty"`
+	RedisRouteSubscriberSignalFanoutQueueFullCount    uint64           `json:"redis_route_subscriber_signal_fanout_queue_full_count,omitempty"`
+	RedisRouteSubscriberSignalFanoutWorkerErrorCount  uint64           `json:"redis_route_subscriber_signal_fanout_worker_error_count,omitempty"`
+	RedisRouteSubscriberSignalFanoutQueueDepth        int64            `json:"redis_route_subscriber_signal_fanout_queue_depth,omitempty"`
+	RedisRouteSubscriberSignalFanoutQueueWaitDuration DurationSnapshot `json:"redis_route_subscriber_signal_fanout_queue_wait_duration,omitempty"`
+	RedisResumeReplayCount                            uint64           `json:"redis_resume_replay_count"`
+	RedisResumeMissCount                              uint64           `json:"redis_resume_miss_count"`
+	RedisResumeAppendCount                            uint64           `json:"redis_resume_append_count"`
+	RedisResumeAppendErrorCount                       uint64           `json:"redis_resume_append_error_count"`
+	RedisResumePermissionDeniedCount                  uint64           `json:"redis_resume_permission_denied_count"`
 }
 
 type registryMetrics struct {

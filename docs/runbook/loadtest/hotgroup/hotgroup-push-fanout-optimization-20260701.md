@@ -594,3 +594,78 @@ same call path and instead evaluate a bigger design choice: persistent per
 conversation / per bucket workers, distributing subscribers across multiple
 push-gateway instances, or reducing total online signal volume through a more
 aggressive pull-first policy for very large rooms.
+
+## Multi Push-Gateway WS Topology Retest
+
+The next experiment changed Docker topology rather than the push protocol:
+four `push-gateway` WebSocket processes share the same Redis route backend, but
+each process has a distinct `NEXUSIM_PUSH_GATEWAY_ID`, container IP and debug
+port.
+
+Topology change commit:
+
+```text
+4be4b2d deploy: add push gateway multi ws hotgroup topology
+```
+
+Runtime ports:
+
+| instance | gateway_id | ws_url | debug_metrics |
+| --- | --- | --- | --- |
+| ws-1 | `nexusim-push-gateway-ws-1` | `ws://172.31.50.2:10498/ws` | `http://172.31.50.2:11913/metrics` |
+| ws-2 | `nexusim-push-gateway-ws-2` | `ws://172.31.50.2:11001/ws` | `http://172.31.50.2:11941/metrics` |
+| ws-3 | `nexusim-push-gateway-ws-3` | `ws://172.31.50.2:11002/ws` | `http://172.31.50.2:11942/metrics` |
+| ws-4 | `nexusim-push-gateway-ws-4` | `ws://172.31.50.2:11003/ws` | `http://172.31.50.2:11943/metrics` |
+
+Prometheus `nexusim-push-gateway` now scrapes all four debug endpoints. The
+experiment assigns one `subscriber-only` shard to each WebSocket endpoint, so
+the same 400 online subscribers are split 100 / 100 / 100 / 100 across four
+processes.
+
+Comparable scenario:
+
+```text
+group_size=6000
+message_count=1000
+message_rate=8000
+sender_count=256
+subscriber_count=400
+fanout_mode=READ_FANOUT
+runner layout=coordinator + 4 subscriber-only shards
+```
+
+Artifacts:
+
+- coordinator:
+  `H:\NexusIM\loadtest-results\hotgroup-multiws-clean-400sub-coordinator-20260701-055706`
+- shards:
+  `H:\NexusIM\loadtest-results\hotgroup-multiws-clean-400sub-shard*-20260701-055706`
+- analysis:
+  `hotgroup-multirunner-analysis-20260701-multiws-400sub.md`
+- metrics window:
+  `hotgroup-metrics-window-20260701-multiws-400sub.md`
+
+Result:
+
+- coordinator send, PullInbox and ACK succeeded;
+- `message_outbox_pending=0`, `delivery_outbox_pending=0`;
+- 4 shards read 400000 conversation signals with no subscriber error;
+- aggregate signal span rate was about `2822.479 signals/s`;
+- previous single-WS fanout-buckets baseline was about `2874.378 signals/s`;
+- ratio vs baseline was about `0.982`, so throughput did not improve;
+- Prometheus reported all four push debug targets as up;
+- `delivery_notify` queue p95 / p99 were about `3.703ms / 4.742ms`;
+- `delivery_notify` write p95 / p99 were about `0.425ms / 0.769ms`;
+- Redis subscriber conversation-signal fanout p95 / p99 remained about
+  `69.014ms / 93.803ms`;
+- writer error, Redis subscriber error, queue-full and slow eviction stayed at
+  0.
+
+Judgment: simply distributing subscribers across multiple WebSocket processes
+does not break the `2.8k signals/s` online-drain curve in the current lab
+topology. This rules out a simple "single push-gateway process CPU is full"
+explanation. The next module should focus on changing the fanout model or
+reducing signal volume: persistent per-conversation / per-bucket workers,
+pull-first or sampled online signals for very large rooms, and a smaller
+diagnostic to distinguish server-side enqueue cost from client/network receive
+cadence.

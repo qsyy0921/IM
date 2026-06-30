@@ -249,6 +249,22 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
   bucket 并行没有突破 `2.85k-2.89k signals/s` 区间；下一步不要继续在同一调用路径
   堆并发，而应评估持久 per-conversation / per-bucket worker、跨 push 实例分摊订阅，
   或对超大房间采用更激进的 pull-first 策略来减少在线 signal 总量。
+- 2026-07-01 已用 clean commit `4be4b2d` 增加 4 个本地 push-gateway ws 实例拓扑，
+  每个实例使用独立 `NEXUSIM_PUSH_GATEWAY_ID`、host ws/debug 端口，并让 Prometheus
+  同时 scrape 4 个 push target。复压
+  `hotgroup-multiws-clean-400sub-coordinator-20260701-055706` 将 400 个
+  conversation subscriber 按 100 / 100 / 100 / 100 分配到 4 个 ws 端口。该 run 为
+  6000 人、1000 消息、目标 8000 msg/s、256 sender、READ_FANOUT；coordinator
+  `send_p95_ms=19.386`、`send_p99_ms=22.528`、`PullInbox p95=19.133ms`，
+  message / delivery outbox pending=0；4 个 shard 共读完 400000 条 signal，
+  drain rate 约 `2822.479 signals/s`，低于单 ws fanout-buckets baseline
+  `2874.378 signals/s`。Prometheus 窗口显示 4 个 push target 均 up，
+  `delivery_notify` queue p95 / p99 约 `3.703ms / 4.742ms`，write p95 / p99
+  约 `0.425ms / 0.769ms`，Redis subscriber fanout p95 / p99 约
+  `69.014ms / 93.803ms`，writer / Redis error、queue-full 和 slow eviction 均为 0。
+  结论：简单把同一会话订阅者分散到多个 push-gateway ws 进程没有突破在线 drain
+  曲线，当前不应把“多开容器”当成热点群主要优化；下一步需要改变 fanout 模型或减少
+  超大房间在线 signal 总量。
 - HYBRID 诊断档位 1000 人 / 1000 消息 / 400 msg/s 暴露 `delivery_outbox` ready query
   在百万级 per-user outbox 下退化：旧 anti-join blocker 查询每批 500 行约 24s。当前
   delivery outbox relay 已改成 per-conversation frontier ready query，并把本地 worker
@@ -278,11 +294,11 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
 
 ## 后续优先级
 
-1. 基于 `a15e0ad` 的复压结论，先做下一轮架构分析：在不破坏 PullInbox durable
-   恢复和 per-session 顺序的前提下，选择是做持久 per-conversation / per-bucket
-   worker、跨 push-gateway 实例分摊同一 conversation subscriber，还是为超大房间改成
-   更强 pull-first / sampled online signal 策略；不要继续只在单次 fanout 调用里增加
-   临时 goroutine。
+1. 基于 `a15e0ad` 和 `4be4b2d` 的复压结论，先做下一轮架构分析：在不破坏
+   PullInbox durable 恢复和 per-session 顺序的前提下，优先评估持久
+   per-conversation / per-bucket worker、超大房间 pull-first / sampled online signal
+   策略，或用更小诊断拆分 server enqueue cost 与 client/network receive cadence；
+   不要继续只在单次 fanout 调用里增加临时 goroutine，也不要把多开 ws 容器当成已验证解法。
 2. 继续为每轮优化保留 clean commit、Docker 镜像归档、三机部署版本和 Prometheus
    时间窗口，保证压测曲线可复现。
 3. 若 HYBRID 仍要支持千人级 per-user materialized outbox，优先评估显式 frontier /

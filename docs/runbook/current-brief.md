@@ -227,6 +227,14 @@ brief、loadtest report、development-progress 或 archive。
   error / slow eviction 均为 0。结论是 per-event fanout bucket goroutine 没有突破瓶颈；
   下一步要做更大设计判断：持久 per-conversation / per-bucket workers、跨 push 实例
   分摊 subscriber，或对超大房间采用更强 pull-first 策略降低在线 signal 总量。
+- 2026-07-01 已用 clean commit `4be4b2d` 验证 4 个 push-gateway ws 进程分摊
+  同一会话 400 个 subscriber 的拓扑：4 个 shard 分别连接 10498 / 11001 /
+  11002 / 11003，每个 ws 实例 100 个 subscriber。run
+  `hotgroup-multiws-clean-400sub-coordinator-20260701-055706` 共读完
+  400000 条 signal，drain rate 约 `2822.479 signals/s`，低于单 ws
+  fanout-buckets baseline 约 `2874.378 signals/s`；Prometheus 显示 4 个 push
+  target 均 up，writer / Redis error、queue-full 和 slow eviction 为 0。结论是
+  简单多开 ws 容器不是当前热点群 online signal drain 的主要解法。
 - 2026-06-30 HYBRID 1000 人 / 1000 消息 / 400 msg/s 诊断 run 暴露 per-user outbox
   写扩散下的 delivery outbox ready query 退化：旧 anti-join blocker 查询在约 100 万
   pending row 下每批 500 行约 24s。delivery-service 已改为 per-conversation frontier
@@ -262,7 +270,8 @@ brief、loadtest report、development-progress 或 archive。
 
 ## 下一个方向
 
-- 下一步围绕 `a15e0ad` 的复压结果做架构分析和下一模块选择：不要继续在单次本地
-  fanout 调用里堆并发；优先评估持久 bucket worker、跨 push 实例分摊订阅，或超大房间
-  pull-first / sampled online signal 策略。
+- 下一步围绕 `a15e0ad` / `4be4b2d` 的复压结果做架构分析和下一模块选择：
+  不要继续在单次本地 fanout 调用里堆并发，也不要把多开 ws 容器当成已验证解法；
+  优先评估持久 bucket worker、超大房间 pull-first / sampled online signal 策略，
+  或先做小诊断拆分 server enqueue cost 与 client/network receive cadence。
   正式生产级运维 UI、provider-grade 长周期平台仍后置。

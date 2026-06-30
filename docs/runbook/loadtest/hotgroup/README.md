@@ -41,6 +41,8 @@ CreateConversation -> batch CreateMemberChange(JOIN)
 | `hotgroup-metrics-window-20260701-writerqueue-clean-400sub.md` | writer queue 窗口显示 `delivery_notify` queue p95 / p99 约 4.665ms / 4.942ms，write p95 / p99 约 0.383ms / 0.587ms，但 worker fanout p95 / p99 仍约 57.759ms / 92.241ms；下一步应评估 conversation-local fanout buckets，而不是继续调 writer queue。 |
 | `hotgroup-multirunner-analysis-20260701-fanoutbuckets-400sub.md` | clean commit `a15e0ad` 的 conversation-local fanout buckets 复压：6000 人 / 1000 消息 / 8000 msg/s / 400 subscriber，400000 条 signal 全部读完，drain rate 约 2874.378 signals/s，未突破旧区间。 |
 | `hotgroup-metrics-window-20260701-fanoutbuckets-400sub.md` | fanout buckets 窗口显示 `delivery_notify` queue p95 / p99 约 4.616ms / 4.931ms，write p95 / p99 约 0.383ms / 0.574ms，Redis subscriber fanout p95 / p99 约 54.133ms / 90.827ms；下一步应评估持久 bucket worker、跨 push 实例分摊订阅或超大房间 pull-first 策略。 |
+| `hotgroup-multirunner-analysis-20260701-multiws-400sub.md` | clean commit `4be4b2d` 的 4 个 push-gateway ws 实例拓扑复压：400 subscriber 按 100 / 100 / 100 / 100 分散到 4 个 ws 端口，400000 条 signal 全部读完，drain rate 约 2822.479 signals/s，低于单 ws fanout-buckets baseline 约 2874.378 signals/s；说明简单多开 ws 进程不是当前瓶颈解。 |
+| `hotgroup-metrics-window-20260701-multiws-400sub.md` | multi-ws 窗口显示 4 个 push debug target 均 up，`delivery_notify` queue p95 / p99 约 3.703ms / 4.742ms，write p95 / p99 约 0.425ms / 0.769ms，Redis subscriber fanout p95 / p99 约 69.014ms / 93.803ms；writer / Redis error、queue-full 和 slow eviction 均为 0。 |
 
 ## 目标
 

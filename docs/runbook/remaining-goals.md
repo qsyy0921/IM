@@ -67,9 +67,12 @@
    redeploy 和 400 subscriber coordinator + 4 shard 复压。结果显示 drain rate 约
    2874.378 signals/s，仍在旧区间；fanout p95 / p99 约 54.133ms / 90.827ms，
    queue full / error / slow eviction 为 0。下一步不要继续在单次 fanout 调用里加
-   临时 goroutine，应评估持久 per-conversation / per-bucket worker、跨 push-gateway
-   实例分摊同一 conversation subscriber，或超大房间 pull-first / sampled online signal
-   策略。
+   临时 goroutine。clean commit `4be4b2d` 已验证 4 个 push-gateway ws 实例分摊
+   同一 conversation 的 400 个 subscriber：4 个实例和 Prometheus target 全部 up，
+   但 drain rate 约 2822.479 signals/s，低于单 ws fanout-buckets baseline
+   约 2874.378 signals/s。后续不要把简单多开 ws 容器当成主要解法，应评估持久
+   per-conversation / per-bucket worker、超大房间 pull-first / sampled online signal
+   策略，或用小诊断拆分 server enqueue cost 与 client/network receive cadence。
 2. Agent action boundary / repair cases：在 provider replay admin / workflow handoff 已落
    的基础上，继续扩更多需要 proposal / approval / workflow / audit 的 action 与 repair 场景。
 3. Product-active 服务按需推进：workflow、audit、admin、notification、media、vector、

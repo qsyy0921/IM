@@ -190,9 +190,14 @@ brief、loadtest report、development-progress 或 archive。
   shard queue：conversation signal 按 `tenant_id + conversation_id` 入 bounded queue
   并由 worker fanout，delivery notify 路径不变；新增 worker / queue size env、
   queued / queue_full / worker_error / queue_depth / queue_wait 指标，并同步
-  hotgroup Prometheus 时间窗口脚本。focused push-gateway tests 和 build 已通过，
-  下一步是 clean commit 镜像重建 / redeploy 后复跑 400 subscriber coordinator +
-  shard 场景。
+  hotgroup Prometheus 时间窗口脚本。clean commit `93654117` 已重建 / 归档 /
+  redeploy，并完成 400 subscriber coordinator + 4 shard 复压：
+  `hotgroup-signalqueue-clean-400sub-coordinator-20260701-041641`。本轮 400000 条
+  signal 全部读完，drain rate 约 `2876.076 signals/s`，queue full / worker error 为 0，
+  queue wait p95 / p99 约 `0.095ms / 0.099ms`；但 worker fanout p95 / p99 仍约
+  `38.636ms / 87.5ms`，总 drain 没突破旧曲线。下一步不要继续调 Redis subscriber
+  handoff，而要分析 worker 本地 fanout、per-session writer 调度、flush / batching
+  和 runner 读取侧。
 - 2026-06-30 HYBRID 1000 人 / 1000 消息 / 400 msg/s 诊断 run 暴露 per-user outbox
   写扩散下的 delivery outbox ready query 退化：旧 anti-join blocker 查询在约 100 万
   pending row 下每批 500 行约 24s。delivery-service 已改为 per-conversation frontier
@@ -228,7 +233,7 @@ brief、loadtest report、development-progress 或 archive。
 
 ## 下一个方向
 
-- 下一步对已实现的 push-gateway conversation fanout worker / shard queue 做 clean
-  镜像复压：记录 queue depth、queue wait、worker fanout、queue full、writer duration
-  和总 drain rate，判断瓶颈是否迁移。
+- 下一步围绕 push-gateway worker 本地 fanout / session writer 调度继续优化：
+  queue handoff 已不是瓶颈；需要对比 per-conversation worker 数、session outbound
+  queue drain、writer goroutine 调度、WebSocket flush 策略和 runner 读取背压。
   正式生产级运维 UI、provider-grade 长周期平台仍后置。

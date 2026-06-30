@@ -343,3 +343,56 @@ Focused checks run before this note:
 . .\tools\go-env.ps1; go test ./services/push-gateway/... -count=1
 . .\tools\go-env.ps1; go build ./services/push-gateway/cmd/push-gateway ./loadtest/hotgroup
 ```
+
+## Redis Subscriber Conversation Signal Worker Queue Retest
+
+The worker / shard queue implementation was committed as `93654117`, rebuilt,
+archived and redeployed to Ubuntu Docker. The image archive is:
+
+```text
+H:\NexusIM\docker-images\archives\nexusim-push-gateway-93654117-20260701-041255.tar
+```
+
+Comparable scenario:
+
+```text
+group_size=6000
+message_count=1000
+message_rate=8000
+sender_count=256
+subscriber_count=400
+fanout_mode=READ_FANOUT
+runner layout=coordinator + 4 subscriber-only shards
+```
+
+Artifacts:
+
+- coordinator:
+  `H:\NexusIM\loadtest-results\hotgroup-signalqueue-clean-400sub-coordinator-20260701-041641`
+- shards:
+  `H:\NexusIM\loadtest-results\hotgroup-signalqueue-clean-400sub-shard*-20260701-041641`
+- analysis:
+  `hotgroup-multirunner-analysis-20260701-signalqueue-400sub.md`
+- metrics window:
+  `hotgroup-metrics-window-20260701-signalqueue-400sub.md`
+
+Result:
+
+- coordinator send, PullInbox and ACK succeeded;
+- `message_outbox_pending=0`, `delivery_outbox_pending=0`;
+- 4 shards read 400000 conversation signals with no subscriber error;
+- aggregate signal span rate was about `2876.076 signals/s`;
+- previous single-runner 400 subscriber baseline was about `2839.888 signals/s`;
+- queue-full and worker-error were both 0;
+- queue depth stayed at 0 in the captured Prometheus window;
+- queue wait p95 / p99 were about `0.095ms / 0.099ms`;
+- worker-side conversation signal fanout p95 / p99 remained about
+  `38.636ms / 87.5ms`;
+- WebSocket `delivery_notify` write p95 / p99 were about `0.349ms / 0.495ms`.
+
+Judgment: Redis subscriber handoff is now cheap and not the dominant bottleneck.
+The end-to-end signal drain rate did not materially move, so the next module
+should stop optimizing the Pub/Sub receive path and instead inspect worker-side
+local fanout, per-session outbound queue drain, WebSocket writer goroutine
+scheduling, flush / batching behavior, runner-side read backpressure and
+network throughput.

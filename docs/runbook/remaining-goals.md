@@ -47,10 +47,12 @@
    / 400000 signal drain rate 约 2883.976 signals/s，WebSocket write p99 约
    0.63ms，而 Redis subscriber conversation signal fanout/enqueue p95 / p99 约
    56.14ms / 91.228ms。push-gateway conversation fanout worker / shard queue
-   已实现，Redis subscriber 现在可快速 handoff conversation signal，并暴露 queue depth、
-   queue wait、worker error、queue full 等指标。下一步需要 clean commit 镜像重建 /
-   redeploy，并用同一 400 subscriber coordinator + shard 场景验证是否突破
-   online signal drain。
+   已实现并用 clean commit `93654117` 完成镜像重建、归档、Ubuntu redeploy 和
+   400 subscriber coordinator + shard 复压。结果显示 queue handoff 正常：
+   queue full / worker error 为 0，queue wait p95 / p99 约 `0.095ms / 0.099ms`；
+   但整体 drain rate 仍约 `2876.076 signals/s`，未突破旧曲线。下一步不再优先调
+   Redis subscriber receive path，转向 worker 本地 fanout、session outbound queue
+   drain、writer goroutine 调度、WebSocket flush / batching 和 runner 读取背压分析。
    已新增
    `tools/analyze-hotgroup-loadtest.ps1`、`tools/analyze-hotgroup-multirunner.ps1` 和
    `tools/record-hotgroup-metrics-window.ps1` 自动汇总压测结果、分类瓶颈、记录
@@ -71,8 +73,8 @@
    smoke；2026-06-30 已定位并修复 `SEQUENCER_BLOCK` 下成员 JOIN 仍未接 timeline
    sequencer 的问题，完成 clean redeploy 三档复验，并完成 message outbox relay
    conversation-sharded batch publish 复验。多 runner 对照已证明单 runner 读取不是唯一瓶颈；
-   下一步继续做 push signal fanout / enqueue 调度优化、virtual partition mapping、
-   leader ownership audit 和 deeper repair。
+   下一步继续做 push worker 本地 fanout / session writer 调度优化、virtual partition
+   mapping、leader ownership audit 和 deeper repair。
 
 ## Client Demo Backlog
 

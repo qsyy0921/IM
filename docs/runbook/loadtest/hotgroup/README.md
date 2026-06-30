@@ -21,6 +21,7 @@ CreateConversation -> batch CreateMemberChange(JOIN)
 | 2026-06-30 pre-commit diagnostic | 200 人 / 500 消息 / 16 sender 中等规模诊断曾暴露 `SEQUENCER_BLOCK` 后成员 JOIN 未接 timeline-service 的缺口；修复后 dirty-run 可完成 `BROADCAST_SIGNAL`，`delivery_outbox_pending=0`、Kafka lag=0。正式报告必须用 clean commit 重跑。 |
 | `loadtest-report-20260630-hotgroup-clean-redeploy.md` | clean commit `d13bff6c` 重建 / redeploy 后，61 人 / 20 消息、200 人 / 500 消息、500 人 / 1000 消息三档均通过；最大档产生 50000 条 conversation signal，`user_inbox_rows=0`、`delivery_outbox_pending=0`、Kafka lag=0。 |
 | `loadtest-report-20260630-hotgroup-message-outbox-relay.md` | message-service outbox relay 已支持 conversation-sharded multi-worker batch publish；1000 人 / 4000 消息 / 800 msg/s 通过，message / delivery outbox 均无积压；随后 clean commit `01b2a70` 完成 READ_FANOUT 6000 人 / 100 subscriber 阶梯复压，最高目标 8000 msg/s、500000 条 conversation signal，outbox / Kafka 均无积压。 |
+| `hotgroup-analysis-20260630-readfanout-clean.md` | 由 `tools/analyze-hotgroup-loadtest.ps1` 自动汇总 clean commit `01b2a70` 的 6 档 READ_FANOUT 结果；当前分类为 `online-signal-drain`，证据是 outbox / Kafka 已追平但 500000 条 signal 最慢读完约 176s。 |
 
 ## 目标
 
@@ -82,6 +83,36 @@ kafka_lag_max
 ```
 
 原始大文件继续写入 `H:\NexusIM\loadtest-results`；仓库只保留低敏 summary 和报告。
+
+## 自动分析工具
+
+每轮正式压测后先用离线分析器把多个 `hotgroup-summary.json` 汇总成低敏报告：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\analyze-hotgroup-loadtest.ps1 `
+  -RunNamePattern hotgroup-readfanout-6000-*clean-01b2a70e-* `
+  -OutputPath docs\runbook\loadtest\hotgroup\hotgroup-analysis-20260630-readfanout-clean.md `
+  -RequireCleanCommit
+```
+
+分析器只读取 `H:\NexusIM\loadtest-results` 下的原始 summary，不改原始数据。
+它会输出 run matrix、clean / dirty 状态、SendMessage / PullInbox 延迟、outbox pending、
+conversation signal drain、瓶颈分类和下一步策略。
+
+当前瓶颈分类规则保持保守：
+
+```text
+send errors / high p99         -> send path
+message_outbox pending / DLQ   -> message outbox relay
+delivery_outbox pending / DLQ  -> delivery outbox relay
+PullInbox / ACK error or slow  -> receiver read / ack
+subscriber incomplete / error  -> push subscribe / read path
+outbox 追平但 signal drain 长  -> online signal drain
+缺少信号或 lag 字段            -> insufficient observability
+```
+
+该报告只能作为本地 / 三机压测诊断材料，不能单独替代 Grafana / Prometheus 时间窗口，
+也不能写成生产 SLO。
 
 ## 可视化要求
 

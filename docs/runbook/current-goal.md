@@ -76,6 +76,12 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
   `26.93ms`、`user_inbox_rows=0`、`delivery_outbox_pending=0`、Kafka lag=0。
   这证明当前瓶颈不在 SendMessage、message outbox、delivery projection、delivery outbox
   或 Kafka consumer；需要继续观察 online signal drain 和压测端读取能力。
+- 已新增 `tools/analyze-hotgroup-loadtest.ps1`，用于离线汇总 H 盘
+  `hotgroup-summary.json`，生成 run matrix、瓶颈分类和下一步策略。当前对 clean commit
+  `01b2a70` 的 6 档 READ_FANOUT 结果生成了
+  `docs/runbook/loadtest/hotgroup/hotgroup-analysis-20260630-readfanout-clean.md`，
+  分类为 `online-signal-drain`：outbox / Kafka 追平，但 500000 条 signal 最慢读完约
+  176s。该报告是诊断材料，不替代 Grafana / Prometheus 时间窗口。
 - HYBRID 诊断档位 1000 人 / 1000 消息 / 400 msg/s 暴露 `delivery_outbox` ready query
   在百万级 per-user outbox 下退化：旧 anti-join blocker 查询每批 500 行约 24s。当前
   delivery outbox relay 已改成 per-conversation frontier ready query，并把本地 worker
@@ -87,7 +93,8 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
 ## 本轮完成条件
 
 - push-focused step 的 READ_FANOUT clean commit 阶梯 run 已完成，并明确记录 signal
-  写出 / 读取指标；当前还需要补 Grafana / Prometheus 时间窗口截图或低敏查询输出。
+  写出 / 读取指标；自动分析报告已生成；当前还需要补 Grafana / Prometheus 时间窗口截图
+  或低敏查询输出。
 - 至少补一轮 Prometheus / Grafana 或 debug metrics 时间窗口信息；若缺 exporter，必须写清楚缺口，不把
   一次性 CLI 统计冒充完整趋势图。
 - 文档同步本轮公开能力或瓶颈变化。

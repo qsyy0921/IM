@@ -104,6 +104,11 @@ brief、loadtest report、development-progress 或 archive。
   `PullInbox p95=26.93ms`、`message_outbox_pending=0`、`delivery_outbox_pending=0`、
   Kafka lag=0。当前瓶颈不在 SendMessage、message outbox、delivery projection、
   delivery outbox 或 Kafka consumer；下一步看 online signal drain / reader 侧。
+- 2026-06-30 已新增 hotgroup 离线分析器 `tools/analyze-hotgroup-loadtest.ps1`，
+  能从 H 盘 `hotgroup-summary.json` 自动生成 run matrix、瓶颈分类和下一步策略。
+  已生成 `docs/runbook/loadtest/hotgroup/hotgroup-analysis-20260630-readfanout-clean.md`：
+  clean commit `01b2a70` 6 档 READ_FANOUT 结果被分类为 `online-signal-drain`，证据是
+  outbox / Kafka 已追平，但 500000 条 conversation signal 最慢读完约 176s。
 - 2026-06-30 HYBRID 1000 人 / 1000 消息 / 400 msg/s 诊断 run 暴露 per-user outbox
   写扩散下的 delivery outbox ready query 退化：旧 anti-join blocker 查询在约 100 万
   pending row 下每批 500 行约 24s。delivery-service 已改为 per-conversation frontier
@@ -140,5 +145,6 @@ brief、loadtest report、development-progress 或 archive。
 ## 下一个方向
 
 - 下一步优先补本轮 READ_FANOUT 阶梯复压的 Prometheus / Grafana 或 debug metrics
-  时间窗口，必要时继续扩大 subscriber 数或总 signal 数来逼近 online signal drain 上限；
+  时间窗口，并用分析器持续记录复压对比；必要时继续扩大 subscriber 数或总 signal 数
+  来逼近 online signal drain 上限；
   正式生产级运维 UI、provider-grade 长周期平台仍后置。

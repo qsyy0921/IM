@@ -292,8 +292,12 @@ brief、loadtest report、development-progress 或 archive。
   sampled signal，span 141.504s；SendMessage / PullInbox / ACK 和 outbox drain
   均成立。结论是策略边界已从全局 knob 收敛到 fanout-mode room policy，但
   READ_FANOUT=10 的性能仍与上一轮 global sample=10 同量级，瓶颈仍是
-  online-signal-drain。当前已继续实现 subscriber-aware conversation signal cadence：
-  可以按 fanout mode 和本机 / 远端 gateway 的 conversation subscriber 数进一步调低
-  online signal cadence；没有配置 threshold 时保留旧采样前置快速路径。下一步是
-  clean commit、重建 / 归档 / redeploy push-gateway，并用同场景复压验证
-  READ_FANOUT `100:20` 这类 subscriber threshold 是否缩短 drain span。
+  online-signal-drain。随后 clean commit `9bdf21c5` 实现并复验 subscriber-aware
+  conversation signal cadence：按 fanout mode 和本机 / 远端 gateway 的 conversation
+  subscriber 数进一步调低 online signal cadence；没有配置 threshold 时保留旧采样
+  前置快速路径。同场景配置 READ_FANOUT `100:20` 后，4 个 shard 共读完 100000
+  条 signal，message / delivery outbox pending=0，writer / Redis route error 为 0；
+  但 signal span 为 289.249s，span rate 约 345.723 signals/s，低于 `37b575e5`
+  baseline 的 1413.391 signals/s。结论：first-stage subscriber threshold 没有突破
+  drain 瓶颈，下一步转向消息速率 / 在线人数感知 dynamic cadence、持久
+  per-conversation / per-bucket worker，或更强 pull-first 策略。

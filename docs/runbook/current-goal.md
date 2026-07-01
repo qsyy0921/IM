@@ -310,18 +310,25 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
   `62.5ms / 92.5ms`。结论：fanout-mode policy 已把全局 sample knob 收敛成
   room policy；在 READ_FANOUT=10 的等价行为下性能与上一轮 global sample=10
   基本同一量级，瓶颈仍是 online-signal-drain。
-- 2026-07-01 已实现 subscriber-aware conversation signal cadence 模块：在
+- 2026-07-01 已实现并复验 subscriber-aware conversation signal cadence 模块：在
   fanout-mode policy 之上，新增
   `NEXUSIM_PUSH_CONVERSATION_SIGNAL_SUBSCRIBER_POLICY_<MODE>`，格式为
   `min_subscribers:sample_every` 的逗号列表。memory registry 按本机
   conversation subscriber 数调整 sample cadence；Redis route 按每个远端
   gateway 的订阅数决定是否 publish，且被采样丢弃的 remote signal 不写 Redis
   resume。没有配置 subscriber threshold 时，Redis route 保留旧的采样前置快速路径，
-  不为 sampled-out signal 做 route lookup。默认空配置不改变现有行为；无效配置会
-  启动失败。focused push-gateway / hotgroup tests、build、compose config 和
-  `git diff --check` 已通过；下一步是 clean commit、Docker 镜像归档 / redeploy，
-  用 READ_FANOUT threshold（例如 4 个 ws 各约 100 subscriber 时配置
-  `100:20`）做与 `37b575e5` 同场景复压。
+  不为 sampled-out signal 做 route lookup。clean commit `9bdf21c5` 已完成镜像
+  重建、归档、Ubuntu redeploy 和同场景复压。run
+  `hotgroup-subscriberpolicy-400sub-5000msg-coordinator-20260701-095457`
+  使用 6000 人、5000 消息、目标 8000 msg/s、256 sender、400 subscriber、
+  READ_FANOUT、4 个 subscriber shard、READ_FANOUT threshold `100:20`；4 个 shard
+  共读完 100000 条 signal，message / delivery outbox pending=0，writer /
+  Redis subscriber error、queue-full 和 eviction 均为 0。但 signal span 为
+  `289.249s`，span rate 约 `345.723 signals/s`，明显低于 `37b575e5`
+  baseline 的 `200000 signal / 141.504s / 1413.391 signals/s`。结论：该
+  first-stage threshold 策略能降低 emitted signal 数，但当前配置没有改善 drain，
+  不能作为热点群吞吐优化闭环；下一步应转向消息速率感知的动态 cadence、持久
+  per-conversation / per-bucket worker，或更强 pull-first 策略。
 - HYBRID 诊断档位 1000 人 / 1000 消息 / 400 msg/s 暴露 `delivery_outbox` ready query
   在百万级 per-user outbox 下退化：旧 anti-join blocker 查询每批 500 行约 24s。当前
   delivery outbox relay 已改成 per-conversation frontier ready query，并把本地 worker
@@ -342,9 +349,9 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
 - fanout-mode conversation signal policy 已完成 clean commit、Docker 镜像重建 /
   归档 / redeploy 和 mode-specific 可比复压。该复压证明策略边界生效，但没有改变
   READ_FANOUT=10 下的核心瓶颈。
-- subscriber-aware conversation signal cadence 已完成代码与 focused 验证；仍需
-  clean commit、Docker 镜像归档 / redeploy 和可比复压，确认在线 signal 总量下降后
-  SendMessage、PullInbox、ACK、outbox drain 与 Prometheus 窗口是否仍成立。
+- subscriber-aware conversation signal cadence 已完成代码、focused 验证、clean
+  Docker redeploy 和可比复压。复压确认 outbox、writer、Redis route 和 subscriber
+  错误路径均正常，但 READ_FANOUT `100:20` 没有改善 drain span。
 - 文档同步本轮公开能力或瓶颈变化。
 - 提交并推送到 GitHub。
 
@@ -358,11 +365,10 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
 
 ## 后续优先级
 
-1. subscriber-aware conversation signal cadence 是当前下一步完整模块：先提交 /
-   redeploy，再用 6000 人、5000 消息、8000 msg/s、400 subscriber 的同场景复压
-   对比 `37b575e5`。若 READ_FANOUT `100:20` 仍不能明显缩短 drain span，再进入
-   持久 per-conversation / per-bucket worker；不要继续只调同一个全局 sample knob。
-   两者都必须保留 PullInbox / ACK 作为 durable truth。
+1. subscriber-aware threshold 已复验且未突破瓶颈。下一模块不要继续只调静态 sample
+   knob：优先设计消息速率 / 在线人数感知的 dynamic cadence，或持久
+   per-conversation / per-bucket fanout worker；如果继续走 pull-first，必须明确
+   PullInbox / ACK 是 durable truth，WebSocket signal 只是轻量唤醒。
 2. 继续为每轮优化保留 clean commit、Docker 镜像归档、三机部署版本和 Prometheus
    时间窗口，保证压测曲线可复现。
 3. 若 HYBRID 仍要支持千人级 per-user materialized outbox，优先评估显式 frontier /

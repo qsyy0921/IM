@@ -95,6 +95,9 @@ Agent Gateway / UX
 - 已补 fixture-only memory admission hardening：duplicate dedupe、
   low-confidence rejection、procedural skill binding、policy-like memory rejection、
   review timeout metadata。
+- 已补 fixture-only memory admission deeper hardening：multi-source duplicate
+  clustering、confidence calibration、procedural memory migration/invalidation、
+  governed policy source allowlist/revocation、review retry/escalation/redrive。
 - 已补 fixture-only state-diff report coverage：approved action outcome refs、
   expected-vs-actual state changes、missing execution refs、incomplete report、
   unauthorized mutation detection。
@@ -104,8 +107,8 @@ Agent Gateway / UX
   cancel propagation incomplete、replay event incomplete。
 - 已补 current EvalReport generation / baseline refresh review CLI，生成当前报告和
   baseline refresh review artifact，默认不覆盖 baseline。
-- 下一段优先做 memory admission deeper hardening，其次做 ContextPackage /
-  EvidencePack deeper hardening。
+- 下一段优先做 ContextPackage / EvidencePack deeper hardening，其次做 current-report
+  / baseline lifecycle deeper hardening。
 
 ## 工作规则
 

@@ -98,22 +98,59 @@ class AgentEvalTraceTests(unittest.TestCase):
                     "capability_family": "MEMORY_ADMISSION",
                     "fixture_version": "fixture-v1",
                     "input_refs": ["input:trace-memory-hardening-case"],
-                    "actual_used_refs": ["message:project:decision:duplicate"],
+                    "visible_evidence_refs": ["policy-source:retention:v2"],
+                    "actual_used_refs": [
+                        "message:project:decision:duplicate",
+                        "policy-source:retention:v2",
+                    ],
                     "expected_memory_outcome": "REJECT",
                     "actual_memory_outcome": "REJECT",
                     "expected_memory_scope": "PROJECT",
                     "actual_memory_scope": "PROJECT",
                     "expected_memory_source_refs": ["message:project:decision:duplicate"],
-                    "actual_memory_source_refs": ["message:project:decision:duplicate"],
+                    "actual_memory_source_refs": [
+                        "message:project:decision:duplicate",
+                        "policy-source:retention:v2",
+                    ],
                     "duplicate_memory_refs": ["memory:project:decision:v1"],
                     "actual_memory_dedupe_refs": ["memory:project:decision:v1"],
                     "memory_deduped": True,
+                    "duplicate_memory_cluster_refs": [
+                        "message:project:decision:duplicate",
+                        "memory:project:decision:v1",
+                    ],
+                    "actual_memory_cluster_refs": [
+                        "message:project:decision:duplicate",
+                        "memory:project:decision:v1",
+                    ],
+                    "memory_duplicate_clustered": True,
                     "low_confidence_memory_refs": ["candidate:memory:uncertain"],
                     "low_confidence_memory_rejected": True,
+                    "expected_memory_confidence_bucket": "LOW",
+                    "actual_memory_confidence_bucket": "LOW",
+                    "memory_confidence_calibrated": True,
+                    "expected_memory_skill_refs": ["skill:memory:procedure:v2"],
+                    "actual_memory_skill_refs": ["skill:memory:procedure:v2"],
+                    "expected_procedural_migration_refs": ["procedure:migrate:v1-to-v2"],
+                    "actual_procedural_migration_refs": ["procedure:migrate:v1-to-v2"],
+                    "expected_procedural_invalidation_refs": ["procedure:invalidate:v1"],
+                    "actual_procedural_invalidation_refs": ["procedure:invalidate:v1"],
+                    "procedural_memory_migrated": True,
+                    "procedural_memory_invalidated": True,
                     "policy_memory_refs": ["candidate:policy-like:rule"],
+                    "governed_policy_source_refs": ["policy-source:retention:v2"],
+                    "governed_policy_allowlist_refs": ["policy-source:retention:v2"],
+                    "actual_governed_policy_allowlist_refs": ["policy-source:retention:v2"],
                     "policy_memory_rejected": True,
                     "review_timeout_refs": ["review-timeout:memory:project"],
                     "memory_review_timeout_recorded": True,
+                    "expected_review_retry_refs": ["review-retry:memory:project"],
+                    "actual_review_retry_refs": ["review-retry:memory:project"],
+                    "expected_review_escalation_refs": ["review-escalation:memory:project"],
+                    "actual_review_escalation_refs": ["review-escalation:memory:project"],
+                    "expected_review_redrive_refs": ["review-redrive:memory:project"],
+                    "actual_review_redrive_refs": ["review-redrive:memory:project"],
+                    "memory_review_redrive_recorded": True,
                 }
             )
         )[0]
@@ -126,12 +163,41 @@ class AgentEvalTraceTests(unittest.TestCase):
         self.assertEqual(trace.memory_candidate.duplicate_refs, ["memory:project:decision:v1"])
         self.assertEqual(trace.memory_candidate.dedupe_refs, ["memory:project:decision:v1"])
         self.assertTrue(trace.memory_candidate.deduped)
+        self.assertEqual(
+            trace.memory_candidate.actual_cluster_refs,
+            ["message:project:decision:duplicate", "memory:project:decision:v1"],
+        )
+        self.assertTrue(trace.memory_candidate.duplicate_clustered)
         self.assertEqual(trace.memory_candidate.low_confidence_refs, ["candidate:memory:uncertain"])
         self.assertTrue(trace.memory_candidate.low_confidence_rejected)
+        self.assertEqual(trace.memory_candidate.confidence_bucket, "LOW")
+        self.assertTrue(trace.memory_candidate.confidence_calibrated)
+        self.assertEqual(trace.memory_candidate.skill_refs, ["skill:memory:procedure:v2"])
+        self.assertEqual(
+            trace.memory_candidate.procedural_migration_refs,
+            ["procedure:migrate:v1-to-v2"],
+        )
+        self.assertTrue(trace.memory_candidate.procedural_memory_migrated)
+        self.assertEqual(
+            trace.memory_candidate.procedural_invalidation_refs,
+            ["procedure:invalidate:v1"],
+        )
+        self.assertTrue(trace.memory_candidate.procedural_memory_invalidated)
         self.assertEqual(trace.memory_candidate.policy_memory_refs, ["candidate:policy-like:rule"])
+        self.assertEqual(
+            trace.memory_candidate.actual_governed_policy_allowlist_refs,
+            ["policy-source:retention:v2"],
+        )
         self.assertTrue(trace.memory_candidate.policy_memory_rejected)
         self.assertEqual(trace.memory_candidate.review_timeout_refs, ["review-timeout:memory:project"])
         self.assertTrue(trace.memory_candidate.review_timeout_recorded)
+        self.assertEqual(trace.memory_candidate.review_retry_refs, ["review-retry:memory:project"])
+        self.assertEqual(
+            trace.memory_candidate.review_escalation_refs,
+            ["review-escalation:memory:project"],
+        )
+        self.assertEqual(trace.memory_candidate.review_redrive_refs, ["review-redrive:memory:project"])
+        self.assertTrue(trace.memory_candidate.review_redrive_recorded)
 
     def test_trace_marks_permission_leakage(self) -> None:
         case = validate_eval_suite(

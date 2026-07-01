@@ -73,6 +73,14 @@ MEMORY_ADMISSION_HARDENING_PATH = (
     / "agent_eval"
     / "synthetic_memory_admission_hardening_scenarios.json"
 )
+MEMORY_ADMISSION_DEEPER_HARDENING_PATH = (
+    REPO_ROOT
+    / "ai"
+    / "python"
+    / "fixtures"
+    / "agent_eval"
+    / "synthetic_memory_admission_deeper_hardening_scenarios.json"
+)
 STATE_DIFF_PATH = (
     REPO_ROOT / "ai" / "python" / "fixtures" / "agent_eval" / "synthetic_state_diff_scenarios.json"
 )
@@ -311,6 +319,31 @@ class AgentEvalIntegrationTests(unittest.TestCase):
         self.assertIn("memory_skill_bound_score", report["aggregate_scores"])
         self.assertIn("memory_policy_source_score", report["aggregate_scores"])
         self.assertIn("memory_review_timeout_score", report["aggregate_scores"])
+
+    def test_cli_outputs_pass_report_for_memory_admission_deeper_hardening_scenarios(
+        self,
+    ) -> None:
+        result = subprocess.run(
+            [
+                sys.executable,
+                "ai/python/scripts/run_agent_eval_fixture.py",
+                str(MEMORY_ADMISSION_DEEPER_HARDENING_PATH),
+            ],
+            check=True,
+            capture_output=True,
+            cwd=REPO_ROOT,
+            text=True,
+        )
+
+        report = json.loads(result.stdout)
+        self.assertEqual(report["status"], "PASS")
+        self.assertEqual(report["case_count"], 5)
+        self.assertEqual(report["failed_count"], 0)
+        self.assertIn("memory_duplicate_cluster_score", report["aggregate_scores"])
+        self.assertIn("memory_confidence_calibration_score", report["aggregate_scores"])
+        self.assertIn("memory_procedural_migration_score", report["aggregate_scores"])
+        self.assertIn("memory_policy_source_governance_score", report["aggregate_scores"])
+        self.assertIn("memory_review_redrive_score", report["aggregate_scores"])
 
     def test_cli_outputs_pass_report_for_state_diff_scenarios(self) -> None:
         result = subprocess.run(

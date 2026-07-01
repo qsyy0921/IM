@@ -352,7 +352,8 @@ Memory admission can move from design to ADR only after:
 Current first-stage code is fixture-only and lives under
 `ai/python/nexusim_ai_eval/` and
 `ai/python/fixtures/agent_eval/synthetic_memory_admission_scenarios.json` and
-`ai/python/fixtures/agent_eval/synthetic_memory_admission_hardening_scenarios.json`.
+`ai/python/fixtures/agent_eval/synthetic_memory_admission_hardening_scenarios.json` and
+`ai/python/fixtures/agent_eval/synthetic_memory_admission_deeper_hardening_scenarios.json`.
 It does not freeze a production memory event or MemoryCandidate schema.
 
 Implemented checks:
@@ -368,14 +369,19 @@ Implemented checks:
 - procedural memory must carry SkillPackage / AgentDefinition refs;
 - policy-like memory is rejected unless backed by governed policy source refs;
 - review timeout metadata can be recorded for retry / operator follow-up.
+- multi-source duplicate clusters must preserve all expected duplicate/source refs;
+- confidence calibration must match the expected admission bucket;
+- procedural memory migration/invalidation refs must be recorded when a skill version changes;
+- governed policy sources must pass allowlist checks and revoked policy sources must reject;
+- review retry, escalation and redrive refs must be present when review recovery is expected.
 
 Remaining hardening:
 
-- multi-source duplicate clustering and tie-breaks;
-- confidence calibration across open dataset adapters;
-- procedural memory version migration / invalidation;
-- governed policy source allowlist / revocation cases;
-- review retry, escalation and redrive cases.
+- duplicate cluster tie-break strategy and cluster representative selection;
+- confidence calibration across real open dataset adapters;
+- procedural memory migration policy beyond fixture refs;
+- governed policy source revocation windows and audit retention;
+- review retry backoff and operator queue policy.
 
 ## 17. References
 

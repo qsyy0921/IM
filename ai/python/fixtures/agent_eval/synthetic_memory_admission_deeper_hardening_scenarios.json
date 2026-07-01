@@ -1,0 +1,162 @@
+{
+  "schema_version": 1,
+  "suite_id": "synthetic-agent-memory-admission-deeper-hardening-v1",
+  "fixture_kind": "synthetic_im_like",
+  "adapter_versions": [
+    "manual-memory-admission-deeper-hardening-fixture-v1"
+  ],
+  "cases": [
+    {
+      "case_id": "memory-multi-source-duplicate-clustered-pass",
+      "dataset_name": "synthetic-memory-admission-deeper-hardening",
+      "dataset_version": "2026-07-02",
+      "capability_family": "MEMORY_ADMISSION",
+      "fixture_version": "memory-admission-deeper-hardening-v1",
+      "input_refs": ["input:memory-multi-source-duplicate-clustered-pass"],
+      "visible_evidence_refs": [
+        "message:project-orion:decision:401",
+        "message:project-orion:decision:409",
+        "memory:project-orion:decision:v2"
+      ],
+      "actual_used_refs": [
+        "message:project-orion:decision:401",
+        "message:project-orion:decision:409"
+      ],
+      "expected_memory_outcome": "REJECT",
+      "actual_memory_outcome": "REJECT",
+      "expected_memory_scope": "PROJECT",
+      "actual_memory_scope": "PROJECT",
+      "expected_memory_source_refs": [
+        "message:project-orion:decision:401",
+        "message:project-orion:decision:409"
+      ],
+      "actual_memory_source_refs": [
+        "message:project-orion:decision:401",
+        "message:project-orion:decision:409"
+      ],
+      "duplicate_memory_refs": ["memory:project-orion:decision:v2"],
+      "actual_memory_dedupe_refs": ["memory:project-orion:decision:v2"],
+      "duplicate_memory_cluster_refs": [
+        "message:project-orion:decision:401",
+        "message:project-orion:decision:409",
+        "memory:project-orion:decision:v2"
+      ],
+      "actual_memory_cluster_refs": [
+        "message:project-orion:decision:401",
+        "message:project-orion:decision:409",
+        "memory:project-orion:decision:v2"
+      ],
+      "memory_deduped": true,
+      "memory_duplicate_clustered": true
+    },
+    {
+      "case_id": "memory-confidence-calibrated-reject-pass",
+      "dataset_name": "synthetic-memory-admission-deeper-hardening",
+      "dataset_version": "2026-07-02",
+      "capability_family": "MEMORY_ADMISSION",
+      "fixture_version": "memory-admission-deeper-hardening-v1",
+      "input_refs": ["input:memory-confidence-calibrated-reject-pass"],
+      "visible_evidence_refs": ["message:group-gamma:ambiguous-owner:51"],
+      "actual_used_refs": ["message:group-gamma:ambiguous-owner:51"],
+      "expected_memory_outcome": "REJECT",
+      "actual_memory_outcome": "REJECT",
+      "expected_memory_scope": "GROUP",
+      "actual_memory_scope": "GROUP",
+      "expected_memory_source_refs": ["message:group-gamma:ambiguous-owner:51"],
+      "actual_memory_source_refs": ["message:group-gamma:ambiguous-owner:51"],
+      "low_confidence_memory_refs": ["candidate:memory:ambiguous-release-owner"],
+      "expected_memory_confidence_bucket": "LOW",
+      "actual_memory_confidence_bucket": "LOW",
+      "low_confidence_memory_rejected": true,
+      "memory_confidence_calibrated": true
+    },
+    {
+      "case_id": "memory-procedural-migration-invalidated-pass",
+      "dataset_name": "synthetic-memory-admission-deeper-hardening",
+      "dataset_version": "2026-07-02",
+      "capability_family": "MEMORY_ADMISSION",
+      "fixture_version": "memory-admission-deeper-hardening-v1",
+      "input_refs": ["input:memory-procedural-migration-invalidated-pass"],
+      "visible_evidence_refs": ["message:agent-lab:procedure-update:63"],
+      "actual_used_refs": ["message:agent-lab:procedure-update:63"],
+      "expected_memory_outcome": "ADMIT",
+      "actual_memory_outcome": "ADMIT",
+      "expected_memory_scope": "EVAL_ONLY_FIXTURE",
+      "actual_memory_scope": "EVAL_ONLY_FIXTURE",
+      "expected_memory_source_refs": ["message:agent-lab:procedure-update:63"],
+      "actual_memory_source_refs": ["message:agent-lab:procedure-update:63"],
+      "expected_memory_skill_refs": ["skill:agent-lab:handoff:v4"],
+      "actual_memory_skill_refs": ["skill:agent-lab:handoff:v4"],
+      "expected_procedural_migration_refs": [
+        "procedural-migration:skill-agent-lab-handoff:v3-to-v4"
+      ],
+      "actual_procedural_migration_refs": [
+        "procedural-migration:skill-agent-lab-handoff:v3-to-v4"
+      ],
+      "expected_procedural_invalidation_refs": [
+        "procedural-invalidation:skill-agent-lab-handoff:v3"
+      ],
+      "actual_procedural_invalidation_refs": [
+        "procedural-invalidation:skill-agent-lab-handoff:v3"
+      ],
+      "procedural_memory_migrated": true,
+      "procedural_memory_invalidated": true
+    },
+    {
+      "case_id": "memory-governed-policy-allowlist-pass",
+      "dataset_name": "synthetic-memory-admission-deeper-hardening",
+      "dataset_version": "2026-07-02",
+      "capability_family": "MEMORY_ADMISSION",
+      "fixture_version": "memory-admission-deeper-hardening-v1",
+      "input_refs": ["input:memory-governed-policy-allowlist-pass"],
+      "visible_evidence_refs": [
+        "policy-source:tenant-retention:v2",
+        "message:tenant-admin:policy-ack:77"
+      ],
+      "actual_used_refs": ["policy-source:tenant-retention:v2"],
+      "expected_memory_outcome": "ADMIT",
+      "actual_memory_outcome": "ADMIT",
+      "expected_memory_scope": "TENANT",
+      "actual_memory_scope": "TENANT",
+      "expected_memory_source_refs": ["policy-source:tenant-retention:v2"],
+      "actual_memory_source_refs": ["policy-source:tenant-retention:v2"],
+      "policy_memory_refs": ["candidate:policy-memory:tenant-retention:v2"],
+      "governed_policy_source_refs": ["policy-source:tenant-retention:v2"],
+      "governed_policy_allowlist_refs": ["policy-source:tenant-retention:v2"],
+      "actual_governed_policy_allowlist_refs": ["policy-source:tenant-retention:v2"]
+    },
+    {
+      "case_id": "memory-policy-revocation-review-redrive-pass",
+      "dataset_name": "synthetic-memory-admission-deeper-hardening",
+      "dataset_version": "2026-07-02",
+      "capability_family": "MEMORY_ADMISSION",
+      "fixture_version": "memory-admission-deeper-hardening-v1",
+      "input_refs": ["input:memory-policy-revocation-review-redrive-pass"],
+      "visible_evidence_refs": [
+        "policy-source:tenant-retention:v1",
+        "review-timeout:memory:tenant-policy:v1"
+      ],
+      "actual_used_refs": ["policy-source:tenant-retention:v1"],
+      "expected_memory_outcome": "REJECT",
+      "actual_memory_outcome": "REJECT",
+      "expected_memory_scope": "TENANT",
+      "actual_memory_scope": "TENANT",
+      "expected_memory_source_refs": ["policy-source:tenant-retention:v1"],
+      "actual_memory_source_refs": ["policy-source:tenant-retention:v1"],
+      "policy_memory_refs": ["candidate:policy-memory:tenant-retention:v1"],
+      "governed_policy_source_refs": ["policy-source:tenant-retention:v1"],
+      "revoked_policy_source_refs": ["policy-source:tenant-retention:v1"],
+      "review_timeout_refs": ["review-timeout:memory:tenant-policy:v1"],
+      "expected_review_retry_refs": ["review-retry:memory:tenant-policy:v1"],
+      "actual_review_retry_refs": ["review-retry:memory:tenant-policy:v1"],
+      "expected_review_escalation_refs": ["review-escalation:memory:tenant-policy:v1"],
+      "actual_review_escalation_refs": ["review-escalation:memory:tenant-policy:v1"],
+      "expected_review_redrive_refs": ["review-redrive:memory:tenant-policy:v1"],
+      "actual_review_redrive_refs": ["review-redrive:memory:tenant-policy:v1"],
+      "policy_memory_rejected": true,
+      "policy_source_revocation_detected": true,
+      "memory_review_timeout_recorded": true,
+      "memory_review_redrive_recorded": true
+    }
+  ]
+}

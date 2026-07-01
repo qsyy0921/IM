@@ -14,18 +14,20 @@
 
 ## 当前优先顺序
 
-1. Memory admission deeper hardening：基础 group/project/profile、supersedes、
-   revocation、stale facts、speaker attribution、audience scope、overgeneralization、
-   duplicate dedupe、low-confidence rejection、procedural skill binding、
-   policy-like memory rejection 和 review timeout fixture 已落地；后续覆盖
-   multi-source duplicate clustering、confidence calibration、procedural memory
-   migration / invalidation、governed policy source allowlist / revocation 和
-   review retry / escalation / redrive cases。
-2. ContextPackage / EvidencePack deeper hardening：基础 source coverage、temporal
+1. ContextPackage / EvidencePack deeper hardening：基础 source coverage、temporal
    version、conflict marker、permission abstain、memory-vs-current-source precedence、
    unsafe tool output quarantine、context-budget retention 和 retrieval lane unavailable
    fixture 已落地；后续覆盖 source ranking、lane redrive、snippet-level citation
    repair、cross-tenant denied-lane 和 taint propagation cases。
+2. Memory admission adapter alignment：基础 group/project/profile、supersedes、
+   revocation、stale facts、speaker attribution、audience scope、overgeneralization、
+   duplicate dedupe、low-confidence rejection、procedural skill binding、
+   policy-like memory rejection、review timeout、multi-source duplicate clustering、
+   confidence calibration、procedural memory migration / invalidation、governed policy
+   source allowlist / revocation 和 review retry / escalation / redrive fixture 已落地；
+   后续只保留 STATE-Bench / LoCoMo 风格 adapter sample 对齐、
+   duplicate cluster representative tie-break strategy、confidence calibration thresholds
+   和 governed policy revocation window metadata。
 3. Tool / MCP security deeper hardening：基础 malicious tool description、unsafe
    output、MCP provider provenance、sandbox-only provider、tool argument schema
    mismatch、tool-selection attack、prepare expiry 和多候选 provider selection fixture

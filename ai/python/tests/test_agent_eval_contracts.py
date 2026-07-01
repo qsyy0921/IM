@@ -212,16 +212,45 @@ class AgentEvalContractTests(unittest.TestCase):
                 "stale_memory_refs": ["memory:project:decision:v1"],
                 "duplicate_memory_refs": ["memory:project:decision:v1"],
                 "actual_memory_dedupe_refs": ["memory:project:decision:v1"],
+                "duplicate_memory_cluster_refs": [
+                    "message:project:decision:2",
+                    "memory:project:decision:v1",
+                ],
+                "actual_memory_cluster_refs": [
+                    "message:project:decision:2",
+                    "memory:project:decision:v1",
+                ],
                 "low_confidence_memory_refs": ["candidate:memory:uncertain"],
+                "expected_memory_confidence_bucket": "low",
+                "actual_memory_confidence_bucket": "LOW",
                 "expected_memory_skill_refs": ["skill:memory:procedure:v1"],
                 "actual_memory_skill_refs": ["skill:memory:procedure:v1"],
+                "expected_procedural_migration_refs": ["procedure:migrate:v1-to-v2"],
+                "actual_procedural_migration_refs": ["procedure:migrate:v1-to-v2"],
+                "expected_procedural_invalidation_refs": ["procedure:invalidate:v1"],
+                "actual_procedural_invalidation_refs": ["procedure:invalidate:v1"],
                 "policy_memory_refs": ["candidate:policy-like:rule"],
                 "governed_policy_source_refs": ["policy-source:retention:v1"],
+                "governed_policy_allowlist_refs": ["policy-source:retention:v1"],
+                "actual_governed_policy_allowlist_refs": ["policy-source:retention:v1"],
+                "revoked_policy_source_refs": ["policy-source:retention:v0"],
                 "review_timeout_refs": ["review-timeout:memory:project"],
+                "expected_review_retry_refs": ["review-retry:memory:project"],
+                "actual_review_retry_refs": ["review-retry:memory:project"],
+                "expected_review_escalation_refs": ["review-escalation:memory:project"],
+                "actual_review_escalation_refs": ["review-escalation:memory:project"],
+                "expected_review_redrive_refs": ["review-redrive:memory:project"],
+                "actual_review_redrive_refs": ["review-redrive:memory:project"],
                 "memory_deduped": True,
+                "memory_duplicate_clustered": True,
                 "low_confidence_memory_rejected": True,
+                "memory_confidence_calibrated": True,
+                "procedural_memory_migrated": True,
+                "procedural_memory_invalidated": True,
                 "policy_memory_rejected": False,
+                "policy_source_revocation_detected": True,
                 "memory_review_timeout_recorded": True,
+                "memory_review_redrive_recorded": True,
                 "profile_aggregate_review_required": True,
                 "profile_aggregate_reviewed": True,
             }
@@ -235,13 +264,43 @@ class AgentEvalContractTests(unittest.TestCase):
         self.assertEqual(cases[0].actual_memory_supersedes_refs, ["memory:project:decision:v1"])
         self.assertEqual(cases[0].duplicate_memory_refs, ["memory:project:decision:v1"])
         self.assertEqual(cases[0].actual_memory_dedupe_refs, ["memory:project:decision:v1"])
+        self.assertEqual(
+            cases[0].duplicate_memory_cluster_refs,
+            ["message:project:decision:2", "memory:project:decision:v1"],
+        )
+        self.assertEqual(
+            cases[0].actual_memory_cluster_refs,
+            ["message:project:decision:2", "memory:project:decision:v1"],
+        )
         self.assertEqual(cases[0].low_confidence_memory_refs, ["candidate:memory:uncertain"])
+        self.assertEqual(cases[0].expected_memory_confidence_bucket, "LOW")
+        self.assertEqual(cases[0].actual_memory_confidence_bucket, "LOW")
         self.assertEqual(cases[0].actual_memory_skill_refs, ["skill:memory:procedure:v1"])
+        self.assertEqual(cases[0].actual_procedural_migration_refs, ["procedure:migrate:v1-to-v2"])
+        self.assertEqual(cases[0].actual_procedural_invalidation_refs, ["procedure:invalidate:v1"])
         self.assertEqual(cases[0].governed_policy_source_refs, ["policy-source:retention:v1"])
+        self.assertEqual(cases[0].governed_policy_allowlist_refs, ["policy-source:retention:v1"])
+        self.assertEqual(
+            cases[0].actual_governed_policy_allowlist_refs,
+            ["policy-source:retention:v1"],
+        )
+        self.assertEqual(cases[0].revoked_policy_source_refs, ["policy-source:retention:v0"])
         self.assertEqual(cases[0].review_timeout_refs, ["review-timeout:memory:project"])
+        self.assertEqual(cases[0].actual_review_retry_refs, ["review-retry:memory:project"])
+        self.assertEqual(
+            cases[0].actual_review_escalation_refs,
+            ["review-escalation:memory:project"],
+        )
+        self.assertEqual(cases[0].actual_review_redrive_refs, ["review-redrive:memory:project"])
         self.assertTrue(cases[0].memory_deduped)
+        self.assertTrue(cases[0].memory_duplicate_clustered)
         self.assertTrue(cases[0].low_confidence_memory_rejected)
+        self.assertTrue(cases[0].memory_confidence_calibrated)
+        self.assertTrue(cases[0].procedural_memory_migrated)
+        self.assertTrue(cases[0].procedural_memory_invalidated)
+        self.assertTrue(cases[0].policy_source_revocation_detected)
         self.assertTrue(cases[0].memory_review_timeout_recorded)
+        self.assertTrue(cases[0].memory_review_redrive_recorded)
         self.assertTrue(cases[0].profile_aggregate_review_required)
 
     def test_validates_state_diff_report_refs(self) -> None:

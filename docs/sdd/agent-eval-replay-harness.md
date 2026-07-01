@@ -179,6 +179,11 @@ Fixtures must be clearly synthetic and must not import production data.
 | `memory_precision` | Admitted candidates are valid |
 | `memory_scope_score` | Memory stays in allowed scope |
 | `memory_revocation_score` | Revoked memory is not used |
+| `memory_duplicate_cluster_score` | Multi-source duplicates map to one cluster |
+| `memory_confidence_calibration_score` | Confidence bucket matches expected gate |
+| `memory_procedural_migration_score` | Skill-bound procedural migration is recorded |
+| `memory_policy_source_governance_score` | Policy sources obey allowlist/revocation |
+| `memory_review_redrive_score` | Review retry/escalation/redrive refs exist |
 | `security_block_score` | Malicious tool/context blocked |
 | `handoff_score` | Delegation stays scoped and useful |
 | `replay_completeness` | Failure can be reconstructed from refs |
@@ -237,10 +242,16 @@ The harness should normalize:
 - `MEMORY_OVERGENERALIZED`
 - `MEMORY_REVIEW_MISSING`
 - `MEMORY_DUPLICATE_NOT_DEDUPED`
+- `MEMORY_DUPLICATE_CLUSTER_MISSING`
 - `MEMORY_LOW_CONFIDENCE_ADMITTED`
+- `MEMORY_CONFIDENCE_CALIBRATION_MISSING`
 - `MEMORY_SKILL_BOUND_MISSING`
+- `MEMORY_PROCEDURAL_MIGRATION_MISSING`
 - `MEMORY_POLICY_SOURCE_MISSING`
+- `MEMORY_POLICY_SOURCE_NOT_ALLOWED`
+- `MEMORY_POLICY_SOURCE_REVOKED`
 - `MEMORY_REVIEW_TIMEOUT_MISSING`
+- `MEMORY_REVIEW_REDRIVE_MISSING`
 - `MEMORY_SCOPE_VIOLATION`
 - `MEMORY_CONFLICT`
 - `MEMORY_POLLUTION`
@@ -382,6 +393,7 @@ ai/python/fixtures/agent_eval/synthetic_context_evidence_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_context_evidence_hardening_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_memory_admission_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_memory_admission_hardening_scenarios.json
+ai/python/fixtures/agent_eval/synthetic_memory_admission_deeper_hardening_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_hardening_scenarios.json
 ai/python/scripts/run_agent_eval_fixture.py
@@ -444,6 +456,9 @@ Implemented checks:
 - memory admission hardening coverage for duplicate dedupe, low-confidence
   rejection, procedural skill binding, policy-like memory rejection and review
   timeout metadata.
+- memory admission deeper hardening coverage for multi-source duplicate
+  clustering, confidence calibration, procedural memory migration/invalidation,
+  governed policy source allowlist/revocation and review retry/escalation/redrive.
 - state-diff report fixture coverage for approved action outcome refs,
   expected-vs-actual state changes, missing execution refs, incomplete reports
   and unauthorized mutation detection.
@@ -464,6 +479,7 @@ python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_context_evidence_hardening_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_memory_admission_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_memory_admission_hardening_scenarios.json
+python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_memory_admission_deeper_hardening_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_state_diff_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_state_diff_hardening_scenarios.json
 python ai/python/scripts/run_agent_eval_current_report.py ai/python/fixtures/agent_eval/synthetic_core_scenarios.json --report-out .tmp-agent-current-report.json --baseline ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json --review-out .tmp-agent-baseline-review.json --force

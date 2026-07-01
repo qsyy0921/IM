@@ -80,6 +80,7 @@ ai/python/fixtures/agent_eval/synthetic_context_evidence_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_context_evidence_hardening_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_memory_admission_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_memory_admission_hardening_scenarios.json
+ai/python/fixtures/agent_eval/synthetic_memory_admission_deeper_hardening_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_hardening_scenarios.json
 ai/python/scripts/run_agent_eval_fixture.py
@@ -143,6 +144,10 @@ Slice 0 covers:
 - fixture-only memory admission hardening coverage for duplicate dedupe,
   low-confidence rejection, procedural skill binding, policy-like memory
   rejection and review timeout metadata.
+- fixture-only memory admission deeper hardening coverage for multi-source
+  duplicate clustering, confidence calibration, procedural memory
+  migration/invalidation, governed policy source allowlist/revocation and review
+  retry/escalation/redrive.
 - fixture-only state-diff report coverage for approved action outcome refs,
   expected-vs-actual state changes, missing execution refs, incomplete reports
   and unauthorized mutation detection.
@@ -236,6 +241,9 @@ fixtures, call models or connect to backend services.
   review metadata.
 - MemoryCandidate hardening metadata for duplicate dedupe, low confidence,
   skill binding, policy-like memory rejection and review timeout.
+- MemoryCandidate deeper hardening metadata for duplicate clusters, calibrated
+  confidence, procedural migration/invalidation, policy-source governance and
+  review retry/escalation/redrive.
 - StateDiffReport execution, approval, prepare, state-change and audit refs.
 - StateDiffReport hardening metadata for repair/redrive, partial execution,
   idempotency and compensating action refs.
@@ -261,6 +269,7 @@ ai/python/fixtures/agent_eval/synthetic_context_evidence_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_context_evidence_hardening_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_memory_admission_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_memory_admission_hardening_scenarios.json
+ai/python/fixtures/agent_eval/synthetic_memory_admission_deeper_hardening_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_hardening_scenarios.json
 ai/python/fixtures/agent_eval/adapter_samples/
@@ -337,6 +346,9 @@ Evaluator tests:
 - MCP security hardening scoring rejects undetected argument schema mismatch,
   undetected prepare expiry, unblocked tool-selection attack and bad provider
   selection.
+- memory admission deeper hardening scoring rejects missing duplicate clusters,
+  confidence calibration mismatch, missing procedural migration, revoked policy
+  sources and missing review redrive refs.
 - AgentRun trace includes context, memory, tool, workflow, runtime-control and
   failure steps.
 
@@ -354,6 +366,7 @@ Integration tests:
 - load `synthetic_context_evidence_hardening_scenarios.json`;
 - load `synthetic_memory_admission_scenarios.json`;
 - load `synthetic_memory_admission_hardening_scenarios.json`;
+- load `synthetic_memory_admission_deeper_hardening_scenarios.json`;
 - load `synthetic_state_diff_scenarios.json`;
 - load `synthetic_state_diff_hardening_scenarios.json`;
 - run `run_agent_eval_fixture.py`;
@@ -387,6 +400,7 @@ python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_context_evidence_hardening_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_memory_admission_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_memory_admission_hardening_scenarios.json
+python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_memory_admission_deeper_hardening_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_state_diff_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_state_diff_hardening_scenarios.json
 python ai/python/scripts/run_agent_eval_current_report.py ai/python/fixtures/agent_eval/synthetic_core_scenarios.json --report-out .tmp-agent-current-report.json --baseline ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json --review-out .tmp-agent-baseline-review.json --force
@@ -414,12 +428,12 @@ git status --short --branch --untracked-files=all
 
 Recommended next slices:
 
-1. Deepen memory admission with multi-source duplicate clustering, confidence
-   calibration, procedural memory migration and governed policy allowlist cases.
-2. Deepen ContextPackage / EvidencePack with source ranking, lane redrive,
+1. Deepen ContextPackage / EvidencePack with source ranking, lane redrive,
    snippet-level citation repair and cross-tenant denied-lane cases.
-3. Add multi-suite current-report and baseline-refresh lifecycle metadata once
+2. Add multi-suite current-report and baseline-refresh lifecycle metadata once
    the next fixture families are stable.
+3. Align memory admission deeper hardening with STATE-Bench/LoCoMo-style
+   adapter samples after the synthetic gates are stable.
 
 Each slice must keep the same isolation rule until an ADR explicitly promotes a
 backend integration boundary.

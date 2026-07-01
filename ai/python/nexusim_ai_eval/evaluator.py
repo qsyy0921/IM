@@ -238,10 +238,15 @@ def _memory_scores(case: EvalCase) -> tuple[dict[str, float], str]:
     stale_score = 0.0 if _stale_memory_used(case) else 1.0
     overgeneralization_score = 0.0 if case.memory_overgeneralized else 1.0
     dedupe_score = _memory_dedupe_score(case)
+    duplicate_cluster_score = _memory_duplicate_cluster_score(case)
     low_confidence_score = _memory_low_confidence_score(case)
+    confidence_calibration_score = _memory_confidence_calibration_score(case)
     skill_bound_score = _memory_skill_bound_score(case)
+    procedural_migration_score = _memory_procedural_migration_score(case)
     policy_source_score = _memory_policy_source_score(case)
+    policy_governance_score = _memory_policy_source_governance_score(case)
     review_timeout_score = _memory_review_timeout_score(case)
+    review_redrive_score = _memory_review_redrive_score(case)
     profile_review_score = 1.0
     if case.profile_aggregate_review_required:
         profile_review_score = 1.0 if case.profile_aggregate_reviewed else 0.0
@@ -261,18 +266,31 @@ def _memory_scores(case: EvalCase) -> tuple[dict[str, float], str]:
         failure = "MEMORY_STALE_FACT_USED"
     elif dedupe_score == 0.0:
         failure = "MEMORY_DUPLICATE_NOT_DEDUPED"
+    elif duplicate_cluster_score == 0.0:
+        failure = "MEMORY_DUPLICATE_CLUSTER_MISSING"
     elif low_confidence_score == 0.0:
         failure = "MEMORY_LOW_CONFIDENCE_ADMITTED"
+    elif confidence_calibration_score == 0.0:
+        failure = "MEMORY_CONFIDENCE_CALIBRATION_MISSING"
     elif skill_bound_score == 0.0:
         failure = "MEMORY_SKILL_BOUND_MISSING"
+    elif procedural_migration_score == 0.0:
+        failure = "MEMORY_PROCEDURAL_MIGRATION_MISSING"
     elif policy_source_score == 0.0:
         failure = "MEMORY_POLICY_SOURCE_MISSING"
+    elif policy_governance_score == 0.0:
+        if case.revoked_policy_source_refs:
+            failure = "MEMORY_POLICY_SOURCE_REVOKED"
+        else:
+            failure = "MEMORY_POLICY_SOURCE_NOT_ALLOWED"
     elif overgeneralization_score == 0.0:
         failure = "MEMORY_OVERGENERALIZED"
     elif profile_review_score == 0.0:
         failure = "MEMORY_REVIEW_MISSING"
     elif review_timeout_score == 0.0:
         failure = "MEMORY_REVIEW_TIMEOUT_MISSING"
+    elif review_redrive_score == 0.0:
+        failure = "MEMORY_REVIEW_REDRIVE_MISSING"
     elif outcome_score == 0.0:
         failure = "MEMORY_CONFLICT"
     else:
@@ -289,10 +307,15 @@ def _memory_scores(case: EvalCase) -> tuple[dict[str, float], str]:
             "memory_stale_fact_score": stale_score,
             "memory_overgeneralization_score": overgeneralization_score,
             "memory_dedupe_score": dedupe_score,
+            "memory_duplicate_cluster_score": duplicate_cluster_score,
             "memory_low_confidence_score": low_confidence_score,
+            "memory_confidence_calibration_score": confidence_calibration_score,
             "memory_skill_bound_score": skill_bound_score,
+            "memory_procedural_migration_score": procedural_migration_score,
             "memory_policy_source_score": policy_source_score,
+            "memory_policy_source_governance_score": policy_governance_score,
             "memory_review_timeout_score": review_timeout_score,
+            "memory_review_redrive_score": review_redrive_score,
             "memory_profile_review_score": profile_review_score,
         },
         failure,
@@ -677,6 +700,15 @@ def _memory_dedupe_score(case: EvalCase) -> float:
     return 1.0 if duplicate_refs.issubset(set(case.actual_memory_dedupe_refs)) else 0.0
 
 
+def _memory_duplicate_cluster_score(case: EvalCase) -> float:
+    expected_cluster = set(case.duplicate_memory_cluster_refs)
+    if not expected_cluster:
+        return 1.0
+    if not case.memory_duplicate_clustered:
+        return 0.0
+    return 1.0 if expected_cluster.issubset(set(case.actual_memory_cluster_refs)) else 0.0
+
+
 def _memory_low_confidence_score(case: EvalCase) -> float:
     if not case.low_confidence_memory_refs:
         return 1.0
@@ -685,11 +717,41 @@ def _memory_low_confidence_score(case: EvalCase) -> float:
     return 1.0 if case.actual_memory_outcome == "REJECT" else 0.0
 
 
+def _memory_confidence_calibration_score(case: EvalCase) -> float:
+    if not case.expected_memory_confidence_bucket:
+        return 1.0
+    if not case.memory_confidence_calibrated:
+        return 0.0
+    return (
+        1.0
+        if case.expected_memory_confidence_bucket == case.actual_memory_confidence_bucket
+        else 0.0
+    )
+
+
 def _memory_skill_bound_score(case: EvalCase) -> float:
     expected_skill_refs = set(case.expected_memory_skill_refs)
     if not expected_skill_refs:
         return 1.0
     return 1.0 if expected_skill_refs.issubset(set(case.actual_memory_skill_refs)) else 0.0
+
+
+def _memory_procedural_migration_score(case: EvalCase) -> float:
+    expected_migrations = set(case.expected_procedural_migration_refs)
+    expected_invalidations = set(case.expected_procedural_invalidation_refs)
+    if not expected_migrations and not expected_invalidations:
+        return 1.0
+    if expected_migrations:
+        if not case.procedural_memory_migrated:
+            return 0.0
+        if not expected_migrations.issubset(set(case.actual_procedural_migration_refs)):
+            return 0.0
+    if expected_invalidations:
+        if not case.procedural_memory_invalidated:
+            return 0.0
+        if not expected_invalidations.issubset(set(case.actual_procedural_invalidation_refs)):
+            return 0.0
+    return 1.0
 
 
 def _memory_policy_source_score(case: EvalCase) -> float:
@@ -708,10 +770,49 @@ def _memory_policy_source_score(case: EvalCase) -> float:
     return 1.0 if case.actual_memory_outcome == "REJECT" else 0.0
 
 
+def _memory_policy_source_governance_score(case: EvalCase) -> float:
+    allowlist = set(case.governed_policy_allowlist_refs)
+    actual_allowlist = set(case.actual_governed_policy_allowlist_refs)
+    governed_sources = set(case.governed_policy_source_refs)
+    revoked_sources = set(case.revoked_policy_source_refs)
+    if not allowlist and not revoked_sources:
+        return 1.0
+    if allowlist:
+        if not allowlist.issubset(actual_allowlist):
+            return 0.0
+        if governed_sources and not governed_sources.issubset(actual_allowlist):
+            return 0.0
+    if revoked_sources:
+        if not case.policy_source_revocation_detected:
+            return 0.0
+        if not case.policy_memory_rejected:
+            return 0.0
+        if case.actual_memory_outcome != "REJECT":
+            return 0.0
+    return 1.0
+
+
 def _memory_review_timeout_score(case: EvalCase) -> float:
     if not case.review_timeout_refs:
         return 1.0
     return 1.0 if case.memory_review_timeout_recorded else 0.0
+
+
+def _memory_review_redrive_score(case: EvalCase) -> float:
+    expected_retry = set(case.expected_review_retry_refs)
+    expected_escalation = set(case.expected_review_escalation_refs)
+    expected_redrive = set(case.expected_review_redrive_refs)
+    if not expected_retry and not expected_escalation and not expected_redrive:
+        return 1.0
+    if not case.memory_review_redrive_recorded:
+        return 0.0
+    if not expected_retry.issubset(set(case.actual_review_retry_refs)):
+        return 0.0
+    if not expected_escalation.issubset(set(case.actual_review_escalation_refs)):
+        return 0.0
+    if not expected_redrive.issubset(set(case.actual_review_redrive_refs)):
+        return 0.0
+    return 1.0
 
 
 def _ref_subset_score(expected_refs: list[str], actual_refs: list[str]) -> float:
@@ -728,6 +829,12 @@ def _replay_bundle(case: EvalCase, failure_class: str) -> ReplayBundle:
         "actual_citation_refs": case.actual_citation_refs,
         "actual_memory_source_refs": case.actual_memory_source_refs,
         "actual_memory_supersedes_refs": case.actual_memory_supersedes_refs,
+        "actual_memory_cluster_refs": case.actual_memory_cluster_refs,
+        "actual_procedural_migration_refs": case.actual_procedural_migration_refs,
+        "actual_procedural_invalidation_refs": case.actual_procedural_invalidation_refs,
+        "actual_review_retry_refs": case.actual_review_retry_refs,
+        "actual_review_escalation_refs": case.actual_review_escalation_refs,
+        "actual_review_redrive_refs": case.actual_review_redrive_refs,
         "actual_state_change_refs": case.actual_state_change_refs,
         "actual_execution_refs": case.actual_execution_refs,
         "actual_state_audit_refs": case.actual_state_audit_refs,

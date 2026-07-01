@@ -62,18 +62,35 @@ class MemoryCandidateFixture:
     stale_refs: list[str]
     duplicate_refs: list[str]
     dedupe_refs: list[str]
+    duplicate_cluster_refs: list[str]
+    actual_cluster_refs: list[str]
     low_confidence_refs: list[str]
+    confidence_bucket: str
     skill_refs: list[str]
+    procedural_migration_refs: list[str]
+    procedural_invalidation_refs: list[str]
     policy_memory_refs: list[str]
     governed_policy_source_refs: list[str]
+    governed_policy_allowlist_refs: list[str]
+    actual_governed_policy_allowlist_refs: list[str]
+    revoked_policy_source_refs: list[str]
     review_timeout_refs: list[str]
+    review_retry_refs: list[str]
+    review_escalation_refs: list[str]
+    review_redrive_refs: list[str]
     revoked_memory_used: bool
     stale_memory_used: bool
     overgeneralized: bool
     deduped: bool
+    duplicate_clustered: bool
     low_confidence_rejected: bool
+    confidence_calibrated: bool
+    procedural_memory_migrated: bool
+    procedural_memory_invalidated: bool
     policy_memory_rejected: bool
+    policy_source_revocation_detected: bool
     review_timeout_recorded: bool
+    review_redrive_recorded: bool
     profile_aggregate_review_required: bool
     profile_aggregate_reviewed: bool
 
@@ -287,18 +304,35 @@ def _memory_candidate(case: EvalCase) -> MemoryCandidateFixture | None:
         stale_refs=case.stale_memory_refs,
         duplicate_refs=case.duplicate_memory_refs,
         dedupe_refs=case.actual_memory_dedupe_refs,
+        duplicate_cluster_refs=case.duplicate_memory_cluster_refs,
+        actual_cluster_refs=case.actual_memory_cluster_refs,
         low_confidence_refs=case.low_confidence_memory_refs,
+        confidence_bucket=case.actual_memory_confidence_bucket,
         skill_refs=case.actual_memory_skill_refs,
+        procedural_migration_refs=case.actual_procedural_migration_refs,
+        procedural_invalidation_refs=case.actual_procedural_invalidation_refs,
         policy_memory_refs=case.policy_memory_refs,
         governed_policy_source_refs=case.governed_policy_source_refs,
+        governed_policy_allowlist_refs=case.governed_policy_allowlist_refs,
+        actual_governed_policy_allowlist_refs=case.actual_governed_policy_allowlist_refs,
+        revoked_policy_source_refs=case.revoked_policy_source_refs,
         review_timeout_refs=case.review_timeout_refs,
+        review_retry_refs=case.actual_review_retry_refs,
+        review_escalation_refs=case.actual_review_escalation_refs,
+        review_redrive_refs=case.actual_review_redrive_refs,
         revoked_memory_used=case.revoked_memory_used,
         stale_memory_used=_stale_memory_used(case),
         overgeneralized=case.memory_overgeneralized,
         deduped=case.memory_deduped,
+        duplicate_clustered=case.memory_duplicate_clustered,
         low_confidence_rejected=case.low_confidence_memory_rejected,
+        confidence_calibrated=case.memory_confidence_calibrated,
+        procedural_memory_migrated=case.procedural_memory_migrated,
+        procedural_memory_invalidated=case.procedural_memory_invalidated,
         policy_memory_rejected=case.policy_memory_rejected,
+        policy_source_revocation_detected=case.policy_source_revocation_detected,
         review_timeout_recorded=case.memory_review_timeout_recorded,
+        review_redrive_recorded=case.memory_review_redrive_recorded,
         profile_aggregate_review_required=case.profile_aggregate_review_required,
         profile_aggregate_reviewed=case.profile_aggregate_reviewed,
     )
@@ -546,12 +580,25 @@ def _memory_step_status(
             set(memory_candidate.dedupe_refs)
         ):
             return ("FAIL", "MEMORY_DUPLICATE_NOT_DEDUPED")
+    duplicate_cluster_refs = set(memory_candidate.duplicate_cluster_refs)
+    if duplicate_cluster_refs:
+        if not memory_candidate.duplicate_clustered or not duplicate_cluster_refs.issubset(
+            set(memory_candidate.actual_cluster_refs)
+        ):
+            return ("FAIL", "MEMORY_DUPLICATE_CLUSTER_MISSING")
     if memory_candidate.low_confidence_refs:
         if not memory_candidate.low_confidence_rejected or memory_candidate.outcome != "REJECT":
             return ("FAIL", "MEMORY_LOW_CONFIDENCE_ADMITTED")
+    if case.expected_memory_confidence_bucket:
+        if not memory_candidate.confidence_calibrated:
+            return ("FAIL", "MEMORY_CONFIDENCE_CALIBRATION_MISSING")
+        if case.expected_memory_confidence_bucket != memory_candidate.confidence_bucket:
+            return ("FAIL", "MEMORY_CONFIDENCE_CALIBRATION_MISSING")
     expected_skill_refs = set(case.expected_memory_skill_refs)
     if expected_skill_refs and not expected_skill_refs.issubset(set(memory_candidate.skill_refs)):
         return ("FAIL", "MEMORY_SKILL_BOUND_MISSING")
+    if not _memory_procedural_migration_valid(case, memory_candidate):
+        return ("FAIL", "MEMORY_PROCEDURAL_MIGRATION_MISSING")
     if memory_candidate.policy_memory_refs:
         governed_sources = set(memory_candidate.governed_policy_source_refs)
         if governed_sources:
@@ -560,6 +607,10 @@ def _memory_step_status(
                 return ("FAIL", "MEMORY_POLICY_SOURCE_MISSING")
         elif not memory_candidate.policy_memory_rejected or memory_candidate.outcome != "REJECT":
             return ("FAIL", "MEMORY_POLICY_SOURCE_MISSING")
+    if not _memory_policy_governance_valid(memory_candidate):
+        if memory_candidate.revoked_policy_source_refs:
+            return ("FAIL", "MEMORY_POLICY_SOURCE_REVOKED")
+        return ("FAIL", "MEMORY_POLICY_SOURCE_NOT_ALLOWED")
     if memory_candidate.overgeneralized:
         return ("FAIL", "MEMORY_OVERGENERALIZED")
     if (
@@ -569,9 +620,68 @@ def _memory_step_status(
         return ("FAIL", "MEMORY_REVIEW_MISSING")
     if memory_candidate.review_timeout_refs and not memory_candidate.review_timeout_recorded:
         return ("FAIL", "MEMORY_REVIEW_TIMEOUT_MISSING")
+    if not _memory_review_redrive_valid(case, memory_candidate):
+        return ("FAIL", "MEMORY_REVIEW_REDRIVE_MISSING")
     if case.expected_memory_outcome != memory_candidate.outcome:
         return ("FAIL", "MEMORY_CONFLICT")
     return ("PASS", "")
+
+
+def _memory_procedural_migration_valid(
+    case: EvalCase,
+    memory_candidate: MemoryCandidateFixture,
+) -> bool:
+    expected_migrations = set(case.expected_procedural_migration_refs)
+    expected_invalidations = set(case.expected_procedural_invalidation_refs)
+    if expected_migrations:
+        if not memory_candidate.procedural_memory_migrated:
+            return False
+        if not expected_migrations.issubset(set(memory_candidate.procedural_migration_refs)):
+            return False
+    if expected_invalidations:
+        if not memory_candidate.procedural_memory_invalidated:
+            return False
+        if not expected_invalidations.issubset(
+            set(memory_candidate.procedural_invalidation_refs)
+        ):
+            return False
+    return True
+
+
+def _memory_policy_governance_valid(memory_candidate: MemoryCandidateFixture) -> bool:
+    allowlist = set(memory_candidate.governed_policy_allowlist_refs)
+    actual_allowlist = set(memory_candidate.actual_governed_policy_allowlist_refs)
+    governed_sources = set(memory_candidate.governed_policy_source_refs)
+    revoked_sources = set(memory_candidate.revoked_policy_source_refs)
+    if allowlist:
+        if not allowlist.issubset(actual_allowlist):
+            return False
+        if governed_sources and not governed_sources.issubset(actual_allowlist):
+            return False
+    if revoked_sources:
+        if not memory_candidate.policy_source_revocation_detected:
+            return False
+        if not memory_candidate.policy_memory_rejected or memory_candidate.outcome != "REJECT":
+            return False
+    return True
+
+
+def _memory_review_redrive_valid(
+    case: EvalCase,
+    memory_candidate: MemoryCandidateFixture,
+) -> bool:
+    expected_retry = set(case.expected_review_retry_refs)
+    expected_escalation = set(case.expected_review_escalation_refs)
+    expected_redrive = set(case.expected_review_redrive_refs)
+    if not expected_retry and not expected_escalation and not expected_redrive:
+        return True
+    if not memory_candidate.review_redrive_recorded:
+        return False
+    if not expected_retry.issubset(set(memory_candidate.review_retry_refs)):
+        return False
+    if not expected_escalation.issubset(set(memory_candidate.review_escalation_refs)):
+        return False
+    return expected_redrive.issubset(set(memory_candidate.review_redrive_refs))
 
 
 def _tool_step_status(

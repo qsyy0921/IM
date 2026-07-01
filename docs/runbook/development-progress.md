@@ -109,6 +109,7 @@ ai/python/fixtures/agent_eval/synthetic_context_evidence_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_context_evidence_hardening_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_memory_admission_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_memory_admission_hardening_scenarios.json
+ai/python/fixtures/agent_eval/synthetic_memory_admission_deeper_hardening_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_hardening_scenarios.json
 ai/python/scripts/run_agent_eval_fixture.py
@@ -148,6 +149,9 @@ ai/python/tests/test_agent_eval_*.py
   aggregate review、revoked/stale memory blocking、overgeneralization prevention。
 - Memory admission hardening fixture：duplicate dedupe、low-confidence rejection、
   procedural skill binding、policy-like memory rejection、review timeout metadata。
+- Memory admission deeper hardening fixture：multi-source duplicate clustering、
+  confidence calibration、procedural memory migration/invalidation、governed policy
+  source allowlist/revocation、review retry/escalation/redrive。
 - State-diff fixture：approved action outcome refs、expected-vs-actual state
   changes、execution/audit refs、incomplete report、unauthorized mutation detection。
 - State-diff hardening fixture：repair/redrive lineage、partial execution detection、
@@ -157,8 +161,8 @@ ai/python/tests/test_agent_eval_*.py
 
 | 优先级 | 工作 | 输出 |
 | --- | --- | --- |
-| P1 | Memory admission deeper hardening | multi-source duplicate clustering、confidence calibration、procedural memory migration、governed policy allowlist、review redrive |
-| P2 | ContextPackage / EvidencePack deeper hardening | source ranking、lane redrive、snippet-level citation repair、denied-lane、taint propagation |
+| P1 | ContextPackage / EvidencePack deeper hardening | source ranking、lane redrive、snippet-level citation repair、denied-lane、taint propagation |
+| P2 | Memory admission adapter alignment | STATE-Bench / LoCoMo 风格 adapter sample、cluster representative tie-break、confidence thresholds、policy revocation windows |
 | P2 | Tool / MCP security deeper hardening | MCPSecBench / MCP-Bench adapter 对齐、capability lease matrix、provider attestation metadata |
 | P2 | Current-report deeper hardening | 多 suite report matrix、baseline refresh approval manifest、report retention metadata |
 | P2 | Runtime-control deeper hardening | checkpoint version drift、workflow wakeup race、replay bundle lineage completeness |
@@ -178,7 +182,7 @@ ai/python/tests/test_agent_eval_*.py
 - SDD index / research index / architecture index link check
 - 不触碰 proto、schema、migration、production service directory
 
-后续 fixture-only prototype 优先推进 Memory admission deeper hardening fixture gate。
+后续 fixture-only prototype 优先推进 ContextPackage / EvidencePack deeper hardening fixture gate。
 
 ## 历史资料路由
 

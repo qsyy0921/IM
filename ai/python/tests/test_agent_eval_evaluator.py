@@ -524,6 +524,179 @@ class AgentEvalEvaluatorTests(unittest.TestCase):
         self.assertEqual(report.status, "FAIL")
         self.assertEqual(report.results[0].failure_class, "MEMORY_REVIEW_TIMEOUT_MISSING")
 
+    def test_memory_admission_deeper_hardening_passes_governed_metadata(self) -> None:
+        case = base_case("MEMORY_ADMISSION")
+        case.update(
+            {
+                "expected_memory_outcome": "NEEDS_REVIEW",
+                "actual_memory_outcome": "NEEDS_REVIEW",
+                "expected_memory_scope": "EVAL_ONLY_FIXTURE",
+                "actual_memory_scope": "EVAL_ONLY_FIXTURE",
+                "actual_used_refs": ["policy-source:retention:v2"],
+                "actual_memory_source_refs": ["policy-source:retention:v2"],
+                "duplicate_memory_refs": ["memory:project:decision:v1"],
+                "actual_memory_dedupe_refs": ["memory:project:decision:v1"],
+                "duplicate_memory_cluster_refs": [
+                    "message:project:decision:1",
+                    "memory:project:decision:v1",
+                ],
+                "actual_memory_cluster_refs": [
+                    "message:project:decision:1",
+                    "memory:project:decision:v1",
+                ],
+                "memory_deduped": True,
+                "memory_duplicate_clustered": True,
+                "expected_memory_confidence_bucket": "MEDIUM",
+                "actual_memory_confidence_bucket": "MEDIUM",
+                "memory_confidence_calibrated": True,
+                "expected_memory_skill_refs": ["skill:memory:procedure:v2"],
+                "actual_memory_skill_refs": ["skill:memory:procedure:v2"],
+                "expected_procedural_migration_refs": ["procedure:migrate:v1-to-v2"],
+                "actual_procedural_migration_refs": ["procedure:migrate:v1-to-v2"],
+                "expected_procedural_invalidation_refs": ["procedure:invalidate:v1"],
+                "actual_procedural_invalidation_refs": ["procedure:invalidate:v1"],
+                "procedural_memory_migrated": True,
+                "procedural_memory_invalidated": True,
+                "policy_memory_refs": ["candidate:policy-memory:retention"],
+                "governed_policy_source_refs": ["policy-source:retention:v2"],
+                "governed_policy_allowlist_refs": ["policy-source:retention:v2"],
+                "actual_governed_policy_allowlist_refs": ["policy-source:retention:v2"],
+                "expected_review_retry_refs": ["review-retry:memory:project"],
+                "actual_review_retry_refs": ["review-retry:memory:project"],
+                "expected_review_escalation_refs": ["review-escalation:memory:project"],
+                "actual_review_escalation_refs": ["review-escalation:memory:project"],
+                "expected_review_redrive_refs": ["review-redrive:memory:project"],
+                "actual_review_redrive_refs": ["review-redrive:memory:project"],
+                "memory_review_redrive_recorded": True,
+            }
+        )
+
+        report = run_eval_suite(suite_with_case(case))
+
+        self.assertEqual(report.status, "PASS")
+        self.assertEqual(report.aggregate_scores["memory_duplicate_cluster_score"], 1.0)
+        self.assertEqual(report.aggregate_scores["memory_confidence_calibration_score"], 1.0)
+        self.assertEqual(report.aggregate_scores["memory_procedural_migration_score"], 1.0)
+        self.assertEqual(report.aggregate_scores["memory_policy_source_governance_score"], 1.0)
+        self.assertEqual(report.aggregate_scores["memory_review_redrive_score"], 1.0)
+
+    def test_memory_admission_fails_missing_duplicate_cluster(self) -> None:
+        case = base_case("MEMORY_ADMISSION")
+        case.update(
+            {
+                "expected_memory_outcome": "REJECT",
+                "actual_memory_outcome": "REJECT",
+                "expected_memory_scope": "PROJECT",
+                "actual_memory_scope": "PROJECT",
+                "duplicate_memory_refs": ["memory:project:decision:v1"],
+                "actual_memory_dedupe_refs": ["memory:project:decision:v1"],
+                "duplicate_memory_cluster_refs": [
+                    "message:project:decision:1",
+                    "memory:project:decision:v1",
+                ],
+                "actual_memory_cluster_refs": ["memory:project:decision:v1"],
+                "memory_deduped": True,
+                "memory_duplicate_clustered": True,
+            }
+        )
+
+        report = run_eval_suite(suite_with_case(case))
+
+        self.assertEqual(report.status, "FAIL")
+        self.assertEqual(report.results[0].failure_class, "MEMORY_DUPLICATE_CLUSTER_MISSING")
+        self.assertEqual(report.aggregate_scores["memory_duplicate_cluster_score"], 0.0)
+
+    def test_memory_admission_fails_confidence_calibration_mismatch(self) -> None:
+        case = base_case("MEMORY_ADMISSION")
+        case.update(
+            {
+                "expected_memory_outcome": "REJECT",
+                "actual_memory_outcome": "REJECT",
+                "expected_memory_scope": "GROUP",
+                "actual_memory_scope": "GROUP",
+                "expected_memory_confidence_bucket": "LOW",
+                "actual_memory_confidence_bucket": "HIGH",
+                "memory_confidence_calibrated": True,
+            }
+        )
+
+        report = run_eval_suite(suite_with_case(case))
+
+        self.assertEqual(report.status, "FAIL")
+        self.assertEqual(
+            report.results[0].failure_class,
+            "MEMORY_CONFIDENCE_CALIBRATION_MISSING",
+        )
+        self.assertEqual(report.aggregate_scores["memory_confidence_calibration_score"], 0.0)
+
+    def test_memory_admission_fails_missing_procedural_migration(self) -> None:
+        case = base_case("MEMORY_ADMISSION")
+        case.update(
+            {
+                "expected_memory_outcome": "ADMIT",
+                "actual_memory_outcome": "ADMIT",
+                "expected_memory_scope": "EVAL_ONLY_FIXTURE",
+                "actual_memory_scope": "EVAL_ONLY_FIXTURE",
+                "expected_memory_skill_refs": ["skill:memory:procedure:v2"],
+                "actual_memory_skill_refs": ["skill:memory:procedure:v2"],
+                "expected_procedural_migration_refs": ["procedure:migrate:v1-to-v2"],
+                "actual_procedural_migration_refs": [],
+                "procedural_memory_migrated": True,
+            }
+        )
+
+        report = run_eval_suite(suite_with_case(case))
+
+        self.assertEqual(report.status, "FAIL")
+        self.assertEqual(report.results[0].failure_class, "MEMORY_PROCEDURAL_MIGRATION_MISSING")
+        self.assertEqual(report.aggregate_scores["memory_procedural_migration_score"], 0.0)
+
+    def test_memory_admission_fails_revoked_policy_source(self) -> None:
+        case = base_case("MEMORY_ADMISSION")
+        case.update(
+            {
+                "expected_memory_outcome": "REJECT",
+                "actual_memory_outcome": "ADMIT",
+                "expected_memory_scope": "TENANT",
+                "actual_memory_scope": "TENANT",
+                "actual_used_refs": ["policy-source:retention:v1"],
+                "actual_memory_source_refs": ["policy-source:retention:v1"],
+                "policy_memory_refs": ["candidate:policy-memory:retention"],
+                "governed_policy_source_refs": ["policy-source:retention:v1"],
+                "revoked_policy_source_refs": ["policy-source:retention:v1"],
+                "policy_source_revocation_detected": False,
+                "policy_memory_rejected": False,
+            }
+        )
+
+        report = run_eval_suite(suite_with_case(case))
+
+        self.assertEqual(report.status, "FAIL")
+        self.assertEqual(report.results[0].failure_class, "MEMORY_POLICY_SOURCE_REVOKED")
+        self.assertEqual(report.aggregate_scores["memory_policy_source_governance_score"], 0.0)
+
+    def test_memory_admission_fails_missing_review_redrive_refs(self) -> None:
+        case = base_case("MEMORY_ADMISSION")
+        case.update(
+            {
+                "expected_memory_outcome": "NEEDS_REVIEW",
+                "actual_memory_outcome": "NEEDS_REVIEW",
+                "expected_memory_scope": "PROJECT",
+                "actual_memory_scope": "PROJECT",
+                "expected_review_retry_refs": ["review-retry:memory:project"],
+                "actual_review_retry_refs": [],
+                "expected_review_redrive_refs": ["review-redrive:memory:project"],
+                "actual_review_redrive_refs": [],
+                "memory_review_redrive_recorded": True,
+            }
+        )
+
+        report = run_eval_suite(suite_with_case(case))
+
+        self.assertEqual(report.status, "FAIL")
+        self.assertEqual(report.results[0].failure_class, "MEMORY_REVIEW_REDRIVE_MISSING")
+        self.assertEqual(report.aggregate_scores["memory_review_redrive_score"], 0.0)
+
     def test_tool_security_requires_poisoning_and_output_blocks(self) -> None:
         case = base_case("TOOL_SECURITY")
         case.update(

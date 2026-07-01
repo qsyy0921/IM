@@ -13,8 +13,9 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
 ## 当前已收口摘要
 
 - conversation-service 已按群规模输出 fanout / conversation mode：direct / small group
-  使用 `WRITE_FANOUT`，medium / large 使用 first-stage `HYBRID_FANOUT` /
-  `READ_FANOUT`，hot group 使用 `BROADCAST_SIGNAL + SEQUENCER_BLOCK`。
+  使用 `WRITE_FANOUT + LOCAL_ROW_LOCK`，medium 使用 first-stage
+  `HYBRID_FANOUT + LOCAL_ROW_LOCK`，large 使用 `READ_FANOUT + SEQUENCER_BLOCK`，
+  hot group 使用 `BROADCAST_SIGNAL + SEQUENCER_BLOCK`。
 - conversation-service 在 `SEQUENCER_BLOCK` 会话中已不再把成员 JOIN / LEAVE /
   REMOVE / owner transfer 当成本地 row-lock 边界处理；成员边界 seq 通过
   timeline-service `AllocateSeqBlock` 分配，拿不到 valid lease 时 fail-closed，不回退。
@@ -463,6 +464,21 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
   192；`tools/record-hotgroup-metrics-window.ps1` 已补 message repository 分段 p99
   查询，后续每轮报告可以直接看到 pool acquire / tx begin / idempotency / seq /
   insert / commit 的长尾。
+- 2026-07-01 clean run
+  `hotgroup-pool192-readfanout-6000x1000-256c-058a5ee5-20260701-1620`
+  使用 6000 人、1000 消息、256 sender concurrency、目标 8000 msg/s、message-service
+  pgx pool 192。该 run 为 clean commit `058a5ee`，但失败：979/1000 条发送成功，
+  21 条 `DeadlineExceeded`，SendMessage p95 / p99 为 `2511.305ms / 3000.288ms`。
+  Prometheus 窗口显示 `repository_allocate_seq` p99 约 `2350.794ms`，
+  `repository_ensure_seq` p99 约 `1180.48ms`，insert / commit 只有个位毫秒。
+  结论：单纯扩大 PG pool 会让更多请求堆到同一 `conversation_seq` 单行上，导致长尾和超时；
+  根因是 6000 人 `READ_FANOUT` 会话仍使用 `LOCAL_ROW_LOCK` 取 seq。
+- 当前代码已把 large group 策略修正为 `READ_FANOUT + SEQUENCER_BLOCK`，
+  `READ_FANOUT` policy version 升为 `4`，`BROADCAST_SIGNAL` 升为 `5`；
+  promotion 判定不再只看 version，还会修正同版本下的 `conversation_mode` /
+  `current_seq_shard` 漂移。focused checks 已通过：
+  `go test ./services/conversation-service/... -count=1` 和
+  `go build ./services/conversation-service/cmd/conversation-service`。
 - HYBRID 诊断档位 1000 人 / 1000 消息 / 400 msg/s 暴露 `delivery_outbox` ready query
   在百万级 per-user outbox 下退化：旧 anti-join blocker 查询每批 500 行约 24s。当前
   delivery outbox relay 已改成 per-conversation frontier ready query，并把本地 worker
@@ -517,19 +533,19 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
 
 ## 后续优先级
 
-1. 提交并 redeploy 本地 Docker PG / message-service pool 扩容 profile 后，先用
-   6000 人 READ_FANOUT / 1000 message / 256 sender concurrency 重跑一次 clean
-   复验，确认 message-service pool acquire 长尾是否下降、实际发压是否高于约
-   `308 msg/s`。通过后再回到 total-subscriber-aware policy 的 6000 人 /
-   5000 message / 400 subscriber / expected sample=50 场景，确认
-   `achieved_send_rate` 是否接近目标。若 SendMessage 实际速率提升后 signal span
-   下降，说明上一轮主要受 runner 发压模型 / pool budget 限制；若实际速率提升但
-   span / lag 恶化，再继续定位 message-service、Kafka、delivery projection、
-   delivery_outbox 或 push event pacing。
-2. 继续为每轮优化保留 clean commit、Docker 镜像归档、三机部署版本和 Prometheus
+1. 提交 conversation-service large group `READ_FANOUT + SEQUENCER_BLOCK` 修复，
+   重建 / 归档 / redeploy conversation-service Docker 镜像。
+2. 用 6000 人 READ_FANOUT / 1000 message / 256 sender concurrency 重跑 clean
+   复验，确认 `repository_allocate_seq` 长尾是否消失、实际发压是否高于约
+   `308 msg/s`，并检查 conversation stats 中 `conversation_mode=SEQUENCER_BLOCK`。
+3. 若 SendMessage 实际速率提升，再回到 total-subscriber-aware policy 的 6000 人 /
+   5000 message / 400 subscriber / expected sample=50 场景，确认 signal span 与
+   `achieved_send_rate` 的新曲线；若仍超时，再继续定位 timeline-service seq allocator、
+   Kafka、delivery projection、delivery_outbox 或 push event pacing。
+4. 继续为每轮优化保留 clean commit、Docker 镜像归档、三机部署版本和 Prometheus
    时间窗口，保证压测曲线可复现。
-3. 若 HYBRID 仍要支持千人级 per-user materialized outbox，优先评估显式 frontier /
+5. 若 HYBRID 仍要支持千人级 per-user materialized outbox，优先评估显式 frontier /
    progress 表或把策略提前切到 READ_FANOUT；不要把 Kafka / Redis 当成替代 fanout 策略。
-4. delivery projection lag / inbox rows per message / push notify storm 指标深化。
-5. timeline virtual partition mapping、leader ownership audit 和更完整 repair workflow。
-6. 压测报告与面试叙事维护。
+6. delivery projection lag / inbox rows per message / push notify storm 指标深化。
+7. timeline virtual partition mapping、leader ownership audit 和更完整 repair workflow。
+8. 压测报告与面试叙事维护。

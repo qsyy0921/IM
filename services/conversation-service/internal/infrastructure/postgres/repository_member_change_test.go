@@ -455,6 +455,107 @@ WHERE tenant_id = 'tenant-scale'
 	}
 }
 
+func TestRepositoryCreateMemberChangePromotesReadFanoutToSequencerIntegration(t *testing.T) {
+	dsn := os.Getenv("NEXUSIM_PG_DSN")
+	if dsn == "" {
+		t.Skip("NEXUSIM_PG_DSN is not set")
+	}
+	ctx := context.Background()
+	pool, err := pgxpool.New(ctx, dsn)
+	if err != nil {
+		t.Fatalf("open pg pool: %v", err)
+	}
+	defer pool.Close()
+
+	resetMemberChangeTables(t, ctx, pool)
+	_, err = pool.Exec(ctx, `
+INSERT INTO conversations (
+    tenant_id, conversation_id, conversation_type, status, conversation_mode,
+    fanout_mode, fanout_policy_version, member_version, permission_version, current_seq_shard
+) VALUES ('tenant-scale-read', 'conv-read-seq', 'GROUP', 'ACTIVE', 'LOCAL_ROW_LOCK', 'READ_FANOUT', 4, 9, 9, 'read');
+INSERT INTO conversation_members (
+    tenant_id, conversation_id, user_id, role, status, join_seq, member_version, permission_version
+)
+SELECT
+    'tenant-scale-read',
+    'conv-read-seq',
+    CASE WHEN seq = 1 THEN 'owner-read-seq' ELSE 'member-read-seq-' || seq::text END,
+    CASE WHEN seq = 1 THEN 'OWNER' ELSE 'MEMBER' END,
+    'ACTIVE',
+    seq,
+    9,
+    9
+FROM generate_series(1, 9) AS seq;
+`)
+	if err != nil {
+		t.Fatalf("seed read fanout promotion data: %v", err)
+	}
+
+	repository := NewRepository(
+		pool,
+		WithScaleThresholds(domain.ConversationScaleThresholds{
+			SmallGroupMaxActiveMembers:  4,
+			MediumGroupMaxActiveMembers: 8,
+			LargeGroupMaxActiveMembers:  12,
+		}),
+		WithIDGenerators(
+			func() (types.ChangeID, error) { return "change-read-seq-10", nil },
+			func() (types.EventID, error) { return "event-read-seq-10", nil },
+		),
+	)
+	_, err = repository.CreateMemberChange(ctx, types.CreateMemberChangeCommand{
+		AuthContext: types.AuthContext{
+			TenantID: "tenant-scale-read",
+			UserID:   "owner-read-seq",
+		},
+		ConversationID:        "conv-read-seq",
+		TargetUserID:          "member-read-seq-10",
+		ChangeType:            types.MemberChangeTypeJoin,
+		TargetRole:            types.MemberRoleMember,
+		ExpectedMemberVersion: 9,
+		IdempotencyKey:        "idem-read-seq-10",
+		ConflictPolicy:        types.MemberChangeConflictPolicyReject,
+		Reason:                "promote read fanout sequence owner",
+	})
+	if err != nil {
+		t.Fatalf("create member change: %v", err)
+	}
+
+	var conversationMode types.ConversationMode
+	var conversationFanout types.FanoutMode
+	var conversationPolicyVersion int64
+	var conversationShard string
+	if err := pool.QueryRow(ctx, `
+SELECT conversation_mode, fanout_mode, fanout_policy_version, current_seq_shard
+FROM conversations
+WHERE tenant_id = 'tenant-scale-read'
+  AND conversation_id = 'conv-read-seq'
+`).Scan(&conversationMode, &conversationFanout, &conversationPolicyVersion, &conversationShard); err != nil {
+		t.Fatalf("query promoted read conversation: %v", err)
+	}
+	if conversationMode != types.ConversationModeSequencerBlock ||
+		conversationFanout != types.FanoutModeReadFanout ||
+		conversationPolicyVersion != domain.FanoutPolicyVersionReadFanout ||
+		conversationShard != "timeline" {
+		t.Fatalf("unexpected promoted read policy: mode=%s fanout=%s version=%d shard=%s", conversationMode, conversationFanout, conversationPolicyVersion, conversationShard)
+	}
+
+	var timelineFanout types.FanoutMode
+	var timelinePolicyVersion int64
+	if err := pool.QueryRow(ctx, `
+SELECT fanout_mode, fanout_policy_version
+FROM conversation_timeline_events
+WHERE tenant_id = 'tenant-scale-read'
+  AND conversation_id = 'conv-read-seq'
+  AND event_id = 'event-read-seq-10'
+`).Scan(&timelineFanout, &timelinePolicyVersion); err != nil {
+		t.Fatalf("query read timeline event: %v", err)
+	}
+	if timelineFanout != types.FanoutModeReadFanout || timelinePolicyVersion != domain.FanoutPolicyVersionReadFanout {
+		t.Fatalf("unexpected read timeline policy: fanout=%s version=%d", timelineFanout, timelinePolicyVersion)
+	}
+}
+
 func TestRepositoryCreateMemberChangePromotesHotGroupPolicyWithThresholdsIntegration(t *testing.T) {
 	dsn := os.Getenv("NEXUSIM_PG_DSN")
 	if dsn == "" {
@@ -535,7 +636,7 @@ WHERE tenant_id = 'tenant-scale-hot'
 	}
 	if conversationMode != types.ConversationModeSequencerBlock ||
 		conversationFanout != types.FanoutModeBroadcastSignal ||
-		conversationPolicyVersion != 4 ||
+		conversationPolicyVersion != domain.FanoutPolicyVersionBroadcastSignal ||
 		conversationShard != "timeline" {
 		t.Fatalf("unexpected promoted hot policy: mode=%s fanout=%s version=%d shard=%s", conversationMode, conversationFanout, conversationPolicyVersion, conversationShard)
 	}
@@ -551,7 +652,7 @@ WHERE tenant_id = 'tenant-scale-hot'
 `).Scan(&timelineFanout, &timelinePolicyVersion); err != nil {
 		t.Fatalf("query hot timeline event: %v", err)
 	}
-	if timelineFanout != types.FanoutModeBroadcastSignal || timelinePolicyVersion != 4 {
+	if timelineFanout != types.FanoutModeBroadcastSignal || timelinePolicyVersion != domain.FanoutPolicyVersionBroadcastSignal {
 		t.Fatalf("unexpected hot timeline policy: fanout=%s version=%d", timelineFanout, timelinePolicyVersion)
 	}
 }
@@ -573,7 +674,7 @@ func TestRepositoryCreateMemberChangeUsesSequencerForHotGroupIntegration(t *test
 INSERT INTO conversations (
     tenant_id, conversation_id, conversation_type, status, conversation_mode,
     fanout_mode, fanout_policy_version, member_version, permission_version, current_seq_shard
-) VALUES ('tenant-seq-member', 'conv-seq-member', 'GROUP', 'ACTIVE', 'SEQUENCER_BLOCK', 'BROADCAST_SIGNAL', 4, 90, 90, 'timeline');
+) VALUES ('tenant-seq-member', 'conv-seq-member', 'GROUP', 'ACTIVE', 'SEQUENCER_BLOCK', 'BROADCAST_SIGNAL', 5, 90, 90, 'timeline');
 INSERT INTO conversation_members (
     tenant_id, conversation_id, user_id, role, status, join_seq, member_version, permission_version
 ) VALUES ('tenant-seq-member', 'conv-seq-member', 'owner-seq', 'OWNER', 'ACTIVE', 1, 90, 90);
@@ -583,7 +684,7 @@ INSERT INTO conversation_timeline_events (
     trace_id, payload_json, created_at
 ) VALUES (
     'tenant-seq-member', 'conv-seq-member', 90, 'event-existing-90', 'message.persisted.v1', 'v1', 'owner-seq',
-    'BROADCAST_SIGNAL', 4, 90, 'MESSAGE', 'message.persisted.v1',
+    'BROADCAST_SIGNAL', 5, 90, 'MESSAGE', 'message.persisted.v1',
     'trace-existing', '{}'::jsonb, now()
 );
 `)
@@ -668,7 +769,7 @@ func TestRepositoryCreateMemberChangeSequencerModeRequiresAllocatorIntegration(t
 INSERT INTO conversations (
     tenant_id, conversation_id, conversation_type, status, conversation_mode,
     fanout_mode, fanout_policy_version, member_version, permission_version, current_seq_shard
-) VALUES ('tenant-seq-missing', 'conv-seq-missing', 'GROUP', 'ACTIVE', 'SEQUENCER_BLOCK', 'BROADCAST_SIGNAL', 4, 12, 12, 'timeline');
+) VALUES ('tenant-seq-missing', 'conv-seq-missing', 'GROUP', 'ACTIVE', 'SEQUENCER_BLOCK', 'BROADCAST_SIGNAL', 5, 12, 12, 'timeline');
 INSERT INTO conversation_members (
     tenant_id, conversation_id, user_id, role, status, join_seq, member_version, permission_version
 ) VALUES ('tenant-seq-missing', 'conv-seq-missing', 'owner-seq', 'OWNER', 'ACTIVE', 1, 12, 12);

@@ -54,15 +54,15 @@ func TestResolveConversationScalePolicy(t *testing.T) {
 			wantShard:        "hybrid",
 		},
 		{
-			name:             "large group uses read fanout",
+			name:             "large group uses sequencer read fanout",
 			conversationType: types.ConversationTypeGroup,
 			members:          MediumGroupMaxActiveMembers + 1,
 			wantTier:         ConversationScaleTierLarge,
 			wantRuntime:      ConversationScaleRuntimeActive,
-			wantMode:         types.ConversationModeLocalRowLock,
+			wantMode:         types.ConversationModeSequencerBlock,
 			wantFanout:       types.FanoutModeReadFanout,
-			wantVersion:      3,
-			wantShard:        "read",
+			wantVersion:      FanoutPolicyVersionReadFanout,
+			wantShard:        "timeline",
 		},
 		{
 			name:             "hot group uses broadcast signal",
@@ -72,7 +72,7 @@ func TestResolveConversationScalePolicy(t *testing.T) {
 			wantRuntime:      ConversationScaleRuntimeActive,
 			wantMode:         types.ConversationModeSequencerBlock,
 			wantFanout:       types.FanoutModeBroadcastSignal,
-			wantVersion:      4,
+			wantVersion:      FanoutPolicyVersionBroadcastSignal,
 			wantShard:        "timeline",
 		},
 	}
@@ -108,7 +108,7 @@ func TestResolveConversationScalePolicyWithThresholds(t *testing.T) {
 		policy.Runtime != ConversationScaleRuntimeActive ||
 		policy.ConversationMode != types.ConversationModeSequencerBlock ||
 		policy.FanoutMode != types.FanoutModeBroadcastSignal ||
-		policy.FanoutPolicyVersion != 4 ||
+		policy.FanoutPolicyVersion != FanoutPolicyVersionBroadcastSignal ||
 		policy.CurrentSeqShard != "timeline" {
 		t.Fatalf("policy=%+v", policy)
 	}

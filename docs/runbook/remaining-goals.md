@@ -219,10 +219,12 @@
   batch publish、批量 mark published 和 ready query indexes；1000 人 / 4000 消息 /
   800 msg/s 档位 message outbox 可追平。后续补更完整发送链路生产观测；删除 / 撤回 /
   编辑深化、外部 proof workflow 后置。
-- `conversation-service`：群规模策略已进入 domain 层，medium / large 策略已转 active
-  first-stage；hot group 策略已与 message-service `SEQUENCER_BLOCK` seq block cache
-  active 写路径、conversation-service 成员边界 seq 分配和 timeline lease 绑定；后续继续补
-  control-plane rollout、群管理深化、历史窗口 / targeted replay repair。
+- `conversation-service`：群规模策略已进入 domain 层，medium 策略为
+  `HYBRID_FANOUT + LOCAL_ROW_LOCK`，large 策略已修正为
+  `READ_FANOUT + SEQUENCER_BLOCK`，hot group 策略为
+  `BROADCAST_SIGNAL + SEQUENCER_BLOCK`；promotion 已能修正同 version 下的
+  `conversation_mode` / `current_seq_shard` 漂移。后续继续补 control-plane rollout、
+  群管理深化、历史窗口 / targeted replay repair。
 - `timeline-service`：已进入本地运行链路的 seq-block allocator，具备 PostgreSQL
   sequence state / block lease / gap marker、`AllocateSeqBlock` gRPC API、Docker /
   Prometheus / Grafana 观测；message-service 已只在 valid block lease 下取号并支持本地

@@ -442,13 +442,28 @@ func applyConversationScalePolicyAfterMemberChange(
 	if resolvedPolicy.Runtime != domain.ConversationScaleRuntimeActive {
 		return domain.ConversationScalePolicy{}, types.NewSequencerUnavailable("conversation scale policy is not active")
 	}
-	if resolvedPolicy.FanoutPolicyVersion <= conversation.FanoutPolicyVersion {
+	if !shouldPromoteConversationScalePolicy(conversation, resolvedPolicy) {
 		return currentPolicy, nil
 	}
 	if err := promoteConversationScalePolicy(ctx, tx, conversation, resolvedPolicy); err != nil {
 		return domain.ConversationScalePolicy{}, err
 	}
 	return resolvedPolicy, nil
+}
+
+func shouldPromoteConversationScalePolicy(
+	conversation domain.Conversation,
+	resolvedPolicy domain.ConversationScalePolicy,
+) bool {
+	if resolvedPolicy.FanoutPolicyVersion > conversation.FanoutPolicyVersion {
+		return true
+	}
+	if resolvedPolicy.FanoutPolicyVersion < conversation.FanoutPolicyVersion {
+		return false
+	}
+	return resolvedPolicy.ConversationMode != conversation.ConversationMode ||
+		resolvedPolicy.FanoutMode != conversation.FanoutMode ||
+		resolvedPolicy.CurrentSeqShard != conversation.CurrentSeqShard
 }
 
 func countActiveConversationMembers(

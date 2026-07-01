@@ -21,9 +21,17 @@ const (
 const (
 	// Direct and small groups use the current durable write-fanout path.
 	SmallGroupMaxActiveMembers int64 = 500
-	// Medium groups use hybrid fanout; large groups use timeline pull.
+	// Medium groups use hybrid fanout; large groups use timeline pull with
+	// timeline-service-owned sequence allocation.
 	MediumGroupMaxActiveMembers int64 = 5000
-	LargeGroupMaxActiveMembers int64 = 50000
+	LargeGroupMaxActiveMembers  int64 = 50000
+)
+
+const (
+	FanoutPolicyVersionWriteFanout     int64 = 1
+	FanoutPolicyVersionHybridFanout    int64 = 2
+	FanoutPolicyVersionReadFanout      int64 = 4
+	FanoutPolicyVersionBroadcastSignal int64 = 5
 )
 
 type ConversationScaleThresholds struct {
@@ -76,7 +84,7 @@ func ResolveConversationScalePolicyWithThresholds(
 			ConversationScaleTierDirect,
 			types.ConversationModeLocalRowLock,
 			types.FanoutModeWriteFanout,
-			1,
+			FanoutPolicyVersionWriteFanout,
 			"local",
 		), nil
 	case types.ConversationTypeGroup:
@@ -116,7 +124,7 @@ func resolveGroupScalePolicy(activeMemberCount int64, thresholds ConversationSca
 			ConversationScaleTierSmall,
 			types.ConversationModeLocalRowLock,
 			types.FanoutModeWriteFanout,
-			1,
+			FanoutPolicyVersionWriteFanout,
 			"local",
 		)
 	case activeMemberCount <= thresholds.MediumGroupMaxActiveMembers:
@@ -124,23 +132,23 @@ func resolveGroupScalePolicy(activeMemberCount int64, thresholds ConversationSca
 			ConversationScaleTierMedium,
 			types.ConversationModeLocalRowLock,
 			types.FanoutModeHybridFanout,
-			2,
+			FanoutPolicyVersionHybridFanout,
 			"hybrid",
 		)
 	case activeMemberCount <= thresholds.LargeGroupMaxActiveMembers:
 		return activeConversationPolicy(
 			ConversationScaleTierLarge,
-			types.ConversationModeLocalRowLock,
+			types.ConversationModeSequencerBlock,
 			types.FanoutModeReadFanout,
-			3,
-			"read",
+			FanoutPolicyVersionReadFanout,
+			"timeline",
 		)
 	default:
 		return activeConversationPolicy(
 			ConversationScaleTierHot,
 			types.ConversationModeSequencerBlock,
 			types.FanoutModeBroadcastSignal,
-			4,
+			FanoutPolicyVersionBroadcastSignal,
 			"timeline",
 		)
 	}

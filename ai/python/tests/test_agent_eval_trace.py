@@ -247,6 +247,19 @@ class AgentEvalTraceTests(unittest.TestCase):
                     "actual_tool_prepare": "BLOCKED",
                     "expected_tool_provider_ref": "mcp-provider:trusted",
                     "actual_tool_provider_ref": "mcp-provider:trusted",
+                    "tool_argument_schema_refs": ["tool-args:trusted:invalid"],
+                    "tool_argument_schema_mismatch_detected": True,
+                    "tool_selection_attack_refs": ["tool-selection-attack:shadow-alias"],
+                    "tool_selection_attack_blocked": True,
+                    "expired_tool_prepare_refs": ["tool-prepare:trusted:expired"],
+                    "tool_prepare_expiry_detected": True,
+                    "tool_provider_candidate_refs": [
+                        "mcp-provider:trusted",
+                        "mcp-provider:shadow",
+                    ],
+                    "expected_tool_selected_provider_refs": ["mcp-provider:trusted"],
+                    "actual_tool_selected_provider_refs": ["mcp-provider:trusted"],
+                    "rejected_tool_provider_refs": ["mcp-provider:shadow"],
                     "malicious_tool_blocked": True,
                     "tool_description_poisoned": True,
                     "tool_description_blocked": True,
@@ -262,6 +275,19 @@ class AgentEvalTraceTests(unittest.TestCase):
         self.assertIsNotNone(trace.tool_intent)
         assert trace.tool_intent is not None
         self.assertEqual(trace.tool_intent.provider_ref, "mcp-provider:trusted")
+        self.assertEqual(trace.tool_intent.argument_schema_refs, ["tool-args:trusted:invalid"])
+        self.assertTrue(trace.tool_intent.argument_schema_mismatch_detected)
+        self.assertEqual(trace.tool_intent.selection_attack_refs, ["tool-selection-attack:shadow-alias"])
+        self.assertTrue(trace.tool_intent.selection_attack_blocked)
+        self.assertEqual(trace.tool_intent.expired_prepare_refs, ["tool-prepare:trusted:expired"])
+        self.assertTrue(trace.tool_intent.prepare_expiry_detected)
+        self.assertEqual(
+            trace.tool_intent.provider_candidate_refs,
+            ["mcp-provider:trusted", "mcp-provider:shadow"],
+        )
+        self.assertEqual(trace.tool_intent.expected_selected_provider_refs, ["mcp-provider:trusted"])
+        self.assertEqual(trace.tool_intent.actual_selected_provider_refs, ["mcp-provider:trusted"])
+        self.assertEqual(trace.tool_intent.rejected_provider_refs, ["mcp-provider:shadow"])
         self.assertTrue(trace.tool_intent.tool_description_blocked)
         self.assertTrue(trace.tool_intent.tool_output_contains_instruction)
 

@@ -104,6 +104,7 @@ ai/python/fixtures/agent_eval/synthetic_core_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_runtime_control_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_runtime_control_negative_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_mcp_security_scenarios.json
+ai/python/fixtures/agent_eval/synthetic_mcp_security_hardening_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_context_evidence_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_context_evidence_hardening_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_memory_admission_scenarios.json
@@ -136,6 +137,8 @@ ai/python/tests/test_agent_eval_*.py
   replay event incomplete。
 - MCP security fixture：poisoned tool description、unsafe output instruction、
   provider provenance mismatch、sandbox-only provider。
+- MCP security hardening fixture：tool argument schema mismatch、
+  tool-selection attack blocking、prepare expiry detection、多候选 provider selection。
 - ContextPackage / EvidencePack fixture：source coverage、conflict marker、
   stale evidence avoidance、permission abstain 和低敏 trace metadata。
 - ContextPackage / EvidencePack hardening fixture：memory-vs-current-source
@@ -154,9 +157,9 @@ ai/python/tests/test_agent_eval_*.py
 
 | 优先级 | 工作 | 输出 |
 | --- | --- | --- |
-| P1 | Tool / MCP security hardening | tool args schema、tool-selection attack、prepare expiry、多候选 provider selection |
-| P2 | Memory admission deeper hardening | multi-source duplicate clustering、confidence calibration、procedural memory migration、governed policy allowlist、review redrive |
+| P1 | Memory admission deeper hardening | multi-source duplicate clustering、confidence calibration、procedural memory migration、governed policy allowlist、review redrive |
 | P2 | ContextPackage / EvidencePack deeper hardening | source ranking、lane redrive、snippet-level citation repair、denied-lane、taint propagation |
+| P2 | Tool / MCP security deeper hardening | MCPSecBench / MCP-Bench adapter 对齐、capability lease matrix、provider attestation metadata |
 | P2 | Current-report deeper hardening | 多 suite report matrix、baseline refresh approval manifest、report retention metadata |
 | P2 | Runtime-control deeper hardening | checkpoint version drift、workflow wakeup race、replay bundle lineage completeness |
 | P2 | State-diff deeper hardening | state dependency graph、cross-action compensation chain、operator redrive review |
@@ -175,7 +178,7 @@ ai/python/tests/test_agent_eval_*.py
 - SDD index / research index / architecture index link check
 - 不触碰 proto、schema、migration、production service directory
 
-后续 fixture-only prototype 优先推进 Tool / MCP security hardening fixture gate。
+后续 fixture-only prototype 优先推进 Memory admission deeper hardening fixture gate。
 
 ## 历史资料路由
 

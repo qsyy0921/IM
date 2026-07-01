@@ -83,11 +83,11 @@ Agent / RAG / memory / Python AI Worker / EvidencePack / eval gate，不使用�
 
 ## 后续优先级
 
-1. 增加 Tool / MCP security hardening fixture，覆盖 tool argument schema mismatch、
-   tool-selection attack、prepare expiry 和多候选 provider selection。
-2. 增加 memory admission 深化 fixture，覆盖 multi-source duplicate clustering、
+1. 增加 memory admission 深化 fixture，覆盖 multi-source duplicate clustering、
    confidence calibration、procedural memory migration 和 governed policy allowlist。
-3. 增加 ContextPackage / EvidencePack 深化 fixture，覆盖 source ranking、
+2. 增加 ContextPackage / EvidencePack 深化 fixture，覆盖 source ranking、
    lane redrive、snippet-level citation repair 和 denied-lane cases。
+3. 对已落地 Tool / MCP security hardening 做更深层 MCPSecBench / MCP-Bench
+   adapter 对齐，但仍保持 fixture-only。
 4. 在上述实验通过后，再决定是否把 Agent Runtime / Harness 提升为 ADR、服务级 SDD
    或实际 runtime module。

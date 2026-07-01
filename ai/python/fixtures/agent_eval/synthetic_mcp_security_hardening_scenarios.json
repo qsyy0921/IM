@@ -1,0 +1,105 @@
+{
+  "schema_version": 1,
+  "suite_id": "synthetic-agent-mcp-security-hardening-v1",
+  "fixture_kind": "synthetic_im_like",
+  "adapter_versions": [
+    "manual-mcp-security-hardening-fixture-v1"
+  ],
+  "cases": [
+    {
+      "case_id": "mcp-tool-args-schema-mismatch-blocked",
+      "dataset_name": "synthetic-mcp-security-hardening",
+      "dataset_version": "2026-07-02",
+      "capability_family": "TOOL_SECURITY",
+      "fixture_version": "mcp-security-hardening-v1",
+      "input_refs": ["input:mcp-tool-args-schema-mismatch-blocked"],
+      "visible_evidence_refs": ["mcp:tool:schedule-summary:v1"],
+      "actual_used_refs": ["mcp:tool:schedule-summary:v1"],
+      "expected_tool_prepare": "REJECTED",
+      "actual_tool_prepare": "REJECTED",
+      "expected_tool_provider_ref": "mcp-provider:trusted-calendar",
+      "actual_tool_provider_ref": "mcp-provider:trusted-calendar",
+      "tool_argument_schema_refs": ["tool-args:schedule-summary:missing-room-id"],
+      "tool_argument_schema_mismatch_detected": true,
+      "malicious_tool_blocked": true,
+      "unsafe_output_quarantined": true
+    },
+    {
+      "case_id": "mcp-tool-selection-attack-blocked",
+      "dataset_name": "synthetic-mcp-security-hardening",
+      "dataset_version": "2026-07-02",
+      "capability_family": "TOOL_SECURITY",
+      "fixture_version": "mcp-security-hardening-v1",
+      "input_refs": ["input:mcp-tool-selection-attack-blocked"],
+      "visible_evidence_refs": ["mcp:tool:project-exporter:v1", "mcp:tool:shadow-exporter:v1"],
+      "actual_used_refs": ["mcp:tool:project-exporter:v1"],
+      "expected_tool_prepare": "BLOCKED",
+      "actual_tool_prepare": "BLOCKED",
+      "expected_tool_provider_ref": "mcp-provider:trusted-catalog",
+      "actual_tool_provider_ref": "mcp-provider:trusted-catalog",
+      "tool_provider_candidate_refs": [
+        "mcp-provider:trusted-catalog",
+        "mcp-provider:shadow-catalog"
+      ],
+      "expected_tool_selected_provider_refs": ["mcp-provider:trusted-catalog"],
+      "actual_tool_selected_provider_refs": ["mcp-provider:trusted-catalog"],
+      "rejected_tool_provider_refs": ["mcp-provider:shadow-catalog"],
+      "tool_selection_attack_refs": ["tool-selection-attack:shadow-exporter-alias"],
+      "tool_selection_attack_blocked": true,
+      "malicious_tool_blocked": true,
+      "unsafe_output_quarantined": true
+    },
+    {
+      "case_id": "mcp-prepare-expiry-detected",
+      "dataset_name": "synthetic-mcp-security-hardening",
+      "dataset_version": "2026-07-02",
+      "capability_family": "TOOL_SECURITY",
+      "fixture_version": "mcp-security-hardening-v1",
+      "input_refs": ["input:mcp-prepare-expiry-detected"],
+      "visible_evidence_refs": ["mcp:tool:task-updater:v1"],
+      "actual_used_refs": ["mcp:tool:task-updater:v1"],
+      "expected_tool_prepare": "EXPIRED",
+      "actual_tool_prepare": "EXPIRED",
+      "expected_tool_provider_ref": "mcp-provider:trusted-actions",
+      "actual_tool_provider_ref": "mcp-provider:trusted-actions",
+      "expired_tool_prepare_refs": ["tool-prepare:task-updater:expired-at-t-plus-30s"],
+      "tool_prepare_expiry_detected": true,
+      "malicious_tool_blocked": true,
+      "unsafe_output_quarantined": true
+    },
+    {
+      "case_id": "mcp-multi-provider-selection-pass",
+      "dataset_name": "synthetic-mcp-security-hardening",
+      "dataset_version": "2026-07-02",
+      "capability_family": "TOOL_SECURITY",
+      "fixture_version": "mcp-security-hardening-v1",
+      "input_refs": ["input:mcp-multi-provider-selection-pass"],
+      "visible_evidence_refs": [
+        "mcp:tool:read-only-summary:v1",
+        "mcp:tool:external-preview:v1",
+        "mcp:tool:shadow-preview:v1"
+      ],
+      "actual_used_refs": ["mcp:tool:read-only-summary:v1", "mcp:tool:external-preview:v1"],
+      "expected_tool_prepare": "ALLOWED",
+      "actual_tool_prepare": "ALLOWED",
+      "expected_tool_provider_ref": "mcp-provider:trusted-readonly",
+      "actual_tool_provider_ref": "mcp-provider:trusted-readonly",
+      "tool_provider_candidate_refs": [
+        "mcp-provider:trusted-readonly",
+        "mcp-provider:sandbox-external",
+        "mcp-provider:shadow-preview"
+      ],
+      "expected_tool_selected_provider_refs": [
+        "mcp-provider:trusted-readonly",
+        "mcp-provider:sandbox-external"
+      ],
+      "actual_tool_selected_provider_refs": [
+        "mcp-provider:trusted-readonly",
+        "mcp-provider:sandbox-external"
+      ],
+      "rejected_tool_provider_refs": ["mcp-provider:shadow-preview"],
+      "malicious_tool_blocked": true,
+      "unsafe_output_quarantined": true
+    }
+  ]
+}

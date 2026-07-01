@@ -102,6 +102,19 @@ class AgentEvalContractTests(unittest.TestCase):
                 "actual_tool_prepare": "BLOCKED",
                 "expected_tool_provider_ref": "mcp-provider:trusted",
                 "actual_tool_provider_ref": "mcp-provider:trusted",
+                "tool_argument_schema_refs": ["tool-args:trusted:invalid"],
+                "tool_argument_schema_mismatch_detected": True,
+                "tool_selection_attack_refs": ["tool-selection-attack:shadow-alias"],
+                "tool_selection_attack_blocked": True,
+                "expired_tool_prepare_refs": ["tool-prepare:trusted:expired"],
+                "tool_prepare_expiry_detected": True,
+                "tool_provider_candidate_refs": [
+                    "mcp-provider:trusted",
+                    "mcp-provider:shadow",
+                ],
+                "expected_tool_selected_provider_refs": ["mcp-provider:trusted"],
+                "actual_tool_selected_provider_refs": ["mcp-provider:trusted"],
+                "rejected_tool_provider_refs": ["mcp-provider:shadow"],
                 "malicious_tool_blocked": True,
                 "tool_description_poisoned": True,
                 "tool_description_blocked": True,
@@ -113,6 +126,16 @@ class AgentEvalContractTests(unittest.TestCase):
         cases = validate_eval_suite(payload)
 
         self.assertEqual(cases[0].expected_tool_provider_ref, "mcp-provider:trusted")
+        self.assertEqual(cases[0].tool_argument_schema_refs, ["tool-args:trusted:invalid"])
+        self.assertTrue(cases[0].tool_argument_schema_mismatch_detected)
+        self.assertEqual(cases[0].tool_selection_attack_refs, ["tool-selection-attack:shadow-alias"])
+        self.assertTrue(cases[0].tool_selection_attack_blocked)
+        self.assertEqual(cases[0].expired_tool_prepare_refs, ["tool-prepare:trusted:expired"])
+        self.assertTrue(cases[0].tool_prepare_expiry_detected)
+        self.assertEqual(cases[0].tool_provider_candidate_refs, ["mcp-provider:trusted", "mcp-provider:shadow"])
+        self.assertEqual(cases[0].expected_tool_selected_provider_refs, ["mcp-provider:trusted"])
+        self.assertEqual(cases[0].actual_tool_selected_provider_refs, ["mcp-provider:trusted"])
+        self.assertEqual(cases[0].rejected_tool_provider_refs, ["mcp-provider:shadow"])
         self.assertTrue(cases[0].tool_description_poisoned)
         self.assertTrue(cases[0].tool_output_contains_instruction)
 

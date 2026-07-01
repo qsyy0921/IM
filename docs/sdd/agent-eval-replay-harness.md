@@ -171,6 +171,10 @@ Fixtures must be clearly synthetic and must not import production data.
 | `permission_leakage` | Forbidden refs used or surfaced |
 | `tool_selection_score` | Correct tool chosen under allowlist |
 | `tool_argument_score` | Args pass schema and policy |
+| `tool_argument_schema_score` | Schema mismatch is detected before execution |
+| `tool_prepare_expiry_score` | Expired prepare refs are rejected before execution |
+| `tool_selection_attack_score` | Tool-selection attack attempts are blocked |
+| `mcp_provider_selection_score` | Selected providers match candidate policy |
 | `state_diff_score` | Final synthetic state matches expected diff |
 | `memory_precision` | Admitted candidates are valid |
 | `memory_scope_score` | Memory stays in allowed scope |
@@ -201,8 +205,12 @@ The harness should normalize:
 - `RETRIEVAL_LANE_GAP_MISSING`
 - `TOOL_NOT_ALLOWED`
 - `TOOL_ARGS_INVALID`
+- `TOOL_SELECTION_ATTACK`
+- `TOOL_PREPARE_EXPIRED`
 - `TOOL_POISONING_DETECTED`
 - `UNSAFE_TOOL_OUTPUT`
+- `MCP_PROVENANCE_MISMATCH`
+- `MCP_PROVIDER_SELECTION_MISMATCH`
 - `PROVIDER_TIMEOUT`
 - `APPROVAL_REQUIRED`
 - `APPROVAL_REJECTED`
@@ -369,6 +377,7 @@ ai/python/fixtures/agent_eval/synthetic_core_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_runtime_control_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_runtime_control_negative_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_mcp_security_scenarios.json
+ai/python/fixtures/agent_eval/synthetic_mcp_security_hardening_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_context_evidence_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_context_evidence_hardening_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_memory_admission_scenarios.json
@@ -421,6 +430,9 @@ Implemented checks:
   cancel propagation and incomplete replay event detection.
 - MCP security fixture coverage for poisoned tool descriptions, unsafe MCP
   output instructions, provider provenance mismatch and sandbox-only providers.
+- MCP security hardening coverage for tool argument schema mismatch,
+  tool-selection attack blocking, prepare expiry detection and multi-candidate
+  provider selection.
 - ContextPackage / EvidencePack fixture coverage for source coverage, conflict
   marker detection, stale evidence avoidance and permission abstain.
 - ContextPackage / EvidencePack hardening coverage for memory-vs-current-source
@@ -447,6 +459,7 @@ python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_runtime_control_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_runtime_control_negative_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_mcp_security_scenarios.json
+python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_mcp_security_hardening_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_context_evidence_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_context_evidence_hardening_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_memory_admission_scenarios.json

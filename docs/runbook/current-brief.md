@@ -82,6 +82,8 @@ Agent Gateway / UX
   from checkpoint、replay without side-effect reexecution。
 - 已补 fixture-only MCP security coverage：poisoned tool description、unsafe MCP
   output instruction、provider provenance mismatch、sandbox-only provider。
+- 已补 fixture-only MCP security hardening：tool argument schema mismatch、
+  tool-selection attack blocking、prepare expiry detection、多候选 provider selection。
 - 已补 fixture-only ContextPackage / EvidencePack coverage：source coverage、
   conflict marker、stale evidence avoidance、permission abstain。
 - 已补 fixture-only ContextPackage / EvidencePack hardening：memory-vs-current-source
@@ -102,7 +104,8 @@ Agent Gateway / UX
   cancel propagation incomplete、replay event incomplete。
 - 已补 current EvalReport generation / baseline refresh review CLI，生成当前报告和
   baseline refresh review artifact，默认不覆盖 baseline。
-- 下一段优先做 Tool / MCP security hardening 等离线能力。
+- 下一段优先做 memory admission deeper hardening，其次做 ContextPackage /
+  EvidencePack deeper hardening。
 
 ## 工作规则
 

@@ -113,6 +113,7 @@ NexusIM Agent 层的开发顺序不是先接真实聊天数据，也不是先写
 - fixture-only cancel / resume / replay runtime-control skeleton。
 - fixture-only runtime-control negative skeleton。
 - fixture-only MCP security skeleton。
+- fixture-only MCP security hardening skeleton。
 - fixture-only ContextPackage / EvidencePack skeleton。
 - fixture-only ContextPackage / EvidencePack hardening skeleton。
 - fixture-only richer MemoryCandidate / memory admission skeleton。

@@ -48,9 +48,12 @@ ALLOWED_FAILURE_CLASSES = {
     "RETRIEVAL_LANE_GAP_MISSING",
     "TOOL_NOT_ALLOWED",
     "TOOL_ARGS_INVALID",
+    "TOOL_SELECTION_ATTACK",
+    "TOOL_PREPARE_EXPIRED",
     "TOOL_POISONING_DETECTED",
     "UNSAFE_TOOL_OUTPUT",
     "MCP_PROVENANCE_MISMATCH",
+    "MCP_PROVIDER_SELECTION_MISMATCH",
     "PROVIDER_TIMEOUT",
     "APPROVAL_REQUIRED",
     "APPROVAL_REJECTED",
@@ -157,6 +160,13 @@ class EvalCase:
     actual_tool_prepare: str = ""
     expected_tool_provider_ref: str = ""
     actual_tool_provider_ref: str = ""
+    tool_argument_schema_refs: list[str] = field(default_factory=list)
+    tool_selection_attack_refs: list[str] = field(default_factory=list)
+    expired_tool_prepare_refs: list[str] = field(default_factory=list)
+    tool_provider_candidate_refs: list[str] = field(default_factory=list)
+    expected_tool_selected_provider_refs: list[str] = field(default_factory=list)
+    actual_tool_selected_provider_refs: list[str] = field(default_factory=list)
+    rejected_tool_provider_refs: list[str] = field(default_factory=list)
     expected_state_diff: dict[str, str] = field(default_factory=dict)
     actual_state_diff: dict[str, str] = field(default_factory=dict)
     expected_state_precondition_refs: list[str] = field(default_factory=list)
@@ -213,6 +223,9 @@ class EvalCase:
     tool_description_blocked: bool = False
     tool_output_contains_instruction: bool = False
     unsafe_output_quarantined: bool = False
+    tool_argument_schema_mismatch_detected: bool = False
+    tool_selection_attack_blocked: bool = False
+    tool_prepare_expiry_detected: bool = False
     revoked_memory_used: bool = False
     side_effect_reexecuted: bool = False
 
@@ -447,6 +460,29 @@ def _eval_case(payload: dict[str, Any], index: int) -> EvalCase:
         actual_tool_prepare=_string(payload.get("actual_tool_prepare", "")).upper(),
         expected_tool_provider_ref=_string(payload.get("expected_tool_provider_ref", "")),
         actual_tool_provider_ref=_string(payload.get("actual_tool_provider_ref", "")),
+        tool_argument_schema_refs=_string_list(
+            payload.get("tool_argument_schema_refs", []), "tool_argument_schema_refs"
+        ),
+        tool_selection_attack_refs=_string_list(
+            payload.get("tool_selection_attack_refs", []), "tool_selection_attack_refs"
+        ),
+        expired_tool_prepare_refs=_string_list(
+            payload.get("expired_tool_prepare_refs", []), "expired_tool_prepare_refs"
+        ),
+        tool_provider_candidate_refs=_string_list(
+            payload.get("tool_provider_candidate_refs", []), "tool_provider_candidate_refs"
+        ),
+        expected_tool_selected_provider_refs=_string_list(
+            payload.get("expected_tool_selected_provider_refs", []),
+            "expected_tool_selected_provider_refs",
+        ),
+        actual_tool_selected_provider_refs=_string_list(
+            payload.get("actual_tool_selected_provider_refs", []),
+            "actual_tool_selected_provider_refs",
+        ),
+        rejected_tool_provider_refs=_string_list(
+            payload.get("rejected_tool_provider_refs", []), "rejected_tool_provider_refs"
+        ),
         expected_state_diff=_string_map(
             payload.get("expected_state_diff", {}), "expected_state_diff"
         ),
@@ -610,6 +646,18 @@ def _eval_case(payload: dict[str, Any], index: int) -> EvalCase:
         ),
         unsafe_output_quarantined=_bool(
             payload.get("unsafe_output_quarantined", False), "unsafe_output_quarantined"
+        ),
+        tool_argument_schema_mismatch_detected=_bool(
+            payload.get("tool_argument_schema_mismatch_detected", False),
+            "tool_argument_schema_mismatch_detected",
+        ),
+        tool_selection_attack_blocked=_bool(
+            payload.get("tool_selection_attack_blocked", False),
+            "tool_selection_attack_blocked",
+        ),
+        tool_prepare_expiry_detected=_bool(
+            payload.get("tool_prepare_expiry_detected", False),
+            "tool_prepare_expiry_detected",
         ),
         revoked_memory_used=_bool(payload.get("revoked_memory_used", False), "revoked_memory_used"),
         side_effect_reexecuted=_bool(

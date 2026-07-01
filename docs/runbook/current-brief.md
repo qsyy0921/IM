@@ -305,7 +305,7 @@ brief、loadtest report、development-progress 或 archive。
   345.723 提升到约 682.034 signals/s，约 1.97x。message / delivery outbox、
   writer / Redis subscriber error、queue-full 和 eviction 均为 0。该结果证明重复
   route lookup 曾是 subscriber-aware 策略的重要成本，但仍未回到 fanout-mode policy
-  baseline 的约 1.4k signals/s。当前已补 delivery-consumer debug endpoint 和
-  Prometheus core scrape target 配置；下一步先 redeploy / 复压确认 route cache
-  hit / miss 可见，随后转向消息速率 / 在线人数感知 dynamic cadence、持久
+  baseline 的约 1.4k signals/s。clean commit `b119716d` 已补 delivery-consumer
+  debug endpoint 和 Prometheus core scrape target 配置，并已在 Ubuntu redeploy
+  验证 target `up`；下一步先复压确认 route cache hit / miss 可见，随后转向消息速率 / 在线人数感知 dynamic cadence、持久
   per-conversation / per-bucket worker，或更强 pull-first 策略。

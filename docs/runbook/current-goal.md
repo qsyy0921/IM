@@ -351,8 +351,10 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
   delivery notify write p95 / p99 约 `0.241ms / 0.433ms`。注意：该窗口中
   Prometheus 只 scrape 4 个 ws debug target，delivery-consumer 尚未进入 debug
   scrape，因此 route cache hit / miss 为 0；这是观测缺口，不代表 cache 未生效。
-  当前仓库已补 delivery-consumer debug endpoint / Prometheus core target 配置，
-  下一步需 clean commit Docker redeploy 后复压确认命中率曲线。
+  clean commit `b119716d` 已补 delivery-consumer debug endpoint / Prometheus
+  core target 配置，并已在 Ubuntu redeploy：`11944` endpoint 可返回
+  `conversation_route_cache_hit / miss / invalidated` 指标，Prometheus target
+  `nexusim-push-gateway-delivery-consumer` 为 `up`。下一步需复压确认命中率曲线。
 - HYBRID 诊断档位 1000 人 / 1000 消息 / 400 msg/s 暴露 `delivery_outbox` ready query
   在百万级 per-user outbox 下退化：旧 anti-join blocker 查询每批 500 行约 24s。当前
   delivery outbox relay 已改成 per-conversation frontier ready query，并把本地 worker
@@ -379,9 +381,9 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
 - Redis conversation route cache 代码、配置、指标和 hotgroup metrics-window 查询已完成
   clean commit 镜像重建 / 归档 / redeploy / 可比复压。该模块在 subscriber-aware
   threshold 场景下把 signal drain rate 提升约 1.97x，但仍未回到 fanout-mode
-  policy baseline 的约 1.4k signals/s。当前已补 delivery-consumer debug endpoint
-  和 Prometheus core scrape target 配置；仍需 redeploy / 复压来取得 cache hit /
-  miss 证据。
+  policy baseline 的约 1.4k signals/s。clean commit `b119716d` 已补
+  delivery-consumer debug endpoint 和 Prometheus core scrape target 配置，并已
+  redeploy 验证 target `up`；仍需复压取得 cache hit / miss 曲线证据。
 - 文档同步本轮公开能力或瓶颈变化。
 - 提交并推送到 GitHub。
 
@@ -397,8 +399,8 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
 
 1. subscriber-aware threshold + Redis conversation route cache 已完成 clean Docker
    复压，证明重复 route lookup 曾是该策略的明显成本来源，但 route cache 后仍未突破
-   fanout-mode policy baseline。当前已补 delivery-consumer debug/metrics scrape
-   配置；下一步先 redeploy / 复压验证 route cache hit / miss 可见，再转向消息速率 /
+   fanout-mode policy baseline。当前已补并 redeploy delivery-consumer
+   debug/metrics scrape 配置；下一步先复压验证 route cache hit / miss 可见，再转向消息速率 /
    在线人数感知的 dynamic cadence、持久 per-conversation / per-bucket fanout worker，
    或更强 pull-first 策略。
 2. 继续为每轮优化保留 clean commit、Docker 镜像归档、三机部署版本和 Prometheus

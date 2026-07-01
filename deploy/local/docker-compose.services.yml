@@ -15,6 +15,7 @@ services:
       NEXUSIM_TIMELINE_SERVICE_ADDR: timeline-service-seq-block-allocator:10780
       NEXUSIM_TIMELINE_RPC_TIMEOUT: 500ms
       NEXUSIM_PG_DSN: postgres://nexusim:nexusim@postgres:5432/nexusim?sslmode=disable
+      NEXUSIM_CONVERSATION_PG_MAX_CONNS: ${NEXUSIM_CONVERSATION_PG_MAX_CONNS:-32}
     ports:
       - "10496:10496"
       - "11911:11911"
@@ -31,6 +32,7 @@ services:
       NEXUSIM_TIMELINE_GRPC_ADDR: 172.30.80.40:10780
       NEXUSIM_TIMELINE_DEBUG_ADDR: 172.30.80.40:11937
       NEXUSIM_PG_DSN: postgres://nexusim:nexusim@postgres:5432/nexusim?sslmode=disable
+      NEXUSIM_TIMELINE_PG_MAX_CONNS: ${NEXUSIM_TIMELINE_PG_MAX_CONNS:-16}
     ports:
       - "10780:10780"
       - "11937:11937"
@@ -55,6 +57,7 @@ services:
       NEXUSIM_GRPC_ADDR: 172.30.80.12:10495
       NEXUSIM_MESSAGE_DEBUG_ADDR: 172.30.80.12:11910
       NEXUSIM_PG_DSN: postgres://nexusim:nexusim@postgres:5432/nexusim?sslmode=disable
+      NEXUSIM_PG_MAX_CONNS: ${NEXUSIM_MESSAGE_PG_MAX_CONNS:-64}
       NEXUSIM_KAFKA_BROKERS: kafka:29092
       NEXUSIM_CONVERSATION_SERVICE_ADDR: conversation-service-grpc:10496
       NEXUSIM_CONVERSATION_RPC_TIMEOUT: 500ms
@@ -80,6 +83,7 @@ services:
       NEXUSIM_DELIVERY_GRPC_ADDR: 172.30.80.13:10497
       NEXUSIM_DELIVERY_DEBUG_ADDR: 172.30.80.13:11912
       NEXUSIM_PG_DSN: postgres://nexusim:nexusim@postgres:5432/nexusim?sslmode=disable
+      NEXUSIM_DELIVERY_PG_MAX_CONNS: ${NEXUSIM_DELIVERY_GRPC_PG_MAX_CONNS:-16}
       NEXUSIM_KAFKA_BROKERS: kafka:29092
     ports:
       - "10497:10497"
@@ -154,6 +158,7 @@ services:
       NEXUSIM_POLICY_GRPC_ADDR: 172.30.80.17:10800
       NEXUSIM_POLICY_DEBUG_ADDR: 172.30.80.17:11916
       NEXUSIM_PG_DSN: postgres://nexusim:nexusim@postgres:5432/nexusim?sslmode=disable
+      NEXUSIM_POLICY_PG_MAX_CONNS: ${NEXUSIM_POLICY_PG_MAX_CONNS:-32}
       NEXUSIM_KAFKA_BROKERS: kafka:29092
       NEXUSIM_POLICY_RULES_ENABLED: "true"
     ports:

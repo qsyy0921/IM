@@ -420,6 +420,28 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
   target rate 调度 job、多 worker 并发调用 `SendMessage`。summary、报告和
   hotgroup 分析脚本已记录 `send_concurrency`、`send_duration_seconds` 和
   `achieved_send_rate`，用于区分“目标 QPS”和“实际发压 QPS”。
+- 2026-07-01 并发 sender 首轮复压暴露本地 Docker runtime profile 的 PostgreSQL
+  连接预算问题：200 人 / 500 消息 / 64 sender concurrency 档位只成功 54 条，
+  PostgreSQL 日志出现大量 `FATAL: sorry, too many clients already`。当时
+  `max_connections=100`，policy-service 和 conversation-service 分别可空闲占用
+  50+ / 30+ 连接，导致并发发压还未进入真实 message / Kafka / delivery 瓶颈就被
+  连接耗尽截断。当前已调整本地 Docker profile：PostgreSQL 默认
+  `NEXUSIM_POSTGRES_MAX_CONNECTIONS=300`，conversation / message / delivery /
+  timeline / policy 和 message / delivery worker 均设置显式 pgx pool cap。下一步
+  需要 redeploy 后用相同并发 sender 档位复验，确认瓶颈是否从“PG 连接耗尽”迁移到
+  message-service、Kafka、delivery projection / outbox 或 push event pacing。
+- 2026-07-01 已完成 PG pool cap 诊断复压：
+  `hotgroup-pgpoolcap-200x500-diagnose-20260701-1510`。该 run 使用 dirty workspace
+  验证 runtime profile，不作为正式容量结论；200 人 / 500 消息 / 64 sender
+  concurrency / 目标 1000 msg/s 全部 SendMessage 成功，message / delivery outbox
+  pending 均为 0，PostgreSQL 日志未再出现 `too many clients already`。实际发送耗时
+  约 2.296s，achieved rate 约 `217.762 msg/s`，但 SendMessage p95 / p99 为
+  `743.89ms / 1024.314ms`。离线分析报告
+  `docs/runbook/loadtest/hotgroup/hotgroup-analysis-20260701-pgpoolcap-diagnose.md`
+  将当前瓶颈从连接耗尽更新为 `send-path-latency`；下一步需要 clean commit 后
+  采集 Prometheus / debug metrics 时间窗口，定位 message-service、conversation /
+  policy RPC、timeline seq block cache、PostgreSQL 写入或 admission/backpressure
+  哪一段导致高延迟。
 - HYBRID 诊断档位 1000 人 / 1000 消息 / 400 msg/s 暴露 `delivery_outbox` ready query
   在百万级 per-user outbox 下退化：旧 anti-join blocker 查询每批 500 行约 24s。当前
   delivery outbox relay 已改成 per-conversation frontier ready query，并把本地 worker
@@ -474,9 +496,11 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
 
 ## 后续优先级
 
-1. 用新增的 concurrent sender runner 做 clean commit 复压：保持
+1. 将 PG 连接预算修正提交为 clean commit 后，先用 200 人 / 500 message /
+   64 sender concurrency 重跑一次带 Prometheus / debug metrics 时间窗口的 clean
+   复验，确认 `send-path-latency` 的具体来源。通过后再回到
    total-subscriber-aware policy 的 6000 人 / 5000 message / 400 subscriber /
-   expected sample=50 场景，先确认 `achieved_send_rate` 是否接近目标；若
+   expected sample=50 场景，确认 `achieved_send_rate` 是否接近目标。若
    SendMessage 实际速率提升后 signal span 下降，说明上一轮主要受 runner 发压模型限制；
    若实际速率提升但 span / lag 恶化，再继续定位 message-service、Kafka、
    delivery projection、delivery_outbox 或 push event pacing。

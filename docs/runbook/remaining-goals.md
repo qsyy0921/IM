@@ -111,9 +111,20 @@
    （约 `66.741 msg/s`，远低于 target `8000 msg/s`）。已定位旧 runner 是
    单 goroutine 同步发送，现已新增 `--send-concurrency`，默认等于 `sender-count`，
    并把 `achieved_send_rate` 纳入分析脚本。剩余任务：用 clean commit 和新 runner
-   重跑同一 total-subscriber 场景，确认 actual send rate 是否提升；若提升后仍无容量改善，
-   再分析 delivery_outbox signal production cadence、Kafka publish / consume cadence
-   和 push event pacing。在取得复压证据前不要继续只提高 sample 阈值，也不要把
+   重跑同一 total-subscriber 场景，确认 actual send rate 是否提升。并发 sender 首轮
+   诊断已经暴露本地 Docker profile 的 PostgreSQL 连接预算不足：`max_connections=100`
+   且核心服务 pgx pool 未显式限额，会在 64 concurrency 下触发
+   `too many clients already`，需要先 redeploy 已修正的 Postgres max_connections
+   和核心服务 PG pool cap，再复验。dirty diagnostic
+   `hotgroup-pgpoolcap-200x500-diagnose-20260701-1510` 已证明连接耗尽解除：
+   500/500 SendMessage 成功、outbox pending 归零、PostgreSQL 日志无新的
+   `too many clients already`；但 SendMessage p95 / p99 为
+   `743.89ms / 1024.314ms`，当前瓶颈转为 `send-path-latency`。剩余任务是用
+   clean commit + Prometheus / debug metrics 时间窗口定位 message-service、
+   conversation / policy RPC、timeline seq block cache、PostgreSQL 写入或
+   admission/backpressure 的具体耗时来源。若连接耗尽解除后仍无容量改善，再分析
+   delivery_outbox signal production cadence、Kafka publish / consume cadence 和
+   push event pacing。在取得复压证据前不要继续只提高 sample 阈值，也不要把
    target rate 当作真实 QPS。
 2. Agent action boundary / repair cases：在 provider replay admin / workflow handoff 已落
    的基础上，继续扩更多需要 proposal / approval / workflow / audit 的 action 与 repair 场景。

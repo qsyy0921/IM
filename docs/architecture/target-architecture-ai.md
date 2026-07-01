@@ -1,6 +1,6 @@
 # NexusIM AI / Memory / Agent Target Architecture
 
-本文规划 NexusIM 后续 AI 相关后端能力。它不是一次性全开工清单；短期不以生产级 HA、全量压测、混沌和跨 Region 验证作为继续推进的阻塞。当前 9 个 IM 后端服务已作为可运行基础，AI 大模型应用底座已进入 collaborative-memory 算法/eval 切片。本文用于保证后续 search、memory、retrieval、RAG、summary、Agent、tool 和 eval 能力不会各自长成孤岛。
+本文规划 NexusIM 后续 AI 相关后端能力。它不是一次性全开工清单；短期不以生产级 HA、全量压测、混沌和跨 Region 验证作为继续推进的阻塞。当前 Agent Lab 的详细设计入口是 `docs/sdd/agent-platform.md`；第一阶段不接真实 IM 数据，而是先用公开数据集和 synthetic IM-like fixture 验证 Agent / RAG / memory / tool / workflow / eval 能力。本文用于保证后续 search、memory、retrieval、RAG、summary、Agent、tool 和 eval 能力不会各自长成孤岛。
 
 ## 1. 设计输入
 

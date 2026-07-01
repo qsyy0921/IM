@@ -1,335 +1,191 @@
-# NexusIM Development Process
+# NexusIM Agent Lab Development Process
 
-这份文档回答的是：
-
-```text
-这个系统应该按什么顺序开发，
-每个阶段的目标是什么，
-什么时候可以进入下一阶段。
-```
-
-它不是详细设计，也不是当前状态快照。
-
-- 当前状态看 `development-progress.md`
-- 每轮入口看 `current-brief.md`
-- 长期摘要看 `current-goal.md`
+这份文档回答 Agent Lab 应该按什么过程开发。它不再描述完整 IM 后端的阶段路线；当前
+workspace 的目标是重新设计并验证 Agent 层。
 
 ## 0. 总原则
 
-NexusIM 的开发顺序不是“先把所有功能铺开”，而是：
+NexusIM Agent 层的开发顺序不是先接真实聊天数据，也不是先写生产 runtime。当前推荐路线是：
 
 ```text
-先把主链路做对
--> 把 9 个核心服务做成 AI-ready 底座
--> 建 search / memory / retrieval / EvidencePack
--> 建 RAG / summary / Agent / skill-registry / mcp-gateway / action-executor / Python AI Worker
--> 进入 collaborative-memory 算法/eval
--> 建 client platform MVP foundation，让 Web / PC / Android 复用协议和同步核心
--> 按完整目标架构继续补业务平台、数据平台、AI / Agent 平台和中间件平台
--> 分布式可靠性和生产级完整测试按风险持续补强
+广泛研究
+-> 平台级 SDD
+-> open dataset eval harness
+-> synthetic IM-like fixture
+-> fixture-only AgentRun trace prototype
+-> ADR / service SDD promotion
+-> 最小生产切片
 ```
 
 核心原则：
 
-1. 不为了“微服务数量”而拆服务。
-2. 不为了“架构好看”提前抽象。
-3. 不在基础链路没收稳前同时铺太多新服务。
-4. 功能能跑不等于阶段完成，必须有 smoke / audit / repair / hardening 证据。
-5. 代码复杂度要持续治理，不能把单个核心文件继续堆成大文件。
-6. 当前工程主线以 `current-goal.md` 为准；面试叙述仍优先强调后端、分布式可靠性和 AI 应用后端，客户端作为产品化展示层按需讲。
-7. 短期转进客户端、AI 大模型应用或产品平台服务不以生产级完整系统测试或生产级 HA 为阻塞，但当前切片仍必须有本地检查、最小 smoke 或等价证据。
-8. 可以使用 multi sub-agent 并行开发，但只能拆分互不重叠的服务、文档或测试面；主 agent 负责集成、最终验证和关闭 stale agents。
-9. 长期完整架构以 `docs/architecture/target-architecture-complete.md` 为准；新增服务、中间件和客户端能力必须按该文档的边界和 ADR / SDD 规则演进。
+1. 先证明 Agent 能力边界，再接真实 IM 数据。
+2. 先用公开数据集和 synthetic fixture 建 eval gate，再决定 proto / schema / runtime。
+3. Memory、RAG、tool、workflow、approval、executor、audit 和 replay 必须一起设计。
+4. Agent 不能直接写业务事实，不能绕过 policy / approval / action-executor / audit。
+5. Python AI Worker 只做候选，不拥有最终状态。
+6. MCP provider、tool description、tool output 和 peer-agent response 都是不可信输入。
+7. Workflow-service 拥有长等待和审批状态；Agent Runtime 只拥有认知运行状态。
+8. 每个可发布 AgentDefinition / SkillPackage 后续都必须有 eval gate 和 rollback path。
 
-## 1. 第一阶段：最小 IM 主链路
-
-目标：
-
-```text
-把 IM 后端从 demo 提升到可工作的最小链路。
-```
-
-这一阶段先做：
-
-- 身份与登录基础能力
-- 会话 / 成员 / 权限读取
-- 发送消息
-- timeline / outbox / Kafka
-- durable inbox
-- `PullInbox` / `AckDelivery`
-- WebSocket 在线通知
-
-这一阶段完成标志：
-
-- 消息从发送到投递、ACK 能串起来
-- 核心服务不再是 mock-only
-- 至少有真实 PostgreSQL / Kafka / gRPC / WebSocket 链路 smoke
-
-当前这个阶段已经完成。
-
-## 2. 第二阶段：把 9 个核心服务做成 AI-ready IM 底座
+## 1. Phase 0：研究和问题定义
 
 目标：
 
-```text
-不急着做孤立 LLM demo，
-先把已有 9 个核心服务补成 search / memory / Agent 能安全依赖的 IM 后端底座。
-```
+- 重新理解 2026 年完整 Agent 系统应该包含什么。
+- 借鉴 OpenClaw、Hermes、Claude Code、OpenAI Agents SDK、LangGraph、MCP、A2A、Microsoft
+  Agent Framework、Google agentic architecture、Databricks 2026 agent report 和相关论文。
+- 明确 NexusIM 自己的企业 IM 约束：tenant、conversation、group memory、approval、audit、
+  compliance、tool risk、message visibility。
 
-当前核心服务是：
+产出：
 
-- `api-gateway`
-- `identity-service`
-- `message-service`
-- `conversation-service`
-- `delivery-service`
-- `push-gateway`
-- `receipt-service`
-- `contacts-service`
-- `policy-service`
+- `docs/research/agent-plane-redesign-20260701.md`
+- `docs/research/agent-ecosystem-research-20260701.md`
+- `docs/research/agent-system-complete-scope-20260701.md`
 
-这一阶段重点不只是 hardening，也包括 AI 所需的 IM 产品语义：
+完成条件：
 
-- 消息编辑 / 撤回 / 删除 / 合规删除的事件语义；
-- 群管理、owner transfer、成员历史可见窗口；
-- 回执、未读、会话摘要、联系人分组 / 搜索 / 隐私策略；
-- policy 决策来源、moderation、关系门禁和 audit；
-- `/healthz` / `/readyz` / `/debug/metrics`
-- trusted metadata / TLS / mTLS 边界
-- outbox / projection / challenge delivery 的 repair / audit / cleanup
-- worker / relay 退避重试
-- fail-closed 语义
-- 文件拆分、降低耦合、控制复杂度
+- 有多套候选架构。
+- 明确不冻结契约。
+- 明确第一阶段不用真实 IM 数据。
 
-进入下一阶段前，至少要满足：
-
-- 这 9 个服务都不是“只跑 happy path”
-- 各自主要 P2 hardening 已经收掉大头
-- search / memory / Agent 会依赖的事实、权限、事件和 tombstone 边界清楚
-- 关键文档、service brief、runbook 已经稳定
-- 不要求生产级完整系统测试或生产级 HA 全部完成后才启动 `search-service` v0.1
-
-当前阶段已经完成到可支撑 AI 算法切片和客户端平台 first slice；后续只在阻塞当前 client / AI / 产品平台主线时回补九服务收口。
-
-当前执行规则：
-
-1. 每次只解决一个服务或一个明确跨服务边界的问题。
-2. 优先做 search / memory / Agent 会依赖的 IM 语义和安全边界。
-3. 不为了面试说法一次性铺开多个 AI 服务；先让 search / memory / retrieval 有可信数据源。
-4. 每个切片完成后更新对应 service brief，并运行本地检查。
-5. 生产代码文件接近 2500 行、测试或 runner 接近 3000 行时，优先同 package 拆文件。
-
-## 3. 第三阶段：分布式与可靠性
+## 2. Phase 1：平台级 SDD
 
 目标：
 
-```text
-证明它不是单机 WebSocket demo，
-而是有明确故障边界和恢复路径的分布式 IM 后端。
-```
+- 将 Agent 层拆成可评审的组成部分。
+- 明确每个组成部分拥有什么状态、不能拥有什么状态。
+- 明确 Runtime、Workflow、Memory、Tool/MCP、Action Executor、Eval 的边界。
 
-这一阶段重点做：
+产出：
 
-- 多进程 / 多实例 smoke
-- Win / Mac 双机 smoke
-- Redis route / resume / recovery
-- PostgreSQL failover smoke
-- Kafka failover smoke
-- Redis Sentinel / quorum / 网络故障 smoke
+- `docs/sdd/agent-platform.md`
+- `docs/research/agent-runtime-workflow-ownership-20260701.md`
+- SDD index 和 architecture index 链接。
 
-这一阶段的关键判断标准：
+完成条件：
 
-- 在线通知可以失败，但 durable 路径不能丢
-- Redis、Kafka、PostgreSQL 局部故障后，最小链路仍可恢复
-- 恢复路径要有真实证据，不靠口头描述
+- 覆盖 Agent Gateway、identity/policy/budget、AgentDefinition、SkillPackage、Model Gateway、
+  Runtime/Harness、Context/RAG、Memory、Tool/MCP、A2A、Workflow/HITL、Action Executor、
+  Multi-agent、Python AI Worker、Eval/Replay、Observability/Audit、Security。
+- 没有 proto、OpenAPI、Kafka schema、migration、production service directory。
 
-注意：
-
-- 本地 failover smoke 不等于生产 HA
-- 单 broker / 单 primary 切换成功，不等于多故障场景完成
-- 生产级 HA 和完整系统测试是持续补强目标，不作为 `search-service` v0.1 的短期阻塞
-
-这一阶段已经有可面试讲述的最小证据，但还没到生产级 HA。
-
-## 4. 第四阶段：完整产品能力
+## 3. Phase 2：Open Dataset Eval Harness
 
 目标：
 
-```text
-从“后端链路能跑”推进到“IM 产品基本完整”。
-```
+- 在不使用真实 IM 数据的情况下，先测试 Agent 关键能力。
+- 为后续模型、prompt、retrieval、memory、tool 和 workflow 改动建立 regression gate。
 
-这阶段再做的内容包括：
+数据集方向：
 
-- 已读 / 送达 / 未读数
-- 编辑 / 撤回 / 删除
-- 会话列表
-- 群管理
-- 联系人完善
-- 真实鉴权闭环
-- 更完整的管理与运营入口
+| 能力 | 数据集 / fixture |
+| --- | --- |
+| Grounded RAG | BEIR、NQ、HotpotQA、Qasper、MS MARCO |
+| Tool / workflow | tau-bench、ToolSandbox、BFCL、MCP-Bench |
+| Policy | JourneyBench |
+| State diff | Agent-Diff |
+| Memory | STATE-Bench、LoCoMo、LongMemEval、EverMemBench、GroupMemBench |
+| Multi-agent | MultiAgentBench、MARBLE |
+| Security | MCPSecBench、MCP poisoning、tool-selection attack fixture |
 
-这阶段的重点是：
+产出：
 
-- 补齐产品语义
-- 继续保证分布式边界不被打穿
-- 不把新能力直接塞回已有大文件
+- dataset adapter 草案。
+- EvalCase / EvalRun / EvalResult / report 草案。
+- synthetic IM-like fixture 规则。
+- failure taxonomy。
 
-当前已有 9 个服务已经覆盖这阶段的一部分能力。现在的重点不是继续铺更多功能，而是把这些能力做干净：
+完成条件：
 
-- `api-gateway`：入口配额、tenant quota 文件 / URL snapshot、URL bearer token / HTTPS guard、applied quota snapshot stale 观测、OTel server/client trace、legacy/facade traffic metrics 和 legacy opt-in 迁移观察；
-- `contacts-service`：first-stage OTel gRPC server span，作为 9 服务 first-stage trace runtime wiring 的服务侧样例；
-- `identity-service`：first-stage OTel gRPC server span，覆盖登录 / Refresh / challenge / MFA 管理服务侧请求；
-- `message-service`：first-stage OTel gRPC server span，开始覆盖核心写链路服务侧请求；
-- `conversation-service`：first-stage OTel gRPC server span，覆盖会话成员事实服务侧请求；
-- `delivery-service`：first-stage OTel gRPC server span，覆盖 durable inbox / ACK 服务侧请求；
-- `receipt-service`：first-stage OTel gRPC server span，覆盖已读 / 会话列表服务侧请求；
-- `policy-service`：first-stage OTel gRPC server span，覆盖权限决策服务侧请求；
-- `deploy/local`：本地 OTel collector debug 入口和 policy OTLP smoke 脚本，覆盖 OTLP gRPC / HTTP 接收、本地 debug exporter 与一条真实 gRPC span 到达验证；
-- `identity-service`：身份安全、通知投递、key / issuer 治理继续 hardening；
-- `message / conversation / delivery / push / receipt / contacts / policy`：继续清 repair、观测、故障语义和容量边界。
+- 每类能力至少有一个可执行或可模拟的 fixture 入口。
+- report 能比较 baseline 和 regression。
+- 不接生产启动路径。
 
-## 5. 第五阶段：搜索与群组记忆底座
+## 4. Phase 3：Fixture-only AgentRun Trace Prototype
 
 目标：
 
-```text
-以 search-service v0.1 作为第一步，
-为聊天记录搜索、群组 memory、retrieval 和后续 RAG / summary / Agent / skill-registry / mcp-gateway / action-executor / Python AI Worker 建立可控的检索事实层。
-```
+- 用 fake/mock/fixture 验证 AgentRun 的过程可追踪、可暂停、可重放。
+- 验证 ContextPackage、MemoryCandidate、ToolIntent、ApprovalWorkflowRef、ExecutionRef、
+  ReplayBundle 的概念边界。
 
-进入这一阶段前，不要求所有生产级 HA 或生产级完整系统测试都完成，但 message / conversation / policy / delivery 的事实边界必须足够稳定，尤其是编辑、撤回、删除、成员窗口和权限策略。
+必须覆盖：
 
-`search-service` v0.1 应该只做后端：
+- 只读问答。
+- 群组 memory admission。
+- 需要审批的业务动作。
+- 长时间等待用户审批。
+- 外部 tool provider 超时。
+- repair / redrive。
+- cancel / resume / replay。
+- multi-agent handoff。
 
-- 消费 message / member / revoke / delete 事件；
-- 维护 search index projection；
-- 强制 tenant / conversation / member visibility 过滤；
-- 支持撤回 / 删除 tombstone；
-- 提供 `SearchMessages` 最小查询和 EvidencePack 前置字段；
-- 不让 RAG 或 Agent 直接读业务库。
+完成条件：
 
-`memory-service` / memory projection 第一阶段应该关注：
+- 每个流程都有 step trace。
+- 失败能落到 failure taxonomy。
+- replay 不重新执行外部副作用。
+- fake/mock/fixture 不进入生产 fallback。
 
-- 消费 message / conversation / contacts / receipt / policy 事件；
-- 抽取 StructuredMemoryEvent；
-- 维护 group memory 的 actor / group / topic / time / status / supersedes 语义；
-- 记录 source refs、speaker / audience scope、valid_from / valid_to、confidence 和 review state；
-- 不把群事实直接升级成个人长期偏好；
-- 不替代 search-service 或 policy-service。
+## 5. Phase 4：ADR / Service SDD Promotion
 
-2025/2026 memory benchmark 和论文暴露的主要风险必须进入第一版测试：多人归因错误、旧事实覆盖失败、群组共识和个人偏好混淆、退群后可见性泄漏、无证据 memory active、无证据回答和需要拒答时未拒答。
+只有 Phase 2 和 Phase 3 给出足够证据后，才进入 promotion。
 
-## 6. 第六阶段：AI 应用后端
+候选 ADR：
 
-目标：
+- Agent Runtime 是否独立为 `agent-runtime-service`。
+- ContextPackage / EvidencePack 契约。
+- MemoryCandidate / MemoryRecord admission 契约。
+- Tool prepare / action execution lineage 契约。
+- ReplayBundle / EvalResult 契约。
+- Python AI Worker request / candidate contract。
 
-```text
-在 search-service、group memory 和 retrieval-gateway 稳定后，
-再开发 RAG、summary、agent 等智能化后端能力。
-```
+反对条件：
 
-这一阶段更合理的顺序：
+- eval gate 仍无法复现。
+- memory pollution 无法拦截。
+- workflow 与 runtime 状态边界仍重叠。
+- action-executor 无法验证 approval / prepare lineage。
+- replay 无法解释失败。
 
-1. `retrieval-gateway` 和 EvidencePack
-2. `rag-service`
-3. `summary-service`
-4. `agent-service` read-only / proposal-only
-5. `skill-registry`
-6. `mcp-gateway/tool-gateway`
-7. `action-executor` + proposal / approval / audit
-8. Python AI Worker foundation + external LLM adapter boundary
+## 6. Phase 5：最小生产切片
 
-必须遵守的边界：
+推荐顺序：
 
-- AI 不直接读业务库；
-- 检索必须带权限过滤；
-- 撤回 / 删除 / 成员可见窗口必须影响搜索和 RAG；
-- AI 输出必须带 source message id、conversation seq 和 evidence pack；
-- Agent 写动作必须可审计、可审批、可回放。
-- `skill-registry`、`mcp-gateway/tool-gateway` 和 `action-executor` 只能封装已通过权限、证据和审计约束的后端能力。
-- Python AI Worker 只返回模型 / 算法 / eval 候选结果；Go 服务继续负责权限、审批、审计、outbox 和持久化。
+1. Read-only grounded QA。
+2. Memory candidate extraction，不直接 ACTIVE。
+3. Human-reviewed memory admission。
+4. Proposal-only agent，不执行。
+5. Approval -> action-executor 最小闭环。
+6. Bounded multi-agent handoff。
+7. Controlled external MCP provider。
 
-## 7. 第七阶段：其它产品后端服务
+每一步都必须有：
 
-目标：
+- policy gate。
+- evidence / source refs。
+- audit refs。
+- eval regression。
+- rollback / disable switch。
 
-```text
-在核心后端和 AI 主线稳定后，
-按真实边界继续拆 media、notification、audit、admin、config 等服务。
-```
+## 7. 质量门禁
 
-新增服务不写死，必须满足至少一个条件：
+任何进入实现阶段的 Agent 能力都至少需要：
 
-- 有独立数据模型；
-- 有独立伸缩需求；
-- 有独立故障边界；
-- 能明显降低现有服务复杂度。
+- Citation verifier。
+- Permission leakage detector。
+- Memory pollution detector。
+- Tool poisoning detector。
+- Approval bypass detector。
+- State-diff checker。
+- Replay completeness checker。
+- Cost / budget guard。
 
-否则优先留在原服务里。
+## 8. 工作区边界
 
-候选服务包括：
-
-- `media-service`
-- `notification-service`
-- `audit-service`
-- `admin-service`
-- `control-plane-service`
-- `presence-service`
-- `model-gateway`
-- `workflow-service`
-- `knowledge-ingestion-service`
-- `vector-index-service`
-
-## 8. 客户端平台 first slice
-
-```text
-Web / PC / Android 是当前产品化展示层切片，
-但不能变成临时 demo 或绕过后端事实源。
-```
-
-客户端平台必须遵守：
-
-- 只连接 `api-gateway` 和 `push-gateway`；
-- PullInbox 是消息事实源，WebSocket 只做在线唤醒；
-- 浏览器、PC、Android 复用 `protocol` / `client-core`；
-- PC / Android 先保留 runtime / packaging 边界，逐步补 installer / APK；
-- 客户端本地存储只做缓存和离线队列，不成为服务端事实源。
-
-## 9. 阶段切换规则
-
-什么时候可以切下一阶段：
-
-1. 当前阶段主目标已经有真实证据，不只是代码存在。
-2. 当前阶段的关键 P0/P1 已清掉。
-3. P2 hardening 不要求全部为零，但不能继续失控积压。
-4. 文档、runbook、service brief 能准确描述当前事实。
-5. 对 `search-service` v0.1 这类 AI 后端转进切片，生产级完整系统测试和生产级 HA 不作为硬门槛；本地检查、最小 smoke、权限过滤和证据边界必须闭环。
-6. 对客户端平台切片，至少需要 focused typecheck / build / BFF + push smoke 或等价证据；不要求立即产出三端生产安装包。
-
-什么时候不能切下一阶段：
-
-- 只是写了代码，还没 smoke
-- 只是 happy path 通了，故障恢复没证据
-- 当前服务还在频繁返工，契约不稳定
-- 文件复杂度已经明显失控，却还在继续堆功能
-
-## 10. 当前实际顺序
-
-按目前项目状态，最合理的顺序已经调整为：
-
-```text
-保留 9 个 IM 服务作为可运行底座
--> 在已落 search / memory / retrieval / RAG / summary / Agent / tool / eval 链路上
-   扩展 collaborative-memory 算法/eval
--> 当前推进 client platform MVP foundation，先让 Web / PC / Android 共享协议和同步核心
--> 按完整架构继续补 media / notification / audit / admin / control-plane / presence /
-   data-platform / AI-runtime / middleware profile 等产品和平台能力
--> 生产级 HA、生产级完整系统测试、长压和 sizing 继续按风险后置
-```
-
-这条顺序的关键点只有一个：
-
-```text
-不要为了追求终局形态一次性铺开所有能力；每一层都先跑通最小真实链路，再按完整目标架构补产品化、平台化和生产化证据。
-```
+- Agent Lab 只做 Agent / RAG / memory / Python AI Worker / EvidencePack / eval gate。
+- 不修改 hotgroup 压测、Docker runtime profile 或后端性能实验路径。
+- 完整模块完成后提交并推送 `origin/codex/agent-lab`。
+- Handoff 给主集成线程时提供 branch、commit、changed files、checks、风险和下一步建议。

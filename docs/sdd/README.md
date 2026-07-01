@@ -13,7 +13,14 @@
 - 当前 AI 底座路线已进入 search / memory / retrieval / RAG / summary / Agent /
   skill-registry / MCP / action-executor / ai-eval 边界；这些服务已有 SDD 时以对应
   SDD 为准，不从旧文档推断目标。
+- Agent Lab 当前平台级草案见 `agent-platform.md`。它用于说明 Agent / RAG /
+  memory / Python AI Worker / EvidencePack / eval gate 如何组合，不冻结 proto、
+  schema、migration、runtime 或生产服务目录。
 - 可以用 multi sub-agent 分别审查不同 SDD 或测试缺口，但同一 SDD、proto、migration 只能由一个 agent 修改，主 agent 负责最终集成。
+
+## 平台 / 跨服务 SDD 草案
+
+- `agent-platform.md`
 
 ## 服务 SDD
 

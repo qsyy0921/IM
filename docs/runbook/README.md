@@ -5,14 +5,12 @@
 ## 当前主线
 
 - 当前 active slice 见 `current-goal.md`；本轮默认只读必要文档。
-- 长期完整架构见 `../architecture/target-architecture-complete.md`，不写死服务、
-  中间件或部署形态。
-- AI / Agent 后续主线包括 group memory、EvidencePack、RAG、summary、Agent、MCP/tool、approval/audit 和 ai-eval。
-- 9 个既有 IM 业务服务作为基础，`timeline-service` 已作为第 10 个 noop 运行节点进入
-  本地 Docker / 观测链路；默认只处理阻塞当前主线的 P0/P1 或用户点名事项。
-- 热点群 / 分区 / distributed timeline 主线通过 `timeline-service` 承接；当前只提供
-  noop runtime，不进入已运行消息写路径。
-- 生产级压测、长故障演练和完整生产就绪测试后置。
+- 当前 workspace 是 Agent Lab，主线是 Agent / RAG / memory / Python AI Worker /
+  EvidencePack / eval gate 的探索、SDD 和后续 fixture/eval。
+- 第一阶段不使用真实 NexusIM IM 数据；先用公开数据集和 synthetic IM-like fixture。
+- 当前不写 proto、OpenAPI、Kafka schema、migration、production service directory 或
+  production startup path。
+- 后端 hotgroup 压测、Docker runtime profile、性能实验和完整生产就绪测试不属于本工作区。
 
 ## 默认入口
 
@@ -21,21 +19,21 @@
 - 具体执行目标：`current-goal.md`
 - 每轮短入口：`current-brief.md`
 - 剩余工作：`remaining-goals.md`
-- 服务短状态索引：`service-briefs/README.md`
-- Docker 镜像归档和三机 SSD 加载策略：`docker-image-storage.md`
+- 协作线程边界：`codex-sessions.md`
+- Agent Lab 开发过程：`development-process.md`
+- Agent Lab 进度总览：`development-progress.md`
 
 ## 按需读取
 
-- 客户端平台：`client-platform.md`、`../sdd/client-platform.md`
-- 开发进度总览：`development-progress.md`
+- Agent 平台级 SDD：`../sdd/agent-platform.md`
+- Agent 初步设计：`../architecture/agent-plane-initial-design.md`
+- Agent 研究输入：`../research/agent-plane-redesign-20260701.md`、
+  `../research/agent-ecosystem-research-20260701.md`、
+  `../research/agent-system-complete-scope-20260701.md`
 - 完整目标架构：`../architecture/target-architecture-complete.md`
-- 中间件目录：`../platform/middleware-catalog.md`
-- 服务设计：`../sdd/<service>.md`
-- smoke / 压测证据：`loadtest/<service>/`
-- 本地分布式 / Docker / 观测 / 压测：`distributed-local.md`、`mac-arm64-docker-images.md`、`docker-image-storage.md`、`observability-local.md`、`local-loadtest.md`
+- 服务级设计：`../sdd/<service>.md`
 - AI eval / evidence manifests：`ai-eval/README.md`、`*-evidence.json`
-- 复杂度治理：`file-size-hotspots.md`、`file-size-hotspot-baseline.json`
-- repair / DLQ operator：`repair-operators.md`、`repair-operators.catalog.json`
+- 历史客户端 / Docker / loadtest / repair 资料：只在用户点名或主集成需要时读取。
 - 历史长文档：`archive/`、`history/`
 
 ## 维护规则

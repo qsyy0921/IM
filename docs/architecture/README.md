@@ -11,6 +11,7 @@
 | `target-architecture-timeline.md` | 消息写入、成员边界、Fanout、数据模型、Kafka、Redis 与长连接。 |
 | `target-architecture-platform.md` | 权限、搜索、RAG、Agent、多 Region、审计、观测、ADR、演进结论。 |
 | `target-architecture-ai.md` | AI / memory / RAG / Agent 的后续目标架构、Python AI Worker 边界、数据模型、检索流程和评测门禁。 |
+| `agent-plane-initial-design.md` | Agent Exploration Mode 的初步设计报告，综合当前开源项目、论文、benchmark 和产品技术报告输入，不冻结契约。 |
 | `target-architecture-complete.md` | 完整目标架构蓝图：业务平台、数据平台、AI / Agent 平台、中间件平台、客户端、可靠性和演进路线。 |
 | `fail-closed-policy.md` | 当前和未来代码的 fail-closed 治理规则：依赖不确定时拒绝推进事实，在线体验退化必须回到事实源恢复，本地测试 adapter 必须显式隔离。 |
 | `adr/` | 已接受的关键架构决策记录。 |
@@ -24,9 +25,11 @@
 3. 需要消息主链路、Kafka、Redis route、push resume 时，读 `target-architecture-timeline.md`。
 4. 需要搜索、RAG、Agent、观测、ADR 和演进路线时，读 `target-architecture-platform.md`。
 5. 需要 AI / memory / Agent / Python AI Worker 的详细目标架构时，读 `target-architecture-ai.md`。
-6. 需要重新理解整个系统完善后的端到端架构时，读 `target-architecture-complete.md`。
-7. 需要判断备用路径、local-test adapter、compat window 或显式恢复是否合理时，读 `fail-closed-policy.md`。
-8. 需要早期设计对照或演进背景时，再查 `add.md` / `tadd.md`；不要从这两份文档推导当前开发目标。
+6. 需要当前 Agent 层重新设计草案时，读 `agent-plane-initial-design.md` 和
+   `../sdd/agent-platform.md`。
+7. 需要重新理解整个系统完善后的端到端架构时，读 `target-architecture-complete.md`。
+8. 需要判断备用路径、local-test adapter、compat window 或显式恢复是否合理时，读 `fail-closed-policy.md`。
+9. 需要早期设计对照或演进背景时，再查 `add.md` / `tadd.md`；不要从这两份文档推导当前开发目标。
 
 ## 变更规则
 

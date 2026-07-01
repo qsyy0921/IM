@@ -562,7 +562,9 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
   delivery outbox relay 已改成 per-conversation frontier ready query，并把本地 worker
   数提高到 8；这是 first-stage 查询优化，不替代后续 fanout 策略 / frontier progress 表设计。
 - 对每轮正式压测记录 run name、commit、dashboard 时间窗口、Kafka lag、delivery projection lag、
-  push signal、PullInbox / ACK 追平和 PostgreSQL 关键指标。
+  push signal、PullInbox / ACK 追平、PostgreSQL 关键指标，以及 Windows / Ubuntu / Mac
+  三台机器的 CPU / 内存时间序列曲线。`tools/record-lab-resource-window.ps1` 已能输出
+  CSV、Markdown summary 和 SVG 曲线；远端机器采样全失败时默认 fail-closed，不生成误导性报告。
 - 本轮只写本地 / 三机实验结论，不写生产容量上限。
 
 ## 本轮完成条件
@@ -631,8 +633,8 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
    5000 message / 400 subscriber / expected sample=50 场景，确认 signal span 与
    `achieved_send_rate` 的新曲线；若仍超时，再继续定位 timeline-service seq allocator、
    Kafka、delivery projection、delivery_outbox 或 push event pacing。
-3. 继续为每轮优化保留 clean commit、Docker 镜像归档、三机部署版本和 Prometheus
-   时间窗口，保证压测曲线可复现。
+3. 继续为每轮优化保留 clean commit、Docker 镜像归档、三机部署版本、Prometheus
+   时间窗口和三机 CPU / 内存曲线，保证压测曲线可复现。
 4. 若 HYBRID 仍要支持千人级 per-user materialized outbox，优先评估显式 frontier /
    progress 表或把策略提前切到 READ_FANOUT；不要把 Kafka / Redis 当成替代 fanout 策略。
 5. delivery projection lag / inbox rows per message / push notify storm 指标深化。

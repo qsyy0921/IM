@@ -82,6 +82,21 @@ go run .\loadtest\hotgroup `
 H:\NexusIM\loadtest-results\<run-name>\
 ```
 
+正式三机压测还要同步采集 Windows / Ubuntu / Mac 的 CPU 和内存曲线。原始
+CSV / SVG 仍放在 H 盘结果目录，不写入仓库：
+
+```powershell
+.\tools\record-lab-resource-window.ps1 `
+  -OutputDir H:\NexusIM\loadtest-results\<run-name>\lab-resource `
+  -DurationSeconds 180 `
+  -IntervalSeconds 1 `
+  -UbuntuHost qsyy0921@172.31.50.2 `
+  -IncludeMac `
+  -MacHost qsyy0921@172.31.50.3
+```
+
+如果任一机器采样全失败，脚本默认失败，避免生成缺机器的误导性曲线。
+
 发送压力由 `--message-rate` 控制全局目标速率，由 `--send-concurrency` 控制
 并发 `SendMessage` worker 数。`--send-concurrency=0` 表示使用 `--sender-count`。
 报告中的 `achieved_send_rate` 才是本轮真实发压速率；不要把 target

@@ -56,7 +56,10 @@
    已新增
    `tools/analyze-hotgroup-loadtest.ps1`、`tools/analyze-hotgroup-multirunner.ps1` 和
    `tools/record-hotgroup-metrics-window.ps1` 自动汇总压测结果、分类瓶颈、记录
-   Prometheus 时间窗口和给出下一步策略；后续每次正式复压都要生成或更新对应低敏分析报告。
+   Prometheus 时间窗口和给出下一步策略；`tools/record-lab-resource-window.ps1`
+   已用于采集 Windows / Ubuntu / Mac 三机 CPU / 内存时间序列，并输出 H 盘 CSV /
+   Markdown / SVG 曲线。后续每次正式复压都要生成或更新对应低敏分析报告，并附三机
+   CPU / 内存曲线；远端资源采样失败不能静默当作成功。
    clean commit `fedb5f43` 的 writer queue latency / batch drain 已完成镜像重建 /
    归档 / redeploy 和 400 subscriber coordinator + shard 复压；queue p95 / p99 低、
    write p95 / p99 低，但 worker fanout p95 / p99 仍约 57.759ms / 92.241ms，
@@ -228,7 +231,8 @@
 - Cross-service loadtest：继续维护 `capacity_summary`，形成容量曲线和瓶颈说明；新增
   `loadtest/hotgroup` 业务压测 runner，覆盖热点群聊 fanout、Kafka lag、delivery
   projection、push notify storm、PullInbox / ACK 追平、成员变更和故障恢复，不用单接口
-  QPS 替代真实业务链路；正式压测必须配套 Prometheus / Grafana 趋势图。当前已新增
+  QPS 替代真实业务链路；正式压测必须配套 Prometheus / Grafana 趋势图和三机
+  CPU / 内存曲线。当前已新增
   `NexusIM Hot Group Loadtest` first-stage dashboard、hotgroup 离线分析器和
   Prometheus 时间窗口记录工具；后续还需补 fanout-mode distribution、Kafka consumer lag、
   delivery timeline item insert rate、

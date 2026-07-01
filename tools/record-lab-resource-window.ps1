@@ -11,7 +11,8 @@ param(
     [switch]$IncludeMac,
     [string]$CsvPath = "",
     [string]$MarkdownPath = "",
-    [string]$SvgPath = ""
+    [string]$SvgPath = "",
+    [switch]$AllowSampleErrors
 )
 
 $ErrorActionPreference = "Stop"
@@ -117,13 +118,18 @@ function Invoke-SSHText {
     param(
         [string]$SSHHost,
         [string]$Command,
-        [int]$TimeoutSeconds = 8
+        [int]$TimeoutSeconds = 8,
+        [ValidateSet("linux", "macos")]
+        [string]$RemoteOS = "linux"
     )
 
     if ($SSHHost.Trim().Length -eq 0) {
         throw "SSH host is empty."
     }
-    $output = & ssh -o BatchMode=yes -o ConnectTimeout=$TimeoutSeconds $SSHHost $Command 2>&1
+    $encoded = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($Command))
+    $decodeCommand = if ($RemoteOS -eq "macos") { "base64 -D" } else { "base64 -d" }
+    $remoteCommand = "printf '%s' '$encoded' | $decodeCommand | bash"
+    $output = & ssh -o BatchMode=yes -o ConnectTimeout=$TimeoutSeconds $SSHHost $remoteCommand 2>&1
     if ($LASTEXITCODE -ne 0) {
         throw (($output | Out-String).Trim())
     }
@@ -138,10 +144,10 @@ function Get-LinuxResourceSample {
     )
 
     $command = @'
-read _ u1 n1 s1 i1 w1 irq1 sirq1 st1 rest < /proc/stat; t1=$((u1+n1+s1+i1+w1+irq1+sirq1+st1)); idle1=$((i1+w1)); sleep 0.2; read _ u2 n2 s2 i2 w2 irq2 sirq2 st2 rest < /proc/stat; t2=$((u2+n2+s2+i2+w2+irq2+sirq2+st2)); idle2=$((i2+w2)); dt=$((t2-t1)); di=$((idle2-idle1)); if [ "$dt" -le 0 ]; then cpu=0; else cpu=$(awk -v dt="$dt" -v di="$di" 'BEGIN { printf "%.3f", 100*(dt-di)/dt }'); fi; free -m | awk -v cpu="$cpu" '/^Mem:/ { printf "%s %.3f %.3f %.3f", cpu, 100*$3/$2, $3, $2 }'
+read _ u1 n1 s1 i1 w1 irq1 sirq1 st1 rest < /proc/stat; t1=$((u1+n1+s1+i1+w1+irq1+sirq1+st1)); idle1=$((i1+w1)); sleep 0.2; read _ u2 n2 s2 i2 w2 irq2 sirq2 st2 rest < /proc/stat; t2=$((u2+n2+s2+i2+w2+irq2+sirq2+st2)); idle2=$((i2+w2)); dt=$((t2-t1)); di=$((idle2-idle1)); if [ "$dt" -le 0 ]; then cpu=0; else cpu=$(awk -v dt="$dt" -v di="$di" 'BEGIN { printf "%.3f", 100*(dt-di)/dt }'); fi; free -m | awk -v cpu="$cpu" 'NR==2 { printf "%s %.3f %.3f %.3f", cpu, 100*$3/$2, $3, $2 }'
 '@
     try {
-        $text = Invoke-SSHText -SSHHost $SSHHost -Command $command
+        $text = Invoke-SSHText -SSHHost $SSHHost -Command $command -RemoteOS "linux"
         $parts = @($text -split "\s+" | Where-Object { $_.Trim().Length -gt 0 })
         if ($parts.Count -lt 4) {
             throw "unexpected linux sample: $text"
@@ -169,7 +175,7 @@ function Get-MacResourceSample {
 idle=$(top -l 1 -n 0 | awk '/CPU usage/ { for (i=1;i<=NF;i++) if ($i=="idle") { gsub("%", "", $(i-1)); print $(i-1); exit } }'); if [ -z "$idle" ]; then idle=100; fi; cpu=$(awk -v idle="$idle" 'BEGIN { printf "%.3f", 100-idle }'); total=$(sysctl -n hw.memsize); pagesize=$(sysctl -n hw.pagesize); used_pages=$(vm_stat | awk '/Pages active|Pages wired down|Pages occupied by compressor/ { gsub("\\.", "", $NF); total += $NF } END { print total+0 }'); used_mb=$(awk -v p="$used_pages" -v ps="$pagesize" 'BEGIN { printf "%.3f", p*ps/1024/1024 }'); total_mb=$(awk -v t="$total" 'BEGIN { printf "%.3f", t/1024/1024 }'); mem_pct=$(awk -v u="$used_mb" -v t="$total_mb" 'BEGIN { if (t <= 0) print "0.000"; else printf "%.3f", 100*u/t }'); printf "%s %s %s %s" "$cpu" "$mem_pct" "$used_mb" "$total_mb"
 '@
     try {
-        $text = Invoke-SSHText -SSHHost $SSHHost -Command $command
+        $text = Invoke-SSHText -SSHHost $SSHHost -Command $command -RemoteOS "macos"
         $parts = @($text -split "\s+" | Where-Object { $_.Trim().Length -gt 0 })
         if ($parts.Count -lt 4) {
             throw "unexpected mac sample: $text"
@@ -349,6 +355,13 @@ foreach ($summary in $machineSummaries) {
 $markdown.Add("")
 $markdown.Add("Use this report together with hotgroup summary, Prometheus window, Kafka lag, and PostgreSQL metrics before claiming a bottleneck.")
 $markdown | Set-Content -LiteralPath $MarkdownPath -Encoding UTF8
+
+if (-not $AllowSampleErrors) {
+    $failedMachines = @($machineSummaries | Where-Object { $_.samples -eq 0 -and $_.errors -gt 0 } | Select-Object -ExpandProperty machine)
+    if ($failedMachines.Count -gt 0) {
+        throw "resource sampling failed for: $($failedMachines -join ', '). See $CsvPath"
+    }
+}
 
 Write-Host "OK   resource samples written: $CsvPath"
 Write-Host "OK   resource summary written: $MarkdownPath"

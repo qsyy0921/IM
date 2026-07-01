@@ -823,6 +823,7 @@ func runGRPC() error {
 	var useCaseOptions []app.CheckMessageActionOption
 	var toolUseCaseOptions []app.CheckToolActionOption
 	var pool *pgxpool.Pool
+	decisionMetrics := monitoringinfra.NewDecisionMetrics()
 	rulesEnabled := envBool("NEXUSIM_POLICY_RULES_ENABLED", false)
 	if rulesEnabled {
 		dsn := envString("NEXUSIM_PG_DSN", "")
@@ -835,7 +836,11 @@ func runGRPC() error {
 			return err
 		}
 		defer pool.Close()
-		postgresEvaluator := postgresinfra.NewMessagePolicyEvaluator(pool, policy)
+		postgresEvaluator := postgresinfra.NewMessagePolicyEvaluator(
+			pool,
+			policy,
+			postgresinfra.WithMessagePolicyEvaluatorObserver(decisionMetrics),
+		)
 		evaluator = postgresEvaluator
 		toolEvaluator = postgresinfra.NewToolPolicyEvaluator(pool, toolPolicy)
 		useCaseOptions = append(useCaseOptions, app.WithPolicyDecisionAuditor(postgresinfra.NewDecisionAuditOutbox(pool)))
@@ -870,7 +875,6 @@ func runGRPC() error {
 			log.Printf("policy-service OpenTelemetry trace shutdown failed: %v", err)
 		}
 	}()
-	decisionMetrics := monitoringinfra.NewDecisionMetrics()
 	useCaseOptions = append(useCaseOptions, app.WithPolicyDecisionObserver(decisionMetrics))
 	debugAddr, err := policyDebugAddrFromEnv()
 	if err != nil {

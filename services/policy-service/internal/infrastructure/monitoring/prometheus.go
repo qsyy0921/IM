@@ -59,6 +59,18 @@ func writeDecisionPrometheus(builder *strings.Builder, snapshot *DecisionSnapsho
 	writePrometheusHeader(builder, "nexusim_policy_decision_action_total", "Policy decisions by action and outcome.", "counter")
 	writePrometheusHeader(builder, "nexusim_policy_decision_latency_avg_milliseconds", "Policy decision average latency by action.", "gauge")
 	writePrometheusHeader(builder, "nexusim_policy_decision_latency_max_milliseconds", "Policy decision max latency by action.", "gauge")
+	writePrometheusHeader(builder, "nexusim_policy_decision_stage_total", "Policy decision stage calls by action and stage.", "counter")
+	writePrometheusHeader(builder, "nexusim_policy_decision_stage_errors_total", "Policy decision stage errors by action and stage.", "counter")
+	writePrometheusHeader(builder, "nexusim_policy_decision_stage_latency_avg_milliseconds", "Policy decision stage average latency by action and stage.", "gauge")
+	writePrometheusHeader(builder, "nexusim_policy_decision_stage_latency_p95_milliseconds", "Policy decision stage recent p95 latency by action and stage.", "gauge")
+	writePrometheusHeader(builder, "nexusim_policy_decision_stage_latency_p99_milliseconds", "Policy decision stage recent p99 latency by action and stage.", "gauge")
+	writePrometheusHeader(builder, "nexusim_policy_decision_stage_latency_max_milliseconds", "Policy decision stage max latency by action and stage.", "gauge")
+	writePrometheusHeader(builder, "nexusim_policy_evaluator_stage_total", "Policy evaluator stage calls by action and stage.", "counter")
+	writePrometheusHeader(builder, "nexusim_policy_evaluator_stage_errors_total", "Policy evaluator stage errors by action and stage.", "counter")
+	writePrometheusHeader(builder, "nexusim_policy_evaluator_stage_latency_avg_milliseconds", "Policy evaluator stage average latency by action and stage.", "gauge")
+	writePrometheusHeader(builder, "nexusim_policy_evaluator_stage_latency_p95_milliseconds", "Policy evaluator stage recent p95 latency by action and stage.", "gauge")
+	writePrometheusHeader(builder, "nexusim_policy_evaluator_stage_latency_p99_milliseconds", "Policy evaluator stage recent p99 latency by action and stage.", "gauge")
+	writePrometheusHeader(builder, "nexusim_policy_evaluator_stage_latency_max_milliseconds", "Policy evaluator stage max latency by action and stage.", "gauge")
 	if snapshot == nil {
 		return
 	}
@@ -77,6 +89,20 @@ func writeDecisionPrometheus(builder *strings.Builder, snapshot *DecisionSnapsho
 		writePrometheusSample(builder, "nexusim_policy_decision_action_total", map[string]string{"action": action.Action, "outcome": "error"}, action.Errors)
 		writePrometheusSample(builder, "nexusim_policy_decision_latency_avg_milliseconds", map[string]string{"action": action.Action}, action.LatencyAvgMS)
 		writePrometheusSample(builder, "nexusim_policy_decision_latency_max_milliseconds", map[string]string{"action": action.Action}, action.LatencyMaxMS)
+	}
+	writeDecisionStagePrometheus(builder, "nexusim_policy_decision_stage", snapshot.Stages)
+	writeDecisionStagePrometheus(builder, "nexusim_policy_evaluator_stage", snapshot.EvaluatorStages)
+}
+
+func writeDecisionStagePrometheus(builder *strings.Builder, prefix string, stages []DecisionStageSnapshot) {
+	for _, stage := range stages {
+		labels := map[string]string{"action": stage.Action, "stage": stage.Stage}
+		writePrometheusSample(builder, prefix+"_total", labels, stage.Total)
+		writePrometheusSample(builder, prefix+"_errors_total", labels, stage.Errors)
+		writePrometheusSample(builder, prefix+"_latency_avg_milliseconds", labels, stage.LatencyAvgMS)
+		writePrometheusSample(builder, prefix+"_latency_p95_milliseconds", labels, stage.LatencyP95MS)
+		writePrometheusSample(builder, prefix+"_latency_p99_milliseconds", labels, stage.LatencyP99MS)
+		writePrometheusSample(builder, prefix+"_latency_max_milliseconds", labels, stage.LatencyMaxMS)
 	}
 }
 

@@ -33,6 +33,10 @@ type PolicyDecisionObserver interface {
 	RecordPolicyDecisionMetric(action types.MessageAction, allowed bool, failed bool, latencyMS int64)
 }
 
+type PolicyDecisionStageObserver interface {
+	RecordPolicyDecisionStage(action types.MessageAction, stage string, failed bool, latencyMS int64)
+}
+
 type CheckMessageActionUseCase struct {
 	evaluator        MessagePolicyEvaluator
 	auditor          PolicyDecisionAuditor
@@ -96,7 +100,7 @@ func (u CheckMessageActionUseCase) Execute(
 	} else if handled {
 		decision = ownershipDecision
 		if u.auditor != nil {
-			if err := u.auditor.RecordPolicyDecision(ctx, command, decision); err != nil {
+			if err := u.recordPolicyDecisionAudit(ctx, command, decision); err != nil {
 				return types.MessageActionDecision{}, err
 			}
 		}
@@ -107,7 +111,7 @@ func (u CheckMessageActionUseCase) Execute(
 	} else if handled {
 		decision = moderationDecision
 		if u.auditor != nil {
-			if err := u.auditor.RecordPolicyDecision(ctx, command, decision); err != nil {
+			if err := u.recordPolicyDecisionAudit(ctx, command, decision); err != nil {
 				return types.MessageActionDecision{}, err
 			}
 		}
@@ -118,11 +122,24 @@ func (u CheckMessageActionUseCase) Execute(
 		return types.MessageActionDecision{}, err
 	}
 	if u.auditor != nil {
-		if err := u.auditor.RecordPolicyDecision(ctx, command, decision); err != nil {
+		if err := u.recordPolicyDecisionAudit(ctx, command, decision); err != nil {
 			return types.MessageActionDecision{}, err
 		}
 	}
 	return decision, nil
+}
+
+func (u CheckMessageActionUseCase) recordPolicyDecisionAudit(
+	ctx context.Context,
+	command types.CheckMessageActionCommand,
+	decision types.MessageActionDecision,
+) error {
+	started := time.Now()
+	err := u.auditor.RecordPolicyDecision(ctx, command, decision)
+	if stageObserver, ok := u.observer.(PolicyDecisionStageObserver); ok {
+		stageObserver.RecordPolicyDecisionStage(command.Action, "decision_audit_outbox", err != nil, time.Since(started).Milliseconds())
+	}
+	return err
 }
 
 func (u CheckMessageActionUseCase) messageModerationDecision(

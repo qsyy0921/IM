@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -18,10 +19,15 @@ type staticDefaultEvaluator interface {
 type MessagePolicyEvaluator struct {
 	pool          *pgxpool.Pool
 	staticDefault staticDefaultEvaluator
+	observer      MessagePolicyEvaluatorObserver
 }
 
-func NewMessagePolicyEvaluator(pool *pgxpool.Pool, staticDefault staticDefaultEvaluator) MessagePolicyEvaluator {
-	return MessagePolicyEvaluator{pool: pool, staticDefault: staticDefault}
+func NewMessagePolicyEvaluator(pool *pgxpool.Pool, staticDefault staticDefaultEvaluator, opts ...MessagePolicyEvaluatorOption) MessagePolicyEvaluator {
+	evaluator := MessagePolicyEvaluator{pool: pool, staticDefault: staticDefault}
+	for _, opt := range opts {
+		opt(&evaluator)
+	}
+	return evaluator
 }
 
 func (e MessagePolicyEvaluator) DecideMessageAction(
@@ -32,7 +38,9 @@ func (e MessagePolicyEvaluator) DecideMessageAction(
 		return e.staticDefaultDecision(ctx, command)
 	}
 
+	started := time.Now()
 	blocked, edgeVersion, err := e.lookupContactBlock(ctx, command)
+	e.observeStage(command.Action, "contact_block_lookup", started, err)
 	if err != nil {
 		return types.MessageActionDecision{}, err
 	}
@@ -51,7 +59,9 @@ func (e MessagePolicyEvaluator) DecideMessageAction(
 		}, nil
 	}
 
+	started = time.Now()
 	decision, restricted, err := e.lookupUserRestriction(ctx, command)
+	e.observeStage(command.Action, "user_restriction_lookup", started, err)
 	if err != nil {
 		return types.MessageActionDecision{}, err
 	}
@@ -59,7 +69,9 @@ func (e MessagePolicyEvaluator) DecideMessageAction(
 		return decision, nil
 	}
 
+	started = time.Now()
 	decision, denied, err := e.applyRoleGate(ctx, command)
+	e.observeStage(command.Action, "role_gate", started, err)
 	if err != nil {
 		return types.MessageActionDecision{}, err
 	}
@@ -67,7 +79,9 @@ func (e MessagePolicyEvaluator) DecideMessageAction(
 		return decision, nil
 	}
 
+	started = time.Now()
 	decision, rebacDenied, err := e.applyReBACRelationGate(ctx, command)
+	e.observeStage(command.Action, "rebac_gate", started, err)
 	if err != nil {
 		return types.MessageActionDecision{}, err
 	}
@@ -75,7 +89,9 @@ func (e MessagePolicyEvaluator) DecideMessageAction(
 		return decision, nil
 	}
 
+	started = time.Now()
 	decision, quotaExceeded, err := e.applyTenantActionQuota(ctx, command)
+	e.observeStage(command.Action, "tenant_quota_lookup", started, err)
 	if err != nil {
 		return types.MessageActionDecision{}, err
 	}
@@ -83,14 +99,18 @@ func (e MessagePolicyEvaluator) DecideMessageAction(
 		return decision, nil
 	}
 
+	started = time.Now()
 	decision, found, err := e.lookupRule(ctx, command)
+	e.observeStage(command.Action, "exact_rule_lookup", started, err)
 	if err != nil {
 		return types.MessageActionDecision{}, err
 	}
 	if found {
 		return decision, nil
 	}
+	started = time.Now()
 	decision, found, err = e.lookupTenantRule(ctx, command)
+	e.observeStage(command.Action, "tenant_rule_lookup", started, err)
 	if err != nil {
 		return types.MessageActionDecision{}, err
 	}

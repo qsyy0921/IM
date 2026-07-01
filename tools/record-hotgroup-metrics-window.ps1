@@ -298,6 +298,9 @@ function Write-MetricsMarkdown {
     [void]$builder.AppendLine("## Interpretation")
     [void]$builder.AppendLine("")
     [void]$builder.AppendLine("- Use this report with the matching hotgroup summary and analysis report.")
+    if ([string]$Summary.run_name -like "*coordinator*" -and [int64]$Summary.push.subscriber_count -eq 0) {
+        [void]$builder.AppendLine("- Multi-runner coordinator summaries usually show `subscriber_count=0`; use the matching multirunner analysis report for total subscriber count and signal count.")
+    }
     [void]$builder.AppendLine("- Metrics ending in `_5m` show the moving five-minute pressure window; metrics ending in `_window` approximate the whole captured run window.")
     [void]$builder.AppendLine("- Metrics with no data mean the exporter or scrape target did not expose that series in this window.")
     [void]$builder.AppendLine("- Do not use this single window as production capacity evidence.")

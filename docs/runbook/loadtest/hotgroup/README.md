@@ -60,7 +60,9 @@ CreateConversation -> batch CreateMemberChange(JOIN)
 | `hotgroup-metrics-window-20260701-policydefaults-400sub-5000msg.md` | 修正后窗口显示 delivery-consumer route cache hit / miss 已可见：hit window 约 4414.596、miss 约 730.621，`remote_publish_call_window` last 约 1029.043，`remote_enqueued_sessions_window` last 约 102904.324。该 run 比旧 routecache baseline 146.62s 慢，下一步需同配置重复复验确认波动来源。 |
 | `hotgroup-multirunner-analysis-20260701-policydefaults-repeat-400sub-5000msg.md` | 同配置 repeat：clean commit `623c797`，6000 人 / 5000 消息 / 8000 msg/s / 400 subscriber / READ_FANOUT `100:20`，4 个 shard 共读完 100000 条 signal，span 193.012s，span rate 约 518.102 signals/s；与上一轮 policydefaults baseline 193.559s / 516.638 signals/s 的 ratio 为 1.003。结论：corrected policy 曲线稳定。 |
 | `hotgroup-metrics-window-20260701-policydefaults-repeat-400sub-5000msg.md` | repeat 窗口显示 delivery-consumer route cache hit / miss 约 4411.541 / 728.917，`remote_publish_call_window` 约 1028.091，`remote_enqueued_sessions_window` 约 102809.147；writer / Redis subscriber error、queue-full 和 eviction 均为 0。下一步不再重复同一静态配置，应设计 dynamic cadence / 更强 pull-first / 持久 fanout worker。 |
-| total-subscriber-aware policy code module | push-gateway 已补 total-subscriber-aware pull-first policy：Redis route 会先按全局 conversation route 数计算 effective sample，再把该 decision 传给远端 ws gateway，解决 400 subscriber 被 4 个 gateway 拆成 100 / 100 / 100 / 100 后无法触发更强 cadence 的问题。本地 Docker 默认 READ_FANOUT / BROADCAST_SIGNAL total policy 为 `400:50`。该模块已通过 focused checks，但尚未 clean image redeploy / 复压，不能写成容量提升结论。 |
+| total-subscriber-aware policy code module | push-gateway 已补 total-subscriber-aware pull-first policy：Redis route 会先按全局 conversation route 数计算 effective sample，再把该 decision 传给远端 ws gateway，解决 400 subscriber 被 4 个 gateway 拆成 100 / 100 / 100 / 100 后无法触发更强 cadence 的问题。本地 Docker 默认 READ_FANOUT / BROADCAST_SIGNAL total policy 为 `400:50`。该模块已完成 focused checks，后续复压结果见下一行；容量结论必须以复压报告为准。 |
+| `hotgroup-multirunner-analysis-20260701-totalsubpolicy-400sub-5000msg.md` | clean commit `9046dc3` 的 total-subscriber-aware policy 复压：6000 人 / 5000 消息 / 8000 msg/s / 400 subscriber / expected sample=50，4 个 shard 全部完成，signal 数从 baseline 100000 降到 40000，message / delivery outbox pending=0；但 signal span 为 193.02s，和 baseline 193.012s 基本相同。原始 summary 显示 5000 条 SendMessage 实际发送耗时 74.916s，achieved send rate 约 66.741 msg/s，远低于 target 8000 msg/s。结论：在线 frame 减量成立，但 drain 时间没有改善，不能写成吞吐提升，也不能把 target rate 当作真实 QPS。 |
+| `hotgroup-metrics-window-20260701-totalsubpolicy-400sub-5000msg.md` | total-subscriber-aware policy 的 Prometheus 窗口：核心 target up，`delivery_outbox_pending` 峰值 2666 后归零，delivery-consumer route cache hit / miss 约 4345 / 723，remote publish call window 约 405，writer / Redis subscriber error、queue-full 和 slow eviction 均为 0；下一步应查 actual SendMessage duration、delivery_outbox signal production cadence、Kafka cadence 和 push event pacing。 |
 
 ## Conversation signal cadence
 
@@ -208,6 +210,7 @@ PullInbox / ACK error or slow  -> receiver read / ack
 subscriber incomplete / error  -> push subscribe / read path
 writer duration p95 / p99 high -> WebSocket write / flush / network
 outbox 追平但 signal drain 长  -> online signal drain
+signal 数下降但 span 不降       -> signal-volume-reduced-without-drain-improvement
 缺少信号或 lag 字段            -> insufficient observability
 ```
 

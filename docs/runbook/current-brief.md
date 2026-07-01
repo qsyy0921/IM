@@ -324,4 +324,12 @@ brief、loadtest report、development-progress 或 archive。
   `sample_every`，并把该内部 decision 传给各 ws gateway，避免 400 subscriber
   分散到 4 个 gateway 后只能触发单 gateway `100:20` 策略。本地 Docker 默认
   READ_FANOUT / BROADCAST_SIGNAL 使用 per-gateway `100:20` 和 total `400:50`。
-  focused push-gateway tests / build 已通过；尚未 redeploy 复压。
+  clean commit `9046dc38` 已完成镜像重建 / 归档 / Ubuntu redeploy 和
+  `400 subscriber / 5000 message / expected sample=50` 可比复压。signal 数从
+  corrected policy baseline 的 100000 降到 40000，message / delivery outbox
+  pending=0，writer / Redis subscriber error、queue-full 和 eviction 均为 0；
+  但 signal span 为 `193.02s`，与 baseline `193.012s` 基本相同。原始 summary
+  显示 5000 条 SendMessage 实际发送耗时 `74.916s`，actual rate 约
+  `66.741 msg/s`，远低于 target `8000 msg/s`。结论：total policy 证明了
+  在线 frame 减量，但没有转化为 drain span 下降；下一步查 SendMessage 实际发压
+  节奏、delivery_outbox signal 生产节奏、Kafka cadence 和 push event pacing。

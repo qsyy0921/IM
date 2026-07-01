@@ -400,10 +400,18 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
   本地 Docker 默认增加 READ_FANOUT / BROADCAST_SIGNAL total policy `400:50`，
   保留 per-gateway policy `100:20`。focused checks 已通过：
   `go test ./services/push-gateway/internal/types ./services/push-gateway/internal/infrastructure/memory ./services/push-gateway/internal/infrastructure/redisroute ./services/push-gateway/cmd/push-gateway -count=1`
-  和 `go build ./services/push-gateway/cmd/push-gateway`。该模块尚未重建镜像 /
-  redeploy / 复压；下一步用 6000 人、5000 消息、400 subscriber、READ_FANOUT、
-  expected `conversation_signal_sample_every=50` 验证 emitted signal 是否从
-  100000 降到约 40000，并观察 drain span 是否同步下降。
+  和 `go build ./services/push-gateway/cmd/push-gateway`。clean commit `9046dc38`
+  已完成 push-gateway 镜像重建 / 归档 / Ubuntu redeploy，并用
+  `hotgroup-totalsubpolicy-400sub-5000msg-coordinator-20260701-132307` 复压
+  6000 人、5000 消息、目标 8000 msg/s、256 sender、400 subscriber、
+  READ_FANOUT、expected sample=50。4 个 subscriber shard 全部完成，
+  emitted signal 从 corrected policy baseline 的 100000 降到 40000，message /
+  delivery outbox pending=0，writer / Redis subscriber error、queue-full 和
+  slow eviction 均为 0；但 signal span 为 `193.02s`，与 baseline `193.012s`
+  基本相同。coordinator 原始 summary 显示 5000 条 SendMessage 实际发送耗时
+  `74.916s`，achieved send rate 约 `66.741 msg/s`，远低于 target `8000 msg/s`。
+  结论：total policy 成功降低在线 frame 总量，但没有降低端到端 drain span；
+  当前不能写成吞吐提升，也不能把 target rate 当作真实 QPS。
 - HYBRID 诊断档位 1000 人 / 1000 消息 / 400 msg/s 暴露 `delivery_outbox` ready query
   在百万级 per-user outbox 下退化：旧 anti-join blocker 查询每批 500 行约 24s。当前
   delivery outbox relay 已改成 per-conversation frontier ready query，并把本地 worker
@@ -437,9 +445,11 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
   remote publish 放大的风险；`hotgroup-policydefaults-repeat-400sub-5000msg`
   复验确认 corrected policy 曲线稳定在约 `193s / 518 signals/s`。本轮收口为
   “观测补齐 + Docker 默认策略固定 + 同配置复验”，不是新的容量上限。
-- total-subscriber-aware pull-first policy 已完成代码和 focused checks，尚未
-  clean commit Docker 镜像重建 / 归档 / redeploy / 复压；本轮不能宣称容量提升，
-  只能宣称策略模块已就绪。
+- total-subscriber-aware pull-first policy 已完成代码、clean commit Docker 镜像
+  重建 / 归档 / redeploy 和可比复压。该轮把 signal 数从 100000 降到 40000，
+  但 signal span 从 `193.012s` 到 `193.02s` 基本不变，且 actual SendMessage
+  rate 只有约 `66.741 msg/s`；本轮结论是“信号减量成立，但 drain 时间未改善，
+  且当前发压节奏不能作为服务端 8000 QPS 证据”，不是容量提升。
 - 文档同步本轮公开能力或瓶颈变化。
 - 提交并推送到 GitHub。
 
@@ -453,12 +463,11 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
 
 ## 后续优先级
 
-1. subscriber-aware threshold + Redis conversation route cache 已完成 clean Docker
-   复压，delivery-consumer route cache hit / miss 也已进入 Prometheus 窗口；
-   同配置 repeat 已确认 corrected policy 曲线稳定。total-subscriber-aware
-   pull-first policy 代码已就绪，下一步优先重建 push-gateway 镜像、归档到 H 盘、
-   redeploy Ubuntu Docker，并跑 `400 subscriber / 5000 message / expected sample=50`
-   可比复压；不要继续在同一静态 `100:20` 配置上重复压测。
+1. total-subscriber-aware pull-first policy 已完成复压：400 subscriber / 5000 message /
+   expected sample=50 场景下 signal 数从 100000 降到 40000，但 signal span
+   基本不变。下一步不要继续提高 sample 阈值；优先分析实际 SendMessage 生成耗时、
+   delivery_outbox conversation signal 生产节奏、Kafka publish / consume cadence
+   和 push event pacing，确认为什么减量没有转化为 drain span 下降。
 2. 继续为每轮优化保留 clean commit、Docker 镜像归档、三机部署版本和 Prometheus
    时间窗口，保证压测曲线可复现。
 3. 若 HYBRID 仍要支持千人级 per-user materialized outbox，优先评估显式 frontier /

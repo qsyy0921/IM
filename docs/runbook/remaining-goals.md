@@ -103,12 +103,15 @@
    已固定 READ_FANOUT / BROADCAST_SIGNAL 默认 sample=10、subscriber policy `100:20`。
    同配置 repeat 已确认 corrected policy 曲线稳定：100000 条 signal 的 span 为
    193.012s，和上一轮 193.559s 基本一致。total-subscriber-aware pull-first policy
-   代码已完成：Redis route 可按整个 conversation 在线订阅总数触发更强 `sample_every`，
-   并把有效 policy decision 传给各 ws gateway。本地 Docker 默认已设
-   per-gateway `100:20`、total `400:50`。剩余任务：重建 / 归档 / redeploy
-   push-gateway 镜像，并跑 6000 人 / 5000 消息 / 400 subscriber / expected
-   sample=50 可比复压；若仍不能降低 drain span，再评估持久 per-conversation /
-   per-bucket fanout worker 或更强 pull-first。
+   已完成代码、镜像重建 / 归档 / redeploy 和可比复压：Redis route 可按整个
+   conversation 在线订阅总数触发更强 `sample_every`，并把有效 policy decision
+   传给各 ws gateway。本地 Docker 默认已设 per-gateway `100:20`、total `400:50`。
+   `hotgroup-totalsubpolicy-400sub-5000msg` 把 signal 数从 100000 降到 40000，
+   但 span 仍约 193s，且 5000 条 SendMessage 实际发送耗时 `74.916s`
+   （约 `66.741 msg/s`，远低于 target `8000 msg/s`）。剩余任务：先分析
+   actual SendMessage generation duration、delivery_outbox signal production cadence、
+   Kafka publish / consume cadence 和 push event pacing；在找到证据前不要继续只提高
+   sample 阈值，也不要把 target rate 当作真实 QPS。
 2. Agent action boundary / repair cases：在 provider replay admin / workflow handoff 已落
    的基础上，继续扩更多需要 proposal / approval / workflow / audit 的 action 与 repair 场景。
 3. Product-active 服务按需推进：workflow、audit、admin、notification、media、vector、

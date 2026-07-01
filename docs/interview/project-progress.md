@@ -195,6 +195,7 @@ CreateConversation(GROUP)
 | Delivery-consumer route cache metrics | clean commit `b119716d` 为 push-gateway delivery-consumer 暴露独立 debug endpoint 和 Prometheus target；随后发现容器 env 中 READ_FANOUT policy 漂移为空，会使 subscriber-aware 场景退回全量 remote publish | 负例 run `hotgroup-routecache-metrics-400sub-5000msg` 中，5000 条消息触发约 20021 次 remote publish，100000 条 expected signal drain span 为 486.339s。它不是容量结论，而是一次配置漂移诊断：热点群压测必须绑定 clean commit、compose env 和 Prometheus target。 |
 | Docker policy defaults 固定后复压 | 已在本地 compose 固定 READ_FANOUT / BROADCAST_SIGNAL 默认 sample=10、subscriber policy `100:20`，并用 `hotgroup-policydefaults-400sub-5000msg` 复压 | 4 个 shard 读完 100000 条 signal，span 193.559s，SendMessage p95 / p99 为 17.021ms / 19.347ms，message / delivery outbox pending=0；Prometheus 已看到 delivery-consumer route cache hit / miss 约 4415 / 731，remote publish window last 约 1029。结论：观测缺口已补，配置漂移已收口；但该 run 比旧 routecache baseline 慢，后续先做同配置重复复验，再决定是否优化 dynamic cadence / 持久 fanout worker。 |
 | Policy defaults 同配置 repeat | clean commit `623c797` 复跑同一 6000 人 / 5000 消息 / 8000 msg/s / 400 subscriber / READ_FANOUT `100:20` 场景 | 4 个 shard 再次读完 100000 条 signal，span 193.012s，span rate 约 518.102 signals/s；与上一轮 193.559s / 516.638 signals/s 的 ratio 为 1.003。Prometheus 显示 route cache hit / miss 约 4412 / 729，remote publish 约 1028，错误和 eviction 仍为 0。结论：corrected policy 曲线稳定，下一步应从静态 sample policy 转向 dynamic cadence / 更强 pull-first / 持久 fanout worker。 |
+| Total-subscriber pull-first policy | clean commit `9046dc3` 将 sample decision 从单 gateway subscriber threshold 扩展到整个 conversation 总 subscriber 数，并用 READ_FANOUT total policy `400:50` 复压 | 6000 人 / 5000 消息 / 8000 msg/s / 400 subscriber 下，4 个 shard 全部完成，signal 数从 baseline 100000 降到 40000，message / delivery outbox pending=0，writer / Redis subscriber error、queue-full 和 eviction 均为 0；但 signal span 为 193.02s，和 baseline 193.012s 基本相同，且 5000 条 SendMessage 实际发送耗时 74.916s，achieved rate 约 66.741 msg/s。结论：在线 frame 减量成立，但没有改善端到端 drain span，不能写成吞吐提升。下一步要查实际 SendMessage generation duration、delivery_outbox signal production cadence、Kafka cadence 和 push event pacing。 |
 
 面试时可以把这个结果讲成一次真实性能定位过程：
 
@@ -230,8 +231,14 @@ BROADCAST_SIGNAL 超大房间可以单独配置更低在线唤醒 cadence。clea
 同一个 fanout mode 下，还要看实际在线订阅压力，本机或远端 gateway 的 subscriber 数越大，
 online signal cadence 越保守；但 PullInbox / ACK 仍是 durable truth。复压结果说明这个
 first-stage 静态 threshold 能降低 emitted signal 数，但没有改善 drain span，甚至把 span rate
-拉低了。因此下一步不能继续堆静态阈值，而应做消息速率 / 在线人数感知 dynamic cadence、
-持久 per-conversation / per-bucket fanout worker，或对超大房间采用更强 pull-first 策略。
+拉低了。后来我补了 Redis conversation route cache，证明重复 route lookup 是成本之一；
+再把策略推进到 total-subscriber-aware pull-first，让 400 个 subscriber 分散到 4 个 gateway
+时仍能按全局 400 人触发 sample=50。复压结果是 signal 从 10 万降到 4 万，但 span 仍约
+193s，且这一轮 actual SendMessage rate 只有约 66.741 msg/s，所以这不是吞吐提升，只是
+在线 frame 减量和新的诊断线索。下一步不能继续堆静态阈值，而应分析实际 SendMessage
+generation duration、delivery_outbox signal production cadence、Kafka cadence 和 push event
+pacing，再决定是否做 dynamic cadence、持久 per-conversation / per-bucket fanout worker，
+或更强 pull-first。
 ```
 
 2026-06-29 的小规模 smoke 进一步证明了策略切换链路：

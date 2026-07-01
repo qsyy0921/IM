@@ -129,6 +129,24 @@ function Get-SendSummary {
     $send = Get-PropertyValue -Object $summary -Name "send"
     $receiver = Get-PropertyValue -Object $summary -Name "receiver"
     $postgres = Get-PropertyValue -Object $summary -Name "postgres"
+    $sendStartedAt = [string](Get-PropertyValue -Object $send -Name "started_at")
+    $sendFinishedAt = [string](Get-PropertyValue -Object $send -Name "finished_at")
+    $sendDurationSeconds = 0.0
+    $achievedSendRate = 0.0
+    if ($sendStartedAt.Trim().Length -gt 0 -and $sendFinishedAt.Trim().Length -gt 0) {
+        try {
+            $started = [datetime]$sendStartedAt
+            $finished = [datetime]$sendFinishedAt
+            $sendDurationSeconds = ($finished.ToUniversalTime() - $started.ToUniversalTime()).TotalSeconds
+        }
+        catch {
+            $sendDurationSeconds = 0.0
+        }
+    }
+    $sendSuccess = Convert-ToInt64OrDefault (Get-PropertyValue -Object $send -Name "success_count")
+    if ($sendDurationSeconds -gt 0) {
+        $achievedSendRate = [double]$sendSuccess / $sendDurationSeconds
+    }
     return [pscustomobject]@{
         run_name = [string](Get-PropertyValue -Object $summary -Name "run_name")
         commit = [string](Get-PropertyValue -Object $summary -Name "commit")
@@ -139,8 +157,12 @@ function Get-SendSummary {
         message_rate = Convert-ToDoubleOrDefault (Get-PropertyValue -Object $summary -Name "message_rate")
         sender_count = Convert-ToInt64OrDefault (Get-PropertyValue -Object $summary -Name "sender_count")
         fanout_mode = [string](Get-PropertyValue -Object $summary -Name "actual_fanout_mode")
-        send_success = Convert-ToInt64OrDefault (Get-PropertyValue -Object $send -Name "success_count")
+        send_success = $sendSuccess
         send_errors = Convert-ToInt64OrDefault (Get-PropertyValue -Object $send -Name "error_count")
+        send_started_at = $sendStartedAt
+        send_finished_at = $sendFinishedAt
+        send_duration_seconds = $sendDurationSeconds
+        achieved_send_rate = $achievedSendRate
         send_p95_ms = Convert-ToDoubleOrDefault (Get-PropertyValue -Object $send -Name "latency_p95_ms")
         send_p99_ms = Convert-ToDoubleOrDefault (Get-PropertyValue -Object $send -Name "latency_p99_ms")
         pull_success = Convert-ToInt64OrDefault (Get-PropertyValue -Object $receiver -Name "pull_success_count")
@@ -302,6 +324,8 @@ function Write-MultirunnerReport {
     [void]$builder.AppendLine("| sender_count | $($SendSummary.sender_count) |")
     [void]$builder.AppendLine("| send_success | $($SendSummary.send_success) |")
     [void]$builder.AppendLine("| send_errors | $($SendSummary.send_errors) |")
+    [void]$builder.AppendLine("| send_duration_seconds | $(Format-Number $SendSummary.send_duration_seconds) |")
+    [void]$builder.AppendLine("| achieved_send_rate | $(Format-Number $SendSummary.achieved_send_rate) |")
     [void]$builder.AppendLine("| send_p95_ms | $(Format-Number $SendSummary.send_p95_ms) |")
     [void]$builder.AppendLine("| send_p99_ms | $(Format-Number $SendSummary.send_p99_ms) |")
     [void]$builder.AppendLine("| pull_success | $($SendSummary.pull_success) |")
@@ -334,8 +358,16 @@ function Write-MultirunnerReport {
     if ($null -ne $BaselineSignalSummary) {
         $delta = $SignalSummary.signal_span_rate - $BaselineSignalSummary.signal_span_rate
         $ratio = 0.0
+        $signalCountRatio = 0.0
+        $spanRatio = 0.0
         if ($BaselineSignalSummary.signal_span_rate -gt 0) {
             $ratio = $SignalSummary.signal_span_rate / $BaselineSignalSummary.signal_span_rate
+        }
+        if ($BaselineSignalSummary.signal_count -gt 0) {
+            $signalCountRatio = [double]$SignalSummary.signal_count / [double]$BaselineSignalSummary.signal_count
+        }
+        if ($BaselineSignalSummary.signal_span_seconds -gt 0) {
+            $spanRatio = [double]$SignalSummary.signal_span_seconds / [double]$BaselineSignalSummary.signal_span_seconds
         }
         [void]$builder.AppendLine("## Baseline Comparison")
         [void]$builder.AppendLine("")
@@ -346,6 +378,8 @@ function Write-MultirunnerReport {
         [void]$builder.AppendLine("")
         [void]$builder.AppendLine("- delta_signals_per_second: $(Format-Number $delta)")
         [void]$builder.AppendLine("- ratio_vs_baseline: $(Format-Number $ratio)")
+        [void]$builder.AppendLine("- signal_count_ratio_vs_baseline: $(Format-Number $signalCountRatio)")
+        [void]$builder.AppendLine("- signal_span_ratio_vs_baseline: $(Format-Number $spanRatio)")
         [void]$builder.AppendLine("")
     }
     [void]$builder.AppendLine("## Shards")
@@ -359,10 +393,29 @@ function Write-MultirunnerReport {
     [void]$builder.AppendLine("## Bottleneck Judgment")
     [void]$builder.AppendLine("")
     if ($SignalSummary.subscribe_errors -eq 0 -and $SignalSummary.subscriber_errors -eq 0 -and $SendSummary.message_outbox_pending -eq 0 -and $SendSummary.delivery_outbox_pending -eq 0) {
-        [void]$builder.AppendLine("- current_bottleneck: online-signal-drain")
-        [void]$builder.AppendLine("- evidence: coordinator send / PullInbox / ACK succeeded, message_outbox and delivery_outbox ended with zero pending, all subscriber shards completed.")
-        [void]$builder.AppendLine("- evidence: multi-runner signal span rate did not materially exceed the previous single-runner 400 subscriber baseline, so the immediate limit is not just one Go process doing JSON decode/accounting.")
-        [void]$builder.AppendLine("- next_strategy: inspect push-gateway conversation signal writer path, WebSocket flush cadence, Redis subscriber fanout, network throughput and per-connection write scheduling before increasing subscriber count again.")
+        $signalVolumeReducedWithoutSpanImprovement = $false
+        if ($null -ne $BaselineSignalSummary -and $BaselineSignalSummary.signal_count -gt 0 -and $BaselineSignalSummary.signal_span_seconds -gt 0) {
+            $signalCountRatioForJudgment = [double]$SignalSummary.signal_count / [double]$BaselineSignalSummary.signal_count
+            $spanRatioForJudgment = [double]$SignalSummary.signal_span_seconds / [double]$BaselineSignalSummary.signal_span_seconds
+            $signalVolumeReducedWithoutSpanImprovement = ($signalCountRatioForJudgment -lt 0.8 -and $spanRatioForJudgment -gt 0.9)
+        }
+
+        if ($signalVolumeReducedWithoutSpanImprovement) {
+            [void]$builder.AppendLine("- current_bottleneck: signal-volume-reduced-without-drain-improvement")
+            [void]$builder.AppendLine("- evidence: coordinator send / PullInbox / ACK succeeded, message_outbox and delivery_outbox ended with zero pending, all subscriber shards completed.")
+            [void]$builder.AppendLine("- evidence: emitted conversation signal count fell materially versus baseline, but first-to-last signal span stayed nearly flat; the stronger pull-first cadence reduced online frame volume but did not reduce end-to-end drain time in this run.")
+            if ($SendSummary.message_rate -gt 0 -and $SendSummary.achieved_send_rate -gt 0 -and ($SendSummary.achieved_send_rate / $SendSummary.message_rate) -lt 0.5) {
+                [void]$builder.AppendLine("- evidence: achieved SendMessage rate was far below the target rate, so sender pacing / setup / client-side throttling must be measured before interpreting signal drain as a server capacity ceiling.")
+            }
+            [void]$builder.AppendLine("- evidence: do not report this as a throughput improvement. Treat it as load-reduction evidence plus a new diagnostic clue.")
+            [void]$builder.AppendLine("- next_strategy: inspect actual SendMessage generation duration, delivery_outbox signal production cadence, Kafka publish / consume cadence, and push event pacing before further increasing sample_every or subscriber count.")
+        }
+        else {
+            [void]$builder.AppendLine("- current_bottleneck: online-signal-drain")
+            [void]$builder.AppendLine("- evidence: coordinator send / PullInbox / ACK succeeded, message_outbox and delivery_outbox ended with zero pending, all subscriber shards completed.")
+            [void]$builder.AppendLine("- evidence: multi-runner signal span rate did not materially exceed the previous single-runner 400 subscriber baseline, so the immediate limit is not just one Go process doing JSON decode/accounting.")
+            [void]$builder.AppendLine("- next_strategy: inspect push-gateway conversation signal writer path, WebSocket flush cadence, Redis subscriber fanout, network throughput and per-connection write scheduling before increasing subscriber count again.")
+        }
     }
     else {
         [void]$builder.AppendLine("- current_bottleneck: failed-or-incomplete-run")

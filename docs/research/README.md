@@ -20,6 +20,8 @@
   包含 EvalCase / EvalRun / EvalResult / synthetic IM-like fixture 草案。
 - `agent-coding-experiment-path-20260701.md`：隔离式 Agent 编码实验路径，记录
   `ai/python/nexusim_ai_eval`、fixture、CLI、单元测试、集成测试和后续切片顺序。
+- `agent-adr-promotion-readiness-20260702.md`：隔离式 Agent eval / replay /
+  memory calibration skeleton 的 ADR 候选 readiness review；不冻结生产契约。
 
 ## 存放位置
 

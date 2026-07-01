@@ -39,6 +39,7 @@ Open Dataset Eval Harness / synthetic IM-like fixture 已开始第一段隔离�
 | `docs/research/agent-current-to-target-matrix-20260701.md` | 已完成 | 当前服务到目标 Agent 平台的迁移矩阵 |
 | `docs/research/agent-open-dataset-eval-plan-20260701.md` | 已完成 | 公开数据集优先 eval 计划和 synthetic fixture 草案 |
 | `docs/research/agent-coding-experiment-path-20260701.md` | 已完成 | 隔离式 Agent 编码实验路径、测试矩阵和后续切片顺序 |
+| `docs/research/agent-adr-promotion-readiness-20260702.md` | 已完成 | ADR 候选 readiness review；可进入候选起草但不能直接推广生产契约 |
 | `docs/sdd/agent-runtime.md` | 已完成 | Runtime / Harness 详细 SDD |
 | `docs/sdd/agent-memory-admission.md` | 已完成 | Memory admission 详细 SDD |
 | `docs/sdd/agent-context-evidencepack.md` | 已完成 | Context / EvidencePack 详细 SDD |
@@ -200,7 +201,7 @@ ai/python/tests/test_agent_eval_*.py
 
 | 优先级 | 工作 | 输出 |
 | --- | --- | --- |
-| P1 | ADR promotion readiness review | 判断 isolated Agent skeleton 是否足以提出 ADR 候选 |
+| P1 | ADR candidate drafting decision | 主集成 / 用户确认是否进入 ADR candidate drafting |
 | P2 | ReplayBundle observability hardening review | 如评审要求，继续补 fixture-only taxonomy / trace evidence |
 | P2 | Memory calibration hardening | 仅在需要时继续追加公开数据集导出或 adapter metadata |
 
@@ -217,8 +218,8 @@ ai/python/tests/test_agent_eval_*.py
 - SDD index / research index / architecture index link check
 - 不触碰 proto、schema、migration、production service directory
 
-后续优先推进 ADR promotion readiness review；ReplayBundle observability 和
-memory calibration 只在评审要求时继续 fixture-only hardening。
+后续等待主集成 / 用户确认是否进入 ADR candidate drafting；ReplayBundle
+observability 和 memory calibration 只在评审要求时继续 fixture-only hardening。
 
 ## 历史资料路由
 

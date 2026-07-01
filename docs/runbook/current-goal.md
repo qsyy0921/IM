@@ -45,6 +45,8 @@ Agent / RAG / memory / Python AI Worker / EvidencePack / eval gate，不使用�
 - `docs/research/agent-open-dataset-eval-plan-20260701.md`：公开数据集优先 eval 计划和
   synthetic IM-like fixture 草案。
 - `docs/research/agent-coding-experiment-path-20260701.md`：隔离式 Agent 编码实验路径。
+- `docs/research/agent-adr-promotion-readiness-20260702.md`：ADR 候选 readiness
+  review；结论是可进入 ADR candidate drafting，但不能直接推广生产契约。
 - `docs/sdd/agent-runtime.md`
 - `docs/sdd/agent-memory-admission.md`
 - `docs/sdd/agent-context-evidencepack.md`
@@ -85,8 +87,8 @@ Agent / RAG / memory / Python AI Worker / EvidencePack / eval gate，不使用�
 
 ## 后续优先级
 
-1. 评审 isolated Agent eval / replay / memory calibration skeleton 是否可以进入
-   ADR promotion decision；未通过前不提升生产契约。
+1. 等待主集成 / 用户确认是否从 readiness review 进入 ADR candidate drafting；
+   未确认前不提升生产契约。
 2. 对 ReplayBundle / observability skeleton 做 review，如需继续 hardening，只补
    fixture-only taxonomy / trace evidence，不提升生产契约。
 3. 在上述实验通过后，再决定是否把 Agent Runtime / Harness 提升为 ADR、服务级 SDD

@@ -132,13 +132,16 @@ Agent Gateway / UX
 - 已补 fixture-only ReplayBundle observability skeleton：低敏
   observability refs、hash refs、version metadata refs、failure taxonomy refs 和
   trace linkage refs，并接入 EvalReport / ReplayBundle / AgentRunTrace。
+- 已完成 ADR promotion readiness review：
+  `docs/research/agent-adr-promotion-readiness-20260702.md`。结论是当前 isolated
+  skeleton 可进入 ADR candidate drafting，但不能直接推广生产契约。
 - 已补 current EvalReport generation / baseline refresh review CLI，生成当前报告和
   baseline refresh review artifact，默认不覆盖 baseline。
 - 已补 current-report / baseline lifecycle deeper hardening：多 suite report
   matrix、baseline refresh approval manifest 和 report retention metadata，
   支持 synthetic fixture 与 public-dataset-style adapter sample 混合进矩阵。
-- 下一段优先做 ADR promotion readiness review 或 ReplayBundle observability
-  review 后续 hardening；仍不提升生产契约，除非用户明确要求。
+- 下一段等待主集成 / 用户确认是否进入 ADR candidate drafting；若不进入，则只按
+  review 反馈继续 fixture-only hardening。
 
 ## 工作规则
 

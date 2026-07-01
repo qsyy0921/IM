@@ -14,9 +14,8 @@
 
 ## 当前优先顺序
 
-1. ADR promotion readiness review：评审 isolated Agent eval / replay / memory
-   calibration skeleton 是否足以推动 Agent Runtime / Harness、ContextPackage、
-   MemoryCandidate、Tool prepare、ReplayBundle 的 ADR 候选；未通过前不提升生产契约。
+1. ADR candidate drafting decision：`docs/research/agent-adr-promotion-readiness-20260702.md`
+   结论是可进入 ADR candidate drafting，但需主集成 / 用户确认；未确认前不提升生产契约。
 2. ReplayBundle observability hardening review：当前 skeleton 已覆盖低敏
    observability refs、hash refs、version metadata refs、failure taxonomy refs 和
    trace linkage refs；如评审要求继续，只增加 fixture-only taxonomy / trace 证据。

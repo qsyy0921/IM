@@ -71,6 +71,15 @@ scrape_configs:
         labels:
           service: push-gateway
 
+  - job_name: nexusim-push-gateway-delivery-consumer
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - host.docker.internal:11944
+        labels:
+          service: push-gateway
+          role: delivery-consumer
+
   - job_name: nexusim-receipt-service
     metrics_path: /metrics
     static_configs:

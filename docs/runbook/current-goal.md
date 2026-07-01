@@ -348,9 +348,11 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
   baseline 的 `289.249s` 降至 `146.62s`，span rate 从约 `345.723 signals/s`
   提升到约 `682.034 signals/s`，约 `1.97x`。Prometheus 窗口显示
   Redis subscriber fanout p95 / p99 降到约 `1.96ms / 6.25ms`，WebSocket
-  delivery notify write p95 / p99 约 `0.241ms / 0.433ms`。注意：当前 Prometheus
-  只 scrape 4 个 ws debug target，delivery-consumer 未暴露 debug 端口，因此
-  route cache hit / miss 在窗口中仍为 0；这是观测缺口，不代表 cache 未生效。
+  delivery notify write p95 / p99 约 `0.241ms / 0.433ms`。注意：该窗口中
+  Prometheus 只 scrape 4 个 ws debug target，delivery-consumer 尚未进入 debug
+  scrape，因此 route cache hit / miss 为 0；这是观测缺口，不代表 cache 未生效。
+  当前仓库已补 delivery-consumer debug endpoint / Prometheus core target 配置，
+  下一步需 clean commit Docker redeploy 后复压确认命中率曲线。
 - HYBRID 诊断档位 1000 人 / 1000 消息 / 400 msg/s 暴露 `delivery_outbox` ready query
   在百万级 per-user outbox 下退化：旧 anti-join blocker 查询每批 500 行约 24s。当前
   delivery outbox relay 已改成 per-conversation frontier ready query，并把本地 worker
@@ -377,8 +379,9 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
 - Redis conversation route cache 代码、配置、指标和 hotgroup metrics-window 查询已完成
   clean commit 镜像重建 / 归档 / redeploy / 可比复压。该模块在 subscriber-aware
   threshold 场景下把 signal drain rate 提升约 1.97x，但仍未回到 fanout-mode
-  policy baseline 的约 1.4k signals/s，且 delivery-consumer cache hit / miss 仍缺
-  debug scrape 证据。
+  policy baseline 的约 1.4k signals/s。当前已补 delivery-consumer debug endpoint
+  和 Prometheus core scrape target 配置；仍需 redeploy / 复压来取得 cache hit /
+  miss 证据。
 - 文档同步本轮公开能力或瓶颈变化。
 - 提交并推送到 GitHub。
 
@@ -394,10 +397,10 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
 
 1. subscriber-aware threshold + Redis conversation route cache 已完成 clean Docker
    复压，证明重复 route lookup 曾是该策略的明显成本来源，但 route cache 后仍未突破
-   fanout-mode policy baseline。下一步先补 delivery-consumer debug/metrics scrape 或
-   低敏 sidecar 观测，使 route cache hit / miss 可见；随后不要继续只调静态 sample
-   knob，转向消息速率 / 在线人数感知的 dynamic cadence、持久 per-conversation /
-   per-bucket fanout worker，或更强 pull-first 策略。
+   fanout-mode policy baseline。当前已补 delivery-consumer debug/metrics scrape
+   配置；下一步先 redeploy / 复压验证 route cache hit / miss 可见，再转向消息速率 /
+   在线人数感知的 dynamic cadence、持久 per-conversation / per-bucket fanout worker，
+   或更强 pull-first 策略。
 2. 继续为每轮优化保留 clean commit、Docker 镜像归档、三机部署版本和 Prometheus
    时间窗口，保证压测曲线可复现。
 3. 若 HYBRID 仍要支持千人级 per-user materialized outbox，优先评估显式 frontier /

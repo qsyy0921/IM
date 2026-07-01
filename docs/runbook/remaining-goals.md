@@ -97,9 +97,10 @@
    READ_FANOUT `100:20` 下，signal span 降至 146.62s，span rate 提升到约
    682.034 signals/s，约 1.97x；message / delivery outbox pending=0，writer /
    Redis subscriber error、queue-full 和 eviction 均为 0。下一步不要继续只调静态
-   sample knob；先补 delivery-consumer debug/metrics scrape，使 route cache hit /
-   miss 可见，再转向消息速率 / 在线人数感知 dynamic cadence、持久
-   per-conversation / per-bucket fanout worker，或更强 pull-first 策略。
+   sample knob；当前已补 delivery-consumer debug/metrics scrape 配置，需要先
+   redeploy / 复压确认 route cache hit / miss 可见，再转向消息速率 / 在线人数感知
+   dynamic cadence、持久 per-conversation / per-bucket fanout worker，或更强
+   pull-first 策略。
 2. Agent action boundary / repair cases：在 provider replay admin / workflow handoff 已落
    的基础上，继续扩更多需要 proposal / approval / workflow / audit 的 action 与 repair 场景。
 3. Product-active 服务按需推进：workflow、audit、admin、notification、media、vector、

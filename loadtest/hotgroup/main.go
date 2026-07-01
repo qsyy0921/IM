@@ -28,6 +28,9 @@ func run(args []string, getenv func(string) string) error {
 		messageCount = 1
 	}
 	cfg.MessageCount = messageCount
+	if cfg.SendConcurrency == 0 {
+		cfg.SendConcurrency = cfg.SenderCount
+	}
 	result := &summary{
 		SchemaVersion:              2,
 		RunName:                    cfg.RunName,
@@ -41,6 +44,7 @@ func run(args []string, getenv func(string) string) error {
 		ConversationID:             cfg.ConversationID,
 		GroupSize:                  cfg.GroupSize,
 		SenderCount:                cfg.SenderCount,
+		SendConcurrency:            cfg.SendConcurrency,
 		OnlineRatio:                cfg.OnlineRatio,
 		SlowClientRatio:            cfg.SlowClientRatio,
 		ACKRatio:                   cfg.ACKRatio,

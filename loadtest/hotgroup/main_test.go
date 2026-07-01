@@ -44,6 +44,44 @@ func TestParseConfigRejectsSenderCountAtLeastGroupSize(t *testing.T) {
 	}
 }
 
+func TestParseConfigRejectsNegativeSendConcurrency(t *testing.T) {
+	_, err := parseConfig([]string{
+		"--send-concurrency", "-1",
+	}, func(string) string { return "" })
+	if err == nil {
+		t.Fatal("expected validation error")
+	}
+}
+
+func TestRunDryRunDefaultsSendConcurrencyToSenderCount(t *testing.T) {
+	dir := t.TempDir()
+	err := run([]string{
+		"--dry-run",
+		"--run-name", "hotgroup-send-concurrency-default",
+		"--result-root", dir,
+		"--tenant-id", "tenant-hot-test",
+		"--conversation-id", "conv-hot-test",
+		"--group-size", "12",
+		"--sender-count", "4",
+		"--message-count", "4",
+	}, func(string) string { return "" })
+	if err != nil {
+		t.Fatalf("run dry-run: %v", err)
+	}
+	summaryPath := filepath.Join(dir, "hotgroup-send-concurrency-default", "hotgroup-summary.json")
+	content, err := os.ReadFile(summaryPath)
+	if err != nil {
+		t.Fatalf("read summary: %v", err)
+	}
+	var result summary
+	if err := json.Unmarshal(content, &result); err != nil {
+		t.Fatalf("decode summary: %v", err)
+	}
+	if result.SendConcurrency != 4 {
+		t.Fatalf("send concurrency = %d", result.SendConcurrency)
+	}
+}
+
 func TestParseConfigSubscriberOnlyDoesNotRequirePostgres(t *testing.T) {
 	cfg, err := parseConfig([]string{
 		"--runner-mode", "subscriber-only",
@@ -142,6 +180,7 @@ func TestRunDryRunWritesSummaryAndUsers(t *testing.T) {
 		"--conversation-id", "conv-hot-test",
 		"--group-size", "12",
 		"--sender-count", "3",
+		"--send-concurrency", "2",
 		"--message-count", "4",
 	}, func(string) string { return "" })
 	if err != nil {
@@ -164,6 +203,9 @@ func TestRunDryRunWritesSummaryAndUsers(t *testing.T) {
 	}
 	if result.RunnerMode != runnerModeFull {
 		t.Fatalf("runner mode = %s", result.RunnerMode)
+	}
+	if result.SendConcurrency != 2 {
+		t.Fatalf("send concurrency = %d", result.SendConcurrency)
 	}
 	if result.ExpectedInboxRows != 48 {
 		t.Fatalf("expected inbox rows = %d", result.ExpectedInboxRows)

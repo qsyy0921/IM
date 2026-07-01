@@ -412,6 +412,14 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
   `74.916s`，achieved send rate 约 `66.741 msg/s`，远低于 target `8000 msg/s`。
   结论：total policy 成功降低在线 frame 总量，但没有降低端到端 drain span；
   当前不能写成吞吐提升，也不能把 target rate 当作真实 QPS。
+- 2026-07-01 已定位并修复 `loadtest/hotgroup` 发压模型问题：此前
+  `sendMessages` 是单 goroutine 同步调用 `SendMessage`，即使配置
+  `sender_count=256` / `message_rate=8000`，也会被单请求约 17ms 的延迟限制到
+  几十 msg/s。runner 现在新增 `--send-concurrency`
+  / `NEXUSIM_HOTGROUP_SEND_CONCURRENCY`，默认使用 `sender-count`，并以全局
+  target rate 调度 job、多 worker 并发调用 `SendMessage`。summary、报告和
+  hotgroup 分析脚本已记录 `send_concurrency`、`send_duration_seconds` 和
+  `achieved_send_rate`，用于区分“目标 QPS”和“实际发压 QPS”。
 - HYBRID 诊断档位 1000 人 / 1000 消息 / 400 msg/s 暴露 `delivery_outbox` ready query
   在百万级 per-user outbox 下退化：旧 anti-join blocker 查询每批 500 行约 24s。当前
   delivery outbox relay 已改成 per-conversation frontier ready query，并把本地 worker
@@ -450,6 +458,9 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
   但 signal span 从 `193.012s` 到 `193.02s` 基本不变，且 actual SendMessage
   rate 只有约 `66.741 msg/s`；本轮结论是“信号减量成立，但 drain 时间未改善，
   且当前发压节奏不能作为服务端 8000 QPS 证据”，不是容量提升。
+- `loadtest/hotgroup` 已支持多 goroutine / 多 sender 并发发压，分析脚本已把
+  `send_concurrency` 和 `achieved_send_rate` 纳入报告。该改动已完成 focused
+  checks；容量结论必须等 clean commit 镜像 / runner 复压后再写。
 - 文档同步本轮公开能力或瓶颈变化。
 - 提交并推送到 GitHub。
 
@@ -463,11 +474,12 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
 
 ## 后续优先级
 
-1. total-subscriber-aware pull-first policy 已完成复压：400 subscriber / 5000 message /
-   expected sample=50 场景下 signal 数从 100000 降到 40000，但 signal span
-   基本不变。下一步不要继续提高 sample 阈值；优先分析实际 SendMessage 生成耗时、
-   delivery_outbox conversation signal 生产节奏、Kafka publish / consume cadence
-   和 push event pacing，确认为什么减量没有转化为 drain span 下降。
+1. 用新增的 concurrent sender runner 做 clean commit 复压：保持
+   total-subscriber-aware policy 的 6000 人 / 5000 message / 400 subscriber /
+   expected sample=50 场景，先确认 `achieved_send_rate` 是否接近目标；若
+   SendMessage 实际速率提升后 signal span 下降，说明上一轮主要受 runner 发压模型限制；
+   若实际速率提升但 span / lag 恶化，再继续定位 message-service、Kafka、
+   delivery projection、delivery_outbox 或 push event pacing。
 2. 继续为每轮优化保留 clean commit、Docker 镜像归档、三机部署版本和 Prometheus
    时间窗口，保证压测曲线可复现。
 3. 若 HYBRID 仍要支持千人级 per-user materialized outbox，优先评估显式 frontier /

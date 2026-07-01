@@ -13,6 +13,18 @@ CreateConversation -> batch CreateMemberChange(JOIN)
 
 本文继续冻结场景、指标和面试口径，避免只用单接口 QPS 代替真实 IM 业务压测。
 
+SendMessage 发压模型：
+
+```text
+--sender-count       生成多少个业务 sender 用户
+--send-concurrency  并发 SendMessage worker 数；0 表示使用 sender-count
+--message-rate      全局目标投递速率，不等于最终达成 QPS
+```
+
+正式压测报告必须同时记录 `message_rate` 和 `achieved_send_rate`。如果
+`achieved_send_rate` 明显低于 `message_rate`，先排查 runner 发压能力、gRPC
+连接、请求超时和客户端机器资源，不要直接把 target rate 当成服务端容量上限。
+
 ## 最新压测记录
 
 | 报告 | 结论 |
@@ -146,7 +158,9 @@ runner summary 至少输出：
 group_size
 online_ratio
 sender_count
+send_concurrency
 message_rate
+achieved_send_rate
 duration
 send_success_count
 send_error_count

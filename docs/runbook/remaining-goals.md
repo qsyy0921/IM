@@ -108,10 +108,13 @@
    传给各 ws gateway。本地 Docker 默认已设 per-gateway `100:20`、total `400:50`。
    `hotgroup-totalsubpolicy-400sub-5000msg` 把 signal 数从 100000 降到 40000，
    但 span 仍约 193s，且 5000 条 SendMessage 实际发送耗时 `74.916s`
-   （约 `66.741 msg/s`，远低于 target `8000 msg/s`）。剩余任务：先分析
-   actual SendMessage generation duration、delivery_outbox signal production cadence、
-   Kafka publish / consume cadence 和 push event pacing；在找到证据前不要继续只提高
-   sample 阈值，也不要把 target rate 当作真实 QPS。
+   （约 `66.741 msg/s`，远低于 target `8000 msg/s`）。已定位旧 runner 是
+   单 goroutine 同步发送，现已新增 `--send-concurrency`，默认等于 `sender-count`，
+   并把 `achieved_send_rate` 纳入分析脚本。剩余任务：用 clean commit 和新 runner
+   重跑同一 total-subscriber 场景，确认 actual send rate 是否提升；若提升后仍无容量改善，
+   再分析 delivery_outbox signal production cadence、Kafka publish / consume cadence
+   和 push event pacing。在取得复压证据前不要继续只提高 sample 阈值，也不要把
+   target rate 当作真实 QPS。
 2. Agent action boundary / repair cases：在 provider replay admin / workflow handoff 已落
    的基础上，继续扩更多需要 proposal / approval / workflow / audit 的 action 与 repair 场景。
 3. Product-active 服务按需推进：workflow、audit、admin、notification、media、vector、

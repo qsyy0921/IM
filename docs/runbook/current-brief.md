@@ -333,3 +333,9 @@ brief、loadtest report、development-progress 或 archive。
   `66.741 msg/s`，远低于 target `8000 msg/s`。结论：total policy 证明了
   在线 frame 减量，但没有转化为 drain span 下降；下一步查 SendMessage 实际发压
   节奏、delivery_outbox signal 生产节奏、Kafka cadence 和 push event pacing。
+- 2026-07-01 已修正 `loadtest/hotgroup` 发压模型：旧 runner 的 SendMessage
+  是单 goroutine 同步循环，无法真实使用 256 sender；现在新增
+  `--send-concurrency` / `NEXUSIM_HOTGROUP_SEND_CONCURRENCY`，默认等于
+  `sender-count`，并记录 `send_concurrency`、`send_duration_seconds`、
+  `achieved_send_rate`。下一轮复压先验证 actual send rate 是否提升，再判断瓶颈是否
+  迁移到 message-service、Kafka、delivery projection 或 push drain。

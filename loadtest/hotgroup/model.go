@@ -123,6 +123,7 @@ type summary struct {
 	ConversationID             string         `json:"conversation_id"`
 	GroupSize                  int            `json:"group_size"`
 	SenderCount                int            `json:"sender_count"`
+	SendConcurrency            int            `json:"send_concurrency"`
 	OnlineRatio                float64        `json:"online_ratio"`
 	SlowClientRatio            float64        `json:"slow_client_ratio"`
 	ACKRatio                   float64        `json:"ack_ratio"`

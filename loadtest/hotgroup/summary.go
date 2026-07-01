@@ -75,6 +75,7 @@ func writeReport(path string, result *summary) error {
 	fmt.Fprintf(&builder, "- conversation_id: `%s`\n", result.ConversationID)
 	fmt.Fprintf(&builder, "- group_size: `%d`\n", result.GroupSize)
 	fmt.Fprintf(&builder, "- sender_count: `%d`\n", result.SenderCount)
+	fmt.Fprintf(&builder, "- send_concurrency: `%d`\n", result.SendConcurrency)
 	fmt.Fprintf(&builder, "- message_count: `%d`\n", result.MessageCount)
 	fmt.Fprintf(&builder, "- actual_fanout_mode: `%s`\n", result.ActualFanoutMode)
 	if result.ExpectedFanoutMode != "" {
@@ -93,6 +94,16 @@ func writeReport(path string, result *summary) error {
 	builder.WriteString("## Send\n\n")
 	fmt.Fprintf(&builder, "- success: `%d`\n", result.Send.SuccessCount)
 	fmt.Fprintf(&builder, "- errors: `%d`\n", result.Send.ErrorCount)
+	sendDurationSeconds := 0.0
+	achievedSendRate := 0.0
+	if !result.Send.StartedAt.IsZero() && !result.Send.FinishedAt.IsZero() && result.Send.FinishedAt.After(result.Send.StartedAt) {
+		sendDurationSeconds = result.Send.FinishedAt.Sub(result.Send.StartedAt).Seconds()
+		if sendDurationSeconds > 0 {
+			achievedSendRate = float64(result.Send.SuccessCount) / sendDurationSeconds
+		}
+	}
+	fmt.Fprintf(&builder, "- duration_seconds: `%.3f`\n", sendDurationSeconds)
+	fmt.Fprintf(&builder, "- achieved_send_rate: `%.3f`\n", achievedSendRate)
 	fmt.Fprintf(&builder, "- p95_ms: `%.2f`\n", result.Send.LatencyP95MS)
 	fmt.Fprintf(&builder, "- p99_ms: `%.2f`\n", result.Send.LatencyP99MS)
 	fmt.Fprintf(&builder, "- max_seq: `%d`\n\n", result.Send.MaxSeq)

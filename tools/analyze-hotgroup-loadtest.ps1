@@ -159,6 +159,29 @@ function Convert-HotGroupSummary {
         $signalDrainSeconds = $lastSignalMs / 1000.0
         $signalDrainRate = [double]$signalCount / $signalDrainSeconds
     }
+    $sendStartedAt = [string](Get-PropertyValue -Object $send -Name "started_at")
+    $sendFinishedAt = [string](Get-PropertyValue -Object $send -Name "finished_at")
+    $sendDurationSeconds = 0.0
+    if ($sendStartedAt.Trim().Length -gt 0 -and $sendFinishedAt.Trim().Length -gt 0) {
+        try {
+            $started = [datetime]$sendStartedAt
+            $finished = [datetime]$sendFinishedAt
+            $sendDurationSeconds = ($finished.ToUniversalTime() - $started.ToUniversalTime()).TotalSeconds
+        }
+        catch {
+            $sendDurationSeconds = 0.0
+        }
+    }
+    $sendSuccess = Convert-ToInt64OrDefault (Get-PropertyValue -Object $send -Name "success_count")
+    $achievedSendRate = 0.0
+    if ($sendDurationSeconds -gt 0) {
+        $achievedSendRate = [double]$sendSuccess / $sendDurationSeconds
+    }
+    $sendConcurrencyValue = Get-PropertyValue -Object $summary -Name "send_concurrency"
+    $sendConcurrency = Convert-ToInt64OrDefault $sendConcurrencyValue
+    if ($null -eq $sendConcurrencyValue) {
+        $sendConcurrency = 1
+    }
 
     $metricsWindowPath = Join-Path $File.RunDirectory "hotgroup-prometheus-window.json"
     $hasMetricsWindow = Test-Path -LiteralPath $metricsWindowPath -PathType Leaf
@@ -178,10 +201,13 @@ function Convert-HotGroupSummary {
         message_count = Convert-ToInt64OrDefault (Get-PropertyValue -Object $summary -Name "message_count")
         message_rate = Convert-ToDoubleOrDefault (Get-PropertyValue -Object $summary -Name "message_rate")
         sender_count = Convert-ToInt64OrDefault (Get-PropertyValue -Object $summary -Name "sender_count")
+        send_concurrency = $sendConcurrency
         fanout_mode = [string](Get-PropertyValue -Object $summary -Name "actual_fanout_mode")
         expected_fanout_mode = [string](Get-PropertyValue -Object $summary -Name "expected_fanout_mode")
-        send_success = Convert-ToInt64OrDefault (Get-PropertyValue -Object $send -Name "success_count")
+        send_success = $sendSuccess
         send_errors = Convert-ToInt64OrDefault (Get-PropertyValue -Object $send -Name "error_count")
+        send_duration_seconds = $sendDurationSeconds
+        achieved_send_rate = $achievedSendRate
         send_p95_ms = Convert-ToDoubleOrDefault (Get-PropertyValue -Object $send -Name "latency_p95_ms")
         send_p99_ms = Convert-ToDoubleOrDefault (Get-PropertyValue -Object $send -Name "latency_p99_ms")
         max_seq = Convert-ToInt64OrDefault (Get-PropertyValue -Object $send -Name "max_seq")
@@ -345,13 +371,13 @@ function Write-AnalysisMarkdown {
 
     [void]$builder.AppendLine("## Run Matrix")
     [void]$builder.AppendLine("")
-    [void]$builder.AppendLine("| run | commit | clean | ok | fanout | group | msg/s | messages | senders | subs | send p95 | send p99 | pull p95 | signals | slowest drain s | drain signals/s | msg pending | delivery pending | metrics window | bottleneck |")
-    [void]$builder.AppendLine("| --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- |")
+    [void]$builder.AppendLine("| run | commit | clean | ok | fanout | group | target msg/s | achieved msg/s | messages | senders | send concurrency | subs | send p95 | send p99 | pull p95 | signals | slowest drain s | drain signals/s | msg pending | delivery pending | metrics window | bottleneck |")
+    [void]$builder.AppendLine("| --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- |")
 
     foreach ($run in $Runs) {
         $classification = Get-BottleneckClassification -Run $run
         [void]$builder.AppendLine((
-            "| {0} | {1} | {2} | {3} | {4} | {5} | {6} | {7} | {8} | {9} | {10} | {11} | {12} | {13} | {14} | {15} | {16} | {17} | {18} | {19} |" -f
+            "| {0} | {1} | {2} | {3} | {4} | {5} | {6} | {7} | {8} | {9} | {10} | {11} | {12} | {13} | {14} | {15} | {16} | {17} | {18} | {19} | {20} | {21} |" -f
             (Escape-MarkdownCell $run.run_name),
             (Escape-MarkdownCell $run.commit),
             (-not $run.git_dirty),
@@ -359,8 +385,10 @@ function Write-AnalysisMarkdown {
             (Escape-MarkdownCell $run.fanout_mode),
             $run.group_size,
             (Format-Number $run.message_rate),
+            (Format-Number $run.achieved_send_rate),
             $run.message_count,
             $run.sender_count,
+            $run.send_concurrency,
             $run.subscriber_count,
             (Format-Number $run.send_p95_ms),
             (Format-Number $run.send_p99_ms),

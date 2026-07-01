@@ -147,6 +147,11 @@ function Get-SendSummary {
     if ($sendDurationSeconds -gt 0) {
         $achievedSendRate = [double]$sendSuccess / $sendDurationSeconds
     }
+    $sendConcurrencyValue = Get-PropertyValue -Object $summary -Name "send_concurrency"
+    $sendConcurrency = Convert-ToInt64OrDefault $sendConcurrencyValue
+    if ($null -eq $sendConcurrencyValue) {
+        $sendConcurrency = 1
+    }
     return [pscustomobject]@{
         run_name = [string](Get-PropertyValue -Object $summary -Name "run_name")
         commit = [string](Get-PropertyValue -Object $summary -Name "commit")
@@ -156,6 +161,7 @@ function Get-SendSummary {
         message_count = Convert-ToInt64OrDefault (Get-PropertyValue -Object $summary -Name "message_count")
         message_rate = Convert-ToDoubleOrDefault (Get-PropertyValue -Object $summary -Name "message_rate")
         sender_count = Convert-ToInt64OrDefault (Get-PropertyValue -Object $summary -Name "sender_count")
+        send_concurrency = $sendConcurrency
         fanout_mode = [string](Get-PropertyValue -Object $summary -Name "actual_fanout_mode")
         send_success = $sendSuccess
         send_errors = Convert-ToInt64OrDefault (Get-PropertyValue -Object $send -Name "error_count")
@@ -322,6 +328,7 @@ function Write-MultirunnerReport {
     [void]$builder.AppendLine("| message_count | $($SendSummary.message_count) |")
     [void]$builder.AppendLine("| target_message_rate | $(Format-Number $SendSummary.message_rate) |")
     [void]$builder.AppendLine("| sender_count | $($SendSummary.sender_count) |")
+    [void]$builder.AppendLine("| send_concurrency | $($SendSummary.send_concurrency) |")
     [void]$builder.AppendLine("| send_success | $($SendSummary.send_success) |")
     [void]$builder.AppendLine("| send_errors | $($SendSummary.send_errors) |")
     [void]$builder.AppendLine("| send_duration_seconds | $(Format-Number $SendSummary.send_duration_seconds) |")

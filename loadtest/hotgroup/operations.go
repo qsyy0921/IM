@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	conversationv1 "github.com/qsyy0921/IM/api/proto/nexusim/conversation/v1"
@@ -127,37 +128,93 @@ func sendMessages(ctx context.Context, cfg config, clients *serviceClients, plan
 		stats.FinishedAt = time.Now().UTC()
 		return stats
 	}
+	sendConcurrency := cfg.SendConcurrency
+	if sendConcurrency <= 0 {
+		sendConcurrency = 1
+	}
+	if sendConcurrency > messageCount {
+		sendConcurrency = messageCount
+	}
 	latencies := make([]float64, 0, messageCount)
 	interval := time.Duration(float64(time.Second) / cfg.MessageRate)
 	if interval <= 0 {
 		interval = time.Millisecond
 	}
-	next := time.Now()
-	for index := 0; index < messageCount; index++ {
-		if wait := time.Until(next); wait > 0 {
-			select {
-			case <-ctx.Done():
-				stats.Errors = append(stats.Errors, ctx.Err().Error())
-				stats.FinishedAt = time.Now().UTC()
-				return finalizeSendStats(stats, latencies)
-			case <-time.After(wait):
+	type sendJob struct {
+		index  int
+		sender loadUser
+	}
+	type sendResult struct {
+		latency float64
+		seq     int64
+		err     error
+	}
+	jobs := make(chan sendJob, sendConcurrency*2)
+	results := make(chan sendResult, sendConcurrency*2)
+	dispatchDone := make(chan error, 1)
+	var workers sync.WaitGroup
+	workers.Add(sendConcurrency)
+	for worker := 0; worker < sendConcurrency; worker++ {
+		go func() {
+			defer workers.Done()
+			for job := range jobs {
+				latency, seq, err := sendOneMessage(ctx, cfg, clients, job.sender, job.index)
+				select {
+				case results <- sendResult{latency: latency, seq: seq, err: err}:
+				case <-ctx.Done():
+					return
+				}
 			}
+		}()
+	}
+	go func() {
+		workers.Wait()
+		close(results)
+	}()
+	go func() {
+		defer close(jobs)
+		next := time.Now()
+		for index := 0; index < messageCount; index++ {
+			if wait := time.Until(next); wait > 0 {
+				timer := time.NewTimer(wait)
+				select {
+				case <-ctx.Done():
+					timer.Stop()
+					dispatchDone <- ctx.Err()
+					return
+				case <-timer.C:
+				}
+			}
+			sender := plan.Senders[index%len(plan.Senders)]
+			select {
+			case jobs <- sendJob{index: index + 1, sender: sender}:
+			case <-ctx.Done():
+				dispatchDone <- ctx.Err()
+				return
+			}
+			next = next.Add(interval)
 		}
-		sender := plan.Senders[index%len(plan.Senders)]
-		latency, seq, err := sendOneMessage(ctx, cfg, clients, sender, index+1)
-		latencies = append(latencies, latency)
-		if err != nil {
+		dispatchDone <- nil
+	}()
+	for result := range results {
+		latencies = append(latencies, result.latency)
+		if result.err != nil {
 			stats.ErrorCount++
 			if len(stats.Errors) < 20 {
-				stats.Errors = append(stats.Errors, err.Error())
+				stats.Errors = append(stats.Errors, result.err.Error())
 			}
 		} else {
 			stats.SuccessCount++
-			if seq > stats.MaxSeq {
-				stats.MaxSeq = seq
+			if result.seq > stats.MaxSeq {
+				stats.MaxSeq = result.seq
 			}
 		}
-		next = next.Add(interval)
+	}
+	if err := <-dispatchDone; err != nil {
+		stats.ErrorCount++
+		if len(stats.Errors) < 20 {
+			stats.Errors = append(stats.Errors, err.Error())
+		}
 	}
 	stats.FinishedAt = time.Now().UTC()
 	return finalizeSendStats(stats, latencies)

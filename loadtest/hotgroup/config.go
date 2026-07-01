@@ -40,6 +40,7 @@ type config struct {
 	ConversationID                string
 	GroupSize                     int
 	SenderCount                   int
+	SendConcurrency               int
 	OnlineRatio                   float64
 	SlowClientRatio               float64
 	ACKRatio                      float64
@@ -79,6 +80,7 @@ func parseConfig(args []string, getenv func(string) string) (config, error) {
 	flags.StringVar(&cfg.ConversationID, "conversation-id", envString(getenv, "NEXUSIM_CONVERSATION_ID", "conv-hotgroup-"+now), "conversation id")
 	flags.IntVar(&cfg.GroupSize, "group-size", envInt(getenv, "NEXUSIM_HOTGROUP_GROUP_SIZE", 100), "total group member count including owner and senders")
 	flags.IntVar(&cfg.SenderCount, "sender-count", envInt(getenv, "NEXUSIM_HOTGROUP_SENDER_COUNT", 5), "number of active senders")
+	flags.IntVar(&cfg.SendConcurrency, "send-concurrency", envInt(getenv, "NEXUSIM_HOTGROUP_SEND_CONCURRENCY", 0), "concurrent SendMessage workers; zero uses sender-count")
 	flags.Float64Var(&cfg.OnlineRatio, "online-ratio", envFloat(getenv, "NEXUSIM_HOTGROUP_ONLINE_RATIO", 0.2), "receiver online ratio")
 	flags.Float64Var(&cfg.SlowClientRatio, "slow-client-ratio", envFloat(getenv, "NEXUSIM_HOTGROUP_SLOW_CLIENT_RATIO", 0.0), "slow client ratio among receivers; modeled in user plan only in v0.1")
 	flags.Float64Var(&cfg.ACKRatio, "ack-ratio", envFloat(getenv, "NEXUSIM_HOTGROUP_ACK_RATIO", 0.8), "ratio of sampled receivers that ack after pull")
@@ -147,6 +149,9 @@ func (cfg config) validate() error {
 	}
 	if cfg.SenderCount >= cfg.GroupSize {
 		return errors.New("--sender-count must be smaller than --group-size")
+	}
+	if cfg.SendConcurrency < 0 {
+		return errors.New("--send-concurrency must be greater than or equal to zero")
 	}
 	if cfg.OnlineRatio < 0 || cfg.OnlineRatio > 1 {
 		return errors.New("--online-ratio must be between 0 and 1")

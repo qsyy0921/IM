@@ -81,3 +81,8 @@ go run .\loadtest\hotgroup `
 ```text
 H:\NexusIM\loadtest-results\<run-name>\
 ```
+
+发送压力由 `--message-rate` 控制全局目标速率，由 `--send-concurrency` 控制
+并发 `SendMessage` worker 数。`--send-concurrency=0` 表示使用 `--sender-count`。
+报告中的 `achieved_send_rate` 才是本轮真实发压速率；不要把 target
+`--message-rate` 直接当成服务端 QPS。

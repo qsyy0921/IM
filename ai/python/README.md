@@ -48,6 +48,7 @@ ai/python/
       synthetic_core_scenarios.json
       synthetic_runtime_control_scenarios.json
       synthetic_mcp_security_scenarios.json
+      synthetic_context_evidence_scenarios.json
   contracts/
     worker-candidate.schema.json
   scripts/
@@ -74,6 +75,7 @@ python ai/python/scripts/run_memory_extraction_candidate.py <low-sensitive-messa
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_first_trio.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_runtime_control_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_mcp_security_scenarios.json
+python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_context_evidence_scenarios.json
 python ai/python/scripts/run_agent_dataset_adapter.py --run ai/python/fixtures/agent_eval/adapter_samples/qasper_like_rag_samples.json
 python ai/python/scripts/run_agent_eval_regression.py ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json
 python -m ruff check ai/python
@@ -142,6 +144,7 @@ ai/python/fixtures/agent_eval/synthetic_first_trio.json
 ai/python/fixtures/agent_eval/synthetic_core_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_runtime_control_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_mcp_security_scenarios.json
+ai/python/fixtures/agent_eval/synthetic_context_evidence_scenarios.json
 ai/python/fixtures/agent_eval/adapter_samples/
 ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json
 ```
@@ -159,6 +162,8 @@ The runtime-control fixture covers cancel propagation, approval resume from a
 checkpoint and replay without side-effect reexecution.
 The MCP security fixture covers poisoned tool descriptions, unsafe MCP output
 instructions, provider provenance mismatch and sandbox-only provider handling.
+The context/evidence fixture covers source coverage, conflict marker detection,
+stale evidence avoidance and permission-driven abstain recommendation.
 `nexusim_ai_eval.adapters` also includes low-sensitive skeleton adapters for
 Qasper/HotpotQA-like RAG, ToolSandbox/tau-bench-like tool cases and
 STATE-Bench/LoCoMo-like memory cases. `nexusim_ai_eval.trace` builds a
@@ -175,6 +180,7 @@ python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_core_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_runtime_control_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_mcp_security_scenarios.json
+python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_context_evidence_scenarios.json
 python ai/python/scripts/run_agent_dataset_adapter.py --run ai/python/fixtures/agent_eval/adapter_samples/qasper_like_rag_samples.json
 python ai/python/scripts/run_agent_dataset_adapter.py --run ai/python/fixtures/agent_eval/adapter_samples/toolsandbox_like_tool_samples.json
 python ai/python/scripts/run_agent_dataset_adapter.py --run ai/python/fixtures/agent_eval/adapter_samples/statebench_like_memory_samples.json

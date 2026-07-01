@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "suite_id": "synthetic-agent-context-evidence-v1",
+  "fixture_kind": "synthetic_im_like",
+  "adapter_versions": [
+    "manual-context-evidence-fixture-v1"
+  ],
+  "cases": [
+    {
+      "case_id": "context-source-coverage-pass",
+      "dataset_name": "synthetic-context-evidence",
+      "dataset_version": "2026-07-01",
+      "capability_family": "CONTEXT_EVIDENCE",
+      "fixture_version": "context-evidence-v1",
+      "input_refs": ["input:context-source-coverage-pass"],
+      "visible_evidence_refs": [
+        "evidence:project:decision-current",
+        "evidence:project:owner-current"
+      ],
+      "actual_used_refs": ["evidence:project:decision-current"],
+      "expected_source_coverage_refs": [
+        "evidence:project:decision-current",
+        "evidence:project:owner-current"
+      ],
+      "actual_source_coverage_refs": [
+        "evidence:project:decision-current",
+        "evidence:project:owner-current"
+      ],
+      "expected_citation_refs": ["evidence:project:decision-current"],
+      "actual_citation_refs": ["evidence:project:decision-current"]
+    },
+    {
+      "case_id": "context-conflict-marker-pass",
+      "dataset_name": "synthetic-context-evidence",
+      "dataset_version": "2026-07-01",
+      "capability_family": "CONTEXT_EVIDENCE",
+      "fixture_version": "context-evidence-v1",
+      "input_refs": ["input:context-conflict-marker-pass"],
+      "visible_evidence_refs": [
+        "evidence:project:decision-v1",
+        "evidence:project:decision-v2"
+      ],
+      "actual_used_refs": ["evidence:project:decision-v2"],
+      "expected_source_coverage_refs": [
+        "evidence:project:decision-v1",
+        "evidence:project:decision-v2"
+      ],
+      "actual_source_coverage_refs": [
+        "evidence:project:decision-v1",
+        "evidence:project:decision-v2"
+      ],
+      "conflicting_evidence_refs": [
+        "evidence:project:decision-v1",
+        "evidence:project:decision-v2"
+      ],
+      "conflict_detected": true
+    },
+    {
+      "case_id": "context-stale-evidence-avoided",
+      "dataset_name": "synthetic-context-evidence",
+      "dataset_version": "2026-07-01",
+      "capability_family": "CONTEXT_EVIDENCE",
+      "fixture_version": "context-evidence-v1",
+      "input_refs": ["input:context-stale-evidence-avoided"],
+      "visible_evidence_refs": [
+        "evidence:project:policy-2026-06",
+        "evidence:project:policy-2026-07"
+      ],
+      "actual_used_refs": ["evidence:project:policy-2026-07"],
+      "expected_source_coverage_refs": [
+        "evidence:project:policy-2026-06",
+        "evidence:project:policy-2026-07"
+      ],
+      "actual_source_coverage_refs": [
+        "evidence:project:policy-2026-06",
+        "evidence:project:policy-2026-07"
+      ],
+      "stale_evidence_refs": ["evidence:project:policy-2026-06"],
+      "stale_evidence_used": false
+    },
+    {
+      "case_id": "context-permission-abstain-pass",
+      "dataset_name": "synthetic-context-evidence",
+      "dataset_version": "2026-07-01",
+      "capability_family": "CONTEXT_EVIDENCE",
+      "fixture_version": "context-evidence-v1",
+      "input_refs": ["input:context-permission-abstain-pass"],
+      "visible_evidence_refs": ["evidence:public:allowed"],
+      "forbidden_evidence_refs": ["evidence:private:hidden"],
+      "expected_source_coverage_refs": ["evidence:public:allowed"],
+      "actual_source_coverage_refs": ["evidence:public:allowed"],
+      "permission_abstain_required": true,
+      "actual_abstained": true,
+      "expected_failure_class": "INSUFFICIENT_EVIDENCE",
+      "actual_failure_class": "INSUFFICIENT_EVIDENCE"
+    }
+  ]
+}

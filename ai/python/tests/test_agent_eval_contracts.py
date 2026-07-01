@@ -116,6 +116,33 @@ class AgentEvalContractTests(unittest.TestCase):
         self.assertTrue(cases[0].tool_description_poisoned)
         self.assertTrue(cases[0].tool_output_contains_instruction)
 
+    def test_validates_context_evidence_refs(self) -> None:
+        payload = valid_suite()
+        payload["cases"] = [
+            {
+                "case_id": "context-evidence-pass",
+                "dataset_name": "synthetic-context",
+                "dataset_version": "2026-07-01",
+                "capability_family": "CONTEXT_EVIDENCE",
+                "fixture_version": "fixture-v1",
+                "input_refs": ["input:context-evidence-pass"],
+                "expected_source_coverage_refs": ["evidence:current"],
+                "actual_source_coverage_refs": ["evidence:current"],
+                "conflicting_evidence_refs": ["evidence:old", "evidence:current"],
+                "stale_evidence_refs": ["evidence:old"],
+                "conflict_detected": True,
+                "stale_evidence_used": False,
+                "permission_abstain_required": False,
+            }
+        ]
+
+        cases = validate_eval_suite(payload)
+
+        self.assertEqual(cases[0].capability_family, "CONTEXT_EVIDENCE")
+        self.assertEqual(cases[0].expected_source_coverage_refs, ["evidence:current"])
+        self.assertTrue(cases[0].conflict_detected)
+        self.assertFalse(cases[0].stale_evidence_used)
+
 
 if __name__ == "__main__":
     unittest.main()

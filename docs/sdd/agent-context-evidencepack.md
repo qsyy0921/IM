@@ -281,7 +281,29 @@ Promote only after:
 - ContextPackage can be replayed from low-sensitive refs;
 - integration with memory-service and mcp-gateway preserves taint/source labels.
 
-## 14. References
+## 14. Current Isolated Fixture Coverage
+
+Current first-stage code is fixture-only and lives under
+`ai/python/nexusim_ai_eval/` and
+`ai/python/fixtures/agent_eval/synthetic_context_evidence_scenarios.json`.
+It does not freeze a production EvidencePack or ContextPackage schema.
+
+Implemented checks:
+
+- source coverage refs must include required evidence refs;
+- conflicting evidence refs must be marked as detected;
+- stale evidence refs must not be used or cited;
+- permission-driven abstain can pass without exposing forbidden refs;
+- trace metadata includes low-sensitive refs only.
+
+Remaining hardening:
+
+- memory-vs-source precedence when memory conflicts with current source truth;
+- unsafe tool output entering context;
+- deterministic token-budget truncation;
+- unavailable retrieval lane handling and coverage-gap scoring.
+
+## 15. References
 
 - `docs/sdd/retrieval-gateway.md`
 - `docs/sdd/rag-service.md`

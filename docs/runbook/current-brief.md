@@ -82,8 +82,10 @@ Agent Gateway / UX
   from checkpoint、replay without side-effect reexecution。
 - 已补 fixture-only MCP security coverage：poisoned tool description、unsafe MCP
   output instruction、provider provenance mismatch、sandbox-only provider。
-- 下一段优先做 memory pollution / supersedes、ContextPackage / EvidencePack、state-diff report
-  等离线 hardening fixture。
+- 已补 fixture-only ContextPackage / EvidencePack coverage：source coverage、
+  conflict marker、stale evidence avoidance、permission abstain。
+- 下一段优先做 memory admission richer fixture、Context/Evidence hardening、
+  state-diff report 等离线能力。
 
 ## 工作规则
 

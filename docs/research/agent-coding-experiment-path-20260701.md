@@ -72,6 +72,7 @@ ai/python/fixtures/agent_eval/synthetic_first_trio.json
 ai/python/fixtures/agent_eval/synthetic_core_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_runtime_control_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_mcp_security_scenarios.json
+ai/python/fixtures/agent_eval/synthetic_context_evidence_scenarios.json
 ai/python/scripts/run_agent_eval_fixture.py
 ai/python/scripts/run_agent_dataset_adapter.py
 ai/python/scripts/run_agent_eval_regression.py
@@ -115,6 +116,8 @@ Slice 0 covers:
   approval resume and replay without side-effect reexecution.
 - fixture-only MCP security coverage for poisoned tool descriptions, unsafe MCP
   output instructions, provider provenance mismatch and sandbox-only providers.
+- fixture-only ContextPackage / EvidencePack coverage for source coverage,
+  conflict markers, stale evidence avoidance and permission abstain.
 
 ## 4. Code Architecture
 
@@ -192,6 +195,8 @@ fixtures, call models or connect to backend services.
 - MemoryCandidateFixture;
 - ToolIntentFixture.
 - RuntimeControlFixture.
+- ContextPackage source coverage, conflict, stale-source and permission-abstain
+  metadata.
 
 The trace is low-sensitive and fixture-only. It records refs, hashes and failure
 classes, not raw prompt, message body or provider output.
@@ -208,6 +213,7 @@ ai/python/fixtures/agent_eval/synthetic_first_trio.json
 ai/python/fixtures/agent_eval/synthetic_core_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_runtime_control_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_mcp_security_scenarios.json
+ai/python/fixtures/agent_eval/synthetic_context_evidence_scenarios.json
 ai/python/fixtures/agent_eval/adapter_samples/
 ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json
 ```
@@ -282,6 +288,7 @@ Integration tests:
 - load `synthetic_core_scenarios.json`;
 - load `synthetic_runtime_control_scenarios.json`;
 - load `synthetic_mcp_security_scenarios.json`;
+- load `synthetic_context_evidence_scenarios.json`;
 - run `run_agent_eval_fixture.py`;
 - verify report status, case count, failure distribution and `raw_payload_returned=false`.
 
@@ -306,6 +313,7 @@ python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_core_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_runtime_control_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_mcp_security_scenarios.json
+python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_context_evidence_scenarios.json
 python ai/python/scripts/run_agent_dataset_adapter.py --run ai/python/fixtures/agent_eval/adapter_samples/qasper_like_rag_samples.json
 python ai/python/scripts/run_agent_eval_regression.py ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json
 ```
@@ -331,7 +339,9 @@ git status --short --branch --untracked-files=all
 Recommended next slices:
 
 1. Add richer memory pollution / revocation / supersedes fixture coverage.
-2. Add ContextPackage / EvidencePack coverage and conflict marker fixtures.
+2. Harden ContextPackage / EvidencePack with memory-vs-source precedence,
+   unsafe tool output in context, token-budget truncation and unavailable
+   retrieval lane cases.
 3. Add state-diff report section for fake action execution.
 4. Add current-report generation script for baseline refresh review.
 5. Add runtime-control negative fixture pack for missing checkpoints and

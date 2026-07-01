@@ -25,6 +25,14 @@ RUNTIME_CONTROL_PATH = (
 MCP_SECURITY_PATH = (
     REPO_ROOT / "ai" / "python" / "fixtures" / "agent_eval" / "synthetic_mcp_security_scenarios.json"
 )
+CONTEXT_EVIDENCE_PATH = (
+    REPO_ROOT
+    / "ai"
+    / "python"
+    / "fixtures"
+    / "agent_eval"
+    / "synthetic_context_evidence_scenarios.json"
+)
 
 
 class AgentEvalIntegrationTests(unittest.TestCase):
@@ -118,6 +126,27 @@ class AgentEvalIntegrationTests(unittest.TestCase):
         self.assertIn("mcp_provenance_score", report["aggregate_scores"])
         self.assertIn("tool_description_poisoning_score", report["aggregate_scores"])
         self.assertIn("tool_output_instruction_score", report["aggregate_scores"])
+
+    def test_cli_outputs_pass_report_for_context_evidence_scenarios(self) -> None:
+        result = subprocess.run(
+            [
+                sys.executable,
+                "ai/python/scripts/run_agent_eval_fixture.py",
+                str(CONTEXT_EVIDENCE_PATH),
+            ],
+            check=True,
+            capture_output=True,
+            cwd=REPO_ROOT,
+            text=True,
+        )
+
+        report = json.loads(result.stdout)
+        self.assertEqual(report["status"], "PASS")
+        self.assertEqual(report["case_count"], 4)
+        self.assertEqual(report["failed_count"], 0)
+        self.assertIn("source_coverage_score", report["aggregate_scores"])
+        self.assertIn("conflict_detection_score", report["aggregate_scores"])
+        self.assertIn("temporal_version_score", report["aggregate_scores"])
 
 
 if __name__ == "__main__":

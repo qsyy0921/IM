@@ -14,11 +14,13 @@
 
 ## 当前优先顺序
 
-1. ContextPackage / EvidencePack 实验：验证 citation、source coverage、temporal
-   version、conflict marker 和 permission abstain。
-2. Memory admission eval：覆盖 group memory、project memory、profile aggregate、
+1. Memory admission eval：覆盖 group memory、project memory、profile aggregate、
    supersedes、revocation、stale facts、speaker attribution、audience scope 和
    overgeneralization。
+2. ContextPackage / EvidencePack hardening：基础 source coverage、temporal
+   version、conflict marker 和 permission abstain fixture 已落地；后续覆盖
+   memory-vs-source precedence、unsafe tool output in context、token-budget
+   truncation 和 retrieval lane unavailable。
 3. Tool / MCP security hardening：基础 malicious tool description、unsafe output、
    MCP provider provenance 和 sandbox-only provider fixture 已落地；后续覆盖 tool
    argument schema mismatch、tool-selection attack、prepare expiry 和多候选 provider

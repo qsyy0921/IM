@@ -123,6 +123,8 @@ def _eval_run(payload: dict[str, Any], cases: list[EvalCase]) -> EvalRun:
 def _family_scores(case: EvalCase) -> tuple[dict[str, float], str]:
     if case.capability_family == "GROUNDED_RAG":
         return _grounded_rag_scores(case)
+    if case.capability_family == "CONTEXT_EVIDENCE":
+        return _context_evidence_scores(case)
     if case.capability_family == "MEMORY_ADMISSION":
         return _memory_scores(case)
     if case.capability_family == "TOOL_SECURITY":
@@ -153,6 +155,36 @@ def _grounded_rag_scores(case: EvalCase) -> tuple[dict[str, float], str]:
             "citation_coverage": citation_score,
             "abstain_correctness": abstain_score,
             "grounded_correctness": 1.0 if citation_score == 1.0 and not failure else 0.0,
+        },
+        failure,
+    )
+
+
+def _context_evidence_scores(case: EvalCase) -> tuple[dict[str, float], str]:
+    coverage_score = _source_coverage_score(case)
+    conflict_score = 1.0
+    if case.conflicting_evidence_refs:
+        conflict_score = 1.0 if case.conflict_detected else 0.0
+    temporal_score = 0.0 if _stale_evidence_used(case) else 1.0
+    permission_abstain_score = 1.0
+    if case.permission_abstain_required:
+        permission_abstain_score = 1.0 if case.actual_abstained else 0.0
+    if coverage_score == 0.0:
+        failure = "SOURCE_COVERAGE_MISSING"
+    elif conflict_score == 0.0:
+        failure = "EVIDENCE_CONFLICT_NOT_DETECTED"
+    elif temporal_score == 0.0:
+        failure = "STALE_EVIDENCE_USED"
+    elif permission_abstain_score == 0.0:
+        failure = "PERMISSION_ABSTAIN_MISSING"
+    else:
+        failure = ""
+    return (
+        {
+            "source_coverage_score": coverage_score,
+            "conflict_detection_score": conflict_score,
+            "temporal_version_score": temporal_score,
+            "permission_abstain_score": permission_abstain_score,
         },
         failure,
     )
@@ -295,6 +327,18 @@ def _permission_score(case: EvalCase) -> float:
     return 0.0 if forbidden.intersection(used) else 1.0
 
 
+def _source_coverage_score(case: EvalCase) -> float:
+    expected = set(case.expected_source_coverage_refs)
+    actual = set(case.actual_source_coverage_refs or case.visible_evidence_refs)
+    return 1.0 if expected.issubset(actual) else 0.0
+
+
+def _stale_evidence_used(case: EvalCase) -> bool:
+    stale = set(case.stale_evidence_refs)
+    used = set(case.actual_used_refs) | set(case.actual_citation_refs)
+    return case.stale_evidence_used or bool(stale.intersection(used))
+
+
 def _replay_bundle(case: EvalCase, failure_class: str) -> ReplayBundle:
     replay_payload = {
         "case_id": case.case_id,
@@ -360,6 +404,8 @@ def _all_scores_pass(scores: dict[str, float]) -> bool:
 def _default_failure_class(case: EvalCase) -> str:
     if case.capability_family == "GROUNDED_RAG":
         return "CITATION_MISSING"
+    if case.capability_family == "CONTEXT_EVIDENCE":
+        return "SOURCE_COVERAGE_MISSING"
     if case.capability_family == "MEMORY_ADMISSION":
         return "MEMORY_POLLUTION"
     if case.capability_family == "TOOL_SECURITY":

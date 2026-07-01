@@ -69,6 +69,35 @@ class AgentEvalTraceTests(unittest.TestCase):
         self.assertTrue(trace.context_package.permission_leakage_detected)
         self.assertEqual(trace.steps[1].failure_class, "PERMISSION_LEAKAGE")
 
+    def test_trace_contains_context_evidence_metadata(self) -> None:
+        case = validate_eval_suite(
+            suite_with_case(
+                {
+                    "case_id": "trace-context-evidence-case",
+                    "dataset_name": "synthetic",
+                    "dataset_version": "2026-07-01",
+                    "capability_family": "CONTEXT_EVIDENCE",
+                    "fixture_version": "fixture-v1",
+                    "input_refs": ["input:trace-context-evidence-case"],
+                    "visible_evidence_refs": ["evidence:old", "evidence:current"],
+                    "actual_used_refs": ["evidence:current"],
+                    "expected_source_coverage_refs": ["evidence:old", "evidence:current"],
+                    "actual_source_coverage_refs": ["evidence:old", "evidence:current"],
+                    "conflicting_evidence_refs": ["evidence:old", "evidence:current"],
+                    "stale_evidence_refs": ["evidence:old"],
+                    "conflict_detected": True,
+                }
+            )
+        )[0]
+
+        trace = build_agent_run_trace(case)
+
+        self.assertEqual(trace.status, "PASS")
+        self.assertEqual(trace.evidence_pack.source_coverage_refs, ["evidence:old", "evidence:current"])
+        self.assertEqual(trace.evidence_pack.conflicting_source_refs, ["evidence:old", "evidence:current"])
+        self.assertTrue(trace.context_package.conflict_detected)
+        self.assertFalse(trace.context_package.stale_evidence_used)
+
     def test_trace_contains_tool_and_workflow_steps(self) -> None:
         case = validate_eval_suite(
             suite_with_case(

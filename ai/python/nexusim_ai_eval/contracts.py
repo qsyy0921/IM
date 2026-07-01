@@ -21,6 +21,7 @@ HARNESS_VERSION = "agent-eval-harness-v1"
 
 ALLOWED_CAPABILITY_FAMILIES = {
     "GROUNDED_RAG",
+    "CONTEXT_EVIDENCE",
     "MEMORY_ADMISSION",
     "TOOL_SECURITY",
     "STATE_DIFF",
@@ -37,6 +38,10 @@ ALLOWED_FAILURE_CLASSES = {
     "CONFLICTING_EVIDENCE",
     "PERMISSION_LEAKAGE",
     "CITATION_MISSING",
+    "SOURCE_COVERAGE_MISSING",
+    "EVIDENCE_CONFLICT_NOT_DETECTED",
+    "STALE_EVIDENCE_USED",
+    "PERMISSION_ABSTAIN_MISSING",
     "TOOL_NOT_ALLOWED",
     "TOOL_ARGS_INVALID",
     "TOOL_POISONING_DETECTED",
@@ -83,6 +88,10 @@ class EvalCase:
     visible_evidence_refs: list[str] = field(default_factory=list)
     forbidden_evidence_refs: list[str] = field(default_factory=list)
     actual_used_refs: list[str] = field(default_factory=list)
+    expected_source_coverage_refs: list[str] = field(default_factory=list)
+    actual_source_coverage_refs: list[str] = field(default_factory=list)
+    conflicting_evidence_refs: list[str] = field(default_factory=list)
+    stale_evidence_refs: list[str] = field(default_factory=list)
     expected_citation_refs: list[str] = field(default_factory=list)
     actual_citation_refs: list[str] = field(default_factory=list)
     expected_memory_outcome: str = ""
@@ -102,6 +111,9 @@ class EvalCase:
     expected_failure_class: str = ""
     actual_failure_class: str = ""
     actual_abstained: bool = False
+    conflict_detected: bool = False
+    stale_evidence_used: bool = False
+    permission_abstain_required: bool = False
     malicious_tool_blocked: bool = False
     tool_description_poisoned: bool = False
     tool_description_blocked: bool = False
@@ -237,6 +249,18 @@ def _eval_case(payload: dict[str, Any], index: int) -> EvalCase:
             payload.get("forbidden_evidence_refs", []), "forbidden_evidence_refs"
         ),
         actual_used_refs=_string_list(payload.get("actual_used_refs", []), "actual_used_refs"),
+        expected_source_coverage_refs=_string_list(
+            payload.get("expected_source_coverage_refs", []), "expected_source_coverage_refs"
+        ),
+        actual_source_coverage_refs=_string_list(
+            payload.get("actual_source_coverage_refs", []), "actual_source_coverage_refs"
+        ),
+        conflicting_evidence_refs=_string_list(
+            payload.get("conflicting_evidence_refs", []), "conflicting_evidence_refs"
+        ),
+        stale_evidence_refs=_string_list(
+            payload.get("stale_evidence_refs", []), "stale_evidence_refs"
+        ),
         expected_citation_refs=_string_list(
             payload.get("expected_citation_refs", []), "expected_citation_refs"
         ),
@@ -270,6 +294,13 @@ def _eval_case(payload: dict[str, Any], index: int) -> EvalCase:
         expected_failure_class=expected_failure_class,
         actual_failure_class=actual_failure_class,
         actual_abstained=_bool(payload.get("actual_abstained", False), "actual_abstained"),
+        conflict_detected=_bool(payload.get("conflict_detected", False), "conflict_detected"),
+        stale_evidence_used=_bool(
+            payload.get("stale_evidence_used", False), "stale_evidence_used"
+        ),
+        permission_abstain_required=_bool(
+            payload.get("permission_abstain_required", False), "permission_abstain_required"
+        ),
         malicious_tool_blocked=_bool(
             payload.get("malicious_tool_blocked", False), "malicious_tool_blocked"
         ),

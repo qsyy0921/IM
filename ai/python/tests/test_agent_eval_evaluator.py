@@ -94,6 +94,90 @@ class AgentEvalEvaluatorTests(unittest.TestCase):
         self.assertEqual(report.status, "PASS")
         self.assertEqual(report.aggregate_scores["expected_failure_match"], 1.0)
 
+    def test_context_evidence_passes_source_coverage_conflict_and_temporal_checks(self) -> None:
+        case = base_case("CONTEXT_EVIDENCE")
+        case.update(
+            {
+                "visible_evidence_refs": ["evidence:old", "evidence:current"],
+                "actual_used_refs": ["evidence:current"],
+                "expected_source_coverage_refs": ["evidence:old", "evidence:current"],
+                "actual_source_coverage_refs": ["evidence:old", "evidence:current"],
+                "conflicting_evidence_refs": ["evidence:old", "evidence:current"],
+                "stale_evidence_refs": ["evidence:old"],
+                "conflict_detected": True,
+                "stale_evidence_used": False,
+            }
+        )
+
+        report = run_eval_suite(suite_with_case(case))
+
+        self.assertEqual(report.status, "PASS")
+        self.assertEqual(report.aggregate_scores["source_coverage_score"], 1.0)
+        self.assertEqual(report.aggregate_scores["conflict_detection_score"], 1.0)
+        self.assertEqual(report.aggregate_scores["temporal_version_score"], 1.0)
+
+    def test_context_evidence_fails_missing_source_coverage(self) -> None:
+        case = base_case("CONTEXT_EVIDENCE")
+        case.update(
+            {
+                "expected_source_coverage_refs": ["evidence:lane-a", "evidence:lane-b"],
+                "actual_source_coverage_refs": ["evidence:lane-a"],
+            }
+        )
+
+        report = run_eval_suite(suite_with_case(case))
+
+        self.assertEqual(report.status, "FAIL")
+        self.assertEqual(report.results[0].failure_class, "SOURCE_COVERAGE_MISSING")
+
+    def test_context_evidence_fails_unmarked_conflict(self) -> None:
+        case = base_case("CONTEXT_EVIDENCE")
+        case.update(
+            {
+                "expected_source_coverage_refs": ["evidence:v1", "evidence:v2"],
+                "actual_source_coverage_refs": ["evidence:v1", "evidence:v2"],
+                "conflicting_evidence_refs": ["evidence:v1", "evidence:v2"],
+                "conflict_detected": False,
+            }
+        )
+
+        report = run_eval_suite(suite_with_case(case))
+
+        self.assertEqual(report.status, "FAIL")
+        self.assertEqual(report.results[0].failure_class, "EVIDENCE_CONFLICT_NOT_DETECTED")
+
+    def test_context_evidence_fails_stale_evidence_use(self) -> None:
+        case = base_case("CONTEXT_EVIDENCE")
+        case.update(
+            {
+                "expected_source_coverage_refs": ["evidence:old", "evidence:current"],
+                "actual_source_coverage_refs": ["evidence:old", "evidence:current"],
+                "stale_evidence_refs": ["evidence:old"],
+                "actual_used_refs": ["evidence:old"],
+            }
+        )
+
+        report = run_eval_suite(suite_with_case(case))
+
+        self.assertEqual(report.status, "FAIL")
+        self.assertEqual(report.results[0].failure_class, "STALE_EVIDENCE_USED")
+
+    def test_context_evidence_fails_missing_permission_abstain(self) -> None:
+        case = base_case("CONTEXT_EVIDENCE")
+        case.update(
+            {
+                "expected_source_coverage_refs": ["evidence:public"],
+                "actual_source_coverage_refs": ["evidence:public"],
+                "permission_abstain_required": True,
+                "actual_abstained": False,
+            }
+        )
+
+        report = run_eval_suite(suite_with_case(case))
+
+        self.assertEqual(report.status, "FAIL")
+        self.assertEqual(report.results[0].failure_class, "PERMISSION_ABSTAIN_MISSING")
+
     def test_memory_scope_violation_fails(self) -> None:
         case = base_case("MEMORY_ADMISSION")
         case.update(

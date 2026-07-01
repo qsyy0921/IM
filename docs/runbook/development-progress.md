@@ -111,12 +111,14 @@ ai/python/fixtures/agent_eval/synthetic_context_evidence_deeper_hardening_scenar
 ai/python/fixtures/agent_eval/synthetic_memory_admission_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_memory_admission_hardening_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_memory_admission_deeper_hardening_scenarios.json
+ai/python/fixtures/agent_eval/memory_calibration_sample.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_hardening_scenarios.json
 ai/python/fixtures/agent_eval/report_matrix_sample.json
 ai/python/scripts/run_agent_eval_fixture.py
 ai/python/scripts/run_agent_eval_current_report.py
 ai/python/scripts/run_agent_eval_report_matrix.py
+ai/python/scripts/run_agent_memory_calibration.py
 ai/python/scripts/run_agent_dataset_adapter.py
 ai/python/scripts/run_agent_eval_regression.py
 ai/python/tests/test_agent_eval_*.py
@@ -168,6 +170,10 @@ ai/python/tests/test_agent_eval_*.py
 - Memory admission adapter alignment：STATE-Bench / LoCoMO 风格 sample 已覆盖
   duplicate cluster representative / tie-break、confidence threshold、
   governed policy revocation window，且 adapter 会保留这些低敏 metadata。
+- Memory admission calibration：STATE-Bench / LoCoMO / LongMemEval /
+  EverMemBench / GroupMemBench 风格本地样本已覆盖 confidence threshold、
+  governed policy revocation-window retention、review backoff/operator queue
+  policy recommendation，并输出 blocked promotion reasons。
 - Tool / MCP adapter alignment：ToolSandbox / MCP-Bench 风格 sample 已覆盖
   capability lease refs、capability scope refs、provider attestation refs，
   evaluator 会输出对应低敏 aggregate score，且仍保持 fixture-only。
@@ -180,9 +186,9 @@ ai/python/tests/test_agent_eval_*.py
 
 | 优先级 | 工作 | 输出 |
 | --- | --- | --- |
-| P1 | Memory admission calibration | 更大公开 memory 数据集上的 confidence threshold tuning、policy revocation-window retention、review backoff / operator queue policy |
-| P2 | Runtime-control deeper hardening | checkpoint version drift、workflow wakeup race、replay bundle lineage completeness |
+| P1 | Runtime-control deeper hardening | checkpoint version drift、workflow wakeup race、replay bundle lineage completeness |
 | P2 | State-diff deeper hardening | state dependency graph、cross-action compensation chain、operator redrive review |
+| P2 | Memory calibration data expansion | 用更大公开 memory 数据集导出替换当前本地 calibration sample |
 | P2 | ADR promotion decision | 是否提升 Agent Runtime / Harness、memory admission、ReplayBundle 等契约 |
 
 ## 验证状态
@@ -198,7 +204,7 @@ ai/python/tests/test_agent_eval_*.py
 - SDD index / research index / architecture index link check
 - 不触碰 proto、schema、migration、production service directory
 
-后续 fixture-only prototype 优先推进 memory admission calibration。
+后续 fixture-only prototype 优先推进 runtime-control deeper hardening。
 
 ## 历史资料路由
 

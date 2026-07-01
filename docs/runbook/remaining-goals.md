@@ -14,24 +14,20 @@
 
 ## 当前优先顺序
 
-1. Memory admission calibration：基础 group/project/profile、supersedes、revocation、
-   stale facts、speaker attribution、audience scope、overgeneralization、duplicate dedupe、
-   duplicate cluster representative / tie-break、low-confidence rejection、confidence
-   threshold、procedural skill binding、policy-like memory rejection、governed policy
-   revocation window、review timeout 和 review redrive fixture / adapter sample 已落地；
-   后续只保留更大公开 memory 数据集上的 confidence threshold tuning、policy
-   revocation-window retention policy 和 review backoff / operator queue policy。
-2. Runtime-control deeper hardening：基础 cancel/resume/replay 正向 fixture 和 missing
+1. Runtime-control deeper hardening：基础 cancel/resume/replay 正向 fixture 和 missing
    checkpoint、cancel propagation incomplete、replay event incomplete 负向 fixture 已落地；
    后续只保留 checkpoint version drift、workflow wakeup race 和 replay bundle lineage
    completeness cases。
-3. State-diff deeper hardening：基础 action outcome report、expected-vs-actual state
+2. State-diff deeper hardening：基础 action outcome report、expected-vs-actual state
    change、execution refs、audit refs、incomplete report、unauthorized mutation、
    repair/redrive、partial execution、idempotency 和 compensating action fixture 已落地；
    后续只保留更深的 state dependency graph、cross-action compensation chain 和 operator
    redrive review cases。
-4. ReplayBundle / observability：定义低敏 refs、hashes、version metadata、failure
+3. ReplayBundle / observability：定义低敏 refs、hashes、version metadata、failure
    taxonomy 和 trace linkage。
+4. Memory calibration data expansion：本地 calibration sample 已覆盖 confidence
+   threshold、policy revocation-window retention 和 review backoff/operator queue
+   recommendation；后续仅在明确优先时替换为更大的公开数据集导出。
 5. ADR promotion review：只有前述 fixture/eval 有证据后，才评估 Agent Runtime、
    ContextPackage、MemoryCandidate、Tool prepare、ReplayBundle 是否提升为 ADR / 契约。
 

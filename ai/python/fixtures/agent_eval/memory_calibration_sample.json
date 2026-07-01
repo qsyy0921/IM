@@ -1,0 +1,227 @@
+{
+  "schema_version": 1,
+  "calibration_id": "agent-memory-admission-calibration-sample-v1",
+  "retention_policy_ref": "retention:agent-memory-calibration-report:research-v1",
+  "acceptance_policy": {
+    "min_confidence_exact_match_rate": 0.9,
+    "min_auto_admit_precision": 1.0,
+    "min_reject_recall": 1.0,
+    "min_pollution_block_rate": 1.0,
+    "min_policy_window_match_rate": 1.0,
+    "min_policy_window_retention_match_rate": 1.0,
+    "min_review_backoff_match_rate": 1.0,
+    "min_review_queue_match_rate": 1.0
+  },
+  "confidence_threshold_candidates": [
+    {
+      "threshold_ref": "confidence-threshold:memory-admission:v1:0.40",
+      "minimum_confidence": 0.4,
+      "auto_admit_scopes": ["PERSONAL", "GROUP", "PROJECT"],
+      "review_scopes": ["ORGANIZATION", "TENANT", "POLICY"],
+      "reject_scopes": []
+    },
+    {
+      "threshold_ref": "confidence-threshold:memory-admission:v1:0.60",
+      "minimum_confidence": 0.6,
+      "auto_admit_scopes": ["PERSONAL", "GROUP", "PROJECT"],
+      "review_scopes": ["ORGANIZATION", "TENANT", "POLICY"],
+      "reject_scopes": []
+    },
+    {
+      "threshold_ref": "confidence-threshold:memory-admission:v1:0.75",
+      "minimum_confidence": 0.75,
+      "auto_admit_scopes": ["PERSONAL", "GROUP", "PROJECT"],
+      "review_scopes": ["ORGANIZATION", "TENANT", "POLICY"],
+      "reject_scopes": []
+    }
+  ],
+  "memory_gate_cases": [
+    {
+      "case_id": "groupmembench-like-current-decision-auto-admit",
+      "dataset_name": "groupmembench-like-local-calibration",
+      "dataset_version": "2026-07-02",
+      "memory_scope": "GROUP",
+      "candidate_confidence": 0.91,
+      "expected_gate": "AUTO_ADMIT",
+      "source_backed": true,
+      "source_visible": true
+    },
+    {
+      "case_id": "statebench-like-project-conflict-needs-review",
+      "dataset_name": "statebench-like-local-calibration",
+      "dataset_version": "2026-07-02",
+      "memory_scope": "PROJECT",
+      "candidate_confidence": 0.82,
+      "expected_gate": "NEEDS_REVIEW",
+      "source_backed": true,
+      "source_visible": true,
+      "conflict_detected": true
+    },
+    {
+      "case_id": "locomo-like-ambiguous-group-owner-reject",
+      "dataset_name": "locomo-like-local-calibration",
+      "dataset_version": "2026-07-02",
+      "memory_scope": "GROUP",
+      "candidate_confidence": 0.42,
+      "expected_gate": "REJECT",
+      "source_backed": true,
+      "source_visible": true
+    },
+    {
+      "case_id": "evermembench-like-revoked-policy-source-reject",
+      "dataset_name": "evermembench-like-local-calibration",
+      "dataset_version": "2026-07-02",
+      "memory_scope": "TENANT",
+      "candidate_confidence": 0.95,
+      "expected_gate": "REJECT",
+      "source_backed": true,
+      "source_visible": true,
+      "policy_source_revoked": true
+    },
+    {
+      "case_id": "longmemeval-like-personal-repeated-preference-auto-admit",
+      "dataset_name": "longmemeval-like-local-calibration",
+      "dataset_version": "2026-07-02",
+      "memory_scope": "PERSONAL",
+      "candidate_confidence": 0.66,
+      "expected_gate": "AUTO_ADMIT",
+      "source_backed": true,
+      "source_visible": true
+    },
+    {
+      "case_id": "statebench-like-org-wide-norm-needs-review",
+      "dataset_name": "statebench-like-local-calibration",
+      "dataset_version": "2026-07-02",
+      "memory_scope": "ORGANIZATION",
+      "candidate_confidence": 0.88,
+      "expected_gate": "NEEDS_REVIEW",
+      "source_backed": true,
+      "source_visible": true,
+      "candidate_high_risk": true
+    }
+  ],
+  "policy_revocation_window_candidates": [
+    {
+      "window_ref": "revocation-window:policy-source:research-v1:close-after-2h",
+      "close_after_hours": 2,
+      "retention_policy_ref": "retention:governed-policy-source-revocation:research-v1"
+    },
+    {
+      "window_ref": "revocation-window:policy-source:research-v1:close-after-24h",
+      "close_after_hours": 24,
+      "retention_policy_ref": "retention:governed-policy-source-revocation:research-v1"
+    },
+    {
+      "window_ref": "revocation-window:policy-source:research-v1:close-after-48h",
+      "close_after_hours": 48,
+      "retention_policy_ref": "retention:governed-policy-source-revocation:research-v1"
+    }
+  ],
+  "policy_revocation_window_cases": [
+    {
+      "case_id": "policy-window-tenant-retention-recent-open",
+      "dataset_name": "evermembench-like-local-calibration",
+      "dataset_version": "2026-07-02",
+      "policy_source_ref": "policy-source:tenant-retention:v1",
+      "revocation_age_hours": 4,
+      "expected_window_state": "OPEN",
+      "expected_retention_policy_ref": "retention:governed-policy-source-revocation:research-v1"
+    },
+    {
+      "case_id": "policy-window-project-rule-closed",
+      "dataset_name": "statebench-like-local-calibration",
+      "dataset_version": "2026-07-02",
+      "policy_source_ref": "policy-source:project-rule:v2",
+      "revocation_age_hours": 25,
+      "expected_window_state": "CLOSED",
+      "expected_retention_policy_ref": "retention:governed-policy-source-revocation:research-v1"
+    },
+    {
+      "case_id": "policy-window-org-norm-closed",
+      "dataset_name": "groupmembench-like-local-calibration",
+      "dataset_version": "2026-07-02",
+      "policy_source_ref": "policy-source:org-norm:v3",
+      "revocation_age_hours": 50,
+      "expected_window_state": "CLOSED",
+      "expected_retention_policy_ref": "retention:governed-policy-source-revocation:research-v1"
+    }
+  ],
+  "review_backoff_candidates": [
+    {
+      "backoff_policy_ref": "review-backoff:memory-admission:research-v1:initial-10m",
+      "initial_delay_minutes": 10,
+      "multiplier": 2.0,
+      "max_attempts": 3,
+      "escalation_after_minutes": 120,
+      "operator_queue_ref": "operator-queue:memory-admission-review:research-v1"
+    },
+    {
+      "backoff_policy_ref": "review-backoff:memory-admission:research-v1:initial-30m",
+      "initial_delay_minutes": 30,
+      "multiplier": 2.0,
+      "max_attempts": 3,
+      "escalation_after_minutes": 120,
+      "operator_queue_ref": "operator-queue:memory-admission-review:research-v1"
+    },
+    {
+      "backoff_policy_ref": "review-backoff:memory-admission:research-v1:escalate-60m",
+      "initial_delay_minutes": 10,
+      "multiplier": 2.0,
+      "max_attempts": 3,
+      "escalation_after_minutes": 60,
+      "operator_queue_ref": "operator-queue:memory-admission-review:research-v1"
+    }
+  ],
+  "review_backoff_cases": [
+    {
+      "case_id": "review-backoff-fresh-wait",
+      "dataset_name": "groupmembench-like-local-calibration",
+      "dataset_version": "2026-07-02",
+      "review_age_minutes": 5,
+      "review_attempt_count": 0,
+      "review_redrive_required": false,
+      "expected_review_action": "WAIT",
+      "expected_operator_queue_ref": "operator-queue:memory-admission-review:research-v1"
+    },
+    {
+      "case_id": "review-backoff-first-retry",
+      "dataset_name": "statebench-like-local-calibration",
+      "dataset_version": "2026-07-02",
+      "review_age_minutes": 15,
+      "review_attempt_count": 0,
+      "review_redrive_required": false,
+      "expected_review_action": "RETRY",
+      "expected_operator_queue_ref": "operator-queue:memory-admission-review:research-v1"
+    },
+    {
+      "case_id": "review-backoff-second-retry",
+      "dataset_name": "locomo-like-local-calibration",
+      "dataset_version": "2026-07-02",
+      "review_age_minutes": 70,
+      "review_attempt_count": 1,
+      "review_redrive_required": false,
+      "expected_review_action": "RETRY",
+      "expected_operator_queue_ref": "operator-queue:memory-admission-review:research-v1"
+    },
+    {
+      "case_id": "review-backoff-escalate",
+      "dataset_name": "longmemeval-like-local-calibration",
+      "dataset_version": "2026-07-02",
+      "review_age_minutes": 140,
+      "review_attempt_count": 2,
+      "review_redrive_required": false,
+      "expected_review_action": "ESCALATE",
+      "expected_operator_queue_ref": "operator-queue:memory-admission-review:research-v1"
+    },
+    {
+      "case_id": "review-backoff-redrive-after-max-attempts",
+      "dataset_name": "evermembench-like-local-calibration",
+      "dataset_version": "2026-07-02",
+      "review_age_minutes": 200,
+      "review_attempt_count": 3,
+      "review_redrive_required": true,
+      "expected_review_action": "REDRIVE",
+      "expected_operator_queue_ref": "operator-queue:memory-admission-review:research-v1"
+    }
+  ]
+}

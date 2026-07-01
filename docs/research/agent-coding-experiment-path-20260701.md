@@ -35,9 +35,11 @@ ai/python/fixtures/agent_eval/
 ai/python/scripts/run_agent_eval_fixture.py
 ai/python/scripts/run_agent_eval_current_report.py
 ai/python/scripts/run_agent_eval_report_matrix.py
+ai/python/scripts/run_agent_memory_calibration.py
 ai/python/scripts/run_agent_dataset_adapter.py
 ai/python/scripts/run_agent_eval_regression.py
 ai/python/tests/test_agent_eval_*.py
+ai/python/tests/test_agent_memory_calibration.py
 docs/research/
 docs/sdd/
 docs/runbook/
@@ -67,6 +69,7 @@ ai/python/nexusim_ai_eval/
   contracts.py
   evaluator.py
   fixtures.py
+  memory_calibration.py
   reporting.py
   trace.py
 ai/python/fixtures/agent_eval/adapter_samples/
@@ -84,11 +87,13 @@ ai/python/fixtures/agent_eval/synthetic_context_evidence_deeper_hardening_scenar
 ai/python/fixtures/agent_eval/synthetic_memory_admission_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_memory_admission_hardening_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_memory_admission_deeper_hardening_scenarios.json
+ai/python/fixtures/agent_eval/memory_calibration_sample.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_hardening_scenarios.json
 ai/python/scripts/run_agent_eval_fixture.py
 ai/python/scripts/run_agent_eval_current_report.py
 ai/python/scripts/run_agent_eval_report_matrix.py
+ai/python/scripts/run_agent_memory_calibration.py
 ai/python/scripts/run_agent_dataset_adapter.py
 ai/python/scripts/run_agent_eval_regression.py
 ```
@@ -103,6 +108,7 @@ ai/python/tests/test_agent_eval_adapters.py
 ai/python/tests/test_agent_eval_adapter_runner.py
 ai/python/tests/test_agent_eval_comparison.py
 ai/python/tests/test_agent_eval_reporting.py
+ai/python/tests/test_agent_memory_calibration.py
 ai/python/tests/test_agent_eval_trace.py
 ```
 
@@ -168,6 +174,9 @@ Slice 0 covers:
 - STATE-Bench/LoCoMO-like memory adapter alignment coverage for duplicate
   cluster representative selection and tie-break refs, confidence threshold refs
   and governed policy revocation window refs.
+- fixture-only memory admission calibration coverage for confidence threshold
+  recommendation, governed policy revocation-window retention selection and
+  review backoff/operator queue recommendation.
 - fixture-only state-diff report coverage for approved action outcome refs,
   expected-vs-actual state changes, missing execution refs, incomplete reports
   and unauthorized mutation detection.
@@ -251,6 +260,17 @@ fixtures, call models or connect to backend services.
 It never overwrites baselines directly. Refresh decisions remain manual
 approval inputs until a later ADR promotes service integration.
 
+`nexusim_ai_eval.memory_calibration` owns offline memory admission calibration:
+
+- confidence threshold candidate scoring;
+- governed policy revocation-window retention candidate scoring;
+- review backoff/operator queue candidate scoring;
+- recommendation refs and blocked promotion reasons.
+
+It consumes only local low-sensitive calibration samples. It does not admit
+ACTIVE memory, update baselines, call workflow-service or connect to a backend
+queue.
+
 ### 4.5 AgentRun Trace
 
 `nexusim_ai_eval.trace` owns deterministic trace skeletons:
@@ -309,6 +329,7 @@ ai/python/fixtures/agent_eval/synthetic_context_evidence_deeper_hardening_scenar
 ai/python/fixtures/agent_eval/synthetic_memory_admission_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_memory_admission_hardening_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_memory_admission_deeper_hardening_scenarios.json
+ai/python/fixtures/agent_eval/memory_calibration_sample.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_hardening_scenarios.json
 ai/python/fixtures/agent_eval/adapter_samples/
@@ -356,6 +377,13 @@ matrix and a baseline refresh approval manifest:
 
 ```powershell
 python ai/python/scripts/run_agent_eval_report_matrix.py ai/python/fixtures/agent_eval/report_matrix_sample.json --matrix-out .tmp-agent-eval-matrix/matrix.json --approval-manifest-out .tmp-agent-eval-matrix/approval-manifest.json --force
+```
+
+`ai/python/scripts/run_agent_memory_calibration.py` runs local low-sensitive
+memory calibration samples and writes a recommendation report:
+
+```powershell
+python ai/python/scripts/run_agent_memory_calibration.py ai/python/fixtures/agent_eval/memory_calibration_sample.json --report-out .tmp-agent-memory-calibration-report.json --force
 ```
 
 Exit codes:
@@ -408,6 +436,8 @@ Evaluator tests:
 - memory admission adapter alignment scoring rejects missing duplicate cluster
   representative refs, missing confidence threshold refs and missing policy
   revocation window refs.
+- memory calibration scoring rejects confidence threshold, revocation-window
+  and review backoff candidates that do not meet acceptance.
 - AgentRun trace includes context, memory, tool, workflow, runtime-control and
   failure steps.
 
@@ -432,6 +462,7 @@ Integration tests:
 - run `run_agent_eval_fixture.py`;
 - run `run_agent_eval_current_report.py`;
 - run `run_agent_eval_report_matrix.py`;
+- run `run_agent_memory_calibration.py`;
 - verify report status, case count, failure distribution and `raw_payload_returned=false`.
 
 ### 5.3 Boundary Tests
@@ -450,7 +481,7 @@ Boundary is enforced by:
 Focused gate:
 
 ```powershell
-python -m pytest ai/python/tests/test_agent_eval_contracts.py ai/python/tests/test_agent_eval_evaluator.py ai/python/tests/test_agent_eval_trace.py ai/python/tests/test_agent_eval_integration.py ai/python/tests/test_agent_eval_reporting.py -q
+python -m pytest ai/python/tests/test_agent_eval_contracts.py ai/python/tests/test_agent_eval_evaluator.py ai/python/tests/test_agent_eval_trace.py ai/python/tests/test_agent_eval_integration.py ai/python/tests/test_agent_eval_reporting.py ai/python/tests/test_agent_memory_calibration.py -q
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_first_trio.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_core_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_runtime_control_scenarios.json
@@ -467,6 +498,7 @@ python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_state_diff_hardening_scenarios.json
 python ai/python/scripts/run_agent_eval_current_report.py ai/python/fixtures/agent_eval/synthetic_core_scenarios.json --report-out .tmp-agent-current-report.json --baseline ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json --review-out .tmp-agent-baseline-review.json --force
 python ai/python/scripts/run_agent_eval_report_matrix.py ai/python/fixtures/agent_eval/report_matrix_sample.json --matrix-out .tmp-agent-eval-matrix/matrix.json --approval-manifest-out .tmp-agent-eval-matrix/approval-manifest.json --force
+python ai/python/scripts/run_agent_memory_calibration.py ai/python/fixtures/agent_eval/memory_calibration_sample.json --report-out .tmp-agent-memory-calibration-report.json --force
 python ai/python/scripts/run_agent_dataset_adapter.py --run ai/python/fixtures/agent_eval/adapter_samples/qasper_like_rag_samples.json
 python ai/python/scripts/run_agent_dataset_adapter.py --run ai/python/fixtures/agent_eval/adapter_samples/toolsandbox_like_tool_samples.json
 python ai/python/scripts/run_agent_dataset_adapter.py --run ai/python/fixtures/agent_eval/adapter_samples/statebench_like_memory_samples.json
@@ -493,8 +525,9 @@ git status --short --branch --untracked-files=all
 
 Recommended next slices:
 
-1. Tune memory admission confidence thresholds and governed policy revocation
-   windows against larger public memory datasets, still without production data.
+1. Add runtime-control deeper hardening for checkpoint version drift, workflow
+   wakeup race and replay bundle lineage completeness, still without production
+   data.
 
 Each slice must keep the same isolation rule until an ADR explicitly promotes a
 backend integration boundary.

@@ -353,7 +353,8 @@ Current first-stage code is fixture-only and lives under
 `ai/python/nexusim_ai_eval/` and
 `ai/python/fixtures/agent_eval/synthetic_memory_admission_scenarios.json` and
 `ai/python/fixtures/agent_eval/synthetic_memory_admission_hardening_scenarios.json` and
-`ai/python/fixtures/agent_eval/synthetic_memory_admission_deeper_hardening_scenarios.json`.
+`ai/python/fixtures/agent_eval/synthetic_memory_admission_deeper_hardening_scenarios.json`
+and `ai/python/fixtures/agent_eval/memory_calibration_sample.json`.
 It does not freeze a production memory event or MemoryCandidate schema.
 
 Implemented checks:
@@ -377,14 +378,17 @@ Implemented checks:
 - STATE-Bench/LoCoMO-style adapter samples must preserve duplicate cluster
   representative refs, deterministic tie-break refs, confidence threshold refs
   and governed policy revocation window refs.
+- memory calibration samples recommend confidence threshold refs, governed
+  policy revocation-window retention refs and review backoff/operator queue
+  refs, or block promotion with explicit reasons.
 
 Remaining hardening:
 
-- confidence calibration and threshold tuning across larger public memory
-  datasets;
+- replacing the local calibration sample with larger exported public memory
+  datasets once dataset ingestion is explicitly prioritized;
 - procedural memory migration policy beyond fixture refs;
-- governed policy source revocation-window retention policy beyond fixture refs;
-- review retry backoff and operator queue policy.
+- ADR review for whether calibrated threshold/window/backoff refs should become
+  service contracts.
 
 ## 17. References
 

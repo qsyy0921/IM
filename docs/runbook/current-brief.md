@@ -108,6 +108,10 @@ Agent Gateway / UX
 - 已补 STATE-Bench / LoCoMO 风格 memory adapter alignment：duplicate cluster
   representative selection / tie-break refs、confidence threshold refs、
   governed policy revocation window refs，并保持 fixture-only。
+- 已补 fixture-only memory admission calibration：基于
+  STATE-Bench / LoCoMO / LongMemEval / EverMemBench / GroupMemBench 风格本地样本，
+  对 confidence threshold、governed policy revocation-window retention 和
+  review backoff/operator queue policy 输出推荐 refs 或 blocked reasons。
 - 已补 ToolSandbox / MCP-Bench 风格 Tool / MCP adapter alignment：capability
   lease refs、capability scope refs、provider attestation refs，并保持
   fixture-only。
@@ -123,7 +127,8 @@ Agent Gateway / UX
 - 已补 current-report / baseline lifecycle deeper hardening：多 suite report
   matrix、baseline refresh approval manifest 和 report retention metadata，
   支持 synthetic fixture 与 public-dataset-style adapter sample 混合进矩阵。
-- 下一段优先做 memory threshold / policy calibration。
+- 下一段优先做 runtime-control deeper hardening：checkpoint version drift、
+  workflow wakeup race、ReplayBundle lineage completeness。
 
 ## 工作规则
 

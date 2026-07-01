@@ -18,6 +18,10 @@ from nexusim_ai_eval.contracts import (
     validate_eval_suite,
 )
 from nexusim_ai_eval.evaluator import run_eval_suite
+from nexusim_ai_eval.memory_calibration import (
+    load_memory_calibration_payload,
+    run_memory_admission_calibration,
+)
 from nexusim_ai_eval.reporting import (
     build_baseline_refresh_approval_manifest,
     build_baseline_refresh_review,
@@ -56,7 +60,9 @@ __all__ = [
     "convert_adapter_payload",
     "generate_current_report_payload",
     "load_report_matrix_plan",
+    "load_memory_calibration_payload",
     "run_eval_suite",
+    "run_memory_admission_calibration",
     "run_adapter_payload",
     "run_report_matrix_plan",
     "suite_from_adapter_cases",

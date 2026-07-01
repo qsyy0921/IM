@@ -39,6 +39,7 @@ ai/python/
     contracts.py
     evaluator.py
     fixtures.py
+    memory_calibration.py
     reporting.py
     trace.py
   fixtures/
@@ -57,6 +58,7 @@ ai/python/
       synthetic_memory_admission_scenarios.json
       synthetic_memory_admission_hardening_scenarios.json
       synthetic_memory_admission_deeper_hardening_scenarios.json
+      memory_calibration_sample.json
       synthetic_state_diff_scenarios.json
       synthetic_state_diff_hardening_scenarios.json
       report_matrix_sample.json
@@ -68,6 +70,7 @@ ai/python/
     run_agent_eval_fixture.py
     run_agent_eval_current_report.py
     run_agent_eval_report_matrix.py
+    run_agent_memory_calibration.py
     run_agent_dataset_adapter.py
     run_agent_eval_regression.py
     validate_contracts.py
@@ -100,6 +103,7 @@ python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_state_diff_hardening_scenarios.json
 python ai/python/scripts/run_agent_eval_current_report.py ai/python/fixtures/agent_eval/synthetic_core_scenarios.json --report-out .tmp-agent-current-report.json --baseline ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json --review-out .tmp-agent-baseline-review.json --force
 python ai/python/scripts/run_agent_eval_report_matrix.py ai/python/fixtures/agent_eval/report_matrix_sample.json --matrix-out .tmp-agent-eval-matrix/matrix.json --approval-manifest-out .tmp-agent-eval-matrix/approval-manifest.json --force
+python ai/python/scripts/run_agent_memory_calibration.py ai/python/fixtures/agent_eval/memory_calibration_sample.json --report-out .tmp-agent-memory-calibration-report.json --force
 python ai/python/scripts/run_agent_dataset_adapter.py --run ai/python/fixtures/agent_eval/adapter_samples/qasper_like_rag_samples.json
 python ai/python/scripts/run_agent_dataset_adapter.py --run ai/python/fixtures/agent_eval/adapter_samples/toolsandbox_like_tool_samples.json
 python ai/python/scripts/run_agent_dataset_adapter.py --run ai/python/fixtures/agent_eval/adapter_samples/statebench_like_memory_samples.json
@@ -178,6 +182,7 @@ ai/python/fixtures/agent_eval/synthetic_context_evidence_deeper_hardening_scenar
 ai/python/fixtures/agent_eval/synthetic_memory_admission_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_memory_admission_hardening_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_memory_admission_deeper_hardening_scenarios.json
+ai/python/fixtures/agent_eval/memory_calibration_sample.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_hardening_scenarios.json
 ai/python/fixtures/agent_eval/adapter_samples/
@@ -236,6 +241,12 @@ The STATE-Bench/LoCoMO-like memory adapter sample now preserves fixture-only
 alignment metadata for duplicate cluster representative selection and
 tie-break refs, confidence threshold refs and governed policy revocation
 window refs.
+The memory calibration sample evaluates low-sensitive
+STATE-Bench/LoCoMO/LongMemEval/EverMemBench/GroupMemBench-style cases across
+candidate confidence thresholds, governed policy revocation windows and review
+backoff/operator queue policies. It emits recommendation refs and blocked
+promotion reasons only; it does not admit ACTIVE memory or call backend
+services.
 The state-diff fixture covers approved action outcome reports, expected-vs-actual
 state changes, execution refs, audit refs, incomplete reports and unauthorized
 mutation detection.
@@ -273,11 +284,12 @@ python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_state_diff_hardening_scenarios.json
 python ai/python/scripts/run_agent_eval_current_report.py ai/python/fixtures/agent_eval/synthetic_core_scenarios.json --report-out .tmp-agent-current-report.json --baseline ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json --review-out .tmp-agent-baseline-review.json --force
 python ai/python/scripts/run_agent_eval_report_matrix.py ai/python/fixtures/agent_eval/report_matrix_sample.json --matrix-out .tmp-agent-eval-matrix/matrix.json --approval-manifest-out .tmp-agent-eval-matrix/approval-manifest.json --force
+python ai/python/scripts/run_agent_memory_calibration.py ai/python/fixtures/agent_eval/memory_calibration_sample.json --report-out .tmp-agent-memory-calibration-report.json --force
 python ai/python/scripts/run_agent_dataset_adapter.py --run ai/python/fixtures/agent_eval/adapter_samples/qasper_like_rag_samples.json
 python ai/python/scripts/run_agent_dataset_adapter.py --run ai/python/fixtures/agent_eval/adapter_samples/toolsandbox_like_tool_samples.json
 python ai/python/scripts/run_agent_dataset_adapter.py --run ai/python/fixtures/agent_eval/adapter_samples/statebench_like_memory_samples.json
 python ai/python/scripts/run_agent_eval_regression.py ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json
-python -m pytest ai/python/tests/test_agent_eval_contracts.py ai/python/tests/test_agent_eval_evaluator.py ai/python/tests/test_agent_eval_trace.py ai/python/tests/test_agent_eval_integration.py ai/python/tests/test_agent_eval_reporting.py -q
+python -m pytest ai/python/tests/test_agent_eval_contracts.py ai/python/tests/test_agent_eval_evaluator.py ai/python/tests/test_agent_eval_trace.py ai/python/tests/test_agent_eval_integration.py ai/python/tests/test_agent_eval_reporting.py ai/python/tests/test_agent_memory_calibration.py -q
 ```
 
 The CLI output is a low-sensitive `EvalReport` with per-case `ReplayBundle`

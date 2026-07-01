@@ -97,6 +97,20 @@ CSV / SVG 仍放在 H 盘结果目录，不写入仓库：
 
 如果任一机器采样全失败，脚本默认失败，避免生成缺机器的误导性曲线。
 
+后续正式后端压测必须把 Ubuntu 服务端资源利用率作为有效性门槛之一：
+若 Ubuntu 整机 CPU 长时间接近空闲，不能直接把低 achieved rate 写成服务端容量上限；
+需要继续提高实际发压、拆分 runner、上调安全的 runtime profile，或定位 RPC / DB /
+连接池等待，直到确认瓶颈已迁移到 Ubuntu 上的具体服务、PostgreSQL、Kafka、
+Redis、网络或磁盘资源。报告必须同时给出三机资源曲线和 Prometheus / PostgreSQL
+证据，避免只凭整机 CPU 判断。
+
+三台机器资源充足时，正式压测默认采用分布式压力模型：Windows、Ubuntu、Mac
+都应参与发压、subscriber-only 读取 shard、或资源采样 / 观测中的至少一种。除非
+单机 runner 已证明能把 Ubuntu 服务端 CPU / IO / 网络打到瓶颈区，否则不要只用
+Windows 单机 runner 下结论。send-only 阶段优先拆分多个 runner 共同调用
+`SendMessage`；online signal 阶段优先把 subscriber shard 分散到三台机器，避免
+客户端单机 JSON decode、WebSocket read 或 accounting 限制掩盖服务端能力。
+
 发送压力由 `--message-rate` 控制全局目标速率，由 `--send-concurrency` 控制
 并发 `SendMessage` worker 数。`--send-concurrency=0` 表示使用 `--sender-count`。
 报告中的 `achieved_send_rate` 才是本轮真实发压速率；不要把 target

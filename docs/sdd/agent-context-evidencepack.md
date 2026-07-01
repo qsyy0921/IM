@@ -284,8 +284,9 @@ Promote only after:
 ## 14. Current Isolated Fixture Coverage
 
 Current first-stage code is fixture-only and lives under
-`ai/python/nexusim_ai_eval/` and
-`ai/python/fixtures/agent_eval/synthetic_context_evidence_scenarios.json`.
+`ai/python/nexusim_ai_eval/`,
+`ai/python/fixtures/agent_eval/synthetic_context_evidence_scenarios.json` and
+`ai/python/fixtures/agent_eval/synthetic_context_evidence_hardening_scenarios.json`.
 It does not freeze a production EvidencePack or ContextPackage schema.
 
 Implemented checks:
@@ -294,14 +295,20 @@ Implemented checks:
 - conflicting evidence refs must be marked as detected;
 - stale evidence refs must not be used or cited;
 - permission-driven abstain can pass without exposing forbidden refs;
+- memory-vs-current-source precedence is scored when memory conflicts with
+  fresher source truth;
+- unsafe tool output refs must be quarantined before context reuse;
+- context-budget retention must preserve required high-priority refs;
+- unavailable retrieval lanes must be reported as explicit coverage gaps;
 - trace metadata includes low-sensitive refs only.
 
 Remaining hardening:
 
-- memory-vs-source precedence when memory conflicts with current source truth;
-- unsafe tool output entering context;
-- deterministic token-budget truncation;
-- unavailable retrieval lane handling and coverage-gap scoring.
+- source ranking / rerank explanation and deterministic tie-breaks;
+- lane retry/redrive metadata and coverage-gap repair;
+- snippet-level citation repair and partial-source rejection;
+- cross-tenant or denied-lane source visibility cases;
+- provider, tool and peer-agent taint propagation through context assembly.
 
 ## 15. References
 

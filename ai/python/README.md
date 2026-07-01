@@ -49,6 +49,7 @@ ai/python/
       synthetic_runtime_control_scenarios.json
       synthetic_mcp_security_scenarios.json
       synthetic_context_evidence_scenarios.json
+      synthetic_context_evidence_hardening_scenarios.json
       synthetic_memory_admission_scenarios.json
       synthetic_state_diff_scenarios.json
   contracts/
@@ -78,6 +79,7 @@ python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_runtime_control_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_mcp_security_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_context_evidence_scenarios.json
+python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_context_evidence_hardening_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_memory_admission_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_state_diff_scenarios.json
 python ai/python/scripts/run_agent_dataset_adapter.py --run ai/python/fixtures/agent_eval/adapter_samples/qasper_like_rag_samples.json
@@ -149,6 +151,7 @@ ai/python/fixtures/agent_eval/synthetic_core_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_runtime_control_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_mcp_security_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_context_evidence_scenarios.json
+ai/python/fixtures/agent_eval/synthetic_context_evidence_hardening_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_memory_admission_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_scenarios.json
 ai/python/fixtures/agent_eval/adapter_samples/
@@ -170,6 +173,9 @@ The MCP security fixture covers poisoned tool descriptions, unsafe MCP output
 instructions, provider provenance mismatch and sandbox-only provider handling.
 The context/evidence fixture covers source coverage, conflict marker detection,
 stale evidence avoidance and permission-driven abstain recommendation.
+The context/evidence hardening fixture covers memory-vs-current-source
+precedence, unsafe tool output quarantine before context reuse, deterministic
+context-budget retention and unavailable retrieval lane gap reporting.
 The memory admission fixture covers group speaker/audience attribution, project
 supersedes lineage, profile aggregate review, revoked memory blocking, stale
 memory blocking and overgeneralization prevention.
@@ -193,13 +199,14 @@ python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_runtime_control_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_mcp_security_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_context_evidence_scenarios.json
+python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_context_evidence_hardening_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_memory_admission_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_state_diff_scenarios.json
 python ai/python/scripts/run_agent_dataset_adapter.py --run ai/python/fixtures/agent_eval/adapter_samples/qasper_like_rag_samples.json
 python ai/python/scripts/run_agent_dataset_adapter.py --run ai/python/fixtures/agent_eval/adapter_samples/toolsandbox_like_tool_samples.json
 python ai/python/scripts/run_agent_dataset_adapter.py --run ai/python/fixtures/agent_eval/adapter_samples/statebench_like_memory_samples.json
 python ai/python/scripts/run_agent_eval_regression.py ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json
-python -m pytest ai/python/tests/test_agent_eval_contracts.py ai/python/tests/test_agent_eval_evaluator.py ai/python/tests/test_agent_eval_integration.py -q
+python -m pytest ai/python/tests/test_agent_eval_contracts.py ai/python/tests/test_agent_eval_evaluator.py ai/python/tests/test_agent_eval_trace.py ai/python/tests/test_agent_eval_integration.py -q
 ```
 
 The CLI output is a low-sensitive `EvalReport` with per-case `ReplayBundle`

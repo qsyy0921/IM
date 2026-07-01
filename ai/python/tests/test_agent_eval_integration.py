@@ -33,6 +33,14 @@ CONTEXT_EVIDENCE_PATH = (
     / "agent_eval"
     / "synthetic_context_evidence_scenarios.json"
 )
+CONTEXT_EVIDENCE_HARDENING_PATH = (
+    REPO_ROOT
+    / "ai"
+    / "python"
+    / "fixtures"
+    / "agent_eval"
+    / "synthetic_context_evidence_hardening_scenarios.json"
+)
 MEMORY_ADMISSION_PATH = (
     REPO_ROOT
     / "ai"
@@ -158,6 +166,28 @@ class AgentEvalIntegrationTests(unittest.TestCase):
         self.assertIn("source_coverage_score", report["aggregate_scores"])
         self.assertIn("conflict_detection_score", report["aggregate_scores"])
         self.assertIn("temporal_version_score", report["aggregate_scores"])
+
+    def test_cli_outputs_pass_report_for_context_evidence_hardening_scenarios(self) -> None:
+        result = subprocess.run(
+            [
+                sys.executable,
+                "ai/python/scripts/run_agent_eval_fixture.py",
+                str(CONTEXT_EVIDENCE_HARDENING_PATH),
+            ],
+            check=True,
+            capture_output=True,
+            cwd=REPO_ROOT,
+            text=True,
+        )
+
+        report = json.loads(result.stdout)
+        self.assertEqual(report["status"], "PASS")
+        self.assertEqual(report["case_count"], 4)
+        self.assertEqual(report["failed_count"], 0)
+        self.assertIn("memory_source_precedence_score", report["aggregate_scores"])
+        self.assertIn("unsafe_context_quarantine_score", report["aggregate_scores"])
+        self.assertIn("context_budget_truncation_score", report["aggregate_scores"])
+        self.assertIn("retrieval_lane_gap_score", report["aggregate_scores"])
 
     def test_cli_outputs_pass_report_for_memory_admission_scenarios(self) -> None:
         result = subprocess.run(

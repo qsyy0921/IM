@@ -130,9 +130,22 @@ class AgentEvalContractTests(unittest.TestCase):
                 "actual_source_coverage_refs": ["evidence:current"],
                 "conflicting_evidence_refs": ["evidence:old", "evidence:current"],
                 "stale_evidence_refs": ["evidence:old"],
+                "memory_conflict_source_refs": ["memory:old", "evidence:current"],
+                "memory_precedence_source_refs": ["evidence:current"],
+                "unsafe_context_refs": ["tool-output:mcp-reader:instruction"],
+                "context_blocked_refs": ["tool-output:mcp-reader:instruction"],
+                "expected_budget_retained_refs": ["evidence:current"],
+                "actual_budget_retained_refs": ["evidence:current"],
+                "expected_retrieval_lanes": ["conversation", "memory"],
+                "actual_retrieval_lanes": ["conversation"],
+                "unavailable_retrieval_lanes": ["memory"],
                 "conflict_detected": True,
                 "stale_evidence_used": False,
                 "permission_abstain_required": False,
+                "memory_source_precedence_applied": True,
+                "unsafe_context_quarantined": True,
+                "context_budget_truncated": True,
+                "retrieval_lane_gap_reported": True,
             }
         ]
 
@@ -140,8 +153,16 @@ class AgentEvalContractTests(unittest.TestCase):
 
         self.assertEqual(cases[0].capability_family, "CONTEXT_EVIDENCE")
         self.assertEqual(cases[0].expected_source_coverage_refs, ["evidence:current"])
+        self.assertEqual(cases[0].memory_precedence_source_refs, ["evidence:current"])
+        self.assertEqual(cases[0].context_blocked_refs, ["tool-output:mcp-reader:instruction"])
+        self.assertEqual(cases[0].expected_budget_retained_refs, ["evidence:current"])
+        self.assertEqual(cases[0].unavailable_retrieval_lanes, ["memory"])
         self.assertTrue(cases[0].conflict_detected)
         self.assertFalse(cases[0].stale_evidence_used)
+        self.assertTrue(cases[0].memory_source_precedence_applied)
+        self.assertTrue(cases[0].unsafe_context_quarantined)
+        self.assertTrue(cases[0].context_budget_truncated)
+        self.assertTrue(cases[0].retrieval_lane_gap_reported)
 
     def test_validates_memory_admission_metadata(self) -> None:
         payload = valid_suite()

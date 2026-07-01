@@ -42,6 +42,10 @@ ALLOWED_FAILURE_CLASSES = {
     "EVIDENCE_CONFLICT_NOT_DETECTED",
     "STALE_EVIDENCE_USED",
     "PERMISSION_ABSTAIN_MISSING",
+    "MEMORY_SOURCE_PRECEDENCE_MISSING",
+    "UNSAFE_CONTEXT_NOT_QUARANTINED",
+    "CONTEXT_BUDGET_TRUNCATION_INVALID",
+    "RETRIEVAL_LANE_GAP_MISSING",
     "TOOL_NOT_ALLOWED",
     "TOOL_ARGS_INVALID",
     "TOOL_POISONING_DETECTED",
@@ -107,6 +111,15 @@ class EvalCase:
     actual_source_coverage_refs: list[str] = field(default_factory=list)
     conflicting_evidence_refs: list[str] = field(default_factory=list)
     stale_evidence_refs: list[str] = field(default_factory=list)
+    memory_conflict_source_refs: list[str] = field(default_factory=list)
+    memory_precedence_source_refs: list[str] = field(default_factory=list)
+    unsafe_context_refs: list[str] = field(default_factory=list)
+    context_blocked_refs: list[str] = field(default_factory=list)
+    expected_budget_retained_refs: list[str] = field(default_factory=list)
+    actual_budget_retained_refs: list[str] = field(default_factory=list)
+    expected_retrieval_lanes: list[str] = field(default_factory=list)
+    actual_retrieval_lanes: list[str] = field(default_factory=list)
+    unavailable_retrieval_lanes: list[str] = field(default_factory=list)
     expected_citation_refs: list[str] = field(default_factory=list)
     actual_citation_refs: list[str] = field(default_factory=list)
     expected_memory_outcome: str = ""
@@ -150,6 +163,10 @@ class EvalCase:
     conflict_detected: bool = False
     stale_evidence_used: bool = False
     permission_abstain_required: bool = False
+    memory_source_precedence_applied: bool = False
+    unsafe_context_quarantined: bool = False
+    context_budget_truncated: bool = False
+    retrieval_lane_gap_reported: bool = False
     stale_memory_used: bool = False
     memory_overgeneralized: bool = False
     profile_aggregate_review_required: bool = False
@@ -303,6 +320,33 @@ def _eval_case(payload: dict[str, Any], index: int) -> EvalCase:
         stale_evidence_refs=_string_list(
             payload.get("stale_evidence_refs", []), "stale_evidence_refs"
         ),
+        memory_conflict_source_refs=_string_list(
+            payload.get("memory_conflict_source_refs", []), "memory_conflict_source_refs"
+        ),
+        memory_precedence_source_refs=_string_list(
+            payload.get("memory_precedence_source_refs", []), "memory_precedence_source_refs"
+        ),
+        unsafe_context_refs=_string_list(
+            payload.get("unsafe_context_refs", []), "unsafe_context_refs"
+        ),
+        context_blocked_refs=_string_list(
+            payload.get("context_blocked_refs", []), "context_blocked_refs"
+        ),
+        expected_budget_retained_refs=_string_list(
+            payload.get("expected_budget_retained_refs", []), "expected_budget_retained_refs"
+        ),
+        actual_budget_retained_refs=_string_list(
+            payload.get("actual_budget_retained_refs", []), "actual_budget_retained_refs"
+        ),
+        expected_retrieval_lanes=_string_list(
+            payload.get("expected_retrieval_lanes", []), "expected_retrieval_lanes"
+        ),
+        actual_retrieval_lanes=_string_list(
+            payload.get("actual_retrieval_lanes", []), "actual_retrieval_lanes"
+        ),
+        unavailable_retrieval_lanes=_string_list(
+            payload.get("unavailable_retrieval_lanes", []), "unavailable_retrieval_lanes"
+        ),
         expected_citation_refs=_string_list(
             payload.get("expected_citation_refs", []), "expected_citation_refs"
         ),
@@ -406,6 +450,19 @@ def _eval_case(payload: dict[str, Any], index: int) -> EvalCase:
         ),
         permission_abstain_required=_bool(
             payload.get("permission_abstain_required", False), "permission_abstain_required"
+        ),
+        memory_source_precedence_applied=_bool(
+            payload.get("memory_source_precedence_applied", False),
+            "memory_source_precedence_applied",
+        ),
+        unsafe_context_quarantined=_bool(
+            payload.get("unsafe_context_quarantined", False), "unsafe_context_quarantined"
+        ),
+        context_budget_truncated=_bool(
+            payload.get("context_budget_truncated", False), "context_budget_truncated"
+        ),
+        retrieval_lane_gap_reported=_bool(
+            payload.get("retrieval_lane_gap_reported", False), "retrieval_lane_gap_reported"
         ),
         stale_memory_used=_bool(payload.get("stale_memory_used", False), "stale_memory_used"),
         memory_overgeneralized=_bool(

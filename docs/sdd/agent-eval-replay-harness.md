@@ -191,6 +191,14 @@ The harness should normalize:
 - `CONFLICTING_EVIDENCE`
 - `PERMISSION_LEAKAGE`
 - `CITATION_MISSING`
+- `SOURCE_COVERAGE_MISSING`
+- `EVIDENCE_CONFLICT_NOT_DETECTED`
+- `STALE_EVIDENCE_USED`
+- `PERMISSION_ABSTAIN_MISSING`
+- `MEMORY_SOURCE_PRECEDENCE_MISSING`
+- `UNSAFE_CONTEXT_NOT_QUARANTINED`
+- `CONTEXT_BUDGET_TRUNCATION_INVALID`
+- `RETRIEVAL_LANE_GAP_MISSING`
 - `TOOL_NOT_ALLOWED`
 - `TOOL_ARGS_INVALID`
 - `TOOL_POISONING_DETECTED`
@@ -340,6 +348,7 @@ ai/python/fixtures/agent_eval/synthetic_core_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_runtime_control_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_mcp_security_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_context_evidence_scenarios.json
+ai/python/fixtures/agent_eval/synthetic_context_evidence_hardening_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_memory_admission_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_scenarios.json
 ai/python/scripts/run_agent_eval_fixture.py
@@ -386,6 +395,9 @@ Implemented checks:
   output instructions, provider provenance mismatch and sandbox-only providers.
 - ContextPackage / EvidencePack fixture coverage for source coverage, conflict
   marker detection, stale evidence avoidance and permission abstain.
+- ContextPackage / EvidencePack hardening coverage for memory-vs-current-source
+  precedence, unsafe tool output quarantine, deterministic context-budget
+  retention and unavailable retrieval lane gap reporting.
 - richer memory admission fixture coverage for group speaker/audience, project
   supersedes, profile aggregate review, revoked memory blocking, stale memory
   blocking and overgeneralization prevention.
@@ -396,12 +408,13 @@ Implemented checks:
 Focused verification:
 
 ```powershell
-python -m pytest ai/python/tests/test_agent_eval_contracts.py ai/python/tests/test_agent_eval_evaluator.py ai/python/tests/test_agent_eval_integration.py -q
+python -m pytest ai/python/tests/test_agent_eval_contracts.py ai/python/tests/test_agent_eval_evaluator.py ai/python/tests/test_agent_eval_trace.py ai/python/tests/test_agent_eval_integration.py -q
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_first_trio.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_core_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_runtime_control_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_mcp_security_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_context_evidence_scenarios.json
+python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_context_evidence_hardening_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_memory_admission_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_state_diff_scenarios.json
 python ai/python/scripts/run_agent_dataset_adapter.py --run ai/python/fixtures/agent_eval/adapter_samples/qasper_like_rag_samples.json

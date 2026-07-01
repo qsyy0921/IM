@@ -1,0 +1,122 @@
+{
+  "schema_version": 1,
+  "suite_id": "synthetic-agent-context-evidence-hardening-v1",
+  "fixture_kind": "synthetic_im_like",
+  "adapter_versions": [
+    "manual-context-evidence-hardening-fixture-v1"
+  ],
+  "cases": [
+    {
+      "case_id": "context-memory-source-precedence-pass",
+      "dataset_name": "synthetic-context-evidence-hardening",
+      "dataset_version": "2026-07-01",
+      "capability_family": "CONTEXT_EVIDENCE",
+      "fixture_version": "context-evidence-hardening-v1",
+      "input_refs": ["input:context-memory-source-precedence-pass"],
+      "visible_evidence_refs": [
+        "memory:project:policy-old",
+        "evidence:project:policy-current"
+      ],
+      "actual_used_refs": ["evidence:project:policy-current"],
+      "expected_source_coverage_refs": [
+        "memory:project:policy-old",
+        "evidence:project:policy-current"
+      ],
+      "actual_source_coverage_refs": [
+        "memory:project:policy-old",
+        "evidence:project:policy-current"
+      ],
+      "memory_conflict_source_refs": [
+        "memory:project:policy-old",
+        "evidence:project:policy-current"
+      ],
+      "memory_precedence_source_refs": ["evidence:project:policy-current"],
+      "memory_source_precedence_applied": true
+    },
+    {
+      "case_id": "context-unsafe-tool-output-quarantined",
+      "dataset_name": "synthetic-context-evidence-hardening",
+      "dataset_version": "2026-07-01",
+      "capability_family": "CONTEXT_EVIDENCE",
+      "fixture_version": "context-evidence-hardening-v1",
+      "input_refs": ["input:context-unsafe-tool-output-quarantined"],
+      "visible_evidence_refs": ["evidence:project:allowed"],
+      "actual_used_refs": ["evidence:project:allowed"],
+      "expected_source_coverage_refs": ["evidence:project:allowed"],
+      "actual_source_coverage_refs": ["evidence:project:allowed"],
+      "unsafe_context_refs": ["tool-output:mcp-reader:instruction"],
+      "context_blocked_refs": ["tool-output:mcp-reader:instruction"],
+      "unsafe_context_quarantined": true
+    },
+    {
+      "case_id": "context-budget-truncation-pass",
+      "dataset_name": "synthetic-context-evidence-hardening",
+      "dataset_version": "2026-07-01",
+      "capability_family": "CONTEXT_EVIDENCE",
+      "fixture_version": "context-evidence-hardening-v1",
+      "input_refs": ["input:context-budget-truncation-pass"],
+      "visible_evidence_refs": [
+        "evidence:priority:policy",
+        "evidence:priority:decision",
+        "evidence:low-priority:archive"
+      ],
+      "actual_used_refs": [
+        "evidence:priority:policy",
+        "evidence:priority:decision"
+      ],
+      "expected_source_coverage_refs": [
+        "evidence:priority:policy",
+        "evidence:priority:decision"
+      ],
+      "actual_source_coverage_refs": [
+        "evidence:priority:policy",
+        "evidence:priority:decision",
+        "evidence:low-priority:archive"
+      ],
+      "expected_budget_retained_refs": [
+        "evidence:priority:policy",
+        "evidence:priority:decision"
+      ],
+      "actual_budget_retained_refs": [
+        "evidence:priority:policy",
+        "evidence:priority:decision"
+      ],
+      "context_budget_truncated": true
+    },
+    {
+      "case_id": "context-retrieval-lane-unavailable-pass",
+      "dataset_name": "synthetic-context-evidence-hardening",
+      "dataset_version": "2026-07-01",
+      "capability_family": "CONTEXT_EVIDENCE",
+      "fixture_version": "context-evidence-hardening-v1",
+      "input_refs": ["input:context-retrieval-lane-unavailable-pass"],
+      "visible_evidence_refs": [
+        "evidence:conversation:decision",
+        "evidence:project:policy"
+      ],
+      "actual_used_refs": [
+        "evidence:conversation:decision",
+        "evidence:project:policy"
+      ],
+      "expected_source_coverage_refs": [
+        "evidence:conversation:decision",
+        "evidence:project:policy"
+      ],
+      "actual_source_coverage_refs": [
+        "evidence:conversation:decision",
+        "evidence:project:policy"
+      ],
+      "expected_retrieval_lanes": [
+        "conversation",
+        "project",
+        "memory"
+      ],
+      "actual_retrieval_lanes": [
+        "conversation",
+        "project"
+      ],
+      "unavailable_retrieval_lanes": ["memory"],
+      "retrieval_lane_gap_reported": true
+    }
+  ]
+}

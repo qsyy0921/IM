@@ -73,6 +73,7 @@ ai/python/fixtures/agent_eval/synthetic_core_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_runtime_control_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_mcp_security_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_context_evidence_scenarios.json
+ai/python/fixtures/agent_eval/synthetic_context_evidence_hardening_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_memory_admission_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_scenarios.json
 ai/python/scripts/run_agent_eval_fixture.py
@@ -120,6 +121,10 @@ Slice 0 covers:
   output instructions, provider provenance mismatch and sandbox-only providers.
 - fixture-only ContextPackage / EvidencePack coverage for source coverage,
   conflict markers, stale evidence avoidance and permission abstain.
+- fixture-only ContextPackage / EvidencePack hardening coverage for
+  memory-vs-current-source precedence, unsafe tool output quarantine,
+  deterministic context-budget retention and unavailable retrieval lane gap
+  reporting.
 - fixture-only richer memory admission coverage for group speaker/audience,
   project supersedes, profile aggregate review, revoked memory blocking, stale
   memory blocking and overgeneralization prevention.
@@ -205,6 +210,8 @@ fixtures, call models or connect to backend services.
 - RuntimeControlFixture.
 - ContextPackage source coverage, conflict, stale-source and permission-abstain
   metadata.
+- ContextPackage hardening metadata for memory/source precedence, unsafe context
+  blocks, context-budget retention and retrieval lane gaps.
 - MemoryCandidate source, speaker, audience, supersedes, stale-memory and
   review metadata.
 - StateDiffReport execution, approval, prepare, state-change and audit refs.
@@ -225,6 +232,7 @@ ai/python/fixtures/agent_eval/synthetic_core_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_runtime_control_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_mcp_security_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_context_evidence_scenarios.json
+ai/python/fixtures/agent_eval/synthetic_context_evidence_hardening_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_memory_admission_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_scenarios.json
 ai/python/fixtures/agent_eval/adapter_samples/
@@ -302,6 +310,7 @@ Integration tests:
 - load `synthetic_runtime_control_scenarios.json`;
 - load `synthetic_mcp_security_scenarios.json`;
 - load `synthetic_context_evidence_scenarios.json`;
+- load `synthetic_context_evidence_hardening_scenarios.json`;
 - load `synthetic_memory_admission_scenarios.json`;
 - load `synthetic_state_diff_scenarios.json`;
 - run `run_agent_eval_fixture.py`;
@@ -323,12 +332,13 @@ Boundary is enforced by:
 Focused gate:
 
 ```powershell
-python -m pytest ai/python/tests/test_agent_eval_contracts.py ai/python/tests/test_agent_eval_evaluator.py ai/python/tests/test_agent_eval_integration.py -q
+python -m pytest ai/python/tests/test_agent_eval_contracts.py ai/python/tests/test_agent_eval_evaluator.py ai/python/tests/test_agent_eval_trace.py ai/python/tests/test_agent_eval_integration.py -q
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_first_trio.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_core_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_runtime_control_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_mcp_security_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_context_evidence_scenarios.json
+python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_context_evidence_hardening_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_memory_admission_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_state_diff_scenarios.json
 python ai/python/scripts/run_agent_dataset_adapter.py --run ai/python/fixtures/agent_eval/adapter_samples/qasper_like_rag_samples.json
@@ -357,14 +367,13 @@ Recommended next slices:
 
 1. Harden memory admission with duplicate/dedupe, low-confidence, procedural
    skill-bound and policy-memory rejection cases.
-2. Harden ContextPackage / EvidencePack with memory-vs-source precedence,
-   unsafe tool output in context, token-budget truncation and unavailable
-   retrieval lane cases.
-3. Harden state-diff with repair/redrive, partial execution and idempotency
+2. Harden state-diff with repair/redrive, partial execution and idempotency
    cases.
-4. Add current-report generation script for baseline refresh review.
-5. Add runtime-control negative fixture pack for missing checkpoints and
+3. Add runtime-control negative fixture pack for missing checkpoints and
    incomplete cancel propagation.
+4. Add current-report generation script for baseline refresh review.
+5. Deepen ContextPackage / EvidencePack with source ranking, lane redrive,
+   snippet-level citation repair and cross-tenant denied-lane cases.
 
 Each slice must keep the same isolation rule until an ADR explicitly promotes a
 backend integration boundary.

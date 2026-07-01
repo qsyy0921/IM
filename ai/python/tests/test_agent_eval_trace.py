@@ -125,6 +125,19 @@ class AgentEvalTraceTests(unittest.TestCase):
                     "actual_source_coverage_refs": ["evidence:old", "evidence:current"],
                     "conflicting_evidence_refs": ["evidence:old", "evidence:current"],
                     "stale_evidence_refs": ["evidence:old"],
+                    "memory_conflict_source_refs": ["memory:old", "evidence:current"],
+                    "memory_precedence_source_refs": ["evidence:current"],
+                    "memory_source_precedence_applied": True,
+                    "unsafe_context_refs": ["tool-output:mcp-reader:instruction"],
+                    "context_blocked_refs": ["tool-output:mcp-reader:instruction"],
+                    "unsafe_context_quarantined": True,
+                    "expected_budget_retained_refs": ["evidence:current"],
+                    "actual_budget_retained_refs": ["evidence:current"],
+                    "context_budget_truncated": True,
+                    "expected_retrieval_lanes": ["conversation", "memory"],
+                    "actual_retrieval_lanes": ["conversation"],
+                    "unavailable_retrieval_lanes": ["memory"],
+                    "retrieval_lane_gap_reported": True,
                     "conflict_detected": True,
                 }
             )
@@ -135,8 +148,15 @@ class AgentEvalTraceTests(unittest.TestCase):
         self.assertEqual(trace.status, "PASS")
         self.assertEqual(trace.evidence_pack.source_coverage_refs, ["evidence:old", "evidence:current"])
         self.assertEqual(trace.evidence_pack.conflicting_source_refs, ["evidence:old", "evidence:current"])
+        self.assertEqual(trace.evidence_pack.memory_conflict_source_refs, ["memory:old", "evidence:current"])
+        self.assertEqual(trace.evidence_pack.unavailable_retrieval_lanes, ["memory"])
         self.assertTrue(trace.context_package.conflict_detected)
         self.assertFalse(trace.context_package.stale_evidence_used)
+        self.assertTrue(trace.context_package.memory_source_precedence_applied)
+        self.assertEqual(trace.context_package.context_blocked_refs, ["tool-output:mcp-reader:instruction"])
+        self.assertEqual(trace.context_package.budget_retained_refs, ["evidence:current"])
+        self.assertEqual(trace.context_package.retrieval_lanes, ["conversation"])
+        self.assertTrue(trace.context_package.retrieval_lane_gap_reported)
 
     def test_trace_contains_tool_and_workflow_steps(self) -> None:
         case = validate_eval_suite(

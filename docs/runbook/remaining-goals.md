@@ -14,29 +14,30 @@
 
 ## 当前优先顺序
 
-1. ContextPackage / EvidencePack hardening：基础 source coverage、temporal
-   version、conflict marker 和 permission abstain fixture 已落地；后续覆盖
-   memory-vs-source precedence、unsafe tool output in context、token-budget
-   truncation 和 retrieval lane unavailable。
-2. Memory admission hardening：基础 group/project/profile、supersedes、
+1. Memory admission hardening：基础 group/project/profile、supersedes、
    revocation、stale facts、speaker attribution、audience scope 和
    overgeneralization fixture 已落地；后续覆盖 duplicate/dedupe、low-confidence、
    procedural skill-bound、policy-memory rejection 和 review timeout。
-3. State-diff hardening：基础 action outcome report、expected-vs-actual state
+2. State-diff hardening：基础 action outcome report、expected-vs-actual state
    change、execution refs、audit refs、incomplete report 和 unauthorized mutation
    fixture 已落地；后续覆盖 repair/redrive、partial execution、idempotency 和
    compensating action cases。
-4. Tool / MCP security hardening：基础 malicious tool description、unsafe output、
+3. Tool / MCP security hardening：基础 malicious tool description、unsafe output、
    MCP provider provenance 和 sandbox-only provider fixture 已落地；后续覆盖 tool
    argument schema mismatch、tool-selection attack、prepare expiry 和多候选 provider
    selection。
-5. ReplayBundle / observability：定义低敏 refs、hashes、version metadata、failure
-   taxonomy 和 trace linkage。
-6. Runtime-control negative fixtures：覆盖 missing checkpoint、cancel propagation
+4. Runtime-control negative fixtures：覆盖 missing checkpoint、cancel propagation
    incomplete、replay event incomplete，作为已落地正向 cancel/resume/replay fixture 的
    hardening。
-7. Current-report generation / baseline refresh review：把当前 EvalReport 生成和 baseline
+5. Current-report generation / baseline refresh review：把当前 EvalReport 生成和 baseline
    更新评审脚本化，避免手工复制导致 baseline 漂移。
+6. ContextPackage / EvidencePack deeper hardening：基础 source coverage、temporal
+   version、conflict marker、permission abstain、memory-vs-current-source precedence、
+   unsafe tool output quarantine、context-budget retention 和 retrieval lane unavailable
+   fixture 已落地；后续覆盖 source ranking、lane redrive、snippet-level citation
+   repair、cross-tenant denied-lane 和 taint propagation cases。
+7. ReplayBundle / observability：定义低敏 refs、hashes、version metadata、failure
+   taxonomy 和 trace linkage。
 8. ADR promotion review：只有前述 fixture/eval 有证据后，才评估 Agent Runtime、
    ContextPackage、MemoryCandidate、Tool prepare、ReplayBundle 是否提升为 ADR / 契约。
 

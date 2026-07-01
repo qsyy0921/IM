@@ -96,10 +96,14 @@
    已完成镜像重建 / 归档 / redeploy 和同场景复压：400 subscriber / 5000 消息 /
    READ_FANOUT `100:20` 下，signal span 降至 146.62s，span rate 提升到约
    682.034 signals/s，约 1.97x；message / delivery outbox pending=0，writer /
-   Redis subscriber error、queue-full 和 eviction 均为 0。下一步不要继续只调静态
-   sample knob；当前已补并 redeploy delivery-consumer debug/metrics scrape 配置，
-   需要先复压确认 route cache hit / miss 可见，再转向消息速率 / 在线人数感知
-   dynamic cadence、持久 per-conversation / per-bucket fanout worker，或更强
+   Redis subscriber error、queue-full 和 eviction 均为 0。当前已补并 redeploy
+   delivery-consumer debug/metrics scrape 配置，并通过
+   `hotgroup-policydefaults-400sub-5000msg` 复压确认 route cache hit / miss 可见。
+   该轮同时发现 Docker env 漂移为空时会退回全量 remote publish，所以本地 compose
+   已固定 READ_FANOUT / BROADCAST_SIGNAL 默认 sample=10、subscriber policy `100:20`。
+   剩余任务：用同配置再跑一次复验，确认 193.559s span 相对旧 routecache baseline
+   146.62s 的差异是波动、观测开销还是新瓶颈；确认后再转向消息速率 / 在线人数
+   感知 dynamic cadence、持久 per-conversation / per-bucket fanout worker，或更强
    pull-first 策略。
 2. Agent action boundary / repair cases：在 provider replay admin / workflow handoff 已落
    的基础上，继续扩更多需要 proposal / approval / workflow / audit 的 action 与 repair 场景。

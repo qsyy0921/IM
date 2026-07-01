@@ -354,7 +354,30 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
   clean commit `b119716d` 已补 delivery-consumer debug endpoint / Prometheus
   core target 配置，并已在 Ubuntu redeploy：`11944` endpoint 可返回
   `conversation_route_cache_hit / miss / invalidated` 指标，Prometheus target
-  `nexusim-push-gateway-delivery-consumer` 为 `up`。下一步需复压确认命中率曲线。
+  `nexusim-push-gateway-delivery-consumer` 为 `up`。
+- 2026-07-01 已补本地 Docker READ_FANOUT / BROADCAST_SIGNAL 默认 signal policy：
+  delivery-consumer 和 4 个 ws 实例现在显式使用
+  `NEXUSIM_PUSH_CONVERSATION_SIGNAL_SAMPLE_EVERY_READ_FANOUT=10`、
+  `NEXUSIM_PUSH_CONVERSATION_SIGNAL_SUBSCRIBER_POLICY_READ_FANOUT=100:20`
+  及对应 `BROADCAST_SIGNAL` 配置，避免容器 env 漂移回全量 remote publish。
+  复压前的诊断 run
+  `hotgroup-routecache-metrics-400sub-5000msg-coordinator-20260701-111956`
+  显示配置空缺会导致 delivery-consumer 对 5000 条消息执行约 20021 次 remote
+  publish call，100000 条 expected signal drain span 拉长到 `486.339s`；
+  该 run 只作为负例诊断，不作为容量结论。修正后 run
+  `hotgroup-policydefaults-400sub-5000msg-coordinator-20260701-114425`
+  使用 clean commit `5fa83ed`、6000 人、5000 消息、目标 8000 msg/s、
+  256 sender、400 subscriber、READ_FANOUT `100:20`；4 个 shard 共读完
+  100000 条 signal，span `193.559s`，span rate 约 `516.638 signals/s`，
+  `send_p95_ms=17.021`、`send_p99_ms=19.347`，message / delivery outbox
+  pending=0，writer / Redis subscriber error、queue-full 和 eviction 均为 0。
+  Prometheus 窗口已经能看到 delivery-consumer route cache：
+  `conversation_route_cache_hit_window` 约 `4414.596`、miss 约 `730.621`，
+  `remote_publish_call_window` last 约 `1029.043`、`remote_enqueued_sessions_window`
+  last 约 `102904.324`。结论：delivery-consumer route cache 观测缺口已补；
+  但 corrected policy run 比旧 routecache baseline `146.62s / 682.034 signals/s`
+  慢，下一步应先做一次同配置重复复验，排除 run 波动 / 指标开销 / runner 环境差异后，
+  再决定是否进入 dynamic cadence、持久 fanout worker 或更强 pull-first 策略。
 - HYBRID 诊断档位 1000 人 / 1000 消息 / 400 msg/s 暴露 `delivery_outbox` ready query
   在百万级 per-user outbox 下退化：旧 anti-join blocker 查询每批 500 行约 24s。当前
   delivery outbox relay 已改成 per-conversation frontier ready query，并把本地 worker
@@ -383,7 +406,10 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
   threshold 场景下把 signal drain rate 提升约 1.97x，但仍未回到 fanout-mode
   policy baseline 的约 1.4k signals/s。clean commit `b119716d` 已补
   delivery-consumer debug endpoint 和 Prometheus core scrape target 配置，并已
-  redeploy 验证 target `up`；仍需复压取得 cache hit / miss 曲线证据。
+  redeploy 验证 target `up`；`hotgroup-policydefaults-400sub-5000msg` 已取得
+  delivery-consumer route cache hit / miss 曲线证据，并暴露 policy env 漂移会造成
+  remote publish 放大的风险。本轮收口为“观测补齐 + Docker 默认策略固定”，不是
+  新的容量上限。
 - 文档同步本轮公开能力或瓶颈变化。
 - 提交并推送到 GitHub。
 
@@ -398,11 +424,11 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
 ## 后续优先级
 
 1. subscriber-aware threshold + Redis conversation route cache 已完成 clean Docker
-   复压，证明重复 route lookup 曾是该策略的明显成本来源，但 route cache 后仍未突破
-   fanout-mode policy baseline。当前已补并 redeploy delivery-consumer
-   debug/metrics scrape 配置；下一步先复压验证 route cache hit / miss 可见，再转向消息速率 /
-   在线人数感知的 dynamic cadence、持久 per-conversation / per-bucket fanout worker，
-   或更强 pull-first 策略。
+   复压，delivery-consumer route cache hit / miss 也已进入 Prometheus 窗口。
+   由于 corrected policy-defaults run 比旧 routecache baseline 慢，下一步先用同配置
+   重复复验确认是否为 run 波动 / 观测开销 / runner 环境差异；若结果稳定，再转向
+   消息速率 / 在线人数感知 dynamic cadence、持久 per-conversation / per-bucket
+   fanout worker，或更强 pull-first 策略。
 2. 继续为每轮优化保留 clean commit、Docker 镜像归档、三机部署版本和 Prometheus
    时间窗口，保证压测曲线可复现。
 3. 若 HYBRID 仍要支持千人级 per-user materialized outbox，优先评估显式 frontier /

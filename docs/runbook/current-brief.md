@@ -307,5 +307,12 @@ brief、loadtest report、development-progress 或 archive。
   route lookup 曾是 subscriber-aware 策略的重要成本，但仍未回到 fanout-mode policy
   baseline 的约 1.4k signals/s。clean commit `b119716d` 已补 delivery-consumer
   debug endpoint 和 Prometheus core scrape target 配置，并已在 Ubuntu redeploy
-  验证 target `up`；下一步先复压确认 route cache hit / miss 可见，随后转向消息速率 / 在线人数感知 dynamic cadence、持久
-  per-conversation / per-bucket worker，或更强 pull-first 策略。
+  验证 target `up`。随后补本地 Docker 默认 policy，显式设置 READ_FANOUT /
+  BROADCAST_SIGNAL 的 sample=10 和 subscriber policy `100:20`，避免 env 漂移回
+  全量 remote publish。诊断 run 证明空配置会把 5000 条消息放大成约 20021 次
+  remote publish call、100000 条 signal drain span 拉长到 486.339s。修正后
+  `hotgroup-policydefaults-400sub-5000msg-coordinator-20260701-114425` 读完
+  100000 条 signal，span 193.559s，message / delivery outbox pending=0，并已在
+  Prometheus 窗口看到 delivery-consumer route cache hit / miss 约 4415 / 731。
+  但该 run 比旧 routecache baseline 146.62s 慢，下一步先同配置重复复验确认波动，
+  再决定是否进入 dynamic cadence、持久 fanout worker 或更强 pull-first 策略。

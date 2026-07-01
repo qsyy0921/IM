@@ -329,6 +329,17 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
   first-stage threshold 策略能降低 emitted signal 数，但当前配置没有改善 drain，
   不能作为热点群吞吐优化闭环；下一步应转向消息速率感知的动态 cadence、持久
   per-conversation / per-bucket worker，或更强 pull-first 策略。
+- 2026-07-01 已补 push-gateway Redis conversation route cache 代码模块：当
+  subscriber-aware cadence 必须先计算每个远端 gateway 的 conversation subscriber
+  数时，Redis route registry 会对同一 `tenant_id + conversation_id` 的 route lookup
+  使用短 TTL 进程内缓存，默认 `NEXUSIM_PUSH_CONVERSATION_ROUTE_CACHE_TTL=250ms`。
+  该缓存只减少重复 Redis `SMembers + GET` 查询，不保存业务事实、不替代 Redis route
+  权威状态；订阅 / 退订 / unregister 会显式失效本机缓存，Redis 失败仍按原逻辑计
+  `lookup_error`，不假装成功。新增 Prometheus / debug 指标：
+  `conversation_route_cache_hit`、`conversation_route_cache_miss`、
+  `conversation_route_cache_invalidated`，并已接入 hotgroup metrics-window 脚本。
+  focused checks 已通过；下一步需要 clean commit、镜像重建 / 归档 / 三机 redeploy，
+  再用同场景 subscriber-aware 400 subscriber / 5000 message 复压，确认瓶颈是否迁移。
 - HYBRID 诊断档位 1000 人 / 1000 消息 / 400 msg/s 暴露 `delivery_outbox` ready query
   在百万级 per-user outbox 下退化：旧 anti-join blocker 查询每批 500 行约 24s。当前
   delivery outbox relay 已改成 per-conversation frontier ready query，并把本地 worker
@@ -352,6 +363,8 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
 - subscriber-aware conversation signal cadence 已完成代码、focused 验证、clean
   Docker redeploy 和可比复压。复压确认 outbox、writer、Redis route 和 subscriber
   错误路径均正常，但 READ_FANOUT `100:20` 没有改善 drain span。
+- Redis conversation route cache 代码、配置、指标和 hotgroup metrics-window 查询已完成
+  focused 验证；尚未重建镜像 / redeploy / 复压，不宣称吞吐提升。
 - 文档同步本轮公开能力或瓶颈变化。
 - 提交并推送到 GitHub。
 
@@ -365,10 +378,10 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
 
 ## 后续优先级
 
-1. subscriber-aware threshold 已复验且未突破瓶颈。下一模块不要继续只调静态 sample
-   knob：优先设计消息速率 / 在线人数感知的 dynamic cadence，或持久
-   per-conversation / per-bucket fanout worker；如果继续走 pull-first，必须明确
-   PullInbox / ACK 是 durable truth，WebSocket signal 只是轻量唤醒。
+1. subscriber-aware threshold 已复验且未突破瓶颈；Redis conversation route cache 代码
+   模块已补。下一步先用 clean Docker 复压验证 route lookup 成本是否下降；若仍不突破，
+   不再继续只调静态 sample knob，转向消息速率 / 在线人数感知的 dynamic cadence、
+   持久 per-conversation / per-bucket fanout worker，或更强 pull-first 策略。
 2. 继续为每轮优化保留 clean commit、Docker 镜像归档、三机部署版本和 Prometheus
    时间窗口，保证压测曲线可复现。
 3. 若 HYBRID 仍要支持千人级 per-user materialized outbox，优先评估显式 frontier /

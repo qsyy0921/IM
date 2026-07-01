@@ -150,6 +150,7 @@ func (registry *Registry) SubscribeConversation(
 		registry.metrics.registerErrorCount.Add(1)
 		return types.ConversationSubscriptionResult{}, err
 	}
+	registry.invalidateConversationRouteCache(state.entry.TenantID, command.ConversationID)
 	return localResult, nil
 }
 
@@ -174,6 +175,7 @@ func (registry *Registry) UnsubscribeConversation(
 		registry.metrics.cleanupErrorCount.Add(1)
 		return localResult, err
 	}
+	registry.invalidateConversationRouteCache(state.entry.TenantID, command.ConversationID)
 	return localResult, nil
 }
 
@@ -194,7 +196,7 @@ func (registry *Registry) EnqueueConversationSignal(
 	if err != nil {
 		return localResult, err
 	}
-	routes, err := registry.lookupConversationRoutes(ctx, notification.TenantID, notification.ConversationID)
+	routes, err := registry.cachedConversationRoutes(ctx, notification.TenantID, notification.ConversationID)
 	if err != nil {
 		localResult.Dropped++
 		registry.metrics.lookupErrorCount.Add(1)
@@ -258,6 +260,61 @@ func (registry *Registry) shouldEmitConversationSignal(notification types.Delive
 		notification.FanoutMode,
 		subscriberCount,
 	)
+}
+
+func (registry *Registry) cachedConversationRoutes(
+	ctx context.Context,
+	tenantID string,
+	conversationID string,
+) ([]routeEntry, error) {
+	key := registry.conversationRouteCacheKey(tenantID, conversationID)
+	now := time.Now()
+	registry.mu.Lock()
+	if cached, ok := registry.routeCache[key]; ok && now.Before(cached.expiresAt) {
+		routes := cloneRouteEntries(cached.routes)
+		registry.mu.Unlock()
+		registry.metrics.conversationRouteCacheHitCount.Add(1)
+		return routes, nil
+	}
+	delete(registry.routeCache, key)
+	registry.mu.Unlock()
+	registry.metrics.conversationRouteCacheMissCount.Add(1)
+
+	routes, err := registry.lookupConversationRoutes(ctx, tenantID, conversationID)
+	if err != nil {
+		return nil, err
+	}
+	registry.mu.Lock()
+	registry.routeCache[key] = conversationRouteCacheEntry{
+		routes:    cloneRouteEntries(routes),
+		expiresAt: now.Add(registry.config.ConversationRouteCacheTTL),
+	}
+	registry.mu.Unlock()
+	return routes, nil
+}
+
+func (registry *Registry) invalidateConversationRouteCache(tenantID string, conversationID string) {
+	key := registry.conversationRouteCacheKey(tenantID, conversationID)
+	registry.mu.Lock()
+	_, existed := registry.routeCache[key]
+	delete(registry.routeCache, key)
+	registry.mu.Unlock()
+	if existed {
+		registry.metrics.conversationRouteCacheInvalidatedCount.Add(1)
+	}
+}
+
+func (registry *Registry) conversationRouteCacheKey(tenantID string, conversationID string) string {
+	return tenantID + "\x1f" + conversationID
+}
+
+func cloneRouteEntries(routes []routeEntry) []routeEntry {
+	if len(routes) == 0 {
+		return nil
+	}
+	cloned := make([]routeEntry, len(routes))
+	copy(cloned, routes)
+	return cloned
 }
 
 func (registry *Registry) EvictDevice(ctx context.Context, tenantID string, userID string, deviceID string, reason string) (types.SessionEvictionResult, error) {

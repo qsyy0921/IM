@@ -426,6 +426,139 @@ func TestRegistryConversationSignalPolicyUsesRemoteSubscriberThreshold(t *testin
 	}
 }
 
+func TestRegistryConversationSignalRouteCacheForSubscriberThreshold(t *testing.T) {
+	server := miniredis.RunT(t)
+	client := redis.NewClient(&redis.Options{Addr: server.Addr()})
+	ctx := context.Background()
+
+	gatewayA := NewRegistry(memory.NewRegistry(), client, Config{
+		GatewayID:                 "gateway-a",
+		RouteTTL:                  time.Minute,
+		ConversationRouteCacheTTL: time.Minute,
+		ConversationSignalPolicy: types.ConversationSignalPolicy{
+			DefaultSampleEvery: 1,
+			SubscriberThresholdsByFanoutMode: map[string][]types.ConversationSignalSubscriberThreshold{
+				types.FanoutModeReadFanout: {
+					{MinSubscribers: 2, SampleEvery: 5},
+				},
+			},
+		},
+	})
+	gatewayB := NewRegistry(memory.NewRegistry(), client, Config{GatewayID: "gateway-b", RouteTTL: time.Minute})
+	for index := 0; index < 2; index++ {
+		sessionID := "remote-cache-session-" + string(rune('a'+index))
+		auth := types.AuthContext{
+			TenantID:  "tenant-1",
+			UserID:    "remote-cache-user-" + string(rune('a'+index)),
+			DeviceID:  "remote-cache-device-" + string(rune('a'+index)),
+			SessionID: sessionID,
+		}
+		if _, err := gatewayB.Register(ctx, types.SessionRegistration{
+			AuthContext: auth,
+			SessionID:   sessionID,
+			Outbound:    make(chan types.ServerFrame, 2),
+		}); err != nil {
+			t.Fatalf("register remote session %d: %v", index, err)
+		}
+		if _, err := gatewayB.SubscribeConversation(ctx, types.ConversationSubscriptionCommand{
+			AuthContext:    auth,
+			ConversationID: "conversation-1",
+		}); err != nil {
+			t.Fatalf("subscribe remote session %d: %v", index, err)
+		}
+	}
+	pubsub := client.Subscribe(ctx, GatewayChannel(defaultKeyPrefix, "gateway-b"))
+	defer pubsub.Close()
+	if _, err := pubsub.Receive(ctx); err != nil {
+		t.Fatalf("subscribe gateway channel: %v", err)
+	}
+
+	suppressed := testNotification()
+	suppressed.Kind = types.DeliveryNotificationKindConversationSignal
+	suppressed.UserID = ""
+	suppressed.FanoutMode = types.FanoutModeReadFanout
+	suppressed.ConversationSeq = 4
+	if _, err := gatewayA.EnqueueConversationSignal(ctx, suppressed); err != nil {
+		t.Fatalf("first threshold suppressed signal: %v", err)
+	}
+	if _, err := gatewayA.EnqueueConversationSignal(ctx, suppressed); err != nil {
+		t.Fatalf("second threshold suppressed signal: %v", err)
+	}
+
+	emitted := suppressed
+	emitted.EventID = "delivery-event-cache-5"
+	emitted.ConversationSeq = 5
+	result, err := gatewayA.EnqueueConversationSignal(ctx, emitted)
+	if err != nil {
+		t.Fatalf("threshold emitted signal: %v", err)
+	}
+	if result.MatchedSessions != 2 || result.Enqueued != 2 {
+		t.Fatalf("threshold emitted signal should publish once for two sessions: %+v", result)
+	}
+	select {
+	case <-pubsub.Channel():
+	case <-time.After(time.Second):
+		t.Fatalf("timed out waiting for threshold emitted publish")
+	}
+	metrics := gatewayA.Metrics()
+	if metrics.RedisRouteConversationRouteCacheMissCount != 1 ||
+		metrics.RedisRouteConversationRouteCacheHitCount != 2 ||
+		metrics.RedisRouteRemotePublishCallCount != 1 {
+		t.Fatalf("unexpected route cache metrics: %+v", metrics)
+	}
+}
+
+func TestRegistryConversationRouteCacheInvalidatesOnLocalSubscriptionChange(t *testing.T) {
+	server := miniredis.RunT(t)
+	client := redis.NewClient(&redis.Options{Addr: server.Addr()})
+	ctx := context.Background()
+	registry := NewRegistry(memory.NewRegistry(), client, Config{
+		GatewayID:                 "gateway-a",
+		RouteTTL:                  time.Minute,
+		ConversationRouteCacheTTL: time.Minute,
+	})
+	auth := types.AuthContext{
+		TenantID:  "tenant-1",
+		UserID:    "user-cache",
+		DeviceID:  "device-cache",
+		SessionID: "session-cache",
+	}
+	if _, err := registry.Register(ctx, types.SessionRegistration{
+		AuthContext: auth,
+		SessionID:   auth.SessionID,
+		Outbound:    make(chan types.ServerFrame, 2),
+	}); err != nil {
+		t.Fatalf("register session: %v", err)
+	}
+	if _, err := registry.SubscribeConversation(ctx, types.ConversationSubscriptionCommand{
+		AuthContext:    auth,
+		ConversationID: "conversation-cache",
+	}); err != nil {
+		t.Fatalf("subscribe conversation: %v", err)
+	}
+	if _, err := registry.cachedConversationRoutes(ctx, auth.TenantID, "conversation-cache"); err != nil {
+		t.Fatalf("first cached lookup: %v", err)
+	}
+	if _, err := registry.cachedConversationRoutes(ctx, auth.TenantID, "conversation-cache"); err != nil {
+		t.Fatalf("second cached lookup: %v", err)
+	}
+	if _, err := registry.UnsubscribeConversation(ctx, types.ConversationSubscriptionCommand{
+		AuthContext:    auth,
+		ConversationID: "conversation-cache",
+	}); err != nil {
+		t.Fatalf("unsubscribe conversation: %v", err)
+	}
+	if _, err := registry.cachedConversationRoutes(ctx, auth.TenantID, "conversation-cache"); err != nil {
+		t.Fatalf("post-invalidation cached lookup: %v", err)
+	}
+	metrics := registry.Metrics()
+	if metrics.RedisRouteConversationRouteCacheMissCount != 2 ||
+		metrics.RedisRouteConversationRouteCacheHitCount != 1 ||
+		metrics.RedisRouteConversationRouteCacheInvalidatedCount != 1 {
+		t.Fatalf("unexpected cache invalidation metrics: %+v", metrics)
+	}
+}
+
 func TestRegistryPublishesRemoteDeviceEvictionAndSubscriberEvicts(t *testing.T) {
 	server := miniredis.RunT(t)
 	client := redis.NewClient(&redis.Options{Addr: server.Addr()})

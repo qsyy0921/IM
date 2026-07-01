@@ -172,22 +172,25 @@ func TestHandlerPrometheusMetrics(t *testing.T) {
 		}).
 		WithRedisRegistryMetrics(func() redisroute.Metrics {
 			return redisroute.Metrics{
-				RedisRouteRegisterErrorCount:       1,
-				RedisRouteRenewErrorCount:          2,
-				RedisRouteRenewSessionEvictedCount: 3,
-				RedisRouteLookupErrorCount:         4,
-				RedisRouteRemoteMatchedSessions:    5,
-				RedisRouteRemotePublishCallCount:   6,
-				RedisRouteRemotePublishErrorCount:  7,
-				RedisRouteRemoteNoSubscriberCount:  8,
-				RedisRouteRemoteEnqueuedSessions:   9,
-				RedisRouteStaleRemovedCount:        10,
-				RedisRouteCleanupErrorCount:        11,
-				RedisResumeReplayCount:             12,
-				RedisResumeMissCount:               13,
-				RedisResumeAppendCount:             14,
-				RedisResumeAppendErrorCount:        15,
-				RedisResumePermissionDeniedCount:   16,
+				RedisRouteRegisterErrorCount:                     1,
+				RedisRouteRenewErrorCount:                        2,
+				RedisRouteRenewSessionEvictedCount:               3,
+				RedisRouteLookupErrorCount:                       4,
+				RedisRouteRemoteMatchedSessions:                  5,
+				RedisRouteRemotePublishCallCount:                 6,
+				RedisRouteRemotePublishErrorCount:                7,
+				RedisRouteRemoteNoSubscriberCount:                8,
+				RedisRouteRemoteEnqueuedSessions:                 9,
+				RedisRouteStaleRemovedCount:                      10,
+				RedisRouteCleanupErrorCount:                      11,
+				RedisRouteConversationRouteCacheHitCount:         12,
+				RedisRouteConversationRouteCacheMissCount:        13,
+				RedisRouteConversationRouteCacheInvalidatedCount: 14,
+				RedisResumeReplayCount:                           15,
+				RedisResumeMissCount:                             16,
+				RedisResumeAppendCount:                           17,
+				RedisResumeAppendErrorCount:                      18,
+				RedisResumePermissionDeniedCount:                 19,
 			}
 		}).
 		WithRedisSubscriberMetrics(func() redisroute.Metrics {
@@ -330,11 +333,14 @@ func TestHandlerPrometheusMetrics(t *testing.T) {
 	assertContains(t, body, `nexusim_push_gateway_resume_buffer{state="stored_frames"} 5`)
 	assertContains(t, body, `nexusim_push_gateway_resume_buffer_events_total{event="miss"} 4`)
 	assertContains(t, body, `nexusim_push_gateway_redis_route_events_total{event="remote_publish_error",role="registry"} 7`)
+	assertContains(t, body, `nexusim_push_gateway_redis_route_events_total{event="conversation_route_cache_hit",role="registry"} 12`)
+	assertContains(t, body, `nexusim_push_gateway_redis_route_events_total{event="conversation_route_cache_miss",role="registry"} 13`)
+	assertContains(t, body, `nexusim_push_gateway_redis_route_events_total{event="conversation_route_cache_invalidated",role="registry"} 14`)
 	assertContains(t, body, `nexusim_push_gateway_redis_route_events_total{event="subscriber_malformed",role="subscriber"} 22`)
 	assertContains(t, body, `nexusim_push_gateway_redis_route_events_total{event="subscriber_signal_fanout_queued",role="subscriber"} 26`)
 	assertContains(t, body, `nexusim_push_gateway_redis_route_events_total{event="subscriber_signal_fanout_queue_full",role="subscriber"} 27`)
 	assertContains(t, body, `nexusim_push_gateway_redis_route_events_total{event="subscriber_signal_fanout_worker_error",role="subscriber"} 28`)
-	assertContains(t, body, `nexusim_push_gateway_redis_resume_events_total{event="append_error",role="registry"} 15`)
+	assertContains(t, body, `nexusim_push_gateway_redis_resume_events_total{event="append_error",role="registry"} 18`)
 	assertContains(t, body, `nexusim_push_gateway_redis_subscriber_fanout_duration_milliseconds_bucket{le="+Inf",operation="conversation_signal"} 3`)
 	assertContains(t, body, `nexusim_push_gateway_redis_subscriber_fanout_duration_milliseconds_sum{operation="delivery_notify"} 6`)
 	assertContains(t, body, `nexusim_push_gateway_redis_subscriber_fanout_duration_milliseconds_count{operation="conversation_signal"} 3`)

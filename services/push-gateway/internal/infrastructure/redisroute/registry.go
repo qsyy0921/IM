@@ -11,6 +11,7 @@ import (
 )
 
 const defaultKeyPrefix = "nexusim:push"
+const defaultConversationRouteCacheTTL = 250 * time.Millisecond
 
 type LocalRegistry interface {
 	Register(context.Context, types.SessionRegistration) (types.SessionRegistrationResult, error)
@@ -24,12 +25,13 @@ type LocalRegistry interface {
 }
 
 type Config struct {
-	GatewayID                string
-	KeyPrefix                string
-	RouteTTL                 time.Duration
-	ResumeTTL                time.Duration
-	RenewFailureThreshold    int
-	ConversationSignalPolicy types.ConversationSignalPolicy
+	GatewayID                 string
+	KeyPrefix                 string
+	RouteTTL                  time.Duration
+	ResumeTTL                 time.Duration
+	RenewFailureThreshold     int
+	ConversationSignalPolicy  types.ConversationSignalPolicy
+	ConversationRouteCacheTTL time.Duration
 }
 
 type Registry struct {
@@ -40,6 +42,7 @@ type Registry struct {
 	mu            sync.Mutex
 	routes        map[string]routeState
 	subscriptions map[string]map[string]struct{}
+	routeCache    map[string]conversationRouteCacheEntry
 
 	metrics registryMetrics
 }
@@ -56,6 +59,9 @@ type Metrics struct {
 	RedisRouteRemoteEnqueuedSessions                   uint64           `json:"redis_route_remote_enqueued_sessions"`
 	RedisRouteStaleRemovedCount                        uint64           `json:"redis_route_stale_removed_count"`
 	RedisRouteCleanupErrorCount                        uint64           `json:"redis_route_cleanup_error_count"`
+	RedisRouteConversationRouteCacheHitCount           uint64           `json:"redis_route_conversation_route_cache_hit_count"`
+	RedisRouteConversationRouteCacheMissCount          uint64           `json:"redis_route_conversation_route_cache_miss_count"`
+	RedisRouteConversationRouteCacheInvalidatedCount   uint64           `json:"redis_route_conversation_route_cache_invalidated_count"`
 	RedisRouteConversationSignalSuppressedEventCount   uint64           `json:"redis_route_conversation_signal_suppressed_event_count"`
 	RedisRouteConversationSignalSuppressedSessionCount uint64           `json:"redis_route_conversation_signal_suppressed_session_count"`
 	RedisRouteSubscriberMessageCount                   uint64           `json:"redis_route_subscriber_message_count,omitempty"`
@@ -89,6 +95,9 @@ type registryMetrics struct {
 	remoteEnqueuedSessions                   atomic.Uint64
 	staleRemovedCount                        atomic.Uint64
 	cleanupErrorCount                        atomic.Uint64
+	conversationRouteCacheHitCount           atomic.Uint64
+	conversationRouteCacheMissCount          atomic.Uint64
+	conversationRouteCacheInvalidatedCount   atomic.Uint64
 	conversationSignalSuppressedEventCount   atomic.Uint64
 	conversationSignalSuppressedSessionCount atomic.Uint64
 	resumeReplayCount                        atomic.Uint64
@@ -101,6 +110,11 @@ type registryMetrics struct {
 type routeState struct {
 	entry  routeEntry
 	cancel context.CancelFunc
+}
+
+type conversationRouteCacheEntry struct {
+	routes    []routeEntry
+	expiresAt time.Time
 }
 
 type routeEntry struct {
@@ -144,6 +158,9 @@ func NewRegistry(local LocalRegistry, client redis.UniversalClient, config Confi
 	if config.RenewFailureThreshold < 0 {
 		config.RenewFailureThreshold = 0
 	}
+	if config.ConversationRouteCacheTTL <= 0 {
+		config.ConversationRouteCacheTTL = defaultConversationRouteCacheTTL
+	}
 	config.ConversationSignalPolicy = types.NormalizeConversationSignalPolicy(config.ConversationSignalPolicy)
 	return &Registry{
 		local:         local,
@@ -151,6 +168,7 @@ func NewRegistry(local LocalRegistry, client redis.UniversalClient, config Confi
 		config:        config,
 		routes:        make(map[string]routeState),
 		subscriptions: make(map[string]map[string]struct{}),
+		routeCache:    make(map[string]conversationRouteCacheEntry),
 	}
 }
 
@@ -237,6 +255,7 @@ func (registry *Registry) Unregister(sessionID string) {
 	_ = registry.deleteRoute(ctx, state.entry)
 	for conversationID := range conversations {
 		_ = registry.deleteConversationSubscription(ctx, state.entry, conversationID)
+		registry.invalidateConversationRouteCache(state.entry.TenantID, conversationID)
 	}
 }
 
@@ -253,6 +272,9 @@ func (registry *Registry) Metrics() Metrics {
 		RedisRouteRemoteEnqueuedSessions:                   registry.metrics.remoteEnqueuedSessions.Load(),
 		RedisRouteStaleRemovedCount:                        registry.metrics.staleRemovedCount.Load(),
 		RedisRouteCleanupErrorCount:                        registry.metrics.cleanupErrorCount.Load(),
+		RedisRouteConversationRouteCacheHitCount:           registry.metrics.conversationRouteCacheHitCount.Load(),
+		RedisRouteConversationRouteCacheMissCount:          registry.metrics.conversationRouteCacheMissCount.Load(),
+		RedisRouteConversationRouteCacheInvalidatedCount:   registry.metrics.conversationRouteCacheInvalidatedCount.Load(),
 		RedisRouteConversationSignalSuppressedEventCount:   registry.metrics.conversationSignalSuppressedEventCount.Load(),
 		RedisRouteConversationSignalSuppressedSessionCount: registry.metrics.conversationSignalSuppressedSessionCount.Load(),
 		RedisResumeReplayCount:                             registry.metrics.resumeReplayCount.Load(),

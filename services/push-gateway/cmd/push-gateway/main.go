@@ -107,12 +107,13 @@ func runRuntime(enableWS bool, enableDeliveryConsumer bool, enableIdentityConsum
 			return err
 		}
 		routeConfig := redisroute.Config{
-			GatewayID:                gatewayID,
-			KeyPrefix:                envString("NEXUSIM_PUSH_REDIS_KEY_PREFIX", "nexusim:push"),
-			RouteTTL:                 envDuration("NEXUSIM_PUSH_ROUTE_TTL", 90*time.Second),
-			ResumeTTL:                envDuration("NEXUSIM_PUSH_RESUME_BUFFER_TTL", 10*time.Minute),
-			RenewFailureThreshold:    envInt("NEXUSIM_PUSH_ROUTE_RENEW_FAILURES_BEFORE_EVICT", 3),
-			ConversationSignalPolicy: conversationSignalPolicy,
+			GatewayID:                 gatewayID,
+			KeyPrefix:                 envString("NEXUSIM_PUSH_REDIS_KEY_PREFIX", "nexusim:push"),
+			RouteTTL:                  envDuration("NEXUSIM_PUSH_ROUTE_TTL", 90*time.Second),
+			ResumeTTL:                 envDuration("NEXUSIM_PUSH_RESUME_BUFFER_TTL", 10*time.Minute),
+			RenewFailureThreshold:     envInt("NEXUSIM_PUSH_ROUTE_RENEW_FAILURES_BEFORE_EVICT", 3),
+			ConversationSignalPolicy:  conversationSignalPolicy,
+			ConversationRouteCacheTTL: envDuration("NEXUSIM_PUSH_CONVERSATION_ROUTE_CACHE_TTL", 250*time.Millisecond),
 		}
 		redisRegistry = redisroute.NewRegistry(localRegistry, redisClient, routeConfig)
 		revocationStore = revocationinfra.NewRedisStore(redisClient, routeConfig.KeyPrefix)

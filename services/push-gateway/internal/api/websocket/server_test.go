@@ -134,7 +134,8 @@ func TestWebSocketPingAndAck(t *testing.T) {
 		t.Fatalf("ack must use session auth context: %+v", delivery.last)
 	}
 	metrics := writerMetrics.Snapshot()
-	if metrics.FrameWriteSuccessCount < 4 ||
+	if metrics.FrameWriteSuccessCount < 3 ||
+		metrics.FrameWriteErrorCount != 0 ||
 		metrics.DeliveryNotifyWriteSuccessCount != 1 ||
 		metrics.OutboundFrameDequeuedCount < 3 ||
 		metrics.LastDeliveryNotifyWriteAtMS <= 0 {

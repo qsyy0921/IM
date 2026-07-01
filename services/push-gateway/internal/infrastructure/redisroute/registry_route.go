@@ -243,11 +243,7 @@ func (registry *Registry) EnqueueConversationSignal(
 }
 
 func (registry *Registry) shouldEmitConversationSignal(notification types.DeliveryNotification) bool {
-	sampleEvery := registry.config.ConversationSignalSampleEvery
-	if sampleEvery <= 1 {
-		return true
-	}
-	return notification.ConversationSeq%int64(sampleEvery) == 0
+	return registry.config.ConversationSignalPolicy.ShouldEmit(notification.ConversationSeq, notification.FanoutMode)
 }
 
 func (registry *Registry) EvictDevice(ctx context.Context, tenantID string, userID string, deviceID string, reason string) (types.SessionEvictionResult, error) {

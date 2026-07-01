@@ -201,9 +201,11 @@ func TestRegistryConversationSignalSamplingSkipsRemotePublish(t *testing.T) {
 	ctx := context.Background()
 
 	gatewayA := NewRegistry(memory.NewRegistry(), client, Config{
-		GatewayID:                     "gateway-a",
-		RouteTTL:                      time.Minute,
-		ConversationSignalSampleEvery: 2,
+		GatewayID: "gateway-a",
+		RouteTTL:  time.Minute,
+		ConversationSignalPolicy: types.ConversationSignalPolicy{
+			DefaultSampleEvery: 2,
+		},
 	})
 	localB := memory.NewRegistry()
 	gatewayB := NewRegistry(localB, client, Config{GatewayID: "gateway-b", RouteTTL: time.Minute})
@@ -246,6 +248,81 @@ func TestRegistryConversationSignalSamplingSkipsRemotePublish(t *testing.T) {
 	case message := <-pubsub.Channel():
 		t.Fatalf("sampled-out signal must not publish remotely: %+v", message)
 	case <-time.After(100 * time.Millisecond):
+	}
+}
+
+func TestRegistryConversationSignalPolicyUsesFanoutModeOverride(t *testing.T) {
+	server := miniredis.RunT(t)
+	client := redis.NewClient(&redis.Options{Addr: server.Addr()})
+	ctx := context.Background()
+
+	gatewayA := NewRegistry(memory.NewRegistry(), client, Config{
+		GatewayID: "gateway-a",
+		RouteTTL:  time.Minute,
+		ConversationSignalPolicy: types.ConversationSignalPolicy{
+			DefaultSampleEvery: 1,
+			ByFanoutMode: map[string]int{
+				types.FanoutModeReadFanout: 3,
+			},
+		},
+	})
+	localB := memory.NewRegistry()
+	gatewayB := NewRegistry(localB, client, Config{GatewayID: "gateway-b", RouteTTL: time.Minute})
+	outbound := make(chan types.ServerFrame, 2)
+	auth := types.AuthContext{TenantID: "tenant-1", UserID: "user-1", DeviceID: "device-1", SessionID: "session-b"}
+	if _, err := gatewayB.Register(ctx, types.SessionRegistration{
+		AuthContext: auth,
+		SessionID:   "session-b",
+		Outbound:    outbound,
+	}); err != nil {
+		t.Fatalf("register remote session: %v", err)
+	}
+	if _, err := gatewayB.SubscribeConversation(ctx, types.ConversationSubscriptionCommand{
+		AuthContext:    auth,
+		ConversationID: "conversation-1",
+	}); err != nil {
+		t.Fatalf("subscribe remote conversation: %v", err)
+	}
+	pubsub := client.Subscribe(ctx, GatewayChannel(defaultKeyPrefix, "gateway-b"))
+	defer pubsub.Close()
+	if _, err := pubsub.Receive(ctx); err != nil {
+		t.Fatalf("subscribe gateway channel: %v", err)
+	}
+
+	readFanout := testNotification()
+	readFanout.Kind = types.DeliveryNotificationKindConversationSignal
+	readFanout.UserID = ""
+	readFanout.FanoutMode = types.FanoutModeReadFanout
+	readFanout.ConversationSeq = 2
+	result, err := gatewayA.EnqueueConversationSignal(ctx, readFanout)
+	if err != nil {
+		t.Fatalf("read fanout signal: %v", err)
+	}
+	if result.MatchedSessions != 0 || result.Enqueued != 0 {
+		t.Fatalf("READ_FANOUT seq=2 should be suppressed: %+v", result)
+	}
+
+	writeFanout := readFanout
+	writeFanout.EventID = "delivery-event-write-fanout"
+	writeFanout.FanoutMode = types.FanoutModeWriteFanout
+	result, err = gatewayA.EnqueueConversationSignal(ctx, writeFanout)
+	if err != nil {
+		t.Fatalf("write fanout signal: %v", err)
+	}
+	if result.MatchedSessions != 1 || result.Enqueued != 1 {
+		t.Fatalf("WRITE_FANOUT should use default full signal policy: %+v", result)
+	}
+	select {
+	case message := <-pubsub.Channel():
+		var forwarded types.DeliveryNotification
+		if err := json.Unmarshal([]byte(message.Payload), &forwarded); err != nil {
+			t.Fatalf("decode forwarded notification: %v", err)
+		}
+		if forwarded.FanoutMode != types.FanoutModeWriteFanout {
+			t.Fatalf("unexpected forwarded mode: %+v", forwarded)
+		}
+	case <-time.After(time.Second):
+		t.Fatalf("timed out waiting for remote publish")
 	}
 }
 
@@ -1112,6 +1189,7 @@ func testNotification() types.DeliveryNotification {
 		SourceEventID:   "timeline-event-1",
 		SourceEventType: "message.persisted.v1",
 		MessageID:       "message-1",
+		FanoutMode:      types.FanoutModeReadFanout,
 	}
 }
 

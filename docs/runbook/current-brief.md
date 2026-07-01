@@ -282,6 +282,8 @@ brief、loadtest report、development-progress 或 archive。
   18.103ms / 20.914ms，PullInbox p95 为 23.874ms，message / delivery outbox
   pending=0。Prometheus 窗口显示 `delivery_notify` write p95 / p99 仍低于 1ms，
   但 Redis subscriber conversation fanout p95 / p99 约 54.541ms / 90.908ms。
-  下一步不再盲目堆 subscriber，应在“更少在线 signal 的 room policy / adaptive
-  cadence”和“push-gateway 本地 conversation fanout 持久 worker / bucket 模型”
-  两个方向中选一个完整模块继续。
+  当前已选择“更少在线 signal 的 room policy / adaptive cadence”作为下一模块：
+  push-gateway 已实现 fanout-mode conversation signal policy，可对 READ_FANOUT /
+  BROADCAST_SIGNAL 单独配置 sample cadence，而不影响未配置 mode 的默认全量策略。
+  代码 focused tests / build 已通过；下一步需要 clean commit 镜像重建 / 归档 /
+  redeploy，并用 mode-specific policy 复压。

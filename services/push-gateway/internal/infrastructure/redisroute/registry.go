@@ -24,12 +24,12 @@ type LocalRegistry interface {
 }
 
 type Config struct {
-	GatewayID                     string
-	KeyPrefix                     string
-	RouteTTL                      time.Duration
-	ResumeTTL                     time.Duration
-	RenewFailureThreshold         int
-	ConversationSignalSampleEvery int
+	GatewayID                string
+	KeyPrefix                string
+	RouteTTL                 time.Duration
+	ResumeTTL                time.Duration
+	RenewFailureThreshold    int
+	ConversationSignalPolicy types.ConversationSignalPolicy
 }
 
 type Registry struct {
@@ -142,9 +142,7 @@ func NewRegistry(local LocalRegistry, client redis.UniversalClient, config Confi
 	if config.RenewFailureThreshold < 0 {
 		config.RenewFailureThreshold = 0
 	}
-	if config.ConversationSignalSampleEvery <= 0 {
-		config.ConversationSignalSampleEvery = 1
-	}
+	config.ConversationSignalPolicy = types.NormalizeConversationSignalPolicy(config.ConversationSignalPolicy)
 	return &Registry{
 		local:         local,
 		client:        client,

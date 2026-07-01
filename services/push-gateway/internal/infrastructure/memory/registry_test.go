@@ -175,7 +175,9 @@ func TestRegistryConversationSignalRequiresSubscription(t *testing.T) {
 }
 
 func TestRegistryConversationSignalSamplingSuppressesNonSampledSignals(t *testing.T) {
-	registry := NewRegistryWithConfig(Config{ConversationSignalSampleEvery: 2})
+	registry := NewRegistryWithConfig(Config{ConversationSignalPolicy: types.ConversationSignalPolicy{
+		DefaultSampleEvery: 2,
+	}})
 	outbound := make(chan types.ServerFrame, 4)
 	auth := types.AuthContext{TenantID: "tenant-1", UserID: "user-1", DeviceID: "device-1", SessionID: "session-1"}
 	if _, err := registry.Register(context.Background(), types.SessionRegistration{
@@ -214,6 +216,52 @@ func TestRegistryConversationSignalSamplingSuppressesNonSampledSignals(t *testin
 		snapshot.ConversationSignalSuppressedSessionCount != 2 ||
 		snapshot.ConversationSignalEnqueuedCount != 2 {
 		t.Fatalf("unexpected sampling metrics: %+v", snapshot)
+	}
+}
+
+func TestRegistryConversationSignalPolicyUsesFanoutModeOverride(t *testing.T) {
+	registry := NewRegistryWithConfig(Config{ConversationSignalPolicy: types.ConversationSignalPolicy{
+		DefaultSampleEvery: 1,
+		ByFanoutMode: map[string]int{
+			types.FanoutModeReadFanout: 3,
+		},
+	}})
+	outbound := make(chan types.ServerFrame, 4)
+	auth := types.AuthContext{TenantID: "tenant-1", UserID: "user-1", DeviceID: "device-1", SessionID: "session-1"}
+	if _, err := registry.Register(context.Background(), types.SessionRegistration{
+		AuthContext: auth,
+		SessionID:   "session-1",
+		Outbound:    outbound,
+	}); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+	if _, err := registry.SubscribeConversation(context.Background(), types.ConversationSubscriptionCommand{
+		AuthContext:    auth,
+		ConversationID: "conversation-1",
+	}); err != nil {
+		t.Fatalf("subscribe: %v", err)
+	}
+
+	readFanout := testNotification()
+	readFanout.Kind = types.DeliveryNotificationKindConversationSignal
+	readFanout.UserID = ""
+	readFanout.FanoutMode = types.FanoutModeReadFanout
+	readFanout.ConversationSeq = 2
+	if _, err := registry.EnqueueConversationSignal(context.Background(), readFanout); err != nil {
+		t.Fatalf("read fanout sampled-out signal: %v", err)
+	}
+	if len(outbound) != 0 {
+		t.Fatalf("READ_FANOUT seq=2 should be suppressed by mode override")
+	}
+
+	writeFanout := readFanout
+	writeFanout.EventID = "delivery-event-write-fanout"
+	writeFanout.FanoutMode = types.FanoutModeWriteFanout
+	if _, err := registry.EnqueueConversationSignal(context.Background(), writeFanout); err != nil {
+		t.Fatalf("write fanout signal: %v", err)
+	}
+	if len(outbound) != 1 {
+		t.Fatalf("WRITE_FANOUT should use default full signal policy, queue=%d", len(outbound))
 	}
 }
 
@@ -860,5 +908,6 @@ func testNotification() types.DeliveryNotification {
 		SourceEventID:   "timeline-event-1",
 		SourceEventType: "message.persisted.v1",
 		MessageID:       "message-1",
+		FanoutMode:      types.FanoutModeReadFanout,
 	}
 }

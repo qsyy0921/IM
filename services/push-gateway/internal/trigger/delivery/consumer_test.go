@@ -194,7 +194,8 @@ func TestWorkerNotifiesConversationSignal(t *testing.T) {
 		notifier.command.Notification.UserID != "" ||
 		notifier.command.Notification.ConversationID != "conversation-1" ||
 		notifier.command.Notification.ConversationSeq != 7 ||
-		notifier.command.Notification.SourceEventID != "timeline-event-1" {
+		notifier.command.Notification.SourceEventID != "timeline-event-1" ||
+		notifier.command.Notification.FanoutMode != "READ_FANOUT" {
 		t.Fatalf("unexpected conversation signal notify: %+v", notifier)
 	}
 	if consumer.commits != 1 {

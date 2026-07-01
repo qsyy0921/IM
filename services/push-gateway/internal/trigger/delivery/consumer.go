@@ -274,6 +274,7 @@ func buildCommand(message types.DeliveryEventMessage) (types.NotifyDeliveryComma
 				SourceEventID:   signal.GetSourceEventId(),
 				SourceEventType: signal.GetSourceEventType(),
 				MessageID:       signal.GetMessageId(),
+				FanoutMode:      signal.GetFanoutMode(),
 				CorrelationID:   event.GetCorrelationId(),
 			},
 		}, true, nil

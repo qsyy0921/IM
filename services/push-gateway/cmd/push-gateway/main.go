@@ -76,10 +76,14 @@ func runRuntime(enableWS bool, enableDeliveryConsumer bool, enableIdentityConsum
 		}
 	}()
 
+	conversationSignalPolicy, err := conversationSignalPolicyFromEnv()
+	if err != nil {
+		return err
+	}
 	localRegistry := memory.NewRegistryWithConfig(memory.Config{
-		ResumeBufferTTL:               envDuration("NEXUSIM_PUSH_RESUME_BUFFER_TTL", 10*time.Minute),
-		ConversationFanoutBuckets:     envInt("NEXUSIM_PUSH_CONVERSATION_FANOUT_BUCKETS", 1),
-		ConversationSignalSampleEvery: envInt("NEXUSIM_PUSH_CONVERSATION_SIGNAL_SAMPLE_EVERY", 1),
+		ResumeBufferTTL:           envDuration("NEXUSIM_PUSH_RESUME_BUFFER_TTL", 10*time.Minute),
+		ConversationFanoutBuckets: envInt("NEXUSIM_PUSH_CONVERSATION_FANOUT_BUCKETS", 1),
+		ConversationSignalPolicy:  conversationSignalPolicy,
 	})
 	writerMetrics := &types.WebSocketWriterMetrics{}
 	registry := app.SessionRegistry(localRegistry)
@@ -103,12 +107,12 @@ func runRuntime(enableWS bool, enableDeliveryConsumer bool, enableIdentityConsum
 			return err
 		}
 		routeConfig := redisroute.Config{
-			GatewayID:                     gatewayID,
-			KeyPrefix:                     envString("NEXUSIM_PUSH_REDIS_KEY_PREFIX", "nexusim:push"),
-			RouteTTL:                      envDuration("NEXUSIM_PUSH_ROUTE_TTL", 90*time.Second),
-			ResumeTTL:                     envDuration("NEXUSIM_PUSH_RESUME_BUFFER_TTL", 10*time.Minute),
-			RenewFailureThreshold:         envInt("NEXUSIM_PUSH_ROUTE_RENEW_FAILURES_BEFORE_EVICT", 3),
-			ConversationSignalSampleEvery: envInt("NEXUSIM_PUSH_CONVERSATION_SIGNAL_SAMPLE_EVERY", 1),
+			GatewayID:                gatewayID,
+			KeyPrefix:                envString("NEXUSIM_PUSH_REDIS_KEY_PREFIX", "nexusim:push"),
+			RouteTTL:                 envDuration("NEXUSIM_PUSH_ROUTE_TTL", 90*time.Second),
+			ResumeTTL:                envDuration("NEXUSIM_PUSH_RESUME_BUFFER_TTL", 10*time.Minute),
+			RenewFailureThreshold:    envInt("NEXUSIM_PUSH_ROUTE_RENEW_FAILURES_BEFORE_EVICT", 3),
+			ConversationSignalPolicy: conversationSignalPolicy,
 		}
 		redisRegistry = redisroute.NewRegistry(localRegistry, redisClient, routeConfig)
 		revocationStore = revocationinfra.NewRedisStore(redisClient, routeConfig.KeyPrefix)
@@ -556,12 +560,66 @@ func pushTraceSamplingRatioFromEnv() (float64, error) {
 	return value, nil
 }
 
+func conversationSignalPolicyFromEnv() (types.ConversationSignalPolicy, error) {
+	defaultSampleEvery, err := envStrictPositiveInt(
+		"NEXUSIM_PUSH_CONVERSATION_SIGNAL_SAMPLE_EVERY",
+		1,
+	)
+	if err != nil {
+		return types.ConversationSignalPolicy{}, err
+	}
+	byFanoutMode := make(map[string]int)
+	overrides := map[string]string{
+		types.FanoutModeWriteFanout:     "NEXUSIM_PUSH_CONVERSATION_SIGNAL_SAMPLE_EVERY_WRITE_FANOUT",
+		types.FanoutModeHybridFanout:    "NEXUSIM_PUSH_CONVERSATION_SIGNAL_SAMPLE_EVERY_HYBRID_FANOUT",
+		types.FanoutModeReadFanout:      "NEXUSIM_PUSH_CONVERSATION_SIGNAL_SAMPLE_EVERY_READ_FANOUT",
+		types.FanoutModeBroadcastSignal: "NEXUSIM_PUSH_CONVERSATION_SIGNAL_SAMPLE_EVERY_BROADCAST_SIGNAL",
+	}
+	for fanoutMode, envName := range overrides {
+		sampleEvery, ok, err := envOptionalStrictPositiveInt(envName)
+		if err != nil {
+			return types.ConversationSignalPolicy{}, err
+		}
+		if ok {
+			byFanoutMode[fanoutMode] = sampleEvery
+		}
+	}
+	return types.NormalizeConversationSignalPolicy(types.ConversationSignalPolicy{
+		DefaultSampleEvery: defaultSampleEvery,
+		ByFanoutMode:       byFanoutMode,
+	}), nil
+}
+
 func envString(name string, defaultValue string) string {
 	value := strings.TrimSpace(os.Getenv(name))
 	if value == "" {
 		return defaultValue
 	}
 	return value
+}
+
+func envStrictPositiveInt(name string, defaultValue int) (int, error) {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		return defaultValue, nil
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil || parsed <= 0 {
+		return 0, errors.New(name + " must be a positive integer")
+	}
+	return parsed, nil
+}
+
+func envOptionalStrictPositiveInt(name string) (int, bool, error) {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		return 0, false, nil
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil || parsed <= 0 {
+		return 0, true, errors.New(name + " must be a positive integer")
+	}
+	return parsed, true, nil
 }
 
 func envInt(name string, defaultValue int) int {

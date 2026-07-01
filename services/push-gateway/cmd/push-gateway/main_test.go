@@ -14,6 +14,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/qsyy0921/IM/services/push-gateway/internal/types"
 )
 
 func TestLoadRedisClientConfigSingleDefaults(t *testing.T) {
@@ -145,6 +147,33 @@ func TestNewRedisUniversalClientRejectsUnsupportedMode(t *testing.T) {
 		t.Fatalf("expected unsupported mode error")
 	} else if !strings.Contains(err.Error(), "unknown-mode") {
 		t.Fatalf("expected unsupported mode error to include mode value, got %v", err)
+	}
+}
+
+func TestConversationSignalPolicyFromEnvLoadsFanoutModeOverrides(t *testing.T) {
+	t.Setenv("NEXUSIM_PUSH_CONVERSATION_SIGNAL_SAMPLE_EVERY", "1")
+	t.Setenv("NEXUSIM_PUSH_CONVERSATION_SIGNAL_SAMPLE_EVERY_READ_FANOUT", "10")
+	t.Setenv("NEXUSIM_PUSH_CONVERSATION_SIGNAL_SAMPLE_EVERY_BROADCAST_SIGNAL", "20")
+
+	policy, err := conversationSignalPolicyFromEnv()
+	if err != nil {
+		t.Fatalf("load policy: %v", err)
+	}
+	if got := policy.SampleEveryFor(types.FanoutModeWriteFanout); got != 1 {
+		t.Fatalf("write fanout sample every = %d, want 1", got)
+	}
+	if got := policy.SampleEveryFor(types.FanoutModeReadFanout); got != 10 {
+		t.Fatalf("read fanout sample every = %d, want 10", got)
+	}
+	if got := policy.SampleEveryFor(types.FanoutModeBroadcastSignal); got != 20 {
+		t.Fatalf("broadcast signal sample every = %d, want 20", got)
+	}
+}
+
+func TestConversationSignalPolicyFromEnvRejectsInvalidOverride(t *testing.T) {
+	t.Setenv("NEXUSIM_PUSH_CONVERSATION_SIGNAL_SAMPLE_EVERY_READ_FANOUT", "0")
+	if _, err := conversationSignalPolicyFromEnv(); err == nil {
+		t.Fatalf("expected invalid read fanout sample policy error")
 	}
 }
 

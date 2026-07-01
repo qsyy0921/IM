@@ -288,6 +288,16 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
   Redis subscriber conversation fanout p95 / p99 约 `54.541ms / 90.908ms`。
   结论：sample=10 能降低在线 frame 总量，但当消息数扩大到 5000 时仍呈
   online-signal-drain，且本地 Redis subscriber fanout/enqueue 继续是主要证据点。
+- 2026-07-01 已实现 fanout-mode conversation signal policy 模块：push-gateway
+  内部 `DeliveryNotification` 现在携带 `fanout_mode`，delivery consumer 从
+  `delivery.conversation.signal.v1` 传入该字段，memory registry 和 Redis route
+  registry 共用 `ConversationSignalPolicy`。新增显式 mode-specific env：
+  `NEXUSIM_PUSH_CONVERSATION_SIGNAL_SAMPLE_EVERY_WRITE_FANOUT`、
+  `..._HYBRID_FANOUT`、`..._READ_FANOUT`、`..._BROADCAST_SIGNAL`。未设置时使用
+  `NEXUSIM_PUSH_CONVERSATION_SIGNAL_SAMPLE_EVERY` 作为默认 policy；无效配置会启动失败。
+  该模块不新增中间件、不改变 durable PullInbox / ACK 边界。当前只完成 focused tests /
+  build 验证，下一步需要 clean commit 镜像重建 / 归档 / redeploy 后，用
+  `READ_FANOUT=10`、默认 `1` 做可比复压。
 - HYBRID 诊断档位 1000 人 / 1000 消息 / 400 msg/s 暴露 `delivery_outbox` ready query
   在百万级 per-user outbox 下退化：旧 anti-join blocker 查询每批 500 行约 24s。当前
   delivery outbox relay 已改成 per-conversation frontier ready query，并把本地 worker
@@ -304,9 +314,10 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
   emitted signal 从 400000 降至 40000，span 从 141.719s 降至 25.243s；5000
   消息档产生 200000 条 sampled signal，span 138.555s。两档 SendMessage、
   PullInbox、ACK 和 outbox drain 均成立，但 5000 消息档继续显示 online-signal-drain
-  和 Redis subscriber 本地 fanout/enqueue 长尾。下一步应选择一个明确模块继续优化：
-  要么进一步减少超大房间在线 signal 总量，要么重构 push-gateway 本地 conversation
-  signal fanout 的持久 worker / bucket 模型。
+  和 Redis subscriber 本地 fanout/enqueue 长尾。
+- fanout-mode conversation signal policy 代码模块已实现并通过 focused tests / build；
+  本轮完成前还需要 clean commit、Docker 镜像重建 / 归档 / redeploy 和 mode-specific
+  可比复压。复压后才能把它写成新的压测结论。
 - 文档同步本轮公开能力或瓶颈变化。
 - 提交并推送到 GitHub。
 
@@ -320,11 +331,11 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
 
 ## 后续优先级
 
-1. 基于 `bac71c65` / `f5bc0199` 的 sample=10 两档复压结论，下一步不要继续盲目加压；
-   优先做一个明确模块：要么把超大房间 online signal 策略从固定采样推进到可配置
-   room policy / adaptive cadence，要么重构 push-gateway 本地 conversation signal
-   fanout 为持久 per-conversation / per-bucket worker。仍需保持 PullInbox / ACK 作为
-   durable 事实追平路径，不能把 sampled WebSocket frame 当可靠投递。
+1. 基于 `bac71c65` / `f5bc0199` 的 sample=10 两档复压结论，当前已选择并实现
+   room policy / adaptive cadence 的第一步：fanout-mode conversation signal policy。
+   下一步是 clean commit 镜像重建 / 归档 / redeploy，并以 default=1、
+   READ_FANOUT/BROADCAST_SIGNAL=10 复压，确认可按房间 fanout mode 降低超大房间
+   online frame 总量，同时保持小群全量在线通知和 PullInbox / ACK durable 追平。
 2. 继续为每轮优化保留 clean commit、Docker 镜像归档、三机部署版本和 Prometheus
    时间窗口，保证压测曲线可复现。
 3. 若 HYBRID 仍要支持千人级 per-user materialized outbox，优先评估显式 frontier /

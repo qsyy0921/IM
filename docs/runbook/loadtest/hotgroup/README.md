@@ -156,12 +156,17 @@ outbox 追平但 signal drain 长  -> online signal drain
 ```text
 push-gateway:
   NEXUSIM_PUSH_CONVERSATION_SIGNAL_SAMPLE_EVERY=10
+  # 可选：只对指定 fanout mode 覆盖默认采样间隔
+  NEXUSIM_PUSH_CONVERSATION_SIGNAL_SAMPLE_EVERY_READ_FANOUT=10
+  NEXUSIM_PUSH_CONVERSATION_SIGNAL_SAMPLE_EVERY_BROADCAST_SIGNAL=10
 
 loadtest/hotgroup:
   --conversation-signal-sample-every 10
 ```
 
-默认值 `1` 表示全量 signal，旧压测口径不变。采样场景的成功条件不再是
+默认值 `1` 表示全量 signal，旧压测口径不变。`WRITE_FANOUT` / `HYBRID_FANOUT` /
+`READ_FANOUT` / `BROADCAST_SIGNAL` 可以通过 mode-specific env 设置不同在线唤醒
+cadence；未设置 mode-specific env 时使用显式 default policy。采样场景的成功条件不再是
 `subscriber_count * message_count`，而是
 `subscriber_count * expected_signals_per_subscriber`。这不是可靠投递降级：
 WebSocket signal 只作为在线唤醒，最终展示和 ACK 仍必须通过 PullInbox 追平最新 seq。

@@ -16,6 +16,56 @@ const (
 	DeliveryNotificationKindConversationSignal = "conversation_signal"
 )
 
+const (
+	FanoutModeWriteFanout     = "WRITE_FANOUT"
+	FanoutModeHybridFanout    = "HYBRID_FANOUT"
+	FanoutModeReadFanout      = "READ_FANOUT"
+	FanoutModeBroadcastSignal = "BROADCAST_SIGNAL"
+)
+
+type ConversationSignalPolicy struct {
+	DefaultSampleEvery int
+	ByFanoutMode       map[string]int
+}
+
+func NormalizeConversationSignalPolicy(policy ConversationSignalPolicy) ConversationSignalPolicy {
+	if policy.DefaultSampleEvery <= 0 {
+		policy.DefaultSampleEvery = 1
+	}
+	if len(policy.ByFanoutMode) == 0 {
+		return policy
+	}
+	normalized := make(map[string]int, len(policy.ByFanoutMode))
+	for mode, sampleEvery := range policy.ByFanoutMode {
+		if mode == "" || sampleEvery <= 0 {
+			continue
+		}
+		normalized[mode] = sampleEvery
+	}
+	policy.ByFanoutMode = normalized
+	return policy
+}
+
+func (policy ConversationSignalPolicy) SampleEveryFor(fanoutMode string) int {
+	if policy.DefaultSampleEvery <= 0 {
+		policy.DefaultSampleEvery = 1
+	}
+	if policy.ByFanoutMode != nil {
+		if sampleEvery := policy.ByFanoutMode[fanoutMode]; sampleEvery > 0 {
+			return sampleEvery
+		}
+	}
+	return policy.DefaultSampleEvery
+}
+
+func (policy ConversationSignalPolicy) ShouldEmit(conversationSeq int64, fanoutMode string) bool {
+	sampleEvery := policy.SampleEveryFor(fanoutMode)
+	if sampleEvery <= 1 {
+		return true
+	}
+	return conversationSeq%int64(sampleEvery) == 0
+}
+
 type SessionRegistration struct {
 	AuthContext     AuthContext
 	SessionID       string
@@ -59,6 +109,7 @@ type DeliveryNotification struct {
 	SourceEventID   string
 	SourceEventType string
 	MessageID       string
+	FanoutMode      string
 	CorrelationID   string
 }
 
@@ -80,6 +131,9 @@ func (notification DeliveryNotification) Validate() error {
 	}
 	if kind != DeliveryNotificationKindConversationSignal && notification.UserID == "" {
 		return NewInvalidFrame("delivery notification is incomplete")
+	}
+	if kind == DeliveryNotificationKindConversationSignal && notification.FanoutMode == "" {
+		return NewInvalidFrame("conversation signal fanout mode is required")
 	}
 	if (kind == DeliveryNotificationKindInboxItemCreated || kind == DeliveryNotificationKindConversationSignal) && notification.SourceEventType == "" {
 		return NewInvalidFrame("delivery notification is incomplete")

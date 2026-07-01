@@ -12,10 +12,10 @@ import (
 )
 
 type Config struct {
-	ResumeBufferTTL               time.Duration
-	ConversationFanoutBuckets     int
-	ConversationSignalSampleEvery int
-	Now                           func() time.Time
+	ResumeBufferTTL           time.Duration
+	ConversationFanoutBuckets int
+	ConversationSignalPolicy  types.ConversationSignalPolicy
+	Now                       func() time.Time
 }
 
 type Registry struct {
@@ -77,9 +77,7 @@ func NewRegistryWithConfig(config Config) *Registry {
 	if config.ConversationFanoutBuckets <= 0 {
 		config.ConversationFanoutBuckets = 1
 	}
-	if config.ConversationSignalSampleEvery <= 0 {
-		config.ConversationSignalSampleEvery = 1
-	}
+	config.ConversationSignalPolicy = types.NormalizeConversationSignalPolicy(config.ConversationSignalPolicy)
 	if config.Now == nil {
 		config.Now = time.Now
 	}
@@ -299,11 +297,7 @@ func (registry *Registry) EnqueueConversationSignal(
 }
 
 func (registry *Registry) shouldEmitConversationSignal(notification types.DeliveryNotification) bool {
-	sampleEvery := registry.config.ConversationSignalSampleEvery
-	if sampleEvery <= 1 {
-		return true
-	}
-	return notification.ConversationSeq%int64(sampleEvery) == 0
+	return registry.config.ConversationSignalPolicy.ShouldEmit(notification.ConversationSeq, notification.FanoutMode)
 }
 
 func (registry *Registry) enqueueConversationOutboundTargets(

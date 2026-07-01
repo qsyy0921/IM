@@ -107,7 +107,9 @@ func testConversationSignal() types.DeliveryNotification {
 		TenantID:        "tenant-1",
 		ConversationID:  "conversation-1",
 		ConversationSeq: 1,
+		SourceEventID:   "timeline-event-1",
 		SourceEventType: "conversation.message.created.v1",
+		FanoutMode:      types.FanoutModeReadFanout,
 	}
 }
 

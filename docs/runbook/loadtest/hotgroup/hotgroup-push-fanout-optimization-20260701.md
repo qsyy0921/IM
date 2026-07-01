@@ -894,3 +894,66 @@ Interpretation:
 - The next module should not be another blind scale-up. Pick one concrete
   design: room-level online signal policy / adaptive cadence, or a persistent
   per-conversation / per-bucket fanout worker model inside push-gateway.
+
+## Fanout-Mode Conversation Signal Policy Module
+
+The next implemented module turns the previous global `sample_every` knob into
+an explicit room-policy input at push-gateway.
+
+Architecture decision:
+
+- no new middleware is introduced;
+- no service boundary changes are required;
+- `delivery.conversation.signal.v1` already carries `fanout_mode`, so
+  push-gateway can make the online wakeup decision from the delivery event
+  itself;
+- durable truth remains `delivery_timeline_items` plus `PullInbox` / ACK;
+- sampled WebSocket frames are still only online wakeups, not reliable delivery.
+
+Code changes:
+
+- push-gateway internal `DeliveryNotification` now carries `fanout_mode`;
+- delivery consumer passes `DeliveryConversationSignalV1.fanout_mode` through
+  to the registry;
+- memory registry and Redis route registry use the same
+  `ConversationSignalPolicy`;
+- invalid / missing fanout mode on a conversation signal is fail-closed;
+- mode-specific env values are parsed strictly, so a typo does not silently
+  fall back to a different cadence.
+
+Configuration:
+
+```text
+NEXUSIM_PUSH_CONVERSATION_SIGNAL_SAMPLE_EVERY=1
+NEXUSIM_PUSH_CONVERSATION_SIGNAL_SAMPLE_EVERY_WRITE_FANOUT=
+NEXUSIM_PUSH_CONVERSATION_SIGNAL_SAMPLE_EVERY_HYBRID_FANOUT=
+NEXUSIM_PUSH_CONVERSATION_SIGNAL_SAMPLE_EVERY_READ_FANOUT=10
+NEXUSIM_PUSH_CONVERSATION_SIGNAL_SAMPLE_EVERY_BROADCAST_SIGNAL=10
+```
+
+Semantics:
+
+- `NEXUSIM_PUSH_CONVERSATION_SIGNAL_SAMPLE_EVERY` is the explicit default policy;
+- mode-specific env overrides only that fanout mode;
+- unset mode-specific env does not change behavior;
+- `1` means full signal;
+- `10` means emit only `conversation_seq % 10 == 0`.
+
+Recommended next retest:
+
+```text
+NEXUSIM_PUSH_CONVERSATION_SIGNAL_SAMPLE_EVERY=1
+NEXUSIM_PUSH_CONVERSATION_SIGNAL_SAMPLE_EVERY_READ_FANOUT=10
+NEXUSIM_PUSH_CONVERSATION_SIGNAL_SAMPLE_EVERY_BROADCAST_SIGNAL=10
+loadtest/hotgroup --conversation-signal-sample-every 10 ...
+```
+
+This retest should compare against the previous global sample=10 runs. Expected
+evidence:
+
+- READ_FANOUT keeps the sampled signal count and drain profile;
+- smaller fanout modes can remain full-signal if no mode-specific sample is set;
+- PullInbox / ACK still reach latest seq;
+- suppressed signal counters match expected mode-specific policy;
+- Redis subscriber fanout p95 / p99 should be interpreted against the reduced
+  emitted-frame count, not as durable delivery throughput.

@@ -130,8 +130,14 @@
    和 repository 分段输出最近 4096 个样本的 `_recent` operation，hotgroup
    Prometheus 时间窗口脚本也已采集这些 recent p95 / p99。剩余任务是用 clean
    commit 重建 / redeploy message-service 后，用更大消息数做稳态 send-only
-   复压，再回到 total-subscriber-aware policy 的 6000 人 / 5000 消息 /
-   400 subscriber 场景，确认 `achieved_send_rate` 与 signal span 新曲线。
+   复压。clean commit `d190c35` 的 256 concurrency / 5000 message send-only
+   run 已达到约 `2052.125 msg/s`、SendMessage p99 `482.711ms`，outbox pending=0；
+   512 concurrency 诊断 run 达到约 `2265.229 msg/s`、p99 `347.978ms`，但因仓库已有
+   未提交报告文件为 dirty run，不能作为正式容量证据。剩余任务是提交报告后复跑
+   clean 512 concurrency，再继续尝试 768 / 1024 concurrency 或扩大 message_count，
+   同时观察 recent repository append / insert_outbox / commit p99、PostgreSQL CPU / IO
+   和 message-service CPU；之后再回到 total-subscriber-aware policy 的 6000 人 /
+   5000 消息 / 400 subscriber 场景，确认 `achieved_send_rate` 与 signal span 新曲线。
    若仍无容量改善，再分析 delivery_outbox signal production cadence、Kafka
    publish / consume cadence 和 push event pacing。在取得复压证据前不要继续只提高
    sample 阈值，也不要把 target rate 当作真实 QPS。

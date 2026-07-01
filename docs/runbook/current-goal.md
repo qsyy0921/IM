@@ -503,6 +503,25 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
   分段同时输出累计 snapshot 与最近 4096 个样本的 `_recent` operation；
   `tools/record-hotgroup-metrics-window.ps1` 已采集这些 recent p95 / p99。该改动用于
   后续压测定位，不改变业务路径、fanout 策略、outbox 或 sequencer 语义。
+- 2026-07-01 clean commit `d190c35` 的 send-only 稳态复压
+  `hotgroup-readseq-sendsteady-6000x5000-256c-d190c359-20260701-1650` 已完成：
+  6000 人、5000 消息、256 sender / concurrency、目标 8000 msg/s、READ_FANOUT /
+  SEQUENCER_BLOCK，5000/5000 SendMessage 成功，无 send error，实际发送窗口约
+  `2.437s`、约 `2052.125 msg/s`，SendMessage p95 / p99 为
+  `243.157ms / 482.711ms`，message / delivery outbox pending 均为 0。
+  recent metrics 显示 `conversation_seq_alloc_recent p99` 约 `0.022ms`、
+  `repository_allocate_seq_recent p99=0`，因此本地 seq 行锁已不在热点路径；
+  `repository_append_recent p99` 约 `41.277ms`，repository insert / commit
+  分段均为十几毫秒级。
+- 512 concurrency 诊断 run
+  `hotgroup-readseq-sendsteady-6000x5000-512c-d190c359-20260701-1655`
+  因仓库已有未提交报告文件而标记 `git_dirty=true`，只能作为诊断，不作为正式容量证据。
+  该 run 5000/5000 成功，实际发送窗口约 `2.207s`、约 `2265.229 msg/s`，
+  SendMessage p95 / p99 为 `284.151ms / 347.978ms`。recent metrics 显示
+  pool acquire p99 约 `0.532ms`、seq allocation p99 约 `0.024ms`、
+  repository append p99 约 `63.52ms`、insert_outbox p99 约 `26.525ms`。
+  这说明提高客户端并发能继续提高吞吐，当前主要应继续沿 DB append / message
+  write path 和客户端发压上限定位，而不是回到 seq allocator 或连接池。
 - HYBRID 诊断档位 1000 人 / 1000 消息 / 400 msg/s 暴露 `delivery_outbox` ready query
   在百万级 per-user outbox 下退化：旧 anti-join blocker 查询每批 500 行约 24s。当前
   delivery outbox relay 已改成 per-conversation frontier ready query，并把本地 worker
@@ -551,6 +570,9 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
 - message-service recent latency metrics 已完成 focused tests / build；下一步需用
   clean commit 重建 / 归档 / redeploy message-service Docker 镜像后，跑更大消息数的
   READ_FANOUT / SEQUENCER_BLOCK 稳态 send-path 复压。
+- 6000 人 READ_FANOUT / SEQUENCER_BLOCK send-only 稳态复压已完成一轮 clean
+  256 concurrency，并完成一轮 dirty 512 concurrency 诊断；下一步需提交报告后
+  复跑 clean 512 concurrency，确认吞吐和 p99 是否稳定。
 - 文档同步本轮公开能力或瓶颈变化。
 - 提交并推送到 GitHub。
 
@@ -564,10 +586,11 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
 
 ## 后续优先级
 
-1. 用 clean commit 重建 / 归档 / redeploy message-service Docker 镜像，让 `_recent`
-   message latency metrics 进入三机运行链路。
-2. 用更大消息数重跑 6000 人 READ_FANOUT / SEQUENCER_BLOCK / 256 concurrency 的
-   send-only 稳态复压，避免 1000 message 短 run 启停开销低估真实 QPS 上限。
+1. 提交本轮 send-only 稳态压测报告，然后复跑 clean 512 concurrency 对照，确认
+   约 `2.2k msg/s` 是否稳定、p99 是否仍低于 500ms。
+2. 若 512 concurrency 稳定，继续尝试 768 / 1024 concurrency 或扩大 message_count，
+   同时观察 recent repository append / insert_outbox / commit p99、PostgreSQL CPU / IO
+   和 message-service CPU，寻找真实硬件瓶颈点。
 3. 回到 total-subscriber-aware policy 的 6000 人 /
    5000 message / 400 subscriber / expected sample=50 场景，确认 signal span 与
    `achieved_send_rate` 的新曲线；若仍超时，再继续定位 timeline-service seq allocator、

@@ -80,9 +80,114 @@ Eval / Replay Plane
 这七个平面不要求一开始拆成七个服务。第一阶段可以复用现有服务边界，用文档、fixture
 和小型 prototype 先验证运行模型。
 
-## 5. 推荐路线
+## 5. 可借鉴系统与研究输入
 
-### 5.1 保留现有安全 baseline
+本节记录可借鉴点，不把任何外部项目原样照搬进 NexusIM。外部系统更多提供设计约束：
+哪些能力必须系统化，哪些能力不能只靠 prompt。
+
+### 5.1 OpenClaw
+
+OpenClaw 的核心启发是 Gateway 和协议边界：
+
+- 单个长生命周期 Gateway 统一多消息通道，控制端、节点和 UI 都通过 typed WebSocket
+  协议进入；
+- 请求、响应、事件分离，并带 `seq` / `stateVersion`；
+- 首帧 handshake、设备身份、pairing、auth 和 device token 是协议一部分；
+- side-effecting method 要求 idempotency key；
+- core 保持 plugin-agnostic，插件通过 SDK、manifest、runtime helper 进入；
+- runtime state 默认进入 SQLite，不把状态散落成 JSON sidecar。
+
+对 NexusIM 的落点：
+
+- Agent Gateway 应该是 typed ingress，不是把 `@agent` 直接塞进某个 handler；
+- AgentRun 接收后应立即返回 accepted / rejected，再通过事件或卡片流式更新；
+- 所有可能产生 side effect 的 tool intent / action proposal / execution request 都必须带
+  idempotency key；
+- Agent 插件、skill、tool 不能把 owner-specific command tree 写进 IM channel；
+- 运行状态应该有明确 owner，不把 checkpoint、queue、run cache 写成临时文件。
+
+### 5.2 Hermes
+
+Hermes 的核心启发是 memory 运行时生命周期，而不是单纯向量库：
+
+- MemoryProvider 有 initialize、system prompt block、prefetch、queue prefetch、
+  sync turn、tool schema、tool call、shutdown；
+- 还有 turn start、session end、session switch、pre-compress、memory write、
+  delegation 等 hook；
+- MemoryManager 限制同一时间最多一个外部 memory provider，避免工具 schema 膨胀和
+  多后端冲突；
+- memory context 通过 `<memory-context>` 围栏注入，并在 streaming 输出中 scrub，避免
+  内部 memory context 泄漏给用户。
+
+对 NexusIM 的落点：
+
+- Memory Plane 应该是 runtime protocol：prefetch、admission、sync、session switch、
+  pre-compact、delegation 都要有 owner；
+- 不能把长期 memory 简化为“写一条摘要到向量库”；
+- 同一个 AgentRun 不应同时挂多个会互相冲突的 memory provider；
+- ContextPackage 需要显式区分“用户输入”“检索证据”“回忆上下文”“工具结果”，并且输出前要有
+  scrub / citation verify；
+- subagent 的结果应作为 parent run 的 delegation observation，而不是自动污染长期 memory。
+
+### 5.3 Claude Code
+
+Claude Code 的核心启发是 agentic loop 周围的确定性控制面：
+
+- hooks 覆盖 session、turn、tool use、permission、subagent、task、compact、file/worktree
+  等生命周期点；
+- `PreToolUse` / `PostToolUse` / `PermissionRequest` 等事件说明权限控制不能只靠模型自觉；
+- subagents 可以拥有独立 prompt、tool restriction、permission mode、hooks 和 skills；
+- checkpoint / compaction / permission / hook 组合让长任务可恢复、可收口、可治理。
+
+对 NexusIM 的落点：
+
+- Agent Runtime 应显式提供 lifecycle hook vocabulary，例如：
+  `BeforeContextBuild`、`BeforeModelCall`、`PreToolPrepare`、`PostToolPrepare`、
+  `BeforeWorkflowRequest`、`AfterWorkflowDecision`、`BeforeMemoryCandidate`、
+  `BeforeSendMessage`、`PreCompact`、`PostCompact`；
+- hook 只能做确定性控制、审计、阻断或上下文补充，不能成为隐藏业务 fallback；
+- subagent 初期只能作为隔离候选生成单元；主 Agent 仍对最终回答和 proposal 负责；
+- permission / policy / approval 必须是系统事件和决策，不是 prompt 里的自然语言规则。
+
+### 5.4 2025/2026 论文和 benchmark
+
+几个方向对 Agent Plane 特别关键：
+
+- tau-bench 强调真实业务 agent 要同时处理用户交互、domain policy、API tools 和最终状态；
+- ToolSandbox 强调 stateful tool execution、隐式状态依赖、交互式轨迹和中间里程碑评估；
+- MultiAgentBench 强调多 agent 系统不能只看单 agent task completion，还要看协作、竞争、
+  通信拓扑和 milestone KPI；
+- JourneyBench 强调客服/业务流程 agent 的 policy adherence，动态流程控制比静态大 prompt
+  更接近真实业务；
+- 2026 企业报告普遍强调 governance、evaluation 和从单 chatbot 走向 multi-agent workflow。
+
+对 NexusIM 的落点：
+
+- Eval 不应只测“回答对不对”，还要测最终业务状态、policy adherence、tool state、approval
+  bypass、memory pollution 和 replay consistency；
+- AgentRun / AgentStep / ReplayBundle 必须能记录中间里程碑，否则无法定位失败；
+- 多 Agent 不应先做“聊天式互相讨论”，应先做 bounded delegation：固定角色、固定工具权限、
+  固定预算、主 Agent 负责最终输出；
+- 客服、项目、运维等 IM Agent 应优先建 workflow-aware skill，而不是一个万能 prompt。
+
+### 5.5 大厂协作产品信号
+
+飞书、钉钉、Slack / Teams 类协作产品的共同方向是把 Agent 放进协作入口，而不是另起一个孤岛：
+
+- Agent 作为 IM 联系人、群内成员、workflow node、任务卡片或审批卡片出现；
+- 企业知识、业务系统工具、权限、审批、审计和工作流需要统一治理；
+- Agent 能力需要可运营：版本、灰度、禁用、效果评估、管理员控制台。
+
+对 NexusIM 的落点：
+
+- Agent UI 应优先使用任务卡片、审批卡片、引用展开、进度状态、转人工和重试，而不是长文本刷屏；
+- 群内 Agent 默认不应主动刷屏，复杂任务进入 thread / card / run view；
+- Agent 发布要支持 owner、version、release channel、shadow / beta / production；
+- 管理员必须能查看 Agent 记住了什么、执行了什么、为什么被拒绝、如何回放。
+
+## 6. 推荐路线
+
+### 6.1 保留现有安全 baseline
 
 当前可继续保留：
 
@@ -98,7 +203,7 @@ EvidencePack
 这条链路已经证明了一个重要原则：Agent 不直接写业务事实，业务 mutation 必须经过
 skill、policy、approval、executor 和 audit。
 
-### 5.2 探索 Agent Runtime / Harness
+### 6.2 探索 Agent Runtime / Harness
 
 下一阶段应重点探索一个独立的 Agent Runtime / Harness。它不一定立刻成为新服务，但需要
 先形成清晰的运行模型。
@@ -132,7 +237,7 @@ EXPIRED
 
 这些名称目前只是设计词汇，不是 schema。
 
-### 5.3 明确 Runtime 与 Workflow 的边界
+### 6.3 明确 Runtime 与 Workflow 的边界
 
 Agent Runtime 与 workflow-service 不应互相替代：
 
@@ -146,9 +251,9 @@ Agent Runtime 与 workflow-service 不应互相替代：
 
 这样可以避免 workflow-service 被迫理解模型上下文，也避免 agent-service 自己实现完整审批平台。
 
-## 6. 关键数据边界
+## 7. 关键数据边界
 
-### 6.1 EvidencePack
+### 7.1 EvidencePack
 
 EvidencePack 仍是 AI 读路径硬边界。RAG、summary 和 Agent 只能基于 EvidencePack 或其
 派生包回答与规划。
@@ -160,7 +265,7 @@ EvidencePack 仍是 AI 读路径硬边界。RAG、summary 和 Agent 只能基于
 - 无证据、证据冲突或权限不确定时必须 abstain 或 clarification；
 - 删除、撤回、retention、legal hold 和历史成员窗口必须影响 evidence 可见性。
 
-### 6.2 ContextPackage
+### 7.2 ContextPackage
 
 ContextPackage 是建议新增的运行时概念，不是事实源。它用于把 EvidencePack 组织成模型可用输入：
 
@@ -178,7 +283,7 @@ ContextPackage =
 
 ContextPackage 可以被 replay 和 eval 使用，但不能替代 EvidencePack 的审计地位。
 
-### 6.3 MemoryCandidate
+### 7.3 MemoryCandidate
 
 模型、Python worker 或 planner 可以提出 MemoryCandidate，但不能直接写 ACTIVE memory。
 
@@ -197,7 +302,7 @@ candidate
 
 长期个人画像必须来自多证据聚合或用户确认，不能从单条群聊消息直接升级。
 
-## 7. 工具与 MCP 设计
+## 8. 工具与 MCP 设计
 
 Agent 工具集成需要分层暴露，避免把所有 tool schema 一次性塞给模型：
 
@@ -223,7 +328,7 @@ MCP server 只作为外部工具/数据连接端，不拥有 NexusIM 权限判�
 式 peer agent，应与 tool call 分开建模：peer agent 有自己的身份、能力边界和 audit lineage，
 不能被简化为普通 function call。
 
-## 8. Skill 设计
+## 9. Skill 设计
 
 当前不建议冻结 agent taxonomy。应先冻结 skill 作为可版本化能力包的原则。
 
@@ -247,7 +352,7 @@ MCP server 只作为外部工具/数据连接端，不拥有 NexusIM 权限判�
 - note / proposal 助手；
 - policy explanation 助手。
 
-## 9. Eval 与 Replay
+## 10. Eval 与 Replay
 
 Agent 层必须把 eval 当成架构组成部分，而不是上线前脚本。
 
@@ -268,7 +373,7 @@ Agent 层必须把 eval 当成架构组成部分，而不是上线前脚本。
 ReplayBundle 至少应记录低敏引用、hash、版本和决策链，不保存 raw prompt、raw provider
 body、secret、完整敏感 payload。
 
-## 10. 服务演进选项
+## 11. 服务演进选项
 
 当前不建议立即新增生产服务。后续如果 Agent Runtime 方向通过主集成评审，有三个演进选项：
 
@@ -285,7 +390,7 @@ body、secret、完整敏感 payload。
 
 建议先用 fixture-only prototype 验证 run trace、ContextPackage 和 replay，再决定是否写 ADR。
 
-## 11. 初步落地实验
+## 12. 初步落地实验
 
 建议下一步只做探索实验，不做生产契约：
 
@@ -295,7 +400,7 @@ body、secret、完整敏感 payload。
 4. 做 tool prepare vs execute lineage replay：串起 skill、mcp prepare audit、proposal、executor result。
 5. 写 Runtime vs Workflow ownership matrix，作为后续 ADR 的前置材料。
 
-## 12. 风险
+## 13. 风险
 
 - 过早拆服务会增加本地运行和门禁成本。
 - 过晚拆 runtime 会让 agent-service 吸收过多编排、workflow、tool、memory 和 eval 逻辑。
@@ -304,7 +409,7 @@ body、secret、完整敏感 payload。
 - 没有 ReplayBundle 的 Agent 很难定位线上问题。
 - 只做 pass/fail eval 不够，必须保留 failure taxonomy。
 
-## 13. 结论
+## 14. 结论
 
 NexusIM Agent 层建议采用“安全 baseline + Runtime 探索”的路线：
 
@@ -323,3 +428,20 @@ NexusIM Agent 层建议采用“安全 baseline + Runtime 探索”的路线：
 下一步不应立刻冻结 proto 或新增生产服务，而应先完成 run trace、ContextPackage、
 memory admission eval 和 runtime/workflow ownership 的小型实验。主集成评审后，再决定是否将
 Agent Runtime / Harness Plane 提升为 ADR / SDD / runtime 实现。
+
+## 15. 参考输入
+
+本报告综合了本地源码/文档与 2026-07-01 可访问的公开资料：
+
+- 本地 OpenClaw：`E:\agent\openclaw\docs\concepts\architecture.md`、
+  `E:\agent\openclaw\AGENTS.md`。
+- 本地 Hermes：`E:\agent\Hermes\agent\memory_provider.py`、
+  `E:\agent\Hermes\agent\memory_manager.py`。
+- Claude Code official docs：hooks、subagents、checkpoint、permission / MCP lifecycle。
+- OpenAI：A Practical Guide to Building Agents。
+- Anthropic / MCP：Model Context Protocol 公开说明与规范。
+- Google A2A：Agent2Agent 协议公开说明。
+- 论文 / benchmark：tau-bench、ToolSandbox、MultiAgentBench、JourneyBench、
+  Agent-Diff、STATE-Bench。
+- 企业报告 / 产品信号：Databricks 2026 State of AI Agents、飞书 Aily / workflow
+  AI Agent node、钉钉 Agent OS 相关公开材料。

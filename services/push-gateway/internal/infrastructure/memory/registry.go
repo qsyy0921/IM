@@ -268,7 +268,7 @@ func (registry *Registry) EnqueueConversationSignal(
 
 	sessionIDs := registry.byConversation[key]
 	result := types.NotifyDeliveryResult{MatchedSessions: len(sessionIDs)}
-	if !registry.shouldEmitConversationSignal(notification) {
+	if !registry.shouldEmitConversationSignal(notification, len(sessionIDs)) {
 		registry.metrics.ConversationSignalSuppressedEventCount++
 		registry.metrics.ConversationSignalSuppressedSessionCount += uint64(len(sessionIDs))
 		registry.mu.Unlock()
@@ -296,8 +296,12 @@ func (registry *Registry) EnqueueConversationSignal(
 	return result, err
 }
 
-func (registry *Registry) shouldEmitConversationSignal(notification types.DeliveryNotification) bool {
-	return registry.config.ConversationSignalPolicy.ShouldEmit(notification.ConversationSeq, notification.FanoutMode)
+func (registry *Registry) shouldEmitConversationSignal(notification types.DeliveryNotification, subscriberCount int) bool {
+	return registry.config.ConversationSignalPolicy.ShouldEmitForSubscribers(
+		notification.ConversationSeq,
+		notification.FanoutMode,
+		subscriberCount,
+	)
 }
 
 func (registry *Registry) enqueueConversationOutboundTargets(

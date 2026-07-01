@@ -1,6 +1,9 @@
 package types
 
-import "time"
+import (
+	"sort"
+	"time"
+)
 
 const (
 	DefaultHeartbeatInterval = 30 * time.Second
@@ -24,25 +27,54 @@ const (
 )
 
 type ConversationSignalPolicy struct {
-	DefaultSampleEvery int
-	ByFanoutMode       map[string]int
+	DefaultSampleEvery               int
+	ByFanoutMode                     map[string]int
+	SubscriberThresholdsByFanoutMode map[string][]ConversationSignalSubscriberThreshold
+}
+
+type ConversationSignalSubscriberThreshold struct {
+	MinSubscribers int
+	SampleEvery    int
 }
 
 func NormalizeConversationSignalPolicy(policy ConversationSignalPolicy) ConversationSignalPolicy {
 	if policy.DefaultSampleEvery <= 0 {
 		policy.DefaultSampleEvery = 1
 	}
-	if len(policy.ByFanoutMode) == 0 {
+	if len(policy.ByFanoutMode) > 0 {
+		normalized := make(map[string]int, len(policy.ByFanoutMode))
+		for mode, sampleEvery := range policy.ByFanoutMode {
+			if mode == "" || sampleEvery <= 0 {
+				continue
+			}
+			normalized[mode] = sampleEvery
+		}
+		policy.ByFanoutMode = normalized
+	}
+	if len(policy.SubscriberThresholdsByFanoutMode) == 0 {
 		return policy
 	}
-	normalized := make(map[string]int, len(policy.ByFanoutMode))
-	for mode, sampleEvery := range policy.ByFanoutMode {
-		if mode == "" || sampleEvery <= 0 {
+	normalizedThresholds := make(map[string][]ConversationSignalSubscriberThreshold, len(policy.SubscriberThresholdsByFanoutMode))
+	for mode, thresholds := range policy.SubscriberThresholdsByFanoutMode {
+		if mode == "" {
 			continue
 		}
-		normalized[mode] = sampleEvery
+		modeThresholds := make([]ConversationSignalSubscriberThreshold, 0, len(thresholds))
+		for _, threshold := range thresholds {
+			if threshold.MinSubscribers <= 0 || threshold.SampleEvery <= 0 {
+				continue
+			}
+			modeThresholds = append(modeThresholds, threshold)
+		}
+		if len(modeThresholds) == 0 {
+			continue
+		}
+		sort.Slice(modeThresholds, func(left int, right int) bool {
+			return modeThresholds[left].MinSubscribers < modeThresholds[right].MinSubscribers
+		})
+		normalizedThresholds[mode] = modeThresholds
 	}
-	policy.ByFanoutMode = normalized
+	policy.SubscriberThresholdsByFanoutMode = normalizedThresholds
 	return policy
 }
 
@@ -58,8 +90,34 @@ func (policy ConversationSignalPolicy) SampleEveryFor(fanoutMode string) int {
 	return policy.DefaultSampleEvery
 }
 
+func (policy ConversationSignalPolicy) SampleEveryForSubscribers(fanoutMode string, subscriberCount int) int {
+	sampleEvery := policy.SampleEveryFor(fanoutMode)
+	if subscriberCount <= 0 || len(policy.SubscriberThresholdsByFanoutMode) == 0 {
+		return sampleEvery
+	}
+	for _, threshold := range policy.SubscriberThresholdsByFanoutMode[fanoutMode] {
+		if subscriberCount >= threshold.MinSubscribers && threshold.SampleEvery > sampleEvery {
+			sampleEvery = threshold.SampleEvery
+		}
+	}
+	return sampleEvery
+}
+
+func (policy ConversationSignalPolicy) RequiresSubscriberCount(fanoutMode string) bool {
+	return len(policy.SubscriberThresholdsByFanoutMode[fanoutMode]) > 0
+}
+
 func (policy ConversationSignalPolicy) ShouldEmit(conversationSeq int64, fanoutMode string) bool {
 	sampleEvery := policy.SampleEveryFor(fanoutMode)
+	return shouldEmitConversationSignal(conversationSeq, sampleEvery)
+}
+
+func (policy ConversationSignalPolicy) ShouldEmitForSubscribers(conversationSeq int64, fanoutMode string, subscriberCount int) bool {
+	sampleEvery := policy.SampleEveryForSubscribers(fanoutMode, subscriberCount)
+	return shouldEmitConversationSignal(conversationSeq, sampleEvery)
+}
+
+func shouldEmitConversationSignal(conversationSeq int64, sampleEvery int) bool {
 	if sampleEvery <= 1 {
 		return true
 	}

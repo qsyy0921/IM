@@ -190,6 +190,7 @@ CreateConversation(GROUP)
 | Pull-first 采样式在线唤醒 | clean commit `bac71c65` 将 delivery-consumer 和 4 个 ws 实例统一配置 `NEXUSIM_PUSH_CONVERSATION_SIGNAL_SAMPLE_EVERY=10`，并用同一 400 subscriber coordinator + 4 shard 场景复压 | 6000 人 / 1000 消息 / 8000 msg/s 下 emitted signal 从 full-signal baseline 的 400000 降至 40000，signal span 从 141.719s 降至 25.243s；SendMessage / PullInbox / ACK 成立，message / delivery outbox pending=0。结论：减少在线 frame 总量能显著改善 drain，但 durable 展示仍靠 PullInbox，不能把采样 signal 当可靠投递。 |
 | Sampled signal 扩大消息数复压 | clean commit `f5bc0199` 在 sample=10、400 subscriber、8000 msg/s 下把消息数扩大到 5000 | 产生并读完 200000 条 sampled signal，span 138.555s，SendMessage p95 / p99 为 18.103ms / 20.914ms，PullInbox p95 为 23.874ms，message / delivery outbox pending=0；Prometheus 显示 `delivery_notify` write p95 / p99 低于 1ms，但 Redis subscriber fanout p95 / p99 约 54.541ms / 90.908ms。结论：采样可以降压，但扩大消息数后仍是 online-signal-drain，下一步应做 room policy / adaptive cadence 或本地 fanout 持久 worker。 |
 | Fanout-mode online signal policy | clean commit `37b575e5` 已把 `delivery.conversation.signal.v1` 的 `fanout_mode` 传入 push-gateway 内部 notification，并支持 `WRITE_FANOUT` / `HYBRID_FANOUT` / `READ_FANOUT` / `BROADCAST_SIGNAL` 各自配置在线 signal cadence；镜像已重建、归档、部署 | 复压 default=1、READ_FANOUT=10、BROADCAST_SIGNAL=10：6000 人 / 5000 消息 / 8000 msg/s / 400 subscriber 共读完 200000 条 sampled signal，span 141.504s，message / delivery outbox pending=0。结论：策略边界已从全局 knob 收敛到 room policy，但 READ_FANOUT=10 下瓶颈仍是 online-signal-drain。下一步应做 adaptive cadence 控制面或持久 fanout worker。 |
+| Subscriber-aware signal cadence | 当前代码已在 fanout-mode policy 之上增加 subscriber-aware threshold：可按本机 / 每个远端 gateway 的 conversation subscriber 数提高 sample_every；未配置 threshold 时保留旧采样前置快速路径 | 这是 adaptive cadence 的 first-stage runtime policy：例如 4 个 ws 各 100 个 subscriber 时，可用 READ_FANOUT `100:20` 把更大在线房间的 signal cadence 降低一档。它不改变消息事实源，也不把 WebSocket signal 当可靠投递；可靠展示仍由 PullInbox / ACK 兜底。下一步是 clean Docker redeploy 后同场景复压并记录对比。 |
 
 面试时可以把这个结果讲成一次真实性能定位过程：
 
@@ -221,7 +222,10 @@ WebSocket signal 当可靠投递，真正可靠展示仍要靠 PullInbox。当�
 fanout-mode online signal policy：小群可以保持默认全量 signal，READ_FANOUT /
 BROADCAST_SIGNAL 超大房间可以单独配置更低在线唤醒 cadence。clean Docker redeploy 后
 复压证明策略按房间类型生效，但 READ_FANOUT=10 下性能与 global sample=10 同量级，
-所以后续不能继续只调 sample knob，而要做 adaptive cadence 控制面或持久 fanout worker。
+所以后续不能继续只调 sample knob。当前已经把下一步落到 subscriber-aware cadence：
+同一个 fanout mode 下，还要看实际在线订阅压力，本机或远端 gateway 的 subscriber 数越大，
+online signal cadence 越保守；但 PullInbox / ACK 仍是 durable truth。这个模块复压后如果
+仍无法明显缩短 drain span，再转向持久 per-conversation / per-bucket fanout worker。
 ```
 
 2026-06-29 的小规模 smoke 进一步证明了策略切换链路：

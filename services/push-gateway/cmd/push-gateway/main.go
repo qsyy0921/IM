@@ -569,6 +569,7 @@ func conversationSignalPolicyFromEnv() (types.ConversationSignalPolicy, error) {
 		return types.ConversationSignalPolicy{}, err
 	}
 	byFanoutMode := make(map[string]int)
+	subscriberThresholdsByFanoutMode := make(map[string][]types.ConversationSignalSubscriberThreshold)
 	overrides := map[string]string{
 		types.FanoutModeWriteFanout:     "NEXUSIM_PUSH_CONVERSATION_SIGNAL_SAMPLE_EVERY_WRITE_FANOUT",
 		types.FanoutModeHybridFanout:    "NEXUSIM_PUSH_CONVERSATION_SIGNAL_SAMPLE_EVERY_HYBRID_FANOUT",
@@ -584,10 +585,58 @@ func conversationSignalPolicyFromEnv() (types.ConversationSignalPolicy, error) {
 			byFanoutMode[fanoutMode] = sampleEvery
 		}
 	}
+	thresholdOverrides := map[string]string{
+		types.FanoutModeWriteFanout:     "NEXUSIM_PUSH_CONVERSATION_SIGNAL_SUBSCRIBER_POLICY_WRITE_FANOUT",
+		types.FanoutModeHybridFanout:    "NEXUSIM_PUSH_CONVERSATION_SIGNAL_SUBSCRIBER_POLICY_HYBRID_FANOUT",
+		types.FanoutModeReadFanout:      "NEXUSIM_PUSH_CONVERSATION_SIGNAL_SUBSCRIBER_POLICY_READ_FANOUT",
+		types.FanoutModeBroadcastSignal: "NEXUSIM_PUSH_CONVERSATION_SIGNAL_SUBSCRIBER_POLICY_BROADCAST_SIGNAL",
+	}
+	for fanoutMode, envName := range thresholdOverrides {
+		thresholds, ok, err := envConversationSignalSubscriberThresholds(envName)
+		if err != nil {
+			return types.ConversationSignalPolicy{}, err
+		}
+		if ok {
+			subscriberThresholdsByFanoutMode[fanoutMode] = thresholds
+		}
+	}
 	return types.NormalizeConversationSignalPolicy(types.ConversationSignalPolicy{
-		DefaultSampleEvery: defaultSampleEvery,
-		ByFanoutMode:       byFanoutMode,
+		DefaultSampleEvery:               defaultSampleEvery,
+		ByFanoutMode:                     byFanoutMode,
+		SubscriberThresholdsByFanoutMode: subscriberThresholdsByFanoutMode,
 	}), nil
+}
+
+func envConversationSignalSubscriberThresholds(name string) ([]types.ConversationSignalSubscriberThreshold, bool, error) {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		return nil, false, nil
+	}
+	parts := strings.Split(value, ",")
+	thresholds := make([]types.ConversationSignalSubscriberThreshold, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			return nil, true, errors.New(name + " contains an empty threshold")
+		}
+		pair := strings.Split(part, ":")
+		if len(pair) != 2 {
+			return nil, true, errors.New(name + " must use min_subscribers:sample_every entries")
+		}
+		minSubscribers, err := strconv.Atoi(strings.TrimSpace(pair[0]))
+		if err != nil || minSubscribers <= 0 {
+			return nil, true, errors.New(name + " min_subscribers must be a positive integer")
+		}
+		sampleEvery, err := strconv.Atoi(strings.TrimSpace(pair[1]))
+		if err != nil || sampleEvery <= 0 {
+			return nil, true, errors.New(name + " sample_every must be a positive integer")
+		}
+		thresholds = append(thresholds, types.ConversationSignalSubscriberThreshold{
+			MinSubscribers: minSubscribers,
+			SampleEvery:    sampleEvery,
+		})
+	}
+	return thresholds, true, nil
 }
 
 func envString(name string, defaultValue string) string {

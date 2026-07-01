@@ -239,9 +239,10 @@ func TestRegistryConversationSignalSamplingSkipsRemotePublish(t *testing.T) {
 		t.Fatalf("enqueue sampled-out signal: %v", err)
 	}
 	if result.MatchedSessions != 0 || result.Enqueued != 0 {
-		t.Fatalf("sampled-out signal should not route: %+v", result)
+		t.Fatalf("sampled-out signal should stop before remote route lookup: %+v", result)
 	}
-	if metrics := gatewayA.Metrics(); metrics.RedisRouteConversationSignalSuppressedEventCount != 1 {
+	if metrics := gatewayA.Metrics(); metrics.RedisRouteConversationSignalSuppressedEventCount != 1 ||
+		metrics.RedisRouteConversationSignalSuppressedSessionCount != 0 {
 		t.Fatalf("unexpected sampling metrics: %+v", metrics)
 	}
 	select {
@@ -323,6 +324,105 @@ func TestRegistryConversationSignalPolicyUsesFanoutModeOverride(t *testing.T) {
 		}
 	case <-time.After(time.Second):
 		t.Fatalf("timed out waiting for remote publish")
+	}
+}
+
+func TestRegistryConversationSignalPolicyUsesRemoteSubscriberThreshold(t *testing.T) {
+	server := miniredis.RunT(t)
+	client := redis.NewClient(&redis.Options{Addr: server.Addr()})
+	ctx := context.Background()
+
+	gatewayA := NewRegistry(memory.NewRegistry(), client, Config{
+		GatewayID: "gateway-a",
+		RouteTTL:  time.Minute,
+		ConversationSignalPolicy: types.ConversationSignalPolicy{
+			DefaultSampleEvery: 1,
+			ByFanoutMode: map[string]int{
+				types.FanoutModeReadFanout: 2,
+			},
+			SubscriberThresholdsByFanoutMode: map[string][]types.ConversationSignalSubscriberThreshold{
+				types.FanoutModeReadFanout: {
+					{MinSubscribers: 2, SampleEvery: 5},
+				},
+			},
+		},
+	})
+	localB := memory.NewRegistry()
+	gatewayB := NewRegistry(localB, client, Config{GatewayID: "gateway-b", RouteTTL: time.Minute})
+	for index := 0; index < 2; index++ {
+		sessionID := "remote-threshold-session-" + string(rune('a'+index))
+		auth := types.AuthContext{
+			TenantID:  "tenant-1",
+			UserID:    "remote-threshold-user-" + string(rune('a'+index)),
+			DeviceID:  "remote-threshold-device-" + string(rune('a'+index)),
+			SessionID: sessionID,
+		}
+		if _, err := gatewayB.Register(ctx, types.SessionRegistration{
+			AuthContext: auth,
+			SessionID:   sessionID,
+			Outbound:    make(chan types.ServerFrame, 2),
+		}); err != nil {
+			t.Fatalf("register remote session %d: %v", index, err)
+		}
+		if _, err := gatewayB.SubscribeConversation(ctx, types.ConversationSubscriptionCommand{
+			AuthContext:    auth,
+			ConversationID: "conversation-1",
+		}); err != nil {
+			t.Fatalf("subscribe remote session %d: %v", index, err)
+		}
+	}
+	pubsub := client.Subscribe(ctx, GatewayChannel(defaultKeyPrefix, "gateway-b"))
+	defer pubsub.Close()
+	if _, err := pubsub.Receive(ctx); err != nil {
+		t.Fatalf("subscribe gateway channel: %v", err)
+	}
+
+	suppressed := testNotification()
+	suppressed.Kind = types.DeliveryNotificationKindConversationSignal
+	suppressed.UserID = ""
+	suppressed.FanoutMode = types.FanoutModeReadFanout
+	suppressed.ConversationSeq = 4
+	result, err := gatewayA.EnqueueConversationSignal(ctx, suppressed)
+	if err != nil {
+		t.Fatalf("enqueue threshold suppressed signal: %v", err)
+	}
+	if result.MatchedSessions != 2 || result.Enqueued != 0 {
+		t.Fatalf("threshold suppressed signal should match but not publish: %+v", result)
+	}
+	select {
+	case message := <-pubsub.Channel():
+		t.Fatalf("threshold suppressed signal must not publish remotely: %+v", message)
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	emitted := suppressed
+	emitted.EventID = "delivery-event-threshold-5"
+	emitted.ConversationSeq = 5
+	result, err = gatewayA.EnqueueConversationSignal(ctx, emitted)
+	if err != nil {
+		t.Fatalf("enqueue threshold emitted signal: %v", err)
+	}
+	if result.MatchedSessions != 2 || result.Enqueued != 2 {
+		t.Fatalf("threshold emitted signal should publish once for two sessions: %+v", result)
+	}
+	select {
+	case message := <-pubsub.Channel():
+		var forwarded types.DeliveryNotification
+		if err := json.Unmarshal([]byte(message.Payload), &forwarded); err != nil {
+			t.Fatalf("decode forwarded notification: %v", err)
+		}
+		if forwarded.EventID != emitted.EventID {
+			t.Fatalf("unexpected forwarded signal: %+v", forwarded)
+		}
+	case <-time.After(time.Second):
+		t.Fatalf("timed out waiting for threshold emitted publish")
+	}
+	metrics := gatewayA.Metrics()
+	if metrics.RedisRouteConversationSignalSuppressedEventCount != 1 ||
+		metrics.RedisRouteConversationSignalSuppressedSessionCount != 2 ||
+		metrics.RedisRouteRemotePublishCallCount != 1 ||
+		metrics.RedisRouteRemoteEnqueuedSessions != 2 {
+		t.Fatalf("unexpected threshold metrics: %+v", metrics)
 	}
 }
 

@@ -185,7 +185,8 @@ func (registry *Registry) EnqueueConversationSignal(
 	if err := notification.Validate(); err != nil {
 		return types.NotifyDeliveryResult{}, err
 	}
-	if !registry.shouldEmitConversationSignal(notification) {
+	if !registry.config.ConversationSignalPolicy.RequiresSubscriberCount(notification.FanoutMode) &&
+		!registry.config.ConversationSignalPolicy.ShouldEmit(notification.ConversationSeq, notification.FanoutMode) {
 		registry.metrics.conversationSignalSuppressedEventCount.Add(1)
 		return types.NotifyDeliveryResult{}, nil
 	}
@@ -200,30 +201,39 @@ func (registry *Registry) EnqueueConversationSignal(
 		return localResult, nil
 	}
 	result := localResult
-	remoteSessionsByGateway := make(map[string]int)
+	remoteRoutesByGateway := make(map[string][]routeEntry)
 	for _, route := range routes {
 		if route.GatewayID == "" || route.SessionID == "" {
 			continue
 		}
-		if route.ResumeToken != "" {
-			if err := registry.appendRedisResume(ctx, route.ResumeToken, domain.DeliveryNotify(notification)); err != nil {
-				registry.metrics.resumeAppendErrorCount.Add(1)
-			}
-		}
 		if route.GatewayID == registry.config.GatewayID {
 			continue
 		}
-		remoteSessionsByGateway[route.GatewayID]++
+		remoteRoutesByGateway[route.GatewayID] = append(remoteRoutesByGateway[route.GatewayID], route)
 		result.MatchedSessions++
 	}
 	var remoteMatched int
-	for _, sessionCount := range remoteSessionsByGateway {
-		remoteMatched += sessionCount
+	for _, gatewayRoutes := range remoteRoutesByGateway {
+		remoteMatched += len(gatewayRoutes)
 	}
 	if remoteMatched > 0 {
 		registry.metrics.remoteMatchedSessions.Add(uint64(remoteMatched))
 	}
-	for gatewayID, sessionCount := range remoteSessionsByGateway {
+	for gatewayID, gatewayRoutes := range remoteRoutesByGateway {
+		sessionCount := len(gatewayRoutes)
+		if !registry.shouldEmitConversationSignal(notification, sessionCount) {
+			registry.metrics.conversationSignalSuppressedEventCount.Add(1)
+			registry.metrics.conversationSignalSuppressedSessionCount.Add(uint64(sessionCount))
+			continue
+		}
+		for _, route := range gatewayRoutes {
+			if route.ResumeToken == "" {
+				continue
+			}
+			if err := registry.appendRedisResume(ctx, route.ResumeToken, domain.DeliveryNotify(notification)); err != nil {
+				registry.metrics.resumeAppendErrorCount.Add(1)
+			}
+		}
 		registry.metrics.remotePublishCallCount.Add(1)
 		subscriberCount, err := registry.publishRemote(ctx, gatewayID, notification)
 		if err != nil {
@@ -242,8 +252,12 @@ func (registry *Registry) EnqueueConversationSignal(
 	return result, nil
 }
 
-func (registry *Registry) shouldEmitConversationSignal(notification types.DeliveryNotification) bool {
-	return registry.config.ConversationSignalPolicy.ShouldEmit(notification.ConversationSeq, notification.FanoutMode)
+func (registry *Registry) shouldEmitConversationSignal(notification types.DeliveryNotification, subscriberCount int) bool {
+	return registry.config.ConversationSignalPolicy.ShouldEmitForSubscribers(
+		notification.ConversationSeq,
+		notification.FanoutMode,
+		subscriberCount,
+	)
 }
 
 func (registry *Registry) EvictDevice(ctx context.Context, tenantID string, userID string, deviceID string, reason string) (types.SessionEvictionResult, error) {

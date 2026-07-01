@@ -265,6 +265,84 @@ func TestRegistryConversationSignalPolicyUsesFanoutModeOverride(t *testing.T) {
 	}
 }
 
+func TestRegistryConversationSignalPolicyUsesSubscriberThreshold(t *testing.T) {
+	registry := NewRegistryWithConfig(Config{ConversationSignalPolicy: types.ConversationSignalPolicy{
+		DefaultSampleEvery: 1,
+		ByFanoutMode: map[string]int{
+			types.FanoutModeReadFanout: 2,
+		},
+		SubscriberThresholdsByFanoutMode: map[string][]types.ConversationSignalSubscriberThreshold{
+			types.FanoutModeReadFanout: {
+				{MinSubscribers: 2, SampleEvery: 5},
+			},
+		},
+	}})
+	outbounds := make([]chan types.ServerFrame, 2)
+	for index := range outbounds {
+		sessionID := "session-threshold-" + string(rune('a'+index))
+		auth := types.AuthContext{
+			TenantID:  "tenant-1",
+			UserID:    "threshold-user-" + string(rune('a'+index)),
+			DeviceID:  "threshold-device-" + string(rune('a'+index)),
+			SessionID: sessionID,
+		}
+		outbounds[index] = make(chan types.ServerFrame, 2)
+		if _, err := registry.Register(context.Background(), types.SessionRegistration{
+			AuthContext: auth,
+			SessionID:   sessionID,
+			Outbound:    outbounds[index],
+		}); err != nil {
+			t.Fatalf("register %s: %v", sessionID, err)
+		}
+		if _, err := registry.SubscribeConversation(context.Background(), types.ConversationSubscriptionCommand{
+			AuthContext:    auth,
+			ConversationID: "conversation-1",
+		}); err != nil {
+			t.Fatalf("subscribe %s: %v", sessionID, err)
+		}
+	}
+
+	suppressed := testNotification()
+	suppressed.Kind = types.DeliveryNotificationKindConversationSignal
+	suppressed.UserID = ""
+	suppressed.FanoutMode = types.FanoutModeReadFanout
+	suppressed.ConversationSeq = 4
+	result, err := registry.EnqueueConversationSignal(context.Background(), suppressed)
+	if err != nil {
+		t.Fatalf("threshold suppressed signal: %v", err)
+	}
+	if result.MatchedSessions != 2 || result.Enqueued != 0 {
+		t.Fatalf("expected two matched suppressed subscribers, got %+v", result)
+	}
+	for index, outbound := range outbounds {
+		if len(outbound) != 0 {
+			t.Fatalf("session %d should not receive seq=4 under threshold policy", index)
+		}
+	}
+
+	emitted := suppressed
+	emitted.EventID = "delivery-event-threshold-5"
+	emitted.ConversationSeq = 5
+	result, err = registry.EnqueueConversationSignal(context.Background(), emitted)
+	if err != nil {
+		t.Fatalf("threshold emitted signal: %v", err)
+	}
+	if result.MatchedSessions != 2 || result.Enqueued != 2 {
+		t.Fatalf("expected two emitted subscribers, got %+v", result)
+	}
+	for index, outbound := range outbounds {
+		frame := <-outbound
+		if frame.ConversationSeq != 5 {
+			t.Fatalf("session %d received wrong seq: %+v", index, frame)
+		}
+	}
+	snapshot := registry.Metrics()
+	if snapshot.ConversationSignalSuppressedEventCount != 1 ||
+		snapshot.ConversationSignalSuppressedSessionCount != 2 {
+		t.Fatalf("unexpected threshold metrics: %+v", snapshot)
+	}
+}
+
 func TestRegistryConversationSignalFanoutBucketsPreservePerSessionOrder(t *testing.T) {
 	registry := NewRegistryWithConfig(Config{ConversationFanoutBuckets: 4})
 	outbounds := make([]chan types.ServerFrame, 8)

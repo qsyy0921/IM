@@ -51,6 +51,45 @@ CreateConversation -> batch CreateMemberChange(JOIN)
 | `hotgroup-multirunner-analysis-20260701-fanoutpolicy-400sub-5000msg.md` | clean commit `37b575e5` 将 push-gateway signal cadence 从全局 sample knob 收敛为 fanout-mode policy；default=1、READ_FANOUT=10、BROADCAST_SIGNAL=10 复压在 6000 人 / 5000 消息 / 8000 msg/s / 400 subscriber 下读完 200000 条 sampled signal，span 141.504s，message / delivery outbox pending=0。该结果证明 room policy 边界生效，但 READ_FANOUT=10 的性能仍与 global sample=10 同量级。 |
 | `hotgroup-metrics-window-20260701-fanoutpolicy-400sub-5000msg.md` | fanout-mode policy 窗口显示核心 target up，`delivery_outbox_pending` 峰值 1721 后归零，writer / Redis subscriber error、queue-full 和 eviction 均为 0；`delivery_notify` write p95 / p99 约 0.465ms / 0.893ms，Redis subscriber conversation fanout window p95 / p99 约 39.944ms / 84.614ms。下一步应做 adaptive cadence 控制面或持久 fanout worker，而不是继续调同一个 sample knob。 |
 
+## Conversation signal cadence
+
+push-gateway 的 conversation signal cadence 分三层：
+
+```text
+NEXUSIM_PUSH_CONVERSATION_SIGNAL_SAMPLE_EVERY
+NEXUSIM_PUSH_CONVERSATION_SIGNAL_SAMPLE_EVERY_<FANOUT_MODE>
+NEXUSIM_PUSH_CONVERSATION_SIGNAL_SUBSCRIBER_POLICY_<FANOUT_MODE>
+```
+
+前两层是固定 sample cadence。第三层是 subscriber-aware policy，格式为：
+
+```text
+min_subscribers:sample_every[,min_subscribers:sample_every...]
+```
+
+例子：
+
+```text
+NEXUSIM_PUSH_CONVERSATION_SIGNAL_SAMPLE_EVERY_READ_FANOUT=10
+NEXUSIM_PUSH_CONVERSATION_SIGNAL_SUBSCRIBER_POLICY_READ_FANOUT=100:20
+```
+
+含义是：READ_FANOUT 默认每 10 条 seq 发一次 online signal；如果本机 memory
+registry 或某个远端 gateway 对同一 conversation 有至少 100 个 subscriber，则改成每
+20 条 seq 发一次。effective sample 只会比 fanout-mode sample 更保守，不会因为
+threshold 变得更频繁。
+
+注意：
+
+- subscriber threshold 按本机 / 每个远端 gateway 的 subscriber 数计算，不是全局房间
+  subscriber 总数。4 个 ws 各 100 个 subscriber 的 400 subscriber 拓扑，应使用
+  `100:20`，不是 `400:20`。
+- 没有配置 subscriber threshold 时，Redis route 会保留旧的采样前置快速路径，不会为了
+  sampled-out signal 查询 route。
+- sampled-out remote signal 不写 Redis resume；durable 展示仍以 PullInbox / ACK 为准。
+- runner 侧必须同步设置 `--conversation-signal-sample-every` 为预期 effective cadence，
+  否则 expected signal 数会和服务端策略不一致。
+
 ## 目标
 
 热点群聊压测要证明端到端链路，而不是单个服务的孤立吞吐：

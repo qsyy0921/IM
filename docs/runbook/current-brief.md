@@ -292,5 +292,8 @@ brief、loadtest report、development-progress 或 archive。
   sampled signal，span 141.504s；SendMessage / PullInbox / ACK 和 outbox drain
   均成立。结论是策略边界已从全局 knob 收敛到 fanout-mode room policy，但
   READ_FANOUT=10 的性能仍与上一轮 global sample=10 同量级，瓶颈仍是
-  online-signal-drain。下一步需要在 adaptive cadence 控制面或持久 fanout worker
-  两条路中选一个完整模块，而不是继续调同一个 sample knob。
+  online-signal-drain。当前已继续实现 subscriber-aware conversation signal cadence：
+  可以按 fanout mode 和本机 / 远端 gateway 的 conversation subscriber 数进一步调低
+  online signal cadence；没有配置 threshold 时保留旧采样前置快速路径。下一步是
+  clean commit、重建 / 归档 / redeploy push-gateway，并用同场景复压验证
+  READ_FANOUT `100:20` 这类 subscriber threshold 是否缩短 drain span。

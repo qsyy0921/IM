@@ -86,9 +86,13 @@
    default=1、READ_FANOUT/BROADCAST_SIGNAL=10 复压。新 run 在 6000 人 /
    5000 消息 / 8000 msg/s / 400 subscriber 下读完 200000 条 sampled signal，
    span 141.504s，message / delivery outbox pending=0。该结果证明 policy 边界生效，
-   但 READ_FANOUT=10 下瓶颈仍是 online-signal-drain；剩余动作是选择一个完整模块：
-   adaptive cadence 控制面 / 运行时策略，或持久 per-conversation / per-bucket fanout
-   worker，不再继续调同一个 sample knob。
+   但 READ_FANOUT=10 下瓶颈仍是 online-signal-drain。当前已继续实现
+   subscriber-aware conversation signal cadence：按 fanout mode 和每个本机 / 远端
+   gateway 的 conversation subscriber 数决定更保守的 sample cadence；未配置
+   subscriber threshold 时保留旧采样前置快速路径。剩余动作是 clean commit、
+   Docker 镜像归档 / redeploy，并用 READ_FANOUT threshold（如 4 个 ws 各约
+   100 subscriber 时配置 `100:20`）同场景复压；若仍不明显改善，再转持久
+   per-conversation / per-bucket fanout worker。
 2. Agent action boundary / repair cases：在 provider replay admin / workflow handoff 已落
    的基础上，继续扩更多需要 proposal / approval / workflow / audit 的 action 与 repair 场景。
 3. Product-active 服务按需推进：workflow、audit、admin、notification、media、vector、

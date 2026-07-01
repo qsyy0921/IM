@@ -45,55 +45,57 @@ type Registry struct {
 }
 
 type Metrics struct {
-	RedisRouteRegisterErrorCount                      uint64           `json:"redis_route_register_error_count"`
-	RedisRouteRenewErrorCount                         uint64           `json:"redis_route_renew_error_count"`
-	RedisRouteRenewSessionEvictedCount                uint64           `json:"redis_route_renew_session_evicted_count"`
-	RedisRouteLookupErrorCount                        uint64           `json:"redis_route_lookup_error_count"`
-	RedisRouteRemoteMatchedSessions                   uint64           `json:"redis_route_remote_matched_sessions"`
-	RedisRouteRemotePublishCallCount                  uint64           `json:"redis_route_remote_publish_call_count"`
-	RedisRouteRemotePublishErrorCount                 uint64           `json:"redis_route_remote_publish_error_count"`
-	RedisRouteRemoteNoSubscriberCount                 uint64           `json:"redis_route_remote_no_subscriber_count"`
-	RedisRouteRemoteEnqueuedSessions                  uint64           `json:"redis_route_remote_enqueued_sessions"`
-	RedisRouteStaleRemovedCount                       uint64           `json:"redis_route_stale_removed_count"`
-	RedisRouteCleanupErrorCount                       uint64           `json:"redis_route_cleanup_error_count"`
-	RedisRouteConversationSignalSuppressedEventCount  uint64           `json:"redis_route_conversation_signal_suppressed_event_count"`
-	RedisRouteSubscriberMessageCount                  uint64           `json:"redis_route_subscriber_message_count,omitempty"`
-	RedisRouteSubscriberMalformedCount                uint64           `json:"redis_route_subscriber_malformed_count,omitempty"`
-	RedisRouteSubscriberEnqueuedCount                 uint64           `json:"redis_route_subscriber_enqueued_count,omitempty"`
-	RedisRouteSubscriberEvictedCount                  uint64           `json:"redis_route_subscriber_evicted_count,omitempty"`
-	RedisRouteSubscriberErrorCount                    uint64           `json:"redis_route_subscriber_error_count,omitempty"`
-	RedisRouteSubscriberNotifyFanoutDuration          DurationSnapshot `json:"redis_route_subscriber_notify_fanout_duration,omitempty"`
-	RedisRouteSubscriberSignalFanoutDuration          DurationSnapshot `json:"redis_route_subscriber_signal_fanout_duration,omitempty"`
-	RedisRouteSubscriberSignalFanoutQueuedCount       uint64           `json:"redis_route_subscriber_signal_fanout_queued_count,omitempty"`
-	RedisRouteSubscriberSignalFanoutQueueFullCount    uint64           `json:"redis_route_subscriber_signal_fanout_queue_full_count,omitempty"`
-	RedisRouteSubscriberSignalFanoutWorkerErrorCount  uint64           `json:"redis_route_subscriber_signal_fanout_worker_error_count,omitempty"`
-	RedisRouteSubscriberSignalFanoutQueueDepth        int64            `json:"redis_route_subscriber_signal_fanout_queue_depth,omitempty"`
-	RedisRouteSubscriberSignalFanoutQueueWaitDuration DurationSnapshot `json:"redis_route_subscriber_signal_fanout_queue_wait_duration,omitempty"`
-	RedisResumeReplayCount                            uint64           `json:"redis_resume_replay_count"`
-	RedisResumeMissCount                              uint64           `json:"redis_resume_miss_count"`
-	RedisResumeAppendCount                            uint64           `json:"redis_resume_append_count"`
-	RedisResumeAppendErrorCount                       uint64           `json:"redis_resume_append_error_count"`
-	RedisResumePermissionDeniedCount                  uint64           `json:"redis_resume_permission_denied_count"`
+	RedisRouteRegisterErrorCount                       uint64           `json:"redis_route_register_error_count"`
+	RedisRouteRenewErrorCount                          uint64           `json:"redis_route_renew_error_count"`
+	RedisRouteRenewSessionEvictedCount                 uint64           `json:"redis_route_renew_session_evicted_count"`
+	RedisRouteLookupErrorCount                         uint64           `json:"redis_route_lookup_error_count"`
+	RedisRouteRemoteMatchedSessions                    uint64           `json:"redis_route_remote_matched_sessions"`
+	RedisRouteRemotePublishCallCount                   uint64           `json:"redis_route_remote_publish_call_count"`
+	RedisRouteRemotePublishErrorCount                  uint64           `json:"redis_route_remote_publish_error_count"`
+	RedisRouteRemoteNoSubscriberCount                  uint64           `json:"redis_route_remote_no_subscriber_count"`
+	RedisRouteRemoteEnqueuedSessions                   uint64           `json:"redis_route_remote_enqueued_sessions"`
+	RedisRouteStaleRemovedCount                        uint64           `json:"redis_route_stale_removed_count"`
+	RedisRouteCleanupErrorCount                        uint64           `json:"redis_route_cleanup_error_count"`
+	RedisRouteConversationSignalSuppressedEventCount   uint64           `json:"redis_route_conversation_signal_suppressed_event_count"`
+	RedisRouteConversationSignalSuppressedSessionCount uint64           `json:"redis_route_conversation_signal_suppressed_session_count"`
+	RedisRouteSubscriberMessageCount                   uint64           `json:"redis_route_subscriber_message_count,omitempty"`
+	RedisRouteSubscriberMalformedCount                 uint64           `json:"redis_route_subscriber_malformed_count,omitempty"`
+	RedisRouteSubscriberEnqueuedCount                  uint64           `json:"redis_route_subscriber_enqueued_count,omitempty"`
+	RedisRouteSubscriberEvictedCount                   uint64           `json:"redis_route_subscriber_evicted_count,omitempty"`
+	RedisRouteSubscriberErrorCount                     uint64           `json:"redis_route_subscriber_error_count,omitempty"`
+	RedisRouteSubscriberNotifyFanoutDuration           DurationSnapshot `json:"redis_route_subscriber_notify_fanout_duration,omitempty"`
+	RedisRouteSubscriberSignalFanoutDuration           DurationSnapshot `json:"redis_route_subscriber_signal_fanout_duration,omitempty"`
+	RedisRouteSubscriberSignalFanoutQueuedCount        uint64           `json:"redis_route_subscriber_signal_fanout_queued_count,omitempty"`
+	RedisRouteSubscriberSignalFanoutQueueFullCount     uint64           `json:"redis_route_subscriber_signal_fanout_queue_full_count,omitempty"`
+	RedisRouteSubscriberSignalFanoutWorkerErrorCount   uint64           `json:"redis_route_subscriber_signal_fanout_worker_error_count,omitempty"`
+	RedisRouteSubscriberSignalFanoutQueueDepth         int64            `json:"redis_route_subscriber_signal_fanout_queue_depth,omitempty"`
+	RedisRouteSubscriberSignalFanoutQueueWaitDuration  DurationSnapshot `json:"redis_route_subscriber_signal_fanout_queue_wait_duration,omitempty"`
+	RedisResumeReplayCount                             uint64           `json:"redis_resume_replay_count"`
+	RedisResumeMissCount                               uint64           `json:"redis_resume_miss_count"`
+	RedisResumeAppendCount                             uint64           `json:"redis_resume_append_count"`
+	RedisResumeAppendErrorCount                        uint64           `json:"redis_resume_append_error_count"`
+	RedisResumePermissionDeniedCount                   uint64           `json:"redis_resume_permission_denied_count"`
 }
 
 type registryMetrics struct {
-	registerErrorCount                     atomic.Uint64
-	renewErrorCount                        atomic.Uint64
-	renewSessionEvicted                    atomic.Uint64
-	lookupErrorCount                       atomic.Uint64
-	remoteMatchedSessions                  atomic.Uint64
-	remotePublishCallCount                 atomic.Uint64
-	remotePublishErrorCount                atomic.Uint64
-	remoteNoSubscriberCount                atomic.Uint64
-	remoteEnqueuedSessions                 atomic.Uint64
-	staleRemovedCount                      atomic.Uint64
-	cleanupErrorCount                      atomic.Uint64
-	conversationSignalSuppressedEventCount atomic.Uint64
-	resumeReplayCount                      atomic.Uint64
-	resumeMissCount                        atomic.Uint64
-	resumeAppendCount                      atomic.Uint64
-	resumeAppendErrorCount                 atomic.Uint64
-	resumePermissionDenied                 atomic.Uint64
+	registerErrorCount                       atomic.Uint64
+	renewErrorCount                          atomic.Uint64
+	renewSessionEvicted                      atomic.Uint64
+	lookupErrorCount                         atomic.Uint64
+	remoteMatchedSessions                    atomic.Uint64
+	remotePublishCallCount                   atomic.Uint64
+	remotePublishErrorCount                  atomic.Uint64
+	remoteNoSubscriberCount                  atomic.Uint64
+	remoteEnqueuedSessions                   atomic.Uint64
+	staleRemovedCount                        atomic.Uint64
+	cleanupErrorCount                        atomic.Uint64
+	conversationSignalSuppressedEventCount   atomic.Uint64
+	conversationSignalSuppressedSessionCount atomic.Uint64
+	resumeReplayCount                        atomic.Uint64
+	resumeMissCount                          atomic.Uint64
+	resumeAppendCount                        atomic.Uint64
+	resumeAppendErrorCount                   atomic.Uint64
+	resumePermissionDenied                   atomic.Uint64
 }
 
 type routeState struct {
@@ -240,22 +242,23 @@ func (registry *Registry) Unregister(sessionID string) {
 
 func (registry *Registry) Metrics() Metrics {
 	return Metrics{
-		RedisRouteRegisterErrorCount:                     registry.metrics.registerErrorCount.Load(),
-		RedisRouteRenewErrorCount:                        registry.metrics.renewErrorCount.Load(),
-		RedisRouteRenewSessionEvictedCount:               registry.metrics.renewSessionEvicted.Load(),
-		RedisRouteLookupErrorCount:                       registry.metrics.lookupErrorCount.Load(),
-		RedisRouteRemoteMatchedSessions:                  registry.metrics.remoteMatchedSessions.Load(),
-		RedisRouteRemotePublishCallCount:                 registry.metrics.remotePublishCallCount.Load(),
-		RedisRouteRemotePublishErrorCount:                registry.metrics.remotePublishErrorCount.Load(),
-		RedisRouteRemoteNoSubscriberCount:                registry.metrics.remoteNoSubscriberCount.Load(),
-		RedisRouteRemoteEnqueuedSessions:                 registry.metrics.remoteEnqueuedSessions.Load(),
-		RedisRouteStaleRemovedCount:                      registry.metrics.staleRemovedCount.Load(),
-		RedisRouteCleanupErrorCount:                      registry.metrics.cleanupErrorCount.Load(),
-		RedisRouteConversationSignalSuppressedEventCount: registry.metrics.conversationSignalSuppressedEventCount.Load(),
-		RedisResumeReplayCount:                           registry.metrics.resumeReplayCount.Load(),
-		RedisResumeMissCount:                             registry.metrics.resumeMissCount.Load(),
-		RedisResumeAppendCount:                           registry.metrics.resumeAppendCount.Load(),
-		RedisResumeAppendErrorCount:                      registry.metrics.resumeAppendErrorCount.Load(),
-		RedisResumePermissionDeniedCount:                 registry.metrics.resumePermissionDenied.Load(),
+		RedisRouteRegisterErrorCount:                       registry.metrics.registerErrorCount.Load(),
+		RedisRouteRenewErrorCount:                          registry.metrics.renewErrorCount.Load(),
+		RedisRouteRenewSessionEvictedCount:                 registry.metrics.renewSessionEvicted.Load(),
+		RedisRouteLookupErrorCount:                         registry.metrics.lookupErrorCount.Load(),
+		RedisRouteRemoteMatchedSessions:                    registry.metrics.remoteMatchedSessions.Load(),
+		RedisRouteRemotePublishCallCount:                   registry.metrics.remotePublishCallCount.Load(),
+		RedisRouteRemotePublishErrorCount:                  registry.metrics.remotePublishErrorCount.Load(),
+		RedisRouteRemoteNoSubscriberCount:                  registry.metrics.remoteNoSubscriberCount.Load(),
+		RedisRouteRemoteEnqueuedSessions:                   registry.metrics.remoteEnqueuedSessions.Load(),
+		RedisRouteStaleRemovedCount:                        registry.metrics.staleRemovedCount.Load(),
+		RedisRouteCleanupErrorCount:                        registry.metrics.cleanupErrorCount.Load(),
+		RedisRouteConversationSignalSuppressedEventCount:   registry.metrics.conversationSignalSuppressedEventCount.Load(),
+		RedisRouteConversationSignalSuppressedSessionCount: registry.metrics.conversationSignalSuppressedSessionCount.Load(),
+		RedisResumeReplayCount:                             registry.metrics.resumeReplayCount.Load(),
+		RedisResumeMissCount:                               registry.metrics.resumeMissCount.Load(),
+		RedisResumeAppendCount:                             registry.metrics.resumeAppendCount.Load(),
+		RedisResumeAppendErrorCount:                        registry.metrics.resumeAppendErrorCount.Load(),
+		RedisResumePermissionDeniedCount:                   registry.metrics.resumePermissionDenied.Load(),
 	}
 }

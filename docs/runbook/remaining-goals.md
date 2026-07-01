@@ -132,9 +132,11 @@
    commit 重建 / redeploy message-service 后，用更大消息数做稳态 send-only
    复压。clean commit `d190c35` 的 256 concurrency / 5000 message send-only
    run 已达到约 `2052.125 msg/s`、SendMessage p99 `482.711ms`，outbox pending=0；
-   512 concurrency 诊断 run 达到约 `2265.229 msg/s`、p99 `347.978ms`，但因仓库已有
-   未提交报告文件为 dirty run，不能作为正式容量证据。剩余任务是提交报告后复跑
-   clean 512 concurrency，再继续尝试 768 / 1024 concurrency 或扩大 message_count，
+   clean commit `1d738f2` 的 512 concurrency / 5000 message 正式复压达到约
+   `2356.419 msg/s`、SendMessage p99 `257.893ms`，outbox pending=0；
+   `conversation_seq_alloc_recent p99` 约 `0.023ms`、`repository_pool_acquire_recent p99`
+   约 `0.538ms`，说明连接池和 seq allocation 仍不是瓶颈。剩余任务是继续尝试
+   768 / 1024 concurrency 或扩大 message_count，
    同时观察 recent repository append / insert_outbox / commit p99、PostgreSQL CPU / IO
    和 message-service CPU；之后再回到 total-subscriber-aware policy 的 6000 人 /
    5000 消息 / 400 subscriber 场景，确认 `achieved_send_rate` 与 signal span 新曲线。

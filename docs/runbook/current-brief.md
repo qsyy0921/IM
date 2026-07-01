@@ -314,5 +314,8 @@ brief、loadtest report、development-progress 或 archive。
   `hotgroup-policydefaults-400sub-5000msg-coordinator-20260701-114425` 读完
   100000 条 signal，span 193.559s，message / delivery outbox pending=0，并已在
   Prometheus 窗口看到 delivery-consumer route cache hit / miss 约 4415 / 731。
-  但该 run 比旧 routecache baseline 146.62s 慢，下一步先同配置重复复验确认波动，
-  再决定是否进入 dynamic cadence、持久 fanout worker 或更强 pull-first 策略。
+  但该 run 比旧 routecache baseline 146.62s 慢；同配置 repeat
+  `hotgroup-policydefaults-repeat-400sub-5000msg-coordinator-20260701-120150`
+  再次读完 100000 条 signal，span 193.012s、span rate 约 518.102 signals/s，
+  与上一轮 ratio 1.003。结论：corrected policy 曲线稳定，不是一次性波动；
+  下一步转向 dynamic cadence、持久 fanout worker 或更强 pull-first 策略。

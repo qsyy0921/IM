@@ -378,6 +378,19 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
   但 corrected policy run 比旧 routecache baseline `146.62s / 682.034 signals/s`
   慢，下一步应先做一次同配置重复复验，排除 run 波动 / 指标开销 / runner 环境差异后，
   再决定是否进入 dynamic cadence、持久 fanout worker 或更强 pull-first 策略。
+- 2026-07-01 已完成同配置重复复验：
+  `hotgroup-policydefaults-repeat-400sub-5000msg-coordinator-20260701-120150`
+  使用 clean commit `623c797`、6000 人、5000 消息、目标 8000 msg/s、
+  256 sender、400 subscriber、READ_FANOUT `100:20`；4 个 shard 共读完
+  100000 条 signal，span `193.012s`，span rate 约 `518.102 signals/s`。
+  与上一轮 policydefaults baseline `193.559s / 516.638 signals/s` 相比 ratio
+  `1.003`，证明该曲线稳定，不是一次性波动。Prometheus 窗口显示
+  delivery-consumer route cache hit / miss 约 `4411.541 / 728.917`，
+  `remote_publish_call_window` 约 `1028.091`，`remote_enqueued_sessions_window`
+  约 `102809.147`；writer / Redis subscriber error、queue-full 和 eviction 均为 0。
+  结论：观测链路和 Docker policy 默认值已收口；当前仍是 online-signal-drain，
+  下一步不再重复同配置复验，而应进入消息速率 / 在线人数感知 dynamic cadence、
+  更强 pull-first 策略，或持久 per-conversation / per-bucket fanout worker 的架构设计。
 - HYBRID 诊断档位 1000 人 / 1000 消息 / 400 msg/s 暴露 `delivery_outbox` ready query
   在百万级 per-user outbox 下退化：旧 anti-join blocker 查询每批 500 行约 24s。当前
   delivery outbox relay 已改成 per-conversation frontier ready query，并把本地 worker
@@ -408,8 +421,9 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
   delivery-consumer debug endpoint 和 Prometheus core scrape target 配置，并已
   redeploy 验证 target `up`；`hotgroup-policydefaults-400sub-5000msg` 已取得
   delivery-consumer route cache hit / miss 曲线证据，并暴露 policy env 漂移会造成
-  remote publish 放大的风险。本轮收口为“观测补齐 + Docker 默认策略固定”，不是
-  新的容量上限。
+  remote publish 放大的风险；`hotgroup-policydefaults-repeat-400sub-5000msg`
+  复验确认 corrected policy 曲线稳定在约 `193s / 518 signals/s`。本轮收口为
+  “观测补齐 + Docker 默认策略固定 + 同配置复验”，不是新的容量上限。
 - 文档同步本轮公开能力或瓶颈变化。
 - 提交并推送到 GitHub。
 
@@ -424,11 +438,11 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
 ## 后续优先级
 
 1. subscriber-aware threshold + Redis conversation route cache 已完成 clean Docker
-   复压，delivery-consumer route cache hit / miss 也已进入 Prometheus 窗口。
-   由于 corrected policy-defaults run 比旧 routecache baseline 慢，下一步先用同配置
-   重复复验确认是否为 run 波动 / 观测开销 / runner 环境差异；若结果稳定，再转向
-   消息速率 / 在线人数感知 dynamic cadence、持久 per-conversation / per-bucket
-   fanout worker，或更强 pull-first 策略。
+   复压，delivery-consumer route cache hit / miss 也已进入 Prometheus 窗口；
+   同配置 repeat 已确认 corrected policy 曲线稳定。下一步转向消息速率 / 在线人数
+   感知 dynamic cadence、更强 pull-first 策略，或持久 per-conversation /
+   per-bucket fanout worker 的架构设计与最小实现；不要继续在同一静态
+   `100:20` 配置上重复压测。
 2. 继续为每轮优化保留 clean commit、Docker 镜像归档、三机部署版本和 Prometheus
    时间窗口，保证压测曲线可复现。
 3. 若 HYBRID 仍要支持千人级 per-user materialized outbox，优先评估显式 frontier /

@@ -679,11 +679,31 @@ class AgentEvalEvaluatorTests(unittest.TestCase):
                     "message:project:decision:1",
                     "memory:project:decision:v1",
                 ],
+                "expected_memory_cluster_representative_refs": [
+                    "message:project:decision:1"
+                ],
+                "actual_memory_cluster_representative_refs": [
+                    "message:project:decision:1"
+                ],
+                "expected_memory_cluster_tie_break_refs": [
+                    "tie-break:project:newest-visible"
+                ],
+                "actual_memory_cluster_tie_break_refs": [
+                    "tie-break:project:newest-visible"
+                ],
                 "memory_deduped": True,
                 "memory_duplicate_clustered": True,
+                "memory_cluster_representative_selected": True,
                 "expected_memory_confidence_bucket": "MEDIUM",
                 "actual_memory_confidence_bucket": "MEDIUM",
+                "expected_memory_confidence_threshold_refs": [
+                    "confidence-threshold:medium-review"
+                ],
+                "actual_memory_confidence_threshold_refs": [
+                    "confidence-threshold:medium-review"
+                ],
                 "memory_confidence_calibrated": True,
+                "memory_confidence_threshold_applied": True,
                 "expected_memory_skill_refs": ["skill:memory:procedure:v2"],
                 "actual_memory_skill_refs": ["skill:memory:procedure:v2"],
                 "expected_procedural_migration_refs": ["procedure:migrate:v1-to-v2"],
@@ -696,6 +716,13 @@ class AgentEvalEvaluatorTests(unittest.TestCase):
                 "governed_policy_source_refs": ["policy-source:retention:v2"],
                 "governed_policy_allowlist_refs": ["policy-source:retention:v2"],
                 "actual_governed_policy_allowlist_refs": ["policy-source:retention:v2"],
+                "expected_policy_revocation_window_refs": [
+                    "revocation-window:retention:v1:closed"
+                ],
+                "actual_policy_revocation_window_refs": [
+                    "revocation-window:retention:v1:closed"
+                ],
+                "policy_revocation_window_recorded": True,
                 "expected_review_retry_refs": ["review-retry:memory:project"],
                 "actual_review_retry_refs": ["review-retry:memory:project"],
                 "expected_review_escalation_refs": ["review-escalation:memory:project"],
@@ -710,9 +737,15 @@ class AgentEvalEvaluatorTests(unittest.TestCase):
 
         self.assertEqual(report.status, "PASS")
         self.assertEqual(report.aggregate_scores["memory_duplicate_cluster_score"], 1.0)
+        self.assertEqual(report.aggregate_scores["memory_cluster_representative_score"], 1.0)
         self.assertEqual(report.aggregate_scores["memory_confidence_calibration_score"], 1.0)
+        self.assertEqual(report.aggregate_scores["memory_confidence_threshold_score"], 1.0)
         self.assertEqual(report.aggregate_scores["memory_procedural_migration_score"], 1.0)
         self.assertEqual(report.aggregate_scores["memory_policy_source_governance_score"], 1.0)
+        self.assertEqual(
+            report.aggregate_scores["memory_policy_revocation_window_score"],
+            1.0,
+        )
         self.assertEqual(report.aggregate_scores["memory_review_redrive_score"], 1.0)
 
     def test_memory_admission_fails_missing_duplicate_cluster(self) -> None:
@@ -741,6 +774,40 @@ class AgentEvalEvaluatorTests(unittest.TestCase):
         self.assertEqual(report.results[0].failure_class, "MEMORY_DUPLICATE_CLUSTER_MISSING")
         self.assertEqual(report.aggregate_scores["memory_duplicate_cluster_score"], 0.0)
 
+    def test_memory_admission_fails_missing_cluster_representative(self) -> None:
+        case = base_case("MEMORY_ADMISSION")
+        case.update(
+            {
+                "expected_memory_outcome": "ADMIT",
+                "actual_memory_outcome": "ADMIT",
+                "expected_memory_scope": "PROJECT",
+                "actual_memory_scope": "PROJECT",
+                "duplicate_memory_cluster_refs": [
+                    "message:project:decision:1",
+                    "memory:project:decision:v1",
+                ],
+                "actual_memory_cluster_refs": [
+                    "message:project:decision:1",
+                    "memory:project:decision:v1",
+                ],
+                "expected_memory_cluster_representative_refs": [
+                    "message:project:decision:1"
+                ],
+                "actual_memory_cluster_representative_refs": [],
+                "memory_duplicate_clustered": True,
+                "memory_cluster_representative_selected": True,
+            }
+        )
+
+        report = run_eval_suite(suite_with_case(case))
+
+        self.assertEqual(report.status, "FAIL")
+        self.assertEqual(
+            report.results[0].failure_class,
+            "MEMORY_CLUSTER_REPRESENTATIVE_MISSING",
+        )
+        self.assertEqual(report.aggregate_scores["memory_cluster_representative_score"], 0.0)
+
     def test_memory_admission_fails_confidence_calibration_mismatch(self) -> None:
         case = base_case("MEMORY_ADMISSION")
         case.update(
@@ -763,6 +830,34 @@ class AgentEvalEvaluatorTests(unittest.TestCase):
             "MEMORY_CONFIDENCE_CALIBRATION_MISSING",
         )
         self.assertEqual(report.aggregate_scores["memory_confidence_calibration_score"], 0.0)
+
+    def test_memory_admission_fails_missing_confidence_threshold(self) -> None:
+        case = base_case("MEMORY_ADMISSION")
+        case.update(
+            {
+                "expected_memory_outcome": "REJECT",
+                "actual_memory_outcome": "REJECT",
+                "expected_memory_scope": "GROUP",
+                "actual_memory_scope": "GROUP",
+                "expected_memory_confidence_bucket": "LOW",
+                "actual_memory_confidence_bucket": "LOW",
+                "memory_confidence_calibrated": True,
+                "expected_memory_confidence_threshold_refs": [
+                    "confidence-threshold:group-low-reject"
+                ],
+                "actual_memory_confidence_threshold_refs": [],
+                "memory_confidence_threshold_applied": True,
+            }
+        )
+
+        report = run_eval_suite(suite_with_case(case))
+
+        self.assertEqual(report.status, "FAIL")
+        self.assertEqual(
+            report.results[0].failure_class,
+            "MEMORY_CONFIDENCE_THRESHOLD_MISSING",
+        )
+        self.assertEqual(report.aggregate_scores["memory_confidence_threshold_score"], 0.0)
 
     def test_memory_admission_fails_missing_procedural_migration(self) -> None:
         case = base_case("MEMORY_ADMISSION")
@@ -809,6 +904,43 @@ class AgentEvalEvaluatorTests(unittest.TestCase):
         self.assertEqual(report.status, "FAIL")
         self.assertEqual(report.results[0].failure_class, "MEMORY_POLICY_SOURCE_REVOKED")
         self.assertEqual(report.aggregate_scores["memory_policy_source_governance_score"], 0.0)
+
+    def test_memory_admission_fails_missing_policy_revocation_window(self) -> None:
+        case = base_case("MEMORY_ADMISSION")
+        case.update(
+            {
+                "expected_memory_outcome": "REJECT",
+                "actual_memory_outcome": "REJECT",
+                "expected_memory_scope": "TENANT",
+                "actual_memory_scope": "TENANT",
+                "actual_used_refs": ["policy-source:retention:v1"],
+                "actual_memory_source_refs": ["policy-source:retention:v1"],
+                "policy_memory_refs": ["candidate:policy-memory:retention"],
+                "governed_policy_source_refs": ["policy-source:retention:v1"],
+                "governed_policy_allowlist_refs": ["policy-source:retention:v1"],
+                "actual_governed_policy_allowlist_refs": ["policy-source:retention:v1"],
+                "revoked_policy_source_refs": ["policy-source:retention:v1"],
+                "policy_source_revocation_detected": True,
+                "policy_memory_rejected": True,
+                "expected_policy_revocation_window_refs": [
+                    "revocation-window:retention:v1:closed"
+                ],
+                "actual_policy_revocation_window_refs": [],
+                "policy_revocation_window_recorded": True,
+            }
+        )
+
+        report = run_eval_suite(suite_with_case(case))
+
+        self.assertEqual(report.status, "FAIL")
+        self.assertEqual(
+            report.results[0].failure_class,
+            "MEMORY_POLICY_REVOCATION_WINDOW_MISSING",
+        )
+        self.assertEqual(
+            report.aggregate_scores["memory_policy_revocation_window_score"],
+            0.0,
+        )
 
     def test_memory_admission_fails_missing_review_redrive_refs(self) -> None:
         case = base_case("MEMORY_ADMISSION")

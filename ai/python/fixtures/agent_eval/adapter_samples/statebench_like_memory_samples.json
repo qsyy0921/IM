@@ -11,20 +11,114 @@
       "expected_memory_outcome": "ADMIT",
       "actual_memory_outcome": "ADMIT",
       "expected_memory_scope": "GROUP",
-      "actual_memory_scope": "GROUP"
+      "actual_memory_scope": "GROUP",
+      "expected_memory_source_refs": ["memory-source:group-alpha:decision-1"],
+      "actual_memory_source_refs": ["memory-source:group-alpha:decision-1"],
+      "expected_memory_speaker_refs": ["speaker:group-alpha:owner"],
+      "actual_memory_speaker_refs": ["speaker:group-alpha:owner"],
+      "expected_memory_audience_refs": ["audience:group-alpha:members"],
+      "actual_memory_audience_refs": ["audience:group-alpha:members"]
     },
     {
-      "case_id": "statebench-like-revoked-memory",
+      "case_id": "statebench-like-duplicate-cluster-representative",
       "dataset_name": "statebench-like-local-sample",
       "dataset_version": "2026-07-01",
-      "source_ref": "memory-source:group-alpha:revoked-1",
-      "expected_memory_outcome": "REJECT",
+      "source_ref": "message:project-orion:decision:401",
+      "visible_evidence_refs": [
+        "message:project-orion:decision:401",
+        "message:project-orion:decision:409",
+        "memory:project-orion:decision:v2"
+      ],
+      "actual_used_refs": ["message:project-orion:decision:409"],
+      "expected_memory_outcome": "ADMIT",
       "actual_memory_outcome": "ADMIT",
+      "expected_memory_scope": "PROJECT",
+      "actual_memory_scope": "PROJECT",
+      "duplicate_memory_refs": [
+        "message:project-orion:decision:401",
+        "message:project-orion:decision:409",
+        "memory:project-orion:decision:v2"
+      ],
+      "actual_memory_dedupe_refs": [
+        "message:project-orion:decision:401",
+        "message:project-orion:decision:409",
+        "memory:project-orion:decision:v2"
+      ],
+      "duplicate_memory_cluster_refs": [
+        "message:project-orion:decision:401",
+        "message:project-orion:decision:409",
+        "memory:project-orion:decision:v2"
+      ],
+      "actual_memory_cluster_refs": [
+        "message:project-orion:decision:401",
+        "message:project-orion:decision:409",
+        "memory:project-orion:decision:v2"
+      ],
+      "expected_memory_cluster_representative_refs": [
+        "message:project-orion:decision:409"
+      ],
+      "actual_memory_cluster_representative_refs": [
+        "message:project-orion:decision:409"
+      ],
+      "expected_memory_cluster_tie_break_refs": [
+        "tie-break:project-orion:newest-source-visible"
+      ],
+      "actual_memory_cluster_tie_break_refs": [
+        "tie-break:project-orion:newest-source-visible"
+      ],
+      "memory_deduped": true,
+      "memory_duplicate_clustered": true,
+      "memory_cluster_representative_selected": true
+    },
+    {
+      "case_id": "locomo-like-confidence-threshold-reject",
+      "dataset_name": "locomo-like-local-sample",
+      "dataset_version": "2026-07-01",
+      "source_ref": "message:group-gamma:ambiguous-owner:51",
+      "expected_memory_outcome": "REJECT",
+      "actual_memory_outcome": "REJECT",
       "expected_memory_scope": "GROUP",
       "actual_memory_scope": "GROUP",
-      "revoked_memory_used": true,
-      "expected_failure_class": "MEMORY_POLLUTION",
-      "actual_failure_class": "MEMORY_POLLUTION"
+      "low_confidence_memory_refs": ["candidate:group-gamma:ambiguous-owner"],
+      "expected_memory_confidence_bucket": "LOW",
+      "actual_memory_confidence_bucket": "LOW",
+      "expected_memory_confidence_threshold_refs": [
+        "confidence-threshold:memory-admission:group-low-reject"
+      ],
+      "actual_memory_confidence_threshold_refs": [
+        "confidence-threshold:memory-admission:group-low-reject"
+      ],
+      "low_confidence_memory_rejected": true,
+      "memory_confidence_calibrated": true,
+      "memory_confidence_threshold_applied": true
+    },
+    {
+      "case_id": "statebench-like-policy-revocation-window",
+      "dataset_name": "statebench-like-local-sample",
+      "dataset_version": "2026-07-01",
+      "source_ref": "policy-source:tenant-retention:v1",
+      "visible_evidence_refs": [
+        "policy-source:tenant-retention:v1",
+        "policy-source:tenant-retention:revocation-2026-07"
+      ],
+      "expected_memory_outcome": "REJECT",
+      "actual_memory_outcome": "REJECT",
+      "expected_memory_scope": "TENANT",
+      "actual_memory_scope": "TENANT",
+      "policy_memory_refs": ["candidate:policy-memory:tenant-retention:v1"],
+      "governed_policy_source_refs": ["policy-source:tenant-retention:v1"],
+      "governed_policy_allowlist_refs": ["policy-source:tenant-retention:v1"],
+      "actual_governed_policy_allowlist_refs": ["policy-source:tenant-retention:v1"],
+      "revoked_policy_source_refs": ["policy-source:tenant-retention:v1"],
+      "expected_policy_revocation_window_refs": [
+        "revocation-window:tenant-retention:v1:closed-2026-07"
+      ],
+      "actual_policy_revocation_window_refs": [
+        "revocation-window:tenant-retention:v1:closed-2026-07"
+      ],
+      "policy_memory_rejected": true,
+      "policy_source_revocation_detected": true,
+      "policy_revocation_window_recorded": true
     }
   ]
 }

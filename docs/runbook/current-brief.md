@@ -101,6 +101,9 @@ Agent Gateway / UX
 - 已补 fixture-only memory admission deeper hardening：multi-source duplicate
   clustering、confidence calibration、procedural memory migration/invalidation、
   governed policy source allowlist/revocation、review retry/escalation/redrive。
+- 已补 STATE-Bench / LoCoMO 风格 memory adapter alignment：duplicate cluster
+  representative selection / tie-break refs、confidence threshold refs、
+  governed policy revocation window refs，并保持 fixture-only。
 - 已补 fixture-only state-diff report coverage：approved action outcome refs、
   expected-vs-actual state changes、missing execution refs、incomplete report、
   unauthorized mutation detection。
@@ -110,8 +113,8 @@ Agent Gateway / UX
   cancel propagation incomplete、replay event incomplete。
 - 已补 current EvalReport generation / baseline refresh review CLI，生成当前报告和
   baseline refresh review artifact，默认不覆盖 baseline。
-- 下一段优先做 memory admission adapter alignment，其次做 Tool / MCP security
-  adapter alignment 或 current-report / baseline lifecycle deeper hardening。
+- 下一段优先做 Tool / MCP security adapter alignment，其次做 current-report /
+  baseline lifecycle deeper hardening 或 memory threshold/policy calibration。
 
 ## 工作规则
 

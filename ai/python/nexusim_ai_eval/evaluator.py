@@ -259,12 +259,15 @@ def _memory_scores(case: EvalCase) -> tuple[dict[str, float], str]:
     overgeneralization_score = 0.0 if case.memory_overgeneralized else 1.0
     dedupe_score = _memory_dedupe_score(case)
     duplicate_cluster_score = _memory_duplicate_cluster_score(case)
+    cluster_representative_score = _memory_cluster_representative_score(case)
     low_confidence_score = _memory_low_confidence_score(case)
     confidence_calibration_score = _memory_confidence_calibration_score(case)
+    confidence_threshold_score = _memory_confidence_threshold_score(case)
     skill_bound_score = _memory_skill_bound_score(case)
     procedural_migration_score = _memory_procedural_migration_score(case)
     policy_source_score = _memory_policy_source_score(case)
     policy_governance_score = _memory_policy_source_governance_score(case)
+    policy_revocation_window_score = _memory_policy_revocation_window_score(case)
     review_timeout_score = _memory_review_timeout_score(case)
     review_redrive_score = _memory_review_redrive_score(case)
     profile_review_score = 1.0
@@ -288,10 +291,14 @@ def _memory_scores(case: EvalCase) -> tuple[dict[str, float], str]:
         failure = "MEMORY_DUPLICATE_NOT_DEDUPED"
     elif duplicate_cluster_score == 0.0:
         failure = "MEMORY_DUPLICATE_CLUSTER_MISSING"
+    elif cluster_representative_score == 0.0:
+        failure = "MEMORY_CLUSTER_REPRESENTATIVE_MISSING"
     elif low_confidence_score == 0.0:
         failure = "MEMORY_LOW_CONFIDENCE_ADMITTED"
     elif confidence_calibration_score == 0.0:
         failure = "MEMORY_CONFIDENCE_CALIBRATION_MISSING"
+    elif confidence_threshold_score == 0.0:
+        failure = "MEMORY_CONFIDENCE_THRESHOLD_MISSING"
     elif skill_bound_score == 0.0:
         failure = "MEMORY_SKILL_BOUND_MISSING"
     elif procedural_migration_score == 0.0:
@@ -303,6 +310,8 @@ def _memory_scores(case: EvalCase) -> tuple[dict[str, float], str]:
             failure = "MEMORY_POLICY_SOURCE_REVOKED"
         else:
             failure = "MEMORY_POLICY_SOURCE_NOT_ALLOWED"
+    elif policy_revocation_window_score == 0.0:
+        failure = "MEMORY_POLICY_REVOCATION_WINDOW_MISSING"
     elif overgeneralization_score == 0.0:
         failure = "MEMORY_OVERGENERALIZED"
     elif profile_review_score == 0.0:
@@ -328,12 +337,15 @@ def _memory_scores(case: EvalCase) -> tuple[dict[str, float], str]:
             "memory_overgeneralization_score": overgeneralization_score,
             "memory_dedupe_score": dedupe_score,
             "memory_duplicate_cluster_score": duplicate_cluster_score,
+            "memory_cluster_representative_score": cluster_representative_score,
             "memory_low_confidence_score": low_confidence_score,
             "memory_confidence_calibration_score": confidence_calibration_score,
+            "memory_confidence_threshold_score": confidence_threshold_score,
             "memory_skill_bound_score": skill_bound_score,
             "memory_procedural_migration_score": procedural_migration_score,
             "memory_policy_source_score": policy_source_score,
             "memory_policy_source_governance_score": policy_governance_score,
+            "memory_policy_revocation_window_score": policy_revocation_window_score,
             "memory_review_timeout_score": review_timeout_score,
             "memory_review_redrive_score": review_redrive_score,
             "memory_profile_review_score": profile_review_score,
@@ -799,6 +811,24 @@ def _memory_duplicate_cluster_score(case: EvalCase) -> float:
     return 1.0 if expected_cluster.issubset(set(case.actual_memory_cluster_refs)) else 0.0
 
 
+def _memory_cluster_representative_score(case: EvalCase) -> float:
+    expected_representatives = set(case.expected_memory_cluster_representative_refs)
+    expected_tie_breaks = set(case.expected_memory_cluster_tie_break_refs)
+    if not expected_representatives and not expected_tie_breaks:
+        return 1.0
+    if not case.memory_cluster_representative_selected:
+        return 0.0
+    if expected_representatives and not expected_representatives.issubset(
+        set(case.actual_memory_cluster_representative_refs)
+    ):
+        return 0.0
+    if expected_tie_breaks and not expected_tie_breaks.issubset(
+        set(case.actual_memory_cluster_tie_break_refs)
+    ):
+        return 0.0
+    return 1.0
+
+
 def _memory_low_confidence_score(case: EvalCase) -> float:
     if not case.low_confidence_memory_refs:
         return 1.0
@@ -815,6 +845,19 @@ def _memory_confidence_calibration_score(case: EvalCase) -> float:
     return (
         1.0
         if case.expected_memory_confidence_bucket == case.actual_memory_confidence_bucket
+        else 0.0
+    )
+
+
+def _memory_confidence_threshold_score(case: EvalCase) -> float:
+    expected_thresholds = set(case.expected_memory_confidence_threshold_refs)
+    if not expected_thresholds:
+        return 1.0
+    if not case.memory_confidence_threshold_applied:
+        return 0.0
+    return (
+        1.0
+        if expected_thresholds.issubset(set(case.actual_memory_confidence_threshold_refs))
         else 0.0
     )
 
@@ -882,6 +925,19 @@ def _memory_policy_source_governance_score(case: EvalCase) -> float:
     return 1.0
 
 
+def _memory_policy_revocation_window_score(case: EvalCase) -> float:
+    expected_windows = set(case.expected_policy_revocation_window_refs)
+    if not expected_windows:
+        return 1.0
+    if not case.policy_revocation_window_recorded:
+        return 0.0
+    return (
+        1.0
+        if expected_windows.issubset(set(case.actual_policy_revocation_window_refs))
+        else 0.0
+    )
+
+
 def _memory_review_timeout_score(case: EvalCase) -> float:
     if not case.review_timeout_refs:
         return 1.0
@@ -919,6 +975,11 @@ def _replay_bundle(case: EvalCase, failure_class: str) -> ReplayBundle:
         "actual_citation_refs": case.actual_citation_refs,
         "actual_memory_source_refs": case.actual_memory_source_refs,
         "actual_memory_supersedes_refs": case.actual_memory_supersedes_refs,
+        "actual_memory_cluster_representative_refs": (
+            case.actual_memory_cluster_representative_refs
+        ),
+        "actual_memory_confidence_threshold_refs": case.actual_memory_confidence_threshold_refs,
+        "actual_policy_revocation_window_refs": case.actual_policy_revocation_window_refs,
         "actual_source_ranking_refs": case.actual_source_ranking_refs,
         "actual_lane_redrive_refs": case.actual_lane_redrive_refs,
         "actual_snippet_citation_refs": case.actual_snippet_citation_refs,

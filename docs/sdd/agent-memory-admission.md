@@ -374,13 +374,16 @@ Implemented checks:
 - procedural memory migration/invalidation refs must be recorded when a skill version changes;
 - governed policy sources must pass allowlist checks and revoked policy sources must reject;
 - review retry, escalation and redrive refs must be present when review recovery is expected.
+- STATE-Bench/LoCoMO-style adapter samples must preserve duplicate cluster
+  representative refs, deterministic tie-break refs, confidence threshold refs
+  and governed policy revocation window refs.
 
 Remaining hardening:
 
-- duplicate cluster tie-break strategy and cluster representative selection;
-- confidence calibration across real open dataset adapters;
+- confidence calibration and threshold tuning across larger public memory
+  datasets;
 - procedural memory migration policy beyond fixture refs;
-- governed policy source revocation windows and audit retention;
+- governed policy source revocation-window retention policy beyond fixture refs;
 - review retry backoff and operator queue policy.
 
 ## 17. References

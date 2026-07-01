@@ -123,12 +123,32 @@ class AgentEvalTraceTests(unittest.TestCase):
                         "message:project:decision:duplicate",
                         "memory:project:decision:v1",
                     ],
+                    "expected_memory_cluster_representative_refs": [
+                        "message:project:decision:duplicate"
+                    ],
+                    "actual_memory_cluster_representative_refs": [
+                        "message:project:decision:duplicate"
+                    ],
+                    "expected_memory_cluster_tie_break_refs": [
+                        "tie-break:project:newest-visible"
+                    ],
+                    "actual_memory_cluster_tie_break_refs": [
+                        "tie-break:project:newest-visible"
+                    ],
                     "memory_duplicate_clustered": True,
+                    "memory_cluster_representative_selected": True,
                     "low_confidence_memory_refs": ["candidate:memory:uncertain"],
                     "low_confidence_memory_rejected": True,
                     "expected_memory_confidence_bucket": "LOW",
                     "actual_memory_confidence_bucket": "LOW",
+                    "expected_memory_confidence_threshold_refs": [
+                        "confidence-threshold:low-reject"
+                    ],
+                    "actual_memory_confidence_threshold_refs": [
+                        "confidence-threshold:low-reject"
+                    ],
                     "memory_confidence_calibrated": True,
+                    "memory_confidence_threshold_applied": True,
                     "expected_memory_skill_refs": ["skill:memory:procedure:v2"],
                     "actual_memory_skill_refs": ["skill:memory:procedure:v2"],
                     "expected_procedural_migration_refs": ["procedure:migrate:v1-to-v2"],
@@ -142,6 +162,13 @@ class AgentEvalTraceTests(unittest.TestCase):
                     "governed_policy_allowlist_refs": ["policy-source:retention:v2"],
                     "actual_governed_policy_allowlist_refs": ["policy-source:retention:v2"],
                     "policy_memory_rejected": True,
+                    "expected_policy_revocation_window_refs": [
+                        "revocation-window:retention:v2:open"
+                    ],
+                    "actual_policy_revocation_window_refs": [
+                        "revocation-window:retention:v2:open"
+                    ],
+                    "policy_revocation_window_recorded": True,
                     "review_timeout_refs": ["review-timeout:memory:project"],
                     "memory_review_timeout_recorded": True,
                     "expected_review_retry_refs": ["review-retry:memory:project"],
@@ -168,10 +195,24 @@ class AgentEvalTraceTests(unittest.TestCase):
             ["message:project:decision:duplicate", "memory:project:decision:v1"],
         )
         self.assertTrue(trace.memory_candidate.duplicate_clustered)
+        self.assertEqual(
+            trace.memory_candidate.cluster_representative_refs,
+            ["message:project:decision:duplicate"],
+        )
+        self.assertEqual(
+            trace.memory_candidate.cluster_tie_break_refs,
+            ["tie-break:project:newest-visible"],
+        )
+        self.assertTrue(trace.memory_candidate.cluster_representative_selected)
         self.assertEqual(trace.memory_candidate.low_confidence_refs, ["candidate:memory:uncertain"])
         self.assertTrue(trace.memory_candidate.low_confidence_rejected)
         self.assertEqual(trace.memory_candidate.confidence_bucket, "LOW")
         self.assertTrue(trace.memory_candidate.confidence_calibrated)
+        self.assertEqual(
+            trace.memory_candidate.confidence_threshold_refs,
+            ["confidence-threshold:low-reject"],
+        )
+        self.assertTrue(trace.memory_candidate.confidence_threshold_applied)
         self.assertEqual(trace.memory_candidate.skill_refs, ["skill:memory:procedure:v2"])
         self.assertEqual(
             trace.memory_candidate.procedural_migration_refs,
@@ -189,6 +230,11 @@ class AgentEvalTraceTests(unittest.TestCase):
             ["policy-source:retention:v2"],
         )
         self.assertTrue(trace.memory_candidate.policy_memory_rejected)
+        self.assertEqual(
+            trace.memory_candidate.policy_revocation_window_refs,
+            ["revocation-window:retention:v2:open"],
+        )
+        self.assertTrue(trace.memory_candidate.policy_revocation_window_recorded)
         self.assertEqual(trace.memory_candidate.review_timeout_refs, ["review-timeout:memory:project"])
         self.assertTrue(trace.memory_candidate.review_timeout_recorded)
         self.assertEqual(trace.memory_candidate.review_retry_refs, ["review-retry:memory:project"])

@@ -93,7 +93,7 @@ class StateBenchLikeMemoryAdapter:
     def to_eval_case(self, payload: dict[str, Any]) -> dict[str, Any]:
         case_id = _required(payload, "case_id")
         source_ref = str(payload.get("source_ref", f"memory-source:{case_id}"))
-        return {
+        case = {
             "case_id": case_id,
             "dataset_name": str(payload.get("dataset_name", "statebench-like-memory")),
             "dataset_version": str(payload.get("dataset_version", "local-skeleton")),
@@ -114,6 +114,17 @@ class StateBenchLikeMemoryAdapter:
             "expected_failure_class": str(payload.get("expected_failure_class", "")),
             "actual_failure_class": str(payload.get("actual_failure_class", "")),
         }
+        _copy_optional_string_fields(
+            payload,
+            case,
+            [
+                "expected_memory_confidence_bucket",
+                "actual_memory_confidence_bucket",
+            ],
+        )
+        _copy_optional_list_fields(payload, case, _STATEBENCH_MEMORY_LIST_FIELDS)
+        _copy_optional_bool_fields(payload, case, _STATEBENCH_MEMORY_BOOL_FIELDS)
+        return case
 
 
 def adapter_by_name(adapter_name: str) -> DatasetAdapter:
@@ -143,6 +154,70 @@ def suite_from_adapter_cases(
     }
 
 
+_STATEBENCH_MEMORY_LIST_FIELDS = [
+    "expected_memory_source_refs",
+    "actual_memory_source_refs",
+    "expected_memory_speaker_refs",
+    "actual_memory_speaker_refs",
+    "expected_memory_audience_refs",
+    "actual_memory_audience_refs",
+    "expected_memory_supersedes_refs",
+    "actual_memory_supersedes_refs",
+    "stale_memory_refs",
+    "duplicate_memory_refs",
+    "actual_memory_dedupe_refs",
+    "duplicate_memory_cluster_refs",
+    "actual_memory_cluster_refs",
+    "expected_memory_cluster_representative_refs",
+    "actual_memory_cluster_representative_refs",
+    "expected_memory_cluster_tie_break_refs",
+    "actual_memory_cluster_tie_break_refs",
+    "low_confidence_memory_refs",
+    "expected_memory_confidence_threshold_refs",
+    "actual_memory_confidence_threshold_refs",
+    "expected_memory_skill_refs",
+    "actual_memory_skill_refs",
+    "expected_procedural_migration_refs",
+    "actual_procedural_migration_refs",
+    "expected_procedural_invalidation_refs",
+    "actual_procedural_invalidation_refs",
+    "policy_memory_refs",
+    "governed_policy_source_refs",
+    "governed_policy_allowlist_refs",
+    "actual_governed_policy_allowlist_refs",
+    "revoked_policy_source_refs",
+    "expected_policy_revocation_window_refs",
+    "actual_policy_revocation_window_refs",
+    "review_timeout_refs",
+    "expected_review_retry_refs",
+    "actual_review_retry_refs",
+    "expected_review_escalation_refs",
+    "actual_review_escalation_refs",
+    "expected_review_redrive_refs",
+    "actual_review_redrive_refs",
+]
+
+_STATEBENCH_MEMORY_BOOL_FIELDS = [
+    "stale_memory_used",
+    "memory_overgeneralized",
+    "memory_deduped",
+    "memory_duplicate_clustered",
+    "memory_cluster_representative_selected",
+    "low_confidence_memory_rejected",
+    "memory_confidence_calibrated",
+    "memory_confidence_threshold_applied",
+    "procedural_memory_migrated",
+    "procedural_memory_invalidated",
+    "policy_memory_rejected",
+    "policy_source_revocation_detected",
+    "policy_revocation_window_recorded",
+    "memory_review_timeout_recorded",
+    "memory_review_redrive_recorded",
+    "profile_aggregate_review_required",
+    "profile_aggregate_reviewed",
+]
+
+
 def _required(payload: dict[str, Any], field_name: str) -> str:
     value = str(payload.get(field_name, "")).strip()
     if not value:
@@ -166,3 +241,33 @@ def _string_map(value: Any, field_name: str) -> dict[str, str]:
     if not isinstance(value, dict):
         raise ValueError(f"{field_name} must be an object")
     return {str(key).strip(): str(nested).strip() for key, nested in value.items()}
+
+
+def _copy_optional_list_fields(
+    source: dict[str, Any],
+    target: dict[str, Any],
+    field_names: list[str],
+) -> None:
+    for field_name in field_names:
+        if field_name in source:
+            target[field_name] = _string_list(source[field_name], field_name)
+
+
+def _copy_optional_bool_fields(
+    source: dict[str, Any],
+    target: dict[str, Any],
+    field_names: list[str],
+) -> None:
+    for field_name in field_names:
+        if field_name in source:
+            target[field_name] = bool(source[field_name])
+
+
+def _copy_optional_string_fields(
+    source: dict[str, Any],
+    target: dict[str, Any],
+    field_names: list[str],
+) -> None:
+    for field_name in field_names:
+        if field_name in source:
+            target[field_name] = str(source[field_name])

@@ -14,29 +14,27 @@
 
 ## 当前优先顺序
 
-1. Memory admission adapter alignment：基础 group/project/profile、supersedes、
-   revocation、stale facts、speaker attribution、audience scope、overgeneralization、
-   duplicate dedupe、low-confidence rejection、procedural skill binding、
-   policy-like memory rejection、review timeout、multi-source duplicate clustering、
-   confidence calibration、procedural memory migration / invalidation、governed policy
-   source allowlist / revocation 和 review retry / escalation / redrive fixture 已落地；
-   后续只保留 STATE-Bench / LoCoMo 风格 adapter sample 对齐、
-   duplicate cluster representative tie-break strategy、confidence calibration thresholds
-   和 governed policy revocation window metadata。
-2. Tool / MCP security deeper hardening：基础 malicious tool description、unsafe
+1. Tool / MCP security deeper hardening：基础 malicious tool description、unsafe
    output、MCP provider provenance、sandbox-only provider、tool argument schema
    mismatch、tool-selection attack、prepare expiry 和多候选 provider selection fixture
    已落地；后续只保留 MCPSecBench / MCP-Bench adapter 对齐、capability lease matrix 和
    provider attestation metadata。
-3. ContextPackage / EvidencePack adapter alignment：基础 source coverage、temporal
+2. ContextPackage / EvidencePack adapter alignment：基础 source coverage、temporal
    version、conflict marker、permission abstain、memory-vs-current-source precedence、
    unsafe context quarantine、context-budget retention、retrieval lane unavailable、
    source ranking、lane redrive、snippet-level citation repair、cross-tenant denied-lane
    和 taint propagation fixture 已落地；后续只保留公开 RAG adapter alignment、
    rerank confidence thresholds、denied-lane audit metadata 和 taint vocabulary 对齐。
-4. Current-report / baseline lifecycle deeper hardening：当前 EvalReport 生成和 baseline
+3. Current-report / baseline lifecycle deeper hardening：当前 EvalReport 生成和 baseline
    refresh review CLI 已落地；后续只保留多 suite report matrix、baseline refresh approval
    manifest 和 report retention metadata。
+4. Memory admission calibration：基础 group/project/profile、supersedes、revocation、
+   stale facts、speaker attribution、audience scope、overgeneralization、duplicate dedupe、
+   duplicate cluster representative / tie-break、low-confidence rejection、confidence
+   threshold、procedural skill binding、policy-like memory rejection、governed policy
+   revocation window、review timeout 和 review redrive fixture / adapter sample 已落地；
+   后续只保留更大公开 memory 数据集上的 confidence threshold tuning、policy
+   revocation-window retention policy 和 review backoff / operator queue policy。
 5. Runtime-control deeper hardening：基础 cancel/resume/replay 正向 fixture 和 missing
    checkpoint、cancel propagation incomplete、replay event incomplete 负向 fixture 已落地；
    后续只保留 checkpoint version drift、workflow wakeup race 和 replay bundle lineage

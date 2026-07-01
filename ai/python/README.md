@@ -98,6 +98,7 @@ python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_state_diff_hardening_scenarios.json
 python ai/python/scripts/run_agent_eval_current_report.py ai/python/fixtures/agent_eval/synthetic_core_scenarios.json --report-out .tmp-agent-current-report.json --baseline ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json --review-out .tmp-agent-baseline-review.json --force
 python ai/python/scripts/run_agent_dataset_adapter.py --run ai/python/fixtures/agent_eval/adapter_samples/qasper_like_rag_samples.json
+python ai/python/scripts/run_agent_dataset_adapter.py --run ai/python/fixtures/agent_eval/adapter_samples/statebench_like_memory_samples.json
 python ai/python/scripts/run_agent_eval_regression.py ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json
 python -m ruff check ai/python
 python -m mypy ai/python/nexusim_ai_common ai/python/nexusim_ai_memory ai/python/nexusim_ai_eval ai/python/scripts
@@ -215,6 +216,10 @@ and review timeout metadata.
 The memory admission deeper hardening fixture covers multi-source duplicate
 clustering, confidence calibration, procedural memory migration/invalidation,
 governed policy source allowlist/revocation and review retry/escalation/redrive.
+The STATE-Bench/LoCoMO-like memory adapter sample now preserves fixture-only
+alignment metadata for duplicate cluster representative selection and
+tie-break refs, confidence threshold refs and governed policy revocation
+window refs.
 The state-diff fixture covers approved action outcome reports, expected-vs-actual
 state changes, execution refs, audit refs, incomplete reports and unauthorized
 mutation detection.

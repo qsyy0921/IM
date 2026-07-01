@@ -86,13 +86,16 @@ ALLOWED_FAILURE_CLASSES = {
     "MEMORY_REVIEW_MISSING",
     "MEMORY_DUPLICATE_NOT_DEDUPED",
     "MEMORY_DUPLICATE_CLUSTER_MISSING",
+    "MEMORY_CLUSTER_REPRESENTATIVE_MISSING",
     "MEMORY_LOW_CONFIDENCE_ADMITTED",
     "MEMORY_CONFIDENCE_CALIBRATION_MISSING",
+    "MEMORY_CONFIDENCE_THRESHOLD_MISSING",
     "MEMORY_SKILL_BOUND_MISSING",
     "MEMORY_PROCEDURAL_MIGRATION_MISSING",
     "MEMORY_POLICY_SOURCE_MISSING",
     "MEMORY_POLICY_SOURCE_NOT_ALLOWED",
     "MEMORY_POLICY_SOURCE_REVOKED",
+    "MEMORY_POLICY_REVOCATION_WINDOW_MISSING",
     "MEMORY_REVIEW_TIMEOUT_MISSING",
     "MEMORY_REVIEW_REDRIVE_MISSING",
     "MEMORY_SCOPE_VIOLATION",
@@ -181,9 +184,15 @@ class EvalCase:
     actual_memory_dedupe_refs: list[str] = field(default_factory=list)
     duplicate_memory_cluster_refs: list[str] = field(default_factory=list)
     actual_memory_cluster_refs: list[str] = field(default_factory=list)
+    expected_memory_cluster_representative_refs: list[str] = field(default_factory=list)
+    actual_memory_cluster_representative_refs: list[str] = field(default_factory=list)
+    expected_memory_cluster_tie_break_refs: list[str] = field(default_factory=list)
+    actual_memory_cluster_tie_break_refs: list[str] = field(default_factory=list)
     low_confidence_memory_refs: list[str] = field(default_factory=list)
     expected_memory_confidence_bucket: str = ""
     actual_memory_confidence_bucket: str = ""
+    expected_memory_confidence_threshold_refs: list[str] = field(default_factory=list)
+    actual_memory_confidence_threshold_refs: list[str] = field(default_factory=list)
     expected_memory_skill_refs: list[str] = field(default_factory=list)
     actual_memory_skill_refs: list[str] = field(default_factory=list)
     expected_procedural_migration_refs: list[str] = field(default_factory=list)
@@ -195,6 +204,8 @@ class EvalCase:
     governed_policy_allowlist_refs: list[str] = field(default_factory=list)
     actual_governed_policy_allowlist_refs: list[str] = field(default_factory=list)
     revoked_policy_source_refs: list[str] = field(default_factory=list)
+    expected_policy_revocation_window_refs: list[str] = field(default_factory=list)
+    actual_policy_revocation_window_refs: list[str] = field(default_factory=list)
     review_timeout_refs: list[str] = field(default_factory=list)
     expected_review_retry_refs: list[str] = field(default_factory=list)
     actual_review_retry_refs: list[str] = field(default_factory=list)
@@ -260,12 +271,15 @@ class EvalCase:
     memory_overgeneralized: bool = False
     memory_deduped: bool = False
     memory_duplicate_clustered: bool = False
+    memory_cluster_representative_selected: bool = False
     low_confidence_memory_rejected: bool = False
     memory_confidence_calibrated: bool = False
+    memory_confidence_threshold_applied: bool = False
     procedural_memory_migrated: bool = False
     procedural_memory_invalidated: bool = False
     policy_memory_rejected: bool = False
     policy_source_revocation_detected: bool = False
+    policy_revocation_window_recorded: bool = False
     memory_review_timeout_recorded: bool = False
     memory_review_redrive_recorded: bool = False
     profile_aggregate_review_required: bool = False
@@ -562,6 +576,22 @@ def _eval_case(payload: dict[str, Any], index: int) -> EvalCase:
         actual_memory_cluster_refs=_string_list(
             payload.get("actual_memory_cluster_refs", []), "actual_memory_cluster_refs"
         ),
+        expected_memory_cluster_representative_refs=_string_list(
+            payload.get("expected_memory_cluster_representative_refs", []),
+            "expected_memory_cluster_representative_refs",
+        ),
+        actual_memory_cluster_representative_refs=_string_list(
+            payload.get("actual_memory_cluster_representative_refs", []),
+            "actual_memory_cluster_representative_refs",
+        ),
+        expected_memory_cluster_tie_break_refs=_string_list(
+            payload.get("expected_memory_cluster_tie_break_refs", []),
+            "expected_memory_cluster_tie_break_refs",
+        ),
+        actual_memory_cluster_tie_break_refs=_string_list(
+            payload.get("actual_memory_cluster_tie_break_refs", []),
+            "actual_memory_cluster_tie_break_refs",
+        ),
         low_confidence_memory_refs=_string_list(
             payload.get("low_confidence_memory_refs", []), "low_confidence_memory_refs"
         ),
@@ -571,6 +601,14 @@ def _eval_case(payload: dict[str, Any], index: int) -> EvalCase:
         actual_memory_confidence_bucket=_string(
             payload.get("actual_memory_confidence_bucket", "")
         ).upper(),
+        expected_memory_confidence_threshold_refs=_string_list(
+            payload.get("expected_memory_confidence_threshold_refs", []),
+            "expected_memory_confidence_threshold_refs",
+        ),
+        actual_memory_confidence_threshold_refs=_string_list(
+            payload.get("actual_memory_confidence_threshold_refs", []),
+            "actual_memory_confidence_threshold_refs",
+        ),
         expected_memory_skill_refs=_string_list(
             payload.get("expected_memory_skill_refs", []), "expected_memory_skill_refs"
         ),
@@ -608,6 +646,14 @@ def _eval_case(payload: dict[str, Any], index: int) -> EvalCase:
         ),
         revoked_policy_source_refs=_string_list(
             payload.get("revoked_policy_source_refs", []), "revoked_policy_source_refs"
+        ),
+        expected_policy_revocation_window_refs=_string_list(
+            payload.get("expected_policy_revocation_window_refs", []),
+            "expected_policy_revocation_window_refs",
+        ),
+        actual_policy_revocation_window_refs=_string_list(
+            payload.get("actual_policy_revocation_window_refs", []),
+            "actual_policy_revocation_window_refs",
         ),
         review_timeout_refs=_string_list(
             payload.get("review_timeout_refs", []), "review_timeout_refs"
@@ -790,6 +836,10 @@ def _eval_case(payload: dict[str, Any], index: int) -> EvalCase:
         memory_duplicate_clustered=_bool(
             payload.get("memory_duplicate_clustered", False), "memory_duplicate_clustered"
         ),
+        memory_cluster_representative_selected=_bool(
+            payload.get("memory_cluster_representative_selected", False),
+            "memory_cluster_representative_selected",
+        ),
         low_confidence_memory_rejected=_bool(
             payload.get("low_confidence_memory_rejected", False),
             "low_confidence_memory_rejected",
@@ -797,6 +847,10 @@ def _eval_case(payload: dict[str, Any], index: int) -> EvalCase:
         memory_confidence_calibrated=_bool(
             payload.get("memory_confidence_calibrated", False),
             "memory_confidence_calibrated",
+        ),
+        memory_confidence_threshold_applied=_bool(
+            payload.get("memory_confidence_threshold_applied", False),
+            "memory_confidence_threshold_applied",
         ),
         procedural_memory_migrated=_bool(
             payload.get("procedural_memory_migrated", False),
@@ -812,6 +866,10 @@ def _eval_case(payload: dict[str, Any], index: int) -> EvalCase:
         policy_source_revocation_detected=_bool(
             payload.get("policy_source_revocation_detected", False),
             "policy_source_revocation_detected",
+        ),
+        policy_revocation_window_recorded=_bool(
+            payload.get("policy_revocation_window_recorded", False),
+            "policy_revocation_window_recorded",
         ),
         memory_review_timeout_recorded=_bool(
             payload.get("memory_review_timeout_recorded", False),

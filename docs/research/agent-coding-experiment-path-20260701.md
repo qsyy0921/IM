@@ -152,6 +152,9 @@ Slice 0 covers:
   duplicate clustering, confidence calibration, procedural memory
   migration/invalidation, governed policy source allowlist/revocation and review
   retry/escalation/redrive.
+- STATE-Bench/LoCoMO-like memory adapter alignment coverage for duplicate
+  cluster representative selection and tie-break refs, confidence threshold refs
+  and governed policy revocation window refs.
 - fixture-only state-diff report coverage for approved action outcome refs,
   expected-vs-actual state changes, missing execution refs, incomplete reports
   and unauthorized mutation detection.
@@ -250,6 +253,9 @@ fixtures, call models or connect to backend services.
 - MemoryCandidate deeper hardening metadata for duplicate clusters, calibrated
   confidence, procedural migration/invalidation, policy-source governance and
   review retry/escalation/redrive.
+- MemoryCandidate adapter alignment metadata for cluster representative refs,
+  deterministic tie-break refs, confidence threshold refs and policy revocation
+  window refs.
 - StateDiffReport execution, approval, prepare, state-change and audit refs.
 - StateDiffReport hardening metadata for repair/redrive, partial execution,
   idempotency and compensating action refs.
@@ -359,6 +365,9 @@ Evaluator tests:
 - memory admission deeper hardening scoring rejects missing duplicate clusters,
   confidence calibration mismatch, missing procedural migration, revoked policy
   sources and missing review redrive refs.
+- memory admission adapter alignment scoring rejects missing duplicate cluster
+  representative refs, missing confidence threshold refs and missing policy
+  revocation window refs.
 - AgentRun trace includes context, memory, tool, workflow, runtime-control and
   failure steps.
 
@@ -417,6 +426,7 @@ python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_state_diff_hardening_scenarios.json
 python ai/python/scripts/run_agent_eval_current_report.py ai/python/fixtures/agent_eval/synthetic_core_scenarios.json --report-out .tmp-agent-current-report.json --baseline ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json --review-out .tmp-agent-baseline-review.json --force
 python ai/python/scripts/run_agent_dataset_adapter.py --run ai/python/fixtures/agent_eval/adapter_samples/qasper_like_rag_samples.json
+python ai/python/scripts/run_agent_dataset_adapter.py --run ai/python/fixtures/agent_eval/adapter_samples/statebench_like_memory_samples.json
 python ai/python/scripts/run_agent_eval_regression.py ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json
 ```
 
@@ -440,12 +450,12 @@ git status --short --branch --untracked-files=all
 
 Recommended next slices:
 
-1. Align memory admission deeper hardening with STATE-Bench/LoCoMo-style
-   adapter samples after the synthetic gates are stable.
+1. Align Tool / MCP security hardening with MCPSecBench / MCP-Bench-style
+   adapter samples while staying fixture-only.
 2. Add multi-suite current-report and baseline-refresh lifecycle metadata once
    the next fixture families are stable.
-3. Align Tool / MCP security hardening with MCPSecBench / MCP-Bench-style
-   adapter samples while staying fixture-only.
+3. Tune memory admission confidence thresholds and governed policy revocation
+   windows against larger public memory datasets, still without production data.
 
 Each slice must keep the same isolation rule until an ADR explicitly promotes a
 backend integration boundary.

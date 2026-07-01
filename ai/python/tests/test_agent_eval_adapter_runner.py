@@ -31,9 +31,36 @@ class AgentEvalAdapterRunnerTests(unittest.TestCase):
         report = run_adapter_payload(payload)
 
         self.assertEqual(report.status, "PASS")
-        self.assertEqual(report.case_count, 2)
-        self.assertEqual(report.failure_distribution, {"PASS": 2})
+        self.assertEqual(report.case_count, 4)
+        self.assertEqual(report.failure_distribution, {"PASS": 4})
         self.assertEqual(report.eval_run.adapter_versions, ["statebench-like-memory-adapter-v1"])
+        self.assertEqual(report.aggregate_scores["memory_cluster_representative_score"], 1.0)
+        self.assertEqual(report.aggregate_scores["memory_confidence_threshold_score"], 1.0)
+        self.assertEqual(report.aggregate_scores["memory_policy_revocation_window_score"], 1.0)
+
+    def test_memory_sample_conversion_preserves_alignment_metadata(self) -> None:
+        payload = json.loads((SAMPLES_DIR / "statebench_like_memory_samples.json").read_text())
+
+        suite = convert_adapter_payload(payload)
+        representative_case = suite["cases"][1]
+        threshold_case = suite["cases"][2]
+        revocation_case = suite["cases"][3]
+
+        self.assertEqual(
+            representative_case["actual_memory_cluster_representative_refs"],
+            ["message:project-orion:decision:409"],
+        )
+        self.assertTrue(representative_case["memory_cluster_representative_selected"])
+        self.assertEqual(
+            threshold_case["actual_memory_confidence_threshold_refs"],
+            ["confidence-threshold:memory-admission:group-low-reject"],
+        )
+        self.assertTrue(threshold_case["memory_confidence_threshold_applied"])
+        self.assertEqual(
+            revocation_case["actual_policy_revocation_window_refs"],
+            ["revocation-window:tenant-retention:v1:closed-2026-07"],
+        )
+        self.assertTrue(revocation_case["policy_revocation_window_recorded"])
 
     def test_rejects_backend_fields_before_conversion(self) -> None:
         payload = json.loads((SAMPLES_DIR / "qasper_like_rag_samples.json").read_text())

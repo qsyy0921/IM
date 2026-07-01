@@ -67,6 +67,49 @@ class AgentEvalAdapterTests(unittest.TestCase):
         self.assertEqual(report.status, "PASS")
         self.assertEqual(report.aggregate_scores["memory_scope_score"], 1.0)
 
+    def test_memory_adapter_preserves_alignment_refs(self) -> None:
+        adapter = StateBenchLikeMemoryAdapter()
+        suite = suite_from_adapter_cases(
+            suite_id="adapter-memory-alignment-suite",
+            adapter=adapter,
+            cases=[
+                {
+                    "case_id": "memory-alignment-case",
+                    "source_ref": "message:project:decision:2",
+                    "expected_memory_scope": "PROJECT",
+                    "actual_memory_scope": "PROJECT",
+                    "expected_memory_cluster_representative_refs": [
+                        "message:project:decision:2"
+                    ],
+                    "actual_memory_cluster_representative_refs": [
+                        "message:project:decision:2"
+                    ],
+                    "memory_cluster_representative_selected": True,
+                    "expected_memory_confidence_threshold_refs": [
+                        "confidence-threshold:project-medium-review"
+                    ],
+                    "actual_memory_confidence_threshold_refs": [
+                        "confidence-threshold:project-medium-review"
+                    ],
+                    "memory_confidence_threshold_applied": True,
+                    "expected_policy_revocation_window_refs": [
+                        "revocation-window:project-policy:v1:closed"
+                    ],
+                    "actual_policy_revocation_window_refs": [
+                        "revocation-window:project-policy:v1:closed"
+                    ],
+                    "policy_revocation_window_recorded": True,
+                }
+            ],
+        )
+
+        report = run_eval_suite(suite)
+
+        self.assertEqual(report.status, "PASS")
+        self.assertEqual(report.aggregate_scores["memory_cluster_representative_score"], 1.0)
+        self.assertEqual(report.aggregate_scores["memory_confidence_threshold_score"], 1.0)
+        self.assertEqual(report.aggregate_scores["memory_policy_revocation_window_score"], 1.0)
+
 
 if __name__ == "__main__":
     unittest.main()

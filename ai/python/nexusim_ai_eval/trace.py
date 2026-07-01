@@ -81,8 +81,11 @@ class MemoryCandidateFixture:
     dedupe_refs: list[str]
     duplicate_cluster_refs: list[str]
     actual_cluster_refs: list[str]
+    cluster_representative_refs: list[str]
+    cluster_tie_break_refs: list[str]
     low_confidence_refs: list[str]
     confidence_bucket: str
+    confidence_threshold_refs: list[str]
     skill_refs: list[str]
     procedural_migration_refs: list[str]
     procedural_invalidation_refs: list[str]
@@ -91,6 +94,7 @@ class MemoryCandidateFixture:
     governed_policy_allowlist_refs: list[str]
     actual_governed_policy_allowlist_refs: list[str]
     revoked_policy_source_refs: list[str]
+    policy_revocation_window_refs: list[str]
     review_timeout_refs: list[str]
     review_retry_refs: list[str]
     review_escalation_refs: list[str]
@@ -100,12 +104,15 @@ class MemoryCandidateFixture:
     overgeneralized: bool
     deduped: bool
     duplicate_clustered: bool
+    cluster_representative_selected: bool
     low_confidence_rejected: bool
     confidence_calibrated: bool
+    confidence_threshold_applied: bool
     procedural_memory_migrated: bool
     procedural_memory_invalidated: bool
     policy_memory_rejected: bool
     policy_source_revocation_detected: bool
+    policy_revocation_window_recorded: bool
     review_timeout_recorded: bool
     review_redrive_recorded: bool
     profile_aggregate_review_required: bool
@@ -340,8 +347,11 @@ def _memory_candidate(case: EvalCase) -> MemoryCandidateFixture | None:
         dedupe_refs=case.actual_memory_dedupe_refs,
         duplicate_cluster_refs=case.duplicate_memory_cluster_refs,
         actual_cluster_refs=case.actual_memory_cluster_refs,
+        cluster_representative_refs=case.actual_memory_cluster_representative_refs,
+        cluster_tie_break_refs=case.actual_memory_cluster_tie_break_refs,
         low_confidence_refs=case.low_confidence_memory_refs,
         confidence_bucket=case.actual_memory_confidence_bucket,
+        confidence_threshold_refs=case.actual_memory_confidence_threshold_refs,
         skill_refs=case.actual_memory_skill_refs,
         procedural_migration_refs=case.actual_procedural_migration_refs,
         procedural_invalidation_refs=case.actual_procedural_invalidation_refs,
@@ -350,6 +360,7 @@ def _memory_candidate(case: EvalCase) -> MemoryCandidateFixture | None:
         governed_policy_allowlist_refs=case.governed_policy_allowlist_refs,
         actual_governed_policy_allowlist_refs=case.actual_governed_policy_allowlist_refs,
         revoked_policy_source_refs=case.revoked_policy_source_refs,
+        policy_revocation_window_refs=case.actual_policy_revocation_window_refs,
         review_timeout_refs=case.review_timeout_refs,
         review_retry_refs=case.actual_review_retry_refs,
         review_escalation_refs=case.actual_review_escalation_refs,
@@ -359,12 +370,15 @@ def _memory_candidate(case: EvalCase) -> MemoryCandidateFixture | None:
         overgeneralized=case.memory_overgeneralized,
         deduped=case.memory_deduped,
         duplicate_clustered=case.memory_duplicate_clustered,
+        cluster_representative_selected=case.memory_cluster_representative_selected,
         low_confidence_rejected=case.low_confidence_memory_rejected,
         confidence_calibrated=case.memory_confidence_calibrated,
+        confidence_threshold_applied=case.memory_confidence_threshold_applied,
         procedural_memory_migrated=case.procedural_memory_migrated,
         procedural_memory_invalidated=case.procedural_memory_invalidated,
         policy_memory_rejected=case.policy_memory_rejected,
         policy_source_revocation_detected=case.policy_source_revocation_detected,
+        policy_revocation_window_recorded=case.policy_revocation_window_recorded,
         review_timeout_recorded=case.memory_review_timeout_recorded,
         review_redrive_recorded=case.memory_review_redrive_recorded,
         profile_aggregate_review_required=case.profile_aggregate_review_required,
@@ -712,6 +726,8 @@ def _memory_step_status(
             set(memory_candidate.actual_cluster_refs)
         ):
             return ("FAIL", "MEMORY_DUPLICATE_CLUSTER_MISSING")
+    if not _memory_cluster_representative_valid(case, memory_candidate):
+        return ("FAIL", "MEMORY_CLUSTER_REPRESENTATIVE_MISSING")
     if memory_candidate.low_confidence_refs:
         if not memory_candidate.low_confidence_rejected or memory_candidate.outcome != "REJECT":
             return ("FAIL", "MEMORY_LOW_CONFIDENCE_ADMITTED")
@@ -720,6 +736,8 @@ def _memory_step_status(
             return ("FAIL", "MEMORY_CONFIDENCE_CALIBRATION_MISSING")
         if case.expected_memory_confidence_bucket != memory_candidate.confidence_bucket:
             return ("FAIL", "MEMORY_CONFIDENCE_CALIBRATION_MISSING")
+    if not _memory_confidence_threshold_valid(case, memory_candidate):
+        return ("FAIL", "MEMORY_CONFIDENCE_THRESHOLD_MISSING")
     expected_skill_refs = set(case.expected_memory_skill_refs)
     if expected_skill_refs and not expected_skill_refs.issubset(set(memory_candidate.skill_refs)):
         return ("FAIL", "MEMORY_SKILL_BOUND_MISSING")
@@ -737,6 +755,8 @@ def _memory_step_status(
         if memory_candidate.revoked_policy_source_refs:
             return ("FAIL", "MEMORY_POLICY_SOURCE_REVOKED")
         return ("FAIL", "MEMORY_POLICY_SOURCE_NOT_ALLOWED")
+    if not _memory_policy_revocation_window_valid(case, memory_candidate):
+        return ("FAIL", "MEMORY_POLICY_REVOCATION_WINDOW_MISSING")
     if memory_candidate.overgeneralized:
         return ("FAIL", "MEMORY_OVERGENERALIZED")
     if (
@@ -751,6 +771,49 @@ def _memory_step_status(
     if case.expected_memory_outcome != memory_candidate.outcome:
         return ("FAIL", "MEMORY_CONFLICT")
     return ("PASS", "")
+
+
+def _memory_cluster_representative_valid(
+    case: EvalCase,
+    memory_candidate: MemoryCandidateFixture,
+) -> bool:
+    expected_representatives = set(case.expected_memory_cluster_representative_refs)
+    expected_tie_breaks = set(case.expected_memory_cluster_tie_break_refs)
+    if not expected_representatives and not expected_tie_breaks:
+        return True
+    if not memory_candidate.cluster_representative_selected:
+        return False
+    if expected_representatives and not expected_representatives.issubset(
+        set(memory_candidate.cluster_representative_refs)
+    ):
+        return False
+    return not expected_tie_breaks or expected_tie_breaks.issubset(
+        set(memory_candidate.cluster_tie_break_refs)
+    )
+
+
+def _memory_confidence_threshold_valid(
+    case: EvalCase,
+    memory_candidate: MemoryCandidateFixture,
+) -> bool:
+    expected_thresholds = set(case.expected_memory_confidence_threshold_refs)
+    if not expected_thresholds:
+        return True
+    if not memory_candidate.confidence_threshold_applied:
+        return False
+    return expected_thresholds.issubset(set(memory_candidate.confidence_threshold_refs))
+
+
+def _memory_policy_revocation_window_valid(
+    case: EvalCase,
+    memory_candidate: MemoryCandidateFixture,
+) -> bool:
+    expected_windows = set(case.expected_policy_revocation_window_refs)
+    if not expected_windows:
+        return True
+    if not memory_candidate.policy_revocation_window_recorded:
+        return False
+    return expected_windows.issubset(set(memory_candidate.policy_revocation_window_refs))
 
 
 def _memory_procedural_migration_valid(

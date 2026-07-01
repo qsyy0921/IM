@@ -1,0 +1,448 @@
+{
+  "schema_version": 1,
+  "calibration_id": "agent-memory-admission-calibration-public-export-v1",
+  "retention_policy_ref": "retention:agent-memory-calibration-report:research-v1",
+  "dataset_source_refs": [
+    "dataset-export:statebench:public-memory-calibration:v1",
+    "dataset-export:locomo:public-memory-calibration:v1",
+    "dataset-export:longmemeval:public-memory-calibration:v1",
+    "dataset-export:evermembench:public-memory-calibration:v1",
+    "dataset-export:groupmembench:public-memory-calibration:v1"
+  ],
+  "acceptance_policy": {
+    "min_confidence_exact_match_rate": 0.9,
+    "min_auto_admit_precision": 1.0,
+    "min_reject_recall": 1.0,
+    "min_pollution_block_rate": 1.0,
+    "min_policy_window_match_rate": 1.0,
+    "min_policy_window_retention_match_rate": 1.0,
+    "min_review_backoff_match_rate": 1.0,
+    "min_review_queue_match_rate": 1.0
+  },
+  "confidence_threshold_candidates": [
+    {
+      "threshold_ref": "confidence-threshold:memory-admission:v2:0.40",
+      "minimum_confidence": 0.4,
+      "auto_admit_scopes": ["PERSONAL", "GROUP", "PROJECT"],
+      "review_scopes": ["ORGANIZATION", "TENANT", "POLICY"],
+      "reject_scopes": []
+    },
+    {
+      "threshold_ref": "confidence-threshold:memory-admission:v2:0.55",
+      "minimum_confidence": 0.55,
+      "auto_admit_scopes": ["PERSONAL", "GROUP", "PROJECT"],
+      "review_scopes": ["ORGANIZATION", "TENANT", "POLICY"],
+      "reject_scopes": []
+    },
+    {
+      "threshold_ref": "confidence-threshold:memory-admission:v2:0.60",
+      "minimum_confidence": 0.6,
+      "auto_admit_scopes": ["PERSONAL", "GROUP", "PROJECT"],
+      "review_scopes": ["ORGANIZATION", "TENANT", "POLICY"],
+      "reject_scopes": []
+    },
+    {
+      "threshold_ref": "confidence-threshold:memory-admission:v2:0.75",
+      "minimum_confidence": 0.75,
+      "auto_admit_scopes": ["PERSONAL", "GROUP", "PROJECT"],
+      "review_scopes": ["ORGANIZATION", "TENANT", "POLICY"],
+      "reject_scopes": []
+    }
+  ],
+  "memory_gate_cases": [
+    {
+      "case_id": "groupmembench-export-current-decision-auto-admit",
+      "dataset_name": "groupmembench-public-export-calibration",
+      "dataset_version": "2026-07-public-style-v1",
+      "memory_scope": "GROUP",
+      "candidate_confidence": 0.91,
+      "expected_gate": "AUTO_ADMIT",
+      "source_backed": true,
+      "source_visible": true
+    },
+    {
+      "case_id": "statebench-export-project-conflict-needs-review",
+      "dataset_name": "statebench-public-export-calibration",
+      "dataset_version": "2026-07-public-style-v1",
+      "memory_scope": "PROJECT",
+      "candidate_confidence": 0.82,
+      "expected_gate": "NEEDS_REVIEW",
+      "source_backed": true,
+      "source_visible": true,
+      "conflict_detected": true
+    },
+    {
+      "case_id": "locomo-export-ambiguous-group-owner-reject",
+      "dataset_name": "locomo-public-export-calibration",
+      "dataset_version": "2026-07-public-style-v1",
+      "memory_scope": "GROUP",
+      "candidate_confidence": 0.42,
+      "expected_gate": "REJECT",
+      "source_backed": true,
+      "source_visible": true
+    },
+    {
+      "case_id": "evermembench-export-revoked-policy-source-reject",
+      "dataset_name": "evermembench-public-export-calibration",
+      "dataset_version": "2026-07-public-style-v1",
+      "memory_scope": "TENANT",
+      "candidate_confidence": 0.95,
+      "expected_gate": "REJECT",
+      "source_backed": true,
+      "source_visible": true,
+      "policy_source_revoked": true
+    },
+    {
+      "case_id": "longmemeval-export-personal-preference-auto-admit",
+      "dataset_name": "longmemeval-public-export-calibration",
+      "dataset_version": "2026-07-public-style-v1",
+      "memory_scope": "PERSONAL",
+      "candidate_confidence": 0.66,
+      "expected_gate": "AUTO_ADMIT",
+      "source_backed": true,
+      "source_visible": true
+    },
+    {
+      "case_id": "statebench-export-org-wide-norm-needs-review",
+      "dataset_name": "statebench-public-export-calibration",
+      "dataset_version": "2026-07-public-style-v1",
+      "memory_scope": "ORGANIZATION",
+      "candidate_confidence": 0.88,
+      "expected_gate": "NEEDS_REVIEW",
+      "source_backed": true,
+      "source_visible": true,
+      "candidate_high_risk": true
+    },
+    {
+      "case_id": "groupmembench-export-missing-source-reject",
+      "dataset_name": "groupmembench-public-export-calibration",
+      "dataset_version": "2026-07-public-style-v1",
+      "memory_scope": "GROUP",
+      "candidate_confidence": 0.89,
+      "expected_gate": "REJECT",
+      "source_backed": false,
+      "source_visible": true
+    },
+    {
+      "case_id": "statebench-export-hidden-source-reject",
+      "dataset_name": "statebench-public-export-calibration",
+      "dataset_version": "2026-07-public-style-v1",
+      "memory_scope": "PROJECT",
+      "candidate_confidence": 0.9,
+      "expected_gate": "REJECT",
+      "source_backed": true,
+      "source_visible": false
+    },
+    {
+      "case_id": "longmemeval-export-low-confidence-personal-reject",
+      "dataset_name": "longmemeval-public-export-calibration",
+      "dataset_version": "2026-07-public-style-v1",
+      "memory_scope": "PERSONAL",
+      "candidate_confidence": 0.58,
+      "expected_gate": "REJECT",
+      "source_backed": true,
+      "source_visible": true
+    },
+    {
+      "case_id": "statebench-export-project-fact-auto-admit",
+      "dataset_name": "statebench-public-export-calibration",
+      "dataset_version": "2026-07-public-style-v1",
+      "memory_scope": "PROJECT",
+      "candidate_confidence": 0.76,
+      "expected_gate": "AUTO_ADMIT",
+      "source_backed": true,
+      "source_visible": true
+    },
+    {
+      "case_id": "evermembench-export-policy-scope-needs-review",
+      "dataset_name": "evermembench-public-export-calibration",
+      "dataset_version": "2026-07-public-style-v1",
+      "memory_scope": "POLICY",
+      "candidate_confidence": 0.93,
+      "expected_gate": "NEEDS_REVIEW",
+      "source_backed": true,
+      "source_visible": true
+    },
+    {
+      "case_id": "evermembench-export-tenant-memory-needs-review",
+      "dataset_name": "evermembench-public-export-calibration",
+      "dataset_version": "2026-07-public-style-v1",
+      "memory_scope": "TENANT",
+      "candidate_confidence": 0.72,
+      "expected_gate": "NEEDS_REVIEW",
+      "source_backed": true,
+      "source_visible": true
+    },
+    {
+      "case_id": "groupmembench-export-review-required-group-needs-review",
+      "dataset_name": "groupmembench-public-export-calibration",
+      "dataset_version": "2026-07-public-style-v1",
+      "memory_scope": "GROUP",
+      "candidate_confidence": 0.81,
+      "expected_gate": "NEEDS_REVIEW",
+      "source_backed": true,
+      "source_visible": true,
+      "candidate_high_risk": true
+    },
+    {
+      "case_id": "locomo-export-personal-conflict-needs-review",
+      "dataset_name": "locomo-public-export-calibration",
+      "dataset_version": "2026-07-public-style-v1",
+      "memory_scope": "PERSONAL",
+      "candidate_confidence": 0.9,
+      "expected_gate": "NEEDS_REVIEW",
+      "source_backed": true,
+      "source_visible": true,
+      "conflict_detected": true
+    },
+    {
+      "case_id": "statebench-export-borderline-project-auto-admit",
+      "dataset_name": "statebench-public-export-calibration",
+      "dataset_version": "2026-07-public-style-v1",
+      "memory_scope": "PROJECT",
+      "candidate_confidence": 0.61,
+      "expected_gate": "AUTO_ADMIT",
+      "source_backed": true,
+      "source_visible": true
+    }
+  ],
+  "policy_revocation_window_candidates": [
+    {
+      "window_ref": "revocation-window:policy-source:research-v2:close-after-2h",
+      "close_after_hours": 2,
+      "retention_policy_ref": "retention:governed-policy-source-revocation:research-v2"
+    },
+    {
+      "window_ref": "revocation-window:policy-source:research-v2:close-after-24h",
+      "close_after_hours": 24,
+      "retention_policy_ref": "retention:governed-policy-source-revocation:research-v2"
+    },
+    {
+      "window_ref": "revocation-window:policy-source:research-v2:close-after-48h",
+      "close_after_hours": 48,
+      "retention_policy_ref": "retention:governed-policy-source-revocation:research-v2"
+    }
+  ],
+  "policy_revocation_window_cases": [
+    {
+      "case_id": "policy-window-export-tenant-recent-open",
+      "dataset_name": "evermembench-public-export-calibration",
+      "dataset_version": "2026-07-public-style-v1",
+      "policy_source_ref": "policy-source:public-export:tenant-retention:v1",
+      "revocation_age_hours": 4,
+      "expected_window_state": "OPEN",
+      "expected_retention_policy_ref": "retention:governed-policy-source-revocation:research-v2"
+    },
+    {
+      "case_id": "policy-window-export-project-rule-closed",
+      "dataset_name": "statebench-public-export-calibration",
+      "dataset_version": "2026-07-public-style-v1",
+      "policy_source_ref": "policy-source:public-export:project-rule:v2",
+      "revocation_age_hours": 25,
+      "expected_window_state": "CLOSED",
+      "expected_retention_policy_ref": "retention:governed-policy-source-revocation:research-v2"
+    },
+    {
+      "case_id": "policy-window-export-org-norm-closed",
+      "dataset_name": "groupmembench-public-export-calibration",
+      "dataset_version": "2026-07-public-style-v1",
+      "policy_source_ref": "policy-source:public-export:org-norm:v3",
+      "revocation_age_hours": 50,
+      "expected_window_state": "CLOSED",
+      "expected_retention_policy_ref": "retention:governed-policy-source-revocation:research-v2"
+    },
+    {
+      "case_id": "policy-window-export-locomo-immediate-open",
+      "dataset_name": "locomo-public-export-calibration",
+      "dataset_version": "2026-07-public-style-v1",
+      "policy_source_ref": "policy-source:public-export:personal-rule:v1",
+      "revocation_age_hours": 0,
+      "expected_window_state": "OPEN",
+      "expected_retention_policy_ref": "retention:governed-policy-source-revocation:research-v2"
+    },
+    {
+      "case_id": "policy-window-export-longmemeval-edge-open",
+      "dataset_name": "longmemeval-public-export-calibration",
+      "dataset_version": "2026-07-public-style-v1",
+      "policy_source_ref": "policy-source:public-export:personal-edge:v2",
+      "revocation_age_hours": 23,
+      "expected_window_state": "OPEN",
+      "expected_retention_policy_ref": "retention:governed-policy-source-revocation:research-v2"
+    },
+    {
+      "case_id": "policy-window-export-statebench-edge-closed",
+      "dataset_name": "statebench-public-export-calibration",
+      "dataset_version": "2026-07-public-style-v1",
+      "policy_source_ref": "policy-source:public-export:state-edge:v3",
+      "revocation_age_hours": 24,
+      "expected_window_state": "CLOSED",
+      "expected_retention_policy_ref": "retention:governed-policy-source-revocation:research-v2"
+    },
+    {
+      "case_id": "policy-window-export-groupmembench-late-closed",
+      "dataset_name": "groupmembench-public-export-calibration",
+      "dataset_version": "2026-07-public-style-v1",
+      "policy_source_ref": "policy-source:public-export:group-late:v4",
+      "revocation_age_hours": 47,
+      "expected_window_state": "CLOSED",
+      "expected_retention_policy_ref": "retention:governed-policy-source-revocation:research-v2"
+    },
+    {
+      "case_id": "policy-window-export-evermembench-stale-closed",
+      "dataset_name": "evermembench-public-export-calibration",
+      "dataset_version": "2026-07-public-style-v1",
+      "policy_source_ref": "policy-source:public-export:tenant-stale:v5",
+      "revocation_age_hours": 72,
+      "expected_window_state": "CLOSED",
+      "expected_retention_policy_ref": "retention:governed-policy-source-revocation:research-v2"
+    }
+  ],
+  "review_backoff_candidates": [
+    {
+      "backoff_policy_ref": "review-backoff:memory-admission:research-v2:initial-10m",
+      "initial_delay_minutes": 10,
+      "multiplier": 2.0,
+      "max_attempts": 3,
+      "escalation_after_minutes": 120,
+      "operator_queue_ref": "operator-queue:memory-admission-review:research-v2"
+    },
+    {
+      "backoff_policy_ref": "review-backoff:memory-admission:research-v2:initial-30m",
+      "initial_delay_minutes": 30,
+      "multiplier": 2.0,
+      "max_attempts": 3,
+      "escalation_after_minutes": 120,
+      "operator_queue_ref": "operator-queue:memory-admission-review:research-v2"
+    },
+    {
+      "backoff_policy_ref": "review-backoff:memory-admission:research-v2:escalate-60m",
+      "initial_delay_minutes": 10,
+      "multiplier": 2.0,
+      "max_attempts": 3,
+      "escalation_after_minutes": 60,
+      "operator_queue_ref": "operator-queue:memory-admission-review:research-v2"
+    }
+  ],
+  "review_backoff_cases": [
+    {
+      "case_id": "review-backoff-export-fresh-wait",
+      "dataset_name": "groupmembench-public-export-calibration",
+      "dataset_version": "2026-07-public-style-v1",
+      "review_age_minutes": 5,
+      "review_attempt_count": 0,
+      "review_redrive_required": false,
+      "expected_review_action": "WAIT",
+      "expected_operator_queue_ref": "operator-queue:memory-admission-review:research-v2"
+    },
+    {
+      "case_id": "review-backoff-export-first-retry",
+      "dataset_name": "statebench-public-export-calibration",
+      "dataset_version": "2026-07-public-style-v1",
+      "review_age_minutes": 15,
+      "review_attempt_count": 0,
+      "review_redrive_required": false,
+      "expected_review_action": "RETRY",
+      "expected_operator_queue_ref": "operator-queue:memory-admission-review:research-v2"
+    },
+    {
+      "case_id": "review-backoff-export-second-retry",
+      "dataset_name": "locomo-public-export-calibration",
+      "dataset_version": "2026-07-public-style-v1",
+      "review_age_minutes": 70,
+      "review_attempt_count": 1,
+      "review_redrive_required": false,
+      "expected_review_action": "RETRY",
+      "expected_operator_queue_ref": "operator-queue:memory-admission-review:research-v2"
+    },
+    {
+      "case_id": "review-backoff-export-escalate",
+      "dataset_name": "longmemeval-public-export-calibration",
+      "dataset_version": "2026-07-public-style-v1",
+      "review_age_minutes": 140,
+      "review_attempt_count": 2,
+      "review_redrive_required": false,
+      "expected_review_action": "ESCALATE",
+      "expected_operator_queue_ref": "operator-queue:memory-admission-review:research-v2"
+    },
+    {
+      "case_id": "review-backoff-export-redrive-after-max-attempts",
+      "dataset_name": "evermembench-public-export-calibration",
+      "dataset_version": "2026-07-public-style-v1",
+      "review_age_minutes": 200,
+      "review_attempt_count": 3,
+      "review_redrive_required": true,
+      "expected_review_action": "REDRIVE",
+      "expected_operator_queue_ref": "operator-queue:memory-admission-review:research-v2"
+    },
+    {
+      "case_id": "review-backoff-export-second-wait",
+      "dataset_name": "locomo-public-export-calibration",
+      "dataset_version": "2026-07-public-style-v1",
+      "review_age_minutes": 19,
+      "review_attempt_count": 1,
+      "review_redrive_required": false,
+      "expected_review_action": "WAIT",
+      "expected_operator_queue_ref": "operator-queue:memory-admission-review:research-v2"
+    },
+    {
+      "case_id": "review-backoff-export-second-edge-retry",
+      "dataset_name": "statebench-public-export-calibration",
+      "dataset_version": "2026-07-public-style-v1",
+      "review_age_minutes": 20,
+      "review_attempt_count": 1,
+      "review_redrive_required": false,
+      "expected_review_action": "RETRY",
+      "expected_operator_queue_ref": "operator-queue:memory-admission-review:research-v2"
+    },
+    {
+      "case_id": "review-backoff-export-third-wait",
+      "dataset_name": "groupmembench-public-export-calibration",
+      "dataset_version": "2026-07-public-style-v1",
+      "review_age_minutes": 39,
+      "review_attempt_count": 2,
+      "review_redrive_required": false,
+      "expected_review_action": "WAIT",
+      "expected_operator_queue_ref": "operator-queue:memory-admission-review:research-v2"
+    },
+    {
+      "case_id": "review-backoff-export-third-edge-retry",
+      "dataset_name": "longmemeval-public-export-calibration",
+      "dataset_version": "2026-07-public-style-v1",
+      "review_age_minutes": 40,
+      "review_attempt_count": 2,
+      "review_redrive_required": false,
+      "expected_review_action": "RETRY",
+      "expected_operator_queue_ref": "operator-queue:memory-admission-review:research-v2"
+    },
+    {
+      "case_id": "review-backoff-export-pre-escalation-retry",
+      "dataset_name": "evermembench-public-export-calibration",
+      "dataset_version": "2026-07-public-style-v1",
+      "review_age_minutes": 119,
+      "review_attempt_count": 2,
+      "review_redrive_required": false,
+      "expected_review_action": "RETRY",
+      "expected_operator_queue_ref": "operator-queue:memory-admission-review:research-v2"
+    },
+    {
+      "case_id": "review-backoff-export-escalation-edge",
+      "dataset_name": "statebench-public-export-calibration",
+      "dataset_version": "2026-07-public-style-v1",
+      "review_age_minutes": 120,
+      "review_attempt_count": 1,
+      "review_redrive_required": false,
+      "expected_review_action": "ESCALATE",
+      "expected_operator_queue_ref": "operator-queue:memory-admission-review:research-v2"
+    },
+    {
+      "case_id": "review-backoff-export-max-attempts-escalate",
+      "dataset_name": "groupmembench-public-export-calibration",
+      "dataset_version": "2026-07-public-style-v1",
+      "review_age_minutes": 60,
+      "review_attempt_count": 3,
+      "review_redrive_required": false,
+      "expected_review_action": "ESCALATE",
+      "expected_operator_queue_ref": "operator-queue:memory-admission-review:research-v2"
+    }
+  ]
+}

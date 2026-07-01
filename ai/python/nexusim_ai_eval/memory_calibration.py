@@ -136,6 +136,10 @@ def run_memory_admission_calibration(payload: dict[str, Any]) -> dict[str, Any]:
         _string(payload.get("retention_policy_ref"))
         or DEFAULT_MEMORY_CALIBRATION_RETENTION_POLICY_REF
     )
+    dataset_source_refs = _string_list(
+        payload.get("dataset_source_refs", []),
+        "dataset_source_refs",
+    )
     gate_cases = _memory_gate_cases(payload.get("memory_gate_cases"))
     threshold_candidates = _threshold_candidates(
         payload.get("confidence_threshold_candidates")
@@ -177,7 +181,16 @@ def run_memory_admission_calibration(payload: dict[str, Any]) -> dict[str, Any]:
         "calibration_id": calibration_id,
         "harness_version": HARNESS_VERSION,
         "status": "PASS" if not blocked_reasons else "FAIL",
+        "dataset_source_refs": dataset_source_refs,
         "dataset_refs": _dataset_refs(gate_cases, window_cases, backoff_cases),
+        "dataset_case_counts": _dataset_case_counts(
+            gate_cases,
+            window_cases,
+            backoff_cases,
+        ),
+        "expected_memory_gate_distribution": _expected_memory_gate_distribution(
+            gate_cases
+        ),
         "memory_gate_case_count": len(gate_cases),
         "policy_window_case_count": len(window_cases),
         "review_backoff_case_count": len(backoff_cases),
@@ -507,6 +520,70 @@ def _dataset_refs(
     return sorted(refs)
 
 
+def _dataset_case_counts(
+    gate_cases: list[MemoryGateCase],
+    window_cases: list[PolicyWindowCase],
+    backoff_cases: list[ReviewBackoffCase],
+) -> list[dict[str, Any]]:
+    counts: dict[str, dict[str, Any]] = {}
+    for gate_case in gate_cases:
+        entry = _dataset_count_entry(
+            counts,
+            gate_case.dataset_name,
+            gate_case.dataset_version,
+        )
+        entry["memory_gate_case_count"] = int(entry["memory_gate_case_count"]) + 1
+    for window_case in window_cases:
+        entry = _dataset_count_entry(
+            counts,
+            window_case.dataset_name,
+            window_case.dataset_version,
+        )
+        entry["policy_window_case_count"] = int(entry["policy_window_case_count"]) + 1
+    for backoff_case in backoff_cases:
+        entry = _dataset_count_entry(
+            counts,
+            backoff_case.dataset_name,
+            backoff_case.dataset_version,
+        )
+        entry["review_backoff_case_count"] = int(entry["review_backoff_case_count"]) + 1
+    for entry in counts.values():
+        entry["case_count"] = (
+            int(entry["memory_gate_case_count"])
+            + int(entry["policy_window_case_count"])
+            + int(entry["review_backoff_case_count"])
+        )
+    return sorted(
+        counts.values(),
+        key=lambda entry: (str(entry["dataset_name"]), str(entry["dataset_version"])),
+    )
+
+
+def _dataset_count_entry(
+    counts: dict[str, dict[str, Any]],
+    dataset_name: str,
+    dataset_version: str,
+) -> dict[str, Any]:
+    key = f"{dataset_name}:{dataset_version}"
+    if key not in counts:
+        counts[key] = {
+            "dataset_name": dataset_name,
+            "dataset_version": dataset_version,
+            "memory_gate_case_count": 0,
+            "policy_window_case_count": 0,
+            "review_backoff_case_count": 0,
+            "case_count": 0,
+        }
+    return counts[key]
+
+
+def _expected_memory_gate_distribution(cases: list[MemoryGateCase]) -> dict[str, int]:
+    counts = {"AUTO_ADMIT": 0, "NEEDS_REVIEW": 0, "REJECT": 0}
+    for case in cases:
+        counts[case.expected_gate] += 1
+    return counts
+
+
 def _acceptance_policy(value: Any) -> AcceptancePolicy:
     if value is None:
         value = {}
@@ -729,6 +806,18 @@ def _required_string(payload: dict[str, Any], field_name: str, context: str) -> 
 
 def _string(value: Any) -> str:
     return str(value or "").strip()
+
+
+def _string_list(value: Any, field_name: str) -> list[str]:
+    if not isinstance(value, list):
+        raise ValueError(f"{field_name} must be a list")
+    result: list[str] = []
+    for item in value:
+        normalized = _string(item)
+        if not normalized:
+            raise ValueError(f"{field_name} contains empty item")
+        result.append(normalized)
+    return result
 
 
 def _upper_string_list(value: Any, field_name: str) -> list[str]:

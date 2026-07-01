@@ -113,6 +113,7 @@ ai/python/fixtures/agent_eval/synthetic_memory_admission_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_memory_admission_hardening_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_memory_admission_deeper_hardening_scenarios.json
 ai/python/fixtures/agent_eval/memory_calibration_sample.json
+ai/python/fixtures/agent_eval/memory_calibration_public_export.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_hardening_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_deeper_hardening_scenarios.json
@@ -179,6 +180,9 @@ ai/python/tests/test_agent_eval_*.py
   EverMemBench / GroupMemBench 风格本地样本已覆盖 confidence threshold、
   governed policy revocation-window retention、review backoff/operator queue
   policy recommendation，并输出 blocked promotion reasons。
+- Memory calibration public export：扩展到 5 类 dataset-source refs、15 个
+  gate case、8 个 policy-window case、12 个 review-backoff case，并输出
+  per-dataset case counts。
 - Tool / MCP adapter alignment：ToolSandbox / MCP-Bench 风格 sample 已覆盖
   capability lease refs、capability scope refs、provider attestation refs，
   evaluator 会输出对应低敏 aggregate score，且仍保持 fixture-only。
@@ -196,9 +200,9 @@ ai/python/tests/test_agent_eval_*.py
 
 | 优先级 | 工作 | 输出 |
 | --- | --- | --- |
-| P1 | Memory calibration data expansion | 用更大公开 memory 数据集导出替换当前本地 calibration sample |
+| P1 | ADR promotion readiness review | 判断 isolated Agent skeleton 是否足以提出 ADR 候选 |
 | P2 | ReplayBundle observability hardening review | 如评审要求，继续补 fixture-only taxonomy / trace evidence |
-| P2 | ADR promotion decision | 是否提升 Agent Runtime / Harness、memory admission、ReplayBundle 等契约 |
+| P2 | Memory calibration hardening | 仅在需要时继续追加公开数据集导出或 adapter metadata |
 
 ## 验证状态
 
@@ -213,8 +217,8 @@ ai/python/tests/test_agent_eval_*.py
 - SDD index / research index / architecture index link check
 - 不触碰 proto、schema、migration、production service directory
 
-后续 fixture-only prototype 优先推进 memory calibration data expansion；ReplayBundle
-observability 只在评审要求时继续 hardening。
+后续优先推进 ADR promotion readiness review；ReplayBundle observability 和
+memory calibration 只在评审要求时继续 fixture-only hardening。
 
 ## 历史资料路由
 

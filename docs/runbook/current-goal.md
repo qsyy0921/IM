@@ -57,7 +57,8 @@ Agent / RAG / memory / Python AI Worker / EvidencePack / eval gate，不使用�
 1. 保持 Agent SDD 包为当前设计事实源，不从旧后端压测或单一平台总览继续推进。
 2. 当前实验只能先做公开数据集 adapter、EvalCase / EvalRun / EvalResult、
    ReplayBundle 和 synthetic IM-like fixture；当前已补 ReplayBundle observability
-   skeleton，不接后端或真实 IM 数据。
+   skeleton 和更大的 public-dataset-style memory calibration export，不接后端或
+   真实 IM 数据。
 3. 任何 production proto、schema、migration、service directory、runtime implementation
    都必须等 eval/fixture 证据和 ADR。
 4. 完整模块完成后提交并推送到 `origin/codex/agent-lab`，再 handoff 给主集成线程。
@@ -84,7 +85,8 @@ Agent / RAG / memory / Python AI Worker / EvidencePack / eval gate，不使用�
 
 ## 后续优先级
 
-1. 扩展 memory calibration data 时，只使用更大的公开数据集导出，不接真实 IM 数据。
+1. 评审 isolated Agent eval / replay / memory calibration skeleton 是否可以进入
+   ADR promotion decision；未通过前不提升生产契约。
 2. 对 ReplayBundle / observability skeleton 做 review，如需继续 hardening，只补
    fixture-only taxonomy / trace evidence，不提升生产契约。
 3. 在上述实验通过后，再决定是否把 Agent Runtime / Harness 提升为 ADR、服务级 SDD

@@ -112,6 +112,9 @@ Agent Gateway / UX
   STATE-Bench / LoCoMO / LongMemEval / EverMemBench / GroupMemBench 风格本地样本，
   对 confidence threshold、governed policy revocation-window retention 和
   review backoff/operator queue policy 输出推荐 refs 或 blocked reasons。
+- 已补更大的 public-dataset-style memory calibration export：覆盖 5 类
+  dataset-source refs、15 个 gate case、8 个 policy-window case、12 个
+  review-backoff case，并在报告中输出 per-dataset case counts。
 - 已补 ToolSandbox / MCP-Bench 风格 Tool / MCP adapter alignment：capability
   lease refs、capability scope refs、provider attestation refs，并保持
   fixture-only。
@@ -134,8 +137,8 @@ Agent Gateway / UX
 - 已补 current-report / baseline lifecycle deeper hardening：多 suite report
   matrix、baseline refresh approval manifest 和 report retention metadata，
   支持 synthetic fixture 与 public-dataset-style adapter sample 混合进矩阵。
-- 下一段优先做 memory calibration data expansion 或 ReplayBundle observability
-  review 后续 hardening；仍只允许公开数据集导出和 synthetic fixture。
+- 下一段优先做 ADR promotion readiness review 或 ReplayBundle observability
+  review 后续 hardening；仍不提升生产契约，除非用户明确要求。
 
 ## 工作规则
 

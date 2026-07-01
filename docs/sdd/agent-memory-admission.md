@@ -354,7 +354,8 @@ Current first-stage code is fixture-only and lives under
 `ai/python/fixtures/agent_eval/synthetic_memory_admission_scenarios.json` and
 `ai/python/fixtures/agent_eval/synthetic_memory_admission_hardening_scenarios.json` and
 `ai/python/fixtures/agent_eval/synthetic_memory_admission_deeper_hardening_scenarios.json`
-and `ai/python/fixtures/agent_eval/memory_calibration_sample.json`.
+and `ai/python/fixtures/agent_eval/memory_calibration_sample.json` and
+`ai/python/fixtures/agent_eval/memory_calibration_public_export.json`.
 It does not freeze a production memory event or MemoryCandidate schema.
 
 Implemented checks:
@@ -381,11 +382,13 @@ Implemented checks:
 - memory calibration samples recommend confidence threshold refs, governed
   policy revocation-window retention refs and review backoff/operator queue
   refs, or block promotion with explicit reasons.
+- the public-export calibration fixture expands the sample to
+  STATE-Bench / LoCoMO / LongMemEval / EverMemBench / GroupMemBench-style
+  dataset-source refs, per-dataset case counts, 15 gate cases, 8 policy-window
+  cases and 12 review-backoff cases.
 
 Remaining hardening:
 
-- replacing the local calibration sample with larger exported public memory
-  datasets once dataset ingestion is explicitly prioritized;
 - procedural memory migration policy beyond fixture refs;
 - ADR review for whether calibrated threshold/window/backoff refs should become
   service contracts.

@@ -18,11 +18,18 @@ PYTHON_ROOT = ROOT / "ai" / "python"
 CALIBRATION_SAMPLE = (
     PYTHON_ROOT / "fixtures" / "agent_eval" / "memory_calibration_sample.json"
 )
+CALIBRATION_PUBLIC_EXPORT = (
+    PYTHON_ROOT / "fixtures" / "agent_eval" / "memory_calibration_public_export.json"
+)
 CLI = PYTHON_ROOT / "scripts" / "run_agent_memory_calibration.py"
 
 
 def _sample_payload() -> dict[str, Any]:
     return json.loads(CALIBRATION_SAMPLE.read_text(encoding="utf-8"))
+
+
+def _public_export_payload() -> dict[str, Any]:
+    return json.loads(CALIBRATION_PUBLIC_EXPORT.read_text(encoding="utf-8"))
 
 
 def test_run_memory_calibration_recommends_all_policies() -> None:
@@ -44,6 +51,50 @@ def test_run_memory_calibration_recommends_all_policies() -> None:
     assert report["blocked_promotion_reasons"] == []
     assert report["retention_metadata"]["raw_payload_retained"] is False
     assert report["retention_metadata"]["production_data_retained"] is False
+
+
+def test_public_export_memory_calibration_recommends_all_v2_policies() -> None:
+    report = run_memory_admission_calibration(_public_export_payload())
+
+    assert report["status"] == "PASS"
+    assert report["recommended_confidence_threshold_ref"] == (
+        "confidence-threshold:memory-admission:v2:0.60"
+    )
+    assert report["recommended_policy_revocation_window_ref"] == (
+        "revocation-window:policy-source:research-v2:close-after-24h"
+    )
+    assert report["recommended_review_backoff_policy_ref"] == (
+        "review-backoff:memory-admission:research-v2:initial-10m"
+    )
+    assert report["memory_gate_case_count"] == 15
+    assert report["policy_window_case_count"] == 8
+    assert report["review_backoff_case_count"] == 12
+    assert report["dataset_source_refs"] == [
+        "dataset-export:statebench:public-memory-calibration:v1",
+        "dataset-export:locomo:public-memory-calibration:v1",
+        "dataset-export:longmemeval:public-memory-calibration:v1",
+        "dataset-export:evermembench:public-memory-calibration:v1",
+        "dataset-export:groupmembench:public-memory-calibration:v1",
+    ]
+    assert report["expected_memory_gate_distribution"] == {
+        "AUTO_ADMIT": 4,
+        "NEEDS_REVIEW": 6,
+        "REJECT": 5,
+    }
+    assert {item["dataset_name"] for item in report["dataset_case_counts"]} == {
+        "evermembench-public-export-calibration",
+        "groupmembench-public-export-calibration",
+        "locomo-public-export-calibration",
+        "longmemeval-public-export-calibration",
+        "statebench-public-export-calibration",
+    }
+    statebench_counts = [
+        item
+        for item in report["dataset_case_counts"]
+        if item["dataset_name"] == "statebench-public-export-calibration"
+    ][0]
+    assert statebench_counts["memory_gate_case_count"] == 5
+    assert statebench_counts["case_count"] == 10
 
 
 def test_confidence_threshold_candidates_report_mismatches() -> None:
@@ -171,6 +222,31 @@ def test_memory_calibration_cli_writes_report(tmp_path: Path) -> None:
     assert report_payload["recommended_confidence_threshold_ref"] == (
         stdout_payload["recommended_confidence_threshold_ref"]
     )
+
+
+def test_memory_calibration_cli_runs_public_export(tmp_path: Path) -> None:
+    report_out = tmp_path / "memory-calibration-public-export-report.json"
+
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(CLI),
+            str(CALIBRATION_PUBLIC_EXPORT),
+            "--report-out",
+            str(report_out),
+        ],
+        check=False,
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+    )
+
+    assert completed.returncode == 0
+    stdout_payload = json.loads(completed.stdout)
+    report_payload = json.loads(report_out.read_text(encoding="utf-8"))
+    assert stdout_payload["status"] == "PASS"
+    assert stdout_payload["memory_gate_case_count"] == 15
+    assert report_payload["dataset_case_counts"] == stdout_payload["dataset_case_counts"]
 
 
 def test_memory_calibration_cli_exits_one_for_blocked_calibration(

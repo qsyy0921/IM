@@ -89,6 +89,7 @@ ai/python/fixtures/agent_eval/synthetic_memory_admission_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_memory_admission_hardening_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_memory_admission_deeper_hardening_scenarios.json
 ai/python/fixtures/agent_eval/memory_calibration_sample.json
+ai/python/fixtures/agent_eval/memory_calibration_public_export.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_hardening_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_deeper_hardening_scenarios.json
@@ -186,6 +187,9 @@ Slice 0 covers:
 - fixture-only memory admission calibration coverage for confidence threshold
   recommendation, governed policy revocation-window retention selection and
   review backoff/operator queue recommendation.
+- fixture-only public-export memory calibration coverage for dataset-source
+  refs, per-dataset case counts, 15 memory gate cases, 8 policy-window cases
+  and 12 review-backoff cases.
 - fixture-only state-diff report coverage for approved action outcome refs,
   expected-vs-actual state changes, missing execution refs, incomplete reports
   and unauthorized mutation detection.
@@ -346,6 +350,7 @@ ai/python/fixtures/agent_eval/synthetic_memory_admission_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_memory_admission_hardening_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_memory_admission_deeper_hardening_scenarios.json
 ai/python/fixtures/agent_eval/memory_calibration_sample.json
+ai/python/fixtures/agent_eval/memory_calibration_public_export.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_hardening_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_deeper_hardening_scenarios.json
@@ -354,8 +359,8 @@ ai/python/fixtures/agent_eval/adapter_samples/
 ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json
 ```
 
-These fixtures are intentionally synthetic. They prove harness mechanics before
-adding larger public dataset adapters.
+These fixtures are intentionally synthetic or public-dataset-style exports.
+They prove harness mechanics before any backend integration.
 
 ### 4.7 CLI
 
@@ -526,6 +531,7 @@ python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval
 python ai/python/scripts/run_agent_eval_current_report.py ai/python/fixtures/agent_eval/synthetic_core_scenarios.json --report-out .tmp-agent-current-report.json --baseline ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json --review-out .tmp-agent-baseline-review.json --force
 python ai/python/scripts/run_agent_eval_report_matrix.py ai/python/fixtures/agent_eval/report_matrix_sample.json --matrix-out .tmp-agent-eval-matrix/matrix.json --approval-manifest-out .tmp-agent-eval-matrix/approval-manifest.json --force
 python ai/python/scripts/run_agent_memory_calibration.py ai/python/fixtures/agent_eval/memory_calibration_sample.json --report-out .tmp-agent-memory-calibration-report.json --force
+python ai/python/scripts/run_agent_memory_calibration.py ai/python/fixtures/agent_eval/memory_calibration_public_export.json --report-out .tmp-agent-memory-calibration-public-export-report.json --force
 python ai/python/scripts/run_agent_dataset_adapter.py --run ai/python/fixtures/agent_eval/adapter_samples/qasper_like_rag_samples.json
 python ai/python/scripts/run_agent_dataset_adapter.py --run ai/python/fixtures/agent_eval/adapter_samples/toolsandbox_like_tool_samples.json
 python ai/python/scripts/run_agent_dataset_adapter.py --run ai/python/fixtures/agent_eval/adapter_samples/statebench_like_memory_samples.json
@@ -552,8 +558,8 @@ git status --short --branch --untracked-files=all
 
 Recommended next slices:
 
-1. Expand memory calibration data with larger public-dataset exports, still
-   without real IM data.
+1. Review whether the isolated Agent eval / replay / memory calibration
+   skeleton is ready for ADR promotion decisions.
 2. Review ReplayBundle observability hardening only if the current skeleton
    shows missing taxonomy / trace evidence in fixture-only gates.
 

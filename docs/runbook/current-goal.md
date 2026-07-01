@@ -479,6 +479,25 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
   `current_seq_shard` 漂移。focused checks 已通过：
   `go test ./services/conversation-service/... -count=1` 和
   `go build ./services/conversation-service/cmd/conversation-service`。
+- 2026-07-01 已用 clean commit `6a4673b` 重建 / 归档 / redeploy
+  conversation-service，并完成 `READ_FANOUT + SEQUENCER_BLOCK` 复验：
+  `hotgroup-readseq-clean-6000x1000-256c-6a4673b6-20260701-1635` 使用
+  6000 人、1000 消息、256 sender concurrency、目标 8000 msg/s，实际 conversation
+  mode 确认为 `SEQUENCER_BLOCK`，fanout policy version 为 `4`。该 run 1000/1000
+  SendMessage 成功、无 send error，SendMessage p95 / p99 为
+  `208.507ms / 220.367ms`，实际发压约 `1902.972 msg/s`，message /
+  delivery outbox pending 均为 0、`user_inbox_rows=0`。与上一轮 pool=192 但仍走
+  `LOCAL_ROW_LOCK` 的失败 run 相比，`DeadlineExceeded` 消失，p99 从约 `3000ms`
+  降到约 `220ms`。这说明 6000 人 READ_FANOUT 的首要瓶颈已从
+  `conversation_seq` 单行锁迁移出去。
+- 该 run 已生成低敏报告：
+  `docs/runbook/loadtest/hotgroup/hotgroup-analysis-20260701-readfanout-sequencer-promotion.md`
+  和
+  `docs/runbook/loadtest/hotgroup/hotgroup-metrics-window-20260701-readseq-clean-6000x1000.md`。
+  注意：本轮 Prometheus message latency gauge 仍保留上一轮失败 run 的 2-3s 历史
+  p99，不能直接当作本轮 run-local 延迟；本轮 SendMessage 延迟以
+  `hotgroup-summary.json` 中的 run-local histogram 为准。后续需要把 message-service
+  压测观测改成 run-window delta histogram 或在复压前重置相关进程，避免时间窗口报告误读。
 - HYBRID 诊断档位 1000 人 / 1000 消息 / 400 msg/s 暴露 `delivery_outbox` ready query
   在百万级 per-user outbox 下退化：旧 anti-join blocker 查询每批 500 行约 24s。当前
   delivery outbox relay 已改成 per-conversation frontier ready query，并把本地 worker
@@ -520,6 +539,10 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
 - `loadtest/hotgroup` 已支持多 goroutine / 多 sender 并发发压，分析脚本已把
   `send_concurrency` 和 `achieved_send_rate` 纳入报告。该改动已完成 focused
   checks；容量结论必须等 clean commit 镜像 / runner 复压后再写。
+- conversation-service large group `READ_FANOUT + SEQUENCER_BLOCK` 修复已完成代码、
+  focused checks、Docker 镜像重建 / 归档 / Ubuntu redeploy 和 clean 复压；复压确认
+  `conversation_mode=SEQUENCER_BLOCK`，`repository_allocate_seq` 行锁瓶颈不再是
+  6000 人 READ_FANOUT 的首要问题。
 - 文档同步本轮公开能力或瓶颈变化。
 - 提交并推送到 GitHub。
 
@@ -533,12 +556,12 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
 
 ## 后续优先级
 
-1. 提交 conversation-service large group `READ_FANOUT + SEQUENCER_BLOCK` 修复，
-   重建 / 归档 / redeploy conversation-service Docker 镜像。
-2. 用 6000 人 READ_FANOUT / 1000 message / 256 sender concurrency 重跑 clean
-   复验，确认 `repository_allocate_seq` 长尾是否消失、实际发压是否高于约
-   `308 msg/s`，并检查 conversation stats 中 `conversation_mode=SEQUENCER_BLOCK`。
-3. 若 SendMessage 实际速率提升，再回到 total-subscriber-aware policy 的 6000 人 /
+1. 修正 hotgroup Prometheus / message-service 压测观测口径：避免 message latency
+   gauge 残留上一轮失败 run 的 p99；优先使用 run-window delta histogram、run-local
+   summary 或复压前进程重置。
+2. 用更大消息数重跑 6000 人 READ_FANOUT / SEQUENCER_BLOCK / 256 concurrency 的
+   send-only 稳态复压，避免 1000 message 短 run 启停开销低估真实 QPS 上限。
+3. 回到 total-subscriber-aware policy 的 6000 人 /
    5000 message / 400 subscriber / expected sample=50 场景，确认 signal span 与
    `achieved_send_rate` 的新曲线；若仍超时，再继续定位 timeline-service seq allocator、
    Kafka、delivery projection、delivery_outbox 或 push event pacing。

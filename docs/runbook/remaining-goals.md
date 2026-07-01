@@ -119,13 +119,19 @@
    `hotgroup-pgpoolcap-200x500-diagnose-20260701-1510` 已证明连接耗尽解除：
    500/500 SendMessage 成功、outbox pending 归零、PostgreSQL 日志无新的
    `too many clients already`；但 SendMessage p95 / p99 为
-   `743.89ms / 1024.314ms`，当前瓶颈转为 `send-path-latency`。剩余任务是用
-   clean commit + Prometheus / debug metrics 时间窗口定位 message-service、
-   conversation / policy RPC、timeline seq block cache、PostgreSQL 写入或
-   admission/backpressure 的具体耗时来源。若连接耗尽解除后仍无容量改善，再分析
-   delivery_outbox signal production cadence、Kafka publish / consume cadence 和
-   push event pacing。在取得复压证据前不要继续只提高 sample 阈值，也不要把
-   target rate 当作真实 QPS。
+   `743.89ms / 1024.314ms`，当前瓶颈转为 `send-path-latency`。随后已确认
+   6000 人 `READ_FANOUT` 会话仍走 `LOCAL_ROW_LOCK` 是更直接的 seq 行锁瓶颈。
+   clean commit `6a4673b` 已把 large group 修正为
+   `READ_FANOUT + SEQUENCER_BLOCK`，并完成 Docker 镜像重建 / 归档 / redeploy
+   和 6000 人 / 1000 消息 / 256 concurrency clean 复验：
+   `conversation_mode=SEQUENCER_BLOCK`、1000/1000 发送成功、SendMessage p95 / p99
+   `208.507ms / 220.367ms`、outbox pending=0。剩余任务是修正
+   Prometheus message latency 历史 gauge 误读问题，用更大消息数做稳态 send-only
+   复压，再回到 total-subscriber-aware policy 的 6000 人 / 5000 消息 /
+   400 subscriber 场景，确认 `achieved_send_rate` 与 signal span 新曲线。
+   若仍无容量改善，再分析 delivery_outbox signal production cadence、Kafka
+   publish / consume cadence 和 push event pacing。在取得复压证据前不要继续只提高
+   sample 阈值，也不要把 target rate 当作真实 QPS。
 2. Agent action boundary / repair cases：在 provider replay admin / workflow handoff 已落
    的基础上，继续扩更多需要 proposal / approval / workflow / audit 的 action 与 repair 场景。
 3. Product-active 服务按需推进：workflow、audit、admin、notification、media、vector、

@@ -92,11 +92,14 @@
    cadence；未配置 subscriber threshold 时保留旧采样前置快速路径。同场景
    READ_FANOUT `100:20` 复压读完 100000 条 signal，outbox 和 writer / Redis
    错误路径正常，但 signal span 289.249s、span rate 约 345.723 signals/s，低于
-   `37b575e5` baseline。Redis conversation route cache 代码模块已补，下一步先
-   clean commit、镜像重建 / redeploy 并复压同场景，确认 subscriber-aware cadence
-   是否受重复 route lookup 影响；若仍未突破，不再继续只调静态 sample knob，转向
-   消息速率 / 在线人数感知 dynamic cadence、持久 per-conversation / per-bucket
-   fanout worker，或更强 pull-first 策略。
+   `37b575e5` baseline。clean commit `304383ea` 的 Redis conversation route cache
+   已完成镜像重建 / 归档 / redeploy 和同场景复压：400 subscriber / 5000 消息 /
+   READ_FANOUT `100:20` 下，signal span 降至 146.62s，span rate 提升到约
+   682.034 signals/s，约 1.97x；message / delivery outbox pending=0，writer /
+   Redis subscriber error、queue-full 和 eviction 均为 0。下一步不要继续只调静态
+   sample knob；先补 delivery-consumer debug/metrics scrape，使 route cache hit /
+   miss 可见，再转向消息速率 / 在线人数感知 dynamic cadence、持久
+   per-conversation / per-bucket fanout worker，或更强 pull-first 策略。
 2. Agent action boundary / repair cases：在 provider replay admin / workflow handoff 已落
    的基础上，继续扩更多需要 proposal / approval / workflow / audit 的 action 与 repair 场景。
 3. Product-active 服务按需推进：workflow、audit、admin、notification、media、vector、

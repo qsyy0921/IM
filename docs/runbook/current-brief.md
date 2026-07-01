@@ -299,9 +299,12 @@ brief、loadtest report、development-progress 或 archive。
   条 signal，message / delivery outbox pending=0，writer / Redis route error 为 0；
   但 signal span 为 289.249s，span rate 约 345.723 signals/s，低于 `37b575e5`
   baseline 的 1413.391 signals/s。结论：first-stage subscriber threshold 没有突破
-  drain 瓶颈。本轮已补 Redis conversation route cache 代码模块，针对
-  subscriber-aware cadence 的重复 conversation route lookup：默认短 TTL 为 250ms，
-  只缓存 route lookup 结果并暴露 hit / miss / invalidated 指标；Redis 仍是权威
-  route 状态，失败仍显式计错。下一步先重建镜像 / redeploy / 复压验证该模块，再决定
-  是否转向消息速率 / 在线人数感知 dynamic cadence、持久 per-conversation /
-  per-bucket worker，或更强 pull-first 策略。
+  drain 瓶颈。随后 clean commit `304383ea` 的 Redis conversation route cache 已重建
+  镜像 / 归档 / redeploy 并用同场景复压：400 subscriber / 5000 消息 / READ_FANOUT
+  `100:20` 下，signal span 从 289.249s 降至 146.62s，span rate 从约
+  345.723 提升到约 682.034 signals/s，约 1.97x。message / delivery outbox、
+  writer / Redis subscriber error、queue-full 和 eviction 均为 0。该结果证明重复
+  route lookup 曾是 subscriber-aware 策略的重要成本，但仍未回到 fanout-mode policy
+  baseline 的约 1.4k signals/s。下一步先补 delivery-consumer debug/metrics scrape，
+  让 route cache hit / miss 可见；随后转向消息速率 / 在线人数感知 dynamic cadence、
+  持久 per-conversation / per-bucket worker，或更强 pull-first 策略。

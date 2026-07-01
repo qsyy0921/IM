@@ -338,8 +338,19 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
   `lookup_error`，不假装成功。新增 Prometheus / debug 指标：
   `conversation_route_cache_hit`、`conversation_route_cache_miss`、
   `conversation_route_cache_invalidated`，并已接入 hotgroup metrics-window 脚本。
-  focused checks 已通过；下一步需要 clean commit、镜像重建 / 归档 / 三机 redeploy，
-  再用同场景 subscriber-aware 400 subscriber / 5000 message 复压，确认瓶颈是否迁移。
+  clean commit `304383ea` 已完成镜像重建 / 归档 / Ubuntu Docker redeploy，并用
+  同场景 subscriber-aware 400 subscriber / 5000 message 复压。run
+  `hotgroup-routecache-400sub-5000msg-coordinator-20260701-104942` 使用 6000 人、
+  5000 消息、目标 8000 msg/s、256 sender、400 subscriber、READ_FANOUT、
+  4 个 subscriber shard、READ_FANOUT threshold `100:20`；4 个 shard 共读完
+  100000 条 signal，message / delivery outbox pending=0，writer / Redis subscriber
+  error、queue-full 和 eviction 均为 0。signal span 从上一轮 subscriber-aware
+  baseline 的 `289.249s` 降至 `146.62s`，span rate 从约 `345.723 signals/s`
+  提升到约 `682.034 signals/s`，约 `1.97x`。Prometheus 窗口显示
+  Redis subscriber fanout p95 / p99 降到约 `1.96ms / 6.25ms`，WebSocket
+  delivery notify write p95 / p99 约 `0.241ms / 0.433ms`。注意：当前 Prometheus
+  只 scrape 4 个 ws debug target，delivery-consumer 未暴露 debug 端口，因此
+  route cache hit / miss 在窗口中仍为 0；这是观测缺口，不代表 cache 未生效。
 - HYBRID 诊断档位 1000 人 / 1000 消息 / 400 msg/s 暴露 `delivery_outbox` ready query
   在百万级 per-user outbox 下退化：旧 anti-join blocker 查询每批 500 行约 24s。当前
   delivery outbox relay 已改成 per-conversation frontier ready query，并把本地 worker
@@ -364,7 +375,10 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
   Docker redeploy 和可比复压。复压确认 outbox、writer、Redis route 和 subscriber
   错误路径均正常，但 READ_FANOUT `100:20` 没有改善 drain span。
 - Redis conversation route cache 代码、配置、指标和 hotgroup metrics-window 查询已完成
-  focused 验证；尚未重建镜像 / redeploy / 复压，不宣称吞吐提升。
+  clean commit 镜像重建 / 归档 / redeploy / 可比复压。该模块在 subscriber-aware
+  threshold 场景下把 signal drain rate 提升约 1.97x，但仍未回到 fanout-mode
+  policy baseline 的约 1.4k signals/s，且 delivery-consumer cache hit / miss 仍缺
+  debug scrape 证据。
 - 文档同步本轮公开能力或瓶颈变化。
 - 提交并推送到 GitHub。
 
@@ -378,10 +392,12 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
 
 ## 后续优先级
 
-1. subscriber-aware threshold 已复验且未突破瓶颈；Redis conversation route cache 代码
-   模块已补。下一步先用 clean Docker 复压验证 route lookup 成本是否下降；若仍不突破，
-   不再继续只调静态 sample knob，转向消息速率 / 在线人数感知的 dynamic cadence、
-   持久 per-conversation / per-bucket fanout worker，或更强 pull-first 策略。
+1. subscriber-aware threshold + Redis conversation route cache 已完成 clean Docker
+   复压，证明重复 route lookup 曾是该策略的明显成本来源，但 route cache 后仍未突破
+   fanout-mode policy baseline。下一步先补 delivery-consumer debug/metrics scrape 或
+   低敏 sidecar 观测，使 route cache hit / miss 可见；随后不要继续只调静态 sample
+   knob，转向消息速率 / 在线人数感知的 dynamic cadence、持久 per-conversation /
+   per-bucket fanout worker，或更强 pull-first 策略。
 2. 继续为每轮优化保留 clean commit、Docker 镜像归档、三机部署版本和 Prometheus
    时间窗口，保证压测曲线可复现。
 3. 若 HYBRID 仍要支持千人级 per-user materialized outbox，优先评估显式 frontier /

@@ -1048,3 +1048,82 @@ Interpretation:
 - The next module should be either adaptive cadence control plane / runtime
   policy, or a persistent per-conversation / per-bucket fanout worker. Do not
   keep tuning the same sample knob.
+
+## Subscriber-Aware Cadence And Route Cache Follow-Up
+
+The first subscriber-aware threshold slice used:
+
+```text
+NEXUSIM_PUSH_CONVERSATION_SIGNAL_SAMPLE_EVERY=1
+NEXUSIM_PUSH_CONVERSATION_SIGNAL_SAMPLE_EVERY_READ_FANOUT=10
+NEXUSIM_PUSH_CONVERSATION_SIGNAL_SUBSCRIBER_POLICY_READ_FANOUT=100:20
+```
+
+Baseline artifacts:
+
+```text
+H:\NexusIM\loadtest-results\hotgroup-subscriberpolicy-400sub-5000msg-coordinator-20260701-095457
+H:\NexusIM\loadtest-results\hotgroup-subscriberpolicy-400sub-5000msg-shard*-20260701-095457
+docs/runbook/loadtest/hotgroup/hotgroup-multirunner-analysis-20260701-subscriberpolicy-400sub-5000msg.md
+docs/runbook/loadtest/hotgroup/hotgroup-metrics-window-20260701-subscriberpolicy-400sub-5000msg.md
+```
+
+The baseline reduced emitted signal count to 100000, but signal span regressed:
+
+| metric | value |
+| --- | ---: |
+| emitted conversation signals | 100000 |
+| signal_span_seconds | 289.249 |
+| signal_span_rate | 345.723 signals/s |
+| message_outbox_pending | 0 |
+| delivery_outbox_pending | 0 |
+| writer / Redis errors | 0 |
+| queue-full / slow eviction | 0 |
+
+The route-cache slice added a short-TTL per-process conversation route cache for
+remote Redis route lookup. Redis remains the authoritative route store; the
+cache only reduces repeated `SMembers + GET` work for the same
+`tenant_id + conversation_id`, and local subscribe / unsubscribe / unregister
+explicitly invalidates the cache.
+
+Route-cache artifacts:
+
+```text
+commit=304383ea
+H:\NexusIM\docker-images\archives\nexusim-push-gateway-304383ea-20260701-104000.tar
+H:\NexusIM\loadtest-results\hotgroup-routecache-400sub-5000msg-coordinator-20260701-104942
+H:\NexusIM\loadtest-results\hotgroup-routecache-400sub-5000msg-shard*-20260701-104942
+docs/runbook/loadtest/hotgroup/hotgroup-multirunner-analysis-20260701-routecache-400sub-5000msg.md
+docs/runbook/loadtest/hotgroup/hotgroup-metrics-window-20260701-routecache-400sub-5000msg.md
+```
+
+Results:
+
+| metric | subscriber-aware baseline | route cache |
+| --- | ---: | ---: |
+| emitted conversation signals | 100000 | 100000 |
+| signal_span_seconds | 289.249 | 146.62 |
+| signal_span_rate | 345.723 signals/s | 682.034 signals/s |
+| ratio_vs_baseline | 1.0x | 1.973x |
+| message_outbox_pending | 0 | 0 |
+| delivery_outbox_pending | 0 | 0 |
+| writer / Redis errors | 0 | 0 |
+| queue-full / slow eviction | 0 | 0 |
+| Redis subscriber fanout p95 / p99 window | 1.977 ms / 6.538 ms | 1.96 ms / 6.25 ms |
+| delivery_notify write p95 / p99 window | 0.241 ms / 0.438 ms | 0.241 ms / 0.433 ms |
+
+Interpretation:
+
+- Repeated route lookup was a real cost in the subscriber-aware threshold path;
+  route cache improved the same 100000-signal scenario by about 1.97x.
+- The route-cache result still does not return to the fanout-mode policy
+  baseline of about 1413 signals/s for 200000 signals, so static threshold
+  cadence remains insufficient.
+- The Prometheus report currently scrapes the four WebSocket debug targets.
+  The delivery-consumer process is not exposed as a debug target, so route cache
+  hit / miss counters in the report are still zero. This is an observability gap,
+  not evidence that the cache was unused.
+- Next work should first expose delivery-consumer debug / metrics for route
+  cache attribution, then move to dynamic cadence, persistent conversation
+  fanout workers, or stronger pull-first policy instead of only tuning static
+  sample knobs.

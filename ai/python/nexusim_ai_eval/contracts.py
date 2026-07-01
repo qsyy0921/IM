@@ -154,9 +154,7 @@ def validate_eval_suite(payload: Any) -> list[EvalCase]:
 
     if not isinstance(payload, dict):
         raise ValueError("eval suite must be an object")
-    assert_no_forbidden_fields(payload)
-    _assert_no_forbidden_eval_fields(payload)
-    assert_low_sensitive_value(payload, "agent eval suite")
+    assert_low_sensitive_eval_payload(payload, "agent eval suite")
 
     if payload.get("schema_version") != SCHEMA_VERSION:
         raise ValueError("schema_version must be 1")
@@ -179,6 +177,14 @@ def validate_eval_suite(payload: Any) -> list[EvalCase]:
         seen_ids.add(case.case_id)
         cases.append(case)
     return cases
+
+
+def assert_low_sensitive_eval_payload(payload: Any, context: str) -> None:
+    """Reject raw prompts, backend connectivity and sensitive eval payloads."""
+
+    assert_no_forbidden_fields(payload)
+    _assert_no_forbidden_eval_fields(payload)
+    assert_low_sensitive_value(payload, context)
 
 
 def suite_id(payload: dict[str, Any]) -> str:

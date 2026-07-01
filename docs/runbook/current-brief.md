@@ -8,8 +8,8 @@ memory / AI worker / EvidencePack / eval gate 的探索和设计，不承接后�
 - Agent Lab 已从探索稿推进到详细 SDD 包。
 - 当前工作不使用 NexusIM 真实 IM 数据；第一阶段能力验证使用公开数据集和
   synthetic IM-like fixture。
-- 当前 active module：`Agent Platform SDD package` 已完成文档重做；下一建议模块是
-  `Open Dataset Eval Harness / synthetic IM-like fixture`。
+- 当前 active module：`Open Dataset Eval Harness / synthetic IM-like fixture`，已进入
+  backend-isolated Python skeleton 增量实现。
 
 ## 最近收口
 
@@ -76,6 +76,9 @@ Agent Gateway / UX
   fixture 和低敏 EvalReport / ReplayBundle，不接后端服务。
 - 当前骨架已包含 adapter skeleton、AgentRun / AgentStep trace skeleton、
   `synthetic_core_scenarios.json` 和对应 unit / integration / boundary tests。
+- 已补本地 public-dataset-style adapter sample payload、批量转换 / 运行 CLI、
+  EvalReport baseline fixture 和 regression comparison CLI。
+- 下一段优先显式补 fixture-only cancel / resume / replay trace。
 
 ## 工作规则
 

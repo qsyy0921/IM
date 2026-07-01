@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "adapter_name": "statebench_like_memory",
+  "suite_id": "adapter-statebench-like-memory-sample-v1",
+  "cases": [
+    {
+      "case_id": "statebench-like-group-memory",
+      "dataset_name": "statebench-like-local-sample",
+      "dataset_version": "2026-07-01",
+      "source_ref": "memory-source:group-alpha:decision-1",
+      "expected_memory_outcome": "ADMIT",
+      "actual_memory_outcome": "ADMIT",
+      "expected_memory_scope": "GROUP",
+      "actual_memory_scope": "GROUP"
+    },
+    {
+      "case_id": "statebench-like-revoked-memory",
+      "dataset_name": "statebench-like-local-sample",
+      "dataset_version": "2026-07-01",
+      "source_ref": "memory-source:group-alpha:revoked-1",
+      "expected_memory_outcome": "REJECT",
+      "actual_memory_outcome": "ADMIT",
+      "expected_memory_scope": "GROUP",
+      "actual_memory_scope": "GROUP",
+      "revoked_memory_used": true,
+      "expected_failure_class": "MEMORY_POLLUTION",
+      "actual_failure_class": "MEMORY_POLLUTION"
+    }
+  ]
+}

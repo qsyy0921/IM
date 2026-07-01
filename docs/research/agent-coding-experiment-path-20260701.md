@@ -33,6 +33,8 @@ Allowed paths:
 ai/python/nexusim_ai_eval/
 ai/python/fixtures/agent_eval/
 ai/python/scripts/run_agent_eval_fixture.py
+ai/python/scripts/run_agent_dataset_adapter.py
+ai/python/scripts/run_agent_eval_regression.py
 ai/python/tests/test_agent_eval_*.py
 docs/research/
 docs/sdd/
@@ -57,14 +59,20 @@ Implemented code:
 ```text
 ai/python/nexusim_ai_eval/
   __init__.py
+  adapter_runner.py
   adapters.py
+  comparison.py
   contracts.py
   evaluator.py
   fixtures.py
   trace.py
+ai/python/fixtures/agent_eval/adapter_samples/
+ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json
 ai/python/fixtures/agent_eval/synthetic_first_trio.json
 ai/python/fixtures/agent_eval/synthetic_core_scenarios.json
 ai/python/scripts/run_agent_eval_fixture.py
+ai/python/scripts/run_agent_dataset_adapter.py
+ai/python/scripts/run_agent_eval_regression.py
 ```
 
 Implemented tests:
@@ -74,6 +82,8 @@ ai/python/tests/test_agent_eval_contracts.py
 ai/python/tests/test_agent_eval_evaluator.py
 ai/python/tests/test_agent_eval_integration.py
 ai/python/tests/test_agent_eval_adapters.py
+ai/python/tests/test_agent_eval_adapter_runner.py
+ai/python/tests/test_agent_eval_comparison.py
 ai/python/tests/test_agent_eval_trace.py
 ```
 
@@ -95,6 +105,10 @@ Slice 0 covers:
 - `synthetic_core_scenarios.json` for insufficient evidence, permission leakage,
   memory pollution, unsafe output, approval timeout, provider timeout,
   state-diff mismatch and bounded handoff.
+- local public-dataset-style sample payloads for Qasper-like RAG,
+  ToolSandbox-like tool security and STATE-Bench-like memory;
+- batch adapter conversion / run CLI;
+- EvalReport baseline fixture, regression delta and blocked promotion reasons.
 
 ## 4. Code Architecture
 
@@ -145,7 +159,23 @@ those refs from public datasets.
 Adapters convert already-local, low-sensitive dict payloads into EvalCase JSON.
 They do not download public datasets, call providers or import backend code.
 
-### 4.4 AgentRun Trace
+`nexusim_ai_eval.adapter_runner` owns batch conversion from local adapter sample
+payloads to validated EvalSuite JSON and optional immediate EvalReport runs.
+
+### 4.4 Baseline Comparison
+
+`nexusim_ai_eval.comparison` owns low-sensitive EvalReport comparison:
+
+- suite/status/count deltas;
+- aggregate score deltas;
+- failure distribution deltas;
+- case-level score/status deltas;
+- blocked promotion reasons.
+
+It accepts EvalReport-like JSON only. It does not read production data, execute
+fixtures, call models or connect to backend services.
+
+### 4.5 AgentRun Trace
 
 `nexusim_ai_eval.trace` owns deterministic trace skeletons:
 
@@ -159,7 +189,7 @@ They do not download public datasets, call providers or import backend code.
 The trace is low-sensitive and fixture-only. It records refs, hashes and failure
 classes, not raw prompt, message body or provider output.
 
-### 4.5 Fixtures
+### 4.6 Fixtures
 
 `nexusim_ai_eval.fixtures` loads and validates JSON suites. The fixture kind must
 be `synthetic_im_like`.
@@ -169,18 +199,34 @@ Current fixture:
 ```text
 ai/python/fixtures/agent_eval/synthetic_first_trio.json
 ai/python/fixtures/agent_eval/synthetic_core_scenarios.json
+ai/python/fixtures/agent_eval/adapter_samples/
+ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json
 ```
 
 These fixtures are intentionally synthetic. They prove harness mechanics before
 adding larger public dataset adapters.
 
-### 4.6 CLI
+### 4.7 CLI
 
 `ai/python/scripts/run_agent_eval_fixture.py` runs one suite and emits a
 low-sensitive report:
 
 ```powershell
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_first_trio.json
+```
+
+`ai/python/scripts/run_agent_dataset_adapter.py` converts local adapter samples
+or runs the converted suite:
+
+```powershell
+python ai/python/scripts/run_agent_dataset_adapter.py --run ai/python/fixtures/agent_eval/adapter_samples/qasper_like_rag_samples.json
+```
+
+`ai/python/scripts/run_agent_eval_regression.py` compares baseline and current
+EvalReport-like JSON:
+
+```powershell
+python ai/python/scripts/run_agent_eval_regression.py ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json
 ```
 
 Exit codes:
@@ -212,6 +258,8 @@ Evaluator tests:
 - replay fails if side effect is reexecuted.
 - expected negative scenarios pass when the expected failure is detected.
 - adapter skeletons generate valid EvalCase suites.
+- adapter runner converts local sample payloads and rejects sensitive fields.
+- baseline comparison blocks aggregate and case-level regressions.
 - AgentRun trace includes context, memory, tool, workflow and failure steps.
 
 ### 5.2 Integration Tests
@@ -242,6 +290,8 @@ Focused gate:
 python -m pytest ai/python/tests/test_agent_eval_contracts.py ai/python/tests/test_agent_eval_evaluator.py ai/python/tests/test_agent_eval_integration.py -q
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_first_trio.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_core_scenarios.json
+python ai/python/scripts/run_agent_dataset_adapter.py --run ai/python/fixtures/agent_eval/adapter_samples/qasper_like_rag_samples.json
+python ai/python/scripts/run_agent_eval_regression.py ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json
 ```
 
 Full Python gate for this workspace:
@@ -264,12 +314,11 @@ git status --short --branch --untracked-files=all
 
 Recommended next slices:
 
-1. Add concrete local sample payloads for Qasper/HotpotQA-like, ToolSandbox-like
-   and STATE-Bench-like adapters.
-2. Add baseline comparison between EvalReports.
-3. Add cancel/resume/replay explicit fixture steps.
-4. Add malicious MCP/tool description fixture pack.
-5. Add state-diff report section for fake action execution.
+1. Add cancel/resume/replay explicit fixture steps.
+2. Add malicious MCP/tool description fixture pack.
+3. Add richer memory pollution / revocation / supersedes fixture coverage.
+4. Add state-diff report section for fake action execution.
+5. Add current-report generation script for baseline refresh review.
 
 Each slice must keep the same isolation rule until an ADR explicitly promotes a
 backend integration boundary.

@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "adapter_name": "qasper_like_rag",
+  "suite_id": "adapter-qasper-like-rag-sample-v1",
+  "cases": [
+    {
+      "case_id": "qasper-like-cited-answer",
+      "dataset_name": "qasper-like-local-sample",
+      "dataset_version": "2026-07-01",
+      "input_refs": ["qasper:question:1"],
+      "evidence_refs": ["qasper:paper:1:chunk:abstract"],
+      "expected_citation_refs": ["qasper:paper:1:chunk:abstract"]
+    },
+    {
+      "case_id": "qasper-like-abstain",
+      "dataset_name": "qasper-like-local-sample",
+      "dataset_version": "2026-07-01",
+      "input_refs": ["qasper:question:2"],
+      "evidence_refs": [],
+      "expected_failure_class": "INSUFFICIENT_EVIDENCE",
+      "actual_failure_class": "INSUFFICIENT_EVIDENCE",
+      "actual_abstained": true
+    }
+  ]
+}

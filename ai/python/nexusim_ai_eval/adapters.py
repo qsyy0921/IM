@@ -116,6 +116,18 @@ class StateBenchLikeMemoryAdapter:
         }
 
 
+def adapter_by_name(adapter_name: str) -> DatasetAdapter:
+    adapters: dict[str, DatasetAdapter] = {
+        QasperLikeRagAdapter.adapter_name: QasperLikeRagAdapter(),
+        ToolSandboxLikeAdapter.adapter_name: ToolSandboxLikeAdapter(),
+        StateBenchLikeMemoryAdapter.adapter_name: StateBenchLikeMemoryAdapter(),
+    }
+    normalized = adapter_name.strip()
+    if normalized not in adapters:
+        raise ValueError(f"unsupported adapter_name: {normalized}")
+    return adapters[normalized]
+
+
 def suite_from_adapter_cases(
     *,
     suite_id: str,

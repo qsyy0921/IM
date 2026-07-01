@@ -97,9 +97,13 @@ EvalResult 和低敏 report 输出。
 
 ```text
 ai/python/nexusim_ai_eval/
+ai/python/fixtures/agent_eval/adapter_samples/
+ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json
 ai/python/fixtures/agent_eval/synthetic_first_trio.json
 ai/python/fixtures/agent_eval/synthetic_core_scenarios.json
 ai/python/scripts/run_agent_eval_fixture.py
+ai/python/scripts/run_agent_dataset_adapter.py
+ai/python/scripts/run_agent_eval_regression.py
 ai/python/tests/test_agent_eval_*.py
 ```
 
@@ -113,13 +117,13 @@ ai/python/tests/test_agent_eval_*.py
 - STATE-Bench/LoCoMo-like memory adapter skeleton。
 - AgentRun / AgentStep trace skeleton。
 - EvidencePack、ContextPackage、MemoryCandidate、ToolIntent fixture refs。
+- 本地 adapter sample payloads 和批量转换 / 运行 CLI。
+- EvalReport baseline comparison、regression delta 和 blocked promotion reasons。
 
 ## 当前未完成项
 
 | 优先级 | 工作 | 输出 |
 | --- | --- | --- |
-| P0 | adapter sample payloads / batch conversion | 给 adapter skeleton 增加本地 sample payload 和批量转换 CLI |
-| P0 | baseline comparison | EvalReport baseline、regression delta、blocked promotion reasons |
 | P0 | fixture-only AgentRun trace hardening | 显式补 cancel / resume / replay 流程 |
 | P1 | ContextPackage / EvidencePack experiment | citation、source coverage、temporal version、conflict marker、permission abstain |
 | P1 | Memory admission eval | scope、speaker attribution、supersedes、revocation、overgeneralization、pollution |
@@ -129,15 +133,18 @@ ai/python/tests/test_agent_eval_*.py
 
 ## 验证状态
 
-本阶段是文档和探索设计阶段，验证以文档检查和引用一致性为主：
+本阶段已进入 backend-isolated Python skeleton。验证以 Python 单元 / 集成 / 边界测试和
+文档一致性为主：
 
+- `python -m pytest ai/python/tests -q`
+- `python -m ruff check ai/python`
+- `python -m mypy ai/python/nexusim_ai_common ai/python/nexusim_ai_memory ai/python/nexusim_ai_eval ai/python/scripts`
+- `.\tools\check-python-ai-worker-boundary.ps1`
 - `git diff --check`
-- heading / reference scan
 - SDD index / research index / architecture index link check
 - 不触碰 proto、schema、migration、production service directory
 
-后续进入 fixture-only prototype 后，再增加单元测试、dataset adapter validation、replay consistency
-和 security fixture gate。
+后续 fixture-only prototype 继续增加 cancel/resume/replay consistency 和 security fixture gate。
 
 ## 历史资料路由
 

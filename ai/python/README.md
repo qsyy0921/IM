@@ -34,12 +34,16 @@ ai/python/
     extractor.py
   nexusim_ai_eval/
     adapters.py
+    adapter_runner.py
+    comparison.py
     contracts.py
     evaluator.py
     fixtures.py
     trace.py
   fixtures/
     agent_eval/
+      adapter_samples/
+      baselines/
       synthetic_first_trio.json
       synthetic_core_scenarios.json
   contracts/
@@ -48,6 +52,8 @@ ai/python/
     run_candidate_worker.py
     run_memory_extraction_candidate.py
     run_agent_eval_fixture.py
+    run_agent_dataset_adapter.py
+    run_agent_eval_regression.py
     validate_contracts.py
   tests/
 ```
@@ -64,6 +70,8 @@ python ai/python/scripts/validate_contracts.py
 python ai/python/scripts/run_candidate_worker.py <low-sensitive-request.json>
 python ai/python/scripts/run_memory_extraction_candidate.py <low-sensitive-message-batch.json>
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_first_trio.json
+python ai/python/scripts/run_agent_dataset_adapter.py --run ai/python/fixtures/agent_eval/adapter_samples/qasper_like_rag_samples.json
+python ai/python/scripts/run_agent_eval_regression.py ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json
 python -m ruff check ai/python
 python -m mypy ai/python/nexusim_ai_common ai/python/nexusim_ai_memory ai/python/nexusim_ai_eval ai/python/scripts
 ```
@@ -128,6 +136,8 @@ The current fixture is:
 ```text
 ai/python/fixtures/agent_eval/synthetic_first_trio.json
 ai/python/fixtures/agent_eval/synthetic_core_scenarios.json
+ai/python/fixtures/agent_eval/adapter_samples/
+ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json
 ```
 
 The first trio covers:
@@ -144,12 +154,19 @@ Qasper/HotpotQA-like RAG, ToolSandbox/tau-bench-like tool cases and
 STATE-Bench/LoCoMo-like memory cases. `nexusim_ai_eval.trace` builds a
 deterministic AgentRun / AgentStep trace skeleton with ContextPackage,
 EvidencePack, MemoryCandidate and ToolIntent fixture refs.
+`nexusim_ai_eval.adapter_runner` converts local public-dataset-style sample
+payloads into validated EvalSuite JSON, and `nexusim_ai_eval.comparison`
+compares low-sensitive EvalReports against a baseline for regression blocking.
 
 Run it directly:
 
 ```powershell
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_first_trio.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_core_scenarios.json
+python ai/python/scripts/run_agent_dataset_adapter.py --run ai/python/fixtures/agent_eval/adapter_samples/qasper_like_rag_samples.json
+python ai/python/scripts/run_agent_dataset_adapter.py --run ai/python/fixtures/agent_eval/adapter_samples/toolsandbox_like_tool_samples.json
+python ai/python/scripts/run_agent_dataset_adapter.py --run ai/python/fixtures/agent_eval/adapter_samples/statebench_like_memory_samples.json
+python ai/python/scripts/run_agent_eval_regression.py ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json
 python -m pytest ai/python/tests/test_agent_eval_contracts.py ai/python/tests/test_agent_eval_evaluator.py ai/python/tests/test_agent_eval_integration.py -q
 ```
 

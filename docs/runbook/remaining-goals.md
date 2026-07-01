@@ -14,24 +14,21 @@
 
 ## 当前优先顺序
 
-1. Adapter sample payloads and batch conversion：给已落地的 Qasper/HotpotQA-like、
-   ToolSandbox/tau-bench-like、STATE-Bench/LoCoMo-like adapter skeleton 增加本地 sample
-   payload 和批量转换 CLI。
-2. EvalReport baseline comparison：比较当前 report 与 baseline，输出 regression delta
-   和 blocked promotion reasons。
-3. Fixture-only AgentRun trace：继续显式建模 cancel / resume / replay。
-4. ContextPackage / EvidencePack 实验：验证 citation、source coverage、temporal
+1. Fixture-only AgentRun trace：继续显式建模 cancel / resume / replay。
+2. ContextPackage / EvidencePack 实验：验证 citation、source coverage、temporal
    version、conflict marker 和 permission abstain。
-5. Memory admission eval：覆盖 group memory、project memory、profile aggregate、
+3. Memory admission eval：覆盖 group memory、project memory、profile aggregate、
    supersedes、revocation、stale facts、speaker attribution、audience scope 和
    overgeneralization。
-6. Tool / MCP security eval：覆盖 malicious tool description、unsafe tool output、
+4. Tool / MCP security eval：覆盖 malicious tool description、unsafe tool output、
    prompt injection、tool-selection attack、MCP server provenance 和 sandbox-only
    high-risk provider。
-7. State-diff eval：基于 Agent-Diff 思路验证 action outcome，而不是只比较 tool call trace。
-8. ReplayBundle / observability：定义低敏 refs、hashes、version metadata、failure
+5. State-diff eval：基于 Agent-Diff 思路验证 action outcome，而不是只比较 tool call trace。
+6. ReplayBundle / observability：定义低敏 refs、hashes、version metadata、failure
    taxonomy 和 trace linkage。
-9. ADR promotion review：只有前述 fixture/eval 有证据后，才评估 Agent Runtime、
+7. Current-report generation / baseline refresh review：把当前 EvalReport 生成和 baseline
+   更新评审脚本化，避免手工复制导致 baseline 漂移。
+8. ADR promotion review：只有前述 fixture/eval 有证据后，才评估 Agent Runtime、
    ContextPackage、MemoryCandidate、Tool prepare、ReplayBundle 是否提升为 ADR / 契约。
 
 ## Dataset Backlog

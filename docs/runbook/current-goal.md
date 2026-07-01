@@ -83,10 +83,9 @@ Agent / RAG / memory / Python AI Worker / EvidencePack / eval gate，不使用�
 
 ## 后续优先级
 
-1. 给现有 adapter skeleton 增加本地 public-dataset-style sample payload 和批量转换 CLI。
-2. 补 EvalReport baseline comparison / regression delta。
-3. 继续扩展 fixture-only AgentRun trace，显式覆盖 cancel / resume / replay。
-4. 做 MCP poisoning、memory pollution、state-diff、approval pause/resume、cancel/replay
+1. 继续扩展 fixture-only AgentRun trace，显式覆盖 cancel / resume / replay。
+2. 做 MCP poisoning、memory pollution、state-diff、approval pause/resume、cancel/replay
    等离线 eval fixture。
+3. 增加 current-report 生成 / baseline refresh review 脚本，避免手工更新 baseline。
 4. 在上述实验通过后，再决定是否把 Agent Runtime / Harness 提升为 ADR、服务级 SDD
    或实际 runtime module。

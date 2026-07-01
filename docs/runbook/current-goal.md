@@ -557,6 +557,19 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
   send-only 曲线已进入 plateau / 长尾区。下一步不再盲目加客户端并发，而是补齐
   SendMessage 阶段指标，区分 command build、admission、conversation context、
   policy check、seq floor、sequencer allocation 和 app-level repository append call。
+- 2026-07-01 已用 process/container 资源口径完成 clean 512 / 768 对照：
+  `hotgroup-procresource-clean-6000x5000-512c-234e8347-20260701-2040` 和
+  `hotgroup-procresource-clean-6000x5000-768c-fa8e475f-20260701-2047`。两轮均为
+  6000 人、5000 消息、READ_FANOUT / SEQUENCER_BLOCK、send-only，均 5000/5000
+  成功且 message / delivery outbox pending=0。512 concurrency 实际约
+  `2464.17 msg/s`、SendMessage p99 `277.387ms`；768 concurrency 实际约
+  `2484.691 msg/s`、p99 `397.149ms`。吞吐只提升约 0.8%，但 p99 明显恶化。
+  768 Prometheus recent metrics 显示 `dependency_read p99` 约 `331.762ms`、
+  `policy_check p99` 约 `285.685ms`、`repository_append_call p99` 约 `49.473ms`、
+  `repository_pool_acquire p99` 约 `16.126ms`。process-resource 口径显示 Ubuntu
+  PostgreSQL / Kafka / policy / message 容器均有压力，但未形成整机 CPU 饱和；
+  当前瓶颈继续指向 policy / dependency read 长尾和服务间等待，而不是本地 seq、
+  repository append 或 PG pool acquire。
 - HYBRID 诊断档位 1000 人 / 1000 消息 / 400 msg/s 暴露 `delivery_outbox` ready query
   在百万级 per-user outbox 下退化：旧 anti-join blocker 查询每批 500 行约 24s。当前
   delivery outbox relay 已改成 per-conversation frontier ready query，并把本地 worker

@@ -312,11 +312,50 @@ The harness becomes a required release gate only after:
 - security fixtures are included;
 - reports link to AgentDefinition / SkillPackage governance.
 
-## 15. References
+## 15. Implementation Slice 0
+
+Current isolated coding slice:
+
+```text
+ai/python/nexusim_ai_eval/
+  contracts.py
+  evaluator.py
+  fixtures.py
+ai/python/fixtures/agent_eval/synthetic_first_trio.json
+ai/python/scripts/run_agent_eval_fixture.py
+ai/python/tests/test_agent_eval_contracts.py
+ai/python/tests/test_agent_eval_evaluator.py
+ai/python/tests/test_agent_eval_integration.py
+```
+
+This slice implements the first offline harness mechanics only. It does not
+call backend services, model providers, databases, Kafka, Redis, OpenSearch,
+MCP providers, workflow-service, action-executor or memory-service.
+
+Implemented checks:
+
+- low-sensitive EvalCase validation;
+- rejection of raw prompt, backend URL and production payload fields;
+- grounded RAG citation and permission leakage scoring;
+- memory admission outcome/scope/revocation scoring;
+- tool poisoning and unsafe output scoring;
+- state-diff mismatch scoring;
+- ReplayBundle completeness and side-effect reexecution rejection;
+- CLI integration on `synthetic_first_trio.json`.
+
+Focused verification:
+
+```powershell
+python -m pytest ai/python/tests/test_agent_eval_contracts.py ai/python/tests/test_agent_eval_evaluator.py ai/python/tests/test_agent_eval_integration.py -q
+python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_first_trio.json
+```
+
+## 16. References
 
 - `docs/sdd/ai-eval-service.md`
 - `docs/sdd/ai-eval-harness.md`
 - `docs/research/agent-open-dataset-eval-plan-20260701.md`
+- `docs/research/agent-coding-experiment-path-20260701.md`
 - ToolSandbox: <https://aclanthology.org/2025.findings-naacl.65/>
 - Agent-Diff: <https://arxiv.org/abs/2602.11224>
 - STATE-Bench:

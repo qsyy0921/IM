@@ -30,6 +30,9 @@
 - `agent-eval-replay-harness.md`
 - `agent-governance-agentops.md`
 
+当前可运行的隔离实验切片在 `ai/python/nexusim_ai_eval/`，路径和测试说明见
+`../research/agent-coding-experiment-path-20260701.md`。
+
 ## 服务 SDD
 
 - `message-service.md`

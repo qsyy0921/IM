@@ -32,11 +32,19 @@ ai/python/
     safety.py
   nexusim_ai_memory/
     extractor.py
+  nexusim_ai_eval/
+    contracts.py
+    evaluator.py
+    fixtures.py
+  fixtures/
+    agent_eval/
+      synthetic_first_trio.json
   contracts/
     worker-candidate.schema.json
   scripts/
     run_candidate_worker.py
     run_memory_extraction_candidate.py
+    run_agent_eval_fixture.py
     validate_contracts.py
   tests/
 ```
@@ -52,8 +60,9 @@ python -m pytest ai/python/tests -q
 python ai/python/scripts/validate_contracts.py
 python ai/python/scripts/run_candidate_worker.py <low-sensitive-request.json>
 python ai/python/scripts/run_memory_extraction_candidate.py <low-sensitive-message-batch.json>
+python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_first_trio.json
 python -m ruff check ai/python
-python -m mypy ai/python/nexusim_ai_common ai/python/nexusim_ai_memory ai/python/scripts
+python -m mypy ai/python/nexusim_ai_common ai/python/nexusim_ai_memory ai/python/nexusim_ai_eval ai/python/scripts
 ```
 
 If the environment already exists, update it instead:
@@ -103,6 +112,36 @@ providers or business writes.
 The RAG, summary and Agent provider smokes prove services can wrap Go-owned
 providers with a Python worker candidate guard while final state, citations,
 approval, audit and failure handling stay in Go.
+
+## Agent Eval Harness
+
+`nexusim_ai_eval` is the first isolated Agent-layer coding experiment. It is a
+deterministic offline harness for public-dataset adapters and synthetic IM-like
+fixtures. It does not call NexusIM backend services, model providers, databases,
+Kafka, Redis, OpenSearch, MCP providers or action executors.
+
+The current fixture is:
+
+```text
+ai/python/fixtures/agent_eval/synthetic_first_trio.json
+```
+
+It covers the first minimal trio:
+
+- grounded RAG citation / permission check;
+- group memory admission scope check;
+- tool poisoning / unsafe output quarantine check.
+
+Run it directly:
+
+```powershell
+python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_first_trio.json
+python -m pytest ai/python/tests/test_agent_eval_contracts.py ai/python/tests/test_agent_eval_evaluator.py ai/python/tests/test_agent_eval_integration.py -q
+```
+
+The CLI output is a low-sensitive `EvalReport` with per-case `ReplayBundle`
+metadata. It includes refs and hashes only; it must not include raw prompts,
+raw provider bodies, secrets, real IM messages or production endpoint fields.
 
 ## Memory Extraction Candidate
 

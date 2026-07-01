@@ -18,6 +18,8 @@
   Agent 平台的迁移和 ownership matrix。
 - `agent-open-dataset-eval-plan-20260701.md`：公开数据集优先的 Agent eval 计划，
   包含 EvalCase / EvalRun / EvalResult / synthetic IM-like fixture 草案。
+- `agent-coding-experiment-path-20260701.md`：隔离式 Agent 编码实验路径，记录
+  `ai/python/nexusim_ai_eval`、fixture、CLI、单元测试、集成测试和后续切片顺序。
 
 ## 存放位置
 

@@ -72,6 +72,8 @@ Agent Gateway / UX
 - 详细设计以 runtime、memory admission、context、tool/MCP、eval/replay、
   governance 六份 SDD 为准。
 - 下一阶段应先做公开数据集和 synthetic fixture，不接真实 IM 数据。
+- 已开始第一段隔离式编码实验：`ai/python/nexusim_ai_eval/`，只运行 synthetic
+  fixture 和低敏 EvalReport / ReplayBundle，不接后端服务。
 
 ## 工作规则
 

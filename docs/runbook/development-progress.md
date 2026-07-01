@@ -13,7 +13,7 @@ Agent / RAG / memory / Python AI Worker / EvidencePack / eval gate
 ```
 
 当前阶段：Agent Exploration Mode -> Agent Platform SDD package 已完成文档重做；
-下一阶段建议进入 Open Dataset Eval Harness / synthetic IM-like fixture。
+Open Dataset Eval Harness / synthetic IM-like fixture 已开始第一段隔离式编码。
 
 当前原则：
 
@@ -38,6 +38,7 @@ Agent / RAG / memory / Python AI Worker / EvidencePack / eval gate
 | `docs/research/agent-current-design-review-20260701.md` | 已完成 | 当前设计评审：方向正确，但平台总览不能单独进入实现 |
 | `docs/research/agent-current-to-target-matrix-20260701.md` | 已完成 | 当前服务到目标 Agent 平台的迁移矩阵 |
 | `docs/research/agent-open-dataset-eval-plan-20260701.md` | 已完成 | 公开数据集优先 eval 计划和 synthetic fixture 草案 |
+| `docs/research/agent-coding-experiment-path-20260701.md` | 已完成 | 隔离式 Agent 编码实验路径、测试矩阵和后续切片顺序 |
 | `docs/sdd/agent-runtime.md` | 已完成 | Runtime / Harness 详细 SDD |
 | `docs/sdd/agent-memory-admission.md` | 已完成 | Memory admission 详细 SDD |
 | `docs/sdd/agent-context-evidencepack.md` | 已完成 | Context / EvidencePack 详细 SDD |
@@ -92,11 +93,23 @@ Agent Platform SDD 覆盖以下能力平面：
 下一步不是接真实 IM 数据，而是为这些能力建立 dataset adapter、EvalCase、AgentRun trace、
 EvalResult 和低敏 report 输出。
 
+已落地第一段可运行代码：
+
+```text
+ai/python/nexusim_ai_eval/
+ai/python/fixtures/agent_eval/synthetic_first_trio.json
+ai/python/scripts/run_agent_eval_fixture.py
+ai/python/tests/test_agent_eval_*.py
+```
+
+该切片只读 synthetic fixture，输出低敏 EvalReport / ReplayBundle，不接后端服务、
+生产数据库、Kafka、Redis、OpenSearch、真实 MCP provider 或模型 provider。
+
 ## 当前未完成项
 
 | 优先级 | 工作 | 输出 |
 | --- | --- | --- |
-| P0 | open dataset eval harness | 基于现有 eval plan 落 fixture-only adapter / EvalCase / EvalRun / EvalResult |
+| P0 | public dataset adapter skeleton | 在已落地 harness 上补 Qasper/HotpotQA、ToolSandbox/tau-bench、STATE-Bench/LoCoMo 风格 adapter skeleton |
 | P0 | fixture-only AgentRun trace | read-only QA、memory admission、approval wait、timeout、cancel/replay、handoff 流程 |
 | P1 | ContextPackage / EvidencePack experiment | citation、source coverage、temporal version、conflict marker、permission abstain |
 | P1 | Memory admission eval | scope、speaker attribution、supersedes、revocation、overgeneralization、pollution |

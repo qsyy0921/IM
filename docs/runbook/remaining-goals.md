@@ -14,9 +14,9 @@
 
 ## 当前优先顺序
 
-1. Open dataset eval harness：基于
-   `docs/research/agent-open-dataset-eval-plan-20260701.md` 选择首批公开数据集并定义
-   dataset adapter、synthetic IM-like fixture、AgentRun trace、EvalResult 和 report 输出。
+1. Public dataset adapter skeleton：在已落地的 `ai/python/nexusim_ai_eval/` 隔离 harness
+   上增加 Qasper/HotpotQA-like RAG、ToolSandbox/tau-bench-like tool、STATE-Bench/LoCoMo-like
+   memory adapter skeleton。
 2. Fixture-only AgentRun trace：建模 read-only QA、group memory admission、
    approval wait、provider timeout redrive、cancel/resume/replay 和 bounded
    multi-agent handoff。

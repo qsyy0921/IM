@@ -11,7 +11,7 @@ Agent Platform SDD package 已完成文档重做：`agent-platform.md` v0.1 方�
 tool/MCP、eval/replay、governance 六份详细 SDD，以及 current-to-target matrix 和
 open-dataset eval plan。
 
-下一阶段建议模块：Open Dataset Eval Harness / synthetic IM-like fixture。仍然只做
+当前编码模块：Open Dataset Eval Harness / synthetic IM-like fixture。仍然只做
 Agent / RAG / memory / Python AI Worker / EvidencePack / eval gate，不使用真实 IM 数据。
 
 ## 当前边界
@@ -44,6 +44,7 @@ Agent / RAG / memory / Python AI Worker / EvidencePack / eval gate，不使用�
   服务到目标 Agent 平台的迁移矩阵。
 - `docs/research/agent-open-dataset-eval-plan-20260701.md`：公开数据集优先 eval 计划和
   synthetic IM-like fixture 草案。
+- `docs/research/agent-coding-experiment-path-20260701.md`：隔离式 Agent 编码实验路径。
 - `docs/sdd/agent-runtime.md`
 - `docs/sdd/agent-memory-admission.md`
 - `docs/sdd/agent-context-evidencepack.md`
@@ -54,7 +55,7 @@ Agent / RAG / memory / Python AI Worker / EvidencePack / eval gate，不使用�
 ## 当前目标
 
 1. 保持 Agent SDD 包为当前设计事实源，不从旧后端压测或单一平台总览继续推进。
-2. 下一步如进入实验，只能先做公开数据集 adapter、EvalCase / EvalRun / EvalResult、
+2. 当前实验只能先做公开数据集 adapter、EvalCase / EvalRun / EvalResult、
    ReplayBundle 和 synthetic IM-like fixture。
 3. 任何 production proto、schema、migration、service directory、runtime implementation
    都必须等 eval/fixture 证据和 ADR。
@@ -82,8 +83,7 @@ Agent / RAG / memory / Python AI Worker / EvidencePack / eval gate，不使用�
 
 ## 后续优先级
 
-1. 基于 `agent-platform.md` 拆出 open-dataset eval 计划，选择首批 RAG / tool-workflow /
-   memory 数据集。
+1. 扩展 `ai/python/nexusim_ai_eval/`，加入公开数据集 adapter skeleton。
 2. 做 fixture-only AgentRun trace、ContextPackage、MemoryCandidate、ToolIntent 和
    ReplayBundle 输出格式实验。
 3. 做 MCP poisoning、memory pollution、state-diff、approval pause/resume、cancel/replay

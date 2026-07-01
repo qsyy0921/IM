@@ -107,12 +107,16 @@ NexusIM Agent 层的开发顺序不是先接真实聊天数据，也不是先写
 - EvalCase / EvalRun / EvalResult / report 草案。
 - synthetic IM-like fixture 规则。
 - failure taxonomy。
+- 隔离式 Python harness：`ai/python/nexusim_ai_eval/`。
+- CLI：`ai/python/scripts/run_agent_eval_fixture.py`。
+- 单元测试、集成测试和边界测试：`ai/python/tests/test_agent_eval_*.py`。
 
 完成条件：
 
 - 每类能力至少有一个可执行或可模拟的 fixture 入口。
 - report 能比较 baseline 和 regression。
 - 不接生产启动路径。
+- 测试能证明 harness 不需要后端服务、真实 IM 数据、模型 provider 或外部 MCP provider。
 
 ## 4. Phase 3：Fixture-only AgentRun Trace Prototype
 

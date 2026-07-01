@@ -29,7 +29,7 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["nexusim_ai_common*", "nexusim_ai_memory*"]
+include = ["nexusim_ai_common*", "nexusim_ai_memory*", "nexusim_ai_eval*"]
 namespaces = false
 
 [tool.nexusim]

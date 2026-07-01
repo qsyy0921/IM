@@ -100,17 +100,8 @@ func (e MessagePolicyEvaluator) DecideMessageAction(
 	}
 
 	started = time.Now()
-	decision, found, err := e.lookupRule(ctx, command)
-	e.observeStage(command.Action, "exact_rule_lookup", started, err)
-	if err != nil {
-		return types.MessageActionDecision{}, err
-	}
-	if found {
-		return decision, nil
-	}
-	started = time.Now()
-	decision, found, err = e.lookupTenantRule(ctx, command)
-	e.observeStage(command.Action, "tenant_rule_lookup", started, err)
+	decision, found, err := e.lookupMessageActionRule(ctx, command)
+	e.observeStage(command.Action, "message_action_rule_lookup", started, err)
 	if err != nil {
 		return types.MessageActionDecision{}, err
 	}
@@ -175,7 +166,7 @@ func (e MessagePolicyEvaluator) staticDefaultDecision(
 	return e.staticDefault.DecideMessageAction(ctx, command)
 }
 
-func (e MessagePolicyEvaluator) lookupRule(
+func (e MessagePolicyEvaluator) lookupMessageActionRule(
 	ctx context.Context,
 	command types.CheckMessageActionCommand,
 ) (types.MessageActionDecision, bool, error) {
@@ -185,60 +176,45 @@ func (e MessagePolicyEvaluator) lookupRule(
 		ConversationID: command.ConversationID,
 		MessageID:      command.MessageID,
 		Action:         command.Action,
-		DecisionSource: types.PolicyDecisionSourceExactRule,
 	}
+	var decisionSource string
 	err := e.pool.QueryRow(ctx, `
-SELECT allowed, permission_version, classification, reason
-FROM policy_message_action_rules
-WHERE tenant_id = $1
-  AND user_id = $2
-  AND conversation_id = $3
-  AND action = $4
+SELECT allowed, permission_version, classification, reason, decision_source
+FROM (
+    SELECT
+        1 AS precedence,
+        allowed,
+        permission_version,
+        classification,
+        reason,
+        'EXACT_RULE' AS decision_source
+    FROM policy_message_action_rules
+    WHERE tenant_id = $1
+      AND user_id = $2
+      AND conversation_id = $3
+      AND action = $4
+
+    UNION ALL
+
+    SELECT
+        2 AS precedence,
+        allowed,
+        permission_version,
+        classification,
+        reason,
+        'TENANT_RULE' AS decision_source
+    FROM policy_tenant_message_action_rules
+    WHERE tenant_id = $1
+      AND action = $4
+) rules
+ORDER BY precedence ASC
+LIMIT 1
 `, command.AuthContext.TenantID, command.AuthContext.UserID, command.ConversationID, command.Action).Scan(
 		&decision.Allowed,
 		&decision.PermissionVersion,
 		&decision.Classification,
 		&decision.Reason,
-	)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return types.MessageActionDecision{}, false, nil
-	}
-	if err != nil {
-		return types.MessageActionDecision{}, false, types.NewDependencyUnavailable("policy rule lookup failed")
-	}
-	decision.Classification = strings.TrimSpace(decision.Classification)
-	decision.Reason = strings.TrimSpace(decision.Reason)
-	if decision.PermissionVersion <= 0 || decision.Classification == "" {
-		return types.MessageActionDecision{}, false, types.NewDependencyUnavailable("policy rule is invalid")
-	}
-	if !decision.Allowed && decision.Reason == "" {
-		decision.Reason = "policy denied"
-	}
-	return decision, true, nil
-}
-
-func (e MessagePolicyEvaluator) lookupTenantRule(
-	ctx context.Context,
-	command types.CheckMessageActionCommand,
-) (types.MessageActionDecision, bool, error) {
-	decision := types.MessageActionDecision{
-		TenantID:       command.AuthContext.TenantID,
-		UserID:         command.AuthContext.UserID,
-		ConversationID: command.ConversationID,
-		MessageID:      command.MessageID,
-		Action:         command.Action,
-		DecisionSource: types.PolicyDecisionSourceTenantRule,
-	}
-	err := e.pool.QueryRow(ctx, `
-SELECT allowed, permission_version, classification, reason
-FROM policy_tenant_message_action_rules
-WHERE tenant_id = $1
-  AND action = $2
-`, command.AuthContext.TenantID, command.Action).Scan(
-		&decision.Allowed,
-		&decision.PermissionVersion,
-		&decision.Classification,
-		&decision.Reason,
+		&decisionSource,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return types.MessageActionDecision{}, false, nil
@@ -247,12 +223,20 @@ WHERE tenant_id = $1
 		return types.MessageActionDecision{}, false, nil
 	}
 	if err != nil {
-		return types.MessageActionDecision{}, false, types.NewDependencyUnavailable("policy tenant rule lookup failed")
+		return types.MessageActionDecision{}, false, types.NewDependencyUnavailable("policy message action rule lookup failed")
+	}
+	switch decisionSource {
+	case "EXACT_RULE":
+		decision.DecisionSource = types.PolicyDecisionSourceExactRule
+	case "TENANT_RULE":
+		decision.DecisionSource = types.PolicyDecisionSourceTenantRule
+	default:
+		return types.MessageActionDecision{}, false, types.NewDependencyUnavailable("policy message action rule source is invalid")
 	}
 	decision.Classification = strings.TrimSpace(decision.Classification)
 	decision.Reason = strings.TrimSpace(decision.Reason)
 	if decision.PermissionVersion <= 0 || decision.Classification == "" {
-		return types.MessageActionDecision{}, false, types.NewDependencyUnavailable("policy tenant rule is invalid")
+		return types.MessageActionDecision{}, false, types.NewDependencyUnavailable("policy message action rule is invalid")
 	}
 	if !decision.Allowed && decision.Reason == "" {
 		decision.Reason = "policy denied"

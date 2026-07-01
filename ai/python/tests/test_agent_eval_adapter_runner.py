@@ -62,6 +62,41 @@ class AgentEvalAdapterRunnerTests(unittest.TestCase):
         )
         self.assertTrue(revocation_case["policy_revocation_window_recorded"])
 
+    def test_runs_toolsandbox_sample_with_alignment_metadata(self) -> None:
+        payload = json.loads((SAMPLES_DIR / "toolsandbox_like_tool_samples.json").read_text())
+
+        report = run_adapter_payload(payload)
+
+        self.assertEqual(report.status, "PASS")
+        self.assertEqual(report.case_count, 5)
+        self.assertEqual(report.failure_distribution, {"PASS": 5})
+        self.assertEqual(report.eval_run.adapter_versions, ["toolsandbox-like-tool-adapter-v1"])
+        self.assertEqual(report.aggregate_scores["tool_capability_lease_score"], 1.0)
+        self.assertEqual(report.aggregate_scores["mcp_provider_attestation_score"], 1.0)
+
+    def test_toolsandbox_sample_conversion_preserves_alignment_metadata(self) -> None:
+        payload = json.loads((SAMPLES_DIR / "toolsandbox_like_tool_samples.json").read_text())
+
+        suite = convert_adapter_payload(payload)
+        poisoned_case = suite["cases"][0]
+        schema_case = suite["cases"][1]
+        selection_case = suite["cases"][2]
+
+        self.assertEqual(
+            poisoned_case["actual_tool_capability_lease_refs"],
+            ["capability-lease:exporter:read-only"],
+        )
+        self.assertTrue(poisoned_case["tool_capability_lease_validated"])
+        self.assertEqual(
+            schema_case["tool_argument_schema_refs"],
+            ["tool-args:scheduler-create:missing-room"],
+        )
+        self.assertEqual(
+            selection_case["actual_tool_provider_attestation_refs"],
+            ["attestation:mcp-provider:trusted-task-writer:v1"],
+        )
+        self.assertTrue(selection_case["tool_provider_attestation_verified"])
+
     def test_rejects_backend_fields_before_conversion(self) -> None:
         payload = json.loads((SAMPLES_DIR / "qasper_like_rag_samples.json").read_text())
         payload["backend_url"] = "http://localhost:8080"

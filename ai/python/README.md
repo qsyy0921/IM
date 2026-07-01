@@ -98,6 +98,7 @@ python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_state_diff_hardening_scenarios.json
 python ai/python/scripts/run_agent_eval_current_report.py ai/python/fixtures/agent_eval/synthetic_core_scenarios.json --report-out .tmp-agent-current-report.json --baseline ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json --review-out .tmp-agent-baseline-review.json --force
 python ai/python/scripts/run_agent_dataset_adapter.py --run ai/python/fixtures/agent_eval/adapter_samples/qasper_like_rag_samples.json
+python ai/python/scripts/run_agent_dataset_adapter.py --run ai/python/fixtures/agent_eval/adapter_samples/toolsandbox_like_tool_samples.json
 python ai/python/scripts/run_agent_dataset_adapter.py --run ai/python/fixtures/agent_eval/adapter_samples/statebench_like_memory_samples.json
 python ai/python/scripts/run_agent_eval_regression.py ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json
 python -m ruff check ai/python
@@ -198,6 +199,10 @@ instructions, provider provenance mismatch and sandbox-only provider handling.
 The MCP security hardening fixture covers tool argument schema mismatch
 blocking, tool-selection attack blocking, expired prepare detection and
 multi-candidate provider selection.
+The ToolSandbox/MCP-Bench-like tool adapter sample now preserves fixture-only
+capability lease refs, capability scope refs and provider attestation refs, and
+the evaluator reports `tool_capability_lease_score` and
+`mcp_provider_attestation_score`.
 The context/evidence fixture covers source coverage, conflict marker detection,
 stale evidence avoidance and permission-driven abstain recommendation.
 The context/evidence hardening fixture covers memory-vs-current-source

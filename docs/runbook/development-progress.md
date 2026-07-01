@@ -159,6 +159,9 @@ ai/python/tests/test_agent_eval_*.py
 - Memory admission adapter alignment：STATE-Bench / LoCoMO 风格 sample 已覆盖
   duplicate cluster representative / tie-break、confidence threshold、
   governed policy revocation window，且 adapter 会保留这些低敏 metadata。
+- Tool / MCP adapter alignment：ToolSandbox / MCP-Bench 风格 sample 已覆盖
+  capability lease refs、capability scope refs、provider attestation refs，
+  evaluator 会输出对应低敏 aggregate score，且仍保持 fixture-only。
 - State-diff fixture：approved action outcome refs、expected-vs-actual state
   changes、execution/audit refs、incomplete report、unauthorized mutation detection。
 - State-diff hardening fixture：repair/redrive lineage、partial execution detection、
@@ -168,8 +171,7 @@ ai/python/tests/test_agent_eval_*.py
 
 | 优先级 | 工作 | 输出 |
 | --- | --- | --- |
-| P1 | Tool / MCP security adapter alignment | MCPSecBench / MCP-Bench adapter 对齐、capability lease matrix、provider attestation metadata |
-| P2 | ContextPackage / EvidencePack adapter alignment | public RAG adapter alignment、rerank confidence thresholds、denied-lane audit metadata、taint vocabulary |
+| P1 | ContextPackage / EvidencePack adapter alignment | public RAG adapter alignment、rerank confidence thresholds、denied-lane audit metadata、taint vocabulary |
 | P2 | Current-report deeper hardening | 多 suite report matrix、baseline refresh approval manifest、report retention metadata |
 | P2 | Memory admission calibration | 更大公开 memory 数据集上的 confidence threshold tuning、policy revocation-window retention、review backoff / operator queue policy |
 | P2 | Runtime-control deeper hardening | checkpoint version drift、workflow wakeup race、replay bundle lineage completeness |
@@ -189,7 +191,7 @@ ai/python/tests/test_agent_eval_*.py
 - SDD index / research index / architecture index link check
 - 不触碰 proto、schema、migration、production service directory
 
-后续 fixture-only prototype 优先推进 Tool / MCP security adapter alignment fixture gate。
+后续 fixture-only prototype 优先推进 ContextPackage / EvidencePack adapter alignment fixture gate。
 
 ## 历史资料路由
 

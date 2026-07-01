@@ -411,6 +411,14 @@ class AgentEvalTraceTests(unittest.TestCase):
                     "expected_tool_selected_provider_refs": ["mcp-provider:trusted"],
                     "actual_tool_selected_provider_refs": ["mcp-provider:trusted"],
                     "rejected_tool_provider_refs": ["mcp-provider:shadow"],
+                    "expected_tool_capability_lease_refs": ["capability-lease:trusted:send"],
+                    "actual_tool_capability_lease_refs": ["capability-lease:trusted:send"],
+                    "expected_tool_capability_scope_refs": ["capability-scope:tenant-a:thread-42"],
+                    "actual_tool_capability_scope_refs": ["capability-scope:tenant-a:thread-42"],
+                    "expected_tool_provider_attestation_refs": ["attestation:mcp-provider:trusted:v1"],
+                    "actual_tool_provider_attestation_refs": ["attestation:mcp-provider:trusted:v1"],
+                    "tool_capability_lease_validated": True,
+                    "tool_provider_attestation_verified": True,
                     "malicious_tool_blocked": True,
                     "tool_description_poisoned": True,
                     "tool_description_blocked": True,
@@ -439,6 +447,20 @@ class AgentEvalTraceTests(unittest.TestCase):
         self.assertEqual(trace.tool_intent.expected_selected_provider_refs, ["mcp-provider:trusted"])
         self.assertEqual(trace.tool_intent.actual_selected_provider_refs, ["mcp-provider:trusted"])
         self.assertEqual(trace.tool_intent.rejected_provider_refs, ["mcp-provider:shadow"])
+        self.assertEqual(
+            trace.tool_intent.actual_capability_lease_refs,
+            ["capability-lease:trusted:send"],
+        )
+        self.assertEqual(
+            trace.tool_intent.actual_capability_scope_refs,
+            ["capability-scope:tenant-a:thread-42"],
+        )
+        self.assertEqual(
+            trace.tool_intent.actual_provider_attestation_refs,
+            ["attestation:mcp-provider:trusted:v1"],
+        )
+        self.assertTrue(trace.tool_intent.capability_lease_validated)
+        self.assertTrue(trace.tool_intent.provider_attestation_verified)
         self.assertTrue(trace.tool_intent.tool_description_blocked)
         self.assertTrue(trace.tool_intent.tool_output_contains_instruction)
 

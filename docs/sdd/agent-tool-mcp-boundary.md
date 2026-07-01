@@ -37,7 +37,9 @@ permission system or direct side-effect path.
 
 - tool registry and provider provenance;
 - MCP server registration metadata;
+- provider attestation refs;
 - schema/version/capability hashes;
+- capability lease and scope refs;
 - tool risk label;
 - tool prepare / precheck;
 - input validation;
@@ -71,6 +73,8 @@ Agent Runtime owns:
 | Skill allowlist | skill-registry | Bound to SkillPackage version |
 | ToolIntent | Agent Runtime | Candidate only |
 | PreparedToolCallRef | mcp-gateway | Validated, not necessarily executed |
+| Capability lease | mcp-gateway / policy owner | Low-sensitive lease and scope refs only |
+| Provider attestation | mcp-gateway / provider governance | Provenance proof refs, not credentials |
 | Approval decision | workflow-service | For high-risk tools/actions |
 | Execution attempt | action-executor | Side-effect owner |
 | Provider failure | action-executor or mcp-gateway by phase | Depends on prepare vs execute |
@@ -111,6 +115,9 @@ PreparedToolCall
   tool_ref
   provider_ref
   tool_schema_hash
+  provider_attestation_ref
+  capability_lease_ref
+  capability_scope_refs
   args_hash
   actor_ref
   tenant_ref
@@ -142,6 +149,8 @@ Required controls:
 
 - provider allowlist or sandbox classification;
 - capability and schema hash tracking;
+- capability lease validation before prepare is accepted;
+- provider attestation verification before trusted provider selection;
 - owner and provenance refs;
 - tenant policy allow/deny;
 - tool description prompt-injection scan;
@@ -219,6 +228,8 @@ selection incorrectly:
 | Schema mismatch | Reject prepare |
 | Policy deny | Deny, no retry bypass |
 | Unknown provider | Sandbox-only or deny |
+| Missing provider attestation | Deny trusted-provider path |
+| Missing capability lease | Deny or re-prepare under policy |
 | Malicious description | Block / quarantine |
 | Unsafe output | Do not insert into trusted context |
 | Prepare timeout | Bounded retry or failure |
@@ -255,6 +266,8 @@ Required eval:
 - malicious tool description block;
 - unsafe output quarantine;
 - MCP server provenance handling;
+- provider attestation verification;
+- capability lease and scope validation;
 - state-diff correctness after approved execution;
 - replay without re-execution.
 
@@ -276,6 +289,8 @@ Metrics:
 - malicious description detections;
 - unsafe output detections;
 - provider timeout rate;
+- provider attestation missing rate;
+- capability lease validation failure rate;
 - approval-required rate;
 - execution request/ref linkage;
 - state-diff failures;
@@ -287,7 +302,9 @@ Audit lineage:
 - skill ref;
 - tool ref;
 - provider ref;
+- provider attestation ref;
 - schema/capability hash;
+- capability lease/scope refs;
 - args hash;
 - policy decision ref;
 - prepared ref;
@@ -313,7 +330,8 @@ Promote tool/MCP integration only after:
 - malicious tool description and unsafe output fixtures pass;
 - prepare/approval/execution lineage is replayable;
 - state-diff eval verifies outcomes;
-- provider provenance and schema hashing are available;
+- provider provenance, provider attestation, capability lease and schema hashing
+  are available;
 - action-executor remains sole side-effect owner.
 
 ## 16. Current Isolated Fixture Coverage
@@ -327,15 +345,21 @@ Implemented fixture coverage:
 - unsafe MCP output instruction is quarantined before reuse;
 - provider provenance mismatch is detected;
 - sandbox-only external provider path is represented as fixture metadata;
+- tool argument schema mismatch, tool-selection attack, expired prepare and
+  multi-candidate provider selection are represented as fixture metadata;
+- ToolSandbox/MCP-Bench-like adapter samples preserve low-sensitive capability
+  lease refs, capability scope refs and provider attestation refs;
 - ReplayBundle keeps low-sensitive prepared refs, provider refs and audit refs,
   not raw provider payloads.
 
 Remaining hardening:
 
-- tool argument schema mismatch fixtures;
-- tool-selection attack fixtures across multiple candidates;
-- prepare expiry and re-prepare fixtures;
-- state-diff linkage after approved execution simulation.
+- broader MCPSecBench/MCP-Bench fixture families beyond the current local
+  sample;
+- capability lease matrix review before any production contract promotion;
+- provider attestation governance review before trusted provider onboarding;
+- prepare expiry re-prepare policy and state-diff linkage after approved
+  execution simulation.
 
 ## 17. References
 

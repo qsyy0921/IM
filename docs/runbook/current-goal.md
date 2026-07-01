@@ -83,8 +83,9 @@ Agent / RAG / memory / Python AI Worker / EvidencePack / eval gate，不使用�
 
 ## 后续优先级
 
-1. 对已落地 Tool / MCP security hardening 做更深层 MCPSecBench / MCP-Bench adapter
-   对齐，但仍保持 fixture-only。
+1. 对已落地 ContextPackage / EvidencePack hardening 做公开 RAG adapter alignment，
+   覆盖 rerank confidence thresholds、denied-lane audit metadata 和 taint vocabulary，
+   仍保持 fixture-only。
 2. 增加 current-report / baseline lifecycle deeper hardening，覆盖多 suite report
    matrix、baseline refresh approval manifest 和 report retention metadata。
 3. 对 memory admission 的 confidence threshold、governed policy revocation window

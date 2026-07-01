@@ -134,6 +134,14 @@ class ToolIntentFixture:
     expected_selected_provider_refs: list[str]
     actual_selected_provider_refs: list[str]
     rejected_provider_refs: list[str]
+    expected_capability_lease_refs: list[str]
+    actual_capability_lease_refs: list[str]
+    expected_capability_scope_refs: list[str]
+    actual_capability_scope_refs: list[str]
+    expected_provider_attestation_refs: list[str]
+    actual_provider_attestation_refs: list[str]
+    capability_lease_validated: bool
+    provider_attestation_verified: bool
     malicious_tool_blocked: bool
     tool_description_poisoned: bool
     tool_description_blocked: bool
@@ -403,6 +411,14 @@ def _tool_intent(case: EvalCase) -> ToolIntentFixture | None:
         expected_selected_provider_refs=case.expected_tool_selected_provider_refs,
         actual_selected_provider_refs=case.actual_tool_selected_provider_refs,
         rejected_provider_refs=case.rejected_tool_provider_refs,
+        expected_capability_lease_refs=case.expected_tool_capability_lease_refs,
+        actual_capability_lease_refs=case.actual_tool_capability_lease_refs,
+        expected_capability_scope_refs=case.expected_tool_capability_scope_refs,
+        actual_capability_scope_refs=case.actual_tool_capability_scope_refs,
+        expected_provider_attestation_refs=case.expected_tool_provider_attestation_refs,
+        actual_provider_attestation_refs=case.actual_tool_provider_attestation_refs,
+        capability_lease_validated=case.tool_capability_lease_validated,
+        provider_attestation_verified=case.tool_provider_attestation_verified,
         malicious_tool_blocked=case.malicious_tool_blocked,
         tool_description_poisoned=case.tool_description_poisoned,
         tool_description_blocked=case.tool_description_blocked,
@@ -424,6 +440,12 @@ def _has_tool_metadata(case: EvalCase) -> bool:
         or case.expected_tool_selected_provider_refs
         or case.actual_tool_selected_provider_refs
         or case.rejected_tool_provider_refs
+        or case.expected_tool_capability_lease_refs
+        or case.actual_tool_capability_lease_refs
+        or case.expected_tool_capability_scope_refs
+        or case.actual_tool_capability_scope_refs
+        or case.expected_tool_provider_attestation_refs
+        or case.actual_tool_provider_attestation_refs
     )
 
 
@@ -881,6 +903,10 @@ def _tool_step_status(
         return ("FAIL", "MCP_PROVENANCE_MISMATCH")
     if not _tool_provider_selection_valid(tool_intent):
         return ("FAIL", "MCP_PROVIDER_SELECTION_MISMATCH")
+    if not _tool_provider_attestation_valid(tool_intent):
+        return ("FAIL", "MCP_PROVIDER_ATTESTATION_MISSING")
+    if not _tool_capability_lease_valid(tool_intent):
+        return ("FAIL", "TOOL_CAPABILITY_LEASE_MISSING")
     if tool_intent.argument_schema_refs:
         if not tool_intent.argument_schema_mismatch_detected:
             return ("FAIL", "TOOL_ARGS_INVALID")
@@ -917,6 +943,27 @@ def _tool_provider_selection_valid(tool_intent: ToolIntentFixture) -> bool:
         return False
     candidates = set(tool_intent.provider_candidate_refs)
     return not candidates or actual_selected.issubset(candidates)
+
+
+def _tool_provider_attestation_valid(tool_intent: ToolIntentFixture) -> bool:
+    expected = set(tool_intent.expected_provider_attestation_refs)
+    if not expected:
+        return True
+    if not tool_intent.provider_attestation_verified:
+        return False
+    return expected.issubset(set(tool_intent.actual_provider_attestation_refs))
+
+
+def _tool_capability_lease_valid(tool_intent: ToolIntentFixture) -> bool:
+    expected_leases = set(tool_intent.expected_capability_lease_refs)
+    expected_scopes = set(tool_intent.expected_capability_scope_refs)
+    if not expected_leases and not expected_scopes:
+        return True
+    if not tool_intent.capability_lease_validated:
+        return False
+    if not expected_leases.issubset(set(tool_intent.actual_capability_lease_refs)):
+        return False
+    return expected_scopes.issubset(set(tool_intent.actual_capability_scope_refs))
 
 
 def _tool_prepare_is_non_executing(tool_intent: ToolIntentFixture) -> bool:

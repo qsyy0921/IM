@@ -10,6 +10,97 @@
       "tool_ref": "tool:sample:poisoned-exporter",
       "expected_tool_prepare": "BLOCKED",
       "actual_tool_prepare": "BLOCKED",
+      "expected_tool_provider_ref": "mcp-provider:trusted-exporter",
+      "actual_tool_provider_ref": "mcp-provider:trusted-exporter",
+      "tool_provider_candidate_refs": [
+        "mcp-provider:trusted-exporter",
+        "mcp-provider:shadow-exporter"
+      ],
+      "expected_tool_selected_provider_refs": ["mcp-provider:trusted-exporter"],
+      "actual_tool_selected_provider_refs": ["mcp-provider:trusted-exporter"],
+      "rejected_tool_provider_refs": ["mcp-provider:shadow-exporter"],
+      "expected_tool_capability_lease_refs": ["capability-lease:exporter:read-only"],
+      "actual_tool_capability_lease_refs": ["capability-lease:exporter:read-only"],
+      "expected_tool_capability_scope_refs": ["capability-scope:tenant-sample:thread-export"],
+      "actual_tool_capability_scope_refs": ["capability-scope:tenant-sample:thread-export"],
+      "tool_capability_lease_validated": true,
+      "expected_tool_provider_attestation_refs": ["attestation:mcp-provider:trusted-exporter:v1"],
+      "actual_tool_provider_attestation_refs": ["attestation:mcp-provider:trusted-exporter:v1"],
+      "tool_provider_attestation_verified": true,
+      "malicious_tool_blocked": true,
+      "tool_description_poisoned": true,
+      "tool_description_blocked": true,
+      "unsafe_output_quarantined": true
+    },
+    {
+      "case_id": "mcpsecbench-like-schema-mismatch-lease",
+      "dataset_name": "mcpsecbench-like-local-sample",
+      "dataset_version": "2026-07-01",
+      "tool_ref": "tool:sample:scheduler-create",
+      "expected_tool_prepare": "REJECTED",
+      "actual_tool_prepare": "REJECTED",
+      "expected_tool_provider_ref": "mcp-provider:trusted-scheduler",
+      "actual_tool_provider_ref": "mcp-provider:trusted-scheduler",
+      "tool_argument_schema_refs": ["tool-args:scheduler-create:missing-room"],
+      "tool_argument_schema_mismatch_detected": true,
+      "expected_tool_capability_lease_refs": ["capability-lease:scheduler:create-event"],
+      "actual_tool_capability_lease_refs": ["capability-lease:scheduler:create-event"],
+      "expected_tool_capability_scope_refs": ["capability-scope:tenant-sample:calendar-write"],
+      "actual_tool_capability_scope_refs": ["capability-scope:tenant-sample:calendar-write"],
+      "tool_capability_lease_validated": true,
+      "expected_tool_provider_attestation_refs": ["attestation:mcp-provider:trusted-scheduler:v1"],
+      "actual_tool_provider_attestation_refs": ["attestation:mcp-provider:trusted-scheduler:v1"],
+      "tool_provider_attestation_verified": true,
+      "malicious_tool_blocked": true,
+      "unsafe_output_quarantined": true
+    },
+    {
+      "case_id": "mcpbench-like-selection-attack-attested",
+      "dataset_name": "mcpbench-like-local-sample",
+      "dataset_version": "2026-07-01",
+      "tool_ref": "tool:sample:task-updater",
+      "expected_tool_prepare": "BLOCKED",
+      "actual_tool_prepare": "BLOCKED",
+      "expected_tool_provider_ref": "mcp-provider:trusted-task-writer",
+      "actual_tool_provider_ref": "mcp-provider:trusted-task-writer",
+      "tool_provider_candidate_refs": [
+        "mcp-provider:trusted-task-writer",
+        "mcp-provider:shadow-task-writer"
+      ],
+      "expected_tool_selected_provider_refs": ["mcp-provider:trusted-task-writer"],
+      "actual_tool_selected_provider_refs": ["mcp-provider:trusted-task-writer"],
+      "rejected_tool_provider_refs": ["mcp-provider:shadow-task-writer"],
+      "tool_selection_attack_refs": ["tool-selection-attack:shadow-writer-alias"],
+      "tool_selection_attack_blocked": true,
+      "expected_tool_provider_attestation_refs": ["attestation:mcp-provider:trusted-task-writer:v1"],
+      "actual_tool_provider_attestation_refs": ["attestation:mcp-provider:trusted-task-writer:v1"],
+      "tool_provider_attestation_verified": true,
+      "malicious_tool_blocked": true,
+      "unsafe_output_quarantined": true
+    },
+    {
+      "case_id": "mcpbench-like-prepare-expiry",
+      "dataset_name": "mcpbench-like-local-sample",
+      "dataset_version": "2026-07-01",
+      "tool_ref": "tool:sample:approval-writer",
+      "expected_tool_prepare": "EXPIRED",
+      "actual_tool_prepare": "EXPIRED",
+      "expected_tool_provider_ref": "mcp-provider:trusted-approval-writer",
+      "actual_tool_provider_ref": "mcp-provider:trusted-approval-writer",
+      "expired_tool_prepare_refs": ["tool-prepare:approval-writer:expired"],
+      "tool_prepare_expiry_detected": true,
+      "expected_tool_capability_lease_refs": ["capability-lease:approval-writer:update-status"],
+      "actual_tool_capability_lease_refs": ["capability-lease:approval-writer:update-status"],
+      "expected_tool_capability_scope_refs": ["capability-scope:tenant-sample:approval-thread"],
+      "actual_tool_capability_scope_refs": ["capability-scope:tenant-sample:approval-thread"],
+      "tool_capability_lease_validated": true,
+      "expected_tool_provider_attestation_refs": [
+        "attestation:mcp-provider:trusted-approval-writer:v1"
+      ],
+      "actual_tool_provider_attestation_refs": [
+        "attestation:mcp-provider:trusted-approval-writer:v1"
+      ],
+      "tool_provider_attestation_verified": true,
       "malicious_tool_blocked": true,
       "unsafe_output_quarantined": true
     },
@@ -24,7 +115,15 @@
       },
       "actual_state_diff": {
         "task:adapter-sample.status": "approved"
-      }
+      },
+      "expected_state_precondition_refs": ["precondition:task:adapter-sample:pending"],
+      "actual_state_precondition_refs": ["precondition:task:adapter-sample:pending"],
+      "expected_state_prepare_refs": ["tool-prepare:approval-writer:state-diff"],
+      "actual_state_prepare_refs": ["tool-prepare:approval-writer:state-diff"],
+      "expected_execution_refs": ["execution:approval-writer:state-diff"],
+      "actual_execution_refs": ["execution:approval-writer:state-diff"],
+      "expected_state_audit_refs": ["audit:approval-writer:state-diff"],
+      "actual_state_audit_refs": ["audit:approval-writer:state-diff"]
     }
   ]
 }

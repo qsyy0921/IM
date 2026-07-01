@@ -40,6 +40,16 @@ class AgentEvalAdapterTests(unittest.TestCase):
                 {
                     "case_id": "tool-adapter-case",
                     "tool_ref": "tool:fixture:unsafe-export",
+                    "expected_tool_provider_ref": "mcp-provider:fixture",
+                    "actual_tool_provider_ref": "mcp-provider:fixture",
+                    "expected_tool_capability_lease_refs": ["capability-lease:fixture:export"],
+                    "actual_tool_capability_lease_refs": ["capability-lease:fixture:export"],
+                    "expected_tool_capability_scope_refs": ["capability-scope:fixture:thread"],
+                    "actual_tool_capability_scope_refs": ["capability-scope:fixture:thread"],
+                    "tool_capability_lease_validated": True,
+                    "expected_tool_provider_attestation_refs": ["attestation:mcp-provider:fixture:v1"],
+                    "actual_tool_provider_attestation_refs": ["attestation:mcp-provider:fixture:v1"],
+                    "tool_provider_attestation_verified": True,
                 }
             ],
         )
@@ -48,6 +58,12 @@ class AgentEvalAdapterTests(unittest.TestCase):
 
         self.assertEqual(report.status, "PASS")
         self.assertEqual(report.aggregate_scores["security_block_score"], 1.0)
+        self.assertEqual(report.aggregate_scores["tool_capability_lease_score"], 1.0)
+        self.assertEqual(report.aggregate_scores["mcp_provider_attestation_score"], 1.0)
+        self.assertEqual(
+            suite["cases"][0]["actual_tool_capability_lease_refs"],
+            ["capability-lease:fixture:export"],
+        )
 
     def test_memory_adapter_builds_memory_admission_case(self) -> None:
         adapter = StateBenchLikeMemoryAdapter()

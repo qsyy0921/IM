@@ -133,6 +133,8 @@ Slice 0 covers:
 - fixture-only MCP security hardening coverage for tool argument schema mismatch,
   tool-selection attack blocking, prepare expiry detection and multi-candidate
   provider selection.
+- ToolSandbox/MCP-Bench-like tool adapter alignment coverage for fixture-only
+  capability lease refs, capability scope refs and provider attestation refs.
 - fixture-only ContextPackage / EvidencePack coverage for source coverage,
   conflict markers, stale evidence avoidance and permission abstain.
 - fixture-only ContextPackage / EvidencePack hardening coverage for
@@ -239,6 +241,8 @@ fixtures, call models or connect to backend services.
 - ToolIntentFixture.
 - ToolIntentFixture hardening metadata for argument schema mismatch,
   tool-selection attacks, expired prepare refs and multi-provider selection.
+- ToolIntentFixture adapter alignment metadata for capability lease refs,
+  capability scope refs and provider attestation refs.
 - RuntimeControlFixture.
 - ContextPackage source coverage, conflict, stale-source and permission-abstain
   metadata.
@@ -306,6 +310,7 @@ or runs the converted suite:
 
 ```powershell
 python ai/python/scripts/run_agent_dataset_adapter.py --run ai/python/fixtures/agent_eval/adapter_samples/qasper_like_rag_samples.json
+python ai/python/scripts/run_agent_dataset_adapter.py --run ai/python/fixtures/agent_eval/adapter_samples/toolsandbox_like_tool_samples.json
 ```
 
 `ai/python/scripts/run_agent_eval_regression.py` compares baseline and current
@@ -359,6 +364,8 @@ Evaluator tests:
 - MCP security hardening scoring rejects undetected argument schema mismatch,
   undetected prepare expiry, unblocked tool-selection attack and bad provider
   selection.
+- Tool / MCP adapter alignment scoring rejects missing capability leases and
+  missing provider attestation refs.
 - ContextPackage / EvidencePack deeper hardening scoring rejects missing source
   ranking, missing lane redrive refs, missing snippet citation repair, exposed
   denied lanes and missing taint propagation.
@@ -426,6 +433,7 @@ python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_state_diff_hardening_scenarios.json
 python ai/python/scripts/run_agent_eval_current_report.py ai/python/fixtures/agent_eval/synthetic_core_scenarios.json --report-out .tmp-agent-current-report.json --baseline ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json --review-out .tmp-agent-baseline-review.json --force
 python ai/python/scripts/run_agent_dataset_adapter.py --run ai/python/fixtures/agent_eval/adapter_samples/qasper_like_rag_samples.json
+python ai/python/scripts/run_agent_dataset_adapter.py --run ai/python/fixtures/agent_eval/adapter_samples/toolsandbox_like_tool_samples.json
 python ai/python/scripts/run_agent_dataset_adapter.py --run ai/python/fixtures/agent_eval/adapter_samples/statebench_like_memory_samples.json
 python ai/python/scripts/run_agent_eval_regression.py ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json
 ```
@@ -450,8 +458,8 @@ git status --short --branch --untracked-files=all
 
 Recommended next slices:
 
-1. Align Tool / MCP security hardening with MCPSecBench / MCP-Bench-style
-   adapter samples while staying fixture-only.
+1. Align ContextPackage / EvidencePack fixtures with public RAG adapter samples,
+   rerank confidence thresholds, denied-lane audit metadata and taint vocabulary.
 2. Add multi-suite current-report and baseline-refresh lifecycle metadata once
    the next fixture families are stable.
 3. Tune memory admission confidence thresholds and governed policy revocation

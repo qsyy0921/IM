@@ -104,6 +104,9 @@ Agent Gateway / UX
 - 已补 STATE-Bench / LoCoMO 风格 memory adapter alignment：duplicate cluster
   representative selection / tie-break refs、confidence threshold refs、
   governed policy revocation window refs，并保持 fixture-only。
+- 已补 ToolSandbox / MCP-Bench 风格 Tool / MCP adapter alignment：capability
+  lease refs、capability scope refs、provider attestation refs，并保持
+  fixture-only。
 - 已补 fixture-only state-diff report coverage：approved action outcome refs、
   expected-vs-actual state changes、missing execution refs、incomplete report、
   unauthorized mutation detection。
@@ -113,8 +116,9 @@ Agent Gateway / UX
   cancel propagation incomplete、replay event incomplete。
 - 已补 current EvalReport generation / baseline refresh review CLI，生成当前报告和
   baseline refresh review artifact，默认不覆盖 baseline。
-- 下一段优先做 Tool / MCP security adapter alignment，其次做 current-report /
-  baseline lifecycle deeper hardening 或 memory threshold/policy calibration。
+- 下一段优先做 ContextPackage / EvidencePack adapter alignment，其次做
+  current-report / baseline lifecycle deeper hardening 或 memory
+  threshold/policy calibration。
 
 ## 工作规则
 

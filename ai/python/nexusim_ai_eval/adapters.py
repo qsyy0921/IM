@@ -60,7 +60,7 @@ class ToolSandboxLikeAdapter:
     def to_eval_case(self, payload: dict[str, Any]) -> dict[str, Any]:
         case_id = _required(payload, "case_id")
         tool_ref = str(payload.get("tool_ref", f"tool:synthetic:{case_id}"))
-        return {
+        case = {
             "case_id": case_id,
             "dataset_name": str(payload.get("dataset_name", "toolsandbox-like")),
             "dataset_version": str(payload.get("dataset_version", "local-skeleton")),
@@ -84,6 +84,10 @@ class ToolSandboxLikeAdapter:
             "expected_failure_class": str(payload.get("expected_failure_class", "")),
             "actual_failure_class": str(payload.get("actual_failure_class", "")),
         }
+        _copy_optional_string_fields(payload, case, _TOOLSANDBOX_TOOL_STRING_FIELDS)
+        _copy_optional_list_fields(payload, case, _TOOLSANDBOX_TOOL_LIST_FIELDS)
+        _copy_optional_bool_fields(payload, case, _TOOLSANDBOX_TOOL_BOOL_FIELDS)
+        return case
 
 
 class StateBenchLikeMemoryAdapter:
@@ -153,6 +157,51 @@ def suite_from_adapter_cases(
         "cases": [adapter.to_eval_case(case) for case in cases],
     }
 
+
+_TOOLSANDBOX_TOOL_STRING_FIELDS = [
+    "expected_tool_provider_ref",
+    "actual_tool_provider_ref",
+]
+
+_TOOLSANDBOX_TOOL_LIST_FIELDS = [
+    "tool_argument_schema_refs",
+    "tool_selection_attack_refs",
+    "expired_tool_prepare_refs",
+    "tool_provider_candidate_refs",
+    "expected_tool_selected_provider_refs",
+    "actual_tool_selected_provider_refs",
+    "rejected_tool_provider_refs",
+    "expected_tool_capability_lease_refs",
+    "actual_tool_capability_lease_refs",
+    "expected_tool_capability_scope_refs",
+    "actual_tool_capability_scope_refs",
+    "expected_tool_provider_attestation_refs",
+    "actual_tool_provider_attestation_refs",
+    "expected_state_precondition_refs",
+    "actual_state_precondition_refs",
+    "expected_state_approval_refs",
+    "actual_state_approval_refs",
+    "expected_state_prepare_refs",
+    "actual_state_prepare_refs",
+    "expected_execution_refs",
+    "actual_execution_refs",
+    "expected_state_change_refs",
+    "actual_state_change_refs",
+    "expected_state_audit_refs",
+    "actual_state_audit_refs",
+]
+
+_TOOLSANDBOX_TOOL_BOOL_FIELDS = [
+    "tool_description_poisoned",
+    "tool_description_blocked",
+    "tool_output_contains_instruction",
+    "tool_argument_schema_mismatch_detected",
+    "tool_selection_attack_blocked",
+    "tool_prepare_expiry_detected",
+    "tool_capability_lease_validated",
+    "tool_provider_attestation_verified",
+    "state_diff_report_complete",
+]
 
 _STATEBENCH_MEMORY_LIST_FIELDS = [
     "expected_memory_source_refs",

@@ -55,10 +55,12 @@ ALLOWED_FAILURE_CLASSES = {
     "TOOL_ARGS_INVALID",
     "TOOL_SELECTION_ATTACK",
     "TOOL_PREPARE_EXPIRED",
+    "TOOL_CAPABILITY_LEASE_MISSING",
     "TOOL_POISONING_DETECTED",
     "UNSAFE_TOOL_OUTPUT",
     "MCP_PROVENANCE_MISMATCH",
     "MCP_PROVIDER_SELECTION_MISMATCH",
+    "MCP_PROVIDER_ATTESTATION_MISSING",
     "PROVIDER_TIMEOUT",
     "APPROVAL_REQUIRED",
     "APPROVAL_REJECTED",
@@ -224,6 +226,12 @@ class EvalCase:
     expected_tool_selected_provider_refs: list[str] = field(default_factory=list)
     actual_tool_selected_provider_refs: list[str] = field(default_factory=list)
     rejected_tool_provider_refs: list[str] = field(default_factory=list)
+    expected_tool_capability_lease_refs: list[str] = field(default_factory=list)
+    actual_tool_capability_lease_refs: list[str] = field(default_factory=list)
+    expected_tool_capability_scope_refs: list[str] = field(default_factory=list)
+    actual_tool_capability_scope_refs: list[str] = field(default_factory=list)
+    expected_tool_provider_attestation_refs: list[str] = field(default_factory=list)
+    actual_tool_provider_attestation_refs: list[str] = field(default_factory=list)
     expected_state_diff: dict[str, str] = field(default_factory=dict)
     actual_state_diff: dict[str, str] = field(default_factory=dict)
     expected_state_precondition_refs: list[str] = field(default_factory=list)
@@ -298,6 +306,8 @@ class EvalCase:
     tool_argument_schema_mismatch_detected: bool = False
     tool_selection_attack_blocked: bool = False
     tool_prepare_expiry_detected: bool = False
+    tool_capability_lease_validated: bool = False
+    tool_provider_attestation_verified: bool = False
     revoked_memory_used: bool = False
     side_effect_reexecuted: bool = False
 
@@ -705,6 +715,30 @@ def _eval_case(payload: dict[str, Any], index: int) -> EvalCase:
         rejected_tool_provider_refs=_string_list(
             payload.get("rejected_tool_provider_refs", []), "rejected_tool_provider_refs"
         ),
+        expected_tool_capability_lease_refs=_string_list(
+            payload.get("expected_tool_capability_lease_refs", []),
+            "expected_tool_capability_lease_refs",
+        ),
+        actual_tool_capability_lease_refs=_string_list(
+            payload.get("actual_tool_capability_lease_refs", []),
+            "actual_tool_capability_lease_refs",
+        ),
+        expected_tool_capability_scope_refs=_string_list(
+            payload.get("expected_tool_capability_scope_refs", []),
+            "expected_tool_capability_scope_refs",
+        ),
+        actual_tool_capability_scope_refs=_string_list(
+            payload.get("actual_tool_capability_scope_refs", []),
+            "actual_tool_capability_scope_refs",
+        ),
+        expected_tool_provider_attestation_refs=_string_list(
+            payload.get("expected_tool_provider_attestation_refs", []),
+            "expected_tool_provider_attestation_refs",
+        ),
+        actual_tool_provider_attestation_refs=_string_list(
+            payload.get("actual_tool_provider_attestation_refs", []),
+            "actual_tool_provider_attestation_refs",
+        ),
         expected_state_diff=_string_map(
             payload.get("expected_state_diff", {}), "expected_state_diff"
         ),
@@ -933,6 +967,14 @@ def _eval_case(payload: dict[str, Any], index: int) -> EvalCase:
         tool_prepare_expiry_detected=_bool(
             payload.get("tool_prepare_expiry_detected", False),
             "tool_prepare_expiry_detected",
+        ),
+        tool_capability_lease_validated=_bool(
+            payload.get("tool_capability_lease_validated", False),
+            "tool_capability_lease_validated",
+        ),
+        tool_provider_attestation_verified=_bool(
+            payload.get("tool_provider_attestation_verified", False),
+            "tool_provider_attestation_verified",
         ),
         revoked_memory_used=_bool(payload.get("revoked_memory_used", False), "revoked_memory_used"),
         side_effect_reexecuted=_bool(

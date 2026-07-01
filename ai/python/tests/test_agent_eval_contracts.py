@@ -115,6 +115,14 @@ class AgentEvalContractTests(unittest.TestCase):
                 "expected_tool_selected_provider_refs": ["mcp-provider:trusted"],
                 "actual_tool_selected_provider_refs": ["mcp-provider:trusted"],
                 "rejected_tool_provider_refs": ["mcp-provider:shadow"],
+                "expected_tool_capability_lease_refs": ["capability-lease:trusted:send"],
+                "actual_tool_capability_lease_refs": ["capability-lease:trusted:send"],
+                "expected_tool_capability_scope_refs": ["capability-scope:tenant-a:thread-42"],
+                "actual_tool_capability_scope_refs": ["capability-scope:tenant-a:thread-42"],
+                "expected_tool_provider_attestation_refs": ["attestation:mcp-provider:trusted:v1"],
+                "actual_tool_provider_attestation_refs": ["attestation:mcp-provider:trusted:v1"],
+                "tool_capability_lease_validated": True,
+                "tool_provider_attestation_verified": True,
                 "malicious_tool_blocked": True,
                 "tool_description_poisoned": True,
                 "tool_description_blocked": True,
@@ -136,6 +144,20 @@ class AgentEvalContractTests(unittest.TestCase):
         self.assertEqual(cases[0].expected_tool_selected_provider_refs, ["mcp-provider:trusted"])
         self.assertEqual(cases[0].actual_tool_selected_provider_refs, ["mcp-provider:trusted"])
         self.assertEqual(cases[0].rejected_tool_provider_refs, ["mcp-provider:shadow"])
+        self.assertEqual(
+            cases[0].expected_tool_capability_lease_refs,
+            ["capability-lease:trusted:send"],
+        )
+        self.assertEqual(
+            cases[0].actual_tool_capability_scope_refs,
+            ["capability-scope:tenant-a:thread-42"],
+        )
+        self.assertEqual(
+            cases[0].expected_tool_provider_attestation_refs,
+            ["attestation:mcp-provider:trusted:v1"],
+        )
+        self.assertTrue(cases[0].tool_capability_lease_validated)
+        self.assertTrue(cases[0].tool_provider_attestation_verified)
         self.assertTrue(cases[0].tool_description_poisoned)
         self.assertTrue(cases[0].tool_output_contains_instruction)
 

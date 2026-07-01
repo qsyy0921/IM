@@ -187,6 +187,8 @@ Fixtures must be clearly synthetic and must not import production data.
 | `tool_prepare_expiry_score` | Expired prepare refs are rejected before execution |
 | `tool_selection_attack_score` | Tool-selection attack attempts are blocked |
 | `mcp_provider_selection_score` | Selected providers match candidate policy |
+| `tool_capability_lease_score` | Expected capability lease and scope refs are validated |
+| `mcp_provider_attestation_score` | Expected provider attestation refs are verified |
 | `state_diff_score` | Final synthetic state matches expected diff |
 | `memory_precision` | Admitted candidates are valid |
 | `memory_scope_score` | Memory stays in allowed scope |
@@ -232,10 +234,12 @@ The harness should normalize:
 - `TOOL_ARGS_INVALID`
 - `TOOL_SELECTION_ATTACK`
 - `TOOL_PREPARE_EXPIRED`
+- `TOOL_CAPABILITY_LEASE_MISSING`
 - `TOOL_POISONING_DETECTED`
 - `UNSAFE_TOOL_OUTPUT`
 - `MCP_PROVENANCE_MISMATCH`
 - `MCP_PROVIDER_SELECTION_MISMATCH`
+- `MCP_PROVIDER_ATTESTATION_MISSING`
 - `PROVIDER_TIMEOUT`
 - `APPROVAL_REQUIRED`
 - `APPROVAL_REJECTED`
@@ -469,6 +473,9 @@ Implemented checks:
 - MCP security hardening coverage for tool argument schema mismatch,
   tool-selection attack blocking, prepare expiry detection and multi-candidate
   provider selection.
+- ToolSandbox/MCP-Bench-like tool adapter alignment coverage for fixture-only
+  capability lease refs, capability scope refs, provider attestation refs and
+  matching aggregate scores.
 - ContextPackage / EvidencePack fixture coverage for source coverage, conflict
   marker detection, stale evidence avoidance and permission abstain.
 - ContextPackage / EvidencePack hardening coverage for memory-vs-current-source
@@ -515,6 +522,7 @@ python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_state_diff_hardening_scenarios.json
 python ai/python/scripts/run_agent_eval_current_report.py ai/python/fixtures/agent_eval/synthetic_core_scenarios.json --report-out .tmp-agent-current-report.json --baseline ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json --review-out .tmp-agent-baseline-review.json --force
 python ai/python/scripts/run_agent_dataset_adapter.py --run ai/python/fixtures/agent_eval/adapter_samples/qasper_like_rag_samples.json
+python ai/python/scripts/run_agent_dataset_adapter.py --run ai/python/fixtures/agent_eval/adapter_samples/toolsandbox_like_tool_samples.json
 python ai/python/scripts/run_agent_dataset_adapter.py --run ai/python/fixtures/agent_eval/adapter_samples/statebench_like_memory_samples.json
 python ai/python/scripts/run_agent_eval_regression.py ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json
 ```

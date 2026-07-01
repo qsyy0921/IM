@@ -120,6 +120,8 @@ Agent Gateway / UX
   unauthorized mutation detection。
 - 已补 fixture-only state-diff hardening：repair/redrive lineage、partial execution
   detection、idempotency-preserved replay、compensating action refs。
+- 已补 fixture-only state-diff deeper hardening：state dependency graph、
+  cross-action compensation chain、operator redrive review refs。
 - 已补 fixture-only runtime-control negative coverage：missing checkpoint、
   cancel propagation incomplete、replay event incomplete。
 - 已补 fixture-only runtime-control deeper hardening：checkpoint version drift
@@ -129,8 +131,8 @@ Agent Gateway / UX
 - 已补 current-report / baseline lifecycle deeper hardening：多 suite report
   matrix、baseline refresh approval manifest 和 report retention metadata，
   支持 synthetic fixture 与 public-dataset-style adapter sample 混合进矩阵。
-- 下一段优先做 state-diff deeper hardening：state dependency graph、
-  cross-action compensation chain、operator redrive review。
+- 下一段优先做 ReplayBundle / observability review：低敏 refs、hashes、
+  version metadata、failure taxonomy、trace linkage。
 
 ## 工作规则
 

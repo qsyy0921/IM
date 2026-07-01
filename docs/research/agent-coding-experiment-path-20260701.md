@@ -91,6 +91,7 @@ ai/python/fixtures/agent_eval/synthetic_memory_admission_deeper_hardening_scenar
 ai/python/fixtures/agent_eval/memory_calibration_sample.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_hardening_scenarios.json
+ai/python/fixtures/agent_eval/synthetic_state_diff_deeper_hardening_scenarios.json
 ai/python/scripts/run_agent_eval_fixture.py
 ai/python/scripts/run_agent_eval_current_report.py
 ai/python/scripts/run_agent_eval_report_matrix.py
@@ -187,6 +188,8 @@ Slice 0 covers:
 - fixture-only state-diff hardening coverage for repair/redrive lineage,
   partial execution detection, idempotency-preserved replay and compensating
   action refs.
+- fixture-only state-diff deeper hardening coverage for state dependency graph,
+  cross-action compensation chain and operator redrive review refs.
 
 ## 4. Code Architecture
 
@@ -311,6 +314,8 @@ queue.
 - StateDiffReport execution, approval, prepare, state-change and audit refs.
 - StateDiffReport hardening metadata for repair/redrive, partial execution,
   idempotency and compensating action refs.
+- StateDiffReport deeper hardening metadata for state dependency graph,
+  compensation chain and operator redrive review refs.
 
 The trace is low-sensitive and fixture-only. It records refs, hashes and failure
 classes, not raw prompt, message body or provider output.
@@ -339,6 +344,7 @@ ai/python/fixtures/agent_eval/synthetic_memory_admission_deeper_hardening_scenar
 ai/python/fixtures/agent_eval/memory_calibration_sample.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_hardening_scenarios.json
+ai/python/fixtures/agent_eval/synthetic_state_diff_deeper_hardening_scenarios.json
 ai/python/fixtures/agent_eval/adapter_samples/
 ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json
 ```
@@ -419,6 +425,8 @@ Evaluator tests:
 - memory scope violation fails;
 - unsafe tool output fails;
 - state-diff mismatch fails;
+- state-diff deeper hardening scoring rejects missing dependency graph,
+  compensation chain and operator redrive review refs;
 - replay fails if side effect is reexecuted.
 - expected negative scenarios pass when the expected failure is detected.
 - adapter skeletons generate valid EvalCase suites.
@@ -469,6 +477,7 @@ Integration tests:
 - load `synthetic_memory_admission_deeper_hardening_scenarios.json`;
 - load `synthetic_state_diff_scenarios.json`;
 - load `synthetic_state_diff_hardening_scenarios.json`;
+- load `synthetic_state_diff_deeper_hardening_scenarios.json`;
 - run `run_agent_eval_fixture.py`;
 - run `run_agent_eval_current_report.py`;
 - run `run_agent_eval_report_matrix.py`;
@@ -507,6 +516,7 @@ python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_memory_admission_deeper_hardening_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_state_diff_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_state_diff_hardening_scenarios.json
+python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_state_diff_deeper_hardening_scenarios.json
 python ai/python/scripts/run_agent_eval_current_report.py ai/python/fixtures/agent_eval/synthetic_core_scenarios.json --report-out .tmp-agent-current-report.json --baseline ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json --review-out .tmp-agent-baseline-review.json --force
 python ai/python/scripts/run_agent_eval_report_matrix.py ai/python/fixtures/agent_eval/report_matrix_sample.json --matrix-out .tmp-agent-eval-matrix/matrix.json --approval-manifest-out .tmp-agent-eval-matrix/approval-manifest.json --force
 python ai/python/scripts/run_agent_memory_calibration.py ai/python/fixtures/agent_eval/memory_calibration_sample.json --report-out .tmp-agent-memory-calibration-report.json --force
@@ -536,9 +546,9 @@ git status --short --branch --untracked-files=all
 
 Recommended next slices:
 
-1. Add state-diff deeper hardening for state dependency graph, cross-action
-   compensation chain and operator redrive review, still without production
-   data.
+1. Add ReplayBundle / observability review for low-sensitive refs, hashes,
+   version metadata, failure taxonomy and trace linkage, still without
+   production data.
 
 Each slice must keep the same isolation rule until an ADR explicitly promotes a
 backend integration boundary.

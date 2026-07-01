@@ -722,6 +722,23 @@ class AgentEvalTraceTests(unittest.TestCase):
                     "expected_compensating_action_refs": ["compensating-action:task-42:rollback"],
                     "actual_compensating_action_refs": ["compensating-action:task-42:rollback"],
                     "compensating_action_recorded": True,
+                    "expected_state_dependency_refs": ["state-dependency:task-42:project"],
+                    "actual_state_dependency_refs": ["state-dependency:task-42:project"],
+                    "state_dependency_graph_recorded": True,
+                    "expected_state_compensation_chain_refs": [
+                        "compensation-chain:task-42:rollback->notify"
+                    ],
+                    "actual_state_compensation_chain_refs": [
+                        "compensation-chain:task-42:rollback->notify"
+                    ],
+                    "state_compensation_chain_recorded": True,
+                    "expected_operator_redrive_review_refs": [
+                        "operator-redrive-review:task-42:attempt-2"
+                    ],
+                    "actual_operator_redrive_review_refs": [
+                        "operator-redrive-review:task-42:attempt-2"
+                    ],
+                    "operator_redrive_review_recorded": True,
                     "repair_redrive_recorded": True,
                 }
             )
@@ -752,7 +769,48 @@ class AgentEvalTraceTests(unittest.TestCase):
             ["compensating-action:task-42:rollback"],
         )
         self.assertTrue(trace.state_diff_report.compensating_action_recorded)
+        self.assertEqual(
+            trace.state_diff_report.dependency_refs,
+            ["state-dependency:task-42:project"],
+        )
+        self.assertTrue(trace.state_diff_report.dependency_graph_recorded)
+        self.assertEqual(
+            trace.state_diff_report.compensation_chain_refs,
+            ["compensation-chain:task-42:rollback->notify"],
+        )
+        self.assertTrue(trace.state_diff_report.compensation_chain_recorded)
+        self.assertEqual(
+            trace.state_diff_report.operator_redrive_review_refs,
+            ["operator-redrive-review:task-42:attempt-2"],
+        )
+        self.assertTrue(trace.state_diff_report.operator_redrive_review_recorded)
         self.assertIn("state_diff", [step.step_type for step in trace.steps])
+
+    def test_trace_flags_missing_state_dependency_graph(self) -> None:
+        case = validate_eval_suite(
+            suite_with_case(
+                {
+                    "case_id": "trace-state-diff-dependency-missing-case",
+                    "dataset_name": "synthetic",
+                    "dataset_version": "2026-07-02",
+                    "capability_family": "STATE_DIFF",
+                    "fixture_version": "fixture-v1",
+                    "input_refs": ["input:trace-state-diff-dependency-missing-case"],
+                    "expected_state_diff": {"task:42.status": "approved"},
+                    "actual_state_diff": {"task:42.status": "approved"},
+                    "expected_state_dependency_refs": ["state-dependency:task-42:project"],
+                    "actual_state_dependency_refs": [],
+                    "state_dependency_graph_recorded": False,
+                }
+            )
+        )[0]
+
+        trace = build_agent_run_trace(case)
+
+        state_steps = [step for step in trace.steps if step.step_type == "state_diff"]
+        self.assertEqual(trace.status, "FAIL")
+        self.assertEqual(len(state_steps), 1)
+        self.assertEqual(state_steps[0].failure_class, "STATE_DEPENDENCY_GRAPH_MISSING")
 
 
 if __name__ == "__main__":

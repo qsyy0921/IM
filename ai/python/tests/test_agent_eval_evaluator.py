@@ -1501,6 +1501,94 @@ class AgentEvalEvaluatorTests(unittest.TestCase):
             "STATE_COMPENSATING_ACTION_MISSING",
         )
 
+    def test_state_diff_deeper_hardening_passes_dependency_and_operator_refs(self) -> None:
+        case = state_diff_case()
+        case.update(
+            {
+                "expected_execution_refs": ["execution:task-42:update"],
+                "actual_execution_refs": ["execution:task-42:update"],
+                "expected_state_dependency_refs": ["state-dependency:task-42:project"],
+                "actual_state_dependency_refs": ["state-dependency:task-42:project"],
+                "expected_state_compensation_chain_refs": [
+                    "compensation-chain:task-42:rollback->notify"
+                ],
+                "actual_state_compensation_chain_refs": [
+                    "compensation-chain:task-42:rollback->notify"
+                ],
+                "expected_operator_redrive_review_refs": [
+                    "operator-redrive-review:task-42:attempt-2"
+                ],
+                "actual_operator_redrive_review_refs": [
+                    "operator-redrive-review:task-42:attempt-2"
+                ],
+                "state_dependency_graph_recorded": True,
+                "state_compensation_chain_recorded": True,
+                "operator_redrive_review_recorded": True,
+            }
+        )
+
+        report = run_eval_suite(suite_with_case(case))
+
+        self.assertEqual(report.status, "PASS")
+        self.assertEqual(report.aggregate_scores["state_dependency_graph_score"], 1.0)
+        self.assertEqual(report.aggregate_scores["state_compensation_chain_score"], 1.0)
+        self.assertEqual(report.aggregate_scores["state_operator_redrive_review_score"], 1.0)
+
+    def test_state_diff_deeper_hardening_fails_missing_dependency_graph(self) -> None:
+        case = state_diff_case()
+        case.update(
+            {
+                "expected_state_dependency_refs": ["state-dependency:task-42:project"],
+                "actual_state_dependency_refs": [],
+                "state_dependency_graph_recorded": True,
+            }
+        )
+
+        report = run_eval_suite(suite_with_case(case))
+
+        self.assertEqual(report.status, "FAIL")
+        self.assertEqual(report.results[0].failure_class, "STATE_DEPENDENCY_GRAPH_MISSING")
+        self.assertEqual(report.aggregate_scores["state_dependency_graph_score"], 0.0)
+
+    def test_state_diff_deeper_hardening_fails_missing_compensation_chain(self) -> None:
+        case = state_diff_case()
+        case.update(
+            {
+                "expected_state_compensation_chain_refs": [
+                    "compensation-chain:task-42:rollback->notify"
+                ],
+                "actual_state_compensation_chain_refs": [],
+                "state_compensation_chain_recorded": True,
+            }
+        )
+
+        report = run_eval_suite(suite_with_case(case))
+
+        self.assertEqual(report.status, "FAIL")
+        self.assertEqual(report.results[0].failure_class, "STATE_COMPENSATION_CHAIN_MISSING")
+        self.assertEqual(report.aggregate_scores["state_compensation_chain_score"], 0.0)
+
+    def test_state_diff_deeper_hardening_fails_missing_operator_redrive_review(self) -> None:
+        case = state_diff_case()
+        case.update(
+            {
+                "expected_operator_redrive_review_refs": [
+                    "operator-redrive-review:task-42:attempt-2"
+                ],
+                "actual_operator_redrive_review_refs": [],
+                "operator_redrive_review_recorded": True,
+            }
+        )
+
+        report = run_eval_suite(suite_with_case(case))
+
+        self.assertEqual(report.status, "FAIL")
+        self.assertEqual(
+            report.results[0].failure_class,
+            "STATE_OPERATOR_REDRIVE_REVIEW_MISSING",
+        )
+        self.assertEqual(report.aggregate_scores["state_operator_redrive_review_score"], 0.0)
+
     def test_replay_fails_if_side_effect_reexecuted(self) -> None:
         case = base_case("STATE_DIFF")
         case.update(

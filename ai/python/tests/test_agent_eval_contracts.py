@@ -492,11 +492,28 @@ class AgentEvalContractTests(unittest.TestCase):
                 "actual_idempotency_refs": ["idempotency:task-1:execution-key"],
                 "expected_compensating_action_refs": ["compensating-action:task-1:rollback"],
                 "actual_compensating_action_refs": ["compensating-action:task-1:rollback"],
+                "expected_state_dependency_refs": ["state-dependency:task-1:project"],
+                "actual_state_dependency_refs": ["state-dependency:task-1:project"],
+                "expected_state_compensation_chain_refs": [
+                    "compensation-chain:task-1:rollback->notify"
+                ],
+                "actual_state_compensation_chain_refs": [
+                    "compensation-chain:task-1:rollback->notify"
+                ],
+                "expected_operator_redrive_review_refs": [
+                    "operator-redrive-review:task-1:attempt-2"
+                ],
+                "actual_operator_redrive_review_refs": [
+                    "operator-redrive-review:task-1:attempt-2"
+                ],
                 "state_diff_report_complete": True,
                 "repair_redrive_recorded": True,
                 "partial_execution_detected": True,
                 "idempotency_preserved": True,
                 "compensating_action_recorded": True,
+                "state_dependency_graph_recorded": True,
+                "state_compensation_chain_recorded": True,
+                "operator_redrive_review_recorded": True,
             }
         ]
 
@@ -513,11 +530,23 @@ class AgentEvalContractTests(unittest.TestCase):
             cases[0].actual_compensating_action_refs,
             ["compensating-action:task-1:rollback"],
         )
+        self.assertEqual(cases[0].actual_state_dependency_refs, ["state-dependency:task-1:project"])
+        self.assertEqual(
+            cases[0].actual_state_compensation_chain_refs,
+            ["compensation-chain:task-1:rollback->notify"],
+        )
+        self.assertEqual(
+            cases[0].actual_operator_redrive_review_refs,
+            ["operator-redrive-review:task-1:attempt-2"],
+        )
         self.assertTrue(cases[0].state_diff_report_complete)
         self.assertTrue(cases[0].repair_redrive_recorded)
         self.assertTrue(cases[0].partial_execution_detected)
         self.assertTrue(cases[0].idempotency_preserved)
         self.assertTrue(cases[0].compensating_action_recorded)
+        self.assertTrue(cases[0].state_dependency_graph_recorded)
+        self.assertTrue(cases[0].state_compensation_chain_recorded)
+        self.assertTrue(cases[0].operator_redrive_review_recorded)
 
 
 if __name__ == "__main__":

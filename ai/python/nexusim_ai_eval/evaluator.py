@@ -539,6 +539,9 @@ def _state_diff_scores(case: EvalCase) -> tuple[dict[str, float], str]:
     partial_execution_score = _state_partial_execution_score(case)
     idempotency_score = _state_idempotency_score(case)
     compensating_action_score = _state_compensating_action_score(case)
+    dependency_graph_score = _state_dependency_graph_score(case)
+    compensation_chain_score = _state_compensation_chain_score(case)
+    operator_redrive_review_score = _state_operator_redrive_review_score(case)
     unauthorized_mutation_score = 0.0 if case.unauthorized_state_mutation_detected else 1.0
     if report_score == 0.0:
         failure = "STATE_REPORT_INCOMPLETE"
@@ -558,12 +561,18 @@ def _state_diff_scores(case: EvalCase) -> tuple[dict[str, float], str]:
         failure = "STATE_REPAIR_REF_MISSING"
     elif redrive_ref_score == 0.0:
         failure = "STATE_REDRIVE_REF_MISSING"
+    elif dependency_graph_score == 0.0:
+        failure = "STATE_DEPENDENCY_GRAPH_MISSING"
     elif partial_execution_score == 0.0:
         failure = "STATE_PARTIAL_EXECUTION_NOT_DETECTED"
     elif idempotency_score == 0.0:
         failure = "STATE_IDEMPOTENCY_VIOLATION"
+    elif compensation_chain_score == 0.0:
+        failure = "STATE_COMPENSATION_CHAIN_MISSING"
     elif compensating_action_score == 0.0:
         failure = "STATE_COMPENSATING_ACTION_MISSING"
+    elif operator_redrive_review_score == 0.0:
+        failure = "STATE_OPERATOR_REDRIVE_REVIEW_MISSING"
     elif unauthorized_mutation_score == 0.0:
         failure = "STATE_UNAUTHORIZED_MUTATION"
     elif diff_score == 0.0:
@@ -582,9 +591,12 @@ def _state_diff_scores(case: EvalCase) -> tuple[dict[str, float], str]:
             "state_audit_ref_score": audit_ref_score,
             "state_repair_ref_score": repair_ref_score,
             "state_redrive_ref_score": redrive_ref_score,
+            "state_dependency_graph_score": dependency_graph_score,
             "state_partial_execution_score": partial_execution_score,
             "state_idempotency_score": idempotency_score,
+            "state_compensation_chain_score": compensation_chain_score,
             "state_compensating_action_score": compensating_action_score,
+            "state_operator_redrive_review_score": operator_redrive_review_score,
             "state_unauthorized_mutation_score": unauthorized_mutation_score,
         },
         failure,
@@ -629,6 +641,39 @@ def _state_compensating_action_score(case: EvalCase) -> float:
     return _ref_subset_score(
         case.expected_compensating_action_refs,
         case.actual_compensating_action_refs,
+    )
+
+
+def _state_dependency_graph_score(case: EvalCase) -> float:
+    if not case.expected_state_dependency_refs:
+        return 1.0
+    if not case.state_dependency_graph_recorded:
+        return 0.0
+    return _ref_subset_score(
+        case.expected_state_dependency_refs,
+        case.actual_state_dependency_refs,
+    )
+
+
+def _state_compensation_chain_score(case: EvalCase) -> float:
+    if not case.expected_state_compensation_chain_refs:
+        return 1.0
+    if not case.state_compensation_chain_recorded:
+        return 0.0
+    return _ref_subset_score(
+        case.expected_state_compensation_chain_refs,
+        case.actual_state_compensation_chain_refs,
+    )
+
+
+def _state_operator_redrive_review_score(case: EvalCase) -> float:
+    if not case.expected_operator_redrive_review_refs:
+        return 1.0
+    if not case.operator_redrive_review_recorded:
+        return 0.0
+    return _ref_subset_score(
+        case.expected_operator_redrive_review_refs,
+        case.actual_operator_redrive_review_refs,
     )
 
 
@@ -1153,6 +1198,9 @@ def _replay_bundle(case: EvalCase, failure_class: str) -> ReplayBundle:
         "actual_redrive_refs": case.actual_redrive_refs,
         "actual_idempotency_refs": case.actual_idempotency_refs,
         "actual_compensating_action_refs": case.actual_compensating_action_refs,
+        "actual_state_dependency_refs": case.actual_state_dependency_refs,
+        "actual_state_compensation_chain_refs": case.actual_state_compensation_chain_refs,
+        "actual_operator_redrive_review_refs": case.actual_operator_redrive_review_refs,
         "actual_failure_class": case.actual_failure_class,
         "actual_tool_provider_ref": case.actual_tool_provider_ref,
         "actual_tool_selected_provider_refs": case.actual_tool_selected_provider_refs,

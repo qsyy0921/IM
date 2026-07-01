@@ -14,18 +14,15 @@
 
 ## 当前优先顺序
 
-1. State-diff deeper hardening：基础 action outcome report、expected-vs-actual state
-   change、execution refs、audit refs、incomplete report、unauthorized mutation、
-   repair/redrive、partial execution、idempotency 和 compensating action fixture 已落地；
-   后续只保留更深的 state dependency graph、cross-action compensation chain 和 operator
-   redrive review cases。
-2. ReplayBundle / observability：runtime-control deeper hardening 已覆盖 checkpoint
-   version drift、workflow wakeup race 和 replay bundle lineage completeness；后续补
-   全局低敏 refs、hashes、version metadata、failure taxonomy 和 trace linkage。
-3. Memory calibration data expansion：本地 calibration sample 已覆盖 confidence
+1. ReplayBundle / observability：runtime-control deeper hardening 已覆盖 checkpoint
+   version drift、workflow wakeup race 和 replay bundle lineage completeness；
+   state-diff deeper hardening 已覆盖 dependency graph、compensation chain 和
+   operator redrive review refs；后续补全局低敏 refs、hashes、version metadata、
+   failure taxonomy 和 trace linkage。
+2. Memory calibration data expansion：本地 calibration sample 已覆盖 confidence
    threshold、policy revocation-window retention 和 review backoff/operator queue
    recommendation；后续仅在明确优先时替换为更大的公开数据集导出。
-4. ADR promotion review：只有前述 fixture/eval 有证据后，才评估 Agent Runtime、
+3. ADR promotion review：只有前述 fixture/eval 有证据后，才评估 Agent Runtime、
    ContextPackage、MemoryCandidate、Tool prepare、ReplayBundle 是否提升为 ADR / 契约。
 
 ## Dataset Backlog

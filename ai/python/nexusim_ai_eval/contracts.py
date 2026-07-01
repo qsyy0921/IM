@@ -82,6 +82,9 @@ ALLOWED_FAILURE_CLASSES = {
     "STATE_PARTIAL_EXECUTION_NOT_DETECTED",
     "STATE_IDEMPOTENCY_VIOLATION",
     "STATE_COMPENSATING_ACTION_MISSING",
+    "STATE_DEPENDENCY_GRAPH_MISSING",
+    "STATE_COMPENSATION_CHAIN_MISSING",
+    "STATE_OPERATOR_REDRIVE_REVIEW_MISSING",
     "STATE_UNAUTHORIZED_MUTATION",
     "MEMORY_SOURCE_MISSING",
     "MEMORY_SPEAKER_MISSING",
@@ -270,6 +273,12 @@ class EvalCase:
     actual_idempotency_refs: list[str] = field(default_factory=list)
     expected_compensating_action_refs: list[str] = field(default_factory=list)
     actual_compensating_action_refs: list[str] = field(default_factory=list)
+    expected_state_dependency_refs: list[str] = field(default_factory=list)
+    actual_state_dependency_refs: list[str] = field(default_factory=list)
+    expected_state_compensation_chain_refs: list[str] = field(default_factory=list)
+    actual_state_compensation_chain_refs: list[str] = field(default_factory=list)
+    expected_operator_redrive_review_refs: list[str] = field(default_factory=list)
+    actual_operator_redrive_review_refs: list[str] = field(default_factory=list)
     expected_runtime_events: list[str] = field(default_factory=list)
     actual_runtime_events: list[str] = field(default_factory=list)
     expected_checkpoint_refs: list[str] = field(default_factory=list)
@@ -327,6 +336,9 @@ class EvalCase:
     partial_execution_detected: bool = False
     idempotency_preserved: bool = False
     compensating_action_recorded: bool = False
+    state_dependency_graph_recorded: bool = False
+    state_compensation_chain_recorded: bool = False
+    operator_redrive_review_recorded: bool = False
     malicious_tool_blocked: bool = False
     tool_description_poisoned: bool = False
     tool_description_blocked: bool = False
@@ -874,6 +886,30 @@ def _eval_case(payload: dict[str, Any], index: int) -> EvalCase:
             payload.get("actual_compensating_action_refs", []),
             "actual_compensating_action_refs",
         ),
+        expected_state_dependency_refs=_string_list(
+            payload.get("expected_state_dependency_refs", []),
+            "expected_state_dependency_refs",
+        ),
+        actual_state_dependency_refs=_string_list(
+            payload.get("actual_state_dependency_refs", []),
+            "actual_state_dependency_refs",
+        ),
+        expected_state_compensation_chain_refs=_string_list(
+            payload.get("expected_state_compensation_chain_refs", []),
+            "expected_state_compensation_chain_refs",
+        ),
+        actual_state_compensation_chain_refs=_string_list(
+            payload.get("actual_state_compensation_chain_refs", []),
+            "actual_state_compensation_chain_refs",
+        ),
+        expected_operator_redrive_review_refs=_string_list(
+            payload.get("expected_operator_redrive_review_refs", []),
+            "expected_operator_redrive_review_refs",
+        ),
+        actual_operator_redrive_review_refs=_string_list(
+            payload.get("actual_operator_redrive_review_refs", []),
+            "actual_operator_redrive_review_refs",
+        ),
         expected_runtime_events=_upper_string_list(
             payload.get("expected_runtime_events", []), "expected_runtime_events"
         ),
@@ -1058,6 +1094,18 @@ def _eval_case(payload: dict[str, Any], index: int) -> EvalCase:
         compensating_action_recorded=_bool(
             payload.get("compensating_action_recorded", False),
             "compensating_action_recorded",
+        ),
+        state_dependency_graph_recorded=_bool(
+            payload.get("state_dependency_graph_recorded", False),
+            "state_dependency_graph_recorded",
+        ),
+        state_compensation_chain_recorded=_bool(
+            payload.get("state_compensation_chain_recorded", False),
+            "state_compensation_chain_recorded",
+        ),
+        operator_redrive_review_recorded=_bool(
+            payload.get("operator_redrive_review_recorded", False),
+            "operator_redrive_review_recorded",
         ),
         malicious_tool_blocked=_bool(
             payload.get("malicious_tool_blocked", False), "malicious_tool_blocked"

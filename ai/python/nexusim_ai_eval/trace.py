@@ -193,6 +193,12 @@ class StateDiffReportFixture:
     idempotency_preserved: bool
     compensating_action_refs: list[str]
     compensating_action_recorded: bool
+    dependency_refs: list[str]
+    dependency_graph_recorded: bool
+    compensation_chain_refs: list[str]
+    compensation_chain_recorded: bool
+    operator_redrive_review_refs: list[str]
+    operator_redrive_review_recorded: bool
     report_complete: bool
     unauthorized_mutation_detected: bool
 
@@ -488,6 +494,9 @@ def _state_diff_report(case: EvalCase) -> StateDiffReportFixture | None:
         and not case.partial_execution_refs
         and not case.expected_idempotency_refs
         and not case.expected_compensating_action_refs
+        and not case.expected_state_dependency_refs
+        and not case.expected_state_compensation_chain_refs
+        and not case.expected_operator_redrive_review_refs
     ):
         return None
     report_payload = {
@@ -499,6 +508,9 @@ def _state_diff_report(case: EvalCase) -> StateDiffReportFixture | None:
         "actual_redrive_refs": case.actual_redrive_refs,
         "actual_idempotency_refs": case.actual_idempotency_refs,
         "actual_compensating_action_refs": case.actual_compensating_action_refs,
+        "actual_state_dependency_refs": case.actual_state_dependency_refs,
+        "actual_state_compensation_chain_refs": case.actual_state_compensation_chain_refs,
+        "actual_operator_redrive_review_refs": case.actual_operator_redrive_review_refs,
     }
     return StateDiffReportFixture(
         state_diff_report_ref=stable_ref("statediff", report_payload),
@@ -518,6 +530,12 @@ def _state_diff_report(case: EvalCase) -> StateDiffReportFixture | None:
         idempotency_preserved=case.idempotency_preserved,
         compensating_action_refs=case.actual_compensating_action_refs,
         compensating_action_recorded=case.compensating_action_recorded,
+        dependency_refs=case.actual_state_dependency_refs,
+        dependency_graph_recorded=case.state_dependency_graph_recorded,
+        compensation_chain_refs=case.actual_state_compensation_chain_refs,
+        compensation_chain_recorded=case.state_compensation_chain_recorded,
+        operator_redrive_review_refs=case.actual_operator_redrive_review_refs,
+        operator_redrive_review_recorded=case.operator_redrive_review_recorded,
         report_complete=case.state_diff_report_complete,
         unauthorized_mutation_detected=case.unauthorized_state_mutation_detected,
     )
@@ -757,18 +775,40 @@ def _state_diff_step_status(
         return ("FAIL", "STATE_REDRIVE_REF_MISSING")
     if case.expected_redrive_refs and not case.repair_redrive_recorded:
         return ("FAIL", "STATE_REDRIVE_REF_MISSING")
+    if not set(case.expected_state_dependency_refs).issubset(set(report.dependency_refs)):
+        return ("FAIL", "STATE_DEPENDENCY_GRAPH_MISSING")
+    if case.expected_state_dependency_refs and not report.dependency_graph_recorded:
+        return ("FAIL", "STATE_DEPENDENCY_GRAPH_MISSING")
     if report.partial_execution_refs and not report.partial_execution_detected:
         return ("FAIL", "STATE_PARTIAL_EXECUTION_NOT_DETECTED")
     if not set(case.expected_idempotency_refs).issubset(set(report.idempotency_refs)):
         return ("FAIL", "STATE_IDEMPOTENCY_VIOLATION")
     if case.expected_idempotency_refs and not report.idempotency_preserved:
         return ("FAIL", "STATE_IDEMPOTENCY_VIOLATION")
+    if not set(case.expected_state_compensation_chain_refs).issubset(
+        set(report.compensation_chain_refs)
+    ):
+        return ("FAIL", "STATE_COMPENSATION_CHAIN_MISSING")
+    if (
+        case.expected_state_compensation_chain_refs
+        and not report.compensation_chain_recorded
+    ):
+        return ("FAIL", "STATE_COMPENSATION_CHAIN_MISSING")
     if not set(case.expected_compensating_action_refs).issubset(
         set(report.compensating_action_refs)
     ):
         return ("FAIL", "STATE_COMPENSATING_ACTION_MISSING")
     if case.expected_compensating_action_refs and not report.compensating_action_recorded:
         return ("FAIL", "STATE_COMPENSATING_ACTION_MISSING")
+    if not set(case.expected_operator_redrive_review_refs).issubset(
+        set(report.operator_redrive_review_refs)
+    ):
+        return ("FAIL", "STATE_OPERATOR_REDRIVE_REVIEW_MISSING")
+    if (
+        case.expected_operator_redrive_review_refs
+        and not report.operator_redrive_review_recorded
+    ):
+        return ("FAIL", "STATE_OPERATOR_REDRIVE_REVIEW_MISSING")
     if report.unauthorized_mutation_detected:
         return ("FAIL", "STATE_UNAUTHORIZED_MUTATION")
     if report.expected_state_diff != report.actual_state_diff:

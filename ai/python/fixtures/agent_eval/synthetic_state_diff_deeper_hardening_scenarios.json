@@ -1,0 +1,124 @@
+{
+  "schema_version": 1,
+  "suite_id": "synthetic-agent-state-diff-deeper-hardening-v1",
+  "fixture_kind": "synthetic_im_like",
+  "adapter_versions": [
+    "manual-state-diff-deeper-hardening-fixture-v1"
+  ],
+  "cases": [
+    {
+      "case_id": "state-dependency-graph-recorded-pass",
+      "dataset_name": "synthetic-state-diff-deeper-hardening",
+      "dataset_version": "2026-07-02",
+      "capability_family": "STATE_DIFF",
+      "fixture_version": "state-diff-deeper-hardening-v1",
+      "input_refs": ["input:state-dependency-graph-recorded-pass"],
+      "expected_state_diff": {
+        "project:alpha.status": "blocked",
+        "task:alpha-7.status": "waiting_vendor"
+      },
+      "actual_state_diff": {
+        "project:alpha.status": "blocked",
+        "task:alpha-7.status": "waiting_vendor"
+      },
+      "expected_execution_refs": ["execution:project-alpha:block-with-task"],
+      "actual_execution_refs": ["execution:project-alpha:block-with-task"],
+      "expected_state_change_refs": [
+        "state-change:project-alpha:status",
+        "state-change:task-alpha-7:status"
+      ],
+      "actual_state_change_refs": [
+        "state-change:project-alpha:status",
+        "state-change:task-alpha-7:status"
+      ],
+      "expected_state_audit_refs": ["audit:project-alpha:block-with-task"],
+      "actual_state_audit_refs": ["audit:project-alpha:block-with-task"],
+      "expected_state_dependency_refs": [
+        "state-dependency:project-alpha:task-alpha-7",
+        "state-dependency:task-alpha-7:vendor-ticket"
+      ],
+      "actual_state_dependency_refs": [
+        "state-dependency:project-alpha:task-alpha-7",
+        "state-dependency:task-alpha-7:vendor-ticket"
+      ],
+      "state_dependency_graph_recorded": true,
+      "state_diff_report_complete": true
+    },
+    {
+      "case_id": "cross-action-compensation-chain-recorded-pass",
+      "dataset_name": "synthetic-state-diff-deeper-hardening",
+      "dataset_version": "2026-07-02",
+      "capability_family": "STATE_DIFF",
+      "fixture_version": "state-diff-deeper-hardening-v1",
+      "input_refs": ["input:cross-action-compensation-chain-recorded-pass"],
+      "expected_state_diff": {
+        "invoice:delta.status": "rolled_back",
+        "ledger:delta.balance_state": "restored"
+      },
+      "actual_state_diff": {
+        "invoice:delta.status": "rolled_back",
+        "ledger:delta.balance_state": "restored"
+      },
+      "expected_execution_refs": ["execution:invoice-delta:rollback"],
+      "actual_execution_refs": ["execution:invoice-delta:rollback"],
+      "expected_state_change_refs": [
+        "state-change:invoice-delta:status",
+        "state-change:ledger-delta:balance-state"
+      ],
+      "actual_state_change_refs": [
+        "state-change:invoice-delta:status",
+        "state-change:ledger-delta:balance-state"
+      ],
+      "expected_state_audit_refs": ["audit:invoice-delta:rollback"],
+      "actual_state_audit_refs": ["audit:invoice-delta:rollback"],
+      "expected_compensating_action_refs": [
+        "compensating-action:invoice-delta:void-charge",
+        "compensating-action:ledger-delta:restore-balance"
+      ],
+      "actual_compensating_action_refs": [
+        "compensating-action:invoice-delta:void-charge",
+        "compensating-action:ledger-delta:restore-balance"
+      ],
+      "expected_state_compensation_chain_refs": [
+        "compensation-chain:invoice-delta:void-charge->restore-balance"
+      ],
+      "actual_state_compensation_chain_refs": [
+        "compensation-chain:invoice-delta:void-charge->restore-balance"
+      ],
+      "compensating_action_recorded": true,
+      "state_compensation_chain_recorded": true,
+      "state_diff_report_complete": true
+    },
+    {
+      "case_id": "operator-redrive-review-recorded-pass",
+      "dataset_name": "synthetic-state-diff-deeper-hardening",
+      "dataset_version": "2026-07-02",
+      "capability_family": "STATE_DIFF",
+      "fixture_version": "state-diff-deeper-hardening-v1",
+      "input_refs": ["input:operator-redrive-review-recorded-pass"],
+      "expected_state_diff": {
+        "order:omega.status": "completed_after_redrive"
+      },
+      "actual_state_diff": {
+        "order:omega.status": "completed_after_redrive"
+      },
+      "expected_execution_refs": ["execution:order-omega:redrive-2"],
+      "actual_execution_refs": ["execution:order-omega:redrive-2"],
+      "expected_state_change_refs": ["state-change:order-omega:status"],
+      "actual_state_change_refs": ["state-change:order-omega:status"],
+      "expected_state_audit_refs": ["audit:order-omega:redrive-2"],
+      "actual_state_audit_refs": ["audit:order-omega:redrive-2"],
+      "expected_redrive_refs": ["redrive:order-omega:attempt-2"],
+      "actual_redrive_refs": ["redrive:order-omega:attempt-2"],
+      "expected_operator_redrive_review_refs": [
+        "operator-redrive-review:order-omega:attempt-2"
+      ],
+      "actual_operator_redrive_review_refs": [
+        "operator-redrive-review:order-omega:attempt-2"
+      ],
+      "repair_redrive_recorded": true,
+      "operator_redrive_review_recorded": true,
+      "state_diff_report_complete": true
+    }
+  ]
+}

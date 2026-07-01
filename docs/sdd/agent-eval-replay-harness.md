@@ -195,6 +195,9 @@ Fixtures must be clearly synthetic and must not import production data.
 | `tool_capability_lease_score` | Expected capability lease and scope refs are validated |
 | `mcp_provider_attestation_score` | Expected provider attestation refs are verified |
 | `state_diff_score` | Final synthetic state matches expected diff |
+| `state_dependency_graph_score` | State changes record required dependency graph refs |
+| `state_compensation_chain_score` | Cross-action compensation lineage is recorded |
+| `state_operator_redrive_review_score` | Operator review refs exist before redrive acceptance |
 | `memory_precision` | Admitted candidates are valid |
 | `memory_scope_score` | Memory stays in allowed scope |
 | `memory_revocation_score` | Revoked memory is not used |
@@ -269,6 +272,9 @@ The harness should normalize:
 - `STATE_PARTIAL_EXECUTION_NOT_DETECTED`
 - `STATE_IDEMPOTENCY_VIOLATION`
 - `STATE_COMPENSATING_ACTION_MISSING`
+- `STATE_DEPENDENCY_GRAPH_MISSING`
+- `STATE_COMPENSATION_CHAIN_MISSING`
+- `STATE_OPERATOR_REDRIVE_REVIEW_MISSING`
 - `STATE_UNAUTHORIZED_MUTATION`
 - `MEMORY_SOURCE_MISSING`
 - `MEMORY_SPEAKER_MISSING`
@@ -444,6 +450,7 @@ ai/python/fixtures/agent_eval/synthetic_memory_admission_deeper_hardening_scenar
 ai/python/fixtures/agent_eval/memory_calibration_sample.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_hardening_scenarios.json
+ai/python/fixtures/agent_eval/synthetic_state_diff_deeper_hardening_scenarios.json
 ai/python/fixtures/agent_eval/report_matrix_sample.json
 ai/python/scripts/run_agent_eval_fixture.py
 ai/python/scripts/run_agent_eval_current_report.py
@@ -535,6 +542,8 @@ Implemented checks:
   and unauthorized mutation detection.
 - state-diff hardening coverage for repair/redrive lineage, partial execution
   detection, idempotency-preserved replay and compensating action refs.
+- state-diff deeper hardening coverage for state dependency graph,
+  cross-action compensation chain and operator redrive review refs.
 
 Focused verification:
 
@@ -555,6 +564,7 @@ python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_memory_admission_deeper_hardening_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_state_diff_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_state_diff_hardening_scenarios.json
+python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_state_diff_deeper_hardening_scenarios.json
 python ai/python/scripts/run_agent_eval_current_report.py ai/python/fixtures/agent_eval/synthetic_core_scenarios.json --report-out .tmp-agent-current-report.json --baseline ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json --review-out .tmp-agent-baseline-review.json --force
 python ai/python/scripts/run_agent_eval_report_matrix.py ai/python/fixtures/agent_eval/report_matrix_sample.json --matrix-out .tmp-agent-eval-matrix/matrix.json --approval-manifest-out .tmp-agent-eval-matrix/approval-manifest.json --force
 python ai/python/scripts/run_agent_memory_calibration.py ai/python/fixtures/agent_eval/memory_calibration_sample.json --report-out .tmp-agent-memory-calibration-report.json --force

@@ -305,6 +305,41 @@ class AgentEvalTraceTests(unittest.TestCase):
         self.assertIn("resume", step_types)
         self.assertIn("replay", step_types)
 
+    def test_trace_flags_incomplete_replay_event(self) -> None:
+        case = validate_eval_suite(
+            suite_with_case(
+                {
+                    "case_id": "trace-runtime-replay-incomplete-case",
+                    "dataset_name": "synthetic",
+                    "dataset_version": "2026-07-02",
+                    "capability_family": "RUNTIME_CONTROL",
+                    "fixture_version": "fixture-v1",
+                    "input_refs": ["input:trace-runtime-replay-incomplete-case"],
+                    "expected_runtime_events": [
+                        "CHECKPOINT_CREATED",
+                        "REPLAY_REQUESTED",
+                        "REPLAY_RECONSTRUCTED",
+                        "REPLAY_SIDE_EFFECT_SKIPPED",
+                    ],
+                    "actual_runtime_events": [
+                        "CHECKPOINT_CREATED",
+                        "REPLAY_REQUESTED",
+                        "REPLAY_SIDE_EFFECT_SKIPPED",
+                    ],
+                    "expected_checkpoint_refs": ["checkpoint:trace-replay"],
+                    "actual_checkpoint_refs": ["checkpoint:trace-replay"],
+                }
+            )
+        )[0]
+
+        trace = build_agent_run_trace(case)
+
+        replay_steps = [step for step in trace.steps if step.step_type == "replay"]
+        self.assertEqual(trace.status, "FAIL")
+        self.assertEqual(len(replay_steps), 1)
+        self.assertEqual(replay_steps[0].status, "FAIL")
+        self.assertEqual(replay_steps[0].failure_class, "RUNTIME_EVENT_MISSING")
+
     def test_trace_contains_state_diff_report_metadata(self) -> None:
         case = validate_eval_suite(
             suite_with_case(

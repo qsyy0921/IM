@@ -1,0 +1,78 @@
+{
+  "schema_version": 1,
+  "suite_id": "synthetic-agent-runtime-control-negative-v1",
+  "fixture_kind": "synthetic_im_like",
+  "adapter_versions": [
+    "manual-runtime-control-negative-fixture-v1"
+  ],
+  "cases": [
+    {
+      "case_id": "runtime-missing-checkpoint-detected",
+      "dataset_name": "synthetic-runtime-control-negative",
+      "dataset_version": "2026-07-02",
+      "capability_family": "RUNTIME_CONTROL",
+      "fixture_version": "runtime-control-negative-v1",
+      "input_refs": ["input:runtime-missing-checkpoint-detected"],
+      "expected_runtime_events": [
+        "CHECKPOINT_CREATED",
+        "RESUME_REQUESTED",
+        "RESUME_COMPLETED"
+      ],
+      "actual_runtime_events": [
+        "CHECKPOINT_CREATED",
+        "RESUME_REQUESTED",
+        "RESUME_COMPLETED"
+      ],
+      "expected_checkpoint_refs": ["checkpoint:missing-resume"],
+      "actual_checkpoint_refs": [],
+      "expected_failure_class": "RESUME_CHECKPOINT_MISSING",
+      "actual_failure_class": "RESUME_CHECKPOINT_MISSING"
+    },
+    {
+      "case_id": "runtime-cancel-propagation-incomplete-detected",
+      "dataset_name": "synthetic-runtime-control-negative",
+      "dataset_version": "2026-07-02",
+      "capability_family": "RUNTIME_CONTROL",
+      "fixture_version": "runtime-control-negative-v1",
+      "input_refs": ["input:runtime-cancel-propagation-incomplete-detected"],
+      "expected_runtime_events": [
+        "CHECKPOINT_CREATED",
+        "CANCEL_REQUESTED",
+        "CANCEL_PROPAGATED",
+        "FINALIZED_CANCELLED"
+      ],
+      "actual_runtime_events": [
+        "CHECKPOINT_CREATED",
+        "CANCEL_REQUESTED"
+      ],
+      "expected_checkpoint_refs": ["checkpoint:cancel-incomplete"],
+      "actual_checkpoint_refs": ["checkpoint:cancel-incomplete"],
+      "expected_failure_class": "CANCEL_NOT_PROPAGATED",
+      "actual_failure_class": "CANCEL_NOT_PROPAGATED"
+    },
+    {
+      "case_id": "runtime-replay-event-incomplete-detected",
+      "dataset_name": "synthetic-runtime-control-negative",
+      "dataset_version": "2026-07-02",
+      "capability_family": "RUNTIME_CONTROL",
+      "fixture_version": "runtime-control-negative-v1",
+      "input_refs": ["input:runtime-replay-event-incomplete-detected"],
+      "expected_runtime_events": [
+        "CHECKPOINT_CREATED",
+        "REPLAY_REQUESTED",
+        "REPLAY_RECONSTRUCTED",
+        "REPLAY_SIDE_EFFECT_SKIPPED"
+      ],
+      "actual_runtime_events": [
+        "CHECKPOINT_CREATED",
+        "REPLAY_REQUESTED",
+        "REPLAY_SIDE_EFFECT_SKIPPED"
+      ],
+      "expected_checkpoint_refs": ["checkpoint:replay-incomplete"],
+      "actual_checkpoint_refs": ["checkpoint:replay-incomplete"],
+      "side_effect_reexecuted": false,
+      "expected_failure_class": "RUNTIME_EVENT_MISSING",
+      "actual_failure_class": "RUNTIME_EVENT_MISSING"
+    }
+  ]
+}

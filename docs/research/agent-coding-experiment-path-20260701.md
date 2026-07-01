@@ -71,6 +71,7 @@ ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json
 ai/python/fixtures/agent_eval/synthetic_first_trio.json
 ai/python/fixtures/agent_eval/synthetic_core_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_runtime_control_scenarios.json
+ai/python/fixtures/agent_eval/synthetic_runtime_control_negative_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_mcp_security_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_context_evidence_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_context_evidence_hardening_scenarios.json
@@ -119,6 +120,8 @@ Slice 0 covers:
 - EvalReport baseline fixture, regression delta and blocked promotion reasons.
 - fixture-only runtime-control coverage for cancel propagation, checkpointed
   approval resume and replay without side-effect reexecution.
+- fixture-only runtime-control negative coverage for missing checkpoint,
+  incomplete cancel propagation and incomplete replay event detection.
 - fixture-only MCP security coverage for poisoned tool descriptions, unsafe MCP
   output instructions, provider provenance mismatch and sandbox-only providers.
 - fixture-only ContextPackage / EvidencePack coverage for source coverage,
@@ -242,6 +245,7 @@ Current fixture:
 ai/python/fixtures/agent_eval/synthetic_first_trio.json
 ai/python/fixtures/agent_eval/synthetic_core_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_runtime_control_scenarios.json
+ai/python/fixtures/agent_eval/synthetic_runtime_control_negative_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_mcp_security_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_context_evidence_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_context_evidence_hardening_scenarios.json
@@ -322,6 +326,7 @@ Integration tests:
 - load `synthetic_first_trio.json`;
 - load `synthetic_core_scenarios.json`;
 - load `synthetic_runtime_control_scenarios.json`;
+- load `synthetic_runtime_control_negative_scenarios.json`;
 - load `synthetic_mcp_security_scenarios.json`;
 - load `synthetic_context_evidence_scenarios.json`;
 - load `synthetic_context_evidence_hardening_scenarios.json`;
@@ -352,6 +357,7 @@ python -m pytest ai/python/tests/test_agent_eval_contracts.py ai/python/tests/te
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_first_trio.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_core_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_runtime_control_scenarios.json
+python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_runtime_control_negative_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_mcp_security_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_context_evidence_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_context_evidence_hardening_scenarios.json
@@ -383,14 +389,12 @@ git status --short --branch --untracked-files=all
 
 Recommended next slices:
 
-1. Add runtime-control negative fixture pack for missing checkpoints and
-   incomplete cancel propagation.
-2. Add current-report generation script for baseline refresh review.
-3. Harden Tool / MCP security with tool argument schema mismatch,
+1. Add current-report generation script for baseline refresh review.
+2. Harden Tool / MCP security with tool argument schema mismatch,
    tool-selection attack, prepare expiry and multi-provider selection cases.
-4. Deepen memory admission with multi-source duplicate clustering, confidence
+3. Deepen memory admission with multi-source duplicate clustering, confidence
    calibration, procedural memory migration and governed policy allowlist cases.
-5. Deepen ContextPackage / EvidencePack with source ranking, lane redrive,
+4. Deepen ContextPackage / EvidencePack with source ranking, lane redrive,
    snippet-level citation repair and cross-tenant denied-lane cases.
 
 Each slice must keep the same isolation rule until an ADR explicitly promotes a

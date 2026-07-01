@@ -625,7 +625,17 @@ def _runtime_control_steps(
             )
         )
     if any(event.startswith("REPLAY_") for event in expected_events | actual_events):
-        replay_status = "PASS" if runtime_control.replay_complete else "FAIL"
+        replay_events_complete = {
+            event for event in expected_events if event.startswith("REPLAY_")
+        }.issubset(actual_events)
+        replay_status = (
+            "PASS" if runtime_control.replay_complete and replay_events_complete else "FAIL"
+        )
+        replay_failure = ""
+        if not runtime_control.replay_complete:
+            replay_failure = "REPLAY_INCOMPLETE"
+        elif not replay_events_complete:
+            replay_failure = "RUNTIME_EVENT_MISSING"
         steps.append(
             _step(
                 case,
@@ -633,7 +643,7 @@ def _runtime_control_steps(
                 replay_status,
                 runtime_control.checkpoint_refs or case.input_refs,
                 [runtime_control.runtime_control_ref],
-                "" if replay_status == "PASS" else "REPLAY_INCOMPLETE",
+                replay_failure,
             )
         )
     return steps

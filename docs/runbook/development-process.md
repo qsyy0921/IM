@@ -111,6 +111,7 @@ NexusIM Agent 层的开发顺序不是先接真实聊天数据，也不是先写
 - public-dataset-style adapter skeleton。
 - AgentRun / AgentStep trace skeleton。
 - fixture-only cancel / resume / replay runtime-control skeleton。
+- fixture-only runtime-control negative skeleton。
 - fixture-only MCP security skeleton。
 - fixture-only ContextPackage / EvidencePack skeleton。
 - fixture-only ContextPackage / EvidencePack hardening skeleton。

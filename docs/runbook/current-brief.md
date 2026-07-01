@@ -98,7 +98,9 @@ Agent Gateway / UX
   unauthorized mutation detection。
 - 已补 fixture-only state-diff hardening：repair/redrive lineage、partial execution
   detection、idempotency-preserved replay、compensating action refs。
-- 下一段优先做 runtime-control negative fixture、current-report generation 和
+- 已补 fixture-only runtime-control negative coverage：missing checkpoint、
+  cancel propagation incomplete、replay event incomplete。
+- 下一段优先做 current-report generation / baseline refresh review 和
   Tool / MCP security hardening 等离线能力。
 
 ## 工作规则

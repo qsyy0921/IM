@@ -102,6 +102,7 @@ ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json
 ai/python/fixtures/agent_eval/synthetic_first_trio.json
 ai/python/fixtures/agent_eval/synthetic_core_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_runtime_control_scenarios.json
+ai/python/fixtures/agent_eval/synthetic_runtime_control_negative_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_mcp_security_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_context_evidence_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_context_evidence_hardening_scenarios.json
@@ -129,6 +130,8 @@ ai/python/tests/test_agent_eval_*.py
 - EvalReport baseline comparison、regression delta 和 blocked promotion reasons。
 - RuntimeControlFixture、checkpoint refs、cancel/resume/replay runtime events 和
   对应 synthetic fixture。
+- Runtime-control negative fixture：missing checkpoint、cancel propagation incomplete、
+  replay event incomplete。
 - MCP security fixture：poisoned tool description、unsafe output instruction、
   provider provenance mismatch、sandbox-only provider。
 - ContextPackage / EvidencePack fixture：source coverage、conflict marker、
@@ -149,11 +152,11 @@ ai/python/tests/test_agent_eval_*.py
 
 | 优先级 | 工作 | 输出 |
 | --- | --- | --- |
-| P1 | Runtime-control negative fixtures | missing checkpoint、cancel propagation incomplete、replay event incomplete |
 | P1 | Current-report generation / baseline refresh review | 当前 EvalReport 生成、baseline refresh review、blocked promotion summary |
 | P1 | Tool / MCP security hardening | tool args schema、tool-selection attack、prepare expiry、多候选 provider selection |
 | P2 | Memory admission deeper hardening | multi-source duplicate clustering、confidence calibration、procedural memory migration、governed policy allowlist、review redrive |
 | P2 | ContextPackage / EvidencePack deeper hardening | source ranking、lane redrive、snippet-level citation repair、denied-lane、taint propagation |
+| P2 | Runtime-control deeper hardening | checkpoint version drift、workflow wakeup race、replay bundle lineage completeness |
 | P2 | State-diff deeper hardening | state dependency graph、cross-action compensation chain、operator redrive review |
 | P2 | ADR promotion decision | 是否提升 Agent Runtime / Harness、memory admission、ReplayBundle 等契约 |
 
@@ -170,7 +173,8 @@ ai/python/tests/test_agent_eval_*.py
 - SDD index / research index / architecture index link check
 - 不触碰 proto、schema、migration、production service directory
 
-后续 fixture-only prototype 继续增加 cancel/resume/replay consistency 和 security fixture gate。
+后续 fixture-only prototype 优先补 current-report generation / baseline refresh review，
+随后推进 Tool / MCP security hardening fixture gate。
 
 ## 历史资料路由
 

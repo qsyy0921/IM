@@ -237,6 +237,9 @@ The harness should normalize:
 - `MEMORY_CONFLICT`
 - `MEMORY_POLLUTION`
 - `HANDOFF_SCOPE_VIOLATION`
+- `RUNTIME_EVENT_MISSING`
+- `RESUME_CHECKPOINT_MISSING`
+- `CANCEL_NOT_PROPAGATED`
 - `REPLAY_INCOMPLETE`
 
 Unknown failures should block promotion until classified.
@@ -363,6 +366,7 @@ ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json
 ai/python/fixtures/agent_eval/synthetic_first_trio.json
 ai/python/fixtures/agent_eval/synthetic_core_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_runtime_control_scenarios.json
+ai/python/fixtures/agent_eval/synthetic_runtime_control_negative_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_mcp_security_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_context_evidence_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_context_evidence_hardening_scenarios.json
@@ -410,6 +414,8 @@ Implemented checks:
   promotion reasons.
 - runtime-control fixture coverage for cancel propagation, checkpointed approval
   resume and replay without side-effect reexecution.
+- runtime-control negative fixture coverage for missing checkpoint, incomplete
+  cancel propagation and incomplete replay event detection.
 - MCP security fixture coverage for poisoned tool descriptions, unsafe MCP
   output instructions, provider provenance mismatch and sandbox-only providers.
 - ContextPackage / EvidencePack fixture coverage for source coverage, conflict
@@ -436,6 +442,7 @@ python -m pytest ai/python/tests/test_agent_eval_contracts.py ai/python/tests/te
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_first_trio.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_core_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_runtime_control_scenarios.json
+python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_runtime_control_negative_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_mcp_security_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_context_evidence_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_context_evidence_hardening_scenarios.json

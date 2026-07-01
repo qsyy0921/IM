@@ -884,6 +884,100 @@ class AgentEvalEvaluatorTests(unittest.TestCase):
         self.assertEqual(report.status, "FAIL")
         self.assertEqual(report.results[0].failure_class, "CANCEL_NOT_PROPAGATED")
 
+    def test_runtime_control_fails_incomplete_replay_event(self) -> None:
+        case = base_case("RUNTIME_CONTROL")
+        case.update(
+            {
+                "expected_runtime_events": [
+                    "CHECKPOINT_CREATED",
+                    "REPLAY_REQUESTED",
+                    "REPLAY_RECONSTRUCTED",
+                    "REPLAY_SIDE_EFFECT_SKIPPED",
+                ],
+                "actual_runtime_events": [
+                    "CHECKPOINT_CREATED",
+                    "REPLAY_REQUESTED",
+                    "REPLAY_SIDE_EFFECT_SKIPPED",
+                ],
+                "expected_checkpoint_refs": ["checkpoint:replay"],
+                "actual_checkpoint_refs": ["checkpoint:replay"],
+            }
+        )
+
+        report = run_eval_suite(suite_with_case(case))
+
+        self.assertEqual(report.status, "FAIL")
+        self.assertEqual(report.results[0].failure_class, "RUNTIME_EVENT_MISSING")
+        self.assertEqual(report.aggregate_scores["runtime_event_score"], 0.0)
+
+    def test_runtime_control_expected_negative_cases_pass_when_detected(self) -> None:
+        cases: list[dict[str, object]] = []
+        missing_checkpoint = base_case("RUNTIME_CONTROL")
+        missing_checkpoint.update(
+            {
+                "case_id": "runtime-missing-checkpoint-detected",
+                "expected_runtime_events": [
+                    "CHECKPOINT_CREATED",
+                    "RESUME_REQUESTED",
+                    "RESUME_COMPLETED",
+                ],
+                "actual_runtime_events": [
+                    "CHECKPOINT_CREATED",
+                    "RESUME_REQUESTED",
+                    "RESUME_COMPLETED",
+                ],
+                "expected_checkpoint_refs": ["checkpoint:runtime"],
+                "actual_checkpoint_refs": [],
+                "expected_failure_class": "RESUME_CHECKPOINT_MISSING",
+                "actual_failure_class": "RESUME_CHECKPOINT_MISSING",
+            }
+        )
+        cases.append(missing_checkpoint)
+        cancel_incomplete = base_case("RUNTIME_CONTROL")
+        cancel_incomplete.update(
+            {
+                "case_id": "runtime-cancel-propagation-incomplete-detected",
+                "expected_runtime_events": ["CANCEL_REQUESTED", "CANCEL_PROPAGATED"],
+                "actual_runtime_events": ["CANCEL_REQUESTED"],
+                "expected_checkpoint_refs": ["checkpoint:cancel"],
+                "actual_checkpoint_refs": ["checkpoint:cancel"],
+                "expected_failure_class": "CANCEL_NOT_PROPAGATED",
+                "actual_failure_class": "CANCEL_NOT_PROPAGATED",
+            }
+        )
+        cases.append(cancel_incomplete)
+        replay_incomplete = base_case("RUNTIME_CONTROL")
+        replay_incomplete.update(
+            {
+                "case_id": "runtime-replay-event-incomplete-detected",
+                "expected_runtime_events": [
+                    "REPLAY_REQUESTED",
+                    "REPLAY_RECONSTRUCTED",
+                    "REPLAY_SIDE_EFFECT_SKIPPED",
+                ],
+                "actual_runtime_events": [
+                    "REPLAY_REQUESTED",
+                    "REPLAY_SIDE_EFFECT_SKIPPED",
+                ],
+                "expected_failure_class": "RUNTIME_EVENT_MISSING",
+                "actual_failure_class": "RUNTIME_EVENT_MISSING",
+            }
+        )
+        cases.append(replay_incomplete)
+
+        payload = {
+            "schema_version": 1,
+            "suite_id": "runtime-negative-suite",
+            "fixture_kind": "synthetic_im_like",
+            "cases": cases,
+        }
+        report = run_eval_suite(payload)
+
+        self.assertEqual(report.status, "PASS")
+        self.assertEqual(report.case_count, 3)
+        self.assertEqual(report.failure_distribution, {"PASS": 3})
+        self.assertEqual(report.aggregate_scores["expected_failure_match"], 1.0)
+
 
 if __name__ == "__main__":
     unittest.main()

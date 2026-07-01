@@ -120,6 +120,7 @@ NexusIM Agent 层的开发顺序不是先接真实聊天数据，也不是先写
 - fixture-only StateDiffReport / action outcome skeleton。
 - fixture-only StateDiffReport hardening skeleton。
 - CLI：`ai/python/scripts/run_agent_eval_fixture.py`。
+- Current report CLI：`ai/python/scripts/run_agent_eval_current_report.py`。
 - Adapter batch CLI：`ai/python/scripts/run_agent_dataset_adapter.py`。
 - Regression CLI：`ai/python/scripts/run_agent_eval_regression.py`。
 - 单元测试、集成测试和边界测试：`ai/python/tests/test_agent_eval_*.py`。

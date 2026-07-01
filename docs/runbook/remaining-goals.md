@@ -14,24 +14,25 @@
 
 ## 当前优先顺序
 
-1. Current-report generation / baseline refresh review：把当前 EvalReport 生成和 baseline
-   更新评审脚本化，避免手工复制导致 baseline 漂移。
-2. Tool / MCP security hardening：基础 malicious tool description、unsafe output、
+1. Tool / MCP security hardening：基础 malicious tool description、unsafe output、
    MCP provider provenance 和 sandbox-only provider fixture 已落地；后续覆盖 tool
    argument schema mismatch、tool-selection attack、prepare expiry 和多候选 provider
    selection。
-3. Memory admission deeper hardening：基础 group/project/profile、supersedes、
+2. Memory admission deeper hardening：基础 group/project/profile、supersedes、
    revocation、stale facts、speaker attribution、audience scope、overgeneralization、
    duplicate dedupe、low-confidence rejection、procedural skill binding、
    policy-like memory rejection 和 review timeout fixture 已落地；后续覆盖
    multi-source duplicate clustering、confidence calibration、procedural memory
    migration / invalidation、governed policy source allowlist / revocation 和
    review retry / escalation / redrive cases。
-4. ContextPackage / EvidencePack deeper hardening：基础 source coverage、temporal
+3. ContextPackage / EvidencePack deeper hardening：基础 source coverage、temporal
    version、conflict marker、permission abstain、memory-vs-current-source precedence、
    unsafe tool output quarantine、context-budget retention 和 retrieval lane unavailable
    fixture 已落地；后续覆盖 source ranking、lane redrive、snippet-level citation
    repair、cross-tenant denied-lane 和 taint propagation cases。
+4. Current-report / baseline lifecycle deeper hardening：当前 EvalReport 生成和 baseline
+   refresh review CLI 已落地；后续只保留多 suite report matrix、baseline refresh approval
+   manifest 和 report retention metadata。
 5. Runtime-control deeper hardening：基础 cancel/resume/replay 正向 fixture 和 missing
    checkpoint、cancel propagation incomplete、replay event incomplete 负向 fixture 已落地；
    后续只保留 checkpoint version drift、workflow wakeup race 和 replay bundle lineage

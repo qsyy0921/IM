@@ -100,8 +100,9 @@ Agent Gateway / UX
   detection、idempotency-preserved replay、compensating action refs。
 - 已补 fixture-only runtime-control negative coverage：missing checkpoint、
   cancel propagation incomplete、replay event incomplete。
-- 下一段优先做 current-report generation / baseline refresh review 和
-  Tool / MCP security hardening 等离线能力。
+- 已补 current EvalReport generation / baseline refresh review CLI，生成当前报告和
+  baseline refresh review artifact，默认不覆盖 baseline。
+- 下一段优先做 Tool / MCP security hardening 等离线能力。
 
 ## 工作规则
 

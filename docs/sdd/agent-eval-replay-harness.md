@@ -360,6 +360,7 @@ ai/python/nexusim_ai_eval/
   contracts.py
   evaluator.py
   fixtures.py
+  reporting.py
   trace.py
 ai/python/fixtures/agent_eval/adapter_samples/
 ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json
@@ -375,6 +376,7 @@ ai/python/fixtures/agent_eval/synthetic_memory_admission_hardening_scenarios.jso
 ai/python/fixtures/agent_eval/synthetic_state_diff_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_hardening_scenarios.json
 ai/python/scripts/run_agent_eval_fixture.py
+ai/python/scripts/run_agent_eval_current_report.py
 ai/python/scripts/run_agent_dataset_adapter.py
 ai/python/scripts/run_agent_eval_regression.py
 ai/python/tests/test_agent_eval_contracts.py
@@ -412,6 +414,7 @@ Implemented checks:
 - batch adapter conversion / run CLI;
 - EvalReport baseline comparison with aggregate deltas, case deltas and blocked
   promotion reasons.
+- current EvalReport generation and baseline refresh review artifact generation.
 - runtime-control fixture coverage for cancel propagation, checkpointed approval
   resume and replay without side-effect reexecution.
 - runtime-control negative fixture coverage for missing checkpoint, incomplete
@@ -450,6 +453,7 @@ python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_memory_admission_hardening_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_state_diff_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_state_diff_hardening_scenarios.json
+python ai/python/scripts/run_agent_eval_current_report.py ai/python/fixtures/agent_eval/synthetic_core_scenarios.json --report-out .tmp-agent-current-report.json --baseline ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json --review-out .tmp-agent-baseline-review.json --force
 python ai/python/scripts/run_agent_dataset_adapter.py --run ai/python/fixtures/agent_eval/adapter_samples/qasper_like_rag_samples.json
 python ai/python/scripts/run_agent_eval_regression.py ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json
 ```

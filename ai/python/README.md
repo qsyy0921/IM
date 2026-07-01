@@ -39,6 +39,7 @@ ai/python/
     contracts.py
     evaluator.py
     fixtures.py
+    reporting.py
     trace.py
   fixtures/
     agent_eval/
@@ -61,6 +62,7 @@ ai/python/
     run_candidate_worker.py
     run_memory_extraction_candidate.py
     run_agent_eval_fixture.py
+    run_agent_eval_current_report.py
     run_agent_dataset_adapter.py
     run_agent_eval_regression.py
     validate_contracts.py
@@ -88,6 +90,7 @@ python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_memory_admission_hardening_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_state_diff_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_state_diff_hardening_scenarios.json
+python ai/python/scripts/run_agent_eval_current_report.py ai/python/fixtures/agent_eval/synthetic_core_scenarios.json --report-out .tmp-agent-current-report.json --baseline ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json --review-out .tmp-agent-baseline-review.json --force
 python ai/python/scripts/run_agent_dataset_adapter.py --run ai/python/fixtures/agent_eval/adapter_samples/qasper_like_rag_samples.json
 python ai/python/scripts/run_agent_eval_regression.py ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json
 python -m ruff check ai/python
@@ -206,6 +209,8 @@ EvidencePack, MemoryCandidate and ToolIntent fixture refs.
 `nexusim_ai_eval.adapter_runner` converts local public-dataset-style sample
 payloads into validated EvalSuite JSON, and `nexusim_ai_eval.comparison`
 compares low-sensitive EvalReports against a baseline for regression blocking.
+`nexusim_ai_eval.reporting` generates current EvalReport artifacts and baseline
+refresh review payloads without overwriting baselines.
 
 Run it directly:
 
@@ -221,6 +226,7 @@ python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_memory_admission_hardening_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_state_diff_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_state_diff_hardening_scenarios.json
+python ai/python/scripts/run_agent_eval_current_report.py ai/python/fixtures/agent_eval/synthetic_core_scenarios.json --report-out .tmp-agent-current-report.json --baseline ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json --review-out .tmp-agent-baseline-review.json --force
 python ai/python/scripts/run_agent_dataset_adapter.py --run ai/python/fixtures/agent_eval/adapter_samples/qasper_like_rag_samples.json
 python ai/python/scripts/run_agent_dataset_adapter.py --run ai/python/fixtures/agent_eval/adapter_samples/toolsandbox_like_tool_samples.json
 python ai/python/scripts/run_agent_dataset_adapter.py --run ai/python/fixtures/agent_eval/adapter_samples/statebench_like_memory_samples.json

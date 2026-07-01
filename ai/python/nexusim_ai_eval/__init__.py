@@ -18,6 +18,10 @@ from nexusim_ai_eval.contracts import (
     validate_eval_suite,
 )
 from nexusim_ai_eval.evaluator import run_eval_suite
+from nexusim_ai_eval.reporting import (
+    build_baseline_refresh_review,
+    generate_current_report_payload,
+)
 from nexusim_ai_eval.trace import (
     AgentRunTrace,
     AgentStep,
@@ -39,8 +43,10 @@ __all__ = [
     "ToolSandboxLikeAdapter",
     "adapter_by_name",
     "build_agent_run_trace",
+    "build_baseline_refresh_review",
     "compare_eval_reports",
     "convert_adapter_payload",
+    "generate_current_report_payload",
     "run_eval_suite",
     "run_adapter_payload",
     "suite_from_adapter_cases",

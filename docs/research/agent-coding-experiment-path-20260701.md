@@ -33,6 +33,7 @@ Allowed paths:
 ai/python/nexusim_ai_eval/
 ai/python/fixtures/agent_eval/
 ai/python/scripts/run_agent_eval_fixture.py
+ai/python/scripts/run_agent_eval_current_report.py
 ai/python/scripts/run_agent_dataset_adapter.py
 ai/python/scripts/run_agent_eval_regression.py
 ai/python/tests/test_agent_eval_*.py
@@ -65,6 +66,7 @@ ai/python/nexusim_ai_eval/
   contracts.py
   evaluator.py
   fixtures.py
+  reporting.py
   trace.py
 ai/python/fixtures/agent_eval/adapter_samples/
 ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json
@@ -118,6 +120,7 @@ Slice 0 covers:
   ToolSandbox-like tool security and STATE-Bench-like memory;
 - batch adapter conversion / run CLI;
 - EvalReport baseline fixture, regression delta and blocked promotion reasons.
+- Current EvalReport generation and baseline refresh review artifacts.
 - fixture-only runtime-control coverage for cancel propagation, checkpointed
   approval resume and replay without side-effect reexecution.
 - fixture-only runtime-control negative coverage for missing checkpoint,
@@ -283,6 +286,14 @@ EvalReport-like JSON:
 python ai/python/scripts/run_agent_eval_regression.py ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json
 ```
 
+`ai/python/scripts/run_agent_eval_current_report.py` generates a current
+EvalReport artifact and optional baseline refresh review without modifying the
+baseline:
+
+```powershell
+python ai/python/scripts/run_agent_eval_current_report.py ai/python/fixtures/agent_eval/synthetic_core_scenarios.json --report-out .tmp-agent-current-report.json --baseline ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json --review-out .tmp-agent-baseline-review.json --force
+```
+
 Exit codes:
 
 - `0`: report status `PASS`;
@@ -335,6 +346,7 @@ Integration tests:
 - load `synthetic_state_diff_scenarios.json`;
 - load `synthetic_state_diff_hardening_scenarios.json`;
 - run `run_agent_eval_fixture.py`;
+- run `run_agent_eval_current_report.py`;
 - verify report status, case count, failure distribution and `raw_payload_returned=false`.
 
 ### 5.3 Boundary Tests
@@ -365,6 +377,7 @@ python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_memory_admission_hardening_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_state_diff_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_state_diff_hardening_scenarios.json
+python ai/python/scripts/run_agent_eval_current_report.py ai/python/fixtures/agent_eval/synthetic_core_scenarios.json --report-out .tmp-agent-current-report.json --baseline ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json --review-out .tmp-agent-baseline-review.json --force
 python ai/python/scripts/run_agent_dataset_adapter.py --run ai/python/fixtures/agent_eval/adapter_samples/qasper_like_rag_samples.json
 python ai/python/scripts/run_agent_eval_regression.py ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json
 ```
@@ -389,12 +402,11 @@ git status --short --branch --untracked-files=all
 
 Recommended next slices:
 
-1. Add current-report generation script for baseline refresh review.
-2. Harden Tool / MCP security with tool argument schema mismatch,
+1. Harden Tool / MCP security with tool argument schema mismatch,
    tool-selection attack, prepare expiry and multi-provider selection cases.
-3. Deepen memory admission with multi-source duplicate clustering, confidence
+2. Deepen memory admission with multi-source duplicate clustering, confidence
    calibration, procedural memory migration and governed policy allowlist cases.
-4. Deepen ContextPackage / EvidencePack with source ranking, lane redrive,
+3. Deepen ContextPackage / EvidencePack with source ranking, lane redrive,
    snippet-level citation repair and cross-tenant denied-lane cases.
 
 Each slice must keep the same isolation rule until an ADR explicitly promotes a

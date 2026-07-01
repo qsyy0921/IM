@@ -14,28 +14,25 @@
 
 ## 当前优先顺序
 
-1. Current-report / baseline lifecycle deeper hardening：当前 EvalReport 生成和 baseline
-   refresh review CLI 已落地；后续只保留多 suite report matrix、baseline refresh approval
-   manifest 和 report retention metadata。
-2. Memory admission calibration：基础 group/project/profile、supersedes、revocation、
+1. Memory admission calibration：基础 group/project/profile、supersedes、revocation、
    stale facts、speaker attribution、audience scope、overgeneralization、duplicate dedupe、
    duplicate cluster representative / tie-break、low-confidence rejection、confidence
    threshold、procedural skill binding、policy-like memory rejection、governed policy
    revocation window、review timeout 和 review redrive fixture / adapter sample 已落地；
    后续只保留更大公开 memory 数据集上的 confidence threshold tuning、policy
    revocation-window retention policy 和 review backoff / operator queue policy。
-3. Runtime-control deeper hardening：基础 cancel/resume/replay 正向 fixture 和 missing
+2. Runtime-control deeper hardening：基础 cancel/resume/replay 正向 fixture 和 missing
    checkpoint、cancel propagation incomplete、replay event incomplete 负向 fixture 已落地；
    后续只保留 checkpoint version drift、workflow wakeup race 和 replay bundle lineage
    completeness cases。
-4. State-diff deeper hardening：基础 action outcome report、expected-vs-actual state
+3. State-diff deeper hardening：基础 action outcome report、expected-vs-actual state
    change、execution refs、audit refs、incomplete report、unauthorized mutation、
    repair/redrive、partial execution、idempotency 和 compensating action fixture 已落地；
    后续只保留更深的 state dependency graph、cross-action compensation chain 和 operator
    redrive review cases。
-5. ReplayBundle / observability：定义低敏 refs、hashes、version metadata、failure
+4. ReplayBundle / observability：定义低敏 refs、hashes、version metadata、failure
    taxonomy 和 trace linkage。
-6. ADR promotion review：只有前述 fixture/eval 有证据后，才评估 Agent Runtime、
+5. ADR promotion review：只有前述 fixture/eval 有证据后，才评估 Agent Runtime、
    ContextPackage、MemoryCandidate、Tool prepare、ReplayBundle 是否提升为 ADR / 契约。
 
 ## Dataset Backlog

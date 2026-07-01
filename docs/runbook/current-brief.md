@@ -120,8 +120,10 @@ Agent Gateway / UX
   cancel propagation incomplete、replay event incomplete。
 - 已补 current EvalReport generation / baseline refresh review CLI，生成当前报告和
   baseline refresh review artifact，默认不覆盖 baseline。
-- 下一段优先做 current-report / baseline lifecycle deeper hardening，其次做
-  memory threshold / policy calibration。
+- 已补 current-report / baseline lifecycle deeper hardening：多 suite report
+  matrix、baseline refresh approval manifest 和 report retention metadata，
+  支持 synthetic fixture 与 public-dataset-style adapter sample 混合进矩阵。
+- 下一段优先做 memory threshold / policy calibration。
 
 ## 工作规则
 

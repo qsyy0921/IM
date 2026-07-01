@@ -113,8 +113,10 @@ ai/python/fixtures/agent_eval/synthetic_memory_admission_hardening_scenarios.jso
 ai/python/fixtures/agent_eval/synthetic_memory_admission_deeper_hardening_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_hardening_scenarios.json
+ai/python/fixtures/agent_eval/report_matrix_sample.json
 ai/python/scripts/run_agent_eval_fixture.py
 ai/python/scripts/run_agent_eval_current_report.py
+ai/python/scripts/run_agent_eval_report_matrix.py
 ai/python/scripts/run_agent_dataset_adapter.py
 ai/python/scripts/run_agent_eval_regression.py
 ai/python/tests/test_agent_eval_*.py
@@ -133,6 +135,9 @@ ai/python/tests/test_agent_eval_*.py
 - 本地 adapter sample payloads 和批量转换 / 运行 CLI。
 - EvalReport baseline comparison、regression delta 和 blocked promotion reasons。
 - Current EvalReport generation、baseline refresh review artifact 和 baseline overwrite guard。
+- Current-report lifecycle hardening：多 suite report matrix、baseline refresh
+  approval manifest、report retention metadata，且支持 synthetic fixture 与
+  public-dataset-style adapter sample 混合进同一矩阵。
 - RuntimeControlFixture、checkpoint refs、cancel/resume/replay runtime events 和
   对应 synthetic fixture。
 - Runtime-control negative fixture：missing checkpoint、cancel propagation incomplete、
@@ -175,8 +180,7 @@ ai/python/tests/test_agent_eval_*.py
 
 | 优先级 | 工作 | 输出 |
 | --- | --- | --- |
-| P1 | Current-report deeper hardening | 多 suite report matrix、baseline refresh approval manifest、report retention metadata |
-| P2 | Memory admission calibration | 更大公开 memory 数据集上的 confidence threshold tuning、policy revocation-window retention、review backoff / operator queue policy |
+| P1 | Memory admission calibration | 更大公开 memory 数据集上的 confidence threshold tuning、policy revocation-window retention、review backoff / operator queue policy |
 | P2 | Runtime-control deeper hardening | checkpoint version drift、workflow wakeup race、replay bundle lineage completeness |
 | P2 | State-diff deeper hardening | state dependency graph、cross-action compensation chain、operator redrive review |
 | P2 | ADR promotion decision | 是否提升 Agent Runtime / Harness、memory admission、ReplayBundle 等契约 |
@@ -194,7 +198,7 @@ ai/python/tests/test_agent_eval_*.py
 - SDD index / research index / architecture index link check
 - 不触碰 proto、schema、migration、production service directory
 
-后续 fixture-only prototype 优先推进 current-report / baseline lifecycle deeper hardening。
+后续 fixture-only prototype 优先推进 memory admission calibration。
 
 ## 历史资料路由
 

@@ -83,9 +83,7 @@ Agent / RAG / memory / Python AI Worker / EvidencePack / eval gate，不使用�
 
 ## 后续优先级
 
-1. 增加 current-report / baseline lifecycle deeper hardening，覆盖多 suite report
-   matrix、baseline refresh approval manifest 和 report retention metadata。
-2. 对 memory admission 的 confidence threshold、governed policy revocation window
+1. 对 memory admission 的 confidence threshold、governed policy revocation window
    和 review backoff 做更大公开数据集校准，仍不接真实 IM 数据。
-3. 在上述实验通过后，再决定是否把 Agent Runtime / Harness 提升为 ADR、服务级 SDD
+2. 在上述实验通过后，再决定是否把 Agent Runtime / Harness 提升为 ADR、服务级 SDD
    或实际 runtime module。

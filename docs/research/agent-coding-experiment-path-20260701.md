@@ -34,6 +34,7 @@ ai/python/nexusim_ai_eval/
 ai/python/fixtures/agent_eval/
 ai/python/scripts/run_agent_eval_fixture.py
 ai/python/scripts/run_agent_eval_current_report.py
+ai/python/scripts/run_agent_eval_report_matrix.py
 ai/python/scripts/run_agent_dataset_adapter.py
 ai/python/scripts/run_agent_eval_regression.py
 ai/python/tests/test_agent_eval_*.py
@@ -70,6 +71,7 @@ ai/python/nexusim_ai_eval/
   trace.py
 ai/python/fixtures/agent_eval/adapter_samples/
 ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json
+ai/python/fixtures/agent_eval/report_matrix_sample.json
 ai/python/fixtures/agent_eval/synthetic_first_trio.json
 ai/python/fixtures/agent_eval/synthetic_core_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_runtime_control_scenarios.json
@@ -85,6 +87,8 @@ ai/python/fixtures/agent_eval/synthetic_memory_admission_deeper_hardening_scenar
 ai/python/fixtures/agent_eval/synthetic_state_diff_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_hardening_scenarios.json
 ai/python/scripts/run_agent_eval_fixture.py
+ai/python/scripts/run_agent_eval_current_report.py
+ai/python/scripts/run_agent_eval_report_matrix.py
 ai/python/scripts/run_agent_dataset_adapter.py
 ai/python/scripts/run_agent_eval_regression.py
 ```
@@ -98,6 +102,7 @@ ai/python/tests/test_agent_eval_integration.py
 ai/python/tests/test_agent_eval_adapters.py
 ai/python/tests/test_agent_eval_adapter_runner.py
 ai/python/tests/test_agent_eval_comparison.py
+ai/python/tests/test_agent_eval_reporting.py
 ai/python/tests/test_agent_eval_trace.py
 ```
 
@@ -124,6 +129,8 @@ Slice 0 covers:
 - batch adapter conversion / run CLI;
 - EvalReport baseline fixture, regression delta and blocked promotion reasons.
 - Current EvalReport generation and baseline refresh review artifacts.
+- Multi-suite current-report matrix, baseline refresh approval manifest and
+  low-sensitive report retention metadata.
 - fixture-only runtime-control coverage for cancel propagation, checkpointed
   approval resume and replay without side-effect reexecution.
 - fixture-only runtime-control negative coverage for missing checkpoint,
@@ -220,7 +227,7 @@ They do not download public datasets, call providers or import backend code.
 `nexusim_ai_eval.adapter_runner` owns batch conversion from local adapter sample
 payloads to validated EvalSuite JSON and optional immediate EvalReport runs.
 
-### 4.4 Baseline Comparison
+### 4.4 Baseline Comparison and Report Lifecycle
 
 `nexusim_ai_eval.comparison` owns low-sensitive EvalReport comparison:
 
@@ -232,6 +239,17 @@ payloads to validated EvalSuite JSON and optional immediate EvalReport runs.
 
 It accepts EvalReport-like JSON only. It does not read production data, execute
 fixtures, call models or connect to backend services.
+
+`nexusim_ai_eval.reporting` owns fixture-only report lifecycle artifacts:
+
+- current EvalReport generation;
+- baseline refresh review payloads;
+- multi-suite current-report matrices;
+- baseline refresh approval manifests;
+- retention metadata for low-sensitive eval artifacts.
+
+It never overwrites baselines directly. Refresh decisions remain manual
+approval inputs until a later ADR promotes service integration.
 
 ### 4.5 AgentRun Trace
 
@@ -332,6 +350,14 @@ baseline:
 python ai/python/scripts/run_agent_eval_current_report.py ai/python/fixtures/agent_eval/synthetic_core_scenarios.json --report-out .tmp-agent-current-report.json --baseline ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json --review-out .tmp-agent-baseline-review.json --force
 ```
 
+`ai/python/scripts/run_agent_eval_report_matrix.py` runs a local report matrix
+plan and writes per-suite current reports, baseline reviews, a multi-suite
+matrix and a baseline refresh approval manifest:
+
+```powershell
+python ai/python/scripts/run_agent_eval_report_matrix.py ai/python/fixtures/agent_eval/report_matrix_sample.json --matrix-out .tmp-agent-eval-matrix/matrix.json --approval-manifest-out .tmp-agent-eval-matrix/approval-manifest.json --force
+```
+
 Exit codes:
 
 - `0`: report status `PASS`;
@@ -405,6 +431,7 @@ Integration tests:
 - load `synthetic_state_diff_hardening_scenarios.json`;
 - run `run_agent_eval_fixture.py`;
 - run `run_agent_eval_current_report.py`;
+- run `run_agent_eval_report_matrix.py`;
 - verify report status, case count, failure distribution and `raw_payload_returned=false`.
 
 ### 5.3 Boundary Tests
@@ -423,7 +450,7 @@ Boundary is enforced by:
 Focused gate:
 
 ```powershell
-python -m pytest ai/python/tests/test_agent_eval_contracts.py ai/python/tests/test_agent_eval_evaluator.py ai/python/tests/test_agent_eval_trace.py ai/python/tests/test_agent_eval_integration.py -q
+python -m pytest ai/python/tests/test_agent_eval_contracts.py ai/python/tests/test_agent_eval_evaluator.py ai/python/tests/test_agent_eval_trace.py ai/python/tests/test_agent_eval_integration.py ai/python/tests/test_agent_eval_reporting.py -q
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_first_trio.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_core_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_runtime_control_scenarios.json
@@ -439,6 +466,7 @@ python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_state_diff_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_state_diff_hardening_scenarios.json
 python ai/python/scripts/run_agent_eval_current_report.py ai/python/fixtures/agent_eval/synthetic_core_scenarios.json --report-out .tmp-agent-current-report.json --baseline ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json --review-out .tmp-agent-baseline-review.json --force
+python ai/python/scripts/run_agent_eval_report_matrix.py ai/python/fixtures/agent_eval/report_matrix_sample.json --matrix-out .tmp-agent-eval-matrix/matrix.json --approval-manifest-out .tmp-agent-eval-matrix/approval-manifest.json --force
 python ai/python/scripts/run_agent_dataset_adapter.py --run ai/python/fixtures/agent_eval/adapter_samples/qasper_like_rag_samples.json
 python ai/python/scripts/run_agent_dataset_adapter.py --run ai/python/fixtures/agent_eval/adapter_samples/toolsandbox_like_tool_samples.json
 python ai/python/scripts/run_agent_dataset_adapter.py --run ai/python/fixtures/agent_eval/adapter_samples/statebench_like_memory_samples.json
@@ -465,9 +493,7 @@ git status --short --branch --untracked-files=all
 
 Recommended next slices:
 
-1. Add multi-suite current-report and baseline-refresh lifecycle metadata once
-   the next fixture families are stable.
-2. Tune memory admission confidence thresholds and governed policy revocation
+1. Tune memory admission confidence thresholds and governed policy revocation
    windows against larger public memory datasets, still without production data.
 
 Each slice must keep the same isolation rule until an ADR explicitly promotes a

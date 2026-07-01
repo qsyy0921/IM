@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "matrix_id": "agent-eval-report-matrix-sample-v1",
+  "retention_policy_ref": "retention:agent-eval-report:research-v1",
+  "approval_policy_ref": "approval-policy:agent-eval-baseline-refresh:manual-v1",
+  "suites": [
+    {
+      "suite_ref": "suite:synthetic-core",
+      "fixture_path": "ai/python/fixtures/agent_eval/synthetic_core_scenarios.json",
+      "report_out": ".tmp-agent-eval-matrix/synthetic-core-current-report.json",
+      "baseline_path": "ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json",
+      "review_out": ".tmp-agent-eval-matrix/synthetic-core-baseline-review.json"
+    },
+    {
+      "suite_ref": "suite:qasper-like-rag-adapter",
+      "adapter_payload_path": "ai/python/fixtures/agent_eval/adapter_samples/qasper_like_rag_samples.json",
+      "report_out": ".tmp-agent-eval-matrix/qasper-like-rag-current-report.json",
+      "review_out": ".tmp-agent-eval-matrix/qasper-like-rag-baseline-review.json"
+    }
+  ]
+}

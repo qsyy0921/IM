@@ -63,6 +63,11 @@ ALLOWED_FAILURE_CLASSES = {
     "STATE_EXECUTION_REF_MISSING",
     "STATE_CHANGE_REF_MISSING",
     "STATE_AUDIT_REF_MISSING",
+    "STATE_REPAIR_REF_MISSING",
+    "STATE_REDRIVE_REF_MISSING",
+    "STATE_PARTIAL_EXECUTION_NOT_DETECTED",
+    "STATE_IDEMPOTENCY_VIOLATION",
+    "STATE_COMPENSATING_ACTION_MISSING",
     "STATE_UNAUTHORIZED_MUTATION",
     "MEMORY_SOURCE_MISSING",
     "MEMORY_SPEAKER_MISSING",
@@ -166,6 +171,15 @@ class EvalCase:
     actual_state_change_refs: list[str] = field(default_factory=list)
     expected_state_audit_refs: list[str] = field(default_factory=list)
     actual_state_audit_refs: list[str] = field(default_factory=list)
+    expected_repair_refs: list[str] = field(default_factory=list)
+    actual_repair_refs: list[str] = field(default_factory=list)
+    expected_redrive_refs: list[str] = field(default_factory=list)
+    actual_redrive_refs: list[str] = field(default_factory=list)
+    partial_execution_refs: list[str] = field(default_factory=list)
+    expected_idempotency_refs: list[str] = field(default_factory=list)
+    actual_idempotency_refs: list[str] = field(default_factory=list)
+    expected_compensating_action_refs: list[str] = field(default_factory=list)
+    actual_compensating_action_refs: list[str] = field(default_factory=list)
     expected_runtime_events: list[str] = field(default_factory=list)
     actual_runtime_events: list[str] = field(default_factory=list)
     expected_checkpoint_refs: list[str] = field(default_factory=list)
@@ -190,6 +204,10 @@ class EvalCase:
     profile_aggregate_reviewed: bool = False
     state_diff_report_complete: bool = True
     unauthorized_state_mutation_detected: bool = False
+    repair_redrive_recorded: bool = False
+    partial_execution_detected: bool = False
+    idempotency_preserved: bool = False
+    compensating_action_recorded: bool = False
     malicious_tool_blocked: bool = False
     tool_description_poisoned: bool = False
     tool_description_blocked: bool = False
@@ -470,6 +488,35 @@ def _eval_case(payload: dict[str, Any], index: int) -> EvalCase:
         actual_state_audit_refs=_string_list(
             payload.get("actual_state_audit_refs", []), "actual_state_audit_refs"
         ),
+        expected_repair_refs=_string_list(
+            payload.get("expected_repair_refs", []), "expected_repair_refs"
+        ),
+        actual_repair_refs=_string_list(
+            payload.get("actual_repair_refs", []), "actual_repair_refs"
+        ),
+        expected_redrive_refs=_string_list(
+            payload.get("expected_redrive_refs", []), "expected_redrive_refs"
+        ),
+        actual_redrive_refs=_string_list(
+            payload.get("actual_redrive_refs", []), "actual_redrive_refs"
+        ),
+        partial_execution_refs=_string_list(
+            payload.get("partial_execution_refs", []), "partial_execution_refs"
+        ),
+        expected_idempotency_refs=_string_list(
+            payload.get("expected_idempotency_refs", []), "expected_idempotency_refs"
+        ),
+        actual_idempotency_refs=_string_list(
+            payload.get("actual_idempotency_refs", []), "actual_idempotency_refs"
+        ),
+        expected_compensating_action_refs=_string_list(
+            payload.get("expected_compensating_action_refs", []),
+            "expected_compensating_action_refs",
+        ),
+        actual_compensating_action_refs=_string_list(
+            payload.get("actual_compensating_action_refs", []),
+            "actual_compensating_action_refs",
+        ),
         expected_runtime_events=_upper_string_list(
             payload.get("expected_runtime_events", []), "expected_runtime_events"
         ),
@@ -534,6 +581,19 @@ def _eval_case(payload: dict[str, Any], index: int) -> EvalCase:
         unauthorized_state_mutation_detected=_bool(
             payload.get("unauthorized_state_mutation_detected", False),
             "unauthorized_state_mutation_detected",
+        ),
+        repair_redrive_recorded=_bool(
+            payload.get("repair_redrive_recorded", False), "repair_redrive_recorded"
+        ),
+        partial_execution_detected=_bool(
+            payload.get("partial_execution_detected", False), "partial_execution_detected"
+        ),
+        idempotency_preserved=_bool(
+            payload.get("idempotency_preserved", False), "idempotency_preserved"
+        ),
+        compensating_action_recorded=_bool(
+            payload.get("compensating_action_recorded", False),
+            "compensating_action_recorded",
         ),
         malicious_tool_blocked=_bool(
             payload.get("malicious_tool_blocked", False), "malicious_tool_blocked"

@@ -83,13 +83,14 @@ Agent / RAG / memory / Python AI Worker / EvidencePack / eval gate，不使用�
 
 ## 后续优先级
 
-1. 做 state-diff hardening、runtime-control negative fixture 等离线 eval fixture。
-2. 增加 current-report 生成 / baseline refresh review 脚本，避免手工更新 baseline。
-3. 增加 memory admission 深化 fixture，覆盖 multi-source duplicate clustering、
-   confidence calibration、procedural memory migration 和 governed policy allowlist。
-4. 增加 ContextPackage / EvidencePack 深化 fixture，覆盖 source ranking、
-   lane redrive、snippet-level citation repair 和 denied-lane cases。
-5. 增加 runtime-control negative fixture pack，覆盖 missing checkpoint、
+1. 做 runtime-control negative fixture，覆盖 missing checkpoint、
    cancel propagation incomplete、replay event incomplete。
+2. 增加 current-report 生成 / baseline refresh review 脚本，避免手工更新 baseline。
+3. 增加 Tool / MCP security hardening fixture，覆盖 tool argument schema mismatch、
+   tool-selection attack、prepare expiry 和多候选 provider selection。
+4. 增加 memory admission 深化 fixture，覆盖 multi-source duplicate clustering、
+   confidence calibration、procedural memory migration 和 governed policy allowlist。
+5. 增加 ContextPackage / EvidencePack 深化 fixture，覆盖 source ranking、
+   lane redrive、snippet-level citation repair 和 denied-lane cases。
 6. 在上述实验通过后，再决定是否把 Agent Runtime / Harness 提升为 ADR、服务级 SDD
    或实际 runtime module。

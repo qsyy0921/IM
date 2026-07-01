@@ -101,6 +101,14 @@ class StateDiffReportFixture:
     execution_refs: list[str]
     state_change_refs: list[str]
     audit_refs: list[str]
+    repair_refs: list[str]
+    redrive_refs: list[str]
+    partial_execution_refs: list[str]
+    partial_execution_detected: bool
+    idempotency_refs: list[str]
+    idempotency_preserved: bool
+    compensating_action_refs: list[str]
+    compensating_action_recorded: bool
     report_complete: bool
     unauthorized_mutation_detected: bool
 
@@ -304,6 +312,11 @@ def _state_diff_report(case: EvalCase) -> StateDiffReportFixture | None:
         and not case.actual_state_diff
         and not case.expected_execution_refs
         and not case.actual_execution_refs
+        and not case.expected_repair_refs
+        and not case.expected_redrive_refs
+        and not case.partial_execution_refs
+        and not case.expected_idempotency_refs
+        and not case.expected_compensating_action_refs
     ):
         return None
     report_payload = {
@@ -311,6 +324,10 @@ def _state_diff_report(case: EvalCase) -> StateDiffReportFixture | None:
         "actual_state_diff": case.actual_state_diff,
         "actual_execution_refs": case.actual_execution_refs,
         "actual_state_change_refs": case.actual_state_change_refs,
+        "actual_repair_refs": case.actual_repair_refs,
+        "actual_redrive_refs": case.actual_redrive_refs,
+        "actual_idempotency_refs": case.actual_idempotency_refs,
+        "actual_compensating_action_refs": case.actual_compensating_action_refs,
     }
     return StateDiffReportFixture(
         state_diff_report_ref=stable_ref("statediff", report_payload),
@@ -322,6 +339,14 @@ def _state_diff_report(case: EvalCase) -> StateDiffReportFixture | None:
         execution_refs=_state_execution_refs(case),
         state_change_refs=case.actual_state_change_refs,
         audit_refs=case.actual_state_audit_refs,
+        repair_refs=case.actual_repair_refs,
+        redrive_refs=case.actual_redrive_refs,
+        partial_execution_refs=case.partial_execution_refs,
+        partial_execution_detected=case.partial_execution_detected,
+        idempotency_refs=case.actual_idempotency_refs,
+        idempotency_preserved=case.idempotency_preserved,
+        compensating_action_refs=case.actual_compensating_action_refs,
+        compensating_action_recorded=case.compensating_action_recorded,
         report_complete=case.state_diff_report_complete,
         unauthorized_mutation_detected=case.unauthorized_state_mutation_detected,
     )
@@ -403,6 +428,26 @@ def _state_diff_step_status(
         return ("FAIL", "STATE_CHANGE_REF_MISSING")
     if not set(case.expected_state_audit_refs).issubset(set(report.audit_refs)):
         return ("FAIL", "STATE_AUDIT_REF_MISSING")
+    if not set(case.expected_repair_refs).issubset(set(report.repair_refs)):
+        return ("FAIL", "STATE_REPAIR_REF_MISSING")
+    if case.expected_repair_refs and not case.repair_redrive_recorded:
+        return ("FAIL", "STATE_REPAIR_REF_MISSING")
+    if not set(case.expected_redrive_refs).issubset(set(report.redrive_refs)):
+        return ("FAIL", "STATE_REDRIVE_REF_MISSING")
+    if case.expected_redrive_refs and not case.repair_redrive_recorded:
+        return ("FAIL", "STATE_REDRIVE_REF_MISSING")
+    if report.partial_execution_refs and not report.partial_execution_detected:
+        return ("FAIL", "STATE_PARTIAL_EXECUTION_NOT_DETECTED")
+    if not set(case.expected_idempotency_refs).issubset(set(report.idempotency_refs)):
+        return ("FAIL", "STATE_IDEMPOTENCY_VIOLATION")
+    if case.expected_idempotency_refs and not report.idempotency_preserved:
+        return ("FAIL", "STATE_IDEMPOTENCY_VIOLATION")
+    if not set(case.expected_compensating_action_refs).issubset(
+        set(report.compensating_action_refs)
+    ):
+        return ("FAIL", "STATE_COMPENSATING_ACTION_MISSING")
+    if case.expected_compensating_action_refs and not report.compensating_action_recorded:
+        return ("FAIL", "STATE_COMPENSATING_ACTION_MISSING")
     if report.unauthorized_mutation_detected:
         return ("FAIL", "STATE_UNAUTHORIZED_MUTATION")
     if report.expected_state_diff != report.actual_state_diff:

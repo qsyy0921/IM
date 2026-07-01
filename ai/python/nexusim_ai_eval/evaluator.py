@@ -361,6 +361,11 @@ def _state_diff_scores(case: EvalCase) -> tuple[dict[str, float], str]:
         case.expected_state_audit_refs,
         case.actual_state_audit_refs,
     )
+    repair_ref_score = _state_repair_ref_score(case)
+    redrive_ref_score = _state_redrive_ref_score(case)
+    partial_execution_score = _state_partial_execution_score(case)
+    idempotency_score = _state_idempotency_score(case)
+    compensating_action_score = _state_compensating_action_score(case)
     unauthorized_mutation_score = 0.0 if case.unauthorized_state_mutation_detected else 1.0
     if report_score == 0.0:
         failure = "STATE_REPORT_INCOMPLETE"
@@ -376,6 +381,16 @@ def _state_diff_scores(case: EvalCase) -> tuple[dict[str, float], str]:
         failure = "STATE_CHANGE_REF_MISSING"
     elif audit_ref_score == 0.0:
         failure = "STATE_AUDIT_REF_MISSING"
+    elif repair_ref_score == 0.0:
+        failure = "STATE_REPAIR_REF_MISSING"
+    elif redrive_ref_score == 0.0:
+        failure = "STATE_REDRIVE_REF_MISSING"
+    elif partial_execution_score == 0.0:
+        failure = "STATE_PARTIAL_EXECUTION_NOT_DETECTED"
+    elif idempotency_score == 0.0:
+        failure = "STATE_IDEMPOTENCY_VIOLATION"
+    elif compensating_action_score == 0.0:
+        failure = "STATE_COMPENSATING_ACTION_MISSING"
     elif unauthorized_mutation_score == 0.0:
         failure = "STATE_UNAUTHORIZED_MUTATION"
     elif diff_score == 0.0:
@@ -392,9 +407,55 @@ def _state_diff_scores(case: EvalCase) -> tuple[dict[str, float], str]:
             "state_execution_ref_score": execution_ref_score,
             "state_change_ref_score": state_change_ref_score,
             "state_audit_ref_score": audit_ref_score,
+            "state_repair_ref_score": repair_ref_score,
+            "state_redrive_ref_score": redrive_ref_score,
+            "state_partial_execution_score": partial_execution_score,
+            "state_idempotency_score": idempotency_score,
+            "state_compensating_action_score": compensating_action_score,
             "state_unauthorized_mutation_score": unauthorized_mutation_score,
         },
         failure,
+    )
+
+
+def _state_repair_ref_score(case: EvalCase) -> float:
+    if not case.expected_repair_refs:
+        return 1.0
+    if not case.repair_redrive_recorded:
+        return 0.0
+    return _ref_subset_score(case.expected_repair_refs, case.actual_repair_refs)
+
+
+def _state_redrive_ref_score(case: EvalCase) -> float:
+    if not case.expected_redrive_refs:
+        return 1.0
+    if not case.repair_redrive_recorded:
+        return 0.0
+    return _ref_subset_score(case.expected_redrive_refs, case.actual_redrive_refs)
+
+
+def _state_partial_execution_score(case: EvalCase) -> float:
+    if not case.partial_execution_refs:
+        return 1.0
+    return 1.0 if case.partial_execution_detected else 0.0
+
+
+def _state_idempotency_score(case: EvalCase) -> float:
+    if not case.expected_idempotency_refs:
+        return 1.0
+    if not case.idempotency_preserved:
+        return 0.0
+    return _ref_subset_score(case.expected_idempotency_refs, case.actual_idempotency_refs)
+
+
+def _state_compensating_action_score(case: EvalCase) -> float:
+    if not case.expected_compensating_action_refs:
+        return 1.0
+    if not case.compensating_action_recorded:
+        return 0.0
+    return _ref_subset_score(
+        case.expected_compensating_action_refs,
+        case.actual_compensating_action_refs,
     )
 
 
@@ -601,6 +662,10 @@ def _replay_bundle(case: EvalCase, failure_class: str) -> ReplayBundle:
         "actual_state_change_refs": case.actual_state_change_refs,
         "actual_execution_refs": case.actual_execution_refs,
         "actual_state_audit_refs": case.actual_state_audit_refs,
+        "actual_repair_refs": case.actual_repair_refs,
+        "actual_redrive_refs": case.actual_redrive_refs,
+        "actual_idempotency_refs": case.actual_idempotency_refs,
+        "actual_compensating_action_refs": case.actual_compensating_action_refs,
         "actual_failure_class": case.actual_failure_class,
         "actual_tool_provider_ref": case.actual_tool_provider_ref,
         "failure_class": failure_class,

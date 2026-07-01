@@ -1,0 +1,194 @@
+{
+  "schema_version": 1,
+  "suite_id": "synthetic-agent-state-diff-hardening-v1",
+  "fixture_kind": "synthetic_im_like",
+  "adapter_versions": [
+    "manual-state-diff-hardening-fixture-v1"
+  ],
+  "cases": [
+    {
+      "case_id": "state-diff-repair-redrive-pass",
+      "dataset_name": "synthetic-state-diff-hardening",
+      "dataset_version": "2026-07-02",
+      "capability_family": "STATE_DIFF",
+      "fixture_version": "state-diff-hardening-v1",
+      "input_refs": ["input:state-diff-repair-redrive-pass"],
+      "visible_evidence_refs": [
+        "proposal:task-77:retry-status",
+        "approval:task-77:operator",
+        "repair:task-77:prepare-expired",
+        "redrive:task-77:attempt-2"
+      ],
+      "actual_used_refs": [
+        "proposal:task-77:retry-status",
+        "approval:task-77:operator",
+        "repair:task-77:prepare-expired",
+        "redrive:task-77:attempt-2"
+      ],
+      "expected_state_diff": {
+        "task:77.status": "approved",
+        "task:77.retry_count": "2"
+      },
+      "actual_state_diff": {
+        "task:77.status": "approved",
+        "task:77.retry_count": "2"
+      },
+      "expected_state_precondition_refs": ["precondition:task-77:pending"],
+      "actual_state_precondition_refs": ["precondition:task-77:pending"],
+      "expected_state_approval_refs": ["approval:task-77:operator"],
+      "actual_state_approval_refs": ["approval:task-77:operator"],
+      "expected_state_prepare_refs": ["tool-prepare:task-service:update-status:v2"],
+      "actual_state_prepare_refs": ["tool-prepare:task-service:update-status:v2"],
+      "expected_execution_refs": ["execution:task-77:update-status:attempt-2"],
+      "actual_execution_refs": ["execution:task-77:update-status:attempt-2"],
+      "expected_state_change_refs": [
+        "state-change:task-77:status",
+        "state-change:task-77:retry-count"
+      ],
+      "actual_state_change_refs": [
+        "state-change:task-77:status",
+        "state-change:task-77:retry-count"
+      ],
+      "expected_state_audit_refs": ["audit:task-77:redrive"],
+      "actual_state_audit_refs": ["audit:task-77:redrive"],
+      "expected_repair_refs": ["repair:task-77:prepare-expired"],
+      "actual_repair_refs": ["repair:task-77:prepare-expired"],
+      "expected_redrive_refs": ["redrive:task-77:attempt-2"],
+      "actual_redrive_refs": ["redrive:task-77:attempt-2"],
+      "repair_redrive_recorded": true,
+      "state_diff_report_complete": true
+    },
+    {
+      "case_id": "state-diff-partial-execution-detected",
+      "dataset_name": "synthetic-state-diff-hardening",
+      "dataset_version": "2026-07-02",
+      "capability_family": "STATE_DIFF",
+      "fixture_version": "state-diff-hardening-v1",
+      "input_refs": ["input:state-diff-partial-execution-detected"],
+      "visible_evidence_refs": [
+        "proposal:task-78:update-two-fields",
+        "approval:task-78:operator",
+        "partial-execution:task-78:owner-written-status-pending"
+      ],
+      "actual_used_refs": [
+        "proposal:task-78:update-two-fields",
+        "approval:task-78:operator",
+        "partial-execution:task-78:owner-written-status-pending"
+      ],
+      "expected_state_diff": {
+        "task:78.status": "approved",
+        "task:78.owner": "user:ops"
+      },
+      "actual_state_diff": {
+        "task:78.status": "approved",
+        "task:78.owner": "user:ops"
+      },
+      "expected_state_approval_refs": ["approval:task-78:operator"],
+      "actual_state_approval_refs": ["approval:task-78:operator"],
+      "expected_execution_refs": ["execution:task-78:update-owner-and-status"],
+      "actual_execution_refs": ["execution:task-78:update-owner-and-status"],
+      "expected_state_change_refs": [
+        "state-change:task-78:status",
+        "state-change:task-78:owner"
+      ],
+      "actual_state_change_refs": [
+        "state-change:task-78:status",
+        "state-change:task-78:owner"
+      ],
+      "expected_state_audit_refs": ["audit:task-78:partial-execution"],
+      "actual_state_audit_refs": ["audit:task-78:partial-execution"],
+      "partial_execution_refs": ["partial-execution:task-78:owner-written-status-pending"],
+      "partial_execution_detected": true,
+      "state_diff_report_complete": true
+    },
+    {
+      "case_id": "state-diff-idempotency-replay-pass",
+      "dataset_name": "synthetic-state-diff-hardening",
+      "dataset_version": "2026-07-02",
+      "capability_family": "STATE_DIFF",
+      "fixture_version": "state-diff-hardening-v1",
+      "input_refs": ["input:state-diff-idempotency-replay-pass"],
+      "visible_evidence_refs": [
+        "proposal:task-79:approve",
+        "approval:task-79:operator",
+        "idempotency:task-79:execution-key"
+      ],
+      "actual_used_refs": [
+        "proposal:task-79:approve",
+        "approval:task-79:operator",
+        "idempotency:task-79:execution-key"
+      ],
+      "expected_state_diff": {
+        "task:79.status": "approved",
+        "task:79.execution_count": "1"
+      },
+      "actual_state_diff": {
+        "task:79.status": "approved",
+        "task:79.execution_count": "1"
+      },
+      "expected_state_approval_refs": ["approval:task-79:operator"],
+      "actual_state_approval_refs": ["approval:task-79:operator"],
+      "expected_execution_refs": ["execution:task-79:update-status"],
+      "actual_execution_refs": ["execution:task-79:update-status"],
+      "expected_state_change_refs": [
+        "state-change:task-79:status",
+        "state-change:task-79:execution-count"
+      ],
+      "actual_state_change_refs": [
+        "state-change:task-79:status",
+        "state-change:task-79:execution-count"
+      ],
+      "expected_state_audit_refs": ["audit:task-79:idempotency"],
+      "actual_state_audit_refs": ["audit:task-79:idempotency"],
+      "expected_idempotency_refs": ["idempotency:task-79:execution-key"],
+      "actual_idempotency_refs": ["idempotency:task-79:execution-key"],
+      "idempotency_preserved": true,
+      "side_effect_reexecuted": false,
+      "state_diff_report_complete": true
+    },
+    {
+      "case_id": "state-diff-compensating-action-pass",
+      "dataset_name": "synthetic-state-diff-hardening",
+      "dataset_version": "2026-07-02",
+      "capability_family": "STATE_DIFF",
+      "fixture_version": "state-diff-hardening-v1",
+      "input_refs": ["input:state-diff-compensating-action-pass"],
+      "visible_evidence_refs": [
+        "proposal:task-80:compensate",
+        "approval:task-80:operator",
+        "compensating-action:task-80:restore-assignee"
+      ],
+      "actual_used_refs": [
+        "proposal:task-80:compensate",
+        "approval:task-80:operator",
+        "compensating-action:task-80:restore-assignee"
+      ],
+      "expected_state_diff": {
+        "task:80.status": "compensated",
+        "task:80.assignee": "user:previous"
+      },
+      "actual_state_diff": {
+        "task:80.status": "compensated",
+        "task:80.assignee": "user:previous"
+      },
+      "expected_state_approval_refs": ["approval:task-80:operator"],
+      "actual_state_approval_refs": ["approval:task-80:operator"],
+      "expected_execution_refs": ["execution:task-80:restore-assignee"],
+      "actual_execution_refs": ["execution:task-80:restore-assignee"],
+      "expected_state_change_refs": [
+        "state-change:task-80:status",
+        "state-change:task-80:assignee"
+      ],
+      "actual_state_change_refs": [
+        "state-change:task-80:status",
+        "state-change:task-80:assignee"
+      ],
+      "expected_state_audit_refs": ["audit:task-80:compensating-action"],
+      "actual_state_audit_refs": ["audit:task-80:compensating-action"],
+      "expected_compensating_action_refs": ["compensating-action:task-80:restore-assignee"],
+      "actual_compensating_action_refs": ["compensating-action:task-80:restore-assignee"],
+      "compensating_action_recorded": true,
+      "state_diff_report_complete": true
+    }
+  ]
+}

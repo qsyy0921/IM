@@ -25,6 +25,17 @@ def base_case(capability_family: str) -> dict[str, object]:
     }
 
 
+def state_diff_case() -> dict[str, object]:
+    case = base_case("STATE_DIFF")
+    case.update(
+        {
+            "expected_state_diff": {"task:42.status": "approved"},
+            "actual_state_diff": {"task:42.status": "approved"},
+        }
+    )
+    return case
+
+
 class AgentEvalEvaluatorTests(unittest.TestCase):
     def test_grounded_rag_passes_with_visible_citation(self) -> None:
         case = base_case("GROUNDED_RAG")
@@ -681,6 +692,115 @@ class AgentEvalEvaluatorTests(unittest.TestCase):
 
         self.assertEqual(report.status, "FAIL")
         self.assertEqual(report.results[0].failure_class, "STATE_UNAUTHORIZED_MUTATION")
+
+    def test_state_diff_hardening_passes_recovery_refs(self) -> None:
+        case = state_diff_case()
+        case.update(
+            {
+                "expected_repair_refs": ["repair:task-42:prepare-expired"],
+                "actual_repair_refs": ["repair:task-42:prepare-expired"],
+                "expected_redrive_refs": ["redrive:task-42:attempt-2"],
+                "actual_redrive_refs": ["redrive:task-42:attempt-2"],
+                "partial_execution_refs": ["partial-execution:task-42:field-written"],
+                "partial_execution_detected": True,
+                "expected_idempotency_refs": ["idempotency:task-42:execution-key"],
+                "actual_idempotency_refs": ["idempotency:task-42:execution-key"],
+                "expected_compensating_action_refs": ["compensating-action:task-42:rollback"],
+                "actual_compensating_action_refs": ["compensating-action:task-42:rollback"],
+                "repair_redrive_recorded": True,
+                "idempotency_preserved": True,
+                "compensating_action_recorded": True,
+            }
+        )
+
+        report = run_eval_suite(suite_with_case(case))
+
+        self.assertEqual(report.status, "PASS")
+        self.assertEqual(report.aggregate_scores["state_repair_ref_score"], 1.0)
+        self.assertEqual(report.aggregate_scores["state_redrive_ref_score"], 1.0)
+        self.assertEqual(report.aggregate_scores["state_partial_execution_score"], 1.0)
+        self.assertEqual(report.aggregate_scores["state_idempotency_score"], 1.0)
+        self.assertEqual(report.aggregate_scores["state_compensating_action_score"], 1.0)
+
+    def test_state_diff_hardening_fails_missing_repair_ref(self) -> None:
+        case = state_diff_case()
+        case.update(
+            {
+                "expected_repair_refs": ["repair:task-42:prepare-expired"],
+                "actual_repair_refs": [],
+                "repair_redrive_recorded": True,
+            }
+        )
+
+        report = run_eval_suite(suite_with_case(case))
+
+        self.assertEqual(report.status, "FAIL")
+        self.assertEqual(report.results[0].failure_class, "STATE_REPAIR_REF_MISSING")
+
+    def test_state_diff_hardening_fails_missing_redrive_ref(self) -> None:
+        case = state_diff_case()
+        case.update(
+            {
+                "expected_redrive_refs": ["redrive:task-42:attempt-2"],
+                "actual_redrive_refs": [],
+                "repair_redrive_recorded": True,
+            }
+        )
+
+        report = run_eval_suite(suite_with_case(case))
+
+        self.assertEqual(report.status, "FAIL")
+        self.assertEqual(report.results[0].failure_class, "STATE_REDRIVE_REF_MISSING")
+
+    def test_state_diff_hardening_fails_undetected_partial_execution(self) -> None:
+        case = state_diff_case()
+        case.update(
+            {
+                "partial_execution_refs": ["partial-execution:task-42:field-written"],
+                "partial_execution_detected": False,
+            }
+        )
+
+        report = run_eval_suite(suite_with_case(case))
+
+        self.assertEqual(report.status, "FAIL")
+        self.assertEqual(
+            report.results[0].failure_class,
+            "STATE_PARTIAL_EXECUTION_NOT_DETECTED",
+        )
+
+    def test_state_diff_hardening_fails_idempotency_violation(self) -> None:
+        case = state_diff_case()
+        case.update(
+            {
+                "expected_idempotency_refs": ["idempotency:task-42:execution-key"],
+                "actual_idempotency_refs": ["idempotency:task-42:execution-key"],
+                "idempotency_preserved": False,
+            }
+        )
+
+        report = run_eval_suite(suite_with_case(case))
+
+        self.assertEqual(report.status, "FAIL")
+        self.assertEqual(report.results[0].failure_class, "STATE_IDEMPOTENCY_VIOLATION")
+
+    def test_state_diff_hardening_fails_missing_compensating_action(self) -> None:
+        case = state_diff_case()
+        case.update(
+            {
+                "expected_compensating_action_refs": ["compensating-action:task-42:rollback"],
+                "actual_compensating_action_refs": [],
+                "compensating_action_recorded": True,
+            }
+        )
+
+        report = run_eval_suite(suite_with_case(case))
+
+        self.assertEqual(report.status, "FAIL")
+        self.assertEqual(
+            report.results[0].failure_class,
+            "STATE_COMPENSATING_ACTION_MISSING",
+        )
 
     def test_replay_fails_if_side_effect_reexecuted(self) -> None:
         case = base_case("STATE_DIFF")

@@ -215,6 +215,11 @@ The harness should normalize:
 - `STATE_EXECUTION_REF_MISSING`
 - `STATE_CHANGE_REF_MISSING`
 - `STATE_AUDIT_REF_MISSING`
+- `STATE_REPAIR_REF_MISSING`
+- `STATE_REDRIVE_REF_MISSING`
+- `STATE_PARTIAL_EXECUTION_NOT_DETECTED`
+- `STATE_IDEMPOTENCY_VIOLATION`
+- `STATE_COMPENSATING_ACTION_MISSING`
 - `STATE_UNAUTHORIZED_MUTATION`
 - `MEMORY_SOURCE_MISSING`
 - `MEMORY_SPEAKER_MISSING`
@@ -364,6 +369,7 @@ ai/python/fixtures/agent_eval/synthetic_context_evidence_hardening_scenarios.jso
 ai/python/fixtures/agent_eval/synthetic_memory_admission_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_memory_admission_hardening_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_scenarios.json
+ai/python/fixtures/agent_eval/synthetic_state_diff_hardening_scenarios.json
 ai/python/scripts/run_agent_eval_fixture.py
 ai/python/scripts/run_agent_dataset_adapter.py
 ai/python/scripts/run_agent_eval_regression.py
@@ -420,6 +426,8 @@ Implemented checks:
 - state-diff report fixture coverage for approved action outcome refs,
   expected-vs-actual state changes, missing execution refs, incomplete reports
   and unauthorized mutation detection.
+- state-diff hardening coverage for repair/redrive lineage, partial execution
+  detection, idempotency-preserved replay and compensating action refs.
 
 Focused verification:
 
@@ -434,6 +442,7 @@ python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_memory_admission_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_memory_admission_hardening_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_state_diff_scenarios.json
+python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_state_diff_hardening_scenarios.json
 python ai/python/scripts/run_agent_dataset_adapter.py --run ai/python/fixtures/agent_eval/adapter_samples/qasper_like_rag_samples.json
 python ai/python/scripts/run_agent_eval_regression.py ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json
 ```

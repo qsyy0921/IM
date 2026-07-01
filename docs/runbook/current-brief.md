@@ -96,8 +96,10 @@ Agent Gateway / UX
 - 已补 fixture-only state-diff report coverage：approved action outcome refs、
   expected-vs-actual state changes、missing execution refs、incomplete report、
   unauthorized mutation detection。
-- 下一段优先做 state-diff hardening、runtime-control negative fixture 和
-  current-report generation 等离线能力。
+- 已补 fixture-only state-diff hardening：repair/redrive lineage、partial execution
+  detection、idempotency-preserved replay、compensating action refs。
+- 下一段优先做 runtime-control negative fixture、current-report generation 和
+  Tool / MCP security hardening 等离线能力。
 
 ## 工作规则
 

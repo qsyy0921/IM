@@ -327,6 +327,19 @@ class AgentEvalTraceTests(unittest.TestCase):
                     "actual_state_change_refs": ["state-change:task-42:status"],
                     "expected_state_audit_refs": ["audit:task-42:update"],
                     "actual_state_audit_refs": ["audit:task-42:update"],
+                    "expected_repair_refs": ["repair:task-42:prepare-expired"],
+                    "actual_repair_refs": ["repair:task-42:prepare-expired"],
+                    "expected_redrive_refs": ["redrive:task-42:attempt-2"],
+                    "actual_redrive_refs": ["redrive:task-42:attempt-2"],
+                    "partial_execution_refs": ["partial-execution:task-42:field-written"],
+                    "partial_execution_detected": True,
+                    "expected_idempotency_refs": ["idempotency:task-42:execution-key"],
+                    "actual_idempotency_refs": ["idempotency:task-42:execution-key"],
+                    "idempotency_preserved": True,
+                    "expected_compensating_action_refs": ["compensating-action:task-42:rollback"],
+                    "actual_compensating_action_refs": ["compensating-action:task-42:rollback"],
+                    "compensating_action_recorded": True,
+                    "repair_redrive_recorded": True,
                 }
             )
         )[0]
@@ -339,6 +352,23 @@ class AgentEvalTraceTests(unittest.TestCase):
         self.assertEqual(trace.state_diff_report.execution_refs, ["execution:task-42:update"])
         self.assertEqual(trace.state_diff_report.state_change_refs, ["state-change:task-42:status"])
         self.assertEqual(trace.state_diff_report.audit_refs, ["audit:task-42:update"])
+        self.assertEqual(trace.state_diff_report.repair_refs, ["repair:task-42:prepare-expired"])
+        self.assertEqual(trace.state_diff_report.redrive_refs, ["redrive:task-42:attempt-2"])
+        self.assertEqual(
+            trace.state_diff_report.partial_execution_refs,
+            ["partial-execution:task-42:field-written"],
+        )
+        self.assertTrue(trace.state_diff_report.partial_execution_detected)
+        self.assertEqual(
+            trace.state_diff_report.idempotency_refs,
+            ["idempotency:task-42:execution-key"],
+        )
+        self.assertTrue(trace.state_diff_report.idempotency_preserved)
+        self.assertEqual(
+            trace.state_diff_report.compensating_action_refs,
+            ["compensating-action:task-42:rollback"],
+        )
+        self.assertTrue(trace.state_diff_report.compensating_action_recorded)
         self.assertIn("state_diff", [step.step_type for step in trace.steps])
 
 

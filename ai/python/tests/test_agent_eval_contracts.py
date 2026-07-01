@@ -245,7 +245,20 @@ class AgentEvalContractTests(unittest.TestCase):
                 "actual_state_change_refs": ["state-change:task-1:status"],
                 "expected_state_audit_refs": ["audit:task-1:update"],
                 "actual_state_audit_refs": ["audit:task-1:update"],
+                "expected_repair_refs": ["repair:task-1:prepare-expired"],
+                "actual_repair_refs": ["repair:task-1:prepare-expired"],
+                "expected_redrive_refs": ["redrive:task-1:attempt-2"],
+                "actual_redrive_refs": ["redrive:task-1:attempt-2"],
+                "partial_execution_refs": ["partial-execution:task-1:field-written"],
+                "expected_idempotency_refs": ["idempotency:task-1:execution-key"],
+                "actual_idempotency_refs": ["idempotency:task-1:execution-key"],
+                "expected_compensating_action_refs": ["compensating-action:task-1:rollback"],
+                "actual_compensating_action_refs": ["compensating-action:task-1:rollback"],
                 "state_diff_report_complete": True,
+                "repair_redrive_recorded": True,
+                "partial_execution_detected": True,
+                "idempotency_preserved": True,
+                "compensating_action_recorded": True,
             }
         ]
 
@@ -254,7 +267,19 @@ class AgentEvalContractTests(unittest.TestCase):
         self.assertEqual(cases[0].capability_family, "STATE_DIFF")
         self.assertEqual(cases[0].actual_execution_refs, ["execution:task-1:update"])
         self.assertEqual(cases[0].expected_state_change_refs, ["state-change:task-1:status"])
+        self.assertEqual(cases[0].actual_repair_refs, ["repair:task-1:prepare-expired"])
+        self.assertEqual(cases[0].actual_redrive_refs, ["redrive:task-1:attempt-2"])
+        self.assertEqual(cases[0].partial_execution_refs, ["partial-execution:task-1:field-written"])
+        self.assertEqual(cases[0].actual_idempotency_refs, ["idempotency:task-1:execution-key"])
+        self.assertEqual(
+            cases[0].actual_compensating_action_refs,
+            ["compensating-action:task-1:rollback"],
+        )
         self.assertTrue(cases[0].state_diff_report_complete)
+        self.assertTrue(cases[0].repair_redrive_recorded)
+        self.assertTrue(cases[0].partial_execution_detected)
+        self.assertTrue(cases[0].idempotency_preserved)
+        self.assertTrue(cases[0].compensating_action_recorded)
 
 
 if __name__ == "__main__":

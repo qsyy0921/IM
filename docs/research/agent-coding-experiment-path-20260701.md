@@ -77,6 +77,7 @@ ai/python/fixtures/agent_eval/synthetic_context_evidence_hardening_scenarios.jso
 ai/python/fixtures/agent_eval/synthetic_memory_admission_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_memory_admission_hardening_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_scenarios.json
+ai/python/fixtures/agent_eval/synthetic_state_diff_hardening_scenarios.json
 ai/python/scripts/run_agent_eval_fixture.py
 ai/python/scripts/run_agent_dataset_adapter.py
 ai/python/scripts/run_agent_eval_regression.py
@@ -135,6 +136,9 @@ Slice 0 covers:
 - fixture-only state-diff report coverage for approved action outcome refs,
   expected-vs-actual state changes, missing execution refs, incomplete reports
   and unauthorized mutation detection.
+- fixture-only state-diff hardening coverage for repair/redrive lineage,
+  partial execution detection, idempotency-preserved replay and compensating
+  action refs.
 
 ## 4. Code Architecture
 
@@ -221,6 +225,8 @@ fixtures, call models or connect to backend services.
 - MemoryCandidate hardening metadata for duplicate dedupe, low confidence,
   skill binding, policy-like memory rejection and review timeout.
 - StateDiffReport execution, approval, prepare, state-change and audit refs.
+- StateDiffReport hardening metadata for repair/redrive, partial execution,
+  idempotency and compensating action refs.
 
 The trace is low-sensitive and fixture-only. It records refs, hashes and failure
 classes, not raw prompt, message body or provider output.
@@ -242,6 +248,7 @@ ai/python/fixtures/agent_eval/synthetic_context_evidence_hardening_scenarios.jso
 ai/python/fixtures/agent_eval/synthetic_memory_admission_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_memory_admission_hardening_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_scenarios.json
+ai/python/fixtures/agent_eval/synthetic_state_diff_hardening_scenarios.json
 ai/python/fixtures/agent_eval/adapter_samples/
 ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json
 ```
@@ -321,6 +328,7 @@ Integration tests:
 - load `synthetic_memory_admission_scenarios.json`;
 - load `synthetic_memory_admission_hardening_scenarios.json`;
 - load `synthetic_state_diff_scenarios.json`;
+- load `synthetic_state_diff_hardening_scenarios.json`;
 - run `run_agent_eval_fixture.py`;
 - verify report status, case count, failure distribution and `raw_payload_returned=false`.
 
@@ -350,6 +358,7 @@ python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_memory_admission_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_memory_admission_hardening_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_state_diff_scenarios.json
+python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_state_diff_hardening_scenarios.json
 python ai/python/scripts/run_agent_dataset_adapter.py --run ai/python/fixtures/agent_eval/adapter_samples/qasper_like_rag_samples.json
 python ai/python/scripts/run_agent_eval_regression.py ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json
 ```
@@ -374,11 +383,11 @@ git status --short --branch --untracked-files=all
 
 Recommended next slices:
 
-1. Harden state-diff with repair/redrive, partial execution and idempotency
-   cases.
-2. Add runtime-control negative fixture pack for missing checkpoints and
+1. Add runtime-control negative fixture pack for missing checkpoints and
    incomplete cancel propagation.
-3. Add current-report generation script for baseline refresh review.
+2. Add current-report generation script for baseline refresh review.
+3. Harden Tool / MCP security with tool argument schema mismatch,
+   tool-selection attack, prepare expiry and multi-provider selection cases.
 4. Deepen memory admission with multi-source duplicate clustering, confidence
    calibration, procedural memory migration and governed policy allowlist cases.
 5. Deepen ContextPackage / EvidencePack with source ranking, lane redrive,

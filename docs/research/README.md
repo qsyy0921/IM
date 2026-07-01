@@ -22,6 +22,9 @@
   `ai/python/nexusim_ai_eval`、fixture、CLI、单元测试、集成测试和后续切片顺序。
 - `agent-adr-promotion-readiness-20260702.md`：隔离式 Agent eval / replay /
   memory calibration skeleton 的 ADR 候选 readiness review；不冻结生产契约。
+- `agent-skeleton-completion-audit-20260702.md`：不可变 Agent Lab goal 对当前
+  backend-isolated skeleton 的完成度审计，确认 Phase 1 骨架可作为当前可执行基线，
+  但不提升生产契约。
 
 ## 存放位置
 

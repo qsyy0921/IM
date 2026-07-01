@@ -1,151 +1,54 @@
 # NexusIM Current Brief
 
 本文件只做每轮入口摘要。当前 workspace 是 Agent Lab，主线是 Agent / RAG /
-memory / AI worker / EvidencePack / eval gate 的探索和设计，不承接后端热点群压测。
+memory / AI worker / EvidencePack / eval gate，不承接后端热点群压测。
 
-## 当前主线
+## 当前状态
 
-- Agent Lab 已从探索稿推进到详细 SDD 包。
-- 当前工作不使用 NexusIM 真实 IM 数据；第一阶段能力验证使用公开数据集和
-  synthetic IM-like fixture。
-- 当前 active module：`Open Dataset Eval Harness / synthetic IM-like fixture`，已进入
-  backend-isolated Python skeleton 增量实现。
+- Immutable Codex goal 保持稳定：先完成 backend-isolated Agent skeleton，再用
+  runbook / SDD / research 文档维护阶段、优先级和验收条件。
+- Phase 1 isolated Agent-layer skeleton 已可作为当前可执行基线：
+  `docs/research/agent-skeleton-completion-audit-20260702.md`。
+- ADR readiness 已完成，但只能进入候选起草，不能直接推广生产契约：
+  `docs/research/agent-adr-promotion-readiness-20260702.md`。
+- 完整进度历史在 `docs/runbook/development-progress.md`，不要把长历史塞回本文件。
 
-## 最近收口
+## 当前设计事实源
 
-- 已完成 Agent Plane 初步设计：
-  `docs/architecture/agent-plane-initial-design.md`。
-- 已完成 runtime / workflow ownership matrix：
-  `docs/research/agent-runtime-workflow-ownership-20260701.md`。
-- 已完成 2026 Agent 生态研究附录：
-  `docs/research/agent-ecosystem-research-20260701.md`。
-- 已完成完整 Agent 系统能力范围探索：
-  `docs/research/agent-system-complete-scope-20260701.md`。
-- 已完成当前设计评审：
-  `docs/research/agent-current-design-review-20260701.md`。结论是方向正确，但
-  `docs/sdd/agent-platform.md` v0.1 不能单独推广实现。
-- 已完成 current-to-target matrix：
-  `docs/research/agent-current-to-target-matrix-20260701.md`。
-- 已完成 open dataset eval plan：
-  `docs/research/agent-open-dataset-eval-plan-20260701.md`。
-- 已完成六份详细 Agent SDD：
-  `docs/sdd/agent-runtime.md`、`docs/sdd/agent-memory-admission.md`、
-  `docs/sdd/agent-context-evidencepack.md`、`docs/sdd/agent-tool-mcp-boundary.md`、
-  `docs/sdd/agent-eval-replay-harness.md`、`docs/sdd/agent-governance-agentops.md`。
-- 设计边界保持为探索 / SDD 草案：不冻结 proto、schema、migration、runtime、
-  agent taxonomy、skill taxonomy、EvidencePack shape 或 memory event shape。
+- 初步架构：`docs/architecture/agent-plane-initial-design.md`。
+- 详细 SDD：`docs/sdd/agent-runtime.md`、`agent-memory-admission.md`、
+  `agent-context-evidencepack.md`、`agent-tool-mcp-boundary.md`、
+  `agent-eval-replay-harness.md`、`agent-governance-agentops.md`。
+- 编码路径：`docs/research/agent-coding-experiment-path-20260701.md`。
+- 剩余工作：`docs/runbook/remaining-goals.md`。
 
-## 当前设计方向
+## 当前可执行基线
 
-NexusIM Agent 层按以下能力平面组织：
+- Code: `ai/python/nexusim_ai_eval/`。
+- Fixtures: `ai/python/fixtures/agent_eval/`。
+- CLIs: `ai/python/scripts/run_agent_eval_*.py` and
+  `ai/python/scripts/run_agent_dataset_adapter.py`。
+- Tests: `ai/python/tests/test_agent_eval_*.py` plus worker / memory boundary tests。
 
-```text
-Agent Gateway / UX
--> Agent identity / policy / budget
--> AgentDefinition / SkillPackage governance
--> Model gateway / Python candidate worker
--> Agent Runtime / Harness
--> Context / EvidencePack / RAG
--> Memory system
--> Tool / MCP boundary
--> Workflow / human-in-the-loop
--> Action executor handoff
--> Eval / replay / open dataset harness
--> Observability / audit / AgentOps
-```
+覆盖能力：EvalCase / EvalRun / EvalResult / EvalReport、ReplayBundle、dataset
+adapter skeleton、synthetic IM-like fixtures、AgentRun / AgentStep trace、
+ContextPackage / EvidencePack、MemoryCandidate、ToolIntent / MCP security、
+runtime control、state-diff、bounded multi-agent handoff、report / regression /
+baseline lifecycle 和 memory calibration。
 
-核心不变量：
+## 不变量
 
-- IM 业务事实仍由 IM 服务拥有。
-- Agent 不进入消息投递热路径。
-- Agent 读路径必须经过 retrieval-gateway / EvidencePack。
-- Agent 写路径必须经过 proposal / approval / action-executor / audit。
-- Python AI Worker 只返回候选。
-- Memory 必须 source-backed、scoped、versioned、reviewed、可撤销。
-- MCP server 不是权限边界；tool description 和 output 均按不可信输入处理。
-- Eval / replay 是架构组成部分，不是上线后脚本。
+- 第一阶段不使用真实 NexusIM IM 数据。
+- 不接 PostgreSQL、Kafka、Redis、OpenSearch、真实 MCP provider、真实 model
+  provider、workflow-service、memory-service 或 action-executor。
+- 不写 proto、OpenAPI、Kafka schema、migration、production service directory
+  或 production startup path。
+- Python AI Worker 只产出候选；Go 服务拥有 auth、policy、audit、persistence、
+  final proposal、execution 和 ACTIVE memory admission。
+- MCP server、tool description 和 provider output 都按不可信输入处理。
 
-## 当前输出
+## 下一步
 
-- 进度入口已指向 Agent Lab 和完整 Agent SDD 包。
-- `docs/sdd/agent-platform.md` 保留为平台总览，但已标注不能单独推广实现。
-- 详细设计以 runtime、memory admission、context、tool/MCP、eval/replay、
-  governance 六份 SDD 为准。
-- 下一阶段应先做公开数据集和 synthetic fixture，不接真实 IM 数据。
-- 已开始第一段隔离式编码实验：`ai/python/nexusim_ai_eval/`，只运行 synthetic
-  fixture 和低敏 EvalReport / ReplayBundle，不接后端服务。
-- 当前骨架已包含 adapter skeleton、AgentRun / AgentStep trace skeleton、
-  `synthetic_core_scenarios.json` 和对应 unit / integration / boundary tests。
-- 已补本地 public-dataset-style adapter sample payload、批量转换 / 运行 CLI、
-  EvalReport baseline fixture 和 regression comparison CLI。
-- 已补 fixture-only runtime-control coverage：cancel propagation、approval resume
-  from checkpoint、replay without side-effect reexecution。
-- 已补 fixture-only MCP security coverage：poisoned tool description、unsafe MCP
-  output instruction、provider provenance mismatch、sandbox-only provider。
-- 已补 fixture-only MCP security hardening：tool argument schema mismatch、
-  tool-selection attack blocking、prepare expiry detection、多候选 provider selection。
-- 已补 fixture-only ContextPackage / EvidencePack coverage：source coverage、
-  conflict marker、stale evidence avoidance、permission abstain。
-- 已补 fixture-only ContextPackage / EvidencePack hardening：memory-vs-current-source
-  precedence、unsafe tool output quarantine、context-budget retention、
-  unavailable retrieval lane gap reporting。
-- 已补 fixture-only ContextPackage / EvidencePack deeper hardening：source ranking
-  / tie-break、retrieval lane redrive、snippet-level citation repair、cross-tenant
-  denied-lane reporting、provider/tool/peer-agent taint propagation。
-- 已补 Qasper / HotpotQA / BEIR 风格 ContextPackage / EvidencePack adapter
-  alignment：public RAG adapter 可保留 rerank confidence threshold refs、
-  rerank explanation refs、denied-lane audit refs 和 taint vocabulary refs，
-  evaluator / trace / CLI 均保持 fixture-only。
-- 已补 fixture-only richer memory admission coverage：group speaker/audience、
-  project supersedes、profile aggregate review、revoked/stale memory blocking、
-  overgeneralization prevention。
-- 已补 fixture-only memory admission hardening：duplicate dedupe、
-  low-confidence rejection、procedural skill binding、policy-like memory rejection、
-  review timeout metadata。
-- 已补 fixture-only memory admission deeper hardening：multi-source duplicate
-  clustering、confidence calibration、procedural memory migration/invalidation、
-  governed policy source allowlist/revocation、review retry/escalation/redrive。
-- 已补 STATE-Bench / LoCoMO 风格 memory adapter alignment：duplicate cluster
-  representative selection / tie-break refs、confidence threshold refs、
-  governed policy revocation window refs，并保持 fixture-only。
-- 已补 fixture-only memory admission calibration：基于
-  STATE-Bench / LoCoMO / LongMemEval / EverMemBench / GroupMemBench 风格本地样本，
-  对 confidence threshold、governed policy revocation-window retention 和
-  review backoff/operator queue policy 输出推荐 refs 或 blocked reasons。
-- 已补更大的 public-dataset-style memory calibration export：覆盖 5 类
-  dataset-source refs、15 个 gate case、8 个 policy-window case、12 个
-  review-backoff case，并在报告中输出 per-dataset case counts。
-- 已补 ToolSandbox / MCP-Bench 风格 Tool / MCP adapter alignment：capability
-  lease refs、capability scope refs、provider attestation refs，并保持
-  fixture-only。
-- 已补 fixture-only state-diff report coverage：approved action outcome refs、
-  expected-vs-actual state changes、missing execution refs、incomplete report、
-  unauthorized mutation detection。
-- 已补 fixture-only state-diff hardening：repair/redrive lineage、partial execution
-  detection、idempotency-preserved replay、compensating action refs。
-- 已补 fixture-only state-diff deeper hardening：state dependency graph、
-  cross-action compensation chain、operator redrive review refs。
-- 已补 fixture-only runtime-control negative coverage：missing checkpoint、
-  cancel propagation incomplete、replay event incomplete。
-- 已补 fixture-only runtime-control deeper hardening：checkpoint version drift
-  detection、workflow wakeup race dedupe、ReplayBundle lineage completeness。
-- 已补 fixture-only ReplayBundle observability skeleton：低敏
-  observability refs、hash refs、version metadata refs、failure taxonomy refs 和
-  trace linkage refs，并接入 EvalReport / ReplayBundle / AgentRunTrace。
-- 已完成 ADR promotion readiness review：
-  `docs/research/agent-adr-promotion-readiness-20260702.md`。结论是当前 isolated
-  skeleton 可进入 ADR candidate drafting，但不能直接推广生产契约。
-- 已补 current EvalReport generation / baseline refresh review CLI，生成当前报告和
-  baseline refresh review artifact，默认不覆盖 baseline。
-- 已补 current-report / baseline lifecycle deeper hardening：多 suite report
-  matrix、baseline refresh approval manifest 和 report retention metadata，
-  支持 synthetic fixture 与 public-dataset-style adapter sample 混合进矩阵。
-- 下一段等待主集成 / 用户确认是否进入 ADR candidate drafting；若不进入，则只按
-  review 反馈继续 fixture-only hardening。
-
-## 工作规则
-
-- 每轮先读 `prompt.md`、`agent.md`、`docs/runbook/current-goal.md`。
-- Agent Lab 不修改 hotgroup 压测、Docker runtime profile 或后端性能实验路径。
-- 文档和实验可以使用 fake / mock / fixture，但不能接生产启动路径或作为真实服务失败 fallback。
-- 完整模块完成后提交并推 `origin/codex/agent-lab`，再 handoff 给主集成线程。
+若用户确认架构推进，起草 ADR candidates；否则只做 fixture-only hardening，
+优先 ReplayBundle observability taxonomy 或 memory calibration export
+reproducibility。完整模块完成后 commit、push `origin/codex/agent-lab` 并 handoff。

@@ -14,12 +14,16 @@
 
 ## 当前优先顺序
 
-1. ADR candidate drafting decision：`docs/research/agent-adr-promotion-readiness-20260702.md`
+1. Document-driven process：immutable Codex goal 保持稳定；具体阶段、优先级、
+   acceptance criteria 和剩余工作只维护在 runbook / SDD / research 文档中。
+   `docs/research/agent-skeleton-completion-audit-20260702.md` 已确认 Phase 1
+   backend-isolated skeleton 可作为当前可执行基线。
+2. ADR candidate drafting decision：`docs/research/agent-adr-promotion-readiness-20260702.md`
    结论是可进入 ADR candidate drafting，但需主集成 / 用户确认；未确认前不提升生产契约。
-2. ReplayBundle observability hardening review：当前 skeleton 已覆盖低敏
+3. ReplayBundle observability hardening review：当前 skeleton 已覆盖低敏
    observability refs、hash refs、version metadata refs、failure taxonomy refs 和
    trace linkage refs；如评审要求继续，只增加 fixture-only taxonomy / trace 证据。
-3. Memory calibration hardening：当前已补 public-dataset-style export；如需继续，
+4. Memory calibration hardening：当前已补 public-dataset-style export；如需继续，
    只追加公开数据集导出或低敏 adapter metadata，不接真实 IM 数据。
 
 ## Dataset Backlog

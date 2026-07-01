@@ -40,6 +40,7 @@ Open Dataset Eval Harness / synthetic IM-like fixture 已开始第一段隔离�
 | `docs/research/agent-open-dataset-eval-plan-20260701.md` | 已完成 | 公开数据集优先 eval 计划和 synthetic fixture 草案 |
 | `docs/research/agent-coding-experiment-path-20260701.md` | 已完成 | 隔离式 Agent 编码实验路径、测试矩阵和后续切片顺序 |
 | `docs/research/agent-adr-promotion-readiness-20260702.md` | 已完成 | ADR 候选 readiness review；可进入候选起草但不能直接推广生产契约 |
+| `docs/research/agent-skeleton-completion-audit-20260702.md` | 已完成 | 不可变 Agent Lab goal 对 Phase 1 backend-isolated skeleton 的完成度审计 |
 | `docs/sdd/agent-runtime.md` | 已完成 | Runtime / Harness 详细 SDD |
 | `docs/sdd/agent-memory-admission.md` | 已完成 | Memory admission 详细 SDD |
 | `docs/sdd/agent-context-evidencepack.md` | 已完成 | Context / EvidencePack 详细 SDD |
@@ -196,12 +197,16 @@ ai/python/tests/test_agent_eval_*.py
 - ReplayBundle observability fixture：low-sensitive observability refs、hash refs、
   version metadata refs、failure taxonomy refs、trace linkage refs，并在
   EvalReport / ReplayBundle / AgentRunTrace 中保持 fixture-only 输出。
+- Skeleton completion audit：已把 immutable goal 的 17 个骨架要求映射到当前
+  代码、fixture、CLI、tests 和 runbook evidence；结论是 Phase 1 isolated
+  Agent-layer skeleton 可作为当前可执行基线，但不能直接推广生产契约。
 
 ## 当前未完成项
 
 | 优先级 | 工作 | 输出 |
 | --- | --- | --- |
 | P1 | ADR candidate drafting decision | 主集成 / 用户确认是否进入 ADR candidate drafting |
+| P1 | Document-driven process | immutable goal 保持稳定，具体阶段与验收条件只维护在 runbook / SDD / research 文档 |
 | P2 | ReplayBundle observability hardening review | 如评审要求，继续补 fixture-only taxonomy / trace evidence |
 | P2 | Memory calibration hardening | 仅在需要时继续追加公开数据集导出或 adapter metadata |
 

@@ -530,6 +530,8 @@ Agent Runtime / Harness Plane 提升为 ADR / SDD / runtime 实现。
 
 - 研究附录：`docs/research/agent-ecosystem-research-20260701.md`，汇总 2025/2026
   Agent 框架、开源项目、benchmark、安全论文和企业产品报告输入。
+- 完整系统范围探索：`docs/research/agent-system-complete-scope-20260701.md`，整理
+  2026 年企业 Agent 系统应包含的能力平面与离线公开数据集验证流程。
 - 本地 OpenClaw：`E:\agent\openclaw\docs\concepts\architecture.md`、
   `E:\agent\openclaw\AGENTS.md`。
 - 本地 Hermes：`E:\agent\Hermes\agent\memory_provider.py`、

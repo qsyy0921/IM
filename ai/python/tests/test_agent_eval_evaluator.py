@@ -194,6 +194,162 @@ class AgentEvalEvaluatorTests(unittest.TestCase):
         self.assertEqual(report.status, "FAIL")
         self.assertEqual(report.results[0].failure_class, "MEMORY_SCOPE_VIOLATION")
 
+    def test_memory_admission_passes_source_speaker_audience_supersedes_and_review(self) -> None:
+        case = base_case("MEMORY_ADMISSION")
+        case.update(
+            {
+                "actual_used_refs": ["message:project:decision:2"],
+                "expected_memory_outcome": "NEEDS_REVIEW",
+                "actual_memory_outcome": "NEEDS_REVIEW",
+                "expected_memory_scope": "PROJECT",
+                "actual_memory_scope": "PROJECT",
+                "expected_memory_source_refs": ["message:project:decision:2"],
+                "actual_memory_source_refs": ["message:project:decision:2"],
+                "expected_memory_speaker_refs": ["user:pm"],
+                "actual_memory_speaker_refs": ["user:pm"],
+                "expected_memory_audience_refs": ["project:phoenix"],
+                "actual_memory_audience_refs": ["project:phoenix"],
+                "expected_memory_supersedes_refs": ["memory:project:decision:v1"],
+                "actual_memory_supersedes_refs": ["memory:project:decision:v1"],
+                "profile_aggregate_review_required": True,
+                "profile_aggregate_reviewed": True,
+            }
+        )
+
+        report = run_eval_suite(suite_with_case(case))
+
+        self.assertEqual(report.status, "PASS")
+        self.assertEqual(report.aggregate_scores["memory_source_score"], 1.0)
+        self.assertEqual(report.aggregate_scores["memory_speaker_score"], 1.0)
+        self.assertEqual(report.aggregate_scores["memory_audience_score"], 1.0)
+        self.assertEqual(report.aggregate_scores["memory_supersedes_score"], 1.0)
+        self.assertEqual(report.aggregate_scores["memory_profile_review_score"], 1.0)
+
+    def test_memory_admission_fails_missing_source(self) -> None:
+        case = base_case("MEMORY_ADMISSION")
+        case.update(
+            {
+                "expected_memory_outcome": "ADMIT",
+                "actual_memory_outcome": "ADMIT",
+                "expected_memory_scope": "GROUP",
+                "actual_memory_scope": "GROUP",
+                "expected_memory_source_refs": ["message:group:decision:1"],
+                "actual_memory_source_refs": [],
+            }
+        )
+
+        report = run_eval_suite(suite_with_case(case))
+
+        self.assertEqual(report.status, "FAIL")
+        self.assertEqual(report.results[0].failure_class, "MEMORY_SOURCE_MISSING")
+
+    def test_memory_admission_fails_missing_speaker(self) -> None:
+        case = base_case("MEMORY_ADMISSION")
+        case.update(
+            {
+                "expected_memory_outcome": "ADMIT",
+                "actual_memory_outcome": "ADMIT",
+                "expected_memory_scope": "GROUP",
+                "actual_memory_scope": "GROUP",
+                "expected_memory_speaker_refs": ["user:alice"],
+                "actual_memory_speaker_refs": [],
+            }
+        )
+
+        report = run_eval_suite(suite_with_case(case))
+
+        self.assertEqual(report.status, "FAIL")
+        self.assertEqual(report.results[0].failure_class, "MEMORY_SPEAKER_MISSING")
+
+    def test_memory_admission_fails_audience_scope_mismatch(self) -> None:
+        case = base_case("MEMORY_ADMISSION")
+        case.update(
+            {
+                "expected_memory_outcome": "ADMIT",
+                "actual_memory_outcome": "ADMIT",
+                "expected_memory_scope": "GROUP",
+                "actual_memory_scope": "GROUP",
+                "expected_memory_audience_refs": ["group:alpha"],
+                "actual_memory_audience_refs": ["user:alice"],
+            }
+        )
+
+        report = run_eval_suite(suite_with_case(case))
+
+        self.assertEqual(report.status, "FAIL")
+        self.assertEqual(report.results[0].failure_class, "MEMORY_AUDIENCE_SCOPE_MISMATCH")
+
+    def test_memory_admission_fails_missing_supersedes(self) -> None:
+        case = base_case("MEMORY_ADMISSION")
+        case.update(
+            {
+                "expected_memory_outcome": "ADMIT",
+                "actual_memory_outcome": "ADMIT",
+                "expected_memory_scope": "PROJECT",
+                "actual_memory_scope": "PROJECT",
+                "expected_memory_supersedes_refs": ["memory:project:decision:v1"],
+                "actual_memory_supersedes_refs": [],
+            }
+        )
+
+        report = run_eval_suite(suite_with_case(case))
+
+        self.assertEqual(report.status, "FAIL")
+        self.assertEqual(report.results[0].failure_class, "MEMORY_SUPERSEDES_MISSING")
+
+    def test_memory_admission_fails_stale_fact_use(self) -> None:
+        case = base_case("MEMORY_ADMISSION")
+        case.update(
+            {
+                "actual_used_refs": ["memory:project:decision:v1"],
+                "expected_memory_outcome": "REJECT",
+                "actual_memory_outcome": "REJECT",
+                "expected_memory_scope": "PROJECT",
+                "actual_memory_scope": "PROJECT",
+                "stale_memory_refs": ["memory:project:decision:v1"],
+            }
+        )
+
+        report = run_eval_suite(suite_with_case(case))
+
+        self.assertEqual(report.status, "FAIL")
+        self.assertEqual(report.results[0].failure_class, "MEMORY_STALE_FACT_USED")
+
+    def test_memory_admission_fails_overgeneralization(self) -> None:
+        case = base_case("MEMORY_ADMISSION")
+        case.update(
+            {
+                "expected_memory_outcome": "REJECT",
+                "actual_memory_outcome": "REJECT",
+                "expected_memory_scope": "GROUP",
+                "actual_memory_scope": "GROUP",
+                "memory_overgeneralized": True,
+            }
+        )
+
+        report = run_eval_suite(suite_with_case(case))
+
+        self.assertEqual(report.status, "FAIL")
+        self.assertEqual(report.results[0].failure_class, "MEMORY_OVERGENERALIZED")
+
+    def test_memory_admission_fails_missing_profile_review(self) -> None:
+        case = base_case("MEMORY_ADMISSION")
+        case.update(
+            {
+                "expected_memory_outcome": "NEEDS_REVIEW",
+                "actual_memory_outcome": "NEEDS_REVIEW",
+                "expected_memory_scope": "PERSONAL",
+                "actual_memory_scope": "PERSONAL",
+                "profile_aggregate_review_required": True,
+                "profile_aggregate_reviewed": False,
+            }
+        )
+
+        report = run_eval_suite(suite_with_case(case))
+
+        self.assertEqual(report.status, "FAIL")
+        self.assertEqual(report.results[0].failure_class, "MEMORY_REVIEW_MISSING")
+
     def test_tool_security_requires_poisoning_and_output_blocks(self) -> None:
         case = base_case("TOOL_SECURITY")
         case.update(

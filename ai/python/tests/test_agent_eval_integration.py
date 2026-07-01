@@ -33,6 +33,14 @@ CONTEXT_EVIDENCE_PATH = (
     / "agent_eval"
     / "synthetic_context_evidence_scenarios.json"
 )
+MEMORY_ADMISSION_PATH = (
+    REPO_ROOT
+    / "ai"
+    / "python"
+    / "fixtures"
+    / "agent_eval"
+    / "synthetic_memory_admission_scenarios.json"
+)
 
 
 class AgentEvalIntegrationTests(unittest.TestCase):
@@ -147,6 +155,29 @@ class AgentEvalIntegrationTests(unittest.TestCase):
         self.assertIn("source_coverage_score", report["aggregate_scores"])
         self.assertIn("conflict_detection_score", report["aggregate_scores"])
         self.assertIn("temporal_version_score", report["aggregate_scores"])
+
+    def test_cli_outputs_pass_report_for_memory_admission_scenarios(self) -> None:
+        result = subprocess.run(
+            [
+                sys.executable,
+                "ai/python/scripts/run_agent_eval_fixture.py",
+                str(MEMORY_ADMISSION_PATH),
+            ],
+            check=True,
+            capture_output=True,
+            cwd=REPO_ROOT,
+            text=True,
+        )
+
+        report = json.loads(result.stdout)
+        self.assertEqual(report["status"], "PASS")
+        self.assertEqual(report["case_count"], 6)
+        self.assertEqual(report["failed_count"], 0)
+        self.assertIn("memory_source_score", report["aggregate_scores"])
+        self.assertIn("memory_speaker_score", report["aggregate_scores"])
+        self.assertIn("memory_audience_score", report["aggregate_scores"])
+        self.assertIn("memory_supersedes_score", report["aggregate_scores"])
+        self.assertIn("memory_overgeneralization_score", report["aggregate_scores"])
 
 
 if __name__ == "__main__":

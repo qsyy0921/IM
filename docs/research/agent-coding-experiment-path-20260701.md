@@ -73,6 +73,7 @@ ai/python/fixtures/agent_eval/synthetic_core_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_runtime_control_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_mcp_security_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_context_evidence_scenarios.json
+ai/python/fixtures/agent_eval/synthetic_memory_admission_scenarios.json
 ai/python/scripts/run_agent_eval_fixture.py
 ai/python/scripts/run_agent_dataset_adapter.py
 ai/python/scripts/run_agent_eval_regression.py
@@ -118,6 +119,9 @@ Slice 0 covers:
   output instructions, provider provenance mismatch and sandbox-only providers.
 - fixture-only ContextPackage / EvidencePack coverage for source coverage,
   conflict markers, stale evidence avoidance and permission abstain.
+- fixture-only richer memory admission coverage for group speaker/audience,
+  project supersedes, profile aggregate review, revoked memory blocking, stale
+  memory blocking and overgeneralization prevention.
 
 ## 4. Code Architecture
 
@@ -197,6 +201,8 @@ fixtures, call models or connect to backend services.
 - RuntimeControlFixture.
 - ContextPackage source coverage, conflict, stale-source and permission-abstain
   metadata.
+- MemoryCandidate source, speaker, audience, supersedes, stale-memory and
+  review metadata.
 
 The trace is low-sensitive and fixture-only. It records refs, hashes and failure
 classes, not raw prompt, message body or provider output.
@@ -214,6 +220,7 @@ ai/python/fixtures/agent_eval/synthetic_core_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_runtime_control_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_mcp_security_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_context_evidence_scenarios.json
+ai/python/fixtures/agent_eval/synthetic_memory_admission_scenarios.json
 ai/python/fixtures/agent_eval/adapter_samples/
 ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json
 ```
@@ -289,6 +296,7 @@ Integration tests:
 - load `synthetic_runtime_control_scenarios.json`;
 - load `synthetic_mcp_security_scenarios.json`;
 - load `synthetic_context_evidence_scenarios.json`;
+- load `synthetic_memory_admission_scenarios.json`;
 - run `run_agent_eval_fixture.py`;
 - verify report status, case count, failure distribution and `raw_payload_returned=false`.
 
@@ -314,6 +322,7 @@ python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_runtime_control_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_mcp_security_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_context_evidence_scenarios.json
+python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_memory_admission_scenarios.json
 python ai/python/scripts/run_agent_dataset_adapter.py --run ai/python/fixtures/agent_eval/adapter_samples/qasper_like_rag_samples.json
 python ai/python/scripts/run_agent_eval_regression.py ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json
 ```
@@ -338,7 +347,8 @@ git status --short --branch --untracked-files=all
 
 Recommended next slices:
 
-1. Add richer memory pollution / revocation / supersedes fixture coverage.
+1. Harden memory admission with duplicate/dedupe, low-confidence, procedural
+   skill-bound and policy-memory rejection cases.
 2. Harden ContextPackage / EvidencePack with memory-vs-source precedence,
    unsafe tool output in context, token-budget truncation and unavailable
    retrieval lane cases.

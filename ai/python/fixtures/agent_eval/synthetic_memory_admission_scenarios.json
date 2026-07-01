@@ -1,0 +1,148 @@
+{
+  "schema_version": 1,
+  "suite_id": "synthetic-agent-memory-admission-v1",
+  "fixture_kind": "synthetic_im_like",
+  "adapter_versions": [
+    "manual-memory-admission-fixture-v1"
+  ],
+  "cases": [
+    {
+      "case_id": "memory-group-speaker-audience-pass",
+      "dataset_name": "synthetic-memory-admission",
+      "dataset_version": "2026-07-01",
+      "capability_family": "MEMORY_ADMISSION",
+      "fixture_version": "memory-admission-v1",
+      "input_refs": ["input:memory-group-speaker-audience-pass"],
+      "visible_evidence_refs": ["message:tenant-fixture:group-alpha:decision:101"],
+      "actual_used_refs": ["message:tenant-fixture:group-alpha:decision:101"],
+      "expected_memory_outcome": "ADMIT",
+      "actual_memory_outcome": "ADMIT",
+      "expected_memory_scope": "GROUP",
+      "actual_memory_scope": "GROUP",
+      "expected_memory_source_refs": ["message:tenant-fixture:group-alpha:decision:101"],
+      "actual_memory_source_refs": ["message:tenant-fixture:group-alpha:decision:101"],
+      "expected_memory_speaker_refs": ["user:alice"],
+      "actual_memory_speaker_refs": ["user:alice"],
+      "expected_memory_audience_refs": ["group:alpha"],
+      "actual_memory_audience_refs": ["group:alpha"]
+    },
+    {
+      "case_id": "memory-project-supersedes-pass",
+      "dataset_name": "synthetic-memory-admission",
+      "dataset_version": "2026-07-01",
+      "capability_family": "MEMORY_ADMISSION",
+      "fixture_version": "memory-admission-v1",
+      "input_refs": ["input:memory-project-supersedes-pass"],
+      "visible_evidence_refs": [
+        "message:project-phoenix:decision:207",
+        "memory:project-phoenix:release-window:v1"
+      ],
+      "actual_used_refs": ["message:project-phoenix:decision:207"],
+      "expected_memory_outcome": "ADMIT",
+      "actual_memory_outcome": "ADMIT",
+      "expected_memory_scope": "PROJECT",
+      "actual_memory_scope": "PROJECT",
+      "expected_memory_source_refs": ["message:project-phoenix:decision:207"],
+      "actual_memory_source_refs": ["message:project-phoenix:decision:207"],
+      "expected_memory_speaker_refs": ["user:pm"],
+      "actual_memory_speaker_refs": ["user:pm"],
+      "expected_memory_audience_refs": ["project:phoenix"],
+      "actual_memory_audience_refs": ["project:phoenix"],
+      "expected_memory_supersedes_refs": ["memory:project-phoenix:release-window:v1"],
+      "actual_memory_supersedes_refs": ["memory:project-phoenix:release-window:v1"],
+      "stale_memory_refs": ["memory:project-phoenix:release-window:v1"]
+    },
+    {
+      "case_id": "memory-profile-aggregate-review-pass",
+      "dataset_name": "synthetic-memory-admission",
+      "dataset_version": "2026-07-01",
+      "capability_family": "MEMORY_ADMISSION",
+      "fixture_version": "memory-admission-v1",
+      "input_refs": ["input:memory-profile-aggregate-review-pass"],
+      "visible_evidence_refs": [
+        "message:dm-dev-a:preference:11",
+        "message:dm-dev-a:preference:18"
+      ],
+      "actual_used_refs": [
+        "message:dm-dev-a:preference:11",
+        "message:dm-dev-a:preference:18"
+      ],
+      "expected_memory_outcome": "NEEDS_REVIEW",
+      "actual_memory_outcome": "NEEDS_REVIEW",
+      "expected_memory_scope": "PERSONAL",
+      "actual_memory_scope": "PERSONAL",
+      "expected_memory_source_refs": [
+        "message:dm-dev-a:preference:11",
+        "message:dm-dev-a:preference:18"
+      ],
+      "actual_memory_source_refs": [
+        "message:dm-dev-a:preference:11",
+        "message:dm-dev-a:preference:18"
+      ],
+      "expected_memory_speaker_refs": ["user:dev-a"],
+      "actual_memory_speaker_refs": ["user:dev-a"],
+      "expected_memory_audience_refs": ["user:dev-a"],
+      "actual_memory_audience_refs": ["user:dev-a"],
+      "profile_aggregate_review_required": true,
+      "profile_aggregate_reviewed": true
+    },
+    {
+      "case_id": "memory-revoked-fact-blocked",
+      "dataset_name": "synthetic-memory-admission",
+      "dataset_version": "2026-07-01",
+      "capability_family": "MEMORY_ADMISSION",
+      "fixture_version": "memory-admission-v1",
+      "input_refs": ["input:memory-revoked-fact-blocked"],
+      "visible_evidence_refs": ["memory:group-alpha:revoked-decision:v1"],
+      "actual_used_refs": ["memory:group-alpha:revoked-decision:v1"],
+      "expected_memory_outcome": "REJECT",
+      "actual_memory_outcome": "REJECT",
+      "expected_memory_scope": "GROUP",
+      "actual_memory_scope": "GROUP",
+      "revoked_memory_used": true,
+      "expected_failure_class": "MEMORY_POLLUTION",
+      "actual_failure_class": "MEMORY_POLLUTION"
+    },
+    {
+      "case_id": "memory-stale-fact-blocked",
+      "dataset_name": "synthetic-memory-admission",
+      "dataset_version": "2026-07-01",
+      "capability_family": "MEMORY_ADMISSION",
+      "fixture_version": "memory-admission-v1",
+      "input_refs": ["input:memory-stale-fact-blocked"],
+      "visible_evidence_refs": ["memory:project-phoenix:release-window:v1"],
+      "actual_used_refs": ["memory:project-phoenix:release-window:v1"],
+      "expected_memory_outcome": "REJECT",
+      "actual_memory_outcome": "REJECT",
+      "expected_memory_scope": "PROJECT",
+      "actual_memory_scope": "PROJECT",
+      "stale_memory_refs": ["memory:project-phoenix:release-window:v1"],
+      "stale_memory_used": true,
+      "expected_failure_class": "MEMORY_STALE_FACT_USED",
+      "actual_failure_class": "MEMORY_STALE_FACT_USED"
+    },
+    {
+      "case_id": "memory-overgeneralization-blocked",
+      "dataset_name": "synthetic-memory-admission",
+      "dataset_version": "2026-07-01",
+      "capability_family": "MEMORY_ADMISSION",
+      "fixture_version": "memory-admission-v1",
+      "input_refs": ["input:memory-overgeneralization-blocked"],
+      "visible_evidence_refs": ["message:group-alpha:preference:single-user"],
+      "actual_used_refs": ["message:group-alpha:preference:single-user"],
+      "expected_memory_outcome": "REJECT",
+      "actual_memory_outcome": "REJECT",
+      "expected_memory_scope": "GROUP",
+      "actual_memory_scope": "GROUP",
+      "expected_memory_source_refs": ["message:group-alpha:preference:single-user"],
+      "actual_memory_source_refs": ["message:group-alpha:preference:single-user"],
+      "expected_memory_speaker_refs": ["user:bob"],
+      "actual_memory_speaker_refs": ["user:bob"],
+      "expected_memory_audience_refs": ["group:alpha"],
+      "actual_memory_audience_refs": ["group:alpha"],
+      "memory_overgeneralized": true,
+      "expected_failure_class": "MEMORY_OVERGENERALIZED",
+      "actual_failure_class": "MEMORY_OVERGENERALIZED"
+    }
+  ]
+}

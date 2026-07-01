@@ -84,8 +84,11 @@ Agent Gateway / UX
   output instruction、provider provenance mismatch、sandbox-only provider。
 - 已补 fixture-only ContextPackage / EvidencePack coverage：source coverage、
   conflict marker、stale evidence avoidance、permission abstain。
-- 下一段优先做 memory admission richer fixture、Context/Evidence hardening、
-  state-diff report 等离线能力。
+- 已补 fixture-only richer memory admission coverage：group speaker/audience、
+  project supersedes、profile aggregate review、revoked/stale memory blocking、
+  overgeneralization prevention。
+- 下一段优先做 state-diff report、Context/Evidence hardening、memory admission
+  hardening 等离线能力。
 
 ## 工作规则
 

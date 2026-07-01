@@ -194,10 +194,45 @@ def _memory_scores(case: EvalCase) -> tuple[dict[str, float], str]:
     outcome_score = 1.0 if case.expected_memory_outcome == case.actual_memory_outcome else 0.0
     scope_score = 1.0 if case.expected_memory_scope == case.actual_memory_scope else 0.0
     revocation_score = 0.0 if case.revoked_memory_used else 1.0
+    source_score = _ref_subset_score(
+        case.expected_memory_source_refs,
+        case.actual_memory_source_refs or case.actual_used_refs,
+    )
+    speaker_score = _ref_subset_score(
+        case.expected_memory_speaker_refs,
+        case.actual_memory_speaker_refs,
+    )
+    audience_score = _ref_subset_score(
+        case.expected_memory_audience_refs,
+        case.actual_memory_audience_refs,
+    )
+    supersedes_score = _ref_subset_score(
+        case.expected_memory_supersedes_refs,
+        case.actual_memory_supersedes_refs,
+    )
+    stale_score = 0.0 if _stale_memory_used(case) else 1.0
+    overgeneralization_score = 0.0 if case.memory_overgeneralized else 1.0
+    profile_review_score = 1.0
+    if case.profile_aggregate_review_required:
+        profile_review_score = 1.0 if case.profile_aggregate_reviewed else 0.0
     if revocation_score == 0.0:
         failure = "MEMORY_POLLUTION"
+    elif source_score == 0.0:
+        failure = "MEMORY_SOURCE_MISSING"
     elif scope_score == 0.0:
         failure = "MEMORY_SCOPE_VIOLATION"
+    elif speaker_score == 0.0:
+        failure = "MEMORY_SPEAKER_MISSING"
+    elif audience_score == 0.0:
+        failure = "MEMORY_AUDIENCE_SCOPE_MISMATCH"
+    elif supersedes_score == 0.0:
+        failure = "MEMORY_SUPERSEDES_MISSING"
+    elif stale_score == 0.0:
+        failure = "MEMORY_STALE_FACT_USED"
+    elif overgeneralization_score == 0.0:
+        failure = "MEMORY_OVERGENERALIZED"
+    elif profile_review_score == 0.0:
+        failure = "MEMORY_REVIEW_MISSING"
     elif outcome_score == 0.0:
         failure = "MEMORY_CONFLICT"
     else:
@@ -207,6 +242,13 @@ def _memory_scores(case: EvalCase) -> tuple[dict[str, float], str]:
             "memory_precision": outcome_score,
             "memory_scope_score": scope_score,
             "memory_revocation_score": revocation_score,
+            "memory_source_score": source_score,
+            "memory_speaker_score": speaker_score,
+            "memory_audience_score": audience_score,
+            "memory_supersedes_score": supersedes_score,
+            "memory_stale_fact_score": stale_score,
+            "memory_overgeneralization_score": overgeneralization_score,
+            "memory_profile_review_score": profile_review_score,
         },
         failure,
     )
@@ -339,12 +381,26 @@ def _stale_evidence_used(case: EvalCase) -> bool:
     return case.stale_evidence_used or bool(stale.intersection(used))
 
 
+def _stale_memory_used(case: EvalCase) -> bool:
+    stale = set(case.stale_memory_refs)
+    used = set(case.actual_used_refs) | set(case.actual_memory_source_refs)
+    return case.stale_memory_used or bool(stale.intersection(used))
+
+
+def _ref_subset_score(expected_refs: list[str], actual_refs: list[str]) -> float:
+    expected = set(expected_refs)
+    actual = set(actual_refs)
+    return 1.0 if expected.issubset(actual) else 0.0
+
+
 def _replay_bundle(case: EvalCase, failure_class: str) -> ReplayBundle:
     replay_payload = {
         "case_id": case.case_id,
         "input_refs": case.input_refs,
         "actual_used_refs": case.actual_used_refs,
         "actual_citation_refs": case.actual_citation_refs,
+        "actual_memory_source_refs": case.actual_memory_source_refs,
+        "actual_memory_supersedes_refs": case.actual_memory_supersedes_refs,
         "actual_failure_class": case.actual_failure_class,
         "actual_tool_provider_ref": case.actual_tool_provider_ref,
         "failure_class": failure_class,

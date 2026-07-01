@@ -52,6 +52,13 @@ ALLOWED_FAILURE_CLASSES = {
     "APPROVAL_REJECTED",
     "APPROVAL_TIMEOUT",
     "STATE_DIFF_MISMATCH",
+    "MEMORY_SOURCE_MISSING",
+    "MEMORY_SPEAKER_MISSING",
+    "MEMORY_AUDIENCE_SCOPE_MISMATCH",
+    "MEMORY_SUPERSEDES_MISSING",
+    "MEMORY_STALE_FACT_USED",
+    "MEMORY_OVERGENERALIZED",
+    "MEMORY_REVIEW_MISSING",
     "MEMORY_SCOPE_VIOLATION",
     "MEMORY_CONFLICT",
     "MEMORY_POLLUTION",
@@ -98,6 +105,15 @@ class EvalCase:
     actual_memory_outcome: str = ""
     expected_memory_scope: str = ""
     actual_memory_scope: str = ""
+    expected_memory_source_refs: list[str] = field(default_factory=list)
+    actual_memory_source_refs: list[str] = field(default_factory=list)
+    expected_memory_speaker_refs: list[str] = field(default_factory=list)
+    actual_memory_speaker_refs: list[str] = field(default_factory=list)
+    expected_memory_audience_refs: list[str] = field(default_factory=list)
+    actual_memory_audience_refs: list[str] = field(default_factory=list)
+    expected_memory_supersedes_refs: list[str] = field(default_factory=list)
+    actual_memory_supersedes_refs: list[str] = field(default_factory=list)
+    stale_memory_refs: list[str] = field(default_factory=list)
     expected_tool_prepare: str = ""
     actual_tool_prepare: str = ""
     expected_tool_provider_ref: str = ""
@@ -114,6 +130,10 @@ class EvalCase:
     conflict_detected: bool = False
     stale_evidence_used: bool = False
     permission_abstain_required: bool = False
+    stale_memory_used: bool = False
+    memory_overgeneralized: bool = False
+    profile_aggregate_review_required: bool = False
+    profile_aggregate_reviewed: bool = False
     malicious_tool_blocked: bool = False
     tool_description_poisoned: bool = False
     tool_description_blocked: bool = False
@@ -271,6 +291,33 @@ def _eval_case(payload: dict[str, Any], index: int) -> EvalCase:
         actual_memory_outcome=_string(payload.get("actual_memory_outcome", "")).upper(),
         expected_memory_scope=_string(payload.get("expected_memory_scope", "")).upper(),
         actual_memory_scope=_string(payload.get("actual_memory_scope", "")).upper(),
+        expected_memory_source_refs=_string_list(
+            payload.get("expected_memory_source_refs", []), "expected_memory_source_refs"
+        ),
+        actual_memory_source_refs=_string_list(
+            payload.get("actual_memory_source_refs", []), "actual_memory_source_refs"
+        ),
+        expected_memory_speaker_refs=_string_list(
+            payload.get("expected_memory_speaker_refs", []), "expected_memory_speaker_refs"
+        ),
+        actual_memory_speaker_refs=_string_list(
+            payload.get("actual_memory_speaker_refs", []), "actual_memory_speaker_refs"
+        ),
+        expected_memory_audience_refs=_string_list(
+            payload.get("expected_memory_audience_refs", []), "expected_memory_audience_refs"
+        ),
+        actual_memory_audience_refs=_string_list(
+            payload.get("actual_memory_audience_refs", []), "actual_memory_audience_refs"
+        ),
+        expected_memory_supersedes_refs=_string_list(
+            payload.get("expected_memory_supersedes_refs", []),
+            "expected_memory_supersedes_refs",
+        ),
+        actual_memory_supersedes_refs=_string_list(
+            payload.get("actual_memory_supersedes_refs", []),
+            "actual_memory_supersedes_refs",
+        ),
+        stale_memory_refs=_string_list(payload.get("stale_memory_refs", []), "stale_memory_refs"),
         expected_tool_prepare=_string(payload.get("expected_tool_prepare", "")).upper(),
         actual_tool_prepare=_string(payload.get("actual_tool_prepare", "")).upper(),
         expected_tool_provider_ref=_string(payload.get("expected_tool_provider_ref", "")),
@@ -300,6 +347,17 @@ def _eval_case(payload: dict[str, Any], index: int) -> EvalCase:
         ),
         permission_abstain_required=_bool(
             payload.get("permission_abstain_required", False), "permission_abstain_required"
+        ),
+        stale_memory_used=_bool(payload.get("stale_memory_used", False), "stale_memory_used"),
+        memory_overgeneralized=_bool(
+            payload.get("memory_overgeneralized", False), "memory_overgeneralized"
+        ),
+        profile_aggregate_review_required=_bool(
+            payload.get("profile_aggregate_review_required", False),
+            "profile_aggregate_review_required",
+        ),
+        profile_aggregate_reviewed=_bool(
+            payload.get("profile_aggregate_reviewed", False), "profile_aggregate_reviewed"
         ),
         malicious_tool_blocked=_bool(
             payload.get("malicious_tool_blocked", False), "malicious_tool_blocked"

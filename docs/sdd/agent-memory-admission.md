@@ -347,7 +347,31 @@ Memory admission can move from design to ADR only after:
 - retrieval-gateway can respect memory state/version/scope;
 - audit can explain memory admission and use.
 
-## 16. References
+## 16. Current Isolated Fixture Coverage
+
+Current first-stage code is fixture-only and lives under
+`ai/python/nexusim_ai_eval/` and
+`ai/python/fixtures/agent_eval/synthetic_memory_admission_scenarios.json`.
+It does not freeze a production memory event or MemoryCandidate schema.
+
+Implemented checks:
+
+- group memory must carry source refs, speaker refs and audience refs;
+- project memory supersedes lineage must be represented when expected;
+- profile aggregate memory can require review before activation;
+- revoked memory use is detected as pollution;
+- stale memory refs must not be used as current facts;
+- overgeneralized memory candidates can be rejected.
+
+Remaining hardening:
+
+- duplicate and near-duplicate memory handling;
+- low-confidence candidate rejection;
+- procedural memory bound to SkillPackage / AgentDefinition version;
+- policy-like memory rejection unless sourced from governed policy;
+- review timeout and retry metadata.
+
+## 17. References
 
 - `docs/sdd/memory-service.md`
 - `docs/sdd/agent-runtime.md`

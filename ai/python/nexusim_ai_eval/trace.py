@@ -35,7 +35,16 @@ class MemoryCandidateFixture:
     memory_candidate_ref: str
     outcome: str
     scope: str
+    source_refs: list[str]
+    speaker_refs: list[str]
+    audience_refs: list[str]
+    supersedes_refs: list[str]
+    stale_refs: list[str]
     revoked_memory_used: bool
+    stale_memory_used: bool
+    overgeneralized: bool
+    profile_aggregate_review_required: bool
+    profile_aggregate_reviewed: bool
 
 
 @dataclass(frozen=True)
@@ -121,14 +130,15 @@ def build_agent_run_trace(case: EvalCase) -> AgentRunTrace:
     ]
     memory_candidate = _memory_candidate(case)
     if memory_candidate is not None:
+        memory_status, memory_failure = _memory_step_status(case, memory_candidate)
         steps.append(
             _step(
                 case,
                 "memory_candidate",
-                "PASS" if not case.revoked_memory_used else "FAIL",
+                memory_status,
                 context_package.selected_source_refs,
                 [memory_candidate.memory_candidate_ref],
-                "MEMORY_POLLUTION" if case.revoked_memory_used else "",
+                memory_failure,
             )
         )
     tool_intent = _tool_intent(case)
@@ -192,7 +202,16 @@ def _memory_candidate(case: EvalCase) -> MemoryCandidateFixture | None:
         memory_candidate_ref=stable_ref("memory", {"case_id": case.case_id}),
         outcome=case.actual_memory_outcome,
         scope=case.actual_memory_scope,
+        source_refs=case.actual_memory_source_refs or case.actual_used_refs,
+        speaker_refs=case.actual_memory_speaker_refs,
+        audience_refs=case.actual_memory_audience_refs,
+        supersedes_refs=case.actual_memory_supersedes_refs,
+        stale_refs=case.stale_memory_refs,
         revoked_memory_used=case.revoked_memory_used,
+        stale_memory_used=_stale_memory_used(case),
+        overgeneralized=case.memory_overgeneralized,
+        profile_aggregate_review_required=case.profile_aggregate_review_required,
+        profile_aggregate_reviewed=case.profile_aggregate_reviewed,
     )
 
 
@@ -240,6 +259,48 @@ def _stale_evidence_used(case: EvalCase) -> bool:
     stale_refs = set(case.stale_evidence_refs)
     used_refs = set(case.actual_used_refs) | set(case.actual_citation_refs)
     return case.stale_evidence_used or bool(stale_refs.intersection(used_refs))
+
+
+def _stale_memory_used(case: EvalCase) -> bool:
+    stale_refs = set(case.stale_memory_refs)
+    used_refs = set(case.actual_used_refs) | set(case.actual_memory_source_refs)
+    return case.stale_memory_used or bool(stale_refs.intersection(used_refs))
+
+
+def _memory_step_status(
+    case: EvalCase,
+    memory_candidate: MemoryCandidateFixture,
+) -> tuple[str, str]:
+    if memory_candidate.revoked_memory_used:
+        return ("FAIL", "MEMORY_POLLUTION")
+    expected_sources = set(case.expected_memory_source_refs)
+    if expected_sources and not expected_sources.issubset(set(memory_candidate.source_refs)):
+        return ("FAIL", "MEMORY_SOURCE_MISSING")
+    if case.expected_memory_scope and case.expected_memory_scope != memory_candidate.scope:
+        return ("FAIL", "MEMORY_SCOPE_VIOLATION")
+    expected_speakers = set(case.expected_memory_speaker_refs)
+    if expected_speakers and not expected_speakers.issubset(set(memory_candidate.speaker_refs)):
+        return ("FAIL", "MEMORY_SPEAKER_MISSING")
+    expected_audience = set(case.expected_memory_audience_refs)
+    if expected_audience and not expected_audience.issubset(set(memory_candidate.audience_refs)):
+        return ("FAIL", "MEMORY_AUDIENCE_SCOPE_MISMATCH")
+    expected_supersedes = set(case.expected_memory_supersedes_refs)
+    if expected_supersedes and not expected_supersedes.issubset(
+        set(memory_candidate.supersedes_refs)
+    ):
+        return ("FAIL", "MEMORY_SUPERSEDES_MISSING")
+    if memory_candidate.stale_memory_used:
+        return ("FAIL", "MEMORY_STALE_FACT_USED")
+    if memory_candidate.overgeneralized:
+        return ("FAIL", "MEMORY_OVERGENERALIZED")
+    if (
+        memory_candidate.profile_aggregate_review_required
+        and not memory_candidate.profile_aggregate_reviewed
+    ):
+        return ("FAIL", "MEMORY_REVIEW_MISSING")
+    if case.expected_memory_outcome != memory_candidate.outcome:
+        return ("FAIL", "MEMORY_CONFLICT")
+    return ("PASS", "")
 
 
 def _tool_step_status(

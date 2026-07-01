@@ -143,6 +143,42 @@ class AgentEvalContractTests(unittest.TestCase):
         self.assertTrue(cases[0].conflict_detected)
         self.assertFalse(cases[0].stale_evidence_used)
 
+    def test_validates_memory_admission_metadata(self) -> None:
+        payload = valid_suite()
+        payload["cases"] = [
+            {
+                "case_id": "memory-admission-pass",
+                "dataset_name": "synthetic-memory",
+                "dataset_version": "2026-07-01",
+                "capability_family": "MEMORY_ADMISSION",
+                "fixture_version": "fixture-v1",
+                "input_refs": ["input:memory-admission-pass"],
+                "expected_memory_outcome": "ADMIT",
+                "actual_memory_outcome": "ADMIT",
+                "expected_memory_scope": "PROJECT",
+                "actual_memory_scope": "PROJECT",
+                "expected_memory_source_refs": ["message:project:decision:2"],
+                "actual_memory_source_refs": ["message:project:decision:2"],
+                "expected_memory_speaker_refs": ["user:pm"],
+                "actual_memory_speaker_refs": ["user:pm"],
+                "expected_memory_audience_refs": ["project:phoenix"],
+                "actual_memory_audience_refs": ["project:phoenix"],
+                "expected_memory_supersedes_refs": ["memory:project:decision:v1"],
+                "actual_memory_supersedes_refs": ["memory:project:decision:v1"],
+                "stale_memory_refs": ["memory:project:decision:v1"],
+                "profile_aggregate_review_required": True,
+                "profile_aggregate_reviewed": True,
+            }
+        ]
+
+        cases = validate_eval_suite(payload)
+
+        self.assertEqual(cases[0].capability_family, "MEMORY_ADMISSION")
+        self.assertEqual(cases[0].expected_memory_source_refs, ["message:project:decision:2"])
+        self.assertEqual(cases[0].expected_memory_speaker_refs, ["user:pm"])
+        self.assertEqual(cases[0].actual_memory_supersedes_refs, ["memory:project:decision:v1"])
+        self.assertTrue(cases[0].profile_aggregate_review_required)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -83,8 +83,8 @@ Agent / RAG / memory / Python AI Worker / EvidencePack / eval gate，不使用�
 
 ## 后续优先级
 
-1. 做 memory pollution / supersedes / revocation、state-diff report、ContextPackage /
-   EvidencePack hardening、runtime-control negative fixture 等离线 eval fixture。
+1. 做 state-diff report、ContextPackage / EvidencePack hardening、memory admission
+   hardening、runtime-control negative fixture 等离线 eval fixture。
 2. 增加 current-report 生成 / baseline refresh review 脚本，避免手工更新 baseline。
 3. 增加 runtime-control negative fixture pack，覆盖 missing checkpoint、
    cancel propagation incomplete、replay event incomplete。

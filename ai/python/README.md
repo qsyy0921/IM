@@ -53,6 +53,7 @@ ai/python/
       synthetic_mcp_security_hardening_scenarios.json
       synthetic_context_evidence_scenarios.json
       synthetic_context_evidence_hardening_scenarios.json
+      synthetic_context_evidence_deeper_hardening_scenarios.json
       synthetic_memory_admission_scenarios.json
       synthetic_memory_admission_hardening_scenarios.json
       synthetic_memory_admission_deeper_hardening_scenarios.json
@@ -89,6 +90,7 @@ python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_mcp_security_hardening_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_context_evidence_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_context_evidence_hardening_scenarios.json
+python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_context_evidence_deeper_hardening_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_memory_admission_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_memory_admission_hardening_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_memory_admission_deeper_hardening_scenarios.json
@@ -167,6 +169,7 @@ ai/python/fixtures/agent_eval/synthetic_mcp_security_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_mcp_security_hardening_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_context_evidence_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_context_evidence_hardening_scenarios.json
+ai/python/fixtures/agent_eval/synthetic_context_evidence_deeper_hardening_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_memory_admission_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_memory_admission_hardening_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_memory_admission_deeper_hardening_scenarios.json
@@ -199,6 +202,10 @@ stale evidence avoidance and permission-driven abstain recommendation.
 The context/evidence hardening fixture covers memory-vs-current-source
 precedence, unsafe tool output quarantine before context reuse, deterministic
 context-budget retention and unavailable retrieval lane gap reporting.
+The context/evidence deeper hardening fixture covers source ranking and
+tie-break explanation, retrieval lane redrive refs, snippet-level citation
+repair with partial-source rejection, cross-tenant denied-lane reporting and
+provider/tool/peer-agent taint propagation.
 The memory admission fixture covers group speaker/audience attribution, project
 supersedes lineage, profile aggregate review, revoked memory blocking, stale
 memory blocking and overgeneralization prevention.
@@ -235,6 +242,7 @@ python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_mcp_security_hardening_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_context_evidence_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_context_evidence_hardening_scenarios.json
+python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_context_evidence_deeper_hardening_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_memory_admission_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_memory_admission_hardening_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_memory_admission_deeper_hardening_scenarios.json

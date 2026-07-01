@@ -252,6 +252,30 @@ class AgentEvalTraceTests(unittest.TestCase):
                     "actual_retrieval_lanes": ["conversation"],
                     "unavailable_retrieval_lanes": ["memory"],
                     "retrieval_lane_gap_reported": True,
+                    "expected_source_ranking_refs": ["evidence:current", "memory:old"],
+                    "actual_source_ranking_refs": ["evidence:current", "memory:old"],
+                    "expected_source_ranking_tie_break_refs": ["evidence:current"],
+                    "actual_source_ranking_tie_break_refs": ["evidence:current"],
+                    "expected_lane_redrive_refs": ["lane-redrive:memory:attempt-2"],
+                    "actual_lane_redrive_refs": ["lane-redrive:memory:attempt-2"],
+                    "denied_retrieval_lanes": ["cross_tenant_memory"],
+                    "denied_lane_source_refs": ["evidence:tenant-other:hidden"],
+                    "reported_denied_lane_source_refs": ["evidence:tenant-other:hidden"],
+                    "expected_snippet_citation_refs": ["snippet:evidence:current#p2"],
+                    "actual_snippet_citation_refs": ["snippet:evidence:current#p2"],
+                    "expected_citation_repair_refs": ["citation-repair:evidence:current#p2"],
+                    "actual_citation_repair_refs": ["citation-repair:evidence:current#p2"],
+                    "partial_source_rejected_refs": ["snippet:memory:old#ambiguous"],
+                    "actual_partial_source_rejected_refs": ["snippet:memory:old#ambiguous"],
+                    "tainted_context_refs": ["peer-agent:analyst:summary"],
+                    "expected_taint_label_refs": ["peer-agent:analyst:summary"],
+                    "actual_taint_label_refs": ["peer-agent:analyst:summary"],
+                    "source_ranking_explained": True,
+                    "lane_redrive_recorded": True,
+                    "denied_lane_reported": True,
+                    "snippet_citation_repaired": True,
+                    "partial_source_rejected": True,
+                    "context_taint_propagated": True,
                     "conflict_detected": True,
                 }
             )
@@ -271,6 +295,21 @@ class AgentEvalTraceTests(unittest.TestCase):
         self.assertEqual(trace.context_package.budget_retained_refs, ["evidence:current"])
         self.assertEqual(trace.context_package.retrieval_lanes, ["conversation"])
         self.assertTrue(trace.context_package.retrieval_lane_gap_reported)
+        self.assertEqual(trace.evidence_pack.source_ranking_refs, ["evidence:current", "memory:old"])
+        self.assertEqual(trace.evidence_pack.lane_redrive_refs, ["lane-redrive:memory:attempt-2"])
+        self.assertEqual(trace.evidence_pack.denied_retrieval_lanes, ["cross_tenant_memory"])
+        self.assertTrue(trace.context_package.source_ranking_explained)
+        self.assertEqual(trace.context_package.snippet_citation_refs, ["snippet:evidence:current#p2"])
+        self.assertEqual(
+            trace.context_package.citation_repair_refs,
+            ["citation-repair:evidence:current#p2"],
+        )
+        self.assertEqual(
+            trace.context_package.partial_source_rejected_refs,
+            ["snippet:memory:old#ambiguous"],
+        )
+        self.assertEqual(trace.context_package.taint_label_refs, ["peer-agent:analyst:summary"])
+        self.assertTrue(trace.context_package.context_taint_propagated)
 
     def test_trace_contains_tool_and_workflow_steps(self) -> None:
         case = validate_eval_suite(

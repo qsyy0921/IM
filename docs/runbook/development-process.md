@@ -116,6 +116,7 @@ NexusIM Agent 层的开发顺序不是先接真实聊天数据，也不是先写
 - fixture-only MCP security hardening skeleton。
 - fixture-only ContextPackage / EvidencePack skeleton。
 - fixture-only ContextPackage / EvidencePack hardening skeleton。
+- fixture-only ContextPackage / EvidencePack deeper hardening skeleton。
 - fixture-only richer MemoryCandidate / memory admission skeleton。
 - fixture-only MemoryCandidate / memory admission hardening skeleton。
 - fixture-only MemoryCandidate / memory admission deeper hardening skeleton。

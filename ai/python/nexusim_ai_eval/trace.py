@@ -26,6 +26,12 @@ class EvidencePackFixture:
     stale_source_refs: list[str]
     memory_conflict_source_refs: list[str]
     unavailable_retrieval_lanes: list[str]
+    source_ranking_refs: list[str]
+    source_ranking_tie_break_refs: list[str]
+    lane_redrive_refs: list[str]
+    denied_retrieval_lanes: list[str]
+    denied_lane_source_refs: list[str]
+    reported_denied_lane_source_refs: list[str]
 
 
 @dataclass(frozen=True)
@@ -48,6 +54,17 @@ class ContextPackageFixture:
     retrieval_lanes: list[str]
     unavailable_retrieval_lanes: list[str]
     retrieval_lane_gap_reported: bool
+    source_ranking_explained: bool
+    snippet_citation_refs: list[str]
+    citation_repair_refs: list[str]
+    partial_source_rejected_refs: list[str]
+    snippet_citation_repaired: bool
+    partial_source_rejected: bool
+    tainted_context_refs: list[str]
+    taint_label_refs: list[str]
+    context_taint_propagated: bool
+    lane_redrive_recorded: bool
+    denied_lane_reported: bool
 
 
 @dataclass(frozen=True)
@@ -186,6 +203,12 @@ def build_agent_run_trace(case: EvalCase) -> AgentRunTrace:
         stale_source_refs=case.stale_evidence_refs,
         memory_conflict_source_refs=case.memory_conflict_source_refs,
         unavailable_retrieval_lanes=case.unavailable_retrieval_lanes,
+        source_ranking_refs=case.actual_source_ranking_refs,
+        source_ranking_tie_break_refs=case.actual_source_ranking_tie_break_refs,
+        lane_redrive_refs=case.actual_lane_redrive_refs,
+        denied_retrieval_lanes=case.denied_retrieval_lanes,
+        denied_lane_source_refs=case.denied_lane_source_refs,
+        reported_denied_lane_source_refs=case.reported_denied_lane_source_refs,
     )
     used_refs = case.actual_used_refs or case.actual_citation_refs
     leakage = bool(set(case.forbidden_evidence_refs).intersection(used_refs))
@@ -208,6 +231,17 @@ def build_agent_run_trace(case: EvalCase) -> AgentRunTrace:
         retrieval_lanes=case.actual_retrieval_lanes,
         unavailable_retrieval_lanes=case.unavailable_retrieval_lanes,
         retrieval_lane_gap_reported=case.retrieval_lane_gap_reported,
+        source_ranking_explained=case.source_ranking_explained,
+        snippet_citation_refs=case.actual_snippet_citation_refs,
+        citation_repair_refs=case.actual_citation_repair_refs,
+        partial_source_rejected_refs=case.actual_partial_source_rejected_refs,
+        snippet_citation_repaired=case.snippet_citation_repaired,
+        partial_source_rejected=case.partial_source_rejected,
+        tainted_context_refs=case.tainted_context_refs,
+        taint_label_refs=case.actual_taint_label_refs,
+        context_taint_propagated=case.context_taint_propagated,
+        lane_redrive_recorded=case.lane_redrive_recorded,
+        denied_lane_reported=case.denied_lane_reported,
     )
     context_status, context_failure = _context_step_status(case, context_package, leakage)
     steps = [
@@ -481,7 +515,99 @@ def _context_step_status(
                 return ("FAIL", "RETRIEVAL_LANE_GAP_MISSING")
             if unavailable_lanes.intersection(actual_lanes):
                 return ("FAIL", "RETRIEVAL_LANE_GAP_MISSING")
+    if not _source_ranking_valid(case, context_package):
+        return ("FAIL", "SOURCE_RANKING_MISSING")
+    if not _retrieval_lane_redrive_valid(case, context_package):
+        return ("FAIL", "RETRIEVAL_LANE_REDRIVE_MISSING")
+    if not _snippet_citation_repair_valid(case, context_package):
+        return ("FAIL", "CITATION_REPAIR_MISSING")
+    if not _denied_retrieval_lane_valid(case, context_package):
+        return ("FAIL", "DENIED_RETRIEVAL_LANE_EXPOSED")
+    if not _context_taint_propagation_valid(case, context_package):
+        return ("FAIL", "CONTEXT_TAINT_PROPAGATION_MISSING")
     return ("PASS", "")
+
+
+def _source_ranking_valid(
+    case: EvalCase,
+    context_package: ContextPackageFixture,
+) -> bool:
+    expected_ranking = case.expected_source_ranking_refs
+    expected_tie_breaks = case.expected_source_ranking_tie_break_refs
+    if not expected_ranking and not expected_tie_breaks:
+        return True
+    if not context_package.source_ranking_explained:
+        return False
+    if expected_ranking and case.actual_source_ranking_refs[: len(expected_ranking)] != expected_ranking:
+        return False
+    return not expected_tie_breaks or case.actual_source_ranking_tie_break_refs == expected_tie_breaks
+
+
+def _retrieval_lane_redrive_valid(
+    case: EvalCase,
+    context_package: ContextPackageFixture,
+) -> bool:
+    expected_redrive = set(case.expected_lane_redrive_refs)
+    if not expected_redrive:
+        return True
+    if not context_package.lane_redrive_recorded:
+        return False
+    return expected_redrive.issubset(set(case.actual_lane_redrive_refs))
+
+
+def _snippet_citation_repair_valid(
+    case: EvalCase,
+    context_package: ContextPackageFixture,
+) -> bool:
+    expected_snippets = set(case.expected_snippet_citation_refs)
+    expected_repairs = set(case.expected_citation_repair_refs)
+    partial_rejects = set(case.partial_source_rejected_refs)
+    if not expected_snippets and not expected_repairs and not partial_rejects:
+        return True
+    if expected_snippets and not expected_snippets.issubset(
+        set(context_package.snippet_citation_refs)
+    ):
+        return False
+    if expected_repairs:
+        if not context_package.snippet_citation_repaired:
+            return False
+        if not expected_repairs.issubset(set(context_package.citation_repair_refs)):
+            return False
+    if partial_rejects:
+        if not context_package.partial_source_rejected:
+            return False
+        if not partial_rejects.issubset(set(context_package.partial_source_rejected_refs)):
+            return False
+    return True
+
+
+def _denied_retrieval_lane_valid(
+    case: EvalCase,
+    context_package: ContextPackageFixture,
+) -> bool:
+    denied_lanes = set(case.denied_retrieval_lanes)
+    denied_sources = set(case.denied_lane_source_refs)
+    if not denied_lanes and not denied_sources:
+        return True
+    if not context_package.denied_lane_reported:
+        return False
+    if denied_lanes.intersection(set(context_package.retrieval_lanes)):
+        return False
+    if denied_sources and not denied_sources.issubset(set(case.reported_denied_lane_source_refs)):
+        return False
+    return not denied_sources.intersection(_context_refs(case))
+
+
+def _context_taint_propagation_valid(
+    case: EvalCase,
+    context_package: ContextPackageFixture,
+) -> bool:
+    expected_taint_labels = set(case.expected_taint_label_refs or case.tainted_context_refs)
+    if not expected_taint_labels:
+        return True
+    if not context_package.context_taint_propagated:
+        return False
+    return expected_taint_labels.issubset(set(context_package.taint_label_refs))
 
 
 def _state_diff_step_status(

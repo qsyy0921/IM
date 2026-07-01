@@ -78,6 +78,7 @@ ai/python/fixtures/agent_eval/synthetic_mcp_security_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_mcp_security_hardening_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_context_evidence_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_context_evidence_hardening_scenarios.json
+ai/python/fixtures/agent_eval/synthetic_context_evidence_deeper_hardening_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_memory_admission_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_memory_admission_hardening_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_memory_admission_deeper_hardening_scenarios.json
@@ -138,6 +139,9 @@ Slice 0 covers:
   memory-vs-current-source precedence, unsafe tool output quarantine,
   deterministic context-budget retention and unavailable retrieval lane gap
   reporting.
+- fixture-only ContextPackage / EvidencePack deeper hardening coverage for
+  source ranking, lane redrive, snippet-level citation repair, denied-lane
+  handling and provider/tool/peer-agent taint propagation.
 - fixture-only richer memory admission coverage for group speaker/audience,
   project supersedes, profile aggregate review, revoked memory blocking, stale
   memory blocking and overgeneralization prevention.
@@ -237,6 +241,8 @@ fixtures, call models or connect to backend services.
   metadata.
 - ContextPackage hardening metadata for memory/source precedence, unsafe context
   blocks, context-budget retention and retrieval lane gaps.
+- ContextPackage deeper hardening metadata for source ranking, lane redrive,
+  snippet-level citation repair, denied lanes and taint propagation.
 - MemoryCandidate source, speaker, audience, supersedes, stale-memory and
   review metadata.
 - MemoryCandidate hardening metadata for duplicate dedupe, low confidence,
@@ -267,6 +273,7 @@ ai/python/fixtures/agent_eval/synthetic_mcp_security_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_mcp_security_hardening_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_context_evidence_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_context_evidence_hardening_scenarios.json
+ai/python/fixtures/agent_eval/synthetic_context_evidence_deeper_hardening_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_memory_admission_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_memory_admission_hardening_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_memory_admission_deeper_hardening_scenarios.json
@@ -346,6 +353,9 @@ Evaluator tests:
 - MCP security hardening scoring rejects undetected argument schema mismatch,
   undetected prepare expiry, unblocked tool-selection attack and bad provider
   selection.
+- ContextPackage / EvidencePack deeper hardening scoring rejects missing source
+  ranking, missing lane redrive refs, missing snippet citation repair, exposed
+  denied lanes and missing taint propagation.
 - memory admission deeper hardening scoring rejects missing duplicate clusters,
   confidence calibration mismatch, missing procedural migration, revoked policy
   sources and missing review redrive refs.
@@ -364,6 +374,7 @@ Integration tests:
 - load `synthetic_mcp_security_hardening_scenarios.json`;
 - load `synthetic_context_evidence_scenarios.json`;
 - load `synthetic_context_evidence_hardening_scenarios.json`;
+- load `synthetic_context_evidence_deeper_hardening_scenarios.json`;
 - load `synthetic_memory_admission_scenarios.json`;
 - load `synthetic_memory_admission_hardening_scenarios.json`;
 - load `synthetic_memory_admission_deeper_hardening_scenarios.json`;
@@ -398,6 +409,7 @@ python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_mcp_security_hardening_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_context_evidence_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_context_evidence_hardening_scenarios.json
+python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_context_evidence_deeper_hardening_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_memory_admission_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_memory_admission_hardening_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_memory_admission_deeper_hardening_scenarios.json
@@ -428,12 +440,12 @@ git status --short --branch --untracked-files=all
 
 Recommended next slices:
 
-1. Deepen ContextPackage / EvidencePack with source ranking, lane redrive,
-   snippet-level citation repair and cross-tenant denied-lane cases.
+1. Align memory admission deeper hardening with STATE-Bench/LoCoMo-style
+   adapter samples after the synthetic gates are stable.
 2. Add multi-suite current-report and baseline-refresh lifecycle metadata once
    the next fixture families are stable.
-3. Align memory admission deeper hardening with STATE-Bench/LoCoMo-style
-   adapter samples after the synthetic gates are stable.
+3. Align Tool / MCP security hardening with MCPSecBench / MCP-Bench-style
+   adapter samples while staying fixture-only.
 
 Each slice must keep the same isolation rule until an ADR explicitly promotes a
 backend integration boundary.

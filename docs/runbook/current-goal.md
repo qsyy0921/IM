@@ -83,11 +83,11 @@ Agent / RAG / memory / Python AI Worker / EvidencePack / eval gate，不使用�
 
 ## 后续优先级
 
-1. 增加 ContextPackage / EvidencePack 深化 fixture，覆盖 source ranking、
-   lane redrive、snippet-level citation repair 和 denied-lane cases。
-2. 对已落地 memory admission deeper hardening 做 STATE-Bench / LoCoMo 风格 adapter
+1. 对已落地 memory admission deeper hardening 做 STATE-Bench / LoCoMo 风格 adapter
    sample 对齐，但仍保持 fixture-only。
-3. 对已落地 Tool / MCP security hardening 做更深层 MCPSecBench / MCP-Bench adapter
+2. 对已落地 Tool / MCP security hardening 做更深层 MCPSecBench / MCP-Bench adapter
    对齐，但仍保持 fixture-only。
+3. 增加 current-report / baseline lifecycle deeper hardening，覆盖多 suite report
+   matrix、baseline refresh approval manifest 和 report retention metadata。
 4. 在上述实验通过后，再决定是否把 Agent Runtime / Harness 提升为 ADR、服务级 SDD
    或实际 runtime module。

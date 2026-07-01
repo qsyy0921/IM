@@ -107,6 +107,7 @@ ai/python/fixtures/agent_eval/synthetic_mcp_security_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_mcp_security_hardening_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_context_evidence_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_context_evidence_hardening_scenarios.json
+ai/python/fixtures/agent_eval/synthetic_context_evidence_deeper_hardening_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_memory_admission_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_memory_admission_hardening_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_memory_admission_deeper_hardening_scenarios.json
@@ -145,6 +146,9 @@ ai/python/tests/test_agent_eval_*.py
 - ContextPackage / EvidencePack hardening fixture：memory-vs-current-source
   precedence、unsafe tool output quarantine、context-budget retention、
   unavailable retrieval lane gap reporting。
+- ContextPackage / EvidencePack deeper hardening fixture：source ranking、
+  lane redrive、snippet-level citation repair、cross-tenant denied-lane、
+  provider/tool/peer-agent taint propagation。
 - Memory admission fixture：group speaker/audience、project supersedes、profile
   aggregate review、revoked/stale memory blocking、overgeneralization prevention。
 - Memory admission hardening fixture：duplicate dedupe、low-confidence rejection、
@@ -161,9 +165,9 @@ ai/python/tests/test_agent_eval_*.py
 
 | 优先级 | 工作 | 输出 |
 | --- | --- | --- |
-| P1 | ContextPackage / EvidencePack deeper hardening | source ranking、lane redrive、snippet-level citation repair、denied-lane、taint propagation |
-| P2 | Memory admission adapter alignment | STATE-Bench / LoCoMo 风格 adapter sample、cluster representative tie-break、confidence thresholds、policy revocation windows |
+| P1 | Memory admission adapter alignment | STATE-Bench / LoCoMo 风格 adapter sample、cluster representative tie-break、confidence thresholds、policy revocation windows |
 | P2 | Tool / MCP security deeper hardening | MCPSecBench / MCP-Bench adapter 对齐、capability lease matrix、provider attestation metadata |
+| P2 | ContextPackage / EvidencePack adapter alignment | public RAG adapter alignment、rerank confidence thresholds、denied-lane audit metadata、taint vocabulary |
 | P2 | Current-report deeper hardening | 多 suite report matrix、baseline refresh approval manifest、report retention metadata |
 | P2 | Runtime-control deeper hardening | checkpoint version drift、workflow wakeup race、replay bundle lineage completeness |
 | P2 | State-diff deeper hardening | state dependency graph、cross-action compensation chain、operator redrive review |
@@ -182,7 +186,7 @@ ai/python/tests/test_agent_eval_*.py
 - SDD index / research index / architecture index link check
 - 不触碰 proto、schema、migration、production service directory
 
-后续 fixture-only prototype 优先推进 ContextPackage / EvidencePack deeper hardening fixture gate。
+后续 fixture-only prototype 优先推进 memory admission adapter alignment fixture gate。
 
 ## 历史资料路由
 

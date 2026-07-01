@@ -1,0 +1,184 @@
+{
+  "schema_version": 1,
+  "suite_id": "synthetic-agent-context-evidence-deeper-hardening-v1",
+  "fixture_kind": "synthetic_im_like",
+  "adapter_versions": [
+    "manual-context-evidence-deeper-hardening-fixture-v1"
+  ],
+  "cases": [
+    {
+      "case_id": "context-source-ranking-tiebreak-pass",
+      "dataset_name": "synthetic-context-evidence-deeper-hardening",
+      "dataset_version": "2026-07-01",
+      "capability_family": "CONTEXT_EVIDENCE",
+      "fixture_version": "context-evidence-deeper-hardening-v1",
+      "input_refs": ["input:context-source-ranking-tiebreak-pass"],
+      "visible_evidence_refs": [
+        "evidence:kb:retention-policy-v3",
+        "evidence:project:decision-89",
+        "evidence:archive:retention-policy-v2"
+      ],
+      "actual_used_refs": ["evidence:kb:retention-policy-v3"],
+      "expected_source_coverage_refs": [
+        "evidence:kb:retention-policy-v3",
+        "evidence:project:decision-89",
+        "evidence:archive:retention-policy-v2"
+      ],
+      "actual_source_coverage_refs": [
+        "evidence:kb:retention-policy-v3",
+        "evidence:project:decision-89",
+        "evidence:archive:retention-policy-v2"
+      ],
+      "expected_source_ranking_refs": [
+        "evidence:kb:retention-policy-v3",
+        "evidence:project:decision-89",
+        "evidence:archive:retention-policy-v2"
+      ],
+      "actual_source_ranking_refs": [
+        "evidence:kb:retention-policy-v3",
+        "evidence:project:decision-89",
+        "evidence:archive:retention-policy-v2"
+      ],
+      "expected_source_ranking_tie_break_refs": [
+        "evidence:project:decision-89",
+        "evidence:archive:retention-policy-v2"
+      ],
+      "actual_source_ranking_tie_break_refs": [
+        "evidence:project:decision-89",
+        "evidence:archive:retention-policy-v2"
+      ],
+      "source_ranking_explained": true
+    },
+    {
+      "case_id": "context-lane-redrive-repair-pass",
+      "dataset_name": "synthetic-context-evidence-deeper-hardening",
+      "dataset_version": "2026-07-01",
+      "capability_family": "CONTEXT_EVIDENCE",
+      "fixture_version": "context-evidence-deeper-hardening-v1",
+      "input_refs": ["input:context-lane-redrive-repair-pass"],
+      "visible_evidence_refs": [
+        "evidence:conversation:decision-301",
+        "memory:project:decision-summary-v2"
+      ],
+      "actual_used_refs": [
+        "evidence:conversation:decision-301",
+        "memory:project:decision-summary-v2"
+      ],
+      "expected_source_coverage_refs": [
+        "evidence:conversation:decision-301",
+        "memory:project:decision-summary-v2"
+      ],
+      "actual_source_coverage_refs": [
+        "evidence:conversation:decision-301",
+        "memory:project:decision-summary-v2"
+      ],
+      "expected_retrieval_lanes": [
+        "conversation",
+        "memory"
+      ],
+      "actual_retrieval_lanes": [
+        "conversation",
+        "memory"
+      ],
+      "expected_lane_redrive_refs": ["lane-redrive:memory:attempt-2"],
+      "actual_lane_redrive_refs": ["lane-redrive:memory:attempt-2"],
+      "lane_redrive_recorded": true
+    },
+    {
+      "case_id": "context-snippet-citation-repair-pass",
+      "dataset_name": "synthetic-context-evidence-deeper-hardening",
+      "dataset_version": "2026-07-01",
+      "capability_family": "CONTEXT_EVIDENCE",
+      "fixture_version": "context-evidence-deeper-hardening-v1",
+      "input_refs": ["input:context-snippet-citation-repair-pass"],
+      "visible_evidence_refs": [
+        "evidence:policy:approval-rules-v5",
+        "evidence:policy:approval-rules-v4"
+      ],
+      "actual_used_refs": ["evidence:policy:approval-rules-v5"],
+      "expected_source_coverage_refs": [
+        "evidence:policy:approval-rules-v5",
+        "evidence:policy:approval-rules-v4"
+      ],
+      "actual_source_coverage_refs": [
+        "evidence:policy:approval-rules-v5",
+        "evidence:policy:approval-rules-v4"
+      ],
+      "expected_citation_refs": ["evidence:policy:approval-rules-v5"],
+      "actual_citation_refs": ["evidence:policy:approval-rules-v5"],
+      "expected_snippet_citation_refs": ["snippet:evidence:policy:approval-rules-v5#p3"],
+      "actual_snippet_citation_refs": ["snippet:evidence:policy:approval-rules-v5#p3"],
+      "expected_citation_repair_refs": ["citation-repair:approval-rules:p3"],
+      "actual_citation_repair_refs": ["citation-repair:approval-rules:p3"],
+      "partial_source_rejected_refs": ["snippet:evidence:policy:approval-rules-v4#p3"],
+      "actual_partial_source_rejected_refs": ["snippet:evidence:policy:approval-rules-v4#p3"],
+      "snippet_citation_repaired": true,
+      "partial_source_rejected": true
+    },
+    {
+      "case_id": "context-cross-tenant-denied-lane-pass",
+      "dataset_name": "synthetic-context-evidence-deeper-hardening",
+      "dataset_version": "2026-07-01",
+      "capability_family": "CONTEXT_EVIDENCE",
+      "fixture_version": "context-evidence-deeper-hardening-v1",
+      "input_refs": ["input:context-cross-tenant-denied-lane-pass"],
+      "visible_evidence_refs": ["evidence:tenant-a:project:decision-7"],
+      "forbidden_evidence_refs": ["evidence:tenant-b:project:decision-9"],
+      "actual_used_refs": ["evidence:tenant-a:project:decision-7"],
+      "expected_source_coverage_refs": ["evidence:tenant-a:project:decision-7"],
+      "actual_source_coverage_refs": ["evidence:tenant-a:project:decision-7"],
+      "expected_retrieval_lanes": [
+        "conversation",
+        "project",
+        "cross_tenant_memory"
+      ],
+      "actual_retrieval_lanes": [
+        "conversation",
+        "project"
+      ],
+      "unavailable_retrieval_lanes": ["cross_tenant_memory"],
+      "retrieval_lane_gap_reported": true,
+      "denied_retrieval_lanes": ["cross_tenant_memory"],
+      "denied_lane_source_refs": ["evidence:tenant-b:project:decision-9"],
+      "reported_denied_lane_source_refs": ["evidence:tenant-b:project:decision-9"],
+      "denied_lane_reported": true
+    },
+    {
+      "case_id": "context-taint-propagation-pass",
+      "dataset_name": "synthetic-context-evidence-deeper-hardening",
+      "dataset_version": "2026-07-01",
+      "capability_family": "CONTEXT_EVIDENCE",
+      "fixture_version": "context-evidence-deeper-hardening-v1",
+      "input_refs": ["input:context-taint-propagation-pass"],
+      "visible_evidence_refs": [
+        "evidence:project:allowed-current",
+        "tool-output:mcp-reader:summary",
+        "peer-agent:analyst:summary"
+      ],
+      "actual_used_refs": ["evidence:project:allowed-current"],
+      "expected_source_coverage_refs": [
+        "evidence:project:allowed-current",
+        "tool-output:mcp-reader:summary",
+        "peer-agent:analyst:summary"
+      ],
+      "actual_source_coverage_refs": [
+        "evidence:project:allowed-current",
+        "tool-output:mcp-reader:summary",
+        "peer-agent:analyst:summary"
+      ],
+      "tainted_context_refs": [
+        "tool-output:mcp-reader:summary",
+        "peer-agent:analyst:summary"
+      ],
+      "expected_taint_label_refs": [
+        "tool-output:mcp-reader:summary",
+        "peer-agent:analyst:summary"
+      ],
+      "actual_taint_label_refs": [
+        "tool-output:mcp-reader:summary",
+        "peer-agent:analyst:summary"
+      ],
+      "context_taint_propagated": true
+    }
+  ]
+}

@@ -182,6 +182,11 @@ def _context_evidence_scores(case: EvalCase) -> tuple[dict[str, float], str]:
     unsafe_context_score = _unsafe_context_quarantine_score(case)
     context_budget_score = _context_budget_truncation_score(case)
     retrieval_lane_score = _retrieval_lane_gap_score(case)
+    source_ranking_score = _source_ranking_score(case)
+    lane_redrive_score = _retrieval_lane_redrive_score(case)
+    citation_repair_score = _snippet_citation_repair_score(case)
+    denied_lane_score = _denied_retrieval_lane_score(case)
+    taint_score = _context_taint_propagation_score(case)
     if coverage_score == 0.0:
         failure = "SOURCE_COVERAGE_MISSING"
     elif conflict_score == 0.0:
@@ -198,6 +203,16 @@ def _context_evidence_scores(case: EvalCase) -> tuple[dict[str, float], str]:
         failure = "CONTEXT_BUDGET_TRUNCATION_INVALID"
     elif retrieval_lane_score == 0.0:
         failure = "RETRIEVAL_LANE_GAP_MISSING"
+    elif source_ranking_score == 0.0:
+        failure = "SOURCE_RANKING_MISSING"
+    elif lane_redrive_score == 0.0:
+        failure = "RETRIEVAL_LANE_REDRIVE_MISSING"
+    elif citation_repair_score == 0.0:
+        failure = "CITATION_REPAIR_MISSING"
+    elif denied_lane_score == 0.0:
+        failure = "DENIED_RETRIEVAL_LANE_EXPOSED"
+    elif taint_score == 0.0:
+        failure = "CONTEXT_TAINT_PROPAGATION_MISSING"
     else:
         failure = ""
     return (
@@ -210,6 +225,11 @@ def _context_evidence_scores(case: EvalCase) -> tuple[dict[str, float], str]:
             "unsafe_context_quarantine_score": unsafe_context_score,
             "context_budget_truncation_score": context_budget_score,
             "retrieval_lane_gap_score": retrieval_lane_score,
+            "source_ranking_score": source_ranking_score,
+            "retrieval_lane_redrive_score": lane_redrive_score,
+            "snippet_citation_repair_score": citation_repair_score,
+            "denied_retrieval_lane_score": denied_lane_score,
+            "context_taint_propagation_score": taint_score,
         },
         failure,
     )
@@ -676,6 +696,76 @@ def _retrieval_lane_gap_score(case: EvalCase) -> float:
     return 1.0
 
 
+def _source_ranking_score(case: EvalCase) -> float:
+    expected_ranking = case.expected_source_ranking_refs
+    expected_tie_breaks = case.expected_source_ranking_tie_break_refs
+    if not expected_ranking and not expected_tie_breaks:
+        return 1.0
+    if not case.source_ranking_explained:
+        return 0.0
+    if expected_ranking and case.actual_source_ranking_refs[: len(expected_ranking)] != expected_ranking:
+        return 0.0
+    if expected_tie_breaks and case.actual_source_ranking_tie_break_refs != expected_tie_breaks:
+        return 0.0
+    return 1.0
+
+
+def _retrieval_lane_redrive_score(case: EvalCase) -> float:
+    expected_redrive = set(case.expected_lane_redrive_refs)
+    if not expected_redrive:
+        return 1.0
+    if not case.lane_redrive_recorded:
+        return 0.0
+    return 1.0 if expected_redrive.issubset(set(case.actual_lane_redrive_refs)) else 0.0
+
+
+def _snippet_citation_repair_score(case: EvalCase) -> float:
+    expected_snippets = set(case.expected_snippet_citation_refs)
+    expected_repairs = set(case.expected_citation_repair_refs)
+    partial_rejects = set(case.partial_source_rejected_refs)
+    if not expected_snippets and not expected_repairs and not partial_rejects:
+        return 1.0
+    if expected_snippets and not expected_snippets.issubset(
+        set(case.actual_snippet_citation_refs)
+    ):
+        return 0.0
+    if expected_repairs:
+        if not case.snippet_citation_repaired:
+            return 0.0
+        if not expected_repairs.issubset(set(case.actual_citation_repair_refs)):
+            return 0.0
+    if partial_rejects:
+        if not case.partial_source_rejected:
+            return 0.0
+        if not partial_rejects.issubset(set(case.actual_partial_source_rejected_refs)):
+            return 0.0
+    return 1.0
+
+
+def _denied_retrieval_lane_score(case: EvalCase) -> float:
+    denied_lanes = set(case.denied_retrieval_lanes)
+    denied_sources = set(case.denied_lane_source_refs)
+    if not denied_lanes and not denied_sources:
+        return 1.0
+    if not case.denied_lane_reported:
+        return 0.0
+    if denied_lanes.intersection(set(case.actual_retrieval_lanes)):
+        return 0.0
+    if denied_sources and not denied_sources.issubset(set(case.reported_denied_lane_source_refs)):
+        return 0.0
+    selected_refs = _context_selected_refs(case)
+    return 0.0 if denied_sources.intersection(selected_refs) else 1.0
+
+
+def _context_taint_propagation_score(case: EvalCase) -> float:
+    expected_taint_labels = set(case.expected_taint_label_refs or case.tainted_context_refs)
+    if not expected_taint_labels:
+        return 1.0
+    if not case.context_taint_propagated:
+        return 0.0
+    return 1.0 if expected_taint_labels.issubset(set(case.actual_taint_label_refs)) else 0.0
+
+
 def _context_selected_refs(case: EvalCase) -> set[str]:
     return (
         set(case.actual_used_refs)
@@ -829,6 +919,11 @@ def _replay_bundle(case: EvalCase, failure_class: str) -> ReplayBundle:
         "actual_citation_refs": case.actual_citation_refs,
         "actual_memory_source_refs": case.actual_memory_source_refs,
         "actual_memory_supersedes_refs": case.actual_memory_supersedes_refs,
+        "actual_source_ranking_refs": case.actual_source_ranking_refs,
+        "actual_lane_redrive_refs": case.actual_lane_redrive_refs,
+        "actual_snippet_citation_refs": case.actual_snippet_citation_refs,
+        "actual_citation_repair_refs": case.actual_citation_repair_refs,
+        "actual_taint_label_refs": case.actual_taint_label_refs,
         "actual_memory_cluster_refs": case.actual_memory_cluster_refs,
         "actual_procedural_migration_refs": case.actual_procedural_migration_refs,
         "actual_procedural_invalidation_refs": case.actual_procedural_invalidation_refs,

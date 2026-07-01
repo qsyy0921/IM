@@ -46,6 +46,11 @@ ALLOWED_FAILURE_CLASSES = {
     "UNSAFE_CONTEXT_NOT_QUARANTINED",
     "CONTEXT_BUDGET_TRUNCATION_INVALID",
     "RETRIEVAL_LANE_GAP_MISSING",
+    "SOURCE_RANKING_MISSING",
+    "RETRIEVAL_LANE_REDRIVE_MISSING",
+    "CITATION_REPAIR_MISSING",
+    "DENIED_RETRIEVAL_LANE_EXPOSED",
+    "CONTEXT_TAINT_PROPAGATION_MISSING",
     "TOOL_NOT_ALLOWED",
     "TOOL_ARGS_INVALID",
     "TOOL_SELECTION_ATTACK",
@@ -139,6 +144,24 @@ class EvalCase:
     expected_retrieval_lanes: list[str] = field(default_factory=list)
     actual_retrieval_lanes: list[str] = field(default_factory=list)
     unavailable_retrieval_lanes: list[str] = field(default_factory=list)
+    expected_source_ranking_refs: list[str] = field(default_factory=list)
+    actual_source_ranking_refs: list[str] = field(default_factory=list)
+    expected_source_ranking_tie_break_refs: list[str] = field(default_factory=list)
+    actual_source_ranking_tie_break_refs: list[str] = field(default_factory=list)
+    expected_lane_redrive_refs: list[str] = field(default_factory=list)
+    actual_lane_redrive_refs: list[str] = field(default_factory=list)
+    denied_retrieval_lanes: list[str] = field(default_factory=list)
+    denied_lane_source_refs: list[str] = field(default_factory=list)
+    reported_denied_lane_source_refs: list[str] = field(default_factory=list)
+    expected_snippet_citation_refs: list[str] = field(default_factory=list)
+    actual_snippet_citation_refs: list[str] = field(default_factory=list)
+    expected_citation_repair_refs: list[str] = field(default_factory=list)
+    actual_citation_repair_refs: list[str] = field(default_factory=list)
+    partial_source_rejected_refs: list[str] = field(default_factory=list)
+    actual_partial_source_rejected_refs: list[str] = field(default_factory=list)
+    tainted_context_refs: list[str] = field(default_factory=list)
+    expected_taint_label_refs: list[str] = field(default_factory=list)
+    actual_taint_label_refs: list[str] = field(default_factory=list)
     expected_citation_refs: list[str] = field(default_factory=list)
     actual_citation_refs: list[str] = field(default_factory=list)
     expected_memory_outcome: str = ""
@@ -227,6 +250,12 @@ class EvalCase:
     unsafe_context_quarantined: bool = False
     context_budget_truncated: bool = False
     retrieval_lane_gap_reported: bool = False
+    source_ranking_explained: bool = False
+    lane_redrive_recorded: bool = False
+    denied_lane_reported: bool = False
+    snippet_citation_repaired: bool = False
+    partial_source_rejected: bool = False
+    context_taint_propagated: bool = False
     stale_memory_used: bool = False
     memory_overgeneralized: bool = False
     memory_deduped: bool = False
@@ -423,6 +452,66 @@ def _eval_case(payload: dict[str, Any], index: int) -> EvalCase:
         ),
         unavailable_retrieval_lanes=_string_list(
             payload.get("unavailable_retrieval_lanes", []), "unavailable_retrieval_lanes"
+        ),
+        expected_source_ranking_refs=_string_list(
+            payload.get("expected_source_ranking_refs", []), "expected_source_ranking_refs"
+        ),
+        actual_source_ranking_refs=_string_list(
+            payload.get("actual_source_ranking_refs", []), "actual_source_ranking_refs"
+        ),
+        expected_source_ranking_tie_break_refs=_string_list(
+            payload.get("expected_source_ranking_tie_break_refs", []),
+            "expected_source_ranking_tie_break_refs",
+        ),
+        actual_source_ranking_tie_break_refs=_string_list(
+            payload.get("actual_source_ranking_tie_break_refs", []),
+            "actual_source_ranking_tie_break_refs",
+        ),
+        expected_lane_redrive_refs=_string_list(
+            payload.get("expected_lane_redrive_refs", []), "expected_lane_redrive_refs"
+        ),
+        actual_lane_redrive_refs=_string_list(
+            payload.get("actual_lane_redrive_refs", []), "actual_lane_redrive_refs"
+        ),
+        denied_retrieval_lanes=_string_list(
+            payload.get("denied_retrieval_lanes", []), "denied_retrieval_lanes"
+        ),
+        denied_lane_source_refs=_string_list(
+            payload.get("denied_lane_source_refs", []), "denied_lane_source_refs"
+        ),
+        reported_denied_lane_source_refs=_string_list(
+            payload.get("reported_denied_lane_source_refs", []),
+            "reported_denied_lane_source_refs",
+        ),
+        expected_snippet_citation_refs=_string_list(
+            payload.get("expected_snippet_citation_refs", []),
+            "expected_snippet_citation_refs",
+        ),
+        actual_snippet_citation_refs=_string_list(
+            payload.get("actual_snippet_citation_refs", []), "actual_snippet_citation_refs"
+        ),
+        expected_citation_repair_refs=_string_list(
+            payload.get("expected_citation_repair_refs", []),
+            "expected_citation_repair_refs",
+        ),
+        actual_citation_repair_refs=_string_list(
+            payload.get("actual_citation_repair_refs", []), "actual_citation_repair_refs"
+        ),
+        partial_source_rejected_refs=_string_list(
+            payload.get("partial_source_rejected_refs", []), "partial_source_rejected_refs"
+        ),
+        actual_partial_source_rejected_refs=_string_list(
+            payload.get("actual_partial_source_rejected_refs", []),
+            "actual_partial_source_rejected_refs",
+        ),
+        tainted_context_refs=_string_list(
+            payload.get("tainted_context_refs", []), "tainted_context_refs"
+        ),
+        expected_taint_label_refs=_string_list(
+            payload.get("expected_taint_label_refs", []), "expected_taint_label_refs"
+        ),
+        actual_taint_label_refs=_string_list(
+            payload.get("actual_taint_label_refs", []), "actual_taint_label_refs"
         ),
         expected_citation_refs=_string_list(
             payload.get("expected_citation_refs", []), "expected_citation_refs"
@@ -674,6 +763,24 @@ def _eval_case(payload: dict[str, Any], index: int) -> EvalCase:
         ),
         retrieval_lane_gap_reported=_bool(
             payload.get("retrieval_lane_gap_reported", False), "retrieval_lane_gap_reported"
+        ),
+        source_ranking_explained=_bool(
+            payload.get("source_ranking_explained", False), "source_ranking_explained"
+        ),
+        lane_redrive_recorded=_bool(
+            payload.get("lane_redrive_recorded", False), "lane_redrive_recorded"
+        ),
+        denied_lane_reported=_bool(
+            payload.get("denied_lane_reported", False), "denied_lane_reported"
+        ),
+        snippet_citation_repaired=_bool(
+            payload.get("snippet_citation_repaired", False), "snippet_citation_repaired"
+        ),
+        partial_source_rejected=_bool(
+            payload.get("partial_source_rejected", False), "partial_source_rejected"
+        ),
+        context_taint_propagated=_bool(
+            payload.get("context_taint_propagated", False), "context_taint_propagated"
         ),
         stale_memory_used=_bool(payload.get("stale_memory_used", False), "stale_memory_used"),
         memory_overgeneralized=_bool(

@@ -286,7 +286,9 @@ Promote only after:
 Current first-stage code is fixture-only and lives under
 `ai/python/nexusim_ai_eval/`,
 `ai/python/fixtures/agent_eval/synthetic_context_evidence_scenarios.json` and
-`ai/python/fixtures/agent_eval/synthetic_context_evidence_hardening_scenarios.json`.
+`ai/python/fixtures/agent_eval/synthetic_context_evidence_hardening_scenarios.json`
+and
+`ai/python/fixtures/agent_eval/synthetic_context_evidence_deeper_hardening_scenarios.json`.
 It does not freeze a production EvidencePack or ContextPackage schema.
 
 Implemented checks:
@@ -300,15 +302,22 @@ Implemented checks:
 - unsafe tool output refs must be quarantined before context reuse;
 - context-budget retention must preserve required high-priority refs;
 - unavailable retrieval lanes must be reported as explicit coverage gaps;
+- source ranking and deterministic tie-break refs must match expected order;
+- retrieval lane redrive refs must exist when lane repair is required;
+- snippet-level citation repair must keep precise snippet refs and reject
+  partial-source ambiguity;
+- denied lanes, including cross-tenant lanes, must be reported without exposing
+  denied source refs;
+- provider, tool and peer-agent taint labels must propagate through context
+  assembly;
 - trace metadata includes low-sensitive refs only.
 
 Remaining hardening:
 
-- source ranking / rerank explanation and deterministic tie-breaks;
-- lane retry/redrive metadata and coverage-gap repair;
-- snippet-level citation repair and partial-source rejection;
-- cross-tenant or denied-lane source visibility cases;
-- provider, tool and peer-agent taint propagation through context assembly.
+- public-dataset-style RAG adapter alignment for ranking/citation repair;
+- ranking confidence thresholds and rerank explanation metadata;
+- retention policy interaction for denied-lane audit refs;
+- taint label vocabulary alignment with Tool/MCP and peer-agent SDDs.
 
 ## 15. References
 

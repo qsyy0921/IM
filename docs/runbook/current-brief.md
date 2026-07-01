@@ -80,7 +80,9 @@ Agent Gateway / UX
   EvalReport baseline fixture 和 regression comparison CLI。
 - 已补 fixture-only runtime-control coverage：cancel propagation、approval resume
   from checkpoint、replay without side-effect reexecution。
-- 下一段优先做 MCP poisoning、memory pollution / supersedes、state-diff report
+- 已补 fixture-only MCP security coverage：poisoned tool description、unsafe MCP
+  output instruction、provider provenance mismatch、sandbox-only provider。
+- 下一段优先做 memory pollution / supersedes、ContextPackage / EvidencePack、state-diff report
   等离线 hardening fixture。
 
 ## 工作规则

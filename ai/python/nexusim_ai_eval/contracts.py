@@ -41,6 +41,7 @@ ALLOWED_FAILURE_CLASSES = {
     "TOOL_ARGS_INVALID",
     "TOOL_POISONING_DETECTED",
     "UNSAFE_TOOL_OUTPUT",
+    "MCP_PROVENANCE_MISMATCH",
     "PROVIDER_TIMEOUT",
     "APPROVAL_REQUIRED",
     "APPROVAL_REJECTED",
@@ -90,6 +91,8 @@ class EvalCase:
     actual_memory_scope: str = ""
     expected_tool_prepare: str = ""
     actual_tool_prepare: str = ""
+    expected_tool_provider_ref: str = ""
+    actual_tool_provider_ref: str = ""
     expected_state_diff: dict[str, str] = field(default_factory=dict)
     actual_state_diff: dict[str, str] = field(default_factory=dict)
     expected_runtime_events: list[str] = field(default_factory=list)
@@ -100,6 +103,9 @@ class EvalCase:
     actual_failure_class: str = ""
     actual_abstained: bool = False
     malicious_tool_blocked: bool = False
+    tool_description_poisoned: bool = False
+    tool_description_blocked: bool = False
+    tool_output_contains_instruction: bool = False
     unsafe_output_quarantined: bool = False
     revoked_memory_used: bool = False
     side_effect_reexecuted: bool = False
@@ -243,6 +249,8 @@ def _eval_case(payload: dict[str, Any], index: int) -> EvalCase:
         actual_memory_scope=_string(payload.get("actual_memory_scope", "")).upper(),
         expected_tool_prepare=_string(payload.get("expected_tool_prepare", "")).upper(),
         actual_tool_prepare=_string(payload.get("actual_tool_prepare", "")).upper(),
+        expected_tool_provider_ref=_string(payload.get("expected_tool_provider_ref", "")),
+        actual_tool_provider_ref=_string(payload.get("actual_tool_provider_ref", "")),
         expected_state_diff=_string_map(
             payload.get("expected_state_diff", {}), "expected_state_diff"
         ),
@@ -264,6 +272,16 @@ def _eval_case(payload: dict[str, Any], index: int) -> EvalCase:
         actual_abstained=_bool(payload.get("actual_abstained", False), "actual_abstained"),
         malicious_tool_blocked=_bool(
             payload.get("malicious_tool_blocked", False), "malicious_tool_blocked"
+        ),
+        tool_description_poisoned=_bool(
+            payload.get("tool_description_poisoned", False), "tool_description_poisoned"
+        ),
+        tool_description_blocked=_bool(
+            payload.get("tool_description_blocked", False), "tool_description_blocked"
+        ),
+        tool_output_contains_instruction=_bool(
+            payload.get("tool_output_contains_instruction", False),
+            "tool_output_contains_instruction",
         ),
         unsafe_output_quarantined=_bool(
             payload.get("unsafe_output_quarantined", False), "unsafe_output_quarantined"

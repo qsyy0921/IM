@@ -71,6 +71,7 @@ ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json
 ai/python/fixtures/agent_eval/synthetic_first_trio.json
 ai/python/fixtures/agent_eval/synthetic_core_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_runtime_control_scenarios.json
+ai/python/fixtures/agent_eval/synthetic_mcp_security_scenarios.json
 ai/python/scripts/run_agent_eval_fixture.py
 ai/python/scripts/run_agent_dataset_adapter.py
 ai/python/scripts/run_agent_eval_regression.py
@@ -112,6 +113,8 @@ Slice 0 covers:
 - EvalReport baseline fixture, regression delta and blocked promotion reasons.
 - fixture-only runtime-control coverage for cancel propagation, checkpointed
   approval resume and replay without side-effect reexecution.
+- fixture-only MCP security coverage for poisoned tool descriptions, unsafe MCP
+  output instructions, provider provenance mismatch and sandbox-only providers.
 
 ## 4. Code Architecture
 
@@ -204,6 +207,7 @@ Current fixture:
 ai/python/fixtures/agent_eval/synthetic_first_trio.json
 ai/python/fixtures/agent_eval/synthetic_core_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_runtime_control_scenarios.json
+ai/python/fixtures/agent_eval/synthetic_mcp_security_scenarios.json
 ai/python/fixtures/agent_eval/adapter_samples/
 ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json
 ```
@@ -265,6 +269,8 @@ Evaluator tests:
 - adapter skeletons generate valid EvalCase suites.
 - adapter runner converts local sample payloads and rejects sensitive fields.
 - baseline comparison blocks aggregate and case-level regressions.
+- MCP security scoring rejects provenance mismatch, unblocked poisoned
+  descriptions and unquarantined output instructions.
 - AgentRun trace includes context, memory, tool, workflow, runtime-control and
   failure steps.
 
@@ -275,6 +281,7 @@ Integration tests:
 - load `synthetic_first_trio.json`;
 - load `synthetic_core_scenarios.json`;
 - load `synthetic_runtime_control_scenarios.json`;
+- load `synthetic_mcp_security_scenarios.json`;
 - run `run_agent_eval_fixture.py`;
 - verify report status, case count, failure distribution and `raw_payload_returned=false`.
 
@@ -298,6 +305,7 @@ python -m pytest ai/python/tests/test_agent_eval_contracts.py ai/python/tests/te
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_first_trio.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_core_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_runtime_control_scenarios.json
+python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_mcp_security_scenarios.json
 python ai/python/scripts/run_agent_dataset_adapter.py --run ai/python/fixtures/agent_eval/adapter_samples/qasper_like_rag_samples.json
 python ai/python/scripts/run_agent_eval_regression.py ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json
 ```
@@ -322,8 +330,8 @@ git status --short --branch --untracked-files=all
 
 Recommended next slices:
 
-1. Add malicious MCP/tool description fixture pack.
-2. Add richer memory pollution / revocation / supersedes fixture coverage.
+1. Add richer memory pollution / revocation / supersedes fixture coverage.
+2. Add ContextPackage / EvidencePack coverage and conflict marker fixtures.
 3. Add state-diff report section for fake action execution.
 4. Add current-report generation script for baseline refresh review.
 5. Add runtime-control negative fixture pack for missing checkpoints and

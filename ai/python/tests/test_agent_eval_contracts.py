@@ -88,6 +88,34 @@ class AgentEvalContractTests(unittest.TestCase):
         self.assertEqual(cases[0].expected_runtime_events, ["CHECKPOINT_CREATED", "RESUME_COMPLETED"])
         self.assertEqual(cases[0].actual_checkpoint_refs, ["checkpoint:runtime"])
 
+    def test_validates_mcp_security_refs(self) -> None:
+        payload = valid_suite()
+        payload["cases"] = [
+            {
+                "case_id": "mcp-security-pass",
+                "dataset_name": "synthetic-mcp",
+                "dataset_version": "2026-07-01",
+                "capability_family": "TOOL_SECURITY",
+                "fixture_version": "fixture-v1",
+                "input_refs": ["input:mcp-security-pass"],
+                "expected_tool_prepare": "BLOCKED",
+                "actual_tool_prepare": "BLOCKED",
+                "expected_tool_provider_ref": "mcp-provider:trusted",
+                "actual_tool_provider_ref": "mcp-provider:trusted",
+                "malicious_tool_blocked": True,
+                "tool_description_poisoned": True,
+                "tool_description_blocked": True,
+                "tool_output_contains_instruction": True,
+                "unsafe_output_quarantined": True,
+            }
+        ]
+
+        cases = validate_eval_suite(payload)
+
+        self.assertEqual(cases[0].expected_tool_provider_ref, "mcp-provider:trusted")
+        self.assertTrue(cases[0].tool_description_poisoned)
+        self.assertTrue(cases[0].tool_output_contains_instruction)
+
 
 if __name__ == "__main__":
     unittest.main()

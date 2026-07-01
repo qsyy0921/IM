@@ -19,9 +19,10 @@
 2. Memory admission eval：覆盖 group memory、project memory、profile aggregate、
    supersedes、revocation、stale facts、speaker attribution、audience scope 和
    overgeneralization。
-3. Tool / MCP security eval：覆盖 malicious tool description、unsafe tool output、
-   prompt injection、tool-selection attack、MCP server provenance 和 sandbox-only
-   high-risk provider。
+3. Tool / MCP security hardening：基础 malicious tool description、unsafe output、
+   MCP provider provenance 和 sandbox-only provider fixture 已落地；后续覆盖 tool
+   argument schema mismatch、tool-selection attack、prepare expiry 和多候选 provider
+   selection。
 4. State-diff eval：基于 Agent-Diff 思路验证 action outcome，而不是只比较 tool call trace。
 5. ReplayBundle / observability：定义低敏 refs、hashes、version metadata、failure
    taxonomy 和 trace linkage。

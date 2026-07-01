@@ -96,6 +96,38 @@ class AgentEvalTraceTests(unittest.TestCase):
         self.assertIn("workflow_wait", step_types)
         self.assertIsNotNone(trace.tool_intent)
 
+    def test_trace_contains_mcp_security_metadata(self) -> None:
+        case = validate_eval_suite(
+            suite_with_case(
+                {
+                    "case_id": "trace-mcp-security-case",
+                    "dataset_name": "synthetic",
+                    "dataset_version": "2026-07-01",
+                    "capability_family": "TOOL_SECURITY",
+                    "fixture_version": "fixture-v1",
+                    "input_refs": ["input:trace-mcp-security-case"],
+                    "expected_tool_prepare": "BLOCKED",
+                    "actual_tool_prepare": "BLOCKED",
+                    "expected_tool_provider_ref": "mcp-provider:trusted",
+                    "actual_tool_provider_ref": "mcp-provider:trusted",
+                    "malicious_tool_blocked": True,
+                    "tool_description_poisoned": True,
+                    "tool_description_blocked": True,
+                    "tool_output_contains_instruction": True,
+                    "unsafe_output_quarantined": True,
+                }
+            )
+        )[0]
+
+        trace = build_agent_run_trace(case)
+
+        self.assertEqual(trace.status, "PASS")
+        self.assertIsNotNone(trace.tool_intent)
+        assert trace.tool_intent is not None
+        self.assertEqual(trace.tool_intent.provider_ref, "mcp-provider:trusted")
+        self.assertTrue(trace.tool_intent.tool_description_blocked)
+        self.assertTrue(trace.tool_intent.tool_output_contains_instruction)
+
     def test_trace_contains_runtime_control_steps(self) -> None:
         case = validate_eval_suite(
             suite_with_case(

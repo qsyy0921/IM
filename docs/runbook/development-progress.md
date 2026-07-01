@@ -102,6 +102,7 @@ ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json
 ai/python/fixtures/agent_eval/synthetic_first_trio.json
 ai/python/fixtures/agent_eval/synthetic_core_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_runtime_control_scenarios.json
+ai/python/fixtures/agent_eval/synthetic_mcp_security_scenarios.json
 ai/python/scripts/run_agent_eval_fixture.py
 ai/python/scripts/run_agent_dataset_adapter.py
 ai/python/scripts/run_agent_eval_regression.py
@@ -122,6 +123,8 @@ ai/python/tests/test_agent_eval_*.py
 - EvalReport baseline comparison、regression delta 和 blocked promotion reasons。
 - RuntimeControlFixture、checkpoint refs、cancel/resume/replay runtime events 和
   对应 synthetic fixture。
+- MCP security fixture：poisoned tool description、unsafe output instruction、
+  provider provenance mismatch、sandbox-only provider。
 
 ## 当前未完成项
 
@@ -129,7 +132,7 @@ ai/python/tests/test_agent_eval_*.py
 | --- | --- | --- |
 | P1 | ContextPackage / EvidencePack experiment | citation、source coverage、temporal version、conflict marker、permission abstain |
 | P1 | Memory admission eval | scope、speaker attribution、supersedes、revocation、overgeneralization、pollution |
-| P1 | Tool / MCP security eval | poisoned tool description、unsafe output、tool-selection attack、provider provenance |
+| P1 | Tool / MCP security hardening | tool args schema、tool-selection attack、prepare expiry、多候选 provider selection |
 | P1 | State-diff eval | action outcome 与预期状态变化比对 |
 | P1 | Runtime-control negative fixtures | missing checkpoint、cancel propagation incomplete、replay event incomplete |
 | P2 | ADR promotion decision | 是否提升 Agent Runtime / Harness、memory admission、ReplayBundle 等契约 |

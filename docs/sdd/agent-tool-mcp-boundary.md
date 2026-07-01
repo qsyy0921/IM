@@ -316,7 +316,28 @@ Promote tool/MCP integration only after:
 - provider provenance and schema hashing are available;
 - action-executor remains sole side-effect owner.
 
-## 16. References
+## 16. Current Isolated Fixture Coverage
+
+Current Agent Lab code only provides offline eval fixtures. It does not create a
+production MCP provider, gateway contract or tool schema.
+
+Implemented fixture coverage:
+
+- poisoned MCP tool description is blocked or quarantined;
+- unsafe MCP output instruction is quarantined before reuse;
+- provider provenance mismatch is detected;
+- sandbox-only external provider path is represented as fixture metadata;
+- ReplayBundle keeps low-sensitive prepared refs, provider refs and audit refs,
+  not raw provider payloads.
+
+Remaining hardening:
+
+- tool argument schema mismatch fixtures;
+- tool-selection attack fixtures across multiple candidates;
+- prepare expiry and re-prepare fixtures;
+- state-diff linkage after approved execution simulation.
+
+## 17. References
 
 - `docs/sdd/mcp-gateway.md`
 - `docs/sdd/skill-registry.md`

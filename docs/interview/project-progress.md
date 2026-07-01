@@ -189,7 +189,7 @@ CreateConversation(GROUP)
 | 多 push-gateway ws 拓扑复压 | clean commit `4be4b2d` 增加 4 个 ws 实例，400 个 subscriber 按 100 / 100 / 100 / 100 分散到 10498 / 11001 / 11002 / 11003 四个 ws 端口 | 400000 条 signal 全部读完，drain rate 约 2822.479 signals/s，低于单 ws fanout-buckets baseline 约 2874.378 signals/s；4 个 Prometheus push target 均 up，writer / Redis error、queue-full 和 slow eviction 为 0。结论：简单多开 push-gateway ws 容器不是当前瓶颈解，不能把“加机器”当成热点群优化答案。 |
 | Pull-first 采样式在线唤醒 | clean commit `bac71c65` 将 delivery-consumer 和 4 个 ws 实例统一配置 `NEXUSIM_PUSH_CONVERSATION_SIGNAL_SAMPLE_EVERY=10`，并用同一 400 subscriber coordinator + 4 shard 场景复压 | 6000 人 / 1000 消息 / 8000 msg/s 下 emitted signal 从 full-signal baseline 的 400000 降至 40000，signal span 从 141.719s 降至 25.243s；SendMessage / PullInbox / ACK 成立，message / delivery outbox pending=0。结论：减少在线 frame 总量能显著改善 drain，但 durable 展示仍靠 PullInbox，不能把采样 signal 当可靠投递。 |
 | Sampled signal 扩大消息数复压 | clean commit `f5bc0199` 在 sample=10、400 subscriber、8000 msg/s 下把消息数扩大到 5000 | 产生并读完 200000 条 sampled signal，span 138.555s，SendMessage p95 / p99 为 18.103ms / 20.914ms，PullInbox p95 为 23.874ms，message / delivery outbox pending=0；Prometheus 显示 `delivery_notify` write p95 / p99 低于 1ms，但 Redis subscriber fanout p95 / p99 约 54.541ms / 90.908ms。结论：采样可以降压，但扩大消息数后仍是 online-signal-drain，下一步应做 room policy / adaptive cadence 或本地 fanout 持久 worker。 |
-| Fanout-mode online signal policy | push-gateway 已把 `delivery.conversation.signal.v1` 的 `fanout_mode` 传入内部 notification，并支持 `WRITE_FANOUT` / `HYBRID_FANOUT` / `READ_FANOUT` / `BROADCAST_SIGNAL` 各自配置在线 signal cadence | 这把上一轮全局 sample=10 推进为 room policy / adaptive cadence 的第一步：默认 policy 可保持小群全量 signal，READ_FANOUT / BROADCAST_SIGNAL 可单独采样。当前完成 focused tests / build，下一步需要 clean Docker redeploy 后复压；不能提前写成容量结论。 |
+| Fanout-mode online signal policy | clean commit `37b575e5` 已把 `delivery.conversation.signal.v1` 的 `fanout_mode` 传入 push-gateway 内部 notification，并支持 `WRITE_FANOUT` / `HYBRID_FANOUT` / `READ_FANOUT` / `BROADCAST_SIGNAL` 各自配置在线 signal cadence；镜像已重建、归档、部署 | 复压 default=1、READ_FANOUT=10、BROADCAST_SIGNAL=10：6000 人 / 5000 消息 / 8000 msg/s / 400 subscriber 共读完 200000 条 sampled signal，span 141.504s，message / delivery outbox pending=0。结论：策略边界已从全局 knob 收敛到 room policy，但 READ_FANOUT=10 下瓶颈仍是 online-signal-drain。下一步应做 adaptive cadence 控制面或持久 fanout worker。 |
 
 面试时可以把这个结果讲成一次真实性能定位过程：
 
@@ -219,8 +219,9 @@ sample=10 的复压把在线 signal 从 40 万降到 4 万，drain span 从 141.
 Redis subscriber fanout p95 / p99 又回到约 54ms / 91ms。这个结果说明热点群不能把
 WebSocket signal 当可靠投递，真正可靠展示仍要靠 PullInbox。当前已经把全局采样推进到
 fanout-mode online signal policy：小群可以保持默认全量 signal，READ_FANOUT /
-BROADCAST_SIGNAL 超大房间可以单独配置更低在线唤醒 cadence；下一步是 clean Docker
-redeploy 后复压，确认策略按房间类型生效。
+BROADCAST_SIGNAL 超大房间可以单独配置更低在线唤醒 cadence。clean Docker redeploy 后
+复压证明策略按房间类型生效，但 READ_FANOUT=10 下性能与 global sample=10 同量级，
+所以后续不能继续只调 sample knob，而要做 adaptive cadence 控制面或持久 fanout worker。
 ```
 
 2026-06-29 的小规模 smoke 进一步证明了策略切换链路：

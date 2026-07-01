@@ -285,5 +285,12 @@ brief、loadtest report、development-progress 或 archive。
   当前已选择“更少在线 signal 的 room policy / adaptive cadence”作为下一模块：
   push-gateway 已实现 fanout-mode conversation signal policy，可对 READ_FANOUT /
   BROADCAST_SIGNAL 单独配置 sample cadence，而不影响未配置 mode 的默认全量策略。
-  代码 focused tests / build 已通过；下一步需要 clean commit 镜像重建 / 归档 /
-  redeploy，并用 mode-specific policy 复压。
+  clean commit `37b575e5` 已完成镜像重建 / 归档 / redeploy，并用 default=1、
+  READ_FANOUT=10、BROADCAST_SIGNAL=10 复压。run
+  `hotgroup-fanoutpolicy-clean-400sub-5000msg-coordinator-20260701-084638`
+  在 6000 人 / 5000 消息 / 8000 msg/s / 400 subscriber 下读完 200000 条
+  sampled signal，span 141.504s；SendMessage / PullInbox / ACK 和 outbox drain
+  均成立。结论是策略边界已从全局 knob 收敛到 fanout-mode room policy，但
+  READ_FANOUT=10 的性能仍与上一轮 global sample=10 同量级，瓶颈仍是
+  online-signal-drain。下一步需要在 adaptive cadence 控制面或持久 fanout worker
+  两条路中选一个完整模块，而不是继续调同一个 sample knob。

@@ -82,8 +82,13 @@
    / PullInbox / ACK 和 outbox drain 仍成立，但 Redis subscriber conversation fanout
    p95 / p99 约 54.541ms / 90.908ms，瓶颈仍是 online-signal-drain。已选择
    room policy / adaptive cadence 方向并实现 fanout-mode conversation signal
-   policy；剩余动作是 clean commit 镜像重建 / 归档 / redeploy 后复压
-   default=1、READ_FANOUT/BROADCAST_SIGNAL=10 的 mode-specific policy。
+   policy；clean commit `37b575e5` 已完成镜像重建 / 归档 / redeploy，并以
+   default=1、READ_FANOUT/BROADCAST_SIGNAL=10 复压。新 run 在 6000 人 /
+   5000 消息 / 8000 msg/s / 400 subscriber 下读完 200000 条 sampled signal，
+   span 141.504s，message / delivery outbox pending=0。该结果证明 policy 边界生效，
+   但 READ_FANOUT=10 下瓶颈仍是 online-signal-drain；剩余动作是选择一个完整模块：
+   adaptive cadence 控制面 / 运行时策略，或持久 per-conversation / per-bucket fanout
+   worker，不再继续调同一个 sample knob。
 2. Agent action boundary / repair cases：在 provider replay admin / workflow handoff 已落
    的基础上，继续扩更多需要 proposal / approval / workflow / audit 的 action 与 repair 场景。
 3. Product-active 服务按需推进：workflow、audit、admin、notification、media、vector、

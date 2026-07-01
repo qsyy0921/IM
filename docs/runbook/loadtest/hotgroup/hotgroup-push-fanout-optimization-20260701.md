@@ -957,3 +957,94 @@ evidence:
 - suppressed signal counters match expected mode-specific policy;
 - Redis subscriber fanout p95 / p99 should be interpreted against the reduced
   emitted-frame count, not as durable delivery throughput.
+
+## Fanout-Mode Conversation Signal Policy Retest
+
+The fanout-mode policy module was committed and deployed as:
+
+```text
+37b575e5 feat: add fanout-mode push signal policy
+```
+
+The clean `nexusim/push-gateway:local` image was rebuilt and archived at:
+
+```text
+H:\NexusIM\docker-images\archives\nexusim-push-gateway-37b575e5-20260701-083327.tar
+```
+
+The archive was loaded on Ubuntu and these containers were recreated:
+
+```text
+nexusim-push-gateway-delivery-consumer
+nexusim-push-gateway-identity-consumer
+nexusim-push-gateway-ws
+nexusim-push-gateway-ws-2
+nexusim-push-gateway-ws-3
+nexusim-push-gateway-ws-4
+```
+
+The runtime policy was:
+
+```text
+NEXUSIM_PUSH_CONVERSATION_SIGNAL_SAMPLE_EVERY=1
+NEXUSIM_PUSH_CONVERSATION_SIGNAL_SAMPLE_EVERY_READ_FANOUT=10
+NEXUSIM_PUSH_CONVERSATION_SIGNAL_SAMPLE_EVERY_BROADCAST_SIGNAL=10
+```
+
+Comparable scenario:
+
+```text
+group_size=6000
+message_count=5000
+target_message_rate=8000 msg/s
+sender_count=256
+subscriber_count=400
+fanout_mode=READ_FANOUT
+runner layout=coordinator + 4 subscriber-only shards
+```
+
+Artifacts:
+
+```text
+H:\NexusIM\loadtest-results\hotgroup-fanoutpolicy-clean-400sub-5000msg-coordinator-20260701-084638
+H:\NexusIM\loadtest-results\hotgroup-fanoutpolicy-clean-400sub-5000msg-shard*-20260701-084638
+docs/runbook/loadtest/hotgroup/hotgroup-multirunner-analysis-20260701-fanoutpolicy-400sub-5000msg.md
+docs/runbook/loadtest/hotgroup/hotgroup-metrics-window-20260701-fanoutpolicy-400sub-5000msg.md
+```
+
+Results:
+
+| metric | value |
+| --- | ---: |
+| success | true |
+| group_size | 6000 |
+| fanout_mode | READ_FANOUT |
+| message_count | 5000 |
+| target_message_rate | 8000 msg/s |
+| sender_count | 256 |
+| send_success / errors | 5000 / 0 |
+| send_p95 / p99 | 21.055 ms / 26.145 ms |
+| PullInbox p95 | 68.047 ms |
+| ACK success / errors | 16 / 0 |
+| message_outbox_pending | 0 |
+| delivery_outbox_pending | 0 |
+| emitted conversation signals | 200000 |
+| signal_span_seconds | 141.504 |
+| signal_span_rate | 1413.391 signals/s |
+| Redis subscriber fanout p95 / p99 window | 39.944 ms / 84.614 ms |
+| Redis subscriber fanout p95 / p99 last 5m | 62.5 ms / 92.5 ms |
+| delivery_notify write p95 / p99 window | 0.465 ms / 0.893 ms |
+
+Interpretation:
+
+- The policy boundary is now correct: small / unspecified modes can keep default
+  full signal while READ_FANOUT and BROADCAST_SIGNAL can use a lower online
+  signal cadence.
+- This is not a throughput breakthrough. Under READ_FANOUT=10, the run is
+  intentionally comparable to the previous global sample=10 run and remains in
+  the same online-signal-drain range.
+- SendMessage, PullInbox, ACK, message outbox and delivery outbox all remained
+  valid, so the sampled WebSocket signal still acts only as an online wakeup.
+- The next module should be either adaptive cadence control plane / runtime
+  policy, or a persistent per-conversation / per-bucket fanout worker. Do not
+  keep tuning the same sample knob.

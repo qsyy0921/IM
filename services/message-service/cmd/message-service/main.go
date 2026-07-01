@@ -216,7 +216,7 @@ func runGRPCServer() error {
 		}))
 	}
 
-	useCaseOptions := make([]app.SendMessageUseCaseOption, 0, 1)
+	useCaseOptions := []app.SendMessageUseCaseOption{app.WithMetrics(metrics)}
 	if envBool("NEXUSIM_ADAPTIVE_LIMIT_ENABLED", false) {
 		config := admissioninfra.Config{
 			Enabled:                       true,

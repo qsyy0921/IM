@@ -15,6 +15,14 @@ import (
 
 type Collector struct {
 	sendMessage               latencySamples
+	sendMessageCommandBuild   latencySamples
+	sendMessageAdmission      latencySamples
+	sendMessageDependencyRead latencySamples
+	sendMessageConversation   latencySamples
+	sendMessagePolicy         latencySamples
+	sendMessageSeqFloor       latencySamples
+	sendMessageSequencer      latencySamples
+	sendMessageRepositoryCall latencySamples
 	repositoryAppend          latencySamples
 	repositoryBegin           latencySamples
 	repositoryPoolAcquire     latencySamples
@@ -52,6 +60,62 @@ func (c *Collector) ObserveSendMessage(duration time.Duration) {
 		return
 	}
 	c.sendMessage.observe(duration)
+}
+
+func (c *Collector) ObserveSendMessageCommandBuild(duration time.Duration) {
+	if c == nil {
+		return
+	}
+	c.sendMessageCommandBuild.observe(duration)
+}
+
+func (c *Collector) ObserveSendMessageAdmission(duration time.Duration) {
+	if c == nil {
+		return
+	}
+	c.sendMessageAdmission.observe(duration)
+}
+
+func (c *Collector) ObserveSendMessageDependencyRead(duration time.Duration) {
+	if c == nil {
+		return
+	}
+	c.sendMessageDependencyRead.observe(duration)
+}
+
+func (c *Collector) ObserveSendMessageConversationContext(duration time.Duration) {
+	if c == nil {
+		return
+	}
+	c.sendMessageConversation.observe(duration)
+}
+
+func (c *Collector) ObserveSendMessagePolicyCheck(duration time.Duration) {
+	if c == nil {
+		return
+	}
+	c.sendMessagePolicy.observe(duration)
+}
+
+func (c *Collector) ObserveSendMessageSeqFloor(duration time.Duration) {
+	if c == nil {
+		return
+	}
+	c.sendMessageSeqFloor.observe(duration)
+}
+
+func (c *Collector) ObserveSendMessageSequencerAllocate(duration time.Duration) {
+	if c == nil {
+		return
+	}
+	c.sendMessageSequencer.observe(duration)
+}
+
+func (c *Collector) ObserveSendMessageRepositoryAppendCall(duration time.Duration) {
+	if c == nil {
+		return
+	}
+	c.sendMessageRepositoryCall.observe(duration)
 }
 
 func (c *Collector) ObserveRepositoryAppend(duration time.Duration) {
@@ -211,6 +275,22 @@ func (c *Collector) Snapshot() Snapshot {
 	return Snapshot{
 		SendMessageLatencyMS:                     c.sendMessage.snapshot(),
 		SendMessageRecentLatencyMS:               c.sendMessage.recentSnapshot(),
+		SendMessageCommandBuildLatencyMS:         c.sendMessageCommandBuild.snapshot(),
+		SendMessageCommandBuildRecentLatencyMS:   c.sendMessageCommandBuild.recentSnapshot(),
+		SendMessageAdmissionLatencyMS:            c.sendMessageAdmission.snapshot(),
+		SendMessageAdmissionRecentLatencyMS:      c.sendMessageAdmission.recentSnapshot(),
+		SendMessageDependencyReadLatencyMS:       c.sendMessageDependencyRead.snapshot(),
+		SendMessageDependencyReadRecentLatencyMS: c.sendMessageDependencyRead.recentSnapshot(),
+		SendMessageConversationLatencyMS:         c.sendMessageConversation.snapshot(),
+		SendMessageConversationRecentLatencyMS:   c.sendMessageConversation.recentSnapshot(),
+		SendMessagePolicyLatencyMS:               c.sendMessagePolicy.snapshot(),
+		SendMessagePolicyRecentLatencyMS:         c.sendMessagePolicy.recentSnapshot(),
+		SendMessageSeqFloorLatencyMS:             c.sendMessageSeqFloor.snapshot(),
+		SendMessageSeqFloorRecentLatencyMS:       c.sendMessageSeqFloor.recentSnapshot(),
+		SendMessageSequencerLatencyMS:            c.sendMessageSequencer.snapshot(),
+		SendMessageSequencerRecentLatencyMS:      c.sendMessageSequencer.recentSnapshot(),
+		SendMessageRepositoryCallLatencyMS:       c.sendMessageRepositoryCall.snapshot(),
+		SendMessageRepositoryCallRecentLatencyMS: c.sendMessageRepositoryCall.recentSnapshot(),
 		RepositoryAppendLatencyMS:                c.repositoryAppend.snapshot(),
 		RepositoryAppendRecentLatencyMS:          c.repositoryAppend.recentSnapshot(),
 		RepositoryBeginLatencyMS:                 c.repositoryBegin.snapshot(),
@@ -266,6 +346,22 @@ func (c *Collector) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 type Snapshot struct {
 	SendMessageLatencyMS                     LatencySnapshot                  `json:"send_message_latency_ms"`
 	SendMessageRecentLatencyMS               LatencySnapshot                  `json:"send_message_recent_latency_ms"`
+	SendMessageCommandBuildLatencyMS         LatencySnapshot                  `json:"send_message_command_build_latency_ms"`
+	SendMessageCommandBuildRecentLatencyMS   LatencySnapshot                  `json:"send_message_command_build_recent_latency_ms"`
+	SendMessageAdmissionLatencyMS            LatencySnapshot                  `json:"send_message_admission_latency_ms"`
+	SendMessageAdmissionRecentLatencyMS      LatencySnapshot                  `json:"send_message_admission_recent_latency_ms"`
+	SendMessageDependencyReadLatencyMS       LatencySnapshot                  `json:"send_message_dependency_read_latency_ms"`
+	SendMessageDependencyReadRecentLatencyMS LatencySnapshot                  `json:"send_message_dependency_read_recent_latency_ms"`
+	SendMessageConversationLatencyMS         LatencySnapshot                  `json:"send_message_conversation_context_latency_ms"`
+	SendMessageConversationRecentLatencyMS   LatencySnapshot                  `json:"send_message_conversation_context_recent_latency_ms"`
+	SendMessagePolicyLatencyMS               LatencySnapshot                  `json:"send_message_policy_check_latency_ms"`
+	SendMessagePolicyRecentLatencyMS         LatencySnapshot                  `json:"send_message_policy_check_recent_latency_ms"`
+	SendMessageSeqFloorLatencyMS             LatencySnapshot                  `json:"send_message_seq_floor_latency_ms"`
+	SendMessageSeqFloorRecentLatencyMS       LatencySnapshot                  `json:"send_message_seq_floor_recent_latency_ms"`
+	SendMessageSequencerLatencyMS            LatencySnapshot                  `json:"send_message_sequencer_allocate_latency_ms"`
+	SendMessageSequencerRecentLatencyMS      LatencySnapshot                  `json:"send_message_sequencer_allocate_recent_latency_ms"`
+	SendMessageRepositoryCallLatencyMS       LatencySnapshot                  `json:"send_message_repository_append_call_latency_ms"`
+	SendMessageRepositoryCallRecentLatencyMS LatencySnapshot                  `json:"send_message_repository_append_call_recent_latency_ms"`
 	RepositoryAppendLatencyMS                LatencySnapshot                  `json:"repository_append_latency_ms"`
 	RepositoryAppendRecentLatencyMS          LatencySnapshot                  `json:"repository_append_recent_latency_ms"`
 	RepositoryBeginLatencyMS                 LatencySnapshot                  `json:"repository_begin_latency_ms"`

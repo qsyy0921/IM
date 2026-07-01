@@ -4,6 +4,14 @@ import "time"
 
 type LatencyRecorder interface {
 	ObserveSendMessage(time.Duration)
+	ObserveSendMessageCommandBuild(time.Duration)
+	ObserveSendMessageAdmission(time.Duration)
+	ObserveSendMessageDependencyRead(time.Duration)
+	ObserveSendMessageConversationContext(time.Duration)
+	ObserveSendMessagePolicyCheck(time.Duration)
+	ObserveSendMessageSeqFloor(time.Duration)
+	ObserveSendMessageSequencerAllocate(time.Duration)
+	ObserveSendMessageRepositoryAppendCall(time.Duration)
 	ObserveRepositoryAppend(time.Duration)
 	ObserveRepositoryBegin(time.Duration)
 	ObserveRepositoryPoolAcquire(time.Duration)
@@ -29,6 +37,22 @@ type LatencyRecorder interface {
 type NoopLatencyRecorder struct{}
 
 func (NoopLatencyRecorder) ObserveSendMessage(time.Duration) {}
+
+func (NoopLatencyRecorder) ObserveSendMessageCommandBuild(time.Duration) {}
+
+func (NoopLatencyRecorder) ObserveSendMessageAdmission(time.Duration) {}
+
+func (NoopLatencyRecorder) ObserveSendMessageDependencyRead(time.Duration) {}
+
+func (NoopLatencyRecorder) ObserveSendMessageConversationContext(time.Duration) {}
+
+func (NoopLatencyRecorder) ObserveSendMessagePolicyCheck(time.Duration) {}
+
+func (NoopLatencyRecorder) ObserveSendMessageSeqFloor(time.Duration) {}
+
+func (NoopLatencyRecorder) ObserveSendMessageSequencerAllocate(time.Duration) {}
+
+func (NoopLatencyRecorder) ObserveSendMessageRepositoryAppendCall(time.Duration) {}
 
 func (NoopLatencyRecorder) ObserveRepositoryAppend(time.Duration) {}
 

@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/qsyy0921/IM/services/message-service/internal/domain"
 	"github.com/qsyy0921/IM/services/message-service/internal/types"
@@ -14,6 +15,7 @@ type SendMessageUseCase struct {
 	sequencer    SequencerPort
 	messageRepo  MessageRepository
 	admission    AdmissionPort
+	metrics      types.LatencyRecorder
 	seqFloors    *seqFloorCache
 }
 
@@ -31,6 +33,7 @@ func NewSendMessageUseCase(
 		conversation: conversation,
 		sequencer:    sequencer,
 		messageRepo:  messageRepo,
+		metrics:      types.NoopLatencyRecorder{},
 		seqFloors:    newSeqFloorCache(),
 	}
 	for _, opt := range opts {
@@ -45,12 +48,22 @@ func WithAdmission(admission AdmissionPort) SendMessageUseCaseOption {
 	}
 }
 
+func WithMetrics(metrics types.LatencyRecorder) SendMessageUseCaseOption {
+	return func(useCase *SendMessageUseCase) {
+		if metrics != nil {
+			useCase.metrics = metrics
+		}
+	}
+}
+
 func (u *SendMessageUseCase) Execute(ctx context.Context, command types.SendMessageCommand) (types.SendMessageResult, error) {
 	if err := command.Validate(); err != nil {
 		return types.SendMessageResult{}, err
 	}
 	if u.admission != nil {
+		started := time.Now()
 		permit, err := u.admission.AdmitSendMessage(ctx)
+		u.metrics.ObserveSendMessageAdmission(time.Since(started))
 		if err != nil {
 			return types.SendMessageResult{}, err
 		}
@@ -59,7 +72,9 @@ func (u *SendMessageUseCase) Execute(ctx context.Context, command types.SendMess
 		}
 	}
 
+	started := time.Now()
 	conversation, permission, err := u.readConsistentSendDependencies(ctx, command)
+	u.metrics.ObserveSendMessageDependencyRead(time.Since(started))
 	if err != nil {
 		return types.SendMessageResult{}, err
 	}
@@ -72,6 +87,7 @@ func (u *SendMessageUseCase) Execute(ctx context.Context, command types.SendMess
 		return types.SendMessageResult{}, err
 	}
 
+	started = time.Now()
 	result, err := u.messageRepo.AppendMessage(ctx, domain.AppendMessageInput{
 		Command:      command,
 		Permission:   permission,
@@ -81,6 +97,7 @@ func (u *SendMessageUseCase) Execute(ctx context.Context, command types.SendMess
 		SeqEpoch:     lease.Epoch,
 		SeqExpiresAt: lease.ExpiresAt,
 	})
+	u.metrics.ObserveSendMessageRepositoryAppendCall(time.Since(started))
 	if err != nil {
 		return types.SendMessageResult{}, err
 	}
@@ -102,12 +119,16 @@ func (u *SendMessageUseCase) readConsistentSendDependencies(
 	var permission types.PermissionDecision
 	for attempt := 0; attempt < 2; attempt++ {
 		var err error
+		started := time.Now()
 		conversation, err = u.readConversationSendContext(ctx, command)
+		u.metrics.ObserveSendMessageConversationContext(time.Since(started))
 		if err != nil {
 			return types.ConversationSendContext{}, types.PermissionDecision{}, err
 		}
 
+		started = time.Now()
 		permission, err = u.policy.CheckSendPermission(ctx, command, conversation)
+		u.metrics.ObserveSendMessagePolicyCheck(time.Since(started))
 		if err != nil {
 			return types.ConversationSendContext{}, types.PermissionDecision{}, err
 		}
@@ -150,11 +171,15 @@ func (u *SendMessageUseCase) allocateConversationSeq(
 		if u.sequencer == nil {
 			return 0, types.SeqBlock{}, types.NewSequencerUnavailable("sequencer client is not configured")
 		}
+		started := time.Now()
 		minimumStartSeq, err := u.seqFloors.minimumStartSeq(ctx, command, u.messageRepo.NextConversationSeqFloor)
+		u.metrics.ObserveSendMessageSeqFloor(time.Since(started))
 		if err != nil {
 			return 0, types.SeqBlock{}, err
 		}
+		started = time.Now()
 		block, err := u.sequencer.AllocateSeqBlock(ctx, command, minimumStartSeq)
+		u.metrics.ObserveSendMessageSequencerAllocate(time.Since(started))
 		if err != nil {
 			return 0, types.SeqBlock{}, err
 		}

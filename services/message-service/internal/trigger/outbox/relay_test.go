@@ -450,6 +450,22 @@ func (m *fakeMetrics) ObserveConversationSeqAlloc(time.Duration) {
 
 func (m *fakeMetrics) ObserveSendMessage(time.Duration) {}
 
+func (m *fakeMetrics) ObserveSendMessageCommandBuild(time.Duration) {}
+
+func (m *fakeMetrics) ObserveSendMessageAdmission(time.Duration) {}
+
+func (m *fakeMetrics) ObserveSendMessageDependencyRead(time.Duration) {}
+
+func (m *fakeMetrics) ObserveSendMessageConversationContext(time.Duration) {}
+
+func (m *fakeMetrics) ObserveSendMessagePolicyCheck(time.Duration) {}
+
+func (m *fakeMetrics) ObserveSendMessageSeqFloor(time.Duration) {}
+
+func (m *fakeMetrics) ObserveSendMessageSequencerAllocate(time.Duration) {}
+
+func (m *fakeMetrics) ObserveSendMessageRepositoryAppendCall(time.Duration) {}
+
 func (m *fakeMetrics) ObserveRepositoryAppend(time.Duration) {}
 
 func (m *fakeMetrics) ObserveRepositoryBegin(time.Duration) {}

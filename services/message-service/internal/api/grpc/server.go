@@ -98,7 +98,9 @@ func (s *Server) SendMessage(ctx context.Context, req *messagev1.SendMessageRequ
 		s.metrics.ObserveSendMessage(time.Since(started))
 	}()
 
+	commandStarted := time.Now()
 	command, err := s.toSendMessageCommand(ctx, req)
+	s.metrics.ObserveSendMessageCommandBuild(time.Since(commandStarted))
 	if err != nil {
 		return nil, grpcError(err, reqCorrelationID(req))
 	}

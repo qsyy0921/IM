@@ -533,8 +533,8 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
   `repository_pool_acquire_recent p99` 约 `0.538ms`、
   `repository_append_recent p99` 约 `41.711ms`，insert message / timeline / outbox
   和 commit recent p99 均约 `10-17ms`。结论：512 concurrency 下 CPU/连接池/seq
-  allocator 仍未成为瓶颈，吞吐继续随并发提升，下一步应尝试 768 / 1024 concurrency
-  或更大 message_count 寻找拐点。
+  allocator 仍未成为瓶颈，吞吐继续随并发提升，因此继续用 768 / 1024 concurrency
+  寻找拐点。
 - 2026-07-01 clean commit `4af8fa1` 已完成 768 concurrency 对照：
   `hotgroup-readseq-sendsteady-6000x5000-768c-clean-4af8fa1a-20260701-1715`。
   该 run 为 6000 人、5000 消息、768 sender / concurrency、目标 16000 msg/s，
@@ -544,8 +544,19 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
   recent metrics 显示 `conversation_seq_alloc_recent p99` 约 `0.024ms`、
   `repository_pool_acquire_recent p99` 约 `0.071ms`、`repository_append_recent p99`
   约 `49.56ms`，insert / commit 分段仍是十几毫秒级。相比 512 concurrency，
-  吞吐只提升约 3.1%，但 p99 明显升高，说明 send-only 曲线已接近当前配置拐点；
-  下一步只需要再跑 1024 concurrency 验证是否进入 plateau / 长尾区。
+  吞吐只提升约 3.1%，但 p99 明显升高，说明 send-only 曲线已接近当前配置拐点。
+- 2026-07-01 clean commit `503b7a9` 已完成 1024 concurrency 对照：
+  `hotgroup-readseq-sendsteady-6000x5000-1024c-clean-503b7a91-20260701-1725`。
+  该 run 为 6000 人、5000 消息、1024 sender / concurrency、目标 20000 msg/s，
+  READ_FANOUT / SEQUENCER_BLOCK；5000/5000 成功、无 send error，实际发送窗口约
+  `2.144s`、约 `2331.718 msg/s`，SendMessage p95 / p99 为
+  `503.595ms / 589.059ms`，message / delivery outbox pending 均为 0。
+  recent metrics 显示 `conversation_seq_alloc_recent p99` 约 `0.026ms`、
+  `repository_pool_acquire_recent p99` 约 `0.176ms`、`repository_append_recent p99`
+  约 `50.893ms`。相比 768 concurrency，1024 吞吐回落且 p99 继续变差；当前
+  send-only 曲线已进入 plateau / 长尾区。下一步不再盲目加客户端并发，而是补齐
+  SendMessage 阶段指标，区分 command build、admission、conversation context、
+  policy check、seq floor、sequencer allocation 和 app-level repository append call。
 - HYBRID 诊断档位 1000 人 / 1000 消息 / 400 msg/s 暴露 `delivery_outbox` ready query
   在百万级 per-user outbox 下退化：旧 anti-join blocker 查询每批 500 行约 24s。当前
   delivery outbox relay 已改成 per-conversation frontier ready query，并把本地 worker
@@ -591,12 +602,14 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
   focused checks、Docker 镜像重建 / 归档 / Ubuntu redeploy 和 clean 复压；复压确认
   `conversation_mode=SEQUENCER_BLOCK`，`repository_allocate_seq` 行锁瓶颈不再是
   6000 人 READ_FANOUT 的首要问题。
-- message-service recent latency metrics 已完成 focused tests / build；下一步需用
-  clean commit 重建 / 归档 / redeploy message-service Docker 镜像后，跑更大消息数的
-  READ_FANOUT / SEQUENCER_BLOCK 稳态 send-path 复压。
+- message-service recent latency metrics 已完成 focused tests / build，并已通过
+  256 / 512 / 768 / 1024 concurrency send-only 稳态复压证明当前曲线进入 plateau。
+  本轮继续补 SendMessage app / gRPC 阶段指标，用于解释总 p99 与 repository p99
+  之间的未归因区间。
 - 6000 人 READ_FANOUT / SEQUENCER_BLOCK send-only 稳态复压已完成 clean
-  256 / 512 / 768 concurrency；下一步只需再跑 1024 concurrency 验证是否进入
-  plateau / 长尾区。
+  256 / 512 / 768 / 1024 concurrency；下一步需在新阶段指标 redeploy 后复跑
+  512 / 768 对照，确认瓶颈是否来自 app 前半段、远端 conversation / policy 调用、
+  sequencer client，还是客户端 / gRPC 调度。
 - 文档同步本轮公开能力或瓶颈变化。
 - 提交并推送到 GitHub。
 
@@ -610,8 +623,9 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
 
 ## 后续优先级
 
-1. 继续尝试 1024 concurrency 或扩大 message_count，
-   同时观察 recent repository append / insert_outbox / commit p99、PostgreSQL CPU / IO
+1. 部署 SendMessage 阶段指标并复跑 512 / 768 clean 对照，重点观察
+   command build、admission、dependency read、conversation context、policy check、
+   seq floor、sequencer allocation、app-level repository append call、PostgreSQL CPU / IO
    和 message-service CPU，寻找真实硬件瓶颈点。
 2. 回到 total-subscriber-aware policy 的 6000 人 /
    5000 message / 400 subscriber / expected sample=50 场景，确认 signal span 与

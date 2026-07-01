@@ -570,6 +570,20 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
   PostgreSQL / Kafka / policy / message 容器均有压力，但未形成整机 CPU 饱和；
   当前瓶颈继续指向 policy / dependency read 长尾和服务间等待，而不是本地 seq、
   repository append 或 PG pool acquire。
+- 2026-07-01 已补 policy-service `CheckMessageAction(SEND)` evaluator stage 观测并
+  redeploy commit `213d7956` 到 Ubuntu；诊断 run
+  `hotgroup-policy-stage-6000x5000-512c-213d7956-20260701-2134` 和
+  `hotgroup-policy-stage-6000x5000-768c-213d7956-20260701-2140` 将 send-path
+  瓶颈进一步定位为 policy-service 多阶段串行 PostgreSQL 访问和 decision audit 写入：
+  768c 中 `policy_check_recent p99` 约 `309.066ms`，policy evaluator 各规则阶段
+  p99 约 `55-60ms`，`decision_audit_outbox` p99 约 `64ms`，
+  `policy_pg_pool_empty_acquire_total` 达 `69307`，而 policy-service 容器 CPU avg
+  仅约 `0.087%`、PostgreSQL avg CPU 约 `123.383%`。结论：当前不是 policy Go CPU
+  饱和，也不是单个孤立慢查询，而是每条 SendMessage 在 policy 规则链路上多次抢
+  `NEXUSIM_POLICY_PG_MAX_CONNS=32` 的连接并排队。512c 因 delivery outbox drain
+  timeout 只能作为 send-path 诊断；768c 因已有未提交报告标记 `git_dirty=true`，
+  不作为正式容量证据。低敏报告见
+  `docs/runbook/loadtest/hotgroup/hotgroup-policy-stage-bottleneck-20260701.md`。
 - HYBRID 诊断档位 1000 人 / 1000 消息 / 400 msg/s 暴露 `delivery_outbox` ready query
   在百万级 per-user outbox 下退化：旧 anti-join blocker 查询每批 500 行约 24s。当前
   delivery outbox relay 已改成 per-conversation frontier ready query，并把本地 worker

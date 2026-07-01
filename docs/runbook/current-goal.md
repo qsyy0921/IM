@@ -629,10 +629,12 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
    command build、admission、dependency read、conversation context、policy check、
    seq floor、sequencer allocation、app-level repository append call、PostgreSQL CPU / IO
    和 message-service CPU，寻找真实硬件瓶颈点。下一轮压测必须同步采集三机资源
-   曲线，并把三台机器资源充分利用作为压测有效性门槛：Windows、Ubuntu、Mac
-   默认都参与发压、subscriber shard、或观测采样；若 Ubuntu CPU / IO / 网络仍明显
-   空闲，不能把 achieved rate 写成服务端容量上限，需要继续提高实际发压、拆分
-   runner、调整安全的 runtime profile，或定位 RPC / DB / 连接池等待。
+   曲线和压测相关进程 / 容器资源窗口；采样在压测开始前启动，压测结束 30 秒后停止，
+   只统计 runner、subscriber shard 和 Ubuntu 上相关服务 / PostgreSQL / Kafka /
+   Redis 容器。三台机器资源充分利用作为压测有效性门槛：Windows、Ubuntu、Mac
+   默认都参与发压、subscriber shard、或观测采样；若 Ubuntu 服务容器 CPU / IO /
+   网络仍明显空闲，不能把 achieved rate 写成服务端容量上限，需要继续提高实际发压、
+   拆分 runner、调整安全的 runtime profile，或定位 RPC / DB / 连接池等待。
 2. 回到 total-subscriber-aware policy 的 6000 人 /
    5000 message / 400 subscriber / expected sample=50 场景，确认 signal span 与
    `achieved_send_rate` 的新曲线；若仍超时，再继续定位 timeline-service seq allocator、

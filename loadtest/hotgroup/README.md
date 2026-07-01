@@ -97,6 +97,37 @@ CSV / SVG 仍放在 H 盘结果目录，不写入仓库：
 
 如果任一机器采样全失败，脚本默认失败，避免生成缺机器的误导性曲线。
 
+容量判断优先使用压测相关进程 / 容器资源窗口，而不是整机汇总。采样必须在
+压测开始前启动，压测结束后等待 30 秒再写 stop file，让 outbox / projection /
+consumer 尾部工作也进入统计：
+
+```powershell
+$runName = "<run-name>"
+$resourceDir = "H:\NexusIM\loadtest-results\$runName\lab-process-resource"
+$stopFile = Join-Path $resourceDir "STOP"
+New-Item -ItemType Directory -Force -Path $resourceDir | Out-Null
+Remove-Item -LiteralPath $stopFile -Force -ErrorAction SilentlyContinue
+
+$sampler = Start-Process powershell -PassThru -WindowStyle Hidden `
+  -WorkingDirectory (Get-Location) `
+  -ArgumentList @(
+    "-NoProfile", "-ExecutionPolicy", "Bypass",
+    "-File", ".\tools\record-lab-process-resource-window.ps1",
+    "-OutputDir", $resourceDir,
+    "-StopFile", $stopFile,
+    "-IntervalSeconds", "1",
+    "-UbuntuHost", "qsyy0921@172.31.50.2",
+    "-IncludeMac",
+    "-MacHost", "qsyy0921@172.31.50.3"
+  )
+
+# run hotgroup loadtest here
+
+Start-Sleep -Seconds 30
+New-Item -ItemType File -Force -Path $stopFile | Out-Null
+Wait-Process -Id $sampler.Id
+```
+
 后续正式后端压测必须把 Ubuntu 服务端资源利用率作为有效性门槛之一：
 若 Ubuntu 整机 CPU 长时间接近空闲，不能直接把低 achieved rate 写成服务端容量上限；
 需要继续提高实际发压、拆分 runner、上调安全的 runtime profile，或定位 RPC / DB /

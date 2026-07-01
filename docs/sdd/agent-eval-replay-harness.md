@@ -216,6 +216,18 @@ The harness should normalize:
 - `STATE_CHANGE_REF_MISSING`
 - `STATE_AUDIT_REF_MISSING`
 - `STATE_UNAUTHORIZED_MUTATION`
+- `MEMORY_SOURCE_MISSING`
+- `MEMORY_SPEAKER_MISSING`
+- `MEMORY_AUDIENCE_SCOPE_MISMATCH`
+- `MEMORY_SUPERSEDES_MISSING`
+- `MEMORY_STALE_FACT_USED`
+- `MEMORY_OVERGENERALIZED`
+- `MEMORY_REVIEW_MISSING`
+- `MEMORY_DUPLICATE_NOT_DEDUPED`
+- `MEMORY_LOW_CONFIDENCE_ADMITTED`
+- `MEMORY_SKILL_BOUND_MISSING`
+- `MEMORY_POLICY_SOURCE_MISSING`
+- `MEMORY_REVIEW_TIMEOUT_MISSING`
 - `MEMORY_SCOPE_VIOLATION`
 - `MEMORY_CONFLICT`
 - `MEMORY_POLLUTION`
@@ -350,6 +362,7 @@ ai/python/fixtures/agent_eval/synthetic_mcp_security_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_context_evidence_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_context_evidence_hardening_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_memory_admission_scenarios.json
+ai/python/fixtures/agent_eval/synthetic_memory_admission_hardening_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_scenarios.json
 ai/python/scripts/run_agent_eval_fixture.py
 ai/python/scripts/run_agent_dataset_adapter.py
@@ -401,6 +414,9 @@ Implemented checks:
 - richer memory admission fixture coverage for group speaker/audience, project
   supersedes, profile aggregate review, revoked memory blocking, stale memory
   blocking and overgeneralization prevention.
+- memory admission hardening coverage for duplicate dedupe, low-confidence
+  rejection, procedural skill binding, policy-like memory rejection and review
+  timeout metadata.
 - state-diff report fixture coverage for approved action outcome refs,
   expected-vs-actual state changes, missing execution refs, incomplete reports
   and unauthorized mutation detection.
@@ -416,6 +432,7 @@ python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_context_evidence_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_context_evidence_hardening_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_memory_admission_scenarios.json
+python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_memory_admission_hardening_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_state_diff_scenarios.json
 python ai/python/scripts/run_agent_dataset_adapter.py --run ai/python/fixtures/agent_eval/adapter_samples/qasper_like_rag_samples.json
 python ai/python/scripts/run_agent_eval_regression.py ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json

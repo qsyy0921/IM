@@ -291,6 +291,11 @@ class AgentEvalEvaluatorTests(unittest.TestCase):
         self.assertEqual(report.aggregate_scores["memory_audience_score"], 1.0)
         self.assertEqual(report.aggregate_scores["memory_supersedes_score"], 1.0)
         self.assertEqual(report.aggregate_scores["memory_profile_review_score"], 1.0)
+        self.assertEqual(report.aggregate_scores["memory_dedupe_score"], 1.0)
+        self.assertEqual(report.aggregate_scores["memory_low_confidence_score"], 1.0)
+        self.assertEqual(report.aggregate_scores["memory_skill_bound_score"], 1.0)
+        self.assertEqual(report.aggregate_scores["memory_policy_source_score"], 1.0)
+        self.assertEqual(report.aggregate_scores["memory_review_timeout_score"], 1.0)
 
     def test_memory_admission_fails_missing_source(self) -> None:
         case = base_case("MEMORY_ADMISSION")
@@ -416,6 +421,97 @@ class AgentEvalEvaluatorTests(unittest.TestCase):
 
         self.assertEqual(report.status, "FAIL")
         self.assertEqual(report.results[0].failure_class, "MEMORY_REVIEW_MISSING")
+
+    def test_memory_admission_fails_duplicate_not_deduped(self) -> None:
+        case = base_case("MEMORY_ADMISSION")
+        case.update(
+            {
+                "expected_memory_outcome": "REJECT",
+                "actual_memory_outcome": "REJECT",
+                "expected_memory_scope": "PROJECT",
+                "actual_memory_scope": "PROJECT",
+                "duplicate_memory_refs": ["memory:project:decision:v1"],
+                "actual_memory_dedupe_refs": [],
+                "memory_deduped": False,
+            }
+        )
+
+        report = run_eval_suite(suite_with_case(case))
+
+        self.assertEqual(report.status, "FAIL")
+        self.assertEqual(report.results[0].failure_class, "MEMORY_DUPLICATE_NOT_DEDUPED")
+
+    def test_memory_admission_fails_low_confidence_admitted(self) -> None:
+        case = base_case("MEMORY_ADMISSION")
+        case.update(
+            {
+                "expected_memory_outcome": "REJECT",
+                "actual_memory_outcome": "ADMIT",
+                "expected_memory_scope": "GROUP",
+                "actual_memory_scope": "GROUP",
+                "low_confidence_memory_refs": ["candidate:memory:uncertain"],
+                "low_confidence_memory_rejected": False,
+            }
+        )
+
+        report = run_eval_suite(suite_with_case(case))
+
+        self.assertEqual(report.status, "FAIL")
+        self.assertEqual(report.results[0].failure_class, "MEMORY_LOW_CONFIDENCE_ADMITTED")
+
+    def test_memory_admission_fails_missing_procedural_skill_bound(self) -> None:
+        case = base_case("MEMORY_ADMISSION")
+        case.update(
+            {
+                "expected_memory_outcome": "ADMIT",
+                "actual_memory_outcome": "ADMIT",
+                "expected_memory_scope": "EVAL_ONLY_FIXTURE",
+                "actual_memory_scope": "EVAL_ONLY_FIXTURE",
+                "expected_memory_skill_refs": ["skill:memory:procedure:v1"],
+                "actual_memory_skill_refs": [],
+            }
+        )
+
+        report = run_eval_suite(suite_with_case(case))
+
+        self.assertEqual(report.status, "FAIL")
+        self.assertEqual(report.results[0].failure_class, "MEMORY_SKILL_BOUND_MISSING")
+
+    def test_memory_admission_fails_policy_memory_without_governed_source(self) -> None:
+        case = base_case("MEMORY_ADMISSION")
+        case.update(
+            {
+                "expected_memory_outcome": "REJECT",
+                "actual_memory_outcome": "ADMIT",
+                "expected_memory_scope": "TENANT",
+                "actual_memory_scope": "TENANT",
+                "policy_memory_refs": ["candidate:policy-like:retention"],
+                "policy_memory_rejected": False,
+            }
+        )
+
+        report = run_eval_suite(suite_with_case(case))
+
+        self.assertEqual(report.status, "FAIL")
+        self.assertEqual(report.results[0].failure_class, "MEMORY_POLICY_SOURCE_MISSING")
+
+    def test_memory_admission_fails_missing_review_timeout_metadata(self) -> None:
+        case = base_case("MEMORY_ADMISSION")
+        case.update(
+            {
+                "expected_memory_outcome": "NEEDS_REVIEW",
+                "actual_memory_outcome": "NEEDS_REVIEW",
+                "expected_memory_scope": "PROJECT",
+                "actual_memory_scope": "PROJECT",
+                "review_timeout_refs": ["review-timeout:memory:project"],
+                "memory_review_timeout_recorded": False,
+            }
+        )
+
+        report = run_eval_suite(suite_with_case(case))
+
+        self.assertEqual(report.status, "FAIL")
+        self.assertEqual(report.results[0].failure_class, "MEMORY_REVIEW_TIMEOUT_MISSING")
 
     def test_tool_security_requires_poisoning_and_output_blocks(self) -> None:
         case = base_case("TOOL_SECURITY")

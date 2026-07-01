@@ -68,6 +68,8 @@ class AgentEvalTraceTests(unittest.TestCase):
                     "actual_memory_audience_refs": ["project:phoenix"],
                     "expected_memory_supersedes_refs": ["memory:project:decision:v1"],
                     "actual_memory_supersedes_refs": ["memory:project:decision:v1"],
+                    "expected_memory_skill_refs": ["skill:project-memory:v2"],
+                    "actual_memory_skill_refs": ["skill:project-memory:v2"],
                     "profile_aggregate_review_required": True,
                     "profile_aggregate_reviewed": True,
                 }
@@ -83,7 +85,53 @@ class AgentEvalTraceTests(unittest.TestCase):
         self.assertEqual(trace.memory_candidate.speaker_refs, ["user:pm"])
         self.assertEqual(trace.memory_candidate.audience_refs, ["project:phoenix"])
         self.assertEqual(trace.memory_candidate.supersedes_refs, ["memory:project:decision:v1"])
+        self.assertEqual(trace.memory_candidate.skill_refs, ["skill:project-memory:v2"])
         self.assertTrue(trace.memory_candidate.profile_aggregate_reviewed)
+
+    def test_trace_contains_memory_hardening_metadata(self) -> None:
+        case = validate_eval_suite(
+            suite_with_case(
+                {
+                    "case_id": "trace-memory-hardening-case",
+                    "dataset_name": "synthetic",
+                    "dataset_version": "2026-07-01",
+                    "capability_family": "MEMORY_ADMISSION",
+                    "fixture_version": "fixture-v1",
+                    "input_refs": ["input:trace-memory-hardening-case"],
+                    "actual_used_refs": ["message:project:decision:duplicate"],
+                    "expected_memory_outcome": "REJECT",
+                    "actual_memory_outcome": "REJECT",
+                    "expected_memory_scope": "PROJECT",
+                    "actual_memory_scope": "PROJECT",
+                    "expected_memory_source_refs": ["message:project:decision:duplicate"],
+                    "actual_memory_source_refs": ["message:project:decision:duplicate"],
+                    "duplicate_memory_refs": ["memory:project:decision:v1"],
+                    "actual_memory_dedupe_refs": ["memory:project:decision:v1"],
+                    "memory_deduped": True,
+                    "low_confidence_memory_refs": ["candidate:memory:uncertain"],
+                    "low_confidence_memory_rejected": True,
+                    "policy_memory_refs": ["candidate:policy-like:rule"],
+                    "policy_memory_rejected": True,
+                    "review_timeout_refs": ["review-timeout:memory:project"],
+                    "memory_review_timeout_recorded": True,
+                }
+            )
+        )[0]
+
+        trace = build_agent_run_trace(case)
+
+        self.assertEqual(trace.status, "PASS")
+        self.assertIsNotNone(trace.memory_candidate)
+        assert trace.memory_candidate is not None
+        self.assertEqual(trace.memory_candidate.duplicate_refs, ["memory:project:decision:v1"])
+        self.assertEqual(trace.memory_candidate.dedupe_refs, ["memory:project:decision:v1"])
+        self.assertTrue(trace.memory_candidate.deduped)
+        self.assertEqual(trace.memory_candidate.low_confidence_refs, ["candidate:memory:uncertain"])
+        self.assertTrue(trace.memory_candidate.low_confidence_rejected)
+        self.assertEqual(trace.memory_candidate.policy_memory_refs, ["candidate:policy-like:rule"])
+        self.assertTrue(trace.memory_candidate.policy_memory_rejected)
+        self.assertEqual(trace.memory_candidate.review_timeout_refs, ["review-timeout:memory:project"])
+        self.assertTrue(trace.memory_candidate.review_timeout_recorded)
 
     def test_trace_marks_permission_leakage(self) -> None:
         case = validate_eval_suite(

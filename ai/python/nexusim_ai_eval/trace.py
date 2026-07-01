@@ -51,9 +51,20 @@ class MemoryCandidateFixture:
     audience_refs: list[str]
     supersedes_refs: list[str]
     stale_refs: list[str]
+    duplicate_refs: list[str]
+    dedupe_refs: list[str]
+    low_confidence_refs: list[str]
+    skill_refs: list[str]
+    policy_memory_refs: list[str]
+    governed_policy_source_refs: list[str]
+    review_timeout_refs: list[str]
     revoked_memory_used: bool
     stale_memory_used: bool
     overgeneralized: bool
+    deduped: bool
+    low_confidence_rejected: bool
+    policy_memory_rejected: bool
+    review_timeout_recorded: bool
     profile_aggregate_review_required: bool
     profile_aggregate_reviewed: bool
 
@@ -247,9 +258,20 @@ def _memory_candidate(case: EvalCase) -> MemoryCandidateFixture | None:
         audience_refs=case.actual_memory_audience_refs,
         supersedes_refs=case.actual_memory_supersedes_refs,
         stale_refs=case.stale_memory_refs,
+        duplicate_refs=case.duplicate_memory_refs,
+        dedupe_refs=case.actual_memory_dedupe_refs,
+        low_confidence_refs=case.low_confidence_memory_refs,
+        skill_refs=case.actual_memory_skill_refs,
+        policy_memory_refs=case.policy_memory_refs,
+        governed_policy_source_refs=case.governed_policy_source_refs,
+        review_timeout_refs=case.review_timeout_refs,
         revoked_memory_used=case.revoked_memory_used,
         stale_memory_used=_stale_memory_used(case),
         overgeneralized=case.memory_overgeneralized,
+        deduped=case.memory_deduped,
+        low_confidence_rejected=case.low_confidence_memory_rejected,
+        policy_memory_rejected=case.policy_memory_rejected,
+        review_timeout_recorded=case.memory_review_timeout_recorded,
         profile_aggregate_review_required=case.profile_aggregate_review_required,
         profile_aggregate_reviewed=case.profile_aggregate_reviewed,
     )
@@ -433,6 +455,26 @@ def _memory_step_status(
         return ("FAIL", "MEMORY_SUPERSEDES_MISSING")
     if memory_candidate.stale_memory_used:
         return ("FAIL", "MEMORY_STALE_FACT_USED")
+    duplicate_refs = set(memory_candidate.duplicate_refs)
+    if duplicate_refs:
+        if not memory_candidate.deduped or not duplicate_refs.issubset(
+            set(memory_candidate.dedupe_refs)
+        ):
+            return ("FAIL", "MEMORY_DUPLICATE_NOT_DEDUPED")
+    if memory_candidate.low_confidence_refs:
+        if not memory_candidate.low_confidence_rejected or memory_candidate.outcome != "REJECT":
+            return ("FAIL", "MEMORY_LOW_CONFIDENCE_ADMITTED")
+    expected_skill_refs = set(case.expected_memory_skill_refs)
+    if expected_skill_refs and not expected_skill_refs.issubset(set(memory_candidate.skill_refs)):
+        return ("FAIL", "MEMORY_SKILL_BOUND_MISSING")
+    if memory_candidate.policy_memory_refs:
+        governed_sources = set(memory_candidate.governed_policy_source_refs)
+        if governed_sources:
+            actual_sources = set(memory_candidate.source_refs) | set(case.visible_evidence_refs)
+            if not governed_sources.issubset(actual_sources):
+                return ("FAIL", "MEMORY_POLICY_SOURCE_MISSING")
+        elif not memory_candidate.policy_memory_rejected or memory_candidate.outcome != "REJECT":
+            return ("FAIL", "MEMORY_POLICY_SOURCE_MISSING")
     if memory_candidate.overgeneralized:
         return ("FAIL", "MEMORY_OVERGENERALIZED")
     if (
@@ -440,6 +482,8 @@ def _memory_step_status(
         and not memory_candidate.profile_aggregate_reviewed
     ):
         return ("FAIL", "MEMORY_REVIEW_MISSING")
+    if memory_candidate.review_timeout_refs and not memory_candidate.review_timeout_recorded:
+        return ("FAIL", "MEMORY_REVIEW_TIMEOUT_MISSING")
     if case.expected_memory_outcome != memory_candidate.outcome:
         return ("FAIL", "MEMORY_CONFLICT")
     return ("PASS", "")

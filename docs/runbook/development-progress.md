@@ -106,6 +106,7 @@ ai/python/fixtures/agent_eval/synthetic_mcp_security_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_context_evidence_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_context_evidence_hardening_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_memory_admission_scenarios.json
+ai/python/fixtures/agent_eval/synthetic_memory_admission_hardening_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_scenarios.json
 ai/python/scripts/run_agent_eval_fixture.py
 ai/python/scripts/run_agent_dataset_adapter.py
@@ -136,6 +137,8 @@ ai/python/tests/test_agent_eval_*.py
   unavailable retrieval lane gap reporting。
 - Memory admission fixture：group speaker/audience、project supersedes、profile
   aggregate review、revoked/stale memory blocking、overgeneralization prevention。
+- Memory admission hardening fixture：duplicate dedupe、low-confidence rejection、
+  procedural skill binding、policy-like memory rejection、review timeout metadata。
 - State-diff fixture：approved action outcome refs、expected-vs-actual state
   changes、execution/audit refs、incomplete report、unauthorized mutation detection。
 
@@ -144,9 +147,9 @@ ai/python/tests/test_agent_eval_*.py
 | 优先级 | 工作 | 输出 |
 | --- | --- | --- |
 | P1 | State-diff hardening | repair/redrive、partial execution、idempotency、compensating action |
-| P1 | Memory admission hardening | duplicate/dedupe、low-confidence、procedural skill-bound、policy-memory rejection、review timeout |
 | P1 | Tool / MCP security hardening | tool args schema、tool-selection attack、prepare expiry、多候选 provider selection |
 | P1 | Runtime-control negative fixtures | missing checkpoint、cancel propagation incomplete、replay event incomplete |
+| P2 | Memory admission deeper hardening | multi-source duplicate clustering、confidence calibration、procedural memory migration、governed policy allowlist、review redrive |
 | P2 | ContextPackage / EvidencePack deeper hardening | source ranking、lane redrive、snippet-level citation repair、denied-lane、taint propagation |
 | P2 | ADR promotion decision | 是否提升 Agent Runtime / Harness、memory admission、ReplayBundle 等契约 |
 

@@ -71,6 +71,11 @@ ALLOWED_FAILURE_CLASSES = {
     "MEMORY_STALE_FACT_USED",
     "MEMORY_OVERGENERALIZED",
     "MEMORY_REVIEW_MISSING",
+    "MEMORY_DUPLICATE_NOT_DEDUPED",
+    "MEMORY_LOW_CONFIDENCE_ADMITTED",
+    "MEMORY_SKILL_BOUND_MISSING",
+    "MEMORY_POLICY_SOURCE_MISSING",
+    "MEMORY_REVIEW_TIMEOUT_MISSING",
     "MEMORY_SCOPE_VIOLATION",
     "MEMORY_CONFLICT",
     "MEMORY_POLLUTION",
@@ -135,6 +140,14 @@ class EvalCase:
     expected_memory_supersedes_refs: list[str] = field(default_factory=list)
     actual_memory_supersedes_refs: list[str] = field(default_factory=list)
     stale_memory_refs: list[str] = field(default_factory=list)
+    duplicate_memory_refs: list[str] = field(default_factory=list)
+    actual_memory_dedupe_refs: list[str] = field(default_factory=list)
+    low_confidence_memory_refs: list[str] = field(default_factory=list)
+    expected_memory_skill_refs: list[str] = field(default_factory=list)
+    actual_memory_skill_refs: list[str] = field(default_factory=list)
+    policy_memory_refs: list[str] = field(default_factory=list)
+    governed_policy_source_refs: list[str] = field(default_factory=list)
+    review_timeout_refs: list[str] = field(default_factory=list)
     expected_tool_prepare: str = ""
     actual_tool_prepare: str = ""
     expected_tool_provider_ref: str = ""
@@ -169,6 +182,10 @@ class EvalCase:
     retrieval_lane_gap_reported: bool = False
     stale_memory_used: bool = False
     memory_overgeneralized: bool = False
+    memory_deduped: bool = False
+    low_confidence_memory_rejected: bool = False
+    policy_memory_rejected: bool = False
+    memory_review_timeout_recorded: bool = False
     profile_aggregate_review_required: bool = False
     profile_aggregate_reviewed: bool = False
     state_diff_report_complete: bool = True
@@ -384,6 +401,30 @@ def _eval_case(payload: dict[str, Any], index: int) -> EvalCase:
             "actual_memory_supersedes_refs",
         ),
         stale_memory_refs=_string_list(payload.get("stale_memory_refs", []), "stale_memory_refs"),
+        duplicate_memory_refs=_string_list(
+            payload.get("duplicate_memory_refs", []), "duplicate_memory_refs"
+        ),
+        actual_memory_dedupe_refs=_string_list(
+            payload.get("actual_memory_dedupe_refs", []), "actual_memory_dedupe_refs"
+        ),
+        low_confidence_memory_refs=_string_list(
+            payload.get("low_confidence_memory_refs", []), "low_confidence_memory_refs"
+        ),
+        expected_memory_skill_refs=_string_list(
+            payload.get("expected_memory_skill_refs", []), "expected_memory_skill_refs"
+        ),
+        actual_memory_skill_refs=_string_list(
+            payload.get("actual_memory_skill_refs", []), "actual_memory_skill_refs"
+        ),
+        policy_memory_refs=_string_list(
+            payload.get("policy_memory_refs", []), "policy_memory_refs"
+        ),
+        governed_policy_source_refs=_string_list(
+            payload.get("governed_policy_source_refs", []), "governed_policy_source_refs"
+        ),
+        review_timeout_refs=_string_list(
+            payload.get("review_timeout_refs", []), "review_timeout_refs"
+        ),
         expected_tool_prepare=_string(payload.get("expected_tool_prepare", "")).upper(),
         actual_tool_prepare=_string(payload.get("actual_tool_prepare", "")).upper(),
         expected_tool_provider_ref=_string(payload.get("expected_tool_provider_ref", "")),
@@ -467,6 +508,18 @@ def _eval_case(payload: dict[str, Any], index: int) -> EvalCase:
         stale_memory_used=_bool(payload.get("stale_memory_used", False), "stale_memory_used"),
         memory_overgeneralized=_bool(
             payload.get("memory_overgeneralized", False), "memory_overgeneralized"
+        ),
+        memory_deduped=_bool(payload.get("memory_deduped", False), "memory_deduped"),
+        low_confidence_memory_rejected=_bool(
+            payload.get("low_confidence_memory_rejected", False),
+            "low_confidence_memory_rejected",
+        ),
+        policy_memory_rejected=_bool(
+            payload.get("policy_memory_rejected", False), "policy_memory_rejected"
+        ),
+        memory_review_timeout_recorded=_bool(
+            payload.get("memory_review_timeout_recorded", False),
+            "memory_review_timeout_recorded",
         ),
         profile_aggregate_review_required=_bool(
             payload.get("profile_aggregate_review_required", False),

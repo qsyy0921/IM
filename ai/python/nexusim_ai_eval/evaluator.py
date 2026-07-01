@@ -228,6 +228,11 @@ def _memory_scores(case: EvalCase) -> tuple[dict[str, float], str]:
     )
     stale_score = 0.0 if _stale_memory_used(case) else 1.0
     overgeneralization_score = 0.0 if case.memory_overgeneralized else 1.0
+    dedupe_score = _memory_dedupe_score(case)
+    low_confidence_score = _memory_low_confidence_score(case)
+    skill_bound_score = _memory_skill_bound_score(case)
+    policy_source_score = _memory_policy_source_score(case)
+    review_timeout_score = _memory_review_timeout_score(case)
     profile_review_score = 1.0
     if case.profile_aggregate_review_required:
         profile_review_score = 1.0 if case.profile_aggregate_reviewed else 0.0
@@ -245,10 +250,20 @@ def _memory_scores(case: EvalCase) -> tuple[dict[str, float], str]:
         failure = "MEMORY_SUPERSEDES_MISSING"
     elif stale_score == 0.0:
         failure = "MEMORY_STALE_FACT_USED"
+    elif dedupe_score == 0.0:
+        failure = "MEMORY_DUPLICATE_NOT_DEDUPED"
+    elif low_confidence_score == 0.0:
+        failure = "MEMORY_LOW_CONFIDENCE_ADMITTED"
+    elif skill_bound_score == 0.0:
+        failure = "MEMORY_SKILL_BOUND_MISSING"
+    elif policy_source_score == 0.0:
+        failure = "MEMORY_POLICY_SOURCE_MISSING"
     elif overgeneralization_score == 0.0:
         failure = "MEMORY_OVERGENERALIZED"
     elif profile_review_score == 0.0:
         failure = "MEMORY_REVIEW_MISSING"
+    elif review_timeout_score == 0.0:
+        failure = "MEMORY_REVIEW_TIMEOUT_MISSING"
     elif outcome_score == 0.0:
         failure = "MEMORY_CONFLICT"
     else:
@@ -264,6 +279,11 @@ def _memory_scores(case: EvalCase) -> tuple[dict[str, float], str]:
             "memory_supersedes_score": supersedes_score,
             "memory_stale_fact_score": stale_score,
             "memory_overgeneralization_score": overgeneralization_score,
+            "memory_dedupe_score": dedupe_score,
+            "memory_low_confidence_score": low_confidence_score,
+            "memory_skill_bound_score": skill_bound_score,
+            "memory_policy_source_score": policy_source_score,
+            "memory_review_timeout_score": review_timeout_score,
             "memory_profile_review_score": profile_review_score,
         },
         failure,
@@ -516,6 +536,52 @@ def _stale_memory_used(case: EvalCase) -> bool:
     stale = set(case.stale_memory_refs)
     used = set(case.actual_used_refs) | set(case.actual_memory_source_refs)
     return case.stale_memory_used or bool(stale.intersection(used))
+
+
+def _memory_dedupe_score(case: EvalCase) -> float:
+    duplicate_refs = set(case.duplicate_memory_refs)
+    if not duplicate_refs:
+        return 1.0
+    if not case.memory_deduped:
+        return 0.0
+    return 1.0 if duplicate_refs.issubset(set(case.actual_memory_dedupe_refs)) else 0.0
+
+
+def _memory_low_confidence_score(case: EvalCase) -> float:
+    if not case.low_confidence_memory_refs:
+        return 1.0
+    if not case.low_confidence_memory_rejected:
+        return 0.0
+    return 1.0 if case.actual_memory_outcome == "REJECT" else 0.0
+
+
+def _memory_skill_bound_score(case: EvalCase) -> float:
+    expected_skill_refs = set(case.expected_memory_skill_refs)
+    if not expected_skill_refs:
+        return 1.0
+    return 1.0 if expected_skill_refs.issubset(set(case.actual_memory_skill_refs)) else 0.0
+
+
+def _memory_policy_source_score(case: EvalCase) -> float:
+    if not case.policy_memory_refs:
+        return 1.0
+    governed_sources = set(case.governed_policy_source_refs)
+    if governed_sources:
+        actual_sources = (
+            set(case.actual_memory_source_refs)
+            | set(case.actual_used_refs)
+            | set(case.visible_evidence_refs)
+        )
+        return 1.0 if governed_sources.issubset(actual_sources) else 0.0
+    if not case.policy_memory_rejected:
+        return 0.0
+    return 1.0 if case.actual_memory_outcome == "REJECT" else 0.0
+
+
+def _memory_review_timeout_score(case: EvalCase) -> float:
+    if not case.review_timeout_refs:
+        return 1.0
+    return 1.0 if case.memory_review_timeout_recorded else 0.0
 
 
 def _ref_subset_score(expected_refs: list[str], actual_refs: list[str]) -> float:

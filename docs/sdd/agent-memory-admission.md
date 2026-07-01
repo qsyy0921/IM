@@ -351,7 +351,8 @@ Memory admission can move from design to ADR only after:
 
 Current first-stage code is fixture-only and lives under
 `ai/python/nexusim_ai_eval/` and
-`ai/python/fixtures/agent_eval/synthetic_memory_admission_scenarios.json`.
+`ai/python/fixtures/agent_eval/synthetic_memory_admission_scenarios.json` and
+`ai/python/fixtures/agent_eval/synthetic_memory_admission_hardening_scenarios.json`.
 It does not freeze a production memory event or MemoryCandidate schema.
 
 Implemented checks:
@@ -362,14 +363,19 @@ Implemented checks:
 - revoked memory use is detected as pollution;
 - stale memory refs must not be used as current facts;
 - overgeneralized memory candidates can be rejected.
+- duplicate and near-duplicate candidates must map to dedupe refs;
+- low-confidence candidates can be rejected instead of admitted;
+- procedural memory must carry SkillPackage / AgentDefinition refs;
+- policy-like memory is rejected unless backed by governed policy source refs;
+- review timeout metadata can be recorded for retry / operator follow-up.
 
 Remaining hardening:
 
-- duplicate and near-duplicate memory handling;
-- low-confidence candidate rejection;
-- procedural memory bound to SkillPackage / AgentDefinition version;
-- policy-like memory rejection unless sourced from governed policy;
-- review timeout and retry metadata.
+- multi-source duplicate clustering and tie-breaks;
+- confidence calibration across open dataset adapters;
+- procedural memory version migration / invalidation;
+- governed policy source allowlist / revocation cases;
+- review retry, escalation and redrive cases.
 
 ## 17. References
 

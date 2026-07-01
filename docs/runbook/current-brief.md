@@ -90,11 +90,14 @@ Agent Gateway / UX
 - 已补 fixture-only richer memory admission coverage：group speaker/audience、
   project supersedes、profile aggregate review、revoked/stale memory blocking、
   overgeneralization prevention。
+- 已补 fixture-only memory admission hardening：duplicate dedupe、
+  low-confidence rejection、procedural skill binding、policy-like memory rejection、
+  review timeout metadata。
 - 已补 fixture-only state-diff report coverage：approved action outcome refs、
   expected-vs-actual state changes、missing execution refs、incomplete report、
   unauthorized mutation detection。
-- 下一段优先做 memory admission hardening、state-diff hardening、
-  runtime-control negative fixture 和 current-report generation 等离线能力。
+- 下一段优先做 state-diff hardening、runtime-control negative fixture 和
+  current-report generation 等离线能力。
 
 ## 工作规则
 

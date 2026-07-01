@@ -187,6 +187,18 @@ class AgentEvalContractTests(unittest.TestCase):
                 "expected_memory_supersedes_refs": ["memory:project:decision:v1"],
                 "actual_memory_supersedes_refs": ["memory:project:decision:v1"],
                 "stale_memory_refs": ["memory:project:decision:v1"],
+                "duplicate_memory_refs": ["memory:project:decision:v1"],
+                "actual_memory_dedupe_refs": ["memory:project:decision:v1"],
+                "low_confidence_memory_refs": ["candidate:memory:uncertain"],
+                "expected_memory_skill_refs": ["skill:memory:procedure:v1"],
+                "actual_memory_skill_refs": ["skill:memory:procedure:v1"],
+                "policy_memory_refs": ["candidate:policy-like:rule"],
+                "governed_policy_source_refs": ["policy-source:retention:v1"],
+                "review_timeout_refs": ["review-timeout:memory:project"],
+                "memory_deduped": True,
+                "low_confidence_memory_rejected": True,
+                "policy_memory_rejected": False,
+                "memory_review_timeout_recorded": True,
                 "profile_aggregate_review_required": True,
                 "profile_aggregate_reviewed": True,
             }
@@ -198,6 +210,15 @@ class AgentEvalContractTests(unittest.TestCase):
         self.assertEqual(cases[0].expected_memory_source_refs, ["message:project:decision:2"])
         self.assertEqual(cases[0].expected_memory_speaker_refs, ["user:pm"])
         self.assertEqual(cases[0].actual_memory_supersedes_refs, ["memory:project:decision:v1"])
+        self.assertEqual(cases[0].duplicate_memory_refs, ["memory:project:decision:v1"])
+        self.assertEqual(cases[0].actual_memory_dedupe_refs, ["memory:project:decision:v1"])
+        self.assertEqual(cases[0].low_confidence_memory_refs, ["candidate:memory:uncertain"])
+        self.assertEqual(cases[0].actual_memory_skill_refs, ["skill:memory:procedure:v1"])
+        self.assertEqual(cases[0].governed_policy_source_refs, ["policy-source:retention:v1"])
+        self.assertEqual(cases[0].review_timeout_refs, ["review-timeout:memory:project"])
+        self.assertTrue(cases[0].memory_deduped)
+        self.assertTrue(cases[0].low_confidence_memory_rejected)
+        self.assertTrue(cases[0].memory_review_timeout_recorded)
         self.assertTrue(cases[0].profile_aggregate_review_required)
 
     def test_validates_state_diff_report_refs(self) -> None:

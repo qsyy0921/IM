@@ -373,7 +373,98 @@ Agent 层必须把 eval 当成架构组成部分，而不是上线前脚本。
 ReplayBundle 至少应记录低敏引用、hash、版本和决策链，不保存 raw prompt、raw provider
 body、secret、完整敏感 payload。
 
-## 11. 服务演进选项
+## 11. 自主研究更新：2026 Agent 工程重点
+
+本节基于后续自主研究补充，聚焦生产级 Agent 的薄弱点。它不改变本文“不冻结契约”的状态。
+
+### 11.1 从 trace matching 转向 state-diff eval
+
+Agent-Diff 的关键启发是：真实企业 API 任务不应只看调用参数是否像预期，也不应只看
+模型轨迹是否合理，而要看外部环境最终状态是否发生了预期变化。它用 sandbox 统一执行层，
+再用 state-diff contract 判断 Slack、Box、Linear、Google Calendar 等企业 API 任务是否真正完成。
+
+对 NexusIM 的落点：
+
+- Agent eval 要增加 `expected_state_diff` 思路：例如 conversation note 是否真的创建、
+  成员是否没有被误改、审批状态是否正确推进；
+- `ReplayBundle` 不只保存 agent trace，还要能关联 action-executor result、业务 request ref、
+  audit record 和可验证的低敏 state diff；
+- tool eval 不能只测“是否调用了某个 tool”，必须验证最终业务状态、幂等行为和副作用边界；
+- 对外部 API / MCP provider，应优先在 sandbox / fixture contract 中验证，再进入真实 adapter。
+
+### 11.2 Agent memory 要按“经验是否改善任务”评测
+
+STATE-Bench 的关键启发是：memory 系统不是为了“能召回更多文本”，而是为了让 Agent 在后续
+企业任务中利用经验、减少重复错误并保持正确上下文。memory-agnostic benchmark 更适合比较
+不同 memory 结构，而不是绑定某个向量库。
+
+对 NexusIM 的落点：
+
+- Memory eval 应增加 before/after task suite：同一用户/群/项目在有经验与无经验下的任务成功率；
+- MemoryCandidate admission 不能只看抽取准确率，还要看长期污染率、过期事实误用率、个人画像过度泛化率；
+- run memory、conversation memory、project memory 和 profile aggregate 必须分开评测；
+- memory recall 应记录 why-used / why-not-used，避免模型把历史回忆当成当前事实。
+
+### 11.3 MCP 安全必须进入架构，而不是工具接入后补
+
+MCPSecBench、ToolHijacker 和 prompt-injection / tool-poisoning 相关研究说明：MCP 把 agent
+能力扩展到外部数据和工具，也显著扩大攻击面。攻击可以发生在 tool 描述、tool selection、
+MCP sampling、外部返回内容或恶意 server 行为中。
+
+对 NexusIM 的落点：
+
+- MCP / tool registry 中的 tool description、schema、examples、doc chunks 都应视为不可信输入；
+- tool selection 不能只由模型在长 tool list 中自由选择，必须经过 skill allowlist、risk policy、
+  tenant policy 和 explicit prepare；
+- `mcp-gateway` 应记录 tool-source provenance、schema version、risk label、owner service 和
+  policy decision ref；
+- external MCP output 进入 ContextPackage 前必须经过 output safety gate、source labeling 和
+  prompt-injection quarantine；
+- 高风险或未知 MCP server 默认不能进入 auto-execute，只能 proposal-only 或 sandbox-only。
+
+### 11.4 Observability 要覆盖 agent 行为，而不只是模型延迟
+
+2026 企业报告和 observability 文章都强调，agent 上线后最难的是看清楚它在生产中做了什么、
+为什么这么做、用了哪些数据和工具、是否仍在 policy 边界内。传统模型指标不足以覆盖多步、
+多工具、记忆和执行链。
+
+对 NexusIM 的落点：
+
+- 每个 AgentRun 需要统一 trace id，贯穿 retrieval、model/provider、mcp prepare、workflow、
+  executor 和 audit；
+- 指标至少覆盖：run success / failure class、tool prepare deny、approval reject、memory candidate
+  reject、citation verifier failure、provider timeout、cost、latency、replay availability；
+- 管理面应能按 agent、skill、tenant、conversation、tool、risk level 聚合观察；
+- eval 结果要能回连生产 failure class，避免“离线评测一套，线上事故另一套”。
+
+### 11.5 生产治理重点从“模型治理”转到“行动治理”
+
+2026 企业 Agent 报告反复指出：agent 治理和传统模型治理不同，因为 agent 会代表组织行动。
+治理对象不仅是 prompt 和 model，还包括 agent identity、tool permission、memory、approval、
+execution、cost、release channel 和 rollback。
+
+对 NexusIM 的落点：
+
+- 每个 AgentDefinition / SkillPackage 必须有 owner、allowed scope、risk profile、release channel
+  和 disable switch；
+- agent identity 不能复用普通 user identity，必须表达 `on_behalf_of` 和 delegated subject；
+- high-risk action 的关键门禁是 policy + approval + executor，而不是让模型“承诺不乱做”；
+- 灰度 / shadow / rollback 应成为 Agent Plane 的 release 能力，而不是部署脚本外置约定；
+- audit 应保存低敏 refs / hashes / decisions，而不是 raw prompt 或 provider body。
+
+### 11.6 对当前设计的修正
+
+基于以上研究，当前报告的设计倾向做三点修正：
+
+1. `ReplayBundle` 的优先级上调。没有 replay / state diff，就无法证明 Agent 是可靠执行体。
+2. `mcp-gateway` 的安全职责上调。它不只是 prepare 边界，还应成为 MCP provenance / poisoning
+   防护 / tool source audit 的入口。
+3. `ai-eval-service` 后续不应只是 run catalog。它需要逐步承接 retrieval、memory、tool、
+   state-diff 和 replay consistency 的 suite aggregation。
+
+这些修正仍然只属于探索结论；是否进入 ADR / SDD 需要后续主集成或用户明确推进。
+
+## 12. 服务演进选项
 
 当前不建议立即新增生产服务。后续如果 Agent Runtime 方向通过主集成评审，有三个演进选项：
 
@@ -390,7 +481,7 @@ body、secret、完整敏感 payload。
 
 建议先用 fixture-only prototype 验证 run trace、ContextPackage 和 replay，再决定是否写 ADR。
 
-## 12. 初步落地实验
+## 13. 初步落地实验
 
 建议下一步只做探索实验，不做生产契约：
 
@@ -399,8 +490,10 @@ body、secret、完整敏感 payload。
 3. 扩展 memory admission eval：覆盖群组歧义、项目决策 supersedes、个人画像过度泛化。
 4. 做 tool prepare vs execute lineage replay：串起 skill、mcp prepare audit、proposal、executor result。
 5. 写 Runtime vs Workflow ownership matrix，作为后续 ADR 的前置材料。
+6. 补 state-diff eval fixture：用低敏 fixture 验证 action-executor result 与预期业务状态差异。
+7. 补 MCP security fixture：模拟 poisoned tool description、unsafe provider output 和 tool-selection attack。
 
-## 13. 风险
+## 14. 风险
 
 - 过早拆服务会增加本地运行和门禁成本。
 - 过晚拆 runtime 会让 agent-service 吸收过多编排、workflow、tool、memory 和 eval 逻辑。
@@ -408,8 +501,10 @@ body、secret、完整敏感 payload。
 - Memory 污染会长期影响 RAG 和 Agent，必须优先做 admission / review / eval。
 - 没有 ReplayBundle 的 Agent 很难定位线上问题。
 - 只做 pass/fail eval 不够，必须保留 failure taxonomy。
+- 只做 trace matching 的 eval 不够，必须补最终状态变化和副作用验证。
+- MCP tool description / output 本身可能被污染，不能当作可信上下文。
 
-## 14. 结论
+## 15. 结论
 
 NexusIM Agent 层建议采用“安全 baseline + Runtime 探索”的路线：
 
@@ -429,7 +524,7 @@ NexusIM Agent 层建议采用“安全 baseline + Runtime 探索”的路线：
 memory admission eval 和 runtime/workflow ownership 的小型实验。主集成评审后，再决定是否将
 Agent Runtime / Harness Plane 提升为 ADR / SDD / runtime 实现。
 
-## 15. 参考输入
+## 16. 参考输入
 
 本报告综合了本地源码/文档与 2026-07-01 可访问的公开资料：
 
@@ -442,6 +537,7 @@ Agent Runtime / Harness Plane 提升为 ADR / SDD / runtime 实现。
 - Anthropic / MCP：Model Context Protocol 公开说明与规范。
 - Google A2A：Agent2Agent 协议公开说明。
 - 论文 / benchmark：tau-bench、ToolSandbox、MultiAgentBench、JourneyBench、
-  Agent-Diff、STATE-Bench。
+  Agent-Diff、STATE-Bench、MCPSecBench、ToolHijacker / MCP tool-selection attack。
 - 企业报告 / 产品信号：Databricks 2026 State of AI Agents、飞书 Aily / workflow
-  AI Agent node、钉钉 Agent OS 相关公开材料。
+  AI Agent node、钉钉 Agent OS 相关公开材料、AI agent observability / governance
+  相关 2026 报告。

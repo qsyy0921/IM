@@ -79,6 +79,21 @@ class AgentEvalContractTests(unittest.TestCase):
                 "actual_runtime_events": ["checkpoint_created", "resume_completed"],
                 "expected_checkpoint_refs": ["checkpoint:runtime"],
                 "actual_checkpoint_refs": ["checkpoint:runtime"],
+                "expected_checkpoint_version_refs": ["checkpoint-version:runtime:v2"],
+                "actual_checkpoint_version_refs": ["checkpoint-version:runtime:v2"],
+                "checkpoint_version_drift_refs": ["checkpoint-version:runtime:v1"],
+                "actual_checkpoint_version_drift_refs": ["checkpoint-version:runtime:v1"],
+                "expected_workflow_wakeup_refs": ["workflow-wakeup:runtime:v2"],
+                "actual_workflow_wakeup_refs": ["workflow-wakeup:runtime:v2"],
+                "workflow_wakeup_race_refs": ["workflow-wakeup:runtime:duplicate-v1"],
+                "actual_workflow_wakeup_race_refs": [
+                    "workflow-wakeup:runtime:duplicate-v1"
+                ],
+                "expected_replay_lineage_refs": ["lineage:runtime:context"],
+                "actual_replay_lineage_refs": ["lineage:runtime:context"],
+                "checkpoint_version_drift_detected": True,
+                "workflow_wakeup_race_resolved": True,
+                "replay_lineage_complete": True,
             }
         ]
 
@@ -87,6 +102,23 @@ class AgentEvalContractTests(unittest.TestCase):
         self.assertEqual(cases[0].capability_family, "RUNTIME_CONTROL")
         self.assertEqual(cases[0].expected_runtime_events, ["CHECKPOINT_CREATED", "RESUME_COMPLETED"])
         self.assertEqual(cases[0].actual_checkpoint_refs, ["checkpoint:runtime"])
+        self.assertEqual(
+            cases[0].actual_checkpoint_version_refs,
+            ["checkpoint-version:runtime:v2"],
+        )
+        self.assertEqual(
+            cases[0].actual_checkpoint_version_drift_refs,
+            ["checkpoint-version:runtime:v1"],
+        )
+        self.assertEqual(cases[0].actual_workflow_wakeup_refs, ["workflow-wakeup:runtime:v2"])
+        self.assertEqual(
+            cases[0].actual_workflow_wakeup_race_refs,
+            ["workflow-wakeup:runtime:duplicate-v1"],
+        )
+        self.assertEqual(cases[0].actual_replay_lineage_refs, ["lineage:runtime:context"])
+        self.assertTrue(cases[0].checkpoint_version_drift_detected)
+        self.assertTrue(cases[0].workflow_wakeup_race_resolved)
+        self.assertTrue(cases[0].replay_lineage_complete)
 
     def test_validates_mcp_security_refs(self) -> None:
         payload = valid_suite()

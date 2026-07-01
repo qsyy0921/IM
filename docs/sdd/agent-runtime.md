@@ -194,7 +194,11 @@ business redrive requires fresh proposal, prepare, approval and executor path.
 
 - Cancel stops future runtime-owned steps and propagates cancellation to
   in-flight model/prepare calls when supported.
-- Resume loads a safe checkpoint and a decision/callback ref.
+- Resume loads a safe current checkpoint version and a decision/callback ref.
+  Stale checkpoint versions must be detected as drift, not silently reused.
+- Duplicate or racing workflow wakeups are deduped before resume. Runtime records
+  wakeup refs and race refs, but workflow-service still owns timers and wait
+  state.
 - Replay reconstructs cognitive lineage from refs, hashes and versions. It does
   not call external providers or execute business actions.
 
@@ -258,7 +262,11 @@ Runtime promotion requires offline tests for:
 - tool prepare denial and timeout;
 - unsafe tool output quarantine;
 - cancellation before and during workflow wait;
+- checkpoint version drift detection before resume;
+- workflow wakeup race dedupe before runtime-owned resume;
 - replay without side-effect execution;
+- ReplayBundle lineage completeness across context, model candidate, checkpoint,
+  workflow decision and audit refs;
 - bounded multi-agent handoff.
 
 ReplayBundle should include:
@@ -271,6 +279,9 @@ ReplayBundle should include:
 - workflow refs;
 - execution refs;
 - memory candidate refs;
+- checkpoint version and workflow wakeup refs where resume is involved;
+- lineage refs that connect context, model candidate, checkpoint, workflow and
+  audit records;
 - failure class.
 
 It should not require raw prompt, raw provider body, secret or private service

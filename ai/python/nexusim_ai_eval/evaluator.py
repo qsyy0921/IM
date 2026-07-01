@@ -657,6 +657,7 @@ def _runtime_control_scores(case: EvalCase) -> tuple[dict[str, float], str]:
         if set(case.expected_checkpoint_refs).issubset(set(case.actual_checkpoint_refs))
         else 0.0
     )
+    checkpoint_version_score = _checkpoint_version_score(case)
     cancel_score = 1.0
     if any(event.startswith("CANCEL_") for event in expected_events):
         cancel_score = (
@@ -670,23 +671,34 @@ def _runtime_control_scores(case: EvalCase) -> tuple[dict[str, float], str]:
             1.0 if "RESUME_COMPLETED" in actual_events and checkpoint_score == 1.0 else 0.0
         )
     replay_safety_score = 0.0 if case.side_effect_reexecuted else 1.0
+    workflow_wakeup_score = _workflow_wakeup_score(case)
+    replay_lineage_score = _replay_lineage_score(case)
     if replay_safety_score == 0.0:
         failure = "REPLAY_INCOMPLETE"
     elif checkpoint_score == 0.0:
         failure = "RESUME_CHECKPOINT_MISSING"
+    elif checkpoint_version_score == 0.0:
+        failure = "CHECKPOINT_VERSION_DRIFT"
     elif cancel_score == 0.0:
         failure = "CANCEL_NOT_PROPAGATED"
+    elif workflow_wakeup_score == 0.0:
+        failure = "WORKFLOW_WAKEUP_RACE"
     elif event_score == 0.0 or resume_score == 0.0:
         failure = "RUNTIME_EVENT_MISSING"
+    elif replay_lineage_score == 0.0:
+        failure = "REPLAY_LINEAGE_INCOMPLETE"
     else:
         failure = ""
     return (
         {
             "runtime_event_score": event_score,
             "checkpoint_score": checkpoint_score,
+            "checkpoint_version_score": checkpoint_version_score,
             "cancel_score": cancel_score,
             "resume_score": resume_score,
             "replay_safety_score": replay_safety_score,
+            "workflow_wakeup_score": workflow_wakeup_score,
+            "replay_lineage_score": replay_lineage_score,
         },
         failure,
     )
@@ -696,6 +708,49 @@ def _permission_score(case: EvalCase) -> float:
     forbidden = set(case.forbidden_evidence_refs)
     used = set(case.actual_used_refs) | set(case.actual_citation_refs)
     return 0.0 if forbidden.intersection(used) else 1.0
+
+
+def _checkpoint_version_score(case: EvalCase) -> float:
+    expected_versions = set(case.expected_checkpoint_version_refs)
+    actual_versions = set(case.actual_checkpoint_version_refs)
+    drift_refs = set(case.checkpoint_version_drift_refs)
+    actual_drift_refs = set(case.actual_checkpoint_version_drift_refs)
+    if not expected_versions and not drift_refs:
+        return 1.0
+    if expected_versions and not expected_versions.issubset(actual_versions):
+        return 0.0
+    if drift_refs:
+        if not case.checkpoint_version_drift_detected:
+            return 0.0
+        if not drift_refs.issubset(actual_drift_refs):
+            return 0.0
+    return 1.0
+
+
+def _workflow_wakeup_score(case: EvalCase) -> float:
+    expected_wakeups = set(case.expected_workflow_wakeup_refs)
+    actual_wakeups = set(case.actual_workflow_wakeup_refs)
+    race_refs = set(case.workflow_wakeup_race_refs)
+    actual_race_refs = set(case.actual_workflow_wakeup_race_refs)
+    if not expected_wakeups and not race_refs:
+        return 1.0
+    if expected_wakeups and not expected_wakeups.issubset(actual_wakeups):
+        return 0.0
+    if race_refs:
+        if not case.workflow_wakeup_race_resolved:
+            return 0.0
+        if not race_refs.issubset(actual_race_refs):
+            return 0.0
+    return 1.0
+
+
+def _replay_lineage_score(case: EvalCase) -> float:
+    expected_lineage = set(case.expected_replay_lineage_refs)
+    if not expected_lineage:
+        return 1.0
+    if not case.replay_lineage_complete:
+        return 0.0
+    return 1.0 if expected_lineage.issubset(set(case.actual_replay_lineage_refs)) else 0.0
 
 
 def _source_coverage_score(case: EvalCase) -> float:
@@ -1086,6 +1141,11 @@ def _replay_bundle(case: EvalCase, failure_class: str) -> ReplayBundle:
         "actual_review_retry_refs": case.actual_review_retry_refs,
         "actual_review_escalation_refs": case.actual_review_escalation_refs,
         "actual_review_redrive_refs": case.actual_review_redrive_refs,
+        "actual_checkpoint_version_refs": case.actual_checkpoint_version_refs,
+        "actual_checkpoint_version_drift_refs": case.actual_checkpoint_version_drift_refs,
+        "actual_workflow_wakeup_refs": case.actual_workflow_wakeup_refs,
+        "actual_workflow_wakeup_race_refs": case.actual_workflow_wakeup_race_refs,
+        "actual_replay_lineage_refs": case.actual_replay_lineage_refs,
         "actual_state_change_refs": case.actual_state_change_refs,
         "actual_execution_refs": case.actual_execution_refs,
         "actual_state_audit_refs": case.actual_state_audit_refs,
@@ -1122,6 +1182,7 @@ def _replay_bundle(case: EvalCase, failure_class: str) -> ReplayBundle:
         else [],
         checkpoint_refs=case.actual_checkpoint_refs,
         audit_refs=case.actual_state_audit_refs + [stable_ref("audit", replay_payload)],
+        lineage_refs=case.actual_replay_lineage_refs,
         failure_class=failure_class,
         replay_complete=replay_complete,
         side_effect_reexecuted=case.side_effect_reexecuted,

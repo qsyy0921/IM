@@ -1,0 +1,110 @@
+{
+  "schema_version": 1,
+  "suite_id": "synthetic-agent-runtime-control-deeper-hardening-v1",
+  "fixture_kind": "synthetic_im_like",
+  "adapter_versions": [
+    "manual-runtime-control-deeper-hardening-fixture-v1"
+  ],
+  "cases": [
+    {
+      "case_id": "checkpoint-version-drift-detected-pass",
+      "dataset_name": "synthetic-runtime-control-deeper-hardening",
+      "dataset_version": "2026-07-02",
+      "capability_family": "RUNTIME_CONTROL",
+      "fixture_version": "runtime-control-deeper-hardening-v1",
+      "input_refs": ["input:checkpoint-version-drift-detected-pass"],
+      "expected_runtime_events": [
+        "CHECKPOINT_CREATED",
+        "RESUME_REQUESTED",
+        "RESUME_COMPLETED"
+      ],
+      "actual_runtime_events": [
+        "CHECKPOINT_CREATED",
+        "RESUME_REQUESTED",
+        "RESUME_COMPLETED"
+      ],
+      "expected_checkpoint_refs": ["checkpoint:approval-wait:current"],
+      "actual_checkpoint_refs": ["checkpoint:approval-wait:current"],
+      "expected_checkpoint_version_refs": ["checkpoint-version:approval-wait:v2"],
+      "actual_checkpoint_version_refs": ["checkpoint-version:approval-wait:v2"],
+      "checkpoint_version_drift_refs": ["checkpoint-version:approval-wait:v1"],
+      "actual_checkpoint_version_drift_refs": ["checkpoint-version:approval-wait:v1"],
+      "checkpoint_version_drift_detected": true
+    },
+    {
+      "case_id": "workflow-wakeup-race-deduped-pass",
+      "dataset_name": "synthetic-runtime-control-deeper-hardening",
+      "dataset_version": "2026-07-02",
+      "capability_family": "RUNTIME_CONTROL",
+      "fixture_version": "runtime-control-deeper-hardening-v1",
+      "input_refs": ["input:workflow-wakeup-race-deduped-pass"],
+      "expected_runtime_events": [
+        "CHECKPOINT_CREATED",
+        "WORKFLOW_WAIT_STARTED",
+        "WORKFLOW_WAKEUP_RECEIVED",
+        "WORKFLOW_WAKEUP_DEDUPED",
+        "WORKFLOW_DECISION_RECEIVED",
+        "RESUME_REQUESTED",
+        "RESUME_COMPLETED"
+      ],
+      "actual_runtime_events": [
+        "CHECKPOINT_CREATED",
+        "WORKFLOW_WAIT_STARTED",
+        "WORKFLOW_WAKEUP_RECEIVED",
+        "WORKFLOW_WAKEUP_DEDUPED",
+        "WORKFLOW_DECISION_RECEIVED",
+        "RESUME_REQUESTED",
+        "RESUME_COMPLETED"
+      ],
+      "expected_checkpoint_refs": ["checkpoint:workflow-wakeup-race"],
+      "actual_checkpoint_refs": ["checkpoint:workflow-wakeup-race"],
+      "expected_workflow_wakeup_refs": ["workflow-wakeup:approval-decision:v2"],
+      "actual_workflow_wakeup_refs": ["workflow-wakeup:approval-decision:v2"],
+      "workflow_wakeup_race_refs": ["workflow-wakeup:approval-decision:duplicate-v1"],
+      "actual_workflow_wakeup_race_refs": [
+        "workflow-wakeup:approval-decision:duplicate-v1"
+      ],
+      "workflow_wakeup_race_resolved": true
+    },
+    {
+      "case_id": "replay-bundle-lineage-complete-pass",
+      "dataset_name": "synthetic-runtime-control-deeper-hardening",
+      "dataset_version": "2026-07-02",
+      "capability_family": "RUNTIME_CONTROL",
+      "fixture_version": "runtime-control-deeper-hardening-v1",
+      "input_refs": ["input:replay-bundle-lineage-complete-pass"],
+      "visible_evidence_refs": ["evidence:runtime:lineage:source"],
+      "expected_runtime_events": [
+        "CHECKPOINT_CREATED",
+        "REPLAY_REQUESTED",
+        "REPLAY_RECONSTRUCTED",
+        "REPLAY_LINEAGE_VERIFIED",
+        "REPLAY_SIDE_EFFECT_SKIPPED"
+      ],
+      "actual_runtime_events": [
+        "CHECKPOINT_CREATED",
+        "REPLAY_REQUESTED",
+        "REPLAY_RECONSTRUCTED",
+        "REPLAY_LINEAGE_VERIFIED",
+        "REPLAY_SIDE_EFFECT_SKIPPED"
+      ],
+      "expected_checkpoint_refs": ["checkpoint:replay-lineage"],
+      "actual_checkpoint_refs": ["checkpoint:replay-lineage"],
+      "expected_replay_lineage_refs": [
+        "lineage:context-package:runtime-lineage",
+        "lineage:model-candidate:runtime-lineage",
+        "lineage:checkpoint:replay-lineage",
+        "lineage:workflow-decision:runtime-lineage",
+        "lineage:audit:runtime-lineage"
+      ],
+      "actual_replay_lineage_refs": [
+        "lineage:context-package:runtime-lineage",
+        "lineage:model-candidate:runtime-lineage",
+        "lineage:checkpoint:replay-lineage",
+        "lineage:workflow-decision:runtime-lineage",
+        "lineage:audit:runtime-lineage"
+      ],
+      "replay_lineage_complete": true
+    }
+  ]
+}

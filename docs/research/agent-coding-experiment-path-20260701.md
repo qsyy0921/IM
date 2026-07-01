@@ -79,6 +79,7 @@ ai/python/fixtures/agent_eval/synthetic_first_trio.json
 ai/python/fixtures/agent_eval/synthetic_core_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_runtime_control_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_runtime_control_negative_scenarios.json
+ai/python/fixtures/agent_eval/synthetic_runtime_control_deeper_hardening_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_mcp_security_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_mcp_security_hardening_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_context_evidence_scenarios.json
@@ -141,6 +142,9 @@ Slice 0 covers:
   approval resume and replay without side-effect reexecution.
 - fixture-only runtime-control negative coverage for missing checkpoint,
   incomplete cancel propagation and incomplete replay event detection.
+- fixture-only runtime-control deeper hardening coverage for checkpoint version
+  drift detection, workflow wakeup race dedupe and ReplayBundle lineage
+  completeness.
 - fixture-only MCP security coverage for poisoned tool descriptions, unsafe MCP
   output instructions, provider provenance mismatch and sandbox-only providers.
 - fixture-only MCP security hardening coverage for tool argument schema mismatch,
@@ -286,6 +290,8 @@ queue.
 - ToolIntentFixture adapter alignment metadata for capability lease refs,
   capability scope refs and provider attestation refs.
 - RuntimeControlFixture.
+- RuntimeControlFixture deeper hardening metadata for checkpoint version refs,
+  drift refs, workflow wakeup refs, wakeup race refs and replay lineage refs.
 - ContextPackage source coverage, conflict, stale-source and permission-abstain
   metadata.
 - ContextPackage hardening metadata for memory/source precedence, unsafe context
@@ -321,6 +327,7 @@ ai/python/fixtures/agent_eval/synthetic_first_trio.json
 ai/python/fixtures/agent_eval/synthetic_core_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_runtime_control_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_runtime_control_negative_scenarios.json
+ai/python/fixtures/agent_eval/synthetic_runtime_control_deeper_hardening_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_mcp_security_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_mcp_security_hardening_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_context_evidence_scenarios.json
@@ -440,6 +447,8 @@ Evaluator tests:
   and review backoff candidates that do not meet acceptance.
 - AgentRun trace includes context, memory, tool, workflow, runtime-control and
   failure steps.
+- runtime-control deeper hardening scoring rejects stale checkpoint versions,
+  unresolved duplicate workflow wakeups and incomplete replay lineage refs.
 
 ### 5.2 Integration Tests
 
@@ -449,6 +458,7 @@ Integration tests:
 - load `synthetic_core_scenarios.json`;
 - load `synthetic_runtime_control_scenarios.json`;
 - load `synthetic_runtime_control_negative_scenarios.json`;
+- load `synthetic_runtime_control_deeper_hardening_scenarios.json`;
 - load `synthetic_mcp_security_scenarios.json`;
 - load `synthetic_mcp_security_hardening_scenarios.json`;
 - load `synthetic_context_evidence_scenarios.json`;
@@ -486,6 +496,7 @@ python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_core_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_runtime_control_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_runtime_control_negative_scenarios.json
+python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_runtime_control_deeper_hardening_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_mcp_security_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_mcp_security_hardening_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_context_evidence_scenarios.json
@@ -525,8 +536,8 @@ git status --short --branch --untracked-files=all
 
 Recommended next slices:
 
-1. Add runtime-control deeper hardening for checkpoint version drift, workflow
-   wakeup race and replay bundle lineage completeness, still without production
+1. Add state-diff deeper hardening for state dependency graph, cross-action
+   compensation chain and operator redrive review, still without production
    data.
 
 Each slice must keep the same isolation rule until an ADR explicitly promotes a

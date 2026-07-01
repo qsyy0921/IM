@@ -109,6 +109,9 @@ ALLOWED_FAILURE_CLASSES = {
     "MEMORY_POLLUTION",
     "HANDOFF_SCOPE_VIOLATION",
     "REPLAY_INCOMPLETE",
+    "CHECKPOINT_VERSION_DRIFT",
+    "WORKFLOW_WAKEUP_RACE",
+    "REPLAY_LINEAGE_INCOMPLETE",
     "RUNTIME_EVENT_MISSING",
     "RESUME_CHECKPOINT_MISSING",
     "CANCEL_NOT_PROPAGATED",
@@ -271,6 +274,16 @@ class EvalCase:
     actual_runtime_events: list[str] = field(default_factory=list)
     expected_checkpoint_refs: list[str] = field(default_factory=list)
     actual_checkpoint_refs: list[str] = field(default_factory=list)
+    expected_checkpoint_version_refs: list[str] = field(default_factory=list)
+    actual_checkpoint_version_refs: list[str] = field(default_factory=list)
+    checkpoint_version_drift_refs: list[str] = field(default_factory=list)
+    actual_checkpoint_version_drift_refs: list[str] = field(default_factory=list)
+    expected_workflow_wakeup_refs: list[str] = field(default_factory=list)
+    actual_workflow_wakeup_refs: list[str] = field(default_factory=list)
+    workflow_wakeup_race_refs: list[str] = field(default_factory=list)
+    actual_workflow_wakeup_race_refs: list[str] = field(default_factory=list)
+    expected_replay_lineage_refs: list[str] = field(default_factory=list)
+    actual_replay_lineage_refs: list[str] = field(default_factory=list)
     expected_failure_class: str = ""
     actual_failure_class: str = ""
     actual_abstained: bool = False
@@ -324,6 +337,9 @@ class EvalCase:
     tool_prepare_expiry_detected: bool = False
     tool_capability_lease_validated: bool = False
     tool_provider_attestation_verified: bool = False
+    checkpoint_version_drift_detected: bool = False
+    workflow_wakeup_race_resolved: bool = False
+    replay_lineage_complete: bool = True
     revoked_memory_used: bool = False
     side_effect_reexecuted: bool = False
 
@@ -341,6 +357,7 @@ class ReplayBundle:
     memory_candidate_refs: list[str]
     checkpoint_refs: list[str]
     audit_refs: list[str]
+    lineage_refs: list[str]
     failure_class: str
     replay_complete: bool
     side_effect_reexecuted: bool
@@ -869,6 +886,46 @@ def _eval_case(payload: dict[str, Any], index: int) -> EvalCase:
         actual_checkpoint_refs=_string_list(
             payload.get("actual_checkpoint_refs", []), "actual_checkpoint_refs"
         ),
+        expected_checkpoint_version_refs=_string_list(
+            payload.get("expected_checkpoint_version_refs", []),
+            "expected_checkpoint_version_refs",
+        ),
+        actual_checkpoint_version_refs=_string_list(
+            payload.get("actual_checkpoint_version_refs", []),
+            "actual_checkpoint_version_refs",
+        ),
+        checkpoint_version_drift_refs=_string_list(
+            payload.get("checkpoint_version_drift_refs", []),
+            "checkpoint_version_drift_refs",
+        ),
+        actual_checkpoint_version_drift_refs=_string_list(
+            payload.get("actual_checkpoint_version_drift_refs", []),
+            "actual_checkpoint_version_drift_refs",
+        ),
+        expected_workflow_wakeup_refs=_string_list(
+            payload.get("expected_workflow_wakeup_refs", []),
+            "expected_workflow_wakeup_refs",
+        ),
+        actual_workflow_wakeup_refs=_string_list(
+            payload.get("actual_workflow_wakeup_refs", []),
+            "actual_workflow_wakeup_refs",
+        ),
+        workflow_wakeup_race_refs=_string_list(
+            payload.get("workflow_wakeup_race_refs", []),
+            "workflow_wakeup_race_refs",
+        ),
+        actual_workflow_wakeup_race_refs=_string_list(
+            payload.get("actual_workflow_wakeup_race_refs", []),
+            "actual_workflow_wakeup_race_refs",
+        ),
+        expected_replay_lineage_refs=_string_list(
+            payload.get("expected_replay_lineage_refs", []),
+            "expected_replay_lineage_refs",
+        ),
+        actual_replay_lineage_refs=_string_list(
+            payload.get("actual_replay_lineage_refs", []),
+            "actual_replay_lineage_refs",
+        ),
         expected_failure_class=expected_failure_class,
         actual_failure_class=actual_failure_class,
         actual_abstained=_bool(payload.get("actual_abstained", False), "actual_abstained"),
@@ -1037,6 +1094,17 @@ def _eval_case(payload: dict[str, Any], index: int) -> EvalCase:
         tool_provider_attestation_verified=_bool(
             payload.get("tool_provider_attestation_verified", False),
             "tool_provider_attestation_verified",
+        ),
+        checkpoint_version_drift_detected=_bool(
+            payload.get("checkpoint_version_drift_detected", False),
+            "checkpoint_version_drift_detected",
+        ),
+        workflow_wakeup_race_resolved=_bool(
+            payload.get("workflow_wakeup_race_resolved", False),
+            "workflow_wakeup_race_resolved",
+        ),
+        replay_lineage_complete=_bool(
+            payload.get("replay_lineage_complete", True), "replay_lineage_complete"
         ),
         revoked_memory_used=_bool(payload.get("revoked_memory_used", False), "revoked_memory_used"),
         side_effect_reexecuted=_bool(

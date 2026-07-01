@@ -124,6 +124,7 @@ prepared_tool_refs
 workflow_decision_refs
 execution_refs
 memory_candidate_refs
+lineage_refs
 audit_refs
 failure_class
 version_metadata
@@ -207,6 +208,9 @@ Fixtures must be clearly synthetic and must not import production data.
 | `memory_review_redrive_score` | Review retry/escalation/redrive refs exist |
 | `security_block_score` | Malicious tool/context blocked |
 | `handoff_score` | Delegation stays scoped and useful |
+| `checkpoint_version_score` | Resume uses current checkpoint refs and detects stale checkpoint drift |
+| `workflow_wakeup_score` | Duplicate or racing workflow wakeups are deduped before resume |
+| `replay_lineage_score` | ReplayBundle contains required context/model/checkpoint/workflow/audit lineage refs |
 | `replay_completeness` | Failure can be reconstructed from refs |
 
 Promotion thresholds start as research baselines. Production SLOs require later
@@ -294,6 +298,9 @@ The harness should normalize:
 - `RUNTIME_EVENT_MISSING`
 - `RESUME_CHECKPOINT_MISSING`
 - `CANCEL_NOT_PROPAGATED`
+- `CHECKPOINT_VERSION_DRIFT`
+- `WORKFLOW_WAKEUP_RACE`
+- `REPLAY_LINEAGE_INCOMPLETE`
 - `REPLAY_INCOMPLETE`
 
 Unknown failures should block promotion until classified.
@@ -425,6 +432,7 @@ ai/python/fixtures/agent_eval/synthetic_first_trio.json
 ai/python/fixtures/agent_eval/synthetic_core_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_runtime_control_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_runtime_control_negative_scenarios.json
+ai/python/fixtures/agent_eval/synthetic_runtime_control_deeper_hardening_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_mcp_security_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_mcp_security_hardening_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_context_evidence_scenarios.json
@@ -485,6 +493,8 @@ Implemented checks:
   resume and replay without side-effect reexecution.
 - runtime-control negative fixture coverage for missing checkpoint, incomplete
   cancel propagation and incomplete replay event detection.
+- runtime-control deeper hardening coverage for checkpoint version drift
+  detection, workflow wakeup race dedupe and ReplayBundle lineage completeness.
 - MCP security fixture coverage for poisoned tool descriptions, unsafe MCP
   output instructions, provider provenance mismatch and sandbox-only providers.
 - MCP security hardening coverage for tool argument schema mismatch,
@@ -534,6 +544,7 @@ python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_core_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_runtime_control_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_runtime_control_negative_scenarios.json
+python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_runtime_control_deeper_hardening_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_mcp_security_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_mcp_security_hardening_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_context_evidence_scenarios.json

@@ -1609,6 +1609,150 @@ class AgentEvalEvaluatorTests(unittest.TestCase):
         self.assertEqual(report.results[0].failure_class, "RUNTIME_EVENT_MISSING")
         self.assertEqual(report.aggregate_scores["runtime_event_score"], 0.0)
 
+    def test_runtime_control_passes_deeper_hardening_refs(self) -> None:
+        case = base_case("RUNTIME_CONTROL")
+        case.update(
+            {
+                "expected_runtime_events": [
+                    "CHECKPOINT_CREATED",
+                    "WORKFLOW_WAKEUP_RECEIVED",
+                    "WORKFLOW_WAKEUP_DEDUPED",
+                    "REPLAY_REQUESTED",
+                    "REPLAY_RECONSTRUCTED",
+                    "REPLAY_LINEAGE_VERIFIED",
+                ],
+                "actual_runtime_events": [
+                    "CHECKPOINT_CREATED",
+                    "WORKFLOW_WAKEUP_RECEIVED",
+                    "WORKFLOW_WAKEUP_DEDUPED",
+                    "REPLAY_REQUESTED",
+                    "REPLAY_RECONSTRUCTED",
+                    "REPLAY_LINEAGE_VERIFIED",
+                ],
+                "expected_checkpoint_refs": ["checkpoint:runtime"],
+                "actual_checkpoint_refs": ["checkpoint:runtime"],
+                "expected_checkpoint_version_refs": ["checkpoint-version:runtime:v2"],
+                "actual_checkpoint_version_refs": ["checkpoint-version:runtime:v2"],
+                "checkpoint_version_drift_refs": ["checkpoint-version:runtime:v1"],
+                "actual_checkpoint_version_drift_refs": ["checkpoint-version:runtime:v1"],
+                "checkpoint_version_drift_detected": True,
+                "expected_workflow_wakeup_refs": ["workflow-wakeup:decision:v2"],
+                "actual_workflow_wakeup_refs": ["workflow-wakeup:decision:v2"],
+                "workflow_wakeup_race_refs": ["workflow-wakeup:decision:duplicate-v1"],
+                "actual_workflow_wakeup_race_refs": [
+                    "workflow-wakeup:decision:duplicate-v1"
+                ],
+                "workflow_wakeup_race_resolved": True,
+                "expected_replay_lineage_refs": [
+                    "lineage:context",
+                    "lineage:checkpoint",
+                    "lineage:audit",
+                ],
+                "actual_replay_lineage_refs": [
+                    "lineage:context",
+                    "lineage:checkpoint",
+                    "lineage:audit",
+                ],
+                "replay_lineage_complete": True,
+            }
+        )
+
+        report = run_eval_suite(suite_with_case(case))
+
+        self.assertEqual(report.status, "PASS")
+        self.assertEqual(report.aggregate_scores["checkpoint_version_score"], 1.0)
+        self.assertEqual(report.aggregate_scores["workflow_wakeup_score"], 1.0)
+        self.assertEqual(report.aggregate_scores["replay_lineage_score"], 1.0)
+        self.assertEqual(
+            report.results[0].replay_bundle.lineage_refs,
+            ["lineage:context", "lineage:checkpoint", "lineage:audit"],
+        )
+
+    def test_runtime_control_fails_checkpoint_version_drift(self) -> None:
+        case = base_case("RUNTIME_CONTROL")
+        case.update(
+            {
+                "expected_runtime_events": ["CHECKPOINT_CREATED", "RESUME_COMPLETED"],
+                "actual_runtime_events": ["CHECKPOINT_CREATED", "RESUME_COMPLETED"],
+                "expected_checkpoint_refs": ["checkpoint:runtime"],
+                "actual_checkpoint_refs": ["checkpoint:runtime"],
+                "expected_checkpoint_version_refs": ["checkpoint-version:runtime:v2"],
+                "actual_checkpoint_version_refs": ["checkpoint-version:runtime:v1"],
+                "checkpoint_version_drift_refs": ["checkpoint-version:runtime:v1"],
+                "actual_checkpoint_version_drift_refs": [],
+                "checkpoint_version_drift_detected": False,
+            }
+        )
+
+        report = run_eval_suite(suite_with_case(case))
+
+        self.assertEqual(report.status, "FAIL")
+        self.assertEqual(report.results[0].failure_class, "CHECKPOINT_VERSION_DRIFT")
+        self.assertEqual(report.aggregate_scores["checkpoint_version_score"], 0.0)
+
+    def test_runtime_control_fails_workflow_wakeup_race(self) -> None:
+        case = base_case("RUNTIME_CONTROL")
+        case.update(
+            {
+                "expected_runtime_events": [
+                    "CHECKPOINT_CREATED",
+                    "WORKFLOW_WAKEUP_RECEIVED",
+                    "WORKFLOW_WAKEUP_DEDUPED",
+                    "RESUME_COMPLETED",
+                ],
+                "actual_runtime_events": [
+                    "CHECKPOINT_CREATED",
+                    "WORKFLOW_WAKEUP_RECEIVED",
+                    "RESUME_COMPLETED",
+                ],
+                "expected_checkpoint_refs": ["checkpoint:workflow"],
+                "actual_checkpoint_refs": ["checkpoint:workflow"],
+                "expected_workflow_wakeup_refs": ["workflow-wakeup:decision:v2"],
+                "actual_workflow_wakeup_refs": ["workflow-wakeup:decision:v2"],
+                "workflow_wakeup_race_refs": ["workflow-wakeup:decision:duplicate-v1"],
+                "actual_workflow_wakeup_race_refs": [],
+                "workflow_wakeup_race_resolved": False,
+            }
+        )
+
+        report = run_eval_suite(suite_with_case(case))
+
+        self.assertEqual(report.status, "FAIL")
+        self.assertEqual(report.results[0].failure_class, "WORKFLOW_WAKEUP_RACE")
+        self.assertEqual(report.aggregate_scores["workflow_wakeup_score"], 0.0)
+
+    def test_runtime_control_fails_incomplete_replay_lineage(self) -> None:
+        case = base_case("RUNTIME_CONTROL")
+        case.update(
+            {
+                "expected_runtime_events": [
+                    "CHECKPOINT_CREATED",
+                    "REPLAY_REQUESTED",
+                    "REPLAY_RECONSTRUCTED",
+                ],
+                "actual_runtime_events": [
+                    "CHECKPOINT_CREATED",
+                    "REPLAY_REQUESTED",
+                    "REPLAY_RECONSTRUCTED",
+                ],
+                "expected_checkpoint_refs": ["checkpoint:replay"],
+                "actual_checkpoint_refs": ["checkpoint:replay"],
+                "expected_replay_lineage_refs": [
+                    "lineage:context",
+                    "lineage:checkpoint",
+                    "lineage:audit",
+                ],
+                "actual_replay_lineage_refs": ["lineage:context", "lineage:checkpoint"],
+                "replay_lineage_complete": False,
+            }
+        )
+
+        report = run_eval_suite(suite_with_case(case))
+
+        self.assertEqual(report.status, "FAIL")
+        self.assertEqual(report.results[0].failure_class, "REPLAY_LINEAGE_INCOMPLETE")
+        self.assertEqual(report.aggregate_scores["replay_lineage_score"], 0.0)
+
     def test_runtime_control_expected_negative_cases_pass_when_detected(self) -> None:
         cases: list[dict[str, object]] = []
         missing_checkpoint = base_case("RUNTIME_CONTROL")

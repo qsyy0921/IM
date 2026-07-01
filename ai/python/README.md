@@ -50,6 +50,7 @@ ai/python/
       synthetic_core_scenarios.json
       synthetic_runtime_control_scenarios.json
       synthetic_runtime_control_negative_scenarios.json
+      synthetic_runtime_control_deeper_hardening_scenarios.json
       synthetic_mcp_security_scenarios.json
       synthetic_mcp_security_hardening_scenarios.json
       synthetic_context_evidence_scenarios.json
@@ -91,6 +92,7 @@ python ai/python/scripts/run_memory_extraction_candidate.py <low-sensitive-messa
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_first_trio.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_runtime_control_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_runtime_control_negative_scenarios.json
+python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_runtime_control_deeper_hardening_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_mcp_security_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_mcp_security_hardening_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_context_evidence_scenarios.json
@@ -174,6 +176,7 @@ ai/python/fixtures/agent_eval/synthetic_first_trio.json
 ai/python/fixtures/agent_eval/synthetic_core_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_runtime_control_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_runtime_control_negative_scenarios.json
+ai/python/fixtures/agent_eval/synthetic_runtime_control_deeper_hardening_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_mcp_security_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_mcp_security_hardening_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_context_evidence_scenarios.json
@@ -203,6 +206,8 @@ The runtime-control fixture covers cancel propagation, approval resume from a
 checkpoint and replay without side-effect reexecution.
 The runtime-control negative fixture covers missing checkpoint, incomplete
 cancel propagation and incomplete replay event detection.
+The runtime-control deeper hardening fixture covers checkpoint version drift
+detection, workflow wakeup race dedupe and ReplayBundle lineage completeness.
 The MCP security fixture covers poisoned tool descriptions, unsafe MCP output
 instructions, provider provenance mismatch and sandbox-only provider handling.
 The MCP security hardening fixture covers tool argument schema mismatch
@@ -272,6 +277,7 @@ python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_core_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_runtime_control_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_runtime_control_negative_scenarios.json
+python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_runtime_control_deeper_hardening_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_mcp_security_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_mcp_security_hardening_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_context_evidence_scenarios.json

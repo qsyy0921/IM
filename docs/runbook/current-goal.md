@@ -83,9 +83,9 @@ Agent / RAG / memory / Python AI Worker / EvidencePack / eval gate，不使用�
 
 ## 后续优先级
 
-1. 对 runtime-control 做 deeper hardening：checkpoint version drift、workflow
-   wakeup race 和 ReplayBundle lineage completeness，仍不接真实 IM 数据。
-2. 补 state-diff dependency graph、cross-action compensation chain 和 operator
+1. 补 state-diff dependency graph、cross-action compensation chain 和 operator
    redrive review cases。
+2. 补 ReplayBundle / observability 的低敏 refs、hashes、version metadata、
+   failure taxonomy 和 trace linkage 设计评审。
 3. 在上述实验通过后，再决定是否把 Agent Runtime / Harness 提升为 ADR、服务级 SDD
    或实际 runtime module。

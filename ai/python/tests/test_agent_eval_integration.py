@@ -30,6 +30,14 @@ RUNTIME_CONTROL_NEGATIVE_PATH = (
     / "agent_eval"
     / "synthetic_runtime_control_negative_scenarios.json"
 )
+RUNTIME_CONTROL_DEEPER_HARDENING_PATH = (
+    REPO_ROOT
+    / "ai"
+    / "python"
+    / "fixtures"
+    / "agent_eval"
+    / "synthetic_runtime_control_deeper_hardening_scenarios.json"
+)
 MCP_SECURITY_PATH = (
     REPO_ROOT / "ai" / "python" / "fixtures" / "agent_eval" / "synthetic_mcp_security_scenarios.json"
 )
@@ -195,6 +203,39 @@ class AgentEvalIntegrationTests(unittest.TestCase):
         self.assertIn("checkpoint_score", report["aggregate_scores"])
         self.assertIn("cancel_score", report["aggregate_scores"])
         self.assertIn("runtime_event_score", report["aggregate_scores"])
+
+    def test_cli_outputs_pass_report_for_runtime_control_deeper_hardening_scenarios(
+        self,
+    ) -> None:
+        result = subprocess.run(
+            [
+                sys.executable,
+                "ai/python/scripts/run_agent_eval_fixture.py",
+                str(RUNTIME_CONTROL_DEEPER_HARDENING_PATH),
+            ],
+            check=True,
+            capture_output=True,
+            cwd=REPO_ROOT,
+            text=True,
+        )
+
+        report = json.loads(result.stdout)
+        self.assertEqual(report["status"], "PASS")
+        self.assertEqual(report["case_count"], 3)
+        self.assertEqual(report["failed_count"], 0)
+        self.assertIn("checkpoint_version_score", report["aggregate_scores"])
+        self.assertIn("workflow_wakeup_score", report["aggregate_scores"])
+        self.assertIn("replay_lineage_score", report["aggregate_scores"])
+        self.assertEqual(
+            report["results"][2]["replay_bundle"]["lineage_refs"],
+            [
+                "lineage:context-package:runtime-lineage",
+                "lineage:model-candidate:runtime-lineage",
+                "lineage:checkpoint:replay-lineage",
+                "lineage:workflow-decision:runtime-lineage",
+                "lineage:audit:runtime-lineage",
+            ],
+        )
 
     def test_cli_outputs_pass_report_for_mcp_security_scenarios(self) -> None:
         result = subprocess.run(

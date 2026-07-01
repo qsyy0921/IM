@@ -103,6 +103,7 @@ ai/python/fixtures/agent_eval/synthetic_first_trio.json
 ai/python/fixtures/agent_eval/synthetic_core_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_runtime_control_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_runtime_control_negative_scenarios.json
+ai/python/fixtures/agent_eval/synthetic_runtime_control_deeper_hardening_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_mcp_security_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_mcp_security_hardening_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_context_evidence_scenarios.json
@@ -144,6 +145,8 @@ ai/python/tests/test_agent_eval_*.py
   对应 synthetic fixture。
 - Runtime-control negative fixture：missing checkpoint、cancel propagation incomplete、
   replay event incomplete。
+- Runtime-control deeper hardening fixture：checkpoint version drift detection、
+  workflow wakeup race dedupe、ReplayBundle lineage completeness。
 - MCP security fixture：poisoned tool description、unsafe output instruction、
   provider provenance mismatch、sandbox-only provider。
 - MCP security hardening fixture：tool argument schema mismatch、
@@ -186,8 +189,8 @@ ai/python/tests/test_agent_eval_*.py
 
 | 优先级 | 工作 | 输出 |
 | --- | --- | --- |
-| P1 | Runtime-control deeper hardening | checkpoint version drift、workflow wakeup race、replay bundle lineage completeness |
-| P2 | State-diff deeper hardening | state dependency graph、cross-action compensation chain、operator redrive review |
+| P1 | State-diff deeper hardening | state dependency graph、cross-action compensation chain、operator redrive review |
+| P2 | ReplayBundle / observability review | 低敏 refs、hashes、version metadata、failure taxonomy、trace linkage |
 | P2 | Memory calibration data expansion | 用更大公开 memory 数据集导出替换当前本地 calibration sample |
 | P2 | ADR promotion decision | 是否提升 Agent Runtime / Harness、memory admission、ReplayBundle 等契约 |
 
@@ -204,7 +207,7 @@ ai/python/tests/test_agent_eval_*.py
 - SDD index / research index / architecture index link check
 - 不触碰 proto、schema、migration、production service directory
 
-后续 fixture-only prototype 优先推进 runtime-control deeper hardening。
+后续 fixture-only prototype 优先推进 state-diff deeper hardening。
 
 ## 历史资料路由
 

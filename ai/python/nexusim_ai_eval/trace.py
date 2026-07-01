@@ -165,6 +165,11 @@ class RuntimeControlFixture:
     runtime_control_ref: str
     runtime_events: list[str]
     checkpoint_refs: list[str]
+    checkpoint_version_refs: list[str]
+    checkpoint_version_drift_refs: list[str]
+    workflow_wakeup_refs: list[str]
+    workflow_wakeup_race_refs: list[str]
+    replay_lineage_refs: list[str]
     replay_complete: bool
     side_effect_reexecuted: bool
 
@@ -1056,12 +1061,27 @@ def _runtime_control(case: EvalCase) -> RuntimeControlFixture | None:
         and not case.actual_runtime_events
         and not case.expected_checkpoint_refs
         and not case.actual_checkpoint_refs
+        and not case.expected_checkpoint_version_refs
+        and not case.actual_checkpoint_version_refs
+        and not case.checkpoint_version_drift_refs
+        and not case.actual_checkpoint_version_drift_refs
+        and not case.expected_workflow_wakeup_refs
+        and not case.actual_workflow_wakeup_refs
+        and not case.workflow_wakeup_race_refs
+        and not case.actual_workflow_wakeup_race_refs
+        and not case.expected_replay_lineage_refs
+        and not case.actual_replay_lineage_refs
     ):
         return None
     return RuntimeControlFixture(
         runtime_control_ref=stable_ref("runtime", {"case_id": case.case_id}),
         runtime_events=case.actual_runtime_events,
         checkpoint_refs=case.actual_checkpoint_refs,
+        checkpoint_version_refs=case.actual_checkpoint_version_refs,
+        checkpoint_version_drift_refs=case.actual_checkpoint_version_drift_refs,
+        workflow_wakeup_refs=case.actual_workflow_wakeup_refs,
+        workflow_wakeup_race_refs=case.actual_workflow_wakeup_race_refs,
+        replay_lineage_refs=case.actual_replay_lineage_refs,
         replay_complete=bool(case.input_refs) and not case.side_effect_reexecuted,
         side_effect_reexecuted=case.side_effect_reexecuted,
     )
@@ -1088,6 +1108,24 @@ def _runtime_control_steps(
                 case.input_refs,
                 runtime_control.checkpoint_refs,
                 "" if checkpoint_status == "PASS" else "RESUME_CHECKPOINT_MISSING",
+            )
+        )
+    if (
+        case.expected_checkpoint_version_refs
+        or case.actual_checkpoint_version_refs
+        or case.checkpoint_version_drift_refs
+        or case.actual_checkpoint_version_drift_refs
+    ):
+        checkpoint_version_status = _checkpoint_version_status(case)
+        steps.append(
+            _step(
+                case,
+                "checkpoint_version",
+                checkpoint_version_status,
+                runtime_control.checkpoint_refs or case.input_refs,
+                runtime_control.checkpoint_version_refs
+                + runtime_control.checkpoint_version_drift_refs,
+                "" if checkpoint_version_status == "PASS" else "CHECKPOINT_VERSION_DRIFT",
             )
         )
     if any(event.startswith("CANCEL_") for event in expected_events | actual_events):
@@ -1123,6 +1161,23 @@ def _runtime_control_steps(
                 "" if resume_status == "PASS" else "RUNTIME_EVENT_MISSING",
             )
         )
+    if (
+        case.expected_workflow_wakeup_refs
+        or case.actual_workflow_wakeup_refs
+        or case.workflow_wakeup_race_refs
+        or case.actual_workflow_wakeup_race_refs
+    ):
+        workflow_wakeup_status = _workflow_wakeup_status(case)
+        steps.append(
+            _step(
+                case,
+                "workflow_wakeup",
+                workflow_wakeup_status,
+                runtime_control.checkpoint_refs or case.input_refs,
+                runtime_control.workflow_wakeup_refs + runtime_control.workflow_wakeup_race_refs,
+                "" if workflow_wakeup_status == "PASS" else "WORKFLOW_WAKEUP_RACE",
+            )
+        )
     if any(event.startswith("REPLAY_") for event in expected_events | actual_events):
         replay_events_complete = {
             event for event in expected_events if event.startswith("REPLAY_")
@@ -1145,7 +1200,58 @@ def _runtime_control_steps(
                 replay_failure,
             )
         )
+    if case.expected_replay_lineage_refs or case.actual_replay_lineage_refs:
+        replay_lineage_status = _replay_lineage_status(case)
+        steps.append(
+            _step(
+                case,
+                "replay_lineage",
+                replay_lineage_status,
+                runtime_control.checkpoint_refs or case.input_refs,
+                runtime_control.replay_lineage_refs,
+                "" if replay_lineage_status == "PASS" else "REPLAY_LINEAGE_INCOMPLETE",
+            )
+        )
     return steps
+
+
+def _checkpoint_version_status(case: EvalCase) -> str:
+    expected_versions = set(case.expected_checkpoint_version_refs)
+    actual_versions = set(case.actual_checkpoint_version_refs)
+    drift_refs = set(case.checkpoint_version_drift_refs)
+    actual_drift_refs = set(case.actual_checkpoint_version_drift_refs)
+    if expected_versions and not expected_versions.issubset(actual_versions):
+        return "FAIL"
+    if drift_refs:
+        if not case.checkpoint_version_drift_detected:
+            return "FAIL"
+        if not drift_refs.issubset(actual_drift_refs):
+            return "FAIL"
+    return "PASS"
+
+
+def _workflow_wakeup_status(case: EvalCase) -> str:
+    expected_wakeups = set(case.expected_workflow_wakeup_refs)
+    actual_wakeups = set(case.actual_workflow_wakeup_refs)
+    race_refs = set(case.workflow_wakeup_race_refs)
+    actual_race_refs = set(case.actual_workflow_wakeup_race_refs)
+    if expected_wakeups and not expected_wakeups.issubset(actual_wakeups):
+        return "FAIL"
+    if race_refs:
+        if not case.workflow_wakeup_race_resolved:
+            return "FAIL"
+        if not race_refs.issubset(actual_race_refs):
+            return "FAIL"
+    return "PASS"
+
+
+def _replay_lineage_status(case: EvalCase) -> str:
+    expected_lineage = set(case.expected_replay_lineage_refs)
+    if expected_lineage and not case.replay_lineage_complete:
+        return "FAIL"
+    if expected_lineage and not expected_lineage.issubset(set(case.actual_replay_lineage_refs)):
+        return "FAIL"
+    return "PASS"
 
 
 def _step(

@@ -579,6 +579,115 @@ class AgentEvalTraceTests(unittest.TestCase):
         self.assertEqual(replay_steps[0].status, "FAIL")
         self.assertEqual(replay_steps[0].failure_class, "RUNTIME_EVENT_MISSING")
 
+    def test_trace_contains_runtime_deeper_hardening_steps(self) -> None:
+        case = validate_eval_suite(
+            suite_with_case(
+                {
+                    "case_id": "trace-runtime-deeper-hardening-case",
+                    "dataset_name": "synthetic",
+                    "dataset_version": "2026-07-02",
+                    "capability_family": "RUNTIME_CONTROL",
+                    "fixture_version": "fixture-v1",
+                    "input_refs": ["input:trace-runtime-deeper-hardening-case"],
+                    "expected_runtime_events": [
+                        "CHECKPOINT_CREATED",
+                        "WORKFLOW_WAKEUP_RECEIVED",
+                        "WORKFLOW_WAKEUP_DEDUPED",
+                        "REPLAY_REQUESTED",
+                        "REPLAY_RECONSTRUCTED",
+                    ],
+                    "actual_runtime_events": [
+                        "CHECKPOINT_CREATED",
+                        "WORKFLOW_WAKEUP_RECEIVED",
+                        "WORKFLOW_WAKEUP_DEDUPED",
+                        "REPLAY_REQUESTED",
+                        "REPLAY_RECONSTRUCTED",
+                    ],
+                    "expected_checkpoint_refs": ["checkpoint:trace-runtime"],
+                    "actual_checkpoint_refs": ["checkpoint:trace-runtime"],
+                    "expected_checkpoint_version_refs": [
+                        "checkpoint-version:trace-runtime:v2"
+                    ],
+                    "actual_checkpoint_version_refs": ["checkpoint-version:trace-runtime:v2"],
+                    "checkpoint_version_drift_refs": ["checkpoint-version:trace-runtime:v1"],
+                    "actual_checkpoint_version_drift_refs": [
+                        "checkpoint-version:trace-runtime:v1"
+                    ],
+                    "checkpoint_version_drift_detected": True,
+                    "expected_workflow_wakeup_refs": ["workflow-wakeup:trace:v2"],
+                    "actual_workflow_wakeup_refs": ["workflow-wakeup:trace:v2"],
+                    "workflow_wakeup_race_refs": ["workflow-wakeup:trace:duplicate-v1"],
+                    "actual_workflow_wakeup_race_refs": [
+                        "workflow-wakeup:trace:duplicate-v1"
+                    ],
+                    "workflow_wakeup_race_resolved": True,
+                    "expected_replay_lineage_refs": [
+                        "lineage:trace:context",
+                        "lineage:trace:checkpoint",
+                    ],
+                    "actual_replay_lineage_refs": [
+                        "lineage:trace:context",
+                        "lineage:trace:checkpoint",
+                    ],
+                    "replay_lineage_complete": True,
+                }
+            )
+        )[0]
+
+        trace = build_agent_run_trace(case)
+
+        step_types = [step.step_type for step in trace.steps]
+        self.assertEqual(trace.status, "PASS")
+        self.assertIsNotNone(trace.runtime_control)
+        self.assertIn("checkpoint_version", step_types)
+        self.assertIn("workflow_wakeup", step_types)
+        self.assertIn("replay_lineage", step_types)
+        assert trace.runtime_control is not None
+        self.assertEqual(
+            trace.runtime_control.replay_lineage_refs,
+            ["lineage:trace:context", "lineage:trace:checkpoint"],
+        )
+
+    def test_trace_flags_incomplete_replay_lineage(self) -> None:
+        case = validate_eval_suite(
+            suite_with_case(
+                {
+                    "case_id": "trace-runtime-lineage-incomplete-case",
+                    "dataset_name": "synthetic",
+                    "dataset_version": "2026-07-02",
+                    "capability_family": "RUNTIME_CONTROL",
+                    "fixture_version": "fixture-v1",
+                    "input_refs": ["input:trace-runtime-lineage-incomplete-case"],
+                    "expected_runtime_events": [
+                        "CHECKPOINT_CREATED",
+                        "REPLAY_REQUESTED",
+                        "REPLAY_RECONSTRUCTED",
+                    ],
+                    "actual_runtime_events": [
+                        "CHECKPOINT_CREATED",
+                        "REPLAY_REQUESTED",
+                        "REPLAY_RECONSTRUCTED",
+                    ],
+                    "expected_checkpoint_refs": ["checkpoint:trace-lineage"],
+                    "actual_checkpoint_refs": ["checkpoint:trace-lineage"],
+                    "expected_replay_lineage_refs": [
+                        "lineage:trace:context",
+                        "lineage:trace:audit",
+                    ],
+                    "actual_replay_lineage_refs": ["lineage:trace:context"],
+                    "replay_lineage_complete": False,
+                }
+            )
+        )[0]
+
+        trace = build_agent_run_trace(case)
+
+        lineage_steps = [step for step in trace.steps if step.step_type == "replay_lineage"]
+        self.assertEqual(trace.status, "FAIL")
+        self.assertEqual(len(lineage_steps), 1)
+        self.assertEqual(lineage_steps[0].status, "FAIL")
+        self.assertEqual(lineage_steps[0].failure_class, "REPLAY_LINEAGE_INCOMPLETE")
+
     def test_trace_contains_state_diff_report_metadata(self) -> None:
         case = validate_eval_suite(
             suite_with_case(

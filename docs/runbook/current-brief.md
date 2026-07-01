@@ -122,13 +122,15 @@ Agent Gateway / UX
   detection、idempotency-preserved replay、compensating action refs。
 - 已补 fixture-only runtime-control negative coverage：missing checkpoint、
   cancel propagation incomplete、replay event incomplete。
+- 已补 fixture-only runtime-control deeper hardening：checkpoint version drift
+  detection、workflow wakeup race dedupe、ReplayBundle lineage completeness。
 - 已补 current EvalReport generation / baseline refresh review CLI，生成当前报告和
   baseline refresh review artifact，默认不覆盖 baseline。
 - 已补 current-report / baseline lifecycle deeper hardening：多 suite report
   matrix、baseline refresh approval manifest 和 report retention metadata，
   支持 synthetic fixture 与 public-dataset-style adapter sample 混合进矩阵。
-- 下一段优先做 runtime-control deeper hardening：checkpoint version drift、
-  workflow wakeup race、ReplayBundle lineage completeness。
+- 下一段优先做 state-diff deeper hardening：state dependency graph、
+  cross-action compensation chain、operator redrive review。
 
 ## 工作规则
 

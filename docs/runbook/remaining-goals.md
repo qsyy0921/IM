@@ -125,8 +125,11 @@
    `READ_FANOUT + SEQUENCER_BLOCK`，并完成 Docker 镜像重建 / 归档 / redeploy
    和 6000 人 / 1000 消息 / 256 concurrency clean 复验：
    `conversation_mode=SEQUENCER_BLOCK`、1000/1000 发送成功、SendMessage p95 / p99
-   `208.507ms / 220.367ms`、outbox pending=0。剩余任务是修正
-   Prometheus message latency 历史 gauge 误读问题，用更大消息数做稳态 send-only
+   `208.507ms / 220.367ms`、outbox pending=0。message-service 已补
+   first-stage recent latency metrics，为 SendMessage、conversation seq allocation
+   和 repository 分段输出最近 4096 个样本的 `_recent` operation，hotgroup
+   Prometheus 时间窗口脚本也已采集这些 recent p95 / p99。剩余任务是用 clean
+   commit 重建 / redeploy message-service 后，用更大消息数做稳态 send-only
    复压，再回到 total-subscriber-aware policy 的 6000 人 / 5000 消息 /
    400 subscriber 场景，确认 `achieved_send_rate` 与 signal span 新曲线。
    若仍无容量改善，再分析 delivery_outbox signal production cadence、Kafka

@@ -43,6 +43,10 @@ func TestCollectorSnapshot(t *testing.T) {
 		snapshot.SendMessageLatencyMS.AvgMS != 40 {
 		t.Fatalf("unexpected send message snapshot: %+v", snapshot.SendMessageLatencyMS)
 	}
+	if snapshot.SendMessageRecentLatencyMS.Count != 1 ||
+		snapshot.SendMessageRecentLatencyMS.AvgMS != 40 {
+		t.Fatalf("unexpected recent send message snapshot: %+v", snapshot.SendMessageRecentLatencyMS)
+	}
 	if snapshot.RepositoryAppendLatencyMS.Count != 1 ||
 		snapshot.RepositoryAppendLatencyMS.AvgMS != 35 {
 		t.Fatalf("unexpected repository append snapshot: %+v", snapshot.RepositoryAppendLatencyMS)
@@ -57,7 +61,9 @@ func TestCollectorSnapshot(t *testing.T) {
 		snapshot.RepositoryIdempotencyLockLatencyMS.Count != 1 ||
 		snapshot.RepositoryFindExistingLatencyMS.Count != 1 ||
 		snapshot.RepositoryEnsureSeqLatencyMS.Count != 1 ||
+		snapshot.RepositoryEnsureSeqRecentLatencyMS.Count != 1 ||
 		snapshot.RepositoryAllocateSeqLatencyMS.Count != 1 ||
+		snapshot.RepositoryAllocateSeqRecentLatencyMS.Count != 1 ||
 		snapshot.RepositoryInsertMessageLatencyMS.Count != 1 ||
 		snapshot.RepositoryInsertTimelineLatencyMS.Count != 1 ||
 		snapshot.RepositoryInsertOutboxLatencyMS.Count != 1 {
@@ -103,12 +109,21 @@ func TestCollectorSnapshot(t *testing.T) {
 
 func TestCollectorRecentSnapshotDropsOldSamples(t *testing.T) {
 	collector := NewCollector()
+	collector.ObserveSendMessage(90 * time.Millisecond)
 	collector.ObserveRepositoryPoolAcquire(100 * time.Millisecond)
 	for i := 0; i < recentSampleLimit; i++ {
+		collector.ObserveSendMessage(2 * time.Millisecond)
 		collector.ObserveRepositoryPoolAcquire(time.Millisecond)
 	}
 
 	snapshot := collector.Snapshot()
+	if snapshot.SendMessageLatencyMS.MaxMS != 90 {
+		t.Fatalf("unexpected cumulative send snapshot: %+v", snapshot.SendMessageLatencyMS)
+	}
+	if snapshot.SendMessageRecentLatencyMS.Count != int64(recentSampleLimit) ||
+		snapshot.SendMessageRecentLatencyMS.MaxMS != 2 {
+		t.Fatalf("unexpected recent send snapshot: %+v", snapshot.SendMessageRecentLatencyMS)
+	}
 	if snapshot.RepositoryPoolAcquireLatencyMS.Count != int64(recentSampleLimit+1) ||
 		snapshot.RepositoryPoolAcquireLatencyMS.MaxMS != 100 {
 		t.Fatalf("unexpected cumulative snapshot: %+v", snapshot.RepositoryPoolAcquireLatencyMS)
@@ -268,7 +283,9 @@ func TestHandlerPrometheusMetrics(t *testing.T) {
 	assertContains(t, body, "# TYPE nexusim_message_latency_samples_total counter")
 	assertContains(t, body, `nexusim_message_latency_samples_total{operation="send_message"} 1`)
 	assertContains(t, body, `nexusim_message_latency_p95_milliseconds{operation="send_message"} 40`)
+	assertContains(t, body, `nexusim_message_latency_p95_milliseconds{operation="send_message_recent"} 40`)
 	assertContains(t, body, `nexusim_message_latency_p95_milliseconds{operation="repository_pool_acquire"} 5`)
+	assertContains(t, body, `nexusim_message_latency_p95_milliseconds{operation="repository_pool_acquire_recent"} 5`)
 	assertContains(t, body, `nexusim_message_value_avg{operation="kafka_publish_records_per_call"} 4`)
 	assertContains(t, body, `nexusim_message_outbox_relay_errors_total 3`)
 	assertContains(t, body, `nexusim_message_otel_traces_enabled{exporter="otlp-grpc"} 1`)

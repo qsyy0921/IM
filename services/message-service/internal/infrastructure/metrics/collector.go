@@ -209,35 +209,48 @@ func (c *Collector) Snapshot() Snapshot {
 		return Snapshot{}
 	}
 	return Snapshot{
-		SendMessageLatencyMS:                    c.sendMessage.snapshot(),
-		RepositoryAppendLatencyMS:               c.repositoryAppend.snapshot(),
-		RepositoryBeginLatencyMS:                c.repositoryBegin.snapshot(),
-		RepositoryPoolAcquireLatencyMS:          c.repositoryPoolAcquire.snapshot(),
-		RepositoryPoolAcquireRecentLatencyMS:    c.repositoryPoolAcquire.recentSnapshot(),
-		RepositoryTxBeginLatencyMS:              c.repositoryTxBegin.snapshot(),
-		RepositoryIdempotencyLockLatencyMS:      c.repositoryIdempotencyLock.snapshot(),
-		RepositoryFindExistingLatencyMS:         c.repositoryFindExisting.snapshot(),
-		RepositoryEnsureSeqLatencyMS:            c.repositoryEnsureSeq.snapshot(),
-		RepositoryAllocateSeqLatencyMS:          c.repositoryAllocateSeq.snapshot(),
-		RepositoryInsertMessageLatencyMS:        c.repositoryInsertMessage.snapshot(),
-		RepositoryInsertTimelineLatencyMS:       c.repositoryInsertTimeline.snapshot(),
-		RepositoryInsertOutboxLatencyMS:         c.repositoryInsertOutbox.snapshot(),
-		RepositoryCommitLatencyMS:               c.repositoryCommit.snapshot(),
-		ConversationSeqAllocLatencyMS:           c.seqAlloc.snapshot(),
-		KafkaPublishLatencyMS:                   c.kafka.snapshot(),
-		KafkaPublishCallLatencyMS:               c.kafkaPublishCall.snapshot(),
-		KafkaPublishRecordLatencyEstimateMS:     c.kafkaRecordEstimate.snapshot(),
-		KafkaPublishRecordsPerCall:              c.kafkaRecordsPerCall.snapshot(),
-		KafkaPublishRecordsPerCallRecent:        c.kafkaRecordsPerCall.recentSnapshot(),
-		OutboxProcessReadyLatencyMS:             c.outboxProcessReady.snapshot(),
-		OutboxProcessReadyActiveLatencyMS:       c.outboxProcessReadyActive.snapshot(),
-		OutboxProcessReadyActiveRecentLatencyMS: c.outboxProcessReadyActive.recentSnapshot(),
-		OutboxProcessReadyIdleLatencyMS:         c.outboxProcessReadyIdle.snapshot(),
-		OutboxFetchedPerCall:                    c.outboxFetchedPerCall.snapshot(),
-		OutboxFetchedPerCallRecent:              c.outboxFetchedPerCall.recentSnapshot(),
-		OutboxFetchReadyLatencyMS:               c.outboxFetchReady.snapshot(),
-		OutboxMarkPublishedLatencyMS:            c.outboxMarkPublished.snapshot(),
-		OutboxCommitLatencyMS:                   c.outboxCommit.snapshot(),
+		SendMessageLatencyMS:                     c.sendMessage.snapshot(),
+		SendMessageRecentLatencyMS:               c.sendMessage.recentSnapshot(),
+		RepositoryAppendLatencyMS:                c.repositoryAppend.snapshot(),
+		RepositoryAppendRecentLatencyMS:          c.repositoryAppend.recentSnapshot(),
+		RepositoryBeginLatencyMS:                 c.repositoryBegin.snapshot(),
+		RepositoryBeginRecentLatencyMS:           c.repositoryBegin.recentSnapshot(),
+		RepositoryPoolAcquireLatencyMS:           c.repositoryPoolAcquire.snapshot(),
+		RepositoryPoolAcquireRecentLatencyMS:     c.repositoryPoolAcquire.recentSnapshot(),
+		RepositoryTxBeginLatencyMS:               c.repositoryTxBegin.snapshot(),
+		RepositoryTxBeginRecentLatencyMS:         c.repositoryTxBegin.recentSnapshot(),
+		RepositoryIdempotencyLockLatencyMS:       c.repositoryIdempotencyLock.snapshot(),
+		RepositoryIdempotencyLockRecentLatencyMS: c.repositoryIdempotencyLock.recentSnapshot(),
+		RepositoryFindExistingLatencyMS:          c.repositoryFindExisting.snapshot(),
+		RepositoryFindExistingRecentLatencyMS:    c.repositoryFindExisting.recentSnapshot(),
+		RepositoryEnsureSeqLatencyMS:             c.repositoryEnsureSeq.snapshot(),
+		RepositoryEnsureSeqRecentLatencyMS:       c.repositoryEnsureSeq.recentSnapshot(),
+		RepositoryAllocateSeqLatencyMS:           c.repositoryAllocateSeq.snapshot(),
+		RepositoryAllocateSeqRecentLatencyMS:     c.repositoryAllocateSeq.recentSnapshot(),
+		RepositoryInsertMessageLatencyMS:         c.repositoryInsertMessage.snapshot(),
+		RepositoryInsertMessageRecentLatencyMS:   c.repositoryInsertMessage.recentSnapshot(),
+		RepositoryInsertTimelineLatencyMS:        c.repositoryInsertTimeline.snapshot(),
+		RepositoryInsertTimelineRecentLatencyMS:  c.repositoryInsertTimeline.recentSnapshot(),
+		RepositoryInsertOutboxLatencyMS:          c.repositoryInsertOutbox.snapshot(),
+		RepositoryInsertOutboxRecentLatencyMS:    c.repositoryInsertOutbox.recentSnapshot(),
+		RepositoryCommitLatencyMS:                c.repositoryCommit.snapshot(),
+		RepositoryCommitRecentLatencyMS:          c.repositoryCommit.recentSnapshot(),
+		ConversationSeqAllocLatencyMS:            c.seqAlloc.snapshot(),
+		ConversationSeqAllocRecentLatencyMS:      c.seqAlloc.recentSnapshot(),
+		KafkaPublishLatencyMS:                    c.kafka.snapshot(),
+		KafkaPublishCallLatencyMS:                c.kafkaPublishCall.snapshot(),
+		KafkaPublishRecordLatencyEstimateMS:      c.kafkaRecordEstimate.snapshot(),
+		KafkaPublishRecordsPerCall:               c.kafkaRecordsPerCall.snapshot(),
+		KafkaPublishRecordsPerCallRecent:         c.kafkaRecordsPerCall.recentSnapshot(),
+		OutboxProcessReadyLatencyMS:              c.outboxProcessReady.snapshot(),
+		OutboxProcessReadyActiveLatencyMS:        c.outboxProcessReadyActive.snapshot(),
+		OutboxProcessReadyActiveRecentLatencyMS:  c.outboxProcessReadyActive.recentSnapshot(),
+		OutboxProcessReadyIdleLatencyMS:          c.outboxProcessReadyIdle.snapshot(),
+		OutboxFetchedPerCall:                     c.outboxFetchedPerCall.snapshot(),
+		OutboxFetchedPerCallRecent:               c.outboxFetchedPerCall.recentSnapshot(),
+		OutboxFetchReadyLatencyMS:                c.outboxFetchReady.snapshot(),
+		OutboxMarkPublishedLatencyMS:             c.outboxMarkPublished.snapshot(),
+		OutboxCommitLatencyMS:                    c.outboxCommit.snapshot(),
 	}
 }
 
@@ -251,38 +264,51 @@ func (c *Collector) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 type Snapshot struct {
-	SendMessageLatencyMS                    LatencySnapshot                  `json:"send_message_latency_ms"`
-	RepositoryAppendLatencyMS               LatencySnapshot                  `json:"repository_append_latency_ms"`
-	RepositoryBeginLatencyMS                LatencySnapshot                  `json:"repository_begin_latency_ms"`
-	RepositoryPoolAcquireLatencyMS          LatencySnapshot                  `json:"repository_pool_acquire_latency_ms"`
-	RepositoryPoolAcquireRecentLatencyMS    LatencySnapshot                  `json:"repository_pool_acquire_recent_latency_ms"`
-	RepositoryTxBeginLatencyMS              LatencySnapshot                  `json:"repository_tx_begin_latency_ms"`
-	RepositoryIdempotencyLockLatencyMS      LatencySnapshot                  `json:"repository_idempotency_lock_latency_ms"`
-	RepositoryFindExistingLatencyMS         LatencySnapshot                  `json:"repository_find_existing_latency_ms"`
-	RepositoryEnsureSeqLatencyMS            LatencySnapshot                  `json:"repository_ensure_seq_latency_ms"`
-	RepositoryAllocateSeqLatencyMS          LatencySnapshot                  `json:"repository_allocate_seq_latency_ms"`
-	RepositoryInsertMessageLatencyMS        LatencySnapshot                  `json:"repository_insert_message_latency_ms"`
-	RepositoryInsertTimelineLatencyMS       LatencySnapshot                  `json:"repository_insert_timeline_latency_ms"`
-	RepositoryInsertOutboxLatencyMS         LatencySnapshot                  `json:"repository_insert_outbox_latency_ms"`
-	RepositoryCommitLatencyMS               LatencySnapshot                  `json:"repository_commit_latency_ms"`
-	ConversationSeqAllocLatencyMS           LatencySnapshot                  `json:"conversation_seq_alloc_latency_ms"`
-	KafkaPublishLatencyMS                   LatencySnapshot                  `json:"kafka_publish_latency_ms"`
-	KafkaPublishCallLatencyMS               LatencySnapshot                  `json:"kafka_publish_call_latency_ms"`
-	KafkaPublishRecordLatencyEstimateMS     LatencySnapshot                  `json:"kafka_publish_record_latency_estimate_ms"`
-	KafkaPublishRecordsPerCall              ValueSnapshot                    `json:"kafka_publish_records_per_call"`
-	KafkaPublishRecordsPerCallRecent        ValueSnapshot                    `json:"kafka_publish_records_per_call_recent"`
-	OutboxProcessReadyLatencyMS             LatencySnapshot                  `json:"outbox_process_ready_latency_ms"`
-	OutboxProcessReadyActiveLatencyMS       LatencySnapshot                  `json:"outbox_process_ready_active_latency_ms"`
-	OutboxProcessReadyActiveRecentLatencyMS LatencySnapshot                  `json:"outbox_process_ready_active_recent_latency_ms"`
-	OutboxProcessReadyIdleLatencyMS         LatencySnapshot                  `json:"outbox_process_ready_idle_latency_ms"`
-	OutboxFetchedPerCall                    ValueSnapshot                    `json:"outbox_fetched_per_call"`
-	OutboxFetchedPerCallRecent              ValueSnapshot                    `json:"outbox_fetched_per_call_recent"`
-	OutboxFetchReadyLatencyMS               LatencySnapshot                  `json:"outbox_fetch_ready_latency_ms"`
-	OutboxMarkPublishedLatencyMS            LatencySnapshot                  `json:"outbox_mark_published_latency_ms"`
-	OutboxCommitLatencyMS                   LatencySnapshot                  `json:"outbox_commit_latency_ms"`
-	PGPool                                  *PGPoolSnapshot                  `json:"pg_pool,omitempty"`
-	OutboxRelay                             *types.OutboxRelayWorkerSnapshot `json:"outbox_relay,omitempty"`
-	Trace                                   *monitoringinfra.TraceSnapshot   `json:"trace,omitempty"`
+	SendMessageLatencyMS                     LatencySnapshot                  `json:"send_message_latency_ms"`
+	SendMessageRecentLatencyMS               LatencySnapshot                  `json:"send_message_recent_latency_ms"`
+	RepositoryAppendLatencyMS                LatencySnapshot                  `json:"repository_append_latency_ms"`
+	RepositoryAppendRecentLatencyMS          LatencySnapshot                  `json:"repository_append_recent_latency_ms"`
+	RepositoryBeginLatencyMS                 LatencySnapshot                  `json:"repository_begin_latency_ms"`
+	RepositoryBeginRecentLatencyMS           LatencySnapshot                  `json:"repository_begin_recent_latency_ms"`
+	RepositoryPoolAcquireLatencyMS           LatencySnapshot                  `json:"repository_pool_acquire_latency_ms"`
+	RepositoryPoolAcquireRecentLatencyMS     LatencySnapshot                  `json:"repository_pool_acquire_recent_latency_ms"`
+	RepositoryTxBeginLatencyMS               LatencySnapshot                  `json:"repository_tx_begin_latency_ms"`
+	RepositoryTxBeginRecentLatencyMS         LatencySnapshot                  `json:"repository_tx_begin_recent_latency_ms"`
+	RepositoryIdempotencyLockLatencyMS       LatencySnapshot                  `json:"repository_idempotency_lock_latency_ms"`
+	RepositoryIdempotencyLockRecentLatencyMS LatencySnapshot                  `json:"repository_idempotency_lock_recent_latency_ms"`
+	RepositoryFindExistingLatencyMS          LatencySnapshot                  `json:"repository_find_existing_latency_ms"`
+	RepositoryFindExistingRecentLatencyMS    LatencySnapshot                  `json:"repository_find_existing_recent_latency_ms"`
+	RepositoryEnsureSeqLatencyMS             LatencySnapshot                  `json:"repository_ensure_seq_latency_ms"`
+	RepositoryEnsureSeqRecentLatencyMS       LatencySnapshot                  `json:"repository_ensure_seq_recent_latency_ms"`
+	RepositoryAllocateSeqLatencyMS           LatencySnapshot                  `json:"repository_allocate_seq_latency_ms"`
+	RepositoryAllocateSeqRecentLatencyMS     LatencySnapshot                  `json:"repository_allocate_seq_recent_latency_ms"`
+	RepositoryInsertMessageLatencyMS         LatencySnapshot                  `json:"repository_insert_message_latency_ms"`
+	RepositoryInsertMessageRecentLatencyMS   LatencySnapshot                  `json:"repository_insert_message_recent_latency_ms"`
+	RepositoryInsertTimelineLatencyMS        LatencySnapshot                  `json:"repository_insert_timeline_latency_ms"`
+	RepositoryInsertTimelineRecentLatencyMS  LatencySnapshot                  `json:"repository_insert_timeline_recent_latency_ms"`
+	RepositoryInsertOutboxLatencyMS          LatencySnapshot                  `json:"repository_insert_outbox_latency_ms"`
+	RepositoryInsertOutboxRecentLatencyMS    LatencySnapshot                  `json:"repository_insert_outbox_recent_latency_ms"`
+	RepositoryCommitLatencyMS                LatencySnapshot                  `json:"repository_commit_latency_ms"`
+	RepositoryCommitRecentLatencyMS          LatencySnapshot                  `json:"repository_commit_recent_latency_ms"`
+	ConversationSeqAllocLatencyMS            LatencySnapshot                  `json:"conversation_seq_alloc_latency_ms"`
+	ConversationSeqAllocRecentLatencyMS      LatencySnapshot                  `json:"conversation_seq_alloc_recent_latency_ms"`
+	KafkaPublishLatencyMS                    LatencySnapshot                  `json:"kafka_publish_latency_ms"`
+	KafkaPublishCallLatencyMS                LatencySnapshot                  `json:"kafka_publish_call_latency_ms"`
+	KafkaPublishRecordLatencyEstimateMS      LatencySnapshot                  `json:"kafka_publish_record_latency_estimate_ms"`
+	KafkaPublishRecordsPerCall               ValueSnapshot                    `json:"kafka_publish_records_per_call"`
+	KafkaPublishRecordsPerCallRecent         ValueSnapshot                    `json:"kafka_publish_records_per_call_recent"`
+	OutboxProcessReadyLatencyMS              LatencySnapshot                  `json:"outbox_process_ready_latency_ms"`
+	OutboxProcessReadyActiveLatencyMS        LatencySnapshot                  `json:"outbox_process_ready_active_latency_ms"`
+	OutboxProcessReadyActiveRecentLatencyMS  LatencySnapshot                  `json:"outbox_process_ready_active_recent_latency_ms"`
+	OutboxProcessReadyIdleLatencyMS          LatencySnapshot                  `json:"outbox_process_ready_idle_latency_ms"`
+	OutboxFetchedPerCall                     ValueSnapshot                    `json:"outbox_fetched_per_call"`
+	OutboxFetchedPerCallRecent               ValueSnapshot                    `json:"outbox_fetched_per_call_recent"`
+	OutboxFetchReadyLatencyMS                LatencySnapshot                  `json:"outbox_fetch_ready_latency_ms"`
+	OutboxMarkPublishedLatencyMS             LatencySnapshot                  `json:"outbox_mark_published_latency_ms"`
+	OutboxCommitLatencyMS                    LatencySnapshot                  `json:"outbox_commit_latency_ms"`
+	PGPool                                   *PGPoolSnapshot                  `json:"pg_pool,omitempty"`
+	OutboxRelay                              *types.OutboxRelayWorkerSnapshot `json:"outbox_relay,omitempty"`
+	Trace                                    *monitoringinfra.TraceSnapshot   `json:"trace,omitempty"`
 }
 
 type PGPoolSnapshot struct {

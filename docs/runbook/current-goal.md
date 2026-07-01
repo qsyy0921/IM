@@ -498,6 +498,11 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
   p99，不能直接当作本轮 run-local 延迟；本轮 SendMessage 延迟以
   `hotgroup-summary.json` 中的 run-local histogram 为准。后续需要把 message-service
   压测观测改成 run-window delta histogram 或在复压前重置相关进程，避免时间窗口报告误读。
+- message-service 已补 first-stage recent latency metrics：`/debug/metrics` 和
+  Prometheus `/metrics` 现在会为 SendMessage、conversation seq allocation 和 repository
+  分段同时输出累计 snapshot 与最近 4096 个样本的 `_recent` operation；
+  `tools/record-hotgroup-metrics-window.ps1` 已采集这些 recent p95 / p99。该改动用于
+  后续压测定位，不改变业务路径、fanout 策略、outbox 或 sequencer 语义。
 - HYBRID 诊断档位 1000 人 / 1000 消息 / 400 msg/s 暴露 `delivery_outbox` ready query
   在百万级 per-user outbox 下退化：旧 anti-join blocker 查询每批 500 行约 24s。当前
   delivery outbox relay 已改成 per-conversation frontier ready query，并把本地 worker
@@ -543,6 +548,9 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
   focused checks、Docker 镜像重建 / 归档 / Ubuntu redeploy 和 clean 复压；复压确认
   `conversation_mode=SEQUENCER_BLOCK`，`repository_allocate_seq` 行锁瓶颈不再是
   6000 人 READ_FANOUT 的首要问题。
+- message-service recent latency metrics 已完成 focused tests / build；下一步需用
+  clean commit 重建 / 归档 / redeploy message-service Docker 镜像后，跑更大消息数的
+  READ_FANOUT / SEQUENCER_BLOCK 稳态 send-path 复压。
 - 文档同步本轮公开能力或瓶颈变化。
 - 提交并推送到 GitHub。
 
@@ -556,9 +564,8 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
 
 ## 后续优先级
 
-1. 修正 hotgroup Prometheus / message-service 压测观测口径：避免 message latency
-   gauge 残留上一轮失败 run 的 p99；优先使用 run-window delta histogram、run-local
-   summary 或复压前进程重置。
+1. 用 clean commit 重建 / 归档 / redeploy message-service Docker 镜像，让 `_recent`
+   message latency metrics 进入三机运行链路。
 2. 用更大消息数重跑 6000 人 READ_FANOUT / SEQUENCER_BLOCK / 256 concurrency 的
    send-only 稳态复压，避免 1000 message 短 run 启停开销低估真实 QPS 上限。
 3. 回到 total-subscriber-aware policy 的 6000 人 /

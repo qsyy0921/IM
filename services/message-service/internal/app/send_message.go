@@ -14,6 +14,7 @@ type SendMessageUseCase struct {
 	sequencer    SequencerPort
 	messageRepo  MessageRepository
 	admission    AdmissionPort
+	seqFloors    *seqFloorCache
 }
 
 type SendMessageUseCaseOption func(*SendMessageUseCase)
@@ -30,6 +31,7 @@ func NewSendMessageUseCase(
 		conversation: conversation,
 		sequencer:    sequencer,
 		messageRepo:  messageRepo,
+		seqFloors:    newSeqFloorCache(),
 	}
 	for _, opt := range opts {
 		opt(useCase)
@@ -148,11 +150,7 @@ func (u *SendMessageUseCase) allocateConversationSeq(
 		if u.sequencer == nil {
 			return 0, types.SeqBlock{}, types.NewSequencerUnavailable("sequencer client is not configured")
 		}
-		minimumStartSeq, err := u.messageRepo.NextConversationSeqFloor(
-			ctx,
-			command.AuthContext.TenantID,
-			command.ConversationID,
-		)
+		minimumStartSeq, err := u.seqFloors.minimumStartSeq(ctx, command, u.messageRepo.NextConversationSeqFloor)
 		if err != nil {
 			return 0, types.SeqBlock{}, err
 		}

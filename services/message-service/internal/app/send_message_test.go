@@ -157,6 +157,51 @@ func TestSendMessageUseCaseUsesSequencerBlockMode(t *testing.T) {
 	}
 }
 
+func TestSendMessageUseCaseCachesSequencerFloorPerConversation(t *testing.T) {
+	repo := &fakeMessageRepository{
+		nextConversationSeqFloor: 42,
+		result: domain.AppendMessageResult{
+			MessageID:       "msg-1",
+			ConversationSeq: 42,
+			AcceptedAt:      time.Unix(100, 0).UTC(),
+		},
+	}
+	conversation := localConversation()
+	conversation.ConversationMode = types.ConversationModeSequencerBlock
+	sequencer := &fakeSequencer{
+		blocks: []types.SeqBlock{
+			testSeqBlock(42, 42),
+			testSeqBlock(43, 43),
+		},
+	}
+	useCase := NewSendMessageUseCase(
+		&fakePolicy{decision: allowedDecision()},
+		&fakeConversation{context: conversation},
+		sequencer,
+		repo,
+	)
+
+	first := testCommand()
+	first.ClientMsgID = "client-1"
+	if _, err := useCase.Execute(context.Background(), first); err != nil {
+		t.Fatalf("execute first sequencer send message: %v", err)
+	}
+	second := testCommand()
+	second.ClientMsgID = "client-2"
+	if _, err := useCase.Execute(context.Background(), second); err != nil {
+		t.Fatalf("execute second sequencer send message: %v", err)
+	}
+	if repo.nextSeqFloorCalls != 1 {
+		t.Fatalf("expected one seq floor query for the conversation, got %d", repo.nextSeqFloorCalls)
+	}
+	if sequencer.calls != 2 {
+		t.Fatalf("expected sequencer called twice, got %d", sequencer.calls)
+	}
+	if sequencer.minimumStartSeqs[0] != 42 || sequencer.minimumStartSeqs[1] != 42 {
+		t.Fatalf("expected cached floor to be reused, got %v", sequencer.minimumStartSeqs)
+	}
+}
+
 func TestSendMessageUseCaseRejectsInvalidSequencerBlock(t *testing.T) {
 	repo := &fakeMessageRepository{}
 	conversation := localConversation()
@@ -479,18 +524,28 @@ func (f *fakeConversation) GetSendContext(context.Context, types.SendMessageComm
 
 type fakeSequencer struct {
 	block               types.SeqBlock
+	blocks              []types.SeqBlock
 	err                 error
 	calls               int
 	lastCommand         types.SendMessageCommand
 	lastMinimumStartSeq int64
+	minimumStartSeqs    []int64
 }
 
 func (f *fakeSequencer) AllocateSeqBlock(_ context.Context, command types.SendMessageCommand, minimumStartSeq int64) (types.SeqBlock, error) {
 	f.calls++
 	f.lastCommand = command
 	f.lastMinimumStartSeq = minimumStartSeq
+	f.minimumStartSeqs = append(f.minimumStartSeqs, minimumStartSeq)
 	if f.err != nil {
 		return types.SeqBlock{}, f.err
+	}
+	if len(f.blocks) > 0 {
+		index := f.calls - 1
+		if index >= len(f.blocks) {
+			index = len(f.blocks) - 1
+		}
+		return f.blocks[index], nil
 	}
 	if f.block.StartSeq == 0 && f.block.EndSeq == 0 {
 		return testSeqBlock(1, 1), nil

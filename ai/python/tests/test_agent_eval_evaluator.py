@@ -442,6 +442,83 @@ class AgentEvalEvaluatorTests(unittest.TestCase):
         self.assertEqual(report.status, "FAIL")
         self.assertEqual(report.results[0].failure_class, "STATE_DIFF_MISMATCH")
 
+    def test_state_diff_report_passes_action_outcome_refs(self) -> None:
+        case = base_case("STATE_DIFF")
+        case.update(
+            {
+                "expected_state_diff": {"task:42.status": "approved"},
+                "actual_state_diff": {"task:42.status": "approved"},
+                "expected_state_precondition_refs": ["precondition:task-42:pending"],
+                "actual_state_precondition_refs": ["precondition:task-42:pending"],
+                "expected_state_approval_refs": ["approval:task-42:manager"],
+                "actual_state_approval_refs": ["approval:task-42:manager"],
+                "expected_state_prepare_refs": ["tool-prepare:task:update"],
+                "actual_state_prepare_refs": ["tool-prepare:task:update"],
+                "expected_execution_refs": ["execution:task-42:update"],
+                "actual_execution_refs": ["execution:task-42:update"],
+                "expected_state_change_refs": ["state-change:task-42:status"],
+                "actual_state_change_refs": ["state-change:task-42:status"],
+                "expected_state_audit_refs": ["audit:task-42:update"],
+                "actual_state_audit_refs": ["audit:task-42:update"],
+                "state_diff_report_complete": True,
+            }
+        )
+
+        report = run_eval_suite(suite_with_case(case))
+
+        self.assertEqual(report.status, "PASS")
+        self.assertEqual(report.aggregate_scores["state_diff_score"], 1.0)
+        self.assertEqual(report.aggregate_scores["state_report_completeness_score"], 1.0)
+        self.assertEqual(report.aggregate_scores["state_execution_ref_score"], 1.0)
+        self.assertEqual(report.results[0].replay_bundle.execution_refs, ["execution:task-42:update"])
+        self.assertIn("audit:task-42:update", report.results[0].replay_bundle.audit_refs)
+
+    def test_state_diff_report_fails_missing_execution_ref(self) -> None:
+        case = base_case("STATE_DIFF")
+        case.update(
+            {
+                "expected_state_diff": {"task:42.status": "approved"},
+                "actual_state_diff": {"task:42.status": "approved"},
+                "expected_execution_refs": ["execution:task-42:update"],
+                "actual_execution_refs": [],
+            }
+        )
+
+        report = run_eval_suite(suite_with_case(case))
+
+        self.assertEqual(report.status, "FAIL")
+        self.assertEqual(report.results[0].failure_class, "STATE_EXECUTION_REF_MISSING")
+
+    def test_state_diff_report_fails_incomplete_report(self) -> None:
+        case = base_case("STATE_DIFF")
+        case.update(
+            {
+                "expected_state_diff": {"task:42.status": "approved"},
+                "actual_state_diff": {"task:42.status": "approved"},
+                "state_diff_report_complete": False,
+            }
+        )
+
+        report = run_eval_suite(suite_with_case(case))
+
+        self.assertEqual(report.status, "FAIL")
+        self.assertEqual(report.results[0].failure_class, "STATE_REPORT_INCOMPLETE")
+
+    def test_state_diff_report_fails_unauthorized_mutation(self) -> None:
+        case = base_case("STATE_DIFF")
+        case.update(
+            {
+                "expected_state_diff": {"task:42.status": "approved"},
+                "actual_state_diff": {"task:42.status": "approved"},
+                "unauthorized_state_mutation_detected": True,
+            }
+        )
+
+        report = run_eval_suite(suite_with_case(case))
+
+        self.assertEqual(report.status, "FAIL")
+        self.assertEqual(report.results[0].failure_class, "STATE_UNAUTHORIZED_MUTATION")
+
     def test_replay_fails_if_side_effect_reexecuted(self) -> None:
         case = base_case("STATE_DIFF")
         case.update(

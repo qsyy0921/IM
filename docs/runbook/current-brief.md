@@ -87,8 +87,11 @@ Agent Gateway / UX
 - 已补 fixture-only richer memory admission coverage：group speaker/audience、
   project supersedes、profile aggregate review、revoked/stale memory blocking、
   overgeneralization prevention。
-- 下一段优先做 state-diff report、Context/Evidence hardening、memory admission
-  hardening 等离线能力。
+- 已补 fixture-only state-diff report coverage：approved action outcome refs、
+  expected-vs-actual state changes、missing execution refs、incomplete report、
+  unauthorized mutation detection。
+- 下一段优先做 Context/Evidence hardening、memory admission hardening、
+  runtime-control negative fixture 等离线能力。
 
 ## 工作规则
 

@@ -52,6 +52,14 @@ ALLOWED_FAILURE_CLASSES = {
     "APPROVAL_REJECTED",
     "APPROVAL_TIMEOUT",
     "STATE_DIFF_MISMATCH",
+    "STATE_REPORT_INCOMPLETE",
+    "STATE_PRECONDITION_MISSING",
+    "STATE_APPROVAL_MISSING",
+    "STATE_PREPARE_MISSING",
+    "STATE_EXECUTION_REF_MISSING",
+    "STATE_CHANGE_REF_MISSING",
+    "STATE_AUDIT_REF_MISSING",
+    "STATE_UNAUTHORIZED_MUTATION",
     "MEMORY_SOURCE_MISSING",
     "MEMORY_SPEAKER_MISSING",
     "MEMORY_AUDIENCE_SCOPE_MISMATCH",
@@ -120,6 +128,18 @@ class EvalCase:
     actual_tool_provider_ref: str = ""
     expected_state_diff: dict[str, str] = field(default_factory=dict)
     actual_state_diff: dict[str, str] = field(default_factory=dict)
+    expected_state_precondition_refs: list[str] = field(default_factory=list)
+    actual_state_precondition_refs: list[str] = field(default_factory=list)
+    expected_state_approval_refs: list[str] = field(default_factory=list)
+    actual_state_approval_refs: list[str] = field(default_factory=list)
+    expected_state_prepare_refs: list[str] = field(default_factory=list)
+    actual_state_prepare_refs: list[str] = field(default_factory=list)
+    expected_execution_refs: list[str] = field(default_factory=list)
+    actual_execution_refs: list[str] = field(default_factory=list)
+    expected_state_change_refs: list[str] = field(default_factory=list)
+    actual_state_change_refs: list[str] = field(default_factory=list)
+    expected_state_audit_refs: list[str] = field(default_factory=list)
+    actual_state_audit_refs: list[str] = field(default_factory=list)
     expected_runtime_events: list[str] = field(default_factory=list)
     actual_runtime_events: list[str] = field(default_factory=list)
     expected_checkpoint_refs: list[str] = field(default_factory=list)
@@ -134,6 +154,8 @@ class EvalCase:
     memory_overgeneralized: bool = False
     profile_aggregate_review_required: bool = False
     profile_aggregate_reviewed: bool = False
+    state_diff_report_complete: bool = True
+    unauthorized_state_mutation_detected: bool = False
     malicious_tool_blocked: bool = False
     tool_description_poisoned: bool = False
     tool_description_blocked: bool = False
@@ -326,6 +348,43 @@ def _eval_case(payload: dict[str, Any], index: int) -> EvalCase:
             payload.get("expected_state_diff", {}), "expected_state_diff"
         ),
         actual_state_diff=_string_map(payload.get("actual_state_diff", {}), "actual_state_diff"),
+        expected_state_precondition_refs=_string_list(
+            payload.get("expected_state_precondition_refs", []),
+            "expected_state_precondition_refs",
+        ),
+        actual_state_precondition_refs=_string_list(
+            payload.get("actual_state_precondition_refs", []), "actual_state_precondition_refs"
+        ),
+        expected_state_approval_refs=_string_list(
+            payload.get("expected_state_approval_refs", []), "expected_state_approval_refs"
+        ),
+        actual_state_approval_refs=_string_list(
+            payload.get("actual_state_approval_refs", []), "actual_state_approval_refs"
+        ),
+        expected_state_prepare_refs=_string_list(
+            payload.get("expected_state_prepare_refs", []), "expected_state_prepare_refs"
+        ),
+        actual_state_prepare_refs=_string_list(
+            payload.get("actual_state_prepare_refs", []), "actual_state_prepare_refs"
+        ),
+        expected_execution_refs=_string_list(
+            payload.get("expected_execution_refs", []), "expected_execution_refs"
+        ),
+        actual_execution_refs=_string_list(
+            payload.get("actual_execution_refs", []), "actual_execution_refs"
+        ),
+        expected_state_change_refs=_string_list(
+            payload.get("expected_state_change_refs", []), "expected_state_change_refs"
+        ),
+        actual_state_change_refs=_string_list(
+            payload.get("actual_state_change_refs", []), "actual_state_change_refs"
+        ),
+        expected_state_audit_refs=_string_list(
+            payload.get("expected_state_audit_refs", []), "expected_state_audit_refs"
+        ),
+        actual_state_audit_refs=_string_list(
+            payload.get("actual_state_audit_refs", []), "actual_state_audit_refs"
+        ),
         expected_runtime_events=_upper_string_list(
             payload.get("expected_runtime_events", []), "expected_runtime_events"
         ),
@@ -358,6 +417,13 @@ def _eval_case(payload: dict[str, Any], index: int) -> EvalCase:
         ),
         profile_aggregate_reviewed=_bool(
             payload.get("profile_aggregate_reviewed", False), "profile_aggregate_reviewed"
+        ),
+        state_diff_report_complete=_bool(
+            payload.get("state_diff_report_complete", True), "state_diff_report_complete"
+        ),
+        unauthorized_state_mutation_detected=_bool(
+            payload.get("unauthorized_state_mutation_detected", False),
+            "unauthorized_state_mutation_detected",
         ),
         malicious_tool_blocked=_bool(
             payload.get("malicious_tool_blocked", False), "malicious_tool_blocked"

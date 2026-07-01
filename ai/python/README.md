@@ -50,6 +50,7 @@ ai/python/
       synthetic_mcp_security_scenarios.json
       synthetic_context_evidence_scenarios.json
       synthetic_memory_admission_scenarios.json
+      synthetic_state_diff_scenarios.json
   contracts/
     worker-candidate.schema.json
   scripts/
@@ -78,6 +79,7 @@ python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_mcp_security_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_context_evidence_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_memory_admission_scenarios.json
+python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_state_diff_scenarios.json
 python ai/python/scripts/run_agent_dataset_adapter.py --run ai/python/fixtures/agent_eval/adapter_samples/qasper_like_rag_samples.json
 python ai/python/scripts/run_agent_eval_regression.py ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json
 python -m ruff check ai/python
@@ -148,6 +150,7 @@ ai/python/fixtures/agent_eval/synthetic_runtime_control_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_mcp_security_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_context_evidence_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_memory_admission_scenarios.json
+ai/python/fixtures/agent_eval/synthetic_state_diff_scenarios.json
 ai/python/fixtures/agent_eval/adapter_samples/
 ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json
 ```
@@ -170,6 +173,9 @@ stale evidence avoidance and permission-driven abstain recommendation.
 The memory admission fixture covers group speaker/audience attribution, project
 supersedes lineage, profile aggregate review, revoked memory blocking, stale
 memory blocking and overgeneralization prevention.
+The state-diff fixture covers approved action outcome reports, expected-vs-actual
+state changes, execution refs, audit refs, incomplete reports and unauthorized
+mutation detection.
 `nexusim_ai_eval.adapters` also includes low-sensitive skeleton adapters for
 Qasper/HotpotQA-like RAG, ToolSandbox/tau-bench-like tool cases and
 STATE-Bench/LoCoMo-like memory cases. `nexusim_ai_eval.trace` builds a
@@ -188,6 +194,7 @@ python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_mcp_security_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_context_evidence_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_memory_admission_scenarios.json
+python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_state_diff_scenarios.json
 python ai/python/scripts/run_agent_dataset_adapter.py --run ai/python/fixtures/agent_eval/adapter_samples/qasper_like_rag_samples.json
 python ai/python/scripts/run_agent_dataset_adapter.py --run ai/python/fixtures/agent_eval/adapter_samples/toolsandbox_like_tool_samples.json
 python ai/python/scripts/run_agent_dataset_adapter.py --run ai/python/fixtures/agent_eval/adapter_samples/statebench_like_memory_samples.json

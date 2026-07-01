@@ -14,15 +14,18 @@
 
 ## 当前优先顺序
 
-1. State-diff eval：基于 Agent-Diff 思路验证 action outcome，而不是只比较 tool call trace。
+1. ContextPackage / EvidencePack hardening：基础 source coverage、temporal
+   version、conflict marker 和 permission abstain fixture 已落地；后续覆盖
+   memory-vs-source precedence、unsafe tool output in context、token-budget
+   truncation 和 retrieval lane unavailable。
 2. Memory admission hardening：基础 group/project/profile、supersedes、
    revocation、stale facts、speaker attribution、audience scope 和
    overgeneralization fixture 已落地；后续覆盖 duplicate/dedupe、low-confidence、
    procedural skill-bound、policy-memory rejection 和 review timeout。
-3. ContextPackage / EvidencePack hardening：基础 source coverage、temporal
-   version、conflict marker 和 permission abstain fixture 已落地；后续覆盖
-   memory-vs-source precedence、unsafe tool output in context、token-budget
-   truncation 和 retrieval lane unavailable。
+3. State-diff hardening：基础 action outcome report、expected-vs-actual state
+   change、execution refs、audit refs、incomplete report 和 unauthorized mutation
+   fixture 已落地；后续覆盖 repair/redrive、partial execution、idempotency 和
+   compensating action cases。
 4. Tool / MCP security hardening：基础 malicious tool description、unsafe output、
    MCP provider provenance 和 sandbox-only provider fixture 已落地；后续覆盖 tool
    argument schema mismatch、tool-selection attack、prepare expiry 和多候选 provider

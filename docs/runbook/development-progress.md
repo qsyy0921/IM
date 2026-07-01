@@ -105,6 +105,7 @@ ai/python/fixtures/agent_eval/synthetic_runtime_control_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_mcp_security_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_context_evidence_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_memory_admission_scenarios.json
+ai/python/fixtures/agent_eval/synthetic_state_diff_scenarios.json
 ai/python/scripts/run_agent_eval_fixture.py
 ai/python/scripts/run_agent_dataset_adapter.py
 ai/python/scripts/run_agent_eval_regression.py
@@ -131,12 +132,14 @@ ai/python/tests/test_agent_eval_*.py
   stale evidence avoidance、permission abstain 和低敏 trace metadata。
 - Memory admission fixture：group speaker/audience、project supersedes、profile
   aggregate review、revoked/stale memory blocking、overgeneralization prevention。
+- State-diff fixture：approved action outcome refs、expected-vs-actual state
+  changes、execution/audit refs、incomplete report、unauthorized mutation detection。
 
 ## 当前未完成项
 
 | 优先级 | 工作 | 输出 |
 | --- | --- | --- |
-| P1 | State-diff eval | action outcome 与预期状态变化比对 |
+| P1 | State-diff hardening | repair/redrive、partial execution、idempotency、compensating action |
 | P1 | Memory admission hardening | duplicate/dedupe、low-confidence、procedural skill-bound、policy-memory rejection、review timeout |
 | P1 | ContextPackage / EvidencePack hardening | memory-vs-source precedence、unsafe tool output in context、token budget、retrieval lane unavailable |
 | P1 | Tool / MCP security hardening | tool args schema、tool-selection attack、prepare expiry、多候选 provider selection |

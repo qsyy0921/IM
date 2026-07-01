@@ -114,6 +114,7 @@ NexusIM Agent 层的开发顺序不是先接真实聊天数据，也不是先写
 - fixture-only MCP security skeleton。
 - fixture-only ContextPackage / EvidencePack skeleton。
 - fixture-only richer MemoryCandidate / memory admission skeleton。
+- fixture-only StateDiffReport / action outcome skeleton。
 - CLI：`ai/python/scripts/run_agent_eval_fixture.py`。
 - Adapter batch CLI：`ai/python/scripts/run_agent_dataset_adapter.py`。
 - Regression CLI：`ai/python/scripts/run_agent_eval_regression.py`。

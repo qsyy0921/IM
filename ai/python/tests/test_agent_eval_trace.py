@@ -237,6 +237,42 @@ class AgentEvalTraceTests(unittest.TestCase):
         self.assertIn("resume", step_types)
         self.assertIn("replay", step_types)
 
+    def test_trace_contains_state_diff_report_metadata(self) -> None:
+        case = validate_eval_suite(
+            suite_with_case(
+                {
+                    "case_id": "trace-state-diff-report-case",
+                    "dataset_name": "synthetic",
+                    "dataset_version": "2026-07-01",
+                    "capability_family": "STATE_DIFF",
+                    "fixture_version": "fixture-v1",
+                    "input_refs": ["input:trace-state-diff-report-case"],
+                    "expected_state_diff": {"task:42.status": "approved"},
+                    "actual_state_diff": {"task:42.status": "approved"},
+                    "expected_state_approval_refs": ["approval:task-42:manager"],
+                    "actual_state_approval_refs": ["approval:task-42:manager"],
+                    "expected_state_prepare_refs": ["tool-prepare:task:update"],
+                    "actual_state_prepare_refs": ["tool-prepare:task:update"],
+                    "expected_execution_refs": ["execution:task-42:update"],
+                    "actual_execution_refs": ["execution:task-42:update"],
+                    "expected_state_change_refs": ["state-change:task-42:status"],
+                    "actual_state_change_refs": ["state-change:task-42:status"],
+                    "expected_state_audit_refs": ["audit:task-42:update"],
+                    "actual_state_audit_refs": ["audit:task-42:update"],
+                }
+            )
+        )[0]
+
+        trace = build_agent_run_trace(case)
+
+        self.assertEqual(trace.status, "PASS")
+        self.assertIsNotNone(trace.state_diff_report)
+        assert trace.state_diff_report is not None
+        self.assertEqual(trace.state_diff_report.execution_refs, ["execution:task-42:update"])
+        self.assertEqual(trace.state_diff_report.state_change_refs, ["state-change:task-42:status"])
+        self.assertEqual(trace.state_diff_report.audit_refs, ["audit:task-42:update"])
+        self.assertIn("state_diff", [step.step_type for step in trace.steps])
+
 
 if __name__ == "__main__":
     unittest.main()

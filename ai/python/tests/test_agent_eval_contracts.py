@@ -179,6 +179,41 @@ class AgentEvalContractTests(unittest.TestCase):
         self.assertEqual(cases[0].actual_memory_supersedes_refs, ["memory:project:decision:v1"])
         self.assertTrue(cases[0].profile_aggregate_review_required)
 
+    def test_validates_state_diff_report_refs(self) -> None:
+        payload = valid_suite()
+        payload["cases"] = [
+            {
+                "case_id": "state-diff-report-pass",
+                "dataset_name": "synthetic-state",
+                "dataset_version": "2026-07-01",
+                "capability_family": "STATE_DIFF",
+                "fixture_version": "fixture-v1",
+                "input_refs": ["input:state-diff-report-pass"],
+                "expected_state_diff": {"task:1.status": "approved"},
+                "actual_state_diff": {"task:1.status": "approved"},
+                "expected_state_precondition_refs": ["precondition:task-1:pending"],
+                "actual_state_precondition_refs": ["precondition:task-1:pending"],
+                "expected_state_approval_refs": ["approval:task-1:manager"],
+                "actual_state_approval_refs": ["approval:task-1:manager"],
+                "expected_state_prepare_refs": ["tool-prepare:task:update"],
+                "actual_state_prepare_refs": ["tool-prepare:task:update"],
+                "expected_execution_refs": ["execution:task-1:update"],
+                "actual_execution_refs": ["execution:task-1:update"],
+                "expected_state_change_refs": ["state-change:task-1:status"],
+                "actual_state_change_refs": ["state-change:task-1:status"],
+                "expected_state_audit_refs": ["audit:task-1:update"],
+                "actual_state_audit_refs": ["audit:task-1:update"],
+                "state_diff_report_complete": True,
+            }
+        ]
+
+        cases = validate_eval_suite(payload)
+
+        self.assertEqual(cases[0].capability_family, "STATE_DIFF")
+        self.assertEqual(cases[0].actual_execution_refs, ["execution:task-1:update"])
+        self.assertEqual(cases[0].expected_state_change_refs, ["state-change:task-1:status"])
+        self.assertTrue(cases[0].state_diff_report_complete)
+
 
 if __name__ == "__main__":
     unittest.main()

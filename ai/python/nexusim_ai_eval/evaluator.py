@@ -299,8 +299,67 @@ def _tool_security_scores(case: EvalCase) -> tuple[dict[str, float], str]:
 
 
 def _state_diff_scores(case: EvalCase) -> tuple[dict[str, float], str]:
-    score = 1.0 if case.expected_state_diff == case.actual_state_diff else 0.0
-    return ({"state_diff_score": score}, "" if score == 1.0 else "STATE_DIFF_MISMATCH")
+    diff_score = 1.0 if case.expected_state_diff == case.actual_state_diff else 0.0
+    report_score = 1.0 if case.state_diff_report_complete else 0.0
+    precondition_score = _ref_subset_score(
+        case.expected_state_precondition_refs,
+        case.actual_state_precondition_refs,
+    )
+    approval_score = _ref_subset_score(
+        case.expected_state_approval_refs,
+        case.actual_state_approval_refs,
+    )
+    prepare_score = _ref_subset_score(
+        case.expected_state_prepare_refs,
+        case.actual_state_prepare_refs,
+    )
+    execution_ref_score = _ref_subset_score(
+        case.expected_execution_refs,
+        case.actual_execution_refs,
+    )
+    state_change_ref_score = _ref_subset_score(
+        case.expected_state_change_refs,
+        case.actual_state_change_refs,
+    )
+    audit_ref_score = _ref_subset_score(
+        case.expected_state_audit_refs,
+        case.actual_state_audit_refs,
+    )
+    unauthorized_mutation_score = 0.0 if case.unauthorized_state_mutation_detected else 1.0
+    if report_score == 0.0:
+        failure = "STATE_REPORT_INCOMPLETE"
+    elif precondition_score == 0.0:
+        failure = "STATE_PRECONDITION_MISSING"
+    elif approval_score == 0.0:
+        failure = "STATE_APPROVAL_MISSING"
+    elif prepare_score == 0.0:
+        failure = "STATE_PREPARE_MISSING"
+    elif execution_ref_score == 0.0:
+        failure = "STATE_EXECUTION_REF_MISSING"
+    elif state_change_ref_score == 0.0:
+        failure = "STATE_CHANGE_REF_MISSING"
+    elif audit_ref_score == 0.0:
+        failure = "STATE_AUDIT_REF_MISSING"
+    elif unauthorized_mutation_score == 0.0:
+        failure = "STATE_UNAUTHORIZED_MUTATION"
+    elif diff_score == 0.0:
+        failure = "STATE_DIFF_MISMATCH"
+    else:
+        failure = ""
+    return (
+        {
+            "state_diff_score": diff_score,
+            "state_report_completeness_score": report_score,
+            "state_precondition_ref_score": precondition_score,
+            "state_approval_ref_score": approval_score,
+            "state_prepare_ref_score": prepare_score,
+            "state_execution_ref_score": execution_ref_score,
+            "state_change_ref_score": state_change_ref_score,
+            "state_audit_ref_score": audit_ref_score,
+            "state_unauthorized_mutation_score": unauthorized_mutation_score,
+        },
+        failure,
+    )
 
 
 def _policy_hitl_scores(case: EvalCase) -> tuple[dict[str, float], str]:
@@ -401,6 +460,9 @@ def _replay_bundle(case: EvalCase, failure_class: str) -> ReplayBundle:
         "actual_citation_refs": case.actual_citation_refs,
         "actual_memory_source_refs": case.actual_memory_source_refs,
         "actual_memory_supersedes_refs": case.actual_memory_supersedes_refs,
+        "actual_state_change_refs": case.actual_state_change_refs,
+        "actual_execution_refs": case.actual_execution_refs,
+        "actual_state_audit_refs": case.actual_state_audit_refs,
         "actual_failure_class": case.actual_failure_class,
         "actual_tool_provider_ref": case.actual_tool_provider_ref,
         "failure_class": failure_class,
@@ -418,21 +480,34 @@ def _replay_bundle(case: EvalCase, failure_class: str) -> ReplayBundle:
         prepared_tool_refs=[stable_ref("prepared", {"case_id": case.case_id})]
         if case.expected_tool_prepare or case.expected_tool_provider_ref
         else [],
-        workflow_decision_refs=[stable_ref("workflow", {"case_id": case.case_id})]
-        if has_workflow_ref
-        else [],
-        execution_refs=[stable_ref("execution", case.actual_state_diff)]
-        if case.actual_state_diff
-        else [],
+        workflow_decision_refs=_workflow_decision_refs(case, has_workflow_ref),
+        execution_refs=_execution_refs(case),
         memory_candidate_refs=[stable_ref("memory", {"case_id": case.case_id})]
         if case.expected_memory_outcome
         else [],
         checkpoint_refs=case.actual_checkpoint_refs,
-        audit_refs=[stable_ref("audit", replay_payload)],
+        audit_refs=case.actual_state_audit_refs + [stable_ref("audit", replay_payload)],
         failure_class=failure_class,
         replay_complete=replay_complete,
         side_effect_reexecuted=case.side_effect_reexecuted,
     )
+
+
+def _workflow_decision_refs(case: EvalCase, has_workflow_ref: bool) -> list[str]:
+    refs = list(case.actual_state_approval_refs)
+    if has_workflow_ref and not refs:
+        refs.append(stable_ref("workflow", {"case_id": case.case_id}))
+    return refs
+
+
+def _execution_refs(case: EvalCase) -> list[str]:
+    if case.expected_execution_refs:
+        return case.actual_execution_refs
+    if case.actual_execution_refs:
+        return case.actual_execution_refs
+    if case.actual_state_diff:
+        return [stable_ref("execution", case.actual_state_diff)]
+    return []
 
 
 def _aggregate_scores(results: list[EvalResult]) -> dict[str, float]:

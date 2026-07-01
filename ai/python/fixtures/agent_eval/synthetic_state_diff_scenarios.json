@@ -1,0 +1,141 @@
+{
+  "schema_version": 1,
+  "suite_id": "synthetic-agent-state-diff-v1",
+  "fixture_kind": "synthetic_im_like",
+  "adapter_versions": [
+    "manual-state-diff-fixture-v1"
+  ],
+  "cases": [
+    {
+      "case_id": "state-diff-approved-action-pass",
+      "dataset_name": "synthetic-state-diff",
+      "dataset_version": "2026-07-01",
+      "capability_family": "STATE_DIFF",
+      "fixture_version": "state-diff-v1",
+      "input_refs": ["input:state-diff-approved-action-pass"],
+      "visible_evidence_refs": [
+        "proposal:task-42:approve",
+        "approval:task-42:manager",
+        "tool-prepare:task-service:update-status"
+      ],
+      "actual_used_refs": [
+        "proposal:task-42:approve",
+        "approval:task-42:manager",
+        "tool-prepare:task-service:update-status"
+      ],
+      "expected_state_diff": {
+        "task:42.status": "approved",
+        "task:42.approved_by": "user:manager"
+      },
+      "actual_state_diff": {
+        "task:42.status": "approved",
+        "task:42.approved_by": "user:manager"
+      },
+      "expected_state_precondition_refs": ["precondition:task-42:pending"],
+      "actual_state_precondition_refs": ["precondition:task-42:pending"],
+      "expected_state_approval_refs": ["approval:task-42:manager"],
+      "actual_state_approval_refs": ["approval:task-42:manager"],
+      "expected_state_prepare_refs": ["tool-prepare:task-service:update-status"],
+      "actual_state_prepare_refs": ["tool-prepare:task-service:update-status"],
+      "expected_execution_refs": ["execution:task-42:update-status"],
+      "actual_execution_refs": ["execution:task-42:update-status"],
+      "expected_state_change_refs": [
+        "state-change:task-42:status",
+        "state-change:task-42:approved-by"
+      ],
+      "actual_state_change_refs": [
+        "state-change:task-42:status",
+        "state-change:task-42:approved-by"
+      ],
+      "expected_state_audit_refs": ["audit:task-42:update-status"],
+      "actual_state_audit_refs": ["audit:task-42:update-status"],
+      "state_diff_report_complete": true
+    },
+    {
+      "case_id": "state-diff-mismatch-detected",
+      "dataset_name": "synthetic-state-diff",
+      "dataset_version": "2026-07-01",
+      "capability_family": "STATE_DIFF",
+      "fixture_version": "state-diff-v1",
+      "input_refs": ["input:state-diff-mismatch-detected"],
+      "expected_state_diff": {
+        "task:43.status": "approved"
+      },
+      "actual_state_diff": {
+        "task:43.status": "pending"
+      },
+      "expected_execution_refs": ["execution:task-43:update-status"],
+      "actual_execution_refs": ["execution:task-43:update-status"],
+      "expected_state_change_refs": ["state-change:task-43:status"],
+      "actual_state_change_refs": ["state-change:task-43:status"],
+      "state_diff_report_complete": true,
+      "expected_failure_class": "STATE_DIFF_MISMATCH",
+      "actual_failure_class": "STATE_DIFF_MISMATCH"
+    },
+    {
+      "case_id": "state-diff-missing-execution-ref-detected",
+      "dataset_name": "synthetic-state-diff",
+      "dataset_version": "2026-07-01",
+      "capability_family": "STATE_DIFF",
+      "fixture_version": "state-diff-v1",
+      "input_refs": ["input:state-diff-missing-execution-ref-detected"],
+      "expected_state_diff": {
+        "task:44.status": "approved"
+      },
+      "actual_state_diff": {
+        "task:44.status": "approved"
+      },
+      "expected_execution_refs": ["execution:task-44:update-status"],
+      "actual_execution_refs": [],
+      "expected_state_change_refs": ["state-change:task-44:status"],
+      "actual_state_change_refs": ["state-change:task-44:status"],
+      "state_diff_report_complete": true,
+      "expected_failure_class": "STATE_EXECUTION_REF_MISSING",
+      "actual_failure_class": "STATE_EXECUTION_REF_MISSING"
+    },
+    {
+      "case_id": "state-diff-unauthorized-mutation-detected",
+      "dataset_name": "synthetic-state-diff",
+      "dataset_version": "2026-07-01",
+      "capability_family": "STATE_DIFF",
+      "fixture_version": "state-diff-v1",
+      "input_refs": ["input:state-diff-unauthorized-mutation-detected"],
+      "expected_state_diff": {
+        "task:45.status": "approved"
+      },
+      "actual_state_diff": {
+        "task:45.status": "approved"
+      },
+      "expected_execution_refs": ["execution:task-45:update-status"],
+      "actual_execution_refs": ["execution:task-45:update-status"],
+      "expected_state_change_refs": ["state-change:task-45:status"],
+      "actual_state_change_refs": [
+        "state-change:task-45:status",
+        "state-change:task-45:owner"
+      ],
+      "unauthorized_state_mutation_detected": true,
+      "state_diff_report_complete": true,
+      "expected_failure_class": "STATE_UNAUTHORIZED_MUTATION",
+      "actual_failure_class": "STATE_UNAUTHORIZED_MUTATION"
+    },
+    {
+      "case_id": "state-diff-report-incomplete-detected",
+      "dataset_name": "synthetic-state-diff",
+      "dataset_version": "2026-07-01",
+      "capability_family": "STATE_DIFF",
+      "fixture_version": "state-diff-v1",
+      "input_refs": ["input:state-diff-report-incomplete-detected"],
+      "expected_state_diff": {
+        "task:46.status": "approved"
+      },
+      "actual_state_diff": {
+        "task:46.status": "approved"
+      },
+      "expected_execution_refs": ["execution:task-46:update-status"],
+      "actual_execution_refs": ["execution:task-46:update-status"],
+      "state_diff_report_complete": false,
+      "expected_failure_class": "STATE_REPORT_INCOMPLETE",
+      "actual_failure_class": "STATE_REPORT_INCOMPLETE"
+    }
+  ]
+}

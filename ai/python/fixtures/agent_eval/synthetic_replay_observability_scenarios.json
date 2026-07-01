@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "suite_id": "synthetic-agent-replay-observability-v1",
+  "fixture_kind": "synthetic_im_like",
+  "adapter_versions": [
+    "manual-replay-observability-fixture-v1"
+  ],
+  "cases": [
+    {
+      "case_id": "replay-low-sensitive-refs-recorded-pass",
+      "dataset_name": "synthetic-replay-observability",
+      "dataset_version": "2026-07-02",
+      "capability_family": "GROUNDED_RAG",
+      "fixture_version": "replay-observability-v1",
+      "input_refs": ["input:replay-low-sensitive-refs-recorded-pass"],
+      "visible_evidence_refs": ["evidence:policy-summary:visible"],
+      "actual_used_refs": ["evidence:policy-summary:visible"],
+      "expected_citation_refs": ["evidence:policy-summary:visible"],
+      "actual_citation_refs": ["evidence:policy-summary:visible"],
+      "expected_replay_observability_refs": [
+        "replay-observability:rag-answer:low-sensitive"
+      ],
+      "actual_replay_observability_refs": [
+        "replay-observability:rag-answer:low-sensitive"
+      ],
+      "expected_replay_hash_refs": ["hash:rag-answer:input-ref"],
+      "actual_replay_hash_refs": ["hash:rag-answer:input-ref"]
+    },
+    {
+      "case_id": "replay-version-and-taxonomy-recorded-pass",
+      "dataset_name": "synthetic-replay-observability",
+      "dataset_version": "2026-07-02",
+      "capability_family": "RUNTIME_CONTROL",
+      "fixture_version": "replay-observability-v1",
+      "input_refs": ["input:replay-version-and-taxonomy-recorded-pass"],
+      "expected_runtime_events": [
+        "REPLAY_REQUESTED",
+        "REPLAY_RECONSTRUCTED",
+        "REPLAY_SIDE_EFFECT_SKIPPED"
+      ],
+      "actual_runtime_events": [
+        "REPLAY_REQUESTED",
+        "REPLAY_RECONSTRUCTED",
+        "REPLAY_SIDE_EFFECT_SKIPPED"
+      ],
+      "expected_checkpoint_refs": ["checkpoint:runtime-replay:ready"],
+      "actual_checkpoint_refs": ["checkpoint:runtime-replay:ready"],
+      "expected_replay_observability_refs": [
+        "replay-observability:runtime-replay:manifest"
+      ],
+      "actual_replay_observability_refs": [
+        "replay-observability:runtime-replay:manifest"
+      ],
+      "expected_replay_version_refs": [
+        "version:agent-eval-harness:v1",
+        "version:fixture-adapter:manual-replay-observability-v1"
+      ],
+      "actual_replay_version_refs": [
+        "version:agent-eval-harness:v1",
+        "version:fixture-adapter:manual-replay-observability-v1"
+      ],
+      "expected_failure_taxonomy_refs": ["failure-taxonomy:agent-eval:v1"],
+      "actual_failure_taxonomy_refs": ["failure-taxonomy:agent-eval:v1"]
+    },
+    {
+      "case_id": "replay-trace-linkage-recorded-pass",
+      "dataset_name": "synthetic-replay-observability",
+      "dataset_version": "2026-07-02",
+      "capability_family": "STATE_DIFF",
+      "fixture_version": "replay-observability-v1",
+      "input_refs": ["input:replay-trace-linkage-recorded-pass"],
+      "expected_state_diff": {
+        "task:replay-review.status": "reviewed"
+      },
+      "actual_state_diff": {
+        "task:replay-review.status": "reviewed"
+      },
+      "expected_execution_refs": ["execution:replay-review:dry-run"],
+      "actual_execution_refs": ["execution:replay-review:dry-run"],
+      "expected_state_audit_refs": ["audit:replay-review:dry-run"],
+      "actual_state_audit_refs": ["audit:replay-review:dry-run"],
+      "expected_replay_observability_refs": [
+        "replay-observability:state-diff:trace"
+      ],
+      "actual_replay_observability_refs": [
+        "replay-observability:state-diff:trace"
+      ],
+      "expected_trace_linkage_refs": [
+        "trace-link:agent-run:state-diff",
+        "trace-link:replay-bundle:state-diff"
+      ],
+      "actual_trace_linkage_refs": [
+        "trace-link:agent-run:state-diff",
+        "trace-link:replay-bundle:state-diff"
+      ]
+    }
+  ]
+}

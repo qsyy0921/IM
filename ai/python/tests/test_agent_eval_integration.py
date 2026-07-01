@@ -116,6 +116,14 @@ STATE_DIFF_DEEPER_HARDENING_PATH = (
     / "agent_eval"
     / "synthetic_state_diff_deeper_hardening_scenarios.json"
 )
+REPLAY_OBSERVABILITY_PATH = (
+    REPO_ROOT
+    / "ai"
+    / "python"
+    / "fixtures"
+    / "agent_eval"
+    / "synthetic_replay_observability_scenarios.json"
+)
 
 
 class AgentEvalIntegrationTests(unittest.TestCase):
@@ -492,6 +500,47 @@ class AgentEvalIntegrationTests(unittest.TestCase):
         self.assertIn("state_dependency_graph_score", report["aggregate_scores"])
         self.assertIn("state_compensation_chain_score", report["aggregate_scores"])
         self.assertIn("state_operator_redrive_review_score", report["aggregate_scores"])
+
+    def test_cli_outputs_pass_report_for_replay_observability_scenarios(self) -> None:
+        result = subprocess.run(
+            [
+                sys.executable,
+                "ai/python/scripts/run_agent_eval_fixture.py",
+                str(REPLAY_OBSERVABILITY_PATH),
+            ],
+            check=True,
+            capture_output=True,
+            cwd=REPO_ROOT,
+            text=True,
+        )
+
+        report = json.loads(result.stdout)
+        self.assertEqual(report["status"], "PASS")
+        self.assertEqual(report["case_count"], 3)
+        self.assertEqual(report["failed_count"], 0)
+        self.assertIn("replay_observability_ref_score", report["aggregate_scores"])
+        self.assertIn("replay_hash_ref_score", report["aggregate_scores"])
+        self.assertIn("replay_version_metadata_score", report["aggregate_scores"])
+        self.assertIn("failure_taxonomy_ref_score", report["aggregate_scores"])
+        self.assertIn("trace_linkage_score", report["aggregate_scores"])
+        self.assertEqual(
+            report["results"][0]["replay_bundle"]["observability_refs"],
+            ["replay-observability:rag-answer:low-sensitive"],
+        )
+        self.assertEqual(
+            report["results"][1]["replay_bundle"]["version_refs"],
+            [
+                "version:agent-eval-harness:v1",
+                "version:fixture-adapter:manual-replay-observability-v1",
+            ],
+        )
+        self.assertEqual(
+            report["results"][2]["replay_bundle"]["trace_linkage_refs"],
+            [
+                "trace-link:agent-run:state-diff",
+                "trace-link:replay-bundle:state-diff",
+            ],
+        )
 
 
 if __name__ == "__main__":

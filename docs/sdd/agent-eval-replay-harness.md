@@ -125,12 +125,19 @@ workflow_decision_refs
 execution_refs
 memory_candidate_refs
 lineage_refs
+observability_refs
+hash_refs
+trace_linkage_refs
 audit_refs
 failure_class
 version_metadata
+failure_taxonomy_refs
 ```
 
 ReplayBundle must support analysis without re-executing external side effects.
+The isolated skeleton records only low-sensitive refs and hashes; it does not
+persist raw prompts, provider bodies, production payloads or backend replay
+state.
 
 ## 6. Dataset and Fixture Plan
 
@@ -214,6 +221,11 @@ Fixtures must be clearly synthetic and must not import production data.
 | `checkpoint_version_score` | Resume uses current checkpoint refs and detects stale checkpoint drift |
 | `workflow_wakeup_score` | Duplicate or racing workflow wakeups are deduped before resume |
 | `replay_lineage_score` | ReplayBundle contains required context/model/checkpoint/workflow/audit lineage refs |
+| `replay_observability_ref_score` | ReplayBundle exposes required low-sensitive observability refs |
+| `replay_hash_ref_score` | ReplayBundle records required low-sensitive hash refs |
+| `replay_version_metadata_score` | ReplayBundle records required harness / adapter version refs |
+| `failure_taxonomy_ref_score` | ReplayBundle records failure taxonomy refs used by the eval gate |
+| `trace_linkage_score` | ReplayBundle and AgentRunTrace share required trace linkage refs |
 | `replay_completeness` | Failure can be reconstructed from refs |
 
 Promotion thresholds start as research baselines. Production SLOs require later
@@ -307,6 +319,11 @@ The harness should normalize:
 - `CHECKPOINT_VERSION_DRIFT`
 - `WORKFLOW_WAKEUP_RACE`
 - `REPLAY_LINEAGE_INCOMPLETE`
+- `REPLAY_OBSERVABILITY_MISSING`
+- `REPLAY_HASH_MISSING`
+- `REPLAY_VERSION_METADATA_MISSING`
+- `FAILURE_TAXONOMY_MISSING`
+- `TRACE_LINKAGE_MISSING`
 - `REPLAY_INCOMPLETE`
 
 Unknown failures should block promotion until classified.
@@ -502,6 +519,9 @@ Implemented checks:
   cancel propagation and incomplete replay event detection.
 - runtime-control deeper hardening coverage for checkpoint version drift
   detection, workflow wakeup race dedupe and ReplayBundle lineage completeness.
+- ReplayBundle observability skeleton coverage for low-sensitive observability
+  refs, hash refs, version metadata refs, failure taxonomy refs and trace
+  linkage refs in EvalReport / ReplayBundle / AgentRunTrace.
 - MCP security fixture coverage for poisoned tool descriptions, unsafe MCP
   output instructions, provider provenance mismatch and sandbox-only providers.
 - MCP security hardening coverage for tool argument schema mismatch,
@@ -565,6 +585,7 @@ python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_state_diff_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_state_diff_hardening_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_state_diff_deeper_hardening_scenarios.json
+python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_replay_observability_scenarios.json
 python ai/python/scripts/run_agent_eval_current_report.py ai/python/fixtures/agent_eval/synthetic_core_scenarios.json --report-out .tmp-agent-current-report.json --baseline ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json --review-out .tmp-agent-baseline-review.json --force
 python ai/python/scripts/run_agent_eval_report_matrix.py ai/python/fixtures/agent_eval/report_matrix_sample.json --matrix-out .tmp-agent-eval-matrix/matrix.json --approval-manifest-out .tmp-agent-eval-matrix/approval-manifest.json --force
 python ai/python/scripts/run_agent_memory_calibration.py ai/python/fixtures/agent_eval/memory_calibration_sample.json --report-out .tmp-agent-memory-calibration-report.json --force

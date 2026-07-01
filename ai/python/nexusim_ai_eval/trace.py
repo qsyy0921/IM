@@ -175,6 +175,21 @@ class RuntimeControlFixture:
 
 
 @dataclass(frozen=True)
+class ReplayObservabilityFixture:
+    replay_observability_ref: str
+    observability_refs: list[str]
+    hash_refs: list[str]
+    version_refs: list[str]
+    failure_taxonomy_refs: list[str]
+    trace_linkage_refs: list[str]
+    observability_complete: bool
+    hashes_recorded: bool
+    version_metadata_recorded: bool
+    failure_taxonomy_recorded: bool
+    trace_linkage_recorded: bool
+
+
+@dataclass(frozen=True)
 class StateDiffReportFixture:
     state_diff_report_ref: str
     expected_state_diff: dict[str, str]
@@ -226,6 +241,7 @@ class AgentRunTrace:
     tool_intent: ToolIntentFixture | None = None
     runtime_control: RuntimeControlFixture | None = None
     state_diff_report: StateDiffReportFixture | None = None
+    replay_observability: ReplayObservabilityFixture | None = None
 
 
 def build_agent_run_trace(case: EvalCase) -> AgentRunTrace:
@@ -356,6 +372,21 @@ def build_agent_run_trace(case: EvalCase) -> AgentRunTrace:
     runtime_control = _runtime_control(case)
     if runtime_control is not None:
         steps.extend(_runtime_control_steps(case, runtime_control))
+    replay_observability = _replay_observability(case)
+    if replay_observability is not None:
+        replay_observability_status, replay_observability_failure = (
+            _replay_observability_step_status(case, replay_observability)
+        )
+        steps.append(
+            _step(
+                case,
+                "replay_observability",
+                replay_observability_status,
+                case.input_refs,
+                _replay_observability_output_refs(replay_observability),
+                replay_observability_failure,
+            )
+        )
     run_status = "FAIL" if any(step.status == "FAIL" for step in steps) else "PASS"
     return AgentRunTrace(
         agent_run_ref=stable_ref("agentrun", {"case_id": case.case_id}),
@@ -369,6 +400,7 @@ def build_agent_run_trace(case: EvalCase) -> AgentRunTrace:
         tool_intent=tool_intent,
         runtime_control=runtime_control,
         state_diff_report=state_diff_report,
+        replay_observability=replay_observability,
     )
 
 
@@ -1125,6 +1157,101 @@ def _runtime_control(case: EvalCase) -> RuntimeControlFixture | None:
         replay_complete=bool(case.input_refs) and not case.side_effect_reexecuted,
         side_effect_reexecuted=case.side_effect_reexecuted,
     )
+
+
+def _replay_observability(case: EvalCase) -> ReplayObservabilityFixture | None:
+    if not _has_replay_observability_requirements(case):
+        return None
+    payload = {
+        "case_id": case.case_id,
+        "actual_replay_observability_refs": case.actual_replay_observability_refs,
+        "actual_replay_hash_refs": case.actual_replay_hash_refs,
+        "actual_replay_version_refs": case.actual_replay_version_refs,
+        "actual_failure_taxonomy_refs": case.actual_failure_taxonomy_refs,
+        "actual_trace_linkage_refs": case.actual_trace_linkage_refs,
+    }
+    return ReplayObservabilityFixture(
+        replay_observability_ref=stable_ref("replayobs", payload),
+        observability_refs=case.actual_replay_observability_refs,
+        hash_refs=case.actual_replay_hash_refs,
+        version_refs=case.actual_replay_version_refs,
+        failure_taxonomy_refs=case.actual_failure_taxonomy_refs,
+        trace_linkage_refs=case.actual_trace_linkage_refs,
+        observability_complete=case.replay_observability_complete,
+        hashes_recorded=case.replay_hashes_recorded,
+        version_metadata_recorded=case.replay_version_metadata_recorded,
+        failure_taxonomy_recorded=case.failure_taxonomy_recorded,
+        trace_linkage_recorded=case.trace_linkage_recorded,
+    )
+
+
+def _has_replay_observability_requirements(case: EvalCase) -> bool:
+    return bool(
+        case.expected_replay_observability_refs
+        or case.actual_replay_observability_refs
+        or case.expected_replay_hash_refs
+        or case.actual_replay_hash_refs
+        or case.expected_replay_version_refs
+        or case.actual_replay_version_refs
+        or case.expected_failure_taxonomy_refs
+        or case.actual_failure_taxonomy_refs
+        or case.expected_trace_linkage_refs
+        or case.actual_trace_linkage_refs
+        or not case.replay_observability_complete
+        or not case.replay_hashes_recorded
+        or not case.replay_version_metadata_recorded
+        or not case.failure_taxonomy_recorded
+        or not case.trace_linkage_recorded
+    )
+
+
+def _replay_observability_step_status(
+    case: EvalCase,
+    fixture: ReplayObservabilityFixture,
+) -> tuple[str, str]:
+    if not fixture.observability_complete or not _refs_satisfied(
+        case.expected_replay_observability_refs,
+        fixture.observability_refs,
+    ):
+        return ("FAIL", "REPLAY_OBSERVABILITY_MISSING")
+    if not fixture.hashes_recorded or not _refs_satisfied(
+        case.expected_replay_hash_refs,
+        fixture.hash_refs,
+    ):
+        return ("FAIL", "REPLAY_HASH_MISSING")
+    if not fixture.version_metadata_recorded or not _refs_satisfied(
+        case.expected_replay_version_refs,
+        fixture.version_refs,
+    ):
+        return ("FAIL", "REPLAY_VERSION_METADATA_MISSING")
+    if not fixture.failure_taxonomy_recorded or not _refs_satisfied(
+        case.expected_failure_taxonomy_refs,
+        fixture.failure_taxonomy_refs,
+    ):
+        return ("FAIL", "FAILURE_TAXONOMY_MISSING")
+    if not fixture.trace_linkage_recorded or not _refs_satisfied(
+        case.expected_trace_linkage_refs,
+        fixture.trace_linkage_refs,
+    ):
+        return ("FAIL", "TRACE_LINKAGE_MISSING")
+    return ("PASS", "")
+
+
+def _replay_observability_output_refs(
+    fixture: ReplayObservabilityFixture,
+) -> list[str]:
+    return (
+        [fixture.replay_observability_ref]
+        + fixture.observability_refs
+        + fixture.hash_refs
+        + fixture.version_refs
+        + fixture.failure_taxonomy_refs
+        + fixture.trace_linkage_refs
+    )
+
+
+def _refs_satisfied(expected_refs: list[str], actual_refs: list[str]) -> bool:
+    return set(expected_refs).issubset(set(actual_refs))
 
 
 def _runtime_control_steps(

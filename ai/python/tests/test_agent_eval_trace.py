@@ -812,6 +812,68 @@ class AgentEvalTraceTests(unittest.TestCase):
         self.assertEqual(len(state_steps), 1)
         self.assertEqual(state_steps[0].failure_class, "STATE_DEPENDENCY_GRAPH_MISSING")
 
+    def test_trace_contains_replay_observability_step(self) -> None:
+        case = validate_eval_suite(
+            suite_with_case(
+                {
+                    "case_id": "trace-replay-observability-pass-case",
+                    "dataset_name": "synthetic",
+                    "dataset_version": "2026-07-02",
+                    "capability_family": "RUNTIME_CONTROL",
+                    "fixture_version": "fixture-v1",
+                    "input_refs": ["input:trace-replay-observability-pass-case"],
+                    "expected_replay_observability_refs": ["replay-observability:trace"],
+                    "actual_replay_observability_refs": ["replay-observability:trace"],
+                    "expected_replay_hash_refs": ["hash:trace"],
+                    "actual_replay_hash_refs": ["hash:trace"],
+                    "expected_replay_version_refs": ["version:trace:v1"],
+                    "actual_replay_version_refs": ["version:trace:v1"],
+                    "expected_failure_taxonomy_refs": ["failure-taxonomy:trace:v1"],
+                    "actual_failure_taxonomy_refs": ["failure-taxonomy:trace:v1"],
+                    "expected_trace_linkage_refs": ["trace-link:trace"],
+                    "actual_trace_linkage_refs": ["trace-link:trace"],
+                }
+            )
+        )[0]
+
+        trace = build_agent_run_trace(case)
+
+        replay_steps = [step for step in trace.steps if step.step_type == "replay_observability"]
+        self.assertEqual(trace.status, "PASS")
+        self.assertEqual(len(replay_steps), 1)
+        self.assertIsNotNone(trace.replay_observability)
+        assert trace.replay_observability is not None
+        self.assertEqual(
+            trace.replay_observability.failure_taxonomy_refs,
+            ["failure-taxonomy:trace:v1"],
+        )
+        self.assertIn("trace-link:trace", replay_steps[0].output_refs)
+
+    def test_trace_flags_missing_replay_trace_linkage(self) -> None:
+        case = validate_eval_suite(
+            suite_with_case(
+                {
+                    "case_id": "trace-replay-observability-linkage-missing-case",
+                    "dataset_name": "synthetic",
+                    "dataset_version": "2026-07-02",
+                    "capability_family": "RUNTIME_CONTROL",
+                    "fixture_version": "fixture-v1",
+                    "input_refs": [
+                        "input:trace-replay-observability-linkage-missing-case"
+                    ],
+                    "expected_trace_linkage_refs": ["trace-link:required"],
+                    "actual_trace_linkage_refs": [],
+                }
+            )
+        )[0]
+
+        trace = build_agent_run_trace(case)
+
+        replay_steps = [step for step in trace.steps if step.step_type == "replay_observability"]
+        self.assertEqual(trace.status, "FAIL")
+        self.assertEqual(len(replay_steps), 1)
+        self.assertEqual(replay_steps[0].failure_class, "TRACE_LINKAGE_MISSING")
+
 
 if __name__ == "__main__":
     unittest.main()

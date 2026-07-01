@@ -116,6 +116,7 @@ ai/python/fixtures/agent_eval/memory_calibration_sample.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_hardening_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_deeper_hardening_scenarios.json
+ai/python/fixtures/agent_eval/synthetic_replay_observability_scenarios.json
 ai/python/fixtures/agent_eval/report_matrix_sample.json
 ai/python/scripts/run_agent_eval_fixture.py
 ai/python/scripts/run_agent_eval_current_report.py
@@ -187,13 +188,16 @@ ai/python/tests/test_agent_eval_*.py
   idempotency-preserved replay、compensating action refs。
 - State-diff deeper hardening fixture：state dependency graph、cross-action
   compensation chain、operator redrive review refs。
+- ReplayBundle observability fixture：low-sensitive observability refs、hash refs、
+  version metadata refs、failure taxonomy refs、trace linkage refs，并在
+  EvalReport / ReplayBundle / AgentRunTrace 中保持 fixture-only 输出。
 
 ## 当前未完成项
 
 | 优先级 | 工作 | 输出 |
 | --- | --- | --- |
-| P1 | ReplayBundle / observability review | 低敏 refs、hashes、version metadata、failure taxonomy、trace linkage |
-| P2 | Memory calibration data expansion | 用更大公开 memory 数据集导出替换当前本地 calibration sample |
+| P1 | Memory calibration data expansion | 用更大公开 memory 数据集导出替换当前本地 calibration sample |
+| P2 | ReplayBundle observability hardening review | 如评审要求，继续补 fixture-only taxonomy / trace evidence |
 | P2 | ADR promotion decision | 是否提升 Agent Runtime / Harness、memory admission、ReplayBundle 等契约 |
 
 ## 验证状态
@@ -209,7 +213,8 @@ ai/python/tests/test_agent_eval_*.py
 - SDD index / research index / architecture index link check
 - 不触碰 proto、schema、migration、production service directory
 
-后续 fixture-only prototype 优先推进 ReplayBundle / observability review。
+后续 fixture-only prototype 优先推进 memory calibration data expansion；ReplayBundle
+observability 只在评审要求时继续 hardening。
 
 ## 历史资料路由
 

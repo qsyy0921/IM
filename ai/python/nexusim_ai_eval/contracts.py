@@ -115,6 +115,11 @@ ALLOWED_FAILURE_CLASSES = {
     "CHECKPOINT_VERSION_DRIFT",
     "WORKFLOW_WAKEUP_RACE",
     "REPLAY_LINEAGE_INCOMPLETE",
+    "REPLAY_OBSERVABILITY_MISSING",
+    "REPLAY_HASH_MISSING",
+    "REPLAY_VERSION_METADATA_MISSING",
+    "FAILURE_TAXONOMY_MISSING",
+    "TRACE_LINKAGE_MISSING",
     "RUNTIME_EVENT_MISSING",
     "RESUME_CHECKPOINT_MISSING",
     "CANCEL_NOT_PROPAGATED",
@@ -293,6 +298,16 @@ class EvalCase:
     actual_workflow_wakeup_race_refs: list[str] = field(default_factory=list)
     expected_replay_lineage_refs: list[str] = field(default_factory=list)
     actual_replay_lineage_refs: list[str] = field(default_factory=list)
+    expected_replay_observability_refs: list[str] = field(default_factory=list)
+    actual_replay_observability_refs: list[str] = field(default_factory=list)
+    expected_replay_hash_refs: list[str] = field(default_factory=list)
+    actual_replay_hash_refs: list[str] = field(default_factory=list)
+    expected_replay_version_refs: list[str] = field(default_factory=list)
+    actual_replay_version_refs: list[str] = field(default_factory=list)
+    expected_failure_taxonomy_refs: list[str] = field(default_factory=list)
+    actual_failure_taxonomy_refs: list[str] = field(default_factory=list)
+    expected_trace_linkage_refs: list[str] = field(default_factory=list)
+    actual_trace_linkage_refs: list[str] = field(default_factory=list)
     expected_failure_class: str = ""
     actual_failure_class: str = ""
     actual_abstained: bool = False
@@ -352,6 +367,11 @@ class EvalCase:
     checkpoint_version_drift_detected: bool = False
     workflow_wakeup_race_resolved: bool = False
     replay_lineage_complete: bool = True
+    replay_observability_complete: bool = True
+    replay_hashes_recorded: bool = True
+    replay_version_metadata_recorded: bool = True
+    failure_taxonomy_recorded: bool = True
+    trace_linkage_recorded: bool = True
     revoked_memory_used: bool = False
     side_effect_reexecuted: bool = False
 
@@ -370,6 +390,11 @@ class ReplayBundle:
     checkpoint_refs: list[str]
     audit_refs: list[str]
     lineage_refs: list[str]
+    observability_refs: list[str]
+    hash_refs: list[str]
+    version_refs: list[str]
+    failure_taxonomy_refs: list[str]
+    trace_linkage_refs: list[str]
     failure_class: str
     replay_complete: bool
     side_effect_reexecuted: bool
@@ -962,6 +987,39 @@ def _eval_case(payload: dict[str, Any], index: int) -> EvalCase:
             payload.get("actual_replay_lineage_refs", []),
             "actual_replay_lineage_refs",
         ),
+        expected_replay_observability_refs=_string_list(
+            payload.get("expected_replay_observability_refs", []),
+            "expected_replay_observability_refs",
+        ),
+        actual_replay_observability_refs=_string_list(
+            payload.get("actual_replay_observability_refs", []),
+            "actual_replay_observability_refs",
+        ),
+        expected_replay_hash_refs=_string_list(
+            payload.get("expected_replay_hash_refs", []), "expected_replay_hash_refs"
+        ),
+        actual_replay_hash_refs=_string_list(
+            payload.get("actual_replay_hash_refs", []), "actual_replay_hash_refs"
+        ),
+        expected_replay_version_refs=_string_list(
+            payload.get("expected_replay_version_refs", []), "expected_replay_version_refs"
+        ),
+        actual_replay_version_refs=_string_list(
+            payload.get("actual_replay_version_refs", []), "actual_replay_version_refs"
+        ),
+        expected_failure_taxonomy_refs=_string_list(
+            payload.get("expected_failure_taxonomy_refs", []),
+            "expected_failure_taxonomy_refs",
+        ),
+        actual_failure_taxonomy_refs=_string_list(
+            payload.get("actual_failure_taxonomy_refs", []), "actual_failure_taxonomy_refs"
+        ),
+        expected_trace_linkage_refs=_string_list(
+            payload.get("expected_trace_linkage_refs", []), "expected_trace_linkage_refs"
+        ),
+        actual_trace_linkage_refs=_string_list(
+            payload.get("actual_trace_linkage_refs", []), "actual_trace_linkage_refs"
+        ),
         expected_failure_class=expected_failure_class,
         actual_failure_class=actual_failure_class,
         actual_abstained=_bool(payload.get("actual_abstained", False), "actual_abstained"),
@@ -1153,6 +1211,23 @@ def _eval_case(payload: dict[str, Any], index: int) -> EvalCase:
         ),
         replay_lineage_complete=_bool(
             payload.get("replay_lineage_complete", True), "replay_lineage_complete"
+        ),
+        replay_observability_complete=_bool(
+            payload.get("replay_observability_complete", True),
+            "replay_observability_complete",
+        ),
+        replay_hashes_recorded=_bool(
+            payload.get("replay_hashes_recorded", True), "replay_hashes_recorded"
+        ),
+        replay_version_metadata_recorded=_bool(
+            payload.get("replay_version_metadata_recorded", True),
+            "replay_version_metadata_recorded",
+        ),
+        failure_taxonomy_recorded=_bool(
+            payload.get("failure_taxonomy_recorded", True), "failure_taxonomy_recorded"
+        ),
+        trace_linkage_recorded=_bool(
+            payload.get("trace_linkage_recorded", True), "trace_linkage_recorded"
         ),
         revoked_memory_used=_bool(payload.get("revoked_memory_used", False), "revoked_memory_used"),
         side_effect_reexecuted=_bool(

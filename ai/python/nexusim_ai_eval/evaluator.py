@@ -74,6 +74,13 @@ def _evaluate_case(case: EvalCase) -> EvalResult:
         scores.update(family_scores)
         failure_class = family_failure
 
+    replay_observability_scores, replay_observability_failure = _replay_observability_scores(
+        case
+    )
+    scores.update(replay_observability_scores)
+    if replay_observability_failure and not failure_class:
+        failure_class = replay_observability_failure
+
     expected_failure_matches = False
     if case.expected_failure_class:
         expected_failure_matches = case.actual_failure_class == case.expected_failure_class
@@ -798,6 +805,91 @@ def _replay_lineage_score(case: EvalCase) -> float:
     return 1.0 if expected_lineage.issubset(set(case.actual_replay_lineage_refs)) else 0.0
 
 
+def _replay_observability_scores(case: EvalCase) -> tuple[dict[str, float], str]:
+    if not _has_replay_observability_requirements(case):
+        return ({}, "")
+
+    observability_score = _replay_metadata_ref_score(
+        case.expected_replay_observability_refs,
+        case.actual_replay_observability_refs,
+        case.replay_observability_complete,
+    )
+    hash_score = _replay_metadata_ref_score(
+        case.expected_replay_hash_refs,
+        case.actual_replay_hash_refs,
+        case.replay_hashes_recorded,
+    )
+    version_score = _replay_metadata_ref_score(
+        case.expected_replay_version_refs,
+        case.actual_replay_version_refs,
+        case.replay_version_metadata_recorded,
+    )
+    failure_taxonomy_score = _replay_metadata_ref_score(
+        case.expected_failure_taxonomy_refs,
+        case.actual_failure_taxonomy_refs,
+        case.failure_taxonomy_recorded,
+    )
+    trace_linkage_score = _replay_metadata_ref_score(
+        case.expected_trace_linkage_refs,
+        case.actual_trace_linkage_refs,
+        case.trace_linkage_recorded,
+    )
+
+    if observability_score == 0.0:
+        failure = "REPLAY_OBSERVABILITY_MISSING"
+    elif hash_score == 0.0:
+        failure = "REPLAY_HASH_MISSING"
+    elif version_score == 0.0:
+        failure = "REPLAY_VERSION_METADATA_MISSING"
+    elif failure_taxonomy_score == 0.0:
+        failure = "FAILURE_TAXONOMY_MISSING"
+    elif trace_linkage_score == 0.0:
+        failure = "TRACE_LINKAGE_MISSING"
+    else:
+        failure = ""
+
+    return (
+        {
+            "replay_observability_ref_score": observability_score,
+            "replay_hash_ref_score": hash_score,
+            "replay_version_metadata_score": version_score,
+            "failure_taxonomy_ref_score": failure_taxonomy_score,
+            "trace_linkage_score": trace_linkage_score,
+        },
+        failure,
+    )
+
+
+def _has_replay_observability_requirements(case: EvalCase) -> bool:
+    return bool(
+        case.expected_replay_observability_refs
+        or case.actual_replay_observability_refs
+        or case.expected_replay_hash_refs
+        or case.actual_replay_hash_refs
+        or case.expected_replay_version_refs
+        or case.actual_replay_version_refs
+        or case.expected_failure_taxonomy_refs
+        or case.actual_failure_taxonomy_refs
+        or case.expected_trace_linkage_refs
+        or case.actual_trace_linkage_refs
+        or not case.replay_observability_complete
+        or not case.replay_hashes_recorded
+        or not case.replay_version_metadata_recorded
+        or not case.failure_taxonomy_recorded
+        or not case.trace_linkage_recorded
+    )
+
+
+def _replay_metadata_ref_score(
+    expected_refs: list[str],
+    actual_refs: list[str],
+    recorded: bool,
+) -> float:
+    if not recorded:
+        return 0.0
+    return _ref_subset_score(expected_refs, actual_refs)
+
+
 def _source_coverage_score(case: EvalCase) -> float:
     expected = set(case.expected_source_coverage_refs)
     actual = set(case.actual_source_coverage_refs or case.visible_evidence_refs)
@@ -1191,6 +1283,11 @@ def _replay_bundle(case: EvalCase, failure_class: str) -> ReplayBundle:
         "actual_workflow_wakeup_refs": case.actual_workflow_wakeup_refs,
         "actual_workflow_wakeup_race_refs": case.actual_workflow_wakeup_race_refs,
         "actual_replay_lineage_refs": case.actual_replay_lineage_refs,
+        "actual_replay_observability_refs": case.actual_replay_observability_refs,
+        "actual_replay_hash_refs": case.actual_replay_hash_refs,
+        "actual_replay_version_refs": case.actual_replay_version_refs,
+        "actual_failure_taxonomy_refs": case.actual_failure_taxonomy_refs,
+        "actual_trace_linkage_refs": case.actual_trace_linkage_refs,
         "actual_state_change_refs": case.actual_state_change_refs,
         "actual_execution_refs": case.actual_execution_refs,
         "actual_state_audit_refs": case.actual_state_audit_refs,
@@ -1231,6 +1328,11 @@ def _replay_bundle(case: EvalCase, failure_class: str) -> ReplayBundle:
         checkpoint_refs=case.actual_checkpoint_refs,
         audit_refs=case.actual_state_audit_refs + [stable_ref("audit", replay_payload)],
         lineage_refs=case.actual_replay_lineage_refs,
+        observability_refs=case.actual_replay_observability_refs,
+        hash_refs=case.actual_replay_hash_refs,
+        version_refs=case.actual_replay_version_refs,
+        failure_taxonomy_refs=case.actual_failure_taxonomy_refs,
+        trace_linkage_refs=case.actual_trace_linkage_refs,
         failure_class=failure_class,
         replay_complete=replay_complete,
         side_effect_reexecuted=case.side_effect_reexecuted,

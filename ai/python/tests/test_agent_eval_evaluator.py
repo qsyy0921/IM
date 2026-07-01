@@ -1909,6 +1909,118 @@ class AgentEvalEvaluatorTests(unittest.TestCase):
         self.assertEqual(report.failure_distribution, {"PASS": 3})
         self.assertEqual(report.aggregate_scores["expected_failure_match"], 1.0)
 
+    def test_replay_observability_passes_with_all_metadata_refs(self) -> None:
+        case = base_case("RUNTIME_CONTROL")
+        case.update(
+            {
+                "case_id": "replay-observability-all-metadata-pass",
+                "expected_replay_observability_refs": ["replay-observability:run-42"],
+                "actual_replay_observability_refs": ["replay-observability:run-42"],
+                "expected_replay_hash_refs": ["hash:input:run-42"],
+                "actual_replay_hash_refs": ["hash:input:run-42"],
+                "expected_replay_version_refs": ["version:harness:v1"],
+                "actual_replay_version_refs": ["version:harness:v1"],
+                "expected_failure_taxonomy_refs": ["failure-taxonomy:agent-eval:v1"],
+                "actual_failure_taxonomy_refs": ["failure-taxonomy:agent-eval:v1"],
+                "expected_trace_linkage_refs": ["trace-link:run-42"],
+                "actual_trace_linkage_refs": ["trace-link:run-42"],
+            }
+        )
+
+        report = run_eval_suite(suite_with_case(case))
+
+        self.assertEqual(report.status, "PASS")
+        self.assertEqual(report.aggregate_scores["replay_observability_ref_score"], 1.0)
+        self.assertEqual(report.aggregate_scores["replay_hash_ref_score"], 1.0)
+        self.assertEqual(report.aggregate_scores["replay_version_metadata_score"], 1.0)
+        self.assertEqual(report.aggregate_scores["failure_taxonomy_ref_score"], 1.0)
+        self.assertEqual(report.aggregate_scores["trace_linkage_score"], 1.0)
+        self.assertEqual(
+            report.results[0].replay_bundle.observability_refs,
+            ["replay-observability:run-42"],
+        )
+        self.assertEqual(report.results[0].replay_bundle.hash_refs, ["hash:input:run-42"])
+        self.assertEqual(
+            report.results[0].replay_bundle.failure_taxonomy_refs,
+            ["failure-taxonomy:agent-eval:v1"],
+        )
+
+    def test_replay_observability_fails_missing_observability_ref(self) -> None:
+        case = base_case("RUNTIME_CONTROL")
+        case.update(
+            {
+                "expected_replay_observability_refs": ["replay-observability:required"],
+                "actual_replay_observability_refs": [],
+            }
+        )
+
+        report = run_eval_suite(suite_with_case(case))
+
+        self.assertEqual(report.status, "FAIL")
+        self.assertEqual(report.results[0].failure_class, "REPLAY_OBSERVABILITY_MISSING")
+        self.assertEqual(report.aggregate_scores["replay_observability_ref_score"], 0.0)
+
+    def test_replay_observability_fails_missing_hash_ref(self) -> None:
+        case = base_case("RUNTIME_CONTROL")
+        case.update(
+            {
+                "expected_replay_hash_refs": ["hash:required"],
+                "actual_replay_hash_refs": [],
+            }
+        )
+
+        report = run_eval_suite(suite_with_case(case))
+
+        self.assertEqual(report.status, "FAIL")
+        self.assertEqual(report.results[0].failure_class, "REPLAY_HASH_MISSING")
+        self.assertEqual(report.aggregate_scores["replay_hash_ref_score"], 0.0)
+
+    def test_replay_observability_fails_missing_version_metadata(self) -> None:
+        case = base_case("RUNTIME_CONTROL")
+        case.update(
+            {
+                "expected_replay_version_refs": ["version:harness:v2"],
+                "actual_replay_version_refs": ["version:harness:v2"],
+                "replay_version_metadata_recorded": False,
+            }
+        )
+
+        report = run_eval_suite(suite_with_case(case))
+
+        self.assertEqual(report.status, "FAIL")
+        self.assertEqual(report.results[0].failure_class, "REPLAY_VERSION_METADATA_MISSING")
+        self.assertEqual(report.aggregate_scores["replay_version_metadata_score"], 0.0)
+
+    def test_replay_observability_fails_missing_failure_taxonomy(self) -> None:
+        case = base_case("RUNTIME_CONTROL")
+        case.update(
+            {
+                "expected_failure_taxonomy_refs": ["failure-taxonomy:agent-eval:v2"],
+                "actual_failure_taxonomy_refs": [],
+            }
+        )
+
+        report = run_eval_suite(suite_with_case(case))
+
+        self.assertEqual(report.status, "FAIL")
+        self.assertEqual(report.results[0].failure_class, "FAILURE_TAXONOMY_MISSING")
+        self.assertEqual(report.aggregate_scores["failure_taxonomy_ref_score"], 0.0)
+
+    def test_replay_observability_fails_missing_trace_linkage(self) -> None:
+        case = base_case("RUNTIME_CONTROL")
+        case.update(
+            {
+                "expected_trace_linkage_refs": ["trace-link:run-42"],
+                "actual_trace_linkage_refs": [],
+            }
+        )
+
+        report = run_eval_suite(suite_with_case(case))
+
+        self.assertEqual(report.status, "FAIL")
+        self.assertEqual(report.results[0].failure_class, "TRACE_LINKAGE_MISSING")
+        self.assertEqual(report.aggregate_scores["trace_linkage_score"], 0.0)
+
 
 if __name__ == "__main__":
     unittest.main()

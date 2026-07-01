@@ -14,14 +14,12 @@
 
 ## 当前优先顺序
 
-1. ReplayBundle / observability：runtime-control deeper hardening 已覆盖 checkpoint
-   version drift、workflow wakeup race 和 replay bundle lineage completeness；
-   state-diff deeper hardening 已覆盖 dependency graph、compensation chain 和
-   operator redrive review refs；后续补全局低敏 refs、hashes、version metadata、
-   failure taxonomy 和 trace linkage。
-2. Memory calibration data expansion：本地 calibration sample 已覆盖 confidence
+1. Memory calibration data expansion：本地 calibration sample 已覆盖 confidence
    threshold、policy revocation-window retention 和 review backoff/operator queue
    recommendation；后续仅在明确优先时替换为更大的公开数据集导出。
+2. ReplayBundle observability hardening review：当前 skeleton 已覆盖低敏
+   observability refs、hash refs、version metadata refs、failure taxonomy refs 和
+   trace linkage refs；如评审要求继续，只增加 fixture-only taxonomy / trace 证据。
 3. ADR promotion review：只有前述 fixture/eval 有证据后，才评估 Agent Runtime、
    ContextPackage、MemoryCandidate、Tool prepare、ReplayBundle 是否提升为 ADR / 契约。
 

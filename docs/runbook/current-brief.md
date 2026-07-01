@@ -126,13 +126,16 @@ Agent Gateway / UX
   cancel propagation incomplete、replay event incomplete。
 - 已补 fixture-only runtime-control deeper hardening：checkpoint version drift
   detection、workflow wakeup race dedupe、ReplayBundle lineage completeness。
+- 已补 fixture-only ReplayBundle observability skeleton：低敏
+  observability refs、hash refs、version metadata refs、failure taxonomy refs 和
+  trace linkage refs，并接入 EvalReport / ReplayBundle / AgentRunTrace。
 - 已补 current EvalReport generation / baseline refresh review CLI，生成当前报告和
   baseline refresh review artifact，默认不覆盖 baseline。
 - 已补 current-report / baseline lifecycle deeper hardening：多 suite report
   matrix、baseline refresh approval manifest 和 report retention metadata，
   支持 synthetic fixture 与 public-dataset-style adapter sample 混合进矩阵。
-- 下一段优先做 ReplayBundle / observability review：低敏 refs、hashes、
-  version metadata、failure taxonomy、trace linkage。
+- 下一段优先做 memory calibration data expansion 或 ReplayBundle observability
+  review 后续 hardening；仍只允许公开数据集导出和 synthetic fixture。
 
 ## 工作规则
 

@@ -29,11 +29,11 @@ class QasperLikeRagAdapter:
         expected_citations = _string_list(
             payload.get("expected_citation_refs", evidence_refs), "expected_citation_refs"
         )
-        return {
+        case = {
             "case_id": case_id,
             "dataset_name": str(payload.get("dataset_name", "qasper-like")),
             "dataset_version": str(payload.get("dataset_version", "local-skeleton")),
-            "capability_family": "GROUNDED_RAG",
+            "capability_family": str(payload.get("capability_family", "GROUNDED_RAG")),
             "fixture_version": self.adapter_version,
             "input_refs": _string_list(payload.get("input_refs", [f"input:{case_id}"]), "input_refs"),
             "visible_evidence_refs": evidence_refs,
@@ -51,6 +51,9 @@ class QasperLikeRagAdapter:
             "actual_failure_class": str(payload.get("actual_failure_class", "")),
             "actual_abstained": bool(payload.get("actual_abstained", False)),
         }
+        _copy_optional_list_fields(payload, case, _QASPER_RAG_LIST_FIELDS)
+        _copy_optional_bool_fields(payload, case, _QASPER_RAG_BOOL_FIELDS)
+        return case
 
 
 class ToolSandboxLikeAdapter:
@@ -161,6 +164,54 @@ def suite_from_adapter_cases(
 _TOOLSANDBOX_TOOL_STRING_FIELDS = [
     "expected_tool_provider_ref",
     "actual_tool_provider_ref",
+]
+
+_QASPER_RAG_LIST_FIELDS = [
+    "expected_source_coverage_refs",
+    "actual_source_coverage_refs",
+    "expected_retrieval_lanes",
+    "actual_retrieval_lanes",
+    "unavailable_retrieval_lanes",
+    "expected_source_ranking_refs",
+    "actual_source_ranking_refs",
+    "expected_source_ranking_tie_break_refs",
+    "actual_source_ranking_tie_break_refs",
+    "expected_rerank_confidence_threshold_refs",
+    "actual_rerank_confidence_threshold_refs",
+    "expected_rerank_explanation_refs",
+    "actual_rerank_explanation_refs",
+    "expected_lane_redrive_refs",
+    "actual_lane_redrive_refs",
+    "denied_retrieval_lanes",
+    "denied_lane_source_refs",
+    "reported_denied_lane_source_refs",
+    "expected_denied_lane_audit_refs",
+    "actual_denied_lane_audit_refs",
+    "expected_snippet_citation_refs",
+    "actual_snippet_citation_refs",
+    "expected_citation_repair_refs",
+    "actual_citation_repair_refs",
+    "partial_source_rejected_refs",
+    "actual_partial_source_rejected_refs",
+    "tainted_context_refs",
+    "expected_taint_label_refs",
+    "actual_taint_label_refs",
+    "expected_taint_vocabulary_refs",
+    "actual_taint_vocabulary_refs",
+]
+
+_QASPER_RAG_BOOL_FIELDS = [
+    "retrieval_lane_gap_reported",
+    "source_ranking_explained",
+    "rerank_confidence_threshold_applied",
+    "rerank_explanation_recorded",
+    "lane_redrive_recorded",
+    "denied_lane_reported",
+    "denied_lane_audit_recorded",
+    "snippet_citation_repaired",
+    "partial_source_rejected",
+    "context_taint_propagated",
+    "context_taint_vocabulary_aligned",
 ]
 
 _TOOLSANDBOX_TOOL_LIST_FIELDS = [

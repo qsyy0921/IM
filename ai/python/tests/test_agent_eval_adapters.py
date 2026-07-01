@@ -31,6 +31,56 @@ class AgentEvalAdapterTests(unittest.TestCase):
         self.assertEqual(report.eval_run.adapter_versions, [adapter.adapter_version])
         self.assertEqual(report.aggregate_scores["citation_coverage"], 1.0)
 
+    def test_qasper_like_adapter_preserves_context_alignment_refs(self) -> None:
+        adapter = QasperLikeRagAdapter()
+        suite = suite_from_adapter_cases(
+            suite_id="adapter-rag-context-suite",
+            adapter=adapter,
+            cases=[
+                {
+                    "case_id": "rag-context-adapter-case",
+                    "capability_family": "CONTEXT_EVIDENCE",
+                    "evidence_refs": ["paper:local:chunk-1", "paper:local:chunk-2"],
+                    "actual_used_refs": ["paper:local:chunk-1"],
+                    "expected_source_coverage_refs": [
+                        "paper:local:chunk-1",
+                        "paper:local:chunk-2",
+                    ],
+                    "actual_source_coverage_refs": [
+                        "paper:local:chunk-1",
+                        "paper:local:chunk-2",
+                    ],
+                    "expected_source_ranking_refs": [
+                        "paper:local:chunk-1",
+                        "paper:local:chunk-2",
+                    ],
+                    "actual_source_ranking_refs": [
+                        "paper:local:chunk-1",
+                        "paper:local:chunk-2",
+                    ],
+                    "expected_rerank_confidence_threshold_refs": [
+                        "rerank-threshold:rag-high-confidence"
+                    ],
+                    "actual_rerank_confidence_threshold_refs": [
+                        "rerank-threshold:rag-high-confidence"
+                    ],
+                    "expected_rerank_explanation_refs": ["rerank-explanation:chunk-match"],
+                    "actual_rerank_explanation_refs": ["rerank-explanation:chunk-match"],
+                    "source_ranking_explained": True,
+                    "rerank_confidence_threshold_applied": True,
+                    "rerank_explanation_recorded": True,
+                }
+            ],
+        )
+
+        report = run_eval_suite(suite)
+
+        self.assertEqual(report.status, "PASS")
+        self.assertEqual(suite["cases"][0]["capability_family"], "CONTEXT_EVIDENCE")
+        self.assertEqual(report.aggregate_scores["source_ranking_score"], 1.0)
+        self.assertEqual(report.aggregate_scores["rerank_confidence_threshold_score"], 1.0)
+        self.assertEqual(report.aggregate_scores["rerank_explanation_score"], 1.0)
+
     def test_tool_adapter_builds_tool_security_case(self) -> None:
         adapter = ToolSandboxLikeAdapter()
         suite = suite_from_adapter_cases(

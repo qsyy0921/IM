@@ -28,10 +28,13 @@ class EvidencePackFixture:
     unavailable_retrieval_lanes: list[str]
     source_ranking_refs: list[str]
     source_ranking_tie_break_refs: list[str]
+    rerank_confidence_threshold_refs: list[str]
+    rerank_explanation_refs: list[str]
     lane_redrive_refs: list[str]
     denied_retrieval_lanes: list[str]
     denied_lane_source_refs: list[str]
     reported_denied_lane_source_refs: list[str]
+    denied_lane_audit_refs: list[str]
 
 
 @dataclass(frozen=True)
@@ -55,6 +58,10 @@ class ContextPackageFixture:
     unavailable_retrieval_lanes: list[str]
     retrieval_lane_gap_reported: bool
     source_ranking_explained: bool
+    rerank_confidence_threshold_refs: list[str]
+    rerank_explanation_refs: list[str]
+    rerank_confidence_threshold_applied: bool
+    rerank_explanation_recorded: bool
     snippet_citation_refs: list[str]
     citation_repair_refs: list[str]
     partial_source_rejected_refs: list[str]
@@ -62,9 +69,13 @@ class ContextPackageFixture:
     partial_source_rejected: bool
     tainted_context_refs: list[str]
     taint_label_refs: list[str]
+    taint_vocabulary_refs: list[str]
     context_taint_propagated: bool
+    context_taint_vocabulary_aligned: bool
     lane_redrive_recorded: bool
     denied_lane_reported: bool
+    denied_lane_audit_refs: list[str]
+    denied_lane_audit_recorded: bool
 
 
 @dataclass(frozen=True)
@@ -220,10 +231,13 @@ def build_agent_run_trace(case: EvalCase) -> AgentRunTrace:
         unavailable_retrieval_lanes=case.unavailable_retrieval_lanes,
         source_ranking_refs=case.actual_source_ranking_refs,
         source_ranking_tie_break_refs=case.actual_source_ranking_tie_break_refs,
+        rerank_confidence_threshold_refs=case.actual_rerank_confidence_threshold_refs,
+        rerank_explanation_refs=case.actual_rerank_explanation_refs,
         lane_redrive_refs=case.actual_lane_redrive_refs,
         denied_retrieval_lanes=case.denied_retrieval_lanes,
         denied_lane_source_refs=case.denied_lane_source_refs,
         reported_denied_lane_source_refs=case.reported_denied_lane_source_refs,
+        denied_lane_audit_refs=case.actual_denied_lane_audit_refs,
     )
     used_refs = case.actual_used_refs or case.actual_citation_refs
     leakage = bool(set(case.forbidden_evidence_refs).intersection(used_refs))
@@ -247,6 +261,10 @@ def build_agent_run_trace(case: EvalCase) -> AgentRunTrace:
         unavailable_retrieval_lanes=case.unavailable_retrieval_lanes,
         retrieval_lane_gap_reported=case.retrieval_lane_gap_reported,
         source_ranking_explained=case.source_ranking_explained,
+        rerank_confidence_threshold_refs=case.actual_rerank_confidence_threshold_refs,
+        rerank_explanation_refs=case.actual_rerank_explanation_refs,
+        rerank_confidence_threshold_applied=case.rerank_confidence_threshold_applied,
+        rerank_explanation_recorded=case.rerank_explanation_recorded,
         snippet_citation_refs=case.actual_snippet_citation_refs,
         citation_repair_refs=case.actual_citation_repair_refs,
         partial_source_rejected_refs=case.actual_partial_source_rejected_refs,
@@ -254,9 +272,13 @@ def build_agent_run_trace(case: EvalCase) -> AgentRunTrace:
         partial_source_rejected=case.partial_source_rejected,
         tainted_context_refs=case.tainted_context_refs,
         taint_label_refs=case.actual_taint_label_refs,
+        taint_vocabulary_refs=case.actual_taint_vocabulary_refs,
         context_taint_propagated=case.context_taint_propagated,
+        context_taint_vocabulary_aligned=case.context_taint_vocabulary_aligned,
         lane_redrive_recorded=case.lane_redrive_recorded,
         denied_lane_reported=case.denied_lane_reported,
+        denied_lane_audit_refs=case.actual_denied_lane_audit_refs,
+        denied_lane_audit_recorded=case.denied_lane_audit_recorded,
     )
     context_status, context_failure = _context_step_status(case, context_package, leakage)
     steps = [
@@ -553,14 +575,22 @@ def _context_step_status(
                 return ("FAIL", "RETRIEVAL_LANE_GAP_MISSING")
     if not _source_ranking_valid(case, context_package):
         return ("FAIL", "SOURCE_RANKING_MISSING")
+    if not _rerank_confidence_threshold_valid(case, context_package):
+        return ("FAIL", "RERANK_CONFIDENCE_THRESHOLD_MISSING")
+    if not _rerank_explanation_valid(case, context_package):
+        return ("FAIL", "RERANK_EXPLANATION_MISSING")
     if not _retrieval_lane_redrive_valid(case, context_package):
         return ("FAIL", "RETRIEVAL_LANE_REDRIVE_MISSING")
     if not _snippet_citation_repair_valid(case, context_package):
         return ("FAIL", "CITATION_REPAIR_MISSING")
     if not _denied_retrieval_lane_valid(case, context_package):
         return ("FAIL", "DENIED_RETRIEVAL_LANE_EXPOSED")
+    if not _denied_lane_audit_valid(case, context_package):
+        return ("FAIL", "DENIED_LANE_AUDIT_MISSING")
     if not _context_taint_propagation_valid(case, context_package):
         return ("FAIL", "CONTEXT_TAINT_PROPAGATION_MISSING")
+    if not _context_taint_vocabulary_valid(case, context_package):
+        return ("FAIL", "CONTEXT_TAINT_VOCABULARY_MISSING")
     return ("PASS", "")
 
 
@@ -577,6 +607,32 @@ def _source_ranking_valid(
     if expected_ranking and case.actual_source_ranking_refs[: len(expected_ranking)] != expected_ranking:
         return False
     return not expected_tie_breaks or case.actual_source_ranking_tie_break_refs == expected_tie_breaks
+
+
+def _rerank_confidence_threshold_valid(
+    case: EvalCase,
+    context_package: ContextPackageFixture,
+) -> bool:
+    expected_thresholds = set(case.expected_rerank_confidence_threshold_refs)
+    if not expected_thresholds:
+        return True
+    if not context_package.rerank_confidence_threshold_applied:
+        return False
+    return expected_thresholds.issubset(
+        set(context_package.rerank_confidence_threshold_refs)
+    )
+
+
+def _rerank_explanation_valid(
+    case: EvalCase,
+    context_package: ContextPackageFixture,
+) -> bool:
+    expected_explanations = set(case.expected_rerank_explanation_refs)
+    if not expected_explanations:
+        return True
+    if not context_package.rerank_explanation_recorded:
+        return False
+    return expected_explanations.issubset(set(context_package.rerank_explanation_refs))
 
 
 def _retrieval_lane_redrive_valid(
@@ -634,6 +690,18 @@ def _denied_retrieval_lane_valid(
     return not denied_sources.intersection(_context_refs(case))
 
 
+def _denied_lane_audit_valid(
+    case: EvalCase,
+    context_package: ContextPackageFixture,
+) -> bool:
+    expected_audits = set(case.expected_denied_lane_audit_refs)
+    if not expected_audits:
+        return True
+    if not context_package.denied_lane_audit_recorded:
+        return False
+    return expected_audits.issubset(set(context_package.denied_lane_audit_refs))
+
+
 def _context_taint_propagation_valid(
     case: EvalCase,
     context_package: ContextPackageFixture,
@@ -644,6 +712,18 @@ def _context_taint_propagation_valid(
     if not context_package.context_taint_propagated:
         return False
     return expected_taint_labels.issubset(set(context_package.taint_label_refs))
+
+
+def _context_taint_vocabulary_valid(
+    case: EvalCase,
+    context_package: ContextPackageFixture,
+) -> bool:
+    expected_vocab = set(case.expected_taint_vocabulary_refs)
+    if not expected_vocab:
+        return True
+    if not context_package.context_taint_vocabulary_aligned:
+        return False
+    return expected_vocab.issubset(set(context_package.taint_vocabulary_refs))
 
 
 def _state_diff_step_status(

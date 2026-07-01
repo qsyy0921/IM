@@ -20,6 +20,107 @@
       "expected_failure_class": "INSUFFICIENT_EVIDENCE",
       "actual_failure_class": "INSUFFICIENT_EVIDENCE",
       "actual_abstained": true
+    },
+    {
+      "case_id": "qasper-like-ranking-rerank-threshold",
+      "dataset_name": "qasper-like-local-sample",
+      "dataset_version": "2026-07-01",
+      "capability_family": "CONTEXT_EVIDENCE",
+      "input_refs": ["qasper:question:3"],
+      "evidence_refs": [
+        "qasper:paper:3:chunk:method",
+        "qasper:paper:3:chunk:discussion"
+      ],
+      "actual_used_refs": ["qasper:paper:3:chunk:method"],
+      "expected_source_coverage_refs": [
+        "qasper:paper:3:chunk:method",
+        "qasper:paper:3:chunk:discussion"
+      ],
+      "actual_source_coverage_refs": [
+        "qasper:paper:3:chunk:method",
+        "qasper:paper:3:chunk:discussion"
+      ],
+      "expected_source_ranking_refs": [
+        "qasper:paper:3:chunk:method",
+        "qasper:paper:3:chunk:discussion"
+      ],
+      "actual_source_ranking_refs": [
+        "qasper:paper:3:chunk:method",
+        "qasper:paper:3:chunk:discussion"
+      ],
+      "expected_source_ranking_tie_break_refs": ["qasper:paper:3:chunk:method"],
+      "actual_source_ranking_tie_break_refs": ["qasper:paper:3:chunk:method"],
+      "expected_rerank_confidence_threshold_refs": [
+        "rerank-threshold:rag-high-confidence"
+      ],
+      "actual_rerank_confidence_threshold_refs": [
+        "rerank-threshold:rag-high-confidence"
+      ],
+      "expected_rerank_explanation_refs": ["rerank-explanation:method-overlap"],
+      "actual_rerank_explanation_refs": ["rerank-explanation:method-overlap"],
+      "source_ranking_explained": true,
+      "rerank_confidence_threshold_applied": true,
+      "rerank_explanation_recorded": true
+    },
+    {
+      "case_id": "hotpotqa-like-citation-repair",
+      "dataset_name": "hotpotqa-like-local-sample",
+      "dataset_version": "2026-07-01",
+      "capability_family": "CONTEXT_EVIDENCE",
+      "input_refs": ["hotpotqa:question:1"],
+      "evidence_refs": [
+        "hotpotqa:doc:alpha:sent:2",
+        "hotpotqa:doc:beta:sent:4"
+      ],
+      "actual_used_refs": ["hotpotqa:doc:alpha:sent:2"],
+      "expected_source_coverage_refs": [
+        "hotpotqa:doc:alpha:sent:2",
+        "hotpotqa:doc:beta:sent:4"
+      ],
+      "actual_source_coverage_refs": [
+        "hotpotqa:doc:alpha:sent:2",
+        "hotpotqa:doc:beta:sent:4"
+      ],
+      "expected_snippet_citation_refs": ["snippet:hotpotqa:doc:alpha:sent:2"],
+      "actual_snippet_citation_refs": ["snippet:hotpotqa:doc:alpha:sent:2"],
+      "expected_citation_repair_refs": [
+        "citation-repair:hotpotqa:doc:alpha:sent:2"
+      ],
+      "actual_citation_repair_refs": [
+        "citation-repair:hotpotqa:doc:alpha:sent:2"
+      ],
+      "partial_source_rejected_refs": ["snippet:hotpotqa:doc:beta:sent:4:ambiguous"],
+      "actual_partial_source_rejected_refs": [
+        "snippet:hotpotqa:doc:beta:sent:4:ambiguous"
+      ],
+      "snippet_citation_repaired": true,
+      "partial_source_rejected": true
+    },
+    {
+      "case_id": "beir-like-denied-lane-taint-vocabulary",
+      "dataset_name": "beir-like-local-sample",
+      "dataset_version": "2026-07-01",
+      "capability_family": "CONTEXT_EVIDENCE",
+      "input_refs": ["beir:query:1"],
+      "evidence_refs": ["beir:doc:tenant-a:policy-visible"],
+      "actual_used_refs": ["beir:doc:tenant-a:policy-visible"],
+      "expected_source_coverage_refs": ["beir:doc:tenant-a:policy-visible"],
+      "actual_source_coverage_refs": ["beir:doc:tenant-a:policy-visible"],
+      "actual_retrieval_lanes": ["public_rag"],
+      "denied_retrieval_lanes": ["cross_tenant_memory"],
+      "denied_lane_source_refs": ["evidence:tenant-b:policy-hidden"],
+      "reported_denied_lane_source_refs": ["evidence:tenant-b:policy-hidden"],
+      "expected_denied_lane_audit_refs": ["audit:denied-lane:cross-tenant"],
+      "actual_denied_lane_audit_refs": ["audit:denied-lane:cross-tenant"],
+      "tainted_context_refs": ["tool-output:mcp-reader:summary"],
+      "expected_taint_label_refs": ["tool-output:mcp-reader:summary"],
+      "actual_taint_label_refs": ["tool-output:mcp-reader:summary"],
+      "expected_taint_vocabulary_refs": ["taint-vocabulary:tool-output:v1"],
+      "actual_taint_vocabulary_refs": ["taint-vocabulary:tool-output:v1"],
+      "denied_lane_reported": true,
+      "denied_lane_audit_recorded": true,
+      "context_taint_propagated": true,
+      "context_taint_vocabulary_aligned": true
     }
   ]
 }

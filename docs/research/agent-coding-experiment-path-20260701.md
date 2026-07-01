@@ -144,6 +144,10 @@ Slice 0 covers:
 - fixture-only ContextPackage / EvidencePack deeper hardening coverage for
   source ranking, lane redrive, snippet-level citation repair, denied-lane
   handling and provider/tool/peer-agent taint propagation.
+- fixture-only ContextPackage / EvidencePack adapter alignment coverage for
+  Qasper / HotpotQA / BEIR-like public RAG samples, rerank confidence threshold
+  refs, rerank explanation refs, denied-lane audit refs and taint vocabulary
+  refs.
 - fixture-only richer memory admission coverage for group speaker/audience,
   project supersedes, profile aggregate review, revoked memory blocking, stale
   memory blocking and overgeneralization prevention.
@@ -369,6 +373,9 @@ Evaluator tests:
 - ContextPackage / EvidencePack deeper hardening scoring rejects missing source
   ranking, missing lane redrive refs, missing snippet citation repair, exposed
   denied lanes and missing taint propagation.
+- ContextPackage / EvidencePack adapter alignment scoring rejects missing
+  rerank confidence thresholds, missing rerank explanations, missing
+  denied-lane audit refs and missing taint vocabulary refs.
 - memory admission deeper hardening scoring rejects missing duplicate clusters,
   confidence calibration mismatch, missing procedural migration, revoked policy
   sources and missing review redrive refs.
@@ -458,11 +465,9 @@ git status --short --branch --untracked-files=all
 
 Recommended next slices:
 
-1. Align ContextPackage / EvidencePack fixtures with public RAG adapter samples,
-   rerank confidence thresholds, denied-lane audit metadata and taint vocabulary.
-2. Add multi-suite current-report and baseline-refresh lifecycle metadata once
+1. Add multi-suite current-report and baseline-refresh lifecycle metadata once
    the next fixture families are stable.
-3. Tune memory admission confidence thresholds and governed policy revocation
+2. Tune memory admission confidence thresholds and governed policy revocation
    windows against larger public memory datasets, still without production data.
 
 Each slice must keep the same isolation rule until an ADR explicitly promotes a

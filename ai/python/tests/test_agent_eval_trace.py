@@ -302,11 +302,21 @@ class AgentEvalTraceTests(unittest.TestCase):
                     "actual_source_ranking_refs": ["evidence:current", "memory:old"],
                     "expected_source_ranking_tie_break_refs": ["evidence:current"],
                     "actual_source_ranking_tie_break_refs": ["evidence:current"],
+                    "expected_rerank_confidence_threshold_refs": [
+                        "rerank-threshold:rag-high-confidence"
+                    ],
+                    "actual_rerank_confidence_threshold_refs": [
+                        "rerank-threshold:rag-high-confidence"
+                    ],
+                    "expected_rerank_explanation_refs": ["rerank-explanation:current-source"],
+                    "actual_rerank_explanation_refs": ["rerank-explanation:current-source"],
                     "expected_lane_redrive_refs": ["lane-redrive:memory:attempt-2"],
                     "actual_lane_redrive_refs": ["lane-redrive:memory:attempt-2"],
                     "denied_retrieval_lanes": ["cross_tenant_memory"],
                     "denied_lane_source_refs": ["evidence:tenant-other:hidden"],
                     "reported_denied_lane_source_refs": ["evidence:tenant-other:hidden"],
+                    "expected_denied_lane_audit_refs": ["audit:denied-lane:cross-tenant"],
+                    "actual_denied_lane_audit_refs": ["audit:denied-lane:cross-tenant"],
                     "expected_snippet_citation_refs": ["snippet:evidence:current#p2"],
                     "actual_snippet_citation_refs": ["snippet:evidence:current#p2"],
                     "expected_citation_repair_refs": ["citation-repair:evidence:current#p2"],
@@ -316,12 +326,18 @@ class AgentEvalTraceTests(unittest.TestCase):
                     "tainted_context_refs": ["peer-agent:analyst:summary"],
                     "expected_taint_label_refs": ["peer-agent:analyst:summary"],
                     "actual_taint_label_refs": ["peer-agent:analyst:summary"],
+                    "expected_taint_vocabulary_refs": ["taint-vocabulary:peer-agent:v1"],
+                    "actual_taint_vocabulary_refs": ["taint-vocabulary:peer-agent:v1"],
                     "source_ranking_explained": True,
+                    "rerank_confidence_threshold_applied": True,
+                    "rerank_explanation_recorded": True,
                     "lane_redrive_recorded": True,
                     "denied_lane_reported": True,
+                    "denied_lane_audit_recorded": True,
                     "snippet_citation_repaired": True,
                     "partial_source_rejected": True,
                     "context_taint_propagated": True,
+                    "context_taint_vocabulary_aligned": True,
                     "conflict_detected": True,
                 }
             )
@@ -342,9 +358,27 @@ class AgentEvalTraceTests(unittest.TestCase):
         self.assertEqual(trace.context_package.retrieval_lanes, ["conversation"])
         self.assertTrue(trace.context_package.retrieval_lane_gap_reported)
         self.assertEqual(trace.evidence_pack.source_ranking_refs, ["evidence:current", "memory:old"])
+        self.assertEqual(
+            trace.evidence_pack.rerank_confidence_threshold_refs,
+            ["rerank-threshold:rag-high-confidence"],
+        )
+        self.assertEqual(
+            trace.evidence_pack.rerank_explanation_refs,
+            ["rerank-explanation:current-source"],
+        )
         self.assertEqual(trace.evidence_pack.lane_redrive_refs, ["lane-redrive:memory:attempt-2"])
         self.assertEqual(trace.evidence_pack.denied_retrieval_lanes, ["cross_tenant_memory"])
+        self.assertEqual(
+            trace.evidence_pack.denied_lane_audit_refs,
+            ["audit:denied-lane:cross-tenant"],
+        )
         self.assertTrue(trace.context_package.source_ranking_explained)
+        self.assertTrue(trace.context_package.rerank_confidence_threshold_applied)
+        self.assertTrue(trace.context_package.rerank_explanation_recorded)
+        self.assertEqual(
+            trace.context_package.rerank_confidence_threshold_refs,
+            ["rerank-threshold:rag-high-confidence"],
+        )
         self.assertEqual(trace.context_package.snippet_citation_refs, ["snippet:evidence:current#p2"])
         self.assertEqual(
             trace.context_package.citation_repair_refs,
@@ -355,7 +389,13 @@ class AgentEvalTraceTests(unittest.TestCase):
             ["snippet:memory:old#ambiguous"],
         )
         self.assertEqual(trace.context_package.taint_label_refs, ["peer-agent:analyst:summary"])
+        self.assertEqual(
+            trace.context_package.taint_vocabulary_refs,
+            ["taint-vocabulary:peer-agent:v1"],
+        )
+        self.assertTrue(trace.context_package.denied_lane_audit_recorded)
         self.assertTrue(trace.context_package.context_taint_propagated)
+        self.assertTrue(trace.context_package.context_taint_vocabulary_aligned)
 
     def test_trace_contains_tool_and_workflow_steps(self) -> None:
         case = validate_eval_suite(

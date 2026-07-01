@@ -47,10 +47,14 @@ ALLOWED_FAILURE_CLASSES = {
     "CONTEXT_BUDGET_TRUNCATION_INVALID",
     "RETRIEVAL_LANE_GAP_MISSING",
     "SOURCE_RANKING_MISSING",
+    "RERANK_CONFIDENCE_THRESHOLD_MISSING",
+    "RERANK_EXPLANATION_MISSING",
     "RETRIEVAL_LANE_REDRIVE_MISSING",
     "CITATION_REPAIR_MISSING",
     "DENIED_RETRIEVAL_LANE_EXPOSED",
+    "DENIED_LANE_AUDIT_MISSING",
     "CONTEXT_TAINT_PROPAGATION_MISSING",
+    "CONTEXT_TAINT_VOCABULARY_MISSING",
     "TOOL_NOT_ALLOWED",
     "TOOL_ARGS_INVALID",
     "TOOL_SELECTION_ATTACK",
@@ -153,11 +157,17 @@ class EvalCase:
     actual_source_ranking_refs: list[str] = field(default_factory=list)
     expected_source_ranking_tie_break_refs: list[str] = field(default_factory=list)
     actual_source_ranking_tie_break_refs: list[str] = field(default_factory=list)
+    expected_rerank_confidence_threshold_refs: list[str] = field(default_factory=list)
+    actual_rerank_confidence_threshold_refs: list[str] = field(default_factory=list)
+    expected_rerank_explanation_refs: list[str] = field(default_factory=list)
+    actual_rerank_explanation_refs: list[str] = field(default_factory=list)
     expected_lane_redrive_refs: list[str] = field(default_factory=list)
     actual_lane_redrive_refs: list[str] = field(default_factory=list)
     denied_retrieval_lanes: list[str] = field(default_factory=list)
     denied_lane_source_refs: list[str] = field(default_factory=list)
     reported_denied_lane_source_refs: list[str] = field(default_factory=list)
+    expected_denied_lane_audit_refs: list[str] = field(default_factory=list)
+    actual_denied_lane_audit_refs: list[str] = field(default_factory=list)
     expected_snippet_citation_refs: list[str] = field(default_factory=list)
     actual_snippet_citation_refs: list[str] = field(default_factory=list)
     expected_citation_repair_refs: list[str] = field(default_factory=list)
@@ -167,6 +177,8 @@ class EvalCase:
     tainted_context_refs: list[str] = field(default_factory=list)
     expected_taint_label_refs: list[str] = field(default_factory=list)
     actual_taint_label_refs: list[str] = field(default_factory=list)
+    expected_taint_vocabulary_refs: list[str] = field(default_factory=list)
+    actual_taint_vocabulary_refs: list[str] = field(default_factory=list)
     expected_citation_refs: list[str] = field(default_factory=list)
     actual_citation_refs: list[str] = field(default_factory=list)
     expected_memory_outcome: str = ""
@@ -270,11 +282,15 @@ class EvalCase:
     context_budget_truncated: bool = False
     retrieval_lane_gap_reported: bool = False
     source_ranking_explained: bool = False
+    rerank_confidence_threshold_applied: bool = False
+    rerank_explanation_recorded: bool = False
     lane_redrive_recorded: bool = False
     denied_lane_reported: bool = False
+    denied_lane_audit_recorded: bool = False
     snippet_citation_repaired: bool = False
     partial_source_rejected: bool = False
     context_taint_propagated: bool = False
+    context_taint_vocabulary_aligned: bool = False
     stale_memory_used: bool = False
     memory_overgeneralized: bool = False
     memory_deduped: bool = False
@@ -491,6 +507,22 @@ def _eval_case(payload: dict[str, Any], index: int) -> EvalCase:
             payload.get("actual_source_ranking_tie_break_refs", []),
             "actual_source_ranking_tie_break_refs",
         ),
+        expected_rerank_confidence_threshold_refs=_string_list(
+            payload.get("expected_rerank_confidence_threshold_refs", []),
+            "expected_rerank_confidence_threshold_refs",
+        ),
+        actual_rerank_confidence_threshold_refs=_string_list(
+            payload.get("actual_rerank_confidence_threshold_refs", []),
+            "actual_rerank_confidence_threshold_refs",
+        ),
+        expected_rerank_explanation_refs=_string_list(
+            payload.get("expected_rerank_explanation_refs", []),
+            "expected_rerank_explanation_refs",
+        ),
+        actual_rerank_explanation_refs=_string_list(
+            payload.get("actual_rerank_explanation_refs", []),
+            "actual_rerank_explanation_refs",
+        ),
         expected_lane_redrive_refs=_string_list(
             payload.get("expected_lane_redrive_refs", []), "expected_lane_redrive_refs"
         ),
@@ -506,6 +538,14 @@ def _eval_case(payload: dict[str, Any], index: int) -> EvalCase:
         reported_denied_lane_source_refs=_string_list(
             payload.get("reported_denied_lane_source_refs", []),
             "reported_denied_lane_source_refs",
+        ),
+        expected_denied_lane_audit_refs=_string_list(
+            payload.get("expected_denied_lane_audit_refs", []),
+            "expected_denied_lane_audit_refs",
+        ),
+        actual_denied_lane_audit_refs=_string_list(
+            payload.get("actual_denied_lane_audit_refs", []),
+            "actual_denied_lane_audit_refs",
         ),
         expected_snippet_citation_refs=_string_list(
             payload.get("expected_snippet_citation_refs", []),
@@ -536,6 +576,14 @@ def _eval_case(payload: dict[str, Any], index: int) -> EvalCase:
         ),
         actual_taint_label_refs=_string_list(
             payload.get("actual_taint_label_refs", []), "actual_taint_label_refs"
+        ),
+        expected_taint_vocabulary_refs=_string_list(
+            payload.get("expected_taint_vocabulary_refs", []),
+            "expected_taint_vocabulary_refs",
+        ),
+        actual_taint_vocabulary_refs=_string_list(
+            payload.get("actual_taint_vocabulary_refs", []),
+            "actual_taint_vocabulary_refs",
         ),
         expected_citation_refs=_string_list(
             payload.get("expected_citation_refs", []), "expected_citation_refs"
@@ -847,11 +895,21 @@ def _eval_case(payload: dict[str, Any], index: int) -> EvalCase:
         source_ranking_explained=_bool(
             payload.get("source_ranking_explained", False), "source_ranking_explained"
         ),
+        rerank_confidence_threshold_applied=_bool(
+            payload.get("rerank_confidence_threshold_applied", False),
+            "rerank_confidence_threshold_applied",
+        ),
+        rerank_explanation_recorded=_bool(
+            payload.get("rerank_explanation_recorded", False), "rerank_explanation_recorded"
+        ),
         lane_redrive_recorded=_bool(
             payload.get("lane_redrive_recorded", False), "lane_redrive_recorded"
         ),
         denied_lane_reported=_bool(
             payload.get("denied_lane_reported", False), "denied_lane_reported"
+        ),
+        denied_lane_audit_recorded=_bool(
+            payload.get("denied_lane_audit_recorded", False), "denied_lane_audit_recorded"
         ),
         snippet_citation_repaired=_bool(
             payload.get("snippet_citation_repaired", False), "snippet_citation_repaired"
@@ -861,6 +919,10 @@ def _eval_case(payload: dict[str, Any], index: int) -> EvalCase:
         ),
         context_taint_propagated=_bool(
             payload.get("context_taint_propagated", False), "context_taint_propagated"
+        ),
+        context_taint_vocabulary_aligned=_bool(
+            payload.get("context_taint_vocabulary_aligned", False),
+            "context_taint_vocabulary_aligned",
         ),
         stale_memory_used=_bool(payload.get("stale_memory_used", False), "stale_memory_used"),
         memory_overgeneralized=_bool(

@@ -188,11 +188,21 @@ class AgentEvalContractTests(unittest.TestCase):
                 "actual_source_ranking_refs": ["evidence:current", "memory:old"],
                 "expected_source_ranking_tie_break_refs": ["evidence:current"],
                 "actual_source_ranking_tie_break_refs": ["evidence:current"],
+                "expected_rerank_confidence_threshold_refs": [
+                    "rerank-threshold:rag-high-confidence"
+                ],
+                "actual_rerank_confidence_threshold_refs": [
+                    "rerank-threshold:rag-high-confidence"
+                ],
+                "expected_rerank_explanation_refs": ["rerank-explanation:current-source"],
+                "actual_rerank_explanation_refs": ["rerank-explanation:current-source"],
                 "expected_lane_redrive_refs": ["lane-redrive:memory:attempt-2"],
                 "actual_lane_redrive_refs": ["lane-redrive:memory:attempt-2"],
                 "denied_retrieval_lanes": ["cross_tenant_memory"],
                 "denied_lane_source_refs": ["evidence:tenant-other:hidden"],
                 "reported_denied_lane_source_refs": ["evidence:tenant-other:hidden"],
+                "expected_denied_lane_audit_refs": ["audit:denied-lane:cross-tenant"],
+                "actual_denied_lane_audit_refs": ["audit:denied-lane:cross-tenant"],
                 "expected_snippet_citation_refs": ["snippet:evidence:current#p1"],
                 "actual_snippet_citation_refs": ["snippet:evidence:current#p1"],
                 "expected_citation_repair_refs": ["citation-repair:evidence:current#p1"],
@@ -202,6 +212,8 @@ class AgentEvalContractTests(unittest.TestCase):
                 "tainted_context_refs": ["tool-output:mcp-reader:summary"],
                 "expected_taint_label_refs": ["tool-output:mcp-reader:summary"],
                 "actual_taint_label_refs": ["tool-output:mcp-reader:summary"],
+                "expected_taint_vocabulary_refs": ["taint-vocabulary:tool-output:v1"],
+                "actual_taint_vocabulary_refs": ["taint-vocabulary:tool-output:v1"],
                 "conflict_detected": True,
                 "stale_evidence_used": False,
                 "permission_abstain_required": False,
@@ -210,11 +222,15 @@ class AgentEvalContractTests(unittest.TestCase):
                 "context_budget_truncated": True,
                 "retrieval_lane_gap_reported": True,
                 "source_ranking_explained": True,
+                "rerank_confidence_threshold_applied": True,
+                "rerank_explanation_recorded": True,
                 "lane_redrive_recorded": True,
                 "denied_lane_reported": True,
+                "denied_lane_audit_recorded": True,
                 "snippet_citation_repaired": True,
                 "partial_source_rejected": True,
                 "context_taint_propagated": True,
+                "context_taint_vocabulary_aligned": True,
             }
         ]
 
@@ -226,12 +242,32 @@ class AgentEvalContractTests(unittest.TestCase):
         self.assertEqual(cases[0].context_blocked_refs, ["tool-output:mcp-reader:instruction"])
         self.assertEqual(cases[0].expected_budget_retained_refs, ["evidence:current"])
         self.assertEqual(cases[0].expected_source_ranking_refs, ["evidence:current", "memory:old"])
+        self.assertEqual(
+            cases[0].actual_rerank_confidence_threshold_refs,
+            ["rerank-threshold:rag-high-confidence"],
+        )
+        self.assertEqual(
+            cases[0].actual_rerank_explanation_refs,
+            ["rerank-explanation:current-source"],
+        )
         self.assertEqual(cases[0].actual_lane_redrive_refs, ["lane-redrive:memory:attempt-2"])
         self.assertEqual(cases[0].denied_retrieval_lanes, ["cross_tenant_memory"])
+        self.assertEqual(
+            cases[0].actual_denied_lane_audit_refs,
+            ["audit:denied-lane:cross-tenant"],
+        )
         self.assertEqual(cases[0].expected_snippet_citation_refs, ["snippet:evidence:current#p1"])
         self.assertEqual(cases[0].actual_taint_label_refs, ["tool-output:mcp-reader:summary"])
+        self.assertEqual(
+            cases[0].actual_taint_vocabulary_refs,
+            ["taint-vocabulary:tool-output:v1"],
+        )
         self.assertTrue(cases[0].source_ranking_explained)
+        self.assertTrue(cases[0].rerank_confidence_threshold_applied)
+        self.assertTrue(cases[0].rerank_explanation_recorded)
+        self.assertTrue(cases[0].denied_lane_audit_recorded)
         self.assertTrue(cases[0].context_taint_propagated)
+        self.assertTrue(cases[0].context_taint_vocabulary_aligned)
         self.assertEqual(cases[0].unavailable_retrieval_lanes, ["memory"])
         self.assertTrue(cases[0].conflict_detected)
         self.assertFalse(cases[0].stale_evidence_used)

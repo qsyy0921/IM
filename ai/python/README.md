@@ -212,6 +212,13 @@ The context/evidence deeper hardening fixture covers source ranking and
 tie-break explanation, retrieval lane redrive refs, snippet-level citation
 repair with partial-source rejection, cross-tenant denied-lane reporting and
 provider/tool/peer-agent taint propagation.
+The Qasper/HotpotQA/BEIR-like RAG adapter sample now preserves fixture-only
+ContextPackage/EvidencePack alignment metadata for rerank confidence threshold
+refs, rerank explanation refs, denied-lane audit refs and taint vocabulary refs.
+The evaluator reports `rerank_confidence_threshold_score`,
+`rerank_explanation_score`, `denied_lane_audit_score` and
+`context_taint_vocabulary_score` while still avoiding backend services,
+provider calls and real IM data.
 The memory admission fixture covers group speaker/audience attribution, project
 supersedes lineage, profile aggregate review, revoked memory blocking, stale
 memory blocking and overgeneralization prevention.

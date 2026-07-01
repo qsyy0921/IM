@@ -92,6 +92,10 @@ Agent Gateway / UX
 - 已补 fixture-only ContextPackage / EvidencePack deeper hardening：source ranking
   / tie-break、retrieval lane redrive、snippet-level citation repair、cross-tenant
   denied-lane reporting、provider/tool/peer-agent taint propagation。
+- 已补 Qasper / HotpotQA / BEIR 风格 ContextPackage / EvidencePack adapter
+  alignment：public RAG adapter 可保留 rerank confidence threshold refs、
+  rerank explanation refs、denied-lane audit refs 和 taint vocabulary refs，
+  evaluator / trace / CLI 均保持 fixture-only。
 - 已补 fixture-only richer memory admission coverage：group speaker/audience、
   project supersedes、profile aggregate review、revoked/stale memory blocking、
   overgeneralization prevention。
@@ -116,9 +120,8 @@ Agent Gateway / UX
   cancel propagation incomplete、replay event incomplete。
 - 已补 current EvalReport generation / baseline refresh review CLI，生成当前报告和
   baseline refresh review artifact，默认不覆盖 baseline。
-- 下一段优先做 ContextPackage / EvidencePack adapter alignment，其次做
-  current-report / baseline lifecycle deeper hardening 或 memory
-  threshold/policy calibration。
+- 下一段优先做 current-report / baseline lifecycle deeper hardening，其次做
+  memory threshold / policy calibration。
 
 ## 工作规则
 

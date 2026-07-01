@@ -23,7 +23,44 @@ class AgentEvalAdapterRunnerTests(unittest.TestCase):
         self.assertEqual(suite["suite_id"], "adapter-qasper-like-rag-sample-v1")
         self.assertEqual(suite["fixture_kind"], "synthetic_im_like")
         self.assertEqual(suite["adapter_versions"], ["qasper-like-rag-adapter-v1"])
-        self.assertEqual(len(suite["cases"]), 2)
+        self.assertEqual(len(suite["cases"]), 5)
+
+    def test_runs_qasper_sample_with_context_alignment_metadata(self) -> None:
+        payload = json.loads((SAMPLES_DIR / "qasper_like_rag_samples.json").read_text())
+
+        report = run_adapter_payload(payload)
+
+        self.assertEqual(report.status, "PASS")
+        self.assertEqual(report.case_count, 5)
+        self.assertEqual(report.failure_distribution, {"PASS": 5})
+        self.assertEqual(report.eval_run.adapter_versions, ["qasper-like-rag-adapter-v1"])
+        self.assertEqual(report.aggregate_scores["rerank_confidence_threshold_score"], 1.0)
+        self.assertEqual(report.aggregate_scores["denied_lane_audit_score"], 1.0)
+        self.assertEqual(report.aggregate_scores["context_taint_vocabulary_score"], 1.0)
+
+    def test_qasper_sample_conversion_preserves_context_alignment_metadata(self) -> None:
+        payload = json.loads((SAMPLES_DIR / "qasper_like_rag_samples.json").read_text())
+
+        suite = convert_adapter_payload(payload)
+        rerank_case = suite["cases"][2]
+        denied_taint_case = suite["cases"][4]
+
+        self.assertEqual(rerank_case["capability_family"], "CONTEXT_EVIDENCE")
+        self.assertEqual(
+            rerank_case["actual_rerank_confidence_threshold_refs"],
+            ["rerank-threshold:rag-high-confidence"],
+        )
+        self.assertTrue(rerank_case["rerank_confidence_threshold_applied"])
+        self.assertEqual(
+            denied_taint_case["actual_denied_lane_audit_refs"],
+            ["audit:denied-lane:cross-tenant"],
+        )
+        self.assertTrue(denied_taint_case["denied_lane_audit_recorded"])
+        self.assertEqual(
+            denied_taint_case["actual_taint_vocabulary_refs"],
+            ["taint-vocabulary:tool-output:v1"],
+        )
+        self.assertTrue(denied_taint_case["context_taint_vocabulary_aligned"])
 
     def test_runs_memory_sample_with_expected_negative_detection(self) -> None:
         payload = json.loads((SAMPLES_DIR / "statebench_like_memory_samples.json").read_text())

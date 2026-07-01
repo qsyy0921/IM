@@ -310,14 +310,23 @@ Implemented checks:
   denied source refs;
 - provider, tool and peer-agent taint labels must propagate through context
   assembly;
+- public RAG adapter samples preserve ContextPackage / EvidencePack alignment
+  refs for ranking/citation repair across Qasper / HotpotQA / BEIR-like
+  fixture cases;
+- rerank confidence threshold refs and rerank explanation refs must be recorded
+  when public RAG adapter samples require them;
+- denied-lane audit refs must be recorded without exposing denied source refs;
+- taint vocabulary refs must align with provider / tool / peer-agent labels;
 - trace metadata includes low-sensitive refs only.
 
-Remaining hardening:
+Remaining production hardening:
 
-- public-dataset-style RAG adapter alignment for ranking/citation repair;
-- ranking confidence thresholds and rerank explanation metadata;
-- retention policy interaction for denied-lane audit refs;
-- taint label vocabulary alignment with Tool/MCP and peer-agent SDDs.
+- audit-retention policy interaction for denied-lane refs after audit-service
+  contract promotion;
+- larger public RAG datasets before any production EvidencePack /
+  ContextPackage schema is frozen;
+- integration proof that memory-service, mcp-gateway and peer-agent adapters
+  preserve the same taint vocabulary through real service boundaries.
 
 ## 15. References
 

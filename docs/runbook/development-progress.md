@@ -149,6 +149,10 @@ ai/python/tests/test_agent_eval_*.py
 - ContextPackage / EvidencePack deeper hardening fixture：source ranking、
   lane redrive、snippet-level citation repair、cross-tenant denied-lane、
   provider/tool/peer-agent taint propagation。
+- ContextPackage / EvidencePack adapter alignment：Qasper / HotpotQA / BEIR
+  风格 sample 已覆盖 public RAG adapter alignment、rerank confidence threshold
+  refs、rerank explanation refs、denied-lane audit refs、taint vocabulary refs，
+  evaluator / trace / adapter runner 均保持低敏 fixture-only。
 - Memory admission fixture：group speaker/audience、project supersedes、profile
   aggregate review、revoked/stale memory blocking、overgeneralization prevention。
 - Memory admission hardening fixture：duplicate dedupe、low-confidence rejection、
@@ -171,8 +175,7 @@ ai/python/tests/test_agent_eval_*.py
 
 | 优先级 | 工作 | 输出 |
 | --- | --- | --- |
-| P1 | ContextPackage / EvidencePack adapter alignment | public RAG adapter alignment、rerank confidence thresholds、denied-lane audit metadata、taint vocabulary |
-| P2 | Current-report deeper hardening | 多 suite report matrix、baseline refresh approval manifest、report retention metadata |
+| P1 | Current-report deeper hardening | 多 suite report matrix、baseline refresh approval manifest、report retention metadata |
 | P2 | Memory admission calibration | 更大公开 memory 数据集上的 confidence threshold tuning、policy revocation-window retention、review backoff / operator queue policy |
 | P2 | Runtime-control deeper hardening | checkpoint version drift、workflow wakeup race、replay bundle lineage completeness |
 | P2 | State-diff deeper hardening | state dependency graph、cross-action compensation chain、operator redrive review |
@@ -191,7 +194,7 @@ ai/python/tests/test_agent_eval_*.py
 - SDD index / research index / architecture index link check
 - 不触碰 proto、schema、migration、production service directory
 
-后续 fixture-only prototype 优先推进 ContextPackage / EvidencePack adapter alignment fixture gate。
+后续 fixture-only prototype 优先推进 current-report / baseline lifecycle deeper hardening。
 
 ## 历史资料路由
 

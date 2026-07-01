@@ -183,10 +183,14 @@ def _context_evidence_scores(case: EvalCase) -> tuple[dict[str, float], str]:
     context_budget_score = _context_budget_truncation_score(case)
     retrieval_lane_score = _retrieval_lane_gap_score(case)
     source_ranking_score = _source_ranking_score(case)
+    rerank_confidence_threshold_score = _rerank_confidence_threshold_score(case)
+    rerank_explanation_score = _rerank_explanation_score(case)
     lane_redrive_score = _retrieval_lane_redrive_score(case)
     citation_repair_score = _snippet_citation_repair_score(case)
     denied_lane_score = _denied_retrieval_lane_score(case)
+    denied_lane_audit_score = _denied_lane_audit_score(case)
     taint_score = _context_taint_propagation_score(case)
+    taint_vocabulary_score = _context_taint_vocabulary_score(case)
     if coverage_score == 0.0:
         failure = "SOURCE_COVERAGE_MISSING"
     elif conflict_score == 0.0:
@@ -205,14 +209,22 @@ def _context_evidence_scores(case: EvalCase) -> tuple[dict[str, float], str]:
         failure = "RETRIEVAL_LANE_GAP_MISSING"
     elif source_ranking_score == 0.0:
         failure = "SOURCE_RANKING_MISSING"
+    elif rerank_confidence_threshold_score == 0.0:
+        failure = "RERANK_CONFIDENCE_THRESHOLD_MISSING"
+    elif rerank_explanation_score == 0.0:
+        failure = "RERANK_EXPLANATION_MISSING"
     elif lane_redrive_score == 0.0:
         failure = "RETRIEVAL_LANE_REDRIVE_MISSING"
     elif citation_repair_score == 0.0:
         failure = "CITATION_REPAIR_MISSING"
     elif denied_lane_score == 0.0:
         failure = "DENIED_RETRIEVAL_LANE_EXPOSED"
+    elif denied_lane_audit_score == 0.0:
+        failure = "DENIED_LANE_AUDIT_MISSING"
     elif taint_score == 0.0:
         failure = "CONTEXT_TAINT_PROPAGATION_MISSING"
+    elif taint_vocabulary_score == 0.0:
+        failure = "CONTEXT_TAINT_VOCABULARY_MISSING"
     else:
         failure = ""
     return (
@@ -226,10 +238,14 @@ def _context_evidence_scores(case: EvalCase) -> tuple[dict[str, float], str]:
             "context_budget_truncation_score": context_budget_score,
             "retrieval_lane_gap_score": retrieval_lane_score,
             "source_ranking_score": source_ranking_score,
+            "rerank_confidence_threshold_score": rerank_confidence_threshold_score,
+            "rerank_explanation_score": rerank_explanation_score,
             "retrieval_lane_redrive_score": lane_redrive_score,
             "snippet_citation_repair_score": citation_repair_score,
             "denied_retrieval_lane_score": denied_lane_score,
+            "denied_lane_audit_score": denied_lane_audit_score,
             "context_taint_propagation_score": taint_score,
+            "context_taint_vocabulary_score": taint_vocabulary_score,
         },
         failure,
     )
@@ -755,6 +771,28 @@ def _source_ranking_score(case: EvalCase) -> float:
     return 1.0
 
 
+def _rerank_confidence_threshold_score(case: EvalCase) -> float:
+    expected_thresholds = set(case.expected_rerank_confidence_threshold_refs)
+    if not expected_thresholds:
+        return 1.0
+    if not case.rerank_confidence_threshold_applied:
+        return 0.0
+    return 1.0 if expected_thresholds.issubset(
+        set(case.actual_rerank_confidence_threshold_refs)
+    ) else 0.0
+
+
+def _rerank_explanation_score(case: EvalCase) -> float:
+    expected_explanations = set(case.expected_rerank_explanation_refs)
+    if not expected_explanations:
+        return 1.0
+    if not case.rerank_explanation_recorded:
+        return 0.0
+    return 1.0 if expected_explanations.issubset(
+        set(case.actual_rerank_explanation_refs)
+    ) else 0.0
+
+
 def _retrieval_lane_redrive_score(case: EvalCase) -> float:
     expected_redrive = set(case.expected_lane_redrive_refs)
     if not expected_redrive:
@@ -802,6 +840,15 @@ def _denied_retrieval_lane_score(case: EvalCase) -> float:
     return 0.0 if denied_sources.intersection(selected_refs) else 1.0
 
 
+def _denied_lane_audit_score(case: EvalCase) -> float:
+    expected_audits = set(case.expected_denied_lane_audit_refs)
+    if not expected_audits:
+        return 1.0
+    if not case.denied_lane_audit_recorded:
+        return 0.0
+    return 1.0 if expected_audits.issubset(set(case.actual_denied_lane_audit_refs)) else 0.0
+
+
 def _context_taint_propagation_score(case: EvalCase) -> float:
     expected_taint_labels = set(case.expected_taint_label_refs or case.tainted_context_refs)
     if not expected_taint_labels:
@@ -809,6 +856,15 @@ def _context_taint_propagation_score(case: EvalCase) -> float:
     if not case.context_taint_propagated:
         return 0.0
     return 1.0 if expected_taint_labels.issubset(set(case.actual_taint_label_refs)) else 0.0
+
+
+def _context_taint_vocabulary_score(case: EvalCase) -> float:
+    expected_vocab = set(case.expected_taint_vocabulary_refs)
+    if not expected_vocab:
+        return 1.0
+    if not case.context_taint_vocabulary_aligned:
+        return 0.0
+    return 1.0 if expected_vocab.issubset(set(case.actual_taint_vocabulary_refs)) else 0.0
 
 
 def _context_selected_refs(case: EvalCase) -> set[str]:
@@ -1014,10 +1070,16 @@ def _replay_bundle(case: EvalCase, failure_class: str) -> ReplayBundle:
         "actual_memory_confidence_threshold_refs": case.actual_memory_confidence_threshold_refs,
         "actual_policy_revocation_window_refs": case.actual_policy_revocation_window_refs,
         "actual_source_ranking_refs": case.actual_source_ranking_refs,
+        "actual_rerank_confidence_threshold_refs": (
+            case.actual_rerank_confidence_threshold_refs
+        ),
+        "actual_rerank_explanation_refs": case.actual_rerank_explanation_refs,
         "actual_lane_redrive_refs": case.actual_lane_redrive_refs,
+        "actual_denied_lane_audit_refs": case.actual_denied_lane_audit_refs,
         "actual_snippet_citation_refs": case.actual_snippet_citation_refs,
         "actual_citation_repair_refs": case.actual_citation_repair_refs,
         "actual_taint_label_refs": case.actual_taint_label_refs,
+        "actual_taint_vocabulary_refs": case.actual_taint_vocabulary_refs,
         "actual_memory_cluster_refs": case.actual_memory_cluster_refs,
         "actual_procedural_migration_refs": case.actual_procedural_migration_refs,
         "actual_procedural_invalidation_refs": case.actual_procedural_invalidation_refs,

@@ -177,10 +177,14 @@ Fixtures must be clearly synthetic and must not import production data.
 | `context_budget_truncation_score` | Required high-priority refs survive budget truncation |
 | `retrieval_lane_gap_score` | Unavailable lanes are explicit coverage gaps |
 | `source_ranking_score` | Source ranking and deterministic tie-break refs match expected order |
+| `rerank_confidence_threshold_score` | Public RAG rerank confidence threshold refs are applied |
+| `rerank_explanation_score` | Public RAG rerank explanation refs are recorded |
 | `retrieval_lane_redrive_score` | Lane retry/redrive refs exist when retrieval repair is required |
 | `snippet_citation_repair_score` | Snippet citation repair and partial-source rejection are recorded |
 | `denied_retrieval_lane_score` | Denied lanes are reported and cannot leak source refs into context |
+| `denied_lane_audit_score` | Denied-lane audit refs are recorded without exposing denied source refs |
 | `context_taint_propagation_score` | Provider/tool/peer-agent taint labels propagate through context assembly |
+| `context_taint_vocabulary_score` | Taint vocabulary refs align across provider/tool/peer-agent labels |
 | `tool_selection_score` | Correct tool chosen under allowlist |
 | `tool_argument_score` | Args pass schema and policy |
 | `tool_argument_schema_score` | Schema mismatch is detected before execution |
@@ -226,10 +230,14 @@ The harness should normalize:
 - `CONTEXT_BUDGET_TRUNCATION_INVALID`
 - `RETRIEVAL_LANE_GAP_MISSING`
 - `SOURCE_RANKING_MISSING`
+- `RERANK_CONFIDENCE_THRESHOLD_MISSING`
+- `RERANK_EXPLANATION_MISSING`
 - `RETRIEVAL_LANE_REDRIVE_MISSING`
 - `CITATION_REPAIR_MISSING`
 - `DENIED_RETRIEVAL_LANE_EXPOSED`
+- `DENIED_LANE_AUDIT_MISSING`
 - `CONTEXT_TAINT_PROPAGATION_MISSING`
+- `CONTEXT_TAINT_VOCABULARY_MISSING`
 - `TOOL_NOT_ALLOWED`
 - `TOOL_ARGS_INVALID`
 - `TOOL_SELECTION_ATTACK`
@@ -484,6 +492,10 @@ Implemented checks:
 - ContextPackage / EvidencePack deeper hardening coverage for source ranking,
   lane redrive, snippet-level citation repair, cross-tenant denied-lane
   handling and provider/tool/peer-agent taint propagation.
+- ContextPackage / EvidencePack adapter alignment coverage for
+  Qasper / HotpotQA / BEIR-like public RAG samples, rerank confidence threshold
+  refs, rerank explanation refs, denied-lane audit refs and taint vocabulary
+  refs.
 - richer memory admission fixture coverage for group speaker/audience, project
   supersedes, profile aggregate review, revoked memory blocking, stale memory
   blocking and overgeneralization prevention.

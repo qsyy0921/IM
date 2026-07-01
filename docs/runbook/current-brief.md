@@ -5,10 +5,11 @@ memory / AI worker / EvidencePack / eval gate 的探索和设计，不承接后�
 
 ## 当前主线
 
-- Agent Lab 正在从探索稿推进到详细 SDD 草案。
+- Agent Lab 已从探索稿推进到详细 SDD 包。
 - 当前工作不使用 NexusIM 真实 IM 数据；第一阶段能力验证使用公开数据集和
   synthetic IM-like fixture。
-- 当前 active module：`Agent Platform SDD package`。
+- 当前 active module：`Agent Platform SDD package` 已完成文档重做；下一建议模块是
+  `Open Dataset Eval Harness / synthetic IM-like fixture`。
 
 ## 最近收口
 
@@ -20,6 +21,17 @@ memory / AI worker / EvidencePack / eval gate 的探索和设计，不承接后�
   `docs/research/agent-ecosystem-research-20260701.md`。
 - 已完成完整 Agent 系统能力范围探索：
   `docs/research/agent-system-complete-scope-20260701.md`。
+- 已完成当前设计评审：
+  `docs/research/agent-current-design-review-20260701.md`。结论是方向正确，但
+  `docs/sdd/agent-platform.md` v0.1 不能单独推广实现。
+- 已完成 current-to-target matrix：
+  `docs/research/agent-current-to-target-matrix-20260701.md`。
+- 已完成 open dataset eval plan：
+  `docs/research/agent-open-dataset-eval-plan-20260701.md`。
+- 已完成六份详细 Agent SDD：
+  `docs/sdd/agent-runtime.md`、`docs/sdd/agent-memory-admission.md`、
+  `docs/sdd/agent-context-evidencepack.md`、`docs/sdd/agent-tool-mcp-boundary.md`、
+  `docs/sdd/agent-eval-replay-harness.md`、`docs/sdd/agent-governance-agentops.md`。
 - 设计边界保持为探索 / SDD 草案：不冻结 proto、schema、migration、runtime、
   agent taxonomy、skill taxonomy、EvidencePack shape 或 memory event shape。
 
@@ -53,11 +65,13 @@ Agent Gateway / UX
 - MCP server 不是权限边界；tool description 和 output 均按不可信输入处理。
 - Eval / replay 是架构组成部分，不是上线后脚本。
 
-## 本轮输出
+## 当前输出
 
-- 更新进度入口，使后续线程从 Agent Lab 当前目标开始。
-- 新增 `docs/sdd/agent-platform.md`，作为覆盖各 Agent 部件的详细 SDD 草案。
-- 更新 SDD index 和 Agent 初步设计报告的参考入口。
+- 进度入口已指向 Agent Lab 和完整 Agent SDD 包。
+- `docs/sdd/agent-platform.md` 保留为平台总览，但已标注不能单独推广实现。
+- 详细设计以 runtime、memory admission、context、tool/MCP、eval/replay、
+  governance 六份 SDD 为准。
+- 下一阶段应先做公开数据集和 synthetic fixture，不接真实 IM 数据。
 
 ## 工作规则
 

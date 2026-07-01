@@ -15,12 +15,20 @@
   SDD 为准，不从旧文档推断目标。
 - Agent Lab 当前平台级草案见 `agent-platform.md`。它用于说明 Agent / RAG /
   memory / Python AI Worker / EvidencePack / eval gate 如何组合，不冻结 proto、
-  schema、migration、runtime 或生产服务目录。
+  schema、migration、runtime 或生产服务目录。`agent-platform.md` v0.1 已被评审为
+  不能单独推广实现；实现前必须同时阅读 runtime、memory admission、context、
+  tool/MCP、eval/replay 和 governance 的详细 SDD。
 - 可以用 multi sub-agent 分别审查不同 SDD 或测试缺口，但同一 SDD、proto、migration 只能由一个 agent 修改，主 agent 负责最终集成。
 
 ## 平台 / 跨服务 SDD 草案
 
 - `agent-platform.md`
+- `agent-runtime.md`
+- `agent-memory-admission.md`
+- `agent-context-evidencepack.md`
+- `agent-tool-mcp-boundary.md`
+- `agent-eval-replay-harness.md`
+- `agent-governance-agentops.md`
 
 ## 服务 SDD
 

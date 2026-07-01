@@ -12,7 +12,8 @@
 Agent / RAG / memory / Python AI Worker / EvidencePack / eval gate
 ```
 
-当前阶段：Agent Exploration Mode -> Agent Platform SDD package。
+当前阶段：Agent Exploration Mode -> Agent Platform SDD package 已完成文档重做；
+下一阶段建议进入 Open Dataset Eval Harness / synthetic IM-like fixture。
 
 当前原则：
 
@@ -33,7 +34,16 @@ Agent / RAG / memory / Python AI Worker / EvidencePack / eval gate
 | `docs/research/agent-runtime-workflow-ownership-20260701.md` | 已完成 | Candidate B runtime / harness 与 workflow-service ownership matrix |
 | `docs/research/agent-ecosystem-research-20260701.md` | 已完成 | OpenClaw、Hermes、Claude Code、OpenAI Agents SDK、LangGraph、A2A、MCP、benchmark 和企业报告输入 |
 | `docs/research/agent-system-complete-scope-20260701.md` | 已完成 | 2026 完整 Agent 系统能力范围和 open-dataset-first 流程 |
-| `docs/sdd/agent-platform.md` | 当前新增草案 | 平台级 SDD，覆盖 Agent 各组成部分、状态所有权、流程、eval 和安全门禁 |
+| `docs/sdd/agent-platform.md` | 已完成但不能单独推广实现 | 平台级 SDD 总览；v0.1 已被 P1 评审打回为实现前需重做 |
+| `docs/research/agent-current-design-review-20260701.md` | 已完成 | 当前设计评审：方向正确，但平台总览不能单独进入实现 |
+| `docs/research/agent-current-to-target-matrix-20260701.md` | 已完成 | 当前服务到目标 Agent 平台的迁移矩阵 |
+| `docs/research/agent-open-dataset-eval-plan-20260701.md` | 已完成 | 公开数据集优先 eval 计划和 synthetic fixture 草案 |
+| `docs/sdd/agent-runtime.md` | 已完成 | Runtime / Harness 详细 SDD |
+| `docs/sdd/agent-memory-admission.md` | 已完成 | Memory admission 详细 SDD |
+| `docs/sdd/agent-context-evidencepack.md` | 已完成 | Context / EvidencePack 详细 SDD |
+| `docs/sdd/agent-tool-mcp-boundary.md` | 已完成 | Tool / MCP boundary 详细 SDD |
+| `docs/sdd/agent-eval-replay-harness.md` | 已完成 | Eval / Replay harness 详细 SDD |
+| `docs/sdd/agent-governance-agentops.md` | 已完成 | Governance / AgentOps 详细 SDD |
 
 ## 当前设计范围
 
@@ -86,7 +96,7 @@ EvalResult 和低敏 report 输出。
 
 | 优先级 | 工作 | 输出 |
 | --- | --- | --- |
-| P0 | open dataset eval plan | 数据集选择、adapter 草案、synthetic IM-like fixture 规则 |
+| P0 | open dataset eval harness | 基于现有 eval plan 落 fixture-only adapter / EvalCase / EvalRun / EvalResult |
 | P0 | fixture-only AgentRun trace | read-only QA、memory admission、approval wait、timeout、cancel/replay、handoff 流程 |
 | P1 | ContextPackage / EvidencePack experiment | citation、source coverage、temporal version、conflict marker、permission abstain |
 | P1 | Memory admission eval | scope、speaker attribution、supersedes、revocation、overgeneralization、pollution |
@@ -100,7 +110,7 @@ EvalResult 和低敏 report 输出。
 
 - `git diff --check`
 - heading / reference scan
-- SDD index / architecture index link check
+- SDD index / research index / architecture index link check
 - 不触碰 proto、schema、migration、production service directory
 
 后续进入 fixture-only prototype 后，再增加单元测试、dataset adapter validation、replay consistency

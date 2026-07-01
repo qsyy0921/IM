@@ -14,27 +14,25 @@
 
 ## 当前优先顺序
 
-1. Agent Platform SDD package：完成 `docs/sdd/agent-platform.md`，覆盖 Agent
-   Gateway、identity/policy/budget、AgentDefinition、SkillPackage、Model gateway、
-   Runtime/Harness、Context/RAG、Memory、Tool/MCP、A2A、Workflow/HITL、
-   Action Executor handoff、Multi-agent、Python AI Worker、Eval/Replay、
-   Observability/Audit、Governance/AgentOps 和 Security。
-2. Open dataset eval plan：选择首批公开数据集并定义 dataset adapter、synthetic
-   IM-like fixture、AgentRun trace、EvalResult 和 report 输出。
-3. Fixture-only AgentRun trace：建模 read-only QA、group memory admission、
+1. Open dataset eval harness：基于
+   `docs/research/agent-open-dataset-eval-plan-20260701.md` 选择首批公开数据集并定义
+   dataset adapter、synthetic IM-like fixture、AgentRun trace、EvalResult 和 report 输出。
+2. Fixture-only AgentRun trace：建模 read-only QA、group memory admission、
    approval wait、provider timeout redrive、cancel/resume/replay 和 bounded
    multi-agent handoff。
-4. ContextPackage / EvidencePack 实验：验证 citation、source coverage、temporal
+3. ContextPackage / EvidencePack 实验：验证 citation、source coverage、temporal
    version、conflict marker 和 permission abstain。
-5. Memory admission eval：覆盖 group memory、project memory、profile aggregate、
+4. Memory admission eval：覆盖 group memory、project memory、profile aggregate、
    supersedes、revocation、stale facts、speaker attribution、audience scope 和
    overgeneralization。
-6. Tool / MCP security eval：覆盖 malicious tool description、unsafe tool output、
+5. Tool / MCP security eval：覆盖 malicious tool description、unsafe tool output、
    prompt injection、tool-selection attack、MCP server provenance 和 sandbox-only
    high-risk provider。
-7. State-diff eval：基于 Agent-Diff 思路验证 action outcome，而不是只比较 tool call trace。
-8. ReplayBundle / observability：定义低敏 refs、hashes、version metadata、failure
+6. State-diff eval：基于 Agent-Diff 思路验证 action outcome，而不是只比较 tool call trace。
+7. ReplayBundle / observability：定义低敏 refs、hashes、version metadata、failure
    taxonomy 和 trace linkage。
+8. ADR promotion review：只有前述 fixture/eval 有证据后，才评估 Agent Runtime、
+   ContextPackage、MemoryCandidate、Tool prepare、ReplayBundle 是否提升为 ADR / 契约。
 
 ## Dataset Backlog
 

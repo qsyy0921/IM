@@ -6,9 +6,13 @@
 
 ## Active Module
 
-Agent Platform SDD package：在 Agent Exploration Mode 的研究基础上，把 NexusIM
-Agent 层推进为一份可评审的详细 SDD 草案，并把本工作区的进度入口从后端热点群压测
-切回 Agent / RAG / memory / AI worker / eval gate。
+Agent Platform SDD package 已完成文档重做：`agent-platform.md` v0.1 方向保留，但被评审为
+不能单独推广实现；当前可评审输入是平台总览 + runtime、memory admission、context、
+tool/MCP、eval/replay、governance 六份详细 SDD，以及 current-to-target matrix 和
+open-dataset eval plan。
+
+下一阶段建议模块：Open Dataset Eval Harness / synthetic IM-like fixture。仍然只做
+Agent / RAG / memory / Python AI Worker / EvidencePack / eval gate，不使用真实 IM 数据。
 
 ## 当前边界
 
@@ -34,39 +38,37 @@ Agent 层推进为一份可评审的详细 SDD 草案，并把本工作区的进
   A2A / MCP / benchmark / 企业报告输入。
 - `docs/research/agent-system-complete-scope-20260701.md`：2026 完整 Agent 系统
   能力平面和 open-dataset-first 开发流程。
+- `docs/research/agent-current-design-review-20260701.md`：当前设计 P1 评审结论；
+  方向正确，但平台级 SDD v0.1 不能单独推广实现。
+- `docs/research/agent-current-to-target-matrix-20260701.md`：现有 AI / Agent foundation
+  服务到目标 Agent 平台的迁移矩阵。
+- `docs/research/agent-open-dataset-eval-plan-20260701.md`：公开数据集优先 eval 计划和
+  synthetic IM-like fixture 草案。
+- `docs/sdd/agent-runtime.md`
+- `docs/sdd/agent-memory-admission.md`
+- `docs/sdd/agent-context-evidencepack.md`
+- `docs/sdd/agent-tool-mcp-boundary.md`
+- `docs/sdd/agent-eval-replay-harness.md`
+- `docs/sdd/agent-governance-agentops.md`
 
-## 本轮目标
+## 当前目标
 
-1. 重新核对 2026 Agent 系统公开输入：runtime、memory、tool/MCP、A2A、workflow、
-   observability、eval、governance、安全和公开 benchmark。
-2. 把本工作区进度报告改为 Agent Lab 当前事实，避免后续线程继续沿后端热点群压测主线推进。
-3. 新增详细 `docs/sdd/agent-platform.md`，覆盖 Agent 各组成部分：
-   - Agent Gateway / UX
-   - Agent identity / policy / budget
-   - AgentDefinition / SkillPackage / release governance
-   - Model gateway and provider boundary
-   - Agent Runtime / Harness
-   - Context / EvidencePack / RAG
-   - Memory system
-   - Tool / MCP gateway
-   - A2A / peer-agent boundary
-   - Workflow / human-in-the-loop
-   - Action executor handoff
-   - Multi-agent bounded delegation
-   - Python AI Worker candidate boundary
-   - Eval / replay / open dataset harness
-   - Observability / audit / AgentOps
-   - Security / privacy / compliance
-4. 更新 SDD index 和架构参考入口。
-5. 做文档级检查、提交并推送到 `origin/codex/agent-lab`，再 handoff 给主集成线程。
+1. 保持 Agent SDD 包为当前设计事实源，不从旧后端压测或单一平台总览继续推进。
+2. 下一步如进入实验，只能先做公开数据集 adapter、EvalCase / EvalRun / EvalResult、
+   ReplayBundle 和 synthetic IM-like fixture。
+3. 任何 production proto、schema、migration、service directory、runtime implementation
+   都必须等 eval/fixture 证据和 ADR。
+4. 完整模块完成后提交并推送到 `origin/codex/agent-lab`，再 handoff 给主集成线程。
 
 ## 完成条件
 
 - `docs/runbook/current-goal.md`、`docs/runbook/current-brief.md`、
   `docs/runbook/remaining-goals.md` 均明确指向 Agent Lab。
 - `docs/runbook/codex-sessions.md` 记录当前协作边界。
-- `docs/sdd/agent-platform.md` 存在，并能作为后续 ADR / SDD / fixture 实验前置输入。
-- `docs/sdd/README.md` 和 `docs/architecture/agent-plane-initial-design.md` 已链接新 SDD。
+- `docs/sdd/agent-platform.md` 存在，并明确标注不能单独推广实现。
+- 六份详细 Agent SDD 存在，并能作为后续 ADR / fixture 实验前置输入。
+- `docs/sdd/README.md`、`docs/research/README.md`、`docs/architecture/README.md` 和
+  `docs/architecture/agent-plane-initial-design.md` 已链接新 SDD / 研究文档。
 - `git diff --check` 和 heading / reference scan 通过。
 - 工作区 clean，commit 已推送。
 

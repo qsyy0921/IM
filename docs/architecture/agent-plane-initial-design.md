@@ -3,6 +3,13 @@
 日期：2026-07-01
 状态：初步设计报告，供主集成评审；不是 ADR、SDD、proto、OpenAPI、Kafka schema 或 migration。
 
+后续评审状态：本报告方向已被保留，但 `docs/sdd/agent-platform.md` v0.1
+已在 `docs/research/agent-current-design-review-20260701.md` 中被判定为
+`REJECTED_FOR_IMPLEMENTATION_PROMOTION`。后续不得只凭本初步报告进入实现；需要同时阅读
+`docs/sdd/agent-runtime.md`、`docs/sdd/agent-memory-admission.md`、
+`docs/sdd/agent-context-evidencepack.md`、`docs/sdd/agent-tool-mcp-boundary.md`、
+`docs/sdd/agent-eval-replay-harness.md` 和 `docs/sdd/agent-governance-agentops.md`。
+
 ## 1. 背景
 
 NexusIM 已经具备 IM 后端底座、search / memory / retrieval / RAG / summary /

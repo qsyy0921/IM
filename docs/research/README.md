@@ -12,6 +12,12 @@
   Agents SDK、LangGraph、MCP、A2A、benchmark、安全论文和企业报告输入。
 - `agent-system-complete-scope-20260701.md`：2026 完整 Agent 系统能力范围和
   open-dataset-first 开发流程。
+- `agent-current-design-review-20260701.md`：当前 Agent 平台设计评审结论；方向正确，
+  但 `agent-platform.md` v0.1 被 P1 打回，不能单独推广实现。
+- `agent-current-to-target-matrix-20260701.md`：当前 AI / Agent foundation 服务到目标
+  Agent 平台的迁移和 ownership matrix。
+- `agent-open-dataset-eval-plan-20260701.md`：公开数据集优先的 Agent eval 计划，
+  包含 EvalCase / EvalRun / EvalResult / synthetic IM-like fixture 草案。
 
 ## 存放位置
 

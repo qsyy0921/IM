@@ -10,6 +10,8 @@ NexusIM Agent 层的开发顺序不是先接真实聊天数据，也不是先写
 ```text
 广泛研究
 -> 平台级 SDD
+-> 当前设计评审；如有 P0/P1 则打回重做
+-> 详细 SDD 包
 -> open dataset eval harness
 -> synthetic IM-like fixture
 -> fixture-only AgentRun trace prototype
@@ -57,11 +59,20 @@ NexusIM Agent 层的开发顺序不是先接真实聊天数据，也不是先写
 - 将 Agent 层拆成可评审的组成部分。
 - 明确每个组成部分拥有什么状态、不能拥有什么状态。
 - 明确 Runtime、Workflow、Memory、Tool/MCP、Action Executor、Eval 的边界。
+- 评审平台级设计是否足够进入实现；P0/P1 问题必须打回重做。
 
 产出：
 
 - `docs/sdd/agent-platform.md`
 - `docs/research/agent-runtime-workflow-ownership-20260701.md`
+- `docs/research/agent-current-design-review-20260701.md`
+- `docs/research/agent-current-to-target-matrix-20260701.md`
+- `docs/sdd/agent-runtime.md`
+- `docs/sdd/agent-memory-admission.md`
+- `docs/sdd/agent-context-evidencepack.md`
+- `docs/sdd/agent-tool-mcp-boundary.md`
+- `docs/sdd/agent-eval-replay-harness.md`
+- `docs/sdd/agent-governance-agentops.md`
 - SDD index 和 architecture index 链接。
 
 完成条件：

@@ -5,6 +5,18 @@
 状态：Agent Exploration Mode 的平台级 SDD 草案；不是 ADR、proto、OpenAPI、Kafka
 schema、migration、生产服务目录或生产启动路径。
 
+评审状态：本文件的 v0.1 方向正确，但已在
+`docs/research/agent-current-design-review-20260701.md` 中被判定为
+`REJECTED_FOR_IMPLEMENTATION_PROMOTION`。它不能单独作为实现推广依据。后续评审应同时阅读
+本文件和以下重做后的详细 SDD 包：
+
+- `docs/sdd/agent-runtime.md`
+- `docs/sdd/agent-memory-admission.md`
+- `docs/sdd/agent-context-evidencepack.md`
+- `docs/sdd/agent-tool-mcp-boundary.md`
+- `docs/sdd/agent-eval-replay-harness.md`
+- `docs/sdd/agent-governance-agentops.md`
+
 ## 1. 目的和定位
 
 本 SDD 只回答一个问题：如果 NexusIM 要在 2026 年构建完整的企业 IM Agent 层，
@@ -945,9 +957,18 @@ Coordinator
 
 - `docs/architecture/agent-plane-initial-design.md`
 - `docs/research/agent-plane-redesign-20260701.md`
+- `docs/research/agent-current-design-review-20260701.md`
+- `docs/research/agent-current-to-target-matrix-20260701.md`
+- `docs/research/agent-open-dataset-eval-plan-20260701.md`
 - `docs/research/agent-runtime-workflow-ownership-20260701.md`
 - `docs/research/agent-ecosystem-research-20260701.md`
 - `docs/research/agent-system-complete-scope-20260701.md`
+- `docs/sdd/agent-runtime.md`
+- `docs/sdd/agent-memory-admission.md`
+- `docs/sdd/agent-context-evidencepack.md`
+- `docs/sdd/agent-tool-mcp-boundary.md`
+- `docs/sdd/agent-eval-replay-harness.md`
+- `docs/sdd/agent-governance-agentops.md`
 - `docs/sdd/agent-service.md`
 - `docs/sdd/memory-service.md`
 - `docs/sdd/retrieval-gateway.md`

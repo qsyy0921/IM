@@ -108,6 +108,8 @@ NexusIM Agent 层的开发顺序不是先接真实聊天数据，也不是先写
 - synthetic IM-like fixture 规则。
 - failure taxonomy。
 - 隔离式 Python harness：`ai/python/nexusim_ai_eval/`。
+- public-dataset-style adapter skeleton。
+- AgentRun / AgentStep trace skeleton。
 - CLI：`ai/python/scripts/run_agent_eval_fixture.py`。
 - 单元测试、集成测试和边界测试：`ai/python/tests/test_agent_eval_*.py`。
 

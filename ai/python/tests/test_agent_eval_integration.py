@@ -11,6 +11,9 @@ from nexusim_ai_eval.fixtures import load_eval_suite
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 FIXTURE_PATH = REPO_ROOT / "ai" / "python" / "fixtures" / "agent_eval" / "synthetic_first_trio.json"
+CORE_SCENARIOS_PATH = (
+    REPO_ROOT / "ai" / "python" / "fixtures" / "agent_eval" / "synthetic_core_scenarios.json"
+)
 
 
 class AgentEvalIntegrationTests(unittest.TestCase):
@@ -42,6 +45,26 @@ class AgentEvalIntegrationTests(unittest.TestCase):
         self.assertEqual(report["failure_distribution"], {"PASS": 3})
         for case_result in report["results"]:
             self.assertFalse(case_result["replay_bundle"]["raw_payload_returned"])
+
+    def test_cli_outputs_pass_report_for_core_scenarios(self) -> None:
+        result = subprocess.run(
+            [
+                sys.executable,
+                "ai/python/scripts/run_agent_eval_fixture.py",
+                str(CORE_SCENARIOS_PATH),
+            ],
+            check=True,
+            capture_output=True,
+            cwd=REPO_ROOT,
+            text=True,
+        )
+
+        report = json.loads(result.stdout)
+        self.assertEqual(report["status"], "PASS")
+        self.assertGreaterEqual(report["case_count"], 10)
+        self.assertEqual(report["failed_count"], 0)
+        self.assertIn("eval_run", report)
+        self.assertIn("manual-core-scenario-fixture-v1", report["eval_run"]["adapter_versions"])
 
 
 if __name__ == "__main__":

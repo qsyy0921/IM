@@ -74,6 +74,8 @@ Agent Gateway / UX
 - 下一阶段应先做公开数据集和 synthetic fixture，不接真实 IM 数据。
 - 已开始第一段隔离式编码实验：`ai/python/nexusim_ai_eval/`，只运行 synthetic
   fixture 和低敏 EvalReport / ReplayBundle，不接后端服务。
+- 当前骨架已包含 adapter skeleton、AgentRun / AgentStep trace skeleton、
+  `synthetic_core_scenarios.json` 和对应 unit / integration / boundary tests。
 
 ## 工作规则
 

@@ -57,10 +57,13 @@ Implemented code:
 ```text
 ai/python/nexusim_ai_eval/
   __init__.py
+  adapters.py
   contracts.py
   evaluator.py
   fixtures.py
+  trace.py
 ai/python/fixtures/agent_eval/synthetic_first_trio.json
+ai/python/fixtures/agent_eval/synthetic_core_scenarios.json
 ai/python/scripts/run_agent_eval_fixture.py
 ```
 
@@ -70,6 +73,8 @@ Implemented tests:
 ai/python/tests/test_agent_eval_contracts.py
 ai/python/tests/test_agent_eval_evaluator.py
 ai/python/tests/test_agent_eval_integration.py
+ai/python/tests/test_agent_eval_adapters.py
+ai/python/tests/test_agent_eval_trace.py
 ```
 
 Slice 0 covers:
@@ -83,6 +88,13 @@ Slice 0 covers:
 - deterministic scoring for state-diff mismatch;
 - ReplayBundle completeness and side-effect reexecution rejection;
 - CLI integration using `synthetic_first_trio.json`.
+- public dataset adapter skeletons for Qasper/HotpotQA-like RAG,
+  ToolSandbox/tau-bench-like tool workflows and STATE-Bench/LoCoMo-like memory;
+- AgentRun / AgentStep trace skeleton with EvidencePack, ContextPackage,
+  MemoryCandidate and ToolIntent fixture refs;
+- `synthetic_core_scenarios.json` for insufficient evidence, permission leakage,
+  memory pollution, unsafe output, approval timeout, provider timeout,
+  state-diff mismatch and bounded handoff.
 
 ## 4. Code Architecture
 
@@ -121,7 +133,33 @@ The evaluator does not call models or services. Inputs represent expected and
 actual low-sensitive refs from fixtures. Later dataset adapters can generate
 those refs from public datasets.
 
-### 4.3 Fixtures
+### 4.3 Adapters
+
+`nexusim_ai_eval.adapters` owns public-dataset-style adapter skeletons:
+
+- `QasperLikeRagAdapter`;
+- `ToolSandboxLikeAdapter`;
+- `StateBenchLikeMemoryAdapter`;
+- `suite_from_adapter_cases`.
+
+Adapters convert already-local, low-sensitive dict payloads into EvalCase JSON.
+They do not download public datasets, call providers or import backend code.
+
+### 4.4 AgentRun Trace
+
+`nexusim_ai_eval.trace` owns deterministic trace skeletons:
+
+- AgentRunTrace;
+- AgentStep;
+- EvidencePackFixture;
+- ContextPackageFixture;
+- MemoryCandidateFixture;
+- ToolIntentFixture.
+
+The trace is low-sensitive and fixture-only. It records refs, hashes and failure
+classes, not raw prompt, message body or provider output.
+
+### 4.5 Fixtures
 
 `nexusim_ai_eval.fixtures` loads and validates JSON suites. The fixture kind must
 be `synthetic_im_like`.
@@ -130,12 +168,13 @@ Current fixture:
 
 ```text
 ai/python/fixtures/agent_eval/synthetic_first_trio.json
+ai/python/fixtures/agent_eval/synthetic_core_scenarios.json
 ```
 
-This fixture is intentionally tiny. It proves harness mechanics before adding
-larger public dataset adapters.
+These fixtures are intentionally synthetic. They prove harness mechanics before
+adding larger public dataset adapters.
 
-### 4.4 CLI
+### 4.6 CLI
 
 `ai/python/scripts/run_agent_eval_fixture.py` runs one suite and emits a
 low-sensitive report:
@@ -171,12 +210,16 @@ Evaluator tests:
 - unsafe tool output fails;
 - state-diff mismatch fails;
 - replay fails if side effect is reexecuted.
+- expected negative scenarios pass when the expected failure is detected.
+- adapter skeletons generate valid EvalCase suites.
+- AgentRun trace includes context, memory, tool, workflow and failure steps.
 
 ### 5.2 Integration Tests
 
 Integration tests:
 
 - load `synthetic_first_trio.json`;
+- load `synthetic_core_scenarios.json`;
 - run `run_agent_eval_fixture.py`;
 - verify report status, case count, failure distribution and `raw_payload_returned=false`.
 
@@ -198,6 +241,7 @@ Focused gate:
 ```powershell
 python -m pytest ai/python/tests/test_agent_eval_contracts.py ai/python/tests/test_agent_eval_evaluator.py ai/python/tests/test_agent_eval_integration.py -q
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_first_trio.json
+python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_core_scenarios.json
 ```
 
 Full Python gate for this workspace:
@@ -220,13 +264,12 @@ git status --short --branch --untracked-files=all
 
 Recommended next slices:
 
-1. Add public dataset adapter skeletons for Qasper/HotpotQA-like RAG cases.
-2. Add ToolSandbox/tau-bench-style tool adapter skeleton with fake state.
-3. Add STATE-Bench/LoCoMo-like memory adapter skeleton.
-4. Add approval wait and timeout fixture.
+1. Add concrete local sample payloads for Qasper/HotpotQA-like, ToolSandbox-like
+   and STATE-Bench-like adapters.
+2. Add baseline comparison between EvalReports.
+3. Add cancel/resume/replay explicit fixture steps.
+4. Add malicious MCP/tool description fixture pack.
 5. Add state-diff report section for fake action execution.
-6. Add malicious MCP/tool description fixture pack.
-7. Add baseline comparison between EvalReports.
 
 Each slice must keep the same isolation rule until an ADR explicitly promotes a
 backend integration boundary.

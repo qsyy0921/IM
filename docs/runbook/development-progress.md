@@ -98,6 +98,7 @@ EvalResult 和低敏 report 输出。
 ```text
 ai/python/nexusim_ai_eval/
 ai/python/fixtures/agent_eval/synthetic_first_trio.json
+ai/python/fixtures/agent_eval/synthetic_core_scenarios.json
 ai/python/scripts/run_agent_eval_fixture.py
 ai/python/tests/test_agent_eval_*.py
 ```
@@ -105,12 +106,21 @@ ai/python/tests/test_agent_eval_*.py
 该切片只读 synthetic fixture，输出低敏 EvalReport / ReplayBundle，不接后端服务、
 生产数据库、Kafka、Redis、OpenSearch、真实 MCP provider 或模型 provider。
 
+当前骨架还包含：
+
+- Qasper/HotpotQA-like RAG adapter skeleton。
+- ToolSandbox/tau-bench-like tool adapter skeleton。
+- STATE-Bench/LoCoMo-like memory adapter skeleton。
+- AgentRun / AgentStep trace skeleton。
+- EvidencePack、ContextPackage、MemoryCandidate、ToolIntent fixture refs。
+
 ## 当前未完成项
 
 | 优先级 | 工作 | 输出 |
 | --- | --- | --- |
-| P0 | public dataset adapter skeleton | 在已落地 harness 上补 Qasper/HotpotQA、ToolSandbox/tau-bench、STATE-Bench/LoCoMo 风格 adapter skeleton |
-| P0 | fixture-only AgentRun trace | read-only QA、memory admission、approval wait、timeout、cancel/replay、handoff 流程 |
+| P0 | adapter sample payloads / batch conversion | 给 adapter skeleton 增加本地 sample payload 和批量转换 CLI |
+| P0 | baseline comparison | EvalReport baseline、regression delta、blocked promotion reasons |
+| P0 | fixture-only AgentRun trace hardening | 显式补 cancel / resume / replay 流程 |
 | P1 | ContextPackage / EvidencePack experiment | citation、source coverage、temporal version、conflict marker、permission abstain |
 | P1 | Memory admission eval | scope、speaker attribution、supersedes、revocation、overgeneralization、pollution |
 | P1 | Tool / MCP security eval | poisoned tool description、unsafe output、tool-selection attack、provider provenance |

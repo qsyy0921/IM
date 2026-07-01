@@ -116,6 +116,15 @@ class ReplayBundle:
 
 
 @dataclass(frozen=True)
+class EvalRun:
+    run_id: str
+    suite_id: str
+    harness_version: str
+    adapter_versions: list[str]
+    case_ids: list[str]
+
+
+@dataclass(frozen=True)
 class EvalResult:
     case_id: str
     capability_family: str
@@ -130,6 +139,7 @@ class EvalReport:
     schema_version: int
     suite_id: str
     harness_version: str
+    eval_run: EvalRun
     status: str
     case_count: int
     passed_count: int

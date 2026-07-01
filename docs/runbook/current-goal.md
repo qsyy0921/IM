@@ -83,10 +83,10 @@ Agent / RAG / memory / Python AI Worker / EvidencePack / eval gate，不使用�
 
 ## 后续优先级
 
-1. 扩展 `ai/python/nexusim_ai_eval/`，加入公开数据集 adapter skeleton。
-2. 做 fixture-only AgentRun trace、ContextPackage、MemoryCandidate、ToolIntent 和
-   ReplayBundle 输出格式实验。
-3. 做 MCP poisoning、memory pollution、state-diff、approval pause/resume、cancel/replay
+1. 给现有 adapter skeleton 增加本地 public-dataset-style sample payload 和批量转换 CLI。
+2. 补 EvalReport baseline comparison / regression delta。
+3. 继续扩展 fixture-only AgentRun trace，显式覆盖 cancel / resume / replay。
+4. 做 MCP poisoning、memory pollution、state-diff、approval pause/resume、cancel/replay
    等离线 eval fixture。
 4. 在上述实验通过后，再决定是否把 Agent Runtime / Harness 提升为 ADR、服务级 SDD
    或实际 runtime module。

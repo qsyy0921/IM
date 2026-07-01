@@ -11,6 +11,7 @@ from nexusim_ai_eval.contracts import (
     EvalCase,
     EvalReport,
     EvalResult,
+    EvalRun,
     ReplayBundle,
     sha256_json,
     stable_ref,
@@ -32,6 +33,7 @@ def run_eval_suite(payload: dict[str, Any]) -> EvalReport:
         schema_version=SCHEMA_VERSION,
         suite_id=suite_id(payload),
         harness_version=HARNESS_VERSION,
+        eval_run=_eval_run(payload, cases),
         status="PASS" if not failed else "FAIL",
         case_count=len(results),
         passed_count=len(passed),
@@ -63,12 +65,11 @@ def _evaluate_case(case: EvalCase) -> EvalResult:
         scores.update(family_scores)
         failure_class = family_failure
 
+    expected_failure_matches = False
     if case.expected_failure_class:
         expected_failure_matches = case.actual_failure_class == case.expected_failure_class
         scores["expected_failure_match"] = 1.0 if expected_failure_matches else 0.0
-        if expected_failure_matches:
-            failure_class = ""
-        elif not failure_class:
+        if not expected_failure_matches and not failure_class:
             failure_class = case.actual_failure_class or "REPLAY_INCOMPLETE"
 
     if case.side_effect_reexecuted and not failure_class:
@@ -78,7 +79,11 @@ def _evaluate_case(case: EvalCase) -> EvalResult:
     if not replay_bundle.replay_complete and not failure_class:
         failure_class = "REPLAY_INCOMPLETE"
 
-    status = "PASS" if not failure_class and _all_scores_pass(scores) else "FAIL"
+    if expected_failure_matches and replay_bundle.replay_complete:
+        status = "PASS"
+        failure_class = ""
+    else:
+        status = "PASS" if not failure_class and _all_scores_pass(scores) else "FAIL"
     if status == "FAIL" and not failure_class:
         failure_class = _default_failure_class(case)
 
@@ -89,6 +94,29 @@ def _evaluate_case(case: EvalCase) -> EvalResult:
         failure_class=failure_class,
         scores=dict(sorted(scores.items())),
         replay_bundle=replay_bundle,
+    )
+
+
+def _eval_run(payload: dict[str, Any], cases: list[EvalCase]) -> EvalRun:
+    adapter_versions_raw = payload.get("adapter_versions", [])
+    adapter_versions = (
+        [str(item).strip() for item in adapter_versions_raw]
+        if isinstance(adapter_versions_raw, list)
+        else []
+    )
+    adapter_versions = [item for item in adapter_versions if item]
+    run_payload = {
+        "suite_id": suite_id(payload),
+        "case_ids": [case.case_id for case in cases],
+        "adapter_versions": adapter_versions,
+        "harness_version": HARNESS_VERSION,
+    }
+    return EvalRun(
+        run_id=stable_ref("evalrun", run_payload),
+        suite_id=suite_id(payload),
+        harness_version=HARNESS_VERSION,
+        adapter_versions=adapter_versions,
+        case_ids=[case.case_id for case in cases],
     )
 
 

@@ -33,12 +33,15 @@ ai/python/
   nexusim_ai_memory/
     extractor.py
   nexusim_ai_eval/
+    adapters.py
     contracts.py
     evaluator.py
     fixtures.py
+    trace.py
   fixtures/
     agent_eval/
       synthetic_first_trio.json
+      synthetic_core_scenarios.json
   contracts/
     worker-candidate.schema.json
   scripts/
@@ -124,18 +127,29 @@ The current fixture is:
 
 ```text
 ai/python/fixtures/agent_eval/synthetic_first_trio.json
+ai/python/fixtures/agent_eval/synthetic_core_scenarios.json
 ```
 
-It covers the first minimal trio:
+The first trio covers:
 
 - grounded RAG citation / permission check;
 - group memory admission scope check;
 - tool poisoning / unsafe output quarantine check.
 
+The core scenarios fixture extends this to insufficient evidence abstain,
+permission leakage detection, memory pollution/revocation, unsafe tool output,
+approval timeout, provider timeout, state-diff mismatch and bounded handoff.
+`nexusim_ai_eval.adapters` also includes low-sensitive skeleton adapters for
+Qasper/HotpotQA-like RAG, ToolSandbox/tau-bench-like tool cases and
+STATE-Bench/LoCoMo-like memory cases. `nexusim_ai_eval.trace` builds a
+deterministic AgentRun / AgentStep trace skeleton with ContextPackage,
+EvidencePack, MemoryCandidate and ToolIntent fixture refs.
+
 Run it directly:
 
 ```powershell
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_first_trio.json
+python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_core_scenarios.json
 python -m pytest ai/python/tests/test_agent_eval_contracts.py ai/python/tests/test_agent_eval_evaluator.py ai/python/tests/test_agent_eval_integration.py -q
 ```
 

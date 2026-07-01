@@ -61,6 +61,24 @@ class AgentEvalEvaluatorTests(unittest.TestCase):
         self.assertEqual(report.results[0].failure_class, "PERMISSION_LEAKAGE")
         self.assertEqual(report.aggregate_scores["permission_leakage"], 0.0)
 
+    def test_expected_permission_leakage_detection_passes_negative_case(self) -> None:
+        case = base_case("GROUNDED_RAG")
+        case.update(
+            {
+                "forbidden_evidence_refs": ["evidence:hidden"],
+                "actual_used_refs": ["evidence:hidden"],
+                "actual_citation_refs": ["evidence:hidden"],
+                "expected_failure_class": "PERMISSION_LEAKAGE",
+                "actual_failure_class": "PERMISSION_LEAKAGE",
+            }
+        )
+
+        report = run_eval_suite(suite_with_case(case))
+
+        self.assertEqual(report.status, "PASS")
+        self.assertEqual(report.results[0].failure_class, "")
+        self.assertEqual(report.aggregate_scores["expected_failure_match"], 1.0)
+
     def test_expected_abstain_passes_without_citation(self) -> None:
         case = base_case("GROUNDED_RAG")
         case.update(

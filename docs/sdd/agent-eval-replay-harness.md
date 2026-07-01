@@ -318,14 +318,19 @@ Current isolated coding slice:
 
 ```text
 ai/python/nexusim_ai_eval/
+  adapters.py
   contracts.py
   evaluator.py
   fixtures.py
+  trace.py
 ai/python/fixtures/agent_eval/synthetic_first_trio.json
+ai/python/fixtures/agent_eval/synthetic_core_scenarios.json
 ai/python/scripts/run_agent_eval_fixture.py
 ai/python/tests/test_agent_eval_contracts.py
 ai/python/tests/test_agent_eval_evaluator.py
 ai/python/tests/test_agent_eval_integration.py
+ai/python/tests/test_agent_eval_adapters.py
+ai/python/tests/test_agent_eval_trace.py
 ```
 
 This slice implements the first offline harness mechanics only. It does not
@@ -342,12 +347,20 @@ Implemented checks:
 - state-diff mismatch scoring;
 - ReplayBundle completeness and side-effect reexecution rejection;
 - CLI integration on `synthetic_first_trio.json`.
+- public dataset adapter skeletons for Qasper/HotpotQA-like RAG,
+  ToolSandbox/tau-bench-like tool and STATE-Bench/LoCoMo-like memory;
+- AgentRun / AgentStep trace skeleton with EvidencePack, ContextPackage,
+  MemoryCandidate and ToolIntent fixture refs;
+- core scenario fixture coverage for abstain, permission leakage, memory
+  pollution, unsafe output, approval timeout, provider timeout, state-diff
+  mismatch and bounded handoff.
 
 Focused verification:
 
 ```powershell
 python -m pytest ai/python/tests/test_agent_eval_contracts.py ai/python/tests/test_agent_eval_evaluator.py ai/python/tests/test_agent_eval_integration.py -q
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_first_trio.json
+python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_core_scenarios.json
 ```
 
 ## 16. References

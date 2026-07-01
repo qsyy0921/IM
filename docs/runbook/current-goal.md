@@ -442,6 +442,27 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
   采集 Prometheus / debug metrics 时间窗口，定位 message-service、conversation /
   policy RPC、timeline seq block cache、PostgreSQL 写入或 admission/backpressure
   哪一段导致高延迟。
+- 2026-07-01 clean baseline `hotgroup-pgpoolcap-clean-200x500-64c-d4e211d8-20260701-1520`
+  已确认 200 人小群仍走 `WRITE_FANOUT`，SendMessage p95 / p99 为
+  `557.167ms / 780.909ms`，实际发压约 `277.867 msg/s`。`f34e571d`
+  新增 message-service sequencer floor cache 后，等价 200 人小群复压
+  `hotgroup-seqfloorcache-clean-200x500-64c-f34e571d-20260701-1610` 仍分类为
+  `send-path-latency`，SendMessage p95 / p99 为 `697.448ms / 945.946ms`，
+  实际发压约 `225.44 msg/s`。结论：200 人小群写扩散瓶颈来自本地
+  `conversation_seq` 单行递增，不是 sequencer floor 查询；不要用该档位判断热点大群
+  QPS 上限。
+- 2026-07-01 诊断性 READ_FANOUT run
+  `hotgroup-seqfloorcache-readfanout-6000x1000-256c-f34e571d-20260701-1625`
+  使用 6000 人、1000 消息、256 sender concurrency、目标 8000 msg/s，实际发压约
+  `308.285 msg/s`，SendMessage p95 / p99 为 `1059.819ms / 1278.26ms`。
+  该 run 因仓库已有未提交报告而标记 `git_dirty=true`，只能用于诊断。Prometheus
+  窗口显示 message-service PG pool acquire 长尾明显，说明 CPU 空闲的主要原因之一是
+  并发请求在连接池前排队，而不是 Go 计算或 Kafka 写出吃满。
+- 本地 Docker 压测 profile 已开始按三机 / Ubuntu 大资源环境调整：PostgreSQL 默认
+  `max_connections` 从 300 提到 600，message-service gRPC 默认 PG pool 从 64 提到
+  192；`tools/record-hotgroup-metrics-window.ps1` 已补 message repository 分段 p99
+  查询，后续每轮报告可以直接看到 pool acquire / tx begin / idempotency / seq /
+  insert / commit 的长尾。
 - HYBRID 诊断档位 1000 人 / 1000 消息 / 400 msg/s 暴露 `delivery_outbox` ready query
   在百万级 per-user outbox 下退化：旧 anti-join blocker 查询每批 500 行约 24s。当前
   delivery outbox relay 已改成 per-conversation frontier ready query，并把本地 worker
@@ -496,14 +517,15 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
 
 ## 后续优先级
 
-1. 将 PG 连接预算修正提交为 clean commit 后，先用 200 人 / 500 message /
-   64 sender concurrency 重跑一次带 Prometheus / debug metrics 时间窗口的 clean
-   复验，确认 `send-path-latency` 的具体来源。通过后再回到
-   total-subscriber-aware policy 的 6000 人 / 5000 message / 400 subscriber /
-   expected sample=50 场景，确认 `achieved_send_rate` 是否接近目标。若
-   SendMessage 实际速率提升后 signal span 下降，说明上一轮主要受 runner 发压模型限制；
-   若实际速率提升但 span / lag 恶化，再继续定位 message-service、Kafka、
-   delivery projection、delivery_outbox 或 push event pacing。
+1. 提交并 redeploy 本地 Docker PG / message-service pool 扩容 profile 后，先用
+   6000 人 READ_FANOUT / 1000 message / 256 sender concurrency 重跑一次 clean
+   复验，确认 message-service pool acquire 长尾是否下降、实际发压是否高于约
+   `308 msg/s`。通过后再回到 total-subscriber-aware policy 的 6000 人 /
+   5000 message / 400 subscriber / expected sample=50 场景，确认
+   `achieved_send_rate` 是否接近目标。若 SendMessage 实际速率提升后 signal span
+   下降，说明上一轮主要受 runner 发压模型 / pool budget 限制；若实际速率提升但
+   span / lag 恶化，再继续定位 message-service、Kafka、delivery projection、
+   delivery_outbox 或 push event pacing。
 2. 继续为每轮优化保留 clean commit、Docker 镜像归档、三机部署版本和 Prometheus
    时间窗口，保证压测曲线可复现。
 3. 若 HYBRID 仍要支持千人级 per-user materialized outbox，优先评估显式 frontier /

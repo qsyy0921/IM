@@ -584,6 +584,18 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
   timeout 只能作为 send-path 诊断；768c 因已有未提交报告标记 `git_dirty=true`，
   不作为正式容量证据。低敏报告见
   `docs/runbook/loadtest/hotgroup/hotgroup-policy-stage-bottleneck-20260701.md`。
+- 2026-07-01 已完成 policy hot path 四项实验并部署 commit `43207080`：
+  新增 quota audit partial index，并把 exact message rule / tenant rule 两次查询合并为
+  一次有优先级的 `UNION ALL` 查询；`go test ./services/policy-service/... -count=1`、
+  `go build ./services/policy-service/cmd/policy-service` 和 `git diff --check` 均通过。
+  EXPLAIN/ANALYZE 显示用户限制、角色规则、ReBAC、tenant quota 和合并规则查询均走索引，
+  单条执行为亚毫秒级，因此瓶颈不是单个慢 SQL，而是每条 SendMessage 串行多次 policy PG
+  往返和 decision audit outbox 写入在高并发下累计排队。PG pool A/B 显示 64 / 96 / 128
+  三档分别约 `2262.690` / `2080.398` / `2062.255 msg/s`，SendMessage p99 分别约
+  `531.929ms` / `654.204ms` / `739.645ms`；盲目扩大
+  `NEXUSIM_POLICY_PG_MAX_CONNS` 会降低 acquire wait counter，但不提升吞吐，反而把压力推向
+  PostgreSQL / audit / delivery projection。报告见
+  `docs/runbook/loadtest/hotgroup/hotgroup-policy-hotpath-experiment-20260701.md`。
 - HYBRID 诊断档位 1000 人 / 1000 消息 / 400 msg/s 暴露 `delivery_outbox` ready query
   在百万级 per-user outbox 下退化：旧 anti-join blocker 查询每批 500 行约 24s。当前
   delivery outbox relay 已改成 per-conversation frontier ready query，并把本地 worker

@@ -135,8 +135,10 @@
    clean commit `1d738f2` 的 512 concurrency / 5000 message 正式复压达到约
    `2356.419 msg/s`、SendMessage p99 `257.893ms`，outbox pending=0；
    `conversation_seq_alloc_recent p99` 约 `0.023ms`、`repository_pool_acquire_recent p99`
-   约 `0.538ms`，说明连接池和 seq allocation 仍不是瓶颈。剩余任务是继续尝试
-   768 / 1024 concurrency 或扩大 message_count，
+   约 `0.538ms`，说明连接池和 seq allocation 仍不是瓶颈。clean commit `4af8fa1`
+   的 768 concurrency 正式复压达到约 `2429.551 msg/s`、SendMessage p99
+   `438.851ms`，相对 512 只提升约 3.1% 且 p99 明显升高。剩余任务是继续尝试
+   1024 concurrency 或扩大 message_count，
    同时观察 recent repository append / insert_outbox / commit p99、PostgreSQL CPU / IO
    和 message-service CPU；之后再回到 total-subscriber-aware policy 的 6000 人 /
    5000 消息 / 400 subscriber 场景，确认 `achieved_send_rate` 与 signal span 新曲线。

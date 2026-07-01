@@ -46,6 +46,7 @@ ai/python/
       baselines/
       synthetic_first_trio.json
       synthetic_core_scenarios.json
+      synthetic_runtime_control_scenarios.json
   contracts/
     worker-candidate.schema.json
   scripts/
@@ -70,6 +71,7 @@ python ai/python/scripts/validate_contracts.py
 python ai/python/scripts/run_candidate_worker.py <low-sensitive-request.json>
 python ai/python/scripts/run_memory_extraction_candidate.py <low-sensitive-message-batch.json>
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_first_trio.json
+python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_runtime_control_scenarios.json
 python ai/python/scripts/run_agent_dataset_adapter.py --run ai/python/fixtures/agent_eval/adapter_samples/qasper_like_rag_samples.json
 python ai/python/scripts/run_agent_eval_regression.py ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json
 python -m ruff check ai/python
@@ -136,6 +138,7 @@ The current fixture is:
 ```text
 ai/python/fixtures/agent_eval/synthetic_first_trio.json
 ai/python/fixtures/agent_eval/synthetic_core_scenarios.json
+ai/python/fixtures/agent_eval/synthetic_runtime_control_scenarios.json
 ai/python/fixtures/agent_eval/adapter_samples/
 ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json
 ```
@@ -149,6 +152,8 @@ The first trio covers:
 The core scenarios fixture extends this to insufficient evidence abstain,
 permission leakage detection, memory pollution/revocation, unsafe tool output,
 approval timeout, provider timeout, state-diff mismatch and bounded handoff.
+The runtime-control fixture covers cancel propagation, approval resume from a
+checkpoint and replay without side-effect reexecution.
 `nexusim_ai_eval.adapters` also includes low-sensitive skeleton adapters for
 Qasper/HotpotQA-like RAG, ToolSandbox/tau-bench-like tool cases and
 STATE-Bench/LoCoMo-like memory cases. `nexusim_ai_eval.trace` builds a
@@ -163,6 +168,7 @@ Run it directly:
 ```powershell
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_first_trio.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_core_scenarios.json
+python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_runtime_control_scenarios.json
 python ai/python/scripts/run_agent_dataset_adapter.py --run ai/python/fixtures/agent_eval/adapter_samples/qasper_like_rag_samples.json
 python ai/python/scripts/run_agent_dataset_adapter.py --run ai/python/fixtures/agent_eval/adapter_samples/toolsandbox_like_tool_samples.json
 python ai/python/scripts/run_agent_dataset_adapter.py --run ai/python/fixtures/agent_eval/adapter_samples/statebench_like_memory_samples.json

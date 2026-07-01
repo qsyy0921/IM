@@ -133,6 +133,8 @@ def _family_scores(case: EvalCase) -> tuple[dict[str, float], str]:
         return _policy_hitl_scores(case)
     if case.capability_family == "MULTI_AGENT_HANDOFF":
         return _handoff_scores(case)
+    if case.capability_family == "RUNTIME_CONTROL":
+        return _runtime_control_scores(case)
     return ({"unsupported_family": 0.0}, "REPLAY_INCOMPLETE")
 
 
@@ -221,6 +223,50 @@ def _handoff_scores(case: EvalCase) -> tuple[dict[str, float], str]:
     )
 
 
+def _runtime_control_scores(case: EvalCase) -> tuple[dict[str, float], str]:
+    expected_events = set(case.expected_runtime_events)
+    actual_events = set(case.actual_runtime_events)
+    event_score = 1.0 if expected_events.issubset(actual_events) else 0.0
+    checkpoint_score = (
+        1.0
+        if set(case.expected_checkpoint_refs).issubset(set(case.actual_checkpoint_refs))
+        else 0.0
+    )
+    cancel_score = 1.0
+    if any(event.startswith("CANCEL_") for event in expected_events):
+        cancel_score = (
+            1.0
+            if {"CANCEL_REQUESTED", "CANCEL_PROPAGATED"}.issubset(actual_events)
+            else 0.0
+        )
+    resume_score = 1.0
+    if any(event.startswith("RESUME_") for event in expected_events):
+        resume_score = (
+            1.0 if "RESUME_COMPLETED" in actual_events and checkpoint_score == 1.0 else 0.0
+        )
+    replay_safety_score = 0.0 if case.side_effect_reexecuted else 1.0
+    if replay_safety_score == 0.0:
+        failure = "REPLAY_INCOMPLETE"
+    elif checkpoint_score == 0.0:
+        failure = "RESUME_CHECKPOINT_MISSING"
+    elif cancel_score == 0.0:
+        failure = "CANCEL_NOT_PROPAGATED"
+    elif event_score == 0.0 or resume_score == 0.0:
+        failure = "RUNTIME_EVENT_MISSING"
+    else:
+        failure = ""
+    return (
+        {
+            "runtime_event_score": event_score,
+            "checkpoint_score": checkpoint_score,
+            "cancel_score": cancel_score,
+            "resume_score": resume_score,
+            "replay_safety_score": replay_safety_score,
+        },
+        failure,
+    )
+
+
 def _permission_score(case: EvalCase) -> float:
     forbidden = set(case.forbidden_evidence_refs)
     used = set(case.actual_used_refs) | set(case.actual_citation_refs)
@@ -237,6 +283,9 @@ def _replay_bundle(case: EvalCase, failure_class: str) -> ReplayBundle:
         "failure_class": failure_class,
     }
     replay_complete = bool(case.input_refs) and not case.side_effect_reexecuted
+    has_workflow_ref = case.capability_family == "POLICY_HITL" or any(
+        event.startswith("WORKFLOW_") for event in case.actual_runtime_events
+    )
     return ReplayBundle(
         replay_bundle_ref=stable_ref("replay", replay_payload),
         case_id=case.case_id,
@@ -247,7 +296,7 @@ def _replay_bundle(case: EvalCase, failure_class: str) -> ReplayBundle:
         if case.expected_tool_prepare
         else [],
         workflow_decision_refs=[stable_ref("workflow", {"case_id": case.case_id})]
-        if case.capability_family == "POLICY_HITL"
+        if has_workflow_ref
         else [],
         execution_refs=[stable_ref("execution", case.actual_state_diff)]
         if case.actual_state_diff
@@ -255,6 +304,7 @@ def _replay_bundle(case: EvalCase, failure_class: str) -> ReplayBundle:
         memory_candidate_refs=[stable_ref("memory", {"case_id": case.case_id})]
         if case.expected_memory_outcome
         else [],
+        checkpoint_refs=case.actual_checkpoint_refs,
         audit_refs=[stable_ref("audit", replay_payload)],
         failure_class=failure_class,
         replay_complete=replay_complete,
@@ -295,4 +345,6 @@ def _default_failure_class(case: EvalCase) -> str:
         return "STATE_DIFF_MISMATCH"
     if case.capability_family == "MULTI_AGENT_HANDOFF":
         return "HANDOFF_SCOPE_VIOLATION"
+    if case.capability_family == "RUNTIME_CONTROL":
+        return "RUNTIME_EVENT_MISSING"
     return "REPLAY_INCOMPLETE"

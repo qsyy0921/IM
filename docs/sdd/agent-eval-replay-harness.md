@@ -329,6 +329,7 @@ ai/python/fixtures/agent_eval/adapter_samples/
 ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json
 ai/python/fixtures/agent_eval/synthetic_first_trio.json
 ai/python/fixtures/agent_eval/synthetic_core_scenarios.json
+ai/python/fixtures/agent_eval/synthetic_runtime_control_scenarios.json
 ai/python/scripts/run_agent_eval_fixture.py
 ai/python/scripts/run_agent_dataset_adapter.py
 ai/python/scripts/run_agent_eval_regression.py
@@ -367,6 +368,8 @@ Implemented checks:
 - batch adapter conversion / run CLI;
 - EvalReport baseline comparison with aggregate deltas, case deltas and blocked
   promotion reasons.
+- runtime-control fixture coverage for cancel propagation, checkpointed approval
+  resume and replay without side-effect reexecution.
 
 Focused verification:
 
@@ -374,6 +377,7 @@ Focused verification:
 python -m pytest ai/python/tests/test_agent_eval_contracts.py ai/python/tests/test_agent_eval_evaluator.py ai/python/tests/test_agent_eval_integration.py -q
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_first_trio.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_core_scenarios.json
+python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_runtime_control_scenarios.json
 python ai/python/scripts/run_agent_dataset_adapter.py --run ai/python/fixtures/agent_eval/adapter_samples/qasper_like_rag_samples.json
 python ai/python/scripts/run_agent_eval_regression.py ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json
 ```

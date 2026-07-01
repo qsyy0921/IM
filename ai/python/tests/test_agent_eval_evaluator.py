@@ -156,6 +156,72 @@ class AgentEvalEvaluatorTests(unittest.TestCase):
         self.assertEqual(report.results[0].failure_class, "REPLAY_INCOMPLETE")
         self.assertFalse(report.results[0].replay_bundle.replay_complete)
 
+    def test_runtime_control_passes_cancel_resume_and_replay_refs(self) -> None:
+        case = base_case("RUNTIME_CONTROL")
+        case.update(
+            {
+                "expected_runtime_events": [
+                    "CHECKPOINT_CREATED",
+                    "CANCEL_REQUESTED",
+                    "CANCEL_PROPAGATED",
+                    "RESUME_REQUESTED",
+                    "RESUME_COMPLETED",
+                    "REPLAY_REQUESTED",
+                    "REPLAY_RECONSTRUCTED",
+                ],
+                "actual_runtime_events": [
+                    "CHECKPOINT_CREATED",
+                    "CANCEL_REQUESTED",
+                    "CANCEL_PROPAGATED",
+                    "RESUME_REQUESTED",
+                    "RESUME_COMPLETED",
+                    "REPLAY_REQUESTED",
+                    "REPLAY_RECONSTRUCTED",
+                ],
+                "expected_checkpoint_refs": ["checkpoint:runtime"],
+                "actual_checkpoint_refs": ["checkpoint:runtime"],
+            }
+        )
+
+        report = run_eval_suite(suite_with_case(case))
+
+        self.assertEqual(report.status, "PASS")
+        self.assertEqual(report.aggregate_scores["runtime_event_score"], 1.0)
+        self.assertEqual(report.aggregate_scores["checkpoint_score"], 1.0)
+        self.assertEqual(report.results[0].replay_bundle.checkpoint_refs, ["checkpoint:runtime"])
+
+    def test_runtime_control_fails_missing_resume_checkpoint(self) -> None:
+        case = base_case("RUNTIME_CONTROL")
+        case.update(
+            {
+                "expected_runtime_events": ["CHECKPOINT_CREATED", "RESUME_COMPLETED"],
+                "actual_runtime_events": ["CHECKPOINT_CREATED", "RESUME_COMPLETED"],
+                "expected_checkpoint_refs": ["checkpoint:runtime"],
+                "actual_checkpoint_refs": [],
+            }
+        )
+
+        report = run_eval_suite(suite_with_case(case))
+
+        self.assertEqual(report.status, "FAIL")
+        self.assertEqual(report.results[0].failure_class, "RESUME_CHECKPOINT_MISSING")
+
+    def test_runtime_control_fails_missing_cancel_propagation(self) -> None:
+        case = base_case("RUNTIME_CONTROL")
+        case.update(
+            {
+                "expected_runtime_events": ["CANCEL_REQUESTED", "CANCEL_PROPAGATED"],
+                "actual_runtime_events": ["CANCEL_REQUESTED"],
+                "expected_checkpoint_refs": ["checkpoint:cancel"],
+                "actual_checkpoint_refs": ["checkpoint:cancel"],
+            }
+        )
+
+        report = run_eval_suite(suite_with_case(case))
+
+        self.assertEqual(report.status, "FAIL")
+        self.assertEqual(report.results[0].failure_class, "CANCEL_NOT_PROPAGATED")
+
 
 if __name__ == "__main__":
     unittest.main()

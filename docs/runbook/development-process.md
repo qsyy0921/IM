@@ -110,6 +110,7 @@ NexusIM Agent 层的开发顺序不是先接真实聊天数据，也不是先写
 - 隔离式 Python harness：`ai/python/nexusim_ai_eval/`。
 - public-dataset-style adapter skeleton。
 - AgentRun / AgentStep trace skeleton。
+- fixture-only cancel / resume / replay runtime-control skeleton。
 - CLI：`ai/python/scripts/run_agent_eval_fixture.py`。
 - Adapter batch CLI：`ai/python/scripts/run_agent_dataset_adapter.py`。
 - Regression CLI：`ai/python/scripts/run_agent_eval_regression.py`。

@@ -70,6 +70,7 @@ ai/python/fixtures/agent_eval/adapter_samples/
 ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json
 ai/python/fixtures/agent_eval/synthetic_first_trio.json
 ai/python/fixtures/agent_eval/synthetic_core_scenarios.json
+ai/python/fixtures/agent_eval/synthetic_runtime_control_scenarios.json
 ai/python/scripts/run_agent_eval_fixture.py
 ai/python/scripts/run_agent_dataset_adapter.py
 ai/python/scripts/run_agent_eval_regression.py
@@ -109,6 +110,8 @@ Slice 0 covers:
   ToolSandbox-like tool security and STATE-Bench-like memory;
 - batch adapter conversion / run CLI;
 - EvalReport baseline fixture, regression delta and blocked promotion reasons.
+- fixture-only runtime-control coverage for cancel propagation, checkpointed
+  approval resume and replay without side-effect reexecution.
 
 ## 4. Code Architecture
 
@@ -185,6 +188,7 @@ fixtures, call models or connect to backend services.
 - ContextPackageFixture;
 - MemoryCandidateFixture;
 - ToolIntentFixture.
+- RuntimeControlFixture.
 
 The trace is low-sensitive and fixture-only. It records refs, hashes and failure
 classes, not raw prompt, message body or provider output.
@@ -199,6 +203,7 @@ Current fixture:
 ```text
 ai/python/fixtures/agent_eval/synthetic_first_trio.json
 ai/python/fixtures/agent_eval/synthetic_core_scenarios.json
+ai/python/fixtures/agent_eval/synthetic_runtime_control_scenarios.json
 ai/python/fixtures/agent_eval/adapter_samples/
 ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json
 ```
@@ -260,7 +265,8 @@ Evaluator tests:
 - adapter skeletons generate valid EvalCase suites.
 - adapter runner converts local sample payloads and rejects sensitive fields.
 - baseline comparison blocks aggregate and case-level regressions.
-- AgentRun trace includes context, memory, tool, workflow and failure steps.
+- AgentRun trace includes context, memory, tool, workflow, runtime-control and
+  failure steps.
 
 ### 5.2 Integration Tests
 
@@ -268,6 +274,7 @@ Integration tests:
 
 - load `synthetic_first_trio.json`;
 - load `synthetic_core_scenarios.json`;
+- load `synthetic_runtime_control_scenarios.json`;
 - run `run_agent_eval_fixture.py`;
 - verify report status, case count, failure distribution and `raw_payload_returned=false`.
 
@@ -290,6 +297,7 @@ Focused gate:
 python -m pytest ai/python/tests/test_agent_eval_contracts.py ai/python/tests/test_agent_eval_evaluator.py ai/python/tests/test_agent_eval_integration.py -q
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_first_trio.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_core_scenarios.json
+python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_runtime_control_scenarios.json
 python ai/python/scripts/run_agent_dataset_adapter.py --run ai/python/fixtures/agent_eval/adapter_samples/qasper_like_rag_samples.json
 python ai/python/scripts/run_agent_eval_regression.py ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json
 ```
@@ -314,11 +322,12 @@ git status --short --branch --untracked-files=all
 
 Recommended next slices:
 
-1. Add cancel/resume/replay explicit fixture steps.
-2. Add malicious MCP/tool description fixture pack.
-3. Add richer memory pollution / revocation / supersedes fixture coverage.
-4. Add state-diff report section for fake action execution.
-5. Add current-report generation script for baseline refresh review.
+1. Add malicious MCP/tool description fixture pack.
+2. Add richer memory pollution / revocation / supersedes fixture coverage.
+3. Add state-diff report section for fake action execution.
+4. Add current-report generation script for baseline refresh review.
+5. Add runtime-control negative fixture pack for missing checkpoints and
+   incomplete cancel propagation.
 
 Each slice must keep the same isolation rule until an ADR explicitly promotes a
 backend integration boundary.

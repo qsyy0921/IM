@@ -96,6 +96,46 @@ class AgentEvalTraceTests(unittest.TestCase):
         self.assertIn("workflow_wait", step_types)
         self.assertIsNotNone(trace.tool_intent)
 
+    def test_trace_contains_runtime_control_steps(self) -> None:
+        case = validate_eval_suite(
+            suite_with_case(
+                {
+                    "case_id": "trace-runtime-control-case",
+                    "dataset_name": "synthetic",
+                    "dataset_version": "2026-07-01",
+                    "capability_family": "RUNTIME_CONTROL",
+                    "fixture_version": "fixture-v1",
+                    "input_refs": ["input:trace-runtime-control-case"],
+                    "expected_runtime_events": [
+                        "CHECKPOINT_CREATED",
+                        "CANCEL_REQUESTED",
+                        "CANCEL_PROPAGATED",
+                        "RESUME_COMPLETED",
+                        "REPLAY_REQUESTED",
+                    ],
+                    "actual_runtime_events": [
+                        "CHECKPOINT_CREATED",
+                        "CANCEL_REQUESTED",
+                        "CANCEL_PROPAGATED",
+                        "RESUME_COMPLETED",
+                        "REPLAY_REQUESTED",
+                    ],
+                    "expected_checkpoint_refs": ["checkpoint:trace-runtime"],
+                    "actual_checkpoint_refs": ["checkpoint:trace-runtime"],
+                }
+            )
+        )[0]
+
+        trace = build_agent_run_trace(case)
+
+        step_types = [step.step_type for step in trace.steps]
+        self.assertEqual(trace.status, "PASS")
+        self.assertIsNotNone(trace.runtime_control)
+        self.assertIn("checkpoint", step_types)
+        self.assertIn("cancel", step_types)
+        self.assertIn("resume", step_types)
+        self.assertIn("replay", step_types)
+
 
 if __name__ == "__main__":
     unittest.main()

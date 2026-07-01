@@ -26,6 +26,7 @@ ALLOWED_CAPABILITY_FAMILIES = {
     "STATE_DIFF",
     "POLICY_HITL",
     "MULTI_AGENT_HANDOFF",
+    "RUNTIME_CONTROL",
 }
 
 ALLOWED_FAILURE_CLASSES = {
@@ -50,6 +51,9 @@ ALLOWED_FAILURE_CLASSES = {
     "MEMORY_POLLUTION",
     "HANDOFF_SCOPE_VIOLATION",
     "REPLAY_INCOMPLETE",
+    "RUNTIME_EVENT_MISSING",
+    "RESUME_CHECKPOINT_MISSING",
+    "CANCEL_NOT_PROPAGATED",
 }
 
 FORBIDDEN_EVAL_FIELDS = {
@@ -88,6 +92,10 @@ class EvalCase:
     actual_tool_prepare: str = ""
     expected_state_diff: dict[str, str] = field(default_factory=dict)
     actual_state_diff: dict[str, str] = field(default_factory=dict)
+    expected_runtime_events: list[str] = field(default_factory=list)
+    actual_runtime_events: list[str] = field(default_factory=list)
+    expected_checkpoint_refs: list[str] = field(default_factory=list)
+    actual_checkpoint_refs: list[str] = field(default_factory=list)
     expected_failure_class: str = ""
     actual_failure_class: str = ""
     actual_abstained: bool = False
@@ -108,6 +116,7 @@ class ReplayBundle:
     workflow_decision_refs: list[str]
     execution_refs: list[str]
     memory_candidate_refs: list[str]
+    checkpoint_refs: list[str]
     audit_refs: list[str]
     failure_class: str
     replay_complete: bool
@@ -238,6 +247,18 @@ def _eval_case(payload: dict[str, Any], index: int) -> EvalCase:
             payload.get("expected_state_diff", {}), "expected_state_diff"
         ),
         actual_state_diff=_string_map(payload.get("actual_state_diff", {}), "actual_state_diff"),
+        expected_runtime_events=_upper_string_list(
+            payload.get("expected_runtime_events", []), "expected_runtime_events"
+        ),
+        actual_runtime_events=_upper_string_list(
+            payload.get("actual_runtime_events", []), "actual_runtime_events"
+        ),
+        expected_checkpoint_refs=_string_list(
+            payload.get("expected_checkpoint_refs", []), "expected_checkpoint_refs"
+        ),
+        actual_checkpoint_refs=_string_list(
+            payload.get("actual_checkpoint_refs", []), "actual_checkpoint_refs"
+        ),
         expected_failure_class=expected_failure_class,
         actual_failure_class=actual_failure_class,
         actual_abstained=_bool(payload.get("actual_abstained", False), "actual_abstained"),
@@ -295,6 +316,10 @@ def _string_list(value: Any, field_name: str) -> list[str]:
             raise ValueError(f"{field_name} contains empty item")
         result.append(normalized)
     return result
+
+
+def _upper_string_list(value: Any, field_name: str) -> list[str]:
+    return [item.upper() for item in _string_list(value, field_name)]
 
 
 def _string_map(value: Any, field_name: str) -> dict[str, str]:

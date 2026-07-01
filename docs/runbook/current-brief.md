@@ -78,7 +78,10 @@ Agent Gateway / UX
   `synthetic_core_scenarios.json` 和对应 unit / integration / boundary tests。
 - 已补本地 public-dataset-style adapter sample payload、批量转换 / 运行 CLI、
   EvalReport baseline fixture 和 regression comparison CLI。
-- 下一段优先显式补 fixture-only cancel / resume / replay trace。
+- 已补 fixture-only runtime-control coverage：cancel propagation、approval resume
+  from checkpoint、replay without side-effect reexecution。
+- 下一段优先做 MCP poisoning、memory pollution / supersedes、state-diff report
+  等离线 hardening fixture。
 
 ## 工作规则
 

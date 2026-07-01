@@ -40,6 +40,15 @@ class ToolIntentFixture:
 
 
 @dataclass(frozen=True)
+class RuntimeControlFixture:
+    runtime_control_ref: str
+    runtime_events: list[str]
+    checkpoint_refs: list[str]
+    replay_complete: bool
+    side_effect_reexecuted: bool
+
+
+@dataclass(frozen=True)
 class AgentStep:
     step_ref: str
     step_type: str
@@ -60,6 +69,7 @@ class AgentRunTrace:
     context_package: ContextPackageFixture
     memory_candidate: MemoryCandidateFixture | None = None
     tool_intent: ToolIntentFixture | None = None
+    runtime_control: RuntimeControlFixture | None = None
 
 
 def build_agent_run_trace(case: EvalCase) -> AgentRunTrace:
@@ -138,6 +148,9 @@ def build_agent_run_trace(case: EvalCase) -> AgentRunTrace:
                 "" if state_status == "PASS" else "STATE_DIFF_MISMATCH",
             )
         )
+    runtime_control = _runtime_control(case)
+    if runtime_control is not None:
+        steps.extend(_runtime_control_steps(case, runtime_control))
     run_status = "FAIL" if any(step.status == "FAIL" for step in steps) else "PASS"
     return AgentRunTrace(
         agent_run_ref=stable_ref("agentrun", {"case_id": case.case_id}),
@@ -149,6 +162,7 @@ def build_agent_run_trace(case: EvalCase) -> AgentRunTrace:
         context_package=context_package,
         memory_candidate=memory_candidate,
         tool_intent=tool_intent,
+        runtime_control=runtime_control,
     )
 
 
@@ -172,6 +186,94 @@ def _tool_intent(case: EvalCase) -> ToolIntentFixture | None:
         malicious_tool_blocked=case.malicious_tool_blocked,
         unsafe_output_quarantined=case.unsafe_output_quarantined,
     )
+
+
+def _runtime_control(case: EvalCase) -> RuntimeControlFixture | None:
+    if (
+        not case.expected_runtime_events
+        and not case.actual_runtime_events
+        and not case.expected_checkpoint_refs
+        and not case.actual_checkpoint_refs
+    ):
+        return None
+    return RuntimeControlFixture(
+        runtime_control_ref=stable_ref("runtime", {"case_id": case.case_id}),
+        runtime_events=case.actual_runtime_events,
+        checkpoint_refs=case.actual_checkpoint_refs,
+        replay_complete=bool(case.input_refs) and not case.side_effect_reexecuted,
+        side_effect_reexecuted=case.side_effect_reexecuted,
+    )
+
+
+def _runtime_control_steps(
+    case: EvalCase,
+    runtime_control: RuntimeControlFixture,
+) -> list[AgentStep]:
+    steps: list[AgentStep] = []
+    expected_events = set(case.expected_runtime_events)
+    actual_events = set(case.actual_runtime_events)
+    expected_checkpoints = set(case.expected_checkpoint_refs)
+    actual_checkpoints = set(case.actual_checkpoint_refs)
+    if expected_checkpoints or actual_checkpoints:
+        checkpoint_status = (
+            "PASS" if expected_checkpoints.issubset(actual_checkpoints) else "FAIL"
+        )
+        steps.append(
+            _step(
+                case,
+                "checkpoint",
+                checkpoint_status,
+                case.input_refs,
+                runtime_control.checkpoint_refs,
+                "" if checkpoint_status == "PASS" else "RESUME_CHECKPOINT_MISSING",
+            )
+        )
+    if any(event.startswith("CANCEL_") for event in expected_events | actual_events):
+        cancel_status = (
+            "PASS"
+            if {"CANCEL_REQUESTED", "CANCEL_PROPAGATED"}.issubset(actual_events)
+            else "FAIL"
+        )
+        steps.append(
+            _step(
+                case,
+                "cancel",
+                cancel_status,
+                runtime_control.checkpoint_refs or case.input_refs,
+                [stable_ref("cancel", {"case_id": case.case_id})],
+                "" if cancel_status == "PASS" else "CANCEL_NOT_PROPAGATED",
+            )
+        )
+    if any(event.startswith("RESUME_") for event in expected_events | actual_events):
+        resume_status = (
+            "PASS"
+            if "RESUME_COMPLETED" in actual_events
+            and expected_checkpoints.issubset(actual_checkpoints)
+            else "FAIL"
+        )
+        steps.append(
+            _step(
+                case,
+                "resume",
+                resume_status,
+                runtime_control.checkpoint_refs,
+                [stable_ref("resume", {"case_id": case.case_id})],
+                "" if resume_status == "PASS" else "RUNTIME_EVENT_MISSING",
+            )
+        )
+    if any(event.startswith("REPLAY_") for event in expected_events | actual_events):
+        replay_status = "PASS" if runtime_control.replay_complete else "FAIL"
+        steps.append(
+            _step(
+                case,
+                "replay",
+                replay_status,
+                runtime_control.checkpoint_refs or case.input_refs,
+                [runtime_control.runtime_control_ref],
+                "" if replay_status == "PASS" else "REPLAY_INCOMPLETE",
+            )
+        )
+    return steps
 
 
 def _step(

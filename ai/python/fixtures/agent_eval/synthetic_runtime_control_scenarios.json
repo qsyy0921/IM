@@ -1,0 +1,78 @@
+{
+  "schema_version": 1,
+  "suite_id": "synthetic-agent-runtime-control-v1",
+  "fixture_kind": "synthetic_im_like",
+  "adapter_versions": [
+    "manual-runtime-control-fixture-v1"
+  ],
+  "cases": [
+    {
+      "case_id": "cancel-before-tool-prepare-pass",
+      "dataset_name": "synthetic-runtime-control",
+      "dataset_version": "2026-07-01",
+      "capability_family": "RUNTIME_CONTROL",
+      "fixture_version": "runtime-control-v1",
+      "input_refs": ["input:cancel-before-tool-prepare-pass"],
+      "expected_runtime_events": [
+        "CHECKPOINT_CREATED",
+        "CANCEL_REQUESTED",
+        "CANCEL_PROPAGATED",
+        "FINALIZED_CANCELLED"
+      ],
+      "actual_runtime_events": [
+        "CHECKPOINT_CREATED",
+        "CANCEL_REQUESTED",
+        "CANCEL_PROPAGATED",
+        "FINALIZED_CANCELLED"
+      ],
+      "expected_checkpoint_refs": ["checkpoint:cancel-before-tool-prepare"],
+      "actual_checkpoint_refs": ["checkpoint:cancel-before-tool-prepare"]
+    },
+    {
+      "case_id": "approval-resume-from-checkpoint-pass",
+      "dataset_name": "synthetic-runtime-control",
+      "dataset_version": "2026-07-01",
+      "capability_family": "RUNTIME_CONTROL",
+      "fixture_version": "runtime-control-v1",
+      "input_refs": ["input:approval-resume-from-checkpoint-pass"],
+      "expected_runtime_events": [
+        "CHECKPOINT_CREATED",
+        "WORKFLOW_WAIT_STARTED",
+        "WORKFLOW_DECISION_RECEIVED",
+        "RESUME_REQUESTED",
+        "RESUME_COMPLETED"
+      ],
+      "actual_runtime_events": [
+        "CHECKPOINT_CREATED",
+        "WORKFLOW_WAIT_STARTED",
+        "WORKFLOW_DECISION_RECEIVED",
+        "RESUME_REQUESTED",
+        "RESUME_COMPLETED"
+      ],
+      "expected_checkpoint_refs": ["checkpoint:approval-wait"],
+      "actual_checkpoint_refs": ["checkpoint:approval-wait"]
+    },
+    {
+      "case_id": "replay-without-side-effect-pass",
+      "dataset_name": "synthetic-runtime-control",
+      "dataset_version": "2026-07-01",
+      "capability_family": "RUNTIME_CONTROL",
+      "fixture_version": "runtime-control-v1",
+      "input_refs": ["input:replay-without-side-effect-pass"],
+      "expected_runtime_events": [
+        "CHECKPOINT_CREATED",
+        "REPLAY_REQUESTED",
+        "REPLAY_RECONSTRUCTED",
+        "REPLAY_SIDE_EFFECT_SKIPPED"
+      ],
+      "actual_runtime_events": [
+        "CHECKPOINT_CREATED",
+        "REPLAY_REQUESTED",
+        "REPLAY_RECONSTRUCTED",
+        "REPLAY_SIDE_EFFECT_SKIPPED"
+      ],
+      "expected_checkpoint_refs": ["checkpoint:replay-safe"],
+      "actual_checkpoint_refs": ["checkpoint:replay-safe"]
+    }
+  ]
+}

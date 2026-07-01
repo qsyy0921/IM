@@ -65,6 +65,29 @@ class AgentEvalContractTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "duplicate case_id"):
             validate_eval_suite(payload)
 
+    def test_validates_runtime_control_refs(self) -> None:
+        payload = valid_suite()
+        payload["cases"] = [
+            {
+                "case_id": "runtime-control-pass",
+                "dataset_name": "synthetic-runtime",
+                "dataset_version": "2026-07-01",
+                "capability_family": "RUNTIME_CONTROL",
+                "fixture_version": "fixture-v1",
+                "input_refs": ["input:runtime-control-pass"],
+                "expected_runtime_events": ["checkpoint_created", "resume_completed"],
+                "actual_runtime_events": ["checkpoint_created", "resume_completed"],
+                "expected_checkpoint_refs": ["checkpoint:runtime"],
+                "actual_checkpoint_refs": ["checkpoint:runtime"],
+            }
+        ]
+
+        cases = validate_eval_suite(payload)
+
+        self.assertEqual(cases[0].capability_family, "RUNTIME_CONTROL")
+        self.assertEqual(cases[0].expected_runtime_events, ["CHECKPOINT_CREATED", "RESUME_COMPLETED"])
+        self.assertEqual(cases[0].actual_checkpoint_refs, ["checkpoint:runtime"])
+
 
 if __name__ == "__main__":
     unittest.main()

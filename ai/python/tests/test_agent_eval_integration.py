@@ -14,6 +14,14 @@ FIXTURE_PATH = REPO_ROOT / "ai" / "python" / "fixtures" / "agent_eval" / "synthe
 CORE_SCENARIOS_PATH = (
     REPO_ROOT / "ai" / "python" / "fixtures" / "agent_eval" / "synthetic_core_scenarios.json"
 )
+RUNTIME_CONTROL_PATH = (
+    REPO_ROOT
+    / "ai"
+    / "python"
+    / "fixtures"
+    / "agent_eval"
+    / "synthetic_runtime_control_scenarios.json"
+)
 
 
 class AgentEvalIntegrationTests(unittest.TestCase):
@@ -65,6 +73,27 @@ class AgentEvalIntegrationTests(unittest.TestCase):
         self.assertEqual(report["failed_count"], 0)
         self.assertIn("eval_run", report)
         self.assertIn("manual-core-scenario-fixture-v1", report["eval_run"]["adapter_versions"])
+
+    def test_cli_outputs_pass_report_for_runtime_control_scenarios(self) -> None:
+        result = subprocess.run(
+            [
+                sys.executable,
+                "ai/python/scripts/run_agent_eval_fixture.py",
+                str(RUNTIME_CONTROL_PATH),
+            ],
+            check=True,
+            capture_output=True,
+            cwd=REPO_ROOT,
+            text=True,
+        )
+
+        report = json.loads(result.stdout)
+        self.assertEqual(report["status"], "PASS")
+        self.assertEqual(report["case_count"], 3)
+        self.assertEqual(report["failed_count"], 0)
+        self.assertIn("runtime_event_score", report["aggregate_scores"])
+        self.assertIn("checkpoint_refs", report["results"][0]["replay_bundle"])
+        self.assertTrue(report["results"][1]["replay_bundle"]["workflow_decision_refs"])
 
 
 if __name__ == "__main__":

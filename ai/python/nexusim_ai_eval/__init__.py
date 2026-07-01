@@ -18,7 +18,12 @@ from nexusim_ai_eval.contracts import (
     validate_eval_suite,
 )
 from nexusim_ai_eval.evaluator import run_eval_suite
-from nexusim_ai_eval.trace import AgentRunTrace, AgentStep, build_agent_run_trace
+from nexusim_ai_eval.trace import (
+    AgentRunTrace,
+    AgentStep,
+    RuntimeControlFixture,
+    build_agent_run_trace,
+)
 
 __all__ = [
     "EvalCase",
@@ -28,6 +33,7 @@ __all__ = [
     "ReplayBundle",
     "AgentRunTrace",
     "AgentStep",
+    "RuntimeControlFixture",
     "QasperLikeRagAdapter",
     "StateBenchLikeMemoryAdapter",
     "ToolSandboxLikeAdapter",

@@ -27,9 +27,10 @@ const (
 )
 
 type ConversationSignalPolicy struct {
-	DefaultSampleEvery               int
-	ByFanoutMode                     map[string]int
-	SubscriberThresholdsByFanoutMode map[string][]ConversationSignalSubscriberThreshold
+	DefaultSampleEvery                    int
+	ByFanoutMode                          map[string]int
+	SubscriberThresholdsByFanoutMode      map[string][]ConversationSignalSubscriberThreshold
+	TotalSubscriberThresholdsByFanoutMode map[string][]ConversationSignalSubscriberThreshold
 }
 
 type ConversationSignalSubscriberThreshold struct {
@@ -51,11 +52,19 @@ func NormalizeConversationSignalPolicy(policy ConversationSignalPolicy) Conversa
 		}
 		policy.ByFanoutMode = normalized
 	}
-	if len(policy.SubscriberThresholdsByFanoutMode) == 0 {
-		return policy
+	policy.SubscriberThresholdsByFanoutMode = normalizeConversationSignalThresholdMap(policy.SubscriberThresholdsByFanoutMode)
+	policy.TotalSubscriberThresholdsByFanoutMode = normalizeConversationSignalThresholdMap(policy.TotalSubscriberThresholdsByFanoutMode)
+	return policy
+}
+
+func normalizeConversationSignalThresholdMap(
+	thresholdsByFanoutMode map[string][]ConversationSignalSubscriberThreshold,
+) map[string][]ConversationSignalSubscriberThreshold {
+	if len(thresholdsByFanoutMode) == 0 {
+		return thresholdsByFanoutMode
 	}
-	normalizedThresholds := make(map[string][]ConversationSignalSubscriberThreshold, len(policy.SubscriberThresholdsByFanoutMode))
-	for mode, thresholds := range policy.SubscriberThresholdsByFanoutMode {
+	normalizedThresholds := make(map[string][]ConversationSignalSubscriberThreshold, len(thresholdsByFanoutMode))
+	for mode, thresholds := range thresholdsByFanoutMode {
 		if mode == "" {
 			continue
 		}
@@ -74,8 +83,7 @@ func NormalizeConversationSignalPolicy(policy ConversationSignalPolicy) Conversa
 		})
 		normalizedThresholds[mode] = modeThresholds
 	}
-	policy.SubscriberThresholdsByFanoutMode = normalizedThresholds
-	return policy
+	return normalizedThresholds
 }
 
 func (policy ConversationSignalPolicy) SampleEveryFor(fanoutMode string) int {
@@ -91,11 +99,33 @@ func (policy ConversationSignalPolicy) SampleEveryFor(fanoutMode string) int {
 }
 
 func (policy ConversationSignalPolicy) SampleEveryForSubscribers(fanoutMode string, subscriberCount int) int {
-	sampleEvery := policy.SampleEveryFor(fanoutMode)
-	if subscriberCount <= 0 || len(policy.SubscriberThresholdsByFanoutMode) == 0 {
+	return applyConversationSignalThresholds(
+		policy.SampleEveryFor(fanoutMode),
+		policy.SubscriberThresholdsByFanoutMode[fanoutMode],
+		subscriberCount,
+	)
+}
+
+func (policy ConversationSignalPolicy) SampleEveryForTotalSubscribers(fanoutMode string, subscriberCount int) int {
+	return applyConversationSignalThresholds(
+		policy.SampleEveryFor(fanoutMode),
+		policy.TotalSubscriberThresholdsByFanoutMode[fanoutMode],
+		subscriberCount,
+	)
+}
+
+func applyConversationSignalThresholds(
+	sampleEvery int,
+	thresholds []ConversationSignalSubscriberThreshold,
+	subscriberCount int,
+) int {
+	if sampleEvery <= 0 {
+		sampleEvery = 1
+	}
+	if subscriberCount <= 0 || len(thresholds) == 0 {
 		return sampleEvery
 	}
-	for _, threshold := range policy.SubscriberThresholdsByFanoutMode[fanoutMode] {
+	for _, threshold := range thresholds {
 		if subscriberCount >= threshold.MinSubscribers && threshold.SampleEvery > sampleEvery {
 			sampleEvery = threshold.SampleEvery
 		}
@@ -104,7 +134,12 @@ func (policy ConversationSignalPolicy) SampleEveryForSubscribers(fanoutMode stri
 }
 
 func (policy ConversationSignalPolicy) RequiresSubscriberCount(fanoutMode string) bool {
-	return len(policy.SubscriberThresholdsByFanoutMode[fanoutMode]) > 0
+	return len(policy.SubscriberThresholdsByFanoutMode[fanoutMode]) > 0 ||
+		len(policy.TotalSubscriberThresholdsByFanoutMode[fanoutMode]) > 0
+}
+
+func (policy ConversationSignalPolicy) RequiresTotalSubscriberCount(fanoutMode string) bool {
+	return len(policy.TotalSubscriberThresholdsByFanoutMode[fanoutMode]) > 0
 }
 
 func (policy ConversationSignalPolicy) ShouldEmit(conversationSeq int64, fanoutMode string) bool {
@@ -158,17 +193,18 @@ type ConnectSessionResult struct {
 }
 
 type DeliveryNotification struct {
-	Kind            string
-	EventID         string
-	TenantID        string
-	UserID          string
-	ConversationID  string
-	ConversationSeq int64
-	SourceEventID   string
-	SourceEventType string
-	MessageID       string
-	FanoutMode      string
-	CorrelationID   string
+	Kind                          string
+	EventID                       string
+	TenantID                      string
+	UserID                        string
+	ConversationID                string
+	ConversationSeq               int64
+	SourceEventID                 string
+	SourceEventType               string
+	MessageID                     string
+	FanoutMode                    string
+	ConversationSignalSampleEvery int
+	CorrelationID                 string
 }
 
 func (notification DeliveryNotification) Validate() error {
@@ -192,6 +228,9 @@ func (notification DeliveryNotification) Validate() error {
 	}
 	if kind == DeliveryNotificationKindConversationSignal && notification.FanoutMode == "" {
 		return NewInvalidFrame("conversation signal fanout mode is required")
+	}
+	if kind == DeliveryNotificationKindConversationSignal && notification.ConversationSignalSampleEvery < 0 {
+		return NewInvalidFrame("conversation signal sample policy is invalid")
 	}
 	if (kind == DeliveryNotificationKindInboxItemCreated || kind == DeliveryNotificationKindConversationSignal) && notification.SourceEventType == "" {
 		return NewInvalidFrame("delivery notification is incomplete")

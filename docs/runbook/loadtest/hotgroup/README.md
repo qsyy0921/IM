@@ -60,18 +60,21 @@ CreateConversation -> batch CreateMemberChange(JOIN)
 | `hotgroup-metrics-window-20260701-policydefaults-400sub-5000msg.md` | 修正后窗口显示 delivery-consumer route cache hit / miss 已可见：hit window 约 4414.596、miss 约 730.621，`remote_publish_call_window` last 约 1029.043，`remote_enqueued_sessions_window` last 约 102904.324。该 run 比旧 routecache baseline 146.62s 慢，下一步需同配置重复复验确认波动来源。 |
 | `hotgroup-multirunner-analysis-20260701-policydefaults-repeat-400sub-5000msg.md` | 同配置 repeat：clean commit `623c797`，6000 人 / 5000 消息 / 8000 msg/s / 400 subscriber / READ_FANOUT `100:20`，4 个 shard 共读完 100000 条 signal，span 193.012s，span rate 约 518.102 signals/s；与上一轮 policydefaults baseline 193.559s / 516.638 signals/s 的 ratio 为 1.003。结论：corrected policy 曲线稳定。 |
 | `hotgroup-metrics-window-20260701-policydefaults-repeat-400sub-5000msg.md` | repeat 窗口显示 delivery-consumer route cache hit / miss 约 4411.541 / 728.917，`remote_publish_call_window` 约 1028.091，`remote_enqueued_sessions_window` 约 102809.147；writer / Redis subscriber error、queue-full 和 eviction 均为 0。下一步不再重复同一静态配置，应设计 dynamic cadence / 更强 pull-first / 持久 fanout worker。 |
+| total-subscriber-aware policy code module | push-gateway 已补 total-subscriber-aware pull-first policy：Redis route 会先按全局 conversation route 数计算 effective sample，再把该 decision 传给远端 ws gateway，解决 400 subscriber 被 4 个 gateway 拆成 100 / 100 / 100 / 100 后无法触发更强 cadence 的问题。本地 Docker 默认 READ_FANOUT / BROADCAST_SIGNAL total policy 为 `400:50`。该模块已通过 focused checks，但尚未 clean image redeploy / 复压，不能写成容量提升结论。 |
 
 ## Conversation signal cadence
 
-push-gateway 的 conversation signal cadence 分三层：
+push-gateway 的 conversation signal cadence 分四层：
 
 ```text
 NEXUSIM_PUSH_CONVERSATION_SIGNAL_SAMPLE_EVERY
 NEXUSIM_PUSH_CONVERSATION_SIGNAL_SAMPLE_EVERY_<FANOUT_MODE>
 NEXUSIM_PUSH_CONVERSATION_SIGNAL_SUBSCRIBER_POLICY_<FANOUT_MODE>
+NEXUSIM_PUSH_CONVERSATION_SIGNAL_TOTAL_SUBSCRIBER_POLICY_<FANOUT_MODE>
 ```
 
-前两层是固定 sample cadence。第三层是 subscriber-aware policy，格式为：
+前两层是固定 sample cadence。第三层是 per-gateway subscriber-aware policy，第四层是
+whole-conversation total-subscriber-aware policy。后两层格式相同：
 
 ```text
 min_subscribers:sample_every[,min_subscribers:sample_every...]
@@ -82,18 +85,24 @@ min_subscribers:sample_every[,min_subscribers:sample_every...]
 ```text
 NEXUSIM_PUSH_CONVERSATION_SIGNAL_SAMPLE_EVERY_READ_FANOUT=10
 NEXUSIM_PUSH_CONVERSATION_SIGNAL_SUBSCRIBER_POLICY_READ_FANOUT=100:20
+NEXUSIM_PUSH_CONVERSATION_SIGNAL_TOTAL_SUBSCRIBER_POLICY_READ_FANOUT=400:50
 ```
 
 含义是：READ_FANOUT 默认每 10 条 seq 发一次 online signal；如果本机 memory
 registry 或某个远端 gateway 对同一 conversation 有至少 100 个 subscriber，则改成每
-20 条 seq 发一次。effective sample 只会比 fanout-mode sample 更保守，不会因为
-threshold 变得更频繁。
+20 条 seq 发一次；如果整个 conversation 在所有 gateway 上共有至少 400 个
+subscriber，则改成每 50 条 seq 发一次。effective sample 只会比 fanout-mode sample
+更保守，不会因为 threshold 变得更频繁。
 
 注意：
 
 - subscriber threshold 按本机 / 每个远端 gateway 的 subscriber 数计算，不是全局房间
   subscriber 总数。4 个 ws 各 100 个 subscriber 的 400 subscriber 拓扑，应使用
-  `100:20`，不是 `400:20`。
+  `100:20`；如果要按全局 400 subscriber 触发更强 pull-first，使用
+  `NEXUSIM_PUSH_CONVERSATION_SIGNAL_TOTAL_SUBSCRIBER_POLICY_READ_FANOUT=400:50`。
+- total-subscriber threshold 由 Redis route 基于全局 conversation routes 计算，并把
+  effective sample decision 传给各 ws gateway；这样各 gateway 不会只按本机 100
+  subscriber 重复做较弱策略。
 - 没有配置 subscriber threshold 时，Redis route 会保留旧的采样前置快速路径，不会为了
   sampled-out signal 查询 route。
 - sampled-out remote signal 不写 Redis resume；durable 展示仍以 PullInbox / ACK 为准。

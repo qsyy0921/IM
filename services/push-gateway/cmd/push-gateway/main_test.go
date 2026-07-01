@@ -193,6 +193,26 @@ func TestConversationSignalPolicyFromEnvLoadsSubscriberThresholds(t *testing.T) 
 	}
 }
 
+func TestConversationSignalPolicyFromEnvLoadsTotalSubscriberThresholds(t *testing.T) {
+	t.Setenv("NEXUSIM_PUSH_CONVERSATION_SIGNAL_SAMPLE_EVERY", "1")
+	t.Setenv("NEXUSIM_PUSH_CONVERSATION_SIGNAL_SAMPLE_EVERY_READ_FANOUT", "10")
+	t.Setenv("NEXUSIM_PUSH_CONVERSATION_SIGNAL_TOTAL_SUBSCRIBER_POLICY_READ_FANOUT", "400:50")
+
+	policy, err := conversationSignalPolicyFromEnv()
+	if err != nil {
+		t.Fatalf("load policy: %v", err)
+	}
+	if got := policy.SampleEveryForTotalSubscribers(types.FanoutModeReadFanout, 399); got != 10 {
+		t.Fatalf("read fanout total sample at 399 subscribers = %d, want 10", got)
+	}
+	if got := policy.SampleEveryForTotalSubscribers(types.FanoutModeReadFanout, 400); got != 50 {
+		t.Fatalf("read fanout total sample at 400 subscribers = %d, want 50", got)
+	}
+	if got := policy.SampleEveryForTotalSubscribers(types.FanoutModeWriteFanout, 400); got != 1 {
+		t.Fatalf("write fanout should not use read total thresholds, got %d", got)
+	}
+}
+
 func TestConversationSignalPolicyFromEnvRejectsInvalidOverride(t *testing.T) {
 	t.Setenv("NEXUSIM_PUSH_CONVERSATION_SIGNAL_SAMPLE_EVERY_READ_FANOUT", "0")
 	if _, err := conversationSignalPolicyFromEnv(); err == nil {

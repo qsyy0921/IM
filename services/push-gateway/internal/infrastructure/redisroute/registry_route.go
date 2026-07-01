@@ -192,52 +192,79 @@ func (registry *Registry) EnqueueConversationSignal(
 		registry.metrics.conversationSignalSuppressedEventCount.Add(1)
 		return types.NotifyDeliveryResult{}, nil
 	}
-	localResult, err := registry.local.EnqueueConversationSignal(ctx, notification)
-	if err != nil {
-		return localResult, err
-	}
 	routes, err := registry.cachedConversationRoutes(ctx, notification.TenantID, notification.ConversationID)
 	if err != nil {
-		localResult.Dropped++
 		registry.metrics.lookupErrorCount.Add(1)
-		return localResult, nil
+		return types.NotifyDeliveryResult{Dropped: 1}, nil
 	}
-	result := localResult
+	totalSampleEvery := 1
+	if registry.config.ConversationSignalPolicy.RequiresTotalSubscriberCount(notification.FanoutMode) {
+		totalSampleEvery = registry.config.ConversationSignalPolicy.SampleEveryForTotalSubscribers(
+			notification.FanoutMode,
+			len(routes),
+		)
+		if !shouldEmitConversationSignal(notification.ConversationSeq, totalSampleEvery) {
+			registry.metrics.conversationSignalSuppressedEventCount.Add(1)
+			registry.metrics.conversationSignalSuppressedSessionCount.Add(uint64(len(routes)))
+			return types.NotifyDeliveryResult{MatchedSessions: len(routes)}, nil
+		}
+	}
+
+	localRouteCount := 0
 	remoteRoutesByGateway := make(map[string][]routeEntry)
 	for _, route := range routes {
 		if route.GatewayID == "" || route.SessionID == "" {
 			continue
 		}
 		if route.GatewayID == registry.config.GatewayID {
+			localRouteCount++
 			continue
 		}
 		remoteRoutesByGateway[route.GatewayID] = append(remoteRoutesByGateway[route.GatewayID], route)
-		result.MatchedSessions++
 	}
+
+	localNotification := notification
+	localNotification.ConversationSignalSampleEvery = maxInt(
+		totalSampleEvery,
+		registry.config.ConversationSignalPolicy.SampleEveryForSubscribers(notification.FanoutMode, localRouteCount),
+	)
+	localResult, err := registry.local.EnqueueConversationSignal(ctx, localNotification)
+	if err != nil {
+		return localResult, err
+	}
+	result := localResult
+	result.MatchedSessions = localRouteCount
 	var remoteMatched int
 	for _, gatewayRoutes := range remoteRoutesByGateway {
 		remoteMatched += len(gatewayRoutes)
 	}
+	result.MatchedSessions += remoteMatched
 	if remoteMatched > 0 {
 		registry.metrics.remoteMatchedSessions.Add(uint64(remoteMatched))
 	}
 	for gatewayID, gatewayRoutes := range remoteRoutesByGateway {
 		sessionCount := len(gatewayRoutes)
-		if !registry.shouldEmitConversationSignal(notification, sessionCount) {
+		gatewaySampleEvery := maxInt(
+			totalSampleEvery,
+			registry.config.ConversationSignalPolicy.SampleEveryForSubscribers(notification.FanoutMode, sessionCount),
+		)
+		if !shouldEmitConversationSignal(notification.ConversationSeq, gatewaySampleEvery) {
 			registry.metrics.conversationSignalSuppressedEventCount.Add(1)
 			registry.metrics.conversationSignalSuppressedSessionCount.Add(uint64(sessionCount))
 			continue
 		}
+		remoteNotification := notification
+		remoteNotification.ConversationSignalSampleEvery = gatewaySampleEvery
 		for _, route := range gatewayRoutes {
 			if route.ResumeToken == "" {
 				continue
 			}
-			if err := registry.appendRedisResume(ctx, route.ResumeToken, domain.DeliveryNotify(notification)); err != nil {
+			if err := registry.appendRedisResume(ctx, route.ResumeToken, domain.DeliveryNotify(remoteNotification)); err != nil {
 				registry.metrics.resumeAppendErrorCount.Add(1)
 			}
 		}
 		registry.metrics.remotePublishCallCount.Add(1)
-		subscriberCount, err := registry.publishRemote(ctx, gatewayID, notification)
+		subscriberCount, err := registry.publishRemote(ctx, gatewayID, remoteNotification)
 		if err != nil {
 			result.Dropped += sessionCount
 			registry.metrics.remotePublishErrorCount.Add(1)
@@ -260,6 +287,23 @@ func (registry *Registry) shouldEmitConversationSignal(notification types.Delive
 		notification.FanoutMode,
 		subscriberCount,
 	)
+}
+
+func shouldEmitConversationSignal(conversationSeq int64, sampleEvery int) bool {
+	if sampleEvery <= 1 {
+		return true
+	}
+	return conversationSeq%int64(sampleEvery) == 0
+}
+
+func maxInt(values ...int) int {
+	maximum := 0
+	for _, value := range values {
+		if value > maximum {
+			maximum = value
+		}
+	}
+	return maximum
 }
 
 func (registry *Registry) cachedConversationRoutes(

@@ -391,6 +391,19 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
   结论：观测链路和 Docker policy 默认值已收口；当前仍是 online-signal-drain，
   下一步不再重复同配置复验，而应进入消息速率 / 在线人数感知 dynamic cadence、
   更强 pull-first 策略，或持久 per-conversation / per-bucket fanout worker 的架构设计。
+- 2026-07-01 已完成 total-subscriber-aware pull-first policy 代码模块：push-gateway
+  的 conversation signal policy 现在区分单 gateway subscriber threshold 和整个
+  conversation total subscriber threshold。Redis route 会先读取 conversation 全局
+  route，按总订阅数计算有效 `sample_every`，再把该 policy decision 随内部
+  `DeliveryNotification` 发给各 ws gateway，避免 400 个 subscriber 分散到 4 个
+  gateway 后每个 gateway 只看到 100 个 subscriber、无法触发更强 pull-first 的问题。
+  本地 Docker 默认增加 READ_FANOUT / BROADCAST_SIGNAL total policy `400:50`，
+  保留 per-gateway policy `100:20`。focused checks 已通过：
+  `go test ./services/push-gateway/internal/types ./services/push-gateway/internal/infrastructure/memory ./services/push-gateway/internal/infrastructure/redisroute ./services/push-gateway/cmd/push-gateway -count=1`
+  和 `go build ./services/push-gateway/cmd/push-gateway`。该模块尚未重建镜像 /
+  redeploy / 复压；下一步用 6000 人、5000 消息、400 subscriber、READ_FANOUT、
+  expected `conversation_signal_sample_every=50` 验证 emitted signal 是否从
+  100000 降到约 40000，并观察 drain span 是否同步下降。
 - HYBRID 诊断档位 1000 人 / 1000 消息 / 400 msg/s 暴露 `delivery_outbox` ready query
   在百万级 per-user outbox 下退化：旧 anti-join blocker 查询每批 500 行约 24s。当前
   delivery outbox relay 已改成 per-conversation frontier ready query，并把本地 worker
@@ -424,6 +437,9 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
   remote publish 放大的风险；`hotgroup-policydefaults-repeat-400sub-5000msg`
   复验确认 corrected policy 曲线稳定在约 `193s / 518 signals/s`。本轮收口为
   “观测补齐 + Docker 默认策略固定 + 同配置复验”，不是新的容量上限。
+- total-subscriber-aware pull-first policy 已完成代码和 focused checks，尚未
+  clean commit Docker 镜像重建 / 归档 / redeploy / 复压；本轮不能宣称容量提升，
+  只能宣称策略模块已就绪。
 - 文档同步本轮公开能力或瓶颈变化。
 - 提交并推送到 GitHub。
 
@@ -439,10 +455,10 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
 
 1. subscriber-aware threshold + Redis conversation route cache 已完成 clean Docker
    复压，delivery-consumer route cache hit / miss 也已进入 Prometheus 窗口；
-   同配置 repeat 已确认 corrected policy 曲线稳定。下一步转向消息速率 / 在线人数
-   感知 dynamic cadence、更强 pull-first 策略，或持久 per-conversation /
-   per-bucket fanout worker 的架构设计与最小实现；不要继续在同一静态
-   `100:20` 配置上重复压测。
+   同配置 repeat 已确认 corrected policy 曲线稳定。total-subscriber-aware
+   pull-first policy 代码已就绪，下一步优先重建 push-gateway 镜像、归档到 H 盘、
+   redeploy Ubuntu Docker，并跑 `400 subscriber / 5000 message / expected sample=50`
+   可比复压；不要继续在同一静态 `100:20` 配置上重复压测。
 2. 继续为每轮优化保留 clean commit、Docker 镜像归档、三机部署版本和 Prometheus
    时间窗口，保证压测曲线可复现。
 3. 若 HYBRID 仍要支持千人级 per-user materialized outbox，优先评估显式 frontier /

@@ -601,10 +601,27 @@ func conversationSignalPolicyFromEnv() (types.ConversationSignalPolicy, error) {
 			subscriberThresholdsByFanoutMode[fanoutMode] = thresholds
 		}
 	}
+	totalSubscriberThresholdsByFanoutMode := make(map[string][]types.ConversationSignalSubscriberThreshold)
+	totalThresholdOverrides := map[string]string{
+		types.FanoutModeWriteFanout:     "NEXUSIM_PUSH_CONVERSATION_SIGNAL_TOTAL_SUBSCRIBER_POLICY_WRITE_FANOUT",
+		types.FanoutModeHybridFanout:    "NEXUSIM_PUSH_CONVERSATION_SIGNAL_TOTAL_SUBSCRIBER_POLICY_HYBRID_FANOUT",
+		types.FanoutModeReadFanout:      "NEXUSIM_PUSH_CONVERSATION_SIGNAL_TOTAL_SUBSCRIBER_POLICY_READ_FANOUT",
+		types.FanoutModeBroadcastSignal: "NEXUSIM_PUSH_CONVERSATION_SIGNAL_TOTAL_SUBSCRIBER_POLICY_BROADCAST_SIGNAL",
+	}
+	for fanoutMode, envName := range totalThresholdOverrides {
+		thresholds, ok, err := envConversationSignalSubscriberThresholds(envName)
+		if err != nil {
+			return types.ConversationSignalPolicy{}, err
+		}
+		if ok {
+			totalSubscriberThresholdsByFanoutMode[fanoutMode] = thresholds
+		}
+	}
 	return types.NormalizeConversationSignalPolicy(types.ConversationSignalPolicy{
-		DefaultSampleEvery:               defaultSampleEvery,
-		ByFanoutMode:                     byFanoutMode,
-		SubscriberThresholdsByFanoutMode: subscriberThresholdsByFanoutMode,
+		DefaultSampleEvery:                    defaultSampleEvery,
+		ByFanoutMode:                          byFanoutMode,
+		SubscriberThresholdsByFanoutMode:      subscriberThresholdsByFanoutMode,
+		TotalSubscriberThresholdsByFanoutMode: totalSubscriberThresholdsByFanoutMode,
 	}), nil
 }
 

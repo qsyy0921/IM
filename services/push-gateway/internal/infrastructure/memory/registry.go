@@ -297,6 +297,9 @@ func (registry *Registry) EnqueueConversationSignal(
 }
 
 func (registry *Registry) shouldEmitConversationSignal(notification types.DeliveryNotification, subscriberCount int) bool {
+	if notification.ConversationSignalSampleEvery > 0 {
+		return notification.ConversationSeq%int64(notification.ConversationSignalSampleEvery) == 0
+	}
 	return registry.config.ConversationSignalPolicy.ShouldEmitForSubscribers(
 		notification.ConversationSeq,
 		notification.FanoutMode,

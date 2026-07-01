@@ -319,3 +319,9 @@ brief、loadtest report、development-progress 或 archive。
   再次读完 100000 条 signal，span 193.012s、span rate 约 518.102 signals/s，
   与上一轮 ratio 1.003。结论：corrected policy 曲线稳定，不是一次性波动；
   下一步转向 dynamic cadence、持久 fanout worker 或更强 pull-first 策略。
+- 2026-07-01 已实现 total-subscriber-aware pull-first policy：新增 total subscriber
+  threshold env，Redis route 按整个 conversation 在线订阅总数计算有效
+  `sample_every`，并把该内部 decision 传给各 ws gateway，避免 400 subscriber
+  分散到 4 个 gateway 后只能触发单 gateway `100:20` 策略。本地 Docker 默认
+  READ_FANOUT / BROADCAST_SIGNAL 使用 per-gateway `100:20` 和 total `400:50`。
+  focused push-gateway tests / build 已通过；尚未 redeploy 复压。

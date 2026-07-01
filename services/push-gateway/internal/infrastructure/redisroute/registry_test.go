@@ -508,6 +508,119 @@ func TestRegistryConversationSignalRouteCacheForSubscriberThreshold(t *testing.T
 	}
 }
 
+func TestRegistryConversationSignalUsesTotalSubscriberThresholdAcrossGateways(t *testing.T) {
+	server := miniredis.RunT(t)
+	client := redis.NewClient(&redis.Options{Addr: server.Addr()})
+	ctx := context.Background()
+
+	gatewayA := NewRegistry(memory.NewRegistry(), client, Config{
+		GatewayID:                 "gateway-a",
+		RouteTTL:                  time.Minute,
+		ConversationRouteCacheTTL: time.Minute,
+		ConversationSignalPolicy: types.ConversationSignalPolicy{
+			DefaultSampleEvery: 1,
+			SubscriberThresholdsByFanoutMode: map[string][]types.ConversationSignalSubscriberThreshold{
+				types.FanoutModeReadFanout: {
+					{MinSubscribers: 2, SampleEvery: 20},
+				},
+			},
+			TotalSubscriberThresholdsByFanoutMode: map[string][]types.ConversationSignalSubscriberThreshold{
+				types.FanoutModeReadFanout: {
+					{MinSubscribers: 4, SampleEvery: 50},
+				},
+			},
+		},
+	})
+	gatewayB := NewRegistry(memory.NewRegistry(), client, Config{GatewayID: "gateway-b", RouteTTL: time.Minute})
+	gatewayC := NewRegistry(memory.NewRegistry(), client, Config{GatewayID: "gateway-c", RouteTTL: time.Minute})
+	for gatewayIndex, gateway := range []*Registry{gatewayB, gatewayC} {
+		for sessionIndex := 0; sessionIndex < 2; sessionIndex++ {
+			sessionID := "total-threshold-session-" + string(rune('a'+gatewayIndex)) + string(rune('a'+sessionIndex))
+			auth := types.AuthContext{
+				TenantID:  "tenant-1",
+				UserID:    "total-threshold-user-" + sessionID,
+				DeviceID:  "total-threshold-device-" + sessionID,
+				SessionID: sessionID,
+			}
+			if _, err := gateway.Register(ctx, types.SessionRegistration{
+				AuthContext: auth,
+				SessionID:   sessionID,
+				Outbound:    make(chan types.ServerFrame, 2),
+			}); err != nil {
+				t.Fatalf("register %s: %v", sessionID, err)
+			}
+			if _, err := gateway.SubscribeConversation(ctx, types.ConversationSubscriptionCommand{
+				AuthContext:    auth,
+				ConversationID: "conversation-1",
+			}); err != nil {
+				t.Fatalf("subscribe %s: %v", sessionID, err)
+			}
+		}
+	}
+	pubsub := client.Subscribe(
+		ctx,
+		GatewayChannel(defaultKeyPrefix, "gateway-b"),
+		GatewayChannel(defaultKeyPrefix, "gateway-c"),
+	)
+	defer pubsub.Close()
+	if _, err := pubsub.Receive(ctx); err != nil {
+		t.Fatalf("subscribe gateway channels: %v", err)
+	}
+
+	suppressed := testNotification()
+	suppressed.Kind = types.DeliveryNotificationKindConversationSignal
+	suppressed.UserID = ""
+	suppressed.FanoutMode = types.FanoutModeReadFanout
+	suppressed.ConversationSeq = 20
+	result, err := gatewayA.EnqueueConversationSignal(ctx, suppressed)
+	if err != nil {
+		t.Fatalf("enqueue total-threshold suppressed signal: %v", err)
+	}
+	if result.MatchedSessions != 4 || result.Enqueued != 0 {
+		t.Fatalf("total threshold should suppress seq=20 across all gateways: %+v", result)
+	}
+	select {
+	case message := <-pubsub.Channel():
+		t.Fatalf("total threshold suppressed signal must not publish remotely: %+v", message)
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	emitted := suppressed
+	emitted.EventID = "delivery-event-total-threshold-50"
+	emitted.ConversationSeq = 50
+	result, err = gatewayA.EnqueueConversationSignal(ctx, emitted)
+	if err != nil {
+		t.Fatalf("enqueue total-threshold emitted signal: %v", err)
+	}
+	if result.MatchedSessions != 4 || result.Enqueued != 4 {
+		t.Fatalf("total threshold emitted signal should publish to four remote sessions: %+v", result)
+	}
+	seen := map[string]struct{}{}
+	for len(seen) < 2 {
+		select {
+		case message := <-pubsub.Channel():
+			var forwarded types.DeliveryNotification
+			if err := json.Unmarshal([]byte(message.Payload), &forwarded); err != nil {
+				t.Fatalf("decode forwarded notification: %v", err)
+			}
+			if forwarded.EventID != emitted.EventID ||
+				forwarded.ConversationSignalSampleEvery != 50 {
+				t.Fatalf("unexpected forwarded signal: %+v", forwarded)
+			}
+			seen[message.Channel] = struct{}{}
+		case <-time.After(time.Second):
+			t.Fatalf("timed out waiting for total-threshold publish; seen=%v", seen)
+		}
+	}
+	metrics := gatewayA.Metrics()
+	if metrics.RedisRouteConversationSignalSuppressedEventCount != 1 ||
+		metrics.RedisRouteConversationSignalSuppressedSessionCount != 4 ||
+		metrics.RedisRouteRemotePublishCallCount != 2 ||
+		metrics.RedisRouteRemoteEnqueuedSessions != 4 {
+		t.Fatalf("unexpected total-threshold metrics: %+v", metrics)
+	}
+}
+
 func TestRegistryConversationRouteCacheInvalidatesOnLocalSubscriptionChange(t *testing.T) {
 	server := miniredis.RunT(t)
 	client := redis.NewClient(&redis.Options{Addr: server.Addr()})

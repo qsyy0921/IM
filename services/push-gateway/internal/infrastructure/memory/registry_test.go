@@ -343,6 +343,44 @@ func TestRegistryConversationSignalPolicyUsesSubscriberThreshold(t *testing.T) {
 	}
 }
 
+func TestRegistryConversationSignalUsesEffectiveSampleEveryFromRouter(t *testing.T) {
+	registry := NewRegistryWithConfig(Config{ConversationSignalPolicy: types.ConversationSignalPolicy{
+		DefaultSampleEvery: 100,
+	}})
+	outbound := make(chan types.ServerFrame, 2)
+	auth := types.AuthContext{TenantID: "tenant-1", UserID: "user-1", DeviceID: "device-1", SessionID: "session-1"}
+	if _, err := registry.Register(context.Background(), types.SessionRegistration{
+		AuthContext: auth,
+		SessionID:   "session-1",
+		Outbound:    outbound,
+	}); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+	if _, err := registry.SubscribeConversation(context.Background(), types.ConversationSubscriptionCommand{
+		AuthContext:    auth,
+		ConversationID: "conversation-1",
+	}); err != nil {
+		t.Fatalf("subscribe: %v", err)
+	}
+
+	notification := testNotification()
+	notification.Kind = types.DeliveryNotificationKindConversationSignal
+	notification.UserID = ""
+	notification.ConversationSeq = 50
+	notification.ConversationSignalSampleEvery = 50
+	result, err := registry.EnqueueConversationSignal(context.Background(), notification)
+	if err != nil {
+		t.Fatalf("effective sample signal: %v", err)
+	}
+	if result.MatchedSessions != 1 || result.Enqueued != 1 || len(outbound) != 1 {
+		t.Fatalf("effective router sample should override local policy: result=%+v queue=%d", result, len(outbound))
+	}
+	frame := <-outbound
+	if frame.ConversationSeq != 50 {
+		t.Fatalf("unexpected frame: %+v", frame)
+	}
+}
+
 func TestRegistryConversationSignalFanoutBucketsPreservePerSessionOrder(t *testing.T) {
 	registry := NewRegistryWithConfig(Config{ConversationFanoutBuckets: 4})
 	outbounds := make([]chan types.ServerFrame, 8)

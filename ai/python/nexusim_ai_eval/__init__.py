@@ -42,6 +42,10 @@ from nexusim_ai_eval.memory_admission_governance import (
     load_memory_admission_governance_rehearsal,
     rehearse_memory_admission_governance,
 )
+from nexusim_ai_eval.object_completeness import (
+    load_object_completeness_rehearsal,
+    rehearse_object_completeness,
+)
 from nexusim_ai_eval.replay_compatibility import (
     load_replay_version_bump_rehearsal,
     rehearse_replay_version_bump,
@@ -98,6 +102,7 @@ __all__ = [
     "load_report_matrix_plan",
     "load_memory_calibration_payload",
     "load_memory_admission_governance_rehearsal",
+    "load_object_completeness_rehearsal",
     "load_replay_version_bump_rehearsal",
     "load_runtime_workflow_ownership_rehearsal",
     "load_tool_mcp_governance_rehearsal",
@@ -107,6 +112,7 @@ __all__ = [
     "rehearse_cross_service_preservation",
     "rehearse_dataset_reproducibility",
     "rehearse_memory_admission_governance",
+    "rehearse_object_completeness",
     "rehearse_replay_version_bump",
     "rehearse_runtime_workflow_ownership",
     "rehearse_tool_mcp_governance",

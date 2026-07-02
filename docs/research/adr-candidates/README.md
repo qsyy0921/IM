@@ -46,6 +46,8 @@ review ledger must show:
 - no open P0 finding;
 - no open P1 finding inside Agent Lab scope;
 - explicit owner and non-owner state boundaries;
+- object catalog completeness evidence for every production-grade object it
+  introduces or consumes;
 - contract versioning and replay-reader requirements;
 - cross-service preservation refs for every boundary it touches;
 - operator inspect-and-act path for high-risk states;

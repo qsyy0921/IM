@@ -53,7 +53,8 @@ baseline lifecycle 和 memory calibration。
 
 若继续架构推进，等待主集成评审六个 ADR candidates 或补 fixture-only evidence。
 Eval / Replay、Runtime / Workflow、Context / Evidence、Memory、Tool、AgentOps、
-dataset reproducibility 和 cross-service preservation fixture evidence 已落地。
+dataset reproducibility、cross-service preservation 和 object completeness
+fixture evidence 已落地。
 若继续编码，优先主集成 review 指出的 P0/P1 或 focused contract/version hardening。
 完整模块完成后 commit、push
 `origin/codex/agent-lab` 并 handoff。

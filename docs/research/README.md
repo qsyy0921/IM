@@ -80,6 +80,9 @@
   fixture-only evidence 更新，记录 retrieval、memory、MCP、workflow、executor
   和 audit 边界的 refs / scope / version / taint / audit-lineage preservation
   证据。
+- `agent-object-completeness-fixture-evidence-20260702.md`：fixture-only
+  evidence 更新，记录当前生产对象目录的 owner / lifecycle / version /
+  permission / audit / replay / operator / evidence / rejection 覆盖证据。
 
 ## 存放位置
 

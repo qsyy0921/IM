@@ -57,6 +57,7 @@ Eval Harness / synthetic IM-like fixture 已开始隔离式编码。
 | `docs/research/agentops-governance-fixture-evidence-20260702.md` | 已完成 AgentOps 段 | AgentOps governance rehearsal 已用 fixture-only code / JSON / tests 落地；仍不提升生产契约 |
 | `docs/research/agent-dataset-reproducibility-fixture-evidence-20260702.md` | 已完成 Dataset 段 | Dataset reproducibility rehearsal 已用 fixture-only code / JSON / tests 落地；仍不提升生产契约 |
 | `docs/research/agent-cross-service-preservation-fixture-evidence-20260702.md` | 已完成 Preservation 段 | Cross-service preservation rehearsal 已用 fixture-only code / JSON / tests 落地；仍不提升生产契约 |
+| `docs/research/agent-object-completeness-fixture-evidence-20260702.md` | 已完成 Object 段 | Object completeness rehearsal 已用 fixture-only code / JSON / tests 落地；仍不提升生产契约 |
 | `docs/sdd/agent-runtime.md` | 已完成 | Runtime / Harness 详细 SDD |
 | `docs/sdd/agent-memory-admission.md` | 已完成 | Memory admission 详细 SDD |
 | `docs/sdd/agent-context-evidencepack.md` | 已完成 | Context / EvidencePack 详细 SDD |
@@ -134,6 +135,7 @@ ai/python/fixtures/agent_eval/synthetic_memory_admission_deeper_hardening_scenar
 ai/python/fixtures/agent_eval/memory_calibration_sample.json
 ai/python/fixtures/agent_eval/memory_calibration_public_export.json
 ai/python/fixtures/agent_eval/cross_service_preservation_rehearsal.json
+ai/python/fixtures/agent_eval/object_completeness_rehearsal.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_hardening_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_deeper_hardening_scenarios.json
@@ -237,14 +239,17 @@ ai/python/tests/test_agent_eval_*.py
 - Cross-service preservation rehearsal：已补 retrieval、memory、MCP、workflow、
   executor、audit 边界的 role refs、scope/version/taint/audit-lineage refs、
   compat window / replay reader refs 和 promotion blocking 证据。
+- Object completeness rehearsal：已补当前 70 个生产级概念对象的 owner、
+  lifecycle、version、permission/audit、replay、operator view、evidence 和
+  rejection refs 覆盖，并阻断错误 durable owner 或 fixture 授权生产契约。
 - Skeleton completion audit：已把 immutable goal 的 17 个骨架要求映射到当前
   代码、fixture、CLI、tests 和 runbook evidence；结论是 Phase 1 isolated
   Agent-layer skeleton 可作为当前可执行基线，但不能直接推广生产契约。
 - Architecture gap closure：已把资深架构评审发现的 ADR 缺失、版本策略、真实服务
   integration proof、Runtime/Workflow ownership、Governance、Memory、EvidencePack、
   MCP、dataset pipeline 和 operator UX 缺口收敛为六个 ADR candidate 和生产阻断条件。
-- Production object model：已把缺失对象收敛为十组概念对象，并标注 owner、
-  生命周期、禁止拥有状态、ADR 提升条件和生产 promotion checklist。
+- Production object model：已把缺失对象收敛为十组概念对象，并补 fixture-only
+  completeness evidence；仍不冻结生产字段、schema 或 service API。
 
 ## 当前未完成项
 

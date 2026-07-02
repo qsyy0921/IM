@@ -47,6 +47,7 @@ scoped integration design. Agent Lab remains backend-isolated.
 | P1 | Eval/Replay and Runtime/Workflow were prioritized but not tied to a reusable review sequence | Later candidates could be reviewed before the platform gate and long-running ownership boundary are stable | Recorded required review order and gate dependencies |
 | P1 | Cross-service preservation matrix existed but did not define the minimum proof ladder before integration design | Real-service integration could start before refs, versions, taint and audit lineage are proven to survive boundaries | Added fixture-only verification ladder and preservation gate |
 | P1 | Operator governance existed as objects, but acceptance did not require inspect-and-act UX evidence | AgentOps could become a release label without practical control | Added operator acceptance gate for memory, evidence, replay, approval, release, failure, kill switch and rollback |
+| P1 | Production object catalog completeness was prose-only | ADR acceptance could miss an object without owner/lifecycle/version/audit/replay/rejection evidence | Added fixture-only object completeness rehearsal and promotion gate |
 | P2 | Capacity, cost, retention and latency budgets remain conceptual | Does not block research-level ADR review, but will block production readiness | Keep as next hardening item after first ADR review |
 
 ## Updated Candidate Acceptance Gates
@@ -82,6 +83,7 @@ has all of the following:
 | Workflow / approval | Runtime/Workflow candidate plus workflow ownership matrix | Conditionally passes; workflow cannot read planner internals |
 | Action executor handoff | Object model and preservation appendix | Conditionally passes; executor remains sole side-effect owner |
 | AgentOps / governance | SDD plus AgentOps candidate | Conditionally passes; operator UX is a promotion prerequisite |
+| Production object completeness | Object model plus fixture evidence | Conditionally passes; production field/schema design remains unfrozen |
 | Contract versioning | Production object model plus shared appendix | Conditionally passes; version-bump rehearsal has fixture evidence |
 | Cross-service ref preservation | Shared appendix and fixture evidence | Conditionally passes; real-service preservation smoke is required before production design |
 | Security / privacy / audit | SDD rejection rules plus appendix | Conditionally passes; raw prompt/provider replay remains rejected |
@@ -116,6 +118,7 @@ Next loop should start from the Eval/Replay candidate and verify:
 - P0/P1 failure classes block promotion;
 - version-bump replay and cross-service preservation rehearsals have fixture
   evidence;
+- object catalog completeness has fixture evidence;
 - report retention and redaction policy are acceptable;
 - baseline approval UX has an owner.
 

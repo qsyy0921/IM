@@ -72,6 +72,7 @@ ai/python/nexusim_ai_eval/
   evaluator.py
   fixtures.py
   memory_calibration.py
+  object_completeness.py
   reporting.py
   trace.py
 ai/python/fixtures/agent_eval/adapter_samples/
@@ -94,6 +95,7 @@ ai/python/fixtures/agent_eval/memory_calibration_sample.json
 ai/python/fixtures/agent_eval/memory_calibration_public_export.json
 ai/python/fixtures/agent_eval/cross_service_preservation_rehearsal.json
 ai/python/fixtures/agent_eval/dataset_reproducibility_rehearsal.json
+ai/python/fixtures/agent_eval/object_completeness_rehearsal.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_hardening_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_deeper_hardening_scenarios.json
@@ -117,6 +119,7 @@ ai/python/tests/test_agent_eval_adapter_runner.py
 ai/python/tests/test_agent_eval_comparison.py
 ai/python/tests/test_agent_eval_reporting.py
 ai/python/tests/test_agent_memory_calibration.py
+ai/python/tests/test_agent_eval_object_completeness.py
 ai/python/tests/test_agent_eval_trace.py
 ```
 
@@ -201,6 +204,9 @@ Slice 0 covers:
 - fixture-only cross-service preservation coverage for retrieval, memory, MCP,
   workflow, executor and audit boundary refs, scope/version/taint/audit lineage
   and promotion blocking when required preservation evidence is dropped.
+- fixture-only object completeness coverage for the conceptual production object
+  catalog, including owner/lifecycle/version/permission/audit/replay/operator/
+  evidence/rejection refs for every listed object group.
 - fixture-only state-diff report coverage for approved action outcome refs,
   expected-vs-actual state changes, missing execution refs, incomplete reports
   and unauthorized mutation detection.
@@ -480,6 +486,9 @@ Evaluator tests:
 - cross-service preservation scoring rejects missing required boundaries,
   dropped role refs, scope widening, raw payload exposure and failed boundary
   promotion allowed through release gates.
+- object completeness scoring rejects missing catalog objects, missing required
+  dimensions, Python-owned durable production objects, wrong ACTIVE memory owner
+  and production-contract authorization from fixture evidence.
 - AgentRun trace includes context, memory, tool, workflow, runtime-control and
   failure steps.
 - runtime-control deeper hardening scoring rejects stale checkpoint versions,

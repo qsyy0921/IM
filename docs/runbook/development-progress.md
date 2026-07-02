@@ -57,6 +57,7 @@ Eval Harness / synthetic IM-like fixture 已开始隔离式编码。
 | `docs/research/agentops-governance-fixture-evidence-20260702.md` | 已完成 AgentOps 段 | AgentOps governance rehearsal 已用 fixture-only code / JSON / tests 落地；仍不提升生产契约 |
 | `docs/research/agent-dataset-reproducibility-fixture-evidence-20260702.md` | 已完成 Dataset 段 | Dataset reproducibility rehearsal 已用 fixture-only code / JSON / tests 落地；仍不提升生产契约 |
 | `docs/research/agent-cross-service-preservation-fixture-evidence-20260702.md` | 已完成 Preservation 段 | Cross-service preservation rehearsal 已用 fixture-only code / JSON / tests 落地；仍不提升生产契约 |
+| `docs/research/agent-multi-agent-handoff-fixture-evidence-20260702.md` | 已完成 Multi-Agent 段 | Multi-agent handoff rehearsal 已用 fixture-only code / JSON / tests 落地；仍不冻结生产 A2A contract |
 | `docs/research/agent-object-completeness-fixture-evidence-20260702.md` | 已完成 Object 段 | Object completeness rehearsal 已用 fixture-only code / JSON / tests 落地；仍不提升生产契约 |
 | `docs/research/agent-operator-governance-fixture-evidence-20260702.md` | 已完成 Operator Governance 段 | Operator governance surface rehearsal 已用 fixture-only code / JSON / tests 落地；仍不提升生产契约 |
 | `docs/sdd/agent-runtime.md` | 已完成 | Runtime / Harness 详细 SDD |
@@ -136,6 +137,7 @@ ai/python/fixtures/agent_eval/synthetic_memory_admission_deeper_hardening_scenar
 ai/python/fixtures/agent_eval/memory_calibration_sample.json
 ai/python/fixtures/agent_eval/memory_calibration_public_export.json
 ai/python/fixtures/agent_eval/cross_service_preservation_rehearsal.json
+ai/python/fixtures/agent_eval/multi_agent_handoff_rehearsal.json
 ai/python/fixtures/agent_eval/object_completeness_rehearsal.json
 ai/python/fixtures/agent_eval/operator_governance_rehearsal.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_scenarios.json
@@ -241,6 +243,12 @@ ai/python/tests/test_agent_eval_*.py
 - Cross-service preservation rehearsal：已补 retrieval、memory、MCP、workflow、
   executor、audit 边界的 role refs、scope/version/taint/audit-lineage refs、
   compat window / replay reader refs 和 promotion blocking 证据。
+- Multi-agent handoff rehearsal：已补 internal specialist、future peer-agent、
+  multi-specialist bounded delegation 的 primary responsibility、
+  candidate-only output、scope、budget/deadline、taint、audit、replay、
+  verifier 和 rejection refs，并阻断 scope widening、unverified integration、
+  direct tool execution、direct memory admission、approval bypass 和 fixture
+  授权 production A2A contract。
 - Object completeness rehearsal：已补当前 70 个生产级概念对象的 owner、
   lifecycle、version、permission/audit、replay、operator view、evidence 和
   rejection refs 覆盖，并阻断错误 durable owner 或 fixture 授权生产契约。

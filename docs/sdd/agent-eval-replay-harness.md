@@ -452,6 +452,7 @@ ai/python/nexusim_ai_eval/
   evaluator.py
   fixtures.py
   memory_admission_governance.py
+  multi_agent_handoff.py
   object_completeness.py
   operator_governance.py
   replay_compatibility.py
@@ -486,6 +487,7 @@ ai/python/fixtures/agent_eval/synthetic_memory_admission_deeper_hardening_scenar
 ai/python/fixtures/agent_eval/memory_calibration_sample.json
 ai/python/fixtures/agent_eval/memory_calibration_public_export.json
 ai/python/fixtures/agent_eval/memory_admission_governance_rehearsal.json
+ai/python/fixtures/agent_eval/multi_agent_handoff_rehearsal.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_hardening_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_deeper_hardening_scenarios.json
@@ -504,6 +506,7 @@ ai/python/tests/test_agent_eval_agentops_governance.py
 ai/python/tests/test_agent_eval_dataset_reproducibility.py
 ai/python/tests/test_agent_eval_integration.py
 ai/python/tests/test_agent_eval_memory_admission_governance.py
+ai/python/tests/test_agent_eval_multi_agent_handoff.py
 ai/python/tests/test_agent_eval_object_completeness.py
 ai/python/tests/test_agent_eval_operator_governance.py
 ai/python/tests/test_agent_eval_replay_compatibility.py
@@ -606,6 +609,10 @@ Implemented checks:
   ownership, category thresholds, revocation dependency invalidation, retrieval
   eligibility blocking, ACTIVE explanation refs and operator review / correction
   / forget controls.
+- multi-agent handoff governance rehearsal coverage for internal specialist,
+  future peer-agent and multi-specialist bounded delegation, with primary-Agent
+  final responsibility, candidate-only specialist output, scoped evidence,
+  budget/deadline refs, taint, audit, replay, verifier and rejection refs.
 - Tool / MCP governance rehearsal coverage for CapabilityLease denial, provider
   attestation downgrade, sandbox-only onboarding, prepare re-prepare on drift /
   expiry, tool-output taint preservation and action-executor stale prepare /
@@ -661,6 +668,7 @@ python -m pytest ai/python/tests/test_agent_eval_replay_compatibility.py -q
 python -m pytest ai/python/tests/test_agent_eval_runtime_workflow_ownership.py -q
 python -m pytest ai/python/tests/test_agent_eval_context_evidence_preservation.py -q
 python -m pytest ai/python/tests/test_agent_eval_memory_admission_governance.py -q
+python -m pytest ai/python/tests/test_agent_eval_multi_agent_handoff.py -q
 python -m pytest ai/python/tests/test_agent_eval_tool_mcp_governance.py -q
 python -m pytest ai/python/tests/test_agent_eval_agentops_governance.py -q
 python -m pytest ai/python/tests/test_agent_eval_dataset_reproducibility.py -q

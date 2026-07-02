@@ -276,6 +276,11 @@ Current isolated evidence:
   dedupe, stale checkpoint rejection, resume correlation, cancel-state checks,
   low-sensitive operator controls, BudgetLedger fail-closed behavior and replay
   without side-effect re-execution.
+- `multi_agent_handoff.py` and `multi_agent_handoff_rehearsal.json` prove
+  bounded internal specialist, future peer-agent and multi-specialist handoff
+  governance with primary-Agent final responsibility, candidate-only specialist
+  output, scoped evidence, budget/deadline refs, taint, audit, replay, verifier
+  and rejection refs.
 
 ReplayBundle should include:
 

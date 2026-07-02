@@ -82,7 +82,7 @@ These should remain target invariants.
 
 | Severity | Finding | Impact | Follow-up |
 | --- | --- | --- | --- |
-| P2 | A2A / peer-agent boundary is still conceptual | Future peer-agent integration may be confused with tools | Keep A2A out of first production slice; model only bounded delegation |
+| P2 | A2A / peer-agent boundary is still conceptual | Future peer-agent integration may be confused with tools | Keep A2A out of first production slice; model only bounded delegation; fixture-only bounded handoff evidence now exists in `agent-multi-agent-handoff-fixture-evidence-20260702.md` |
 | P2 | Multi-agent taxonomy is intentionally not frozen | Some examples remain abstract | Acceptable in Exploration Mode; evaluate bounded handoff first |
 | P2 | SDD does not choose `agent-runtime-service` vs module | Service promotion is unresolved | Keep as runtime module plus workflow-service until fixture evidence justifies ADR |
 | P2 | Synthetic IM-like fixture rules are not yet concrete | Dataset adapters may diverge | Fix in open dataset eval plan |

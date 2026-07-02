@@ -31,6 +31,7 @@ scoped integration design. Agent Lab remains backend-isolated.
 - `docs/research/agent-architecture-gap-closure-20260702.md`
 - `docs/research/agent-production-object-model-20260702.md`
 - `docs/research/adr-candidates/`
+- `docs/research/agent-multi-agent-handoff-fixture-evidence-20260702.md`
 - `docs/research/agent-operator-governance-fixture-evidence-20260702.md`
 - `docs/sdd/agent-runtime.md`
 - `docs/sdd/agent-eval-replay-harness.md`
@@ -81,6 +82,7 @@ has all of the following:
 | Context / EvidencePack / RAG | SDD plus Context/EvidencePack ADR candidate | Conditionally passes; body schema remains unfrozen |
 | Memory admission | SDD plus Memory Admission ADR candidate | Conditionally passes; ACTIVE memory remains Go-owned |
 | Tool / MCP boundary | SDD plus Tool/MCP ADR candidate | Conditionally passes; provider trust remains untrusted by default |
+| Multi-agent / A2A boundary | Complete-scope note, Runtime SDD and fixture evidence | Conditionally passes; bounded delegation evidence exists and production A2A remains unfrozen |
 | Workflow / approval | Runtime/Workflow candidate plus workflow ownership matrix | Conditionally passes; workflow cannot read planner internals |
 | Action executor handoff | Object model and preservation appendix | Conditionally passes; executor remains sole side-effect owner |
 | AgentOps / governance | SDD plus AgentOps candidate and fixture evidence | Conditionally passes; production operator UX remains unimplemented |

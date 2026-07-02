@@ -439,6 +439,16 @@ A2A / peer-agent boundary 用于与其他 agent 或系统协作。它不是信�
 - 不跨 tenant 传递未授权上下文。
 - 不把 peer 的 tool capability 并入当前 agent 权限。
 
+当前 fixture-only evidence：
+
+- `ai/python/nexusim_ai_eval/multi_agent_handoff.py`；
+- `ai/python/fixtures/agent_eval/multi_agent_handoff_rehearsal.json`；
+- `docs/research/agent-multi-agent-handoff-fixture-evidence-20260702.md`。
+
+该证据只验证 bounded delegation 的 owner、scope、budget、deadline、taint、
+audit、replay 和 verifier 边界；不冻结生产 A2A protocol、peer-agent identity
+contract 或 integration path。
+
 ### 4.10 Workflow / Human-in-the-loop
 
 Workflow-service 拥有长等待、审批、补偿、resume、timeout、escalation。Agent Runtime 只发起或

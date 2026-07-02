@@ -42,6 +42,10 @@ from nexusim_ai_eval.memory_admission_governance import (
     load_memory_admission_governance_rehearsal,
     rehearse_memory_admission_governance,
 )
+from nexusim_ai_eval.multi_agent_handoff import (
+    load_multi_agent_handoff_rehearsal,
+    rehearse_multi_agent_handoff,
+)
 from nexusim_ai_eval.object_completeness import (
     load_object_completeness_rehearsal,
     rehearse_object_completeness,
@@ -106,6 +110,7 @@ __all__ = [
     "load_report_matrix_plan",
     "load_memory_calibration_payload",
     "load_memory_admission_governance_rehearsal",
+    "load_multi_agent_handoff_rehearsal",
     "load_object_completeness_rehearsal",
     "load_operator_governance_rehearsal",
     "load_replay_version_bump_rehearsal",
@@ -117,6 +122,7 @@ __all__ = [
     "rehearse_cross_service_preservation",
     "rehearse_dataset_reproducibility",
     "rehearse_memory_admission_governance",
+    "rehearse_multi_agent_handoff",
     "rehearse_object_completeness",
     "rehearse_operator_governance",
     "rehearse_replay_version_bump",

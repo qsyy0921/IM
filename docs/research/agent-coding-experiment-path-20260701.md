@@ -72,6 +72,7 @@ ai/python/nexusim_ai_eval/
   evaluator.py
   fixtures.py
   memory_calibration.py
+  multi_agent_handoff.py
   object_completeness.py
   operator_governance.py
   reporting.py
@@ -96,6 +97,7 @@ ai/python/fixtures/agent_eval/memory_calibration_sample.json
 ai/python/fixtures/agent_eval/memory_calibration_public_export.json
 ai/python/fixtures/agent_eval/cross_service_preservation_rehearsal.json
 ai/python/fixtures/agent_eval/dataset_reproducibility_rehearsal.json
+ai/python/fixtures/agent_eval/multi_agent_handoff_rehearsal.json
 ai/python/fixtures/agent_eval/object_completeness_rehearsal.json
 ai/python/fixtures/agent_eval/operator_governance_rehearsal.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_scenarios.json
@@ -121,6 +123,7 @@ ai/python/tests/test_agent_eval_adapter_runner.py
 ai/python/tests/test_agent_eval_comparison.py
 ai/python/tests/test_agent_eval_reporting.py
 ai/python/tests/test_agent_memory_calibration.py
+ai/python/tests/test_agent_eval_multi_agent_handoff.py
 ai/python/tests/test_agent_eval_object_completeness.py
 ai/python/tests/test_agent_eval_operator_governance.py
 ai/python/tests/test_agent_eval_trace.py
@@ -207,6 +210,10 @@ Slice 0 covers:
 - fixture-only cross-service preservation coverage for retrieval, memory, MCP,
   workflow, executor and audit boundary refs, scope/version/taint/audit lineage
   and promotion blocking when required preservation evidence is dropped.
+- fixture-only multi-agent handoff governance coverage for internal specialist,
+  future peer-agent and multi-specialist bounded delegation with primary-Agent
+  final responsibility, candidate-only output, scoped evidence, budget/deadline
+  refs, taint, audit, replay, verifier and rejection refs.
 - fixture-only object completeness coverage for the conceptual production object
   catalog, including owner/lifecycle/version/permission/audit/replay/operator/
   evidence/rejection refs for every listed object group.
@@ -499,6 +506,10 @@ Evaluator tests:
 - operator governance scoring rejects missing surfaces, passive-only operator
   views, body exposure, unauthorized actor access, Python override and release
   gates that allow failed surface evidence.
+- multi-agent handoff governance scoring rejects missing scenarios, scope
+  widening, missing primary responsibility, unverified integration, direct tool
+  execution, direct memory admission, approval bypass and fixture authorization
+  of production A2A contracts.
 - AgentRun trace includes context, memory, tool, workflow, runtime-control and
   failure steps.
 - runtime-control deeper hardening scoring rejects stale checkpoint versions,
@@ -572,6 +583,7 @@ python ai/python/scripts/run_agent_dataset_adapter.py --run ai/python/fixtures/a
 python ai/python/scripts/run_agent_dataset_adapter.py --run ai/python/fixtures/agent_eval/adapter_samples/toolsandbox_like_tool_samples.json
 python ai/python/scripts/run_agent_dataset_adapter.py --run ai/python/fixtures/agent_eval/adapter_samples/statebench_like_memory_samples.json
 python ai/python/scripts/run_agent_eval_regression.py ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json
+python -m pytest ai/python/tests/test_agent_eval_multi_agent_handoff.py -q
 ```
 
 Full Python gate for this workspace:

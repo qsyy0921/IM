@@ -83,6 +83,11 @@
 - `agent-object-completeness-fixture-evidence-20260702.md`：fixture-only
   evidence 更新，记录当前生产对象目录的 owner / lifecycle / version /
   permission / audit / replay / operator / evidence / rejection 覆盖证据。
+- `agent-multi-agent-handoff-fixture-evidence-20260702.md`：fixture-only
+  evidence 更新，记录 internal specialist、future peer-agent 和
+  multi-specialist bounded delegation 的 primary responsibility、candidate-only
+  output、scope、budget / deadline、taint、audit、replay、verifier 和 rejection
+  覆盖证据；不冻结生产 A2A contract。
 - `agent-operator-governance-fixture-evidence-20260702.md`：fixture-only
   evidence 更新，记录 memory、evidence、replay、approval、release、
   failure-class、kill-switch、rollback operator surfaces 的 inspect-and-act、

@@ -280,6 +280,15 @@ Multi-agent should begin as bounded delegation:
 Open-ended group chat between agents should not be a first production shape. It
 is hard to audit, hard to replay and expensive to evaluate.
 
+Current fixture-only evidence:
+
+- `ai/python/nexusim_ai_eval/multi_agent_handoff.py`;
+- `ai/python/fixtures/agent_eval/multi_agent_handoff_rehearsal.json`;
+- `docs/research/agent-multi-agent-handoff-fixture-evidence-20260702.md`.
+
+This evidence verifies bounded delegation invariants only. It does not freeze
+an A2A protocol, peer-agent identity contract or production integration path.
+
 ### 3.13 Evaluation, Replay and Benchmark Plane
 
 Eval is part of the architecture:

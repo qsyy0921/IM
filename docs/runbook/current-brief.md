@@ -52,5 +52,6 @@ baseline lifecycle 和 memory calibration。
 ## 下一步
 
 若继续架构推进，等待主集成评审六个 ADR candidates 或补 fixture-only evidence。
-若继续编码，优先 Eval / Replay version-bump rehearsal 或 Runtime wakeup dedupe
-fixture。完整模块完成后 commit、push `origin/codex/agent-lab` 并 handoff。
+Eval / Replay version-bump rehearsal 已落地；若继续编码，优先 Runtime wakeup
+dedupe / stale checkpoint fixture。完整模块完成后 commit、push
+`origin/codex/agent-lab` 并 handoff。

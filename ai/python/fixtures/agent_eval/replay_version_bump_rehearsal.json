@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "rehearsal_kind": "agent_replay_version_bump_rehearsal",
+  "rehearsal_id": "replay-version-bump-rehearsal-v1",
+  "old_contract_version_ref": "contract:ReplayBundle:0.9",
+  "current_contract_version_ref": "contract:ReplayBundle:1.0",
+  "current_reader_policy_ref": "replay-reader-policy:low-sensitive:v1",
+  "old_replay_bundle": {
+    "replay_bundle_ref": "replay:legacy:runtime-approval:v09",
+    "case_id": "legacy-runtime-approval-replay",
+    "input_hashes": ["hash:input:legacy-runtime-approval"],
+    "evidence_pack_refs": ["evidence-pack:legacy:approval-context"],
+    "context_package_refs": ["context-package:legacy:approval-context"],
+    "prepared_tool_refs": ["prepared-tool:legacy:approval-dry-run"],
+    "workflow_decision_refs": ["workflow-decision:legacy:approval-accepted"],
+    "execution_refs": ["execution:legacy:dry-run-ref"],
+    "memory_candidate_refs": ["memory-candidate:legacy:project-decision"],
+    "checkpoint_refs": ["checkpoint:legacy:approval-wait:v09"],
+    "audit_refs": ["audit:legacy:approval-run"],
+    "lineage_refs": [
+      "lineage:legacy:context",
+      "lineage:legacy:model-candidate",
+      "lineage:legacy:checkpoint",
+      "lineage:legacy:workflow",
+      "lineage:legacy:audit"
+    ],
+    "observability_refs": ["replay-observability:legacy:approval-run"],
+    "hash_refs": ["hash:legacy:replay-inputs"],
+    "version_refs": [
+      "version:agent-eval-harness:v0",
+      "version:fixture-adapter:legacy-runtime-approval-v1",
+      "replay-reader-policy:low-sensitive:v1"
+    ],
+    "failure_taxonomy_refs": ["failure-taxonomy:agent-eval:v1"],
+    "trace_linkage_refs": ["trace-link:legacy:agent-run"],
+    "failure_class": "",
+    "replay_complete": true,
+    "side_effect_reexecuted": false,
+    "raw_payload_returned": false
+  },
+  "required_refs": {
+    "input_hashes": ["hash:input:legacy-runtime-approval"],
+    "evidence_pack_refs": ["evidence-pack:legacy:approval-context"],
+    "context_package_refs": ["context-package:legacy:approval-context"],
+    "workflow_decision_refs": ["workflow-decision:legacy:approval-accepted"],
+    "checkpoint_refs": ["checkpoint:legacy:approval-wait:v09"],
+    "audit_refs": ["audit:legacy:approval-run"],
+    "lineage_refs": [
+      "lineage:legacy:context",
+      "lineage:legacy:checkpoint",
+      "lineage:legacy:audit"
+    ],
+    "hash_refs": ["hash:legacy:replay-inputs"],
+    "version_refs": [
+      "version:agent-eval-harness:v0",
+      "replay-reader-policy:low-sensitive:v1"
+    ],
+    "failure_taxonomy_refs": ["failure-taxonomy:agent-eval:v1"],
+    "trace_linkage_refs": ["trace-link:legacy:agent-run"]
+  },
+  "deprecated_field_records": [
+    {
+      "field_ref": "legacy-field:provider-body-archive",
+      "reader_behavior": "FAIL_CLOSED",
+      "reason_ref": "deprecation:raw-provider-body-not-readable"
+    },
+    {
+      "field_ref": "legacy-field:source-snippet-inline-text",
+      "reader_behavior": "EXPIRED",
+      "reason_ref": "expiry:source-ref-requires-current-visibility-check"
+    }
+  ]
+}

@@ -54,6 +54,8 @@
 - `agentops-governance-adr-review-20260702.md`：AgentOps / Governance ADR
   candidate focused review，补齐 kill switch、release pinning、baseline
   approval、failure-class owner workflow 和 canary/shadow comparison。
+- `agent-fixture-evidence-hardening-20260702.md`：fixture-only evidence 更新，
+  记录 Eval / Replay version-bump rehearsal 的代码、fixture、测试和剩余条件。
 
 ## 存放位置
 

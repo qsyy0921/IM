@@ -52,6 +52,7 @@ Eval Harness / synthetic IM-like fixture 已开始隔离式编码。
 | `docs/research/agent-memory-admission-adr-review-20260702.md` | 已完成首轮 focused review | Memory Admission candidate 补齐 lifecycle、category thresholds、revocation/dependency invalidation、audit explanation 和 operator UX |
 | `docs/research/agent-tool-mcp-adr-review-20260702.md` | 已完成首轮 focused review | Tool / MCP candidate 补齐 capability lease、provider attestation、prepare expiry/re-prepare、sandbox onboarding 和 output reuse |
 | `docs/research/agentops-governance-adr-review-20260702.md` | 已完成首轮 focused review | AgentOps candidate 补齐 kill switch、release pinning、baseline approval、failure owner workflow 和 canary/shadow comparison |
+| `docs/research/agent-fixture-evidence-hardening-20260702.md` | 已完成首段 | Eval / Replay version-bump rehearsal 已用 fixture-only code / JSON / tests 落地；仍不提升生产契约 |
 | `docs/sdd/agent-runtime.md` | 已完成 | Runtime / Harness 详细 SDD |
 | `docs/sdd/agent-memory-admission.md` | 已完成 | Memory admission 详细 SDD |
 | `docs/sdd/agent-context-evidencepack.md` | 已完成 | Context / EvidencePack 详细 SDD |
@@ -112,6 +113,7 @@ EvalResult 和低敏 report 输出。
 ai/python/nexusim_ai_eval/
 ai/python/fixtures/agent_eval/adapter_samples/
 ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json
+ai/python/fixtures/agent_eval/replay_version_bump_rehearsal.json
 ai/python/fixtures/agent_eval/synthetic_first_trio.json
 ai/python/fixtures/agent_eval/synthetic_core_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_runtime_control_scenarios.json

@@ -22,6 +22,10 @@ from nexusim_ai_eval.memory_calibration import (
     load_memory_calibration_payload,
     run_memory_admission_calibration,
 )
+from nexusim_ai_eval.replay_compatibility import (
+    load_replay_version_bump_rehearsal,
+    rehearse_replay_version_bump,
+)
 from nexusim_ai_eval.reporting import (
     build_baseline_refresh_approval_manifest,
     build_baseline_refresh_review,
@@ -61,7 +65,9 @@ __all__ = [
     "generate_current_report_payload",
     "load_report_matrix_plan",
     "load_memory_calibration_payload",
+    "load_replay_version_bump_rehearsal",
     "run_eval_suite",
+    "rehearse_replay_version_bump",
     "run_memory_admission_calibration",
     "run_adapter_payload",
     "run_report_matrix_plan",

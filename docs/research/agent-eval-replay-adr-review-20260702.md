@@ -48,10 +48,18 @@ mapping and no production contract may be created from this document alone.
 ## Remaining Conditions
 
 - Main integration review must accept the owner mapping.
-- Fixture code may later implement the version-bump rehearsal, but that is not
-  required before candidate review.
+- Fixture code now implements the version-bump rehearsal in
+  `ai/python/nexusim_ai_eval/replay_compatibility.py` and
+  `ai/python/fixtures/agent_eval/replay_version_bump_rehearsal.json`.
 - Production retention durations and legal policy owners remain outside Agent Lab
   and must be set during integration design.
+
+## Fixture Evidence Update
+
+`docs/research/agent-fixture-evidence-hardening-20260702.md` records the
+fixture-only version-bump rehearsal. It proves old ReplayBundle refs remain
+explainable under the current replay reader policy and that legacy raw payload
+fields fail closed or expire with explicit deprecation refs.
 
 ## Next Review Target
 

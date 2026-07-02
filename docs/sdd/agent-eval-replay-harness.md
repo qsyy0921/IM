@@ -447,10 +447,12 @@ ai/python/nexusim_ai_eval/
   contracts.py
   evaluator.py
   fixtures.py
+  replay_compatibility.py
   reporting.py
   trace.py
 ai/python/fixtures/agent_eval/adapter_samples/
 ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json
+ai/python/fixtures/agent_eval/replay_version_bump_rehearsal.json
 ai/python/fixtures/agent_eval/synthetic_first_trio.json
 ai/python/fixtures/agent_eval/synthetic_core_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_runtime_control_scenarios.json
@@ -479,6 +481,7 @@ ai/python/scripts/run_agent_eval_regression.py
 ai/python/tests/test_agent_eval_contracts.py
 ai/python/tests/test_agent_eval_evaluator.py
 ai/python/tests/test_agent_eval_integration.py
+ai/python/tests/test_agent_eval_replay_compatibility.py
 ai/python/tests/test_agent_eval_adapters.py
 ai/python/tests/test_agent_eval_adapter_runner.py
 ai/python/tests/test_agent_eval_comparison.py
@@ -523,6 +526,9 @@ Implemented checks:
 - ReplayBundle observability skeleton coverage for low-sensitive observability
   refs, hash refs, version metadata refs, failure taxonomy refs and trace
   linkage refs in EvalReport / ReplayBundle / AgentRunTrace.
+- ReplayBundle version-bump rehearsal coverage for current reader policy,
+  required refs/hashes/versions/lineage/failure taxonomy and fail-closed
+  deprecated legacy fields, without raw payload retention.
 - MCP security fixture coverage for poisoned tool descriptions, unsafe MCP
   output instructions, provider provenance mismatch and sandbox-only providers.
 - MCP security hardening coverage for tool argument schema mismatch,
@@ -590,6 +596,7 @@ python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_state_diff_hardening_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_state_diff_deeper_hardening_scenarios.json
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_replay_observability_scenarios.json
+python -m pytest ai/python/tests/test_agent_eval_replay_compatibility.py -q
 python ai/python/scripts/run_agent_eval_current_report.py ai/python/fixtures/agent_eval/synthetic_core_scenarios.json --report-out .tmp-agent-current-report.json --baseline ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json --review-out .tmp-agent-baseline-review.json --force
 python ai/python/scripts/run_agent_eval_report_matrix.py ai/python/fixtures/agent_eval/report_matrix_sample.json --matrix-out .tmp-agent-eval-matrix/matrix.json --approval-manifest-out .tmp-agent-eval-matrix/approval-manifest.json --force
 python ai/python/scripts/run_agent_memory_calibration.py ai/python/fixtures/agent_eval/memory_calibration_sample.json --report-out .tmp-agent-memory-calibration-report.json --force

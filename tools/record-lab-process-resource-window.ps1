@@ -23,7 +23,7 @@ param(
     [string]$MacHost = "",
     [string]$MacName = "mac",
     [switch]$IncludeMac,
-    [string[]]$MacCommandPatterns = @("loadtest/hotgroup", "loadtest\\hotgroup"),
+    [string[]]$MacCommandPatterns = @("hotgroup-loadtest", "loadtest/hotgroup", "loadtest\\hotgroup"),
     [string]$CsvPath = "",
     [string]$MarkdownPath = "",
     [int]$MaxSeconds = 3600,
@@ -123,8 +123,9 @@ function Get-WindowsProcessSamples {
 
     try {
         $processes = Get-CimInstance Win32_Process | Where-Object {
-            $_.CommandLine -and
-                (Test-AnyPattern -Text $_.CommandLine -Patterns $WindowsCommandPatterns) -and
+            $processText = (@([string]$_.Name, [string]$_.CommandLine) -join " ")
+            $processText.Trim().Length -gt 0 -and
+                (Test-AnyPattern -Text $processText -Patterns $WindowsCommandPatterns) -and
                 -not (Test-AnyPattern -Text ([string]$_.Name) -Patterns $WindowsExcludeProcessNames)
         }
         $rows = @()

@@ -608,6 +608,15 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
   acquire / insert 指标，并补齐 message / delivery outbox relay metrics，再评估 audit
   outbox 分区、索引收敛、payload 缩减或独立 audit PG。报告见
   `docs/runbook/loadtest/hotgroup/hotgroup-analysis-20260702-runtime-profile-bottleneck.md`。
+- 2026-07-02 Backend Lab 完成 policy audit outbox 索引收敛实验：旧的全量
+  `idx_policy_decision_audit_outbox_partition_order` 已替换为只覆盖 `PENDING` / `DLQ`
+  的 partial index，Ubuntu PG 上 audit outbox 索引体积约从 `228MB` 降到 `97MB`。
+  该改动不改变权限语义或同步 fail-closed audit 语义，并保留 ordered blocker 查询的索引支持。
+  但 clean 双客户端复压未稳定改善端到端 p99；policy audit pool 仍有约 `58.78ms/acquire`
+  平均等待，PG 侧出现 `WALWrite` / `WALInsert` / `BufferContent` 等写等待。当前瓶颈继续收敛为
+  “同步 policy decision audit 写入 + 共享 PostgreSQL WAL 写路径竞争”，下一步优先实验独立
+  audit PG 或 audit outbox 分区，而不是继续盲目扩大连接池。报告见
+  `docs/runbook/loadtest/hotgroup/hotgroup-analysis-20260702-policy-audit-index-experiment.md`。
 - HYBRID 诊断档位 1000 人 / 1000 消息 / 400 msg/s 暴露 `delivery_outbox` ready query
   在百万级 per-user outbox 下退化：旧 anti-join blocker 查询每批 500 行约 24s。当前
   delivery outbox relay 已改成 per-conversation frontier ready query，并把本地 worker

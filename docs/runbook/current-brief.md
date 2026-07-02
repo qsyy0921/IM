@@ -13,6 +13,8 @@ memory / AI worker / EvidencePack / eval gate，不承接后端热点群压测�
   `docs/research/agent-adr-promotion-readiness-20260702.md`。
 - 架构缺口、生产对象模型、ADR candidate package 和首轮 review ledger 已完成到
   research 级事实源；下一步只做评审或 fixture-only hardening，不直接写生产契约。
+- Controlled implementation entry audit 已确认 Agent Lab evidence 条件通过，但
+  actual controlled implementation 仍被 accepted ADR / full-package entry decision / owner review 阻断。
 - 完整进度历史在 `docs/runbook/development-progress.md`，不要把长历史塞回本文件。
 
 ## 当前设计事实源

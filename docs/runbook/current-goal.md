@@ -31,7 +31,7 @@ runbook / SDD / research 文档维护。
 - Memory / Tool / AgentOps reviews：`docs/research/agent-memory-admission-adr-review-20260702.md`、
   `docs/research/agent-tool-mcp-adr-review-20260702.md`、`docs/research/agentops-governance-adr-review-20260702.md`。
 - Fixture evidence：`docs/research/agent-*-fixture-evidence-20260702.md`。
-- Latest fixture focus：controlled implementation、architecture coverage、contract version compatibility。
+- Latest audit focus：controlled implementation entry audit、contract version compatibility。
 - 详细 SDD：`docs/sdd/agent-runtime.md`、`agent-memory-admission.md`、
   `agent-context-evidencepack.md`、`agent-tool-mcp-boundary.md`、
   `agent-eval-replay-harness.md`、`agent-governance-agentops.md`。
@@ -77,4 +77,4 @@ runbook / SDD / research 文档维护。
    object completeness、operator governance、operational readiness、controlled implementation readiness、architecture coverage 和 contract version compatibility
    fixture evidence 已落地；
    未接受前不提升生产契约。
-3. 若继续编码，优先主集成 review 指出的 P0/P1 或 focused contract/version hardening。
+3. 若继续编码，优先主集成 review 指出的 P0/P1 或 focused review-requested hardening。

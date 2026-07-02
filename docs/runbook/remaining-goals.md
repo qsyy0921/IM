@@ -34,6 +34,8 @@
    governance、operational readiness、controlled implementation readiness、
    architecture coverage 和 contract version compatibility rehearsal 已落地；
    下一步优先主集成 review 或 focused review-requested hardening。
+   Controlled implementation entry audit 已确认 Agent Lab 内部证据条件通过，
+   但实际受控实现仍需 accepted ADR、full-package entry decision、owner review 和 real-service smoke。
 4. ReplayBundle observability hardening review：当前 skeleton 已覆盖低敏
    observability refs、hash refs、version metadata refs、failure taxonomy refs 和
    trace linkage refs；如评审要求继续，只增加 fixture-only taxonomy / trace 证据。

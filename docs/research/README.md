@@ -36,6 +36,10 @@
   governance appendix；仍不是正式 ADR。
 - `agent-architecture-review-loop-20260702.md`：首轮 Agent 架构
   review-and-closure ledger，记录打回原因、P0/P1/P2 缺口、补齐项和复审结论。
+- `agent-controlled-implementation-entry-audit-20260702.md`：受控实现入口审计，
+  将架构通过标准映射到当前 SDD / ADR candidate / fixture evidence，并明确
+  Agent Lab 条件通过但真实受控实现仍被 accepted ADR、full-package entry
+  decision、owner review 和 real-service preservation smoke 阻断。
 - `agent-eval-replay-adr-review-20260702.md`：Eval / Replay ADR candidate
   focused review，补齐 failure-class lifecycle、baseline approval、retention /
   redaction 和 contract-version bump rehearsal。

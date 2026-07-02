@@ -55,6 +55,9 @@
 - `agent-sdd-interview-readiness-review-20260702.md`：面向面试讲解的 SDD 复审，
   逐份评估 platform、Runtime、Context / EvidencePack、Memory、Tool / MCP、
   Eval / Replay、AgentOps 是否足够完整且不过度深入；结论是不重开架构，转 demo。
+- `agent-demo-codex-implementation-playbook-20260702.md`：把 SDD package 转成
+  Codex 可执行的面试级 demo 实现手册，明确目标 prompt、允许路径、fixture、
+  runner、输出、测试、auto-reject 和 done 条件；不允许自动写完整生产项目。
 - `agent-eval-replay-l2-scoped-implementation-design-20260702.md`：Eval /
   Replay promotion gate 的第一份 L2 scoped implementation design；只定义 owner、
   L3 smoke、operator / audit / replay gates，不授权生产实现。

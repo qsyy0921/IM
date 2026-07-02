@@ -58,6 +58,7 @@ Eval Harness / synthetic IM-like fixture 已开始隔离式编码。
 | `docs/research/agent-l1-package-closure-audit-20260702.md` | 已被主集成接受为 closure record | 六个 Agent ADR candidates 已被主集成接受为 L1 reviewability only；下一步只能进入 L2 scoped design 或 fixture-only hardening |
 | `docs/research/agent-architecture-scope-closure-20260702.md` | 已完成架构收口 | 当前 Agent 架构满足面试级完整度和适度生产级意识；后续不再无限扩展，默认转向 backend-isolated demo |
 | `docs/research/agent-sdd-interview-readiness-review-20260702.md` | 已完成 SDD 面试可讲性复审 | 七份 Agent SDD 足够覆盖面试项目全貌；不重开大架构，下一步实现隔离 demo |
+| `docs/research/agent-demo-codex-implementation-playbook-20260702.md` | 已完成 Codex 实现手册 | SDD 不足以自动生成完整生产项目；已收敛为面试级隔离 demo 的目标 prompt、文件清单、测试和 done 条件 |
 | `docs/research/agent-eval-replay-l2-scoped-implementation-design-20260702.md` | 已完成第一份 L2 design | Eval / Replay promotion gate 的 owner、L3 smoke、operator / audit / replay gates 已定义；仍不授权实现 |
 | `docs/research/agentops-governance-l2-scoped-implementation-design-20260702.md` | 已完成第六份 L2 design | AgentOps / Governance release-control、baseline、kill-switch、rollback、canary / shadow、operator ledger 和 incident evidence 已定义；仍不授权实现 |
 | `docs/research/agent-fixture-evidence-hardening-20260702.md` | 已完成首段 | Eval / Replay version-bump rehearsal 已用 fixture-only code / JSON / tests 落地；仍不提升生产契约 |
@@ -363,6 +364,9 @@ ai/python/tests/test_agent_eval_*.py
 - Agent SDD interview readiness review：已逐份复审 Platform、Runtime、Context /
   EvidencePack、Memory、Tool / MCP、Eval / Replay 和 AgentOps SDD；结论是不继续
   深挖文档，转向 interview-ready backend-isolated demo。
+- Agent demo Codex implementation playbook：已把下一步实现约束为一个
+  backend-isolated demo runner、fixture、README 和 tests；明确不能让 Codex 从 SDD
+  自动写完整生产 IM 项目。
 
 ## 当前未完成项
 

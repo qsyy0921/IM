@@ -18,7 +18,7 @@ runbook / SDD / research 文档维护。
 ## 当前事实源
 
 - 架构总览：`docs/architecture/agent-plane-initial-design.md`。
-- 当前编码路径：`docs/research/agent-coding-experiment-path-20260701.md`。
+- 当前编码路径：`docs/research/agent-coding-experiment-path-20260701.md`、`docs/research/agent-demo-codex-implementation-playbook-20260702.md`。
 - 完成度审计：`docs/research/agent-skeleton-completion-audit-20260702.md`。
 - ADR readiness：`docs/research/agent-adr-promotion-readiness-20260702.md`。
 - 缺口关闭包：`docs/research/agent-architecture-gap-closure-20260702.md`。

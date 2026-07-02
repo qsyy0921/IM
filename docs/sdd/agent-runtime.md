@@ -269,6 +269,14 @@ Runtime promotion requires offline tests for:
   workflow decision and audit refs;
 - bounded multi-agent handoff.
 
+Current isolated evidence:
+
+- `runtime_workflow_ownership.py` and
+  `runtime_workflow_ownership_rehearsal.json` prove duplicate workflow wakeup
+  dedupe, stale checkpoint rejection, resume correlation, cancel-state checks,
+  low-sensitive operator controls, BudgetLedger fail-closed behavior and replay
+  without side-effect re-execution.
+
 ReplayBundle should include:
 
 - run and step refs;

@@ -28,9 +28,9 @@
    `docs/research/agent-context-evidencepack-adr-review-20260702.md`，Memory /
    Tool / AgentOps focused reviews 也已补齐。下一步优先主集成 review 或
    fixture-only evidence，未接受前不提升生产契约。
-3. Fixture-only evidence hardening：Eval / Replay version-bump rehearsal 已落地；
-   下一步优先 Runtime wakeup dedupe / stale checkpoint proof、Context denied-lane retention、
-   Memory revocation/category-threshold proof、Tool prepare-expiry re-prepare 和
+3. Fixture-only evidence hardening：Eval / Replay version-bump 和 Runtime / Workflow
+   ownership rehearsal 已落地；下一步优先 Context denied-lane retention、Memory
+   revocation/category-threshold proof、Tool prepare-expiry re-prepare 和
    AgentOps release-blocking proof。
 4. ReplayBundle observability hardening review：当前 skeleton 已覆盖低敏
    observability refs、hash refs、version metadata refs、failure taxonomy refs 和

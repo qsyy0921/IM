@@ -1,0 +1,242 @@
+{
+  "schema_version": 1,
+  "rehearsal_kind": "agent_runtime_workflow_ownership_rehearsal",
+  "rehearsal_id": "runtime-workflow-ownership-rehearsal-v1",
+  "ownership_assertions": [
+    {
+      "state_ref": "state:agent-checkpoint:approval-wait",
+      "state_kind": "agent-checkpoint",
+      "owner": "Agent Runtime",
+      "forbidden_state_refs": [
+        "state:approval-timer",
+        "state:active-memory",
+        "state:provider-body-archive"
+      ],
+      "rejected_forbidden_state_refs": [
+        "state:approval-timer",
+        "state:active-memory",
+        "state:provider-body-archive"
+      ],
+      "contains_production_state": false
+    },
+    {
+      "state_ref": "state:workflow-approval-wait",
+      "state_kind": "approval-wait",
+      "owner": "workflow-service",
+      "forbidden_state_refs": [
+        "state:planner-internals",
+        "state:evidence-body",
+        "state:model-output"
+      ],
+      "rejected_forbidden_state_refs": [
+        "state:planner-internals",
+        "state:evidence-body",
+        "state:model-output"
+      ],
+      "contains_production_state": false
+    },
+    {
+      "state_ref": "state:executor-side-effect",
+      "state_kind": "side-effect-execution",
+      "owner": "action-executor",
+      "forbidden_state_refs": ["state:cognitive-planner"],
+      "rejected_forbidden_state_refs": ["state:cognitive-planner"],
+      "contains_production_state": false
+    },
+    {
+      "state_ref": "state:python-candidate-generation",
+      "state_kind": "candidate-generation",
+      "owner": "Python AI Worker",
+      "forbidden_state_refs": [
+        "state:active-memory",
+        "state:approval-decision-truth",
+        "state:audit-archive"
+      ],
+      "rejected_forbidden_state_refs": [
+        "state:active-memory",
+        "state:approval-decision-truth",
+        "state:audit-archive"
+      ],
+      "contains_production_state": false
+    }
+  ],
+  "checkpoint_records": [
+    {
+      "checkpoint_ref": "checkpoint:approval-wait:v2",
+      "run_ref": "agent-run:approval-wait",
+      "step_ref": "agent-step:workflow-wait",
+      "version_ref": "checkpoint-version:approval-wait:v2",
+      "current_version_ref": "checkpoint-version:approval-wait:v2",
+      "replay_reader_policy_ref": "replay-reader-policy:low-sensitive:v1",
+      "audit_ref": "audit:runtime:checkpoint-created",
+      "replay_index_ref": "replay-index:approval-wait:v2",
+      "stale_checkpoint_refs": ["checkpoint:approval-wait:v1"],
+      "rejected_stale_checkpoint_refs": ["checkpoint:approval-wait:v1"],
+      "contains_raw_payload": false,
+      "stores_business_fact": false
+    }
+  ],
+  "wakeup_records": [
+    {
+      "wakeup_ref": "workflow-wakeup:approval-decision:primary",
+      "dedupe_key_ref": "dedupe:workflow-decision:approval-42",
+      "decision_ref": "workflow-decision:approval-42:approved",
+      "checkpoint_ref": "checkpoint:approval-wait:v2",
+      "run_ref": "agent-run:approval-wait",
+      "step_ref": "agent-step:workflow-wait",
+      "consumption_status": "CONSUMED",
+      "side_effect_reexecuted": false
+    },
+    {
+      "wakeup_ref": "workflow-wakeup:approval-decision:duplicate",
+      "dedupe_key_ref": "dedupe:workflow-decision:approval-42",
+      "decision_ref": "workflow-decision:approval-42:approved",
+      "checkpoint_ref": "checkpoint:approval-wait:v2",
+      "run_ref": "agent-run:approval-wait",
+      "step_ref": "agent-step:workflow-wait",
+      "consumption_status": "DUPLICATE_REJECTED",
+      "rejection_reason_ref": "runtime-reject:wakeup-dedupe-already-consumed",
+      "side_effect_reexecuted": false
+    },
+    {
+      "wakeup_ref": "workflow-wakeup:approval-decision:mismatch",
+      "dedupe_key_ref": "dedupe:workflow-decision:mismatch",
+      "decision_ref": "workflow-decision:other-run:approved",
+      "checkpoint_ref": "checkpoint:approval-wait:v2",
+      "run_ref": "agent-run:other",
+      "step_ref": "agent-step:workflow-wait",
+      "consumption_status": "MISMATCH_REJECTED",
+      "rejection_reason_ref": "runtime-reject:wakeup-correlation-mismatch",
+      "side_effect_reexecuted": false
+    }
+  ],
+  "resume_records": [
+    {
+      "resume_ref": "resume:approval-wait:accepted",
+      "resume_status": "RESUMED",
+      "checkpoint_ref": "checkpoint:approval-wait:v2",
+      "wakeup_ref": "workflow-wakeup:approval-decision:primary",
+      "decision_ref": "workflow-decision:approval-42:approved",
+      "cancel_state": "ACTIVE",
+      "side_effect_reexecuted": false
+    },
+    {
+      "resume_ref": "resume:approval-wait:stale-checkpoint",
+      "resume_status": "REJECTED_STALE_CHECKPOINT",
+      "checkpoint_ref": "checkpoint:approval-wait:v1",
+      "wakeup_ref": "workflow-wakeup:approval-decision:primary",
+      "decision_ref": "workflow-decision:approval-42:approved",
+      "cancel_state": "ACTIVE",
+      "rejection_reason_ref": "runtime-reject:checkpoint-version-drift",
+      "side_effect_reexecuted": false
+    },
+    {
+      "resume_ref": "resume:approval-wait:cancelled",
+      "resume_status": "REJECTED_CANCELLED",
+      "checkpoint_ref": "checkpoint:approval-wait:v2",
+      "wakeup_ref": "workflow-wakeup:approval-decision:primary",
+      "decision_ref": "workflow-decision:approval-42:approved",
+      "cancel_state": "CANCELLED",
+      "rejection_reason_ref": "runtime-reject:cancel-state-closed",
+      "side_effect_reexecuted": false
+    },
+    {
+      "resume_ref": "resume:approval-wait:correlation-mismatch",
+      "resume_status": "REJECTED_CORRELATION",
+      "checkpoint_ref": "checkpoint:approval-wait:v2",
+      "wakeup_ref": "workflow-wakeup:approval-decision:mismatch",
+      "decision_ref": "workflow-decision:other-run:approved",
+      "cancel_state": "ACTIVE",
+      "rejection_reason_ref": "runtime-reject:resume-correlation-mismatch",
+      "side_effect_reexecuted": false
+    }
+  ],
+  "operator_control_records": [
+    {
+      "control_ref": "agentops-control:cancel:approval-wait",
+      "control_type": "CANCEL",
+      "control_status": "ACCEPTED",
+      "visible_refs": [
+        "agent-run:approval-wait",
+        "checkpoint:approval-wait:v2",
+        "audit:runtime:checkpoint-created"
+      ],
+      "redaction_policy_ref": "redaction-policy:runtime-low-sensitive:v1",
+      "audit_ref": "audit:agentops:cancel-inspected",
+      "exposes_sensitive_payload": false,
+      "side_effect_reexecuted": false
+    },
+    {
+      "control_ref": "agentops-control:resume:approval-wait",
+      "control_type": "RESUME",
+      "control_status": "ACCEPTED",
+      "visible_refs": [
+        "checkpoint:approval-wait:v2",
+        "workflow-decision:approval-42:approved",
+        "replay-index:approval-wait:v2"
+      ],
+      "redaction_policy_ref": "redaction-policy:runtime-low-sensitive:v1",
+      "audit_ref": "audit:agentops:resume-inspected",
+      "exposes_sensitive_payload": false,
+      "side_effect_reexecuted": false
+    },
+    {
+      "control_ref": "agentops-control:replay:approval-wait",
+      "control_type": "REPLAY",
+      "control_status": "ACCEPTED",
+      "visible_refs": [
+        "replay-index:approval-wait:v2",
+        "checkpoint:approval-wait:v2",
+        "workflow-decision:approval-42:approved",
+        "audit:runtime:checkpoint-created"
+      ],
+      "redaction_policy_ref": "redaction-policy:runtime-low-sensitive:v1",
+      "audit_ref": "audit:agentops:replay-inspected",
+      "exposes_sensitive_payload": false,
+      "side_effect_reexecuted": false
+    },
+    {
+      "control_ref": "agentops-control:inspect:approval-wait",
+      "control_type": "INSPECT",
+      "control_status": "ACCEPTED",
+      "visible_refs": [
+        "agent-run:approval-wait",
+        "checkpoint:approval-wait:v2",
+        "workflow-wakeup:approval-decision:primary",
+        "budget-ledger:approval-wait"
+      ],
+      "redaction_policy_ref": "redaction-policy:runtime-low-sensitive:v1",
+      "audit_ref": "audit:agentops:inspect",
+      "exposes_sensitive_payload": false,
+      "side_effect_reexecuted": false
+    }
+  ],
+  "budget_ledger_records": [
+    {
+      "budget_ledger_ref": "budget-ledger:approval-wait",
+      "owner": "Agent Runtime",
+      "run_ref": "agent-run:approval-wait",
+      "limit_refs": [
+        "budget-limit:model-calls:3",
+        "budget-limit:workflow-wait:external-owned",
+        "budget-limit:tool-prepare:1"
+      ],
+      "usage_refs": [
+        "budget-usage:model-calls:1",
+        "budget-usage:tool-prepare:1"
+      ],
+      "over_budget": false,
+      "continued_after_over_budget": false
+    },
+    {
+      "budget_ledger_ref": "budget-ledger:approval-wait-over",
+      "owner": "Agent Runtime",
+      "run_ref": "agent-run:approval-wait-over",
+      "limit_refs": ["budget-limit:model-calls:1"],
+      "usage_refs": ["budget-usage:model-calls:2"],
+      "over_budget": true,
+      "continued_after_over_budget": false,
+      "review_ref": "budget-review:approval-wait-over-required"
+    }
+  ]
+}

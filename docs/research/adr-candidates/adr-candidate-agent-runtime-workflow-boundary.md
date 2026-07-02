@@ -142,6 +142,8 @@ Reject the ADR if:
 
 - Main integration owner review for checkpoint storage.
 - Fixture proof for wakeup race, duplicate callback and stale checkpoint
-  rejection.
+  rejection now exists in
+  `docs/research/agent-runtime-workflow-fixture-evidence-20260702.md`; production
+  integration remains blocked.
 - Control-plane / AgentOps owner for cancel, resume and replay controls.
 - Policy owner for BudgetLedger limits and abuse review path.

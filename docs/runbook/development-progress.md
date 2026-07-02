@@ -210,6 +210,9 @@ ai/python/tests/test_agent_eval_*.py
 - ReplayBundle observability fixture：low-sensitive observability refs、hash refs、
   version metadata refs、failure taxonomy refs、trace linkage refs，并在
   EvalReport / ReplayBundle / AgentRunTrace 中保持 fixture-only 输出。
+- Runtime / Workflow ownership rehearsal：已补 duplicate workflow wakeup dedupe、
+  stale checkpoint rejection、resume correlation、cancel-state checks、
+  operator control refs、BudgetLedger fail-closed 和 no side-effect replay/resume。
 - Skeleton completion audit：已把 immutable goal 的 17 个骨架要求映射到当前
   代码、fixture、CLI、tests 和 runbook evidence；结论是 Phase 1 isolated
   Agent-layer skeleton 可作为当前可执行基线，但不能直接推广生产契约。

@@ -48,9 +48,21 @@ checkpoint pressure and operator control-plane needs are proven.
 ## Remaining Conditions
 
 - Main integration review must accept the ownership split.
-- Future fixture hardening should prove duplicate wakeup and stale checkpoint
-  rejection, but production workflow integration remains blocked.
+- Fixture code now proves duplicate wakeup, stale checkpoint, resume correlation,
+  cancel-state, operator control and over-budget fail-closed behavior in
+  `ai/python/nexusim_ai_eval/runtime_workflow_ownership.py` and
+  `ai/python/fixtures/agent_eval/runtime_workflow_ownership_rehearsal.json`.
+- Production workflow integration remains blocked until checkpoint storage,
+  wakeup durability, control-plane UX and policy owners accept the mapping.
 - Capacity and queue evidence are required before any service promotion.
+
+## Fixture Evidence Update
+
+`docs/research/agent-runtime-workflow-fixture-evidence-20260702.md` records the
+fixture-only ownership rehearsal. It proves Runtime consumes workflow wakeups
+idempotently, rejects stale or cancelled resume, preserves low-sensitive
+checkpoint / workflow / audit / ReplayIndex refs and does not re-execute side
+effects during replay or resume.
 
 ## Next Review Target
 

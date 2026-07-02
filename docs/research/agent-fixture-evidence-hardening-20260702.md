@@ -53,11 +53,11 @@ It does not close:
 - admin/release UX owner for baseline approval;
 - legal/security owner for final retention duration and redaction policy.
 
-## Next Evidence Target
+## Follow-Up Evidence
 
-Next fixture-only evidence should focus on Runtime / Workflow:
+Runtime / Workflow fixture evidence is now recorded in
+`docs/research/agent-runtime-workflow-fixture-evidence-20260702.md`.
 
-- duplicate workflow wakeup dedupe;
-- stale checkpoint rejection;
-- resume correlation and cancel-token checks;
-- replay proof that no side effect is re-executed.
+Remaining fixture-only targets are Context denied-lane retention, Memory
+revocation/category threshold, Tool prepare-expiry re-prepare and AgentOps
+release-blocking proof.

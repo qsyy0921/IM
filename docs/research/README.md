@@ -56,6 +56,9 @@
   approval、failure-class owner workflow 和 canary/shadow comparison。
 - `agent-fixture-evidence-hardening-20260702.md`：fixture-only evidence 更新，
   记录 Eval / Replay version-bump rehearsal 的代码、fixture、测试和剩余条件。
+- `agent-runtime-workflow-fixture-evidence-20260702.md`：fixture-only evidence
+  更新，记录 Runtime / Workflow ownership rehearsal 的 wakeup dedupe、stale
+  checkpoint、resume/cancel、operator control 和 BudgetLedger 证据。
 
 ## 存放位置
 

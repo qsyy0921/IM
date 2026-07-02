@@ -49,9 +49,22 @@ contract is authorized.
 
 - Main integration must accept the mcp-gateway / policy / executor ownership
   split.
-- Fixture hardening should later prove lease denial, attestation downgrade and
-  prepare-expiry re-prepare behavior.
+- Fixture code now proves lease denial, attestation downgrade, sandbox
+  onboarding, prepare re-prepare, tool-output reuse and stale prepare executor
+  rejection in `ai/python/nexusim_ai_eval/tool_mcp_governance.py`,
+  `ai/python/fixtures/agent_eval/tool_mcp_governance_rehearsal.json` and
+  `ai/python/tests/test_agent_eval_tool_mcp_governance.py`.
 - Production provider review process remains governance-scope.
+
+## Fixture Evidence Update
+
+Fixture evidence is recorded in
+`docs/research/agent-tool-mcp-fixture-evidence-20260702.md`.
+
+This update closes the fixture-only proof request for lease denial,
+attestation downgrade and prepare-expiry re-prepare. It does not close
+production ownership acceptance, provider governance, action-executor production
+contract review or provider capacity / timeout budgets.
 
 ## Next Review Target
 

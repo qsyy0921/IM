@@ -351,6 +351,10 @@ Implemented fixture coverage:
   lease refs, capability scope refs and provider attestation refs;
 - ReplayBundle keeps low-sensitive prepared refs, provider refs and audit refs,
   not raw provider payloads.
+- Tool / MCP governance rehearsal proves fixture-only CapabilityLease denial,
+  provider attestation downgrade, sandbox-only onboarding, prepare re-prepare
+  on drift / expiry, tool-output taint preservation and action-executor
+  rejection of stale prepare or missing approval before side effects.
 
 Remaining hardening:
 
@@ -358,8 +362,9 @@ Remaining hardening:
   sample;
 - capability lease matrix review before any production contract promotion;
 - provider attestation governance review before trusted provider onboarding;
-- prepare expiry re-prepare policy and state-diff linkage after approved
-  execution simulation.
+- action-executor production owner review for stale PreparedToolRef rejection;
+- provider capacity and timeout budget evidence before production provider
+  rollout.
 
 ## 17. References
 

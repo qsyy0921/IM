@@ -53,6 +53,7 @@ Eval Harness / synthetic IM-like fixture 已开始隔离式编码。
 | `docs/research/agent-tool-mcp-adr-review-20260702.md` | 已完成首轮 focused review | Tool / MCP candidate 补齐 capability lease、provider attestation、prepare expiry/re-prepare、sandbox onboarding 和 output reuse |
 | `docs/research/agentops-governance-adr-review-20260702.md` | 已完成首轮 focused review | AgentOps candidate 补齐 kill switch、release pinning、baseline approval、failure owner workflow 和 canary/shadow comparison |
 | `docs/research/agent-fixture-evidence-hardening-20260702.md` | 已完成首段 | Eval / Replay version-bump rehearsal 已用 fixture-only code / JSON / tests 落地；仍不提升生产契约 |
+| `docs/research/agent-tool-mcp-fixture-evidence-20260702.md` | 已完成 Tool 段 | Tool / MCP governance rehearsal 已用 fixture-only code / JSON / tests 落地；仍不提升生产契约 |
 | `docs/sdd/agent-runtime.md` | 已完成 | Runtime / Harness 详细 SDD |
 | `docs/sdd/agent-memory-admission.md` | 已完成 | Memory admission 详细 SDD |
 | `docs/sdd/agent-context-evidencepack.md` | 已完成 | Context / EvidencePack 详细 SDD |
@@ -219,6 +220,10 @@ ai/python/tests/test_agent_eval_*.py
 - Memory admission governance rehearsal：已补 Python candidate-only、
   category thresholds、revocation dependency invalidation、retrieval eligibility、
   ACTIVE explanation refs 和 operator review/correction/forget controls。
+- Tool / MCP governance rehearsal：已补 capability lease denial、provider
+  attestation downgrade、sandbox-only onboarding、prepare re-prepare on drift /
+  expiry、tool-output taint preservation 和 action-executor stale prepare /
+  missing approval rejection。
 - Skeleton completion audit：已把 immutable goal 的 17 个骨架要求映射到当前
   代码、fixture、CLI、tests 和 runbook evidence；结论是 Phase 1 isolated
   Agent-layer skeleton 可作为当前可执行基线，但不能直接推广生产契约。

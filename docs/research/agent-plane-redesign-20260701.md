@@ -480,7 +480,9 @@ Likely middleware needs if promoted:
    profile overgeneralization.
 4. Tool prepare vs execute replay:
    model the lineage from skill contract to mcp prepare audit to proposal to
-   executor result, without adding new production schemas.
+   executor result, without adding new production schemas. Initial fixture
+   evidence is now recorded in
+   `docs/research/agent-tool-mcp-fixture-evidence-20260702.md`.
 5. Runtime vs workflow ownership matrix:
    decide which states belong to Agent Runtime and which belong to
    workflow-service before any ADR.

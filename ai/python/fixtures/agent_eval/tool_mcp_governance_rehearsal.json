@@ -1,0 +1,248 @@
+{
+  "schema_version": 1,
+  "rehearsal_kind": "agent_tool_mcp_governance_rehearsal",
+  "rehearsal_id": "tool-mcp-governance-rehearsal-v1",
+  "ownership_assertions": [
+    {
+      "object_ref": "tool-intent:approval-writer:set-workflow-state",
+      "object_kind": "tool-intent",
+      "owner": "Agent Runtime",
+      "forbidden_state_refs": [
+        "state:side-effect-execution",
+        "state:approval-decision",
+        "state:provider-credential"
+      ],
+      "rejected_forbidden_state_refs": [
+        "state:side-effect-execution",
+        "state:approval-decision",
+        "state:provider-credential"
+      ],
+      "runtime_executed_side_effect": false
+    },
+    {
+      "object_ref": "prepared-tool:approval-writer:v2",
+      "object_kind": "prepared-tool-ref",
+      "owner": "mcp-gateway",
+      "forbidden_state_refs": ["state:business-final-state"],
+      "rejected_forbidden_state_refs": ["state:business-final-state"],
+      "runtime_executed_side_effect": false
+    },
+    {
+      "object_ref": "execution:approval-writer:accepted",
+      "object_kind": "execution-attempt",
+      "owner": "action-executor",
+      "forbidden_state_refs": ["state:cognitive-planner"],
+      "rejected_forbidden_state_refs": ["state:cognitive-planner"],
+      "runtime_executed_side_effect": false
+    }
+  ],
+  "capability_lease_records": [
+    {
+      "lease_ref": "capability-lease:approval-writer:set-workflow-state:v2",
+      "lease_status": "VALID",
+      "actor_scope_ref": "actor-scope:user-alpha",
+      "tenant_scope_ref": "tenant-scope:tenant-a",
+      "skill_scope_ref": "skill-scope:approval-workflow:v3",
+      "tool_scope_ref": "tool-scope:approval-writer:set-workflow-state",
+      "risk_tier_ref": "risk-tier:high-risk-proposal",
+      "policy_decision_ref": "policy-decision:tool-prepare:allow",
+      "expiry_ref": "lease-expiry:approval-writer:v2",
+      "replay_reader_policy_ref": "replay-reader-policy:low-sensitive:v1",
+      "scope_overbroad": false,
+      "expired": false,
+      "prepare_allowed": true
+    },
+    {
+      "lease_ref": "capability-lease:approval-writer:expired-v1",
+      "lease_status": "EXPIRED",
+      "actor_scope_ref": "actor-scope:user-alpha",
+      "tenant_scope_ref": "tenant-scope:tenant-a",
+      "skill_scope_ref": "skill-scope:approval-workflow:v2",
+      "tool_scope_ref": "tool-scope:approval-writer:set-workflow-state",
+      "risk_tier_ref": "risk-tier:high-risk-proposal",
+      "policy_decision_ref": "policy-decision:tool-prepare:expired",
+      "expiry_ref": "lease-expiry:approval-writer:v1",
+      "replay_reader_policy_ref": "replay-reader-policy:low-sensitive:v1",
+      "rejection_reason_ref": "tool-reject:capability-lease-expired",
+      "scope_overbroad": false,
+      "expired": true,
+      "prepare_allowed": false
+    },
+    {
+      "lease_ref": "capability-lease:approval-writer:overbroad",
+      "lease_status": "OVERBROAD",
+      "actor_scope_ref": "actor-scope:user-alpha",
+      "tenant_scope_ref": "tenant-scope:tenant-a",
+      "skill_scope_ref": "skill-scope:approval-workflow:v3",
+      "tool_scope_ref": "tool-scope:approval-writer:any-write",
+      "risk_tier_ref": "risk-tier:high-risk-proposal",
+      "policy_decision_ref": "policy-decision:tool-prepare:deny-overbroad",
+      "expiry_ref": "lease-expiry:approval-writer:v2",
+      "replay_reader_policy_ref": "replay-reader-policy:low-sensitive:v1",
+      "rejection_reason_ref": "tool-reject:capability-scope-overbroad",
+      "scope_overbroad": true,
+      "expired": false,
+      "prepare_allowed": false
+    }
+  ],
+  "provider_attestation_records": [
+    {
+      "attestation_ref": "attestation:mcp-provider:trusted-approval-writer:v2",
+      "attestation_status": "TRUSTED",
+      "provider_ref": "mcp-provider:trusted-approval-writer",
+      "owner_ref": "provider-owner:workflow-tools",
+      "schema_hash_ref": "schema-hash:approval-writer:v2",
+      "last_review_ref": "provider-review:trusted-approval-writer:v2",
+      "trusted_provider_selected": true
+    },
+    {
+      "attestation_ref": "attestation:mcp-provider:trusted-approval-writer:v1",
+      "attestation_status": "STALE",
+      "provider_ref": "mcp-provider:trusted-approval-writer",
+      "owner_ref": "provider-owner:workflow-tools",
+      "schema_hash_ref": "schema-hash:approval-writer:v1",
+      "last_review_ref": "provider-review:trusted-approval-writer:v1",
+      "downgrade_ref": "provider-downgrade:attestation-stale",
+      "trusted_provider_selected": false
+    },
+    {
+      "attestation_ref": "attestation:mcp-provider:unknown-writer:missing",
+      "attestation_status": "SANDBOX_ONLY",
+      "provider_ref": "mcp-provider:unknown-writer",
+      "owner_ref": "provider-owner:unknown",
+      "schema_hash_ref": "schema-hash:unknown-writer:v0",
+      "last_review_ref": "provider-review:missing",
+      "downgrade_ref": "provider-downgrade:sandbox-only",
+      "trusted_provider_selected": false
+    }
+  ],
+  "prepare_records": [
+    {
+      "prepared_ref": "prepared-tool:approval-writer:v2",
+      "prepare_status": "PREPARED",
+      "tool_ref": "tool:approval-writer:set-workflow-state",
+      "provider_ref": "mcp-provider:trusted-approval-writer",
+      "schema_hash_ref": "schema-hash:approval-writer:v2",
+      "capability_lease_ref": "capability-lease:approval-writer:set-workflow-state:v2",
+      "provider_attestation_ref": "attestation:mcp-provider:trusted-approval-writer:v2",
+      "policy_decision_ref": "policy-decision:tool-prepare:allow",
+      "args_hash_ref": "args-hash:approval-writer:set-workflow-state:v2",
+      "audit_ref": "audit:mcp-prepare:approval-writer:v2",
+      "drift_refs": [],
+      "reprepare_ref": "",
+      "expired": false,
+      "executed_before_reprepare": false,
+      "execution_allowed": false
+    },
+    {
+      "prepared_ref": "prepared-tool:approval-writer:stale-v1",
+      "prepare_status": "REPREPARED",
+      "tool_ref": "tool:approval-writer:set-workflow-state",
+      "provider_ref": "mcp-provider:trusted-approval-writer",
+      "schema_hash_ref": "schema-hash:approval-writer:v1",
+      "capability_lease_ref": "capability-lease:approval-writer:expired-v1",
+      "provider_attestation_ref": "attestation:mcp-provider:trusted-approval-writer:v1",
+      "policy_decision_ref": "policy-decision:tool-prepare:expired",
+      "args_hash_ref": "args-hash:approval-writer:set-workflow-state:v1",
+      "audit_ref": "audit:mcp-prepare:approval-writer:stale-v1",
+      "drift_refs": [
+        "drift:schema-hash:approval-writer:v1-to-v2",
+        "drift:lease-expired:approval-writer:v1",
+        "drift:approval-window-expired"
+      ],
+      "reprepare_ref": "prepared-tool:approval-writer:v2",
+      "expired": true,
+      "executed_before_reprepare": false,
+      "execution_allowed": false
+    },
+    {
+      "prepared_ref": "prepared-tool:approval-writer:overbroad",
+      "prepare_status": "REJECTED_LEASE",
+      "tool_ref": "tool:approval-writer:set-workflow-state",
+      "provider_ref": "mcp-provider:trusted-approval-writer",
+      "schema_hash_ref": "schema-hash:approval-writer:v2",
+      "capability_lease_ref": "capability-lease:approval-writer:overbroad",
+      "provider_attestation_ref": "attestation:mcp-provider:trusted-approval-writer:v2",
+      "policy_decision_ref": "policy-decision:tool-prepare:deny-overbroad",
+      "args_hash_ref": "args-hash:approval-writer:set-workflow-state:overbroad",
+      "audit_ref": "audit:mcp-prepare:approval-writer:overbroad",
+      "drift_refs": ["drift:capability-scope-overbroad"],
+      "reprepare_ref": "",
+      "rejection_reason_ref": "tool-reject:capability-scope-overbroad",
+      "expired": false,
+      "executed_before_reprepare": false,
+      "execution_allowed": false
+    }
+  ],
+  "provider_onboarding_records": [
+    {
+      "provider_ref": "mcp-provider:unknown-writer",
+      "onboarding_status": "SANDBOX_ONLY",
+      "review_ref": "provider-review:unknown-writer:pending",
+      "attestation_ref": "attestation:mcp-provider:unknown-writer:missing",
+      "sandbox_policy_ref": "sandbox-policy:mcp-provider:unknown-default",
+      "audit_ref": "audit:mcp-provider:onboarding-unknown-writer",
+      "production_prepare_allowed": false
+    },
+    {
+      "provider_ref": "mcp-provider:trusted-approval-writer",
+      "onboarding_status": "TRUSTED_REVIEWED",
+      "review_ref": "provider-review:trusted-approval-writer:v2",
+      "attestation_ref": "attestation:mcp-provider:trusted-approval-writer:v2",
+      "sandbox_policy_ref": "sandbox-policy:mcp-provider:trusted-review-complete",
+      "audit_ref": "audit:mcp-provider:onboarding-trusted-approval-writer",
+      "production_prepare_allowed": true
+    }
+  ],
+  "tool_output_records": [
+    {
+      "output_ref": "tool-output:approval-writer:dry-run",
+      "provider_ref": "mcp-provider:trusted-approval-writer",
+      "validation_ref": "tool-output-validation:approval-writer:dry-run",
+      "taint_label_ref": "taint:tool-output:untrusted",
+      "reuse_policy_ref": "reuse-policy:tool-output:quote-only",
+      "audit_ref": "audit:tool-output:approval-writer:dry-run",
+      "used_as_instruction": false,
+      "used_as_permission_authority": false,
+      "admitted_as_active_memory": false,
+      "taint_removed": false
+    }
+  ],
+  "execution_handoff_records": [
+    {
+      "execution_ref": "execution:approval-writer:accepted",
+      "execution_status": "ACCEPTED",
+      "prepared_ref": "prepared-tool:approval-writer:v2",
+      "approval_ref": "workflow-approval:approval-writer:approved",
+      "idempotency_ref": "idempotency:approval-writer:set-workflow-state:v2",
+      "audit_ref": "audit:action-executor:approval-writer:accepted",
+      "prepare_stale": false,
+      "approval_missing": false,
+      "side_effect_executed": true
+    },
+    {
+      "execution_ref": "execution:approval-writer:stale-prepare-rejected",
+      "execution_status": "REJECTED_STALE_PREPARE",
+      "prepared_ref": "prepared-tool:approval-writer:stale-v1",
+      "approval_ref": "workflow-approval:approval-writer:expired-window",
+      "idempotency_ref": "idempotency:approval-writer:set-workflow-state:v1",
+      "audit_ref": "audit:action-executor:approval-writer:stale-rejected",
+      "rejection_reason_ref": "executor-reject:prepared-ref-stale",
+      "prepare_stale": true,
+      "approval_missing": false,
+      "side_effect_executed": false
+    },
+    {
+      "execution_ref": "execution:approval-writer:missing-approval-rejected",
+      "execution_status": "REJECTED_MISSING_APPROVAL",
+      "prepared_ref": "prepared-tool:approval-writer:v2",
+      "approval_ref": "workflow-approval:missing",
+      "idempotency_ref": "idempotency:approval-writer:set-workflow-state:no-approval",
+      "audit_ref": "audit:action-executor:approval-writer:no-approval",
+      "rejection_reason_ref": "executor-reject:approval-missing",
+      "prepare_stale": false,
+      "approval_missing": true,
+      "side_effect_executed": false
+    }
+  ]
+}

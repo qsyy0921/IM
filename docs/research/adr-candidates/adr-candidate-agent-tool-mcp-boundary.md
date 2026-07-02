@@ -123,6 +123,7 @@ Reject the ADR if:
 
 - Main integration review for capability lease matrix.
 - Provider governance review for attestation and sandbox onboarding.
-- Fixture proof for lease expiry, attestation downgrade and state-diff
-  re-prepare.
-- action-executor review for stale PreparedToolRef rejection.
+- Fixture proof for lease expiry, attestation downgrade, sandbox onboarding,
+  state-diff re-prepare and stale PreparedToolRef rejection is recorded in
+  `docs/research/agent-tool-mcp-fixture-evidence-20260702.md`.
+- action-executor production review for stale PreparedToolRef rejection.

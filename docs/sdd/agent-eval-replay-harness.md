@@ -452,10 +452,12 @@ ai/python/nexusim_ai_eval/
   replay_compatibility.py
   reporting.py
   runtime_workflow_ownership.py
+  tool_mcp_governance.py
   trace.py
 ai/python/fixtures/agent_eval/adapter_samples/
 ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json
 ai/python/fixtures/agent_eval/context_evidence_preservation_rehearsal.json
+ai/python/fixtures/agent_eval/tool_mcp_governance_rehearsal.json
 ai/python/fixtures/agent_eval/replay_version_bump_rehearsal.json
 ai/python/fixtures/agent_eval/runtime_workflow_ownership_rehearsal.json
 ai/python/fixtures/agent_eval/synthetic_first_trio.json
@@ -491,6 +493,7 @@ ai/python/tests/test_agent_eval_integration.py
 ai/python/tests/test_agent_eval_memory_admission_governance.py
 ai/python/tests/test_agent_eval_replay_compatibility.py
 ai/python/tests/test_agent_eval_runtime_workflow_ownership.py
+ai/python/tests/test_agent_eval_tool_mcp_governance.py
 ai/python/tests/test_agent_eval_adapters.py
 ai/python/tests/test_agent_eval_adapter_runner.py
 ai/python/tests/test_agent_eval_comparison.py
@@ -588,6 +591,10 @@ Implemented checks:
   ownership, category thresholds, revocation dependency invalidation, retrieval
   eligibility blocking, ACTIVE explanation refs and operator review / correction
   / forget controls.
+- Tool / MCP governance rehearsal coverage for CapabilityLease denial, provider
+  attestation downgrade, sandbox-only onboarding, prepare re-prepare on drift /
+  expiry, tool-output taint preservation and action-executor stale prepare /
+  missing approval rejection before side effects.
 - state-diff report fixture coverage for approved action outcome refs,
   expected-vs-actual state changes, missing execution refs, incomplete reports
   and unauthorized mutation detection.
@@ -621,6 +628,7 @@ python -m pytest ai/python/tests/test_agent_eval_replay_compatibility.py -q
 python -m pytest ai/python/tests/test_agent_eval_runtime_workflow_ownership.py -q
 python -m pytest ai/python/tests/test_agent_eval_context_evidence_preservation.py -q
 python -m pytest ai/python/tests/test_agent_eval_memory_admission_governance.py -q
+python -m pytest ai/python/tests/test_agent_eval_tool_mcp_governance.py -q
 python ai/python/scripts/run_agent_eval_current_report.py ai/python/fixtures/agent_eval/synthetic_core_scenarios.json --report-out .tmp-agent-current-report.json --baseline ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json --review-out .tmp-agent-baseline-review.json --force
 python ai/python/scripts/run_agent_eval_report_matrix.py ai/python/fixtures/agent_eval/report_matrix_sample.json --matrix-out .tmp-agent-eval-matrix/matrix.json --approval-manifest-out .tmp-agent-eval-matrix/approval-manifest.json --force
 python ai/python/scripts/run_agent_memory_calibration.py ai/python/fixtures/agent_eval/memory_calibration_sample.json --report-out .tmp-agent-memory-calibration-report.json --force

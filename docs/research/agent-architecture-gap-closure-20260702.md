@@ -51,7 +51,7 @@ This document does not authorize:
 | Governance weak | Treat AgentOps as release-control candidate, not implementation boundary yet | Owner, kill switch, rollback, failure-class lifecycle and release-blocking UX review |
 | Memory semantics incomplete | Promote candidate-only memory boundary; keep ACTIVE admission in Go memory-service | Group/project/procedural fixtures plus retrieval/audit proof for scope, version and revocation |
 | EvidencePack body not production-ready | Promote lineage and verifier requirements only; keep body shape out of first ADR | Retrieval-gateway proof for source labels, denied lanes, taint and citation verification |
-| MCP provider governance missing | Promote prepare/lease/attestation/provenance requirements, not provider schemas | Capability lease matrix, provider attestation governance and prepare-expiry policy review |
+| MCP provider governance missing | Promote prepare/lease/attestation/provenance requirements, not provider schemas | Fixture proof exists; production still needs capability lease matrix, provider attestation governance, action-executor stale prepare rejection review and provider capacity / timeout evidence |
 | Dataset pipeline incomplete | Keep sample adapters as skeleton; add dataset manifest/reproducibility requirement before gate use | License refs, snapshot hash, split manifest, import hash and deterministic report reproduction |
 | Operator/product UX incomplete | Add UX as production-promotion prerequisite for high-risk skills | Admin can inspect memory, evidence, failures, approval, replay, kill switch and rollback |
 
@@ -180,7 +180,14 @@ Production blockers:
 
 - capability lease matrix not reviewed;
 - provider attestation governance not reviewed;
-- prepare expiry and re-prepare policy not tied to state-diff evidence.
+- production action-executor stale PreparedToolRef rejection not reviewed;
+- provider capacity and timeout budgets not reviewed.
+
+Fixture-only update:
+
+- lease denial, attestation downgrade, sandbox onboarding, prepare re-prepare,
+  tool-output taint and executor stale-prepare rejection are recorded in
+  `docs/research/agent-tool-mcp-fixture-evidence-20260702.md`.
 
 ### ADR 6: AgentOps / Governance
 

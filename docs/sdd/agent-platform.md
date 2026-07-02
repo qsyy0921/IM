@@ -867,6 +867,8 @@ Coordinator
 - Permission leakage detector。
 - Memory pollution detector。
 - Tool poisoning detector。
+- Capability lease / provider attestation detector。
+- Stale PreparedToolRef rejection detector。
 - Approval bypass detector。
 - State-diff checker。
 - Replay completeness checker。
@@ -911,7 +913,8 @@ Coordinator
 
 - 只读 RAG citation / abstain 未通过。
 - Memory admission 仍会把错误或越权事实升级为 ACTIVE。
-- Tool prepare 与 action execution 仍没有清楚 lineage。
+- Tool prepare 与 action execution 只有 fixture 证据，尚未获得
+  mcp-gateway / policy / action-executor owner 的生产接受。
 - Workflow ownership 与 Runtime ownership 仍重叠。
 - ReplayBundle 无法支持调试。
 - Eval harness 无法在公开数据集和 synthetic fixture 上稳定复现。

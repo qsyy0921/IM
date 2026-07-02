@@ -61,5 +61,6 @@ Runtime / Workflow fixture evidence is now recorded in
 Context evidence is now recorded in
 `docs/research/agent-context-evidence-fixture-evidence-20260702.md`; Memory
 evidence is recorded in `docs/research/agent-memory-fixture-evidence-20260702.md`.
-Remaining fixture-only targets are Tool prepare-expiry re-prepare and AgentOps
-release-blocking proof.
+Tool / MCP evidence is recorded in
+`docs/research/agent-tool-mcp-fixture-evidence-20260702.md`.
+Remaining fixture-only target is AgentOps release-blocking / kill-switch proof.

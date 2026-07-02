@@ -64,7 +64,8 @@ It does not close:
 
 ## Next Evidence Target
 
-Next fixture-only evidence should focus on one of:
+Tool / MCP fixture evidence is now recorded in
+`docs/research/agent-tool-mcp-fixture-evidence-20260702.md`.
 
-- Tool prepare-expiry re-prepare proof;
-- AgentOps release-blocking and kill-switch proof.
+Next fixture-only evidence should focus on AgentOps release-blocking and
+kill-switch proof.

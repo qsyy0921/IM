@@ -65,6 +65,10 @@
 - `agent-memory-fixture-evidence-20260702.md`：fixture-only evidence 更新，
   记录 Memory Admission governance rehearsal 的 category threshold、
   revocation、retrieval eligibility、ACTIVE explanation 和 operator UX 证据。
+- `agent-tool-mcp-fixture-evidence-20260702.md`：fixture-only evidence 更新，
+  记录 Tool / MCP governance rehearsal 的 capability lease denial、
+  provider attestation downgrade、sandbox onboarding、prepare re-prepare、
+  tool-output taint 和 executor stale-prepare rejection 证据。
 
 ## 存放位置
 

@@ -71,6 +71,6 @@ runbook / SDD / research 文档维护。
 ## 后续优先级
 
 1. 六个 ADR candidates 已完成首轮 focused review；未接受前不提升生产契约。
-2. Eval / Replay、Runtime / Workflow、Context / Evidence、Memory fixture evidence
-   已落地；若继续编码，优先 Tool prepare-expiry 或 AgentOps release-blocking 证据。
+2. Eval / Replay、Runtime / Workflow、Context / Evidence、Memory、Tool fixture
+   evidence 已落地；若继续编码，优先 AgentOps release-blocking / kill-switch 证据。
 3. 其次 memory calibration export reproducibility。

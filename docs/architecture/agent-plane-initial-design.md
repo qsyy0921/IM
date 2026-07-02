@@ -8,7 +8,8 @@
 `REJECTED_FOR_IMPLEMENTATION_PROMOTION`。后续不得只凭本初步报告进入实现；需要同时阅读
 `docs/sdd/agent-runtime.md`、`docs/sdd/agent-memory-admission.md`、
 `docs/sdd/agent-context-evidencepack.md`、`docs/sdd/agent-tool-mcp-boundary.md`、
-`docs/sdd/agent-eval-replay-harness.md` 和 `docs/sdd/agent-governance-agentops.md`。
+`docs/sdd/agent-eval-replay-harness.md`、`docs/sdd/agent-governance-agentops.md`
+和 `docs/research/agent-architecture-scope-closure-20260702.md`。
 
 ## 1. 背景
 
@@ -554,9 +555,14 @@ NexusIM Agent 层建议采用“安全 baseline + Runtime 探索”的路线：
   replayable long-running agent、可审计多 agent 协作
 ```
 
-下一步不应立刻冻结 proto 或新增生产服务，而应先完成 run trace、ContextPackage、
-memory admission eval 和 runtime/workflow ownership 的小型实验。主集成评审后，再决定是否将
-Agent Runtime / Harness Plane 提升为 ADR / SDD / runtime 实现。
+截至 2026-07-02，六个 L2 方向已经被主集成接受为 review material only，生产级
+缺口矩阵也已记录。后续不再继续扩充大架构；默认进入
+`docs/research/agent-architecture-scope-closure-20260702.md` 定义的收口状态。
+
+下一步不应冻结 proto 或新增生产服务，而应做面试级、backend-isolated 的可运行
+Agent demo：用 synthetic / public-dataset-style fixture 串起 EvidencePack /
+ContextPackage、MemoryCandidate、ToolIntent / proposal、EvalReport 和 ReplayBundle。
+只有主集成或 owner 返回 P0/P1 时，才重新打开架构扩展。
 
 ## 17. 参考输入
 
@@ -570,6 +576,9 @@ Agent Runtime / Harness Plane 提升为 ADR / SDD / runtime 实现。
   policy / budget、AgentDefinition、SkillPackage、Runtime / Harness、Context /
   RAG、Memory、Tool / MCP、A2A、Workflow、Action Executor handoff、Python AI
   Worker、Eval / Replay、Observability / Audit、AgentOps 和 Security 收口为可评审设计。
+- 架构收口：`docs/research/agent-architecture-scope-closure-20260702.md`，规定
+  当前 Agent 架构已对面试级目标和适度生产意识收口，后续只做隔离 demo、
+  focused hardening 或 reviewer P0/P1。
 - 本地 OpenClaw：`E:\agent\openclaw\docs\concepts\architecture.md`、
   `E:\agent\openclaw\AGENTS.md`。
 - 本地 Hermes：`E:\agent\Hermes\agent\memory_provider.py`、

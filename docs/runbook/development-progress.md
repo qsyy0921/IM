@@ -56,6 +56,7 @@ Eval Harness / synthetic IM-like fixture 已开始隔离式编码。
 | `docs/research/agentops-governance-adr-review-20260702.md` | 已完成首轮 focused review | AgentOps candidate 补齐 kill switch、release pinning、baseline approval、failure owner workflow 和 canary/shadow comparison |
 | `docs/research/agentops-governance-l1-acceptance-review-20260702.md` | 已完成第六个候选 L1 自评 | AgentOps / Governance candidate 建议接受 release-control / baseline approval / kill-switch / failure-owner / canary-shadow 边界；仍不授权 release pipeline 或 admin console |
 | `docs/research/agent-l1-package-closure-audit-20260702.md` | 已被主集成接受为 closure record | 六个 Agent ADR candidates 已被主集成接受为 L1 reviewability only；下一步只能进入 L2 scoped design 或 fixture-only hardening |
+| `docs/research/agent-architecture-scope-closure-20260702.md` | 已完成架构收口 | 当前 Agent 架构满足面试级完整度和适度生产级意识；后续不再无限扩展，默认转向 backend-isolated demo |
 | `docs/research/agent-eval-replay-l2-scoped-implementation-design-20260702.md` | 已完成第一份 L2 design | Eval / Replay promotion gate 的 owner、L3 smoke、operator / audit / replay gates 已定义；仍不授权实现 |
 | `docs/research/agentops-governance-l2-scoped-implementation-design-20260702.md` | 已完成第六份 L2 design | AgentOps / Governance release-control、baseline、kill-switch、rollback、canary / shadow、operator ledger 和 incident evidence 已定义；仍不授权实现 |
 | `docs/research/agent-fixture-evidence-hardening-20260702.md` | 已完成首段 | Eval / Replay version-bump rehearsal 已用 fixture-only code / JSON / tests 落地；仍不提升生产契约 |
@@ -356,14 +357,16 @@ ai/python/tests/test_agent_eval_*.py
   MCP、dataset pipeline 和 operator UX 缺口收敛为六个 ADR candidate 和生产阻断条件。
 - Production object model：已把缺失对象收敛为十组概念对象，并补 fixture-only
   completeness evidence；仍不冻结生产字段、schema 或 service API。
+- Agent architecture scope closure：已把当前架构封版为面试级完整度 + 适度生产级
+  意识；后续只做隔离 demo、focused hardening 或主集成 / owner P0/P1 打回项。
 
 ## 当前未完成项
 
 | 优先级 | 工作 | 输出 |
 | --- | --- | --- |
 | P1 | Document-driven process | immutable goal 保持稳定，具体阶段与验收条件只维护在 runbook / SDD / research 文档 |
-| P1 | L2 scoped design review | Eval / Replay、Runtime / Workflow、Context / EvidencePack、Memory Admission、Tool / MCP 和 AgentOps L2 design 等待 owner review / L3 smoke 决策 |
-| P1 | L2 package closure | 如继续架构推进，做六份 L2 design 的 package closure audit 或 review-requested hardening |
+| P1 | Interview-ready Agent demo | 用 backend-isolated fixture 串起 EvidencePack / ContextPackage、MemoryCandidate、ToolIntent / proposal、EvalReport 和 ReplayBundle |
+| P1 | Scope control | 不再新增大架构；只处理主集成 / owner P0/P1 或 demo 所需的 focused hardening |
 | P2 | ReplayBundle observability hardening review | 如评审要求，继续补 fixture-only taxonomy / trace evidence |
 | P2 | Memory calibration hardening | 仅在需要时继续追加公开数据集导出或 adapter metadata |
 

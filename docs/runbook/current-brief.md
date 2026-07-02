@@ -11,10 +11,12 @@ memory / AI worker / EvidencePack / eval gate，不承接后端热点群压测�
   `docs/research/agent-skeleton-completion-audit-20260702.md`。
 - ADR readiness 已完成，但只能进入候选起草，不能直接推广生产契约：
   `docs/research/agent-adr-promotion-readiness-20260702.md`。
-- 架构缺口、生产对象模型、ADR candidate package 和首轮 review ledger 已完成到
-  research 级事实源；下一步只做评审或 fixture-only hardening，不直接写生产契约。
+- 架构缺口、生产对象模型、ADR candidate package 和 review ledger 已完成到
+  research 级事实源；下一步默认转向隔离 demo，不直接写生产契约。
 - 六个 Agent ADR candidates 和 L1 closure 已被主集成接受为 reviewability only；
   Eval / Replay、Runtime / Workflow、Context / EvidencePack、Memory Admission、Tool / MCP 和 AgentOps L2 已被主集成接受为 review material only。
+- `docs/research/agent-architecture-scope-closure-20260702.md` 已将架构收口：
+  后续默认做面试级 backend-isolated demo，不再无限扩展大架构。
 - 完整进度历史在 `docs/runbook/development-progress.md`，不要把长历史塞回本文件。
 
 ## 当前设计事实源
@@ -53,7 +55,6 @@ baseline lifecycle 和 memory calibration。
 
 ## 下一步
 
-若继续架构推进，优先等待 / 支撑六份 L2 owner review 或 review-requested hardening。
-Eval / Replay、Runtime / Workflow、Context / Evidence、Memory、Tool、AgentOps、dataset reproducibility、cross-service preservation、multi-agent handoff、object completeness、operator governance、operational readiness、controlled implementation readiness、architecture coverage 和 contract version compatibility fixture evidence 已落地。
-若继续编码，优先主集成 review 指出的 P0/P1 或 focused review-requested hardening。
+默认不继续扩展架构；下一步优先 interview-ready backend-isolated Agent demo。
+只有主集成或 owner 返回 P0/P1 时，才做 focused hardening 或重新打开架构。
 完整模块完成后 commit、push `origin/codex/agent-lab` 并 handoff。

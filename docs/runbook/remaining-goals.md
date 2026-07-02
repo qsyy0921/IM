@@ -17,7 +17,8 @@
 1. Document-driven process：immutable Codex goal 保持稳定；具体阶段、优先级、
    acceptance criteria 和剩余工作只维护在 runbook / SDD / research 文档中。
    `docs/research/agent-skeleton-completion-audit-20260702.md` 已确认 Phase 1
-   backend-isolated skeleton 可作为当前可执行基线。
+   backend-isolated skeleton 可作为当前可执行基线。`docs/research/agent-architecture-scope-closure-20260702.md`
+   已确认当前架构不再继续大范围扩充。
 2. ADR candidate package：`docs/research/adr-candidates/` 已起草六个候选 ADR
    和 cross-service versioning / replay / governance appendix；首轮 review ledger
    在 `docs/research/agent-architecture-review-loop-20260702.md`，Eval / Replay
@@ -37,8 +38,8 @@
    下一步优先主集成 review 或 focused review-requested hardening。
    Controlled implementation entry audit 已确认 Agent Lab 内部证据条件通过，
    但实际受控实现仍需 accepted ADR、owner review 和 real-service smoke。
-   六候选 L1 package 已闭环到 reviewability only；下一步优先六份 L2 owner
-   review 或 owner-requested hardening。
+   六候选 L1 package 已闭环到 reviewability only；六份 L2 已接受为 review
+   material only；下一步优先 interview-ready backend-isolated Agent demo。
 4. ReplayBundle observability hardening review：当前 skeleton 已覆盖低敏
    observability refs、hash refs、version metadata refs、failure taxonomy refs 和
    trace linkage refs；如评审要求继续，只增加 fixture-only taxonomy / trace 证据。

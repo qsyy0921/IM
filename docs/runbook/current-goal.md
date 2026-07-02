@@ -23,6 +23,7 @@ runbook / SDD / research 文档维护。
 - ADR readiness：`docs/research/agent-adr-promotion-readiness-20260702.md`。
 - 缺口关闭包：`docs/research/agent-architecture-gap-closure-20260702.md`。
 - 对象模型：`docs/research/agent-production-object-model-20260702.md`。
+- 架构收口：`docs/research/agent-architecture-scope-closure-20260702.md`。
 - ADR candidates：`docs/research/adr-candidates/`。
 - Review loop：`docs/research/agent-architecture-review-loop-20260702.md`。
 - Eval / Replay review：`docs/research/agent-eval-replay-adr-review-20260702.md`。
@@ -54,8 +55,8 @@ runbook / SDD / research 文档维护。
 
 1. 保持 Phase 1 skeleton 作为当前可执行基线，不重新做大范围路线研究。
 2. 用 runbook / SDD / research 文档维护阶段推进，不把可变计划写回 immutable goal。
-3. 若进入编码，只做 backend-isolated fixture / adapter / eval / report hardening。
-4. 若进入架构推进，只起草 ADR candidates，不直接提升生产契约。
+3. 架构已按面试级完整度和适度生产级意识收口；不再新增大平面、大服务、大对象族或 benchmark survey。
+4. 若进入编码，只做 backend-isolated demo / fixture / adapter / eval / report hardening。
 5. 完整模块完成后提交并推送到 `origin/codex/agent-lab`，再 handoff 给主集成线程。
 
 ## 完成条件
@@ -72,9 +73,5 @@ runbook / SDD / research 文档维护。
 ## 后续优先级
 
 1. Full package 已完成六个 L1 reviewability verdict；Eval / Replay、Runtime / Workflow、Context / EvidencePack、Memory Admission、Tool / MCP 和 AgentOps L2 已被主集成接受为 review material only。
-2. Eval / Replay、Runtime / Workflow、Context / Evidence、Memory、Tool、AgentOps、
-   dataset reproducibility、cross-service preservation、multi-agent handoff、
-   object completeness、operator governance、operational readiness、controlled implementation readiness、architecture coverage 和 contract version compatibility
-   fixture evidence 已落地；
-   未接受前不提升生产契约。
-3. 若继续编码，优先主集成 review 指出的 P0/P1 或 focused review-requested hardening。
+2. Eval / Runtime / Context / Memory / Tool / AgentOps 和 cross-cutting fixture evidence 已落地；未接受前不提升生产契约。
+3. 下一步默认做 interview-ready backend-isolated Agent demo；只有 P0/P1 review 才重新打开架构扩展。

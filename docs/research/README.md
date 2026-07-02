@@ -49,6 +49,9 @@
 - `agent-l1-package-closure-audit-20260702.md`：六个 Agent ADR candidates
   均被主集成接受为 L1 reviewability only 后的闭环审计，主集成已接受为
   closure record；下一步只能进入 L2 scoped design 或 fixture-only hardening。
+- `agent-architecture-scope-closure-20260702.md`：Agent 架构收口文档，明确
+  当前架构已满足面试级完整度和适度生产级意识，禁止继续无限扩充大平面、
+  大服务、大对象族或 benchmark survey；下一步转向 backend-isolated demo。
 - `agent-eval-replay-l2-scoped-implementation-design-20260702.md`：Eval /
   Replay promotion gate 的第一份 L2 scoped implementation design；只定义 owner、
   L3 smoke、operator / audit / replay gates，不授权生产实现。

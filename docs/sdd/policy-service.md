@@ -56,7 +56,7 @@ policy_revision_state:
 tenant_id + scope_type + scope_id + action -> revision
 ```
 
-PostgreSQL triggers bump the relevant scoped revision in the same transaction as policy rule, restriction, quota, contact projection or conversation member projection writes. The optional Redis decision cache is enabled with `NEXUSIM_POLICY_DECISION_CACHE_BACKEND=redis`; before a cache lookup, policy-service reads the relevant revision vector and hashes it into the cache key along with tenant, user, conversation, action and caller-supplied conversation permission version. TTL is only cleanup for old keys. User restriction decisions are not cached because `expires_at` can pass without a write, and any path with an enabled tenant quota row is not cached because quota depends on current audit counts. Cache hits still go through the normal use-case audit write before the gRPC response returns.
+PostgreSQL triggers bump the relevant scoped revision in the same transaction as policy rule, restriction, quota, contact projection or conversation member projection writes. The optional Redis decision cache is enabled with `NEXUSIM_POLICY_DECISION_CACHE_BACKEND=redis`; before a cache lookup, policy-service reads the relevant revision vector and hashes it into the cache key along with tenant, user, conversation, action and caller-supplied conversation permission version. TTL is only cleanup for old keys. User restriction decisions are not cached because `expires_at` can pass without a write, and any path with an enabled tenant quota row is not cached because quota depends on current audit counts. Static default decisions are also not cached, because there is no policy fact row to bind to a meaningful policy revision. Cache hits still go through the normal use-case audit write before the gRPC response returns. The local Docker hotgroup profile keeps this cache disabled by default and turns it on only for workloads dominated by cacheable rule/fact decisions.
 
 The first-stage moderation restriction table is deny-only:
 
@@ -176,7 +176,7 @@ permission_version=<blocked edge_version>
 
 Policy-service does not guess direct peers and does not synchronously query contacts-service or conversation-service. If no `direct_peer_user_id` is supplied, contacts block enforcement is skipped and the request continues to the exact rule / tenant rule / static decision path.
 
-When PostgreSQL rules mode is enabled, successful `CheckMessageAction` decisions are staged into `policy_decision_audit_outbox` before the response is returned. Audit write failure fails closed as policy unavailable. The gRPC runtime opens an isolated audit PostgreSQL pool, controlled by `NEXUSIM_POLICY_AUDIT_PG_DSN` and `NEXUSIM_POLICY_AUDIT_PG_MAX_CONNS`, so synchronous audit inserts do not compete with policy facts reads for the same pgx pool. `NEXUSIM_POLICY_SERVICE_MODE=outbox-relay` publishes these rows to `im.policy.events` as protobuf `PolicyEvent` records and marks successful rows `PUBLISHED`.
+When PostgreSQL rules mode is enabled, successful `CheckMessageAction` decisions are staged into `policy_decision_audit_outbox` before the response is returned. Audit write failure fails closed as policy unavailable. The gRPC runtime opens an isolated audit PostgreSQL pool, controlled by `NEXUSIM_POLICY_AUDIT_PG_DSN` and `NEXUSIM_POLICY_AUDIT_PG_MAX_CONNS`, so synchronous audit inserts do not compete with policy facts reads for the same pgx pool. The default audit pool size is 32 after the hotgroup pressure runs showed 16 connections queueing under 768 sender concurrency. `NEXUSIM_POLICY_SERVICE_MODE=outbox-relay` publishes these rows to `im.policy.events` as protobuf `PolicyEvent` records and marks successful rows `PUBLISHED`; local Docker starts this relay as `policy-service-outbox-relay` so audit rows do not accumulate indefinitely as `PENDING`.
 
 `NEXUSIM_POLICY_SERVICE_MODE=outbox-audit` is a read-only operator view over `policy_decision_audit_outbox`. It supports `outbox_id / event_id / tenant_id / aggregate_id / status / event_type / created_at RFC3339 window` filters, returns newest rows first, and never mutates relay state, retry state or repair history.
 
@@ -226,7 +226,7 @@ NEXUSIM_POLICY_RULES_ENABLED=false
 NEXUSIM_PG_DSN=
 NEXUSIM_POLICY_PG_MAX_CONNS=
 NEXUSIM_POLICY_AUDIT_PG_DSN=
-NEXUSIM_POLICY_AUDIT_PG_MAX_CONNS=16
+NEXUSIM_POLICY_AUDIT_PG_MAX_CONNS=32
 NEXUSIM_POLICY_DECISION_CACHE_BACKEND=
 NEXUSIM_POLICY_DECISION_CACHE_ENABLED=false
 NEXUSIM_POLICY_DECISION_CACHE_REDIS_MODE=single

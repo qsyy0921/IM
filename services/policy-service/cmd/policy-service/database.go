@@ -11,7 +11,7 @@ func openPGPool(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
 }
 
 func openPolicyAuditPGPool(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
-	return openPGPoolWithMaxConns(ctx, dsn, envInt("NEXUSIM_POLICY_AUDIT_PG_MAX_CONNS", 16))
+	return openPGPoolWithMaxConns(ctx, dsn, envInt("NEXUSIM_POLICY_AUDIT_PG_MAX_CONNS", 32))
 }
 
 func openPGPoolWithMaxConns(ctx context.Context, dsn string, maxConns int) (*pgxpool.Pool, error) {

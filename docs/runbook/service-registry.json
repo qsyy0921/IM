@@ -304,6 +304,12 @@
       "value": "outbox-relay"
     },
     {
+      "name": "policy-service-outbox-relay",
+      "service": "policy-service",
+      "env": "NEXUSIM_POLICY_SERVICE_MODE",
+      "value": "outbox-relay"
+    },
+    {
       "name": "search-service-timeline-consumer",
       "service": "search-service",
       "env": "NEXUSIM_SEARCH_SERVICE_MODE",

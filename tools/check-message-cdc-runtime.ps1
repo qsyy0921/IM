@@ -57,7 +57,10 @@ SELECT json_build_object(
 )::text;
 "@
 
-$slotRaw = $slotSql | docker exec -i $PostgresContainer psql -U $PostgresUser -d $PostgresDb -t -A
+$slotRaw = docker exec $PostgresContainer psql -U $PostgresUser -d $PostgresDb -t -A -c $slotSql
+if ($LASTEXITCODE -ne 0) {
+    throw "failed to query PostgreSQL replication slot state"
+}
 $slot = $slotRaw | ConvertFrom-Json
 $targetOffsets = Get-TopicEndOffsets -Topic $TargetTopic
 

@@ -37,6 +37,12 @@ type Bridge struct {
 }
 
 type debziumEnvelope struct {
+	Op      string                     `json:"op"`
+	After   map[string]json.RawMessage `json:"after"`
+	Payload *debeziumPayload           `json:"payload"`
+}
+
+type debeziumPayload struct {
 	Op    string                     `json:"op"`
 	After map[string]json.RawMessage `json:"after"`
 }
@@ -64,6 +70,7 @@ func NewBridge(config Config) (*Bridge, error) {
 			Brokers:        config.Brokers,
 			Topic:          config.SourceTopic,
 			GroupID:        config.GroupID,
+			StartOffset:    kafkago.FirstOffset,
 			MinBytes:       1,
 			MaxBytes:       10e6,
 			CommitInterval: 0,
@@ -132,17 +139,23 @@ func BuildRecord(value []byte) (types.KafkaPublishRecord, bool, error) {
 	if err := json.Unmarshal(value, &envelope); err != nil {
 		return types.KafkaPublishRecord{}, false, fmt.Errorf("decode debezium envelope: %w", err)
 	}
-	switch envelope.Op {
+	op := envelope.Op
+	after := envelope.After
+	if envelope.Payload != nil {
+		op = envelope.Payload.Op
+		after = envelope.Payload.After
+	}
+	switch op {
 	case "c", "r":
 	case "u", "d":
 		return types.KafkaPublishRecord{}, false, nil
 	default:
-		return types.KafkaPublishRecord{}, false, fmt.Errorf("unsupported debezium op %q", envelope.Op)
+		return types.KafkaPublishRecord{}, false, fmt.Errorf("unsupported debezium op %q", op)
 	}
-	if len(envelope.After) == 0 {
+	if len(after) == 0 {
 		return types.KafkaPublishRecord{}, false, nil
 	}
-	message, err := outboxMessageFromRow(envelope.After)
+	message, err := outboxMessageFromRow(after)
 	if err != nil {
 		return types.KafkaPublishRecord{}, false, err
 	}

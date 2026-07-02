@@ -665,8 +665,10 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
   `ConversationTimelineEvent` protobuf 后发布到 `conversation.timeline.events.cdc`；
   `cdc_only` 显式跳过 `message_outbox` 写入，不做隐藏 fallback。已补本地 `cdc` compose profile、
   connector 注册 / runtime health 脚本和 `tools/message-cdc-shadow-check` 对账工具。focused
-  tests / builds / compose config / diff check 已通过；Docker CDC runtime 注册、shadow 对账和
-  hotgroup 压测尚未执行。切换 runbook 见
+  tests / builds / compose config / diff check 已通过。Docker CDC runtime smoke 已完成：
+  connector / task `RUNNING`，PostgreSQL `wal_level=logical`，replication slot active，
+  插入 1 条 `conversation_timeline_events` smoke row 后，`conversation.timeline.events.cdc`
+  offset 增至 1，shadow-check `expected_count=1 / observed_count=1`。正式 hotgroup 压测尚未执行。切换 runbook 见
   `docs/runbook/loadtest/hotgroup/hotgroup-message-cdc-wal-shadow-plan-20260702.md`。
 - HYBRID 诊断档位 1000 人 / 1000 消息 / 400 msg/s 暴露 `delivery_outbox` ready query
   在百万级 per-user outbox 下退化：旧 anti-join blocker 查询每批 500 行约 24s。当前

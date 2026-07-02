@@ -154,7 +154,14 @@ func loadObserved(brokers []string, topic string, tenantID string, conversationI
 	deadline := time.Now().Add(timeout)
 	var observed []observedEvent
 	for _, partitionID := range partitionIDs {
-		partitionEvents, err := readPartition(brokers[0], topic, partitionID, tenantID, conversationID, deadline)
+		firstOffset, lastOffset, err := partitionOffsets(dialer, brokers[0], topic, partitionID)
+		if err != nil {
+			return nil, err
+		}
+		if firstOffset >= lastOffset {
+			continue
+		}
+		partitionEvents, err := readPartition(brokers[0], topic, partitionID, tenantID, conversationID, firstOffset, lastOffset, deadline)
 		if err != nil {
 			return nil, err
 		}
@@ -169,12 +176,31 @@ func loadObserved(brokers []string, topic string, tenantID string, conversationI
 	return observed, nil
 }
 
-func readPartition(broker string, topic string, partitionID int, tenantID string, conversationID string, deadline time.Time) ([]observedEvent, error) {
+func partitionOffsets(dialer *kafkago.Dialer, broker string, topic string, partitionID int) (int64, int64, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	conn, err := dialer.DialLeader(ctx, "tcp", broker, topic, partitionID)
+	if err != nil {
+		return 0, 0, err
+	}
+	defer conn.Close()
+	firstOffset, err := conn.ReadFirstOffset()
+	if err != nil {
+		return 0, 0, err
+	}
+	lastOffset, err := conn.ReadLastOffset()
+	if err != nil {
+		return 0, 0, err
+	}
+	return firstOffset, lastOffset, nil
+}
+
+func readPartition(broker string, topic string, partitionID int, tenantID string, conversationID string, firstOffset int64, lastOffset int64, deadline time.Time) ([]observedEvent, error) {
 	reader := kafkago.NewReader(kafkago.ReaderConfig{
 		Brokers:     []string{broker},
 		Topic:       topic,
 		Partition:   partitionID,
-		StartOffset: kafkago.FirstOffset,
+		StartOffset: firstOffset,
 		MinBytes:    1,
 		MaxBytes:    10e6,
 		MaxWait:     500 * time.Millisecond,
@@ -182,6 +208,9 @@ func readPartition(broker string, topic string, partitionID int, tenantID string
 	defer reader.Close()
 	var observed []observedEvent
 	for time.Now().Before(deadline) {
+		if len(observed) > 0 && observed[len(observed)-1].Offset >= lastOffset-1 {
+			return observed, nil
+		}
 		readCtx, cancel := context.WithDeadline(context.Background(), minTime(deadline, time.Now().Add(500*time.Millisecond)))
 		msg, err := reader.ReadMessage(readCtx)
 		cancel()
@@ -193,9 +222,15 @@ func readPartition(broker string, topic string, partitionID int, tenantID string
 		}
 		var event conversationtimelinev1.ConversationTimelineEvent
 		if err := proto.Unmarshal(msg.Value, &event); err != nil {
+			if msg.Offset >= lastOffset-1 {
+				return observed, nil
+			}
 			continue
 		}
 		if event.GetTenantId() != tenantID || event.GetAggregateId() != conversationID {
+			if msg.Offset >= lastOffset-1 {
+				return observed, nil
+			}
 			continue
 		}
 		observed = append(observed, observedEvent{
@@ -204,6 +239,9 @@ func readPartition(broker string, topic string, partitionID int, tenantID string
 			Partition: partitionID,
 			Offset:    msg.Offset,
 		})
+		if msg.Offset >= lastOffset-1 {
+			return observed, nil
+		}
 	}
 	return observed, nil
 }

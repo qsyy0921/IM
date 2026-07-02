@@ -32,5 +32,31 @@ try {
     Write-Output "created connector $($definition.name)"
 }
 
-$status = Invoke-RestMethod -Method Get -Uri "$statusUrl/status" -TimeoutSec 10
-$status | ConvertTo-Json -Depth 20
+$lastStatusError = $null
+for ($attempt = 1; $attempt -le 30; $attempt++) {
+    try {
+        $status = Invoke-RestMethod -Method Get -Uri "$statusUrl/status" -TimeoutSec 10
+        $connectorRunning = $status.connector.state -eq "RUNNING"
+        $tasksRunning = @($status.tasks | Where-Object { $_.state -ne "RUNNING" }).Count -eq 0
+        if ($connectorRunning -and $tasksRunning) {
+            $status | ConvertTo-Json -Depth 20
+            return
+        }
+        if ($status.connector.state -eq "FAILED" -or @($status.tasks | Where-Object { $_.state -eq "FAILED" }).Count -gt 0) {
+            $status | ConvertTo-Json -Depth 20
+            throw "connector $($definition.name) entered FAILED state"
+        }
+    } catch {
+        $lastStatusError = $_
+        $response = $_.Exception.Response
+        if (-not $response) {
+            throw
+        }
+        if ($response -and [int]$response.StatusCode -ne 404) {
+            throw
+        }
+        Start-Sleep -Seconds 1
+    }
+}
+
+throw "connector $($definition.name) was created or updated, but status was not available within 30s: $($lastStatusError.Exception.Message)"

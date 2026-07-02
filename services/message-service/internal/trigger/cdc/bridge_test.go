@@ -125,6 +125,50 @@ func TestBuildRecordPublishesObjectPayloadJSON(t *testing.T) {
 	}
 }
 
+func TestBuildRecordPublishesSchemaWrappedEnvelope(t *testing.T) {
+	value := []byte(`{
+		"schema":{"type":"struct"},
+		"payload":{
+			"op":"c",
+			"after":{
+				"tenant_id":"tenant-1",
+				"conversation_id":"conv-1",
+				"seq":9,
+				"event_id":"event-3",
+				"event_type":"message.persisted.v1",
+				"event_version":"v1",
+				"fanout_mode":"READ_FANOUT",
+				"fanout_policy_version":3,
+				"permission_version":9,
+				"classification":"INTERNAL",
+				"mapping_version":"message.persisted.v1",
+				"trace_id":"trace-1",
+				"partition_key":"tenant-1:conv-1",
+				"correlation_id":"request-3",
+				"causation_id":"client-3",
+				"producer":"message-service",
+				"payload_json":"{\"message_id\":\"msg-3\",\"conversation_id\":\"conv-1\",\"conversation_seq\":9,\"sender_id\":\"user-1\",\"device_id\":\"device-1\",\"client_msg_id\":\"client-3\",\"command_hash\":\"hash-3\",\"message_type\":\"TEXT\",\"payload\":{\"text\":\"wrapped\"},\"attachment_ids\":[],\"accepted_at\":\"2026-07-02T12:00:02Z\"}",
+				"created_at":"2026-07-02T12:00:02Z"
+			}
+		}
+	}`)
+
+	record, publish, err := BuildRecord(value)
+	if err != nil {
+		t.Fatalf("BuildRecord returned error: %v", err)
+	}
+	if !publish {
+		t.Fatal("expected publish")
+	}
+	var event conversationtimelinev1.ConversationTimelineEvent
+	if err := proto.Unmarshal(record.Value, &event); err != nil {
+		t.Fatalf("unmarshal protobuf: %v", err)
+	}
+	if event.GetEventId() != "event-3" || event.GetMessagePersisted().GetPayload().GetFields()["text"].GetStringValue() != "wrapped" {
+		t.Fatalf("unexpected schema-wrapped event: %+v", &event)
+	}
+}
+
 func TestBuildRecordSkipsDeletesAndTombstones(t *testing.T) {
 	for _, value := range [][]byte{
 		nil,

@@ -8,8 +8,8 @@ events. PostgreSQL remains the message fact source. The request path commits
 rows and `message-service cdc-bridge` converts them to the existing
 `ConversationTimelineEvent` protobuf.
 
-This is implementation and operator wiring only. It has not yet been used as a
-formal hotgroup pressure-test result.
+This is implementation, operator wiring and one local CDC runtime smoke. It has
+not yet been used as a formal hotgroup pressure-test result.
 
 ## Why This Exists
 
@@ -174,5 +174,48 @@ docker compose --profile cdc -f deploy/local/docker-compose.yml -f deploy/local/
 git diff --check
 ```
 
-All listed checks passed. Docker CDC runtime registration and hotgroup pressure
-test are the next step after commit / redeploy.
+All listed checks passed.
+
+## Local CDC Runtime Smoke
+
+Executed after commit `5c54fc05` with follow-up fixes in the working tree:
+
+```powershell
+docker pull quay.io/debezium/connect:3.3
+.\tools\build-service-docker-images.ps1 -Services message-service -Platform linux/amd64
+docker compose --profile cdc -f deploy/local/docker-compose.yml -f deploy/local/docker-compose.services.yml -f deploy/local/docker-compose.service-workers.yml up -d postgres kafka schema-registry kafka-connect message-service-cdc-bridge
+.\tools\ensure-message-cdc-kafka-topics.ps1
+.\tools\register-message-timeline-cdc-connector.ps1
+.\tools\check-message-cdc-runtime.ps1
+go run ./tools/message-cdc-shadow-check -tenant-id tenant-cdc-smoke-20260703003533 -conversation-id conv-cdc-smoke-20260703003533 -created-after 2026-07-02T16:35:00Z -timeout 20s -include-rows
+```
+
+Result:
+
+```text
+connector = RUNNING
+task = RUNNING
+postgres wal_level = logical
+replication slot nexusim_message_timeline_slot active = true
+conversation.timeline.events.cdc total_end_offset = 1
+shadow-check expected_count = 1
+shadow-check observed_count = 1
+missing / unexpected / duplicate / out_of_order = empty
+```
+
+Issues found and fixed during smoke:
+
+- Debezium's JSON output can include a `schema/payload` wrapper when worker
+  converter settings are not applied. The bridge now supports both wrapped and
+  schemaless envelopes, and the local connector config explicitly sets JSON
+  converter schemas disabled.
+- The connector registration script now waits until connector and tasks are
+  `RUNNING`, not merely until `/status` exists.
+- The runtime health script now uses `psql -c` instead of piping SQL through
+  Windows PowerShell stdin, avoiding a BOM before `SELECT`.
+- The shadow checker now reads each Kafka partition only up to its current end
+  offset, so empty lower-numbered partitions cannot consume the whole timeout.
+
+Next step: run `cdc_shadow` under the real hotgroup SendMessage load, compare
+CDC topic count/order with `conversation_timeline_events`, then explicitly test
+`cdc_only` with delivery consuming `conversation.timeline.events.cdc`.

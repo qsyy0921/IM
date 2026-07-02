@@ -617,6 +617,19 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
   “同步 policy decision audit 写入 + 共享 PostgreSQL WAL 写路径竞争”，下一步优先实验独立
   audit PG 或 audit outbox 分区，而不是继续盲目扩大连接池。报告见
   `docs/runbook/loadtest/hotgroup/hotgroup-analysis-20260702-policy-audit-index-experiment.md`。
+- 2026-07-02 Backend Lab 完成独立 policy audit PG 验证：临时
+  `nexusim-policy-audit-postgres` + 独立 audit relay 承接 policy decision audit 写入，
+  `policy-service-grpc` 通过 `NEXUSIM_POLICY_AUDIT_PG_DSN` 指向该库。正式双客户端复压
+  5000/5000 SendMessage 成功、message / delivery outbox 均归零；独立 audit PG
+  `policy_decision_audit_outbox` 收到并发布 5000 条记录，主 PG audit outbox 计数保持
+  248524 不变，证明 audit 路由隔离成立。该实验把 audit p99 从 partial-index run 的约
+  `133ms` 降到 `69ms`，audit pool p99 从约 `111ms` 降到 `49ms`，但端到端吞吐未提升：
+  Windows / Mac 实际约 `889.582` / `993.732 msg/s`，SendMessage p99 约
+  `757.653ms` / `707.529ms`。Prometheus 窗口显示新瓶颈转移到 message-service 主 PG
+  写路径，`repository_append_recent p99` 约 `485.394ms`，`repository_pool_acquire_recent p99`
+  约 `260.508ms`。下一步不要继续只扩 audit；应优先剖析 message repository append、
+  message PG pool、message_log / timeline / message_outbox insert/index/WAL 路径。报告见
+  `docs/runbook/loadtest/hotgroup/hotgroup-analysis-20260702-policy-auditpg-experiment.md`。
 - HYBRID 诊断档位 1000 人 / 1000 消息 / 400 msg/s 暴露 `delivery_outbox` ready query
   在百万级 per-user outbox 下退化：旧 anti-join blocker 查询每批 500 行约 24s。当前
   delivery outbox relay 已改成 per-conversation frontier ready query，并把本地 worker

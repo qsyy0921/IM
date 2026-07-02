@@ -36,7 +36,7 @@
    下一步优先主集成 review 或 focused review-requested hardening。
    Controlled implementation entry audit 已确认 Agent Lab 内部证据条件通过，
    但实际受控实现仍需 accepted ADR、full-package entry decision、owner review 和 real-service smoke。
-   Full-package entry review request 已发起；下一步等待主集成接受、打回或要求 owner / smoke 证据。
+   Full-package entry review request 和 ADR acceptance playbook 已发起；下一步等待主集成接受、打回或要求 owner / smoke 证据。
 4. ReplayBundle observability hardening review：当前 skeleton 已覆盖低敏
    observability refs、hash refs、version metadata refs、failure taxonomy refs 和
    trace linkage refs；如评审要求继续，只增加 fixture-only taxonomy / trace 证据。

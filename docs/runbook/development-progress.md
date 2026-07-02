@@ -295,6 +295,9 @@ ai/python/tests/test_agent_eval_*.py
 - Full-package entry review request：已把完整包裁决项提交为 review request，
   请求主集成选择接受 ADR acceptance review、按 P0/P1 打回或因 owner / smoke
   证据不足而 defer；不请求生产实现授权。
+- ADR acceptance review playbook：补齐 L0-L4 准入层级、候选 ADR signoff
+  matrix、auto-reject / deferral rules 和 reviewer result template，避免
+  完整包被按意图而非证据接受；仍不授权生产实现。
 - Skeleton completion audit：已把 immutable goal 的 17 个骨架要求映射到当前
   代码、fixture、CLI、tests 和 runbook evidence；结论是 Phase 1 isolated
   Agent-layer skeleton 可作为当前可执行基线，但不能直接推广生产契约。

@@ -43,6 +43,9 @@
 - `agent-full-package-entry-review-request-20260702.md`：面向主集成的完整包准入
   review request，列出请求裁决、acceptance questions、非请求项、接受 / 打回
   后动作；只请求 ADR acceptance review，不请求生产实现授权。
+- `agent-adr-acceptance-review-playbook-20260702.md`：ADR acceptance review
+  playbook，定义 L0-L4 准入层级、候选 ADR signoff matrix、auto-reject /
+  deferral rules 和 reviewer result template；不授权生产实现。
 - `agent-eval-replay-adr-review-20260702.md`：Eval / Replay ADR candidate
   focused review，补齐 failure-class lifecycle、baseline approval、retention /
   redaction 和 contract-version bump rehearsal。

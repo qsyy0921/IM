@@ -31,7 +31,7 @@ runbook / SDD / research 文档维护。
 - Memory / Tool / AgentOps reviews：`docs/research/agent-memory-admission-adr-review-20260702.md`、
   `docs/research/agent-tool-mcp-adr-review-20260702.md`、`docs/research/agentops-governance-adr-review-20260702.md`。
 - Fixture evidence：`docs/research/agent-*-fixture-evidence-20260702.md`。
-- Latest audit focus：controlled implementation entry audit、full-package entry review request。
+- Latest audit focus：controlled implementation entry audit、full-package entry review request、ADR acceptance review playbook。
 - 详细 SDD：`docs/sdd/agent-runtime.md`、`agent-memory-admission.md`、
   `agent-context-evidencepack.md`、`agent-tool-mcp-boundary.md`、
   `agent-eval-replay-harness.md`、`agent-governance-agentops.md`。

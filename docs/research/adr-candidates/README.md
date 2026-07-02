@@ -39,6 +39,7 @@ authorizes the next explicitly scoped integration design.
 - `../agent-architecture-review-loop-20260702.md`
 - `../agent-controlled-implementation-entry-audit-20260702.md`
 - `../agent-full-package-entry-review-request-20260702.md`
+- `../agent-adr-acceptance-review-playbook-20260702.md`
 - `../agent-multi-agent-handoff-fixture-evidence-20260702.md`
 - `../agent-operator-governance-fixture-evidence-20260702.md`
 - `../agent-operational-readiness-fixture-evidence-20260702.md`
@@ -54,6 +55,7 @@ review ledger must show:
 - no open P0 finding;
 - no open P1 finding inside Agent Lab scope;
 - explicit owner and non-owner state boundaries;
+- named signoffs, deferral owner and auto-reject rules from the acceptance playbook;
 - object catalog completeness evidence for every production-grade object it
   introduces or consumes;
 - contract-version compatibility and replay-reader evidence;

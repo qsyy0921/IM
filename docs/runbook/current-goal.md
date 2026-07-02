@@ -643,6 +643,21 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
   结论：Kafka 可用于可靠异步 audit，但“同步 PG audit -> 同步 Kafka ACK”只是瓶颈迁移，
   下一步应做有显式可靠性 / DLQ / redrive 指标的异步 audit 边界。报告见
   `docs/runbook/loadtest/hotgroup/hotgroup-analysis-20260702-kafka-audit-experiment.md`。
+- 2026-07-02 Backend Lab 完成 `NEXUSIM_POLICY_DECISION_AUDIT_SINK=kafka_async` 压测隔离：
+  policy-service 在请求路径只构建 / marshal 低敏 `PolicyEvent` 并写入有界内存队列，后台 worker
+  批量发布到 `im.policy.events`，主 topic 重试耗尽后进入 `im.policy.events.dlq`。代码门禁
+  `go test ./services/policy-service/... -count=1`、`go build ./services/policy-service/cmd/policy-service`
+  和 `git diff --check` 均通过；`-race` 因本地 `CGO_ENABLED=0` 未运行。正式 run
+  `hotgroup-kafkaasync-clean-2client-6000x2500x2-384c-9b87f95d-20260702-221912` 中 Windows /
+  Mac 各 2500/2500 SendMessage 成功、无 send error，PG audit outbox 保持
+  `253524,0,0`，Kafka main topic 精确新增 5000 条，DLQ 为 0。`decision_audit_kafka_async_enqueue`
+  p99 为 0ms、错误为 0；后台 Kafka publish p99 最高约 300ms，但不再阻塞请求路径。
+  新瓶颈回到 SendMessage 主链路：`message_dependency_read_recent p99` 最高约 305ms、
+  `message_policy_check_recent p99` 约 242ms、`message_repository_append_recent p99` 约
+  345ms、`message_repository_pool_acquire_recent p99` 最高约 206ms。下一步聚焦 message-service
+  repository append / message PG pool / outbox insert-index-WAL 路径；`kafka_async` 仅是
+  压测隔离 profile，非 crash-durable 生产 audit 方案。报告见
+  `docs/runbook/loadtest/hotgroup/hotgroup-analysis-20260702-kafka-async-audit-experiment.md`。
 - HYBRID 诊断档位 1000 人 / 1000 消息 / 400 msg/s 暴露 `delivery_outbox` ready query
   在百万级 per-user outbox 下退化：旧 anti-join blocker 查询每批 500 行约 24s。当前
   delivery outbox relay 已改成 per-conversation frontier ready query，并把本地 worker

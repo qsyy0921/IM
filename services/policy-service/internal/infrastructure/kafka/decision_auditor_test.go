@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -145,11 +146,14 @@ func (publisher *recordingDecisionAuditPublisher) PublishBatch(_ context.Context
 }
 
 type recordingDecisionAuditStageObserver struct {
+	mu     sync.Mutex
 	stages []string
 	failed []bool
 }
 
 func (observer *recordingDecisionAuditStageObserver) RecordPolicyDecisionStage(_ types.MessageAction, stage string, failed bool, latencyMS int64) {
+	observer.mu.Lock()
+	defer observer.mu.Unlock()
 	observer.stages = append(observer.stages, stage)
 	observer.failed = append(observer.failed, failed)
 	if latencyMS < 0 {
@@ -159,6 +163,8 @@ func (observer *recordingDecisionAuditStageObserver) RecordPolicyDecisionStage(_
 
 func (observer *recordingDecisionAuditStageObserver) assertStages(t *testing.T, expected []string) {
 	t.Helper()
+	observer.mu.Lock()
+	defer observer.mu.Unlock()
 	if len(observer.stages) != len(expected) {
 		t.Fatalf("expected stages %v, got %v", expected, observer.stages)
 	}

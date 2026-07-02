@@ -178,7 +178,9 @@ Policy-service does not guess direct peers and does not synchronously query cont
 
 When PostgreSQL rules mode is enabled, successful `CheckMessageAction` decisions are audited before the response is returned. The default sink is `NEXUSIM_POLICY_DECISION_AUDIT_SINK=postgres`, which stages rows into `policy_decision_audit_outbox`; audit write failure fails closed as policy unavailable. The gRPC runtime opens an isolated audit PostgreSQL pool, controlled by `NEXUSIM_POLICY_AUDIT_PG_DSN` and `NEXUSIM_POLICY_AUDIT_PG_MAX_CONNS`, so synchronous audit inserts do not compete with policy facts reads for the same pgx pool. The default audit pool size is 32 after the hotgroup pressure runs showed 16 connections queueing under 768 sender concurrency. `NEXUSIM_POLICY_SERVICE_MODE=outbox-relay` publishes these rows to `im.policy.events` as protobuf `PolicyEvent` records and marks successful rows `PUBLISHED`; local Docker starts this relay as `policy-service-outbox-relay` so audit rows do not accumulate indefinitely as `PENDING`. Policy decision audit events are immutable audit facts, not a state-rebuild timeline, so this relay uses unordered partition publishing; a lower-version `PENDING` / `DLQ` audit row does not block later audit facts for the same conversation.
 
-`NEXUSIM_POLICY_DECISION_AUDIT_SINK=kafka` is the first-stage reliable async-audit pressure profile. It builds the same low-sensitive `PolicyEvent` payload in the gRPC request path, publishes one record to `NEXUSIM_POLICY_AUDIT_EVENTS_TOPIC`, and waits for the Kafka producer ACK before returning the policy decision. Publish / marshal / configuration failure still fails closed as policy unavailable. This mode removes the synchronous `policy_decision_audit_outbox` PostgreSQL insert from the SendMessage critical path; it does not by itself write a PostgreSQL audit row, so downstream audit consumers must dedupe by `event_id` and persist or export the Kafka event stream according to the target audit retention policy. The current Go adapter uses `kafka-go` with `acks=all`, bounded retries, no auto topic creation, and event-id idempotency at the consumer/sink layer; `kafka-go` does not expose Kafka's producer idempotence flag, so product-grade exactly-once sink semantics still require a dedicated idempotent sink or a lower-level Kafka producer.
+`NEXUSIM_POLICY_DECISION_AUDIT_SINK=kafka` is the synchronous Kafka ACK pressure profile. It builds the same low-sensitive `PolicyEvent` payload in the gRPC request path, publishes one record to `NEXUSIM_POLICY_AUDIT_EVENTS_TOPIC`, and waits for the Kafka producer ACK before returning the policy decision. Publish / marshal / configuration failure still fails closed as policy unavailable. This mode removes the synchronous `policy_decision_audit_outbox` PostgreSQL insert from the SendMessage critical path; it does not by itself write a PostgreSQL audit row, so downstream audit consumers must dedupe by `event_id` and persist or export the Kafka event stream according to the target audit retention policy. The current Go adapter uses `kafka-go` with `acks=all`, bounded retries, no auto topic creation, and event-id idempotency at the consumer/sink layer; `kafka-go` does not expose Kafka's producer idempotence flag, so product-grade exactly-once sink semantics still require a dedicated idempotent sink or a lower-level Kafka producer.
+
+`NEXUSIM_POLICY_DECISION_AUDIT_SINK=kafka_async` is the first-stage async Kafka audit pressure profile. It still builds and marshals the low-sensitive `PolicyEvent` before returning and fails closed when the payload is invalid, the queue is closed, the queue is full or request enqueue is canceled. After enqueue, background workers publish bounded batches to `NEXUSIM_POLICY_AUDIT_EVENTS_TOPIC`; if the main topic publish exhausts `NEXUSIM_POLICY_DECISION_AUDIT_ASYNC_MAX_ATTEMPTS`, the same records are retried to `NEXUSIM_POLICY_AUDIT_EVENTS_DLQ_TOPIC`. This mode deliberately measures the effect of removing Kafka ACK wait from the policy decision path. It is process-reliable while the service instance is alive, but it is not crash-durable between enqueue and Kafka ACK. A production-grade reliable async audit design still needs a durable spool, transactional outbox / CDC relay, or an idempotent external audit sink with explicit replay and retention controls.
 
 `NEXUSIM_POLICY_SERVICE_MODE=outbox-audit` is a read-only operator view over `policy_decision_audit_outbox`. It supports `outbox_id / event_id / tenant_id / aggregate_id / status / event_type / created_at RFC3339 window` filters, returns newest rows first, and never mutates relay state, retry state or repair history.
 
@@ -232,8 +234,19 @@ NEXUSIM_POLICY_AUDIT_PG_MAX_CONNS=32
 NEXUSIM_KAFKA_BROKERS=localhost:9092
 NEXUSIM_POLICY_DECISION_AUDIT_SINK=postgres
 NEXUSIM_POLICY_AUDIT_EVENTS_TOPIC=im.policy.events
+NEXUSIM_POLICY_AUDIT_EVENTS_DLQ_TOPIC=im.policy.events.dlq
 NEXUSIM_POLICY_DECISION_AUDIT_KAFKA_BATCH_SIZE=1
 NEXUSIM_POLICY_DECISION_AUDIT_KAFKA_BATCH_TIMEOUT=1ms
+NEXUSIM_POLICY_DECISION_AUDIT_KAFKA_WRITER_BATCH_SIZE=
+NEXUSIM_POLICY_DECISION_AUDIT_KAFKA_WRITER_BATCH_TIMEOUT=
+NEXUSIM_POLICY_DECISION_AUDIT_ASYNC_QUEUE_SIZE=8192
+NEXUSIM_POLICY_DECISION_AUDIT_ASYNC_WORKERS=1
+NEXUSIM_POLICY_DECISION_AUDIT_ASYNC_BATCH_SIZE=100
+NEXUSIM_POLICY_DECISION_AUDIT_ASYNC_FLUSH_INTERVAL=10ms
+NEXUSIM_POLICY_DECISION_AUDIT_ASYNC_MAX_ATTEMPTS=5
+NEXUSIM_POLICY_DECISION_AUDIT_ASYNC_RETRY_BASE_DELAY=50ms
+NEXUSIM_POLICY_DECISION_AUDIT_ASYNC_RETRY_MAX_DELAY=1s
+NEXUSIM_POLICY_DECISION_AUDIT_ASYNC_CLOSE_TIMEOUT=5s
 NEXUSIM_POLICY_DECISION_CACHE_BACKEND=
 NEXUSIM_POLICY_DECISION_CACHE_ENABLED=false
 NEXUSIM_POLICY_DECISION_CACHE_REDIS_MODE=single

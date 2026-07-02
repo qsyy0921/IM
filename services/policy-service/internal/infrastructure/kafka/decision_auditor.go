@@ -92,29 +92,40 @@ func (auditor *DecisionAuditKafka) RecordPolicyDecision(
 	if auditor == nil || auditor.publisher == nil {
 		return types.NewDependencyUnavailable("policy decision audit kafka publisher is not configured")
 	}
-	buildStarted := time.Now()
-	event, partitionKey, err := auditor.buildPolicyEvent(command, decision)
-	auditor.recordStage(command.Action, "decision_audit_kafka_build", err != nil, buildStarted)
+	record, err := auditor.buildPublishRecord(command, decision)
 	if err != nil {
 		return err
 	}
-	marshalStarted := time.Now()
-	value, err := proto.Marshal(event)
-	auditor.recordStage(command.Action, "decision_audit_kafka_marshal", err != nil, marshalStarted)
-	if err != nil {
-		return types.NewDependencyUnavailable("policy decision audit kafka marshal failed")
-	}
 
 	publishStarted := time.Now()
-	err = auditor.publisher.PublishBatch(ctx, auditor.topic, []types.KafkaPublishRecord{{
-		Key:   []byte(partitionKey),
-		Value: value,
-	}})
+	err = auditor.publisher.PublishBatch(ctx, auditor.topic, []types.KafkaPublishRecord{record})
 	auditor.recordStage(command.Action, "decision_audit_kafka_publish", err != nil, publishStarted)
 	if err != nil {
 		return types.NewDependencyUnavailable("policy decision audit kafka publish failed")
 	}
 	return nil
+}
+
+func (auditor *DecisionAuditKafka) buildPublishRecord(
+	command types.CheckMessageActionCommand,
+	decision types.MessageActionDecision,
+) (types.KafkaPublishRecord, error) {
+	buildStarted := time.Now()
+	event, partitionKey, err := auditor.buildPolicyEvent(command, decision)
+	auditor.recordStage(command.Action, "decision_audit_kafka_build", err != nil, buildStarted)
+	if err != nil {
+		return types.KafkaPublishRecord{}, err
+	}
+	marshalStarted := time.Now()
+	value, err := proto.Marshal(event)
+	auditor.recordStage(command.Action, "decision_audit_kafka_marshal", err != nil, marshalStarted)
+	if err != nil {
+		return types.KafkaPublishRecord{}, types.NewDependencyUnavailable("policy decision audit kafka marshal failed")
+	}
+	return types.KafkaPublishRecord{
+		Key:   []byte(partitionKey),
+		Value: value,
+	}, nil
 }
 
 func (auditor *DecisionAuditKafka) buildPolicyEvent(

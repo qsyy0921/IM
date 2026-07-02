@@ -13,8 +13,9 @@ import (
 )
 
 type OutboxStore struct {
-	pool *pgxpool.Pool
-	now  func() time.Time
+	pool                       *pgxpool.Pool
+	now                        func() time.Time
+	orderedPartitionPublishing bool
 }
 
 type OutboxStoreOption func(*OutboxStore)
@@ -91,13 +92,20 @@ type OutboxRepairCleanupStats struct {
 
 func NewOutboxStore(pool *pgxpool.Pool, opts ...OutboxStoreOption) *OutboxStore {
 	store := &OutboxStore{
-		pool: pool,
-		now:  func() time.Time { return time.Now().UTC() },
+		pool:                       pool,
+		now:                        func() time.Time { return time.Now().UTC() },
+		orderedPartitionPublishing: true,
 	}
 	for _, opt := range opts {
 		opt(store)
 	}
 	return store
+}
+
+func WithOutboxOrderedPartitionPublishing(enabled bool) OutboxStoreOption {
+	return func(store *OutboxStore) {
+		store.orderedPartitionPublishing = enabled
+	}
 }
 
 func WithOutboxClock(clock func() time.Time) OutboxStoreOption {
@@ -687,7 +695,7 @@ INSERT INTO policy_decision_audit_outbox_repair_audit (
 }
 
 func (store *OutboxStore) fetchReadyLocked(ctx context.Context, tx pgx.Tx, limit int) ([]types.OutboxMessage, error) {
-	rows, err := tx.Query(ctx, `
+	query := `
 SELECT
     id,
     event_id,
@@ -710,6 +718,9 @@ FROM policy_decision_audit_outbox current
 WHERE status = 'PENDING'
   AND published_at IS NULL
   AND COALESCE(next_retry_at, available_at) <= now()
+`
+	if store.orderedPartitionPublishing {
+		query += `
   AND NOT EXISTS (
       SELECT 1
       FROM policy_decision_audit_outbox previous
@@ -718,10 +729,14 @@ WHERE status = 'PENDING'
         AND previous.aggregate_version < current.aggregate_version
         AND previous.status IN ('PENDING', 'DLQ')
   )
+`
+	}
+	query += `
 ORDER BY id
 LIMIT $1
 FOR UPDATE OF current SKIP LOCKED
-`, limit)
+`
+	rows, err := tx.Query(ctx, query, limit)
 	if err != nil {
 		return nil, types.NewDBWriteFailed(err.Error())
 	}

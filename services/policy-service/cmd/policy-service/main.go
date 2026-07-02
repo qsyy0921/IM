@@ -92,7 +92,7 @@ func runOutboxRelay() error {
 	defer producer.Close()
 
 	relay := outboxtrigger.NewRelay(
-		postgresinfra.NewOutboxStore(pool),
+		postgresinfra.NewOutboxStore(pool, postgresinfra.WithOutboxOrderedPartitionPublishing(false)),
 		producer,
 		outboxtrigger.Config{
 			Topic:          envString("NEXUSIM_POLICY_AUDIT_EVENTS_TOPIC", outboxtrigger.TopicPolicyEvents),
@@ -113,7 +113,7 @@ func runOutboxRelay() error {
 		return err
 	}
 	defer stopDebug()
-	log.Println("policy-service decision audit outbox relay started")
+	log.Println("policy-service decision audit outbox relay started with unordered partition publishing")
 	return relay.Run(ctx)
 }
 

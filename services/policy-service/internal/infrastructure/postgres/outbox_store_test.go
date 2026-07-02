@@ -176,6 +176,34 @@ func TestOutboxStoreDLQBlocksHigherVersionPolicyAuditIntegration(t *testing.T) {
 	}
 }
 
+func TestOutboxStoreUnorderedPublishesHigherVersionPolicyAuditIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetPolicyTables(t, ctx, pool)
+	partitionKey := "tenant-policy:conversation-key"
+	insertPolicyAuditOutboxRow(t, ctx, pool, "policy-audit-unordered-low", partitionKey, types.OutboxStatusDLQ, 1)
+	highID1, _ := insertPolicyAuditOutboxRow(t, ctx, pool, "policy-audit-unordered-high-1", partitionKey, types.OutboxStatusPending, 0)
+	highID2, _ := insertPolicyAuditOutboxRow(t, ctx, pool, "policy-audit-unordered-high-2", partitionKey, types.OutboxStatusPending, 0)
+
+	store := NewOutboxStore(pool, WithOutboxOrderedPartitionPublishing(false))
+	published := make(map[int64]bool)
+	stats, err := store.ProcessReadyBatch(ctx, 10, 5, time.Millisecond, func(ctx context.Context, messages []types.OutboxMessage) []error {
+		errs := make([]error, len(messages))
+		for _, message := range messages {
+			published[message.ID] = true
+		}
+		return errs
+	})
+	if err != nil {
+		t.Fatalf("process unordered ready batch: %v", err)
+	}
+	if stats.Fetched != 2 || stats.Published != 2 || !published[highID1] || !published[highID2] {
+		t.Fatalf("expected unordered relay to publish both higher rows, stats=%+v published=%v", stats, published)
+	}
+	assertPolicyAuditOutboxStatusCount(t, ctx, pool, types.OutboxStatusDLQ, 1)
+	assertPolicyAuditOutboxStatusCount(t, ctx, pool, types.OutboxStatusPublished, 2)
+}
+
 func TestOutboxStoreRepairDLQPolicyAuditIntegration(t *testing.T) {
 	pool := openTestPool(t)
 	ctx := context.Background()

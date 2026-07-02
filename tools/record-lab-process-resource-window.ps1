@@ -10,6 +10,7 @@ param(
     [string]$UbuntuName = "ubuntu",
     [string[]]$UbuntuContainerPatterns = @(
         "nexusim-postgres",
+        "nexusim-policy-audit-postgres",
         "nexusim-kafka",
         "nexusim-redis",
         "nexusim-message-service",

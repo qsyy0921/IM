@@ -52,6 +52,9 @@
 - `agent-architecture-scope-closure-20260702.md`：Agent 架构收口文档，明确
   当前架构已满足面试级完整度和适度生产级意识，禁止继续无限扩充大平面、
   大服务、大对象族或 benchmark survey；下一步转向 backend-isolated demo。
+- `agent-sdd-interview-readiness-review-20260702.md`：面向面试讲解的 SDD 复审，
+  逐份评估 platform、Runtime、Context / EvidencePack、Memory、Tool / MCP、
+  Eval / Replay、AgentOps 是否足够完整且不过度深入；结论是不重开架构，转 demo。
 - `agent-eval-replay-l2-scoped-implementation-design-20260702.md`：Eval /
   Replay promotion gate 的第一份 L2 scoped implementation design；只定义 owner、
   L3 smoke、operator / audit / replay gates，不授权生产实现。

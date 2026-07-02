@@ -31,7 +31,7 @@ runbook / SDD / research 文档维护。
 - Memory / Tool / AgentOps reviews：`docs/research/agent-memory-admission-adr-review-20260702.md`、
   `docs/research/agent-tool-mcp-adr-review-20260702.md`、`docs/research/agentops-governance-adr-review-20260702.md`。
 - Fixture evidence：`docs/research/agent-*-fixture-evidence-20260702.md`。
-- Latest audit focus：six L1 ADR candidates accepted for reviewability only; L1 package closure audit drafted。
+- Latest audit focus：L1 package closure accepted; Eval / Replay L2 scoped design drafted。
 - 详细 SDD：`docs/sdd/agent-runtime.md`、`agent-memory-admission.md`、
   `agent-context-evidencepack.md`、`agent-tool-mcp-boundary.md`、
   `agent-eval-replay-harness.md`、`agent-governance-agentops.md`。
@@ -71,7 +71,7 @@ runbook / SDD / research 文档维护。
 
 ## 后续优先级
 
-1. Full package 已完成六个 L1 reviewability verdict；L1 package closure audit 已起草，未进入 L2 scoped design 前不提升生产契约。
+1. Full package 已完成六个 L1 reviewability verdict；Eval / Replay L2 scoped design 已起草，未过 owner review 前不提升生产契约。
 2. Eval / Replay、Runtime / Workflow、Context / Evidence、Memory、Tool、AgentOps、
    dataset reproducibility、cross-service preservation、multi-agent handoff、
    object completeness、operator governance、operational readiness、controlled implementation readiness、architecture coverage 和 contract version compatibility

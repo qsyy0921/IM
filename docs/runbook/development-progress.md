@@ -55,7 +55,8 @@ Eval Harness / synthetic IM-like fixture 已开始隔离式编码。
 | `docs/research/agent-tool-mcp-l1-acceptance-review-20260702.md` | 已完成第五个候选 L1 自评 | Tool / MCP candidate 建议接受 untrusted provider / capability lease / attestation / executor owner 边界；仍不授权 provider 或 tool schema |
 | `docs/research/agentops-governance-adr-review-20260702.md` | 已完成首轮 focused review | AgentOps candidate 补齐 kill switch、release pinning、baseline approval、failure owner workflow 和 canary/shadow comparison |
 | `docs/research/agentops-governance-l1-acceptance-review-20260702.md` | 已完成第六个候选 L1 自评 | AgentOps / Governance candidate 建议接受 release-control / baseline approval / kill-switch / failure-owner / canary-shadow 边界；仍不授权 release pipeline 或 admin console |
-| `docs/research/agent-l1-package-closure-audit-20260702.md` | 已完成 L1 package closure audit | 六个 Agent ADR candidates 已被主集成接受为 L1 reviewability only；下一步只能进入 L2 scoped design 或 fixture-only hardening |
+| `docs/research/agent-l1-package-closure-audit-20260702.md` | 已被主集成接受为 closure record | 六个 Agent ADR candidates 已被主集成接受为 L1 reviewability only；下一步只能进入 L2 scoped design 或 fixture-only hardening |
+| `docs/research/agent-eval-replay-l2-scoped-implementation-design-20260702.md` | 已完成第一份 L2 design | Eval / Replay promotion gate 的 owner、L3 smoke、operator / audit / replay gates 已定义；仍不授权实现 |
 | `docs/research/agent-fixture-evidence-hardening-20260702.md` | 已完成首段 | Eval / Replay version-bump rehearsal 已用 fixture-only code / JSON / tests 落地；仍不提升生产契约 |
 | `docs/research/agent-tool-mcp-fixture-evidence-20260702.md` | 已完成 Tool 段 | Tool / MCP governance rehearsal 已用 fixture-only code / JSON / tests 落地；仍不提升生产契约 |
 | `docs/research/agentops-governance-fixture-evidence-20260702.md` | 已完成 AgentOps 段 | AgentOps governance rehearsal 已用 fixture-only code / JSON / tests 落地；仍不提升生产契约 |
@@ -323,6 +324,9 @@ ai/python/tests/test_agent_eval_*.py
   only；结论是 L1 broad review 可以收口，但 actual controlled implementation
   仍需 L2 scoped design、owner review、real-service preservation smoke 和
   production operator UX。
+- Eval / Replay L2 scoped implementation design：第一份 L2 design 已起草，范围
+  只限 promotion gate、low-sensitive refs、replay-reader policy、baseline
+  approval、operator / audit surfaces 和 L3 smoke plan；不授权生产实现。
 - Skeleton completion audit：已把 immutable goal 的 17 个骨架要求映射到当前
   代码、fixture、CLI、tests 和 runbook evidence；结论是 Phase 1 isolated
   Agent-layer skeleton 可作为当前可执行基线，但不能直接推广生产契约。

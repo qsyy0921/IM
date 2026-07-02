@@ -678,8 +678,19 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
   delivery 改读 `conversation.timeline.events.cdc` 后业务成功、CDC consumer lag=0；
   20 条 SendMessage 未新增 `message.persisted.v1` 的 `message_outbox`，但建群 / 入群仍由
   conversation-service 写入 61 条 `conversation.member.joined.v1` outbox，后续若要彻底去除
-  timeline table outbox 需主集成协调 conversation-service CDC 切换。正式 send-only 压测尚未执行。切换 runbook 见
+  timeline table outbox 需主集成协调 conversation-service CDC 切换。切换 runbook 见
   `docs/runbook/loadtest/hotgroup/hotgroup-message-cdc-wal-shadow-plan-20260702.md`。
+- 2026-07-03 Backend Lab 已完成远端 `cdc_only` 6000 人双客户端压测验证：
+  first pass commit `5d8dc543` 的 200ms bridge hold 能让 5000 条事件全部到达并追平，
+  但 shadow-check 仍有 2 条 out-of-order；commit `aad98064` 将 CDC bridge bounded
+  reorder hold 调整为 3s 后，同一 6000 人 READ_FANOUT / SEQUENCER_BLOCK、Windows /
+  Mac 各 2500 条、384 并发 run 全部成功，CDC source / delivery consumer lag=0，
+  shadow-check `expected_count=5000 / observed_count=5000` 且 missing / duplicate /
+  out-of-order 为空。Prometheus 窗口显示 `repository_insert_outbox_p99_recent_ms=0`、
+  message outbox relay samples=0，说明 `message.persisted.v1` table outbox 已从该
+  per-message 热路径移除；剩余长尾回到 dependency / policy waiting 和主 PG append。
+  报告见
+  `docs/runbook/loadtest/hotgroup/hotgroup-analysis-20260703-cdc-only-reorderhold.md`。
 - HYBRID 诊断档位 1000 人 / 1000 消息 / 400 msg/s 暴露 `delivery_outbox` ready query
   在百万级 per-user outbox 下退化：旧 anti-join blocker 查询每批 500 行约 24s。当前
   delivery outbox relay 已改成 per-conversation frontier ready query，并把本地 worker

@@ -8,8 +8,9 @@ events. PostgreSQL remains the message fact source. The request path commits
 rows and `message-service cdc-bridge` converts them to the existing
 `ConversationTimelineEvent` protobuf.
 
-This is implementation, operator wiring and one local CDC runtime smoke. It has
-not yet been used as a formal hotgroup pressure-test result.
+This is implementation, operator wiring, CDC runtime smoke and the first remote
+`cdc_only` hotgroup pressure validation. The detailed pressure report is
+`docs/runbook/loadtest/hotgroup/hotgroup-analysis-20260703-cdc-only-reorderhold.md`.
 
 ## Why This Exists
 
@@ -160,7 +161,12 @@ timeline CDC cutover and is not part of this message-service-only experiment.
   fail, so downstream consumers must keep `event_id` idempotency.
 - Source partitioning is part of correctness, not just throughput tuning. The
   Debezium source topic must use conversation-level keys so every event for the
-  same `(tenant_id, conversation_id)` is emitted in per-conversation order.
+  same `(tenant_id, conversation_id)` is emitted to the same source partition.
+- WAL commit order can still differ from allocated `conversation_seq` under
+  `SEQUENCER_BLOCK` concurrency. The CDC bridge uses a bounded reorder hold and
+  sorts each batch by `partition_key + aggregate_version`; this is a local
+  loadtest correctness profile, not a full durable continuous-stream reorder
+  log.
 - `snapshot.mode=no_data` exports only new rows after connector registration.
   Historical backfill needs a separate operator plan.
 - A stopped connector can retain WAL through the replication slot. Monitor
@@ -301,6 +307,43 @@ The `cdc_only` run still had 61 `message_outbox` rows, all
 `conversation.member.joined.v1` from conversation-service setup. There were no
 `message.persisted.v1` rows in `message_outbox` for the 20 SendMessage calls.
 
-Next step: run `cdc_shadow` and then `cdc_only` under a send-only hotgroup load
-with an already prepared group, so the measurement isolates per-message
-`message_outbox` write amplification instead of setup-time membership events.
+## Remote `cdc_only` Pressure Validation
+
+After the local smoke, the Ubuntu runtime was switched to `cdc_only`, delivery
+was pointed at `conversation.timeline.events.cdc`, and `message-service-outbox-relay`
+was stopped. The first 6000-member dual-client run with a `200ms` CDC bridge
+hold delivered all 5000 events but still produced 2 target-topic out-of-order
+records. The bridge default hold was then raised to 3 seconds.
+
+Passing run after the 3-second hold:
+
+```text
+run = hotgroup-cdcreorderhold-2client-6000x2500x2-384c-aad98064-20260703-0230
+commit = aad98064
+group_size = 6000
+fanout_mode = READ_FANOUT
+conversation_mode = SEQUENCER_BLOCK
+Windows SendMessage = 2500/2500, p99 = 817.526ms
+Mac SendMessage = 2500/2500, p99 = 940.766ms
+message_log_count = 17500
+delivery_timeline_rows = 17500
+user_inbox_rows = 0
+message_outbox_pending = 0
+delivery_outbox_pending = 0
+message-cdc-bridge lag = 0
+delivery CDC consumer lag = 0
+shadow-check expected_count = 5000
+shadow-check observed_count = 5000
+missing / unexpected / duplicate / out_of_order = empty
+```
+
+Prometheus showed `repository_insert_outbox_p99_recent_ms = 0`,
+`message_outbox_process_ready_active_samples_window = 0`, and
+`message_kafka_publish_call_samples_window = 0`, confirming that
+`message.persisted.v1` table-outbox work was removed from the per-message hot
+path for this run.
+
+Remaining bottleneck shifted back to SendMessage dependency / policy waiting
+and the primary PostgreSQL append path. The bridge hold is still bounded; a
+production CDC cutover must either add durable per-conversation reorder state or
+explicitly make downstream consumers order-insensitive by `conversation_seq`.

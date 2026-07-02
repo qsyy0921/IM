@@ -17,6 +17,7 @@
     "publication.autocreate.mode": "filtered",
     "topic.prefix": "nexusim",
     "table.include.list": "public.conversation_timeline_events",
+    "message.key.columns": "public.conversation_timeline_events:tenant_id,conversation_id",
     "snapshot.mode": "no_data",
     "tombstones.on.delete": "false",
     "include.schema.changes": "false",

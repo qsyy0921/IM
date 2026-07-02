@@ -668,7 +668,17 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
   tests / builds / compose config / diff check 已通过。Docker CDC runtime smoke 已完成：
   connector / task `RUNNING`，PostgreSQL `wal_level=logical`，replication slot active，
   插入 1 条 `conversation_timeline_events` smoke row 后，`conversation.timeline.events.cdc`
-  offset 增至 1，shadow-check `expected_count=1 / observed_count=1`。正式 hotgroup 压测尚未执行。切换 runbook 见
+  offset 增至 1，shadow-check `expected_count=1 / observed_count=1`。随后本地 hotgroup
+  CDC smoke 发现 Debezium source topic 默认 primary-key 分区会导致同 conversation
+  seq 乱序，已通过 `message.key.columns=public.conversation_timeline_events:tenant_id,conversation_id`
+  修正；修正后 `cdc_shadow` run
+  `hotgroup-cdc-shadow-keyed-smoke-20260703-005318` 业务成功且 shadow-check
+  `expected_count=81 / observed_count=81 / out_of_order=empty`。`cdc_only` run
+  `hotgroup-cdc-only-smoke-20260703-005525` 在停掉 `message-service-outbox-relay`、
+  delivery 改读 `conversation.timeline.events.cdc` 后业务成功、CDC consumer lag=0；
+  20 条 SendMessage 未新增 `message.persisted.v1` 的 `message_outbox`，但建群 / 入群仍由
+  conversation-service 写入 61 条 `conversation.member.joined.v1` outbox，后续若要彻底去除
+  timeline table outbox 需主集成协调 conversation-service CDC 切换。正式 send-only 压测尚未执行。切换 runbook 见
   `docs/runbook/loadtest/hotgroup/hotgroup-message-cdc-wal-shadow-plan-20260702.md`。
 - HYBRID 诊断档位 1000 人 / 1000 消息 / 400 msg/s 暴露 `delivery_outbox` ready query
   在百万级 per-user outbox 下退化：旧 anti-join blocker 查询每批 500 行约 24s。当前

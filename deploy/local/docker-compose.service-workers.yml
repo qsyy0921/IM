@@ -45,7 +45,7 @@ services:
       NEXUSIM_DELIVERY_PG_MAX_CONNS: ${NEXUSIM_DELIVERY_TIMELINE_PG_MAX_CONNS:-16}
       NEXUSIM_KAFKA_BROKERS: kafka:29092
       NEXUSIM_TIMELINE_TOPIC: ${NEXUSIM_TIMELINE_TOPIC:-conversation.timeline.events}
-      NEXUSIM_DELIVERY_CONSUMER_GROUP: nexusim-delivery-service-local
+      NEXUSIM_DELIVERY_CONSUMER_GROUP: ${NEXUSIM_DELIVERY_CONSUMER_GROUP:-nexusim-delivery-service-local}
       NEXUSIM_DELIVERY_TIMELINE_CONSUMER_WORKERS: 4
     restart: unless-stopped
     networks:

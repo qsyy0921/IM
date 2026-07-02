@@ -77,6 +77,10 @@ Expected runtime facts:
 - Replication slot `nexusim_message_timeline_slot` exists and is active once
   the connector is running.
 - Connector `nexusim-message-timeline-cdc` is `RUNNING`.
+- The connector must set `message.key.columns` to
+  `public.conversation_timeline_events:tenant_id,conversation_id`. Otherwise
+  Debezium can partition rows for the same conversation by the table primary key
+  and the CDC bridge can publish seq out of order.
 - Target topic `conversation.timeline.events.cdc` has partitions and offsets
   increasing after new timeline rows are committed.
 
@@ -141,13 +145,22 @@ it idle with no new rows. The expected database effect is:
 ```text
 message_log rows increase
 conversation_timeline_events rows increase
-message_outbox rows do not increase for message-service events
+message_outbox rows do not increase for message-service message events
 ```
+
+Conversation-service currently also writes membership boundary events into the
+same `message_outbox` table. A hotgroup setup can therefore still create
+`conversation.member.*` outbox rows even when message-service runs in
+`cdc_only`. Removing those rows requires a coordinated conversation-service
+timeline CDC cutover and is not part of this message-service-only experiment.
 
 ## Risks
 
 - CDC bridge is at-least-once. A publish can succeed and source offset commit can
   fail, so downstream consumers must keep `event_id` idempotency.
+- Source partitioning is part of correctness, not just throughput tuning. The
+  Debezium source topic must use conversation-level keys so every event for the
+  same `(tenant_id, conversation_id)` is emitted in per-conversation order.
 - `snapshot.mode=no_data` exports only new rows after connector registration.
   Historical backfill needs a separate operator plan.
 - A stopped connector can retain WAL through the replication slot. Monitor
@@ -216,6 +229,78 @@ Issues found and fixed during smoke:
 - The shadow checker now reads each Kafka partition only up to its current end
   offset, so empty lower-numbered partitions cannot consume the whole timeout.
 
-Next step: run `cdc_shadow` under the real hotgroup SendMessage load, compare
-CDC topic count/order with `conversation_timeline_events`, then explicitly test
-`cdc_only` with delivery consuming `conversation.timeline.events.cdc`.
+## Local Hotgroup CDC Smoke
+
+After commit `ebdc45be`, the minimal local stack was expanded to
+conversation-service, timeline-service, policy-service, message-service,
+delivery-service, push-gateway, Redis, Kafka, Kafka Connect and the CDC bridge.
+The first `cdc_shadow` hotgroup run exposed a correctness issue:
+
+```text
+run = hotgroup-cdc-shadow-smoke-20260703-005102
+business result = success
+shadow expected_count = 81
+shadow observed_count = 81
+shadow out_of_order = non-empty
+```
+
+Root cause: the Debezium source topic had 3 partitions and used the default
+table key. Rows for one conversation were spread across source partitions, then
+the bridge re-published them into the same target key out of seq order.
+
+Fix: set connector `message.key.columns` to
+`public.conversation_timeline_events:tenant_id,conversation_id` and re-register
+the connector.
+
+Passing `cdc_shadow` run after the key fix:
+
+```text
+run = hotgroup-cdc-shadow-keyed-smoke-20260703-005318
+tenant = tenant-hotgroup-20260703-005319
+conversation = conv-hotgroup-20260703-005319
+business result = success
+fanout_mode = WRITE_FANOUT
+SendMessage = 20/20
+send_p95_ms = 12.38
+send_p99_ms = 16.317
+message_outbox_pending = 0
+delivery_outbox_pending = 0
+delivery_timeline_rows = 20
+shadow expected_count = 81
+shadow observed_count = 81
+missing / unexpected / duplicate / out_of_order = empty
+message-cdc-bridge lag = 0
+```
+
+Passing `cdc_only` run:
+
+```text
+run = hotgroup-cdc-only-smoke-20260703-005525
+tenant = tenant-hotgroup-20260703-005526
+conversation = conv-hotgroup-20260703-005526
+message-service export mode = cdc_only
+delivery timeline topic = conversation.timeline.events.cdc
+delivery consumer group = nexusim-delivery-service-cdc-local
+message-service-outbox-relay = stopped
+business result = success
+fanout_mode = WRITE_FANOUT
+SendMessage = 20/20
+send_p95_ms = 18.001
+send_p99_ms = 40.943
+delivery_outbox_pending = 0
+delivery_timeline_rows = 20
+user_inbox_rows = 1220
+shadow expected_count = 81
+shadow observed_count = 81
+missing / unexpected / duplicate / out_of_order = empty
+delivery CDC consumer lag = 0
+message-cdc-bridge lag = 0
+```
+
+The `cdc_only` run still had 61 `message_outbox` rows, all
+`conversation.member.joined.v1` from conversation-service setup. There were no
+`message.persisted.v1` rows in `message_outbox` for the 20 SendMessage calls.
+
+Next step: run `cdc_shadow` and then `cdc_only` under a send-only hotgroup load
+with an already prepared group, so the measurement isolates per-message
+`message_outbox` write amplification instead of setup-time membership events.

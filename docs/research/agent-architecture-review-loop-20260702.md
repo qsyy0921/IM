@@ -33,6 +33,7 @@ scoped integration design. Agent Lab remains backend-isolated.
 - `docs/research/adr-candidates/`
 - `docs/research/agent-multi-agent-handoff-fixture-evidence-20260702.md`
 - `docs/research/agent-operator-governance-fixture-evidence-20260702.md`
+- `docs/research/agent-operational-readiness-fixture-evidence-20260702.md`
 - `docs/sdd/agent-runtime.md`
 - `docs/sdd/agent-eval-replay-harness.md`
 - `docs/sdd/agent-memory-admission.md`
@@ -50,7 +51,7 @@ scoped integration design. Agent Lab remains backend-isolated.
 | P1 | Cross-service preservation matrix existed but did not define the minimum proof ladder before integration design | Real-service integration could start before refs, versions, taint and audit lineage are proven to survive boundaries | Added fixture-only verification ladder and preservation gate |
 | P1 | Operator governance existed as objects, but acceptance did not require inspect-and-act UX evidence | AgentOps could become a release label without practical control | Added operator acceptance gate for memory, evidence, replay, approval, release, failure, kill switch and rollback |
 | P1 | Production object catalog completeness was prose-only | ADR acceptance could miss an object without owner/lifecycle/version/audit/replay/rejection evidence | Added fixture-only object completeness rehearsal and promotion gate |
-| P2 | Capacity, cost, retention and latency budgets remain conceptual | Does not block research-level ADR review, but will block production readiness | Keep as next hardening item after first ADR review |
+| P2 | Capacity, cost, retention and latency budgets were conceptual | Does not block research-level ADR review, but will block production readiness without real owner approval | Added fixture-only operational readiness budget rehearsal; production SLOs remain blocked |
 
 ## Updated Candidate Acceptance Gates
 
@@ -88,6 +89,7 @@ has all of the following:
 | AgentOps / governance | SDD plus AgentOps candidate and fixture evidence | Conditionally passes; production operator UX remains unimplemented |
 | Production object completeness | Object model plus fixture evidence | Conditionally passes; production field/schema design remains unfrozen |
 | Operator governance surfaces | Operator governance fixture evidence | Conditionally passes; memory, evidence, replay, approval, release, failure-class, kill-switch and rollback inspect-and-act surfaces have low-sensitive evidence |
+| Operational readiness budgets | Operational readiness fixture evidence | Conditionally passes as fixture-only proof; real telemetry, capacity, SLO and on-call contracts remain future owner review |
 | Contract versioning | Production object model plus shared appendix | Conditionally passes; version-bump rehearsal has fixture evidence |
 | Cross-service ref preservation | Shared appendix and fixture evidence | Conditionally passes; real-service preservation smoke is required before production design |
 | Security / privacy / audit | SDD rejection rules plus appendix | Conditionally passes; raw prompt/provider replay remains rejected |
@@ -124,6 +126,7 @@ Next loop should start from the Eval/Replay candidate and verify:
   evidence;
 - object catalog completeness has fixture evidence;
 - operator governance surface completeness has fixture evidence;
+- operational readiness budget coverage has fixture evidence;
 - report retention and redaction policy are acceptable;
 - baseline approval UX has an owner.
 

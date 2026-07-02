@@ -75,6 +75,7 @@ ai/python/nexusim_ai_eval/
   multi_agent_handoff.py
   object_completeness.py
   operator_governance.py
+  operational_readiness.py
   reporting.py
   trace.py
 ai/python/fixtures/agent_eval/adapter_samples/
@@ -100,6 +101,7 @@ ai/python/fixtures/agent_eval/dataset_reproducibility_rehearsal.json
 ai/python/fixtures/agent_eval/multi_agent_handoff_rehearsal.json
 ai/python/fixtures/agent_eval/object_completeness_rehearsal.json
 ai/python/fixtures/agent_eval/operator_governance_rehearsal.json
+ai/python/fixtures/agent_eval/operational_readiness_rehearsal.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_hardening_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_deeper_hardening_scenarios.json
@@ -126,6 +128,7 @@ ai/python/tests/test_agent_memory_calibration.py
 ai/python/tests/test_agent_eval_multi_agent_handoff.py
 ai/python/tests/test_agent_eval_object_completeness.py
 ai/python/tests/test_agent_eval_operator_governance.py
+ai/python/tests/test_agent_eval_operational_readiness.py
 ai/python/tests/test_agent_eval_trace.py
 ```
 
@@ -221,6 +224,10 @@ Slice 0 covers:
   replay, approval, release, failure-class, kill-switch and rollback
   inspect-and-act paths with owner, auth-policy, audit, redaction,
   replay-reader, failure-class, evidence and rejection refs.
+- fixture-only operational readiness budget coverage for runtime steps, model
+  spend, tool timeout, retrieval latency, eval retention, canary telemetry and
+  incident escalation with owner, limit, measurement, operator view, audit,
+  release gate, failure-class and rejection refs.
 - fixture-only state-diff report coverage for approved action outcome refs,
   expected-vs-actual state changes, missing execution refs, incomplete reports
   and unauthorized mutation detection.
@@ -506,6 +513,9 @@ Evaluator tests:
 - operator governance scoring rejects missing surfaces, passive-only operator
   views, body exposure, unauthorized actor access, Python override and release
   gates that allow failed surface evidence.
+- operational readiness scoring rejects missing budget coverage, owner
+  mismatch, missing measurement, over-limit continuation, raw body retention,
+  production SLO authorization and release gates that allow failed evidence.
 - multi-agent handoff governance scoring rejects missing scenarios, scope
   widening, missing primary responsibility, unverified integration, direct tool
   execution, direct memory admission, approval bypass and fixture authorization
@@ -584,6 +594,7 @@ python ai/python/scripts/run_agent_dataset_adapter.py --run ai/python/fixtures/a
 python ai/python/scripts/run_agent_dataset_adapter.py --run ai/python/fixtures/agent_eval/adapter_samples/statebench_like_memory_samples.json
 python ai/python/scripts/run_agent_eval_regression.py ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json
 python -m pytest ai/python/tests/test_agent_eval_multi_agent_handoff.py -q
+python -m pytest ai/python/tests/test_agent_eval_operational_readiness.py -q
 ```
 
 Full Python gate for this workspace:

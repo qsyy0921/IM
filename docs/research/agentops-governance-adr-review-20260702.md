@@ -30,7 +30,7 @@ ownership and no production release pipeline is authorized by this review.
 | P1 | Release pinning and baseline approval UX were underspecified | Releases could drift or silently refresh baselines | Candidate now requires release pin and baseline decision records |
 | P1 | Failure-class owner workflow was a note | Repeated failures could remain unowned and untested | Candidate now requires owner, fixture backfill and retirement rules |
 | P1 | Canary/shadow comparison policy was not explicit | Production-like regressions could be incomparable to offline baseline | Candidate now requires comparable metrics and rollback behavior |
-| P2 | On-call escalation and SLO budgets remain conceptual | Does not block candidate review, but blocks production rollout | Keep for AgentOps hardening |
+| P2 | On-call escalation and SLO budgets were conceptual | Does not block candidate review, but blocks production rollout without owner-approved telemetry and escalation policy | Fixture-only operational readiness rehearsal added; production SLO remains blocked |
 
 ## Re-Review Checklist
 
@@ -53,17 +53,25 @@ ownership and no production release pipeline is authorized by this review.
   operator controls in `ai/python/nexusim_ai_eval/agentops_governance.py`,
   `ai/python/fixtures/agent_eval/agentops_governance_rehearsal.json` and
   `ai/python/tests/test_agent_eval_agentops_governance.py`.
-- Production on-call, SLO and incident escalation remain integration-scope.
+- Fixture code also proves operational budget evidence for runtime steps,
+  model spend, provider timeout, retrieval latency, eval retention, canary
+  telemetry and incident escalation in
+  `ai/python/nexusim_ai_eval/operational_readiness.py`.
+- Production on-call, SLO, real telemetry and incident escalation remain
+  integration-scope.
 
 ## Fixture Evidence Update
 
 Fixture evidence is recorded in
 `docs/research/agentops-governance-fixture-evidence-20260702.md`.
+Operational readiness fixture evidence is recorded in
+`docs/research/agent-operational-readiness-fixture-evidence-20260702.md`.
 
 This update closes the fixture-only proof request for release-blocking behavior
-and baseline approval records. It does not close production governance owner
-acceptance, admin UX, on-call / SLO / incident escalation or production canary
-telemetry.
+and baseline approval records. The operational readiness update closes the
+fixture-only budget proof request. These updates do not close production
+governance owner acceptance, admin UX, on-call / SLO / incident escalation or
+production canary telemetry.
 
 ## Next Review Target
 

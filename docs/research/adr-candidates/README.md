@@ -39,6 +39,7 @@ authorizes the next explicitly scoped integration design.
 - `../agent-architecture-review-loop-20260702.md`
 - `../agent-multi-agent-handoff-fixture-evidence-20260702.md`
 - `../agent-operator-governance-fixture-evidence-20260702.md`
+- `../agent-operational-readiness-fixture-evidence-20260702.md`
 
 ## Candidate Acceptance Gate
 

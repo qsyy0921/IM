@@ -455,6 +455,7 @@ ai/python/nexusim_ai_eval/
   multi_agent_handoff.py
   object_completeness.py
   operator_governance.py
+  operational_readiness.py
   replay_compatibility.py
   reporting.py
   runtime_workflow_ownership.py
@@ -468,6 +469,7 @@ ai/python/fixtures/agent_eval/cross_service_preservation_rehearsal.json
 ai/python/fixtures/agent_eval/dataset_reproducibility_rehearsal.json
 ai/python/fixtures/agent_eval/object_completeness_rehearsal.json
 ai/python/fixtures/agent_eval/operator_governance_rehearsal.json
+ai/python/fixtures/agent_eval/operational_readiness_rehearsal.json
 ai/python/fixtures/agent_eval/tool_mcp_governance_rehearsal.json
 ai/python/fixtures/agent_eval/replay_version_bump_rehearsal.json
 ai/python/fixtures/agent_eval/runtime_workflow_ownership_rehearsal.json
@@ -509,6 +511,7 @@ ai/python/tests/test_agent_eval_memory_admission_governance.py
 ai/python/tests/test_agent_eval_multi_agent_handoff.py
 ai/python/tests/test_agent_eval_object_completeness.py
 ai/python/tests/test_agent_eval_operator_governance.py
+ai/python/tests/test_agent_eval_operational_readiness.py
 ai/python/tests/test_agent_eval_replay_compatibility.py
 ai/python/tests/test_agent_eval_runtime_workflow_ownership.py
 ai/python/tests/test_agent_eval_tool_mcp_governance.py
@@ -635,6 +638,11 @@ Implemented checks:
   approval, release, failure-class, kill-switch and rollback inspect-and-act
   surfaces, including owner, auth-policy, audit, redaction, replay-reader,
   failure-class, evidence and rejection refs.
+- operational readiness budget rehearsal coverage for runtime steps, model
+  spend, MCP/tool timeout, retrieval latency, eval retention, canary telemetry
+  and incident escalation, including owner, limit, measurement, enforcement,
+  operator view, audit, evidence, release gate, failure-class and rejection
+  refs, while blocking fixture claims that production SLOs are authorized.
 - state-diff report fixture coverage for approved action outcome refs,
   expected-vs-actual state changes, missing execution refs, incomplete reports
   and unauthorized mutation detection.
@@ -675,6 +683,7 @@ python -m pytest ai/python/tests/test_agent_eval_dataset_reproducibility.py -q
 python -m pytest ai/python/tests/test_agent_eval_cross_service_preservation.py -q
 python -m pytest ai/python/tests/test_agent_eval_object_completeness.py -q
 python -m pytest ai/python/tests/test_agent_eval_operator_governance.py -q
+python -m pytest ai/python/tests/test_agent_eval_operational_readiness.py -q
 python ai/python/scripts/run_agent_eval_current_report.py ai/python/fixtures/agent_eval/synthetic_core_scenarios.json --report-out .tmp-agent-current-report.json --baseline ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json --review-out .tmp-agent-baseline-review.json --force
 python ai/python/scripts/run_agent_eval_report_matrix.py ai/python/fixtures/agent_eval/report_matrix_sample.json --matrix-out .tmp-agent-eval-matrix/matrix.json --approval-manifest-out .tmp-agent-eval-matrix/approval-manifest.json --force
 python ai/python/scripts/run_agent_memory_calibration.py ai/python/fixtures/agent_eval/memory_calibration_sample.json --report-out .tmp-agent-memory-calibration-report.json --force

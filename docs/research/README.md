@@ -93,6 +93,11 @@
   failure-class、kill-switch、rollback operator surfaces 的 inspect-and-act、
   owner、auth-policy、audit、redaction、replay-reader、failure-class、evidence
   和 rejection 覆盖证据。
+- `agent-operational-readiness-fixture-evidence-20260702.md`：fixture-only
+  evidence 更新，记录 runtime step、model spend、tool timeout、retrieval
+  latency、eval retention、canary telemetry 和 incident escalation budget 的
+  owner、limit、measurement、operator view、audit、release gate 和 rejection
+  覆盖证据；不授权生产 SLO。
 
 ## 存放位置
 

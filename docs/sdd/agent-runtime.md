@@ -281,6 +281,10 @@ Current isolated evidence:
   governance with primary-Agent final responsibility, candidate-only specialist
   output, scoped evidence, budget/deadline refs, taint, audit, replay, verifier
   and rejection refs.
+- `operational_readiness.py` and `operational_readiness_rehearsal.json` prove
+  fixture-only budget evidence for runtime steps, model spend, tool timeout,
+  retrieval latency, eval retention, canary telemetry and incident escalation;
+  production SLO and real capacity limits remain future owner-reviewed work.
 
 ReplayBundle should include:
 

@@ -603,6 +603,12 @@ AgentOps 是 Agent 平台的运维和治理能力，覆盖 tracing、quality、c
 | Eval | dataset score、regression delta、failure class distribution |
 | Release | version adoption、canary failure、rollback |
 
+当前 isolated evidence 已补 operational readiness budget rehearsal，用
+fixture-only refs 验证 runtime step、model spend、tool timeout、retrieval latency、
+eval retention、canary telemetry 和 incident escalation budget 的 owner、limit、
+measurement、operator view、audit、release gate 和 rejection refs。它不代表生产
+SLO、真实容量或 on-call 流程已批准。
+
 Trace 需要分层：
 
 - User-visible status：pending、needs approval、answered、failed、cancelled。
@@ -916,6 +922,13 @@ Coordinator
 | Tool poisoning block rate | malicious fixture 阻断率达到阈值 |
 | Replay completeness | failed run 可重放到 failure class |
 | State-diff correctness | action outcome 与预期状态变化匹配 |
+
+Operational readiness gate 在第一阶段只检查 fixture evidence：每类 budget 必须
+有 owner、limit、measurement、operator view、audit、release gate 和 rejection refs；
+missing measurement、over-limit continuation、raw body retention、Python override、
+unreviewed capacity 或生产 SLO 授权声明都必须阻断 promotion。生产 SLO 数值、真实
+provider capacity、on-call escalation 和 canary telemetry 自动化必须由后续 owner
+review 单独批准。
 
 ## 13. 风险和反对条件
 

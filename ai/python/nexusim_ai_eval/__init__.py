@@ -54,6 +54,10 @@ from nexusim_ai_eval.operator_governance import (
     load_operator_governance_rehearsal,
     rehearse_operator_governance,
 )
+from nexusim_ai_eval.operational_readiness import (
+    load_operational_readiness_rehearsal,
+    rehearse_operational_readiness,
+)
 from nexusim_ai_eval.replay_compatibility import (
     load_replay_version_bump_rehearsal,
     rehearse_replay_version_bump,
@@ -113,6 +117,7 @@ __all__ = [
     "load_multi_agent_handoff_rehearsal",
     "load_object_completeness_rehearsal",
     "load_operator_governance_rehearsal",
+    "load_operational_readiness_rehearsal",
     "load_replay_version_bump_rehearsal",
     "load_runtime_workflow_ownership_rehearsal",
     "load_tool_mcp_governance_rehearsal",
@@ -125,6 +130,7 @@ __all__ = [
     "rehearse_multi_agent_handoff",
     "rehearse_object_completeness",
     "rehearse_operator_governance",
+    "rehearse_operational_readiness",
     "rehearse_replay_version_bump",
     "rehearse_runtime_workflow_ownership",
     "rehearse_tool_mcp_governance",

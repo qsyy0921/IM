@@ -31,7 +31,7 @@ contract is authorized.
 | P1 | Provider attestation governance was underspecified | Trusted-provider path could be granted without provenance | Candidate now requires attestation state and sandbox default |
 | P1 | Prepare expiry was not tied to state diff | Execution could use stale precheck results | Candidate now requires re-prepare when schema, state or approval window changes |
 | P1 | Unknown provider onboarding was future evidence | New MCP providers could bypass quarantine | Candidate now requires sandbox-only onboarding until reviewed |
-| P2 | Provider capacity and timeout budgets remain conceptual | Does not block candidate review, but blocks production rollout | Keep for eval/ops hardening |
+| P2 | Provider capacity and timeout budgets were conceptual | Does not block candidate review, but blocks production rollout without real provider owner review | Fixture-only operational readiness rehearsal now covers tool-timeout evidence; production capacity remains blocked |
 
 ## Re-Review Checklist
 
@@ -54,7 +54,8 @@ contract is authorized.
   rejection in `ai/python/nexusim_ai_eval/tool_mcp_governance.py`,
   `ai/python/fixtures/agent_eval/tool_mcp_governance_rehearsal.json` and
   `ai/python/tests/test_agent_eval_tool_mcp_governance.py`.
-- Production provider review process remains governance-scope.
+- Production provider review process and real provider capacity planning remain
+  governance-scope.
 
 ## Fixture Evidence Update
 
@@ -64,7 +65,9 @@ Fixture evidence is recorded in
 This update closes the fixture-only proof request for lease denial,
 attestation downgrade and prepare-expiry re-prepare. It does not close
 production ownership acceptance, provider governance, action-executor production
-contract review or provider capacity / timeout budgets.
+contract review or real provider capacity / timeout budgets. Fixture-only
+timeout budget evidence is separately recorded in
+`docs/research/agent-operational-readiness-fixture-evidence-20260702.md`.
 
 ## Next Review Target
 

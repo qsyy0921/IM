@@ -317,13 +317,21 @@ Implemented fixture coverage:
 - operator surface gaps block promotion when a view is passive-only,
   unaudited, body-exposing, accessible to an unauthorized actor or overridable
   by Python worker output.
+- operational readiness budget coverage requires owner, limit, measurement,
+  enforcement, operator view, audit, evidence, release gate, failure class and
+  rejection refs for runtime steps, model spend, MCP/tool timeout, retrieval
+  latency, eval retention, canary telemetry and incident escalation;
+- budget gaps block promotion when measurement is missing, a limit is exceeded
+  and execution continues, raw bodies are retained, Python can override the
+  decision, unreviewed capacity is allowed, or fixture evidence claims to
+  authorize production SLOs.
 
 Remaining hardening:
 
 - main integration acceptance for governance / control-plane ownership;
 - admin UX owner review for production release pinning and baseline approval;
-- production on-call, SLO and incident escalation design;
-- production canary telemetry and rollback automation.
+- production on-call, SLO, real telemetry and incident escalation design;
+- production capacity, canary telemetry and rollback automation.
 
 ## 18. References
 

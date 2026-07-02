@@ -61,7 +61,7 @@ It does not close:
 - control-plane / AgentOps owner review for production cancel / resume / replay
   UX;
 - policy owner review for production BudgetLedger limits;
-- capacity and queue evidence required before service promotion.
+- real capacity and queue evidence required before service promotion.
 
 ## Next Evidence Target
 
@@ -73,5 +73,7 @@ AgentOps fixture evidence is now recorded in
 
 Dataset reproducibility evidence is recorded in
 `docs/research/agent-dataset-reproducibility-fixture-evidence-20260702.md`.
+Operational readiness budget evidence is recorded in
+`docs/research/agent-operational-readiness-fixture-evidence-20260702.md`.
 Next work should focus on main integration review or focused contract/version
 hardening.

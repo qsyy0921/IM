@@ -73,4 +73,4 @@ runbook / SDD / research 文档维护。
 1. 六个 ADR candidates 已完成首轮 focused review；未接受前不提升生产契约。
 2. Eval / Replay、Runtime / Workflow、Context / Evidence、Memory、Tool、AgentOps
    fixture evidence 已落地；未接受前不提升生产契约。
-3. 若继续编码，优先 memory calibration / dataset reproducibility hardening。
+3. 若继续编码，优先主集成 review 指出的 P0/P1 或 focused contract/version hardening。

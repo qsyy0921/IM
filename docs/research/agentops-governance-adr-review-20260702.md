@@ -68,5 +68,7 @@ telemetry.
 ## Next Review Target
 
 All six ADR candidates now have first-pass focused review ledgers and
-fixture-only evidence slices. The next loop should wait for main integration
-review or harden memory calibration / dataset reproducibility.
+fixture-only evidence slices. Dataset reproducibility evidence is recorded in
+`docs/research/agent-dataset-reproducibility-fixture-evidence-20260702.md`;
+the next loop should wait for main integration review or focused
+contract/version hardening.

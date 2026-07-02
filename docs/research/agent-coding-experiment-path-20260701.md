@@ -65,6 +65,7 @@ ai/python/nexusim_ai_eval/
   __init__.py
   adapter_runner.py
   adapters.py
+  dataset_reproducibility.py
   comparison.py
   contracts.py
   evaluator.py
@@ -90,6 +91,7 @@ ai/python/fixtures/agent_eval/synthetic_memory_admission_hardening_scenarios.jso
 ai/python/fixtures/agent_eval/synthetic_memory_admission_deeper_hardening_scenarios.json
 ai/python/fixtures/agent_eval/memory_calibration_sample.json
 ai/python/fixtures/agent_eval/memory_calibration_public_export.json
+ai/python/fixtures/agent_eval/dataset_reproducibility_rehearsal.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_hardening_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_deeper_hardening_scenarios.json
@@ -190,6 +192,10 @@ Slice 0 covers:
 - fixture-only public-export memory calibration coverage for dataset-source
   refs, per-dataset case counts, 15 memory gate cases, 8 policy-window cases
   and 12 review-backoff cases.
+- fixture-only dataset reproducibility coverage for dataset manifest refs,
+  license refs, snapshot hashes, split manifests, import hashes, adapter
+  versions, deterministic report hashes and promotion blocking for changed or
+  non-reproducible dataset evidence.
 - fixture-only state-diff report coverage for approved action outcome refs,
   expected-vs-actual state changes, missing execution refs, incomplete reports
   and unauthorized mutation detection.
@@ -463,6 +469,9 @@ Evaluator tests:
   revocation window refs.
 - memory calibration scoring rejects confidence threshold, revocation-window
   and review backoff candidates that do not meet acceptance.
+- dataset reproducibility scoring rejects production-data manifests, missing
+  split manifests, backend-connected runs, non-deterministic reports, mismatched
+  calibration export counts and changed snapshots allowed through promotion.
 - AgentRun trace includes context, memory, tool, workflow, runtime-control and
   failure steps.
 - runtime-control deeper hardening scoring rejects stale checkpoint versions,

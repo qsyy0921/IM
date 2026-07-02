@@ -17,6 +17,10 @@ from nexusim_ai_eval.context_evidence_preservation import (
     load_context_evidence_preservation_rehearsal,
     rehearse_context_evidence_preservation,
 )
+from nexusim_ai_eval.dataset_reproducibility import (
+    load_dataset_reproducibility_rehearsal,
+    rehearse_dataset_reproducibility,
+)
 from nexusim_ai_eval.contracts import (
     EvalCase,
     EvalRun,
@@ -85,6 +89,7 @@ __all__ = [
     "generate_current_report_payload",
     "load_agentops_governance_rehearsal",
     "load_context_evidence_preservation_rehearsal",
+    "load_dataset_reproducibility_rehearsal",
     "load_report_matrix_plan",
     "load_memory_calibration_payload",
     "load_memory_admission_governance_rehearsal",
@@ -94,6 +99,7 @@ __all__ = [
     "run_eval_suite",
     "rehearse_agentops_governance",
     "rehearse_context_evidence_preservation",
+    "rehearse_dataset_reproducibility",
     "rehearse_memory_admission_governance",
     "rehearse_replay_version_bump",
     "rehearse_runtime_workflow_ownership",

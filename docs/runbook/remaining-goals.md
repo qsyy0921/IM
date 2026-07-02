@@ -29,13 +29,14 @@
    Tool / AgentOps focused reviews 也已补齐。下一步优先主集成 review 或
    fixture-only evidence，未接受前不提升生产契约。
 3. Fixture-only evidence hardening：Eval / Replay、Runtime / Workflow、Context /
-   Evidence、Memory、Tool、AgentOps rehearsal 已落地；下一步优先主集成 review
-   或 memory calibration / dataset reproducibility hardening。
+   Evidence、Memory、Tool、AgentOps 和 dataset reproducibility rehearsal 已落地；
+   下一步优先主集成 review 或 focused contract/version hardening。
 4. ReplayBundle observability hardening review：当前 skeleton 已覆盖低敏
    observability refs、hash refs、version metadata refs、failure taxonomy refs 和
    trace linkage refs；如评审要求继续，只增加 fixture-only taxonomy / trace 证据。
-5. Memory calibration hardening：当前已补 public-dataset-style export；如需继续，
-   只追加公开数据集导出或低敏 adapter metadata，不接真实 IM 数据。
+5. Memory calibration hardening：当前已补 public-dataset-style export 和
+   reproducibility rehearsal；如需继续，只追加低敏 adapter metadata 或 review
+   要求的 reproducibility case，不接真实 IM 数据。
 
 ## Dataset Backlog
 

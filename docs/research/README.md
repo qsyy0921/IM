@@ -73,6 +73,9 @@
   更新，记录 AgentOps governance rehearsal 的 release blocking、baseline
   approval、kill-switch propagation、failure owner、canary / shadow comparability
   和 operator controls 证据。
+- `agent-dataset-reproducibility-fixture-evidence-20260702.md`：fixture-only
+  evidence 更新，记录 open dataset / synthetic fixture manifest、snapshot、
+  split、import、adapter version 和 deterministic report 证据。
 
 ## 存放位置
 

@@ -70,5 +70,7 @@ Tool / MCP fixture evidence is now recorded in
 AgentOps fixture evidence is now recorded in
 `docs/research/agentops-governance-fixture-evidence-20260702.md`.
 
-Next work should focus on main integration review or memory calibration /
-dataset reproducibility hardening.
+Dataset reproducibility evidence is recorded in
+`docs/research/agent-dataset-reproducibility-fixture-evidence-20260702.md`.
+Next work should focus on main integration review or focused contract/version
+hardening.

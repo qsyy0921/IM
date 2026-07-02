@@ -26,6 +26,9 @@ EvidencePack shape, memory event shape, tool shape or runtime shape.
 5. Eval output cannot become production fallback.
 6. Real NexusIM IM messages, private users and tenant data are out of scope for
    this first stage.
+7. Dataset evidence must be reproducible from low-sensitive manifest refs:
+   license, snapshot hash, split manifest, import hash, adapter version and
+   deterministic report hash.
 
 ## 3. First Dataset Families
 
@@ -104,6 +107,10 @@ EvalRun
   run_id
   suite_id
   case_ids
+  dataset_manifest_ref
+  dataset_snapshot_hash_ref
+  split_manifest_ref
+  import_hash_ref
   model_provider_ref
   model_version
   adapter_version
@@ -236,6 +243,8 @@ Recommended sequence:
 4. Add state-diff checks for every approval/action scenario.
 5. Add ReplayBundle checks before treating failures as debuggable.
 6. Link EvalReport results to AgentDefinition / SkillPackage release gates.
+7. Require dataset manifest and deterministic report evidence before treating a
+   public-dataset or synthetic fixture result as promotion evidence.
 
 No production service should consume eval fixtures as fallback data.
 
@@ -249,6 +258,7 @@ Reject the next implementation step if:
 - it only checks tool-call trace and not final state diff;
 - it stores raw prompt, provider body, secret or private payload as replay source;
 - it uses model output as ground truth for eval.
+- it cannot reproduce reports from manifest / snapshot / split / import refs.
 
 ## 12. References
 

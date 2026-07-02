@@ -55,6 +55,7 @@ Eval Harness / synthetic IM-like fixture 已开始隔离式编码。
 | `docs/research/agent-fixture-evidence-hardening-20260702.md` | 已完成首段 | Eval / Replay version-bump rehearsal 已用 fixture-only code / JSON / tests 落地；仍不提升生产契约 |
 | `docs/research/agent-tool-mcp-fixture-evidence-20260702.md` | 已完成 Tool 段 | Tool / MCP governance rehearsal 已用 fixture-only code / JSON / tests 落地；仍不提升生产契约 |
 | `docs/research/agentops-governance-fixture-evidence-20260702.md` | 已完成 AgentOps 段 | AgentOps governance rehearsal 已用 fixture-only code / JSON / tests 落地；仍不提升生产契约 |
+| `docs/research/agent-dataset-reproducibility-fixture-evidence-20260702.md` | 已完成 Dataset 段 | Dataset reproducibility rehearsal 已用 fixture-only code / JSON / tests 落地；仍不提升生产契约 |
 | `docs/sdd/agent-runtime.md` | 已完成 | Runtime / Harness 详细 SDD |
 | `docs/sdd/agent-memory-admission.md` | 已完成 | Memory admission 详细 SDD |
 | `docs/sdd/agent-context-evidencepack.md` | 已完成 | Context / EvidencePack 详细 SDD |
@@ -228,6 +229,9 @@ ai/python/tests/test_agent_eval_*.py
 - AgentOps governance rehearsal：已补 release blocking、baseline approval、
   kill-switch propagation、failure-class owner workflow、canary / shadow
   comparability 和 operator controls。
+- Dataset reproducibility rehearsal：已补 dataset manifest、license ref、
+  snapshot hash、split manifest、import hash、adapter version、deterministic
+  report hash 和 promotion blocking 证据。
 - Skeleton completion audit：已把 immutable goal 的 17 个骨架要求映射到当前
   代码、fixture、CLI、tests 和 runbook evidence；结论是 Phase 1 isolated
   Agent-layer skeleton 可作为当前可执行基线，但不能直接推广生产契约。
@@ -259,8 +263,8 @@ ai/python/tests/test_agent_eval_*.py
 - SDD index / research index / architecture index link check
 - 不触碰 proto、schema、migration、production service directory
 
-后续等待主集成 / 用户确认是否进入 ADR candidate drafting；memory calibration /
-dataset reproducibility 只在评审要求时继续 fixture-only hardening。
+后续等待主集成 / 用户确认是否进入 ADR candidate drafting；只在评审要求时继续
+fixture-only contract/version hardening。
 
 ## 历史资料路由
 

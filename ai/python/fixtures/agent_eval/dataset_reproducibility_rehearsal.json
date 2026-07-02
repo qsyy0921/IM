@@ -1,0 +1,167 @@
+{
+  "schema_version": 1,
+  "rehearsal_kind": "agent_dataset_reproducibility_rehearsal",
+  "rehearsal_id": "dataset-reproducibility-rehearsal-v1",
+  "dataset_manifest_records": [
+    {
+      "manifest_ref": "dataset-manifest:statebench-public:v1",
+      "dataset_ref": "dataset:statebench-public-export-calibration",
+      "dataset_version_ref": "dataset-version:statebench:2026-07-public-style-v1",
+      "license_ref": "license-ref:statebench-public-research",
+      "snapshot_hash_ref": "snapshot-hash:statebench:20260702:v1",
+      "split_manifest_ref": "split-manifest:statebench:memory-gate-policy-window-review",
+      "import_hash_ref": "import-hash:statebench:adapter-export:v1",
+      "adapter_version_ref": "adapter-version:statebench-like-memory:v1",
+      "case_count": 10,
+      "public_or_synthetic_only": true,
+      "production_data_used": false,
+      "ground_truth_separated": true,
+      "low_sensitive_export": true
+    },
+    {
+      "manifest_ref": "dataset-manifest:groupmembench-public:v1",
+      "dataset_ref": "dataset:groupmembench-public-export-calibration",
+      "dataset_version_ref": "dataset-version:groupmembench:2026-07-public-style-v1",
+      "license_ref": "license-ref:groupmembench-public-research",
+      "snapshot_hash_ref": "snapshot-hash:groupmembench:20260702:v1",
+      "split_manifest_ref": "split-manifest:groupmembench:memory-gate-policy-window-review",
+      "import_hash_ref": "import-hash:groupmembench:adapter-export:v1",
+      "adapter_version_ref": "adapter-version:groupmembench-like-memory:v1",
+      "case_count": 7,
+      "public_or_synthetic_only": true,
+      "production_data_used": false,
+      "ground_truth_separated": true,
+      "low_sensitive_export": true
+    },
+    {
+      "manifest_ref": "dataset-manifest:synthetic-agent-core:v1",
+      "dataset_ref": "dataset:synthetic-agent-core",
+      "dataset_version_ref": "dataset-version:synthetic-core:2026-07-v1",
+      "license_ref": "license-ref:internal-synthetic-fixture",
+      "snapshot_hash_ref": "snapshot-hash:synthetic-core:20260702:v1",
+      "split_manifest_ref": "split-manifest:synthetic-core:core-runtime-tool-memory",
+      "import_hash_ref": "import-hash:synthetic-core:fixture-loader:v1",
+      "adapter_version_ref": "adapter-version:synthetic-im-like:v1",
+      "case_count": 12,
+      "public_or_synthetic_only": true,
+      "production_data_used": false,
+      "ground_truth_separated": true,
+      "low_sensitive_export": true
+    }
+  ],
+  "run_reproducibility_records": [
+    {
+      "run_ref": "dataset-run:memory-calibration:v1",
+      "manifest_ref": "dataset-manifest:statebench-public:v1",
+      "adapter_version_ref": "adapter-version:statebench-like-memory:v1",
+      "harness_version_ref": "harness-version:agent-eval-harness-v1",
+      "determinism_ref": "determinism:sort-json-and-stable-case-order:v1",
+      "report_hash_ref": "report-hash:memory-calibration-public-export:v1",
+      "repeated_report_hash_ref": "report-hash:memory-calibration-public-export:v1",
+      "retention_policy_ref": "retention:agent-memory-calibration-report:research-v1",
+      "audit_ref": "audit:dataset-run:memory-calibration:v1",
+      "backend_connected": false,
+      "model_provider_called": false,
+      "raw_payload_retained": false
+    },
+    {
+      "run_ref": "dataset-run:synthetic-core-report:v1",
+      "manifest_ref": "dataset-manifest:synthetic-agent-core:v1",
+      "adapter_version_ref": "adapter-version:synthetic-im-like:v1",
+      "harness_version_ref": "harness-version:agent-eval-harness-v1",
+      "determinism_ref": "determinism:fixture-hash-and-stable-case-order:v1",
+      "report_hash_ref": "report-hash:synthetic-core-current-report:v1",
+      "repeated_report_hash_ref": "report-hash:synthetic-core-current-report:v1",
+      "retention_policy_ref": "retention:agent-eval-report:research-v1",
+      "audit_ref": "audit:dataset-run:synthetic-core-report:v1",
+      "backend_connected": false,
+      "model_provider_called": false,
+      "raw_payload_retained": false
+    }
+  ],
+  "calibration_export_records": [
+    {
+      "export_ref": "calibration-export:memory-public:v1",
+      "dataset_source_refs": [
+        "dataset-export:statebench:public-memory-calibration:v1",
+        "dataset-export:locomo:public-memory-calibration:v1",
+        "dataset-export:longmemeval:public-memory-calibration:v1",
+        "dataset-export:evermembench:public-memory-calibration:v1",
+        "dataset-export:groupmembench:public-memory-calibration:v1"
+      ],
+      "dataset_case_counts": [
+        {
+          "dataset_source_ref": "dataset-export:statebench:public-memory-calibration:v1",
+          "case_count": 10
+        },
+        {
+          "dataset_source_ref": "dataset-export:locomo:public-memory-calibration:v1",
+          "case_count": 4
+        },
+        {
+          "dataset_source_ref": "dataset-export:longmemeval:public-memory-calibration:v1",
+          "case_count": 5
+        },
+        {
+          "dataset_source_ref": "dataset-export:evermembench:public-memory-calibration:v1",
+          "case_count": 6
+        },
+        {
+          "dataset_source_ref": "dataset-export:groupmembench:public-memory-calibration:v1",
+          "case_count": 10
+        }
+      ],
+      "input_payload_hash_ref": "input-payload-hash:memory-calibration-public-export:v1",
+      "report_hash_ref": "report-hash:memory-calibration-public-export:v1",
+      "repeated_report_hash_ref": "report-hash:memory-calibration-public-export:v1",
+      "recommended_confidence_threshold_ref": "confidence-threshold:memory-admission:v2:0.60",
+      "recommended_policy_window_ref": "revocation-window:policy-source:research-v2:close-after-24h",
+      "recommended_review_backoff_ref": "review-backoff:memory-admission:research-v2:initial-10m",
+      "production_data_used": false
+    }
+  ],
+  "promotion_gate_records": [
+    {
+      "gate_ref": "dataset-gate:memory-calibration-public-export",
+      "expected_gate_decision": "ALLOW",
+      "actual_gate_decision": "ALLOW",
+      "manifest_ref": "dataset-manifest:statebench-public:v1",
+      "eval_report_ref": "eval-report:memory-calibration-public-export:v1",
+      "baseline_review_ref": "baseline-review:memory-calibration-public-export:v1",
+      "audit_ref": "audit:dataset-gate:memory-calibration-public-export",
+      "manifest_missing": false,
+      "snapshot_changed": false,
+      "import_hash_mismatch": false,
+      "non_deterministic_report": false,
+      "release_allowed": true
+    },
+    {
+      "gate_ref": "dataset-gate:snapshot-changed",
+      "expected_gate_decision": "BLOCK",
+      "actual_gate_decision": "BLOCK",
+      "manifest_ref": "dataset-manifest:statebench-public:v1",
+      "eval_report_ref": "eval-report:memory-calibration-public-export:snapshot-changed",
+      "baseline_review_ref": "baseline-review:memory-calibration-public-export:snapshot-changed",
+      "audit_ref": "audit:dataset-gate:snapshot-changed",
+      "manifest_missing": false,
+      "snapshot_changed": true,
+      "import_hash_mismatch": false,
+      "non_deterministic_report": false,
+      "release_allowed": false
+    },
+    {
+      "gate_ref": "dataset-gate:non-deterministic-report",
+      "expected_gate_decision": "BLOCK",
+      "actual_gate_decision": "BLOCK",
+      "manifest_ref": "dataset-manifest:synthetic-agent-core:v1",
+      "eval_report_ref": "eval-report:synthetic-core:non-deterministic",
+      "baseline_review_ref": "baseline-review:synthetic-core:non-deterministic",
+      "audit_ref": "audit:dataset-gate:non-deterministic-report",
+      "manifest_missing": false,
+      "snapshot_changed": false,
+      "import_hash_mismatch": false,
+      "non_deterministic_report": true,
+      "release_allowed": false
+    }
+  ]
+}

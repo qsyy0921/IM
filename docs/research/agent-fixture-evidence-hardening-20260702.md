@@ -65,5 +65,7 @@ Tool / MCP evidence is recorded in
 `docs/research/agent-tool-mcp-fixture-evidence-20260702.md`.
 AgentOps evidence is recorded in
 `docs/research/agentops-governance-fixture-evidence-20260702.md`.
-All six focused ADR areas now have fixture-only evidence; next work is main
-integration review or memory calibration / dataset reproducibility hardening.
+All six focused ADR areas now have fixture-only evidence; dataset
+reproducibility evidence is recorded in
+`docs/research/agent-dataset-reproducibility-fixture-evidence-20260702.md`.
+Next work is main integration review or focused contract/version hardening.

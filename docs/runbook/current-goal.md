@@ -658,6 +658,16 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
   repository append / message PG pool / outbox insert-index-WAL 路径；`kafka_async` 仅是
   压测隔离 profile，非 crash-durable 生产 audit 方案。报告见
   `docs/runbook/loadtest/hotgroup/hotgroup-analysis-20260702-kafka-async-audit-experiment.md`。
+- 2026-07-02 Backend Lab 已完成 message timeline DB-first CDC/WAL shadow implementation：
+  message-service 新增 `NEXUSIM_MESSAGE_EVENT_EXPORT_MODE=table_outbox|cdc_shadow|cdc_only`；
+  `cdc_shadow` 保留 `message_outbox` 主路径并通过 Debezium / Kafka Connect 读取
+  `conversation_timeline_events` WAL，`message-service cdc-bridge` 将 Debezium JSON 转为既有
+  `ConversationTimelineEvent` protobuf 后发布到 `conversation.timeline.events.cdc`；
+  `cdc_only` 显式跳过 `message_outbox` 写入，不做隐藏 fallback。已补本地 `cdc` compose profile、
+  connector 注册 / runtime health 脚本和 `tools/message-cdc-shadow-check` 对账工具。focused
+  tests / builds / compose config / diff check 已通过；Docker CDC runtime 注册、shadow 对账和
+  hotgroup 压测尚未执行。切换 runbook 见
+  `docs/runbook/loadtest/hotgroup/hotgroup-message-cdc-wal-shadow-plan-20260702.md`。
 - HYBRID 诊断档位 1000 人 / 1000 消息 / 400 msg/s 暴露 `delivery_outbox` ready query
   在百万级 per-user outbox 下退化：旧 anti-join blocker 查询每批 500 行约 24s。当前
   delivery outbox relay 已改成 per-conversation frontier ready query，并把本地 worker

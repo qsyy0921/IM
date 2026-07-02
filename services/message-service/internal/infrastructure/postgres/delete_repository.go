@@ -117,8 +117,10 @@ func (r *MessageRepository) DeleteMessage(
 	if err := insertDeleteMessageTimelineEvent(ctx, tx, input, record); err != nil {
 		return domain.MessageChangeResult{}, err
 	}
-	if err := insertMessageChangeOutboxEvent(ctx, tx, record); err != nil {
-		return domain.MessageChangeResult{}, err
+	if r.shouldWriteOutbox() {
+		if err := insertMessageChangeOutboxEvent(ctx, tx, record); err != nil {
+			return domain.MessageChangeResult{}, err
+		}
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return domain.MessageChangeResult{}, types.NewDBWriteFailed(err.Error())
@@ -442,9 +444,13 @@ INSERT INTO conversation_timeline_events (
     classification,
     mapping_version,
     trace_id,
+    partition_key,
+    correlation_id,
+    causation_id,
+    producer,
     payload_json,
     created_at
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15::jsonb, $16)
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19::jsonb, $20)
 `,
 		record.Timeline.TenantID,
 		record.Timeline.ConversationID,
@@ -460,6 +466,10 @@ INSERT INTO conversation_timeline_events (
 		record.Timeline.Classification,
 		record.Timeline.MappingVersion,
 		record.Timeline.TraceID,
+		record.Outbox.PartitionKey,
+		record.Outbox.CorrelationID,
+		record.Outbox.CausationID,
+		record.Outbox.Producer,
 		record.Timeline.PayloadJSON,
 		record.Timeline.CreatedAt,
 	)

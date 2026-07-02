@@ -49,6 +49,7 @@ Profiles are additive. Do not start every middleware component by default.
 | `workflow-agent` | workflow-service / agent-service / skill-registry / MCP gateway / action-executor. |
 | `security` | OIDC provider, Vault/KMS emulator, OpenFGA/OPA adapters. |
 | `data-platform` | CDC / ingestion / lakehouse / OLAP / analytics services. |
+| `cdc` | Kafka Connect / Debezium local CDC runtime for service-owned PostgreSQL WAL export experiments. |
 | `ai-runtime` | local model runtime or provider proxy used by model-gateway. |
 
 ## Adoption Checklist
@@ -99,6 +100,10 @@ Replacement / migration notes:
   a hard timeout and images are not pulled unless `-AllowPull` is passed.
 - Add search / vector / object storage / workflow / security middleware only
   when its service slice becomes active.
+- The local `cdc` profile currently exists for message timeline CDC shadow
+  validation: PostgreSQL logical WAL + Kafka Connect / Debezium reads
+  `conversation_timeline_events`, and `message-service cdc-bridge` publishes the
+  comparable Kafka topic. It is opt-in and is not part of the default core path.
 - Treat data-platform middleware as analytical infrastructure. It cannot become
   a hidden command path for business facts.
 - Treat AI runtime middleware as provider infrastructure behind model-gateway.

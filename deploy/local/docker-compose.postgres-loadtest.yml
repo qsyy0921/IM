@@ -7,6 +7,12 @@ services:
       - -c
       - max_connections=${NEXUSIM_POSTGRES_MAX_CONNECTIONS:-600}
       - -c
+      - wal_level=logical
+      - -c
+      - max_replication_slots=${NEXUSIM_POSTGRES_MAX_REPLICATION_SLOTS:-8}
+      - -c
+      - max_wal_senders=${NEXUSIM_POSTGRES_MAX_WAL_SENDERS:-8}
+      - -c
       - shared_buffers=1GB
       - -c
       - effective_cache_size=8GB

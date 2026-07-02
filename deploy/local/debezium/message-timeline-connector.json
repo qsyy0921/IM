@@ -1,0 +1,24 @@
+{
+  "name": "nexusim-message-timeline-cdc",
+  "config": {
+    "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+    "database.hostname": "postgres",
+    "database.port": "5432",
+    "database.user": "nexusim",
+    "database.password": "nexusim",
+    "database.dbname": "nexusim",
+    "plugin.name": "pgoutput",
+    "slot.name": "nexusim_message_timeline_slot",
+    "publication.name": "nexusim_message_timeline_pub",
+    "publication.autocreate.mode": "filtered",
+    "topic.prefix": "nexusim",
+    "table.include.list": "public.conversation_timeline_events",
+    "snapshot.mode": "no_data",
+    "tombstones.on.delete": "false",
+    "include.schema.changes": "false",
+    "skipped.operations": "u,d,t",
+    "topic.creation.enable": "true",
+    "topic.creation.default.replication.factor": "1",
+    "topic.creation.default.partitions": "3"
+  }
+}

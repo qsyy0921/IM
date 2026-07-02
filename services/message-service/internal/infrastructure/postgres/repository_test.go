@@ -69,6 +69,37 @@ func TestMessageRepositoryAppendMessageIntegration(t *testing.T) {
 	assertPersistedFacts(t, ctx, pool, input, result)
 }
 
+func TestMessageRepositoryEventExportModesIntegration(t *testing.T) {
+	ctx := context.Background()
+	pool := openIntegrationPool(t, ctx)
+	defer pool.Close()
+	applyMessageMigration(t, ctx, pool)
+
+	runID := time.Now().UnixNano()
+	tests := []struct {
+		name       string
+		mode       MessageEventExportMode
+		wantOutbox int64
+	}{
+		{name: "table_outbox", mode: MessageEventExportModeTableOutbox, wantOutbox: 1},
+		{name: "cdc_shadow", mode: MessageEventExportModeCDCShadow, wantOutbox: 1},
+		{name: "cdc_only", mode: MessageEventExportModeCDCOnly, wantOutbox: 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tenantID := types.TenantID(fmt.Sprintf("tenant-event-export-%s-%d", tt.name, runID))
+			repo := NewMessageRepository(pool, WithMessageEventExportMode(tt.mode))
+			input := testAppendInput(tenantID, types.ClientMsgID("client-"+tt.name), []byte(`{"text":"hello"}`))
+			if _, err := repo.AppendMessage(ctx, input); err != nil {
+				t.Fatalf("append message: %v", err)
+			}
+			assertCount(t, ctx, pool, "message_log", tenantID, 1)
+			assertCount(t, ctx, pool, "conversation_timeline_events", tenantID, 1)
+			assertCount(t, ctx, pool, "message_outbox", tenantID, tt.wantOutbox)
+		})
+	}
+}
+
 func TestMessageRepositoryAppendAttachmentMessageIntegration(t *testing.T) {
 	ctx := context.Background()
 	pool := openIntegrationPool(t, ctx)

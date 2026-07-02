@@ -14,17 +14,39 @@ import (
 )
 
 type MessageRepository struct {
-	pool      *pgxpool.Pool
-	now       func() time.Time
-	messageID func() (types.MessageID, error)
-	eventID   func() (types.EventID, error)
-	metrics   types.LatencyRecorder
+	pool            *pgxpool.Pool
+	now             func() time.Time
+	messageID       func() (types.MessageID, error)
+	eventID         func() (types.EventID, error)
+	metrics         types.LatencyRecorder
+	eventExportMode MessageEventExportMode
 
 	backpressureEnabled           bool
 	backpressureMinAvailableConns int32
 }
 
 type MessageRepositoryOption func(*MessageRepository)
+
+type MessageEventExportMode string
+
+const (
+	MessageEventExportModeTableOutbox MessageEventExportMode = "table_outbox"
+	MessageEventExportModeCDCShadow   MessageEventExportMode = "cdc_shadow"
+	MessageEventExportModeCDCOnly     MessageEventExportMode = "cdc_only"
+)
+
+func ParseMessageEventExportMode(value string) (MessageEventExportMode, error) {
+	switch MessageEventExportMode(value) {
+	case "", MessageEventExportModeTableOutbox:
+		return MessageEventExportModeTableOutbox, nil
+	case MessageEventExportModeCDCShadow:
+		return MessageEventExportModeCDCShadow, nil
+	case MessageEventExportModeCDCOnly:
+		return MessageEventExportModeCDCOnly, nil
+	default:
+		return "", types.NewInvalidArgument("unsupported message event export mode")
+	}
+}
 
 type BackpressureConfig struct {
 	Enabled           bool
@@ -49,7 +71,8 @@ func NewMessageRepository(pool *pgxpool.Pool, opts ...MessageRepositoryOption) *
 			}
 			return types.EventID(id), nil
 		},
-		metrics: types.NoopLatencyRecorder{},
+		metrics:         types.NoopLatencyRecorder{},
+		eventExportMode: MessageEventExportModeTableOutbox,
 	}
 	for _, opt := range opts {
 		opt(repo)
@@ -70,6 +93,14 @@ func WithBackpressure(config BackpressureConfig) MessageRepositoryOption {
 		repo.backpressureEnabled = config.Enabled
 		if config.MinAvailableConns > 0 {
 			repo.backpressureMinAvailableConns = config.MinAvailableConns
+		}
+	}
+}
+
+func WithMessageEventExportMode(mode MessageEventExportMode) MessageRepositoryOption {
+	return func(repo *MessageRepository) {
+		if mode != "" {
+			repo.eventExportMode = mode
 		}
 	}
 }
@@ -171,8 +202,10 @@ func (r *MessageRepository) AppendMessage(ctx context.Context, input domain.Appe
 	if err := r.insertTimelineEvent(ctx, tx, input, record); err != nil {
 		return domain.AppendMessageResult{}, err
 	}
-	if err := r.insertOutboxEvent(ctx, tx, record); err != nil {
-		return domain.AppendMessageResult{}, err
+	if r.shouldWriteOutbox() {
+		if err := r.insertOutboxEvent(ctx, tx, record); err != nil {
+			return domain.AppendMessageResult{}, err
+		}
 	}
 	commitStarted := time.Now()
 	if err := tx.Commit(ctx); err != nil {
@@ -186,6 +219,10 @@ func (r *MessageRepository) AppendMessage(ctx context.Context, input domain.Appe
 		AcceptedAt:       record.Message.CreatedAt,
 		IdempotentReplay: false,
 	}, nil
+}
+
+func (r *MessageRepository) shouldWriteOutbox() bool {
+	return r.eventExportMode != MessageEventExportModeCDCOnly
 }
 
 func (r *MessageRepository) checkBackpressure() error {
@@ -437,9 +474,13 @@ INSERT INTO conversation_timeline_events (
     classification,
     mapping_version,
     trace_id,
+    partition_key,
+    correlation_id,
+    causation_id,
+    producer,
     payload_json,
     created_at
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15::jsonb, $16)
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19::jsonb, $20)
 `,
 		record.Timeline.TenantID,
 		record.Timeline.ConversationID,
@@ -455,6 +496,10 @@ INSERT INTO conversation_timeline_events (
 		record.Timeline.Classification,
 		record.Timeline.MappingVersion,
 		record.Timeline.TraceID,
+		record.Outbox.PartitionKey,
+		record.Outbox.CorrelationID,
+		record.Outbox.CausationID,
+		record.Outbox.Producer,
 		record.Timeline.PayloadJSON,
 		record.Timeline.CreatedAt,
 	)

@@ -19,6 +19,7 @@ import (
 	monitoringinfra "github.com/qsyy0921/IM/services/message-service/internal/infrastructure/monitoring"
 	postgresinfra "github.com/qsyy0921/IM/services/message-service/internal/infrastructure/postgres"
 	rpcinfra "github.com/qsyy0921/IM/services/message-service/internal/infrastructure/rpc"
+	"github.com/qsyy0921/IM/services/message-service/internal/trigger/cdc"
 	"github.com/qsyy0921/IM/services/message-service/internal/trigger/outbox"
 	"google.golang.org/grpc"
 )
@@ -33,12 +34,14 @@ func run() error {
 	mode := strings.TrimSpace(os.Getenv("NEXUSIM_MESSAGE_SERVICE_MODE"))
 	switch mode {
 	case "", "noop":
-		log.Println("message-service runtime wiring is idle; set NEXUSIM_MESSAGE_SERVICE_MODE=grpc, outbox-relay, outbox-audit, outbox-repair, outbox-repair-audit, outbox-repair-cleanup, change-history-audit, retention-proof-audit, legal-hold-audit, legal-hold-set, legal-hold-release, compliance-proof-audit, compliance-proof-register, compliance-proof-revoke, compliance-approval-audit, compliance-approval-create, or compliance-approval-cancel")
+		log.Println("message-service runtime wiring is idle; set NEXUSIM_MESSAGE_SERVICE_MODE=grpc, outbox-relay, cdc-bridge, outbox-audit, outbox-repair, outbox-repair-audit, outbox-repair-cleanup, change-history-audit, retention-proof-audit, legal-hold-audit, legal-hold-set, legal-hold-release, compliance-proof-audit, compliance-proof-register, compliance-proof-revoke, compliance-approval-audit, compliance-approval-create, or compliance-approval-cancel")
 		return nil
 	case "grpc":
 		return runGRPCServer()
 	case "outbox-relay":
 		return runOutboxRelay()
+	case "cdc-bridge":
+		return runCDCBridge()
 	case "outbox-audit":
 		return runOutboxAudit()
 	case "outbox-repair":
@@ -72,6 +75,39 @@ func run() error {
 	default:
 		return errors.New("unsupported NEXUSIM_MESSAGE_SERVICE_MODE")
 	}
+}
+
+func runCDCBridge() error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	brokers := splitCSV(os.Getenv("NEXUSIM_KAFKA_BROKERS"))
+	if len(brokers) == 0 {
+		return errors.New("NEXUSIM_KAFKA_BROKERS is required")
+	}
+	bridge, err := cdc.NewBridge(cdc.Config{
+		Brokers:      brokers,
+		SourceTopic:  envString("NEXUSIM_MESSAGE_CDC_SOURCE_TOPIC", cdc.DefaultSourceTopic),
+		TargetTopic:  envString("NEXUSIM_MESSAGE_CDC_TARGET_TOPIC", cdc.DefaultTargetTopic),
+		GroupID:      envString("NEXUSIM_MESSAGE_CDC_GROUP_ID", "message-cdc-bridge"),
+		ErrorBackoff: envDuration("NEXUSIM_MESSAGE_CDC_ERROR_BACKOFF", time.Second),
+		Logf:         log.Printf,
+	})
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err := bridge.Close(); err != nil {
+			log.Printf("close message CDC bridge: %v", err)
+		}
+	}()
+	log.Printf(
+		"message-service CDC bridge started source_topic=%s target_topic=%s group_id=%s",
+		envString("NEXUSIM_MESSAGE_CDC_SOURCE_TOPIC", cdc.DefaultSourceTopic),
+		envString("NEXUSIM_MESSAGE_CDC_TARGET_TOPIC", cdc.DefaultTargetTopic),
+		envString("NEXUSIM_MESSAGE_CDC_GROUP_ID", "message-cdc-bridge"),
+	)
+	return bridge.Run(ctx)
 }
 
 func runGRPCServer() error {
@@ -209,6 +245,12 @@ func runGRPCServer() error {
 	}
 
 	repositoryOptions := []postgresinfra.MessageRepositoryOption{postgresinfra.WithMetrics(metrics)}
+	eventExportMode, err := postgresinfra.ParseMessageEventExportMode(envString("NEXUSIM_MESSAGE_EVENT_EXPORT_MODE", ""))
+	if err != nil {
+		return err
+	}
+	repositoryOptions = append(repositoryOptions, postgresinfra.WithMessageEventExportMode(eventExportMode))
+	log.Printf("message-service event export mode=%s", eventExportMode)
 	if envBool("NEXUSIM_PG_BACKPRESSURE_ENABLED", false) {
 		repositoryOptions = append(repositoryOptions, postgresinfra.WithBackpressure(postgresinfra.BackpressureConfig{
 			Enabled:           true,

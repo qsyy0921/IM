@@ -1,13 +1,15 @@
 # message-service SDD v1.0
 
-状态：冻结；主链路、`outbox-audit` / `outbox-repair` / `outbox-repair-audit` / `outbox-repair-cleanup` operator，以及 `/healthz` / `/readyz` / `/debug/metrics` / Prometheus text `/metrics` 低敏观测入口已落地，可继续做后续集成测试和 hardening。
+状态：冻结；主链路、`outbox-audit` / `outbox-repair` / `outbox-repair-audit` / `outbox-repair-cleanup` operator、DB-first CDC/WAL shadow export，以及 `/healthz` / `/readyz` / `/debug/metrics` / Prometheus text `/metrics` 低敏观测入口已落地，可继续做后续集成测试和 hardening。
 
 ## 1. 服务定位
 
-message-service 是 NexusIM 消息事实源服务，负责普通会话消息写入、消息变更和消息 outbox。它承载最核心不变量：
+message-service 是 NexusIM 消息事实源服务，负责普通会话消息写入、消息变更和消息事件导出。它承载最核心不变量：
 
 ```text
-普通会话下 seq + message + timeline + outbox 必须同库同分片同事务。
+普通会话下 seq + message + timeline 必须同库同分片同事务。
+table_outbox / cdc_shadow 模式下，message_outbox 也必须在同一事务内写入。
+cdc_only 模式下，Kafka 发布只能来自已提交 timeline row 的 PostgreSQL WAL / CDC，不允许请求路径直接 publish Kafka。
 ```
 
 职责：
@@ -19,8 +21,8 @@ message-service 是 NexusIM 消息事实源服务，负责普通会话消息写�
 - `client_msg_id` 幂等
 - `message_log` 写入
 - `conversation_timeline_events` 写入
-- `message_outbox` 写入
-- outbox relay 发布 Kafka 事件
+- `message_outbox` 写入（`table_outbox` / `cdc_shadow`）
+- outbox relay 或 CDC bridge 发布 Kafka 事件
 - 热点会话 seq block 使用与 journal 标记
 
 不负责：
@@ -41,8 +43,8 @@ message-service 是 NexusIM 消息事实源服务，负责普通会话消息写�
 | 上游 | api-gateway | 发消息、编辑、撤回、删除 |
 | 同步依赖 | policy-service | 发送和变更权限校验 |
 | 同步依赖 | timeline-service | 仅热点会话获取 seq block |
-| 事实源 | PostgreSQL | message、timeline、outbox 同事务 |
-| 异步下游 | Kafka | `conversation.timeline.events` |
+| 事实源 | PostgreSQL | message、timeline 同事务；table outbox 模式额外同事务写 outbox |
+| 异步下游 | Kafka | `conversation.timeline.events` / CDC shadow `conversation.timeline.events.cdc` |
 | 消费者 | delivery/search/rag/agent/audit | 消费消息事件 |
 
 ### 2.1 第一阶段依赖端口
@@ -54,7 +56,7 @@ message-service 是 NexusIM 消息事实源服务，负责普通会话消息写�
 | `PolicyCheckPort` | 返回 allow/deny、`permission_version`、拒绝原因 | 不在 message-service 内硬编码角色、群主、管理员或合规规则 |
 | `ConversationQueryPort` | 返回会话存在性、`member_version`、`permission_version`、`conversation_mode`、`fanout_mode`、`fanout_policy_version`、`current_seq_shard` | 不修改成员事实，不生成成员边界事件，不硬编码 fanout 策略 |
 | `SequencerPort` | 热点会话调用 timeline-service `AllocateSeqBlock`，message-service 本地消费 seq block cache | 不在 message-service 内实现 sequencer 状态机、leader ownership 或跨服务 repair |
-| `EventPublisherPort` | 由 outbox relay 发布 Kafka 事件 | 不允许业务事务绕过 outbox 直接发布 |
+| `EventPublisherPort` | 由 outbox relay 或 CDC bridge 发布 Kafka 事件 | 不允许业务事务直接发布 Kafka |
 
 当前已实现普通会话 `LOCAL_ROW_LOCK` 和热点会话 first-stage `SEQUENCER_BLOCK` active 写路径。`SEQUENCER_BLOCK` 必须依赖 timeline-service valid lease；未配置 sequencer、lease 无效、epoch / lease id 缺失或 lease 过期时 fail-closed，不允许回退到本地 row lock。
 
@@ -433,6 +435,10 @@ CREATE TABLE conversation_timeline_events (
     classification     TEXT,
     mapping_version    TEXT        NOT NULL,
     trace_id           TEXT        NOT NULL,
+    partition_key      TEXT        NOT NULL DEFAULT '',
+    correlation_id     TEXT        NOT NULL DEFAULT '',
+    causation_id       TEXT        NOT NULL DEFAULT '',
+    producer           TEXT        NOT NULL DEFAULT 'message-service',
     payload_json       JSONB       NOT NULL,
     created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
     PRIMARY KEY (tenant_id, conversation_id, seq),
@@ -675,7 +681,8 @@ begin
   allocate seq from conversation_seq by row lock
   insert message_log
   insert conversation_timeline_events(message.persisted)
-  insert message_outbox(message.persisted)
+  if event_export_mode in table_outbox / cdc_shadow:
+    insert message_outbox(message.persisted)
 commit
 return message_id + seq
 ```
@@ -702,7 +709,8 @@ begin
   check permission_version
   insert message_log
   insert conversation_timeline_events(message.persisted)
-  insert message_outbox(message.persisted)
+  if event_export_mode in table_outbox / cdc_shadow:
+    insert message_outbox(message.persisted)
 commit
 ```
 
@@ -738,9 +746,24 @@ begin
   insert message_command_idempotency with command_hash and result_json
   allocate new timeline seq
   insert conversation_timeline_events
-  insert message_outbox
+  if event_export_mode in table_outbox / cdc_shadow:
+    insert message_outbox
 commit
 ```
+
+`NEXUSIM_MESSAGE_EVENT_EXPORT_MODE` controls how committed timeline events leave
+message-service:
+
+| Mode | Write `message_outbox` | Kafka source | Intended use |
+| --- | --- | --- | --- |
+| `table_outbox` | yes | `message_outbox` relay -> `conversation.timeline.events` | Existing default and compatibility mode. |
+| `cdc_shadow` | yes | outbox relay remains primary; CDC bridge writes comparable events to `conversation.timeline.events.cdc` | Shadow validation and pressure-test comparison. |
+| `cdc_only` | no | Debezium reads committed `conversation_timeline_events` from WAL; CDC bridge writes `conversation.timeline.events.cdc` | Explicit cutover after CDC health and shadow reconciliation pass. |
+
+`cdc_only` is not a hidden fallback. If Kafka Connect, the Debezium connector,
+the replication slot, or the CDC bridge is unhealthy, operators must fail the
+runtime health check, backpressure, or roll back the explicit mode. The
+message-service request path must still not publish Kafka directly.
 
 权限 action 粒度：
 
@@ -818,6 +841,56 @@ lock batch
 - 同一 `tenant_id + conversation_id` 的事件必须按 `aggregate_version` 严格发布。
 - 如果同会话存在更小 `aggregate_version` 的 `PENDING` 或 `DLQ` 事件，Relay 不能发布后续事件。
 - Relay worker 必须对同一会话 single-flight，避免多 worker 并发发布同一 conversation 的事件。
+
+### 10.1 DB-first CDC/WAL timeline export
+
+CDC export keeps PostgreSQL as the message fact source:
+
+```text
+SendMessage / Edit / Revoke / Delete
+-> commit message_log + conversation_timeline_events in PostgreSQL
+-> Debezium reads committed conversation_timeline_events from PostgreSQL WAL
+-> message-service cdc-bridge converts Debezium JSON envelope to the existing
+   ConversationTimelineEvent protobuf
+-> publish to Kafka topic conversation.timeline.events.cdc
+-> delivery/search consumers can be switched explicitly by topic env
+```
+
+Runtime pieces:
+
+```text
+PostgreSQL wal_level=logical
+Kafka Connect / Debezium connector:
+  deploy/local/debezium/message-timeline-connector.json
+message-service mode:
+  NEXUSIM_MESSAGE_SERVICE_MODE=cdc-bridge
+shadow topic:
+  conversation.timeline.events.cdc
+```
+
+CDC bridge constraints:
+
+- It only consumes committed INSERT / snapshot rows for `conversation_timeline_events`.
+- It skips update/delete/tombstone records and fails closed on malformed insert payloads.
+- It publishes the same protobuf envelope as the table outbox relay, keyed by
+  `partition_key` and therefore by `tenant_id + conversation_id`.
+- It commits the Debezium source offset only after the target Kafka publish
+  succeeds, so delivery is at-least-once. Consumers must continue to use
+  `event_id + handler_name` idempotency.
+- It is not allowed to synthesize missing message facts or query private
+  delivery/search tables to repair gaps.
+
+Operational constraints:
+
+- `cdc_shadow` must be used before `cdc_only`; shadow checks compare
+  `conversation_timeline_events` rows against `conversation.timeline.events.cdc`.
+- `snapshot.mode=no_data` means the local connector only exports new rows after
+  connector registration. Backfill requires an explicit separate operator plan.
+- If the connector stops, the replication slot can retain WAL and fill disk.
+  Operators must monitor connector status, slot activity and retained WAL bytes.
+- `cdc_only` must not run with the old delivery consumer still pointed only at
+  `conversation.timeline.events`, unless the run intentionally measures shadow
+  lag and does not expect CDC-driven projection.
 
 DLQ repair 操作：
 
@@ -975,6 +1048,7 @@ pgx + sqlc
 PostgreSQL
 Kafka + Schema Registry
 Transactional Outbox
+DB-first CDC shadow export
 六层 DDD: api / app / domain / infrastructure / types / trigger
 ```
 
@@ -985,7 +1059,8 @@ GORM 或其他 ORM 替代 sqlc
 NATS / RocketMQ / Pulsar 替代 Kafka
 REST-only 内部服务通信
 跨服务共享业务 domain package
-绕过 outbox 的直接 Kafka publish
+业务事务内直接 Kafka publish
+CDC bridge 以外的隐藏事件发布 fallback
 ```
 
 必须先创建的契约文件：
@@ -994,17 +1069,19 @@ REST-only 内部服务通信
 | --- | --- | --- |
 | `api/proto/nexusim/message/v1/message_service.proto` | `SendMessage`、`EditMessage`、`RevokeMessage`、`DeleteMessage` | request 必须包含幂等键；`Edit/Revoke/Delete` 必须包含 `conversation_id`；`SendMessage` 必须明确 `client_msg_id` scope 和 `command_hash` canonical 规则 |
 | `api/proto/nexusim/message/v1/message_error.proto` | message-service 错误码 | 与 SDD 错误码表保持一致，不直接暴露数据库错误 |
-| `schemas/kafka/conversation.timeline.events.proto` | `message.persisted/edited/revoked/deleted.v1` | envelope 字段与 `message_outbox` 对齐；metadata 包含 fanout/permission/mapping 版本 |
+| `schemas/kafka/conversation.timeline.events.proto` | `message.persisted/edited/revoked/deleted.v1` | envelope 字段与 `message_outbox` / CDC timeline envelope 对齐；metadata 包含 fanout/permission/mapping 版本 |
 | `migrations/postgres/message/000001_message_core.sql` | 核心表和唯一约束 | 必须包含 `conversation_seq`、`message_log`、`conversation_timeline_events`、`message_outbox`、`message_change_history`、`message_command_idempotency`；变更表必须带 `conversation_id` |
+| `migrations/postgres/message/000007_conversation_timeline_cdc_envelope.sql` | timeline CDC envelope 列 | 让 `conversation_timeline_events` 携带 `partition_key` / correlation / causation / producer，避免 CDC bridge 猜测 Kafka envelope |
 
 第一阶段实现范围：
 
 | 项 | 状态 | 说明 |
 | --- | --- | --- |
 | `SendMessage` | 实现 | 打穿主写链路和压测基线 |
-| PostgreSQL 本地事务 | 实现 | `conversation_seq + message_log + timeline + outbox` 同事务 |
+| PostgreSQL 本地事务 | 实现 | `conversation_seq + message_log + timeline` 同事务；`table_outbox` / `cdc_shadow` 下 outbox 也同事务 |
 | Outbox Relay | 实现 | 支持 pending、retry、DLQ 状态 |
 | Kafka publish path | 实现 | 可用真实 broker；不可用时保留 outbox 积压测试 |
+| DB-first CDC/WAL shadow export | 实现 | `cdc_shadow` 双写对账；`cdc_only` 显式切掉 `message_outbox` 写入，由 Debezium WAL + cdc-bridge 发布 shadow topic |
 | `EditMessage` | 只定义契约 | 不进入第一条代码切片 |
 | `RevokeMessage` | 只定义契约 | 不进入第一条代码切片 |
 | `DeleteMessage` | 只定义契约 | 不进入第一条代码切片 |

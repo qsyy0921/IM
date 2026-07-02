@@ -258,7 +258,7 @@ profile 和最小 smoke。
 | 策略 / ReBAC | policy-service、tool policy precheck、关系投影 first path | OpenFGA、OPA、DSL / quota 策略中心 | 外部策略引擎只能作为 adapter，不能绕过 policy-service。 |
 | 密钥 / 机密 | 本地 env / 文件 guard；生产语义已预留 | Vault、云 KMS、HSM、密钥轮换 | secret 不写入 docs、metrics、报告或事件 payload。 |
 | 可观测性 | `/metrics`、Prometheus rules、Grafana dashboard、OTel first-stage wiring | OTel Collector、Loki、Tempo、Alertmanager、SLO / retention | 本地观测是开发证据，不等于生产 SLO。 |
-| 数据平台 | 当前仍是目标架构能力；公开事件 / CDC 消费边界已定义 | Debezium、Flink、Iceberg、Delta、Trino、ClickHouse / Doris | 数据平台不能成为业务 command 写入口。 |
+| 数据平台 | 公开事件 / CDC 消费边界已定义；本地 `cdc` profile 已有 Kafka Connect / Debezium message timeline shadow path | Flink、Iceberg、Delta、Trino、ClickHouse / Doris、生产级 CDC 编排 | 数据平台和 CDC bridge 不能成为业务 command 写入口；message timeline CDC 只能读取已提交 WAL。 |
 | AI runtime | model-gateway、Python AI Worker、mock / guarded external HTTP provider | OpenAI / Claude / 本地模型、vLLM、Ollama、Triton、LiteLLM | 业务服务不直连模型 provider。 |
 | 图 / 知识关系 | memory-service 结构化 memory、source refs、supersedes、profile aggregate | Neo4j、图投影、关系图索引 | 只有关系查询收益明确时才引入独立图能力。 |
 | MCP / 工具 | skill-registry、mcp-gateway prepare、action-executor | 更多 MCP tool servers、外部业务工具 | 工具调用必须经过 skill metadata、policy、approval 和 audit。 |
@@ -308,7 +308,7 @@ message / conversation / policy events -> search-service + memory-service projec
 | --- | --- |
 | `api-gateway` | 外部入口、认证透传、租户 quota、legacy descriptor 迁移门禁。 |
 | `identity-service` | 登录、Refresh、MFA、recovery code、JWKS、challenge delivery。 |
-| `message-service` | 发消息、编辑 / 撤回 / 删除、timeline / outbox。 |
+| `message-service` | 发消息、编辑 / 撤回 / 删除、timeline / outbox，以及 message timeline CDC shadow export。 |
 | `conversation-service` | 会话、成员边界、owner transfer、发送上下文。 |
 | `timeline-service` | Seq block allocator、lease / idempotency / status 记录、gap marker、repair operator modes、debug health / metrics；已被 message-service 热点 `SEQUENCER_BLOCK` 写路径调用，后续继续承接 virtual partition mapping、leader ownership audit 和 timeline 分区。 |
 | `delivery-service` | durable inbox、`PullInbox`、`AckDelivery`、delivery outbox。 |

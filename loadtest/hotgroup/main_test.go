@@ -53,6 +53,16 @@ func TestParseConfigRejectsNegativeSendConcurrency(t *testing.T) {
 	}
 }
 
+func TestParseConfigRejectsSkipSetupWithCleanup(t *testing.T) {
+	_, err := parseConfig([]string{
+		"--skip-setup",
+		"--cleanup",
+	}, func(string) string { return "" })
+	if err == nil {
+		t.Fatal("expected validation error")
+	}
+}
+
 func TestRunDryRunDefaultsSendConcurrencyToSenderCount(t *testing.T) {
 	dir := t.TempDir()
 	err := run([]string{
@@ -180,6 +190,7 @@ func TestRunDryRunWritesSummaryAndUsers(t *testing.T) {
 		"--conversation-id", "conv-hot-test",
 		"--group-size", "12",
 		"--sender-count", "3",
+		"--skip-setup",
 		"--send-concurrency", "2",
 		"--message-count", "4",
 	}, func(string) string { return "" })
@@ -197,6 +208,9 @@ func TestRunDryRunWritesSummaryAndUsers(t *testing.T) {
 	}
 	if !result.Success || !result.DryRun {
 		t.Fatalf("unexpected dry-run result: success=%v dry_run=%v error=%s", result.Success, result.DryRun, result.Error)
+	}
+	if !result.SkipSetup {
+		t.Fatal("expected skip_setup in summary")
 	}
 	if result.SchemaVersion != 2 {
 		t.Fatalf("schema version = %d", result.SchemaVersion)

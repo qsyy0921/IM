@@ -146,3 +146,22 @@ Windows 单机 runner 下结论。send-only 阶段优先拆分多个 runner 共�
 并发 `SendMessage` worker 数。`--send-concurrency=0` 表示使用 `--sender-count`。
 报告中的 `achieved_send_rate` 才是本轮真实发压速率；不要把 target
 `--message-rate` 直接当成服务端 QPS。
+
+Prepared-group send-only A/B:
+
+```powershell
+go run .\loadtest\hotgroup `
+  --skip-setup `
+  --tenant-id <existing-tenant> `
+  --conversation-id <existing-conversation> `
+  --group-size <same-group-size> `
+  --sender-count <same-sender-count> `
+  --message-count 5000 `
+  --send-concurrency 256
+```
+
+`--skip-setup` reuses the deterministic hotgroup users and existing
+conversation membership. It records the current `user_inbox` /
+`delivery_timeline_items` baseline and waits for `baseline + this-run messages`,
+so it can isolate per-message SendMessage / message timeline export behavior
+without adding setup-time member boundary events.

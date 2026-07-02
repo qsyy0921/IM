@@ -39,6 +39,7 @@ func run(args []string, getenv func(string) string) error {
 		GitStatusShort:             gitStatusShort(),
 		RunnerMode:                 cfg.RunnerMode,
 		DryRun:                     cfg.DryRun,
+		SkipSetup:                  cfg.SkipSetup,
 		VerifiedAuthMetadata:       cfg.VerifiedAuthMetadata,
 		TenantID:                   cfg.TenantID,
 		ConversationID:             cfg.ConversationID,
@@ -93,15 +94,17 @@ func execute(ctx context.Context, cfg config, plan userPlan, result *summary) er
 		return err
 	}
 	defer clients.close()
-	memberVersion, err := createGroup(ctx, cfg, clients, plan)
-	if err != nil {
-		return err
+	if !cfg.SkipSetup {
+		memberVersion, err := createGroup(ctx, cfg, clients, plan)
+		if err != nil {
+			return err
+		}
+		memberVersion, err = joinMembers(ctx, cfg, clients, plan, memberVersion)
+		if err != nil {
+			return err
+		}
+		_ = memberVersion
 	}
-	memberVersion, err = joinMembers(ctx, cfg, clients, plan, memberVersion)
-	if err != nil {
-		return err
-	}
-	_ = memberVersion
 	if _, err := waitForCount(ctx, pool, cfg.WaitTimeout, cfg.PollInterval, `
 SELECT COUNT(*) FROM delivery_membership_projection
 WHERE tenant_id = $1 AND conversation_id = $2 AND status = 'ACTIVE'
@@ -114,6 +117,14 @@ WHERE tenant_id = $1 AND conversation_id = $2 AND status = 'ACTIVE'
 	}
 	result.ActualFanoutMode = fanoutMode
 	result.ExpectedInboxRows = expectedInboxRowsForFanoutMode(result.MessageCount, cfg.GroupSize, fanoutMode)
+	baseline, err := readProjectionBaseline(ctx, pool, cfg)
+	if err != nil {
+		return err
+	}
+	result.BaselineUserInboxRows = baseline.UserInboxRows
+	result.BaselineDeliveryTimelineRows = baseline.DeliveryTimelineRows
+	result.TargetUserInboxRows = baseline.UserInboxRows + result.ExpectedInboxRows
+	result.TargetDeliveryTimelineRows = baseline.DeliveryTimelineRows + result.ExpectedTimelineRows
 	if cfg.ExpectedFanoutMode != "" && fanoutMode != cfg.ExpectedFanoutMode {
 		stats, statsErr := readPostgresStats(ctx, pool, cfg)
 		if statsErr == nil {
@@ -148,7 +159,7 @@ WHERE tenant_id = $1 AND conversation_id = $2 AND status = 'ACTIVE'
 		if _, err := waitForCount(ctx, pool, cfg.WaitTimeout, cfg.PollInterval, `
 SELECT COUNT(*) FROM user_inbox
 WHERE tenant_id = $1 AND conversation_id = $2
-`, result.ExpectedInboxRows, cfg.TenantID, cfg.ConversationID); err != nil {
+`, result.TargetUserInboxRows, cfg.TenantID, cfg.ConversationID); err != nil {
 			stats, statsErr := readPostgresStats(ctx, pool, cfg)
 			if statsErr == nil {
 				result.Postgres = &stats
@@ -159,7 +170,7 @@ WHERE tenant_id = $1 AND conversation_id = $2
 		if _, err := waitForCount(ctx, pool, cfg.WaitTimeout, cfg.PollInterval, `
 SELECT COUNT(*) FROM delivery_timeline_items
 WHERE tenant_id = $1 AND conversation_id = $2
-`, result.ExpectedTimelineRows, cfg.TenantID, cfg.ConversationID); err != nil {
+`, result.TargetDeliveryTimelineRows, cfg.TenantID, cfg.ConversationID); err != nil {
 			stats, statsErr := readPostgresStats(ctx, pool, cfg)
 			if statsErr == nil {
 				result.Postgres = &stats
@@ -199,8 +210,8 @@ WHERE tenant_id = $1 AND conversation_id = $2 AND status = 'PENDING'
 	result.ActualFanoutMode = stats.FanoutMode
 	result.Success = result.Send.SuccessCount == result.MessageCount &&
 		result.Receiver.PullErrorCount == 0 &&
-		result.Postgres.UserInboxRows >= result.ExpectedInboxRows &&
-		result.Postgres.DeliveryTimelineRows >= result.ExpectedTimelineRows &&
+		result.Postgres.UserInboxRows >= result.TargetUserInboxRows &&
+		result.Postgres.DeliveryTimelineRows >= result.TargetDeliveryTimelineRows &&
 		result.Postgres.MessageOutboxDLQ == 0 &&
 		result.Postgres.DeliveryOutboxDLQ == 0 &&
 		(!cfg.RequireConversationNotify ||

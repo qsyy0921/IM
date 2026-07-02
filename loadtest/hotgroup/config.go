@@ -24,6 +24,7 @@ type config struct {
 	RunnerMode                    string
 	DryRun                        bool
 	Cleanup                       bool
+	SkipSetup                     bool
 	RequestTimeout                time.Duration
 	WaitTimeout                   time.Duration
 	PollInterval                  time.Duration
@@ -67,6 +68,7 @@ func parseConfig(args []string, getenv func(string) string) (config, error) {
 	flags.StringVar(&cfg.RunnerMode, "runner-mode", envString(getenv, "NEXUSIM_HOTGROUP_RUNNER_MODE", runnerModeFull), "runner mode: full or subscriber-only")
 	flags.BoolVar(&cfg.DryRun, "dry-run", envBool(getenv, "NEXUSIM_HOTGROUP_DRY_RUN", false), "write user model and summary without contacting services")
 	flags.BoolVar(&cfg.Cleanup, "cleanup", envBool(getenv, "NEXUSIM_HOTGROUP_CLEANUP", false), "delete rows for the configured tenant before running; requires --pg-dsn")
+	flags.BoolVar(&cfg.SkipSetup, "skip-setup", envBool(getenv, "NEXUSIM_HOTGROUP_SKIP_SETUP", false), "reuse an existing conversation and members; send messages only")
 	flags.DurationVar(&cfg.RequestTimeout, "request-timeout", envDuration(getenv, "NEXUSIM_REQUEST_TIMEOUT", 3*time.Second), "per-request timeout")
 	flags.DurationVar(&cfg.WaitTimeout, "wait-timeout", envDuration(getenv, "NEXUSIM_WAIT_TIMEOUT", 60*time.Second), "max wait for async projections")
 	flags.DurationVar(&cfg.PollInterval, "poll-interval", envDuration(getenv, "NEXUSIM_POLL_INTERVAL", 500*time.Millisecond), "async projection poll interval")
@@ -134,6 +136,12 @@ func (cfg config) validate() error {
 	}
 	if cfg.RunnerMode == runnerModeSubscriberOnly && cfg.Cleanup {
 		return errors.New("--cleanup cannot be used with --runner-mode subscriber-only")
+	}
+	if cfg.SkipSetup && cfg.Cleanup {
+		return errors.New("--skip-setup cannot be used with --cleanup")
+	}
+	if cfg.SkipSetup && cfg.RunnerMode == runnerModeSubscriberOnly {
+		return errors.New("--skip-setup is only valid with --runner-mode full")
 	}
 	if strings.TrimSpace(cfg.TenantID) == "" {
 		return errors.New("--tenant-id is required")

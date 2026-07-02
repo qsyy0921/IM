@@ -67,6 +67,7 @@ func writeReport(path string, result *summary) error {
 	fmt.Fprintf(&builder, "- commit: `%s`\n", result.Commit)
 	fmt.Fprintf(&builder, "- runner_mode: `%s`\n", result.RunnerMode)
 	fmt.Fprintf(&builder, "- dry_run: `%t`\n", result.DryRun)
+	fmt.Fprintf(&builder, "- skip_setup: `%t`\n", result.SkipSetup)
 	fmt.Fprintf(&builder, "- success: `%t`\n", result.Success)
 	if result.Error != "" {
 		fmt.Fprintf(&builder, "- error: `%s`\n", result.Error)
@@ -83,6 +84,10 @@ func writeReport(path string, result *summary) error {
 	}
 	fmt.Fprintf(&builder, "- expected_inbox_rows: `%d`\n", result.ExpectedInboxRows)
 	fmt.Fprintf(&builder, "- expected_timeline_rows: `%d`\n\n", result.ExpectedTimelineRows)
+	fmt.Fprintf(&builder, "- baseline_user_inbox_rows: `%d`\n", result.BaselineUserInboxRows)
+	fmt.Fprintf(&builder, "- baseline_delivery_timeline_rows: `%d`\n", result.BaselineDeliveryTimelineRows)
+	fmt.Fprintf(&builder, "- target_user_inbox_rows: `%d`\n", result.TargetUserInboxRows)
+	fmt.Fprintf(&builder, "- target_delivery_timeline_rows: `%d`\n\n", result.TargetDeliveryTimelineRows)
 	fmt.Fprintf(&builder, "- require_delivery_outbox_drain: `%t`\n\n", result.RequireDeliveryOutboxDrain)
 	builder.WriteString("## User Model\n\n")
 	fmt.Fprintf(&builder, "- owner: `%s`\n", result.UserPlan.Owner.UserID)

@@ -115,6 +115,30 @@ WHERE tenant_id = $1 AND conversation_id = $2
 	return fanoutMode, nil
 }
 
+type projectionBaseline struct {
+	UserInboxRows        int64
+	DeliveryTimelineRows int64
+}
+
+func readProjectionBaseline(ctx context.Context, pool *pgxpool.Pool, cfg config) (projectionBaseline, error) {
+	var baseline projectionBaseline
+	if err := pool.QueryRow(ctx, `
+SELECT COUNT(*)
+FROM user_inbox
+WHERE tenant_id = $1 AND conversation_id = $2
+`, cfg.TenantID, cfg.ConversationID).Scan(&baseline.UserInboxRows); err != nil {
+		return projectionBaseline{}, fmt.Errorf("query user inbox baseline: %w", err)
+	}
+	if err := pool.QueryRow(ctx, `
+SELECT COUNT(*)
+FROM delivery_timeline_items
+WHERE tenant_id = $1 AND conversation_id = $2
+`, cfg.TenantID, cfg.ConversationID).Scan(&baseline.DeliveryTimelineRows); err != nil {
+		return projectionBaseline{}, fmt.Errorf("query delivery timeline baseline: %w", err)
+	}
+	return baseline, nil
+}
+
 func readPostgresStats(ctx context.Context, pool *pgxpool.Pool, cfg config) (postgresStats, error) {
 	stats := postgresStats{}
 	if err := pool.QueryRow(ctx, `

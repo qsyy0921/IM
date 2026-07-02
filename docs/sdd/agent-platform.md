@@ -858,6 +858,11 @@ Coordinator
 - Tool prepare / action execution 契约。
 - ReplayBundle / eval report 契约。
 
+当前 isolated evidence 还包含 controlled implementation readiness gate：在缺少
+accepted ADR、main integration review、owner review、preservation evidence 或 operator
+gate 时，只允许继续 fixture-only hardening，不能进入 controlled implementation 或
+production contract 设计。
+
 ### Phase 5：最小生产切片
 
 - 从 read-only grounded QA 开始。

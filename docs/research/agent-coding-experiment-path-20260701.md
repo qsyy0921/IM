@@ -65,6 +65,7 @@ ai/python/nexusim_ai_eval/
   __init__.py
   adapter_runner.py
   adapters.py
+  controlled_implementation_readiness.py
   cross_service_preservation.py
   dataset_reproducibility.py
   comparison.py
@@ -96,6 +97,7 @@ ai/python/fixtures/agent_eval/synthetic_memory_admission_hardening_scenarios.jso
 ai/python/fixtures/agent_eval/synthetic_memory_admission_deeper_hardening_scenarios.json
 ai/python/fixtures/agent_eval/memory_calibration_sample.json
 ai/python/fixtures/agent_eval/memory_calibration_public_export.json
+ai/python/fixtures/agent_eval/controlled_implementation_readiness_rehearsal.json
 ai/python/fixtures/agent_eval/cross_service_preservation_rehearsal.json
 ai/python/fixtures/agent_eval/dataset_reproducibility_rehearsal.json
 ai/python/fixtures/agent_eval/multi_agent_handoff_rehearsal.json
@@ -123,6 +125,7 @@ ai/python/tests/test_agent_eval_integration.py
 ai/python/tests/test_agent_eval_adapters.py
 ai/python/tests/test_agent_eval_adapter_runner.py
 ai/python/tests/test_agent_eval_comparison.py
+ai/python/tests/test_agent_eval_controlled_implementation_readiness.py
 ai/python/tests/test_agent_eval_reporting.py
 ai/python/tests/test_agent_memory_calibration.py
 ai/python/tests/test_agent_eval_multi_agent_handoff.py
@@ -228,6 +231,10 @@ Slice 0 covers:
   spend, tool timeout, retrieval latency, eval retention, canary telemetry and
   incident escalation with owner, limit, measurement, operator view, audit,
   release gate, failure-class and rejection refs.
+- fixture-only controlled implementation readiness coverage for allowing only
+  backend-isolated hardening while blocking unaccepted ADRs, production contract
+  changes, real service connections, Python final ownership and open P0/P1
+  findings before accepted owner review.
 - fixture-only state-diff report coverage for approved action outcome refs,
   expected-vs-actual state changes, missing execution refs, incomplete reports
   and unauthorized mutation detection.
@@ -516,6 +523,9 @@ Evaluator tests:
 - operational readiness scoring rejects missing budget coverage, owner
   mismatch, missing measurement, over-limit continuation, raw body retention,
   production SLO authorization and release gates that allow failed evidence.
+- controlled implementation readiness scoring rejects missing scenario
+  coverage, unaccepted ADR allow, production path changes, missing preservation
+  evidence, Python final ownership, open P1 findings and missing owner review.
 - multi-agent handoff governance scoring rejects missing scenarios, scope
   widening, missing primary responsibility, unverified integration, direct tool
   execution, direct memory admission, approval bypass and fixture authorization
@@ -595,6 +605,7 @@ python ai/python/scripts/run_agent_dataset_adapter.py --run ai/python/fixtures/a
 python ai/python/scripts/run_agent_eval_regression.py ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json
 python -m pytest ai/python/tests/test_agent_eval_multi_agent_handoff.py -q
 python -m pytest ai/python/tests/test_agent_eval_operational_readiness.py -q
+python -m pytest ai/python/tests/test_agent_eval_controlled_implementation_readiness.py -q
 ```
 
 Full Python gate for this workspace:

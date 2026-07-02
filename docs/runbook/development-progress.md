@@ -61,6 +61,7 @@ Eval Harness / synthetic IM-like fixture 已开始隔离式编码。
 | `docs/research/agent-object-completeness-fixture-evidence-20260702.md` | 已完成 Object 段 | Object completeness rehearsal 已用 fixture-only code / JSON / tests 落地；仍不提升生产契约 |
 | `docs/research/agent-operator-governance-fixture-evidence-20260702.md` | 已完成 Operator Governance 段 | Operator governance surface rehearsal 已用 fixture-only code / JSON / tests 落地；仍不提升生产契约 |
 | `docs/research/agent-operational-readiness-fixture-evidence-20260702.md` | 已完成 Operational Readiness 段 | Operational readiness budget rehearsal 已用 fixture-only code / JSON / tests 落地；仍不授权生产 SLO |
+| `docs/research/agent-controlled-implementation-readiness-fixture-evidence-20260702.md` | 已完成 Controlled Implementation Readiness 段 | Readiness gate rehearsal 已用 fixture-only code / JSON / tests 落地；仍阻断未接受 ADR 的受控实现 |
 | `docs/sdd/agent-runtime.md` | 已完成 | Runtime / Harness 详细 SDD |
 | `docs/sdd/agent-memory-admission.md` | 已完成 | Memory admission 详细 SDD |
 | `docs/sdd/agent-context-evidencepack.md` | 已完成 | Context / EvidencePack 详细 SDD |
@@ -137,6 +138,7 @@ ai/python/fixtures/agent_eval/synthetic_memory_admission_hardening_scenarios.jso
 ai/python/fixtures/agent_eval/synthetic_memory_admission_deeper_hardening_scenarios.json
 ai/python/fixtures/agent_eval/memory_calibration_sample.json
 ai/python/fixtures/agent_eval/memory_calibration_public_export.json
+ai/python/fixtures/agent_eval/controlled_implementation_readiness_rehearsal.json
 ai/python/fixtures/agent_eval/cross_service_preservation_rehearsal.json
 ai/python/fixtures/agent_eval/multi_agent_handoff_rehearsal.json
 ai/python/fixtures/agent_eval/object_completeness_rehearsal.json
@@ -267,6 +269,11 @@ ai/python/tests/test_agent_eval_*.py
   owner mismatch、missing measurement、over-limit continuation、raw body
   retention、Python override、unreviewed capacity、production SLO authorization
   和 release-with-gap。
+- Controlled implementation readiness rehearsal：已补 fixture-only hardening
+  allowed、unaccepted ADR blocked、production contract blocked 和 unsafe
+  shortcut blocked 四类 readiness gate，并阻断 production path change、real
+  service connection、Python final owner、missing preservation / replay /
+  operator / eval gate、open P0/P1 和 missing owner review。
 - Skeleton completion audit：已把 immutable goal 的 17 个骨架要求映射到当前
   代码、fixture、CLI、tests 和 runbook evidence；结论是 Phase 1 isolated
   Agent-layer skeleton 可作为当前可执行基线，但不能直接推广生产契约。

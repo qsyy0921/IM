@@ -24,6 +24,9 @@ Reason:
   skeleton without backend services or real IM data.
 - Remaining gaps are contract governance and production ownership decisions,
   not missing first-stage skeleton mechanics.
+- Controlled implementation readiness now has fixture evidence that allows
+  backend-isolated hardening while blocking unaccepted ADR, production contract
+  and unsafe real-service shortcut paths.
 
 ## Evidence Snapshot
 
@@ -38,6 +41,7 @@ Current fixture families under `ai/python/fixtures/agent_eval/`:
 - state-diff, hardening and deeper hardening scenarios;
 - ReplayBundle observability scenarios;
 - report matrix sample and public-dataset-style adapter samples.
+- controlled implementation readiness rehearsal.
 
 Current tests under `ai/python/tests/` cover:
 
@@ -119,6 +123,8 @@ contract promotion:
   manifests; current public export is deliberately fixture metadata only.
 - No load or runtime profile for a future runtime service; current work is
   backend-isolated by design.
+- No accepted ADR or owner review has cleared the controlled implementation
+  gate; current evidence only proves that unsafe promotion is blocked.
 
 ## Rejection Conditions
 

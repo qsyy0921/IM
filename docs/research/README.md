@@ -98,6 +98,11 @@
   latency、eval retention、canary telemetry 和 incident escalation budget 的
   owner、limit、measurement、operator view、audit、release gate 和 rejection
   覆盖证据；不授权生产 SLO。
+- `agent-controlled-implementation-readiness-fixture-evidence-20260702.md`：
+  fixture-only evidence 更新，记录 fixture-only hardening 可以继续、但
+  controlled implementation / production contract 在缺少 accepted ADR、main
+  review、owner review、preservation evidence 或出现真实服务 / Python final
+  owner 越界时必须阻断。
 
 ## 存放位置
 

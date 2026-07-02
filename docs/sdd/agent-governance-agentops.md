@@ -325,6 +325,10 @@ Implemented fixture coverage:
   and execution continues, raw bodies are retained, Python can override the
   decision, unreviewed capacity is allowed, or fixture evidence claims to
   authorize production SLOs.
+- controlled implementation readiness coverage allows backend-isolated
+  fixture hardening but blocks controlled implementation or production contract
+  promotion when accepted ADRs, main review, owner review, eval evidence,
+  replay-reader policy, preservation evidence or operator gates are missing.
 
 Remaining hardening:
 

@@ -3,9 +3,9 @@
 Date: 2026-07-02
 
 Status: request package for main integration review. Main integration later
-accepted L0 entry into ADR acceptance review only. This is not an accepted ADR,
-production contract, schema, migration, service directory or runtime
-implementation.
+accepted L0 entry and all six L1 candidate reviews for reviewability only. This
+is not an accepted ADR set, production contract, schema, migration, service
+directory or runtime implementation.
 
 ## Requested Verdict
 
@@ -68,7 +68,8 @@ Do not approve from this request:
 Acceptance should mean only:
 
 - Agent Lab may stop broad fixture discovery;
-- main integration may start ADR acceptance review in the documented order;
+- main integration may start or close ADR acceptance review in the documented
+  order;
 - any later controlled implementation still needs a scoped implementation
   design, owner review and real-service preservation smoke.
 
@@ -102,7 +103,7 @@ Rationale:
 
 Remaining blockers are external to Agent Lab:
 
-- accepted ADRs do not exist yet;
-- full-package L0 entry was accepted for ADR review only;
+- formal implementation-ready ADRs and L2 scoped designs do not exist yet;
+- full-package L0 and six L1 candidates were accepted for reviewability only;
 - owner review and real-service preservation smoke are not complete;
 - production operator UX is not implemented.

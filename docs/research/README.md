@@ -46,6 +46,9 @@
 - `agent-adr-acceptance-review-playbook-20260702.md`：ADR acceptance review
   playbook，定义 L0-L4 准入层级、候选 ADR signoff matrix、auto-reject /
   deferral rules 和 reviewer result template；不授权生产实现。
+- `agent-l1-package-closure-audit-20260702.md`：六个 Agent ADR candidates
+  均被主集成接受为 L1 reviewability only 后的闭环审计；确认下一步只能进入
+  L2 scoped implementation design 或 fixture-only hardening，不能直接生产实现。
 - `agent-eval-replay-l1-acceptance-review-20260702.md`：Eval / Replay
   candidate 的 L1 acceptance review 自评包，建议进入主集成 ADR review，
   但继续 defer production implementation。

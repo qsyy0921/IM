@@ -40,6 +40,7 @@ authorizes the next explicitly scoped integration design.
 - `../agent-controlled-implementation-entry-audit-20260702.md`
 - `../agent-full-package-entry-review-request-20260702.md`
 - `../agent-adr-acceptance-review-playbook-20260702.md`
+- `../agent-l1-package-closure-audit-20260702.md`
 - `../agent-eval-replay-l1-acceptance-review-20260702.md`
 - `../agent-runtime-workflow-l1-acceptance-review-20260702.md`
 - `../agent-context-evidencepack-l1-acceptance-review-20260702.md`

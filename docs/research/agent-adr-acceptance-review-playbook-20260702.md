@@ -147,9 +147,10 @@ It did not approve production implementation. Begin L1 review in this order:
 6. AgentOps / Governance.
 
 Eval / Replay Harness, Runtime / Workflow Boundary, Context / EvidencePack,
-Memory Admission and Tool / MCP Boundary have been accepted for L1 ADR
-acceptance by main integration. AgentOps / Governance is the next L1 candidate
-under review with an Agent Lab self-review package drafted.
+Memory Admission, Tool / MCP Boundary and AgentOps / Governance have all been
+accepted for L1 ADR acceptance by main integration as reviewability-only
+decisions. The six-candidate L1 package closure audit is now the current
+post-review artifact.
 
 Current P0 inside Agent Lab scope: none known.
 
@@ -158,7 +159,7 @@ Current P1 inside Agent Lab scope: none known.
 External blockers remain:
 
 - formal implementation-ready ADRs do not exist yet;
-- the AgentOps / Governance L1 candidate verdict is pending;
+- L2 scoped implementation designs do not exist yet;
 - production owner signoff is missing;
 - real-service preservation smoke is missing;
 - production operator UX is missing.

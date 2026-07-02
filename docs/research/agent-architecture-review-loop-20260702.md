@@ -112,11 +112,12 @@ the first two ADR candidates:
 1. Agent Eval / Replay Harness.
 2. Agent Runtime / Workflow Boundary.
 
-Do not mark the overall goal complete yet. The following blockers remain
-outside this isolated pass:
+Do not mark the overall goal complete yet. The following blockers remained
+outside this isolated pass and still block controlled implementation after the
+later L1 package closure:
 
-- no accepted ADR exists yet;
-- main integration has not reviewed this pass;
+- no formal implementation-ready ADR or L2 scoped design exists yet;
+- main integration has accepted only reviewability, not implementation entry;
 - no real-service preservation smoke has been approved;
 - no production operator UX has been implemented;
 - no production schema or runtime contract is authorized.

@@ -333,6 +333,12 @@ function New-HotGroupMetricQueries {
         [pscustomobject]@{ name = "push_redis_subscriber_signal_fanout_duration_p99_ms_window"; query = "histogram_quantile(0.99, sum(increase(nexusim_push_gateway_redis_subscriber_fanout_duration_milliseconds_bucket{operation=`"conversation_signal`"}[$($WindowSeconds)s])) by (le))" },
         [pscustomobject]@{ name = "push_redis_subscriber_signal_fanout_queue_wait_p95_ms_window"; query = "histogram_quantile(0.95, sum(increase(nexusim_push_gateway_redis_subscriber_signal_fanout_queue_wait_duration_milliseconds_bucket[$($WindowSeconds)s])) by (le))" },
         [pscustomobject]@{ name = "push_redis_subscriber_signal_fanout_queue_wait_p99_ms_window"; query = "histogram_quantile(0.99, sum(increase(nexusim_push_gateway_redis_subscriber_signal_fanout_queue_wait_duration_milliseconds_bucket[$($WindowSeconds)s])) by (le))" },
+        [pscustomobject]@{ name = "message_pg_pool_acquire_total"; query = 'max(nexusim_message_pg_pool_acquire_total)' },
+        [pscustomobject]@{ name = "message_pg_pool_acquire_duration_ms_total"; query = 'max(nexusim_message_pg_pool_acquire_duration_milliseconds_total)' },
+        [pscustomobject]@{ name = "message_pg_pool_empty_acquire_total"; query = 'max(nexusim_message_pg_pool_empty_acquire_total)' },
+        [pscustomobject]@{ name = "message_pg_pool_canceled_acquire_total"; query = 'max(nexusim_message_pg_pool_canceled_acquire_total)' },
+        [pscustomobject]@{ name = "message_pg_pool_conns_acquired"; query = 'max(nexusim_message_pg_pool_conns{state="acquired"})' },
+        [pscustomobject]@{ name = "message_pg_pool_conns_max"; query = 'max(nexusim_message_pg_pool_conns{state="max"})' },
         [pscustomobject]@{ name = "message_pg_pool_conns"; query = 'max(nexusim_message_pg_pool_conns)' },
         [pscustomobject]@{ name = "conversation_pg_pool_conns"; query = 'max(nexusim_conversation_pg_pool_conns)' },
         [pscustomobject]@{ name = "delivery_pg_pool_conns"; query = 'max(nexusim_delivery_pg_pool_conns)' }

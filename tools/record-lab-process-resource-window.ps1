@@ -4,7 +4,8 @@ param(
     [int]$IntervalSeconds = 1,
     [string]$StopFile = "",
     [string]$WindowsName = "windows",
-    [string[]]$WindowsCommandPatterns = @("loadtest\\hotgroup", "loadtest/hotgroup"),
+    [string[]]$WindowsCommandPatterns = @("hotgroup-loadtest", "loadtest\\hotgroup", "loadtest/hotgroup"),
+    [string[]]$WindowsExcludeProcessNames = @("powershell.exe", "pwsh.exe", "ssh.exe", "cmd.exe"),
     [string]$UbuntuHost = "qsyy0921@172.31.50.2",
     [string]$UbuntuName = "ubuntu",
     [string[]]$UbuntuContainerPatterns = @(
@@ -18,6 +19,7 @@ param(
         "nexusim-timeline-service",
         "nexusim-push-gateway"
     ),
+    [string[]]$UbuntuContainerExcludePatterns = @("nexusim-kafka-ui"),
     [string]$MacHost = "",
     [string]$MacName = "mac",
     [switch]$IncludeMac,
@@ -121,7 +123,9 @@ function Get-WindowsProcessSamples {
 
     try {
         $processes = Get-CimInstance Win32_Process | Where-Object {
-            $_.CommandLine -and (Test-AnyPattern -Text $_.CommandLine -Patterns $WindowsCommandPatterns)
+            $_.CommandLine -and
+                (Test-AnyPattern -Text $_.CommandLine -Patterns $WindowsCommandPatterns) -and
+                -not (Test-AnyPattern -Text ([string]$_.Name) -Patterns $WindowsExcludeProcessNames)
         }
         $rows = @()
         foreach ($process in $processes) {
@@ -211,9 +215,13 @@ docker stats --no-stream --format '{{json .}}' 2>/dev/null | grep -E '$patternTe
                 continue
             }
             $entry = $line | ConvertFrom-Json
+            $name = [string]$entry.Name
+            if (Test-AnyPattern -Text $name -Patterns $UbuntuContainerExcludePatterns) {
+                continue
+            }
             $memUsed = ([string]$entry.MemUsage -split "/")[0].Trim()
             $rows += New-ProcessSample -Timestamp $Timestamp -Machine $UbuntuName -OS "linux" -Kind "container" `
-                -Name ([string]$entry.Name) -ID ([string]$entry.Container) `
+                -Name $name -ID ([string]$entry.Container) `
                 -CPUPercent (Convert-ToDoubleOrNull $entry.CPUPerc) -MemoryMB (Convert-DockerMemoryToMB $memUsed)
         }
         return $rows

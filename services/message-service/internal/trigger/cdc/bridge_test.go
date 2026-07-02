@@ -1,12 +1,38 @@
 package cdc
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
+	"time"
 
 	conversationtimelinev1 "github.com/qsyy0921/IM/schemas/kafka"
 	"google.golang.org/protobuf/proto"
 )
+
+func TestNewBridgeDefersReaderUntilSourceTopicExists(t *testing.T) {
+	bridge, err := NewBridge(Config{
+		Brokers:     []string{"127.0.0.1:1"},
+		SourceTopic: "source-topic",
+		TargetTopic: "target-topic",
+		GroupID:     "bridge-test",
+	})
+	if err != nil {
+		t.Fatalf("NewBridge returned error: %v", err)
+	}
+	defer bridge.Close()
+	if bridge.reader != nil {
+		t.Fatal("reader should be created after source topic readiness, not during NewBridge")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Nanosecond)
+	defer cancel()
+	if err := bridge.ensureReader(ctx); err == nil {
+		t.Fatal("ensureReader unexpectedly succeeded without a reachable broker/source topic")
+	}
+	if bridge.reader != nil {
+		t.Fatal("reader should remain nil when source topic readiness fails")
+	}
+}
 
 func TestBuildRecordPublishesTimelineInsert(t *testing.T) {
 	payloadJSON := `{"message_id":"msg-1","conversation_id":"conv-1","conversation_seq":7,"sender_id":"user-1","device_id":"device-1","client_msg_id":"client-1","command_hash":"hash-1","message_type":"TEXT","payload":{"text":"hello"},"attachment_ids":[],"accepted_at":"2026-07-02T12:00:00Z"}`

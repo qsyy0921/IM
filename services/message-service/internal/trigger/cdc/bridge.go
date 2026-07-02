@@ -66,16 +66,6 @@ func NewBridge(config Config) (*Bridge, error) {
 		return nil, err
 	}
 	return &Bridge{
-		reader: kafkago.NewReader(kafkago.ReaderConfig{
-			Brokers:        config.Brokers,
-			Topic:          config.SourceTopic,
-			GroupID:        config.GroupID,
-			StartOffset:    kafkago.FirstOffset,
-			MinBytes:       1,
-			MaxBytes:       10e6,
-			CommitInterval: 0,
-			MaxWait:        500 * time.Millisecond,
-		}),
 		writer: writer,
 		config: config,
 	}, nil
@@ -96,14 +86,27 @@ func (b *Bridge) Close() error {
 }
 
 func (b *Bridge) Run(ctx context.Context) error {
-	if b == nil || b.reader == nil || b.writer == nil {
+	if b == nil || b.writer == nil {
 		return errors.New("cdc bridge is not configured")
 	}
 	for {
+		if err := b.ensureReader(ctx); err != nil {
+			if errors.Is(err, context.Canceled) {
+				return context.Canceled
+			}
+			if b.config.Logf != nil {
+				b.config.Logf("message CDC bridge waiting for source topic after error: %v", err)
+			}
+			if err := waitForInterval(ctx, b.config.ErrorBackoff); err != nil {
+				return err
+			}
+			continue
+		}
 		if err := b.runOnce(ctx); err != nil {
 			if errors.Is(err, context.Canceled) {
 				return context.Canceled
 			}
+			b.closeReader()
 			if b.config.Logf != nil {
 				b.config.Logf("message CDC bridge retrying after error: %v", err)
 			}
@@ -112,6 +115,84 @@ func (b *Bridge) Run(ctx context.Context) error {
 			}
 		}
 	}
+}
+
+func (b *Bridge) ensureReader(ctx context.Context) error {
+	if b.reader != nil {
+		return nil
+	}
+	if err := b.waitForSourceTopic(ctx); err != nil {
+		return err
+	}
+	b.reader = b.newReader()
+	return nil
+}
+
+func (b *Bridge) newReader() *kafkago.Reader {
+	return kafkago.NewReader(kafkago.ReaderConfig{
+		Brokers:        b.config.Brokers,
+		Topic:          b.config.SourceTopic,
+		GroupID:        b.config.GroupID,
+		StartOffset:    kafkago.FirstOffset,
+		MinBytes:       1,
+		MaxBytes:       10e6,
+		CommitInterval: 0,
+		MaxWait:        500 * time.Millisecond,
+	})
+}
+
+func (b *Bridge) closeReader() {
+	if b.reader == nil {
+		return
+	}
+	_ = b.reader.Close()
+	b.reader = nil
+}
+
+func (b *Bridge) waitForSourceTopic(ctx context.Context) error {
+	for {
+		exists, err := topicExists(ctx, b.config.Brokers, b.config.SourceTopic)
+		if err == nil && exists {
+			if b.config.Logf != nil {
+				b.config.Logf("message CDC bridge source topic ready: %s", b.config.SourceTopic)
+			}
+			return nil
+		}
+		if b.config.Logf != nil {
+			if err != nil {
+				b.config.Logf("message CDC bridge waiting for source topic %s: %v", b.config.SourceTopic, err)
+			} else {
+				b.config.Logf("message CDC bridge waiting for source topic %s", b.config.SourceTopic)
+			}
+		}
+		if err := waitForInterval(ctx, b.config.ErrorBackoff); err != nil {
+			return err
+		}
+	}
+}
+
+func topicExists(ctx context.Context, brokers []string, topic string) (bool, error) {
+	if len(brokers) == 0 {
+		return false, errors.New("kafka brokers are required")
+	}
+	dialer := &kafkago.Dialer{Timeout: 5 * time.Second}
+	dialCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	conn, err := dialer.DialContext(dialCtx, "tcp", brokers[0])
+	if err != nil {
+		return false, err
+	}
+	defer conn.Close()
+	partitions, err := conn.ReadPartitions(topic)
+	if err != nil {
+		return false, err
+	}
+	for _, partition := range partitions {
+		if partition.Topic == topic {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func (b *Bridge) runOnce(ctx context.Context) error {

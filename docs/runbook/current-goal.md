@@ -630,6 +630,19 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
   约 `260.508ms`。下一步不要继续只扩 audit；应优先剖析 message repository append、
   message PG pool、message_log / timeline / message_outbox insert/index/WAL 路径。报告见
   `docs/runbook/loadtest/hotgroup/hotgroup-analysis-20260702-policy-auditpg-experiment.md`。
+- 2026-07-02 Backend Lab 完成 Kafka policy decision audit feasibility 实验：
+  policy-service 新增 `NEXUSIM_POLICY_DECISION_AUDIT_SINK=kafka`，本地 hot path 不再同步写
+  `policy_decision_audit_outbox`，而是直接向 `im.policy.events` 发布低敏 audit event。
+  smoke 和正式双客户端复压均通过，PG audit outbox 计数保持 `253524 -> 253524`、
+  pending `0 -> 0`，Kafka audit stage `5010` 次、错误 `0`。正式 run 为
+  `hotgroup-kafkaaudit-clean-2client-6000x2500x2-384c-19771df0-20260702-213651`：
+  Windows / Mac 各 6000 人、2500 消息、384 并发，实际约 `1790.630` / `1854.436 msg/s`，
+  SendMessage p99 约 `373.781ms` / `244.973ms`，message / delivery outbox pending 均为 0。
+  但当前 Kafka audit 仍在 policy check 内同步等待 Kafka ACK，`decision_audit_kafka_publish p99`
+  约 `222ms`，几乎等于剩余的 `message_policy_check_recent p99` 约 `227.421ms`。
+  结论：Kafka 可用于可靠异步 audit，但“同步 PG audit -> 同步 Kafka ACK”只是瓶颈迁移，
+  下一步应做有显式可靠性 / DLQ / redrive 指标的异步 audit 边界。报告见
+  `docs/runbook/loadtest/hotgroup/hotgroup-analysis-20260702-kafka-audit-experiment.md`。
 - HYBRID 诊断档位 1000 人 / 1000 消息 / 400 msg/s 暴露 `delivery_outbox` ready query
   在百万级 per-user outbox 下退化：旧 anti-join blocker 查询每批 500 行约 24s。当前
   delivery outbox relay 已改成 per-conversation frontier ready query，并把本地 worker

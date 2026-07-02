@@ -300,6 +300,8 @@ ai/python/tests/test_agent_eval_*.py
   完整包被按意图而非证据接受；仍不授权生产实现。
 - Eval / Replay L1 acceptance review：按 playbook 起草第一份候选 ADR 自评包；
   结论是建议主集成接受该 candidate 进入 L1 ADR review，但生产实现继续 defer。
+- Runtime / Workflow L1 acceptance review：按 playbook 起草第二份候选 ADR 自评包；
+  结论是建议接受 cognitive runtime / durable workflow wait 边界，但不授权 runtime service。
 - Skeleton completion audit：已把 immutable goal 的 17 个骨架要求映射到当前
   代码、fixture、CLI、tests 和 runbook evidence；结论是 Phase 1 isolated
   Agent-layer skeleton 可作为当前可执行基线，但不能直接推广生产契约。

@@ -146,6 +146,9 @@ It did not approve production implementation. Begin L1 review in this order:
 5. Tool / MCP Boundary.
 6. AgentOps / Governance.
 
+Eval / Replay Harness has been accepted for L1 ADR acceptance by main
+integration. Runtime / Workflow Boundary is the next L1 candidate under review.
+
 Current P0 inside Agent Lab scope: none known.
 
 Current P1 inside Agent Lab scope: none known.
@@ -153,7 +156,7 @@ Current P1 inside Agent Lab scope: none known.
 External blockers remain:
 
 - accepted ADRs do not exist yet;
-- individual L1 ADR candidate verdicts are pending;
+- remaining L1 ADR candidate verdicts are pending;
 - production owner signoff is missing;
 - real-service preservation smoke is missing;
 - production operator UX is missing.

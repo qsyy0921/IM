@@ -41,6 +41,7 @@ authorizes the next explicitly scoped integration design.
 - `../agent-full-package-entry-review-request-20260702.md`
 - `../agent-adr-acceptance-review-playbook-20260702.md`
 - `../agent-eval-replay-l1-acceptance-review-20260702.md`
+- `../agent-runtime-workflow-l1-acceptance-review-20260702.md`
 - `../agent-multi-agent-handoff-fixture-evidence-20260702.md`
 - `../agent-operator-governance-fixture-evidence-20260702.md`
 - `../agent-operational-readiness-fixture-evidence-20260702.md`

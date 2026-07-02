@@ -31,7 +31,7 @@ runbook / SDD / research 文档维护。
 - Memory / Tool / AgentOps reviews：`docs/research/agent-memory-admission-adr-review-20260702.md`、
   `docs/research/agent-tool-mcp-adr-review-20260702.md`、`docs/research/agentops-governance-adr-review-20260702.md`。
 - Fixture evidence：`docs/research/agent-*-fixture-evidence-20260702.md`。
-- Latest audit focus：full-package entry accepted for ADR review; Eval / Replay L1 review package drafted。
+- Latest audit focus：Eval / Replay L1 accepted; Runtime / Workflow L1 review package drafted。
 - 详细 SDD：`docs/sdd/agent-runtime.md`、`agent-memory-admission.md`、
   `agent-context-evidencepack.md`、`agent-tool-mcp-boundary.md`、
   `agent-eval-replay-harness.md`、`agent-governance-agentops.md`。
@@ -71,7 +71,7 @@ runbook / SDD / research 文档维护。
 
 ## 后续优先级
 
-1. Full package 已被主集成接受进入 ADR review；Eval / Replay L1 自评已起草，未接受前不提升生产契约。
+1. Full package 已进入 ADR review；Eval / Replay L1 已接受，Runtime / Workflow L1 自评已起草；未接受前不提升生产契约。
 2. Eval / Replay、Runtime / Workflow、Context / Evidence、Memory、Tool、AgentOps、
    dataset reproducibility、cross-service preservation、multi-agent handoff、
    object completeness、operator governance、operational readiness、controlled implementation readiness、architecture coverage 和 contract version compatibility

@@ -49,6 +49,9 @@
 - `agent-eval-replay-l1-acceptance-review-20260702.md`：Eval / Replay
   candidate 的 L1 acceptance review 自评包，建议进入主集成 ADR review，
   但继续 defer production implementation。
+- `agent-runtime-workflow-l1-acceptance-review-20260702.md`：Runtime /
+  Workflow candidate 的 L1 acceptance review 自评包，建议作为第二个候选
+  进入主集成 ADR review；不授权 runtime service 或 workflow 改动。
 - `agent-eval-replay-adr-review-20260702.md`：Eval / Replay ADR candidate
   focused review，补齐 failure-class lifecycle、baseline approval、retention /
   redaction 和 contract-version bump rehearsal。

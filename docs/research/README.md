@@ -58,6 +58,9 @@
 - `agent-memory-admission-l1-acceptance-review-20260702.md`：Memory Admission
   candidate 的 L1 acceptance review 自评包，建议作为第四个候选进入主集成
   ADR review；不冻结 MemoryCandidate / MemoryClaim / memory event schema。
+- `agent-tool-mcp-l1-acceptance-review-20260702.md`：Tool / MCP candidate 的
+  L1 acceptance review 自评包，建议作为第五个候选进入主集成 ADR review；
+  不授权生产 MCP provider、tool schema 或 side-effect execution path。
 - `agent-eval-replay-adr-review-20260702.md`：Eval / Replay ADR candidate
   focused review，补齐 failure-class lifecycle、baseline approval、retention /
   redaction 和 contract-version bump rehearsal。

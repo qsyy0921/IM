@@ -31,17 +31,19 @@ type observedEvent struct {
 }
 
 type summary struct {
-	TenantID        string          `json:"tenant_id"`
-	ConversationID  string          `json:"conversation_id"`
-	Topic           string          `json:"topic"`
-	ExpectedCount   int             `json:"expected_count"`
-	ObservedCount   int             `json:"observed_count"`
-	MissingEventIDs []string        `json:"missing_event_ids,omitempty"`
-	UnexpectedIDs   []string        `json:"unexpected_event_ids,omitempty"`
-	DuplicateIDs    []string        `json:"duplicate_event_ids,omitempty"`
-	OutOfOrder      []observedEvent `json:"out_of_order,omitempty"`
-	Expected        []expectedEvent `json:"expected,omitempty"`
-	Observed        []observedEvent `json:"observed,omitempty"`
+	TenantID             string          `json:"tenant_id"`
+	ConversationID       string          `json:"conversation_id"`
+	Topic                string          `json:"topic"`
+	ExpectedCount        int             `json:"expected_count"`
+	ObservedCount        int             `json:"observed_count"`
+	ScannedObservedCount int             `json:"scanned_observed_count,omitempty"`
+	IgnoredObservedCount int             `json:"ignored_observed_count,omitempty"`
+	MissingEventIDs      []string        `json:"missing_event_ids,omitempty"`
+	UnexpectedIDs        []string        `json:"unexpected_event_ids,omitempty"`
+	DuplicateIDs         []string        `json:"duplicate_event_ids,omitempty"`
+	OutOfOrder           []observedEvent `json:"out_of_order,omitempty"`
+	Expected             []expectedEvent `json:"expected,omitempty"`
+	Observed             []observedEvent `json:"observed,omitempty"`
 }
 
 func main() {
@@ -53,6 +55,7 @@ func main() {
 	var createdAfterRaw string
 	var timeout time.Duration
 	var includeRows bool
+	var matchExpectedOnly bool
 
 	flag.StringVar(&dsn, "pg-dsn", getenv("NEXUSIM_PG_DSN", "postgres://nexusim:nexusim@localhost:5432/nexusim?sslmode=disable"), "PostgreSQL DSN")
 	flag.StringVar(&brokersCSV, "brokers", getenv("NEXUSIM_KAFKA_BROKERS", "localhost:9092"), "comma-separated Kafka brokers")
@@ -62,6 +65,7 @@ func main() {
 	flag.StringVar(&createdAfterRaw, "created-after", "", "RFC3339 lower bound for PG timeline rows")
 	flag.DurationVar(&timeout, "timeout", 10*time.Second, "Kafka scan timeout")
 	flag.BoolVar(&includeRows, "include-rows", false, "include expected/observed rows in JSON output")
+	flag.BoolVar(&matchExpectedOnly, "match-expected-only", false, "ignore historical Kafka events whose event_id is not in the expected PG row set")
 	flag.Parse()
 
 	if tenantID == "" || conversationID == "" {
@@ -87,7 +91,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	result := compare(tenantID, conversationID, topic, expected, observed, includeRows)
+	result := compare(tenantID, conversationID, topic, expected, observed, includeRows, matchExpectedOnly)
 	encoded, err := json.MarshalIndent(result, "", "  ")
 	if err != nil {
 		log.Fatal(err)
@@ -253,10 +257,23 @@ func minTime(a time.Time, b time.Time) time.Time {
 	return b
 }
 
-func compare(tenantID string, conversationID string, topic string, expected []expectedEvent, observed []observedEvent, includeRows bool) summary {
+func compare(tenantID string, conversationID string, topic string, expected []expectedEvent, observed []observedEvent, includeRows bool, matchExpectedOnly bool) summary {
 	expectedIDs := make(map[string]expectedEvent, len(expected))
 	for _, event := range expected {
 		expectedIDs[event.EventID] = event
+	}
+	scannedObservedCount := len(observed)
+	ignoredObservedCount := 0
+	if matchExpectedOnly {
+		filtered := make([]observedEvent, 0, len(expected))
+		for _, event := range observed {
+			if _, ok := expectedIDs[event.EventID]; ok {
+				filtered = append(filtered, event)
+				continue
+			}
+			ignoredObservedCount++
+		}
+		observed = filtered
 	}
 	observedCounts := make(map[string]int, len(observed))
 	for _, event := range observed {
@@ -275,19 +292,21 @@ func compare(tenantID string, conversationID string, topic string, expected []ex
 		}
 	}
 	sort.Strings(duplicates)
-	seenUnexpected := map[string]struct{}{}
 	var unexpected []string
-	for _, event := range observed {
-		if _, ok := expectedIDs[event.EventID]; ok {
-			continue
+	if !matchExpectedOnly {
+		seenUnexpected := map[string]struct{}{}
+		for _, event := range observed {
+			if _, ok := expectedIDs[event.EventID]; ok {
+				continue
+			}
+			if _, seen := seenUnexpected[event.EventID]; seen {
+				continue
+			}
+			seenUnexpected[event.EventID] = struct{}{}
+			unexpected = append(unexpected, event.EventID)
 		}
-		if _, seen := seenUnexpected[event.EventID]; seen {
-			continue
-		}
-		seenUnexpected[event.EventID] = struct{}{}
-		unexpected = append(unexpected, event.EventID)
+		sort.Strings(unexpected)
 	}
-	sort.Strings(unexpected)
 	var outOfOrder []observedEvent
 	lastSeqByPartition := map[int]int64{}
 	for _, event := range observed {
@@ -300,15 +319,17 @@ func compare(tenantID string, conversationID string, topic string, expected []ex
 		lastSeqByPartition[event.Partition] = event.Seq
 	}
 	result := summary{
-		TenantID:        tenantID,
-		ConversationID:  conversationID,
-		Topic:           topic,
-		ExpectedCount:   len(expected),
-		ObservedCount:   len(observed),
-		MissingEventIDs: missing,
-		UnexpectedIDs:   unexpected,
-		DuplicateIDs:    duplicates,
-		OutOfOrder:      outOfOrder,
+		TenantID:             tenantID,
+		ConversationID:       conversationID,
+		Topic:                topic,
+		ExpectedCount:        len(expected),
+		ObservedCount:        len(observed),
+		ScannedObservedCount: scannedObservedCount,
+		IgnoredObservedCount: ignoredObservedCount,
+		MissingEventIDs:      missing,
+		UnexpectedIDs:        unexpected,
+		DuplicateIDs:         duplicates,
+		OutOfOrder:           outOfOrder,
 	}
 	if includeRows {
 		result.Expected = expected

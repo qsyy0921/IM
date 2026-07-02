@@ -82,8 +82,8 @@ has all of the following:
 | Workflow / approval | Runtime/Workflow candidate plus workflow ownership matrix | Conditionally passes; workflow cannot read planner internals |
 | Action executor handoff | Object model and preservation appendix | Conditionally passes; executor remains sole side-effect owner |
 | AgentOps / governance | SDD plus AgentOps candidate | Conditionally passes; operator UX is a promotion prerequisite |
-| Contract versioning | Production object model plus shared appendix | Conditionally passes; version-bump rehearsal still needed |
-| Cross-service ref preservation | Shared appendix | Conditionally passes; integration smoke is required before production design |
+| Contract versioning | Production object model plus shared appendix | Conditionally passes; version-bump rehearsal has fixture evidence |
+| Cross-service ref preservation | Shared appendix and fixture evidence | Conditionally passes; real-service preservation smoke is required before production design |
 | Security / privacy / audit | SDD rejection rules plus appendix | Conditionally passes; raw prompt/provider replay remains rejected |
 | Open dataset / synthetic eval | Eval SDD and current Python fixture harness | Passes Phase 1 boundary; not a production release gate yet |
 
@@ -114,7 +114,8 @@ Next loop should start from the Eval/Replay candidate and verify:
 
 - release-gate semantics are sufficient;
 - P0/P1 failure classes block promotion;
-- version-bump replay rehearsal is defined;
+- version-bump replay and cross-service preservation rehearsals have fixture
+  evidence;
 - report retention and redaction policy are acceptable;
 - baseline approval UX has an owner.
 

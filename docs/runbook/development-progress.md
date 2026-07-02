@@ -56,6 +56,7 @@ Eval Harness / synthetic IM-like fixture 已开始隔离式编码。
 | `docs/research/agent-tool-mcp-fixture-evidence-20260702.md` | 已完成 Tool 段 | Tool / MCP governance rehearsal 已用 fixture-only code / JSON / tests 落地；仍不提升生产契约 |
 | `docs/research/agentops-governance-fixture-evidence-20260702.md` | 已完成 AgentOps 段 | AgentOps governance rehearsal 已用 fixture-only code / JSON / tests 落地；仍不提升生产契约 |
 | `docs/research/agent-dataset-reproducibility-fixture-evidence-20260702.md` | 已完成 Dataset 段 | Dataset reproducibility rehearsal 已用 fixture-only code / JSON / tests 落地；仍不提升生产契约 |
+| `docs/research/agent-cross-service-preservation-fixture-evidence-20260702.md` | 已完成 Preservation 段 | Cross-service preservation rehearsal 已用 fixture-only code / JSON / tests 落地；仍不提升生产契约 |
 | `docs/sdd/agent-runtime.md` | 已完成 | Runtime / Harness 详细 SDD |
 | `docs/sdd/agent-memory-admission.md` | 已完成 | Memory admission 详细 SDD |
 | `docs/sdd/agent-context-evidencepack.md` | 已完成 | Context / EvidencePack 详细 SDD |
@@ -132,6 +133,7 @@ ai/python/fixtures/agent_eval/synthetic_memory_admission_hardening_scenarios.jso
 ai/python/fixtures/agent_eval/synthetic_memory_admission_deeper_hardening_scenarios.json
 ai/python/fixtures/agent_eval/memory_calibration_sample.json
 ai/python/fixtures/agent_eval/memory_calibration_public_export.json
+ai/python/fixtures/agent_eval/cross_service_preservation_rehearsal.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_hardening_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_deeper_hardening_scenarios.json
@@ -232,6 +234,9 @@ ai/python/tests/test_agent_eval_*.py
 - Dataset reproducibility rehearsal：已补 dataset manifest、license ref、
   snapshot hash、split manifest、import hash、adapter version、deterministic
   report hash 和 promotion blocking 证据。
+- Cross-service preservation rehearsal：已补 retrieval、memory、MCP、workflow、
+  executor、audit 边界的 role refs、scope/version/taint/audit-lineage refs、
+  compat window / replay reader refs 和 promotion blocking 证据。
 - Skeleton completion audit：已把 immutable goal 的 17 个骨架要求映射到当前
   代码、fixture、CLI、tests 和 runbook evidence；结论是 Phase 1 isolated
   Agent-layer skeleton 可作为当前可执行基线，但不能直接推广生产契约。

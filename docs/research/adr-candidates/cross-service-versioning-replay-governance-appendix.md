@@ -97,6 +97,18 @@ Before any production integration design, evidence must progress in this order:
 
 Skipping a rung rejects promotion.
 
+Current fixture-only evidence:
+
+- replay version-bump proof:
+  `ai/python/nexusim_ai_eval/replay_compatibility.py`;
+- cross-service preservation proof:
+  `ai/python/nexusim_ai_eval/cross_service_preservation.py`;
+- evidence report:
+  `docs/research/agent-cross-service-preservation-fixture-evidence-20260702.md`.
+
+This evidence closes the Agent Lab fixture rung only. It does not approve real
+service integration or production contract promotion.
+
 ## Operator Acceptance Gate
 
 High-risk Agent releases are not promotable unless an authorized operator can

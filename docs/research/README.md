@@ -76,6 +76,10 @@
 - `agent-dataset-reproducibility-fixture-evidence-20260702.md`：fixture-only
   evidence 更新，记录 open dataset / synthetic fixture manifest、snapshot、
   split、import、adapter version 和 deterministic report 证据。
+- `agent-cross-service-preservation-fixture-evidence-20260702.md`：
+  fixture-only evidence 更新，记录 retrieval、memory、MCP、workflow、executor
+  和 audit 边界的 refs / scope / version / taint / audit-lineage preservation
+  证据。
 
 ## 存放位置
 

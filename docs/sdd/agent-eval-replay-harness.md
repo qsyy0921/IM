@@ -447,6 +447,7 @@ ai/python/nexusim_ai_eval/
   comparison.py
   context_evidence_preservation.py
   contracts.py
+  cross_service_preservation.py
   dataset_reproducibility.py
   evaluator.py
   fixtures.py
@@ -460,6 +461,7 @@ ai/python/fixtures/agent_eval/adapter_samples/
 ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json
 ai/python/fixtures/agent_eval/agentops_governance_rehearsal.json
 ai/python/fixtures/agent_eval/context_evidence_preservation_rehearsal.json
+ai/python/fixtures/agent_eval/cross_service_preservation_rehearsal.json
 ai/python/fixtures/agent_eval/dataset_reproducibility_rehearsal.json
 ai/python/fixtures/agent_eval/tool_mcp_governance_rehearsal.json
 ai/python/fixtures/agent_eval/replay_version_bump_rehearsal.json
@@ -492,6 +494,7 @@ ai/python/scripts/run_agent_dataset_adapter.py
 ai/python/scripts/run_agent_eval_regression.py
 ai/python/tests/test_agent_eval_context_evidence_preservation.py
 ai/python/tests/test_agent_eval_contracts.py
+ai/python/tests/test_agent_eval_cross_service_preservation.py
 ai/python/tests/test_agent_eval_evaluator.py
 ai/python/tests/test_agent_eval_agentops_governance.py
 ai/python/tests/test_agent_eval_dataset_reproducibility.py
@@ -608,6 +611,10 @@ Implemented checks:
   refs, snapshot hashes, split manifests, import hashes, adapter versions,
   deterministic report hashes and promotion blocking for changed or
   non-reproducible dataset evidence.
+- cross-service preservation rehearsal coverage for retrieval, memory, MCP,
+  workflow, executor and audit boundary refs, scope/version/taint/audit
+  lineage, compatibility-window refs and promotion blocking when a boundary
+  drops required preservation evidence.
 - state-diff report fixture coverage for approved action outcome refs,
   expected-vs-actual state changes, missing execution refs, incomplete reports
   and unauthorized mutation detection.
@@ -644,6 +651,7 @@ python -m pytest ai/python/tests/test_agent_eval_memory_admission_governance.py 
 python -m pytest ai/python/tests/test_agent_eval_tool_mcp_governance.py -q
 python -m pytest ai/python/tests/test_agent_eval_agentops_governance.py -q
 python -m pytest ai/python/tests/test_agent_eval_dataset_reproducibility.py -q
+python -m pytest ai/python/tests/test_agent_eval_cross_service_preservation.py -q
 python ai/python/scripts/run_agent_eval_current_report.py ai/python/fixtures/agent_eval/synthetic_core_scenarios.json --report-out .tmp-agent-current-report.json --baseline ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json --review-out .tmp-agent-baseline-review.json --force
 python ai/python/scripts/run_agent_eval_report_matrix.py ai/python/fixtures/agent_eval/report_matrix_sample.json --matrix-out .tmp-agent-eval-matrix/matrix.json --approval-manifest-out .tmp-agent-eval-matrix/approval-manifest.json --force
 python ai/python/scripts/run_agent_memory_calibration.py ai/python/fixtures/agent_eval/memory_calibration_sample.json --report-out .tmp-agent-memory-calibration-report.json --force

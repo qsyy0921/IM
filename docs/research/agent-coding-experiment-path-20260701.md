@@ -65,6 +65,7 @@ ai/python/nexusim_ai_eval/
   __init__.py
   adapter_runner.py
   adapters.py
+  cross_service_preservation.py
   dataset_reproducibility.py
   comparison.py
   contracts.py
@@ -91,6 +92,7 @@ ai/python/fixtures/agent_eval/synthetic_memory_admission_hardening_scenarios.jso
 ai/python/fixtures/agent_eval/synthetic_memory_admission_deeper_hardening_scenarios.json
 ai/python/fixtures/agent_eval/memory_calibration_sample.json
 ai/python/fixtures/agent_eval/memory_calibration_public_export.json
+ai/python/fixtures/agent_eval/cross_service_preservation_rehearsal.json
 ai/python/fixtures/agent_eval/dataset_reproducibility_rehearsal.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_hardening_scenarios.json
@@ -196,6 +198,9 @@ Slice 0 covers:
   license refs, snapshot hashes, split manifests, import hashes, adapter
   versions, deterministic report hashes and promotion blocking for changed or
   non-reproducible dataset evidence.
+- fixture-only cross-service preservation coverage for retrieval, memory, MCP,
+  workflow, executor and audit boundary refs, scope/version/taint/audit lineage
+  and promotion blocking when required preservation evidence is dropped.
 - fixture-only state-diff report coverage for approved action outcome refs,
   expected-vs-actual state changes, missing execution refs, incomplete reports
   and unauthorized mutation detection.
@@ -472,6 +477,9 @@ Evaluator tests:
 - dataset reproducibility scoring rejects production-data manifests, missing
   split manifests, backend-connected runs, non-deterministic reports, mismatched
   calibration export counts and changed snapshots allowed through promotion.
+- cross-service preservation scoring rejects missing required boundaries,
+  dropped role refs, scope widening, raw payload exposure and failed boundary
+  promotion allowed through release gates.
 - AgentRun trace includes context, memory, tool, workflow, runtime-control and
   failure steps.
 - runtime-control deeper hardening scoring rejects stale checkpoint versions,

@@ -48,6 +48,10 @@ Eval Harness / synthetic IM-like fixture 已开始隔离式编码。
 | `docs/research/agent-architecture-review-loop-20260702.md` | 已完成首轮 | 打回生产推广，补齐 ADR candidate review ledger / acceptance gate 后条件通过 research-level review |
 | `docs/research/agent-eval-replay-adr-review-20260702.md` | 已完成首轮 focused review | Eval / Replay candidate 补齐 failure-class lifecycle、baseline approval、retention/redaction 和 version-bump rehearsal |
 | `docs/research/agent-runtime-workflow-adr-review-20260702.md` | 已完成首轮 focused review | Runtime / Workflow candidate 补齐 checkpoint storage、wakeup dedupe、operator controls 和 BudgetLedger 边界 |
+| `docs/research/agent-context-evidencepack-adr-review-20260702.md` | 已完成首轮 focused review | Context / EvidencePack candidate 补齐 source visibility、denied-lane、citation verifier、taint vocabulary 和 operator evidence inspection |
+| `docs/research/agent-memory-admission-adr-review-20260702.md` | 已完成首轮 focused review | Memory Admission candidate 补齐 lifecycle、category thresholds、revocation/dependency invalidation、audit explanation 和 operator UX |
+| `docs/research/agent-tool-mcp-adr-review-20260702.md` | 已完成首轮 focused review | Tool / MCP candidate 补齐 capability lease、provider attestation、prepare expiry/re-prepare、sandbox onboarding 和 output reuse |
+| `docs/research/agentops-governance-adr-review-20260702.md` | 已完成首轮 focused review | AgentOps candidate 补齐 kill switch、release pinning、baseline approval、failure owner workflow 和 canary/shadow comparison |
 | `docs/sdd/agent-runtime.md` | 已完成 | Runtime / Harness 详细 SDD |
 | `docs/sdd/agent-memory-admission.md` | 已完成 | Memory admission 详细 SDD |
 | `docs/sdd/agent-context-evidencepack.md` | 已完成 | Context / EvidencePack 详细 SDD |

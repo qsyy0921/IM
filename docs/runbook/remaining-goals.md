@@ -23,12 +23,19 @@
    在 `docs/research/agent-architecture-review-loop-20260702.md`，Eval / Replay
    focused review 在 `docs/research/agent-eval-replay-adr-review-20260702.md`，
    Runtime / Workflow focused review 在
-   `docs/research/agent-runtime-workflow-adr-review-20260702.md`。下一步优先评审
-   Context / EvidencePack，未接受前不提升生产契约。
-3. ReplayBundle observability hardening review：当前 skeleton 已覆盖低敏
+   `docs/research/agent-runtime-workflow-adr-review-20260702.md`，Context /
+   EvidencePack focused review 在
+   `docs/research/agent-context-evidencepack-adr-review-20260702.md`，Memory /
+   Tool / AgentOps focused reviews 也已补齐。下一步优先主集成 review 或
+   fixture-only evidence，未接受前不提升生产契约。
+3. Fixture-only evidence hardening：优先 Eval / Replay version-bump rehearsal、
+   Runtime wakeup dedupe / stale checkpoint proof、Context denied-lane retention、
+   Memory revocation/category-threshold proof、Tool prepare-expiry re-prepare 和
+   AgentOps release-blocking proof。
+4. ReplayBundle observability hardening review：当前 skeleton 已覆盖低敏
    observability refs、hash refs、version metadata refs、failure taxonomy refs 和
    trace linkage refs；如评审要求继续，只增加 fixture-only taxonomy / trace 证据。
-4. Memory calibration hardening：当前已补 public-dataset-style export；如需继续，
+5. Memory calibration hardening：当前已补 public-dataset-style export；如需继续，
    只追加公开数据集导出或低敏 adapter metadata，不接真实 IM 数据。
 
 ## Dataset Backlog

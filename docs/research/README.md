@@ -42,6 +42,18 @@
 - `agent-runtime-workflow-adr-review-20260702.md`：Runtime / Workflow ADR
   candidate focused review，补齐 checkpoint storage、wakeup dedupe、operator
   controls 和 budget ledger 边界。
+- `agent-context-evidencepack-adr-review-20260702.md`：Context / EvidencePack
+  ADR candidate focused review，补齐 source visibility、denied-lane、citation
+  verifier、taint vocabulary 和 operator evidence inspection。
+- `agent-memory-admission-adr-review-20260702.md`：Memory Admission ADR
+  candidate focused review，补齐 lifecycle states、category thresholds、
+  revocation / dependency invalidation、audit explanation 和 operator UX。
+- `agent-tool-mcp-adr-review-20260702.md`：Tool / MCP ADR candidate focused
+  review，补齐 capability lease、provider attestation、prepare expiry /
+  re-prepare、sandbox onboarding 和 output reuse。
+- `agentops-governance-adr-review-20260702.md`：AgentOps / Governance ADR
+  candidate focused review，补齐 kill switch、release pinning、baseline
+  approval、failure-class owner workflow 和 canary/shadow comparison。
 
 ## 存放位置
 

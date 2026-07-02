@@ -51,7 +51,6 @@ baseline lifecycle 和 memory calibration。
 
 ## 下一步
 
-若继续架构推进，按 `docs/research/agent-architecture-review-loop-20260702.md`
-优先评审 Context / EvidencePack；否则只做 fixture-only hardening。若继续编码，
-优先 Eval / Replay version-bump rehearsal 或 Runtime wakeup dedupe fixture。
-完整模块完成后 commit、push `origin/codex/agent-lab` 并 handoff。
+若继续架构推进，等待主集成评审六个 ADR candidates 或补 fixture-only evidence。
+若继续编码，优先 Eval / Replay version-bump rehearsal 或 Runtime wakeup dedupe
+fixture。完整模块完成后 commit、push `origin/codex/agent-lab` 并 handoff。

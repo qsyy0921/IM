@@ -27,6 +27,9 @@ runbook / SDD / research 文档维护。
 - Review loop：`docs/research/agent-architecture-review-loop-20260702.md`。
 - Eval / Replay review：`docs/research/agent-eval-replay-adr-review-20260702.md`。
 - Runtime / Workflow review：`docs/research/agent-runtime-workflow-adr-review-20260702.md`。
+- Context / EvidencePack review：`docs/research/agent-context-evidencepack-adr-review-20260702.md`。
+- Memory / Tool / AgentOps reviews：`docs/research/agent-memory-admission-adr-review-20260702.md`、
+  `docs/research/agent-tool-mcp-adr-review-20260702.md`、`docs/research/agentops-governance-adr-review-20260702.md`。
 - 详细 SDD：`docs/sdd/agent-runtime.md`、`agent-memory-admission.md`、
   `agent-context-evidencepack.md`、`agent-tool-mcp-boundary.md`、
   `agent-eval-replay-harness.md`、`agent-governance-agentops.md`。
@@ -66,6 +69,6 @@ runbook / SDD / research 文档维护。
 
 ## 后续优先级
 
-1. Eval / Replay 与 Runtime / Workflow candidates 已完成首轮 focused review；下一轮优先 Context / EvidencePack，未接受前不提升生产契约。
+1. 六个 ADR candidates 已完成首轮 focused review；下一轮优先主集成 review 或 fixture-only evidence，未接受前不提升生产契约。
 2. 若继续编码，优先 ReplayBundle observability taxonomy fixture-only hardening。
 3. 其次 memory calibration export reproducibility。

@@ -46,6 +46,67 @@ remains the sole side-effect owner.
 - Schema changes after prepare require re-prepare.
 - Tool output cannot become ACTIVE memory without memory admission.
 
+## Capability Lease Gate
+
+CapabilityLease must define:
+
+- actor and tenant scope;
+- skill and tool scope;
+- allowed operation class;
+- risk tier;
+- expiry;
+- policy decision ref;
+- approval requirement;
+- replay reader policy ref.
+
+Missing, expired or over-broad leases reject prepare or force re-prepare. A
+provider cannot self-issue authority by advertising a capability.
+
+## Provider Attestation And Sandbox Onboarding
+
+ProviderAttestation must record:
+
+- provider identity;
+- owner;
+- review status;
+- trust tier;
+- schema hash;
+- sandbox or production eligibility;
+- last review ref.
+
+Unknown or unreviewed providers are sandbox-only or blocked. Trusted-provider
+selection requires current attestation; stale or missing attestation downgrades
+the provider to sandbox behavior.
+
+## Prepare Expiry And State-Diff Re-Prepare
+
+PreparedToolRef is invalid when:
+
+- lease expired;
+- schema hash changed;
+- provider attestation changed;
+- relevant state diff invalidates the dry-run/precheck;
+- approval window expired;
+- actor, tenant, skill or tool scope changed.
+
+Execution must verify fresh prepare lineage before action-executor accepts a
+high-risk action. Stale prepare refs reject execution or force re-prepare.
+
+## Tool Output Reuse
+
+ToolOutputEnvelope must keep provenance, validation status and taint labels
+whenever output enters ContextPackage, memory candidate extraction or replay.
+
+Tool output cannot become:
+
+- system instruction;
+- permission authority;
+- ACTIVE memory;
+- execution approval;
+- untainted factual source
+
+without the owning verifier or admission path.
+
 ## Rejection Rules
 
 Reject the ADR if:
@@ -54,11 +115,14 @@ Reject the ADR if:
 - tool description is inserted as trusted instruction;
 - high-risk action can execute without approval and executor;
 - provider attestation and capability lease are optional for trusted providers;
-- tool output can bypass taint labels.
+- tool output can bypass taint labels;
+- unknown providers can bypass sandbox onboarding;
+- stale PreparedToolRef can execute without re-prepare.
 
 ## Next Evidence Needed
 
-- Capability lease matrix review.
-- Provider attestation governance review.
-- Prepare-expiry re-prepare policy tied to state diff.
-- Sandbox onboarding rules for unknown MCP providers.
+- Main integration review for capability lease matrix.
+- Provider governance review for attestation and sandbox onboarding.
+- Fixture proof for lease expiry, attestation downgrade and state-diff
+  re-prepare.
+- action-executor review for stale PreparedToolRef rejection.

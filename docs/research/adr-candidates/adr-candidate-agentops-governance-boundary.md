@@ -45,6 +45,68 @@ P0/P1 eval failures, replay gaps and audit gaps block release.
 - Repeated production failure class becomes a regression fixture.
 - Canary and shadow results must be comparable to offline baseline.
 
+## Kill Switch Semantics
+
+KillSwitch must define:
+
+- owner;
+- scope: AgentDefinition, SkillPackage, tool grant, memory grant or release
+  channel;
+- activation reason;
+- propagation target;
+- behavior for new runs;
+- behavior for running or waiting runs;
+- audit and rollback refs.
+
+Kill switch activation must stop new eligible runs. Existing runs are cancelled,
+drained or left to workflow-owned waits according to risk policy; Python worker
+cannot own this decision.
+
+## Release Pinning And Baseline Approval
+
+AgentRelease must pin:
+
+- AgentDefinition ref;
+- SkillPackage refs;
+- model/provider policy refs;
+- tool and memory grants;
+- EvalReport and ReplayBundle refs;
+- BaselineApproval ref;
+- rollback ref.
+
+Baseline refresh requires explicit approval. Score improvements cannot silently
+replace a baseline if failure classes, datasets, risk tier or required suites
+changed.
+
+## Failure-Class Owner Workflow
+
+Every P0/P1 failure class must have:
+
+- owner;
+- severity;
+- first-seen report ref;
+- linked replay bundle;
+- required regression fixture or explicit reason none is possible;
+- closure and retirement rule.
+
+Unowned P0/P1 classes block release and baseline refresh.
+
+## Canary And Shadow Comparison
+
+CanaryReport must compare production-like behavior to offline baselines using
+compatible metrics:
+
+- grounded quality;
+- permission leakage;
+- memory pollution or stale use;
+- tool prepare/execute failures;
+- approval and workflow failures;
+- replay availability;
+- cost and latency budget where available.
+
+Canary P0/P1 regression rolls back or holds release. Shadow results cannot
+promote production unless they are comparable to required offline suites.
+
 ## Operator UX Requirements
 
 Authorized operators must inspect:
@@ -65,11 +127,14 @@ Reject the ADR if:
 - SkillPackage can use tools without eval/approval metadata;
 - governance stores business truth or raw prompt archives;
 - release can proceed with replay unavailable;
-- kill switch cannot stop new runs.
+- kill switch cannot stop new runs;
+- baseline refresh can occur without explicit approval;
+- P0/P1 failure class has no owner or regression disposition;
+- canary/shadow metrics are not comparable to offline baseline.
 
 ## Next Evidence Needed
 
-- Control-plane ownership for kill switch.
-- Admin UX for release pinning and baseline refresh approval.
-- Failure-class owner workflow.
-- Canary/shadow comparison policy.
+- Main integration review for governance/control-plane kill-switch ownership.
+- Admin UX owner for release pinning and baseline refresh approval.
+- Fixture proof that unowned P0/P1 failure classes block release.
+- Canary/shadow comparison policy tied to offline baseline metrics.

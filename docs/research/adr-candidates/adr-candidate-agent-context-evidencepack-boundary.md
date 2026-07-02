@@ -51,6 +51,73 @@ Future EvidencePack contracts must carry:
 - citation verifier version;
 - replay reader policy.
 
+## Source Visibility And Denied-Lane Gate
+
+SourceVisibilityVersion is required for every source or lane that influences a
+grounded answer, proposal or tool choice.
+
+The gate must record:
+
+- source and lane refs;
+- visibility or projection version;
+- permission decision ref;
+- freshness or temporal window ref;
+- denied, unavailable or expired lane refs;
+- redaction policy ref when content is hidden.
+
+DeniedLane must be visible to Runtime, eval and operator review without exposing
+forbidden content. If a required lane is denied, unavailable or expired, the
+answer must abstain, clarify or mark the coverage gap; it must not pretend the
+lane had no relevant facts.
+
+## Citation Verifier Gate
+
+Grounded answers and action-driving proposals require a CitationVerifierResult
+before finalization.
+
+The verifier must decide:
+
+- supported;
+- unsupported;
+- conflicting;
+- stale;
+- denied or unavailable;
+- insufficient coverage.
+
+Unsupported, conflicting, stale or insufficient high-risk claims block answer
+finalization or force clarification/abstain. A model answer cannot self-certify
+its citations.
+
+## Taint Vocabulary And Context Reuse
+
+TaintLabel must carry a vocabulary version and source lane.
+
+Tainted content includes:
+
+- tool and MCP output;
+- peer-agent output;
+- external provider text;
+- retrieved text with prompt-injection risk;
+- memory derived from tainted or disputed sources.
+
+Tainted content can be quoted, summarized or used as evidence only under the
+reuse policy for that taint class. It cannot become trusted instruction, ACTIVE
+memory or action authority by appearing in ContextPackage.
+
+## Operator Evidence Inspection
+
+Before production promotion, authorized operators must be able to inspect:
+
+- EvidencePack and ContextPackage refs;
+- selected source refs and citation map;
+- denied, unavailable and expired lanes;
+- conflict set and verifier result;
+- taint labels and vocabulary version;
+- redaction and replay reader policy refs.
+
+This inspection path must not expose content the operator is not authorized to
+see.
+
 ## Rejection Rules
 
 Reject the ADR if:
@@ -59,10 +126,15 @@ Reject the ADR if:
 - answer candidates can bypass citation verification;
 - denied lanes are invisible;
 - tool output can become trusted instruction;
-- memory replaces current source truth without labels.
+- memory replaces current source truth without labels;
+- source visibility versions or taint vocabulary versions are absent;
+- operators cannot inspect denied-lane or verifier decisions for high-risk
+  failures.
 
 ## Next Evidence Needed
 
-- Real retrieval-gateway preservation proof for source refs and taint labels.
-- Product acceptance of denied-lane reporting.
-- Citation verifier gate policy for high-risk answers.
+- Main integration owner review for retrieval-gateway source visibility.
+- Product / security review for denied-lane reporting semantics.
+- Fixture proof for visibility expiry, denied-lane retention and citation
+  verifier blocking.
+- Operator UX owner for evidence, citation, denied-lane and taint inspection.

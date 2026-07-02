@@ -367,13 +367,18 @@ ai/python/tests/test_agent_eval_*.py
 - Agent demo Codex implementation playbook：已把下一步实现约束为一个
   backend-isolated demo runner、fixture、README 和 tests；明确不能让 Codex 从 SDD
   自动写完整生产 IM 项目。
+- Agent interview demo runner：已新增 `run_agent_interview_demo.py`、ref-only
+  fixture、demo README、EvalReport / ReplayBundle 输出和 focused tests；闭环为
+  MessageCommitted ref -> EvidencePack / ContextPackage -> MemoryCandidate ->
+  ToolIntent / proposal -> approval/action fixture refs -> EvalReport ->
+  ReplayBundle，不接生产后端或真实 IM 数据。
 
 ## 当前未完成项
 
 | 优先级 | 工作 | 输出 |
 | --- | --- | --- |
 | P1 | Document-driven process | immutable goal 保持稳定，具体阶段与验收条件只维护在 runbook / SDD / research 文档 |
-| P1 | Interview-ready Agent demo | 用 backend-isolated fixture 串起 EvidencePack / ContextPackage、MemoryCandidate、ToolIntent / proposal、EvalReport 和 ReplayBundle |
+| P1 | Demo hardening / interview narrative | 基于已落地 demo 继续补面试叙述、边界说明或 focused hardening |
 | P1 | Scope control | 不再新增大架构；只处理主集成 / owner P0/P1 或 demo 所需的 focused hardening |
 | P2 | ReplayBundle observability hardening review | 如评审要求，继续补 fixture-only taxonomy / trace evidence |
 | P2 | Memory calibration hardening | 仅在需要时继续追加公开数据集导出或 adapter metadata |
@@ -384,6 +389,7 @@ ai/python/tests/test_agent_eval_*.py
 文档一致性为主：
 
 - `python -m pytest ai/python/tests -q`
+- `python ai/python/scripts/run_agent_interview_demo.py ai/python/fixtures/agent_eval/interview_send_message_agent_demo.json`
 - `python -m ruff check ai/python`
 - `python -m mypy ai/python/nexusim_ai_common ai/python/nexusim_ai_memory ai/python/nexusim_ai_eval ai/python/scripts`
 - `.\tools\check-python-ai-worker-boundary.ps1`

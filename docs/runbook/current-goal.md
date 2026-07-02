@@ -14,6 +14,7 @@ runbook / SDD / research 文档维护。
 
 当前 Phase 1 backend-isolated skeleton 已完成到可执行基线，见
 `docs/research/agent-skeleton-completion-audit-20260702.md`。
+Interview-ready backend-isolated Agent demo 初版已落地，入口为 `ai/python/scripts/run_agent_interview_demo.py`。
 
 ## 当前事实源
 
@@ -36,6 +37,8 @@ runbook / SDD / research 文档维护。
 - 详细 SDD：`docs/sdd/agent-runtime.md`、`agent-memory-admission.md`、
   `agent-context-evidencepack.md`、`agent-tool-mcp-boundary.md`、
   `agent-eval-replay-harness.md`、`agent-governance-agentops.md`。
+- Demo fixture / README：`ai/python/fixtures/agent_eval/interview_send_message_agent_demo.json`、
+  `ai/python/fixtures/agent_eval/interview_demo_README.md`。
 
 ## 当前边界
 
@@ -56,7 +59,7 @@ runbook / SDD / research 文档维护。
 1. 保持 Phase 1 skeleton 作为当前可执行基线，不重新做大范围路线研究。
 2. 用 runbook / SDD / research 文档维护阶段推进，不把可变计划写回 immutable goal。
 3. 架构已按面试级完整度和适度生产级意识收口；不再新增大平面、大服务、大对象族或 benchmark survey。
-4. 若进入编码，只做 backend-isolated demo / fixture / adapter / eval / report hardening。
+4. backend-isolated demo 初版已完成；后续只做 focused hardening / 面试叙述整理。
 5. 完整模块完成后提交并推送到 `origin/codex/agent-lab`，再 handoff 给主集成线程。
 
 ## 完成条件
@@ -74,4 +77,4 @@ runbook / SDD / research 文档维护。
 
 1. Full package 已完成六个 L1 reviewability verdict；Eval / Replay、Runtime / Workflow、Context / EvidencePack、Memory Admission、Tool / MCP 和 AgentOps L2 已被主集成接受为 review material only。
 2. Eval / Runtime / Context / Memory / Tool / AgentOps 和 cross-cutting fixture evidence 已落地；未接受前不提升生产契约。
-3. 下一步默认做 interview-ready backend-isolated Agent demo；只有 P0/P1 review 才重新打开架构扩展。
+3. Demo 初版已落地；下一步默认做 focused hardening 或 interview narrative，只有 P0/P1 review 才重新打开架构扩展。

@@ -46,6 +46,18 @@ from nexusim_ai_eval.contracts import (
     validate_eval_suite,
 )
 from nexusim_ai_eval.evaluator import run_eval_suite
+from nexusim_ai_eval.interview_demo import (
+    InterviewCaseResult,
+    InterviewDemoCase,
+    InterviewDemoFixture,
+    InterviewDemoResult,
+    OutputPaths,
+    interview_demo_result_to_payload,
+    load_interview_demo_fixture,
+    run_interview_demo,
+    validate_interview_demo_fixture,
+    write_interview_demo_outputs,
+)
 from nexusim_ai_eval.memory_calibration import (
     load_memory_calibration_payload,
     run_memory_admission_calibration,
@@ -104,6 +116,11 @@ __all__ = [
     "EvalReport",
     "EvalResult",
     "ReplayBundle",
+    "InterviewCaseResult",
+    "InterviewDemoCase",
+    "InterviewDemoFixture",
+    "InterviewDemoResult",
+    "OutputPaths",
     "AgentRunTrace",
     "AgentStep",
     "RuntimeControlFixture",
@@ -119,6 +136,7 @@ __all__ = [
     "compare_eval_reports",
     "convert_adapter_payload",
     "generate_current_report_payload",
+    "interview_demo_result_to_payload",
     "load_agentops_governance_rehearsal",
     "load_architecture_coverage_rehearsal",
     "load_context_evidence_preservation_rehearsal",
@@ -128,6 +146,7 @@ __all__ = [
     "load_dataset_reproducibility_rehearsal",
     "load_report_matrix_plan",
     "load_memory_calibration_payload",
+    "load_interview_demo_fixture",
     "load_memory_admission_governance_rehearsal",
     "load_multi_agent_handoff_rehearsal",
     "load_object_completeness_rehearsal",
@@ -137,6 +156,7 @@ __all__ = [
     "load_runtime_workflow_ownership_rehearsal",
     "load_tool_mcp_governance_rehearsal",
     "run_eval_suite",
+    "run_interview_demo",
     "rehearse_agentops_governance",
     "rehearse_architecture_coverage",
     "rehearse_context_evidence_preservation",
@@ -157,4 +177,6 @@ __all__ = [
     "run_report_matrix_plan",
     "suite_from_adapter_cases",
     "validate_eval_suite",
+    "validate_interview_demo_fixture",
+    "write_interview_demo_outputs",
 ]

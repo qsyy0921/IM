@@ -1,0 +1,170 @@
+{
+  "schema_version": 1,
+  "fixture_kind": "agent_interview_demo",
+  "demo_id": "interview-send-message-agent-demo-v1",
+  "send_message_trace_ref": "trace:send-message:demo-001",
+  "message_committed_ref": "message-committed:demo-001",
+  "agent_request_ref": "agent-request:release-followup-summary",
+  "cases": [
+    {
+      "case_id": "happy-release-followup-proposal",
+      "case_kind": "happy_path",
+      "user_request_ref": "request-ref:agent:release-followup-summary",
+      "conversation_ref": "conversation:fixture:release-war-room",
+      "visible_message_refs": [
+        "message-ref:release-war-room:delay-announcement",
+        "message-ref:release-war-room:new-target-date",
+        "message-ref:release-war-room:owner-followup"
+      ],
+      "forbidden_message_refs": [
+        "message-ref:manager-dm:budget-note"
+      ],
+      "policy_scope_ref": "policy-scope:group-release-war-room:agent-readable",
+      "evidence_pack_ref": "evidence-pack:demo:happy-release-followup",
+      "context_package_ref": "context-package:demo:happy-release-followup",
+      "context_source_refs": [
+        "message-ref:release-war-room:delay-announcement",
+        "message-ref:release-war-room:new-target-date",
+        "message-ref:release-war-room:owner-followup"
+      ],
+      "expected_memory_candidate_ref": "memory-candidate:demo:release-date-shift",
+      "memory_candidate_state": "candidate_only",
+      "expected_tool_intent_ref": "tool-intent:demo:create-followup-workitem",
+      "tool_intent_state": "prepared",
+      "approval_fixture_ref": "approval-fixture:demo:proposal-visible",
+      "approval_state": "proposal_only",
+      "action_fixture_ref": "action-fixture:demo:not-executed",
+      "action_state": "not_executed",
+      "blocked_reason_refs": [],
+      "expected_failure_class": "none"
+    },
+    {
+      "case_id": "denied-evidence-block",
+      "case_kind": "denied_evidence",
+      "user_request_ref": "request-ref:agent:include-private-dm",
+      "conversation_ref": "conversation:fixture:release-war-room",
+      "visible_message_refs": [
+        "message-ref:release-war-room:public-status"
+      ],
+      "forbidden_message_refs": [
+        "message-ref:manager-dm:private-escalation",
+        "message-ref:manager-dm:budget-note"
+      ],
+      "policy_scope_ref": "policy-scope:group-release-war-room:dm-denied",
+      "evidence_pack_ref": "evidence-pack:demo:denied-evidence",
+      "context_package_ref": "context-package:demo:denied-evidence",
+      "context_source_refs": [
+        "message-ref:release-war-room:public-status",
+        "coverage-gap:policy-denied:manager-dm"
+      ],
+      "expected_memory_candidate_ref": "memory-candidate:demo:denied-evidence:none",
+      "memory_candidate_state": "none",
+      "expected_tool_intent_ref": "tool-intent:demo:denied-evidence:none",
+      "tool_intent_state": "none",
+      "approval_fixture_ref": "approval-fixture:demo:denied-evidence:not-required",
+      "approval_state": "not_required",
+      "action_fixture_ref": "action-fixture:demo:denied-evidence:not-executed",
+      "action_state": "not_executed",
+      "blocked_reason_refs": [
+        "blocked-ref:policy:denied-private-evidence"
+      ],
+      "expected_failure_class": "POLICY_DENIED"
+    },
+    {
+      "case_id": "memory-needs-review",
+      "case_kind": "memory_needs_review",
+      "user_request_ref": "request-ref:agent:capture-team-decision",
+      "conversation_ref": "conversation:fixture:release-war-room",
+      "visible_message_refs": [
+        "message-ref:release-war-room:tentative-decision",
+        "message-ref:release-war-room:followup-needed"
+      ],
+      "forbidden_message_refs": [
+        "message-ref:manager-dm:private-escalation"
+      ],
+      "policy_scope_ref": "policy-scope:group-release-war-room:memory-review",
+      "evidence_pack_ref": "evidence-pack:demo:memory-needs-review",
+      "context_package_ref": "context-package:demo:memory-needs-review",
+      "context_source_refs": [
+        "message-ref:release-war-room:tentative-decision",
+        "message-ref:release-war-room:followup-needed"
+      ],
+      "expected_memory_candidate_ref": "memory-candidate:demo:tentative-release-decision",
+      "memory_candidate_state": "needs_review",
+      "expected_tool_intent_ref": "tool-intent:demo:memory-review:none",
+      "tool_intent_state": "none",
+      "approval_fixture_ref": "approval-fixture:demo:memory-review:review-queued",
+      "approval_state": "required",
+      "action_fixture_ref": "action-fixture:demo:memory-review:not-executed",
+      "action_state": "not_executed",
+      "blocked_reason_refs": [
+        "blocked-ref:memory:needs-human-review"
+      ],
+      "expected_failure_class": "MEMORY_REVIEW_MISSING"
+    },
+    {
+      "case_id": "unsafe-tool-output-blocked",
+      "case_kind": "unsafe_tool_output",
+      "user_request_ref": "request-ref:agent:prepare-external-ticket-tool",
+      "conversation_ref": "conversation:fixture:release-war-room",
+      "visible_message_refs": [
+        "message-ref:release-war-room:ticket-request",
+        "tool-provider-ref:fixture:ticket-provider"
+      ],
+      "forbidden_message_refs": [
+        "message-ref:manager-dm:private-escalation"
+      ],
+      "policy_scope_ref": "policy-scope:group-release-war-room:tool-prepare",
+      "evidence_pack_ref": "evidence-pack:demo:unsafe-tool-output",
+      "context_package_ref": "context-package:demo:unsafe-tool-output",
+      "context_source_refs": [
+        "message-ref:release-war-room:ticket-request",
+        "tool-provider-ref:fixture:ticket-provider"
+      ],
+      "expected_memory_candidate_ref": "memory-candidate:demo:unsafe-tool:none",
+      "memory_candidate_state": "none",
+      "expected_tool_intent_ref": "tool-intent:demo:external-ticket-blocked",
+      "tool_intent_state": "blocked",
+      "approval_fixture_ref": "approval-fixture:demo:unsafe-tool:not-required",
+      "approval_state": "not_required",
+      "action_fixture_ref": "action-fixture:demo:unsafe-tool:not-executed",
+      "action_state": "blocked_fixture",
+      "blocked_reason_refs": [
+        "blocked-ref:tool:unsafe-output-quarantined"
+      ],
+      "expected_failure_class": "UNSAFE_TOOL_OUTPUT"
+    },
+    {
+      "case_id": "approval-required-not-executed",
+      "case_kind": "approval_required",
+      "user_request_ref": "request-ref:agent:create-release-followup-workitem",
+      "conversation_ref": "conversation:fixture:release-war-room",
+      "visible_message_refs": [
+        "message-ref:release-war-room:owner-followup",
+        "message-ref:release-war-room:new-target-date"
+      ],
+      "forbidden_message_refs": [
+        "message-ref:manager-dm:budget-note"
+      ],
+      "policy_scope_ref": "policy-scope:group-release-war-room:action-approval",
+      "evidence_pack_ref": "evidence-pack:demo:approval-required",
+      "context_package_ref": "context-package:demo:approval-required",
+      "context_source_refs": [
+        "message-ref:release-war-room:owner-followup",
+        "message-ref:release-war-room:new-target-date"
+      ],
+      "expected_memory_candidate_ref": "memory-candidate:demo:approval-action:none",
+      "memory_candidate_state": "none",
+      "expected_tool_intent_ref": "tool-intent:demo:create-workitem-awaiting-approval",
+      "tool_intent_state": "approval_required",
+      "approval_fixture_ref": "approval-fixture:demo:create-workitem:required",
+      "approval_state": "required",
+      "action_fixture_ref": "action-fixture:demo:create-workitem:not-executed",
+      "action_state": "not_executed",
+      "blocked_reason_refs": [
+        "blocked-ref:approval:human-required"
+      ],
+      "expected_failure_class": "APPROVAL_REQUIRED"
+    }
+  ]
+}

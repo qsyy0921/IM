@@ -12,7 +12,7 @@ memory / AI worker / EvidencePack / eval gate，不承接后端热点群压测�
 - ADR readiness 已完成，但只能进入候选起草，不能直接推广生产契约：
   `docs/research/agent-adr-promotion-readiness-20260702.md`。
 - 架构缺口、生产对象模型、ADR candidate package 和 review ledger 已完成到
-  research 级事实源；下一步默认转向隔离 demo，不直接写生产契约。
+  research 级事实源；interview-ready 隔离 demo 初版已落地，不直接写生产契约。
 - 六个 Agent ADR candidates 和 L1 closure 已被主集成接受为 reviewability only；
   Eval / Replay、Runtime / Workflow、Context / EvidencePack、Memory Admission、Tool / MCP 和 AgentOps L2 已被主集成接受为 review material only。
 - `docs/research/agent-architecture-scope-closure-20260702.md` 已将架构收口：
@@ -30,10 +30,10 @@ memory / AI worker / EvidencePack / eval gate，不承接后端热点群压测�
 
 ## 当前可执行基线
 
-- Code: `ai/python/nexusim_ai_eval/`。
+- Code: `ai/python/nexusim_ai_eval/`，含 `interview_demo.py`。
 - Fixtures: `ai/python/fixtures/agent_eval/`。
-- CLIs: `ai/python/scripts/run_agent_eval_*.py` and
-  `ai/python/scripts/run_agent_dataset_adapter.py`。
+- CLIs: `ai/python/scripts/run_agent_eval_*.py`、
+  `run_agent_interview_demo.py` and `run_agent_dataset_adapter.py`。
 - Tests: `ai/python/tests/test_agent_eval_*.py` plus worker / memory boundary tests。
 
 覆盖能力：EvalCase / EvalRun / EvalResult / EvalReport、ReplayBundle、dataset
@@ -55,6 +55,6 @@ baseline lifecycle 和 memory calibration。
 
 ## 下一步
 
-默认不继续扩展架构；下一步优先 interview-ready backend-isolated Agent demo。
+默认不继续扩展架构；下一步优先 demo hardening 或面试叙述整理。
 只有主集成或 owner 返回 P0/P1 时，才做 focused hardening 或重新打开架构。
 完整模块完成后 commit、push `origin/codex/agent-lab` 并 handoff。

@@ -11,6 +11,8 @@ memory / AI worker / EvidencePack / eval gate，不承接后端热点群压测�
   `docs/research/agent-skeleton-completion-audit-20260702.md`。
 - ADR readiness 已完成，但只能进入候选起草，不能直接推广生产契约：
   `docs/research/agent-adr-promotion-readiness-20260702.md`。
+- 架构缺口关闭包已完成：`docs/research/agent-architecture-gap-closure-20260702.md`，
+  下一步按该包拆六个 ADR candidates，不直接写生产契约。
 - 完整进度历史在 `docs/runbook/development-progress.md`，不要把长历史塞回本文件。
 
 ## 当前设计事实源
@@ -50,5 +52,6 @@ baseline lifecycle 和 memory calibration。
 ## 下一步
 
 若用户确认架构推进，起草 ADR candidates；否则只做 fixture-only hardening，
+优先 Eval / Replay 和 Runtime / Workflow 两个 ADR candidates；若继续编码，
 优先 ReplayBundle observability taxonomy 或 memory calibration export
 reproducibility。完整模块完成后 commit、push `origin/codex/agent-lab` 并 handoff。

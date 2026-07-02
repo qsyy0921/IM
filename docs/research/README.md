@@ -25,6 +25,8 @@
 - `agent-skeleton-completion-audit-20260702.md`：不可变 Agent Lab goal 对当前
   backend-isolated skeleton 的完成度审计，确认 Phase 1 骨架可作为当前可执行基线，
   但不提升生产契约。
+- `agent-architecture-gap-closure-20260702.md`：资深架构评审后的缺口关闭包，
+  给出 ADR candidate map、版本策略、集成 preservation matrix 和生产提升阻断条件。
 
 ## 存放位置
 

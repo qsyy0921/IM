@@ -54,6 +54,7 @@ Eval Harness / synthetic IM-like fixture 已开始隔离式编码。
 | `docs/research/agent-tool-mcp-adr-review-20260702.md` | 已完成首轮 focused review | Tool / MCP candidate 补齐 capability lease、provider attestation、prepare expiry/re-prepare、sandbox onboarding 和 output reuse |
 | `docs/research/agent-tool-mcp-l1-acceptance-review-20260702.md` | 已完成第五个候选 L1 自评 | Tool / MCP candidate 建议接受 untrusted provider / capability lease / attestation / executor owner 边界；仍不授权 provider 或 tool schema |
 | `docs/research/agentops-governance-adr-review-20260702.md` | 已完成首轮 focused review | AgentOps candidate 补齐 kill switch、release pinning、baseline approval、failure owner workflow 和 canary/shadow comparison |
+| `docs/research/agentops-governance-l1-acceptance-review-20260702.md` | 已完成第六个候选 L1 自评 | AgentOps / Governance candidate 建议接受 release-control / baseline approval / kill-switch / failure-owner / canary-shadow 边界；仍不授权 release pipeline 或 admin console |
 | `docs/research/agent-fixture-evidence-hardening-20260702.md` | 已完成首段 | Eval / Replay version-bump rehearsal 已用 fixture-only code / JSON / tests 落地；仍不提升生产契约 |
 | `docs/research/agent-tool-mcp-fixture-evidence-20260702.md` | 已完成 Tool 段 | Tool / MCP governance rehearsal 已用 fixture-only code / JSON / tests 落地；仍不提升生产契约 |
 | `docs/research/agentops-governance-fixture-evidence-20260702.md` | 已完成 AgentOps 段 | AgentOps governance rehearsal 已用 fixture-only code / JSON / tests 落地；仍不提升生产契约 |
@@ -312,6 +313,11 @@ ai/python/tests/test_agent_eval_*.py
 - Tool / MCP L1 acceptance review：按 playbook 起草第五份候选 ADR 自评包；
   结论是建议接受 untrusted provider、capability lease、attestation、re-prepare
   和 action-executor owner 边界，但不授权 provider 或 tool schema。
+- AgentOps / Governance L1 acceptance review：按 playbook 起草第六份候选 ADR
+  自评包；结论是建议接受 release-control、pinned release refs、baseline
+  approval、kill switch、failure-class owner workflow、canary / shadow
+  comparability 和 operator governance 边界，但不授权 release pipeline、admin
+  console 或 control-plane API。
 - Skeleton completion audit：已把 immutable goal 的 17 个骨架要求映射到当前
   代码、fixture、CLI、tests 和 runbook evidence；结论是 Phase 1 isolated
   Agent-layer skeleton 可作为当前可执行基线，但不能直接推广生产契约。

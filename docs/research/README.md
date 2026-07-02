@@ -61,6 +61,10 @@
 - `agent-tool-mcp-l1-acceptance-review-20260702.md`：Tool / MCP candidate 的
   L1 acceptance review 自评包，建议作为第五个候选进入主集成 ADR review；
   不授权生产 MCP provider、tool schema 或 side-effect execution path。
+- `agentops-governance-l1-acceptance-review-20260702.md`：AgentOps /
+  Governance candidate 的 L1 acceptance review 自评包，建议作为第六个候选进入
+  主集成 ADR review；不授权生产 release pipeline、admin console 或
+  control-plane API。
 - `agent-eval-replay-adr-review-20260702.md`：Eval / Replay ADR candidate
   focused review，补齐 failure-class lifecycle、baseline approval、retention /
   redaction 和 contract-version bump rehearsal。

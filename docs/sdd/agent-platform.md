@@ -863,6 +863,11 @@ accepted ADR、main integration review、owner review、preservation evidence �
 gate 时，只允许继续 fixture-only hardening，不能进入 controlled implementation 或
 production contract 设计。
 
+Architecture coverage rehearsal 还验证所有必需 Agent 架构面都有 owner、SDD /
+research / ADR ref、fixture evidence、lifecycle、version、replay、preservation、
+audit、operator、eval gate 和 rejection refs；这只是受控实现前的 coverage gate，
+不是生产实现授权。
+
 ### Phase 5：最小生产切片
 
 - 从 read-only grounded QA 开始。

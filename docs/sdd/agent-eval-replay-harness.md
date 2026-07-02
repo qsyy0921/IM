@@ -444,6 +444,7 @@ ai/python/nexusim_ai_eval/
   adapters.py
   adapter_runner.py
   agentops_governance.py
+  architecture_coverage.py
   comparison.py
   context_evidence_preservation.py
   controlled_implementation_readiness.py
@@ -463,6 +464,7 @@ ai/python/nexusim_ai_eval/
   tool_mcp_governance.py
   trace.py
 ai/python/fixtures/agent_eval/adapter_samples/
+ai/python/fixtures/agent_eval/architecture_coverage_rehearsal.json
 ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json
 ai/python/fixtures/agent_eval/agentops_governance_rehearsal.json
 ai/python/fixtures/agent_eval/context_evidence_preservation_rehearsal.json
@@ -502,6 +504,7 @@ ai/python/scripts/run_agent_eval_report_matrix.py
 ai/python/scripts/run_agent_memory_calibration.py
 ai/python/scripts/run_agent_dataset_adapter.py
 ai/python/scripts/run_agent_eval_regression.py
+ai/python/tests/test_agent_eval_architecture_coverage.py
 ai/python/tests/test_agent_eval_context_evidence_preservation.py
 ai/python/tests/test_agent_eval_controlled_implementation_readiness.py
 ai/python/tests/test_agent_eval_contracts.py
@@ -650,6 +653,9 @@ Implemented checks:
   fixture-only hardening while blocking controlled implementation, production
   contract changes, real service connections, Python final ownership and open
   P0/P1 findings before accepted ADRs and owner review.
+- architecture coverage rehearsal coverage for all required Agent surfaces,
+  including owner, SDD/research/ADR refs, fixture evidence, lifecycle, version,
+  replay, preservation, audit, operator, eval gate and rejection refs.
 - state-diff report fixture coverage for approved action outcome refs,
   expected-vs-actual state changes, missing execution refs, incomplete reports
   and unauthorized mutation detection.
@@ -692,6 +698,7 @@ python -m pytest ai/python/tests/test_agent_eval_object_completeness.py -q
 python -m pytest ai/python/tests/test_agent_eval_operator_governance.py -q
 python -m pytest ai/python/tests/test_agent_eval_operational_readiness.py -q
 python -m pytest ai/python/tests/test_agent_eval_controlled_implementation_readiness.py -q
+python -m pytest ai/python/tests/test_agent_eval_architecture_coverage.py -q
 python ai/python/scripts/run_agent_eval_current_report.py ai/python/fixtures/agent_eval/synthetic_core_scenarios.json --report-out .tmp-agent-current-report.json --baseline ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json --review-out .tmp-agent-baseline-review.json --force
 python ai/python/scripts/run_agent_eval_report_matrix.py ai/python/fixtures/agent_eval/report_matrix_sample.json --matrix-out .tmp-agent-eval-matrix/matrix.json --approval-manifest-out .tmp-agent-eval-matrix/approval-manifest.json --force
 python ai/python/scripts/run_agent_memory_calibration.py ai/python/fixtures/agent_eval/memory_calibration_sample.json --report-out .tmp-agent-memory-calibration-report.json --force

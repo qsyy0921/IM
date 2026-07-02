@@ -329,6 +329,9 @@ Implemented fixture coverage:
   fixture hardening but blocks controlled implementation or production contract
   promotion when accepted ADRs, main review, owner review, eval evidence,
   replay-reader policy, preservation evidence or operator gates are missing.
+- architecture coverage evidence requires every required Agent surface to carry
+  owner, version, replay, preservation, audit, operator, eval and rejection refs
+  before the package can be recommended for controlled implementation review.
 
 Remaining hardening:
 

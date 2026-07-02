@@ -27,6 +27,10 @@ Reason:
 - Controlled implementation readiness now has fixture evidence that allows
   backend-isolated hardening while blocking unaccepted ADR, production contract
   and unsafe real-service shortcut paths.
+- Required architecture surface coverage now has fixture evidence across
+  runtime, eval/replay, context/evidence, memory, tool/MCP, workflow, executor,
+  multi-agent, AgentOps, versioning, preservation, security/operator UX and
+  open-dataset eval.
 
 ## Evidence Snapshot
 
@@ -42,6 +46,7 @@ Current fixture families under `ai/python/fixtures/agent_eval/`:
 - ReplayBundle observability scenarios;
 - report matrix sample and public-dataset-style adapter samples.
 - controlled implementation readiness rehearsal.
+- architecture coverage rehearsal.
 
 Current tests under `ai/python/tests/` cover:
 
@@ -125,6 +130,8 @@ contract promotion:
   backend-isolated by design.
 - No accepted ADR or owner review has cleared the controlled implementation
   gate; current evidence only proves that unsafe promotion is blocked.
+- Architecture coverage evidence proves coverage of required surfaces only; it
+  does not prove production integration readiness.
 
 ## Rejection Conditions
 

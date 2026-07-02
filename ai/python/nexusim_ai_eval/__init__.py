@@ -12,6 +12,10 @@ from nexusim_ai_eval.agentops_governance import (
     load_agentops_governance_rehearsal,
     rehearse_agentops_governance,
 )
+from nexusim_ai_eval.architecture_coverage import (
+    load_architecture_coverage_rehearsal,
+    rehearse_architecture_coverage,
+)
 from nexusim_ai_eval.comparison import compare_eval_reports
 from nexusim_ai_eval.context_evidence_preservation import (
     load_context_evidence_preservation_rehearsal,
@@ -112,6 +116,7 @@ __all__ = [
     "convert_adapter_payload",
     "generate_current_report_payload",
     "load_agentops_governance_rehearsal",
+    "load_architecture_coverage_rehearsal",
     "load_context_evidence_preservation_rehearsal",
     "load_controlled_implementation_readiness_rehearsal",
     "load_cross_service_preservation_rehearsal",
@@ -128,6 +133,7 @@ __all__ = [
     "load_tool_mcp_governance_rehearsal",
     "run_eval_suite",
     "rehearse_agentops_governance",
+    "rehearse_architecture_coverage",
     "rehearse_context_evidence_preservation",
     "rehearse_controlled_implementation_readiness",
     "rehearse_cross_service_preservation",

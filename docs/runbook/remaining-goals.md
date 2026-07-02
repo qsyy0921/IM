@@ -31,8 +31,9 @@
 3. Fixture-only evidence hardening：Eval / Replay、Runtime / Workflow、Context /
    Evidence、Memory、Tool、AgentOps、dataset reproducibility、cross-service
    preservation、multi-agent handoff、object completeness 和 operator
-   governance、operational readiness、controlled implementation readiness
-   rehearsal 已落地；下一步优先主集成 review 或 focused contract/version hardening。
+   governance、operational readiness、controlled implementation readiness、
+   architecture coverage rehearsal 已落地；下一步优先主集成 review 或 focused
+   contract/version hardening。
 4. ReplayBundle observability hardening review：当前 skeleton 已覆盖低敏
    observability refs、hash refs、version metadata refs、failure taxonomy refs 和
    trace linkage refs；如评审要求继续，只增加 fixture-only taxonomy / trace 证据。

@@ -41,6 +41,7 @@ authorizes the next explicitly scoped integration design.
 - `../agent-operator-governance-fixture-evidence-20260702.md`
 - `../agent-operational-readiness-fixture-evidence-20260702.md`
 - `../agent-controlled-implementation-readiness-fixture-evidence-20260702.md`
+- `../agent-architecture-coverage-fixture-evidence-20260702.md`
 
 ## Candidate Acceptance Gate
 
@@ -58,4 +59,5 @@ review ledger must show:
 - fixture-only or public-dataset-style evidence, or a recorded blocker;
 - rejection rules that block promotion instead of relying on reviewer intent;
 - controlled implementation readiness evidence that blocks unaccepted ADRs,
-  production contract shortcuts and real-service/Python-owner boundary breaks.
+  production contract shortcuts and real-service/Python-owner boundary breaks;
+- architecture coverage evidence for every required Agent surface.

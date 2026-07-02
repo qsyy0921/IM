@@ -103,6 +103,10 @@
   controlled implementation / production contract 在缺少 accepted ADR、main
   review、owner review、preservation evidence 或出现真实服务 / Python final
   owner 越界时必须阻断。
+- `agent-architecture-coverage-fixture-evidence-20260702.md`：fixture-only
+  evidence 更新，记录 13 个必需 Agent 架构面的 owner、SDD、research、ADR、
+  fixture evidence、lifecycle、version、replay、preservation、audit、operator、
+  eval gate 和 rejection refs 覆盖证据。
 
 ## 存放位置
 

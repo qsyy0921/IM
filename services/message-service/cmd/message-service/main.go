@@ -93,7 +93,7 @@ func runCDCBridge() error {
 		ErrorBackoff: envDuration("NEXUSIM_MESSAGE_CDC_ERROR_BACKOFF", time.Second),
 		ReorderFlushDelay: envDuration(
 			"NEXUSIM_MESSAGE_CDC_REORDER_FLUSH_DELAY",
-			200*time.Millisecond,
+			3*time.Second,
 		),
 		ReorderMaxRecords: envInt("NEXUSIM_MESSAGE_CDC_REORDER_MAX_RECORDS", 10000),
 		Logf:              log.Printf,
@@ -111,7 +111,7 @@ func runCDCBridge() error {
 		envString("NEXUSIM_MESSAGE_CDC_SOURCE_TOPIC", cdc.DefaultSourceTopic),
 		envString("NEXUSIM_MESSAGE_CDC_TARGET_TOPIC", cdc.DefaultTargetTopic),
 		envString("NEXUSIM_MESSAGE_CDC_GROUP_ID", "message-cdc-bridge"),
-		envDuration("NEXUSIM_MESSAGE_CDC_REORDER_FLUSH_DELAY", 200*time.Millisecond),
+		envDuration("NEXUSIM_MESSAGE_CDC_REORDER_FLUSH_DELAY", 3*time.Second),
 		envInt("NEXUSIM_MESSAGE_CDC_REORDER_MAX_RECORDS", 10000),
 	)
 	return bridge.Run(ctx)

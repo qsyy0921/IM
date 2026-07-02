@@ -28,9 +28,10 @@ type Config struct {
 	TargetTopic  string
 	GroupID      string
 	ErrorBackoff time.Duration
-	// ReorderFlushDelay lets the bridge collect a short Debezium burst before
+	// ReorderFlushDelay lets the bridge collect a Debezium burst before
 	// publishing by conversation aggregate_version. WAL commit order can differ
-	// from allocated conversation_seq under SEQUENCER_BLOCK concurrency.
+	// from allocated conversation_seq under SEQUENCER_BLOCK concurrency, and
+	// the delay must cover normal concurrent transaction commit skew.
 	ReorderFlushDelay time.Duration
 	ReorderMaxRecords int
 	Logf              func(format string, args ...any)
@@ -430,7 +431,7 @@ func normalizeConfig(config Config) Config {
 		config.ErrorBackoff = time.Second
 	}
 	if config.ReorderFlushDelay <= 0 {
-		config.ReorderFlushDelay = 200 * time.Millisecond
+		config.ReorderFlushDelay = 3 * time.Second
 	}
 	if config.ReorderMaxRecords <= 0 {
 		config.ReorderMaxRecords = 10000

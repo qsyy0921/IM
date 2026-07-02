@@ -45,6 +45,7 @@ authorizes the next explicitly scoped integration design.
 - `../agent-runtime-workflow-l2-scoped-implementation-design-20260702.md`
 - `../agent-context-evidencepack-l2-scoped-implementation-design-20260702.md`
 - `../agent-memory-admission-l2-scoped-implementation-design-20260702.md`
+- `../agent-tool-mcp-l2-scoped-implementation-design-20260702.md`
 - `../agent-eval-replay-l1-acceptance-review-20260702.md`
 - `../agent-runtime-workflow-l1-acceptance-review-20260702.md`
 - `../agent-context-evidencepack-l1-acceptance-review-20260702.md`

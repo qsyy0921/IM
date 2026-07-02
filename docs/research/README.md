@@ -64,6 +64,10 @@
   Memory Admission boundary 的第四份 L2 scoped implementation design；只定义
   candidate-only Python、ACTIVE memory owner、category thresholds、revocation /
   retrieval eligibility、operator controls 和 L3 smoke，不授权生产实现。
+- `agent-tool-mcp-l2-scoped-implementation-design-20260702.md`：Tool / MCP
+  boundary 的第五份 L2 scoped implementation design；只定义 untrusted provider、
+  capability lease、provider attestation、prepare / re-prepare、taint、executor
+  handoff、operator gates 和 L3 smoke，不授权生产实现。
 - `agent-eval-replay-l1-acceptance-review-20260702.md`：Eval / Replay
   candidate 的 L1 acceptance review 自评包，建议进入主集成 ADR review，
   但继续 defer production implementation。

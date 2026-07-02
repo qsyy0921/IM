@@ -207,6 +207,79 @@ func TestMessagePolicyEvaluatorUserRestrictionOverridesExactAllowIntegration(t *
 	assertPolicyDecisionSource(t, decision, types.PolicyDecisionSourceUserRestriction)
 }
 
+func TestMessagePolicyEvaluatorDecisionCacheUsesRevisionAfterUserRestrictionIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetPolicyTables(t, ctx, pool)
+	cache := newFakeMessageDecisionCache()
+	evaluator := NewMessagePolicyEvaluator(pool, domain.StaticMessagePolicy{
+		Allowed:           false,
+		PermissionVersion: 1,
+		Classification:    "STATIC_DENY",
+	}, WithMessageDecisionCache(cache, time.Minute))
+	command := testPolicyCommand(types.MessageActionSend)
+	seedTenantPolicyRule(t, ctx, pool, command.AuthContext.TenantID, command.Action, true, 88, "TENANT_ALLOW", "")
+
+	decision, err := evaluator.DecideMessageAction(ctx, command)
+	if err != nil {
+		t.Fatalf("decide message action before restriction: %v", err)
+	}
+	if !decision.Allowed || decision.PermissionVersion != 88 || len(cache.setKeys) != 1 {
+		t.Fatalf("expected first allow to be cached, decision=%+v cache_sets=%d", decision, len(cache.setKeys))
+	}
+	seedUserRestriction(t, ctx, pool, command, 123, "USER_MUTED", "user muted")
+
+	decision, err = evaluator.DecideMessageAction(ctx, command)
+	if err != nil {
+		t.Fatalf("decide message action after restriction: %v", err)
+	}
+	if decision.Allowed ||
+		decision.PermissionVersion != 123 ||
+		decision.Classification != "USER_MUTED" ||
+		len(cache.setKeys) != 1 ||
+		len(cache.getKeys) < 2 ||
+		cache.getKeys[0] == cache.getKeys[len(cache.getKeys)-1] {
+		t.Fatalf("expected revision bump to avoid stale allow cache, decision=%+v get_keys=%v set_keys=%v", decision, cache.getKeys, cache.setKeys)
+	}
+}
+
+func TestMessagePolicyEvaluatorDecisionCacheReusesAcrossMessagesIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetPolicyTables(t, ctx, pool)
+	cache := newFakeMessageDecisionCache()
+	evaluator := NewMessagePolicyEvaluator(pool, domain.StaticMessagePolicy{
+		Allowed:           false,
+		PermissionVersion: 1,
+		Classification:    "STATIC_DENY",
+	}, WithMessageDecisionCache(cache, time.Minute))
+	command := testPolicyCommand(types.MessageActionEdit)
+	command.MessageID = "msg-cache-1"
+	seedTenantPolicyRule(t, ctx, pool, command.AuthContext.TenantID, command.Action, true, 88, "TENANT_ALLOW", "")
+
+	decision, err := evaluator.DecideMessageAction(ctx, command)
+	if err != nil {
+		t.Fatalf("decide first message action: %v", err)
+	}
+	if !decision.Allowed || decision.MessageID != "msg-cache-1" || len(cache.setKeys) != 1 {
+		t.Fatalf("expected first decision to be cached, decision=%+v set_keys=%v", decision, cache.setKeys)
+	}
+
+	second := command
+	second.MessageID = "msg-cache-2"
+	decision, err = evaluator.DecideMessageAction(ctx, second)
+	if err != nil {
+		t.Fatalf("decide second message action: %v", err)
+	}
+	if !decision.Allowed ||
+		decision.MessageID != second.MessageID ||
+		len(cache.setKeys) != 1 ||
+		len(cache.getKeys) < 2 ||
+		cache.getKeys[0] != cache.getKeys[len(cache.getKeys)-1] {
+		t.Fatalf("expected cache reuse with current message identity, decision=%+v get_keys=%v set_keys=%v", decision, cache.getKeys, cache.setKeys)
+	}
+}
+
 func TestMessagePolicyEvaluatorTenantQuotaDeniesBeforeExactAllowIntegration(t *testing.T) {
 	pool := openTestPool(t)
 	ctx := context.Background()
@@ -260,6 +333,34 @@ func TestMessagePolicyEvaluatorTenantQuotaAllowsBelowLimitIntegration(t *testing
 		decision.PermissionVersion != 88 ||
 		decision.Classification != "TENANT_ALLOW" {
 		t.Fatalf("expected quota below limit to fall through to tenant allow, got %+v", decision)
+	}
+}
+
+func TestMessagePolicyEvaluatorDoesNotCacheQuotaPathIntegration(t *testing.T) {
+	pool := openTestPool(t)
+	ctx := context.Background()
+	resetPolicyTables(t, ctx, pool)
+	cache := newFakeMessageDecisionCache()
+	evaluator := NewMessagePolicyEvaluator(pool, domain.StaticMessagePolicy{
+		Allowed:           false,
+		PermissionVersion: 1,
+		Classification:    "STATIC_DENY",
+	}, WithMessageDecisionCache(cache, time.Minute))
+	command := testPolicyCommand(types.MessageActionEdit)
+	command.MessageID = "msg-policy-edit"
+	seedTenantActionQuota(t, ctx, pool, command.AuthContext.TenantID, command.Action, 2, 3600, 302, "TENANT_EDIT_QUOTA", "tenant edit quota exceeded")
+	seedTenantPolicyRule(t, ctx, pool, command.AuthContext.TenantID, command.Action, true, 88, "TENANT_ALLOW", "")
+	seedPolicyDecisionAuditRow(t, ctx, pool, "quota-edit-allowed", command.AuthContext.TenantID, command.Action, true, time.Now().UTC().Add(-time.Minute))
+
+	decision, err := evaluator.DecideMessageAction(ctx, command)
+	if err != nil {
+		t.Fatalf("decide message action: %v", err)
+	}
+	if !decision.Allowed || decision.PermissionVersion != 88 {
+		t.Fatalf("expected quota-below-limit path to fall through to tenant allow, got %+v", decision)
+	}
+	if len(cache.setKeys) != 0 {
+		t.Fatalf("quota path must not cache final allow decisions, set_keys=%v", cache.setKeys)
 	}
 }
 
@@ -851,7 +952,7 @@ func applyPolicyMigration(t *testing.T, ctx context.Context, pool *pgxpool.Pool)
 
 func resetPolicyTables(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
 	t.Helper()
-	if _, err := pool.Exec(ctx, `TRUNCATE policy_tool_decision_audit, policy_tool_action_rules, policy_decision_audit_outbox_repair_audit, policy_decision_audit_outbox, policy_rebac_message_action_rules, policy_user_message_action_restrictions, policy_message_ownership_override_rules, policy_conversation_role_action_rules, policy_conversation_members_projection, policy_tenant_message_action_quotas, policy_tenant_message_action_rules, policy_message_action_rules, policy_contact_edges_projection, policy_kafka_checkpoints`); err != nil {
+	if _, err := pool.Exec(ctx, `TRUNCATE policy_revision_state, policy_tool_decision_audit, policy_tool_action_rules, policy_decision_audit_outbox_repair_audit, policy_decision_audit_outbox, policy_rebac_message_action_rules, policy_user_message_action_restrictions, policy_message_ownership_override_rules, policy_conversation_role_action_rules, policy_conversation_members_projection, policy_tenant_message_action_quotas, policy_tenant_message_action_rules, policy_message_action_rules, policy_contact_edges_projection, policy_kafka_checkpoints`); err != nil {
 		t.Fatalf("reset policy tables: %v", err)
 	}
 }
@@ -1206,4 +1307,34 @@ func testPolicyCommand(action types.MessageAction) types.CheckMessageActionComma
 		command.MessageID = "msg-policy"
 	}
 	return command
+}
+
+type fakeMessageDecisionCache struct {
+	values  map[string]types.MessageActionDecision
+	getKeys []string
+	setKeys []string
+}
+
+func newFakeMessageDecisionCache() *fakeMessageDecisionCache {
+	return &fakeMessageDecisionCache{values: make(map[string]types.MessageActionDecision)}
+}
+
+func (cache *fakeMessageDecisionCache) GetMessageDecision(
+	_ context.Context,
+	key string,
+) (types.MessageActionDecision, bool, error) {
+	cache.getKeys = append(cache.getKeys, key)
+	decision, ok := cache.values[key]
+	return decision, ok, nil
+}
+
+func (cache *fakeMessageDecisionCache) SetMessageDecision(
+	_ context.Context,
+	key string,
+	decision types.MessageActionDecision,
+	_ time.Duration,
+) error {
+	cache.setKeys = append(cache.setKeys, key)
+	cache.values[key] = decision
+	return nil
 }

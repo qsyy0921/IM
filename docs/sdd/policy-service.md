@@ -47,7 +47,16 @@ The next table adds a tenant action default:
 tenant_id + action
 ```
 
-When `NEXUSIM_POLICY_RULES_ENABLED=true`, policy-service first evaluates hard contact-block denies for direct `SEND` requests that include `direct_peer_user_id`, then evaluates first-stage user-level message action restrictions from `policy_user_message_action_restrictions`. Active user restrictions are hard denies and intentionally override exact / tenant allow rules. It then applies the message ownership gate for mutation requests that include `message_sender_user_id`. Non-sender mutations can pass only through an explicit `policy_message_ownership_override_rules` row backed by a fresh `policy_conversation_members_projection` `ADMIN` / `OWNER` row. After ownership has passed, policy-service applies the conversation role gate, then applies first-stage `policy_rebac_message_action_rules` relationship gates, then tenant action quota, then checks `policy_message_action_rules`, then checks `policy_tenant_message_action_rules`, and finally falls back to the static policy. A matching exact or tenant rule returns its allow / deny decision, `permission_version`, `classification` and public reason. Exact user/conversation rules intentionally override tenant defaults only after the hard gates have passed.
+When `NEXUSIM_POLICY_RULES_ENABLED=true`, policy-service first evaluates hard contact-block denies for direct `SEND` requests that include `direct_peer_user_id`, then evaluates first-stage user-level message action restrictions from `policy_user_message_action_restrictions`. Active user restrictions are hard denies and intentionally override exact / tenant allow rules. It then applies the message ownership gate for mutation requests that include `message_sender_user_id`. Non-sender mutations can pass only through an explicit `policy_message_ownership_override_rules` row backed by a fresh `policy_conversation_members_projection` `ADMIN` / `OWNER` row. After ownership has passed, policy-service applies the conversation role gate, then applies first-stage `policy_rebac_message_action_rules` relationship gates, then tenant action quota, then checks `policy_message_action_rules`, then checks `policy_tenant_message_action_rules`, and finally falls back to the static policy. A matching exact or tenant rule returns its allow / deny decision, `permission_version`, `classification` and public reason. Exact user/conversation rules intentionally override tenant defaults only after the hard gates have passed. The `CheckMessageAction` hot path reads contact, restriction, role/member, ReBAC, quota and exact/tenant rule facts with one combined PostgreSQL facts query, then applies this same precedence in memory.
+
+Policy revisions are service-owned logical versions, not wall-clock timestamps:
+
+```text
+policy_revision_state:
+tenant_id + scope_type + scope_id + action -> revision
+```
+
+PostgreSQL triggers bump the relevant scoped revision in the same transaction as policy rule, restriction, quota, contact projection or conversation member projection writes. The optional Redis decision cache is enabled with `NEXUSIM_POLICY_DECISION_CACHE_BACKEND=redis`; before a cache lookup, policy-service reads the relevant revision vector and hashes it into the cache key along with tenant, user, conversation, action and caller-supplied conversation permission version. TTL is only cleanup for old keys. User restriction decisions are not cached because `expires_at` can pass without a write, and any path with an enabled tenant quota row is not cached because quota depends on current audit counts. Cache hits still go through the normal use-case audit write before the gRPC response returns.
 
 The first-stage moderation restriction table is deny-only:
 
@@ -56,7 +65,7 @@ policy_user_message_action_restrictions:
 tenant_id + user_id + action -> permission_version + classification + public reason + optional expires_at
 ```
 
-It is intended for low-cardinality tenant-local controls such as temporarily preventing a user from sending messages. Expired rows are ignored by the evaluator. The table does not store message content, risk features, raw moderation provider output, prompt text or model output. Missing table during rollout is treated as no restriction, while other PostgreSQL errors fail closed as policy unavailable.
+It is intended for low-cardinality tenant-local controls such as temporarily preventing a user from sending messages. Expired rows are ignored by the evaluator. The table does not store message content, risk features, raw moderation provider output, prompt text or model output. PostgreSQL errors fail closed as policy unavailable.
 
 The first-stage ReBAC relationship gate is deny-only. It is not a complete graph engine, but it lets policy-service express a small set of relationship requirements using only policy-owned projections:
 
@@ -143,7 +152,7 @@ permission_version=<conversation_permission_version>
 
 The `ownership_override` response field is a typed internal proof from policy-service to message-service. message-service rejects ownership override on `SEND`, on denied decisions, or on mismatched responses; mutation repositories use this boolean, not the classification string, to allow a non-sender transaction. Static default, exact rules and tenant rules cannot by themselves override message ownership.
 
-PostgreSQL lookup errors return policy unavailable so a broken rule store cannot silently bypass a deny rule. The user restriction table, tenant rule table and role rule table are backward-compatible during rollout: if a table has not been migrated yet, a lookup miss due to the missing relation is treated as no rule and the request continues to the next decision step.
+PostgreSQL lookup errors return policy unavailable so a broken rule store cannot silently bypass a deny rule. When rules mode is enabled, policy migrations are required before serving traffic; missing policy tables or a missing revision table are deployment errors, not an implicit allow path.
 
 The contacts projection slice consumes `im.contact.events` into policy-service owned tables:
 
@@ -167,7 +176,7 @@ permission_version=<blocked edge_version>
 
 Policy-service does not guess direct peers and does not synchronously query contacts-service or conversation-service. If no `direct_peer_user_id` is supplied, contacts block enforcement is skipped and the request continues to the exact rule / tenant rule / static decision path.
 
-When PostgreSQL rules mode is enabled, successful `CheckMessageAction` decisions are staged into `policy_decision_audit_outbox` before the response is returned. Audit write failure fails closed as policy unavailable. `NEXUSIM_POLICY_SERVICE_MODE=outbox-relay` publishes these rows to `im.policy.events` as protobuf `PolicyEvent` records and marks successful rows `PUBLISHED`.
+When PostgreSQL rules mode is enabled, successful `CheckMessageAction` decisions are staged into `policy_decision_audit_outbox` before the response is returned. Audit write failure fails closed as policy unavailable. The gRPC runtime opens an isolated audit PostgreSQL pool, controlled by `NEXUSIM_POLICY_AUDIT_PG_DSN` and `NEXUSIM_POLICY_AUDIT_PG_MAX_CONNS`, so synchronous audit inserts do not compete with policy facts reads for the same pgx pool. `NEXUSIM_POLICY_SERVICE_MODE=outbox-relay` publishes these rows to `im.policy.events` as protobuf `PolicyEvent` records and marks successful rows `PUBLISHED`.
 
 `NEXUSIM_POLICY_SERVICE_MODE=outbox-audit` is a read-only operator view over `policy_decision_audit_outbox`. It supports `outbox_id / event_id / tenant_id / aggregate_id / status / event_type / created_at RFC3339 window` filters, returns newest rows first, and never mutates relay state, retry state or repair history.
 
@@ -216,6 +225,17 @@ NEXUSIM_POLICY_DENY_REASON=
 NEXUSIM_POLICY_RULES_ENABLED=false
 NEXUSIM_PG_DSN=
 NEXUSIM_POLICY_PG_MAX_CONNS=
+NEXUSIM_POLICY_AUDIT_PG_DSN=
+NEXUSIM_POLICY_AUDIT_PG_MAX_CONNS=16
+NEXUSIM_POLICY_DECISION_CACHE_BACKEND=
+NEXUSIM_POLICY_DECISION_CACHE_ENABLED=false
+NEXUSIM_POLICY_DECISION_CACHE_REDIS_MODE=single
+NEXUSIM_POLICY_DECISION_CACHE_REDIS_ADDR=
+NEXUSIM_POLICY_DECISION_CACHE_REDIS_USERNAME=
+NEXUSIM_POLICY_DECISION_CACHE_REDIS_PASSWORD=
+NEXUSIM_POLICY_DECISION_CACHE_REDIS_DB=0
+NEXUSIM_POLICY_DECISION_CACHE_KEY_PREFIX=nexusim:policy
+NEXUSIM_POLICY_DECISION_CACHE_TTL=30s
 NEXUSIM_POLICY_DEBUG_ADDR=
 NEXUSIM_DEBUG_ADDR=
 NEXUSIM_POLICY_OTEL_TRACES_ENABLED=false
@@ -363,7 +383,7 @@ When `NEXUSIM_POLICY_DEBUG_ADDR` is set, policy-service exposes:
 /metrics
 ```
 
-The debug metrics include aggregate gRPC request counts and status codes, aggregate final `CheckMessageAction` decision counts, per-action aggregate decision counts, optional PostgreSQL pool stats, optional rule-store row counts, optional projection row counts / checkpoints and optional decision audit outbox status counts. Decision metrics are recorded at the use-case boundary, so they include static / exact / user-restriction / tenant / role / relationship decisions as well as first-stage ownership denies and `ownership_override=true` allows. The `policy_rule_store` snapshot includes low-cardinality row counts for exact message action rules, user message action restrictions, tenant action defaults, conversation role gate rules, ownership override rules and ReBAC relationship rules, grouped only by action / allow-deny / min-role / relation type / conversation scope where applicable. The `policy_projection` snapshot includes contact edge status counts, conversation member status / role counts and Kafka checkpoint topic aggregates. `/metrics` renders the same low-sensitive aggregate snapshot as Prometheus text for local scrape / dashboard prototypes. The local scrape target is `host.docker.internal:11916` when the service debug listener runs as `NEXUSIM_POLICY_DEBUG_ADDR=127.0.0.1:11916`. They intentionally do not expose tenant id, user id, conversation id, message id, device id, session id, request / response payloads, raw rule parameters, deny reason text, classification strings, DSNs or SQL error text.
+The debug metrics include aggregate gRPC request counts and status codes, aggregate final `CheckMessageAction` decision counts, per-action aggregate decision counts, optional policy PostgreSQL pool stats, optional isolated audit PostgreSQL pool stats, optional rule-store row counts, optional projection row counts / checkpoints and optional decision audit outbox status counts. Decision metrics are recorded at the use-case boundary, so they include static / exact / user-restriction / tenant / role / relationship decisions as well as first-stage ownership denies and `ownership_override=true` allows. The `policy_rule_store` snapshot includes low-cardinality row counts for exact message action rules, user message action restrictions, tenant action defaults, conversation role gate rules, ownership override rules and ReBAC relationship rules, grouped only by action / allow-deny / min-role / relation type / conversation scope where applicable. The `policy_projection` snapshot includes contact edge status counts, conversation member status / role counts and Kafka checkpoint topic aggregates. `/metrics` renders the same low-sensitive aggregate snapshot as Prometheus text for local scrape / dashboard prototypes, including `nexusim_policy_pg_pool_*`, `nexusim_policy_audit_pg_pool_*`, `nexusim_policy_evaluator_stage_*` and `nexusim_policy_decision_stage_*`. The local scrape target is `host.docker.internal:11916` when the service debug listener runs as `NEXUSIM_POLICY_DEBUG_ADDR=127.0.0.1:11916`. They intentionally do not expose tenant id, user id, conversation id, message id, device id, session id, request / response payloads, raw rule parameters, deny reason text, classification strings, DSNs or SQL error text.
 
 The debug HTTP listener is intended for local smoke and private operational access. `NEXUSIM_POLICY_DEBUG_ADDR` is the service-specific setting; if it is unset, the shared `NEXUSIM_DEBUG_ADDR` value is used explicitly by the startup config. By default the listener only allows loopback / RFC1918 private addresses. Binding the debug listener to a public or unspecified address requires explicit `NEXUSIM_POLICY_DEBUG_ALLOW_PUBLIC=true`.
 

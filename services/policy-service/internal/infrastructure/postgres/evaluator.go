@@ -17,9 +17,11 @@ type staticDefaultEvaluator interface {
 }
 
 type MessagePolicyEvaluator struct {
-	pool          *pgxpool.Pool
-	staticDefault staticDefaultEvaluator
-	observer      MessagePolicyEvaluatorObserver
+	pool             *pgxpool.Pool
+	staticDefault    staticDefaultEvaluator
+	observer         MessagePolicyEvaluatorObserver
+	decisionCache    MessageDecisionCache
+	decisionCacheTTL time.Duration
 }
 
 func NewMessagePolicyEvaluator(pool *pgxpool.Pool, staticDefault staticDefaultEvaluator, opts ...MessagePolicyEvaluatorOption) MessagePolicyEvaluator {
@@ -39,76 +41,50 @@ func (e MessagePolicyEvaluator) DecideMessageAction(
 	}
 
 	started := time.Now()
-	blocked, edgeVersion, err := e.lookupContactBlock(ctx, command)
-	e.observeStage(command.Action, "contact_block_lookup", started, err)
+	revisionToken, cacheReady, err := e.lookupCacheRevisionToken(ctx, command)
+	e.observeStage(command.Action, "policy_revision_lookup", started, err)
 	if err != nil {
 		return types.MessageActionDecision{}, err
 	}
-	if blocked {
-		return types.MessageActionDecision{
-			TenantID:          command.AuthContext.TenantID,
-			UserID:            command.AuthContext.UserID,
-			ConversationID:    command.ConversationID,
-			MessageID:         command.MessageID,
-			Action:            command.Action,
-			Allowed:           false,
-			PermissionVersion: edgeVersion,
-			Classification:    "CONTACT_BLOCKED",
-			Reason:            "contact blocked",
-			DecisionSource:    types.PolicyDecisionSourceContactProjection,
-		}, nil
+	cacheKey := ""
+	if cacheReady {
+		cacheKey = messageDecisionCacheKey(command, revisionToken)
+		started = time.Now()
+		decision, ok, err := e.decisionCache.GetMessageDecision(ctx, cacheKey)
+		e.observeStage(command.Action, "decision_cache_get", started, err)
+		if err == nil && ok {
+			return bindMessageDecisionToCommand(command, decision), nil
+		}
 	}
 
 	started = time.Now()
-	decision, restricted, err := e.lookupUserRestriction(ctx, command)
-	e.observeStage(command.Action, "user_restriction_lookup", started, err)
+	facts, err := e.lookupMessagePolicyFacts(ctx, command)
+	e.observeStage(command.Action, "policy_facts_read", started, err)
 	if err != nil {
 		return types.MessageActionDecision{}, err
 	}
-	if restricted {
-		return decision, nil
+	decision, cacheable, err := e.decideMessageActionFromFacts(ctx, command, facts)
+	if err != nil {
+		return types.MessageActionDecision{}, err
 	}
+	if cacheReady && cacheable && e.decisionCacheTTL > 0 {
+		started = time.Now()
+		err := e.decisionCache.SetMessageDecision(ctx, cacheKey, decision, e.decisionCacheTTL)
+		e.observeStage(command.Action, "decision_cache_set", started, err)
+	}
+	return decision, nil
+}
 
-	started = time.Now()
-	decision, denied, err := e.applyRoleGate(ctx, command)
-	e.observeStage(command.Action, "role_gate", started, err)
-	if err != nil {
-		return types.MessageActionDecision{}, err
-	}
-	if denied {
-		return decision, nil
-	}
-
-	started = time.Now()
-	decision, rebacDenied, err := e.applyReBACRelationGate(ctx, command)
-	e.observeStage(command.Action, "rebac_gate", started, err)
-	if err != nil {
-		return types.MessageActionDecision{}, err
-	}
-	if rebacDenied {
-		return decision, nil
-	}
-
-	started = time.Now()
-	decision, quotaExceeded, err := e.applyTenantActionQuota(ctx, command)
-	e.observeStage(command.Action, "tenant_quota_lookup", started, err)
-	if err != nil {
-		return types.MessageActionDecision{}, err
-	}
-	if quotaExceeded {
-		return decision, nil
-	}
-
-	started = time.Now()
-	decision, found, err := e.lookupMessageActionRule(ctx, command)
-	e.observeStage(command.Action, "message_action_rule_lookup", started, err)
-	if err != nil {
-		return types.MessageActionDecision{}, err
-	}
-	if found {
-		return decision, nil
-	}
-	return e.staticDefaultDecision(ctx, command)
+func bindMessageDecisionToCommand(
+	command types.CheckMessageActionCommand,
+	decision types.MessageActionDecision,
+) types.MessageActionDecision {
+	decision.TenantID = command.AuthContext.TenantID
+	decision.UserID = command.AuthContext.UserID
+	decision.ConversationID = command.ConversationID
+	decision.MessageID = command.MessageID
+	decision.Action = command.Action
+	return decision
 }
 
 func (e MessagePolicyEvaluator) lookupUserRestriction(
@@ -308,17 +284,17 @@ WHERE q.tenant_id = $1
 }
 
 type rolePolicyRule struct {
-	MinRole        string
-	Classification string
-	Reason         string
+	MinRole        string `json:"min_role"`
+	Classification string `json:"classification"`
+	Reason         string `json:"reason"`
 }
 
 type rebacRelationRule struct {
-	RelationType      string
-	ConversationScope string
-	PermissionVersion int64
-	Classification    string
-	Reason            string
+	RelationType      string `json:"relation_type"`
+	ConversationScope string `json:"conversation_scope"`
+	PermissionVersion int64  `json:"permission_version"`
+	Classification    string `json:"classification"`
+	Reason            string `json:"reason"`
 }
 
 func (e MessagePolicyEvaluator) applyReBACRelationGate(

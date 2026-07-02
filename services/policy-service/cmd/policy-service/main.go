@@ -823,6 +823,7 @@ func runGRPC() error {
 	var useCaseOptions []app.CheckMessageActionOption
 	var toolUseCaseOptions []app.CheckToolActionOption
 	var pool *pgxpool.Pool
+	var auditPool *pgxpool.Pool
 	decisionMetrics := monitoringinfra.NewDecisionMetrics()
 	rulesEnabled := envBool("NEXUSIM_POLICY_RULES_ENABLED", false)
 	if rulesEnabled {
@@ -836,20 +837,40 @@ func runGRPC() error {
 			return err
 		}
 		defer pool.Close()
+		auditDSN := envString("NEXUSIM_POLICY_AUDIT_PG_DSN", dsn)
+		auditPool, err = openPolicyAuditPGPool(ctx, auditDSN)
+		if err != nil {
+			return err
+		}
+		defer auditPool.Close()
+		decisionCache, err := policyDecisionCacheRuntimeFromEnv(ctx)
+		if err != nil {
+			return err
+		}
+		if decisionCache.client != nil {
+			defer decisionCache.client.Close()
+		}
+		evaluatorOptions := []postgresinfra.MessagePolicyEvaluatorOption{
+			postgresinfra.WithMessagePolicyEvaluatorObserver(decisionMetrics),
+		}
+		if decisionCache.cache != nil {
+			evaluatorOptions = append(evaluatorOptions, postgresinfra.WithMessageDecisionCache(decisionCache.cache, decisionCache.ttl))
+			log.Println("policy-service revision-bound Redis decision cache enabled")
+		}
 		postgresEvaluator := postgresinfra.NewMessagePolicyEvaluator(
 			pool,
 			policy,
-			postgresinfra.WithMessagePolicyEvaluatorObserver(decisionMetrics),
+			evaluatorOptions...,
 		)
 		evaluator = postgresEvaluator
 		toolEvaluator = postgresinfra.NewToolPolicyEvaluator(pool, toolPolicy)
-		useCaseOptions = append(useCaseOptions, app.WithPolicyDecisionAuditor(postgresinfra.NewDecisionAuditOutbox(pool)))
-		toolUseCaseOptions = append(toolUseCaseOptions, app.WithToolDecisionAuditor(postgresinfra.NewToolDecisionAudit(pool)))
+		useCaseOptions = append(useCaseOptions, app.WithPolicyDecisionAuditor(postgresinfra.NewDecisionAuditOutbox(auditPool)))
+		toolUseCaseOptions = append(toolUseCaseOptions, app.WithToolDecisionAuditor(postgresinfra.NewToolDecisionAudit(auditPool)))
 		useCaseOptions = append(useCaseOptions, app.WithMessageOwnershipOverrideChecker(postgresEvaluator))
 		log.Println("policy-service message action rule store enabled")
 		log.Println("policy-service tool action rule store enabled")
-		log.Println("policy-service decision audit outbox enabled")
-		log.Println("policy-service tool decision audit enabled")
+		log.Println("policy-service decision audit outbox enabled with isolated postgres pool")
+		log.Println("policy-service tool decision audit enabled with isolated postgres pool")
 	}
 	moderator, moderationEnabled, err := policyContentModeratorFromEnv()
 	if err != nil {
@@ -880,7 +901,7 @@ func runGRPC() error {
 	if err != nil {
 		return err
 	}
-	stopDebug, err := startDebugServer(ctx, debugAddr, monitoringinfra.NewHandler(pool, rulesEnabled, grpcMetrics, decisionMetrics).WithTraceStats(traceRuntime.Snapshot))
+	stopDebug, err := startDebugServer(ctx, debugAddr, monitoringinfra.NewHandler(pool, rulesEnabled, grpcMetrics, decisionMetrics).WithAuditPGPool(auditPool).WithTraceStats(traceRuntime.Snapshot))
 	if err != nil {
 		return err
 	}

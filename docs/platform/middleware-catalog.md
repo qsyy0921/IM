@@ -21,7 +21,7 @@ Business code must not depend directly on middleware clients outside
 | --- | --- | --- | --- |
 | Transactional store | PostgreSQL, future cloud PostgreSQL | All fact-owning services | One service owns its schema; no cross-service private-table reads. |
 | Event bus | Kafka, Schema Registry, future Pulsar | Outbox relays, projections, data platform | Public event contracts only; prefer AsyncAPI / CloudEvents-compatible metadata over time. |
-| Cache / route / ephemeral state | Redis single, Sentinel, Cluster | push-gateway, api-gateway quota, presence | Cache is never source of durable business facts. |
+| Cache / route / ephemeral state | Redis single, Sentinel, Cluster | push-gateway, api-gateway quota, policy-service decision cache, presence | Cache is never source of durable business facts; policy decision cache keys must include policy revision tokens. |
 | Search | OpenSearch, Elasticsearch, Meilisearch | search-service, retrieval-gateway | Only search-service writes search indexes. |
 | Vector store | pgvector, Milvus, Qdrant, Weaviate | vector-index, retrieval, memory | Vector indexes are projections; rebuildable from source events/data products. |
 | Object storage | MinIO, S3, Ceph | media, ingestion, data lake | Store binary payloads outside message-service. |

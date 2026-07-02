@@ -16,6 +16,7 @@ func renderPrometheus(snapshot Snapshot) string {
 	writeGRPCPrometheus(&builder, snapshot.GRPC)
 	writeDecisionPrometheus(&builder, snapshot.Decisions)
 	writePGPoolPrometheus(&builder, snapshot.PGPool)
+	writeAuditPGPoolPrometheus(&builder, snapshot.AuditPGPool)
 	writeRuleStorePrometheus(&builder, snapshot.RuleStore, snapshot.RuleStoreError)
 	writeProjectionPrometheus(&builder, snapshot.Projection, snapshot.ProjectionError)
 	writeAuditOutboxPrometheus(&builder, snapshot.AuditOutbox, snapshot.AuditOutboxError)
@@ -107,23 +108,31 @@ func writeDecisionStagePrometheus(builder *strings.Builder, prefix string, stage
 }
 
 func writePGPoolPrometheus(builder *strings.Builder, snapshot *PGPoolSnapshot) {
-	writePrometheusHeader(builder, "nexusim_policy_pg_pool_acquire_total", "Policy service PostgreSQL pool acquire count.", "counter")
-	writePrometheusHeader(builder, "nexusim_policy_pg_pool_acquire_duration_milliseconds_total", "Policy service PostgreSQL pool acquire duration total.", "counter")
-	writePrometheusHeader(builder, "nexusim_policy_pg_pool_canceled_acquire_total", "Policy service PostgreSQL pool canceled acquire count.", "counter")
-	writePrometheusHeader(builder, "nexusim_policy_pg_pool_empty_acquire_total", "Policy service PostgreSQL pool empty acquire count.", "counter")
-	writePrometheusHeader(builder, "nexusim_policy_pg_pool_conns", "Policy service PostgreSQL pool connection counts.", "gauge")
+	writePGPoolPrometheusWithName(builder, "nexusim_policy_pg_pool", "Policy service PostgreSQL pool", snapshot)
+}
+
+func writeAuditPGPoolPrometheus(builder *strings.Builder, snapshot *PGPoolSnapshot) {
+	writePGPoolPrometheusWithName(builder, "nexusim_policy_audit_pg_pool", "Policy service audit PostgreSQL pool", snapshot)
+}
+
+func writePGPoolPrometheusWithName(builder *strings.Builder, prefix string, helpPrefix string, snapshot *PGPoolSnapshot) {
+	writePrometheusHeader(builder, prefix+"_acquire_total", helpPrefix+" acquire count.", "counter")
+	writePrometheusHeader(builder, prefix+"_acquire_duration_milliseconds_total", helpPrefix+" acquire duration total.", "counter")
+	writePrometheusHeader(builder, prefix+"_canceled_acquire_total", helpPrefix+" canceled acquire count.", "counter")
+	writePrometheusHeader(builder, prefix+"_empty_acquire_total", helpPrefix+" empty acquire count.", "counter")
+	writePrometheusHeader(builder, prefix+"_conns", helpPrefix+" connection counts.", "gauge")
 	if snapshot == nil {
 		return
 	}
-	writePrometheusSample(builder, "nexusim_policy_pg_pool_acquire_total", nil, snapshot.AcquireCount)
-	writePrometheusSample(builder, "nexusim_policy_pg_pool_acquire_duration_milliseconds_total", nil, snapshot.AcquireDurationMS)
-	writePrometheusSample(builder, "nexusim_policy_pg_pool_canceled_acquire_total", nil, snapshot.CanceledAcquireCount)
-	writePrometheusSample(builder, "nexusim_policy_pg_pool_empty_acquire_total", nil, snapshot.EmptyAcquireCount)
-	writePrometheusSample(builder, "nexusim_policy_pg_pool_conns", map[string]string{"state": "acquired"}, snapshot.AcquiredConns)
-	writePrometheusSample(builder, "nexusim_policy_pg_pool_conns", map[string]string{"state": "constructing"}, snapshot.ConstructingConns)
-	writePrometheusSample(builder, "nexusim_policy_pg_pool_conns", map[string]string{"state": "idle"}, snapshot.IdleConns)
-	writePrometheusSample(builder, "nexusim_policy_pg_pool_conns", map[string]string{"state": "max"}, snapshot.MaxConns)
-	writePrometheusSample(builder, "nexusim_policy_pg_pool_conns", map[string]string{"state": "total"}, snapshot.TotalConns)
+	writePrometheusSample(builder, prefix+"_acquire_total", nil, snapshot.AcquireCount)
+	writePrometheusSample(builder, prefix+"_acquire_duration_milliseconds_total", nil, snapshot.AcquireDurationMS)
+	writePrometheusSample(builder, prefix+"_canceled_acquire_total", nil, snapshot.CanceledAcquireCount)
+	writePrometheusSample(builder, prefix+"_empty_acquire_total", nil, snapshot.EmptyAcquireCount)
+	writePrometheusSample(builder, prefix+"_conns", map[string]string{"state": "acquired"}, snapshot.AcquiredConns)
+	writePrometheusSample(builder, prefix+"_conns", map[string]string{"state": "constructing"}, snapshot.ConstructingConns)
+	writePrometheusSample(builder, prefix+"_conns", map[string]string{"state": "idle"}, snapshot.IdleConns)
+	writePrometheusSample(builder, prefix+"_conns", map[string]string{"state": "max"}, snapshot.MaxConns)
+	writePrometheusSample(builder, prefix+"_conns", map[string]string{"state": "total"}, snapshot.TotalConns)
 }
 
 func writeRuleStorePrometheus(builder *strings.Builder, snapshot *RuleSnapshot, queryError string) {

@@ -44,6 +44,18 @@ func envInt(name string, defaultValue int) int {
 	return parsed
 }
 
+func envIntAllowZero(name string, defaultValue int) int {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		return defaultValue
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil || parsed < 0 {
+		return defaultValue
+	}
+	return parsed
+}
+
 func envDuration(name string, defaultValue time.Duration) time.Duration {
 	value := strings.TrimSpace(os.Getenv(name))
 	if value == "" {

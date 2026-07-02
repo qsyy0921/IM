@@ -16,6 +16,7 @@ const serviceName = "policy-service"
 
 type Handler struct {
 	pool                   *pgxpool.Pool
+	auditPool              *pgxpool.Pool
 	requirePostgres        bool
 	grpcMetrics            *GRPCMetrics
 	decisionMetrics        *DecisionMetrics
@@ -54,6 +55,11 @@ func (h *Handler) WithTraceStats(snapshotFunc func() TraceSnapshot) *Handler {
 	return h
 }
 
+func (h *Handler) WithAuditPGPool(pool *pgxpool.Pool) *Handler {
+	h.auditPool = pool
+	return h
+}
+
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch r.URL.Path {
 	case "/healthz":
@@ -85,6 +91,12 @@ func (h *Handler) handleReady(w http.ResponseWriter, r *http.Request) {
 	if err := h.pool.Ping(ctx); err != nil {
 		writeJSON(w, http.StatusServiceUnavailable, healthResponse{Service: serviceName, Status: "unready", Error: "postgres ping failed"})
 		return
+	}
+	if h.auditPool != nil {
+		if err := h.auditPool.Ping(ctx); err != nil {
+			writeJSON(w, http.StatusServiceUnavailable, healthResponse{Service: serviceName, Status: "unready", Error: "audit postgres ping failed"})
+			return
+		}
 	}
 	writeJSON(w, http.StatusOK, healthResponse{Service: serviceName, Status: "ready"})
 }
@@ -119,18 +131,7 @@ func (h *Handler) snapshot(ctx context.Context) Snapshot {
 		snapshot.TimelineProjectionWorker = &workerSnapshot
 	}
 	if h.pool != nil {
-		stats := h.pool.Stat()
-		snapshot.PGPool = &PGPoolSnapshot{
-			AcquireCount:         stats.AcquireCount(),
-			AcquireDurationMS:    int64(stats.AcquireDuration() / time.Millisecond),
-			AcquiredConns:        stats.AcquiredConns(),
-			CanceledAcquireCount: stats.CanceledAcquireCount(),
-			ConstructingConns:    stats.ConstructingConns(),
-			EmptyAcquireCount:    stats.EmptyAcquireCount(),
-			IdleConns:            stats.IdleConns(),
-			MaxConns:             stats.MaxConns(),
-			TotalConns:           stats.TotalConns(),
-		}
+		snapshot.PGPool = pgPoolSnapshot(h.pool)
 		ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 		defer cancel()
 		rules, err := queryRuleSnapshot(ctx, h.pool)
@@ -152,6 +153,9 @@ func (h *Handler) snapshot(ctx context.Context) Snapshot {
 			snapshot.AuditOutbox = &auditOutbox
 		}
 	}
+	if h.auditPool != nil {
+		snapshot.AuditPGPool = pgPoolSnapshot(h.auditPool)
+	}
 	return snapshot
 }
 
@@ -165,6 +169,7 @@ type Snapshot struct {
 	Service                  string                           `json:"service"`
 	GeneratedAtMS            int64                            `json:"generated_at_ms"`
 	PGPool                   *PGPoolSnapshot                  `json:"pg_pool,omitempty"`
+	AuditPGPool              *PGPoolSnapshot                  `json:"audit_pg_pool,omitempty"`
 	RuleStore                *RuleSnapshot                    `json:"policy_rule_store,omitempty"`
 	RuleStoreError           string                           `json:"policy_rule_store_error,omitempty"`
 	Projection               *ProjectionSnapshot              `json:"policy_projection,omitempty"`
@@ -177,6 +182,21 @@ type Snapshot struct {
 	OutboxRelay              *types.OutboxRelayWorkerSnapshot `json:"outbox_relay,omitempty"`
 	ContactProjectionWorker  *types.ProjectionWorkerSnapshot  `json:"contact_projection_worker,omitempty"`
 	TimelineProjectionWorker *types.ProjectionWorkerSnapshot  `json:"timeline_projection_worker,omitempty"`
+}
+
+func pgPoolSnapshot(pool *pgxpool.Pool) *PGPoolSnapshot {
+	stats := pool.Stat()
+	return &PGPoolSnapshot{
+		AcquireCount:         stats.AcquireCount(),
+		AcquireDurationMS:    int64(stats.AcquireDuration() / time.Millisecond),
+		AcquiredConns:        stats.AcquiredConns(),
+		CanceledAcquireCount: stats.CanceledAcquireCount(),
+		ConstructingConns:    stats.ConstructingConns(),
+		EmptyAcquireCount:    stats.EmptyAcquireCount(),
+		IdleConns:            stats.IdleConns(),
+		MaxConns:             stats.MaxConns(),
+		TotalConns:           stats.TotalConns(),
+	}
 }
 
 type PGPoolSnapshot struct {

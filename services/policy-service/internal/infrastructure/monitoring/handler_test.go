@@ -65,6 +65,39 @@ func TestHandlerReadyzWithRequiredMissingPool(t *testing.T) {
 	}
 }
 
+func TestHandlerReadyzChecksAuditPoolIntegration(t *testing.T) {
+	dsn := os.Getenv("NEXUSIM_PG_DSN")
+	if dsn == "" {
+		t.Skip("NEXUSIM_PG_DSN is not set")
+	}
+	ctx := context.Background()
+	pool, err := pgxpool.New(ctx, dsn)
+	if err != nil {
+		t.Fatalf("open main pg pool: %v", err)
+	}
+	defer pool.Close()
+	auditPool, err := pgxpool.New(ctx, dsn)
+	if err != nil {
+		t.Fatalf("open audit pg pool: %v", err)
+	}
+	auditPool.Close()
+
+	handler := NewHandler(pool, true, nil, nil).WithAuditPGPool(auditPool)
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/readyz", nil))
+
+	if response.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected status 503, got %d", response.Code)
+	}
+	var body healthResponse
+	if err := json.NewDecoder(response.Body).Decode(&body); err != nil {
+		t.Fatalf("decode ready response: %v", err)
+	}
+	if body.Status != "unready" || body.Error != "audit postgres ping failed" {
+		t.Fatalf("unexpected ready response: %+v", body)
+	}
+}
+
 func TestHandlerMetricsIncludesGRPCAndDecisionSnapshots(t *testing.T) {
 	grpcMetrics := NewGRPCMetrics()
 	grpcMetrics.record("/nexusim.policy.v1.PolicyService/CheckMessageAction", "OK", 12)

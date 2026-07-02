@@ -94,6 +94,40 @@ func TestPolicyContentModeratorFromEnvDisabledByDefault(t *testing.T) {
 	}
 }
 
+func TestPolicyDecisionCacheConfigFromEnv(t *testing.T) {
+	clearPolicyDecisionCacheConfig(t)
+	config, err := policyDecisionCacheConfigFromEnv()
+	if err != nil {
+		t.Fatalf("load disabled decision cache config: %v", err)
+	}
+	if config.Enabled {
+		t.Fatalf("expected decision cache disabled by default, got %+v", config)
+	}
+
+	clearPolicyDecisionCacheConfig(t)
+	t.Setenv("NEXUSIM_POLICY_DECISION_CACHE_BACKEND", "redis")
+	t.Setenv("NEXUSIM_POLICY_DECISION_CACHE_REDIS_ADDR", "127.0.0.1:6379")
+	t.Setenv("NEXUSIM_POLICY_DECISION_CACHE_TTL", "15s")
+	config, err = policyDecisionCacheConfigFromEnv()
+	if err != nil {
+		t.Fatalf("load redis decision cache config: %v", err)
+	}
+	if !config.Enabled || config.Addr != "127.0.0.1:6379" || config.TTL != 15*time.Second {
+		t.Fatalf("unexpected redis decision cache config: %+v", config)
+	}
+
+	clearPolicyDecisionCacheConfig(t)
+	t.Setenv("NEXUSIM_POLICY_DECISION_CACHE_BACKEND", "disabled")
+	t.Setenv("NEXUSIM_POLICY_DECISION_CACHE_ENABLED", "true")
+	config, err = policyDecisionCacheConfigFromEnv()
+	if err != nil {
+		t.Fatalf("load explicitly disabled decision cache config: %v", err)
+	}
+	if config.Enabled {
+		t.Fatalf("explicit disabled backend should win, got %+v", config)
+	}
+}
+
 func TestPolicyContentModeratorFromEnvLoadsKeywordMode(t *testing.T) {
 	clearPolicyModerationConfig(t)
 	t.Setenv("NEXUSIM_POLICY_MODERATION_MODE", "keyword")
@@ -420,6 +454,19 @@ func clearPolicyModerationConfig(t *testing.T) {
 	t.Setenv("NEXUSIM_POLICY_MODERATION_PERMISSION_VERSION", "")
 	t.Setenv("NEXUSIM_POLICY_MODERATION_CLASSIFICATION", "")
 	t.Setenv("NEXUSIM_POLICY_MODERATION_DENY_REASON", "")
+}
+
+func clearPolicyDecisionCacheConfig(t *testing.T) {
+	t.Helper()
+	t.Setenv("NEXUSIM_POLICY_DECISION_CACHE_BACKEND", "")
+	t.Setenv("NEXUSIM_POLICY_DECISION_CACHE_ENABLED", "")
+	t.Setenv("NEXUSIM_POLICY_DECISION_CACHE_REDIS_MODE", "")
+	t.Setenv("NEXUSIM_POLICY_DECISION_CACHE_REDIS_ADDR", "")
+	t.Setenv("NEXUSIM_POLICY_DECISION_CACHE_REDIS_USERNAME", "")
+	t.Setenv("NEXUSIM_POLICY_DECISION_CACHE_REDIS_PASSWORD", "")
+	t.Setenv("NEXUSIM_POLICY_DECISION_CACHE_REDIS_DB", "")
+	t.Setenv("NEXUSIM_POLICY_DECISION_CACHE_KEY_PREFIX", "")
+	t.Setenv("NEXUSIM_POLICY_DECISION_CACHE_TTL", "")
 }
 
 func writePolicyTLSTestCert(t *testing.T, dir string, name string) (string, string) {

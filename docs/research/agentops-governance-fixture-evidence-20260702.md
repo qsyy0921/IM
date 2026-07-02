@@ -61,6 +61,12 @@ It also adds fixture evidence for kill-switch propagation, failure-class owner
 workflow, canary / shadow comparability, rollback / hold behavior and operator
 controls.
 
+Related operator-surface completeness evidence is recorded separately in
+`docs/research/agent-operator-governance-fixture-evidence-20260702.md` so the
+cross-cutting inspect-and-act path for memory, evidence, replay, approval,
+release, failure-class, kill-switch and rollback surfaces can be reviewed
+without turning this AgentOps release-gate document into a UI/API contract.
+
 It does not close:
 
 - main integration review for governance / control-plane ownership;

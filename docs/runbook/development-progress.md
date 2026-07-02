@@ -58,6 +58,7 @@ Eval Harness / synthetic IM-like fixture 已开始隔离式编码。
 | `docs/research/agent-dataset-reproducibility-fixture-evidence-20260702.md` | 已完成 Dataset 段 | Dataset reproducibility rehearsal 已用 fixture-only code / JSON / tests 落地；仍不提升生产契约 |
 | `docs/research/agent-cross-service-preservation-fixture-evidence-20260702.md` | 已完成 Preservation 段 | Cross-service preservation rehearsal 已用 fixture-only code / JSON / tests 落地；仍不提升生产契约 |
 | `docs/research/agent-object-completeness-fixture-evidence-20260702.md` | 已完成 Object 段 | Object completeness rehearsal 已用 fixture-only code / JSON / tests 落地；仍不提升生产契约 |
+| `docs/research/agent-operator-governance-fixture-evidence-20260702.md` | 已完成 Operator Governance 段 | Operator governance surface rehearsal 已用 fixture-only code / JSON / tests 落地；仍不提升生产契约 |
 | `docs/sdd/agent-runtime.md` | 已完成 | Runtime / Harness 详细 SDD |
 | `docs/sdd/agent-memory-admission.md` | 已完成 | Memory admission 详细 SDD |
 | `docs/sdd/agent-context-evidencepack.md` | 已完成 | Context / EvidencePack 详细 SDD |
@@ -136,6 +137,7 @@ ai/python/fixtures/agent_eval/memory_calibration_sample.json
 ai/python/fixtures/agent_eval/memory_calibration_public_export.json
 ai/python/fixtures/agent_eval/cross_service_preservation_rehearsal.json
 ai/python/fixtures/agent_eval/object_completeness_rehearsal.json
+ai/python/fixtures/agent_eval/operator_governance_rehearsal.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_hardening_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_deeper_hardening_scenarios.json
@@ -242,6 +244,12 @@ ai/python/tests/test_agent_eval_*.py
 - Object completeness rehearsal：已补当前 70 个生产级概念对象的 owner、
   lifecycle、version、permission/audit、replay、operator view、evidence 和
   rejection refs 覆盖，并阻断错误 durable owner 或 fixture 授权生产契约。
+- Operator governance surface rehearsal：已补 memory、evidence、replay、
+  approval、release、failure-class、kill-switch、rollback 八类 operator
+  surfaces 的 inspect-and-act、owner、auth-policy、audit、redaction、
+  replay-reader、failure-class、evidence 和 rejection refs，并阻断
+  passive-only view、body exposure、unauthorized actor、Python override 和
+  release-with-gap。
 - Skeleton completion audit：已把 immutable goal 的 17 个骨架要求映射到当前
   代码、fixture、CLI、tests 和 runbook evidence；结论是 Phase 1 isolated
   Agent-layer skeleton 可作为当前可执行基线，但不能直接推广生产契约。

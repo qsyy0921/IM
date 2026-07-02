@@ -31,6 +31,7 @@ scoped integration design. Agent Lab remains backend-isolated.
 - `docs/research/agent-architecture-gap-closure-20260702.md`
 - `docs/research/agent-production-object-model-20260702.md`
 - `docs/research/adr-candidates/`
+- `docs/research/agent-operator-governance-fixture-evidence-20260702.md`
 - `docs/sdd/agent-runtime.md`
 - `docs/sdd/agent-eval-replay-harness.md`
 - `docs/sdd/agent-memory-admission.md`
@@ -82,8 +83,9 @@ has all of the following:
 | Tool / MCP boundary | SDD plus Tool/MCP ADR candidate | Conditionally passes; provider trust remains untrusted by default |
 | Workflow / approval | Runtime/Workflow candidate plus workflow ownership matrix | Conditionally passes; workflow cannot read planner internals |
 | Action executor handoff | Object model and preservation appendix | Conditionally passes; executor remains sole side-effect owner |
-| AgentOps / governance | SDD plus AgentOps candidate | Conditionally passes; operator UX is a promotion prerequisite |
+| AgentOps / governance | SDD plus AgentOps candidate and fixture evidence | Conditionally passes; production operator UX remains unimplemented |
 | Production object completeness | Object model plus fixture evidence | Conditionally passes; production field/schema design remains unfrozen |
+| Operator governance surfaces | Operator governance fixture evidence | Conditionally passes; memory, evidence, replay, approval, release, failure-class, kill-switch and rollback inspect-and-act surfaces have low-sensitive evidence |
 | Contract versioning | Production object model plus shared appendix | Conditionally passes; version-bump rehearsal has fixture evidence |
 | Cross-service ref preservation | Shared appendix and fixture evidence | Conditionally passes; real-service preservation smoke is required before production design |
 | Security / privacy / audit | SDD rejection rules plus appendix | Conditionally passes; raw prompt/provider replay remains rejected |
@@ -119,6 +121,7 @@ Next loop should start from the Eval/Replay candidate and verify:
 - version-bump replay and cross-service preservation rehearsals have fixture
   evidence;
 - object catalog completeness has fixture evidence;
+- operator governance surface completeness has fixture evidence;
 - report retention and redaction policy are acceptable;
 - baseline approval UX has an owner.
 

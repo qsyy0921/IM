@@ -36,10 +36,14 @@ Current fixture-only evidence:
 
 - `ai/python/nexusim_ai_eval/object_completeness.py`;
 - `ai/python/fixtures/agent_eval/object_completeness_rehearsal.json`;
-- `docs/research/agent-object-completeness-fixture-evidence-20260702.md`.
+- `docs/research/agent-object-completeness-fixture-evidence-20260702.md`;
+- `ai/python/nexusim_ai_eval/operator_governance.py`;
+- `ai/python/fixtures/agent_eval/operator_governance_rehearsal.json`;
+- `docs/research/agent-operator-governance-fixture-evidence-20260702.md`.
 
-This evidence verifies catalog coverage and promotion blockers only. It does
-not authorize production object fields, schemas, storage or service APIs.
+This evidence verifies catalog coverage, operator-surface coverage and
+promotion blockers only. It does not authorize production object fields,
+schemas, storage, service APIs or admin UI contracts.
 
 ## Ownership Principles
 

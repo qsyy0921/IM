@@ -37,6 +37,7 @@ authorizes the next explicitly scoped integration design.
 ## Review Artifacts
 
 - `../agent-architecture-review-loop-20260702.md`
+- `../agent-operator-governance-fixture-evidence-20260702.md`
 
 ## Candidate Acceptance Gate
 

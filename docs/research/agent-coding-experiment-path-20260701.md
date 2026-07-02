@@ -73,6 +73,7 @@ ai/python/nexusim_ai_eval/
   fixtures.py
   memory_calibration.py
   object_completeness.py
+  operator_governance.py
   reporting.py
   trace.py
 ai/python/fixtures/agent_eval/adapter_samples/
@@ -96,6 +97,7 @@ ai/python/fixtures/agent_eval/memory_calibration_public_export.json
 ai/python/fixtures/agent_eval/cross_service_preservation_rehearsal.json
 ai/python/fixtures/agent_eval/dataset_reproducibility_rehearsal.json
 ai/python/fixtures/agent_eval/object_completeness_rehearsal.json
+ai/python/fixtures/agent_eval/operator_governance_rehearsal.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_hardening_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_deeper_hardening_scenarios.json
@@ -120,6 +122,7 @@ ai/python/tests/test_agent_eval_comparison.py
 ai/python/tests/test_agent_eval_reporting.py
 ai/python/tests/test_agent_memory_calibration.py
 ai/python/tests/test_agent_eval_object_completeness.py
+ai/python/tests/test_agent_eval_operator_governance.py
 ai/python/tests/test_agent_eval_trace.py
 ```
 
@@ -207,6 +210,10 @@ Slice 0 covers:
 - fixture-only object completeness coverage for the conceptual production object
   catalog, including owner/lifecycle/version/permission/audit/replay/operator/
   evidence/rejection refs for every listed object group.
+- fixture-only operator governance surface coverage for memory, evidence,
+  replay, approval, release, failure-class, kill-switch and rollback
+  inspect-and-act paths with owner, auth-policy, audit, redaction,
+  replay-reader, failure-class, evidence and rejection refs.
 - fixture-only state-diff report coverage for approved action outcome refs,
   expected-vs-actual state changes, missing execution refs, incomplete reports
   and unauthorized mutation detection.
@@ -489,6 +496,9 @@ Evaluator tests:
 - object completeness scoring rejects missing catalog objects, missing required
   dimensions, Python-owned durable production objects, wrong ACTIVE memory owner
   and production-contract authorization from fixture evidence.
+- operator governance scoring rejects missing surfaces, passive-only operator
+  views, body exposure, unauthorized actor access, Python override and release
+  gates that allow failed surface evidence.
 - AgentRun trace includes context, memory, tool, workflow, runtime-control and
   failure steps.
 - runtime-control deeper hardening scoring rejects stale checkpoint versions,

@@ -83,6 +83,11 @@
 - `agent-object-completeness-fixture-evidence-20260702.md`：fixture-only
   evidence 更新，记录当前生产对象目录的 owner / lifecycle / version /
   permission / audit / replay / operator / evidence / rejection 覆盖证据。
+- `agent-operator-governance-fixture-evidence-20260702.md`：fixture-only
+  evidence 更新，记录 memory、evidence、replay、approval、release、
+  failure-class、kill-switch、rollback operator surfaces 的 inspect-and-act、
+  owner、auth-policy、audit、redaction、replay-reader、failure-class、evidence
+  和 rejection 覆盖证据。
 
 ## 存放位置
 

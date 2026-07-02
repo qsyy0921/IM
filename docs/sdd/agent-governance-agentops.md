@@ -309,6 +309,14 @@ Implemented fixture coverage:
   regression must hold or roll back release;
 - operator controls expose only low-sensitive refs and cannot be overridden by
   Python worker output.
+- operator governance surface completeness covers memory, evidence, replay,
+  approval, release, failure-class, kill-switch and rollback surfaces with
+  inspect refs, action refs, owner refs, auth-policy refs, audit refs,
+  redaction refs, replay-reader refs, failure-class refs, evidence refs and
+  rejection refs;
+- operator surface gaps block promotion when a view is passive-only,
+  unaudited, body-exposing, accessible to an unauthorized actor or overridable
+  by Python worker output.
 
 Remaining hardening:
 

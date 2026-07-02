@@ -1,0 +1,325 @@
+{
+  "schema_version": 1,
+  "rehearsal_kind": "agent_operator_governance_rehearsal",
+  "rehearsal_id": "operator-governance-rehearsal-v1",
+  "operator_surface_records": [
+    {
+      "surface_ref": "operator-surface:memory-governance",
+      "surface_kind": "memory-governance",
+      "owner_ref": "memory-service+governance",
+      "operator_role_ref": "role:memory-curator",
+      "auth_policy_ref": "auth-policy:memory-review",
+      "inspect_ref": "memory-inspect-view:claim-life-cycle",
+      "action_ref": "memory-action:review-correct-forget",
+      "audit_ref": "audit:operator-surface:memory",
+      "redaction_policy_ref": "redaction-policy:memory-low-sensitive:v1",
+      "replay_reader_policy_ref": "replay-reader-policy:memory-refs:v1",
+      "failure_class_ref": "failure-class:memory-pollution",
+      "evidence_ref": "evidence:operator-governance:memory",
+      "visible_refs": [
+        "memory-inspect-view:active-review-revoked",
+        "memory-claim:synthetic-project-consensus",
+        "memory-review-task:synthetic-project-consensus"
+      ],
+      "action_target_refs": [
+        "memory-action-target:correct",
+        "memory-action-target:forget",
+        "memory-action-target:redrive-review"
+      ],
+      "rejection_condition_refs": [
+        "reject:memory-body-exposed",
+        "reject:python-active-memory",
+        "reject:actionless-memory-view"
+      ],
+      "body_exposed": false,
+      "unauthorized_actor_allowed": false,
+      "python_override_allowed": false,
+      "missing_audit": false,
+      "actionless_view": false,
+      "release_allowed_with_gap": false,
+      "production_contract_authorized": false
+    },
+    {
+      "surface_ref": "operator-surface:evidence-governance",
+      "surface_kind": "evidence-governance",
+      "owner_ref": "retrieval-gateway+governance",
+      "operator_role_ref": "role:evidence-reviewer",
+      "auth_policy_ref": "auth-policy:evidence-inspect",
+      "inspect_ref": "evidence-inspect-view:coverage-denied-taint",
+      "action_ref": "evidence-action:redrive-lane-or-block",
+      "audit_ref": "audit:operator-surface:evidence",
+      "redaction_policy_ref": "redaction-policy:evidence-low-sensitive:v1",
+      "replay_reader_policy_ref": "replay-reader-policy:evidence-refs:v1",
+      "failure_class_ref": "failure-class:source-coverage-missing",
+      "evidence_ref": "evidence:operator-governance:evidence",
+      "visible_refs": [
+        "evidence-inspect-view:coverage-denied-taint",
+        "source-visibility-version:synthetic-visible",
+        "denied-lane:cross-scope"
+      ],
+      "action_target_refs": [
+        "evidence-action-target:redrive-lane",
+        "evidence-action-target:block-answer",
+        "evidence-action-target:record-taint"
+      ],
+      "rejection_condition_refs": [
+        "reject:evidence-body-exposed",
+        "reject:denied-lane-leak",
+        "reject:missing-evidence-audit"
+      ],
+      "body_exposed": false,
+      "unauthorized_actor_allowed": false,
+      "python_override_allowed": false,
+      "missing_audit": false,
+      "actionless_view": false,
+      "release_allowed_with_gap": false,
+      "production_contract_authorized": false
+    },
+    {
+      "surface_ref": "operator-surface:replay-governance",
+      "surface_kind": "replay-governance",
+      "owner_ref": "agent-runtime+ai-eval-service",
+      "operator_role_ref": "role:replay-reviewer",
+      "auth_policy_ref": "auth-policy:replay-inspect",
+      "inspect_ref": "replay-view:low-sensitive-run-reconstruction",
+      "action_ref": "replay-action:repair-redrive-or-block",
+      "audit_ref": "audit:operator-surface:replay",
+      "redaction_policy_ref": "redaction-policy:replay-low-sensitive:v1",
+      "replay_reader_policy_ref": "replay-reader-policy:runtime-eval:v1",
+      "failure_class_ref": "failure-class:replay-incomplete",
+      "evidence_ref": "evidence:operator-governance:replay",
+      "visible_refs": [
+        "replay-view:low-sensitive-run-reconstruction",
+        "replay-index:synthetic-failed-run",
+        "eval-report:synthetic-replay-gap"
+      ],
+      "action_target_refs": [
+        "replay-action-target:repair-request",
+        "replay-action-target:redrive-request",
+        "replay-action-target:block-release"
+      ],
+      "rejection_condition_refs": [
+        "reject:replay-needs-body",
+        "reject:side-effect-rerun",
+        "reject:missing-replay-audit"
+      ],
+      "body_exposed": false,
+      "unauthorized_actor_allowed": false,
+      "python_override_allowed": false,
+      "missing_audit": false,
+      "actionless_view": false,
+      "release_allowed_with_gap": false,
+      "production_contract_authorized": false
+    },
+    {
+      "surface_ref": "operator-surface:approval-governance",
+      "surface_kind": "approval-governance",
+      "owner_ref": "workflow-service",
+      "operator_role_ref": "role:approval-operator",
+      "auth_policy_ref": "auth-policy:approval-console",
+      "inspect_ref": "approval-console:pending-timeout-delegated",
+      "action_ref": "approval-action:approve-reject-timeout-redrive",
+      "audit_ref": "audit:operator-surface:approval",
+      "redaction_policy_ref": "redaction-policy:approval-low-sensitive:v1",
+      "replay_reader_policy_ref": "replay-reader-policy:approval-refs:v1",
+      "failure_class_ref": "failure-class:approval-timeout",
+      "evidence_ref": "evidence:operator-governance:approval",
+      "visible_refs": [
+        "approval-console:pending-timeout-delegated",
+        "approval-request:synthetic-high-risk-action",
+        "approval-decision:synthetic-timeout"
+      ],
+      "action_target_refs": [
+        "approval-action-target:reject",
+        "approval-action-target:delegate",
+        "approval-action-target:redrive"
+      ],
+      "rejection_condition_refs": [
+        "reject:runtime-owns-approval-wait",
+        "reject:approval-body-exposed",
+        "reject:unowned-approval-action"
+      ],
+      "body_exposed": false,
+      "unauthorized_actor_allowed": false,
+      "python_override_allowed": false,
+      "missing_audit": false,
+      "actionless_view": false,
+      "release_allowed_with_gap": false,
+      "production_contract_authorized": false
+    },
+    {
+      "surface_ref": "operator-surface:release-governance",
+      "surface_kind": "release-governance",
+      "owner_ref": "governance+admin-workflow",
+      "operator_role_ref": "role:release-owner",
+      "auth_policy_ref": "auth-policy:agent-release",
+      "inspect_ref": "agent-release-console:gate-baseline-canary",
+      "action_ref": "release-action:hold-promote-disable",
+      "audit_ref": "audit:operator-surface:release",
+      "redaction_policy_ref": "redaction-policy:release-low-sensitive:v1",
+      "replay_reader_policy_ref": "replay-reader-policy:release-refs:v1",
+      "failure_class_ref": "failure-class:blocked-promotion",
+      "evidence_ref": "evidence:operator-governance:release",
+      "visible_refs": [
+        "agent-release-console:gate-baseline-canary",
+        "agent-release:copilot:v4:beta",
+        "baseline-approval:copilot:v3-to-v4"
+      ],
+      "action_target_refs": [
+        "release-action-target:hold",
+        "release-action-target:promote",
+        "release-action-target:disable"
+      ],
+      "rejection_condition_refs": [
+        "reject:release-unpinned",
+        "reject:baseline-missing",
+        "reject:p0-p1-release"
+      ],
+      "body_exposed": false,
+      "unauthorized_actor_allowed": false,
+      "python_override_allowed": false,
+      "missing_audit": false,
+      "actionless_view": false,
+      "release_allowed_with_gap": false,
+      "production_contract_authorized": false
+    },
+    {
+      "surface_ref": "operator-surface:failure-class-governance",
+      "surface_kind": "failure-class-governance",
+      "owner_ref": "governance+ai-eval-service",
+      "operator_role_ref": "role:failure-owner",
+      "auth_policy_ref": "auth-policy:failure-review",
+      "inspect_ref": "failure-review-queue:p0-p1-owner-lifecycle",
+      "action_ref": "failure-action:assign-classify-fixture",
+      "audit_ref": "audit:operator-surface:failure-class",
+      "redaction_policy_ref": "redaction-policy:failure-low-sensitive:v1",
+      "replay_reader_policy_ref": "replay-reader-policy:failure-refs:v1",
+      "failure_class_ref": "failure-class:permission-leakage",
+      "evidence_ref": "evidence:operator-governance:failure-class",
+      "visible_refs": [
+        "failure-review-queue:p0-p1-owner-lifecycle",
+        "failure-class-owner:permission-leakage",
+        "blocked-promotion-reason:p1-open"
+      ],
+      "action_target_refs": [
+        "failure-action-target:assign-owner",
+        "failure-action-target:add-regression-fixture",
+        "failure-action-target:block-baseline-refresh"
+      ],
+      "rejection_condition_refs": [
+        "reject:p1-unowned",
+        "reject:baseline-refresh-open-p1",
+        "reject:unknown-failure-pass"
+      ],
+      "body_exposed": false,
+      "unauthorized_actor_allowed": false,
+      "python_override_allowed": false,
+      "missing_audit": false,
+      "actionless_view": false,
+      "release_allowed_with_gap": false,
+      "production_contract_authorized": false
+    },
+    {
+      "surface_ref": "operator-surface:kill-switch-governance",
+      "surface_kind": "kill-switch-governance",
+      "owner_ref": "governance+control-plane",
+      "operator_role_ref": "role:incident-owner",
+      "auth_policy_ref": "auth-policy:kill-switch",
+      "inspect_ref": "agent-release-console:kill-switch-propagation",
+      "action_ref": "kill-switch-action:activate-drain-cancel",
+      "audit_ref": "audit:operator-surface:kill-switch",
+      "redaction_policy_ref": "redaction-policy:kill-switch-low-sensitive:v1",
+      "replay_reader_policy_ref": "replay-reader-policy:kill-switch-refs:v1",
+      "failure_class_ref": "failure-class:permission-leakage",
+      "evidence_ref": "evidence:operator-governance:kill-switch",
+      "visible_refs": [
+        "kill-switch:agent-definition:copilot-v4",
+        "propagation-ack:agent-service",
+        "propagation-ack:agent-runtime"
+      ],
+      "action_target_refs": [
+        "kill-switch-action-target:activate",
+        "kill-switch-action-target:cancel-new-runs",
+        "kill-switch-action-target:drain-running-runs"
+      ],
+      "rejection_condition_refs": [
+        "reject:python-kill-switch-owner",
+        "reject:missing-propagation-ack",
+        "reject:new-runs-allowed"
+      ],
+      "body_exposed": false,
+      "unauthorized_actor_allowed": false,
+      "python_override_allowed": false,
+      "missing_audit": false,
+      "actionless_view": false,
+      "release_allowed_with_gap": false,
+      "production_contract_authorized": false
+    },
+    {
+      "surface_ref": "operator-surface:rollback-governance",
+      "surface_kind": "rollback-governance",
+      "owner_ref": "governance+control-plane",
+      "operator_role_ref": "role:release-owner",
+      "auth_policy_ref": "auth-policy:rollback",
+      "inspect_ref": "agent-release-console:rollback-compatibility",
+      "action_ref": "rollback-action:restore-disable-redrive",
+      "audit_ref": "audit:operator-surface:rollback",
+      "redaction_policy_ref": "redaction-policy:rollback-low-sensitive:v1",
+      "replay_reader_policy_ref": "replay-reader-policy:rollback-refs:v1",
+      "failure_class_ref": "failure-class:canary-p1-regression",
+      "evidence_ref": "evidence:operator-governance:rollback",
+      "visible_refs": [
+        "rollback-plan:copilot:v3",
+        "compatibility-window:agent-release:v3-v4",
+        "canary-report:copilot:v4:p1-regression"
+      ],
+      "action_target_refs": [
+        "rollback-action-target:restore-previous-release",
+        "rollback-action-target:disable-current-release",
+        "rollback-action-target:redrive-baseline-review"
+      ],
+      "rejection_condition_refs": [
+        "reject:rollback-plan-missing",
+        "reject:rollback-erases-audit",
+        "reject:memory-grant-impact-unreviewed"
+      ],
+      "body_exposed": false,
+      "unauthorized_actor_allowed": false,
+      "python_override_allowed": false,
+      "missing_audit": false,
+      "actionless_view": false,
+      "release_allowed_with_gap": false,
+      "production_contract_authorized": false
+    }
+  ],
+  "promotion_gate_records": [
+    {
+      "gate_ref": "operator-governance-gate:complete-surfaces",
+      "expected_gate_decision": "ALLOW",
+      "actual_gate_decision": "ALLOW",
+      "review_ref": "review:operator-governance:complete-surfaces",
+      "audit_ref": "audit:operator-governance:complete-surfaces",
+      "missing_surface": false,
+      "actionless_surface": false,
+      "unauthorized_surface": false,
+      "exposed_body": false,
+      "python_override": false,
+      "missing_audit": false,
+      "release_allowed": true
+    },
+    {
+      "gate_ref": "operator-governance-gate:block-gap",
+      "expected_gate_decision": "BLOCK",
+      "actual_gate_decision": "BLOCK",
+      "review_ref": "review:operator-governance:block-gap",
+      "audit_ref": "audit:operator-governance:block-gap",
+      "missing_surface": false,
+      "actionless_surface": true,
+      "unauthorized_surface": false,
+      "exposed_body": false,
+      "python_override": false,
+      "missing_audit": false,
+      "release_allowed": false
+    }
+  ]
+}

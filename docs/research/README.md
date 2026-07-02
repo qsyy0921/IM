@@ -60,6 +60,10 @@
   Context / EvidencePack / RAG boundary 的第三份 L2 scoped implementation
   design；只定义 AI read boundary、source visibility、denied lanes、citation
   verifier、taint / redaction / replay-reader、operator gates 和 L3 smoke，不授权生产实现。
+- `agent-memory-admission-l2-scoped-implementation-design-20260702.md`：
+  Memory Admission boundary 的第四份 L2 scoped implementation design；只定义
+  candidate-only Python、ACTIVE memory owner、category thresholds、revocation /
+  retrieval eligibility、operator controls 和 L3 smoke，不授权生产实现。
 - `agent-eval-replay-l1-acceptance-review-20260702.md`：Eval / Replay
   candidate 的 L1 acceptance review 自评包，建议进入主集成 ADR review，
   但继续 defer production implementation。

@@ -292,6 +292,9 @@ ai/python/tests/test_agent_eval_*.py
   SDD、ADR candidates 和 fixture evidence；结论是 Agent Lab 内部证据条件通过，
   但 actual controlled implementation 仍被 accepted ADR、full-package entry
   decision、owner review、real-service preservation smoke 和 production operator UX 阻断。
+- Full-package entry review request：已把完整包裁决项提交为 review request，
+  请求主集成选择接受 ADR acceptance review、按 P0/P1 打回或因 owner / smoke
+  证据不足而 defer；不请求生产实现授权。
 - Skeleton completion audit：已把 immutable goal 的 17 个骨架要求映射到当前
   代码、fixture、CLI、tests 和 runbook evidence；结论是 Phase 1 isolated
   Agent-layer skeleton 可作为当前可执行基线，但不能直接推广生产契约。

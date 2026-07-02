@@ -13,8 +13,8 @@ memory / AI worker / EvidencePack / eval gate，不承接后端热点群压测�
   `docs/research/agent-adr-promotion-readiness-20260702.md`。
 - 架构缺口、生产对象模型、ADR candidate package 和首轮 review ledger 已完成到
   research 级事实源；下一步只做评审或 fixture-only hardening，不直接写生产契约。
-- Controlled implementation entry audit 已确认 Agent Lab evidence 条件通过，但
-  actual controlled implementation 仍被 accepted ADR / full-package entry decision / owner review 阻断。
+- Full-package entry review request 已发起：只请求 ADR acceptance review，
+  actual controlled implementation 仍被 accepted ADR / owner review / real-service smoke 阻断。
 - 完整进度历史在 `docs/runbook/development-progress.md`，不要把长历史塞回本文件。
 
 ## 当前设计事实源
@@ -53,8 +53,8 @@ baseline lifecycle 和 memory calibration。
 
 ## 下一步
 
-若继续架构推进，等待主集成评审六个 ADR candidates 或补 fixture-only evidence。
+若继续架构推进，等待主集成完整包准入评审或处理其 P0/P1 打回。
 Eval / Replay、Runtime / Workflow、Context / Evidence、Memory、Tool、AgentOps、dataset reproducibility、cross-service preservation、multi-agent handoff、object completeness、operator governance、operational readiness、controlled implementation readiness、architecture coverage 和 contract version compatibility fixture evidence 已落地。
-若继续编码，优先主集成 review 指出的 P0/P1 或 focused contract/version hardening。
+若继续编码，优先主集成 review 指出的 P0/P1 或 focused review-requested hardening。
 完整模块完成后 commit、push
 `origin/codex/agent-lab` 并 handoff。

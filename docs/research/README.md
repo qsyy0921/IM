@@ -40,6 +40,9 @@
   将架构通过标准映射到当前 SDD / ADR candidate / fixture evidence，并明确
   Agent Lab 条件通过但真实受控实现仍被 accepted ADR、full-package entry
   decision、owner review 和 real-service preservation smoke 阻断。
+- `agent-full-package-entry-review-request-20260702.md`：面向主集成的完整包准入
+  review request，列出请求裁决、acceptance questions、非请求项、接受 / 打回
+  后动作；只请求 ADR acceptance review，不请求生产实现授权。
 - `agent-eval-replay-adr-review-20260702.md`：Eval / Replay ADR candidate
   focused review，补齐 failure-class lifecycle、baseline approval、retention /
   redaction 和 contract-version bump rehearsal。

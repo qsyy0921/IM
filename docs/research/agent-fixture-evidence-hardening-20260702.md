@@ -63,4 +63,7 @@ Context evidence is now recorded in
 evidence is recorded in `docs/research/agent-memory-fixture-evidence-20260702.md`.
 Tool / MCP evidence is recorded in
 `docs/research/agent-tool-mcp-fixture-evidence-20260702.md`.
-Remaining fixture-only target is AgentOps release-blocking / kill-switch proof.
+AgentOps evidence is recorded in
+`docs/research/agentops-governance-fixture-evidence-20260702.md`.
+All six focused ADR areas now have fixture-only evidence; next work is main
+integration review or memory calibration / dataset reproducibility hardening.

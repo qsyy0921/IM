@@ -8,6 +8,10 @@ from nexusim_ai_eval.adapters import (
     suite_from_adapter_cases,
 )
 from nexusim_ai_eval.adapter_runner import convert_adapter_payload, run_adapter_payload
+from nexusim_ai_eval.agentops_governance import (
+    load_agentops_governance_rehearsal,
+    rehearse_agentops_governance,
+)
 from nexusim_ai_eval.comparison import compare_eval_reports
 from nexusim_ai_eval.context_evidence_preservation import (
     load_context_evidence_preservation_rehearsal,
@@ -79,6 +83,7 @@ __all__ = [
     "compare_eval_reports",
     "convert_adapter_payload",
     "generate_current_report_payload",
+    "load_agentops_governance_rehearsal",
     "load_context_evidence_preservation_rehearsal",
     "load_report_matrix_plan",
     "load_memory_calibration_payload",
@@ -87,6 +92,7 @@ __all__ = [
     "load_runtime_workflow_ownership_rehearsal",
     "load_tool_mcp_governance_rehearsal",
     "run_eval_suite",
+    "rehearse_agentops_governance",
     "rehearse_context_evidence_preservation",
     "rehearse_memory_admission_governance",
     "rehearse_replay_version_bump",

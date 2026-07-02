@@ -48,13 +48,25 @@ ownership and no production release pipeline is authorized by this review.
 ## Remaining Conditions
 
 - Main integration must accept governance/control-plane ownership.
-- Future fixture hardening should prove release-blocking behavior and baseline
-  approval records.
+- Fixture code now proves release blocking, baseline approval, kill-switch
+  propagation, failure-class owner workflow, canary / shadow comparability and
+  operator controls in `ai/python/nexusim_ai_eval/agentops_governance.py`,
+  `ai/python/fixtures/agent_eval/agentops_governance_rehearsal.json` and
+  `ai/python/tests/test_agent_eval_agentops_governance.py`.
 - Production on-call, SLO and incident escalation remain integration-scope.
+
+## Fixture Evidence Update
+
+Fixture evidence is recorded in
+`docs/research/agentops-governance-fixture-evidence-20260702.md`.
+
+This update closes the fixture-only proof request for release-blocking behavior
+and baseline approval records. It does not close production governance owner
+acceptance, admin UX, on-call / SLO / incident escalation or production canary
+telemetry.
 
 ## Next Review Target
 
-All six ADR candidates now have first-pass focused review ledgers. The next
-loop should either wait for main integration review or implement fixture-only
-evidence for the highest-risk rehearsal: Eval / Replay version-bump rehearsal
-and Runtime wakeup dedupe.
+All six ADR candidates now have first-pass focused review ledgers and
+fixture-only evidence slices. The next loop should wait for main integration
+review or harden memory calibration / dataset reproducibility.

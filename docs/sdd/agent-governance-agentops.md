@@ -283,7 +283,41 @@ Move toward ADR / implementation only after:
 - kill switch and rollback semantics are agreed with control-plane ownership;
 - production slice risk is narrow enough to operate.
 
-## 17. References
+## 17. Current Isolated Fixture Coverage
+
+Current Agent Lab code only provides offline governance fixtures. It does not
+create production AgentOps APIs, release pipelines, admin UI or control-plane
+contracts.
+
+Implemented fixture coverage:
+
+- AgentOps ownership assertions for AgentDefinition, SkillPackage,
+  AgentRelease, BaselineApproval, FailureClassOwner, KillSwitch, RollbackPlan
+  and CanaryReport refs;
+- Python worker and model output cannot own governance decisions;
+- production-enabled release gates require pinned AgentDefinition /
+  SkillPackage, EvalReport, ReplayBundle, BaselineApproval, rollback, disable
+  switch and audit refs;
+- P0/P1 eval failure, replay gap, audit gap or missing baseline blocks release;
+- active kill switch blocks new runs, records propagation acknowledgements and
+  running-run behavior;
+- baseline refresh requires explicit approval when datasets, failure classes,
+  risk tier or required suites change;
+- P0/P1 failure classes require owner and regression disposition and block
+  release / baseline refresh while open;
+- canary / shadow metrics must be comparable to offline baseline and P0/P1
+  regression must hold or roll back release;
+- operator controls expose only low-sensitive refs and cannot be overridden by
+  Python worker output.
+
+Remaining hardening:
+
+- main integration acceptance for governance / control-plane ownership;
+- admin UX owner review for production release pinning and baseline approval;
+- production on-call, SLO and incident escalation design;
+- production canary telemetry and rollback automation.
+
+## 18. References
 
 - `docs/sdd/agent-platform.md`
 - `docs/sdd/agent-runtime.md`

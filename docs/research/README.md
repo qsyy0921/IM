@@ -69,6 +69,10 @@
   记录 Tool / MCP governance rehearsal 的 capability lease denial、
   provider attestation downgrade、sandbox onboarding、prepare re-prepare、
   tool-output taint 和 executor stale-prepare rejection 证据。
+- `agentops-governance-fixture-evidence-20260702.md`：fixture-only evidence
+  更新，记录 AgentOps governance rehearsal 的 release blocking、baseline
+  approval、kill-switch propagation、failure owner、canary / shadow comparability
+  和 operator controls 证据。
 
 ## 存放位置
 

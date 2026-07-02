@@ -29,8 +29,8 @@
    Tool / AgentOps focused reviews 也已补齐。下一步优先主集成 review 或
    fixture-only evidence，未接受前不提升生产契约。
 3. Fixture-only evidence hardening：Eval / Replay、Runtime / Workflow、Context /
-   Evidence、Memory、Tool rehearsal 已落地；下一步优先 AgentOps
-   release-blocking / kill-switch proof。
+   Evidence、Memory、Tool、AgentOps rehearsal 已落地；下一步优先主集成 review
+   或 memory calibration / dataset reproducibility hardening。
 4. ReplayBundle observability hardening review：当前 skeleton 已覆盖低敏
    observability refs、hash refs、version metadata refs、failure taxonomy refs 和
    trace linkage refs；如评审要求继续，只增加 fixture-only taxonomy / trace 证据。

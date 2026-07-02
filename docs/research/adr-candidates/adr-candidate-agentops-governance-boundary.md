@@ -136,5 +136,8 @@ Reject the ADR if:
 
 - Main integration review for governance/control-plane kill-switch ownership.
 - Admin UX owner for release pinning and baseline refresh approval.
-- Fixture proof that unowned P0/P1 failure classes block release.
-- Canary/shadow comparison policy tied to offline baseline metrics.
+- Fixture proof that unowned P0/P1 failure classes block release, baseline
+  refresh requires approval, kill switch blocks new runs and canary / shadow
+  metrics remain comparable is recorded in
+  `docs/research/agentops-governance-fixture-evidence-20260702.md`.
+- Production canary telemetry, on-call and incident escalation review.

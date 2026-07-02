@@ -1,0 +1,312 @@
+{
+  "schema_version": 1,
+  "rehearsal_kind": "agentops_governance_rehearsal",
+  "rehearsal_id": "agentops-governance-rehearsal-v1",
+  "ownership_assertions": [
+    {
+      "object_ref": "agent-definition:copilot:v4",
+      "object_kind": "agent-definition",
+      "owner": "agent-service+governance",
+      "forbidden_state_refs": [
+        "state:business-truth",
+        "state:model-output-authority",
+        "state:python-final-release"
+      ],
+      "rejected_forbidden_state_refs": [
+        "state:business-truth",
+        "state:model-output-authority",
+        "state:python-final-release"
+      ],
+      "python_worker_owns_decision": false,
+      "model_output_owns_decision": false
+    },
+    {
+      "object_ref": "skill-package:workflow-helper:v3",
+      "object_kind": "skill-package",
+      "owner": "skill-registry",
+      "forbidden_state_refs": ["state:release-approval"],
+      "rejected_forbidden_state_refs": ["state:release-approval"],
+      "python_worker_owns_decision": false,
+      "model_output_owns_decision": false
+    },
+    {
+      "object_ref": "kill-switch:agent-definition:copilot-v4",
+      "object_kind": "kill-switch",
+      "owner": "governance+control-plane",
+      "forbidden_state_refs": ["state:runtime-local-only-disable"],
+      "rejected_forbidden_state_refs": ["state:runtime-local-only-disable"],
+      "python_worker_owns_decision": false,
+      "model_output_owns_decision": false
+    },
+    {
+      "object_ref": "canary:copilot:v4:beta",
+      "object_kind": "canary-report",
+      "owner": "governance+observability",
+      "forbidden_state_refs": ["state:release-self-certification"],
+      "rejected_forbidden_state_refs": ["state:release-self-certification"],
+      "python_worker_owns_decision": false,
+      "model_output_owns_decision": false
+    }
+  ],
+  "release_gate_records": [
+    {
+      "release_ref": "agent-release:copilot:v4:beta",
+      "expected_gate_decision": "ALLOW",
+      "actual_gate_decision": "ALLOW",
+      "agent_definition_ref": "agent-definition:copilot:v4",
+      "skill_package_refs": ["skill-package:workflow-helper:v3"],
+      "owner_ref": "owner:agent-platform",
+      "eval_report_ref": "eval-report:copilot:v4:all-suites-pass",
+      "replay_bundle_ref": "replay-bundle:copilot:v4:sample-failures",
+      "baseline_approval_ref": "baseline-approval:copilot:v3-to-v4",
+      "rollback_ref": "rollback-plan:copilot:v3",
+      "disable_switch_ref": "kill-switch:agent-definition:copilot-v4",
+      "audit_ref": "audit:agent-release:copilot:v4:beta",
+      "has_p0_p1_eval_failure": false,
+      "replay_gap": false,
+      "audit_gap": false,
+      "baseline_missing": false,
+      "release_pinned": true,
+      "production_enabled": true
+    },
+    {
+      "release_ref": "agent-release:copilot:blocked-p1",
+      "expected_gate_decision": "BLOCK",
+      "actual_gate_decision": "BLOCK",
+      "agent_definition_ref": "agent-definition:copilot:v4",
+      "skill_package_refs": ["skill-package:workflow-helper:v3"],
+      "owner_ref": "owner:agent-platform",
+      "eval_report_ref": "eval-report:copilot:v4:p1-permission-leakage",
+      "replay_bundle_ref": "replay-bundle:copilot:v4:p1-case",
+      "baseline_approval_ref": "baseline-approval:blocked-by-p1",
+      "rollback_ref": "rollback-plan:copilot:v3",
+      "disable_switch_ref": "kill-switch:agent-definition:copilot-v4",
+      "audit_ref": "audit:agent-release:copilot:v4:blocked",
+      "has_p0_p1_eval_failure": true,
+      "replay_gap": false,
+      "audit_gap": false,
+      "baseline_missing": false,
+      "release_pinned": true,
+      "production_enabled": false
+    },
+    {
+      "release_ref": "agent-release:copilot:replay-gap",
+      "expected_gate_decision": "BLOCK",
+      "actual_gate_decision": "BLOCK",
+      "agent_definition_ref": "agent-definition:copilot:v4",
+      "skill_package_refs": ["skill-package:workflow-helper:v3"],
+      "owner_ref": "owner:agent-platform",
+      "eval_report_ref": "eval-report:copilot:v4:replay-gap",
+      "replay_bundle_ref": "replay-bundle:missing",
+      "baseline_approval_ref": "baseline-approval:blocked-by-replay-gap",
+      "rollback_ref": "rollback-plan:copilot:v3",
+      "disable_switch_ref": "kill-switch:agent-definition:copilot-v4",
+      "audit_ref": "audit:agent-release:copilot:v4:replay-gap",
+      "has_p0_p1_eval_failure": false,
+      "replay_gap": true,
+      "audit_gap": false,
+      "baseline_missing": false,
+      "release_pinned": true,
+      "production_enabled": false
+    }
+  ],
+  "kill_switch_records": [
+    {
+      "kill_switch_ref": "kill-switch:agent-definition:copilot-v4",
+      "switch_state": "ACTIVE",
+      "owner_ref": "owner:agent-platform-incident",
+      "scope_kind": "AgentDefinition",
+      "scope_ref": "agent-definition:copilot:v4",
+      "activation_reason_ref": "incident:permission-leakage:20260702",
+      "propagation_target_refs": [
+        "target:agent-service",
+        "target:agent-runtime",
+        "target:skill-registry"
+      ],
+      "propagation_ack_refs": [
+        "target:agent-service",
+        "target:agent-runtime",
+        "target:skill-registry"
+      ],
+      "new_runs_allowed": false,
+      "running_run_strategy": "CANCEL",
+      "audit_ref": "audit:kill-switch:copilot-v4:active",
+      "rollback_ref": "rollback-plan:copilot:v3",
+      "python_worker_owns_decision": false
+    },
+    {
+      "kill_switch_ref": "kill-switch:skill-package:workflow-helper-v3",
+      "switch_state": "INACTIVE",
+      "owner_ref": "owner:skill-registry",
+      "scope_kind": "SkillPackage",
+      "scope_ref": "skill-package:workflow-helper:v3",
+      "activation_reason_ref": "incident:none",
+      "propagation_target_refs": [],
+      "propagation_ack_refs": [],
+      "new_runs_allowed": true,
+      "running_run_strategy": "NONE",
+      "audit_ref": "audit:kill-switch:workflow-helper-v3:inactive",
+      "rollback_ref": "rollback-plan:workflow-helper:v2",
+      "python_worker_owns_decision": false
+    }
+  ],
+  "baseline_approval_records": [
+    {
+      "baseline_ref": "baseline:copilot:rag-tool-memory:v3",
+      "baseline_decision": "APPROVED",
+      "approval_record_ref": "baseline-approval:copilot:v3-to-v4",
+      "approver_ref": "owner:agent-quality",
+      "eval_report_ref": "eval-report:copilot:v4:all-suites-pass",
+      "dataset_manifest_ref": "dataset-manifest:public-plus-synthetic:v3",
+      "replay_reader_policy_ref": "replay-reader-policy:low-sensitive:v1",
+      "audit_ref": "audit:baseline:copilot:v3-to-v4",
+      "failure_classes_changed": true,
+      "dataset_changed": true,
+      "risk_tier_changed": false,
+      "required_suites_changed": true,
+      "explicit_approval": true,
+      "silent_refresh": false,
+      "has_p0_p1_regression": false
+    },
+    {
+      "baseline_ref": "baseline:copilot:blocked-regression",
+      "baseline_decision": "REJECTED",
+      "approval_record_ref": "baseline-approval:rejected-p1-regression",
+      "approver_ref": "owner:agent-quality",
+      "eval_report_ref": "eval-report:copilot:v4:p1-permission-leakage",
+      "dataset_manifest_ref": "dataset-manifest:public-plus-synthetic:v3",
+      "replay_reader_policy_ref": "replay-reader-policy:low-sensitive:v1",
+      "audit_ref": "audit:baseline:copilot:rejected-regression",
+      "failure_classes_changed": true,
+      "dataset_changed": false,
+      "risk_tier_changed": false,
+      "required_suites_changed": false,
+      "explicit_approval": true,
+      "silent_refresh": false,
+      "has_p0_p1_regression": true
+    }
+  ],
+  "failure_class_records": [
+    {
+      "failure_class_ref": "failure-class:permission-leakage",
+      "severity": "P1",
+      "owner_workflow_state": "OPEN",
+      "owner_ref": "owner:security-agent-platform",
+      "first_seen_report_ref": "eval-report:copilot:v4:p1-permission-leakage",
+      "replay_bundle_ref": "replay-bundle:copilot:v4:p1-permission-case",
+      "regression_fixture_ref": "fixture:permission-leakage:copilot-v4",
+      "no_fixture_reason_ref": "",
+      "release_blocking": true,
+      "baseline_refresh_allowed": false,
+      "audit_ref": "audit:failure-class:permission-leakage"
+    },
+    {
+      "failure_class_ref": "failure-class:replay-metadata-noise",
+      "severity": "P2",
+      "owner_workflow_state": "CLOSED",
+      "owner_ref": "owner:agent-quality",
+      "first_seen_report_ref": "eval-report:copilot:v4:p2-replay-noise",
+      "replay_bundle_ref": "replay-bundle:copilot:v4:p2-noise",
+      "regression_fixture_ref": "",
+      "no_fixture_reason_ref": "reason:p2-doc-only",
+      "release_blocking": false,
+      "baseline_refresh_allowed": true,
+      "audit_ref": "audit:failure-class:replay-noise"
+    }
+  ],
+  "canary_shadow_records": [
+    {
+      "canary_report_ref": "canary:copilot:v4:beta",
+      "release_ref": "agent-release:copilot:v4:beta",
+      "offline_baseline_ref": "baseline:copilot:rag-tool-memory:v3",
+      "shadow_report_ref": "shadow-report:copilot:v4:tenant-sample",
+      "metric_refs": [
+        "metric:grounded-correctness",
+        "metric:permission-leakage",
+        "metric:memory-pollution",
+        "metric:tool-prepare-failure",
+        "metric:replay-availability"
+      ],
+      "comparable_metric_refs": [
+        "metric:grounded-correctness",
+        "metric:permission-leakage",
+        "metric:memory-pollution",
+        "metric:tool-prepare-failure",
+        "metric:replay-availability"
+      ],
+      "p0_p1_regression": false,
+      "rollback_or_hold_ref": "",
+      "promoted_to_production": false,
+      "shadow_only": false,
+      "canary_decision_ref": "canary-decision:hold-for-main-review",
+      "audit_ref": "audit:canary:copilot:v4:beta"
+    },
+    {
+      "canary_report_ref": "canary:copilot:v4:p1-regression",
+      "release_ref": "agent-release:copilot:v4:beta",
+      "offline_baseline_ref": "baseline:copilot:rag-tool-memory:v3",
+      "shadow_report_ref": "shadow-report:copilot:v4:p1-sample",
+      "metric_refs": [
+        "metric:permission-leakage",
+        "metric:replay-availability"
+      ],
+      "comparable_metric_refs": [
+        "metric:permission-leakage",
+        "metric:replay-availability"
+      ],
+      "p0_p1_regression": true,
+      "rollback_or_hold_ref": "hold-release:copilot:v4:p1-regression",
+      "promoted_to_production": false,
+      "shadow_only": true,
+      "canary_decision_ref": "",
+      "audit_ref": "audit:canary:copilot:v4:p1-regression"
+    }
+  ],
+  "operator_control_records": [
+    {
+      "control_ref": "agentops-operator:inspect-release:v4",
+      "action": "RELEASE_INSPECT",
+      "visible_refs": [
+        "agent-release:copilot:v4:beta",
+        "eval-report:copilot:v4:all-suites-pass",
+        "baseline:copilot:rag-tool-memory:v3"
+      ],
+      "operator_authority_ref": "authority:agentops:release-view",
+      "redaction_policy_ref": "redaction-policy:agentops-low-sensitive:v1",
+      "audit_ref": "audit:agentops-operator:inspect-release-v4",
+      "body_exposed": false,
+      "unauthorized_actor": false,
+      "python_worker_override": false
+    },
+    {
+      "control_ref": "agentops-operator:kill-switch:copilot-v4",
+      "action": "KILL_SWITCH_ACTIVATE",
+      "visible_refs": [
+        "kill-switch:agent-definition:copilot-v4",
+        "incident:permission-leakage:20260702",
+        "rollback-plan:copilot:v3"
+      ],
+      "operator_authority_ref": "authority:agentops:incident-owner",
+      "redaction_policy_ref": "redaction-policy:agentops-low-sensitive:v1",
+      "audit_ref": "audit:agentops-operator:kill-switch-copilot-v4",
+      "body_exposed": false,
+      "unauthorized_actor": false,
+      "python_worker_override": false
+    },
+    {
+      "control_ref": "agentops-operator:rollback:v4",
+      "action": "ROLLBACK",
+      "visible_refs": [
+        "rollback-plan:copilot:v3",
+        "agent-release:copilot:v4:beta",
+        "audit:agent-release:copilot:v4:beta"
+      ],
+      "operator_authority_ref": "authority:agentops:release-owner",
+      "redaction_policy_ref": "redaction-policy:agentops-low-sensitive:v1",
+      "audit_ref": "audit:agentops-operator:rollback-v4",
+      "body_exposed": false,
+      "unauthorized_actor": false,
+      "python_worker_override": false
+    }
+  ]
+}

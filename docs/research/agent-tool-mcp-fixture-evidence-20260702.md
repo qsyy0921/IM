@@ -67,5 +67,8 @@ It does not close:
 
 ## Next Evidence Target
 
-Next fixture-only evidence should focus on AgentOps release-blocking and
-kill-switch proof.
+AgentOps fixture evidence is now recorded in
+`docs/research/agentops-governance-fixture-evidence-20260702.md`.
+
+Next work should focus on main integration review or memory calibration /
+dataset reproducibility hardening.

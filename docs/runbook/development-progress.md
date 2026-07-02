@@ -42,6 +42,7 @@ Open Dataset Eval Harness / synthetic IM-like fixture 已开始第一段隔离�
 | `docs/research/agent-adr-promotion-readiness-20260702.md` | 已完成 | ADR 候选 readiness review；可进入候选起草但不能直接推广生产契约 |
 | `docs/research/agent-skeleton-completion-audit-20260702.md` | 已完成 | 不可变 Agent Lab goal 对 Phase 1 backend-isolated skeleton 的完成度审计 |
 | `docs/research/agent-architecture-gap-closure-20260702.md` | 已完成 | 架构缺口关闭包：ADR candidate map、版本策略、集成 preservation matrix 和生产提升阻断条件 |
+| `docs/research/agent-production-object-model-20260702.md` | 已完成 | Agent 生产级对象模型草案：decision、version、runtime、evidence、memory、tool、workflow、AgentOps、dataset/eval 和 operator UX |
 | `docs/sdd/agent-runtime.md` | 已完成 | Runtime / Harness 详细 SDD |
 | `docs/sdd/agent-memory-admission.md` | 已完成 | Memory admission 详细 SDD |
 | `docs/sdd/agent-context-evidencepack.md` | 已完成 | Context / EvidencePack 详细 SDD |
@@ -204,6 +205,8 @@ ai/python/tests/test_agent_eval_*.py
 - Architecture gap closure：已把资深架构评审发现的 ADR 缺失、版本策略、真实服务
   integration proof、Runtime/Workflow ownership、Governance、Memory、EvidencePack、
   MCP、dataset pipeline 和 operator UX 缺口收敛为六个 ADR candidate 和生产阻断条件。
+- Production object model：已把缺失对象收敛为十组概念对象，并标注 owner、
+  生命周期、禁止拥有状态、ADR 提升条件和生产 promotion checklist。
 
 ## 当前未完成项
 

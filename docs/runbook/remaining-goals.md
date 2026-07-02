@@ -19,7 +19,8 @@
    `docs/research/agent-skeleton-completion-audit-20260702.md` 已确认 Phase 1
    backend-isolated skeleton 可作为当前可执行基线。
 2. ADR candidate package：`docs/research/agent-architecture-gap-closure-20260702.md`
-   已给出六个候选 ADR、版本策略和集成 preservation matrix；下一步优先起草
+   和 `docs/research/agent-production-object-model-20260702.md` 已给出候选 ADR、
+   版本策略、对象模型和集成 preservation matrix；下一步优先起草
    Eval / Replay 与 Runtime / Workflow 两个候选 ADR，未评审前不提升生产契约。
 3. ReplayBundle observability hardening review：当前 skeleton 已覆盖低敏
    observability refs、hash refs、version metadata refs、failure taxonomy refs 和

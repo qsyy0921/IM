@@ -13,6 +13,7 @@ memory / AI worker / EvidencePack / eval gate，不承接后端热点群压测�
   `docs/research/agent-adr-promotion-readiness-20260702.md`。
 - 架构缺口关闭包已完成：`docs/research/agent-architecture-gap-closure-20260702.md`，
   下一步按该包拆六个 ADR candidates，不直接写生产契约。
+- 生产级对象模型草案已完成：`docs/research/agent-production-object-model-20260702.md`。
 - 完整进度历史在 `docs/runbook/development-progress.md`，不要把长历史塞回本文件。
 
 ## 当前设计事实源

@@ -27,6 +27,9 @@
   但不提升生产契约。
 - `agent-architecture-gap-closure-20260702.md`：资深架构评审后的缺口关闭包，
   给出 ADR candidate map、版本策略、集成 preservation matrix 和生产提升阻断条件。
+- `agent-production-object-model-20260702.md`：Agent 生产级对象模型草案，
+  收敛 decision、version、runtime、evidence、memory、tool、workflow、AgentOps、
+  dataset/eval 和 operator UX 对象；不冻结生产 schema。
 
 ## 存放位置
 

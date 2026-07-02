@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -27,7 +28,12 @@ type Config struct {
 	TargetTopic  string
 	GroupID      string
 	ErrorBackoff time.Duration
-	Logf         func(format string, args ...any)
+	// ReorderFlushDelay lets the bridge collect a short Debezium burst before
+	// publishing by conversation aggregate_version. WAL commit order can differ
+	// from allocated conversation_seq under SEQUENCER_BLOCK concurrency.
+	ReorderFlushDelay time.Duration
+	ReorderMaxRecords int
+	Logf              func(format string, args ...any)
 }
 
 type Bridge struct {
@@ -45,6 +51,18 @@ type debziumEnvelope struct {
 type debeziumPayload struct {
 	Op    string                     `json:"op"`
 	After map[string]json.RawMessage `json:"after"`
+}
+
+type recordOrder struct {
+	PartitionKey     string
+	AggregateVersion int64
+}
+
+type batchItem struct {
+	source  kafkago.Message
+	record  types.KafkaPublishRecord
+	order   recordOrder
+	publish bool
 }
 
 func NewBridge(config Config) (*Bridge, error) {
@@ -200,25 +218,83 @@ func (b *Bridge) runOnce(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	record, publish, err := BuildRecord(source.Value)
-	if err != nil {
-		return err
+	sources := []kafkago.Message{source}
+	for len(sources) < b.config.ReorderMaxRecords {
+		fetchCtx, cancel := context.WithTimeout(ctx, b.config.ReorderFlushDelay)
+		next, err := b.reader.FetchMessage(fetchCtx)
+		cancel()
+		if err != nil {
+			if errors.Is(err, context.DeadlineExceeded) {
+				break
+			}
+			if errors.Is(ctx.Err(), context.Canceled) {
+				return context.Canceled
+			}
+			return err
+		}
+		sources = append(sources, next)
 	}
-	if publish {
-		if err := b.writer.Publish(ctx, b.config.TargetTopic, record.Key, record.Value); err != nil {
+	return b.publishAndCommitBatch(ctx, sources)
+}
+
+func (b *Bridge) publishAndCommitBatch(ctx context.Context, sources []kafkago.Message) error {
+	items := make([]batchItem, 0, len(sources))
+	for _, source := range sources {
+		record, publish, order, err := BuildRecordWithOrder(source.Value)
+		if err != nil {
+			return err
+		}
+		items = append(items, batchItem{
+			source:  source,
+			record:  record,
+			order:   order,
+			publish: publish,
+		})
+	}
+	publishable := make([]batchItem, 0, len(items))
+	for _, item := range items {
+		if item.publish {
+			publishable = append(publishable, item)
+		}
+	}
+	sortBatchForPublish(publishable)
+	for _, item := range publishable {
+		if err := b.writer.Publish(ctx, b.config.TargetTopic, item.record.Key, item.record.Value); err != nil {
 			return err
 		}
 	}
-	return b.reader.CommitMessages(ctx, source)
+	return b.reader.CommitMessages(ctx, sources...)
+}
+
+func sortBatchForPublish(items []batchItem) {
+	sort.SliceStable(items, func(i int, j int) bool {
+		left := items[i]
+		right := items[j]
+		if left.order.PartitionKey != right.order.PartitionKey {
+			return left.order.PartitionKey < right.order.PartitionKey
+		}
+		if left.order.AggregateVersion != right.order.AggregateVersion {
+			return left.order.AggregateVersion < right.order.AggregateVersion
+		}
+		if left.source.Partition != right.source.Partition {
+			return left.source.Partition < right.source.Partition
+		}
+		return left.source.Offset < right.source.Offset
+	})
 }
 
 func BuildRecord(value []byte) (types.KafkaPublishRecord, bool, error) {
+	record, publish, _, err := BuildRecordWithOrder(value)
+	return record, publish, err
+}
+
+func BuildRecordWithOrder(value []byte) (types.KafkaPublishRecord, bool, recordOrder, error) {
 	if len(value) == 0 || string(value) == "null" {
-		return types.KafkaPublishRecord{}, false, nil
+		return types.KafkaPublishRecord{}, false, recordOrder{}, nil
 	}
 	var envelope debziumEnvelope
 	if err := json.Unmarshal(value, &envelope); err != nil {
-		return types.KafkaPublishRecord{}, false, fmt.Errorf("decode debezium envelope: %w", err)
+		return types.KafkaPublishRecord{}, false, recordOrder{}, fmt.Errorf("decode debezium envelope: %w", err)
 	}
 	op := envelope.Op
 	after := envelope.After
@@ -229,25 +305,28 @@ func BuildRecord(value []byte) (types.KafkaPublishRecord, bool, error) {
 	switch op {
 	case "c", "r":
 	case "u", "d":
-		return types.KafkaPublishRecord{}, false, nil
+		return types.KafkaPublishRecord{}, false, recordOrder{}, nil
 	default:
-		return types.KafkaPublishRecord{}, false, fmt.Errorf("unsupported debezium op %q", op)
+		return types.KafkaPublishRecord{}, false, recordOrder{}, fmt.Errorf("unsupported debezium op %q", op)
 	}
 	if len(after) == 0 {
-		return types.KafkaPublishRecord{}, false, nil
+		return types.KafkaPublishRecord{}, false, recordOrder{}, nil
 	}
 	message, err := outboxMessageFromRow(after)
 	if err != nil {
-		return types.KafkaPublishRecord{}, false, err
+		return types.KafkaPublishRecord{}, false, recordOrder{}, err
 	}
 	valueBytes, err := outbox.BuildKafkaValue(message)
 	if err != nil {
-		return types.KafkaPublishRecord{}, false, err
+		return types.KafkaPublishRecord{}, false, recordOrder{}, err
 	}
 	return types.KafkaPublishRecord{
-		Key:   []byte(message.PartitionKey),
-		Value: valueBytes,
-	}, true, nil
+			Key:   []byte(message.PartitionKey),
+			Value: valueBytes,
+		}, true, recordOrder{
+			PartitionKey:     message.PartitionKey,
+			AggregateVersion: message.AggregateVersion,
+		}, nil
 }
 
 func outboxMessageFromRow(row map[string]json.RawMessage) (types.OutboxMessage, error) {
@@ -349,6 +428,12 @@ func normalizeConfig(config Config) Config {
 	}
 	if config.ErrorBackoff <= 0 {
 		config.ErrorBackoff = time.Second
+	}
+	if config.ReorderFlushDelay <= 0 {
+		config.ReorderFlushDelay = 200 * time.Millisecond
+	}
+	if config.ReorderMaxRecords <= 0 {
+		config.ReorderMaxRecords = 10000
 	}
 	return config
 }

@@ -91,7 +91,12 @@ func runCDCBridge() error {
 		TargetTopic:  envString("NEXUSIM_MESSAGE_CDC_TARGET_TOPIC", cdc.DefaultTargetTopic),
 		GroupID:      envString("NEXUSIM_MESSAGE_CDC_GROUP_ID", "message-cdc-bridge"),
 		ErrorBackoff: envDuration("NEXUSIM_MESSAGE_CDC_ERROR_BACKOFF", time.Second),
-		Logf:         log.Printf,
+		ReorderFlushDelay: envDuration(
+			"NEXUSIM_MESSAGE_CDC_REORDER_FLUSH_DELAY",
+			200*time.Millisecond,
+		),
+		ReorderMaxRecords: envInt("NEXUSIM_MESSAGE_CDC_REORDER_MAX_RECORDS", 10000),
+		Logf:              log.Printf,
 	})
 	if err != nil {
 		return err
@@ -102,10 +107,12 @@ func runCDCBridge() error {
 		}
 	}()
 	log.Printf(
-		"message-service CDC bridge started source_topic=%s target_topic=%s group_id=%s",
+		"message-service CDC bridge started source_topic=%s target_topic=%s group_id=%s reorder_flush_delay=%s reorder_max_records=%d",
 		envString("NEXUSIM_MESSAGE_CDC_SOURCE_TOPIC", cdc.DefaultSourceTopic),
 		envString("NEXUSIM_MESSAGE_CDC_TARGET_TOPIC", cdc.DefaultTargetTopic),
 		envString("NEXUSIM_MESSAGE_CDC_GROUP_ID", "message-cdc-bridge"),
+		envDuration("NEXUSIM_MESSAGE_CDC_REORDER_FLUSH_DELAY", 200*time.Millisecond),
+		envInt("NEXUSIM_MESSAGE_CDC_REORDER_MAX_RECORDS", 10000),
 	)
 	return bridge.Run(ctx)
 }

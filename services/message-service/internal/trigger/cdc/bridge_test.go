@@ -7,6 +7,8 @@ import (
 	"time"
 
 	conversationtimelinev1 "github.com/qsyy0921/IM/schemas/kafka"
+	"github.com/qsyy0921/IM/services/message-service/internal/types"
+	kafkago "github.com/segmentio/kafka-go"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -103,6 +105,84 @@ func TestBuildRecordPublishesTimelineInsert(t *testing.T) {
 		payload.GetSenderId() != "user-1" ||
 		payload.GetPayload().GetFields()["text"].GetStringValue() != "hello" {
 		t.Fatalf("unexpected message persisted payload: %+v", payload)
+	}
+}
+
+func TestBuildRecordWithOrderReturnsTimelineOrderKey(t *testing.T) {
+	value := []byte(`{
+		"op":"c",
+		"after":{
+			"tenant_id":"tenant-1",
+			"conversation_id":"conv-1",
+			"seq":42,
+			"event_id":"event-order",
+			"event_type":"message.persisted.v1",
+			"event_version":"v1",
+			"fanout_mode":"READ_FANOUT",
+			"fanout_policy_version":3,
+			"permission_version":9,
+			"classification":"INTERNAL",
+			"mapping_version":"message.persisted.v1",
+			"trace_id":"trace-1",
+			"partition_key":"tenant-1:conv-1",
+			"payload_json":"{\"message_id\":\"msg-order\",\"conversation_id\":\"conv-1\",\"conversation_seq\":42,\"sender_id\":\"user-1\",\"device_id\":\"device-1\",\"client_msg_id\":\"client-order\",\"command_hash\":\"hash-order\",\"message_type\":\"TEXT\",\"payload\":{\"text\":\"ordered\"},\"attachment_ids\":[],\"accepted_at\":\"2026-07-02T12:00:00Z\"}",
+			"created_at":"2026-07-02T12:00:00Z"
+		}
+	}`)
+	record, publish, order, err := BuildRecordWithOrder(value)
+	if err != nil {
+		t.Fatalf("BuildRecordWithOrder returned error: %v", err)
+	}
+	if !publish {
+		t.Fatal("expected publish")
+	}
+	if string(record.Key) != "tenant-1:conv-1" {
+		t.Fatalf("unexpected key: %q", string(record.Key))
+	}
+	if order.PartitionKey != "tenant-1:conv-1" || order.AggregateVersion != 42 {
+		t.Fatalf("unexpected order key: %+v", order)
+	}
+}
+
+func TestSortBatchForPublishOrdersByConversationSeq(t *testing.T) {
+	items := []batchItem{
+		{
+			source: kafkago.Message{Partition: 0, Offset: 1},
+			record: types.KafkaPublishRecord{
+				Key:   []byte("tenant:conv"),
+				Value: []byte("seq-3"),
+			},
+			order:   recordOrder{PartitionKey: "tenant:conv", AggregateVersion: 3},
+			publish: true,
+		},
+		{
+			source: kafkago.Message{Partition: 0, Offset: 2},
+			record: types.KafkaPublishRecord{
+				Key:   []byte("tenant:conv"),
+				Value: []byte("seq-1"),
+			},
+			order:   recordOrder{PartitionKey: "tenant:conv", AggregateVersion: 1},
+			publish: true,
+		},
+		{
+			source: kafkago.Message{Partition: 0, Offset: 3},
+			record: types.KafkaPublishRecord{
+				Key:   []byte("tenant:conv"),
+				Value: []byte("seq-2"),
+			},
+			order:   recordOrder{PartitionKey: "tenant:conv", AggregateVersion: 2},
+			publish: true,
+		},
+	}
+
+	sortBatchForPublish(items)
+
+	got := []string{string(items[0].record.Value), string(items[1].record.Value), string(items[2].record.Value)}
+	want := []string{"seq-1", "seq-2", "seq-3"}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("unexpected order at %d: got %v want %v", i, got, want)
+		}
 	}
 }
 

@@ -12,8 +12,9 @@
 Agent / RAG / memory / Python AI Worker / EvidencePack / eval gate
 ```
 
-当前阶段：Agent Exploration Mode -> Agent Platform SDD package 已完成文档重做；
-Open Dataset Eval Harness / synthetic IM-like fixture 已开始第一段隔离式编码。
+当前阶段：Agent Exploration Mode -> Agent Platform SDD package、backend-isolated
+skeleton、生产对象模型和 ADR candidate package 已完成到 research 级；Open Dataset
+Eval Harness / synthetic IM-like fixture 已开始隔离式编码。
 
 当前原则：
 
@@ -43,6 +44,7 @@ Open Dataset Eval Harness / synthetic IM-like fixture 已开始第一段隔离�
 | `docs/research/agent-skeleton-completion-audit-20260702.md` | 已完成 | 不可变 Agent Lab goal 对 Phase 1 backend-isolated skeleton 的完成度审计 |
 | `docs/research/agent-architecture-gap-closure-20260702.md` | 已完成 | 架构缺口关闭包：ADR candidate map、版本策略、集成 preservation matrix 和生产提升阻断条件 |
 | `docs/research/agent-production-object-model-20260702.md` | 已完成 | Agent 生产级对象模型草案：decision、version、runtime、evidence、memory、tool、workflow、AgentOps、dataset/eval 和 operator UX |
+| `docs/research/adr-candidates/` | 已完成候选起草 | 六个 Agent ADR candidates 加 cross-service versioning / replay / governance appendix；仍不是正式 ADR |
 | `docs/sdd/agent-runtime.md` | 已完成 | Runtime / Harness 详细 SDD |
 | `docs/sdd/agent-memory-admission.md` | 已完成 | Memory admission 详细 SDD |
 | `docs/sdd/agent-context-evidencepack.md` | 已完成 | Context / EvidencePack 详细 SDD |

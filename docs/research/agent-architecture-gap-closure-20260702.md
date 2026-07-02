@@ -22,6 +22,10 @@ defining:
 - which evidence is required before real service integration;
 - which follow-up work stays fixture-only.
 
+The first ADR candidate package created from this map lives under
+`docs/research/adr-candidates/`. It is review material only; it does not promote
+any contract, schema or runtime implementation.
+
 ## Non-Negotiable Boundary
 
 Agent Lab remains an isolated Agent / RAG / memory / Python AI Worker /

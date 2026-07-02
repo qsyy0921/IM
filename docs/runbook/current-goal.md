@@ -23,6 +23,7 @@ runbook / SDD / research 文档维护。
 - ADR readiness：`docs/research/agent-adr-promotion-readiness-20260702.md`。
 - 缺口关闭包：`docs/research/agent-architecture-gap-closure-20260702.md`。
 - 对象模型：`docs/research/agent-production-object-model-20260702.md`。
+- ADR candidates：`docs/research/adr-candidates/`。
 - 详细 SDD：`docs/sdd/agent-runtime.md`、`agent-memory-admission.md`、
   `agent-context-evidencepack.md`、`agent-tool-mcp-boundary.md`、
   `agent-eval-replay-harness.md`、`agent-governance-agentops.md`。
@@ -62,6 +63,6 @@ runbook / SDD / research 文档维护。
 
 ## 后续优先级
 
-1. 按缺口关闭包和对象模型起草 ADR candidates，优先 Eval / Replay 与 Runtime / Workflow。
+1. 评审 ADR candidate package，优先 Eval / Replay 与 Runtime / Workflow；未接受前不提升生产契约。
 2. 若继续编码，优先 ReplayBundle observability taxonomy fixture-only hardening。
 3. 其次 memory calibration export reproducibility。

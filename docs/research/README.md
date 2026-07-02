@@ -30,6 +30,10 @@
 - `agent-production-object-model-20260702.md`：Agent 生产级对象模型草案，
   收敛 decision、version、runtime、evidence、memory、tool、workflow、AgentOps、
   dataset/eval 和 operator UX 对象；不冻结生产 schema。
+- `adr-candidates/`：Agent ADR candidate package，包含 Eval / Replay、
+  Runtime / Workflow、Context / EvidencePack、Memory Admission、Tool / MCP、
+  AgentOps / Governance 六份候选 ADR 和 cross-service versioning / replay /
+  governance appendix；仍不是正式 ADR。
 
 ## 存放位置
 

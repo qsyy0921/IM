@@ -42,6 +42,7 @@ authorizes the next explicitly scoped integration design.
 - `../agent-operational-readiness-fixture-evidence-20260702.md`
 - `../agent-controlled-implementation-readiness-fixture-evidence-20260702.md`
 - `../agent-architecture-coverage-fixture-evidence-20260702.md`
+- `../agent-contract-version-compatibility-fixture-evidence-20260702.md`
 
 ## Candidate Acceptance Gate
 
@@ -53,7 +54,7 @@ review ledger must show:
 - explicit owner and non-owner state boundaries;
 - object catalog completeness evidence for every production-grade object it
   introduces or consumes;
-- contract versioning and replay-reader requirements;
+- contract-version compatibility and replay-reader evidence;
 - cross-service preservation refs for every boundary it touches;
 - operator inspect-and-act path for high-risk states;
 - fixture-only or public-dataset-style evidence, or a recorded blocker;

@@ -868,6 +868,12 @@ research / ADR ref、fixture evidence、lifecycle、version、replay、preservat
 audit、operator、eval gate 和 rejection refs；这只是受控实现前的 coverage gate，
 不是生产实现授权。
 
+Contract-version compatibility rehearsal 还验证 EvidencePack、ContextPackage、
+MemoryCandidate、MemoryClaim、ToolIntent、PreparedToolRef、ApprovalDecision、
+ExecutionReceipt、EvalReport 和 ReplayBundle 都有 compatibility window、
+replay-reader、redaction、deprecation、migration、preservation、audit、operator、
+eval gate 和 rejection refs；这只是生产契约前的治理证据，不冻结字段或 schema。
+
 ### Phase 5：最小生产切片
 
 - 从 read-only grounded QA 开始。

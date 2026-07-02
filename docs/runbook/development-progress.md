@@ -281,6 +281,13 @@ ai/python/tests/test_agent_eval_*.py
   audit、operator、eval gate 和 rejection refs 覆盖，并阻断 missing surface、
   missing dimension、open P1、Python final owner 和 production contract
   authorization。
+- Contract version compatibility rehearsal：已补 EvidencePack、ContextPackage、
+  MemoryCandidate、MemoryClaim、ToolIntent、PreparedToolRef、ApprovalDecision、
+  ExecutionReceipt、EvalReport 和 ReplayBundle 的 compatibility window、
+  replay-reader、redaction、deprecation、migration、preservation、audit、
+  operator、eval gate 和 rejection refs 覆盖，并阻断 reader gap、body archive
+  replay requirement、removed ref、Python final owner 和 production contract
+  authorization。
 - Skeleton completion audit：已把 immutable goal 的 17 个骨架要求映射到当前
   代码、fixture、CLI、tests 和 runbook evidence；结论是 Phase 1 isolated
   Agent-layer skeleton 可作为当前可执行基线，但不能直接推广生产契约。

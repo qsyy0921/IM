@@ -140,6 +140,9 @@ Applies to:
 - EvalReport;
 - approval / execution refs.
 
+Fixture-only compatibility coverage for these targets is recorded in
+`docs/research/agent-contract-version-compatibility-fixture-evidence-20260702.md`.
+
 Conceptual fields:
 
 - contract_name;

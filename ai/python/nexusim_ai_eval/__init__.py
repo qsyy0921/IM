@@ -21,6 +21,10 @@ from nexusim_ai_eval.context_evidence_preservation import (
     load_context_evidence_preservation_rehearsal,
     rehearse_context_evidence_preservation,
 )
+from nexusim_ai_eval.contract_version_compatibility import (
+    load_contract_version_compatibility_rehearsal,
+    rehearse_contract_version_compatibility,
+)
 from nexusim_ai_eval.controlled_implementation_readiness import (
     load_controlled_implementation_readiness_rehearsal,
     rehearse_controlled_implementation_readiness,
@@ -118,6 +122,7 @@ __all__ = [
     "load_agentops_governance_rehearsal",
     "load_architecture_coverage_rehearsal",
     "load_context_evidence_preservation_rehearsal",
+    "load_contract_version_compatibility_rehearsal",
     "load_controlled_implementation_readiness_rehearsal",
     "load_cross_service_preservation_rehearsal",
     "load_dataset_reproducibility_rehearsal",
@@ -135,6 +140,7 @@ __all__ = [
     "rehearse_agentops_governance",
     "rehearse_architecture_coverage",
     "rehearse_context_evidence_preservation",
+    "rehearse_contract_version_compatibility",
     "rehearse_controlled_implementation_readiness",
     "rehearse_cross_service_preservation",
     "rehearse_dataset_reproducibility",

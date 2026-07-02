@@ -447,6 +447,7 @@ ai/python/nexusim_ai_eval/
   architecture_coverage.py
   comparison.py
   context_evidence_preservation.py
+  contract_version_compatibility.py
   controlled_implementation_readiness.py
   contracts.py
   cross_service_preservation.py
@@ -468,6 +469,7 @@ ai/python/fixtures/agent_eval/architecture_coverage_rehearsal.json
 ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json
 ai/python/fixtures/agent_eval/agentops_governance_rehearsal.json
 ai/python/fixtures/agent_eval/context_evidence_preservation_rehearsal.json
+ai/python/fixtures/agent_eval/contract_version_compatibility_rehearsal.json
 ai/python/fixtures/agent_eval/controlled_implementation_readiness_rehearsal.json
 ai/python/fixtures/agent_eval/cross_service_preservation_rehearsal.json
 ai/python/fixtures/agent_eval/dataset_reproducibility_rehearsal.json
@@ -506,6 +508,7 @@ ai/python/scripts/run_agent_dataset_adapter.py
 ai/python/scripts/run_agent_eval_regression.py
 ai/python/tests/test_agent_eval_architecture_coverage.py
 ai/python/tests/test_agent_eval_context_evidence_preservation.py
+ai/python/tests/test_agent_eval_contract_version_compatibility.py
 ai/python/tests/test_agent_eval_controlled_implementation_readiness.py
 ai/python/tests/test_agent_eval_contracts.py
 ai/python/tests/test_agent_eval_cross_service_preservation.py
@@ -568,6 +571,11 @@ Implemented checks:
 - ReplayBundle version-bump rehearsal coverage for current reader policy,
   required refs/hashes/versions/lineage/failure taxonomy and fail-closed
   deprecated legacy fields, without raw payload retention.
+- Contract-version compatibility rehearsal coverage for EvidencePack,
+  ContextPackage, MemoryCandidate, MemoryClaim, ToolIntent, PreparedToolRef,
+  ApprovalDecision, ExecutionReceipt, EvalReport and ReplayBundle compatibility
+  windows, replay-reader policies, redaction / deprecation / migration refs,
+  preservation refs and release-blocking gates.
 - Runtime / Workflow ownership rehearsal coverage for duplicate wakeup dedupe,
   stale checkpoint rejection, resume correlation, cancel-state checks,
   low-sensitive operator controls, BudgetLedger fail-closed behavior and no
@@ -699,6 +707,7 @@ python -m pytest ai/python/tests/test_agent_eval_operator_governance.py -q
 python -m pytest ai/python/tests/test_agent_eval_operational_readiness.py -q
 python -m pytest ai/python/tests/test_agent_eval_controlled_implementation_readiness.py -q
 python -m pytest ai/python/tests/test_agent_eval_architecture_coverage.py -q
+python -m pytest ai/python/tests/test_agent_eval_contract_version_compatibility.py -q
 python ai/python/scripts/run_agent_eval_current_report.py ai/python/fixtures/agent_eval/synthetic_core_scenarios.json --report-out .tmp-agent-current-report.json --baseline ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json --review-out .tmp-agent-baseline-review.json --force
 python ai/python/scripts/run_agent_eval_report_matrix.py ai/python/fixtures/agent_eval/report_matrix_sample.json --matrix-out .tmp-agent-eval-matrix/matrix.json --approval-manifest-out .tmp-agent-eval-matrix/approval-manifest.json --force
 python ai/python/scripts/run_agent_memory_calibration.py ai/python/fixtures/agent_eval/memory_calibration_sample.json --report-out .tmp-agent-memory-calibration-report.json --force

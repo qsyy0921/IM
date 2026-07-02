@@ -89,10 +89,12 @@ an open P0 or P1 finding inside Agent Lab scope.
 Before any production integration design, evidence must progress in this order:
 
 1. Document ledger proves ownership, versioning, replay and rejection rules.
-2. Fixture replay proves required refs survive one contract-version bump.
-3. Fixture preservation proof shows refs, scope, version, taint and audit
+2. Fixture compatibility matrix proves every target has a compatibility window,
+   replay-reader policy, deprecation policy and release-blocking gate.
+3. Fixture replay proves required refs survive one contract-version bump.
+4. Fixture preservation proof shows refs, scope, version, taint and audit
    lineage across retrieval, memory, MCP, workflow, executor and audit lanes.
-4. Main integration review explicitly approves a real-service integration
+5. Main integration review explicitly approves a real-service integration
    design.
 
 Skipping a rung rejects promotion.
@@ -101,10 +103,13 @@ Current fixture-only evidence:
 
 - replay version-bump proof:
   `ai/python/nexusim_ai_eval/replay_compatibility.py`;
+- contract-version compatibility proof:
+  `ai/python/nexusim_ai_eval/contract_version_compatibility.py`;
 - cross-service preservation proof:
   `ai/python/nexusim_ai_eval/cross_service_preservation.py`;
 - evidence report:
-  `docs/research/agent-cross-service-preservation-fixture-evidence-20260702.md`.
+  `docs/research/agent-contract-version-compatibility-fixture-evidence-20260702.md`
+  and `docs/research/agent-cross-service-preservation-fixture-evidence-20260702.md`.
 
 This evidence closes the Agent Lab fixture rung only. It does not approve real
 service integration or production contract promotion.

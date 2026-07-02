@@ -47,6 +47,7 @@ Current fixture families under `ai/python/fixtures/agent_eval/`:
 - report matrix sample and public-dataset-style adapter samples.
 - controlled implementation readiness rehearsal.
 - architecture coverage rehearsal.
+- contract version compatibility rehearsal.
 
 Current tests under `ai/python/tests/` cover:
 
@@ -118,8 +119,9 @@ These gaps do not block ADR candidate drafting, but they block production
 contract promotion:
 
 - No production owner review for failure-class lifecycle and release blocking.
-- No agreed versioning policy for EvidencePack, MemoryCandidate, ToolIntent or
-  ReplayBundle beyond low-sensitive fixture refs.
+- No accepted production versioning policy for EvidencePack, MemoryCandidate,
+  ToolIntent or ReplayBundle beyond low-sensitive fixture refs; the
+  compatibility matrix is fixture evidence only.
 - No integration proof that retrieval-gateway, memory-service, mcp-gateway,
   workflow-service, action-executor and audit-service preserve the same refs.
 - No operator UX for redrive, baseline refresh approval, release pinning,
@@ -132,6 +134,8 @@ contract promotion:
   gate; current evidence only proves that unsafe promotion is blocked.
 - Architecture coverage evidence proves coverage of required surfaces only; it
   does not prove production integration readiness.
+- Contract-version compatibility evidence proves the future target matrix has
+  compatibility refs only; it does not accept production schemas or readers.
 
 ## Rejection Conditions
 

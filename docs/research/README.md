@@ -107,6 +107,12 @@
   evidence 更新，记录 13 个必需 Agent 架构面的 owner、SDD、research、ADR、
   fixture evidence、lifecycle、version、replay、preservation、audit、operator、
   eval gate 和 rejection refs 覆盖证据。
+- `agent-contract-version-compatibility-fixture-evidence-20260702.md`：
+  fixture-only evidence 更新，记录 EvidencePack、ContextPackage、
+  MemoryCandidate、MemoryClaim、ToolIntent、PreparedToolRef、ApprovalDecision、
+  ExecutionReceipt、EvalReport 和 ReplayBundle 的兼容窗口、replay-reader、
+  redaction、deprecation、migration、preservation、audit、operator、eval gate
+  和 rejection refs 覆盖证据。
 
 ## 存放位置
 

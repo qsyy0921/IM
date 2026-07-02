@@ -332,6 +332,10 @@ Implemented fixture coverage:
 - architecture coverage evidence requires every required Agent surface to carry
   owner, version, replay, preservation, audit, operator, eval and rejection refs
   before the package can be recommended for controlled implementation review.
+- contract-version compatibility evidence requires each future Agent contract
+  target to carry compatibility-window, replay-reader, redaction, deprecation,
+  migration, preservation, audit, operator, eval and rejection refs before
+  production contract review.
 
 Remaining hardening:
 

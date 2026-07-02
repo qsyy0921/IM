@@ -32,8 +32,8 @@
    Evidence、Memory、Tool、AgentOps、dataset reproducibility、cross-service
    preservation、multi-agent handoff、object completeness 和 operator
    governance、operational readiness、controlled implementation readiness、
-   architecture coverage rehearsal 已落地；下一步优先主集成 review 或 focused
-   contract/version hardening。
+   architecture coverage 和 contract version compatibility rehearsal 已落地；
+   下一步优先主集成 review 或 focused review-requested hardening。
 4. ReplayBundle observability hardening review：当前 skeleton 已覆盖低敏
    observability refs、hash refs、version metadata refs、failure taxonomy refs 和
    trace linkage refs；如评审要求继续，只增加 fixture-only taxonomy / trace 证据。

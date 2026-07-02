@@ -1,0 +1,236 @@
+{
+  "schema_version": 1,
+  "rehearsal_kind": "agent_contract_version_compatibility_rehearsal",
+  "rehearsal_id": "contract-version-compatibility-rehearsal-v1",
+  "contract_records": [
+    {
+      "contract_ref": "contract-version:EvidencePack:v1",
+      "contract_name": "EvidencePack",
+      "producer_owner": "retrieval-gateway",
+      "consumer_owners": ["Agent Runtime", "Eval/Replay"],
+      "current_version_ref": "version:EvidencePack:1.0",
+      "previous_version_ref": "version:EvidencePack:0.9",
+      "compatibility_window_ref": "compat-window:evidencepack:two-reader-generations",
+      "replay_reader_policy_ref": "replay-reader-policy:evidencepack:refs-hashes-visibility",
+      "redaction_policy_ref": "redaction:evidencepack:source-ref-only",
+      "deprecation_policy_ref": "deprecation:evidencepack:inline-source-snippet-expired",
+      "migration_or_backfill_policy_ref": "migration:evidencepack:source-ref-backfill",
+      "preservation_matrix_ref": "preservation:retrieval-runtime-evidencepack",
+      "audit_ref": "audit:contract-version:evidencepack",
+      "operator_ref": "operator:compat-review:evidencepack",
+      "eval_gate_ref": "eval-gate:evidencepack-version-replay",
+      "rejection_condition_refs": [
+        "reject:evidencepack-window-missing",
+        "reject:evidencepack-reader-needs-body-archive"
+      ]
+    },
+    {
+      "contract_ref": "contract-version:ContextPackage:v1",
+      "contract_name": "ContextPackage",
+      "producer_owner": "Agent Runtime",
+      "consumer_owners": ["Model Gateway", "Eval/Replay"],
+      "current_version_ref": "version:ContextPackage:1.0",
+      "previous_version_ref": "version:ContextPackage:0.9",
+      "compatibility_window_ref": "compat-window:contextpackage:two-reader-generations",
+      "replay_reader_policy_ref": "replay-reader-policy:contextpackage:selection-refs",
+      "redaction_policy_ref": "redaction:contextpackage:no-body-archive",
+      "deprecation_policy_ref": "deprecation:contextpackage:legacy-rank-ref",
+      "migration_or_backfill_policy_ref": "migration:contextpackage:rank-ref-backfill",
+      "preservation_matrix_ref": "preservation:runtime-replay-contextpackage",
+      "audit_ref": "audit:contract-version:contextpackage",
+      "operator_ref": "operator:compat-review:contextpackage",
+      "eval_gate_ref": "eval-gate:contextpackage-version-replay",
+      "rejection_condition_refs": [
+        "reject:contextpackage-taint-dropped",
+        "reject:contextpackage-scope-widened"
+      ]
+    },
+    {
+      "contract_ref": "contract-version:MemoryCandidate:v1",
+      "contract_name": "MemoryCandidate",
+      "producer_owner": "Python AI Worker",
+      "consumer_owners": ["memory-service", "Eval/Replay"],
+      "current_version_ref": "version:MemoryCandidate:1.0",
+      "previous_version_ref": "version:MemoryCandidate:0.9",
+      "compatibility_window_ref": "compat-window:memorycandidate:two-reader-generations",
+      "replay_reader_policy_ref": "replay-reader-policy:memorycandidate:candidate-refs",
+      "redaction_policy_ref": "redaction:memorycandidate:claim-hash-only",
+      "deprecation_policy_ref": "deprecation:memorycandidate:legacy-confidence-band",
+      "migration_or_backfill_policy_ref": "migration:memorycandidate:confidence-ref-backfill",
+      "preservation_matrix_ref": "preservation:worker-memory-candidate",
+      "audit_ref": "audit:contract-version:memorycandidate",
+      "operator_ref": "operator:compat-review:memorycandidate",
+      "eval_gate_ref": "eval-gate:memorycandidate-version-replay",
+      "rejection_condition_refs": [
+        "reject:memorycandidate-final-state-owned-by-python",
+        "reject:memorycandidate-active-admission-claim"
+      ]
+    },
+    {
+      "contract_ref": "contract-version:MemoryClaim:v1",
+      "contract_name": "MemoryClaim",
+      "producer_owner": "memory-service",
+      "consumer_owners": ["Agent Runtime", "retrieval-gateway", "Eval/Replay"],
+      "current_version_ref": "version:MemoryClaim:1.0",
+      "previous_version_ref": "version:MemoryClaim:0.9",
+      "compatibility_window_ref": "compat-window:memoryclaim:two-reader-generations",
+      "replay_reader_policy_ref": "replay-reader-policy:memoryclaim:scope-status-version",
+      "redaction_policy_ref": "redaction:memoryclaim:scope-ref-only",
+      "deprecation_policy_ref": "deprecation:memoryclaim:legacy-status-name",
+      "migration_or_backfill_policy_ref": "migration:memoryclaim:status-ref-backfill",
+      "preservation_matrix_ref": "preservation:memory-runtime-claim",
+      "audit_ref": "audit:contract-version:memoryclaim",
+      "operator_ref": "operator:compat-review:memoryclaim",
+      "eval_gate_ref": "eval-gate:memoryclaim-version-replay",
+      "rejection_condition_refs": [
+        "reject:memoryclaim-revocation-ref-dropped",
+        "reject:memoryclaim-scope-widened"
+      ]
+    },
+    {
+      "contract_ref": "contract-version:ToolIntent:v1",
+      "contract_name": "ToolIntent",
+      "producer_owner": "Agent Runtime",
+      "consumer_owners": ["mcp-gateway", "action-executor", "Eval/Replay"],
+      "current_version_ref": "version:ToolIntent:1.0",
+      "previous_version_ref": "version:ToolIntent:0.9",
+      "compatibility_window_ref": "compat-window:toolintent:two-reader-generations",
+      "replay_reader_policy_ref": "replay-reader-policy:toolintent:intent-refs",
+      "redaction_policy_ref": "redaction:toolintent:argument-hash-only",
+      "deprecation_policy_ref": "deprecation:toolintent:legacy-provider-name",
+      "migration_or_backfill_policy_ref": "migration:toolintent:provider-ref-backfill",
+      "preservation_matrix_ref": "preservation:runtime-mcp-toolintent",
+      "audit_ref": "audit:contract-version:toolintent",
+      "operator_ref": "operator:compat-review:toolintent",
+      "eval_gate_ref": "eval-gate:toolintent-version-replay",
+      "rejection_condition_refs": [
+        "reject:toolintent-provider-output-trusted",
+        "reject:toolintent-lease-ref-missing"
+      ]
+    },
+    {
+      "contract_ref": "contract-version:PreparedToolRef:v1",
+      "contract_name": "PreparedToolRef",
+      "producer_owner": "mcp-gateway",
+      "consumer_owners": ["Agent Runtime", "action-executor", "Eval/Replay"],
+      "current_version_ref": "version:PreparedToolRef:1.0",
+      "previous_version_ref": "version:PreparedToolRef:0.9",
+      "compatibility_window_ref": "compat-window:preparedtoolref:two-reader-generations",
+      "replay_reader_policy_ref": "replay-reader-policy:preparedtoolref:prepare-lease-attestation",
+      "redaction_policy_ref": "redaction:preparedtoolref:provider-body-excluded",
+      "deprecation_policy_ref": "deprecation:preparedtoolref:legacy-lease",
+      "migration_or_backfill_policy_ref": "migration:preparedtoolref:lease-ref-backfill",
+      "preservation_matrix_ref": "preservation:mcp-runtime-prepare",
+      "audit_ref": "audit:contract-version:preparedtoolref",
+      "operator_ref": "operator:compat-review:preparedtoolref",
+      "eval_gate_ref": "eval-gate:preparedtoolref-version-replay",
+      "rejection_condition_refs": [
+        "reject:preparedtoolref-attestation-missing",
+        "reject:preparedtoolref-expired-lease-accepted"
+      ]
+    },
+    {
+      "contract_ref": "contract-version:ApprovalDecision:v1",
+      "contract_name": "ApprovalDecision",
+      "producer_owner": "workflow-service",
+      "consumer_owners": ["Agent Runtime", "action-executor", "audit-service"],
+      "current_version_ref": "version:ApprovalDecision:1.0",
+      "previous_version_ref": "version:ApprovalDecision:0.9",
+      "compatibility_window_ref": "compat-window:approvaldecision:two-reader-generations",
+      "replay_reader_policy_ref": "replay-reader-policy:approvaldecision:decision-ref-timeout",
+      "redaction_policy_ref": "redaction:approvaldecision:reason-ref-only",
+      "deprecation_policy_ref": "deprecation:approvaldecision:legacy-approval-state",
+      "migration_or_backfill_policy_ref": "migration:approvaldecision:decision-ref-backfill",
+      "preservation_matrix_ref": "preservation:workflow-runtime-approval",
+      "audit_ref": "audit:contract-version:approvaldecision",
+      "operator_ref": "operator:compat-review:approvaldecision",
+      "eval_gate_ref": "eval-gate:approvaldecision-version-replay",
+      "rejection_condition_refs": [
+        "reject:approvaldecision-timeout-ref-missing",
+        "reject:approvaldecision-workflow-state-leak"
+      ]
+    },
+    {
+      "contract_ref": "contract-version:ExecutionReceipt:v1",
+      "contract_name": "ExecutionReceipt",
+      "producer_owner": "action-executor",
+      "consumer_owners": ["Eval/Replay", "audit-service", "AgentOps"],
+      "current_version_ref": "version:ExecutionReceipt:1.0",
+      "previous_version_ref": "version:ExecutionReceipt:0.9",
+      "compatibility_window_ref": "compat-window:executionreceipt:two-reader-generations",
+      "replay_reader_policy_ref": "replay-reader-policy:executionreceipt:state-diff-idempotency",
+      "redaction_policy_ref": "redaction:executionreceipt:state-ref-only",
+      "deprecation_policy_ref": "deprecation:executionreceipt:legacy-result-code",
+      "migration_or_backfill_policy_ref": "migration:executionreceipt:state-diff-ref-backfill",
+      "preservation_matrix_ref": "preservation:executor-eval-replay-receipt",
+      "audit_ref": "audit:contract-version:executionreceipt",
+      "operator_ref": "operator:compat-review:executionreceipt",
+      "eval_gate_ref": "eval-gate:executionreceipt-version-replay",
+      "rejection_condition_refs": [
+        "reject:executionreceipt-idempotency-ref-missing",
+        "reject:executionreceipt-side-effect-replay"
+      ]
+    },
+    {
+      "contract_ref": "contract-version:EvalReport:v1",
+      "contract_name": "EvalReport",
+      "producer_owner": "ai-eval-service",
+      "consumer_owners": ["AgentOps", "release-gate", "main-integration-review"],
+      "current_version_ref": "version:EvalReport:1.0",
+      "previous_version_ref": "version:EvalReport:0.9",
+      "compatibility_window_ref": "compat-window:evalreport:two-reader-generations",
+      "replay_reader_policy_ref": "replay-reader-policy:evalreport:report-refs",
+      "redaction_policy_ref": "redaction:evalreport:examples-as-refs",
+      "deprecation_policy_ref": "deprecation:evalreport:legacy-score-field",
+      "migration_or_backfill_policy_ref": "migration:evalreport:score-ref-backfill",
+      "preservation_matrix_ref": "preservation:eval-agentops-report",
+      "audit_ref": "audit:contract-version:evalreport",
+      "operator_ref": "operator:compat-review:evalreport",
+      "eval_gate_ref": "eval-gate:evalreport-version-replay",
+      "rejection_condition_refs": [
+        "reject:evalreport-unknown-failure-pass",
+        "reject:evalreport-baseline-missing"
+      ]
+    },
+    {
+      "contract_ref": "contract-version:ReplayBundle:v1",
+      "contract_name": "ReplayBundle",
+      "producer_owner": "Agent Runtime",
+      "consumer_owners": ["Eval/Replay", "AgentOps", "main-integration-review"],
+      "current_version_ref": "version:ReplayBundle:1.0",
+      "previous_version_ref": "version:ReplayBundle:0.9",
+      "compatibility_window_ref": "compat-window:replaybundle:two-reader-generations",
+      "replay_reader_policy_ref": "replay-reader-policy:replaybundle:low-sensitive",
+      "redaction_policy_ref": "redaction:replaybundle:refs-hashes-only",
+      "deprecation_policy_ref": "deprecation:replaybundle:legacy-body-archive",
+      "migration_or_backfill_policy_ref": "migration:replaybundle:lineage-ref-backfill",
+      "preservation_matrix_ref": "preservation:runtime-eval-replay-bundle",
+      "audit_ref": "audit:contract-version:replaybundle",
+      "operator_ref": "operator:compat-review:replaybundle",
+      "eval_gate_ref": "eval-gate:replaybundle-version-replay",
+      "rejection_condition_refs": [
+        "reject:replaybundle-reader-needs-body-archive",
+        "reject:replaybundle-hash-ref-missing"
+      ]
+    }
+  ],
+  "promotion_gate_records": [
+    {
+      "gate_ref": "contract-version-gate:complete-matrix",
+      "contract_ref": "contract-version:ReplayBundle:v1",
+      "expected_gate_decision": "ALLOW",
+      "actual_gate_decision": "ALLOW",
+      "review_ref": "review:contract-version-compatibility:complete",
+      "audit_ref": "audit:contract-version-gate:complete"
+    },
+    {
+      "gate_ref": "contract-version-gate:block-reader-gap",
+      "contract_ref": "contract-version:EvidencePack:v1",
+      "expected_gate_decision": "BLOCK",
+      "actual_gate_decision": "BLOCK",
+      "review_ref": "review:contract-version-compatibility:block-reader-gap",
+      "audit_ref": "audit:contract-version-gate:block-reader-gap",
+      "missing_replay_reader_policy": true
+    }
+  ]
+}

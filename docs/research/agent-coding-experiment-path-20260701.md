@@ -66,6 +66,7 @@ ai/python/nexusim_ai_eval/
   adapter_runner.py
   adapters.py
   architecture_coverage.py
+  contract_version_compatibility.py
   controlled_implementation_readiness.py
   cross_service_preservation.py
   dataset_reproducibility.py
@@ -83,6 +84,7 @@ ai/python/nexusim_ai_eval/
 ai/python/fixtures/agent_eval/adapter_samples/
 ai/python/fixtures/agent_eval/architecture_coverage_rehearsal.json
 ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json
+ai/python/fixtures/agent_eval/contract_version_compatibility_rehearsal.json
 ai/python/fixtures/agent_eval/report_matrix_sample.json
 ai/python/fixtures/agent_eval/synthetic_first_trio.json
 ai/python/fixtures/agent_eval/synthetic_core_scenarios.json
@@ -126,6 +128,7 @@ ai/python/tests/test_agent_eval_evaluator.py
 ai/python/tests/test_agent_eval_integration.py
 ai/python/tests/test_agent_eval_adapters.py
 ai/python/tests/test_agent_eval_architecture_coverage.py
+ai/python/tests/test_agent_eval_contract_version_compatibility.py
 ai/python/tests/test_agent_eval_adapter_runner.py
 ai/python/tests/test_agent_eval_comparison.py
 ai/python/tests/test_agent_eval_controlled_implementation_readiness.py
@@ -241,6 +244,11 @@ Slice 0 covers:
 - fixture-only architecture surface coverage for runtime, eval/replay,
   context/evidence, memory, tool/MCP, workflow, executor, multi-agent, AgentOps,
   versioning, preservation, security/operator UX and open-dataset eval paths.
+- fixture-only contract-version compatibility coverage for EvidencePack,
+  ContextPackage, MemoryCandidate, MemoryClaim, ToolIntent, PreparedToolRef,
+  ApprovalDecision, ExecutionReceipt, EvalReport and ReplayBundle compatibility
+  windows, replay readers, redaction, deprecation, migration, preservation,
+  audit, operator, eval gate and rejection refs.
 - fixture-only state-diff report coverage for approved action outcome refs,
   expected-vs-actual state changes, missing execution refs, incomplete reports
   and unauthorized mutation detection.
@@ -535,6 +543,10 @@ Evaluator tests:
 - architecture coverage scoring rejects missing surfaces, missing owner /
   version / replay / preservation / operator / eval dimensions, open P1,
   Python final ownership and fixture authorization of production contracts.
+- contract-version compatibility scoring rejects missing targets, missing
+  compatibility window, missing replay reader, body-archive replay requirement,
+  removed required refs, Python final ownership and fixture authorization of
+  production contracts.
 - multi-agent handoff governance scoring rejects missing scenarios, scope
   widening, missing primary responsibility, unverified integration, direct tool
   execution, direct memory admission, approval bypass and fixture authorization
@@ -616,6 +628,7 @@ python -m pytest ai/python/tests/test_agent_eval_multi_agent_handoff.py -q
 python -m pytest ai/python/tests/test_agent_eval_operational_readiness.py -q
 python -m pytest ai/python/tests/test_agent_eval_controlled_implementation_readiness.py -q
 python -m pytest ai/python/tests/test_agent_eval_architecture_coverage.py -q
+python -m pytest ai/python/tests/test_agent_eval_contract_version_compatibility.py -q
 ```
 
 Full Python gate for this workspace:

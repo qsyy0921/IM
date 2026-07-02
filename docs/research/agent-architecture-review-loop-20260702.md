@@ -36,6 +36,7 @@ scoped integration design. Agent Lab remains backend-isolated.
 - `docs/research/agent-operational-readiness-fixture-evidence-20260702.md`
 - `docs/research/agent-controlled-implementation-readiness-fixture-evidence-20260702.md`
 - `docs/research/agent-architecture-coverage-fixture-evidence-20260702.md`
+- `docs/research/agent-contract-version-compatibility-fixture-evidence-20260702.md`
 - `docs/sdd/agent-runtime.md`
 - `docs/sdd/agent-eval-replay-harness.md`
 - `docs/sdd/agent-memory-admission.md`
@@ -94,7 +95,7 @@ has all of the following:
 | Operational readiness budgets | Operational readiness fixture evidence | Conditionally passes as fixture-only proof; real telemetry, capacity, SLO and on-call contracts remain future owner review |
 | Controlled implementation readiness | Controlled implementation readiness fixture evidence | Conditionally passes as a fail-closed gate; fixture-only hardening may continue, but controlled implementation and production contracts remain blocked without accepted ADRs and owner review |
 | Required architecture surface coverage | Architecture coverage fixture evidence | Conditionally passes; 13 required surfaces have owner, SDD, research, ADR, fixture, lifecycle, version, replay, preservation, audit, operator, eval and rejection refs |
-| Contract versioning | Production object model plus shared appendix | Conditionally passes; version-bump rehearsal has fixture evidence |
+| Contract versioning | Production object model, shared appendix and fixture evidence | Conditionally passes; compatibility matrix and version-bump rehearsals have fixture evidence |
 | Cross-service ref preservation | Shared appendix and fixture evidence | Conditionally passes; real-service preservation smoke is required before production design |
 | Security / privacy / audit | SDD rejection rules plus appendix | Conditionally passes; raw prompt/provider replay remains rejected |
 | Open dataset / synthetic eval | Eval SDD and current Python fixture harness | Passes Phase 1 boundary; not a production release gate yet |
@@ -126,8 +127,8 @@ Next loop should start from the Eval/Replay candidate and verify:
 
 - release-gate semantics are sufficient;
 - P0/P1 failure classes block promotion;
-- version-bump replay and cross-service preservation rehearsals have fixture
-  evidence;
+- contract-version compatibility, version-bump replay and cross-service
+  preservation rehearsals have fixture evidence;
 - object catalog completeness has fixture evidence;
 - operator governance surface completeness has fixture evidence;
 - operational readiness budget coverage has fixture evidence;

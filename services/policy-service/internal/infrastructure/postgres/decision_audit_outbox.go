@@ -17,12 +17,17 @@ import (
 const policyDecisionAuditEventType = "policy.message_action_decision.v1"
 
 type DecisionAuditOutbox struct {
-	pool    *pgxpool.Pool
-	eventID func() (string, error)
-	now     func() time.Time
+	pool          *pgxpool.Pool
+	eventID       func() (string, error)
+	now           func() time.Time
+	stageObserver DecisionAuditStageObserver
 }
 
 type DecisionAuditOutboxOption func(*DecisionAuditOutbox)
+
+type DecisionAuditStageObserver interface {
+	RecordPolicyDecisionStage(action types.MessageAction, stage string, failed bool, latencyMS int64)
+}
 
 func NewDecisionAuditOutbox(pool *pgxpool.Pool, opts ...DecisionAuditOutboxOption) *DecisionAuditOutbox {
 	outbox := &DecisionAuditOutbox{
@@ -41,6 +46,12 @@ func WithDecisionAuditEventID(fn func() (string, error)) DecisionAuditOutboxOpti
 		if fn != nil {
 			outbox.eventID = fn
 		}
+	}
+}
+
+func WithDecisionAuditStageObserver(observer DecisionAuditStageObserver) DecisionAuditOutboxOption {
+	return func(outbox *DecisionAuditOutbox) {
+		outbox.stageObserver = observer
 	}
 }
 
@@ -110,7 +121,16 @@ func (outbox *DecisionAuditOutbox) RecordPolicyDecision(
 	if err != nil {
 		return types.NewDBWriteFailed(err.Error())
 	}
-	_, err = outbox.pool.Exec(ctx, `
+	acquireStarted := time.Now()
+	conn, err := outbox.pool.Acquire(ctx)
+	outbox.recordStage(command.Action, "decision_audit_pool_acquire", err != nil, acquireStarted)
+	if err != nil {
+		return types.NewDBWriteFailed(err.Error())
+	}
+	defer conn.Release()
+
+	insertStarted := time.Now()
+	_, err = conn.Exec(ctx, `
 INSERT INTO policy_decision_audit_outbox (
     event_id,
     tenant_id,
@@ -164,10 +184,18 @@ INSERT INTO policy_decision_audit_outbox (
 		string(payloadJSON),
 		decidedAt,
 	)
+	outbox.recordStage(command.Action, "decision_audit_insert_exec", err != nil, insertStarted)
 	if err != nil {
 		return types.NewDBWriteFailed(err.Error())
 	}
 	return nil
+}
+
+func (outbox *DecisionAuditOutbox) recordStage(action types.MessageAction, stage string, failed bool, started time.Time) {
+	if outbox == nil || outbox.stageObserver == nil {
+		return
+	}
+	outbox.stageObserver.RecordPolicyDecisionStage(action, stage, failed, time.Since(started).Milliseconds())
 }
 
 type policyDecisionAuditPayload struct {

@@ -16,6 +16,7 @@ func TestDecisionAuditOutboxRecordsPolicyDecisionIntegration(t *testing.T) {
 	ctx := context.Background()
 	resetPolicyTables(t, ctx, pool)
 	decidedAt := time.Date(2026, 6, 13, 10, 20, 30, 0, time.UTC)
+	stageObserver := &decisionAuditStageRecorder{}
 	outbox := NewDecisionAuditOutbox(
 		pool,
 		WithDecisionAuditEventID(func() (string, error) {
@@ -24,6 +25,7 @@ func TestDecisionAuditOutboxRecordsPolicyDecisionIntegration(t *testing.T) {
 		WithDecisionAuditClock(func() time.Time {
 			return decidedAt
 		}),
+		WithDecisionAuditStageObserver(stageObserver),
 	)
 	command := testPolicyCommand(types.MessageActionSend)
 	command.DirectPeerUserID = "peer-policy"
@@ -45,6 +47,7 @@ func TestDecisionAuditOutboxRecordsPolicyDecisionIntegration(t *testing.T) {
 	if err := outbox.RecordPolicyDecision(ctx, command, decision); err != nil {
 		t.Fatalf("record policy decision: %v", err)
 	}
+	stageObserver.assertStages(t, []string{"decision_audit_pool_acquire", "decision_audit_insert_exec"})
 
 	var row struct {
 		EventID           string
@@ -165,6 +168,39 @@ WHERE tenant_id = $1
 	for _, raw := range []string{"user-policy", "device-policy", "peer-policy", "conv-policy", "session-should-not-be-persisted", "contact blocked"} {
 		if strings.Contains(row.PayloadJSON, raw) {
 			t.Fatalf("audit payload must not include raw value %q: %s", raw, row.PayloadJSON)
+		}
+	}
+}
+
+type decisionAuditStageRecorder struct {
+	stages []decisionAuditStageRecord
+}
+
+type decisionAuditStageRecord struct {
+	action    types.MessageAction
+	stage     string
+	failed    bool
+	latencyMS int64
+}
+
+func (recorder *decisionAuditStageRecorder) RecordPolicyDecisionStage(action types.MessageAction, stage string, failed bool, latencyMS int64) {
+	recorder.stages = append(recorder.stages, decisionAuditStageRecord{
+		action:    action,
+		stage:     stage,
+		failed:    failed,
+		latencyMS: latencyMS,
+	})
+}
+
+func (recorder *decisionAuditStageRecorder) assertStages(t *testing.T, expected []string) {
+	t.Helper()
+	if len(recorder.stages) != len(expected) {
+		t.Fatalf("expected %d audit stages, got %+v", len(expected), recorder.stages)
+	}
+	for i, expectedStage := range expected {
+		stage := recorder.stages[i]
+		if stage.action != types.MessageActionSend || stage.stage != expectedStage || stage.failed || stage.latencyMS < 0 {
+			t.Fatalf("unexpected audit stage at %d: %+v", i, stage)
 		}
 	}
 }

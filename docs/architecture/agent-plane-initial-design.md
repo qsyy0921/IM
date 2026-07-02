@@ -488,7 +488,32 @@ execution、cost、release channel 和 rollback。
 
 建议先用 fixture-only prototype 验证 run trace、ContextPackage 和 replay，再决定是否写 ADR。
 
-## 13. 初步落地实验
+## 13. 生产级集成缺口矩阵
+
+以下 12 项不是“只差 12 个小任务”，而是生产化必须关闭的一级门类。
+补齐它们是必要条件，不等于自动充分；每一项还需要 owner review、正式
+ADR / 契约、实现、real-service smoke、SLO / 回滚和安全审计通过。
+
+| 缺口门类 | 生产级要求 | 未关闭前的限制 |
+| --- | --- | --- |
+| 正式 ADR / 契约冻结 | 六个 Agent 方向需要 accepted ADR，并冻结 proto / OpenAPI / Kafka schema / DB migration / service boundary | 只能作为 review material 或 fixture-only 实验 |
+| 真实服务接入 | 接入 retrieval-gateway、memory-service、workflow-service、mcp-gateway、action-executor、audit-service、policy-service、model-gateway | 不允许创建 production startup path 或真实后端依赖 |
+| 真实数据链路 | EvidencePack 从真实 IM / search / memory / retrieval 低敏证据构造，Agent 不跨服务读私表 | 只能使用 synthetic / public-dataset-style fixture |
+| Memory 生产闭环 | MemoryCandidate、review、ACTIVE admission、revocation、forget、retrieval eligibility、memory-use audit 全链路落地 | Python / Runtime 只能产出 candidate，不能拥有 ACTIVE memory |
+| Tool / MCP 生产安全 | provider registry、attestation、CapabilityLease、prepare / re-prepare、ToolOutputEnvelope taint、executor handoff | MCP provider / tool description / output 仍按不可信输入处理 |
+| Workflow / 审批 / 执行 | 高风险动作必须走 proposal -> approval -> action-executor -> audit，支持 cancel / resume / replay / redrive | Runtime / Python / mcp-gateway 不能直接执行副作用 |
+| Eval / Replay 上线门禁 | EvalReport、ReplayBundle、baseline approval、regression gate、failure-class owner 阻断 P0/P1 | Eval 只能证明离线能力，不能授权生产发布 |
+| AgentOps 控制面 | release channel、kill switch、rollback、canary / shadow、failure owner、operator action ledger、incident escalation | 不能上线 release pipeline、admin console 或 control-plane API |
+| 权限与审计 | 接真实 identity / policy / audit，保留 actor、tenant、on_behalf_of、scope、redaction、retention | 低敏 fixture trace 不能替代生产审计 |
+| 观测与 SLO | metrics、trace、cost / latency / timeout budget、error taxonomy、alert、on-call runbook | 不能承诺生产 SLO 或容量边界 |
+| 部署与运维 | Docker / runtime profile、service registry、config、secret、灰度、回滚、兼容窗口、migration scripts | 不能进入正式 deployment 或 shared runtime |
+| 真实 smoke / 压测 / 安全测试 | real-service smoke、permission leakage、MCP poisoning、long-wait recovery、fault injection、capacity verification | fixture pass 不能替代生产级验收 |
+
+面试级目标可以把这些作为 production roadmap；生产级目标必须逐项形成 owner
+signoff 和验收证据。任何一项出现 owner 缺失、P0/P1 未关闭、真实服务 smoke
+缺失或 Python final owner 越界，都应阻断生产推广。
+
+## 14. 初步落地实验
 
 建议下一步只做探索实验，不做生产契约：
 
@@ -500,7 +525,7 @@ execution、cost、release channel 和 rollback。
 6. 补 state-diff eval fixture：用低敏 fixture 验证 action-executor result 与预期业务状态差异。
 7. 补 MCP security fixture：模拟 poisoned tool description、unsafe provider output 和 tool-selection attack。
 
-## 14. 风险
+## 15. 风险
 
 - 过早拆服务会增加本地运行和门禁成本。
 - 过晚拆 runtime 会让 agent-service 吸收过多编排、workflow、tool、memory 和 eval 逻辑。
@@ -510,8 +535,10 @@ execution、cost、release channel 和 rollback。
 - 只做 pass/fail eval 不够，必须保留 failure taxonomy。
 - 只做 trace matching 的 eval 不够，必须补最终状态变化和副作用验证。
 - MCP tool description / output 本身可能被污染，不能当作可信上下文。
+- 把生产级集成缺口矩阵误读为“补完 12 个点即可上线”会低估 owner review、
+  真实服务 smoke、SLO、回滚和安全审计成本。
 
-## 15. 结论
+## 16. 结论
 
 NexusIM Agent 层建议采用“安全 baseline + Runtime 探索”的路线：
 
@@ -531,7 +558,7 @@ NexusIM Agent 层建议采用“安全 baseline + Runtime 探索”的路线：
 memory admission eval 和 runtime/workflow ownership 的小型实验。主集成评审后，再决定是否将
 Agent Runtime / Harness Plane 提升为 ADR / SDD / runtime 实现。
 
-## 16. 参考输入
+## 17. 参考输入
 
 本报告综合了本地源码/文档与 2026-07-01 可访问的公开资料：
 

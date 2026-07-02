@@ -28,7 +28,7 @@
    `docs/research/agent-context-evidencepack-adr-review-20260702.md`，Memory /
    Tool / AgentOps focused reviews 也已补齐。Full package 已进入 ADR review；
    六个 Agent ADR candidates 和 L1 closure 已被主集成接受为 reviewability only；
-   Eval / Replay、Runtime / Workflow、Context / EvidencePack、Memory Admission 和 Tool / MCP L2 已被主集成接受为 review material；AgentOps L2 已起草。
+   Eval / Replay、Runtime / Workflow、Context / EvidencePack、Memory Admission、Tool / MCP 和 AgentOps L2 已被主集成接受为 review material only。
 3. Fixture-only evidence hardening：Eval / Replay、Runtime / Workflow、Context /
    Evidence、Memory、Tool、AgentOps、dataset reproducibility、cross-service
    preservation、multi-agent handoff、object completeness 和 operator

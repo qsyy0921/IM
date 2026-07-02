@@ -14,7 +14,7 @@ memory / AI worker / EvidencePack / eval gate，不承接后端热点群压测�
 - 架构缺口、生产对象模型、ADR candidate package 和首轮 review ledger 已完成到
   research 级事实源；下一步只做评审或 fixture-only hardening，不直接写生产契约。
 - 六个 Agent ADR candidates 和 L1 closure 已被主集成接受为 reviewability only；
-  Eval / Replay、Runtime / Workflow、Context / EvidencePack、Memory Admission 和 Tool / MCP L2 已被主集成接受为 review material；AgentOps L2 已起草。
+  Eval / Replay、Runtime / Workflow、Context / EvidencePack、Memory Admission、Tool / MCP 和 AgentOps L2 已被主集成接受为 review material only。
 - 完整进度历史在 `docs/runbook/development-progress.md`，不要把长历史塞回本文件。
 
 ## 当前设计事实源

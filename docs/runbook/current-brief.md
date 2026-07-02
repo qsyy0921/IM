@@ -52,7 +52,7 @@ baseline lifecycle 和 memory calibration。
 ## 下一步
 
 若继续架构推进，等待主集成评审六个 ADR candidates 或补 fixture-only evidence。
-Eval / Replay、Runtime / Workflow、Context / Evidence fixture evidence 已落地；
-若继续编码，优先 Memory / Tool / AgentOps 的 fixture-only 证据。
+Eval / Replay、Runtime / Workflow、Context / Evidence、Memory fixture evidence
+已落地；若继续编码，优先 Tool / AgentOps 的 fixture-only 证据。
 完整模块完成后 commit、push
 `origin/codex/agent-lab` 并 handoff。

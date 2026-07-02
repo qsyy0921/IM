@@ -62,6 +62,9 @@
 - `agent-context-evidence-fixture-evidence-20260702.md`：fixture-only evidence
   更新，记录 Context / EvidencePack preservation rehearsal 的 denied-lane、
   source-ref、citation verifier、taint 和 operator inspect 证据。
+- `agent-memory-fixture-evidence-20260702.md`：fixture-only evidence 更新，
+  记录 Memory Admission governance rehearsal 的 category threshold、
+  revocation、retrieval eligibility、ACTIVE explanation 和 operator UX 证据。
 
 ## 存放位置
 

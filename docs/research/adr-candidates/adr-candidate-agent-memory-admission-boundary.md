@@ -136,6 +136,8 @@ Reject the ADR if:
 
 - Main integration owner review for memory-service admission and retrieval.
 - Fixture proof for category thresholds, revocation, dependency invalidation and
-  stale-memory blocking.
+  stale-memory blocking now exists in
+  `docs/research/agent-memory-fixture-evidence-20260702.md`; production
+  integration remains blocked.
 - Audit explanation path review for ACTIVE decisions.
 - Operator UX owner for review, correction, revocation and forget requests.

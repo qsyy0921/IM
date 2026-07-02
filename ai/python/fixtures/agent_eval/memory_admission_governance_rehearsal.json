@@ -1,0 +1,258 @@
+{
+  "schema_version": 1,
+  "rehearsal_kind": "agent_memory_admission_governance_rehearsal",
+  "rehearsal_id": "memory-admission-governance-rehearsal-v1",
+  "ownership_assertions": [
+    {
+      "object_ref": "memory-candidate:worker-output:personal-style",
+      "object_kind": "python-candidate",
+      "owner": "Python AI Worker",
+      "forbidden_state_refs": [
+        "state:active-memory",
+        "state:admission-decision",
+        "state:retrieval-eligibility"
+      ],
+      "rejected_forbidden_state_refs": [
+        "state:active-memory",
+        "state:admission-decision",
+        "state:retrieval-eligibility"
+      ],
+      "python_made_active_decision": false
+    },
+    {
+      "object_ref": "memory-decision:project-alpha:decision-7",
+      "object_kind": "admission-decision",
+      "owner": "memory-service",
+      "forbidden_state_refs": ["state:workflow-timer", "state:python-final"],
+      "rejected_forbidden_state_refs": ["state:workflow-timer", "state:python-final"],
+      "python_made_active_decision": false
+    },
+    {
+      "object_ref": "memory-review:group-alpha:norm-3",
+      "object_kind": "review-task",
+      "owner": "memory-service+workflow-service",
+      "forbidden_state_refs": ["state:active-memory"],
+      "rejected_forbidden_state_refs": ["state:active-memory"],
+      "python_made_active_decision": false
+    }
+  ],
+  "category_threshold_records": [
+    {
+      "candidate_ref": "memory-candidate:personal:style-concise",
+      "category": "PERSONAL",
+      "decision_owner": "memory-service",
+      "expected_outcome": "ACTIVE",
+      "actual_outcome": "ACTIVE",
+      "threshold_policy_ref": "memory-threshold:personal:explicit-confirmation:v1",
+      "present_refs": [
+        "source_refs",
+        "scope_ref",
+        "subject_ref",
+        "confirmation_or_repeated_evidence_ref"
+      ],
+      "review_required": false,
+      "review_decision_ref": "",
+      "audit_ref": "audit:memory:personal-style-admitted"
+    },
+    {
+      "candidate_ref": "memory-candidate:group:ops-norm",
+      "category": "GROUP",
+      "decision_owner": "memory-service",
+      "expected_outcome": "NEEDS_REVIEW",
+      "actual_outcome": "NEEDS_REVIEW",
+      "threshold_policy_ref": "memory-threshold:group:decision-plus-audience:v1",
+      "present_refs": [
+        "source_refs",
+        "scope_ref",
+        "group_ref",
+        "speaker_refs",
+        "audience_refs",
+        "membership_window_ref",
+        "decision_or_confirmation_ref"
+      ],
+      "review_required": true,
+      "review_decision_ref": "memory-review:group-ops-norm:pending",
+      "audit_ref": "audit:memory:group-ops-norm-needs-review"
+    },
+    {
+      "candidate_ref": "memory-candidate:project:decision-7",
+      "category": "PROJECT",
+      "decision_owner": "memory-service",
+      "expected_outcome": "ACTIVE",
+      "actual_outcome": "ACTIVE",
+      "threshold_policy_ref": "memory-threshold:project:supersedes-review:v1",
+      "present_refs": [
+        "source_refs",
+        "scope_ref",
+        "project_ref",
+        "supersedes_or_conflict_ref",
+        "review_policy_ref"
+      ],
+      "review_required": true,
+      "review_decision_ref": "memory-review:project-decision-7:approved",
+      "audit_ref": "audit:memory:project-decision-7-admitted"
+    },
+    {
+      "candidate_ref": "memory-candidate:procedural:scheduling-v2",
+      "category": "PROCEDURAL",
+      "decision_owner": "memory-service",
+      "expected_outcome": "QUARANTINED",
+      "actual_outcome": "QUARANTINED",
+      "threshold_policy_ref": "memory-threshold:procedural:skill-bound:v1",
+      "present_refs": [
+        "source_refs",
+        "scope_ref",
+        "skill_version_ref",
+        "migration_or_invalidation_ref"
+      ],
+      "review_required": true,
+      "review_decision_ref": "memory-review:procedural:scheduling-v2",
+      "audit_ref": "audit:memory:procedural-scheduling-quarantined"
+    },
+    {
+      "candidate_ref": "memory-candidate:policy:retention-summary",
+      "category": "POLICY",
+      "decision_owner": "memory-service",
+      "expected_outcome": "REJECTED",
+      "actual_outcome": "REJECTED",
+      "threshold_policy_ref": "memory-threshold:policy:governed-source-only:v1",
+      "present_refs": [
+        "source_refs",
+        "scope_ref",
+        "governed_policy_source_ref",
+        "policy_owner_ref"
+      ],
+      "review_required": false,
+      "review_decision_ref": "",
+      "audit_ref": "audit:memory:policy-summary-rejected"
+    }
+  ],
+  "revocation_records": [
+    {
+      "revocation_ref": "memory-revocation:project-decision-legacy",
+      "affected_memory_refs": [
+        "memory:project-alpha:legacy-decision",
+        "memory:project-alpha:legacy-summary"
+      ],
+      "actual_dependency_invalidation_refs": [
+        "memory:project-alpha:legacy-decision",
+        "memory:project-alpha:legacy-summary"
+      ],
+      "authority_decision_ref": "authority:project-owner:forget-approved",
+      "retrieval_change_ref": "retrieval-eligibility:project-alpha:legacy-removed",
+      "retention_policy_ref": "retention-policy:memory-revocation-low-sensitive:v1",
+      "audit_ref": "audit:memory:project-legacy-revoked",
+      "retrieved_after_revocation": false,
+      "body_retained": false
+    }
+  ],
+  "retrieval_eligibility_records": [
+    {
+      "memory_ref": "memory:personal:style-concise",
+      "lifecycle_state": "ACTIVE",
+      "retrieval_eligible": true,
+      "expected_retrieval_eligible": true,
+      "scope_ref": "scope:user:alpha",
+      "version_ref": "memory-version:personal-style:v1",
+      "audit_ref": "audit:memory:personal-style-retrieval",
+      "source_revoked": false,
+      "source_unavailable_fallback": false
+    },
+    {
+      "memory_ref": "memory:project-alpha:legacy-decision",
+      "lifecycle_state": "REVOKED",
+      "retrieval_eligible": false,
+      "expected_retrieval_eligible": false,
+      "scope_ref": "scope:project-alpha",
+      "version_ref": "memory-version:project-legacy:v1",
+      "audit_ref": "audit:memory:project-legacy-retrieval-blocked",
+      "source_revoked": true,
+      "source_unavailable_fallback": false
+    },
+    {
+      "memory_ref": "memory:procedural:scheduling-v2",
+      "lifecycle_state": "QUARANTINED",
+      "retrieval_eligible": false,
+      "expected_retrieval_eligible": false,
+      "scope_ref": "scope:skill:scheduling",
+      "version_ref": "memory-version:procedural-scheduling:v2",
+      "audit_ref": "audit:memory:procedural-scheduling-quarantined",
+      "source_revoked": false,
+      "source_unavailable_fallback": false
+    }
+  ],
+  "admission_explanation_records": [
+    {
+      "decision_ref": "memory-decision:personal-style:active",
+      "decision_outcome": "ACTIVE",
+      "source_refs": ["source:user-alpha:style-confirmation"],
+      "candidate_hash_ref": "hash:memory-candidate:personal-style",
+      "scope_ref": "scope:user:alpha",
+      "confidence_ref": "confidence:personal-style:high",
+      "calibration_ref": "calibration:memory-threshold:personal:v1",
+      "reason_ref": "reason:explicit-user-confirmation",
+      "review_required": false,
+      "review_decision_ref": "",
+      "audit_ref": "audit:memory:personal-style-explain",
+      "raw_text_required": false
+    },
+    {
+      "decision_ref": "memory-decision:project-decision-7:active",
+      "decision_outcome": "ACTIVE",
+      "source_refs": ["source:project-alpha:decision-7"],
+      "candidate_hash_ref": "hash:memory-candidate:project-decision-7",
+      "scope_ref": "scope:project-alpha",
+      "confidence_ref": "confidence:project-decision:high",
+      "calibration_ref": "calibration:memory-threshold:project:v1",
+      "reason_ref": "reason:review-approved-supersedes",
+      "review_required": true,
+      "review_decision_ref": "memory-review:project-decision-7:approved",
+      "audit_ref": "audit:memory:project-decision-7-explain",
+      "raw_text_required": false
+    }
+  ],
+  "operator_memory_records": [
+    {
+      "control_ref": "memory-operator:review:group-ops-norm",
+      "action": "REVIEW",
+      "visible_refs": [
+        "memory-candidate:group:ops-norm",
+        "memory-review:group-ops-norm:pending",
+        "audit:memory:group-ops-norm-needs-review"
+      ],
+      "redaction_policy_ref": "redaction-policy:memory-operator-low-sensitive:v1",
+      "audit_ref": "audit:memory-operator:review-group-ops-norm",
+      "authority_decision_ref": "",
+      "body_exposed": false,
+      "python_override": false
+    },
+    {
+      "control_ref": "memory-operator:correct:project-decision-7",
+      "action": "CORRECT",
+      "visible_refs": [
+        "memory:project-alpha:decision-7",
+        "memory-decision:project-decision-7:active",
+        "memory-version:project-decision-7:v2"
+      ],
+      "redaction_policy_ref": "redaction-policy:memory-operator-low-sensitive:v1",
+      "audit_ref": "audit:memory-operator:correct-project-decision-7",
+      "authority_decision_ref": "authority:project-owner:correction-approved",
+      "body_exposed": false,
+      "python_override": false
+    },
+    {
+      "control_ref": "memory-operator:forget:project-legacy",
+      "action": "FORGET",
+      "visible_refs": [
+        "memory-revocation:project-decision-legacy",
+        "retrieval-eligibility:project-alpha:legacy-removed",
+        "audit:memory:project-legacy-revoked"
+      ],
+      "redaction_policy_ref": "redaction-policy:memory-operator-low-sensitive:v1",
+      "audit_ref": "audit:memory-operator:forget-project-legacy",
+      "authority_decision_ref": "authority:project-owner:forget-approved",
+      "body_exposed": false,
+      "python_override": false
+    }
+  ]
+}

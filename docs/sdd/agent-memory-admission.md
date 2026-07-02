@@ -356,6 +356,8 @@ Current first-stage code is fixture-only and lives under
 `ai/python/fixtures/agent_eval/synthetic_memory_admission_deeper_hardening_scenarios.json`
 and `ai/python/fixtures/agent_eval/memory_calibration_sample.json` and
 `ai/python/fixtures/agent_eval/memory_calibration_public_export.json`.
+Additional governance evidence lives in
+`ai/python/fixtures/agent_eval/memory_admission_governance_rehearsal.json`.
 It does not freeze a production memory event or MemoryCandidate schema.
 
 Implemented checks:
@@ -386,6 +388,10 @@ Implemented checks:
   STATE-Bench / LoCoMO / LongMemEval / EverMemBench / GroupMemBench-style
   dataset-source refs, per-dataset case counts, 15 gate cases, 8 policy-window
   cases and 12 review-backoff cases.
+- memory admission governance rehearsal proves Python candidate-only ownership,
+  distinct category thresholds, revocation dependency invalidation, retrieval
+  eligibility blocking, ACTIVE explanation refs and operator review / correction
+  / forget controls.
 
 Remaining hardening:
 

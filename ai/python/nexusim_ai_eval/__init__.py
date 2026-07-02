@@ -26,6 +26,10 @@ from nexusim_ai_eval.memory_calibration import (
     load_memory_calibration_payload,
     run_memory_admission_calibration,
 )
+from nexusim_ai_eval.memory_admission_governance import (
+    load_memory_admission_governance_rehearsal,
+    rehearse_memory_admission_governance,
+)
 from nexusim_ai_eval.replay_compatibility import (
     load_replay_version_bump_rehearsal,
     rehearse_replay_version_bump,
@@ -74,10 +78,12 @@ __all__ = [
     "load_context_evidence_preservation_rehearsal",
     "load_report_matrix_plan",
     "load_memory_calibration_payload",
+    "load_memory_admission_governance_rehearsal",
     "load_replay_version_bump_rehearsal",
     "load_runtime_workflow_ownership_rehearsal",
     "run_eval_suite",
     "rehearse_context_evidence_preservation",
+    "rehearse_memory_admission_governance",
     "rehearse_replay_version_bump",
     "rehearse_runtime_workflow_ownership",
     "run_memory_admission_calibration",

@@ -50,9 +50,19 @@ authorized.
 
 - Main integration must accept memory-service ownership and workflow-service wait
   ownership.
-- Fixture hardening should later prove category threshold and revocation
-  behavior in repeatable eval suites.
+- Fixture code now proves category thresholds, revocation, dependency
+  invalidation, ACTIVE explanation and operator memory governance in
+  `ai/python/nexusim_ai_eval/memory_admission_governance.py` and
+  `ai/python/fixtures/agent_eval/memory_admission_governance_rehearsal.json`.
 - Production retention and deletion policy remain integration-scope decisions.
+
+## Fixture Evidence Update
+
+`docs/research/agent-memory-fixture-evidence-20260702.md` records the
+fixture-only governance rehearsal. It proves Python remains candidate-only,
+category thresholds are distinct, revoked memory cannot stay retrieval eligible
+and operator review / correction / forget controls preserve low-sensitive
+authority, redaction and audit refs.
 
 ## Next Review Target
 

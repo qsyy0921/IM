@@ -448,6 +448,7 @@ ai/python/nexusim_ai_eval/
   contracts.py
   evaluator.py
   fixtures.py
+  memory_admission_governance.py
   replay_compatibility.py
   reporting.py
   runtime_workflow_ownership.py
@@ -472,6 +473,7 @@ ai/python/fixtures/agent_eval/synthetic_memory_admission_hardening_scenarios.jso
 ai/python/fixtures/agent_eval/synthetic_memory_admission_deeper_hardening_scenarios.json
 ai/python/fixtures/agent_eval/memory_calibration_sample.json
 ai/python/fixtures/agent_eval/memory_calibration_public_export.json
+ai/python/fixtures/agent_eval/memory_admission_governance_rehearsal.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_hardening_scenarios.json
 ai/python/fixtures/agent_eval/synthetic_state_diff_deeper_hardening_scenarios.json
@@ -486,6 +488,7 @@ ai/python/tests/test_agent_eval_context_evidence_preservation.py
 ai/python/tests/test_agent_eval_contracts.py
 ai/python/tests/test_agent_eval_evaluator.py
 ai/python/tests/test_agent_eval_integration.py
+ai/python/tests/test_agent_eval_memory_admission_governance.py
 ai/python/tests/test_agent_eval_replay_compatibility.py
 ai/python/tests/test_agent_eval_runtime_workflow_ownership.py
 ai/python/tests/test_agent_eval_adapters.py
@@ -581,6 +584,10 @@ Implemented checks:
 - public-export memory calibration coverage for dataset-source refs,
   per-dataset case counts, 15 memory gate cases, 8 policy-window cases and
   12 review-backoff cases.
+- memory admission governance rehearsal coverage for Python candidate-only
+  ownership, category thresholds, revocation dependency invalidation, retrieval
+  eligibility blocking, ACTIVE explanation refs and operator review / correction
+  / forget controls.
 - state-diff report fixture coverage for approved action outcome refs,
   expected-vs-actual state changes, missing execution refs, incomplete reports
   and unauthorized mutation detection.
@@ -613,6 +620,7 @@ python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval
 python -m pytest ai/python/tests/test_agent_eval_replay_compatibility.py -q
 python -m pytest ai/python/tests/test_agent_eval_runtime_workflow_ownership.py -q
 python -m pytest ai/python/tests/test_agent_eval_context_evidence_preservation.py -q
+python -m pytest ai/python/tests/test_agent_eval_memory_admission_governance.py -q
 python ai/python/scripts/run_agent_eval_current_report.py ai/python/fixtures/agent_eval/synthetic_core_scenarios.json --report-out .tmp-agent-current-report.json --baseline ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json --review-out .tmp-agent-baseline-review.json --force
 python ai/python/scripts/run_agent_eval_report_matrix.py ai/python/fixtures/agent_eval/report_matrix_sample.json --matrix-out .tmp-agent-eval-matrix/matrix.json --approval-manifest-out .tmp-agent-eval-matrix/approval-manifest.json --force
 python ai/python/scripts/run_agent_memory_calibration.py ai/python/fixtures/agent_eval/memory_calibration_sample.json --report-out .tmp-agent-memory-calibration-report.json --force

@@ -66,6 +66,5 @@ It does not close:
 
 Next fixture-only evidence should focus on one of:
 
-- Memory revocation and category-threshold proof;
 - Tool prepare-expiry re-prepare proof;
 - AgentOps release-blocking and kill-switch proof.

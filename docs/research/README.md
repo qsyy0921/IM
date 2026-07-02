@@ -68,6 +68,11 @@
   boundary 的第五份 L2 scoped implementation design；只定义 untrusted provider、
   capability lease、provider attestation、prepare / re-prepare、taint、executor
   handoff、operator gates 和 L3 smoke，不授权生产实现。
+- `agentops-governance-l2-scoped-implementation-design-20260702.md`：
+  AgentOps / Governance boundary 的第六份 L2 scoped implementation design；
+  只定义 release gate、baseline approval、failure owner、kill switch、
+  rollback、canary / shadow、operator action ledger、incident evidence 和 L3
+  smoke，不授权生产实现。
 - `agent-eval-replay-l1-acceptance-review-20260702.md`：Eval / Replay
   candidate 的 L1 acceptance review 自评包，建议进入主集成 ADR review，
   但继续 defer production implementation。

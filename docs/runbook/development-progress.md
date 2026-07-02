@@ -57,6 +57,7 @@ Eval Harness / synthetic IM-like fixture 已开始隔离式编码。
 | `docs/research/agentops-governance-l1-acceptance-review-20260702.md` | 已完成第六个候选 L1 自评 | AgentOps / Governance candidate 建议接受 release-control / baseline approval / kill-switch / failure-owner / canary-shadow 边界；仍不授权 release pipeline 或 admin console |
 | `docs/research/agent-l1-package-closure-audit-20260702.md` | 已被主集成接受为 closure record | 六个 Agent ADR candidates 已被主集成接受为 L1 reviewability only；下一步只能进入 L2 scoped design 或 fixture-only hardening |
 | `docs/research/agent-eval-replay-l2-scoped-implementation-design-20260702.md` | 已完成第一份 L2 design | Eval / Replay promotion gate 的 owner、L3 smoke、operator / audit / replay gates 已定义；仍不授权实现 |
+| `docs/research/agentops-governance-l2-scoped-implementation-design-20260702.md` | 已完成第六份 L2 design | AgentOps / Governance release-control、baseline、kill-switch、rollback、canary / shadow、operator ledger 和 incident evidence 已定义；仍不授权实现 |
 | `docs/research/agent-fixture-evidence-hardening-20260702.md` | 已完成首段 | Eval / Replay version-bump rehearsal 已用 fixture-only code / JSON / tests 落地；仍不提升生产契约 |
 | `docs/research/agent-tool-mcp-fixture-evidence-20260702.md` | 已完成 Tool 段 | Tool / MCP governance rehearsal 已用 fixture-only code / JSON / tests 落地；仍不提升生产契约 |
 | `docs/research/agentops-governance-fixture-evidence-20260702.md` | 已完成 AgentOps 段 | AgentOps governance rehearsal 已用 fixture-only code / JSON / tests 落地；仍不提升生产契约 |
@@ -343,6 +344,10 @@ ai/python/tests/test_agent_eval_*.py
   untrusted provider、CapabilityLease、ProviderAttestation、prepare / re-prepare、
   ToolOutputEnvelope taint、action-executor handoff、operator controls 和 L3
   smoke plan；不授权生产实现。
+- AgentOps / Governance L2 scoped implementation design：第六份 L2 design 已起草，
+  范围只限 release gate、BaselineApproval、FailureClassOwner、KillSwitch、
+  RollbackPlan、CanaryShadowPlan、OperatorActionLedger、incident evidence、
+  service-promotion choice 和 L3 smoke plan；不授权生产实现。
 - Skeleton completion audit：已把 immutable goal 的 17 个骨架要求映射到当前
   代码、fixture、CLI、tests 和 runbook evidence；结论是 Phase 1 isolated
   Agent-layer skeleton 可作为当前可执行基线，但不能直接推广生产契约。
@@ -357,8 +362,8 @@ ai/python/tests/test_agent_eval_*.py
 | 优先级 | 工作 | 输出 |
 | --- | --- | --- |
 | P1 | Document-driven process | immutable goal 保持稳定，具体阶段与验收条件只维护在 runbook / SDD / research 文档 |
-| P1 | L2 scoped design review | Eval / Replay、Runtime / Workflow、Context / EvidencePack、Memory Admission 和 Tool / MCP 等 L2 design 等待 owner review / L3 smoke 决策 |
-| P1 | Next scoped design | 如继续架构推进，补 Context / EvidencePack、Memory、Tool / MCP 或 AgentOps 的 L2 design |
+| P1 | L2 scoped design review | Eval / Replay、Runtime / Workflow、Context / EvidencePack、Memory Admission、Tool / MCP 和 AgentOps L2 design 等待 owner review / L3 smoke 决策 |
+| P1 | L2 package closure | 如继续架构推进，做六份 L2 design 的 package closure audit 或 review-requested hardening |
 | P2 | ReplayBundle observability hardening review | 如评审要求，继续补 fixture-only taxonomy / trace evidence |
 | P2 | Memory calibration hardening | 仅在需要时继续追加公开数据集导出或 adapter metadata |
 

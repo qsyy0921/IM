@@ -17,8 +17,9 @@ Reason: Agent Lab now has fixture-only evidence for the required Agent
 architecture surfaces, production-object coverage, version compatibility,
 cross-service preservation, operator governance and fail-closed implementation
 readiness. Those proofs are enough to ask main integration to review ADR
-candidates, but they are not enough to create production contracts or connect
-real services.
+candidates. Main integration later accepted L0 package entry for ADR acceptance
+review only, but that is still not enough to create production contracts or
+connect real services.
 
 ## Evidence Sources
 
@@ -55,15 +56,15 @@ real services.
 | Operator can govern high-risk surfaces | Operator governance and AgentOps rehearsals | Pass for future inspect-and-act design |
 | Open dataset / synthetic eval path exists | Eval SDD, adapters, fixtures and reproducibility evidence | Pass for Phase 1 isolation |
 | Controlled implementation gate fails closed | Controlled implementation readiness rehearsal | Pass; controlled implementation remains blocked |
-| Main integration has no new P0/P1 | Latest module review for `220be2b` recorded no P0/P1 | Pass for latest handoff; full-package entry decision still pending |
+| Main integration has no new P0/P1 | Latest full-package review accepted L0 entry for ADR review only | Pass for ADR review entry; implementation approval still absent |
 
 ## Blocking Conditions Outside Agent Lab
 
 These blockers prevent actual controlled implementation:
 
 - no accepted ADR exists yet;
-- main integration has not accepted the full package as an implementation entry
-  decision, even though the latest fixture module review found no P0/P1;
+- main integration accepted the full package only for ADR review, not as an
+  implementation entry decision;
 - production owners have not reviewed real service integration boundaries;
 - no real-service preservation smoke exists for retrieval, memory, MCP,
   workflow, executor or audit lanes;
@@ -77,7 +78,7 @@ These blockers prevent actual controlled implementation:
 | Severity | Finding | Disposition |
 | --- | --- | --- |
 | P0 | None inside current Agent Lab fixture boundary | Closed by hard boundary and boundary tests |
-| P1 | Missing accepted ADR / full-package entry decision / owner review | External blocker; controlled implementation gate blocks progress |
+| P1 | Missing accepted ADR / owner review | External blocker; controlled implementation gate blocks progress |
 | P1 | Missing real-service preservation smoke | External blocker; fixture preservation cannot substitute for integration smoke |
 | P1 | Production operator UX not implemented | External blocker before production operation, not Agent Lab fixture work |
 | P2 | Repo-wide runbook entrypoint length failures in non-Agent docs | Existing unrelated issue; Agent Lab entrypoints pass |

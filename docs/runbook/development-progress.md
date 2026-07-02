@@ -298,6 +298,8 @@ ai/python/tests/test_agent_eval_*.py
 - ADR acceptance review playbook：补齐 L0-L4 准入层级、候选 ADR signoff
   matrix、auto-reject / deferral rules 和 reviewer result template，避免
   完整包被按意图而非证据接受；仍不授权生产实现。
+- Eval / Replay L1 acceptance review：按 playbook 起草第一份候选 ADR 自评包；
+  结论是建议主集成接受该 candidate 进入 L1 ADR review，但生产实现继续 defer。
 - Skeleton completion audit：已把 immutable goal 的 17 个骨架要求映射到当前
   代码、fixture、CLI、tests 和 runbook evidence；结论是 Phase 1 isolated
   Agent-layer skeleton 可作为当前可执行基线，但不能直接推广生产契约。

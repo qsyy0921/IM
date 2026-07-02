@@ -136,8 +136,8 @@ L1 acceptance still does not allow production code until L2 and L3 are complete.
 
 ## Current Package Decision
 
-Recommendation: accept the package for L0 entry and begin L1 review in this
-order:
+Main integration accepted the package for L0 entry into ADR acceptance review.
+It did not approve production implementation. Begin L1 review in this order:
 
 1. Eval / Replay Harness.
 2. Runtime / Workflow Boundary.
@@ -153,7 +153,7 @@ Current P1 inside Agent Lab scope: none known.
 External blockers remain:
 
 - accepted ADRs do not exist yet;
-- main integration full-package entry verdict is pending;
+- individual L1 ADR candidate verdicts are pending;
 - production owner signoff is missing;
 - real-service preservation smoke is missing;
 - production operator UX is missing.

@@ -46,6 +46,9 @@
 - `agent-adr-acceptance-review-playbook-20260702.md`：ADR acceptance review
   playbook，定义 L0-L4 准入层级、候选 ADR signoff matrix、auto-reject /
   deferral rules 和 reviewer result template；不授权生产实现。
+- `agent-eval-replay-l1-acceptance-review-20260702.md`：Eval / Replay
+  candidate 的 L1 acceptance review 自评包，建议进入主集成 ADR review，
+  但继续 defer production implementation。
 - `agent-eval-replay-adr-review-20260702.md`：Eval / Replay ADR candidate
   focused review，补齐 failure-class lifecycle、baseline approval、retention /
   redaction 和 contract-version bump rehearsal。

@@ -2,8 +2,9 @@
 
 Date: 2026-07-02
 
-Status: request package for main integration review. This is not an accepted
-ADR, production contract, schema, migration, service directory or runtime
+Status: request package for main integration review. Main integration later
+accepted L0 entry into ADR acceptance review only. This is not an accepted ADR,
+production contract, schema, migration, service directory or runtime
 implementation.
 
 ## Requested Verdict
@@ -102,6 +103,6 @@ Rationale:
 Remaining blockers are external to Agent Lab:
 
 - accepted ADRs do not exist yet;
-- full-package main integration entry decision is still pending;
+- full-package L0 entry was accepted for ADR review only;
 - owner review and real-service preservation smoke are not complete;
 - production operator UX is not implemented.

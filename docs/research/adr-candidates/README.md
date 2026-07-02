@@ -33,3 +33,21 @@ Shared appendix:
 A candidate can only become an accepted ADR after main integration review. An
 accepted ADR still does not create production schema by itself; it only
 authorizes the next explicitly scoped integration design.
+
+## Review Artifacts
+
+- `../agent-architecture-review-loop-20260702.md`
+
+## Candidate Acceptance Gate
+
+Before a candidate can be recommended for main integration acceptance, the
+review ledger must show:
+
+- no open P0 finding;
+- no open P1 finding inside Agent Lab scope;
+- explicit owner and non-owner state boundaries;
+- contract versioning and replay-reader requirements;
+- cross-service preservation refs for every boundary it touches;
+- operator inspect-and-act path for high-risk states;
+- fixture-only or public-dataset-style evidence, or a recorded blocker;
+- rejection rules that block promotion instead of relying on reviewer intent.

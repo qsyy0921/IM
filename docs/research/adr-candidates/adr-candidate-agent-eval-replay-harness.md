@@ -75,6 +75,64 @@ A candidate release is blocked if:
 - dataset license or snapshot is not reproducible;
 - failure class has no owner.
 
+## Failure-Class Lifecycle
+
+Every failure class used by a release gate must have:
+
+- severity: P0, P1 or P2;
+- owner;
+- first-seen report ref;
+- disposition: block, allow with condition, or backlog;
+- regression fixture requirement;
+- retirement rule.
+
+Unknown failures block promotion until classified. Repeated production
+incidents must become regression fixtures before the next high-risk release.
+
+## Baseline Approval
+
+Baseline refresh is a governed decision, not a test update.
+
+BaselineApproval must record:
+
+- old baseline ref;
+- new baseline ref;
+- changed suites and failure classes;
+- reviewer;
+- reason;
+- blocked promotion reasons that were waived or rejected;
+- rollback ref.
+
+Unreviewed baseline changes block promotion even when aggregate scores improve.
+
+## Retention And Redaction
+
+EvalReport and ReplayBundle retention must use low-sensitive refs by default.
+
+Retention policy must define:
+
+- retention class;
+- redaction policy ref;
+- allowed archive fields;
+- forbidden raw payload fields;
+- replay reader behavior after source expiry;
+- audit owner for deletion or expiry.
+
+Normal replay must not depend on raw prompt text, raw provider bodies, raw IM
+messages, secrets or full external MCP payload archives.
+
+## Contract-Version Bump Rehearsal
+
+Before this ADR can authorize production contract design, the fixture harness
+must demonstrate one version-bump rehearsal:
+
+1. Produce an older EvalReport / ReplayBundle fixture.
+2. Read it with the current replay reader policy.
+3. Verify required refs, hashes, versions and failure class remain explainable.
+4. Verify removed or unsupported fields fail closed with a deprecation or expiry
+   reason.
+5. Verify no raw payload is required for the replay explanation.
+
 ## Rejection Rules
 
 Reject the ADR if it:
@@ -86,7 +144,7 @@ Reject the ADR if it:
 
 ## Next Evidence Needed
 
-- Owner review for failure-class lifecycle.
-- Baseline approval UX.
-- Report retention and redaction policy.
-- One contract-version bump rehearsal using fixture replay artifacts.
+- Main integration owner review for failure-class lifecycle.
+- Admin/release UX owner for baseline approval.
+- Legal/security owner for final retention duration and redaction policy.
+- Fixture implementation of the contract-version bump rehearsal.

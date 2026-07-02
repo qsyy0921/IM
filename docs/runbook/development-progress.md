@@ -45,6 +45,9 @@ Eval Harness / synthetic IM-like fixture 已开始隔离式编码。
 | `docs/research/agent-architecture-gap-closure-20260702.md` | 已完成 | 架构缺口关闭包：ADR candidate map、版本策略、集成 preservation matrix 和生产提升阻断条件 |
 | `docs/research/agent-production-object-model-20260702.md` | 已完成 | Agent 生产级对象模型草案：decision、version、runtime、evidence、memory、tool、workflow、AgentOps、dataset/eval 和 operator UX |
 | `docs/research/adr-candidates/` | 已完成候选起草 | 六个 Agent ADR candidates 加 cross-service versioning / replay / governance appendix；仍不是正式 ADR |
+| `docs/research/agent-architecture-review-loop-20260702.md` | 已完成首轮 | 打回生产推广，补齐 ADR candidate review ledger / acceptance gate 后条件通过 research-level review |
+| `docs/research/agent-eval-replay-adr-review-20260702.md` | 已完成首轮 focused review | Eval / Replay candidate 补齐 failure-class lifecycle、baseline approval、retention/redaction 和 version-bump rehearsal |
+| `docs/research/agent-runtime-workflow-adr-review-20260702.md` | 已完成首轮 focused review | Runtime / Workflow candidate 补齐 checkpoint storage、wakeup dedupe、operator controls 和 BudgetLedger 边界 |
 | `docs/sdd/agent-runtime.md` | 已完成 | Runtime / Harness 详细 SDD |
 | `docs/sdd/agent-memory-admission.md` | 已完成 | Memory admission 详细 SDD |
 | `docs/sdd/agent-context-evidencepack.md` | 已完成 | Context / EvidencePack 详细 SDD |

@@ -34,6 +34,14 @@
   Runtime / Workflow、Context / EvidencePack、Memory Admission、Tool / MCP、
   AgentOps / Governance 六份候选 ADR 和 cross-service versioning / replay /
   governance appendix；仍不是正式 ADR。
+- `agent-architecture-review-loop-20260702.md`：首轮 Agent 架构
+  review-and-closure ledger，记录打回原因、P0/P1/P2 缺口、补齐项和复审结论。
+- `agent-eval-replay-adr-review-20260702.md`：Eval / Replay ADR candidate
+  focused review，补齐 failure-class lifecycle、baseline approval、retention /
+  redaction 和 contract-version bump rehearsal。
+- `agent-runtime-workflow-adr-review-20260702.md`：Runtime / Workflow ADR
+  candidate focused review，补齐 checkpoint storage、wakeup dedupe、operator
+  controls 和 budget ledger 边界。
 
 ## 存放位置
 

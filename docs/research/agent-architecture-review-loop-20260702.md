@@ -1,0 +1,122 @@
+# Agent Architecture Review Loop
+
+Date: 2026-07-02
+
+Status: first review-and-closure pass for Agent ADR candidates. This is not an
+accepted ADR, production contract, service directory, schema or runtime
+implementation.
+
+## Verdict
+
+Initial review verdict: rejected for production promotion.
+
+Reason: the Agent plane has the right major components, object model and ADR
+candidates, but the candidate package did not yet contain a reusable pass/fail
+review ledger. Without that ledger, future review could accept a candidate by
+reading intent instead of checking evidence.
+
+After this pass: conditionally passed for research-level ADR-candidate review.
+
+This does not mean the overall architecture goal is complete. Full completion
+still requires main integration review, accepted ADRs and later explicitly
+scoped integration design. Agent Lab remains backend-isolated.
+
+## Evidence Read
+
+- `prompt.md`
+- `agent.md`
+- `docs/runbook/current-goal.md`
+- `docs/runbook/current-brief.md`
+- `docs/runbook/remaining-goals.md`
+- `docs/research/agent-architecture-gap-closure-20260702.md`
+- `docs/research/agent-production-object-model-20260702.md`
+- `docs/research/adr-candidates/`
+- `docs/sdd/agent-runtime.md`
+- `docs/sdd/agent-eval-replay-harness.md`
+- `docs/sdd/agent-memory-admission.md`
+- `docs/sdd/agent-context-evidencepack.md`
+- `docs/sdd/agent-tool-mcp-boundary.md`
+- `docs/sdd/agent-governance-agentops.md`
+
+## Review Findings Before Fix
+
+| Severity | Finding | Impact | Fix In This Pass |
+| --- | --- | --- | --- |
+| P0 | None found inside current research boundary | No immediate production-safety contradiction found because production integration is still blocked | Keep hard boundary unchanged |
+| P1 | ADR candidates lacked one shared review ledger and candidate-acceptance gate | Review could become subjective and skip owner/version/replay/operator/eval proof | Added shared review ledger requirements and acceptance gates |
+| P1 | Eval/Replay and Runtime/Workflow were prioritized but not tied to a reusable review sequence | Later candidates could be reviewed before the platform gate and long-running ownership boundary are stable | Recorded required review order and gate dependencies |
+| P1 | Cross-service preservation matrix existed but did not define the minimum proof ladder before integration design | Real-service integration could start before refs, versions, taint and audit lineage are proven to survive boundaries | Added fixture-only verification ladder and preservation gate |
+| P1 | Operator governance existed as objects, but acceptance did not require inspect-and-act UX evidence | AgentOps could become a release label without practical control | Added operator acceptance gate for memory, evidence, replay, approval, release, failure, kill switch and rollback |
+| P2 | Capacity, cost, retention and latency budgets remain conceptual | Does not block research-level ADR review, but will block production readiness | Keep as next hardening item after first ADR review |
+
+## Updated Candidate Acceptance Gates
+
+An ADR candidate can only be recommended for main integration acceptance when it
+has all of the following:
+
+1. Ownership: owner, non-owner and state boundary are explicit.
+2. Lifecycle: object states or run states are named at concept level.
+3. Versioning: contract version, compatibility window and replay reader policy
+   are required before any future production contract.
+4. Replay: normal replay works from low-sensitive refs, hashes, versions and
+   lineage, not raw prompts or raw provider payloads.
+5. Preservation: boundary refs for source, memory, tool, workflow, action and
+   audit are listed and cannot be silently dropped.
+6. Eval evidence: fixture-only or public-dataset-style proof exists, or the gap
+   is marked as a blocker.
+7. Operator governance: authorized operators have a future inspect-and-act path
+   for the affected object.
+8. Rejection rules: P0/P1 failure classes block promotion.
+9. Review ledger: open P0/P1 findings are either closed or explicitly rejected
+   from scope by the hard Agent Lab boundary.
+
+## Requirement Review Matrix
+
+| Required Area | Current Evidence | Review Result |
+| --- | --- | --- |
+| Agent Runtime / Harness | SDD plus Runtime/Workflow ADR candidate | Conditionally passes candidate review; checkpoint owner and wakeup proof remain future evidence |
+| Eval / Replay Harness | SDD plus Eval/Replay ADR candidate | Conditionally passes candidate review; first accepted ADR should be this gate |
+| Context / EvidencePack / RAG | SDD plus Context/EvidencePack ADR candidate | Conditionally passes; body schema remains unfrozen |
+| Memory admission | SDD plus Memory Admission ADR candidate | Conditionally passes; ACTIVE memory remains Go-owned |
+| Tool / MCP boundary | SDD plus Tool/MCP ADR candidate | Conditionally passes; provider trust remains untrusted by default |
+| Workflow / approval | Runtime/Workflow candidate plus workflow ownership matrix | Conditionally passes; workflow cannot read planner internals |
+| Action executor handoff | Object model and preservation appendix | Conditionally passes; executor remains sole side-effect owner |
+| AgentOps / governance | SDD plus AgentOps candidate | Conditionally passes; operator UX is a promotion prerequisite |
+| Contract versioning | Production object model plus shared appendix | Conditionally passes; version-bump rehearsal still needed |
+| Cross-service ref preservation | Shared appendix | Conditionally passes; integration smoke is required before production design |
+| Security / privacy / audit | SDD rejection rules plus appendix | Conditionally passes; raw prompt/provider replay remains rejected |
+| Open dataset / synthetic eval | Eval SDD and current Python fixture harness | Passes Phase 1 boundary; not a production release gate yet |
+
+## Re-Review Result
+
+After adding the review ledger requirement, the current package has no known P0
+inside Agent Lab scope and no unresolved P1 that can be closed without main
+integration review or prohibited production integration.
+
+The architecture is therefore conditionally ready for main integration review of
+the first two ADR candidates:
+
+1. Agent Eval / Replay Harness.
+2. Agent Runtime / Workflow Boundary.
+
+Do not mark the overall goal complete yet. The following blockers remain
+outside this isolated pass:
+
+- no accepted ADR exists yet;
+- main integration has not reviewed this pass;
+- no real-service preservation smoke has been approved;
+- no production operator UX has been implemented;
+- no production schema or runtime contract is authorized.
+
+## Next Review Loop
+
+Next loop should start from the Eval/Replay candidate and verify:
+
+- release-gate semantics are sufficient;
+- P0/P1 failure classes block promotion;
+- version-bump replay rehearsal is defined;
+- report retention and redaction policy are acceptable;
+- baseline approval UX has an owner.
+
+If any P0/P1 is found, update the candidate and rerun this review loop before
+moving to Runtime/Workflow.

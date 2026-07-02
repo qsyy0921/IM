@@ -68,6 +68,47 @@ Replay readers must be able to explain:
 Promotion is rejected if a boundary drops a required ref even when the happy path
 answer is correct.
 
+## ADR Candidate Review Ledger
+
+Each review round must record:
+
+- verdict: pass, conditional pass or rejected;
+- reviewed files;
+- P0/P1/P2 findings;
+- owner for every open P0/P1;
+- disposition: closed, deferred by hard boundary or still blocking;
+- changed files;
+- validation commands;
+- next review target.
+
+A candidate cannot be recommended for main integration acceptance while it has
+an open P0 or P1 finding inside Agent Lab scope.
+
+## Fixture-Only Verification Ladder
+
+Before any production integration design, evidence must progress in this order:
+
+1. Document ledger proves ownership, versioning, replay and rejection rules.
+2. Fixture replay proves required refs survive one contract-version bump.
+3. Fixture preservation proof shows refs, scope, version, taint and audit
+   lineage across retrieval, memory, MCP, workflow, executor and audit lanes.
+4. Main integration review explicitly approves a real-service integration
+   design.
+
+Skipping a rung rejects promotion.
+
+## Operator Acceptance Gate
+
+High-risk Agent releases are not promotable unless an authorized operator can
+inspect and act on:
+
+- memory candidate and ACTIVE memory state;
+- evidence, citations, denied lanes and taint labels;
+- replay bundle and failure class;
+- approval, execution and state-diff refs;
+- release channel, baseline and canary result;
+- kill switch, rollback and disabled state.
+
 ## Governance Requirements
 
 Every production Agent release must have:

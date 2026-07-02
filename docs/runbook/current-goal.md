@@ -596,6 +596,18 @@ Hot group pressure step-up and bottleneck curve：在 clean commit Docker redepl
   `NEXUSIM_POLICY_PG_MAX_CONNS` 会降低 acquire wait counter，但不提升吞吐，反而把压力推向
   PostgreSQL / audit / delivery projection。报告见
   `docs/runbook/loadtest/hotgroup/hotgroup-policy-hotpath-experiment-20260701.md`。
+- 2026-07-02 Backend Lab 继续完成 policy facts / runtime profile 瓶颈排查：
+  policy 多阶段读取已合并为一次 facts read，最终 p99 约 `16-34ms`，不再是主瓶颈；
+  Ubuntu runtime 发现 message-service 未设置 `NEXUSIM_PG_MAX_CONNS`，实际 pgx pool
+  为 `72`，已同步本地 loadtest compose 并重建为 `192`，PostgreSQL loadtest profile
+  也已启用 `shared_buffers=1GB`、`max_wal_size=4GB`、`checkpoint_timeout=15min`。
+  修正后 message pool acquire recent p99 从约 `252.653ms` 降到 `5-22ms`，但压力转移到
+  共享 PostgreSQL 写路径：`policy_decision_audit_outbox` p99 约 `265-289ms`，
+  audit pool empty acquire 仍高，且 audit64 诊断会导致 message outbox / delivery
+  projection 尾部追赶失败。当前结论：不要继续盲目加 PG pool，下一步应拆分 policy audit
+  acquire / insert 指标，并补齐 message / delivery outbox relay metrics，再评估 audit
+  outbox 分区、索引收敛、payload 缩减或独立 audit PG。报告见
+  `docs/runbook/loadtest/hotgroup/hotgroup-analysis-20260702-runtime-profile-bottleneck.md`。
 - HYBRID 诊断档位 1000 人 / 1000 消息 / 400 msg/s 暴露 `delivery_outbox` ready query
   在百万级 per-user outbox 下退化：旧 anti-join blocker 查询每批 500 行约 24s。当前
   delivery outbox relay 已改成 per-conversation frontier ready query，并把本地 worker

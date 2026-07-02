@@ -146,8 +146,9 @@ It did not approve production implementation. Begin L1 review in this order:
 5. Tool / MCP Boundary.
 6. AgentOps / Governance.
 
-Eval / Replay Harness has been accepted for L1 ADR acceptance by main
-integration. Runtime / Workflow Boundary is the next L1 candidate under review.
+Eval / Replay Harness and Runtime / Workflow Boundary have been accepted for L1
+ADR acceptance by main integration. Context / EvidencePack is the next L1
+candidate under review.
 
 Current P0 inside Agent Lab scope: none known.
 

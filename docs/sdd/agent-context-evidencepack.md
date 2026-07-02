@@ -317,6 +317,9 @@ Implemented checks:
   when public RAG adapter samples require them;
 - denied-lane audit refs must be recorded without exposing denied source refs;
 - taint vocabulary refs must align with provider / tool / peer-agent labels;
+- context preservation rehearsal proves visibility expiry, denied-lane
+  retention, cross-service source-ref preservation, citation verifier blocking,
+  taint preservation, operator inspection redaction and audit-lineage retention;
 - trace metadata includes low-sensitive refs only.
 
 Remaining production hardening:

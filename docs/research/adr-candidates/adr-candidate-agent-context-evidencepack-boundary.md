@@ -136,5 +136,7 @@ Reject the ADR if:
 - Main integration owner review for retrieval-gateway source visibility.
 - Product / security review for denied-lane reporting semantics.
 - Fixture proof for visibility expiry, denied-lane retention and citation
-  verifier blocking.
+  verifier blocking now exists in
+  `docs/research/agent-context-evidence-fixture-evidence-20260702.md`;
+  production integration remains blocked.
 - Operator UX owner for evidence, citation, denied-lane and taint inspection.

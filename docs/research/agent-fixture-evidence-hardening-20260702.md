@@ -58,6 +58,7 @@ It does not close:
 Runtime / Workflow fixture evidence is now recorded in
 `docs/research/agent-runtime-workflow-fixture-evidence-20260702.md`.
 
-Remaining fixture-only targets are Context denied-lane retention, Memory
-revocation/category threshold, Tool prepare-expiry re-prepare and AgentOps
-release-blocking proof.
+Context evidence is now recorded in
+`docs/research/agent-context-evidence-fixture-evidence-20260702.md`. Remaining
+fixture-only targets are Memory revocation/category threshold, Tool
+prepare-expiry re-prepare and AgentOps release-blocking proof.

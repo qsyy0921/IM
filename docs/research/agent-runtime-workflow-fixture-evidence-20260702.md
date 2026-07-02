@@ -67,7 +67,6 @@ It does not close:
 
 Next fixture-only evidence should focus on one of:
 
-- Context denied-lane retention and cross-service source-ref preservation;
 - Memory revocation and category-threshold proof;
 - Tool prepare-expiry re-prepare proof;
 - AgentOps release-blocking and kill-switch proof.

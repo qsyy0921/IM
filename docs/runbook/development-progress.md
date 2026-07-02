@@ -213,6 +213,9 @@ ai/python/tests/test_agent_eval_*.py
 - Runtime / Workflow ownership rehearsal：已补 duplicate workflow wakeup dedupe、
   stale checkpoint rejection、resume correlation、cancel-state checks、
   operator control refs、BudgetLedger fail-closed 和 no side-effect replay/resume。
+- Context / Evidence preservation rehearsal：已补 denied-lane retention、
+  visibility expiry、cross-service source-ref preservation、citation verifier
+  blocking、taint preservation、operator inspect redaction 和 audit-lineage refs。
 - Skeleton completion audit：已把 immutable goal 的 17 个骨架要求映射到当前
   代码、fixture、CLI、tests 和 runbook evidence；结论是 Phase 1 isolated
   Agent-layer skeleton 可作为当前可执行基线，但不能直接推广生产契约。

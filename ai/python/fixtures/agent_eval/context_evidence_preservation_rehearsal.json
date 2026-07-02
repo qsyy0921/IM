@@ -1,0 +1,234 @@
+{
+  "schema_version": 1,
+  "rehearsal_kind": "agent_context_evidence_preservation_rehearsal",
+  "rehearsal_id": "context-evidence-preservation-rehearsal-v1",
+  "source_visibility_records": [
+    {
+      "source_ref": "source:project-alpha:decision-7",
+      "lane_ref": "lane:project",
+      "visibility_status": "VISIBLE",
+      "source_visibility_version_ref": "source-visibility:project-alpha:v3",
+      "permission_decision_ref": "permission:project-alpha:allow:v3",
+      "temporal_window_ref": "temporal-window:project-alpha:current",
+      "redaction_policy_ref": "redaction-policy:evidence-low-sensitive:v1",
+      "audit_ref": "audit:evidence:project-alpha:decision-7",
+      "coverage_gap_ref": "",
+      "selected_into_context": true,
+      "body_exposed": false
+    },
+    {
+      "source_ref": "source:tenant-b:project-secret:decision-9",
+      "lane_ref": "lane:cross-tenant-project",
+      "visibility_status": "DENIED",
+      "source_visibility_version_ref": "source-visibility:tenant-b:v1",
+      "permission_decision_ref": "permission:tenant-b:deny:v1",
+      "temporal_window_ref": "temporal-window:tenant-b:unknown",
+      "redaction_policy_ref": "redaction-policy:denied-lane:v1",
+      "audit_ref": "audit:evidence:denied:tenant-b-project",
+      "coverage_gap_ref": "coverage-gap:cross-tenant-project-denied",
+      "selected_into_context": false,
+      "body_exposed": false
+    },
+    {
+      "source_ref": "source:archive:decision-legacy-v1",
+      "lane_ref": "lane:archive",
+      "visibility_status": "EXPIRED",
+      "source_visibility_version_ref": "source-visibility:archive:v1",
+      "permission_decision_ref": "permission:archive:expired-window",
+      "temporal_window_ref": "temporal-window:archive:expired",
+      "redaction_policy_ref": "redaction-policy:expired-source:v1",
+      "audit_ref": "audit:evidence:expired:archive-decision",
+      "coverage_gap_ref": "coverage-gap:archive-expired",
+      "selected_into_context": false,
+      "body_exposed": false
+    }
+  ],
+  "denied_lane_records": [
+    {
+      "lane_ref": "lane:cross-tenant-project",
+      "denied_source_refs": ["source:tenant-b:project-secret:decision-9"],
+      "reported_denied_source_refs": ["source:tenant-b:project-secret:decision-9"],
+      "retained_denied_lane_refs": ["source:tenant-b:project-secret:decision-9"],
+      "selected_context_refs": ["source:project-alpha:decision-7"],
+      "permission_decision_ref": "permission:tenant-b:deny:v1",
+      "redaction_policy_ref": "redaction-policy:denied-lane:v1",
+      "retention_policy_ref": "retention-policy:denied-lane-low-sensitive:v1",
+      "operator_report_ref": "evidence-inspect:denied-lane:cross-tenant-project",
+      "audit_ref": "audit:evidence:denied:tenant-b-project",
+      "body_exposed": false
+    }
+  ],
+  "boundary_preservation_records": [
+    {
+      "boundary_ref": "boundary:retrieval-gateway-to-runtime",
+      "from_owner": "retrieval-gateway",
+      "to_owner": "Agent Runtime",
+      "expected_preserved_refs": [
+        "evidence-pack:project-alpha:v3",
+        "source:project-alpha:decision-7",
+        "source-visibility:project-alpha:v3",
+        "coverage-gap:cross-tenant-project-denied",
+        "permission:tenant-b:deny:v1",
+        "redaction-policy:denied-lane:v1"
+      ],
+      "actual_preserved_refs": [
+        "evidence-pack:project-alpha:v3",
+        "source:project-alpha:decision-7",
+        "source-visibility:project-alpha:v3",
+        "coverage-gap:cross-tenant-project-denied",
+        "permission:tenant-b:deny:v1",
+        "redaction-policy:denied-lane:v1"
+      ],
+      "expected_taint_label_refs": ["taint-vocabulary:context:v2"],
+      "actual_taint_label_refs": ["taint-vocabulary:context:v2"],
+      "scope_ref": "scope:tenant-a:project-alpha",
+      "version_ref": "evidence-boundary-version:v1",
+      "audit_lineage_ref": "audit-lineage:retrieval-to-runtime",
+      "replay_reader_policy_ref": "replay-reader-policy:low-sensitive:v1",
+      "scope_widened": false,
+      "version_downgraded": false,
+      "audit_lineage_missing": false,
+      "body_exposed": false
+    },
+    {
+      "boundary_ref": "boundary:mcp-gateway-to-runtime",
+      "from_owner": "mcp-gateway",
+      "to_owner": "Agent Runtime",
+      "expected_preserved_refs": [
+        "tool-output:mcp-reader:summary",
+        "tool-prepare:mcp-reader:dry-run",
+        "provenance:mcp-reader:attested"
+      ],
+      "actual_preserved_refs": [
+        "tool-output:mcp-reader:summary",
+        "tool-prepare:mcp-reader:dry-run",
+        "provenance:mcp-reader:attested"
+      ],
+      "expected_taint_label_refs": [
+        "taint:tool-output:untrusted",
+        "taint-vocabulary:context:v2"
+      ],
+      "actual_taint_label_refs": [
+        "taint:tool-output:untrusted",
+        "taint-vocabulary:context:v2"
+      ],
+      "scope_ref": "scope:tenant-a:project-alpha",
+      "version_ref": "mcp-context-boundary-version:v1",
+      "audit_lineage_ref": "audit-lineage:mcp-to-runtime",
+      "replay_reader_policy_ref": "replay-reader-policy:low-sensitive:v1",
+      "scope_widened": false,
+      "version_downgraded": false,
+      "audit_lineage_missing": false,
+      "body_exposed": false
+    },
+    {
+      "boundary_ref": "boundary:runtime-to-rag-verifier",
+      "from_owner": "Agent Runtime",
+      "to_owner": "rag-service",
+      "expected_preserved_refs": [
+        "context-package:project-alpha:v3",
+        "citation-map:project-alpha:decision-7",
+        "source:project-alpha:decision-7",
+        "coverage-gap:cross-tenant-project-denied"
+      ],
+      "actual_preserved_refs": [
+        "context-package:project-alpha:v3",
+        "citation-map:project-alpha:decision-7",
+        "source:project-alpha:decision-7",
+        "coverage-gap:cross-tenant-project-denied"
+      ],
+      "expected_taint_label_refs": ["taint-vocabulary:context:v2"],
+      "actual_taint_label_refs": ["taint-vocabulary:context:v2"],
+      "scope_ref": "scope:tenant-a:project-alpha",
+      "version_ref": "rag-verifier-boundary-version:v1",
+      "audit_lineage_ref": "audit-lineage:runtime-to-rag-verifier",
+      "replay_reader_policy_ref": "replay-reader-policy:low-sensitive:v1",
+      "scope_widened": false,
+      "version_downgraded": false,
+      "audit_lineage_missing": false,
+      "body_exposed": false
+    }
+  ],
+  "citation_verifier_records": [
+    {
+      "verifier_result_ref": "citation-verifier:project-alpha:decision-7:supported",
+      "verifier_status": "SUPPORTED",
+      "finalization_status": "FINALIZED",
+      "claim_refs": ["claim:project-alpha:decision-7"],
+      "source_refs": ["source:project-alpha:decision-7"],
+      "citation_map_refs": ["citation-map:project-alpha:decision-7"],
+      "verifier_version_ref": "citation-verifier-version:v2",
+      "audit_ref": "audit:rag-verifier:project-alpha:decision-7"
+    },
+    {
+      "verifier_result_ref": "citation-verifier:cross-tenant:denied",
+      "verifier_status": "DENIED",
+      "finalization_status": "ABSTAINED",
+      "claim_refs": ["claim:cross-tenant:missing-project-decision"],
+      "source_refs": ["source:tenant-b:project-secret:decision-9"],
+      "citation_map_refs": ["citation-map:cross-tenant:denied"],
+      "verifier_version_ref": "citation-verifier-version:v2",
+      "audit_ref": "audit:rag-verifier:cross-tenant-denied"
+    }
+  ],
+  "taint_preservation_records": [
+    {
+      "tainted_ref": "tool-output:mcp-reader:summary",
+      "expected_taint_label_refs": [
+        "taint:tool-output:untrusted",
+        "taint:instruction-risk:quoted-only"
+      ],
+      "actual_taint_label_refs": [
+        "taint:tool-output:untrusted",
+        "taint:instruction-risk:quoted-only"
+      ],
+      "taint_vocabulary_ref": "taint-vocabulary:context:v2",
+      "source_lane_ref": "lane:tool-output",
+      "reuse_policy_ref": "reuse-policy:tainted-tool-output:quote-only",
+      "audit_ref": "audit:taint:tool-output",
+      "used_as_instruction": false,
+      "admitted_as_active_memory": false,
+      "authorized_reuse": true
+    },
+    {
+      "tainted_ref": "peer-agent:analyst:summary",
+      "expected_taint_label_refs": [
+        "taint:peer-agent:untrusted-candidate",
+        "taint:instruction-risk:quoted-only"
+      ],
+      "actual_taint_label_refs": [
+        "taint:peer-agent:untrusted-candidate",
+        "taint:instruction-risk:quoted-only"
+      ],
+      "taint_vocabulary_ref": "taint-vocabulary:context:v2",
+      "source_lane_ref": "lane:peer-agent-output",
+      "reuse_policy_ref": "reuse-policy:peer-agent-output:verify-before-use",
+      "audit_ref": "audit:taint:peer-agent",
+      "used_as_instruction": false,
+      "admitted_as_active_memory": false,
+      "authorized_reuse": true
+    }
+  ],
+  "operator_inspect_records": [
+    {
+      "inspect_ref": "evidence-inspect:project-alpha:incident-1",
+      "visible_refs": [
+        "evidence-pack:project-alpha:v3",
+        "context-package:project-alpha:v3",
+        "source:project-alpha:decision-7",
+        "citation-map:project-alpha:decision-7",
+        "citation-verifier:project-alpha:decision-7:supported",
+        "taint-vocabulary:context:v2"
+      ],
+      "denied_lane_refs": [
+        "lane:cross-tenant-project",
+        "coverage-gap:cross-tenant-project-denied",
+        "permission:tenant-b:deny:v1"
+      ],
+      "redaction_policy_ref": "redaction-policy:evidence-inspect-low-sensitive:v1",
+      "replay_reader_policy_ref": "replay-reader-policy:low-sensitive:v1",
+      "audit_ref": "audit:evidence-inspect:project-alpha:incident-1",
+      "body_exposed": false
+    }
+  ]
+}

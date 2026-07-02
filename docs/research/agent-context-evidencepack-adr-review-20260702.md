@@ -50,9 +50,22 @@ review.
 
 - Main integration must accept the retrieval-gateway and product UX ownership
   split.
-- Later fixture hardening can add visibility expiry and denied-lane retention
-  cases, but real-service integration remains blocked.
+- Fixture code now proves visibility expiry, denied-lane retention,
+  cross-service source-ref preservation, citation verifier blocking and taint
+  preservation in `ai/python/nexusim_ai_eval/context_evidence_preservation.py`
+  and
+  `ai/python/fixtures/agent_eval/context_evidence_preservation_rehearsal.json`.
+- Real-service integration remains blocked until retrieval-gateway, product /
+  security and operator UX owners accept the mapping.
 - Production EvidencePack and ContextPackage field names remain out of scope.
+
+## Fixture Evidence Update
+
+`docs/research/agent-context-evidence-fixture-evidence-20260702.md` records the
+fixture-only preservation rehearsal. It proves low-sensitive source visibility,
+denied-lane, citation verifier, taint, scope/version and audit refs survive
+retrieval, Runtime, RAG, MCP and operator-inspection boundaries without exposing
+hidden source bodies.
 
 ## Next Review Target
 

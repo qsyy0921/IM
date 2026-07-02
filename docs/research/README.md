@@ -59,6 +59,9 @@
 - `agent-runtime-workflow-fixture-evidence-20260702.md`：fixture-only evidence
   更新，记录 Runtime / Workflow ownership rehearsal 的 wakeup dedupe、stale
   checkpoint、resume/cancel、operator control 和 BudgetLedger 证据。
+- `agent-context-evidence-fixture-evidence-20260702.md`：fixture-only evidence
+  更新，记录 Context / EvidencePack preservation rehearsal 的 denied-lane、
+  source-ref、citation verifier、taint 和 operator inspect 证据。
 
 ## 存放位置
 

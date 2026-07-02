@@ -30,8 +30,7 @@ runbook / SDD / research 文档维护。
 - Context / EvidencePack review：`docs/research/agent-context-evidencepack-adr-review-20260702.md`。
 - Memory / Tool / AgentOps reviews：`docs/research/agent-memory-admission-adr-review-20260702.md`、
   `docs/research/agent-tool-mcp-adr-review-20260702.md`、`docs/research/agentops-governance-adr-review-20260702.md`。
-- Fixture evidence：`docs/research/agent-fixture-evidence-hardening-20260702.md`、
-  `docs/research/agent-runtime-workflow-fixture-evidence-20260702.md`。
+- Fixture evidence：`docs/research/agent-*-fixture-evidence-20260702.md`。
 - 详细 SDD：`docs/sdd/agent-runtime.md`、`agent-memory-admission.md`、
   `agent-context-evidencepack.md`、`agent-tool-mcp-boundary.md`、
   `agent-eval-replay-harness.md`、`agent-governance-agentops.md`。
@@ -72,7 +71,7 @@ runbook / SDD / research 文档维护。
 ## 后续优先级
 
 1. 六个 ADR candidates 已完成首轮 focused review；未接受前不提升生产契约。
-2. Eval / Replay 和 Runtime / Workflow fixture evidence 已落地；若继续编码，
-   优先 Context denied-lane retention、Memory revocation/category threshold、
-   Tool prepare-expiry 或 AgentOps release-blocking 证据。
+2. Eval / Replay、Runtime / Workflow、Context / Evidence fixture evidence 已落地；
+   若继续编码，优先 Memory revocation/category threshold、Tool prepare-expiry
+   或 AgentOps release-blocking 证据。
 3. 其次 memory calibration export reproducibility。

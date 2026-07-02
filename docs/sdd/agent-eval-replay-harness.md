@@ -444,6 +444,7 @@ ai/python/nexusim_ai_eval/
   adapters.py
   adapter_runner.py
   comparison.py
+  context_evidence_preservation.py
   contracts.py
   evaluator.py
   fixtures.py
@@ -453,6 +454,7 @@ ai/python/nexusim_ai_eval/
   trace.py
 ai/python/fixtures/agent_eval/adapter_samples/
 ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json
+ai/python/fixtures/agent_eval/context_evidence_preservation_rehearsal.json
 ai/python/fixtures/agent_eval/replay_version_bump_rehearsal.json
 ai/python/fixtures/agent_eval/runtime_workflow_ownership_rehearsal.json
 ai/python/fixtures/agent_eval/synthetic_first_trio.json
@@ -480,6 +482,7 @@ ai/python/scripts/run_agent_eval_report_matrix.py
 ai/python/scripts/run_agent_memory_calibration.py
 ai/python/scripts/run_agent_dataset_adapter.py
 ai/python/scripts/run_agent_eval_regression.py
+ai/python/tests/test_agent_eval_context_evidence_preservation.py
 ai/python/tests/test_agent_eval_contracts.py
 ai/python/tests/test_agent_eval_evaluator.py
 ai/python/tests/test_agent_eval_integration.py
@@ -536,6 +539,10 @@ Implemented checks:
   stale checkpoint rejection, resume correlation, cancel-state checks,
   low-sensitive operator controls, BudgetLedger fail-closed behavior and no
   side-effect re-execution during replay or resume.
+- Context / EvidencePack preservation rehearsal coverage for denied-lane
+  retention, visibility expiry, cross-service source-ref preservation, citation
+  verifier blocking, taint preservation, operator inspection redaction and
+  audit-lineage refs.
 - MCP security fixture coverage for poisoned tool descriptions, unsafe MCP
   output instructions, provider provenance mismatch and sandbox-only providers.
 - MCP security hardening coverage for tool argument schema mismatch,
@@ -605,6 +612,7 @@ python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval
 python ai/python/scripts/run_agent_eval_fixture.py ai/python/fixtures/agent_eval/synthetic_replay_observability_scenarios.json
 python -m pytest ai/python/tests/test_agent_eval_replay_compatibility.py -q
 python -m pytest ai/python/tests/test_agent_eval_runtime_workflow_ownership.py -q
+python -m pytest ai/python/tests/test_agent_eval_context_evidence_preservation.py -q
 python ai/python/scripts/run_agent_eval_current_report.py ai/python/fixtures/agent_eval/synthetic_core_scenarios.json --report-out .tmp-agent-current-report.json --baseline ai/python/fixtures/agent_eval/baselines/synthetic_core_scenarios_baseline.json --review-out .tmp-agent-baseline-review.json --force
 python ai/python/scripts/run_agent_eval_report_matrix.py ai/python/fixtures/agent_eval/report_matrix_sample.json --matrix-out .tmp-agent-eval-matrix/matrix.json --approval-manifest-out .tmp-agent-eval-matrix/approval-manifest.json --force
 python ai/python/scripts/run_agent_memory_calibration.py ai/python/fixtures/agent_eval/memory_calibration_sample.json --report-out .tmp-agent-memory-calibration-report.json --force

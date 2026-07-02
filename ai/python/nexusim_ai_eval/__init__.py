@@ -9,6 +9,10 @@ from nexusim_ai_eval.adapters import (
 )
 from nexusim_ai_eval.adapter_runner import convert_adapter_payload, run_adapter_payload
 from nexusim_ai_eval.comparison import compare_eval_reports
+from nexusim_ai_eval.context_evidence_preservation import (
+    load_context_evidence_preservation_rehearsal,
+    rehearse_context_evidence_preservation,
+)
 from nexusim_ai_eval.contracts import (
     EvalCase,
     EvalRun,
@@ -67,11 +71,13 @@ __all__ = [
     "compare_eval_reports",
     "convert_adapter_payload",
     "generate_current_report_payload",
+    "load_context_evidence_preservation_rehearsal",
     "load_report_matrix_plan",
     "load_memory_calibration_payload",
     "load_replay_version_bump_rehearsal",
     "load_runtime_workflow_ownership_rehearsal",
     "run_eval_suite",
+    "rehearse_context_evidence_preservation",
     "rehearse_replay_version_bump",
     "rehearse_runtime_workflow_ownership",
     "run_memory_admission_calibration",

@@ -864,15 +864,19 @@ func runGRPC() error {
 		)
 		evaluator = postgresEvaluator
 		toolEvaluator = postgresinfra.NewToolPolicyEvaluator(pool, toolPolicy)
-		useCaseOptions = append(useCaseOptions, app.WithPolicyDecisionAuditor(postgresinfra.NewDecisionAuditOutbox(
+		messageAuditor, closeMessageAuditor, err := policyDecisionAuditorFromEnv(
 			auditPool,
-			postgresinfra.WithDecisionAuditStageObserver(decisionMetrics),
-		)))
+			decisionMetrics,
+		)
+		if err != nil {
+			return err
+		}
+		defer closeMessageAuditor()
+		useCaseOptions = append(useCaseOptions, app.WithPolicyDecisionAuditor(messageAuditor))
 		toolUseCaseOptions = append(toolUseCaseOptions, app.WithToolDecisionAuditor(postgresinfra.NewToolDecisionAudit(auditPool)))
 		useCaseOptions = append(useCaseOptions, app.WithMessageOwnershipOverrideChecker(postgresEvaluator))
 		log.Println("policy-service message action rule store enabled")
 		log.Println("policy-service tool action rule store enabled")
-		log.Println("policy-service decision audit outbox enabled with isolated postgres pool")
 		log.Println("policy-service tool decision audit enabled with isolated postgres pool")
 	}
 	moderator, moderationEnabled, err := policyContentModeratorFromEnv()

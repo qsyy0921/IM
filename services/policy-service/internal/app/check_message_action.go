@@ -37,6 +37,10 @@ type PolicyDecisionStageObserver interface {
 	RecordPolicyDecisionStage(action types.MessageAction, stage string, failed bool, latencyMS int64)
 }
 
+type PolicyDecisionAuditStageNamer interface {
+	PolicyDecisionAuditStageName() string
+}
+
 type CheckMessageActionUseCase struct {
 	evaluator        MessagePolicyEvaluator
 	auditor          PolicyDecisionAuditor
@@ -137,7 +141,13 @@ func (u CheckMessageActionUseCase) recordPolicyDecisionAudit(
 	started := time.Now()
 	err := u.auditor.RecordPolicyDecision(ctx, command, decision)
 	if stageObserver, ok := u.observer.(PolicyDecisionStageObserver); ok {
-		stageObserver.RecordPolicyDecisionStage(command.Action, "decision_audit_outbox", err != nil, time.Since(started).Milliseconds())
+		stage := "decision_audit_outbox"
+		if namer, ok := u.auditor.(PolicyDecisionAuditStageNamer); ok {
+			if namedStage := namer.PolicyDecisionAuditStageName(); namedStage != "" {
+				stage = namedStage
+			}
+		}
+		stageObserver.RecordPolicyDecisionStage(command.Action, stage, err != nil, time.Since(started).Milliseconds())
 	}
 	return err
 }

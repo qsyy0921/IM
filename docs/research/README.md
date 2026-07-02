@@ -52,6 +52,10 @@
 - `agent-eval-replay-l2-scoped-implementation-design-20260702.md`：Eval /
   Replay promotion gate 的第一份 L2 scoped implementation design；只定义 owner、
   L3 smoke、operator / audit / replay gates，不授权生产实现。
+- `agent-runtime-workflow-l2-scoped-implementation-design-20260702.md`：Runtime /
+  Workflow boundary 的第二份 L2 scoped implementation design；只定义
+  cognitive runtime、durable workflow wait、checkpoint / wakeup、operator /
+  audit gates 和 L3 smoke，不授权生产实现。
 - `agent-eval-replay-l1-acceptance-review-20260702.md`：Eval / Replay
   candidate 的 L1 acceptance review 自评包，建议进入主集成 ADR review，
   但继续 defer production implementation。

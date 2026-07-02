@@ -28,7 +28,7 @@
    `docs/research/agent-context-evidencepack-adr-review-20260702.md`，Memory /
    Tool / AgentOps focused reviews 也已补齐。Full package 已进入 ADR review；
    六个 Agent ADR candidates 和 L1 closure 已被主集成接受为 reviewability only；
-   Eval / Replay L2 已被主集成接受为 review material；Runtime / Workflow L2 已起草。
+   Eval / Replay 和 Runtime / Workflow L2 已被主集成接受为 review material；Context / EvidencePack L2 已起草。
 3. Fixture-only evidence hardening：Eval / Replay、Runtime / Workflow、Context /
    Evidence、Memory、Tool、AgentOps、dataset reproducibility、cross-service
    preservation、multi-agent handoff、object completeness 和 operator
@@ -37,7 +37,7 @@
    下一步优先主集成 review 或 focused review-requested hardening。
    Controlled implementation entry audit 已确认 Agent Lab 内部证据条件通过，
    但实际受控实现仍需 accepted ADR、owner review 和 real-service smoke。
-   六候选 L1 package 已闭环到 reviewability only；下一步优先两份 L2 owner
+   六候选 L1 package 已闭环到 reviewability only；下一步优先三份 L2 owner
    review、下一 scoped design 或 owner-requested hardening。
 4. ReplayBundle observability hardening review：当前 skeleton 已覆盖低敏
    observability refs、hash refs、version metadata refs、failure taxonomy refs 和

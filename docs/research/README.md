@@ -56,6 +56,10 @@
   Workflow boundary 的第二份 L2 scoped implementation design；只定义
   cognitive runtime、durable workflow wait、checkpoint / wakeup、operator /
   audit gates 和 L3 smoke，不授权生产实现。
+- `agent-context-evidencepack-l2-scoped-implementation-design-20260702.md`：
+  Context / EvidencePack / RAG boundary 的第三份 L2 scoped implementation
+  design；只定义 AI read boundary、source visibility、denied lanes、citation
+  verifier、taint / redaction / replay-reader、operator gates 和 L3 smoke，不授权生产实现。
 - `agent-eval-replay-l1-acceptance-review-20260702.md`：Eval / Replay
   candidate 的 L1 acceptance review 自评包，建议进入主集成 ADR review，
   但继续 defer production implementation。

@@ -331,6 +331,10 @@ ai/python/tests/test_agent_eval_*.py
   范围只限 cognitive runtime / durable workflow wait owner boundary、checkpoint
   / wakeup、cancel / resume / replay、action-executor handoff、operator / audit
   gates、service-promotion choice 和 L3 smoke plan；不授权生产实现。
+- Context / EvidencePack L2 scoped implementation design：第三份 L2 design 已起草，
+  范围只限 AI read boundary、source visibility、denied / unavailable /
+  expired lanes、citation verifier、taint / redaction / replay-reader policy、
+  operator inspection 和 L3 smoke plan；不授权生产实现。
 - Skeleton completion audit：已把 immutable goal 的 17 个骨架要求映射到当前
   代码、fixture、CLI、tests 和 runbook evidence；结论是 Phase 1 isolated
   Agent-layer skeleton 可作为当前可执行基线，但不能直接推广生产契约。
@@ -345,7 +349,7 @@ ai/python/tests/test_agent_eval_*.py
 | 优先级 | 工作 | 输出 |
 | --- | --- | --- |
 | P1 | Document-driven process | immutable goal 保持稳定，具体阶段与验收条件只维护在 runbook / SDD / research 文档 |
-| P1 | L2 scoped design review | Eval / Replay 和 Runtime / Workflow 等 L2 design 等待 owner review / L3 smoke 决策 |
+| P1 | L2 scoped design review | Eval / Replay、Runtime / Workflow 和 Context / EvidencePack 等 L2 design 等待 owner review / L3 smoke 决策 |
 | P1 | Next scoped design | 如继续架构推进，补 Context / EvidencePack、Memory、Tool / MCP 或 AgentOps 的 L2 design |
 | P2 | ReplayBundle observability hardening review | 如评审要求，继续补 fixture-only taxonomy / trace evidence |
 | P2 | Memory calibration hardening | 仅在需要时继续追加公开数据集导出或 adapter metadata |
